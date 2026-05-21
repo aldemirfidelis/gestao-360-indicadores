@@ -16,6 +16,11 @@ export class UsersController {
     return this.service.list(me.companyId);
   }
 
+  @Get('permissions')
+  permissions() {
+    return this.service.listPermissions();
+  }
+
   @Get(':id')
   byId(@Param('id') id: string) {
     return this.service.getById(id);
@@ -25,6 +30,18 @@ export class UsersController {
   @Post()
   create(@Body(new ZodValidationPipe(userCreateSchema)) input: any) {
     return this.service.create(input);
+  }
+
+  @Roles(UserRoleEnum.COMPANY_ADMIN, UserRoleEnum.SUPER_ADMIN)
+  @Patch(':id')
+  update(@Param('id') id: string, @Body() input: any) {
+    return this.service.update(id, input);
+  }
+
+  @Roles(UserRoleEnum.COMPANY_ADMIN, UserRoleEnum.SUPER_ADMIN)
+  @Patch(':id/permissions')
+  setPermissions(@Param('id') id: string, @Body() body: { permissionKeys: string[] }) {
+    return this.service.setPermissions(id, body.permissionKeys ?? []);
   }
 
   @Roles(UserRoleEnum.COMPANY_ADMIN, UserRoleEnum.SUPER_ADMIN)

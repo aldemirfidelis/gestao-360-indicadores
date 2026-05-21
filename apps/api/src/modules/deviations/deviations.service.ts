@@ -1,6 +1,9 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../../prisma/prisma.service';
 import {
+  ActionOrigin,
+  ActionPriority,
+  ActionStatus,
   AnalysisMethod,
   DeviationSeverity,
   DeviationStatus,
@@ -111,6 +114,51 @@ export class DeviationsService {
     return this.prisma.deviationAnalysis.create({
       data: { deviationId, method, content },
     });
+  }
+
+  async createAction(
+    deviationId: string,
+    createdById: string,
+    body: {
+      title: string;
+      description?: string;
+      responsibleUserId?: string | null;
+      ownerNodeId?: string | null;
+      priority?: 'LOW' | 'MEDIUM' | 'HIGH' | 'CRITICAL';
+      dueDate?: string | null;
+      estimatedCost?: number | null;
+    },
+  ) {
+    const dev = await this.prisma.deviation.findFirst({
+      where: { id: deviationId, deletedAt: null },
+      include: { indicator: { select: { ownerNodeId: true } } },
+    });
+    if (!dev) throw new NotFoundException('Desvio nao encontrado');
+
+    const action = await this.prisma.actionPlan.create({
+      data: {
+        companyId: dev.companyId,
+        deviationId: dev.id,
+        origin: ActionOrigin.DEVIATION,
+        originRefId: dev.id,
+        title: body.title,
+        description: body.description ?? null,
+        responsibleUserId: body.responsibleUserId ?? dev.responsibleUserId ?? null,
+        ownerNodeId: body.ownerNodeId ?? dev.indicator.ownerNodeId ?? null,
+        priority: (body.priority as ActionPriority | undefined) ?? ActionPriority.HIGH,
+        status: ActionStatus.NOT_STARTED,
+        dueDate: body.dueDate ? new Date(body.dueDate) : dev.dueDate,
+        estimatedCost: body.estimatedCost ?? null,
+        createdById,
+      },
+    });
+
+    await this.prisma.deviation.update({
+      where: { id: deviationId },
+      data: { status: DeviationStatus.WAITING_ACTION },
+    });
+
+    return action;
   }
 
   async close(id: string) {

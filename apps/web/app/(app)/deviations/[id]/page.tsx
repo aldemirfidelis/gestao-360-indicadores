@@ -5,7 +5,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useState } from 'react';
 import { toast } from 'sonner';
 import Link from 'next/link';
-import { ArrowLeft, AlertTriangle, Plus, Trash2, CheckCircle2 } from 'lucide-react';
+import { ArrowLeft, Plus, Trash2, CheckCircle2 } from 'lucide-react';
 import { PageHeader } from '@/components/shell/page-header';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -14,6 +14,13 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { NativeSelect } from '@/components/ui/select';
+import {
+  Dialog,
+  DialogContent,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog';
 import { api } from '@/lib/api';
 import { formatDate, periodRefLabel } from '@/lib/utils';
 
@@ -36,6 +43,13 @@ interface Deviation {
   causes: { id: string; category: string | null; description: string; weight: number }[];
   analyses: { id: string; method: string; content: string; createdAt: string }[];
   actions: { id: string; title: string; status: string; responsibleUser: { id: string; name: string } | null }[];
+}
+
+interface UserOption {
+  id: string;
+  name: string;
+  email: string;
+  active?: boolean;
 }
 
 const SEVERITY_LABEL: Record<string, string> = {
@@ -64,6 +78,12 @@ const METHOD_LABEL: Record<string, string> = {
 };
 
 const CAUSE_CATEGORIES = ['Metodo', 'Maquina', 'Mao de obra', 'Material', 'Medida', 'Meio ambiente'];
+const PRIORITY_LABEL: Record<string, string> = {
+  LOW: 'Baixa',
+  MEDIUM: 'Media',
+  HIGH: 'Alta',
+  CRITICAL: 'Critica',
+};
 
 export default function DeviationDetailPage() {
   const { id } = useParams<{ id: string }>();
@@ -74,8 +94,22 @@ export default function DeviationDetailPage() {
     queryFn: () => api<Deviation>(`/deviations/${id}`),
   });
 
+  const usersQuery = useQuery<UserOption[]>({
+    queryKey: ['users', 'deviation-action-picker'],
+    queryFn: () => api<UserOption[]>('/users'),
+  });
+
   const [newCause, setNewCause] = useState({ category: 'Metodo', description: '' });
   const [newAnalysis, setNewAnalysis] = useState({ method: 'FIVE_WHYS', content: '' });
+  const [actionOpen, setActionOpen] = useState(false);
+  const [actionForm, setActionForm] = useState({
+    title: '',
+    description: '',
+    priority: 'HIGH',
+    dueDate: '',
+    responsibleUserId: '',
+    estimatedCost: '',
+  });
 
   const update = useMutation({
     mutationFn: (patch: any) => api(`/deviations/${id}`, { method: 'PATCH', json: patch }),
@@ -103,6 +137,37 @@ export default function DeviationDetailPage() {
     },
   });
 
+  const createAction = useMutation({
+    mutationFn: () =>
+      api(`/deviations/${id}/actions`, {
+        method: 'POST',
+        json: {
+          title: actionForm.title,
+          description: actionForm.description || undefined,
+          priority: actionForm.priority,
+          dueDate: actionForm.dueDate || undefined,
+          responsibleUserId: actionForm.responsibleUserId || undefined,
+          estimatedCost: actionForm.estimatedCost ? Number(actionForm.estimatedCost) : undefined,
+        },
+      }),
+    onSuccess: () => {
+      toast.success('Plano de acao criado e enviado para o Kanban');
+      setActionOpen(false);
+      setActionForm({
+        title: '',
+        description: '',
+        priority: 'HIGH',
+        dueDate: '',
+        responsibleUserId: '',
+        estimatedCost: '',
+      });
+      qc.invalidateQueries({ queryKey: ['deviation', id] });
+      qc.invalidateQueries({ queryKey: ['actions'] });
+      qc.invalidateQueries({ queryKey: ['dashboard'] });
+    },
+    onError: (e: any) => toast.error(e?.message ?? 'Nao foi possivel criar a acao'),
+  });
+
   const close = useMutation({
     mutationFn: () => api(`/deviations/${id}/close`, { method: 'POST' }),
     onSuccess: () => {
@@ -117,6 +182,22 @@ export default function DeviationDetailPage() {
   const d = query.data;
 
   const openActions = d.actions.filter((a) => a.status !== 'DONE' && a.status !== 'DONE_LATE');
+  const users = (usersQuery.data ?? []).filter((u) => u.active !== false);
+  const openActionDialog = () => {
+    setActionForm({
+      title: d.rootCause ? `Tratar causa raiz: ${d.rootCause.slice(0, 80)}` : `Tratar desvio #${d.number} - ${d.title}`,
+      description: [
+        d.fact ? `Fato observado: ${d.fact}` : null,
+        d.rootCause ? `Causa raiz: ${d.rootCause}` : null,
+        d.impact ? `Impacto: ${d.impact}` : null,
+      ].filter(Boolean).join('\n\n'),
+      priority: d.severity === 'CRITICAL' ? 'CRITICAL' : 'HIGH',
+      dueDate: d.dueDate ? d.dueDate.slice(0, 10) : '',
+      responsibleUserId: d.responsibleUser?.id ?? '',
+      estimatedCost: '',
+    });
+    setActionOpen(true);
+  };
 
   return (
     <div>
@@ -312,13 +393,22 @@ export default function DeviationDetailPage() {
       </Card>
 
       <Card className="mt-6">
-        <CardHeader>
-          <CardTitle>Acoes vinculadas ({d.actions.length})</CardTitle>
+        <CardHeader className="flex-row items-start justify-between gap-3 space-y-0">
+          <div>
+            <CardTitle>Acoes vinculadas ({d.actions.length})</CardTitle>
+            <p className="mt-1 text-sm text-muted-foreground">
+              Transforme a analise de causa em plano de acao acompanhavel no Kanban.
+            </p>
+          </div>
+          <Button onClick={openActionDialog}>
+            <Plus className="mr-2 h-4 w-4" />
+            Criar plano de acao
+          </Button>
         </CardHeader>
         <CardContent>
           {d.actions.length === 0 && (
             <p className="text-sm text-muted-foreground">
-              Nenhuma acao vinculada. Crie uma acao na pagina de Planos de Acao indicando este desvio como origem.
+              Nenhuma acao vinculada. Use o botao acima para criar uma acao ja conectada a este desvio.
             </p>
           )}
           <div className="space-y-2">
@@ -342,6 +432,85 @@ export default function DeviationDetailPage() {
           </div>
         </CardContent>
       </Card>
+
+      <Dialog open={actionOpen} onOpenChange={setActionOpen}>
+        <DialogContent className="max-w-2xl">
+          <DialogHeader>
+            <DialogTitle>Criar plano de acao para o desvio</DialogTitle>
+          </DialogHeader>
+          <div className="grid gap-4">
+            <div className="space-y-2">
+              <Label>Titulo *</Label>
+              <Input
+                value={actionForm.title}
+                onChange={(e) => setActionForm({ ...actionForm, title: e.target.value })}
+                placeholder="Ex.: Corrigir causa raiz do indicador"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label>Descricao</Label>
+              <Textarea
+                rows={5}
+                value={actionForm.description}
+                onChange={(e) => setActionForm({ ...actionForm, description: e.target.value })}
+                placeholder="Contexto da causa, evidencia e orientacao da acao..."
+              />
+            </div>
+            <div className="grid gap-3 sm:grid-cols-3">
+              <div className="space-y-2">
+                <Label>Prioridade</Label>
+                <NativeSelect
+                  value={actionForm.priority}
+                  onChange={(e) => setActionForm({ ...actionForm, priority: e.target.value })}
+                >
+                  {Object.entries(PRIORITY_LABEL).map(([key, label]) => (
+                    <option key={key} value={key}>{label}</option>
+                  ))}
+                </NativeSelect>
+              </div>
+              <div className="space-y-2">
+                <Label>Prazo</Label>
+                <Input
+                  type="date"
+                  value={actionForm.dueDate}
+                  onChange={(e) => setActionForm({ ...actionForm, dueDate: e.target.value })}
+                />
+              </div>
+              <div className="space-y-2">
+                <Label>Custo estimado</Label>
+                <Input
+                  type="number"
+                  min="0"
+                  step="0.01"
+                  value={actionForm.estimatedCost}
+                  onChange={(e) => setActionForm({ ...actionForm, estimatedCost: e.target.value })}
+                />
+              </div>
+            </div>
+            <div className="space-y-2">
+              <Label>Responsavel</Label>
+              <NativeSelect
+                value={actionForm.responsibleUserId}
+                onChange={(e) => setActionForm({ ...actionForm, responsibleUserId: e.target.value })}
+              >
+                <option value="">Sem responsavel definido</option>
+                {users.map((u) => (
+                  <option key={u.id} value={u.id}>{u.name}</option>
+                ))}
+              </NativeSelect>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setActionOpen(false)}>Cancelar</Button>
+            <Button
+              onClick={() => createAction.mutate()}
+              disabled={!actionForm.title.trim() || createAction.isPending}
+            >
+              {createAction.isPending ? 'Criando...' : 'Enviar para Planos de Acao'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

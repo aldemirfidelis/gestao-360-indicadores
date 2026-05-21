@@ -73,6 +73,24 @@ export class DeviationsController {
     return this.service.addAnalysis(id, body.method, body.content);
   }
 
+  @Post(':id/actions')
+  createAction(
+    @CurrentUser() me: AuthPayload,
+    @Param('id') id: string,
+    @Body()
+    body: {
+      title: string;
+      description?: string;
+      responsibleUserId?: string | null;
+      ownerNodeId?: string | null;
+      priority?: 'LOW' | 'MEDIUM' | 'HIGH' | 'CRITICAL';
+      dueDate?: string | null;
+      estimatedCost?: number | null;
+    },
+  ) {
+    return this.service.createAction(id, me.sub, body);
+  }
+
   @Post(':id/close')
   close(@Param('id') id: string) {
     return this.service.close(id);

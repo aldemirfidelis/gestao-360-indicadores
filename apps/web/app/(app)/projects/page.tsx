@@ -1,15 +1,29 @@
 'use client';
 
 import Link from 'next/link';
-import { useQuery } from '@tanstack/react-query';
-import { FolderKanban, Plus } from 'lucide-react';
+import { useRouter } from 'next/navigation';
+import { useMemo, useState } from 'react';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { toast } from 'sonner';
+import { AlertTriangle, CheckCircle2, Clock3, FolderKanban, Plus } from 'lucide-react';
 import { PageHeader } from '@/components/shell/page-header';
+import { MetricCard } from '@/components/platform/metric-card';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Badge } from '@/components/ui/badge';
+import {
+  Dialog,
+  DialogContent,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
 import { Progress } from '@/components/ui/progress';
+import { NativeSelect } from '@/components/ui/select';
+import { Textarea } from '@/components/ui/textarea';
 import { api } from '@/lib/api';
-import { formatDate } from '@/lib/utils';
+import { formatDate, formatNumber } from '@/lib/utils';
 import { cn } from '@/lib/utils';
 
 interface Project {
@@ -42,9 +56,62 @@ const STATUS_LABEL: Record<string, string> = {
 };
 
 export default function ProjectsPage() {
+  const router = useRouter();
+  const qc = useQueryClient();
+  const [open, setOpen] = useState(false);
+  const [form, setForm] = useState({
+    name: '',
+    description: '',
+    responsible: '',
+    startsAt: '',
+    endsAt: '',
+    budget: '',
+    status: 'PLANNED' as Project['status'],
+  });
+
   const query = useQuery<Project[]>({
     queryKey: ['projects'],
     queryFn: () => api<Project[]>('/projects'),
+  });
+
+  const projects = useMemo(() => query.data ?? [], [query.data]);
+  const inProgress = projects.filter((p) => p.status === 'IN_PROGRESS').length;
+  const done = projects.filter((p) => p.status === 'DONE').length;
+  const overdue = projects.filter((p) => p.endsAt && new Date(p.endsAt) < new Date() && p.status !== 'DONE').length;
+  const avgProgress = projects.length
+    ? Math.round(projects.reduce((acc, p) => acc + p.progressOverall, 0) / projects.length)
+    : 0;
+
+  const createProject = useMutation({
+    mutationFn: () =>
+      api<Project>('/projects', {
+        method: 'POST',
+        json: {
+          name: form.name,
+          description: form.description || undefined,
+          responsible: form.responsible || undefined,
+          startsAt: form.startsAt || undefined,
+          endsAt: form.endsAt || undefined,
+          budget: form.budget ? Number(form.budget) : undefined,
+          status: form.status,
+        },
+      }),
+    onSuccess: (project) => {
+      toast.success('Projeto criado');
+      setOpen(false);
+      setForm({
+        name: '',
+        description: '',
+        responsible: '',
+        startsAt: '',
+        endsAt: '',
+        budget: '',
+        status: 'PLANNED',
+      });
+      qc.invalidateQueries({ queryKey: ['projects'] });
+      router.push(`/projects/${project.id}`);
+    },
+    onError: (e: any) => toast.error(e?.message ?? 'Nao foi possivel criar o projeto'),
   });
 
   return (
@@ -52,12 +119,19 @@ export default function ProjectsPage() {
       <PageHeader
         title="Projetos"
         description="Iniciativas estrategicas com cronograma, marcos e tarefas."
-        actions={<Button disabled><Plus className="h-4 w-4 mr-2" />Novo projeto</Button>}
+        actions={<Button onClick={() => setOpen(true)}><Plus className="h-4 w-4 mr-2" />Novo projeto</Button>}
       />
+
+      <div className="mb-6 grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
+        <MetricCard title="Projetos ativos" value={formatNumber(inProgress)} description={`${formatNumber(projects.length)} no total`} icon={<FolderKanban className="h-4 w-4" />} tone="blue" />
+        <MetricCard title="Concluidos" value={formatNumber(done)} description="Entregas finalizadas" icon={<CheckCircle2 className="h-4 w-4" />} tone="green" />
+        <MetricCard title="Atrasados" value={formatNumber(overdue)} description="Fim previsto vencido" icon={<AlertTriangle className="h-4 w-4" />} tone="red" />
+        <MetricCard title="Progresso medio" value={`${avgProgress}%`} description="Com base nos marcos" icon={<Clock3 className="h-4 w-4" />} tone="yellow" />
+      </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
         {query.isLoading && <p className="text-sm text-muted-foreground">Carregando...</p>}
-        {query.data?.map((p) => {
+        {projects.map((p) => {
           const late = p.endsAt && new Date(p.endsAt) < new Date() && p.status !== 'DONE';
           return (
             <Link key={p.id} href={`/projects/${p.id}`}>
@@ -89,6 +163,18 @@ export default function ProjectsPage() {
                       <div className="text-foreground">{p._count.milestones}</div>
                     </div>
                   </div>
+                  <div className="mt-3 grid grid-cols-2 gap-3 text-xs text-muted-foreground">
+                    <div>
+                      <div className="text-[10px] uppercase">Responsavel</div>
+                      <div className="truncate text-foreground">{p.responsible ?? 'Nao definido'}</div>
+                    </div>
+                    <div>
+                      <div className="text-[10px] uppercase">Orcamento</div>
+                      <div className="text-foreground">
+                        {p.budget ? formatNumber(p.budget, { style: 'currency', currency: 'BRL' }) : '-'}
+                      </div>
+                    </div>
+                  </div>
                   <div className="mt-3">
                     <div className="flex justify-between text-xs mb-1">
                       <span className="text-muted-foreground">{p._count.tasks} tarefa(s)</span>
@@ -101,14 +187,99 @@ export default function ProjectsPage() {
             </Link>
           );
         })}
-        {!query.isLoading && query.data?.length === 0 && (
+        {!query.isLoading && projects.length === 0 && (
           <Card className="lg:col-span-2">
             <CardContent className="py-10 text-center text-sm text-muted-foreground">
-              Nenhum projeto cadastrado.
+              Nenhum projeto cadastrado. Use o botao Novo projeto para iniciar um cronograma.
             </CardContent>
           </Card>
         )}
       </div>
+
+      <Dialog open={open} onOpenChange={setOpen}>
+        <DialogContent className="max-w-2xl">
+          <DialogHeader>
+            <DialogTitle>Novo projeto</DialogTitle>
+          </DialogHeader>
+          <div className="grid gap-4">
+            <div className="space-y-2">
+              <Label>Nome do projeto *</Label>
+              <Input
+                value={form.name}
+                onChange={(e) => setForm({ ...form, name: e.target.value })}
+                placeholder="Ex.: Implantacao do plano de melhoria operacional"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label>Descricao</Label>
+              <Textarea
+                rows={4}
+                value={form.description}
+                onChange={(e) => setForm({ ...form, description: e.target.value })}
+                placeholder="Escopo, objetivo, entregas esperadas e observacoes..."
+              />
+            </div>
+            <div className="grid gap-3 sm:grid-cols-2">
+              <div className="space-y-2">
+                <Label>Responsavel</Label>
+                <Input
+                  value={form.responsible}
+                  onChange={(e) => setForm({ ...form, responsible: e.target.value })}
+                  placeholder="Nome do responsavel"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label>Status</Label>
+                <NativeSelect
+                  value={form.status}
+                  onChange={(e) => setForm({ ...form, status: e.target.value as Project['status'] })}
+                >
+                  {Object.entries(STATUS_LABEL).map(([key, label]) => (
+                    <option key={key} value={key}>{label}</option>
+                  ))}
+                </NativeSelect>
+              </div>
+            </div>
+            <div className="grid gap-3 sm:grid-cols-3">
+              <div className="space-y-2">
+                <Label>Inicio</Label>
+                <Input
+                  type="date"
+                  value={form.startsAt}
+                  onChange={(e) => setForm({ ...form, startsAt: e.target.value })}
+                />
+              </div>
+              <div className="space-y-2">
+                <Label>Fim previsto</Label>
+                <Input
+                  type="date"
+                  value={form.endsAt}
+                  onChange={(e) => setForm({ ...form, endsAt: e.target.value })}
+                />
+              </div>
+              <div className="space-y-2">
+                <Label>Orcamento</Label>
+                <Input
+                  type="number"
+                  min="0"
+                  step="0.01"
+                  value={form.budget}
+                  onChange={(e) => setForm({ ...form, budget: e.target.value })}
+                />
+              </div>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setOpen(false)}>Cancelar</Button>
+            <Button
+              onClick={() => createProject.mutate()}
+              disabled={!form.name.trim() || createProject.isPending}
+            >
+              {createProject.isPending ? 'Criando...' : 'Criar projeto'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

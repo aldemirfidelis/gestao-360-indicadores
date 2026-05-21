@@ -1,11 +1,13 @@
 'use client';
 
-import { useState, useMemo } from 'react';
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { useMemo, useState } from 'react';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
-import { ChevronRight, Plus, MessageSquare, Target } from 'lucide-react';
+import { ChevronRight, MessageSquare, Plus, Save, Target } from 'lucide-react';
 import { PageHeader } from '@/components/shell/page-header';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { MetricCard } from '@/components/platform/metric-card';
+import { SectionCard } from '@/components/platform/section-card';
+import { StatusBadge } from '@/components/platform/status-badge';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Progress } from '@/components/ui/progress';
@@ -16,12 +18,12 @@ import { NativeSelect } from '@/components/ui/select';
 import {
   Dialog,
   DialogContent,
+  DialogFooter,
   DialogHeader,
   DialogTitle,
-  DialogFooter,
 } from '@/components/ui/dialog';
 import { api } from '@/lib/api';
-import { cn, formatPercent, formatDate } from '@/lib/utils';
+import { cn, formatDate, formatNumber, formatPercent } from '@/lib/utils';
 
 interface Cycle {
   id: string;
@@ -59,15 +61,6 @@ interface Objective {
   _count?: { checkins: number };
 }
 
-const STATUS_PILL: Record<string, string> = {
-  PLANNED: 'pill-gray',
-  ON_TRACK: 'pill-green',
-  AT_RISK: 'pill-yellow',
-  OFF_TRACK: 'pill-red',
-  DONE: 'pill-blue',
-  CANCELLED: 'pill-gray',
-};
-
 const STATUS_LABEL: Record<string, string> = {
   PLANNED: 'Planejado',
   ON_TRACK: 'No prazo',
@@ -77,16 +70,28 @@ const STATUS_LABEL: Record<string, string> = {
   CANCELLED: 'Cancelado',
 };
 
+const emptyCycle = { name: '', startsAt: new Date().toISOString().slice(0, 10), endsAt: `${new Date().getFullYear()}-12-31` };
+const emptyObjective = { name: '', description: '', ownerName: '', team: '', weight: 1 };
+const emptyKr = { objectiveId: '', metric: '', unit: 'PERCENT', startValue: 0, currentValue: 0, targetValue: 100, direction: 'HIGHER_BETTER', weight: 1, responsible: '' };
+
 export default function OkrsPage() {
   const qc = useQueryClient();
   const [activeCycleId, setActiveCycleId] = useState<string | null>(null);
+  const [cycleOpen, setCycleOpen] = useState(false);
+  const [objectiveOpen, setObjectiveOpen] = useState(false);
+  const [krOpen, setKrOpen] = useState(false);
+  const [cycleForm, setCycleForm] = useState(emptyCycle);
+  const [objectiveForm, setObjectiveForm] = useState(emptyObjective);
+  const [krForm, setKrForm] = useState(emptyKr);
+  const [checkinObj, setCheckinObj] = useState<Objective | null>(null);
+  const [checkin, setCheckin] = useState({ confidence: 0.7, progress: 0.5, note: '' });
 
   const cycles = useQuery<Cycle[]>({
     queryKey: ['okrs', 'cycles'],
     queryFn: () => api<Cycle[]>('/okrs/cycles'),
   });
-
   const cycleId = activeCycleId ?? cycles.data?.[0]?.id ?? null;
+  const activeCycle = cycles.data?.find((c) => c.id === cycleId);
 
   const objectives = useQuery<Objective[]>({
     queryKey: ['okrs', 'objectives', cycleId],
@@ -94,9 +99,36 @@ export default function OkrsPage() {
     enabled: !!cycleId,
   });
 
-  // Check-in modal
-  const [checkinObj, setCheckinObj] = useState<Objective | null>(null);
-  const [checkin, setCheckin] = useState({ confidence: 0.7, progress: 0.5, note: '' });
+  const createCycle = useMutation({
+    mutationFn: () => api<Cycle>('/okrs/cycles', { method: 'POST', json: cycleForm }),
+    onSuccess: (created) => {
+      toast.success('Ciclo criado');
+      setCycleOpen(false);
+      setCycleForm(emptyCycle);
+      setActiveCycleId(created.id);
+      qc.invalidateQueries({ queryKey: ['okrs', 'cycles'] });
+    },
+  });
+
+  const createObjective = useMutation({
+    mutationFn: () => api(`/okrs/cycles/${cycleId}/objectives`, { method: 'POST', json: objectiveForm }),
+    onSuccess: () => {
+      toast.success('Objetivo criado');
+      setObjectiveOpen(false);
+      setObjectiveForm(emptyObjective);
+      qc.invalidateQueries({ queryKey: ['okrs'] });
+    },
+  });
+
+  const createKr = useMutation({
+    mutationFn: () => api(`/okrs/objectives/${krForm.objectiveId}/krs`, { method: 'POST', json: krForm }),
+    onSuccess: () => {
+      toast.success('KR criado');
+      setKrOpen(false);
+      setKrForm(emptyKr);
+      qc.invalidateQueries({ queryKey: ['okrs'] });
+    },
+  });
 
   const submitCheckin = useMutation({
     mutationFn: () =>
@@ -116,188 +148,270 @@ export default function OkrsPage() {
     },
   });
 
-  // KR update inline
   const updateKR = useMutation({
     mutationFn: ({ krId, currentValue }: { krId: string; currentValue: number }) =>
       api(`/okrs/krs/${krId}`, { method: 'PATCH', json: { currentValue } }),
     onSuccess: () => qc.invalidateQueries({ queryKey: ['okrs', 'objectives'] }),
   });
 
+  const stats = useMemo(() => {
+    const list = objectives.data ?? [];
+    const krs = list.reduce((acc, obj) => acc + obj.keyResults.length, 0);
+    const progress = list.length ? list.reduce((acc, obj) => acc + obj.progress, 0) / list.length : 0;
+    const risk = list.filter((obj) => ['AT_RISK', 'OFF_TRACK'].includes(obj.status)).length;
+    return { objectives: list.length, krs, progress, risk };
+  }, [objectives.data]);
+
   return (
     <div>
       <PageHeader
+        eyebrow="Visualizacao"
+        tone="view"
         title="OKRs"
-        description="Objetivos e Key Results por ciclo, com calculo de progresso e confianca."
-        actions={<Button disabled><Plus className="h-4 w-4 mr-2" />Novo ciclo</Button>}
+        description="Ciclos objetivos: crie o ciclo, defina objetivos, adicione KRs e registre check-ins semanais."
+        breadcrumbs={[{ label: 'Inicio', href: '/' }, { label: 'Visualizacao', href: '/visualization' }, { label: 'OKRs' }]}
+        actions={
+          <>
+            <Button variant="outline" onClick={() => setCycleOpen(true)}>
+              <Plus className="mr-2 h-4 w-4" />
+              Novo ciclo
+            </Button>
+            <Button onClick={() => setObjectiveOpen(true)} disabled={!cycleId}>
+              <Plus className="mr-2 h-4 w-4" />
+              Novo objetivo
+            </Button>
+          </>
+        }
       />
 
-      <div className="flex flex-wrap gap-2 mb-6">
+      <div className="mb-6 flex flex-wrap gap-2">
         {cycles.data?.map((c) => (
-          <Button
-            key={c.id}
-            variant={c.id === cycleId ? 'default' : 'outline'}
-            size="sm"
-            onClick={() => setActiveCycleId(c.id)}
-          >
+          <Button key={c.id} variant={c.id === cycleId ? 'default' : 'outline'} size="sm" onClick={() => setActiveCycleId(c.id)}>
             {c.name}
             <Badge variant="secondary" className="ml-2">{c._count.objectives}</Badge>
           </Button>
         ))}
       </div>
 
+      <div className="mb-6 grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
+        <MetricCard title="Ciclo ativo" value={activeCycle?.name ?? '-'} description={activeCycle ? `${formatDate(activeCycle.startsAt)} - ${formatDate(activeCycle.endsAt)}` : 'Crie um ciclo'} tone="blue" />
+        <MetricCard title="Objetivos" value={formatNumber(stats.objectives)} description="No ciclo selecionado" icon={<Target className="h-4 w-4" />} tone="purple" />
+        <MetricCard title="Key Results" value={formatNumber(stats.krs)} description="Metrica de resultado" icon={<Target className="h-4 w-4" />} tone="green" />
+        <MetricCard title="Progresso medio" value={formatPercent(stats.progress)} description={`${stats.risk} em risco`} icon={<Target className="h-4 w-4" />} tone="yellow" />
+      </div>
+
       <div className="grid gap-4">
-        {objectives.isLoading && <p className="text-sm text-muted-foreground">Carregando...</p>}
         {objectives.data?.map((o) => (
-          <Card key={o.id}>
-            <CardContent className="p-5">
-              <div className="flex flex-col lg:flex-row lg:items-start gap-4 mb-4">
-                <div className="flex-1 min-w-0">
-                  <div className="flex flex-wrap items-center gap-2 mb-1">
-                    <span className={cn('pill', STATUS_PILL[o.status])}>{STATUS_LABEL[o.status]}</span>
-                    {o.strategicObj && (
-                      <Badge variant="outline" className="text-[10px]">
-                        BSC: {o.strategicObj.name}
-                      </Badge>
-                    )}
-                    {o.team && <Badge variant="secondary" className="text-[10px]">{o.team}</Badge>}
-                  </div>
-                  <h3 className="font-semibold">{o.name}</h3>
-                  {o.description && <p className="text-sm text-muted-foreground mt-1">{o.description}</p>}
-                </div>
-                <div className="grid grid-cols-2 gap-6 text-right">
-                  <div>
-                    <div className="text-[11px] uppercase text-muted-foreground">Progresso</div>
-                    <div className="text-xl font-semibold">{formatPercent(o.progress)}</div>
-                  </div>
-                  <div>
-                    <div className="text-[11px] uppercase text-muted-foreground">Confianca</div>
-                    <div className="text-xl font-semibold">{formatPercent(o.confidence)}</div>
-                  </div>
-                </div>
-              </div>
-
-              <Progress value={o.progress * 100} className="mb-4" />
-
-              <div className="space-y-2">
-                {o.keyResults.map((kr) => (
-                  <div
-                    key={kr.id}
-                    className="grid grid-cols-1 sm:grid-cols-[1fr,140px,140px,1fr] gap-3 items-center rounded-md border p-2"
-                  >
-                    <div className="text-sm">
-                      <div className="font-medium flex items-center gap-2">
-                        <Target className="h-3 w-3 text-muted-foreground" />
-                        {kr.metric}
-                      </div>
-                      <div className="text-[11px] text-muted-foreground">
-                        {kr.direction === 'HIGHER_BETTER' ? 'subir' : kr.direction === 'LOWER_BETTER' ? 'reduzir' : 'manter'}{' '}
-                        - peso {kr.weight}
-                      </div>
-                    </div>
-                    <div className="text-xs text-muted-foreground">
-                      Inicio <strong className="text-foreground">{kr.startValue}</strong>
-                    </div>
-                    <div className="text-xs text-muted-foreground">
-                      Meta <strong className="text-foreground">{kr.targetValue}</strong>
-                    </div>
-                    <div className="flex items-center gap-3">
-                      <Input
-                        type="number"
-                        defaultValue={kr.currentValue}
-                        className="h-8 w-24"
-                        step="0.01"
-                        onBlur={(e) => {
-                          const v = Number(e.target.value);
-                          if (!Number.isFinite(v) || v === kr.currentValue) return;
-                          updateKR.mutate({ krId: kr.id, currentValue: v });
-                        }}
-                      />
-                      <div className="flex-1">
-                        <Progress value={kr.progress * 100} className="h-2" />
-                      </div>
-                      <span className="text-xs text-muted-foreground w-12 text-right">
-                        {formatPercent(kr.progress)}
-                      </span>
-                    </div>
-                  </div>
-                ))}
-              </div>
-
-              <div className="flex justify-between items-center mt-4">
-                <span className="text-xs text-muted-foreground">
-                  {o._count?.checkins ?? 0} check-in(s)
-                </span>
+          <SectionCard
+            key={o.id}
+            title={o.name}
+            description={o.description ?? `${o.ownerName ?? 'Sem owner'}${o.team ? ` - ${o.team}` : ''}`}
+            actions={
+              <div className="flex flex-wrap gap-2">
+                <StatusBadge value={o.status} label={STATUS_LABEL[o.status] ?? o.status} />
                 <Button
                   variant="outline"
                   size="sm"
                   onClick={() => {
-                    setCheckinObj(o);
-                    setCheckin({ confidence: o.confidence, progress: o.progress, note: '' });
+                    setKrForm({ ...emptyKr, objectiveId: o.id });
+                    setKrOpen(true);
                   }}
                 >
-                  <MessageSquare className="h-4 w-4 mr-2" /> Check-in
+                  <Plus className="mr-2 h-4 w-4" />
+                  KR
                 </Button>
               </div>
-            </CardContent>
-          </Card>
+            }
+          >
+            <div className="mb-4 grid grid-cols-2 gap-4 lg:grid-cols-4">
+              <div>
+                <div className="text-xs text-muted-foreground">Progresso</div>
+                <div className="text-xl font-semibold">{formatPercent(o.progress)}</div>
+              </div>
+              <div>
+                <div className="text-xs text-muted-foreground">Confianca</div>
+                <div className="text-xl font-semibold">{formatPercent(o.confidence)}</div>
+              </div>
+              <div>
+                <div className="text-xs text-muted-foreground">Peso</div>
+                <div className="text-xl font-semibold">{o.weight}</div>
+              </div>
+              <div>
+                <div className="text-xs text-muted-foreground">Check-ins</div>
+                <div className="text-xl font-semibold">{o._count?.checkins ?? 0}</div>
+              </div>
+            </div>
+            <Progress value={o.progress * 100} className="mb-4" />
+            <div className="space-y-2">
+              {o.keyResults.map((kr) => (
+                <div key={kr.id} className="grid grid-cols-1 gap-3 rounded-lg border p-3 lg:grid-cols-[1fr,120px,120px,1fr] lg:items-center">
+                  <div>
+                    <div className="font-medium">{kr.metric}</div>
+                    <div className="text-xs text-muted-foreground">peso {kr.weight} - {kr.direction}</div>
+                  </div>
+                  <div className="text-xs text-muted-foreground">Inicio <strong className="text-foreground">{kr.startValue}</strong></div>
+                  <div className="text-xs text-muted-foreground">Meta <strong className="text-foreground">{kr.targetValue}</strong></div>
+                  <div className="flex items-center gap-3">
+                    <Input
+                      type="number"
+                      defaultValue={kr.currentValue}
+                      className="h-8 w-24"
+                      step="0.01"
+                      onBlur={(e) => {
+                        const v = Number(e.target.value);
+                        if (!Number.isFinite(v) || v === kr.currentValue) return;
+                        updateKR.mutate({ krId: kr.id, currentValue: v });
+                      }}
+                    />
+                    <Progress value={kr.progress * 100} className="h-2 flex-1" />
+                    <span className="w-14 text-right text-xs text-muted-foreground">{formatPercent(kr.progress)}</span>
+                  </div>
+                </div>
+              ))}
+              {o.keyResults.length === 0 && <div className="rounded-lg border border-dashed p-4 text-sm text-muted-foreground">Adicione KRs para calcular o progresso automaticamente.</div>}
+            </div>
+            <div className="mt-4 flex justify-end">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => {
+                  setCheckinObj(o);
+                  setCheckin({ confidence: o.confidence, progress: o.progress, note: '' });
+                }}
+              >
+                <MessageSquare className="mr-2 h-4 w-4" />
+                Check-in
+              </Button>
+            </div>
+          </SectionCard>
         ))}
-        {!objectives.isLoading && objectives.data?.length === 0 && (
-          <Card>
-            <CardContent className="py-10 text-center text-sm text-muted-foreground">
-              Nenhum objetivo neste ciclo.
-            </CardContent>
-          </Card>
-        )}
       </div>
+
+      <Dialog open={cycleOpen} onOpenChange={setCycleOpen}>
+        <DialogContent>
+          <DialogHeader><DialogTitle>Novo ciclo OKR</DialogTitle></DialogHeader>
+          <div className="space-y-3">
+            <div>
+              <Label>Nome</Label>
+              <Input value={cycleForm.name} onChange={(e) => setCycleForm({ ...cycleForm, name: e.target.value })} placeholder="Ex.: OKR 2026 T1" />
+            </div>
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <Label>Inicio</Label>
+                <Input type="date" value={cycleForm.startsAt} onChange={(e) => setCycleForm({ ...cycleForm, startsAt: e.target.value })} />
+              </div>
+              <div>
+                <Label>Fim</Label>
+                <Input type="date" value={cycleForm.endsAt} onChange={(e) => setCycleForm({ ...cycleForm, endsAt: e.target.value })} />
+              </div>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="ghost" onClick={() => setCycleOpen(false)}>Cancelar</Button>
+            <Button onClick={() => createCycle.mutate()} disabled={!cycleForm.name || createCycle.isPending}>Criar ciclo</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={objectiveOpen} onOpenChange={setObjectiveOpen}>
+        <DialogContent>
+          <DialogHeader><DialogTitle>Novo objetivo</DialogTitle></DialogHeader>
+          <div className="space-y-3">
+            <div>
+              <Label>Objetivo</Label>
+              <Input value={objectiveForm.name} onChange={(e) => setObjectiveForm({ ...objectiveForm, name: e.target.value })} />
+            </div>
+            <div>
+              <Label>Descricao</Label>
+              <Textarea value={objectiveForm.description} onChange={(e) => setObjectiveForm({ ...objectiveForm, description: e.target.value })} />
+            </div>
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <Label>Owner</Label>
+                <Input value={objectiveForm.ownerName} onChange={(e) => setObjectiveForm({ ...objectiveForm, ownerName: e.target.value })} />
+              </div>
+              <div>
+                <Label>Time</Label>
+                <Input value={objectiveForm.team} onChange={(e) => setObjectiveForm({ ...objectiveForm, team: e.target.value })} />
+              </div>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="ghost" onClick={() => setObjectiveOpen(false)}>Cancelar</Button>
+            <Button onClick={() => createObjective.mutate()} disabled={!objectiveForm.name || !cycleId || createObjective.isPending}>
+              <Save className="mr-2 h-4 w-4" />
+              Criar objetivo
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={krOpen} onOpenChange={setKrOpen}>
+        <DialogContent>
+          <DialogHeader><DialogTitle>Novo Key Result</DialogTitle></DialogHeader>
+          <div className="space-y-3">
+            <div>
+              <Label>Metrica</Label>
+              <Input value={krForm.metric} onChange={(e) => setKrForm({ ...krForm, metric: e.target.value })} />
+            </div>
+            <div className="grid grid-cols-3 gap-3">
+              <div>
+                <Label>Inicio</Label>
+                <Input type="number" value={krForm.startValue} onChange={(e) => setKrForm({ ...krForm, startValue: Number(e.target.value) })} />
+              </div>
+              <div>
+                <Label>Atual</Label>
+                <Input type="number" value={krForm.currentValue} onChange={(e) => setKrForm({ ...krForm, currentValue: Number(e.target.value) })} />
+              </div>
+              <div>
+                <Label>Meta</Label>
+                <Input type="number" value={krForm.targetValue} onChange={(e) => setKrForm({ ...krForm, targetValue: Number(e.target.value) })} />
+              </div>
+            </div>
+            <div>
+              <Label>Direcao</Label>
+              <NativeSelect value={krForm.direction} onChange={(e) => setKrForm({ ...krForm, direction: e.target.value })}>
+                <option value="HIGHER_BETTER">Quanto maior, melhor</option>
+                <option value="LOWER_BETTER">Quanto menor, melhor</option>
+                <option value="EQUAL_TARGET">Igual a meta</option>
+              </NativeSelect>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="ghost" onClick={() => setKrOpen(false)}>Cancelar</Button>
+            <Button onClick={() => createKr.mutate()} disabled={!krForm.metric || createKr.isPending}>
+              <ChevronRight className="mr-2 h-4 w-4" />
+              Criar KR
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       <Dialog open={!!checkinObj} onOpenChange={(v) => !v && setCheckinObj(null)}>
         <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Check-in semanal</DialogTitle>
-          </DialogHeader>
+          <DialogHeader><DialogTitle>Check-in semanal</DialogTitle></DialogHeader>
           {checkinObj && (
             <div className="space-y-4">
               <p className="text-sm font-medium">{checkinObj.name}</p>
               <div>
                 <Label>Confianca ({Math.round(checkin.confidence * 100)}%)</Label>
-                <input
-                  type="range"
-                  min={0}
-                  max={1}
-                  step={0.05}
-                  value={checkin.confidence}
-                  onChange={(e) => setCheckin({ ...checkin, confidence: Number(e.target.value) })}
-                  className="w-full"
-                />
+                <input type="range" min={0} max={1} step={0.05} value={checkin.confidence} onChange={(e) => setCheckin({ ...checkin, confidence: Number(e.target.value) })} className="w-full" />
               </div>
               <div>
                 <Label>Progresso ({Math.round(checkin.progress * 100)}%)</Label>
-                <input
-                  type="range"
-                  min={0}
-                  max={1}
-                  step={0.05}
-                  value={checkin.progress}
-                  onChange={(e) => setCheckin({ ...checkin, progress: Number(e.target.value) })}
-                  className="w-full"
-                />
+                <input type="range" min={0} max={1} step={0.05} value={checkin.progress} onChange={(e) => setCheckin({ ...checkin, progress: Number(e.target.value) })} className="w-full" />
               </div>
               <div>
-                <Label>Comentario (opcional)</Label>
-                <Textarea
-                  value={checkin.note}
-                  onChange={(e) => setCheckin({ ...checkin, note: e.target.value })}
-                  rows={3}
-                />
+                <Label>Comentario</Label>
+                <Textarea value={checkin.note} onChange={(e) => setCheckin({ ...checkin, note: e.target.value })} rows={3} />
               </div>
             </div>
           )}
           <DialogFooter>
-            <Button variant="ghost" onClick={() => setCheckinObj(null)}>
-              Cancelar
-            </Button>
+            <Button variant="ghost" onClick={() => setCheckinObj(null)}>Cancelar</Button>
             <Button onClick={() => submitCheckin.mutate()} disabled={submitCheckin.isPending}>
-              <ChevronRight className="h-4 w-4 mr-2" /> Registrar
+              <ChevronRight className="mr-2 h-4 w-4" />
+              Registrar
             </Button>
           </DialogFooter>
         </DialogContent>
