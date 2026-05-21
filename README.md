@@ -67,22 +67,38 @@ Para abrir uma versao navegavel, imprimir em PDF ou baixar os diagramas em SVG, 
 
 ## Deploy em producao
 
-Para subir em **DigitalOcean App Platform + Neon Postgres** (~$10/mes), veja **[DEPLOY.md](./DEPLOY.md)**:
+Dois caminhos suportados, **ambos** usando Neon Postgres como banco:
+
+### Opcao A (recomendada) — Droplet DigitalOcean (~$6/mes)
+VM Linux gerenciada por voce, Caddy fazendo proxy reverso com SSL automatico. Veja **[DEPLOY-DROPLET.md](./DEPLOY-DROPLET.md)**.
 
 ```bash
 # Resumo:
-# 1. Crie projeto no Neon, copie DATABASE_URL (pooler) e DIRECT_URL (direto)
-# 2. Suba o repo no GitHub
-# 3. Edite .do/app.yaml (troque REPO_OWNER/REPO_NAME)
-# 4. doctl apps create --spec .do/app.yaml
-# 5. Configure secrets (DATABASE_URL, DIRECT_URL, JWT_*_SECRET)
+# 1. Criar Droplet $6 Ubuntu 24.04 + SSH key
+# 2. ssh root@IP
+# 3. curl -fsSL https://raw.githubusercontent.com/aldemirfidelis/gestao-360-indicadores/main/scripts/setup-droplet.sh | bash
+# 4. nano /opt/gestao-360-indicadores/.env  (cole URLs Neon + JWT secrets)
+# 5. cd /opt/gestao-360-indicadores && bash scripts/deploy.sh
+# 6. http://IP
 ```
 
-A stack inclui:
-- `Dockerfile` multi-stage em `apps/api/` e `apps/web/`
-- Spec do DO App Platform em `.do/app.yaml`
-- `.env.production.example` com placeholders Neon
-- Prisma configurado com `directUrl` (pgbouncer-safe) e `binaryTargets` Alpine
+### Opcao B — DigitalOcean App Platform (~$10/mes)
+Plataforma cuida de build/deploy/SSL/escala. Veja **[DEPLOY.md](./DEPLOY.md)**.
+
+```bash
+# 1. Editar .do/app.yaml (ja com repo aldemirfidelis/gestao-360-indicadores)
+# 2. doctl apps create --spec .do/app.yaml
+# 3. Configurar secrets no painel
+```
+
+### Stack de deploy ja pronta:
+- `Dockerfile` multi-stage para API e Web (Alpine, ~80MB Web standalone)
+- `docker-compose.droplet.yml` (API + Web + Caddy) e `.do/app.yaml` (App Platform)
+- `Caddyfile` (proxy reverso, SSL Let's Encrypt automatico quando voce tiver dominio)
+- `scripts/setup-droplet.sh` (provisiona Droplet zerada em 3 min)
+- `scripts/deploy.sh` + `Makefile` (deploy / logs / restart / migrate / seed)
+- `.env.droplet.example` e `.env.production.example` (templates)
+- Prisma com `directUrl` (pgbouncer-safe) e `binaryTargets` Alpine
 
 **Credenciais demo:**
 - `admin@demo.com` / `admin123` (admin completo)

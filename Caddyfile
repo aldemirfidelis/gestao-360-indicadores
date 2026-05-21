@@ -1,0 +1,68 @@
+# =====================================================
+# Caddy - Proxy Reverso (Droplet DigitalOcean)
+# =====================================================
+# - Sem dominio: usa :80 (HTTP apenas)
+# - Com dominio: troque ':80' por 'seu-dominio.com' e Caddy
+#   emite SSL automaticamente via Let's Encrypt
+# =====================================================
+
+# === MODO IP-ONLY (default) ===
+# Quando tiver dominio:
+#   1. Aponte o A-record do seu dominio para o IP da Droplet
+#   2. Substitua ':80' abaixo por 'seu-dominio.com'
+#   3. (Opcional) Adicione: tls seu-email@dominio.com  // dentro do bloco
+#   4. Recarregue: docker compose -f docker-compose.droplet.yml restart caddy
+:80 {
+    # Limites de upload (importacao CSV, evidencias)
+    request_body {
+        max_size 50MB
+    }
+
+    # Compressao
+    encode zstd gzip
+
+    # Logs estruturados em stdout (vai pro docker logs)
+    log {
+        output stdout
+        format console
+    }
+
+    # === Roteamento ===
+
+    # API: tudo que comeca com /api -> container api
+    # Preserva o path completo (a API tem global prefix 'api')
+    handle /api/* {
+        reverse_proxy api:3333 {
+            header_up X-Real-IP {remote_host}
+            header_up X-Forwarded-For {remote_host}
+            header_up X-Forwarded-Proto {scheme}
+        }
+    }
+
+    # Tudo o mais -> Next.js (web)
+    handle {
+        reverse_proxy web:3000 {
+            header_up X-Real-IP {remote_host}
+            header_up X-Forwarded-For {remote_host}
+            header_up X-Forwarded-Proto {scheme}
+        }
+    }
+}
+
+# =====================================================
+# Exemplo com dominio (descomente quando aplicavel)
+# =====================================================
+# gestao.suaempresa.com.br {
+#     tls aldemir.fidelis@gmail.com
+#
+#     request_body { max_size 50MB }
+#     encode zstd gzip
+#     log { output stdout format console }
+#
+#     handle /api/* {
+#         reverse_proxy api:3333
+#     }
+#     handle {
+#         reverse_proxy web:3000
+#     }
+# }

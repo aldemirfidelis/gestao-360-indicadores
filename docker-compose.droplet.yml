@@ -1,0 +1,101 @@
+# =====================================================
+# Docker Compose para Droplet DigitalOcean (producao)
+# - API + Web + Caddy (proxy reverso com SSL automatico)
+# - Banco fica no Neon (nao sobe Postgres local)
+# - Variaveis sensiveis vem de /opt/gestao-360-indicadores/.env
+# =====================================================
+
+services:
+  api:
+    build:
+      context: .
+      dockerfile: apps/api/Dockerfile
+    image: g360-api:latest
+    container_name: g360-api
+    restart: unless-stopped
+    env_file:
+      - .env
+    environment:
+      NODE_ENV: production
+      PORT: "3333"
+      API_PREFIX: api
+    networks:
+      - g360
+    expose:
+      - "3333"
+    healthcheck:
+      test: ["CMD", "node", "-e", "require('http').get('http://localhost:3333/api/health',r=>process.exit(r.statusCode===200?0:1)).on('error',()=>process.exit(1))"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 40s
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+  web:
+    build:
+      context: .
+      dockerfile: apps/web/Dockerfile
+      args:
+        # NEXT_PUBLIC_* precisa estar no build (Next inlina)
+        NEXT_PUBLIC_API_URL: /api
+        NEXT_PUBLIC_APP_NAME: "Gestao 360 Indicadores"
+    image: g360-web:latest
+    container_name: g360-web
+    restart: unless-stopped
+    environment:
+      NODE_ENV: production
+      PORT: "3000"
+      HOSTNAME: "0.0.0.0"
+    networks:
+      - g360
+    expose:
+      - "3000"
+    depends_on:
+      api:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "node", "-e", "require('http').get('http://localhost:3000/login',r=>process.exit(r.statusCode<500?0:1)).on('error',()=>process.exit(1))"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 30s
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+  caddy:
+    image: caddy:2-alpine
+    container_name: g360-caddy
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+      - "443:443/udp"
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+    networks:
+      - g360
+    depends_on:
+      - api
+      - web
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+networks:
+  g360:
+    driver: bridge
+
+volumes:
+  caddy_data:
+  caddy_config:
