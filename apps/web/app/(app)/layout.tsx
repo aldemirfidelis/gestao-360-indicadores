@@ -3,21 +3,27 @@
 import { ReactNode } from 'react';
 import { Sidebar } from '@/components/shell/sidebar';
 import { Topbar } from '@/components/shell/topbar';
+import { MobileNav } from '@/components/shell/mobile-nav';
 import { useAuth } from '@/components/auth/auth-provider';
 
 export default function AppLayout({ children }: { children: ReactNode }) {
   const { user, loading } = useAuth();
   if (loading) {
-    return <div className="min-h-screen grid place-items-center text-sm text-muted-foreground">Carregando...</div>;
+    return (
+      <div className="enterprise-shell grid min-h-screen place-items-center text-sm text-muted-foreground">
+        <div className="rounded-lg border bg-card px-5 py-4 shadow-sm">Carregando Gestao 360...</div>
+      </div>
+    );
   }
   if (!user) return null;
   return (
-    <div className="flex min-h-screen">
+    <div className="enterprise-shell flex min-h-screen">
       <Sidebar />
       <div className="flex flex-1 flex-col min-w-0">
         <Topbar />
-        <main className="flex-1 overflow-y-auto p-6 lg:p-8">{children}</main>
+        <main className="flex-1 overflow-y-auto px-4 py-5 pb-24 sm:px-6 lg:px-8 lg:py-7">{children}</main>
       </div>
+      <MobileNav />
     </div>
   );
 }

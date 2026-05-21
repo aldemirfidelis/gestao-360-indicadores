@@ -1,26 +1,26 @@
 'use client';
 
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { useMemo } from 'react';
+import Link from 'next/link';
+import { useMemo, useState } from 'react';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
-import { Clock, User } from 'lucide-react';
+import { AlertTriangle, CalendarDays, ClipboardList, Columns3, List, Plus, UserRound } from 'lucide-react';
 import { PageHeader } from '@/components/shell/page-header';
-import { Card, CardContent } from '@/components/ui/card';
+import { MetricCard } from '@/components/platform/metric-card';
+import { ActionPlanCard, type ActionPlanCardData } from '@/components/platform/action-plan-card';
+import { EmptyState } from '@/components/platform/empty-state';
+import { LoadingState } from '@/components/platform/loading-state';
+import { SectionCard } from '@/components/platform/section-card';
+import { StatusBadge } from '@/components/platform/status-badge';
+import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
+import { Progress } from '@/components/ui/progress';
 import { api } from '@/lib/api';
-import { cn, formatDate } from '@/lib/utils';
+import { cn, formatDate, formatNumber } from '@/lib/utils';
 
-interface Action {
-  id: string;
-  title: string;
-  description: string | null;
+interface Action extends ActionPlanCardData {
   status: 'NOT_STARTED' | 'IN_PROGRESS' | 'WAITING_THIRD' | 'PAUSED' | 'DONE' | 'DONE_LATE' | 'CANCELLED';
   priority: 'LOW' | 'MEDIUM' | 'HIGH' | 'CRITICAL';
-  origin: string;
-  dueDate: string | null;
-  progress: number;
-  responsibleUser: { id: string; name: string } | null;
-  ownerNode: { id: string; name: string } | null;
 }
 
 const STATUS_LABEL: Record<Action['status'], string> = {
@@ -35,29 +35,32 @@ const STATUS_LABEL: Record<Action['status'], string> = {
 
 const COLUMNS: Action['status'][] = ['NOT_STARTED', 'IN_PROGRESS', 'WAITING_THIRD', 'DONE'];
 
-const PRI: Record<Action['priority'], string> = {
-  LOW: 'border-l-status-gray',
-  MEDIUM: 'border-l-status-blue',
-  HIGH: 'border-l-status-yellow',
-  CRITICAL: 'border-l-status-red',
-};
+type ViewMode = 'kanban' | 'list' | 'timeline';
 
 export default function ActionsPage() {
   const qc = useQueryClient();
+  const [view, setView] = useState<ViewMode>('kanban');
+
   const query = useQuery<Action[]>({
     queryKey: ['actions'],
     queryFn: () => api<Action[]>('/actions'),
   });
 
+  const actions = useMemo(() => query.data ?? [], [query.data]);
   const byCol = useMemo(() => {
     const map = new Map<Action['status'], Action[]>();
     COLUMNS.forEach((c) => map.set(c, []));
-    (query.data ?? []).forEach((a) => {
+    actions.forEach((a) => {
       if (!map.has(a.status)) map.set(a.status, []);
       map.get(a.status)!.push(a);
     });
     return map;
-  }, [query.data]);
+  }, [actions]);
+
+  const overdue = actions.filter((a) => isOverdue(a)).length;
+  const done = actions.filter((a) => ['DONE', 'DONE_LATE'].includes(a.status)).length;
+  const critical = actions.filter((a) => a.priority === 'CRITICAL').length;
+  const avgProgress = actions.length ? Math.round(actions.reduce((acc, a) => acc + a.progress, 0) / actions.length) : 0;
 
   const changeStatus = useMutation({
     mutationFn: ({ id, status }: { id: string; status: Action['status'] }) =>
@@ -72,90 +75,161 @@ export default function ActionsPage() {
   return (
     <div>
       <PageHeader
-        title="Planos de Acao"
-        description="Kanban de acoes geradas de desvios, indicadores e iniciativas estrategicas."
+        eyebrow="Lancamentos"
+        tone="launch"
+        title="Planos de acao"
+        description="Gestao operacional de acoes por status, responsavel, prazo, prioridade, progresso e origem."
+        breadcrumbs={[{ label: 'Inicio', href: '/' }, { label: 'Lancamentos', href: '/launches' }, { label: 'Planos de acao' }]}
+        actions={
+          <>
+            <div className="inline-flex rounded-lg border bg-card p-1">
+              {[
+                ['kanban', Columns3, 'Kanban'],
+                ['list', List, 'Lista'],
+                ['timeline', CalendarDays, 'Cronograma'],
+              ].map(([key, Icon, label]) => {
+                const I = Icon as typeof Columns3;
+                return (
+                  <Button
+                    key={String(key)}
+                    variant={view === key ? 'default' : 'ghost'}
+                    size="sm"
+                    onClick={() => setView(key as ViewMode)}
+                  >
+                    <I className="mr-2 h-4 w-4" />
+                    {String(label)}
+                  </Button>
+                );
+              })}
+            </div>
+            <Button disabled>
+              <Plus className="mr-2 h-4 w-4" />
+              Nova acao
+            </Button>
+          </>
+        }
       />
 
-      <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4">
-        {COLUMNS.map((col) => {
-          const items = byCol.get(col) ?? [];
-          return (
-            <div key={col} className="bg-muted/40 rounded-lg p-3 min-h-[300px]">
-              <div className="flex items-center justify-between mb-3 px-1">
-                <span className="text-sm font-semibold">{STATUS_LABEL[col]}</span>
-                <Badge variant="secondary">{items.length}</Badge>
-              </div>
-              <div className="space-y-3">
-                {items.map((a) => {
-                  const isOverdue =
-                    a.dueDate &&
-                    new Date(a.dueDate) < new Date() &&
-                    a.status !== 'DONE' &&
-                    a.status !== 'DONE_LATE';
-                  return (
-                    <Card
-                      key={a.id}
-                      className={cn('border-l-4 hover:shadow-md transition-shadow', PRI[a.priority])}
-                    >
-                      <CardContent className="p-3">
-                        <div className="text-sm font-medium leading-tight mb-2">{a.title}</div>
-                        {a.description && (
-                          <p className="text-xs text-muted-foreground line-clamp-2 mb-2">{a.description}</p>
-                        )}
-                        <div className="h-1.5 w-full bg-muted rounded-full overflow-hidden mb-2">
-                          <div
-                            className={cn(
-                              'h-full',
-                              a.progress >= 100
-                                ? 'bg-status-green'
-                                : a.progress >= 50
-                                  ? 'bg-status-blue'
-                                  : 'bg-status-yellow',
-                            )}
-                            style={{ width: `${Math.min(100, a.progress)}%` }}
-                          />
-                        </div>
-                        <div className="flex items-center justify-between text-[11px] text-muted-foreground">
-                          <span className="flex items-center gap-1 truncate">
-                            <User className="h-3 w-3" />
-                            {a.responsibleUser?.name ?? 'Sem responsavel'}
-                          </span>
-                          <span
-                            className={cn(
-                              'flex items-center gap-1',
-                              isOverdue && 'text-status-red font-medium',
-                            )}
-                          >
-                            <Clock className="h-3 w-3" />
-                            {formatDate(a.dueDate)}
-                          </span>
-                        </div>
-                        <div className="flex flex-wrap gap-1 mt-2">
-                          {(['NOT_STARTED', 'IN_PROGRESS', 'WAITING_THIRD', 'DONE'] as const)
-                            .filter((s) => s !== a.status)
-                            .map((s) => (
-                              <button
-                                key={s}
-                                onClick={() => changeStatus.mutate({ id: a.id, status: s })}
-                                className="text-[10px] px-2 py-0.5 rounded bg-background hover:bg-accent border"
-                              >
-                                {'> '}
-                                {STATUS_LABEL[s]}
-                              </button>
-                            ))}
-                        </div>
-                      </CardContent>
-                    </Card>
-                  );
-                })}
-                {items.length === 0 && (
-                  <p className="text-xs text-muted-foreground text-center py-6">Vazio</p>
-                )}
-              </div>
-            </div>
-          );
-        })}
+      <div className="mb-6 grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
+        <MetricCard title="Acoes abertas" value={formatNumber(actions.length - done)} description={`${formatNumber(done)} concluidas`} icon={<ClipboardList className="h-4 w-4" />} tone="blue" />
+        <MetricCard title="Atrasadas" value={formatNumber(overdue)} description="Prazos vencidos" icon={<AlertTriangle className="h-4 w-4" />} tone="red" />
+        <MetricCard title="Criticas" value={formatNumber(critical)} description="Prioridade critica" icon={<AlertTriangle className="h-4 w-4" />} tone="yellow" />
+        <MetricCard title="Progresso medio" value={`${avgProgress}%`} description="Conclusao geral" icon={<ClipboardList className="h-4 w-4" />} tone="green" />
       </div>
+
+      {query.isLoading && <LoadingState />}
+      {!query.isLoading && actions.length === 0 && (
+        <EmptyState title="Nenhum plano de acao" description="Os planos criados a partir de desvios e indicadores aparecem aqui." />
+      )}
+
+      {!query.isLoading && actions.length > 0 && view === 'kanban' && (
+        <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-4">
+          {COLUMNS.map((col) => {
+            const items = byCol.get(col) ?? [];
+            return (
+              <section key={col} className="rounded-lg border bg-muted/45 p-3">
+                <div className="mb-3 flex items-center justify-between px-1">
+                  <span className="text-sm font-semibold">{STATUS_LABEL[col]}</span>
+                  <Badge variant="secondary">{items.length}</Badge>
+                </div>
+                <div className="space-y-3">
+                  {items.map((a) => (
+                    <div key={a.id} className="space-y-2">
+                      <ActionPlanCard action={a} />
+                      <div className="flex flex-wrap gap-1">
+                        {COLUMNS.filter((s) => s !== a.status).map((s) => (
+                          <button
+                            key={s}
+                            onClick={() => changeStatus.mutate({ id: a.id, status: s })}
+                            className="rounded border bg-card px-2 py-1 text-[10px] font-medium text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
+                          >
+                            {STATUS_LABEL[s]}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  ))}
+                  {items.length === 0 && <div className="rounded-lg border border-dashed bg-card/50 p-6 text-center text-xs text-muted-foreground">Sem acoes</div>}
+                </div>
+              </section>
+            );
+          })}
+        </div>
+      )}
+
+      {!query.isLoading && actions.length > 0 && view === 'list' && (
+        <SectionCard title="Lista de acoes" description="Visao tabular para conferencia e priorizacao." contentClassName="p-0">
+          <div className="overflow-x-auto">
+            <table className="table-modern">
+              <thead>
+                <tr>
+                  <th className="text-left">Acao</th>
+                  <th className="text-left">Status</th>
+                  <th className="text-left">Responsavel</th>
+                  <th className="text-left">Prazo</th>
+                  <th className="text-left">Prioridade</th>
+                  <th className="text-left">Progresso</th>
+                </tr>
+              </thead>
+              <tbody>
+                {actions.map((a) => (
+                  <tr key={a.id}>
+                    <td>
+                      <Link href={`/actions/${a.id}`} className="font-medium hover:underline">{a.title}</Link>
+                      <div className="text-xs text-muted-foreground">{a.ownerNode?.name ?? a.origin}</div>
+                    </td>
+                    <td><StatusBadge value={a.status} label={STATUS_LABEL[a.status]} /></td>
+                    <td>
+                      <div className="flex items-center gap-2">
+                        <UserRound className="h-3.5 w-3.5 text-muted-foreground" />
+                        {a.responsibleUser?.name ?? 'Sem responsavel'}
+                      </div>
+                    </td>
+                    <td className={cn(isOverdue(a) && 'font-medium text-status-red')}>{formatDate(a.dueDate)}</td>
+                    <td><StatusBadge value={a.priority} label={a.priority} /></td>
+                    <td>
+                      <div className="min-w-32">
+                        <div className="mb-1 text-xs font-medium">{a.progress}%</div>
+                        <Progress value={a.progress} className="h-1.5" />
+                      </div>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </SectionCard>
+      )}
+
+      {!query.isLoading && actions.length > 0 && view === 'timeline' && (
+        <SectionCard title="Cronograma de acoes" description="Prazos ordenados para acompanhamento semanal.">
+          <div className="space-y-3">
+            {actions
+              .slice()
+              .sort((a, b) => new Date(a.dueDate ?? '2999-12-31').getTime() - new Date(b.dueDate ?? '2999-12-31').getTime())
+              .map((a) => (
+                <Link key={a.id} href={`/actions/${a.id}`} className="grid gap-3 rounded-lg border p-3 transition-colors hover:bg-accent/35 md:grid-cols-[140px,1fr,160px] md:items-center">
+                  <div className={cn('text-sm font-semibold', isOverdue(a) && 'text-status-red')}>{formatDate(a.dueDate)}</div>
+                  <div className="min-w-0">
+                    <div className="truncate text-sm font-semibold">{a.title}</div>
+                    <div className="text-xs text-muted-foreground">{a.responsibleUser?.name ?? 'Sem responsavel'}</div>
+                  </div>
+                  <div>
+                    <StatusBadge value={a.status} label={STATUS_LABEL[a.status]} />
+                  </div>
+                </Link>
+              ))}
+          </div>
+        </SectionCard>
+      )}
     </div>
+  );
+}
+
+function isOverdue(action: Action) {
+  return Boolean(
+    action.dueDate &&
+      new Date(action.dueDate) < new Date() &&
+      !['DONE', 'DONE_LATE', 'CANCELLED'].includes(action.status),
   );
 }

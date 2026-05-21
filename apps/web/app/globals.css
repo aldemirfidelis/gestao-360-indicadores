@@ -4,71 +4,71 @@
 
 @layer base {
   :root {
-    --background: 0 0% 100%;
-    --foreground: 222.2 47.4% 11.2%;
+    --background: 210 24% 97%;
+    --foreground: 221 39% 11%;
 
     --card: 0 0% 100%;
-    --card-foreground: 222.2 47.4% 11.2%;
+    --card-foreground: 221 39% 11%;
 
     --popover: 0 0% 100%;
-    --popover-foreground: 222.2 47.4% 11.2%;
+    --popover-foreground: 221 39% 11%;
 
-    --primary: 222.2 47.4% 11.2%;
+    --primary: 214 45% 18%;
     --primary-foreground: 210 40% 98%;
 
-    --secondary: 210 40% 96.1%;
-    --secondary-foreground: 222.2 47.4% 11.2%;
+    --secondary: 207 32% 93%;
+    --secondary-foreground: 214 45% 18%;
 
-    --muted: 210 40% 96.1%;
-    --muted-foreground: 215.4 16.3% 46.9%;
+    --muted: 210 28% 94%;
+    --muted-foreground: 215 16% 42%;
 
-    --accent: 210 40% 96.1%;
-    --accent-foreground: 222.2 47.4% 11.2%;
+    --accent: 188 54% 92%;
+    --accent-foreground: 191 72% 22%;
 
     --destructive: 0 84.2% 60.2%;
     --destructive-foreground: 210 40% 98%;
 
-    --border: 214.3 31.8% 91.4%;
-    --input: 214.3 31.8% 91.4%;
-    --ring: 222.2 84% 4.9%;
+    --border: 213 23% 87%;
+    --input: 213 23% 87%;
+    --ring: 190 88% 31%;
 
-    --status-green: 142 71% 45%;
-    --status-yellow: 38 92% 50%;
-    --status-red: 0 84% 60%;
+    --status-green: 158 64% 38%;
+    --status-yellow: 39 91% 48%;
+    --status-red: 0 74% 52%;
     --status-gray: 215 16% 65%;
-    --status-blue: 217 91% 60%;
-    --status-purple: 262 83% 58%;
+    --status-blue: 199 89% 42%;
+    --status-purple: 262 63% 52%;
 
-    --radius: 0.6rem;
+    --radius: 0.5rem;
   }
 
   .dark {
-    --background: 222.2 47% 7%;
+    --background: 221 42% 8%;
     --foreground: 210 40% 98%;
 
-    --card: 222.2 47% 9%;
+    --card: 221 40% 10%;
     --card-foreground: 210 40% 98%;
 
-    --popover: 222.2 47% 9%;
+    --popover: 221 40% 10%;
     --popover-foreground: 210 40% 98%;
 
-    --primary: 210 40% 98%;
-    --primary-foreground: 222.2 47.4% 11.2%;
+    --primary: 190 72% 47%;
+    --primary-foreground: 221 42% 8%;
 
-    --secondary: 217.2 32% 17%;
+    --secondary: 218 31% 16%;
     --secondary-foreground: 210 40% 98%;
 
-    --muted: 217.2 32% 15%;
+    --muted: 218 31% 15%;
     --muted-foreground: 215 20% 65%;
 
-    --accent: 217.2 32% 17%;
-    --accent-foreground: 210 40% 98%;
+    --accent: 190 38% 18%;
+    --accent-foreground: 189 62% 82%;
 
     --destructive: 0 62.8% 50%;
     --destructive-foreground: 210 40% 98%;
 
-    --border: 217.2 32.6% 18%;
-    --input: 217.2 32.6% 18%;
+    --border: 218 28% 19%;
+    --input: 218 28% 19%;
     --ring: 212.7 26.8% 83.9%;
   }
 }
@@ -77,6 +77,49 @@
   * { @apply border-border; }
   body { @apply bg-background text-foreground antialiased; font-feature-settings: "rlig" 1, "calt" 1; }
   html, body { height: 100%; }
+}
+
+@layer components {
+  .enterprise-shell {
+    background:
+      linear-gradient(180deg, hsl(var(--background)) 0%, hsl(210 25% 95%) 45%, hsl(var(--background)) 100%);
+  }
+
+  .panel {
+    @apply rounded-lg border bg-card text-card-foreground shadow-sm;
+    box-shadow: 0 1px 2px hsl(221 39% 11% / 0.05), 0 12px 30px hsl(221 39% 11% / 0.04);
+  }
+
+  .panel-hover {
+    @apply transition-all duration-200 hover:-translate-y-0.5 hover:border-primary/25;
+    box-shadow: 0 1px 2px hsl(221 39% 11% / 0.05), 0 12px 30px hsl(221 39% 11% / 0.04);
+  }
+
+  .panel-hover:hover {
+    box-shadow: 0 8px 26px hsl(221 39% 11% / 0.10);
+  }
+
+  .table-modern {
+    @apply w-full text-sm;
+  }
+
+  .table-modern thead {
+    @apply bg-muted/70 text-[11px] uppercase tracking-wide text-muted-foreground;
+  }
+
+  .table-modern th,
+  .table-modern td {
+    @apply px-4 py-3;
+  }
+
+  .table-modern tbody tr {
+    @apply border-t transition-colors hover:bg-accent/35;
+  }
+
+  .field-required::after {
+    content: " *";
+    color: hsl(var(--destructive));
+  }
 }
 
 /* Status pill helpers */

@@ -1,16 +1,19 @@
 'use client';
 
-import { useState, useMemo } from 'react';
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { useMemo, useState } from 'react';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
-import { Save } from 'lucide-react';
+import { CalendarClock, CheckCircle2, RotateCcw, Save, Target } from 'lucide-react';
 import { PageHeader } from '@/components/shell/page-header';
-import { Card, CardContent } from '@/components/ui/card';
+import { MetricCard } from '@/components/platform/metric-card';
+import { SectionCard } from '@/components/platform/section-card';
+import { EmptyState } from '@/components/platform/empty-state';
+import { LoadingState } from '@/components/platform/loading-state';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { StatusLight } from '@/components/ui/status-light';
 import { api } from '@/lib/api';
-import { cn, periodRefLabel } from '@/lib/utils';
+import { cn, formatNumber, periodRefLabel } from '@/lib/utils';
 
 interface PendingRow {
   indicator: {
@@ -39,13 +42,12 @@ interface UpsertOutcome {
 
 export default function ResultsPage() {
   const qc = useQueryClient();
+  const [edits, setEdits] = useState<Record<string, Record<string, string>>>({});
+
   const query = useQuery<PendingRow[]>({
     queryKey: ['results', 'pending'],
     queryFn: () => api<PendingRow[]>('/results/pending?points=6'),
   });
-
-  // local state: indicatorId -> periodRef -> string
-  const [edits, setEdits] = useState<Record<string, Record<string, string>>>({});
 
   const allPeriods = useMemo(() => {
     const set = new Set<string>();
@@ -69,6 +71,15 @@ export default function ResultsPage() {
     onError: (e: any) => toast.error(e?.message ?? 'Falha ao salvar'),
   });
 
+  const pendingCount = Object.values(edits).reduce(
+    (acc, m) => acc + Object.values(m).filter((v) => v.trim() !== '').length,
+    0,
+  );
+  const totalCells = query.data?.reduce((acc, r) => acc + r.cells.length, 0) ?? 0;
+  const filledCells =
+    query.data?.reduce((acc, r) => acc + r.cells.filter((c) => c.value !== null && c.value !== undefined).length, 0) ?? 0;
+  const missingCells = Math.max(0, totalCells - filledCells);
+
   const handleSave = () => {
     const items: { indicatorId: string; periodRef: string; value: number }[] = [];
     for (const [indicatorId, byRef] of Object.entries(edits)) {
@@ -87,32 +98,67 @@ export default function ResultsPage() {
     upsert.mutate(items);
   };
 
-  const pendingCount = Object.values(edits).reduce(
-    (acc, m) => acc + Object.values(m).filter((v) => v.trim() !== '').length,
-    0,
-  );
-
   return (
     <div>
       <PageHeader
-        title="Lancamentos"
-        description="Insira valores realizados por periodo. O farol e o desvio sao calculados automaticamente."
+        eyebrow="Lancamentos"
+        tone="launch"
+        title="Lancamento de resultados"
+        description="Registro de realizado por indicador e periodo, com farol e desvio calculados automaticamente."
+        breadcrumbs={[{ label: 'Inicio', href: '/' }, { label: 'Lancamentos', href: '/launches' }, { label: 'Resultados' }]}
         actions={
-          <Button onClick={handleSave} disabled={upsert.isPending || pendingCount === 0}>
-            <Save className="h-4 w-4 mr-2" />
-            {upsert.isPending ? 'Salvando...' : `Salvar (${pendingCount})`}
-          </Button>
+          <>
+            <Button variant="outline" onClick={() => setEdits({})} disabled={pendingCount === 0}>
+              <RotateCcw className="mr-2 h-4 w-4" />
+              Limpar
+            </Button>
+            <Button onClick={handleSave} disabled={upsert.isPending || pendingCount === 0}>
+              <Save className="mr-2 h-4 w-4" />
+              {upsert.isPending ? 'Salvando...' : `Salvar (${pendingCount})`}
+            </Button>
+          </>
         }
       />
 
-      <Card>
-        <CardContent className="p-0 overflow-x-auto">
-          <table className="w-full text-sm">
-            <thead className="bg-muted/50 text-xs uppercase">
+      <div className="mb-6 grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
+        <MetricCard
+          title="Indicadores"
+          value={formatNumber(query.data?.length)}
+          description="Disponiveis para lancamento"
+          icon={<Target className="h-4 w-4" />}
+          tone="blue"
+        />
+        <MetricCard
+          title="Periodos"
+          value={formatNumber(allPeriods.length)}
+          description={allPeriods[0] ? `${periodRefLabel(allPeriods[0])} em diante` : 'Sem periodo'}
+          icon={<CalendarClock className="h-4 w-4" />}
+          tone="purple"
+        />
+        <MetricCard
+          title="Preenchidos"
+          value={formatNumber(filledCells)}
+          description={`${formatNumber(totalCells)} celulas previstas`}
+          icon={<CheckCircle2 className="h-4 w-4" />}
+          tone="green"
+        />
+        <MetricCard
+          title="Pendentes"
+          value={formatNumber(missingCells)}
+          description={`${formatNumber(pendingCount)} alteracoes locais`}
+          icon={<Save className="h-4 w-4" />}
+          tone="yellow"
+        />
+      </div>
+
+      <SectionCard title="Grade de lancamento" description="Digite os valores realizados e salve em lote." contentClassName="p-0">
+        <div className="overflow-x-auto">
+          <table className="table-modern">
+            <thead>
               <tr>
-                <th className="px-4 py-3 text-left sticky left-0 bg-muted/50 z-10 min-w-[260px]">Indicador</th>
+                <th className="sticky left-0 z-10 min-w-[280px] bg-muted/70 text-left">Indicador</th>
                 {allPeriods.map((p) => (
-                  <th key={p} className="px-3 py-3 text-center min-w-[120px]">
+                  <th key={p} className="min-w-[128px] text-center">
                     {periodRefLabel(p)}
                   </th>
                 ))}
@@ -120,8 +166,8 @@ export default function ResultsPage() {
             </thead>
             <tbody>
               {query.data?.map((row) => (
-                <tr key={row.indicator.id} className="border-t hover:bg-muted/30">
-                  <td className="px-4 py-3 sticky left-0 bg-background z-10">
+                <tr key={row.indicator.id}>
+                  <td className="sticky left-0 z-10 bg-card">
                     <div className="font-medium">{row.indicator.name}</div>
                     <div className="text-xs text-muted-foreground">{row.indicator.ownerNode.name}</div>
                   </td>
@@ -135,7 +181,7 @@ export default function ResultsPage() {
                           ? String(cell.value)
                           : '';
                     return (
-                      <td key={p} className="px-2 py-2 text-center">
+                      <td key={p} className="text-center">
                         <div className="flex flex-col items-center gap-1">
                           <Input
                             value={display}
@@ -145,9 +191,9 @@ export default function ResultsPage() {
                                 [row.indicator.id]: { ...prev[row.indicator.id], [p]: e.target.value },
                               }))
                             }
-                            placeholder={cell?.target !== null ? String(cell?.target) : '—'}
+                            placeholder={cell?.target !== null && cell?.target !== undefined ? String(cell.target) : '-'}
                             className={cn(
-                              'h-8 w-24 text-center text-sm',
+                              'h-9 w-24 text-center text-sm',
                               cell?.light === 'RED' && 'border-status-red/60',
                               cell?.light === 'YELLOW' && 'border-status-yellow/60',
                               cell?.light === 'GREEN' && 'border-status-green/60',
@@ -165,14 +211,14 @@ export default function ResultsPage() {
               ))}
             </tbody>
           </table>
-          {query.isLoading && <p className="p-6 text-sm text-muted-foreground">Carregando...</p>}
+          {query.isLoading && <LoadingState className="m-4" />}
           {!query.isLoading && (query.data?.length ?? 0) === 0 && (
-            <p className="p-10 text-center text-sm text-muted-foreground">
-              Nenhum indicador ativo para lancamento no momento.
-            </p>
+            <div className="p-4">
+              <EmptyState title="Nenhum indicador ativo" description="Cadastre indicadores antes de registrar resultados." />
+            </div>
           )}
-        </CardContent>
-      </Card>
+        </div>
+      </SectionCard>
     </div>
   );
 }

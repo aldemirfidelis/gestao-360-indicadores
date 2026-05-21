@@ -1,17 +1,20 @@
 'use client';
 
 import Link from 'next/link';
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { Filter, Plus, Search } from 'lucide-react';
+import { AlertTriangle, CheckCircle2, Filter, Plus, Search, Target, UserRound } from 'lucide-react';
 import { PageHeader } from '@/components/shell/page-header';
-import { Card, CardContent } from '@/components/ui/card';
-import { Input } from '@/components/ui/input';
+import { MetricCard } from '@/components/platform/metric-card';
+import { FilterBar } from '@/components/platform/filter-bar';
+import { EmptyState } from '@/components/platform/empty-state';
+import { LoadingState } from '@/components/platform/loading-state';
+import { IndicatorCard, type IndicatorCardData } from '@/components/platform/indicator-card';
 import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
 import { StatusLight } from '@/components/ui/status-light';
-import { Badge } from '@/components/ui/badge';
 import { api } from '@/lib/api';
-import { formatNumber, formatPercent, periodRefLabel } from '@/lib/utils';
+import { formatNumber } from '@/lib/utils';
 
 interface IndicatorRow {
   id: string;
@@ -50,15 +53,6 @@ const TYPE_LABEL: Record<string, string> = {
   CUSTOM: 'Personalizado',
 };
 
-const UNIT_SYMBOL: Record<string, string> = {
-  PERCENT: '%',
-  CURRENCY: 'R$',
-  HOURS: 'h',
-  DAYS: 'd',
-  TONS: 't',
-  LITERS: 'l',
-};
-
 export default function IndicatorsPage() {
   const [search, setSearch] = useState('');
   const [light, setLight] = useState<string | null>(null);
@@ -71,105 +65,94 @@ export default function IndicatorsPage() {
       ),
   });
 
-  const items = query.data ?? [];
+  const items = useMemo<IndicatorCardData[]>(
+    () =>
+      (query.data ?? []).map((ind) => ({
+        ...ind,
+        type: TYPE_LABEL[ind.type] ?? ind.type,
+      })),
+    [query.data],
+  );
+  const green = items.filter((i) => i.last?.light === 'GREEN').length;
+  const red = items.filter((i) => i.last?.light === 'RED').length;
+  const gray = items.filter((i) => !i.last || i.last.light === 'GRAY').length;
+  const withoutOwner = items.filter((i) => !i.responsibleUser).length;
 
   return (
     <div>
       <PageHeader
-        title="Indicadores"
-        description="Catalogo de KPIs corporativos com metas, realizado e status atual."
+        eyebrow="Visualizacao"
+        tone="view"
+        title="Dashboard de indicadores"
+        description="Catalogo analitico com farol de desempenho, responsaveis, areas, ultimo realizado e historico."
+        breadcrumbs={[{ label: 'Inicio', href: '/' }, { label: 'Visualizacao', href: '/visualization' }, { label: 'Indicadores' }]}
         actions={
-          <Link href="/indicators/new">
-            <Button>
-              <Plus className="h-4 w-4 mr-2" />
+          <Button asChild>
+            <Link href="/indicators/new">
+              <Plus className="mr-2 h-4 w-4" />
               Novo indicador
-            </Button>
-          </Link>
+            </Link>
+          </Button>
         }
       />
 
-      <Card className="mb-6">
-        <CardContent className="p-4 flex flex-col sm:flex-row gap-3 items-stretch sm:items-center">
-          <div className="relative flex-1">
-            <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-            <Input
-              placeholder="Buscar por nome ou codigo..."
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              className="pl-9"
-            />
-          </div>
-          <div className="flex items-center gap-2 flex-wrap">
-            <Filter className="h-4 w-4 text-muted-foreground" />
-            {(['GREEN', 'YELLOW', 'RED', 'GRAY'] as const).map((l) => (
-              <Button
-                key={l}
-                variant={light === l ? 'default' : 'outline'}
-                size="sm"
-                onClick={() => setLight(light === l ? null : l)}
-              >
-                <StatusLight light={l} />
-              </Button>
-            ))}
-          </div>
-        </CardContent>
-      </Card>
+      <div className="mb-6 grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
+        <MetricCard title="Total de indicadores" value={formatNumber(items.length)} description="Ativos no catalogo" icon={<Target className="h-4 w-4" />} tone="blue" />
+        <MetricCard title="Dentro da meta" value={formatNumber(green)} description="Farol verde" icon={<CheckCircle2 className="h-4 w-4" />} tone="green" />
+        <MetricCard title="Fora da meta" value={formatNumber(red)} description={`${formatNumber(gray)} sem lancamento`} icon={<AlertTriangle className="h-4 w-4" />} tone="red" />
+        <MetricCard title="Sem responsavel" value={formatNumber(withoutOwner)} description="Revisar governanca" icon={<UserRound className="h-4 w-4" />} tone="yellow" />
+      </div>
 
-      {query.isLoading && <p className="text-sm text-muted-foreground">Carregando...</p>}
+      <FilterBar
+        actions={
+          <Button variant="outline" size="sm" onClick={() => { setSearch(''); setLight(null); }}>
+            Limpar filtros
+          </Button>
+        }
+      >
+        <div className="relative sm:col-span-2">
+          <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+          <Input
+            placeholder="Buscar por nome, codigo, area ou responsavel..."
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            className="pl-9"
+          />
+        </div>
+        <div className="flex items-center gap-2">
+          <Filter className="h-4 w-4 text-muted-foreground" />
+          {(['GREEN', 'YELLOW', 'RED', 'GRAY'] as const).map((l) => (
+            <Button
+              key={l}
+              variant={light === l ? 'default' : 'outline'}
+              size="sm"
+              onClick={() => setLight(light === l ? null : l)}
+              aria-label={`Filtrar ${l}`}
+            >
+              <StatusLight light={l} />
+            </Button>
+          ))}
+        </div>
+      </FilterBar>
 
-      <div className="grid gap-3">
+      {query.isLoading && <LoadingState />}
+
+      {!query.isLoading && items.length === 0 && (
+        <EmptyState
+          title="Nenhum indicador encontrado"
+          description="Ajuste os filtros ou cadastre um novo indicador."
+          action={
+            <Button asChild>
+              <Link href="/indicators/new">Cadastrar indicador</Link>
+            </Button>
+          }
+        />
+      )}
+
+      <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4">
         {items.map((ind) => (
-          <Link key={ind.id} href={`/indicators/${ind.id}`}>
-            <Card className="hover:border-primary/40 hover:shadow-md transition-all cursor-pointer">
-              <CardContent className="p-4 flex flex-col md:flex-row md:items-center gap-4">
-                <div className="flex-1 min-w-0">
-                  <div className="flex flex-wrap items-center gap-2 mb-1">
-                    <h3 className="font-medium truncate">{ind.name}</h3>
-                    {ind.code && <Badge variant="outline">{ind.code}</Badge>}
-                    <Badge variant="secondary">{TYPE_LABEL[ind.type] ?? ind.type}</Badge>
-                  </div>
-                  <p className="text-xs text-muted-foreground">
-                    {ind.ownerNode.name} - {ind.responsibleUser?.name ?? 'Sem responsavel'} - {ind.periodicity}
-                  </p>
-                </div>
-                <div className="grid grid-cols-3 gap-6 text-right">
-                  <div>
-                    <div className="text-[11px] uppercase text-muted-foreground">Realizado</div>
-                    <div className="font-semibold">
-                      {ind.last ? formatNumber(ind.last.value) : '—'}
-                      <span className="text-xs text-muted-foreground ml-1">
-                        {ind.unitLabel ?? UNIT_SYMBOL[ind.unit] ?? ''}
-                      </span>
-                    </div>
-                    {ind.last && (
-                      <div className="text-[11px] text-muted-foreground">{periodRefLabel(ind.last.periodRef)}</div>
-                    )}
-                  </div>
-                  <div>
-                    <div className="text-[11px] uppercase text-muted-foreground">Atingim.</div>
-                    <div className="font-semibold">{formatPercent(ind.last?.attainment ?? null)}</div>
-                    {ind.last?.deviationPct !== null && ind.last?.deviationPct !== undefined && (
-                      <div className="text-[11px] text-muted-foreground">
-                        {ind.last.deviationPct > 0 ? '+' : ''}
-                        {formatNumber(ind.last.deviationPct, { maximumFractionDigits: 1 })}%
-                      </div>
-                    )}
-                  </div>
-                  <div className="flex flex-col items-end justify-center">
-                    <StatusLight light={ind.last?.light ?? 'GRAY'} />
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-          </Link>
+          <IndicatorCard key={ind.id} indicator={ind} />
         ))}
-        {!query.isLoading && items.length === 0 && (
-          <Card>
-            <CardContent className="py-10 text-center text-sm text-muted-foreground">
-              Nenhum indicador encontrado. Ajuste os filtros ou cadastre um novo.
-            </CardContent>
-          </Card>
-        )}
       </div>
     </div>
   );
