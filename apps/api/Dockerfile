@@ -81,4 +81,4 @@ EXPOSE 3333
 # Roda migrate deploy idempotente + start.
 # Para pular migrations (ex.: pre-deploy job ja rodou), defina SKIP_MIGRATE=1.
 # Usa ./node_modules/.bin/prisma (symlink pnpm gera no workspace local).
-CMD ["sh", "-c", "if [ \"$SKIP_MIGRATE\" != \"1\" ]; then ./node_modules/.bin/prisma migrate deploy; fi && node dist/main.js"]
+CMD ["sh", "-c", "if [ \"$SKIP_MIGRATE\" != \"1\" ]; then ./node_modules/.bin/prisma migrate deploy; fi && node dist/src/main.js"]
