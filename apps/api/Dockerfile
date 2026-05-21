@@ -36,9 +36,22 @@ COPY packages/shared ./packages/shared
 COPY apps/api ./apps/api
 
 # Build em ordem: shared -> prisma -> api
-RUN pnpm --filter @g360/shared build \
-    && pnpm --filter @g360/api prisma generate \
-    && pnpm --filter @g360/api build
+# set -ex: aborta no primeiro erro + loga cada comando
+# Usamos pnpm exec dentro do diretorio para garantir que prisma generate
+# resolve o binario e o schema corretamente (alguns ambientes pnpm tem
+# resolucao diferente com --filter)
+RUN set -ex \
+    && echo "=== [1/3] Build @g360/shared ===" \
+    && pnpm --filter @g360/shared run build \
+    && ls -la packages/shared/dist \
+    && echo "=== [2/3] Prisma generate ===" \
+    && cd apps/api \
+    && pnpm exec prisma generate --schema=prisma/schema.prisma \
+    && ls -la ../../node_modules/.pnpm/@prisma+client*/node_modules/.prisma/client/ | head -10 \
+    && cd /app \
+    && echo "=== [3/3] Nest build ===" \
+    && pnpm --filter @g360/api run build \
+    && ls -la apps/api/dist
 
 # Remove devDeps para reduzir imagem final
 RUN --mount=type=cache,id=pnpm-store,target=/pnpm/store \
