@@ -53,9 +53,10 @@ RUN set -ex \
     && pnpm --filter @g360/api run build \
     && ls -la apps/api/dist
 
-# Remove devDeps para reduzir imagem final
-RUN --mount=type=cache,id=pnpm-store,target=/pnpm/store \
-    pnpm prune --prod --no-optional
+# Nota: NAO rodamos `pnpm prune --prod` aqui porque o pnpm em workspaces
+# remove o node_modules de packages/shared/, quebrando a resolucao de
+# transitive deps (zod, etc.) usadas no dist do shared em runtime.
+# A imagem fica ~50 MB maior, troca aceitavel pela robustez.
 
 # ----------- Stage: runtime -----------
 FROM base AS runtime
@@ -63,10 +64,11 @@ ENV NODE_ENV=production \
     PORT=3333 \
     API_PREFIX=api
 
-# Copia node_modules pruned, shared/dist e api/dist
+# Copia node_modules, shared/dist e api/dist
 COPY --from=build /app/node_modules ./node_modules
 COPY --from=build /app/pnpm-workspace.yaml /app/package.json ./
 COPY --from=build /app/packages/shared/package.json ./packages/shared/
+COPY --from=build /app/packages/shared/node_modules ./packages/shared/node_modules
 COPY --from=build /app/packages/shared/dist ./packages/shared/dist
 COPY --from=build /app/apps/api/node_modules ./apps/api/node_modules
 COPY --from=build /app/apps/api/package.json ./apps/api/
