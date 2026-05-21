@@ -1,0 +1,58 @@
+# Dependencias e builds
+node_modules
+**/node_modules
+.pnpm-store
+dist
+**/dist
+.next
+**/.next
+out
+**/out
+build
+**/build
+.turbo
+**/.turbo
+
+# Env locais (NUNCA copiar para imagem)
+.env
+.env.*
+!.env.example
+!.env.production.example
+
+# VCS
+.git
+.gitignore
+.gitattributes
+
+# Editor / SO
+.vscode
+.idea
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+npm-debug.log*
+pnpm-debug.log*
+
+# Testes
+coverage
+playwright-report
+test-results
+
+# CI / docs
+.github
+docs
+*.md
+!README.md
+!DEPLOY.md
+
+# Docker
+Dockerfile
+**/Dockerfile
+.dockerignore
+docker-compose.yml
+
+# Prisma local sqlite (caso uso futuro)
+*.db
+*.sqlite

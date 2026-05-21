@@ -1,0 +1,36 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: g360_postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: g360
+      POSTGRES_PASSWORD: g360
+      POSTGRES_DB: g360
+    ports:
+      - "5432:5432"
+    volumes:
+      - g360_pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U g360 -d g360"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  redis:
+    image: redis:7-alpine
+    container_name: g360_redis
+    restart: unless-stopped
+    ports:
+      - "6379:6379"
+    volumes:
+      - g360_redisdata:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+volumes:
+  g360_pgdata:
+  g360_redisdata:

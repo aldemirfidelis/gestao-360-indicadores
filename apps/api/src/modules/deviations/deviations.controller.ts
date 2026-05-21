@@ -1,0 +1,80 @@
+import { Body, Controller, Delete, Get, Param, Patch, Post, Query } from '@nestjs/common';
+import { DeviationsService } from './deviations.service';
+import { CurrentUser } from '../../common/decorators/current-user.decorator';
+import { AuthPayload } from '../auth/auth.types';
+import { AnalysisMethod, DeviationSeverity, DeviationStatus } from '@prisma/client';
+
+@Controller('deviations')
+export class DeviationsController {
+  constructor(private readonly service: DeviationsService) {}
+
+  @Get()
+  list(
+    @CurrentUser() me: AuthPayload,
+    @Query('status') status?: DeviationStatus,
+    @Query('indicatorId') indicatorId?: string,
+  ) {
+    return this.service.list(me.companyId, status, indicatorId);
+  }
+
+  @Get(':id')
+  byId(@Param('id') id: string) {
+    return this.service.getById(id);
+  }
+
+  @Post()
+  open(
+    @CurrentUser() me: AuthPayload,
+    @Body()
+    body: {
+      indicatorId: string;
+      periodRef: string;
+      title?: string;
+      severity?: DeviationSeverity;
+      responsibleUserId?: string;
+      dueDate?: string;
+      method?: AnalysisMethod;
+      fact?: string;
+    },
+  ) {
+    return this.service.open({
+      companyId: me.companyId,
+      indicatorId: body.indicatorId,
+      periodRef: body.periodRef,
+      title: body.title,
+      severity: body.severity,
+      responsibleUserId: body.responsibleUserId ?? null,
+      dueDate: body.dueDate ? new Date(body.dueDate) : null,
+      method: body.method,
+      fact: body.fact,
+    });
+  }
+
+  @Patch(':id')
+  update(@Param('id') id: string, @Body() patch: any) {
+    return this.service.update(id, patch);
+  }
+
+  @Post(':id/causes')
+  addCause(
+    @Param('id') id: string,
+    @Body() body: { description: string; category?: string; weight?: number },
+  ) {
+    return this.service.addCause(id, body.description, body.category, body.weight ?? 1);
+  }
+
+  @Delete('causes/:causeId')
+  removeCause(@Param('causeId') causeId: string) {
+    return this.service.removeCause(causeId);
+  }
+
+  @Post(':id/analyses')
+  addAnalysis(@Param('id') id: string, @Body() body: { method: AnalysisMethod; content: string }) {
+    return this.service.addAnalysis(id, body.method, body.content);
+  }
+
+  @Post(':id/close')
+  close(@Param('id') id: string) {
+    return this.service.close(id);
+  }
+}

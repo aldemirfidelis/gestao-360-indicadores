@@ -1,0 +1,136 @@
+# =====================================================
+# DigitalOcean App Platform - Gestao 360 Indicadores
+# =====================================================
+# Antes de aplicar:
+# 1. Substitua REPO_OWNER/REPO_NAME pela sua org/usuario e nome do repo
+# 2. Crie os secrets no painel DO (ou via doctl) com os mesmos nomes:
+#    DATABASE_URL, DIRECT_URL, JWT_ACCESS_SECRET, JWT_REFRESH_SECRET
+# 3. Aplicar:  doctl apps create --spec .do/app.yaml
+#    Atualizar: doctl apps update <APP_ID> --spec .do/app.yaml
+# =====================================================
+
+name: gestao-360-indicadores
+region: nyc
+
+# ----------------- API (NestJS) -----------------
+services:
+  - name: api
+    dockerfile_path: apps/api/Dockerfile
+    source_dir: /
+    github:
+      branch: main
+      deploy_on_push: true
+      repo: aldemirfidelis/gestao-360-indicadores
+    instance_size_slug: basic-xxs   # 512MB / 1 vCPU compartilhada (~$5/mes)
+    instance_count: 1
+    http_port: 3333
+    health_check:
+      http_path: /api/health
+      initial_delay_seconds: 30
+      period_seconds: 20
+      timeout_seconds: 5
+      failure_threshold: 5
+      success_threshold: 1
+    routes:
+      - path: /api
+        preserve_path_prefix: true
+    envs:
+      - key: NODE_ENV
+        scope: RUN_AND_BUILD_TIME
+        value: production
+      - key: PORT
+        scope: RUN_TIME
+        value: "3333"
+      - key: API_PREFIX
+        scope: RUN_TIME
+        value: api
+      - key: API_CORS_ORIGIN
+        scope: RUN_TIME
+        value: ${APP_URL}
+      # ---- Banco Neon ----
+      - key: DATABASE_URL
+        scope: RUN_AND_BUILD_TIME
+        type: SECRET
+        # Use a URL do POOLER do Neon (com '-pooler' no host) +
+        # ?sslmode=require&pgbouncer=true&connect_timeout=15
+      - key: DIRECT_URL
+        scope: RUN_AND_BUILD_TIME
+        type: SECRET
+        # URL direta do Neon (sem pooler), usada por prisma migrate
+      # ---- Auth ----
+      - key: JWT_ACCESS_SECRET
+        scope: RUN_TIME
+        type: SECRET
+      - key: JWT_REFRESH_SECRET
+        scope: RUN_TIME
+        type: SECRET
+      - key: JWT_ACCESS_TTL
+        scope: RUN_TIME
+        value: 15m
+      - key: JWT_REFRESH_TTL
+        scope: RUN_TIME
+        value: 7d
+      - key: BCRYPT_ROUNDS
+        scope: RUN_TIME
+        value: "10"
+      # ---- Flags ----
+      # API ja roda 'prisma migrate deploy' no CMD; se preferir job dedicado, defina SKIP_MIGRATE=1
+      # - key: SKIP_MIGRATE
+      #   scope: RUN_TIME
+      #   value: "1"
+
+  # ----------------- Web (Next.js) -----------------
+  - name: web
+    dockerfile_path: apps/web/Dockerfile
+    source_dir: /
+    github:
+      branch: main
+      deploy_on_push: true
+      repo: aldemirfidelis/gestao-360-indicadores
+    instance_size_slug: basic-xxs
+    instance_count: 1
+    http_port: 3000
+    health_check:
+      http_path: /login
+      initial_delay_seconds: 20
+      period_seconds: 20
+      timeout_seconds: 5
+      failure_threshold: 5
+      success_threshold: 1
+    routes:
+      - path: /                # tudo que nao for /api vai para o Next
+    envs:
+      - key: NODE_ENV
+        scope: RUN_AND_BUILD_TIME
+        value: production
+      - key: PORT
+        scope: RUN_TIME
+        value: "3000"
+      # NEXT_PUBLIC_* precisam estar em BUILD_TIME para serem inlined
+      - key: NEXT_PUBLIC_API_URL
+        scope: BUILD_TIME
+        value: /api            # mesmo dominio do app, rota /api -> service api
+      - key: NEXT_PUBLIC_APP_NAME
+        scope: BUILD_TIME
+        value: "Gestao 360 Indicadores"
+
+# ----------------- Job opcional: seed inicial -----------------
+# Descomente para popular dados demo NA PRIMEIRA INSTALACAO.
+# Apos rodar uma vez, comente novamente (ou apague) para nao repetir.
+# jobs:
+#   - name: seed
+#     kind: POST_DEPLOY
+#     dockerfile_path: apps/api/Dockerfile
+#     source_dir: /
+#     github:
+#       branch: main
+#       repo: aldemirfidelis/gestao-360-indicadores
+#     instance_size_slug: basic-xxs
+#     run_command: cd apps/api && pnpm prisma:seed
+#     envs:
+#       - key: DATABASE_URL
+#         scope: RUN_AND_BUILD_TIME
+#         type: SECRET
+#       - key: DIRECT_URL
+#         scope: RUN_AND_BUILD_TIME
+#         type: SECRET

@@ -1,0 +1,35 @@
+{
+  "name": "gestao-360-indicadores",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Plataforma SaaS de Gestao Estrategica de Indicadores, BSC, OKR, KPI e Planos de Acao",
+  "scripts": {
+    "dev": "pnpm shared:build && pnpm -r --parallel --filter \"./apps/*\" dev",
+    "dev:api": "pnpm shared:build && pnpm --filter @g360/api dev",
+    "dev:web": "pnpm shared:build && pnpm --filter @g360/web dev",
+    "shared:build": "pnpm --filter @g360/shared build",
+    "shared:dev": "pnpm --filter @g360/shared dev",
+    "build": "pnpm shared:build && pnpm --filter @g360/api build && pnpm --filter @g360/web build",
+    "lint": "pnpm -r lint",
+    "test": "pnpm -r test",
+    "db:up": "docker compose up -d postgres redis",
+    "db:down": "docker compose down",
+    "db:migrate": "pnpm --filter @g360/api prisma:migrate",
+    "db:seed": "pnpm --filter @g360/api prisma:seed",
+    "db:reset": "pnpm --filter @g360/api prisma:reset",
+    "deploy:migrate": "pnpm --filter @g360/api deploy:migrate",
+    "deploy:seed": "pnpm --filter @g360/api deploy:seed",
+    "setup": "pnpm install && pnpm shared:build && pnpm db:up && pnpm db:migrate && pnpm db:seed",
+    "docker:api": "docker build -f apps/api/Dockerfile -t g360-api .",
+    "docker:web": "docker build -f apps/web/Dockerfile -t g360-web ."
+  },
+  "devDependencies": {
+    "typescript": "^5.5.4",
+    "prettier": "^3.3.3"
+  },
+  "engines": {
+    "node": ">=20",
+    "pnpm": ">=9"
+  },
+  "packageManager": "pnpm@9.7.0"
+}

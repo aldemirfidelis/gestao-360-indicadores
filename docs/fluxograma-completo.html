@@ -1,0 +1,524 @@
+<!doctype html>
+<html lang="pt-BR">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Fluxograma Completo - Gestao 360 Indicadores</title>
+    <style>
+      :root {
+        color-scheme: light;
+        --bg: #f8fafc;
+        --panel: #ffffff;
+        --text: #0f172a;
+        --muted: #475569;
+        --line: #cbd5e1;
+        --brand: #2563eb;
+        --brand-dark: #1d4ed8;
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+
+      body {
+        margin: 0;
+        background: var(--bg);
+        color: var(--text);
+        font-family:
+          Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+        line-height: 1.5;
+      }
+
+      header {
+        position: sticky;
+        top: 0;
+        z-index: 10;
+        border-bottom: 1px solid var(--line);
+        background: rgba(255, 255, 255, 0.92);
+        backdrop-filter: blur(10px);
+      }
+
+      .bar {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 16px;
+        max-width: 1180px;
+        margin: 0 auto;
+        padding: 16px 24px;
+      }
+
+      h1,
+      h2,
+      h3 {
+        line-height: 1.15;
+        margin: 0;
+      }
+
+      h1 {
+        font-size: 24px;
+      }
+
+      h2 {
+        font-size: 21px;
+        margin-bottom: 12px;
+      }
+
+      h3 {
+        font-size: 16px;
+        margin-top: 18px;
+        margin-bottom: 8px;
+      }
+
+      p {
+        margin: 8px 0;
+        color: var(--muted);
+      }
+
+      main {
+        max-width: 1180px;
+        margin: 0 auto;
+        padding: 24px;
+      }
+
+      .actions {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 8px;
+      }
+
+      button,
+      a.button {
+        appearance: none;
+        border: 1px solid var(--brand);
+        border-radius: 8px;
+        background: var(--brand);
+        color: white;
+        cursor: pointer;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        font: inherit;
+        font-weight: 600;
+        min-height: 36px;
+        padding: 8px 12px;
+        text-decoration: none;
+      }
+
+      button.secondary,
+      a.button.secondary {
+        background: white;
+        color: var(--brand-dark);
+      }
+
+      .intro,
+      section {
+        background: var(--panel);
+        border: 1px solid var(--line);
+        border-radius: 8px;
+        margin-bottom: 18px;
+        padding: 18px;
+      }
+
+      .grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+        gap: 12px;
+      }
+
+      .metric {
+        border: 1px solid #e2e8f0;
+        border-radius: 8px;
+        padding: 12px;
+      }
+
+      .metric strong {
+        display: block;
+        margin-bottom: 4px;
+      }
+
+      ol,
+      ul {
+        margin: 8px 0 0 20px;
+        padding: 0;
+      }
+
+      li {
+        margin: 6px 0;
+      }
+
+      .diagram-wrap {
+        border: 1px solid #e2e8f0;
+        border-radius: 8px;
+        overflow: auto;
+        padding: 12px;
+        background: #ffffff;
+      }
+
+      .download-row {
+        display: flex;
+        justify-content: flex-end;
+        margin-bottom: 10px;
+      }
+
+      table {
+        width: 100%;
+        border-collapse: collapse;
+        margin-top: 10px;
+        font-size: 14px;
+      }
+
+      th,
+      td {
+        border: 1px solid #e2e8f0;
+        padding: 8px 10px;
+        text-align: left;
+        vertical-align: top;
+      }
+
+      th {
+        background: #f1f5f9;
+      }
+
+      code {
+        background: #f1f5f9;
+        border-radius: 4px;
+        padding: 1px 4px;
+      }
+
+      @media print {
+        header,
+        .download-row,
+        .actions {
+          display: none;
+        }
+
+        body {
+          background: white;
+        }
+
+        section,
+        .intro {
+          break-inside: avoid;
+          border-color: #e5e7eb;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <header>
+      <div class="bar">
+        <div>
+          <h1>Fluxograma Completo - Gestao 360 Indicadores</h1>
+          <p>Documentacao visual para usuarios, gestores e equipe tecnica.</p>
+        </div>
+        <div class="actions">
+          <button class="secondary" type="button" onclick="window.print()">Imprimir / Salvar PDF</button>
+          <a class="button secondary" href="./fluxograma-completo.md" download>Baixar Markdown</a>
+        </div>
+      </div>
+    </header>
+
+    <main>
+      <div class="intro">
+        <h2>Como usar</h2>
+        <p>
+          Abra este arquivo no navegador para ver os fluxogramas renderizados. Use os botoes de cada
+          diagrama para baixar SVG, ou use <strong>Imprimir / Salvar PDF</strong> para gerar uma
+          versao de distribuicao.
+        </p>
+        <div class="grid">
+          <div class="metric">
+            <strong>Frontend</strong>
+            Next.js 14, App Router, Tailwind, Recharts, React Flow, jsPDF e Papaparse.
+          </div>
+          <div class="metric">
+            <strong>Backend</strong>
+            NestJS, Prisma, JWT, Zod, Helmet, Throttler e modulos de negocio.
+          </div>
+          <div class="metric">
+            <strong>Banco</strong>
+            PostgreSQL com 41 entidades e multiempresa por <code>companyId</code>.
+          </div>
+          <div class="metric">
+            <strong>Ciclo principal</strong>
+            Planejar, medir, analisar desvios, executar acoes e reportar.
+          </div>
+        </div>
+      </div>
+
+      <section>
+        <h2>1. Arquitetura</h2>
+        <div class="download-row"><button type="button" onclick="downloadSvg('arquitetura')">Baixar SVG</button></div>
+        <div class="diagram-wrap">
+          <pre id="arquitetura" class="mermaid">
+flowchart LR
+  U["Usuario / Gestor"] --> W["Frontend Next.js 14<br/>apps/web"]
+  W --> A["Cliente API<br/>lib/api.ts"]
+  A -->|Bearer JWT| B["Backend NestJS<br/>apps/api"]
+  B --> G["Guards globais<br/>JWT + Roles + Throttler"]
+  G --> M["Modulos de negocio<br/>auth, indicadores, resultados,<br/>desvios, acoes, dashboard..."]
+  M --> P["Prisma Service"]
+  P --> DB[("PostgreSQL<br/>41 entidades")]
+  M --> S["Package compartilhado<br/>packages/shared"]
+  S --> C["Enums, schemas Zod<br/>calcStatus"]
+  B -. pronto para filas .-> R[("Redis / BullMQ")]
+  W --> UI["UI<br/>Tailwind, shadcn-style,<br/>Recharts, React Flow, jsPDF"]
+  D["Deploy<br/>Docker + DigitalOcean App Platform"] --> B
+  D --> W
+  D --> N[("Neon Postgres")]
+          </pre>
+        </div>
+        <ol>
+          <li>O usuario trabalha no frontend, que chama a API com JWT.</li>
+          <li>O backend aplica autenticacao, perfis, validacao, CORS, helmet e throttling.</li>
+          <li>Prisma centraliza acesso ao PostgreSQL; <code>@g360/shared</code> centraliza enums, Zod e farol.</li>
+          <li>Redis/BullMQ esta preparado para evoluir notificacoes para fila ou cron.</li>
+        </ol>
+      </section>
+
+      <section>
+        <h2>2. Jornada ponta a ponta</h2>
+        <div class="download-row"><button type="button" onclick="downloadSvg('jornada')">Baixar SVG</button></div>
+        <div class="diagram-wrap">
+          <pre id="jornada" class="mermaid">
+flowchart TD
+  A["Inicio<br/>Setup local ou deploy"] --> B["Empresa, filiais,<br/>usuarios e permissoes"]
+  B --> C["Login"]
+  C --> D{"Credenciais validas?"}
+  D -- "Nao" --> C1["Erro de login"]
+  D -- "Sim" --> E["Tokens + auditoria"]
+  E --> F["Dashboard executivo"]
+  F --> G["Base corporativa<br/>empresa, estrutura, usuarios"]
+  G --> H["Estrategia<br/>BSC e OKRs"]
+  H --> I["Indicadores,<br/>metas e arvore"]
+  I --> J["Lancamento manual<br/>ou importacao CSV"]
+  J --> K["Farol e atingimento<br/>automaticos"]
+  K --> L{"Farol vermelho?"}
+  L -- "Nao" --> M["Dashboards, relatorios,<br/>insights e acompanhamento"]
+  L -- "Sim" --> N["Abrir desvio<br/>e analisar causa"]
+  N --> O["Criar plano de acao"]
+  O --> P["Executar tarefas<br/>e atualizar progresso"]
+  P --> Q{"Acoes concluidas?"}
+  Q -- "Nao" --> P
+  Q -- "Sim" --> R["Fechar desvio"]
+  R --> S["Auditoria,<br/>notificacoes e reports"]
+  M --> T["Novo ciclo de gestao"]
+  S --> T
+  T --> J
+          </pre>
+        </div>
+        <p>
+          Esse e o ciclo operacional do sistema: configurar a empresa, planejar metas, medir resultados,
+          detectar problemas, tratar desvios, executar acoes e voltar ao acompanhamento executivo.
+        </p>
+      </section>
+
+      <section>
+        <h2>3. Indicadores, metas e resultados</h2>
+        <div class="download-row"><button type="button" onclick="downloadSvg('kpi')">Baixar SVG</button></div>
+        <div class="diagram-wrap">
+          <pre id="kpi" class="mermaid">
+flowchart TD
+  A["Cadastrar indicador"] --> B["Area dona, responsavel,<br/>periodicidade, direcao e peso"]
+  B --> C[("Indicator")]
+  C --> D["Cadastrar metas<br/>por periodRef"]
+  D --> E[("IndicatorTarget")]
+  E --> F["Lancamento manual<br/>ou importacao"]
+  F --> G["Busca meta do periodo"]
+  G --> H["calcStatus"]
+  H --> I[("IndicatorResult<br/>light + attainment + desvios")]
+  I --> J{"Farol vermelho?"}
+  J -- "Nao" --> K["Atualiza dashboard,<br/>series e relatorios"]
+  J -- "Sim" --> L["UI sugere abrir desvio"]
+  L --> M[("Deviation")]
+          </pre>
+        </div>
+        <table>
+          <thead><tr><th>Direcao</th><th>Regra de leitura</th></tr></thead>
+          <tbody>
+            <tr><td><code>HIGHER_BETTER</code></td><td>Quanto maior melhor; abaixo da meta usa tolerancia amarela antes de vermelho.</td></tr>
+            <tr><td><code>LOWER_BETTER</code></td><td>Quanto menor melhor; acima da meta usa tolerancia amarela antes de vermelho.</td></tr>
+            <tr><td><code>EQUAL_TARGET</code></td><td>Quanto mais perto da meta melhor.</td></tr>
+            <tr><td><code>RANGE</code></td><td>Verde dentro da faixa; amarelo ou vermelho fora dela conforme tolerancia.</td></tr>
+          </tbody>
+        </table>
+      </section>
+
+      <section>
+        <h2>4. Desvios e planos de acao</h2>
+        <div class="download-row"><button type="button" onclick="downloadSvg('desvios')">Baixar SVG</button></div>
+        <div class="diagram-wrap">
+          <pre id="desvios" class="mermaid">
+flowchart TD
+  A["Resultado vermelho<br/>ou abertura manual"] --> B["Abrir desvio"]
+  B --> C["Numero sequencial<br/>por empresa"]
+  C --> D["Fato, impacto,<br/>responsavel, prazo e metodo"]
+  D --> E["Causas e analises<br/>FCA, 5 Porques,<br/>Ishikawa, Pareto, CAPA"]
+  E --> F["Criar acoes vinculadas"]
+  F --> G["Subtarefas"]
+  G --> H["Recalculo automatico<br/>do progresso"]
+  H --> I["Concluir acao"]
+  I --> J{"Concluiu atrasada?"}
+  J -- "Sim" --> K["DONE_LATE"]
+  J -- "Nao" --> L["DONE"]
+  K --> M["Tentar fechar desvio"]
+  L --> M
+  M --> N{"Existe acao aberta?"}
+  N -- "Sim" --> O["Bloqueia fechamento"]
+  N -- "Nao" --> P{"Fechou atrasado?"}
+  P -- "Sim" --> Q["CLOSED_LATE"]
+  P -- "Nao" --> R["CLOSED"]
+          </pre>
+        </div>
+        <p>
+          O desvio so e encerrado quando todas as acoes vinculadas estao concluidas. Isso evita que
+          um problema seja marcado como resolvido sem execucao comprovada.
+        </p>
+      </section>
+
+      <section>
+        <h2>5. Estrategia e OKRs</h2>
+        <div class="download-row"><button type="button" onclick="downloadSvg('estrategia')">Baixar SVG</button></div>
+        <div class="diagram-wrap">
+          <pre id="estrategia" class="mermaid">
+flowchart TD
+  A["Mapa estrategico"] --> B["Perspectivas BSC"]
+  B --> C["Objetivos estrategicos"]
+  C --> D["Relacoes causa-efeito"]
+  C --> E["Indicadores vinculados"]
+  E --> F["Farol agregado<br/>por ultimo resultado"]
+  F --> G["Gestor acompanha<br/>status do objetivo"]
+  A --> H["Ciclos OKR"]
+  H --> I["Objetivos OKR"]
+  I --> J["Key Results<br/>com peso"]
+  J --> K["Progresso ponderado"]
+  K --> L["Check-in semanal"]
+  L --> M{"Progresso >= 95%?"}
+  M -- "Sim" --> N["DONE"]
+  M -- "Nao" --> O{"Confianca >= 70%<br/>e progresso >= 30%?"}
+  O -- "Sim" --> P["ON_TRACK"]
+  O -- "Nao" --> Q{"Confianca < 40%?"}
+  Q -- "Sim" --> R["OFF_TRACK"]
+  Q -- "Nao" --> S["AT_RISK"]
+          </pre>
+        </div>
+      </section>
+
+      <section>
+        <h2>6. Importacao, relatorios e notificacoes</h2>
+        <div class="download-row"><button type="button" onclick="downloadSvg('dados')">Baixar SVG</button></div>
+        <div class="diagram-wrap">
+          <pre id="dados" class="mermaid">
+flowchart TD
+  A["CSV no navegador"] --> B["Preview"]
+  B --> C["Validacao linha a linha"]
+  C --> D{"Linha valida?"}
+  D -- "Nao" --> E["Erro exibido<br/>sem gravar"]
+  D -- "Sim" --> F["Commit"]
+  F --> G[("ImportJob")]
+  G --> H["Upsert de indicadores,<br/>metas ou resultados"]
+  H --> I{"Importou resultado?"}
+  I -- "Sim" --> J["Calcula farol"]
+  I -- "Nao" --> K["Atualiza cadastro"]
+  J --> L["Dashboard e relatorios"]
+  K --> L
+  L --> M["PDF executivo<br/>no browser"]
+  L --> N["CSV via API"]
+  L --> O["Verificar regras<br/>de notificacao"]
+  O --> P["Acao atrasada"]
+  O --> Q["Indicador vermelho"]
+  P --> R[("Notification")]
+  Q --> R
+          </pre>
+        </div>
+        <table>
+          <thead><tr><th>Saida</th><th>Como e gerada</th></tr></thead>
+          <tbody>
+            <tr><td>PDF executivo</td><td>No frontend, com jsPDF.</td></tr>
+            <tr><td>CSVs</td><td>Na API, para indicadores, resultados, acoes e desvios.</td></tr>
+            <tr><td>Notificacoes</td><td>Sob demanda, por indicador vermelho e acao atrasada.</td></tr>
+            <tr><td>Insights</td><td>Heuristicas locais de resumo, tendencia, causa e acao.</td></tr>
+          </tbody>
+        </table>
+      </section>
+
+      <section>
+        <h2>7. Telas principais</h2>
+        <table>
+          <thead><tr><th>Area</th><th>Rotas</th><th>Uso</th></tr></thead>
+          <tbody>
+            <tr><td>Visao</td><td><code>/</code>, <code>/insights</code></td><td>Resumo executivo, riscos, tendencias e recomendacoes.</td></tr>
+            <tr><td>Estrategia</td><td><code>/strategy</code>, <code>/okrs</code></td><td>BSC, objetivos, indicadores vinculados e OKRs.</td></tr>
+            <tr><td>Performance</td><td><code>/indicators</code>, <code>/results</code>, <code>/tree</code></td><td>KPI, metas, lancamentos e impacto entre indicadores.</td></tr>
+            <tr><td>Execucao</td><td><code>/deviations</code>, <code>/actions</code>, <code>/projects</code>, <code>/meetings</code></td><td>Desvios, acoes, Gantt, reunioes e decisoes.</td></tr>
+            <tr><td>Dados</td><td><code>/imports</code>, <code>/reports</code></td><td>CSV, PDF e exportacoes.</td></tr>
+            <tr><td>Empresa</td><td><code>/org</code>, <code>/users</code>, <code>/audit</code>, <code>/settings</code></td><td>Estrutura, usuarios, auditoria e configuracoes.</td></tr>
+          </tbody>
+        </table>
+      </section>
+
+      <section>
+        <h2>8. Setup e deploy</h2>
+        <div class="download-row"><button type="button" onclick="downloadSvg('deploy')">Baixar SVG</button></div>
+        <div class="diagram-wrap">
+          <pre id="deploy" class="mermaid">
+flowchart TD
+  A["Repo local"] --> B["pnpm install"]
+  B --> C[".env"]
+  C --> D["pnpm shared:build"]
+  D --> E["pnpm db:up"]
+  E --> F["pnpm db:migrate"]
+  F --> G["pnpm db:seed"]
+  G --> H["pnpm dev"]
+  H --> I["Web localhost:3000"]
+  H --> J["API localhost:3333/api"]
+  A --> K["Producao"]
+  K --> L["Neon Postgres"]
+  L --> M["GitHub repo"]
+  M --> N[".do/app.yaml"]
+  N --> O["Secrets"]
+  O --> P["DigitalOcean App Platform"]
+  P --> Q["api + web"]
+          </pre>
+        </div>
+      </section>
+    </main>
+
+    <script type="module">
+      import mermaid from "https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.esm.min.mjs";
+
+      mermaid.initialize({
+        startOnLoad: true,
+        securityLevel: "loose",
+        theme: "base",
+        themeVariables: {
+          primaryColor: "#e0f2fe",
+          primaryBorderColor: "#0284c7",
+          primaryTextColor: "#0f172a",
+          lineColor: "#64748b",
+          fontFamily: "Inter, ui-sans-serif, system-ui, sans-serif"
+        }
+      });
+
+      window.downloadSvg = function downloadSvg(id) {
+        const container = document.getElementById(id)?.parentElement;
+        const svg = container?.querySelector("svg");
+        if (!svg) {
+          alert("Diagrama ainda nao renderizado. Aguarde alguns segundos e tente novamente.");
+          return;
+        }
+        const source = new XMLSerializer().serializeToString(svg);
+        const blob = new Blob([source], { type: "image/svg+xml;charset=utf-8" });
+        const url = URL.createObjectURL(blob);
+        const link = document.createElement("a");
+        link.href = url;
+        link.download = `${id}.svg`;
+        document.body.appendChild(link);
+        link.click();
+        link.remove();
+        URL.revokeObjectURL(url);
+      };
+    </script>
+  </body>
+</html>

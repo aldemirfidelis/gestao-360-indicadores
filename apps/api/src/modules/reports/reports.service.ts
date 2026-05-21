@@ -1,0 +1,129 @@
+import { Injectable } from '@nestjs/common';
+import { PrismaService } from '../../prisma/prisma.service';
+
+function toCsv(rows: Record<string, unknown>[]): string {
+  if (rows.length === 0) return '';
+  const headers = Array.from(
+    rows.reduce<Set<string>>((set, r) => {
+      Object.keys(r).forEach((k) => set.add(k));
+      return set;
+    }, new Set()),
+  );
+  const escape = (v: unknown): string => {
+    if (v === null || v === undefined) return '';
+    const s = String(v);
+    if (s.includes(',') || s.includes('\n') || s.includes('"')) return `"${s.replace(/"/g, '""')}"`;
+    return s;
+  };
+  const lines = [headers.join(',')];
+  rows.forEach((r) => lines.push(headers.map((h) => escape(r[h])).join(',')));
+  return lines.join('\n');
+}
+
+@Injectable()
+export class ReportsService {
+  constructor(private readonly prisma: PrismaService) {}
+
+  async indicatorsCsv(companyId: string) {
+    const items = await this.prisma.indicator.findMany({
+      where: { companyId, deletedAt: null },
+      include: {
+        ownerNode: { select: { name: true } },
+        responsibleUser: { select: { name: true } },
+        results: { orderBy: { periodDate: 'desc' }, take: 1 },
+      },
+      orderBy: { name: 'asc' },
+    });
+    const rows = items.map((i) => ({
+      code: i.code ?? '',
+      name: i.name,
+      type: i.type,
+      unit: i.unit,
+      periodicity: i.periodicity,
+      direction: i.direction,
+      owner: i.ownerNode.name,
+      responsible: i.responsibleUser?.name ?? '',
+      status: i.status,
+      lastPeriod: i.results[0]?.periodRef ?? '',
+      lastValue: i.results[0]?.value ?? '',
+      lastLight: i.results[0]?.light ?? '',
+      lastAttainment: i.results[0]?.attainment ?? '',
+    }));
+    return toCsv(rows);
+  }
+
+  async resultsCsv(companyId: string, periodFrom?: string, periodTo?: string) {
+    const results = await this.prisma.indicatorResult.findMany({
+      where: {
+        indicator: { companyId, deletedAt: null },
+        ...(periodFrom ? { periodRef: { gte: periodFrom } } : {}),
+        ...(periodTo ? { periodRef: { lte: periodTo } } : {}),
+      },
+      include: {
+        indicator: { select: { code: true, name: true, ownerNode: { select: { name: true } } } },
+      },
+      orderBy: [{ periodDate: 'desc' }],
+    });
+    const rows = results.map((r) => ({
+      periodRef: r.periodRef,
+      code: r.indicator.code ?? '',
+      indicator: r.indicator.name,
+      area: r.indicator.ownerNode.name,
+      value: r.value,
+      attainment: r.attainment,
+      deviationPct: r.deviationPct,
+      light: r.light,
+      status: r.status,
+    }));
+    return toCsv(rows);
+  }
+
+  async actionsCsv(companyId: string) {
+    const items = await this.prisma.actionPlan.findMany({
+      where: { companyId, deletedAt: null },
+      include: {
+        responsibleUser: { select: { name: true } },
+        ownerNode: { select: { name: true } },
+      },
+      orderBy: { createdAt: 'desc' },
+    });
+    const rows = items.map((a) => ({
+      title: a.title,
+      origin: a.origin,
+      priority: a.priority,
+      status: a.status,
+      responsible: a.responsibleUser?.name ?? '',
+      area: a.ownerNode?.name ?? '',
+      startDate: a.startDate?.toISOString().slice(0, 10) ?? '',
+      dueDate: a.dueDate?.toISOString().slice(0, 10) ?? '',
+      completedAt: a.completedAt?.toISOString().slice(0, 10) ?? '',
+      progress: a.progress,
+    }));
+    return toCsv(rows);
+  }
+
+  async deviationsCsv(companyId: string) {
+    const items = await this.prisma.deviation.findMany({
+      where: { companyId, deletedAt: null },
+      include: {
+        indicator: { select: { code: true, name: true } },
+        responsibleUser: { select: { name: true } },
+      },
+      orderBy: { number: 'asc' },
+    });
+    const rows = items.map((d) => ({
+      number: d.number,
+      title: d.title,
+      indicatorCode: d.indicator.code ?? '',
+      indicator: d.indicator.name,
+      periodRef: d.periodRef,
+      severity: d.severity,
+      status: d.status,
+      responsible: d.responsibleUser?.name ?? '',
+      openedAt: d.openedAt.toISOString().slice(0, 10),
+      dueDate: d.dueDate?.toISOString().slice(0, 10) ?? '',
+      closedAt: d.closedAt?.toISOString().slice(0, 10) ?? '',
+    }));
+    return toCsv(rows);
+  }
+}
