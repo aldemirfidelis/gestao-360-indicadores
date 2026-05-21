@@ -3,7 +3,8 @@
 import { useMemo, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
-import { CalendarClock, CheckCircle2, RotateCcw, Save, Target } from 'lucide-react';
+import Link from 'next/link';
+import { AlertTriangle, CalendarClock, CheckCircle2, RotateCcw, Save, Target } from 'lucide-react';
 import { PageHeader } from '@/components/shell/page-header';
 import { MetricCard } from '@/components/platform/metric-card';
 import { SectionCard } from '@/components/platform/section-card';
@@ -12,6 +13,14 @@ import { LoadingState } from '@/components/platform/loading-state';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { StatusLight } from '@/components/ui/status-light';
+import {
+  Dialog,
+  DialogContent,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog';
+import { Textarea } from '@/components/ui/textarea';
 import { api } from '@/lib/api';
 import { cn, formatNumber, periodRefLabel } from '@/lib/utils';
 
@@ -36,13 +45,17 @@ interface PendingRow {
 }
 
 interface UpsertOutcome {
-  result: { id: string };
+  result: { id: string; indicatorId: string; periodRef: string };
   shouldOpenDeviation: boolean;
+  treatment?: { id: string; status: string } | null;
 }
 
 export default function ResultsPage() {
   const qc = useQueryClient();
   const [edits, setEdits] = useState<Record<string, Record<string, string>>>({});
+  const [offTargetOpen, setOffTargetOpen] = useState(false);
+  const [offTargets, setOffTargets] = useState<UpsertOutcome[]>([]);
+  const [ignoreReason, setIgnoreReason] = useState('');
 
   const query = useQuery<PendingRow[]>({
     queryKey: ['results', 'pending'],
@@ -64,11 +77,28 @@ export default function ResultsPage() {
     onSuccess: (out) => {
       const reds = out.results.filter((r) => r.shouldOpenDeviation).length;
       toast.success(`${out.count} lancamentos salvos${reds ? ` - ${reds} indicador(es) em vermelho` : ''}`);
+      const treatments = out.results.filter((r) => r.shouldOpenDeviation && r.treatment);
+      setOffTargets(treatments);
+      setOffTargetOpen(treatments.length > 0);
       setEdits({});
       qc.invalidateQueries({ queryKey: ['results', 'pending'] });
       qc.invalidateQueries({ queryKey: ['dashboard'] });
     },
     onError: (e: any) => toast.error(e?.message ?? 'Falha ao salvar'),
+  });
+
+  const ignoreTreatment = useMutation({
+    mutationFn: (treatmentId: string) =>
+      api(`/treatments/${treatmentId}/ignore`, {
+        method: 'POST',
+        json: { reason: ignoreReason || 'Ignorado temporariamente no lancamento de resultado.' },
+      }),
+    onSuccess: () => {
+      toast.success('Tratativa ignorada temporariamente');
+      setIgnoreReason('');
+      setOffTargetOpen(false);
+      qc.invalidateQueries({ queryKey: ['dashboard'] });
+    },
   });
 
   const pendingCount = Object.values(edits).reduce(
@@ -219,6 +249,69 @@ export default function ResultsPage() {
           )}
         </div>
       </SectionCard>
+
+      <Dialog open={offTargetOpen} onOpenChange={setOffTargetOpen}>
+        <DialogContent className="max-w-3xl">
+          <DialogHeader>
+            <DialogTitle>Indicador fora da meta detectado</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div className="rounded-lg border border-status-red/30 bg-status-red/10 p-4">
+              <div className="flex items-start gap-3">
+                <AlertTriangle className="mt-0.5 h-5 w-5 text-status-red" />
+                <div>
+                  <div className="font-semibold">Este indicador esta fora da meta. Deseja iniciar o tratamento?</div>
+                  <p className="mt-1 text-sm text-muted-foreground">
+                    O sistema ja registrou a rastreabilidade inicial. Agora voce pode criar analise de causa, agendar reuniao, criar plano de acao ou ignorar temporariamente com justificativa.
+                  </p>
+                </div>
+              </div>
+            </div>
+            <div className="space-y-2">
+              {offTargets.map((item) => {
+                const row = query.data?.find((r) => r.indicator.id === item.result.indicatorId);
+                return (
+                  <div key={item.treatment?.id} className="flex flex-col gap-3 rounded-lg border p-3 sm:flex-row sm:items-center sm:justify-between">
+                    <div>
+                      <div className="font-medium">{row?.indicator.name ?? 'Indicador fora da meta'}</div>
+                      <div className="text-xs text-muted-foreground">
+                        Periodo {periodRefLabel(item.result.periodRef)} - status {item.treatment?.status}
+                      </div>
+                    </div>
+                    <div className="flex flex-wrap gap-2">
+                      <Button asChild>
+                        <Link href={`/treatments/${item.treatment?.id}`}>Iniciar tratamento</Link>
+                      </Button>
+                      <Button variant="outline" asChild>
+                        <Link href={`/indicators/${item.result.indicatorId}`}>Ver historico</Link>
+                      </Button>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+            <div className="space-y-2">
+              <div className="text-sm font-medium">Ignorar temporariamente com justificativa</div>
+              <Textarea
+                rows={3}
+                value={ignoreReason}
+                onChange={(e) => setIgnoreReason(e.target.value)}
+                placeholder="Explique por que esta tratativa sera adiada..."
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setOffTargetOpen(false)}>Fechar</Button>
+            <Button
+              variant="destructive"
+              disabled={offTargets.length === 0 || ignoreTreatment.isPending || !ignoreReason.trim()}
+              onClick={() => offTargets[0]?.treatment?.id && ignoreTreatment.mutate(offTargets[0].treatment.id)}
+            >
+              Ignorar com justificativa
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

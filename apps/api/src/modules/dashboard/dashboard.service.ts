@@ -1,6 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { PrismaService } from '../../prisma/prisma.service';
-import { ActionStatus, DeviationStatus, TrafficLight } from '@prisma/client';
+import { ActionStatus, DeviationStatus, TrafficLight, TreatmentStatus } from '@prisma/client';
 import { dateToPeriodRef, lastNPeriodRefs } from '../indicators/period.util';
 
 @Injectable()
@@ -38,7 +38,21 @@ export class DashboardService {
     counts.GRAY += totalIndicators - seenIds.size;
     const generalAttainment = attainmentN > 0 ? attainmentSum / attainmentN : null;
 
-    const [openActions, overdueActions, criticalDeviations] = await Promise.all([
+    const now = new Date();
+    const soon = new Date(now);
+    soon.setDate(now.getDate() + 7);
+
+    const [
+      openActions,
+      overdueActions,
+      doneActions,
+      criticalDeviations,
+      openDeviations,
+      pendingMeetings,
+      dueSoonActions,
+      openTreatmentCases,
+      treatmentAlerts,
+    ] = await Promise.all([
       this.prisma.actionPlan.count({
         where: {
           companyId,
@@ -54,6 +68,13 @@ export class DashboardService {
           status: { notIn: [ActionStatus.DONE, ActionStatus.DONE_LATE, ActionStatus.CANCELLED] },
         },
       }),
+      this.prisma.actionPlan.count({
+        where: {
+          companyId,
+          deletedAt: null,
+          status: { in: [ActionStatus.DONE, ActionStatus.DONE_LATE] },
+        },
+      }),
       this.prisma.deviation.count({
         where: {
           companyId,
@@ -64,7 +85,81 @@ export class DashboardService {
           },
         },
       }),
+      this.prisma.deviation.count({
+        where: {
+          companyId,
+          deletedAt: null,
+          status: { notIn: [DeviationStatus.CLOSED, DeviationStatus.CLOSED_LATE, DeviationStatus.CANCELLED] },
+        },
+      }),
+      this.prisma.meeting.count({
+        where: {
+          companyId,
+          deletedAt: null,
+          startsAt: { gte: now, lte: soon },
+        },
+      }),
+      this.prisma.actionPlan.findMany({
+        where: {
+          companyId,
+          deletedAt: null,
+          dueDate: { gte: now, lte: soon },
+          status: { notIn: [ActionStatus.DONE, ActionStatus.DONE_LATE, ActionStatus.CANCELLED] },
+        },
+        include: { responsibleUser: { select: { id: true, name: true } } },
+        orderBy: { dueDate: 'asc' },
+        take: 8,
+      }),
+      this.prisma.treatmentCase.count({
+        where: {
+          companyId,
+          status: { notIn: [TreatmentStatus.RESOLVED, TreatmentStatus.CONCLUDED, TreatmentStatus.IGNORED_TEMPORARILY] },
+        },
+      }),
+      this.prisma.treatmentCase.findMany({
+        where: {
+          companyId,
+          status: {
+            in: [
+              TreatmentStatus.AWAITING_CAUSE_ANALYSIS,
+              TreatmentStatus.CAUSE_ANALYSIS_CREATED,
+              TreatmentStatus.MEETING_SCHEDULED,
+              TreatmentStatus.ACTION_PLAN_CREATED,
+              TreatmentStatus.ACTIONS_OVERDUE,
+              TreatmentStatus.UNRESOLVED,
+            ],
+          },
+        },
+        include: { indicator: { select: { id: true, name: true, ownerNode: { select: { name: true } } } } },
+        orderBy: { updatedAt: 'desc' },
+        take: 5,
+      }),
     ]);
+
+    const deviationsBySector = await this.prisma.deviation.groupBy({
+      by: ['indicatorId'],
+      where: {
+        companyId,
+        deletedAt: null,
+        status: { notIn: [DeviationStatus.CLOSED, DeviationStatus.CLOSED_LATE, DeviationStatus.CANCELLED] },
+      },
+      _count: { indicatorId: true },
+      orderBy: { _count: { indicatorId: 'desc' } },
+      take: 50,
+    });
+    const indicatorsForDeviations = await this.prisma.indicator.findMany({
+      where: { id: { in: deviationsBySector.map((d) => d.indicatorId) } },
+      select: { id: true, ownerNode: { select: { id: true, name: true, type: true } } },
+    });
+    const indOwner = new Map(indicatorsForDeviations.map((i) => [i.id, i.ownerNode]));
+    const sectorBuckets = new Map<string, { nodeId: string; nodeName: string; nodeType: string; deviations: number }>();
+    deviationsBySector.forEach((row) => {
+      const owner = indOwner.get(row.indicatorId);
+      if (!owner) return;
+      const bucket = sectorBuckets.get(owner.id) ?? { nodeId: owner.id, nodeName: owner.name, nodeType: owner.type, deviations: 0 };
+      bucket.deviations += row._count.indicatorId;
+      sectorBuckets.set(owner.id, bucket);
+    });
 
     return {
       totalIndicators,
@@ -72,7 +167,16 @@ export class DashboardService {
       generalAttainment,
       openActions,
       overdueActions,
+      doneActions,
       criticalDeviations,
+      openDeviations,
+      pendingMeetings,
+      dueSoonActions,
+      openTreatmentCases,
+      treatmentAlerts,
+      sectorsWithDeviation: Array.from(sectorBuckets.values())
+        .sort((a, b) => b.deviations - a.deviations)
+        .slice(0, 5),
     };
   }
 

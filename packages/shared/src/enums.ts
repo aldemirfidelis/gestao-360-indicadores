@@ -125,6 +125,9 @@ export const AnalysisMethod = {
   FIVE_WHYS: 'FIVE_WHYS',
   ISHIKAWA: 'ISHIKAWA',
   PARETO: 'PARETO',
+  PDCA: 'PDCA',
+  MASP: 'MASP',
+  DMAIC: 'DMAIC',
   CAPA: 'CAPA',
   SIMPLE: 'SIMPLE',
 } as const;

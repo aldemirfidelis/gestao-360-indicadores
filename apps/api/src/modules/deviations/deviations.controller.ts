@@ -47,20 +47,22 @@ export class DeviationsController {
       dueDate: body.dueDate ? new Date(body.dueDate) : null,
       method: body.method,
       fact: body.fact,
+      createdById: me.sub,
     });
   }
 
   @Patch(':id')
-  update(@Param('id') id: string, @Body() patch: any) {
-    return this.service.update(id, patch);
+  update(@CurrentUser() me: AuthPayload, @Param('id') id: string, @Body() patch: any) {
+    return this.service.update(id, patch, me.sub);
   }
 
   @Post(':id/causes')
   addCause(
     @Param('id') id: string,
     @Body() body: { description: string; category?: string; weight?: number },
+    @CurrentUser() me: AuthPayload,
   ) {
-    return this.service.addCause(id, body.description, body.category, body.weight ?? 1);
+    return this.service.addCause(id, body.description, body.category, body.weight ?? 1, me.sub);
   }
 
   @Delete('causes/:causeId')
@@ -69,8 +71,12 @@ export class DeviationsController {
   }
 
   @Post(':id/analyses')
-  addAnalysis(@Param('id') id: string, @Body() body: { method: AnalysisMethod; content: string }) {
-    return this.service.addAnalysis(id, body.method, body.content);
+  addAnalysis(
+    @CurrentUser() me: AuthPayload,
+    @Param('id') id: string,
+    @Body() body: { method: AnalysisMethod; content: string },
+  ) {
+    return this.service.addAnalysis(id, body.method, body.content, me.sub);
   }
 
   @Post(':id/actions')
@@ -92,7 +98,7 @@ export class DeviationsController {
   }
 
   @Post(':id/close')
-  close(@Param('id') id: string) {
-    return this.service.close(id);
+  close(@CurrentUser() me: AuthPayload, @Param('id') id: string) {
+    return this.service.close(id, me.sub);
   }
 }

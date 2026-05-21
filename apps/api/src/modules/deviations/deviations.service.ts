@@ -8,7 +8,10 @@ import {
   DeviationSeverity,
   DeviationStatus,
   Prisma,
+  TraceEntityType,
+  TraceEventType,
 } from '@prisma/client';
+import { TraceabilityService } from '../traceability/traceability.service';
 
 export interface OpenDeviationInput {
   companyId: string;
@@ -20,11 +23,15 @@ export interface OpenDeviationInput {
   dueDate?: Date | null;
   method?: AnalysisMethod;
   fact?: string;
+  createdById?: string;
 }
 
 @Injectable()
 export class DeviationsService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly traceability: TraceabilityService,
+  ) {}
 
   async list(companyId: string, status?: DeviationStatus, indicatorId?: string) {
     return this.prisma.deviation.findMany({
@@ -93,27 +100,91 @@ export class DeviationsService {
 
       return { id: deviation.id, number: deviation.number };
     });
+    await this.traceability.record({
+      companyId: input.companyId,
+      indicatorId: input.indicatorId,
+      userId: input.createdById,
+      eventType: TraceEventType.CREATED,
+      entityType: TraceEntityType.DEVIATION,
+      entityId: result.id,
+      title: `Desvio #${result.number} aberto`,
+      description: input.title ?? `Desvio aberto para o periodo ${input.periodRef}`,
+      statusTo: DeviationStatus.OPEN,
+      metadata: { periodRef: input.periodRef, severity: input.severity ?? DeviationSeverity.MODERATE },
+    });
+
     return result;
   }
 
-  async update(id: string, patch: Prisma.DeviationUpdateInput) {
-    return this.prisma.deviation.update({ where: { id }, data: patch });
+  async update(id: string, patch: Prisma.DeviationUpdateInput, userId?: string) {
+    const before = await this.prisma.deviation.findUnique({ where: { id } });
+    const updated = await this.prisma.deviation.update({ where: { id }, data: patch });
+    const nextStatus = typeof patch.status === 'string' ? patch.status : undefined;
+    if (before && nextStatus && before.status !== nextStatus) {
+      await this.traceability.record({
+        companyId: updated.companyId,
+        indicatorId: updated.indicatorId,
+        userId,
+        eventType: TraceEventType.STATUS_CHANGED,
+        entityType: TraceEntityType.DEVIATION,
+        entityId: updated.id,
+        title: `Status do desvio #${updated.number} alterado`,
+        description: updated.title,
+        statusFrom: before.status,
+        statusTo: nextStatus,
+      });
+    }
+    return updated;
   }
 
-  async addCause(deviationId: string, description: string, category?: string, weight = 1) {
-    return this.prisma.deviationCause.create({
+  async addCause(deviationId: string, description: string, category?: string, weight = 1, userId?: string) {
+    const cause = await this.prisma.deviationCause.create({
       data: { deviationId, description, category: category ?? null, weight },
     });
+    const dev = await this.prisma.deviation.findUnique({ where: { id: deviationId } });
+    if (dev) {
+      await this.traceability.record({
+        companyId: dev.companyId,
+        indicatorId: dev.indicatorId,
+        userId,
+        eventType: TraceEventType.CAUSE_CREATED,
+        entityType: TraceEntityType.DEVIATION_CAUSE,
+        entityId: cause.id,
+        relatedType: TraceEntityType.DEVIATION,
+        relatedId: deviationId,
+        title: 'Causa identificada',
+        description,
+        metadata: { category, weight, deviationNumber: dev.number },
+      });
+    }
+    return cause;
   }
 
   async removeCause(causeId: string) {
     return this.prisma.deviationCause.delete({ where: { id: causeId } });
   }
 
-  async addAnalysis(deviationId: string, method: AnalysisMethod, content: string) {
-    return this.prisma.deviationAnalysis.create({
+  async addAnalysis(deviationId: string, method: AnalysisMethod, content: string, userId?: string) {
+    const analysis = await this.prisma.deviationAnalysis.create({
       data: { deviationId, method, content },
     });
+    const dev = await this.prisma.deviation.findUnique({ where: { id: deviationId } });
+    if (dev) {
+      await this.traceability.record({
+        companyId: dev.companyId,
+        indicatorId: dev.indicatorId,
+        userId,
+        eventType: TraceEventType.ANALYSIS_CREATED,
+        entityType: TraceEntityType.DEVIATION_ANALYSIS,
+        entityId: analysis.id,
+        relatedType: TraceEntityType.DEVIATION,
+        relatedId: deviationId,
+        title: `Analise de causa registrada (${method})`,
+        description: content,
+        metadata: { method, deviationNumber: dev.number },
+      });
+    }
+    return analysis;
   }
 
   async createAction(
@@ -158,10 +229,26 @@ export class DeviationsService {
       data: { status: DeviationStatus.WAITING_ACTION },
     });
 
+    await this.traceability.record({
+      companyId: dev.companyId,
+      indicatorId: dev.indicatorId,
+      userId: createdById,
+      eventType: TraceEventType.ACTION_CREATED,
+      entityType: TraceEntityType.ACTION_PLAN,
+      entityId: action.id,
+      relatedType: TraceEntityType.DEVIATION,
+      relatedId: dev.id,
+      title: 'Plano de acao criado a partir do desvio',
+      description: action.title,
+      statusFrom: dev.status,
+      statusTo: DeviationStatus.WAITING_ACTION,
+      metadata: { priority: action.priority, dueDate: action.dueDate, deviationNumber: dev.number },
+    });
+
     return action;
   }
 
-  async close(id: string) {
+  async close(id: string, userId?: string) {
     const dev = await this.getById(id);
     const open = dev.actions.filter((a) => a.status !== 'DONE' && a.status !== 'DONE_LATE');
     if (open.length > 0) {
@@ -170,12 +257,25 @@ export class DeviationsService {
       );
     }
     const lateClose = dev.dueDate && dev.dueDate < new Date();
-    return this.prisma.deviation.update({
+    const closed = await this.prisma.deviation.update({
       where: { id },
       data: {
         status: lateClose ? DeviationStatus.CLOSED_LATE : DeviationStatus.CLOSED,
         closedAt: new Date(),
       },
     });
+    await this.traceability.record({
+      companyId: closed.companyId,
+      indicatorId: closed.indicatorId,
+      userId,
+      eventType: TraceEventType.CLOSED,
+      entityType: TraceEntityType.DEVIATION,
+      entityId: closed.id,
+      title: `Desvio #${closed.number} concluido`,
+      description: closed.title,
+      statusFrom: dev.status,
+      statusTo: closed.status,
+    });
+    return closed;
   }
 }

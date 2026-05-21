@@ -2,7 +2,7 @@
 
 Plataforma SaaS corporativa para gestao estrategica de indicadores, BSC, OKR, KPI, planos de acao, FCA/CAPA, cronogramas, reunioes, importacao de dados, relatorios, insights e dashboards executivos.
 
-> **Status:** todas as fases planejadas concluidas. Sistema funcional ponta a ponta com backend NestJS + frontend Next.js, banco PostgreSQL com 41 entidades modeladas, 20+ telas, regras de negocio implementadas e dados demo realistas.
+> **Status:** sistema funcional ponta a ponta com backend NestJS + frontend Next.js, banco PostgreSQL com 40+ entidades modeladas, rastreabilidade, mapa de relacoes, dashboards, regras de negocio implementadas e dados demo realistas.
 
 ---
 
@@ -64,6 +64,10 @@ Atalho: `pnpm setup` faz tudo de uma vez.
 Foi adicionada uma documentacao visual completa do fluxo da aplicacao em **[docs/fluxograma-completo.md](./docs/fluxograma-completo.md)**.
 
 Para abrir uma versao navegavel, imprimir em PDF ou baixar os diagramas em SVG, use **[docs/fluxograma-completo.html](./docs/fluxograma-completo.html)**.
+
+A arquitetura funcional atualizada, incluindo rastreabilidade, mapa persistente, eventos, status history e fluxo completo do indicador, esta documentada em **[docs/arquitetura-gestao-360.md](./docs/arquitetura-gestao-360.md)**.
+
+O novo fluxo inteligente para tratar indicadores fora da meta esta documentado em **[docs/fluxo-tratativa-indicador-fora-meta.md](./docs/fluxo-tratativa-indicador-fora-meta.md)**.
 
 ## Deploy em producao
 
@@ -137,6 +141,9 @@ Plataforma cuida de build/deploy/SSL/escala. Veja **[DEPLOY.md](./DEPLOY.md)**.
 | `imports` | `POST /preview`, `/commit`, `GET /jobs` | Importacao CSV com validacao linha a linha |
 | `reports` | `/indicators.csv`, `/results.csv`, `/actions.csv`, `/deviations.csv` | Exports CSV com BOM para Excel pt-BR |
 | `insights` | `GET /insights` | Heuristicas locais: resumo executivo, tendencia, sugestoes |
+| `traceability` | `/traceability`, `/traceability/indicators/:id` | Linha de rastreabilidade e historico completo do indicador |
+| `relationship-map` | `/relationship-map/default`, `/nodes`, `/edges`, `/:id/layout` | Mapa 360 persistente com blocos, conexoes e layout |
+| `search` | `/search?q=...` | Busca global entre indicadores, estrutura, acoes, desvios, reunioes, usuarios e objetivos |
 | `health` | `GET /health` | Health check sem auth |
 
 ### Frontend (apps/web)
@@ -153,7 +160,7 @@ Plataforma cuida de build/deploy/SSL/escala. Veja **[DEPLOY.md](./DEPLOY.md)**.
 | `/indicators/new` | **Formulario completo de novo indicador** com 14 campos |
 | `/indicators/:id` | Detalhe: cards, grafico meta vs realizado, **editor de metas**, historico, botao **"abrir desvio"** se vermelho |
 | `/results` | Grid de **lancamentos em lote** com calculo automatico de farol |
-| `/tree` | **Arvore de indicadores** com React Flow (layout BFS por niveis) + **simulacao de impacto** |
+| `/tree` | **Mapa de relacoes 360** com React Flow, blocos persistentes, conexoes manuais e layout salvo |
 | `/deviations` | Lista com severidade e contagens |
 | `/deviations/:id` | **Detalhe completo do desvio** com Ishikawa 6M, editor de causas, multiplas analises (5 Porques, Ishikawa, Pareto, CAPA), fechamento que valida acoes abertas |
 | `/actions` | Kanban com 4 colunas e troca rapida de status |
@@ -176,7 +183,7 @@ Plataforma cuida de build/deploy/SSL/escala. Veja **[DEPLOY.md](./DEPLOY.md)**.
 
 ---
 
-## Modelagem (Prisma) — 41 entidades
+## Modelagem (Prisma) - 40+ entidades
 
 `Company`, `Branch`, `OrgNode`, `User`, `Permission`, `UserPermission`, `RefreshToken`, `StrategicMap`, `Perspective`, `StrategicObjective`, `ObjectiveRelation`, `OKRCycle`, `OKRObjective`, `KeyResult`, `OKRCheckin`, `Indicator`, `IndicatorTarget`, `IndicatorResult`, `IndicatorTreeRelation`, `Deviation`, `DeviationCause`, `DeviationAnalysis`, `ActionPlan`, `ActionTask`, `Project`, `ProjectMilestone`, `ProjectTask`, `Meeting`, `MeetingParticipant`, `MeetingAgendaItem`, `MeetingDecision`, `Attachment`, `Comment`, `Notification`, `ImportJob`, `ImportError`, `AuditLog`, `AppSetting`.
 
@@ -186,6 +193,11 @@ Plataforma cuida de build/deploy/SSL/escala. Veja **[DEPLOY.md](./DEPLOY.md)**.
 
 ## Regras de negocio implementadas
 
+- **Tratativa automatica de indicador fora da meta**: ao salvar resultado vermelho, o backend cria/atualiza uma `TreatmentCase`, registra historico e a tela de lancamentos oferece abrir o fluxo guiado.
+- **Fluxo guiado de tratativa**: `/treatments/:id` conduz analise de causa, reuniao, participantes, envio de convite, plano de acao e reavaliacao.
+- **Convites de reuniao com ICS**: `POST /meetings/:id/invitations/send` gera iCalendar e registra `EmailLog`; se SMTP nao estiver configurado, o envio fica como `PENDING` sem perder auditoria.
+- **Status automatico da tratativa**: acoes vinculadas atualizam a tratativa para em andamento, atrasada ou aguardando reavaliacao; novo resultado verde resolve o caso.
+- **Mapa de relacoes integrado**: o mapa inclui blocos de `TreatmentCase`, ligados ao indicador, desvio, reuniao e planos de acao.
 - **Calculo de farol automatico** (`packages/shared/src/status.ts`): direcao maior-melhor / menor-melhor / igual / faixa, retorna verde/amarelo/vermelho/cinza + atingimento + desvio. Mesmo codigo no front (badges) e backend (gravacao).
 - **Sugestao de desvio**: `POST /results/batch` retorna `shouldOpenDeviation: true` quando o lancamento ficou vermelho; a UI exibe toast.
 - **Abertura de desvio com numero sequencial** por empresa.
@@ -200,6 +212,19 @@ Plataforma cuida de build/deploy/SSL/escala. Veja **[DEPLOY.md](./DEPLOY.md)**.
 - **Importacao CSV** valida cada linha contra o schema do indicador (verifica codigo existente, area existente, valor numerico).
 - **Notificacoes geradas por regras**: indicador vermelho sem notificacao previa + acao atrasada com responsavel.
 - **Auditoria de login** com IP e user-agent automatico.
+
+## Fluxo de indicador fora da meta
+
+1. Lance um resultado em `/results`.
+2. Se o farol calculado for vermelho, a tela mostra "Indicador fora da meta detectado" e abre a tratativa.
+3. Em `/treatments/:id`, registre problema, causa provavel, causa raiz e metodo de analise: 5 Porques, Ishikawa, Pareto, PDCA, MASP, DMAIC, FCA, CAPA ou simples.
+4. Agende a "Reuniao de Tratativa do Indicador"; a pauta e o titulo sao sugeridos a partir do indicador, meta, resultado e desvio.
+5. Adicione participantes internos ou externos com nome, e-mail, area, cargo e papel.
+6. Envie convites pela reuniao. O sistema gera ICS e registra `EmailLog` por participante. Para envio real, configure `SMTP_HOST`, `SMTP_PORT`, `SMTP_USER`, `SMTP_PASS`, `SMTP_FROM`.
+7. Crie acoes pela aba de plano de acao da reuniao ou pelo fluxo guiado. As acoes ficam vinculadas ao indicador, analise, reuniao e tratativa.
+8. Ao concluir as acoes, lance novo resultado e use "Reavaliar indicador". Resultado verde resolve a tratativa; resultado vermelho marca como nao resolvida.
+
+Tabelas novas/alteradas neste fluxo: `TreatmentCase`, `MeetingGuest`, `EmailLog`, `CalendarInvite`, novos campos em `Meeting`, `MeetingParticipant` e `ActionPlan`, e novos eventos em `TraceabilityEvent`.
 
 ---
 

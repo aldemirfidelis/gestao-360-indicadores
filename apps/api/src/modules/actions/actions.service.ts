@@ -1,7 +1,8 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../../prisma/prisma.service';
-import { ActionStatus, Prisma } from '@prisma/client';
+import { ActionStatus, Prisma, TraceEntityType, TraceEventType, TreatmentStatus } from '@prisma/client';
 import { ActionCreateInput } from '@g360/shared';
+import { TraceabilityService } from '../traceability/traceability.service';
 
 interface ActionFilter {
   companyId: string;
@@ -14,7 +15,10 @@ interface ActionFilter {
 
 @Injectable()
 export class ActionsService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly traceability: TraceabilityService,
+  ) {}
 
   async list(f: ActionFilter) {
     const where: Prisma.ActionPlanWhereInput = {
@@ -58,7 +62,7 @@ export class ActionsService {
   }
 
   async create(input: ActionCreateInput, createdById: string) {
-    return this.prisma.actionPlan.create({
+    const action = await this.prisma.actionPlan.create({
       data: {
         companyId: input.companyId,
         title: input.title,
@@ -76,13 +80,27 @@ export class ActionsService {
         deviationId: input.origin === 'DEVIATION' ? input.originRefId ?? null : null,
       },
     });
+    const ctx = await this.actionTraceContext(action.id);
+    await this.traceability.record({
+      companyId: action.companyId,
+      indicatorId: ctx.indicatorId,
+      userId: createdById,
+      eventType: TraceEventType.ACTION_CREATED,
+      entityType: TraceEntityType.ACTION_PLAN,
+      entityId: action.id,
+      title: 'Plano de acao criado',
+      description: action.title,
+      statusTo: action.status,
+      metadata: { origin: action.origin, priority: action.priority, dueDate: action.dueDate },
+    });
+    return action;
   }
 
   async update(id: string, patch: Prisma.ActionPlanUpdateInput) {
     return this.prisma.actionPlan.update({ where: { id }, data: patch });
   }
 
-  async changeStatus(id: string, status: ActionStatus) {
+  async changeStatus(id: string, status: ActionStatus, userId?: string) {
     const action = await this.getById(id);
     let completedAt: Date | null = action.completedAt;
     let finalStatus = status;
@@ -91,17 +109,49 @@ export class ActionsService {
       completedAt = new Date();
       if (action.dueDate && completedAt > action.dueDate) finalStatus = ActionStatus.DONE_LATE;
     }
-    return this.prisma.actionPlan.update({
+    const updated = await this.prisma.actionPlan.update({
       where: { id },
       data: { status: finalStatus, completedAt },
     });
+    const ctx = await this.actionTraceContext(id);
+    if (ctx.treatmentId) {
+      await this.updateTreatmentFromActions(ctx.treatmentId);
+    }
+    await this.traceability.record({
+      companyId: updated.companyId,
+      indicatorId: ctx.indicatorId,
+      userId,
+      eventType: TraceEventType.ACTION_STATUS_CHANGED,
+      entityType: TraceEntityType.ACTION_PLAN,
+      entityId: id,
+      title: 'Status do plano de acao alterado',
+      description: updated.title,
+      statusFrom: action.status,
+      statusTo: updated.status,
+      metadata: { progress: updated.progress, completedAt: updated.completedAt },
+    });
+    return updated;
   }
 
   async addTask(actionId: string, title: string, dueDate?: Date) {
     const count = await this.prisma.actionTask.count({ where: { actionId } });
-    return this.prisma.actionTask.create({
+    const task = await this.prisma.actionTask.create({
       data: { actionId, title, dueDate: dueDate ?? null, position: count },
     });
+    const ctx = await this.actionTraceContext(actionId);
+    await this.traceability.record({
+      companyId: ctx.companyId,
+      indicatorId: ctx.indicatorId,
+      eventType: TraceEventType.TASK_UPDATED,
+      entityType: TraceEntityType.ACTION_TASK,
+      entityId: task.id,
+      relatedType: TraceEntityType.ACTION_PLAN,
+      relatedId: actionId,
+      title: 'Tarefa criada no plano de acao',
+      description: task.title,
+      metadata: { dueDate: task.dueDate },
+    });
+    return task;
   }
 
   async toggleTask(taskId: string, done: boolean) {
@@ -110,6 +160,19 @@ export class ActionsService {
       data: { done },
     });
     await this.recalcProgress(t.actionId);
+    const ctx = await this.actionTraceContext(t.actionId);
+    await this.traceability.record({
+      companyId: ctx.companyId,
+      indicatorId: ctx.indicatorId,
+      eventType: TraceEventType.TASK_UPDATED,
+      entityType: TraceEntityType.ACTION_TASK,
+      entityId: taskId,
+      relatedType: TraceEntityType.ACTION_PLAN,
+      relatedId: t.actionId,
+      title: done ? 'Tarefa concluida' : 'Tarefa reaberta',
+      description: t.title,
+      statusTo: done ? 'DONE' : 'OPEN',
+    });
     return t;
   }
 
@@ -122,9 +185,57 @@ export class ActionsService {
   }
 
   async remove(id: string) {
-    return this.prisma.actionPlan.update({
+    const removed = await this.prisma.actionPlan.update({
       where: { id },
       data: { deletedAt: new Date(), status: ActionStatus.CANCELLED },
     });
+    const ctx = await this.actionTraceContext(id);
+    await this.traceability.record({
+      companyId: removed.companyId,
+      indicatorId: ctx.indicatorId,
+      eventType: TraceEventType.STATUS_CHANGED,
+      entityType: TraceEntityType.ACTION_PLAN,
+      entityId: id,
+      title: 'Plano de acao cancelado',
+      description: removed.title,
+      statusTo: ActionStatus.CANCELLED,
+    });
+    return removed;
+  }
+
+  private async actionTraceContext(actionId: string) {
+    const action = await this.prisma.actionPlan.findUnique({
+      where: { id: actionId },
+      select: {
+        companyId: true,
+        indicatorId: true,
+        treatmentId: true,
+        deviation: { select: { indicatorId: true } },
+        origin: true,
+        originRefId: true,
+      },
+    });
+    if (!action) throw new NotFoundException('Acao nao encontrada');
+    let indicatorId = action.indicatorId ?? action.deviation?.indicatorId ?? null;
+    if (!indicatorId && action.origin === 'INDICATOR') indicatorId = action.originRefId;
+    return { companyId: action.companyId, indicatorId, treatmentId: action.treatmentId };
+  }
+
+  private async updateTreatmentFromActions(treatmentId: string) {
+    const actions = await this.prisma.actionPlan.findMany({
+      where: { treatmentId, deletedAt: null },
+      select: { status: true, dueDate: true },
+    });
+    if (actions.length === 0) return;
+    const now = new Date();
+    const finalStatuses: ActionStatus[] = [ActionStatus.DONE, ActionStatus.DONE_LATE, ActionStatus.CANCELLED];
+    const allDone = actions.every((action) => finalStatuses.includes(action.status));
+    const hasOverdue = actions.some((action) => action.dueDate && action.dueDate < now && !finalStatuses.includes(action.status));
+    const status = allDone
+      ? TreatmentStatus.AWAITING_REEVALUATION
+      : hasOverdue
+        ? TreatmentStatus.ACTIONS_OVERDUE
+        : TreatmentStatus.ACTIONS_IN_PROGRESS;
+    await this.prisma.treatmentCase.update({ where: { id: treatmentId }, data: { status } });
   }
 }

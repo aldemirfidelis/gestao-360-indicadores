@@ -5,6 +5,8 @@ import { useQuery } from '@tanstack/react-query';
 import {
   AlertTriangle,
   ArrowRight,
+  Building2,
+  CalendarClock,
   CheckCircle2,
   ClipboardList,
   Clock,
@@ -20,7 +22,7 @@ import { SectionCard } from '@/components/platform/section-card';
 import { StatusBadge } from '@/components/platform/status-badge';
 import { Button } from '@/components/ui/button';
 import { api } from '@/lib/api';
-import { formatNumber, formatPercent, periodRefLabel } from '@/lib/utils';
+import { formatDate, formatNumber, formatPercent, periodRefLabel } from '@/lib/utils';
 
 interface Overview {
   totalIndicators: number;
@@ -28,7 +30,26 @@ interface Overview {
   generalAttainment: number | null;
   openActions: number;
   overdueActions: number;
+  doneActions: number;
   criticalDeviations: number;
+  openDeviations: number;
+  pendingMeetings: number;
+  openTreatmentCases: number;
+  treatmentAlerts: Array<{
+    id: string;
+    title: string;
+    periodRef: string;
+    status: string;
+    indicator: { id: string; name: string; ownerNode: { name: string } };
+  }>;
+  dueSoonActions: Array<{
+    id: string;
+    title: string;
+    dueDate: string | null;
+    priority: string;
+    responsibleUser: { id: string; name: string } | null;
+  }>;
+  sectorsWithDeviation: Array<{ nodeId: string; nodeName: string; nodeType: string; deviations: number }>;
 }
 
 interface Pending {
@@ -145,6 +166,41 @@ export default function HomePage() {
         />
       </div>
 
+      <div className="mb-6 grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
+        <MetricCard
+          title="Acoes abertas"
+          value={formatNumber(ov?.openActions)}
+          description={`${formatNumber(ov?.doneActions)} concluidas`}
+          icon={<ClipboardList className="h-4 w-4" />}
+          tone="purple"
+          href="/actions"
+        />
+        <MetricCard
+          title="Acoes atrasadas"
+          value={formatNumber(ov?.overdueActions)}
+          description="Prazos vencidos"
+          icon={<AlertTriangle className="h-4 w-4" />}
+          tone="red"
+          href="/actions"
+        />
+        <MetricCard
+          title="Tratativas abertas"
+          value={formatNumber(ov?.openTreatmentCases)}
+          description={`${formatNumber(ov?.openDeviations)} desvios abertos`}
+          icon={<AlertTriangle className="h-4 w-4" />}
+          tone="yellow"
+          href="/deviations"
+        />
+        <MetricCard
+          title="Reunioes pendentes"
+          value={formatNumber(ov?.pendingMeetings)}
+          description="Proximos 7 dias"
+          icon={<CalendarClock className="h-4 w-4" />}
+          tone="blue"
+          href="/meetings"
+        />
+      </div>
+
       <div className="grid grid-cols-1 gap-6 xl:grid-cols-[1fr,380px]">
         <SectionCard title="Atalhos rapidos" description="Acoes frequentes da rotina corporativa." contentClassName="grid grid-cols-1 gap-3 md:grid-cols-2">
           {[
@@ -180,6 +236,18 @@ export default function HomePage() {
             </div>
           </div>
           <div className="space-y-3">
+            {ov?.treatmentAlerts?.map((item) => (
+              <Link key={item.id} href={`/treatments/${item.id}`} className="flex items-start justify-between gap-3 rounded-lg border border-status-orange/30 bg-status-orange/10 p-3 transition-colors hover:bg-status-orange/15">
+                <div className="min-w-0">
+                  <div className="truncate text-sm font-semibold">{item.indicator.name}</div>
+                  <div className="mt-1 flex items-center gap-2 text-xs text-muted-foreground">
+                    <AlertTriangle className="h-3.5 w-3.5" />
+                    <span>{item.indicator.ownerNode.name} - {periodRefLabel(item.periodRef)}</span>
+                  </div>
+                </div>
+                <StatusBadge value={item.status} label={treatmentStatusLabel(item.status)} tone="yellow" />
+              </Link>
+            ))}
             {worst.data?.map((w) => (
               <Link key={`${w.indicator.id}-${w.periodRef}`} href={`/indicators/${w.indicator.id}`} className="flex items-start justify-between gap-3 rounded-lg border p-3 transition-colors hover:bg-accent/35">
                 <div className="min-w-0">
@@ -200,6 +268,66 @@ export default function HomePage() {
           </div>
         </SectionCard>
       </div>
+
+      <div className="mt-6 grid grid-cols-1 gap-6 xl:grid-cols-2">
+        <SectionCard title="Proximos vencimentos" description="Acoes que precisam de acompanhamento na semana.">
+          <div className="space-y-3">
+            {ov?.dueSoonActions?.map((action) => (
+              <Link key={action.id} href={`/actions/${action.id}`} className="flex items-center justify-between gap-3 rounded-lg border p-3 transition-colors hover:bg-accent/35">
+                <div className="min-w-0">
+                  <div className="truncate text-sm font-semibold">{action.title}</div>
+                  <div className="text-xs text-muted-foreground">{action.responsibleUser?.name ?? 'Sem responsavel'}</div>
+                </div>
+                <div className="text-right text-xs">
+                  <div className="font-medium">{formatDate(action.dueDate)}</div>
+                  <StatusBadge value={action.priority} label={action.priority} />
+                </div>
+              </Link>
+            ))}
+            {(!ov?.dueSoonActions || ov.dueSoonActions.length === 0) && (
+              <div className="rounded-lg border border-dashed p-4 text-center text-sm text-muted-foreground">
+                Nenhuma acao vencendo nos proximos dias.
+              </div>
+            )}
+          </div>
+        </SectionCard>
+
+        <SectionCard title="Setores com mais desvios" description="Onde concentrar energia gerencial agora.">
+          <div className="space-y-3">
+            {ov?.sectorsWithDeviation?.map((sector) => (
+              <Link key={sector.nodeId} href="/org" className="flex items-center justify-between gap-3 rounded-lg border p-3 transition-colors hover:bg-accent/35">
+                <div className="flex min-w-0 items-center gap-3">
+                  <div className="grid h-9 w-9 shrink-0 place-items-center rounded-lg bg-status-orange/10 text-status-orange">
+                    <Building2 className="h-4 w-4" />
+                  </div>
+                  <div className="min-w-0">
+                    <div className="truncate text-sm font-semibold">{sector.nodeName}</div>
+                    <div className="text-xs text-muted-foreground">{sector.nodeType}</div>
+                  </div>
+                </div>
+                <div className="text-xl font-semibold">{sector.deviations}</div>
+              </Link>
+            ))}
+            {(!ov?.sectorsWithDeviation || ov.sectorsWithDeviation.length === 0) && (
+              <div className="rounded-lg border border-dashed p-4 text-center text-sm text-muted-foreground">
+                Nenhum desvio aberto por setor.
+              </div>
+            )}
+          </div>
+        </SectionCard>
+      </div>
     </div>
   );
+}
+
+function treatmentStatusLabel(status: string) {
+  const labels: Record<string, string> = {
+    AWAITING_CAUSE_ANALYSIS: 'Sem analise',
+    CAUSE_ANALYSIS_CREATED: 'Sem reuniao',
+    MEETING_SCHEDULED: 'Sem acao',
+    ACTION_PLAN_CREATED: 'Em execucao',
+    ACTIONS_OVERDUE: 'Acoes atrasadas',
+    UNRESOLVED: 'Nao resolvido',
+  };
+  return labels[status] ?? status;
 }

@@ -2,6 +2,8 @@
 
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
+import { useState } from 'react';
+import { useQuery } from '@tanstack/react-query';
 import { Menu, Moon, Search, Sun, LogOut, LifeBuoy } from 'lucide-react';
 import { useTheme } from 'next-themes';
 import { Button } from '@/components/ui/button';
@@ -17,12 +19,30 @@ import { useAuth } from '@/components/auth/auth-provider';
 import { navSections } from '@/components/shell/navigation';
 import { NotificationsBell } from './notifications-bell';
 import { cn } from '@/lib/utils';
+import { api } from '@/lib/api';
+
+interface SearchResult {
+  id: string;
+  type: string;
+  label: string;
+  description: string;
+  href: string;
+  status: string;
+}
 
 export function Topbar() {
   const { setTheme, theme } = useTheme();
   const { user, logout } = useAuth();
   const pathname = usePathname();
+  const [search, setSearch] = useState('');
+  const [searchOpen, setSearchOpen] = useState(false);
   const section = navSections.find((s) => s.items.some((i) => isActive(pathname, i.href)));
+
+  const globalSearch = useQuery<SearchResult[]>({
+    queryKey: ['global-search', search],
+    queryFn: () => api<SearchResult[]>(`/search?q=${encodeURIComponent(search)}&limit=6`),
+    enabled: search.trim().length >= 2 && searchOpen,
+  });
 
   return (
     <header className="sticky top-0 z-30 flex h-16 items-center gap-3 border-b bg-background/88 px-3 backdrop-blur lg:px-6">
@@ -77,9 +97,52 @@ export function Topbar() {
       <div className="relative min-w-0 flex-1 lg:max-w-2xl">
         <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
         <Input
+          value={search}
+          onChange={(event) => {
+            setSearch(event.target.value);
+            setSearchOpen(true);
+          }}
+          onFocus={() => setSearchOpen(true)}
+          onKeyDown={(event) => {
+            if (event.key === 'Escape') setSearchOpen(false);
+          }}
           placeholder="Buscar indicadores, acoes, setores, responsaveis..."
           className="h-10 border-border/80 bg-card pl-9 shadow-sm"
         />
+        {searchOpen && search.trim().length >= 2 && (
+          <div className="absolute left-0 right-0 top-12 z-50 overflow-hidden rounded-lg border bg-card shadow-xl">
+            <div className="border-b px-3 py-2 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
+              Busca global
+            </div>
+            <div className="max-h-[420px] overflow-y-auto p-2">
+              {globalSearch.isLoading && (
+                <div className="px-3 py-6 text-center text-sm text-muted-foreground">Buscando...</div>
+              )}
+              {!globalSearch.isLoading && (globalSearch.data?.length ?? 0) === 0 && (
+                <div className="px-3 py-6 text-center text-sm text-muted-foreground">Nada encontrado.</div>
+              )}
+              {globalSearch.data?.map((item) => (
+                <Link
+                  key={`${item.type}-${item.id}`}
+                  href={item.href}
+                  onClick={() => {
+                    setSearchOpen(false);
+                    setSearch('');
+                  }}
+                  className="flex items-start justify-between gap-3 rounded-md px-3 py-2 text-sm transition-colors hover:bg-accent"
+                >
+                  <span className="min-w-0">
+                    <span className="block truncate font-medium">{item.label}</span>
+                    <span className="block truncate text-xs text-muted-foreground">{item.description}</span>
+                  </span>
+                  <span className="shrink-0 rounded border bg-background px-2 py-0.5 text-[10px] uppercase text-muted-foreground">
+                    {typeLabel(item.type)}
+                  </span>
+                </Link>
+              ))}
+            </div>
+          </div>
+        )}
       </div>
 
       <div className="flex items-center gap-1 lg:gap-2">
@@ -121,4 +184,17 @@ export function Topbar() {
 function isActive(pathname: string, href: string) {
   if (href === '/') return pathname === '/';
   return pathname === href || pathname.startsWith(`${href}/`);
+}
+
+function typeLabel(type: string) {
+  const labels: Record<string, string> = {
+    indicator: 'Indicador',
+    org: 'Estrutura',
+    action: 'Acao',
+    deviation: 'Desvio',
+    meeting: 'Reuniao',
+    user: 'Usuario',
+    objective: 'Objetivo',
+  };
+  return labels[type] ?? type;
 }

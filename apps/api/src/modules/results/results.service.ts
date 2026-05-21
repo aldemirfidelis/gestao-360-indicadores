@@ -2,17 +2,30 @@ import { Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../../prisma/prisma.service';
 import { calcStatus } from '@g360/shared';
 import { IndicatorResultUpsertInput } from '@g360/shared';
-import { Direction, ResultStatus, TrafficLight } from '@prisma/client';
+import {
+  Direction,
+  NotificationKind,
+  ResultStatus,
+  TraceEntityType,
+  TraceEventType,
+  TrafficLight,
+  TreatmentStatus,
+} from '@prisma/client';
 import { lastNPeriodRefs, periodRefToDate } from '../indicators/period.util';
+import { TraceabilityService } from '../traceability/traceability.service';
 
 interface ResultSaveOutcome {
   result: any;
   shouldOpenDeviation: boolean;
+  treatment?: { id: string; status: TreatmentStatus } | null;
 }
 
 @Injectable()
 export class ResultsService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly traceability: TraceabilityService,
+  ) {}
 
   /**
    * Lista lancamentos pendentes/preenchidos para um conjunto de indicadores
@@ -131,9 +144,118 @@ export class ResultsService {
       },
     });
 
+    await this.traceability.record({
+      companyId: indicator.companyId,
+      indicatorId: indicator.id,
+      userId,
+      eventType: status.light === 'RED' ? TraceEventType.OFF_TARGET_ALERT : TraceEventType.RESULT_RECORDED,
+      entityType: TraceEntityType.INDICATOR_RESULT,
+      entityId: result.id,
+      title: status.light === 'RED' ? 'Indicador fora da meta' : 'Resultado do indicador registrado',
+      description: `${indicator.name} - ${input.periodRef}: realizado ${input.value}`,
+      statusTo: status.light,
+      metadata: {
+        periodRef: input.periodRef,
+        value: input.value,
+        target: target?.target ?? null,
+        attainment: status.attainment,
+        deviationAbs: status.deviationAbs,
+        deviationPct: status.deviationPct,
+      },
+    });
+
+    let treatment: { id: string; status: TreatmentStatus } | null = null;
+    if (status.light === 'RED') {
+      const nextTreatmentStatus = TreatmentStatus.AWAITING_CAUSE_ANALYSIS;
+      const existing = await this.prisma.treatmentCase.findUnique({
+        where: { indicatorId_periodRef: { indicatorId: indicator.id, periodRef: input.periodRef } },
+      });
+      treatment = await this.prisma.treatmentCase.upsert({
+        where: { indicatorId_periodRef: { indicatorId: indicator.id, periodRef: input.periodRef } },
+        create: {
+          companyId: indicator.companyId,
+          indicatorId: indicator.id,
+          resultId: result.id,
+          periodRef: input.periodRef,
+          title: `Tratativa - ${indicator.name} (${input.periodRef})`,
+          problem: `Resultado ${input.value} fora da meta ${target?.target ?? 'nao definida'}.`,
+          status: nextTreatmentStatus,
+          createdById: userId,
+        },
+        update: {
+          resultId: result.id,
+          problem: `Resultado ${input.value} fora da meta ${target?.target ?? 'nao definida'}.`,
+          status: existing?.status === TreatmentStatus.IGNORED_TEMPORARILY ? existing.status : nextTreatmentStatus,
+        },
+        select: { id: true, status: true },
+      });
+
+      await this.traceability.record({
+        companyId: indicator.companyId,
+        indicatorId: indicator.id,
+        userId,
+        eventType: TraceEventType.TREATMENT_STARTED,
+        entityType: TraceEntityType.INDICATOR,
+        entityId: indicator.id,
+        relatedType: TraceEntityType.INDICATOR_RESULT,
+        relatedId: result.id,
+        title: 'Tratativa automatica iniciada',
+        description: `O indicador ficou fora da meta no periodo ${input.periodRef}.`,
+        statusTo: treatment.status,
+        metadata: { treatmentId: treatment.id, periodRef: input.periodRef, target: target?.target ?? null, value: input.value },
+      });
+
+      if (indicator.responsibleUserId) {
+        await this.prisma.notification.create({
+          data: {
+            companyId: indicator.companyId,
+            userId: indicator.responsibleUserId,
+            kind: NotificationKind.INDICATOR_OFF_TARGET,
+            title: 'Indicador fora da meta',
+            body: `${indicator.name} ficou fora da meta em ${input.periodRef}. Inicie a tratativa.`,
+            link: `/treatments/${treatment.id}`,
+          },
+        });
+      }
+    } else if (status.light === 'GREEN') {
+      const openCases = await this.prisma.treatmentCase.findMany({
+        where: {
+          indicatorId: indicator.id,
+          status: {
+            in: [
+              TreatmentStatus.AWAITING_REEVALUATION,
+              TreatmentStatus.ACTIONS_IN_PROGRESS,
+              TreatmentStatus.ACTION_PLAN_CREATED,
+              TreatmentStatus.ACTIONS_OVERDUE,
+            ],
+          },
+        },
+      });
+      for (const item of openCases) {
+        await this.prisma.treatmentCase.update({
+          where: { id: item.id },
+          data: { status: TreatmentStatus.RESOLVED, resolvedAt: new Date() },
+        });
+        await this.traceability.record({
+          companyId: indicator.companyId,
+          indicatorId: indicator.id,
+          userId,
+          eventType: TraceEventType.INDICATOR_RESOLVED,
+          entityType: TraceEntityType.INDICATOR,
+          entityId: indicator.id,
+          title: 'Indicador voltou para a meta',
+          description: `${indicator.name} voltou para a meta em ${input.periodRef}.`,
+          statusFrom: item.status,
+          statusTo: TreatmentStatus.RESOLVED,
+          metadata: { treatmentId: item.id, periodRef: input.periodRef, value: input.value },
+        });
+      }
+    }
+
     return {
       result,
       shouldOpenDeviation: status.light === 'RED',
+      treatment,
     };
   }
 

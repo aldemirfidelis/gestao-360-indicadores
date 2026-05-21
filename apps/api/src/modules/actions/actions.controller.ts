@@ -48,8 +48,12 @@ export class ActionsController {
   }
 
   @Patch(':id/status')
-  changeStatus(@Param('id') id: string, @Body() body: { status: ActionStatus }) {
-    return this.service.changeStatus(id, body.status);
+  changeStatus(
+    @CurrentUser() me: AuthPayload,
+    @Param('id') id: string,
+    @Body() body: { status: ActionStatus },
+  ) {
+    return this.service.changeStatus(id, body.status, me.sub);
   }
 
   @Post(':id/tasks')
