@@ -83,9 +83,10 @@ export async function api<T>(path: string, opts: ApiOptions = {}): Promise<T> {
   const body: unknown = text ? safeJson(text) : null;
 
   if (!res.ok) {
-    const message =
-      (body && typeof body === 'object' && 'message' in body && String((body as any).message)) ||
-      `Erro ${res.status}`;
+    let message = `Erro ${res.status}`;
+    if (body && typeof body === 'object' && 'message' in body) {
+      message = String((body as { message: unknown }).message);
+    }
     throw new ApiError(res.status, message, body);
   }
   return body as T;
