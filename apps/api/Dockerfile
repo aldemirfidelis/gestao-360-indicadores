@@ -1,6 +1,6 @@
 # syntax=docker/dockerfile:1.7
 # =====================================================
-# Dockerfile da API NestJS (Gestao 360 Indicadores)
+# Dockerfile da API NestJS (Gestão 360)
 # - Multi-stage com node:20-alpine
 # - Compativel com pnpm workspaces e Prisma (Neon)
 # - Roda migrate deploy + start no entrypoint

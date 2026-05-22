@@ -2,9 +2,10 @@
 
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { Building2, ChevronRight } from 'lucide-react';
+import { ChevronRight } from 'lucide-react';
 import { navSections, type NavSection } from '@/components/shell/navigation';
 import { cn } from '@/lib/utils';
+import { BrandLogo } from '@/components/brand/brand-mark';
 
 const intentClass: Record<NavSection['intent'], string> = {
   home: 'bg-primary/10 text-primary',
@@ -19,13 +20,7 @@ export function Sidebar() {
   return (
     <aside className="hidden w-[280px] shrink-0 border-r bg-card/95 lg:flex lg:flex-col">
       <Link href="/" className="flex h-16 items-center gap-3 border-b px-5">
-        <div className="grid h-10 w-10 place-items-center rounded-lg bg-primary text-primary-foreground shadow-sm">
-          <Building2 className="h-5 w-5" />
-        </div>
-        <div className="min-w-0 leading-tight">
-          <div className="text-sm font-semibold">Gestao 360</div>
-          <div className="text-xs text-muted-foreground">Suite corporativa de indicadores</div>
-        </div>
+        <BrandLogo />
       </Link>
 
       <nav className="flex-1 overflow-y-auto px-3 py-4">
@@ -68,7 +63,7 @@ export function Sidebar() {
       <div className="border-t p-4">
         <div className="rounded-lg border bg-muted/40 p-3">
           <div className="text-xs font-semibold">Ambiente principal</div>
-          <p className="mt-1 text-xs leading-relaxed text-muted-foreground">Gestao 360 - v0.3</p>
+          <p className="mt-1 text-xs leading-relaxed text-muted-foreground">Gestão 360 - v0.4</p>
         </div>
       </div>
     </aside>

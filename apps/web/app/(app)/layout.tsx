@@ -11,7 +11,7 @@ export default function AppLayout({ children }: { children: ReactNode }) {
   if (loading) {
     return (
       <div className="enterprise-shell grid min-h-screen place-items-center text-sm text-muted-foreground">
-        <div className="rounded-lg border bg-card px-5 py-4 shadow-sm">Carregando Gestao 360...</div>
+        <div className="rounded-lg border bg-card px-5 py-4 shadow-sm">Carregando Gestão 360...</div>
       </div>
     );
   }

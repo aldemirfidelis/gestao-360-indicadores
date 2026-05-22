@@ -20,6 +20,7 @@ import { navSections } from '@/components/shell/navigation';
 import { NotificationsBell } from './notifications-bell';
 import { cn } from '@/lib/utils';
 import { api } from '@/lib/api';
+import { BrandMark } from '@/components/brand/brand-mark';
 
 interface SearchResult {
   id: string;
@@ -54,7 +55,10 @@ export function Topbar() {
         </DialogTrigger>
         <DialogContent className="left-3 top-3 h-[calc(100vh-1.5rem)] max-w-[340px] translate-x-0 translate-y-0 p-0 sm:rounded-lg">
           <DialogHeader className="border-b px-4 py-4">
-            <DialogTitle className="text-base">Gestao 360</DialogTitle>
+            <DialogTitle className="flex items-center gap-3 text-base">
+              <BrandMark className="h-9 w-9" />
+              <span>Gestão 360</span>
+            </DialogTitle>
           </DialogHeader>
           <div className="overflow-y-auto p-3">
             {navSections.map((nav) => (
@@ -89,9 +93,9 @@ export function Topbar() {
 
       <div className="hidden min-w-[140px] lg:block">
         <div className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
-          {section?.heading ?? 'Inicio'}
+          {section?.heading ?? 'Início'}
         </div>
-        <div className="text-sm font-medium">Gestao 360</div>
+        <div className="text-sm font-medium">Gestão 360</div>
       </div>
 
       <div className="relative min-w-0 flex-1 lg:max-w-2xl">
@@ -106,7 +110,7 @@ export function Topbar() {
           onKeyDown={(event) => {
             if (event.key === 'Escape') setSearchOpen(false);
           }}
-          placeholder="Buscar indicadores, acoes, setores, responsaveis..."
+          placeholder="Buscar indicadores, ações, setores, responsáveis..."
           className="h-10 border-border/80 bg-card pl-9 shadow-sm"
         />
         {searchOpen && search.trim().length >= 2 && (
@@ -190,10 +194,10 @@ function typeLabel(type: string) {
   const labels: Record<string, string> = {
     indicator: 'Indicador',
     org: 'Estrutura',
-    action: 'Acao',
+    action: 'Ação',
     deviation: 'Desvio',
-    meeting: 'Reuniao',
-    user: 'Usuario',
+    meeting: 'Reunião',
+    user: 'Usuário',
     objective: 'Objetivo',
   };
   return labels[type] ?? type;

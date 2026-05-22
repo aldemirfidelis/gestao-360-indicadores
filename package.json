@@ -1,8 +1,8 @@
 {
-  "name": "gestao-360-indicadores",
+  "name": "gestao-360",
   "version": "0.1.0",
   "private": true,
-  "description": "Plataforma SaaS de Gestao Estrategica de Indicadores, BSC, OKR, KPI e Planos de Acao",
+  "description": "Plataforma SaaS de Gestão Estratégica, BSC, OKR, KPI, planos de ação e melhoria contínua",
   "scripts": {
     "dev": "pnpm shared:build && pnpm -r --parallel --filter \"./apps/*\" dev",
     "dev:api": "pnpm shared:build && pnpm --filter @g360/api dev",

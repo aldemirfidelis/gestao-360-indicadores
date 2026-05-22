@@ -9,12 +9,12 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Button } from '@/components/ui/button';
-import { Building2 } from 'lucide-react';
 import { useAuth } from '@/components/auth/auth-provider';
+import { BrandMark } from '@/components/brand/brand-mark';
 
 const schema = z.object({
-  email: z.string().email('E-mail invalido'),
-  password: z.string().min(6, 'Minimo 6 caracteres'),
+  email: z.string().email('E-mail inválido'),
+  password: z.string().min(6, 'Mínimo de 6 caracteres'),
 });
 
 type Form = z.infer<typeof schema>;
@@ -33,31 +33,31 @@ export default function LoginPage() {
       await login(data.email, data.password);
       toast.success('Bem-vindo de volta!');
     } catch (err) {
-      toast.error('Credenciais invalidas');
+      toast.error('Credenciais inválidas');
     } finally {
       setBusy(false);
     }
   };
 
   return (
-    <div className="min-h-screen grid lg:grid-cols-2">
-      <div className="hidden lg:flex flex-col justify-between bg-gradient-to-br from-primary to-purple-700 text-primary-foreground p-12">
+    <div className="grid min-h-screen lg:grid-cols-2">
+      <div className="relative hidden overflow-hidden bg-primary text-primary-foreground lg:flex lg:flex-col lg:justify-between lg:p-12">
+        <div className="absolute inset-0 bg-[radial-gradient(circle_at_20%_20%,rgba(6,182,212,0.32),transparent_34%),radial-gradient(circle_at_80%_0%,rgba(124,58,237,0.22),transparent_30%)]" />
+        <div className="absolute inset-x-12 bottom-20 h-px bg-white/20" />
         <div className="flex items-center gap-3">
-          <div className="grid h-10 w-10 place-items-center rounded-lg bg-white/15 backdrop-blur">
-            <Building2 className="h-5 w-5" />
-          </div>
-          <span className="text-lg font-semibold">Gestao 360 Indicadores</span>
+          <BrandMark className="h-11 w-11" />
+          <span className="text-lg font-semibold">Gestão 360</span>
         </div>
-        <div className="space-y-4 max-w-lg">
+        <div className="relative max-w-lg space-y-4">
           <h1 className="text-4xl font-semibold leading-tight">
-            Estrategia, indicadores e execucao em um unico lugar.
+            Estratégia, indicadores e execução em um único lugar.
           </h1>
           <p className="text-primary-foreground/80">
-            BSC, OKR, KPI, planos de acao, FCA, cronogramas e dashboards executivos. Tudo conectado para
-            transformar dados em decisao.
+            BSC, OKR, metas, planos de ação, reuniões, rastreabilidade e dashboards executivos. Tudo conectado para
+            transformar dados em decisão.
           </p>
         </div>
-        <div className="text-xs text-primary-foreground/70">
+        <div className="relative text-xs text-primary-foreground/70">
           Demo: <strong>admin@demo.com</strong> / <strong>admin123</strong>
         </div>
       </div>
@@ -65,6 +65,10 @@ export default function LoginPage() {
       <div className="flex items-center justify-center p-6">
         <Card className="w-full max-w-sm">
           <CardHeader>
+            <div className="mb-3 flex items-center gap-3 lg:hidden">
+              <BrandMark className="h-10 w-10" />
+              <span className="text-base font-semibold">Gestão 360</span>
+            </div>
             <CardTitle>Entrar</CardTitle>
             <CardDescription>Use suas credenciais para acessar a plataforma.</CardDescription>
           </CardHeader>

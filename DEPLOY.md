@@ -88,7 +88,7 @@ git push -u origin main
 5. Em **Environment Variables** de cada servico, adicione as variaveis (ver secao 5)
 6. **Tamanho**: `basic-xxs` para ambos (pode escalar depois)
 7. **Region**: a mesma do Neon
-8. **App name**: `gestao-360-indicadores`
+8. **App name**: `gestao-360`
 9. Clique em **Create Resources**
 
 ### Opcao B — Via `doctl` (mais reprodutivel)
@@ -129,7 +129,7 @@ No painel da DigitalOcean, em **Settings -> App-Level Environment Variables** (o
 | `JWT_REFRESH_TTL` | `7d` | API: Run | Texto |
 | `API_CORS_ORIGIN` | `${APP_URL}` | API: Run | Texto |
 | `NEXT_PUBLIC_API_URL` | `/api` | Web: **Build** | Texto |
-| `NEXT_PUBLIC_APP_NAME` | `Gestao 360 Indicadores` | Web: **Build** | Texto |
+| `NEXT_PUBLIC_APP_NAME` | `Gestão 360` | Web: **Build** | Texto |
 
 > **Atencao**: `NEXT_PUBLIC_*` precisa estar em **BUILD_TIME** porque o Next.js os embuti no bundle. Se mudar depois, e necessario fazer rebuild.
 

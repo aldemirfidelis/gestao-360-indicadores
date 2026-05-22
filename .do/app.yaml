@@ -1,5 +1,5 @@
 # =====================================================
-# DigitalOcean App Platform - Gestao 360 Indicadores
+# DigitalOcean App Platform - Gestão 360
 # =====================================================
 # Antes de aplicar:
 # 1. Substitua REPO_OWNER/REPO_NAME pela sua org/usuario e nome do repo
@@ -9,7 +9,7 @@
 #    Atualizar: doctl apps update <APP_ID> --spec .do/app.yaml
 # =====================================================
 
-name: gestao-360-indicadores
+name: gestao-360
 region: nyc
 
 # ----------------- API (NestJS) -----------------
@@ -112,7 +112,7 @@ services:
         value: /api            # mesmo dominio do app, rota /api -> service api
       - key: NEXT_PUBLIC_APP_NAME
         scope: BUILD_TIME
-        value: "Gestao 360 Indicadores"
+        value: "Gestão 360"
 
 # ----------------- Job opcional: seed inicial -----------------
 # Descomente para popular dados demo NA PRIMEIRA INSTALACAO.

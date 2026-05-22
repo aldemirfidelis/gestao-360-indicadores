@@ -2,7 +2,7 @@
 # Docker Compose para Droplet DigitalOcean (producao)
 # - API + Web + Caddy (proxy reverso com SSL automatico)
 # - Banco fica no Neon (nao sobe Postgres local)
-# - Variaveis sensiveis vem de /opt/gestao-360-indicadores/.env
+# - Variaveis sensiveis vem do arquivo .env no servidor
 # =====================================================
 
 services:
@@ -42,7 +42,7 @@ services:
       args:
         # NEXT_PUBLIC_* precisa estar no build (Next inlina)
         NEXT_PUBLIC_API_URL: /api
-        NEXT_PUBLIC_APP_NAME: "Gestao 360 Indicadores"
+        NEXT_PUBLIC_APP_NAME: "Gestão 360"
     image: g360-web:latest
     container_name: g360-web
     restart: unless-stopped

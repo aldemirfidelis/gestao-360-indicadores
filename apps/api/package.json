@@ -2,7 +2,7 @@
   "name": "@g360/api",
   "version": "0.1.0",
   "private": true,
-  "description": "API NestJS - Gestao 360 Indicadores",
+  "description": "API NestJS - Gestão 360",
   "scripts": {
     "dev": "nest start --watch",
     "build": "nest build",

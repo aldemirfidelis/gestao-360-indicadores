@@ -1,6 +1,6 @@
 # syntax=docker/dockerfile:1.7
 # =====================================================
-# Dockerfile do Frontend Next.js 14 (Gestao 360)
+# Dockerfile do Frontend Next.js 14 (Gestão 360)
 # - Multi-stage com output standalone
 # - Compativel com pnpm workspaces
 # =====================================================
@@ -31,7 +31,7 @@ COPY apps/web ./apps/web
 
 # NEXT_PUBLIC_* precisa estar disponivel em build time
 ARG NEXT_PUBLIC_API_URL=/api
-ARG NEXT_PUBLIC_APP_NAME="Gestao 360 Indicadores"
+ARG NEXT_PUBLIC_APP_NAME="Gestão 360"
 ENV NEXT_PUBLIC_API_URL=$NEXT_PUBLIC_API_URL \
     NEXT_PUBLIC_APP_NAME=$NEXT_PUBLIC_APP_NAME
 
