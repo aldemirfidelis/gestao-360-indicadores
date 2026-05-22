@@ -45,6 +45,12 @@ enum AdminRecordStatus {
   ARCHIVED
 }
 
+enum WorkPeriodStatus {
+  OPEN
+  CLOSED
+  ARCHIVED
+}
+
 enum OrgNodeType {
   COMPANY
   BRANCH
@@ -489,6 +495,30 @@ model Company {
   treatmentCases      TreatmentCase[]
   emailLogs           EmailLog[]
   calendarInvites     CalendarInvite[]
+  workPeriods         WorkPeriod[]
+}
+
+model WorkPeriod {
+  id          String           @id @default(uuid())
+  companyId   String
+  company     Company          @relation(fields: [companyId], references: [id])
+  year        Int
+  name        String
+  startsAt    DateTime
+  endsAt      DateTime
+  status      WorkPeriodStatus @default(OPEN)
+  isCurrent   Boolean          @default(false)
+  closedAt    DateTime?
+  closedById  String?
+  createdById String?
+  updatedById String?
+  createdAt   DateTime         @default(now())
+  updatedAt   DateTime         @updatedAt
+  deletedAt   DateTime?
+
+  @@unique([companyId, year])
+  @@index([companyId, isCurrent])
+  @@index([companyId, status])
 }
 
 model Branch {

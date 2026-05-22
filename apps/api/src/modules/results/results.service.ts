@@ -13,6 +13,7 @@ import {
 } from '@prisma/client';
 import { lastNPeriodRefs, periodRefToDate } from '../indicators/period.util';
 import { TraceabilityService } from '../traceability/traceability.service';
+import { PeriodsService } from '../periods/periods.service';
 
 interface ResultSaveOutcome {
   result: any;
@@ -25,6 +26,7 @@ export class ResultsService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly traceability: TraceabilityService,
+    private readonly periods: PeriodsService,
   ) {}
 
   /**
@@ -63,8 +65,9 @@ export class ResultsService {
       }>;
     }> = [];
 
+    const anchor = await this.periods.currentAnchorDate(companyId);
     for (const ind of indicators) {
-      const refs = lastNPeriodRefs(ind.periodicity, points);
+      const refs = lastNPeriodRefs(ind.periodicity, points, anchor);
       const [targets, results] = await Promise.all([
         this.prisma.indicatorTarget.findMany({
           where: { indicatorId: ind.id, periodRef: { in: refs } },

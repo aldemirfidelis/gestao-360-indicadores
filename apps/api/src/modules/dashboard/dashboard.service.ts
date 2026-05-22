@@ -1,11 +1,15 @@
 import { Injectable } from '@nestjs/common';
 import { PrismaService } from '../../prisma/prisma.service';
 import { ActionStatus, DeviationStatus, TrafficLight, TreatmentStatus } from '@prisma/client';
-import { dateToPeriodRef, lastNPeriodRefs } from '../indicators/period.util';
+import { lastNPeriodRefs } from '../indicators/period.util';
+import { PeriodsService } from '../periods/periods.service';
 
 @Injectable()
 export class DashboardService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly periods: PeriodsService,
+  ) {}
 
   async overview(companyId: string) {
     const totalIndicators = await this.prisma.indicator.count({
@@ -256,7 +260,8 @@ export class DashboardService {
    * Evolucao mensal: media de atingimento por mes nos ultimos N meses.
    */
   async evolution(companyId: string, months = 12) {
-    const refs = lastNPeriodRefs('MONTHLY', months);
+    const anchor = await this.periods.currentAnchorDate(companyId);
+    const refs = lastNPeriodRefs('MONTHLY', months, anchor);
     const results = await this.prisma.indicatorResult.findMany({
       where: {
         indicator: { companyId, deletedAt: null },
@@ -326,8 +331,7 @@ export class DashboardService {
   }
 
   async pendingFillCount(companyId: string) {
-    const now = new Date();
-    const periodRef = dateToPeriodRef(now, 'MONTHLY');
+    const periodRef = await this.periods.currentMonthlyRef(companyId);
     const active = await this.prisma.indicator.count({
       where: { companyId, deletedAt: null, status: 'ACTIVE', periodicity: 'MONTHLY' },
     });

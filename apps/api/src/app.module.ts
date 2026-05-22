@@ -28,6 +28,7 @@ import { SearchModule } from './modules/search/search.module';
 import { TreatmentsModule } from './modules/treatments/treatments.module';
 import { AuditInterceptor } from './common/interceptors/audit.interceptor';
 import { AdminModule } from './modules/admin/admin.module';
+import { PeriodsModule } from './modules/periods/periods.module';
 
 @Module({
   imports: [
@@ -57,6 +58,7 @@ import { AdminModule } from './modules/admin/admin.module';
     SearchModule,
     TreatmentsModule,
     AdminModule,
+    PeriodsModule,
   ],
   providers: [
     { provide: APP_GUARD, useClass: ThrottlerGuard },

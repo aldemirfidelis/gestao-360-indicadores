@@ -4,6 +4,7 @@ import { IndicatorCreateInput, IndicatorTargetUpsertInput } from '@g360/shared';
 import { calcStatus } from '@g360/shared';
 import { Direction, TrafficLight } from '@prisma/client';
 import { lastNPeriodRefs, periodRefToDate } from './period.util';
+import { PeriodsService } from '../periods/periods.service';
 
 export interface IndicatorFilter {
   companyId: string;
@@ -16,7 +17,10 @@ export interface IndicatorFilter {
 
 @Injectable()
 export class IndicatorsService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly periods: PeriodsService,
+  ) {}
 
   async list(f: IndicatorFilter) {
     const items = await this.prisma.indicator.findMany({
@@ -280,10 +284,11 @@ export class IndicatorsService {
   async series(indicatorId: string, points = 12) {
     const indicator = await this.prisma.indicator.findUnique({
       where: { id: indicatorId },
-      select: { periodicity: true },
+      select: { periodicity: true, companyId: true },
     });
     if (!indicator) throw new NotFoundException('Indicador nao encontrado');
-    const refs = lastNPeriodRefs(indicator.periodicity, points);
+    const anchor = await this.periods.currentAnchorDate(indicator.companyId);
+    const refs = lastNPeriodRefs(indicator.periodicity, points, anchor);
     const [targets, results] = await Promise.all([
       this.prisma.indicatorTarget.findMany({
         where: { indicatorId, periodRef: { in: refs } },
