@@ -44,6 +44,8 @@ class AuditController {
                 { action: { contains: q, mode: 'insensitive' } },
                 { recordLabel: { contains: q, mode: 'insensitive' } },
                 { payload: { contains: q, mode: 'insensitive' } },
+                { beforeValue: { contains: q, mode: 'insensitive' } },
+                { afterValue: { contains: q, mode: 'insensitive' } },
               ],
             }
           : {}),
