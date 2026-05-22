@@ -6,53 +6,68 @@ import { Roles } from '../../common/decorators/roles.decorator';
 import { UserRoleEnum } from '@prisma/client';
 import { ZodValidationPipe } from '../../common/pipes/zod-validation.pipe';
 import { userCreateSchema } from '@g360/shared';
+import { RequirePermissions } from '../../common/decorators/permissions.decorator';
 
 @Controller('users')
 export class UsersController {
   constructor(private readonly service: UsersService) {}
 
   @Get()
+  @Roles(UserRoleEnum.COMPANY_ADMIN, UserRoleEnum.SUPER_ADMIN)
+  @RequirePermissions('users:manage')
   list(@CurrentUser() me: AuthPayload) {
     return this.service.list(me.companyId);
   }
 
   @Get('permissions')
+  @Roles(UserRoleEnum.COMPANY_ADMIN, UserRoleEnum.SUPER_ADMIN)
+  @RequirePermissions('users:manage')
   permissions() {
     return this.service.listPermissions();
   }
 
   @Get(':id')
-  byId(@Param('id') id: string) {
-    return this.service.getById(id);
+  @Roles(UserRoleEnum.COMPANY_ADMIN, UserRoleEnum.SUPER_ADMIN)
+  @RequirePermissions('users:manage')
+  byId(@CurrentUser() me: AuthPayload, @Param('id') id: string) {
+    return this.service.getById(id, me.companyId, me.role === UserRoleEnum.SUPER_ADMIN);
   }
 
   @Roles(UserRoleEnum.COMPANY_ADMIN, UserRoleEnum.SUPER_ADMIN)
+  @RequirePermissions('users:manage')
   @Post()
-  create(@Body(new ZodValidationPipe(userCreateSchema)) input: any) {
-    return this.service.create(input);
+  create(@CurrentUser() me: AuthPayload, @Body(new ZodValidationPipe(userCreateSchema)) input: any) {
+    return this.service.create({
+      ...input,
+      companyId: me.role === UserRoleEnum.SUPER_ADMIN && input.companyId ? input.companyId : me.companyId,
+    });
   }
 
   @Roles(UserRoleEnum.COMPANY_ADMIN, UserRoleEnum.SUPER_ADMIN)
+  @RequirePermissions('users:manage')
   @Patch(':id')
-  update(@Param('id') id: string, @Body() input: any) {
-    return this.service.update(id, input);
+  update(@CurrentUser() me: AuthPayload, @Param('id') id: string, @Body() input: any) {
+    return this.service.update(id, me.companyId, me.role === UserRoleEnum.SUPER_ADMIN, input);
   }
 
   @Roles(UserRoleEnum.COMPANY_ADMIN, UserRoleEnum.SUPER_ADMIN)
+  @RequirePermissions('users:manage')
   @Patch(':id/permissions')
-  setPermissions(@Param('id') id: string, @Body() body: { permissionKeys: string[] }) {
-    return this.service.setPermissions(id, body.permissionKeys ?? []);
+  setPermissions(@CurrentUser() me: AuthPayload, @Param('id') id: string, @Body() body: { permissionKeys: string[] }) {
+    return this.service.setPermissions(id, me.companyId, me.role === UserRoleEnum.SUPER_ADMIN, body.permissionKeys ?? []);
   }
 
   @Roles(UserRoleEnum.COMPANY_ADMIN, UserRoleEnum.SUPER_ADMIN)
+  @RequirePermissions('users:manage')
   @Patch(':id/active')
-  setActive(@Param('id') id: string, @Body() body: { active: boolean }) {
-    return this.service.setActive(id, body.active);
+  setActive(@CurrentUser() me: AuthPayload, @Param('id') id: string, @Body() body: { active: boolean }) {
+    return this.service.setActive(id, me.companyId, me.role === UserRoleEnum.SUPER_ADMIN, body.active);
   }
 
   @Roles(UserRoleEnum.COMPANY_ADMIN, UserRoleEnum.SUPER_ADMIN)
+  @RequirePermissions('users:manage')
   @Delete(':id')
-  remove(@Param('id') id: string) {
-    return this.service.remove(id);
+  remove(@CurrentUser() me: AuthPayload, @Param('id') id: string) {
+    return this.service.remove(id, me.companyId, me.role === UserRoleEnum.SUPER_ADMIN);
   }
 }

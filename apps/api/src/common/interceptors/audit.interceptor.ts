@@ -1,0 +1,100 @@
+import { CallHandler, ExecutionContext, Injectable, NestInterceptor } from '@nestjs/common';
+import { Observable, catchError, tap, throwError } from 'rxjs';
+import { Request } from 'express';
+import { PrismaService } from '../../prisma/prisma.service';
+import { AuthPayload } from '../../modules/auth/auth.types';
+
+const METHOD_ACTION: Record<string, string> = {
+  POST: 'CREATE',
+  PUT: 'UPDATE',
+  PATCH: 'UPDATE',
+  DELETE: 'DELETE',
+};
+
+@Injectable()
+export class AuditInterceptor implements NestInterceptor {
+  constructor(private readonly prisma: PrismaService) {}
+
+  intercept(context: ExecutionContext, next: CallHandler): Observable<unknown> {
+    const req = context.switchToHttp().getRequest<Request & { user?: AuthPayload }>();
+    const action = METHOD_ACTION[req.method];
+    const startedAt = Date.now();
+    if (!action || req.path?.includes('/api/health') || req.path?.includes('/api/auth/refresh')) {
+      return next.handle();
+    }
+
+    return next.handle().pipe(
+      tap((result) => {
+        void this.write(req, action, 'SUCCESS', result, startedAt);
+      }),
+      catchError((error) => {
+        void this.write(req, action, 'ERROR', { message: error?.message, status: error?.status }, startedAt);
+        return throwError(() => error);
+      }),
+    );
+  }
+
+  private async write(
+    req: Request & { user?: AuthPayload },
+    action: string,
+    result: 'SUCCESS' | 'ERROR',
+    response: unknown,
+    startedAt: number,
+  ) {
+    try {
+      const path = req.path ?? req.originalUrl ?? '';
+      const parts = path.replace(/^\/api\/?/, '').split('/').filter(Boolean);
+      const module = parts[0] ?? 'system';
+      const entity = parts[0] ? toEntity(parts[0]) : 'System';
+      const entityId = req.params?.id ?? req.params?.indicatorId ?? req.params?.resultId ?? null;
+      const payload = {
+        path,
+        method: req.method,
+        params: req.params,
+        query: req.query,
+        durationMs: Date.now() - startedAt,
+      };
+      await this.prisma.auditLog.create({
+        data: {
+          companyId: req.user?.companyId ?? null,
+          userId: req.user?.sub ?? null,
+          action,
+          module,
+          entity,
+          entityId,
+          payload: safeStringify(payload),
+          afterValue: result === 'ERROR' ? safeStringify(response) : safeStringify(redact(req.body)),
+          result,
+          ip: req.ip,
+          userAgent: req.headers['user-agent'],
+        },
+      });
+    } catch {
+      // Auditoria nunca deve quebrar a operacao principal.
+    }
+  }
+}
+
+function toEntity(value: string) {
+  return value
+    .split('-')
+    .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
+    .join('');
+}
+
+function redact(value: unknown): unknown {
+  if (!value || typeof value !== 'object') return value;
+  const copy = { ...(value as Record<string, unknown>) };
+  for (const key of Object.keys(copy)) {
+    if (/password|token|secret/i.test(key)) copy[key] = '[redacted]';
+  }
+  return copy;
+}
+
+function safeStringify(value: unknown) {
+  try {
+    return JSON.stringify(value);
+  } catch {
+    return null;
+  }
+}

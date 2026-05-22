@@ -16,7 +16,7 @@ export class AuthService {
     const user = await this.prisma.user.findUnique({
       where: { email: email.toLowerCase() },
     });
-    if (!user || !user.active || user.deletedAt) {
+    if (!user || !user.active || user.status !== 'ACTIVE' || user.deletedAt) {
       throw new UnauthorizedException('Credenciais invalidas');
     }
     const ok = await bcrypt.compare(password, user.passwordHash);
@@ -103,12 +103,27 @@ export class AuthService {
     return { accessToken };
   }
 
-  async logout(refreshToken?: string) {
+  async logout(refreshToken?: string, ctx?: { userId?: string; companyId?: string; ip?: string; userAgent?: string }) {
     if (!refreshToken) return { ok: true };
     const tokenHash = createHash('sha256').update(refreshToken).digest('hex');
     await this.prisma.refreshToken
       .update({ where: { tokenHash }, data: { revokedAt: new Date() } })
       .catch(() => undefined);
+    if (ctx?.userId) {
+      await this.prisma.auditLog.create({
+        data: {
+          companyId: ctx.companyId,
+          userId: ctx.userId,
+          action: 'LOGOUT',
+          module: 'auth',
+          entity: 'User',
+          entityId: ctx.userId,
+          result: 'SUCCESS',
+          ip: ctx.ip,
+          userAgent: ctx.userAgent,
+        },
+      });
+    }
     return { ok: true };
   }
 }

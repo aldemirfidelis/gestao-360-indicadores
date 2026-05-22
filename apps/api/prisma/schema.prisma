@@ -32,14 +32,33 @@ enum UserRoleEnum {
   VIEWER
 }
 
+enum UserAccessStatus {
+  ACTIVE
+  INACTIVE
+  BLOCKED
+  PENDING
+}
+
+enum AdminRecordStatus {
+  ACTIVE
+  INACTIVE
+  ARCHIVED
+}
+
 enum OrgNodeType {
   COMPANY
   BRANCH
+  UNIT
   DIRECTORATE
   MANAGEMENT
   COORDINATION
   SECTOR
+  SUBSECTOR
   AREA
+  SUBAREA
+  DEPARTMENT
+  COST_CENTER
+  MACROPROCESS
   PROCESS
 }
 
@@ -401,6 +420,9 @@ model Company {
   auditLogs           AuditLog[]
   notifications       Notification[]
   appSettings         AppSetting[]
+  accessProfiles      AccessProfile[]
+  parameterCategories ParameterCategory[]
+  parameterItems      ParameterItem[]
   traceabilityEvents  TraceabilityEvent[]
   statusHistories     StatusHistory[]
   relationshipMaps    RelationshipMap[]
@@ -423,6 +445,7 @@ model Branch {
   deletedAt DateTime?
 
   orgNodes OrgNode[]
+  users    User[]
 
   @@index([companyId])
 }
@@ -477,12 +500,20 @@ model User {
   phone         String?
   avatarUrl     String?
   role          UserRoleEnum  @default(COLLABORATOR)
+  status        UserAccessStatus @default(ACTIVE)
   active        Boolean       @default(true)
   lastLoginAt   DateTime?
+  passwordResetRequired Boolean @default(false)
+  invitedAt     DateTime?
+  blockedAt     DateTime?
   createdAt     DateTime      @default(now())
   updatedAt     DateTime      @updatedAt
   deletedAt     DateTime?
 
+  branchId      String?
+  branch        Branch?       @relation(fields: [branchId], references: [id])
+  accessProfileId String?
+  accessProfile AccessProfile? @relation(fields: [accessProfileId], references: [id])
   defaultNodeId String?
   defaultNode   OrgNode?      @relation("UserDefaultNode", fields: [defaultNodeId], references: [id])
 
@@ -506,7 +537,10 @@ model User {
   meetingsResponsible   Meeting[]            @relation("MeetingResponsible")
 
   @@index([companyId])
+  @@index([branchId])
+  @@index([accessProfileId])
   @@index([role])
+  @@index([status])
 }
 
 model Permission {
@@ -516,6 +550,7 @@ model Permission {
   module      String
   action      String
   users       UserPermission[]
+  profiles    ProfilePermission[]
 }
 
 model UserPermission {
@@ -526,6 +561,39 @@ model UserPermission {
   grantedAt    DateTime   @default(now())
 
   @@id([userId, permissionId])
+}
+
+model AccessProfile {
+  id          String            @id @default(uuid())
+  companyId   String?
+  company     Company?          @relation(fields: [companyId], references: [id])
+  code        String
+  name        String
+  description String?
+  role        UserRoleEnum?
+  status      AdminRecordStatus @default(ACTIVE)
+  system      Boolean           @default(false)
+  createdById String?
+  updatedById String?
+  createdAt   DateTime          @default(now())
+  updatedAt   DateTime          @updatedAt
+  deletedAt   DateTime?
+
+  users       User[]
+  permissions ProfilePermission[]
+
+  @@unique([companyId, code])
+  @@index([companyId, status])
+}
+
+model ProfilePermission {
+  profileId    String
+  permissionId String
+  profile      AccessProfile @relation(fields: [profileId], references: [id], onDelete: Cascade)
+  permission   Permission    @relation(fields: [permissionId], references: [id], onDelete: Cascade)
+  grantedAt    DateTime      @default(now())
+
+  @@id([profileId, permissionId])
 }
 
 model RefreshToken {
@@ -1361,14 +1429,22 @@ model AuditLog {
   userId    String?
   user      User?    @relation(fields: [userId], references: [id])
   action    String   // "CREATE", "UPDATE", "DELETE", "LOGIN" ...
+  module    String?
   entity    String
   entityId  String?
+  recordLabel String?
   payload   String?  // JSON serializado do diff
+  beforeValue String?
+  afterValue  String?
+  result    String?  @default("SUCCESS")
+  sessionId String?
   ip        String?
   userAgent String?
   createdAt DateTime @default(now())
 
   @@index([companyId, createdAt])
+  @@index([userId, createdAt])
+  @@index([module, action])
   @@index([entity, entityId])
 }
 
@@ -1378,7 +1454,63 @@ model AppSetting {
   company   Company? @relation(fields: [companyId], references: [id])
   key       String
   value     String
+  description String?
+  valueType String?  @default("text")
+  group     String?  @default("Sistema")
+  active    Boolean  @default(true)
+  createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
   @@unique([companyId, key])
+}
+
+model ParameterCategory {
+  id          String            @id @default(uuid())
+  companyId   String?
+  company     Company?          @relation(fields: [companyId], references: [id])
+  code        String
+  name        String
+  description String?
+  module      String?
+  status      AdminRecordStatus @default(ACTIVE)
+  system      Boolean           @default(false)
+  sortOrder   Int               @default(0)
+  createdById String?
+  updatedById String?
+  createdAt   DateTime          @default(now())
+  updatedAt   DateTime          @updatedAt
+  deletedAt   DateTime?
+
+  items       ParameterItem[]
+
+  @@unique([companyId, code])
+  @@index([companyId, status])
+  @@index([module])
+}
+
+model ParameterItem {
+  id          String            @id @default(uuid())
+  companyId   String?
+  company     Company?          @relation(fields: [companyId], references: [id])
+  categoryId  String
+  category    ParameterCategory @relation(fields: [categoryId], references: [id])
+  parentId    String?
+  parent      ParameterItem?    @relation("ParameterItemChildren", fields: [parentId], references: [id])
+  children    ParameterItem[]   @relation("ParameterItemChildren")
+  code        String
+  name        String
+  description String?
+  status      AdminRecordStatus @default(ACTIVE)
+  sortOrder   Int               @default(0)
+  metadata    Json?
+  createdById String?
+  updatedById String?
+  createdAt   DateTime          @default(now())
+  updatedAt   DateTime          @updatedAt
+  deletedAt   DateTime?
+
+  @@unique([categoryId, code])
+  @@index([companyId, status])
+  @@index([categoryId, status])
+  @@index([parentId])
 }

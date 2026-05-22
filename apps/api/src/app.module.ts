@@ -1,7 +1,7 @@
 import { Module } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
 import { ThrottlerGuard, ThrottlerModule } from '@nestjs/throttler';
-import { APP_GUARD } from '@nestjs/core';
+import { APP_GUARD, APP_INTERCEPTOR } from '@nestjs/core';
 
 import { PrismaModule } from './prisma/prisma.module';
 import { AuthModule } from './modules/auth/auth.module';
@@ -27,6 +27,8 @@ import { TraceabilityModule } from './modules/traceability/traceability.module';
 import { RelationshipMapModule } from './modules/relationship-map/relationship-map.module';
 import { SearchModule } from './modules/search/search.module';
 import { TreatmentsModule } from './modules/treatments/treatments.module';
+import { AuditInterceptor } from './common/interceptors/audit.interceptor';
+import { AdminModule } from './modules/admin/admin.module';
 
 @Module({
   imports: [
@@ -56,7 +58,11 @@ import { TreatmentsModule } from './modules/treatments/treatments.module';
     RelationshipMapModule,
     SearchModule,
     TreatmentsModule,
+    AdminModule,
   ],
-  providers: [{ provide: APP_GUARD, useClass: ThrottlerGuard }],
+  providers: [
+    { provide: APP_GUARD, useClass: ThrottlerGuard },
+    { provide: APP_INTERCEPTOR, useClass: AuditInterceptor },
+  ],
 })
 export class AppModule {}

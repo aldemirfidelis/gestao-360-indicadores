@@ -41,8 +41,13 @@ export class AuthController {
 
   @UseGuards(JwtAuthGuard)
   @Post('logout')
-  logout(@Body() body: { refreshToken?: string }) {
-    return this.auth.logout(body.refreshToken);
+  logout(@CurrentUser() me: AuthPayload, @Body() body: { refreshToken?: string }, @Req() req: Request) {
+    return this.auth.logout(body.refreshToken, {
+      userId: me.sub,
+      companyId: me.companyId,
+      ip: req.ip,
+      userAgent: req.headers['user-agent'],
+    });
   }
 
   @UseGuards(JwtAuthGuard)

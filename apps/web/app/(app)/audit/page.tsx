@@ -1,21 +1,30 @@
 'use client';
 
+import { useMemo, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { useState } from 'react';
-import { ScrollText } from 'lucide-react';
+import { Download, Eye, FileText, ScrollText, Search } from 'lucide-react';
 import { PageHeader } from '@/components/shell/page-header';
-import { Card, CardContent } from '@/components/ui/card';
+import { SectionCard } from '@/components/platform/section-card';
+import { EmptyState } from '@/components/platform/empty-state';
+import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
 import { NativeSelect } from '@/components/ui/select';
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { api } from '@/lib/api';
-import { formatDate } from '@/lib/utils';
+import { cn, formatDate } from '@/lib/utils';
 
 interface AuditEntry {
   id: string;
   action: string;
+  module: string | null;
   entity: string;
   entityId: string | null;
+  recordLabel: string | null;
+  payload: string | null;
+  beforeValue: string | null;
+  afterValue: string | null;
+  result: string | null;
   ip: string | null;
   userAgent: string | null;
   createdAt: string;
@@ -24,117 +33,210 @@ interface AuditEntry {
 
 const ACTION_PILL: Record<string, string> = {
   LOGIN: 'pill-blue',
+  LOGOUT: 'pill-gray',
   CREATE: 'pill-green',
   UPDATE: 'pill-yellow',
   DELETE: 'pill-red',
+  PERMISSION_CHANGE: 'pill-purple',
 };
 
 export default function AuditPage() {
-  const [entity, setEntity] = useState('');
-  const [action, setAction] = useState('');
+  const [filters, setFilters] = useState({ q: '', entity: '', action: '', module: '', userId: '', from: '', to: '' });
+  const [selected, setSelected] = useState<AuditEntry | null>(null);
 
   const query = useQuery<AuditEntry[]>({
-    queryKey: ['audit', entity, action],
+    queryKey: ['audit', filters],
     queryFn: () => {
       const params = new URLSearchParams();
-      if (entity) params.set('entity', entity);
-      if (action) params.set('action', action);
-      params.set('limit', '200');
+      Object.entries(filters).forEach(([key, value]) => value && params.set(key, value));
+      params.set('limit', '500');
       return api<AuditEntry[]>(`/audit?${params.toString()}`);
     },
   });
 
+  const users = useMemo(() => {
+    const map = new Map<string, { id: string; name: string; email: string }>();
+    (query.data ?? []).forEach((row) => row.user && map.set(row.user.id, row.user));
+    return Array.from(map.values()).sort((a, b) => a.name.localeCompare(b.name, 'pt-BR'));
+  }, [query.data]);
+
+  const modules = useMemo(() => Array.from(new Set((query.data ?? []).map((row) => row.module).filter(Boolean))) as string[], [query.data]);
+
   return (
     <div>
       <PageHeader
+        eyebrow="Configuracoes"
+        tone="admin"
         title="Auditoria"
-        description="Rastro de quem fez o que e quando. Login, criacoes, atualizacoes e exclusoes."
+        description="Rastreabilidade automatica de acessos, criacoes, edicoes, exclusoes, parametros e permissoes."
+        breadcrumbs={[{ label: 'Inicio', href: '/' }, { label: 'Configuracoes', href: '/settings' }, { label: 'Auditoria' }]}
+        actions={
+          <div className="flex gap-2">
+            <Button variant="outline" onClick={downloadCsv}>
+              <Download className="mr-2 h-4 w-4" />
+              Exportar CSV
+            </Button>
+            <Button variant="outline" onClick={() => window.print()}>
+              <FileText className="mr-2 h-4 w-4" />
+              PDF
+            </Button>
+          </div>
+        }
       />
 
-      <Card className="mb-6">
-        <CardContent className="p-4 grid grid-cols-1 sm:grid-cols-3 gap-3">
-          <Input
-            placeholder="Filtrar por entidade (ex.: Indicator, Deviation)..."
-            value={entity}
-            onChange={(e) => setEntity(e.target.value)}
-          />
-          <NativeSelect value={action} onChange={(e) => setAction(e.target.value)}>
-            <option value="">Todas as acoes</option>
-            <option value="LOGIN">LOGIN</option>
-            <option value="CREATE">CREATE</option>
-            <option value="UPDATE">UPDATE</option>
-            <option value="DELETE">DELETE</option>
-          </NativeSelect>
-          <div className="text-sm text-muted-foreground self-center">
-            {query.data?.length ?? 0} registro(s)
+      <SectionCard title="Filtros" description="Combine periodo, usuario, modulo, tipo de acao e busca livre.">
+        <div className="grid grid-cols-1 gap-3 lg:grid-cols-6">
+          <div className="relative lg:col-span-2">
+            <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+            <Input className="pl-9" placeholder="Pesquisar no log..." value={filters.q} onChange={(e) => setFilters({ ...filters, q: e.target.value })} />
           </div>
-        </CardContent>
-      </Card>
+          <NativeSelect value={filters.action} onChange={(e) => setFilters({ ...filters, action: e.target.value })}>
+            <option value="">Todas as acoes</option>
+            <option value="LOGIN">Login</option>
+            <option value="LOGOUT">Logout</option>
+            <option value="CREATE">Criacao</option>
+            <option value="UPDATE">Edicao</option>
+            <option value="DELETE">Exclusao</option>
+            <option value="PERMISSION_CHANGE">Permissao</option>
+          </NativeSelect>
+          <NativeSelect value={filters.module} onChange={(e) => setFilters({ ...filters, module: e.target.value })}>
+            <option value="">Todos os modulos</option>
+            {modules.map((module) => <option key={module} value={module}>{module}</option>)}
+          </NativeSelect>
+          <NativeSelect value={filters.userId} onChange={(e) => setFilters({ ...filters, userId: e.target.value })}>
+            <option value="">Todos usuarios</option>
+            {users.map((user) => <option key={user.id} value={user.id}>{user.name}</option>)}
+          </NativeSelect>
+          <Input type="date" value={filters.from} onChange={(e) => setFilters({ ...filters, from: e.target.value })} />
+          <Input type="date" value={filters.to} onChange={(e) => setFilters({ ...filters, to: e.target.value })} />
+        </div>
+      </SectionCard>
 
-      <Card>
-        <CardContent className="p-0 overflow-x-auto">
-          <table className="w-full text-sm">
-            <thead className="bg-muted/50 text-xs uppercase">
+      <SectionCard title="Eventos auditados" description={`${query.data?.length ?? 0} registro(s) encontrados.`} contentClassName="p-0">
+        <div className="overflow-x-auto">
+          <table className="table-modern">
+            <thead>
               <tr>
-                <th className="px-4 py-2 text-left w-40">Quando</th>
-                <th className="px-4 py-2 text-left">Usuario</th>
-                <th className="px-4 py-2 text-left">Acao</th>
-                <th className="px-4 py-2 text-left">Entidade</th>
-                <th className="px-4 py-2 text-left">IP / agente</th>
+                <th className="text-left">Quando</th>
+                <th className="text-left">Usuario</th>
+                <th className="text-left">Acao</th>
+                <th className="text-left">Modulo</th>
+                <th className="text-left">Registro afetado</th>
+                <th className="text-left">Resultado</th>
+                <th className="text-left">IP / sessao</th>
+                <th />
               </tr>
             </thead>
             <tbody>
-              {query.data?.map((e) => (
-                <tr key={e.id} className="border-t">
-                  <td className="px-4 py-2 text-xs text-muted-foreground">{formatDate(e.createdAt)}</td>
-                  <td className="px-4 py-2">
-                    {e.user ? (
+              {query.data?.map((entry) => (
+                <tr key={entry.id}>
+                  <td className="text-xs text-muted-foreground">{formatDate(entry.createdAt)}</td>
+                  <td>
+                    {entry.user ? (
                       <div>
-                        <div className="font-medium">{e.user.name}</div>
-                        <div className="text-xs text-muted-foreground">{e.user.email}</div>
+                        <div className="font-medium">{entry.user.name}</div>
+                        <div className="text-xs text-muted-foreground">{entry.user.email}</div>
                       </div>
                     ) : (
-                      <span className="text-muted-foreground">—</span>
+                      <span className="text-muted-foreground">Sistema</span>
                     )}
                   </td>
-                  <td className="px-4 py-2">
-                    <span className={`pill ${ACTION_PILL[e.action] ?? 'pill-gray'}`}>{e.action}</span>
-                  </td>
-                  <td className="px-4 py-2">
+                  <td><span className={cn('pill', ACTION_PILL[entry.action] ?? 'pill-gray')}>{entry.action}</span></td>
+                  <td>{entry.module ?? '-'}</td>
+                  <td>
                     <div className="flex flex-col">
-                      <Badge variant="outline" className="w-fit">{e.entity}</Badge>
-                      {e.entityId && (
-                        <span className="text-[10px] text-muted-foreground font-mono mt-0.5 truncate max-w-[200px]">
-                          {e.entityId}
-                        </span>
-                      )}
+                      <Badge variant="outline" className="w-fit">{entry.entity}</Badge>
+                      {entry.entityId && <span className="mt-0.5 max-w-[220px] truncate font-mono text-[10px] text-muted-foreground">{entry.entityId}</span>}
                     </div>
                   </td>
-                  <td className="px-4 py-2 text-xs text-muted-foreground">
-                    <div>{e.ip ?? '—'}</div>
-                    <div className="truncate max-w-[280px]">{e.userAgent ?? ''}</div>
+                  <td><span className={cn('pill', entry.result === 'ERROR' ? 'pill-red' : 'pill-green')}>{entry.result ?? 'SUCCESS'}</span></td>
+                  <td className="text-xs text-muted-foreground">
+                    <div>{entry.ip ?? '-'}</div>
+                    <div className="max-w-[260px] truncate">{entry.userAgent ?? ''}</div>
+                  </td>
+                  <td className="text-right">
+                    <Button variant="outline" size="sm" onClick={() => setSelected(entry)}>
+                      <Eye className="mr-2 h-4 w-4" />
+                      Detalhe
+                    </Button>
                   </td>
                 </tr>
               ))}
               {query.isLoading && (
-                <tr>
-                  <td colSpan={5} className="px-4 py-6 text-center text-sm text-muted-foreground">
-                    Carregando...
-                  </td>
-                </tr>
+                <tr><td colSpan={8} className="px-4 py-8 text-center text-sm text-muted-foreground">Carregando...</td></tr>
               )}
               {!query.isLoading && (query.data?.length ?? 0) === 0 && (
                 <tr>
-                  <td colSpan={5} className="px-4 py-6 text-center text-sm text-muted-foreground">
-                    <ScrollText className="h-8 w-8 mx-auto mb-2 opacity-40" />
-                    Nenhum registro encontrado.
+                  <td colSpan={8}>
+                    <EmptyState icon={<ScrollText className="h-5 w-5" />} title="Nenhum registro encontrado" description="Ajuste os filtros ou aguarde novas acoes do sistema." className="border-0 bg-transparent" />
                   </td>
                 </tr>
               )}
             </tbody>
           </table>
-        </CardContent>
-      </Card>
+        </div>
+      </SectionCard>
+
+      <Dialog open={!!selected} onOpenChange={(open) => !open && setSelected(null)}>
+        <DialogContent className="max-w-4xl">
+          <DialogHeader>
+            <DialogTitle>Detalhe da auditoria</DialogTitle>
+          </DialogHeader>
+          {selected && (
+            <div className="space-y-4">
+              <div className="grid grid-cols-1 gap-3 md:grid-cols-4">
+                <Detail label="Acao" value={selected.action} />
+                <Detail label="Modulo" value={selected.module ?? '-'} />
+                <Detail label="Entidade" value={selected.entity} />
+                <Detail label="Resultado" value={selected.result ?? 'SUCCESS'} />
+              </div>
+              <Payload title="Valor anterior" value={selected.beforeValue} />
+              <Payload title="Valor novo / payload" value={selected.afterValue ?? selected.payload} />
+              <Payload title="Metadados" value={selected.payload} />
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
     </div>
   );
+
+  async function downloadCsv() {
+    const csv = await api<string>('/audit/exports/csv');
+    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = 'auditoria.csv';
+    link.click();
+    URL.revokeObjectURL(url);
+  }
+}
+
+function Detail({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="rounded-lg border bg-muted/25 p-3">
+      <div className="text-xs text-muted-foreground">{label}</div>
+      <div className="mt-1 truncate text-sm font-semibold">{value}</div>
+    </div>
+  );
+}
+
+function Payload({ title, value }: { title: string; value: string | null }) {
+  return (
+    <div>
+      <div className="mb-1 text-sm font-semibold">{title}</div>
+      <pre className="max-h-56 overflow-auto rounded-lg border bg-muted/35 p-3 text-xs">
+        {pretty(value)}
+      </pre>
+    </div>
+  );
+}
+
+function pretty(value: string | null) {
+  if (!value) return '-';
+  try {
+    return JSON.stringify(JSON.parse(value), null, 2);
+  } catch {
+    return value;
+  }
 }

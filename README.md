@@ -69,6 +69,8 @@ A arquitetura funcional atualizada, incluindo rastreabilidade, mapa persistente,
 
 O novo fluxo inteligente para tratar indicadores fora da meta esta documentado em **[docs/fluxo-tratativa-indicador-fora-meta.md](./docs/fluxo-tratativa-indicador-fora-meta.md)**.
 
+A central administrativa de Configuracoes, com Usuarios, Auditoria, Parametros, Seguranca e Sistema, esta documentada em **[docs/configuracoes-administracao.md](./docs/configuracoes-administracao.md)**.
+
 ## Deploy em producao
 
 Dois caminhos suportados, **ambos** usando Neon Postgres como banco:

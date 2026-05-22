@@ -2,23 +2,16 @@ import { ConflictException, Injectable, NotFoundException } from '@nestjs/common
 import * as bcrypt from 'bcryptjs';
 import { PrismaService } from '../../prisma/prisma.service';
 import { UserCreateInput } from '@g360/shared';
-import { Prisma, UserRoleEnum } from '@prisma/client';
+import { Prisma, UserAccessStatus, UserRoleEnum } from '@prisma/client';
+import { PERMISSION_CATALOG } from './permission-catalog';
 
-const PERMISSION_CATALOG = [
-  ['dashboard:view', 'Visualizar dashboards', 'Dashboard', 'view'],
-  ['indicators:view', 'Visualizar indicadores', 'Indicadores', 'view'],
-  ['indicators:create', 'Criar indicadores', 'Indicadores', 'create'],
-  ['indicators:update', 'Editar indicadores', 'Indicadores', 'update'],
-  ['results:launch', 'Lancar resultados', 'Lancamentos', 'create'],
-  ['actions:manage', 'Gerenciar planos de acao', 'Planos de acao', 'manage'],
-  ['deviations:manage', 'Gerenciar desvios e analises', 'Desvios', 'manage'],
-  ['projects:manage', 'Gerenciar projetos', 'Projetos', 'manage'],
-  ['strategy:manage', 'Gerenciar mapa estrategico', 'Estrategia', 'manage'],
-  ['okrs:manage', 'Gerenciar OKRs', 'OKRs', 'manage'],
-  ['org:manage', 'Gerenciar estrutura organizacional', 'Estrutura', 'manage'],
-  ['reports:export', 'Exportar relatorios', 'Relatorios', 'export'],
-  ['users:manage', 'Gerenciar usuarios e permissoes', 'Usuarios', 'manage'],
-] as const;
+type UserAdminCreateInput = UserCreateInput & {
+  branchId?: string | null;
+  accessProfileId?: string | null;
+  status?: UserAccessStatus;
+  active?: boolean;
+  passwordResetRequired?: boolean;
+};
 
 @Injectable()
 export class UsersService {
@@ -33,19 +26,24 @@ export class UsersService {
         email: true,
         name: true,
         role: true,
+        status: true,
         jobTitle: true,
+        phone: true,
         avatarUrl: true,
         active: true,
         lastLoginAt: true,
+        passwordResetRequired: true,
+        branch: { select: { id: true, name: true, code: true } },
+        accessProfile: { select: { id: true, code: true, name: true } },
         defaultNode: { select: { id: true, name: true } },
         permissions: { select: { permission: { select: { key: true } } } },
       },
     });
   }
 
-  async getById(id: string) {
+  async getById(id: string, companyId?: string, isSuperAdmin = false) {
     const user = await this.prisma.user.findFirst({
-      where: { id, deletedAt: null },
+      where: { id, deletedAt: null, ...(companyId && !isSuperAdmin ? { companyId } : {}) },
       include: {
         defaultNode: true,
         permissions: { select: { permission: true } },
@@ -62,11 +60,13 @@ export class UsersService {
     });
   }
 
-  async create(input: UserCreateInput) {
+  async create(input: UserAdminCreateInput) {
     const exists = await this.prisma.user.findUnique({ where: { email: input.email } });
     if (exists) throw new ConflictException('Email ja cadastrado');
     const rounds = parseInt(process.env.BCRYPT_ROUNDS ?? '10', 10);
     const hash = await bcrypt.hash(input.password, rounds);
+    const status = input.status ?? UserAccessStatus.ACTIVE;
+    await this.validateUserLinks(input.companyId, input);
     return this.prisma.user.create({
       data: {
         companyId: input.companyId,
@@ -74,6 +74,11 @@ export class UsersService {
         name: input.name,
         passwordHash: hash,
         role: input.role,
+        status,
+        active: input.active ?? status === UserAccessStatus.ACTIVE,
+        branchId: input.branchId ?? null,
+        accessProfileId: input.accessProfileId ?? null,
+        passwordResetRequired: input.passwordResetRequired ?? false,
         jobTitle: input.jobTitle ?? null,
         phone: input.phone ?? null,
         defaultNodeId: input.defaultNodeId ?? null,
@@ -81,12 +86,19 @@ export class UsersService {
     });
   }
 
-  async setActive(id: string, active: boolean) {
-    return this.prisma.user.update({ where: { id }, data: { active } });
+  async setActive(id: string, companyId: string, isSuperAdmin: boolean, active: boolean) {
+    const user = await this.prisma.user.findFirst({ where: { id, deletedAt: null, ...(!isSuperAdmin ? { companyId } : {}) }, select: { id: true } });
+    if (!user) throw new NotFoundException('Usuario nao encontrado');
+    return this.prisma.user.update({
+      where: { id },
+      data: { active, status: active ? UserAccessStatus.ACTIVE : UserAccessStatus.INACTIVE },
+    });
   }
 
   async update(
     id: string,
+    companyId: string,
+    isSuperAdmin: boolean,
     input: {
       email?: string;
       name?: string;
@@ -95,11 +107,16 @@ export class UsersService {
       phone?: string | null;
       defaultNodeId?: string | null;
       active?: boolean;
+      status?: UserAccessStatus;
       password?: string;
+      branchId?: string | null;
+      accessProfileId?: string | null;
+      passwordResetRequired?: boolean;
     },
   ) {
-    const user = await this.prisma.user.findFirst({ where: { id, deletedAt: null } });
+    const user = await this.prisma.user.findFirst({ where: { id, deletedAt: null, ...(!isSuperAdmin ? { companyId } : {}) } });
     if (!user) throw new NotFoundException('Usuario nao encontrado');
+    await this.validateUserLinks(user.companyId, input);
 
     if (input.email && input.email.toLowerCase() !== user.email) {
       const exists = await this.prisma.user.findUnique({ where: { email: input.email.toLowerCase() } });
@@ -112,7 +129,19 @@ export class UsersService {
       role: input.role,
       jobTitle: input.jobTitle,
       phone: input.phone,
-      active: input.active,
+      active: input.active ?? (input.status ? input.status === UserAccessStatus.ACTIVE : undefined),
+      status: input.status ?? (input.active === undefined ? undefined : input.active ? UserAccessStatus.ACTIVE : UserAccessStatus.INACTIVE),
+      passwordResetRequired: input.passwordResetRequired,
+      branch: input.branchId === undefined
+        ? undefined
+        : input.branchId
+          ? { connect: { id: input.branchId } }
+          : { disconnect: true },
+      accessProfile: input.accessProfileId === undefined
+        ? undefined
+        : input.accessProfileId
+          ? { connect: { id: input.accessProfileId } }
+          : { disconnect: true },
       defaultNode: input.defaultNodeId === undefined
         ? undefined
         : input.defaultNodeId
@@ -128,9 +157,9 @@ export class UsersService {
     return this.prisma.user.update({ where: { id }, data });
   }
 
-  async setPermissions(id: string, permissionKeys: string[]) {
+  async setPermissions(id: string, companyId: string, isSuperAdmin: boolean, permissionKeys: string[]) {
     await this.ensurePermissionCatalog();
-    const user = await this.prisma.user.findFirst({ where: { id, deletedAt: null }, select: { id: true } });
+    const user = await this.prisma.user.findFirst({ where: { id, deletedAt: null, ...(!isSuperAdmin ? { companyId } : {}) }, select: { id: true } });
     if (!user) throw new NotFoundException('Usuario nao encontrado');
     const permissions = await this.prisma.permission.findMany({
       where: { key: { in: permissionKeys } },
@@ -146,13 +175,15 @@ export class UsersService {
       ),
     ]);
 
-    return this.getById(id);
+    return this.getById(id, companyId, isSuperAdmin);
   }
 
-  async remove(id: string) {
+  async remove(id: string, companyId: string, isSuperAdmin: boolean) {
+    const user = await this.prisma.user.findFirst({ where: { id, deletedAt: null, ...(!isSuperAdmin ? { companyId } : {}) }, select: { id: true } });
+    if (!user) throw new NotFoundException('Usuario nao encontrado');
     return this.prisma.user.update({
       where: { id },
-      data: { deletedAt: new Date(), active: false },
+      data: { deletedAt: new Date(), active: false, status: UserAccessStatus.INACTIVE },
     });
   }
 
@@ -166,5 +197,26 @@ export class UsersService {
         }),
       ),
     );
+  }
+
+  private async validateUserLinks(
+    companyId: string,
+    input: { branchId?: string | null; accessProfileId?: string | null; defaultNodeId?: string | null },
+  ) {
+    if (input.branchId) {
+      const branch = await this.prisma.branch.findFirst({ where: { id: input.branchId, companyId, deletedAt: null }, select: { id: true } });
+      if (!branch) throw new NotFoundException('Filial nao encontrada para a empresa informada');
+    }
+    if (input.accessProfileId) {
+      const profile = await this.prisma.accessProfile.findFirst({
+        where: { id: input.accessProfileId, OR: [{ companyId }, { companyId: null }], deletedAt: null },
+        select: { id: true },
+      });
+      if (!profile) throw new NotFoundException('Perfil de acesso nao encontrado para a empresa informada');
+    }
+    if (input.defaultNodeId) {
+      const node = await this.prisma.orgNode.findFirst({ where: { id: input.defaultNodeId, companyId, deletedAt: null }, select: { id: true } });
+      if (!node) throw new NotFoundException('Estrutura organizacional nao encontrada para a empresa informada');
+    }
   }
 }

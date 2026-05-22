@@ -73,6 +73,10 @@ async function main() {
     prisma.notification.deleteMany(),
     prisma.auditLog.deleteMany(),
     prisma.user.deleteMany(),
+    prisma.profilePermission.deleteMany(),
+    prisma.accessProfile.deleteMany(),
+    prisma.parameterItem.deleteMany(),
+    prisma.parameterCategory.deleteMany(),
     prisma.orgNode.deleteMany(),
     prisma.branch.deleteMany(),
     prisma.appSetting.deleteMany(),
@@ -187,7 +191,7 @@ async function main() {
       email: 'admin@demo.com',
       passwordHash: hash,
       name: 'Aldemir Admin',
-      role: UserRoleEnum.COMPANY_ADMIN,
+      role: UserRoleEnum.SUPER_ADMIN,
       jobTitle: 'Administrador',
       defaultNodeId: directorate.id,
     },
@@ -705,12 +709,35 @@ async function main() {
     'dashboard:read',
     'users:manage',
     'settings:manage',
+    'audit:view',
+    'audit:export',
+    'users:manage',
   ];
   await prisma.permission.createMany({
+    skipDuplicates: true,
     data: permKeys.map((k) => {
       const [module, action] = k.split(':');
       return { key: k, module, action, description: `${module} - ${action}` };
     }),
+  });
+
+  const superAdminProfile = await prisma.accessProfile.create({
+    data: {
+      companyId: company.id,
+      code: 'SUPER_ADMIN',
+      name: 'Super Admin',
+      description: 'Acesso total ao sistema.',
+      role: UserRoleEnum.SUPER_ADMIN,
+      system: true,
+    },
+  });
+  const allPermissions = await prisma.permission.findMany({ select: { id: true } });
+  await prisma.profilePermission.createMany({
+    data: allPermissions.map((permission) => ({ profileId: superAdminProfile.id, permissionId: permission.id })),
+  });
+  await prisma.user.update({
+    where: { id: admin.id },
+    data: { accessProfileId: superAdminProfile.id },
   });
 
   // ---------------- Resumo ----------------

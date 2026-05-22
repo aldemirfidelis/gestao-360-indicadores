@@ -83,7 +83,7 @@ export const navSections: NavSection[] = [
     items: [
       { href: '/users', label: 'Usuários', description: 'Responsáveis e acessos', icon: Users },
       { href: '/audit', label: 'Auditoria', description: 'Histórico e rastreabilidade', icon: ShieldCheck },
-      { href: '/settings', label: 'Parâmetros', description: 'Preferências e cadastros base', icon: Settings },
+      { href: '/settings', label: 'Configurações', description: 'Usuários, auditoria, parâmetros e segurança', icon: Settings },
     ],
   },
 ];
@@ -93,7 +93,7 @@ export const mobileNavItems: NavItem[] = [
   { href: '/launches', label: 'Lançamentos', icon: PencilLine },
   { href: '/visualization', label: 'Dashboards', icon: LayoutDashboard },
   { href: '/indicators', label: 'Indicadores', icon: Target },
-  { href: '/settings', label: 'Ajustes', icon: Settings },
+  { href: '/settings', label: 'Config.', icon: Settings },
 ];
 
 export const productAreas = [

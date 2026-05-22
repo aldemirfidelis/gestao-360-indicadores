@@ -17,11 +17,17 @@ export type UserRole = (typeof UserRole)[keyof typeof UserRole];
 export const OrgNodeType = {
   COMPANY: 'COMPANY',
   BRANCH: 'BRANCH',
+  UNIT: 'UNIT',
   DIRECTORATE: 'DIRECTORATE',
   MANAGEMENT: 'MANAGEMENT',
   COORDINATION: 'COORDINATION',
   SECTOR: 'SECTOR',
+  SUBSECTOR: 'SUBSECTOR',
   AREA: 'AREA',
+  SUBAREA: 'SUBAREA',
+  DEPARTMENT: 'DEPARTMENT',
+  COST_CENTER: 'COST_CENTER',
+  MACROPROCESS: 'MACROPROCESS',
   PROCESS: 'PROCESS',
 } as const;
 export type OrgNodeType = (typeof OrgNodeType)[keyof typeof OrgNodeType];

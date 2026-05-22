@@ -3,7 +3,7 @@
 import { useMemo, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
-import { Edit, KeyRound, Plus, Save, UsersRound } from 'lucide-react';
+import { Edit, KeyRound, Plus, Save, Search, Trash2, UsersRound } from 'lucide-react';
 import { PageHeader } from '@/components/shell/page-header';
 import { MetricCard } from '@/components/platform/metric-card';
 import { SectionCard } from '@/components/platform/section-card';
@@ -29,10 +29,16 @@ interface UserRow {
   email: string;
   name: string;
   role: string;
+  status: string;
   jobTitle: string | null;
   phone?: string | null;
   active: boolean;
   lastLoginAt: string | null;
+  branchId?: string | null;
+  branch?: { id: string; name: string; code: string | null } | null;
+  accessProfileId?: string | null;
+  accessProfile?: { id: string; code: string; name: string } | null;
+  passwordResetRequired?: boolean;
   defaultNodeId?: string | null;
   defaultNode: { id: string; name: string } | null;
   permissions?: { permission: { key: string } }[];
@@ -50,6 +56,11 @@ interface OrgNode {
   id: string;
   name: string;
   type: string;
+}
+
+interface AdminBootstrapLite {
+  branches: { id: string; name: string; code: string | null }[];
+  profiles: { id: string; code: string; name: string; role: string | null }[];
 }
 
 const ROLE_LABEL: Record<string, string> = {
@@ -70,6 +81,10 @@ const emptyForm = {
   role: 'COLLABORATOR',
   jobTitle: '',
   phone: '',
+  branchId: '',
+  accessProfileId: '',
+  status: 'ACTIVE',
+  passwordResetRequired: false,
   defaultNodeId: '',
   active: true,
   permissionKeys: [] as string[],
@@ -81,6 +96,7 @@ export default function UsersPage() {
   const qc = useQueryClient();
   const { user: me } = useAuth();
   const [open, setOpen] = useState(false);
+  const [search, setSearch] = useState('');
   const [form, setForm] = useState<UserForm>(emptyForm);
 
   const users = useQuery<UserRow[]>({
@@ -94,6 +110,10 @@ export default function UsersPage() {
   const permissions = useQuery<Permission[]>({
     queryKey: ['users', 'permissions'],
     queryFn: () => api<Permission[]>('/users/permissions'),
+  });
+  const admin = useQuery<AdminBootstrapLite>({
+    queryKey: ['admin', 'bootstrap', 'users-lite'],
+    queryFn: () => api<AdminBootstrapLite>('/admin/bootstrap'),
   });
 
   const byModule = useMemo(() => {
@@ -115,8 +135,12 @@ export default function UsersPage() {
         companyId: me?.companyId,
         jobTitle: form.jobTitle || null,
         phone: form.phone || null,
+        branchId: form.branchId || null,
+        accessProfileId: form.accessProfileId || null,
+        status: form.status,
+        active: form.status === 'ACTIVE',
+        passwordResetRequired: form.passwordResetRequired,
         defaultNodeId: form.defaultNodeId || null,
-        active: form.active,
       };
       let userId = form.id;
       if (form.id) {
@@ -151,8 +175,26 @@ export default function UsersPage() {
     },
   });
 
+  const removeUser = useMutation({
+    mutationFn: (id: string) => api(`/users/${id}`, { method: 'DELETE' }),
+    onSuccess: () => {
+      toast.success('Usuario excluido logicamente');
+      qc.invalidateQueries({ queryKey: ['users'] });
+    },
+    onError: (e: any) => toast.error(e?.message ?? 'Falha ao excluir usuario'),
+  });
+
   const active = users.data?.filter((u) => u.active).length ?? 0;
   const admins = users.data?.filter((u) => ['SUPER_ADMIN', 'COMPANY_ADMIN'].includes(u.role)).length ?? 0;
+  const filteredUsers = useMemo(() => {
+    const q = search.toLowerCase();
+    return (users.data ?? []).filter((u) =>
+      [u.name, u.email, u.role, u.status, u.jobTitle ?? '', u.branch?.name ?? '', u.defaultNode?.name ?? '']
+        .join(' ')
+        .toLowerCase()
+        .includes(q),
+    );
+  }, [search, users.data]);
 
   const openUser = (user?: UserRow) => {
     if (!user) {
@@ -166,6 +208,10 @@ export default function UsersPage() {
         role: user.role,
         jobTitle: user.jobTitle ?? '',
         phone: user.phone ?? '',
+        branchId: user.branch?.id ?? user.branchId ?? '',
+        accessProfileId: user.accessProfile?.id ?? user.accessProfileId ?? '',
+        status: user.status ?? (user.active ? 'ACTIVE' : 'INACTIVE'),
+        passwordResetRequired: user.passwordResetRequired ?? false,
         defaultNodeId: user.defaultNode?.id ?? user.defaultNodeId ?? '',
         active: user.active,
         permissionKeys: user.permissions?.map((p) => p.permission.key) ?? [],
@@ -197,13 +243,26 @@ export default function UsersPage() {
       </div>
 
       <SectionCard title="Equipe" description="Clique em editar para alterar cadastro e permissoes." contentClassName="p-0">
+        <div className="border-b p-3">
+          <div className="relative max-w-xl">
+            <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+            <Input
+              className="pl-9"
+              placeholder="Pesquisar por nome, e-mail, perfil, empresa, filial ou setor..."
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+            />
+          </div>
+        </div>
         <div className="overflow-x-auto">
           <table className="table-modern">
             <thead>
               <tr>
                 <th className="text-left">Usuario</th>
                 <th className="text-left">Cargo</th>
+                <th className="text-left">Filial</th>
                 <th className="text-left">Perfil</th>
+                <th className="text-left">Perfil acesso</th>
                 <th className="text-left">Area</th>
                 <th className="text-left">Permissoes</th>
                 <th className="text-left">Ultimo acesso</th>
@@ -212,18 +271,20 @@ export default function UsersPage() {
               </tr>
             </thead>
             <tbody>
-              {users.data?.map((u) => (
+              {filteredUsers.map((u) => (
                 <tr key={u.id}>
                   <td>
                     <div className="font-medium">{u.name}</div>
                     <div className="text-xs text-muted-foreground">{u.email}</div>
                   </td>
                   <td>{u.jobTitle ?? '-'}</td>
+                  <td>{u.branch?.name ?? '-'}</td>
                   <td><Badge variant="outline">{ROLE_LABEL[u.role] ?? u.role}</Badge></td>
+                  <td>{u.accessProfile?.name ?? '-'}</td>
                   <td>{u.defaultNode?.name ?? '-'}</td>
                   <td>{u.permissions?.length ?? 0}</td>
                   <td className="text-xs">{formatDate(u.lastLoginAt)}</td>
-                  <td><StatusBadge value={u.active ? 'ACTIVE' : 'CANCELLED'} label={u.active ? 'Ativo' : 'Inativo'} /></td>
+                  <td><StatusBadge value={u.active ? 'ACTIVE' : 'CANCELLED'} label={u.status === 'BLOCKED' ? 'Bloqueado' : u.status === 'PENDING' ? 'Pendente' : u.active ? 'Ativo' : 'Inativo'} /></td>
                   <td className="text-right">
                     <div className="flex justify-end gap-2">
                       <Button variant="outline" size="sm" onClick={() => openUser(u)}>
@@ -236,6 +297,14 @@ export default function UsersPage() {
                         onClick={() => toggleActive.mutate({ id: u.id, active: !u.active })}
                       >
                         {u.active ? 'Inativar' : 'Ativar'}
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => window.confirm('Confirma excluir logicamente este usuario?') && removeUser.mutate(u.id)}
+                      >
+                        <Trash2 className="mr-2 h-4 w-4" />
+                        Excluir
                       </Button>
                     </div>
                   </td>
@@ -276,9 +345,31 @@ export default function UsersPage() {
                 </div>
                 <div>
                   <Label>Status</Label>
-                  <NativeSelect value={form.active ? 'true' : 'false'} onChange={(e) => setForm({ ...form, active: e.target.value === 'true' })}>
-                    <option value="true">Ativo</option>
-                    <option value="false">Inativo</option>
+                  <NativeSelect value={form.status} onChange={(e) => setForm({ ...form, status: e.target.value, active: e.target.value === 'ACTIVE' })}>
+                    <option value="ACTIVE">Ativo</option>
+                    <option value="INACTIVE">Inativo</option>
+                    <option value="BLOCKED">Bloqueado</option>
+                    <option value="PENDING">Pendente</option>
+                  </NativeSelect>
+                </div>
+              </div>
+              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                <div>
+                  <Label>Filial</Label>
+                  <NativeSelect value={form.branchId} onChange={(e) => setForm({ ...form, branchId: e.target.value })}>
+                    <option value="">Sem filial</option>
+                    {admin.data?.branches.map((branch) => (
+                      <option key={branch.id} value={branch.id}>{branch.name}</option>
+                    ))}
+                  </NativeSelect>
+                </div>
+                <div>
+                  <Label>Perfil de acesso</Label>
+                  <NativeSelect value={form.accessProfileId} onChange={(e) => setForm({ ...form, accessProfileId: e.target.value })}>
+                    <option value="">Permissoes individuais</option>
+                    {admin.data?.profiles.map((profile) => (
+                      <option key={profile.id} value={profile.id}>{profile.name}</option>
+                    ))}
                   </NativeSelect>
                 </div>
               </div>
@@ -299,6 +390,14 @@ export default function UsersPage() {
                   ))}
                 </NativeSelect>
               </div>
+              <label className="flex items-center gap-2 rounded-lg border p-3 text-sm">
+                <input
+                  type="checkbox"
+                  checked={form.passwordResetRequired}
+                  onChange={(e) => setForm({ ...form, passwordResetRequired: e.target.checked })}
+                />
+                Exigir troca de senha no proximo acesso
+              </label>
             </div>
 
             <div className="rounded-lg border p-4">
