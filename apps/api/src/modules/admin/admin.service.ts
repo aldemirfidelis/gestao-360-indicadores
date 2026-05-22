@@ -462,15 +462,13 @@ export class AdminService {
   }
 
   private async ensurePermissions() {
-    await Promise.all(
-      PERMISSION_CATALOG.map(([key, description, module, action]) =>
-        this.prisma.permission.upsert({
-          where: { key },
-          create: { key, description, module, action },
-          update: { description, module, action },
-        }),
-      ),
-    );
+    for (const [key, description, module, action] of PERMISSION_CATALOG) {
+      await this.prisma.permission.upsert({
+        where: { key },
+        create: { key, description, module, action },
+        update: { description, module, action },
+      });
+    }
   }
 
   private async ensureParameterParent(parentId: string, categoryId: string, currentId?: string) {
