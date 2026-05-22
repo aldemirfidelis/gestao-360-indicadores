@@ -4,7 +4,7 @@ import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { Menu, Moon, Search, Sun, LogOut, LifeBuoy } from 'lucide-react';
+import { LifeBuoy, LogOut, Menu, Moon, Search, Sun } from 'lucide-react';
 import { useTheme } from 'next-themes';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -16,9 +16,9 @@ import {
   DialogTrigger,
 } from '@/components/ui/dialog';
 import { useAuth } from '@/components/auth/auth-provider';
-import { navSections } from '@/components/shell/navigation';
+import { AccordionNavigation } from '@/components/shell/accordion-navigation';
+import { isActivePath, visibleNavSections } from '@/components/shell/navigation';
 import { NotificationsBell } from './notifications-bell';
-import { cn } from '@/lib/utils';
 import { api } from '@/lib/api';
 import { BrandMark } from '@/components/brand/brand-mark';
 
@@ -37,7 +37,9 @@ export function Topbar() {
   const pathname = usePathname();
   const [search, setSearch] = useState('');
   const [searchOpen, setSearchOpen] = useState(false);
-  const section = navSections.find((s) => s.items.some((i) => isActive(pathname, i.href)));
+  const [menuOpen, setMenuOpen] = useState(false);
+  const sections = visibleNavSections(user);
+  const section = sections.find((s) => s.items.some((i) => isActivePath(pathname, i.href, i.exact)));
 
   const globalSearch = useQuery<SearchResult[]>({
     queryKey: ['global-search', search],
@@ -47,51 +49,24 @@ export function Topbar() {
 
   return (
     <header className="sticky top-0 z-30 flex h-16 items-center gap-3 border-b bg-background/88 px-3 backdrop-blur lg:px-6">
-      <Dialog>
+      <Dialog open={menuOpen} onOpenChange={setMenuOpen}>
         <DialogTrigger asChild>
           <Button variant="outline" size="icon" className="lg:hidden" aria-label="Abrir menu">
             <Menu className="h-4 w-4" />
           </Button>
         </DialogTrigger>
-        <DialogContent className="left-3 top-3 h-[calc(100vh-1.5rem)] max-w-[340px] translate-x-0 translate-y-0 p-0 sm:rounded-lg">
+        <DialogContent className="left-3 top-3 h-[calc(100vh-1.5rem)] max-w-[360px] translate-x-0 translate-y-0 p-0 sm:rounded-lg">
           <DialogHeader className="border-b px-4 py-4">
             <DialogTitle className="flex items-center gap-3 text-base">
               <BrandMark className="h-9 w-9" />
               <span>Gestão 360</span>
             </DialogTitle>
           </DialogHeader>
-          <div className="overflow-y-auto p-3">
-            {navSections.map((nav) => (
-              <div key={nav.heading} className="mb-4">
-                <div className="mb-1 px-2 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
-                  {nav.heading}
-                </div>
-                <div className="space-y-1">
-                  {nav.items.map((item) => {
-                    const Icon = item.icon;
-                    const active = isActive(pathname, item.href);
-                    return (
-                      <Link
-                        key={`${nav.heading}-${item.href}`}
-                        href={item.href}
-                        className={cn(
-                          'flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm',
-                          active ? 'bg-primary text-primary-foreground' : 'text-muted-foreground hover:bg-accent',
-                        )}
-                      >
-                        <Icon className="h-4 w-4" />
-                        <span>{item.label}</span>
-                      </Link>
-                    );
-                  })}
-                </div>
-              </div>
-            ))}
-          </div>
+          <AccordionNavigation mobile onNavigate={() => setMenuOpen(false)} />
         </DialogContent>
       </Dialog>
 
-      <div className="hidden min-w-[140px] lg:block">
+      <div className="hidden min-w-[150px] lg:block">
         <div className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
           {section?.heading ?? 'Início'}
         </div>
@@ -166,7 +141,7 @@ export function Topbar() {
           <div className="flex items-center gap-2 pl-2 lg:border-l lg:pl-3">
             <div className="hidden text-right leading-tight sm:block">
               <div className="text-sm font-medium">{user.name}</div>
-              <div className="text-xs text-muted-foreground">{user.jobTitle ?? user.role}</div>
+              <div className="text-xs text-muted-foreground">{user.accessProfile?.name ?? user.jobTitle ?? user.role}</div>
             </div>
             <div className="grid h-9 w-9 place-items-center rounded-full bg-primary text-sm font-semibold text-primary-foreground">
               {user.name
@@ -183,11 +158,6 @@ export function Topbar() {
       </div>
     </header>
   );
-}
-
-function isActive(pathname: string, href: string) {
-  if (href === '/') return pathname === '/';
-  return pathname === href || pathname.startsWith(`${href}/`);
 }
 
 function typeLabel(type: string) {

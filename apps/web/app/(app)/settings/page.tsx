@@ -35,6 +35,7 @@ import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '
 import { Textarea } from '@/components/ui/textarea';
 import { api } from '@/lib/api';
 import { cn, formatDate, formatNumber } from '@/lib/utils';
+import { useAuth } from '@/components/auth/auth-provider';
 
 type ModuleKey = 'users' | 'audit' | 'parameters' | 'security' | 'system';
 type ParamView = 'companies' | 'branches' | 'structure' | 'categories' | 'items';
@@ -160,6 +161,19 @@ const modules: Array<{ key: ModuleKey; title: string; description: string; icon:
   { key: 'system', title: 'Sistema', description: 'Configure notificacoes, aprovacoes e regras globais.', icon: Settings, tone: 'text-status-yellow bg-status-yellow/10' },
 ];
 
+const adminCards: Array<{ title: string; description: string; icon: any; active: ModuleKey; view?: ParamView; tone: string }> = [
+  { title: 'Usuários', description: 'Acessos, status, vínculos e responsáveis.', icon: UsersRound, active: 'users', tone: 'text-status-blue bg-status-blue/10' },
+  { title: 'Permissões', description: 'Regras por módulo e ações autorizadas.', icon: KeyRound, active: 'security', tone: 'text-status-purple bg-status-purple/10' },
+  { title: 'Perfis de acesso', description: 'Perfis corporativos e permissões agrupadas.', icon: ShieldCheck, active: 'security', tone: 'text-status-red bg-status-red/10' },
+  { title: 'Auditoria', description: 'Logs por usuário, data, módulo e resultado.', icon: ScrollText, active: 'audit', tone: 'text-status-green bg-status-green/10' },
+  { title: 'Parâmetros', description: 'Tipos, status, prioridades e cadastros base.', icon: SlidersHorizontal, active: 'parameters', view: 'categories', tone: 'text-status-yellow bg-status-yellow/10' },
+  { title: 'Empresas', description: 'Empresas, dados cadastrais e status.', icon: Building2, active: 'parameters', view: 'companies', tone: 'text-status-blue bg-status-blue/10' },
+  { title: 'Filiais', description: 'Unidades de negócio e localizações.', icon: GitBranch, active: 'parameters', view: 'branches', tone: 'text-status-purple bg-status-purple/10' },
+  { title: 'Áreas e Setores', description: 'Hierarquia organizacional e processos.', icon: Layers3, active: 'parameters', view: 'structure', tone: 'text-status-green bg-status-green/10' },
+  { title: 'Notificações', description: 'Preferências, alertas e regras globais.', icon: Settings, active: 'system', tone: 'text-status-yellow bg-status-yellow/10' },
+  { title: 'Sistema', description: 'Configurações gerais e comportamento global.', icon: Settings, active: 'system', tone: 'text-muted-foreground bg-muted' },
+];
+
 const roleLabels: Record<string, string> = {
   SUPER_ADMIN: 'Super Admin',
   COMPANY_ADMIN: 'Admin',
@@ -189,14 +203,17 @@ const nodeTypeLabels: Record<string, string> = {
 
 export default function SettingsPage() {
   const qc = useQueryClient();
+  const { hasPermission, loading: authLoading } = useAuth();
   const [active, setActive] = useState<ModuleKey>('parameters');
   const [paramView, setParamView] = useState<ParamView>('companies');
   const [search, setSearch] = useState('');
   const [dialog, setDialog] = useState<{ type: string; record?: any } | null>(null);
+  const canOpenSettings = hasPermission(['settings:view', 'settings:manage', 'users:manage', 'audit:view']);
 
   const query = useQuery<Bootstrap>({
     queryKey: ['admin', 'bootstrap'],
     queryFn: () => api<Bootstrap>('/admin/bootstrap'),
+    enabled: canOpenSettings,
   });
 
   const data = query.data;
@@ -253,8 +270,28 @@ export default function SettingsPage() {
     onError: (e: any) => toast.error(e?.message ?? 'Nao foi possivel excluir'),
   });
 
-  if (query.isLoading) {
+  if (authLoading || query.isLoading) {
     return <LoadingState label="Carregando configuracoes..." />;
+  }
+
+  if (!canOpenSettings) {
+    return (
+      <div>
+        <PageHeader
+          eyebrow="Administração"
+          tone="admin"
+          title="Configurações"
+          description="Central administrativa protegida por permissão."
+          breadcrumbs={[{ label: 'Início', href: '/' }, { label: 'Configurações' }]}
+        />
+        <SectionCard title="Acesso restrito" description="Seu perfil não possui permissão para visualizar Configurações.">
+          <div className="rounded-lg border border-dashed p-8 text-center text-sm text-muted-foreground">
+            <ShieldCheck className="mx-auto mb-3 h-8 w-8 opacity-50" />
+            Solicite ao Super Admin a permissão adequada para acessar usuários, auditoria, parâmetros, segurança ou sistema.
+          </div>
+        </SectionCard>
+      </div>
+    );
   }
 
   return (
@@ -274,6 +311,37 @@ export default function SettingsPage() {
           </Button>
         }
       />
+
+      <SectionCard
+        title="Central de Configurações"
+        description="Acesso separado da operação diária para usuários, permissões, auditoria, parâmetros e regras globais."
+        contentClassName="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-5"
+        className="mb-6"
+      >
+        {adminCards.map((card) => {
+          const Icon = card.icon;
+          return (
+            <button
+              key={card.title}
+              type="button"
+              onClick={() => {
+                setActive(card.active);
+                if (card.view) setParamView(card.view);
+              }}
+              className={cn(
+                'h-full rounded-lg border bg-card p-4 text-left shadow-sm transition-colors hover:bg-accent/35',
+                active === card.active && (!card.view || card.view === paramView) && 'border-primary/40 bg-primary/5',
+              )}
+            >
+              <div className={cn('grid h-10 w-10 place-items-center rounded-md', card.tone)}>
+                <Icon className="h-5 w-5" />
+              </div>
+              <div className="mt-4 text-sm font-semibold">{card.title}</div>
+              <p className="mt-1 text-xs leading-relaxed text-muted-foreground">{card.description}</p>
+            </button>
+          );
+        })}
+      </SectionCard>
 
       <div className="mb-6 grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-5">
         {modules.map((item) => {

@@ -12,11 +12,14 @@ export interface AuthUser {
   companyId: string;
   avatarUrl?: string | null;
   jobTitle?: string | null;
+  accessProfile?: { id: string; code: string; name: string } | null;
+  permissions?: string[];
 }
 
 interface AuthCtx {
   user: AuthUser | null;
   loading: boolean;
+  hasPermission: (permissions?: string | string[]) => boolean;
   login: (email: string, password: string) => Promise<void>;
   logout: () => Promise<void>;
 }
@@ -39,7 +42,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       return;
     }
     api<AuthUser & { sub?: string }>('/auth/me')
-      .then((u) => setUser({ ...u, id: u.sub ?? u.id }))
+      .then((u) => setUser({ ...u, id: u.sub ?? u.id, permissions: u.permissions ?? [] }))
       .catch(() => {
         clearTokens();
         router.replace('/login');
@@ -55,7 +58,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       user: AuthUser;
     }>('/auth/login', { method: 'POST', json: { email, password } });
     setTokens(out.accessToken, out.refreshToken);
-    setUser(out.user);
+    const profile = await api<AuthUser & { sub?: string }>('/auth/me');
+    setUser({ ...profile, id: profile.sub ?? profile.id, permissions: profile.permissions ?? out.user.permissions ?? [] });
     router.replace('/');
   };
 
@@ -70,7 +74,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     router.replace('/login');
   };
 
-  return <Ctx.Provider value={{ user, loading, login, logout }}>{children}</Ctx.Provider>;
+  const hasPermission = (permissions?: string | string[]) => {
+    if (!permissions || (Array.isArray(permissions) && permissions.length === 0)) return true;
+    if (!user) return false;
+    if (user.role === 'SUPER_ADMIN') return true;
+    const required = Array.isArray(permissions) ? permissions : [permissions];
+    const granted = new Set(user.permissions ?? []);
+    return required.some((permission) => granted.has(permission) || granted.has(`${permission.split(':')[0]}:manage`));
+  };
+
+  return <Ctx.Provider value={{ user, loading, hasPermission, login, logout }}>{children}</Ctx.Provider>;
 }
 
 export function useAuth(): AuthCtx {

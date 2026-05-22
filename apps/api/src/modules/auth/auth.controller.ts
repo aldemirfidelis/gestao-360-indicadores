@@ -53,6 +53,6 @@ export class AuthController {
   @UseGuards(JwtAuthGuard)
   @Get('me')
   me(@CurrentUser() user: AuthPayload) {
-    return user;
+    return this.auth.me(user);
   }
 }

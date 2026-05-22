@@ -73,6 +73,8 @@ A central administrativa de Configuracoes, com Usuarios, Auditoria, Parametros, 
 
 O Mapa Estrategico editavel, com perspectivas, objetivos, indicadores, permissoes, auditoria, versionamento e integracao com o Mapa de Relacoes, esta documentado em **[docs/mapa-estrategico-integrado.md](./docs/mapa-estrategico-integrado.md)**.
 
+A nova navegacao lateral em accordion, com grupos por Visualizacoes, Lancamentos, Gestao, Relatorios e Configuracoes separadas por engrenagem, esta documentada em **[docs/navegacao-menu-accordion.md](./docs/navegacao-menu-accordion.md)**.
+
 ## Deploy em producao
 
 Dois caminhos suportados, **ambos** usando Neon Postgres como banco:
@@ -181,7 +183,7 @@ Plataforma cuida de build/deploy/SSL/escala. Veja **[DEPLOY.md](./DEPLOY.md)**.
 | `/settings` | Empresa e filiais |
 
 ### Componentes globais
-- **Sidebar agrupada** em 6 secoes (Visao, Estrategia, Performance, Execucao, Dados, Empresa)
+- **Sidebar accordion** com grupos de Visualizacoes, Lancamentos, Gestao e Relatorios, filtrada por permissoes e com Configuracoes separadas no rodape por engrenagem
 - **Topbar** com busca, **sino de notificacoes** com contador, toggle de tema, perfil
 - **NotificationsBell** com dialog + endpoint `POST /notifications/generate` para rodar regras de alerta sob demanda
 

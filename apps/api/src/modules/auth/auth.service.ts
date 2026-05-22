@@ -65,19 +65,17 @@ export class AuthService {
       },
     });
 
+    const profile = await this.userProfile(user.id);
+
     return {
       accessToken,
       refreshToken: refreshRaw,
-      user: {
-        id: user.id,
-        email: user.email,
-        name: user.name,
-        role: user.role,
-        companyId: user.companyId,
-        avatarUrl: user.avatarUrl,
-        jobTitle: user.jobTitle,
-      },
+      user: profile,
     };
+  }
+
+  async me(payload: AuthPayload) {
+    return this.userProfile(payload.sub);
   }
 
   async refresh(refreshToken: string) {
@@ -125,5 +123,44 @@ export class AuthService {
       });
     }
     return { ok: true };
+  }
+
+  private async userProfile(userId: string) {
+    const user = await this.prisma.user.findUnique({
+      where: { id: userId },
+      select: {
+        id: true,
+        email: true,
+        name: true,
+        role: true,
+        companyId: true,
+        avatarUrl: true,
+        jobTitle: true,
+        permissions: { select: { permission: { select: { key: true } } } },
+        accessProfile: {
+          select: {
+            id: true,
+            code: true,
+            name: true,
+            permissions: { select: { permission: { select: { key: true } } } },
+          },
+        },
+      },
+    });
+    if (!user) throw new UnauthorizedException('Usuario nao encontrado');
+    const permissionKeys = new Set<string>();
+    user.permissions.forEach((item) => permissionKeys.add(item.permission.key));
+    user.accessProfile?.permissions.forEach((item) => permissionKeys.add(item.permission.key));
+    return {
+      id: user.id,
+      email: user.email,
+      name: user.name,
+      role: user.role,
+      companyId: user.companyId,
+      avatarUrl: user.avatarUrl,
+      jobTitle: user.jobTitle,
+      accessProfile: user.accessProfile ? { id: user.accessProfile.id, code: user.accessProfile.code, name: user.accessProfile.name } : null,
+      permissions: Array.from(permissionKeys).sort(),
+    };
   }
 }
