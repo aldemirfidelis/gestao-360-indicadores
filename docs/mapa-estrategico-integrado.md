@@ -17,7 +17,7 @@ No detalhe do mapa, o usuario autorizado consegue:
 - vincular indicadores existentes;
 - vincular areas, setores, processos ou outras estruturas;
 - ver status agregado do objetivo com base nos indicadores vinculados;
-- abrir indicador, analise, reuniao, plano de acao e Mapa de Relacoes;
+- abrir indicador, analise, reuniao, plano de acao e Arvore Organizacional;
 - criar versoes de trabalho;
 - publicar uma versao do mapa.
 
@@ -38,9 +38,9 @@ As principais entidades sao:
 
 O campo legado `Indicator.strategicObjectiveId` foi mantido para compatibilidade, mas novos vinculos sao gravados tambem em `StrategicObjectiveIndicator`.
 
-## Integracao com o Mapa de Relacoes
+## Integracao com a Arvore Organizacional
 
-O Mapa de Relacoes sincroniza a origem estrategica dos indicadores.
+O Mapa Estrategico sincroniza a origem estrategica dos indicadores com a Arvore Organizacional.
 
 O fluxo exibido passa a considerar:
 
@@ -57,7 +57,7 @@ Empresa
 > Acompanhamento
 ```
 
-Quando um objetivo possui indicadores vinculados, o mapa cria conexoes `Objetivo Estrategico -> Indicador`. O indicador tambem guarda, nos dados do no, a lista de origens estrategicas para facilitar a rastreabilidade.
+Quando um objetivo possui indicadores vinculados, o sistema preserva a conexao real `Objetivo Estrategico -> Indicador` e o indicador segue vinculado ao seu no da Arvore Organizacional.
 
 ## Permissoes
 
@@ -139,7 +139,7 @@ Antes de publicar em producao, validar:
 - criar e remover ligacoes entre objetivos;
 - vincular e remover indicadores;
 - vincular areas, setores e processos;
-- abrir origem no Mapa de Relacoes;
+- abrir origem na Arvore Organizacional;
 - publicar versao;
 - consultar auditoria;
 - testar usuario sem permissao de edicao.

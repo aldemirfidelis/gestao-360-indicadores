@@ -1,6 +1,7 @@
 'use client';
 
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
+import { useSearchParams } from 'next/navigation';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
 import {
@@ -128,11 +129,13 @@ const emptyNode = {
 type NodeForm = typeof emptyNode;
 
 export default function OrgPage() {
+  const searchParams = useSearchParams();
   const [selected, setSelected] = useState<TreeNode | null>(null);
   const [open, setOpen] = useState(false);
   const [form, setForm] = useState<NodeForm>(emptyNode);
   const qc = useQueryClient();
   const { user } = useAuth();
+  const createMode = searchParams.get('create');
 
   const tree = useQuery<TreeNode[]>({
     queryKey: ['orgnodes', 'tree'],
@@ -211,6 +214,26 @@ export default function OrgPage() {
     );
     setOpen(true);
   };
+
+  useEffect(() => {
+    if (!createMode) return;
+    const type = createMode === 'guideline' ? 'DIRECTORATE' : createMode === 'micro' ? 'AREA' : 'SECTOR';
+    const name =
+      createMode === 'guideline'
+        ? 'Nova diretriz'
+        : createMode === 'micro'
+          ? 'Nova area micro'
+          : 'Nova area macro';
+    setForm({
+      ...emptyNode,
+      name: '',
+      type,
+      parentId: createMode === 'micro' ? selected?.id ?? '' : '',
+      description: name,
+    });
+    setOpen(true);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [createMode]);
 
   return (
     <div>

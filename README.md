@@ -2,7 +2,7 @@
 
 Plataforma SaaS corporativa para gestao estrategica de indicadores, BSC, OKR, KPI, planos de acao, FCA/CAPA, cronogramas, reunioes, importacao de dados, relatorios, insights e dashboards executivos.
 
-> **Status:** sistema funcional ponta a ponta com backend NestJS + frontend Next.js, banco PostgreSQL com 40+ entidades modeladas, rastreabilidade, mapa de relacoes, dashboards, regras de negocio implementadas e dados demo realistas.
+> **Status:** sistema funcional ponta a ponta com backend NestJS + frontend Next.js, banco PostgreSQL com 40+ entidades modeladas, rastreabilidade pela Arvore Organizacional e Mapa Estrategico, dashboards, regras de negocio implementadas e dados demo realistas.
 
 ---
 
@@ -65,17 +65,17 @@ Foi adicionada uma documentacao visual completa do fluxo da aplicacao em **[docs
 
 Para abrir uma versao navegavel, imprimir em PDF ou baixar os diagramas em SVG, use **[docs/fluxograma-completo.html](./docs/fluxograma-completo.html)**.
 
-A arquitetura funcional atualizada, incluindo rastreabilidade, mapa persistente, eventos, status history e fluxo completo do indicador, esta documentada em **[docs/arquitetura-gestao-360.md](./docs/arquitetura-gestao-360.md)**.
+A arquitetura funcional atualizada, incluindo rastreabilidade pela Arvore Organizacional, eventos, status history e fluxo completo do indicador, esta documentada em **[docs/arquitetura-gestao-360.md](./docs/arquitetura-gestao-360.md)**.
 
 O novo fluxo inteligente para tratar indicadores fora da meta esta documentado em **[docs/fluxo-tratativa-indicador-fora-meta.md](./docs/fluxo-tratativa-indicador-fora-meta.md)**.
 
 A central administrativa de Configuracoes, com Usuarios, Auditoria, Parametros, Seguranca e Sistema, esta documentada em **[docs/configuracoes-administracao.md](./docs/configuracoes-administracao.md)**.
 
-O Mapa Estrategico editavel, com perspectivas, objetivos, indicadores, permissoes, auditoria, versionamento e integracao com o Mapa de Relacoes, esta documentado em **[docs/mapa-estrategico-integrado.md](./docs/mapa-estrategico-integrado.md)**.
+O Mapa Estrategico editavel, com perspectivas, objetivos, indicadores, permissoes, auditoria, versionamento e integracao com a Arvore Organizacional, esta documentado em **[docs/mapa-estrategico-integrado.md](./docs/mapa-estrategico-integrado.md)**.
 
 A nova navegacao lateral em accordion, com grupos por Visualizacoes, Lancamentos, Gestao, Relatorios e Configuracoes separadas por engrenagem, esta documentada em **[docs/navegacao-menu-accordion.md](./docs/navegacao-menu-accordion.md)**.
 
-O modulo avancado de Plano de Acao, com origem ponta a ponta, ferramentas de analise, IA assistente, evidencias, eficacia e Mapa de Relacoes, esta documentado em **[docs/plano-acao-avancado.md](./docs/plano-acao-avancado.md)**.
+O modulo avancado de Plano de Acao, com origem ponta a ponta, ferramentas de analise, IA assistente, evidencias, eficacia e vinculo com Arvore Organizacional/Mapa Estrategico, esta documentado em **[docs/plano-acao-avancado.md](./docs/plano-acao-avancado.md)**.
 
 ## Deploy em producao
 
@@ -140,7 +140,7 @@ Plataforma cuida de build/deploy/SSL/escala. Veja **[DEPLOY.md](./DEPLOY.md)**.
 | `deviations` | CRUD + causas, analises (`/causes`, `/analyses`), `POST /:id/close` | FCA/CAPA com 6 metodos (FCA, 5 Porques, Ishikawa, Pareto, CAPA, simples) |
 | `actions` | CRUD + subtarefas (`/tasks`), `PATCH /:id/status` | Kanban com recalculo automatico de progresso |
 | `dashboard` | `/overview`, `/ranking`, `/evolution`, `/worst`, `/pending` | Agregacoes para o dashboard executivo |
-| `strategy` | CRUD de mapas, perspectivas, objetivos, layout, vinculos, relacoes e versoes | Mapa estrategico editavel integrado ao Mapa de Relacoes |
+| `strategy` | CRUD de mapas, perspectivas, objetivos, layout, vinculos, relacoes e versoes | Mapa estrategico editavel integrado a Arvore Organizacional |
 | `okrs` | CRUD de ciclos, objetivos, KRs e check-ins | Calculo de progresso ponderado por peso |
 | `projects` | CRUD + milestones + tasks com dependencias | Suporte a Gantt |
 | `meetings` | CRUD + participantes, agenda, decisoes, `POST /:id/actions` | Reuniao gera acao com origin=MEETING |
@@ -150,7 +150,6 @@ Plataforma cuida de build/deploy/SSL/escala. Veja **[DEPLOY.md](./DEPLOY.md)**.
 | `reports` | `/indicators.csv`, `/results.csv`, `/actions.csv`, `/deviations.csv` | Exports CSV com BOM para Excel pt-BR |
 | `insights` | `GET /insights` | Heuristicas locais: resumo executivo, tendencia, sugestoes |
 | `traceability` | `/traceability`, `/traceability/indicators/:id` | Linha de rastreabilidade e historico completo do indicador |
-| `relationship-map` | `/relationship-map/default`, `/nodes`, `/edges`, `/:id/layout` | Mapa 360 persistente com blocos, conexoes e layout |
 | `search` | `/search?q=...` | Busca global entre indicadores, estrutura, acoes, desvios, reunioes, usuarios e objetivos |
 | `health` | `GET /health` | Health check sem auth |
 
@@ -168,7 +167,7 @@ Plataforma cuida de build/deploy/SSL/escala. Veja **[DEPLOY.md](./DEPLOY.md)**.
 | `/indicators/new` | **Formulario completo de novo indicador** com 14 campos |
 | `/indicators/:id` | Detalhe: cards, grafico meta vs realizado, **editor de metas**, historico, botao **"abrir desvio"** se vermelho |
 | `/results` | Grid de **lancamentos em lote** com calculo automatico de farol |
-| `/tree` | **Mapa de relacoes 360** com React Flow, blocos persistentes, conexoes manuais e layout salvo |
+| `/tree` | Rota legada redirecionada para `/org`; a rastreabilidade operacional fica na Arvore Organizacional e no Mapa Estrategico |
 | `/deviations` | Lista com severidade e contagens |
 | `/deviations/:id` | **Detalhe completo do desvio** com Ishikawa 6M, editor de causas, multiplas analises (5 Porques, Ishikawa, Pareto, CAPA), fechamento que valida acoes abertas |
 | `/actions` | Kanban com 4 colunas e troca rapida de status |

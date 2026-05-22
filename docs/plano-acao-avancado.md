@@ -132,11 +132,12 @@ Eventos registrados:
 - Validacao de eficacia.
 - Cancelamento ou reabertura.
 
-## Mapa de Relacoes
+## Arvore Organizacional e Mapa Estrategico
 
-O Mapa de Relacoes exibe os vinculos do plano com:
+O vinculo do plano agora fica concentrado na Arvore Organizacional e no Mapa Estrategico, exibindo:
 
 - Objetivo estrategico.
+- Area macro e area micro.
 - Indicador.
 - Resultado do indicador.
 - Desvio.
@@ -147,7 +148,7 @@ O Mapa de Relacoes exibe os vinculos do plano com:
 - Evidencias.
 - Conclusao de eficacia.
 
-Ao clicar no plano de acao, o usuario abre `/actions/:id`.
+Ao clicar no plano de acao, o usuario abre `/actions/:id`. A rota legada `/tree` redireciona para `/org`.
 
 ## Permissoes
 
@@ -191,7 +192,7 @@ A migration `20260522213000_action_plan_management_suite` adiciona:
 9. Adicionar evidencia e comentario.
 10. Concluir e validar eficacia.
 11. Reabrir plano ineficaz.
-12. Conferir Mapa de Relacoes.
+12. Conferir Arvore Organizacional, Mapa Estrategico e linha de rastreabilidade.
 13. Conferir Auditoria e Historico.
 
 ## Deploy

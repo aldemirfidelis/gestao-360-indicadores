@@ -24,7 +24,6 @@ import 'reactflow/dist/style.css';
 import {
   ArrowLeft,
   Circle,
-  GitBranch,
   GripVertical,
   History,
   Link2,
@@ -312,7 +311,6 @@ export default function StrategyMapPage() {
 
   const invalidate = () => {
     qc.invalidateQueries({ queryKey: ['strategy', 'map', id] });
-    qc.invalidateQueries({ queryKey: ['relationship-map'] });
   };
 
   const createPerspective = useMutation({
@@ -520,7 +518,7 @@ export default function StrategyMapPage() {
         }
       />
 
-      <div className="mb-4 grid grid-cols-1 gap-3 lg:grid-cols-[1fr,160px,180px,auto]">
+      <div className="mb-4 grid grid-cols-1 gap-3 lg:grid-cols-[1fr,160px,180px]">
         <div className="relative">
           <Search className="pointer-events-none absolute left-3 top-2.5 h-4 w-4 text-muted-foreground" />
           <Input className="pl-9" value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Buscar objetivo, indicador, responsavel ou area" />
@@ -540,12 +538,6 @@ export default function StrategyMapPage() {
             <option key={perspective.id} value={perspective.id}>{perspective.name}</option>
           ))}
         </NativeSelect>
-        <Button variant="outline" asChild>
-          <Link href="/tree">
-            <GitBranch className="mr-2 h-4 w-4" />
-            Mapa de Relacoes
-          </Link>
-        </Button>
       </div>
 
       <div className="grid grid-cols-1 gap-4 xl:grid-cols-[1fr,390px]">

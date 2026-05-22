@@ -23,13 +23,10 @@ Agrupa telas de consulta, acompanhamento e analise:
 
 - Visao Geral.
 - Dashboard Executivo.
-- Mapa Estrategico.
-- Mapa de Relacoes.
 - Arvore Organizacional.
+- Mapa Estrategico.
 - Indicadores.
-- Planos de Acao.
 - Cronogramas.
-- Reunioes.
 - Acompanhamentos.
 
 ### Lancamentos
@@ -39,9 +36,10 @@ Agrupa telas de entrada operacional:
 - Central de Lancamentos.
 - Lancar Resultado.
 - Criar Indicador.
+- Criar Area Macro.
+- Criar Area Micro.
+- Criar Diretriz.
 - Criar Analise de Causa.
-- Criar Reuniao.
-- Criar Plano de Acao.
 - Registrar Evidencia.
 
 ### Gestao
@@ -50,21 +48,20 @@ Agrupa cadastros e objetos de gestao do dia a dia:
 
 - Estrutura Organizacional.
 - Objetivos Estrategicos.
+- Plano de Acao.
+- Reunioes.
+- Analise de Causa.
 - Indicadores.
 - OKRs.
 - Projetos e Cronogramas.
-- Governanca de Reunioes.
 - Responsaveis.
 
 ### Relatorios
 
 Agrupa consultas analiticas, auditoria e exportacoes:
 
-- Indicadores.
-- Planos de Acao.
-- Reunioes.
+- Relatorios e Exportacoes.
 - Auditoria.
-- Exportacoes.
 
 ## Configuracoes separadas
 

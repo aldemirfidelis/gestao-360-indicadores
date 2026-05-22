@@ -205,7 +205,7 @@ export default function TreatmentPage() {
               </Link>
             </Button>
             <Button variant="outline" asChild>
-              <Link href="/tree">Ver no mapa</Link>
+              <Link href="/org">Ver na arvore</Link>
             </Button>
           </>
         }

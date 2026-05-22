@@ -153,6 +153,18 @@ interface Bootstrap {
   auditCount: number;
 }
 
+const EMPTY_BOOTSTRAP: Bootstrap = {
+  companies: [],
+  branches: [],
+  orgNodes: [],
+  users: [],
+  categories: [],
+  profiles: [],
+  permissions: [],
+  settings: [],
+  auditCount: 0,
+};
+
 const modules: Array<{ key: ModuleKey; title: string; description: string; icon: any; tone: string }> = [
   { key: 'users', title: 'Usuarios', description: 'Gerencie usuarios, perfis, permissoes e acessos.', icon: UsersRound, tone: 'text-status-blue bg-status-blue/10' },
   { key: 'audit', title: 'Auditoria', description: 'Acompanhe tudo o que acontece no sistema.', icon: ScrollText, tone: 'text-status-green bg-status-green/10' },
@@ -208,15 +220,16 @@ export default function SettingsPage() {
   const [paramView, setParamView] = useState<ParamView>('companies');
   const [search, setSearch] = useState('');
   const [dialog, setDialog] = useState<{ type: string; record?: any } | null>(null);
-  const canOpenSettings = hasPermission(['settings:view', 'settings:manage', 'users:manage', 'audit:view']);
+  const canOpenSettings = hasPermission(['settings:view', 'settings:manage']);
 
   const query = useQuery<Bootstrap>({
     queryKey: ['admin', 'bootstrap'],
-    queryFn: () => api<Bootstrap>('/admin/bootstrap'),
+    queryFn: () => withTimeout(api<Bootstrap>('/admin/bootstrap'), 15000, 'Tempo excedido ao carregar configuracoes.'),
     enabled: canOpenSettings,
+    retry: 1,
   });
 
-  const data = query.data;
+  const data = query.data ?? EMPTY_BOOTSTRAP;
   const filteredUsers = useMemo(() => {
     const q = search.toLowerCase();
     return (data?.users ?? []).filter((user) =>
@@ -270,7 +283,7 @@ export default function SettingsPage() {
     onError: (e: any) => toast.error(e?.message ?? 'Nao foi possivel excluir'),
   });
 
-  if (authLoading || query.isLoading) {
+  if (authLoading || (canOpenSettings && query.isPending && query.fetchStatus !== 'idle')) {
     return <LoadingState label="Carregando configuracoes..." />;
   }
 
@@ -311,6 +324,23 @@ export default function SettingsPage() {
           </Button>
         }
       />
+
+      {query.isError && (
+        <SectionCard
+          title="Configuracoes em modo seguro"
+          description="Nao foi possivel carregar os dados administrativos agora. A tela continua disponivel com listas vazias para evitar carregamento infinito."
+          className="mb-6 border-status-yellow/30"
+          actions={
+            <Button variant="outline" onClick={() => query.refetch()}>
+              Tentar novamente
+            </Button>
+          }
+        >
+          <div className="rounded-lg border border-status-yellow/30 bg-status-yellow/10 p-4 text-sm text-muted-foreground">
+            {(query.error as Error)?.message ?? 'Falha ao carregar configuracoes.'}
+          </div>
+        </SectionCard>
+      )}
 
       <SectionCard
         title="Central de Configurações"
@@ -928,4 +958,14 @@ function toPayload(type: string, form: any) {
   if (type === 'profile') return { code: form.code, name: form.name, description: form.description || null, role: form.role, status: form.status, permissionKeys: form.permissionKeys };
   if (type === 'setting') return { key: form.key, value: form.value, description: form.description || null, valueType: form.valueType, group: form.group, active: form.status === 'ACTIVE' };
   return form;
+}
+
+function withTimeout<T>(promise: Promise<T>, ms: number, message: string): Promise<T> {
+  return new Promise((resolve, reject) => {
+    const timer = window.setTimeout(() => reject(new Error(message)), ms);
+    promise
+      .then(resolve)
+      .catch(reject)
+      .finally(() => window.clearTimeout(timer));
+  });
 }

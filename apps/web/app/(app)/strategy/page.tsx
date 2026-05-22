@@ -4,7 +4,7 @@ import Link from 'next/link';
 import { useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
-import { CalendarDays, Edit3, GitBranch, Map, Plus, Save, Trash2 } from 'lucide-react';
+import { CalendarDays, Edit3, Map, Plus, Save, Trash2 } from 'lucide-react';
 import { PageHeader } from '@/components/shell/page-header';
 import { MetricCard } from '@/components/platform/metric-card';
 import { SectionCard } from '@/components/platform/section-card';
@@ -125,21 +125,13 @@ export default function StrategyPage() {
         eyebrow="Estrategia"
         tone="view"
         title="Mapa Estrategico"
-        description="Crie, publique e mantenha mapas estrategicos editaveis conectados ao Mapa de Relacoes."
+        description="Crie, publique e mantenha mapas estrategicos editaveis conectados a Arvore Organizacional e aos indicadores."
         breadcrumbs={[{ label: 'Inicio', href: '/' }, { label: 'Visualizacao', href: '/visualization' }, { label: 'Mapa Estrategico' }]}
         actions={
-          <>
-            <Button variant="outline" asChild>
-              <Link href="/tree">
-                <GitBranch className="mr-2 h-4 w-4" />
-                Mapa de Relacoes
-              </Link>
-            </Button>
-            <Button onClick={openCreate}>
-              <Plus className="mr-2 h-4 w-4" />
-              Novo mapa
-            </Button>
-          </>
+          <Button onClick={openCreate}>
+            <Plus className="mr-2 h-4 w-4" />
+            Novo mapa
+          </Button>
         }
       />
 

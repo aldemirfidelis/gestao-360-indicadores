@@ -4,7 +4,7 @@ import { useMemo, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
 import Link from 'next/link';
-import { AlertTriangle, CalendarClock, CheckCircle2, Minus, Plus, RotateCcw, Save, Target } from 'lucide-react';
+import { AlertTriangle, CalendarClock, CheckCircle2, Minus, Network, Plus, RotateCcw, Save, Target } from 'lucide-react';
 import { PageHeader } from '@/components/shell/page-header';
 import { MetricCard } from '@/components/platform/metric-card';
 import { SectionCard } from '@/components/platform/section-card';
@@ -51,6 +51,32 @@ interface UpsertOutcome {
   treatment?: { id: string; status: string } | null;
 }
 
+interface TreeNode {
+  id: string;
+  parentId: string | null;
+  name: string;
+  type: string;
+  active: boolean;
+  children: TreeNode[];
+}
+
+interface AreaContext {
+  macro: { id: string; name: string; type: string };
+  micro: { id: string; name: string; type: string };
+}
+
+interface AreaGroup {
+  id: string;
+  name: string;
+  type: string;
+  microAreas: Array<{
+    id: string;
+    name: string;
+    type: string;
+    rows: PendingRow[];
+  }>;
+}
+
 const periodicityLabels: Record<string, string> = {
   DAILY: 'Diario',
   WEEKLY: 'Semanal',
@@ -65,6 +91,7 @@ export default function ResultsPage() {
   const qc = useQueryClient();
   const [edits, setEdits] = useState<Record<string, Record<string, string>>>({});
   const [selectedIndicatorId, setSelectedIndicatorId] = useState('');
+  const [selectedAreaId, setSelectedAreaId] = useState('');
   const [expandedGroups, setExpandedGroups] = useState<Record<string, boolean>>({});
   const [offTargetOpen, setOffTargetOpen] = useState(false);
   const [offTargets, setOffTargets] = useState<UpsertOutcome[]>([]);
@@ -74,6 +101,10 @@ export default function ResultsPage() {
     queryKey: ['results', 'pending'],
     queryFn: () => api<PendingRow[]>('/results/pending?points=6'),
   });
+  const orgTree = useQuery<TreeNode[]>({
+    queryKey: ['orgnodes', 'tree'],
+    queryFn: () => api<TreeNode[]>('/orgnodes/tree'),
+  });
 
   const allPeriods = useMemo(() => {
     const set = new Set<string>();
@@ -81,25 +112,58 @@ export default function ResultsPage() {
     return Array.from(set);
   }, [query.data]);
 
-  const indicatorGroups = useMemo(() => {
-    const groups = new Map<string, { id: string; name: string; rows: PendingRow[] }>();
-    query.data?.forEach((row) => {
-      const groupId = row.indicator.ownerNode.id;
-      const group = groups.get(groupId) ?? {
-        id: groupId,
-        name: row.indicator.ownerNode.name,
-        rows: [],
-      };
-      group.rows.push(row);
-      groups.set(groupId, group);
-    });
-    return Array.from(groups.values()).sort((a, b) => a.name.localeCompare(b.name, 'pt-BR'));
-  }, [query.data]);
+  const orgPaths = useMemo(() => buildPathMap(orgTree.data ?? []), [orgTree.data]);
+
+  const areaGroups = useMemo(() => {
+    const groups = new Map<string, AreaGroup>();
+    const rows = query.data ?? [];
+
+    for (const path of orgPaths.values()) {
+      const activePath = path.filter((node) => node.active !== false);
+      const areaPath = activePath.filter((node) => !ROOT_NODE_TYPES.has(node.type));
+      if (areaPath.length === 0) continue;
+      const macro = areaPath[0];
+      const micro = areaPath.length > 1 ? areaPath[areaPath.length - 1] : macro;
+      ensureAreaBucket(groups, {
+        macro: { id: macro.id, name: macro.name, type: macro.type },
+        micro: { id: micro.id, name: micro.name, type: micro.type },
+      });
+    }
+
+    for (const row of rows) {
+      const context = resolveAreaContext(row, orgPaths);
+      const micro = ensureAreaBucket(groups, context);
+      micro.rows.push(row);
+    }
+
+    return Array.from(groups.values())
+      .map((group) => ({
+        ...group,
+        microAreas: group.microAreas
+          .map((micro) => ({ ...micro, rows: micro.rows.sort((a, b) => a.indicator.name.localeCompare(b.indicator.name, 'pt-BR')) }))
+          .sort((a, b) => {
+            if (a.rows.length !== b.rows.length) return b.rows.length - a.rows.length;
+            return a.name.localeCompare(b.name, 'pt-BR');
+          }),
+      }))
+      .sort((a, b) => {
+        const countDiff = countRows(b) - countRows(a);
+        return countDiff || a.name.localeCompare(b.name, 'pt-BR');
+      });
+  }, [orgPaths, query.data]);
+
+  const effectiveAreaId = selectedAreaId || findMacroIdForIndicator(selectedIndicatorId, areaGroups) || areaGroups[0]?.id || '';
+  const selectedArea = areaGroups.find((group) => group.id === effectiveAreaId) ?? areaGroups[0];
 
   const selectedRow = useMemo(() => {
-    const rows = query.data ?? [];
-    return rows.find((row) => row.indicator.id === selectedIndicatorId) ?? rows[0];
-  }, [query.data, selectedIndicatorId]);
+    const areaRows = selectedArea?.microAreas.flatMap((micro) => micro.rows) ?? [];
+    return areaRows.find((row) => row.indicator.id === selectedIndicatorId) ?? areaRows[0] ?? null;
+  }, [selectedArea, selectedIndicatorId]);
+
+  const selectedContext = useMemo(
+    () => (selectedRow ? resolveAreaContext(selectedRow, orgPaths) : null),
+    [orgPaths, selectedRow],
+  );
 
   const upsert = useMutation({
     mutationFn: (items: { indicatorId: string; periodRef: string; value: number }[]) =>
@@ -226,41 +290,45 @@ export default function ResultsPage() {
 
       <SectionCard
         title="Aba de lancamento"
-        description="Escolha um indicador e preencha os periodos em formato vertical."
+        description="Escolha a area macro, expanda a area micro e lance o resultado do indicador vinculado."
         contentClassName="p-0"
       >
         <div className="grid grid-cols-1 xl:grid-cols-[360px,1fr]">
           <div className="border-b p-4 xl:border-b-0 xl:border-r">
             <div className="space-y-4">
               <div className="space-y-2">
-                <div className="text-xs font-semibold uppercase text-muted-foreground">Selecionar indicador</div>
+                <div className="text-xs font-semibold uppercase text-muted-foreground">Selecionar area</div>
                 <NativeSelect
-                  value={selectedRow?.indicator.id ?? ''}
-                  onChange={(e) => setSelectedIndicatorId(e.target.value)}
-                  disabled={query.isLoading || (query.data?.length ?? 0) === 0}
+                  value={selectedArea?.id ?? ''}
+                  onChange={(e) => {
+                    const next = areaGroups.find((group) => group.id === e.target.value);
+                    setSelectedAreaId(e.target.value);
+                    setSelectedIndicatorId(next?.microAreas.flatMap((micro) => micro.rows)[0]?.indicator.id ?? '');
+                  }}
+                  disabled={query.isLoading || orgTree.isLoading || areaGroups.length === 0}
                 >
                   <option value="" disabled>
-                    Selecione um indicador
+                    Selecione uma area macro
                   </option>
-                  {query.data?.map((row) => (
-                    <option key={row.indicator.id} value={row.indicator.id}>
-                      {row.indicator.name}
+                  {areaGroups.map((area) => (
+                    <option key={area.id} value={area.id}>
+                      {area.name}
                     </option>
                   ))}
                 </NativeSelect>
               </div>
 
               <div className="overflow-hidden rounded-md border">
-                {query.isLoading && <LoadingState className="min-h-56 border-0" />}
-                {!query.isLoading && (query.data?.length ?? 0) === 0 && (
+                {(query.isLoading || orgTree.isLoading) && <LoadingState className="min-h-56 border-0" />}
+                {!query.isLoading && !orgTree.isLoading && areaGroups.length === 0 && (
                   <EmptyState
-                    title="Nenhum indicador ativo"
-                    description="Cadastre indicadores antes de registrar resultados."
+                    title="Nenhuma area com indicador"
+                    description="Cadastre a area na Arvore Organizacional e vincule indicadores para registrar resultados."
                     className="border-0 bg-transparent py-8"
                   />
                 )}
-                {!query.isLoading &&
-                  indicatorGroups.map((group) => {
+                {!query.isLoading && !orgTree.isLoading &&
+                  selectedArea?.microAreas.map((group) => {
                     const open = expandedGroups[group.id] ?? true;
                     const selectedInGroup = group.rows.some((row) => row.indicator.id === selectedRow?.indicator.id);
                     return (
@@ -283,6 +351,11 @@ export default function ResultsPage() {
                         </button>
                         {open && (
                           <div className="max-h-96 overflow-y-auto bg-background">
+                            {group.rows.length === 0 && (
+                              <div className="border-t px-3 py-4 text-sm text-muted-foreground">
+                                Nenhum indicador cadastrado para esta area.
+                              </div>
+                            )}
                             {group.rows.map((row) => {
                               const selected = row.indicator.id === selectedRow?.indicator.id;
                               const edited = Object.values(edits[row.indicator.id] ?? {}).some((value) => value.trim() !== '');
@@ -291,7 +364,10 @@ export default function ResultsPage() {
                                 <button
                                   key={row.indicator.id}
                                   type="button"
-                                  onClick={() => setSelectedIndicatorId(row.indicator.id)}
+                                  onClick={() => {
+                                    setSelectedAreaId(effectiveAreaId);
+                                    setSelectedIndicatorId(row.indicator.id);
+                                  }}
                                   className={cn(
                                     'flex w-full items-start justify-between gap-3 border-t px-3 py-3 text-left transition-colors hover:bg-accent/35',
                                     selected && 'bg-accent/60',
@@ -337,7 +413,11 @@ export default function ResultsPage() {
                       <div className="text-xs font-semibold uppercase text-muted-foreground">Indicador selecionado</div>
                       <h2 className="mt-1 truncate text-base font-semibold">{selectedRow.indicator.name}</h2>
                       <div className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 text-sm text-muted-foreground">
-                        <span>{selectedRow.indicator.ownerNode.name}</span>
+                        <span className="inline-flex items-center gap-1">
+                          <Network className="h-3.5 w-3.5" />
+                          {selectedContext?.macro.name ?? selectedRow.indicator.ownerNode.name}
+                        </span>
+                        <span>{selectedContext?.micro.name ?? selectedRow.indicator.ownerNode.name}</span>
                         <span>{selectedRow.indicator.code ?? 'Sem codigo'}</span>
                         <span>{periodicityLabels[selectedRow.indicator.periodicity] ?? selectedRow.indicator.periodicity}</span>
                       </div>
@@ -490,4 +570,74 @@ export default function ResultsPage() {
       </Dialog>
     </div>
   );
+}
+
+const ROOT_NODE_TYPES = new Set(['COMPANY', 'BRANCH', 'DIRECTORATE']);
+
+function buildPathMap(nodes: TreeNode[]) {
+  const paths = new Map<string, TreeNode[]>();
+
+  function walk(node: TreeNode, parents: TreeNode[]) {
+    const path = [...parents, node];
+    paths.set(node.id, path);
+    node.children?.forEach((child) => walk(child, path));
+  }
+
+  nodes.forEach((node) => walk(node, []));
+  return paths;
+}
+
+function resolveAreaContext(row: PendingRow, paths: Map<string, TreeNode[]>): AreaContext {
+  const fallback = {
+    id: row.indicator.ownerNode.id,
+    name: row.indicator.ownerNode.name,
+    type: 'AREA',
+  };
+  const path = paths.get(row.indicator.ownerNode.id) ?? [];
+  const areaPath = path
+    .filter((node) => node.active !== false)
+    .filter((node) => !ROOT_NODE_TYPES.has(node.type));
+
+  if (areaPath.length === 0) return { macro: fallback, micro: fallback };
+
+  const macro = areaPath[0];
+  const micro = areaPath.length > 1 ? areaPath[areaPath.length - 1] : macro;
+  return {
+    macro: { id: macro.id, name: macro.name, type: macro.type },
+    micro: { id: micro.id, name: micro.name, type: micro.type },
+  };
+}
+
+function ensureAreaBucket(groups: Map<string, AreaGroup>, context: AreaContext) {
+  const macro =
+    groups.get(context.macro.id) ??
+    {
+      id: context.macro.id,
+      name: context.macro.name,
+      type: context.macro.type,
+      microAreas: [],
+    };
+
+  let micro = macro.microAreas.find((item) => item.id === context.micro.id);
+  if (!micro) {
+    micro = {
+      id: context.micro.id,
+      name: context.micro.id === context.macro.id ? 'Indicadores diretamente vinculados' : context.micro.name,
+      type: context.micro.type,
+      rows: [],
+    };
+    macro.microAreas.push(micro);
+  }
+  groups.set(macro.id, macro);
+  return micro;
+}
+
+function countRows(group: AreaGroup) {
+  return group.microAreas.reduce((total, micro) => total + micro.rows.length, 0);
+}
+
+function findMacroIdForIndicator(indicatorId: string, groups: AreaGroup[]) {
+  return groups.find((group) =>
+    group.microAreas.some((micro) => micro.rows.some((row) => row.indicator.id === indicatorId)),
+  )?.id;
 }

@@ -24,7 +24,6 @@ import { ImportsModule } from './modules/imports/imports.module';
 import { ReportsModule } from './modules/reports/reports.module';
 import { InsightsModule } from './modules/insights/insights.module';
 import { TraceabilityModule } from './modules/traceability/traceability.module';
-import { RelationshipMapModule } from './modules/relationship-map/relationship-map.module';
 import { SearchModule } from './modules/search/search.module';
 import { TreatmentsModule } from './modules/treatments/treatments.module';
 import { AuditInterceptor } from './common/interceptors/audit.interceptor';
@@ -55,7 +54,6 @@ import { AdminModule } from './modules/admin/admin.module';
     ReportsModule,
     InsightsModule,
     TraceabilityModule,
-    RelationshipMapModule,
     SearchModule,
     TreatmentsModule,
     AdminModule,

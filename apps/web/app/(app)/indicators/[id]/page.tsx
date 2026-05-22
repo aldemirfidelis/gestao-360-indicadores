@@ -13,7 +13,7 @@ import {
   XAxis,
   YAxis,
 } from 'recharts';
-import { ArrowLeft, AlertTriangle, GitBranch, Save, ScrollText } from 'lucide-react';
+import { ArrowLeft, AlertTriangle, Network, Save, ScrollText } from 'lucide-react';
 import Link from 'next/link';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -248,11 +248,11 @@ export default function IndicatorDetailPage() {
           </CardHeader>
           <CardContent className="grid gap-3 md:grid-cols-3">
             <Button variant="outline" className="h-auto justify-start gap-3 p-4" asChild>
-              <Link href={`/tree?indicatorId=${id}`}>
-                <GitBranch className="h-5 w-5 text-primary" />
+              <Link href="/org">
+                <Network className="h-5 w-5 text-primary" />
                 <span className="text-left">
-                  <span className="block font-medium">Ver mapa</span>
-                  <span className="block text-xs text-muted-foreground">Rastrear relacoes e impactos</span>
+                  <span className="block font-medium">Ver na arvore</span>
+                  <span className="block text-xs text-muted-foreground">Area, setor e indicadores vinculados</span>
                 </span>
               </Link>
             </Button>
