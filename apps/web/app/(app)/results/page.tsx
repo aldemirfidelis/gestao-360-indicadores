@@ -4,7 +4,7 @@ import { useMemo, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
 import Link from 'next/link';
-import { AlertTriangle, CalendarClock, CheckCircle2, RotateCcw, Save, Target } from 'lucide-react';
+import { AlertTriangle, CalendarClock, CheckCircle2, Minus, Plus, RotateCcw, Save, Target } from 'lucide-react';
 import { PageHeader } from '@/components/shell/page-header';
 import { MetricCard } from '@/components/platform/metric-card';
 import { SectionCard } from '@/components/platform/section-card';
@@ -12,6 +12,7 @@ import { EmptyState } from '@/components/platform/empty-state';
 import { LoadingState } from '@/components/platform/loading-state';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { NativeSelect } from '@/components/ui/select';
 import { StatusLight } from '@/components/ui/status-light';
 import {
   Dialog,
@@ -50,9 +51,21 @@ interface UpsertOutcome {
   treatment?: { id: string; status: string } | null;
 }
 
+const periodicityLabels: Record<string, string> = {
+  DAILY: 'Diario',
+  WEEKLY: 'Semanal',
+  BIWEEKLY: 'Quinzenal',
+  MONTHLY: 'Mensal',
+  QUARTERLY: 'Trimestral',
+  SEMIANNUAL: 'Semestral',
+  ANNUAL: 'Anual',
+};
+
 export default function ResultsPage() {
   const qc = useQueryClient();
   const [edits, setEdits] = useState<Record<string, Record<string, string>>>({});
+  const [selectedIndicatorId, setSelectedIndicatorId] = useState('');
+  const [expandedGroups, setExpandedGroups] = useState<Record<string, boolean>>({});
   const [offTargetOpen, setOffTargetOpen] = useState(false);
   const [offTargets, setOffTargets] = useState<UpsertOutcome[]>([]);
   const [ignoreReason, setIgnoreReason] = useState('');
@@ -67,6 +80,26 @@ export default function ResultsPage() {
     query.data?.forEach((r) => r.cells.forEach((c) => set.add(c.periodRef)));
     return Array.from(set);
   }, [query.data]);
+
+  const indicatorGroups = useMemo(() => {
+    const groups = new Map<string, { id: string; name: string; rows: PendingRow[] }>();
+    query.data?.forEach((row) => {
+      const groupId = row.indicator.ownerNode.id;
+      const group = groups.get(groupId) ?? {
+        id: groupId,
+        name: row.indicator.ownerNode.name,
+        rows: [],
+      };
+      group.rows.push(row);
+      groups.set(groupId, group);
+    });
+    return Array.from(groups.values()).sort((a, b) => a.name.localeCompare(b.name, 'pt-BR'));
+  }, [query.data]);
+
+  const selectedRow = useMemo(() => {
+    const rows = query.data ?? [];
+    return rows.find((row) => row.indicator.id === selectedIndicatorId) ?? rows[0];
+  }, [query.data, selectedIndicatorId]);
 
   const upsert = useMutation({
     mutationFn: (items: { indicatorId: string; periodRef: string; value: number }[]) =>
@@ -109,6 +142,16 @@ export default function ResultsPage() {
   const filledCells =
     query.data?.reduce((acc, r) => acc + r.cells.filter((c) => c.value !== null && c.value !== undefined).length, 0) ?? 0;
   const missingCells = Math.max(0, totalCells - filledCells);
+  const selectedCells = selectedRow?.cells ?? [];
+  const selectedEditMap = selectedRow ? edits[selectedRow.indicator.id] ?? {} : {};
+  const selectedFilledCells = selectedCells.filter((c) => {
+    const hasLocalValue = (selectedEditMap[c.periodRef] ?? '').trim() !== '';
+    return hasLocalValue || (c.value !== null && c.value !== undefined);
+  }).length;
+  const selectedEditedCount = selectedRow
+    ? Object.values(edits[selectedRow.indicator.id] ?? {}).filter((v) => v.trim() !== '').length
+    : 0;
+  const selectedPendingCells = Math.max(0, selectedCells.length - selectedFilledCells);
 
   const handleSave = () => {
     const items: { indicatorId: string; periodRef: string; value: number }[] = [];
@@ -181,72 +224,205 @@ export default function ResultsPage() {
         />
       </div>
 
-      <SectionCard title="Grade de lancamento" description="Digite os valores realizados e salve em lote." contentClassName="p-0">
-        <div className="overflow-x-auto">
-          <table className="table-modern">
-            <thead>
-              <tr>
-                <th className="sticky left-0 z-10 min-w-[280px] bg-muted/70 text-left">Indicador</th>
-                {allPeriods.map((p) => (
-                  <th key={p} className="min-w-[128px] text-center">
-                    {periodRefLabel(p)}
-                  </th>
-                ))}
-              </tr>
-            </thead>
-            <tbody>
-              {query.data?.map((row) => (
-                <tr key={row.indicator.id}>
-                  <td className="sticky left-0 z-10 bg-card">
-                    <div className="font-medium">{row.indicator.name}</div>
-                    <div className="text-xs text-muted-foreground">{row.indicator.ownerNode.name}</div>
-                  </td>
-                  {allPeriods.map((p) => {
-                    const cell = row.cells.find((c) => c.periodRef === p);
-                    const editVal = edits[row.indicator.id]?.[p] ?? '';
-                    const display =
-                      editVal !== ''
-                        ? editVal
-                        : cell?.value !== null && cell?.value !== undefined
-                          ? String(cell.value)
-                          : '';
+      <SectionCard
+        title="Aba de lancamento"
+        description="Escolha um indicador e preencha os periodos em formato vertical."
+        contentClassName="p-0"
+      >
+        <div className="grid grid-cols-1 xl:grid-cols-[360px,1fr]">
+          <div className="border-b p-4 xl:border-b-0 xl:border-r">
+            <div className="space-y-4">
+              <div className="space-y-2">
+                <div className="text-xs font-semibold uppercase text-muted-foreground">Selecionar indicador</div>
+                <NativeSelect
+                  value={selectedRow?.indicator.id ?? ''}
+                  onChange={(e) => setSelectedIndicatorId(e.target.value)}
+                  disabled={query.isLoading || (query.data?.length ?? 0) === 0}
+                >
+                  <option value="" disabled>
+                    Selecione um indicador
+                  </option>
+                  {query.data?.map((row) => (
+                    <option key={row.indicator.id} value={row.indicator.id}>
+                      {row.indicator.name}
+                    </option>
+                  ))}
+                </NativeSelect>
+              </div>
+
+              <div className="overflow-hidden rounded-md border">
+                {query.isLoading && <LoadingState className="min-h-56 border-0" />}
+                {!query.isLoading && (query.data?.length ?? 0) === 0 && (
+                  <EmptyState
+                    title="Nenhum indicador ativo"
+                    description="Cadastre indicadores antes de registrar resultados."
+                    className="border-0 bg-transparent py-8"
+                  />
+                )}
+                {!query.isLoading &&
+                  indicatorGroups.map((group) => {
+                    const open = expandedGroups[group.id] ?? true;
+                    const selectedInGroup = group.rows.some((row) => row.indicator.id === selectedRow?.indicator.id);
                     return (
-                      <td key={p} className="text-center">
-                        <div className="flex flex-col items-center gap-1">
-                          <Input
-                            value={display}
-                            onChange={(e) =>
-                              setEdits((prev) => ({
-                                ...prev,
-                                [row.indicator.id]: { ...prev[row.indicator.id], [p]: e.target.value },
-                              }))
-                            }
-                            placeholder={cell?.target !== null && cell?.target !== undefined ? String(cell.target) : '-'}
-                            className={cn(
-                              'h-9 w-24 text-center text-sm',
-                              cell?.light === 'RED' && 'border-status-red/60',
-                              cell?.light === 'YELLOW' && 'border-status-yellow/60',
-                              cell?.light === 'GREEN' && 'border-status-green/60',
-                            )}
-                          />
-                          {cell?.light && cell.light !== 'GRAY' && <StatusLight light={cell.light} />}
-                          {cell?.target !== null && cell?.target !== undefined && (
-                            <span className="text-[10px] text-muted-foreground">meta: {cell.target}</span>
+                      <div key={group.id} className="border-b last:border-b-0">
+                        <button
+                          type="button"
+                          onClick={() => setExpandedGroups((prev) => ({ ...prev, [group.id]: !(prev[group.id] ?? true) }))}
+                          className={cn(
+                            'flex w-full items-center gap-2 bg-muted/35 px-3 py-2.5 text-left text-sm font-semibold transition-colors hover:bg-accent/45',
+                            selectedInGroup && 'text-primary',
                           )}
-                        </div>
-                      </td>
+                        >
+                          <span className="grid h-6 w-6 shrink-0 place-items-center rounded-md border bg-background">
+                            {open ? <Minus className="h-3.5 w-3.5" /> : <Plus className="h-3.5 w-3.5" />}
+                          </span>
+                          <span className="min-w-0 flex-1 truncate">{group.name}</span>
+                          <span className="rounded-full bg-background px-2 py-0.5 text-xs text-muted-foreground">
+                            {group.rows.length}
+                          </span>
+                        </button>
+                        {open && (
+                          <div className="max-h-96 overflow-y-auto bg-background">
+                            {group.rows.map((row) => {
+                              const selected = row.indicator.id === selectedRow?.indicator.id;
+                              const edited = Object.values(edits[row.indicator.id] ?? {}).some((value) => value.trim() !== '');
+                              const unitLabel = row.indicator.unitLabel ?? row.indicator.unit;
+                              return (
+                                <button
+                                  key={row.indicator.id}
+                                  type="button"
+                                  onClick={() => setSelectedIndicatorId(row.indicator.id)}
+                                  className={cn(
+                                    'flex w-full items-start justify-between gap-3 border-t px-3 py-3 text-left transition-colors hover:bg-accent/35',
+                                    selected && 'bg-accent/60',
+                                  )}
+                                >
+                                  <span className="min-w-0">
+                                    <span className="block truncate text-sm font-medium">{row.indicator.name}</span>
+                                    <span className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-muted-foreground">
+                                      <span>{row.indicator.code ?? 'Sem codigo'}</span>
+                                      <span>{periodicityLabels[row.indicator.periodicity] ?? row.indicator.periodicity}</span>
+                                      <span>{unitLabel}</span>
+                                    </span>
+                                  </span>
+                                  {edited && (
+                                    <span className="shrink-0 rounded-full bg-status-yellow/15 px-2 py-0.5 text-xs font-medium text-status-yellow">
+                                      editado
+                                    </span>
+                                  )}
+                                </button>
+                              );
+                            })}
+                          </div>
+                        )}
+                      </div>
                     );
                   })}
-                </tr>
-              ))}
-            </tbody>
-          </table>
-          {query.isLoading && <LoadingState className="m-4" />}
-          {!query.isLoading && (query.data?.length ?? 0) === 0 && (
-            <div className="p-4">
-              <EmptyState title="Nenhum indicador ativo" description="Cadastre indicadores antes de registrar resultados." />
+              </div>
             </div>
-          )}
+          </div>
+
+          <div className="min-w-0">
+            {query.isLoading && <LoadingState className="m-4 min-h-80" />}
+            {!query.isLoading && !selectedRow && (
+              <div className="p-4">
+                <EmptyState title="Selecione um indicador" description="A grade vertical sera exibida aqui." />
+              </div>
+            )}
+            {!query.isLoading && selectedRow && (
+              <>
+                <div className="border-b p-4">
+                  <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
+                    <div className="min-w-0">
+                      <div className="text-xs font-semibold uppercase text-muted-foreground">Indicador selecionado</div>
+                      <h2 className="mt-1 truncate text-base font-semibold">{selectedRow.indicator.name}</h2>
+                      <div className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 text-sm text-muted-foreground">
+                        <span>{selectedRow.indicator.ownerNode.name}</span>
+                        <span>{selectedRow.indicator.code ?? 'Sem codigo'}</span>
+                        <span>{periodicityLabels[selectedRow.indicator.periodicity] ?? selectedRow.indicator.periodicity}</span>
+                      </div>
+                    </div>
+                    <div className="flex flex-wrap gap-2 text-xs">
+                      <span className="rounded-full bg-status-green/15 px-2.5 py-1 font-medium text-status-green">
+                        {formatNumber(selectedFilledCells)} preenchidos
+                      </span>
+                      <span className="rounded-full bg-status-yellow/15 px-2.5 py-1 font-medium text-status-yellow">
+                        {formatNumber(selectedPendingCells)} pendentes
+                      </span>
+                      <span className="rounded-full bg-status-blue/15 px-2.5 py-1 font-medium text-status-blue">
+                        {formatNumber(selectedEditedCount)} edicoes
+                      </span>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="overflow-x-auto">
+                  <table className="table-modern min-w-[640px]">
+                    <thead>
+                      <tr>
+                        <th className="text-left">Mes/periodo</th>
+                        <th className="text-left">Realizado</th>
+                        <th className="text-left">Meta</th>
+                        <th className="text-center">Farol</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {selectedRow.cells.map((cell) => {
+                        const editVal = edits[selectedRow.indicator.id]?.[cell.periodRef] ?? '';
+                        const display =
+                          editVal !== ''
+                            ? editVal
+                            : cell.value !== null && cell.value !== undefined
+                              ? String(cell.value)
+                              : '';
+                        return (
+                          <tr key={cell.periodRef}>
+                            <td>
+                              <div className="font-medium">{periodRefLabel(cell.periodRef)}</div>
+                              <div className="text-xs text-muted-foreground">{cell.periodRef}</div>
+                            </td>
+                            <td>
+                              <Input
+                                value={display}
+                                onChange={(e) =>
+                                  setEdits((prev) => ({
+                                    ...prev,
+                                    [selectedRow.indicator.id]: {
+                                      ...prev[selectedRow.indicator.id],
+                                      [cell.periodRef]: e.target.value,
+                                    },
+                                  }))
+                                }
+                                placeholder={cell.target !== null && cell.target !== undefined ? String(cell.target) : '-'}
+                                className={cn(
+                                  'h-9 w-full max-w-[180px] text-sm',
+                                  cell.light === 'RED' && 'border-status-red/60',
+                                  cell.light === 'YELLOW' && 'border-status-yellow/60',
+                                  cell.light === 'GREEN' && 'border-status-green/60',
+                                )}
+                              />
+                            </td>
+                            <td>
+                              <div className="text-sm font-medium">
+                                {cell.target !== null && cell.target !== undefined ? formatNumber(cell.target) : '-'}
+                              </div>
+                            </td>
+                            <td className="text-center">
+                              {cell.light && cell.light !== 'GRAY' ? (
+                                <StatusLight light={cell.light} />
+                              ) : (
+                                <span className="text-xs text-muted-foreground">Sem farol</span>
+                              )}
+                            </td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+              </>
+            )}
+          </div>
         </div>
       </SectionCard>
 
