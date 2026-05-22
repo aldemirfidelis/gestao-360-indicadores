@@ -3,6 +3,7 @@ import {
   ActionOrigin,
   ActionPriority,
   ActionStatus,
+  ActionAnalysisTool,
   Direction,
   FeedKind,
   IndicatorStatus,
@@ -75,18 +76,33 @@ export const indicatorResultUpsertSchema = z.object({
 export type IndicatorResultUpsertInput = z.infer<typeof indicatorResultUpsertSchema>;
 
 export const actionCreateSchema = z.object({
-  companyId: z.string().uuid(),
+  companyId: z.string().uuid().optional(),
   title: z.string().min(2).max(200),
   description: z.string().max(4000).optional().nullable(),
+  problemDescription: z.string().max(4000).optional().nullable(),
   origin: z.nativeEnum(ActionOrigin).default(ActionOrigin.MANUAL),
   originRefId: z.string().uuid().optional().nullable(),
+  branchId: z.string().uuid().optional().nullable(),
+  strategicObjectiveId: z.string().uuid().optional().nullable(),
+  indicatorId: z.string().uuid().optional().nullable(),
+  indicatorResultId: z.string().uuid().optional().nullable(),
+  deviationId: z.string().uuid().optional().nullable(),
+  analysisId: z.string().uuid().optional().nullable(),
+  meetingId: z.string().uuid().optional().nullable(),
+  treatmentId: z.string().uuid().optional().nullable(),
+  analysisTool: z.nativeEnum(ActionAnalysisTool).optional().nullable(),
+  rootCause: z.string().max(4000).optional().nullable(),
   responsibleUserId: z.string().uuid().optional().nullable(),
   ownerNodeId: z.string().uuid().optional().nullable(),
   priority: z.nativeEnum(ActionPriority).default(ActionPriority.MEDIUM),
+  criticality: z.nativeEnum(ActionPriority).default(ActionPriority.MEDIUM),
   status: z.nativeEnum(ActionStatus).default(ActionStatus.NOT_STARTED),
   startDate: z.coerce.date().optional().nullable(),
   dueDate: z.coerce.date().optional().nullable(),
   estimatedCost: z.number().nonnegative().optional().nullable(),
+  expectedResult: z.string().max(4000).optional().nullable(),
+  achievedResult: z.string().max(4000).optional().nullable(),
+  evidenceRequired: z.boolean().optional(),
 });
 export type ActionCreateInput = z.infer<typeof actionCreateSchema>;
 

@@ -75,6 +75,8 @@ O Mapa Estrategico editavel, com perspectivas, objetivos, indicadores, permissoe
 
 A nova navegacao lateral em accordion, com grupos por Visualizacoes, Lancamentos, Gestao, Relatorios e Configuracoes separadas por engrenagem, esta documentada em **[docs/navegacao-menu-accordion.md](./docs/navegacao-menu-accordion.md)**.
 
+O modulo avancado de Plano de Acao, com origem ponta a ponta, ferramentas de analise, IA assistente, evidencias, eficacia e Mapa de Relacoes, esta documentado em **[docs/plano-acao-avancado.md](./docs/plano-acao-avancado.md)**.
+
 ## Deploy em producao
 
 Dois caminhos suportados, **ambos** usando Neon Postgres como banco:

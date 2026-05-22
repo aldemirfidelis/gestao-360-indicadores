@@ -139,14 +139,37 @@ export const AnalysisMethod = {
 } as const;
 export type AnalysisMethod = (typeof AnalysisMethod)[keyof typeof AnalysisMethod];
 
+export const ActionAnalysisTool = {
+  FIVE_WHYS: 'FIVE_WHYS',
+  ISHIKAWA: 'ISHIKAWA',
+  MASP: 'MASP',
+  PDCA: 'PDCA',
+  FIVE_W_TWO_H: 'FIVE_W_TWO_H',
+  PARETO: 'PARETO',
+  FCA: 'FCA',
+  GUT: 'GUT',
+  PRIORITIZATION_MATRIX: 'PRIORITIZATION_MATRIX',
+  BRAINSTORMING: 'BRAINSTORMING',
+  ROOT_CAUSE: 'ROOT_CAUSE',
+  EFFECTIVENESS_CHECKLIST: 'EFFECTIVENESS_CHECKLIST',
+} as const;
+export type ActionAnalysisTool = (typeof ActionAnalysisTool)[keyof typeof ActionAnalysisTool];
+
 export const ActionStatus = {
+  DRAFT: 'DRAFT',
   NOT_STARTED: 'NOT_STARTED',
+  UNDER_ANALYSIS: 'UNDER_ANALYSIS',
   IN_PROGRESS: 'IN_PROGRESS',
   WAITING_THIRD: 'WAITING_THIRD',
+  WAITING_EVIDENCE: 'WAITING_EVIDENCE',
+  WAITING_VALIDATION: 'WAITING_VALIDATION',
   PAUSED: 'PAUSED',
   DONE: 'DONE',
   DONE_LATE: 'DONE_LATE',
   CANCELLED: 'CANCELLED',
+  REOPENED: 'REOPENED',
+  INEFFECTIVE: 'INEFFECTIVE',
+  EFFECTIVE: 'EFFECTIVE',
 } as const;
 export type ActionStatus = (typeof ActionStatus)[keyof typeof ActionStatus];
 
@@ -165,6 +188,12 @@ export const ActionOrigin = {
   OKR: 'OKR',
   MEETING: 'MEETING',
   PROJECT: 'PROJECT',
+  STRATEGIC_MAP: 'STRATEGIC_MAP',
+  RELATIONSHIP_MAP: 'RELATIONSHIP_MAP',
+  FOLLOW_UP: 'FOLLOW_UP',
+  NON_CONFORMITY: 'NON_CONFORMITY',
+  OCCURRENCE: 'OCCURRENCE',
+  AUDIT: 'AUDIT',
   MANUAL: 'MANUAL',
 } as const;
 export type ActionOrigin = (typeof ActionOrigin)[keyof typeof ActionOrigin];

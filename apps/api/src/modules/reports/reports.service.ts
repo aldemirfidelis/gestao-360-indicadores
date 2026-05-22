@@ -84,20 +84,38 @@ export class ReportsService {
       include: {
         responsibleUser: { select: { name: true } },
         ownerNode: { select: { name: true } },
+        indicator: { select: { code: true, name: true } },
+        strategicObjective: { select: { name: true, perspective: { select: { name: true } } } },
+        deviation: { select: { number: true, title: true, method: true } },
+        meeting: { select: { title: true } },
+        _count: { select: { evidences: true, comments: true, analysisSessions: true } },
       },
       orderBy: { createdAt: 'desc' },
     });
     const rows = items.map((a) => ({
       title: a.title,
       origin: a.origin,
+      strategicObjective: a.strategicObjective?.name ?? '',
+      perspective: a.strategicObjective?.perspective?.name ?? '',
+      indicatorCode: a.indicator?.code ?? '',
+      indicator: a.indicator?.name ?? '',
+      deviation: a.deviation ? `#${a.deviation.number} ${a.deviation.title}` : '',
+      meeting: a.meeting?.title ?? '',
+      analysisTool: a.analysisTool ?? a.deviation?.method ?? '',
+      rootCause: a.rootCause ?? '',
       priority: a.priority,
+      criticality: a.criticality,
       status: a.status,
+      effectivenessStatus: a.effectivenessStatus,
       responsible: a.responsibleUser?.name ?? '',
       area: a.ownerNode?.name ?? '',
       startDate: a.startDate?.toISOString().slice(0, 10) ?? '',
       dueDate: a.dueDate?.toISOString().slice(0, 10) ?? '',
       completedAt: a.completedAt?.toISOString().slice(0, 10) ?? '',
       progress: a.progress,
+      evidences: a._count.evidences,
+      comments: a._count.comments,
+      analyses: a._count.analysisSessions,
     }));
     return toCsv(rows);
   }

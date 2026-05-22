@@ -37,7 +37,8 @@ export function ActionPlanCard({ action, href = true }: { action: ActionPlanCard
     new Date(action.dueDate) < new Date() &&
     action.status !== 'DONE' &&
     action.status !== 'DONE_LATE' &&
-    action.status !== 'CANCELLED';
+    action.status !== 'CANCELLED' &&
+    action.status !== 'EFFECTIVE';
 
   const body = (
     <article className={cn('panel panel-hover h-full border-l-4 p-4', priorityTone[action.priority])}>
@@ -76,13 +77,20 @@ export function ActionPlanCard({ action, href = true }: { action: ActionPlanCard
 
 function statusLabel(status: string) {
   const map: Record<string, string> = {
+    DRAFT: 'Rascunho',
     NOT_STARTED: 'Nao iniciada',
+    UNDER_ANALYSIS: 'Em analise',
     IN_PROGRESS: 'Em andamento',
     WAITING_THIRD: 'Aguardando',
+    WAITING_EVIDENCE: 'Aguardando evidencia',
+    WAITING_VALIDATION: 'Aguardando validacao',
     PAUSED: 'Pausada',
     DONE: 'Concluida',
     DONE_LATE: 'Concluida tarde',
     CANCELLED: 'Cancelada',
+    REOPENED: 'Reaberta',
+    INEFFECTIVE: 'Ineficaz',
+    EFFECTIVE: 'Eficaz',
   };
   return map[status] ?? status;
 }

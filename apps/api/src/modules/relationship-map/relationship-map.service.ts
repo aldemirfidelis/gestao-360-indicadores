@@ -308,7 +308,12 @@ export class RelationshipMapService {
       }),
       this.prisma.actionPlan.findMany({
         where: { companyId, deletedAt: null },
-        include: { responsibleUser: { select: { name: true } } },
+        include: {
+          responsibleUser: { select: { name: true } },
+          indicatorResult: { select: { id: true, periodRef: true, value: true, light: true, deviationPct: true } },
+          analysisSessions: { select: { id: true, method: true, status: true, rootCause: true } },
+          evidences: { where: { deletedAt: null }, select: { id: true, title: true, url: true } },
+        },
         orderBy: { createdAt: 'desc' },
         take: 200,
       }),
@@ -510,8 +515,41 @@ export class RelationshipMapService {
         action.status,
         action.responsibleUser?.name,
         action.dueDate ?? undefined,
-        { priority: action.priority, progress: action.progress, origin: action.origin },
+        {
+          priority: action.priority,
+          criticality: action.criticality,
+          progress: action.progress,
+          origin: action.origin,
+          analysisTool: action.analysisTool,
+          effectivenessStatus: action.effectivenessStatus,
+          rootCause: action.rootCause,
+        },
       );
+      if (action.strategicObjectiveId) {
+        await this.upsertRefEdge(mapId, 'StrategicObjective', action.strategicObjectiveId, 'ActionPlan', action.id, 'drives_action', 'plano');
+      }
+      if (action.indicatorId) {
+        await this.upsertRefEdge(mapId, 'Indicator', action.indicatorId, 'ActionPlan', action.id, 'generates_action', 'plano');
+      }
+      if (action.indicatorResultId) {
+        await this.upsertRefNode(
+          mapId,
+          'IndicatorResult',
+          action.indicatorResultId,
+          MapNodeType.CUSTOM,
+          `${action.indicatorResult?.periodRef ?? 'Resultado'} - ${action.indicatorResult?.value ?? ''}`,
+          1120,
+          (index % 35) * 92,
+          action.indicatorResult?.light ?? 'RESULT',
+          action.responsibleUser?.name,
+          undefined,
+          { value: action.indicatorResult?.value, deviationPct: action.indicatorResult?.deviationPct, actionId: action.id },
+        );
+        if (action.indicatorId) {
+          await this.upsertRefEdge(mapId, 'Indicator', action.indicatorId, 'IndicatorResult', action.indicatorResultId, 'has_result', 'resultado');
+        }
+        await this.upsertRefEdge(mapId, 'IndicatorResult', action.indicatorResultId, 'ActionPlan', action.id, 'triggered_action', 'resultado');
+      }
       if (action.treatmentId) {
         await this.upsertRefEdge(mapId, 'TreatmentCase', action.treatmentId, 'ActionPlan', action.id, 'generates', 'acao');
       } else if (action.meetingId) {
@@ -524,6 +562,54 @@ export class RelationshipMapService {
         await this.upsertRefEdge(mapId, 'OrgNode', action.ownerNodeId, 'ActionPlan', action.id, 'owns', 'acao');
       } else if (company) {
         await this.upsertRefEdge(mapId, 'Company', company.id, 'ActionPlan', action.id, 'tracks', 'acao');
+      }
+      for (const [sessionIndex, session] of action.analysisSessions.entries()) {
+        await this.upsertRefNode(
+          mapId,
+          'ActionAnalysisSession',
+          session.id,
+          MapNodeType.CUSTOM,
+          `${session.method} - ${action.title}`,
+          1700,
+          (index % 35) * 92 + sessionIndex * 34,
+          session.status,
+          action.responsibleUser?.name,
+          undefined,
+          { method: session.method, rootCause: session.rootCause, actionId: action.id },
+        );
+        await this.upsertRefEdge(mapId, 'ActionAnalysisSession', session.id, 'ActionPlan', action.id, 'defines_action', 'analise');
+      }
+      for (const [evidenceIndex, evidence] of action.evidences.entries()) {
+        await this.upsertRefNode(
+          mapId,
+          'ActionEvidence',
+          evidence.id,
+          MapNodeType.EXECUTION,
+          evidence.title,
+          2040,
+          (index % 35) * 92 + evidenceIndex * 34,
+          'EVIDENCE',
+          action.responsibleUser?.name,
+          undefined,
+          { actionId: action.id, url: evidence.url },
+        );
+        await this.upsertRefEdge(mapId, 'ActionPlan', action.id, 'ActionEvidence', evidence.id, 'has_evidence', 'evidencia');
+      }
+      if (['EFFECTIVE', 'INEFFECTIVE', 'REOPENED'].includes(action.effectivenessStatus)) {
+        await this.upsertRefNode(
+          mapId,
+          'ActionEffectiveness',
+          action.id,
+          MapNodeType.CONCLUSION,
+          `Eficacia - ${action.title}`,
+          2200,
+          (index % 35) * 92,
+          action.effectivenessStatus,
+          action.responsibleUser?.name,
+          action.effectivenessValidatedAt ?? undefined,
+          { actionId: action.id, summary: action.effectivenessSummary },
+        );
+        await this.upsertRefEdge(mapId, 'ActionPlan', action.id, 'ActionEffectiveness', action.id, 'validated_by', 'eficacia');
       }
     }
 

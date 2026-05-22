@@ -159,14 +159,68 @@ enum AnalysisMethod {
   SIMPLE
 }
 
-enum ActionStatus {
+enum ActionAnalysisTool {
+  FIVE_WHYS
+  ISHIKAWA
+  MASP
+  PDCA
+  FIVE_W_TWO_H
+  PARETO
+  FCA
+  GUT
+  PRIORITIZATION_MATRIX
+  BRAINSTORMING
+  ROOT_CAUSE
+  EFFECTIVENESS_CHECKLIST
+}
+
+enum ActionToolStatus {
+  DRAFT
+  IN_PROGRESS
+  READY
+  VALIDATED
+}
+
+enum ActionStepStatus {
+  PENDING
+  IN_PROGRESS
+  DONE
+  BLOCKED
+  VALIDATED
+}
+
+enum ActionEffectivenessStatus {
   NOT_STARTED
+  PENDING
+  IN_REVIEW
+  EFFECTIVE
+  INEFFECTIVE
+  REOPENED
+  NOT_APPLICABLE
+}
+
+enum ActionAiSuggestionStatus {
+  PENDING
+  ACCEPTED
+  REJECTED
+  APPLIED
+}
+
+enum ActionStatus {
+  DRAFT
+  NOT_STARTED
+  UNDER_ANALYSIS
   IN_PROGRESS
   WAITING_THIRD
+  WAITING_EVIDENCE
+  WAITING_VALIDATION
   PAUSED
   DONE
   DONE_LATE
   CANCELLED
+  REOPENED
+  INEFFECTIVE
+  EFFECTIVE
 }
 
 enum ActionPriority {
@@ -183,6 +237,12 @@ enum ActionOrigin {
   OKR
   MEETING
   PROJECT
+  STRATEGIC_MAP
+  RELATIONSHIP_MAP
+  FOLLOW_UP
+  NON_CONFORMITY
+  OCCURRENCE
+  AUDIT
   MANUAL
 }
 
@@ -446,6 +506,7 @@ model Branch {
 
   orgNodes OrgNode[]
   users    User[]
+  actions  ActionPlan[]
 
   @@index([companyId])
 }
@@ -708,6 +769,7 @@ model StrategicObjective {
   indicators    Indicator[]         @relation("IndicatorStrategicObjective")
   indicatorLinks StrategicObjectiveIndicator[]
   orgNodeLinks   StrategicObjectiveOrgNode[]
+  actionPlans    ActionPlan[]       @relation("ActionStrategicObjective")
   okrs          OKRObjective[]
   outRelations  ObjectiveRelation[] @relation("ObjFrom")
   inRelations   ObjectiveRelation[] @relation("ObjTo")
@@ -947,6 +1009,7 @@ model IndicatorResult {
   createdAt       DateTime      @default(now())
   updatedAt       DateTime      @updatedAt
   treatmentCases  TreatmentCase[]
+  actionsGenerated ActionPlan[] @relation("ActionIndicatorResult")
 
   @@unique([indicatorId, periodRef])
   @@index([indicatorId, periodDate])
@@ -1034,14 +1097,20 @@ model ActionPlan {
   id                String         @id @default(uuid())
   companyId         String
   company           Company        @relation(fields: [companyId], references: [id])
+  branchId          String?
+  branch            Branch?        @relation(fields: [branchId], references: [id])
   ownerNodeId       String?
   ownerNode         OrgNode?       @relation("ActionOwnerNode", fields: [ownerNodeId], references: [id])
   responsibleUserId String?
   responsibleUser   User?          @relation("ActionResponsible", fields: [responsibleUserId], references: [id])
   createdById       String?
   createdBy         User?          @relation("ActionCreatedBy", fields: [createdById], references: [id])
+  strategicObjectiveId String?
+  strategicObjective StrategicObjective? @relation("ActionStrategicObjective", fields: [strategicObjectiveId], references: [id])
   indicatorId       String?
   indicator         Indicator?     @relation("ActionIndicator", fields: [indicatorId], references: [id])
+  indicatorResultId String?
+  indicatorResult   IndicatorResult? @relation("ActionIndicatorResult", fields: [indicatorResultId], references: [id])
   meetingId         String?
   meeting           Meeting?       @relation("ActionFromMeeting", fields: [meetingId], references: [id])
   analysisId        String?
@@ -1051,9 +1120,13 @@ model ActionPlan {
 
   title          String
   description    String?
+  problemDescription String?
   origin         ActionOrigin   @default(MANUAL)
   originRefId    String?
+  analysisTool   ActionAnalysisTool?
+  rootCause      String?
   priority       ActionPriority @default(MEDIUM)
+  criticality    ActionPriority @default(MEDIUM)
   status         ActionStatus   @default(NOT_STARTED)
   startDate      DateTime?
   dueDate        DateTime?
@@ -1065,6 +1138,14 @@ model ActionPlan {
   evidenceRequired Boolean      @default(false)
   expectedResult   String?
   achievedResult   String?
+  effectivenessStatus ActionEffectivenessStatus @default(NOT_STARTED)
+  effectivenessChecklist Json?
+  effectivenessSummary   String?
+  effectivenessEvidence  String?
+  effectivenessValidatedById String?
+  effectivenessValidatedAt DateTime?
+  reopenedAt      DateTime?
+  cancelReason    String?
 
   deviationId    String?
   deviation      Deviation?     @relation("ActionFromDeviation", fields: [deviationId], references: [id])
@@ -1074,13 +1155,23 @@ model ActionPlan {
   deletedAt      DateTime?
 
   tasks          ActionTask[]
+  participants   ActionParticipant[]
+  evidences      ActionEvidence[]
+  comments       ActionComment[]
+  history        ActionHistory[]
+  analysisSessions ActionAnalysisSession[]
+  aiSuggestions  ActionAiSuggestion[]
 
   @@index([companyId])
+  @@index([branchId])
   @@index([status])
   @@index([dueDate])
+  @@index([strategicObjectiveId])
   @@index([indicatorId])
+  @@index([indicatorResultId])
   @@index([meetingId])
   @@index([treatmentId])
+  @@index([effectivenessStatus])
 }
 
 model ActionTask {
@@ -1093,6 +1184,191 @@ model ActionTask {
   position    Int         @default(0)
   createdAt   DateTime    @default(now())
   updatedAt   DateTime    @updatedAt
+}
+
+model ActionParticipant {
+  id        String     @id @default(uuid())
+  actionId  String
+  action    ActionPlan @relation(fields: [actionId], references: [id], onDelete: Cascade)
+  userId    String?
+  name      String?
+  email     String?
+  role      String?
+  createdAt DateTime   @default(now())
+
+  @@index([actionId])
+  @@index([userId])
+}
+
+model ActionEvidence {
+  id          String     @id @default(uuid())
+  actionId    String
+  action      ActionPlan @relation(fields: [actionId], references: [id], onDelete: Cascade)
+  title       String
+  description String?
+  url         String?
+  fileName    String?
+  fileType    String?
+  uploadedById String?
+  createdAt   DateTime   @default(now())
+  deletedAt   DateTime?
+
+  @@index([actionId])
+}
+
+model ActionComment {
+  id        String     @id @default(uuid())
+  actionId  String
+  action    ActionPlan @relation(fields: [actionId], references: [id], onDelete: Cascade)
+  authorId  String?
+  authorName String?
+  comment   String
+  createdAt DateTime   @default(now())
+  deletedAt DateTime?
+
+  @@index([actionId, createdAt])
+}
+
+model ActionHistory {
+  id          String     @id @default(uuid())
+  actionId    String
+  action      ActionPlan @relation(fields: [actionId], references: [id], onDelete: Cascade)
+  userId      String?
+  eventType   String
+  field       String?
+  beforeValue String?
+  afterValue  String?
+  note        String?
+  createdAt   DateTime   @default(now())
+
+  @@index([actionId, createdAt])
+}
+
+model ActionAnalysisSession {
+  id          String             @id @default(uuid())
+  actionId    String
+  action      ActionPlan         @relation(fields: [actionId], references: [id], onDelete: Cascade)
+  method      ActionAnalysisTool
+  status      ActionToolStatus   @default(DRAFT)
+  problem     String?
+  rootCause   String?
+  responsibleUserId String?
+  data        Json?
+  aiSummary   String?
+  createdAt   DateTime           @default(now())
+  updatedAt   DateTime           @updatedAt
+
+  fiveWhys       ActionFiveWhy[]
+  ishikawaCauses ActionIshikawaCause[]
+  maspSteps      ActionMaspStep[]
+  pdcaSteps      ActionPdcaStep[]
+  fiveW2H        ActionFiveW2H?
+
+  @@unique([actionId, method])
+  @@index([actionId])
+}
+
+model ActionFiveWhy {
+  id          String                @id @default(uuid())
+  sessionId   String
+  session     ActionAnalysisSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  position    Int
+  question    String
+  answer      String?
+  evidence    String?
+  aiPrompt    String?
+  isRootCause Boolean               @default(false)
+  createdAt   DateTime              @default(now())
+  updatedAt   DateTime              @updatedAt
+
+  @@unique([sessionId, position])
+}
+
+model ActionIshikawaCause {
+  id          String                @id @default(uuid())
+  sessionId   String
+  session     ActionAnalysisSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  category    String
+  description String
+  impact      Int                   @default(3)
+  probability Int                   @default(3)
+  evidence    String?
+  likelyRootCause Boolean           @default(false)
+  createdAt   DateTime              @default(now())
+  updatedAt   DateTime              @updatedAt
+
+  @@index([sessionId])
+}
+
+model ActionMaspStep {
+  id          String                @id @default(uuid())
+  sessionId   String
+  session     ActionAnalysisSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  step        Int
+  title       String
+  description String?
+  responsibleUserId String?
+  dueDate     DateTime?
+  evidence    String?
+  comments    String?
+  status      ActionStepStatus      @default(PENDING)
+  validated   Boolean               @default(false)
+  createdAt   DateTime              @default(now())
+  updatedAt   DateTime              @updatedAt
+
+  @@unique([sessionId, step])
+}
+
+model ActionPdcaStep {
+  id          String                @id @default(uuid())
+  sessionId   String
+  session     ActionAnalysisSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  phase       String
+  description String?
+  responsibleUserId String?
+  dueDate     DateTime?
+  evidence    String?
+  comments    String?
+  status      ActionStepStatus      @default(PENDING)
+  validated   Boolean               @default(false)
+  createdAt   DateTime              @default(now())
+  updatedAt   DateTime              @updatedAt
+
+  @@unique([sessionId, phase])
+}
+
+model ActionFiveW2H {
+  id          String                @id @default(uuid())
+  sessionId   String                @unique
+  session     ActionAnalysisSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  what        String?
+  why         String?
+  where       String?
+  when        DateTime?
+  who         String?
+  how         String?
+  howMuch     Float?
+  reviewNotes String?
+  completeScore Int                 @default(0)
+  updatedAt   DateTime              @updatedAt
+}
+
+model ActionAiSuggestion {
+  id          String                   @id @default(uuid())
+  actionId    String
+  action      ActionPlan               @relation(fields: [actionId], references: [id], onDelete: Cascade)
+  sessionId   String?
+  suggestionType String
+  title       String
+  content     String
+  context     Json?
+  status      ActionAiSuggestionStatus @default(PENDING)
+  createdAt   DateTime                 @default(now())
+  decidedAt   DateTime?
+  decidedById String?
+
+  @@index([actionId, createdAt])
+  @@index([status])
 }
 
 // =====================================================

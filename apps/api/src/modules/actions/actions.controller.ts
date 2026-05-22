@@ -1,76 +1,136 @@
 import { Body, Controller, Delete, Get, Param, Patch, Post, Query } from '@nestjs/common';
+import { ActionAiSuggestionStatus, ActionEffectivenessStatus, ActionStatus } from '@prisma/client';
+import { actionCreateSchema } from '@g360/shared';
 import { ActionsService } from './actions.service';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
-import { AuthPayload } from '../auth/auth.types';
+import { RequirePermissions } from '../../common/decorators/permissions.decorator';
 import { ZodValidationPipe } from '../../common/pipes/zod-validation.pipe';
-import { actionCreateSchema } from '@g360/shared';
-import { ActionStatus } from '@prisma/client';
+import { AuthPayload } from '../auth/auth.types';
 
 @Controller('actions')
 export class ActionsController {
   constructor(private readonly service: ActionsService) {}
 
   @Get()
+  @RequirePermissions('actions:view')
   list(
     @CurrentUser() me: AuthPayload,
     @Query('status') status?: ActionStatus,
     @Query('responsibleUserId') responsibleUserId?: string,
     @Query('ownerNodeId') ownerNodeId?: string,
+    @Query('indicatorId') indicatorId?: string,
+    @Query('strategicObjectiveId') strategicObjectiveId?: string,
+    @Query('effectivenessStatus') effectivenessStatus?: ActionEffectivenessStatus,
     @Query('overdue') overdue?: string,
     @Query('origin') origin?: string,
+    @Query('search') search?: string,
   ) {
     return this.service.list({
       companyId: me.companyId,
       status,
       responsibleUserId,
       ownerNodeId,
+      indicatorId,
+      strategicObjectiveId,
+      effectivenessStatus,
       overdue: overdue === 'true',
       origin,
+      search,
     });
   }
 
+  @Get('options')
+  @RequirePermissions('actions:view')
+  options(@CurrentUser() me: AuthPayload) {
+    return this.service.options(me.companyId);
+  }
+
   @Get(':id')
-  byId(@Param('id') id: string) {
-    return this.service.getById(id);
+  @RequirePermissions('actions:view')
+  byId(@CurrentUser() me: AuthPayload, @Param('id') id: string) {
+    return this.service.getById(id, me.companyId);
   }
 
   @Post()
+  @RequirePermissions('actions:create')
   create(
     @CurrentUser() me: AuthPayload,
     @Body(new ZodValidationPipe(actionCreateSchema)) input: any,
   ) {
-    return this.service.create(input, me.sub);
+    return this.service.create({ ...input, companyId: me.companyId }, me.sub);
   }
 
   @Patch(':id')
-  update(@Param('id') id: string, @Body() patch: any) {
-    return this.service.update(id, patch);
+  @RequirePermissions('actions:update')
+  update(@CurrentUser() me: AuthPayload, @Param('id') id: string, @Body() patch: any) {
+    return this.service.update(id, patch, me.sub);
   }
 
   @Patch(':id/status')
+  @RequirePermissions('actions:update')
   changeStatus(
     @CurrentUser() me: AuthPayload,
     @Param('id') id: string,
-    @Body() body: { status: ActionStatus },
+    @Body() body: { status: ActionStatus; reason?: string },
   ) {
-    return this.service.changeStatus(id, body.status, me.sub);
+    return this.service.changeStatus(id, body.status, me.sub, body.reason);
   }
 
   @Post(':id/tasks')
+  @RequirePermissions('actions:update')
   addTask(
+    @CurrentUser() me: AuthPayload,
     @Param('id') id: string,
     @Body() body: { title: string; dueDate?: string },
   ) {
-    return this.service.addTask(id, body.title, body.dueDate ? new Date(body.dueDate) : undefined);
+    return this.service.addTask(id, body.title, body.dueDate ? new Date(body.dueDate) : undefined, me.sub);
   }
 
   @Patch('tasks/:taskId')
-  toggleTask(@Param('taskId') taskId: string, @Body() body: { done: boolean }) {
-    return this.service.toggleTask(taskId, body.done);
+  @RequirePermissions('actions:update')
+  toggleTask(@CurrentUser() me: AuthPayload, @Param('taskId') taskId: string, @Body() body: { done: boolean }) {
+    return this.service.toggleTask(taskId, body.done, me.sub);
+  }
+
+  @Post(':id/analysis')
+  @RequirePermissions('actions:analysis')
+  saveAnalysis(@CurrentUser() me: AuthPayload, @Param('id') id: string, @Body() body: any) {
+    return this.service.saveAnalysis(id, body, me.sub);
+  }
+
+  @Post(':id/evidences')
+  @RequirePermissions('actions:update')
+  addEvidence(@CurrentUser() me: AuthPayload, @Param('id') id: string, @Body() body: any) {
+    return this.service.addEvidence(id, body, me.sub);
+  }
+
+  @Post(':id/comments')
+  @RequirePermissions('actions:update')
+  addComment(@CurrentUser() me: AuthPayload, @Param('id') id: string, @Body() body: any) {
+    return this.service.addComment(id, body, me.sub, me.email);
+  }
+
+  @Post(':id/effectiveness')
+  @RequirePermissions('actions:effectiveness')
+  validateEffectiveness(@CurrentUser() me: AuthPayload, @Param('id') id: string, @Body() body: any) {
+    return this.service.validateEffectiveness(id, body, me.sub);
+  }
+
+  @Post(':id/ai-assist')
+  @RequirePermissions('actions:ai')
+  aiAssist(@CurrentUser() me: AuthPayload, @Param('id') id: string, @Body() body: any) {
+    return this.service.aiAssist(id, body, me.sub);
+  }
+
+  @Patch('ai-suggestions/:id')
+  @RequirePermissions('actions:ai')
+  decideSuggestion(@CurrentUser() me: AuthPayload, @Param('id') id: string, @Body() body: { status: ActionAiSuggestionStatus }) {
+    return this.service.decideSuggestion(id, body.status, me.sub);
   }
 
   @Delete(':id')
-  remove(@Param('id') id: string) {
-    return this.service.remove(id);
+  @RequirePermissions('actions:delete')
+  remove(@CurrentUser() me: AuthPayload, @Param('id') id: string, @Body() body?: { reason?: string }) {
+    return this.service.remove(id, me.sub, body?.reason);
   }
 }

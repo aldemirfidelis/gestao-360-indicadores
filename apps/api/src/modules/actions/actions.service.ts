@@ -1,7 +1,19 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
+import {
+  ActionAiSuggestionStatus,
+  ActionAnalysisTool,
+  ActionEffectivenessStatus,
+  ActionOrigin,
+  ActionPriority,
+  ActionStatus,
+  ActionStepStatus,
+  ActionToolStatus,
+  Prisma,
+  TraceEntityType,
+  TraceEventType,
+  TreatmentStatus,
+} from '@prisma/client';
 import { PrismaService } from '../../prisma/prisma.service';
-import { ActionStatus, Prisma, TraceEntityType, TraceEventType, TreatmentStatus } from '@prisma/client';
-import { ActionCreateInput } from '@g360/shared';
 import { TraceabilityService } from '../traceability/traceability.service';
 
 interface ActionFilter {
@@ -9,9 +21,21 @@ interface ActionFilter {
   status?: ActionStatus;
   responsibleUserId?: string;
   ownerNodeId?: string;
+  indicatorId?: string;
+  strategicObjectiveId?: string;
+  effectivenessStatus?: ActionEffectivenessStatus;
   overdue?: boolean;
   origin?: string;
+  search?: string;
 }
+
+const finalStatuses: ActionStatus[] = [
+  ActionStatus.DONE,
+  ActionStatus.DONE_LATE,
+  ActionStatus.CANCELLED,
+  ActionStatus.EFFECTIVE,
+  ActionStatus.INEFFECTIVE,
+];
 
 @Injectable()
 export class ActionsService {
@@ -27,63 +51,156 @@ export class ActionsService {
       ...(f.status ? { status: f.status } : {}),
       ...(f.responsibleUserId ? { responsibleUserId: f.responsibleUserId } : {}),
       ...(f.ownerNodeId ? { ownerNodeId: f.ownerNodeId } : {}),
-      ...(f.origin ? { origin: f.origin as any } : {}),
+      ...(f.indicatorId ? { indicatorId: f.indicatorId } : {}),
+      ...(f.strategicObjectiveId ? { strategicObjectiveId: f.strategicObjectiveId } : {}),
+      ...(f.effectivenessStatus ? { effectivenessStatus: f.effectivenessStatus } : {}),
+      ...(f.origin ? { origin: f.origin as ActionOrigin } : {}),
+      ...(f.search
+        ? {
+            OR: [
+              { title: { contains: f.search, mode: 'insensitive' } },
+              { description: { contains: f.search, mode: 'insensitive' } },
+              { problemDescription: { contains: f.search, mode: 'insensitive' } },
+              { rootCause: { contains: f.search, mode: 'insensitive' } },
+            ],
+          }
+        : {}),
       ...(f.overdue
         ? {
             dueDate: { lt: new Date() },
-            status: { notIn: [ActionStatus.DONE, ActionStatus.DONE_LATE, ActionStatus.CANCELLED] },
+            status: { notIn: finalStatuses },
           }
         : {}),
     };
     return this.prisma.actionPlan.findMany({
       where,
-      include: {
-        ownerNode: { select: { id: true, name: true } },
-        responsibleUser: { select: { id: true, name: true, avatarUrl: true } },
-        _count: { select: { tasks: true } },
-      },
-      orderBy: [{ priority: 'desc' }, { dueDate: 'asc' }],
+      include: this.listInclude(),
+      orderBy: [{ priority: 'desc' }, { criticality: 'desc' }, { dueDate: 'asc' }, { createdAt: 'desc' }],
     });
   }
 
-  async getById(id: string) {
+  async options(companyId: string) {
+    const [users, orgNodes, branches, indicators, deviations, meetings, strategicObjectives] = await Promise.all([
+      this.prisma.user.findMany({
+        where: { companyId, deletedAt: null, active: true },
+        select: { id: true, name: true, email: true, jobTitle: true, defaultNodeId: true },
+        orderBy: { name: 'asc' },
+      }),
+      this.prisma.orgNode.findMany({
+        where: { companyId, deletedAt: null, active: true },
+        select: { id: true, name: true, type: true, branchId: true, parentId: true },
+        orderBy: [{ type: 'asc' }, { name: 'asc' }],
+      }),
+      this.prisma.branch.findMany({
+        where: { companyId, deletedAt: null, active: true },
+        select: { id: true, name: true, code: true },
+        orderBy: { name: 'asc' },
+      }),
+      this.prisma.indicator.findMany({
+        where: { companyId, deletedAt: null },
+        select: {
+          id: true,
+          name: true,
+          code: true,
+          ownerNodeId: true,
+          strategicObjectiveId: true,
+          responsibleUserId: true,
+          results: {
+            orderBy: { periodDate: 'desc' },
+            take: 6,
+            select: { id: true, periodRef: true, value: true, light: true, attainment: true, deviationPct: true },
+          },
+        },
+        orderBy: { name: 'asc' },
+      }),
+      this.prisma.deviation.findMany({
+        where: { companyId, deletedAt: null },
+        select: { id: true, number: true, title: true, indicatorId: true, method: true, rootCause: true, status: true },
+        orderBy: { openedAt: 'desc' },
+        take: 150,
+      }),
+      this.prisma.meeting.findMany({
+        where: { companyId, deletedAt: null },
+        select: { id: true, title: true, indicatorId: true, deviationId: true, analysisId: true, treatmentId: true, startsAt: true },
+        orderBy: { startsAt: 'desc' },
+        take: 150,
+      }),
+      this.prisma.strategicObjective.findMany({
+        where: { map: { companyId }, deletedAt: null, active: true },
+        select: { id: true, name: true, perspective: { select: { id: true, name: true } }, ownerNodeId: true },
+        orderBy: [{ perspective: { position: 'asc' } }, { position: 'asc' }, { name: 'asc' }],
+      }),
+    ]);
+
+    return {
+      users,
+      orgNodes,
+      branches,
+      indicators,
+      deviations,
+      meetings,
+      strategicObjectives,
+      statuses: Object.values(ActionStatus),
+      priorities: Object.values(ActionPriority),
+      origins: Object.values(ActionOrigin),
+      analysisTools: Object.values(ActionAnalysisTool),
+      effectivenessStatuses: Object.values(ActionEffectivenessStatus),
+    };
+  }
+
+  async getById(id: string, companyId?: string) {
     const action = await this.prisma.actionPlan.findFirst({
-      where: { id, deletedAt: null },
-      include: {
-        ownerNode: true,
-        responsibleUser: true,
-        createdBy: true,
-        deviation: { select: { id: true, number: true, title: true } },
-        tasks: { orderBy: { position: 'asc' } },
-      },
+      where: { id, deletedAt: null, ...(companyId ? { companyId } : {}) },
+      include: this.detailInclude(),
     });
     if (!action) throw new NotFoundException('Acao nao encontrada');
-    return action;
+    return {
+      ...action,
+      originTrail: this.buildOriginTrail(action),
+      aiReadiness: this.assessActionReadiness(action),
+    };
   }
 
-  async create(input: ActionCreateInput, createdById: string) {
+  async create(input: any, createdById: string) {
+    const inferred = await this.inferLinks(input);
     const action = await this.prisma.actionPlan.create({
       data: {
         companyId: input.companyId,
+        branchId: input.branchId ?? inferred.branchId ?? null,
+        strategicObjectiveId: input.strategicObjectiveId ?? inferred.strategicObjectiveId ?? null,
+        indicatorId: input.indicatorId ?? inferred.indicatorId ?? null,
+        indicatorResultId: input.indicatorResultId ?? inferred.indicatorResultId ?? null,
+        deviationId: input.deviationId ?? inferred.deviationId ?? null,
+        analysisId: input.analysisId ?? inferred.analysisId ?? null,
+        meetingId: input.meetingId ?? inferred.meetingId ?? null,
+        treatmentId: input.treatmentId ?? inferred.treatmentId ?? null,
+        ownerNodeId: input.ownerNodeId ?? inferred.ownerNodeId ?? null,
         title: input.title,
         description: input.description ?? null,
+        problemDescription: input.problemDescription ?? inferred.problemDescription ?? null,
         origin: input.origin,
         originRefId: input.originRefId ?? null,
-        responsibleUserId: input.responsibleUserId ?? null,
-        ownerNodeId: input.ownerNodeId ?? null,
+        analysisTool: input.analysisTool ?? inferred.analysisTool ?? null,
+        rootCause: input.rootCause ?? inferred.rootCause ?? null,
+        responsibleUserId: input.responsibleUserId ?? inferred.responsibleUserId ?? null,
         priority: input.priority,
+        criticality: input.criticality ?? input.priority,
         status: input.status,
         startDate: input.startDate ?? null,
         dueDate: input.dueDate ?? null,
         estimatedCost: input.estimatedCost ?? null,
+        expectedResult: input.expectedResult ?? null,
+        achievedResult: input.achievedResult ?? null,
+        evidenceRequired: input.evidenceRequired ?? true,
         createdById,
-        deviationId: input.origin === 'DEVIATION' ? input.originRefId ?? null : null,
       },
     });
-    const ctx = await this.actionTraceContext(action.id);
+
+    await this.recordHistory(action.id, createdById, 'CREATE', null, null, action.title);
+    await this.audit(action.companyId, createdById, 'CREATE', 'ActionPlan', action.id, null, action);
     await this.traceability.record({
       companyId: action.companyId,
-      indicatorId: ctx.indicatorId,
+      indicatorId: action.indicatorId,
       userId: createdById,
       eventType: TraceEventType.ACTION_CREATED,
       entityType: TraceEntityType.ACTION_PLAN,
@@ -91,32 +208,78 @@ export class ActionsService {
       title: 'Plano de acao criado',
       description: action.title,
       statusTo: action.status,
-      metadata: { origin: action.origin, priority: action.priority, dueDate: action.dueDate },
+      metadata: {
+        origin: action.origin,
+        priority: action.priority,
+        criticality: action.criticality,
+        dueDate: action.dueDate,
+        analysisTool: action.analysisTool,
+      },
     });
     return action;
   }
 
-  async update(id: string, patch: Prisma.ActionPlanUpdateInput) {
-    return this.prisma.actionPlan.update({ where: { id }, data: patch });
+  async update(id: string, patch: any, userId?: string) {
+    const before = await this.prisma.actionPlan.findUnique({ where: { id } });
+    if (!before || before.deletedAt) throw new NotFoundException('Acao nao encontrada');
+    const data = this.toActionUpdate(patch, before);
+    const updated = await this.prisma.actionPlan.update({ where: { id }, data });
+
+    const changed = Object.keys(data).filter((key) => JSON.stringify((before as any)[key]) !== JSON.stringify((updated as any)[key]));
+    for (const field of changed) {
+      await this.recordHistory(id, userId, 'UPDATE', field, stringify((before as any)[field]), stringify((updated as any)[field]));
+    }
+    await this.audit(updated.companyId, userId, 'UPDATE', 'ActionPlan', id, before, updated);
+    await this.traceability.record({
+      companyId: updated.companyId,
+      indicatorId: updated.indicatorId,
+      userId,
+      eventType: TraceEventType.UPDATED,
+      entityType: TraceEntityType.ACTION_PLAN,
+      entityId: id,
+      title: 'Plano de acao atualizado',
+      description: updated.title,
+      statusFrom: before.status,
+      statusTo: updated.status,
+      metadata: { changed },
+    });
+    return updated;
   }
 
-  async changeStatus(id: string, status: ActionStatus, userId?: string) {
+  async changeStatus(id: string, status: ActionStatus, userId?: string, reason?: string) {
     const action = await this.getById(id);
     let completedAt: Date | null = action.completedAt;
     let finalStatus = status;
+    let effectivenessStatus: ActionEffectivenessStatus | undefined;
+    let reopenedAt: Date | null | undefined;
 
     if (status === ActionStatus.DONE) {
       completedAt = new Date();
       if (action.dueDate && completedAt > action.dueDate) finalStatus = ActionStatus.DONE_LATE;
+      effectivenessStatus = ActionEffectivenessStatus.PENDING;
     }
+    if (status === ActionStatus.REOPENED) {
+      reopenedAt = new Date();
+      effectivenessStatus = ActionEffectivenessStatus.REOPENED;
+    }
+    if (status === ActionStatus.CANCELLED && reason) {
+      await this.recordHistory(id, userId, 'CANCEL_REASON', 'cancelReason', action.cancelReason, reason);
+    }
+
     const updated = await this.prisma.actionPlan.update({
       where: { id },
-      data: { status: finalStatus, completedAt },
+      data: {
+        status: finalStatus,
+        completedAt,
+        ...(effectivenessStatus ? { effectivenessStatus } : {}),
+        ...(reopenedAt ? { reopenedAt } : {}),
+        ...(reason ? { cancelReason: reason } : {}),
+      },
     });
     const ctx = await this.actionTraceContext(id);
-    if (ctx.treatmentId) {
-      await this.updateTreatmentFromActions(ctx.treatmentId);
-    }
+    if (ctx.treatmentId) await this.updateTreatmentFromActions(ctx.treatmentId);
+    await this.recordHistory(id, userId, 'STATUS', 'status', action.status, updated.status);
+    await this.audit(updated.companyId, userId, 'STATUS_CHANGE', 'ActionPlan', id, action, updated);
     await this.traceability.record({
       companyId: updated.companyId,
       indicatorId: ctx.indicatorId,
@@ -128,20 +291,23 @@ export class ActionsService {
       description: updated.title,
       statusFrom: action.status,
       statusTo: updated.status,
-      metadata: { progress: updated.progress, completedAt: updated.completedAt },
+      metadata: { progress: updated.progress, completedAt: updated.completedAt, reason },
     });
     return updated;
   }
 
-  async addTask(actionId: string, title: string, dueDate?: Date) {
+  async addTask(actionId: string, title: string, dueDate?: Date, userId?: string) {
     const count = await this.prisma.actionTask.count({ where: { actionId } });
     const task = await this.prisma.actionTask.create({
       data: { actionId, title, dueDate: dueDate ?? null, position: count },
     });
     const ctx = await this.actionTraceContext(actionId);
+    await this.recordHistory(actionId, userId, 'TASK_CREATED', null, null, task.title);
+    await this.audit(ctx.companyId, userId, 'TASK_CREATED', 'ActionTask', task.id, null, task);
     await this.traceability.record({
       companyId: ctx.companyId,
       indicatorId: ctx.indicatorId,
+      userId,
       eventType: TraceEventType.TASK_UPDATED,
       entityType: TraceEntityType.ACTION_TASK,
       entityId: task.id,
@@ -154,16 +320,16 @@ export class ActionsService {
     return task;
   }
 
-  async toggleTask(taskId: string, done: boolean) {
-    const t = await this.prisma.actionTask.update({
-      where: { id: taskId },
-      data: { done },
-    });
+  async toggleTask(taskId: string, done: boolean, userId?: string) {
+    const t = await this.prisma.actionTask.update({ where: { id: taskId }, data: { done } });
     await this.recalcProgress(t.actionId);
     const ctx = await this.actionTraceContext(t.actionId);
+    await this.recordHistory(t.actionId, userId, done ? 'TASK_DONE' : 'TASK_REOPENED', null, null, t.title);
+    await this.audit(ctx.companyId, userId, 'TASK_UPDATED', 'ActionTask', taskId, null, t);
     await this.traceability.record({
       companyId: ctx.companyId,
       indicatorId: ctx.indicatorId,
+      userId,
       eventType: TraceEventType.TASK_UPDATED,
       entityType: TraceEntityType.ACTION_TASK,
       entityId: taskId,
@@ -176,31 +342,436 @@ export class ActionsService {
     return t;
   }
 
+  async saveAnalysis(actionId: string, body: any, userId?: string) {
+    const method = body.method as ActionAnalysisTool;
+    if (!method) throw new NotFoundException('Ferramenta de analise obrigatoria');
+    const action = await this.prisma.actionPlan.findUnique({ where: { id: actionId } });
+    if (!action || action.deletedAt) throw new NotFoundException('Acao nao encontrada');
+
+    const session = await this.prisma.actionAnalysisSession.upsert({
+      where: { actionId_method: { actionId, method } },
+      create: {
+        actionId,
+        method,
+        status: body.status ?? ActionToolStatus.IN_PROGRESS,
+        problem: body.problem ?? action.problemDescription ?? action.description ?? null,
+        rootCause: body.rootCause ?? action.rootCause ?? null,
+        responsibleUserId: body.responsibleUserId ?? action.responsibleUserId ?? null,
+        data: body.data ?? undefined,
+        aiSummary: body.aiSummary ?? null,
+      },
+      update: {
+        status: body.status ?? ActionToolStatus.IN_PROGRESS,
+        problem: body.problem ?? null,
+        rootCause: body.rootCause ?? null,
+        responsibleUserId: body.responsibleUserId ?? null,
+        data: body.data ?? undefined,
+        aiSummary: body.aiSummary ?? null,
+      },
+    });
+
+    await this.replaceToolRows(session.id, method, body);
+    await this.prisma.actionPlan.update({
+      where: { id: actionId },
+      data: {
+        analysisTool: method,
+        problemDescription: body.problem ?? action.problemDescription,
+        rootCause: body.rootCause ?? action.rootCause,
+        status: finalStatuses.includes(action.status) ? action.status : ActionStatus.UNDER_ANALYSIS,
+      },
+    });
+    await this.recordHistory(actionId, userId, 'ANALYSIS_SAVED', 'analysisTool', action.analysisTool, method);
+    await this.audit(action.companyId, userId, 'ANALYSIS_SAVED', 'ActionAnalysisSession', session.id, null, body);
+    await this.traceability.record({
+      companyId: action.companyId,
+      indicatorId: action.indicatorId,
+      userId,
+      eventType: TraceEventType.ANALYSIS_CREATED,
+      entityType: TraceEntityType.ACTION_PLAN,
+      entityId: actionId,
+      title: `Ferramenta de analise salva (${method})`,
+      description: body.rootCause ?? body.problem ?? action.title,
+      metadata: { method, sessionId: session.id },
+    });
+    return this.getById(actionId);
+  }
+
+  async addEvidence(actionId: string, body: any, userId?: string) {
+    const action = await this.prisma.actionPlan.findUnique({ where: { id: actionId } });
+    if (!action || action.deletedAt) throw new NotFoundException('Acao nao encontrada');
+    const evidence = await this.prisma.actionEvidence.create({
+      data: {
+        actionId,
+        title: body.title,
+        description: body.description ?? null,
+        url: body.url ?? null,
+        fileName: body.fileName ?? null,
+        fileType: body.fileType ?? null,
+        uploadedById: userId ?? null,
+      },
+    });
+    if (action.status === ActionStatus.WAITING_EVIDENCE) {
+      await this.prisma.actionPlan.update({ where: { id: actionId }, data: { status: ActionStatus.WAITING_VALIDATION } });
+    }
+    await this.recordHistory(actionId, userId, 'EVIDENCE_ADDED', null, null, evidence.title);
+    await this.audit(action.companyId, userId, 'EVIDENCE_ADDED', 'ActionEvidence', evidence.id, null, evidence);
+    await this.traceability.record({
+      companyId: action.companyId,
+      indicatorId: action.indicatorId,
+      userId,
+      eventType: TraceEventType.EVIDENCE_ADDED,
+      entityType: TraceEntityType.ACTION_PLAN,
+      entityId: actionId,
+      title: 'Evidencia adicionada ao plano',
+      description: evidence.title,
+      metadata: { evidenceId: evidence.id, url: evidence.url },
+    });
+    return evidence;
+  }
+
+  async addComment(actionId: string, body: any, userId?: string, authorName?: string) {
+    const action = await this.prisma.actionPlan.findUnique({ where: { id: actionId } });
+    if (!action || action.deletedAt) throw new NotFoundException('Acao nao encontrada');
+    const comment = await this.prisma.actionComment.create({
+      data: { actionId, authorId: userId ?? null, authorName: authorName ?? null, comment: body.comment },
+    });
+    await this.recordHistory(actionId, userId, 'COMMENT_ADDED', null, null, comment.comment);
+    await this.audit(action.companyId, userId, 'COMMENT_ADDED', 'ActionComment', comment.id, null, comment);
+    await this.traceability.record({
+      companyId: action.companyId,
+      indicatorId: action.indicatorId,
+      userId,
+      eventType: TraceEventType.COMMENT_ADDED,
+      entityType: TraceEntityType.ACTION_PLAN,
+      entityId: actionId,
+      title: 'Comentario adicionado ao plano',
+      description: comment.comment,
+    });
+    return comment;
+  }
+
+  async validateEffectiveness(actionId: string, body: any, userId?: string) {
+    const action = await this.getById(actionId);
+    const status = body.effective
+      ? ActionEffectivenessStatus.EFFECTIVE
+      : body.reopen
+        ? ActionEffectivenessStatus.REOPENED
+        : ActionEffectivenessStatus.INEFFECTIVE;
+    const actionStatus = body.effective ? ActionStatus.EFFECTIVE : body.reopen ? ActionStatus.REOPENED : ActionStatus.INEFFECTIVE;
+    const updated = await this.prisma.actionPlan.update({
+      where: { id: actionId },
+      data: {
+        effectivenessStatus: status,
+        effectivenessChecklist: body.checklist ?? undefined,
+        effectivenessSummary: body.summary ?? null,
+        effectivenessEvidence: body.evidence ?? null,
+        effectivenessValidatedById: userId ?? null,
+        effectivenessValidatedAt: new Date(),
+        achievedResult: body.achievedResult ?? action.achievedResult,
+        status: actionStatus,
+        ...(body.reopen ? { reopenedAt: new Date() } : {}),
+      },
+    });
+    await this.recordHistory(actionId, userId, 'EFFECTIVENESS', 'effectivenessStatus', action.effectivenessStatus, status);
+    await this.audit(updated.companyId, userId, 'EFFECTIVENESS_VALIDATED', 'ActionPlan', actionId, action, updated);
+    await this.traceability.record({
+      companyId: updated.companyId,
+      indicatorId: updated.indicatorId,
+      userId,
+      eventType: body.reopen ? TraceEventType.REOPENED : TraceEventType.CLOSED,
+      entityType: TraceEntityType.ACTION_PLAN,
+      entityId: actionId,
+      title: body.effective ? 'Eficacia validada' : 'Plano marcado como ineficaz',
+      description: body.summary ?? updated.title,
+      statusFrom: action.status,
+      statusTo: updated.status,
+      metadata: { effectivenessStatus: status, checklist: body.checklist },
+    });
+    return updated;
+  }
+
+  async aiAssist(actionId: string, body: any, userId?: string) {
+    const action = await this.getById(actionId);
+    const suggestions = this.generateSuggestions(action, body?.scope);
+    const saved = await this.prisma.$transaction(
+      suggestions.map((suggestion) =>
+        this.prisma.actionAiSuggestion.create({
+          data: {
+            actionId,
+            sessionId: body?.sessionId ?? null,
+            suggestionType: suggestion.type,
+            title: suggestion.title,
+            content: suggestion.content,
+            context: suggestion.context,
+          },
+        }),
+      ),
+    );
+    await this.recordHistory(actionId, userId, 'AI_USED', null, null, body?.scope ?? 'general');
+    await this.audit(action.companyId, userId, 'AI_USED', 'ActionPlan', actionId, null, { scope: body?.scope, suggestions });
+    return saved;
+  }
+
+  async decideSuggestion(id: string, status: ActionAiSuggestionStatus, userId?: string) {
+    const suggestion = await this.prisma.actionAiSuggestion.update({
+      where: { id },
+      data: { status, decidedAt: new Date(), decidedById: userId ?? null },
+      include: { action: true },
+    });
+    await this.recordHistory(suggestion.actionId, userId, `AI_${status}`, null, null, suggestion.title);
+    await this.audit(suggestion.action.companyId, userId, `AI_${status}`, 'ActionAiSuggestion', id, null, suggestion);
+    return suggestion;
+  }
+
   async recalcProgress(actionId: string) {
     const tasks = await this.prisma.actionTask.findMany({ where: { actionId } });
     if (tasks.length === 0) return;
     const done = tasks.filter((t) => t.done).length;
     const progress = Math.round((done / tasks.length) * 100);
-    await this.prisma.actionPlan.update({ where: { id: actionId }, data: { progress } });
+    const status = progress >= 100 ? ActionStatus.WAITING_VALIDATION : ActionStatus.IN_PROGRESS;
+    await this.prisma.actionPlan.update({ where: { id: actionId }, data: { progress, status } });
   }
 
-  async remove(id: string) {
+  async remove(id: string, userId?: string, reason?: string) {
+    const before = await this.prisma.actionPlan.findUnique({ where: { id } });
+    if (!before) throw new NotFoundException('Acao nao encontrada');
     const removed = await this.prisma.actionPlan.update({
       where: { id },
-      data: { deletedAt: new Date(), status: ActionStatus.CANCELLED },
+      data: { deletedAt: new Date(), status: ActionStatus.CANCELLED, cancelReason: reason ?? null },
     });
     const ctx = await this.actionTraceContext(id);
+    await this.recordHistory(id, userId, 'DELETE', 'deletedAt', null, removed.deletedAt?.toISOString() ?? null);
+    await this.audit(removed.companyId, userId, 'DELETE', 'ActionPlan', id, before, removed);
     await this.traceability.record({
       companyId: removed.companyId,
       indicatorId: ctx.indicatorId,
+      userId,
       eventType: TraceEventType.STATUS_CHANGED,
       entityType: TraceEntityType.ACTION_PLAN,
       entityId: id,
       title: 'Plano de acao cancelado',
       description: removed.title,
       statusTo: ActionStatus.CANCELLED,
+      metadata: { reason },
     });
     return removed;
+  }
+
+  private listInclude() {
+    return {
+      ownerNode: { select: { id: true, name: true, type: true } },
+      responsibleUser: { select: { id: true, name: true, avatarUrl: true, email: true } },
+      indicator: { select: { id: true, name: true, code: true, ownerNode: { select: { id: true, name: true } } } },
+      indicatorResult: { select: { id: true, periodRef: true, value: true, light: true, deviationPct: true } },
+      strategicObjective: { select: { id: true, name: true, perspective: { select: { id: true, name: true } } } },
+      deviation: { select: { id: true, number: true, title: true, method: true, rootCause: true, status: true } },
+      analysis: { select: { id: true, method: true, content: true } },
+      meeting: { select: { id: true, title: true, startsAt: true } },
+      treatment: { select: { id: true, title: true, status: true, periodRef: true } },
+      _count: { select: { tasks: true, evidences: true, comments: true, analysisSessions: true } },
+    } satisfies Prisma.ActionPlanInclude;
+  }
+
+  private detailInclude() {
+    return {
+      branch: { select: { id: true, name: true, code: true } },
+      ownerNode: true,
+      responsibleUser: true,
+      createdBy: true,
+      indicator: {
+        include: {
+          ownerNode: true,
+          responsibleUser: { select: { id: true, name: true, email: true } },
+          strategicObjective: { include: { perspective: true, map: true } },
+          results: { orderBy: { periodDate: 'desc' }, take: 12 },
+        },
+      },
+      indicatorResult: true,
+      strategicObjective: { include: { perspective: true, map: true } },
+      deviation: { include: { causes: true, analyses: true } },
+      analysis: true,
+      meeting: { include: { participants: { include: { user: { select: { id: true, name: true } } } }, decisions: true } },
+      treatment: { include: { result: true } },
+      tasks: { orderBy: { position: 'asc' } },
+      participants: { orderBy: { createdAt: 'asc' } },
+      evidences: { where: { deletedAt: null }, orderBy: { createdAt: 'desc' } },
+      comments: { where: { deletedAt: null }, orderBy: { createdAt: 'desc' } },
+      history: { orderBy: { createdAt: 'desc' }, take: 80 },
+      aiSuggestions: { orderBy: { createdAt: 'desc' }, take: 50 },
+      analysisSessions: {
+        orderBy: { updatedAt: 'desc' },
+        include: {
+          fiveWhys: { orderBy: { position: 'asc' } },
+          ishikawaCauses: { orderBy: [{ category: 'asc' }, { createdAt: 'asc' }] },
+          maspSteps: { orderBy: { step: 'asc' } },
+          pdcaSteps: { orderBy: { phase: 'asc' } },
+          fiveW2H: true,
+        },
+      },
+    } satisfies Prisma.ActionPlanInclude;
+  }
+
+  private async inferLinks(input: any) {
+    const out: Record<string, any> = {};
+    if (input.origin === ActionOrigin.DEVIATION && input.originRefId) {
+      const deviation = await this.prisma.deviation.findUnique({
+        where: { id: input.originRefId },
+        include: { indicator: { select: { ownerNodeId: true, strategicObjectiveId: true } }, analyses: { orderBy: { createdAt: 'desc' }, take: 1 } },
+      });
+      if (deviation) {
+        out.deviationId = deviation.id;
+        out.indicatorId = deviation.indicatorId;
+        out.ownerNodeId = deviation.indicator.ownerNodeId;
+        out.strategicObjectiveId = deviation.indicator.strategicObjectiveId;
+        out.analysisId = deviation.analyses[0]?.id;
+        out.analysisTool = this.methodToTool(deviation.method);
+        out.rootCause = deviation.rootCause;
+        out.problemDescription = deviation.fact ?? deviation.title;
+        out.responsibleUserId = deviation.responsibleUserId;
+      }
+    }
+    if (input.origin === ActionOrigin.MEETING && input.originRefId) {
+      const meeting = await this.prisma.meeting.findUnique({ where: { id: input.originRefId } });
+      if (meeting) {
+        out.meetingId = meeting.id;
+        out.indicatorId = meeting.indicatorId;
+        out.deviationId = meeting.deviationId;
+        out.analysisId = meeting.analysisId;
+        out.treatmentId = meeting.treatmentId;
+        out.responsibleUserId = meeting.responsibleUserId;
+      }
+    }
+    if (input.origin === ActionOrigin.INDICATOR && input.originRefId) {
+      const indicator = await this.prisma.indicator.findUnique({ where: { id: input.originRefId } });
+      if (indicator) {
+        out.indicatorId = indicator.id;
+        out.ownerNodeId = indicator.ownerNodeId;
+        out.strategicObjectiveId = indicator.strategicObjectiveId;
+        out.responsibleUserId = indicator.responsibleUserId;
+      }
+    }
+    if ((input.origin === ActionOrigin.OBJECTIVE || input.origin === ActionOrigin.STRATEGIC_MAP) && input.originRefId) {
+      out.strategicObjectiveId = input.originRefId;
+    }
+    return out;
+  }
+
+  private toActionUpdate(patch: any, before: any): Prisma.ActionPlanUpdateInput {
+    const data: Prisma.ActionPlanUpdateInput = {};
+    const simple = [
+      'title',
+      'description',
+      'problemDescription',
+      'origin',
+      'originRefId',
+      'priority',
+      'criticality',
+      'status',
+      'progress',
+      'estimatedCost',
+      'actualCost',
+      'responsibleEmail',
+      'evidenceRequired',
+      'expectedResult',
+      'achievedResult',
+      'rootCause',
+      'analysisTool',
+      'cancelReason',
+    ];
+    for (const key of simple) if (key in patch) (data as any)[key] = patch[key];
+    const nullableRelations = ['branchId', 'ownerNodeId', 'responsibleUserId', 'strategicObjectiveId', 'indicatorId', 'indicatorResultId', 'meetingId', 'analysisId', 'treatmentId', 'deviationId'];
+    for (const key of nullableRelations) if (key in patch) (data as any)[key] = patch[key] || null;
+    if ('startDate' in patch) data.startDate = patch.startDate ? new Date(patch.startDate) : null;
+    if ('dueDate' in patch) data.dueDate = patch.dueDate ? new Date(patch.dueDate) : null;
+    if ('status' in patch && patch.status === ActionStatus.DONE) {
+      const completedAt = new Date();
+      data.completedAt = completedAt;
+      data.status = before.dueDate && completedAt > before.dueDate ? ActionStatus.DONE_LATE : ActionStatus.DONE;
+      data.effectivenessStatus = ActionEffectivenessStatus.PENDING;
+    }
+    if ('status' in patch && patch.status === ActionStatus.REOPENED) {
+      data.reopenedAt = new Date();
+      data.effectivenessStatus = ActionEffectivenessStatus.REOPENED;
+    }
+    return data;
+  }
+
+  private async replaceToolRows(sessionId: string, method: ActionAnalysisTool, body: any) {
+    if (method === ActionAnalysisTool.FIVE_WHYS) {
+      await this.prisma.actionFiveWhy.deleteMany({ where: { sessionId } });
+      const rows = (body.fiveWhys ?? []).map((item: any, index: number) => ({
+        sessionId,
+        position: item.position ?? index + 1,
+        question: item.question ?? `${index + 1}o por que?`,
+        answer: item.answer ?? null,
+        evidence: item.evidence ?? null,
+        aiPrompt: item.aiPrompt ?? null,
+        isRootCause: item.isRootCause ?? false,
+      }));
+      if (rows.length > 0) await this.prisma.actionFiveWhy.createMany({ data: rows });
+    }
+    if (method === ActionAnalysisTool.ISHIKAWA) {
+      await this.prisma.actionIshikawaCause.deleteMany({ where: { sessionId } });
+      const rows = (body.ishikawaCauses ?? []).filter((item: any) => item.description).map((item: any) => ({
+        sessionId,
+        category: item.category,
+        description: item.description,
+        impact: Number(item.impact ?? 3),
+        probability: Number(item.probability ?? 3),
+        evidence: item.evidence ?? null,
+        likelyRootCause: item.likelyRootCause ?? false,
+      }));
+      if (rows.length > 0) await this.prisma.actionIshikawaCause.createMany({ data: rows });
+    }
+    if (method === ActionAnalysisTool.MASP) {
+      await this.prisma.actionMaspStep.deleteMany({ where: { sessionId } });
+      const rows = (body.maspSteps ?? defaultMaspSteps()).map((item: any, index: number) => ({
+        sessionId,
+        step: item.step ?? index + 1,
+        title: item.title,
+        description: item.description ?? null,
+        responsibleUserId: item.responsibleUserId ?? null,
+        dueDate: item.dueDate ? new Date(item.dueDate) : null,
+        evidence: item.evidence ?? null,
+        comments: item.comments ?? null,
+        status: item.status ?? ActionStepStatus.PENDING,
+        validated: item.validated ?? false,
+      }));
+      await this.prisma.actionMaspStep.createMany({ data: rows });
+    }
+    if (method === ActionAnalysisTool.PDCA) {
+      await this.prisma.actionPdcaStep.deleteMany({ where: { sessionId } });
+      const rows = (body.pdcaSteps ?? defaultPdcaSteps()).map((item: any) => ({
+        sessionId,
+        phase: item.phase,
+        description: item.description ?? null,
+        responsibleUserId: item.responsibleUserId ?? null,
+        dueDate: item.dueDate ? new Date(item.dueDate) : null,
+        evidence: item.evidence ?? null,
+        comments: item.comments ?? null,
+        status: item.status ?? ActionStepStatus.PENDING,
+        validated: item.validated ?? false,
+      }));
+      await this.prisma.actionPdcaStep.createMany({ data: rows });
+    }
+    if (method === ActionAnalysisTool.FIVE_W_TWO_H) {
+      await this.prisma.actionFiveW2H.deleteMany({ where: { sessionId } });
+      const item = body.fiveW2H ?? {};
+      await this.prisma.actionFiveW2H.create({
+        data: {
+          sessionId,
+          what: item.what ?? null,
+          why: item.why ?? null,
+          where: item.where ?? null,
+          when: item.when ? new Date(item.when) : null,
+          who: item.who ?? null,
+          how: item.how ?? null,
+          howMuch: item.howMuch === '' || item.howMuch === undefined ? null : Number(item.howMuch),
+          reviewNotes: item.reviewNotes ?? null,
+          completeScore: fiveW2HScore(item),
+        },
+      });
+    }
   }
 
   private async actionTraceContext(actionId: string) {
@@ -217,7 +788,7 @@ export class ActionsService {
     });
     if (!action) throw new NotFoundException('Acao nao encontrada');
     let indicatorId = action.indicatorId ?? action.deviation?.indicatorId ?? null;
-    if (!indicatorId && action.origin === 'INDICATOR') indicatorId = action.originRefId;
+    if (!indicatorId && action.origin === ActionOrigin.INDICATOR) indicatorId = action.originRefId;
     return { companyId: action.companyId, indicatorId, treatmentId: action.treatmentId };
   }
 
@@ -228,7 +799,6 @@ export class ActionsService {
     });
     if (actions.length === 0) return;
     const now = new Date();
-    const finalStatuses: ActionStatus[] = [ActionStatus.DONE, ActionStatus.DONE_LATE, ActionStatus.CANCELLED];
     const allDone = actions.every((action) => finalStatuses.includes(action.status));
     const hasOverdue = actions.some((action) => action.dueDate && action.dueDate < now && !finalStatuses.includes(action.status));
     const status = allDone
@@ -238,4 +808,128 @@ export class ActionsService {
         : TreatmentStatus.ACTIONS_IN_PROGRESS;
     await this.prisma.treatmentCase.update({ where: { id: treatmentId }, data: { status } });
   }
+
+  private buildOriginTrail(action: any) {
+    const trail = [];
+    if (action.strategicObjective) trail.push({ type: 'Objetivo estrategico', label: action.strategicObjective.name, href: `/strategy/${action.strategicObjective.mapId ?? action.strategicObjective.map?.id ?? ''}` });
+    if (action.ownerNode) trail.push({ type: 'Area/Setor', label: action.ownerNode.name, href: '/org' });
+    if (action.indicator) trail.push({ type: 'Indicador', label: action.indicator.name, href: `/indicators/${action.indicator.id}` });
+    if (action.indicatorResult) trail.push({ type: 'Resultado', label: `${action.indicatorResult.periodRef} - ${action.indicatorResult.light}`, href: action.indicator ? `/indicators/${action.indicator.id}` : undefined });
+    if (action.deviation) trail.push({ type: 'Desvio', label: `#${action.deviation.number} ${action.deviation.title}`, href: `/deviations/${action.deviation.id}` });
+    if (action.analysis) trail.push({ type: 'Analise de causa', label: action.analysis.method, href: action.deviation ? `/deviations/${action.deviation.id}` : undefined });
+    if (action.meeting) trail.push({ type: 'Reuniao', label: action.meeting.title, href: `/meetings/${action.meeting.id}` });
+    trail.push({ type: 'Plano de acao', label: action.title, href: `/actions/${action.id}` });
+    return trail;
+  }
+
+  private assessActionReadiness(action: any) {
+    const gaps = [];
+    if (!action.rootCause && action.analysisSessions.length === 0) gaps.push('Causa raiz ainda nao registrada.');
+    if (!action.responsibleUserId && !action.responsibleEmail) gaps.push('Responsavel nao definido.');
+    if (!action.dueDate) gaps.push('Prazo final ausente.');
+    if (!action.expectedResult) gaps.push('Resultado esperado ausente.');
+    if (action.evidenceRequired && action.evidences.length === 0) gaps.push('Evidencia esperada ainda nao anexada.');
+    return {
+      score: Math.max(0, 100 - gaps.length * 18),
+      gaps,
+    };
+  }
+
+  private generateSuggestions(action: any, scope?: string) {
+    const context = {
+      scope: scope ?? 'general',
+      indicator: action.indicator?.name,
+      objective: action.strategicObjective?.name,
+      area: action.ownerNode?.name,
+      status: action.status,
+      dueDate: action.dueDate,
+    };
+    const rootCause = action.rootCause || action.analysisSessions?.[0]?.rootCause;
+    const problem = action.problemDescription || action.description || action.deviation?.title || action.indicator?.name || action.title;
+    return [
+      {
+        type: 'QUESTION',
+        title: 'Pergunta de aprofundamento',
+        content: rootCause
+          ? `Confirme se a causa raiz "${rootCause}" possui evidencia objetiva e esta sob controle da area responsavel.`
+          : `A causa raiz ainda parece indefinida. Use 5 Porques ou Ishikawa para separar sintoma de causa do problema: "${problem}".`,
+        context,
+      },
+      {
+        type: 'ACTION',
+        title: 'Sugestao de acao estruturada',
+        content: `Defina uma acao em formato 5W2H: o que sera feito, por que resolve a causa, quem responde, prazo, local, metodo de execucao, custo estimado e evidencia esperada.`,
+        context,
+      },
+      {
+        type: 'EFFECTIVENESS',
+        title: 'Criterio de eficacia',
+        content: action.indicator
+          ? `Valide a eficacia comparando o proximo resultado do indicador "${action.indicator.name}" com o resultado que gerou o plano e anexe evidencia da melhoria.`
+          : `Defina um indicador de eficacia antes de concluir o plano, para evitar encerrar a acao apenas por entrega de tarefa.`,
+        context,
+      },
+    ];
+  }
+
+  private methodToTool(method: string | null | undefined): ActionAnalysisTool | null {
+    if (!method) return null;
+    if (method === 'FIVE_WHYS') return ActionAnalysisTool.FIVE_WHYS;
+    if (method === 'ISHIKAWA') return ActionAnalysisTool.ISHIKAWA;
+    if (method === 'MASP') return ActionAnalysisTool.MASP;
+    if (method === 'PDCA') return ActionAnalysisTool.PDCA;
+    if (method === 'PARETO') return ActionAnalysisTool.PARETO;
+    if (method === 'FCA') return ActionAnalysisTool.FCA;
+    return ActionAnalysisTool.ROOT_CAUSE;
+  }
+
+  private async recordHistory(actionId: string, userId: string | undefined, eventType: string, field: string | null, beforeValue: string | null, afterValue: string | null) {
+    await this.prisma.actionHistory.create({
+      data: { actionId, userId: userId ?? null, eventType, field, beforeValue, afterValue },
+    });
+  }
+
+  private async audit(companyId: string | null | undefined, userId: string | undefined, action: string, entity: string, entityId: string, beforeValue: unknown, afterValue: unknown) {
+    await this.prisma.auditLog.create({
+      data: {
+        companyId: companyId ?? null,
+        userId: userId ?? null,
+        action,
+        module: 'Planos de acao',
+        entity,
+        entityId,
+        beforeValue: stringify(beforeValue),
+        afterValue: stringify(afterValue),
+        result: 'SUCCESS',
+      },
+    });
+  }
+}
+
+function defaultMaspSteps() {
+  return [
+    { step: 1, title: 'Identificacao do problema' },
+    { step: 2, title: 'Observacao' },
+    { step: 3, title: 'Analise' },
+    { step: 4, title: 'Plano de acao' },
+    { step: 5, title: 'Execucao' },
+    { step: 6, title: 'Verificacao' },
+    { step: 7, title: 'Padronizacao' },
+    { step: 8, title: 'Conclusao' },
+  ];
+}
+
+function defaultPdcaSteps() {
+  return [{ phase: 'PLAN' }, { phase: 'DO' }, { phase: 'CHECK' }, { phase: 'ACT' }];
+}
+
+function fiveW2HScore(item: any) {
+  const keys = ['what', 'why', 'where', 'when', 'who', 'how', 'howMuch'];
+  const filled = keys.filter((key) => item[key] !== undefined && item[key] !== null && item[key] !== '').length;
+  return Math.round((filled / keys.length) * 100);
+}
+
+function stringify(value: unknown) {
+  if (value === null || value === undefined) return null;
+  return JSON.stringify(value, (_key, item) => (typeof item === 'bigint' ? item.toString() : item));
 }
