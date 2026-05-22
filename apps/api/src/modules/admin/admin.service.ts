@@ -90,14 +90,19 @@ const PARAMETER_CATEGORIES: Array<{ code: string; name: string; module: string; 
 
 @Injectable()
 export class AdminService {
+  private permissionsReady = false;
+  private readonly catalogReadyCompanies = new Set<string>();
+
   constructor(private readonly prisma: PrismaService) {}
 
   async bootstrap(me: AuthPayload) {
     await this.ensureCatalog(me.companyId, me.sub);
     const whereCompany = me.role === UserRoleEnum.SUPER_ADMIN ? { deletedAt: null } : { id: me.companyId, deletedAt: null };
-    const [companies, branches, orgNodes, users, categories, profiles, permissions, settings, auditCount] = await Promise.all([
+    const [companies, branches] = await Promise.all([
       this.prisma.company.findMany({ where: whereCompany, include: { branches: { where: { deletedAt: null } } }, orderBy: { name: 'asc' } }),
       this.prisma.branch.findMany({ where: { companyId: me.companyId, deletedAt: null }, orderBy: { name: 'asc' } }),
+    ]);
+    const [orgNodes, users] = await Promise.all([
       this.prisma.orgNode.findMany({
         where: { companyId: me.companyId, deletedAt: null },
         include: { responsibleUser: { select: { id: true, name: true } }, _count: { select: { children: true, indicatorsOwned: true } } },
@@ -108,6 +113,8 @@ export class AdminService {
         select: { id: true, name: true, email: true, role: true, status: true, active: true, lastLoginAt: true },
         orderBy: { name: 'asc' },
       }),
+    ]);
+    const [categories, profiles] = await Promise.all([
       this.prisma.parameterCategory.findMany({
         where: { OR: [{ companyId: null }, { companyId: me.companyId }], deletedAt: null },
         include: { items: { where: { deletedAt: null }, orderBy: [{ sortOrder: 'asc' }, { name: 'asc' }] } },
@@ -118,86 +125,102 @@ export class AdminService {
         include: { permissions: { include: { permission: true } }, _count: { select: { users: true } } },
         orderBy: [{ system: 'desc' }, { name: 'asc' }],
       }),
-      this.listPermissions(),
-      this.prisma.appSetting.findMany({ where: { OR: [{ companyId: null }, { companyId: me.companyId }] }, orderBy: [{ group: 'asc' }, { key: 'asc' }] }),
-      this.prisma.auditLog.count({ where: { companyId: me.companyId } }),
     ]);
+    const [permissions, settings] = await Promise.all([
+      this.listPermissions({ ensure: false }),
+      this.prisma.appSetting.findMany({ where: { OR: [{ companyId: null }, { companyId: me.companyId }] }, orderBy: [{ group: 'asc' }, { key: 'asc' }] }),
+    ]);
+    const auditCount = await this.prisma.auditLog.count({ where: { companyId: me.companyId } });
     return { companies, branches, orgNodes, users, categories, profiles, permissions, settings, auditCount };
   }
 
-  async listPermissions() {
-    await this.ensurePermissions();
+  async listPermissions(options: { ensure?: boolean } = {}) {
+    if (options.ensure !== false) await this.ensurePermissions();
     return this.prisma.permission.findMany({ orderBy: [{ module: 'asc' }, { action: 'asc' }, { key: 'asc' }] });
   }
 
   async ensureCatalog(companyId: string, userId?: string) {
+    if (this.catalogReadyCompanies.has(companyId)) return;
     await this.ensurePermissions();
+    const categoryCodes = PARAMETER_CATEGORIES.map((category) => category.code);
+    const profileCodes = DEFAULT_PROFILES.map((profile) => profile.code);
+    const [categoryCount, profileCount] = await Promise.all([
+      this.prisma.parameterCategory.count({ where: { companyId, code: { in: categoryCodes }, deletedAt: null } }),
+      this.prisma.accessProfile.count({ where: { companyId, code: { in: profileCodes }, deletedAt: null } }),
+    ]);
+    if (categoryCount >= PARAMETER_CATEGORIES.length && profileCount >= DEFAULT_PROFILES.length) {
+      this.catalogReadyCompanies.add(companyId);
+      return;
+    }
+
+    await this.prisma.parameterCategory.createMany({
+      data: PARAMETER_CATEGORIES.map((category, sortOrder) => ({
+        companyId,
+        code: category.code,
+        name: category.name,
+        description: category.description,
+        module: category.module,
+        system: true,
+        sortOrder,
+        createdById: userId ?? null,
+      })),
+      skipDuplicates: true,
+    });
+
+    const savedCategories = await this.prisma.parameterCategory.findMany({
+      where: { companyId, code: { in: PARAMETER_CATEGORIES.map((category) => category.code) } },
+      select: { id: true, code: true },
+    });
+    const categoryByCode = new Map(savedCategories.map((category) => [category.code, category.id]));
+    const parameterItems = PARAMETER_CATEGORIES.flatMap((category) => {
+      const categoryId = categoryByCode.get(category.code);
+      if (!categoryId) return [];
+      return (category.items ?? []).map((item, sortOrder) => ({
+        companyId,
+        categoryId,
+        code: item.code,
+        name: item.name,
+        description: item.description ?? null,
+        sortOrder,
+        createdById: userId ?? null,
+      }));
+    });
+    if (parameterItems.length > 0) {
+      await this.prisma.parameterItem.createMany({ data: parameterItems, skipDuplicates: true });
+    }
+
+    await this.prisma.accessProfile.createMany({
+      data: DEFAULT_PROFILES.map((profile) => ({
+        companyId,
+        code: profile.code,
+        name: profile.name,
+        description: profile.description,
+        role: profile.role as UserRoleEnum,
+        system: true,
+        createdById: userId ?? null,
+      })),
+      skipDuplicates: true,
+    });
+
     const permissions = await this.prisma.permission.findMany({ select: { id: true, key: true } });
     const permissionByKey = new Map(permissions.map((p) => [p.key, p.id]));
-
-    for (let i = 0; i < PARAMETER_CATEGORIES.length; i++) {
-      const category = PARAMETER_CATEGORIES[i];
-      const saved = await this.prisma.parameterCategory.upsert({
-        where: { companyId_code: { companyId, code: category.code } },
-        create: {
-          companyId,
-          code: category.code,
-          name: category.name,
-          description: category.description,
-          module: category.module,
-          system: true,
-          sortOrder: i,
-          createdById: userId ?? null,
-        },
-        update: {
-          name: category.name,
-          description: category.description,
-          module: category.module,
-          sortOrder: i,
-          updatedById: userId ?? null,
-        },
-      });
-      for (const item of category.items ?? []) {
-        await this.prisma.parameterItem.upsert({
-          where: { categoryId_code: { categoryId: saved.id, code: item.code } },
-          create: {
-            companyId,
-            categoryId: saved.id,
-            code: item.code,
-            name: item.name,
-            description: item.description ?? null,
-            createdById: userId ?? null,
-          },
-          update: { name: item.name, description: item.description ?? null, updatedById: userId ?? null },
-        });
-      }
+    const savedProfiles = await this.prisma.accessProfile.findMany({
+      where: { companyId, code: { in: DEFAULT_PROFILES.map((profile) => profile.code) } },
+      select: { id: true, code: true },
+    });
+    const profileByCode = new Map(savedProfiles.map((profile) => [profile.code, profile.id]));
+    const profilePermissions = DEFAULT_PROFILES.flatMap((profile) => {
+      const profileId = profileByCode.get(profile.code);
+      if (!profileId) return [];
+      return profile.permissions
+        .map((key) => permissionByKey.get(key))
+        .filter(Boolean)
+        .map((permissionId) => ({ profileId, permissionId: permissionId as string }));
+    });
+    if (profilePermissions.length > 0) {
+      await this.prisma.profilePermission.createMany({ data: profilePermissions, skipDuplicates: true });
     }
-
-    for (const profile of DEFAULT_PROFILES) {
-      const saved = await this.prisma.accessProfile.upsert({
-        where: { companyId_code: { companyId, code: profile.code } },
-        create: {
-          companyId,
-          code: profile.code,
-          name: profile.name,
-          description: profile.description,
-          role: profile.role as UserRoleEnum,
-          system: true,
-          createdById: userId ?? null,
-        },
-        update: {
-          name: profile.name,
-          description: profile.description,
-          role: profile.role as UserRoleEnum,
-          updatedById: userId ?? null,
-        },
-      });
-      const ids = profile.permissions.map((key) => permissionByKey.get(key)).filter(Boolean) as string[];
-      await this.prisma.$transaction([
-        this.prisma.profilePermission.deleteMany({ where: { profileId: saved.id } }),
-        ...ids.map((permissionId) => this.prisma.profilePermission.create({ data: { profileId: saved.id, permissionId } })),
-      ]);
-    }
+    this.catalogReadyCompanies.add(companyId);
   }
 
   async createCompany(me: AuthPayload, body: any) {
@@ -462,13 +485,18 @@ export class AdminService {
   }
 
   private async ensurePermissions() {
-    for (const [key, description, module, action] of PERMISSION_CATALOG) {
-      await this.prisma.permission.upsert({
-        where: { key },
-        create: { key, description, module, action },
-        update: { description, module, action },
+    if (this.permissionsReady) return;
+    const keys = PERMISSION_CATALOG.map(([key]) => key);
+    const existing = await this.prisma.permission.findMany({ where: { key: { in: keys } }, select: { key: true } });
+    const existingKeys = new Set(existing.map((permission) => permission.key));
+    const missing = PERMISSION_CATALOG.filter(([key]) => !existingKeys.has(key));
+    if (missing.length > 0) {
+      await this.prisma.permission.createMany({
+        data: missing.map(([key, description, module, action]) => ({ key, description, module, action })),
+        skipDuplicates: true,
       });
     }
+    this.permissionsReady = true;
   }
 
   private async ensureParameterParent(parentId: string, categoryId: string, currentId?: string) {

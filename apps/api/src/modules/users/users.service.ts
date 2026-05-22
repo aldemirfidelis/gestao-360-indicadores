@@ -15,6 +15,8 @@ type UserAdminCreateInput = UserCreateInput & {
 
 @Injectable()
 export class UsersService {
+  private permissionsReady = false;
+
   constructor(private readonly prisma: PrismaService) {}
 
   async list(companyId: string) {
@@ -188,15 +190,18 @@ export class UsersService {
   }
 
   private async ensurePermissionCatalog() {
-    await Promise.all(
-      PERMISSION_CATALOG.map(([key, description, module, action]) =>
-        this.prisma.permission.upsert({
-          where: { key },
-          create: { key, description, module, action },
-          update: { description, module, action },
-        }),
-      ),
-    );
+    if (this.permissionsReady) return;
+    const keys = PERMISSION_CATALOG.map(([key]) => key);
+    const existing = await this.prisma.permission.findMany({ where: { key: { in: keys } }, select: { key: true } });
+    const existingKeys = new Set(existing.map((permission) => permission.key));
+    const missing = PERMISSION_CATALOG.filter(([key]) => !existingKeys.has(key));
+    if (missing.length > 0) {
+      await this.prisma.permission.createMany({
+        data: missing.map(([key, description, module, action]) => ({ key, description, module, action })),
+        skipDuplicates: true,
+      });
+    }
+    this.permissionsReady = true;
   }
 
   private async validateUserLinks(
