@@ -12,7 +12,9 @@ export class RelationshipMapService {
 
   async defaultMap(companyId: string) {
     const map = await this.ensureDefaultMap(companyId);
-    await this.syncDefaultMap(companyId, map.id);
+    if (await this.shouldSyncDefaultMap(companyId, map.id, map.updatedAt)) {
+      await this.syncDefaultMap(companyId, map.id);
+    }
     return this.getById(companyId, map.id);
   }
 
@@ -218,6 +220,37 @@ export class RelationshipMapService {
   private async assertMap(companyId: string, mapId: string) {
     const count = await this.prisma.relationshipMap.count({ where: { id: mapId, companyId, deletedAt: null } });
     if (!count) throw new NotFoundException('Mapa nao encontrado');
+  }
+
+  private async shouldSyncDefaultMap(companyId: string, mapId: string, lastSyncAt: Date) {
+    const nodeCount = await this.prisma.mapNode.count({ where: { mapId } });
+    if (nodeCount === 0) return true;
+
+    const [orgNodes, indicators, deviations, treatments, actions, meetings, strategicMaps, perspectives, objectives, relations] = await Promise.all([
+      this.prisma.orgNode.aggregate({ where: { companyId, deletedAt: null }, _max: { updatedAt: true } }),
+      this.prisma.indicator.aggregate({ where: { companyId, deletedAt: null }, _max: { updatedAt: true } }),
+      this.prisma.deviation.aggregate({ where: { companyId, deletedAt: null }, _max: { updatedAt: true } }),
+      this.prisma.treatmentCase.aggregate({ where: { companyId }, _max: { updatedAt: true } }),
+      this.prisma.actionPlan.aggregate({ where: { companyId, deletedAt: null }, _max: { updatedAt: true } }),
+      this.prisma.meeting.aggregate({ where: { companyId, deletedAt: null }, _max: { updatedAt: true } }),
+      this.prisma.strategicMap.aggregate({ where: { companyId, deletedAt: null }, _max: { updatedAt: true } }),
+      this.prisma.perspective.aggregate({ where: { map: { companyId, deletedAt: null }, deletedAt: null }, _max: { updatedAt: true } }),
+      this.prisma.strategicObjective.aggregate({ where: { map: { companyId, deletedAt: null }, deletedAt: null }, _max: { updatedAt: true } }),
+      this.prisma.objectiveRelation.aggregate({ where: { from: { map: { companyId, deletedAt: null } } }, _max: { updatedAt: true } }),
+    ]);
+
+    return [
+      orgNodes._max.updatedAt,
+      indicators._max.updatedAt,
+      deviations._max.updatedAt,
+      treatments._max.updatedAt,
+      actions._max.updatedAt,
+      meetings._max.updatedAt,
+      strategicMaps._max.updatedAt,
+      perspectives._max.updatedAt,
+      objectives._max.updatedAt,
+      relations._max.updatedAt,
+    ].some((updatedAt) => !!updatedAt && updatedAt > lastSyncAt);
   }
 
   private async syncDefaultMap(companyId: string, mapId: string) {
@@ -493,6 +526,11 @@ export class RelationshipMapService {
         await this.upsertRefEdge(mapId, 'Company', company.id, 'ActionPlan', action.id, 'tracks', 'acao');
       }
     }
+
+    await this.prisma.relationshipMap.update({
+      where: { id: mapId },
+      data: { active: true },
+    });
   }
 
   private async upsertRefNode(
