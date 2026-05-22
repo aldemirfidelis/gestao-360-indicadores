@@ -5,6 +5,7 @@ import { ROLES_KEY } from '../decorators/roles.decorator';
 import { PERMISSIONS_KEY } from '../decorators/permissions.decorator';
 import { AuthPayload } from '../../modules/auth/auth.types';
 import { PrismaService } from '../../prisma/prisma.service';
+import { IS_PUBLIC_KEY } from '../../modules/auth/jwt-auth.guard';
 
 @Injectable()
 export class RolesGuard implements CanActivate {
@@ -14,6 +15,12 @@ export class RolesGuard implements CanActivate {
   ) {}
 
   async canActivate(context: ExecutionContext): Promise<boolean> {
+    const isPublic = this.reflector.getAllAndOverride<boolean>(IS_PUBLIC_KEY, [
+      context.getHandler(),
+      context.getClass(),
+    ]);
+    if (isPublic) return true;
+
     const required = this.reflector.getAllAndOverride<UserRoleEnum[] | undefined>(ROLES_KEY, [
       context.getHandler(),
       context.getClass(),
