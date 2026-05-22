@@ -72,7 +72,7 @@ export const navSections: NavSection[] = [
     items: [
       { href: '/launches', label: 'Central de Lançamentos', description: 'Entrada rápida de dados', icon: PencilLine, permissions: ['launches:view', 'results:launch'] },
       { href: '/results', label: 'Lançar Resultado', description: 'Realizado mensal dos indicadores', icon: LineChart, permissions: ['results:launch'] },
-      { href: '/indicators/new', label: 'Criar Indicador', description: 'Cadastro de KPI e meta', icon: Target, permissions: ['indicators:create'] },
+      { href: '/indicators?new=1', label: 'Criar Indicador', description: 'Cadastro de KPI e meta na central de indicadores', icon: Target, permissions: ['indicators:create'] },
       { href: '/org?create=macro', label: 'Criar Área Macro', description: 'Novo nível macro na árvore', icon: Building2, permissions: ['org:manage'] },
       { href: '/org?create=micro', label: 'Criar Área Micro', description: 'Subnível vinculado à área macro', icon: Network, permissions: ['org:manage'] },
       { href: '/org?create=guideline', label: 'Criar Diretriz', description: 'Diretriz dentro da árvore organizacional', icon: GitBranch, permissions: ['org:manage', 'strategy:manage'] },
@@ -174,6 +174,7 @@ export function canAccess(user: NavUser | null | undefined, permissions?: string
 }
 
 export function isActivePath(pathname: string, href: string, exact = false) {
+  const cleanHref = href.split('?')[0];
   if (href === '/' || exact) return pathname === href;
-  return pathname === href || pathname.startsWith(`${href}/`);
+  return pathname === cleanHref || pathname.startsWith(`${cleanHref}/`);
 }

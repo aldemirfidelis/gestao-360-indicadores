@@ -568,6 +568,7 @@ model OrgNode {
   deletedAt           DateTime?
 
   indicatorsOwned     Indicator[]   @relation("IndicatorOwnerNode")
+  guidelineIndicators  Indicator[]   @relation("IndicatorGuidelineNode")
   defaultForUsers     User[]        @relation("UserDefaultNode")
   actions             ActionPlan[]  @relation("ActionOwnerNode")
   strategicObjectives StrategicObjective[] @relation("StrategicObjectiveOwnerNode")
@@ -959,6 +960,8 @@ model Indicator {
   company             Company             @relation(fields: [companyId], references: [id])
   ownerNodeId         String
   ownerNode           OrgNode             @relation("IndicatorOwnerNode", fields: [ownerNodeId], references: [id])
+  guidelineNodeId     String?
+  guidelineNode       OrgNode?            @relation("IndicatorGuidelineNode", fields: [guidelineNodeId], references: [id])
   responsibleUserId   String?
   responsibleUser     User?               @relation("IndicatorResponsible", fields: [responsibleUserId], references: [id])
   feederUserId        String?
@@ -999,6 +1002,7 @@ model Indicator {
 
   @@index([companyId])
   @@index([ownerNodeId])
+  @@index([guidelineNodeId])
   @@index([type])
   @@index([status])
   @@unique([companyId, code])
