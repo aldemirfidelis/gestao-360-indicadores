@@ -221,18 +221,43 @@ export class RelationshipMapService {
   }
 
   private async syncDefaultMap(companyId: string, mapId: string) {
-    const [company, orgNodes, indicators, deviations, treatments, actions, meetings] = await Promise.all([
+    const [company, orgNodes, strategicMaps, indicators, deviations, treatments, actions, meetings] = await Promise.all([
       this.prisma.company.findUnique({ where: { id: companyId }, select: { id: true, name: true } }),
       this.prisma.orgNode.findMany({
         where: { companyId, deletedAt: null, active: true },
         include: { parent: { select: { id: true } }, responsibleUser: { select: { name: true } } },
         orderBy: [{ type: 'asc' }, { position: 'asc' }, { name: 'asc' }],
       }),
+      this.prisma.strategicMap.findMany({
+        where: { companyId, deletedAt: null, active: true },
+        include: {
+          perspectives: { where: { deletedAt: null, active: true }, orderBy: [{ position: 'asc' }, { name: 'asc' }] },
+          objectives: {
+            where: { deletedAt: null, active: true },
+            include: {
+              perspective: { select: { id: true, name: true, color: true } },
+              ownerNode: { select: { id: true, name: true } },
+              responsibleUser: { select: { name: true } },
+              orgNodeLinks: { where: { deletedAt: null }, select: { orgNodeId: true, kind: true } },
+              indicatorLinks: { where: { deletedAt: null }, select: { indicatorId: true } },
+              indicators: { select: { id: true } },
+              outRelations: { where: { deletedAt: null, active: true }, select: { toId: true, kind: true, label: true } },
+            },
+            orderBy: [{ perspective: { position: 'asc' } }, { position: 'asc' }, { name: 'asc' }],
+          },
+        },
+        orderBy: [{ startsAt: 'desc' }, { name: 'asc' }],
+      }),
       this.prisma.indicator.findMany({
         where: { companyId, deletedAt: null, status: 'ACTIVE' },
         include: {
           ownerNode: { select: { id: true, name: true } },
           responsibleUser: { select: { name: true } },
+          strategicObjective: { select: { id: true, name: true, perspective: { select: { id: true, name: true } } } },
+          strategicObjectiveLinks: {
+            where: { deletedAt: null },
+            include: { objective: { select: { id: true, name: true, perspective: { select: { id: true, name: true } } } } },
+          },
           results: { orderBy: { periodDate: 'desc' }, take: 1, select: { light: true, periodRef: true, attainment: true } },
         },
       }),
@@ -280,7 +305,80 @@ export class RelationshipMapService {
       }
     }
 
+    for (const [mapIndex, strategicMap] of strategicMaps.entries()) {
+      await this.upsertRefNode(
+        mapId,
+        'StrategicMap',
+        strategicMap.id,
+        MapNodeType.GUIDELINE,
+        strategicMap.name,
+        220,
+        mapIndex * 180,
+        strategicMap.active ? 'ACTIVE' : 'INACTIVE',
+        undefined,
+        strategicMap.endsAt,
+        { startsAt: strategicMap.startsAt.toISOString(), endsAt: strategicMap.endsAt.toISOString() },
+      );
+      if (company) {
+        await this.upsertRefEdge(mapId, 'Company', company.id, 'StrategicMap', strategicMap.id, 'strategy', 'estrategia');
+      }
+
+      for (const [perspectiveIndex, perspective] of strategicMap.perspectives.entries()) {
+        await this.upsertRefNode(
+          mapId,
+          'Perspective',
+          perspective.id,
+          MapNodeType.GUIDELINE,
+          perspective.name,
+          460,
+          mapIndex * 180 + perspectiveIndex * 92,
+          'ACTIVE',
+          undefined,
+          undefined,
+          { mapId: strategicMap.id, color: perspective.color },
+        );
+        await this.upsertRefEdge(mapId, 'StrategicMap', strategicMap.id, 'Perspective', perspective.id, 'has_perspective', 'perspectiva');
+      }
+
+      for (const [objectiveIndex, objective] of strategicMap.objectives.entries()) {
+        await this.upsertRefNode(
+          mapId,
+          'StrategicObjective',
+          objective.id,
+          MapNodeType.OBJECTIVE,
+          objective.name,
+          700,
+          mapIndex * 180 + objectiveIndex * 92,
+          objective.status,
+          objective.responsibleUser?.name ?? objective.responsible ?? undefined,
+          undefined,
+          {
+            mapId: strategicMap.id,
+            perspectiveId: objective.perspectiveId,
+            perspective: objective.perspective?.name,
+            priority: objective.priority,
+            weight: objective.weight,
+            ownerNodeId: objective.ownerNodeId,
+          },
+        );
+        await this.upsertRefEdge(mapId, 'Perspective', objective.perspectiveId, 'StrategicObjective', objective.id, 'contains_objective', 'objetivo');
+        if (objective.ownerNodeId) {
+          await this.upsertRefEdge(mapId, 'OrgNode', objective.ownerNodeId, 'StrategicObjective', objective.id, 'owns_strategy', 'responsavel');
+        }
+        for (const link of objective.orgNodeLinks) {
+          await this.upsertRefEdge(mapId, 'OrgNode', link.orgNodeId, 'StrategicObjective', objective.id, link.kind, 'estrutura');
+        }
+        for (const relation of objective.outRelations) {
+          await this.upsertRefEdge(mapId, 'StrategicObjective', objective.id, 'StrategicObjective', relation.toId, relation.kind, relation.label ?? 'impacta');
+        }
+      }
+    }
+
     for (const [index, indicator] of indicators.entries()) {
+      const strategicOrigins = [
+        ...(indicator.strategicObjective ? [indicator.strategicObjective] : []),
+        ...indicator.strategicObjectiveLinks.map((link) => link.objective),
+      ].filter((objective, originIndex, all) => all.findIndex((item) => item.id === objective.id) === originIndex);
       await this.upsertRefNode(
         mapId,
         'Indicator',
@@ -292,9 +390,21 @@ export class RelationshipMapService {
         indicator.results[0]?.light ?? 'GRAY',
         indicator.responsibleUser?.name,
         undefined,
-        { code: indicator.code, periodRef: indicator.results[0]?.periodRef, attainment: indicator.results[0]?.attainment },
+        {
+          code: indicator.code,
+          periodRef: indicator.results[0]?.periodRef,
+          attainment: indicator.results[0]?.attainment,
+          strategicOrigins: strategicOrigins.map((objective) => ({
+            id: objective.id,
+            name: objective.name,
+            perspective: objective.perspective?.name,
+          })),
+        },
       );
       await this.upsertRefEdge(mapId, 'OrgNode', indicator.ownerNodeId, 'Indicator', indicator.id, 'owns', 'acompanha');
+      for (const objective of strategicOrigins) {
+        await this.upsertRefEdge(mapId, 'StrategicObjective', objective.id, 'Indicator', indicator.id, 'measured_by', 'indicador');
+      }
     }
 
     for (const [index, deviation] of deviations.entries()) {

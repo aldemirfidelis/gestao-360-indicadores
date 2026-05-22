@@ -479,6 +479,8 @@ model OrgNode {
   indicatorsOwned     Indicator[]   @relation("IndicatorOwnerNode")
   defaultForUsers     User[]        @relation("UserDefaultNode")
   actions             ActionPlan[]  @relation("ActionOwnerNode")
+  strategicObjectives StrategicObjective[] @relation("StrategicObjectiveOwnerNode")
+  strategicObjectiveLinks StrategicObjectiveOrgNode[]
 
   @@index([companyId])
   @@index([parentId])
@@ -535,6 +537,14 @@ model User {
   mapLayouts            MapLayout[]          @relation("MapLayoutUpdatedBy")
   treatmentsCreated     TreatmentCase[]      @relation("TreatmentCreatedBy")
   meetingsResponsible   Meeting[]            @relation("MeetingResponsible")
+  strategicMapsCreated  StrategicMap[]       @relation("StrategicMapCreatedBy")
+  strategicMapsUpdated  StrategicMap[]       @relation("StrategicMapUpdatedBy")
+  perspectivesCreated   Perspective[]        @relation("PerspectiveCreatedBy")
+  perspectivesUpdated   Perspective[]        @relation("PerspectiveUpdatedBy")
+  objectivesResponsible StrategicObjective[] @relation("StrategicObjectiveResponsible")
+  objectivesCreated     StrategicObjective[] @relation("StrategicObjectiveCreatedBy")
+  objectivesUpdated     StrategicObjective[] @relation("StrategicObjectiveUpdatedBy")
+  strategyVersions      StrategicMapVersion[] @relation("StrategicVersionCreatedBy")
 
   @@index([companyId])
   @@index([branchId])
@@ -623,14 +633,21 @@ model StrategicMap {
   startsAt    DateTime
   endsAt      DateTime
   active      Boolean             @default(true)
+  publishedVersionId String?
+  createdById String?
+  createdBy   User?               @relation("StrategicMapCreatedBy", fields: [createdById], references: [id])
+  updatedById String?
+  updatedBy   User?               @relation("StrategicMapUpdatedBy", fields: [updatedById], references: [id])
   createdAt   DateTime            @default(now())
   updatedAt   DateTime            @updatedAt
   deletedAt   DateTime?
 
   perspectives Perspective[]
   objectives   StrategicObjective[]
+  versions     StrategicMapVersion[]
 
   @@index([companyId])
+  @@index([publishedVersionId])
 }
 
 model Perspective {
@@ -639,12 +656,23 @@ model Perspective {
   map         StrategicMap     @relation(fields: [mapId], references: [id], onDelete: Cascade)
   kind        PerspectiveKind
   name        String
+  description String?
   color       String?
+  icon        String?
   position    Int              @default(0)
+  active      Boolean          @default(true)
+  createdById String?
+  createdBy   User?            @relation("PerspectiveCreatedBy", fields: [createdById], references: [id])
+  updatedById String?
+  updatedBy   User?            @relation("PerspectiveUpdatedBy", fields: [updatedById], references: [id])
+  createdAt   DateTime         @default(now())
+  updatedAt   DateTime         @updatedAt
+  deletedAt   DateTime?
 
   objectives  StrategicObjective[]
 
   @@index([mapId])
+  @@index([active])
 }
 
 model StrategicObjective {
@@ -657,22 +685,38 @@ model StrategicObjective {
   name          String
   description   String?
   responsible   String?
+  responsibleUserId String?
+  responsibleUser   User?               @relation("StrategicObjectiveResponsible", fields: [responsibleUserId], references: [id])
+  ownerNodeId    String?
+  ownerNode      OrgNode?               @relation("StrategicObjectiveOwnerNode", fields: [ownerNodeId], references: [id])
   weight        Float               @default(1)
   status        ObjectiveStatus     @default(PLANNED)
   priority      Int                 @default(3)
   position      Int                 @default(0)
+  positionX     Float               @default(0)
+  positionY     Float               @default(0)
+  active        Boolean             @default(true)
+  createdById   String?
+  createdBy     User?               @relation("StrategicObjectiveCreatedBy", fields: [createdById], references: [id])
+  updatedById   String?
+  updatedBy     User?               @relation("StrategicObjectiveUpdatedBy", fields: [updatedById], references: [id])
 
   createdAt     DateTime            @default(now())
   updatedAt     DateTime            @updatedAt
   deletedAt     DateTime?
 
   indicators    Indicator[]         @relation("IndicatorStrategicObjective")
+  indicatorLinks StrategicObjectiveIndicator[]
+  orgNodeLinks   StrategicObjectiveOrgNode[]
   okrs          OKRObjective[]
   outRelations  ObjectiveRelation[] @relation("ObjFrom")
   inRelations   ObjectiveRelation[] @relation("ObjTo")
 
   @@index([mapId])
   @@index([perspectiveId])
+  @@index([responsibleUserId])
+  @@index([ownerNodeId])
+  @@index([active])
 }
 
 model ObjectiveRelation {
@@ -682,8 +726,63 @@ model ObjectiveRelation {
   from   StrategicObjective  @relation("ObjFrom", fields: [fromId], references: [id], onDelete: Cascade)
   to     StrategicObjective  @relation("ObjTo", fields: [toId], references: [id], onDelete: Cascade)
   weight Float               @default(1)
+  kind   String              @default("impacta")
+  label  String?
+  description String?
+  active Boolean             @default(true)
+  createdAt DateTime         @default(now())
+  updatedAt DateTime         @updatedAt
+  deletedAt DateTime?
 
   @@unique([fromId, toId])
+  @@index([active])
+}
+
+model StrategicObjectiveIndicator {
+  id          String              @id @default(uuid())
+  objectiveId String
+  objective   StrategicObjective  @relation(fields: [objectiveId], references: [id], onDelete: Cascade)
+  indicatorId String
+  indicator   Indicator           @relation(fields: [indicatorId], references: [id], onDelete: Cascade)
+  createdById String?
+  createdAt   DateTime            @default(now())
+  deletedAt   DateTime?
+
+  @@unique([objectiveId, indicatorId])
+  @@index([indicatorId])
+}
+
+model StrategicObjectiveOrgNode {
+  id          String              @id @default(uuid())
+  objectiveId String
+  objective   StrategicObjective  @relation(fields: [objectiveId], references: [id], onDelete: Cascade)
+  orgNodeId   String
+  orgNode     OrgNode             @relation(fields: [orgNodeId], references: [id], onDelete: Cascade)
+  kind        String              @default("responsavel")
+  createdById String?
+  createdAt   DateTime            @default(now())
+  deletedAt   DateTime?
+
+  @@unique([objectiveId, orgNodeId, kind])
+  @@index([orgNodeId])
+}
+
+model StrategicMapVersion {
+  id          String              @id @default(uuid())
+  mapId       String
+  map         StrategicMap        @relation(fields: [mapId], references: [id], onDelete: Cascade)
+  version     Int
+  title       String
+  description String?
+  status      String              @default("DRAFT")
+  snapshot    Json
+  createdById String?
+  createdBy   User?               @relation("StrategicVersionCreatedBy", fields: [createdById], references: [id])
+  createdAt   DateTime            @default(now())
+  publishedAt DateTime?
+
+  @@unique([mapId, version])
+  @@index([mapId, status])
 }
 
 // =====================================================
@@ -804,6 +903,7 @@ model Indicator {
   treatmentCases      TreatmentCase[]
   childRelations      IndicatorTreeRelation[] @relation("RelChild")
   parentRelations     IndicatorTreeRelation[] @relation("RelParent")
+  strategicObjectiveLinks StrategicObjectiveIndicator[]
 
   @@index([companyId])
   @@index([ownerNodeId])

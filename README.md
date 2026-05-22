@@ -71,6 +71,8 @@ O novo fluxo inteligente para tratar indicadores fora da meta esta documentado e
 
 A central administrativa de Configuracoes, com Usuarios, Auditoria, Parametros, Seguranca e Sistema, esta documentada em **[docs/configuracoes-administracao.md](./docs/configuracoes-administracao.md)**.
 
+O Mapa Estrategico editavel, com perspectivas, objetivos, indicadores, permissoes, auditoria, versionamento e integracao com o Mapa de Relacoes, esta documentado em **[docs/mapa-estrategico-integrado.md](./docs/mapa-estrategico-integrado.md)**.
+
 ## Deploy em producao
 
 Dois caminhos suportados, **ambos** usando Neon Postgres como banco:
@@ -134,7 +136,7 @@ Plataforma cuida de build/deploy/SSL/escala. Veja **[DEPLOY.md](./DEPLOY.md)**.
 | `deviations` | CRUD + causas, analises (`/causes`, `/analyses`), `POST /:id/close` | FCA/CAPA com 6 metodos (FCA, 5 Porques, Ishikawa, Pareto, CAPA, simples) |
 | `actions` | CRUD + subtarefas (`/tasks`), `PATCH /:id/status` | Kanban com recalculo automatico de progresso |
 | `dashboard` | `/overview`, `/ranking`, `/evolution`, `/worst`, `/pending` | Agregacoes para o dashboard executivo |
-| `strategy` | CRUD de mapas BSC, perspectivas, objetivos e relacoes causa-efeito | Mapa estrategico com farol agregado por objetivo |
+| `strategy` | CRUD de mapas, perspectivas, objetivos, layout, vinculos, relacoes e versoes | Mapa estrategico editavel integrado ao Mapa de Relacoes |
 | `okrs` | CRUD de ciclos, objetivos, KRs e check-ins | Calculo de progresso ponderado por peso |
 | `projects` | CRUD + milestones + tasks com dependencias | Suporte a Gantt |
 | `meetings` | CRUD + participantes, agenda, decisoes, `POST /:id/actions` | Reuniao gera acao com origin=MEETING |

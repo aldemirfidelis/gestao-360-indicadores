@@ -1,77 +1,152 @@
-import { Body, Controller, Delete, Get, Param, Patch, Post } from '@nestjs/common';
-import { StrategyService } from './strategy.service';
+import { Body, Controller, Delete, Get, Param, Patch, Post, Query } from '@nestjs/common';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
+import { RequirePermissions } from '../../common/decorators/permissions.decorator';
 import { AuthPayload } from '../auth/auth.types';
-import { ObjectiveStatus, PerspectiveKind } from '@prisma/client';
+import { StrategyService } from './strategy.service';
 
 @Controller('strategy')
+@RequirePermissions('strategy:view')
 export class StrategyController {
   constructor(private readonly service: StrategyService) {}
 
   @Get('maps')
-  list(@CurrentUser() me: AuthPayload) {
-    return this.service.listMaps(me.companyId);
+  list(@CurrentUser() me: AuthPayload, @Query('includeInactive') includeInactive?: string) {
+    return this.service.listMaps(me.companyId, includeInactive === 'true');
+  }
+
+  @Get('options')
+  options(@CurrentUser() me: AuthPayload) {
+    return this.service.options(me.companyId);
   }
 
   @Get('maps/:id')
-  getMap(@Param('id') id: string) {
-    return this.service.getMap(id);
+  getMap(@CurrentUser() me: AuthPayload, @Param('id') id: string) {
+    return this.service.getMap(me.companyId, id);
   }
 
   @Post('maps')
-  createMap(
-    @CurrentUser() me: AuthPayload,
-    @Body() body: { name: string; startsAt: string; endsAt: string },
-  ) {
-    return this.service.createMap(me.companyId, body.name, new Date(body.startsAt), new Date(body.endsAt));
+  @RequirePermissions('strategy:maps:create')
+  createMap(@CurrentUser() me: AuthPayload, @Body() body: any) {
+    return this.service.createMap(me, body);
+  }
+
+  @Patch('maps/:id')
+  @RequirePermissions('strategy:maps:update')
+  updateMap(@CurrentUser() me: AuthPayload, @Param('id') id: string, @Body() body: any) {
+    return this.service.updateMap(me, id, body);
+  }
+
+  @Delete('maps/:id')
+  @RequirePermissions('strategy:maps:delete')
+  removeMap(@CurrentUser() me: AuthPayload, @Param('id') id: string) {
+    return this.service.removeMap(me, id);
   }
 
   @Post('maps/:id/perspectives')
-  addPerspective(
-    @Param('id') id: string,
-    @Body() body: { kind: PerspectiveKind; name: string; color?: string },
-  ) {
-    return this.service.addPerspective(id, body.kind, body.name, body.color);
+  @RequirePermissions('strategy:perspectives:create')
+  addPerspective(@CurrentUser() me: AuthPayload, @Param('id') id: string, @Body() body: any) {
+    return this.service.addPerspective(me, id, body);
+  }
+
+  @Patch('perspectives/:id')
+  @RequirePermissions('strategy:perspectives:update')
+  updatePerspective(@CurrentUser() me: AuthPayload, @Param('id') id: string, @Body() body: any) {
+    return this.service.updatePerspective(me, id, body);
+  }
+
+  @Delete('perspectives/:id')
+  @RequirePermissions('strategy:perspectives:delete')
+  removePerspective(@CurrentUser() me: AuthPayload, @Param('id') id: string) {
+    return this.service.removePerspective(me, id);
+  }
+
+  @Patch('maps/:id/perspectives/reorder')
+  @RequirePermissions('strategy:perspectives:update')
+  reorderPerspectives(@CurrentUser() me: AuthPayload, @Param('id') id: string, @Body() body: { ids: string[] }) {
+    return this.service.reorderPerspectives(me, id, body.ids ?? []);
   }
 
   @Post('maps/:id/objectives')
-  addObjective(
-    @Param('id') id: string,
-    @Body() body: { perspectiveId: string; name: string; description?: string; weight?: number },
-  ) {
-    return this.service.addObjective(id, body.perspectiveId, body.name, body.description, body.weight ?? 1);
+  @RequirePermissions('strategy:objectives:create')
+  addObjective(@CurrentUser() me: AuthPayload, @Param('id') id: string, @Body() body: any) {
+    return this.service.addObjective(me, id, body);
   }
 
   @Patch('objectives/:objId')
-  updateObjective(
-    @Param('objId') objId: string,
-    @Body() body: { name?: string; description?: string; status?: ObjectiveStatus; weight?: number; priority?: number },
-  ) {
-    return this.service.updateObjective(objId, body);
+  @RequirePermissions('strategy:objectives:update')
+  updateObjective(@CurrentUser() me: AuthPayload, @Param('objId') objId: string, @Body() body: any) {
+    return this.service.updateObjective(me, objId, body);
   }
 
   @Delete('objectives/:objId')
-  removeObjective(@Param('objId') objId: string) {
-    return this.service.removeObjective(objId);
+  @RequirePermissions('strategy:objectives:delete')
+  removeObjective(@CurrentUser() me: AuthPayload, @Param('objId') objId: string) {
+    return this.service.removeObjective(me, objId);
+  }
+
+  @Patch('maps/:id/layout')
+  @RequirePermissions('strategy:objectives:update')
+  saveLayout(@CurrentUser() me: AuthPayload, @Param('id') id: string, @Body() body: { nodes: any[] }) {
+    return this.service.saveLayout(me, id, body.nodes ?? []);
   }
 
   @Post('relations')
-  addRelation(@Body() body: { fromId: string; toId: string; weight?: number }) {
-    return this.service.addRelation(body.fromId, body.toId, body.weight ?? 1);
+  @RequirePermissions('strategy:links:manage')
+  addRelation(@CurrentUser() me: AuthPayload, @Body() body: any) {
+    return this.service.addRelation(me, body);
+  }
+
+  @Patch('relations/:id')
+  @RequirePermissions('strategy:links:manage')
+  updateRelation(@CurrentUser() me: AuthPayload, @Param('id') id: string, @Body() body: any) {
+    return this.service.updateRelation(me, id, body);
   }
 
   @Delete('relations/:id')
-  removeRelation(@Param('id') id: string) {
-    return this.service.removeRelation(id);
+  @RequirePermissions('strategy:links:manage')
+  removeRelation(@CurrentUser() me: AuthPayload, @Param('id') id: string) {
+    return this.service.removeRelation(me, id);
   }
 
   @Post('objectives/:objId/indicators/:indicatorId')
-  attachIndicator(@Param('objId') objId: string, @Param('indicatorId') indicatorId: string) {
-    return this.service.attachIndicator(objId, indicatorId);
+  @RequirePermissions('strategy:indicators:link')
+  attachIndicator(@CurrentUser() me: AuthPayload, @Param('objId') objId: string, @Param('indicatorId') indicatorId: string) {
+    return this.service.attachIndicator(me, objId, indicatorId);
+  }
+
+  @Delete('objectives/:objId/indicators/:indicatorId')
+  @RequirePermissions('strategy:indicators:link')
+  detachObjectiveIndicator(@CurrentUser() me: AuthPayload, @Param('objId') objId: string, @Param('indicatorId') indicatorId: string) {
+    return this.service.detachIndicator(me, objId, indicatorId);
   }
 
   @Delete('indicators/:indicatorId/objective')
-  detachIndicator(@Param('indicatorId') indicatorId: string) {
-    return this.service.detachIndicator(indicatorId);
+  @RequirePermissions('strategy:indicators:link')
+  detachIndicator(@CurrentUser() me: AuthPayload, @Param('indicatorId') indicatorId: string) {
+    return this.service.detachIndicatorLegacy(me, indicatorId);
+  }
+
+  @Post('objectives/:objId/orgnodes/:orgNodeId')
+  @RequirePermissions('strategy:objectives:update')
+  attachOrgNode(@CurrentUser() me: AuthPayload, @Param('objId') objId: string, @Param('orgNodeId') orgNodeId: string, @Body() body: { kind?: string }) {
+    return this.service.attachOrgNode(me, objId, orgNodeId, body.kind ?? 'responsavel');
+  }
+
+  @Delete('objectives/:objId/orgnodes/:orgNodeId')
+  @RequirePermissions('strategy:objectives:update')
+  detachOrgNode(@CurrentUser() me: AuthPayload, @Param('objId') objId: string, @Param('orgNodeId') orgNodeId: string, @Query('kind') kind?: string) {
+    return this.service.detachOrgNode(me, objId, orgNodeId, kind ?? 'responsavel');
+  }
+
+  @Get('maps/:id/versions')
+  @RequirePermissions('strategy:history:view')
+  listVersions(@CurrentUser() me: AuthPayload, @Param('id') id: string) {
+    return this.service.listVersions(me, id);
+  }
+
+  @Post('maps/:id/versions')
+  @RequirePermissions('strategy:publish')
+  createVersion(@CurrentUser() me: AuthPayload, @Param('id') id: string, @Body() body: any) {
+    return this.service.createVersion(me, id, body);
   }
 }
