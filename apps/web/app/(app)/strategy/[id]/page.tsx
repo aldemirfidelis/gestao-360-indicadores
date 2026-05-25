@@ -203,10 +203,10 @@ const LIGHT_LABEL: Record<string, string> = {
 };
 
 const LIGHT_CLASS: Record<string, string> = {
-  GREEN: 'border-status-green/50 bg-status-green/10',
-  YELLOW: 'border-status-yellow/60 bg-status-yellow/10',
-  RED: 'border-status-red/60 bg-status-red/10',
-  GRAY: 'border-muted-foreground/30 bg-muted/40',
+  GREEN: 'border-emerald-600 bg-emerald-600 text-white shadow-md',
+  YELLOW: 'border-amber-500 bg-amber-500 text-amber-950 shadow-md',
+  RED: 'border-rose-600 bg-rose-600 text-white shadow-md',
+  GRAY: 'border-muted bg-muted text-muted-foreground shadow-sm',
 };
 
 interface RelationKindMeta {
@@ -231,6 +231,50 @@ const RELATION_KIND_MAP = new Map(RELATION_KINDS.map((rel) => [rel.kind, rel]));
 function kindMeta(kind?: string | null): RelationKindMeta {
   return RELATION_KIND_MAP.get(kind ?? 'impacta') ?? RELATION_KINDS[1];
 }
+
+function getBestHandles(sourceNode: Node, targetNode: Node): { sourceHandle: string; targetHandle: string } {
+  const sX = sourceNode.position.x;
+  const sY = sourceNode.position.y;
+  const sW = sourceNode.width ?? 260;
+  const sH = sourceNode.height ?? 150;
+
+  const tX = targetNode.position.x;
+  const tY = targetNode.position.y;
+  const tW = targetNode.width ?? 260;
+  const tH = targetNode.height ?? 150;
+
+  const sCX = sX + sW / 2;
+  const sCY = sY + sH / 2;
+  const tCX = tX + tW / 2;
+  const tCY = tY + tH / 2;
+
+  const dx = tCX - sCX;
+  const dy = tCY - sCY;
+
+  if (Math.abs(dy) > Math.abs(dx) * 0.8) {
+    return dy > 0
+      ? { sourceHandle: 'bottom', targetHandle: 'top' }
+      : { sourceHandle: 'top', targetHandle: 'bottom' };
+  } else {
+    return dx > 0
+      ? { sourceHandle: 'right', targetHandle: 'left' }
+      : { sourceHandle: 'left', targetHandle: 'right' };
+  }
+}
+
+const PERSPECTIVE_PRESETS = [
+  { name: 'Personalizado', kind: 'CUSTOM', color: '#2563eb', icon: '' },
+  { name: 'Financeiro', kind: 'FINANCIAL', color: '#16a34a', icon: 'F' },
+  { name: 'Clientes & Mercado', kind: 'CUSTOMERS', color: '#2563eb', icon: 'C' },
+  { name: 'Processos Internos', kind: 'INTERNAL_PROCESS', color: '#f59e0b', icon: 'P' },
+  { name: 'Aprendizado & Crescimento', kind: 'LEARNING_GROWTH', color: '#8b5cf6', icon: 'A' },
+  { name: 'Segurança & Saúde', kind: 'SAFETY', color: '#dc2626', icon: 'S' },
+  { name: 'Sustentabilidade (ESG)', kind: 'ESG', color: '#059669', icon: 'E' },
+  { name: 'Qualidade', kind: 'QUALITY', color: '#4f46e5', icon: 'Q' },
+  { name: 'Produtividade', kind: 'PRODUCTIVITY', color: '#06b6d4', icon: 'PR' },
+  { name: 'Pessoas & Cultura', kind: 'PEOPLE', color: '#ec4899', icon: 'PE' },
+  { name: 'Custos', kind: 'COSTS', color: '#ef4444', icon: '$' },
+];
 
 function PerspectiveLane({
   data,
@@ -285,13 +329,14 @@ function ObjectiveNode({
   const baseLight = objective.baseLight ?? objective.aggregateLight;
   const propagatedOnly = data.propagated && baseLight !== light;
   const offIndicators = objective.indicators.filter((indicator) => indicator.results?.[0]?.light === 'RED').length;
+  const isDarkColor = light === 'GREEN' || light === 'RED';
   return (
     <div
       className={cn(
-        'flex h-full w-full flex-col rounded-lg border-2 bg-card p-3 shadow-md transition',
+        'flex h-full w-full flex-col rounded-lg border-2 p-3 shadow-md transition',
         LIGHT_CLASS[light] ?? LIGHT_CLASS.GRAY,
         (selected || data.selected) && 'ring-2 ring-primary',
-        light === 'RED' && 'animate-[pulse_3s_ease-in-out_infinite]',
+        light === 'RED' && 'animate-[pulse_3.5s_ease-in-out_infinite]',
       )}
     >
       {data.editMode && (
@@ -307,31 +352,50 @@ function ObjectiveNode({
       <Handle id="top" type="source" position={Position.Top} className="!h-3 !w-3 !bg-primary" />
       <div className="mb-2 flex items-start justify-between gap-2">
         <div className="min-w-0">
-          <div className="line-clamp-2 text-sm font-semibold leading-tight">{objective.name}</div>
-          <div className="mt-1 truncate text-[11px] text-muted-foreground">
+          <div className={cn("line-clamp-2 text-sm font-semibold leading-tight", isDarkColor ? "text-white" : "text-foreground")}>{objective.name}</div>
+          <div className={cn("mt-1 truncate text-[11px]", isDarkColor ? "text-white/80" : "text-muted-foreground")}>
             {objective.responsibleUser?.name ?? objective.responsible ?? objective.ownerNode?.name ?? 'Sem responsável'}
           </div>
         </div>
-        {data.editMode && <GripVertical className="h-4 w-4 shrink-0 text-muted-foreground" />}
+        {data.editMode && <GripVertical className={cn("h-4 w-4 shrink-0", isDarkColor ? "text-white/70" : "text-muted-foreground")} />}
       </div>
       <div className="mb-2 flex flex-wrap gap-1">
-        <Badge variant="secondary">{objective.indicators.length} ind.</Badge>
-        <Badge variant="secondary">{objective.actionCount} ações</Badge>
-        <Badge variant="secondary">P{objective.priority}</Badge>
+        <Badge className={cn("text-[10px] px-1.5 py-0.5", isDarkColor ? "bg-white/20 text-white border-none hover:bg-white/30" : "bg-secondary text-secondary-foreground")}>{objective.indicators.length} ind.</Badge>
+        <Badge className={cn("text-[10px] px-1.5 py-0.5", isDarkColor ? "bg-white/20 text-white border-none hover:bg-white/30" : "bg-secondary text-secondary-foreground")}>{objective.actionCount} ações</Badge>
+        <Badge className={cn("text-[10px] px-1.5 py-0.5", isDarkColor ? "bg-white/20 text-white border-none hover:bg-white/30" : "bg-secondary text-secondary-foreground")}>P{objective.priority}</Badge>
         {offIndicators > 0 && (
-          <Badge className="border border-status-red/40 bg-status-red/10 text-status-red" variant="outline">
+          <Badge className={cn("text-[10px] px-1.5 py-0.5", isDarkColor ? "bg-rose-900/60 text-white border-none" : "border border-status-red/40 bg-status-red/10 text-status-red")} variant="outline">
             {offIndicators} fora
           </Badge>
         )}
         {propagatedOnly && (
-          <Badge className="border border-amber-300 bg-amber-50 text-amber-700" variant="outline">
-            <AlertTriangle className="mr-1 h-3 w-3" /> Impacto herdado
+          <Badge className={cn("text-[10px] px-1.5 py-0.5", isDarkColor ? "bg-amber-800/40 text-amber-100 border-none" : "border border-amber-300 bg-amber-50 text-amber-700")} variant="outline">
+            <AlertTriangle className="mr-1 h-3 w-3 inline" /> Impacto herdado
           </Badge>
         )}
       </div>
-      <div className="mt-auto flex items-center justify-between gap-2 text-[11px] text-muted-foreground">
+
+      <div className="mt-2 w-full">
+        <div className="flex items-center justify-between text-[10px] mb-0.5">
+          <span className={isDarkColor ? "text-white/80" : "text-muted-foreground"}>Atingimento</span>
+          <span className={cn("font-semibold", isDarkColor ? "text-white" : "text-foreground")}>
+            {formatPercent(objective.aggregateAttainment)}
+          </span>
+        </div>
+        <div className={cn("h-1.5 w-full rounded-full overflow-hidden", isDarkColor ? "bg-white/20" : "bg-muted")}>
+          <div
+            className={cn(
+              "h-full rounded-full transition-all duration-500",
+              isDarkColor ? "bg-white" : "bg-primary"
+            )}
+            style={{ width: `${Math.min(Math.max(objective.aggregateAttainment ?? 0, 0), 100)}%` }}
+          />
+        </div>
+      </div>
+
+      <div className={cn("mt-2 flex items-center justify-between gap-2 text-[10px]", isDarkColor ? "text-white/95" : "text-muted-foreground")}>
         <span>{LIGHT_LABEL[light] ?? light}</span>
-        <span>{formatPercent(objective.aggregateAttainment)}</span>
+        <span>Peso {objective.weight}</span>
       </div>
       <Handle id="right" type="source" position={Position.Right} className="!h-3 !w-3 !bg-primary" />
       <Handle id="bottom" type="source" position={Position.Bottom} className="!h-3 !w-3 !bg-primary" />
@@ -484,6 +548,23 @@ function StrategyMapPageInner() {
     setNodes(flowNodes);
     setEdges(flowEdges);
   }, [editMode, filteredObjectives, map, selectedId, setEdges, setNodes, handlePerspectiveResize]);
+
+  const computedEdges = useMemo(() => {
+    const nodesMap = new Map(nodes.map((n) => [n.id, n]));
+    return edges.map((edge) => {
+      const sourceNode = nodesMap.get(edge.source);
+      const targetNode = nodesMap.get(edge.target);
+      if (sourceNode && targetNode && sourceNode.type === 'objective' && targetNode.type === 'objective') {
+        const { sourceHandle, targetHandle } = getBestHandles(sourceNode, targetNode);
+        return {
+          ...edge,
+          sourceHandle,
+          targetHandle,
+        };
+      }
+      return edge;
+    });
+  }, [nodes, edges]);
 
   useEffect(() => {
     const term = search.trim().toLowerCase();
@@ -883,13 +964,13 @@ function StrategyMapPageInner() {
           <div
             ref={canvasRef}
             className={cn(
-              'relative overflow-hidden rounded-b-lg bg-muted/20',
-              fullscreen || presentationMode ? 'h-screen' : 'h-[74vh]',
+              'relative overflow-hidden rounded-b-lg transition-colors duration-200',
+              fullscreen || presentationMode ? 'h-screen bg-background p-4' : 'h-[74vh] bg-muted/5',
             )}
           >
             <ReactFlow
               nodes={nodes}
-              edges={edges}
+              edges={computedEdges}
               nodeTypes={nodeTypes}
               edgeTypes={edgeTypes}
               connectionMode={ConnectionMode.Loose}
@@ -941,6 +1022,10 @@ function StrategyMapPageInner() {
                 setHoveredObjective(found);
                 setHoverPos({ x: event.clientX + 16, y: event.clientY + 16 });
               }}
+              onNodeMouseMove={(event, node) => {
+                if (node.type !== 'objective') return;
+                setHoverPos({ x: event.clientX + 16, y: event.clientY + 16 });
+              }}
               onNodeMouseLeave={() => {
                 setHoveredObjective(null);
                 setHoverPos(null);
@@ -958,7 +1043,7 @@ function StrategyMapPageInner() {
                   </marker>
                 </defs>
               </svg>
-              <Background gap={24} />
+              <Background gap={20} size={1} color="#cbd5e1" className="opacity-45" />
               <MiniMap pannable zoomable nodeStrokeColor={() => '#475569'} nodeColor={(node) => {
                 const obj = map?.objectives.find((o) => o.id === node.id);
                 if (!obj) return '#cbd5e1';
@@ -1276,6 +1361,30 @@ function StrategyMapPageInner() {
         <DialogContent>
           <DialogHeader><DialogTitle>Nova perspectiva</DialogTitle></DialogHeader>
           <div className="space-y-3">
+            <div>
+              <Label>Modelo / Preset</Label>
+              <NativeSelect
+                onChange={(event) => {
+                  const val = event.target.value;
+                  const preset = PERSPECTIVE_PRESETS.find((p) => p.name === val);
+                  if (preset) {
+                    setPerspectiveForm({
+                      ...perspectiveForm,
+                      kind: preset.kind,
+                      name: preset.name === 'Personalizado' ? '' : preset.name,
+                      color: preset.color,
+                      icon: preset.icon,
+                    });
+                  }
+                }}
+              >
+                {PERSPECTIVE_PRESETS.map((p) => (
+                  <option key={p.name} value={p.name}>
+                    {p.name}
+                  </option>
+                ))}
+              </NativeSelect>
+            </div>
             <div className="grid gap-3 sm:grid-cols-[1fr,88px]">
               <div>
                 <Label>Nome *</Label>
@@ -1502,8 +1611,13 @@ function StrategyMapPageInner() {
       {/* Hover card flutuante */}
       {hoveredObjective && hoverPos && (
         <div
-          style={{ position: 'fixed', left: hoverPos.x, top: hoverPos.y, zIndex: 50 }}
-          className="pointer-events-none w-[320px] rounded-xl border bg-background/95 p-4 shadow-2xl backdrop-blur"
+          style={{
+            position: 'fixed',
+            left: `${Math.min(hoverPos.x, typeof window !== 'undefined' ? window.innerWidth - 340 : hoverPos.x)}px`,
+            top: `${Math.min(hoverPos.y, typeof window !== 'undefined' ? window.innerHeight - 400 : hoverPos.y)}px`,
+            zIndex: 9999,
+          }}
+          className="pointer-events-none w-[320px] rounded-xl border bg-background/95 p-4 shadow-2xl backdrop-blur transition-all duration-75"
         >
           <ObjectiveHoverCard objective={hoveredObjective} />
         </div>
