@@ -82,6 +82,54 @@ export function lastNPeriodRefs(periodicity: Periodicity, n: number, ref = new D
   return out;
 }
 
+/**
+ * Lista todos os periodRef pertencentes a um ano civil para a periodicidade
+ * informada (do mais antigo para o mais novo).
+ */
+export function periodRefsForYear(periodicity: Periodicity, year: number): string[] {
+  const pad = (n: number) => String(n).padStart(2, '0');
+  switch (periodicity) {
+    case 'ANNUAL':
+      return [String(year)];
+    case 'SEMIANNUAL':
+      return [`${year}-S1`, `${year}-S2`];
+    case 'QUARTERLY':
+      return [`${year}-Q1`, `${year}-Q2`, `${year}-Q3`, `${year}-Q4`];
+    case 'MONTHLY':
+      return Array.from({ length: 12 }, (_, i) => `${year}-${pad(i + 1)}`);
+    case 'WEEKLY': {
+      const out: string[] = [];
+      const cursor = new Date(Date.UTC(year, 0, 4));
+      while (cursor.getUTCFullYear() <= year) {
+        const w = isoWeek(cursor);
+        if (w.year > year) break;
+        if (w.year === year) out.push(`${w.year}-W${pad(w.week)}`);
+        cursor.setUTCDate(cursor.getUTCDate() + 7);
+      }
+      return out;
+    }
+    case 'BIWEEKLY': {
+      const weeks = periodRefsForYear('WEEKLY', year);
+      const seen = new Set<string>();
+      for (const ref of weeks) {
+        const [yy, ww] = ref.split('-W');
+        seen.add(`${yy}-BW${Math.ceil(parseInt(ww, 10) / 2)}`);
+      }
+      return Array.from(seen);
+    }
+    case 'DAILY':
+    default: {
+      const out: string[] = [];
+      const cursor = new Date(Date.UTC(year, 0, 1));
+      while (cursor.getUTCFullYear() === year) {
+        out.push(`${year}-${pad(cursor.getUTCMonth() + 1)}-${pad(cursor.getUTCDate())}`);
+        cursor.setUTCDate(cursor.getUTCDate() + 1);
+      }
+      return out;
+    }
+  }
+}
+
 function stepBack(d: Date, p: Periodicity): void {
   switch (p) {
     case 'ANNUAL':

@@ -19,12 +19,17 @@ export class ResultsController {
     @CurrentUser() me: AuthPayload,
     @Query('points') points?: string,
     @Query('ownerNodeId') ownerNodeId?: string,
+    @Query('year') year?: string,
+    @Query('indicatorId') indicatorId?: string,
   ) {
-    return this.service.pendingByCompany(
-      me.companyId,
-      points ? parseInt(points, 10) : 6,
+    const parsedYear = year ? parseInt(year, 10) : undefined;
+    const parsedPoints = points ? parseInt(points, 10) : undefined;
+    return this.service.pendingByCompany(me.companyId, {
+      year: Number.isFinite(parsedYear) ? parsedYear : undefined,
+      points: Number.isFinite(parsedPoints) ? parsedPoints : undefined,
       ownerNodeId,
-    );
+      indicatorId,
+    });
   }
 
   @Post()

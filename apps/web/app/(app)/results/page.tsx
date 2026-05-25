@@ -96,10 +96,9 @@ export default function ResultsPage() {
   const [offTargetOpen, setOffTargetOpen] = useState(false);
   const [offTargets, setOffTargets] = useState<UpsertOutcome[]>([]);
   const [ignoreReason, setIgnoreReason] = useState('');
-
   const query = useQuery<PendingRow[]>({
-    queryKey: ['results', 'pending'],
-    queryFn: () => api<PendingRow[]>('/results/pending?points=6'),
+    queryKey: ['results', 'pending', 'current-year'],
+    queryFn: () => api<PendingRow[]>('/results/pending'),
   });
   const orgTree = useQuery<TreeNode[]>({
     queryKey: ['orgnodes', 'tree'],
@@ -268,7 +267,11 @@ export default function ResultsPage() {
         <MetricCard
           title="Periodos"
           value={formatNumber(allPeriods.length)}
-          description={allPeriods[0] ? `${periodRefLabel(allPeriods[0])} em diante` : 'Sem periodo'}
+          description={
+            allPeriods.length > 0
+              ? `${periodRefLabel(allPeriods[0])} a ${periodRefLabel(allPeriods[allPeriods.length - 1])}`
+              : 'Sem periodo'
+          }
           icon={<CalendarClock className="h-4 w-4" />}
           tone="purple"
         />
@@ -290,7 +293,7 @@ export default function ResultsPage() {
 
       <SectionCard
         title="Aba de lancamento"
-        description="Escolha a area macro, expanda a area micro e lance o resultado do indicador vinculado."
+        description="Escolha a area macro, expanda a area micro e lance ou ajuste o resultado em qualquer periodo do ano."
         contentClassName="p-0"
       >
         <div className="grid grid-cols-1 xl:grid-cols-[360px,1fr]">

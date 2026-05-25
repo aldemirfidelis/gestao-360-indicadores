@@ -16,7 +16,6 @@ import {
 } from 'recharts';
 import {
   AlertTriangle,
-  CheckCircle2,
   Clock3,
   Download,
   Eye,
@@ -44,6 +43,7 @@ import { NativeSelect } from '@/components/ui/select';
 import { Progress } from '@/components/ui/progress';
 import { StatusLight } from '@/components/ui/status-light';
 import { Textarea } from '@/components/ui/textarea';
+import { IndicatorResultEditor } from '@/components/platform/indicator-result-editor';
 import { api } from '@/lib/api';
 import { cn, formatDate, formatNumber, formatPercent, periodRefLabel } from '@/lib/utils';
 
@@ -306,7 +306,6 @@ export default function IndicatorsPage() {
   const [resultEditing, setResultEditing] = useState<IndicatorRow | null>(null);
   const [historyIndicator, setHistoryIndicator] = useState<IndicatorRow | null>(null);
   const [targetForm, setTargetForm] = useState({ periodRef: '', target: '', lowerBound: '', upperBound: '', justification: '' });
-  const [resultForm, setResultForm] = useState({ periodRef: '', value: '', note: '', justification: '' });
 
   const options = useQuery<IndicatorOptions>({
     queryKey: ['indicators', 'options'],
@@ -428,19 +427,6 @@ export default function IndicatorsPage() {
     onError: (error: Error) => toast.error(error.message || 'Falha ao salvar meta'),
   });
 
-  const saveResult = useMutation({
-    mutationFn: () => {
-      if (!resultEditing) throw new Error('Indicador nao selecionado');
-      return api(`/indicators/${resultEditing.id}/results`, { method: 'POST', json: resultForm });
-    },
-    onSuccess: () => {
-      toast.success('Realizado atualizado');
-      setResultEditing(null);
-      qc.invalidateQueries({ queryKey: ['indicators'] });
-    },
-    onError: (error: Error) => toast.error(error.message || 'Falha ao salvar realizado'),
-  });
-
   const deleteIndicator = useMutation({
     mutationFn: (indicator: IndicatorRow) => api(`/indicators/${indicator.id}`, { method: 'DELETE' }),
     onSuccess: () => {
@@ -497,14 +483,7 @@ export default function IndicatorsPage() {
   }
 
   function openResult(indicator: IndicatorRow) {
-    const periodRef = indicator.last?.periodRef || indicator.currentTarget?.periodRef || defaultPeriodRef(options.data?.currentPeriod.year);
     setResultEditing(indicator);
-    setResultForm({
-      periodRef,
-      value: indicator.last?.value !== undefined && indicator.last?.value !== null ? String(indicator.last.value) : '',
-      note: indicator.last?.note ?? '',
-      justification: '',
-    });
   }
 
   function clearFilters() {
@@ -719,11 +698,7 @@ export default function IndicatorsPage() {
 
       <ResultDialog
         indicator={resultEditing}
-        form={resultForm}
-        setForm={setResultForm}
-        isSaving={saveResult.isPending}
         onOpenChange={(open) => !open && setResultEditing(null)}
-        onSave={() => saveResult.mutate()}
       />
 
       <HistoryDialog
@@ -1101,55 +1076,31 @@ const targetFormShape = { periodRef: '', target: '', lowerBound: '', upperBound:
 
 function ResultDialog({
   indicator,
-  form,
-  setForm,
-  isSaving,
   onOpenChange,
-  onSave,
 }: {
   indicator: IndicatorRow | null;
-  form: typeof resultFormShape;
-  setForm: React.Dispatch<React.SetStateAction<typeof resultFormShape>>;
-  isSaving: boolean;
   onOpenChange: (open: boolean) => void;
-  onSave: () => void;
 }) {
   return (
     <Dialog open={Boolean(indicator)} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-3xl">
+      <DialogContent className="max-w-4xl">
         <DialogHeader>
           <DialogTitle>Alterar realizado</DialogTitle>
         </DialogHeader>
         {indicator && (
-          <div className="space-y-4">
-            <p className="text-sm text-muted-foreground">{indicator.name}</p>
-            <div className="grid gap-3 md:grid-cols-3">
-              <Field label="Periodo" required>
-                <Input value={form.periodRef} onChange={(e) => setForm((prev) => ({ ...prev, periodRef: e.target.value }))} placeholder="2026-01" />
-              </Field>
-              <Field label="Valor realizado" required>
-                <Input type="number" step="0.01" value={form.value} onChange={(e) => setForm((prev) => ({ ...prev, value: e.target.value }))} />
-              </Field>
-              <Field label="Observacao">
-                <Input value={form.note} onChange={(e) => setForm((prev) => ({ ...prev, note: e.target.value }))} />
-              </Field>
-              <Field label="Justificativa da alteracao" className="md:col-span-3">
-                <Textarea rows={3} value={form.justification} onChange={(e) => setForm((prev) => ({ ...prev, justification: e.target.value }))} />
-              </Field>
-            </div>
-            <MiniHistoryTable indicator={indicator} mode="result" />
-          </div>
+          <IndicatorResultEditor
+            indicatorId={indicator.id}
+            fallbackName={indicator.name}
+            unitLabel={indicator.unitLabel ?? indicator.unit}
+          />
         )}
         <DialogFooter>
-          <Button variant="outline" onClick={() => onOpenChange(false)}>Cancelar</Button>
-          <Button onClick={onSave} disabled={isSaving}>{isSaving ? 'Salvando...' : 'Salvar realizado'}</Button>
+          <Button variant="outline" onClick={() => onOpenChange(false)}>Fechar</Button>
         </DialogFooter>
       </DialogContent>
     </Dialog>
   );
 }
-
-const resultFormShape = { periodRef: '', value: '', note: '', justification: '' };
 
 function HistoryDialog({
   indicator,

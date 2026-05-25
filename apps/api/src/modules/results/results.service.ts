@@ -11,7 +11,7 @@ import {
   TrafficLight,
   TreatmentStatus,
 } from '@prisma/client';
-import { lastNPeriodRefs, periodRefToDate } from '../indicators/period.util';
+import { lastNPeriodRefs, periodRefToDate, periodRefsForYear } from '../indicators/period.util';
 import { TraceabilityService } from '../traceability/traceability.service';
 import { PeriodsService } from '../periods/periods.service';
 
@@ -30,16 +30,24 @@ export class ResultsService {
   ) {}
 
   /**
-   * Lista lancamentos pendentes/preenchidos para um conjunto de indicadores
-   * relativos aos N ultimos periodos, agrupados.
+   * Lista lancamentos pendentes/preenchidos para um conjunto de indicadores,
+   * agrupados por periodo. Quando `year` esta definido (caso padrao), lista
+   * todos os periodos daquele ano civil para a periodicidade do indicador.
+   * Quando `points` esta definido, lista apenas os N periodos mais recentes
+   * (compativel com a versao antiga).
    */
-  async pendingByCompany(companyId: string, points = 6, ownerNodeId?: string) {
+  async pendingByCompany(
+    companyId: string,
+    opts: { year?: number; points?: number; ownerNodeId?: string; indicatorId?: string } = {},
+  ) {
+    const { ownerNodeId, indicatorId } = opts;
     const indicators = await this.prisma.indicator.findMany({
       where: {
         companyId,
         deletedAt: null,
         status: 'ACTIVE',
         ...(ownerNodeId ? { ownerNodeId } : {}),
+        ...(indicatorId ? { id: indicatorId } : {}),
       },
       select: {
         id: true,
@@ -65,9 +73,14 @@ export class ResultsService {
       }>;
     }> = [];
 
+    const usePoints = opts.points !== undefined && opts.year === undefined;
+    const currentPeriod = await this.periods.current(companyId);
+    const targetYear = opts.year ?? currentPeriod.year;
     const anchor = await this.periods.currentAnchorDate(companyId);
     for (const ind of indicators) {
-      const refs = lastNPeriodRefs(ind.periodicity, points, anchor);
+      const refs = usePoints
+        ? lastNPeriodRefs(ind.periodicity, opts.points ?? 6, anchor)
+        : periodRefsForYear(ind.periodicity, targetYear);
       const [targets, results] = await Promise.all([
         this.prisma.indicatorTarget.findMany({
           where: { indicatorId: ind.id, periodRef: { in: refs } },
