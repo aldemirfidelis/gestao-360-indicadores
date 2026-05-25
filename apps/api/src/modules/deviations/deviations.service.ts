@@ -250,7 +250,8 @@ export class DeviationsService {
 
   async close(id: string, userId?: string) {
     const dev = await this.getById(id);
-    const open = dev.actions.filter((a) => a.status !== 'DONE' && a.status !== 'DONE_LATE');
+    const completedStatuses = ['DONE', 'DONE_LATE', 'CANCELLED', 'EFFECTIVE', 'INEFFECTIVE'];
+    const open = dev.actions.filter((a) => !completedStatuses.includes(a.status));
     if (open.length > 0) {
       throw new NotFoundException(
         `Existem ${open.length} acao(oes) abertas. Conclua-as antes de fechar o desvio.`,

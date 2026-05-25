@@ -94,7 +94,7 @@ const TOOL_LABEL: Record<string, string> = {
   EFFECTIVENESS_CHECKLIST: 'Checklist de eficacia',
 };
 
-const tabs = ['Visao geral', 'Origem', 'Analise de causa', '5W2H', 'Execucao', 'Evidencias', 'Eficacia', 'IA', 'Historico'];
+const tabs = ['Visão geral', 'Origem', 'Análise de causa', '5W2H', 'Execução', 'Evidências', 'Eficácia', 'IA', 'Histórico'];
 
 export default function ActionDetailPage() {
   const { id } = useParams<{ id: string }>();
@@ -240,7 +240,7 @@ export default function ActionDetailPage() {
         ))}
       </div>
 
-      {tab === 'Visao geral' && (
+      {tab === 'Visão geral' && (
         <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
           <div className="space-y-6 lg:col-span-2">
             <SectionCard title="Problema e plano" description="Contexto, causa raiz, acao proposta e resultado esperado.">
@@ -248,7 +248,7 @@ export default function ActionDetailPage() {
                 <EditableText label="Descricao do problema" value={a.problemDescription ?? ''} onSave={(problemDescription) => update.mutate({ problemDescription })} />
                 <EditableText label="Causa raiz identificada" value={a.rootCause ?? ''} onSave={(rootCause) => update.mutate({ rootCause })} />
                 <EditableText label="Acao proposta" value={a.description ?? ''} onSave={(description) => update.mutate({ description })} />
-                <EditableText label="Resultado esperado" value={a.expectedResult ?? ''} onSave={(expectedResult) => update.mutate({ expectedResult })} />
+                <EditableText label="Resultado esperado (Impacto Esperado)" value={a.expectedResult ?? ''} onSave={(expectedResult) => update.mutate({ expectedResult })} />
               </div>
             </SectionCard>
             <ExecutionCard a={a} newTask={newTask} setNewTask={setNewTask} addTask={addTask.mutate} toggleTask={toggleTask.mutate} />
@@ -273,17 +273,17 @@ export default function ActionDetailPage() {
       )}
 
       {tab === 'Origem' && <OriginTrail a={a} />}
-      {tab === 'Analise de causa' && <AnalysisWorkspace action={a} onSave={saveAnalysis.mutate} saving={saveAnalysis.isPending} onAskAi={() => aiAssist.mutate('analysis')} />}
+      {tab === 'Análise de causa' && <AnalysisWorkspace action={a} onSave={saveAnalysis.mutate} saving={saveAnalysis.isPending} onAskAi={() => aiAssist.mutate('analysis')} />}
       {tab === '5W2H' && <FiveW2H action={a} onSave={saveAnalysis.mutate} saving={saveAnalysis.isPending} onAskAi={() => aiAssist.mutate('5w2h')} />}
-      {tab === 'Execucao' && <ExecutionCard a={a} newTask={newTask} setNewTask={setNewTask} addTask={addTask.mutate} toggleTask={toggleTask.mutate} />}
-      {tab === 'Evidencias' && (
+      {tab === 'Execução' && <ExecutionCard a={a} newTask={newTask} setNewTask={setNewTask} addTask={addTask.mutate} toggleTask={toggleTask.mutate} />}
+      {tab === 'Evidências' && (
         <EvidencePanel a={a} evidence={evidence} setEvidence={setEvidence} addEvidence={() => addEvidence.mutate()} comment={comment} setComment={setComment} addComment={() => addComment.mutate()} />
       )}
-      {tab === 'Eficacia' && (
+      {tab === 'Eficácia' && (
         <EffectivenessPanel a={a} effectiveness={effectiveness} setEffectiveness={setEffectiveness} validate={() => validate.mutate()} saving={validate.isPending} onAskAi={() => aiAssist.mutate('effectiveness')} />
       )}
       {tab === 'IA' && <AiPanel suggestions={a.aiSuggestions} onGenerate={(scope) => aiAssist.mutate(scope)} onDecide={(sid, status) => decideAi.mutate({ sid, status })} />}
-      {tab === 'Historico' && <HistoryPanel history={a.history} />}
+      {tab === 'Histórico' && <HistoryPanel history={a.history} />}
     </div>
   );
 }
@@ -319,17 +319,32 @@ function EditableText({ label, value, onSave }: { label: string; value: string; 
 
 function OriginTrail({ a }: { a: ActionDetail }) {
   return (
-    <SectionCard title="Trilha completa de origem" description="Caminho que levou ate este plano de acao.">
-      <div className="space-y-3">
+    <SectionCard title="Trilha completa de origem" description="Caminho lógico que originou este plano de ação.">
+      <div className="relative pl-6 border-l-2 border-primary/20 space-y-6">
         {a.originTrail.map((item, index) => (
-          <div key={`${item.type}-${index}`} className="grid gap-3 rounded-lg border p-3 md:grid-cols-[180px,1fr] md:items-center">
-            <div className="flex items-center gap-2 text-xs font-semibold uppercase text-muted-foreground">
-              <GitBranch className="h-4 w-4" />
-              {item.type}
+          <div key={`${item.type}-${index}`} className="relative">
+            {/* Círculo do Timeline */}
+            <span className="absolute -left-[31px] top-1 grid h-5 w-5 place-items-center rounded-full bg-background border-2 border-primary text-[10px] font-bold text-primary">
+              {index + 1}
+            </span>
+            <div className="rounded-xl border bg-card p-4 shadow-sm">
+              <div className="flex items-center gap-2 text-xs font-bold uppercase tracking-wider text-muted-foreground mb-1">
+                <GitBranch className="h-3.5 w-3.5 text-primary" />
+                {item.type === 'INDICATOR' ? 'Indicador' : item.type === 'DEVIATION' ? 'Desvio / FCA' : item.type === 'MEETING' ? 'Reunião' : item.type}
+              </div>
+              {item.href ? (
+                <Link className="text-sm font-semibold text-primary hover:underline block" href={item.href}>
+                  {item.label}
+                </Link>
+              ) : (
+                <div className="text-sm font-semibold text-foreground">{item.label}</div>
+              )}
             </div>
-            {item.href ? <Link className="font-medium text-primary hover:underline" href={item.href}>{item.label}</Link> : <div className="font-medium">{item.label}</div>}
           </div>
         ))}
+        {a.originTrail.length === 0 && (
+          <EmptyState title="Origem não detalhada" description="Este plano de ação foi criado de forma manual direta." />
+        )}
       </div>
     </SectionCard>
   );
@@ -414,29 +429,81 @@ function FiveW2H({ action, onSave, saving, onAskAi }: { action: ActionDetail; on
   const session = action.analysisSessions.find((item) => item.method === 'FIVE_W_TWO_H');
   const [form, setForm] = useState<any>(session?.fiveW2H ?? {});
   const set = (key: string, value: any) => setForm({ ...form, [key]: value });
+
   return (
-    <SectionCard title="5W2H integrado" description="Transforme causa raiz em acao executavel." actions={<Button variant="outline" onClick={onAskAi}><Bot className="mr-2 h-4 w-4" />Revisar 5W2H</Button>}>
-      <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-        {[
-          ['what', 'What - o que sera feito?'],
-          ['why', 'Why - por que sera feito?'],
-          ['where', 'Where - onde sera feito?'],
-          ['who', 'Who - quem sera responsavel?'],
-          ['how', 'How - como sera feito?'],
-        ].map(([key, label]) => <TextInput key={key} label={label} value={form[key] ?? ''} onChange={(value) => set(key, value)} />)}
-        <div>
-          <Label>When - quando?</Label>
-          <Input type="date" value={form.when?.slice?.(0, 10) ?? ''} onChange={(e) => set('when', e.target.value)} />
+    <SectionCard 
+      title="Plano de Ação 5W2H" 
+      description="Detalhe a execução da ação respondendo às perguntas do padrão 5W2H." 
+      actions={<Button variant="outline" onClick={onAskAi}><Bot className="mr-2 h-4 w-4" />Revisar 5W2H com IA</Button>}
+    >
+      <div className="grid grid-cols-1 gap-5 md:grid-cols-2">
+        <div className="rounded-xl border bg-muted/20 p-4 space-y-4">
+          <h3 className="text-sm font-bold text-primary border-b pb-1.5 uppercase tracking-wide">Os 5 "W"s (Direcionamento)</h3>
+          {[
+            ['what', 'What (O que será feito?)', 'Ação concreta a ser executada'],
+            ['why', 'Why (Por que será feito?)', 'Justificativa e causa raiz que a ação resolve'],
+            ['where', 'Where (Onde será feito?)', 'Local, departamento ou sistema afetado'],
+            ['who', 'Who (Quem irá fazer?)', 'Responsável ou executor da ação'],
+          ].map(([key, label, desc]) => (
+            <div key={key}>
+              <Label className="font-semibold text-xs text-foreground">{label}</Label>
+              <Input 
+                value={form[key] ?? ''} 
+                placeholder={desc} 
+                onChange={(e) => set(key, e.target.value)} 
+                className="mt-1"
+              />
+            </div>
+          ))}
+          <div>
+            <Label className="font-semibold text-xs text-foreground">When (Quando será feito? - Prazo)</Label>
+            <Input 
+              type="date" 
+              value={form.when?.slice?.(0, 10) ?? ''} 
+              onChange={(e) => set('when', e.target.value)} 
+              className="mt-1"
+            />
+          </div>
         </div>
-        <div>
-          <Label>How much - custo</Label>
-          <Input type="number" value={form.howMuch ?? ''} onChange={(e) => set('howMuch', e.target.value)} />
+
+        <div className="rounded-xl border bg-muted/20 p-4 space-y-4">
+          <h3 className="text-sm font-bold text-primary border-b pb-1.5 uppercase tracking-wide">Os 2 "H"s & Notas (Execução)</h3>
+          <div>
+            <Label className="font-semibold text-xs text-foreground">How (Como será feito?)</Label>
+            <Textarea 
+              rows={4} 
+              value={form.how ?? ''} 
+              placeholder="Método, ferramentas e etapas detalhadas do procedimento..." 
+              onChange={(e) => set('how', e.target.value)} 
+              className="mt-1"
+            />
+          </div>
+          <div>
+            <Label className="font-semibold text-xs text-foreground">How Much (Quanto custará?)</Label>
+            <Input 
+              type="number" 
+              value={form.howMuch ?? ''} 
+              placeholder="Custo estimado em R$" 
+              onChange={(e) => set('howMuch', e.target.value)} 
+              className="mt-1"
+            />
+          </div>
+          <div className="pt-2">
+            <Label className="font-semibold text-xs text-muted-foreground">Notas de Revisão</Label>
+            <Textarea 
+              rows={2} 
+              value={form.reviewNotes ?? ''} 
+              placeholder="Comentários adicionais da diretoria ou auditoria..." 
+              onChange={(e) => set('reviewNotes', e.target.value)} 
+              className="mt-1 bg-background/50"
+            />
+          </div>
         </div>
       </div>
-      <div className="mt-4 flex justify-end">
+      <div className="mt-5 flex justify-end">
         <Button disabled={saving} onClick={() => onSave({ method: 'FIVE_W_TWO_H', problem: action.problemDescription, rootCause: action.rootCause, fiveW2H: form })}>
           <Save className="mr-2 h-4 w-4" />
-          Salvar 5W2H
+          {saving ? 'Gravando...' : 'Salvar Plano 5W2H'}
         </Button>
       </div>
     </SectionCard>
@@ -493,25 +560,66 @@ function EvidencePanel({ a, evidence, setEvidence, addEvidence, comment, setComm
 
 function EffectivenessPanel({ a, effectiveness, setEffectiveness, validate, saving, onAskAi }: any) {
   return (
-    <SectionCard title="Verificacao de eficacia" description="Confirme se a acao resolveu a causa raiz e melhorou o resultado." actions={<Button variant="outline" onClick={onAskAi}><Sparkles className="mr-2 h-4 w-4" />Avaliar coerencia</Button>}>
-      <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-        <label className="flex items-center gap-2 rounded-lg border p-3 text-sm">
-          <input type="checkbox" checked={effectiveness.effective} onChange={(e) => setEffectiveness({ ...effectiveness, effective: e.target.checked, reopen: !e.target.checked })} />
-          A acao resolveu a causa raiz
-        </label>
-        <label className="flex items-center gap-2 rounded-lg border p-3 text-sm">
-          <input type="checkbox" checked={effectiveness.reopen} onChange={(e) => setEffectiveness({ ...effectiveness, reopen: e.target.checked, effective: !e.target.checked })} />
-          Reabrir plano por ineficacia
-        </label>
-        <TextInput label="Resultado alcancado" value={effectiveness.achievedResult} onChange={(achievedResult) => setEffectiveness({ ...effectiveness, achievedResult })} />
-        <TextInput label="Evidencia da melhoria" value={effectiveness.evidence} onChange={(evidence) => setEffectiveness({ ...effectiveness, evidence })} />
+    <SectionCard 
+      title="Verificação de Eficácia & Aprendizado" 
+      description="Verifique se a ação eliminou a causa raiz, avalie a melhoria dos indicadores e registre as lições aprendidas (Aprendizado)." 
+      actions={<Button variant="outline" onClick={onAskAi}><Sparkles className="mr-2 h-4 w-4" />Análise de Coerência com IA</Button>}
+    >
+      <div className="grid grid-cols-1 gap-5 md:grid-cols-2">
+        <div className="md:col-span-2 grid grid-cols-1 gap-3 sm:grid-cols-2">
+          <label className="flex items-center gap-3 rounded-xl border p-4 text-sm bg-card hover:bg-accent/30 cursor-pointer transition-colors shadow-sm">
+            <input 
+              type="checkbox" 
+              checked={effectiveness.effective} 
+              onChange={(e) => setEffectiveness({ ...effectiveness, effective: e.target.checked, reopen: !e.target.checked })} 
+              className="h-4 w-4 accent-primary" 
+            />
+            <div>
+              <span className="font-semibold block">Eficácia Validada</span>
+              <span className="text-xs text-muted-foreground">A ação eliminou a causa raiz com sucesso.</span>
+            </div>
+          </label>
+          <label className="flex items-center gap-3 rounded-xl border p-4 text-sm bg-card hover:bg-accent/30 cursor-pointer transition-colors shadow-sm">
+            <input 
+              type="checkbox" 
+              checked={effectiveness.reopen} 
+              onChange={(e) => setEffectiveness({ ...effectiveness, reopen: e.target.checked, effective: !e.target.checked })} 
+              className="h-4 w-4 accent-primary" 
+            />
+            <div>
+              <span className="font-semibold block text-status-red">Reabrir Plano de Ação</span>
+              <span className="text-xs text-muted-foreground">A ação foi ineficaz e o desvio continua.</span>
+            </div>
+          </label>
+        </div>
+
+        <TextInput 
+          label="Resultado Alcançado (Impacto Atingido)" 
+          value={effectiveness.achievedResult} 
+          onChange={(achievedResult) => setEffectiveness({ ...effectiveness, achievedResult })} 
+        />
+        <TextInput 
+          label="Evidência da Melhoria (Link ou Documento)" 
+          value={effectiveness.evidence} 
+          onChange={(evidence) => setEffectiveness({ ...effectiveness, evidence })} 
+        />
+        
         <div className="md:col-span-2">
-          <Label>Resumo da verificacao</Label>
-          <Textarea rows={4} value={effectiveness.summary} onChange={(e) => setEffectiveness({ ...effectiveness, summary: e.target.value })} />
+          <Label className="font-semibold text-xs">Aprendizado & Lições Aprendidas (Encerramento)</Label>
+          <Textarea 
+            rows={4} 
+            value={effectiveness.summary} 
+            placeholder="Descreva o que a equipe aprendeu com a tratativa desse problema, o conhecimento organizacional adquirido e as recomendações para evitar reincidência..." 
+            onChange={(e) => setEffectiveness({ ...effectiveness, summary: e.target.value })} 
+            className="mt-1"
+          />
         </div>
       </div>
-      <div className="mt-4 flex justify-end">
-        <Button disabled={saving} onClick={validate}><ShieldCheck className="mr-2 h-4 w-4" />Registrar eficacia</Button>
+      <div className="mt-5 flex justify-end">
+        <Button disabled={saving} onClick={validate} className="bg-primary hover:bg-primary/95 text-primary-foreground font-semibold">
+          <ShieldCheck className="mr-2 h-4 w-4" />
+          Registrar Eficácia & Aprendizado
+        </Button>
       </div>
     </SectionCard>
   );

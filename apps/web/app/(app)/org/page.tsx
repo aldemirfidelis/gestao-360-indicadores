@@ -92,25 +92,27 @@ const ICONS: Record<string, any> = {
 };
 
 const TYPE_LABEL: Record<string, string> = {
-  COMPANY: 'Valores',
-  BRANCH: 'Unidade',
-  DIRECTORATE: 'Diretrizes',
-  MANAGEMENT: 'Gestao',
-  COORDINATION: 'Coordenacao',
-  SECTOR: 'Area',
-  AREA: 'Pilar',
+  COMPANY: 'Empresa / Valores',
+  BRANCH: 'Filial / Unidade',
+  UNIT: 'Pilar',
+  DIRECTORATE: 'Diretriz',
+  MANAGEMENT: 'Gerência / Gestão',
+  COORDINATION: 'Coordenação / Setor',
+  SECTOR: 'Área Macro',
+  AREA: 'Área Micro',
   PROCESS: 'Processo / Indicadores',
 };
 
 const TYPE_OPTIONS = [
-  ['COMPANY', 'Valores'],
-  ['DIRECTORATE', 'Diretrizes'],
-  ['SECTOR', 'Area'],
-  ['AREA', 'Pilar'],
+  ['COMPANY', 'Empresa / Valores'],
+  ['SECTOR', 'Área Macro'],
+  ['AREA', 'Área Micro'],
+  ['UNIT', 'Pilar'],
+  ['DIRECTORATE', 'Diretriz'],
   ['PROCESS', 'Processo / Indicadores'],
-  ['BRANCH', 'Unidade'],
-  ['MANAGEMENT', 'Gestao'],
-  ['COORDINATION', 'Coordenacao'],
+  ['BRANCH', 'Filial / Unidade'],
+  ['MANAGEMENT', 'Gerência / Gestão'],
+  ['COORDINATION', 'Coordenação / Setor'],
 ] as const;
 
 const emptyNode = {
@@ -217,18 +219,27 @@ export default function OrgPage() {
 
   useEffect(() => {
     if (!createMode) return;
-    const type = createMode === 'guideline' ? 'DIRECTORATE' : createMode === 'micro' ? 'AREA' : 'SECTOR';
+    const type = 
+      createMode === 'guideline' 
+        ? 'DIRECTORATE' 
+        : createMode === 'pilar'
+          ? 'UNIT'
+          : createMode === 'micro' 
+            ? 'AREA' 
+            : 'SECTOR';
     const name =
       createMode === 'guideline'
         ? 'Nova diretriz'
-        : createMode === 'micro'
-          ? 'Nova area micro'
-          : 'Nova area macro';
+        : createMode === 'pilar'
+          ? 'Novo pilar'
+          : createMode === 'micro'
+            ? 'Nova area micro'
+            : 'Nova area macro';
     setForm({
       ...emptyNode,
       name: '',
       type,
-      parentId: createMode === 'micro' ? selected?.id ?? '' : '',
+      parentId: (createMode === 'micro' || createMode === 'pilar') ? selected?.id ?? '' : '',
       description: name,
     });
     setOpen(true);

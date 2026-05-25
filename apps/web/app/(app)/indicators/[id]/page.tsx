@@ -13,7 +13,7 @@ import {
   XAxis,
   YAxis,
 } from 'recharts';
-import { ArrowLeft, AlertTriangle, Network, Save, ScrollText } from 'lucide-react';
+import { ArrowLeft, AlertTriangle, Network, Save, ScrollText, Calendar, Link as LinkIcon } from 'lucide-react';
 import Link from 'next/link';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -35,8 +35,13 @@ interface IndicatorDetail {
   periodicity: string;
   direction: string;
   status: string;
-  ownerNode: { id: string; name: string; type: string };
+  company?: { id: string; name: string } | null;
+  ownerNode: { id: string; name: string; type: string; parent?: { id: string; name: string; type: string } | null };
+  areaMacro?: { id: string; name: string; type: string } | null;
+  areaMicro?: { id: string; name: string; type: string } | null;
+  guidelineNode?: { id: string; name: string; type: string } | null;
   responsibleUser: { id: string; name: string } | null;
+  strategicObjective?: { id: string; name: string; perspective?: { id: string; name: string; color: string } | null } | null;
   targets: { periodRef: string; target: number }[];
   results: {
     id: string;
@@ -46,6 +51,8 @@ interface IndicatorDetail {
     attainment: number | null;
     deviationPct: number | null;
   }[];
+  actions?: { id: string; title: string; status: string; dueDate: string | null }[] | null;
+  meetings?: { id: string; title: string; status: string; startsAt: string | null }[] | null;
 }
 
 interface SeriesPoint {
@@ -79,6 +86,23 @@ interface CurrentTreatment {
   periodRef: string;
   title: string;
 }
+
+const STATUS_LABEL: Record<string, string> = {
+  DRAFT: 'Rascunho',
+  NOT_STARTED: 'Aberto',
+  UNDER_ANALYSIS: 'Em análise',
+  IN_PROGRESS: 'Em execução',
+  WAITING_THIRD: 'Aguardando terceiro',
+  WAITING_EVIDENCE: 'Aguardando evidência',
+  WAITING_VALIDATION: 'Aguardando validação',
+  PAUSED: 'Pausado',
+  DONE: 'Concluído',
+  DONE_LATE: 'Concluído fora do prazo',
+  CANCELLED: 'Cancelado',
+  REOPENED: 'Reaberto',
+  INEFFECTIVE: 'Ineficaz',
+  EFFECTIVE: 'Eficaz',
+};
 
 export default function IndicatorDetailPage() {
   const params = useParams<{ id: string }>();
@@ -165,7 +189,7 @@ export default function IndicatorDetailPage() {
 
       <PageHeader
         title={ind.name}
-        description={ind.description ?? `${ind.ownerNode.name} - ${ind.code ?? '-'}`}
+        description={ind.description ?? `${ind.ownerNode?.name ?? '-'} - ${ind.code ?? '-'}`}
         actions={
           last?.light === 'RED' && (
             <>
@@ -189,6 +213,40 @@ export default function IndicatorDetailPage() {
           )
         }
       />
+
+      {/* Fluxo Lógico e Rastreabilidade Superior */}
+      <div className="mb-6 flex flex-wrap items-center gap-2 rounded-xl border bg-card/45 p-3 text-xs shadow-sm backdrop-blur-sm">
+        <span className="font-semibold text-muted-foreground">Hierarquia integrada:</span>
+        <span className="font-medium text-foreground">{ind.company?.name ?? 'Empresa'}</span>
+        <span className="text-muted-foreground/60">&rarr;</span>
+        <span className="font-medium text-foreground">{ind.areaMacro?.name ?? 'Sem Área Macro'}</span>
+        {ind.areaMicro && (
+          <>
+            <span className="text-muted-foreground/60">&rarr;</span>
+            <span className="font-medium text-foreground">{ind.areaMicro.name}</span>
+          </>
+        )}
+        {ind.ownerNode?.type === 'UNIT' && (
+          <>
+            <span className="text-muted-foreground/60">&rarr;</span>
+            <span className="font-medium text-foreground">Pilar: {ind.ownerNode.name}</span>
+          </>
+        )}
+        {ind.guidelineNode && (
+          <>
+            <span className="text-muted-foreground/60">&rarr;</span>
+            <span className="font-medium text-foreground">Diretriz: {ind.guidelineNode.name}</span>
+          </>
+        )}
+        {ind.strategicObjective && (
+          <>
+            <span className="text-muted-foreground/60">&rarr;</span>
+            <span className="rounded bg-primary/10 px-1.5 py-0.5 font-semibold text-primary">
+              Objetivo Estratégico: {ind.strategicObjective.name}
+            </span>
+          </>
+        )}
+      </div>
 
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
         <Card>
@@ -216,14 +274,14 @@ export default function IndicatorDetailPage() {
           <CardContent className="p-4">
             <div className="text-xs uppercase text-muted-foreground">Periodicidade</div>
             <div className="text-2xl font-semibold mt-1">{ind.periodicity}</div>
-            <div className="text-xs text-muted-foreground">Direcao: {ind.direction}</div>
+            <div className="text-xs text-muted-foreground">Direção: {ind.direction}</div>
           </CardContent>
         </Card>
       </div>
 
       <Card className="mb-6">
         <CardHeader>
-          <CardTitle>Evolucao (12 periodos)</CardTitle>
+          <CardTitle>Evolução (12 períodos)</CardTitle>
         </CardHeader>
         <CardContent className="h-80">
           <ResponsiveContainer width="100%" height="100%">
@@ -241,18 +299,77 @@ export default function IndicatorDetailPage() {
         </CardContent>
       </Card>
 
+      {/* Blocos de Ações e Reuniões Relacionados */}
+      <div className="mb-6 grid grid-cols-1 gap-6 md:grid-cols-2">
+        <Card className="shadow-sm">
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2 border-b">
+            <CardTitle className="text-sm font-bold uppercase tracking-wide text-muted-foreground flex items-center gap-2">
+              <ScrollText className="h-4 w-4 text-primary" />
+              Planos de Ação Relacionados ({ind.actions?.length ?? 0})
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="pt-4">
+            {(!ind.actions || ind.actions.length === 0) ? (
+              <p className="text-xs text-muted-foreground py-2">Nenhum plano de ação vinculado a este indicador.</p>
+            ) : (
+              <div className="divide-y divide-border">
+                {ind.actions.map((act) => (
+                  <div key={act.id} className="py-2.5 flex items-center justify-between text-xs gap-3">
+                    <div className="min-w-0">
+                      <Link href={`/actions/${act.id}`} className="font-semibold hover:underline block truncate text-foreground">
+                        {act.title}
+                      </Link>
+                      <span className="text-muted-foreground block mt-0.5">Prazo: {act.dueDate ? new Date(act.dueDate).toLocaleDateString('pt-BR') : 'Sem prazo'}</span>
+                    </div>
+                    <StatusBadge value={act.status} label={STATUS_LABEL[act.status] ?? act.status} />
+                  </div>
+                ))}
+              </div>
+            )}
+          </CardContent>
+        </Card>
+
+        <Card className="shadow-sm">
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2 border-b">
+            <CardTitle className="text-sm font-bold uppercase tracking-wide text-muted-foreground flex items-center gap-2">
+              <Calendar className="h-4 w-4 text-primary" />
+              Reuniões de Alinhamento ({ind.meetings?.length ?? 0})
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="pt-4">
+            {(!ind.meetings || ind.meetings.length === 0) ? (
+              <p className="text-xs text-muted-foreground py-2">Nenhuma reunião vinculada a este indicador.</p>
+            ) : (
+              <div className="divide-y divide-border">
+                {ind.meetings.map((meet) => (
+                  <div key={meet.id} className="py-2.5 flex items-center justify-between text-xs gap-3">
+                    <div className="min-w-0">
+                      <Link href={`/meetings/${meet.id}`} className="font-semibold hover:underline block truncate text-foreground">
+                        {meet.title}
+                      </Link>
+                      <span className="text-muted-foreground block mt-0.5">Agendada para: {meet.startsAt ? new Date(meet.startsAt).toLocaleString('pt-BR') : 'Sem data'}</span>
+                    </div>
+                    <StatusBadge value={meet.status} label={meet.status === 'SCHEDULED' ? 'Agendada' : meet.status === 'COMPLETED' ? 'Concluída' : 'Cancelada'} />
+                  </div>
+                ))}
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      </div>
+
       <div className="mb-6 grid grid-cols-1 gap-6 xl:grid-cols-[1fr,420px]">
         <Card>
           <CardHeader>
-            <CardTitle>Proximos passos sugeridos</CardTitle>
+            <CardTitle>Próximos passos sugeridos</CardTitle>
           </CardHeader>
           <CardContent className="grid gap-3 md:grid-cols-3">
             <Button variant="outline" className="h-auto justify-start gap-3 p-4" asChild>
               <Link href="/org">
                 <Network className="h-5 w-5 text-primary" />
                 <span className="text-left">
-                  <span className="block font-medium">Ver na arvore</span>
-                  <span className="block text-xs text-muted-foreground">Area, setor e indicadores vinculados</span>
+                  <span className="block font-medium">Ver na árvore</span>
+                  <span className="block text-xs text-muted-foreground">Área, setor e pilar vinculados</span>
                 </span>
               </Link>
             </Button>
@@ -265,15 +382,15 @@ export default function IndicatorDetailPage() {
               <AlertTriangle className="h-5 w-5" />
               <span className="text-left">
                 <span className="block font-medium">{currentTreatment.data ? 'Abrir tratativa' : 'Iniciar tratativa'}</span>
-                <span className="block text-xs opacity-80">Analise, reuniao e plano de acao</span>
+                <span className="block text-xs opacity-80">Análise, reunião e plano de ação</span>
               </span>
             </Button>
             <Button variant="outline" className="h-auto justify-start gap-3 p-4" asChild>
               <Link href="/meetings">
                 <ScrollText className="h-5 w-5 text-primary" />
                 <span className="text-left">
-                  <span className="block font-medium">Registrar reuniao</span>
-                  <span className="block text-xs text-muted-foreground">Ata, decisoes e acoes</span>
+                  <span className="block font-medium">Registrar reunião</span>
+                  <span className="block text-xs text-muted-foreground">Ata, decisões e ações</span>
                 </span>
               </Link>
             </Button>
@@ -285,7 +402,7 @@ export default function IndicatorDetailPage() {
             <CardTitle>Linha de rastreabilidade</CardTitle>
           </CardHeader>
           <CardContent>
-            {timeline.isLoading && <p className="text-sm text-muted-foreground">Carregando historico...</p>}
+            {timeline.isLoading && <p className="text-sm text-muted-foreground">Carregando histórico...</p>}
             {!timeline.isLoading && (timeline.data?.events.length ?? 0) === 0 && (
               <p className="text-sm text-muted-foreground">Nenhum evento registrado para este indicador.</p>
             )}
@@ -374,7 +491,7 @@ export default function IndicatorDetailPage() {
 
       <Card>
         <CardHeader>
-          <CardTitle>Historico de lancamentos</CardTitle>
+          <CardTitle>Histórico de lançamentos</CardTitle>
         </CardHeader>
         <CardContent className="p-0">
           <div className="overflow-x-auto">
