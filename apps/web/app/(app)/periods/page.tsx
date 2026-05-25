@@ -33,6 +33,18 @@ interface PeriodsResponse {
   periods: WorkPeriod[];
 }
 
+interface ClosedMonth {
+  id: string;
+  periodRef: string;
+  reason: string | null;
+  closedAt: string;
+  closedBy: { id: string; name: string } | null;
+  reopenedAt: string | null;
+  reopenedBy: { id: string; name: string } | null;
+  deletedAt: string | null;
+  isClosed: boolean;
+}
+
 const statusLabel: Record<WorkPeriod['status'], string> = {
   OPEN: 'Aberto',
   CLOSED: 'Fechado',
@@ -42,9 +54,15 @@ const statusLabel: Record<WorkPeriod['status'], string> = {
 export default function PeriodsPage() {
   const qc = useQueryClient();
   const [selectedId, setSelectedId] = useState('');
+  const [newClosedRef, setNewClosedRef] = useState('');
+  const [newClosedReason, setNewClosedReason] = useState('');
   const periods = useQuery<PeriodsResponse>({
     queryKey: ['periods'],
     queryFn: () => api<PeriodsResponse>('/periods'),
+  });
+  const closedMonths = useQuery<ClosedMonth[]>({
+    queryKey: ['closed-months'],
+    queryFn: () => api<ClosedMonth[]>('/closed-months'),
   });
 
   const data = periods.data;
@@ -86,6 +104,32 @@ export default function PeriodsPage() {
       invalidate();
     },
     onError: (error: any) => toast.error(error?.message ?? 'Nao foi possivel criar o proximo ano'),
+  });
+
+  const closeMonth = useMutation({
+    mutationFn: () =>
+      api<ClosedMonth>('/closed-months', {
+        method: 'POST',
+        json: { periodRef: newClosedRef.trim(), reason: newClosedReason.trim() || null },
+      }),
+    onSuccess: () => {
+      toast.success(`Mes ${newClosedRef.trim()} fechado para lancamentos`);
+      setNewClosedRef('');
+      setNewClosedReason('');
+      qc.invalidateQueries({ queryKey: ['closed-months'] });
+      qc.invalidateQueries({ queryKey: ['results', 'pending'] });
+    },
+    onError: (error: any) => toast.error(error?.message ?? 'Nao foi possivel fechar o mes'),
+  });
+
+  const reopenMonth = useMutation({
+    mutationFn: (id: string) => api<ClosedMonth>(`/closed-months/${id}`, { method: 'DELETE' }),
+    onSuccess: () => {
+      toast.success('Mes reaberto');
+      qc.invalidateQueries({ queryKey: ['closed-months'] });
+      qc.invalidateQueries({ queryKey: ['results', 'pending'] });
+    },
+    onError: (error: any) => toast.error(error?.message ?? 'Nao foi possivel reabrir o mes'),
   });
 
   const handleClose = (period: WorkPeriod) => {
@@ -242,6 +286,102 @@ export default function PeriodsPage() {
                           Fechar
                         </Button>
                       </div>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </SectionCard>
+      </div>
+
+      <div className="mt-6">
+        <SectionCard
+          title="Bloqueio de lancamento por mes"
+          description="Mes fechado impede o lancamento ou alteracao de realizado por todas as areas. Reabertura sempre disponivel ao admin."
+        >
+          <div className="grid gap-4 md:grid-cols-[1fr,1fr,auto]">
+            <div>
+              <label className="text-xs font-semibold uppercase text-muted-foreground">Periodo (YYYY-MM)</label>
+              <input
+                value={newClosedRef}
+                onChange={(e) => setNewClosedRef(e.target.value)}
+                placeholder="2026-05"
+                className="mt-1 h-9 w-full rounded-md border bg-background px-3 text-sm"
+              />
+            </div>
+            <div>
+              <label className="text-xs font-semibold uppercase text-muted-foreground">Motivo (opcional)</label>
+              <input
+                value={newClosedReason}
+                onChange={(e) => setNewClosedReason(e.target.value)}
+                placeholder="Ex.: fechamento contabil"
+                className="mt-1 h-9 w-full rounded-md border bg-background px-3 text-sm"
+              />
+            </div>
+            <div className="flex items-end">
+              <Button
+                onClick={() => closeMonth.mutate()}
+                disabled={!newClosedRef.trim() || closeMonth.isPending}
+              >
+                <LockKeyhole className="mr-2 h-4 w-4" />
+                Fechar mes
+              </Button>
+            </div>
+          </div>
+
+          <div className="mt-6 overflow-x-auto rounded-lg border">
+            <table className="w-full text-sm">
+              <thead className="bg-muted/50 text-xs uppercase text-muted-foreground">
+                <tr>
+                  <th className="px-4 py-3 text-left">Periodo</th>
+                  <th className="px-4 py-3 text-left">Status</th>
+                  <th className="px-4 py-3 text-left">Motivo</th>
+                  <th className="px-4 py-3 text-left">Fechado por</th>
+                  <th className="px-4 py-3 text-left">Reaberto por</th>
+                  <th className="px-4 py-3 text-right">Acoes</th>
+                </tr>
+              </thead>
+              <tbody>
+                {(closedMonths.data ?? []).length === 0 && (
+                  <tr>
+                    <td colSpan={6} className="px-4 py-6 text-center text-sm text-muted-foreground">
+                      Nenhum mes fechado ate o momento.
+                    </td>
+                  </tr>
+                )}
+                {(closedMonths.data ?? []).map((row) => (
+                  <tr key={row.id} className="border-t">
+                    <td className="px-4 py-3 font-medium">{row.periodRef}</td>
+                    <td className="px-4 py-3">
+                      {row.isClosed ? (
+                        <Badge variant="secondary">Fechado</Badge>
+                      ) : (
+                        <Badge variant="outline" className="border-status-green text-status-green">
+                          Reaberto
+                        </Badge>
+                      )}
+                    </td>
+                    <td className="px-4 py-3 text-muted-foreground">{row.reason ?? '-'}</td>
+                    <td className="px-4 py-3 text-muted-foreground">
+                      {row.closedBy?.name ?? '-'}
+                      <div className="text-xs">{formatDate(row.closedAt)}</div>
+                    </td>
+                    <td className="px-4 py-3 text-muted-foreground">
+                      {row.reopenedBy?.name ?? '-'}
+                      <div className="text-xs">{row.reopenedAt ? formatDate(row.reopenedAt) : ''}</div>
+                    </td>
+                    <td className="px-4 py-3 text-right">
+                      {row.isClosed && (
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          disabled={reopenMonth.isPending}
+                          onClick={() => reopenMonth.mutate(row.id)}
+                        >
+                          Reabrir
+                        </Button>
+                      )}
                     </td>
                   </tr>
                 ))}

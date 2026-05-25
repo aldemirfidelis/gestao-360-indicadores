@@ -132,7 +132,7 @@ export class IndicatorsService {
             map: { select: { id: true, name: true } },
           },
         },
-        parentRelations: {
+        childRelations: {
           select: {
             parent: { select: { id: true, name: true, code: true } },
           },
@@ -143,7 +143,7 @@ export class IndicatorsService {
             meetings: true,
             targets: true,
             results: true,
-            childRelations: true,
+            parentRelations: true,
           },
         },
       },
@@ -184,11 +184,11 @@ export class IndicatorsService {
       const currentTarget = currentRef ? targetMap.get(`${indicator.id}:${currentRef}`) : null;
       const last = lastByIndicator.get(indicator.id) ?? null;
       const area = deriveArea(indicator.ownerNode);
-      const parentIndicator = indicator.parentRelations?.[0]?.parent ?? null;
+      const parentIndicator = indicator.childRelations?.[0]?.parent ?? null;
       return {
         ...indicator,
         parentIndicator,
-        isMacro: (indicator._count?.childRelations ?? 0) > 0,
+        isMacro: (indicator._count?.parentRelations ?? 0) > 0,
         areaMacro: area.areaMacro,
         areaMicro: area.areaMicro,
         currentTarget: currentTarget
@@ -364,8 +364,25 @@ export class IndicatorsService {
       return indicator;
     });
 
+    const directionChanged = data.direction !== undefined && updated.direction !== current.direction;
+    const toleranceChanged =
+      data.yellowToleranceP !== undefined && updated.yellowToleranceP !== current.yellowToleranceP;
+    if (directionChanged || toleranceChanged) {
+      await this.recalcAllResults(id);
+    }
+
     await this.audit(me, 'UPDATE', 'Indicator', id, current, updated, 'Indicador editado');
     return this.getById(id, me);
+  }
+
+  async recalcAllResults(indicatorId: string) {
+    const results = await this.prisma.indicatorResult.findMany({
+      where: { indicatorId },
+      select: { periodRef: true },
+    });
+    for (const r of results) {
+      await this.recalcResultStatus(indicatorId, r.periodRef);
+    }
   }
 
   async remove(me: AuthPayload, id: string) {

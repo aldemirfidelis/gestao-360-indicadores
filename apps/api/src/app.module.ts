@@ -29,6 +29,7 @@ import { TreatmentsModule } from './modules/treatments/treatments.module';
 import { AuditInterceptor } from './common/interceptors/audit.interceptor';
 import { AdminModule } from './modules/admin/admin.module';
 import { PeriodsModule } from './modules/periods/periods.module';
+import { ClosedMonthsModule } from './modules/closed-months/closed-months.module';
 
 @Module({
   imports: [
@@ -59,6 +60,7 @@ import { PeriodsModule } from './modules/periods/periods.module';
     TreatmentsModule,
     AdminModule,
     PeriodsModule,
+    ClosedMonthsModule,
   ],
   providers: [
     { provide: APP_GUARD, useClass: ThrottlerGuard },

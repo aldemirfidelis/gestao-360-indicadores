@@ -27,6 +27,7 @@ interface PendingCell {
   value: number | null;
   status: string;
   light: string;
+  isClosed?: boolean;
 }
 
 interface PendingRow {
@@ -227,6 +228,7 @@ export function IndicatorResultEditor(props: IndicatorMonthlyEditorProps) {
     let touched = 0;
     for (let i = idx + 1; i < cells.length; i++) {
       const c = cells[i];
+      if (mode === 'result' && c.isClosed) continue;
       const local = next[c.periodRef];
       const hasLocal = local !== undefined && local.trim() !== '';
       const persisted = readValue(c);
@@ -347,15 +349,24 @@ export function IndicatorResultEditor(props: IndicatorMonthlyEditorProps) {
                   const otherDisplay = otherValue(cell);
                   const editingAcum = mode === 'target' ? cumulativeTarget[idx] : cumulativeValue[idx];
                   const otherAcum = mode === 'target' ? cumulativeValue[idx] : cumulativeTarget[idx];
+                  const isLockedForMode = mode === 'result' && Boolean(cell.isClosed);
                   return (
-                    <tr key={cell.periodRef}>
+                    <tr key={cell.periodRef} className={cn(isLockedForMode && 'bg-muted/20')}>
                       <td>
-                        <div className="font-medium">{periodRefLabel(cell.periodRef)}</div>
+                        <div className="flex items-center gap-2 font-medium">
+                          {periodRefLabel(cell.periodRef)}
+                          {isLockedForMode && (
+                            <span className="rounded-full bg-muted px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
+                              Fechado
+                            </span>
+                          )}
+                        </div>
                         <div className="text-xs text-muted-foreground">{cell.periodRef}</div>
                       </td>
                       <td>
                         <Input
                           value={display}
+                          disabled={isLockedForMode}
                           onChange={(e) =>
                             setEdits((prev) => ({ ...prev, [cell.periodRef]: e.target.value }))
                           }
@@ -369,6 +380,7 @@ export function IndicatorResultEditor(props: IndicatorMonthlyEditorProps) {
                             cell.light === 'RED' && 'border-status-red/60',
                             cell.light === 'YELLOW' && 'border-status-yellow/60',
                             cell.light === 'GREEN' && 'border-status-green/60',
+                            isLockedForMode && 'opacity-60',
                           )}
                         />
                       </td>

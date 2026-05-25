@@ -21,6 +21,7 @@ import {
   Eye,
   FileClock,
   History,
+  Minus,
   Pencil,
   Plus,
   RefreshCcw,
@@ -366,6 +367,20 @@ export default function IndicatorsPage() {
   const guidelineOptions = useMemo(() => formOrgNodes.filter((node) => node.type === 'DIRECTORATE'), [formOrgNodes]);
   const rows = indicators.data ?? [];
 
+  const microsByParent = useMemo(() => {
+    const map = new Map<string, IndicatorRow[]>();
+    for (const row of rows) {
+      const parentId = row.parentIndicator?.id;
+      if (!parentId) continue;
+      const list = map.get(parentId) ?? [];
+      list.push(row);
+      map.set(parentId, list);
+    }
+    return map;
+  }, [rows]);
+
+  const topLevelRows = useMemo(() => rows.filter((row) => !row.parentIndicator), [rows]);
+
   const stats = useMemo(() => {
     const active = rows.filter((row) => row.status === 'ACTIVE').length;
     const red = rows.filter((row) => row.last?.light === 'RED').length;
@@ -635,15 +650,26 @@ export default function IndicatorsPage() {
       )}
 
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-2 2xl:grid-cols-3">
-        {rows.map((indicator) => (
+        {topLevelRows.map((indicator) => (
           <IndicatorManagementCard
             key={indicator.id}
             indicator={indicator}
+            micros={microsByParent.get(indicator.id) ?? []}
             onView={() => setViewing(indicator)}
             onEdit={() => openEdit(indicator)}
             onTarget={() => openTarget(indicator)}
             onResult={() => openResult(indicator)}
             onHistory={() => setHistoryIndicator(indicator)}
+            onMicroView={(micro) => setViewing(micro)}
+            onMicroEdit={(micro) => openEdit(micro)}
+            onMicroTarget={(micro) => openTarget(micro)}
+            onMicroResult={(micro) => openResult(micro)}
+            onMicroHistory={(micro) => setHistoryIndicator(micro)}
+            onMicroDelete={(micro) => {
+              if (window.confirm('Inativar este indicador? A exclusao sera logica e o historico sera preservado.')) {
+                deleteIndicator.mutate(micro);
+              }
+            }}
             onDelete={() => {
               if (window.confirm('Inativar este indicador? A exclusao sera logica e o historico sera preservado.')) {
                 deleteIndicator.mutate(indicator);
@@ -694,23 +720,58 @@ export default function IndicatorsPage() {
 
 function IndicatorManagementCard({
   indicator,
+  micros = [],
   onView,
   onEdit,
   onTarget,
   onResult,
   onHistory,
   onDelete,
+  onMicroView,
+  onMicroEdit,
+  onMicroTarget,
+  onMicroResult,
+  onMicroHistory,
+  onMicroDelete,
 }: {
   indicator: IndicatorRow;
+  micros?: IndicatorRow[];
   onView: () => void;
   onEdit: () => void;
   onTarget: () => void;
   onResult: () => void;
   onHistory: () => void;
   onDelete: () => void;
+  onMicroView?: (micro: IndicatorRow) => void;
+  onMicroEdit?: (micro: IndicatorRow) => void;
+  onMicroTarget?: (micro: IndicatorRow) => void;
+  onMicroResult?: (micro: IndicatorRow) => void;
+  onMicroHistory?: (micro: IndicatorRow) => void;
+  onMicroDelete?: (micro: IndicatorRow) => void;
 }) {
-  const light = indicator.last?.light ?? 'GRAY';
-  const attainment = indicator.last?.attainment ? Math.max(0, Math.min(100, Math.round(indicator.last.attainment * 100))) : 0;
+  const [microsOpen, setMicrosOpen] = useState(false);
+  const monthlyHistory = indicator.monthlyHistory ?? [];
+  const lastFilledIdx = (() => {
+    for (let i = monthlyHistory.length - 1; i >= 0; i--) {
+      const point = monthlyHistory[i];
+      if (point.meta !== null || point.realizado !== null) return i;
+    }
+    return monthlyHistory.length - 1;
+  })();
+  const [selectedIdx, setSelectedIdx] = useState<number>(Math.max(0, lastFilledIdx));
+  const selected = monthlyHistory[selectedIdx] ?? null;
+  const light = (selected?.status as string | undefined) ?? indicator.last?.light ?? 'GRAY';
+  const attainment = selected?.attainment ? Math.max(0, Math.min(100, Math.round(selected.attainment * 100))) : 0;
+  const unitText = indicator.unitLabel || UNIT_LABEL[indicator.unit] || '';
+  const monthLabel = selected ? periodRefLabel(selected.periodRef) : '-';
+
+  function onBarClick(state: any) {
+    const idx = state?.activeTooltipIndex;
+    if (typeof idx === 'number' && idx >= 0 && idx < monthlyHistory.length) {
+      setSelectedIdx(idx);
+    }
+  }
+
   return (
     <article className="panel panel-hover flex h-full flex-col p-4">
       <div className="flex items-start justify-between gap-3">
@@ -737,29 +798,55 @@ function IndicatorManagementCard({
 
       <div className="mt-4 grid grid-cols-3 gap-3 text-xs">
         <div>
-          <div className="text-muted-foreground">Meta atual</div>
-          <div className="text-base font-semibold">{formatNumber(indicator.currentTarget?.target)}</div>
+          <div className="text-muted-foreground">
+            Meta <span className="font-normal text-muted-foreground/80">({monthLabel})</span>
+          </div>
+          <div className="text-base font-semibold">{formatNumber(selected?.meta ?? null)}</div>
         </div>
         <div>
           <div className="text-muted-foreground">Realizado</div>
           <div className="text-base font-semibold">
-            {indicator.last ? formatNumber(indicator.last.value) : '-'}
-            <span className="ml-1 text-xs font-normal text-muted-foreground">{indicator.unitLabel || UNIT_LABEL[indicator.unit] || ''}</span>
+            {selected && selected.realizado !== null && selected.realizado !== undefined
+              ? formatNumber(selected.realizado)
+              : '-'}
+            <span className="ml-1 text-xs font-normal text-muted-foreground">{unitText}</span>
           </div>
         </div>
         <div>
           <div className="text-muted-foreground">Atingimento</div>
-          <div className="text-base font-semibold">{formatPercent(indicator.last?.attainment ?? null)}</div>
+          <div className="text-base font-semibold">{formatPercent(selected?.attainment ?? null)}</div>
         </div>
       </div>
 
       <Progress value={attainment} className="mt-3 h-1.5" />
 
       <div className="mt-4 h-28 rounded-md border bg-card/60 p-2">
-        {indicator.monthlyHistory.some((point) => point.meta !== null || point.realizado !== null) ? (
+        {monthlyHistory.some((point) => point.meta !== null || point.realizado !== null) ? (
           <ResponsiveContainer width="100%" height="100%">
-            <BarChart data={indicator.monthlyHistory} barGap={1}>
-              <XAxis dataKey="month" tick={{ fontSize: 10 }} axisLine={false} tickLine={false} interval={0} />
+            <BarChart
+              data={monthlyHistory}
+              barGap={1}
+              onClick={onBarClick}
+              style={{ cursor: 'pointer' }}
+            >
+              <XAxis
+                dataKey="month"
+                tick={({ x, y, payload, index }: any) => (
+                  <text
+                    x={x}
+                    y={y + 10}
+                    textAnchor="middle"
+                    fontSize={10}
+                    fontWeight={index === selectedIdx ? 700 : 400}
+                    fill={index === selectedIdx ? 'hsl(var(--primary))' : 'currentColor'}
+                  >
+                    {payload.value}
+                  </text>
+                )}
+                axisLine={false}
+                tickLine={false}
+                interval={0}
+              />
               <YAxis hide domain={[0, 'auto']} />
               <Tooltip content={<ChartTooltip />} cursor={{ fill: 'hsl(var(--muted))', opacity: 0.35 }} />
               <Bar dataKey="meta" name="Meta" fill="hsl(var(--muted-foreground))" radius={[2, 2, 0, 0]} />
@@ -798,7 +885,86 @@ function IndicatorManagementCard({
         <Button variant="ghost" size="sm" onClick={onHistory}><History className="mr-1.5 h-3.5 w-3.5" />Historico</Button>
         <Button variant="ghost" size="sm" className="text-destructive hover:text-destructive" onClick={onDelete}><Trash2 className="mr-1.5 h-3.5 w-3.5" />Inativar</Button>
       </div>
+
+      {micros.length > 0 && (
+        <div className="mt-4 border-t pt-3">
+          <button
+            type="button"
+            onClick={() => setMicrosOpen((open) => !open)}
+            className="flex w-full items-center justify-between rounded-md px-2 py-1.5 text-left text-sm font-medium transition-colors hover:bg-accent/35"
+          >
+            <span className="flex items-center gap-2">
+              {microsOpen ? <Minus className="h-4 w-4" /> : <Plus className="h-4 w-4" />}
+              {formatNumber(micros.length)} indicador(es) micro
+            </span>
+            <span className="text-xs text-muted-foreground">
+              {microsOpen ? 'Recolher' : 'Expandir'}
+            </span>
+          </button>
+          {microsOpen && (
+            <div className="mt-3 space-y-2">
+              {micros.map((micro) => (
+                <MicroIndicatorRow
+                  key={micro.id}
+                  micro={micro}
+                  onView={() => onMicroView?.(micro)}
+                  onEdit={() => onMicroEdit?.(micro)}
+                  onTarget={() => onMicroTarget?.(micro)}
+                  onResult={() => onMicroResult?.(micro)}
+                  onHistory={() => onMicroHistory?.(micro)}
+                  onDelete={() => onMicroDelete?.(micro)}
+                />
+              ))}
+            </div>
+          )}
+        </div>
+      )}
     </article>
+  );
+}
+
+function MicroIndicatorRow({
+  micro,
+  onView,
+  onEdit,
+  onTarget,
+  onResult,
+  onHistory,
+  onDelete,
+}: {
+  micro: IndicatorRow;
+  onView: () => void;
+  onEdit: () => void;
+  onTarget: () => void;
+  onResult: () => void;
+  onHistory: () => void;
+  onDelete: () => void;
+}) {
+  const light = micro.last?.light ?? 'GRAY';
+  return (
+    <div className="flex flex-col gap-2 rounded-lg border bg-muted/15 p-3 sm:flex-row sm:items-center sm:justify-between">
+      <div className="min-w-0">
+        <div className="flex flex-wrap items-center gap-2">
+          {micro.code && <Badge variant="outline">{micro.code}</Badge>}
+          <Badge className={cn('border', statusBadgeClass(light))} variant="outline">{LIGHT_LABEL[light] ?? light}</Badge>
+          <span className="text-xs text-muted-foreground">{micro.areaMicro?.name ?? micro.ownerNode.name}</span>
+        </div>
+        <div className="mt-1 truncate text-sm font-medium">{micro.name}</div>
+        <div className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-muted-foreground">
+          <span>Meta: {formatNumber(micro.currentTarget?.target)}</span>
+          <span>Realizado: {micro.last ? formatNumber(micro.last.value) : '-'}</span>
+          <span>Atingimento: {formatPercent(micro.last?.attainment ?? null)}</span>
+        </div>
+      </div>
+      <div className="flex flex-wrap gap-1.5">
+        <Button variant="ghost" size="sm" onClick={onView} title="Visualizar"><Eye className="h-3.5 w-3.5" /></Button>
+        <Button variant="ghost" size="sm" onClick={onEdit} title="Editar"><Pencil className="h-3.5 w-3.5" /></Button>
+        <Button variant="ghost" size="sm" onClick={onTarget}>Metas</Button>
+        <Button variant="ghost" size="sm" onClick={onResult}>Realizados</Button>
+        <Button variant="ghost" size="sm" onClick={onHistory} title="Historico"><History className="h-3.5 w-3.5" /></Button>
+        <Button variant="ghost" size="sm" className="text-destructive hover:text-destructive" onClick={onDelete} title="Inativar"><Trash2 className="h-3.5 w-3.5" /></Button>
+      </div>
+    </div>
   );
 }
 

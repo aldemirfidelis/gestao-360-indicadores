@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { ConflictException, Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../../prisma/prisma.service';
 import { calcStatus } from '@g360/shared';
 import { IndicatorResultUpsertInput } from '@g360/shared';
@@ -14,6 +14,7 @@ import {
 import { lastNPeriodRefs, periodRefToDate, periodRefsForYear } from '../indicators/period.util';
 import { TraceabilityService } from '../traceability/traceability.service';
 import { PeriodsService } from '../periods/periods.service';
+import { ClosedMonthsService } from '../closed-months/closed-months.service';
 
 interface ResultSaveOutcome {
   result: any;
@@ -27,6 +28,7 @@ export class ResultsService {
     private readonly prisma: PrismaService,
     private readonly traceability: TraceabilityService,
     private readonly periods: PeriodsService,
+    private readonly closedMonths: ClosedMonthsService,
   ) {}
 
   /**
@@ -70,6 +72,7 @@ export class ResultsService {
         value: number | null;
         status: ResultStatus | 'NONE';
         light: TrafficLight;
+        isClosed: boolean;
       }>;
     }> = [];
 
@@ -77,6 +80,11 @@ export class ResultsService {
     const currentPeriod = await this.periods.current(companyId);
     const targetYear = opts.year ?? currentPeriod.year;
     const anchor = await this.periods.currentAnchorDate(companyId);
+    const closed = await this.prisma.closedMonth.findMany({
+      where: { companyId, deletedAt: null, reopenedAt: null },
+      select: { periodRef: true },
+    });
+    const closedSet = new Set(closed.map((c) => c.periodRef));
     for (const ind of indicators) {
       const refs = usePoints
         ? lastNPeriodRefs(ind.periodicity, opts.points ?? 6, anchor)
@@ -101,6 +109,7 @@ export class ResultsService {
             value: r?.value ?? null,
             status: (r?.status ?? 'NONE') as ResultStatus | 'NONE',
             light: (r?.light ?? 'GRAY') as TrafficLight,
+            isClosed: closedSet.has(ref),
           };
         }),
       });
@@ -113,6 +122,12 @@ export class ResultsService {
       where: { id: input.indicatorId },
     });
     if (!indicator) throw new NotFoundException('Indicador nao encontrado');
+
+    if (await this.closedMonths.isMonthClosed(indicator.companyId, input.periodRef)) {
+      throw new ConflictException(
+        `O periodo ${input.periodRef} esta fechado para lancamentos. Solicite a reabertura ao administrador.`,
+      );
+    }
 
     const target = await this.prisma.indicatorTarget.findUnique({
       where: {

@@ -496,6 +496,7 @@ model Company {
   emailLogs           EmailLog[]
   calendarInvites     CalendarInvite[]
   workPeriods         WorkPeriod[]
+  closedMonths        ClosedMonth[]
 }
 
 model WorkPeriod {
@@ -637,6 +638,8 @@ model User {
   objectivesCreated     StrategicObjective[] @relation("StrategicObjectiveCreatedBy")
   objectivesUpdated     StrategicObjective[] @relation("StrategicObjectiveUpdatedBy")
   strategyVersions      StrategicMapVersion[] @relation("StrategicVersionCreatedBy")
+  closedMonthsClosed    ClosedMonth[]        @relation("ClosedMonthClosedBy")
+  closedMonthsReopened  ClosedMonth[]        @relation("ClosedMonthReopenedBy")
 
   @@index([companyId])
   @@index([branchId])
@@ -1060,6 +1063,24 @@ model IndicatorTreeRelation {
   weight    Float                 @default(1)
 
   @@unique([parentId, childId])
+}
+
+model ClosedMonth {
+  id          String   @id @default(uuid())
+  companyId   String
+  company     Company  @relation(fields: [companyId], references: [id])
+  periodRef   String   // ex: 2026-01
+  reason      String?
+  closedAt    DateTime @default(now())
+  closedById  String?
+  closedBy    User?    @relation("ClosedMonthClosedBy", fields: [closedById], references: [id])
+  reopenedAt  DateTime?
+  reopenedById String?
+  reopenedBy  User?    @relation("ClosedMonthReopenedBy", fields: [reopenedById], references: [id])
+  deletedAt   DateTime?
+
+  @@unique([companyId, periodRef])
+  @@index([companyId])
 }
 
 // =====================================================
