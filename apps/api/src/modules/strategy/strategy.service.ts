@@ -38,6 +38,8 @@ type ObjectiveBody = {
   position?: number;
   positionX?: number;
   positionY?: number;
+  width?: number;
+  height?: number;
   active?: boolean;
 };
 
@@ -157,25 +159,55 @@ export class StrategyService {
     const treatmentsByIndicator = new Map(treatmentCounts.map((row) => [row.indicatorId, row._count._all]));
     const deviationsByIndicator = new Map(deviationCounts.map((row) => [row.indicatorId, row._count._all]));
 
+    const baseLights = new Map<string, TrafficLight>();
+    const baseAttainments = new Map<string, number | null>();
+    const enrichedObjectives = map.objectives.map((obj) => {
+      const indicators = uniqueIndicators(obj);
+      const lights = indicators.map((i) => i.results[0]?.light).filter((l): l is TrafficLight => !!l);
+      const attainments = indicators.map((i) => i.results[0]?.attainment).filter((v): v is number => v !== null && v !== undefined);
+      const avg = attainments.length > 0 ? attainments.reduce((a, b) => a + b, 0) / attainments.length : null;
+      const baseLight = aggregateTrafficLight(lights);
+      baseLights.set(obj.id, baseLight);
+      baseAttainments.set(obj.id, avg);
+      return {
+        ...obj,
+        indicators,
+        indicatorLinks: undefined,
+        baseLight,
+        aggregateAttainment: avg,
+        actionCount: indicators.reduce((sum, indicator) => sum + (actionsByIndicator.get(indicator.id) ?? 0), 0),
+        treatmentCount: indicators.reduce((sum, indicator) => sum + (treatmentsByIndicator.get(indicator.id) ?? 0), 0),
+        deviationCount: indicators.reduce((sum, indicator) => sum + (deviationsByIndicator.get(indicator.id) ?? 0), 0),
+      };
+    });
+
+    const propagated = new Map<string, TrafficLight>(baseLights);
+    const adjacency: Array<[string, string]> = [];
+    for (const obj of enrichedObjectives) {
+      for (const out of obj.outRelations) {
+        adjacency.push([obj.id, out.to.id]);
+      }
+    }
+    for (let iter = 0; iter < enrichedObjectives.length; iter++) {
+      let changed = false;
+      for (const [from, to] of adjacency) {
+        const a = propagated.get(from) ?? 'GRAY';
+        const b = propagated.get(to) ?? 'GRAY';
+        const worst = worstLight(a, b);
+        if (worst !== b) {
+          propagated.set(to, worst);
+          changed = true;
+        }
+      }
+      if (!changed) break;
+    }
+
     return {
       ...map,
-      objectives: map.objectives.map((obj) => {
-        const indicators = uniqueIndicators(obj);
-        const lights = indicators.map((i) => i.results[0]?.light).filter((l): l is TrafficLight => !!l);
-        const attainments = indicators.map((i) => i.results[0]?.attainment).filter((v): v is number => v !== null && v !== undefined);
-        const avg = attainments.length > 0 ? attainments.reduce((a, b) => a + b, 0) / attainments.length : null;
-        const aggregateLight = aggregateTrafficLight(lights);
-        return {
-          ...obj,
-          indicators,
-          indicatorLinks: undefined,
-          aggregateLight,
-          aggregateAttainment: avg,
-          actionCount: indicators.reduce((sum, indicator) => sum + (actionsByIndicator.get(indicator.id) ?? 0), 0),
-          treatmentCount: indicators.reduce((sum, indicator) => sum + (treatmentsByIndicator.get(indicator.id) ?? 0), 0),
-          deviationCount: indicators.reduce((sum, indicator) => sum + (deviationsByIndicator.get(indicator.id) ?? 0), 0),
-        };
-      }),
+      objectives: enrichedObjectives.map((obj) => ({
+        ...obj,
+        aggregateLight: propagated.get(obj.id) ?? obj.baseLight,
+      })),
     };
   }
 
@@ -337,6 +369,8 @@ export class StrategyService {
         position: body.position ?? count,
         positionX: body.positionX ?? 0,
         positionY: body.positionY ?? 0,
+        width: body.width ?? 260,
+        height: body.height ?? 150,
         status: body.status ?? ObjectiveStatus.PLANNED,
         active: body.active ?? true,
         createdById: me.sub,
@@ -370,6 +404,8 @@ export class StrategyService {
         position: body.position,
         positionX: body.positionX,
         positionY: body.positionY,
+        width: body.width,
+        height: body.height,
         active: body.active,
         updatedById: me.sub,
       },
@@ -381,12 +417,24 @@ export class StrategyService {
     return after;
   }
 
-  async saveLayout(me: AuthPayload, mapId: string, nodes: Array<{ id: string; perspectiveId?: string; position?: number; positionX: number; positionY: number }>) {
+  async saveLayout(
+    me: AuthPayload,
+    mapId: string,
+    nodes: Array<{
+      id: string;
+      perspectiveId?: string;
+      position?: number;
+      positionX: number;
+      positionY: number;
+      width?: number;
+      height?: number;
+    }>,
+  ) {
     await this.getMapRecord(me.companyId, mapId);
     if (!nodes?.length) return { ok: true };
     const objectives = await this.prisma.strategicObjective.findMany({
       where: { mapId, id: { in: nodes.map((node) => node.id) }, deletedAt: null },
-      select: { id: true, perspectiveId: true, positionX: true, positionY: true, position: true },
+      select: { id: true, perspectiveId: true, positionX: true, positionY: true, position: true, width: true, height: true },
     });
     if (objectives.length !== nodes.length) throw new BadRequestException('Layout contem objetivos invalidos');
     const before = objectives;
@@ -399,6 +447,8 @@ export class StrategyService {
             position: node.position,
             positionX: node.positionX,
             positionY: node.positionY,
+            ...(node.width !== undefined ? { width: node.width } : {}),
+            ...(node.height !== undefined ? { height: node.height } : {}),
             updatedById: me.sub,
           },
         }),
@@ -743,6 +793,17 @@ function aggregateTrafficLight(lights: TrafficLight[]) {
   if (lights.some((light) => light === TrafficLight.RED)) return TrafficLight.RED;
   if (lights.some((light) => light === TrafficLight.YELLOW)) return TrafficLight.YELLOW;
   return TrafficLight.GREEN;
+}
+
+const LIGHT_ORDER: Record<TrafficLight, number> = {
+  GRAY: 0,
+  GREEN: 1,
+  YELLOW: 2,
+  RED: 3,
+};
+
+function worstLight(a: TrafficLight, b: TrafficLight): TrafficLight {
+  return LIGHT_ORDER[a] >= LIGHT_ORDER[b] ? a : b;
 }
 
 function uniqueIds(ids: string[]) {

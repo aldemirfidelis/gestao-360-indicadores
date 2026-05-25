@@ -790,6 +790,8 @@ model StrategicObjective {
   position      Int                 @default(0)
   positionX     Float               @default(0)
   positionY     Float               @default(0)
+  width         Float               @default(260)
+  height        Float               @default(150)
   active        Boolean             @default(true)
   createdById   String?
   createdBy     User?               @relation("StrategicObjectiveCreatedBy", fields: [createdById], references: [id])
