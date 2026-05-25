@@ -20,9 +20,9 @@ interface Insight {
 
 const KIND_META: Record<Insight['kind'], { label: string; icon: any; color: string }> = {
   EXECUTIVE_SUMMARY: { label: 'Resumo executivo', icon: FileText, color: 'bg-status-blue/15 text-status-blue' },
-  WORSENING_TREND: { label: 'Tendencia de piora', icon: TrendingDown, color: 'bg-status-yellow/15 text-status-yellow' },
-  CAUSE_SUGGESTION: { label: 'Sugestao de causa', icon: AlertCircle, color: 'bg-status-purple/15 text-status-purple' },
-  ACTION_SUGGESTION: { label: 'Sugestao de acao', icon: Lightbulb, color: 'bg-status-green/15 text-status-green' },
+  WORSENING_TREND: { label: 'Tendência de piora', icon: TrendingDown, color: 'bg-status-yellow/15 text-status-yellow' },
+  CAUSE_SUGGESTION: { label: 'Sugestão de causa', icon: AlertCircle, color: 'bg-status-purple/15 text-status-purple' },
+  ACTION_SUGGESTION: { label: 'Sugestão de ação', icon: Lightbulb, color: 'bg-status-green/15 text-status-green' },
   RISK_FLAG: { label: 'Risco', icon: AlertCircle, color: 'bg-status-red/15 text-status-red' },
 };
 
@@ -42,7 +42,7 @@ export default function InsightsPage() {
     <div>
       <PageHeader
         title="Insights"
-        description="Resumo executivo, tendencias e sugestoes geradas a partir do estado atual dos indicadores."
+        description="Resumo executivo, tendências e sugestões geradas a partir do estado atual dos indicadores."
         actions={<Badge variant="outline">Heuristicas locais</Badge>}
       />
 
@@ -50,8 +50,8 @@ export default function InsightsPage() {
         <CardContent className="p-4 flex items-start gap-3">
           <Sparkles className="h-5 w-5 text-primary shrink-0 mt-0.5" />
           <div className="text-sm">
-            <strong>Como funciona:</strong> hoje os insights vem de regras determinísticas (calculo de
-            tendencia em 3 periodos, biblioteca de causas e acoes por tipo de indicador). A arquitetura
+            <strong>Como funciona:</strong> hoje os insights vem de regras determinísticas (cálculo de
+            tendência em 3 períodos, biblioteca de causas e ações por tipo de indicador). A arquitetura
             esta pronta para plugar uma API de IA (Claude, OpenAI, etc.) substituindo o
             <code className="mx-1 px-1.5 py-0.5 rounded bg-background">InsightsService</code> do backend.
           </div>

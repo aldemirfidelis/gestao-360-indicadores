@@ -1,9 +1,9 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   reactStrictMode: true,
-  // Necessario porque @g360/shared e workspace local em TypeScript
+  // Necessário porque @g360/shared e workspace local em TypeScript
   transpilePackages: ['@g360/shared'],
-  // Saida self-contained para Docker (gera .next/standalone com server.js)
+  // Saída self-contained para Docker (gera .next/standalone com server.js)
   output: 'standalone',
   experimental: {
     typedRoutes: false,

@@ -78,7 +78,7 @@ interface AreaGroup {
 }
 
 const periodicityLabels: Record<string, string> = {
-  DAILY: 'Diario',
+  DAILY: 'Diário',
   WEEKLY: 'Semanal',
   BIWEEKLY: 'Quinzenal',
   MONTHLY: 'Mensal',
@@ -172,7 +172,7 @@ export default function ResultsPage() {
       }),
     onSuccess: (out) => {
       const reds = out.results.filter((r) => r.shouldOpenDeviation).length;
-      toast.success(`${out.count} lancamentos salvos${reds ? ` - ${reds} indicador(es) em vermelho` : ''}`);
+      toast.success(`${out.count} lançamentos salvos${reds ? ` - ${reds} indicador(es) em vermelho` : ''}`);
       const treatments = out.results.filter((r) => r.shouldOpenDeviation && r.treatment);
       setOffTargets(treatments);
       setOffTargetOpen(treatments.length > 0);
@@ -187,7 +187,7 @@ export default function ResultsPage() {
     mutationFn: (treatmentId: string) =>
       api(`/treatments/${treatmentId}/ignore`, {
         method: 'POST',
-        json: { reason: ignoreReason || 'Ignorado temporariamente no lancamento de resultado.' },
+        json: { reason: ignoreReason || 'Ignorado temporariamente no lançamento de resultado.' },
       }),
     onSuccess: () => {
       toast.success('Tratativa ignorada temporariamente');
@@ -237,11 +237,11 @@ export default function ResultsPage() {
   return (
     <div>
       <PageHeader
-        eyebrow="Lancamentos"
+        eyebrow="Lançamentos"
         tone="launch"
-        title="Lancamento de resultados"
-        description="Registro de realizado por indicador e periodo, com farol e desvio calculados automaticamente."
-        breadcrumbs={[{ label: 'Inicio', href: '/' }, { label: 'Lancamentos', href: '/launches' }, { label: 'Resultados' }]}
+        title="Lançamento de resultados"
+        description="Registro de realizado por indicador e período, com farol e desvio calculados automaticamente."
+        breadcrumbs={[{ label: 'Início', href: '/' }, { label: 'Lançamentos', href: '/launches' }, { label: 'Resultados' }]}
         actions={
           <>
             <Button variant="outline" onClick={() => setEdits({})} disabled={pendingCount === 0}>
@@ -260,17 +260,17 @@ export default function ResultsPage() {
         <MetricCard
           title="Indicadores"
           value={formatNumber(query.data?.length)}
-          description="Disponiveis para lancamento"
+          description="Disponíveis para lançamento"
           icon={<Target className="h-4 w-4" />}
           tone="blue"
         />
         <MetricCard
-          title="Periodos"
+          title="Períodos"
           value={formatNumber(allPeriods.length)}
           description={
             allPeriods.length > 0
               ? `${periodRefLabel(allPeriods[0])} a ${periodRefLabel(allPeriods[allPeriods.length - 1])}`
-              : 'Sem periodo'
+              : 'Sem período'
           }
           icon={<CalendarClock className="h-4 w-4" />}
           tone="purple"
@@ -285,22 +285,22 @@ export default function ResultsPage() {
         <MetricCard
           title="Pendentes"
           value={formatNumber(missingCells)}
-          description={`${formatNumber(pendingCount)} alteracoes locais`}
+          description={`${formatNumber(pendingCount)} alterações locais`}
           icon={<Save className="h-4 w-4" />}
           tone="yellow"
         />
       </div>
 
       <SectionCard
-        title="Aba de lancamento"
-        description="Escolha a area macro, expanda a area micro e lance ou ajuste o resultado em qualquer periodo do ano."
+        title="Aba de lançamento"
+        description="Escolha a área macro, expanda a área micro e lance ou ajuste o resultado em qualquer período do ano."
         contentClassName="p-0"
       >
         <div className="grid grid-cols-1 xl:grid-cols-[360px,1fr]">
           <div className="border-b p-4 xl:border-b-0 xl:border-r">
             <div className="space-y-4">
               <div className="space-y-2">
-                <div className="text-xs font-semibold uppercase text-muted-foreground">Selecionar area</div>
+                <div className="text-xs font-semibold uppercase text-muted-foreground">Selecionar área</div>
                 <NativeSelect
                   value={selectedArea?.id ?? ''}
                   onChange={(e) => {
@@ -311,11 +311,11 @@ export default function ResultsPage() {
                   disabled={query.isLoading || orgTree.isLoading || areaGroups.length === 0}
                 >
                   <option value="" disabled>
-                    Selecione uma area macro
+                    Selecione uma área macro
                   </option>
-                  {areaGroups.map((area) => (
-                    <option key={area.id} value={area.id}>
-                      {area.name}
+                  {areaGroups.map((área) => (
+                    <option key={área.id} value={área.id}>
+                      {área.name}
                     </option>
                   ))}
                 </NativeSelect>
@@ -325,8 +325,8 @@ export default function ResultsPage() {
                 {(query.isLoading || orgTree.isLoading) && <LoadingState className="min-h-56 border-0" />}
                 {!query.isLoading && !orgTree.isLoading && areaGroups.length === 0 && (
                   <EmptyState
-                    title="Nenhuma area com indicador"
-                    description="Cadastre a area na Arvore Organizacional e vincule indicadores para registrar resultados."
+                    title="Nenhuma área com indicador"
+                    description="Cadastre a área na Arvore Organizacional e vincule indicadores para registrar resultados."
                     className="border-0 bg-transparent py-8"
                   />
                 )}
@@ -356,7 +356,7 @@ export default function ResultsPage() {
                           <div className="max-h-96 overflow-y-auto bg-background">
                             {group.rows.length === 0 && (
                               <div className="border-t px-3 py-4 text-sm text-muted-foreground">
-                                Nenhum indicador cadastrado para esta area.
+                                Nenhum indicador cadastrado para esta área.
                               </div>
                             )}
                             {group.rows.map((row) => {
@@ -379,7 +379,7 @@ export default function ResultsPage() {
                                   <span className="min-w-0">
                                     <span className="block truncate text-sm font-medium">{row.indicator.name}</span>
                                     <span className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-muted-foreground">
-                                      <span>{row.indicator.code ?? 'Sem codigo'}</span>
+                                      <span>{row.indicator.code ?? 'Sem código'}</span>
                                       <span>{periodicityLabels[row.indicator.periodicity] ?? row.indicator.periodicity}</span>
                                       <span>{unitLabel}</span>
                                     </span>
@@ -405,7 +405,7 @@ export default function ResultsPage() {
             {query.isLoading && <LoadingState className="m-4 min-h-80" />}
             {!query.isLoading && !selectedRow && (
               <div className="p-4">
-                <EmptyState title="Selecione um indicador" description="A grade vertical sera exibida aqui." />
+                <EmptyState title="Selecione um indicador" description="A grade vertical será exibida aqui." />
               </div>
             )}
             {!query.isLoading && selectedRow && (
@@ -421,7 +421,7 @@ export default function ResultsPage() {
                           {selectedContext?.macro.name ?? selectedRow.indicator.ownerNode.name}
                         </span>
                         <span>{selectedContext?.micro.name ?? selectedRow.indicator.ownerNode.name}</span>
-                        <span>{selectedRow.indicator.code ?? 'Sem codigo'}</span>
+                        <span>{selectedRow.indicator.code ?? 'Sem código'}</span>
                         <span>{periodicityLabels[selectedRow.indicator.periodicity] ?? selectedRow.indicator.periodicity}</span>
                       </div>
                     </div>
@@ -443,7 +443,7 @@ export default function ResultsPage() {
                   <table className="table-modern min-w-[640px]">
                     <thead>
                       <tr>
-                        <th className="text-left">Mes/periodo</th>
+                        <th className="text-left">Mês/período</th>
                         <th className="text-left">Realizado</th>
                         <th className="text-left">Meta</th>
                         <th className="text-center">Farol</th>
@@ -521,7 +521,7 @@ export default function ResultsPage() {
                 <div>
                   <div className="font-semibold">Este indicador esta fora da meta. Deseja iniciar o tratamento?</div>
                   <p className="mt-1 text-sm text-muted-foreground">
-                    O sistema ja registrou a rastreabilidade inicial. Agora voce pode criar analise de causa, agendar reuniao, criar plano de acao ou ignorar temporariamente com justificativa.
+                    O sistema ja registrou a rastreabilidade inicial. Agora você pode criar análise de causa, agendar reunião, criar plano de ação ou ignorar temporariamente com justificativa.
                   </p>
                 </div>
               </div>
@@ -534,7 +534,7 @@ export default function ResultsPage() {
                     <div>
                       <div className="font-medium">{row?.indicator.name ?? 'Indicador fora da meta'}</div>
                       <div className="text-xs text-muted-foreground">
-                        Periodo {periodRefLabel(item.result.periodRef)} - status {item.treatment?.status}
+                        Período {periodRefLabel(item.result.periodRef)} - status {item.treatment?.status}
                       </div>
                     </div>
                     <div className="flex flex-wrap gap-2">
@@ -542,7 +542,7 @@ export default function ResultsPage() {
                         <Link href={`/treatments/${item.treatment?.id}`}>Iniciar tratamento</Link>
                       </Button>
                       <Button variant="outline" asChild>
-                        <Link href={`/indicators/${item.result.indicatorId}`}>Ver historico</Link>
+                        <Link href={`/indicators/${item.result.indicatorId}`}>Ver histórico</Link>
                       </Button>
                     </div>
                   </div>
@@ -555,7 +555,7 @@ export default function ResultsPage() {
                 rows={3}
                 value={ignoreReason}
                 onChange={(e) => setIgnoreReason(e.target.value)}
-                placeholder="Explique por que esta tratativa sera adiada..."
+                placeholder="Explique por que esta tratativa será adiada..."
               />
             </div>
           </div>

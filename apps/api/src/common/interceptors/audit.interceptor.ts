@@ -70,7 +70,7 @@ export class AuditInterceptor implements NestInterceptor {
         },
       });
     } catch {
-      // Auditoria nunca deve quebrar a operacao principal.
+      // Auditoria nunca deve quebrar a operação principal.
     }
   }
 }

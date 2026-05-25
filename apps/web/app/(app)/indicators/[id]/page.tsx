@@ -440,7 +440,7 @@ export default function IndicatorDetailPage() {
           <table className="w-full text-sm">
             <thead className="bg-muted/50 text-xs uppercase">
               <tr>
-                <th className="px-4 py-2 text-left">Periodo</th>
+                <th className="px-4 py-2 text-left">Período</th>
                 <th className="px-4 py-2 text-right">Meta atual</th>
                 <th className="px-4 py-2 text-right">Nova meta</th>
                 <th className="px-4 py-2 text-right"></th>
@@ -498,7 +498,7 @@ export default function IndicatorDetailPage() {
             <table className="w-full text-sm">
               <thead className="bg-muted/50">
                 <tr className="text-left">
-                  <th className="px-4 py-2 font-medium">Periodo</th>
+                  <th className="px-4 py-2 font-medium">Período</th>
                   <th className="px-4 py-2 font-medium text-right">Meta</th>
                   <th className="px-4 py-2 font-medium text-right">Realizado</th>
                   <th className="px-4 py-2 font-medium text-right">Desvio %</th>
@@ -551,8 +551,8 @@ function shortEventLabel(type: string) {
     OFF_TARGET_ALERT: 'Fora da meta',
     CREATED: 'Criado',
     CAUSE_CREATED: 'Causa',
-    ANALYSIS_CREATED: 'Analise',
-    ACTION_CREATED: 'Acao',
+    ANALYSIS_CREATED: 'Análise',
+    ACTION_CREATED: 'Ação',
     ACTION_STATUS_CHANGED: 'Status',
     CLOSED: 'Concluido',
   };

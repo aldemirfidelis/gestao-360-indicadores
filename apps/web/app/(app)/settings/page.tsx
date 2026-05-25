@@ -166,11 +166,11 @@ const EMPTY_BOOTSTRAP: Bootstrap = {
 };
 
 const modules: Array<{ key: ModuleKey; title: string; description: string; icon: any; tone: string }> = [
-  { key: 'users', title: 'Usuarios', description: 'Gerencie usuarios, perfis, permissoes e acessos.', icon: UsersRound, tone: 'text-status-blue bg-status-blue/10' },
+  { key: 'users', title: 'Usuários', description: 'Gerencie usuários, perfis, permissões e acessos.', icon: UsersRound, tone: 'text-status-blue bg-status-blue/10' },
   { key: 'audit', title: 'Auditoria', description: 'Acompanhe tudo o que acontece no sistema.', icon: ScrollText, tone: 'text-status-green bg-status-green/10' },
   { key: 'parameters', title: 'Parametros', description: 'Configure empresas, filiais, setores e cadastros base.', icon: SlidersHorizontal, tone: 'text-status-purple bg-status-purple/10' },
-  { key: 'security', title: 'Seguranca', description: 'Controle perfis, permissoes e acessos por modulo.', icon: ShieldCheck, tone: 'text-status-red bg-status-red/10' },
-  { key: 'system', title: 'Sistema', description: 'Configure notificacoes, aprovacoes e regras globais.', icon: Settings, tone: 'text-status-yellow bg-status-yellow/10' },
+  { key: 'security', title: 'Seguranca', description: 'Controle perfis, permissões e acessos por módulo.', icon: ShieldCheck, tone: 'text-status-red bg-status-red/10' },
+  { key: 'system', title: 'Sistema', description: 'Configure notificações, aprovações e regras globais.', icon: Settings, tone: 'text-status-yellow bg-status-yellow/10' },
 ];
 
 const adminCards: Array<{ title: string; description: string; icon: any; active: ModuleKey; view?: ParamView; tone: string }> = [
@@ -192,7 +192,7 @@ const roleLabels: Record<string, string> = {
   DIRECTOR: 'Diretor',
   MANAGER: 'Gestor',
   ANALYST: 'Analista',
-  COLLABORATOR: 'Usuario',
+  COLLABORATOR: 'Usuário',
   VIEWER: 'Visualizador',
 };
 
@@ -200,7 +200,7 @@ const nodeTypeLabels: Record<string, string> = {
   COMPANY: 'Empresa',
   BRANCH: 'Filial',
   UNIT: 'Unidade',
-  AREA: 'Area',
+  AREA: 'Área',
   SUBAREA: 'Subarea',
   SECTOR: 'Setor',
   SUBSECTOR: 'Subsetor',
@@ -224,7 +224,7 @@ export default function SettingsPage() {
 
   const query = useQuery<Bootstrap>({
     queryKey: ['admin', 'bootstrap'],
-    queryFn: () => withTimeout(api<Bootstrap>('/admin/bootstrap'), 15000, 'Tempo excedido ao carregar configuracoes.'),
+    queryFn: () => withTimeout(api<Bootstrap>('/admin/bootstrap'), 15000, 'Tempo excedido ao carregar configurações.'),
     enabled: canOpenSettings,
     retry: 1,
   });
@@ -253,7 +253,7 @@ export default function SettingsPage() {
         setting: '/admin/system/settings',
       };
       const path = endpoints[type];
-      if (!path) throw new Error('Tipo de cadastro invalido');
+      if (!path) throw new Error('Tipo de cadastro inválido');
       if (type === 'setting') return api(path, { method: 'PUT', json: payload });
       return api(id ? `${path}/${id}` : path, { method: id ? 'PATCH' : 'POST', json: payload });
     },
@@ -277,14 +277,14 @@ export default function SettingsPage() {
       return api(`${endpoints[type]}/${id}`, { method: 'DELETE' });
     },
     onSuccess: () => {
-      toast.success('Exclusao logica realizada');
+      toast.success('Exclusão lógica realizada');
       qc.invalidateQueries({ queryKey: ['admin', 'bootstrap'] });
     },
-    onError: (e: any) => toast.error(e?.message ?? 'Nao foi possivel excluir'),
+    onError: (e: any) => toast.error(e?.message ?? 'Não foi possível excluir'),
   });
 
   if (authLoading || (canOpenSettings && query.isPending && query.fetchStatus !== 'idle')) {
-    return <LoadingState label="Carregando configuracoes..." />;
+    return <LoadingState label="Carregando configurações..." />;
   }
 
   if (!canOpenSettings) {
@@ -312,9 +312,9 @@ export default function SettingsPage() {
       <PageHeader
         eyebrow="Administracao"
         tone="admin"
-        title="Configuracoes"
-        description="Central administrativa para usuarios, auditoria, parametros, seguranca e regras do sistema."
-        breadcrumbs={[{ label: 'Inicio', href: '/' }, { label: 'Configuracoes' }]}
+        title="Configurações"
+        description="Central administrativa para usuários, auditoria, parametros, seguranca e regras do sistema."
+        breadcrumbs={[{ label: 'Início', href: '/' }, { label: 'Configurações' }]}
         actions={
           <Button asChild variant="outline">
             <Link href="/audit">
@@ -327,8 +327,8 @@ export default function SettingsPage() {
 
       {query.isError && (
         <SectionCard
-          title="Configuracoes em modo seguro"
-          description="Nao foi possivel carregar os dados administrativos agora. A tela continua disponivel com listas vazias para evitar carregamento infinito."
+          title="Configurações em modo seguro"
+          description="Não foi possível carregar os dados administrativos agora. A tela continua disponível com listas vazias para evitar carregamento infinito."
           className="mb-6 border-status-yellow/30"
           actions={
             <Button variant="outline" onClick={() => query.refetch()}>
@@ -337,7 +337,7 @@ export default function SettingsPage() {
           }
         >
           <div className="rounded-lg border border-status-yellow/30 bg-status-yellow/10 p-4 text-sm text-muted-foreground">
-            {(query.error as Error)?.message ?? 'Falha ao carregar configuracoes.'}
+            {(query.error as Error)?.message ?? 'Falha ao carregar configurações.'}
           </div>
         </SectionCard>
       )}
@@ -398,13 +398,13 @@ export default function SettingsPage() {
 
       {active === 'users' && (
         <SectionCard
-          title="Usuarios"
-          description="Usuarios cadastrados, status, ultimo acesso e atalhos para cadastro completo."
+          title="Usuários"
+          description="Usuários cadastrados, status, último acesso e atalhos para cadastro completo."
           actions={
             <Button asChild>
               <Link href="/users">
                 <Plus className="mr-2 h-4 w-4" />
-                Novo usuario
+                Novo usuário
               </Link>
             </Button>
           }
@@ -412,8 +412,8 @@ export default function SettingsPage() {
         >
           <Toolbar search={search} setSearch={setSearch} placeholder="Pesquisar por nome, email, perfil ou status..." />
           <DataTable
-            headers={['Usuario', 'Perfil', 'Status', 'Ultimo acesso', 'Acoes']}
-            empty="Nenhum usuario encontrado."
+            headers={['Usuário', 'Perfil', 'Status', 'Último acesso', 'Ações']}
+            empty="Nenhum usuário encontrado."
           >
             {filteredUsers.map((user) => (
               <tr key={user.id}>
@@ -436,7 +436,7 @@ export default function SettingsPage() {
       {active === 'audit' && (
         <SectionCard
           title="Auditoria"
-          description="Logs automaticos de acoes, acessos, alteracoes de permissoes e parametrizacoes."
+          description="Logs automaticos de ações, acessos, alterações de permissões e parametrizacoes."
           actions={
             <div className="flex gap-2">
               <Button asChild variant="outline" size="sm">
@@ -451,7 +451,7 @@ export default function SettingsPage() {
         >
           <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
             <SummaryTile label="Eventos registrados" value={formatNumber(data?.auditCount)} icon={<ScrollText className="h-4 w-4" />} />
-            <SummaryTile label="Usuarios monitorados" value={formatNumber(data?.users.length)} icon={<UsersRound className="h-4 w-4" />} />
+            <SummaryTile label="Usuários monitorados" value={formatNumber(data?.users.length)} icon={<UsersRound className="h-4 w-4" />} />
             <SummaryTile label="Parametros auditaveis" value={formatNumber(allItems.length)} icon={<SlidersHorizontal className="h-4 w-4" />} />
           </div>
         </SectionCard>
@@ -482,7 +482,7 @@ export default function SettingsPage() {
           </div>
 
           {paramView === 'companies' && (
-            <DataTable headers={['Empresa', 'CNPJ', 'Filiais', 'Status', 'Atualizado', 'Acoes']} empty="Nenhuma empresa cadastrada.">
+            <DataTable headers={['Empresa', 'CNPJ', 'Filiais', 'Status', 'Atualizado', 'Ações']} empty="Nenhuma empresa cadastrada.">
               {data?.companies.map((company) => (
                 <tr key={company.id}>
                   <td>
@@ -500,7 +500,7 @@ export default function SettingsPage() {
           )}
 
           {paramView === 'branches' && (
-            <DataTable headers={['Filial', 'Codigo', 'Localizacao', 'Status', 'Atualizado', 'Acoes']} empty="Nenhuma filial cadastrada.">
+            <DataTable headers={['Filial', 'Código', 'Localizacao', 'Status', 'Atualizado', 'Ações']} empty="Nenhuma filial cadastrada.">
               {data?.branches.map((branch) => (
                 <tr key={branch.id}>
                   <td className="font-medium">{branch.name}</td>
@@ -515,7 +515,7 @@ export default function SettingsPage() {
           )}
 
           {paramView === 'structure' && (
-            <DataTable headers={['Estrutura', 'Tipo', 'Responsavel', 'Indicadores', 'Status', 'Acoes']} empty="Nenhum no estrutural cadastrado.">
+            <DataTable headers={['Estrutura', 'Tipo', 'Responsável', 'Indicadores', 'Status', 'Ações']} empty="Nenhum no estrutural cadastrado.">
               {data?.orgNodes.map((node) => (
                 <tr key={node.id}>
                   <td>
@@ -533,7 +533,7 @@ export default function SettingsPage() {
           )}
 
           {paramView === 'categories' && (
-            <DataTable headers={['Categoria', 'Modulo', 'Itens', 'Status', 'Sistema', 'Acoes']} empty="Nenhuma categoria cadastrada.">
+            <DataTable headers={['Categoria', 'Módulo', 'Itens', 'Status', 'Sistema', 'Ações']} empty="Nenhuma categoria cadastrada.">
               {data?.categories.map((category) => (
                 <tr key={category.id}>
                   <td>
@@ -543,7 +543,7 @@ export default function SettingsPage() {
                   <td>{category.module ?? '-'}</td>
                   <td>{category.items.length}</td>
                   <td><StatusPill status={category.status} /></td>
-                  <td>{category.system ? 'Sim' : 'Nao'}</td>
+                  <td>{category.system ? 'Sim' : 'Não'}</td>
                   <RowActions onEdit={() => setDialog({ type: 'category', record: category })} onDelete={() => confirmDelete('category', category.id)} />
                 </tr>
               ))}
@@ -552,8 +552,8 @@ export default function SettingsPage() {
 
           {paramView === 'items' && (
             <>
-              <Toolbar search={search} setSearch={setSearch} placeholder="Pesquisar item, codigo, categoria ou modulo..." />
-              <DataTable headers={['Parametro', 'Categoria', 'Descricao', 'Status', 'Atualizado', 'Acoes']} empty="Nenhum item encontrado.">
+              <Toolbar search={search} setSearch={setSearch} placeholder="Pesquisar item, código, categoria ou módulo..." />
+              <DataTable headers={['Parametro', 'Categoria', 'Descrição', 'Status', 'Atualizado', 'Ações']} empty="Nenhum item encontrado.">
                 {allItems
                   .filter((item) => [item.name, item.code, item.category.name, item.category.module ?? ''].join(' ').toLowerCase().includes(search.toLowerCase()))
                   .map((item) => (
@@ -578,11 +578,11 @@ export default function SettingsPage() {
       {active === 'security' && (
         <SectionCard
           title="Seguranca"
-          description="Perfis administraveis e permissoes por modulo salvas no banco de dados."
+          description="Perfis administraveis e permissões por módulo salvas no banco de dados."
           actions={<Button onClick={() => setDialog({ type: 'profile' })}><Plus className="mr-2 h-4 w-4" />Novo perfil</Button>}
           contentClassName="p-0"
         >
-          <DataTable headers={['Perfil', 'Papel base', 'Permissoes', 'Usuarios', 'Status', 'Acoes']} empty="Nenhum perfil cadastrado.">
+          <DataTable headers={['Perfil', 'Papel base', 'Permissões', 'Usuários', 'Status', 'Ações']} empty="Nenhum perfil cadastrado.">
             {data?.profiles.map((profile) => (
               <tr key={profile.id}>
                 <td>
@@ -603,11 +603,11 @@ export default function SettingsPage() {
       {active === 'system' && (
         <SectionCard
           title="Sistema"
-          description="Regras globais, notificacoes, aprovacoes e preferencias da plataforma."
+          description="Regras globais, notificações, aprovações e preferencias da plataforma."
           actions={<Button onClick={() => setDialog({ type: 'setting' })}><Plus className="mr-2 h-4 w-4" />Novo parametro</Button>}
           contentClassName="p-0"
         >
-          <DataTable headers={['Chave', 'Grupo', 'Valor', 'Tipo', 'Status', 'Acoes']} empty="Nenhum parametro de sistema cadastrado.">
+          <DataTable headers={['Chave', 'Grupo', 'Valor', 'Tipo', 'Status', 'Ações']} empty="Nenhum parametro de sistema cadastrado.">
             {data?.settings.map((setting) => (
               <tr key={setting.id}>
                 <td>
@@ -643,7 +643,7 @@ export default function SettingsPage() {
   );
 
   function confirmDelete(type: string, id: string) {
-    if (window.confirm('Confirma a exclusao logica deste cadastro?')) remove.mutate({ type, id });
+    if (window.confirm('Confirma a exclusão lógica deste cadastro?')) remove.mutate({ type, id });
   }
 }
 
@@ -694,7 +694,7 @@ function DataTable({ headers, children, empty }: { headers: string[]; children: 
         <thead>
           <tr>
             {headers.map((header) => (
-              <th key={header} className={cn('text-left', header === 'Acoes' && 'text-right')}>{header}</th>
+              <th key={header} className={cn('text-left', header === 'Ações' && 'text-right')}>{header}</th>
             ))}
           </tr>
         </thead>
@@ -799,7 +799,7 @@ function AdminDialog({
         <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
           {dialog.type === 'company' && (
             <>
-              <Field label="Razao social" value={form.name} onChange={(name) => setForm({ ...form, name })} required />
+              <Field label="Razão social" value={form.name} onChange={(name) => setForm({ ...form, name })} required />
               <Field label="Nome fantasia" value={form.tradeName} onChange={(tradeName) => setForm({ ...form, tradeName })} />
               <Field label="CNPJ" value={form.cnpj} onChange={(cnpj) => setForm({ ...form, cnpj })} />
               <StatusSelect form={form} setForm={setForm} />
@@ -809,7 +809,7 @@ function AdminDialog({
           {dialog.type === 'branch' && (
             <>
               <Field label="Nome" value={form.name} onChange={(name) => setForm({ ...form, name })} required />
-              <Field label="Codigo" value={form.code} onChange={(code) => setForm({ ...form, code })} />
+              <Field label="Código" value={form.code} onChange={(code) => setForm({ ...form, code })} />
               <Field label="Cidade" value={form.city} onChange={(city) => setForm({ ...form, city })} />
               <Field label="Estado" value={form.state} onChange={(state) => setForm({ ...form, state })} />
               <StatusSelect form={form} setForm={setForm} />
@@ -818,11 +818,11 @@ function AdminDialog({
 
           {dialog.type === 'category' && (
             <>
-              <Field label="Codigo" value={form.code} onChange={(code) => setForm({ ...form, code })} required />
+              <Field label="Código" value={form.code} onChange={(code) => setForm({ ...form, code })} required />
               <Field label="Nome" value={form.name} onChange={(name) => setForm({ ...form, name })} required />
-              <Field label="Modulo" value={form.module} onChange={(module) => setForm({ ...form, module })} />
+              <Field label="Módulo" value={form.module} onChange={(module) => setForm({ ...form, module })} />
               <StatusSelect form={form} setForm={setForm} />
-              <div className="md:col-span-2"><TextField label="Descricao" value={form.description} onChange={(description) => setForm({ ...form, description })} /></div>
+              <div className="md:col-span-2"><TextField label="Descrição" value={form.description} onChange={(description) => setForm({ ...form, description })} /></div>
             </>
           )}
 
@@ -834,16 +834,16 @@ function AdminDialog({
                   {data?.categories.map((category) => <option key={category.id} value={category.id}>{category.name}</option>)}
                 </NativeSelect>
               </div>
-              <Field label="Codigo" value={form.code} onChange={(code) => setForm({ ...form, code })} required />
+              <Field label="Código" value={form.code} onChange={(code) => setForm({ ...form, code })} required />
               <Field label="Nome" value={form.name} onChange={(name) => setForm({ ...form, name })} required />
               <StatusSelect form={form} setForm={setForm} />
-              <div className="md:col-span-2"><TextField label="Descricao" value={form.description} onChange={(description) => setForm({ ...form, description })} /></div>
+              <div className="md:col-span-2"><TextField label="Descrição" value={form.description} onChange={(description) => setForm({ ...form, description })} /></div>
             </>
           )}
 
           {dialog.type === 'profile' && (
             <>
-              <Field label="Codigo" value={form.code} onChange={(code) => setForm({ ...form, code })} required />
+              <Field label="Código" value={form.code} onChange={(code) => setForm({ ...form, code })} required />
               <Field label="Nome" value={form.name} onChange={(name) => setForm({ ...form, name })} required />
               <div>
                 <Label>Papel base</Label>
@@ -852,9 +852,9 @@ function AdminDialog({
                 </NativeSelect>
               </div>
               <StatusSelect form={form} setForm={setForm} />
-              <div className="md:col-span-2"><TextField label="Descricao" value={form.description} onChange={(description) => setForm({ ...form, description })} /></div>
+              <div className="md:col-span-2"><TextField label="Descrição" value={form.description} onChange={(description) => setForm({ ...form, description })} /></div>
               <div className="md:col-span-2 max-h-80 overflow-y-auto rounded-lg border p-3">
-                <div className="mb-3 text-sm font-semibold">Permissoes por modulo</div>
+                <div className="mb-3 text-sm font-semibold">Permissões por módulo</div>
                 <div className="grid grid-cols-1 gap-2 md:grid-cols-2">
                   {data?.permissions.map((permission) => {
                     const checked = form.permissionKeys.includes(permission.key);
@@ -893,13 +893,13 @@ function AdminDialog({
                 <Label>Tipo</Label>
                 <NativeSelect value={form.valueType} onChange={(e) => setForm({ ...form, valueType: e.target.value })}>
                   <option value="text">Texto</option>
-                  <option value="number">Numero</option>
+                  <option value="number">Número</option>
                   <option value="boolean">Booleano</option>
                   <option value="json">JSON</option>
                 </NativeSelect>
               </div>
               <StatusSelect form={form} setForm={setForm} />
-              <div className="md:col-span-2"><TextField label="Descricao" value={form.description} onChange={(description) => setForm({ ...form, description })} /></div>
+              <div className="md:col-span-2"><TextField label="Descrição" value={form.description} onChange={(description) => setForm({ ...form, description })} /></div>
             </>
           )}
         </div>

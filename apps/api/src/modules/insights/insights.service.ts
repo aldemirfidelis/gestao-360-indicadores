@@ -20,24 +20,24 @@ const CAUSE_LIBRARY: Record<string, string[]> = {
   default: [
     'Variabilidade do processo nao controlada',
     'Falta de procedimento padronizado',
-    'Equipe sub-dimensionada para o periodo',
+    'Equipe sub-dimensionada para o período',
     'Demanda atipica acima do plano',
   ],
   HR: ['Clima organizacional impactado', 'Concorrencia regional por mao de obra'],
   SAFETY: ['Reciclagem de NRs em atraso', 'Equipamento de protecao individual nao padronizado'],
-  PRODUCTION: ['Manutencao corretiva acima da media', 'Materia-prima fora de especificacao'],
+  PRODUCTION: ['Manutenção corretiva acima da media', 'Materia-prima fora de especificacao'],
   QUALITY: ['Calibracao de instrumentos em atraso', 'Treinamento de inspetores defasado'],
 };
 
 const ACTION_LIBRARY: Record<string, string[]> = {
   default: [
-    'Abrir analise FCA com a equipe responsavel',
-    'Revisar procedimento operacional padrao',
-    'Definir plano de comunicacao semanal',
+    'Abrir análise FCA com a equipe responsável',
+    'Revisar procedimento operacional padrão',
+    'Definir plano de comunicação semanal',
   ],
   HR: ['Programa de retencao para os 6 meses iniciais', 'Realizar pesquisa de clima focal'],
-  SAFETY: ['Reforcar DSS - dialogo diario de seguranca', 'Auditoria comportamental nas frentes criticas'],
-  PRODUCTION: ['Revisar plano de manutencao preventiva', 'Bloquear materia-prima fora de spec'],
+  SAFETY: ['Reforcar DSS - dialogo diário de seguranca', 'Auditoria comportamental nas frentes críticas'],
+  PRODUCTION: ['Revisar plano de manutenção preventiva', 'Bloquear materia-prima fora de spec'],
   QUALITY: ['Cronograma de calibracao trimestral', 'Reciclagem dos inspetores'],
 };
 
@@ -52,15 +52,15 @@ export class InsightsService {
     const summary = await this.executiveSummary(companyId);
     out.push(summary);
 
-    // 2) Indicadores em tendencia de piora
+    // 2) Indicadores em tendência de piora
     const worsening = await this.worsening(companyId);
     out.push(...worsening);
 
-    // 3) Sugestoes de causa para desvios abertos
+    // 3) Sugestões de causa para desvios abertos
     const causes = await this.causeSuggestions(companyId);
     out.push(...causes);
 
-    // 4) Sugestoes de acao para indicadores vermelhos
+    // 4) Sugestões de ação para indicadores vermelhos
     const actions = await this.actionSuggestions(companyId);
     out.push(...actions);
 
@@ -97,13 +97,13 @@ export class InsightsService {
     return {
       id: 'summary',
       kind: 'EXECUTIVE_SUMMARY',
-      title: 'Resumo executivo do periodo',
+      title: 'Resumo executivo do período',
       body:
-        `Do total de ${total} indicadores ativos, ${greenRate}% estao no verde, ${counts.YELLOW ?? 0} em atencao e ${counts.RED ?? 0} criticos. ` +
-        `Existem ${overdue} acoes atrasadas e ${criticalDev} desvios criticos abertos. ` +
+        `Do total de ${total} indicadores ativos, ${greenRate}% estão no verde, ${counts.YELLOW ?? 0} em atenção e ${counts.RED ?? 0} críticos. ` +
+        `Existem ${overdue} ações atrasadas e ${criticalDev} desvios críticos abertos. ` +
         (greenRate >= 70
           ? 'O cenario geral e positivo, mantenha cadencia nas revisoes.'
-          : 'Prioridade: atacar os indicadores criticos e destravar acoes atrasadas nas proximas reunioes.'),
+          : 'Prioridade: atacar os indicadores críticos e destravar ações atrasadas nas próximas reuniões.'),
       severity: greenRate >= 70 ? 'info' : counts.RED ?? 0 > 3 ? 'critical' : 'warning',
     };
   }
@@ -123,13 +123,13 @@ export class InsightsService {
       if (i.results.length < 3) continue;
       const [c, b, a] = i.results; // c=mais recente, a=mais antigo
       if (a.attainment === null || b.attainment === null || c.attainment === null) continue;
-      // tendencia de piora se 3 valores em declinio
+      // tendência de piora se 3 valores em declinio
       if (a.attainment > b.attainment && b.attainment > c.attainment && a.attainment - c.attainment > 0.05) {
         out.push({
           id: `worsen-${i.id}`,
           kind: 'WORSENING_TREND',
-          title: `Tendencia de piora: ${i.name}`,
-          body: `O atingimento caiu de ${pct(a.attainment)} para ${pct(c.attainment)} nos ultimos 3 periodos. Avalie causas estruturais.`,
+          title: `Tendência de piora: ${i.name}`,
+          body: `O atingimento caiu de ${pct(a.attainment)} para ${pct(c.attainment)} nos últimos 3 períodos. Avalie causas estruturais.`,
           refs: [{ type: 'indicator', id: i.id, label: i.name }],
           severity: 'warning',
         });
@@ -158,7 +158,7 @@ export class InsightsService {
         return {
           id: `cause-${d.id}`,
           kind: 'CAUSE_SUGGESTION',
-          title: `Sugestao de causas: desvio #${d.number}`,
+          title: `Sugestão de causas: desvio #${d.number}`,
           body: `Considere as seguintes hipoteses para "${d.indicator.name}":\n- ${lib.slice(0, 3).join('\n- ')}`,
           refs: [{ type: 'deviation', id: d.id, label: `#${d.number}` }],
           severity: 'info',
@@ -179,7 +179,7 @@ export class InsightsService {
       return {
         id: `action-${r.indicator.id}`,
         kind: 'ACTION_SUGGESTION',
-        title: `Acoes recomendadas: ${r.indicator.name}`,
+        title: `Ações recomendadas: ${r.indicator.name}`,
         body: `Como o indicador esta no vermelho (${pct(r.attainment ?? 0)}), avalie:\n- ${lib.slice(0, 3).join('\n- ')}`,
         refs: [{ type: 'indicator', id: r.indicator.id, label: r.indicator.name }],
         severity: 'critical',

@@ -58,7 +58,7 @@ export default function MeetingsPage() {
   const create = useMutation({
     mutationFn: () => api('/meetings', { method: 'POST', json: form }),
     onSuccess: () => {
-      toast.success('Reuniao criada');
+      toast.success('Reunião criada');
       setOpen(false);
       setForm({ title: '', kind: 'INDICATORS', startsAt: new Date().toISOString().slice(0, 16), location: '' });
       qc.invalidateQueries({ queryKey: ['meetings'] });
@@ -68,11 +68,11 @@ export default function MeetingsPage() {
   return (
     <div>
       <PageHeader
-        title="Reunioes de Gestao"
-        description="Pauta, decisoes e acoes geradas em cada encontro."
+        title="Reuniões de Gestão"
+        description="Pauta, decisões e ações geradas em cada encontro."
         actions={
           <Button onClick={() => setOpen(true)}>
-            <Plus className="h-4 w-4 mr-2" /> Nova reuniao
+            <Plus className="h-4 w-4 mr-2" /> Nova reunião
           </Button>
         }
       />
@@ -103,7 +103,7 @@ export default function MeetingsPage() {
                     <div className="text-foreground">{m._count.agendaItems}</div>
                   </div>
                   <div>
-                    <div className="text-[10px] uppercase">Decisoes</div>
+                    <div className="text-[10px] uppercase">Decisões</div>
                     <div className="text-foreground">{m._count.decisions}</div>
                   </div>
                 </div>
@@ -114,7 +114,7 @@ export default function MeetingsPage() {
         {!query.isLoading && query.data?.length === 0 && (
           <Card className="lg:col-span-2">
             <CardContent className="py-10 text-center text-sm text-muted-foreground">
-              Nenhuma reuniao registrada.
+              Nenhuma reunião registrada.
             </CardContent>
           </Card>
         )}
@@ -123,11 +123,11 @@ export default function MeetingsPage() {
       <Dialog open={open} onOpenChange={setOpen}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>Nova reuniao</DialogTitle>
+            <DialogTitle>Nova reunião</DialogTitle>
           </DialogHeader>
           <div className="space-y-3">
             <div>
-              <Label>Titulo</Label>
+              <Label>Título</Label>
               <Input value={form.title} onChange={(e) => setForm({ ...form, title: e.target.value })} />
             </div>
             <div>

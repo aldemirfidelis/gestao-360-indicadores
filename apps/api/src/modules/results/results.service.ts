@@ -32,11 +32,11 @@ export class ResultsService {
   ) {}
 
   /**
-   * Lista lancamentos pendentes/preenchidos para um conjunto de indicadores,
-   * agrupados por periodo. Quando `year` esta definido (caso padrao), lista
-   * todos os periodos daquele ano civil para a periodicidade do indicador.
-   * Quando `points` esta definido, lista apenas os N periodos mais recentes
-   * (compativel com a versao antiga).
+   * Lista lançamentos pendentes/preenchidos para um conjunto de indicadores,
+   * agrupados por período. Quando `year` esta definido (caso padrão), lista
+   * todos os períodos daquele ano civil para a periodicidade do indicador.
+   * Quando `points` esta definido, lista apenas os N períodos mais recentes
+   * (compatível com a versão antiga).
    */
   async pendingByCompany(
     companyId: string,
@@ -125,7 +125,7 @@ export class ResultsService {
 
     if (await this.closedMonths.isMonthClosed(indicator.companyId, input.periodRef)) {
       throw new ConflictException(
-        `O periodo ${input.periodRef} esta fechado para lancamentos. Solicite a reabertura ao administrador.`,
+        `O período ${input.periodRef} esta fechado para lançamentos. Solicite a reabertura ao administrador.`,
       );
     }
 
@@ -230,8 +230,8 @@ export class ResultsService {
         entityId: indicator.id,
         relatedType: TraceEntityType.INDICATOR_RESULT,
         relatedId: result.id,
-        title: 'Tratativa automatica iniciada',
-        description: `O indicador ficou fora da meta no periodo ${input.periodRef}.`,
+        title: 'Tratativa automática iniciada',
+        description: `O indicador ficou fora da meta no período ${input.periodRef}.`,
         statusTo: treatment.status,
         metadata: { treatmentId: treatment.id, periodRef: input.periodRef, target: target?.target ?? null, value: input.value },
       });

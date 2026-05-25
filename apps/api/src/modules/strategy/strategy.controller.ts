@@ -129,13 +129,13 @@ export class StrategyController {
   @Post('objectives/:objId/orgnodes/:orgNodeId')
   @RequirePermissions('strategy:objectives:update')
   attachOrgNode(@CurrentUser() me: AuthPayload, @Param('objId') objId: string, @Param('orgNodeId') orgNodeId: string, @Body() body: { kind?: string }) {
-    return this.service.attachOrgNode(me, objId, orgNodeId, body.kind ?? 'responsavel');
+    return this.service.attachOrgNode(me, objId, orgNodeId, body.kind ?? 'responsável');
   }
 
   @Delete('objectives/:objId/orgnodes/:orgNodeId')
   @RequirePermissions('strategy:objectives:update')
   detachOrgNode(@CurrentUser() me: AuthPayload, @Param('objId') objId: string, @Param('orgNodeId') orgNodeId: string, @Query('kind') kind?: string) {
-    return this.service.detachOrgNode(me, objId, orgNodeId, kind ?? 'responsavel');
+    return this.service.detachOrgNode(me, objId, orgNodeId, kind ?? 'responsável');
   }
 
   @Get('maps/:id/versions')

@@ -12,7 +12,7 @@ export function MobileNav() {
   const items = visibleMobileItems(user);
 
   return (
-    <nav className="fixed inset-x-0 bottom-0 z-40 border-t bg-card/96 px-2 pb-[env(safe-area-inset-bottom)] shadow-lg backdrop-blur lg:hidden">
+    <nav className="fixed inset-x-0 bottom-0 z-40 border-t bg-card/96 px-2 pb-[env(safe-área-inset-bottom)] shadow-lg backdrop-blur lg:hidden">
       <div className="grid h-16" style={{ gridTemplateColumns: `repeat(${Math.max(items.length, 1)}, minmax(0, 1fr))` }}>
         {items.map((item) => {
           const Icon = item.icon;

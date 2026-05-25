@@ -21,7 +21,7 @@ const priorityLabel: Record<string, string> = {
   LOW: 'Baixa',
   MEDIUM: 'Media',
   HIGH: 'Alta',
-  CRITICAL: 'Critica',
+  CRITICAL: 'Crítica',
 };
 
 const priorityTone: Record<string, string> = {
@@ -52,7 +52,7 @@ export function ActionPlanCard({ action, href = true }: { action: ActionPlanCard
       <div className="mt-4 space-y-1.5 text-xs text-muted-foreground">
         <div className="flex items-center gap-2">
           <UserRound className="h-3.5 w-3.5" />
-          <span className="truncate">{action.responsibleUser?.name ?? 'Sem responsavel'}</span>
+          <span className="truncate">{action.responsibleUser?.name ?? 'Sem responsável'}</span>
         </div>
         <div className={cn('flex items-center gap-2', isOverdue && 'font-medium text-status-red')}>
           <CalendarClock className="h-3.5 w-3.5" />
@@ -78,12 +78,12 @@ export function ActionPlanCard({ action, href = true }: { action: ActionPlanCard
 function statusLabel(status: string) {
   const map: Record<string, string> = {
     DRAFT: 'Rascunho',
-    NOT_STARTED: 'Nao iniciada',
-    UNDER_ANALYSIS: 'Em analise',
+    NOT_STARTED: 'Não iniciada',
+    UNDER_ANALYSIS: 'Em análise',
     IN_PROGRESS: 'Em andamento',
     WAITING_THIRD: 'Aguardando',
     WAITING_EVIDENCE: 'Aguardando evidencia',
-    WAITING_VALIDATION: 'Aguardando validacao',
+    WAITING_VALIDATION: 'Aguardando validação',
     PAUSED: 'Pausada',
     DONE: 'Concluida',
     DONE_LATE: 'Concluida tarde',

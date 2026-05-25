@@ -107,10 +107,10 @@ export default function VisualizationPage() {
   return (
     <div>
       <PageHeader
-        eyebrow="Visualizacao"
+        eyebrow="Visualização"
         tone="view"
-        title="Dashboard Executivo Gestao 360"
-        description="Panorama de desempenho, farois, planos de acao, rankings e alertas para tomada de decisao."
+        title="Dashboard Executivo Gestão 360"
+        description="Panorama de desempenho, farois, planos de ação, rankings e alertas para tomada de decisão."
         actions={
           <>
             <Button variant="outline" asChild>
@@ -127,7 +127,7 @@ export default function VisualizationPage() {
             </Button>
           </>
         }
-        breadcrumbs={[{ label: 'Inicio', href: '/' }, { label: 'Visualizacao' }]}
+        breadcrumbs={[{ label: 'Início', href: '/' }, { label: 'Visualização' }]}
       />
 
       <div className="mb-6 grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
@@ -183,9 +183,9 @@ export default function VisualizationPage() {
           </div>
         </SectionCard>
 
-        <SectionCard title="Indicadores criticos" description="Itens com maior desvio no periodo.">
+        <SectionCard title="Indicadores críticos" description="Itens com maior desvio no período.">
           {worst.data && worst.data.length === 0 && (
-            <EmptyState title="Nenhum indicador critico" description="Os alertas de desempenho aparecem nesta lista." className="border-0 bg-transparent" />
+            <EmptyState title="Nenhum indicador crítico" description="Os alertas de desempenho aparecem nesta lista." className="border-0 bg-transparent" />
           )}
           <div className="space-y-3">
             {worst.data?.map((w) => (
@@ -210,7 +210,7 @@ export default function VisualizationPage() {
       </div>
 
       <div className="mt-6 grid grid-cols-1 gap-6 xl:grid-cols-[1fr,360px]">
-        <SectionCard title="Ranking de areas" description="Atingimento medio por estrutura organizacional.">
+        <SectionCard title="Ranking de áreas" description="Atingimento medio por estrutura organizacional.">
           <div className="h-80">
             <ResponsiveContainer width="100%" height="100%">
               <BarChart data={rankRows} layout="vertical" margin={{ top: 8, right: 16, bottom: 0, left: 12 }}>
@@ -231,9 +231,9 @@ export default function VisualizationPage() {
           <div className="space-y-4">
             {[
               ['GREEN', 'Dentro da meta', ov?.counts.GREEN ?? 0],
-              ['YELLOW', 'Atencao', ov?.counts.YELLOW ?? 0],
+              ['YELLOW', 'Atenção', ov?.counts.YELLOW ?? 0],
               ['RED', 'Fora da meta', ov?.counts.RED ?? 0],
-              ['GRAY', 'Sem lancamento', ov?.counts.GRAY ?? 0],
+              ['GRAY', 'Sem lançamento', ov?.counts.GRAY ?? 0],
             ].map(([light, label, value]) => (
               <div key={light} className="flex items-center justify-between rounded-lg border p-3">
                 <div className="flex items-center gap-3">

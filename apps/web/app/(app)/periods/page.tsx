@@ -83,7 +83,7 @@ export default function PeriodsPage() {
       toast.success('Ano de trabalho atualizado');
       invalidate();
     },
-    onError: (error: any) => toast.error(error?.message ?? 'Nao foi possivel alterar o periodo'),
+    onError: (error: any) => toast.error(error?.message ?? 'Não foi possível alterar o período'),
   });
 
   const closePeriod = useMutation({
@@ -93,17 +93,17 @@ export default function PeriodsPage() {
       setSelectedId(next.id);
       invalidate();
     },
-    onError: (error: any) => toast.error(error?.message ?? 'Nao foi possivel fechar o periodo'),
+    onError: (error: any) => toast.error(error?.message ?? 'Não foi possível fechar o período'),
   });
 
   const createNext = useMutation({
     mutationFn: () => api<WorkPeriod>('/periods', { method: 'POST', json: { year: nextYear } }),
     onSuccess: (period) => {
-      toast.success(`Periodo ${period.year} criado`);
+      toast.success(`Período ${period.year} criado`);
       setSelectedId(period.id);
       invalidate();
     },
-    onError: (error: any) => toast.error(error?.message ?? 'Nao foi possivel criar o proximo ano'),
+    onError: (error: any) => toast.error(error?.message ?? 'Não foi possível criar o próximo ano'),
   });
 
   const closeMonth = useMutation({
@@ -113,23 +113,23 @@ export default function PeriodsPage() {
         json: { periodRef: newClosedRef.trim(), reason: newClosedReason.trim() || null },
       }),
     onSuccess: () => {
-      toast.success(`Mes ${newClosedRef.trim()} fechado para lancamentos`);
+      toast.success(`Mês ${newClosedRef.trim()} fechado para lançamentos`);
       setNewClosedRef('');
       setNewClosedReason('');
       qc.invalidateQueries({ queryKey: ['closed-months'] });
       qc.invalidateQueries({ queryKey: ['results', 'pending'] });
     },
-    onError: (error: any) => toast.error(error?.message ?? 'Nao foi possivel fechar o mes'),
+    onError: (error: any) => toast.error(error?.message ?? 'Não foi possível fechar o mes'),
   });
 
   const reopenMonth = useMutation({
     mutationFn: (id: string) => api<ClosedMonth>(`/closed-months/${id}`, { method: 'DELETE' }),
     onSuccess: () => {
-      toast.success('Mes reaberto');
+      toast.success('Mês reaberto');
       qc.invalidateQueries({ queryKey: ['closed-months'] });
       qc.invalidateQueries({ queryKey: ['results', 'pending'] });
     },
-    onError: (error: any) => toast.error(error?.message ?? 'Nao foi possivel reabrir o mes'),
+    onError: (error: any) => toast.error(error?.message ?? 'Não foi possível reabrir o mes'),
   });
 
   const handleClose = (period: WorkPeriod) => {
@@ -137,16 +137,16 @@ export default function PeriodsPage() {
     if (confirmed) closePeriod.mutate(period.id);
   };
 
-  if (periods.isLoading) return <LoadingState label="Carregando periodos..." />;
+  if (periods.isLoading) return <LoadingState label="Carregando períodos..." />;
 
   return (
     <div>
       <PageHeader
-        eyebrow="Gestao"
+        eyebrow="Gestão"
         tone="admin"
-        title="Periodos de trabalho"
-        description="Defina o ano vigente para metas, lancamentos, resultados e analises do sistema."
-        breadcrumbs={[{ label: 'Inicio', href: '/' }, { label: 'Gestao' }, { label: 'Periodos' }]}
+        title="Períodos de trabalho"
+        description="Defina o ano vigente para metas, lançamentos, resultados e análises do sistema."
+        breadcrumbs={[{ label: 'Início', href: '/' }, { label: 'Gestão' }, { label: 'Períodos' }]}
       />
 
       <div className="mb-6 grid grid-cols-1 gap-4 lg:grid-cols-4">
@@ -156,20 +156,20 @@ export default function PeriodsPage() {
             <Calendar className="h-4 w-4 text-status-blue" />
           </div>
           <div className="mt-3 text-3xl font-semibold">{current?.year ?? '-'}</div>
-          <div className="mt-1 text-xs text-muted-foreground">{current ? `${formatDate(current.startsAt)} a ${formatDate(current.endsAt)}` : 'Nenhum periodo aberto'}</div>
+          <div className="mt-1 text-xs text-muted-foreground">{current ? `${formatDate(current.startsAt)} a ${formatDate(current.endsAt)}` : 'Nenhum período aberto'}</div>
         </div>
         <div className="rounded-lg border bg-card p-4">
-          <div className="text-sm text-muted-foreground">Periodos cadastrados</div>
+          <div className="text-sm text-muted-foreground">Períodos cadastrados</div>
           <div className="mt-3 text-3xl font-semibold">{ordered.length}</div>
           <div className="mt-1 text-xs text-muted-foreground">A partir de {data?.baseYear ?? 2026}</div>
         </div>
         <div className="rounded-lg border bg-card p-4">
           <div className="text-sm text-muted-foreground">Anos fechados</div>
           <div className="mt-3 text-3xl font-semibold">{ordered.filter((period) => period.status === 'CLOSED').length}</div>
-          <div className="mt-1 text-xs text-muted-foreground">Historico protegido</div>
+          <div className="mt-1 text-xs text-muted-foreground">Histórico protegido</div>
         </div>
         <div className="rounded-lg border bg-card p-4">
-          <div className="text-sm text-muted-foreground">Proximo ano</div>
+          <div className="text-sm text-muted-foreground">Próximo ano</div>
           <div className="mt-3 text-3xl font-semibold">{nextYear}</div>
           <div className="mt-1 text-xs text-muted-foreground">Criado automaticamente ao fechar</div>
         </div>
@@ -178,7 +178,7 @@ export default function PeriodsPage() {
       <div className="grid grid-cols-1 gap-6 xl:grid-cols-[380px,1fr]">
         <SectionCard
           title="Ano de trabalho"
-          description="Escolha o exercicio usado como referencia operacional."
+          description="Escolha o exercício usado como referência operacional."
           actions={
             <Button variant="outline" size="sm" onClick={() => periods.refetch()} disabled={periods.isFetching}>
               <RefreshCw className="mr-2 h-4 w-4" />
@@ -186,7 +186,7 @@ export default function PeriodsPage() {
             </Button>
           }
         >
-          {ordered.length === 0 && <EmptyState title="Nenhum periodo cadastrado" description="O sistema cria 2026 automaticamente no primeiro carregamento." />}
+          {ordered.length === 0 && <EmptyState title="Nenhum período cadastrado" description="O sistema cria 2026 automaticamente no primeiro carregamento." />}
           {ordered.length > 0 && (
             <div className="space-y-4">
               <NativeSelect value={selected?.id ?? ''} onChange={(event) => setSelectedId(event.target.value)}>
@@ -209,7 +209,7 @@ export default function PeriodsPage() {
                     <PeriodBadge period={selected} />
                   </div>
                   <div className="mt-4 grid grid-cols-2 gap-3 text-sm">
-                    <Info label="Inicio" value={formatDate(selected.startsAt)} />
+                    <Info label="Início" value={formatDate(selected.startsAt)} />
                     <Info label="Fim" value={formatDate(selected.endsAt)} />
                     <Info label="Status" value={selected.isCurrent ? 'Vigente' : statusLabel[selected.status]} />
                     <Info label="Fechado em" value={formatDate(selected.closedAt)} />
@@ -240,7 +240,7 @@ export default function PeriodsPage() {
 
         <SectionCard
           title="Calendario anual"
-          description="Cada periodo anual sempre cobre 01/01 a 31/12 do respectivo ano."
+          description="Cada período anual sempre cobre 01/01 a 31/12 do respectivo ano."
           actions={
             <Button variant="outline" size="sm" onClick={() => createNext.mutate()} disabled={createNext.isPending}>
               <Plus className="mr-2 h-4 w-4" />
@@ -254,10 +254,10 @@ export default function PeriodsPage() {
               <thead className="bg-muted/50 text-xs uppercase text-muted-foreground">
                 <tr>
                   <th className="px-4 py-3 text-left">Ano</th>
-                  <th className="px-4 py-3 text-left">Inicio</th>
+                  <th className="px-4 py-3 text-left">Início</th>
                   <th className="px-4 py-3 text-left">Fim</th>
                   <th className="px-4 py-3 text-left">Status</th>
-                  <th className="px-4 py-3 text-right">Acoes</th>
+                  <th className="px-4 py-3 text-right">Ações</th>
                 </tr>
               </thead>
               <tbody>
@@ -297,12 +297,12 @@ export default function PeriodsPage() {
 
       <div className="mt-6">
         <SectionCard
-          title="Bloqueio de lancamento por mes"
-          description="Mes fechado impede o lancamento ou alteracao de realizado por todas as areas. Reabertura sempre disponivel ao admin."
+          title="Bloqueio de lançamento por mes"
+          description="Mês fechado impede o lançamento ou alteração de realizado por todas as áreas. Reabertura sempre disponível ao admin."
         >
           <div className="grid gap-4 md:grid-cols-[1fr,1fr,auto]">
             <div>
-              <label className="text-xs font-semibold uppercase text-muted-foreground">Periodo (YYYY-MM)</label>
+              <label className="text-xs font-semibold uppercase text-muted-foreground">Período (YYYY-MM)</label>
               <input
                 value={newClosedRef}
                 onChange={(e) => setNewClosedRef(e.target.value)}
@@ -315,7 +315,7 @@ export default function PeriodsPage() {
               <input
                 value={newClosedReason}
                 onChange={(e) => setNewClosedReason(e.target.value)}
-                placeholder="Ex.: fechamento contabil"
+                placeholder="Ex.: fechamento contábil"
                 className="mt-1 h-9 w-full rounded-md border bg-background px-3 text-sm"
               />
             </div>
@@ -334,12 +334,12 @@ export default function PeriodsPage() {
             <table className="w-full text-sm">
               <thead className="bg-muted/50 text-xs uppercase text-muted-foreground">
                 <tr>
-                  <th className="px-4 py-3 text-left">Periodo</th>
+                  <th className="px-4 py-3 text-left">Período</th>
                   <th className="px-4 py-3 text-left">Status</th>
                   <th className="px-4 py-3 text-left">Motivo</th>
                   <th className="px-4 py-3 text-left">Fechado por</th>
                   <th className="px-4 py-3 text-left">Reaberto por</th>
-                  <th className="px-4 py-3 text-right">Acoes</th>
+                  <th className="px-4 py-3 text-right">Ações</th>
                 </tr>
               </thead>
               <tbody>

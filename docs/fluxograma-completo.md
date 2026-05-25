@@ -1,8 +1,8 @@
-# Fluxograma completo da aplicacao
+# Fluxograma completo da aplicação
 
-Documentacao visual do projeto **Gestao 360 Indicadores**, criada para usuarios, gestores e equipes tecnicas entenderem o caminho completo da aplicacao: da configuracao inicial ao acompanhamento executivo, tratamento de desvios, planos de acao, reunioes, importacoes, relatorios, notificacoes e auditoria.
+Documentação visual do projeto **Gestão 360 Indicadores**, criada para usuários, gestores e equipes técnicas entenderem o caminho completo da aplicação: da configuração inicial ao acompanhamento executivo, tratamento de desvios, planos de ação, reuniões, importações, relatorios, notificações e auditoria.
 
-Esta documentacao foi montada a partir do `README.md`, schema Prisma, controllers/services do backend NestJS e rotas do frontend Next.js.
+Está documentação foi montada a partir do `README.md`, schema Prisma, controllers/services do backend NestJS e rotas do frontend Next.js.
 
 Arquivo para abrir no navegador: [fluxograma-completo.html](./fluxograma-completo.html)
 
@@ -10,21 +10,21 @@ Arquivo para abrir no navegador: [fluxograma-completo.html](./fluxograma-complet
 
 | Simbolo | Significado |
 | --- | --- |
-| Caixa azul | Tela, modulo ou etapa acessada pelo usuario |
-| Caixa verde | Regra de negocio automatica |
-| Caixa amarela | Decisao, alerta ou ponto de atencao |
-| Caixa vermelha | Risco, pendencia, atraso ou desvio |
+| Caixa azul | Tela, módulo ou etapa acessada pelo usuário |
+| Caixa verde | Regra de negócio automática |
+| Caixa amarela | Decisão, alerta ou ponto de atenção |
+| Caixa vermelha | Risco, pendência, atraso ou desvio |
 | Banco | Persistencia via Prisma/PostgreSQL |
 
-## 1. Visao geral da arquitetura
+## 1. Visão geral da arquitetura
 
 ```mermaid
 flowchart LR
-  U["Usuario / Gestor"] --> W["Frontend Next.js 14<br/>apps/web"]
+  U["Usuário / Gestor"] --> W["Frontend Next.js 14<br/>apps/web"]
   W --> A["Cliente API<br/>lib/api.ts"]
   A -->|Bearer JWT| B["Backend NestJS<br/>apps/api"]
   B --> G["Guards globais<br/>JWT + Roles + Throttler"]
-  G --> M["Modulos de negocio<br/>auth, indicadores, resultados,<br/>desvios, acoes, dashboard..."]
+  G --> M["Módulos de negócio<br/>auth, indicadores, resultados,<br/>desvios, ações, dashboard..."]
   M --> P["Prisma Service"]
   P --> DB[("PostgreSQL<br/>41 entidades")]
   M --> S["Package compartilhado<br/>packages/shared"]
@@ -48,42 +48,42 @@ flowchart LR
 
 ### Item por item
 
-1. O usuario acessa o **frontend Next.js** em `apps/web`.
+1. O usuário acessa o **frontend Next.js** em `apps/web`.
 2. O frontend usa `apps/web/lib/api.ts` para chamar a API. Esse cliente adiciona `Authorization: Bearer <token>` e tenta renovar o access token automaticamente quando recebe `401`.
-3. O backend NestJS roda com prefixo global `/api`, aplica `helmet`, CORS configuravel, `ValidationPipe`, filtro global de excecoes e limite de requisicoes com `Throttler`.
+3. O backend NestJS roda com prefixo global `/api`, aplica `helmet`, CORS configuravel, `ValidationPipe`, filtro global de exceções e limite de requisicoes com `Throttler`.
 4. O `AuthModule` registra guards globais: JWT para proteger rotas e `RolesGuard` para endpoints com restricao de perfil.
-5. Os modulos de negocio acessam o banco via `PrismaService`.
-6. O banco modelado no Prisma e PostgreSQL possui 41 entidades, com `companyId` nas entidades de negocio para multiempresa.
+5. Os módulos de negócio acessam o banco via `PrismaService`.
+6. O banco modelado no Prisma e PostgreSQL possui 41 entidades, com `companyId` nas entidades de negócio para multiempresa.
 7. O pacote `@g360/shared` concentra enums, schemas Zod e a regra `calcStatus`, usada por backend e frontend.
-8. Redis/BullMQ estao instalados na stack, mas o fluxo atual de notificacoes e manual via `POST /notifications/generate`.
-9. Em producao, o projeto esta preparado para Docker e DigitalOcean App Platform, com banco Neon Postgres.
+8. Redis/BullMQ estão instalados na stack, mas o fluxo atual de notificações e manual via `POST /notifications/generate`.
+9. Em produção, o projeto esta preparado para Docker e DigitalOcean App Platform, com banco Neon Postgres.
 
 ## 2. Jornada ponta a ponta do sistema
 
 ```mermaid
 flowchart TD
-  A["Inicio<br/>Setup local ou deploy"] --> B["Criar/semear empresa,<br/>filiais, usuarios e permissoes"]
-  B --> C["Login do usuario<br/>/login"]
+  A["Início<br/>Setup local ou deploy"] --> B["Criar/semear empresa,<br/>filiais, usuários e permissões"]
+  B --> C["Login do usuário<br/>/login"]
   C --> D{"Credenciais validas?"}
-  D -- "Nao" --> C1["Exibe erro<br/>na tela de login"]
+  D -- "Não" --> C1["Exibe erro<br/>na tela de login"]
   D -- "Sim" --> E["API gera access token,<br/>refresh token e log de auditoria"]
   E --> F["Dashboard executivo<br/>/"]
-  F --> G["Configurar base corporativa<br/>Empresa, filiais, estrutura, usuarios"]
-  G --> H["Definir estrategia<br/>Mapa BSC e OKRs"]
-  H --> I["Cadastrar indicadores,<br/>metas e arvore de influencia"]
-  I --> J["Lancamento manual ou<br/>importacao CSV de resultados"]
-  J --> K["Calculo automatico<br/>de farol e atingimento"]
+  F --> G["Configurar base corporativa<br/>Empresa, filiais, estrutura, usuários"]
+  G --> H["Definir estratégia<br/>Mapa BSC e OKRs"]
+  H --> I["Cadastrar indicadores,<br/>metas e arvore de influência"]
+  I --> J["Lançamento manual ou<br/>importação CSV de resultados"]
+  J --> K["Cálculo automático<br/>de farol e atingimento"]
   K --> L{"Farol vermelho?"}
-  L -- "Nao" --> M["Dashboard, ranking,<br/>evolucao, relatorios e insights"]
+  L -- "Não" --> M["Dashboard, ranking,<br/>evolucao, relatorios e insights"]
   L -- "Sim" --> N["Sugerir / abrir desvio<br/>FCA, 5 Porques, Ishikawa,<br/>Pareto, CAPA ou simples"]
-  N --> O["Registrar causas,<br/>analises e impacto"]
-  O --> P["Criar plano de acao<br/>manual, por desvio ou por reuniao"]
+  N --> O["Registrar causas,<br/>análises e impacto"]
+  O --> P["Criar plano de ação<br/>manual, por desvio ou por reunião"]
   P --> Q["Executar tarefas,<br/>atualizar status e progresso"]
-  Q --> R{"Todas as acoes<br/>do desvio concluidas?"}
-  R -- "Nao" --> Q1["Desvio permanece aberto<br/>ou aguardando acao"]
+  Q --> R{"Todas as ações<br/>do desvio concluidas?"}
+  R -- "Não" --> Q1["Desvio permanece aberto<br/>ou aguardando ação"]
   R -- "Sim" --> S["Fechar desvio<br/>normal ou com atraso"]
-  S --> T["Gerar notificacoes,<br/>auditoria e relatorios"]
-  M --> U["Ciclo de gestao continua"]
+  S --> T["Gerar notificações,<br/>auditoria e relatorios"]
+  M --> U["Ciclo de gestão continua"]
   T --> U
   U --> J
 
@@ -100,44 +100,44 @@ flowchart TD
 ### Etapas operacionais
 
 1. **Setup ou deploy**: `pnpm setup` no ambiente local ou deploy via `.do/app.yaml` na DigitalOcean.
-2. **Dados iniciais**: seed cria empresa, estrutura, usuarios demo, permissoes, indicadores e dados realistas.
-3. **Login**: o usuario entra por `/login`; a API valida senha bcrypt, usuario ativo e gera tokens.
-4. **Sessao**: o frontend guarda tokens em `localStorage`; em falha de access token, chama `/auth/refresh`.
-5. **Painel executivo**: gestores iniciam no dashboard com total de indicadores, farois, ranking, evolucao e pendencias.
-6. **Base corporativa**: empresa, filiais, organograma e usuarios sustentam todos os filtros por area/responsavel.
-7. **Estrategia**: mapa BSC, objetivos e OKRs conectam metas estrategicas ao acompanhamento operacional.
-8. **Indicadores**: cada KPI tem area dona, responsavel, periodicidade, direcao de meta, unidade, fonte e peso.
+2. **Dados iniciais**: seed cria empresa, estrutura, usuários demo, permissões, indicadores e dados realistas.
+3. **Login**: o usuário entra por `/login`; a API válida senha bcrypt, usuário ativo e gera tokens.
+4. **Sessão**: o frontend guarda tokens em `localStorage`; em falha de access token, chama `/auth/refresh`.
+5. **Painel executivo**: gestores iniciam no dashboard com total de indicadores, farois, ranking, evolucao e pendências.
+6. **Base corporativa**: empresa, filiais, organograma e usuários sustentam todos os filtros por área/responsável.
+7. **Estratégia**: mapa BSC, objetivos e OKRs conectam metas estratégicas ao acompanhamento operacional.
+8. **Indicadores**: cada KPI tem área dona, responsável, periodicidade, direção de meta, unidade, fonte e peso.
 9. **Metas**: metas sao cadastradas por `periodRef` canonico, como `YYYY-MM`, `YYYY-Q1`, `YYYY`, etc.
 10. **Resultados**: o valor realizado pode ser lancado em lote na tela `/results` ou importado por CSV.
 11. **Farol**: a regra `calcStatus` calcula verde, amarelo, vermelho ou cinza, alem de atingimento e desvios.
-12. **Gestao do desvio**: se o farol fica vermelho, o sistema permite abrir desvio e conduzir analise de causa.
-13. **Plano de acao**: acoes tratam desvios, reunioes, projetos, OKRs, objetivos ou demandas manuais.
-14. **Controle de execucao**: subtarefas recalculam progresso; acoes concluidas fora do prazo viram `DONE_LATE`.
-15. **Fechamento**: desvio nao fecha enquanto houver acao vinculada aberta.
-16. **Aprendizado e governanca**: notificacoes, auditoria, relatorios e insights alimentam o proximo ciclo.
+12. **Gestão do desvio**: se o farol fica vermelho, o sistema permite abrir desvio e conduzir análise de causa.
+13. **Plano de ação**: ações tratam desvios, reuniões, projetos, OKRs, objetivos ou demandas manuais.
+14. **Controle de execucao**: subtarefas recalculam progresso; ações concluidas fora do prazo viram `DONE_LATE`.
+15. **Fechamento**: desvio nao fecha enquanto houver ação vinculada aberta.
+16. **Aprendizado e governanca**: notificações, auditoria, relatorios e insights alimentam o próximo ciclo.
 
 ## 3. Fluxo de autenticacao e seguranca
 
 ```mermaid
 flowchart TD
-  A["Usuario informa email e senha"] --> B["POST /auth/login"]
-  B --> C["Busca usuario por email"]
-  C --> D{"Usuario existe,<br/>ativo e sem deletedAt?"}
-  D -- "Nao" --> X["401 Credenciais invalidas"]
+  A["Usuário informa email e senha"] --> B["POST /auth/login"]
+  B --> C["Busca usuário por email"]
+  C --> D{"Usuário existe,<br/>ativo e sem deletedAt?"}
+  D -- "Não" --> X["401 Credenciais inválidas"]
   D -- "Sim" --> E["Compara senha com bcrypt"]
   E --> F{"Senha confere?"}
-  F -- "Nao" --> X
-  F -- "Sim" --> G["Gera access token JWT<br/>TTL padrao 15m"]
+  F -- "Não" --> X
+  F -- "Sim" --> G["Gera access token JWT<br/>TTL padrão 15m"]
   G --> H["Gera refresh token aleatorio<br/>salva hash SHA-256"]
   H --> I["Atualiza lastLoginAt"]
   I --> J["Cria AuditLog LOGIN<br/>com IP e user-agent"]
   J --> K["Frontend salva tokens<br/>e abre Dashboard"]
   K --> L["Chamadas autenticadas<br/>Bearer JWT"]
   L --> M{"Access token expirou?"}
-  M -- "Nao" --> N["API responde dados"]
+  M -- "Não" --> N["API responde dados"]
   M -- "Sim" --> O["Frontend chama<br/>POST /auth/refresh"]
-  O --> P{"Refresh valido,<br/>nao revogado e nao vencido?"}
-  P -- "Nao" --> Q["Limpa tokens<br/>volta para /login"]
+  O --> P{"Refresh válido,<br/>nao revogado e nao vencido?"}
+  P -- "Não" --> Q["Limpa tokens<br/>volta para /login"]
   P -- "Sim" --> R["Novo access token"]
   R --> L
 
@@ -154,25 +154,25 @@ flowchart TD
 
 | Controle | Onde fica | Como funciona |
 | --- | --- | --- |
-| JWT obrigatorio | `AuthModule` / `JwtAuthGuard` | Rotas sao protegidas por padrao, exceto `@Public()` como login, refresh e health. |
+| JWT obrigatorio | `AuthModule` / `JwtAuthGuard` | Rotas sao protegidas por padrão, exceto `@Public()` como login, refresh e health. |
 | Refresh token | `AuthService` | Token bruto fica no cliente; hash SHA-256 fica no banco. |
-| Perfil de acesso | `RolesGuard` + `@Roles` | Usado em criacao, ativacao e remocao de usuarios. |
-| Tenant | `companyId` no payload JWT | Controllers filtram dados por empresa do usuario logado. |
-| Auditoria | `AuditLog` | Login e consultas de auditoria estao implementados; demais acoes podem ser ampliadas. |
+| Perfil de acesso | `RolesGuard` + `@Roles` | Usado em criação, ativação e remocao de usuários. |
+| Tenant | `companyId` no payload JWT | Controllers filtram dados por empresa do usuário logado. |
+| Auditoria | `AuditLog` | Login e consultas de auditoria estão implementados; demais ações podem ser ampliadas. |
 | Rate limit | `ThrottlerGuard` | Limite global configurado em 200 requisicoes por minuto. |
 
 ## 4. Fluxo de indicadores, metas e resultados
 
 ```mermaid
 flowchart TD
-  A["Cadastrar indicador<br/>/indicators/new"] --> B["Selecionar area dona<br/>OrgNode"]
-  B --> C["Definir responsavel,<br/>alimentador, tipo, unidade,<br/>periodicidade, direcao e peso"]
+  A["Cadastrar indicador<br/>/indicators/new"] --> B["Selecionar área dona<br/>OrgNode"]
+  B --> C["Definir responsável,<br/>alimentador, tipo, unidade,<br/>periodicidade, direção e peso"]
   C --> D["POST /indicators"]
   D --> DB1[("Indicator")]
-  DB1 --> E["Cadastrar metas por periodo<br/>POST /indicators/:id/targets"]
+  DB1 --> E["Cadastrar metas por período<br/>POST /indicators/:id/targets"]
   E --> DB2[("IndicatorTarget<br/>periodRef + target + bounds")]
-  DB2 --> F["Se ja existe resultado<br/>recalcula farol do periodo"]
-  F --> G["Lancamento manual em lote<br/>/results"]
+  DB2 --> F["Se ja existe resultado<br/>recalcula farol do período"]
+  F --> G["Lançamento manual em lote<br/>/results"]
   DB2 --> G
   G --> H["POST /results/batch"]
   H --> I["Para cada linha:<br/>busca indicador e meta"]
@@ -180,7 +180,7 @@ flowchart TD
   J --> K["calcStatus"]
   K --> L["Upsert IndicatorResult<br/>valor, light, attainment,<br/>deviationAbs, deviationPct"]
   L --> M{"light == RED?"}
-  M -- "Nao" --> N["Atualiza dashboards,<br/>series, ranking e relatorios"]
+  M -- "Não" --> N["Atualiza dashboards,<br/>series, ranking e relatorios"]
   M -- "Sim" --> O["Retorna shouldOpenDeviation=true<br/>e UI sugere abrir desvio"]
   O --> P["POST /deviations<br/>abre desvio sequencial"]
   N --> Q["Gestor acompanha<br/>/dashboard, /indicators/:id,<br/>/tree, /reports"]
@@ -200,50 +200,50 @@ flowchart TD
 
 ### Regras do farol
 
-| Direcao da meta | Verde | Amarelo | Vermelho | Cinza |
+| Direção da meta | Verde | Amarelo | Vermelho | Cinza |
 | --- | --- | --- | --- | --- |
-| `HIGHER_BETTER` | realizado maior ou igual a meta | abaixo da meta dentro da tolerancia | abaixo da tolerancia | sem valor ou sem meta |
-| `LOWER_BETTER` | realizado menor ou igual a meta | acima da meta dentro da tolerancia | acima da tolerancia | sem valor ou sem meta |
-| `EQUAL_TARGET` | distancia ate a meta dentro de metade da tolerancia | distancia dentro da tolerancia | distancia acima da tolerancia | sem valor ou sem meta |
-| `RANGE` | realizado entre limite inferior e superior | fora da faixa, mas dentro da tolerancia | fora da faixa acima da tolerancia | sem valor ou sem meta |
+| `HIGHER_BETTER` | realizado maior ou igual a meta | abaixo da meta dentro da tolerância | abaixo da tolerância | sem valor ou sem meta |
+| `LOWER_BETTER` | realizado menor ou igual a meta | acima da meta dentro da tolerância | acima da tolerância | sem valor ou sem meta |
+| `EQUAL_TARGET` | distância ate a meta dentro de metade da tolerância | distância dentro da tolerância | distância acima da tolerância | sem valor ou sem meta |
+| `RANGE` | realizado entre limite inferior e superior | fora da faixa, mas dentro da tolerância | fora da faixa acima da tolerância | sem valor ou sem meta |
 
 ### Telas envolvidas
 
-| Tela | Funcao |
+| Tela | Função |
 | --- | --- |
 | `/indicators` | Lista indicadores, permite busca e filtro por farol. |
 | `/indicators/new` | Cadastro completo do KPI. |
-| `/indicators/:id` | Detalhe, historico, grafico meta x realizado, metas e abertura de desvio. |
-| `/results` | Lancamento em lote dos ultimos periodos. |
-| `/tree` | Grafo de influencia entre indicadores e simulacao de impacto. |
+| `/indicators/:id` | Detalhe, histórico, grafico meta x realizado, metas e abertura de desvio. |
+| `/results` | Lançamento em lote dos últimos períodos. |
+| `/tree` | Grafo de influência entre indicadores e simulacao de impacto. |
 | `/reports` | PDF executivo no navegador e CSVs. |
 
-## 5. Fluxo de desvios, causa raiz e planos de acao
+## 5. Fluxo de desvios, causa raiz e planos de ação
 
 ```mermaid
 flowchart TD
-  A["Resultado vermelho<br/>ou decisao manual do gestor"] --> B["Abrir desvio<br/>POST /deviations"]
-  B --> C["Sistema calcula numero sequencial<br/>por empresa"]
+  A["Resultado vermelho<br/>ou decisão manual do gestor"] --> B["Abrir desvio<br/>POST /deviations"]
+  B --> C["Sistema calcula número sequencial<br/>por empresa"]
   C --> D[("Deviation<br/>status OPEN")]
-  D --> E["Detalhar fato,<br/>impacto, severidade,<br/>responsavel, prazo e metodo"]
+  D --> E["Detalhar fato,<br/>impacto, severidade,<br/>responsável, prazo e metodo"]
   E --> F["Adicionar causas<br/>POST /deviations/:id/causes"]
-  F --> G["Registrar analises<br/>FCA, 5 Porques, Ishikawa,<br/>Pareto, CAPA ou simples"]
-  G --> H["Criar plano de acao<br/>POST /actions<br/>origin=DEVIATION"]
+  F --> G["Registrar análises<br/>FCA, 5 Porques, Ishikawa,<br/>Pareto, CAPA ou simples"]
+  G --> H["Criar plano de ação<br/>POST /actions<br/>origin=DEVIATION"]
   H --> I[("ActionPlan<br/>vinculado ao desvio")]
   I --> J["Adicionar subtarefas<br/>POST /actions/:id/tasks"]
   J --> K["Executar e marcar subtarefas"]
-  K --> L["Recalculo automatico<br/>do progresso da acao"]
-  L --> M["Alterar status da acao<br/>PATCH /actions/:id/status"]
-  M --> N{"Status DONE<br/>apos dueDate?"}
+  K --> L["Recalculo automático<br/>do progresso da ação"]
+  L --> M["Alterar status da ação<br/>PATCH /actions/:id/status"]
+  M --> N{"Status DONE<br/>após dueDate?"}
   N -- "Sim" --> O["Sistema grava DONE_LATE"]
-  N -- "Nao" --> P["Sistema grava DONE"]
+  N -- "Não" --> P["Sistema grava DONE"]
   O --> Q["Tentar fechar desvio<br/>POST /deviations/:id/close"]
   P --> Q
-  Q --> R{"Existe acao aberta<br/>vinculada ao desvio?"}
+  Q --> R{"Existe ação aberta<br/>vinculada ao desvio?"}
   R -- "Sim" --> S["Bloqueia fechamento<br/>e informa quantidade"]
-  R -- "Nao" --> T{"Desvio fechou<br/>apos dueDate?"}
+  R -- "Não" --> T{"Desvio fechou<br/>após dueDate?"}
   T -- "Sim" --> U["Status CLOSED_LATE"]
-  T -- "Nao" --> V["Status CLOSED"]
+  T -- "Não" --> V["Status CLOSED"]
 
   classDef step fill:#e0f2fe,stroke:#0284c7,color:#0f172a
   classDef rule fill:#dcfce7,stroke:#16a34a,color:#0f172a
@@ -259,49 +259,49 @@ flowchart TD
 
 ### Item por item
 
-1. Um desvio nasce normalmente de indicador vermelho, mas tambem pode ser aberto manualmente pela tela do indicador.
-2. O backend gera um numero sequencial por empresa para facilitar rastreabilidade.
-3. A ficha do desvio aceita fato, causa raiz, impacto, severidade, responsavel, prazo e metodo de analise.
+1. Um desvio nasce normalmente de indicador vermelho, mas também pode ser aberto manualmente pela tela do indicador.
+2. O backend gera um número sequencial por empresa para facilitar rastreabilidade.
+3. A ficha do desvio aceita fato, causa raiz, impacto, severidade, responsável, prazo e metodo de análise.
 4. As causas podem ser categorizadas, por exemplo, usando 6M no Ishikawa.
-5. Analises sao armazenadas como texto livre ou JSON serializado.
-6. Acoes podem nascer do desvio e ficam vinculadas por `deviationId`.
-7. Subtarefas controlam a execucao fina; ao marcar/desmarcar, o progresso da acao e recalculado.
-8. Ao concluir uma acao depois do prazo, a regra grava `DONE_LATE`.
-9. O fechamento do desvio e bloqueado se ainda houver acao diferente de `DONE` ou `DONE_LATE`.
+5. Análises sao armazenadas como texto livre ou JSON serializado.
+6. Ações podem nascer do desvio e ficam vinculadas por `deviationId`.
+7. Subtarefas controlam a execucao fina; ao marcar/desmarcar, o progresso da ação e recalculado.
+8. Ao concluir uma ação depois do prazo, a regra grava `DONE_LATE`.
+9. O fechamento do desvio e bloqueado se ainda houver ação diferente de `DONE` ou `DONE_LATE`.
 10. Se o desvio for fechado depois do prazo, o status final vira `CLOSED_LATE`.
 
-## 6. Fluxo estrategico: BSC, objetivos e OKRs
+## 6. Fluxo estratégico: BSC, objetivos e OKRs
 
 ```mermaid
 flowchart TD
-  A["Criar mapa estrategico<br/>POST /strategy/maps"] --> B[("StrategicMap")]
+  A["Criar mapa estratégico<br/>POST /strategy/maps"] --> B[("StrategicMap")]
   B --> C["Adicionar perspectivas<br/>Financeira, clientes,<br/>processos, pessoas etc."]
   C --> D[("Perspective")]
-  D --> E["Adicionar objetivos estrategicos"]
+  D --> E["Adicionar objetivos estratégicos"]
   E --> F[("StrategicObjective")]
-  F --> G["Criar relacoes causa-efeito<br/>entre objetivos"]
+  F --> G["Criar relações causa-efeito<br/>entre objetivos"]
   G --> H[("ObjectiveRelation")]
   F --> I["Vincular indicadores<br/>ao objetivo"]
-  I --> J["Buscar ultimo resultado<br/>de cada indicador"]
+  I --> J["Buscar último resultado<br/>de cada indicador"]
   J --> K["Farol agregado do objetivo"]
   K --> L{"Algum indicador vermelho?"}
   L -- "Sim" --> M["Objetivo agregado vermelho"]
-  L -- "Nao" --> N{"Algum indicador amarelo?"}
+  L -- "Não" --> N{"Algum indicador amarelo?"}
   N -- "Sim" --> O["Objetivo agregado amarelo"]
-  N -- "Nao" --> P["Todos verdes ou cinza<br/>conforme disponibilidade"]
+  N -- "Não" --> P["Todos verdes ou cinza<br/>conforme disponibilidade"]
   B --> Q["Criar ciclo OKR<br/>POST /okrs/cycles"]
   Q --> R["Criar objetivo OKR"]
-  R --> S["Adicionar Key Results<br/>com peso e direcao"]
+  R --> S["Adicionar Key Results<br/>com peso e direção"]
   S --> T["Atualizar valor atual<br/>dos KRs"]
-  T --> U["Calculo de progresso<br/>ponderado"]
+  T --> U["Cálculo de progresso<br/>ponderado"]
   U --> V["Check-in semanal<br/>confidence + progress"]
   V --> W{"progress >= 95%?"}
   W -- "Sim" --> X["OKR DONE"]
-  W -- "Nao" --> Y{"confidence >= 70%<br/>e progress >= 30%?"}
+  W -- "Não" --> Y{"confidence >= 70%<br/>e progress >= 30%?"}
   Y -- "Sim" --> Z["OKR ON_TRACK"]
-  Y -- "Nao" --> AA{"confidence < 40%?"}
+  Y -- "Não" --> AA{"confidence < 40%?"}
   AA -- "Sim" --> AB["OKR OFF_TRACK"]
-  AA -- "Nao" --> AC["OKR AT_RISK"]
+  AA -- "Não" --> AC["OKR AT_RISK"]
 
   classDef step fill:#e0f2fe,stroke:#0284c7,color:#0f172a
   classDef rule fill:#dcfce7,stroke:#16a34a,color:#0f172a
@@ -315,10 +315,10 @@ flowchart TD
 
 ### Como o gestor usa
 
-| Modulo | Uso gerencial |
+| Módulo | Uso gerencial |
 | --- | --- |
-| Mapa BSC | Mostra a estrategia em perspectivas e objetivos, com farol agregado pelos indicadores vinculados. |
-| Relacoes causa-efeito | Mostram dependencia entre objetivos estrategicos. |
+| Mapa BSC | Mostra a estratégia em perspectivas e objetivos, com farol agregado pelos indicadores vinculados. |
+| Relações causa-efeito | Mostram dependência entre objetivos estratégicos. |
 | OKRs | Traduzem objetivos em ciclos, objetivos mensuraveis, KRs e check-ins. |
 | Check-in | Atualiza confianca e status automaticamente: `DONE`, `ON_TRACK`, `OFF_TRACK` ou `AT_RISK`. |
 
@@ -326,13 +326,13 @@ flowchart TD
 
 ```mermaid
 flowchart TD
-  A["Cadastrar indicadores"] --> B["Criar relacoes pai-filho<br/>POST /indicators/:id/children"]
+  A["Cadastrar indicadores"] --> B["Criar relações pai-filho<br/>POST /indicators/:id/children"]
   B --> C[("IndicatorTreeRelation<br/>kind + weight")]
   C --> D["Abrir tela /tree"]
   D --> E["GET /indicators/tree/graph"]
-  E --> F["API retorna nodes e edges<br/>com ultimo farol"]
+  E --> F["API retorna nodes e edges<br/>com último farol"]
   F --> G["Frontend monta grafo<br/>com React Flow"]
-  G --> H["Usuario seleciona indicador"]
+  G --> H["Usuário seleciona indicador"]
   H --> I["GET /indicators/:id/impact?depth=4"]
   I --> J["Backend percorre descendentes<br/>com BFS ate profundidade maxima"]
   J --> K["Multiplica pesos acumulados"]
@@ -347,24 +347,24 @@ flowchart TD
   class C data
 ```
 
-## 8. Fluxo de reunioes, projetos e execucao
+## 8. Fluxo de reuniões, projetos e execucao
 
 ```mermaid
 flowchart TD
-  A["Criar reuniao<br/>/meetings"] --> B[("Meeting")]
+  A["Criar reunião<br/>/meetings"] --> B[("Meeting")]
   B --> C["Adicionar participantes"]
   C --> D["Registrar pauta"]
-  D --> E["Registrar decisoes"]
-  E --> F["Gerar acao a partir da reuniao"]
+  D --> E["Registrar decisões"]
+  E --> F["Gerar ação a partir da reunião"]
   F --> G[("ActionPlan<br/>origin=MEETING")]
-  G --> H["Kanban de acoes<br/>/actions"]
+  G --> H["Kanban de ações<br/>/actions"]
   H --> I["Mover status<br/>NOT_STARTED, IN_PROGRESS,<br/>WAITING_THIRD, PAUSED, DONE"]
-  I --> J["Detalhe da acao<br/>subtarefas, custo, prazo,<br/>responsavel e progresso"]
+  I --> J["Detalhe da ação<br/>subtarefas, custo, prazo,<br/>responsável e progresso"]
   J --> K["Concluir ou registrar atraso"]
   A --> L["Criar projeto<br/>/projects"]
   L --> M[("Project")]
   M --> N["Adicionar milestones"]
-  N --> O["Adicionar tarefas<br/>com dependencias"]
+  N --> O["Adicionar tarefas<br/>com dependências"]
   O --> P["Visualizar Gantt SVG"]
   P --> Q["Atualizar progresso e marcos"]
   Q --> H
@@ -379,39 +379,39 @@ flowchart TD
 
 ### Pontos de controle
 
-| Area | Controle |
+| Área | Controle |
 | --- | --- |
-| Reunioes | Participantes, presenca, pauta, decisoes e geracao de acao. |
-| Acoes | Kanban, prioridade, responsavel, area, origem, prazo, progresso e subtarefas. |
-| Projetos | Marcos, tarefas, dependencias e visualizacao em Gantt. |
-| Atrasos | Acoes vencidas aparecem em filtros, notificacoes e dashboard. |
+| Reuniões | Participantes, presenca, pauta, decisões e geração de ação. |
+| Ações | Kanban, prioridade, responsável, área, origem, prazo, progresso e subtarefas. |
+| Projetos | Marcos, tarefas, dependências e visualização em Gantt. |
+| Atrasos | Ações vencidas aparecem em filtros, notificações e dashboard. |
 
-## 9. Fluxo de importacao CSV
+## 9. Fluxo de importação CSV
 
 ```mermaid
 flowchart TD
-  A["Usuario baixa ou prepara modelo CSV"] --> B["Tela /imports<br/>Papaparse no navegador"]
+  A["Usuário baixa ou prepara modelo CSV"] --> B["Tela /imports<br/>Papaparse no navegador"]
   B --> C["Seleciona alvo<br/>INDICATORS, TARGETS ou RESULTS"]
   C --> D["CSV vira linhas JSON<br/>com rowIndex"]
   D --> E["POST /imports/preview"]
-  E --> F["Backend valida linha a linha"]
-  F --> G{"Linha valida?"}
-  G -- "Nao" --> H["Retorna erro da linha<br/>sem gravar no banco"]
+  E --> F["Backend válida linha a linha"]
+  F --> G{"Linha válida?"}
+  G -- "Não" --> H["Retorna erro da linha<br/>sem gravar no banco"]
   G -- "Sim" --> I["Marca linha como OK<br/>no preview"]
-  H --> J["Usuario corrige arquivo<br/>ou decide importar validas"]
+  H --> J["Usuário corrige arquivo<br/>ou decide importar validas"]
   I --> K["POST /imports/commit"]
   K --> L["Cria ImportJob"]
   L --> M["Processa cada linha"]
   M --> N{"Erro no processamento?"}
   N -- "Sim" --> O["Cria ImportError<br/>com payload e mensagem"]
-  N -- "Nao" --> P["Upsert no destino"]
+  N -- "Não" --> P["Upsert no destino"]
   P --> Q{"Destino RESULTS?"}
   Q -- "Sim" --> R["Calcula farol via calcStatus"]
-  Q -- "Nao" --> S["Atualiza indicador ou meta"]
+  Q -- "Não" --> S["Atualiza indicador ou meta"]
   R --> T["Atualiza ImportJob<br/>okRows, errorRows, finishedAt"]
   S --> T
   O --> T
-  T --> U["Historico em /imports/jobs"]
+  T --> U["Histórico em /imports/jobs"]
 
   classDef step fill:#e0f2fe,stroke:#0284c7,color:#0f172a
   classDef rule fill:#dcfce7,stroke:#16a34a,color:#0f172a
@@ -425,43 +425,43 @@ flowchart TD
   class L data
 ```
 
-### Validacoes importantes
+### Validações importantes
 
-| Alvo | Validacao principal | Gravacao |
+| Alvo | Validação principal | Gravacao |
 | --- | --- | --- |
 | `INDICATORS` | `code` e `name` obrigatorios; `ownerCode` precisa existir. | Upsert de indicador por `companyId + code`. |
 | `TARGETS` | `code`, `periodRef` e `target` numerico; indicador precisa existir. | Upsert de meta por `indicatorId + periodRef`. |
-| `RESULTS` | `code`, `periodRef` e `value` numerico; indicador precisa existir. | Upsert de resultado e calculo automatico do farol. |
+| `RESULTS` | `code`, `periodRef` e `value` numerico; indicador precisa existir. | Upsert de resultado e cálculo automático do farol. |
 
-## 10. Fluxo de dashboard, insights, notificacoes e relatorios
+## 10. Fluxo de dashboard, insights, notificações e relatorios
 
 ```mermaid
 flowchart TD
-  A["Resultados, metas,<br/>acoes e desvios no banco"] --> B["Dashboard /"]
+  A["Resultados, metas,<br/>ações e desvios no banco"] --> B["Dashboard /"]
   B --> C["GET /dashboard/overview"]
   B --> D["GET /dashboard/ranking"]
   B --> E["GET /dashboard/evolution"]
   B --> F["GET /dashboard/worst"]
   B --> G["GET /dashboard/pending"]
-  C --> H["Cards executivos<br/>total, farois, atingimento,<br/>acoes abertas, atrasadas,<br/>desvios criticos"]
-  D --> I["Ranking de areas<br/>por atingimento medio"]
+  C --> H["Cards executivos<br/>total, farois, atingimento,<br/>ações abertas, atrasadas,<br/>desvios críticos"]
+  D --> I["Ranking de áreas<br/>por atingimento medio"]
   E --> J["Evolucao mensal<br/>e taxa de verdes"]
   F --> K["Piores indicadores<br/>vermelhos recentes"]
-  G --> L["Pendencias de lancamento"]
+  G --> L["Pendências de lançamento"]
   A --> M["Insights /insights"]
   M --> N["Resumo executivo"]
-  M --> O["Tendencia de piora"]
-  M --> P["Sugestoes de causa"]
-  M --> Q["Sugestoes de acao"]
-  A --> R["Sino de notificacoes"]
+  M --> O["Tendência de piora"]
+  M --> P["Sugestões de causa"]
+  M --> Q["Sugestões de ação"]
+  A --> R["Sino de notificações"]
   R --> S["POST /notifications/generate"]
-  S --> T["Regra: acoes atrasadas<br/>sem alerta aberto"]
-  S --> U["Regra: indicador vermelho<br/>para responsavel"]
+  S --> T["Regra: ações atrasadas<br/>sem alerta aberto"]
+  S --> U["Regra: indicador vermelho<br/>para responsável"]
   T --> V[("Notification")]
   U --> V
   A --> W["Relatorios /reports"]
   W --> X["PDF executivo no browser<br/>jsPDF"]
-  W --> Y["CSVs da API<br/>indicadores, resultados,<br/>acoes e desvios"]
+  W --> Y["CSVs da API<br/>indicadores, resultados,<br/>ações e desvios"]
 
   classDef step fill:#e0f2fe,stroke:#0284c7,color:#0f172a
   classDef rule fill:#dcfce7,stroke:#16a34a,color:#0f172a
@@ -471,17 +471,17 @@ flowchart TD
   class V data
 ```
 
-### Como a informacao executiva e formada
+### Como a informação executiva e formada
 
-| Saida | Origem dos dados |
+| Saída | Origem dos dados |
 | --- | --- |
-| Total e farois | Ultimo resultado de cada indicador ativo. |
+| Total e farois | Último resultado de cada indicador ativo. |
 | Atingimento geral | Media dos atingimentos, limitada para evitar distorcao extrema. |
-| Ranking de areas | Agrupa indicadores por `ownerNodeId`. |
-| Evolucao | Resultados mensais dos ultimos N meses. |
-| Piores indicadores | Indicadores com ultimo farol vermelho, ordenados por pior atingimento. |
+| Ranking de áreas | Agrupa indicadores por `ownerNodeId`. |
+| Evolucao | Resultados mensais dos últimos N meses. |
+| Piores indicadores | Indicadores com último farol vermelho, ordenados por pior atingimento. |
 | Insights | Heuristicas locais; nao chama IA externa no estado atual. |
-| Notificacoes | Geradas sob demanda por regras de indicador vermelho e acao atrasada. |
+| Notificações | Geradas sob demanda por regras de indicador vermelho e ação atrasada. |
 | Relatorios | CSVs no backend e PDF executivo gerado no frontend. |
 
 ## 11. Fluxo de dados principais
@@ -507,8 +507,8 @@ erDiagram
   OrgNode ||--o{ ActionPlan : e_area_de
 
   User ||--o{ IndicatorResult : lanca
-  User ||--o{ ActionPlan : responsavel
-  User ||--o{ Deviation : responsavel
+  User ||--o{ ActionPlan : responsável
+  User ||--o{ Deviation : responsável
   User ||--o{ Notification : recebe
 
   Indicator ||--o{ IndicatorTarget : tem_metas
@@ -541,10 +541,10 @@ erDiagram
 | Dominio | Entidades |
 | --- | --- |
 | Organizacao | `Company`, `Branch`, `OrgNode`, `User`, `Permission`, `UserPermission`, `RefreshToken` |
-| Estrategia | `StrategicMap`, `Perspective`, `StrategicObjective`, `ObjectiveRelation` |
+| Estratégia | `StrategicMap`, `Perspective`, `StrategicObjective`, `ObjectiveRelation` |
 | OKR | `OKRCycle`, `OKRObjective`, `KeyResult`, `OKRCheckin` |
 | KPI | `Indicator`, `IndicatorTarget`, `IndicatorResult`, `IndicatorTreeRelation` |
-| Desvio e acao | `Deviation`, `DeviationCause`, `DeviationAnalysis`, `ActionPlan`, `ActionTask` |
+| Desvio e ação | `Deviation`, `DeviationCause`, `DeviationAnalysis`, `ActionPlan`, `ActionTask` |
 | Execucao | `Project`, `ProjectMilestone`, `ProjectTask`, `Meeting`, `MeetingParticipant`, `MeetingAgendaItem`, `MeetingDecision` |
 | Suporte | `Attachment`, `Comment`, `Notification`, `ImportJob`, `ImportError`, `AuditLog`, `AppSetting` |
 
@@ -561,7 +561,7 @@ flowchart TD
   G --> H["pnpm dev<br/>API + Web"]
   H --> I["Web local<br/>localhost:3000"]
   H --> J["API local<br/>localhost:3333/api"]
-  A --> K["Deploy producao"]
+  A --> K["Deploy produção"]
   K --> L["Criar Neon Postgres<br/>DATABASE_URL + DIRECT_URL"]
   L --> M["Subir repo no GitHub"]
   M --> N["Editar .do/app.yaml<br/>REPO_OWNER/REPO_NAME"]
@@ -580,98 +580,98 @@ flowchart TD
 | Perfil | Primeiro uso recomendado | Rotas principais |
 | --- | --- | --- |
 | Diretoria | Acompanhar resultado consolidado e riscos. | `/`, `/insights`, `/strategy`, `/okrs`, `/reports` |
-| Gestor de area | Cuidar indicadores, lancamentos, desvios e acoes da area. | `/indicators`, `/results`, `/deviations`, `/actions`, `/tree` |
+| Gestor de área | Cuidar indicadores, lançamentos, desvios e ações da área. | `/indicators`, `/results`, `/deviations`, `/actions`, `/tree` |
 | Analista | Alimentar dados, importar CSV, montar relatorios e apoiar causas. | `/results`, `/imports`, `/reports`, `/audit` |
-| PMO / Projetos | Controlar cronogramas, marcos, tarefas e reunioes. | `/projects`, `/meetings`, `/actions` |
-| Administrador | Manter empresa, estrutura e usuarios. | `/settings`, `/org`, `/users`, `/audit` |
+| PMO / Projetos | Controlar cronogramas, marcos, tarefas e reuniões. | `/projects`, `/meetings`, `/actions` |
+| Administrador | Manter empresa, estrutura e usuários. | `/settings`, `/org`, `/users`, `/audit` |
 
 ## 14. Mapa completo das telas
 
-| Secao da sidebar | Rota | O que entrega |
+| Seção da sidebar | Rota | O que entrega |
 | --- | --- | --- |
-| Visao | `/` | Dashboard executivo com KPIs, farois, ranking, evolucao, criticos e pendencias. |
-| Visao | `/insights` | Heuristicas locais de resumo, tendencia, causa e acao. |
-| Estrategia | `/strategy` | Lista de mapas estrategicos. |
-| Estrategia | `/strategy/:id` | Mapa BSC com perspectivas, objetivos, farol agregado e status inline. |
-| Estrategia | `/okrs` | Ciclos, objetivos, KRs, check-ins e progresso ponderado. |
+| Visão | `/` | Dashboard executivo com KPIs, farois, ranking, evolucao, críticos e pendências. |
+| Visão | `/insights` | Heuristicas locais de resumo, tendência, causa e ação. |
+| Estratégia | `/strategy` | Lista de mapas estratégicos. |
+| Estratégia | `/strategy/:id` | Mapa BSC com perspectivas, objetivos, farol agregado e status inline. |
+| Estratégia | `/okrs` | Ciclos, objetivos, KRs, check-ins e progresso ponderado. |
 | Performance | `/indicators` | Lista de indicadores com filtros. |
 | Performance | `/indicators/new` | Cadastro de indicador. |
-| Performance | `/indicators/:id` | Detalhe, serie historica, metas, historico e abertura de desvio. |
-| Performance | `/results` | Lancamentos em lote dos resultados. |
+| Performance | `/indicators/:id` | Detalhe, serie historica, metas, histórico e abertura de desvio. |
+| Performance | `/results` | Lançamentos em lote dos resultados. |
 | Performance | `/tree` | Arvore de indicadores e simulacao de impacto. |
 | Execucao | `/deviations` | Lista de desvios com severidade e contagens. |
-| Execucao | `/deviations/:id` | Analise completa do desvio, causas, metodos e fechamento. |
-| Execucao | `/actions` | Kanban de planos de acao. |
-| Execucao | `/actions/:id` | Detalhe da acao, subtarefas, status, custo, datas e progresso. |
+| Execucao | `/deviations/:id` | Análise completa do desvio, causas, metodos e fechamento. |
+| Execucao | `/actions` | Kanban de planos de ação. |
+| Execucao | `/actions/:id` | Detalhe da ação, subtarefas, status, custo, datas e progresso. |
 | Execucao | `/projects` | Lista de projetos e progresso. |
-| Execucao | `/projects/:id` | Gantt, marcos, tarefas e dependencias. |
-| Execucao | `/meetings` | Lista e criacao de reunioes. |
-| Execucao | `/meetings/:id` | Pauta, participantes, decisoes e gerador de acao. |
+| Execucao | `/projects/:id` | Gantt, marcos, tarefas e dependências. |
+| Execucao | `/meetings` | Lista e criação de reuniões. |
+| Execucao | `/meetings/:id` | Pauta, participantes, decisões e gerador de ação. |
 | Dados | `/imports` | Wizard CSV com preview, erros por linha e commit. |
-| Dados | `/reports` | PDF executivo e exportacoes CSV. |
+| Dados | `/reports` | PDF executivo e exportações CSV. |
 | Empresa | `/org` | Estrutura organizacional em arvore. |
-| Empresa | `/users` | Usuarios e perfis. |
-| Empresa | `/audit` | Auditoria com filtros por entidade e acao. |
+| Empresa | `/users` | Usuários e perfis. |
+| Empresa | `/audit` | Auditoria com filtros por entidade e ação. |
 | Empresa | `/settings` | Dados da empresa e filiais. |
 
-## 15. API por modulo
+## 15. API por módulo
 
-| Modulo | Endpoints principais | Papel no fluxo |
+| Módulo | Endpoints principais | Papel no fluxo |
 | --- | --- | --- |
-| `auth` | `POST /auth/login`, `POST /auth/refresh`, `POST /auth/logout`, `GET /auth/me` | Entrada, sessao, renovacao e identidade do usuario. |
+| `auth` | `POST /auth/login`, `POST /auth/refresh`, `POST /auth/logout`, `GET /auth/me` | Entrada, sessão, renovacao e identidade do usuário. |
 | `companies` | `GET /companies/me`, `GET /companies/me/branches` | Dados da empresa logada e filiais. |
-| `users` | `GET /users`, `POST /users`, `PATCH /users/:id/active`, `DELETE /users/:id` | Gestao de usuarios, com criacao/ativacao/remocao restritas a admin. |
-| `orgnodes` | `GET /orgnodes`, `GET /orgnodes/tree`, CRUD, `PATCH /:id/move` | Organograma e areas donas dos indicadores. |
+| `users` | `GET /users`, `POST /users`, `PATCH /users/:id/active`, `DELETE /users/:id` | Gestão de usuários, com criação/ativação/remocao restritas a admin. |
+| `orgnodes` | `GET /orgnodes`, `GET /orgnodes/tree`, CRUD, `PATCH /:id/move` | Organograma e áreas donas dos indicadores. |
 | `indicators` | CRUD, `/series`, `/targets`, `/children`, `/tree/graph`, `/impact` | KPIs, metas, series, arvore e simulacao. |
-| `results` | `/pending`, `POST /results`, `POST /results/batch`, `POST /:id/approve` | Lancamentos, calculo de farol e aprovacao/rejeicao. |
-| `deviations` | CRUD, `/causes`, `/analyses`, `/close` | Desvios, causa raiz, analises e fechamento controlado. |
-| `actions` | CRUD, `/status`, `/tasks` | Planos de acao, Kanban, subtarefas e progresso. |
+| `results` | `/pending`, `POST /results`, `POST /results/batch`, `POST /:id/approve` | Lançamentos, cálculo de farol e aprovação/rejeicao. |
+| `deviations` | CRUD, `/causes`, `/analyses`, `/close` | Desvios, causa raiz, análises e fechamento controlado. |
+| `actions` | CRUD, `/status`, `/tasks` | Planos de ação, Kanban, subtarefas e progresso. |
 | `dashboard` | `/overview`, `/ranking`, `/evolution`, `/worst`, `/pending` | Agregacoes executivas. |
-| `strategy` | `/maps`, `/perspectives`, `/objectives`, `/relations`, vinculo de indicadores | Mapa estrategico BSC. |
+| `strategy` | `/maps`, `/perspectives`, `/objectives`, `/relations`, vínculo de indicadores | Mapa estratégico BSC. |
 | `okrs` | `/cycles`, `/objectives`, `/krs`, `/checkin` | Ciclos OKR, KRs, progresso e confianca. |
-| `projects` | CRUD, `/milestones`, `/tasks` | Projetos, Gantt, marcos e dependencias. |
-| `meetings` | CRUD, participantes, pauta, decisoes, `/actions` | Reunioes e geracao de acoes. |
+| `projects` | CRUD, `/milestones`, `/tasks` | Projetos, Gantt, marcos e dependências. |
+| `meetings` | CRUD, participantes, pauta, decisões, `/actions` | Reuniões e geração de ações. |
 | `notifications` | `/`, `/count`, `/read`, `/read-all`, `/generate` | Sino, contagem e regras de alerta. |
-| `imports` | `/preview`, `/commit`, `/jobs`, `/jobs/:id/errors` | Importacao CSV validada linha a linha. |
-| `reports` | `/indicators.csv`, `/results.csv`, `/actions.csv`, `/deviations.csv` | Exportacoes para Excel/BI. |
+| `imports` | `/preview`, `/commit`, `/jobs`, `/jobs/:id/errors` | Importação CSV validada linha a linha. |
+| `reports` | `/indicators.csv`, `/results.csv`, `/actions.csv`, `/deviations.csv` | Exportações para Excel/BI. |
 | `insights` | `GET /insights` | Heuristicas executivas sem IA externa. |
-| `audit` | `GET /audit` | Rastro consultavel por empresa, entidade e acao. |
-| `health` | `GET /health` | Health check publico. |
+| `audit` | `GET /audit` | Rastro consultavel por empresa, entidade e ação. |
+| `health` | `GET /health` | Health check público. |
 
-## 16. Regras de negocio consolidadas
+## 16. Regras de negócio consolidadas
 
 | Regra | Onde aparece | Resultado |
 | --- | --- | --- |
-| `calcStatus` compartilhado | `packages/shared/src/status.ts` | Mesmo calculo de farol no front e no back. |
+| `calcStatus` compartilhado | `packages/shared/src/status.ts` | Mesmo cálculo de farol no front e no back. |
 | Meta alterada recalcula resultado existente | `IndicatorsService.upsertTarget` | Evita farol desatualizado quando a meta muda. |
 | Resultado vermelho sugere desvio | `ResultsService.upsert` | Retorna `shouldOpenDeviation: true`. |
-| Desvio recebe numero sequencial por empresa | `DeviationsService.open` | Facilita gestao e rastreabilidade. |
-| Fechamento de desvio exige acoes concluidas | `DeviationsService.close` | Bloqueia encerramento prematuro. |
-| Acao concluida em atraso vira `DONE_LATE` | `ActionsService.changeStatus` | Mantem historico do prazo. |
+| Desvio recebe número sequencial por empresa | `DeviationsService.open` | Facilita gestão e rastreabilidade. |
+| Fechamento de desvio exige ações concluidas | `DeviationsService.close` | Bloqueia encerramento prematuro. |
+| Ação concluida em atraso vira `DONE_LATE` | `ActionsService.changeStatus` | Mantem histórico do prazo. |
 | Subtarefas recalculam progresso | `ActionsService.recalcProgress` | Progresso sempre coerente com tarefas. |
-| Ranking de areas usa ultimo resultado | `DashboardService.ranking` | Gestao compara areas pelo atingimento. |
+| Ranking de áreas usa último resultado | `DashboardService.ranking` | Gestão compara áreas pelo atingimento. |
 | Objetivo BSC agrega farol dos indicadores | `StrategyService.getMap` | Vermelho prevalece, depois amarelo, depois verde. |
 | OKR usa progresso ponderado | `OkrsService.enrich` | KRs com maior peso impactam mais o objetivo. |
 | Check-in define status OKR | `OkrsService.checkin` | `DONE`, `ON_TRACK`, `OFF_TRACK` ou `AT_RISK`. |
-| Importacao valida antes de gravar | `ImportsService.preview` | Erros aparecem por linha antes do commit. |
-| Notificacao evita duplicidade aberta | `NotificationsService.generateAlerts` | Nao cria alerta repetido nao lido para o mesmo link. |
+| Importação válida antes de gravar | `ImportsService.preview` | Erros aparecem por linha antes do commit. |
+| Notificação evita duplicidade aberta | `NotificationsService.generateAlerts` | Não cria alerta repetido nao lido para o mesmo link. |
 | Soft delete | Diversos services | Registros sao inativados via `deletedAt`, nao apagados fisicamente. |
 
 ## 17. Leitura gerencial do ciclo
 
-O sistema implementa um ciclo PDCA/gestao a vista:
+O sistema implementa um ciclo PDCA/gestão a vista:
 
-1. **Planejar**: estrutura organizacional, estrategia, objetivos, OKRs, indicadores e metas.
-2. **Executar**: lancar resultados, executar projetos, reunioes e planos de acao.
-3. **Checar**: dashboards, farois, ranking, evolucao, relatorios, insights e notificacoes.
-4. **Agir**: abrir desvios, analisar causa raiz, criar acoes, acompanhar prazos e fechar somente quando resolvido.
-5. **Aprender**: auditoria, historico, tendencias e relatorios alimentam a proxima rodada de metas.
+1. **Planejar**: estrutura organizacional, estratégia, objetivos, OKRs, indicadores e metas.
+2. **Executar**: lancar resultados, executar projetos, reuniões e planos de ação.
+3. **Checar**: dashboards, farois, ranking, evolucao, relatorios, insights e notificações.
+4. **Agir**: abrir desvios, analisar causa raiz, criar ações, acompanhar prazos e fechar somente quando resolvido.
+5. **Aprender**: auditoria, histórico, tendências e relatorios alimentam a próxima rodada de metas.
 
 ## 18. Observacoes importantes
 
 - Apesar do nome da pasta conter `sqlite`, o schema atual usa **PostgreSQL** via Prisma.
 - Redis/BullMQ esta na stack, mas as filas ainda nao foram implementadas; alertas rodam sob demanda.
 - Os insights sao heuristicas locais, nao chamadas a uma IA externa.
-- O isolamento multiempresa depende de `companyId` nos filtros da aplicacao; nao ha RLS no Postgres no estado atual.
-- O catalogo de permissoes existe, mas o enforcement detalhado por permissao ainda nao esta espalhado por todos os endpoints.
+- O isolamento multiempresa depende de `companyId` nos filtros da aplicação; nao ha RLS no Postgres no estado atual.
+- O catalogo de permissões existe, mas o enforcement detalhado por permissão ainda nao esta espalhado por todos os endpoints.
 

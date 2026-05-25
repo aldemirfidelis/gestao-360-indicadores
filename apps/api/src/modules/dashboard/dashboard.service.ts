@@ -185,7 +185,7 @@ export class DashboardService {
   }
 
   /**
-   * Ranking de areas por % medio de atingimento (ultimos resultados).
+   * Ranking de areas por % medio de atingimento (últimos resultados).
    */
   async ranking(companyId: string, limit = 10) {
     const indicators = await this.prisma.indicator.findMany({
@@ -257,7 +257,7 @@ export class DashboardService {
   }
 
   /**
-   * Evolucao mensal: media de atingimento por mes nos ultimos N meses.
+   * Evolucao mensal: media de atingimento por mes nos últimos N meses.
    */
   async evolution(companyId: string, months = 12) {
     const anchor = await this.periods.currentAnchorDate(companyId);

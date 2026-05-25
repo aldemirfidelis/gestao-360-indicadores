@@ -38,13 +38,13 @@ export class PeriodsService {
       create: {
         companyId: me.companyId,
         year,
-        name: `Exercicio ${year}`,
+        name: `Exercício ${year}`,
         ...periodDates(year),
         isCurrent: !current,
         createdById: me.sub,
       },
       update: {
-        name: `Exercicio ${year}`,
+        name: `Exercício ${year}`,
         ...periodDates(year),
         status: WorkPeriodStatus.OPEN,
         deletedAt: null,
@@ -56,7 +56,7 @@ export class PeriodsService {
   async setCurrent(me: AuthPayload, id: string) {
     const period = await this.findCompanyPeriodOrThrow(me.companyId, id);
     if (period.status !== WorkPeriodStatus.OPEN) {
-      throw new ConflictException('Somente periodos abertos podem ser definidos como ano de trabalho.');
+      throw new ConflictException('Somente períodos abertos podem ser definidos como ano de trabalho.');
     }
     await this.prisma.$transaction([
       this.prisma.workPeriod.updateMany({
@@ -77,7 +77,7 @@ export class PeriodsService {
       return this.ensureNextPeriod(me, period.year);
     }
     if (period.status !== WorkPeriodStatus.OPEN) {
-      throw new ConflictException('Somente periodos abertos podem ser fechados.');
+      throw new ConflictException('Somente períodos abertos podem ser fechados.');
     }
     return this.prisma.$transaction(async (tx) => {
       await tx.workPeriod.updateMany({
@@ -99,14 +99,14 @@ export class PeriodsService {
         where: { companyId_year: { companyId: me.companyId, year: nextYear } },
       });
       if (existingNext?.status === WorkPeriodStatus.CLOSED && !existingNext.deletedAt) {
-        throw new ConflictException(`O periodo ${nextYear} ja esta fechado.`);
+        throw new ConflictException(`O período ${nextYear} ja esta fechado.`);
       }
       const next = await tx.workPeriod.upsert({
         where: { companyId_year: { companyId: me.companyId, year: nextYear } },
         create: {
           companyId: me.companyId,
           year: nextYear,
-          name: `Exercicio ${nextYear}`,
+          name: `Exercício ${nextYear}`,
           ...periodDates(nextYear),
           status: WorkPeriodStatus.OPEN,
           isCurrent: true,
@@ -168,7 +168,7 @@ export class PeriodsService {
       data: {
         companyId,
         year,
-        name: `Exercicio ${year}`,
+        name: `Exercício ${year}`,
         ...periodDates(year),
         status: WorkPeriodStatus.OPEN,
         isCurrent: true,
@@ -183,7 +183,7 @@ export class PeriodsService {
       where: { companyId_year: { companyId: me.companyId, year: nextYear } },
     });
     if (existing && !existing.deletedAt) {
-      if (existing.status !== WorkPeriodStatus.OPEN) throw new ConflictException(`O periodo ${nextYear} nao esta aberto.`);
+      if (existing.status !== WorkPeriodStatus.OPEN) throw new ConflictException(`O período ${nextYear} nao esta aberto.`);
       return this.setCurrent(me, existing.id);
     }
     const next = await this.create(me, nextYear);
@@ -192,13 +192,13 @@ export class PeriodsService {
 
   private async findCompanyPeriodOrThrow(companyId: string, id: string) {
     const period = await this.prisma.workPeriod.findFirst({ where: { id, companyId, deletedAt: null } });
-    if (!period) throw new NotFoundException('Periodo nao encontrado.');
+    if (!period) throw new NotFoundException('Período nao encontrado.');
     return period;
   }
 
   private validateYear(year: number) {
     if (!Number.isInteger(year) || year < BASE_YEAR || year > 2100) {
-      throw new BadRequestException(`Informe um ano valido a partir de ${BASE_YEAR}.`);
+      throw new BadRequestException(`Informe um ano válido a partir de ${BASE_YEAR}.`);
     }
   }
 }

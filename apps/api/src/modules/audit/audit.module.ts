@@ -75,7 +75,7 @@ class AuditController {
       orderBy: { createdAt: 'desc' },
       take: limit ? parseInt(limit, 10) : 1000,
     });
-    const header = ['data_hora', 'usuario', 'email', 'acao', 'modulo', 'entidade', 'registro', 'resultado', 'ip'];
+    const header = ['data_hora', 'usuário', 'email', 'ação', 'módulo', 'entidade', 'registro', 'resultado', 'ip'];
     return [
       header.join(';'),
       ...rows.map((row) =>

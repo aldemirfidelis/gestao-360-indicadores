@@ -64,7 +64,7 @@ export function IndicatorCard({ indicator }: { indicator: IndicatorCardData }) {
           </div>
           <div className="flex items-center gap-2">
             <UserRound className="h-3.5 w-3.5" />
-            <span className="truncate">{indicator.responsibleUser?.name ?? 'Sem responsavel'}</span>
+            <span className="truncate">{indicator.responsibleUser?.name ?? 'Sem responsável'}</span>
           </div>
           <div className="flex items-center gap-2">
             <CalendarClock className="h-3.5 w-3.5" />

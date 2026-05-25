@@ -88,7 +88,7 @@ export const navSections: NavSection[] = [
     icon: Building2,
     items: [
       { href: '/org', label: 'Estrutura Organizacional', description: 'Empresas, áreas macros, micros, pilares e diretrizes', icon: Building2, permissions: ['org:manage'] },
-      { href: '/periods', label: 'Periodos', description: 'Ano de trabalho, abertura e fechamento anual', icon: Calendar, permissions: ['settings:manage'] },
+      { href: '/periods', label: 'Períodos', description: 'Ano de trabalho, abertura e fechamento anual', icon: Calendar, permissions: ['settings:manage'] },
       { href: '/strategy', label: 'Objetivos Estratégicos', description: 'Mapas, perspectivas e objetivos', icon: Crosshair, permissions: ['strategy:manage', 'strategy:objectives:update'] },
       { href: '/actions', label: 'Plano de Ação', description: 'Ações, execução, evidências e eficácia', icon: ClipboardList, permissions: ['actions:view'] },
       { href: '/meetings', label: 'Reuniões', description: 'Agenda, atas e decisões', icon: Calendar, permissions: ['meetings:view'] },

@@ -87,7 +87,7 @@ export class OkrsService {
       const p = (startValue - currentValue) / (startValue - targetValue);
       return Math.max(0, Math.min(1, p));
     }
-    // EQUAL/RANGE: distancia relativa
+    // EQUAL/RANGE: distância relativa
     const dist = Math.abs(currentValue - targetValue);
     const base = Math.max(Math.abs(targetValue - startValue), 1);
     return Math.max(0, 1 - dist / base);

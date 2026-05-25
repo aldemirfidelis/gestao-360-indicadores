@@ -90,21 +90,21 @@ export default function HomePage() {
   return (
     <div>
       <PageHeader
-        eyebrow="Inicio"
-        title="Visao geral do Gestao 360"
-        description="Resumo executivo, pendencias operacionais e atalhos para lancar dados ou analisar desempenho."
+        eyebrow="Início"
+        title="Visão geral do Gestão 360"
+        description="Resumo executivo, pendências operacionais e atalhos para lancar dados ou analisar desempenho."
         actions={
           <>
             <Button variant="outline" asChild>
               <Link href="/launches">
                 <Zap className="mr-2 h-4 w-4" />
-                Lancamentos
+                Lançamentos
               </Link>
             </Button>
             <Button asChild>
               <Link href="/visualization">
                 <LayoutDashboard className="mr-2 h-4 w-4" />
-                Visualizacao
+                Visualização
               </Link>
             </Button>
           </>
@@ -112,19 +112,19 @@ export default function HomePage() {
       />
 
       <div className="mb-6 grid grid-cols-1 gap-4 lg:grid-cols-3">
-        {productAreas.map((area) => {
-          const Icon = area.icon;
+        {productAreas.map((área) => {
+          const Icon = área.icon;
           return (
-            <Link key={area.href} href={area.href} className="panel panel-hover flex items-start gap-4 p-5">
+            <Link key={área.href} href={área.href} className="panel panel-hover flex items-start gap-4 p-5">
               <div className="grid h-11 w-11 shrink-0 place-items-center rounded-lg bg-primary text-primary-foreground">
                 <Icon className="h-5 w-5" />
               </div>
               <div className="min-w-0 flex-1">
                 <div className="flex items-center justify-between gap-3">
-                  <h2 className="text-base font-semibold">{area.title}</h2>
+                  <h2 className="text-base font-semibold">{área.title}</h2>
                   <ArrowRight className="h-4 w-4 text-muted-foreground" />
                 </div>
-                <p className="mt-1 text-sm leading-relaxed text-muted-foreground">{area.description}</p>
+                <p className="mt-1 text-sm leading-relaxed text-muted-foreground">{área.description}</p>
               </div>
             </Link>
           );
@@ -149,7 +149,7 @@ export default function HomePage() {
           href="/visualization"
         />
         <MetricCard
-          title="Criticos"
+          title="Críticos"
           value={formatNumber((ov?.counts.RED ?? 0) + (ov?.criticalDeviations ?? 0))}
           description="Indicadores e desvios"
           icon={<AlertTriangle className="h-4 w-4" />}
@@ -157,9 +157,9 @@ export default function HomePage() {
           href="/visualization"
         />
         <MetricCard
-          title="Pendencias"
+          title="Pendências"
           value={formatNumber((pending.data?.pending ?? 0) + (ov?.overdueActions ?? 0))}
-          description="Lancamentos e acoes"
+          description="Lançamentos e ações"
           icon={<ClipboardList className="h-4 w-4" />}
           tone="yellow"
           href="/launches"
@@ -168,7 +168,7 @@ export default function HomePage() {
 
       <div className="mb-6 grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
         <MetricCard
-          title="Acoes abertas"
+          title="Ações abertas"
           value={formatNumber(ov?.openActions)}
           description={`${formatNumber(ov?.doneActions)} concluidas`}
           icon={<ClipboardList className="h-4 w-4" />}
@@ -176,7 +176,7 @@ export default function HomePage() {
           href="/actions"
         />
         <MetricCard
-          title="Acoes atrasadas"
+          title="Ações atrasadas"
           value={formatNumber(ov?.overdueActions)}
           description="Prazos vencidos"
           icon={<AlertTriangle className="h-4 w-4" />}
@@ -192,9 +192,9 @@ export default function HomePage() {
           href="/deviations"
         />
         <MetricCard
-          title="Reunioes pendentes"
+          title="Reuniões pendentes"
           value={formatNumber(ov?.pendingMeetings)}
-          description="Proximos 7 dias"
+          description="Próximos 7 dias"
           icon={<CalendarClock className="h-4 w-4" />}
           tone="blue"
           href="/meetings"
@@ -202,11 +202,11 @@ export default function HomePage() {
       </div>
 
       <div className="grid grid-cols-1 gap-6 xl:grid-cols-[1fr,380px]">
-        <SectionCard title="Atalhos rapidos" description="Acoes frequentes da rotina corporativa." contentClassName="grid grid-cols-1 gap-3 md:grid-cols-2">
+        <SectionCard title="Atalhos rapidos" description="Ações frequentes da rotina corporativa." contentClassName="grid grid-cols-1 gap-3 md:grid-cols-2">
           {[
             { href: '/results', label: 'Lancar resultado', icon: LineChart, tone: 'blue' },
             { href: '/indicators/new', label: 'Cadastrar indicador', icon: Target, tone: 'green' },
-            { href: '/actions', label: 'Planos de acao', icon: ClipboardList, tone: 'purple' },
+            { href: '/actions', label: 'Planos de ação', icon: ClipboardList, tone: 'purple' },
             { href: '/reports', label: 'Exportar relatorio', icon: LayoutDashboard, tone: 'yellow' },
           ].map((item) => {
             const Icon = item.icon;
@@ -227,9 +227,9 @@ export default function HomePage() {
           <div className="mb-4 rounded-lg border bg-muted/35 p-3">
             <div className="flex items-center justify-between gap-3">
               <div>
-                <div className="text-sm font-semibold">Lancamentos pendentes</div>
+                <div className="text-sm font-semibold">Lançamentos pendentes</div>
                 <div className="text-xs text-muted-foreground">
-                  {pending.data ? periodRefLabel(pending.data.periodRef) : 'Periodo atual'}
+                  {pending.data ? periodRefLabel(pending.data.periodRef) : 'Período atual'}
                 </div>
               </div>
               <div className="text-2xl font-semibold">{formatNumber(pending.data?.pending)}</div>
@@ -257,12 +257,12 @@ export default function HomePage() {
                     <span>{w.indicator.ownerNode.name} - {periodRefLabel(w.periodRef)}</span>
                   </div>
                 </div>
-                <StatusBadge value={w.light} label={w.light === 'RED' ? 'Critico' : w.light} />
+                <StatusBadge value={w.light} label={w.light === 'RED' ? 'Crítico' : w.light} />
               </Link>
             ))}
             {!worst.isLoading && (worst.data?.length ?? 0) === 0 && (
               <div className="rounded-lg border border-dashed p-4 text-center text-sm text-muted-foreground">
-                Nenhum alerta critico no momento.
+                Nenhum alerta crítico no momento.
               </div>
             )}
           </div>
@@ -270,13 +270,13 @@ export default function HomePage() {
       </div>
 
       <div className="mt-6 grid grid-cols-1 gap-6 xl:grid-cols-2">
-        <SectionCard title="Proximos vencimentos" description="Acoes que precisam de acompanhamento na semana.">
+        <SectionCard title="Próximos vencimentos" description="Ações que precisam de acompanhamento na semana.">
           <div className="space-y-3">
             {ov?.dueSoonActions?.map((action) => (
               <Link key={action.id} href={`/actions/${action.id}`} className="flex items-center justify-between gap-3 rounded-lg border p-3 transition-colors hover:bg-accent/35">
                 <div className="min-w-0">
                   <div className="truncate text-sm font-semibold">{action.title}</div>
-                  <div className="text-xs text-muted-foreground">{action.responsibleUser?.name ?? 'Sem responsavel'}</div>
+                  <div className="text-xs text-muted-foreground">{action.responsibleUser?.name ?? 'Sem responsável'}</div>
                 </div>
                 <div className="text-right text-xs">
                   <div className="font-medium">{formatDate(action.dueDate)}</div>
@@ -286,7 +286,7 @@ export default function HomePage() {
             ))}
             {(!ov?.dueSoonActions || ov.dueSoonActions.length === 0) && (
               <div className="rounded-lg border border-dashed p-4 text-center text-sm text-muted-foreground">
-                Nenhuma acao vencendo nos proximos dias.
+                Nenhuma ação vencendo nos próximos dias.
               </div>
             )}
           </div>
@@ -322,12 +322,12 @@ export default function HomePage() {
 
 function treatmentStatusLabel(status: string) {
   const labels: Record<string, string> = {
-    AWAITING_CAUSE_ANALYSIS: 'Sem analise',
-    CAUSE_ANALYSIS_CREATED: 'Sem reuniao',
-    MEETING_SCHEDULED: 'Sem acao',
+    AWAITING_CAUSE_ANALYSIS: 'Sem análise',
+    CAUSE_ANALYSIS_CREATED: 'Sem reunião',
+    MEETING_SCHEDULED: 'Sem ação',
     ACTION_PLAN_CREATED: 'Em execucao',
-    ACTIONS_OVERDUE: 'Acoes atrasadas',
-    UNRESOLVED: 'Nao resolvido',
+    ACTIONS_OVERDUE: 'Ações atrasadas',
+    UNRESOLVED: 'Não resolvido',
   };
   return labels[status] ?? status;
 }

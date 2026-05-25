@@ -108,7 +108,7 @@ export class DeviationsService {
       entityType: TraceEntityType.DEVIATION,
       entityId: result.id,
       title: `Desvio #${result.number} aberto`,
-      description: input.title ?? `Desvio aberto para o periodo ${input.periodRef}`,
+      description: input.title ?? `Desvio aberto para o período ${input.periodRef}`,
       statusTo: DeviationStatus.OPEN,
       metadata: { periodRef: input.periodRef, severity: input.severity ?? DeviationSeverity.MODERATE },
     });
@@ -179,7 +179,7 @@ export class DeviationsService {
         entityId: analysis.id,
         relatedType: TraceEntityType.DEVIATION,
         relatedId: deviationId,
-        title: `Analise de causa registrada (${method})`,
+        title: `Análise de causa registrada (${method})`,
         description: content,
         metadata: { method, deviationNumber: dev.number },
       });
@@ -238,7 +238,7 @@ export class DeviationsService {
       entityId: action.id,
       relatedType: TraceEntityType.DEVIATION,
       relatedId: dev.id,
-      title: 'Plano de acao criado a partir do desvio',
+      title: 'Plano de ação criado a partir do desvio',
       description: action.title,
       statusFrom: dev.status,
       statusTo: DeviationStatus.WAITING_ACTION,
@@ -254,7 +254,7 @@ export class DeviationsService {
     const open = dev.actions.filter((a) => !completedStatuses.includes(a.status));
     if (open.length > 0) {
       throw new NotFoundException(
-        `Existem ${open.length} acao(oes) abertas. Conclua-as antes de fechar o desvio.`,
+        `Existem ${open.length} ação(oes) abertas. Conclua-as antes de fechar o desvio.`,
       );
     }
     const lateClose = dev.dueDate && dev.dueDate < new Date();

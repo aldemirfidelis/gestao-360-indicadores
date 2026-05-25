@@ -51,28 +51,28 @@ interface ActionRow {
 const launchCards = [
   {
     title: 'Cadastro de Indicadores',
-    description: 'KPIs, metas, areas, formulas e responsaveis.',
+    description: 'KPIs, metas, áreas, formulas e responsáveis.',
     href: '/indicators/new',
     icon: Target,
     action: 'Novo indicador',
   },
   {
     title: 'Resultado de Indicadores',
-    description: 'Realizado mensal, farol automatico e desvios.',
+    description: 'Realizado mensal, farol automático e desvios.',
     href: '/results',
     icon: LineChart,
     action: 'Lancar resultado',
   },
   {
-    title: 'Planos de Acao',
+    title: 'Planos de Ação',
     description: 'Prazos, prioridades, progresso e evidencias.',
     href: '/actions',
     icon: ClipboardList,
     action: 'Abrir planos',
   },
   {
-    title: 'Nao Conformidades',
-    description: 'FCA, causas, tratativas e responsaveis.',
+    title: 'Não Conformidades',
+    description: 'FCA, causas, tratativas e responsáveis.',
     href: '/deviations',
     icon: AlertTriangle,
     action: 'Analisar desvios',
@@ -86,7 +86,7 @@ const launchCards = [
   },
   {
     title: 'Arquivos e Evidencias',
-    description: 'Uploads, CSV, modelos e historico.',
+    description: 'Uploads, CSV, modelos e histórico.',
     href: '/imports',
     icon: FileUp,
     action: 'Enviar arquivo',
@@ -114,19 +114,19 @@ export default function LaunchesPage() {
   return (
     <div>
       <PageHeader
-        eyebrow="Lancamentos"
+        eyebrow="Lançamentos"
         tone="launch"
         title="Central operacional"
-        description="Cadastros, alimentacao de resultados, registros de acoes, evidencias e rotinas de execucao."
+        description="Cadastros, alimentacao de resultados, registros de ações, evidencias e rotinas de execucao."
         actions={
           <Button asChild>
             <Link href="/results">
               <Plus className="mr-2 h-4 w-4" />
-              Novo lancamento
+              Novo lançamento
             </Link>
           </Button>
         }
-        breadcrumbs={[{ label: 'Inicio', href: '/' }, { label: 'Lancamentos' }]}
+        breadcrumbs={[{ label: 'Início', href: '/' }, { label: 'Lançamentos' }]}
       />
 
       <div className="mb-6 grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
@@ -141,13 +141,13 @@ export default function LaunchesPage() {
         <MetricCard
           title="Resultados pendentes"
           value={formatNumber(pending.data?.pending)}
-          description={pending.data ? periodRefLabel(pending.data.periodRef) : 'Periodo atual'}
+          description={pending.data ? periodRefLabel(pending.data.periodRef) : 'Período atual'}
           icon={<CalendarClock className="h-4 w-4" />}
           tone="yellow"
           href="/results"
         />
         <MetricCard
-          title="Acoes abertas"
+          title="Ações abertas"
           value={formatNumber(overview.data?.openActions)}
           description="Em execucao"
           icon={<ClipboardList className="h-4 w-4" />}
@@ -155,7 +155,7 @@ export default function LaunchesPage() {
           href="/actions"
         />
         <MetricCard
-          title="Acoes atrasadas"
+          title="Ações atrasadas"
           value={formatNumber(overview.data?.overdueActions)}
           description="Requerem tratativa"
           icon={<AlertTriangle className="h-4 w-4" />}
@@ -165,7 +165,7 @@ export default function LaunchesPage() {
       </div>
 
       <div className="grid grid-cols-1 gap-6 xl:grid-cols-[1fr,360px]">
-        <SectionCard title="Rotinas de lancamento" description="Fluxos mais usados pela operacao." contentClassName="p-0">
+        <SectionCard title="Rotinas de lançamento" description="Fluxos mais usados pela operação." contentClassName="p-0">
           <div className="grid grid-cols-1 divide-y md:grid-cols-2 md:divide-x md:divide-y-0 xl:grid-cols-3">
             {launchCards.map((card) => {
               const Icon = card.icon;
@@ -191,7 +191,7 @@ export default function LaunchesPage() {
 
         <SectionCard
           title="Fila operacional"
-          description="Prazos vencidos e pendencias abertas."
+          description="Prazos vencidos e pendências abertas."
           actions={
             <Button variant="outline" size="sm" asChild>
               <Link href="/actions">Ver tudo</Link>
@@ -202,7 +202,7 @@ export default function LaunchesPage() {
           {!actions.isLoading && overdue.length === 0 && (
             <EmptyState
               title="Nenhum prazo vencido"
-              description="As pendencias criticas aparecem aqui quando exigem acao."
+              description="As pendências críticas aparecem aqui quando exigem ação."
               className="border-0 bg-transparent py-8"
             />
           )}
@@ -214,7 +214,7 @@ export default function LaunchesPage() {
                     <div className="truncate text-sm font-semibold">{a.title}</div>
                     <div className="mt-1 flex items-center gap-2 text-xs text-muted-foreground">
                       <UsersRound className="h-3.5 w-3.5" />
-                      <span className="truncate">{a.responsibleUser?.name ?? 'Sem responsavel'}</span>
+                      <span className="truncate">{a.responsibleUser?.name ?? 'Sem responsável'}</span>
                     </div>
                   </div>
                   <StatusBadge value={a.priority} label={a.priority} />

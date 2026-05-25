@@ -111,14 +111,14 @@ export default function ProjectsPage() {
       qc.invalidateQueries({ queryKey: ['projects'] });
       router.push(`/projects/${project.id}`);
     },
-    onError: (e: any) => toast.error(e?.message ?? 'Nao foi possivel criar o projeto'),
+    onError: (e: any) => toast.error(e?.message ?? 'Não foi possível criar o projeto'),
   });
 
   return (
     <div>
       <PageHeader
         title="Projetos"
-        description="Iniciativas estrategicas com cronograma, marcos e tarefas."
+        description="Iniciativas estratégicas com cronograma, marcos e tarefas."
         actions={<Button onClick={() => setOpen(true)}><Plus className="h-4 w-4 mr-2" />Novo projeto</Button>}
       />
 
@@ -149,7 +149,7 @@ export default function ProjectsPage() {
                   )}
                   <div className="grid grid-cols-3 gap-3 text-xs text-muted-foreground mt-3">
                     <div>
-                      <div className="text-[10px] uppercase">Inicio</div>
+                      <div className="text-[10px] uppercase">Início</div>
                       <div className="text-foreground">{formatDate(p.startsAt)}</div>
                     </div>
                     <div>
@@ -165,8 +165,8 @@ export default function ProjectsPage() {
                   </div>
                   <div className="mt-3 grid grid-cols-2 gap-3 text-xs text-muted-foreground">
                     <div>
-                      <div className="text-[10px] uppercase">Responsavel</div>
-                      <div className="truncate text-foreground">{p.responsible ?? 'Nao definido'}</div>
+                      <div className="text-[10px] uppercase">Responsável</div>
+                      <div className="truncate text-foreground">{p.responsible ?? 'Não definido'}</div>
                     </div>
                     <div>
                       <div className="text-[10px] uppercase">Orcamento</div>
@@ -190,7 +190,7 @@ export default function ProjectsPage() {
         {!query.isLoading && projects.length === 0 && (
           <Card className="lg:col-span-2">
             <CardContent className="py-10 text-center text-sm text-muted-foreground">
-              Nenhum projeto cadastrado. Use o botao Novo projeto para iniciar um cronograma.
+              Nenhum projeto cadastrado. Use o botão Novo projeto para iniciar um cronograma.
             </CardContent>
           </Card>
         )}
@@ -211,7 +211,7 @@ export default function ProjectsPage() {
               />
             </div>
             <div className="space-y-2">
-              <Label>Descricao</Label>
+              <Label>Descrição</Label>
               <Textarea
                 rows={4}
                 value={form.description}
@@ -221,11 +221,11 @@ export default function ProjectsPage() {
             </div>
             <div className="grid gap-3 sm:grid-cols-2">
               <div className="space-y-2">
-                <Label>Responsavel</Label>
+                <Label>Responsável</Label>
                 <Input
                   value={form.responsible}
                   onChange={(e) => setForm({ ...form, responsible: e.target.value })}
-                  placeholder="Nome do responsavel"
+                  placeholder="Nome do responsável"
                 />
               </div>
               <div className="space-y-2">
@@ -242,7 +242,7 @@ export default function ProjectsPage() {
             </div>
             <div className="grid gap-3 sm:grid-cols-3">
               <div className="space-y-2">
-                <Label>Inicio</Label>
+                <Label>Início</Label>
                 <Input
                   type="date"
                   value={form.startsAt}

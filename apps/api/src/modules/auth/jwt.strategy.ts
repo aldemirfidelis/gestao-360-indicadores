@@ -20,7 +20,7 @@ export class JwtStrategy extends PassportStrategy(Strategy, 'jwt') {
       select: { id: true, active: true, status: true, deletedAt: true },
     });
     if (!user || !user.active || user.status !== 'ACTIVE' || user.deletedAt) {
-      throw new UnauthorizedException('Usuario inativo');
+      throw new UnauthorizedException('Usuário inativo');
     }
     return payload;
   }

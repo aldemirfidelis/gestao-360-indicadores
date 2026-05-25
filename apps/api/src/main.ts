@@ -7,7 +7,7 @@ import { HttpExceptionFilter } from './common/filters/http-exception.filter';
 async function bootstrap() {
   const app = await NestFactory.create(AppModule, { cors: false });
 
-  // PORT (padrao DigitalOcean/Heroku/Render) > API_PORT > 3333
+  // PORT (padrão DigitalOcean/Heroku/Render) > API_PORT > 3333
   const port = parseInt(process.env.PORT ?? process.env.API_PORT ?? '3333', 10);
   const prefix = process.env.API_PREFIX ?? 'api';
   const corsOrigin = process.env.API_CORS_ORIGIN ?? 'http://localhost:3000';

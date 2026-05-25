@@ -57,11 +57,11 @@ interface Options {
 const STATUS_LABEL: Record<string, string> = {
   DRAFT: 'Rascunho',
   NOT_STARTED: 'Aberto',
-  UNDER_ANALYSIS: 'Em analise',
+  UNDER_ANALYSIS: 'Em análise',
   IN_PROGRESS: 'Em execucao',
   WAITING_THIRD: 'Aguardando terceiro',
   WAITING_EVIDENCE: 'Aguardando evidencia',
-  WAITING_VALIDATION: 'Aguardando validacao',
+  WAITING_VALIDATION: 'Aguardando validação',
   PAUSED: 'Pausado',
   DONE: 'Concluido',
   DONE_LATE: 'Concluido fora do prazo',
@@ -146,7 +146,7 @@ export default function ActionsPage() {
   const create = useMutation({
     mutationFn: () => api('/actions', { method: 'POST', json: toPayload(form) }),
     onSuccess: (created: any) => {
-      toast.success('Plano de acao criado');
+      toast.success('Plano de ação criado');
       setOpen(false);
       setForm({ ...emptyForm });
       qc.invalidateQueries({ queryKey: ['actions'] });
@@ -167,11 +167,11 @@ export default function ActionsPage() {
   return (
     <div>
       <PageHeader
-        eyebrow="Gestao"
+        eyebrow="Gestão"
         tone="launch"
-        title="Planos de acao"
-        description="Gestao completa da origem, analise de causa, execucao, evidencias e eficacia dos planos."
-        breadcrumbs={[{ label: 'Inicio', href: '/' }, { label: 'Planos de acao' }]}
+        title="Planos de ação"
+        description="Gestão completa da origem, análise de causa, execucao, evidencias e eficacia dos planos."
+        breadcrumbs={[{ label: 'Início', href: '/' }, { label: 'Planos de ação' }]}
         actions={
           <>
             <div className="inline-flex rounded-lg border bg-card p-1">
@@ -200,11 +200,11 @@ export default function ActionsPage() {
       <div className="mb-6 grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
         <MetricCard title="Total de planos" value={formatNumber(actions.length)} description={`${formatNumber(actions.length - done)} em aberto`} icon={<ClipboardList className="h-4 w-4" />} tone="blue" />
         <MetricCard title="Atrasados" value={formatNumber(overdue)} description={`${formatNumber(doneLate)} concluidos fora do prazo`} icon={<AlertTriangle className="h-4 w-4" />} tone="red" />
-        <MetricCard title="Sem responsavel" value={formatNumber(withoutOwner)} description={`${formatNumber(critical)} criticos`} icon={<UserRound className="h-4 w-4" />} tone="yellow" />
-        <MetricCard title="Eficacia pendente" value={formatNumber(pendingEffectiveness)} description="Aguardando verificacao" icon={<ShieldCheck className="h-4 w-4" />} tone="green" />
+        <MetricCard title="Sem responsável" value={formatNumber(withoutOwner)} description={`${formatNumber(critical)} críticos`} icon={<UserRound className="h-4 w-4" />} tone="yellow" />
+        <MetricCard title="Eficacia pendente" value={formatNumber(pendingEffectiveness)} description="Aguardando verificação" icon={<ShieldCheck className="h-4 w-4" />} tone="green" />
       </div>
 
-      <SectionCard title="Filtros avancados" description="Busque por origem, status, indicador, area ou eficacia." className="mb-6">
+      <SectionCard title="Filtros avançados" description="Busque por origem, status, indicador, área ou eficacia." className="mb-6">
         <div className="grid grid-cols-1 gap-3 md:grid-cols-5">
           <div className="relative md:col-span-2">
             <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
@@ -227,7 +227,7 @@ export default function ActionsPage() {
 
       {query.isLoading && <LoadingState />}
       {!query.isLoading && actions.length === 0 && (
-        <EmptyState title="Nenhum plano de acao" description="Crie planos a partir de indicadores, desvios, reunioes, mapa estrategico ou ocorrencias." />
+        <EmptyState title="Nenhum plano de ação" description="Crie planos a partir de indicadores, desvios, reuniões, mapa estratégico ou ocorrências." />
       )}
 
       {!query.isLoading && actions.length > 0 && view === 'kanban' && (
@@ -262,14 +262,14 @@ export default function ActionsPage() {
       )}
 
       {!query.isLoading && actions.length > 0 && view === 'list' && (
-        <SectionCard title="Lista de planos" description="Visao tabular para priorizacao, rastreabilidade e cobranca." contentClassName="p-0">
+        <SectionCard title="Lista de planos" description="Visão tabular para priorizacao, rastreabilidade e cobrança." contentClassName="p-0">
           <div className="overflow-x-auto">
             <table className="table-modern">
               <thead>
                 <tr>
                   <th className="text-left">Plano</th>
                   <th className="text-left">Origem</th>
-                  <th className="text-left">Responsavel</th>
+                  <th className="text-left">Responsável</th>
                   <th className="text-left">Prazo</th>
                   <th className="text-left">Ferramenta</th>
                   <th className="text-left">Eficacia</th>
@@ -283,7 +283,7 @@ export default function ActionsPage() {
       )}
 
       {!query.isLoading && actions.length > 0 && view === 'timeline' && (
-        <SectionCard title="Cronograma de execucao" description="Prazos ordenados para acompanhamento semanal e validacao de eficacia.">
+        <SectionCard title="Cronograma de execucao" description="Prazos ordenados para acompanhamento semanal e validação de eficacia.">
           <div className="space-y-3">
             {actions.slice().sort((a, b) => new Date(a.dueDate ?? '2999-12-31').getTime() - new Date(b.dueDate ?? '2999-12-31').getTime()).map((a) => (
               <Link key={a.id} href={`/actions/${a.id}`} className="grid gap-3 rounded-lg border p-3 transition-colors hover:bg-accent/35 md:grid-cols-[140px,1fr,180px] md:items-center">
@@ -302,7 +302,7 @@ export default function ActionsPage() {
       <Dialog open={open} onOpenChange={setOpen}>
         <DialogContent className="max-w-5xl">
           <DialogHeader>
-            <DialogTitle>Novo plano de acao</DialogTitle>
+            <DialogTitle>Novo plano de ação</DialogTitle>
           </DialogHeader>
           <ActionForm form={form} setForm={setForm} options={options.data} />
           <DialogFooter>
@@ -329,9 +329,9 @@ function ActionRow({ action: a }: { action: Action }) {
         <div className="text-sm">{a.indicator?.name ?? a.deviation?.title ?? a.meeting?.title ?? a.origin}</div>
         {a.indicatorResult && <div className="text-xs text-muted-foreground">{a.indicatorResult.periodRef} - {a.indicatorResult.light}</div>}
       </td>
-      <td>{a.responsibleUser?.name ?? 'Sem responsavel'}</td>
+      <td>{a.responsibleUser?.name ?? 'Sem responsável'}</td>
       <td className={cn(isOverdue(a) && 'font-medium text-status-red')}>{formatDate(a.dueDate)}</td>
-      <td><Badge variant="outline">{a.analysisTool ? TOOL_LABEL[a.analysisTool] ?? a.analysisTool : 'Nao definida'}</Badge></td>
+      <td><Badge variant="outline">{a.analysisTool ? TOOL_LABEL[a.analysisTool] ?? a.analysisTool : 'Não definida'}</Badge></td>
       <td><StatusBadge value={a.effectivenessStatus} label={a.effectivenessStatus} /></td>
       <td>
         <div className="min-w-32">
@@ -347,15 +347,15 @@ function ActionForm({ form, setForm, options }: { form: typeof emptyForm; setFor
   const selectedIndicator = options?.indicators.find((item) => item.id === form.indicatorId);
   return (
     <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-      <Field label="Titulo do plano" value={form.title} onChange={(title) => setForm({ ...form, title })} required />
+      <Field label="Título do plano" value={form.title} onChange={(title) => setForm({ ...form, title })} required />
       <div>
         <Label>Origem</Label>
         <NativeSelect value={form.origin} onChange={(e) => setForm({ ...form, origin: e.target.value })}>
           {(options?.origins ?? ['MANUAL', 'INDICATOR', 'DEVIATION', 'MEETING', 'STRATEGIC_MAP', 'RELATIONSHIP_MAP']).map((origin) => <option key={origin} value={origin}>{origin}</option>)}
         </NativeSelect>
       </div>
-      <SelectField label="Objetivo estrategico" value={form.strategicObjectiveId} onChange={(strategicObjectiveId) => setForm({ ...form, strategicObjectiveId })} items={options?.strategicObjectives ?? []} />
-      <SelectField label="Area ou setor" value={form.ownerNodeId} onChange={(ownerNodeId) => setForm({ ...form, ownerNodeId })} items={options?.orgNodes ?? []} />
+      <SelectField label="Objetivo estratégico" value={form.strategicObjectiveId} onChange={(strategicObjectiveId) => setForm({ ...form, strategicObjectiveId })} items={options?.strategicObjectives ?? []} />
+      <SelectField label="Área ou setor" value={form.ownerNodeId} onChange={(ownerNodeId) => setForm({ ...form, ownerNodeId })} items={options?.orgNodes ?? []} />
       <SelectField label="Indicador vinculado" value={form.indicatorId} onChange={(indicatorId) => {
         const indicator = options?.indicators.find((item) => item.id === indicatorId);
         setForm({ ...form, indicatorId, ownerNodeId: indicator?.ownerNodeId ?? form.ownerNodeId, strategicObjectiveId: indicator?.strategicObjectiveId ?? form.strategicObjectiveId, indicatorResultId: indicator?.results[0]?.id ?? '' });
@@ -363,7 +363,7 @@ function ActionForm({ form, setForm, options }: { form: typeof emptyForm; setFor
       <div>
         <Label>Resultado que gerou o plano</Label>
         <NativeSelect value={form.indicatorResultId} onChange={(e) => setForm({ ...form, indicatorResultId: e.target.value })}>
-          <option value="">Nao vinculado</option>
+          <option value="">Não vinculado</option>
           {(selectedIndicator?.results ?? []).map((result) => <option key={result.id} value={result.id}>{result.periodRef} - {result.value} ({result.light})</option>)}
         </NativeSelect>
       </div>
@@ -371,14 +371,14 @@ function ActionForm({ form, setForm, options }: { form: typeof emptyForm; setFor
         const deviation = options?.deviations.find((item) => item.id === deviationId);
         setForm({ ...form, deviationId, origin: deviationId ? 'DEVIATION' : form.origin, indicatorId: deviation?.indicatorId ?? form.indicatorId, analysisTool: deviation?.method === 'FIVE_WHYS' ? 'FIVE_WHYS' : deviation?.method ?? form.analysisTool });
       }} items={(options?.deviations ?? []).map((item) => ({ id: item.id, name: `#${item.number} - ${item.title}` }))} />
-      <SelectField label="Reuniao vinculada" value={form.meetingId} onChange={(meetingId) => setForm({ ...form, meetingId, origin: meetingId ? 'MEETING' : form.origin })} items={(options?.meetings ?? []).map((item) => ({ id: item.id, name: item.title }))} />
+      <SelectField label="Reunião vinculada" value={form.meetingId} onChange={(meetingId) => setForm({ ...form, meetingId, origin: meetingId ? 'MEETING' : form.origin })} items={(options?.meetings ?? []).map((item) => ({ id: item.id, name: item.title }))} />
       <div>
-        <Label>Ferramenta de analise</Label>
+        <Label>Ferramenta de análise</Label>
         <NativeSelect value={form.analysisTool} onChange={(e) => setForm({ ...form, analysisTool: e.target.value })}>
           {(options?.analysisTools ?? Object.keys(TOOL_LABEL)).map((tool) => <option key={tool} value={tool}>{TOOL_LABEL[tool] ?? tool}</option>)}
         </NativeSelect>
       </div>
-      <SelectField label="Responsavel" value={form.responsibleUserId} onChange={(responsibleUserId) => setForm({ ...form, responsibleUserId })} items={options?.users ?? []} />
+      <SelectField label="Responsável" value={form.responsibleUserId} onChange={(responsibleUserId) => setForm({ ...form, responsibleUserId })} items={options?.users ?? []} />
       <div>
         <Label>Prioridade</Label>
         <NativeSelect value={form.priority} onChange={(e) => setForm({ ...form, priority: e.target.value })}>
@@ -391,13 +391,13 @@ function ActionForm({ form, setForm, options }: { form: typeof emptyForm; setFor
           {['LOW', 'MEDIUM', 'HIGH', 'CRITICAL'].map((item) => <option key={item} value={item}>{item}</option>)}
         </NativeSelect>
       </div>
-      <Field label="Inicio" type="date" value={form.startDate} onChange={(startDate) => setForm({ ...form, startDate })} />
+      <Field label="Início" type="date" value={form.startDate} onChange={(startDate) => setForm({ ...form, startDate })} />
       <Field label="Prazo final" type="date" value={form.dueDate} onChange={(dueDate) => setForm({ ...form, dueDate })} />
       <div className="md:col-span-2">
-        <Text label="Descricao do problema" value={form.problemDescription} onChange={(problemDescription) => setForm({ ...form, problemDescription })} />
+        <Text label="Descrição do problema" value={form.problemDescription} onChange={(problemDescription) => setForm({ ...form, problemDescription })} />
       </div>
       <div className="md:col-span-2">
-        <Text label="Acao proposta" value={form.description} onChange={(description) => setForm({ ...form, description })} />
+        <Text label="Ação proposta" value={form.description} onChange={(description) => setForm({ ...form, description })} />
       </div>
       <div className="md:col-span-2">
         <Text label="Resultado esperado / criterio de eficacia" value={form.expectedResult} onChange={(expectedResult) => setForm({ ...form, expectedResult })} />
@@ -429,7 +429,7 @@ function SelectField({ label, value, onChange, items }: { label: string; value: 
     <div>
       <Label>{label}</Label>
       <NativeSelect value={value} onChange={(e) => onChange(e.target.value)}>
-        <option value="">Nao vinculado</option>
+        <option value="">Não vinculado</option>
         {items.map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}
       </NativeSelect>
     </div>

@@ -65,11 +65,11 @@ export default function AuditPage() {
   return (
     <div>
       <PageHeader
-        eyebrow="Configuracoes"
+        eyebrow="Configurações"
         tone="admin"
         title="Auditoria"
-        description="Rastreabilidade automatica de acessos, criacoes, edicoes, exclusoes, parametros e permissoes."
-        breadcrumbs={[{ label: 'Inicio', href: '/' }, { label: 'Configuracoes', href: '/settings' }, { label: 'Auditoria' }]}
+        description="Rastreabilidade automática de acessos, criacoes, edicoes, exclusoes, parametros e permissões."
+        breadcrumbs={[{ label: 'Início', href: '/' }, { label: 'Configurações', href: '/settings' }, { label: 'Auditoria' }]}
         actions={
           <div className="flex gap-2">
             <Button variant="outline" onClick={downloadCsv}>
@@ -84,27 +84,27 @@ export default function AuditPage() {
         }
       />
 
-      <SectionCard title="Filtros" description="Combine periodo, usuario, modulo, tipo de acao e busca livre.">
+      <SectionCard title="Filtros" description="Combine período, usuário, módulo, tipo de ação e busca livre.">
         <div className="grid grid-cols-1 gap-3 lg:grid-cols-6">
           <div className="relative lg:col-span-2">
             <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
             <Input className="pl-9" placeholder="Pesquisar no log..." value={filters.q} onChange={(e) => setFilters({ ...filters, q: e.target.value })} />
           </div>
           <NativeSelect value={filters.action} onChange={(e) => setFilters({ ...filters, action: e.target.value })}>
-            <option value="">Todas as acoes</option>
+            <option value="">Todas as ações</option>
             <option value="LOGIN">Login</option>
             <option value="LOGOUT">Logout</option>
-            <option value="CREATE">Criacao</option>
-            <option value="UPDATE">Edicao</option>
-            <option value="DELETE">Exclusao</option>
-            <option value="PERMISSION_CHANGE">Permissao</option>
+            <option value="CREATE">Criação</option>
+            <option value="UPDATE">Edição</option>
+            <option value="DELETE">Exclusão</option>
+            <option value="PERMISSION_CHANGE">Permissão</option>
           </NativeSelect>
           <NativeSelect value={filters.module} onChange={(e) => setFilters({ ...filters, module: e.target.value })}>
-            <option value="">Todos os modulos</option>
+            <option value="">Todos os módulos</option>
             {modules.map((module) => <option key={module} value={module}>{module}</option>)}
           </NativeSelect>
           <NativeSelect value={filters.userId} onChange={(e) => setFilters({ ...filters, userId: e.target.value })}>
-            <option value="">Todos usuarios</option>
+            <option value="">Todos usuários</option>
             {users.map((user) => <option key={user.id} value={user.id}>{user.name}</option>)}
           </NativeSelect>
           <Input type="date" value={filters.from} onChange={(e) => setFilters({ ...filters, from: e.target.value })} />
@@ -118,12 +118,12 @@ export default function AuditPage() {
             <thead>
               <tr>
                 <th className="text-left">Quando</th>
-                <th className="text-left">Usuario</th>
-                <th className="text-left">Acao</th>
-                <th className="text-left">Modulo</th>
+                <th className="text-left">Usuário</th>
+                <th className="text-left">Ação</th>
+                <th className="text-left">Módulo</th>
                 <th className="text-left">Registro afetado</th>
                 <th className="text-left">Resultado</th>
-                <th className="text-left">IP / sessao</th>
+                <th className="text-left">IP / sessão</th>
                 <th />
               </tr>
             </thead>
@@ -168,7 +168,7 @@ export default function AuditPage() {
               {!query.isLoading && (query.data?.length ?? 0) === 0 && (
                 <tr>
                   <td colSpan={8}>
-                    <EmptyState icon={<ScrollText className="h-5 w-5" />} title="Nenhum registro encontrado" description="Ajuste os filtros ou aguarde novas acoes do sistema." className="border-0 bg-transparent" />
+                    <EmptyState icon={<ScrollText className="h-5 w-5" />} title="Nenhum registro encontrado" description="Ajuste os filtros ou aguarde novas ações do sistema." className="border-0 bg-transparent" />
                   </td>
                 </tr>
               )}
@@ -185,8 +185,8 @@ export default function AuditPage() {
           {selected && (
             <div className="space-y-4">
               <div className="grid grid-cols-1 gap-3 md:grid-cols-4">
-                <Detail label="Acao" value={selected.action} />
-                <Detail label="Modulo" value={selected.module ?? '-'} />
+                <Detail label="Ação" value={selected.action} />
+                <Detail label="Módulo" value={selected.module ?? '-'} />
                 <Detail label="Entidade" value={selected.entity} />
                 <Detail label="Resultado" value={selected.result ?? 'SUCCESS'} />
               </div>

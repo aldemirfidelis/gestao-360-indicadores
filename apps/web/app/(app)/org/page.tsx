@@ -233,8 +233,8 @@ export default function OrgPage() {
         : createMode === 'pilar'
           ? 'Novo pilar'
           : createMode === 'micro'
-            ? 'Nova area micro'
-            : 'Nova area macro';
+            ? 'Nova área micro'
+            : 'Nova área macro';
     setForm({
       ...emptyNode,
       name: '',
@@ -249,11 +249,11 @@ export default function OrgPage() {
   return (
     <div>
       <PageHeader
-        eyebrow="Visualizacao"
+        eyebrow="Visualização"
         tone="view"
         title="Arvore de valores, diretrizes, pilares e indicadores"
-        description="Modelo livre para organizar Valores, Diretrizes, Areas, Pilares e os indicadores vinculados a cada pilar."
-        breadcrumbs={[{ label: 'Inicio', href: '/' }, { label: 'Visualizacao', href: '/visualization' }, { label: 'Arvore de gestao' }]}
+        description="Modelo livre para organizar Valores, Diretrizes, Áreas, Pilares e os indicadores vinculados a cada pilar."
+        breadcrumbs={[{ label: 'Início', href: '/' }, { label: 'Visualização', href: '/visualization' }, { label: 'Arvore de gestão' }]}
         actions={
           <Button onClick={() => openNode()}>
             <Plus className="mr-2 h-4 w-4" />
@@ -263,17 +263,17 @@ export default function OrgPage() {
       />
 
       <div className="mb-6 grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
-        <MetricCard title="Nos da estrutura" value={formatNumber(stats.total)} description="Valores, areas e pilares" icon={<Network className="h-4 w-4" />} tone="blue" />
+        <MetricCard title="Nos da estrutura" value={formatNumber(stats.total)} description="Valores, áreas e pilares" icon={<Network className="h-4 w-4" />} tone="blue" />
         <MetricCard title="Ativos" value={formatNumber(stats.active)} description="Liberados para uso" icon={<BadgeCheck className="h-4 w-4" />} tone="green" />
         <MetricCard title="Indicadores vinculados" value={formatNumber(stats.indicators)} description="Distribuidos por pilar" icon={<Target className="h-4 w-4" />} tone="purple" />
-        <MetricCard title="Com responsavel" value={formatNumber(stats.responsible)} description="Governanca atribuida" icon={<UserRound className="h-4 w-4" />} tone="yellow" />
+        <MetricCard title="Com responsável" value={formatNumber(stats.responsible)} description="Governanca atribuida" icon={<UserRound className="h-4 w-4" />} tone="yellow" />
       </div>
 
       <div className="grid grid-cols-1 gap-6 xl:grid-cols-[1fr,360px]">
-        <SectionCard title="Estrutura de gestao" description="Expanda, selecione e edite qualquer nivel da hierarquia." contentClassName="p-3">
+        <SectionCard title="Estrutura de gestão" description="Expanda, selecione e edite qualquer nível da hierarquia." contentClassName="p-3">
           {tree.isLoading && <LoadingState />}
           {!tree.isLoading && (tree.data?.length ?? 0) === 0 && (
-            <EmptyState title="Nenhuma estrutura cadastrada" description="Crie Valores, Diretrizes, Areas e Pilares para vincular indicadores." />
+            <EmptyState title="Nenhuma estrutura cadastrada" description="Crie Valores, Diretrizes, Áreas e Pilares para vincular indicadores." />
           )}
           <div className="space-y-1">
             {tree.data?.map((root) => (
@@ -284,7 +284,7 @@ export default function OrgPage() {
 
         <SectionCard title="Detalhes do item" description="Resumo e manipulacao do no selecionado.">
           {!selected && (
-            <EmptyState title="Selecione um item" description="Os detalhes de responsavel, indicadores e filhos aparecem neste painel." className="border-0 bg-transparent" />
+            <EmptyState title="Selecione um item" description="Os detalhes de responsável, indicadores e filhos aparecem neste painel." className="border-0 bg-transparent" />
           )}
           {selected && (
             <div className="space-y-4">
@@ -309,12 +309,12 @@ export default function OrgPage() {
                 </div>
               </div>
               <div className="rounded-lg border p-3">
-                <div className="text-xs text-muted-foreground">Responsavel</div>
-                <div className="mt-1 text-sm font-medium">{selected.responsibleUser?.name ?? 'Sem responsavel'}</div>
+                <div className="text-xs text-muted-foreground">Responsável</div>
+                <div className="mt-1 text-sm font-medium">{selected.responsibleUser?.name ?? 'Sem responsável'}</div>
               </div>
               {selected.description && (
                 <div className="rounded-lg border p-3">
-                  <div className="text-xs text-muted-foreground">Descricao</div>
+                  <div className="text-xs text-muted-foreground">Descrição</div>
                   <div className="mt-1 text-sm">{selected.description}</div>
                 </div>
               )}
@@ -347,11 +347,11 @@ export default function OrgPage() {
               </NativeSelect>
             </div>
             <div>
-              <Label>Codigo</Label>
+              <Label>Código</Label>
               <Input value={form.code} onChange={(e) => setForm({ ...form, code: e.target.value })} />
             </div>
             <div>
-              <Label>Nivel pai</Label>
+              <Label>Nível pai</Label>
               <NativeSelect value={form.parentId} onChange={(e) => setForm({ ...form, parentId: e.target.value })}>
                 <option value="">Raiz da estrutura</option>
                 {flat.data?.filter((node) => node.id !== form.id).map((node) => (
@@ -360,9 +360,9 @@ export default function OrgPage() {
               </NativeSelect>
             </div>
             <div>
-              <Label>Responsavel</Label>
+              <Label>Responsável</Label>
               <NativeSelect value={form.responsibleUserId} onChange={(e) => setForm({ ...form, responsibleUserId: e.target.value })}>
-                <option value="">Sem responsavel</option>
+                <option value="">Sem responsável</option>
                 {users.data?.map((u) => (
                   <option key={u.id} value={u.id}>{u.name}</option>
                 ))}
@@ -380,7 +380,7 @@ export default function OrgPage() {
               </NativeSelect>
             </div>
             <div className="md:col-span-2">
-              <Label>Descricao</Label>
+              <Label>Descrição</Label>
               <Textarea rows={3} value={form.description} onChange={(e) => setForm({ ...form, description: e.target.value })} />
             </div>
           </div>
@@ -444,7 +444,7 @@ function OrgNode({
           <span className="min-w-0">
             <span className="block truncate text-sm font-semibold">{node.name}</span>
             <span className="block truncate text-xs text-muted-foreground">
-              {TYPE_LABEL[node.type] ?? node.type} - {node.responsibleUser?.name ?? 'Sem responsavel'}
+              {TYPE_LABEL[node.type] ?? node.type} - {node.responsibleUser?.name ?? 'Sem responsável'}
             </span>
           </span>
         </button>

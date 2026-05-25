@@ -51,7 +51,7 @@ export class MeetingsService {
         calendarInvites: true,
       },
     });
-    if (!meeting) throw new NotFoundException('Reuniao nao encontrada');
+    if (!meeting) throw new NotFoundException('Reunião nao encontrada');
     return meeting;
   }
 
@@ -100,7 +100,7 @@ export class MeetingsService {
       eventType: TraceEventType.MEETING_CREATED,
       entityType: TraceEntityType.MEETING,
       entityId: meeting.id,
-      title: 'Reuniao criada',
+      title: 'Reunião criada',
       description: meeting.title,
       statusTo: meeting.startsAt > new Date() ? 'SCHEDULED' : 'DONE',
       metadata: { kind: meeting.kind, startsAt: meeting.startsAt, location: meeting.location },
@@ -137,7 +137,7 @@ export class MeetingsService {
         eventType: TraceEventType.PARTICIPANT_ADDED,
         entityType: TraceEntityType.MEETING,
         entityId: meetingId,
-        title: 'Participante adicionado a reuniao',
+        title: 'Participante adicionado a reunião',
         description: userId,
         metadata: { role },
       });
@@ -164,9 +164,9 @@ export class MeetingsService {
     body: { name: string; email: string; jobTitle?: string; area?: string; role?: MeetingParticipantRole; notes?: string },
     actorId?: string,
   ) {
-    if (!this.isEmail(body.email)) throw new NotFoundException('E-mail invalido');
+    if (!this.isEmail(body.email)) throw new NotFoundException('E-mail inválido');
     const meeting = await this.prisma.meeting.findUnique({ where: { id: meetingId } });
-    if (!meeting) throw new NotFoundException('Reuniao nao encontrada');
+    if (!meeting) throw new NotFoundException('Reunião nao encontrada');
     const guest = await this.prisma.meetingGuest.upsert({
       where: { meetingId_email: { meetingId, email: body.email.toLowerCase() } },
       create: {
@@ -214,7 +214,7 @@ export class MeetingsService {
         entityId: item.id,
         relatedType: TraceEntityType.MEETING,
         relatedId: meetingId,
-        title: 'Decisao registrada em reuniao',
+        title: 'Decisão registrada em reunião',
         description: decision,
         metadata: { owner, dueDate },
       });
@@ -247,7 +247,7 @@ export class MeetingsService {
         meetingId,
         treatmentId: meeting.treatmentId ?? null,
         title: body.title,
-        description: body.description ?? `Acao gerada na reuniao "${meeting.title}"`,
+        description: body.description ?? `Ação gerada na reunião "${meeting.title}"`,
         origin: ActionOrigin.MEETING,
         originRefId: meetingId,
         responsibleUserId: body.responsibleUserId ?? null,
@@ -276,7 +276,7 @@ export class MeetingsService {
       entityId: action.id,
       relatedType: TraceEntityType.MEETING,
       relatedId: meetingId,
-      title: 'Plano de acao criado pela reuniao',
+      title: 'Plano de ação criado pela reunião',
       description: action.title,
       statusTo: action.status,
       metadata: { meetingTitle: meeting.title, dueDate: action.dueDate, priority: action.priority },
@@ -303,7 +303,7 @@ export class MeetingsService {
       eventType: TraceEventType.MEETING_COMPLETED,
       entityType: TraceEntityType.MEETING,
       entityId: meetingId,
-      title: 'Reuniao concluida',
+      title: 'Reunião concluida',
       description: meeting.title,
       statusFrom: meeting.status,
       statusTo: updated.status,
@@ -320,7 +320,7 @@ export class MeetingsService {
     ].filter((r) => this.isEmail(r.email));
 
     if (recipients.length === 0) {
-      throw new NotFoundException('Nenhum participante com e-mail valido');
+      throw new NotFoundException('Nenhum participante com e-mail válido');
     }
 
     const ics = this.buildIcs(meeting, recipients);
@@ -343,7 +343,7 @@ export class MeetingsService {
       metadata: { recipients: recipients.length },
     });
 
-    const subject = `Convite de Reuniao - Tratativa do Indicador ${meeting.indicator?.name ?? meeting.title}`;
+    const subject = `Convite de Reunião - Tratativa do Indicador ${meeting.indicator?.name ?? meeting.title}`;
     const body = this.buildEmailBody(meeting);
     const logs = [];
     for (const recipient of recipients) {
@@ -418,29 +418,29 @@ export class MeetingsService {
     const target = indicator?.targets?.find((item: any) => item.periodRef === meeting.treatment?.periodRef)?.target;
     const agenda = meeting.agendaItems.map((item: any) => `- ${item.topic}`).join('\n');
     return [
-      `Ola.`,
+      `Olá.`,
       ``,
-      `Voce foi convidado para participar da reuniao de tratativa do indicador ${indicator?.name ?? meeting.title}.`,
+      `Você foi convidado para participar da reunião de tratativa do indicador ${indicator?.name ?? meeting.title}.`,
       ``,
-      `Este indicador encontra-se fora da meta e sera necessario analisar a causa, discutir os impactos e definir um plano de acao.`,
+      `Este indicador encontra-se fora da meta e será necessário analisar a causa, discutir os impactos e definir um plano de ação.`,
       ``,
-      `Dados da reuniao:`,
+      `Dados da reunião:`,
       `- Data: ${meeting.startsAt.toLocaleString('pt-BR')}`,
       `- Horario: ${meeting.endsAt ? `${meeting.startsAt.toLocaleTimeString('pt-BR')} ate ${meeting.endsAt.toLocaleTimeString('pt-BR')}` : meeting.startsAt.toLocaleTimeString('pt-BR')}`,
       `- Local/Link: ${meeting.location ?? '-'}`,
-      `- Responsavel: ${meeting.responsibleUser?.name ?? indicator?.responsibleUser?.name ?? '-'}`,
+      `- Responsável: ${meeting.responsibleUser?.name ?? indicator?.responsibleUser?.name ?? '-'}`,
       ``,
       `Dados do indicador:`,
       `- Indicador: ${indicator?.name ?? '-'}`,
       `- Meta: ${target ?? '-'}`,
       `- Resultado atual: ${result?.value ?? '-'}`,
       `- Desvio: ${result?.deviationPct ?? '-'}`,
-      `- Area responsavel: ${indicator?.ownerNode?.name ?? '-'}`,
+      `- Area responsável: ${indicator?.ownerNode?.name ?? '-'}`,
       ``,
       `Pauta:`,
-      agenda || '- Discussao das acoes necessarias',
+      agenda || '- Discussão das ações necessarias',
       ``,
-      `Acesse o sistema para acompanhar os detalhes e registrar as decisoes.`,
+      `Acesse o sistema para acompanhar os detalhes e registrar as decisões.`,
     ].join('\n');
   }
 
@@ -452,7 +452,7 @@ export class MeetingsService {
     return [
       'BEGIN:VCALENDAR',
       'VERSION:2.0',
-      'PRODID:-//Gestao 360//Indicadores//PT-BR',
+      'PRODID:-//Gestão 360//Indicadores//PT-BR',
       'METHOD:REQUEST',
       'BEGIN:VEVENT',
       `UID:${meeting.id}@gestao360`,

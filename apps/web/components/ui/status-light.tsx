@@ -11,8 +11,8 @@ interface Props {
 
 const map: Record<string, { pill: string; dot: string; label: string }> = {
   GREEN: { pill: 'pill-green', dot: 'bg-status-green', label: 'No alvo' },
-  YELLOW: { pill: 'pill-yellow', dot: 'bg-status-yellow', label: 'Atencao' },
-  RED: { pill: 'pill-red', dot: 'bg-status-red', label: 'Critico' },
+  YELLOW: { pill: 'pill-yellow', dot: 'bg-status-yellow', label: 'Atenção' },
+  RED: { pill: 'pill-red', dot: 'bg-status-red', label: 'Crítico' },
   GRAY: { pill: 'pill-gray', dot: 'bg-status-gray', label: 'Sem dados' },
 };
 

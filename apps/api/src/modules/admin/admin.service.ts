@@ -7,23 +7,23 @@ import { AuthPayload } from '../auth/auth.types';
 const PARAMETER_CATEGORIES: Array<{ code: string; name: string; module: string; description: string; items?: Array<{ code: string; name: string; description?: string }> }> = [
   { code: 'UNIDADES', name: 'Unidades', module: 'Estrutura', description: 'Unidades operacionais e administrativas.' },
   { code: 'SETORES', name: 'Setores', module: 'Estrutura', description: 'Setores organizacionais usados em filtros e indicadores.' },
-  { code: 'AREAS', name: 'Areas', module: 'Estrutura', description: 'Areas corporativas e de gestao.' },
+  { code: 'AREAS', name: 'Areas', module: 'Estrutura', description: 'Areas corporativas e de gestão.' },
   { code: 'SUBAREAS', name: 'Subareas', module: 'Estrutura', description: 'Subdivisoes de areas.' },
-  { code: 'CARGOS', name: 'Cargos', module: 'Usuarios', description: 'Cargos e funcoes dos usuarios.' },
+  { code: 'CARGOS', name: 'Cargos', module: 'Usuários', description: 'Cargos e funções dos usuários.' },
   { code: 'DEPARTAMENTOS', name: 'Departamentos', module: 'Estrutura', description: 'Departamentos da empresa.' },
   { code: 'CENTROS_CUSTO', name: 'Centros de custo', module: 'Financeiro', description: 'Centros de custo para planos e indicadores.' },
   { code: 'PROCESSOS', name: 'Processos', module: 'Processos', description: 'Processos controlados pelo sistema.' },
   { code: 'MACROPROCESSOS', name: 'Macroprocessos', module: 'Processos', description: 'Agrupadores de processos.' },
-  { code: 'DIRETRIZES', name: 'Diretrizes', module: 'Estrategia', description: 'Diretrizes estrategicas.' },
-  { code: 'PILARES_ESTRATEGICOS', name: 'Pilares estrategicos', module: 'Estrategia', description: 'Pilares e temas estrategicos.' },
+  { code: 'DIRETRIZES', name: 'Diretrizes', module: 'Estratégia', description: 'Diretrizes estratégicas.' },
+  { code: 'PILARES_ESTRATEGICOS', name: 'Pilares estratégicos', module: 'Estratégia', description: 'Pilares e temas estratégicos.' },
   {
     code: 'TIPOS_INDICADOR',
     name: 'Tipos de indicadores',
     module: 'Indicadores',
     description: 'Classificacao dos indicadores.',
     items: [
-      { code: 'STRATEGIC', name: 'Estrategico' },
-      { code: 'TACTICAL', name: 'Tatico' },
+      { code: 'STRATEGIC', name: 'Estratégico' },
+      { code: 'TACTICAL', name: 'Tático' },
       { code: 'OPERATIONAL', name: 'Operacional' },
       { code: 'PROCESS', name: 'Processo' },
       { code: 'CUSTOM', name: 'Personalizado' },
@@ -36,7 +36,7 @@ const PARAMETER_CATEGORIES: Array<{ code: string; name: string; module: string; 
     module: 'Indicadores',
     description: 'Frequencias de apuracao.',
     items: [
-      { code: 'DAILY', name: 'Diaria' },
+      { code: 'DAILY', name: 'Diária' },
       { code: 'WEEKLY', name: 'Semanal' },
       { code: 'BIWEEKLY', name: 'Quinzenal' },
       { code: 'MONTHLY', name: 'Mensal' },
@@ -61,14 +61,14 @@ const PARAMETER_CATEGORIES: Array<{ code: string; name: string; module: string; 
   },
   { code: 'TIPOS_META', name: 'Tipos de metas', module: 'Indicadores', description: 'Modelos de alvo e faixa.' },
   { code: 'STATUS_INDICADOR', name: 'Status de indicadores', module: 'Indicadores', description: 'Estados operacionais de indicadores.' },
-  { code: 'STATUS_PLANO_ACAO', name: 'Status de planos de acao', module: 'Planos de acao', description: 'Estados de planos de acao.' },
-  { code: 'CRITICIDADES', name: 'Criticidades', module: 'Governanca', description: 'Niveis de criticidade.' },
+  { code: 'STATUS_PLANO_ACAO', name: 'Status de planos de ação', module: 'Planos de ação', description: 'Estados de planos de ação.' },
+  { code: 'CRITICIDADES', name: 'Criticidades', module: 'Governanca', description: 'Níveis de criticidade.' },
   { code: 'PRIORIDADES', name: 'Prioridades', module: 'Governanca', description: 'Prioridades corporativas.' },
-  { code: 'TIPOS_REUNIAO', name: 'Tipos de reuniao', module: 'Reunioes', description: 'Classificacoes de reunioes.' },
-  { code: 'TIPOS_ANALISE_CAUSA', name: 'Tipos de analise de causa', module: 'Tratativas', description: 'Tipos de analise.' },
+  { code: 'TIPOS_REUNIAO', name: 'Tipos de reunião', module: 'Reuniões', description: 'Classificacoes de reuniões.' },
+  { code: 'TIPOS_ANALISE_CAUSA', name: 'Tipos de análise de causa', module: 'Tratativas', description: 'Tipos de análise.' },
   {
     code: 'METODOS_ANALISE_CAUSA',
-    name: 'Metodos de analise de causa',
+    name: 'Metodos de análise de causa',
     module: 'Tratativas',
     description: 'Metodos como 5 Porques, Ishikawa, Pareto, PDCA e FCA.',
     items: [
@@ -81,11 +81,11 @@ const PARAMETER_CATEGORIES: Array<{ code: string; name: string; module: string; 
       { code: 'DMAIC', name: 'DMAIC' },
     ],
   },
-  { code: 'MODELOS_PLANO_ACAO', name: 'Modelos de plano de acao', module: 'Planos de acao', description: 'Templates para abertura de acoes.' },
+  { code: 'MODELOS_PLANO_ACAO', name: 'Modelos de plano de ação', module: 'Planos de ação', description: 'Templates para abertura de ações.' },
   { code: 'TIPOS_EVIDENCIA', name: 'Tipos de evidencia', module: 'Evidencias', description: 'Tipos de anexo e comprovacao.' },
-  { code: 'PARAMETROS_NOTIFICACAO', name: 'Parametros de notificacao', module: 'Sistema', description: 'Regras e canais de notificacao.' },
-  { code: 'PARAMETROS_APROVACAO', name: 'Parametros de aprovacao', module: 'Sistema', description: 'Regras de aprovacao.' },
-  { code: 'PARAMETROS_GERAIS', name: 'Parametros gerais do sistema', module: 'Sistema', description: 'Configuracoes gerais.' },
+  { code: 'PARAMETROS_NOTIFICACAO', name: 'Parametros de notificação', module: 'Sistema', description: 'Regras e canais de notificação.' },
+  { code: 'PARAMETROS_APROVACAO', name: 'Parametros de aprovação', module: 'Sistema', description: 'Regras de aprovação.' },
+  { code: 'PARAMETROS_GERAIS', name: 'Parametros gerais do sistema', module: 'Sistema', description: 'Configurações gerais.' },
 ];
 
 @Injectable()
@@ -301,7 +301,7 @@ export class AdminService {
   }
 
   async createCategory(me: AuthPayload, body: any) {
-    if (!body.code || !body.name) throw new BadRequestException('Codigo e nome sao obrigatorios');
+    if (!body.code || !body.name) throw new BadRequestException('Código e nome sao obrigatorios');
     const companyId = body.global ? null : me.companyId;
     const created = await this.prisma.parameterCategory.create({
       data: {
@@ -347,7 +347,7 @@ export class AdminService {
   }
 
   async createItem(me: AuthPayload, body: any) {
-    if (!body.categoryId || !body.code || !body.name) throw new BadRequestException('Categoria, codigo e nome sao obrigatorios');
+    if (!body.categoryId || !body.code || !body.name) throw new BadRequestException('Categoria, código e nome sao obrigatorios');
     const category = await this.getCategoryOrThrow(body.categoryId, me.companyId);
     if (body.parentId) await this.ensureParameterParent(body.parentId, category.id);
     const created = await this.prisma.parameterItem.create({
@@ -394,14 +394,14 @@ export class AdminService {
   async removeItem(me: AuthPayload, id: string) {
     const before = await this.getItemOrThrow(id, me.companyId);
     const children = await this.prisma.parameterItem.count({ where: { parentId: id, deletedAt: null } });
-    if (children > 0) throw new ConflictException('Parametro possui itens filhos. Remova os vinculos antes.');
+    if (children > 0) throw new ConflictException('Parametro possui itens filhos. Remova os vínculos antes.');
     const updated = await this.prisma.parameterItem.update({ where: { id }, data: { deletedAt: new Date(), status: AdminRecordStatus.ARCHIVED, updatedById: me.sub } });
     await this.audit(me, 'DELETE', 'Parametros', 'ParameterItem', id, before, updated);
     return updated;
   }
 
   async createProfile(me: AuthPayload, body: any) {
-    if (!body.code || !body.name) throw new BadRequestException('Codigo e nome sao obrigatorios');
+    if (!body.code || !body.name) throw new BadRequestException('Código e nome sao obrigatorios');
     const created = await this.prisma.accessProfile.create({
       data: {
         companyId: me.companyId,
@@ -451,7 +451,7 @@ export class AdminService {
   async removeProfile(me: AuthPayload, id: string) {
     const before = await this.getProfile(id, me.companyId);
     const users = await this.prisma.user.count({ where: { accessProfileId: id, deletedAt: null } });
-    if (users > 0) throw new ConflictException('Perfil em uso por usuarios. Remova os vinculos antes.');
+    if (users > 0) throw new ConflictException('Perfil em uso por usuários. Remova os vínculos antes.');
     const updated = await this.prisma.accessProfile.update({ where: { id }, data: { deletedAt: new Date(), status: AdminRecordStatus.ARCHIVED, updatedById: me.sub } });
     await this.audit(me, 'DELETE', 'Seguranca', 'AccessProfile', id, before, updated);
     return updated;
@@ -539,12 +539,12 @@ export class AdminService {
   }
 
   private requireSuperAdmin(me: AuthPayload) {
-    if (me.role !== UserRoleEnum.SUPER_ADMIN) throw new ConflictException('Somente Super Admin pode executar esta acao.');
+    if (me.role !== UserRoleEnum.SUPER_ADMIN) throw new ConflictException('Somente Super Admin pode executar esta ação.');
   }
 
   private requireCompanyAccess(me: AuthPayload, companyId: string) {
     if (me.role !== UserRoleEnum.SUPER_ADMIN && me.companyId !== companyId) {
-      throw new ConflictException('Empresa fora do escopo do usuario.');
+      throw new ConflictException('Empresa fora do escopo do usuário.');
     }
   }
 
@@ -566,7 +566,7 @@ export class AdminService {
       },
       select: { id: true },
     });
-    if (found) throw new ConflictException('Filial com nome ou codigo ja cadastrada');
+    if (found) throw new ConflictException('Filial com nome ou código ja cadastrada');
   }
 
   private async audit(me: AuthPayload, action: string, module: string, entity: string, entityId: string, beforeValue: unknown, afterValue: unknown) {

@@ -64,7 +64,7 @@ export default function StrategyPage() {
       return map;
     },
     onSuccess: () => {
-      toast.success('Mapa estrategico criado');
+      toast.success('Mapa estratégico criado');
       closeDialog();
       qc.invalidateQueries({ queryKey: ['strategy', 'maps'] });
     },
@@ -122,11 +122,11 @@ export default function StrategyPage() {
   return (
     <div>
       <PageHeader
-        eyebrow="Estrategia"
+        eyebrow="Estratégia"
         tone="view"
-        title="Mapa Estrategico"
-        description="Crie, publique e mantenha mapas estrategicos editaveis conectados a Arvore Organizacional e aos indicadores."
-        breadcrumbs={[{ label: 'Inicio', href: '/' }, { label: 'Visualizacao', href: '/visualization' }, { label: 'Mapa Estrategico' }]}
+        title="Mapa Estratégico"
+        description="Crie, publique e mantenha mapas estratégicos editaveis conectados a Arvore Organizacional e aos indicadores."
+        breadcrumbs={[{ label: 'Início', href: '/' }, { label: 'Visualização', href: '/visualization' }, { label: 'Mapa Estratégico' }]}
         actions={
           <Button onClick={openCreate}>
             <Plus className="mr-2 h-4 w-4" />
@@ -139,10 +139,10 @@ export default function StrategyPage() {
         <MetricCard title="Mapas" value={formatNumber(maps.length)} description="Ciclos cadastrados" icon={<Map className="h-4 w-4" />} tone="blue" />
         <MetricCard title="Ativos" value={formatNumber(active)} description="Em acompanhamento" icon={<Map className="h-4 w-4" />} tone="green" />
         <MetricCard title="Objetivos" value={formatNumber(objectives)} description="Conectados ao desempenho" icon={<CalendarDays className="h-4 w-4" />} tone="purple" />
-        <MetricCard title="Versoes" value={formatNumber(versions)} description="Historico publicado" icon={<CalendarDays className="h-4 w-4" />} tone="yellow" />
+        <MetricCard title="Versões" value={formatNumber(versions)} description="Histórico publicado" icon={<CalendarDays className="h-4 w-4" />} tone="yellow" />
       </div>
 
-      <SectionCard title="Mapas cadastrados" description="Abra um mapa para editar perspectivas, objetivos, ligacoes e vinculos com indicadores." contentClassName="space-y-3">
+      <SectionCard title="Mapas cadastrados" description="Abra um mapa para editar perspectivas, objetivos, ligacoes e vínculos com indicadores." contentClassName="space-y-3">
         {maps.map((m) => (
           <div key={m.id} className={cn('rounded-lg border bg-card p-4', !m.active && 'opacity-60')}>
             <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
@@ -162,13 +162,13 @@ export default function StrategyPage() {
               <div className="grid grid-cols-3 gap-2 text-center text-xs text-muted-foreground sm:w-[260px]">
                 <div className="rounded-md border p-2"><strong className="block text-sm text-foreground">{m._count?.perspectives ?? 0}</strong>persp.</div>
                 <div className="rounded-md border p-2"><strong className="block text-sm text-foreground">{m._count?.objectives ?? 0}</strong>objetivos</div>
-                <div className="rounded-md border p-2"><strong className="block text-sm text-foreground">{m._count?.versions ?? 0}</strong>versoes</div>
+                <div className="rounded-md border p-2"><strong className="block text-sm text-foreground">{m._count?.versions ?? 0}</strong>versões</div>
               </div>
               <div className="flex gap-2">
                 <Button variant="outline" size="sm" onClick={() => openEdit(m)}>
                   <Edit3 className="h-4 w-4" />
                 </Button>
-                <Button variant="outline" size="sm" onClick={() => window.confirm('Inativar este mapa estrategico?') && remove.mutate(m.id)}>
+                <Button variant="outline" size="sm" onClick={() => window.confirm('Inativar este mapa estratégico?') && remove.mutate(m.id)}>
                   <Trash2 className="h-4 w-4" />
                 </Button>
               </div>
@@ -176,27 +176,27 @@ export default function StrategyPage() {
           </div>
         ))}
         {!query.isLoading && maps.length === 0 && (
-          <EmptyState title="Nenhum mapa estrategico" description="Crie o primeiro mapa para organizar perspectivas, objetivos, indicadores e relacoes." />
+          <EmptyState title="Nenhum mapa estratégico" description="Crie o primeiro mapa para organizar perspectivas, objetivos, indicadores e relações." />
         )}
       </SectionCard>
 
       <Dialog open={open} onOpenChange={setOpen}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>{editing ? 'Editar mapa estrategico' : 'Novo mapa estrategico'}</DialogTitle>
+            <DialogTitle>{editing ? 'Editar mapa estratégico' : 'Novo mapa estratégico'}</DialogTitle>
           </DialogHeader>
           <div className="space-y-4">
             <div>
               <Label>Nome *</Label>
-              <Input value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} placeholder="Ex.: Mapa Estrategico 2026" />
+              <Input value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} placeholder="Ex.: Mapa Estratégico 2026" />
             </div>
             <div>
-              <Label>Descricao</Label>
+              <Label>Descrição</Label>
               <Textarea value={form.description} onChange={(e) => setForm({ ...form, description: e.target.value })} rows={3} />
             </div>
             <div className="grid grid-cols-2 gap-3">
               <div>
-                <Label>Inicio</Label>
+                <Label>Início</Label>
                 <Input type="date" value={form.startsAt} onChange={(e) => setForm({ ...form, startsAt: e.target.value })} />
               </div>
               <div>

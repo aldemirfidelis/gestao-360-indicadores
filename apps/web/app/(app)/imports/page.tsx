@@ -82,7 +82,7 @@ export default function ImportsPage() {
       json: { target, fileName, rows },
     }),
     onSuccess: (out) => {
-      toast.success(`Importacao concluida: ${out.okRows}/${out.totalRows} linhas`);
+      toast.success(`Importação concluida: ${out.okRows}/${out.totalRows} linhas`);
       qc.invalidateQueries({ queryKey: ['imports', 'jobs'] });
       qc.invalidateQueries({ queryKey: ['indicators'] });
       qc.invalidateQueries({ queryKey: ['dashboard'] });
@@ -133,7 +133,7 @@ export default function ImportsPage() {
   return (
     <div>
       <PageHeader
-        title="Importacao de dados"
+        title="Importação de dados"
         description="CSV de indicadores, metas e realizados com preview antes de gravar."
       />
 
@@ -246,7 +246,7 @@ export default function ImportsPage() {
 
       <Card>
         <CardHeader>
-          <CardTitle>Historico de importacoes</CardTitle>
+          <CardTitle>Histórico de importações</CardTitle>
         </CardHeader>
         <CardContent className="p-0 overflow-x-auto">
           <table className="w-full text-sm">
@@ -274,7 +274,7 @@ export default function ImportsPage() {
               {(jobs.data?.length ?? 0) === 0 && (
                 <tr>
                   <td colSpan={6} className="px-4 py-6 text-center text-sm text-muted-foreground">
-                    Nenhuma importacao registrada.
+                    Nenhuma importação registrada.
                   </td>
                 </tr>
               )}
@@ -297,7 +297,7 @@ function exampleRow(target: Target): Record<string, string> {
         periodicity: 'MONTHLY',
         direction: 'HIGHER_BETTER',
         ownerCode: 'RH',
-        description: 'Descricao do indicador',
+        description: 'Descrição do indicador',
       };
     case 'TARGETS':
       return { code: 'EX-001', periodRef: '2026-06', target: '95', lowerBound: '', upperBound: '' };

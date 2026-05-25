@@ -65,7 +65,7 @@ export function NotificationsBell() {
   const markAll = useMutation({
     mutationFn: () => api('/notifications/read-all', { method: 'POST' }),
     onSuccess: () => {
-      toast.success('Notificacoes marcadas como lidas');
+      toast.success('Notificações marcadas como lidas');
       qc.invalidateQueries({ queryKey: ['notifications'] });
     },
   });
@@ -73,7 +73,7 @@ export function NotificationsBell() {
   const generate = useMutation({
     mutationFn: () => api<{ generated: number }>('/notifications/generate', { method: 'POST' }),
     onSuccess: (out) => {
-      toast.success(`${out.generated} nova(s) notificacao(oes) gerada(s)`);
+      toast.success(`${out.generated} nova(s) notificação(oes) gerada(s)`);
       qc.invalidateQueries({ queryKey: ['notifications'] });
     },
   });
@@ -86,7 +86,7 @@ export function NotificationsBell() {
         variant="ghost"
         size="icon"
         onClick={() => setOpen(true)}
-        aria-label="Notificacoes"
+        aria-label="Notificações"
         className="relative"
       >
         {unread > 0 ? <BellRing className="h-4 w-4" /> : <Bell className="h-4 w-4" />}
@@ -100,7 +100,7 @@ export function NotificationsBell() {
       <Dialog open={open} onOpenChange={setOpen}>
         <DialogContent className="max-w-md sm:max-w-lg">
           <DialogHeader>
-            <DialogTitle>Notificacoes</DialogTitle>
+            <DialogTitle>Notificações</DialogTitle>
             <DialogDescription>
               {unread > 0 ? `${unread} nao lida(s)` : 'Tudo em dia.'}
             </DialogDescription>
@@ -129,7 +129,7 @@ export function NotificationsBell() {
             )}
             {list.data?.length === 0 && (
               <p className="text-sm text-muted-foreground text-center py-6">
-                Nenhuma notificacao por aqui.
+                Nenhuma notificação por aqui.
               </p>
             )}
             {list.data?.map((n) => {

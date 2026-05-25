@@ -165,11 +165,11 @@ export default function OkrsPage() {
   return (
     <div>
       <PageHeader
-        eyebrow="Visualizacao"
+        eyebrow="Visualização"
         tone="view"
         title="OKRs"
         description="Ciclos objetivos: crie o ciclo, defina objetivos, adicione KRs e registre check-ins semanais."
-        breadcrumbs={[{ label: 'Inicio', href: '/' }, { label: 'Visualizacao', href: '/visualization' }, { label: 'OKRs' }]}
+        breadcrumbs={[{ label: 'Início', href: '/' }, { label: 'Visualização', href: '/visualization' }, { label: 'OKRs' }]}
         actions={
           <>
             <Button variant="outline" onClick={() => setCycleOpen(true)}>
@@ -196,7 +196,7 @@ export default function OkrsPage() {
       <div className="mb-6 grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
         <MetricCard title="Ciclo ativo" value={activeCycle?.name ?? '-'} description={activeCycle ? `${formatDate(activeCycle.startsAt)} - ${formatDate(activeCycle.endsAt)}` : 'Crie um ciclo'} tone="blue" />
         <MetricCard title="Objetivos" value={formatNumber(stats.objectives)} description="No ciclo selecionado" icon={<Target className="h-4 w-4" />} tone="purple" />
-        <MetricCard title="Key Results" value={formatNumber(stats.krs)} description="Metrica de resultado" icon={<Target className="h-4 w-4" />} tone="green" />
+        <MetricCard title="Key Results" value={formatNumber(stats.krs)} description="Métrica de resultado" icon={<Target className="h-4 w-4" />} tone="green" />
         <MetricCard title="Progresso medio" value={formatPercent(stats.progress)} description={`${stats.risk} em risco`} icon={<Target className="h-4 w-4" />} tone="yellow" />
       </div>
 
@@ -249,7 +249,7 @@ export default function OkrsPage() {
                     <div className="font-medium">{kr.metric}</div>
                     <div className="text-xs text-muted-foreground">peso {kr.weight} - {kr.direction}</div>
                   </div>
-                  <div className="text-xs text-muted-foreground">Inicio <strong className="text-foreground">{kr.startValue}</strong></div>
+                  <div className="text-xs text-muted-foreground">Início <strong className="text-foreground">{kr.startValue}</strong></div>
                   <div className="text-xs text-muted-foreground">Meta <strong className="text-foreground">{kr.targetValue}</strong></div>
                   <div className="flex items-center gap-3">
                     <Input
@@ -297,7 +297,7 @@ export default function OkrsPage() {
             </div>
             <div className="grid grid-cols-2 gap-3">
               <div>
-                <Label>Inicio</Label>
+                <Label>Início</Label>
                 <Input type="date" value={cycleForm.startsAt} onChange={(e) => setCycleForm({ ...cycleForm, startsAt: e.target.value })} />
               </div>
               <div>
@@ -322,7 +322,7 @@ export default function OkrsPage() {
               <Input value={objectiveForm.name} onChange={(e) => setObjectiveForm({ ...objectiveForm, name: e.target.value })} />
             </div>
             <div>
-              <Label>Descricao</Label>
+              <Label>Descrição</Label>
               <Textarea value={objectiveForm.description} onChange={(e) => setObjectiveForm({ ...objectiveForm, description: e.target.value })} />
             </div>
             <div className="grid grid-cols-2 gap-3">
@@ -351,12 +351,12 @@ export default function OkrsPage() {
           <DialogHeader><DialogTitle>Novo Key Result</DialogTitle></DialogHeader>
           <div className="space-y-3">
             <div>
-              <Label>Metrica</Label>
+              <Label>Métrica</Label>
               <Input value={krForm.metric} onChange={(e) => setKrForm({ ...krForm, metric: e.target.value })} />
             </div>
             <div className="grid grid-cols-3 gap-3">
               <div>
-                <Label>Inicio</Label>
+                <Label>Início</Label>
                 <Input type="number" value={krForm.startValue} onChange={(e) => setKrForm({ ...krForm, startValue: Number(e.target.value) })} />
               </div>
               <div>
@@ -369,7 +369,7 @@ export default function OkrsPage() {
               </div>
             </div>
             <div>
-              <Label>Direcao</Label>
+              <Label>Direção</Label>
               <NativeSelect value={krForm.direction} onChange={(e) => setKrForm({ ...krForm, direction: e.target.value })}>
                 <option value="HIGHER_BETTER">Quanto maior, melhor</option>
                 <option value="LOWER_BETTER">Quanto menor, melhor</option>

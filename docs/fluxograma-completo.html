@@ -3,7 +3,7 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>Fluxograma Completo - Gestao 360 Indicadores</title>
+    <title>Fluxograma Completo - Gestão 360 Indicadores</title>
     <style>
       :root {
         color-scheme: light;
@@ -209,8 +209,8 @@
     <header>
       <div class="bar">
         <div>
-          <h1>Fluxograma Completo - Gestao 360 Indicadores</h1>
-          <p>Documentacao visual para usuarios, gestores e equipe tecnica.</p>
+          <h1>Fluxograma Completo - Gestão 360 Indicadores</h1>
+          <p>Documentação visual para usuários, gestores e equipe técnica.</p>
         </div>
         <div class="actions">
           <button class="secondary" type="button" onclick="window.print()">Imprimir / Salvar PDF</button>
@@ -223,9 +223,9 @@
       <div class="intro">
         <h2>Como usar</h2>
         <p>
-          Abra este arquivo no navegador para ver os fluxogramas renderizados. Use os botoes de cada
+          Abra este arquivo no navegador para ver os fluxogramas renderizados. Use os botões de cada
           diagrama para baixar SVG, ou use <strong>Imprimir / Salvar PDF</strong> para gerar uma
-          versao de distribuicao.
+          versão de distribuicao.
         </p>
         <div class="grid">
           <div class="metric">
@@ -234,7 +234,7 @@
           </div>
           <div class="metric">
             <strong>Backend</strong>
-            NestJS, Prisma, JWT, Zod, Helmet, Throttler e modulos de negocio.
+            NestJS, Prisma, JWT, Zod, Helmet, Throttler e módulos de negócio.
           </div>
           <div class="metric">
             <strong>Banco</strong>
@@ -242,7 +242,7 @@
           </div>
           <div class="metric">
             <strong>Ciclo principal</strong>
-            Planejar, medir, analisar desvios, executar acoes e reportar.
+            Planejar, medir, analisar desvios, executar ações e reportar.
           </div>
         </div>
       </div>
@@ -253,11 +253,11 @@
         <div class="diagram-wrap">
           <pre id="arquitetura" class="mermaid">
 flowchart LR
-  U["Usuario / Gestor"] --> W["Frontend Next.js 14<br/>apps/web"]
+  U["Usuário / Gestor"] --> W["Frontend Next.js 14<br/>apps/web"]
   W --> A["Cliente API<br/>lib/api.ts"]
   A -->|Bearer JWT| B["Backend NestJS<br/>apps/api"]
   B --> G["Guards globais<br/>JWT + Roles + Throttler"]
-  G --> M["Modulos de negocio<br/>auth, indicadores, resultados,<br/>desvios, acoes, dashboard..."]
+  G --> M["Módulos de negócio<br/>auth, indicadores, resultados,<br/>desvios, ações, dashboard..."]
   M --> P["Prisma Service"]
   P --> DB[("PostgreSQL<br/>41 entidades")]
   M --> S["Package compartilhado<br/>packages/shared"]
@@ -270,10 +270,10 @@ flowchart LR
           </pre>
         </div>
         <ol>
-          <li>O usuario trabalha no frontend, que chama a API com JWT.</li>
-          <li>O backend aplica autenticacao, perfis, validacao, CORS, helmet e throttling.</li>
+          <li>O usuário trabalha no frontend, que chama a API com JWT.</li>
+          <li>O backend aplica autenticacao, perfis, validação, CORS, helmet e throttling.</li>
           <li>Prisma centraliza acesso ao PostgreSQL; <code>@g360/shared</code> centraliza enums, Zod e farol.</li>
-          <li>Redis/BullMQ esta preparado para evoluir notificacoes para fila ou cron.</li>
+          <li>Redis/BullMQ esta preparado para evoluir notificações para fila ou cron.</li>
         </ol>
       </section>
 
@@ -283,34 +283,34 @@ flowchart LR
         <div class="diagram-wrap">
           <pre id="jornada" class="mermaid">
 flowchart TD
-  A["Inicio<br/>Setup local ou deploy"] --> B["Empresa, filiais,<br/>usuarios e permissoes"]
+  A["Início<br/>Setup local ou deploy"] --> B["Empresa, filiais,<br/>usuários e permissões"]
   B --> C["Login"]
   C --> D{"Credenciais validas?"}
-  D -- "Nao" --> C1["Erro de login"]
+  D -- "Não" --> C1["Erro de login"]
   D -- "Sim" --> E["Tokens + auditoria"]
   E --> F["Dashboard executivo"]
-  F --> G["Base corporativa<br/>empresa, estrutura, usuarios"]
-  G --> H["Estrategia<br/>BSC e OKRs"]
+  F --> G["Base corporativa<br/>empresa, estrutura, usuários"]
+  G --> H["Estratégia<br/>BSC e OKRs"]
   H --> I["Indicadores,<br/>metas e arvore"]
-  I --> J["Lancamento manual<br/>ou importacao CSV"]
+  I --> J["Lançamento manual<br/>ou importação CSV"]
   J --> K["Farol e atingimento<br/>automaticos"]
   K --> L{"Farol vermelho?"}
-  L -- "Nao" --> M["Dashboards, relatorios,<br/>insights e acompanhamento"]
+  L -- "Não" --> M["Dashboards, relatorios,<br/>insights e acompanhamento"]
   L -- "Sim" --> N["Abrir desvio<br/>e analisar causa"]
-  N --> O["Criar plano de acao"]
+  N --> O["Criar plano de ação"]
   O --> P["Executar tarefas<br/>e atualizar progresso"]
-  P --> Q{"Acoes concluidas?"}
-  Q -- "Nao" --> P
+  P --> Q{"Ações concluidas?"}
+  Q -- "Não" --> P
   Q -- "Sim" --> R["Fechar desvio"]
-  R --> S["Auditoria,<br/>notificacoes e reports"]
-  M --> T["Novo ciclo de gestao"]
+  R --> S["Auditoria,<br/>notificações e reports"]
+  M --> T["Novo ciclo de gestão"]
   S --> T
   T --> J
           </pre>
         </div>
         <p>
           Esse e o ciclo operacional do sistema: configurar a empresa, planejar metas, medir resultados,
-          detectar problemas, tratar desvios, executar acoes e voltar ao acompanhamento executivo.
+          detectar problemas, tratar desvios, executar ações e voltar ao acompanhamento executivo.
         </p>
       </section>
 
@@ -320,74 +320,74 @@ flowchart TD
         <div class="diagram-wrap">
           <pre id="kpi" class="mermaid">
 flowchart TD
-  A["Cadastrar indicador"] --> B["Area dona, responsavel,<br/>periodicidade, direcao e peso"]
+  A["Cadastrar indicador"] --> B["Área dona, responsável,<br/>periodicidade, direção e peso"]
   B --> C[("Indicator")]
   C --> D["Cadastrar metas<br/>por periodRef"]
   D --> E[("IndicatorTarget")]
-  E --> F["Lancamento manual<br/>ou importacao"]
-  F --> G["Busca meta do periodo"]
+  E --> F["Lançamento manual<br/>ou importação"]
+  F --> G["Busca meta do período"]
   G --> H["calcStatus"]
   H --> I[("IndicatorResult<br/>light + attainment + desvios")]
   I --> J{"Farol vermelho?"}
-  J -- "Nao" --> K["Atualiza dashboard,<br/>series e relatorios"]
+  J -- "Não" --> K["Atualiza dashboard,<br/>series e relatorios"]
   J -- "Sim" --> L["UI sugere abrir desvio"]
   L --> M[("Deviation")]
           </pre>
         </div>
         <table>
-          <thead><tr><th>Direcao</th><th>Regra de leitura</th></tr></thead>
+          <thead><tr><th>Direção</th><th>Regra de leitura</th></tr></thead>
           <tbody>
-            <tr><td><code>HIGHER_BETTER</code></td><td>Quanto maior melhor; abaixo da meta usa tolerancia amarela antes de vermelho.</td></tr>
-            <tr><td><code>LOWER_BETTER</code></td><td>Quanto menor melhor; acima da meta usa tolerancia amarela antes de vermelho.</td></tr>
+            <tr><td><code>HIGHER_BETTER</code></td><td>Quanto maior melhor; abaixo da meta usa tolerância amarela antes de vermelho.</td></tr>
+            <tr><td><code>LOWER_BETTER</code></td><td>Quanto menor melhor; acima da meta usa tolerância amarela antes de vermelho.</td></tr>
             <tr><td><code>EQUAL_TARGET</code></td><td>Quanto mais perto da meta melhor.</td></tr>
-            <tr><td><code>RANGE</code></td><td>Verde dentro da faixa; amarelo ou vermelho fora dela conforme tolerancia.</td></tr>
+            <tr><td><code>RANGE</code></td><td>Verde dentro da faixa; amarelo ou vermelho fora dela conforme tolerância.</td></tr>
           </tbody>
         </table>
       </section>
 
       <section>
-        <h2>4. Desvios e planos de acao</h2>
+        <h2>4. Desvios e planos de ação</h2>
         <div class="download-row"><button type="button" onclick="downloadSvg('desvios')">Baixar SVG</button></div>
         <div class="diagram-wrap">
           <pre id="desvios" class="mermaid">
 flowchart TD
   A["Resultado vermelho<br/>ou abertura manual"] --> B["Abrir desvio"]
-  B --> C["Numero sequencial<br/>por empresa"]
-  C --> D["Fato, impacto,<br/>responsavel, prazo e metodo"]
-  D --> E["Causas e analises<br/>FCA, 5 Porques,<br/>Ishikawa, Pareto, CAPA"]
-  E --> F["Criar acoes vinculadas"]
+  B --> C["Número sequencial<br/>por empresa"]
+  C --> D["Fato, impacto,<br/>responsável, prazo e metodo"]
+  D --> E["Causas e análises<br/>FCA, 5 Porques,<br/>Ishikawa, Pareto, CAPA"]
+  E --> F["Criar ações vinculadas"]
   F --> G["Subtarefas"]
-  G --> H["Recalculo automatico<br/>do progresso"]
-  H --> I["Concluir acao"]
+  G --> H["Recalculo automático<br/>do progresso"]
+  H --> I["Concluir ação"]
   I --> J{"Concluiu atrasada?"}
   J -- "Sim" --> K["DONE_LATE"]
-  J -- "Nao" --> L["DONE"]
+  J -- "Não" --> L["DONE"]
   K --> M["Tentar fechar desvio"]
   L --> M
-  M --> N{"Existe acao aberta?"}
+  M --> N{"Existe ação aberta?"}
   N -- "Sim" --> O["Bloqueia fechamento"]
-  N -- "Nao" --> P{"Fechou atrasado?"}
+  N -- "Não" --> P{"Fechou atrasado?"}
   P -- "Sim" --> Q["CLOSED_LATE"]
-  P -- "Nao" --> R["CLOSED"]
+  P -- "Não" --> R["CLOSED"]
           </pre>
         </div>
         <p>
-          O desvio so e encerrado quando todas as acoes vinculadas estao concluidas. Isso evita que
+          O desvio so e encerrado quando todas as ações vinculadas estão concluidas. Isso evita que
           um problema seja marcado como resolvido sem execucao comprovada.
         </p>
       </section>
 
       <section>
-        <h2>5. Estrategia e OKRs</h2>
-        <div class="download-row"><button type="button" onclick="downloadSvg('estrategia')">Baixar SVG</button></div>
+        <h2>5. Estratégia e OKRs</h2>
+        <div class="download-row"><button type="button" onclick="downloadSvg('estratégia')">Baixar SVG</button></div>
         <div class="diagram-wrap">
-          <pre id="estrategia" class="mermaid">
+          <pre id="estratégia" class="mermaid">
 flowchart TD
-  A["Mapa estrategico"] --> B["Perspectivas BSC"]
-  B --> C["Objetivos estrategicos"]
-  C --> D["Relacoes causa-efeito"]
+  A["Mapa estratégico"] --> B["Perspectivas BSC"]
+  B --> C["Objetivos estratégicos"]
+  C --> D["Relações causa-efeito"]
   C --> E["Indicadores vinculados"]
-  E --> F["Farol agregado<br/>por ultimo resultado"]
+  E --> F["Farol agregado<br/>por último resultado"]
   F --> G["Gestor acompanha<br/>status do objetivo"]
   A --> H["Ciclos OKR"]
   H --> I["Objetivos OKR"]
@@ -396,49 +396,49 @@ flowchart TD
   K --> L["Check-in semanal"]
   L --> M{"Progresso >= 95%?"}
   M -- "Sim" --> N["DONE"]
-  M -- "Nao" --> O{"Confianca >= 70%<br/>e progresso >= 30%?"}
+  M -- "Não" --> O{"Confianca >= 70%<br/>e progresso >= 30%?"}
   O -- "Sim" --> P["ON_TRACK"]
-  O -- "Nao" --> Q{"Confianca < 40%?"}
+  O -- "Não" --> Q{"Confianca < 40%?"}
   Q -- "Sim" --> R["OFF_TRACK"]
-  Q -- "Nao" --> S["AT_RISK"]
+  Q -- "Não" --> S["AT_RISK"]
           </pre>
         </div>
       </section>
 
       <section>
-        <h2>6. Importacao, relatorios e notificacoes</h2>
+        <h2>6. Importação, relatorios e notificações</h2>
         <div class="download-row"><button type="button" onclick="downloadSvg('dados')">Baixar SVG</button></div>
         <div class="diagram-wrap">
           <pre id="dados" class="mermaid">
 flowchart TD
   A["CSV no navegador"] --> B["Preview"]
-  B --> C["Validacao linha a linha"]
-  C --> D{"Linha valida?"}
-  D -- "Nao" --> E["Erro exibido<br/>sem gravar"]
+  B --> C["Validação linha a linha"]
+  C --> D{"Linha válida?"}
+  D -- "Não" --> E["Erro exibido<br/>sem gravar"]
   D -- "Sim" --> F["Commit"]
   F --> G[("ImportJob")]
   G --> H["Upsert de indicadores,<br/>metas ou resultados"]
   H --> I{"Importou resultado?"}
   I -- "Sim" --> J["Calcula farol"]
-  I -- "Nao" --> K["Atualiza cadastro"]
+  I -- "Não" --> K["Atualiza cadastro"]
   J --> L["Dashboard e relatorios"]
   K --> L
   L --> M["PDF executivo<br/>no browser"]
   L --> N["CSV via API"]
-  L --> O["Verificar regras<br/>de notificacao"]
-  O --> P["Acao atrasada"]
+  L --> O["Verificar regras<br/>de notificação"]
+  O --> P["Ação atrasada"]
   O --> Q["Indicador vermelho"]
   P --> R[("Notification")]
   Q --> R
           </pre>
         </div>
         <table>
-          <thead><tr><th>Saida</th><th>Como e gerada</th></tr></thead>
+          <thead><tr><th>Saída</th><th>Como e gerada</th></tr></thead>
           <tbody>
             <tr><td>PDF executivo</td><td>No frontend, com jsPDF.</td></tr>
-            <tr><td>CSVs</td><td>Na API, para indicadores, resultados, acoes e desvios.</td></tr>
-            <tr><td>Notificacoes</td><td>Sob demanda, por indicador vermelho e acao atrasada.</td></tr>
-            <tr><td>Insights</td><td>Heuristicas locais de resumo, tendencia, causa e acao.</td></tr>
+            <tr><td>CSVs</td><td>Na API, para indicadores, resultados, ações e desvios.</td></tr>
+            <tr><td>Notificações</td><td>Sob demanda, por indicador vermelho e ação atrasada.</td></tr>
+            <tr><td>Insights</td><td>Heuristicas locais de resumo, tendência, causa e ação.</td></tr>
           </tbody>
         </table>
       </section>
@@ -446,14 +446,14 @@ flowchart TD
       <section>
         <h2>7. Telas principais</h2>
         <table>
-          <thead><tr><th>Area</th><th>Rotas</th><th>Uso</th></tr></thead>
+          <thead><tr><th>Área</th><th>Rotas</th><th>Uso</th></tr></thead>
           <tbody>
-            <tr><td>Visao</td><td><code>/</code>, <code>/insights</code></td><td>Resumo executivo, riscos, tendencias e recomendacoes.</td></tr>
-            <tr><td>Estrategia</td><td><code>/strategy</code>, <code>/okrs</code></td><td>BSC, objetivos, indicadores vinculados e OKRs.</td></tr>
-            <tr><td>Performance</td><td><code>/indicators</code>, <code>/results</code>, <code>/tree</code></td><td>KPI, metas, lancamentos e impacto entre indicadores.</td></tr>
-            <tr><td>Execucao</td><td><code>/deviations</code>, <code>/actions</code>, <code>/projects</code>, <code>/meetings</code></td><td>Desvios, acoes, Gantt, reunioes e decisoes.</td></tr>
-            <tr><td>Dados</td><td><code>/imports</code>, <code>/reports</code></td><td>CSV, PDF e exportacoes.</td></tr>
-            <tr><td>Empresa</td><td><code>/org</code>, <code>/users</code>, <code>/audit</code>, <code>/settings</code></td><td>Estrutura, usuarios, auditoria e configuracoes.</td></tr>
+            <tr><td>Visão</td><td><code>/</code>, <code>/insights</code></td><td>Resumo executivo, riscos, tendências e recomendações.</td></tr>
+            <tr><td>Estratégia</td><td><code>/strategy</code>, <code>/okrs</code></td><td>BSC, objetivos, indicadores vinculados e OKRs.</td></tr>
+            <tr><td>Performance</td><td><code>/indicators</code>, <code>/results</code>, <code>/tree</code></td><td>KPI, metas, lançamentos e impacto entre indicadores.</td></tr>
+            <tr><td>Execucao</td><td><code>/deviations</code>, <code>/actions</code>, <code>/projects</code>, <code>/meetings</code></td><td>Desvios, ações, Gantt, reuniões e decisões.</td></tr>
+            <tr><td>Dados</td><td><code>/imports</code>, <code>/reports</code></td><td>CSV, PDF e exportações.</td></tr>
+            <tr><td>Empresa</td><td><code>/org</code>, <code>/users</code>, <code>/audit</code>, <code>/settings</code></td><td>Estrutura, usuários, auditoria e configurações.</td></tr>
           </tbody>
         </table>
       </section>
@@ -473,7 +473,7 @@ flowchart TD
   G --> H["pnpm dev"]
   H --> I["Web localhost:3000"]
   H --> J["API localhost:3333/api"]
-  A --> K["Producao"]
+  A --> K["Produção"]
   K --> L["Neon Postgres"]
   L --> M["GitHub repo"]
   M --> N[".do/app.yaml"]

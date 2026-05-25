@@ -22,7 +22,7 @@ interface Props {
 
 /**
  * Gantt SVG simples mas funcional. Calcula range a partir das tarefas
- * e desenha barras com progresso e ligacoes de dependencia.
+ * e desenha barras com progresso e ligacoes de dependência.
  */
 export function Gantt({ tasks, rowHeight = 38, labelWidth = 220 }: Props) {
   const valid = useMemo(
@@ -97,7 +97,7 @@ export function Gantt({ tasks, rowHeight = 38, labelWidth = 220 }: Props) {
           </g>
         )}
 
-        {/* dependencias */}
+        {/* dependências */}
         {valid.map((t, i) => {
           if (!t.dependencyId) return null;
           const depIdx = valid.findIndex((x) => x.id === t.dependencyId);

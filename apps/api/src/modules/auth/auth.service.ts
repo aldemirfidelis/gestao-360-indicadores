@@ -17,10 +17,10 @@ export class AuthService {
       where: { email: email.toLowerCase() },
     });
     if (!user || !user.active || user.status !== 'ACTIVE' || user.deletedAt) {
-      throw new UnauthorizedException('Credenciais invalidas');
+      throw new UnauthorizedException('Credenciais inválidas');
     }
     const ok = await bcrypt.compare(password, user.passwordHash);
-    if (!ok) throw new UnauthorizedException('Credenciais invalidas');
+    if (!ok) throw new UnauthorizedException('Credenciais inválidas');
 
     const payload: AuthPayload = {
       sub: user.id,
@@ -85,7 +85,7 @@ export class AuthService {
       include: { user: true },
     });
     if (!stored || stored.revokedAt || stored.expiresAt < new Date() || !stored.user.active) {
-      throw new UnauthorizedException('Refresh invalido');
+      throw new UnauthorizedException('Refresh inválido');
     }
     const payload: AuthPayload = {
       sub: stored.user.id,
@@ -147,7 +147,7 @@ export class AuthService {
         },
       },
     });
-    if (!user) throw new UnauthorizedException('Usuario nao encontrado');
+    if (!user) throw new UnauthorizedException('Usuário nao encontrado');
     const permissionKeys = new Set<string>();
     user.permissions.forEach((item) => permissionKeys.add(item.permission.key));
     user.accessProfile?.permissions.forEach((item) => permissionKeys.add(item.permission.key));

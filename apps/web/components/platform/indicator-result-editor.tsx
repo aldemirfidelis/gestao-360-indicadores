@@ -51,7 +51,7 @@ interface UpsertOutcome {
 }
 
 const periodicityLabels: Record<string, string> = {
-  DAILY: 'Diario',
+  DAILY: 'Diário',
   WEEKLY: 'Semanal',
   BIWEEKLY: 'Quinzenal',
   MONTHLY: 'Mensal',
@@ -135,7 +135,7 @@ export function IndicatorResultEditor(props: IndicatorMonthlyEditorProps) {
       }),
     onSuccess: (out) => {
       const reds = out.results.filter((r) => r.shouldOpenDeviation).length;
-      toast.success(`${out.count} lancamentos salvos${reds ? ` - ${reds} indicador(es) em vermelho` : ''}`);
+      toast.success(`${out.count} lançamentos salvos${reds ? ` - ${reds} indicador(es) em vermelho` : ''}`);
       const treatments = out.results.filter((r) => r.shouldOpenDeviation && r.treatment);
       setOffTargets(treatments);
       setOffTargetOpen(treatments.length > 0);
@@ -163,7 +163,7 @@ export function IndicatorResultEditor(props: IndicatorMonthlyEditorProps) {
     mutationFn: (treatmentId: string) =>
       api(`/treatments/${treatmentId}/ignore`, {
         method: 'POST',
-        json: { reason: ignoreReason || 'Ignorado temporariamente no lancamento de resultado.' },
+        json: { reason: ignoreReason || 'Ignorado temporariamente no lançamento de resultado.' },
       }),
     onSuccess: () => {
       toast.success('Tratativa ignorada temporariamente');
@@ -238,11 +238,11 @@ export function IndicatorResultEditor(props: IndicatorMonthlyEditorProps) {
       touched++;
     }
     if (touched === 0) {
-      toast.message('Nenhum periodo vazio a frente para replicar.');
+      toast.message('Nenhum período vazio a frente para replicar.');
       return;
     }
     setEdits(next);
-    toast.success(`Valor replicado para ${touched} periodo(s) vazio(s)`);
+    toast.success(`Valor replicado para ${touched} período(s) vazio(s)`);
   }
 
   function replicateAllFromFirstFilled() {
@@ -253,7 +253,7 @@ export function IndicatorResultEditor(props: IndicatorMonthlyEditorProps) {
       return persisted !== null && persisted !== undefined;
     });
     if (!firstFilled) {
-      toast.message('Preencha pelo menos um periodo antes de replicar.');
+      toast.message('Preencha pelo menos um período antes de replicar.');
       return;
     }
     replicateForwardFrom(firstFilled.periodRef);
@@ -275,7 +275,7 @@ export function IndicatorResultEditor(props: IndicatorMonthlyEditorProps) {
           <h3 className="mt-1 truncate text-base font-semibold">{name}</h3>
           {row && (
             <div className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 text-sm text-muted-foreground">
-              <span>{row.indicator.code ?? 'Sem codigo'}</span>
+              <span>{row.indicator.code ?? 'Sem código'}</span>
               <span>{periodicityLabels[row.indicator.periodicity] ?? row.indicator.periodicity}</span>
               <span>{unit}</span>
             </div>
@@ -297,15 +297,15 @@ export function IndicatorResultEditor(props: IndicatorMonthlyEditorProps) {
       {query.isLoading && <LoadingState className="min-h-56" />}
       {!query.isLoading && cells.length === 0 && (
         <EmptyState
-          title="Sem periodos disponiveis"
-          description="O indicador esta inativo ou ainda nao possui periodos cadastrados para o ano atual."
+          title="Sem períodos disponíveis"
+          description="O indicador esta inativo ou ainda nao possui períodos cadastrados para o ano atual."
         />
       )}
       {!query.isLoading && cells.length > 0 && (
         <>
           <div className="flex flex-wrap items-center justify-between gap-2">
             <div className="text-xs text-muted-foreground">
-              Acumulado calculado como media year-to-date dos periodos preenchidos.
+              Acumulado calculado como media year-to-date dos períodos preenchidos.
             </div>
             <Button
               type="button"
@@ -321,7 +321,7 @@ export function IndicatorResultEditor(props: IndicatorMonthlyEditorProps) {
             <table className="table-modern min-w-[760px]">
               <thead>
                 <tr>
-                  <th className="text-left">Mes/periodo</th>
+                  <th className="text-left">Mês/período</th>
                   <th className="text-left">{editingLabel}</th>
                   <th className="text-left">
                     {editingLabel} acum.
@@ -333,7 +333,7 @@ export function IndicatorResultEditor(props: IndicatorMonthlyEditorProps) {
                     <span className="ml-1 text-[10px] font-normal text-muted-foreground">(media YTD)</span>
                   </th>
                   <th className="text-center">Farol</th>
-                  <th className="text-center">Acoes</th>
+                  <th className="text-center">Ações</th>
                 </tr>
               </thead>
               <tbody>
@@ -453,8 +453,8 @@ export function IndicatorResultEditor(props: IndicatorMonthlyEditorProps) {
                     Este indicador esta fora da meta. Deseja iniciar o tratamento?
                   </div>
                   <p className="mt-1 text-sm text-muted-foreground">
-                    O sistema ja registrou a rastreabilidade inicial. Voce pode criar analise de causa,
-                    agendar reuniao, criar plano de acao ou ignorar temporariamente com justificativa.
+                    O sistema ja registrou a rastreabilidade inicial. Você pode criar análise de causa,
+                    agendar reunião, criar plano de ação ou ignorar temporariamente com justificativa.
                   </p>
                 </div>
               </div>
@@ -468,7 +468,7 @@ export function IndicatorResultEditor(props: IndicatorMonthlyEditorProps) {
                   <div>
                     <div className="font-medium">{name}</div>
                     <div className="text-xs text-muted-foreground">
-                      Periodo {periodRefLabel(item.result.periodRef)} - status {item.treatment?.status}
+                      Período {periodRefLabel(item.result.periodRef)} - status {item.treatment?.status}
                     </div>
                   </div>
                   <div className="flex flex-wrap gap-2">
@@ -476,7 +476,7 @@ export function IndicatorResultEditor(props: IndicatorMonthlyEditorProps) {
                       <Link href={`/treatments/${item.treatment?.id}`}>Iniciar tratamento</Link>
                     </Button>
                     <Button variant="outline" asChild>
-                      <Link href={`/indicators/${item.result.indicatorId}`}>Ver historico</Link>
+                      <Link href={`/indicators/${item.result.indicatorId}`}>Ver histórico</Link>
                     </Button>
                   </div>
                 </div>
@@ -488,7 +488,7 @@ export function IndicatorResultEditor(props: IndicatorMonthlyEditorProps) {
                 rows={3}
                 value={ignoreReason}
                 onChange={(e) => setIgnoreReason(e.target.value)}
-                placeholder="Explique por que esta tratativa sera adiada..."
+                placeholder="Explique por que esta tratativa será adiada..."
               />
             </div>
           </div>

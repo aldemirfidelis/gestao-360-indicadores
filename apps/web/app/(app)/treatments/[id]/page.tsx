@@ -61,14 +61,14 @@ const METHOD_LABEL: Record<string, string> = {
   DMAIC: 'DMAIC',
   FCA: 'FCA',
   CAPA: 'CAPA',
-  SIMPLE: 'Analise simples',
+  SIMPLE: 'Análise simples',
 };
 
 const steps = [
-  ['AWAITING_CAUSE_ANALYSIS', 'Analise de causa'],
-  ['CAUSE_ANALYSIS_CREATED', 'Analise criada'],
-  ['MEETING_SCHEDULED', 'Reuniao agendada'],
-  ['ACTION_PLAN_CREATED', 'Plano de acao'],
+  ['AWAITING_CAUSE_ANALYSIS', 'Análise de causa'],
+  ['CAUSE_ANALYSIS_CREATED', 'Análise criada'],
+  ['MEETING_SCHEDULED', 'Reunião agendada'],
+  ['ACTION_PLAN_CREATED', 'Plano de ação'],
   ['AWAITING_REEVALUATION', 'Reavaliacao'],
   ['RESOLVED', 'Resolvido'],
 ];
@@ -117,11 +117,11 @@ export default function TreatmentPage() {
   const createAnalysis = useMutation({
     mutationFn: () => api(`/treatments/${id}/analysis`, { method: 'POST', json: analysisForm }),
     onSuccess: () => {
-      toast.success('Analise de causa criada');
+      toast.success('Análise de causa criada');
       qc.invalidateQueries({ queryKey: ['treatment', id] });
       qc.invalidateQueries({ queryKey: ['traceability'] });
     },
-    onError: (e: any) => toast.error(e?.message ?? 'Nao foi possivel salvar a analise'),
+    onError: (e: any) => toast.error(e?.message ?? 'Não foi possível salvar a análise'),
   });
 
   const scheduleMeeting = useMutation({
@@ -144,7 +144,7 @@ export default function TreatmentPage() {
         },
       }),
     onSuccess: () => {
-      toast.success('Reuniao de tratativa agendada');
+      toast.success('Reunião de tratativa agendada');
       qc.invalidateQueries({ queryKey: ['treatment', id] });
     },
   });
@@ -155,7 +155,7 @@ export default function TreatmentPage() {
       toast.success('Convites processados');
       qc.invalidateQueries({ queryKey: ['treatment', id] });
     },
-    onError: (e: any) => toast.error(e?.message ?? 'Nao foi possivel enviar convites'),
+    onError: (e: any) => toast.error(e?.message ?? 'Não foi possível enviar convites'),
   });
 
   const createAction = useMutation({
@@ -165,7 +165,7 @@ export default function TreatmentPage() {
         json: actionForm,
       }),
     onSuccess: () => {
-      toast.success('Plano de acao criado');
+      toast.success('Plano de ação criado');
       setActionForm({ title: '', description: '', responsibleEmail: '', dueDate: '', priority: 'HIGH', expectedResult: '', evidenceRequired: true });
       qc.invalidateQueries({ queryKey: ['treatment', id] });
       qc.invalidateQueries({ queryKey: ['actions'] });
@@ -194,14 +194,14 @@ export default function TreatmentPage() {
         eyebrow="Fluxo guiado"
         tone="launch"
         title={treatment.title}
-        description="Tratativa rastreavel para indicador fora da meta: analise, reuniao, convite, plano de acao e reavaliacao."
-        breadcrumbs={[{ label: 'Inicio', href: '/' }, { label: 'Indicadores', href: '/indicators' }, { label: 'Tratativa' }]}
+        description="Tratativa rastreavel para indicador fora da meta: análise, reunião, convite, plano de ação e reavaliacao."
+        breadcrumbs={[{ label: 'Início', href: '/' }, { label: 'Indicadores', href: '/indicators' }, { label: 'Tratativa' }]}
         actions={
           <>
             <Button variant="outline" asChild>
               <Link href={`/indicators/${treatment.indicator.id}`}>
                 <SearchCheck className="mr-2 h-4 w-4" />
-                Historico
+                Histórico
               </Link>
             </Button>
             <Button variant="outline" asChild>
@@ -218,7 +218,7 @@ export default function TreatmentPage() {
         <MetricCard title="Status" value={statusLabel(treatment.status)} description="Tratativa atual" icon={<ClipboardList className="h-4 w-4" />} tone="purple" />
       </div>
 
-      <SectionCard title="Linha de progresso" description="O status avanca automaticamente conforme analise, reuniao, acao e reavaliacao evoluem." className="mb-6">
+      <SectionCard title="Linha de progresso" description="O status avanca automaticamente conforme análise, reunião, ação e reavaliacao evoluem." className="mb-6">
         <div className="grid gap-2 md:grid-cols-6">
           {steps.map(([key, label], index) => {
             const active = stepIndex(treatment.status) >= index;
@@ -236,7 +236,7 @@ export default function TreatmentPage() {
       </SectionCard>
 
       {treatment.alerts.length > 0 && (
-        <SectionCard title="Alertas inteligentes" description="Pontos que precisam de acao para a tratativa nao ficar parada." className="mb-6">
+        <SectionCard title="Alertas inteligentes" description="Pontos que precisam de ação para a tratativa nao ficar parada." className="mb-6">
           <div className="space-y-2">
             {treatment.alerts.map((alert) => (
               <div key={alert} className="flex items-start gap-2 rounded-lg border border-status-yellow/30 bg-status-yellow/10 p-3 text-sm">
@@ -249,7 +249,7 @@ export default function TreatmentPage() {
       )}
 
       <div className="grid grid-cols-1 gap-6 xl:grid-cols-2">
-        <SectionCard title="1. Analise de causa" description="Registre problema, causa provavel, causa raiz, metodo e evidencias.">
+        <SectionCard title="1. Análise de causa" description="Registre problema, causa provavel, causa raiz, metodo e evidencias.">
           {treatment.analysis ? (
             <div className="rounded-lg border p-4">
               <StatusBadge value="CAUSE_ANALYSIS_CREATED" label={METHOD_LABEL[treatment.analysis.method] ?? treatment.analysis.method} />
@@ -282,13 +282,13 @@ export default function TreatmentPage() {
                 <Textarea value={analysisForm.evidence} onChange={(e) => setAnalysisForm({ ...analysisForm, evidence: e.target.value })} />
               </div>
               <Button onClick={() => createAnalysis.mutate()} disabled={!analysisForm.problem || !analysisForm.rootCause || createAnalysis.isPending}>
-                Salvar analise de causa
+                Salvar análise de causa
               </Button>
             </div>
           )}
         </SectionCard>
 
-        <SectionCard title="2. Reuniao de tratativa" description="Agende a reuniao, defina participantes e envie convite com ICS.">
+        <SectionCard title="2. Reunião de tratativa" description="Agende a reunião, defina participantes e envie convite com ICS.">
           {treatment.meeting ? (
             <div className="space-y-3">
               <div className="rounded-lg border p-4">
@@ -309,7 +309,7 @@ export default function TreatmentPage() {
                   Enviar convite
                 </Button>
                 <Button variant="outline" asChild>
-                  <Link href={`/meetings/${treatment.meeting.id}`}>Abrir reuniao</Link>
+                  <Link href={`/meetings/${treatment.meeting.id}`}>Abrir reunião</Link>
                 </Button>
               </div>
             </div>
@@ -317,7 +317,7 @@ export default function TreatmentPage() {
             <div className="space-y-3">
               <div className="grid gap-3 md:grid-cols-2">
                 <div className="space-y-1">
-                  <Label>Inicio *</Label>
+                  <Label>Início *</Label>
                   <Input type="datetime-local" value={meetingForm.startsAt} onChange={(e) => setMeetingForm({ ...meetingForm, startsAt: e.target.value })} />
                 </div>
                 <div className="space-y-1">
@@ -348,13 +348,13 @@ export default function TreatmentPage() {
               </div>
               <Button onClick={() => scheduleMeeting.mutate()} disabled={!meetingForm.startsAt || scheduleMeeting.isPending}>
                 <CalendarPlus className="mr-2 h-4 w-4" />
-                Agendar reuniao
+                Agendar reunião
               </Button>
             </div>
           )}
         </SectionCard>
 
-        <SectionCard title="3. Plano de acao" description="Crie a acao vinculada ao indicador, analise, reuniao e responsavel.">
+        <SectionCard title="3. Plano de ação" description="Crie a ação vinculada ao indicador, análise, reunião e responsável.">
           <div className="space-y-3">
             {allActions.map((action) => (
               <Link key={action.id} href={`/actions/${action.id}`} className="flex items-center justify-between gap-3 rounded-lg border p-3 hover:bg-accent/35">
@@ -366,30 +366,30 @@ export default function TreatmentPage() {
               </Link>
             ))}
             <div className="space-y-2 rounded-lg border bg-muted/30 p-3">
-              <Input placeholder="Titulo da acao" value={actionForm.title} onChange={(e) => setActionForm({ ...actionForm, title: e.target.value })} />
-              <Textarea placeholder="Descricao" value={actionForm.description} onChange={(e) => setActionForm({ ...actionForm, description: e.target.value })} />
+              <Input placeholder="Título da ação" value={actionForm.title} onChange={(e) => setActionForm({ ...actionForm, title: e.target.value })} />
+              <Textarea placeholder="Descrição" value={actionForm.description} onChange={(e) => setActionForm({ ...actionForm, description: e.target.value })} />
               <div className="grid gap-2 md:grid-cols-3">
-                <Input type="email" placeholder="E-mail do responsavel" value={actionForm.responsibleEmail} onChange={(e) => setActionForm({ ...actionForm, responsibleEmail: e.target.value })} />
+                <Input type="email" placeholder="E-mail do responsável" value={actionForm.responsibleEmail} onChange={(e) => setActionForm({ ...actionForm, responsibleEmail: e.target.value })} />
                 <Input type="date" value={actionForm.dueDate} onChange={(e) => setActionForm({ ...actionForm, dueDate: e.target.value })} />
                 <NativeSelect value={actionForm.priority} onChange={(e) => setActionForm({ ...actionForm, priority: e.target.value })}>
                   <option value="LOW">Baixa</option>
                   <option value="MEDIUM">Media</option>
                   <option value="HIGH">Alta</option>
-                  <option value="CRITICAL">Critica</option>
+                  <option value="CRITICAL">Crítica</option>
                 </NativeSelect>
               </div>
               <Input placeholder="Resultado esperado" value={actionForm.expectedResult} onChange={(e) => setActionForm({ ...actionForm, expectedResult: e.target.value })} />
               <Button onClick={() => createAction.mutate()} disabled={!actionForm.title || createAction.isPending}>
-                Criar plano de acao
+                Criar plano de ação
               </Button>
             </div>
           </div>
         </SectionCard>
 
-        <SectionCard title="4. Acompanhamento" description="Depois das acoes, reavalie se o indicador voltou para a meta.">
+        <SectionCard title="4. Acompanhamento" description="Depois das ações, reavalie se o indicador voltou para a meta.">
           <div className="space-y-3">
             <p className="text-sm text-muted-foreground">
-              Quando as acoes forem concluidas, lance novo resultado do indicador. A reavaliacao verifica o ultimo farol e atualiza a tratativa para resolvida ou nao resolvida.
+              Quando as ações forem concluidas, lance novo resultado do indicador. A reavaliacao verifica o último farol e atualiza a tratativa para resolvida ou nao resolvida.
             </p>
             <Button onClick={() => reevaluate.mutate()} disabled={reevaluate.isPending}>
               Reavaliar indicador
@@ -412,17 +412,17 @@ function stepIndex(status: string) {
 
 function statusLabel(status: string) {
   const labels: Record<string, string> = {
-    AWAITING_CAUSE_ANALYSIS: 'Aguardando analise',
-    CAUSE_ANALYSIS_CREATED: 'Analise criada',
-    MEETING_SCHEDULED: 'Reuniao agendada',
-    MEETING_COMPLETED: 'Reuniao realizada',
+    AWAITING_CAUSE_ANALYSIS: 'Aguardando análise',
+    CAUSE_ANALYSIS_CREATED: 'Análise criada',
+    MEETING_SCHEDULED: 'Reunião agendada',
+    MEETING_COMPLETED: 'Reunião realizada',
     ACTION_PLAN_CREATED: 'Plano criado',
-    ACTIONS_IN_PROGRESS: 'Acoes em andamento',
-    ACTIONS_OVERDUE: 'Acoes atrasadas',
+    ACTIONS_IN_PROGRESS: 'Ações em andamento',
+    ACTIONS_OVERDUE: 'Ações atrasadas',
     AWAITING_EVIDENCE: 'Aguardando evidencia',
     AWAITING_REEVALUATION: 'Aguardando reavaliacao',
     RESOLVED: 'Resolvido',
-    UNRESOLVED: 'Nao resolvido',
+    UNRESOLVED: 'Não resolvido',
     REOPENED: 'Reaberto',
     CONCLUDED: 'Concluido',
     IGNORED_TEMPORARILY: 'Ignorado temporariamente',

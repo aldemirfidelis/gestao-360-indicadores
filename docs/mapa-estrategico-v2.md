@@ -59,7 +59,7 @@ Fora do escopo desta rodada (deferidos):
     `useReactFlow` para `fitView` programático.
   - Tipos: `Objective.width/height/baseLight` opcionais.
   - Constante `RELATION_KINDS` com 7 tipos (`contribui`, `impacta`,
-    `depende`, `medido_por`, `gera_acao`, `vinculado`, `responsavel`),
+    `depende`, `medido_por`, `gera_acao`, `vinculado`, `responsável`),
     cada um com `label`, `color` e `description`.
   - `ObjectiveNode` agora respeita `width/height` da `data`, exibe
     `NodeResizer` quando selecionado em modo edição, pulsa quando
@@ -101,7 +101,7 @@ Fora do escopo desta rodada (deferidos):
 
 ### Documentação
 
-- `docs/mapa-estrategico-v2.md` — este arquivo.
+- `docs/mapa-estratégico-v2.md` — este arquivo.
 
 ## Modelo conceitual
 

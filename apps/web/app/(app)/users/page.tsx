@@ -159,11 +159,11 @@ export default function UsersPage() {
       return userId;
     },
     onSuccess: () => {
-      toast.success('Usuario salvo');
+      toast.success('Usuário salvo');
       setOpen(false);
       qc.invalidateQueries({ queryKey: ['users'] });
     },
-    onError: (e: any) => toast.error(e?.message ?? 'Falha ao salvar usuario'),
+    onError: (e: any) => toast.error(e?.message ?? 'Falha ao salvar usuário'),
   });
 
   const toggleActive = useMutation({
@@ -178,10 +178,10 @@ export default function UsersPage() {
   const removeUser = useMutation({
     mutationFn: (id: string) => api(`/users/${id}`, { method: 'DELETE' }),
     onSuccess: () => {
-      toast.success('Usuario excluido logicamente');
+      toast.success('Usuário excluido logicamente');
       qc.invalidateQueries({ queryKey: ['users'] });
     },
-    onError: (e: any) => toast.error(e?.message ?? 'Falha ao excluir usuario'),
+    onError: (e: any) => toast.error(e?.message ?? 'Falha ao excluir usuário'),
   });
 
   const active = users.data?.filter((u) => u.active).length ?? 0;
@@ -223,26 +223,26 @@ export default function UsersPage() {
   return (
     <div>
       <PageHeader
-        eyebrow="Configuracoes"
+        eyebrow="Configurações"
         tone="admin"
-        title="Usuarios e permissoes"
-        description="Cadastre usuarios, vincule areas de trabalho e ajuste permissoes por modulo."
-        breadcrumbs={[{ label: 'Inicio', href: '/' }, { label: 'Configuracoes' }, { label: 'Usuarios' }]}
+        title="Usuários e permissões"
+        description="Cadastre usuários, vincule áreas de trabalho e ajuste permissões por módulo."
+        breadcrumbs={[{ label: 'Início', href: '/' }, { label: 'Configurações' }, { label: 'Usuários' }]}
         actions={
           <Button onClick={() => openUser()}>
             <Plus className="mr-2 h-4 w-4" />
-            Novo usuario
+            Novo usuário
           </Button>
         }
       />
 
       <div className="mb-6 grid grid-cols-1 gap-4 sm:grid-cols-3">
-        <MetricCard title="Usuarios" value={formatNumber(users.data?.length)} description="Cadastrados" icon={<UsersRound className="h-4 w-4" />} tone="blue" />
+        <MetricCard title="Usuários" value={formatNumber(users.data?.length)} description="Cadastrados" icon={<UsersRound className="h-4 w-4" />} tone="blue" />
         <MetricCard title="Ativos" value={formatNumber(active)} description="Com acesso liberado" icon={<UsersRound className="h-4 w-4" />} tone="green" />
-        <MetricCard title="Administradores" value={formatNumber(admins)} description="Permissoes elevadas" icon={<KeyRound className="h-4 w-4" />} tone="purple" />
+        <MetricCard title="Administradores" value={formatNumber(admins)} description="Permissões elevadas" icon={<KeyRound className="h-4 w-4" />} tone="purple" />
       </div>
 
-      <SectionCard title="Equipe" description="Clique em editar para alterar cadastro e permissoes." contentClassName="p-0">
+      <SectionCard title="Equipe" description="Clique em editar para alterar cadastro e permissões." contentClassName="p-0">
         <div className="border-b p-3">
           <div className="relative max-w-xl">
             <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
@@ -258,14 +258,14 @@ export default function UsersPage() {
           <table className="table-modern">
             <thead>
               <tr>
-                <th className="text-left">Usuario</th>
+                <th className="text-left">Usuário</th>
                 <th className="text-left">Cargo</th>
                 <th className="text-left">Filial</th>
                 <th className="text-left">Perfil</th>
                 <th className="text-left">Perfil acesso</th>
-                <th className="text-left">Area</th>
-                <th className="text-left">Permissoes</th>
-                <th className="text-left">Ultimo acesso</th>
+                <th className="text-left">Área</th>
+                <th className="text-left">Permissões</th>
+                <th className="text-left">Último acesso</th>
                 <th className="text-left">Status</th>
                 <th />
               </tr>
@@ -301,7 +301,7 @@ export default function UsersPage() {
                       <Button
                         variant="ghost"
                         size="sm"
-                        onClick={() => window.confirm('Confirma excluir logicamente este usuario?') && removeUser.mutate(u.id)}
+                        onClick={() => window.confirm('Confirma excluir logicamente este usuário?') && removeUser.mutate(u.id)}
                       >
                         <Trash2 className="mr-2 h-4 w-4" />
                         Excluir
@@ -318,7 +318,7 @@ export default function UsersPage() {
       <Dialog open={open} onOpenChange={setOpen}>
         <DialogContent className="max-w-4xl">
           <DialogHeader>
-            <DialogTitle>{form.id ? 'Editar usuario' : 'Novo usuario'}</DialogTitle>
+            <DialogTitle>{form.id ? 'Editar usuário' : 'Novo usuário'}</DialogTitle>
           </DialogHeader>
           <div className="grid grid-cols-1 gap-5 lg:grid-cols-[1fr,1fr]">
             <div className="space-y-4">
@@ -366,7 +366,7 @@ export default function UsersPage() {
                 <div>
                   <Label>Perfil de acesso</Label>
                   <NativeSelect value={form.accessProfileId} onChange={(e) => setForm({ ...form, accessProfileId: e.target.value })}>
-                    <option value="">Permissoes individuais</option>
+                    <option value="">Permissões individuais</option>
                     {admin.data?.profiles.map((profile) => (
                       <option key={profile.id} value={profile.id}>{profile.name}</option>
                     ))}
@@ -382,9 +382,9 @@ export default function UsersPage() {
                 <Input value={form.phone} onChange={(e) => setForm({ ...form, phone: e.target.value })} />
               </div>
               <div>
-                <Label>Area padrao</Label>
+                <Label>Área padrão</Label>
                 <NativeSelect value={form.defaultNodeId} onChange={(e) => setForm({ ...form, defaultNodeId: e.target.value })}>
-                  <option value="">Sem area padrao</option>
+                  <option value="">Sem área padrão</option>
                   {orgs.data?.map((node) => (
                     <option key={node.id} value={node.id}>{node.name} ({node.type})</option>
                   ))}
@@ -396,15 +396,15 @@ export default function UsersPage() {
                   checked={form.passwordResetRequired}
                   onChange={(e) => setForm({ ...form, passwordResetRequired: e.target.checked })}
                 />
-                Exigir troca de senha no proximo acesso
+                Exigir troca de senha no próximo acesso
               </label>
             </div>
 
             <div className="rounded-lg border p-4">
               <div className="mb-3 flex items-center justify-between gap-3">
                 <div>
-                  <div className="text-sm font-semibold">Permissoes</div>
-                  <div className="text-xs text-muted-foreground">Marque os acessos liberados para este usuario.</div>
+                  <div className="text-sm font-semibold">Permissões</div>
+                  <div className="text-xs text-muted-foreground">Marque os acessos liberados para este usuário.</div>
                 </div>
                 <Badge variant="secondary">{form.permissionKeys.length}</Badge>
               </div>
@@ -450,7 +450,7 @@ export default function UsersPage() {
             <Button variant="ghost" onClick={() => setOpen(false)}>Cancelar</Button>
             <Button onClick={() => save.mutate()} disabled={save.isPending || !form.name || !form.email || (!form.id && !form.password)}>
               <Save className="mr-2 h-4 w-4" />
-              {save.isPending ? 'Salvando...' : 'Salvar usuario'}
+              {save.isPending ? 'Salvando...' : 'Salvar usuário'}
             </Button>
           </DialogFooter>
         </DialogContent>

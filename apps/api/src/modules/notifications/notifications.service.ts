@@ -43,13 +43,13 @@ export class NotificationsService {
   }
 
   /**
-   * Job manual: gera alertas baseados em regras de negocio.
-   * Em producao seria um cron com BullMQ. Aqui pode ser chamado on-demand.
+   * Job manual: gera alertas baseados em regras de negócio.
+   * Em produção seria um cron com BullMQ. Aqui pode ser chamado on-demand.
    */
   async generateAlerts(companyId: string) {
     const created: string[] = [];
 
-    // 1. Acoes atrasadas
+    // 1. Ações atrasadas
     const overdueActions = await this.prisma.actionPlan.findMany({
       where: {
         companyId,
@@ -75,7 +75,7 @@ export class NotificationsService {
         companyId,
         a.responsibleUser.id,
         NotificationKind.ACTION_OVERDUE,
-        `Acao atrasada: ${a.title}`,
+        `Ação atrasada: ${a.title}`,
         `Prazo vencido em ${a.dueDate?.toLocaleDateString('pt-BR')}`,
         `/actions/${a.id}`,
       );
@@ -106,8 +106,8 @@ export class NotificationsService {
         companyId,
         uid,
         NotificationKind.INDICATOR_OFF_TARGET,
-        `Indicador critico: ${r.indicator.name}`,
-        `Fora da meta no periodo ${r.periodRef}`,
+        `Indicador crítico: ${r.indicator.name}`,
+        `Fora da meta no período ${r.periodRef}`,
         `/indicators/${r.indicator.id}`,
       );
       created.push(r.indicator.id);

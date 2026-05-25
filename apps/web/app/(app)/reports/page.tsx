@@ -37,10 +37,10 @@ interface Overview {
 }
 
 const CSV_REPORTS = [
-  { key: 'indicators', label: 'Relatorio por indicador', description: 'Catalogo completo com ultimo realizado.', url: '/reports/indicators.csv' },
-  { key: 'results', label: 'Historico de lancamentos', description: 'Realizados, farois, metas e atingimento.', url: '/reports/results.csv' },
-  { key: 'actions', label: 'Planos de acao', description: 'Status, prazos, responsaveis e prioridades.', url: '/reports/actions.csv' },
-  { key: 'deviations', label: 'Nao conformidades', description: 'Severidade, tratativas, prazos e historico.', url: '/reports/deviations.csv' },
+  { key: 'indicators', label: 'Relatorio por indicador', description: 'Catalogo completo com último realizado.', url: '/reports/indicators.csv' },
+  { key: 'results', label: 'Histórico de lançamentos', description: 'Realizados, farois, metas e atingimento.', url: '/reports/results.csv' },
+  { key: 'actions', label: 'Planos de ação', description: 'Status, prazos, responsáveis e prioridades.', url: '/reports/actions.csv' },
+  { key: 'deviations', label: 'Não conformidades', description: 'Severidade, tratativas, prazos e histórico.', url: '/reports/deviations.csv' },
 ];
 
 export default function ReportsPage() {
@@ -83,27 +83,27 @@ export default function ReportsPage() {
     const doc = new jsPDF({ orientation: 'portrait', unit: 'pt' });
     const o = overview.data;
     doc.setFontSize(18);
-    doc.text('Relatorio Executivo - Gestao 360 Indicadores', 40, 50);
+    doc.text('Relatorio Executivo - Gestão 360 Indicadores', 40, 50);
     doc.setFontSize(10);
     doc.setTextColor(100);
-    doc.text(`Periodo: ${periodRefLabel(period)} | Escopo: ${scope} | Gerado em ${formatDate(new Date())}`, 40, 68);
+    doc.text(`Período: ${periodRefLabel(period)} | Escopo: ${scope} | Gerado em ${formatDate(new Date())}`, 40, 68);
     doc.setTextColor(0);
 
     doc.setFontSize(13);
     doc.text('Resumo executivo', 40, 110);
     autoTable(doc, {
       startY: 120,
-      head: [['Metrica', 'Valor']],
+      head: [['Métrica', 'Valor']],
       body: [
         ['Indicadores ativos', String(o.totalIndicators)],
         ['Dentro da meta', String(o.counts.GREEN)],
-        ['Em atencao', String(o.counts.YELLOW)],
+        ['Em atenção', String(o.counts.YELLOW)],
         ['Fora da meta', String(o.counts.RED)],
         ['Sem dados', String(o.counts.GRAY)],
         ['Atingimento medio', formatPercent(o.generalAttainment ?? 0)],
-        ['Acoes em aberto', String(o.openActions)],
-        ['Acoes atrasadas', String(o.overdueActions)],
-        ['Desvios criticos', String(o.criticalDeviations)],
+        ['Ações em aberto', String(o.openActions)],
+        ['Ações atrasadas', String(o.overdueActions)],
+        ['Desvios críticos', String(o.criticalDeviations)],
       ],
       theme: 'striped',
       headStyles: { fillColor: [22, 63, 101] },
@@ -115,7 +115,7 @@ export default function ReportsPage() {
     doc.text('Indicadores ativos', 40, finalY);
     autoTable(doc, {
       startY: finalY + 10,
-      head: [['Codigo', 'Indicador', 'Area', 'Periodo', 'Realizado', 'Farol']],
+      head: [['Código', 'Indicador', 'Área', 'Período', 'Realizado', 'Farol']],
       body: indicators.data.map((i) => [
         i.code ?? '-',
         i.name,
@@ -136,11 +136,11 @@ export default function ReportsPage() {
   return (
     <div>
       <PageHeader
-        eyebrow="Visualizacao"
+        eyebrow="Visualização"
         tone="view"
-        title="Relatorios e exportacao"
-        description="Relatorios executivos, historicos, indicadores, planos de acao e dados para auditoria."
-        breadcrumbs={[{ label: 'Inicio', href: '/' }, { label: 'Visualizacao', href: '/visualization' }, { label: 'Relatorios' }]}
+        title="Relatorios e exportação"
+        description="Relatorios executivos, históricos, indicadores, planos de ação e dados para auditoria."
+        breadcrumbs={[{ label: 'Início', href: '/' }, { label: 'Visualização', href: '/visualization' }, { label: 'Relatorios' }]}
         actions={
           <>
             <Button variant="outline" onClick={() => window.print()}>
@@ -158,8 +158,8 @@ export default function ReportsPage() {
       <div className="mb-6 grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
         <MetricCard title="Indicadores" value={formatNumber(overview.data?.totalIndicators)} description="Base do relatorio" icon={<FileSpreadsheet className="h-4 w-4" />} tone="blue" />
         <MetricCard title="Atingimento geral" value={formatPercent(overview.data?.generalAttainment)} description="Resumo executivo" icon={<FileText className="h-4 w-4" />} tone="green" />
-        <MetricCard title="Acoes em aberto" value={formatNumber(overview.data?.openActions)} description={`${formatNumber(overview.data?.overdueActions)} atrasadas`} icon={<SlidersHorizontal className="h-4 w-4" />} tone="yellow" />
-        <MetricCard title="Exportacoes" value={formatNumber(CSV_REPORTS.length + 1)} description="PDF e CSV" icon={<Download className="h-4 w-4" />} tone="purple" />
+        <MetricCard title="Ações em aberto" value={formatNumber(overview.data?.openActions)} description={`${formatNumber(overview.data?.overdueActions)} atrasadas`} icon={<SlidersHorizontal className="h-4 w-4" />} tone="yellow" />
+        <MetricCard title="Exportações" value={formatNumber(CSV_REPORTS.length + 1)} description="PDF e CSV" icon={<Download className="h-4 w-4" />} tone="purple" />
       </div>
 
       <FilterBar
@@ -173,8 +173,8 @@ export default function ReportsPage() {
         <div>
           <NativeSelect value={scope} onChange={(e) => setScope(e.target.value)}>
             <option value="ALL">Todos os setores</option>
-            <option value="CRITICAL">Apenas criticos</option>
-            <option value="ACTIONS">Com plano de acao</option>
+            <option value="CRITICAL">Apenas críticos</option>
+            <option value="ACTIONS">Com plano de ação</option>
           </NativeSelect>
         </div>
         <div>
@@ -183,7 +183,7 @@ export default function ReportsPage() {
       </FilterBar>
 
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
-        <SectionCard title="Relatorio executivo" description="Sumario em PDF para reunioes, com indicadores, farois e prioridades.">
+        <SectionCard title="Relatorio executivo" description="Sumario em PDF para reuniões, com indicadores, farois e prioridades.">
           <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
             <div className="grid h-12 w-12 place-items-center rounded-lg bg-primary text-primary-foreground">
               <FileText className="h-6 w-6" />

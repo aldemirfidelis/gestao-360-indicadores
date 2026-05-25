@@ -202,8 +202,8 @@ type Filters = {
 };
 
 const TYPE_LABEL: Record<string, string> = {
-  STRATEGIC: 'Estrategico',
-  TACTICAL: 'Tatico',
+  STRATEGIC: 'Estratégico',
+  TACTICAL: 'Tático',
   OPERATIONAL: 'Operacional',
   PROJECT: 'Projeto',
   PROCESS: 'Processo',
@@ -211,8 +211,8 @@ const TYPE_LABEL: Record<string, string> = {
   QUALITY: 'Qualidade',
   HR: 'RH',
   FINANCE: 'Financeiro',
-  PRODUCTION: 'Producao',
-  MAINTENANCE: 'Manutencao',
+  PRODUCTION: 'Produção',
+  MAINTENANCE: 'Manutenção',
   PROCUREMENT: 'Suprimentos',
   COMMERCIAL: 'Comercial',
   CUSTOM: 'Personalizado',
@@ -226,13 +226,13 @@ const UNIT_LABEL: Record<string, string> = {
   DAYS: 'Dias',
   TONS: 'Toneladas',
   LITERS: 'Litros',
-  INDEX: 'Indice',
+  INDEX: 'Índice',
   TEXT: 'Texto',
   CUSTOM: 'Personalizada',
 };
 
 const PERIODICITY_LABEL: Record<string, string> = {
-  DAILY: 'Diaria',
+  DAILY: 'Diária',
   WEEKLY: 'Semanal',
   BIWEEKLY: 'Quinzenal',
   MONTHLY: 'Mensal',
@@ -256,8 +256,8 @@ const STATUS_LABEL: Record<string, string> = {
 
 const LIGHT_LABEL: Record<string, string> = {
   GREEN: 'No alvo',
-  YELLOW: 'Atencao',
-  RED: 'Critico',
+  YELLOW: 'Atenção',
+  RED: 'Crítico',
   GRAY: 'Sem dados',
 };
 
@@ -393,7 +393,7 @@ export default function IndicatorsPage() {
     mutationFn: () => {
       const ownerNodeId = form.areaMicroId || form.areaMacroId || form.ownerNodeId;
       if (!form.name.trim()) throw new Error('Informe o nome do indicador');
-      if (!ownerNodeId) throw new Error('Selecione a area macro ou micro');
+      if (!ownerNodeId) throw new Error('Selecione a área macro ou micro');
       if (!form.unit) throw new Error('Selecione a unidade de medida');
       if (!form.periodicity) throw new Error('Selecione a periodicidade');
       const payload = {
@@ -436,7 +436,7 @@ export default function IndicatorsPage() {
   const deleteIndicator = useMutation({
     mutationFn: (indicator: IndicatorRow) => api(`/indicators/${indicator.id}`, { method: 'DELETE' }),
     onSuccess: () => {
-      toast.success('Indicador inativado com exclusao logica');
+      toast.success('Indicador inativado com exclusão lógica');
       qc.invalidateQueries({ queryKey: ['indicators'] });
     },
     onError: (error: Error) => toast.error(error.message || 'Falha ao inativar indicador'),
@@ -503,11 +503,11 @@ export default function IndicatorsPage() {
   return (
     <div>
       <PageHeader
-        eyebrow="Gestao"
+        eyebrow="Gestão"
         tone="admin"
         title="Indicadores"
-        description="Gerencie os indicadores, metas, realizados e vinculos organizacionais."
-        breadcrumbs={[{ label: 'Inicio', href: '/' }, { label: 'Gestao' }, { label: 'Indicadores' }]}
+        description="Gerencie os indicadores, metas, realizados e vínculos organizacionais."
+        breadcrumbs={[{ label: 'Início', href: '/' }, { label: 'Gestão' }, { label: 'Indicadores' }]}
         actions={
           <div className="flex flex-wrap gap-2">
             <Button variant="outline" onClick={() => indicators.refetch()}>
@@ -528,16 +528,16 @@ export default function IndicatorsPage() {
 
       <div className="mb-6 grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
         <MetricCard title="Total de indicadores" value={formatNumber(rows.length)} description={`${formatNumber(stats.active)} ativos`} icon={<Target className="h-4 w-4" />} tone="blue" />
-        <MetricCard title="Criticos" value={formatNumber(stats.red)} description="Fora da meta no ultimo periodo" icon={<AlertTriangle className="h-4 w-4" />} tone="red" />
-        <MetricCard title="Sem responsavel" value={formatNumber(stats.withoutOwner)} description="Revisar governanca" icon={<UserRound className="h-4 w-4" />} tone="yellow" />
-        <MetricCard title="Sem dados mensais" value={formatNumber(stats.withoutMonthlyData)} description="Precisam de lancamento" icon={<FileClock className="h-4 w-4" />} tone="purple" />
+        <MetricCard title="Críticos" value={formatNumber(stats.red)} description="Fora da meta no último período" icon={<AlertTriangle className="h-4 w-4" />} tone="red" />
+        <MetricCard title="Sem responsável" value={formatNumber(stats.withoutOwner)} description="Revisar governanca" icon={<UserRound className="h-4 w-4" />} tone="yellow" />
+        <MetricCard title="Sem dados mensais" value={formatNumber(stats.withoutMonthlyData)} description="Precisam de lançamento" icon={<FileClock className="h-4 w-4" />} tone="purple" />
       </div>
 
       <section className="panel mb-6 p-4">
         <div className="mb-3 flex items-center justify-between gap-3">
           <div>
             <h2 className="text-sm font-semibold">Filtros</h2>
-            <p className="text-xs text-muted-foreground">Filtre por empresa, estrutura, status, tipo, periodicidade e responsavel.</p>
+            <p className="text-xs text-muted-foreground">Filtre por empresa, estrutura, status, tipo, periodicidade e responsável.</p>
           </div>
           <Button variant="ghost" size="sm" onClick={clearFilters}>Limpar</Button>
         </div>
@@ -551,7 +551,7 @@ export default function IndicatorsPage() {
             </NativeSelect>
           </div>
           <div>
-            <Label>Area Macro</Label>
+            <Label>Área Macro</Label>
             <NativeSelect value={filters.areaMacroId} onChange={(e) => setFilters((prev) => ({ ...prev, areaMacroId: e.target.value, areaMicroId: '' }))}>
               <option value="">Todas</option>
               {macroOptions.map((node) => (
@@ -560,7 +560,7 @@ export default function IndicatorsPage() {
             </NativeSelect>
           </div>
           <div>
-            <Label>Area Micro</Label>
+            <Label>Área Micro</Label>
             <NativeSelect value={filters.areaMicroId} onChange={(e) => setFilters((prev) => ({ ...prev, areaMicroId: e.target.value }))}>
               <option value="">Todas</option>
               {filterMicroOptions.map((node) => (
@@ -596,7 +596,7 @@ export default function IndicatorsPage() {
             </NativeSelect>
           </div>
           <div>
-            <Label>Responsavel</Label>
+            <Label>Responsável</Label>
             <NativeSelect value={filters.responsibleUserId} onChange={(e) => setFilters((prev) => ({ ...prev, responsibleUserId: e.target.value }))}>
               <option value="">Todos</option>
               {users.map((user) => (
@@ -614,7 +614,7 @@ export default function IndicatorsPage() {
             <Input
               value={filters.search}
               onChange={(e) => setFilters((prev) => ({ ...prev, search: e.target.value }))}
-              placeholder="Buscar por nome, codigo, area ou responsavel"
+              placeholder="Buscar por nome, código, área ou responsável"
               className="pl-9"
             />
           </div>
@@ -666,12 +666,12 @@ export default function IndicatorsPage() {
             onMicroResult={(micro) => openResult(micro)}
             onMicroHistory={(micro) => setHistoryIndicator(micro)}
             onMicroDelete={(micro) => {
-              if (window.confirm('Inativar este indicador? A exclusao sera logica e o historico sera preservado.')) {
+              if (window.confirm('Inativar este indicador? A exclusão será lógica e o histórico será preservado.')) {
                 deleteIndicator.mutate(micro);
               }
             }}
             onDelete={() => {
-              if (window.confirm('Inativar este indicador? A exclusao sera logica e o historico sera preservado.')) {
+              if (window.confirm('Inativar este indicador? A exclusão será lógica e o histórico será preservado.')) {
                 deleteIndicator.mutate(indicator);
               }
             }}
@@ -869,7 +869,7 @@ function IndicatorManagementCard({
         </div>
         <div className="flex items-center gap-2">
           <UserRound className="h-3.5 w-3.5" />
-          <span className="truncate">{indicator.responsibleUser?.name ?? 'Sem responsavel'}</span>
+          <span className="truncate">{indicator.responsibleUser?.name ?? 'Sem responsável'}</span>
         </div>
         <div className="flex items-center gap-2">
           <Clock3 className="h-3.5 w-3.5" />
@@ -882,7 +882,7 @@ function IndicatorManagementCard({
         <Button variant="outline" size="sm" onClick={onEdit}><Pencil className="mr-1.5 h-3.5 w-3.5" />Editar</Button>
         <Button variant="outline" size="sm" onClick={onTarget}>Metas</Button>
         <Button variant="outline" size="sm" onClick={onResult}>Realizados</Button>
-        <Button variant="ghost" size="sm" onClick={onHistory}><History className="mr-1.5 h-3.5 w-3.5" />Historico</Button>
+        <Button variant="ghost" size="sm" onClick={onHistory}><History className="mr-1.5 h-3.5 w-3.5" />Histórico</Button>
         <Button variant="ghost" size="sm" className="text-destructive hover:text-destructive" onClick={onDelete}><Trash2 className="mr-1.5 h-3.5 w-3.5" />Inativar</Button>
       </div>
 
@@ -961,7 +961,7 @@ function MicroIndicatorRow({
         <Button variant="ghost" size="sm" onClick={onEdit} title="Editar"><Pencil className="h-3.5 w-3.5" /></Button>
         <Button variant="ghost" size="sm" onClick={onTarget}>Metas</Button>
         <Button variant="ghost" size="sm" onClick={onResult}>Realizados</Button>
-        <Button variant="ghost" size="sm" onClick={onHistory} title="Historico"><History className="h-3.5 w-3.5" /></Button>
+        <Button variant="ghost" size="sm" onClick={onHistory} title="Histórico"><History className="h-3.5 w-3.5" /></Button>
         <Button variant="ghost" size="sm" className="text-destructive hover:text-destructive" onClick={onDelete} title="Inativar"><Trash2 className="h-3.5 w-3.5" /></Button>
       </div>
     </div>
@@ -1009,7 +1009,7 @@ function IndicatorFormDialog({
           <Field label="Nome do indicador" required className="xl:col-span-2">
             <Input value={form.name} onChange={(e) => patchForm(setForm, { name: e.target.value })} placeholder="Ex.: Absenteismo" />
           </Field>
-          <Field label="Codigo">
+          <Field label="Código">
             <Input value={form.code} onChange={(e) => patchForm(setForm, { code: e.target.value })} placeholder="Ex.: RH-001" />
           </Field>
           <Field label="Empresa" required>
@@ -1020,7 +1020,7 @@ function IndicatorFormDialog({
               ))}
             </NativeSelect>
           </Field>
-          <Field label="Area Macro" required>
+          <Field label="Área Macro" required>
             <NativeSelect value={form.areaMacroId} onChange={(e) => patchForm(setForm, { areaMacroId: e.target.value, areaMicroId: '' })}>
               <option value="">Selecione</option>
               {macroOptions.map((node) => (
@@ -1028,9 +1028,9 @@ function IndicatorFormDialog({
               ))}
             </NativeSelect>
           </Field>
-          <Field label="Area Micro">
+          <Field label="Área Micro">
             <NativeSelect value={form.areaMicroId} onChange={(e) => patchForm(setForm, { areaMicroId: e.target.value })}>
-              <option value="">Usar area macro</option>
+              <option value="">Usar área macro</option>
               {microOptions.map((node) => (
                 <option key={node.id} value={node.id}>{node.name}</option>
               ))}
@@ -1038,7 +1038,7 @@ function IndicatorFormDialog({
           </Field>
           <Field label="Indicador macro (pai)">
             <NativeSelect value={form.parentIndicatorId} onChange={(e) => patchForm(setForm, { parentIndicatorId: e.target.value })}>
-              <option value="">Sem vinculo (indicador macro proprio)</option>
+              <option value="">Sem vínculo (indicador macro proprio)</option>
               {parentIndicatorOptions.map((row) => (
                 <option key={row.id} value={row.id}>
                   {row.code ? `${row.code} - ` : ''}{row.name}
@@ -1048,23 +1048,23 @@ function IndicatorFormDialog({
           </Field>
           <Field label="Diretriz vinculada">
             <NativeSelect value={form.guidelineNodeId} onChange={(e) => patchForm(setForm, { guidelineNodeId: e.target.value })}>
-              <option value="">Nao vinculada</option>
+              <option value="">Não vinculada</option>
               {guidelineOptions.map((node) => (
                 <option key={node.id} value={node.id}>{node.name}</option>
               ))}
             </NativeSelect>
           </Field>
-          <Field label="Objetivo estrategico">
+          <Field label="Objetivo estratégico">
             <NativeSelect value={form.strategicObjectiveId} onChange={(e) => patchForm(setForm, { strategicObjectiveId: e.target.value })}>
-              <option value="">Nao vinculado</option>
+              <option value="">Não vinculado</option>
               {strategicObjectives.map((objective) => (
                 <option key={objective.id} value={objective.id}>{objective.perspective.name} - {objective.name}</option>
               ))}
             </NativeSelect>
           </Field>
-          <Field label="Responsavel">
+          <Field label="Responsável">
             <NativeSelect value={form.responsibleUserId} onChange={(e) => patchForm(setForm, { responsibleUserId: e.target.value })}>
-              <option value="">Sem responsavel</option>
+              <option value="">Sem responsável</option>
               {users.map((user) => (
                 <option key={user.id} value={user.id}>{user.name}</option>
               ))}
@@ -1084,7 +1084,7 @@ function IndicatorFormDialog({
               ))}
             </NativeSelect>
           </Field>
-          <Field label="Rotulo da unidade">
+          <Field label="Rótulo da unidade">
             <Input value={form.unitLabel} onChange={(e) => patchForm(setForm, { unitLabel: e.target.value })} placeholder="Ex.: R$/t" />
           </Field>
           <Field label="Periodicidade" required>
@@ -1111,7 +1111,7 @@ function IndicatorFormDialog({
           <Field label="Peso">
             <Input type="number" step="0.1" value={form.weight} onChange={(e) => patchForm(setForm, { weight: e.target.value })} />
           </Field>
-          <Field label="Tolerancia amarela (%)">
+          <Field label="Tolerância amarela (%)">
             <Input type="number" step="0.1" value={form.yellowToleranceP} onChange={(e) => patchForm(setForm, { yellowToleranceP: e.target.value })} />
           </Field>
           {!form.id && (
@@ -1127,13 +1127,13 @@ function IndicatorFormDialog({
           <Field label="Fonte dos dados">
             <Input value={form.source} onChange={(e) => patchForm(setForm, { source: e.target.value })} placeholder="ERP, planilha, sistema interno" />
           </Field>
-          <Field label="Formula de calculo" className="md:col-span-2">
+          <Field label="Formula de cálculo" className="md:col-span-2">
             <Input value={form.formula} onChange={(e) => patchForm(setForm, { formula: e.target.value })} placeholder="Ex.: (faltas / horas previstas) * 100" />
           </Field>
           <Field label="Categoria">
             <Input value={form.category} onChange={(e) => patchForm(setForm, { category: e.target.value })} placeholder="Opcional" />
           </Field>
-          <Field label="Descricao e observacoes" className="md:col-span-2 xl:col-span-3">
+          <Field label="Descrição e observacoes" className="md:col-span-2 xl:col-span-3">
             <Textarea rows={3} value={form.description} onChange={(e) => patchForm(setForm, { description: e.target.value })} />
           </Field>
         </div>
@@ -1157,11 +1157,11 @@ function IndicatorViewDialog({ indicator, onOpenChange }: { indicator: Indicator
           <div className="space-y-5">
             <div className="grid gap-3 md:grid-cols-3">
               <Info label="Empresa" value={indicator.company.tradeName || indicator.company.name} />
-              <Info label="Area Macro" value={indicator.areaMacro?.name} />
-              <Info label="Area Micro" value={indicator.areaMicro?.name ?? indicator.ownerNode.name} />
+              <Info label="Área Macro" value={indicator.areaMacro?.name} />
+              <Info label="Área Micro" value={indicator.areaMicro?.name ?? indicator.ownerNode.name} />
               <Info label="Diretriz" value={indicator.guidelineNode?.name ?? '-'} />
-              <Info label="Objetivo estrategico" value={indicator.strategicObjective?.name ?? '-'} />
-              <Info label="Responsavel" value={indicator.responsibleUser?.name ?? 'Sem responsavel'} />
+              <Info label="Objetivo estratégico" value={indicator.strategicObjective?.name ?? '-'} />
+              <Info label="Responsável" value={indicator.responsibleUser?.name ?? 'Sem responsável'} />
               <Info label="Periodicidade" value={PERIODICITY_LABEL[indicator.periodicity] ?? indicator.periodicity} />
               <Info label="Sentido" value={DIRECTION_LABEL[indicator.direction] ?? indicator.direction} />
               <Info label="Status" value={STATUS_LABEL[indicator.status] ?? indicator.status} />
@@ -1171,8 +1171,8 @@ function IndicatorViewDialog({ indicator, onOpenChange }: { indicator: Indicator
               <div className="mt-3 grid gap-3 text-sm md:grid-cols-4">
                 <Info label="Metas" value={formatNumber(indicator._count.targets)} />
                 <Info label="Realizados" value={formatNumber(indicator._count.results)} />
-                <Info label="Planos de acao" value={formatNumber(indicator._count.actions)} />
-                <Info label="Reunioes" value={formatNumber(indicator._count.meetings)} />
+                <Info label="Planos de ação" value={formatNumber(indicator._count.actions)} />
+                <Info label="Reuniões" value={formatNumber(indicator._count.meetings)} />
               </div>
             </div>
             {indicator.description && <p className="text-sm text-muted-foreground">{indicator.description}</p>}
@@ -1260,7 +1260,7 @@ function HistoryDialog({
     <Dialog open={Boolean(indicator)} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-4xl">
         <DialogHeader>
-          <DialogTitle>Historico do indicador</DialogTitle>
+          <DialogTitle>Histórico do indicador</DialogTitle>
         </DialogHeader>
         {isLoading && <LoadingState />}
         {!isLoading && (history?.logs.length ?? 0) === 0 && (
@@ -1341,9 +1341,9 @@ function statusBadgeClass(light: string) {
 
 function historyActionLabel(action: string) {
   const labels: Record<string, string> = {
-    CREATE: 'Criacao do indicador',
-    UPDATE: 'Edicao cadastral',
-    DELETE: 'Exclusao logica',
+    CREATE: 'Criação do indicador',
+    UPDATE: 'Edição cadastral',
+    DELETE: 'Exclusão lógica',
     CREATE_TARGET: 'Meta criada',
     UPDATE_TARGET: 'Meta alterada',
     CREATE_RESULT: 'Realizado lancado',
@@ -1353,7 +1353,7 @@ function historyActionLabel(action: string) {
 }
 
 function exportCsv(rows: IndicatorRow[]) {
-  const header = ['Nome', 'Codigo', 'Empresa', 'Area Macro', 'Area Micro', 'Responsavel', 'Meta Atual', 'Realizado Atual', 'Status'];
+  const header = ['Nome', 'Código', 'Empresa', 'Área Macro', 'Área Micro', 'Responsável', 'Meta Atual', 'Realizado Atual', 'Status'];
   const lines = rows.map((row) => [
     row.name,
     row.code ?? '',

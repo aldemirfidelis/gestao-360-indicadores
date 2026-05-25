@@ -153,7 +153,7 @@ export class ActionsService {
       where: { id, deletedAt: null, ...(companyId ? { companyId } : {}) },
       include: this.detailInclude(),
     });
-    if (!action) throw new NotFoundException('Acao nao encontrada');
+    if (!action) throw new NotFoundException('Ação nao encontrada');
     return {
       ...action,
       originTrail: this.buildOriginTrail(action),
@@ -205,7 +205,7 @@ export class ActionsService {
       eventType: TraceEventType.ACTION_CREATED,
       entityType: TraceEntityType.ACTION_PLAN,
       entityId: action.id,
-      title: 'Plano de acao criado',
+      title: 'Plano de ação criado',
       description: action.title,
       statusTo: action.status,
       metadata: {
@@ -221,7 +221,7 @@ export class ActionsService {
 
   async update(id: string, patch: any, userId?: string) {
     const before = await this.prisma.actionPlan.findUnique({ where: { id } });
-    if (!before || before.deletedAt) throw new NotFoundException('Acao nao encontrada');
+    if (!before || before.deletedAt) throw new NotFoundException('Ação nao encontrada');
     const data = this.toActionUpdate(patch, before);
     const updated = await this.prisma.actionPlan.update({ where: { id }, data });
 
@@ -237,7 +237,7 @@ export class ActionsService {
       eventType: TraceEventType.UPDATED,
       entityType: TraceEntityType.ACTION_PLAN,
       entityId: id,
-      title: 'Plano de acao atualizado',
+      title: 'Plano de ação atualizado',
       description: updated.title,
       statusFrom: before.status,
       statusTo: updated.status,
@@ -287,7 +287,7 @@ export class ActionsService {
       eventType: TraceEventType.ACTION_STATUS_CHANGED,
       entityType: TraceEntityType.ACTION_PLAN,
       entityId: id,
-      title: 'Status do plano de acao alterado',
+      title: 'Status do plano de ação alterado',
       description: updated.title,
       statusFrom: action.status,
       statusTo: updated.status,
@@ -313,7 +313,7 @@ export class ActionsService {
       entityId: task.id,
       relatedType: TraceEntityType.ACTION_PLAN,
       relatedId: actionId,
-      title: 'Tarefa criada no plano de acao',
+      title: 'Tarefa criada no plano de ação',
       description: task.title,
       metadata: { dueDate: task.dueDate },
     });
@@ -344,9 +344,9 @@ export class ActionsService {
 
   async saveAnalysis(actionId: string, body: any, userId?: string) {
     const method = body.method as ActionAnalysisTool;
-    if (!method) throw new NotFoundException('Ferramenta de analise obrigatoria');
+    if (!method) throw new NotFoundException('Ferramenta de análise obrigatoria');
     const action = await this.prisma.actionPlan.findUnique({ where: { id: actionId } });
-    if (!action || action.deletedAt) throw new NotFoundException('Acao nao encontrada');
+    if (!action || action.deletedAt) throw new NotFoundException('Ação nao encontrada');
 
     const session = await this.prisma.actionAnalysisSession.upsert({
       where: { actionId_method: { actionId, method } },
@@ -389,7 +389,7 @@ export class ActionsService {
       eventType: TraceEventType.ANALYSIS_CREATED,
       entityType: TraceEntityType.ACTION_PLAN,
       entityId: actionId,
-      title: `Ferramenta de analise salva (${method})`,
+      title: `Ferramenta de análise salva (${method})`,
       description: body.rootCause ?? body.problem ?? action.title,
       metadata: { method, sessionId: session.id },
     });
@@ -398,7 +398,7 @@ export class ActionsService {
 
   async addEvidence(actionId: string, body: any, userId?: string) {
     const action = await this.prisma.actionPlan.findUnique({ where: { id: actionId } });
-    if (!action || action.deletedAt) throw new NotFoundException('Acao nao encontrada');
+    if (!action || action.deletedAt) throw new NotFoundException('Ação nao encontrada');
     const evidence = await this.prisma.actionEvidence.create({
       data: {
         actionId,
@@ -431,7 +431,7 @@ export class ActionsService {
 
   async addComment(actionId: string, body: any, userId?: string, authorName?: string) {
     const action = await this.prisma.actionPlan.findUnique({ where: { id: actionId } });
-    if (!action || action.deletedAt) throw new NotFoundException('Acao nao encontrada');
+    if (!action || action.deletedAt) throw new NotFoundException('Ação nao encontrada');
     const comment = await this.prisma.actionComment.create({
       data: { actionId, authorId: userId ?? null, authorName: authorName ?? null, comment: body.comment },
     });
@@ -534,7 +534,7 @@ export class ActionsService {
 
   async remove(id: string, userId?: string, reason?: string) {
     const before = await this.prisma.actionPlan.findUnique({ where: { id } });
-    if (!before) throw new NotFoundException('Acao nao encontrada');
+    if (!before) throw new NotFoundException('Ação nao encontrada');
     const removed = await this.prisma.actionPlan.update({
       where: { id },
       data: { deletedAt: new Date(), status: ActionStatus.CANCELLED, cancelReason: reason ?? null },
@@ -549,7 +549,7 @@ export class ActionsService {
       eventType: TraceEventType.STATUS_CHANGED,
       entityType: TraceEntityType.ACTION_PLAN,
       entityId: id,
-      title: 'Plano de acao cancelado',
+      title: 'Plano de ação cancelado',
       description: removed.title,
       statusTo: ActionStatus.CANCELLED,
       metadata: { reason },
@@ -786,7 +786,7 @@ export class ActionsService {
         originRefId: true,
       },
     });
-    if (!action) throw new NotFoundException('Acao nao encontrada');
+    if (!action) throw new NotFoundException('Ação nao encontrada');
     let indicatorId = action.indicatorId ?? action.deviation?.indicatorId ?? null;
     if (!indicatorId && action.origin === ActionOrigin.INDICATOR) indicatorId = action.originRefId;
     return { companyId: action.companyId, indicatorId, treatmentId: action.treatmentId };
@@ -811,21 +811,21 @@ export class ActionsService {
 
   private buildOriginTrail(action: any) {
     const trail = [];
-    if (action.strategicObjective) trail.push({ type: 'Objetivo estrategico', label: action.strategicObjective.name, href: `/strategy/${action.strategicObjective.mapId ?? action.strategicObjective.map?.id ?? ''}` });
+    if (action.strategicObjective) trail.push({ type: 'Objetivo estratégico', label: action.strategicObjective.name, href: `/strategy/${action.strategicObjective.mapId ?? action.strategicObjective.map?.id ?? ''}` });
     if (action.ownerNode) trail.push({ type: 'Area/Setor', label: action.ownerNode.name, href: '/org' });
     if (action.indicator) trail.push({ type: 'Indicador', label: action.indicator.name, href: `/indicators/${action.indicator.id}` });
     if (action.indicatorResult) trail.push({ type: 'Resultado', label: `${action.indicatorResult.periodRef} - ${action.indicatorResult.light}`, href: action.indicator ? `/indicators/${action.indicator.id}` : undefined });
     if (action.deviation) trail.push({ type: 'Desvio', label: `#${action.deviation.number} ${action.deviation.title}`, href: `/deviations/${action.deviation.id}` });
-    if (action.analysis) trail.push({ type: 'Analise de causa', label: action.analysis.method, href: action.deviation ? `/deviations/${action.deviation.id}` : undefined });
-    if (action.meeting) trail.push({ type: 'Reuniao', label: action.meeting.title, href: `/meetings/${action.meeting.id}` });
-    trail.push({ type: 'Plano de acao', label: action.title, href: `/actions/${action.id}` });
+    if (action.analysis) trail.push({ type: 'Análise de causa', label: action.analysis.method, href: action.deviation ? `/deviations/${action.deviation.id}` : undefined });
+    if (action.meeting) trail.push({ type: 'Reunião', label: action.meeting.title, href: `/meetings/${action.meeting.id}` });
+    trail.push({ type: 'Plano de ação', label: action.title, href: `/actions/${action.id}` });
     return trail;
   }
 
   private assessActionReadiness(action: any) {
     const gaps = [];
     if (!action.rootCause && action.analysisSessions.length === 0) gaps.push('Causa raiz ainda nao registrada.');
-    if (!action.responsibleUserId && !action.responsibleEmail) gaps.push('Responsavel nao definido.');
+    if (!action.responsibleUserId && !action.responsibleEmail) gaps.push('Responsável nao definido.');
     if (!action.dueDate) gaps.push('Prazo final ausente.');
     if (!action.expectedResult) gaps.push('Resultado esperado ausente.');
     if (action.evidenceRequired && action.evidences.length === 0) gaps.push('Evidencia esperada ainda nao anexada.');
@@ -851,22 +851,22 @@ export class ActionsService {
         type: 'QUESTION',
         title: 'Pergunta de aprofundamento',
         content: rootCause
-          ? `Confirme se a causa raiz "${rootCause}" possui evidencia objetiva e esta sob controle da area responsavel.`
+          ? `Confirme se a causa raiz "${rootCause}" possui evidencia objetiva e esta sob controle da area responsável.`
           : `A causa raiz ainda parece indefinida. Use 5 Porques ou Ishikawa para separar sintoma de causa do problema: "${problem}".`,
         context,
       },
       {
         type: 'ACTION',
-        title: 'Sugestao de acao estruturada',
-        content: `Defina uma acao em formato 5W2H: o que sera feito, por que resolve a causa, quem responde, prazo, local, metodo de execucao, custo estimado e evidencia esperada.`,
+        title: 'Sugestão de ação estruturada',
+        content: `Defina uma ação em formato 5W2H: o que será feito, por que resolve a causa, quem responde, prazo, local, metodo de execucao, custo estimado e evidencia esperada.`,
         context,
       },
       {
         type: 'EFFECTIVENESS',
         title: 'Criterio de eficacia',
         content: action.indicator
-          ? `Valide a eficacia comparando o proximo resultado do indicador "${action.indicator.name}" com o resultado que gerou o plano e anexe evidencia da melhoria.`
-          : `Defina um indicador de eficacia antes de concluir o plano, para evitar encerrar a acao apenas por entrega de tarefa.`,
+          ? `Valide a eficacia comparando o próximo resultado do indicador "${action.indicator.name}" com o resultado que gerou o plano e anexe evidencia da melhoria.`
+          : `Defina um indicador de eficacia antes de concluir o plano, para evitar encerrar a ação apenas por entrega de tarefa.`,
         context,
       },
     ];
@@ -895,7 +895,7 @@ export class ActionsService {
         companyId: companyId ?? null,
         userId: userId ?? null,
         action,
-        module: 'Planos de acao',
+        module: 'Planos de ação',
         entity,
         entityId,
         beforeValue: stringify(beforeValue),
@@ -908,14 +908,14 @@ export class ActionsService {
 
 function defaultMaspSteps() {
   return [
-    { step: 1, title: 'Identificacao do problema' },
+    { step: 1, title: 'Identificação do problema' },
     { step: 2, title: 'Observacao' },
-    { step: 3, title: 'Analise' },
-    { step: 4, title: 'Plano de acao' },
+    { step: 3, title: 'Análise' },
+    { step: 4, title: 'Plano de ação' },
     { step: 5, title: 'Execucao' },
-    { step: 6, title: 'Verificacao' },
+    { step: 6, title: 'Verificação' },
     { step: 7, title: 'Padronizacao' },
-    { step: 8, title: 'Conclusao' },
+    { step: 8, title: 'Conclusão' },
   ];
 }
 

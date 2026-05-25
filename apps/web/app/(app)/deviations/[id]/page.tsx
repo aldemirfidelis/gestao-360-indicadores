@@ -55,13 +55,13 @@ interface UserOption {
 const SEVERITY_LABEL: Record<string, string> = {
   LOW: 'Leve',
   MODERATE: 'Moderado',
-  CRITICAL: 'Critico',
+  CRITICAL: 'Crítico',
 };
 
 const STATUS_LABEL: Record<string, string> = {
   OPEN: 'Aberto',
-  IN_ANALYSIS: 'Em analise',
-  WAITING_ACTION: 'Aguardando acao',
+  IN_ANALYSIS: 'Em análise',
+  WAITING_ACTION: 'Aguardando ação',
   IN_PROGRESS: 'Em execucao',
   CLOSED: 'Concluido',
   CLOSED_LATE: 'Concluido fora do prazo',
@@ -74,15 +74,15 @@ const METHOD_LABEL: Record<string, string> = {
   ISHIKAWA: 'Ishikawa (6M)',
   PARETO: 'Pareto',
   CAPA: 'CAPA',
-  SIMPLE: 'Analise simples',
+  SIMPLE: 'Análise simples',
 };
 
-const CAUSE_CATEGORIES = ['Metodo', 'Maquina', 'Mao de obra', 'Material', 'Medida', 'Meio ambiente'];
+const CAUSE_CATEGORIES = ['Metodo', 'Máquina', 'Mao de obra', 'Material', 'Medida', 'Meio ambiente'];
 const PRIORITY_LABEL: Record<string, string> = {
   LOW: 'Baixa',
   MEDIUM: 'Media',
   HIGH: 'Alta',
-  CRITICAL: 'Critica',
+  CRITICAL: 'Crítica',
 };
 
 export default function DeviationDetailPage() {
@@ -151,7 +151,7 @@ export default function DeviationDetailPage() {
         },
       }),
     onSuccess: () => {
-      toast.success('Plano de acao criado e enviado para o Kanban');
+      toast.success('Plano de ação criado e enviado para o Kanban');
       setActionOpen(false);
       setActionForm({
         title: '',
@@ -165,7 +165,7 @@ export default function DeviationDetailPage() {
       qc.invalidateQueries({ queryKey: ['actions'] });
       qc.invalidateQueries({ queryKey: ['dashboard'] });
     },
-    onError: (e: any) => toast.error(e?.message ?? 'Nao foi possivel criar a acao'),
+    onError: (e: any) => toast.error(e?.message ?? 'Não foi possível criar a ação'),
   });
 
   const close = useMutation({
@@ -174,7 +174,7 @@ export default function DeviationDetailPage() {
       toast.success('Desvio concluido');
       qc.invalidateQueries({ queryKey: ['deviation', id] });
     },
-    onError: (e: any) => toast.error(e?.message ?? 'Nao foi possivel fechar'),
+    onError: (e: any) => toast.error(e?.message ?? 'Não foi possível fechar'),
   });
 
   if (query.isLoading) return <p className="text-sm text-muted-foreground">Carregando...</p>;
@@ -207,13 +207,13 @@ export default function DeviationDetailPage() {
 
       <PageHeader
         title={`#${d.number} - ${d.title}`}
-        description={`Indicador: ${d.indicator.name} - Periodo ${periodRefLabel(d.periodRef)}`}
+        description={`Indicador: ${d.indicator.name} - Período ${periodRefLabel(d.periodRef)}`}
         actions={
           d.status !== 'CLOSED' &&
           d.status !== 'CLOSED_LATE' && (
             <Button onClick={() => close.mutate()} disabled={close.isPending}>
               <CheckCircle2 className="h-4 w-4 mr-2" />
-              {openActions.length > 0 ? `Fechar (${openActions.length} acao(oes) abertas)` : 'Fechar desvio'}
+              {openActions.length > 0 ? `Fechar (${openActions.length} ação(oes) abertas)` : 'Fechar desvio'}
             </Button>
           )
         }
@@ -251,7 +251,7 @@ export default function DeviationDetailPage() {
         </Card>
         <Card>
           <CardContent className="p-4 space-y-2">
-            <div className="text-xs uppercase text-muted-foreground">Metodo de analise</div>
+            <div className="text-xs uppercase text-muted-foreground">Metodo de análise</div>
             <NativeSelect
               value={d.method}
               onChange={(e) => update.mutate({ method: e.target.value })}
@@ -273,7 +273,7 @@ export default function DeviationDetailPage() {
           <CardContent className="space-y-3">
             <Textarea
               defaultValue={d.fact ?? ''}
-              placeholder="Descreva objetivamente o que aconteceu (numeros, datas, evidencias)..."
+              placeholder="Descreva objetivamente o que aconteceu (números, datas, evidencias)..."
               onBlur={(e) => {
                 if (e.target.value !== (d.fact ?? '')) {
                   update.mutate({ fact: e.target.value });
@@ -284,7 +284,7 @@ export default function DeviationDetailPage() {
               <Label>Causa raiz consolidada</Label>
               <Textarea
                 defaultValue={d.rootCause ?? ''}
-                placeholder="Apos analise das causas, qual e a causa raiz?"
+                placeholder="Após análise das causas, qual e a causa raiz?"
                 onBlur={(e) => {
                   if (e.target.value !== (d.rootCause ?? '')) {
                     update.mutate({ rootCause: e.target.value });
@@ -353,7 +353,7 @@ export default function DeviationDetailPage() {
 
       <Card className="mt-6">
         <CardHeader>
-          <CardTitle>Analises detalhadas</CardTitle>
+          <CardTitle>Análises detalhadas</CardTitle>
         </CardHeader>
         <CardContent>
           <div className="grid grid-cols-1 sm:grid-cols-[180px,1fr,auto] gap-2 mb-3">
@@ -367,7 +367,7 @@ export default function DeviationDetailPage() {
             </NativeSelect>
             <Textarea
               rows={2}
-              placeholder="Conteudo da analise (ex.: 5 Porques pergunta-resposta, hipoteses Ishikawa, etc.)"
+              placeholder="Conteúdo da análise (ex.: 5 Porques pergunta-resposta, hipoteses Ishikawa, etc.)"
               value={newAnalysis.content}
               onChange={(e) => setNewAnalysis({ ...newAnalysis, content: e.target.value })}
             />
@@ -386,7 +386,7 @@ export default function DeviationDetailPage() {
               </div>
             ))}
             {d.analyses.length === 0 && (
-              <p className="text-xs text-muted-foreground py-2">Nenhuma analise registrada.</p>
+              <p className="text-xs text-muted-foreground py-2">Nenhuma análise registrada.</p>
             )}
           </div>
         </CardContent>
@@ -395,20 +395,20 @@ export default function DeviationDetailPage() {
       <Card className="mt-6">
         <CardHeader className="flex-row items-start justify-between gap-3 space-y-0">
           <div>
-            <CardTitle>Acoes vinculadas ({d.actions.length})</CardTitle>
+            <CardTitle>Ações vinculadas ({d.actions.length})</CardTitle>
             <p className="mt-1 text-sm text-muted-foreground">
-              Transforme a analise de causa em plano de acao acompanhavel no Kanban.
+              Transforme a análise de causa em plano de ação acompanhavel no Kanban.
             </p>
           </div>
           <Button onClick={openActionDialog}>
             <Plus className="mr-2 h-4 w-4" />
-            Criar plano de acao
+            Criar plano de ação
           </Button>
         </CardHeader>
         <CardContent>
           {d.actions.length === 0 && (
             <p className="text-sm text-muted-foreground">
-              Nenhuma acao vinculada. Use o botao acima para criar uma acao ja conectada a este desvio.
+              Nenhuma ação vinculada. Use o botão acima para criar uma ação ja conectada a este desvio.
             </p>
           )}
           <div className="space-y-2">
@@ -421,7 +421,7 @@ export default function DeviationDetailPage() {
                 <div>
                   <div className="text-sm font-medium">{a.title}</div>
                   <div className="text-xs text-muted-foreground">
-                    {a.responsibleUser?.name ?? 'Sem responsavel'}
+                    {a.responsibleUser?.name ?? 'Sem responsável'}
                   </div>
                 </div>
                 <Badge variant={a.status === 'DONE' || a.status === 'DONE_LATE' ? 'default' : 'secondary'}>
@@ -436,11 +436,11 @@ export default function DeviationDetailPage() {
       <Dialog open={actionOpen} onOpenChange={setActionOpen}>
         <DialogContent className="max-w-2xl">
           <DialogHeader>
-            <DialogTitle>Criar plano de acao para o desvio</DialogTitle>
+            <DialogTitle>Criar plano de ação para o desvio</DialogTitle>
           </DialogHeader>
           <div className="grid gap-4">
             <div className="space-y-2">
-              <Label>Titulo *</Label>
+              <Label>Título *</Label>
               <Input
                 value={actionForm.title}
                 onChange={(e) => setActionForm({ ...actionForm, title: e.target.value })}
@@ -448,12 +448,12 @@ export default function DeviationDetailPage() {
               />
             </div>
             <div className="space-y-2">
-              <Label>Descricao</Label>
+              <Label>Descrição</Label>
               <Textarea
                 rows={5}
                 value={actionForm.description}
                 onChange={(e) => setActionForm({ ...actionForm, description: e.target.value })}
-                placeholder="Contexto da causa, evidencia e orientacao da acao..."
+                placeholder="Contexto da causa, evidencia e orientacao da ação..."
               />
             </div>
             <div className="grid gap-3 sm:grid-cols-3">
@@ -488,12 +488,12 @@ export default function DeviationDetailPage() {
               </div>
             </div>
             <div className="space-y-2">
-              <Label>Responsavel</Label>
+              <Label>Responsável</Label>
               <NativeSelect
                 value={actionForm.responsibleUserId}
                 onChange={(e) => setActionForm({ ...actionForm, responsibleUserId: e.target.value })}
               >
-                <option value="">Sem responsavel definido</option>
+                <option value="">Sem responsável definido</option>
                 {users.map((u) => (
                   <option key={u.id} value={u.id}>{u.name}</option>
                 ))}
@@ -506,7 +506,7 @@ export default function DeviationDetailPage() {
               onClick={() => createAction.mutate()}
               disabled={!actionForm.title.trim() || createAction.isPending}
             >
-              {createAction.isPending ? 'Criando...' : 'Enviar para Planos de Acao'}
+              {createAction.isPending ? 'Criando...' : 'Enviar para Planos de Ação'}
             </Button>
           </DialogFooter>
         </DialogContent>

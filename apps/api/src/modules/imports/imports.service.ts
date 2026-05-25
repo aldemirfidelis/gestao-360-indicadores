@@ -146,7 +146,7 @@ export class ImportsService {
       });
       if (!ind) throw new Error(`Indicador "${d.code}" nao encontrado nesta empresa`);
       const val = target === ImportTargetKind.TARGETS ? (d as TargetRow).target : (d as ResultRow).value;
-      if (typeof val !== 'number' || Number.isNaN(val)) throw new Error('valor numerico invalido');
+      if (typeof val !== 'number' || Number.isNaN(val)) throw new Error('valor numerico inválido');
     }
   }
 
@@ -156,7 +156,7 @@ export class ImportsService {
       const ownerNode = d.ownerCode
         ? await this.prisma.orgNode.findFirst({ where: { companyId, code: d.ownerCode } })
         : null;
-      if (!ownerNode) throw new Error('ownerCode invalido (area nao encontrada)');
+      if (!ownerNode) throw new Error('ownerCode inválido (area nao encontrada)');
       await this.prisma.indicator.upsert({
         where: { companyId_code: { companyId, code: d.code } },
         create: {

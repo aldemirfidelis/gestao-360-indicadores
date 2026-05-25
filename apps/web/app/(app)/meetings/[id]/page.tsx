@@ -67,7 +67,7 @@ interface MeetingDetail {
     name: string;
     email: string;
     jobTitle: string | null;
-    area: string | null;
+    área: string | null;
     role: string;
     confirmed: boolean;
     notes: string | null;
@@ -92,13 +92,13 @@ const statusLabels: Record<string, string> = {
   SCHEDULED: 'Agendada',
   COMPLETED: 'Concluida',
   CANCELLED: 'Cancelada',
-  NOT_STARTED: 'Nao iniciada',
+  NOT_STARTED: 'Não iniciada',
   IN_PROGRESS: 'Em andamento',
   WAITING_THIRD: 'Aguardando terceiros',
   PAUSED: 'Pausada',
   DONE: 'Concluida',
   DONE_LATE: 'Concluida fora do prazo',
-  CRITICAL: 'Critica',
+  CRITICAL: 'Crítica',
   HIGH: 'Alta',
   MEDIUM: 'Media',
   LOW: 'Baixa',
@@ -109,7 +109,7 @@ export default function MeetingDetailPage() {
   const qc = useQueryClient();
   const [agendaTopic, setAgendaTopic] = useState('');
   const [decision, setDecision] = useState({ decision: '', owner: '', dueDate: '' });
-  const [guest, setGuest] = useState({ name: '', email: '', jobTitle: '', area: '', role: 'PARTICIPANT', notes: '' });
+  const [guest, setGuest] = useState({ name: '', email: '', jobTitle: '', área: '', role: 'PARTICIPANT', notes: '' });
   const [actionForm, setActionForm] = useState({
     title: '',
     description: '',
@@ -154,7 +154,7 @@ export default function MeetingDetailPage() {
   const addDecision = useMutation({
     mutationFn: () => api(`/meetings/${id}/decisions`, { method: 'POST', json: decision }),
     onSuccess: () => {
-      toast.success('Decisao registrada');
+      toast.success('Decisão registrada');
       setDecision({ decision: '', owner: '', dueDate: '' });
       qc.invalidateQueries({ queryKey: ['meeting', id] });
     },
@@ -164,16 +164,16 @@ export default function MeetingDetailPage() {
     mutationFn: () => api(`/meetings/${id}/guests`, { method: 'POST', json: guest }),
     onSuccess: () => {
       toast.success('Participante adicionado');
-      setGuest({ name: '', email: '', jobTitle: '', area: '', role: 'PARTICIPANT', notes: '' });
+      setGuest({ name: '', email: '', jobTitle: '', área: '', role: 'PARTICIPANT', notes: '' });
       qc.invalidateQueries({ queryKey: ['meeting', id] });
     },
-    onError: (e: any) => toast.error(e?.message ?? 'Nao foi possivel adicionar participante'),
+    onError: (e: any) => toast.error(e?.message ?? 'Não foi possível adicionar participante'),
   });
 
   const generateAction = useMutation({
     mutationFn: () => api(`/meetings/${id}/actions`, { method: 'POST', json: actionForm }),
     onSuccess: () => {
-      toast.success('Acao criada e vinculada a reuniao');
+      toast.success('Ação criada e vinculada a reunião');
       setActionForm({ title: '', description: '', responsibleEmail: '', dueDate: '', priority: 'HIGH', expectedResult: '', evidenceRequired: true });
       qc.invalidateQueries({ queryKey: ['meeting', id] });
       qc.invalidateQueries({ queryKey: ['actions'] });
@@ -192,32 +192,32 @@ export default function MeetingDetailPage() {
       toast.success(`${data.count} convite(s) processado(s)`);
       qc.invalidateQueries({ queryKey: ['meeting', id] });
     },
-    onError: (e: any) => toast.error(e?.message ?? 'Nao foi possivel enviar convites'),
+    onError: (e: any) => toast.error(e?.message ?? 'Não foi possível enviar convites'),
   });
 
   const completeMeeting = useMutation({
     mutationFn: () => api(`/meetings/${id}/complete`, { method: 'POST' }),
     onSuccess: () => {
-      toast.success('Reuniao concluida');
+      toast.success('Reunião concluida');
       qc.invalidateQueries({ queryKey: ['meeting', id] });
     },
   });
 
-  if (query.isLoading) return <p className="text-sm text-muted-foreground">Carregando reuniao...</p>;
+  if (query.isLoading) return <p className="text-sm text-muted-foreground">Carregando reunião...</p>;
   if (!m) return null;
 
   return (
     <div>
       <Link href="/meetings" className="mb-4 inline-flex items-center text-sm text-muted-foreground hover:text-foreground">
-        <ArrowLeft className="mr-1 h-4 w-4" /> Reunioes
+        <ArrowLeft className="mr-1 h-4 w-4" /> Reuniões
       </Link>
 
       <PageHeader
-        eyebrow="Reuniao de tratativa"
+        eyebrow="Reunião de tratativa"
         tone="view"
         title={m.title}
         description={`${formatDateTime(m.startsAt)}${m.location ? ` - ${m.location}` : ''}`}
-        breadcrumbs={[{ label: 'Inicio', href: '/' }, { label: 'Reunioes', href: '/meetings' }, { label: 'Tratativa' }]}
+        breadcrumbs={[{ label: 'Início', href: '/' }, { label: 'Reuniões', href: '/meetings' }, { label: 'Tratativa' }]}
         actions={
           <>
             {m.treatment && (
@@ -240,14 +240,14 @@ export default function MeetingDetailPage() {
       <div className="mb-6 grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
         <MetricCard title="Status" value={statusLabels[m.status] ?? m.status} description={formatLabel(m.format)} icon={<CalendarCheck2 className="h-4 w-4" />} tone="blue" />
         <MetricCard title="Participantes" value={m.participants.length + m.guests.length} description={`${m.participants.filter((p) => p.attended).length} presenca(s) confirmadas`} icon={<Users className="h-4 w-4" />} tone="purple" />
-        <MetricCard title="Acoes criadas" value={summary.total} description={`${summary.overdue} atrasada(s), ${summary.done} concluida(s)`} icon={<ClipboardList className="h-4 w-4" />} tone={summary.overdue ? 'red' : 'green'} />
+        <MetricCard title="Ações criadas" value={summary.total} description={`${summary.overdue} atrasada(s), ${summary.done} concluida(s)`} icon={<ClipboardList className="h-4 w-4" />} tone={summary.overdue ? 'red' : 'green'} />
         <MetricCard title="Convites" value={m.emailLogs.length} description={`${m.calendarInvites.length} arquivo(s) ICS`} icon={<Mail className="h-4 w-4" />} tone="neutral" />
       </div>
 
       <div className="grid grid-cols-1 gap-6 xl:grid-cols-[1.25fr_0.75fr]">
         <SectionCard
           title="Indicador tratado"
-          description="Contexto executivo da ocorrencia que gerou a reuniao."
+          description="Contexto executivo da ocorrência que gerou a reunião."
           actions={m.treatment && <StatusBadge value={m.treatment.status} label={statusLabels[m.treatment.status] ?? m.treatment.status} />}
         >
           {m.indicator ? (
@@ -269,28 +269,28 @@ export default function MeetingDetailPage() {
                 </p>
               </div>
               <div className="rounded-lg border p-3">
-                <p className="text-[11px] font-semibold uppercase text-muted-foreground">Responsavel</p>
+                <p className="text-[11px] font-semibold uppercase text-muted-foreground">Responsável</p>
                 <div className="mt-1 font-semibold">{m.indicator.responsibleUser?.name ?? '-'}</div>
                 <p className="mt-1 text-xs text-muted-foreground">{m.indicator.responsibleUser?.email ?? 'Sem e-mail cadastrado'}</p>
               </div>
             </div>
           ) : (
-            <p className="text-sm text-muted-foreground">Esta reuniao ainda nao possui indicador vinculado.</p>
+            <p className="text-sm text-muted-foreground">Está reunião ainda nao possui indicador vinculado.</p>
           )}
         </SectionCard>
 
-        <SectionCard title="Analise de causa" description="Resumo da causa registrada para a tratativa.">
+        <SectionCard title="Análise de causa" description="Resumo da causa registrada para a tratativa.">
           {m.analysis ? (
             <div className="space-y-3">
               <StatusBadge value={m.analysis.method} label={methodLabel(m.analysis.method)} tone="yellow" />
               <p className="whitespace-pre-wrap text-sm text-muted-foreground">{m.analysis.content}</p>
             </div>
           ) : (
-            <p className="text-sm text-muted-foreground">Nenhuma analise de causa vinculada.</p>
+            <p className="text-sm text-muted-foreground">Nenhuma análise de causa vinculada.</p>
           )}
         </SectionCard>
 
-        <SectionCard title="Pauta da reuniao" description="Itens para conduzir a discussao, decisao e plano de acao.">
+        <SectionCard title="Pauta da reunião" description="Itens para conduzir a discussão, decisão e plano de ação.">
           <div className="mb-3 flex gap-2">
             <Input
               placeholder="Adicionar item de pauta..."
@@ -347,10 +347,10 @@ export default function MeetingDetailPage() {
                 <Input placeholder="Nome" value={guest.name} onChange={(e) => setGuest({ ...guest, name: e.target.value })} />
                 <Input placeholder="E-mail" type="email" value={guest.email} onChange={(e) => setGuest({ ...guest, email: e.target.value })} />
                 <Input placeholder="Cargo" value={guest.jobTitle} onChange={(e) => setGuest({ ...guest, jobTitle: e.target.value })} />
-                <Input placeholder="Area" value={guest.area} onChange={(e) => setGuest({ ...guest, area: e.target.value })} />
+                <Input placeholder="Área" value={guest.área} onChange={(e) => setGuest({ ...guest, área: e.target.value })} />
                 <NativeSelect value={guest.role} onChange={(e) => setGuest({ ...guest, role: e.target.value })}>
                   <option value="PARTICIPANT">Participante</option>
-                  <option value="RESPONSIBLE">Responsavel</option>
+                  <option value="RESPONSIBLE">Responsável</option>
                   <option value="APPROVER">Aprovador</option>
                   <option value="EXECUTOR">Executor</option>
                   <option value="GUEST">Convidado</option>
@@ -364,10 +364,10 @@ export default function MeetingDetailPage() {
           </div>
         </SectionCard>
 
-        <SectionCard title="Decisoes e encaminhamentos" description="Registre as decisoes tomadas na reuniao.">
+        <SectionCard title="Decisões e encaminhamentos" description="Registre as decisões tomadas na reunião.">
           <div className="mb-3 grid grid-cols-1 gap-2 sm:grid-cols-[1fr_160px_160px_auto]">
-            <Input placeholder="Decisao..." value={decision.decision} onChange={(e) => setDecision({ ...decision, decision: e.target.value })} />
-            <Input placeholder="Responsavel" value={decision.owner} onChange={(e) => setDecision({ ...decision, owner: e.target.value })} />
+            <Input placeholder="Decisão..." value={decision.decision} onChange={(e) => setDecision({ ...decision, decision: e.target.value })} />
+            <Input placeholder="Responsável" value={decision.owner} onChange={(e) => setDecision({ ...decision, owner: e.target.value })} />
             <Input type="date" value={decision.dueDate} onChange={(e) => setDecision({ ...decision, dueDate: e.target.value })} />
             <Button onClick={() => addDecision.mutate()} disabled={!decision.decision || addDecision.isPending}>
               <Plus className="h-4 w-4" />
@@ -380,11 +380,11 @@ export default function MeetingDetailPage() {
                 <span className="text-xs text-muted-foreground">{d.owner ?? '-'} {d.dueDate ? `- ${formatDate(d.dueDate)}` : ''}</span>
               </div>
             ))}
-            {m.decisions.length === 0 && <p className="py-4 text-center text-sm text-muted-foreground">Nenhuma decisao registrada.</p>}
+            {m.decisions.length === 0 && <p className="py-4 text-center text-sm text-muted-foreground">Nenhuma decisão registrada.</p>}
           </div>
         </SectionCard>
 
-        <SectionCard title="Plano de acao da reuniao" description="Acoes criadas aqui ficam vinculadas ao indicador, analise, reuniao e tratativa.">
+        <SectionCard title="Plano de ação da reunião" description="Ações criadas aqui ficam vinculadas ao indicador, análise, reunião e tratativa.">
           <div className="mb-4 grid grid-cols-2 gap-2 md:grid-cols-5">
             <ActionSummary label="Total" value={summary.total} />
             <ActionSummary label="Pendentes" value={summary.pending} />
@@ -399,7 +399,7 @@ export default function MeetingDetailPage() {
                   <div className="min-w-0">
                     <div className="truncate font-medium">{action.title}</div>
                     <div className="mt-1 text-xs text-muted-foreground">
-                      {action.responsibleUser?.name ?? action.responsibleEmail ?? 'Sem responsavel'} - Prazo {formatDate(action.dueDate)}
+                      {action.responsibleUser?.name ?? action.responsibleEmail ?? 'Sem responsável'} - Prazo {formatDate(action.dueDate)}
                     </div>
                   </div>
                   <StatusBadge value={action.status} label={statusLabels[action.status] ?? action.status} />
@@ -408,22 +408,22 @@ export default function MeetingDetailPage() {
             ))}
           </div>
           <div className="mt-4 space-y-2 rounded-lg border bg-muted/30 p-3">
-            <Label>Nova acao</Label>
-            <Input placeholder="Titulo da acao" value={actionForm.title} onChange={(e) => setActionForm({ ...actionForm, title: e.target.value })} />
-            <Textarea placeholder="Descricao" value={actionForm.description} onChange={(e) => setActionForm({ ...actionForm, description: e.target.value })} />
+            <Label>Nova ação</Label>
+            <Input placeholder="Título da ação" value={actionForm.title} onChange={(e) => setActionForm({ ...actionForm, title: e.target.value })} />
+            <Textarea placeholder="Descrição" value={actionForm.description} onChange={(e) => setActionForm({ ...actionForm, description: e.target.value })} />
             <div className="grid gap-2 md:grid-cols-3">
-              <Input type="email" placeholder="E-mail do responsavel" value={actionForm.responsibleEmail} onChange={(e) => setActionForm({ ...actionForm, responsibleEmail: e.target.value })} />
+              <Input type="email" placeholder="E-mail do responsável" value={actionForm.responsibleEmail} onChange={(e) => setActionForm({ ...actionForm, responsibleEmail: e.target.value })} />
               <Input type="date" value={actionForm.dueDate} onChange={(e) => setActionForm({ ...actionForm, dueDate: e.target.value })} />
               <NativeSelect value={actionForm.priority} onChange={(e) => setActionForm({ ...actionForm, priority: e.target.value })}>
                 <option value="LOW">Baixa</option>
                 <option value="MEDIUM">Media</option>
                 <option value="HIGH">Alta</option>
-                <option value="CRITICAL">Critica</option>
+                <option value="CRITICAL">Crítica</option>
               </NativeSelect>
             </div>
             <Input placeholder="Resultado esperado" value={actionForm.expectedResult} onChange={(e) => setActionForm({ ...actionForm, expectedResult: e.target.value })} />
             <Button onClick={() => generateAction.mutate()} disabled={!actionForm.title || generateAction.isPending}>
-              Criar acao vinculada
+              Criar ação vinculada
             </Button>
           </div>
         </SectionCard>
@@ -480,14 +480,14 @@ function methodLabel(value: string) {
     DMAIC: 'DMAIC',
     FCA: 'FCA',
     CAPA: 'CAPA',
-    SIMPLE: 'Analise simples',
+    SIMPLE: 'Análise simples',
   };
   return labels[value] ?? value;
 }
 
 function roleLabel(value: string) {
   const labels: Record<string, string> = {
-    RESPONSIBLE: 'Responsavel',
+    RESPONSIBLE: 'Responsável',
     PARTICIPANT: 'Participante',
     APPROVER: 'Aprovador',
     EXECUTOR: 'Executor',

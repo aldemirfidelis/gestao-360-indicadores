@@ -391,7 +391,7 @@ export class IndicatorsService {
       where: { id },
       data: { deletedAt: new Date(), status: IndicatorStatus.INACTIVE },
     });
-    await this.audit(me, 'DELETE', 'Indicator', id, current, updated, 'Exclusao logica do indicador');
+    await this.audit(me, 'DELETE', 'Indicator', id, current, updated, 'Exclusão lógica do indicador');
     return updated;
   }
 
@@ -445,7 +445,7 @@ export class IndicatorsService {
   }
 
   async upsertTargetForIndicator(me: AuthPayload, id: string, body: TargetWriteInput) {
-    const periodRef = requiredString(body.periodRef, 'Informe o periodo da meta');
+    const periodRef = requiredString(body.periodRef, 'Informe o período da meta');
     const target = requiredNumber(body.target, 'Informe a meta');
     return this.upsertTarget(
       {
@@ -472,7 +472,7 @@ export class IndicatorsService {
     const justification = cleanString(body?.justification) ?? null;
     let count = 0;
     for (const item of items) {
-      const periodRef = requiredString(item.periodRef, 'Informe o periodo da meta');
+      const periodRef = requiredString(item.periodRef, 'Informe o período da meta');
       const target = requiredNumber(item.target, 'Informe a meta');
       await this.upsertTarget(
         {
@@ -493,7 +493,7 @@ export class IndicatorsService {
 
   async upsertResult(me: AuthPayload, id: string, body: ResultWriteInput) {
     const indicator = await this.findScopedIndicator(id, me);
-    const periodRef = requiredString(body.periodRef, 'Informe o periodo do realizado');
+    const periodRef = requiredString(body.periodRef, 'Informe o período do realizado');
     const value = requiredNumber(body.value, 'Informe o valor realizado');
     const before = await this.prisma.indicatorResult.findUnique({
       where: { indicatorId_periodRef: { indicatorId: id, periodRef } },
@@ -532,7 +532,7 @@ export class IndicatorsService {
   }
 
   /**
-   * Aplica recomputo de status, atingimento e desvios. Util quando meta muda.
+   * Aplica recomputo de status, atingimento e desvios. Útil quando meta muda.
    */
   async recalcResultStatus(indicatorId: string, periodRef: string) {
     const result = await this.prisma.indicatorResult.findUnique({
@@ -565,7 +565,7 @@ export class IndicatorsService {
     });
   }
 
-  // --- relacoes (arvore de indicadores) ---
+  // --- relações (arvore de indicadores) ---
 
   async listChildren(parentId: string) {
     return this.prisma.indicatorTreeRelation.findMany({
@@ -589,7 +589,7 @@ export class IndicatorsService {
 
   /**
    * Retorna grafo completo da arvore de indicadores (nodes + edges).
-   * Inclui o ultimo light de cada indicador.
+   * Inclui o último light de cada indicador.
    */
   async treeGraph(companyId: string) {
     const indicators = await this.prisma.indicator.findMany({
@@ -629,7 +629,7 @@ export class IndicatorsService {
 
   /**
    * Simulacao: dado um indicador "fonte", encontra todos os descendentes
-   * ate profundidade max, com o peso acumulado da influencia.
+   * ate profundidade max, com o peso acumulado da influência.
    */
   async simulateImpact(sourceId: string, maxDepth = 4) {
     const all = await this.prisma.indicatorTreeRelation.findMany();
@@ -734,7 +734,7 @@ export class IndicatorsService {
   }
 
   private async buildCreateData(companyId: string, input: IndicatorWriteInput): Promise<Prisma.IndicatorUncheckedCreateInput> {
-    const ownerNodeId = requiredString(input.ownerNodeId, 'Selecione a area micro ou estrutura responsavel');
+    const ownerNodeId = requiredString(input.ownerNodeId, 'Selecione a area micro ou estrutura responsável');
     await this.validateLinks(companyId, {
       ownerNodeId,
       guidelineNodeId: cleanString(input.guidelineNodeId),
@@ -763,7 +763,7 @@ export class IndicatorsService {
       feedKind: enumOrDefault(FeedKind, input.feedKind, FeedKind.MANUAL),
       status: enumOrDefault(IndicatorStatus, input.status, IndicatorStatus.ACTIVE),
       weight: optionalNumber(input.weight, 'Peso') ?? 1,
-      yellowToleranceP: optionalNumber(input.yellowToleranceP, 'Tolerancia amarela') ?? 10,
+      yellowToleranceP: optionalNumber(input.yellowToleranceP, 'Tolerância amarela') ?? 10,
     };
   }
 
@@ -797,7 +797,7 @@ export class IndicatorsService {
     if (input.feedKind !== undefined) data.feedKind = enumOrDefault(FeedKind, input.feedKind, FeedKind.MANUAL);
     if (input.status !== undefined) data.status = enumOrDefault(IndicatorStatus, input.status, IndicatorStatus.ACTIVE);
     if (input.weight !== undefined) data.weight = optionalNumber(input.weight, 'Peso') ?? 1;
-    if (input.yellowToleranceP !== undefined) data.yellowToleranceP = optionalNumber(input.yellowToleranceP, 'Tolerancia amarela') ?? 10;
+    if (input.yellowToleranceP !== undefined) data.yellowToleranceP = optionalNumber(input.yellowToleranceP, 'Tolerância amarela') ?? 10;
     return data;
   }
 
@@ -813,7 +813,7 @@ export class IndicatorsService {
   ) {
     if (links.ownerNodeId) {
       const node = await this.prisma.orgNode.findFirst({ where: { id: links.ownerNodeId, companyId, deletedAt: null }, select: { id: true } });
-      if (!node) throw new NotFoundException('Area responsavel nao encontrada para a empresa');
+      if (!node) throw new NotFoundException('Area responsável nao encontrada para a empresa');
     }
     if (links.guidelineNodeId) {
       const node = await this.prisma.orgNode.findFirst({ where: { id: links.guidelineNodeId, companyId, deletedAt: null }, select: { id: true } });
@@ -821,14 +821,14 @@ export class IndicatorsService {
     }
     for (const userId of [links.responsibleUserId, links.feederUserId].filter(Boolean) as string[]) {
       const user = await this.prisma.user.findFirst({ where: { id: userId, companyId, deletedAt: null }, select: { id: true } });
-      if (!user) throw new NotFoundException('Usuario responsavel nao encontrado para a empresa');
+      if (!user) throw new NotFoundException('Usuário responsável nao encontrado para a empresa');
     }
     if (links.strategicObjectiveId) {
       const objective = await this.prisma.strategicObjective.findFirst({
         where: { id: links.strategicObjectiveId, deletedAt: null, map: { companyId, deletedAt: null } },
         select: { id: true },
       });
-      if (!objective) throw new NotFoundException('Objetivo estrategico nao encontrado para a empresa');
+      if (!objective) throw new NotFoundException('Objetivo estratégico nao encontrado para a empresa');
     }
   }
 
@@ -838,7 +838,7 @@ export class IndicatorsService {
       where: { companyId, code, deletedAt: null, ...(ignoreId ? { NOT: { id: ignoreId } } : {}) },
       select: { id: true },
     });
-    if (existing) throw new ConflictException('Ja existe indicador com este codigo nesta empresa');
+    if (existing) throw new ConflictException('Já existe indicador com este código nesta empresa');
   }
 
   private async findIndicatorOrThrow(id: string) {
@@ -980,7 +980,7 @@ function enumOrDefault<T extends Record<string, string>>(values: T, value: unkno
   if (typeof value !== 'string' || value.trim() === '') return fallback;
   const clean = value.trim();
   if (!Object.values(values).includes(clean)) {
-    throw new BadRequestException(`Valor invalido: ${clean}`);
+    throw new BadRequestException(`Valor inválido: ${clean}`);
   }
   return clean as T[keyof T];
 }
@@ -988,7 +988,7 @@ function enumOrDefault<T extends Record<string, string>>(values: T, value: unkno
 function parseYear(value?: string) {
   if (!value) return null;
   const year = Number(value);
-  if (!Number.isInteger(year) || year < 2026 || year > 2100) throw new BadRequestException('Ano invalido para indicadores');
+  if (!Number.isInteger(year) || year < 2026 || year > 2100) throw new BadRequestException('Ano inválido para indicadores');
   return year;
 }
 

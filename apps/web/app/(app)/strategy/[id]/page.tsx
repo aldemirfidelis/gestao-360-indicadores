@@ -195,8 +195,8 @@ const STATUS_LABEL: Record<string, string> = {
 
 const LIGHT_LABEL: Record<string, string> = {
   GREEN: 'Dentro da meta',
-  YELLOW: 'Atencao',
-  RED: 'Critico',
+  YELLOW: 'Atenção',
+  RED: 'Crítico',
   GRAY: 'Sem dados',
 };
 
@@ -219,9 +219,9 @@ const RELATION_KINDS: RelationKindMeta[] = [
   { kind: 'impacta', label: 'Impacta', description: 'A altera direta ou indiretamente o resultado de B', color: '#2563eb' },
   { kind: 'depende', label: 'Depende de', description: 'A so avanca quando B avanca', color: '#9333ea' },
   { kind: 'medido_por', label: 'E medido por', description: 'A e mensurado pelo indicador/objetivo B', color: '#0ea5e9' },
-  { kind: 'gera_acao', label: 'Gera acao', description: 'A motiva um plano de acao em B', color: '#f97316' },
-  { kind: 'vinculado', label: 'Esta vinculado a', description: 'Ligacao livre entre A e B', color: '#64748b' },
-  { kind: 'responsavel', label: 'Responsavel por', description: 'A responde pela execucao de B', color: '#db2777' },
+  { kind: 'gera_acao', label: 'Gera ação', description: 'A motiva um plano de ação em B', color: '#f97316' },
+  { kind: 'vinculado', label: 'Está vinculado a', description: 'Ligacao livre entre A e B', color: '#64748b' },
+  { kind: 'responsável', label: 'Responsável por', description: 'A responde pela execucao de B', color: '#db2777' },
 ];
 
 const RELATION_KIND_MAP = new Map(RELATION_KINDS.map((rel) => [rel.kind, rel]));
@@ -307,14 +307,14 @@ function ObjectiveNode({
         <div className="min-w-0">
           <div className="line-clamp-2 text-sm font-semibold leading-tight">{objective.name}</div>
           <div className="mt-1 truncate text-[11px] text-muted-foreground">
-            {objective.responsibleUser?.name ?? objective.responsible ?? objective.ownerNode?.name ?? 'Sem responsavel'}
+            {objective.responsibleUser?.name ?? objective.responsible ?? objective.ownerNode?.name ?? 'Sem responsável'}
           </div>
         </div>
         {data.editMode && <GripVertical className="h-4 w-4 shrink-0 text-muted-foreground" />}
       </div>
       <div className="mb-2 flex flex-wrap gap-1">
         <Badge variant="secondary">{objective.indicators.length} ind.</Badge>
-        <Badge variant="secondary">{objective.actionCount} acoes</Badge>
+        <Badge variant="secondary">{objective.actionCount} ações</Badge>
         <Badge variant="secondary">P{objective.priority}</Badge>
         {offIndicators > 0 && (
           <Badge className="border border-status-red/40 bg-status-red/10 text-status-red" variant="outline">
@@ -711,7 +711,7 @@ function StrategyMapPageInner() {
 
   const attachOrgNode = useMutation({
     mutationFn: ({ objectiveId, orgNodeId }: { objectiveId: string; orgNodeId: string }) =>
-      api(`/strategy/objectives/${objectiveId}/orgnodes/${orgNodeId}`, { method: 'POST', json: { kind: 'responsavel' } }),
+      api(`/strategy/objectives/${objectiveId}/orgnodes/${orgNodeId}`, { method: 'POST', json: { kind: 'responsável' } }),
     onSuccess: () => {
       toast.success('Estrutura vinculada');
       setOrgNodeToAttach('');
@@ -732,10 +732,10 @@ function StrategyMapPageInner() {
     mutationFn: (publish: boolean) =>
       api(`/strategy/maps/${id}/versions`, {
         method: 'POST',
-        json: { publish, title: publish ? `Versao publicada - ${new Date().toLocaleDateString('pt-BR')}` : undefined },
+        json: { publish, title: publish ? `Versão publicada - ${new Date().toLocaleDateString('pt-BR')}` : undefined },
       }),
     onSuccess: (_, publish) => {
-      toast.success(publish ? 'Mapa publicado' : 'Versao criada');
+      toast.success(publish ? 'Mapa publicado' : 'Versão criada');
       invalidate();
     },
     onError: (e: any) => toast.error(e?.message ?? 'Falha ao versionar mapa'),
@@ -758,18 +758,18 @@ function StrategyMapPageInner() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [editingRelation?.id]);
 
-  if (mapQuery.isLoading) return <p className="text-sm text-muted-foreground">Carregando mapa estrategico...</p>;
+  if (mapQuery.isLoading) return <p className="text-sm text-muted-foreground">Carregando mapa estratégico...</p>;
   if (!map) return null;
 
   return (
     <div className={cn(presentationMode && 'bg-background')}>
       {!presentationMode && (
         <PageHeader
-          eyebrow="Estrategia"
+          eyebrow="Estratégia"
           tone="view"
           title={map.name}
-          description={`${formatDate(map.startsAt)} - ${formatDate(map.endsAt)}. Mapa visual integrado a indicadores, areas, planos e rastreabilidade.`}
-          breadcrumbs={[{ label: 'Mapas estrategicos', href: '/strategy' }, { label: map.name }]}
+          description={`${formatDate(map.startsAt)} - ${formatDate(map.endsAt)}. Mapa visual integrado a indicadores, áreas, planos e rastreabilidade.`}
+          breadcrumbs={[{ label: 'Mapas estratégicos', href: '/strategy' }, { label: map.name }]}
           actions={
             <>
               <Button variant="outline" asChild>
@@ -780,7 +780,7 @@ function StrategyMapPageInner() {
               </Button>
               <Button variant={editMode ? 'default' : 'outline'} onClick={() => setEditMode((value) => !value)}>
                 <Pencil className="mr-2 h-4 w-4" />
-                {editMode ? 'Modo edicao' : 'Modo visualizacao'}
+                {editMode ? 'Modo edição' : 'Modo visualização'}
               </Button>
               <Button variant="outline" onClick={() => setPerspectiveOpen(true)} disabled={!editMode}>
                 <Plus className="mr-2 h-4 w-4" />
@@ -817,7 +817,7 @@ function StrategyMapPageInner() {
         <div className="mb-4 flex flex-wrap items-center gap-2">
           <div className="relative min-w-[260px] flex-1">
             <Search className="pointer-events-none absolute left-3 top-2.5 h-4 w-4 text-muted-foreground" />
-            <Input className="pl-9" value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Buscar objetivo, indicador, responsavel ou area" />
+            <Input className="pl-9" value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Buscar objetivo, indicador, responsável ou área" />
           </div>
           <NativeSelect className="w-[180px]" value={statusFilter} onChange={(event) => setStatusFilter(event.target.value)}>
             <option value="">Todos status</option>
@@ -838,15 +838,15 @@ function StrategyMapPageInner() {
             variant={onlyCritical ? 'default' : 'outline'}
             size="sm"
             onClick={() => setOnlyCritical((v) => !v)}
-            title="Mostrar apenas itens criticos"
+            title="Mostrar apenas itens críticos"
           >
-            <ShieldAlert className="mr-1.5 h-3.5 w-3.5" /> Criticos
+            <ShieldAlert className="mr-1.5 h-3.5 w-3.5" /> Críticos
           </Button>
           <Button
             variant={onlyOverdue ? 'default' : 'outline'}
             size="sm"
             onClick={() => setOnlyOverdue((v) => !v)}
-            title="Itens com acoes ou tratativas em andamento"
+            title="Itens com ações ou tratativas em andamento"
           >
             <Calendar className="mr-1.5 h-3.5 w-3.5" /> Com tratativa
           </Button>
@@ -856,7 +856,7 @@ function StrategyMapPageInner() {
             onClick={() => setOnlyUnlinked((v) => !v)}
             title="Apenas objetivos sem indicador ou estrutura"
           >
-            <Sliders className="mr-1.5 h-3.5 w-3.5" /> Sem vinculo
+            <Sliders className="mr-1.5 h-3.5 w-3.5" /> Sem vínculo
           </Button>
           <div className="ml-auto flex items-center gap-1 rounded-md border bg-background p-1 text-xs">
             <span className="px-2 text-muted-foreground">Camadas:</span>
@@ -872,7 +872,7 @@ function StrategyMapPageInner() {
               size="sm"
               onClick={() => setShowActionOverlay((v) => !v)}
             >
-              <ClipboardList className="mr-1 h-3.5 w-3.5" /> Acoes
+              <ClipboardList className="mr-1 h-3.5 w-3.5" /> Ações
             </Button>
           </div>
           {(search || statusFilter || perspectiveFilter || onlyCritical || onlyOverdue || onlyUnlinked) && (
@@ -896,7 +896,7 @@ function StrategyMapPageInner() {
 
       <div className={cn('grid grid-cols-1 gap-4', presentationMode ? '' : 'xl:grid-cols-[1fr,390px]')}>
         <SectionCard
-          title="Canvas estrategico"
+          title="Canvas estratégico"
           description={editMode ? 'Arraste objetivos, conecte com drag-to-connect, redimensione pelos cantos e clique nas linhas para editar.' : 'Navegue, aproxime e clique no objetivo para abrir o detalhe. Passe o mouse para ver o resumo.'}
           contentClassName="p-0"
         >
@@ -987,7 +987,7 @@ function StrategyMapPageInner() {
 
             <div className="pointer-events-none absolute bottom-3 left-3 z-10 flex flex-col gap-1 rounded-md border bg-background/95 p-2 text-[10px] shadow">
               <div className="flex items-center gap-2 font-semibold uppercase text-muted-foreground">
-                <Layers className="h-3 w-3" /> Tipos de relacao
+                <Layers className="h-3 w-3" /> Tipos de relação
               </div>
               <div className="grid grid-cols-2 gap-x-3 gap-y-0.5 pt-1">
                 {RELATION_KINDS.map((rel) => (
@@ -1022,7 +1022,7 @@ function StrategyMapPageInner() {
                   </div>
                 </div>
                 <div>
-                  <Label>Descricao</Label>
+                  <Label>Descrição</Label>
                   <Textarea value={selectedPerspectiveDraft.description} onChange={(event) => setSelectedPerspectiveDraft({ ...selectedPerspectiveDraft, description: event.target.value })} disabled={!editMode} rows={3} />
                 </div>
                 <div className="grid grid-cols-2 gap-2">
@@ -1072,7 +1072,7 @@ function StrategyMapPageInner() {
                   <Input value={selectedObjectiveDraft.name} onChange={(event) => setSelectedObjectiveDraft({ ...selectedObjectiveDraft, name: event.target.value })} disabled={!editMode} />
                 </div>
                 <div>
-                  <Label>Descricao</Label>
+                  <Label>Descrição</Label>
                   <Textarea value={selectedObjectiveDraft.description} onChange={(event) => setSelectedObjectiveDraft({ ...selectedObjectiveDraft, description: event.target.value })} disabled={!editMode} rows={3} />
                 </div>
                 <div className="grid grid-cols-2 gap-3">
@@ -1104,16 +1104,16 @@ function StrategyMapPageInner() {
                   </div>
                 </div>
                 <div>
-                  <Label>Responsavel</Label>
+                  <Label>Responsável</Label>
                   <NativeSelect value={selectedObjectiveDraft.responsibleUserId} onChange={(event) => setSelectedObjectiveDraft({ ...selectedObjectiveDraft, responsibleUserId: event.target.value })} disabled={!editMode}>
-                    <option value="">Sem usuario vinculado</option>
+                    <option value="">Sem usuário vinculado</option>
                     {optionsQuery.data?.users.map((user) => (
                       <option key={user.id} value={user.id}>{user.name}</option>
                     ))}
                   </NativeSelect>
                 </div>
                 <div>
-                  <Label>Area ou setor responsavel</Label>
+                  <Label>Área ou setor responsável</Label>
                   <NativeSelect value={selectedObjectiveDraft.ownerNodeId} onChange={(event) => setSelectedObjectiveDraft({ ...selectedObjectiveDraft, ownerNodeId: event.target.value })} disabled={!editMode}>
                     <option value="">Sem estrutura vinculada</option>
                     {optionsQuery.data?.orgNodes.map((node) => (
@@ -1173,7 +1173,7 @@ function StrategyMapPageInner() {
                 </div>
 
                 <div className="rounded-lg border p-3">
-                  <div className="mb-2 text-sm font-semibold">Areas, setores e processos</div>
+                  <div className="mb-2 text-sm font-semibold">Áreas, setores e processos</div>
                   <div className="flex flex-wrap gap-1">
                     {selectedObjective.orgNodeLinks.map((link) => (
                       <Badge key={`${link.orgNode.id}-${link.kind}`} variant="secondary" className="gap-1">
@@ -1203,7 +1203,7 @@ function StrategyMapPageInner() {
                 </div>
 
                 <div className="rounded-lg border p-3">
-                  <div className="mb-2 text-sm font-semibold">Ligacoes estrategicas</div>
+                  <div className="mb-2 text-sm font-semibold">Ligacoes estratégicas</div>
                   <div className="space-y-1 text-xs">
                     {selectedObjective.outRelations.map((relation) => (
                       <div key={relation.id} className="flex items-center justify-between gap-2 rounded-md bg-muted/40 px-2 py-1">
@@ -1223,8 +1223,8 @@ function StrategyMapPageInner() {
                 </div>
 
                 <div className="grid grid-cols-3 gap-2 text-center text-xs">
-                  <Link className="rounded-lg border p-2 hover:bg-muted" href={`/treatments?indicatorId=${selectedObjective.indicators[0]?.id ?? ''}`}>Analise</Link>
-                  <Link className="rounded-lg border p-2 hover:bg-muted" href={`/meetings?indicatorId=${selectedObjective.indicators[0]?.id ?? ''}`}>Reuniao</Link>
+                  <Link className="rounded-lg border p-2 hover:bg-muted" href={`/treatments?indicatorId=${selectedObjective.indicators[0]?.id ?? ''}`}>Análise</Link>
+                  <Link className="rounded-lg border p-2 hover:bg-muted" href={`/meetings?indicatorId=${selectedObjective.indicators[0]?.id ?? ''}`}>Reunião</Link>
                   <Link className="rounded-lg border p-2 hover:bg-muted" href={`/actions?indicatorId=${selectedObjective.indicators[0]?.id ?? ''}`}>Plano</Link>
                 </div>
 
@@ -1240,7 +1240,7 @@ function StrategyMapPageInner() {
                   <Button
                     variant="outline"
                     disabled={!editMode}
-                    onClick={() => window.confirm('Inativar este objetivo? Os vinculos serao preservados na auditoria.') && deleteObjective.mutate(selectedObjective.id)}
+                    onClick={() => window.confirm('Inativar este objetivo? Os vínculos serão preservados na auditoria.') && deleteObjective.mutate(selectedObjective.id)}
                   >
                     <Trash2 className="h-4 w-4" />
                   </Button>
@@ -1249,11 +1249,11 @@ function StrategyMapPageInner() {
             )}
           </SectionCard>
 
-          <SectionCard title="Versionamento" description="Publique versoes para congelar o mapa aprovado.">
+          <SectionCard title="Versionamento" description="Publique versões para congelar o mapa aprovado.">
             <div className="mb-3 flex gap-2">
               <Button variant="outline" size="sm" onClick={() => createVersion.mutate(false)}>
                 <History className="mr-2 h-4 w-4" />
-                Criar versao
+                Criar versão
               </Button>
               <Button size="sm" onClick={() => createVersion.mutate(true)}>
                 <Circle className="mr-2 h-4 w-4" />
@@ -1270,7 +1270,7 @@ function StrategyMapPageInner() {
                   <div className="mt-1 text-muted-foreground">{formatDate(version.createdAt)} por {version.createdBy?.name ?? 'Sistema'}</div>
                 </div>
               ))}
-              {map.versions?.length === 0 && <p className="text-sm text-muted-foreground">Nenhuma versao criada.</p>}
+              {map.versions?.length === 0 && <p className="text-sm text-muted-foreground">Nenhuma versão criada.</p>}
             </div>
           </SectionCard>
         </div>
@@ -1283,7 +1283,7 @@ function StrategyMapPageInner() {
             <div className="grid gap-3 sm:grid-cols-[1fr,88px]">
               <div>
                 <Label>Nome *</Label>
-                <Input value={perspectiveForm.name} onChange={(event) => setPerspectiveForm({ ...perspectiveForm, name: event.target.value })} placeholder="Ex.: Clientes, Operacoes, Sustentabilidade" />
+                <Input value={perspectiveForm.name} onChange={(event) => setPerspectiveForm({ ...perspectiveForm, name: event.target.value })} placeholder="Ex.: Clientes, Operações, Sustentabilidade" />
               </div>
               <div>
                 <Label>Cor</Label>
@@ -1295,7 +1295,7 @@ function StrategyMapPageInner() {
               <Input maxLength={3} value={perspectiveForm.icon} onChange={(event) => setPerspectiveForm({ ...perspectiveForm, icon: event.target.value })} />
             </div>
             <div>
-              <Label>Descricao</Label>
+              <Label>Descrição</Label>
               <Textarea value={perspectiveForm.description} onChange={(event) => setPerspectiveForm({ ...perspectiveForm, description: event.target.value })} rows={3} />
             </div>
           </div>
@@ -1308,7 +1308,7 @@ function StrategyMapPageInner() {
 
       <Dialog open={objectiveOpen} onOpenChange={setObjectiveOpen}>
         <DialogContent>
-          <DialogHeader><DialogTitle>Novo objetivo estrategico</DialogTitle></DialogHeader>
+          <DialogHeader><DialogTitle>Novo objetivo estratégico</DialogTitle></DialogHeader>
           <div className="space-y-3">
             <div>
               <Label>Perspectiva *</Label>
@@ -1323,21 +1323,21 @@ function StrategyMapPageInner() {
               <Input value={objectiveForm.name} onChange={(event) => setObjectiveForm({ ...objectiveForm, name: event.target.value })} />
             </div>
             <div>
-              <Label>Descricao</Label>
+              <Label>Descrição</Label>
               <Textarea value={objectiveForm.description} onChange={(event) => setObjectiveForm({ ...objectiveForm, description: event.target.value })} rows={3} />
             </div>
             <div className="grid grid-cols-2 gap-3">
               <div>
-                <Label>Responsavel</Label>
+                <Label>Responsável</Label>
                 <NativeSelect value={objectiveForm.responsibleUserId} onChange={(event) => setObjectiveForm({ ...objectiveForm, responsibleUserId: event.target.value })}>
-                  <option value="">Sem usuario</option>
+                  <option value="">Sem usuário</option>
                   {optionsQuery.data?.users.map((user) => (
                     <option key={user.id} value={user.id}>{user.name}</option>
                   ))}
                 </NativeSelect>
               </div>
               <div>
-                <Label>Area ou setor</Label>
+                <Label>Área ou setor</Label>
                 <NativeSelect value={objectiveForm.ownerNodeId} onChange={(event) => setObjectiveForm({ ...objectiveForm, ownerNodeId: event.target.value })}>
                   <option value="">Sem estrutura</option>
                   {optionsQuery.data?.orgNodes.map((node) => (
@@ -1373,15 +1373,15 @@ function StrategyMapPageInner() {
         </DialogContent>
       </Dialog>
 
-      {/* Dialog: escolher tipo de relacao quando o usuario conecta */}
+      {/* Dialog: escolher tipo de relação quando o usuário conecta */}
       <Dialog open={Boolean(pendingConnection)} onOpenChange={(open) => !open && setPendingConnection(null)}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>Nova ligacao estrategica</DialogTitle>
+            <DialogTitle>Nova ligacao estratégica</DialogTitle>
           </DialogHeader>
           <div className="space-y-3">
             <p className="text-sm text-muted-foreground">
-              Escolha o tipo de relacao entre os objetivos selecionados.
+              Escolha o tipo de relação entre os objetivos selecionados.
             </p>
             <div className="grid gap-2">
               {RELATION_KINDS.map((rel) => (
@@ -1560,7 +1560,7 @@ function ObjectiveHoverCard({ objective }: { objective: Objective }) {
           </div>
         </div>
         <div className="rounded-md border p-2">
-          <div className="text-muted-foreground">Acoes</div>
+          <div className="text-muted-foreground">Ações</div>
           <div className="text-base font-semibold">{objective.actionCount}</div>
         </div>
         <div className="rounded-md border p-2">
@@ -1585,7 +1585,7 @@ function ObjectiveHoverCard({ objective }: { objective: Objective }) {
       )}
       <div className="mt-3 flex items-center gap-2 text-[11px] text-muted-foreground">
         <UserCheck className="h-3 w-3" />
-        {objective.responsibleUser?.name ?? objective.responsible ?? objective.ownerNode?.name ?? 'Sem responsavel'}
+        {objective.responsibleUser?.name ?? objective.responsible ?? objective.ownerNode?.name ?? 'Sem responsável'}
       </div>
       <div className="mt-2 border-t pt-2 text-[10px] uppercase text-muted-foreground">
         Clique no objetivo para abrir o detalhe completo.
@@ -1611,13 +1611,13 @@ function ObjectiveDrawerContent({ objective }: { objective: Objective }) {
       )}
       <div className="grid grid-cols-2 gap-2 text-xs">
         <div className="rounded-md border p-2">
-          <div className="text-muted-foreground">Responsavel</div>
+          <div className="text-muted-foreground">Responsável</div>
           <div className="font-medium">
             {objective.responsibleUser?.name ?? objective.responsible ?? '-'}
           </div>
         </div>
         <div className="rounded-md border p-2">
-          <div className="text-muted-foreground">Area/Setor</div>
+          <div className="text-muted-foreground">Área/Setor</div>
           <div className="font-medium">{objective.ownerNode?.name ?? '-'}</div>
         </div>
         <div className="rounded-md border p-2">
@@ -1659,10 +1659,10 @@ function ObjectiveDrawerContent({ objective }: { objective: Objective }) {
       <div className="grid grid-cols-2 gap-2 text-center text-xs">
         <Link className="rounded-md border p-2 transition hover:bg-accent/35" href={`/actions${indicatorId ? `?indicatorId=${indicatorId}` : ''}`}>
           <ClipboardList className="mx-auto mb-1 h-4 w-4" />
-          Acoes ({objective.actionCount})
+          Ações ({objective.actionCount})
         </Link>
         <Link className="rounded-md border p-2 transition hover:bg-accent/35" href={`/meetings${indicatorId ? `?indicatorId=${indicatorId}` : ''}`}>
-          <Calendar className="mx-auto mb-1 h-4 w-4" /> Reunioes
+          <Calendar className="mx-auto mb-1 h-4 w-4" /> Reuniões
         </Link>
         <Link className="rounded-md border p-2 transition hover:bg-accent/35" href={`/treatments${indicatorId ? `?indicatorId=${indicatorId}` : ''}`}>
           <Network className="mx-auto mb-1 h-4 w-4" /> Tratativas ({objective.treatmentCount})
@@ -1673,7 +1673,7 @@ function ObjectiveDrawerContent({ objective }: { objective: Objective }) {
       </div>
 
       <div>
-        <div className="mb-2 text-xs font-semibold uppercase text-muted-foreground">Areas/setores</div>
+        <div className="mb-2 text-xs font-semibold uppercase text-muted-foreground">Áreas/setores</div>
         <div className="flex flex-wrap gap-1.5">
           {objective.orgNodeLinks.length === 0 && (
             <span className="text-xs text-muted-foreground">Nenhuma estrutura vinculada.</span>
@@ -1685,7 +1685,7 @@ function ObjectiveDrawerContent({ objective }: { objective: Objective }) {
       </div>
 
       <div>
-        <div className="mb-2 text-xs font-semibold uppercase text-muted-foreground">Ligacoes estrategicas</div>
+        <div className="mb-2 text-xs font-semibold uppercase text-muted-foreground">Ligacoes estratégicas</div>
         <div className="space-y-1 text-xs">
           {objective.outRelations.length === 0 && objective.inRelations.length === 0 && (
             <div className="text-muted-foreground">Sem ligacoes cadastradas.</div>

@@ -100,7 +100,7 @@ export class TreatmentsService {
       eventType: TraceEventType.TREATMENT_STARTED,
       entityType: TraceEntityType.INDICATOR_RESULT,
       entityId: result.id,
-      title: 'Tratativa iniciada pelo usuario',
+      title: 'Tratativa iniciada pelo usuário',
       description: treatment.title,
       statusTo: treatment.status,
       metadata: { treatmentId: treatment.id },
@@ -194,7 +194,7 @@ export class TreatmentsService {
       entityId: analysis.id,
       relatedType: TraceEntityType.DEVIATION,
       relatedId: deviation.id,
-      title: 'Analise de causa criada para indicador fora da meta',
+      title: 'Análise de causa criada para indicador fora da meta',
       description: body.rootCause,
       statusFrom: treatment.status,
       statusTo: updated.status,
@@ -216,7 +216,7 @@ export class TreatmentsService {
   }) {
     const treatment = await this.getTreatmentWithContext(companyId, id);
     const indicator = treatment.indicator;
-    const title = body.title || `Reuniao de Tratativa - Indicador ${indicator.name}`;
+    const title = body.title || `Reunião de Tratativa - Indicador ${indicator.name}`;
     const agenda = this.defaultAgenda(treatment);
     const meeting = await this.prisma.meeting.create({
       data: {
@@ -233,7 +233,7 @@ export class TreatmentsService {
         startsAt: new Date(body.startsAt),
         endsAt: body.endsAt ? new Date(body.endsAt) : null,
         location: body.location ?? null,
-        objective: body.objective ?? 'Analisar o desvio do indicador, decidir tratativas e definir plano de acao.',
+        objective: body.objective ?? 'Analisar o desvio do indicador, decidir tratativas e definir plano de ação.',
         notes: body.notes ?? agenda.join('\n'),
         agendaItems: {
           create: agenda.map((topic, position) => ({ topic, position })),
@@ -298,7 +298,7 @@ export class TreatmentsService {
       entityId: meeting.id,
       relatedType: TraceEntityType.INDICATOR,
       relatedId: indicator.id,
-      title: 'Reuniao de tratativa agendada',
+      title: 'Reunião de tratativa agendada',
       description: meeting.title,
       statusFrom: treatment.status,
       statusTo: updated.status,
@@ -361,7 +361,7 @@ export class TreatmentsService {
       entityId: action.id,
       relatedType: treatment.meetingId ? TraceEntityType.MEETING : TraceEntityType.DEVIATION,
       relatedId: treatment.meetingId ?? treatment.deviationId ?? undefined,
-      title: 'Plano de acao criado na tratativa',
+      title: 'Plano de ação criado na tratativa',
       description: action.title,
       statusFrom: treatment.status,
       statusTo: updated.status,
@@ -392,7 +392,7 @@ export class TreatmentsService {
       eventType: resolved ? TraceEventType.INDICATOR_RESOLVED : TraceEventType.INDICATOR_REEVALUATED,
       entityType: TraceEntityType.INDICATOR,
       entityId: treatment.indicatorId,
-      title: resolved ? 'Indicador resolvido apos reavaliacao' : 'Indicador reavaliado e ainda fora da meta',
+      title: resolved ? 'Indicador resolvido após reavaliacao' : 'Indicador reavaliado e ainda fora da meta',
       description: lastResult ? `${lastResult.periodRef}: farol ${lastResult.light}` : 'Sem novo resultado lancado',
       statusFrom: treatment.status,
       statusTo: updated.status,
@@ -452,30 +452,30 @@ export class TreatmentsService {
       `Indicador fora da meta: ${treatment.indicator.name}`,
       `Resultado atual: ${treatment.result?.value ?? '-'} | Meta esperada: ${target ?? '-'}`,
       'Desvio identificado e impacto no processo',
-      treatment.analysis ? 'Analise de causa e causa raiz' : 'Definicao da analise de causa',
-      'Discussao das acoes necessarias',
-      'Definicao de responsaveis e prazos',
-      'Criacao do plano de acao',
-      'Proximos passos e forma de acompanhamento',
+      treatment.analysis ? 'Análise de causa e causa raiz' : 'Definicao da análise de causa',
+      'Discussão das ações necessarias',
+      'Definicao de responsáveis e prazos',
+      'Criação do plano de ação',
+      'Próximos passos e forma de acompanhamento',
     ];
   }
 
   private alertsFor(treatment: any) {
     const alerts: string[] = [];
-    if (!treatment.analysisId) alerts.push('Indicador fora da meta sem analise de causa concluida.');
-    if (treatment.analysisId && !treatment.meetingId) alerts.push('Analise criada sem reuniao de tratativa.');
+    if (!treatment.analysisId) alerts.push('Indicador fora da meta sem análise de causa concluida.');
+    if (treatment.analysisId && !treatment.meetingId) alerts.push('Análise criada sem reunião de tratativa.');
     if (treatment.meetingId && treatment.actions.length === 0 && (treatment.meeting?.actions?.length ?? 0) === 0) {
-      alerts.push('Reuniao agendada sem plano de acao.');
+      alerts.push('Reunião agendada sem plano de ação.');
     }
     for (const action of [...treatment.actions, ...(treatment.meeting?.actions ?? [])]) {
-      if (!action.responsibleUserId && !action.responsibleEmail) alerts.push(`Acao sem responsavel: ${action.title}`);
-      if (!action.dueDate) alerts.push(`Acao sem prazo: ${action.title}`);
+      if (!action.responsibleUserId && !action.responsibleEmail) alerts.push(`Ação sem responsável: ${action.title}`);
+      if (!action.dueDate) alerts.push(`Ação sem prazo: ${action.title}`);
       if (action.dueDate && new Date(action.dueDate) < new Date() && !['DONE', 'DONE_LATE', 'CANCELLED'].includes(action.status)) {
-        alerts.push(`Acao atrasada: ${action.title}`);
+        alerts.push(`Ação atrasada: ${action.title}`);
       }
     }
     if (treatment.meeting?.guests?.some((guest: any) => !this.isEmail(guest.email))) {
-      alerts.push('Existe participante com e-mail invalido.');
+      alerts.push('Existe participante com e-mail inválido.');
     }
     return alerts;
   }

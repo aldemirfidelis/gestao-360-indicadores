@@ -4,7 +4,7 @@ import { cn } from '@/lib/utils';
 export interface NativeSelectProps extends React.SelectHTMLAttributes<HTMLSelectElement> {}
 
 /**
- * Select nativo estilizado. Mais simples e acessivel sem Radix.
+ * Select nativo estilizado. Mais simples e acessível sem Radix.
  */
 export const NativeSelect = React.forwardRef<HTMLSelectElement, NativeSelectProps>(
   ({ className, children, ...props }, ref) => (

@@ -62,7 +62,7 @@ export class ClosedMonthsService {
     const existing = await this.prisma.closedMonth.findFirst({
       where: { id, companyId: me.companyId },
     });
-    if (!existing) throw new NotFoundException('Mes fechado nao encontrado.');
+    if (!existing) throw new NotFoundException('Mês fechado nao encontrado.');
     if (existing.reopenedAt || existing.deletedAt) {
       throw new ConflictException(`O mes ${existing.periodRef} ja esta aberto.`);
     }
@@ -75,7 +75,7 @@ export class ClosedMonthsService {
 
 function sanitizePeriodRef(value: unknown) {
   if (typeof value !== 'string' || !/^\d{4}(-(\d{2}|Q[1-4]|S[1-2]|W\d{2}|BW\d+)|-\d{2}-\d{2})?$/.test(value.trim())) {
-    throw new BadRequestException('Periodo invalido. Use o formato YYYY-MM (ou trimestre/semestre).');
+    throw new BadRequestException('Período inválido. Use o formato YYYY-MM (ou trimestre/semestre).');
   }
   return value.trim();
 }

@@ -27,13 +27,13 @@ interface Deviation {
 const SEVERITY: Record<string, { label: string; className: string }> = {
   LOW: { label: 'Leve', className: 'bg-status-blue/15 text-status-blue' },
   MODERATE: { label: 'Moderado', className: 'bg-status-yellow/15 text-status-yellow' },
-  CRITICAL: { label: 'Critico', className: 'bg-status-red/15 text-status-red' },
+  CRITICAL: { label: 'Crítico', className: 'bg-status-red/15 text-status-red' },
 };
 
 const STATUS_LABEL: Record<string, string> = {
   OPEN: 'Aberto',
-  IN_ANALYSIS: 'Em analise',
-  WAITING_ACTION: 'Aguardando acao',
+  IN_ANALYSIS: 'Em análise',
+  WAITING_ACTION: 'Aguardando ação',
   IN_PROGRESS: 'Em execucao',
   CLOSED: 'Concluido',
   CLOSED_LATE: 'Concluido fora do prazo',
@@ -50,7 +50,7 @@ export default function DeviationsPage() {
     <div>
       <PageHeader
         title="Desvios / FCA"
-        description="Analises de causa para indicadores fora da meta, com vinculo direto aos planos de acao."
+        description="Análises de causa para indicadores fora da meta, com vínculo direto aos planos de ação."
       />
 
       <div className="grid gap-3">
@@ -76,7 +76,7 @@ export default function DeviationsPage() {
                       {d.title}
                     </Link>
                     <div className="text-xs text-muted-foreground">
-                      Indicador: {d.indicator.name} - Periodo: {periodRefLabel(d.periodRef)}
+                      Indicador: {d.indicator.name} - Período: {periodRefLabel(d.periodRef)}
                     </div>
                   </div>
                 </div>
@@ -90,7 +90,7 @@ export default function DeviationsPage() {
                     <div className="font-medium">{formatDate(d.dueDate)}</div>
                   </div>
                   <div>
-                    <div className="text-muted-foreground">Causas / Acoes</div>
+                    <div className="text-muted-foreground">Causas / Ações</div>
                     <div className="font-medium">
                       {d._count.causes} / {d._count.actions}
                     </div>
@@ -103,7 +103,7 @@ export default function DeviationsPage() {
         {!query.isLoading && (query.data?.length ?? 0) === 0 && (
           <Card>
             <CardContent className="py-10 text-center text-sm text-muted-foreground">
-              Nenhum desvio aberto. Otimo trabalho.
+              Nenhum desvio aberto. Ótimo trabalho.
             </CardContent>
           </Card>
         )}

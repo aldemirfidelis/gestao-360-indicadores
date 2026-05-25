@@ -10,8 +10,8 @@ interface Props {
 }
 
 /**
- * Marcador honesto para modulos previstos no escopo da Fase 2.
- * Mostra ao usuario o que esta planejado, em vez de pagina em branco.
+ * Marcador honesto para módulos previstos no escopo da Fase 2.
+ * Mostra ao usuário o que esta planejado, em vez de página em branco.
  */
 export function ComingSoon({ title, description, features }: Props) {
   return (
@@ -28,9 +28,9 @@ export function ComingSoon({ title, description, features }: Props) {
               <Sparkles className="h-6 w-6" />
             </div>
             <div>
-              <h2 className="text-lg font-semibold">Modulo em desenvolvimento</h2>
+              <h2 className="text-lg font-semibold">Módulo em desenvolvimento</h2>
               <p className="text-sm text-muted-foreground">
-                A modelagem de dados ja esta pronta no backend e este modulo entra na proxima fase do roadmap.
+                A modelagem de dados ja esta pronta no backend e este módulo entra na próxima fase do roadmap.
               </p>
             </div>
           </div>

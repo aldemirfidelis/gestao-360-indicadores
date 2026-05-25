@@ -132,7 +132,7 @@ export class OrgNodesService {
       this.prisma.user.count({ where: { defaultNodeId: id, deletedAt: null } }),
     ]);
     if (children + indicators + actions + users > 0) {
-      throw new ConflictException('Estrutura em uso nao pode ser excluida. Inative o cadastro ou remova os vinculos.');
+      throw new ConflictException('Estrutura em uso nao pode ser excluida. Inative o cadastro ou remova os vínculos.');
     }
     return this.prisma.orgNode.update({
       where: { id },
@@ -152,7 +152,7 @@ export class OrgNodesService {
     }
     if (input.responsibleUserId) {
       const user = await this.prisma.user.findFirst({ where: { id: input.responsibleUserId, companyId, deletedAt: null }, select: { id: true } });
-      if (!user) throw new NotFoundException('Responsavel nao encontrado para a empresa informada');
+      if (!user) throw new NotFoundException('Responsável nao encontrado para a empresa informada');
     }
   }
 }

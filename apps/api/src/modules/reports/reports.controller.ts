@@ -22,13 +22,13 @@ export class ReportsController {
     @Query('to') to?: string,
   ) {
     const csv = await this.service.resultsCsv(me.companyId, from, to);
-    this.sendCsv(res, 'lancamentos.csv', csv);
+    this.sendCsv(res, 'lançamentos.csv', csv);
   }
 
   @Get('actions.csv')
   async actions(@CurrentUser() me: AuthPayload, @Res() res: Response) {
     const csv = await this.service.actionsCsv(me.companyId);
-    this.sendCsv(res, 'acoes.csv', csv);
+    this.sendCsv(res, 'ações.csv', csv);
   }
 
   @Get('deviations.csv')

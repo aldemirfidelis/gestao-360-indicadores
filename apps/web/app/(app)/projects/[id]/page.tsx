@@ -104,7 +104,7 @@ export default function ProjectDetailPage() {
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
         <Card>
           <CardContent className="p-4">
-            <div className="text-[11px] uppercase text-muted-foreground">Inicio</div>
+            <div className="text-[11px] uppercase text-muted-foreground">Início</div>
             <div className="font-semibold">{formatDate(p.startsAt)}</div>
           </CardContent>
         </Card>
@@ -116,7 +116,7 @@ export default function ProjectDetailPage() {
         </Card>
         <Card>
           <CardContent className="p-4">
-            <div className="text-[11px] uppercase text-muted-foreground">Responsavel</div>
+            <div className="text-[11px] uppercase text-muted-foreground">Responsável</div>
             <div className="font-semibold">{p.responsible ?? '—'}</div>
           </CardContent>
         </Card>
@@ -208,7 +208,7 @@ export default function ProjectDetailPage() {
                 onChange={(e) => setTask({ ...task, endDate: e.target.value })}
               />
               <Input
-                placeholder="Responsavel"
+                placeholder="Responsável"
                 value={task.responsible}
                 onChange={(e) => setTask({ ...task, responsible: e.target.value })}
               />
@@ -217,7 +217,7 @@ export default function ProjectDetailPage() {
                 onChange={(e) => setTask({ ...task, dependencyId: e.target.value })}
                 className="h-10 rounded-md border border-input bg-background px-3 text-sm"
               >
-                <option value="">Sem dependencia</option>
+                <option value="">Sem dependência</option>
                 {p.tasks.map((t) => (
                   <option key={t.id} value={t.id}>
                     {t.name}

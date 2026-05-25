@@ -65,11 +65,11 @@ interface ActionDetail {
 const STATUS_LABEL: Record<string, string> = {
   DRAFT: 'Rascunho',
   NOT_STARTED: 'Aberto',
-  UNDER_ANALYSIS: 'Em analise',
+  UNDER_ANALYSIS: 'Em análise',
   IN_PROGRESS: 'Em execucao',
   WAITING_THIRD: 'Aguardando terceiro',
   WAITING_EVIDENCE: 'Aguardando evidencia',
-  WAITING_VALIDATION: 'Aguardando validacao',
+  WAITING_VALIDATION: 'Aguardando validação',
   PAUSED: 'Pausado',
   DONE: 'Concluido',
   DONE_LATE: 'Concluido fora do prazo',
@@ -148,7 +148,7 @@ export default function ActionDetailPage() {
   const saveAnalysis = useMutation({
     mutationFn: (payload: any) => api(`/actions/${id}/analysis`, { method: 'POST', json: payload }),
     onSuccess: () => {
-      toast.success('Analise salva');
+      toast.success('Análise salva');
       qc.invalidateQueries({ queryKey: ['action', id] });
     },
   });
@@ -176,7 +176,7 @@ export default function ActionDetailPage() {
   const aiAssist = useMutation({
     mutationFn: (scope: string) => api(`/actions/${id}/ai-assist`, { method: 'POST', json: { scope } }),
     onSuccess: () => {
-      toast.success('Sugestoes geradas');
+      toast.success('Sugestões geradas');
       qc.invalidateQueries({ queryKey: ['action', id] });
     },
   });
@@ -185,14 +185,14 @@ export default function ActionDetailPage() {
     onSuccess: () => qc.invalidateQueries({ queryKey: ['action', id] }),
   });
 
-  if (query.isLoading) return <LoadingState label="Carregando plano de acao..." />;
+  if (query.isLoading) return <LoadingState label="Carregando plano de ação..." />;
   if (!a) return null;
   const isOverdue = a.dueDate && new Date(a.dueDate) < new Date() && !['DONE', 'DONE_LATE', 'CANCELLED', 'EFFECTIVE'].includes(a.status);
 
   return (
     <div>
       <Link href="/actions" className="mb-4 inline-flex items-center text-sm text-muted-foreground hover:text-foreground">
-        <ArrowLeft className="mr-1 h-4 w-4" /> Planos de acao
+        <ArrowLeft className="mr-1 h-4 w-4" /> Planos de ação
       </Link>
 
       <PageHeader
@@ -243,29 +243,29 @@ export default function ActionDetailPage() {
       {tab === 'Visão geral' && (
         <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
           <div className="space-y-6 lg:col-span-2">
-            <SectionCard title="Problema e plano" description="Contexto, causa raiz, acao proposta e resultado esperado.">
+            <SectionCard title="Problema e plano" description="Contexto, causa raiz, ação proposta e resultado esperado.">
               <div className="grid gap-4">
-                <EditableText label="Descricao do problema" value={a.problemDescription ?? ''} onSave={(problemDescription) => update.mutate({ problemDescription })} />
+                <EditableText label="Descrição do problema" value={a.problemDescription ?? ''} onSave={(problemDescription) => update.mutate({ problemDescription })} />
                 <EditableText label="Causa raiz identificada" value={a.rootCause ?? ''} onSave={(rootCause) => update.mutate({ rootCause })} />
-                <EditableText label="Acao proposta" value={a.description ?? ''} onSave={(description) => update.mutate({ description })} />
+                <EditableText label="Ação proposta" value={a.description ?? ''} onSave={(description) => update.mutate({ description })} />
                 <EditableText label="Resultado esperado (Impacto Esperado)" value={a.expectedResult ?? ''} onSave={(expectedResult) => update.mutate({ expectedResult })} />
               </div>
             </SectionCard>
             <ExecutionCard a={a} newTask={newTask} setNewTask={setNewTask} addTask={addTask.mutate} toggleTask={toggleTask.mutate} />
           </div>
           <div className="space-y-4">
-            <SectionCard title="Responsabilidade" description="Responsavel, area, origem e ferramenta.">
-              <Info label="Responsavel" value={a.responsibleUser?.name ?? 'Sem responsavel'} />
-              <Info label="Area/Setor" value={a.ownerNode?.name ?? '-'} />
+            <SectionCard title="Responsabilidade" description="Responsável, área, origem e ferramenta.">
+              <Info label="Responsável" value={a.responsibleUser?.name ?? 'Sem responsável'} />
+              <Info label="Área/Setor" value={a.ownerNode?.name ?? '-'} />
               <Info label="Origem" value={a.origin} />
-              <Info label="Ferramenta" value={a.analysisTool ? TOOL_LABEL[a.analysisTool] ?? a.analysisTool : 'Nao definida'} />
+              <Info label="Ferramenta" value={a.analysisTool ? TOOL_LABEL[a.analysisTool] ?? a.analysisTool : 'Não definida'} />
               <Info label="Criticidade" value={a.criticality} />
             </SectionCard>
-            <SectionCard title="Prontidao da acao" description="Lacunas antes de considerar o plano robusto.">
+            <SectionCard title="Prontidao da ação" description="Lacunas antes de considerar o plano robusto.">
               <div className="mb-3 text-2xl font-semibold">{a.aiReadiness.score}%</div>
               <Progress value={a.aiReadiness.score} />
               <div className="mt-3 space-y-2">
-                {a.aiReadiness.gaps.length === 0 ? <Badge>Sem lacunas criticas</Badge> : a.aiReadiness.gaps.map((gap) => <div key={gap} className="rounded-md border p-2 text-xs text-muted-foreground">{gap}</div>)}
+                {a.aiReadiness.gaps.length === 0 ? <Badge>Sem lacunas críticas</Badge> : a.aiReadiness.gaps.map((gap) => <div key={gap} className="rounded-md border p-2 text-xs text-muted-foreground">{gap}</div>)}
               </div>
             </SectionCard>
           </div>
@@ -356,14 +356,14 @@ function AnalysisWorkspace({ action, onSave, saving, onAskAi }: { action: Action
   const [problem, setProblem] = useState(session?.problem ?? action.problemDescription ?? '');
   const [rootCause, setRootCause] = useState(session?.rootCause ?? action.rootCause ?? '');
   const [fiveWhys, setFiveWhys] = useState<any[]>(session?.fiveWhys?.length ? session.fiveWhys : Array.from({ length: 5 }, (_v, i) => ({ position: i + 1, question: `${i + 1}o por que?`, answer: '', evidence: '' })));
-  const [ishikawa, setIshikawa] = useState<any[]>(session?.ishikawaCauses?.length ? session.ishikawaCauses : ['Metodo', 'Maquina', 'Mao de obra', 'Material', 'Meio ambiente', 'Medicao'].map((category) => ({ category, description: '', impact: 3, probability: 3, evidence: '' })));
-  const [maspSteps, setMaspSteps] = useState<any[]>(session?.maspSteps?.length ? session.maspSteps : ['Identificacao do problema', 'Observacao', 'Analise', 'Plano de acao', 'Execucao', 'Verificacao', 'Padronizacao', 'Conclusao'].map((title, i) => ({ step: i + 1, title, description: '', status: 'PENDING' })));
+  const [ishikawa, setIshikawa] = useState<any[]>(session?.ishikawaCauses?.length ? session.ishikawaCauses : ['Metodo', 'Máquina', 'Mao de obra', 'Material', 'Meio ambiente', 'Medicao'].map((category) => ({ category, description: '', impact: 3, probability: 3, evidence: '' })));
+  const [maspSteps, setMaspSteps] = useState<any[]>(session?.maspSteps?.length ? session.maspSteps : ['Identificação do problema', 'Observacao', 'Análise', 'Plano de ação', 'Execucao', 'Verificação', 'Padronizacao', 'Conclusão'].map((title, i) => ({ step: i + 1, title, description: '', status: 'PENDING' })));
   const [pdcaSteps, setPdcaSteps] = useState<any[]>(session?.pdcaSteps?.length ? session.pdcaSteps : ['PLAN', 'DO', 'CHECK', 'ACT'].map((phase) => ({ phase, description: '', status: 'PENDING' })));
 
   return (
     <SectionCard
-      title="Ferramentas reais de analise"
-      description="Preencha a ferramenta escolhida, salve a analise e use a IA como facilitadora antes de confirmar."
+      title="Ferramentas reais de análise"
+      description="Preencha a ferramenta escolhida, salve a análise e use a IA como facilitadora antes de confirmar."
       actions={<Button variant="outline" onClick={onAskAi}><Sparkles className="mr-2 h-4 w-4" />Sugerir perguntas</Button>}
     >
       <div className="mb-4 grid grid-cols-1 gap-4 md:grid-cols-3">
@@ -397,7 +397,7 @@ function AnalysisWorkspace({ action, onSave, saving, onAskAi }: { action: Action
           {ishikawa.map((item, index) => (
             <div key={index} className="rounded-lg border p-3">
               <div className="mb-2 text-sm font-semibold">{item.category}</div>
-              <Textarea rows={2} value={item.description ?? ''} placeholder="Causa possivel" onChange={(e) => setIshikawa(updateArray(ishikawa, index, { ...item, description: e.target.value }))} />
+              <Textarea rows={2} value={item.description ?? ''} placeholder="Causa possível" onChange={(e) => setIshikawa(updateArray(ishikawa, index, { ...item, description: e.target.value }))} />
               <div className="mt-2 grid grid-cols-2 gap-2">
                 <Input type="number" min={1} max={5} value={item.impact ?? 3} onChange={(e) => setIshikawa(updateArray(ishikawa, index, { ...item, impact: Number(e.target.value) }))} />
                 <Input type="number" min={1} max={5} value={item.probability ?? 3} onChange={(e) => setIshikawa(updateArray(ishikawa, index, { ...item, probability: Number(e.target.value) }))} />
@@ -418,7 +418,7 @@ function AnalysisWorkspace({ action, onSave, saving, onAskAi }: { action: Action
       <div className="mt-4 flex justify-end">
         <Button disabled={saving} onClick={() => onSave({ method, problem, rootCause, fiveWhys, ishikawaCauses: ishikawa, maspSteps, pdcaSteps })}>
           <Save className="mr-2 h-4 w-4" />
-          {saving ? 'Salvando...' : 'Salvar analise'}
+          {saving ? 'Salvando...' : 'Salvar análise'}
         </Button>
       </div>
     </SectionCard>
@@ -512,7 +512,7 @@ function FiveW2H({ action, onSave, saving, onAskAi }: { action: ActionDetail; on
 
 function ExecutionCard({ a, newTask, setNewTask, addTask, toggleTask }: { a: ActionDetail; newTask: string; setNewTask: (v: string) => void; addTask: () => void; toggleTask: (v: { taskId: string; done: boolean }) => void }) {
   return (
-    <SectionCard title={`Execucao (${a.tasks.length})`} description="Atualize tarefas, progresso e pendencias.">
+    <SectionCard title={`Execucao (${a.tasks.length})`} description="Atualize tarefas, progresso e pendências.">
       <div className="mb-3 flex gap-2">
         <Input placeholder="Adicionar tarefa..." value={newTask} onChange={(e) => setNewTask(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && newTask && addTask()} />
         <Button onClick={addTask} disabled={!newTask}><Plus className="h-4 w-4" /></Button>
@@ -536,16 +536,16 @@ function EvidencePanel({ a, evidence, setEvidence, addEvidence, comment, setComm
     <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
       <SectionCard title="Evidencias" description="Anexe ou registre evidencias de execucao e eficacia.">
         <div className="mb-4 grid gap-2">
-          <Input placeholder="Titulo da evidencia" value={evidence.title} onChange={(e) => setEvidence({ ...evidence, title: e.target.value })} />
-          <Input placeholder="URL ou referencia" value={evidence.url} onChange={(e) => setEvidence({ ...evidence, url: e.target.value })} />
-          <Textarea placeholder="Descricao" value={evidence.description} onChange={(e) => setEvidence({ ...evidence, description: e.target.value })} />
+          <Input placeholder="Título da evidencia" value={evidence.title} onChange={(e) => setEvidence({ ...evidence, title: e.target.value })} />
+          <Input placeholder="URL ou referência" value={evidence.url} onChange={(e) => setEvidence({ ...evidence, url: e.target.value })} />
+          <Textarea placeholder="Descrição" value={evidence.description} onChange={(e) => setEvidence({ ...evidence, description: e.target.value })} />
           <Button disabled={!evidence.title} onClick={addEvidence}><FileCheck2 className="mr-2 h-4 w-4" />Registrar evidencia</Button>
         </div>
         <div className="space-y-2">
           {a.evidences.map((item: any) => <div key={item.id} className="rounded-lg border p-3"><div className="font-medium">{item.title}</div><div className="text-xs text-muted-foreground">{item.description ?? item.url ?? '-'}</div></div>)}
         </div>
       </SectionCard>
-      <SectionCard title="Comentarios" description="Historico narrativo do acompanhamento.">
+      <SectionCard title="Comentarios" description="Histórico narrativo do acompanhamento.">
         <div className="mb-4 grid gap-2">
           <Textarea placeholder="Adicionar comentario..." value={comment} onChange={(e) => setComment(e.target.value)} />
           <Button disabled={!comment} onClick={addComment}><MessageSquare className="mr-2 h-4 w-4" />Comentar</Button>
@@ -627,9 +627,9 @@ function EffectivenessPanel({ a, effectiveness, setEffectiveness, validate, savi
 
 function AiPanel({ suggestions, onGenerate, onDecide }: { suggestions: any[]; onGenerate: (scope: string) => void; onDecide: (id: string, status: string) => void }) {
   return (
-    <SectionCard title="IA assistente" description="Sugestoes ficam pendentes ate o usuario aceitar ou rejeitar." actions={<Button onClick={() => onGenerate('general')}><Bot className="mr-2 h-4 w-4" />Gerar sugestoes</Button>}>
+    <SectionCard title="IA assistente" description="Sugestões ficam pendentes ate o usuário aceitar ou rejeitar." actions={<Button onClick={() => onGenerate('general')}><Bot className="mr-2 h-4 w-4" />Gerar sugestões</Button>}>
       <div className="space-y-3">
-        {suggestions.length === 0 && <EmptyState title="Nenhuma sugestao gerada" description="Peça apoio da IA para revisar causa, acao e eficacia." />}
+        {suggestions.length === 0 && <EmptyState title="Nenhuma sugestão gerada" description="Peça apoio da IA para revisar causa, ação e eficacia." />}
         {suggestions.map((item) => (
           <div key={item.id} className="rounded-lg border p-4">
             <div className="flex flex-wrap items-start justify-between gap-2">
@@ -655,7 +655,7 @@ function AiPanel({ suggestions, onGenerate, onDecide }: { suggestions: any[]; on
 
 function HistoryPanel({ history }: { history: any[] }) {
   return (
-    <SectionCard title="Historico e auditoria do plano" description="Eventos gerados automaticamente por atualizacoes, IA, evidencias e eficacia.">
+    <SectionCard title="Histórico e auditoria do plano" description="Eventos gerados automaticamente por atualizações, IA, evidencias e eficacia.">
       <div className="space-y-2">
         {history.map((item) => (
           <div key={item.id} className="rounded-lg border p-3">
@@ -685,7 +685,7 @@ function StepEditor({ rows, setRows, labelKey }: { rows: any[]; setRows: (rows: 
 function GenericAnalysis({ method, session }: { method: string; session?: any }) {
   return (
     <div className="rounded-lg border border-dashed p-4 text-sm text-muted-foreground">
-      Use o campo de causa raiz abaixo para registrar a analise {TOOL_LABEL[method] ?? method}. Dados complementares ficam salvos no JSON da sessao.
+      Use o campo de causa raiz abaixo para registrar a análise {TOOL_LABEL[method] ?? method}. Dados complementares ficam salvos no JSON da sessão.
       {session?.aiSummary && <div className="mt-2 rounded-md bg-muted p-2">{session.aiSummary}</div>}
     </div>
   );
