@@ -250,6 +250,11 @@ make deploy
 
 ### Build falha por falta de memoria
 Droplet $6/mes tem 1GB RAM. Build do Next pode estourar. Solucoes:
+- Buildar os servicos em sequencia:
+  ```bash
+  docker compose -f docker-compose.droplet.yml build --pull api
+  docker compose -f docker-compose.droplet.yml build --pull web
+  ```
 - Adicionar swap:
   ```bash
   fallocate -l 2G /swapfile && chmod 600 /swapfile

@@ -438,7 +438,7 @@ function FiveW2H({ action, onSave, saving, onAskAi }: { action: ActionDetail; on
     >
       <div className="grid grid-cols-1 gap-5 md:grid-cols-2">
         <div className="rounded-xl border bg-muted/20 p-4 space-y-4">
-          <h3 className="text-sm font-bold text-primary border-b pb-1.5 uppercase tracking-wide">Os 5 "W"s (Direcionamento)</h3>
+          <h3 className="text-sm font-bold text-primary border-b pb-1.5 uppercase tracking-wide">Os 5 &quot;W&quot;s (Direcionamento)</h3>
           {[
             ['what', 'What (O que será feito?)', 'Ação concreta a ser executada'],
             ['why', 'Why (Por que será feito?)', 'Justificativa e causa raiz que a ação resolve'],
@@ -467,7 +467,7 @@ function FiveW2H({ action, onSave, saving, onAskAi }: { action: ActionDetail; on
         </div>
 
         <div className="rounded-xl border bg-muted/20 p-4 space-y-4">
-          <h3 className="text-sm font-bold text-primary border-b pb-1.5 uppercase tracking-wide">Os 2 "H"s & Notas (Execução)</h3>
+          <h3 className="text-sm font-bold text-primary border-b pb-1.5 uppercase tracking-wide">Os 2 &quot;H&quot;s & Notas (Execução)</h3>
           <div>
             <Label className="font-semibold text-xs text-foreground">How (Como será feito?)</Label>
             <Textarea 

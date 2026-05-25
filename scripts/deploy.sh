@@ -27,8 +27,9 @@ echo "[1/4] Atualizando codigo (git pull)..."
 git pull --ff-only
 
 echo ""
-echo "[2/4] Build das imagens Docker..."
-docker compose -f "$COMPOSE_FILE" build --pull
+echo "[2/4] Build das imagens Docker (sequencial para poupar memoria)..."
+docker compose -f "$COMPOSE_FILE" build --pull api
+docker compose -f "$COMPOSE_FILE" build --pull web
 
 echo ""
 echo "[3/4] Subindo containers (zero downtime quando possivel)..."

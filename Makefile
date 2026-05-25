@@ -12,8 +12,9 @@ help: ## Mostra esta ajuda
 deploy: ## Pull + build + up (deploy completo)
 	bash scripts/deploy.sh
 
-build: ## Build das imagens Docker
-	$(COMPOSE) build --pull
+build: ## Build das imagens Docker (sequencial para Droplets pequenas)
+	$(COMPOSE) build --pull api
+	$(COMPOSE) build --pull web
 
 up: ## Sobe containers
 	$(COMPOSE) up -d --remove-orphans
