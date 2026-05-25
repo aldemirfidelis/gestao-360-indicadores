@@ -20,6 +20,8 @@ type PerspectiveBody = {
   color?: string | null;
   icon?: string | null;
   position?: number;
+  width?: number;
+  height?: number;
   active?: boolean;
 };
 
@@ -296,6 +298,8 @@ export class StrategyService {
         icon: body.icon ?? null,
         active: body.active ?? true,
         position: body.position ?? count,
+        width: body.width ?? 1320,
+        height: body.height ?? 230,
         createdById: me.sub,
         updatedById: me.sub,
       },
@@ -316,6 +320,8 @@ export class StrategyService {
         color: body.color,
         icon: body.icon,
         position: body.position,
+        width: body.width,
+        height: body.height,
         active: body.active,
         updatedById: me.sub,
       },

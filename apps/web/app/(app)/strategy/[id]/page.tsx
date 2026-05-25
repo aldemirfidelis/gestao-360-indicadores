@@ -86,6 +86,8 @@ interface Perspective {
   color: string | null;
   icon: string | null;
   position: number;
+  width?: number;
+  height?: number;
   active: boolean;
 }
 
@@ -228,10 +230,31 @@ function kindMeta(kind?: string | null): RelationKindMeta {
   return RELATION_KIND_MAP.get(kind ?? 'impacta') ?? RELATION_KINDS[1];
 }
 
-function PerspectiveLane({ data }: NodeProps<{ perspective: Perspective; objectiveCount: number }>) {
+function PerspectiveLane({
+  data,
+  selected,
+}: NodeProps<{
+  perspective: Perspective;
+  objectiveCount: number;
+  editMode: boolean;
+  onResize?: (width: number, height: number) => void;
+}>) {
   const perspective = data.perspective;
   return (
-    <div className="h-full w-full rounded-lg border bg-background/80 shadow-sm" style={{ borderColor: perspective.color ?? undefined }}>
+    <div
+      className="relative h-full w-full rounded-lg border bg-background/80 shadow-sm"
+      style={{ borderColor: perspective.color ?? undefined }}
+    >
+      {data.editMode && (
+        <NodeResizer
+          minWidth={520}
+          minHeight={150}
+          isVisible={selected}
+          handleStyle={{ background: perspective.color ?? 'hsl(var(--primary))' }}
+          lineStyle={{ borderColor: perspective.color ?? 'hsl(var(--primary))' }}
+          onResizeEnd={(_, params) => data.onResize?.(Math.round(params.width), Math.round(params.height))}
+        />
+      )}
       <div className="flex h-full gap-4 p-4">
         <div className="w-[230px] shrink-0">
           <div className="mb-2 flex items-center gap-2">
@@ -460,9 +483,18 @@ function StrategyMapPageInner() {
     setEditingEdgeId(edgeId);
   }, []);
 
+  const handlePerspectiveResize = useCallback(
+    (perspectiveId: string, width: number, height: number) => {
+      updatePerspective.mutate({ perspectiveId, patch: { width, height } });
+    },
+    // updatePerspective is stable from useMutation
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [],
+  );
+
   useEffect(() => {
     if (!map) return;
-    const flowNodes = buildNodes(map, filteredObjectives, editMode, selectedId);
+    const flowNodes = buildNodes(map, filteredObjectives, editMode, selectedId, handlePerspectiveResize);
     const objectiveIds = new Set(filteredObjectives.map((objective) => objective.id));
     const flowEdges = filteredObjectives.flatMap((objective) =>
       objective.outRelations
@@ -471,7 +503,7 @@ function StrategyMapPageInner() {
     );
     setNodes(flowNodes);
     setEdges(flowEdges);
-  }, [editMode, filteredObjectives, map, selectedId, setEdges, setNodes, openEdgeEditor]);
+  }, [editMode, filteredObjectives, map, selectedId, setEdges, setNodes, openEdgeEditor, handlePerspectiveResize]);
 
   useEffect(() => {
     const term = search.trim().toLowerCase();
@@ -1680,7 +1712,29 @@ function ObjectiveDrawerContent({ objective }: { objective: Objective }) {
   );
 }
 
-function buildNodes(map: StrategicMap, objectives: Objective[], editMode: boolean, selectedId: string | null): Node[] {
+function laneOffsets(map: StrategicMap): { offsetById: Map<string, number>; heightById: Map<string, number>; widthById: Map<string, number> } {
+  const offsetById = new Map<string, number>();
+  const heightById = new Map<string, number>();
+  const widthById = new Map<string, number>();
+  let cursor = 0;
+  for (const perspective of map.perspectives) {
+    const height = perspective.height ?? LANE_HEIGHT;
+    const width = perspective.width ?? LANE_WIDTH;
+    offsetById.set(perspective.id, cursor);
+    heightById.set(perspective.id, height);
+    widthById.set(perspective.id, width);
+    cursor += height;
+  }
+  return { offsetById, heightById, widthById };
+}
+
+function buildNodes(
+  map: StrategicMap,
+  objectives: Objective[],
+  editMode: boolean,
+  selectedId: string | null,
+  onPerspectiveResize?: (perspectiveId: string, width: number, height: number) => void,
+): Node[] {
   const objectiveByPerspective = new Map<string, Objective[]>();
   for (const objective of objectives) {
     const list = objectiveByPerspective.get(objective.perspectiveId) ?? [];
@@ -1688,21 +1742,34 @@ function buildNodes(map: StrategicMap, objectives: Objective[], editMode: boolea
     objectiveByPerspective.set(objective.perspectiveId, list);
   }
 
-  const lanes: Node[] = map.perspectives.map((perspective, index) => ({
-    id: perspective.id,
-    type: 'perspectiveLane',
-    position: { x: LANE_X, y: index * LANE_HEIGHT },
-    data: { perspective, objectiveCount: objectiveByPerspective.get(perspective.id)?.length ?? 0 },
-    draggable: false,
-    selectable: true,
-    style: { width: LANE_WIDTH, height: LANE_HEIGHT - 20, zIndex: 0 },
-  }));
+  const { offsetById, heightById, widthById } = laneOffsets(map);
+
+  const lanes: Node[] = map.perspectives.map((perspective) => {
+    const width = widthById.get(perspective.id) ?? LANE_WIDTH;
+    const height = heightById.get(perspective.id) ?? LANE_HEIGHT;
+    return {
+      id: perspective.id,
+      type: 'perspectiveLane',
+      position: { x: LANE_X, y: offsetById.get(perspective.id) ?? 0 },
+      data: {
+        perspective,
+        objectiveCount: objectiveByPerspective.get(perspective.id)?.length ?? 0,
+        editMode,
+        onResize: onPerspectiveResize ? (w: number, h: number) => onPerspectiveResize(perspective.id, w, h) : undefined,
+      },
+      draggable: false,
+      selectable: editMode,
+      style: { width, height: Math.max(height - 20, 130), zIndex: 0 },
+      width,
+      height,
+    } satisfies Node;
+  });
 
   const objectiveNodes = objectives.map((objective) => {
-    const laneIndex = map.perspectives.findIndex((perspective) => perspective.id === objective.perspectiveId);
     const indexInsideLane = objectiveByPerspective.get(objective.perspectiveId)?.findIndex((item) => item.id === objective.id) ?? 0;
+    const laneY = offsetById.get(objective.perspectiveId) ?? 0;
     const defaultX = OBJECTIVE_START_X + (indexInsideLane % 3) * 310;
-    const defaultY = Math.max(laneIndex, 0) * LANE_HEIGHT + 46 + Math.floor(indexInsideLane / 3) * 96;
+    const defaultY = laneY + 46 + Math.floor(indexInsideLane / 3) * 96;
     const hasSavedPosition = objective.positionX !== 0 || objective.positionY !== 0;
     const width = objective.width ?? 260;
     const height = objective.height ?? 150;
@@ -1742,8 +1809,13 @@ function toFlowEdge(
 
 function perspectiveForY(map: StrategicMap | undefined, y: number) {
   if (!map?.perspectives.length) return null;
-  const index = Math.max(0, Math.min(map.perspectives.length - 1, Math.floor((y + LANE_HEIGHT / 3) / LANE_HEIGHT)));
-  return map.perspectives[index] ?? null;
+  let cursor = 0;
+  for (const perspective of map.perspectives) {
+    const height = perspective.height ?? LANE_HEIGHT;
+    if (y < cursor + height) return perspective;
+    cursor += height;
+  }
+  return map.perspectives[map.perspectives.length - 1] ?? null;
 }
 
 function movePerspective(map: StrategicMap, perspectiveId: string, direction: -1 | 1, mutate: (ids: string[]) => void) {
