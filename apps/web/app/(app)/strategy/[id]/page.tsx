@@ -8,8 +8,8 @@ import { toast } from 'sonner';
 import ReactFlow, {
   Background,
   BaseEdge,
+  ConnectionMode,
   Controls,
-  EdgeLabelRenderer,
   Handle,
   MarkerType,
   MiniMap,
@@ -86,6 +86,8 @@ interface Perspective {
   color: string | null;
   icon: string | null;
   position: number;
+  positionX?: number;
+  positionY?: number;
   width?: number;
   height?: number;
   active: boolean;
@@ -301,8 +303,8 @@ function ObjectiveNode({
           lineStyle={{ borderColor: 'hsl(var(--primary))' }}
         />
       )}
-      <Handle type="target" position={Position.Left} className="!bg-muted-foreground" />
-      <Handle type="target" position={Position.Top} id="t" className="!bg-muted-foreground" />
+      <Handle id="left" type="source" position={Position.Left} className="!h-3 !w-3 !bg-primary" />
+      <Handle id="top" type="source" position={Position.Top} className="!h-3 !w-3 !bg-primary" />
       <div className="mb-2 flex items-start justify-between gap-2">
         <div className="min-w-0">
           <div className="line-clamp-2 text-sm font-semibold leading-tight">{objective.name}</div>
@@ -331,8 +333,8 @@ function ObjectiveNode({
         <span>{LIGHT_LABEL[light] ?? light}</span>
         <span>{formatPercent(objective.aggregateAttainment)}</span>
       </div>
-      <Handle type="source" position={Position.Right} className="!bg-muted-foreground" />
-      <Handle type="source" position={Position.Bottom} id="b" className="!bg-muted-foreground" />
+      <Handle id="right" type="source" position={Position.Right} className="!h-3 !w-3 !bg-primary" />
+      <Handle id="bottom" type="source" position={Position.Bottom} className="!h-3 !w-3 !bg-primary" />
     </div>
   );
 }
@@ -347,8 +349,8 @@ function StrategyEdge({
   targetPosition,
   data,
   selected,
-}: EdgeProps<{ kind: string; label?: string | null; onPick?: (edgeId: string) => void }>) {
-  const [path, labelX, labelY] = getBezierPath({
+}: EdgeProps<{ kind: string; label?: string | null }>) {
+  const [path] = getBezierPath({
     sourceX,
     sourceY,
     targetX,
@@ -357,41 +359,19 @@ function StrategyEdge({
     targetPosition,
   });
   const meta = kindMeta(data?.kind);
-  const label = data?.label ?? meta.label;
   return (
-    <>
-      <BaseEdge
-        id={id}
-        path={path}
-        markerEnd="url(#g360-arrow)"
-        style={{
-          stroke: meta.color,
-          strokeWidth: selected ? 3 : 2,
-          opacity: 0.9,
-          strokeDasharray: data?.kind === 'depende' ? '6 4' : undefined,
-        }}
-      />
-      <EdgeLabelRenderer>
-        <button
-          type="button"
-          onClick={(event) => {
-            event.stopPropagation();
-            data?.onPick?.(id);
-          }}
-          style={{
-            position: 'absolute',
-            transform: `translate(-50%, -50%) translate(${labelX}px, ${labelY}px)`,
-            pointerEvents: 'all',
-            background: '#fff',
-            border: `1px solid ${meta.color}`,
-            color: meta.color,
-          }}
-          className="rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase shadow-sm transition hover:scale-105"
-        >
-          {label}
-        </button>
-      </EdgeLabelRenderer>
-    </>
+    <BaseEdge
+      id={id}
+      path={path}
+      markerEnd="url(#g360-arrow)"
+      style={{
+        stroke: meta.color,
+        strokeWidth: selected ? 5 : 4,
+        opacity: 1,
+        strokeDasharray: data?.kind === 'depende' ? '8 5' : undefined,
+        filter: 'drop-shadow(0 1px 1px rgba(15, 23, 42, 0.18))',
+      }}
+    />
   );
 }
 
@@ -499,11 +479,11 @@ function StrategyMapPageInner() {
     const flowEdges = filteredObjectives.flatMap((objective) =>
       objective.outRelations
         .filter((relation) => objectiveIds.has(relation.to.id))
-        .map((relation) => toFlowEdge(relation, objective.id, openEdgeEditor)),
+        .map((relation) => toFlowEdge(relation, objective.id)),
     );
     setNodes(flowNodes);
     setEdges(flowEdges);
-  }, [editMode, filteredObjectives, map, selectedId, setEdges, setNodes, openEdgeEditor, handlePerspectiveResize]);
+  }, [editMode, filteredObjectives, map, selectedId, setEdges, setNodes, handlePerspectiveResize]);
 
   useEffect(() => {
     const term = search.trim().toLowerCase();
@@ -912,6 +892,7 @@ function StrategyMapPageInner() {
               edges={edges}
               nodeTypes={nodeTypes}
               edgeTypes={edgeTypes}
+              connectionMode={ConnectionMode.Loose}
               onNodesChange={onNodesChange}
               onEdgesChange={onEdgesChange}
               onConnect={(connection) => {
@@ -922,21 +903,36 @@ function StrategyMapPageInner() {
                 setPendingLabel('');
               }}
               onNodeDragStop={(_, node) => {
-                if (!editMode || node.type !== 'objective') return;
-                const targetPerspective = perspectiveForY(map, node.position.y);
-                updateObjective.mutate({
-                  objectiveId: node.id,
-                  patch: {
-                    perspectiveId: targetPerspective?.id,
-                    positionX: Math.round(node.position.x),
-                    positionY: Math.round(node.position.y),
-                  },
-                });
+                if (!editMode) return;
+                if (node.type === 'objective') {
+                  updateObjective.mutate({
+                    objectiveId: node.id,
+                    patch: {
+                      positionX: Math.round(node.position.x),
+                      positionY: Math.round(node.position.y),
+                    },
+                  });
+                }
+                if (node.type === 'perspectiveLane') {
+                  updatePerspective.mutate({
+                    perspectiveId: node.id,
+                    patch: {
+                      positionX: Math.round(node.position.x),
+                      positionY: Math.round(node.position.y),
+                    },
+                  });
+                }
               }}
               onNodeClick={(_, node) => {
                 setSelectedId(node.id);
-                const found = map?.objectives.find((o) => o.id === node.id);
-                if (found) setDrawerObjective(found);
+                if (node.type === 'objective') {
+                  const found = map?.objectives.find((o) => o.id === node.id);
+                  if (found) setDrawerObjective(found);
+                }
+              }}
+              onEdgeClick={(_, edge) => {
+                if (!editMode) return;
+                openEdgeEditor(edge.id);
               }}
               onNodeMouseEnter={(event, node) => {
                 if (node.type !== 'objective') return;
@@ -1747,17 +1743,21 @@ function buildNodes(
   const lanes: Node[] = map.perspectives.map((perspective) => {
     const width = widthById.get(perspective.id) ?? LANE_WIDTH;
     const height = heightById.get(perspective.id) ?? LANE_HEIGHT;
+    const hasSavedPos = (perspective.positionX ?? 0) !== 0 || (perspective.positionY ?? 0) !== 0;
     return {
       id: perspective.id,
       type: 'perspectiveLane',
-      position: { x: LANE_X, y: offsetById.get(perspective.id) ?? 0 },
+      position: {
+        x: hasSavedPos ? (perspective.positionX ?? LANE_X) : LANE_X,
+        y: hasSavedPos ? (perspective.positionY ?? 0) : (offsetById.get(perspective.id) ?? 0),
+      },
       data: {
         perspective,
         objectiveCount: objectiveByPerspective.get(perspective.id)?.length ?? 0,
         editMode,
         onResize: onPerspectiveResize ? (w: number, h: number) => onPerspectiveResize(perspective.id, w, h) : undefined,
       },
-      draggable: false,
+      draggable: editMode,
       selectable: editMode,
       style: { width, height: Math.max(height - 20, 130), zIndex: 0 },
       width,
@@ -1795,7 +1795,6 @@ function buildNodes(
 function toFlowEdge(
   relation: Objective['outRelations'][number],
   sourceId: string,
-  onPick: (edgeId: string) => void,
 ): Edge {
   const meta = kindMeta(relation.kind);
   return {
@@ -1803,7 +1802,7 @@ function toFlowEdge(
     source: sourceId,
     target: relation.to.id,
     type: 'strategy',
-    data: { kind: relation.kind ?? 'impacta', label: relation.label ?? meta.label, onPick },
+    data: { kind: relation.kind ?? 'impacta', label: relation.label ?? meta.label },
   };
 }
 

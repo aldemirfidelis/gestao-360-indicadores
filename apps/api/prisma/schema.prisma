@@ -755,6 +755,8 @@ model Perspective {
   color       String?
   icon        String?
   position    Int              @default(0)
+  positionX   Float            @default(0)
+  positionY   Float            @default(0)
   width       Float            @default(1320)
   height      Float            @default(230)
   active      Boolean          @default(true)
