@@ -709,24 +709,25 @@ function StrategyMapPageInner() {
     onError: (e: any) => toast.error(e?.message ?? 'Falha ao versionar mapa'),
   });
 
-  if (mapQuery.isLoading) return <p className="text-sm text-muted-foreground">Carregando mapa estrategico...</p>;
-  if (!map) return null;
-
-  const editingRelationCtx = (() => {
+  const editingRelationCtx = useMemo(() => {
     if (!editingEdgeId || !map) return null;
     for (const obj of map.objectives) {
       const rel = obj.outRelations.find((r) => r.id === editingEdgeId);
       if (rel) return { rel, from: { id: obj.id, name: obj.name } };
     }
     return null;
-  })();
+  }, [editingEdgeId, map]);
   const editingRelation = editingRelationCtx?.rel ?? null;
 
   useEffect(() => {
     if (!editingRelation) return;
     setEditingEdgeKind(editingRelation.kind ?? 'impacta');
     setEditingEdgeLabel(editingRelation.label ?? '');
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [editingRelation?.id]);
+
+  if (mapQuery.isLoading) return <p className="text-sm text-muted-foreground">Carregando mapa estrategico...</p>;
+  if (!map) return null;
 
   return (
     <div className={cn(presentationMode && 'bg-background')}>
