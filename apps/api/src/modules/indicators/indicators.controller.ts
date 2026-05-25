@@ -106,6 +106,12 @@ export class IndicatorsController {
     return this.service.upsertTargetForIndicator(me, id, body);
   }
 
+  @Post(':id/targets/batch')
+  @RequirePermissions('indicators:update')
+  upsertTargetsBatch(@CurrentUser() me: AuthPayload, @Param('id') id: string, @Body() body: any) {
+    return this.service.upsertTargetsBatchForIndicator(me, id, body);
+  }
+
   @Post(':id/results')
   @RequirePermissions('results:launch')
   upsertResult(@CurrentUser() me: AuthPayload, @Param('id') id: string, @Body() body: any) {

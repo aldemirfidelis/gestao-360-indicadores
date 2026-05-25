@@ -128,6 +128,8 @@ interface IndicatorRow {
   responsibleUser: { id: string; name: string } | null;
   areaMacro: { id: string; name: string; type: string | null };
   areaMicro: { id: string; name: string; type: string | null } | null;
+  parentIndicator: { id: string; name: string; code: string | null } | null;
+  isMacro: boolean;
   currentTarget: { periodRef: string; target: number; lowerBound: number | null; upperBound: number | null } | null;
   last: {
     id: string;
@@ -166,6 +168,7 @@ type IndicatorForm = {
   guidelineNodeId: string;
   strategicObjectiveId: string;
   responsibleUserId: string;
+  parentIndicatorId: string;
   name: string;
   code: string;
   description: string;
@@ -266,6 +269,7 @@ const EMPTY_FORM: IndicatorForm = {
   guidelineNodeId: '',
   strategicObjectiveId: '',
   responsibleUserId: '',
+  parentIndicatorId: '',
   name: '',
   code: '',
   description: '',
@@ -305,7 +309,6 @@ export default function IndicatorsPage() {
   const [targetEditing, setTargetEditing] = useState<IndicatorRow | null>(null);
   const [resultEditing, setResultEditing] = useState<IndicatorRow | null>(null);
   const [historyIndicator, setHistoryIndicator] = useState<IndicatorRow | null>(null);
-  const [targetForm, setTargetForm] = useState({ periodRef: '', target: '', lowerBound: '', upperBound: '', justification: '' });
 
   const options = useQuery<IndicatorOptions>({
     queryKey: ['indicators', 'options'],
@@ -384,6 +387,7 @@ export default function IndicatorsPage() {
         guidelineNodeId: form.guidelineNodeId || null,
         strategicObjectiveId: form.strategicObjectiveId || null,
         responsibleUserId: form.responsibleUserId || null,
+        parentIndicatorId: form.parentIndicatorId || null,
         name: form.name,
         code: form.code || null,
         description: form.description || null,
@@ -414,19 +418,6 @@ export default function IndicatorsPage() {
     onError: (error: Error) => toast.error(error.message || 'Falha ao salvar indicador'),
   });
 
-  const saveTarget = useMutation({
-    mutationFn: () => {
-      if (!targetEditing) throw new Error('Indicador nao selecionado');
-      return api(`/indicators/${targetEditing.id}/target`, { method: 'POST', json: targetForm });
-    },
-    onSuccess: () => {
-      toast.success('Meta atualizada');
-      setTargetEditing(null);
-      qc.invalidateQueries({ queryKey: ['indicators'] });
-    },
-    onError: (error: Error) => toast.error(error.message || 'Falha ao salvar meta'),
-  });
-
   const deleteIndicator = useMutation({
     mutationFn: (indicator: IndicatorRow) => api(`/indicators/${indicator.id}`, { method: 'DELETE' }),
     onSuccess: () => {
@@ -452,6 +443,7 @@ export default function IndicatorsPage() {
       guidelineNodeId: indicator.guidelineNode?.id ?? '',
       strategicObjectiveId: indicator.strategicObjective?.id ?? '',
       responsibleUserId: indicator.responsibleUser?.id ?? '',
+      parentIndicatorId: indicator.parentIndicator?.id ?? '',
       name: indicator.name,
       code: indicator.code ?? '',
       description: indicator.description ?? '',
@@ -471,15 +463,7 @@ export default function IndicatorsPage() {
   }
 
   function openTarget(indicator: IndicatorRow) {
-    const periodRef = indicator.currentTarget?.periodRef || indicator.last?.periodRef || defaultPeriodRef(options.data?.currentPeriod.year);
     setTargetEditing(indicator);
-    setTargetForm({
-      periodRef,
-      target: indicator.currentTarget?.target !== undefined && indicator.currentTarget?.target !== null ? String(indicator.currentTarget.target) : '',
-      lowerBound: indicator.currentTarget?.lowerBound !== undefined && indicator.currentTarget?.lowerBound !== null ? String(indicator.currentTarget.lowerBound) : '',
-      upperBound: indicator.currentTarget?.upperBound !== undefined && indicator.currentTarget?.upperBound !== null ? String(indicator.currentTarget.upperBound) : '',
-      justification: '',
-    });
   }
 
   function openResult(indicator: IndicatorRow) {
@@ -680,6 +664,7 @@ export default function IndicatorsPage() {
         guidelineOptions={guidelineOptions}
         users={users}
         strategicObjectives={strategicObjectives}
+        parentIndicatorOptions={rows.filter((row) => row.id !== form.id)}
         options={options.data}
         isSaving={saveIndicator.isPending}
         onSave={() => saveIndicator.mutate()}
@@ -689,11 +674,7 @@ export default function IndicatorsPage() {
 
       <TargetDialog
         indicator={targetEditing}
-        form={targetForm}
-        setForm={setTargetForm}
-        isSaving={saveTarget.isPending}
         onOpenChange={(open) => !open && setTargetEditing(null)}
-        onSave={() => saveTarget.mutate()}
       />
 
       <ResultDialog
@@ -738,6 +719,16 @@ function IndicatorManagementCard({
             {indicator.code && <Badge variant="outline">{indicator.code}</Badge>}
             <Badge variant="secondary">{TYPE_LABEL[indicator.type] ?? indicator.type}</Badge>
             <Badge className={cn('border', statusBadgeClass(light))} variant="outline">{LIGHT_LABEL[light] ?? light}</Badge>
+            {indicator.isMacro && (
+              <Badge className="border border-status-blue/40 bg-status-blue/10 text-status-blue" variant="outline">
+                Macro
+              </Badge>
+            )}
+            {indicator.parentIndicator && (
+              <Badge className="border border-status-purple/40 bg-status-purple/10 text-status-purple" variant="outline">
+                Micro de {indicator.parentIndicator.code ?? indicator.parentIndicator.name}
+              </Badge>
+            )}
           </div>
           <h3 className="mt-2 line-clamp-2 text-base font-semibold leading-snug">{indicator.name}</h3>
         </div>
@@ -822,6 +813,7 @@ function IndicatorFormDialog({
   guidelineOptions,
   users,
   strategicObjectives,
+  parentIndicatorOptions,
   options,
   isSaving,
   onSave,
@@ -836,6 +828,7 @@ function IndicatorFormDialog({
   guidelineOptions: OrgNodeOption[];
   users: UserOption[];
   strategicObjectives: StrategicObjectiveOption[];
+  parentIndicatorOptions: IndicatorRow[];
   options?: IndicatorOptions;
   isSaving: boolean;
   onSave: () => void;
@@ -874,6 +867,16 @@ function IndicatorFormDialog({
               <option value="">Usar area macro</option>
               {microOptions.map((node) => (
                 <option key={node.id} value={node.id}>{node.name}</option>
+              ))}
+            </NativeSelect>
+          </Field>
+          <Field label="Indicador macro (pai)">
+            <NativeSelect value={form.parentIndicatorId} onChange={(e) => patchForm(setForm, { parentIndicatorId: e.target.value })}>
+              <option value="">Sem vinculo (indicador macro proprio)</option>
+              {parentIndicatorOptions.map((row) => (
+                <option key={row.id} value={row.id}>
+                  {row.code ? `${row.code} - ` : ''}{row.name}
+                </option>
               ))}
             </NativeSelect>
           </Field>
@@ -1021,58 +1024,32 @@ function IndicatorViewDialog({ indicator, onOpenChange }: { indicator: Indicator
 
 function TargetDialog({
   indicator,
-  form,
-  setForm,
-  isSaving,
   onOpenChange,
-  onSave,
 }: {
   indicator: IndicatorRow | null;
-  form: typeof targetFormShape;
-  setForm: React.Dispatch<React.SetStateAction<typeof targetFormShape>>;
-  isSaving: boolean;
   onOpenChange: (open: boolean) => void;
-  onSave: () => void;
 }) {
   return (
     <Dialog open={Boolean(indicator)} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-3xl">
+      <DialogContent className="max-w-4xl">
         <DialogHeader>
-          <DialogTitle>Alterar meta</DialogTitle>
+          <DialogTitle>Alterar metas do ano</DialogTitle>
         </DialogHeader>
         {indicator && (
-          <div className="space-y-4">
-            <p className="text-sm text-muted-foreground">{indicator.name}</p>
-            <div className="grid gap-3 md:grid-cols-4">
-              <Field label="Periodo" required>
-                <Input value={form.periodRef} onChange={(e) => setForm((prev) => ({ ...prev, periodRef: e.target.value }))} placeholder="2026-01" />
-              </Field>
-              <Field label="Nova meta" required>
-                <Input type="number" step="0.01" value={form.target} onChange={(e) => setForm((prev) => ({ ...prev, target: e.target.value }))} />
-              </Field>
-              <Field label="Limite inferior">
-                <Input type="number" step="0.01" value={form.lowerBound} onChange={(e) => setForm((prev) => ({ ...prev, lowerBound: e.target.value }))} />
-              </Field>
-              <Field label="Limite superior">
-                <Input type="number" step="0.01" value={form.upperBound} onChange={(e) => setForm((prev) => ({ ...prev, upperBound: e.target.value }))} />
-              </Field>
-              <Field label="Justificativa da alteracao" className="md:col-span-4">
-                <Textarea rows={3} value={form.justification} onChange={(e) => setForm((prev) => ({ ...prev, justification: e.target.value }))} />
-              </Field>
-            </div>
-            <MiniHistoryTable indicator={indicator} mode="target" />
-          </div>
+          <IndicatorResultEditor
+            mode="target"
+            indicatorId={indicator.id}
+            fallbackName={indicator.name}
+            unitLabel={indicator.unitLabel ?? indicator.unit}
+          />
         )}
         <DialogFooter>
-          <Button variant="outline" onClick={() => onOpenChange(false)}>Cancelar</Button>
-          <Button onClick={onSave} disabled={isSaving}>{isSaving ? 'Salvando...' : 'Salvar meta'}</Button>
+          <Button variant="outline" onClick={() => onOpenChange(false)}>Fechar</Button>
         </DialogFooter>
       </DialogContent>
     </Dialog>
   );
 }
-
-const targetFormShape = { periodRef: '', target: '', lowerBound: '', upperBound: '', justification: '' };
 
 function ResultDialog({
   indicator,
@@ -1139,35 +1116,6 @@ function HistoryDialog({
   );
 }
 
-function MiniHistoryTable({ indicator, mode }: { indicator: IndicatorRow; mode: 'target' | 'result' }) {
-  return (
-    <div className="overflow-x-auto rounded-lg border">
-      <table className="w-full text-sm">
-        <thead className="bg-muted/50 text-xs uppercase text-muted-foreground">
-          <tr>
-            <th className="px-3 py-2 text-left">Periodo</th>
-            <th className="px-3 py-2 text-right">Meta</th>
-            <th className="px-3 py-2 text-right">Realizado</th>
-            <th className="px-3 py-2 text-right">Atingimento</th>
-            <th className="px-3 py-2 text-left">Status</th>
-          </tr>
-        </thead>
-        <tbody>
-          {indicator.monthlyHistory.map((point) => (
-            <tr key={`${mode}-${point.periodRef}`} className="border-t">
-              <td className="px-3 py-2">{periodRefLabel(point.periodRef)}</td>
-              <td className="px-3 py-2 text-right">{formatNumber(point.meta)}</td>
-              <td className="px-3 py-2 text-right">{formatNumber(point.realizado)}</td>
-              <td className="px-3 py-2 text-right">{formatPercent(point.attainment)}</td>
-              <td className="px-3 py-2"><StatusLight light={point.status} /></td>
-            </tr>
-          ))}
-        </tbody>
-      </table>
-    </div>
-  );
-}
-
 function Field({ label, required, className, children }: { label: string; required?: boolean; className?: string; children: React.ReactNode }) {
   return (
     <div className={className}>
@@ -1207,10 +1155,6 @@ function patchForm(setForm: React.Dispatch<React.SetStateAction<IndicatorForm>>,
 function numberOrUndefined(value: string) {
   if (!value.trim()) return undefined;
   return Number(value.replace(',', '.'));
-}
-
-function defaultPeriodRef(year?: number) {
-  return `${year ?? 2026}-01`;
 }
 
 function toQueryString(filters: Filters) {

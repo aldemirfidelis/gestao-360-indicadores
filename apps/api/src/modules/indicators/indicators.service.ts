@@ -38,6 +38,7 @@ type IndicatorWriteInput = {
   strategicObjectiveId?: string | null;
   responsibleUserId?: string | null;
   feederUserId?: string | null;
+  parentIndicatorId?: string | null;
   name?: string | null;
   code?: string | null;
   description?: string | null;
@@ -131,7 +132,20 @@ export class IndicatorsService {
             map: { select: { id: true, name: true } },
           },
         },
-        _count: { select: { actions: true, meetings: true, targets: true, results: true } },
+        parentRelations: {
+          select: {
+            parent: { select: { id: true, name: true, code: true } },
+          },
+        },
+        _count: {
+          select: {
+            actions: true,
+            meetings: true,
+            targets: true,
+            results: true,
+            childRelations: true,
+          },
+        },
       },
       orderBy: [{ name: 'asc' }],
     });
@@ -170,8 +184,11 @@ export class IndicatorsService {
       const currentTarget = currentRef ? targetMap.get(`${indicator.id}:${currentRef}`) : null;
       const last = lastByIndicator.get(indicator.id) ?? null;
       const area = deriveArea(indicator.ownerNode);
+      const parentIndicator = indicator.parentRelations?.[0]?.parent ?? null;
       return {
         ...indicator,
+        parentIndicator,
+        isMacro: (indicator._count?.childRelations ?? 0) > 0,
         areaMacro: area.areaMacro,
         areaMicro: area.areaMicro,
         currentTarget: currentTarget
@@ -304,10 +321,14 @@ export class IndicatorsService {
     const companyId = this.scopeCompany(me, input.companyId);
     const data = await this.buildCreateData(companyId, input);
     await this.ensureCodeAvailable(companyId, data.code ?? null);
+    const parentIndicatorId = cleanString(input.parentIndicatorId);
 
     const created = await this.prisma.$transaction(async (tx) => {
       const indicator = await tx.indicator.create({ data });
       await this.syncObjectiveLink(tx, indicator.id, indicator.strategicObjectiveId, me.sub);
+      if (parentIndicatorId) {
+        await this.syncParentRelation(tx, companyId, indicator.id, parentIndicatorId);
+      }
       return indicator;
     });
 
@@ -336,6 +357,9 @@ export class IndicatorsService {
       const indicator = await tx.indicator.update({ where: { id }, data });
       if (data.strategicObjectiveId !== undefined) {
         await this.syncObjectiveLink(tx, indicator.id, indicator.strategicObjectiveId, me.sub);
+      }
+      if (input.parentIndicatorId !== undefined) {
+        await this.syncParentRelation(tx, current.companyId, indicator.id, cleanString(input.parentIndicatorId) ?? null);
       }
       return indicator;
     });
@@ -418,6 +442,36 @@ export class IndicatorsService {
       },
       me,
     );
+  }
+
+  async upsertTargetsBatchForIndicator(
+    me: AuthPayload,
+    id: string,
+    body: { items?: Array<TargetWriteInput & { periodRef?: string }>; justification?: string | null },
+  ) {
+    await this.findScopedIndicator(id, me);
+    const items = Array.isArray(body?.items) ? body.items : [];
+    if (items.length === 0) return { count: 0 };
+    const justification = cleanString(body?.justification) ?? null;
+    let count = 0;
+    for (const item of items) {
+      const periodRef = requiredString(item.periodRef, 'Informe o periodo da meta');
+      const target = requiredNumber(item.target, 'Informe a meta');
+      await this.upsertTarget(
+        {
+          indicatorId: id,
+          periodRef,
+          target,
+          lowerBound: optionalNumber(item.lowerBound, 'Limite inferior') ?? null,
+          upperBound: optionalNumber(item.upperBound, 'Limite superior') ?? null,
+          weight: optionalNumber(item.weight, 'Peso') ?? 1,
+          justification,
+        },
+        me,
+      );
+      count++;
+    }
+    return { count };
   }
 
   async upsertResult(me: AuthPayload, id: string, body: ResultWriteInput) {
@@ -786,6 +840,34 @@ export class IndicatorsService {
     });
     if (!indicator) throw new NotFoundException('Indicador nao encontrado');
     return indicator;
+  }
+
+  private async syncParentRelation(
+    tx: Prisma.TransactionClient,
+    companyId: string,
+    childId: string,
+    parentId: string | null,
+  ) {
+    if (!parentId) {
+      await tx.indicatorTreeRelation.deleteMany({ where: { childId } });
+      return;
+    }
+    if (parentId === childId) {
+      throw new BadRequestException('Indicador macro nao pode ser ele mesmo.');
+    }
+    const parent = await tx.indicator.findFirst({
+      where: { id: parentId, companyId, deletedAt: null },
+      select: { id: true },
+    });
+    if (!parent) {
+      throw new NotFoundException('Indicador macro nao encontrado nesta empresa.');
+    }
+    await tx.indicatorTreeRelation.deleteMany({ where: { childId, NOT: { parentId } } });
+    await tx.indicatorTreeRelation.upsert({
+      where: { parentId_childId: { parentId, childId } },
+      create: { parentId, childId },
+      update: {},
+    });
   }
 
   private async syncObjectiveLink(
