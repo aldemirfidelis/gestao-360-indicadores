@@ -498,6 +498,8 @@ function StrategyMapPageInner() {
   const [editingEdgeId, setEditingEdgeId] = useState<string | null>(null);
   const [editingEdgeKind, setEditingEdgeKind] = useState<string>('impacta');
   const [editingEdgeLabel, setEditingEdgeLabel] = useState<string>('');
+  const [editingEdgeSourceHandle, setEditingEdgeSourceHandle] = useState<string>('auto');
+  const [editingEdgeTargetHandle, setEditingEdgeTargetHandle] = useState<string>('auto');
   const [onlyCritical, setOnlyCritical] = useState(false);
   const [onlyOverdue, setOnlyOverdue] = useState(false);
   const [onlyUnlinked, setOnlyUnlinked] = useState(false);
@@ -571,6 +573,9 @@ function StrategyMapPageInner() {
   const computedEdges = useMemo(() => {
     const nodesMap = new Map(nodes.map((n) => [n.id, n]));
     return edges.map((edge) => {
+      if (edge.sourceHandle && edge.targetHandle) {
+        return edge; // Respect manual connection!
+      }
       const sourceNode = nodesMap.get(edge.source);
       const targetNode = nodesMap.get(edge.target);
       if (sourceNode && targetNode && sourceNode.type === 'objective' && targetNode.type === 'objective') {
@@ -735,7 +740,16 @@ function StrategyMapPageInner() {
     mutationFn: ({ connection, kind, label }: { connection: Connection; kind: string; label: string }) =>
       api('/strategy/relations', {
         method: 'POST',
-        json: { fromId: connection.source, toId: connection.target, kind, label: label || kindMeta(kind).label, weight: 1 },
+        json: {
+          fromId: connection.source,
+          toId: connection.target,
+          kind,
+          label: label || kindMeta(kind).label,
+          description: (connection.sourceHandle && connection.targetHandle)
+            ? `${connection.sourceHandle}:${connection.targetHandle}`
+            : null,
+          weight: 1,
+        },
       }),
     onSuccess: () => {
       toast.success('Ligacao criada');
@@ -748,10 +762,10 @@ function StrategyMapPageInner() {
   });
 
   const updateRelation = useMutation({
-    mutationFn: ({ relationId, kind, label }: { relationId: string; kind: string; label: string }) =>
+    mutationFn: ({ relationId, kind, label, description }: { relationId: string; kind: string; label: string; description: string | null }) =>
       api(`/strategy/relations/${relationId}`, {
         method: 'PATCH',
-        json: { kind, label: label || kindMeta(kind).label },
+        json: { kind, label: label || kindMeta(kind).label, description },
       }),
     onSuccess: () => {
       toast.success('Ligacao atualizada');
@@ -835,6 +849,16 @@ function StrategyMapPageInner() {
     if (!editingRelation) return;
     setEditingEdgeKind(editingRelation.kind ?? 'impacta');
     setEditingEdgeLabel(editingRelation.label ?? '');
+    
+    const desc = (editingRelation as any).description ?? '';
+    if (desc && desc.includes(':')) {
+      const parts = desc.split(':');
+      setEditingEdgeSourceHandle(parts[0]);
+      setEditingEdgeTargetHandle(parts[1]);
+    } else {
+      setEditingEdgeSourceHandle('auto');
+      setEditingEdgeTargetHandle('auto');
+    }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [editingRelation?.id]);
 
@@ -1593,6 +1617,34 @@ function StrategyMapPageInner() {
                   placeholder={kindMeta(editingEdgeKind || editingRelation.kind || 'impacta').label}
                 />
               </div>
+              <div className="grid grid-cols-2 gap-3 pt-1">
+                <div>
+                  <Label>Lado de Saída (Origem)</Label>
+                  <NativeSelect
+                    value={editingEdgeSourceHandle}
+                    onChange={(event) => setEditingEdgeSourceHandle(event.target.value)}
+                  >
+                    <option value="auto">Automático (Mais próximo)</option>
+                    <option value="top">Superior (Cima)</option>
+                    <option value="bottom">Inferior (Baixo)</option>
+                    <option value="left">Lado Esquerdo</option>
+                    <option value="right">Lado Direito</option>
+                  </NativeSelect>
+                </div>
+                <div>
+                  <Label>Lado de Entrada (Destino)</Label>
+                  <NativeSelect
+                    value={editingEdgeTargetHandle}
+                    onChange={(event) => setEditingEdgeTargetHandle(event.target.value)}
+                  >
+                    <option value="auto">Automático (Mais próximo)</option>
+                    <option value="top">Superior (Cima)</option>
+                    <option value="bottom">Inferior (Baixo)</option>
+                    <option value="left">Lado Esquerdo</option>
+                    <option value="right">Lado Direito</option>
+                  </NativeSelect>
+                </div>
+              </div>
             </div>
           )}
           <DialogFooter className="flex-wrap gap-2">
@@ -1612,14 +1664,18 @@ function StrategyMapPageInner() {
             <Button variant="ghost" onClick={() => setEditingEdgeId(null)}>Fechar</Button>
             <Button
               disabled={!editingEdgeId || updateRelation.isPending}
-              onClick={() =>
-                editingEdgeId &&
+              onClick={() => {
+                if (!editingEdgeId) return;
+                const description = (editingEdgeSourceHandle === 'auto' || editingEdgeTargetHandle === 'auto')
+                  ? null
+                  : `${editingEdgeSourceHandle}:${editingEdgeTargetHandle}`;
                 updateRelation.mutate({
                   relationId: editingEdgeId,
                   kind: editingEdgeKind || editingRelation?.kind || 'impacta',
                   label: editingEdgeLabel || editingRelation?.label || '',
-                })
-              }
+                  description,
+                });
+              }}
             >
               <Save className="mr-2 h-4 w-4" /> Salvar ligacao
             </Button>
@@ -1930,12 +1986,24 @@ function toFlowEdge(
   sourceId: string,
 ): Edge {
   const meta = kindMeta(relation.kind);
+  let sourceHandle: string | undefined;
+  let targetHandle: string | undefined;
+  const relAny = relation as any;
+  if (relAny.description && relAny.description.includes(':')) {
+    const parts = relAny.description.split(':');
+    if (parts.length === 2) {
+      sourceHandle = parts[0];
+      targetHandle = parts[1];
+    }
+  }
   return {
     id: relation.id,
     source: sourceId,
     target: relation.to.id,
     type: 'strategy',
-    data: { kind: relation.kind ?? 'impacta', label: relation.label ?? meta.label },
+    sourceHandle,
+    targetHandle,
+    data: { kind: relation.kind ?? 'impacta', label: relation.label ?? meta.label, description: relAny.description },
   };
 }
 
