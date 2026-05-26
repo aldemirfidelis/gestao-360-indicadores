@@ -289,7 +289,7 @@ export default function HomePage() {
           })}
           {selectedShortcuts.length === 0 && (
             <div className="col-span-2 py-6 text-center text-sm text-muted-foreground border border-dashed rounded-lg">
-              Nenhum atalho selecionado. Clique em "Configurar" para adicionar seus atalhos personalizados.
+              Nenhum atalho selecionado. Clique em &quot;Configurar&quot; para adicionar seus atalhos personalizados.
             </div>
           )}
         </SectionCard>
