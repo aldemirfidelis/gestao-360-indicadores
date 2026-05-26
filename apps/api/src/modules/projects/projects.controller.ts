@@ -12,6 +12,11 @@ export class ProjectsController {
     return this.service.list(me.companyId);
   }
 
+  @Get('indicators')
+  listIndicators(@CurrentUser() me: AuthPayload) {
+    return this.service.listIndicators(me.companyId);
+  }
+
   @Get(':id')
   byId(@Param('id') id: string) {
     return this.service.getById(id);

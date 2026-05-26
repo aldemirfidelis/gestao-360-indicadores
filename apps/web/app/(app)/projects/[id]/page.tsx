@@ -5,17 +5,17 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useState } from 'react';
 import Link from 'next/link';
 import { toast } from 'sonner';
-import { ArrowLeft, Plus, Check } from 'lucide-react';
+import { ArrowLeft, Plus, Target, TrendingUp, TrendingDown } from 'lucide-react';
 import { PageHeader } from '@/components/shell/page-header';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Badge } from '@/components/ui/badge';
 import { Progress } from '@/components/ui/progress';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { NativeSelect } from '@/components/ui/select';
 import { Gantt } from '@/components/gantt';
 import { api } from '@/lib/api';
-import { formatDate, cn } from '@/lib/utils';
+import { formatDate, formatNumber, cn } from '@/lib/utils';
 
 interface Milestone {
   id: string;
@@ -35,6 +35,26 @@ interface Task {
   dependency: { id: string; name: string } | null;
 }
 
+interface LinkedIndicator {
+  id: string;
+  name: string;
+  code: string | null;
+  unit: string;
+  unitLabel: string | null;
+  direction: 'HIGHER_BETTER' | 'LOWER_BETTER';
+  ownerNode: { id: string; name: string } | null;
+  results: { id: string; periodRef: string; value: number; light: string; attainment: number | null }[];
+}
+
+interface IndicatorOption {
+  id: string;
+  name: string;
+  code: string | null;
+  unit: string;
+  unitLabel: string | null;
+  direction: 'HIGHER_BETTER' | 'LOWER_BETTER';
+}
+
 interface ProjectDetail {
   id: string;
   name: string;
@@ -45,6 +65,8 @@ interface ProjectDetail {
   responsible: string | null;
   budget: number | null;
   progressOverall: number;
+  indicatorId: string | null;
+  indicator: LinkedIndicator | null;
   milestones: Milestone[];
   tasks: Task[];
 }
@@ -58,8 +80,24 @@ export default function ProjectDetailPage() {
     queryFn: () => api<ProjectDetail>(`/projects/${id}`),
   });
 
+  const indicatorsQuery = useQuery<IndicatorOption[]>({
+    queryKey: ['projects', 'indicators'],
+    queryFn: () => api<IndicatorOption[]>('/projects/indicators'),
+    staleTime: 60_000,
+  });
+
   const [milestone, setMilestone] = useState({ name: '', dueDate: '' });
   const [task, setTask] = useState({ name: '', startDate: '', endDate: '', responsible: '', dependencyId: '' });
+
+  const linkIndicator = useMutation({
+    mutationFn: (indicatorId: string) => api(`/projects/${id}`, { method: 'PATCH', json: { indicatorId } }),
+    onSuccess: () => {
+      toast.success('Indicador atualizado');
+      qc.invalidateQueries({ queryKey: ['project', id] });
+      qc.invalidateQueries({ queryKey: ['projects'] });
+    },
+    onError: (e: any) => toast.error(e?.message ?? 'Falha ao vincular indicador'),
+  });
 
   const addMilestone = useMutation({
     mutationFn: () => api(`/projects/${id}/milestones`, { method: 'POST', json: milestone }),
@@ -128,6 +166,43 @@ export default function ProjectDetailPage() {
           </CardContent>
         </Card>
       </div>
+
+      <Card className="mb-6">
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <Target className="h-4 w-4" /> Indicador vinculado
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="grid gap-4 md:grid-cols-[280px,1fr]">
+            <div className="space-y-2">
+              <Label>Selecionar indicador</Label>
+              <NativeSelect
+                value={p.indicatorId ?? ''}
+                onChange={(e) => linkIndicator.mutate(e.target.value)}
+                disabled={linkIndicator.isPending}
+              >
+                <option value="">Sem indicador</option>
+                {(indicatorsQuery.data ?? []).map((ind) => (
+                  <option key={ind.id} value={ind.id}>
+                    {ind.code ? `[${ind.code}] ` : ''}{ind.name}
+                  </option>
+                ))}
+              </NativeSelect>
+              <p className="text-xs text-muted-foreground">
+                Vincule um KPI para acompanhar o impacto do projeto.
+              </p>
+            </div>
+            {p.indicator ? (
+              <IndicatorImpactPanel indicator={p.indicator} />
+            ) : (
+              <div className="rounded-lg border border-dashed p-6 text-center text-sm text-muted-foreground">
+                Nenhum indicador vinculado. Escolha um KPI ao lado para ver tendência e atingimento.
+              </div>
+            )}
+          </div>
+        </CardContent>
+      </Card>
 
       <Card className="mb-6">
         <CardHeader>
@@ -260,6 +335,81 @@ export default function ProjectDetailPage() {
             </div>
           </CardContent>
         </Card>
+      </div>
+    </div>
+  );
+}
+
+function IndicatorImpactPanel({ indicator }: { indicator: LinkedIndicator }) {
+  const latest = indicator.results[0];
+  const previous = indicator.results[1];
+  const trendUp = latest && previous ? latest.value > previous.value : null;
+  const onTarget = latest?.light === 'GREEN' || latest?.light === 'BLUE';
+  const unitLabel = indicator.unitLabel ?? (indicator.unit === 'PERCENT' ? '%' : '');
+  const valueColor = !latest
+    ? 'text-muted-foreground'
+    : onTarget
+      ? 'text-[hsl(var(--status-green))]'
+      : latest.light === 'YELLOW'
+        ? 'text-[hsl(var(--status-yellow))]'
+        : 'text-[hsl(var(--status-red))]';
+
+  return (
+    <div className="rounded-lg border bg-card p-4">
+      <div className="flex items-start justify-between gap-3 mb-3">
+        <div className="min-w-0">
+          <div className="text-[11px] uppercase text-muted-foreground">
+            {indicator.code && <span className="mr-2 font-mono">[{indicator.code}]</span>}
+            {indicator.ownerNode?.name ?? 'KPI'}
+          </div>
+          <div className="font-semibold truncate">{indicator.name}</div>
+        </div>
+        <Link
+          href={`/indicators/${indicator.id}`}
+          className="shrink-0 text-xs text-primary hover:underline"
+        >
+          Ver detalhes →
+        </Link>
+      </div>
+
+      <div className="grid grid-cols-3 gap-4">
+        <div>
+          <div className="text-[10px] uppercase text-muted-foreground">Atual</div>
+          <div className={cn('text-xl font-bold', valueColor)}>
+            {latest ? `${formatNumber(latest.value)}${unitLabel}` : '—'}
+          </div>
+          {latest && (
+            <div className="text-[10px] text-muted-foreground">{latest.periodRef}</div>
+          )}
+        </div>
+        <div>
+          <div className="text-[10px] uppercase text-muted-foreground">Atingimento</div>
+          <div className="text-xl font-bold">
+            {latest?.attainment != null ? `${Math.round(latest.attainment)}%` : '—'}
+          </div>
+          <Progress value={Math.min(100, Math.max(0, latest?.attainment ?? 0))} className="mt-1 h-1.5" />
+        </div>
+        <div>
+          <div className="text-[10px] uppercase text-muted-foreground">Tendência</div>
+          <div className="text-xl font-bold flex items-center gap-1.5">
+            {trendUp === null ? (
+              '—'
+            ) : trendUp ? (
+              <>
+                <TrendingUp className="h-5 w-5 text-[hsl(var(--status-green))]" />
+                <span className="text-[hsl(var(--status-green))]">Subindo</span>
+              </>
+            ) : (
+              <>
+                <TrendingDown className="h-5 w-5 text-[hsl(var(--status-red))]" />
+                <span className="text-[hsl(var(--status-red))]">Caindo</span>
+              </>
+            )}
+          </div>
+          <div className="text-[10px] text-muted-foreground">
+            {indicator.direction === 'HIGHER_BETTER' ? 'Maior é melhor' : 'Menor é melhor'}
+          </div>
+        </div>
       </div>
     </div>
   );

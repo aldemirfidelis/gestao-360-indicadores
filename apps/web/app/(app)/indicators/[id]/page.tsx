@@ -292,8 +292,25 @@ export default function IndicatorDetailPage() {
               <Tooltip
                 contentStyle={{ background: 'hsl(var(--card))', border: '1px solid hsl(var(--border))' }}
               />
-              <Line type="monotone" dataKey="target" stroke="hsl(var(--status-gray))" strokeDasharray="5 5" strokeWidth={2} dot={false} name="Meta" />
-              <Line type="monotone" dataKey="value" stroke="hsl(var(--status-blue))" strokeWidth={2.5} dot={{ r: 3 }} name="Realizado" />
+              <Line type="monotone" dataKey="target" stroke="#1e3a8a" strokeDasharray="5 5" strokeWidth={2.5} dot={false} name="Meta" />
+              <Line
+                type="monotone"
+                dataKey="value"
+                stroke="hsl(var(--status-blue))"
+                strokeWidth={2.5}
+                dot={(dotProps: any) => {
+                  const { cx, cy, payload, index } = dotProps;
+                  if (payload.value === null || payload.value === undefined) {
+                    return <circle key={`dot-${index}`} cx={cx} cy={cy} r={0} fill="transparent" />;
+                  }
+                  const isWithin = ind.direction === 'LOWER'
+                    ? (payload.value ?? 0) <= (payload.target ?? 0)
+                    : (payload.value ?? 0) >= (payload.target ?? 0);
+                  const color = isWithin ? '#10b981' : '#ef4444';
+                  return <circle key={`dot-${index}`} cx={cx} cy={cy} r={4.5} fill={color} stroke={color} />;
+                }}
+                name="Realizado"
+              />
             </LineChart>
           </ResponsiveContainer>
         </CardContent>

@@ -36,7 +36,26 @@ interface Project {
   responsible: string | null;
   budget: number | null;
   progressOverall: number;
+  indicatorId: string | null;
+  indicator: {
+    id: string;
+    name: string;
+    code: string | null;
+    unit: string;
+    unitLabel: string | null;
+    direction: 'HIGHER_BETTER' | 'LOWER_BETTER';
+    results: { value: number; light: string; attainment: number | null; periodRef: string }[];
+  } | null;
   _count: { tasks: number; milestones: number };
+}
+
+interface IndicatorOption {
+  id: string;
+  name: string;
+  code: string | null;
+  unit: string;
+  unitLabel: string | null;
+  direction: 'HIGHER_BETTER' | 'LOWER_BETTER';
 }
 
 const STATUS_PILL: Record<string, string> = {
@@ -67,11 +86,18 @@ export default function ProjectsPage() {
     endsAt: '',
     budget: '',
     status: 'PLANNED' as Project['status'],
+    indicatorId: '',
   });
 
   const query = useQuery<Project[]>({
     queryKey: ['projects'],
     queryFn: () => api<Project[]>('/projects'),
+  });
+
+  const indicatorsQuery = useQuery<IndicatorOption[]>({
+    queryKey: ['projects', 'indicators'],
+    queryFn: () => api<IndicatorOption[]>('/projects/indicators'),
+    staleTime: 60_000,
   });
 
   const projects = useMemo(() => query.data ?? [], [query.data]);
@@ -94,6 +120,7 @@ export default function ProjectsPage() {
           endsAt: form.endsAt || undefined,
           budget: form.budget ? Number(form.budget) : undefined,
           status: form.status,
+          indicatorId: form.indicatorId || undefined,
         },
       }),
     onSuccess: (project) => {
@@ -107,6 +134,7 @@ export default function ProjectsPage() {
         endsAt: '',
         budget: '',
         status: 'PLANNED',
+        indicatorId: '',
       });
       qc.invalidateQueries({ queryKey: ['projects'] });
       router.push(`/projects/${project.id}`);
@@ -146,6 +174,12 @@ export default function ProjectsPage() {
                   <h3 className="font-semibold">{p.name}</h3>
                   {p.description && (
                     <p className="text-xs text-muted-foreground mt-1 line-clamp-2">{p.description}</p>
+                  )}
+                  {p.indicator && (
+                    <div className="mt-2 inline-flex items-center gap-1.5 rounded-md bg-primary/10 px-2 py-1 text-[11px] font-medium text-primary">
+                      <span>KPI</span>
+                      <span className="truncate max-w-[180px]">{p.indicator.name}</span>
+                    </div>
                   )}
                   <div className="grid grid-cols-3 gap-3 text-xs text-muted-foreground mt-3">
                     <div>
@@ -267,6 +301,23 @@ export default function ProjectsPage() {
                   onChange={(e) => setForm({ ...form, budget: e.target.value })}
                 />
               </div>
+            </div>
+            <div className="space-y-2">
+              <Label>Indicador vinculado</Label>
+              <NativeSelect
+                value={form.indicatorId}
+                onChange={(e) => setForm({ ...form, indicatorId: e.target.value })}
+              >
+                <option value="">Sem indicador</option>
+                {(indicatorsQuery.data ?? []).map((ind) => (
+                  <option key={ind.id} value={ind.id}>
+                    {ind.code ? `[${ind.code}] ` : ''}{ind.name}
+                  </option>
+                ))}
+              </NativeSelect>
+              <p className="text-xs text-muted-foreground">
+                O progresso do projeto sera comparado com este KPI no detalhe do projeto.
+              </p>
             </div>
           </div>
           <DialogFooter>

@@ -623,6 +623,7 @@ model User {
   deviationsResponsible Deviation[]         @relation("DeviationResponsible")
   actionsResponsible    ActionPlan[]        @relation("ActionResponsible")
   actionsCreated        ActionPlan[]        @relation("ActionCreatedBy")
+  actionTasksAssigned   ActionTask[]        @relation("ActionTaskAssignee")
   meetingParticipations MeetingParticipant[]
   comments              Comment[]
   notifications         Notification[]
@@ -1012,6 +1013,7 @@ model Indicator {
   childRelations      IndicatorTreeRelation[] @relation("RelChild")
   parentRelations     IndicatorTreeRelation[] @relation("RelParent")
   strategicObjectiveLinks StrategicObjectiveIndicator[]
+  projects            Project[]              @relation("ProjectIndicator")
 
   @@index([companyId])
   @@index([ownerNodeId])
@@ -1240,15 +1242,22 @@ model ActionPlan {
 }
 
 model ActionTask {
-  id          String      @id @default(uuid())
-  actionId    String
-  action      ActionPlan  @relation(fields: [actionId], references: [id], onDelete: Cascade)
-  title       String
-  done        Boolean     @default(false)
-  dueDate     DateTime?
-  position    Int         @default(0)
-  createdAt   DateTime    @default(now())
-  updatedAt   DateTime    @updatedAt
+  id           String      @id @default(uuid())
+  actionId     String
+  action       ActionPlan  @relation(fields: [actionId], references: [id], onDelete: Cascade)
+  title        String
+  done         Boolean     @default(false)
+  dueDate      DateTime?
+  startDate    DateTime?
+  endDate      DateTime?
+  assignedToId String?
+  assignedTo   User?       @relation("ActionTaskAssignee", fields: [assignedToId], references: [id])
+  position     Int         @default(0)
+  createdAt    DateTime    @default(now())
+  updatedAt    DateTime    @updatedAt
+
+  @@index([actionId])
+  @@index([assignedToId])
 }
 
 model ActionParticipant {
@@ -1444,6 +1453,8 @@ model Project {
   id          String         @id @default(uuid())
   companyId   String
   company     Company        @relation(fields: [companyId], references: [id])
+  indicatorId String?
+  indicator   Indicator?     @relation("ProjectIndicator", fields: [indicatorId], references: [id])
   name        String
   description String?
   status      ProjectStatus  @default(PLANNED)
@@ -1459,6 +1470,7 @@ model Project {
   tasks       ProjectTask[]
 
   @@index([companyId])
+  @@index([indicatorId])
 }
 
 model ProjectMilestone {

@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
 import {
   ActionAiSuggestionStatus,
   ActionAnalysisTool,
@@ -296,10 +296,22 @@ export class ActionsService {
     return updated;
   }
 
-  async addTask(actionId: string, title: string, dueDate?: Date, userId?: string) {
+  async addTask(
+    actionId: string,
+    body: { title: string; dueDate?: Date; startDate?: Date; endDate?: Date; assignedToId?: string },
+    userId?: string,
+  ) {
     const count = await this.prisma.actionTask.count({ where: { actionId } });
     const task = await this.prisma.actionTask.create({
-      data: { actionId, title, dueDate: dueDate ?? null, position: count },
+      data: {
+        actionId,
+        title: body.title,
+        dueDate: body.dueDate ?? null,
+        startDate: body.startDate ?? null,
+        endDate: body.endDate ?? null,
+        assignedToId: body.assignedToId ?? null,
+        position: count,
+      },
     });
     const ctx = await this.actionTraceContext(actionId);
     await this.recordHistory(actionId, userId, 'TASK_CREATED', null, null, task.title);
@@ -315,17 +327,40 @@ export class ActionsService {
       relatedId: actionId,
       title: 'Tarefa criada no plano de ação',
       description: task.title,
-      metadata: { dueDate: task.dueDate },
+      metadata: { dueDate: task.dueDate, startDate: task.startDate, endDate: task.endDate },
     });
     return task;
   }
 
-  async toggleTask(taskId: string, done: boolean, userId?: string) {
-    const t = await this.prisma.actionTask.update({ where: { id: taskId }, data: { done } });
-    await this.recalcProgress(t.actionId);
+  async updateTask(
+    taskId: string,
+    patch: { title?: string; dueDate?: Date | null; startDate?: Date | null; endDate?: Date | null; assignedToId?: string | null; done?: boolean },
+    userId?: string,
+  ) {
+    const existing = await this.prisma.actionTask.findUnique({ where: { id: taskId } });
+    if (!existing) throw new NotFoundException('Tarefa nao encontrada');
+
+    if (patch.done === true) {
+      const nextEnd = patch.endDate !== undefined ? patch.endDate : existing.endDate;
+      if (!nextEnd) {
+        throw new BadRequestException('Informe a Data de Conclusao antes de marcar a tarefa como concluida.');
+      }
+    }
+
+    const data: any = {};
+    if (patch.title !== undefined) data.title = patch.title;
+    if (patch.dueDate !== undefined) data.dueDate = patch.dueDate;
+    if (patch.startDate !== undefined) data.startDate = patch.startDate;
+    if (patch.endDate !== undefined) data.endDate = patch.endDate;
+    if (patch.assignedToId !== undefined) data.assignedToId = patch.assignedToId;
+    if (patch.done !== undefined) data.done = patch.done;
+
+    const t = await this.prisma.actionTask.update({ where: { id: taskId }, data });
+    if (patch.done !== undefined) await this.recalcProgress(t.actionId);
     const ctx = await this.actionTraceContext(t.actionId);
-    await this.recordHistory(t.actionId, userId, done ? 'TASK_DONE' : 'TASK_REOPENED', null, null, t.title);
-    await this.audit(ctx.companyId, userId, 'TASK_UPDATED', 'ActionTask', taskId, null, t);
+    const event = patch.done === true ? 'TASK_DONE' : patch.done === false ? 'TASK_REOPENED' : 'TASK_UPDATED';
+    await this.recordHistory(t.actionId, userId, event, null, null, t.title);
+    await this.audit(ctx.companyId, userId, 'TASK_UPDATED', 'ActionTask', taskId, existing, t);
     await this.traceability.record({
       companyId: ctx.companyId,
       indicatorId: ctx.indicatorId,
@@ -335,11 +370,16 @@ export class ActionsService {
       entityId: taskId,
       relatedType: TraceEntityType.ACTION_PLAN,
       relatedId: t.actionId,
-      title: done ? 'Tarefa concluida' : 'Tarefa reaberta',
+      title: patch.done === true ? 'Tarefa concluida' : patch.done === false ? 'Tarefa reaberta' : 'Tarefa atualizada',
       description: t.title,
-      statusTo: done ? 'DONE' : 'OPEN',
+      statusTo: patch.done === undefined ? undefined : patch.done ? 'DONE' : 'OPEN',
+      metadata: { startDate: t.startDate, endDate: t.endDate, assignedToId: t.assignedToId, dueDate: t.dueDate },
     });
     return t;
+  }
+
+  async toggleTask(taskId: string, done: boolean, userId?: string) {
+    return this.updateTask(taskId, { done }, userId);
   }
 
   async saveAnalysis(actionId: string, body: any, userId?: string) {
@@ -592,7 +632,10 @@ export class ActionsService {
       analysis: true,
       meeting: { include: { participants: { include: { user: { select: { id: true, name: true } } } }, decisions: true } },
       treatment: { include: { result: true } },
-      tasks: { orderBy: { position: 'asc' } },
+      tasks: {
+        orderBy: { position: 'asc' },
+        include: { assignedTo: { select: { id: true, name: true, email: true, avatarUrl: true } } },
+      },
       participants: { orderBy: { createdAt: 'asc' } },
       evidences: { where: { deletedAt: null }, orderBy: { createdAt: 'desc' } },
       comments: { where: { deletedAt: null }, orderBy: { createdAt: 'desc' } },

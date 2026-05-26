@@ -52,7 +52,16 @@ interface ActionDetail {
   deviation: any | null;
   analysis: any | null;
   meeting: any | null;
-  tasks: { id: string; title: string; done: boolean; dueDate: string | null }[];
+  tasks: {
+    id: string;
+    title: string;
+    done: boolean;
+    dueDate: string | null;
+    startDate: string | null;
+    endDate: string | null;
+    assignedToId: string | null;
+    assignedTo: { id: string; name: string; email?: string; avatarUrl?: string | null } | null;
+  }[];
   evidences: any[];
   comments: any[];
   history: any[];
@@ -100,7 +109,7 @@ export default function ActionDetailPage() {
   const { id } = useParams<{ id: string }>();
   const qc = useQueryClient();
   const [tab, setTab] = useState(tabs[0]);
-  const [newTask, setNewTask] = useState('');
+  const [newTask, setNewTask] = useState<{ title: string; startDate: string; endDate: string; assignedToId: string }>({ title: '', startDate: '', endDate: '', assignedToId: '' });
   const [evidence, setEvidence] = useState({ title: '', url: '', description: '' });
   const [comment, setComment] = useState('');
   const [effectiveness, setEffectiveness] = useState({ effective: true, reopen: false, summary: '', evidence: '', achievedResult: '' });
@@ -110,7 +119,14 @@ export default function ActionDetailPage() {
     queryFn: () => api<ActionDetail>(`/actions/${id}`),
   });
 
+  const optionsQuery = useQuery<{ users: { id: string; name: string; email?: string }[] }>({
+    queryKey: ['actions', 'options'],
+    queryFn: () => api(`/actions/options`),
+    staleTime: 60_000,
+  });
+
   const a = query.data;
+  const users = optionsQuery.data?.users ?? [];
 
   useEffect(() => {
     if (!a) return;
@@ -135,15 +151,33 @@ export default function ActionDetailPage() {
     },
   });
   const addTask = useMutation({
-    mutationFn: () => api(`/actions/${id}/tasks`, { method: 'POST', json: { title: newTask } }),
+    mutationFn: () =>
+      api(`/actions/${id}/tasks`, {
+        method: 'POST',
+        json: {
+          title: newTask.title,
+          startDate: newTask.startDate || undefined,
+          endDate: newTask.endDate || undefined,
+          assignedToId: newTask.assignedToId || undefined,
+        },
+      }),
     onSuccess: () => {
-      setNewTask('');
+      setNewTask({ title: '', startDate: '', endDate: '', assignedToId: '' });
       qc.invalidateQueries({ queryKey: ['action', id] });
     },
+    onError: (e: any) => toast.error(e?.message ?? 'Não foi possível criar a tarefa'),
+  });
+  const updateTask = useMutation({
+    mutationFn: ({ taskId, patch }: { taskId: string; patch: Record<string, any> }) =>
+      api(`/actions/tasks/${taskId}`, { method: 'PATCH', json: patch }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['action', id] }),
+    onError: (e: any) => toast.error(e?.message ?? 'Não foi possível atualizar a tarefa'),
   });
   const toggleTask = useMutation({
-    mutationFn: ({ taskId, done }: { taskId: string; done: boolean }) => api(`/actions/tasks/${taskId}`, { method: 'PATCH', json: { done } }),
+    mutationFn: ({ taskId, done }: { taskId: string; done: boolean }) =>
+      api(`/actions/tasks/${taskId}`, { method: 'PATCH', json: { done } }),
     onSuccess: () => qc.invalidateQueries({ queryKey: ['action', id] }),
+    onError: (e: any) => toast.error(e?.message ?? 'Não foi possível atualizar a tarefa'),
   });
   const saveAnalysis = useMutation({
     mutationFn: (payload: any) => api(`/actions/${id}/analysis`, { method: 'POST', json: payload }),
@@ -251,7 +285,7 @@ export default function ActionDetailPage() {
                 <EditableText label="Resultado esperado (Impacto Esperado)" value={a.expectedResult ?? ''} onSave={(expectedResult) => update.mutate({ expectedResult })} />
               </div>
             </SectionCard>
-            <ExecutionCard a={a} newTask={newTask} setNewTask={setNewTask} addTask={addTask.mutate} toggleTask={toggleTask.mutate} />
+            <ExecutionCard a={a} users={users} newTask={newTask} setNewTask={setNewTask} addTask={addTask.mutate} toggleTask={toggleTask.mutate} updateTask={updateTask.mutate} />
           </div>
           <div className="space-y-4">
             <SectionCard title="Responsabilidade" description="Responsável, área, origem e ferramenta.">
@@ -275,7 +309,7 @@ export default function ActionDetailPage() {
       {tab === 'Origem' && <OriginTrail a={a} />}
       {tab === 'Análise de causa' && <AnalysisWorkspace action={a} onSave={saveAnalysis.mutate} saving={saveAnalysis.isPending} onAskAi={() => aiAssist.mutate('analysis')} />}
       {tab === '5W2H' && <FiveW2H action={a} onSave={saveAnalysis.mutate} saving={saveAnalysis.isPending} onAskAi={() => aiAssist.mutate('5w2h')} />}
-      {tab === 'Execução' && <ExecutionCard a={a} newTask={newTask} setNewTask={setNewTask} addTask={addTask.mutate} toggleTask={toggleTask.mutate} />}
+      {tab === 'Execução' && <ExecutionCard a={a} users={users} newTask={newTask} setNewTask={setNewTask} addTask={addTask.mutate} toggleTask={toggleTask.mutate} updateTask={updateTask.mutate} />}
       {tab === 'Evidências' && (
         <EvidencePanel a={a} evidence={evidence} setEvidence={setEvidence} addEvidence={() => addEvidence.mutate()} comment={comment} setComment={setComment} addComment={() => addComment.mutate()} />
       )}
@@ -510,21 +544,133 @@ function FiveW2H({ action, onSave, saving, onAskAi }: { action: ActionDetail; on
   );
 }
 
-function ExecutionCard({ a, newTask, setNewTask, addTask, toggleTask }: { a: ActionDetail; newTask: string; setNewTask: (v: string) => void; addTask: () => void; toggleTask: (v: { taskId: string; done: boolean }) => void }) {
+function ExecutionCard({
+  a,
+  users,
+  newTask,
+  setNewTask,
+  addTask,
+  toggleTask,
+  updateTask,
+}: {
+  a: ActionDetail;
+  users: { id: string; name: string; email?: string }[];
+  newTask: { title: string; startDate: string; endDate: string; assignedToId: string };
+  setNewTask: (v: { title: string; startDate: string; endDate: string; assignedToId: string }) => void;
+  addTask: () => void;
+  toggleTask: (v: { taskId: string; done: boolean }) => void;
+  updateTask: (v: { taskId: string; patch: Record<string, any> }) => void;
+}) {
+  const handleToggle = (t: ActionDetail['tasks'][number], next: boolean) => {
+    if (next && !t.endDate) {
+      toast.error('Informe a Data de Conclusao antes de marcar como concluida.');
+      return;
+    }
+    toggleTask({ taskId: t.id, done: next });
+  };
   return (
-    <SectionCard title={`Execucao (${a.tasks.length})`} description="Atualize tarefas, progresso e pendências.">
-      <div className="mb-3 flex gap-2">
-        <Input placeholder="Adicionar tarefa..." value={newTask} onChange={(e) => setNewTask(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && newTask && addTask()} />
-        <Button onClick={addTask} disabled={!newTask}><Plus className="h-4 w-4" /></Button>
+    <SectionCard title={`Execucao (${a.tasks.length})`} description="Cada tarefa exige Data Final para ser concluida.">
+      <div className="mb-3 grid gap-2 rounded-lg border bg-muted/30 p-3">
+        <Input
+          placeholder="Título da tarefa"
+          value={newTask.title}
+          onChange={(e) => setNewTask({ ...newTask, title: e.target.value })}
+        />
+        <div className="grid grid-cols-1 gap-2 sm:grid-cols-2 lg:grid-cols-4">
+          <div>
+            <Label className="text-[10px] uppercase text-muted-foreground">Início</Label>
+            <Input type="date" value={newTask.startDate} onChange={(e) => setNewTask({ ...newTask, startDate: e.target.value })} className="h-9" />
+          </div>
+          <div>
+            <Label className="text-[10px] uppercase text-muted-foreground">Conclusão</Label>
+            <Input type="date" value={newTask.endDate} onChange={(e) => setNewTask({ ...newTask, endDate: e.target.value })} className="h-9" />
+          </div>
+          <div className="sm:col-span-2">
+            <Label className="text-[10px] uppercase text-muted-foreground">Responsável</Label>
+            <NativeSelect
+              value={newTask.assignedToId}
+              onChange={(e) => setNewTask({ ...newTask, assignedToId: e.target.value })}
+              className="h-9"
+            >
+              <option value="">Sem responsável</option>
+              {users.map((u) => (
+                <option key={u.id} value={u.id}>{u.name}</option>
+              ))}
+            </NativeSelect>
+          </div>
+        </div>
+        <Button onClick={addTask} disabled={!newTask.title.trim()} className="w-full sm:w-auto sm:justify-self-end">
+          <Plus className="mr-2 h-4 w-4" /> Adicionar tarefa
+        </Button>
       </div>
       <div className="space-y-2">
-        {a.tasks.map((t) => (
-          <label key={t.id} className={cn('flex cursor-pointer items-center gap-3 rounded-md border p-2 text-sm hover:bg-accent/40', t.done && 'opacity-60')}>
-            <input type="checkbox" checked={t.done} onChange={(e) => toggleTask({ taskId: t.id, done: e.target.checked })} className="h-4 w-4" />
-            <span className={cn('flex-1', t.done && 'line-through')}>{t.title}</span>
-            {t.dueDate && <span className="text-xs text-muted-foreground">{formatDate(t.dueDate)}</span>}
-          </label>
-        ))}
+        {a.tasks.map((t) => {
+          const overdue = !t.done && t.endDate && new Date(t.endDate) < new Date();
+          return (
+            <div
+              key={t.id}
+              className={cn(
+                'rounded-md border p-3 text-sm',
+                t.done && 'opacity-70 bg-muted/40',
+                overdue && 'border-status-red/40',
+              )}
+            >
+              <div className="flex items-start gap-3">
+                <input
+                  type="checkbox"
+                  checked={t.done}
+                  onChange={(e) => handleToggle(t, e.target.checked)}
+                  className="mt-1 h-4 w-4 shrink-0"
+                />
+                <div className="flex-1 min-w-0">
+                  <div className={cn('font-medium', t.done && 'line-through')}>{t.title}</div>
+                  <div className="mt-2 grid grid-cols-1 gap-2 sm:grid-cols-3">
+                    <div>
+                      <Label className="text-[10px] uppercase text-muted-foreground">Início</Label>
+                      <Input
+                        type="date"
+                        defaultValue={t.startDate ? t.startDate.slice(0, 10) : ''}
+                        onBlur={(e) => {
+                          const v = e.target.value;
+                          const cur = t.startDate ? t.startDate.slice(0, 10) : '';
+                          if (v !== cur) updateTask({ taskId: t.id, patch: { startDate: v || null } });
+                        }}
+                        className="h-8"
+                      />
+                    </div>
+                    <div>
+                      <Label className="text-[10px] uppercase text-muted-foreground">Conclusão {!t.endDate && <span className="text-status-red">*</span>}</Label>
+                      <Input
+                        type="date"
+                        defaultValue={t.endDate ? t.endDate.slice(0, 10) : ''}
+                        onBlur={(e) => {
+                          const v = e.target.value;
+                          const cur = t.endDate ? t.endDate.slice(0, 10) : '';
+                          if (v !== cur) updateTask({ taskId: t.id, patch: { endDate: v || null } });
+                        }}
+                        className={cn('h-8', !t.endDate && 'border-status-red/50')}
+                      />
+                    </div>
+                    <div>
+                      <Label className="text-[10px] uppercase text-muted-foreground">Responsável</Label>
+                      <NativeSelect
+                        value={t.assignedToId ?? ''}
+                        onChange={(e) => updateTask({ taskId: t.id, patch: { assignedToId: e.target.value || null } })}
+                        className="h-8"
+                      >
+                        <option value="">Sem responsável</option>
+                        {users.map((u) => (
+                          <option key={u.id} value={u.id}>{u.name}</option>
+                        ))}
+                      </NativeSelect>
+                    </div>
+                  </div>
+                  {overdue && <div className="mt-2 text-xs text-status-red">Tarefa atrasada</div>}
+                </div>
+              </div>
+            </div>
+          );
+        })}
         {a.tasks.length === 0 && <EmptyState title="Nenhuma tarefa" description="Crie etapas de execucao para acompanhar o progresso automaticamente." className="border-dashed" />}
       </div>
     </SectionCard>

@@ -13,6 +13,7 @@ import {
   Tooltip,
   XAxis,
   YAxis,
+  Cell,
 } from 'recharts';
 import {
   AlertTriangle,
@@ -849,8 +850,19 @@ function IndicatorManagementCard({
               />
               <YAxis hide domain={[0, 'auto']} />
               <Tooltip content={<ChartTooltip />} cursor={{ fill: 'hsl(var(--muted))', opacity: 0.35 }} />
-              <Bar dataKey="meta" name="Meta" fill="hsl(var(--muted-foreground))" radius={[2, 2, 0, 0]} />
-              <Bar dataKey="realizado" name="Realizado" fill="hsl(var(--primary))" radius={[2, 2, 0, 0]} />
+              <Bar dataKey="meta" name="Meta" fill="#1e3a8a" radius={[2, 2, 0, 0]} />
+              <Bar dataKey="realizado" name="Realizado" radius={[2, 2, 0, 0]}>
+                {monthlyHistory.map((entry, index) => {
+                  let color = 'hsl(var(--status-gray))';
+                  if (entry.realizado !== null && entry.realizado !== undefined) {
+                    const isWithin = indicator.direction === 'LOWER'
+                      ? (entry.realizado ?? 0) <= (entry.meta ?? 0)
+                      : (entry.realizado ?? 0) >= (entry.meta ?? 0);
+                    color = isWithin ? '#10b981' : '#ef4444';
+                  }
+                  return <Cell key={`cell-${index}`} fill={color} />;
+                })}
+              </Bar>
             </BarChart>
           </ResponsiveContainer>
         ) : (

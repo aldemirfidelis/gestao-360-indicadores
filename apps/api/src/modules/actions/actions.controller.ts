@@ -81,15 +81,36 @@ export class ActionsController {
   addTask(
     @CurrentUser() me: AuthPayload,
     @Param('id') id: string,
-    @Body() body: { title: string; dueDate?: string },
+    @Body() body: { title: string; dueDate?: string; startDate?: string; endDate?: string; assignedToId?: string },
   ) {
-    return this.service.addTask(id, body.title, body.dueDate ? new Date(body.dueDate) : undefined, me.sub);
+    return this.service.addTask(
+      id,
+      {
+        title: body.title,
+        dueDate: body.dueDate ? new Date(body.dueDate) : undefined,
+        startDate: body.startDate ? new Date(body.startDate) : undefined,
+        endDate: body.endDate ? new Date(body.endDate) : undefined,
+        assignedToId: body.assignedToId || undefined,
+      },
+      me.sub,
+    );
   }
 
   @Patch('tasks/:taskId')
   @RequirePermissions('actions:update')
-  toggleTask(@CurrentUser() me: AuthPayload, @Param('taskId') taskId: string, @Body() body: { done: boolean }) {
-    return this.service.toggleTask(taskId, body.done, me.sub);
+  updateTask(
+    @CurrentUser() me: AuthPayload,
+    @Param('taskId') taskId: string,
+    @Body() body: { title?: string; done?: boolean; dueDate?: string | null; startDate?: string | null; endDate?: string | null; assignedToId?: string | null },
+  ) {
+    const patch: any = {};
+    if (body.title !== undefined) patch.title = body.title;
+    if (body.done !== undefined) patch.done = body.done;
+    if (body.dueDate !== undefined) patch.dueDate = body.dueDate ? new Date(body.dueDate) : null;
+    if (body.startDate !== undefined) patch.startDate = body.startDate ? new Date(body.startDate) : null;
+    if (body.endDate !== undefined) patch.endDate = body.endDate ? new Date(body.endDate) : null;
+    if (body.assignedToId !== undefined) patch.assignedToId = body.assignedToId || null;
+    return this.service.updateTask(taskId, patch, me.sub);
   }
 
   @Post(':id/analysis')
