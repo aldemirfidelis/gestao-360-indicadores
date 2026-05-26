@@ -644,34 +644,7 @@ function StrategyMapPageInner() {
     [],
   );
 
-  const handleEdgeDragStop = useCallback((edgeId: string, offsetX: number, offsetY: number) => {
-    let relation: any = null;
-    if (map) {
-      for (const obj of map.objectives) {
-        const found = obj.outRelations.find((r) => r.id === edgeId);
-        if (found) {
-          relation = found;
-          break;
-        }
-      }
-    }
-    if (!relation) return;
-    let sourceHandle = 'auto';
-    let targetHandle = 'auto';
-    const desc = relation.description ?? '';
-    if (desc && desc.includes(':')) {
-      const parts = desc.split(':');
-      sourceHandle = parts[0] || 'auto';
-      targetHandle = parts[1] || 'auto';
-    }
-    const newDesc = `${sourceHandle}:${targetHandle}:${offsetX}:${offsetY}`;
-    updateRelation.mutate({
-      relationId: edgeId,
-      kind: relation.kind || 'impacta',
-      label: relation.label || '',
-      description: newDesc,
-    });
-  }, [map, updateRelation]);
+
 
   useEffect(() => {
     if (!map) return;
@@ -890,6 +863,35 @@ function StrategyMapPageInner() {
     },
     onError: (e: any) => toast.error(e?.message ?? 'Falha ao atualizar ligacao'),
   });
+
+  const handleEdgeDragStop = useCallback((edgeId: string, offsetX: number, offsetY: number) => {
+    let relation: any = null;
+    if (map) {
+      for (const obj of map.objectives) {
+        const found = obj.outRelations.find((r) => r.id === edgeId);
+        if (found) {
+          relation = found;
+          break;
+        }
+      }
+    }
+    if (!relation) return;
+    let sourceHandle = 'auto';
+    let targetHandle = 'auto';
+    const desc = relation.description ?? '';
+    if (desc && desc.includes(':')) {
+      const parts = desc.split(':');
+      sourceHandle = parts[0] || 'auto';
+      targetHandle = parts[1] || 'auto';
+    }
+    const newDesc = `${sourceHandle}:${targetHandle}:${offsetX}:${offsetY}`;
+    updateRelation.mutate({
+      relationId: edgeId,
+      kind: relation.kind || 'impacta',
+      label: relation.label || '',
+      description: newDesc,
+    });
+  }, [map, updateRelation]);
 
   const removeRelation = useMutation({
     mutationFn: (relationId: string) => api(`/strategy/relations/${relationId}`, { method: 'DELETE' }),
