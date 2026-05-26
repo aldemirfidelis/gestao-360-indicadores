@@ -336,7 +336,6 @@ function ObjectiveNode({
         'flex h-full w-full flex-col rounded-lg border-2 p-3 shadow-md transition',
         LIGHT_CLASS[light] ?? LIGHT_CLASS.GRAY,
         (selected || data.selected) && 'ring-2 ring-primary',
-        light === 'RED' && 'animate-[pulse_3.5s_ease-in-out_infinite]',
       )}
     >
       {data.editMode && (
@@ -430,7 +429,7 @@ function StrategyEdge({
       markerEnd="url(#g360-arrow)"
       style={{
         stroke: meta.color,
-        strokeWidth: selected ? 5 : 4,
+        strokeWidth: selected ? 4.5 : 3,
         opacity: 1,
         strokeDasharray: data?.kind === 'depende' ? '8 5' : undefined,
         filter: 'drop-shadow(0 1px 1px rgba(15, 23, 42, 0.18))',
@@ -1038,8 +1037,8 @@ function StrategyMapPageInner() {
             >
               <svg width="0" height="0">
                 <defs>
-                  <marker id="g360-arrow" viewBox="0 0 12 12" markerWidth="10" markerHeight="10" refX="10" refY="6" orient="auto">
-                    <path d="M0,0 L0,12 L12,6 z" fill="currentColor" />
+                  <marker id="g360-arrow" viewBox="0 0 10 10" markerWidth="6" markerHeight="6" refX="8" refY="5" orient="auto">
+                    <path d="M0,2 L8,5 L0,8 L2,5 z" fill="currentColor" />
                   </marker>
                 </defs>
               </svg>
@@ -1873,7 +1872,7 @@ function buildNodes(
       },
       draggable: editMode,
       selectable: editMode,
-      style: { width, height: Math.max(height - 20, 130), zIndex: 0 },
+      style: { width, height: Math.max(height - 20, 130), zIndex: -1 },
       width,
       height,
     } satisfies Node;
