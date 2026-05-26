@@ -605,17 +605,17 @@ function StrategyMapPageInner() {
 
   useEffect(() => {
     if (!fullscreen && document.fullscreenElement) {
-      document.exitFullscreen().catch(() => {});
+      document.exitFullscreen().catch(() => { });
     }
   }, [fullscreen]);
 
   function toggleFullscreen() {
     if (!canvasRef.current) return;
     if (document.fullscreenElement) {
-      document.exitFullscreen().catch(() => {});
+      document.exitFullscreen().catch(() => { });
       setFullscreen(false);
     } else {
-      canvasRef.current.requestFullscreen().then(() => setFullscreen(true)).catch(() => {});
+      canvasRef.current.requestFullscreen().then(() => setFullscreen(true)).catch(() => { });
     }
   }
 
@@ -849,7 +849,7 @@ function StrategyMapPageInner() {
     if (!editingRelation) return;
     setEditingEdgeKind(editingRelation.kind ?? 'impacta');
     setEditingEdgeLabel(editingRelation.label ?? '');
-    
+
     const desc = (editingRelation as any).description ?? '';
     if (desc && desc.includes(':')) {
       const parts = desc.split(':');
@@ -859,7 +859,7 @@ function StrategyMapPageInner() {
       setEditingEdgeSourceHandle('auto');
       setEditingEdgeTargetHandle('auto');
     }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [editingRelation?.id]);
 
   if (mapQuery.isLoading) return <p className="text-sm text-muted-foreground">Carregando mapa estratégico...</p>;

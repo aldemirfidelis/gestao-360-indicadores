@@ -149,4 +149,57 @@ export class StrategyController {
   createVersion(@CurrentUser() me: AuthPayload, @Param('id') id: string, @Body() body: any) {
     return this.service.createVersion(me, id, body);
   }
+
+  @Get('organograma')
+  getOrganograma(@CurrentUser() me: AuthPayload) {
+    return this.service.getOrganograma(me.companyId);
+  }
+
+  @Post('jobs')
+  @RequirePermissions('strategy:links:manage')
+  createJob(@CurrentUser() me: AuthPayload, @Body() body: any) {
+    return this.service.createJob(me, body);
+  }
+
+  @Patch('jobs/:id')
+  @RequirePermissions('strategy:links:manage')
+  updateJob(@CurrentUser() me: AuthPayload, @Param('id') id: string, @Body() body: any) {
+    return this.service.updateJob(me, id, body);
+  }
+
+  @Delete('jobs/:id')
+  @RequirePermissions('strategy:links:manage')
+  removeJob(@CurrentUser() me: AuthPayload, @Param('id') id: string) {
+    return this.service.removeJob(me, id);
+  }
+
+  @Post('employees')
+  @RequirePermissions('strategy:links:manage')
+  createEmployee(@CurrentUser() me: AuthPayload, @Body() body: any) {
+    return this.service.createEmployee(me, body);
+  }
+
+  @Patch('employees/:id')
+  @RequirePermissions('strategy:links:manage')
+  updateEmployee(@CurrentUser() me: AuthPayload, @Param('id') id: string, @Body() body: any) {
+    return this.service.updateEmployee(me, id, body);
+  }
+
+  @Delete('employees/:id')
+  @RequirePermissions('strategy:links:manage')
+  removeEmployee(@CurrentUser() me: AuthPayload, @Param('id') id: string) {
+    return this.service.removeEmployee(me, id);
+  }
+
+  @Post('career-paths')
+  @RequirePermissions('strategy:links:manage')
+  createCareerPath(@CurrentUser() me: AuthPayload, @Body() body: any) {
+    return this.service.createCareerPath(me, body);
+  }
+
+  @Delete('career-paths/:id')
+  @RequirePermissions('strategy:links:manage')
+  removeCareerPath(@CurrentUser() me: AuthPayload, @Param('id') id: string) {
+    return this.service.removeCareerPath(me, id);
+  }
 }

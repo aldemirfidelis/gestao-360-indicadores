@@ -493,6 +493,9 @@ model Company {
   statusHistories     StatusHistory[]
   relationshipMaps    RelationshipMap[]
   treatmentCases      TreatmentCase[]
+  orgJobs             OrgJob[]
+  orgEmployees        OrgEmployee[]
+  orgJobCareerPaths   OrgJobCareerPath[]
   emailLogs           EmailLog[]
   calendarInvites     CalendarInvite[]
   workPeriods         WorkPeriod[]
@@ -574,6 +577,7 @@ model OrgNode {
   actions             ActionPlan[]  @relation("ActionOwnerNode")
   strategicObjectives StrategicObjective[] @relation("StrategicObjectiveOwnerNode")
   strategicObjectiveLinks StrategicObjectiveOrgNode[]
+  orgEmployees        OrgEmployee[]
 
   @@index([companyId])
   @@index([parentId])
@@ -1950,4 +1954,59 @@ model ParameterItem {
   @@index([companyId, status])
   @@index([categoryId, status])
   @@index([parentId])
+}
+
+model OrgJob {
+  id          String   @id @default(uuid())
+  companyId   String
+  company     Company  @relation(fields: [companyId], references: [id])
+  name        String
+  description String?
+  active      Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  employees   OrgEmployee[]
+  fromPaths   OrgJobCareerPath[] @relation("JobFrom")
+  toPaths     OrgJobCareerPath[] @relation("JobTo")
+
+  @@index([companyId])
+}
+
+model OrgEmployee {
+  id             String      @id @default(uuid())
+  companyId      String
+  company        Company     @relation(fields: [companyId], references: [id])
+  orgNodeId      String?     
+  orgNode        OrgNode?    @relation(fields: [orgNodeId], references: [id])
+  registrationId String?     
+  name           String
+  jobId          String
+  job            OrgJob      @relation(fields: [jobId], references: [id])
+  band           String      @default("B") 
+  shift          String      @default("D") 
+  isBudgeted     Boolean     @default(true) 
+  status         String      @default("ACTIVE") 
+  createdAt      DateTime    @default(now())
+  updatedAt      DateTime    @updatedAt
+
+  @@index([companyId])
+  @@index([orgNodeId])
+}
+
+model OrgJobCareerPath {
+  id             String   @id @default(uuid())
+  companyId      String
+  company        Company  @relation(fields: [companyId], references: [id])
+  fromJobId      String
+  toJobId        String
+  fromJob        OrgJob   @relation("JobFrom", fields: [fromJobId], references: [id], onDelete: Cascade)
+  toJob          OrgJob   @relation("JobTo", fields: [toJobId], references: [id], onDelete: Cascade)
+  sourceHandle   String?  @default("right")
+  targetHandle   String?  @default("left")
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  @@unique([fromJobId, toJobId])
+  @@index([companyId])
 }

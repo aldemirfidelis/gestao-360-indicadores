@@ -758,6 +758,150 @@ export class StrategyService {
     if (!exists) throw new NotFoundException('Responsável nao encontrado para esta empresa');
   }
 
+  async getOrganograma(companyId: string) {
+    let jobs = await this.prisma.orgJob.findMany({
+      where: { companyId, active: true },
+      orderBy: { name: 'asc' },
+    });
+
+    if (jobs.length === 0) {
+      const createdJobs = await Promise.all([
+        this.prisma.orgJob.create({ data: { companyId, name: 'Gestor de Pessoas', description: 'Liderança de Recursos Humanos' } }),
+        this.prisma.orgJob.create({ data: { companyId, name: 'Gestor Administrativo Pl', description: 'Remuneração e orçamentos' } }),
+        this.prisma.orgJob.create({ data: { companyId, name: 'Gestor Administrativo Jr', description: 'Suporte operacional do setor' } }),
+        this.prisma.orgJob.create({ data: { companyId, name: 'Coordenador Adm Sr', description: 'Coordenação e planejamento administrativo' } }),
+        this.prisma.orgJob.create({ data: { companyId, name: 'Analista Sr', description: 'Análise de cargos, salários e planos' } }),
+      ]);
+
+      const [gPessoas, gAdmPl, gAdmJr, coordSr, analistaSr] = createdJobs;
+      const firstNode = await this.prisma.orgNode.findFirst({ where: { companyId, active: true } });
+      const nodeId = firstNode?.id ?? null;
+
+      await Promise.all([
+        this.prisma.orgEmployee.create({ data: { companyId, orgNodeId: nodeId, name: 'Victor Rafael de Assis Claudino', jobId: gPessoas.id, registrationId: '945870', band: 'A', shift: 'D', isBudgeted: true } }),
+        this.prisma.orgEmployee.create({ data: { companyId, orgNodeId: nodeId, name: 'Marcos Dias Moreira Junior', jobId: gAdmPl.id, registrationId: '943914', band: 'B', shift: 'D', isBudgeted: true } }),
+        this.prisma.orgEmployee.create({ data: { companyId, orgNodeId: nodeId, name: 'Jailson Moreira Pimentel', jobId: gAdmJr.id, registrationId: '945951', band: 'A', shift: 'A', isBudgeted: true } }),
+        this.prisma.orgEmployee.create({ data: { companyId, orgNodeId: nodeId, name: 'Ana Paula Rodrigues', jobId: coordSr.id, registrationId: '926331', band: 'C', shift: 'D', isBudgeted: true } }),
+        this.prisma.orgEmployee.create({ data: { companyId, orgNodeId: nodeId, name: 'Aline Jeronimo de Lima', jobId: coordSr.id, registrationId: '947296', band: 'B', shift: 'D', isBudgeted: true } }),
+        this.prisma.orgEmployee.create({ data: { companyId, orgNodeId: nodeId, name: 'Debora Duarte Ferreira Naves', jobId: analistaSr.id, registrationId: '943395', band: 'B', shift: 'D', isBudgeted: true } }),
+        this.prisma.orgEmployee.create({ data: { companyId, orgNodeId: nodeId, name: 'Vaga - Segurança Patrimonial', jobId: gAdmJr.id, registrationId: null, band: 'B', shift: 'B', isBudgeted: false, status: 'VACANT' } }),
+      ]);
+
+      await Promise.all([
+        this.prisma.orgJobCareerPath.create({ data: { companyId, fromJobId: gAdmJr.id, toJobId: gAdmPl.id } }),
+        this.prisma.orgJobCareerPath.create({ data: { companyId, fromJobId: gAdmPl.id, toJobId: gPessoas.id } }),
+        this.prisma.orgJobCareerPath.create({ data: { companyId, fromJobId: analistaSr.id, toJobId: coordSr.id } }),
+      ]);
+
+      jobs = await this.prisma.orgJob.findMany({
+        where: { companyId, active: true },
+        orderBy: { name: 'asc' },
+      });
+    }
+
+    const [employees, careerPaths] = await Promise.all([
+      this.prisma.orgEmployee.findMany({
+        where: { companyId },
+        include: { job: true, orgNode: true },
+        orderBy: { name: 'asc' },
+      }),
+      this.prisma.orgJobCareerPath.findMany({
+        where: { companyId },
+        include: { fromJob: true, toJob: true },
+      }),
+    ]);
+
+    return { jobs, employees, careerPaths };
+  }
+
+  async createJob(me: AuthPayload, body: { name: string; description?: string }) {
+    return this.prisma.orgJob.create({
+      data: {
+        companyId: me.companyId,
+        name: body.name,
+        description: body.description ?? null,
+      },
+    });
+  }
+
+  async updateJob(me: AuthPayload, id: string, body: { name?: string; description?: string }) {
+    return this.prisma.orgJob.update({
+      where: { id },
+      data: {
+        name: body.name,
+        description: body.description,
+      },
+    });
+  }
+
+  async removeJob(me: AuthPayload, id: string) {
+    return this.prisma.orgJob.update({
+      where: { id },
+      data: { active: false },
+    });
+  }
+
+  async createEmployee(me: AuthPayload, body: { name: string; jobId: string; orgNodeId?: string; registrationId?: string; band?: string; shift?: string; isBudgeted?: boolean; status?: string }) {
+    return this.prisma.orgEmployee.create({
+      data: {
+        companyId: me.companyId,
+        name: body.name,
+        jobId: body.jobId,
+        orgNodeId: body.orgNodeId || null,
+        registrationId: body.registrationId || null,
+        band: body.band || 'B',
+        shift: body.shift || 'D',
+        isBudgeted: body.isBudgeted ?? true,
+        status: body.status || 'ACTIVE',
+      },
+    });
+  }
+
+  async updateEmployee(me: AuthPayload, id: string, body: { name?: string; jobId?: string; orgNodeId?: string; registrationId?: string; band?: string; shift?: string; isBudgeted?: boolean; status?: string }) {
+    return this.prisma.orgEmployee.update({
+      where: { id },
+      data: {
+        name: body.name,
+        jobId: body.jobId,
+        orgNodeId: body.orgNodeId === undefined ? undefined : (body.orgNodeId || null),
+        registrationId: body.registrationId,
+        band: body.band,
+        shift: body.shift,
+        isBudgeted: body.isBudgeted,
+        status: body.status,
+      },
+    });
+  }
+
+  async removeEmployee(me: AuthPayload, id: string) {
+    return this.prisma.orgEmployee.delete({
+      where: { id },
+    });
+  }
+
+  async createCareerPath(me: AuthPayload, body: { fromJobId: string; toJobId: string; sourceHandle?: string; targetHandle?: string }) {
+    return this.prisma.orgJobCareerPath.upsert({
+      where: { fromJobId_toJobId: { fromJobId: body.fromJobId, toJobId: body.toJobId } },
+      create: {
+        companyId: me.companyId,
+        fromJobId: body.fromJobId,
+        toJobId: body.toJobId,
+        sourceHandle: body.sourceHandle || 'right',
+        targetHandle: body.targetHandle || 'left',
+      },
+      update: {
+        sourceHandle: body.sourceHandle,
+        targetHandle: body.targetHandle,
+      },
+    });
+  }
+
+  async removeCareerPath(me: AuthPayload, id: string) {
+    return this.prisma.orgJobCareerPath.delete({
+      where: { id },
+    });
+  }
+
   private async audit(me: AuthPayload, action: string, entity: string, entityId: string, beforeValue: unknown, afterValue: unknown, recordLabel?: string | null) {
     await this.prisma.auditLog.create({
       data: {
