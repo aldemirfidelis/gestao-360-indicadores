@@ -13,6 +13,7 @@ import {
   Clock,
   LayoutDashboard,
   LineChart,
+  Plus,
   Target,
   Zap,
   Settings,
@@ -287,11 +288,21 @@ export default function HomePage() {
               </Button>
             );
           })}
-          {selectedShortcuts.length === 0 && (
-            <div className="col-span-2 py-6 text-center text-sm text-muted-foreground border border-dashed rounded-lg">
-              Nenhum atalho selecionado. Clique em &quot;Configurar&quot; para adicionar seus atalhos personalizados.
-            </div>
-          )}
+          <button
+            type="button"
+            onClick={() => setIsConfigOpen(true)}
+            className={cn(
+              'group flex h-14 items-center justify-center gap-2 rounded-md border border-dashed text-sm text-muted-foreground transition hover:border-primary hover:bg-primary/5 hover:text-primary',
+              selectedShortcuts.length === 0 && 'col-span-2',
+            )}
+          >
+            <span className="grid h-8 w-8 place-items-center rounded-md bg-muted text-muted-foreground transition group-hover:bg-primary/10 group-hover:text-primary">
+              <Plus className="h-4 w-4" />
+            </span>
+            <span className="font-medium">
+              {selectedShortcuts.length === 0 ? 'Adicionar seu primeiro atalho' : 'Adicionar atalho'}
+            </span>
+          </button>
         </SectionCard>
 
         <SectionCard title="Alertas importantes" description="Itens que merecem acompanhamento.">
