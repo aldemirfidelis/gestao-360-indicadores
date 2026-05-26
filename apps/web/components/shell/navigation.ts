@@ -57,7 +57,7 @@ export const navSections: NavSection[] = [
     items: [
       { href: '/', label: 'Visão Geral', description: 'Resumo, pendências e atalhos', icon: Home, permissions: ['dashboard:view'], exact: true },
       { href: '/visualization', label: 'Dashboard Executivo', description: 'Visão 360 para decisão', icon: BarChart3, permissions: ['dashboard:view'] },
-      { href: '/org', label: 'Árvore Organizacional', description: 'Áreas macros, micros, pilares e diretrizes', icon: Network, permissions: ['org:view'] },
+      { href: '/org', label: 'Árvore Organizacional', description: 'Áreas, setores, pilares e diretrizes', icon: Network, permissions: ['org:view'] },
       { href: '/strategy', label: 'Mapa Estratégico', description: 'Perspectivas, objetivos e impactos', icon: Map, permissions: ['strategy:view'] },
       { href: '/indicators', label: 'Indicadores', description: 'Farol, ranking e histórico', icon: Target, permissions: ['indicators:view'], exact: true },
       { href: '/projects', label: 'Cronogramas', description: 'Projetos, marcos e tarefas', icon: FolderKanban, permissions: ['projects:view'] },
@@ -73,8 +73,8 @@ export const navSections: NavSection[] = [
       { href: '/launches', label: 'Central de Lançamentos', description: 'Entrada rápida de dados', icon: PencilLine, permissions: ['launches:view', 'results:launch'] },
       { href: '/results', label: 'Lançar Resultado', description: 'Realizado mensal dos indicadores', icon: LineChart, permissions: ['results:launch'] },
       { href: '/indicators?new=1', label: 'Criar Indicador', description: 'Cadastro de KPI e meta na central de indicadores', icon: Target, permissions: ['indicators:create'] },
-      { href: '/org?create=macro', label: 'Criar Área Macro', description: 'Novo nível macro na árvore', icon: Building2, permissions: ['org:manage'] },
-      { href: '/org?create=micro', label: 'Criar Área Micro', description: 'Subnível vinculado à área macro', icon: Network, permissions: ['org:manage'] },
+      { href: '/org?create=macro', label: 'Criar Área', description: 'Novo nível de área na árvore', icon: Building2, permissions: ['org:manage'] },
+      { href: '/org?create=micro', label: 'Criar Setor', description: 'Setor vinculado à área', icon: Network, permissions: ['org:manage'] },
       { href: '/org?create=pilar', label: 'Criar Pilar', description: 'Pilar para organizar os indicadores', icon: Building2, permissions: ['org:manage'] },
       { href: '/org?create=guideline', label: 'Criar Diretriz', description: 'Diretriz dentro da árvore organizacional', icon: GitBranch, permissions: ['org:manage', 'strategy:manage'] },
       { href: '/deviations', label: 'Criar Análise de Causa', description: 'Desvios, FCA e tratativas', icon: AlertTriangle, permissions: ['deviations:manage'] },
@@ -87,7 +87,7 @@ export const navSections: NavSection[] = [
     intent: 'management',
     icon: Building2,
     items: [
-      { href: '/org', label: 'Estrutura Organizacional', description: 'Empresas, áreas macros, micros, pilares e diretrizes', icon: Building2, permissions: ['org:manage'] },
+      { href: '/org', label: 'Estrutura Organizacional', description: 'Empresas, áreas, setores, pilares e diretrizes', icon: Building2, permissions: ['org:manage'] },
       { href: '/periods', label: 'Períodos', description: 'Ano de trabalho, abertura e fechamento anual', icon: Calendar, permissions: ['settings:manage'] },
       { href: '/strategy', label: 'Objetivos Estratégicos', description: 'Mapas, perspectivas e objetivos', icon: Crosshair, permissions: ['strategy:manage', 'strategy:objectives:update'] },
       { href: '/actions', label: 'Plano de Ação', description: 'Ações, execução, evidências e eficácia', icon: ClipboardList, permissions: ['actions:view'] },

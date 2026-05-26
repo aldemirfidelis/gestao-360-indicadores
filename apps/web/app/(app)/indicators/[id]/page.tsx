@@ -219,7 +219,7 @@ export default function IndicatorDetailPage() {
         <span className="font-semibold text-muted-foreground">Hierarquia integrada:</span>
         <span className="font-medium text-foreground">{ind.company?.name ?? 'Empresa'}</span>
         <span className="text-muted-foreground/60">&rarr;</span>
-        <span className="font-medium text-foreground">{ind.areaMacro?.name ?? 'Sem Área Macro'}</span>
+        <span className="font-medium text-foreground">{ind.areaMacro?.name ?? 'Sem Área'}</span>
         {ind.areaMicro && (
           <>
             <span className="text-muted-foreground/60">&rarr;</span>

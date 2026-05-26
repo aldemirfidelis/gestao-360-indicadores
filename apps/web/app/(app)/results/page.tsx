@@ -293,7 +293,7 @@ export default function ResultsPage() {
 
       <SectionCard
         title="Aba de lançamento"
-        description="Escolha a área macro, expanda a área micro e lance ou ajuste o resultado em qualquer período do ano."
+        description="Escolha a área, expanda o setor e lance ou ajuste o resultado em qualquer período do ano."
         contentClassName="p-0"
       >
         <div className="grid grid-cols-1 xl:grid-cols-[360px,1fr]">
@@ -311,7 +311,7 @@ export default function ResultsPage() {
                   disabled={query.isLoading || orgTree.isLoading || areaGroups.length === 0}
                 >
                   <option value="" disabled>
-                    Selecione uma área macro
+                    Selecione uma área
                   </option>
                   {areaGroups.map((área) => (
                     <option key={área.id} value={área.id}>

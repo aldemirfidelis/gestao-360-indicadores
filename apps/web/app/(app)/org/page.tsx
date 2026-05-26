@@ -92,27 +92,23 @@ const ICONS: Record<string, any> = {
 };
 
 const TYPE_LABEL: Record<string, string> = {
-  COMPANY: 'Empresa / Valores',
-  BRANCH: 'Filial / Unidade',
+  COMPANY: 'Empresa',
+  SECTOR: 'Área',
+  AREA: 'Setor',
+  BRANCH: 'Filial',
   UNIT: 'Pilar',
   DIRECTORATE: 'Diretriz',
-  MANAGEMENT: 'Gerência / Gestão',
-  COORDINATION: 'Coordenação / Setor',
-  SECTOR: 'Área Macro',
-  AREA: 'Área Micro',
-  PROCESS: 'Processo / Indicadores',
+  PROCESS: 'Processo',
 };
 
 const TYPE_OPTIONS = [
-  ['COMPANY', 'Empresa / Valores'],
-  ['SECTOR', 'Área Macro'],
-  ['AREA', 'Área Micro'],
+  ['COMPANY', 'Empresa'],
+  ['SECTOR', 'Área'],
+  ['AREA', 'Setor'],
+  ['BRANCH', 'Filial'],
   ['UNIT', 'Pilar'],
   ['DIRECTORATE', 'Diretriz'],
-  ['PROCESS', 'Processo / Indicadores'],
-  ['BRANCH', 'Filial / Unidade'],
-  ['MANAGEMENT', 'Gerência / Gestão'],
-  ['COORDINATION', 'Coordenação / Setor'],
+  ['PROCESS', 'Processo'],
 ] as const;
 
 const emptyNode = {
@@ -233,8 +229,8 @@ export default function OrgPage() {
         : createMode === 'pilar'
           ? 'Novo pilar'
           : createMode === 'micro'
-            ? 'Nova área micro'
-            : 'Nova área macro';
+            ? 'Novo setor'
+            : 'Nova área';
     setForm({
       ...emptyNode,
       name: '',

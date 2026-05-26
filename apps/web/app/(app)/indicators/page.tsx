@@ -393,7 +393,7 @@ export default function IndicatorsPage() {
     mutationFn: () => {
       const ownerNodeId = form.areaMicroId || form.areaMacroId || form.ownerNodeId;
       if (!form.name.trim()) throw new Error('Informe o nome do indicador');
-      if (!ownerNodeId) throw new Error('Selecione a área macro ou micro');
+      if (!ownerNodeId) throw new Error('Selecione a área ou setor');
       if (!form.unit) throw new Error('Selecione a unidade de medida');
       if (!form.periodicity) throw new Error('Selecione a periodicidade');
       const payload = {
@@ -551,7 +551,7 @@ export default function IndicatorsPage() {
             </NativeSelect>
           </div>
           <div>
-            <Label>Área Macro</Label>
+            <Label>Área</Label>
             <NativeSelect value={filters.areaMacroId} onChange={(e) => setFilters((prev) => ({ ...prev, areaMacroId: e.target.value, areaMicroId: '' }))}>
               <option value="">Todas</option>
               {macroOptions.map((node) => (
@@ -560,7 +560,7 @@ export default function IndicatorsPage() {
             </NativeSelect>
           </div>
           <div>
-            <Label>Área Micro</Label>
+            <Label>Setor</Label>
             <NativeSelect value={filters.areaMicroId} onChange={(e) => setFilters((prev) => ({ ...prev, areaMicroId: e.target.value }))}>
               <option value="">Todas</option>
               {filterMicroOptions.map((node) => (
@@ -1020,7 +1020,7 @@ function IndicatorFormDialog({
               ))}
             </NativeSelect>
           </Field>
-          <Field label="Área Macro" required>
+          <Field label="Área" required>
             <NativeSelect value={form.areaMacroId} onChange={(e) => patchForm(setForm, { areaMacroId: e.target.value, areaMicroId: '' })}>
               <option value="">Selecione</option>
               {macroOptions.map((node) => (
@@ -1028,9 +1028,9 @@ function IndicatorFormDialog({
               ))}
             </NativeSelect>
           </Field>
-          <Field label="Área Micro">
+          <Field label="Setor">
             <NativeSelect value={form.areaMicroId} onChange={(e) => patchForm(setForm, { areaMicroId: e.target.value })}>
-              <option value="">Usar área macro</option>
+              <option value="">Usar área</option>
               {microOptions.map((node) => (
                 <option key={node.id} value={node.id}>{node.name}</option>
               ))}
@@ -1157,8 +1157,8 @@ function IndicatorViewDialog({ indicator, onOpenChange }: { indicator: Indicator
           <div className="space-y-5">
             <div className="grid gap-3 md:grid-cols-3">
               <Info label="Empresa" value={indicator.company.tradeName || indicator.company.name} />
-              <Info label="Área Macro" value={indicator.areaMacro?.name} />
-              <Info label="Área Micro" value={indicator.areaMicro?.name ?? indicator.ownerNode.name} />
+              <Info label="Área" value={indicator.areaMacro?.name} />
+              <Info label="Setor" value={indicator.areaMicro?.name ?? indicator.ownerNode.name} />
               <Info label="Diretriz" value={indicator.guidelineNode?.name ?? '-'} />
               <Info label="Objetivo estratégico" value={indicator.strategicObjective?.name ?? '-'} />
               <Info label="Responsável" value={indicator.responsibleUser?.name ?? 'Sem responsável'} />
@@ -1353,7 +1353,7 @@ function historyActionLabel(action: string) {
 }
 
 function exportCsv(rows: IndicatorRow[]) {
-  const header = ['Nome', 'Código', 'Empresa', 'Área Macro', 'Área Micro', 'Responsável', 'Meta Atual', 'Realizado Atual', 'Status'];
+  const header = ['Nome', 'Código', 'Empresa', 'Área', 'Setor', 'Responsável', 'Meta Atual', 'Realizado Atual', 'Status'];
   const lines = rows.map((row) => [
     row.name,
     row.code ?? '',
