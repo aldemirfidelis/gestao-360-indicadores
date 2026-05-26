@@ -36,6 +36,8 @@ import {
   FileSpreadsheet,
   ArrowRight,
   Sparkles,
+  ChevronDown,
+  ChevronRight,
 } from 'lucide-react';
 import { PageHeader } from '@/components/shell/page-header';
 import { SectionCard } from '@/components/platform/section-card';
@@ -77,9 +79,11 @@ interface OrgEmployee {
   orgNodeId: string | null;
   orgNode: OrgNode | null;
   band: string; // A, B, C
+  bandPretended: string; // A, B, C
   shift: string; // A, B, C, D
   isBudgeted: boolean;
   status: string; // ACTIVE, VACANT
+  approvalStatus: string; // PENDENTE, APROVADO, REPROVADO, EM_ANALISE
 }
 
 interface OrgJobCareerPath {
@@ -213,13 +217,24 @@ function CareerPathEdge({
   );
 }
 
-const nodeTypes = { jobRole: JobRoleNode };
+function AreaGroupNode({ data }: NodeProps<{ label: string }>) {
+  return (
+    <div className="h-full w-full rounded-2xl border-2 border-dashed border-emerald-600/30 bg-emerald-600/5 p-4 relative shadow-inner">
+      <div className="absolute top-2 left-4 text-[10px] font-black uppercase tracking-wider text-emerald-800 dark:text-emerald-300 bg-emerald-100 dark:bg-emerald-950 px-2 py-0.5 rounded-md border border-emerald-300">
+        Perspectiva: {data.label}
+      </div>
+    </div>
+  );
+}
+
+const nodeTypes = { jobRole: JobRoleNode, areaGroup: AreaGroupNode };
 const edgeTypes = { strategy: CareerPathEdge };
 
 function OrganogramaInner() {
   const qc = useQueryClient();
   const [viewMode, setViewMode] = useState<'excel' | 'canvas'>('excel');
   const [selectedAreaId, setSelectedAreaId] = useState<string>('');
+  const [expandedAreas, setExpandedAreas] = useState<Record<string, boolean>>({});
   
   // States for CRUD modals
   const [jobModalOpen, setJobModalOpen] = useState(false);
@@ -233,10 +248,13 @@ function OrganogramaInner() {
   const [employeeName, setEmployeeName] = useState('');
   const [employeeRegistration, setEmployeeRegistration] = useState('');
   const [employeeBand, setEmployeeBand] = useState('A');
+  const [employeeBandPretended, setEmployeeBandPretended] = useState('B');
   const [employeeShift, setEmployeeShift] = useState('D');
   const [employeeIsBudgeted, setEmployeeIsBudgeted] = useState(true);
   const [employeeStatus, setEmployeeStatus] = useState('ACTIVE');
+  const [employeeApprovalStatus, setEmployeeApprovalStatus] = useState('PENDENTE');
   const [employeeAreaId, setEmployeeAreaId] = useState('');
+  const [employeeNewAreaName, setEmployeeNewAreaName] = useState('');
 
   // Canvas States
   const [nodes, setNodes, onNodesChange] = useNodesState([]);
@@ -261,9 +279,21 @@ function OrganogramaInner() {
     return orgNodes.filter(n => n.type === 'SECTOR' || n.type === 'AREA');
   }, [orgNodes]);
 
+  // Expand all by default
+  useEffect(() => {
+    if (areasAndSectors.length > 0) {
+      const initial: Record<string, boolean> = { 'unlinked': true };
+      areasAndSectors.forEach(a => {
+        initial[a.id] = true;
+      });
+      setExpandedAreas(prev => ({ ...initial, ...prev }));
+    }
+  }, [areasAndSectors]);
+
   // MUTATIONS
   const invalidate = () => {
     qc.invalidateQueries({ queryKey: ['strategy', 'organograma'] });
+    qc.invalidateQueries({ queryKey: ['strategy', 'options'] });
   };
 
   const createJob = useMutation({
@@ -291,6 +321,15 @@ function OrganogramaInner() {
     onError: (e: any) => toast.error(e?.message ?? 'Falha ao alocar colaborador'),
   });
 
+  const updateEmployee = useMutation({
+    mutationFn: ({ id, ...body }: { id: string; name?: string; jobId?: string; orgNodeId?: string; registrationId?: string | null; band?: string; bandPretended?: string; shift?: string; isBudgeted?: boolean; status?: string; approvalStatus?: string }) =>
+      api(`/strategy/employees/${id}`, { method: 'PATCH', json: body }),
+    onSuccess: () => {
+      invalidate();
+    },
+    onError: (e: any) => toast.error(e?.message ?? 'Falha ao atualizar dados'),
+  });
+
   const removeEmployee = useMutation({
     mutationFn: (id: string) =>
       api(`/strategy/employees/${id}`, { method: 'DELETE' }),
@@ -309,23 +348,17 @@ function OrganogramaInner() {
     },
   });
 
-  const removeCareerPath = useMutation({
-    mutationFn: (id: string) =>
-      api(`/strategy/career-paths/${id}`, { method: 'DELETE' }),
-    onSuccess: () => {
-      toast.success('Caminho de desenvolvimento removido');
-      invalidate();
-    },
-  });
-
   const resetEmployeeForm = () => {
     setEmployeeName('');
     setEmployeeRegistration('');
     setEmployeeBand('A');
+    setEmployeeBandPretended('B');
     setEmployeeShift('D');
     setEmployeeIsBudgeted(true);
     setEmployeeStatus('ACTIVE');
+    setEmployeeApprovalStatus('PENDENTE');
     setEmployeeAreaId(selectedAreaId);
+    setEmployeeNewAreaName('');
   };
 
   // Filtered lists based on Selected Area/Sector
@@ -346,45 +379,138 @@ function OrganogramaInner() {
     };
   }, [filteredEmployees]);
 
-  // BUILD REACT FLOW NODES & EDGES
+  // BUILD REACT FLOW NODES & EDGES (With lanes/perspectives)
   useEffect(() => {
     if (!data) return;
 
-    // Calculate node coordinates by grouping them vertically or in hierarchy
-    const flowNodes: Node[] = data.jobs.map((job, index) => {
-      const jobEmployees = filteredEmployees.filter(emp => emp.jobId === job.id);
-      return {
-        id: job.id,
-        type: 'jobRole',
-        data: { job, employees: jobEmployees, editMode: true },
-        position: { x: 50 + (index % 3) * 320, y: 50 + Math.floor(index / 3) * 280 },
-      };
+    const flowNodes: Node[] = [];
+    const flowEdges: Edge[] = [];
+
+    const activeAreas = areasAndSectors.filter(area => 
+      data.employees.some(e => e.orgNodeId === area.id)
+    );
+
+    let currentX = 50;
+    activeAreas.forEach((area) => {
+      const areaEmployees = data.employees.filter(e => e.orgNodeId === area.id);
+      const areaJobIds = Array.from(new Set(areaEmployees.map(e => e.jobId)));
+      const areaJobs = data.jobs.filter(j => areaJobIds.includes(j.id));
+
+      if (areaJobs.length === 0) return;
+
+      const cols = 2;
+      const rows = Math.ceil(areaJobs.length / cols);
+      const laneWidth = 660;
+      const laneHeight = 80 + rows * 260;
+
+      flowNodes.push({
+        id: `group-${area.id}`,
+        type: 'areaGroup',
+        data: { label: area.name },
+        position: { x: currentX, y: 50 },
+        style: { width: laneWidth, height: laneHeight },
+        selectable: false,
+        draggable: true,
+      });
+
+      areaJobs.forEach((job, jobIdx) => {
+        const jobEmployees = areaEmployees.filter(e => e.jobId === job.id);
+        const col = jobIdx % cols;
+        const row = Math.floor(jobIdx / cols);
+
+        flowNodes.push({
+          id: `${area.id}-${job.id}`,
+          parentId: `group-${area.id}`,
+          type: 'jobRole',
+          data: { job, employees: jobEmployees, editMode: true },
+          position: { x: 30 + col * 310, y: 80 + row * 240 },
+          extent: 'parent',
+        });
+      });
+
+      currentX += laneWidth + 100;
     });
 
-    const flowEdges: Edge[] = data.careerPaths.map((path) => ({
-      id: path.id,
-      source: path.fromJobId,
-      target: path.toJobId,
-      type: 'strategy',
-      sourceHandle: path.sourceHandle ?? 'right',
-      targetHandle: path.targetHandle ?? 'left',
-    }));
+    // Unlinked jobs
+    const unlinkedEmployees = data.employees.filter(e => !e.orgNodeId);
+    const unlinkedJobIds = Array.from(new Set(unlinkedEmployees.map(e => e.jobId)));
+    const remainingJobs = data.jobs.filter(j => 
+      !data.employees.some(e => e.jobId === j.id) || unlinkedJobIds.includes(j.id)
+    );
+
+    if (remainingJobs.length > 0) {
+      const cols = 2;
+      const rows = Math.ceil(remainingJobs.length / cols);
+      const laneWidth = 660;
+      const laneHeight = 80 + rows * 260;
+
+      flowNodes.push({
+        id: 'group-unlinked',
+        type: 'areaGroup',
+        data: { label: 'Sem Área Definida' },
+        position: { x: currentX, y: 50 },
+        style: { width: laneWidth, height: laneHeight },
+        selectable: false,
+        draggable: true,
+      });
+
+      remainingJobs.forEach((job, jobIdx) => {
+        const jobEmployees = unlinkedEmployees.filter(e => e.jobId === job.id);
+        const col = jobIdx % cols;
+        const row = Math.floor(jobIdx / cols);
+
+        flowNodes.push({
+          id: `unlinked-${job.id}`,
+          parentId: 'group-unlinked',
+          type: 'jobRole',
+          data: { job, employees: jobEmployees, editMode: true },
+          position: { x: 30 + col * 310, y: 80 + row * 240 },
+          extent: 'parent',
+        });
+      });
+    }
+
+    // Connectors
+    data.careerPaths.forEach((path) => {
+      const sourceNodes = flowNodes.filter(n => n.id.endsWith(`-${path.fromJobId}`));
+      const targetNodes = flowNodes.filter(n => n.id.endsWith(`-${path.toJobId}`));
+
+      sourceNodes.forEach(src => {
+        targetNodes.forEach(tgt => {
+          flowEdges.push({
+            id: `${path.id}-${src.id}-${tgt.id}`,
+            source: src.id,
+            target: tgt.id,
+            type: 'strategy',
+            sourceHandle: path.sourceHandle ?? 'right',
+            targetHandle: path.targetHandle ?? 'left',
+          });
+        });
+      });
+    });
 
     setNodes(flowNodes);
     setEdges(flowEdges);
-  }, [data, filteredEmployees, setNodes, setEdges]);
+  }, [data, setNodes, setEdges, areasAndSectors]);
 
-  // Handle Drag-To-Connect Careers
   const onConnect = useCallback(
     (connection: Connection) => {
       if (!connection.source || !connection.target) return;
+      const srcJobId = connection.source.split('-').pop();
+      const tgtJobId = connection.target.split('-').pop();
+      if (!srcJobId || !tgtJobId) return;
+
       createCareerPath.mutate({
-        fromJobId: connection.source,
-        toJobId: connection.target,
+        fromJobId: srcJobId,
+        toJobId: tgtJobId,
       });
     },
     [createCareerPath]
   );
+
+  const toggleAreaExpand = (areaId: string) => {
+    setExpandedAreas((prev) => ({ ...prev, [areaId]: !prev[areaId] }));
+  };
 
   return (
     <div className="space-y-4">
@@ -442,7 +568,7 @@ function OrganogramaInner() {
             className="text-xs"
           >
             <FileSpreadsheet className="mr-1.5 h-3.5 w-3.5" />
-            Lotação Turno (Excel)
+            Lista de Carreira
           </Button>
           <Button
             variant={viewMode === 'canvas' ? 'default' : 'ghost'}
@@ -458,166 +584,194 @@ function OrganogramaInner() {
 
       {/* DUAL VIEW RENDER */}
       {viewMode === 'excel' ? (
-        <div className="rounded-xl border bg-card p-6 shadow-md overflow-x-auto">
-          {/* HEADER GOIASA ESTILIZADO */}
-          <div className="border-b-2 border-emerald-600 pb-4 mb-6 flex justify-between items-center">
-            <div>
-              <h2 className="text-xl font-bold uppercase text-emerald-700 tracking-wider">Organograma de Área</h2>
-              <p className="text-xs text-muted-foreground">
-                Setor Selecionado:{' '}
-                <span className="font-semibold text-foreground">
-                  {areasAndSectors.find((n) => n.id === selectedAreaId)?.name ?? 'Geral'}
-                </span>
-              </p>
-            </div>
-            <div className="text-right">
-              <Badge className="bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-sm px-3 py-1">
-                MO TOTAL: {headcountTotals.total}
-              </Badge>
-            </div>
-          </div>
+        <div className="space-y-4">
+          {/* ACCORDION BY AREA */}
+          {(selectedAreaId ? areasAndSectors.filter(a => a.id === selectedAreaId) : [...areasAndSectors, { id: 'unlinked', name: 'Sem Área Definida' }]).map((area) => {
+            const areaEmps = data?.employees.filter(e => 
+              area.id === 'unlinked' ? !e.orgNodeId : e.orgNodeId === area.id
+            ) ?? [];
 
-          <table className="w-full border-collapse text-left text-xs">
-            <thead>
-              <tr className="bg-muted border-b text-muted-foreground font-semibold uppercase tracking-wider text-[10px]">
-                <th className="p-3 w-[240px]">Cargo</th>
-                <th className="p-3 w-[80px] text-center">Faixa</th>
-                <th className="p-3 w-[120px] text-center">Turno D</th>
-                <th className="p-3 w-[120px] text-center">Turno A</th>
-                <th className="p-3 w-[120px] text-center">Turno B</th>
-                <th className="p-3 w-[120px] text-center">Turno C</th>
-                <th className="p-3 w-[110px] text-center">Total MO</th>
-                <th className="p-3 text-center w-[160px]">Orçamento / Situação</th>
-                {selectedAreaId && <th className="p-3 w-[60px] text-center">Ações</th>}
-              </tr>
-            </thead>
-            <tbody>
-              {data?.jobs.map((job) => {
-                const jobEmps = filteredEmployees.filter((e) => e.jobId === job.id);
-                if (selectedAreaId && jobEmps.length === 0) return null;
+            if (areaEmps.length === 0 && area.id === 'unlinked') return null;
 
-                // Group by shift
-                const shiftD = jobEmps.filter((e) => e.shift === 'D');
-                const shiftA = jobEmps.filter((e) => e.shift === 'A');
-                const shiftB = jobEmps.filter((e) => e.shift === 'B');
-                const shiftC = jobEmps.filter((e) => e.shift === 'C');
+            const isOpen = !!expandedAreas[area.id];
 
-                const maxCount = Math.max(1, shiftD.length, shiftA.length, shiftB.length, shiftC.length);
+            return (
+              <div key={area.id} className="rounded-xl border bg-card shadow-sm overflow-hidden transition">
+                {/* ACCORDION HEADER */}
+                <button
+                  onClick={() => toggleAreaExpand(area.id)}
+                  className="w-full flex items-center justify-between p-4 bg-muted/40 hover:bg-muted/70 transition border-b text-left"
+                >
+                  <div className="flex items-center gap-2.5">
+                    {isOpen ? <ChevronDown className="h-4 w-4 text-emerald-600" /> : <ChevronRight className="h-4 w-4 text-muted-foreground" />}
+                    <div>
+                      <h3 className="font-bold text-sm text-foreground uppercase tracking-wider flex items-center gap-2">
+                        {area.name}
+                        <Badge className="bg-emerald-600 hover:bg-emerald-700 text-white text-[10px] py-0.5 px-2 font-bold shrink-0">
+                          {areaEmps.length} Colaboradores
+                        </Badge>
+                      </h3>
+                    </div>
+                  </div>
+                  <div className="text-xs text-muted-foreground font-semibold">
+                    Divergentes: {areaEmps.filter(e => !e.isBudgeted).length}
+                  </div>
+                </button>
 
-                return Array.from({ length: maxCount }).map((_, rowIndex) => {
-                  const empD = shiftD[rowIndex];
-                  const empA = shiftA[rowIndex];
-                  const empB = shiftB[rowIndex];
-                  const empC = shiftC[rowIndex];
+                {/* ACCORDION CONTENT */}
+                {isOpen && (
+                  <div className="p-4 overflow-x-auto">
+                    <table className="w-full border-collapse text-left text-xs">
+                      <thead>
+                        <tr className="bg-muted border-b text-muted-foreground font-semibold uppercase tracking-wider text-[10px]">
+                          <th className="p-3 w-[220px]">Colaborador</th>
+                          <th className="p-3 w-[180px]">Cargo</th>
+                          <th className="p-3 w-[110px] text-center">Faixa Atual</th>
+                          <th className="p-3 w-[110px] text-center">Faixa Pretendida</th>
+                          <th className="p-3 w-[100px] text-center">Turno</th>
+                          <th className="p-3 w-[110px] text-center">Matrícula</th>
+                          <th className="p-3 w-[130px] text-center">Orçamento</th>
+                          <th className="p-3 w-[150px] text-center">Status Carreira</th>
+                          <th className="p-3 w-[60px] text-center">Ações</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {areaEmps.map((emp) => (
+                          <tr key={emp.id} className="border-b transition hover:bg-muted/20 align-middle">
+                            {/* COLABORADOR NAME */}
+                            <td className="p-3">
+                              <Input
+                                value={emp.name}
+                                onChange={(e) => updateEmployee.mutate({ id: emp.id, name: e.target.value })}
+                                className="h-8 font-semibold text-xs bg-background max-w-[200px]"
+                                placeholder="Nome do Colaborador"
+                              />
+                            </td>
 
-                  const isRowEmpty = !empD && !empA && !empB && !empC;
-                  if (isRowEmpty && rowIndex > 0) return null;
+                            {/* CARGO (JOB ASSIGNMENT) */}
+                            <td className="p-3">
+                              <NativeSelect
+                                value={emp.jobId}
+                                onChange={(e) => updateEmployee.mutate({ id: emp.id, jobId: e.target.value })}
+                                className="h-8 text-xs bg-background w-[160px]"
+                              >
+                                {data?.jobs.map((job) => (
+                                  <option key={job.id} value={job.id}>
+                                    {job.name}
+                                  </option>
+                                ))}
+                              </NativeSelect>
+                            </td>
 
-                  return (
-                    <tr
-                      key={`${job.id}-${rowIndex}`}
-                      className="border-b transition hover:bg-muted/30 align-middle"
-                    >
-                      {rowIndex === 0 ? (
-                        <td className="p-3 font-semibold text-foreground bg-muted/10 border-r" rowSpan={maxCount}>
-                          <div className="flex flex-col">
-                            <span className="text-sm font-semibold">{job.name}</span>
-                            <span className="text-[10px] text-muted-foreground font-normal line-clamp-1">{job.description}</span>
-                          </div>
-                        </td>
-                      ) : null}
+                            {/* FAIXA ATUAL */}
+                            <td className="p-3 text-center">
+                              <NativeSelect
+                                value={emp.band}
+                                onChange={(e) => updateEmployee.mutate({ id: emp.id, band: e.target.value })}
+                                className="h-8 text-xs bg-background mx-auto w-[80px] font-bold text-emerald-600"
+                              >
+                                <option value="A">Faixa A</option>
+                                <option value="B">Faixa B</option>
+                                <option value="C">Faixa C</option>
+                                <option value="D">Faixa D</option>
+                              </NativeSelect>
+                            </td>
 
-                      {/* FAIXA */}
-                      <td className="p-3 text-center border-r font-bold text-primary">
-                        {empD?.band ?? empA?.band ?? empB?.band ?? empC?.band ?? 'B'}
-                      </td>
+                            {/* FAIXA PRETENDIDA */}
+                            <td className="p-3 text-center">
+                              <NativeSelect
+                                value={emp.bandPretended || 'B'}
+                                onChange={(e) => updateEmployee.mutate({ id: emp.id, bandPretended: e.target.value })}
+                                className="h-8 text-xs bg-background mx-auto w-[80px] font-bold text-amber-600"
+                              >
+                                <option value="A">Faixa A</option>
+                                <option value="B">Faixa B</option>
+                                <option value="C">Faixa C</option>
+                                <option value="D">Faixa D</option>
+                              </NativeSelect>
+                            </td>
 
-                      {/* SHIFT CELLS */}
-                      <td className="p-3 text-center border-r">
-                        {empD ? (
-                          <div className="flex flex-col gap-0.5 items-center">
-                            <span className="font-semibold text-foreground">{empD.name}</span>
-                            <span className="text-[9px] text-muted-foreground">{empD.registrationId ? `#${empD.registrationId}` : 'VAGA'}</span>
-                          </div>
-                        ) : '-'}
-                      </td>
-                      <td className="p-3 text-center border-r">
-                        {empA ? (
-                          <div className="flex flex-col gap-0.5 items-center">
-                            <span className="font-semibold text-foreground">{empA.name}</span>
-                            <span className="text-[9px] text-muted-foreground">{empA.registrationId ? `#${empA.registrationId}` : 'VAGA'}</span>
-                          </div>
-                        ) : '-'}
-                      </td>
-                      <td className="p-3 text-center border-r">
-                        {empB ? (
-                          <div className="flex flex-col gap-0.5 items-center">
-                            <span className="font-semibold text-foreground">{empB.name}</span>
-                            <span className="text-[9px] text-muted-foreground">{empB.registrationId ? `#${empB.registrationId}` : 'VAGA'}</span>
-                          </div>
-                        ) : '-'}
-                      </td>
-                      <td className="p-3 text-center border-r">
-                        {empC ? (
-                          <div className="flex flex-col gap-0.5 items-center">
-                            <span className="font-semibold text-foreground">{empC.name}</span>
-                            <span className="text-[9px] text-muted-foreground">{empC.registrationId ? `#${empC.registrationId}` : 'VAGA'}</span>
-                          </div>
-                        ) : '-'}
-                      </td>
+                            {/* TURNO */}
+                            <td className="p-3 text-center">
+                              <NativeSelect
+                                value={emp.shift}
+                                onChange={(e) => updateEmployee.mutate({ id: emp.id, shift: e.target.value })}
+                                className="h-8 text-xs bg-background mx-auto w-[80px]"
+                              >
+                                <option value="A">Turno A</option>
+                                <option value="B">Turno B</option>
+                                <option value="C">Turno C</option>
+                                <option value="D">Turno D</option>
+                              </NativeSelect>
+                            </td>
 
-                      {/* TOTAL MO per Role Row */}
-                      {rowIndex === 0 ? (
-                        <td className="p-3 text-center font-bold text-sm text-foreground bg-muted/10 border-r" rowSpan={maxCount}>
-                          {jobEmps.length}
-                        </td>
-                      ) : null}
+                            {/* MATRICULA */}
+                            <td className="p-3 text-center">
+                              <Input
+                                value={emp.registrationId || ''}
+                                onChange={(e) => updateEmployee.mutate({ id: emp.id, registrationId: e.target.value || null })}
+                                className="h-8 text-center text-xs bg-background mx-auto w-[100px]"
+                                placeholder="VAGA"
+                              />
+                            </td>
 
-                      {/* BUDGET STATUS / ORÇAMENTO */}
-                      <td className="p-3 text-center border-r">
-                        {empD || empA || empB || empC ? (
-                          <div className="flex items-center justify-center gap-1.5">
-                            {((empD?.isBudgeted ?? true) && (empA?.isBudgeted ?? true) && (empB?.isBudgeted ?? true) && (empC?.isBudgeted ?? true)) ? (
-                              <Badge className="bg-emerald-500/10 text-emerald-700 dark:text-emerald-300 border border-emerald-500/30 font-semibold">
-                                Previsto
-                              </Badge>
-                            ) : (
-                              <Badge className="bg-amber-500/10 text-amber-700 dark:text-amber-300 border border-amber-500/30 font-semibold" title="Divergência de quadro orçado">
-                                Divergente (Fora)
-                              </Badge>
-                            )}
-                          </div>
-                        ) : '-'}
-                      </td>
+                            {/* ORÇAMENTO */}
+                            <td className="p-3 text-center">
+                              <NativeSelect
+                                value={emp.isBudgeted ? 'true' : 'false'}
+                                onChange={(e) => updateEmployee.mutate({ id: emp.id, isBudgeted: e.target.value === 'true' })}
+                                className={cn(
+                                  "h-8 text-xs mx-auto w-[120px] font-semibold rounded-md border",
+                                  emp.isBudgeted 
+                                    ? "bg-emerald-50 text-emerald-800 border-emerald-300"
+                                    : "bg-amber-50 text-amber-800 border-amber-300"
+                                )}
+                              >
+                                <option value="true">Previsto</option>
+                                <option value="false">Fora Orçado</option>
+                              </NativeSelect>
+                            </td>
 
-                      {/* ACTION CONTROLS */}
-                      <td className="p-3 text-center">
-                        <div className="flex items-center justify-center gap-1">
-                          {empD && (
-                            <Button variant="ghost" size="sm" onClick={() => removeEmployee.mutate(empD.id)} className="h-7 w-7 p-0 text-destructive">
-                              <Trash2 className="h-3.5 w-3.5" />
-                            </Button>
-                          )}
-                          {empA && (
-                            <Button variant="ghost" size="sm" onClick={() => removeEmployee.mutate(empA.id)} className="h-7 w-7 p-0 text-destructive">
-                              <Trash2 className="h-3.5 w-3.5" />
-                            </Button>
-                          )}
-                        </div>
-                      </td>
-                    </tr>
-                  );
-                });
-              })}
-              {filteredEmployees.length === 0 && (
-                <tr>
-                  <td colSpan={9} className="p-8 text-center text-muted-foreground italic">
-                    Nenhum colaborador alocado nesta área ou setor. Clique no botão de alocação para começar!
-                  </td>
-                </tr>
-              )}
-            </tbody>
-          </table>
+                            {/* CAREER STATUS */}
+                            <td className="p-3 text-center">
+                              <NativeSelect
+                                value={emp.approvalStatus || 'PENDENTE'}
+                                onChange={(e) => updateEmployee.mutate({ id: emp.id, approvalStatus: e.target.value })}
+                                className={cn(
+                                  "h-8 text-xs mx-auto w-[130px] font-bold rounded-md border",
+                                  emp.approvalStatus === 'APROVADO' && "bg-emerald-500/10 text-emerald-700 border-emerald-300",
+                                  emp.approvalStatus === 'REPROVADO' && "bg-destructive/10 text-destructive border-destructive-foreground/20",
+                                  emp.approvalStatus === 'PENDENTE' && "bg-gray-100 text-gray-700 border-gray-300",
+                                  emp.approvalStatus === 'EM_ANALISE' && "bg-sky-100 text-sky-800 border-sky-300"
+                                )}
+                              >
+                                <option value="PENDENTE">Pendente</option>
+                                <option value="EM_ANALISE">Em Análise</option>
+                                <option value="APROVADO">Aprovado</option>
+                                <option value="REPROVADO">Reprovado</option>
+                              </NativeSelect>
+                            </td>
+
+                            {/* ACTIONS */}
+                            <td className="p-3 text-center">
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                onClick={() => removeEmployee.mutate(emp.id)}
+                                className="h-7 w-7 p-0 text-destructive hover:bg-destructive/10"
+                              >
+                                <Trash2 className="h-3.5 w-3.5" />
+                              </Button>
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
+              </div>
+            );
+          })}
         </div>
       ) : (
         <div className="relative border rounded-xl overflow-hidden shadow-md bg-muted/5 h-[65vh]">
@@ -701,7 +855,7 @@ function OrganogramaInner() {
           <DialogHeader>
             <DialogTitle>Alocar Colaborador no Quadro</DialogTitle>
           </DialogHeader>
-          <div className="space-y-4 py-2">
+          <div className="space-y-4 py-2 max-h-[70vh] overflow-y-auto pr-1">
             <div className="grid grid-cols-2 gap-3">
               <div>
                 <Label>Cargo *</Label>
@@ -718,12 +872,15 @@ function OrganogramaInner() {
                 </NativeSelect>
               </div>
               <div>
-                <Label>Área / Setor de Destino *</Label>
+                <Label>Área / Setor Existente</Label>
                 <NativeSelect
                   value={employeeAreaId}
-                  onChange={(e) => setEmployeeAreaId(e.target.value)}
+                  onChange={(e) => {
+                    setEmployeeAreaId(e.target.value);
+                    if (e.target.value) setEmployeeNewAreaName('');
+                  }}
                 >
-                  <option value="">Sem vínculo</option>
+                  <option value="">-- Selecione para vincular --</option>
                   {areasAndSectors.map((node) => (
                     <option key={node.id} value={node.id}>
                       {node.name}
@@ -731,6 +888,21 @@ function OrganogramaInner() {
                   ))}
                 </NativeSelect>
               </div>
+            </div>
+
+            <div>
+              <Label>OU Criar Nova Perspectiva (Área / Setor)</Label>
+              <Input
+                value={employeeNewAreaName}
+                onChange={(e) => {
+                  setEmployeeNewAreaName(e.target.value);
+                  if (e.target.value) setEmployeeAreaId('');
+                }}
+                placeholder="Ex.: Novos Negócios, Auditoria Interna"
+              />
+              <p className="text-[10px] text-muted-foreground mt-1">
+                Se digitado, criará essa nova perspectiva automaticamente no Canvas.
+              </p>
             </div>
 
             <div>
@@ -752,7 +924,7 @@ function OrganogramaInner() {
                 />
               </div>
               <div>
-                <Label>Faixa Salarial / Nível *</Label>
+                <Label>Faixa Salarial Atual *</Label>
                 <NativeSelect
                   value={employeeBand}
                   onChange={(e) => setEmployeeBand(e.target.value)}
@@ -767,6 +939,18 @@ function OrganogramaInner() {
 
             <div className="grid grid-cols-2 gap-3">
               <div>
+                <Label>Faixa Pretendida *</Label>
+                <NativeSelect
+                  value={employeeBandPretended}
+                  onChange={(e) => setEmployeeBandPretended(e.target.value)}
+                >
+                  <option value="A">Faixa A</option>
+                  <option value="B">Faixa B</option>
+                  <option value="C">Faixa C</option>
+                  <option value="D">Faixa D</option>
+                </NativeSelect>
+              </div>
+              <div>
                 <Label>Turno Operacional *</Label>
                 <NativeSelect
                   value={employeeShift}
@@ -776,6 +960,21 @@ function OrganogramaInner() {
                   <option value="B">Turno B</option>
                   <option value="C">Turno C</option>
                   <option value="D">Turno D</option>
+                </NativeSelect>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <Label>Status da Carreira *</Label>
+                <NativeSelect
+                  value={employeeApprovalStatus}
+                  onChange={(e) => setEmployeeApprovalStatus(e.target.value)}
+                >
+                  <option value="PENDENTE">Pendente</option>
+                  <option value="EM_ANALISE">Em Análise</option>
+                  <option value="APROVADO">Aprovado</option>
+                  <option value="REPROVADO">Reprovado</option>
                 </NativeSelect>
               </div>
               <div>
@@ -798,7 +997,7 @@ function OrganogramaInner() {
                 onChange={(e) => setEmployeeIsBudgeted(e.target.checked)}
                 className="h-4 w-4 border-gray-300 rounded text-primary focus:ring-primary"
               />
-              <Label htmlFor="isBudgeted" className="font-semibold cursor-pointer">
+              <Label htmlFor="isBudgeted" className="font-semibold cursor-pointer text-xs">
                 Colaborador dentro do limite orçado do quadro de lotação
               </Label>
             </div>
@@ -813,11 +1012,14 @@ function OrganogramaInner() {
                   name: employeeName || 'Vaga em Aberto',
                   jobId: selectedJobIdForEmployee,
                   orgNodeId: employeeAreaId,
+                  orgNodeName: employeeNewAreaName,
                   registrationId: employeeRegistration,
                   band: employeeBand,
+                  bandPretended: employeeBandPretended,
                   shift: employeeShift,
                   isBudgeted: employeeIsBudgeted,
                   status: employeeStatus,
+                  approvalStatus: employeeApprovalStatus,
                 })
               }
               disabled={!selectedJobIdForEmployee || !employeeName.trim() || createEmployee.isPending}

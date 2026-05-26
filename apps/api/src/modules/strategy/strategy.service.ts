@@ -841,23 +841,73 @@ export class StrategyService {
     });
   }
 
-  async createEmployee(me: AuthPayload, body: { name: string; jobId: string; orgNodeId?: string; registrationId?: string; band?: string; shift?: string; isBudgeted?: boolean; status?: string }) {
+  async createEmployee(me: AuthPayload, body: { 
+    name: string; 
+    jobId: string; 
+    orgNodeId?: string; 
+    orgNodeName?: string; 
+    registrationId?: string; 
+    band?: string; 
+    bandPretended?: string; 
+    shift?: string; 
+    isBudgeted?: boolean; 
+    status?: string;
+    approvalStatus?: string;
+  }) {
+    let finalOrgNodeId = body.orgNodeId || null;
+
+    if (!finalOrgNodeId && body.orgNodeName?.trim()) {
+      const existing = await this.prisma.orgNode.findFirst({
+        where: {
+          companyId: me.companyId,
+          name: { equals: body.orgNodeName.trim(), mode: 'insensitive' },
+          deletedAt: null,
+        },
+      });
+      if (existing) {
+        finalOrgNodeId = existing.id;
+      } else {
+        const created = await this.prisma.orgNode.create({
+          data: {
+            companyId: me.companyId,
+            name: body.orgNodeName.trim(),
+            type: 'AREA',
+            active: true,
+          },
+        });
+        finalOrgNodeId = created.id;
+      }
+    }
+
     return this.prisma.orgEmployee.create({
       data: {
         companyId: me.companyId,
         name: body.name,
         jobId: body.jobId,
-        orgNodeId: body.orgNodeId || null,
+        orgNodeId: finalOrgNodeId,
         registrationId: body.registrationId || null,
         band: body.band || 'B',
+        bandPretended: body.bandPretended || body.band || 'B',
         shift: body.shift || 'D',
         isBudgeted: body.isBudgeted ?? true,
         status: body.status || 'ACTIVE',
+        approvalStatus: body.approvalStatus || 'PENDENTE',
       },
     });
   }
 
-  async updateEmployee(me: AuthPayload, id: string, body: { name?: string; jobId?: string; orgNodeId?: string; registrationId?: string; band?: string; shift?: string; isBudgeted?: boolean; status?: string }) {
+  async updateEmployee(me: AuthPayload, id: string, body: { 
+    name?: string; 
+    jobId?: string; 
+    orgNodeId?: string; 
+    registrationId?: string; 
+    band?: string; 
+    bandPretended?: string; 
+    shift?: string; 
+    isBudgeted?: boolean; 
+    status?: string;
+    approvalStatus?: string;
+  }) {
     return this.prisma.orgEmployee.update({
       where: { id },
       data: {
@@ -866,9 +916,11 @@ export class StrategyService {
         orgNodeId: body.orgNodeId === undefined ? undefined : (body.orgNodeId || null),
         registrationId: body.registrationId,
         band: body.band,
+        bandPretended: body.bandPretended,
         shift: body.shift,
         isBudgeted: body.isBudgeted,
         status: body.status,
+        approvalStatus: body.approvalStatus,
       },
     });
   }

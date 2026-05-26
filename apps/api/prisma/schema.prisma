@@ -1984,9 +1984,11 @@ model OrgEmployee {
   jobId          String
   job            OrgJob      @relation(fields: [jobId], references: [id])
   band           String      @default("B") 
+  bandPretended  String      @default("B") 
   shift          String      @default("D") 
   isBudgeted     Boolean     @default(true) 
   status         String      @default("ACTIVE") 
+  approvalStatus String      @default("PENDENTE") 
   createdAt      DateTime    @default(now())
   updatedAt      DateTime    @updatedAt
 
