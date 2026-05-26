@@ -368,7 +368,7 @@ export default function AprovacoesCargoPage() {
                   <span className="text-amber-700 font-medium">{decisionDialog.row.targetJob.name} • Faixa {decisionDialog.row.targetBand}</span>
                 </div>
                 {decisionDialog.row.reason && (
-                  <div className="mt-2 text-muted-foreground italic">"{decisionDialog.row.reason}"</div>
+                  <div className="mt-2 text-muted-foreground italic">&ldquo;{decisionDialog.row.reason}&rdquo;</div>
                 )}
               </div>
               <div className="space-y-2">
