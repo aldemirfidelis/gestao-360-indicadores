@@ -802,7 +802,22 @@ export class StrategyService {
     const [employees, careerPaths] = await Promise.all([
       this.prisma.orgEmployee.findMany({
         where: { companyId },
-        include: { job: true, orgNode: true },
+        include: {
+          job: true,
+          jobPretended: true,
+          orgNode: true,
+          approvalRequests: {
+            where: { status: 'PENDING' },
+            orderBy: { createdAt: 'desc' },
+            take: 1,
+            include: {
+              approver: { select: { id: true, name: true, email: true } },
+              requester: { select: { id: true, name: true, email: true } },
+              currentJob: { select: { id: true, name: true } },
+              targetJob: { select: { id: true, name: true } },
+            },
+          },
+        },
         orderBy: { name: 'asc' },
       }),
       this.prisma.orgJobCareerPath.findMany({
@@ -841,16 +856,17 @@ export class StrategyService {
     });
   }
 
-  async createEmployee(me: AuthPayload, body: { 
-    name: string; 
-    jobId: string; 
-    orgNodeId?: string; 
-    orgNodeName?: string; 
-    registrationId?: string; 
-    band?: string; 
-    bandPretended?: string; 
-    shift?: string; 
-    isBudgeted?: boolean; 
+  async createEmployee(me: AuthPayload, body: {
+    name: string;
+    jobId: string;
+    jobPretendedId?: string | null;
+    orgNodeId?: string;
+    orgNodeName?: string;
+    registrationId?: string;
+    band?: string;
+    bandPretended?: string;
+    shift?: string;
+    isBudgeted?: boolean;
     status?: string;
     approvalStatus?: string;
   }) {
@@ -884,6 +900,7 @@ export class StrategyService {
         companyId: me.companyId,
         name: body.name,
         jobId: body.jobId,
+        jobPretendedId: body.jobPretendedId || null,
         orgNodeId: finalOrgNodeId,
         registrationId: body.registrationId || null,
         band: body.band || 'B',
@@ -896,15 +913,16 @@ export class StrategyService {
     });
   }
 
-  async updateEmployee(me: AuthPayload, id: string, body: { 
-    name?: string; 
-    jobId?: string; 
-    orgNodeId?: string; 
-    registrationId?: string; 
-    band?: string; 
-    bandPretended?: string; 
-    shift?: string; 
-    isBudgeted?: boolean; 
+  async updateEmployee(me: AuthPayload, id: string, body: {
+    name?: string;
+    jobId?: string;
+    jobPretendedId?: string | null;
+    orgNodeId?: string;
+    registrationId?: string;
+    band?: string;
+    bandPretended?: string;
+    shift?: string;
+    isBudgeted?: boolean;
     status?: string;
     approvalStatus?: string;
   }) {
@@ -913,6 +931,7 @@ export class StrategyService {
       data: {
         name: body.name,
         jobId: body.jobId,
+        jobPretendedId: body.jobPretendedId === undefined ? undefined : (body.jobPretendedId || null),
         orgNodeId: body.orgNodeId === undefined ? undefined : (body.orgNodeId || null),
         registrationId: body.registrationId,
         band: body.band,
@@ -952,6 +971,167 @@ export class StrategyService {
     return this.prisma.orgJobCareerPath.delete({
       where: { id },
     });
+  }
+
+  // ============================================================
+  // Aprovacoes de cargo (career approvals)
+  // ============================================================
+
+  async listApprovers(me: AuthPayload) {
+    return this.prisma.user.findMany({
+      where: {
+        companyId: me.companyId,
+        deletedAt: null,
+        active: true,
+        role: { in: ['SUPER_ADMIN', 'COMPANY_ADMIN', 'DIRECTOR', 'MANAGER'] },
+      },
+      select: { id: true, name: true, email: true, role: true, jobTitle: true },
+      orderBy: { name: 'asc' },
+    });
+  }
+
+  async listCareerApprovals(me: AuthPayload, filter?: { status?: string; scope?: 'mine' | 'requested' | 'all' }) {
+    const scope = filter?.scope ?? 'mine';
+    const where: any = { companyId: me.companyId };
+    if (filter?.status) where.status = filter.status;
+    if (scope === 'mine') where.approverId = me.sub;
+    else if (scope === 'requested') where.requesterId = me.sub;
+    return this.prisma.orgJobApprovalRequest.findMany({
+      where,
+      include: {
+        employee: { include: { orgNode: true } },
+        requester: { select: { id: true, name: true, email: true } },
+        approver: { select: { id: true, name: true, email: true } },
+        currentJob: { select: { id: true, name: true } },
+        targetJob: { select: { id: true, name: true } },
+      },
+      orderBy: [{ status: 'asc' }, { createdAt: 'desc' }],
+    });
+  }
+
+  async getCareerApproval(me: AuthPayload, id: string) {
+    const request = await this.prisma.orgJobApprovalRequest.findFirst({
+      where: { id, companyId: me.companyId },
+      include: {
+        employee: { include: { orgNode: true, job: true, jobPretended: true } },
+        requester: { select: { id: true, name: true, email: true, jobTitle: true } },
+        approver: { select: { id: true, name: true, email: true, jobTitle: true, role: true } },
+        currentJob: { select: { id: true, name: true } },
+        targetJob: { select: { id: true, name: true } },
+        company: { select: { id: true, name: true, tradeName: true, cnpj: true } },
+      },
+    });
+    if (!request) throw new NotFoundException('Solicitacao de aprovacao nao encontrada');
+    return request;
+  }
+
+  async createCareerApproval(me: AuthPayload, body: {
+    employeeId: string;
+    approverId: string;
+    targetJobId?: string;
+    targetBand?: string;
+    reason?: string;
+  }) {
+    const employee = await this.prisma.orgEmployee.findFirst({
+      where: { id: body.employeeId, companyId: me.companyId },
+      include: { job: true, jobPretended: true },
+    });
+    if (!employee) throw new NotFoundException('Colaborador nao encontrado');
+    const approver = await this.prisma.user.findFirst({
+      where: { id: body.approverId, companyId: me.companyId, deletedAt: null, role: { in: ['SUPER_ADMIN', 'COMPANY_ADMIN', 'DIRECTOR', 'MANAGER'] } },
+      select: { id: true },
+    });
+    if (!approver) throw new NotFoundException('Aprovador invalido (precisa ser ADMIN/MANAGER)');
+
+    const existingPending = await this.prisma.orgJobApprovalRequest.findFirst({
+      where: { employeeId: body.employeeId, status: 'PENDING' },
+    });
+    if (existingPending) throw new ConflictException('Ja existe uma solicitacao pendente para este colaborador');
+
+    const targetJobId = body.targetJobId ?? employee.jobPretendedId ?? employee.jobId;
+    const targetBand = body.targetBand ?? employee.bandPretended ?? employee.band;
+
+    const request = await this.prisma.orgJobApprovalRequest.create({
+      data: {
+        companyId: me.companyId,
+        employeeId: body.employeeId,
+        requesterId: me.sub,
+        approverId: body.approverId,
+        currentJobId: employee.jobId,
+        currentBand: employee.band,
+        targetJobId,
+        targetBand,
+        status: 'PENDING',
+        reason: body.reason ?? null,
+      },
+    });
+
+    await this.prisma.orgEmployee.update({
+      where: { id: body.employeeId },
+      data: { approvalStatus: 'EM_ANALISE' },
+    });
+
+    await this.audit(me, 'CAREER_APPROVAL_CREATED', 'OrgJobApprovalRequest', request.id, null, request, employee.name);
+    return request;
+  }
+
+  async decideCareerApproval(me: AuthPayload, id: string, body: { decision: 'APPROVED' | 'REJECTED'; decisionNote?: string }) {
+    const request = await this.prisma.orgJobApprovalRequest.findFirst({
+      where: { id, companyId: me.companyId },
+      include: { employee: true },
+    });
+    if (!request) throw new NotFoundException('Solicitacao nao encontrada');
+    if (request.approverId !== me.sub) throw new ConflictException('Apenas o aprovador designado pode decidir esta solicitacao');
+    if (request.status !== 'PENDING') throw new ConflictException('Esta solicitacao ja foi decidida');
+
+    const updated = await this.prisma.orgJobApprovalRequest.update({
+      where: { id },
+      data: {
+        status: body.decision,
+        decisionNote: body.decisionNote ?? null,
+        decidedAt: new Date(),
+      },
+    });
+
+    if (body.decision === 'APPROVED') {
+      await this.prisma.orgEmployee.update({
+        where: { id: request.employeeId },
+        data: {
+          jobId: request.targetJobId,
+          band: request.targetBand,
+          jobPretendedId: null,
+          bandPretended: request.targetBand,
+          approvalStatus: 'APROVADO',
+        },
+      });
+    } else {
+      await this.prisma.orgEmployee.update({
+        where: { id: request.employeeId },
+        data: { approvalStatus: 'REPROVADO' },
+      });
+    }
+
+    await this.audit(me, 'CAREER_APPROVAL_DECIDED', 'OrgJobApprovalRequest', id, request, updated, request.employee.name);
+    return updated;
+  }
+
+  async cancelCareerApproval(me: AuthPayload, id: string) {
+    const request = await this.prisma.orgJobApprovalRequest.findFirst({
+      where: { id, companyId: me.companyId },
+    });
+    if (!request) throw new NotFoundException('Solicitacao nao encontrada');
+    if (request.requesterId !== me.sub) throw new ConflictException('Apenas o solicitante pode cancelar');
+    if (request.status !== 'PENDING') throw new ConflictException('Apenas solicitacoes pendentes podem ser canceladas');
+
+    const updated = await this.prisma.orgJobApprovalRequest.update({
+      where: { id },
+      data: { status: 'CANCELLED', decidedAt: new Date() },
+    });
+    await this.prisma.orgEmployee.update({
+      where: { id: request.employeeId },
+      data: { approvalStatus: 'PENDENTE' },
+    });
+    return updated;
   }
 
   private async audit(me: AuthPayload, action: string, entity: string, entityId: string, beforeValue: unknown, afterValue: unknown, recordLabel?: string | null) {

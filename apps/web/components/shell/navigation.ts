@@ -4,6 +4,7 @@ import {
   BarChart3,
   Building2,
   Calendar,
+  ClipboardCheck,
   ClipboardList,
   Crosshair,
   FileBarChart,
@@ -89,6 +90,8 @@ export const navSections: NavSection[] = [
     items: [
       { href: '/org', label: 'Estrutura Organizacional', description: 'Empresas, áreas, setores, pilares e diretrizes', icon: Building2, permissions: ['org:manage'] },
       { href: '/organograma', label: 'Organograma de Área', description: 'Estrutura de cargos, faixas, turnos e orçamento', icon: Users, permissions: ['org:view'] },
+      { href: '/aprovacoes-cargo', label: 'Aprovações de Cargo', description: 'Solicitações de promoção e mudança de cargo', icon: ShieldCheck, permissions: ['org:view'] },
+      { href: '/eficacia', label: 'Análise de Eficácia', description: 'Validação de eficácia dos planos de ação (restrito)', icon: ClipboardCheck, permissions: ['actions:effectiveness', 'actions:view'] },
       { href: '/periods', label: 'Períodos', description: 'Ano de trabalho, abertura e fechamento anual', icon: Calendar, permissions: ['settings:manage'] },
       { href: '/strategy', label: 'Objetivos Estratégicos', description: 'Mapas, perspectivas e objetivos', icon: Crosshair, permissions: ['strategy:manage', 'strategy:objectives:update'] },
       { href: '/actions', label: 'Plano de Ação', description: 'Ações, execução, evidências e eficácia', icon: ClipboardList, permissions: ['actions:view'] },

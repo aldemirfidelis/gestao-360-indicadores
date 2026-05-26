@@ -496,6 +496,7 @@ model Company {
   orgJobs             OrgJob[]
   orgEmployees        OrgEmployee[]
   orgJobCareerPaths   OrgJobCareerPath[]
+  orgJobApprovalRequests OrgJobApprovalRequest[]
   emailLogs           EmailLog[]
   calendarInvites     CalendarInvite[]
   workPeriods         WorkPeriod[]
@@ -624,6 +625,8 @@ model User {
   actionsResponsible    ActionPlan[]        @relation("ActionResponsible")
   actionsCreated        ActionPlan[]        @relation("ActionCreatedBy")
   actionTasksAssigned   ActionTask[]        @relation("ActionTaskAssignee")
+  careerApprovalsRequested OrgJobApprovalRequest[] @relation("CareerApprovalRequester")
+  careerApprovalsToReview  OrgJobApprovalRequest[] @relation("CareerApprovalApprover")
   meetingParticipations MeetingParticipant[]
   comments              Comment[]
   notifications         Notification[]
@@ -1978,34 +1981,72 @@ model OrgJob {
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 
-  employees   OrgEmployee[]
+  employees   OrgEmployee[] @relation("EmployeeCurrentJob")
+  pretendedBy OrgEmployee[] @relation("EmployeePretendedJob")
   fromPaths   OrgJobCareerPath[] @relation("JobFrom")
   toPaths     OrgJobCareerPath[] @relation("JobTo")
+  approvalRequestsAsCurrent OrgJobApprovalRequest[] @relation("CareerApprovalCurrentJob")
+  approvalRequestsAsTarget  OrgJobApprovalRequest[] @relation("CareerApprovalTargetJob")
 
   @@index([companyId])
 }
 
 model OrgEmployee {
-  id             String      @id @default(uuid())
-  companyId      String
-  company        Company     @relation(fields: [companyId], references: [id])
-  orgNodeId      String?     
-  orgNode        OrgNode?    @relation(fields: [orgNodeId], references: [id])
-  registrationId String?     
-  name           String
-  jobId          String
-  job            OrgJob      @relation(fields: [jobId], references: [id])
-  band           String      @default("B") 
-  bandPretended  String      @default("B") 
-  shift          String      @default("D") 
-  isBudgeted     Boolean     @default(true) 
-  status         String      @default("ACTIVE") 
-  approvalStatus String      @default("PENDENTE") 
-  createdAt      DateTime    @default(now())
-  updatedAt      DateTime    @updatedAt
+  id              String      @id @default(uuid())
+  companyId       String
+  company         Company     @relation(fields: [companyId], references: [id])
+  orgNodeId       String?
+  orgNode         OrgNode?    @relation(fields: [orgNodeId], references: [id])
+  registrationId  String?
+  name            String
+  jobId           String
+  job             OrgJob      @relation("EmployeeCurrentJob", fields: [jobId], references: [id])
+  jobPretendedId  String?
+  jobPretended    OrgJob?     @relation("EmployeePretendedJob", fields: [jobPretendedId], references: [id])
+  band            String      @default("B")
+  bandPretended   String      @default("B")
+  shift           String      @default("D")
+  isBudgeted      Boolean     @default(true)
+  status          String      @default("ACTIVE")
+  approvalStatus  String      @default("PENDENTE")
+  createdAt       DateTime    @default(now())
+  updatedAt       DateTime    @updatedAt
+
+  approvalRequests OrgJobApprovalRequest[]
 
   @@index([companyId])
   @@index([orgNodeId])
+  @@index([jobPretendedId])
+}
+
+model OrgJobApprovalRequest {
+  id              String           @id @default(uuid())
+  companyId       String
+  company         Company          @relation(fields: [companyId], references: [id])
+  employeeId      String
+  employee        OrgEmployee      @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+  requesterId     String
+  requester       User             @relation("CareerApprovalRequester", fields: [requesterId], references: [id])
+  approverId      String
+  approver        User             @relation("CareerApprovalApprover", fields: [approverId], references: [id])
+  currentJobId    String
+  currentJob      OrgJob           @relation("CareerApprovalCurrentJob", fields: [currentJobId], references: [id])
+  targetJobId     String
+  targetJob       OrgJob           @relation("CareerApprovalTargetJob", fields: [targetJobId], references: [id])
+  currentBand     String
+  targetBand      String
+  status          String           @default("PENDING") // PENDING | APPROVED | REJECTED | CANCELLED
+  reason          String?
+  decisionNote    String?
+  decidedAt       DateTime?
+  createdAt       DateTime         @default(now())
+  updatedAt       DateTime         @updatedAt
+
+  @@index([companyId])
+  @@index([employeeId])
+  @@index([approverId])
+  @@index([requesterId])
+  @@index([status])
 }
 
 model OrgJobCareerPath {

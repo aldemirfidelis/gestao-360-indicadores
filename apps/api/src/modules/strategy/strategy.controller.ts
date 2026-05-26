@@ -202,4 +202,43 @@ export class StrategyController {
   removeCareerPath(@CurrentUser() me: AuthPayload, @Param('id') id: string) {
     return this.service.removeCareerPath(me, id);
   }
+
+  // Career approvals
+  @Get('career-approvals/approvers')
+  listApprovers(@CurrentUser() me: AuthPayload) {
+    return this.service.listApprovers(me);
+  }
+
+  @Get('career-approvals')
+  listCareerApprovals(
+    @CurrentUser() me: AuthPayload,
+    @Query('status') status?: string,
+    @Query('scope') scope?: 'mine' | 'requested' | 'all',
+  ) {
+    return this.service.listCareerApprovals(me, { status, scope });
+  }
+
+  @Get('career-approvals/:id')
+  getCareerApproval(@CurrentUser() me: AuthPayload, @Param('id') id: string) {
+    return this.service.getCareerApproval(me, id);
+  }
+
+  @Post('career-approvals')
+  createCareerApproval(@CurrentUser() me: AuthPayload, @Body() body: any) {
+    return this.service.createCareerApproval(me, body);
+  }
+
+  @Patch('career-approvals/:id/decision')
+  decideCareerApproval(
+    @CurrentUser() me: AuthPayload,
+    @Param('id') id: string,
+    @Body() body: { decision: 'APPROVED' | 'REJECTED'; decisionNote?: string },
+  ) {
+    return this.service.decideCareerApproval(me, id, body);
+  }
+
+  @Patch('career-approvals/:id/cancel')
+  cancelCareerApproval(@CurrentUser() me: AuthPayload, @Param('id') id: string) {
+    return this.service.cancelCareerApproval(me, id);
+  }
 }
