@@ -71,13 +71,7 @@ export const navSections: NavSection[] = [
     intent: 'launch',
     icon: PencilLine,
     items: [
-      { href: '/launches', label: 'Central de Lançamentos', description: 'Entrada rápida de dados', icon: PencilLine, permissions: ['launches:view', 'results:launch'] },
       { href: '/results', label: 'Lançar Resultado', description: 'Realizado mensal dos indicadores', icon: LineChart, permissions: ['results:launch'] },
-      { href: '/indicators?new=1', label: 'Criar Indicador', description: 'Cadastro de KPI e meta na central de indicadores', icon: Target, permissions: ['indicators:create'] },
-      { href: '/org?create=macro', label: 'Criar Área', description: 'Novo nível de área na árvore', icon: Building2, permissions: ['org:manage'] },
-      { href: '/org?create=micro', label: 'Criar Setor', description: 'Setor vinculado à área', icon: Network, permissions: ['org:manage'] },
-      { href: '/org?create=pilar', label: 'Criar Pilar', description: 'Pilar para organizar os indicadores', icon: Building2, permissions: ['org:manage'] },
-      { href: '/org?create=guideline', label: 'Criar Diretriz', description: 'Diretriz dentro da árvore organizacional', icon: GitBranch, permissions: ['org:manage', 'strategy:manage'] },
       { href: '/deviations', label: 'Criar Análise de Causa', description: 'Desvios, FCA e tratativas', icon: AlertTriangle, permissions: ['deviations:manage'] },
       { href: '/imports', label: 'Registrar Evidência', description: 'Arquivos, CSV e documentos', icon: Upload, permissions: ['actions:manage', 'reports:export'] },
     ],
@@ -88,19 +82,13 @@ export const navSections: NavSection[] = [
     intent: 'management',
     icon: Building2,
     items: [
-      { href: '/org', label: 'Estrutura Organizacional', description: 'Empresas, áreas, setores, pilares e diretrizes', icon: Building2, permissions: ['org:manage'] },
       { href: '/organograma', label: 'Organograma de Área', description: 'Estrutura de cargos, faixas, turnos e orçamento', icon: Users, permissions: ['org:view'] },
       { href: '/aprovacoes-cargo', label: 'Aprovações de Cargo', description: 'Solicitações de promoção e mudança de cargo', icon: ShieldCheck, permissions: ['org:view'] },
       { href: '/eficacia', label: 'Análise de Eficácia', description: 'Validação de eficácia dos planos de ação (restrito)', icon: ClipboardCheck, permissions: ['actions:effectiveness', 'actions:view'] },
       { href: '/periods', label: 'Períodos', description: 'Ano de trabalho, abertura e fechamento anual', icon: Calendar, permissions: ['settings:manage'] },
-      { href: '/strategy', label: 'Objetivos Estratégicos', description: 'Mapas, perspectivas e objetivos', icon: Crosshair, permissions: ['strategy:manage', 'strategy:objectives:update'] },
       { href: '/actions', label: 'Plano de Ação', description: 'Ações, execução, evidências e eficácia', icon: ClipboardList, permissions: ['actions:view'] },
       { href: '/meetings', label: 'Reuniões', description: 'Agenda, atas e decisões', icon: Calendar, permissions: ['meetings:view'] },
-      { href: '/deviations', label: 'Análise de Causa', description: 'Desvios, causas e tratativas', icon: AlertTriangle, permissions: ['deviations:manage'] },
-      { href: '/indicators', label: 'Indicadores', description: 'Gestão de KPIs e responsáveis', icon: BarChart3, permissions: ['indicators:update', 'indicators:create'], exact: true },
       { href: '/okrs', label: 'OKRs', description: 'Ciclos e resultados-chave', icon: Activity, permissions: ['okrs:manage'] },
-      { href: '/projects', label: 'Projetos e Cronogramas', description: 'Projetos, marcos e tarefas', icon: FolderKanban, permissions: ['projects:manage'] },
-      { href: '/users', label: 'Responsáveis', description: 'Usuários e responsáveis operacionais', icon: Users, permissions: ['users:manage'] },
     ],
   },
   {
@@ -125,7 +113,7 @@ export const settingsNavItem: NavItem = {
 
 export const mobileNavItems: NavItem[] = [
   { href: '/', label: 'Visão', icon: Home, permissions: ['dashboard:view'], exact: true },
-  { href: '/launches', label: 'Lançar', icon: PencilLine, permissions: ['launches:view', 'results:launch'] },
+  { href: '/results', label: 'Lançar', icon: PencilLine, permissions: ['results:launch'] },
   { href: '/strategy', label: 'Mapa', icon: Map, permissions: ['strategy:view'] },
   { href: '/org', label: 'Árvore', icon: Network, permissions: ['org:view'] },
   { href: '/reports', label: 'Relatórios', icon: FileBarChart, permissions: ['reports:export'] },
@@ -138,12 +126,6 @@ export const productAreas = [
     description: 'Dashboards, mapas, faróis, histórico, rankings e tendências.',
     href: '/visualization',
     icon: LayoutDashboard,
-  },
-  {
-    title: 'Lançamentos',
-    description: 'Resultados, evidências, planos, análises e movimentação operacional.',
-    href: '/launches',
-    icon: PencilLine,
   },
   {
     title: 'Configurações',

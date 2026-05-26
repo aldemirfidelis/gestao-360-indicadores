@@ -413,17 +413,82 @@ function StrategyEdge({
   targetPosition,
   data,
   selected,
-}: EdgeProps<{ kind: string; label?: string | null }>) {
-  const [path] = getSmoothStepPath({
-    sourceX,
-    sourceY,
-    targetX,
-    targetY,
-    sourcePosition,
-    targetPosition,
-    borderRadius: 0,
-  });
+}: EdgeProps<{
+  kind: string;
+  label?: string | null;
+  description?: string | null;
+  editMode?: boolean;
+  onEdgeDragStop?: (edgeId: string, offsetX: number, offsetY: number) => void;
+}>) {
+  const [isDragging, setIsDragging] = useState(false);
+  const [localOffset, setLocalOffset] = useState({ x: 0, y: 0 });
+  const startDragPos = useRef({ x: 0, y: 0 });
+  const startOffset = useRef({ x: 0, y: 0 });
+
+  const parsedOffset = useMemo(() => {
+    let x = 0;
+    let y = 0;
+    if (data?.description) {
+      const parts = data.description.split(':');
+      if (parts.length >= 4) {
+        x = parseFloat(parts[2]) || 0;
+        y = parseFloat(parts[3]) || 0;
+      }
+    }
+    return { x, y };
+  }, [data?.description]);
+
+  useEffect(() => {
+    if (!isDragging) {
+      setLocalOffset(parsedOffset);
+    }
+  }, [parsedOffset, isDragging]);
+
+  const midX = (sourceX + targetX) / 2;
+  const midY = (sourceY + targetY) / 2;
+  const controlX = midX + localOffset.x;
+  const controlY = midY + localOffset.y;
+
+  // Use a quadratic bezier curve for smooth custom bending
+  const path = `M ${sourceX} ${sourceY} Q ${controlX} ${controlY} ${targetX} ${targetY}`;
   const meta = kindMeta(data?.kind);
+
+  const onMouseDown = (event: React.MouseEvent<SVGCircleElement>) => {
+    event.stopPropagation();
+    event.preventDefault();
+    setIsDragging(true);
+    startDragPos.current = { x: event.clientX, y: event.clientY };
+    startOffset.current = { ...localOffset };
+  };
+
+  useEffect(() => {
+    if (!isDragging) return;
+
+    const onMouseMove = (event: MouseEvent) => {
+      const dx = event.clientX - startDragPos.current.x;
+      const dy = event.clientY - startDragPos.current.y;
+      setLocalOffset({
+        x: startOffset.current.x + dx,
+        y: startOffset.current.y + dy,
+      });
+    };
+
+    const onMouseUp = () => {
+      setIsDragging(false);
+      if (data?.onEdgeDragStop) {
+        data.onEdgeDragStop(id, Math.round(localOffset.x), Math.round(localOffset.y));
+      }
+    };
+
+    document.addEventListener('mousemove', onMouseMove);
+    document.addEventListener('mouseup', onMouseUp);
+
+    return () => {
+      document.removeEventListener('mousemove', onMouseMove);
+      document.removeEventListener('mouseup', onMouseUp);
+    };
+  }, [isDragging, localOffset, id, data]);
+
   return (
     <>
       <style>{`
@@ -454,6 +519,28 @@ function StrategyEdge({
         }}
         className={cn("react-flow__edge-path", selected ? 'edge-animated-selected' : '')}
       />
+      {data?.editMode && (
+        <g>
+          <circle
+            cx={controlX}
+            cy={controlY}
+            r={8}
+            fill="#ffffff"
+            stroke={meta.color}
+            strokeWidth={3}
+            style={{ cursor: isDragging ? 'grabbing' : 'grab' }}
+            onMouseDown={onMouseDown}
+            className="shadow-sm hover:scale-125 transition-transform"
+          />
+          <circle
+            cx={controlX}
+            cy={controlY}
+            r={3.5}
+            fill={meta.color}
+            style={{ pointerEvents: 'none' }}
+          />
+        </g>
+      )}
     </>
   );
 }
@@ -557,6 +644,35 @@ function StrategyMapPageInner() {
     [],
   );
 
+  const handleEdgeDragStop = useCallback((edgeId: string, offsetX: number, offsetY: number) => {
+    let relation: any = null;
+    if (map) {
+      for (const obj of map.objectives) {
+        const found = obj.outRelations.find((r) => r.id === edgeId);
+        if (found) {
+          relation = found;
+          break;
+        }
+      }
+    }
+    if (!relation) return;
+    let sourceHandle = 'auto';
+    let targetHandle = 'auto';
+    const desc = relation.description ?? '';
+    if (desc && desc.includes(':')) {
+      const parts = desc.split(':');
+      sourceHandle = parts[0] || 'auto';
+      targetHandle = parts[1] || 'auto';
+    }
+    const newDesc = `${sourceHandle}:${targetHandle}:${offsetX}:${offsetY}`;
+    updateRelation.mutate({
+      relationId: edgeId,
+      kind: relation.kind || 'impacta',
+      label: relation.label || '',
+      description: newDesc,
+    });
+  }, [map, updateRelation]);
+
   useEffect(() => {
     if (!map) return;
     const flowNodes = buildNodes(map, filteredObjectives, editMode, selectedId, handlePerspectiveResize);
@@ -564,11 +680,11 @@ function StrategyMapPageInner() {
     const flowEdges = filteredObjectives.flatMap((objective) =>
       objective.outRelations
         .filter((relation) => objectiveIds.has(relation.to.id))
-        .map((relation) => toFlowEdge(relation, objective.id)),
+        .map((relation) => toFlowEdge(relation, objective.id, handleEdgeDragStop, editMode)),
     );
     setNodes(flowNodes);
     setEdges(flowEdges);
-  }, [editMode, filteredObjectives, map, selectedId, setEdges, setNodes, handlePerspectiveResize]);
+  }, [editMode, filteredObjectives, map, selectedId, setEdges, setNodes, handlePerspectiveResize, handleEdgeDragStop]);
 
   const computedEdges = useMemo(() => {
     const nodesMap = new Map(nodes.map((n) => [n.id, n]));
@@ -1984,6 +2100,8 @@ function buildNodes(
 function toFlowEdge(
   relation: Objective['outRelations'][number],
   sourceId: string,
+  onEdgeDragStop?: (edgeId: string, offsetX: number, offsetY: number) => void,
+  editMode?: boolean,
 ): Edge {
   const meta = kindMeta(relation.kind);
   let sourceHandle: string | undefined;
@@ -1991,7 +2109,7 @@ function toFlowEdge(
   const relAny = relation as any;
   if (relAny.description && relAny.description.includes(':')) {
     const parts = relAny.description.split(':');
-    if (parts.length === 2) {
+    if (parts.length >= 2) {
       sourceHandle = parts[0];
       targetHandle = parts[1];
     }
@@ -2003,7 +2121,13 @@ function toFlowEdge(
     type: 'strategy',
     sourceHandle,
     targetHandle,
-    data: { kind: relation.kind ?? 'impacta', label: relation.label ?? meta.label, description: relAny.description },
+    data: {
+      kind: relation.kind ?? 'impacta',
+      label: relation.label ?? meta.label,
+      description: relAny.description,
+      editMode,
+      onEdgeDragStop,
+    },
   };
 }
 

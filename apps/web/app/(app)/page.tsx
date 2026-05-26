@@ -1,6 +1,7 @@
 'use client';
 
 import Link from 'next/link';
+import { useEffect, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import {
   AlertTriangle,
@@ -14,6 +15,14 @@ import {
   LineChart,
   Target,
   Zap,
+  Settings,
+  Calendar,
+  BarChart3,
+  Network,
+  Map,
+  ClipboardCheck,
+  Users,
+  FileBarChart,
 } from 'lucide-react';
 import { PageHeader } from '@/components/shell/page-header';
 import { productAreas } from '@/components/shell/navigation';
@@ -21,8 +30,15 @@ import { MetricCard } from '@/components/platform/metric-card';
 import { SectionCard } from '@/components/platform/section-card';
 import { StatusBadge } from '@/components/platform/status-badge';
 import { Button } from '@/components/ui/button';
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogFooter,
+} from '@/components/ui/dialog';
 import { api } from '@/lib/api';
-import { formatDate, formatNumber, formatPercent, periodRefLabel } from '@/lib/utils';
+import { cn, formatDate, formatNumber, formatPercent, periodRefLabel } from '@/lib/utils';
 
 interface Overview {
   totalIndicators: number;
@@ -71,6 +87,20 @@ interface WorstRow {
   light: string;
 }
 
+const SHORTCUT_DEFS = [
+  { id: 'results', href: '/results', label: 'Lançar resultado', icon: LineChart },
+  { id: 'indicators', href: '/indicators', label: 'Gestão de Indicadores', icon: Target },
+  { id: 'actions', href: '/actions', label: 'Planos de ação', icon: ClipboardList },
+  { id: 'reports', href: '/reports', label: 'Exportar relatório', icon: FileBarChart },
+  { id: 'visualization', href: '/visualization', label: 'Dashboard Executivo', icon: BarChart3 },
+  { id: 'org', href: '/org', label: 'Árvore Organizacional', icon: Network },
+  { id: 'strategy', href: '/strategy', label: 'Mapa Estratégico', icon: Map },
+  { id: 'eficacia', href: '/eficacia', label: 'Análise de Eficácia', icon: ClipboardCheck },
+  { id: 'meetings', href: '/meetings', label: 'Reuniões', icon: Calendar },
+  { id: 'deviations', href: '/deviations', label: 'Criar Análise de Causa', icon: AlertTriangle },
+  { id: 'organograma', href: '/organograma', label: 'Organograma de Área', icon: Users },
+];
+
 export default function HomePage() {
   const overview = useQuery<Overview>({
     queryKey: ['dashboard', 'overview'],
@@ -85,6 +115,37 @@ export default function HomePage() {
     queryFn: () => api<WorstRow[]>('/dashboard/worst?limit=5'),
   });
 
+  const [selectedShortcuts, setSelectedShortcuts] = useState<string[]>([]);
+  const [isConfigOpen, setIsConfigOpen] = useState(false);
+
+  useEffect(() => {
+    const saved = localStorage.getItem('g360-dashboard-shortcuts');
+    if (saved) {
+      try {
+        setSelectedShortcuts(JSON.parse(saved));
+      } catch (e) {
+        setSelectedShortcuts(['results', 'indicators', 'actions', 'reports']);
+      }
+    } else {
+      setSelectedShortcuts(['results', 'indicators', 'actions', 'reports']);
+    }
+  }, []);
+
+  const handleToggleShortcut = (id: string) => {
+    setSelectedShortcuts((prev) => {
+      if (prev.includes(id)) {
+        return prev.filter((item) => item !== id);
+      } else {
+        return [...prev, id];
+      }
+    });
+  };
+
+  const handleSaveShortcuts = () => {
+    localStorage.setItem('g360-dashboard-shortcuts', JSON.stringify(selectedShortcuts));
+    setIsConfigOpen(false);
+  };
+
   const ov = overview.data;
 
   return (
@@ -96,7 +157,7 @@ export default function HomePage() {
         actions={
           <>
             <Button variant="outline" asChild>
-              <Link href="/launches">
+              <Link href="/results">
                 <Zap className="mr-2 h-4 w-4" />
                 Lançamentos
               </Link>
@@ -162,7 +223,7 @@ export default function HomePage() {
           description="Lançamentos e ações"
           icon={<ClipboardList className="h-4 w-4" />}
           tone="yellow"
-          href="/launches"
+          href="/results"
         />
       </div>
 
@@ -202,16 +263,21 @@ export default function HomePage() {
       </div>
 
       <div className="grid grid-cols-1 gap-6 xl:grid-cols-[1fr,380px]">
-        <SectionCard title="Atalhos rapidos" description="Ações frequentes da rotina corporativa." contentClassName="grid grid-cols-1 gap-3 md:grid-cols-2">
-          {[
-            { href: '/results', label: 'Lancar resultado', icon: LineChart, tone: 'blue' },
-            { href: '/indicators/new', label: 'Cadastrar indicador', icon: Target, tone: 'green' },
-            { href: '/actions', label: 'Planos de ação', icon: ClipboardList, tone: 'purple' },
-            { href: '/reports', label: 'Exportar relatorio', icon: LayoutDashboard, tone: 'yellow' },
-          ].map((item) => {
+        <SectionCard
+          title="Atalhos rápidos"
+          description="Personalize seus atalhos para ações frequentes."
+          actions={
+            <Button variant="ghost" size="sm" onClick={() => setIsConfigOpen(true)}>
+              <Settings className="mr-1.5 h-3.5 w-3.5" />
+              Configurar
+            </Button>
+          }
+          contentClassName="grid grid-cols-1 gap-3 md:grid-cols-2"
+        >
+          {SHORTCUT_DEFS.filter((s) => selectedShortcuts.includes(s.id)).map((item) => {
             const Icon = item.icon;
             return (
-              <Button key={item.href} variant="outline" className="h-14 justify-start gap-3 bg-background" asChild>
+              <Button key={item.id} variant="outline" className="h-14 justify-start gap-3 bg-background" asChild>
                 <Link href={item.href}>
                   <span className="grid h-8 w-8 place-items-center rounded-md bg-muted">
                     <Icon className="h-4 w-4" />
@@ -221,6 +287,11 @@ export default function HomePage() {
               </Button>
             );
           })}
+          {selectedShortcuts.length === 0 && (
+            <div className="col-span-2 py-6 text-center text-sm text-muted-foreground border border-dashed rounded-lg">
+              Nenhum atalho selecionado. Clique em "Configurar" para adicionar seus atalhos personalizados.
+            </div>
+          )}
         </SectionCard>
 
         <SectionCard title="Alertas importantes" description="Itens que merecem acompanhamento.">
@@ -316,6 +387,51 @@ export default function HomePage() {
           </div>
         </SectionCard>
       </div>
+
+      <Dialog open={isConfigOpen} onOpenChange={setIsConfigOpen}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>Personalizar atalhos rápidos</DialogTitle>
+          </DialogHeader>
+          <div className="grid grid-cols-1 gap-2 max-h-[60vh] overflow-y-auto py-2">
+            {SHORTCUT_DEFS.map((shortcut) => {
+              const Icon = shortcut.icon;
+              const isSelected = selectedShortcuts.includes(shortcut.id);
+              return (
+                <button
+                  key={shortcut.id}
+                  type="button"
+                  onClick={() => handleToggleShortcut(shortcut.id)}
+                  className={cn(
+                    'flex items-center gap-3 rounded-lg border p-3 text-left transition hover:bg-accent/40',
+                    isSelected ? 'border-primary bg-primary/5' : 'bg-card'
+                  )}
+                >
+                  <span className={cn(
+                    'grid h-8 w-8 place-items-center rounded-md',
+                    isSelected ? 'bg-primary/10 text-primary' : 'bg-muted text-muted-foreground'
+                  )}>
+                    <Icon className="h-4 w-4" />
+                  </span>
+                  <div className="flex-1 min-w-0">
+                    <div className="text-sm font-semibold">{shortcut.label}</div>
+                  </div>
+                  <div className={cn(
+                    'h-4 w-4 rounded border flex items-center justify-center shrink-0',
+                    isSelected ? 'border-primary bg-primary text-primary-foreground' : 'border-muted-foreground'
+                  )}>
+                    {isSelected && <span className="text-[10px]">✓</span>}
+                  </div>
+                </button>
+              );
+            })}
+          </div>
+          <DialogFooter>
+            <Button variant="ghost" onClick={() => setIsConfigOpen(false)}>Cancelar</Button>
+            <Button onClick={handleSaveShortcuts}>Salvar atalhos</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
