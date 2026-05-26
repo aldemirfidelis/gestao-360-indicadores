@@ -646,18 +646,7 @@ function StrategyMapPageInner() {
 
 
 
-  useEffect(() => {
-    if (!map) return;
-    const flowNodes = buildNodes(map, filteredObjectives, editMode, selectedId, handlePerspectiveResize);
-    const objectiveIds = new Set(filteredObjectives.map((objective) => objective.id));
-    const flowEdges = filteredObjectives.flatMap((objective) =>
-      objective.outRelations
-        .filter((relation) => objectiveIds.has(relation.to.id))
-        .map((relation) => toFlowEdge(relation, objective.id, handleEdgeDragStop, editMode)),
-    );
-    setNodes(flowNodes);
-    setEdges(flowEdges);
-  }, [editMode, filteredObjectives, map, selectedId, setEdges, setNodes, handlePerspectiveResize, handleEdgeDragStop]);
+
 
   const computedEdges = useMemo(() => {
     const nodesMap = new Map(nodes.map((n) => [n.id, n]));
@@ -892,6 +881,19 @@ function StrategyMapPageInner() {
       description: newDesc,
     });
   }, [map, updateRelation]);
+
+  useEffect(() => {
+    if (!map) return;
+    const flowNodes = buildNodes(map, filteredObjectives, editMode, selectedId, handlePerspectiveResize);
+    const objectiveIds = new Set(filteredObjectives.map((objective) => objective.id));
+    const flowEdges = filteredObjectives.flatMap((objective) =>
+      objective.outRelations
+        .filter((relation) => objectiveIds.has(relation.to.id))
+        .map((relation) => toFlowEdge(relation, objective.id, handleEdgeDragStop, editMode)),
+    );
+    setNodes(flowNodes);
+    setEdges(flowEdges);
+  }, [editMode, filteredObjectives, map, selectedId, setEdges, setNodes, handlePerspectiveResize, handleEdgeDragStop]);
 
   const removeRelation = useMutation({
     mutationFn: (relationId: string) => api(`/strategy/relations/${relationId}`, { method: 'DELETE' }),
