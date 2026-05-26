@@ -17,6 +17,7 @@ import ReactFlow, {
   Position,
   addEdge,
   getBezierPath,
+  getSmoothStepPath,
   useEdgesState,
   useNodesState,
   useReactFlow,
@@ -413,28 +414,47 @@ function StrategyEdge({
   data,
   selected,
 }: EdgeProps<{ kind: string; label?: string | null }>) {
-  const [path] = getBezierPath({
+  const [path] = getSmoothStepPath({
     sourceX,
     sourceY,
     targetX,
     targetY,
     sourcePosition,
     targetPosition,
+    borderRadius: 0,
   });
   const meta = kindMeta(data?.kind);
   return (
-    <BaseEdge
-      id={id}
-      path={path}
-      markerEnd="url(#g360-arrow)"
-      style={{
-        stroke: meta.color,
-        strokeWidth: selected ? 4.5 : 3,
-        opacity: 1,
-        strokeDasharray: data?.kind === 'depende' ? '8 5' : undefined,
-        filter: 'drop-shadow(0 1px 1px rgba(15, 23, 42, 0.18))',
-      }}
-    />
+    <>
+      <style>{`
+        @keyframes edge-flow-dash {
+          from {
+            stroke-dashoffset: 24;
+          }
+          to {
+            stroke-dashoffset: 0;
+          }
+        }
+        .edge-animated-selected {
+          stroke-dasharray: 8 4 !important;
+          animation: edge-flow-dash 0.6s linear infinite !important;
+        }
+      `}</style>
+      <path
+        id={id}
+        d={path}
+        markerEnd="url(#g360-arrow)"
+        fill="none"
+        style={{
+          stroke: meta.color,
+          strokeWidth: selected ? 4.5 : 3,
+          opacity: 1,
+          strokeDasharray: selected ? undefined : (data?.kind === 'depende' ? '8 5' : undefined),
+          filter: 'drop-shadow(0 1px 1px rgba(15, 23, 42, 0.18))',
+        }}
+        className={cn("react-flow__edge-path", selected ? 'edge-animated-selected' : '')}
+      />
+    </>
   );
 }
 
