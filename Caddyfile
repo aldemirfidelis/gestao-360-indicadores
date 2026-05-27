@@ -6,13 +6,11 @@
 #   emite SSL automaticamente via Let's Encrypt
 # =====================================================
 
-# === MODO IP-ONLY (default) ===
-# Quando tiver dominio:
-#   1. Aponte o A-record do seu dominio para o IP da Droplet
-#   2. Substitua ':80' abaixo por 'seu-dominio.com'
-#   3. (Opcional) Adicione: tls seu-email@dominio.com  // dentro do bloco
-#   4. Recarregue: docker compose -f docker-compose.droplet.yml restart caddy
-:80 {
+www.gestao360.org {
+    redir https://gestao360.org{uri} permanent
+}
+
+gestao360.org {
     # Limites de upload (importacao CSV, evidencias)
     request_body {
         max_size 50MB
