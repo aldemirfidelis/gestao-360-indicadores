@@ -287,10 +287,18 @@ function PerspectiveLane({
   onResize?: (width: number, height: number) => void;
 }>) {
   const perspective = data.perspective;
+  
+  const laneStyle: React.CSSProperties = {
+    borderColor: perspective.color ?? undefined,
+    background: perspective.color
+      ? `linear-gradient(to right, ${perspective.color}0f, ${perspective.color}03), hsl(var(--background))`
+      : 'hsl(var(--background))'
+  };
+
   return (
     <div
-      className="relative h-full w-full rounded-lg border bg-background/80 shadow-sm"
-      style={{ borderColor: perspective.color ?? undefined }}
+      className="relative h-full w-full rounded-lg border shadow-sm"
+      style={laneStyle}
     >
       {data.editMode && (
         <NodeResizer
