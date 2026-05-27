@@ -56,7 +56,7 @@ export const navSections: NavSection[] = [
     intent: 'view',
     icon: LayoutDashboard,
     items: [
-      { href: '/', label: 'Visão Geral', description: 'Resumo, pendências e atalhos', icon: Home, permissions: ['dashboard:view'], exact: true },
+      { href: '/dashboard', label: 'Visão Geral', description: 'Resumo, pendências e atalhos', icon: Home, permissions: ['dashboard:view'], exact: true },
       { href: '/visualization', label: 'Dashboard Executivo', description: 'Visão 360 para decisão', icon: BarChart3, permissions: ['dashboard:view'] },
       { href: '/org', label: 'Árvore Organizacional', description: 'Áreas, setores, pilares e diretrizes', icon: Network, permissions: ['org:view'] },
       { href: '/strategy', label: 'Mapa Estratégico', description: 'Perspectivas, objetivos e impactos', icon: Map, permissions: ['strategy:view'] },

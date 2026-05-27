@@ -26,7 +26,7 @@ interface AuthCtx {
 
 const Ctx = createContext<AuthCtx | null>(null);
 
-const PUBLIC_PATHS = ['/login'];
+const PUBLIC_PATHS = ['/', '/login'];
 
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<AuthUser | null>(null);
@@ -60,7 +60,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setTokens(out.accessToken, out.refreshToken);
     const profile = await api<AuthUser & { sub?: string }>('/auth/me');
     setUser({ ...profile, id: profile.sub ?? profile.id, permissions: profile.permissions ?? out.user.permissions ?? [] });
-    router.replace('/');
+    router.replace('/dashboard');
   };
 
   const logout = async () => {

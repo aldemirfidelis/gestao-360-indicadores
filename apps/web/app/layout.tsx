@@ -2,7 +2,6 @@ import './globals.css';
 import type { Metadata } from 'next';
 import { ReactNode } from 'react';
 import { Providers } from '@/components/providers';
-import { CreditFooter } from '@/components/brand/credit-footer';
 
 export const metadata: Metadata = {
   title: process.env.NEXT_PUBLIC_APP_NAME ?? 'Gestão 360',
@@ -19,10 +18,7 @@ export default function RootLayout({ children }: { children: ReactNode }) {
   return (
     <html lang="pt-BR" suppressHydrationWarning>
       <body className="min-h-screen bg-background font-sans antialiased">
-        <Providers>
-          {children}
-          <CreditFooter />
-        </Providers>
+        <Providers>{children}</Providers>
       </body>
     </html>
   );
