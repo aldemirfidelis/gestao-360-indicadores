@@ -247,8 +247,8 @@ export default function OrgPage() {
       <PageHeader
         eyebrow="Visualização"
         tone="view"
-        title="Arvore de valores, diretrizes, pilares e indicadores"
-        description="Modelo livre para organizar Valores, Diretrizes, Áreas, Pilares e os indicadores vinculados a cada pilar."
+        title="Estrutura de gestão, Empresa, Áreas e setores"
+        description="Modelo livre para organizar Áreas e os indicadores vinculados a cada pilar."
         breadcrumbs={[{ label: 'Início', href: '/' }, { label: 'Visualização', href: '/visualization' }, { label: 'Arvore de gestão' }]}
         actions={
           <Button onClick={() => openNode()}>

@@ -334,7 +334,7 @@ function ObjectiveNode({
   return (
     <div
       className={cn(
-        'flex h-full w-full flex-col rounded-lg border-2 p-3 shadow-md transition',
+        'group flex h-full w-full flex-col rounded-lg border-2 p-3 shadow-md transition relative',
         LIGHT_CLASS[light] ?? LIGHT_CLASS.GRAY,
         (selected || data.selected) && 'ring-2 ring-primary',
       )}
@@ -348,8 +348,30 @@ function ObjectiveNode({
           lineStyle={{ borderColor: 'hsl(var(--primary))' }}
         />
       )}
-      <Handle id="left" type="source" position={Position.Left} className="!h-3 !w-3 !bg-primary" />
-      <Handle id="top" type="source" position={Position.Top} className="!h-3 !w-3 !bg-primary" />
+      <Handle
+        id="left"
+        type="source"
+        position={Position.Left}
+        className={cn(
+          "!h-5 !w-5 !bg-transparent !border-0 flex items-center justify-center -translate-x-1 !absolute",
+          data.editMode ? "group-hover:opacity-100 opacity-0 transition-opacity duration-200 pointer-events-auto" : "!pointer-events-none !opacity-0"
+        )}
+        style={{ left: 0 }}
+      >
+        <span className="h-2.5 w-2.5 rounded-full bg-primary ring-2 ring-background shadow-md hover:scale-125 transition-transform duration-150 animate-pulse" />
+      </Handle>
+      <Handle
+        id="top"
+        type="source"
+        position={Position.Top}
+        className={cn(
+          "!h-5 !w-5 !bg-transparent !border-0 flex items-center justify-center -translate-y-1 !absolute",
+          data.editMode ? "group-hover:opacity-100 opacity-0 transition-opacity duration-200 pointer-events-auto" : "!pointer-events-none !opacity-0"
+        )}
+        style={{ top: 0 }}
+      >
+        <span className="h-2.5 w-2.5 rounded-full bg-primary ring-2 ring-background shadow-md hover:scale-125 transition-transform duration-150 animate-pulse" />
+      </Handle>
       <div className="mb-2 flex items-start justify-between gap-2">
         <div className="min-w-0">
           <div className={cn("line-clamp-2 text-sm font-semibold leading-tight", isDarkColor ? "text-white" : "text-foreground")}>{objective.name}</div>
@@ -397,8 +419,30 @@ function ObjectiveNode({
         <span>{LIGHT_LABEL[light] ?? light}</span>
         <span>Peso {objective.weight}</span>
       </div>
-      <Handle id="right" type="source" position={Position.Right} className="!h-3 !w-3 !bg-primary" />
-      <Handle id="bottom" type="source" position={Position.Bottom} className="!h-3 !w-3 !bg-primary" />
+      <Handle
+        id="right"
+        type="source"
+        position={Position.Right}
+        className={cn(
+          "!h-5 !w-5 !bg-transparent !border-0 flex items-center justify-center translate-x-1 !absolute",
+          data.editMode ? "group-hover:opacity-100 opacity-0 transition-opacity duration-200 pointer-events-auto" : "!pointer-events-none !opacity-0"
+        )}
+        style={{ right: 0 }}
+      >
+        <span className="h-2.5 w-2.5 rounded-full bg-primary ring-2 ring-background shadow-md hover:scale-125 transition-transform duration-150 animate-pulse" />
+      </Handle>
+      <Handle
+        id="bottom"
+        type="source"
+        position={Position.Bottom}
+        className={cn(
+          "!h-5 !w-5 !bg-transparent !border-0 flex items-center justify-center translate-y-1 !absolute",
+          data.editMode ? "group-hover:opacity-100 opacity-0 transition-opacity duration-200 pointer-events-auto" : "!pointer-events-none !opacity-0"
+        )}
+        style={{ bottom: 0 }}
+      >
+        <span className="h-2.5 w-2.5 rounded-full bg-primary ring-2 ring-background shadow-md hover:scale-125 transition-transform duration-150 animate-pulse" />
+      </Handle>
     </div>
   );
 }
@@ -424,23 +468,41 @@ function getOrthogonalPath({
 }) {
   const sourceIsHorizontal = sourcePosition === Position.Left || sourcePosition === Position.Right;
   const targetIsHorizontal = targetPosition === Position.Left || targetPosition === Position.Right;
-  const routeHorizontalFirst = sourceIsHorizontal || (!targetIsHorizontal && Math.abs(targetX - sourceX) >= Math.abs(targetY - sourceY));
 
-  const points = routeHorizontalFirst
-    ? [
-        { x: sourceX, y: sourceY },
-        { x: controlX, y: sourceY },
-        { x: controlX, y: controlY },
-        { x: targetX, y: controlY },
-        { x: targetX, y: targetY },
-      ]
-    : [
-        { x: sourceX, y: sourceY },
-        { x: sourceX, y: controlY },
-        { x: controlX, y: controlY },
-        { x: controlX, y: targetY },
-        { x: targetX, y: targetY },
-      ];
+  const points = [];
+  if (sourceIsHorizontal && targetIsHorizontal) {
+    points.push(
+      { x: sourceX, y: sourceY },
+      { x: controlX, y: sourceY },
+      { x: controlX, y: controlY },
+      { x: controlX, y: targetY },
+      { x: targetX, y: targetY }
+    );
+  } else if (!sourceIsHorizontal && !targetIsHorizontal) {
+    points.push(
+      { x: sourceX, y: sourceY },
+      { x: sourceX, y: controlY },
+      { x: controlX, y: controlY },
+      { x: targetX, y: controlY },
+      { x: targetX, y: targetY }
+    );
+  } else if (sourceIsHorizontal && !targetIsHorizontal) {
+    points.push(
+      { x: sourceX, y: sourceY },
+      { x: controlX, y: sourceY },
+      { x: controlX, y: controlY },
+      { x: targetX, y: controlY },
+      { x: targetX, y: targetY }
+    );
+  } else {
+    points.push(
+      { x: sourceX, y: sourceY },
+      { x: sourceX, y: controlY },
+      { x: controlX, y: controlY },
+      { x: controlX, y: targetY },
+      { x: targetX, y: targetY }
+    );
+  }
 
   return points
     .map((point, index) => `${index === 0 ? 'M' : 'L'} ${point.x} ${point.y}`)

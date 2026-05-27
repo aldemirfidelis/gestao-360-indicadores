@@ -134,7 +134,7 @@ export default function VisualizationPage() {
         <MetricCard
           title="Desempenho geral"
           value={formatPercent(ov?.generalAttainment)}
-          description="Atingimento medio"
+          description="Atingimento médio"
           icon={<Gauge className="h-4 w-4" />}
           tone="blue"
         />
@@ -165,7 +165,7 @@ export default function VisualizationPage() {
       </div>
 
       <div className="grid grid-cols-1 gap-6 xl:grid-cols-[1.4fr,0.8fr]">
-        <SectionCard title="Evolucao mensal dos indicadores" description="Atingimento medio e taxa de farol verde.">
+        <SectionCard title="Evolução mensal dos indicadores" description="Atingimento médio e taxa de farol verde.">
           <div className="h-80">
             <ResponsiveContainer width="100%" height="100%">
               <LineChart data={evRows}>
@@ -210,7 +210,7 @@ export default function VisualizationPage() {
       </div>
 
       <div className="mt-6 grid grid-cols-1 gap-6 xl:grid-cols-[1fr,360px]">
-        <SectionCard title="Ranking de áreas" description="Atingimento medio por estrutura organizacional.">
+        <SectionCard title="Ranking de áreas" description="Atingimento médio por estrutura organizacional.">
           <div className="h-80">
             <ResponsiveContainer width="100%" height="100%">
               <BarChart data={rankRows} layout="vertical" margin={{ top: 8, right: 16, bottom: 0, left: 12 }}>
@@ -227,7 +227,7 @@ export default function VisualizationPage() {
           </div>
         </SectionCard>
 
-        <SectionCard title="Farois consolidados" description="Distribuicao atual por status.">
+        <SectionCard title="Farois consolidados" description="Distribuição atual por status.">
           <div className="space-y-4">
             {[
               ['GREEN', 'Dentro da meta', ov?.counts.GREEN ?? 0],

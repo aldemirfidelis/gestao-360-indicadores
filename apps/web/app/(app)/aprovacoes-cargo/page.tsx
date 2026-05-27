@@ -231,19 +231,19 @@ export default function AprovacoesCargoPage() {
       const safeName = detail.employee.name.replace(/[^a-z0-9]/gi, '-').toLowerCase();
       doc.save(`aprovacao-cargo-${safeName}-${detail.id.slice(0, 8)}.pdf`);
     } catch (e: any) {
-      toast.error(e?.message ?? 'Falha ao gerar relatorio');
+      toast.error(e?.message ?? 'Falha ao gerar relatório');
     }
   };
 
   return (
     <div>
       <PageHeader
-        title="Aprovacoes de Cargo"
-        description="Solicitacoes de promocao e mudanca de cargo. Apenas o aprovador designado pode decidir cada caso."
+        title="Aprovações de Cargo"
+        description="Solicitações de promoção e mudança de cargo. Apenas o aprovador designado pode decidir cada caso."
       />
 
       <div className="mb-6 grid grid-cols-2 gap-4 md:grid-cols-4">
-        <MetricCard title="Pendentes" value={String(stats.pending)} description="Aguardando decisao" icon={<Clock className="h-4 w-4" />} tone="yellow" />
+        <MetricCard title="Pendentes" value={String(stats.pending)} description="Aguardando decisão" icon={<Clock className="h-4 w-4" />} tone="yellow" />
         <MetricCard title="Aprovadas" value={String(stats.approved)} description="Cargos liberados" icon={<CheckCircle2 className="h-4 w-4" />} tone="green" />
         <MetricCard title="Reprovadas" value={String(stats.rejected)} description="Recusas registradas" icon={<XCircle className="h-4 w-4" />} tone="red" />
         <MetricCard title="No filtro" value={String(stats.total)} description="Total exibido" icon={<Inbox className="h-4 w-4" />} tone="blue" />
@@ -352,9 +352,9 @@ export default function AprovacoesCargoPage() {
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
               {decisionDialog.decision === 'APPROVED' ? (
-                <><CheckCircle2 className="h-5 w-5 text-emerald-600" /> Aprovar movimentacao de cargo</>
+                <><CheckCircle2 className="h-5 w-5 text-emerald-600" /> Aprovar movimentação de cargo</>
               ) : (
-                <><XCircle className="h-5 w-5 text-rose-600" /> Reprovar solicitacao</>
+                <><XCircle className="h-5 w-5 text-rose-600" /> Reprovar solicitação</>
               )}
             </DialogTitle>
           </DialogHeader>
@@ -372,12 +372,12 @@ export default function AprovacoesCargoPage() {
                 )}
               </div>
               <div className="space-y-2">
-                <Label>Observacao do aprovador (opcional)</Label>
+                <Label>Observação do aprovador (opcional)</Label>
                 <Textarea
                   rows={3}
                   value={decisionNote}
                   onChange={(e) => setDecisionNote(e.target.value)}
-                  placeholder={decisionDialog.decision === 'APPROVED' ? 'Comente os pontos considerados...' : 'Motivo da reprovacao...'}
+                  placeholder={decisionDialog.decision === 'APPROVED' ? 'Comente os pontos considerados...' : 'Motivo da reprovação...'}
                 />
               </div>
             </div>
@@ -389,7 +389,7 @@ export default function AprovacoesCargoPage() {
               disabled={decide.isPending}
               className={decisionDialog.decision === 'APPROVED' ? 'bg-emerald-600 hover:bg-emerald-700' : 'bg-rose-600 hover:bg-rose-700'}
             >
-              {decisionDialog.decision === 'APPROVED' ? 'Confirmar aprovacao' : 'Confirmar reprovacao'}
+              {decisionDialog.decision === 'APPROVED' ? 'Confirmar aprovação' : 'Confirmar reprovação'}
             </Button>
           </DialogFooter>
         </DialogContent>

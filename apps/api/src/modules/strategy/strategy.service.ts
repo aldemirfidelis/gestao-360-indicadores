@@ -1021,7 +1021,7 @@ export class StrategyService {
         company: { select: { id: true, name: true, tradeName: true, cnpj: true } },
       },
     });
-    if (!request) throw new NotFoundException('Solicitacao de aprovacao nao encontrada');
+    if (!request) throw new NotFoundException('Solicitação de aprovação não encontrada');
     return request;
   }
 
