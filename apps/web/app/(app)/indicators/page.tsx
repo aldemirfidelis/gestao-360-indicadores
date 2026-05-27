@@ -31,6 +31,8 @@ import {
   Trash2,
   TrendingUp,
   UserRound,
+  Sliders,
+  Filter,
 } from 'lucide-react';
 import { PageHeader } from '@/components/shell/page-header';
 import { MetricCard } from '@/components/platform/metric-card';
@@ -252,7 +254,7 @@ const DIRECTION_LABEL: Record<string, string> = {
 const STATUS_LABEL: Record<string, string> = {
   ACTIVE: 'Ativo',
   INACTIVE: 'Inativo',
-  IN_REVIEW: 'Em revisao',
+  IN_REVIEW: 'Em revisão',
 };
 
 const LIGHT_LABEL: Record<string, string> = {
@@ -311,6 +313,7 @@ export default function IndicatorsPage() {
   const [targetEditing, setTargetEditing] = useState<IndicatorRow | null>(null);
   const [resultEditing, setResultEditing] = useState<IndicatorRow | null>(null);
   const [historyIndicator, setHistoryIndicator] = useState<IndicatorRow | null>(null);
+  const [filtersOpen, setFiltersOpen] = useState(false);
 
   const options = useQuery<IndicatorOptions>({
     queryKey: ['indicators', 'options'],
@@ -535,109 +538,141 @@ export default function IndicatorsPage() {
       </div>
 
       <section className="panel mb-6 p-4">
-        <div className="mb-3 flex items-center justify-between gap-3">
-          <div>
-            <h2 className="text-sm font-semibold">Filtros</h2>
-            <p className="text-xs text-muted-foreground">Filtre por empresa, estrutura, status, tipo, periodicidade e responsável.</p>
-          </div>
-          <Button variant="ghost" size="sm" onClick={clearFilters}>Limpar</Button>
-        </div>
-        <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
-          <div>
-            <Label>Empresa</Label>
-            <NativeSelect value={filters.companyId} onChange={(e) => setFilters((prev) => ({ ...prev, companyId: e.target.value, areaMacroId: '', areaMicroId: '' }))}>
-              {companies.map((company) => (
-                <option key={company.id} value={company.id}>{company.tradeName || company.name}</option>
-              ))}
-            </NativeSelect>
-          </div>
-          <div>
-            <Label>Área</Label>
-            <NativeSelect value={filters.areaMacroId} onChange={(e) => setFilters((prev) => ({ ...prev, areaMacroId: e.target.value, areaMicroId: '' }))}>
-              <option value="">Todas</option>
-              {macroOptions.map((node) => (
-                <option key={node.id} value={node.id}>{node.name}</option>
-              ))}
-            </NativeSelect>
-          </div>
-          <div>
-            <Label>Setor</Label>
-            <NativeSelect value={filters.areaMicroId} onChange={(e) => setFilters((prev) => ({ ...prev, areaMicroId: e.target.value }))}>
-              <option value="">Todas</option>
-              {filterMicroOptions.map((node) => (
-                <option key={node.id} value={node.id}>{node.name}</option>
-              ))}
-            </NativeSelect>
-          </div>
-          <div>
-            <Label>Status</Label>
-            <NativeSelect value={filters.status} onChange={(e) => setFilters((prev) => ({ ...prev, status: e.target.value }))}>
-              <option value="">Todos</option>
-              {options.data?.statuses.map((status) => (
-                <option key={status} value={status}>{STATUS_LABEL[status] ?? status}</option>
-              ))}
-            </NativeSelect>
-          </div>
-          <div>
-            <Label>Tipo</Label>
-            <NativeSelect value={filters.type} onChange={(e) => setFilters((prev) => ({ ...prev, type: e.target.value }))}>
-              <option value="">Todos</option>
-              {options.data?.indicatorTypes.map((type) => (
-                <option key={type} value={type}>{TYPE_LABEL[type] ?? type}</option>
-              ))}
-            </NativeSelect>
-          </div>
-          <div>
-            <Label>Periodicidade</Label>
-            <NativeSelect value={filters.periodicity} onChange={(e) => setFilters((prev) => ({ ...prev, periodicity: e.target.value }))}>
-              <option value="">Todas</option>
-              {options.data?.periodicities.map((periodicity) => (
-                <option key={periodicity} value={periodicity}>{PERIODICITY_LABEL[periodicity] ?? periodicity}</option>
-              ))}
-            </NativeSelect>
-          </div>
-          <div>
-            <Label>Responsável</Label>
-            <NativeSelect value={filters.responsibleUserId} onChange={(e) => setFilters((prev) => ({ ...prev, responsibleUserId: e.target.value }))}>
-              <option value="">Todos</option>
-              {users.map((user) => (
-                <option key={user.id} value={user.id}>{user.name}</option>
-              ))}
-            </NativeSelect>
-          </div>
-          <div>
-            <Label>Ano</Label>
-            <Input value={filters.year} onChange={(e) => setFilters((prev) => ({ ...prev, year: e.target.value }))} placeholder="2026" />
-          </div>
-          <div className="relative md:col-span-2 xl:col-span-3">
-            <Label>Busca</Label>
-            <Search className="absolute left-3 top-[35px] h-4 w-4 text-muted-foreground" />
-            <Input
-              value={filters.search}
-              onChange={(e) => setFilters((prev) => ({ ...prev, search: e.target.value }))}
-              placeholder="Buscar por nome, código, área ou responsável"
-              className="pl-9"
-            />
-          </div>
-          <div>
-            <Label>Farol</Label>
-            <div className="flex gap-2">
-              {(['GREEN', 'YELLOW', 'RED', 'GRAY'] as const).map((light) => (
-                <Button
-                  key={light}
-                  type="button"
-                  variant={filters.light === light ? 'default' : 'outline'}
-                  size="sm"
-                  className="h-10 flex-1"
-                  onClick={() => setFilters((prev) => ({ ...prev, light: prev.light === light ? '' : light }))}
-                  aria-label={`Filtrar ${LIGHT_LABEL[light]}`}
-                >
-                  <StatusLight light={light} />
-                </Button>
-              ))}
+        {/* Main Toolbar */}
+        <div className="flex flex-wrap items-end justify-between gap-4">
+          <div className="flex flex-1 min-w-[280px] flex-col gap-1.5">
+            <Label htmlFor="search-indicator">Buscar Indicador</Label>
+            <div className="relative">
+              <Search className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
+              <Input
+                id="search-indicator"
+                value={filters.search}
+                onChange={(e) => setFilters((prev) => ({ ...prev, search: e.target.value }))}
+                placeholder="Buscar por nome, código, área ou responsável..."
+                className="pl-9"
+              />
             </div>
           </div>
+          
+          <div className="flex flex-col gap-1.5">
+            <Label>Filtrar por Farol</Label>
+            <div className="flex flex-wrap gap-1.5">
+              {(['GREEN', 'YELLOW', 'RED', 'GRAY'] as const).map((light) => {
+                const label = LIGHT_LABEL[light] ?? light;
+                const isSelected = filters.light === light;
+                return (
+                  <Button
+                    key={light}
+                    type="button"
+                    variant={isSelected ? 'default' : 'outline'}
+                    size="sm"
+                    className={cn(
+                      "h-9 px-3 gap-2 flex items-center transition-all",
+                      isSelected && "ring-2 ring-primary/20"
+                    )}
+                    onClick={() => setFilters((prev) => ({ ...prev, light: prev.light === light ? '' : light }))}
+                    aria-label={`Filtrar ${label}`}
+                  >
+                    <StatusLight light={light} />
+                    <span className="text-xs font-medium hidden sm:inline">{label}</span>
+                  </Button>
+                );
+              })}
+            </div>
+          </div>
+
+          <div className="flex gap-2">
+            <Button
+              type="button"
+              variant={filtersOpen ? 'secondary' : 'outline'}
+              size="sm"
+              className="h-9 gap-2"
+              onClick={() => setFiltersOpen(!filtersOpen)}
+            >
+              <Sliders className="h-4 w-4" />
+              <span className="hidden md:inline">Filtros Avançados</span>
+              <span className="md:hidden">Filtros</span>
+            </Button>
+            
+            {(filters.companyId || filters.areaMacroId || filters.areaMicroId || filters.status || filters.type || filters.periodicity || filters.responsibleUserId || filters.light || filters.search) && (
+              <Button variant="ghost" size="sm" className="h-9 px-3" onClick={clearFilters}>
+                Limpar
+              </Button>
+            )}
+          </div>
         </div>
+
+        {/* Collapsible Advanced Filters */}
+        {filtersOpen && (
+          <div className="mt-4 border-t pt-4 grid gap-3 md:grid-cols-2 xl:grid-cols-4 animate-in fade-in slide-in-from-top-2 duration-200">
+            <div>
+              <Label>Empresa</Label>
+              <NativeSelect value={filters.companyId} onChange={(e) => setFilters((prev) => ({ ...prev, companyId: e.target.value, areaMacroId: '', areaMicroId: '' }))}>
+                {companies.map((company) => (
+                  <option key={company.id} value={company.id}>{company.tradeName || company.name}</option>
+                ))}
+              </NativeSelect>
+            </div>
+            <div>
+              <Label>Área</Label>
+              <NativeSelect value={filters.areaMacroId} onChange={(e) => setFilters((prev) => ({ ...prev, areaMacroId: e.target.value, areaMicroId: '' }))}>
+                <option value="">Todas</option>
+                {macroOptions.map((node) => (
+                  <option key={node.id} value={node.id}>{node.name}</option>
+                ))}
+              </NativeSelect>
+            </div>
+            <div>
+              <Label>Setor</Label>
+              <NativeSelect value={filters.areaMicroId} onChange={(e) => setFilters((prev) => ({ ...prev, areaMicroId: e.target.value }))}>
+                <option value="">Todas</option>
+                {filterMicroOptions.map((node) => (
+                  <option key={node.id} value={node.id}>{node.name}</option>
+                ))}
+              </NativeSelect>
+            </div>
+            <div>
+              <Label>Status</Label>
+              <NativeSelect value={filters.status} onChange={(e) => setFilters((prev) => ({ ...prev, status: e.target.value }))}>
+                <option value="">Todos</option>
+                {options.data?.statuses.map((status) => (
+                  <option key={status} value={status}>{STATUS_LABEL[status] ?? status}</option>
+                ))}
+              </NativeSelect>
+            </div>
+            <div>
+              <Label>Tipo</Label>
+              <NativeSelect value={filters.type} onChange={(e) => setFilters((prev) => ({ ...prev, type: e.target.value }))}>
+                <option value="">Todos</option>
+                {options.data?.indicatorTypes.map((type) => (
+                  <option key={type} value={type}>{TYPE_LABEL[type] ?? type}</option>
+                ))}
+              </NativeSelect>
+            </div>
+            <div>
+              <Label>Periodicidade</Label>
+              <NativeSelect value={filters.periodicity} onChange={(e) => setFilters((prev) => ({ ...prev, periodicity: e.target.value }))}>
+                <option value="">Todas</option>
+                {options.data?.periodicities.map((periodicity) => (
+                  <option key={periodicity} value={periodicity}>{PERIODICITY_LABEL[periodicity] ?? periodicity}</option>
+                ))}
+              </NativeSelect>
+            </div>
+            <div>
+              <Label>Responsável</Label>
+              <NativeSelect value={filters.responsibleUserId} onChange={(e) => setFilters((prev) => ({ ...prev, responsibleUserId: e.target.value }))}>
+                <option value="">Todos</option>
+                {users.map((user) => (
+                  <option key={user.id} value={user.id}>{user.name}</option>
+                ))}
+              </NativeSelect>
+            </div>
+            <div>
+              <Label>Ano</Label>
+              <Input value={filters.year} onChange={(e) => setFilters((prev) => ({ ...prev, year: e.target.value }))} placeholder="2026" />
+            </div>
+          </div>
+        )}
       </section>
 
       {(options.isLoading || indicators.isLoading) && <LoadingState />}
@@ -953,28 +988,121 @@ function MicroIndicatorRow({
   onDelete: () => void;
 }) {
   const light = micro.last?.light ?? 'GRAY';
+  const monthlyHistory = micro.monthlyHistory ?? [];
+  const hasHistory = monthlyHistory.some((point) => point.meta !== null || point.realizado !== null);
+
   return (
-    <div className="flex flex-col gap-2 rounded-lg border bg-muted/15 p-3 sm:flex-row sm:items-center sm:justify-between">
-      <div className="min-w-0">
-        <div className="flex flex-wrap items-center gap-2">
-          {micro.code && <Badge variant="outline">{micro.code}</Badge>}
-          <Badge className={cn('border', statusBadgeClass(light))} variant="outline">{LIGHT_LABEL[light] ?? light}</Badge>
-          <span className="text-xs text-muted-foreground">{micro.areaMicro?.name ?? micro.ownerNode.name}</span>
+    <div className="group relative flex flex-col gap-3 rounded-lg border bg-muted/15 p-4 transition-all hover:border-primary/20 hover:bg-muted/25">
+      <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
+        
+        {/* Left Side: Indicator Metadata and Numbers */}
+        <div className="flex-1 min-w-0">
+          <div className="flex flex-wrap items-center gap-2">
+            {micro.code && <Badge variant="outline" className="font-mono text-[10px]">{micro.code}</Badge>}
+            <Badge className={cn('border text-[10px] px-1.5 py-0', statusBadgeClass(light))} variant="outline">
+              {LIGHT_LABEL[light] ?? light}
+            </Badge>
+            <span className="text-xs text-muted-foreground truncate">
+              {micro.areaMicro?.name ?? micro.ownerNode.name}
+            </span>
+          </div>
+          <h4 className="mt-1.5 truncate text-sm font-semibold text-foreground leading-tight">
+            {micro.name}
+          </h4>
+          
+          <div className="mt-2 flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-muted-foreground">
+            <span className="flex items-center gap-1">
+              <span className="font-medium text-foreground/80">Meta:</span> 
+              {formatNumber(micro.currentTarget?.target)}
+            </span>
+            <span className="flex items-center gap-1">
+              <span className="font-medium text-foreground/80">Realizado:</span> 
+              {micro.last ? formatNumber(micro.last.value) : '-'}
+            </span>
+            <span className="flex items-center gap-1">
+              <span className="font-medium text-foreground/80">Atingimento:</span> 
+              <span className={cn(
+                "font-semibold",
+                micro.last?.attainment && micro.last.attainment >= 1 ? "text-emerald-500" : micro.last?.attainment ? "text-rose-500" : ""
+              )}>
+                {formatPercent(micro.last?.attainment ?? null)}
+              </span>
+            </span>
+          </div>
         </div>
-        <div className="mt-1 truncate text-sm font-medium">{micro.name}</div>
-        <div className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-muted-foreground">
-          <span>Meta: {formatNumber(micro.currentTarget?.target)}</span>
-          <span>Realizado: {micro.last ? formatNumber(micro.last.value) : '-'}</span>
-          <span>Atingimento: {formatPercent(micro.last?.attainment ?? null)}</span>
+
+        {/* Right Side: Mini Bar Chart Sparkline */}
+        <div className="flex items-center gap-3 self-stretch md:self-auto min-w-[170px] justify-between border-t border-muted md:border-t-0 md:pt-0 pt-3">
+          {hasHistory ? (
+            <div className="flex flex-col items-center gap-0.5">
+              <div className="h-10 w-40">
+                <ResponsiveContainer width="100%" height="100%">
+                  <BarChart data={monthlyHistory} barGap={1}>
+                    <Tooltip
+                      content={<ChartTooltip />}
+                      cursor={{ fill: 'hsl(var(--muted))', opacity: 0.2 }}
+                    />
+                    <Bar dataKey="meta" name="Meta" fill="hsl(var(--muted-foreground)/20)" radius={[1, 1, 0, 0]} />
+                    <Bar dataKey="realizado" name="Realizado" radius={[1, 1, 0, 0]}>
+                      {monthlyHistory.map((entry, index) => {
+                        let color = 'hsl(var(--status-gray))';
+                        if (entry.realizado !== null && entry.realizado !== undefined) {
+                          const isWithin = micro.direction === 'LOWER'
+                            ? (entry.realizado ?? 0) <= (entry.meta ?? 0)
+                            : (entry.realizado ?? 0) >= (entry.meta ?? 0);
+                          color = isWithin ? '#10b981' : '#ef4444';
+                        }
+                        return <Cell key={`cell-${index}`} fill={color} />;
+                      })}
+                    </Bar>
+                  </BarChart>
+                </ResponsiveContainer>
+              </div>
+              <div className="flex w-40 justify-between px-1 text-[9px] text-muted-foreground/60 select-none">
+                <span>Jan</span>
+                <span>Dez</span>
+              </div>
+            </div>
+          ) : (
+            <div className="flex h-12 w-40 items-center justify-center rounded border border-dashed text-[10px] text-muted-foreground/50">
+              Sem dados mensais
+            </div>
+          )}
         </div>
+
       </div>
-      <div className="flex flex-wrap gap-1.5">
-        <Button variant="ghost" size="sm" onClick={onView} title="Visualizar"><Eye className="h-3.5 w-3.5" /></Button>
-        <Button variant="ghost" size="sm" onClick={onEdit} title="Editar"><Pencil className="h-3.5 w-3.5" /></Button>
-        <Button variant="ghost" size="sm" onClick={onTarget}>Metas</Button>
-        <Button variant="ghost" size="sm" onClick={onResult}>Realizados</Button>
-        <Button variant="ghost" size="sm" onClick={onHistory} title="Histórico"><History className="h-3.5 w-3.5" /></Button>
-        <Button variant="ghost" size="sm" className="text-destructive hover:text-destructive" onClick={onDelete} title="Inativar"><Trash2 className="h-3.5 w-3.5" /></Button>
+
+      {/* Micro actions row */}
+      <div className="mt-1 flex flex-wrap gap-1 border-t pt-2.5">
+        <Button variant="ghost" size="sm" className="h-7 text-xs px-2.5 gap-1.5" onClick={onView} title="Visualizar">
+          <Eye className="h-3.5 w-3.5" />
+          <span className="hidden sm:inline">Visualizar</span>
+        </Button>
+        <Button variant="ghost" size="sm" className="h-7 text-xs px-2.5 gap-1.5" onClick={onEdit} title="Editar">
+          <Pencil className="h-3.5 w-3.5" />
+          <span className="hidden sm:inline">Editar</span>
+        </Button>
+        <Button variant="ghost" size="sm" className="h-7 text-xs px-2.5" onClick={onTarget}>
+          Metas
+        </Button>
+        <Button variant="ghost" size="sm" className="h-7 text-xs px-2.5" onClick={onResult}>
+          Realizados
+        </Button>
+        <Button variant="ghost" size="sm" className="h-7 text-xs px-2.5 gap-1.5" onClick={onHistory} title="Histórico">
+          <History className="h-3.5 w-3.5" />
+          <span className="hidden sm:inline">Histórico</span>
+        </Button>
+        <div className="flex-1" />
+        <Button 
+          variant="ghost" 
+          size="sm" 
+          className="h-7 text-xs text-destructive hover:text-destructive hover:bg-destructive/10 px-2.5 gap-1.5 ml-auto" 
+          onClick={onDelete}
+          title="Inativar"
+        >
+          <Trash2 className="h-3.5 w-3.5" />
+          <span className="hidden sm:inline">Inativar</span>
+        </Button>
       </div>
     </div>
   );

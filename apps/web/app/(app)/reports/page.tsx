@@ -138,9 +138,9 @@ export default function ReportsPage() {
       <PageHeader
         eyebrow="Visualização"
         tone="view"
-        title="Relatorios e exportação"
-        description="Relatorios executivos, históricos, indicadores, planos de ação e dados para auditoria."
-        breadcrumbs={[{ label: 'Início', href: '/' }, { label: 'Visualização', href: '/visualization' }, { label: 'Relatorios' }]}
+        title="Relatórios e exportação"
+        description="Relatórios executivos, históricos, indicadores, planos de ação e dados para auditoria."
+        breadcrumbs={[{ label: 'Início', href: '/' }, { label: 'Visualização', href: '/visualization' }, { label: 'Relatórios' }]}
         actions={
           <>
             <Button variant="outline" onClick={() => window.print()}>
@@ -156,7 +156,7 @@ export default function ReportsPage() {
       />
 
       <div className="mb-6 grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
-        <MetricCard title="Indicadores" value={formatNumber(overview.data?.totalIndicators)} description="Base do relatorio" icon={<FileSpreadsheet className="h-4 w-4" />} tone="blue" />
+        <MetricCard title="Indicadores" value={formatNumber(overview.data?.totalIndicators)} description="Base do relatório" icon={<FileSpreadsheet className="h-4 w-4" />} tone="blue" />
         <MetricCard title="Atingimento geral" value={formatPercent(overview.data?.generalAttainment)} description="Resumo executivo" icon={<FileText className="h-4 w-4" />} tone="green" />
         <MetricCard title="Ações em aberto" value={formatNumber(overview.data?.openActions)} description={`${formatNumber(overview.data?.overdueActions)} atrasadas`} icon={<SlidersHorizontal className="h-4 w-4" />} tone="yellow" />
         <MetricCard title="Exportações" value={formatNumber(CSV_REPORTS.length + 1)} description="PDF e CSV" icon={<Download className="h-4 w-4" />} tone="purple" />
@@ -183,7 +183,7 @@ export default function ReportsPage() {
       </FilterBar>
 
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
-        <SectionCard title="Relatorio executivo" description="Sumario em PDF para reuniões, com indicadores, farois e prioridades.">
+        <SectionCard title="Relatório executivo" description="Sumário em PDF para reuniões, com indicadores, faróis e prioridades.">
           <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
             <div className="grid h-12 w-12 place-items-center rounded-lg bg-primary text-primary-foreground">
               <FileText className="h-6 w-6" />

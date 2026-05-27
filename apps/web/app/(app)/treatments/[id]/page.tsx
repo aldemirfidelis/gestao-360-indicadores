@@ -389,7 +389,7 @@ export default function TreatmentPage() {
         <SectionCard title="4. Acompanhamento" description="Depois das ações, reavalie se o indicador voltou para a meta.">
           <div className="space-y-3">
             <p className="text-sm text-muted-foreground">
-              Quando as ações forem concluidas, lance novo resultado do indicador. A reavaliacao verifica o último farol e atualiza a tratativa para resolvida ou nao resolvida.
+              Quando as ações forem concluídas, lance novo resultado do indicador. A reavaliacão verifica o último farol e atualiza a tratativa para resolvida ou nao resolvida.
             </p>
             <Button onClick={() => reevaluate.mutate()} disabled={reevaluate.isPending}>
               Reavaliar indicador

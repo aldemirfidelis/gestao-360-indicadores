@@ -58,13 +58,13 @@ const STATUS_LABEL: Record<string, string> = {
   DRAFT: 'Rascunho',
   NOT_STARTED: 'Aberto',
   UNDER_ANALYSIS: 'Em análise',
-  IN_PROGRESS: 'Em execucao',
+  IN_PROGRESS: 'Em execução',
   WAITING_THIRD: 'Aguardando terceiro',
-  WAITING_EVIDENCE: 'Aguardando evidencia',
+  WAITING_EVIDENCE: 'Aguardando evidência',
   WAITING_VALIDATION: 'Aguardando validação',
   PAUSED: 'Pausado',
-  DONE: 'Concluido',
-  DONE_LATE: 'Concluido fora do prazo',
+  DONE: 'Concluído',
+  DONE_LATE: 'Concluído fora do prazo',
   CANCELLED: 'Cancelado',
   REOPENED: 'Reaberto',
   INEFFECTIVE: 'Ineficaz',
@@ -80,10 +80,10 @@ const TOOL_LABEL: Record<string, string> = {
   PARETO: 'Pareto',
   FCA: 'FCA',
   GUT: 'Matriz GUT',
-  PRIORITIZATION_MATRIX: 'Matriz de priorizacao',
+  PRIORITIZATION_MATRIX: 'Matriz de priorização',
   BRAINSTORMING: 'Brainstorming',
   ROOT_CAUSE: 'Causa raiz',
-  EFFECTIVENESS_CHECKLIST: 'Checklist de eficacia',
+  EFFECTIVENESS_CHECKLIST: 'Checklist de eficácia',
 };
 
 const COLUMNS = ['DRAFT', 'UNDER_ANALYSIS', 'IN_PROGRESS', 'WAITING_VALIDATION', 'EFFECTIVE'];
@@ -170,7 +170,7 @@ export default function ActionsPage() {
         eyebrow="Gestão"
         tone="launch"
         title="Planos de ação"
-        description="Gestão completa da origem, análise de causa, execucao, evidencias e eficacia dos planos."
+        description="Gestão completa da origem, análise de causa, execução, evidências e eficácia dos planos."
         breadcrumbs={[{ label: 'Início', href: '/' }, { label: 'Planos de ação' }]}
         actions={
           <>
@@ -199,12 +199,12 @@ export default function ActionsPage() {
 
       <div className="mb-6 grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
         <MetricCard title="Total de planos" value={formatNumber(actions.length)} description={`${formatNumber(actions.length - done)} em aberto`} icon={<ClipboardList className="h-4 w-4" />} tone="blue" />
-        <MetricCard title="Atrasados" value={formatNumber(overdue)} description={`${formatNumber(doneLate)} concluidos fora do prazo`} icon={<AlertTriangle className="h-4 w-4" />} tone="red" />
+        <MetricCard title="Atrasados" value={formatNumber(overdue)} description={`${formatNumber(doneLate)} concluídos fora do prazo`} icon={<AlertTriangle className="h-4 w-4" />} tone="red" />
         <MetricCard title="Sem responsável" value={formatNumber(withoutOwner)} description={`${formatNumber(critical)} críticos`} icon={<UserRound className="h-4 w-4" />} tone="yellow" />
-        <MetricCard title="Eficacia pendente" value={formatNumber(pendingEffectiveness)} description="Aguardando verificação" icon={<ShieldCheck className="h-4 w-4" />} tone="green" />
+        <MetricCard title="Eficácia pendente" value={formatNumber(pendingEffectiveness)} description="Aguardando verificação" icon={<ShieldCheck className="h-4 w-4" />} tone="green" />
       </div>
 
-      <SectionCard title="Filtros avançados" description="Busque por origem, status, indicador, área ou eficacia." className="mb-6">
+      <SectionCard title="Filtros avançados" description="Busque por origem, status, indicador, área ou eficácia." className="mb-6">
         <div className="grid grid-cols-1 gap-3 md:grid-cols-5">
           <div className="relative md:col-span-2">
             <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
@@ -219,7 +219,7 @@ export default function ActionsPage() {
             {(options.data?.indicators ?? []).map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}
           </NativeSelect>
           <NativeSelect value={filters.effectivenessStatus} onChange={(e) => setFilters({ ...filters, effectivenessStatus: e.target.value })}>
-            <option value="">Todas eficacias</option>
+            <option value="">Todas eficácias</option>
             {(options.data?.effectivenessStatuses ?? []).map((item) => <option key={item} value={item}>{item}</option>)}
           </NativeSelect>
         </div>
@@ -272,7 +272,7 @@ export default function ActionsPage() {
                   <th className="text-left">Responsável</th>
                   <th className="text-left">Prazo</th>
                   <th className="text-left">Ferramenta</th>
-                  <th className="text-left">Eficacia</th>
+                  <th className="text-left">Eficácia</th>
                   <th className="text-left">Progresso</th>
                 </tr>
               </thead>
@@ -283,7 +283,7 @@ export default function ActionsPage() {
       )}
 
       {!query.isLoading && actions.length > 0 && view === 'timeline' && (
-        <SectionCard title="Cronograma de execucao" description="Prazos ordenados para acompanhamento semanal e validação de eficacia.">
+        <SectionCard title="Cronograma de execução" description="Prazos ordenados para acompanhamento semanal e validação de eficácia.">
           <div className="space-y-3">
             {actions.slice().sort((a, b) => new Date(a.dueDate ?? '2999-12-31').getTime() - new Date(b.dueDate ?? '2999-12-31').getTime()).map((a) => (
               <Link key={a.id} href={`/actions/${a.id}`} className="grid gap-3 rounded-lg border p-3 transition-colors hover:bg-accent/35 md:grid-cols-[140px,1fr,180px] md:items-center">

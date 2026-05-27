@@ -78,7 +78,7 @@ export default function AprovacoesCargoPage() {
     mutationFn: ({ id, decision, note }: { id: string; decision: 'APPROVED' | 'REJECTED'; note?: string }) =>
       api(`/strategy/career-approvals/${id}/decision`, { method: 'PATCH', json: { decision, decisionNote: note } }),
     onSuccess: () => {
-      toast.success('Decisao registrada');
+      toast.success('Decisão registrada');
       setDecisionDialog({ open: false, row: null, decision: null });
       setDecisionNote('');
       qc.invalidateQueries({ queryKey: ['career-approvals'] });
@@ -170,7 +170,7 @@ export default function AprovacoesCargoPage() {
       doc.setFont('helvetica', 'bold');
       doc.setFontSize(9);
       doc.setTextColor(120);
-      doc.text('MOVIMENTACAO DE CARREIRA', margin, y);
+      doc.text('MOVIMENTAÇÃO DE CARREIRA', margin, y);
       y += 14;
       doc.setFont('helvetica', 'normal');
       doc.setFontSize(11);
@@ -202,7 +202,7 @@ export default function AprovacoesCargoPage() {
         doc.setFont('helvetica', 'bold');
         doc.setFontSize(9);
         doc.setTextColor(120);
-        doc.text('OBSERVACAO DO APROVADOR', margin, y);
+        doc.text('OBSERVAÇÃO DO APROVADOR', margin, y);
         y += 14;
         doc.setFont('helvetica', 'normal');
         doc.setFontSize(10);
@@ -251,7 +251,7 @@ export default function AprovacoesCargoPage() {
 
       <div className="mb-4 flex flex-wrap gap-2">
         <Button variant={scope === 'mine' ? 'default' : 'outline'} size="sm" onClick={() => setScope('mine')}>
-          Para minha aprovacao
+          Para minha aprovação
         </Button>
         <Button variant={scope === 'requested' ? 'default' : 'outline'} size="sm" onClick={() => setScope('requested')}>
           Solicitadas por mim
@@ -267,12 +267,12 @@ export default function AprovacoesCargoPage() {
             <thead className="bg-muted text-[10px] uppercase text-muted-foreground">
               <tr>
                 <th className="p-3 text-left">Colaborador</th>
-                <th className="p-3 text-left">Movimentacao</th>
+                <th className="p-3 text-left">Movimentação</th>
                 <th className="p-3 text-left">Solicitante</th>
                 <th className="p-3 text-left">Aprovador</th>
                 <th className="p-3 text-center">Status</th>
                 <th className="p-3 text-center">Solicitado em</th>
-                <th className="p-3 text-center">Acoes</th>
+                <th className="p-3 text-center">Ações</th>
               </tr>
             </thead>
             <tbody>
@@ -326,7 +326,7 @@ export default function AprovacoesCargoPage() {
                           </Button>
                         )}
                         {(row.status === 'APPROVED' || row.status === 'REJECTED') && (
-                          <Button size="sm" variant="outline" className="h-7 px-2 text-[10px]" onClick={() => downloadReport(row.id)} title="Baixar relatorio em PDF">
+                          <Button size="sm" variant="outline" className="h-7 px-2 text-[10px]" onClick={() => downloadReport(row.id)} title="Baixar relatório em PDF">
                             <FileDown className="h-3 w-3 mr-1" /> PDF
                           </Button>
                         )}
@@ -338,7 +338,7 @@ export default function AprovacoesCargoPage() {
               {rows.length === 0 && !query.isLoading && (
                 <tr>
                   <td colSpan={7} className="p-8 text-center text-muted-foreground text-sm">
-                    Nenhuma solicitacao no filtro selecionado.
+                    Nenhuma solicitação no filtro selecionado.
                   </td>
                 </tr>
               )}

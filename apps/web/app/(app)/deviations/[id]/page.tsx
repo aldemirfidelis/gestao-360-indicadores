@@ -62,9 +62,9 @@ const STATUS_LABEL: Record<string, string> = {
   OPEN: 'Aberto',
   IN_ANALYSIS: 'Em análise',
   WAITING_ACTION: 'Aguardando ação',
-  IN_PROGRESS: 'Em execucao',
-  CLOSED: 'Concluido',
-  CLOSED_LATE: 'Concluido fora do prazo',
+  IN_PROGRESS: 'Em execução',
+  CLOSED: 'Concluído',
+  CLOSED_LATE: 'Concluído fora do prazo',
   CANCELLED: 'Cancelado',
 };
 
@@ -77,10 +77,10 @@ const METHOD_LABEL: Record<string, string> = {
   SIMPLE: 'Análise simples',
 };
 
-const CAUSE_CATEGORIES = ['Metodo', 'Máquina', 'Mao de obra', 'Material', 'Medida', 'Meio ambiente'];
+const CAUSE_CATEGORIES = ['Método', 'Máquina', 'Mão de obra', 'Material', 'Medida', 'Meio ambiente'];
 const PRIORITY_LABEL: Record<string, string> = {
   LOW: 'Baixa',
-  MEDIUM: 'Media',
+  MEDIUM: 'Média',
   HIGH: 'Alta',
   CRITICAL: 'Crítica',
 };

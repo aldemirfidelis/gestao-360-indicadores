@@ -152,9 +152,9 @@ export default function ProjectsPage() {
 
       <div className="mb-6 grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
         <MetricCard title="Projetos ativos" value={formatNumber(inProgress)} description={`${formatNumber(projects.length)} no total`} icon={<FolderKanban className="h-4 w-4" />} tone="blue" />
-        <MetricCard title="Concluidos" value={formatNumber(done)} description="Entregas finalizadas" icon={<CheckCircle2 className="h-4 w-4" />} tone="green" />
+        <MetricCard title="Concluídos" value={formatNumber(done)} description="Entregas finalizadas" icon={<CheckCircle2 className="h-4 w-4" />} tone="green" />
         <MetricCard title="Atrasados" value={formatNumber(overdue)} description="Fim previsto vencido" icon={<AlertTriangle className="h-4 w-4" />} tone="red" />
-        <MetricCard title="Progresso medio" value={`${avgProgress}%`} description="Com base nos marcos" icon={<Clock3 className="h-4 w-4" />} tone="yellow" />
+        <MetricCard title="Progresso médio" value={`${avgProgress}%`} description="Com base nos marcos" icon={<Clock3 className="h-4 w-4" />} tone="yellow" />
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
@@ -203,7 +203,7 @@ export default function ProjectsPage() {
                       <div className="truncate text-foreground">{p.responsible ?? 'Não definido'}</div>
                     </div>
                     <div>
-                      <div className="text-[10px] uppercase">Orcamento</div>
+                      <div className="text-[10px] uppercase">Orçamento</div>
                       <div className="text-foreground">
                         {p.budget ? formatNumber(p.budget, { style: 'currency', currency: 'BRL' }) : '-'}
                       </div>
@@ -292,7 +292,7 @@ export default function ProjectsPage() {
                 />
               </div>
               <div className="space-y-2">
-                <Label>Orcamento</Label>
+                <Label>Orçamento</Label>
                 <Input
                   type="number"
                   min="0"
@@ -316,7 +316,7 @@ export default function ProjectsPage() {
                 ))}
               </NativeSelect>
               <p className="text-xs text-muted-foreground">
-                O progresso do projeto sera comparado com este KPI no detalhe do projeto.
+                O progresso do projeto será comparado com este KPI no detalhe do projeto.
               </p>
             </div>
           </div>

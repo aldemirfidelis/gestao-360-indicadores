@@ -34,9 +34,9 @@ const STATUS_LABEL: Record<string, string> = {
   OPEN: 'Aberto',
   IN_ANALYSIS: 'Em análise',
   WAITING_ACTION: 'Aguardando ação',
-  IN_PROGRESS: 'Em execucao',
-  CLOSED: 'Concluido',
-  CLOSED_LATE: 'Concluido fora do prazo',
+  IN_PROGRESS: 'Em execução',
+  CLOSED: 'Concluído',
+  CLOSED_LATE: 'Concluído fora do prazo',
   CANCELLED: 'Cancelado',
 };
 

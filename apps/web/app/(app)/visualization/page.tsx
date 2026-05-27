@@ -116,7 +116,7 @@ export default function VisualizationPage() {
             <Button variant="outline" asChild>
               <Link href="/reports">
                 <FileBarChart className="mr-2 h-4 w-4" />
-                Relatorios
+                Relatórios
               </Link>
             </Button>
             <Button asChild>

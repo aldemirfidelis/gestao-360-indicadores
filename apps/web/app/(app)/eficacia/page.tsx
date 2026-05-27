@@ -120,7 +120,7 @@ export default function EficaciaPage() {
   if (!allowed) {
     return (
       <div>
-        <PageHeader title="Analise de Eficacia" description="Validacao de eficacia dos planos de acao." />
+        <PageHeader title="Análise de Eficácia" description="Validação de eficacia dos planos de acao." />
         <Card className="mt-6">
           <CardContent className="py-12 text-center space-y-3">
             <Lock className="mx-auto h-10 w-10 text-muted-foreground" />
@@ -140,14 +140,14 @@ export default function EficaciaPage() {
   return (
     <div>
       <PageHeader
-        title="Analise de Eficacia"
-        description="Validacao formal de que as acoes resolveram o problema e atingiram o resultado esperado."
+        title="Análise de Eficácia"
+        description="Validação formal de que as ações resolveram o problema e atingiram o resultado esperado."
       />
 
       <div className="mb-6 grid grid-cols-2 gap-4 md:grid-cols-4">
-        <MetricCard title="Aguardando analise" value={String(stats.pending)} description="Pendente / em analise / reaberto" icon={<ClipboardCheck className="h-4 w-4" />} tone="yellow" />
-        <MetricCard title="Eficazes" value={String(stats.effective)} description="Acoes validadas" icon={<CheckCircle2 className="h-4 w-4" />} tone="green" />
-        <MetricCard title="Ineficazes" value={String(stats.ineffective)} description="Resultado nao atingido" icon={<XCircle className="h-4 w-4" />} tone="red" />
+        <MetricCard title="Aguardando análise" value={String(stats.pending)} description="Pendente / em análise / reaberto" icon={<ClipboardCheck className="h-4 w-4" />} tone="yellow" />
+        <MetricCard title="Eficazes" value={String(stats.effective)} description="Ações validadas" icon={<CheckCircle2 className="h-4 w-4" />} tone="green" />
+        <MetricCard title="Ineficazes" value={String(stats.ineffective)} description="Resultado não atingido" icon={<XCircle className="h-4 w-4" />} tone="red" />
         <MetricCard title="No filtro" value={String(stats.total)} description="Total exibido" icon={<ShieldCheck className="h-4 w-4" />} tone="blue" />
       </div>
 
@@ -164,13 +164,13 @@ export default function EficaciaPage() {
           <table className="w-full text-sm">
             <thead className="bg-muted text-[10px] uppercase text-muted-foreground">
               <tr>
-                <th className="p-3 text-left">Acao</th>
+                <th className="p-3 text-left">Ação</th>
                 <th className="p-3 text-left">Indicador</th>
-                <th className="p-3 text-left">Responsavel</th>
-                <th className="p-3 text-center">Status acao</th>
-                <th className="p-3 text-center">Eficacia</th>
-                <th className="p-3 text-center">Concluida em</th>
-                <th className="p-3 text-center">Acoes</th>
+                <th className="p-3 text-left">Responsável</th>
+                <th className="p-3 text-center">Status ação</th>
+                <th className="p-3 text-center">Eficácia</th>
+                <th className="p-3 text-center">Concluída em</th>
+                <th className="p-3 text-center">Ações</th>
               </tr>
             </thead>
             <tbody>
@@ -208,7 +208,7 @@ export default function EficaciaPage() {
               {actions.length === 0 && !query.isLoading && (
                 <tr>
                   <td colSpan={7} className="p-8 text-center text-sm text-muted-foreground">
-                    Nenhuma acao no filtro selecionado.
+                    Nenhuma ação no filtro selecionado.
                   </td>
                 </tr>
               )}
@@ -221,7 +221,7 @@ export default function EficaciaPage() {
         <DialogContent className="max-w-2xl">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
-              <ShieldCheck className="h-5 w-5 text-primary" /> Analisar eficacia
+              <ShieldCheck className="h-5 w-5 text-primary" /> Analisar eficácia
             </DialogTitle>
           </DialogHeader>
           {dialog.row && (
@@ -258,7 +258,7 @@ export default function EficaciaPage() {
                 >
                   <XCircle className="h-5 w-5 text-rose-600 mb-1" />
                   <div className="font-semibold">Ineficaz</div>
-                  <div className="text-xs text-muted-foreground">Resultado nao atingido</div>
+                  <div className="text-xs text-muted-foreground">Resultado não atingido</div>
                 </button>
               </div>
               <label className="flex items-center gap-2 text-xs cursor-pointer">
@@ -268,19 +268,19 @@ export default function EficaciaPage() {
                   onChange={(e) => setForm({ ...form, reopen: e.target.checked })}
                   className="h-4 w-4 rounded"
                 />
-                <RotateCcw className="h-3.5 w-3.5" /> Reabrir acao (precisa de nova execucao)
+                <RotateCcw className="h-3.5 w-3.5" /> Reabrir ação (precisa de nova execução)
               </label>
               <div className="space-y-2">
-                <Label>Resultado alcancado</Label>
+                <Label>Resultado alcançado</Label>
                 <Textarea rows={2} value={form.achievedResult} onChange={(e) => setForm({ ...form, achievedResult: e.target.value })} placeholder="Numero/indicador/situacao apos a acao" />
               </div>
               <div className="space-y-2">
-                <Label>Resumo da analise</Label>
+                <Label>Resumo da análise</Label>
                 <Textarea rows={3} value={form.summary} onChange={(e) => setForm({ ...form, summary: e.target.value })} placeholder="Conclusao sobre a eficacia" />
               </div>
               <div className="space-y-2">
-                <Label>Evidencias (URLs, refs, anexos)</Label>
-                <Input value={form.evidence} onChange={(e) => setForm({ ...form, evidence: e.target.value })} placeholder="Links, codigos de documentos, etc." />
+                <Label>Evidências (URLs, refs, anexos)</Label>
+                <Input value={form.evidence} onChange={(e) => setForm({ ...form, evidence: e.target.value })} placeholder="Links, códigos de documentos, etc." />
               </div>
             </div>
           )}

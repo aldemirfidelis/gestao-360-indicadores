@@ -390,7 +390,7 @@ export default function MeetingDetailPage() {
             <ActionSummary label="Pendentes" value={summary.pending} />
             <ActionSummary label="Em andamento" value={summary.progress} />
             <ActionSummary label="Atrasadas" value={summary.overdue} danger />
-            <ActionSummary label="Concluidas" value={summary.done} />
+            <ActionSummary label="Concluídas" value={summary.done} />
           </div>
           <div className="space-y-2">
             {m.actions.map((action) => (

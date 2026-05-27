@@ -168,7 +168,7 @@ const EMPTY_BOOTSTRAP: Bootstrap = {
 const modules: Array<{ key: ModuleKey; title: string; description: string; icon: any; tone: string }> = [
   { key: 'users', title: 'Usuários', description: 'Gerencie usuários, perfis, permissões e acessos.', icon: UsersRound, tone: 'text-status-blue bg-status-blue/10' },
   { key: 'audit', title: 'Auditoria', description: 'Acompanhe tudo o que acontece no sistema.', icon: ScrollText, tone: 'text-status-green bg-status-green/10' },
-  { key: 'parameters', title: 'Parametros', description: 'Configure empresas, filiais, setores e cadastros base.', icon: SlidersHorizontal, tone: 'text-status-purple bg-status-purple/10' },
+  { key: 'parameters', title: 'Parâmetros', description: 'Configure empresas, filiais, setores e cadastros base.', icon: SlidersHorizontal, tone: 'text-status-purple bg-status-purple/10' },
   { key: 'security', title: 'Seguranca', description: 'Controle perfis, permissões e acessos por módulo.', icon: ShieldCheck, tone: 'text-status-red bg-status-red/10' },
   { key: 'system', title: 'Sistema', description: 'Configure notificações, aprovações e regras globais.', icon: Settings, tone: 'text-status-yellow bg-status-yellow/10' },
 ];
@@ -313,7 +313,7 @@ export default function SettingsPage() {
         eyebrow="Administracao"
         tone="admin"
         title="Configurações"
-        description="Central administrativa para usuários, auditoria, parametros, seguranca e regras do sistema."
+        description="Central administrativa para usuários, auditoria, parâmetros, segurança e regras do sistema."
         breadcrumbs={[{ label: 'Início', href: '/' }, { label: 'Configurações' }]}
         actions={
           <Button asChild variant="outline">
@@ -452,14 +452,14 @@ export default function SettingsPage() {
           <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
             <SummaryTile label="Eventos registrados" value={formatNumber(data?.auditCount)} icon={<ScrollText className="h-4 w-4" />} />
             <SummaryTile label="Usuários monitorados" value={formatNumber(data?.users.length)} icon={<UsersRound className="h-4 w-4" />} />
-            <SummaryTile label="Parametros auditaveis" value={formatNumber(allItems.length)} icon={<SlidersHorizontal className="h-4 w-4" />} />
+            <SummaryTile label="Parâmetros auditáveis" value={formatNumber(allItems.length)} icon={<SlidersHorizontal className="h-4 w-4" />} />
           </div>
         </SectionCard>
       )}
 
       {active === 'parameters' && (
         <SectionCard
-          title="Parametros"
+          title="Parâmetros"
           description="Cadastros estruturais usados por empresas, filiais, hierarquia, indicadores e tratativas."
           actions={<ParameterActions view={paramView} onNew={(type) => setDialog({ type })} />}
           contentClassName="p-0"
@@ -500,7 +500,7 @@ export default function SettingsPage() {
           )}
 
           {paramView === 'branches' && (
-            <DataTable headers={['Filial', 'Código', 'Localizacao', 'Status', 'Atualizado', 'Ações']} empty="Nenhuma filial cadastrada.">
+            <DataTable headers={['Filial', 'Código', 'Localização', 'Status', 'Atualizado', 'Ações']} empty="Nenhuma filial cadastrada.">
               {data?.branches.map((branch) => (
                 <tr key={branch.id}>
                   <td className="font-medium">{branch.name}</td>

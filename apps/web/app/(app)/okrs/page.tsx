@@ -196,8 +196,8 @@ export default function OkrsPage() {
       <div className="mb-6 grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
         <MetricCard title="Ciclo ativo" value={activeCycle?.name ?? '-'} description={activeCycle ? `${formatDate(activeCycle.startsAt)} - ${formatDate(activeCycle.endsAt)}` : 'Crie um ciclo'} tone="blue" />
         <MetricCard title="Objetivos" value={formatNumber(stats.objectives)} description="No ciclo selecionado" icon={<Target className="h-4 w-4" />} tone="purple" />
-        <MetricCard title="Key Results" value={formatNumber(stats.krs)} description="Métrica de resultado" icon={<Target className="h-4 w-4" />} tone="green" />
-        <MetricCard title="Progresso medio" value={formatPercent(stats.progress)} description={`${stats.risk} em risco`} icon={<Target className="h-4 w-4" />} tone="yellow" />
+        <MetricCard title="Resultado" value={formatNumber(stats.krs)} description="Métrica de resultado" icon={<Target className="h-4 w-4" />} tone="green" />
+        <MetricCard title="Progresso médio" value={formatPercent(stats.progress)} description={`${stats.risk} em risco`} icon={<Target className="h-4 w-4" />} tone="yellow" />
       </div>
 
       <div className="grid gap-4">
@@ -229,7 +229,7 @@ export default function OkrsPage() {
                 <div className="text-xl font-semibold">{formatPercent(o.progress)}</div>
               </div>
               <div>
-                <div className="text-xs text-muted-foreground">Confianca</div>
+                <div className="text-xs text-muted-foreground">Confiança</div>
                 <div className="text-xl font-semibold">{formatPercent(o.confidence)}</div>
               </div>
               <div>

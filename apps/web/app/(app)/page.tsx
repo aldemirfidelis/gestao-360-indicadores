@@ -232,7 +232,7 @@ export default function HomePage() {
         <MetricCard
           title="Ações abertas"
           value={formatNumber(ov?.openActions)}
-          description={`${formatNumber(ov?.doneActions)} concluidas`}
+          description={`${formatNumber(ov?.doneActions)} concluídas`}
           icon={<ClipboardList className="h-4 w-4" />}
           tone="purple"
           href="/actions"
@@ -452,7 +452,7 @@ function treatmentStatusLabel(status: string) {
     AWAITING_CAUSE_ANALYSIS: 'Sem análise',
     CAUSE_ANALYSIS_CREATED: 'Sem reunião',
     MEETING_SCHEDULED: 'Sem ação',
-    ACTION_PLAN_CREATED: 'Em execucao',
+    ACTION_PLAN_CREATED: 'Em execução',
     ACTIONS_OVERDUE: 'Ações atrasadas',
     UNRESOLVED: 'Não resolvido',
   };
