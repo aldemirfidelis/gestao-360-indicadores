@@ -466,43 +466,24 @@ function getOrthogonalPath({
   controlX: number;
   controlY: number;
 }) {
-  const sourceIsHorizontal = sourcePosition === Position.Left || sourcePosition === Position.Right;
   const targetIsHorizontal = targetPosition === Position.Left || targetPosition === Position.Right;
+  const routeHorizontalFirst = !targetIsHorizontal;
 
-  const points = [];
-  if (sourceIsHorizontal && targetIsHorizontal) {
-    points.push(
-      { x: sourceX, y: sourceY },
-      { x: controlX, y: sourceY },
-      { x: controlX, y: controlY },
-      { x: controlX, y: targetY },
-      { x: targetX, y: targetY }
-    );
-  } else if (!sourceIsHorizontal && !targetIsHorizontal) {
-    points.push(
-      { x: sourceX, y: sourceY },
-      { x: sourceX, y: controlY },
-      { x: controlX, y: controlY },
-      { x: targetX, y: controlY },
-      { x: targetX, y: targetY }
-    );
-  } else if (sourceIsHorizontal && !targetIsHorizontal) {
-    points.push(
-      { x: sourceX, y: sourceY },
-      { x: controlX, y: sourceY },
-      { x: controlX, y: controlY },
-      { x: targetX, y: controlY },
-      { x: targetX, y: targetY }
-    );
-  } else {
-    points.push(
-      { x: sourceX, y: sourceY },
-      { x: sourceX, y: controlY },
-      { x: controlX, y: controlY },
-      { x: controlX, y: targetY },
-      { x: targetX, y: targetY }
-    );
-  }
+  const points = routeHorizontalFirst
+    ? [
+        { x: sourceX, y: sourceY },
+        { x: controlX, y: sourceY },
+        { x: controlX, y: controlY },
+        { x: targetX, y: controlY },
+        { x: targetX, y: targetY },
+      ]
+    : [
+        { x: sourceX, y: sourceY },
+        { x: sourceX, y: controlY },
+        { x: controlX, y: controlY },
+        { x: controlX, y: targetY },
+        { x: targetX, y: targetY },
+      ];
 
   return points
     .map((point, index) => `${index === 0 ? 'M' : 'L'} ${point.x} ${point.y}`)
