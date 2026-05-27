@@ -424,8 +424,6 @@ function StrategyEdge({
   const [localOffset, setLocalOffset] = useState({ x: 0, y: 0 });
   const startDragPos = useRef({ x: 0, y: 0 });
   const startOffset = useRef({ x: 0, y: 0 });
-  const dragMoved = useRef(false);
-  const suppressNextClick = useRef(false);
 
   const parsedOffset = useMemo(() => {
     let x = 0;
@@ -455,15 +453,12 @@ function StrategyEdge({
   const path = `M ${sourceX} ${sourceY} Q ${controlX} ${controlY} ${targetX} ${targetY}`;
   const meta = kindMeta(data?.kind);
 
-  const startDrag = (event: React.MouseEvent<SVGElement>) => {
-    if (!data?.editMode) return;
-    if (event.button !== 0) return;
+  const onMouseDown = (event: React.MouseEvent<SVGCircleElement>) => {
     event.stopPropagation();
     event.preventDefault();
     setIsDragging(true);
     startDragPos.current = { x: event.clientX, y: event.clientY };
     startOffset.current = { ...localOffset };
-    dragMoved.current = false;
   };
 
   useEffect(() => {
@@ -472,8 +467,6 @@ function StrategyEdge({
     const onMouseMove = (event: MouseEvent) => {
       const dx = event.clientX - startDragPos.current.x;
       const dy = event.clientY - startDragPos.current.y;
-      if (!dragMoved.current && Math.hypot(dx, dy) < 4) return;
-      dragMoved.current = true;
       setLocalOffset({
         x: startOffset.current.x + dx,
         y: startOffset.current.y + dy,
@@ -482,8 +475,7 @@ function StrategyEdge({
 
     const onMouseUp = () => {
       setIsDragging(false);
-      if (dragMoved.current && data?.onEdgeDragStop) {
-        suppressNextClick.current = true;
+      if (data?.onEdgeDragStop) {
         data.onEdgeDragStop(id, Math.round(localOffset.x), Math.round(localOffset.y));
       }
     };
@@ -496,13 +488,6 @@ function StrategyEdge({
       document.removeEventListener('mouseup', onMouseUp);
     };
   }, [isDragging, localOffset, id, data]);
-
-  const onPathClick = (event: React.MouseEvent<SVGElement>) => {
-    if (suppressNextClick.current) {
-      suppressNextClick.current = false;
-      event.stopPropagation();
-    }
-  };
 
   return (
     <>
@@ -531,23 +516,9 @@ function StrategyEdge({
           opacity: 1,
           strokeDasharray: selected ? undefined : (data?.kind === 'depende' ? '8 5' : undefined),
           filter: 'drop-shadow(0 1px 1px rgba(15, 23, 42, 0.18))',
-          cursor: data?.editMode ? (isDragging ? 'grabbing' : 'grab') : undefined,
         }}
         className={cn("react-flow__edge-path", selected ? 'edge-animated-selected' : '')}
-        onMouseDown={data?.editMode ? startDrag : undefined}
-        onClick={data?.editMode ? onPathClick : undefined}
       />
-      {data?.editMode && (
-        <path
-          d={path}
-          fill="none"
-          stroke="transparent"
-          strokeWidth={16}
-          style={{ cursor: isDragging ? 'grabbing' : 'grab' }}
-          onMouseDown={startDrag}
-          onClick={onPathClick}
-        />
-      )}
       {data?.editMode && (
         <g>
           <circle
@@ -558,7 +529,7 @@ function StrategyEdge({
             stroke={meta.color}
             strokeWidth={3}
             style={{ cursor: isDragging ? 'grabbing' : 'grab' }}
-            onMouseDown={startDrag}
+            onMouseDown={onMouseDown}
             className="shadow-sm hover:scale-125 transition-transform"
           />
           <circle
