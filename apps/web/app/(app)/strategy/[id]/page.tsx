@@ -420,16 +420,10 @@ function StrategyEdge({
   editMode?: boolean;
   onEdgeDragStop?: (edgeId: string, offsetX: number, offsetY: number) => void;
 }>) {
-  const reactFlow = useReactFlow();
   const [isDragging, setIsDragging] = useState(false);
   const [localOffset, setLocalOffset] = useState({ x: 0, y: 0 });
-  const dragState = useRef<{
-    pointerId: number;
-    startClient: { x: number; y: number };
-    startOffset: { x: number; y: number };
-    moved: boolean;
-  } | null>(null);
-  const suppressNextClick = useRef(false);
+  const startDragPos = useRef({ x: 0, y: 0 });
+  const startOffset = useRef({ x: 0, y: 0 });
 
   const parsedOffset = useMemo(() => {
     let x = 0;
@@ -459,51 +453,41 @@ function StrategyEdge({
   const path = `M ${sourceX} ${sourceY} Q ${controlX} ${controlY} ${targetX} ${targetY}`;
   const meta = kindMeta(data?.kind);
 
-  const onLinePointerDown = (event: React.PointerEvent<SVGPathElement>) => {
-    if (!data?.editMode) return;
-    if (event.button !== 0) return;
-    (event.target as SVGPathElement).setPointerCapture(event.pointerId);
-    dragState.current = {
-      pointerId: event.pointerId,
-      startClient: { x: event.clientX, y: event.clientY },
-      startOffset: { ...localOffset },
-      moved: false,
+  const onMouseDown = (event: React.MouseEvent<SVGCircleElement>) => {
+    event.stopPropagation();
+    event.preventDefault();
+    setIsDragging(true);
+    startDragPos.current = { x: event.clientX, y: event.clientY };
+    startOffset.current = { ...localOffset };
+  };
+
+  useEffect(() => {
+    if (!isDragging) return;
+
+    const onMouseMove = (event: MouseEvent) => {
+      const dx = event.clientX - startDragPos.current.x;
+      const dy = event.clientY - startDragPos.current.y;
+      setLocalOffset({
+        x: startOffset.current.x + dx,
+        y: startOffset.current.y + dy,
+      });
     };
-  };
 
-  const onLinePointerMove = (event: React.PointerEvent<SVGPathElement>) => {
-    const state = dragState.current;
-    if (!state || state.pointerId !== event.pointerId) return;
-    const dx = event.clientX - state.startClient.x;
-    const dy = event.clientY - state.startClient.y;
-    if (!state.moved && Math.hypot(dx, dy) < 4) return;
-    state.moved = true;
-    if (!isDragging) setIsDragging(true);
-    const zoom = reactFlow.getZoom() || 1;
-    setLocalOffset({
-      x: state.startOffset.x + dx / zoom,
-      y: state.startOffset.y + dy / zoom,
-    });
-  };
-
-  const onLinePointerUp = (event: React.PointerEvent<SVGPathElement>) => {
-    const state = dragState.current;
-    if (!state || state.pointerId !== event.pointerId) return;
-    (event.target as SVGPathElement).releasePointerCapture(event.pointerId);
-    dragState.current = null;
-    if (state.moved) {
+    const onMouseUp = () => {
       setIsDragging(false);
-      suppressNextClick.current = true;
-      data?.onEdgeDragStop?.(id, Math.round(localOffset.x), Math.round(localOffset.y));
-    }
-  };
+      if (data?.onEdgeDragStop) {
+        data.onEdgeDragStop(id, Math.round(localOffset.x), Math.round(localOffset.y));
+      }
+    };
 
-  const onLineClick = (event: React.MouseEvent<SVGPathElement>) => {
-    if (suppressNextClick.current) {
-      suppressNextClick.current = false;
-      event.stopPropagation();
-    }
-  };
+    document.addEventListener('mousemove', onMouseMove);
+    document.addEventListener('mouseup', onMouseUp);
+
+    return () => {
+      document.removeEventListener('mousemove', onMouseMove);
+      document.removeEventListener('mouseup', onMouseUp);
+    };
+  }, [isDragging, localOffset, id, data]);
 
   return (
     <>
@@ -532,43 +516,28 @@ function StrategyEdge({
           opacity: 1,
           strokeDasharray: selected ? undefined : (data?.kind === 'depende' ? '8 5' : undefined),
           filter: 'drop-shadow(0 1px 1px rgba(15, 23, 42, 0.18))',
-          pointerEvents: 'none',
         }}
         className={cn("react-flow__edge-path", selected ? 'edge-animated-selected' : '')}
       />
       {data?.editMode && (
-        <path
-          d={path}
-          fill="none"
-          stroke="transparent"
-          strokeWidth={20}
-          style={{
-            cursor: isDragging ? 'grabbing' : 'grab',
-            pointerEvents: 'stroke',
-          }}
-          onPointerDown={onLinePointerDown}
-          onPointerMove={onLinePointerMove}
-          onPointerUp={onLinePointerUp}
-          onPointerCancel={onLinePointerUp}
-          onClick={onLineClick}
-        />
-      )}
-      {data?.editMode && (
-        <g pointerEvents="none">
+        <g>
           <circle
             cx={controlX}
             cy={controlY}
-            r={6}
+            r={8}
             fill="#ffffff"
             stroke={meta.color}
-            strokeWidth={2}
-            opacity={isDragging ? 1 : 0.65}
+            strokeWidth={3}
+            style={{ cursor: isDragging ? 'grabbing' : 'grab' }}
+            onMouseDown={onMouseDown}
+            className="shadow-sm hover:scale-125 transition-transform"
           />
           <circle
             cx={controlX}
             cy={controlY}
-            r={2.5}
+            r={3.5}
             fill={meta.color}
+            style={{ pointerEvents: 'none' }}
           />
         </g>
       )}
