@@ -228,9 +228,14 @@ const RELATION_KINDS: RelationKindMeta[] = [
 ];
 
 const RELATION_KIND_MAP = new Map(RELATION_KINDS.map((rel) => [rel.kind, rel]));
+const HANDLE_IDS = new Set(['top', 'right', 'bottom', 'left']);
 
 function kindMeta(kind?: string | null): RelationKindMeta {
   return RELATION_KIND_MAP.get(kind ?? 'impacta') ?? RELATION_KINDS[1];
+}
+
+function isManualHandle(value: string | undefined): value is 'top' | 'right' | 'bottom' | 'left' {
+  return Boolean(value && HANDLE_IDS.has(value));
 }
 
 function getBestHandles(sourceNode: Node, targetNode: Node): { sourceHandle: string; targetHandle: string } {
@@ -424,6 +429,7 @@ function StrategyEdge({
   const [localOffset, setLocalOffset] = useState({ x: 0, y: 0 });
   const startDragPos = useRef({ x: 0, y: 0 });
   const startOffset = useRef({ x: 0, y: 0 });
+  const currentOffset = useRef({ x: 0, y: 0 });
 
   const parsedOffset = useMemo(() => {
     let x = 0;
@@ -441,6 +447,7 @@ function StrategyEdge({
   useEffect(() => {
     if (!isDragging) {
       setLocalOffset(parsedOffset);
+      currentOffset.current = parsedOffset;
     }
   }, [parsedOffset, isDragging]);
 
@@ -453,41 +460,55 @@ function StrategyEdge({
   const path = `M ${sourceX} ${sourceY} Q ${controlX} ${controlY} ${targetX} ${targetY}`;
   const meta = kindMeta(data?.kind);
 
-  const onMouseDown = (event: React.MouseEvent<SVGCircleElement>) => {
-    event.stopPropagation();
-    event.preventDefault();
-    setIsDragging(true);
-    startDragPos.current = { x: event.clientX, y: event.clientY };
-    startOffset.current = { ...localOffset };
+  const getPointerPosition = (event: React.PointerEvent<SVGCircleElement>) => {
+    const svg = event.currentTarget.ownerSVGElement;
+    const screenCtm = svg?.getScreenCTM();
+    if (!svg || !screenCtm) {
+      return { x: event.clientX, y: event.clientY };
+    }
+    const point = svg.createSVGPoint();
+    point.x = event.clientX;
+    point.y = event.clientY;
+    const transformed = point.matrixTransform(screenCtm.inverse());
+    return { x: transformed.x, y: transformed.y };
   };
 
-  useEffect(() => {
+  const onPointerDown = (event: React.PointerEvent<SVGCircleElement>) => {
+    event.stopPropagation();
+    event.preventDefault();
+    event.currentTarget.setPointerCapture(event.pointerId);
+    setIsDragging(true);
+    startDragPos.current = getPointerPosition(event);
+    startOffset.current = { ...currentOffset.current };
+  };
+
+  const onPointerMove = (event: React.PointerEvent<SVGCircleElement>) => {
     if (!isDragging) return;
-
-    const onMouseMove = (event: MouseEvent) => {
-      const dx = event.clientX - startDragPos.current.x;
-      const dy = event.clientY - startDragPos.current.y;
-      setLocalOffset({
-        x: startOffset.current.x + dx,
-        y: startOffset.current.y + dy,
-      });
+    event.stopPropagation();
+    event.preventDefault();
+    const pointer = getPointerPosition(event);
+    const next = {
+      x: startOffset.current.x + pointer.x - startDragPos.current.x,
+      y: startOffset.current.y + pointer.y - startDragPos.current.y,
     };
+    currentOffset.current = next;
+    setLocalOffset(next);
+  };
 
-    const onMouseUp = () => {
-      setIsDragging(false);
-      if (data?.onEdgeDragStop) {
-        data.onEdgeDragStop(id, Math.round(localOffset.x), Math.round(localOffset.y));
-      }
-    };
-
-    document.addEventListener('mousemove', onMouseMove);
-    document.addEventListener('mouseup', onMouseUp);
-
-    return () => {
-      document.removeEventListener('mousemove', onMouseMove);
-      document.removeEventListener('mouseup', onMouseUp);
-    };
-  }, [isDragging, localOffset, id, data]);
+  const onPointerUp = (event: React.PointerEvent<SVGCircleElement>) => {
+    if (!isDragging) return;
+    event.stopPropagation();
+    event.preventDefault();
+    if (event.currentTarget.hasPointerCapture(event.pointerId)) {
+      event.currentTarget.releasePointerCapture(event.pointerId);
+    }
+    setIsDragging(false);
+    data?.onEdgeDragStop?.(
+      id,
+      Math.round(currentOffset.current.x),
+      Math.round(currentOffset.current.y),
+    );
+  };
 
   return (
     <>
@@ -528,9 +549,13 @@ function StrategyEdge({
             fill="#ffffff"
             stroke={meta.color}
             strokeWidth={3}
-            style={{ cursor: isDragging ? 'grabbing' : 'grab' }}
-            onMouseDown={onMouseDown}
-            className="shadow-sm hover:scale-125 transition-transform"
+            style={{ cursor: isDragging ? 'grabbing' : 'grab', pointerEvents: 'all' }}
+            onClick={(event) => event.stopPropagation()}
+            onPointerDown={onPointerDown}
+            onPointerMove={onPointerMove}
+            onPointerUp={onPointerUp}
+            onPointerCancel={onPointerUp}
+            className="nodrag nopan shadow-sm hover:scale-125 transition-transform"
           />
           <circle
             cx={controlX}
@@ -876,15 +901,19 @@ function StrategyMapPageInner() {
       }
     }
     if (!relation) return;
-    let sourceHandle = 'auto';
-    let targetHandle = 'auto';
+    let sourceHandle: string | null = null;
+    let targetHandle: string | null = null;
     const desc = relation.description ?? '';
     if (desc && desc.includes(':')) {
       const parts = desc.split(':');
-      sourceHandle = parts[0] || 'auto';
-      targetHandle = parts[1] || 'auto';
+      if (isManualHandle(parts[0]) && isManualHandle(parts[1])) {
+        sourceHandle = parts[0];
+        targetHandle = parts[1];
+      }
     }
-    const newDesc = `${sourceHandle}:${targetHandle}:${offsetX}:${offsetY}`;
+    const newDesc = sourceHandle && targetHandle
+      ? `${sourceHandle}:${targetHandle}:${offsetX}:${offsetY}`
+      : `auto:auto:${offsetX}:${offsetY}`;
     updateRelationMutateRef.current({
       relationId: edgeId,
       kind: relation.kind || 'impacta',
@@ -2124,7 +2153,7 @@ function toFlowEdge(
   const relAny = relation as any;
   if (relAny.description && relAny.description.includes(':')) {
     const parts = relAny.description.split(':');
-    if (parts.length >= 2) {
+    if (isManualHandle(parts[0]) && isManualHandle(parts[1])) {
       sourceHandle = parts[0];
       targetHandle = parts[1];
     }
