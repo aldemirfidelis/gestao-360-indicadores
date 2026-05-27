@@ -1,26 +1,30 @@
 'use client';
 
 import Link from 'next/link';
-import { useState } from 'react';
+import type { FormEvent, ReactNode } from 'react';
+import { useMemo, useState } from 'react';
 import {
+  AlertTriangle,
   ArrowRight,
   BarChart3,
+  Check,
   CheckCircle2,
   ChevronDown,
   ClipboardCheck,
   ClipboardList,
-  Crosshair,
-  FolderKanban,
+  Factory,
+  FileBarChart,
   LineChart,
+  LockKeyhole,
+  Mail,
   Map,
   Menu,
   Network,
-  Shield,
-  Sparkles,
+  ShieldCheck,
   Target,
+  TrendingUp,
   Users,
   X,
-  Zap,
 } from 'lucide-react';
 import { BrandLogo } from '@/components/brand/brand-mark';
 import { Button } from '@/components/ui/button';
@@ -28,95 +32,85 @@ import { useAuth } from '@/components/auth/auth-provider';
 import { cn } from '@/lib/utils';
 
 const NAV_LINKS = [
-  { href: '#modulos', label: 'Módulos' },
-  { href: '#beneficios', label: 'Benefícios' },
-  { href: '#precos', label: 'Preços' },
-  { href: '#faq', label: 'FAQ' },
+  { href: '#produto', label: 'Produto' },
+  { href: '#metodo', label: 'Método' },
+  { href: '#governanca', label: 'Governança' },
+  { href: '#planos', label: 'Planos' },
   { href: '#contato', label: 'Contato' },
 ];
 
-const MODULES = [
+const PRODUCT_AREAS = [
   {
     icon: Target,
-    title: 'Indicadores',
-    desc: 'Farol em tempo real, ranking de aderência, histórico mensal e drill-down até a causa raiz.',
-    accent: 'from-sky-500 to-blue-600',
+    title: 'Indicadores e metas',
+    desc: 'Cadastre KPIs, metas, tolerâncias, periodicidades e responsáveis por área, processo ou unidade.',
   },
   {
     icon: Map,
-    title: 'Mapa Estratégico',
-    desc: 'Perspectivas BSC, objetivos, relações de causa e efeito visuais e ligadas aos indicadores.',
-    accent: 'from-violet-500 to-purple-600',
-  },
-  {
-    icon: Crosshair,
-    title: 'OKRs',
-    desc: 'Objetivos e Key Results com cadência trimestral, contribuintes e cálculo automático de progresso.',
-    accent: 'from-emerald-500 to-teal-600',
+    title: 'Mapa estratégico',
+    desc: 'Conecte objetivos, perspectivas BSC e relações de causa e efeito em um mapa único.',
   },
   {
     icon: ClipboardList,
-    title: 'Planos de Ação',
-    desc: 'Origem rastreável (indicador, desvio, reunião), responsáveis, prazos, anexos e eficácia pós-fechamento.',
-    accent: 'from-amber-500 to-orange-600',
+    title: 'Planos de ação',
+    desc: 'Transforme desvio em ação com prazos, responsáveis, prioridades, anexos e acompanhamento.',
   },
   {
     icon: ClipboardCheck,
-    title: 'Análise de Causa',
-    desc: 'FCA, 5 porquês, Ishikawa, MASP, PDCA, DMAIC e CAPA — fluxo guiado e auditável de tratativas.',
-    accent: 'from-rose-500 to-red-600',
-  },
-  {
-    icon: Network,
-    title: 'Organograma',
-    desc: 'Estrutura corporativa de empresas, unidades, áreas e processos com propagação de responsabilidades.',
-    accent: 'from-indigo-500 to-blue-700',
-  },
-  {
-    icon: FolderKanban,
-    title: 'Projetos & Cronogramas',
-    desc: 'Gantt, marcos, dependências e vínculo com indicadores e objetivos estratégicos.',
-    accent: 'from-cyan-500 to-sky-600',
+    title: 'Análise de causa',
+    desc: 'Estruture FCA, 5 porquês, Ishikawa, MASP, PDCA, DMAIC e CAPA com histórico auditável.',
   },
   {
     icon: BarChart3,
-    title: 'Dashboard Executivo',
-    desc: 'Visão 360 para decisão: KPIs, alertas críticos, setores em risco e tendências consolidadas.',
-    accent: 'from-fuchsia-500 to-pink-600',
-  },
-];
-
-const BENEFITS = [
-  {
-    icon: Zap,
-    title: 'Tudo num só lugar',
-    desc: 'Estratégia, indicadores, OKRs, ações e reuniões integrados — chega de planilhas isoladas e retrabalho.',
+    title: 'Dashboard executivo',
+    desc: 'Veja atingimento, faróis, riscos por setor e evolução mensal sem depender de planilhas paralelas.',
   },
   {
-    icon: LineChart,
-    title: 'Decisão por dados',
-    desc: 'Farol automático, atingimento e desvios calculados em tempo real. O time discute fato, não opinião.',
-  },
-  {
-    icon: Shield,
-    title: 'Pronto para auditoria',
-    desc: 'Trilha de auditoria completa, controle de acesso granular por perfil e LGPD por design.',
-  },
-  {
-    icon: Sparkles,
-    title: 'Implantação rápida',
-    desc: 'Onboarding guiado, importação por planilha, modelos prontos por setor e suporte na configuração inicial.',
+    icon: Network,
+    title: 'Organograma e processos',
+    desc: 'Mapeie empresas, unidades, áreas e processos para distribuir responsabilidades com clareza.',
   },
   {
     icon: Users,
-    title: 'Engaja o time',
-    desc: 'Notificações, atribuições e visão por área garantem que cada um saiba o que fazer e quando.',
+    title: 'Reuniões e rotina',
+    desc: 'Leve pautas, pendências e decisões para um fluxo recorrente de gestão por resultado.',
   },
   {
-    icon: CheckCircle2,
-    title: 'Melhoria contínua',
-    desc: 'Do desvio à eficácia da ação — ciclos PDCA fechados com indicadores de retrabalho e reincidência.',
+    icon: FileBarChart,
+    title: 'Relatórios e evidências',
+    desc: 'Exporte informações consolidadas para diretoria, qualidade, auditorias e acompanhamento mensal.',
   },
+];
+
+const PROCESS_STEPS = [
+  {
+    label: '1',
+    title: 'Defina o modelo de gestão',
+    desc: 'Objetivos, áreas, indicadores, metas e papéis ficam padronizados desde a implantação.',
+  },
+  {
+    label: '2',
+    title: 'Acompanhe a execução',
+    desc: 'Resultados, faróis, atrasos e desvios aparecem no mesmo painel para liderança e operação.',
+  },
+  {
+    label: '3',
+    title: 'Trate o desvio com método',
+    desc: 'Cada indicador fora da meta pode virar análise de causa, plano de ação e reunião de acompanhamento.',
+  },
+  {
+    label: '4',
+    title: 'Comprove evolução',
+    desc: 'A trilha de decisões, responsáveis e evidências fica pronta para auditoria e gestão mensal.',
+  },
+];
+
+const GOVERNANCE_ITEMS = [
+  'Perfis de acesso por responsabilidade e área',
+  'Histórico de alterações com usuário, data e origem',
+  'Fluxo completo do desvio até a eficácia da ação',
+  'Evidências e anexos vinculados ao indicador',
+  'Exportação para ritos gerenciais e auditorias',
 ];
 
 const PLANS = [
@@ -124,29 +118,28 @@ const PLANS = [
     name: 'Essencial',
     price: 'R$ 890',
     suffix: '/mês',
-    description: 'Para times que estão estruturando a gestão por indicadores.',
+    description: 'Para equipes que querem substituir controles dispersos por uma rotina única de indicadores.',
     features: [
       'Até 25 usuários',
-      'Indicadores, OKRs e Planos de Ação',
+      'Indicadores, OKRs e planos de ação',
       'Importação por planilha',
+      'Painéis de acompanhamento',
       'Suporte por e-mail',
-      '2 GB de anexos',
     ],
-    cta: 'Quero conhecer',
+    cta: 'Conhecer o Essencial',
     highlighted: false,
   },
   {
     name: 'Profissional',
     price: 'R$ 2.490',
     suffix: '/mês',
-    description: 'Para empresas que querem rodar a estratégia ponta a ponta.',
+    description: 'Para empresas que precisam conectar estratégia, operação e melhoria contínua.',
     features: [
       'Até 150 usuários',
       'Todos os módulos da plataforma',
-      'Mapa Estratégico e Análise de Causa',
-      'API e integrações',
+      'Mapa estratégico e análise de causa',
+      'API para integrações',
       'Suporte prioritário',
-      '50 GB de anexos',
     ],
     cta: 'Falar com vendas',
     highlighted: true,
@@ -155,14 +148,13 @@ const PLANS = [
     name: 'Corporativo',
     price: 'Sob consulta',
     suffix: '',
-    description: 'Para grupos com múltiplas unidades, BUs e exigências regulatórias.',
+    description: 'Para grupos com múltiplas unidades, governança avançada e implantação assistida.',
     features: [
-      'Usuários ilimitados',
-      'SSO / SAML, auditoria avançada',
-      'Multi-empresa e multi-idioma',
-      'SLA e gerente de sucesso dedicado',
-      'On-premise ou nuvem privada',
-      'Treinamento e implantação assistida',
+      'Usuários e unidades sob medida',
+      'SSO, auditoria avançada e políticas de acesso',
+      'Ambiente dedicado ou nuvem privada',
+      'SLA e gerente de sucesso',
+      'Treinamento e implantação guiada',
     ],
     cta: 'Solicitar proposta',
     highlighted: false,
@@ -171,30 +163,28 @@ const PLANS = [
 
 const FAQS = [
   {
-    q: 'Quanto tempo leva para implantar?',
-    a: 'A configuração básica fica pronta em até 5 dias úteis. Para implantações guiadas (modelos, importação histórica e treinamento) o prazo típico é de 3 a 6 semanas, dependendo do porte da operação.',
+    q: 'Em quanto tempo a empresa consegue começar?',
+    a: 'A configuração inicial pode ficar pronta em poucos dias quando os cadastros principais já existem. Implantações com histórico, treinamento e desenho de rotina costumam depender do número de áreas, indicadores e integrações.',
   },
   {
-    q: 'Posso importar dados das minhas planilhas atuais?',
-    a: 'Sim. A plataforma aceita importação por planilha (XLSX/CSV) para indicadores, metas, resultados, áreas e usuários. Também oferecemos API para integrações nativas com seus sistemas (ERP, BI, RH).',
+    q: 'A plataforma substitui as planilhas de indicadores?',
+    a: 'Sim. A ideia é manter metas, resultados, faróis, responsáveis e planos de ação em um ambiente controlado. Planilhas podem ser usadas para importação inicial ou cargas recorrentes quando fizer sentido.',
   },
   {
-    q: 'A solução atende LGPD e auditorias externas?',
-    a: 'Sim. Toda alteração é registrada em trilha de auditoria (quem, quando, o quê) e os perfis de acesso seguem o princípio do menor privilégio. Exportamos relatórios e evidências sob demanda.',
+    q: 'É possível começar apenas com alguns módulos?',
+    a: 'Sim. O Gestão 360 foi organizado de forma modular. Muitas empresas começam por indicadores e planos de ação, depois expandem para mapa estratégico, OKRs, reuniões e análise de causa.',
   },
   {
-    q: 'É possível personalizar fórmulas e periodicidades?',
-    a: 'Sim. Cada indicador suporta unidades, fórmulas, sentido (maior/menor melhor), tolerância de farol e periodicidade própria (diária, mensal, trimestral, anual ou customizada).',
+    q: 'Como ficam permissões e auditoria?',
+    a: 'Os acessos são definidos por perfil e responsabilidade. Alterações relevantes ficam registradas para facilitar rastreabilidade, prestação de contas e auditorias internas ou externas.',
   },
   {
-    q: 'Como funciona o suporte?',
-    a: 'Planos Essencial e Profissional contam com suporte por e-mail e portal. Corporativo inclui gerente de sucesso, SLA com horário estendido e canal direto via WhatsApp/Teams.',
-  },
-  {
-    q: 'Posso cancelar a qualquer momento?',
-    a: 'Sim, a assinatura é mensal. Para o plano Corporativo, oferecemos descontos significativos em contratos anuais.',
+    q: 'Vocês ajudam na implantação?',
+    a: 'Sim. A implantação pode incluir revisão de cadastros, importação, parametrização, treinamento e acompanhamento dos primeiros ciclos de gestão.',
   },
 ];
+
+const LOGOS = ['Diretoria', 'Qualidade', 'Operações', 'Controladoria', 'RH Estratégico'];
 
 export default function LandingPage() {
   const { user } = useAuth();
@@ -202,45 +192,45 @@ export default function LandingPage() {
   const [openFaq, setOpenFaq] = useState<number | null>(0);
 
   const ctaHref = user ? '/dashboard' : '/login';
-  const ctaLabel = user ? 'Ir para o Dashboard' : 'Acessar plataforma';
+  const ctaLabel = user ? 'Ir para o dashboard' : 'Acessar plataforma';
 
   return (
     <div className="min-h-screen bg-white text-slate-900">
-      {/* Header */}
-      <header className="sticky top-0 z-50 border-b border-slate-200 bg-white/80 backdrop-blur">
+      <header className="sticky top-0 z-50 border-b border-slate-200 bg-white/95 backdrop-blur">
         <div className="mx-auto flex h-16 max-w-7xl items-center justify-between px-4 sm:px-6 lg:px-8">
           <Link href="/" className="flex items-center" title="Gestão 360">
             <BrandLogo />
           </Link>
 
-          <nav className="hidden items-center gap-7 md:flex">
+          <nav className="hidden items-center gap-6 md:flex">
             {NAV_LINKS.map((link) => (
               <a
                 key={link.href}
                 href={link.href}
-                className="text-sm font-medium text-slate-600 transition-colors hover:text-slate-900"
+                className="text-sm font-medium text-slate-600 transition-colors hover:text-slate-950"
               >
                 {link.label}
               </a>
             ))}
           </nav>
 
-          <div className="hidden items-center gap-3 md:flex">
-            <a
-              href="#contato"
-              className="text-sm font-medium text-slate-600 transition-colors hover:text-slate-900"
-            >
-              Contate-nos
-            </a>
-            <Button asChild className="bg-blue-600 hover:bg-blue-700">
+          <div className="hidden items-center gap-2 md:flex">
+            <Button asChild variant="ghost">
               <Link href={ctaHref}>{ctaLabel}</Link>
+            </Button>
+            <Button asChild>
+              <a href="#contato">
+                Agendar demo
+                <ArrowRight className="ml-2 h-4 w-4" />
+              </a>
             </Button>
           </div>
 
           <button
             onClick={() => setMobileOpen((v) => !v)}
-            className="rounded-md p-2 md:hidden"
-            aria-label="Menu"
+            className="rounded-md p-2 text-slate-700 transition hover:bg-slate-100 md:hidden"
+            aria-label="Abrir menu"
+            aria-expanded={mobileOpen}
           >
             {mobileOpen ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}
           </button>
@@ -259,310 +249,349 @@ export default function LandingPage() {
                   {link.label}
                 </a>
               ))}
-              <Button asChild className="mt-2 w-full bg-blue-600 hover:bg-blue-700">
-                <Link href={ctaHref}>{ctaLabel}</Link>
-              </Button>
+              <div className="grid gap-2 pt-2">
+                <Button asChild variant="outline" className="w-full">
+                  <Link href={ctaHref}>{ctaLabel}</Link>
+                </Button>
+                <Button asChild className="w-full">
+                  <a href="#contato" onClick={() => setMobileOpen(false)}>
+                    Agendar demo
+                  </a>
+                </Button>
+              </div>
             </div>
           </div>
         )}
       </header>
 
-      {/* Hero */}
-      <section className="relative overflow-hidden">
-        <div className="absolute inset-0 -z-10 bg-gradient-to-br from-slate-50 via-white to-blue-50" />
-        <div
-          className="absolute -top-32 left-1/2 -z-10 h-[460px] w-[920px] -translate-x-1/2 rounded-full bg-gradient-to-br from-cyan-200/40 via-blue-300/30 to-violet-300/30 blur-3xl"
-          aria-hidden
-        />
-
-        <div className="mx-auto max-w-7xl px-4 pt-20 pb-16 sm:px-6 lg:px-8 lg:pt-28 lg:pb-24">
-          <div className="mx-auto max-w-4xl text-center">
-            <div className="mx-auto mb-6 inline-flex items-center gap-2 rounded-full border border-blue-200 bg-white/70 px-4 py-1.5 text-xs font-semibold uppercase tracking-wide text-blue-700 backdrop-blur">
-              <Sparkles className="h-3.5 w-3.5" />
-              Plataforma all-in-one de gestão estratégica
-            </div>
-            <h1 className="text-4xl font-extrabold leading-[1.05] tracking-tight text-slate-900 sm:text-5xl lg:text-6xl">
-              A plataforma que conecta <span className="bg-gradient-to-r from-cyan-500 via-blue-600 to-violet-600 bg-clip-text text-transparent">estratégia, indicadores e ação</span> da sua empresa
-            </h1>
-            <p className="mx-auto mt-6 max-w-2xl text-base text-slate-600 sm:text-lg">
-              Centralize objetivos, KPIs, OKRs, planos de ação e melhoria contínua em um único sistema feito para
-              executivos, gerentes e times operacionais. Decisões mais rápidas, com auditabilidade ponta a ponta.
-            </p>
-            <div className="mt-9 flex flex-col items-center justify-center gap-3 sm:flex-row">
-              <Button asChild size="lg" className="h-12 bg-blue-600 px-7 text-base hover:bg-blue-700">
-                <a href="#contato">
-                  Agende uma demonstração
-                  <ArrowRight className="ml-2 h-5 w-5" />
-                </a>
-              </Button>
-              <Button asChild size="lg" variant="outline" className="h-12 border-slate-300 px-7 text-base">
-                <Link href={ctaHref}>{ctaLabel}</Link>
-              </Button>
-            </div>
-            <div className="mt-10 flex flex-wrap items-center justify-center gap-x-8 gap-y-3 text-xs text-slate-500">
-              <span className="flex items-center gap-1.5">
-                <CheckCircle2 className="h-4 w-4 text-emerald-500" />
-                Implantação em até 5 dias
-              </span>
-              <span className="flex items-center gap-1.5">
-                <CheckCircle2 className="h-4 w-4 text-emerald-500" />
-                LGPD e trilha de auditoria
-              </span>
-              <span className="flex items-center gap-1.5">
-                <CheckCircle2 className="h-4 w-4 text-emerald-500" />
-                Sem cobrança por usuário ocioso
-              </span>
-            </div>
-          </div>
-        </div>
-      </section>
-
-      {/* Módulos */}
-      <section id="modulos" className="bg-white py-20 lg:py-28">
-        <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
-          <div className="mx-auto max-w-3xl text-center">
-            <p className="text-sm font-semibold uppercase tracking-wider text-blue-600">Módulos</p>
-            <h2 className="mt-3 text-3xl font-bold tracking-tight text-slate-900 sm:text-4xl">
-              Uma suíte completa, modular e integrada
-            </h2>
-            <p className="mt-4 text-base text-slate-600">
-              Você ativa apenas o que precisa. Todos os módulos compartilham os mesmos cadastros, perfis e trilhas de auditoria.
-            </p>
-          </div>
-
-          <div className="mt-14 grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-4">
-            {MODULES.map((mod) => {
-              const Icon = mod.icon;
-              return (
-                <div
-                  key={mod.title}
-                  className="group relative overflow-hidden rounded-xl border border-slate-200 bg-white p-6 shadow-sm transition-all hover:-translate-y-0.5 hover:shadow-md"
-                >
-                  <div
-                    className={cn(
-                      'inline-flex h-12 w-12 items-center justify-center rounded-lg bg-gradient-to-br text-white shadow-sm',
-                      mod.accent,
-                    )}
-                  >
-                    <Icon className="h-6 w-6" />
-                  </div>
-                  <h3 className="mt-4 text-base font-semibold text-slate-900">{mod.title}</h3>
-                  <p className="mt-2 text-sm leading-relaxed text-slate-600">{mod.desc}</p>
-                </div>
-              );
-            })}
-          </div>
-        </div>
-      </section>
-
-      {/* Benefícios */}
-      <section id="beneficios" className="relative overflow-hidden bg-slate-50 py-20 lg:py-28">
-        <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
-          <div className="mx-auto max-w-3xl text-center">
-            <p className="text-sm font-semibold uppercase tracking-wider text-blue-600">Por que Gestão 360</p>
-            <h2 className="mt-3 text-3xl font-bold tracking-tight text-slate-900 sm:text-4xl">
-              Os resultados que sua liderança quer ver
-            </h2>
-            <p className="mt-4 text-base text-slate-600">
-              Mais do que ferramentas: um método estruturado para transformar planejamento em execução medida.
-            </p>
-          </div>
-
-          <div className="mt-14 grid grid-cols-1 gap-6 md:grid-cols-2 lg:grid-cols-3">
-            {BENEFITS.map((b) => {
-              const Icon = b.icon;
-              return (
-                <div
-                  key={b.title}
-                  className="rounded-xl border border-slate-200 bg-white p-7 shadow-sm transition-all hover:shadow-md"
-                >
-                  <div className="inline-flex h-11 w-11 items-center justify-center rounded-lg bg-blue-50 text-blue-700">
-                    <Icon className="h-5 w-5" />
-                  </div>
-                  <h3 className="mt-5 text-lg font-semibold text-slate-900">{b.title}</h3>
-                  <p className="mt-2 text-sm leading-relaxed text-slate-600">{b.desc}</p>
-                </div>
-              );
-            })}
-          </div>
-
-          {/* Métricas */}
-          <div className="mt-16 grid grid-cols-2 gap-6 rounded-2xl border border-slate-200 bg-white p-8 shadow-sm md:grid-cols-4">
-            {[
-              { v: '+200', l: 'indicadores por cliente em média' },
-              { v: '5 dias', l: 'para implantação básica' },
-              { v: '99,9%', l: 'de disponibilidade SLA' },
-              { v: '24/7', l: 'monitoramento de infraestrutura' },
-            ].map((s) => (
-              <div key={s.l} className="text-center">
-                <div className="bg-gradient-to-r from-cyan-500 via-blue-600 to-violet-600 bg-clip-text text-3xl font-extrabold text-transparent sm:text-4xl">
-                  {s.v}
-                </div>
-                <div className="mt-1 text-xs text-slate-600 sm:text-sm">{s.l}</div>
+      <main>
+        <section id="produto" className="border-b border-slate-200 bg-slate-50">
+          <div className="mx-auto grid max-w-7xl gap-10 px-4 py-14 sm:px-6 lg:grid-cols-[0.95fr,1.05fr] lg:px-8 lg:py-16">
+            <div className="flex flex-col justify-center">
+              <div className="mb-5 inline-flex w-fit items-center gap-2 rounded-md border border-teal-200 bg-white px-3 py-1 text-sm font-medium text-teal-800">
+                <ShieldCheck className="h-4 w-4" />
+                SaaS para rotina de gestão estratégica
               </div>
-            ))}
-          </div>
-        </div>
-      </section>
+              <h1 className="max-w-2xl text-4xl font-semibold leading-none text-slate-950 sm:text-5xl lg:text-6xl">
+                Gestão 360
+              </h1>
+              <p className="mt-5 max-w-xl text-lg leading-8 text-slate-700">
+                Centralize indicadores, OKRs, planos de ação e análise de causa em uma plataforma pensada para empresas que
+                precisam transformar metas em execução acompanhável.
+              </p>
 
-      {/* Preços */}
-      <section id="precos" className="bg-white py-20 lg:py-28">
-        <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
-          <div className="mx-auto max-w-3xl text-center">
-            <p className="text-sm font-semibold uppercase tracking-wider text-blue-600">Planos</p>
-            <h2 className="mt-3 text-3xl font-bold tracking-tight text-slate-900 sm:text-4xl">
-              Escolha o plano que cresce com a sua operação
-            </h2>
-            <p className="mt-4 text-base text-slate-600">
-              Comece pequeno e expanda conforme o ritmo da empresa. Sem fidelidade, sem surpresas.
-            </p>
-          </div>
-
-          <div className="mt-14 grid grid-cols-1 gap-6 lg:grid-cols-3">
-            {PLANS.map((plan) => (
-              <div
-                key={plan.name}
-                className={cn(
-                  'relative flex flex-col rounded-2xl border bg-white p-7 shadow-sm transition-all',
-                  plan.highlighted
-                    ? 'border-blue-600 shadow-xl ring-1 ring-blue-600/20 lg:-translate-y-2'
-                    : 'border-slate-200 hover:shadow-md',
-                )}
-              >
-                {plan.highlighted && (
-                  <div className="absolute -top-3 left-1/2 -translate-x-1/2 rounded-full bg-blue-600 px-3 py-1 text-[10px] font-bold uppercase tracking-wider text-white shadow">
-                    Mais escolhido
-                  </div>
-                )}
-                <h3 className="text-lg font-semibold text-slate-900">{plan.name}</h3>
-                <p className="mt-1 text-sm text-slate-600">{plan.description}</p>
-                <div className="mt-5 flex items-baseline gap-1">
-                  <span className="text-4xl font-extrabold tracking-tight text-slate-900">{plan.price}</span>
-                  {plan.suffix && <span className="text-sm text-slate-500">{plan.suffix}</span>}
-                </div>
-                <ul className="mt-6 space-y-2.5">
-                  {plan.features.map((f) => (
-                    <li key={f} className="flex items-start gap-2 text-sm text-slate-700">
-                      <CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0 text-emerald-500" />
-                      <span>{f}</span>
-                    </li>
-                  ))}
-                </ul>
-                <Button
-                  asChild
-                  className={cn(
-                    'mt-7 w-full',
-                    plan.highlighted ? 'bg-blue-600 hover:bg-blue-700' : 'bg-slate-900 hover:bg-slate-800',
-                  )}
-                >
-                  <a href="#contato">{plan.cta}</a>
+              <div className="mt-8 flex flex-col gap-3 sm:flex-row">
+                <Button asChild size="lg" className="h-11 px-6">
+                  <a href="#contato">
+                    Solicitar demonstração
+                    <ArrowRight className="ml-2 h-4 w-4" />
+                  </a>
+                </Button>
+                <Button asChild size="lg" variant="outline" className="h-11 px-6">
+                  <Link href={ctaHref}>{ctaLabel}</Link>
                 </Button>
               </div>
-            ))}
-          </div>
-        </div>
-      </section>
 
-      {/* FAQ */}
-      <section id="faq" className="bg-slate-50 py-20 lg:py-28">
-        <div className="mx-auto max-w-4xl px-4 sm:px-6 lg:px-8">
-          <div className="text-center">
-            <p className="text-sm font-semibold uppercase tracking-wider text-blue-600">Perguntas frequentes</p>
-            <h2 className="mt-3 text-3xl font-bold tracking-tight text-slate-900 sm:text-4xl">
-              Tire suas dúvidas antes de começar
-            </h2>
+              <div className="mt-9 grid gap-3 text-sm text-slate-700 sm:grid-cols-3">
+                <TrustItem label="Rastreabilidade" />
+                <TrustItem label="Rotina por área" />
+                <TrustItem label="Evidências auditáveis" />
+              </div>
+            </div>
+
+            <ProductPreview />
           </div>
 
-          <div className="mt-12 divide-y divide-slate-200 rounded-2xl border border-slate-200 bg-white shadow-sm">
-            {FAQS.map((faq, idx) => {
-              const open = openFaq === idx;
-              return (
-                <button
-                  key={faq.q}
-                  onClick={() => setOpenFaq(open ? null : idx)}
-                  className="block w-full px-6 py-5 text-left transition-colors hover:bg-slate-50"
-                  aria-expanded={open}
-                >
-                  <div className="flex items-center justify-between gap-4">
-                    <span className="text-sm font-semibold text-slate-900 sm:text-base">{faq.q}</span>
-                    <ChevronDown
-                      className={cn(
-                        'h-5 w-5 shrink-0 text-slate-500 transition-transform',
-                        open && 'rotate-180 text-blue-600',
-                      )}
-                    />
-                  </div>
-                  {open && <p className="mt-3 text-sm leading-relaxed text-slate-600">{faq.a}</p>}
-                </button>
-              );
-            })}
+          <div className="border-t border-slate-200 bg-white">
+            <div className="mx-auto flex max-w-7xl flex-col gap-3 px-4 py-5 sm:px-6 md:flex-row md:items-center md:justify-between lg:px-8">
+              <p className="text-sm font-medium text-slate-700">Construído para rotinas de gestão que envolvem</p>
+              <div className="flex flex-wrap gap-2">
+                {LOGOS.map((item) => (
+                  <span key={item} className="rounded-md border border-slate-200 bg-slate-50 px-3 py-1 text-xs text-slate-600">
+                    {item}
+                  </span>
+                ))}
+              </div>
+            </div>
           </div>
-        </div>
-      </section>
+        </section>
 
-      {/* Contato */}
-      <section id="contato" className="relative overflow-hidden bg-white py-20 lg:py-28">
-        <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
-          <div className="overflow-hidden rounded-3xl border border-slate-200 bg-gradient-to-br from-slate-900 via-blue-900 to-violet-900 px-6 py-12 shadow-xl sm:px-10 lg:grid lg:grid-cols-2 lg:gap-12 lg:px-14 lg:py-16">
-            <div className="text-white">
-              <h2 className="text-3xl font-bold tracking-tight sm:text-4xl">
-                Pronto para colocar sua estratégia em movimento?
+        <section className="bg-white py-16 lg:py-20">
+          <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
+            <div className="grid gap-10 lg:grid-cols-[0.78fr,1.22fr] lg:items-start">
+              <div>
+                <p className="text-sm font-semibold text-teal-700">Produto</p>
+                <h2 className="mt-3 text-3xl font-semibold leading-tight text-slate-950">
+                  Uma plataforma para conectar estratégia, operação e melhoria contínua.
+                </h2>
+                <p className="mt-4 text-base leading-7 text-slate-600">
+                  O Gestão 360 organiza a rotina de indicadores com método, responsabilidades e visibilidade executiva. Cada
+                  módulo compartilha a mesma base de usuários, áreas, processos e auditoria.
+                </p>
+              </div>
+
+              <div className="grid gap-4 sm:grid-cols-2">
+                {PRODUCT_AREAS.map((area) => {
+                  const Icon = area.icon;
+                  return (
+                    <article key={area.title} className="rounded-lg border border-slate-200 bg-white p-5 shadow-sm">
+                      <div className="flex items-start gap-3">
+                        <div className="grid h-10 w-10 shrink-0 place-items-center rounded-md bg-slate-100 text-slate-800">
+                          <Icon className="h-5 w-5" />
+                        </div>
+                        <div>
+                          <h3 className="text-base font-semibold text-slate-950">{area.title}</h3>
+                          <p className="mt-2 text-sm leading-6 text-slate-600">{area.desc}</p>
+                        </div>
+                      </div>
+                    </article>
+                  );
+                })}
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <section id="metodo" className="border-y border-slate-200 bg-slate-50 py-16 lg:py-20">
+          <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
+            <div className="max-w-3xl">
+              <p className="text-sm font-semibold text-teal-700">Método</p>
+              <h2 className="mt-3 text-3xl font-semibold leading-tight text-slate-950">
+                Da meta ao plano de ação, com responsabilidade clara em cada etapa.
               </h2>
-              <p className="mt-4 text-base text-slate-200">
-                Fale com nosso time. Em uma reunião de 30 minutos mostramos a plataforma rodando com cenários do seu setor e
-                construímos juntos uma proposta personalizada.
+              <p className="mt-4 text-base leading-7 text-slate-600">
+                A plataforma reduz a distância entre planejamento e execução: o resultado mensal mostra o desvio, o desvio
+                abre a tratativa, a tratativa gera ação e a ação volta para o acompanhamento de eficácia.
               </p>
-              <ul className="mt-8 space-y-3 text-sm text-slate-200">
-                <li className="flex items-start gap-2">
-                  <CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0 text-emerald-400" />
-                  Demo personalizada com seus dados de exemplo
-                </li>
-                <li className="flex items-start gap-2">
-                  <CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0 text-emerald-400" />
-                  Proposta com prazo de implantação realista
-                </li>
-                <li className="flex items-start gap-2">
-                  <CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0 text-emerald-400" />
-                  Suporte do início ao fim — sem custo na avaliação
-                </li>
-              </ul>
+            </div>
+
+            <div className="mt-10 grid gap-4 md:grid-cols-4">
+              {PROCESS_STEPS.map((step) => (
+                <article key={step.title} className="rounded-lg border border-slate-200 bg-white p-5">
+                  <div className="mb-4 grid h-8 w-8 place-items-center rounded-md bg-teal-700 text-sm font-semibold text-white">
+                    {step.label}
+                  </div>
+                  <h3 className="text-base font-semibold text-slate-950">{step.title}</h3>
+                  <p className="mt-2 text-sm leading-6 text-slate-600">{step.desc}</p>
+                </article>
+              ))}
+            </div>
+          </div>
+        </section>
+
+        <section id="governanca" className="bg-white py-16 lg:py-20">
+          <div className="mx-auto grid max-w-7xl gap-10 px-4 sm:px-6 lg:grid-cols-[1fr,0.9fr] lg:px-8">
+            <div>
+              <p className="text-sm font-semibold text-teal-700">Governança</p>
+              <h2 className="mt-3 text-3xl font-semibold leading-tight text-slate-950">
+                Controle suficiente para diretoria, qualidade e auditoria trabalharem com confiança.
+              </h2>
+              <p className="mt-4 text-base leading-7 text-slate-600">
+                Em vez de relatórios montados manualmente ao fim do mês, cada decisão fica ligada ao indicador, área,
+                responsável e evidência que originou a ação.
+              </p>
+
+              <div className="mt-8 grid gap-3">
+                {GOVERNANCE_ITEMS.map((item) => (
+                  <div key={item} className="flex items-start gap-3 rounded-lg border border-slate-200 bg-slate-50 p-4">
+                    <CheckCircle2 className="mt-0.5 h-5 w-5 shrink-0 text-teal-700" />
+                    <span className="text-sm leading-6 text-slate-700">{item}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            <div className="rounded-lg border border-slate-200 bg-slate-950 p-5 text-white shadow-sm">
+              <div className="flex items-center justify-between border-b border-white/10 pb-4">
+                <div>
+                  <p className="text-sm text-slate-300">Trilha de auditoria</p>
+                  <h3 className="mt-1 text-lg font-semibold">Tratativa do indicador OEE</h3>
+                </div>
+                <LockKeyhole className="h-5 w-5 text-teal-300" />
+              </div>
+              <AuditRow label="Resultado lançado" value="78,4%" status="Registrado" tone="green" />
+              <AuditRow label="Desvio identificado" value="-6,6 p.p." status="Crítico" tone="red" />
+              <AuditRow label="Causa raiz" value="Setup acima do padrão" status="Validado" tone="amber" />
+              <AuditRow label="Plano de ação" value="3 ações abertas" status="Em curso" tone="blue" />
+              <div className="mt-5 rounded-md border border-white/10 bg-white/5 p-4">
+                <p className="text-xs text-slate-400">Responsável</p>
+                <div className="mt-2 flex items-center justify-between gap-3">
+                  <div>
+                    <p className="text-sm font-semibold">Coordenação de Produção</p>
+                    <p className="text-xs text-slate-400">Prazo de revisão: 31/05/2026</p>
+                  </div>
+                  <Factory className="h-5 w-5 text-slate-300" />
+                </div>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <section id="planos" className="border-y border-slate-200 bg-slate-50 py-16 lg:py-20">
+          <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
+            <div className="mx-auto max-w-3xl text-center">
+              <p className="text-sm font-semibold text-teal-700">Planos</p>
+              <h2 className="mt-3 text-3xl font-semibold leading-tight text-slate-950">
+                Comece com o escopo certo e expanda conforme a maturidade da gestão.
+              </h2>
+              <p className="mt-4 text-base leading-7 text-slate-600">
+                Planos pensados para implantação gradual, com módulos, usuários e suporte alinhados ao tamanho da operação.
+              </p>
+            </div>
+
+            <div className="mt-10 grid gap-5 lg:grid-cols-3">
+              {PLANS.map((plan) => (
+                <article
+                  key={plan.name}
+                  className={cn(
+                    'flex rounded-lg border bg-white p-6 shadow-sm',
+                    plan.highlighted ? 'border-teal-700 ring-1 ring-teal-700' : 'border-slate-200',
+                  )}
+                >
+                  <div className="flex min-h-full w-full flex-col">
+                    <div className="flex items-start justify-between gap-4">
+                      <div>
+                        <h3 className="text-lg font-semibold text-slate-950">{plan.name}</h3>
+                        <p className="mt-2 text-sm leading-6 text-slate-600">{plan.description}</p>
+                      </div>
+                      {plan.highlighted && (
+                        <span className="shrink-0 rounded-md bg-teal-50 px-2.5 py-1 text-xs font-medium text-teal-800">
+                          Recomendado
+                        </span>
+                      )}
+                    </div>
+
+                    <div className="mt-6 flex items-baseline gap-1">
+                      <span className="text-3xl font-semibold text-slate-950">{plan.price}</span>
+                      {plan.suffix && <span className="text-sm text-slate-500">{plan.suffix}</span>}
+                    </div>
+
+                    <ul className="mt-6 space-y-3">
+                      {plan.features.map((feature) => (
+                        <li key={feature} className="flex items-start gap-2 text-sm leading-6 text-slate-700">
+                          <Check className="mt-1 h-4 w-4 shrink-0 text-teal-700" />
+                          <span>{feature}</span>
+                        </li>
+                      ))}
+                    </ul>
+
+                    <Button
+                      asChild
+                      className={cn('mt-7 w-full', !plan.highlighted && 'bg-slate-900 hover:bg-slate-800')}
+                      variant={plan.highlighted ? 'default' : undefined}
+                    >
+                      <a href="#contato">{plan.cta}</a>
+                    </Button>
+                  </div>
+                </article>
+              ))}
+            </div>
+
+            <p className="mt-6 text-center text-sm text-slate-500">
+              Valores referenciais para assinatura mensal. Implantação, integrações e ambientes dedicados são definidos conforme
+              escopo.
+            </p>
+          </div>
+        </section>
+
+        <section id="faq" className="bg-white py-16 lg:py-20">
+          <div className="mx-auto grid max-w-7xl gap-10 px-4 sm:px-6 lg:grid-cols-[0.75fr,1.25fr] lg:px-8">
+            <div>
+              <p className="text-sm font-semibold text-teal-700">Perguntas frequentes</p>
+              <h2 className="mt-3 text-3xl font-semibold leading-tight text-slate-950">
+                Antes de levar a proposta para o time.
+              </h2>
+              <p className="mt-4 text-base leading-7 text-slate-600">
+                Respostas diretas para as dúvidas que costumam aparecer em avaliações comerciais e implantação.
+              </p>
+            </div>
+
+            <div className="divide-y divide-slate-200 rounded-lg border border-slate-200 bg-white">
+              {FAQS.map((faq, idx) => {
+                const open = openFaq === idx;
+                return (
+                  <button
+                    key={faq.q}
+                    onClick={() => setOpenFaq(open ? null : idx)}
+                    className="block w-full px-5 py-5 text-left transition-colors hover:bg-slate-50"
+                    aria-expanded={open}
+                  >
+                    <div className="flex items-center justify-between gap-4">
+                      <span className="text-base font-semibold text-slate-950">{faq.q}</span>
+                      <ChevronDown className={cn('h-5 w-5 shrink-0 text-slate-500 transition-transform', open && 'rotate-180')} />
+                    </div>
+                    {open && <p className="mt-3 text-sm leading-6 text-slate-600">{faq.a}</p>}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+        </section>
+
+        <section id="contato" className="border-t border-slate-200 bg-slate-950 py-16 text-white lg:py-20">
+          <div className="mx-auto grid max-w-7xl gap-10 px-4 sm:px-6 lg:grid-cols-[0.9fr,1.1fr] lg:px-8">
+            <div>
+              <p className="text-sm font-semibold text-teal-300">Contato comercial</p>
+              <h2 className="mt-3 text-3xl font-semibold leading-tight">
+                Veja o Gestão 360 aplicado à rotina da sua empresa.
+              </h2>
+              <p className="mt-4 text-base leading-7 text-slate-300">
+                Em uma conversa objetiva, entendemos seu cenário de indicadores, demonstramos os fluxos principais e indicamos
+                o melhor caminho de implantação.
+              </p>
+
+              <div className="mt-8 grid gap-4">
+                <ContactPoint icon={<LineChart className="h-5 w-5" />} title="Demonstração guiada" desc="Fluxo de indicadores, desvios, ações e relatórios." />
+                <ContactPoint icon={<ShieldCheck className="h-5 w-5" />} title="Diagnóstico de implantação" desc="Escopo, cadastros, integrações e rotina gerencial." />
+                <ContactPoint icon={<Mail className="h-5 w-5" />} title="Retorno comercial" desc="Resposta em até 1 dia útil após o envio." />
+              </div>
             </div>
 
             <ContactForm />
           </div>
-        </div>
-      </section>
+        </section>
+      </main>
 
-      {/* Footer */}
-      <footer className="border-t border-slate-200 bg-slate-50 py-12">
+      <footer className="border-t border-slate-200 bg-white py-10">
         <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
-          <div className="grid grid-cols-1 gap-10 md:grid-cols-4">
-            <div className="md:col-span-2">
+          <div className="flex flex-col gap-8 md:flex-row md:items-start md:justify-between">
+            <div>
               <BrandLogo />
-              <p className="mt-4 max-w-md text-sm text-slate-600">
-                Plataforma corporativa de gestão estratégica, indicadores, planos de ação e melhoria contínua.
+              <p className="mt-4 max-w-md text-sm leading-6 text-slate-600">
+                Plataforma corporativa para gestão estratégica, indicadores, planos de ação e melhoria contínua.
               </p>
             </div>
-            <div>
-              <h4 className="text-sm font-semibold text-slate-900">Produto</h4>
-              <ul className="mt-3 space-y-2 text-sm text-slate-600">
-                <li><a href="#modulos" className="hover:text-slate-900">Módulos</a></li>
-                <li><a href="#beneficios" className="hover:text-slate-900">Benefícios</a></li>
-                <li><a href="#precos" className="hover:text-slate-900">Preços</a></li>
-                <li><a href="#faq" className="hover:text-slate-900">FAQ</a></li>
-              </ul>
-            </div>
-            <div>
-              <h4 className="text-sm font-semibold text-slate-900">Empresa</h4>
-              <ul className="mt-3 space-y-2 text-sm text-slate-600">
-                <li><a href="#contato" className="hover:text-slate-900">Contato</a></li>
-                <li><Link href="/login" className="hover:text-slate-900">Área do cliente</Link></li>
-              </ul>
+            <div className="grid grid-cols-2 gap-10 text-sm">
+              <div>
+                <h3 className="font-semibold text-slate-950">Produto</h3>
+                <ul className="mt-3 space-y-2 text-slate-600">
+                  <li>
+                    <a href="#produto" className="hover:text-slate-950">Visão geral</a>
+                  </li>
+                  <li>
+                    <a href="#metodo" className="hover:text-slate-950">Método</a>
+                  </li>
+                  <li>
+                    <a href="#planos" className="hover:text-slate-950">Planos</a>
+                  </li>
+                </ul>
+              </div>
+              <div>
+                <h3 className="font-semibold text-slate-950">Empresa</h3>
+                <ul className="mt-3 space-y-2 text-slate-600">
+                  <li>
+                    <a href="#contato" className="hover:text-slate-950">Contato</a>
+                  </li>
+                  <li>
+                    <Link href="/login" className="hover:text-slate-950">Área do cliente</Link>
+                  </li>
+                </ul>
+              </div>
             </div>
           </div>
-          <div className="mt-10 flex flex-col items-start justify-between gap-3 border-t border-slate-200 pt-6 text-xs text-slate-500 sm:flex-row sm:items-center">
+          <div className="mt-8 flex flex-col gap-2 border-t border-slate-200 pt-5 text-xs text-slate-500 sm:flex-row sm:items-center sm:justify-between">
             <span>© {new Date().getFullYear()} Gestão 360. Todos os direitos reservados.</span>
-            <span>Criado e Desenvolvido por Aldemir Fidelis</span>
+            <span>Criado e desenvolvido por Aldemir Fidelis.</span>
           </div>
         </div>
       </footer>
@@ -570,59 +599,275 @@ export default function LandingPage() {
   );
 }
 
+function TrustItem({ label }: { label: string }) {
+  return (
+    <div className="flex items-center gap-2 rounded-md border border-slate-200 bg-white px-3 py-2">
+      <CheckCircle2 className="h-4 w-4 shrink-0 text-teal-700" />
+      <span>{label}</span>
+    </div>
+  );
+}
+
+function ProductPreview() {
+  return (
+    <div className="relative lg:pt-3">
+      <div className="rounded-lg border border-slate-300 bg-white p-3 shadow-xl">
+        <div className="overflow-hidden rounded-md border border-slate-200 bg-slate-50">
+          <div className="flex items-center justify-between border-b border-slate-200 bg-white px-4 py-3">
+            <div>
+              <div className="text-xs font-medium text-slate-500">Dashboard executivo</div>
+              <div className="text-sm font-semibold text-slate-950">Maio/2026 · Operações</div>
+            </div>
+            <div className="hidden items-center gap-2 sm:flex">
+              <StatusDot tone="green" label="No prazo" />
+              <StatusDot tone="amber" label="Atenção" />
+              <StatusDot tone="red" label="Crítico" />
+            </div>
+          </div>
+
+          <div className="grid gap-3 p-4 md:grid-cols-3">
+            <PreviewMetric label="Atingimento geral" value="86%" tone="green" />
+            <PreviewMetric label="Ações atrasadas" value="7" tone="amber" />
+            <PreviewMetric label="Indicadores críticos" value="12" tone="red" />
+          </div>
+
+          <div className="grid gap-4 px-4 pb-4 lg:grid-cols-[0.9fr,1.1fr]">
+            <div className="rounded-md border border-slate-200 bg-white p-4">
+              <div className="mb-4 flex items-center justify-between">
+                <div>
+                  <p className="text-xs font-medium text-slate-500">Evolução mensal</p>
+                  <p className="text-sm font-semibold text-slate-950">Indicadores dentro da meta</p>
+                </div>
+                <TrendingUp className="h-4 w-4 text-teal-700" />
+              </div>
+              <div className="flex h-36 items-end gap-2">
+                {[54, 62, 58, 71, 69, 78, 82, 86].map((height, index) => (
+                  <div key={index} className="flex flex-1 flex-col items-center gap-2">
+                    <div className="w-full rounded-sm bg-teal-700" style={{ height: `${height}%` }} />
+                    <span className="text-[10px] text-slate-400">{index + 1}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            <div className="rounded-md border border-slate-200 bg-white p-4">
+              <div className="mb-3 flex items-center justify-between">
+                <div>
+                  <p className="text-xs font-medium text-slate-500">Tratativas prioritárias</p>
+                  <p className="text-sm font-semibold text-slate-950">Risco por processo</p>
+                </div>
+                <AlertTriangle className="h-4 w-4 text-amber-600" />
+              </div>
+              <PreviewRow area="Produção" indicator="OEE linha 03" status="Causa em análise" tone="red" />
+              <PreviewRow area="Logística" indicator="OTIF clientes A" status="Plano aberto" tone="amber" />
+              <PreviewRow area="Qualidade" indicator="Reclamações" status="Em eficácia" tone="green" />
+              <PreviewRow area="Manutenção" indicator="MTTR crítico" status="Reunião marcada" tone="amber" />
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function PreviewMetric({ label, value, tone }: { label: string; value: string; tone: 'green' | 'amber' | 'red' }) {
+  const toneClass = {
+    green: 'text-teal-800 bg-teal-50 border-teal-200',
+    amber: 'text-amber-800 bg-amber-50 border-amber-200',
+    red: 'text-red-800 bg-red-50 border-red-200',
+  }[tone];
+
+  return (
+    <div className={cn('rounded-md border p-4', toneClass)}>
+      <p className="text-xs font-medium">{label}</p>
+      <p className="mt-2 text-3xl font-semibold">{value}</p>
+    </div>
+  );
+}
+
+function PreviewRow({
+  area,
+  indicator,
+  status,
+  tone,
+}: {
+  area: string;
+  indicator: string;
+  status: string;
+  tone: 'green' | 'amber' | 'red';
+}) {
+  const toneClass = {
+    green: 'bg-teal-600',
+    amber: 'bg-amber-500',
+    red: 'bg-red-600',
+  }[tone];
+
+  return (
+    <div className="flex items-center justify-between gap-3 border-t border-slate-100 py-3 first:border-t-0 first:pt-0">
+      <div className="min-w-0">
+        <p className="truncate text-sm font-semibold text-slate-950">{indicator}</p>
+        <p className="text-xs text-slate-500">{area}</p>
+      </div>
+      <div className="flex shrink-0 items-center gap-2 text-xs text-slate-600">
+        <span className={cn('h-2.5 w-2.5 rounded-full', toneClass)} aria-hidden="true" />
+        <span className="hidden sm:inline">{status}</span>
+      </div>
+    </div>
+  );
+}
+
+function StatusDot({ label, tone }: { label: string; tone: 'green' | 'amber' | 'red' }) {
+  const toneClass = {
+    green: 'bg-teal-600',
+    amber: 'bg-amber-500',
+    red: 'bg-red-600',
+  }[tone];
+
+  return (
+    <div className="flex items-center gap-1.5 text-xs text-slate-600">
+      <span className={cn('h-2.5 w-2.5 rounded-full', toneClass)} aria-hidden="true" />
+      {label}
+    </div>
+  );
+}
+
+function AuditRow({
+  label,
+  value,
+  status,
+  tone,
+}: {
+  label: string;
+  value: string;
+  status: string;
+  tone: 'green' | 'amber' | 'red' | 'blue';
+}) {
+  const toneClass = {
+    green: 'bg-teal-400/15 text-teal-200',
+    amber: 'bg-amber-400/15 text-amber-200',
+    red: 'bg-red-400/15 text-red-200',
+    blue: 'bg-sky-400/15 text-sky-200',
+  }[tone];
+
+  return (
+    <div className="flex items-center justify-between gap-4 border-b border-white/10 py-4">
+      <div>
+        <p className="text-sm font-semibold">{label}</p>
+        <p className="mt-1 text-xs text-slate-400">{value}</p>
+      </div>
+      <span className={cn('shrink-0 rounded-md px-2.5 py-1 text-xs font-medium', toneClass)}>{status}</span>
+    </div>
+  );
+}
+
+function ContactPoint({ icon, title, desc }: { icon: ReactNode; title: string; desc: string }) {
+  return (
+    <div className="flex items-start gap-3">
+      <div className="grid h-10 w-10 shrink-0 place-items-center rounded-md bg-white/10 text-teal-300">{icon}</div>
+      <div>
+        <h3 className="text-sm font-semibold">{title}</h3>
+        <p className="mt-1 text-sm leading-6 text-slate-400">{desc}</p>
+      </div>
+    </div>
+  );
+}
+
 function ContactForm() {
   const [submitted, setSubmitted] = useState(false);
+  const [formData, setFormData] = useState<Record<string, string>>({});
 
-  function onSubmit(e: React.FormEvent<HTMLFormElement>) {
+  const summary = useMemo(() => {
+    const company = formData.company ? ` da ${formData.company}` : '';
+    return `Obrigado${company}. Recebemos sua solicitação e retornaremos em até 1 dia útil.`;
+  }, [formData.company]);
+
+  function onSubmit(e: FormEvent<HTMLFormElement>) {
     e.preventDefault();
+    const data = new FormData(e.currentTarget);
+    setFormData(Object.fromEntries(data.entries()) as Record<string, string>);
     setSubmitted(true);
   }
 
   if (submitted) {
     return (
-      <div className="mt-10 flex h-full flex-col items-center justify-center rounded-2xl bg-white/10 p-8 text-center text-white backdrop-blur lg:mt-0">
-        <div className="mb-3 inline-flex h-14 w-14 items-center justify-center rounded-full bg-emerald-500/20">
-          <CheckCircle2 className="h-7 w-7 text-emerald-300" />
+      <div className="rounded-lg border border-white/10 bg-white p-7 text-slate-950 shadow-xl">
+        <div className="grid h-12 w-12 place-items-center rounded-md bg-teal-50 text-teal-700">
+          <CheckCircle2 className="h-6 w-6" />
         </div>
-        <h3 className="text-xl font-semibold">Obrigado pelo contato!</h3>
-        <p className="mt-2 max-w-sm text-sm text-slate-200">
-          Recebemos seu interesse. Nosso time comercial responderá em até 1 dia útil.
-        </p>
+        <h3 className="mt-5 text-xl font-semibold">Solicitação enviada</h3>
+        <p className="mt-2 text-sm leading-6 text-slate-600">{summary}</p>
+        <Button className="mt-6" onClick={() => setSubmitted(false)} variant="outline">
+          Enviar outra solicitação
+        </Button>
       </div>
     );
   }
 
   return (
-    <form
-      onSubmit={onSubmit}
-      className="mt-10 rounded-2xl bg-white p-6 shadow-lg lg:mt-0"
-    >
-      <h3 className="text-lg font-semibold text-slate-900">Fale com o time comercial</h3>
-      <p className="mt-1 text-sm text-slate-500">Resposta em até 1 dia útil.</p>
+    <form onSubmit={onSubmit} className="rounded-lg border border-white/10 bg-white p-6 text-slate-950 shadow-xl">
+      <h3 className="text-xl font-semibold">Solicitar demonstração</h3>
+      <p className="mt-2 text-sm leading-6 text-slate-600">
+        Preencha os dados para receber uma proposta de conversa comercial.
+      </p>
 
-      <div className="mt-5 grid grid-cols-1 gap-4 sm:grid-cols-2">
-        <Field label="Nome completo" name="name" required />
-        <Field label="E-mail corporativo" name="email" type="email" required />
+      <div className="mt-6 grid gap-4 sm:grid-cols-2">
+        <Field label="Nome" name="name" required />
+        <Field label="E-mail profissional" name="email" type="email" required />
         <Field label="Empresa" name="company" required />
         <Field label="Telefone" name="phone" type="tel" />
       </div>
 
+      <div className="mt-4 grid gap-4 sm:grid-cols-2">
+        <div>
+          <label className="block text-xs font-medium text-slate-700" htmlFor="team-size">
+            Tamanho da equipe
+          </label>
+          <select
+            id="team-size"
+            name="teamSize"
+            className="mt-1 h-10 w-full rounded-md border border-slate-300 bg-white px-3 text-sm text-slate-900 focus:border-teal-700 focus:outline-none focus:ring-2 focus:ring-teal-700/15"
+          >
+            <option>Até 25 usuários</option>
+            <option>26 a 150 usuários</option>
+            <option>Mais de 150 usuários</option>
+            <option>Ainda não sei</option>
+          </select>
+        </div>
+        <div>
+          <label className="block text-xs font-medium text-slate-700" htmlFor="interest">
+            Interesse principal
+          </label>
+          <select
+            id="interest"
+            name="interest"
+            className="mt-1 h-10 w-full rounded-md border border-slate-300 bg-white px-3 text-sm text-slate-900 focus:border-teal-700 focus:outline-none focus:ring-2 focus:ring-teal-700/15"
+          >
+            <option>Indicadores e metas</option>
+            <option>Planos de ação</option>
+            <option>Mapa estratégico</option>
+            <option>Implantação completa</option>
+          </select>
+        </div>
+      </div>
+
       <div className="mt-4">
-        <label className="block text-xs font-medium text-slate-700">Como podemos ajudar?</label>
+        <label className="block text-xs font-medium text-slate-700" htmlFor="message">
+          Contexto
+        </label>
         <textarea
+          id="message"
           name="message"
           rows={4}
-          required
-          className="mt-1 w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 placeholder:text-slate-400 focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/20"
-          placeholder="Conte um pouco sobre seu cenário, número de usuários, prazos, etc."
+          className="mt-1 w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 placeholder:text-slate-400 focus:border-teal-700 focus:outline-none focus:ring-2 focus:ring-teal-700/15"
+          placeholder="Conte sobre sua rotina atual de indicadores, áreas envolvidas ou prazo de implantação."
         />
       </div>
 
-      <Button type="submit" size="lg" className="mt-5 w-full bg-blue-600 text-base hover:bg-blue-700">
-        Enviar mensagem
+      <Button type="submit" size="lg" className="mt-5 w-full">
+        Enviar solicitação
       </Button>
-      <p className="mt-3 text-[11px] text-slate-500">
-        Ao enviar, você concorda com nossa política de privacidade. Não compartilhamos seus dados.
+      <p className="mt-3 text-xs leading-5 text-slate-500">
+        Usaremos seus dados apenas para responder ao contato comercial solicitado.
       </p>
     </form>
   );
@@ -641,15 +886,16 @@ function Field({
 }) {
   return (
     <div>
-      <label className="block text-xs font-medium text-slate-700">
+      <label className="block text-xs font-medium text-slate-700" htmlFor={name}>
         {label}
-        {required && <span className="ml-0.5 text-rose-500">*</span>}
+        {required && <span className="ml-0.5 text-red-600">*</span>}
       </label>
       <input
+        id={name}
         type={type}
         name={name}
         required={required}
-        className="mt-1 w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 placeholder:text-slate-400 focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/20"
+        className="mt-1 h-10 w-full rounded-md border border-slate-300 bg-white px-3 text-sm text-slate-900 placeholder:text-slate-400 focus:border-teal-700 focus:outline-none focus:ring-2 focus:ring-teal-700/15"
       />
     </div>
   );
