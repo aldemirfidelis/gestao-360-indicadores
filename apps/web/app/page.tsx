@@ -591,7 +591,6 @@ export default function LandingPage() {
           </div>
           <div className="mt-8 flex flex-col gap-2 border-t border-slate-200 pt-5 text-xs text-slate-500 sm:flex-row sm:items-center sm:justify-between">
             <span>© {new Date().getFullYear()} Gestão 360. Todos os direitos reservados.</span>
-            <span>Criado e desenvolvido por Aldemir Fidelis.</span>
           </div>
         </div>
       </footer>

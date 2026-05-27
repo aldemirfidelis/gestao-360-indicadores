@@ -3,7 +3,6 @@
 ## Entregue
 
 - Identidade visual Gestão 360 aplicada no login, menu lateral, cabeçalho, favicon, manifesto e ícones.
-- Rodapé global com o crédito “Criado e Desenvolvido por Aldemir Fidelis”.
 - Navegação separada em Início, Lançamentos, Visualização e Configurações.
 - Cadastro e edição de usuários em `Configurações > Usuários`, incluindo dados de perfil, cargo, área e permissões por módulo.
 - Estrutura organizacional em `Visualização > Árvore de gestão`.
