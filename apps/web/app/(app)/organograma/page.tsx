@@ -42,6 +42,7 @@ import {
   Send,
   CheckCircle2,
   Clock,
+  User,
 } from 'lucide-react';
 import { PageHeader } from '@/components/shell/page-header';
 import { SectionCard } from '@/components/platform/section-card';
@@ -717,7 +718,7 @@ function OrganogramaInner() {
                 {/* ACCORDION CONTENT */}
                 {isOpen && (
                   <div className="p-4 overflow-x-auto">
-                    <table className="w-full border-collapse text-left text-xs">
+                    <table className="w-full min-w-[1320px] border-collapse text-left text-xs">
                       <thead>
                         <tr className="bg-muted border-b text-muted-foreground font-semibold uppercase tracking-wider text-[10px]">
                           <th className="p-3 w-[260px]">Colaborador</th>
@@ -737,11 +738,14 @@ function OrganogramaInner() {
                           <tr key={emp.id} className="border-b transition hover:bg-muted/20 align-middle">
                             {/* COLABORADOR NAME + ENVIAR PARA APROVACAO */}
                             <td className="p-3">
-                              <div className="flex items-center gap-2">
+                              <div className="flex items-center gap-2 min-w-[240px]">
+                                <div className="flex items-center justify-center h-8 w-8 rounded-full bg-emerald-500/10 text-emerald-600 shrink-0 shadow-sm border border-emerald-500/20">
+                                  <User className="h-4 w-4" />
+                                </div>
                                 <Input
                                   value={emp.name}
                                   onChange={(e) => updateEmployee.mutate({ id: emp.id, name: e.target.value })}
-                                  className="h-8 font-semibold text-xs bg-background flex-1 min-w-0"
+                                  className="h-8 font-semibold text-xs bg-background flex-1 min-w-[150px] w-full"
                                   placeholder="Nome do Colaborador"
                                 />
                                 {emp.approvalRequests && emp.approvalRequests.length > 0 ? (
