@@ -53,13 +53,11 @@ export default function LoginPage() {
             Estratégia, indicadores e execução em um único lugar.
           </h1>
           <p className="text-primary-foreground/80">
-            BSC, OKR, metas, planos de ação, reuniões, rastreabilidade e dashboards executivos. Tudo conectado para
+            Metas, planos de ação, reuniões, rastreabilidade e dashboards executivos. Tudo conectado para
             transformar dados em decisão.
           </p>
         </div>
-        <div className="relative text-xs text-primary-foreground/70">
-          Demo: <strong>admin@demo.com</strong> / <strong>admin123</strong>
-        </div>
+       
       </div>
 
       <div className="flex items-center justify-center p-6">

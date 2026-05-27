@@ -303,7 +303,7 @@ export default function IndicatorDetailPage() {
                   if (payload.value === null || payload.value === undefined) {
                     return <circle key={`dot-${index}`} cx={cx} cy={cy} r={0} fill="transparent" />;
                   }
-                  const isWithin = ind.direction === 'LOWER'
+                  const isWithin = ind.direction === 'LOWER_BETTER'
                     ? (payload.value ?? 0) <= (payload.target ?? 0)
                     : (payload.value ?? 0) >= (payload.target ?? 0);
                   const color = isWithin ? '#10b981' : '#ef4444';

@@ -890,7 +890,7 @@ function IndicatorManagementCard({
                 {monthlyHistory.map((entry, index) => {
                   let color = 'hsl(var(--status-gray))';
                   if (entry.realizado !== null && entry.realizado !== undefined) {
-                    const isWithin = indicator.direction === 'LOWER'
+                    const isWithin = indicator.direction === 'LOWER_BETTER'
                       ? (entry.realizado ?? 0) <= (entry.meta ?? 0)
                       : (entry.realizado ?? 0) >= (entry.meta ?? 0);
                     color = isWithin ? '#10b981' : '#ef4444';
@@ -1047,7 +1047,7 @@ function MicroIndicatorRow({
                       {monthlyHistory.map((entry, index) => {
                         let color = 'hsl(var(--status-gray))';
                         if (entry.realizado !== null && entry.realizado !== undefined) {
-                          const isWithin = micro.direction === 'LOWER'
+                          const isWithin = micro.direction === 'LOWER_BETTER'
                             ? (entry.realizado ?? 0) <= (entry.meta ?? 0)
                             : (entry.realizado ?? 0) >= (entry.meta ?? 0);
                           color = isWithin ? '#10b981' : '#ef4444';
