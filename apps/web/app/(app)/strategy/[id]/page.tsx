@@ -7,17 +7,12 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
 import ReactFlow, {
   Background,
-  BaseEdge,
   ConnectionMode,
   Controls,
   Handle,
-  MarkerType,
   MiniMap,
   NodeResizer,
   Position,
-  addEdge,
-  getBezierPath,
-  getSmoothStepPath,
   useEdgesState,
   useNodesState,
   useReactFlow,
@@ -408,6 +403,50 @@ function ObjectiveNode({
   );
 }
 
+function getOrthogonalPath({
+  sourceX,
+  sourceY,
+  targetX,
+  targetY,
+  sourcePosition,
+  targetPosition,
+  controlX,
+  controlY,
+}: {
+  sourceX: number;
+  sourceY: number;
+  targetX: number;
+  targetY: number;
+  sourcePosition?: Position;
+  targetPosition?: Position;
+  controlX: number;
+  controlY: number;
+}) {
+  const sourceIsHorizontal = sourcePosition === Position.Left || sourcePosition === Position.Right;
+  const targetIsHorizontal = targetPosition === Position.Left || targetPosition === Position.Right;
+  const routeHorizontalFirst = sourceIsHorizontal || (!targetIsHorizontal && Math.abs(targetX - sourceX) >= Math.abs(targetY - sourceY));
+
+  const points = routeHorizontalFirst
+    ? [
+        { x: sourceX, y: sourceY },
+        { x: controlX, y: sourceY },
+        { x: controlX, y: controlY },
+        { x: targetX, y: controlY },
+        { x: targetX, y: targetY },
+      ]
+    : [
+        { x: sourceX, y: sourceY },
+        { x: sourceX, y: controlY },
+        { x: controlX, y: controlY },
+        { x: controlX, y: targetY },
+        { x: targetX, y: targetY },
+      ];
+
+  return points
+    .map((point, index) => `${index === 0 ? 'M' : 'L'} ${point.x} ${point.y}`)
+    .join(' ');
+}
+
 function StrategyEdge({
   id,
   sourceX,
@@ -456,8 +495,16 @@ function StrategyEdge({
   const controlX = midX + localOffset.x;
   const controlY = midY + localOffset.y;
 
-  // Use a quadratic bezier curve for smooth custom bending
-  const path = `M ${sourceX} ${sourceY} Q ${controlX} ${controlY} ${targetX} ${targetY}`;
+  const path = getOrthogonalPath({
+    sourceX,
+    sourceY,
+    targetX,
+    targetY,
+    sourcePosition,
+    targetPosition,
+    controlX,
+    controlY,
+  });
   const meta = kindMeta(data?.kind);
 
   const getPointerPosition = (event: React.PointerEvent<SVGCircleElement>) => {
@@ -526,6 +573,13 @@ function StrategyEdge({
           animation: edge-flow-dash 0.6s linear infinite !important;
         }
       `}</style>
+      <path
+        d={path}
+        fill="none"
+        stroke="transparent"
+        strokeWidth={18}
+        className="react-flow__edge-interaction"
+      />
       <path
         id={id}
         d={path}
