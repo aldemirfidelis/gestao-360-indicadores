@@ -9,14 +9,20 @@ import { toast } from 'sonner';
 import {
   Bar,
   BarChart,
+  CartesianGrid,
+  Cell,
+  Line,
+  LineChart,
   ResponsiveContainer,
   Tooltip,
   XAxis,
   YAxis,
-  Cell,
 } from 'recharts';
 import {
   AlertTriangle,
+  Activity,
+  BarChart3,
+  CalendarDays,
   Clock3,
   Download,
   Eye,
@@ -638,7 +644,7 @@ export default function IndicatorsPage() {
         />
       )}
 
-      <div className="grid grid-cols-1 gap-4 lg:grid-cols-2 2xl:grid-cols-3">
+      <div className="grid grid-cols-1 gap-4">
         {topLevelRows.map((indicator) => (
           <IndicatorManagementCard
             key={indicator.id}
@@ -707,6 +713,34 @@ export default function IndicatorsPage() {
   );
 }
 
+type IndicatorViewMode = 'monthly' | 'cumulative';
+type IndicatorChartType = 'bar' | 's-curve';
+
+interface ChartPoint {
+  periodRef: string;
+  month: string;
+  meta: number | null;
+  realizado: number | null;
+  attainment: number | null;
+  status: string;
+  displayMeta: number | null;
+  displayRealizado: number | null;
+}
+
+function buildCumulativeAvg(values: Array<number | null | undefined>): Array<number | null> {
+  const out: Array<number | null> = [];
+  let sum = 0;
+  let count = 0;
+  for (const v of values) {
+    if (v !== null && v !== undefined && Number.isFinite(v)) {
+      sum += v;
+      count += 1;
+    }
+    out.push(count === 0 ? null : sum / count);
+  }
+  return out;
+}
+
 function IndicatorManagementCard({
   indicator,
   micros = [],
@@ -739,6 +773,8 @@ function IndicatorManagementCard({
   onMicroDelete?: (micro: IndicatorRow) => void;
 }) {
   const [microsOpen, setMicrosOpen] = useState(false);
+  const [viewMode, setViewMode] = useState<IndicatorViewMode>('monthly');
+  const [chartType, setChartType] = useState<IndicatorChartType>('bar');
   const monthlyHistory = indicator.monthlyHistory ?? [];
   const lastFilledIdx = (() => {
     for (let i = monthlyHistory.length - 1; i >= 0; i--) {
@@ -748,27 +784,66 @@ function IndicatorManagementCard({
     return monthlyHistory.length - 1;
   })();
   const [selectedIdx, setSelectedIdx] = useState<number>(Math.max(0, lastFilledIdx));
-  const selected = monthlyHistory[selectedIdx] ?? null;
-  const light = (selected?.status as string | undefined) ?? indicator.last?.light ?? 'GRAY';
-  const attainment = selected?.attainment ? Math.max(0, Math.min(100, Math.round(selected.attainment * 100))) : 0;
-  const unitText = indicator.unitLabel || UNIT_LABEL[indicator.unit] || '';
-  const monthLabel = selected ? periodRefLabel(selected.periodRef) : '-';
 
-  function onBarClick(state: any) {
+  const chartData: ChartPoint[] = useMemo(() => {
+    if (viewMode === 'monthly') {
+      return monthlyHistory.map((p) => ({
+        periodRef: p.periodRef,
+        month: p.month,
+        meta: p.meta,
+        realizado: p.realizado,
+        attainment: p.attainment,
+        status: p.status,
+        displayMeta: p.meta,
+        displayRealizado: p.realizado,
+      }));
+    }
+    const cumMeta = buildCumulativeAvg(monthlyHistory.map((p) => p.meta));
+    const cumReal = buildCumulativeAvg(monthlyHistory.map((p) => p.realizado));
+    return monthlyHistory.map((p, idx) => ({
+      periodRef: p.periodRef,
+      month: p.month,
+      meta: p.meta,
+      realizado: p.realizado,
+      attainment: p.attainment,
+      status: p.status,
+      displayMeta: cumMeta[idx],
+      displayRealizado: cumReal[idx],
+    }));
+  }, [monthlyHistory, viewMode]);
+
+  const selectedPoint = monthlyHistory[selectedIdx] ?? null;
+  const selectedChart = chartData[selectedIdx] ?? null;
+  const light = (selectedPoint?.status as string | undefined) ?? indicator.last?.light ?? 'GRAY';
+  const baseAttainment = selectedPoint?.attainment ?? 0;
+  const attainment = Math.max(0, Math.min(100, Math.round(baseAttainment * 100)));
+  const unitText = indicator.unitLabel || UNIT_LABEL[indicator.unit] || '';
+  const monthLabel = selectedPoint ? periodRefLabel(selectedPoint.periodRef) : '-';
+  const hasAnyData = monthlyHistory.some((p) => p.meta !== null || p.realizado !== null);
+
+  function onChartClick(state: any) {
     const idx = state?.activeTooltipIndex;
     if (typeof idx === 'number' && idx >= 0 && idx < monthlyHistory.length) {
       setSelectedIdx(idx);
     }
   }
 
+  function showsDaily() { return indicator.periodicity === 'DAILY'; }
+  function showsWeekly() { return indicator.periodicity === 'WEEKLY' || indicator.periodicity === 'BIWEEKLY'; }
+  function showsMonthly() { return indicator.periodicity === 'MONTHLY' || indicator.periodicity === 'QUARTERLY' || indicator.periodicity === 'SEMIANNUAL' || indicator.periodicity === 'ANNUAL'; }
+
+  const realizadoDisplay = viewMode === 'cumulative' ? selectedChart?.displayRealizado : selectedPoint?.realizado;
+  const metaDisplay = viewMode === 'cumulative' ? selectedChart?.displayMeta : selectedPoint?.meta;
+
   return (
-    <article className="panel panel-hover flex h-full flex-col p-4">
+    <article className="panel panel-hover flex h-full flex-col p-5">
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0">
           <div className="flex flex-wrap items-center gap-2">
             {indicator.code && <Badge variant="outline">{indicator.code}</Badge>}
             <Badge variant="secondary">{TYPE_LABEL[indicator.type] ?? indicator.type}</Badge>
             <Badge className={cn('border', statusBadgeClass(light))} variant="outline">{LIGHT_LABEL[light] ?? light}</Badge>
+            <Badge variant="outline" className="text-xs">{PERIODICITY_LABEL[indicator.periodicity] ?? indicator.periodicity}</Badge>
             {indicator.isMacro && (
               <Badge className="border border-status-blue/40 bg-status-blue/10 text-status-blue" variant="outline">
                 Macro
@@ -780,110 +855,162 @@ function IndicatorManagementCard({
               </Badge>
             )}
           </div>
-          <h3 className="mt-2 line-clamp-2 text-base font-semibold leading-snug">{indicator.name}</h3>
+          <h3 className="mt-2 text-lg font-semibold leading-snug">{indicator.name}</h3>
+          <div className="mt-1 flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-muted-foreground">
+            <span className="flex items-center gap-1.5"><Target className="h-3.5 w-3.5" />{indicator.areaMacro?.name ?? '-'}</span>
+            <span className="flex items-center gap-1.5"><TrendingUp className="h-3.5 w-3.5" />{indicator.areaMicro?.name ?? indicator.ownerNode.name}</span>
+            <span className="flex items-center gap-1.5"><UserRound className="h-3.5 w-3.5" />{indicator.responsibleUser?.name ?? 'Sem responsável'}</span>
+            <span className="flex items-center gap-1.5"><Clock3 className="h-3.5 w-3.5" />{indicator.last ? periodRefLabel(indicator.last.periodRef) : (PERIODICITY_LABEL[indicator.periodicity] ?? indicator.periodicity)}</span>
+          </div>
         </div>
         <StatusLight light={light} size="md" />
       </div>
 
-      <div className="mt-4 grid grid-cols-3 gap-3 text-xs">
-        <div>
-          <div className="text-muted-foreground">
-            Meta <span className="font-normal text-muted-foreground/80">({monthLabel})</span>
+      <div className="mt-5 grid grid-cols-1 gap-5 lg:grid-cols-[280px,1fr]">
+        <div className="space-y-3">
+          <div className="rounded-lg border bg-card/60 p-3">
+            <div className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
+              Meta {viewMode === 'cumulative' ? 'acumulada' : ''} <span className="font-normal text-muted-foreground/80">({monthLabel})</span>
+            </div>
+            <div className="mt-1 text-2xl font-semibold">{formatNumber(metaDisplay ?? null)}</div>
           </div>
-          <div className="text-base font-semibold">{formatNumber(selected?.meta ?? null)}</div>
-        </div>
-        <div>
-          <div className="text-muted-foreground">Realizado</div>
-          <div className="text-base font-semibold">
-            {selected && selected.realizado !== null && selected.realizado !== undefined
-              ? formatNumber(selected.realizado)
-              : '-'}
-            <span className="ml-1 text-xs font-normal text-muted-foreground">{unitText}</span>
+          <div className="rounded-lg border bg-card/60 p-3">
+            <div className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">Realizado {viewMode === 'cumulative' ? 'acumulado' : ''}</div>
+            <div className="mt-1 text-2xl font-semibold">
+              {realizadoDisplay !== null && realizadoDisplay !== undefined ? formatNumber(realizadoDisplay) : '-'}
+              <span className="ml-1 text-xs font-normal text-muted-foreground">{unitText}</span>
+            </div>
+          </div>
+          <div className="rounded-lg border bg-card/60 p-3">
+            <div className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">Atingimento</div>
+            <div className="mt-1 text-2xl font-semibold">{formatPercent(selectedPoint?.attainment ?? null)}</div>
+            <Progress value={attainment} className="mt-2 h-1.5" />
           </div>
         </div>
-        <div>
-          <div className="text-muted-foreground">Atingimento</div>
-          <div className="text-base font-semibold">{formatPercent(selected?.attainment ?? null)}</div>
-        </div>
-      </div>
 
-      <Progress value={attainment} className="mt-3 h-1.5" />
+        <div className="flex flex-col">
+          <div className="flex flex-wrap items-center justify-between gap-2 mb-2">
+            <div className="inline-flex rounded-md border bg-card/60 p-0.5">
+              <button
+                type="button"
+                onClick={() => setViewMode('monthly')}
+                className={cn('px-3 py-1.5 text-xs font-medium rounded transition-colors', viewMode === 'monthly' ? 'bg-primary text-primary-foreground shadow-sm' : 'text-muted-foreground hover:text-foreground')}
+              >
+                Mensal
+              </button>
+              <button
+                type="button"
+                onClick={() => setViewMode('cumulative')}
+                className={cn('px-3 py-1.5 text-xs font-medium rounded transition-colors', viewMode === 'cumulative' ? 'bg-primary text-primary-foreground shadow-sm' : 'text-muted-foreground hover:text-foreground')}
+              >
+                Acumulado
+              </button>
+            </div>
+            <div className="inline-flex rounded-md border bg-card/60 p-0.5">
+              <button
+                type="button"
+                onClick={() => setChartType('bar')}
+                className={cn('inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded transition-colors', chartType === 'bar' ? 'bg-primary text-primary-foreground shadow-sm' : 'text-muted-foreground hover:text-foreground')}
+              >
+                <BarChart3 className="h-3.5 w-3.5" />
+                Barras
+              </button>
+              <button
+                type="button"
+                onClick={() => setChartType('s-curve')}
+                className={cn('inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded transition-colors', chartType === 's-curve' ? 'bg-primary text-primary-foreground shadow-sm' : 'text-muted-foreground hover:text-foreground')}
+              >
+                <Activity className="h-3.5 w-3.5" />
+                Curva S
+              </button>
+            </div>
+          </div>
 
-      <div className="mt-4 h-28 rounded-md border bg-card/60 p-2">
-        {monthlyHistory.some((point) => point.meta !== null || point.realizado !== null) ? (
-          <ResponsiveContainer width="100%" height="100%">
-            <BarChart
-              data={monthlyHistory}
-              barGap={1}
-              onClick={onBarClick}
-              style={{ cursor: 'pointer' }}
-            >
-              <XAxis
-                dataKey="month"
-                tick={({ x, y, payload, index }: any) => (
-                  <text
-                    x={x}
-                    y={y + 10}
-                    textAnchor="middle"
-                    fontSize={10}
-                    fontWeight={index === selectedIdx ? 700 : 400}
-                    fill={index === selectedIdx ? 'hsl(var(--primary))' : 'currentColor'}
-                  >
-                    {payload.value}
-                  </text>
+          <div className="h-64 rounded-md border bg-card/60 p-3">
+            {hasAnyData ? (
+              <ResponsiveContainer width="100%" height="100%">
+                {chartType === 'bar' ? (
+                  <BarChart data={chartData} barGap={2} onClick={onChartClick} style={{ cursor: 'pointer' }}>
+                    <CartesianGrid strokeDasharray="3 3" className="stroke-border" vertical={false} />
+                    <XAxis
+                      dataKey="month"
+                      tick={({ x, y, payload, index }: any) => (
+                        <text x={x} y={y + 12} textAnchor="middle" fontSize={11} fontWeight={index === selectedIdx ? 700 : 400} fill={index === selectedIdx ? 'hsl(var(--primary))' : 'currentColor'}>
+                          {payload.value}
+                        </text>
+                      )}
+                      axisLine={false}
+                      tickLine={false}
+                      interval={0}
+                    />
+                    <YAxis tick={{ fontSize: 11 }} width={48} />
+                    <Tooltip content={<ChartTooltip viewMode={viewMode} />} cursor={{ fill: 'hsl(var(--muted))', opacity: 0.35 }} />
+                    <Bar dataKey="displayMeta" name="Meta" fill="#1e3a8a" radius={[3, 3, 0, 0]} />
+                    <Bar dataKey="displayRealizado" name="Realizado" radius={[3, 3, 0, 0]}>
+                      {chartData.map((entry, index) => {
+                        let color = 'hsl(var(--status-gray))';
+                        const r = entry.displayRealizado;
+                        const m = entry.displayMeta;
+                        if (r !== null && r !== undefined) {
+                          const isWithin = indicator.direction === 'LOWER_BETTER'
+                            ? (r ?? 0) <= (m ?? 0)
+                            : (r ?? 0) >= (m ?? 0);
+                          color = isWithin ? '#10b981' : '#ef4444';
+                        }
+                        return <Cell key={`cell-${index}`} fill={color} />;
+                      })}
+                    </Bar>
+                  </BarChart>
+                ) : (
+                  <LineChart data={chartData} onClick={onChartClick} style={{ cursor: 'pointer' }}>
+                    <CartesianGrid strokeDasharray="3 3" className="stroke-border" vertical={false} />
+                    <XAxis
+                      dataKey="month"
+                      tick={({ x, y, payload, index }: any) => (
+                        <text x={x} y={y + 12} textAnchor="middle" fontSize={11} fontWeight={index === selectedIdx ? 700 : 400} fill={index === selectedIdx ? 'hsl(var(--primary))' : 'currentColor'}>
+                          {payload.value}
+                        </text>
+                      )}
+                      axisLine={false}
+                      tickLine={false}
+                      interval={0}
+                    />
+                    <YAxis tick={{ fontSize: 11 }} width={48} />
+                    <Tooltip content={<ChartTooltip viewMode={viewMode} />} cursor={{ stroke: 'hsl(var(--muted-foreground))', strokeWidth: 1, strokeDasharray: '3 3' }} />
+                    <Line type="monotone" dataKey="displayMeta" name="Meta" stroke="#1e3a8a" strokeWidth={2.5} strokeDasharray="6 4" dot={{ r: 3, fill: '#1e3a8a' }} activeDot={{ r: 5 }} />
+                    <Line type="monotone" dataKey="displayRealizado" name="Realizado" stroke="#10b981" strokeWidth={2.5} dot={{ r: 3, fill: '#10b981' }} activeDot={{ r: 5 }} />
+                  </LineChart>
                 )}
-                axisLine={false}
-                tickLine={false}
-                interval={0}
-              />
-              <YAxis hide domain={[0, 'auto']} />
-              <Tooltip content={<ChartTooltip />} cursor={{ fill: 'hsl(var(--muted))', opacity: 0.35 }} />
-              <Bar dataKey="meta" name="Meta" fill="#1e3a8a" radius={[2, 2, 0, 0]} />
-              <Bar dataKey="realizado" name="Realizado" radius={[2, 2, 0, 0]}>
-                {monthlyHistory.map((entry, index) => {
-                  let color = 'hsl(var(--status-gray))';
-                  if (entry.realizado !== null && entry.realizado !== undefined) {
-                    const isWithin = indicator.direction === 'LOWER_BETTER'
-                      ? (entry.realizado ?? 0) <= (entry.meta ?? 0)
-                      : (entry.realizado ?? 0) >= (entry.meta ?? 0);
-                    color = isWithin ? '#10b981' : '#ef4444';
-                  }
-                  return <Cell key={`cell-${index}`} fill={color} />;
-                })}
-              </Bar>
-            </BarChart>
-          </ResponsiveContainer>
-        ) : (
-          <div className="flex h-full items-center justify-center text-xs text-muted-foreground">Sem dados mensais</div>
-        )}
-      </div>
-
-      <div className="mt-4 grid grid-cols-2 gap-2 text-xs text-muted-foreground">
-        <div className="flex items-center gap-2">
-          <Target className="h-3.5 w-3.5" />
-          <span className="truncate">{indicator.areaMacro?.name ?? '-'}</span>
-        </div>
-        <div className="flex items-center gap-2">
-          <TrendingUp className="h-3.5 w-3.5" />
-          <span className="truncate">{indicator.areaMicro?.name ?? indicator.ownerNode.name}</span>
-        </div>
-        <div className="flex items-center gap-2">
-          <UserRound className="h-3.5 w-3.5" />
-          <span className="truncate">{indicator.responsibleUser?.name ?? 'Sem responsável'}</span>
-        </div>
-        <div className="flex items-center gap-2">
-          <Clock3 className="h-3.5 w-3.5" />
-          <span>{indicator.last ? periodRefLabel(indicator.last.periodRef) : PERIODICITY_LABEL[indicator.periodicity]}</span>
+              </ResponsiveContainer>
+            ) : (
+              <div className="flex h-full items-center justify-center text-xs text-muted-foreground">Sem dados para o período</div>
+            )}
+          </div>
+          <div className="mt-2 text-[11px] text-muted-foreground">
+            {viewMode === 'cumulative' ? 'Acumulado calculado como média YTD dos períodos preenchidos.' : 'Valores mensais do indicador no ano corrente.'} Clique nas barras/pontos para ver os detalhes do período.
+          </div>
         </div>
       </div>
 
-      <div className="mt-4 flex flex-wrap gap-2">
+      <div className="mt-5 flex flex-wrap gap-2 border-t pt-4">
+        <Button variant="default" size="sm" onClick={onResult}>
+          <CalendarDays className="mr-1.5 h-3.5 w-3.5" />
+          Lançar Mensal
+        </Button>
+        <Button variant="outline" size="sm" onClick={onResult}>
+          <CalendarDays className="mr-1.5 h-3.5 w-3.5" />
+          Lançar Semanal
+        </Button>
+        <Button variant="outline" size="sm" onClick={onResult}>
+          <CalendarDays className="mr-1.5 h-3.5 w-3.5" />
+          Lançar Diário
+        </Button>
+        <div className="hidden md:block mx-1 w-px self-stretch bg-border" />
         <Button variant="outline" size="sm" onClick={onView}><Eye className="mr-1.5 h-3.5 w-3.5" />Visualizar</Button>
         <Button variant="outline" size="sm" onClick={onEdit}><Pencil className="mr-1.5 h-3.5 w-3.5" />Editar</Button>
         <Button variant="outline" size="sm" onClick={onTarget}>Metas</Button>
-        <Button variant="outline" size="sm" onClick={onResult}>Realizados</Button>
         <Button variant="ghost" size="sm" onClick={onHistory}><History className="mr-1.5 h-3.5 w-3.5" />Histórico</Button>
-        <Button variant="ghost" size="sm" className="text-destructive hover:text-destructive" onClick={onDelete}><Trash2 className="mr-1.5 h-3.5 w-3.5" />Inativar</Button>
+        <Button variant="ghost" size="sm" className="text-destructive hover:text-destructive ml-auto" onClick={onDelete}><Trash2 className="mr-1.5 h-3.5 w-3.5" />Inativar</Button>
       </div>
 
       {micros.length > 0 && (
@@ -1393,15 +1520,16 @@ function Info({ label, value }: { label: string; value: React.ReactNode }) {
   );
 }
 
-function ChartTooltip({ active, payload, label }: any) {
+function ChartTooltip({ active, payload, label, viewMode }: any) {
   if (!active || !payload?.length) return null;
-  const point = payload[0]?.payload as MonthlyPoint | undefined;
+  const point = payload[0]?.payload as ChartPoint | undefined;
+  const isCum = viewMode === 'cumulative';
   return (
     <div className="rounded-md border bg-background p-2 text-xs shadow-sm">
-      <div className="font-semibold">{label}</div>
-      <div>Meta: {formatNumber(point?.meta)}</div>
-      <div>Realizado: {formatNumber(point?.realizado)}</div>
-      <div>Atingimento: {formatPercent(point?.attainment)}</div>
+      <div className="font-semibold">{label}{isCum && ' (acumulado)'}</div>
+      <div>Meta: {formatNumber(point?.displayMeta ?? point?.meta)}</div>
+      <div>Realizado: {formatNumber(point?.displayRealizado ?? point?.realizado)}</div>
+      {!isCum && <div>Atingimento: {formatPercent(point?.attainment)}</div>}
       <div>Status: {LIGHT_LABEL[point?.status ?? 'GRAY']}</div>
     </div>
   );
