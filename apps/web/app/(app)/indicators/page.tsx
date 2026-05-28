@@ -50,6 +50,14 @@ import { Textarea } from '@/components/ui/textarea';
 import { IndicatorResultEditor } from '@/components/platform/indicator-result-editor';
 import { api } from '@/lib/api';
 import { cn, formatDate, formatNumber, formatPercent, periodRefLabel } from '@/lib/utils';
+import {
+  PERIODICITY_LABEL,
+  DIRECTION_LABEL,
+  INDICATOR_TYPE_LABEL,
+  INDICATOR_UNIT_LABEL,
+  INDICATOR_STATUS_LABEL,
+  TRAFFIC_LIGHT_LABEL,
+} from '@/lib/labels';
 
 interface CompanyOption {
   id: string;
@@ -204,65 +212,10 @@ type Filters = {
   year: string;
 };
 
-const TYPE_LABEL: Record<string, string> = {
-  STRATEGIC: 'Estratégico',
-  TACTICAL: 'Tático',
-  OPERATIONAL: 'Operacional',
-  PROJECT: 'Projeto',
-  PROCESS: 'Processo',
-  SAFETY: 'Seguranca',
-  QUALITY: 'Qualidade',
-  HR: 'RH',
-  FINANCE: 'Financeiro',
-  PRODUCTION: 'Produção',
-  MAINTENANCE: 'Manutenção',
-  PROCUREMENT: 'Suprimentos',
-  COMMERCIAL: 'Comercial',
-  CUSTOM: 'Personalizado',
-};
-
-const UNIT_LABEL: Record<string, string> = {
-  PERCENT: '%',
-  CURRENCY: 'R$',
-  QUANTITY: 'Quantidade',
-  HOURS: 'Horas',
-  DAYS: 'Dias',
-  TONS: 'Toneladas',
-  LITERS: 'Litros',
-  INDEX: 'Índice',
-  TEXT: 'Texto',
-  CUSTOM: 'Personalizada',
-};
-
-const PERIODICITY_LABEL: Record<string, string> = {
-  DAILY: 'Diária',
-  WEEKLY: 'Semanal',
-  BIWEEKLY: 'Quinzenal',
-  MONTHLY: 'Mensal',
-  QUARTERLY: 'Trimestral',
-  SEMIANNUAL: 'Semestral',
-  ANNUAL: 'Anual',
-};
-
-const DIRECTION_LABEL: Record<string, string> = {
-  HIGHER_BETTER: 'Quanto maior melhor',
-  LOWER_BETTER: 'Quanto menor melhor',
-  EQUAL_TARGET: 'Igual a meta',
-  RANGE: 'Faixa aceitavel',
-};
-
-const STATUS_LABEL: Record<string, string> = {
-  ACTIVE: 'Ativo',
-  INACTIVE: 'Inativo',
-  IN_REVIEW: 'Em revisão',
-};
-
-const LIGHT_LABEL: Record<string, string> = {
-  GREEN: 'No alvo',
-  YELLOW: 'Atenção',
-  RED: 'Crítico',
-  GRAY: 'Sem dados',
-};
+const TYPE_LABEL = INDICATOR_TYPE_LABEL;
+const UNIT_LABEL = INDICATOR_UNIT_LABEL;
+const STATUS_LABEL = INDICATOR_STATUS_LABEL;
+const LIGHT_LABEL = TRAFFIC_LIGHT_LABEL;
 
 const EMPTY_FORM: IndicatorForm = {
   id: '',

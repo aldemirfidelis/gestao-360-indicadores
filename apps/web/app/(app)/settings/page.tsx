@@ -725,10 +725,18 @@ function RowActions({ onEdit, onDelete }: { onEdit: () => void; onDelete: () => 
   );
 }
 
+const ADMIN_STATUS_LABEL: Record<string, string> = {
+  ACTIVE: 'Ativo',
+  INACTIVE: 'Inativo',
+  PENDING: 'Pendente',
+  BLOCKED: 'Bloqueado',
+  ARCHIVED: 'Arquivado',
+};
+
 function StatusPill({ status, label }: { status: string; label?: string }) {
-  const normalized = label ?? status;
-  const cls = normalized === 'ACTIVE' ? 'pill-green' : normalized === 'PENDING' ? 'pill-yellow' : normalized === 'BLOCKED' || normalized === 'ARCHIVED' ? 'pill-red' : 'pill-gray';
-  return <span className={cn('pill', cls)}>{normalized}</span>;
+  const raw = label ?? status;
+  const cls = raw === 'ACTIVE' ? 'pill-green' : raw === 'PENDING' ? 'pill-yellow' : raw === 'BLOCKED' || raw === 'ARCHIVED' ? 'pill-red' : 'pill-gray';
+  return <span className={cn('pill', cls)}>{ADMIN_STATUS_LABEL[raw] ?? raw}</span>;
 }
 
 function SummaryTile({ label, value, icon }: { label: string; value: string; icon: React.ReactNode }) {

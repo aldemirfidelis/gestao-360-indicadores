@@ -23,6 +23,7 @@ import { StatusLight } from '@/components/ui/status-light';
 import { StatusBadge } from '@/components/platform/status-badge';
 import { api } from '@/lib/api';
 import { formatNumber, formatPercent, periodRefLabel } from '@/lib/utils';
+import { PERIODICITY_LABEL, DIRECTION_LABEL, ACTION_STATUS_LABEL, MEETING_STATUS_LABEL } from '@/lib/labels';
 
 interface IndicatorDetail {
   id: string;
@@ -87,22 +88,7 @@ interface CurrentTreatment {
   title: string;
 }
 
-const STATUS_LABEL: Record<string, string> = {
-  DRAFT: 'Rascunho',
-  NOT_STARTED: 'Aberto',
-  UNDER_ANALYSIS: 'Em análise',
-  IN_PROGRESS: 'Em execução',
-  WAITING_THIRD: 'Aguardando terceiro',
-  WAITING_EVIDENCE: 'Aguardando evidência',
-  WAITING_VALIDATION: 'Aguardando validação',
-  PAUSED: 'Pausado',
-  DONE: 'Concluído',
-  DONE_LATE: 'Concluído fora do prazo',
-  CANCELLED: 'Cancelado',
-  REOPENED: 'Reaberto',
-  INEFFECTIVE: 'Ineficaz',
-  EFFECTIVE: 'Eficaz',
-};
+const STATUS_LABEL = ACTION_STATUS_LABEL;
 
 export default function IndicatorDetailPage() {
   const params = useParams<{ id: string }>();
@@ -273,8 +259,8 @@ export default function IndicatorDetailPage() {
         <Card>
           <CardContent className="p-4">
             <div className="text-xs uppercase text-muted-foreground">Periodicidade</div>
-            <div className="text-2xl font-semibold mt-1">{ind.periodicity}</div>
-            <div className="text-xs text-muted-foreground">Direção: {ind.direction}</div>
+            <div className="text-2xl font-semibold mt-1">{PERIODICITY_LABEL[ind.periodicity] ?? ind.periodicity}</div>
+            <div className="text-xs text-muted-foreground">Direção: {DIRECTION_LABEL[ind.direction] ?? ind.direction}</div>
           </CardContent>
         </Card>
       </div>
@@ -366,7 +352,7 @@ export default function IndicatorDetailPage() {
                       </Link>
                       <span className="text-muted-foreground block mt-0.5">Agendada para: {meet.startsAt ? new Date(meet.startsAt).toLocaleString('pt-BR') : 'Sem data'}</span>
                     </div>
-                    <StatusBadge value={meet.status} label={meet.status === 'SCHEDULED' ? 'Agendada' : meet.status === 'COMPLETED' ? 'Concluída' : 'Cancelada'} />
+                    <StatusBadge value={meet.status} label={MEETING_STATUS_LABEL[meet.status] ?? meet.status} />
                   </div>
                 ))}
               </div>

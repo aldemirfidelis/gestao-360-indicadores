@@ -21,6 +21,7 @@ import { NativeSelect } from '@/components/ui/select';
 import { Progress } from '@/components/ui/progress';
 import { api } from '@/lib/api';
 import { cn, formatDate } from '@/lib/utils';
+import { SUGGESTION_STATUS_LABEL } from '@/lib/labels';
 
 interface ActionDetail {
   id: string;
@@ -783,7 +784,7 @@ function AiPanel({ suggestions, onGenerate, onDecide }: { suggestions: any[]; on
                 <Badge variant="outline">{item.suggestionType}</Badge>
                 <div className="mt-2 font-semibold">{item.title}</div>
               </div>
-              <StatusBadge value={item.status} label={item.status} />
+              <StatusBadge value={item.status} label={SUGGESTION_STATUS_LABEL[item.status] ?? item.status} />
             </div>
             <p className="mt-2 text-sm text-muted-foreground">{item.content}</p>
             {item.status === 'PENDING' && (

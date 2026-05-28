@@ -4,6 +4,7 @@ import { Badge } from '@/components/ui/badge';
 import { Progress } from '@/components/ui/progress';
 import { StatusLight } from '@/components/ui/status-light';
 import { formatNumber, formatPercent, periodRefLabel } from '@/lib/utils';
+import { INDICATOR_TYPE_LABEL, PERIODICITY_LABEL } from '@/lib/labels';
 
 export interface IndicatorCardData {
   id: string;
@@ -34,7 +35,7 @@ export function IndicatorCard({ indicator }: { indicator: IndicatorCardData }) {
           <div className="min-w-0">
             <div className="flex flex-wrap items-center gap-2">
               {indicator.code && <Badge variant="outline">{indicator.code}</Badge>}
-              <Badge variant="secondary">{indicator.type}</Badge>
+              <Badge variant="secondary">{INDICATOR_TYPE_LABEL[indicator.type] ?? indicator.type}</Badge>
             </div>
             <h3 className="mt-2 line-clamp-2 text-sm font-semibold leading-snug">{indicator.name}</h3>
           </div>
@@ -68,7 +69,7 @@ export function IndicatorCard({ indicator }: { indicator: IndicatorCardData }) {
           </div>
           <div className="flex items-center gap-2">
             <CalendarClock className="h-3.5 w-3.5" />
-            <span>{indicator.last ? periodRefLabel(indicator.last.periodRef) : indicator.periodicity}</span>
+            <span>{indicator.last ? periodRefLabel(indicator.last.periodRef) : (PERIODICITY_LABEL[indicator.periodicity] ?? indicator.periodicity)}</span>
           </div>
         </div>
       </article>

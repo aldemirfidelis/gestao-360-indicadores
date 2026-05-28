@@ -20,6 +20,7 @@ import {
 import { Textarea } from '@/components/ui/textarea';
 import { api } from '@/lib/api';
 import { cn, formatNumber, periodRefLabel } from '@/lib/utils';
+import { PERIODICITY_LABEL } from '@/lib/labels';
 
 interface PendingCell {
   periodRef: string;
@@ -50,15 +51,7 @@ interface UpsertOutcome {
   treatment?: { id: string; status: string } | null;
 }
 
-const periodicityLabels: Record<string, string> = {
-  DAILY: 'Diário',
-  WEEKLY: 'Semanal',
-  BIWEEKLY: 'Quinzenal',
-  MONTHLY: 'Mensal',
-  QUARTERLY: 'Trimestral',
-  SEMIANNUAL: 'Semestral',
-  ANNUAL: 'Anual',
-};
+const periodicityLabels = PERIODICITY_LABEL;
 
 export type IndicatorMonthlyMode = 'result' | 'target';
 

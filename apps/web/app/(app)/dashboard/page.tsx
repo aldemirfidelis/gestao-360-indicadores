@@ -40,6 +40,7 @@ import {
 } from '@/components/ui/dialog';
 import { api } from '@/lib/api';
 import { cn, formatDate, formatNumber, formatPercent, periodRefLabel } from '@/lib/utils';
+import { ACTION_PRIORITY_LABEL } from '@/lib/labels';
 
 interface Overview {
   totalIndicators: number;
@@ -362,7 +363,7 @@ export default function HomePage() {
                 </div>
                 <div className="text-right text-xs">
                   <div className="font-medium">{formatDate(action.dueDate)}</div>
-                  <StatusBadge value={action.priority} label={action.priority} />
+                  <StatusBadge value={action.priority} label={ACTION_PRIORITY_LABEL[action.priority] ?? action.priority} />
                 </div>
               </Link>
             ))}
