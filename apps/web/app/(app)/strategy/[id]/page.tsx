@@ -1530,7 +1530,7 @@ function StrategyMapPageInner() {
                       <div key={indicator.id} className="flex items-center justify-between gap-2 rounded-md bg-muted/40 px-2 py-1 text-xs">
                         <span className="truncate">{indicator.code ? `${indicator.code} - ` : ''}{indicator.name}</span>
                         <div className="flex items-center gap-1">
-                          <StatusBadge value={indicator.results?.[0]?.light ?? 'GRAY'} label={indicator.results?.[0]?.light ?? 'GRAY'} />
+                          <StatusBadge value={indicator.results?.[0]?.light ?? 'GRAY'} label={LIGHT_LABEL[indicator.results?.[0]?.light ?? 'GRAY'] ?? (indicator.results?.[0]?.light ?? 'GRAY')} />
                           <Button variant="ghost" size="sm" asChild>
                             <Link href={`/indicators/${indicator.id}`}>
                               <Maximize2 className="h-3.5 w-3.5" />
@@ -1654,7 +1654,7 @@ function StrategyMapPageInner() {
                 <div key={version.id} className="rounded-lg border p-2 text-xs">
                   <div className="flex items-center justify-between gap-2">
                     <span className="font-semibold">v{version.version} - {version.title}</span>
-                    <Badge variant={version.status === 'PUBLISHED' ? 'default' : 'secondary'}>{version.status}</Badge>
+                    <Badge variant={version.status === 'PUBLISHED' ? 'default' : 'secondary'}>{version.status === 'PUBLISHED' ? 'Publicada' : version.status === 'DRAFT' ? 'Rascunho' : version.status === 'ARCHIVED' ? 'Arquivada' : version.status}</Badge>
                   </div>
                   <div className="mt-1 text-muted-foreground">{formatDate(version.createdAt)} por {version.createdBy?.name ?? 'Sistema'}</div>
                 </div>

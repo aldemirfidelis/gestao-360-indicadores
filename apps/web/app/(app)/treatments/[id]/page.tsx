@@ -17,7 +17,7 @@ import { NativeSelect } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
 import { api } from '@/lib/api';
 import { cn, formatDate, formatNumber, periodRefLabel } from '@/lib/utils';
-import { ACTION_STATUS_LABEL } from '@/lib/labels';
+import { ACTION_STATUS_LABEL, MEETING_STATUS_LABEL } from '@/lib/labels';
 
 interface TreatmentDetail {
   id: string;
@@ -298,7 +298,7 @@ export default function TreatmentPage() {
                     <div className="font-semibold">{treatment.meeting.title}</div>
                     <div className="text-sm text-muted-foreground">{formatDate(treatment.meeting.startsAt)} - {treatment.meeting.location ?? 'Online'}</div>
                   </div>
-                  <StatusBadge value={treatment.meeting.status} label={treatment.meeting.status} />
+                  <StatusBadge value={treatment.meeting.status} label={MEETING_STATUS_LABEL[treatment.meeting.status] ?? treatment.meeting.status} />
                 </div>
               </div>
               <div className="text-sm text-muted-foreground">

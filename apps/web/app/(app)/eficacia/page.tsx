@@ -22,6 +22,7 @@ import {
 import { useAuth } from '@/components/auth/auth-provider';
 import { api } from '@/lib/api';
 import { cn, formatDate } from '@/lib/utils';
+import { ACTION_STATUS_LABEL } from '@/lib/labels';
 
 const ALLOWED_ROLES = ['SUPER_ADMIN', 'COMPANY_ADMIN', 'DIRECTOR', 'MANAGER'];
 
@@ -191,7 +192,7 @@ export default function EficaciaPage() {
                     ) : '—'}
                   </td>
                   <td className="p-3 text-xs">{a.responsibleUser?.name ?? '—'}</td>
-                  <td className="p-3 text-center text-xs font-medium">{a.status}</td>
+                  <td className="p-3 text-center text-xs font-medium">{ACTION_STATUS_LABEL[a.status] ?? a.status}</td>
                   <td className="p-3 text-center">
                     <span className={cn('inline-flex items-center rounded-md px-2 py-1 text-[10px] font-semibold border', STATUS_PILL[a.effectivenessStatus] ?? STATUS_PILL.NOT_STARTED)}>
                       {EFFECTIVENESS_LABEL[a.effectivenessStatus] ?? a.effectivenessStatus}

@@ -23,7 +23,7 @@ import { StatusLight } from '@/components/ui/status-light';
 import { StatusBadge } from '@/components/platform/status-badge';
 import { api } from '@/lib/api';
 import { formatNumber, formatPercent, periodRefLabel } from '@/lib/utils';
-import { PERIODICITY_LABEL, DIRECTION_LABEL, ACTION_STATUS_LABEL, MEETING_STATUS_LABEL } from '@/lib/labels';
+import { PERIODICITY_LABEL, DIRECTION_LABEL, ACTION_STATUS_LABEL, MEETING_STATUS_LABEL, TRACE_EVENT_LABEL } from '@/lib/labels';
 
 interface IndicatorDetail {
   id: string;
@@ -549,15 +549,5 @@ function eventHref(event: TraceEvent) {
 }
 
 function shortEventLabel(type: string) {
-  const labels: Record<string, string> = {
-    RESULT_RECORDED: 'Resultado',
-    OFF_TARGET_ALERT: 'Fora da meta',
-    CREATED: 'Criado',
-    CAUSE_CREATED: 'Causa',
-    ANALYSIS_CREATED: 'Análise',
-    ACTION_CREATED: 'Ação',
-    ACTION_STATUS_CHANGED: 'Status',
-    CLOSED: 'Concluido',
-  };
-  return labels[type] ?? type;
+  return TRACE_EVENT_LABEL[type] ?? type;
 }

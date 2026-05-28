@@ -22,6 +22,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { api } from '@/lib/api';
 import { cn, formatDate, formatNumber } from '@/lib/utils';
+import { ACTION_STATUS_LABEL, EFFECTIVENESS_STATUS_LABEL } from '@/lib/labels';
 
 interface Action extends ActionPlanCardData {
   status: string;
@@ -54,22 +55,7 @@ interface Options {
   effectivenessStatuses: string[];
 }
 
-const STATUS_LABEL: Record<string, string> = {
-  DRAFT: 'Rascunho',
-  NOT_STARTED: 'Aberto',
-  UNDER_ANALYSIS: 'Em análise',
-  IN_PROGRESS: 'Em execução',
-  WAITING_THIRD: 'Aguardando terceiro',
-  WAITING_EVIDENCE: 'Aguardando evidência',
-  WAITING_VALIDATION: 'Aguardando validação',
-  PAUSED: 'Pausado',
-  DONE: 'Concluído',
-  DONE_LATE: 'Concluído fora do prazo',
-  CANCELLED: 'Cancelado',
-  REOPENED: 'Reaberto',
-  INEFFECTIVE: 'Ineficaz',
-  EFFECTIVE: 'Eficaz',
-};
+const STATUS_LABEL = ACTION_STATUS_LABEL;
 
 const TOOL_LABEL: Record<string, string> = {
   FIVE_WHYS: '5 Porques',
@@ -332,7 +318,7 @@ function ActionRow({ action: a }: { action: Action }) {
       <td>{a.responsibleUser?.name ?? 'Sem responsável'}</td>
       <td className={cn(isOverdue(a) && 'font-medium text-status-red')}>{formatDate(a.dueDate)}</td>
       <td><Badge variant="outline">{a.analysisTool ? TOOL_LABEL[a.analysisTool] ?? a.analysisTool : 'Não definida'}</Badge></td>
-      <td><StatusBadge value={a.effectivenessStatus} label={a.effectivenessStatus} /></td>
+      <td><StatusBadge value={a.effectivenessStatus} label={EFFECTIVENESS_STATUS_LABEL[a.effectivenessStatus] ?? a.effectivenessStatus} /></td>
       <td>
         <div className="min-w-32">
           <div className="mb-1 text-xs font-medium">{a.progress}%</div>

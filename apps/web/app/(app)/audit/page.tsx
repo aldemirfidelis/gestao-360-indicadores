@@ -13,6 +13,7 @@ import { NativeSelect } from '@/components/ui/select';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { api } from '@/lib/api';
 import { cn, formatDate } from '@/lib/utils';
+import { TRACE_ENTITY_LABEL } from '@/lib/labels';
 
 interface AuditEntry {
   id: string;
@@ -38,6 +39,21 @@ const ACTION_PILL: Record<string, string> = {
   UPDATE: 'pill-yellow',
   DELETE: 'pill-red',
   PERMISSION_CHANGE: 'pill-purple',
+};
+
+const ACTION_LABEL: Record<string, string> = {
+  LOGIN: 'Login',
+  LOGOUT: 'Logout',
+  CREATE: 'Criação',
+  UPDATE: 'Atualização',
+  DELETE: 'Exclusão',
+  PERMISSION_CHANGE: 'Alteração de permissão',
+};
+
+const RESULT_LABEL: Record<string, string> = {
+  SUCCESS: 'Sucesso',
+  ERROR: 'Erro',
+  WARNING: 'Alerta',
 };
 
 export default function AuditPage() {
@@ -141,15 +157,15 @@ export default function AuditPage() {
                       <span className="text-muted-foreground">Sistema</span>
                     )}
                   </td>
-                  <td><span className={cn('pill', ACTION_PILL[entry.action] ?? 'pill-gray')}>{entry.action}</span></td>
+                  <td><span className={cn('pill', ACTION_PILL[entry.action] ?? 'pill-gray')}>{ACTION_LABEL[entry.action] ?? entry.action}</span></td>
                   <td>{entry.module ?? '-'}</td>
                   <td>
                     <div className="flex flex-col">
-                      <Badge variant="outline" className="w-fit">{entry.entity}</Badge>
+                      <Badge variant="outline" className="w-fit">{TRACE_ENTITY_LABEL[entry.entity] ?? entry.entity}</Badge>
                       {entry.entityId && <span className="mt-0.5 max-w-[220px] truncate font-mono text-[10px] text-muted-foreground">{entry.entityId}</span>}
                     </div>
                   </td>
-                  <td><span className={cn('pill', entry.result === 'ERROR' ? 'pill-red' : 'pill-green')}>{entry.result ?? 'SUCCESS'}</span></td>
+                  <td><span className={cn('pill', entry.result === 'ERROR' ? 'pill-red' : 'pill-green')}>{RESULT_LABEL[entry.result ?? 'SUCCESS'] ?? entry.result}</span></td>
                   <td className="text-xs text-muted-foreground">
                     <div>{entry.ip ?? '-'}</div>
                     <div className="max-w-[260px] truncate">{entry.userAgent ?? ''}</div>

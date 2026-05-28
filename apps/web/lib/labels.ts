@@ -135,12 +135,79 @@ export const SUGGESTION_STATUS_LABEL: Record<string, string> = {
   REJECTED: 'Rejeitada',
 };
 
+export const SUGGESTION_TYPE_LABEL: Record<string, string> = {
+  QUESTION: 'Pergunta',
+  ACTION: 'Ação',
+  EFFECTIVENESS: 'Eficácia',
+};
+
+export const TRACE_ENTITY_LABEL: Record<string, string> = {
+  COMPANY: 'Empresa',
+  ORG_NODE: 'Setor',
+  STRATEGIC_OBJECTIVE: 'Objetivo estratégico',
+  OKR_OBJECTIVE: 'Objetivo OKR',
+  INDICATOR: 'Indicador',
+  INDICATOR_RESULT: 'Resultado',
+  DEVIATION: 'Desvio',
+  DEVIATION_CAUSE: 'Causa',
+  DEVIATION_ANALYSIS: 'Análise',
+  MEETING: 'Reunião',
+  MEETING_DECISION: 'Decisão',
+  ACTION_PLAN: 'Plano de ação',
+  ACTION_TASK: 'Tarefa',
+  PROJECT: 'Projeto',
+};
+
 export const FEED_KIND_LABEL: Record<string, string> = {
   MANUAL: 'Manual',
   IMPORT: 'Importação',
   API: 'API',
   DATABASE: 'Banco de dados',
   INTEGRATION: 'Integração',
+};
+
+export const TRACE_EVENT_LABEL: Record<string, string> = {
+  CREATED: 'Criado',
+  UPDATED: 'Atualizado',
+  STATUS_CHANGED: 'Status alterado',
+  RESULT_RECORDED: 'Resultado registrado',
+  OFF_TARGET_ALERT: 'Alerta fora da meta',
+  CAUSE_CREATED: 'Causa registrada',
+  ANALYSIS_CREATED: 'Análise registrada',
+  MEETING_CREATED: 'Reunião criada',
+  MEETING_COMPLETED: 'Reunião concluída',
+  MEETING_DECISION: 'Decisão de reunião',
+  ACTION_CREATED: 'Ação criada',
+  ACTION_STATUS_CHANGED: 'Status da ação',
+  TASK_UPDATED: 'Tarefa atualizada',
+  TASK_CREATED: 'Tarefa criada',
+  TASK_DONE: 'Tarefa concluída',
+  TASK_REOPENED: 'Tarefa reaberta',
+  EVIDENCE_ADDED: 'Evidência adicionada',
+  COMMENT_ADDED: 'Comentário adicionado',
+  PARTICIPANT_ADDED: 'Participante adicionado',
+  PARTICIPANT_REMOVED: 'Participante removido',
+  EMAIL_INVITE_SENT: 'Convite enviado',
+  EMAIL_INVITE_FAILED: 'Falha no convite',
+  CALENDAR_INVITE_CREATED: 'Convite de agenda',
+  TREATMENT_STARTED: 'Tratativa iniciada',
+  TREATMENT_IGNORED: 'Tratativa ignorada',
+  INDICATOR_REEVALUATED: 'Indicador reavaliado',
+  INDICATOR_RESOLVED: 'Indicador resolvido',
+  LINK_CREATED: 'Vínculo criado',
+  LINK_REMOVED: 'Vínculo removido',
+  CLOSED: 'Concluído',
+  REOPENED: 'Reaberto',
+};
+
+export const EFFECTIVENESS_STATUS_LABEL: Record<string, string> = {
+  NOT_STARTED: 'Não avaliada',
+  PENDING: 'Pendente',
+  IN_REVIEW: 'Em revisão',
+  EFFECTIVE: 'Eficaz',
+  INEFFECTIVE: 'Ineficaz',
+  REOPENED: 'Reaberta',
+  NOT_APPLICABLE: 'Não se aplica',
 };
 
 export const PERSPECTIVE_KIND_LABEL: Record<string, string> = {

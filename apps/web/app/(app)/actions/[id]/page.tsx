@@ -21,7 +21,7 @@ import { NativeSelect } from '@/components/ui/select';
 import { Progress } from '@/components/ui/progress';
 import { api } from '@/lib/api';
 import { cn, formatDate } from '@/lib/utils';
-import { SUGGESTION_STATUS_LABEL } from '@/lib/labels';
+import { SUGGESTION_STATUS_LABEL, SUGGESTION_TYPE_LABEL, ACTION_STATUS_LABEL, EFFECTIVENESS_STATUS_LABEL, TRACE_EVENT_LABEL } from '@/lib/labels';
 
 interface ActionDetail {
   id: string;
@@ -72,22 +72,7 @@ interface ActionDetail {
   aiReadiness: { score: number; gaps: string[] };
 }
 
-const STATUS_LABEL: Record<string, string> = {
-  DRAFT: 'Rascunho',
-  NOT_STARTED: 'Aberto',
-  UNDER_ANALYSIS: 'Em análise',
-  IN_PROGRESS: 'Em execução',
-  WAITING_THIRD: 'Aguardando terceiro',
-  WAITING_EVIDENCE: 'Aguardando evidência',
-  WAITING_VALIDATION: 'Aguardando validação',
-  PAUSED: 'Pausado',
-  DONE: 'Concluído',
-  DONE_LATE: 'Concluído fora do prazo',
-  CANCELLED: 'Cancelado',
-  REOPENED: 'Reaberto',
-  INEFFECTIVE: 'Ineficaz',
-  EFFECTIVE: 'Eficaz',
-};
+const STATUS_LABEL = ACTION_STATUS_LABEL;
 
 const TOOL_LABEL: Record<string, string> = {
   FIVE_WHYS: '5 Porques',
@@ -259,7 +244,7 @@ export default function ActionDetailPage() {
           </NativeSelect>
         </Mini>
         <Mini title="Eficacia">
-          <div className="mt-1"><StatusBadge value={a.effectivenessStatus} label={a.effectivenessStatus} /></div>
+          <div className="mt-1"><StatusBadge value={a.effectivenessStatus} label={EFFECTIVENESS_STATUS_LABEL[a.effectivenessStatus] ?? a.effectivenessStatus} /></div>
         </Mini>
         <Mini title="Progresso">
           <div className="mt-1 text-base font-semibold">{a.progress}%</div>
@@ -781,7 +766,7 @@ function AiPanel({ suggestions, onGenerate, onDecide }: { suggestions: any[]; on
           <div key={item.id} className="rounded-lg border p-4">
             <div className="flex flex-wrap items-start justify-between gap-2">
               <div>
-                <Badge variant="outline">{item.suggestionType}</Badge>
+                <Badge variant="outline">{SUGGESTION_TYPE_LABEL[item.suggestionType] ?? item.suggestionType}</Badge>
                 <div className="mt-2 font-semibold">{item.title}</div>
               </div>
               <StatusBadge value={item.status} label={SUGGESTION_STATUS_LABEL[item.status] ?? item.status} />
@@ -806,7 +791,7 @@ function HistoryPanel({ history }: { history: any[] }) {
       <div className="space-y-2">
         {history.map((item) => (
           <div key={item.id} className="rounded-lg border p-3">
-            <div className="text-sm font-semibold">{item.eventType}</div>
+            <div className="text-sm font-semibold">{TRACE_EVENT_LABEL[item.eventType] ?? item.eventType}</div>
             <div className="text-xs text-muted-foreground">{formatDate(item.createdAt)} {item.field ? `- ${item.field}` : ''}</div>
             {item.afterValue && <div className="mt-1 text-sm">{item.afterValue}</div>}
           </div>
