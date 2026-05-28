@@ -1,6 +1,7 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, Logger } from '@nestjs/common';
 import { PrismaService } from '../../prisma/prisma.service';
 import { ActionStatus, DeviationStatus, TrafficLight } from '@prisma/client';
+import { GeminiService } from '../ai/gemini.service';
 
 export interface InsightItem {
   id: string;
@@ -14,6 +15,7 @@ export interface InsightItem {
   body: string;
   refs?: { type: string; id: string; label: string }[];
   severity?: 'info' | 'warning' | 'critical';
+  source?: 'ai' | 'rules';
 }
 
 const CAUSE_LIBRARY: Record<string, string[]> = {
@@ -41,30 +43,39 @@ const ACTION_LIBRARY: Record<string, string[]> = {
   QUALITY: ['Cronograma de calibracao trimestral', 'Reciclagem dos inspetores'],
 };
 
+interface GeminiInsightsResponse {
+  summary?: string;
+  trends?: Array<{ indicatorId: string; title: string; body: string }>;
+  causes?: Array<{ deviationId: string; title: string; body: string }>;
+  actions?: Array<{ indicatorId: string; title: string; body: string }>;
+}
+
 @Injectable()
 export class InsightsService {
-  constructor(private readonly prisma: PrismaService) {}
+  private readonly logger = new Logger(InsightsService.name);
+
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly gemini: GeminiService,
+  ) {}
 
   async generate(companyId: string): Promise<InsightItem[]> {
+    const baseInsights = await this.generateRuleBased(companyId);
+    if (!this.gemini.isEnabled) return baseInsights;
+
+    const enriched = await this.tryGeminiEnrichment(companyId, baseInsights);
+    return enriched ?? baseInsights;
+  }
+
+  // -------- regras deterministicas (fallback / base) --------
+
+  private async generateRuleBased(companyId: string): Promise<InsightItem[]> {
     const out: InsightItem[] = [];
-
-    // 1) Resumo executivo
-    const summary = await this.executiveSummary(companyId);
-    out.push(summary);
-
-    // 2) Indicadores em tendência de piora
-    const worsening = await this.worsening(companyId);
-    out.push(...worsening);
-
-    // 3) Sugestões de causa para desvios abertos
-    const causes = await this.causeSuggestions(companyId);
-    out.push(...causes);
-
-    // 4) Sugestões de ação para indicadores vermelhos
-    const actions = await this.actionSuggestions(companyId);
-    out.push(...actions);
-
-    return out;
+    out.push(await this.executiveSummary(companyId));
+    out.push(...(await this.worsening(companyId)));
+    out.push(...(await this.causeSuggestions(companyId)));
+    out.push(...(await this.actionSuggestions(companyId)));
+    return out.map((i) => ({ ...i, source: i.source ?? 'rules' }));
   }
 
   private async executiveSummary(companyId: string): Promise<InsightItem> {
@@ -121,9 +132,8 @@ export class InsightsService {
     const out: InsightItem[] = [];
     for (const i of indicators) {
       if (i.results.length < 3) continue;
-      const [c, b, a] = i.results; // c=mais recente, a=mais antigo
+      const [c, b, a] = i.results;
       if (a.attainment === null || b.attainment === null || c.attainment === null) continue;
-      // tendência de piora se 3 valores em declinio
       if (a.attainment > b.attainment && b.attainment > c.attainment && a.attainment - c.attainment > 0.05) {
         out.push({
           id: `worsen-${i.id}`,
@@ -185,6 +195,189 @@ export class InsightsService {
         severity: 'critical',
       } as InsightItem;
     });
+  }
+
+  // -------- enriquecimento via Gemini --------
+
+  private async tryGeminiEnrichment(
+    companyId: string,
+    baseInsights: InsightItem[],
+  ): Promise<InsightItem[] | null> {
+    const context = await this.buildCompanyContext(companyId);
+    if (context.indicators.length === 0) return null;
+
+    const prompt = this.buildInsightsPrompt(context);
+    const response = await this.gemini.generateJson<GeminiInsightsResponse>(prompt, {
+      temperature: 0.4,
+      maxOutputTokens: 1800,
+    });
+    if (!response) {
+      this.logger.warn('Gemini nao retornou insights validos - usando regras.');
+      return null;
+    }
+
+    const out: InsightItem[] = [];
+    if (response.summary) {
+      out.push({
+        id: 'summary',
+        kind: 'EXECUTIVE_SUMMARY',
+        title: 'Resumo executivo do período',
+        body: response.summary,
+        severity: 'info',
+        source: 'ai',
+      });
+    } else {
+      const fallbackSummary = baseInsights.find((i) => i.kind === 'EXECUTIVE_SUMMARY');
+      if (fallbackSummary) out.push(fallbackSummary);
+    }
+
+    for (const t of response.trends ?? []) {
+      if (!t.indicatorId || !t.title) continue;
+      out.push({
+        id: `worsen-${t.indicatorId}`,
+        kind: 'WORSENING_TREND',
+        title: t.title,
+        body: t.body ?? '',
+        refs: [{ type: 'indicator', id: t.indicatorId, label: t.title }],
+        severity: 'warning',
+        source: 'ai',
+      });
+    }
+    for (const c of response.causes ?? []) {
+      if (!c.deviationId || !c.title) continue;
+      out.push({
+        id: `cause-${c.deviationId}`,
+        kind: 'CAUSE_SUGGESTION',
+        title: c.title,
+        body: c.body ?? '',
+        refs: [{ type: 'deviation', id: c.deviationId, label: c.title }],
+        severity: 'info',
+        source: 'ai',
+      });
+    }
+    for (const a of response.actions ?? []) {
+      if (!a.indicatorId || !a.title) continue;
+      out.push({
+        id: `action-${a.indicatorId}`,
+        kind: 'ACTION_SUGGESTION',
+        title: a.title,
+        body: a.body ?? '',
+        refs: [{ type: 'indicator', id: a.indicatorId, label: a.title }],
+        severity: 'critical',
+        source: 'ai',
+      });
+    }
+
+    if (out.length === 0) return null;
+
+    // Mantem ao menos o resumo + complementa com regras quando IA nao cobriu
+    if (!out.some((i) => i.kind === 'WORSENING_TREND')) {
+      out.push(...baseInsights.filter((i) => i.kind === 'WORSENING_TREND'));
+    }
+    if (!out.some((i) => i.kind === 'ACTION_SUGGESTION')) {
+      out.push(...baseInsights.filter((i) => i.kind === 'ACTION_SUGGESTION'));
+    }
+    if (!out.some((i) => i.kind === 'CAUSE_SUGGESTION')) {
+      out.push(...baseInsights.filter((i) => i.kind === 'CAUSE_SUGGESTION'));
+    }
+    return out;
+  }
+
+  private async buildCompanyContext(companyId: string) {
+    const indicators = await this.prisma.indicator.findMany({
+      where: { companyId, deletedAt: null, status: 'ACTIVE' },
+      select: {
+        id: true,
+        name: true,
+        code: true,
+        type: true,
+        direction: true,
+        unitLabel: true,
+        unit: true,
+        results: {
+          orderBy: { periodDate: 'desc' },
+          take: 6,
+          select: { periodRef: true, value: true, light: true, attainment: true },
+        },
+      },
+      take: 30,
+    });
+
+    const openDeviations = await this.prisma.deviation.findMany({
+      where: {
+        companyId,
+        deletedAt: null,
+        status: { in: [DeviationStatus.OPEN, DeviationStatus.IN_ANALYSIS, DeviationStatus.WAITING_ACTION] },
+      },
+      select: {
+        id: true,
+        number: true,
+        severity: true,
+        status: true,
+        rootCause: true,
+        indicator: { select: { id: true, name: true, type: true } },
+      },
+      take: 10,
+    });
+
+    return { indicators, openDeviations };
+  }
+
+  private buildInsightsPrompt(ctx: Awaited<ReturnType<typeof this.buildCompanyContext>>): string {
+    const indicatorsSnap = ctx.indicators.map((i) => ({
+      id: i.id,
+      code: i.code,
+      name: i.name,
+      type: i.type,
+      direction: i.direction,
+      unit: i.unitLabel ?? i.unit,
+      latest: i.results.map((r) => ({
+        periodRef: r.periodRef,
+        value: r.value,
+        light: r.light,
+        attainment: r.attainment,
+      })),
+    }));
+    const deviationsSnap = ctx.openDeviations.map((d) => ({
+      id: d.id,
+      number: d.number,
+      severity: d.severity,
+      status: d.status,
+      rootCause: d.rootCause,
+      indicator: { id: d.indicator.id, name: d.indicator.name, type: d.indicator.type },
+    }));
+
+    return `Voce e um consultor senior de gestao de performance. Analise os indicadores abaixo
+e produza insights acionaveis em portugues do Brasil. Use linguagem objetiva, foco em decisao gerencial.
+
+Calcule tendencia observando os ultimos 3 periodos com dado (do mais recente para o mais antigo). Considere
+"direction" do indicador: HIGHER_BETTER = maior e melhor, LOWER_BETTER = menor e melhor.
+
+Responda no schema JSON:
+{
+  "summary": "Resumo executivo do periodo em 3-5 frases.",
+  "trends": [
+    { "indicatorId": "...", "title": "Tendencia de piora: <nome>", "body": "Explicacao 2-3 frases com numeros." }
+  ],
+  "causes": [
+    { "deviationId": "...", "title": "Causas para desvio #X", "body": "3 hipoteses praticas com bullet points." }
+  ],
+  "actions": [
+    { "indicatorId": "...", "title": "Acoes recomendadas: <nome>", "body": "3 acoes 5W2H curtas com bullet points." }
+  ]
+}
+
+Regras:
+- Limite trends, causes e actions a no maximo 4 itens cada.
+- Inclua trends apenas para indicadores com queda real do atingimento em 3+ periodos.
+- Inclua causes apenas para os desvios fornecidos.
+- Inclua actions para os 3-4 indicadores em pior situacao.
+
+INDICADORES (JSON):
+${JSON.stringify(indicatorsSnap, null, 2)}
+
+DESVIOS ABERTOS (JSON):
+${JSON.stringify(deviationsSnap, null, 2)}`;
   }
 }
 

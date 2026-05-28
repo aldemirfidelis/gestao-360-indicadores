@@ -15,6 +15,7 @@ import {
 } from '@prisma/client';
 import { PrismaService } from '../../prisma/prisma.service';
 import { TraceabilityService } from '../traceability/traceability.service';
+import { GeminiService } from '../ai/gemini.service';
 
 interface ActionFilter {
   companyId: string;
@@ -42,6 +43,7 @@ export class ActionsService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly traceability: TraceabilityService,
+    private readonly gemini: GeminiService,
   ) {}
 
   async list(f: ActionFilter) {
@@ -532,7 +534,8 @@ export class ActionsService {
 
   async aiAssist(actionId: string, body: any, userId?: string) {
     const action = await this.getById(actionId);
-    const suggestions = this.generateSuggestions(action, body?.scope);
+    const aiSuggestions = await this.generateSuggestionsViaGemini(action, body?.scope);
+    const suggestions = aiSuggestions ?? this.generateSuggestions(action, body?.scope);
     const saved = await this.prisma.$transaction(
       suggestions.map((suggestion) =>
         this.prisma.actionAiSuggestion.create({
@@ -548,8 +551,75 @@ export class ActionsService {
       ),
     );
     await this.recordHistory(actionId, userId, 'AI_USED', null, null, body?.scope ?? 'general');
-    await this.audit(action.companyId, userId, 'AI_USED', 'ActionPlan', actionId, null, { scope: body?.scope, suggestions });
+    await this.audit(action.companyId, userId, 'AI_USED', 'ActionPlan', actionId, null, { scope: body?.scope, suggestions, source: aiSuggestions ? 'gemini' : 'rules' });
     return saved;
+  }
+
+  private async generateSuggestionsViaGemini(action: any, scope?: string) {
+    if (!this.gemini.isEnabled) return null;
+    const context = {
+      scope: scope ?? 'general',
+      indicator: action.indicator?.name,
+      objective: action.strategicObjective?.name,
+      area: action.ownerNode?.name,
+      status: action.status,
+      dueDate: action.dueDate,
+    };
+    const rootCause = action.rootCause || action.analysisSessions?.[0]?.rootCause;
+    const problem =
+      action.problemDescription || action.description || action.deviation?.title || action.indicator?.name || action.title;
+    const lastResults = action.indicator?.results?.slice?.(-6) ?? [];
+
+    const prompt = `Voce e um consultor senior em gestao de planos de acao em empresas industriais brasileiras.
+Para o plano abaixo, gere 3 sugestoes objetivas em portugues do Brasil:
+1. Uma pergunta de aprofundamento sobre a causa-raiz (type=QUESTION)
+2. Uma sugestao de acao no formato 5W2H curto (type=ACTION)
+3. Um criterio de eficacia mensuravel (type=EFFECTIVENESS)
+
+Considere o contexto historico, a periodicidade do indicador (se houver) e priorize acoes que atacam a causa-raiz.
+
+Responda no schema JSON:
+{
+  "suggestions": [
+    { "type": "QUESTION", "title": "...", "content": "..." },
+    { "type": "ACTION", "title": "...", "content": "..." },
+    { "type": "EFFECTIVENESS", "title": "...", "content": "..." }
+  ]
+}
+
+CONTEXTO DO PLANO:
+- Titulo: ${action.title ?? '-'}
+- Descricao: ${action.description ?? '-'}
+- Problema: ${problem ?? '-'}
+- Causa raiz informada: ${rootCause ?? 'nao definida'}
+- Indicador: ${action.indicator?.name ?? '-'} (tipo ${action.indicator?.type ?? '-'})
+- Objetivo estrategico: ${action.strategicObjective?.name ?? '-'}
+- Area: ${action.ownerNode?.name ?? '-'}
+- Status atual: ${action.status ?? '-'}
+- Escopo solicitado: ${scope ?? 'general'}
+
+ULTIMOS RESULTADOS DO INDICADOR (mais recentes ao fim):
+${JSON.stringify(lastResults, null, 2)}`;
+
+    interface GeminiActionResp {
+      suggestions?: Array<{ type?: string; title?: string; content?: string }>;
+    }
+    const json = await this.gemini.generateJson<GeminiActionResp>(prompt, {
+      temperature: 0.45,
+      maxOutputTokens: 1200,
+    });
+    if (!json?.suggestions?.length) return null;
+    const allowed = new Set(['QUESTION', 'ACTION', 'EFFECTIVENESS']);
+    const cleaned = json.suggestions
+      .filter((s) => s.type && allowed.has(s.type) && s.title && s.content)
+      .map((s) => ({
+        type: s.type as 'QUESTION' | 'ACTION' | 'EFFECTIVENESS',
+        title: s.title!,
+        content: s.content!,
+        context,
+      }));
+    if (cleaned.length === 0) return null;
+    return cleaned;
   }
 
   async decideSuggestion(id: string, status: ActionAiSuggestionStatus, userId?: string) {

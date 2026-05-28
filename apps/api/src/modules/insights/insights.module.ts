@@ -2,6 +2,7 @@ import { Controller, Get, Module } from '@nestjs/common';
 import { InsightsService } from './insights.service';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import { AuthPayload } from '../auth/auth.types';
+import { AiModule } from '../ai/ai.module';
 
 @Controller('insights')
 class InsightsController {
@@ -14,6 +15,7 @@ class InsightsController {
 }
 
 @Module({
+  imports: [AiModule],
   controllers: [InsightsController],
   providers: [InsightsService],
   exports: [InsightsService],
