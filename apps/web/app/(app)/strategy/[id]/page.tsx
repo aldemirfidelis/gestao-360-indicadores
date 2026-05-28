@@ -202,7 +202,7 @@ const LIGHT_CLASS: Record<string, string> = {
   GREEN: 'border-emerald-600 bg-emerald-600 text-white shadow-md',
   YELLOW: 'border-amber-500 bg-amber-500 text-amber-950 shadow-md',
   RED: 'border-rose-600 bg-rose-600 text-white shadow-md',
-  GRAY: 'border-muted bg-muted text-muted-foreground shadow-sm',
+  GRAY: 'border-foreground bg-muted text-muted-foreground shadow-sm',
 };
 
 interface RelationKindMeta {
