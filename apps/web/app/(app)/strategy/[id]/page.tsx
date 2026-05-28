@@ -1320,17 +1320,16 @@ function StrategyMapPageInner() {
               )}
             </div>
 
-            <div className="pointer-events-none absolute bottom-3 left-3 z-10 flex flex-col gap-1 rounded-md border bg-background/95 p-2 text-[10px] shadow">
+            <div className="pointer-events-none absolute inset-x-3 bottom-3 z-10 flex flex-wrap items-center justify-center gap-x-5 gap-y-1 rounded-md border bg-background/95 px-4 py-1.5 text-[11px] shadow-sm backdrop-blur">
               <div className="flex items-center gap-2 font-semibold uppercase text-muted-foreground">
-                <Layers className="h-3 w-3" /> Tipos de relação
+                <Layers className="h-3 w-3" /> Tipos de relação:
               </div>
-              <div className="grid grid-cols-2 gap-x-3 gap-y-0.5 pt-1">
-                {RELATION_KINDS.map((rel) => (
-                  <div key={rel.kind} className="flex items-center gap-1">
-                    <span style={{ background: rel.color }} className="h-2 w-3 rounded" /> {rel.label}
-                  </div>
-                ))}
-              </div>
+              {RELATION_KINDS.map((rel) => (
+                <div key={rel.kind} className="flex items-center gap-1.5">
+                  <span style={{ background: rel.color }} className="h-2 w-4 rounded" />
+                  {rel.label}
+                </div>
+              ))}
             </div>
           </div>
         </SectionCard>
