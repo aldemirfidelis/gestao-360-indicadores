@@ -11,7 +11,7 @@ import {
   TrafficLight,
   TreatmentStatus,
 } from '@prisma/client';
-import { lastNPeriodRefs, periodRefToDate, periodRefsForYear } from '../indicators/period.util';
+import { lastNPeriodRefs, periodRefToDate, periodRefsForYear, periodRefsForMonth } from '../indicators/period.util';
 import { TraceabilityService } from '../traceability/traceability.service';
 import { PeriodsService } from '../periods/periods.service';
 import { ClosedMonthsService } from '../closed-months/closed-months.service';
@@ -115,6 +115,67 @@ export class ResultsService {
       });
     }
     return out;
+  }
+
+  /**
+   * Retorna celulas de uma granularidade especifica dentro de um mes.
+   * Independe da periodicidade cadastral do indicador - permite lancar/visualizar
+   * dia/semana em qualquer indicador.
+   */
+  async grainByMonth(
+    companyId: string,
+    indicatorId: string,
+    granularity: 'DAILY' | 'WEEKLY' | 'BIWEEKLY' | 'MONTHLY',
+    monthRef: string,
+  ) {
+    const indicator = await this.prisma.indicator.findFirst({
+      where: { id: indicatorId, companyId, deletedAt: null },
+      select: {
+        id: true,
+        name: true,
+        code: true,
+        unit: true,
+        unitLabel: true,
+        periodicity: true,
+        direction: true,
+        ownerNode: { select: { id: true, name: true } },
+      },
+    });
+    if (!indicator) throw new NotFoundException('Indicador nao encontrado');
+
+    const refs = periodRefsForMonth(granularity, monthRef);
+    const [targets, results] = await Promise.all([
+      this.prisma.indicatorTarget.findMany({
+        where: { indicatorId, periodRef: { in: refs } },
+      }),
+      this.prisma.indicatorResult.findMany({
+        where: { indicatorId, periodRef: { in: refs } },
+      }),
+    ]);
+    const tMap = new Map(targets.map((t) => [t.periodRef, t]));
+    const rMap = new Map(results.map((r) => [r.periodRef, r]));
+    const closed = await this.prisma.closedMonth.findMany({
+      where: { companyId, deletedAt: null, reopenedAt: null },
+      select: { periodRef: true },
+    });
+    const closedSet = new Set(closed.map((c) => c.periodRef));
+
+    return {
+      indicator,
+      granularity,
+      monthRef,
+      cells: refs.map((ref) => {
+        const r = rMap.get(ref);
+        return {
+          periodRef: ref,
+          target: tMap.get(ref)?.target ?? null,
+          value: r?.value ?? null,
+          status: (r?.status ?? 'NONE') as ResultStatus | 'NONE',
+          light: (r?.light ?? 'GRAY') as TrafficLight,
+          isClosed: closedSet.has(ref),
+        };
+      }),
+    };
   }
 
   async upsert(input: IndicatorResultUpsertInput, userId: string): Promise<ResultSaveOutcome> {

@@ -41,9 +41,13 @@ export function dateToPeriodRef(date: Date, periodicity: Periodicity): string {
 
 /**
  * Primeira data UTC de um periodRef (para ordenacao/grafico).
+ * Aceita uma periodicidade dica mas sempre da prioridade ao formato real do periodRef,
+ * permitindo armazenar resultados em granularidades diferentes da cadastral.
  */
 export function periodRefToDate(periodRef: string, periodicity: Periodicity): Date {
-  switch (periodicity) {
+  const detected = detectPeriodicityFromRef(periodRef);
+  const effective = detected !== periodicity ? detected : periodicity;
+  switch (effective) {
     case 'ANNUAL':
       return new Date(Date.UTC(parseInt(periodRef, 10), 0, 1));
     case 'SEMIANNUAL': {
@@ -60,12 +64,31 @@ export function periodRefToDate(periodRef: string, periodicity: Periodicity): Da
       const [yy, mm] = periodRef.split('-');
       return new Date(Date.UTC(parseInt(yy, 10), parseInt(mm, 10) - 1, 1));
     }
+    case 'WEEKLY': {
+      const [yy, ww] = periodRef.split('-W');
+      return isoWeekToDate(parseInt(yy, 10), parseInt(ww, 10));
+    }
+    case 'BIWEEKLY': {
+      const [yy, bw] = periodRef.split('-BW');
+      const week = (parseInt(bw, 10) - 1) * 2 + 1;
+      return isoWeekToDate(parseInt(yy, 10), week);
+    }
     case 'DAILY':
     default: {
       const [yy, mm, dd] = periodRef.split('-');
       return new Date(Date.UTC(parseInt(yy, 10), parseInt(mm, 10) - 1, parseInt(dd, 10)));
     }
   }
+}
+
+function isoWeekToDate(year: number, week: number): Date {
+  const jan4 = new Date(Date.UTC(year, 0, 4));
+  const dayOfWeek = jan4.getUTCDay() || 7;
+  const mondayOfWeek1 = new Date(jan4);
+  mondayOfWeek1.setUTCDate(jan4.getUTCDate() - (dayOfWeek - 1));
+  const target = new Date(mondayOfWeek1);
+  target.setUTCDate(mondayOfWeek1.getUTCDate() + (week - 1) * 7);
+  return target;
 }
 
 /**
@@ -154,6 +177,73 @@ function stepBack(d: Date, p: Periodicity): void {
     default:
       d.setUTCDate(d.getUTCDate() - 1);
       return;
+  }
+}
+
+/**
+ * Detecta a periodicidade a partir do formato do periodRef.
+ * Permite armazenar resultados em granularidades diferentes da periodicidade
+ * cadastral do indicador (ex.: lancar diario num indicador mensal).
+ */
+export function detectPeriodicityFromRef(periodRef: string): Periodicity {
+  if (/^\d{4}-\d{2}-\d{2}$/.test(periodRef)) return 'DAILY';
+  if (/^\d{4}-W\d{2}$/.test(periodRef)) return 'WEEKLY';
+  if (/^\d{4}-BW\d+$/.test(periodRef)) return 'BIWEEKLY';
+  if (/^\d{4}-Q\d$/.test(periodRef)) return 'QUARTERLY';
+  if (/^\d{4}-S\d$/.test(periodRef)) return 'SEMIANNUAL';
+  if (/^\d{4}-\d{2}$/.test(periodRef)) return 'MONTHLY';
+  if (/^\d{4}$/.test(periodRef)) return 'ANNUAL';
+  return 'MONTHLY';
+}
+
+/**
+ * Lista periodRefs de uma granularidade especifica dentro de um mes (YYYY-MM).
+ * Util para visualizacao/lancamento diario ou semanal dentro do mes.
+ */
+export function periodRefsForMonth(granularity: Periodicity, monthRef: string): string[] {
+  const [yStr, mStr] = monthRef.split('-');
+  const year = parseInt(yStr, 10);
+  const month = parseInt(mStr, 10);
+  if (!Number.isFinite(year) || !Number.isFinite(month)) return [];
+  const pad = (n: number) => String(n).padStart(2, '0');
+
+  switch (granularity) {
+    case 'DAILY': {
+      const out: string[] = [];
+      const cursor = new Date(Date.UTC(year, month - 1, 1));
+      while (cursor.getUTCMonth() === month - 1) {
+        out.push(`${year}-${pad(month)}-${pad(cursor.getUTCDate())}`);
+        cursor.setUTCDate(cursor.getUTCDate() + 1);
+      }
+      return out;
+    }
+    case 'WEEKLY': {
+      const out: string[] = [];
+      const seen = new Set<string>();
+      const cursor = new Date(Date.UTC(year, month - 1, 1));
+      while (cursor.getUTCMonth() === month - 1) {
+        const w = isoWeek(cursor);
+        const ref = `${w.year}-W${pad(w.week)}`;
+        if (!seen.has(ref)) {
+          seen.add(ref);
+          out.push(ref);
+        }
+        cursor.setUTCDate(cursor.getUTCDate() + 1);
+      }
+      return out;
+    }
+    case 'BIWEEKLY': {
+      const weeks = periodRefsForMonth('WEEKLY', monthRef);
+      const seen = new Set<string>();
+      for (const ref of weeks) {
+        const [yy, ww] = ref.split('-W');
+        seen.add(`${yy}-BW${Math.ceil(parseInt(ww, 10) / 2)}`);
+      }
+      return Array.from(seen);
+    }
+    case 'MONTHLY':
+    default:
+      return [monthRef];
   }
 }
 

@@ -13,11 +13,11 @@ import {
   XAxis,
   YAxis,
 } from 'recharts';
-import { ArrowLeft, AlertTriangle, Network, Save, ScrollText, Calendar, Link as LinkIcon } from 'lucide-react';
+import { ArrowLeft, AlertTriangle, Network, ScrollText, Calendar } from 'lucide-react';
 import Link from 'next/link';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { PageHeader } from '@/components/shell/page-header';
 import { StatusLight } from '@/components/ui/status-light';
 import { StatusBadge } from '@/components/platform/status-badge';
@@ -51,6 +51,10 @@ interface IndicatorDetail {
     light: string;
     attainment: number | null;
     deviationPct: number | null;
+    note: string | null;
+    createdAt: string;
+    updatedAt: string;
+    createdBy?: { id: string; name: string } | null;
   }[];
   actions?: { id: string; title: string; status: string; dueDate: string | null }[] | null;
   meetings?: { id: string; title: string; status: string; startsAt: string | null }[] | null;
@@ -88,6 +92,16 @@ interface CurrentTreatment {
   title: string;
 }
 
+interface AuditLogEntry {
+  id: string;
+  action: string;
+  recordLabel: string | null;
+  beforeValue: string | null;
+  afterValue: string | null;
+  createdAt: string;
+  user: { id: string; name: string; email: string } | null;
+}
+
 const STATUS_LABEL = ACTION_STATUS_LABEL;
 
 export default function IndicatorDetailPage() {
@@ -95,7 +109,7 @@ export default function IndicatorDetailPage() {
   const router = useRouter();
   const id = params.id;
   const qc = useQueryClient();
-  const [targetEdits, setTargetEdits] = useState<Record<string, string>>({});
+  const [auditOpen, setAuditOpen] = useState(false);
 
   const detail = useQuery<IndicatorDetail>({
     queryKey: ['indicator', id],
@@ -117,18 +131,10 @@ export default function IndicatorDetailPage() {
     enabled: lastForTreatment?.light === 'RED',
   });
 
-  const saveTarget = useMutation({
-    mutationFn: ({ periodRef, target }: { periodRef: string; target: number }) =>
-      api(`/indicators/${id}/targets`, {
-        method: 'POST',
-        json: { periodRef, target },
-      }),
-    onSuccess: () => {
-      toast.success('Meta salva');
-      setTargetEdits({});
-      qc.invalidateQueries({ queryKey: ['indicator', id] });
-      qc.invalidateQueries({ queryKey: ['indicator', id, 'series'] });
-    },
+  const auditLog = useQuery<{ logs: AuditLogEntry[] }>({
+    queryKey: ['indicator', id, 'history'],
+    enabled: auditOpen,
+    queryFn: () => api<{ logs: AuditLogEntry[] }>(`/indicators/${id}/history`),
   });
 
   const last = lastForTreatment;
@@ -363,54 +369,49 @@ export default function IndicatorDetailPage() {
 
       <div className="mb-6 grid grid-cols-1 gap-6 xl:grid-cols-[1fr,420px]">
         <Card>
-          <CardHeader>
-            <CardTitle>Próximos passos sugeridos</CardTitle>
+          <CardHeader className="py-3">
+            <CardTitle className="text-sm">Próximos passos sugeridos</CardTitle>
           </CardHeader>
-          <CardContent className="grid gap-3 md:grid-cols-3">
-            <Button variant="outline" className="h-auto justify-start gap-3 p-4" asChild>
+          <CardContent className="flex flex-wrap gap-2 pt-0">
+            <Button variant="outline" size="sm" asChild>
               <Link href="/org">
-                <Network className="h-5 w-5 text-primary" />
-                <span className="text-left">
-                  <span className="block font-medium">Ver na árvore</span>
-                  <span className="block text-xs text-muted-foreground">Área, setor e pilar vinculados</span>
-                </span>
+                <Network className="mr-1.5 h-4 w-4" />
+                Ver na árvore
               </Link>
             </Button>
             <Button
               variant={last?.light === 'RED' ? 'destructive' : 'outline'}
-              className="h-auto justify-start gap-3 p-4"
+              size="sm"
               onClick={() => currentTreatment.data ? router.push(`/treatments/${currentTreatment.data.id}`) : startTreatment.mutate()}
               disabled={!last || (last.light !== 'RED' && !currentTreatment.data) || startTreatment.isPending}
             >
-              <AlertTriangle className="h-5 w-5" />
-              <span className="text-left">
-                <span className="block font-medium">{currentTreatment.data ? 'Abrir tratativa' : 'Iniciar tratativa'}</span>
-                <span className="block text-xs opacity-80">Análise, reunião e plano de ação</span>
-              </span>
+              <AlertTriangle className="mr-1.5 h-4 w-4" />
+              {currentTreatment.data ? 'Abrir tratativa' : 'Iniciar tratativa'}
             </Button>
-            <Button variant="outline" className="h-auto justify-start gap-3 p-4" asChild>
+            <Button variant="outline" size="sm" asChild>
               <Link href="/meetings">
-                <ScrollText className="h-5 w-5 text-primary" />
-                <span className="text-left">
-                  <span className="block font-medium">Registrar reunião</span>
-                  <span className="block text-xs text-muted-foreground">Ata, decisões e ações</span>
-                </span>
+                <ScrollText className="mr-1.5 h-4 w-4" />
+                Registrar reunião
               </Link>
             </Button>
           </CardContent>
         </Card>
 
         <Card>
-          <CardHeader>
-            <CardTitle>Linha de rastreabilidade</CardTitle>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 py-3">
+            <CardTitle className="text-sm">Linha de rastreabilidade</CardTitle>
+            <Button variant="ghost" size="sm" onClick={() => setAuditOpen(true)}>
+              <ScrollText className="mr-1.5 h-3.5 w-3.5" />
+              Auditoria completa
+            </Button>
           </CardHeader>
-          <CardContent>
+          <CardContent className="pt-0">
             {timeline.isLoading && <p className="text-sm text-muted-foreground">Carregando histórico...</p>}
             {!timeline.isLoading && (timeline.data?.events.length ?? 0) === 0 && (
               <p className="text-sm text-muted-foreground">Nenhum evento registrado para este indicador.</p>
             )}
-            <div className="space-y-3">
-              {timeline.data?.events.slice(0, 8).map((event) => (
+            <div className="max-h-[420px] space-y-2 overflow-y-auto pr-1">
+              {timeline.data?.events.map((event) => (
                 <Link
                   key={event.id}
                   href={eventHref(event)}
@@ -435,78 +436,30 @@ export default function IndicatorDetailPage() {
         </Card>
       </div>
 
-      <Card className="mb-6">
-        <CardHeader>
-          <CardTitle>Editor de metas</CardTitle>
-        </CardHeader>
-        <CardContent className="p-0 overflow-x-auto">
-          <table className="w-full text-sm">
-            <thead className="bg-muted/50 text-xs uppercase">
-              <tr>
-                <th className="px-4 py-2 text-left">Período</th>
-                <th className="px-4 py-2 text-right">Meta atual</th>
-                <th className="px-4 py-2 text-right">Nova meta</th>
-                <th className="px-4 py-2 text-right"></th>
-              </tr>
-            </thead>
-            <tbody>
-              {(series.data ?? []).map((s) => {
-                const editKey = s.periodRef;
-                const editVal = targetEdits[editKey] ?? '';
-                return (
-                  <tr key={editKey} className="border-t">
-                    <td className="px-4 py-2">{periodRefLabel(s.periodRef)}</td>
-                    <td className="px-4 py-2 text-right text-muted-foreground">
-                      {s.target !== null ? formatNumber(s.target) : '-'}
-                    </td>
-                    <td className="px-4 py-2 text-right">
-                      <Input
-                        value={editVal}
-                        onChange={(e) =>
-                          setTargetEdits((prev) => ({ ...prev, [editKey]: e.target.value }))
-                        }
-                        placeholder={s.target !== null ? String(s.target) : 'definir'}
-                        className="h-8 w-28 text-right text-sm inline-block"
-                      />
-                    </td>
-                    <td className="px-4 py-2 text-right">
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        disabled={!editVal || saveTarget.isPending}
-                        onClick={() => {
-                          const v = Number(editVal.replace(',', '.'));
-                          if (Number.isFinite(v)) {
-                            saveTarget.mutate({ periodRef: s.periodRef, target: v });
-                          }
-                        }}
-                      >
-                        <Save className="h-4 w-4" />
-                      </Button>
-                    </td>
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
-        </CardContent>
-      </Card>
-
       <Card>
         <CardHeader>
-          <CardTitle>Histórico de lançamentos</CardTitle>
+          <div className="flex flex-row items-center justify-between">
+            <CardTitle>Histórico de lançamentos</CardTitle>
+            <Button variant="ghost" size="sm" onClick={() => setAuditOpen(true)}>
+              <ScrollText className="mr-1.5 h-3.5 w-3.5" />
+              Auditoria completa
+            </Button>
+          </div>
         </CardHeader>
         <CardContent className="p-0">
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
               <thead className="bg-muted/50">
-                <tr className="text-left">
+                <tr className="text-left text-xs uppercase">
                   <th className="px-4 py-2 font-medium">Período</th>
                   <th className="px-4 py-2 font-medium text-right">Meta</th>
                   <th className="px-4 py-2 font-medium text-right">Realizado</th>
                   <th className="px-4 py-2 font-medium text-right">Desvio %</th>
                   <th className="px-4 py-2 font-medium text-right">Atingim.</th>
                   <th className="px-4 py-2 font-medium">Status</th>
+                  <th className="px-4 py-2 font-medium">Lançado por</th>
+                  <th className="px-4 py-2 font-medium">Atualizado em</th>
+                  <th className="px-4 py-2 font-medium">Observação</th>
                 </tr>
               </thead>
               <tbody>
@@ -516,8 +469,8 @@ export default function IndicatorDetailPage() {
                   .map((r) => {
                     const t = ind.targets.find((x) => x.periodRef === r.periodRef);
                     return (
-                      <tr key={r.id} className="border-t">
-                        <td className="px-4 py-2">{periodRefLabel(r.periodRef)}</td>
+                      <tr key={r.id} className="border-t hover:bg-muted/20">
+                        <td className="px-4 py-2 font-medium">{periodRefLabel(r.periodRef)}</td>
                         <td className="px-4 py-2 text-right">{t ? formatNumber(t.target) : '-'}</td>
                         <td className="px-4 py-2 text-right font-medium">{formatNumber(r.value)}</td>
                         <td className="px-4 py-2 text-right">
@@ -529,6 +482,13 @@ export default function IndicatorDetailPage() {
                         <td className="px-4 py-2">
                           <StatusLight light={r.light} />
                         </td>
+                        <td className="px-4 py-2 text-xs text-muted-foreground">{r.createdBy?.name ?? 'Sistema'}</td>
+                        <td className="px-4 py-2 text-xs text-muted-foreground">
+                          {r.updatedAt ? new Date(r.updatedAt).toLocaleString('pt-BR') : '-'}
+                        </td>
+                        <td className="px-4 py-2 text-xs text-muted-foreground max-w-[260px] truncate" title={r.note ?? ''}>
+                          {r.note ?? '-'}
+                        </td>
                       </tr>
                     );
                   })}
@@ -537,6 +497,47 @@ export default function IndicatorDetailPage() {
           </div>
         </CardContent>
       </Card>
+
+      <Dialog open={auditOpen} onOpenChange={setAuditOpen}>
+        <DialogContent className="max-w-3xl">
+          <DialogHeader>
+            <DialogTitle>Auditoria completa - {ind.name}</DialogTitle>
+          </DialogHeader>
+          <div className="max-h-[70vh] space-y-2 overflow-y-auto pr-1">
+            {auditLog.isLoading && <p className="text-sm text-muted-foreground">Carregando auditoria...</p>}
+            {!auditLog.isLoading && (auditLog.data?.logs.length ?? 0) === 0 && (
+              <p className="text-sm text-muted-foreground">Nenhum registro de auditoria encontrado.</p>
+            )}
+            {auditLog.data?.logs.map((log) => (
+              <div key={log.id} className="rounded-lg border p-3">
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <div className="text-sm font-semibold">{auditActionLabel(log.action)}</div>
+                  <div className="text-xs text-muted-foreground">
+                    {new Date(log.createdAt).toLocaleString('pt-BR')} - {log.user?.name ?? 'Sistema'}
+                  </div>
+                </div>
+                {log.recordLabel && <p className="mt-1 text-sm text-muted-foreground">{log.recordLabel}</p>}
+                {(log.beforeValue || log.afterValue) && (
+                  <div className="mt-2 grid grid-cols-1 gap-2 text-xs md:grid-cols-2">
+                    {log.beforeValue && (
+                      <div className="rounded border bg-muted/30 p-2">
+                        <div className="font-semibold text-muted-foreground">Antes</div>
+                        <pre className="mt-1 whitespace-pre-wrap break-words text-[11px]">{log.beforeValue}</pre>
+                      </div>
+                    )}
+                    {log.afterValue && (
+                      <div className="rounded border bg-muted/30 p-2">
+                        <div className="font-semibold text-muted-foreground">Depois</div>
+                        <pre className="mt-1 whitespace-pre-wrap break-words text-[11px]">{log.afterValue}</pre>
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
+            ))}
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
@@ -550,4 +551,18 @@ function eventHref(event: TraceEvent) {
 
 function shortEventLabel(type: string) {
   return TRACE_EVENT_LABEL[type] ?? type;
+}
+
+function auditActionLabel(action: string) {
+  const labels: Record<string, string> = {
+    CREATE: 'Criação do indicador',
+    UPDATE: 'Edição cadastral',
+    DELETE: 'Exclusão lógica',
+    CREATE_TARGET: 'Meta criada',
+    UPDATE_TARGET: 'Meta alterada',
+    CREATE_RESULT: 'Lançamento de realizado',
+    UPDATE_RESULT: 'Alteração de realizado',
+    PERMISSION_CHANGE: 'Alteração de permissão',
+  };
+  return labels[action] ?? action;
 }

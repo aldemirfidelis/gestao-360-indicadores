@@ -32,6 +32,20 @@ export class ResultsController {
     });
   }
 
+  @Get('grain')
+  grain(
+    @CurrentUser() me: AuthPayload,
+    @Query('indicatorId') indicatorId: string,
+    @Query('granularity') granularity: string,
+    @Query('month') month: string,
+  ) {
+    const allowed = ['DAILY', 'WEEKLY', 'BIWEEKLY', 'MONTHLY'] as const;
+    const g = (allowed as readonly string[]).includes(granularity)
+      ? (granularity as (typeof allowed)[number])
+      : 'MONTHLY';
+    return this.service.grainByMonth(me.companyId, indicatorId, g, month);
+  }
+
   @Post()
   async upsert(
     @CurrentUser() me: AuthPayload,

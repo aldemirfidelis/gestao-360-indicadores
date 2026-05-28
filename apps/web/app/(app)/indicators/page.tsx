@@ -271,6 +271,7 @@ export default function IndicatorsPage() {
   const [viewing, setViewing] = useState<IndicatorRow | null>(null);
   const [targetEditing, setTargetEditing] = useState<IndicatorRow | null>(null);
   const [resultEditing, setResultEditing] = useState<IndicatorRow | null>(null);
+  const [grainLaunch, setGrainLaunch] = useState<{ indicator: IndicatorRow; granularity: 'WEEKLY' | 'DAILY'; month: string } | null>(null);
   const [historyIndicator, setHistoryIndicator] = useState<IndicatorRow | null>(null);
   const [filtersOpen, setFiltersOpen] = useState(false);
 
@@ -654,6 +655,7 @@ export default function IndicatorsPage() {
             onEdit={() => openEdit(indicator)}
             onTarget={() => openTarget(indicator)}
             onResult={() => openResult(indicator)}
+            onLaunchGrain={(granularity, month) => setGrainLaunch({ indicator, granularity, month })}
             onHistory={() => setHistoryIndicator(indicator)}
             onMicroView={(micro) => setViewing(micro)}
             onMicroEdit={(micro) => openEdit(micro)}
@@ -703,6 +705,11 @@ export default function IndicatorsPage() {
         onOpenChange={(open) => !open && setResultEditing(null)}
       />
 
+      <GrainLaunchDialog
+        state={grainLaunch}
+        onOpenChange={(open) => !open && setGrainLaunch(null)}
+      />
+
       <HistoryDialog
         indicator={historyIndicator}
         history={history.data}
@@ -713,7 +720,7 @@ export default function IndicatorsPage() {
   );
 }
 
-type IndicatorViewMode = 'monthly' | 'cumulative';
+type IndicatorViewMode = 'monthly' | 'cumulative' | 'weekly' | 'daily';
 type IndicatorChartType = 'bar' | 's-curve';
 
 interface ChartPoint {
@@ -725,6 +732,51 @@ interface ChartPoint {
   status: string;
   displayMeta: number | null;
   displayRealizado: number | null;
+}
+
+interface GrainCell {
+  periodRef: string;
+  target: number | null;
+  value: number | null;
+  status: string;
+  light: string;
+  isClosed?: boolean;
+}
+
+interface GrainResponse {
+  indicator: { id: string; name: string };
+  granularity: 'DAILY' | 'WEEKLY' | 'BIWEEKLY' | 'MONTHLY';
+  monthRef: string;
+  cells: GrainCell[];
+}
+
+function grainPeriodLabel(periodRef: string): string {
+  // DAILY: 2026-05-15 -> 15
+  if (/^\d{4}-\d{2}-\d{2}$/.test(periodRef)) {
+    return periodRef.slice(8, 10);
+  }
+  // WEEKLY: 2026-W21 -> S21
+  const wMatch = /^\d{4}-W(\d{2})$/.exec(periodRef);
+  if (wMatch) return `S${wMatch[1]}`;
+  // BIWEEKLY: 2026-BW3 -> Q3
+  const bwMatch = /^\d{4}-BW(\d+)$/.exec(periodRef);
+  if (bwMatch) return `Q${bwMatch[1]}`;
+  return periodRef;
+}
+
+function currentMonthRef(): string {
+  const d = new Date();
+  const pad = (n: number) => String(n).padStart(2, '0');
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}`;
+}
+
+function monthOptionsForYear(year: number): { value: string; label: string }[] {
+  const monthNames = ['Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun', 'Jul', 'Ago', 'Set', 'Out', 'Nov', 'Dez'];
+  const pad = (n: number) => String(n).padStart(2, '0');
+  return monthNames.map((label, i) => ({
+    value: `${year}-${pad(i + 1)}`,
+    label: `${label}/${String(year).slice(2)}`,
+  }));
 }
 
 function buildCumulativeAvg(values: Array<number | null | undefined>): Array<number | null> {
@@ -748,6 +800,7 @@ function IndicatorManagementCard({
   onEdit,
   onTarget,
   onResult,
+  onLaunchGrain,
   onHistory,
   onDelete,
   onMicroView,
@@ -763,6 +816,7 @@ function IndicatorManagementCard({
   onEdit: () => void;
   onTarget: () => void;
   onResult: () => void;
+  onLaunchGrain?: (granularity: 'WEEKLY' | 'DAILY', month: string) => void;
   onHistory: () => void;
   onDelete: () => void;
   onMicroView?: (micro: IndicatorRow) => void;
@@ -775,7 +829,17 @@ function IndicatorManagementCard({
   const [microsOpen, setMicrosOpen] = useState(false);
   const [viewMode, setViewMode] = useState<IndicatorViewMode>('monthly');
   const [chartType, setChartType] = useState<IndicatorChartType>('bar');
+  const [grainMonth, setGrainMonth] = useState<string>(currentMonthRef());
   const monthlyHistory = indicator.monthlyHistory ?? [];
+  const isGrainMode = viewMode === 'weekly' || viewMode === 'daily';
+  const grainGranularity = viewMode === 'weekly' ? 'WEEKLY' : 'DAILY';
+
+  const grainQuery = useQuery<GrainResponse>({
+    queryKey: ['indicator', indicator.id, 'grain', grainGranularity, grainMonth],
+    enabled: isGrainMode,
+    queryFn: () => api<GrainResponse>(`/results/grain?indicatorId=${indicator.id}&granularity=${grainGranularity}&month=${grainMonth}`),
+  });
+
   const lastFilledIdx = (() => {
     for (let i = monthlyHistory.length - 1; i >= 0; i--) {
       const point = monthlyHistory[i];
@@ -786,6 +850,19 @@ function IndicatorManagementCard({
   const [selectedIdx, setSelectedIdx] = useState<number>(Math.max(0, lastFilledIdx));
 
   const chartData: ChartPoint[] = useMemo(() => {
+    if (isGrainMode) {
+      const cells = grainQuery.data?.cells ?? [];
+      return cells.map((c) => ({
+        periodRef: c.periodRef,
+        month: grainPeriodLabel(c.periodRef),
+        meta: c.target,
+        realizado: c.value,
+        attainment: c.target !== null && c.value !== null && c.target !== 0 ? c.value / c.target : null,
+        status: c.light,
+        displayMeta: c.target,
+        displayRealizado: c.value,
+      }));
+    }
     if (viewMode === 'monthly') {
       return monthlyHistory.map((p) => ({
         periodRef: p.periodRef,
@@ -810,53 +887,49 @@ function IndicatorManagementCard({
       displayMeta: cumMeta[idx],
       displayRealizado: cumReal[idx],
     }));
-  }, [monthlyHistory, viewMode]);
+  }, [monthlyHistory, viewMode, isGrainMode, grainQuery.data]);
 
-  const selectedPoint = monthlyHistory[selectedIdx] ?? null;
-  const selectedChart = chartData[selectedIdx] ?? null;
+  const safeSelectedIdx = Math.min(selectedIdx, Math.max(0, chartData.length - 1));
+  const selectedChart = chartData[safeSelectedIdx] ?? null;
+  const selectedPoint = isGrainMode
+    ? selectedChart
+      ? {
+          periodRef: selectedChart.periodRef,
+          month: selectedChart.month,
+          meta: selectedChart.meta,
+          realizado: selectedChart.realizado,
+          attainment: selectedChart.attainment,
+          status: selectedChart.status,
+        }
+      : null
+    : monthlyHistory[safeSelectedIdx] ?? null;
   const light = (selectedPoint?.status as string | undefined) ?? indicator.last?.light ?? 'GRAY';
   const baseAttainment = selectedPoint?.attainment ?? 0;
   const attainment = Math.max(0, Math.min(100, Math.round(baseAttainment * 100)));
   const unitText = indicator.unitLabel || UNIT_LABEL[indicator.unit] || '';
-  const monthLabel = selectedPoint ? periodRefLabel(selectedPoint.periodRef) : '-';
-  const hasAnyData = monthlyHistory.some((p) => p.meta !== null || p.realizado !== null);
+  const monthLabel = selectedPoint
+    ? (isGrainMode ? selectedPoint.periodRef : periodRefLabel(selectedPoint.periodRef))
+    : '-';
+  const hasAnyData = isGrainMode
+    ? (grainQuery.data?.cells ?? []).some((c) => c.target !== null || c.value !== null)
+    : monthlyHistory.some((p) => p.meta !== null || p.realizado !== null);
 
   function onChartClick(state: any) {
     const idx = state?.activeTooltipIndex;
-    if (typeof idx === 'number' && idx >= 0 && idx < monthlyHistory.length) {
+    if (typeof idx === 'number' && idx >= 0 && idx < chartData.length) {
       setSelectedIdx(idx);
     }
   }
-
-  function showsDaily() { return indicator.periodicity === 'DAILY'; }
-  function showsWeekly() { return indicator.periodicity === 'WEEKLY' || indicator.periodicity === 'BIWEEKLY'; }
-  function showsMonthly() { return indicator.periodicity === 'MONTHLY' || indicator.periodicity === 'QUARTERLY' || indicator.periodicity === 'SEMIANNUAL' || indicator.periodicity === 'ANNUAL'; }
 
   const realizadoDisplay = viewMode === 'cumulative' ? selectedChart?.displayRealizado : selectedPoint?.realizado;
   const metaDisplay = viewMode === 'cumulative' ? selectedChart?.displayMeta : selectedPoint?.meta;
 
   return (
     <article className="panel panel-hover flex h-full flex-col p-5">
-      <div className="flex items-start justify-between gap-3">
-        <div className="min-w-0">
-          <div className="flex flex-wrap items-center gap-2">
-            {indicator.code && <Badge variant="outline">{indicator.code}</Badge>}
-            <Badge variant="secondary">{TYPE_LABEL[indicator.type] ?? indicator.type}</Badge>
-            <Badge className={cn('border', statusBadgeClass(light))} variant="outline">{LIGHT_LABEL[light] ?? light}</Badge>
-            <Badge variant="outline" className="text-xs">{PERIODICITY_LABEL[indicator.periodicity] ?? indicator.periodicity}</Badge>
-            {indicator.isMacro && (
-              <Badge className="border border-status-blue/40 bg-status-blue/10 text-status-blue" variant="outline">
-                Macro
-              </Badge>
-            )}
-            {indicator.parentIndicator && (
-              <Badge className="border border-status-purple/40 bg-status-purple/10 text-status-purple" variant="outline">
-                Micro de {indicator.parentIndicator.code ?? indicator.parentIndicator.name}
-              </Badge>
-            )}
-          </div>
-          <h3 className="mt-2 text-lg font-semibold leading-snug">{indicator.name}</h3>
-          <div className="mt-1 flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-muted-foreground">
+      <div className="flex items-start justify-between gap-4">
+        <div className="min-w-0 flex-1">
+          <h3 className="text-2xl font-bold leading-tight">{indicator.name}</h3>
+          <div className="mt-2 flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-muted-foreground">
             <span className="flex items-center gap-1.5"><Target className="h-3.5 w-3.5" />{indicator.areaMacro?.name ?? '-'}</span>
             <span className="flex items-center gap-1.5"><TrendingUp className="h-3.5 w-3.5" />{indicator.areaMicro?.name ?? indicator.ownerNode.name}</span>
             <span className="flex items-center gap-1.5"><UserRound className="h-3.5 w-3.5" />{indicator.responsibleUser?.name ?? 'Sem responsável'}</span>
@@ -890,21 +963,36 @@ function IndicatorManagementCard({
 
         <div className="flex flex-col">
           <div className="flex flex-wrap items-center justify-between gap-2 mb-2">
-            <div className="inline-flex rounded-md border bg-card/60 p-0.5">
-              <button
-                type="button"
-                onClick={() => setViewMode('monthly')}
-                className={cn('px-3 py-1.5 text-xs font-medium rounded transition-colors', viewMode === 'monthly' ? 'bg-primary text-primary-foreground shadow-sm' : 'text-muted-foreground hover:text-foreground')}
-              >
-                Mensal
-              </button>
-              <button
-                type="button"
-                onClick={() => setViewMode('cumulative')}
-                className={cn('px-3 py-1.5 text-xs font-medium rounded transition-colors', viewMode === 'cumulative' ? 'bg-primary text-primary-foreground shadow-sm' : 'text-muted-foreground hover:text-foreground')}
-              >
-                Acumulado
-              </button>
+            <div className="flex flex-wrap items-center gap-2">
+              <div className="inline-flex rounded-md border bg-card/60 p-0.5">
+                {(['monthly', 'cumulative', 'weekly', 'daily'] as const).map((mode) => (
+                  <button
+                    key={mode}
+                    type="button"
+                    onClick={() => { setViewMode(mode); setSelectedIdx(0); }}
+                    className={cn(
+                      'px-3 py-1.5 text-xs font-medium rounded transition-colors',
+                      viewMode === mode ? 'bg-primary text-primary-foreground shadow-sm' : 'text-muted-foreground hover:text-foreground',
+                    )}
+                  >
+                    {mode === 'monthly' && 'Mensal'}
+                    {mode === 'cumulative' && 'Acumulado'}
+                    {mode === 'weekly' && 'Semanal'}
+                    {mode === 'daily' && 'Diário'}
+                  </button>
+                ))}
+              </div>
+              {isGrainMode && (
+                <NativeSelect
+                  value={grainMonth}
+                  onChange={(e) => { setGrainMonth(e.target.value); setSelectedIdx(0); }}
+                  className="h-8 text-xs"
+                >
+                  {monthOptionsForYear(new Date().getFullYear()).map((opt) => (
+                    <option key={opt.value} value={opt.value}>{opt.label}</option>
+                  ))}
+                </NativeSelect>
+              )}
             </div>
             <div className="inline-flex rounded-md border bg-card/60 p-0.5">
               <button
@@ -987,7 +1075,12 @@ function IndicatorManagementCard({
             )}
           </div>
           <div className="mt-2 text-[11px] text-muted-foreground">
-            {viewMode === 'cumulative' ? 'Acumulado calculado como média YTD dos períodos preenchidos.' : 'Valores mensais do indicador no ano corrente.'} Clique nas barras/pontos para ver os detalhes do período.
+            {viewMode === 'cumulative' && 'Acumulado calculado como média YTD dos períodos preenchidos. '}
+            {viewMode === 'monthly' && 'Valores mensais do indicador no ano corrente. '}
+            {viewMode === 'weekly' && `Semanas do mês ${grainMonth}. `}
+            {viewMode === 'daily' && `Dias do mês ${grainMonth}. `}
+            {isGrainMode && grainQuery.isLoading && 'Carregando... '}
+            Clique nas barras/pontos para ver os detalhes do período.
           </div>
         </div>
       </div>
@@ -997,11 +1090,11 @@ function IndicatorManagementCard({
           <CalendarDays className="mr-1.5 h-3.5 w-3.5" />
           Lançar Mensal
         </Button>
-        <Button variant="outline" size="sm" onClick={onResult}>
+        <Button variant="outline" size="sm" onClick={() => onLaunchGrain?.('WEEKLY', grainMonth)}>
           <CalendarDays className="mr-1.5 h-3.5 w-3.5" />
           Lançar Semanal
         </Button>
-        <Button variant="outline" size="sm" onClick={onResult}>
+        <Button variant="outline" size="sm" onClick={() => onLaunchGrain?.('DAILY', grainMonth)}>
           <CalendarDays className="mr-1.5 h-3.5 w-3.5" />
           Lançar Diário
         </Button>
@@ -1448,7 +1541,7 @@ function ResultDialog({
     <Dialog open={Boolean(indicator)} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-4xl">
         <DialogHeader>
-          <DialogTitle>Alterar realizado</DialogTitle>
+          <DialogTitle>Lançar resultados mensais</DialogTitle>
         </DialogHeader>
         {indicator && (
           <IndicatorResultEditor
@@ -1459,6 +1552,133 @@ function ResultDialog({
         )}
         <DialogFooter>
           <Button variant="outline" onClick={() => onOpenChange(false)}>Fechar</Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+function GrainLaunchDialog({
+  state,
+  onOpenChange,
+}: {
+  state: { indicator: IndicatorRow; granularity: 'WEEKLY' | 'DAILY'; month: string } | null;
+  onOpenChange: (open: boolean) => void;
+}) {
+  const qc = useQueryClient();
+  const [month, setMonth] = useState<string>(state?.month ?? currentMonthRef());
+  const [edits, setEdits] = useState<Record<string, string>>({});
+
+  useEffect(() => {
+    if (state) {
+      setMonth(state.month);
+      setEdits({});
+    }
+  }, [state?.indicator.id, state?.granularity, state?.month]);
+
+  const query = useQuery<GrainResponse>({
+    queryKey: ['grain', state?.indicator.id, state?.granularity, month],
+    enabled: Boolean(state),
+    queryFn: () => api<GrainResponse>(`/results/grain?indicatorId=${state!.indicator.id}&granularity=${state!.granularity}&month=${month}`),
+  });
+
+  const save = useMutation({
+    mutationFn: () => {
+      const items: { indicatorId: string; periodRef: string; value: number }[] = [];
+      for (const [periodRef, raw] of Object.entries(edits)) {
+        const trimmed = raw.trim().replace(',', '.');
+        if (trimmed === '') continue;
+        const num = Number(trimmed);
+        if (!Number.isFinite(num)) continue;
+        items.push({ indicatorId: state!.indicator.id, periodRef, value: num });
+      }
+      if (items.length === 0) return Promise.reject(new Error('Nada para salvar'));
+      return api<{ count: number }>('/results/batch', { method: 'POST', json: { items } });
+    },
+    onSuccess: (out) => {
+      toast.success(`${out.count} lançamento(s) salvos`);
+      setEdits({});
+      qc.invalidateQueries({ queryKey: ['grain', state?.indicator.id] });
+      qc.invalidateQueries({ queryKey: ['indicators'] });
+      qc.invalidateQueries({ queryKey: ['indicator', state?.indicator.id, 'grain'] });
+    },
+    onError: (e: any) => toast.error(e?.message ?? 'Falha ao salvar'),
+  });
+
+  if (!state) return null;
+  const cells = query.data?.cells ?? [];
+  const title = state.granularity === 'WEEKLY' ? 'Lançar resultados semanais' : 'Lançar resultados diários';
+  const editedCount = Object.values(edits).filter((v) => v.trim() !== '').length;
+
+  return (
+    <Dialog open={Boolean(state)} onOpenChange={onOpenChange}>
+      <DialogContent className="max-w-4xl">
+        <DialogHeader>
+          <DialogTitle>{title} - {state.indicator.name}</DialogTitle>
+        </DialogHeader>
+        <div className="space-y-4">
+          <div className="flex flex-wrap items-center gap-3">
+            <Label className="text-xs uppercase text-muted-foreground">Mês</Label>
+            <NativeSelect value={month} onChange={(e) => { setMonth(e.target.value); setEdits({}); }} className="h-9 w-40">
+              {monthOptionsForYear(new Date().getFullYear()).map((opt) => (
+                <option key={opt.value} value={opt.value}>{opt.label}</option>
+              ))}
+            </NativeSelect>
+            <span className="text-xs text-muted-foreground">
+              {state.granularity === 'WEEKLY' ? `${cells.length} semana(s) no mês` : `${cells.length} dia(s) no mês`}
+            </span>
+          </div>
+
+          {query.isLoading && <LoadingState className="min-h-40" />}
+          {!query.isLoading && cells.length === 0 && (
+            <EmptyState title="Sem períodos" description="Selecione outro mês." />
+          )}
+          {!query.isLoading && cells.length > 0 && (
+            <div className="overflow-x-auto rounded-lg border">
+              <table className="table-modern min-w-[480px]">
+                <thead>
+                  <tr>
+                    <th className="text-left">{state.granularity === 'WEEKLY' ? 'Semana' : 'Dia'}</th>
+                    <th className="text-left">Meta</th>
+                    <th className="text-left">Realizado</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {cells.map((cell) => {
+                    const editVal = edits[cell.periodRef] ?? '';
+                    const display = editVal !== ''
+                      ? editVal
+                      : cell.value !== null && cell.value !== undefined ? String(cell.value) : '';
+                    return (
+                      <tr key={cell.periodRef}>
+                        <td>
+                          <div className="font-medium">{grainPeriodLabel(cell.periodRef)}</div>
+                          <div className="text-xs text-muted-foreground">{cell.periodRef}</div>
+                        </td>
+                        <td>
+                          <div className="text-sm">{cell.target !== null ? formatNumber(cell.target) : '-'}</div>
+                        </td>
+                        <td>
+                          <Input
+                            value={display}
+                            onChange={(e) => setEdits((prev) => ({ ...prev, [cell.periodRef]: e.target.value }))}
+                            placeholder={cell.target !== null ? String(cell.target) : '-'}
+                            className="h-9 w-32 text-sm"
+                          />
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </div>
+        <DialogFooter>
+          <Button variant="outline" onClick={() => onOpenChange(false)}>Fechar</Button>
+          <Button onClick={() => save.mutate()} disabled={editedCount === 0 || save.isPending}>
+            {save.isPending ? 'Salvando...' : `Salvar (${editedCount})`}
+          </Button>
         </DialogFooter>
       </DialogContent>
     </Dialog>
