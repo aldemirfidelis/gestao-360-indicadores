@@ -508,11 +508,11 @@ export default function OrganogramaPage() {
                                       {initials}
                                     </span>
                                     <div className="min-w-0 flex-1">
-                                      <div className="flex items-center gap-2">
+                                      <div className="flex flex-wrap items-center gap-2">
                                         <Input
                                           value={emp.name}
                                           onChange={(e) => updateEmployee.mutate({ id: emp.id, name: e.target.value })}
-                                          className="h-8 max-w-[260px] text-xs font-medium"
+                                          className="h-8 max-w-[260px] flex-1 text-xs font-medium"
                                         />
                                         {emp.approvalRequests && emp.approvalRequests.length > 0 ? (
                                           <span className="inline-flex shrink-0 items-center gap-1 border border-status-blue/30 bg-status-blue/10 px-1.5 py-0.5 text-[10px] font-medium text-status-blue">
@@ -532,6 +532,28 @@ export default function OrganogramaPage() {
                                             <Send className="mr-1 h-3 w-3" /> Aprovação
                                           </Button>
                                         )}
+                                        <div className="ml-auto flex shrink-0 items-center gap-1">
+                                          <Button
+                                            variant="ghost"
+                                            size="sm"
+                                            onClick={() => openEditEmployee(emp)}
+                                            className="h-7 w-7 p-0"
+                                            title="Editar cadastro"
+                                          >
+                                            <Pencil className="h-3.5 w-3.5" />
+                                          </Button>
+                                          <Button
+                                            variant="ghost"
+                                            size="sm"
+                                            onClick={() => {
+                                              if (window.confirm('Remover este colaborador?')) removeEmployee.mutate(emp.id);
+                                            }}
+                                            className="h-7 w-7 p-0 text-destructive hover:bg-destructive/10"
+                                            title="Excluir"
+                                          >
+                                            <Trash2 className="h-3.5 w-3.5" />
+                                          </Button>
+                                        </div>
                                       </div>
                                       <div className="mt-2 grid grid-cols-2 gap-x-3 gap-y-2 text-[11px] text-muted-foreground sm:grid-cols-4 lg:grid-cols-[80px,minmax(180px,1fr),100px,80px,110px,120px,130px]">
                                         <Field label="Faixa">
@@ -617,28 +639,6 @@ export default function OrganogramaPage() {
                                           />
                                         </Field>
                                       </div>
-                                    </div>
-                                    <div className="flex shrink-0 items-center gap-1 opacity-0 transition-opacity group-hover:opacity-100">
-                                      <Button
-                                        variant="ghost"
-                                        size="sm"
-                                        onClick={() => openEditEmployee(emp)}
-                                        className="h-7 w-7 p-0"
-                                        title="Editar cadastro"
-                                      >
-                                        <Pencil className="h-3.5 w-3.5" />
-                                      </Button>
-                                      <Button
-                                        variant="ghost"
-                                        size="sm"
-                                        onClick={() => {
-                                          if (window.confirm('Remover este colaborador?')) removeEmployee.mutate(emp.id);
-                                        }}
-                                        className="h-7 w-7 p-0 text-destructive hover:bg-destructive/10"
-                                        title="Excluir"
-                                      >
-                                        <Trash2 className="h-3.5 w-3.5" />
-                                      </Button>
                                     </div>
                                   </div>
                                 );
