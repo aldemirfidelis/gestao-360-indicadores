@@ -533,80 +533,80 @@ export default function OrganogramaPage() {
                                           </Button>
                                         )}
                                       </div>
-                                      <div className="mt-1 flex flex-wrap items-center gap-2 text-[11px] text-muted-foreground">
-                                        <FieldChip label="Faixa">
+                                      <div className="mt-2 grid grid-cols-2 gap-x-3 gap-y-2 text-[11px] text-muted-foreground sm:grid-cols-4 xl:grid-cols-7">
+                                        <Field label="Faixa">
                                           <NativeSelect
                                             value={emp.band}
                                             onChange={(e) => updateEmployee.mutate({ id: emp.id, band: e.target.value })}
-                                            className="h-6 w-[68px] border-none bg-transparent px-1 text-[11px] font-semibold text-foreground"
+                                            className="h-7 w-full text-[11px] font-semibold"
                                           >
-                                            <option value="A">A</option>
-                                            <option value="B">B</option>
-                                            <option value="C">C</option>
-                                            <option value="D">D</option>
+                                            <option value="A">Faixa A</option>
+                                            <option value="B">Faixa B</option>
+                                            <option value="C">Faixa C</option>
+                                            <option value="D">Faixa D</option>
                                           </NativeSelect>
-                                        </FieldChip>
-                                        <FieldChip label="Pretendido">
+                                        </Field>
+                                        <Field label="Cargo pretendido">
                                           <NativeSelect
                                             value={emp.jobPretendedId ?? ''}
                                             onChange={(e) => updateEmployee.mutate({ id: emp.id, jobPretendedId: e.target.value || null })}
-                                            className="h-6 w-[130px] border-none bg-transparent px-1 text-[11px] text-foreground"
+                                            className="h-7 w-full text-[11px]"
                                           >
-                                            <option value="">— mesmo —</option>
+                                            <option value="">— Mesmo cargo —</option>
                                             {data?.jobs.map((j) => <option key={j.id} value={j.id}>{j.name}</option>)}
                                           </NativeSelect>
-                                        </FieldChip>
-                                        <FieldChip label="F. pretendida">
+                                        </Field>
+                                        <Field label="F. pretendida">
                                           <NativeSelect
                                             value={emp.bandPretended || 'B'}
                                             onChange={(e) => updateEmployee.mutate({ id: emp.id, bandPretended: e.target.value })}
-                                            className="h-6 w-[60px] border-none bg-transparent px-1 text-[11px] font-semibold text-foreground"
+                                            className="h-7 w-full text-[11px] font-semibold"
                                           >
-                                            <option value="A">A</option>
-                                            <option value="B">B</option>
-                                            <option value="C">C</option>
-                                            <option value="D">D</option>
+                                            <option value="A">Faixa A</option>
+                                            <option value="B">Faixa B</option>
+                                            <option value="C">Faixa C</option>
+                                            <option value="D">Faixa D</option>
                                           </NativeSelect>
-                                        </FieldChip>
-                                        <FieldChip label="Turno">
+                                        </Field>
+                                        <Field label="Turno">
                                           <NativeSelect
                                             value={emp.shift}
                                             onChange={(e) => updateEmployee.mutate({ id: emp.id, shift: e.target.value })}
-                                            className="h-6 w-[58px] border-none bg-transparent px-1 text-[11px] font-semibold text-foreground"
+                                            className="h-7 w-full text-[11px] font-semibold"
                                           >
-                                            <option value="A">A</option>
-                                            <option value="B">B</option>
-                                            <option value="C">C</option>
-                                            <option value="D">D</option>
+                                            <option value="A">Turno A</option>
+                                            <option value="B">Turno B</option>
+                                            <option value="C">Turno C</option>
+                                            <option value="D">Turno D</option>
                                           </NativeSelect>
-                                        </FieldChip>
-                                        <FieldChip label="Matrícula">
+                                        </Field>
+                                        <Field label="Matrícula">
                                           <Input
                                             value={emp.registrationId ?? ''}
                                             onChange={(e) => updateEmployee.mutate({ id: emp.id, registrationId: e.target.value || null })}
-                                            className="h-6 w-[90px] border-none bg-transparent px-1 text-[11px] font-semibold text-foreground"
+                                            className="h-7 w-full text-[11px] font-semibold"
                                             placeholder="VAGA"
                                           />
-                                        </FieldChip>
-                                        <FieldChip label="Orçamento">
+                                        </Field>
+                                        <Field label="Orçamento">
                                           <NativeSelect
                                             value={emp.isBudgeted ? 'true' : 'false'}
                                             onChange={(e) => updateEmployee.mutate({ id: emp.id, isBudgeted: e.target.value === 'true' })}
                                             className={cn(
-                                              'h-6 w-[100px] border-none bg-transparent px-1 text-[11px] font-semibold',
+                                              'h-7 w-full text-[11px] font-semibold',
                                               emp.isBudgeted ? 'text-status-green' : 'text-status-yellow',
                                             )}
                                           >
                                             <option value="true">Previsto</option>
                                             <option value="false">Fora orçado</option>
                                           </NativeSelect>
-                                        </FieldChip>
-                                        <FieldChip label="Status">
+                                        </Field>
+                                        <Field label="Status carreira">
                                           <NativeSelect
                                             value={emp.approvalStatus || 'PENDENTE'}
                                             onChange={(e) => updateEmployee.mutate({ id: emp.id, approvalStatus: e.target.value })}
                                             className={cn(
-                                              'h-6 w-[110px] border-none bg-transparent px-1 text-[11px] font-semibold',
+                                              'h-7 w-full text-[11px] font-semibold',
                                               emp.approvalStatus === 'APROVADO' && 'text-status-green',
                                               emp.approvalStatus === 'REPROVADO' && 'text-status-red',
                                               emp.approvalStatus === 'EM_ANALISE' && 'text-status-blue',
@@ -617,7 +617,7 @@ export default function OrganogramaPage() {
                                             <option value="APROVADO">Aprovado</option>
                                             <option value="REPROVADO">Reprovado</option>
                                           </NativeSelect>
-                                        </FieldChip>
+                                        </Field>
                                       </div>
                                     </div>
                                     <div className="flex shrink-0 items-center gap-1 opacity-0 transition-opacity group-hover:opacity-100">
@@ -914,11 +914,11 @@ export default function OrganogramaPage() {
   );
 }
 
-function FieldChip({ label, children }: { label: string; children: React.ReactNode }) {
+function Field({ label, children }: { label: string; children: React.ReactNode }) {
   return (
-    <span className="inline-flex items-center gap-1 border border-border/60 bg-muted/40 px-1.5 py-0.5">
-      <span className="text-[9px] uppercase tracking-wide text-muted-foreground/80">{label}</span>
+    <div className="flex min-w-0 flex-col gap-1">
+      <span className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground/80">{label}</span>
       {children}
-    </span>
+    </div>
   );
 }
