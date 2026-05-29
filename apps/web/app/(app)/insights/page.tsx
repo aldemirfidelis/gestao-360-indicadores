@@ -9,6 +9,7 @@ import { Badge } from '@/components/ui/badge';
 import { api } from '@/lib/api';
 import { cn } from '@/lib/utils';
 
+
 interface Insight {
   id: string;
   kind: 'EXECUTIVE_SUMMARY' | 'WORSENING_TREND' | 'CAUSE_SUGGESTION' | 'ACTION_SUGGESTION' | 'RISK_FLAG';
@@ -56,39 +57,7 @@ export default function InsightsPage() {
       <PageHeader
         title="Insights"
         description="Resumo executivo, tendências e sugestões geradas a partir do estado atual dos indicadores."
-        actions={
-          aiEnabled ? (
-            <Badge className="border-primary/30 bg-primary/10 text-primary">
-              <Sparkles className="mr-1 h-3 w-3" /> Gemini ativo
-            </Badge>
-          ) : (
-            <Badge variant="outline">Heuristicas locais</Badge>
-          )
-        }
       />
-
-      <Card className="mb-6 border-primary/30 bg-primary/5">
-        <CardContent className="p-4 flex items-start gap-3">
-          <Sparkles className="h-5 w-5 text-primary shrink-0 mt-0.5" />
-          <div className="text-sm">
-            {aiEnabled ? (
-              <>
-                <strong>IA ligada:</strong> os insights vêm do Google Gemini com base no histórico real
-                dos indicadores, tendências dos últimos períodos e desvios abertos. Quando a IA não
-                consegue responder, o sistema cai automaticamente nas regras determinísticas.
-              </>
-            ) : (
-              <>
-                <strong>Modo regras:</strong> hoje os insights vêm de regras determinísticas (cálculo de
-                tendência em 3 períodos, biblioteca de causas e ações por tipo de indicador). Configure
-                <code className="mx-1 px-1.5 py-0.5 rounded bg-background">GEMINI_API_KEY</code> no
-                <code className="mx-1 px-1.5 py-0.5 rounded bg-background">.env</code> para ativar o
-                Google Gemini.
-              </>
-            )}
-          </div>
-        </CardContent>
-      </Card>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
         {query.isLoading && <p className="text-sm text-muted-foreground">Carregando...</p>}

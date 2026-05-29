@@ -19,9 +19,9 @@ export function SectionCard({
 }) {
   return (
     <Card className={className}>
-      <CardHeader className="flex-row items-start justify-between gap-4 space-y-0 border-b bg-muted/25 p-4">
+      <CardHeader className="flex-row items-start justify-between gap-4 space-y-0 border-b border-border/60 p-4">
         <div className="min-w-0">
-          <CardTitle className="text-sm">{title}</CardTitle>
+          <CardTitle className="text-[13px] font-semibold uppercase tracking-[0.06em]">{title}</CardTitle>
           {description && <div className="mt-1 text-xs text-muted-foreground">{description}</div>}
         </div>
         {actions && <div className="shrink-0">{actions}</div>}

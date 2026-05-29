@@ -15,7 +15,7 @@ export default function AppLayout({ children }: { children: ReactNode }) {
   if (loading) {
     return (
       <div className="enterprise-shell grid min-h-screen place-items-center text-sm text-muted-foreground">
-        <div className="rounded-lg border bg-card px-5 py-4 shadow-sm">Carregando Gestão 360...</div>
+        <div className="border border-border/60 bg-card px-5 py-4">Carregando Gestão 360...</div>
       </div>
     );
   }
@@ -26,7 +26,7 @@ export default function AppLayout({ children }: { children: ReactNode }) {
       <Sidebar />
       <div className="flex flex-1 flex-col min-w-0">
         <Topbar />
-        <main className="flex-1 overflow-y-auto px-4 py-5 pb-24 sm:px-6 lg:px-8 lg:py-7">
+        <main className="flex-1 overflow-y-auto px-4 py-6 pb-24 sm:px-6 lg:px-10 lg:py-8">
           {routePerms ? (
             <RoutePermissionGate permissions={routePerms}>{children}</RoutePermissionGate>
           ) : (

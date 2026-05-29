@@ -58,9 +58,21 @@ const config: Config = {
         },
       },
       borderRadius: {
-        lg: 'var(--radius)',
-        md: 'calc(var(--radius) - 2px)',
-        sm: 'calc(var(--radius) - 4px)',
+        // Visual minimalista: cantos quadrados em todo o sistema.
+        // Os componentes seguem usando rounded-lg/md/sm — todos viram 0.
+        lg: '0',
+        md: '0',
+        sm: '0',
+      },
+      fontFamily: {
+        sans: ['var(--font-sans)', 'Inter', 'system-ui', '-apple-system', 'Segoe UI', 'sans-serif'],
+      },
+      boxShadow: {
+        // Sombras mais sutis e flat
+        sm: '0 1px 2px 0 hsl(221 39% 11% / 0.04)',
+        DEFAULT: '0 1px 2px 0 hsl(221 39% 11% / 0.04)',
+        md: '0 2px 4px 0 hsl(221 39% 11% / 0.05)',
+        lg: '0 4px 8px 0 hsl(221 39% 11% / 0.06)',
       },
       keyframes: {
         'accordion-down': {

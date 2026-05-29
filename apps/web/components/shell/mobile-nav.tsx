@@ -12,8 +12,8 @@ export function MobileNav() {
   const items = visibleMobileItems(user);
 
   return (
-    <nav className="fixed inset-x-0 bottom-0 z-40 border-t bg-card/96 px-2 pb-[env(safe-área-inset-bottom)] shadow-lg backdrop-blur lg:hidden">
-      <div className="grid h-16" style={{ gridTemplateColumns: `repeat(${Math.max(items.length, 1)}, minmax(0, 1fr))` }}>
+    <nav className="fixed inset-x-0 bottom-0 z-40 border-t border-border/60 bg-card/95 px-1 pb-[env(safe-area-inset-bottom)] backdrop-blur lg:hidden">
+      <div className="grid h-14" style={{ gridTemplateColumns: `repeat(${Math.max(items.length, 1)}, minmax(0, 1fr))` }}>
         {items.map((item) => {
           const Icon = item.icon;
           const active = isActivePath(pathname, item.href, item.exact);
@@ -22,11 +22,12 @@ export function MobileNav() {
               key={`${item.href}-${item.label}`}
               href={item.href}
               className={cn(
-                'flex flex-col items-center justify-center gap-1 rounded-md text-[11px] font-medium',
-                active ? 'text-primary' : 'text-muted-foreground',
+                'relative flex flex-col items-center justify-center gap-0.5 text-[10px] font-medium uppercase tracking-wider transition-colors',
+                active ? 'text-foreground' : 'text-muted-foreground/80',
               )}
             >
-              <Icon className={cn('h-5 w-5', active && 'fill-primary/10')} />
+              {active && <span className="absolute top-0 h-[2px] w-8 bg-foreground" />}
+              <Icon className="h-4 w-4" strokeWidth={active ? 2.2 : 1.6} />
               <span className="truncate">{item.label}</span>
             </Link>
           );

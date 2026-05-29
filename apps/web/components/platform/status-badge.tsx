@@ -71,12 +71,12 @@ export function StatusBadge({
   return (
     <span
       className={cn(
-        'inline-flex h-7 items-center gap-1.5 rounded-full border px-2.5 text-xs font-semibold',
+        'inline-flex h-6 items-center gap-1.5 border px-2 text-[11px] font-medium uppercase tracking-wide',
         toneClass[finalTone],
         className,
       )}
     >
-      <Icon className="h-3.5 w-3.5" />
+      <Icon className="h-3 w-3" />
       {label ?? value ?? 'Sem status'}
     </span>
   );

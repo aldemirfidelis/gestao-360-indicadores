@@ -1,7 +1,14 @@
 import './globals.css';
 import type { Metadata } from 'next';
 import { ReactNode } from 'react';
+import { Inter } from 'next/font/google';
 import { Providers } from '@/components/providers';
+
+const inter = Inter({
+  subsets: ['latin'],
+  display: 'swap',
+  variable: '--font-sans',
+});
 
 export const metadata: Metadata = {
   title: process.env.NEXT_PUBLIC_APP_NAME ?? 'Gestão 360',
@@ -16,7 +23,7 @@ export const metadata: Metadata = {
 
 export default function RootLayout({ children }: { children: ReactNode }) {
   return (
-    <html lang="pt-BR" suppressHydrationWarning>
+    <html lang="pt-BR" className={inter.variable} suppressHydrationWarning>
       <body className="min-h-screen bg-background font-sans antialiased">
         <Providers>{children}</Providers>
       </body>

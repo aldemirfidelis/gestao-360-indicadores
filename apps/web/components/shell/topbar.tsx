@@ -48,17 +48,17 @@ export function Topbar() {
   });
 
   return (
-    <header className="sticky top-0 z-30 flex h-16 items-center gap-3 border-b bg-background/88 px-3 backdrop-blur lg:px-6">
+    <header className="sticky top-0 z-30 flex h-14 items-center gap-3 border-b border-border/60 bg-background/95 px-3 backdrop-blur lg:px-6">
       <Dialog open={menuOpen} onOpenChange={setMenuOpen}>
         <DialogTrigger asChild>
-          <Button variant="outline" size="icon" className="lg:hidden" aria-label="Abrir menu">
+          <Button variant="ghost" size="icon" className="lg:hidden" aria-label="Abrir menu">
             <Menu className="h-4 w-4" />
           </Button>
         </DialogTrigger>
-        <DialogContent className="left-3 top-3 h-[calc(100vh-1.5rem)] max-w-[360px] translate-x-0 translate-y-0 p-0 sm:rounded-lg">
-          <DialogHeader className="border-b px-4 py-4">
-            <DialogTitle className="flex items-center gap-3 text-base">
-              <BrandMark className="h-9 w-9" />
+        <DialogContent className="left-2 top-2 h-[calc(100vh-1rem)] max-w-[300px] translate-x-0 translate-y-0 p-0">
+          <DialogHeader className="border-b border-border/60 px-4 py-3">
+            <DialogTitle className="flex items-center gap-2 text-sm">
+              <BrandMark className="h-7 w-7" />
               <span>Gestão 360</span>
             </DialogTitle>
           </DialogHeader>
@@ -66,15 +66,14 @@ export function Topbar() {
         </DialogContent>
       </Dialog>
 
-      <div className="hidden min-w-[150px] lg:block">
-        <div className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
+      <div className="hidden min-w-[140px] lg:block">
+        <div className="text-[10px] font-medium uppercase tracking-[0.14em] text-muted-foreground/70">
           {section?.heading ?? 'Início'}
         </div>
-        <div className="text-sm font-medium">Gestão 360</div>
       </div>
 
-      <div className="relative min-w-0 flex-1 lg:max-w-2xl">
-        <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+      <div className="relative min-w-0 flex-1 lg:max-w-xl">
+        <Search className="absolute left-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground/70" />
         <Input
           value={search}
           onChange={(event) => {
@@ -85,15 +84,15 @@ export function Topbar() {
           onKeyDown={(event) => {
             if (event.key === 'Escape') setSearchOpen(false);
           }}
-          placeholder="Buscar indicadores, ações, setores, responsáveis..."
-          className="h-10 border-border/80 bg-card pl-9 shadow-sm"
+          placeholder="Buscar indicadores, ações, setores..."
+          className="h-9 border-border/60 bg-muted/40 pl-9 text-sm placeholder:text-muted-foreground/60"
         />
         {searchOpen && search.trim().length >= 2 && (
-          <div className="absolute left-0 right-0 top-12 z-50 overflow-hidden rounded-lg border bg-card shadow-xl">
-            <div className="border-b px-3 py-2 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
+          <div className="absolute left-0 right-0 top-11 z-50 overflow-hidden border border-border bg-card shadow-lg">
+            <div className="border-b border-border/60 px-3 py-2 text-[10px] font-medium uppercase tracking-[0.12em] text-muted-foreground">
               Busca global
             </div>
-            <div className="max-h-[420px] overflow-y-auto p-2">
+            <div className="max-h-[420px] overflow-y-auto p-1">
               {globalSearch.isLoading && (
                 <div className="px-3 py-6 text-center text-sm text-muted-foreground">Buscando...</div>
               )}
@@ -108,13 +107,13 @@ export function Topbar() {
                     setSearchOpen(false);
                     setSearch('');
                   }}
-                  className="flex items-start justify-between gap-3 rounded-md px-3 py-2 text-sm transition-colors hover:bg-accent"
+                  className="flex items-start justify-between gap-3 px-3 py-2 text-sm transition-colors hover:bg-muted"
                 >
                   <span className="min-w-0">
                     <span className="block truncate font-medium">{item.label}</span>
                     <span className="block truncate text-xs text-muted-foreground">{item.description}</span>
                   </span>
-                  <span className="shrink-0 rounded border bg-background px-2 py-0.5 text-[10px] uppercase text-muted-foreground">
+                  <span className="shrink-0 border border-border/60 bg-background px-1.5 py-0.5 text-[10px] uppercase tracking-wide text-muted-foreground">
                     {typeLabel(item.type)}
                   </span>
                 </Link>
@@ -124,33 +123,34 @@ export function Topbar() {
         )}
       </div>
 
-      <div className="flex items-center gap-1 lg:gap-2">
-        <Button variant="ghost" size="icon" aria-label="Ajuda">
+      <div className="flex items-center gap-0.5">
+        <Button variant="ghost" size="icon" className="h-9 w-9" aria-label="Ajuda">
           <LifeBuoy className="h-4 w-4" />
         </Button>
         <NotificationsBell />
         <Button
           variant="ghost"
           size="icon"
+          className="h-9 w-9"
           onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')}
           aria-label="Alternar tema"
         >
           {theme === 'dark' ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
         </Button>
         {user && (
-          <div className="flex items-center gap-2 pl-2 lg:border-l lg:pl-3">
+          <div className="ml-1 flex items-center gap-2 border-l border-border/60 pl-3">
             <div className="hidden text-right leading-tight sm:block">
-              <div className="text-sm font-medium">{user.name}</div>
-              <div className="text-xs text-muted-foreground">{user.accessProfile?.name ?? user.jobTitle ?? user.role}</div>
+              <div className="text-xs font-medium">{user.name}</div>
+              <div className="text-[10px] text-muted-foreground">{user.accessProfile?.name ?? user.jobTitle ?? user.role}</div>
             </div>
-            <div className="grid h-9 w-9 place-items-center rounded-full bg-primary text-sm font-semibold text-primary-foreground">
+            <div className="grid h-8 w-8 place-items-center rounded-full bg-foreground text-[11px] font-semibold text-background">
               {user.name
                 .split(' ')
                 .slice(0, 2)
                 .map((n) => n[0])
                 .join('')}
             </div>
-            <Button variant="ghost" size="icon" onClick={logout} aria-label="Sair" className="hidden sm:inline-flex">
+            <Button variant="ghost" size="icon" className="h-9 w-9" onClick={logout} aria-label="Sair">
               <LogOut className="h-4 w-4" />
             </Button>
           </div>

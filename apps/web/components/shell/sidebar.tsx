@@ -12,16 +12,16 @@ export function Sidebar() {
   return (
     <aside
       className={cn(
-        'hidden shrink-0 border-r bg-card/95 transition-[width] duration-200 lg:flex lg:flex-col',
-        collapsed ? 'w-[88px]' : 'w-[304px]',
+        'hidden shrink-0 border-r border-border/60 bg-card transition-[width] duration-200 lg:flex lg:flex-col',
+        collapsed ? 'w-[64px]' : 'w-[248px]',
       )}
     >
       <Link
         href="/dashboard"
-        className={cn('flex h-16 items-center border-b px-5', collapsed ? 'justify-center px-3' : 'gap-3')}
+        className={cn('flex h-14 items-center border-b border-border/60 px-4', collapsed ? 'justify-center px-2' : 'gap-3')}
         title="Gestão 360"
       >
-        {collapsed ? <BrandMark className="h-9 w-9" /> : <BrandLogo />}
+        {collapsed ? <BrandMark className="h-7 w-7" /> : <BrandLogo />}
       </Link>
 
       <AccordionNavigation collapsed={collapsed} onCollapsedChange={setCollapsed} />
