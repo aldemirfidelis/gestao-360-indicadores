@@ -94,20 +94,20 @@ interface StrategyOptions {
 
 const UNLINKED_KEY = 'unlinked';
 
+const AREA_COLOR = '#0f172a';
+const JOB_COLOR = '#475569';
+
 export default function OrganogramaPage() {
   const qc = useQueryClient();
-  const [expandedAreas, setExpandedAreas] = useState<Record<string, boolean>>({});
-  const [expandedJobs, setExpandedJobs] = useState<Record<string, boolean>>({});
+  const [expanded, setExpanded] = useState<Record<string, boolean>>({});
   const [dragEmployeeId, setDragEmployeeId] = useState<string | null>(null);
   const [hoverSlot, setHoverSlot] = useState<string | null>(null);
 
-  // Modals
   const [jobModalOpen, setJobModalOpen] = useState(false);
   const [employeeModalOpen, setEmployeeModalOpen] = useState(false);
   const [editEmployeeModal, setEditEmployeeModal] = useState<{ open: boolean; employee: OrgEmployee | null }>({ open: false, employee: null });
   const [approvalDialog, setApprovalDialog] = useState<{ open: boolean; employee: OrgEmployee | null }>({ open: false, employee: null });
 
-  // Forms
   const [jobForm, setJobForm] = useState({ name: '', description: '' });
   const [newEmployee, setNewEmployee] = useState({
     name: '',
@@ -134,7 +134,6 @@ export default function OrganogramaPage() {
   });
   const [approvalForm, setApprovalForm] = useState({ approverId: '', reason: '' });
 
-  // Queries
   const organogramaQuery = useQuery<OrganogramaData>({
     queryKey: ['strategy', 'organograma'],
     queryFn: () => api<OrganogramaData>('/strategy/organograma'),
@@ -153,7 +152,6 @@ export default function OrganogramaPage() {
   const orgNodes = optionsQuery.data?.orgNodes ?? [];
   const areasAndSectors = useMemo(() => orgNodes.filter((n) => n.type === 'SECTOR' || n.type === 'AREA'), [orgNodes]);
 
-  // Mutations
   const invalidate = () => {
     qc.invalidateQueries({ queryKey: ['strategy', 'organograma'] });
     qc.invalidateQueries({ queryKey: ['strategy', 'options'] });
@@ -203,12 +201,11 @@ export default function OrganogramaPage() {
     onError: (e: any) => toast.error(e?.message ?? 'Falha ao enviar para aprovação'),
   });
 
-  // Group data by Area -> Job -> Employees
+  // Agrupamento Area -> Job -> Empregados
   const grouped = useMemo(() => {
     const map = new Map<string, { area: OrgNode | null; jobs: Map<string, { job: OrgJob; employees: OrgEmployee[] }> }>();
     if (!data) return map;
 
-    // initialize known areas/sectors so they appear even sem colaboradores
     areasAndSectors.forEach((area) => {
       map.set(area.id, { area, jobs: new Map() });
     });
@@ -235,14 +232,13 @@ export default function OrganogramaPage() {
     return { total, active, budgeted, vacant };
   }, [data]);
 
-  function toggleArea(key: string) {
-    setExpandedAreas((prev) => ({ ...prev, [key]: !(prev[key] ?? true) }));
+  function isOpen(key: string, defaultOpen = true) {
+    return expanded[key] ?? defaultOpen;
   }
-  function toggleJob(key: string) {
-    setExpandedJobs((prev) => ({ ...prev, [key]: !(prev[key] ?? true) }));
+  function toggle(key: string, defaultOpen = true) {
+    setExpanded((prev) => ({ ...prev, [key]: !(prev[key] ?? defaultOpen) }));
   }
 
-  // Drag & drop handlers
   function onDragStart(empId: string) {
     setDragEmployeeId(empId);
   }
@@ -268,16 +264,12 @@ export default function OrganogramaPage() {
       return;
     }
     updateEmployee.mutate(
-      {
-        id: emp.id,
-        orgNodeId: targetOrgNodeId,
-        jobId,
-      },
+      { id: emp.id, orgNodeId: targetOrgNodeId, jobId },
       {
         onSuccess: () => {
           const areaLabel = targetOrgNodeId ? areasAndSectors.find((a) => a.id === targetOrgNodeId)?.name ?? 'Área' : 'Sem área';
           const jobLabel = data.jobs.find((j) => j.id === jobId)?.name ?? 'cargo';
-          toast.success(`${emp.name} movido para ${jobLabel} • ${areaLabel}`);
+          toast.success(`${emp.name} movido para ${jobLabel} · ${areaLabel}`);
         },
       },
     );
@@ -346,7 +338,7 @@ export default function OrganogramaPage() {
         eyebrow="Gestão de Pessoas"
         tone="view"
         title="Organograma de Área"
-        description="Hierarquia de Áreas, Cargos e Colaboradores. Arraste a linha do colaborador para movê-lo entre Cargos ou Áreas — a alocação é salva automaticamente no cadastro."
+        description="Hierarquia de Áreas, Cargos e Colaboradores. Arraste a linha do colaborador para movê-lo — a alocação é salva automaticamente no cadastro."
         breadcrumbs={[{ label: 'Início', href: '/' }, { label: 'Organograma' }]}
         actions={
           <div className="flex gap-2">
@@ -371,7 +363,7 @@ export default function OrganogramaPage() {
 
       <SectionCard
         title="Estrutura de pessoas"
-        description="Áreas, cargos e colaboradores. Clique nas linhas para arrastá-las e reorganizar a alocação sem editar o cadastro."
+        description="Áreas, cargos e colaboradores. Arraste o ícone da linha do colaborador para movê-lo de cargo ou área."
         contentClassName="p-3"
       >
         {organogramaQuery.isLoading && <LoadingState />}
@@ -388,220 +380,233 @@ export default function OrganogramaPage() {
             if (!entry) return null;
             const totalEmps = Array.from(entry.jobs.values()).reduce((acc, j) => acc + j.employees.length, 0);
             if (key === UNLINKED_KEY && totalEmps === 0) return null;
-            const areaOpen = expandedAreas[key] ?? true;
+            const areaOpen = isOpen(`area:${key}`);
             const areaLabel = area?.name ?? 'Sem área definida';
+            const responsavel = area ? '' : '';
 
             return (
               <div key={key}>
-                <div className="grid grid-cols-[auto,1fr,auto] items-center gap-3 border-b border-border/60 px-2 py-2 transition-colors hover:bg-accent/40">
+                {/* Linha da Area (mesmo padrao da Arvore Organizacional) */}
+                <div
+                  className="grid grid-cols-[auto,1fr,auto] items-center gap-3 px-2 py-2 transition-colors hover:bg-accent/45"
+                  style={{ paddingLeft: '0.5rem' }}
+                >
                   <button
-                    onClick={() => toggleArea(key)}
-                    className="grid h-7 w-7 place-items-center text-muted-foreground hover:bg-muted hover:text-foreground"
+                    onClick={() => toggle(`area:${key}`)}
+                    className="grid h-7 w-7 place-items-center text-muted-foreground hover:bg-background hover:text-foreground"
                     aria-label={areaOpen ? 'Recolher' : 'Expandir'}
                   >
-                    {areaOpen ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
+                    {entry.jobs.size > 0 ? (
+                      areaOpen ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />
+                    ) : (
+                      <span className="h-1.5 w-1.5 rounded-full bg-muted-foreground/50" />
+                    )}
                   </button>
-                  <button onClick={() => toggleArea(key)} className="flex min-w-0 items-center gap-3 text-left">
-                    <span className="grid h-8 w-8 shrink-0 place-items-center bg-foreground text-background">
+                  <button onClick={() => toggle(`area:${key}`)} className="flex min-w-0 items-center gap-3 text-left">
+                    <span
+                      className="grid h-9 w-9 shrink-0 place-items-center text-white"
+                      style={{ backgroundColor: AREA_COLOR }}
+                    >
                       <Building2 className="h-4 w-4" />
                     </span>
                     <span className="min-w-0">
-                      <span className="block truncate text-sm font-semibold">{areaLabel}</span>
-                      <span className="block text-xs text-muted-foreground">
+                      <span className="block truncate text-sm font-semibold">Área: {areaLabel}</span>
+                      <span className="block truncate text-xs text-muted-foreground">
                         {entry.jobs.size} cargo(s) · {totalEmps} colaborador(es)
                       </span>
                     </span>
                   </button>
-                  <Badge variant="outline">{totalEmps}</Badge>
+                  <div className="flex items-center gap-2">
+                    <Badge variant="secondary" className="hidden sm:inline-flex">{totalEmps} pessoas</Badge>
+                  </div>
                 </div>
 
+                {/* Filhos: Cargos (com linha tracejada) */}
                 {areaOpen && (
-                  <div className="ml-5 border-l border-dashed border-border/60">
+                  <div className="ml-5 border-l border-dashed">
                     {entry.jobs.size === 0 && (
-                      <div className="ml-3 px-3 py-3 text-xs italic text-muted-foreground">
-                        Nenhum colaborador alocado nesta área. Arraste um colaborador para cá.
+                      <div className="px-3 py-3 text-xs italic text-muted-foreground" style={{ paddingLeft: '2rem' }}>
+                        Nenhum colaborador nesta área. Arraste uma linha para cá.
                       </div>
                     )}
                     {Array.from(entry.jobs.values()).map(({ job, employees }) => {
-                      const slotKey = `${key}::${job.id}`;
-                      const jobOpen = expandedJobs[slotKey] ?? true;
-                      const isHover = hoverSlot === slotKey;
+                      const jobKey = `${key}::${job.id}`;
+                      const jobOpen = isOpen(`job:${jobKey}`);
+                      const isHover = hoverSlot === jobKey;
                       return (
                         <div
-                          key={slotKey}
-                          onDragOver={(ev) => onDragOver(ev, slotKey)}
-                          onDragLeave={() => setHoverSlot((cur) => (cur === slotKey ? null : cur))}
+                          key={jobKey}
+                          onDragOver={(ev) => onDragOver(ev, jobKey)}
+                          onDragLeave={() => setHoverSlot((cur) => (cur === jobKey ? null : cur))}
                           onDrop={(ev) => onDrop(ev, key, job.id)}
-                          className={cn(
-                            'border-l border-transparent',
-                            isHover && 'border-l-foreground bg-foreground/[0.04]',
-                          )}
+                          className={cn(isHover && 'bg-foreground/[0.04] outline outline-1 outline-dashed outline-foreground/30')}
                         >
-                          <div className="grid grid-cols-[auto,1fr,auto] items-center gap-3 px-2 py-2 transition-colors hover:bg-accent/30">
+                          {/* Linha do Cargo (mesmo padrao /org) */}
+                          <div
+                            className="grid grid-cols-[auto,1fr,auto] items-center gap-3 px-2 py-2 transition-colors hover:bg-accent/45"
+                            style={{ paddingLeft: '1.75rem' }}
+                          >
                             <button
-                              onClick={() => toggleJob(slotKey)}
-                              className="grid h-6 w-6 place-items-center text-muted-foreground hover:bg-muted hover:text-foreground"
+                              onClick={() => toggle(`job:${jobKey}`)}
+                              className="grid h-7 w-7 place-items-center text-muted-foreground hover:bg-background hover:text-foreground"
+                              aria-label={jobOpen ? 'Recolher' : 'Expandir'}
                             >
-                              {jobOpen ? <ChevronDown className="h-3.5 w-3.5" /> : <ChevronRight className="h-3.5 w-3.5" />}
+                              {employees.length > 0 ? (
+                                jobOpen ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />
+                              ) : (
+                                <span className="h-1.5 w-1.5 rounded-full bg-muted-foreground/50" />
+                              )}
                             </button>
-                            <button onClick={() => toggleJob(slotKey)} className="flex min-w-0 items-center gap-3 text-left">
-                              <span className="grid h-7 w-7 shrink-0 place-items-center border border-border/60 bg-muted text-muted-foreground">
-                                <Briefcase className="h-3.5 w-3.5" />
+                            <button onClick={() => toggle(`job:${jobKey}`)} className="flex min-w-0 items-center gap-3 text-left">
+                              <span
+                                className="grid h-9 w-9 shrink-0 place-items-center text-white"
+                                style={{ backgroundColor: JOB_COLOR }}
+                              >
+                                <Briefcase className="h-4 w-4" />
                               </span>
                               <span className="min-w-0">
-                                <span className="block truncate text-sm font-medium">{job.name}</span>
-                                <span className="block text-xs text-muted-foreground">{employees.length} colaborador(es)</span>
+                                <span className="block truncate text-sm font-semibold">Cargo: {job.name}</span>
+                                <span className="block truncate text-xs text-muted-foreground">
+                                  {employees.length} colaborador(es)
+                                </span>
                               </span>
                             </button>
-                            <Badge variant="secondary">{employees.length}</Badge>
+                            <div className="flex items-center gap-2">
+                              <Badge variant="secondary">{employees.length}</Badge>
+                            </div>
                           </div>
 
+                          {/* Filhos: Colaboradores (mesmo padrao /org, com linha tracejada) */}
                           {jobOpen && (
-                            <div className="ml-4 border-l border-dashed border-border/60">
+                            <div className="ml-5 border-l border-dashed">
                               {employees.length === 0 && (
-                                <div className="ml-3 px-3 py-2 text-xs italic text-muted-foreground">
+                                <div className="px-3 py-2 text-xs italic text-muted-foreground" style={{ paddingLeft: '2rem' }}>
                                   Solte um colaborador aqui para movê-lo para {job.name}.
                                 </div>
                               )}
-                              <div className="overflow-x-auto">
-                                <table className="w-full min-w-[1080px] border-collapse text-left text-xs">
-                                  <thead>
-                                    <tr className="border-b border-border/60 text-[10px] uppercase tracking-wide text-muted-foreground">
-                                      <th className="p-2 w-8"></th>
-                                      <th className="p-2 w-[200px]">Colaborador</th>
-                                      <th className="p-2 w-[100px] text-center">Faixa atual</th>
-                                      <th className="p-2 w-[140px]">Cargo pretendido</th>
-                                      <th className="p-2 w-[100px] text-center">Faixa pretendida</th>
-                                      <th className="p-2 w-[80px] text-center">Turno</th>
-                                      <th className="p-2 w-[100px] text-center">Matrícula</th>
-                                      <th className="p-2 w-[110px] text-center">Orçamento</th>
-                                      <th className="p-2 w-[130px] text-center">Status</th>
-                                      <th className="p-2 w-[90px] text-center">Ações</th>
-                                    </tr>
-                                  </thead>
-                                  <tbody>
-                                    {employees.map((emp) => (
-                                      <tr
-                                        key={emp.id}
-                                        draggable
-                                        onDragStart={() => onDragStart(emp.id)}
-                                        onDragEnd={onDragEnd}
-                                        className={cn(
-                                          'border-b border-border/60 align-middle transition-colors hover:bg-muted/30',
-                                          dragEmployeeId === emp.id && 'opacity-40',
-                                        )}
-                                      >
-                                        <td className="p-2 align-middle">
-                                          <span className="grid h-7 w-7 cursor-grab place-items-center text-muted-foreground/70 active:cursor-grabbing" title="Arraste para mover">
-                                            <GripVertical className="h-4 w-4" />
+                              {employees.map((emp) => {
+                                const initials = emp.name.split(' ').slice(0, 2).map((n) => n[0]).join('');
+                                return (
+                                  <div
+                                    key={emp.id}
+                                    draggable
+                                    onDragStart={() => onDragStart(emp.id)}
+                                    onDragEnd={onDragEnd}
+                                    className={cn(
+                                      'group flex items-center gap-3 px-2 py-2 transition-colors hover:bg-accent/45',
+                                      dragEmployeeId === emp.id && 'opacity-40',
+                                    )}
+                                    style={{ paddingLeft: '3rem' }}
+                                  >
+                                    <span
+                                      className="grid h-7 w-7 shrink-0 cursor-grab place-items-center text-muted-foreground/70 active:cursor-grabbing"
+                                      title="Arraste para mover de cargo ou área"
+                                    >
+                                      <GripVertical className="h-4 w-4" />
+                                    </span>
+                                    <span className="grid h-9 w-9 shrink-0 place-items-center rounded-full bg-foreground text-[11px] font-semibold text-background">
+                                      {initials}
+                                    </span>
+                                    <div className="min-w-0 flex-1">
+                                      <div className="flex items-center gap-2">
+                                        <Input
+                                          value={emp.name}
+                                          onChange={(e) => updateEmployee.mutate({ id: emp.id, name: e.target.value })}
+                                          className="h-8 max-w-[260px] text-xs font-medium"
+                                        />
+                                        {emp.approvalRequests && emp.approvalRequests.length > 0 ? (
+                                          <span className="inline-flex shrink-0 items-center gap-1 border border-status-blue/30 bg-status-blue/10 px-1.5 py-0.5 text-[10px] font-medium text-status-blue">
+                                            <Clock className="h-3 w-3" /> Aguardando
                                           </span>
-                                        </td>
-                                        <td className="p-2">
-                                          <div className="flex min-w-[180px] items-center gap-2">
-                                            <span className="grid h-7 w-7 shrink-0 place-items-center rounded-full bg-foreground text-[10px] font-semibold text-background">
-                                              {emp.name.split(' ').slice(0, 2).map((n) => n[0]).join('')}
-                                            </span>
-                                            <Input
-                                              value={emp.name}
-                                              onChange={(e) => updateEmployee.mutate({ id: emp.id, name: e.target.value })}
-                                              className="h-8 text-xs"
-                                              placeholder="Nome do colaborador"
-                                            />
-                                            {emp.approvalRequests && emp.approvalRequests.length > 0 ? (
-                                              <span className="inline-flex shrink-0 items-center gap-1 border border-status-blue/30 bg-status-blue/10 px-1.5 py-0.5 text-[10px] font-medium text-status-blue">
-                                                <Clock className="h-3 w-3" /> Aguardando
-                                              </span>
-                                            ) : (
-                                              <Button
-                                                variant="outline"
-                                                size="sm"
-                                                onClick={() => {
-                                                  setApprovalForm({ approverId: '', reason: '' });
-                                                  setApprovalDialog({ open: true, employee: emp });
-                                                }}
-                                                className="h-7 shrink-0 px-2 text-[10px]"
-                                                title="Enviar para aprovação"
-                                              >
-                                                <Send className="mr-1 h-3 w-3" /> Aprovação
-                                              </Button>
-                                            )}
-                                          </div>
-                                        </td>
-                                        <td className="p-2 text-center">
+                                        ) : (
+                                          <Button
+                                            variant="outline"
+                                            size="sm"
+                                            onClick={() => {
+                                              setApprovalForm({ approverId: '', reason: '' });
+                                              setApprovalDialog({ open: true, employee: emp });
+                                            }}
+                                            className="h-7 shrink-0 px-2 text-[10px]"
+                                            title="Enviar para aprovação"
+                                          >
+                                            <Send className="mr-1 h-3 w-3" /> Aprovação
+                                          </Button>
+                                        )}
+                                      </div>
+                                      <div className="mt-1 flex flex-wrap items-center gap-2 text-[11px] text-muted-foreground">
+                                        <FieldChip label="Faixa">
                                           <NativeSelect
                                             value={emp.band}
                                             onChange={(e) => updateEmployee.mutate({ id: emp.id, band: e.target.value })}
-                                            className="h-8 w-[80px] mx-auto text-xs"
-                                          >
-                                            <option value="A">Faixa A</option>
-                                            <option value="B">Faixa B</option>
-                                            <option value="C">Faixa C</option>
-                                            <option value="D">Faixa D</option>
-                                          </NativeSelect>
-                                        </td>
-                                        <td className="p-2">
-                                          <NativeSelect
-                                            value={emp.jobPretendedId ?? ''}
-                                            onChange={(e) => updateEmployee.mutate({ id: emp.id, jobPretendedId: e.target.value || null })}
-                                            className="h-8 w-[130px] text-xs"
-                                          >
-                                            <option value="">— Mesmo cargo —</option>
-                                            {data?.jobs.map((j) => (
-                                              <option key={j.id} value={j.id}>{j.name}</option>
-                                            ))}
-                                          </NativeSelect>
-                                        </td>
-                                        <td className="p-2 text-center">
-                                          <NativeSelect
-                                            value={emp.bandPretended || 'B'}
-                                            onChange={(e) => updateEmployee.mutate({ id: emp.id, bandPretended: e.target.value })}
-                                            className="h-8 w-[80px] mx-auto text-xs"
-                                          >
-                                            <option value="A">Faixa A</option>
-                                            <option value="B">Faixa B</option>
-                                            <option value="C">Faixa C</option>
-                                            <option value="D">Faixa D</option>
-                                          </NativeSelect>
-                                        </td>
-                                        <td className="p-2 text-center">
-                                          <NativeSelect
-                                            value={emp.shift}
-                                            onChange={(e) => updateEmployee.mutate({ id: emp.id, shift: e.target.value })}
-                                            className="h-8 w-[80px] mx-auto text-xs"
+                                            className="h-6 w-[68px] border-none bg-transparent px-1 text-[11px] font-semibold text-foreground"
                                           >
                                             <option value="A">A</option>
                                             <option value="B">B</option>
                                             <option value="C">C</option>
                                             <option value="D">D</option>
                                           </NativeSelect>
-                                        </td>
-                                        <td className="p-2 text-center">
+                                        </FieldChip>
+                                        <FieldChip label="Pretendido">
+                                          <NativeSelect
+                                            value={emp.jobPretendedId ?? ''}
+                                            onChange={(e) => updateEmployee.mutate({ id: emp.id, jobPretendedId: e.target.value || null })}
+                                            className="h-6 w-[130px] border-none bg-transparent px-1 text-[11px] text-foreground"
+                                          >
+                                            <option value="">— mesmo —</option>
+                                            {data?.jobs.map((j) => <option key={j.id} value={j.id}>{j.name}</option>)}
+                                          </NativeSelect>
+                                        </FieldChip>
+                                        <FieldChip label="F. pretendida">
+                                          <NativeSelect
+                                            value={emp.bandPretended || 'B'}
+                                            onChange={(e) => updateEmployee.mutate({ id: emp.id, bandPretended: e.target.value })}
+                                            className="h-6 w-[60px] border-none bg-transparent px-1 text-[11px] font-semibold text-foreground"
+                                          >
+                                            <option value="A">A</option>
+                                            <option value="B">B</option>
+                                            <option value="C">C</option>
+                                            <option value="D">D</option>
+                                          </NativeSelect>
+                                        </FieldChip>
+                                        <FieldChip label="Turno">
+                                          <NativeSelect
+                                            value={emp.shift}
+                                            onChange={(e) => updateEmployee.mutate({ id: emp.id, shift: e.target.value })}
+                                            className="h-6 w-[58px] border-none bg-transparent px-1 text-[11px] font-semibold text-foreground"
+                                          >
+                                            <option value="A">A</option>
+                                            <option value="B">B</option>
+                                            <option value="C">C</option>
+                                            <option value="D">D</option>
+                                          </NativeSelect>
+                                        </FieldChip>
+                                        <FieldChip label="Matrícula">
                                           <Input
                                             value={emp.registrationId ?? ''}
                                             onChange={(e) => updateEmployee.mutate({ id: emp.id, registrationId: e.target.value || null })}
-                                            className="h-8 w-[100px] mx-auto text-center text-xs"
+                                            className="h-6 w-[90px] border-none bg-transparent px-1 text-[11px] font-semibold text-foreground"
                                             placeholder="VAGA"
                                           />
-                                        </td>
-                                        <td className="p-2 text-center">
+                                        </FieldChip>
+                                        <FieldChip label="Orçamento">
                                           <NativeSelect
                                             value={emp.isBudgeted ? 'true' : 'false'}
                                             onChange={(e) => updateEmployee.mutate({ id: emp.id, isBudgeted: e.target.value === 'true' })}
                                             className={cn(
-                                              'h-8 w-[110px] mx-auto text-xs font-medium',
+                                              'h-6 w-[100px] border-none bg-transparent px-1 text-[11px] font-semibold',
                                               emp.isBudgeted ? 'text-status-green' : 'text-status-yellow',
                                             )}
                                           >
                                             <option value="true">Previsto</option>
                                             <option value="false">Fora orçado</option>
                                           </NativeSelect>
-                                        </td>
-                                        <td className="p-2 text-center">
+                                        </FieldChip>
+                                        <FieldChip label="Status">
                                           <NativeSelect
                                             value={emp.approvalStatus || 'PENDENTE'}
                                             onChange={(e) => updateEmployee.mutate({ id: emp.id, approvalStatus: e.target.value })}
                                             className={cn(
-                                              'h-8 w-[130px] mx-auto text-xs font-medium',
+                                              'h-6 w-[110px] border-none bg-transparent px-1 text-[11px] font-semibold',
                                               emp.approvalStatus === 'APROVADO' && 'text-status-green',
                                               emp.approvalStatus === 'REPROVADO' && 'text-status-red',
                                               emp.approvalStatus === 'EM_ANALISE' && 'text-status-blue',
@@ -612,36 +617,34 @@ export default function OrganogramaPage() {
                                             <option value="APROVADO">Aprovado</option>
                                             <option value="REPROVADO">Reprovado</option>
                                           </NativeSelect>
-                                        </td>
-                                        <td className="p-2 text-center">
-                                          <div className="flex items-center justify-center gap-1">
-                                            <Button
-                                              variant="ghost"
-                                              size="sm"
-                                              onClick={() => openEditEmployee(emp)}
-                                              className="h-7 w-7 p-0"
-                                              title="Editar cadastro"
-                                            >
-                                              <Pencil className="h-3.5 w-3.5" />
-                                            </Button>
-                                            <Button
-                                              variant="ghost"
-                                              size="sm"
-                                              onClick={() => {
-                                                if (window.confirm('Remover este colaborador?')) removeEmployee.mutate(emp.id);
-                                              }}
-                                              className="h-7 w-7 p-0 text-destructive hover:bg-destructive/10"
-                                              title="Excluir"
-                                            >
-                                              <Trash2 className="h-3.5 w-3.5" />
-                                            </Button>
-                                          </div>
-                                        </td>
-                                      </tr>
-                                    ))}
-                                  </tbody>
-                                </table>
-                              </div>
+                                        </FieldChip>
+                                      </div>
+                                    </div>
+                                    <div className="flex shrink-0 items-center gap-1 opacity-0 transition-opacity group-hover:opacity-100">
+                                      <Button
+                                        variant="ghost"
+                                        size="sm"
+                                        onClick={() => openEditEmployee(emp)}
+                                        className="h-7 w-7 p-0"
+                                        title="Editar cadastro"
+                                      >
+                                        <Pencil className="h-3.5 w-3.5" />
+                                      </Button>
+                                      <Button
+                                        variant="ghost"
+                                        size="sm"
+                                        onClick={() => {
+                                          if (window.confirm('Remover este colaborador?')) removeEmployee.mutate(emp.id);
+                                        }}
+                                        className="h-7 w-7 p-0 text-destructive hover:bg-destructive/10"
+                                        title="Excluir"
+                                      >
+                                        <Trash2 className="h-3.5 w-3.5" />
+                                      </Button>
+                                    </div>
+                                  </div>
+                                );
+                              })}
                             </div>
                           )}
                         </div>
@@ -908,5 +911,14 @@ export default function OrganogramaPage() {
         </DialogContent>
       </Dialog>
     </div>
+  );
+}
+
+function FieldChip({ label, children }: { label: string; children: React.ReactNode }) {
+  return (
+    <span className="inline-flex items-center gap-1 border border-border/60 bg-muted/40 px-1.5 py-0.5">
+      <span className="text-[9px] uppercase tracking-wide text-muted-foreground/80">{label}</span>
+      {children}
+    </span>
   );
 }
