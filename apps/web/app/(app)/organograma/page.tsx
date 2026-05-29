@@ -533,52 +533,52 @@ export default function OrganogramaPage() {
                                           </Button>
                                         )}
                                       </div>
-                                      <div className="mt-2 grid grid-cols-2 gap-x-3 gap-y-2 text-[11px] text-muted-foreground sm:grid-cols-4 xl:grid-cols-7">
+                                      <div className="mt-2 grid grid-cols-2 gap-x-3 gap-y-2 text-[11px] text-muted-foreground sm:grid-cols-4 lg:grid-cols-[80px,minmax(180px,1fr),100px,80px,110px,120px,130px]">
                                         <Field label="Faixa">
-                                          <NativeSelect
+                                          <SelectChip
                                             value={emp.band}
-                                            onChange={(e) => updateEmployee.mutate({ id: emp.id, band: e.target.value })}
-                                            className="h-7 w-full text-[11px] font-semibold"
-                                          >
-                                            <option value="A">Faixa A</option>
-                                            <option value="B">Faixa B</option>
-                                            <option value="C">Faixa C</option>
-                                            <option value="D">Faixa D</option>
-                                          </NativeSelect>
+                                            onChange={(value) => updateEmployee.mutate({ id: emp.id, band: value })}
+                                            options={[
+                                              { value: 'A', label: 'A' },
+                                              { value: 'B', label: 'B' },
+                                              { value: 'C', label: 'C' },
+                                              { value: 'D', label: 'D' },
+                                            ]}
+                                          />
                                         </Field>
                                         <Field label="Cargo pretendido">
-                                          <NativeSelect
+                                          <SelectChip
                                             value={emp.jobPretendedId ?? ''}
-                                            onChange={(e) => updateEmployee.mutate({ id: emp.id, jobPretendedId: e.target.value || null })}
-                                            className="h-7 w-full text-[11px]"
-                                          >
-                                            <option value="">— Mesmo cargo —</option>
-                                            {data?.jobs.map((j) => <option key={j.id} value={j.id}>{j.name}</option>)}
-                                          </NativeSelect>
+                                            onChange={(value) => updateEmployee.mutate({ id: emp.id, jobPretendedId: value || null })}
+                                            options={[
+                                              { value: '', label: '— Mesmo cargo —' },
+                                              ...(data?.jobs.map((j) => ({ value: j.id, label: j.name })) ?? []),
+                                            ]}
+                                          />
                                         </Field>
                                         <Field label="F. pretendida">
-                                          <NativeSelect
+                                          <SelectChip
                                             value={emp.bandPretended || 'B'}
-                                            onChange={(e) => updateEmployee.mutate({ id: emp.id, bandPretended: e.target.value })}
-                                            className="h-7 w-full text-[11px] font-semibold"
-                                          >
-                                            <option value="A">Faixa A</option>
-                                            <option value="B">Faixa B</option>
-                                            <option value="C">Faixa C</option>
-                                            <option value="D">Faixa D</option>
-                                          </NativeSelect>
+                                            onChange={(value) => updateEmployee.mutate({ id: emp.id, bandPretended: value })}
+                                            options={[
+                                              { value: 'A', label: 'A' },
+                                              { value: 'B', label: 'B' },
+                                              { value: 'C', label: 'C' },
+                                              { value: 'D', label: 'D' },
+                                            ]}
+                                          />
                                         </Field>
                                         <Field label="Turno">
-                                          <NativeSelect
+                                          <SelectChip
                                             value={emp.shift}
-                                            onChange={(e) => updateEmployee.mutate({ id: emp.id, shift: e.target.value })}
-                                            className="h-7 w-full text-[11px] font-semibold"
-                                          >
-                                            <option value="A">Turno A</option>
-                                            <option value="B">Turno B</option>
-                                            <option value="C">Turno C</option>
-                                            <option value="D">Turno D</option>
-                                          </NativeSelect>
+                                            onChange={(value) => updateEmployee.mutate({ id: emp.id, shift: value })}
+                                            options={[
+                                              { value: 'A', label: 'A' },
+                                              { value: 'B', label: 'B' },
+                                              { value: 'C', label: 'C' },
+                                              { value: 'D', label: 'D' },
+                                            ]}
+                                          />
                                         </Field>
                                         <Field label="Matrícula">
                                           <Input
@@ -589,34 +589,32 @@ export default function OrganogramaPage() {
                                           />
                                         </Field>
                                         <Field label="Orçamento">
-                                          <NativeSelect
+                                          <SelectChip
                                             value={emp.isBudgeted ? 'true' : 'false'}
-                                            onChange={(e) => updateEmployee.mutate({ id: emp.id, isBudgeted: e.target.value === 'true' })}
-                                            className={cn(
-                                              'h-7 w-full text-[11px] font-semibold',
-                                              emp.isBudgeted ? 'text-status-green' : 'text-status-yellow',
-                                            )}
-                                          >
-                                            <option value="true">Previsto</option>
-                                            <option value="false">Fora orçado</option>
-                                          </NativeSelect>
+                                            onChange={(value) => updateEmployee.mutate({ id: emp.id, isBudgeted: value === 'true' })}
+                                            className={emp.isBudgeted ? 'text-status-green' : 'text-status-yellow'}
+                                            options={[
+                                              { value: 'true', label: 'Previsto' },
+                                              { value: 'false', label: 'Fora orçado' },
+                                            ]}
+                                          />
                                         </Field>
-                                        <Field label="Status carreira">
-                                          <NativeSelect
+                                        <Field label="Status">
+                                          <SelectChip
                                             value={emp.approvalStatus || 'PENDENTE'}
-                                            onChange={(e) => updateEmployee.mutate({ id: emp.id, approvalStatus: e.target.value })}
+                                            onChange={(value) => updateEmployee.mutate({ id: emp.id, approvalStatus: value })}
                                             className={cn(
-                                              'h-7 w-full text-[11px] font-semibold',
                                               emp.approvalStatus === 'APROVADO' && 'text-status-green',
                                               emp.approvalStatus === 'REPROVADO' && 'text-status-red',
                                               emp.approvalStatus === 'EM_ANALISE' && 'text-status-blue',
                                             )}
-                                          >
-                                            <option value="PENDENTE">Pendente</option>
-                                            <option value="EM_ANALISE">Em análise</option>
-                                            <option value="APROVADO">Aprovado</option>
-                                            <option value="REPROVADO">Reprovado</option>
-                                          </NativeSelect>
+                                            options={[
+                                              { value: 'PENDENTE', label: 'Pendente' },
+                                              { value: 'EM_ANALISE', label: 'Em análise' },
+                                              { value: 'APROVADO', label: 'Aprovado' },
+                                              { value: 'REPROVADO', label: 'Reprovado' },
+                                            ]}
+                                          />
                                         </Field>
                                       </div>
                                     </div>
@@ -917,8 +915,42 @@ export default function OrganogramaPage() {
 function Field({ label, children }: { label: string; children: React.ReactNode }) {
   return (
     <div className="flex min-w-0 flex-col gap-1">
-      <span className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground/80">{label}</span>
+      <span className="truncate text-[10px] font-medium uppercase tracking-wide text-muted-foreground/80">{label}</span>
       {children}
+    </div>
+  );
+}
+
+function SelectChip({
+  value,
+  onChange,
+  options,
+  className,
+}: {
+  value: string;
+  onChange: (value: string) => void;
+  options: { value: string; label: string }[];
+  className?: string;
+}) {
+  return (
+    <div className="relative w-full">
+      <select
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        className={cn(
+          'h-7 w-full appearance-none truncate border border-border bg-background pl-2 pr-6 text-[11px] font-semibold text-foreground focus:outline-none focus:ring-1 focus:ring-foreground/40',
+          className,
+        )}
+      >
+        {options.map((opt) => (
+          <option key={opt.value} value={opt.value}>{opt.label}</option>
+        ))}
+      </select>
+      <span className="pointer-events-none absolute right-1.5 top-1/2 -translate-y-1/2 text-muted-foreground/70">
+        <svg width="10" height="10" viewBox="0 0 10 10" fill="none" xmlns="http://www.w3.org/2000/svg">
+          <path d="M2 3.5L5 6.5L8 3.5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+        </svg>
+      </span>
     </div>
   );
 }
