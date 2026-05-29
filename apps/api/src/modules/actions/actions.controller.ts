@@ -131,6 +131,12 @@ export class ActionsController {
     return this.service.addComment(id, body, me.sub, me.email);
   }
 
+  @Post(':id/effectiveness/request')
+  @RequirePermissions('actions:update')
+  requestEffectivenessReview(@CurrentUser() me: AuthPayload, @Param('id') id: string, @Body() body: any) {
+    return this.service.requestEffectivenessReview(id, body, me.sub);
+  }
+
   @Post(':id/effectiveness')
   @RequirePermissions('actions:effectiveness')
   validateEffectiveness(@CurrentUser() me: AuthPayload, @Param('id') id: string, @Body() body: any) {

@@ -492,6 +492,36 @@ export class ActionsService {
     return comment;
   }
 
+  async requestEffectivenessReview(actionId: string, body: any, userId?: string) {
+    const action = await this.getById(actionId);
+    const updated = await this.prisma.actionPlan.update({
+      where: { id: actionId },
+      data: {
+        effectivenessStatus: ActionEffectivenessStatus.PENDING,
+        effectivenessSummary: body?.summary ?? action.effectivenessSummary,
+        effectivenessEvidence: body?.evidence ?? action.effectivenessEvidence,
+        achievedResult: body?.achievedResult ?? action.achievedResult,
+        status: ActionStatus.WAITING_VALIDATION,
+      },
+    });
+    await this.recordHistory(actionId, userId, 'EFFECTIVENESS_REQUESTED', 'effectivenessStatus', action.effectivenessStatus, ActionEffectivenessStatus.PENDING);
+    await this.audit(updated.companyId, userId, 'EFFECTIVENESS_REQUESTED', 'ActionPlan', actionId, action, updated);
+    await this.traceability.record({
+      companyId: updated.companyId,
+      indicatorId: updated.indicatorId,
+      userId,
+      eventType: TraceEventType.UPDATED,
+      entityType: TraceEntityType.ACTION_PLAN,
+      entityId: actionId,
+      title: 'Eficácia enviada para análise',
+      description: body?.summary ?? updated.title,
+      statusFrom: action.status,
+      statusTo: updated.status,
+      metadata: { requested: true },
+    });
+    return updated;
+  }
+
   async validateEffectiveness(actionId: string, body: any, userId?: string) {
     const action = await this.getById(actionId);
     const status = body.effective

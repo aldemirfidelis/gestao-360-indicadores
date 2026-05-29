@@ -5,7 +5,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
 import Link from 'next/link';
-import { ArrowLeft, Bot, CheckCircle2, ClipboardCheck, FileCheck2, GitBranch, MessageSquare, Plus, Save, ShieldCheck, Sparkles } from 'lucide-react';
+import { ArrowLeft, Bot, CheckCircle2, ClipboardCheck, FileCheck2, GitBranch, MessageSquare, Plus, Save, Send, ShieldCheck, Sparkles, XCircle } from 'lucide-react';
 import { PageHeader } from '@/components/shell/page-header';
 import { SectionCard } from '@/components/platform/section-card';
 import { StatusBadge } from '@/components/platform/status-badge';
@@ -21,7 +21,8 @@ import { NativeSelect } from '@/components/ui/select';
 import { Progress } from '@/components/ui/progress';
 import { api } from '@/lib/api';
 import { cn, formatDate } from '@/lib/utils';
-import { SUGGESTION_STATUS_LABEL, SUGGESTION_TYPE_LABEL, ACTION_STATUS_LABEL, EFFECTIVENESS_STATUS_LABEL, TRACE_EVENT_LABEL } from '@/lib/labels';
+import { SUGGESTION_STATUS_LABEL, SUGGESTION_TYPE_LABEL, ACTION_STATUS_LABEL, ACTION_PRIORITY_LABEL, ACTION_ORIGIN_LABEL, ACTION_CRITICALITY_LABEL, EFFECTIVENESS_STATUS_LABEL, TRACE_EVENT_LABEL, TRACE_FIELD_LABEL, ANALYSIS_METHOD_LABEL } from '@/lib/labels';
+import { useAuth } from '@/components/auth/auth-provider';
 
 interface ActionDetail {
   id: string;
@@ -73,27 +74,15 @@ interface ActionDetail {
 }
 
 const STATUS_LABEL = ACTION_STATUS_LABEL;
-
-const TOOL_LABEL: Record<string, string> = {
-  FIVE_WHYS: '5 Porques',
-  ISHIKAWA: 'Ishikawa',
-  MASP: 'MASP',
-  PDCA: 'PDCA',
-  FIVE_W_TWO_H: '5W2H',
-  PARETO: 'Pareto',
-  FCA: 'FCA',
-  GUT: 'Matriz GUT',
-  PRIORITIZATION_MATRIX: 'Matriz de priorizacao',
-  BRAINSTORMING: 'Brainstorming',
-  ROOT_CAUSE: 'Causa raiz',
-  EFFECTIVENESS_CHECKLIST: 'Checklist de eficacia',
-};
+const TOOL_LABEL = ANALYSIS_METHOD_LABEL;
 
 const tabs = ['Visão geral', 'Origem', 'Análise de causa', '5W2H', 'Execução', 'Evidências', 'Eficácia', 'IA', 'Histórico'];
 
 export default function ActionDetailPage() {
   const { id } = useParams<{ id: string }>();
   const qc = useQueryClient();
+  const { hasPermission } = useAuth();
+  const canApproveEffectiveness = hasPermission(['actions:effectiveness', 'eficacia:approve']);
   const [tab, setTab] = useState(tabs[0]);
   const [newTask, setNewTask] = useState<{ title: string; startDate: string; endDate: string; assignedToId: string }>({ title: '', startDate: '', endDate: '', assignedToId: '' });
   const [evidence, setEvidence] = useState({ title: '', url: '', description: '' });
@@ -189,9 +178,25 @@ export default function ActionDetailPage() {
   const validate = useMutation({
     mutationFn: () => api(`/actions/${id}/effectiveness`, { method: 'POST', json: effectiveness }),
     onSuccess: () => {
-      toast.success('Eficacia registrada');
+      toast.success('Eficácia registrada');
       qc.invalidateQueries({ queryKey: ['action', id] });
     },
+    onError: (e: any) => toast.error(e?.message ?? 'Falha ao registrar eficácia'),
+  });
+  const requestReview = useMutation({
+    mutationFn: () => api(`/actions/${id}/effectiveness/request`, {
+      method: 'POST',
+      json: {
+        summary: effectiveness.summary,
+        evidence: effectiveness.evidence,
+        achievedResult: effectiveness.achievedResult,
+      },
+    }),
+    onSuccess: () => {
+      toast.success('Eficácia enviada para análise do responsável');
+      qc.invalidateQueries({ queryKey: ['action', id] });
+    },
+    onError: (e: any) => toast.error(e?.message ?? 'Falha ao enviar para análise'),
   });
   const aiAssist = useMutation({
     mutationFn: (scope: string) => api(`/actions/${id}/ai-assist`, { method: 'POST', json: { scope } }),
@@ -240,7 +245,9 @@ export default function ActionDetailPage() {
         </Mini>
         <Mini title="Prioridade">
           <NativeSelect value={a.priority} onChange={(e) => update.mutate({ priority: e.target.value })} className="mt-1 h-9">
-            {['LOW', 'MEDIUM', 'HIGH', 'CRITICAL'].map((item) => <option key={item} value={item}>{item}</option>)}
+            {['LOW', 'MEDIUM', 'HIGH', 'CRITICAL'].map((item) => (
+              <option key={item} value={item}>{ACTION_PRIORITY_LABEL[item] ?? item}</option>
+            ))}
           </NativeSelect>
         </Mini>
         <Mini title="Eficacia">
@@ -277,9 +284,9 @@ export default function ActionDetailPage() {
             <SectionCard title="Responsabilidade" description="Responsável, área, origem e ferramenta.">
               <Info label="Responsável" value={a.responsibleUser?.name ?? 'Sem responsável'} />
               <Info label="Área/Setor" value={a.ownerNode?.name ?? '-'} />
-              <Info label="Origem" value={a.origin} />
+              <Info label="Origem" value={ACTION_ORIGIN_LABEL[a.origin] ?? a.origin} />
               <Info label="Ferramenta" value={a.analysisTool ? TOOL_LABEL[a.analysisTool] ?? a.analysisTool : 'Não definida'} />
-              <Info label="Criticidade" value={a.criticality} />
+              <Info label="Criticidade" value={ACTION_CRITICALITY_LABEL[a.criticality] ?? a.criticality} />
             </SectionCard>
             <SectionCard title="Prontidao da ação" description="Lacunas antes de considerar o plano robusto.">
               <div className="mb-3 text-2xl font-semibold">{a.aiReadiness.score}%</div>
@@ -300,7 +307,18 @@ export default function ActionDetailPage() {
         <EvidencePanel a={a} evidence={evidence} setEvidence={setEvidence} addEvidence={() => addEvidence.mutate()} comment={comment} setComment={setComment} addComment={() => addComment.mutate()} />
       )}
       {tab === 'Eficácia' && (
-        <EffectivenessPanel a={a} effectiveness={effectiveness} setEffectiveness={setEffectiveness} validate={() => validate.mutate()} saving={validate.isPending} onAskAi={() => aiAssist.mutate('effectiveness')} />
+        <EffectivenessPanel
+          a={a}
+          effectiveness={effectiveness}
+          setEffectiveness={setEffectiveness}
+          canApprove={canApproveEffectiveness}
+          validate={() => validate.mutate()}
+          requestReview={() => requestReview.mutate()}
+          saving={validate.isPending || requestReview.isPending}
+          aiBusy={aiAssist.isPending}
+          aiSuggestions={a.aiSuggestions?.filter((s: any) => s.context?.scope === 'effectiveness' || s.suggestionType === 'EFFECTIVENESS') ?? []}
+          onAskAi={() => aiAssist.mutate('effectiveness')}
+        />
       )}
       {tab === 'IA' && <AiPanel suggestions={a.aiSuggestions} onGenerate={(scope) => aiAssist.mutate(scope)} onDecide={(sid, status) => decideAi.mutate({ sid, status })} />}
       {tab === 'Histórico' && <HistoryPanel history={a.history} />}
@@ -690,70 +708,140 @@ function EvidencePanel({ a, evidence, setEvidence, addEvidence, comment, setComm
   );
 }
 
-function EffectivenessPanel({ a, effectiveness, setEffectiveness, validate, saving, onAskAi }: any) {
+function EffectivenessPanel({
+  a,
+  effectiveness,
+  setEffectiveness,
+  validate,
+  requestReview,
+  canApprove,
+  saving,
+  aiBusy,
+  aiSuggestions,
+  onAskAi,
+}: {
+  a: ActionDetail;
+  effectiveness: { effective: boolean; reopen: boolean; summary: string; evidence: string; achievedResult: string };
+  setEffectiveness: (value: any) => void;
+  validate: () => void;
+  requestReview: () => void;
+  canApprove: boolean;
+  saving: boolean;
+  aiBusy: boolean;
+  aiSuggestions: any[];
+  onAskAi: () => void;
+}) {
   return (
-    <SectionCard 
-      title="Verificação de Eficácia & Aprendizado" 
-      description="Verifique se a ação eliminou a causa raiz, avalie a melhoria dos indicadores e registre as lições aprendidas (Aprendizado)." 
-      actions={<Button variant="outline" onClick={onAskAi}><Sparkles className="mr-2 h-4 w-4" />Análise de Coerência com IA</Button>}
-    >
-      <div className="grid grid-cols-1 gap-5 md:grid-cols-2">
-        <div className="md:col-span-2 grid grid-cols-1 gap-3 sm:grid-cols-2">
-          <label className="flex items-center gap-3 rounded-xl border p-4 text-sm bg-card hover:bg-accent/30 cursor-pointer transition-colors shadow-sm">
-            <input 
-              type="checkbox" 
-              checked={effectiveness.effective} 
-              onChange={(e) => setEffectiveness({ ...effectiveness, effective: e.target.checked, reopen: !e.target.checked })} 
-              className="h-4 w-4 accent-primary" 
+    <div className="grid grid-cols-1 gap-6 lg:grid-cols-[1fr,380px]">
+      <SectionCard
+        title="Análise de Eficácia"
+        description="Registre o resultado alcançado, anexe evidências e envie para o responsável Master validar a eficácia do plano."
+      >
+        <div className="grid grid-cols-1 gap-5 md:grid-cols-2">
+          <TextInput
+            label="Resultado alcançado (impacto atingido)"
+            value={effectiveness.achievedResult}
+            onChange={(achievedResult) => setEffectiveness({ ...effectiveness, achievedResult })}
+          />
+          <TextInput
+            label="Evidência da melhoria (link ou documento)"
+            value={effectiveness.evidence}
+            onChange={(evidence) => setEffectiveness({ ...effectiveness, evidence })}
+          />
+          <div className="md:col-span-2">
+            <Label className="text-xs font-semibold">Aprendizado e lições aprendidas</Label>
+            <Textarea
+              rows={4}
+              value={effectiveness.summary}
+              placeholder="Descreva o que a equipe aprendeu, o conhecimento adquirido e as recomendações para evitar reincidência..."
+              onChange={(e) => setEffectiveness({ ...effectiveness, summary: e.target.value })}
+              className="mt-1"
             />
-            <div>
-              <span className="font-semibold block">Eficácia Validada</span>
-              <span className="text-xs text-muted-foreground">A ação eliminou a causa raiz com sucesso.</span>
-            </div>
-          </label>
-          <label className="flex items-center gap-3 rounded-xl border p-4 text-sm bg-card hover:bg-accent/30 cursor-pointer transition-colors shadow-sm">
-            <input 
-              type="checkbox" 
-              checked={effectiveness.reopen} 
-              onChange={(e) => setEffectiveness({ ...effectiveness, reopen: e.target.checked, effective: !e.target.checked })} 
-              className="h-4 w-4 accent-primary" 
-            />
-            <div>
-              <span className="font-semibold block text-status-red">Reabrir Plano de Ação</span>
-              <span className="text-xs text-muted-foreground">A ação foi ineficaz e o desvio continua.</span>
-            </div>
-          </label>
+          </div>
         </div>
 
-        <TextInput 
-          label="Resultado Alcançado (Impacto Atingido)" 
-          value={effectiveness.achievedResult} 
-          onChange={(achievedResult) => setEffectiveness({ ...effectiveness, achievedResult })} 
-        />
-        <TextInput 
-          label="Evidência da Melhoria (Link ou Documento)" 
-          value={effectiveness.evidence} 
-          onChange={(evidence) => setEffectiveness({ ...effectiveness, evidence })} 
-        />
-        
-        <div className="md:col-span-2">
-          <Label className="font-semibold text-xs">Aprendizado & Lições Aprendidas (Encerramento)</Label>
-          <Textarea 
-            rows={4} 
-            value={effectiveness.summary} 
-            placeholder="Descreva o que a equipe aprendeu com a tratativa desse problema, o conhecimento organizacional adquirido e as recomendações para evitar reincidência..." 
-            onChange={(e) => setEffectiveness({ ...effectiveness, summary: e.target.value })} 
-            className="mt-1"
-          />
+        <div className="mt-5 flex flex-wrap items-center justify-between gap-2 border-t border-border/60 pt-4">
+          <div className="text-xs text-muted-foreground">
+            Status atual: <span className="font-medium text-foreground">{EFFECTIVENESS_STATUS_LABEL[a.effectivenessStatus] ?? a.effectivenessStatus}</span>
+          </div>
+          <div className="flex flex-wrap gap-2">
+            <Button variant="outline" onClick={onAskAi} disabled={aiBusy}>
+              <Sparkles className="mr-2 h-4 w-4" />
+              {aiBusy ? 'Analisando...' : 'Análise de Coerência com IA'}
+            </Button>
+            <Button onClick={requestReview} disabled={saving}>
+              <Send className="mr-2 h-4 w-4" />
+              Enviar para análise
+            </Button>
+          </div>
         </div>
-      </div>
-      <div className="mt-5 flex justify-end">
-        <Button disabled={saving} onClick={validate} className="bg-primary hover:bg-primary/95 text-primary-foreground font-semibold">
-          <ShieldCheck className="mr-2 h-4 w-4" />
-          Registrar Eficácia & Aprendizado
-        </Button>
-      </div>
-    </SectionCard>
+
+        {canApprove && (
+          <div className="mt-5 border-t border-border/60 pt-4">
+            <div className="mb-3 text-[11px] font-medium uppercase tracking-[0.1em] text-muted-foreground">
+              Decisão do responsável Master
+            </div>
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+              <label className="flex items-start gap-3 border border-border/60 p-4 text-sm transition-colors hover:bg-accent/30 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={effectiveness.effective}
+                  onChange={(e) => setEffectiveness({ ...effectiveness, effective: e.target.checked, reopen: !e.target.checked })}
+                  className="mt-0.5 h-4 w-4 accent-foreground"
+                />
+                <div>
+                  <span className="block font-semibold">Eficácia validada</span>
+                  <span className="text-xs text-muted-foreground">A ação eliminou a causa raiz com sucesso.</span>
+                </div>
+              </label>
+              <label className="flex items-start gap-3 border border-border/60 p-4 text-sm transition-colors hover:bg-accent/30 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={effectiveness.reopen}
+                  onChange={(e) => setEffectiveness({ ...effectiveness, reopen: e.target.checked, effective: !e.target.checked })}
+                  className="mt-0.5 h-4 w-4 accent-foreground"
+                />
+                <div>
+                  <span className="block font-semibold text-status-red">Reabrir plano de ação</span>
+                  <span className="text-xs text-muted-foreground">A ação foi ineficaz e o desvio continua.</span>
+                </div>
+              </label>
+            </div>
+            <div className="mt-4 flex justify-end">
+              <Button onClick={validate} disabled={saving}>
+                <ShieldCheck className="mr-2 h-4 w-4" />
+                Registrar decisão de eficácia
+              </Button>
+            </div>
+          </div>
+        )}
+      </SectionCard>
+
+      <SectionCard
+        title="Sugestões da IA"
+        description="Análise de coerência sobre a eficácia da tratativa e o método aplicado."
+      >
+        {aiSuggestions.length === 0 ? (
+          <EmptyState
+            title="Sem sugestões ainda"
+            description='Clique em "Análise de Coerência com IA" para gerar dicas baseadas no plano, no método e nos indicadores.'
+          />
+        ) : (
+          <div className="space-y-3">
+            {aiSuggestions.map((item) => (
+              <div key={item.id} className="border border-border/60 bg-card p-3">
+                <div className="mb-1 flex items-center justify-between gap-2">
+                  <Badge variant="outline">{SUGGESTION_TYPE_LABEL[item.suggestionType] ?? item.suggestionType}</Badge>
+                  <span className="text-[10px] uppercase tracking-wide text-muted-foreground">{SUGGESTION_STATUS_LABEL[item.status] ?? item.status}</span>
+                </div>
+                <div className="text-sm font-semibold">{item.title}</div>
+                <p className="mt-1 whitespace-pre-wrap text-xs text-muted-foreground">{item.content}</p>
+              </div>
+            ))}
+          </div>
+        )}
+      </SectionCard>
+    </div>
   );
 }
 
@@ -786,14 +874,37 @@ function AiPanel({ suggestions, onGenerate, onDecide }: { suggestions: any[]; on
 }
 
 function HistoryPanel({ history }: { history: any[] }) {
+  function translateValue(field: string | null | undefined, value: string | null | undefined) {
+    if (!value) return '';
+    if (field === 'analysisTool') return ANALYSIS_METHOD_LABEL[value] ?? value;
+    if (field === 'effectivenessStatus') return EFFECTIVENESS_STATUS_LABEL[value] ?? value;
+    if (field === 'status') return ACTION_STATUS_LABEL[value] ?? value;
+    if (TRACE_FIELD_LABEL[value]) return TRACE_FIELD_LABEL[value];
+    return value;
+  }
   return (
-    <SectionCard title="Histórico e auditoria do plano" description="Eventos gerados automaticamente por atualizações, IA, evidencias e eficacia.">
+    <SectionCard
+      title="Histórico e auditoria do plano"
+      description="Eventos gerados automaticamente por atualizações, IA, evidências e eficácia."
+    >
       <div className="space-y-2">
+        {history.length === 0 && (
+          <EmptyState title="Nenhum evento registrado" description="Edições, sugestões de IA e validações aparecem aqui automaticamente." />
+        )}
         {history.map((item) => (
-          <div key={item.id} className="rounded-lg border p-3">
-            <div className="text-sm font-semibold">{TRACE_EVENT_LABEL[item.eventType] ?? item.eventType}</div>
-            <div className="text-xs text-muted-foreground">{formatDate(item.createdAt)} {item.field ? `- ${item.field}` : ''}</div>
-            {item.afterValue && <div className="mt-1 text-sm">{item.afterValue}</div>}
+          <div key={item.id} className="border border-border/60 bg-card p-3">
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <div className="text-sm font-semibold">{TRACE_EVENT_LABEL[item.eventType] ?? item.eventType}</div>
+              <div className="text-xs text-muted-foreground">{formatDate(item.createdAt)}</div>
+            </div>
+            {item.field && (
+              <div className="mt-0.5 text-xs text-muted-foreground">
+                {TRACE_FIELD_LABEL[item.field] ?? item.field}
+              </div>
+            )}
+            {item.afterValue && (
+              <div className="mt-1 text-sm">{translateValue(item.field, item.afterValue)}</div>
+            )}
           </div>
         ))}
       </div>

@@ -89,6 +89,23 @@ export const ACTION_PRIORITY_LABEL: Record<string, string> = {
   CRITICAL: 'Crítica',
 };
 
+export const ACTION_ORIGIN_LABEL: Record<string, string> = {
+  INDICATOR: 'Indicador',
+  DEVIATION: 'Desvio',
+  MEETING: 'Reunião',
+  STRATEGY: 'Mapa estratégico',
+  OKR: 'OKR',
+  MANUAL: 'Manual',
+  IMPORT: 'Importação',
+};
+
+export const ACTION_CRITICALITY_LABEL: Record<string, string> = {
+  LOW: 'Baixa',
+  MEDIUM: 'Média',
+  HIGH: 'Alta',
+  CRITICAL: 'Crítica',
+};
+
 export const DEVIATION_STATUS_LABEL: Record<string, string> = {
   OPEN: 'Aberto',
   IN_ANALYSIS: 'Em análise',
@@ -174,6 +191,7 @@ export const TRACE_EVENT_LABEL: Record<string, string> = {
   OFF_TARGET_ALERT: 'Alerta fora da meta',
   CAUSE_CREATED: 'Causa registrada',
   ANALYSIS_CREATED: 'Análise registrada',
+  ANALYSIS_SAVED: 'Análise salva',
   MEETING_CREATED: 'Reunião criada',
   MEETING_COMPLETED: 'Reunião concluída',
   MEETING_DECISION: 'Decisão de reunião',
@@ -198,6 +216,51 @@ export const TRACE_EVENT_LABEL: Record<string, string> = {
   LINK_REMOVED: 'Vínculo removido',
   CLOSED: 'Concluído',
   REOPENED: 'Reaberto',
+  AI_USED: 'IA utilizada',
+  AI_SUGGESTION_GENERATED: 'Sugestão de IA gerada',
+  AI_SUGGESTION_ACCEPTED: 'Sugestão de IA aceita',
+  AI_SUGGESTION_REJECTED: 'Sugestão de IA rejeitada',
+  EFFECTIVENESS_RECORDED: 'Eficácia registrada',
+  EFFECTIVENESS_REQUESTED: 'Análise de eficácia solicitada',
+};
+
+export const TRACE_FIELD_LABEL: Record<string, string> = {
+  general: 'Geral',
+  analysis: 'Análise de causa',
+  effectiveness: 'Eficácia',
+  '5w2h': '5W2H',
+  analysisTool: 'Ferramenta',
+  problemDescription: 'Descrição do problema',
+  rootCause: 'Causa raiz',
+  description: 'Ação proposta',
+  expectedResult: 'Resultado esperado',
+  achievedResult: 'Resultado alcançado',
+  effectivenessSummary: 'Aprendizado',
+  effectivenessEvidence: 'Evidência da eficácia',
+  status: 'Status',
+  priority: 'Prioridade',
+  dueDate: 'Prazo',
+  startDate: 'Início',
+  endDate: 'Conclusão',
+  responsibleUserId: 'Responsável',
+  ownerNodeId: 'Área/Setor',
+  origin: 'Origem',
+  criticality: 'Criticidade',
+};
+
+export const ANALYSIS_METHOD_LABEL: Record<string, string> = {
+  FIVE_WHYS: '5 Porquês',
+  ISHIKAWA: 'Ishikawa',
+  MASP: 'MASP',
+  PDCA: 'PDCA',
+  FIVE_W_TWO_H: '5W2H',
+  PARETO: 'Pareto',
+  FCA: 'FCA',
+  GUT: 'Matriz GUT',
+  PRIORITIZATION_MATRIX: 'Matriz de priorização',
+  BRAINSTORMING: 'Brainstorming',
+  ROOT_CAUSE: 'Causa raiz',
+  EFFECTIVENESS_CHECKLIST: 'Checklist de eficácia',
 };
 
 export const EFFECTIVENESS_STATUS_LABEL: Record<string, string> = {

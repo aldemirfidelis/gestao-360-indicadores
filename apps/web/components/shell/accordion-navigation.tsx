@@ -116,31 +116,79 @@ export function AccordionNavigation({
                   )}
                 >
                   <div className="overflow-hidden">
-                    <div className="space-y-0.5 pb-2">
-                      {section.items.map((item) => {
-                        const Icon = item.icon;
-                        const active = sectionActive && isActivePath(pathname, item.href, item.exact);
-                        return (
-                          <Link
-                            key={`${section.heading}-${item.href}-${item.label}`}
-                            href={item.href}
-                            onClick={onNavigate}
-                            title={collapsed ? item.label : item.description}
-                            className={cn(
-                              'group relative flex items-center gap-2.5 px-3 py-2 text-sm transition-colors',
-                              active
-                                ? 'bg-foreground/[0.06] font-medium text-foreground'
-                                : 'text-muted-foreground hover:bg-foreground/[0.04] hover:text-foreground',
-                              collapsed && 'justify-center px-2',
-                            )}
-                          >
-                            {active && <span className="absolute left-0 top-0 h-full w-[2px] bg-foreground" />}
-                            <Icon className={cn('h-4 w-4 shrink-0', active ? 'text-foreground' : 'text-muted-foreground/80')} />
-                            {!collapsed && <span className="min-w-0 flex-1 truncate">{item.label}</span>}
-                          </Link>
-                        );
-                      })}
-                    </div>
+                    {!collapsed ? (
+                      <div className="relative ml-[18px] pb-2">
+                        {/* Linha vertical do pai descendo ate o ultimo filho */}
+                        <span
+                          aria-hidden="true"
+                          className="pointer-events-none absolute left-0 top-0 h-full w-px bg-border"
+                        />
+                        <div className="space-y-0.5">
+                          {section.items.map((item, idx) => {
+                            const Icon = item.icon;
+                            const active = sectionActive && isActivePath(pathname, item.href, item.exact);
+                            const isLast = idx === section.items.length - 1;
+                            return (
+                              <Link
+                                key={`${section.heading}-${item.href}-${item.label}`}
+                                href={item.href}
+                                onClick={onNavigate}
+                                title={item.description}
+                                className={cn(
+                                  'group relative flex items-center gap-2.5 py-2 pl-5 pr-3 text-sm transition-colors',
+                                  active
+                                    ? 'bg-foreground/[0.06] font-medium text-foreground'
+                                    : 'text-muted-foreground hover:bg-foreground/[0.04] hover:text-foreground',
+                                )}
+                              >
+                                {/* Conector horizontal pai -> filho (L invertido) */}
+                                <span
+                                  aria-hidden="true"
+                                  className={cn(
+                                    'pointer-events-none absolute left-0 top-1/2 h-px w-3 -translate-y-1/2',
+                                    active ? 'bg-foreground' : 'bg-border',
+                                  )}
+                                />
+                                {/* Mascara para encerrar a linha vertical no ultimo filho */}
+                                {isLast && (
+                                  <span
+                                    aria-hidden="true"
+                                    className="pointer-events-none absolute -left-px top-1/2 h-1/2 w-px bg-card"
+                                  />
+                                )}
+                                {active && <span className="absolute left-0 top-0 h-full w-[2px] bg-foreground" />}
+                                <Icon className={cn('h-4 w-4 shrink-0', active ? 'text-foreground' : 'text-muted-foreground/80')} />
+                                <span className="min-w-0 flex-1 truncate">{item.label}</span>
+                              </Link>
+                            );
+                          })}
+                        </div>
+                      </div>
+                    ) : (
+                      <div className="space-y-0.5 pb-2">
+                        {section.items.map((item) => {
+                          const Icon = item.icon;
+                          const active = sectionActive && isActivePath(pathname, item.href, item.exact);
+                          return (
+                            <Link
+                              key={`${section.heading}-${item.href}-${item.label}`}
+                              href={item.href}
+                              onClick={onNavigate}
+                              title={item.label}
+                              className={cn(
+                                'group relative flex items-center justify-center gap-2.5 py-2 px-2 text-sm transition-colors',
+                                active
+                                  ? 'bg-foreground/[0.06] font-medium text-foreground'
+                                  : 'text-muted-foreground hover:bg-foreground/[0.04] hover:text-foreground',
+                              )}
+                            >
+                              {active && <span className="absolute left-0 top-0 h-full w-[2px] bg-foreground" />}
+                              <Icon className={cn('h-4 w-4 shrink-0', active ? 'text-foreground' : 'text-muted-foreground/80')} />
+                            </Link>
+                          );
+                        })}
+                      </div>
+                    )}
                   </div>
                 </div>
               </div>
