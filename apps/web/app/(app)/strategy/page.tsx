@@ -22,6 +22,7 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog';
 import { api } from '@/lib/api';
+import { useAuth } from '@/components/auth/auth-provider';
 import { cn, formatDate, formatNumber } from '@/lib/utils';
 
 interface StrategicMap {
@@ -43,6 +44,10 @@ const defaultPerspectives = [
 
 export default function StrategyPage() {
   const qc = useQueryClient();
+  const { hasPermission } = useAuth();
+  const canCreate = hasPermission(['strategy:maps:create', 'strategy:manage']);
+  const canUpdate = hasPermission(['strategy:maps:update', 'strategy:manage']);
+  const canDelete = hasPermission(['strategy:maps:delete', 'strategy:manage']);
   const [open, setOpen] = useState(false);
   const [editing, setEditing] = useState<StrategicMap | null>(null);
   const [form, setForm] = useState(defaultForm());
@@ -128,10 +133,12 @@ export default function StrategyPage() {
         description="Crie, publique e mantenha mapas estratégicos editaveis conectados a Arvore Organizacional e aos indicadores."
         breadcrumbs={[{ label: 'Início', href: '/' }, { label: 'Visualização', href: '/visualization' }, { label: 'Mapa Estratégico' }]}
         actions={
-          <Button onClick={openCreate}>
-            <Plus className="mr-2 h-4 w-4" />
-            Novo mapa
-          </Button>
+          canCreate ? (
+            <Button onClick={openCreate}>
+              <Plus className="mr-2 h-4 w-4" />
+              Novo mapa
+            </Button>
+          ) : null
         }
       />
 
@@ -165,12 +172,16 @@ export default function StrategyPage() {
                 <div className="rounded-md border p-2"><strong className="block text-sm text-foreground">{m._count?.versions ?? 0}</strong>versões</div>
               </div>
               <div className="flex gap-2">
-                <Button variant="outline" size="sm" onClick={() => openEdit(m)}>
-                  <Edit3 className="h-4 w-4" />
-                </Button>
-                <Button variant="outline" size="sm" onClick={() => window.confirm('Inativar este mapa estratégico?') && remove.mutate(m.id)}>
-                  <Trash2 className="h-4 w-4" />
-                </Button>
+                {canUpdate && (
+                  <Button variant="outline" size="sm" onClick={() => openEdit(m)}>
+                    <Edit3 className="h-4 w-4" />
+                  </Button>
+                )}
+                {canDelete && (
+                  <Button variant="outline" size="sm" onClick={() => window.confirm('Inativar este mapa estratégico?') && remove.mutate(m.id)}>
+                    <Trash2 className="h-4 w-4" />
+                  </Button>
+                )}
               </div>
             </div>
           </div>

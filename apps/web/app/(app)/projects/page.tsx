@@ -23,6 +23,7 @@ import { Progress } from '@/components/ui/progress';
 import { NativeSelect } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
 import { api } from '@/lib/api';
+import { useAuth } from '@/components/auth/auth-provider';
 import { formatDate, formatNumber } from '@/lib/utils';
 import { cn } from '@/lib/utils';
 
@@ -77,6 +78,8 @@ const STATUS_LABEL: Record<string, string> = {
 export default function ProjectsPage() {
   const router = useRouter();
   const qc = useQueryClient();
+  const { hasPermission } = useAuth();
+  const canCreate = hasPermission(['projects:create']);
   const [open, setOpen] = useState(false);
   const [form, setForm] = useState({
     name: '',
@@ -147,7 +150,7 @@ export default function ProjectsPage() {
       <PageHeader
         title="Projetos"
         description="Iniciativas estratégicas com cronograma, marcos e tarefas."
-        actions={<Button onClick={() => setOpen(true)}><Plus className="h-4 w-4 mr-2" />Novo projeto</Button>}
+        actions={canCreate ? <Button onClick={() => setOpen(true)}><Plus className="h-4 w-4 mr-2" />Novo projeto</Button> : null}
       />
 
       <div className="mb-6 grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">

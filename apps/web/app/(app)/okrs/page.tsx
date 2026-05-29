@@ -23,6 +23,7 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog';
 import { api } from '@/lib/api';
+import { useAuth } from '@/components/auth/auth-provider';
 import { cn, formatDate, formatNumber, formatPercent } from '@/lib/utils';
 
 interface Cycle {
@@ -76,6 +77,10 @@ const emptyKr = { objectiveId: '', metric: '', unit: 'PERCENT', startValue: 0, c
 
 export default function OkrsPage() {
   const qc = useQueryClient();
+  const { hasPermission } = useAuth();
+  const canCreate = hasPermission(['okrs:create']);
+  const canUpdate = hasPermission(['okrs:update']);
+  const canCheckin = hasPermission(['okrs:checkin', 'okrs:update']);
   const [activeCycleId, setActiveCycleId] = useState<string | null>(null);
   const [cycleOpen, setCycleOpen] = useState(false);
   const [objectiveOpen, setObjectiveOpen] = useState(false);
@@ -171,16 +176,18 @@ export default function OkrsPage() {
         description="Ciclos objetivos: crie o ciclo, defina objetivos, adicione KRs e registre check-ins semanais."
         breadcrumbs={[{ label: 'Início', href: '/' }, { label: 'Visualização', href: '/visualization' }, { label: 'OKRs' }]}
         actions={
-          <>
-            <Button variant="outline" onClick={() => setCycleOpen(true)}>
-              <Plus className="mr-2 h-4 w-4" />
-              Novo ciclo
-            </Button>
-            <Button onClick={() => setObjectiveOpen(true)} disabled={!cycleId}>
-              <Plus className="mr-2 h-4 w-4" />
-              Novo objetivo
-            </Button>
-          </>
+          canCreate ? (
+            <>
+              <Button variant="outline" onClick={() => setCycleOpen(true)}>
+                <Plus className="mr-2 h-4 w-4" />
+                Novo ciclo
+              </Button>
+              <Button onClick={() => setObjectiveOpen(true)} disabled={!cycleId}>
+                <Plus className="mr-2 h-4 w-4" />
+                Novo objetivo
+              </Button>
+            </>
+          ) : null
         }
       />
 
@@ -209,17 +216,19 @@ export default function OkrsPage() {
             actions={
               <div className="flex flex-wrap gap-2">
                 <StatusBadge value={o.status} label={STATUS_LABEL[o.status] ?? o.status} />
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => {
-                    setKrForm({ ...emptyKr, objectiveId: o.id });
-                    setKrOpen(true);
-                  }}
-                >
-                  <Plus className="mr-2 h-4 w-4" />
-                  KR
-                </Button>
+                {canUpdate && (
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => {
+                      setKrForm({ ...emptyKr, objectiveId: o.id });
+                      setKrOpen(true);
+                    }}
+                  >
+                    <Plus className="mr-2 h-4 w-4" />
+                    KR
+                  </Button>
+                )}
               </div>
             }
           >
@@ -257,7 +266,9 @@ export default function OkrsPage() {
                       defaultValue={kr.currentValue}
                       className="h-8 w-24"
                       step="0.01"
+                      disabled={!canUpdate}
                       onBlur={(e) => {
+                        if (!canUpdate) return;
                         const v = Number(e.target.value);
                         if (!Number.isFinite(v) || v === kr.currentValue) return;
                         updateKR.mutate({ krId: kr.id, currentValue: v });
@@ -270,19 +281,21 @@ export default function OkrsPage() {
               ))}
               {o.keyResults.length === 0 && <div className="rounded-lg border border-dashed p-4 text-sm text-muted-foreground">Adicione KRs para calcular o progresso automaticamente.</div>}
             </div>
-            <div className="mt-4 flex justify-end">
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => {
-                  setCheckinObj(o);
-                  setCheckin({ confidence: o.confidence, progress: o.progress, note: '' });
-                }}
-              >
-                <MessageSquare className="mr-2 h-4 w-4" />
-                Check-in
-              </Button>
-            </div>
+            {canCheckin && (
+              <div className="mt-4 flex justify-end">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => {
+                    setCheckinObj(o);
+                    setCheckin({ confidence: o.confidence, progress: o.progress, note: '' });
+                  }}
+                >
+                  <MessageSquare className="mr-2 h-4 w-4" />
+                  Check-in
+                </Button>
+              </div>
+            )}
           </SectionCard>
         ))}
       </div>

@@ -3,6 +3,7 @@ import { PrismaClient, OrgNodeType, IndicatorType, IndicatorUnit, Periodicity, D
 import * as bcrypt from 'bcryptjs';
 import { calcStatus } from '@g360/shared';
 import { dateToPeriodRef, lastNPeriodRefs, periodRefToDate } from '../src/modules/indicators/period.util';
+import { PERMISSION_CATALOG, DEFAULT_PROFILES } from '../src/modules/users/permission-catalog';
 
 const prisma = new PrismaClient();
 
@@ -694,51 +695,44 @@ async function main() {
 
   // ---------------- Permissoes basicas ----------------
   console.log('[seed] criando permissoes de catalogo...');
-  const permKeys = [
-    'indicators:read',
-    'indicators:create',
-    'indicators:update',
-    'indicators:delete',
-    'results:create',
-    'results:approve',
-    'deviations:read',
-    'deviations:create',
-    'actions:read',
-    'actions:create',
-    'actions:update',
-    'dashboard:read',
-    'users:manage',
-    'settings:manage',
-    'audit:view',
-    'audit:export',
-    'users:manage',
-  ];
   await prisma.permission.createMany({
     skipDuplicates: true,
-    data: permKeys.map((k) => {
-      const [module, action] = k.split(':');
-      return { key: k, module, action, description: `${module} - ${action}` };
-    }),
+    data: PERMISSION_CATALOG.map(([key, description, module, action]) => ({
+      key,
+      module,
+      action,
+      description,
+    })),
   });
 
-  const superAdminProfile = await prisma.accessProfile.create({
-    data: {
-      companyId: company.id,
-      code: 'SUPER_ADMIN',
-      name: 'Super Admin',
-      description: 'Acesso total ao sistema.',
-      role: UserRoleEnum.SUPER_ADMIN,
-      system: true,
-    },
-  });
-  const allPermissions = await prisma.permission.findMany({ select: { id: true } });
-  await prisma.profilePermission.createMany({
-    data: allPermissions.map((permission) => ({ profileId: superAdminProfile.id, permissionId: permission.id })),
-  });
-  await prisma.user.update({
-    where: { id: admin.id },
-    data: { accessProfileId: superAdminProfile.id },
-  });
+  const allPermissions = await prisma.permission.findMany({ select: { id: true, key: true } });
+  const permissionByKey = new Map(allPermissions.map((p) => [p.key, p.id]));
+
+  for (const profile of DEFAULT_PROFILES) {
+    const created = await prisma.accessProfile.create({
+      data: {
+        companyId: company.id,
+        code: profile.code,
+        name: profile.name,
+        description: profile.description,
+        role: profile.role as UserRoleEnum,
+        system: true,
+      },
+    });
+    const entries = profile.permissions
+      .map((key) => permissionByKey.get(key))
+      .filter((id): id is string => Boolean(id))
+      .map((permissionId) => ({ profileId: created.id, permissionId }));
+    if (entries.length > 0) {
+      await prisma.profilePermission.createMany({ data: entries, skipDuplicates: true });
+    }
+    if (profile.code === 'SUPER_ADMIN') {
+      await prisma.user.update({
+        where: { id: admin.id },
+        data: { accessProfileId: created.id },
+      });
+    }
+  }
 
   // ---------------- Resumo ----------------
   const totals = {

@@ -5,6 +5,7 @@ import { AuthPayload } from '../auth/auth.types';
 import { ZodValidationPipe } from '../../common/pipes/zod-validation.pipe';
 import { indicatorResultUpsertSchema } from '@g360/shared';
 import { z } from 'zod';
+import { RequirePermissions } from '../../common/decorators/permissions.decorator';
 
 const batchSchema = z.object({
   items: z.array(indicatorResultUpsertSchema).min(1).max(500),
@@ -15,6 +16,7 @@ export class ResultsController {
   constructor(private readonly service: ResultsService) {}
 
   @Get('pending')
+  @RequirePermissions('launches:view')
   pending(
     @CurrentUser() me: AuthPayload,
     @Query('points') points?: string,
@@ -33,6 +35,7 @@ export class ResultsController {
   }
 
   @Get('grain')
+  @RequirePermissions('launches:view')
   grain(
     @CurrentUser() me: AuthPayload,
     @Query('indicatorId') indicatorId: string,
@@ -47,6 +50,7 @@ export class ResultsController {
   }
 
   @Post()
+  @RequirePermissions('results:launch')
   async upsert(
     @CurrentUser() me: AuthPayload,
     @Body(new ZodValidationPipe(indicatorResultUpsertSchema)) input: any,
@@ -55,6 +59,7 @@ export class ResultsController {
   }
 
   @Post('batch')
+  @RequirePermissions('results:launch')
   async upsertBatch(
     @CurrentUser() me: AuthPayload,
     @Body(new ZodValidationPipe(batchSchema)) body: any,
@@ -67,6 +72,7 @@ export class ResultsController {
   }
 
   @Post(':id/approve')
+  @RequirePermissions('results:approve')
   approve(@Param('id') id: string, @Body() body: { approve: boolean }) {
     return this.service.approve(id, body.approve);
   }

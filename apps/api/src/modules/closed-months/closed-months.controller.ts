@@ -9,6 +9,7 @@ export class ClosedMonthsController {
   constructor(private readonly service: ClosedMonthsService) {}
 
   @Get()
+  @RequirePermissions('settings:view')
   list(@CurrentUser() me: AuthPayload) {
     return this.service.list(me.companyId);
   }

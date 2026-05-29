@@ -21,6 +21,7 @@ import { NativeSelect } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { api } from '@/lib/api';
+import { useAuth } from '@/components/auth/auth-provider';
 import { cn, formatDate, formatNumber } from '@/lib/utils';
 import { ACTION_STATUS_LABEL, EFFECTIVENESS_STATUS_LABEL } from '@/lib/labels';
 
@@ -97,6 +98,9 @@ const emptyForm = {
 
 export default function ActionsPage() {
   const qc = useQueryClient();
+  const { hasPermission } = useAuth();
+  const canCreate = hasPermission(['actions:create']);
+  const canUpdate = hasPermission(['actions:update']);
   const [view, setView] = useState<ViewMode>('kanban');
   const [open, setOpen] = useState(false);
   const [form, setForm] = useState({ ...emptyForm });
@@ -175,10 +179,12 @@ export default function ActionsPage() {
                 );
               })}
             </div>
-            <Button onClick={() => setOpen(true)}>
-              <Plus className="mr-2 h-4 w-4" />
-              Novo plano
-            </Button>
+            {canCreate && (
+              <Button onClick={() => setOpen(true)}>
+                <Plus className="mr-2 h-4 w-4" />
+                Novo plano
+              </Button>
+            )}
           </>
         }
       />
@@ -230,13 +236,15 @@ export default function ActionsPage() {
                   {items.map((a) => (
                     <div key={a.id} className="space-y-2">
                       <ActionPlanCard action={a} />
-                      <div className="flex flex-wrap gap-1">
-                        {['UNDER_ANALYSIS', 'IN_PROGRESS', 'WAITING_EVIDENCE', 'WAITING_VALIDATION', 'DONE'].filter((s) => s !== a.status).map((s) => (
-                          <button key={s} onClick={() => changeStatus.mutate({ id: a.id, status: s })} className="rounded border bg-card px-2 py-1 text-[10px] font-medium text-muted-foreground transition-colors hover:bg-accent hover:text-foreground">
-                            {STATUS_LABEL[s]}
-                          </button>
-                        ))}
-                      </div>
+                      {canUpdate && (
+                        <div className="flex flex-wrap gap-1">
+                          {['UNDER_ANALYSIS', 'IN_PROGRESS', 'WAITING_EVIDENCE', 'WAITING_VALIDATION', 'DONE'].filter((s) => s !== a.status).map((s) => (
+                            <button key={s} onClick={() => changeStatus.mutate({ id: a.id, status: s })} className="rounded border bg-card px-2 py-1 text-[10px] font-medium text-muted-foreground transition-colors hover:bg-accent hover:text-foreground">
+                              {STATUS_LABEL[s]}
+                            </button>
+                          ))}
+                        </div>
+                      )}
                     </div>
                   ))}
                   {items.length === 0 && <div className="rounded-lg border border-dashed bg-card/50 p-6 text-center text-xs text-muted-foreground">Sem planos</div>}

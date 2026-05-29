@@ -20,6 +20,7 @@ import {
   DialogFooter,
 } from '@/components/ui/dialog';
 import { api } from '@/lib/api';
+import { useAuth } from '@/components/auth/auth-provider';
 import { formatDate } from '@/lib/utils';
 
 interface Meeting {
@@ -42,6 +43,8 @@ const KIND_LABEL: Record<string, string> = {
 
 export default function MeetingsPage() {
   const qc = useQueryClient();
+  const { hasPermission } = useAuth();
+  const canCreate = hasPermission(['meetings:create']);
   const [open, setOpen] = useState(false);
   const [form, setForm] = useState({
     title: '',
@@ -71,9 +74,11 @@ export default function MeetingsPage() {
         title="Reuniões de Gestão"
         description="Pauta, decisões e ações geradas em cada encontro."
         actions={
-          <Button onClick={() => setOpen(true)}>
-            <Plus className="h-4 w-4 mr-2" /> Nova reunião
-          </Button>
+          canCreate ? (
+            <Button onClick={() => setOpen(true)}>
+              <Plus className="h-4 w-4 mr-2" /> Nova reunião
+            </Button>
+          ) : null
         }
       />
 

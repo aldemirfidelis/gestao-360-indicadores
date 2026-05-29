@@ -1,34 +1,72 @@
 export const PERMISSION_CATALOG = [
-  ['dashboard:view', 'Visualizar dashboards', 'Dashboard', 'view'],
+  // Dashboard / Visão geral
+  ['dashboard:view', 'Visualizar dashboards e visão geral', 'Dashboard', 'view'],
   ['dashboard:export', 'Exportar dashboards', 'Dashboard', 'export'],
+  ['visualization:view', 'Acessar dashboard executivo 360', 'Dashboard', 'view'],
+  ['insights:view', 'Visualizar acompanhamentos e insights', 'Dashboard', 'view'],
+
+  // Lançamentos
   ['launches:view', 'Visualizar lançamentos', 'Lançamentos', 'view'],
-  ['results:launch', 'Lancar resultados', 'Lançamentos', 'create'],
-  ['results:approve', 'Aprovar resultados', 'Lançamentos', 'approve'],
+  ['results:launch', 'Lançar resultados mensais', 'Lançamentos', 'create'],
+  ['results:approve', 'Aprovar resultados lançados', 'Lançamentos', 'approve'],
+  ['results:grain', 'Lançar resultados diário/semanal/quinzenal', 'Lançamentos', 'create'],
+
+  // Indicadores
   ['indicators:view', 'Visualizar indicadores', 'Indicadores', 'view'],
   ['indicators:create', 'Criar indicadores', 'Indicadores', 'create'],
   ['indicators:update', 'Editar indicadores', 'Indicadores', 'update'],
-  ['indicators:delete', 'Excluir indicadores', 'Indicadores', 'delete'],
+  ['indicators:delete', 'Inativar indicadores', 'Indicadores', 'delete'],
+  ['indicators:targets', 'Gerenciar metas dos indicadores', 'Indicadores', 'manage'],
+  ['indicators:export', 'Exportar indicadores', 'Indicadores', 'export'],
+  ['indicators:history', 'Visualizar histórico do indicador', 'Indicadores', 'view'],
+
+  // Planos de ação
   ['actions:view', 'Visualizar planos de ação', 'Planos de ação', 'view'],
   ['actions:create', 'Criar planos de ação', 'Planos de ação', 'create'],
   ['actions:update', 'Editar planos de ação', 'Planos de ação', 'update'],
   ['actions:delete', 'Cancelar ou excluir logicamente planos', 'Planos de ação', 'delete'],
   ['actions:complete', 'Concluir planos de ação', 'Planos de ação', 'complete'],
-  ['actions:effectiveness', 'Validar eficacia de planos de ação', 'Planos de ação', 'approve'],
+  ['actions:effectiveness', 'Validar eficácia de planos de ação', 'Planos de ação', 'approve'],
   ['actions:reopen', 'Reabrir planos de ação', 'Planos de ação', 'update'],
-  ['actions:extension:approve', 'Aprovar prorrogacao de prazo', 'Planos de ação', 'approve'],
+  ['actions:extension:approve', 'Aprovar prorrogação de prazo', 'Planos de ação', 'approve'],
   ['actions:analysis', 'Usar ferramentas de análise de causa', 'Planos de ação', 'manage'],
   ['actions:ai', 'Usar IA assistente em planos de ação', 'Planos de ação', 'assist'],
   ['actions:export', 'Exportar planos de ação', 'Planos de ação', 'export'],
-  ['actions:view_all', 'Visualizar planos de outras areas', 'Planos de ação', 'view'],
+  ['actions:view_all', 'Visualizar planos de outras áreas', 'Planos de ação', 'view'],
   ['actions:manage_all', 'Gerenciar planos de toda empresa', 'Planos de ação', 'manage'],
   ['actions:manage', 'Gerenciar planos de ação', 'Planos de ação', 'manage'],
   ['actions:approve', 'Aprovar planos de ação', 'Planos de ação', 'approve'],
+
+  // Desvios e tratativas
   ['deviations:view', 'Visualizar desvios e análises', 'Desvios', 'view'],
+  ['deviations:create', 'Abrir desvios', 'Desvios', 'create'],
+  ['deviations:update', 'Editar desvios e causas', 'Desvios', 'update'],
+  ['deviations:close', 'Encerrar desvios', 'Desvios', 'approve'],
   ['deviations:manage', 'Gerenciar desvios e análises', 'Desvios', 'manage'],
-  ['projects:view', 'Visualizar projetos', 'Projetos', 'view'],
+  ['treatments:view', 'Visualizar tratativas', 'Tratativas', 'view'],
+  ['treatments:manage', 'Iniciar e gerenciar tratativas', 'Tratativas', 'manage'],
+  ['treatments:ignore', 'Ignorar tratativas com justificativa', 'Tratativas', 'approve'],
+
+  // Eficácia
+  ['eficacia:view', 'Visualizar análise de eficácia', 'Eficácia', 'view'],
+  ['eficacia:approve', 'Aprovar/rejeitar eficácia', 'Eficácia', 'approve'],
+
+  // Projetos / Cronogramas
+  ['projects:view', 'Visualizar projetos e cronogramas', 'Projetos', 'view'],
+  ['projects:create', 'Criar projetos', 'Projetos', 'create'],
+  ['projects:update', 'Editar projetos, marcos e tarefas', 'Projetos', 'update'],
+  ['projects:delete', 'Excluir projetos', 'Projetos', 'delete'],
   ['projects:manage', 'Gerenciar projetos', 'Projetos', 'manage'],
+
+  // Reuniões
   ['meetings:view', 'Visualizar reuniões', 'Reuniões', 'view'],
+  ['meetings:create', 'Criar reuniões', 'Reuniões', 'create'],
+  ['meetings:update', 'Editar reuniões, agenda e decisões', 'Reuniões', 'update'],
+  ['meetings:delete', 'Excluir reuniões', 'Reuniões', 'delete'],
+  ['meetings:complete', 'Concluir reuniões e enviar convites', 'Reuniões', 'approve'],
   ['meetings:manage', 'Gerenciar reuniões', 'Reuniões', 'manage'],
+
+  // Estratégia
   ['strategy:view', 'Visualizar mapa estratégico', 'Estratégia', 'view'],
   ['strategy:manage', 'Gerenciar mapa estratégico', 'Estratégia', 'manage'],
   ['strategy:maps:create', 'Criar mapas estratégicos', 'Estratégia', 'create'],
@@ -44,32 +82,67 @@ export const PERMISSION_CATALOG = [
   ['strategy:links:manage', 'Gerenciar ligações entre objetivos estratégicos', 'Estratégia', 'manage'],
   ['strategy:publish', 'Publicar versões do mapa estratégico', 'Estratégia', 'publish'],
   ['strategy:history:view', 'Visualizar histórico do mapa estratégico', 'Estratégia', 'view'],
+
+  // OKRs
   ['okrs:view', 'Visualizar OKRs', 'OKRs', 'view'],
+  ['okrs:create', 'Criar ciclos e objetivos OKR', 'OKRs', 'create'],
+  ['okrs:update', 'Editar OKRs e key results', 'OKRs', 'update'],
+  ['okrs:delete', 'Excluir OKRs e KRs', 'OKRs', 'delete'],
+  ['okrs:checkin', 'Realizar check-ins de OKR', 'OKRs', 'update'],
   ['okrs:manage', 'Gerenciar OKRs', 'OKRs', 'manage'],
+
+  // Estrutura organizacional
   ['org:view', 'Visualizar estrutura organizacional', 'Estrutura', 'view'],
   ['org:manage', 'Gerenciar estrutura organizacional', 'Estrutura', 'manage'],
-  ['reports:export', 'Exportar relatorios', 'Relatorios', 'export'],
+  ['org:positions:view', 'Visualizar organograma de cargos', 'Estrutura', 'view'],
+  ['org:positions:manage', 'Gerenciar organograma de cargos', 'Estrutura', 'manage'],
+  ['org:positions:approve', 'Aprovar mudanças de cargo', 'Estrutura', 'approve'],
+
+  // Importações
+  ['imports:view', 'Visualizar histórico de importações', 'Importações', 'view'],
+  ['imports:create', 'Importar arquivos e evidências', 'Importações', 'create'],
+  ['imports:manage', 'Gerenciar jobs de importação', 'Importações', 'manage'],
+
+  // Relatórios
+  ['reports:view', 'Visualizar relatórios', 'Relatórios', 'view'],
+  ['reports:export', 'Exportar relatórios em CSV', 'Relatórios', 'export'],
+
+  // Configurações e usuários
   ['settings:view', 'Visualizar configurações', 'Configurações', 'view'],
-  ['settings:manage', 'Gerenciar parametros do sistema', 'Configurações', 'manage'],
+  ['settings:manage', 'Gerenciar parâmetros do sistema', 'Configurações', 'manage'],
+  ['users:view', 'Visualizar usuários', 'Usuários', 'view'],
+  ['users:create', 'Criar usuários', 'Usuários', 'create'],
+  ['users:update', 'Editar usuários', 'Usuários', 'update'],
+  ['users:delete', 'Inativar/excluir usuários', 'Usuários', 'delete'],
+  ['users:permissions', 'Atribuir permissões a usuários', 'Usuários', 'manage'],
+  ['users:profiles', 'Gerenciar perfis de acesso', 'Usuários', 'manage'],
   ['users:manage', 'Gerenciar usuários e permissões', 'Usuários', 'manage'],
+
+  // Auditoria
   ['audit:view', 'Visualizar auditoria', 'Auditoria', 'view'],
   ['audit:export', 'Exportar auditoria', 'Auditoria', 'export'],
+
+  // IA
+  ['ai:use', 'Usar recursos de IA (Gemini)', 'IA', 'assist'],
+  ['ai:status', 'Consultar status do provedor de IA', 'IA', 'view'],
 ] as const;
+
+const ALL_KEYS = PERMISSION_CATALOG.map(([key]) => key);
 
 export const DEFAULT_PROFILES = [
   {
     code: 'SUPER_ADMIN',
     name: 'Super Admin',
     role: 'SUPER_ADMIN',
-    description: 'Acesso total ao sistema, segurança, auditoria e parametros.',
-    permissions: PERMISSION_CATALOG.map(([key]) => key),
+    description: 'Acesso total ao sistema, segurança, auditoria e parâmetros.',
+    permissions: ALL_KEYS,
   },
   {
     code: 'ADMIN',
     name: 'Admin',
     role: 'COMPANY_ADMIN',
     description: 'Administração da empresa com acesso a usuários, estrutura e parametrização.',
-    permissions: PERMISSION_CATALOG.map(([key]) => key).filter((key) => key !== 'audit:export'),
+    permissions: ALL_KEYS.filter((key) => key !== 'audit:export'),
   },
   {
     code: 'GESTOR',
@@ -78,20 +151,47 @@ export const DEFAULT_PROFILES = [
     description: 'Gestão de indicadores, planos de ação e acompanhamentos do setor.',
     permissions: [
       'dashboard:view',
+      'visualization:view',
+      'insights:view',
       'launches:view',
       'results:launch',
+      'results:grain',
       'indicators:view',
       'indicators:create',
       'indicators:update',
+      'indicators:targets',
+      'indicators:history',
+      'indicators:export',
       'actions:view',
+      'actions:create',
+      'actions:update',
+      'actions:complete',
       'actions:manage',
+      'actions:export',
       'deviations:view',
+      'deviations:create',
+      'deviations:update',
       'deviations:manage',
+      'treatments:view',
+      'treatments:manage',
+      'eficacia:view',
+      'projects:view',
+      'projects:create',
+      'projects:update',
       'meetings:view',
+      'meetings:create',
+      'meetings:update',
+      'meetings:complete',
       'meetings:manage',
       'strategy:view',
-      'reports:export',
+      'okrs:view',
+      'okrs:checkin',
       'org:view',
+      'org:positions:view',
+      'imports:view',
+      'imports:create',
+      'reports:view',
+      'reports:export',
     ],
   },
   {
@@ -99,13 +199,44 @@ export const DEFAULT_PROFILES = [
     name: 'Usuário',
     role: 'COLLABORATOR',
     description: 'Acesso operacional para lançamentos e execução de atividades.',
-    permissions: ['dashboard:view', 'launches:view', 'results:launch', 'indicators:view', 'actions:view', 'actions:manage', 'meetings:view'],
+    permissions: [
+      'dashboard:view',
+      'launches:view',
+      'results:launch',
+      'indicators:view',
+      'indicators:history',
+      'actions:view',
+      'actions:create',
+      'actions:update',
+      'actions:complete',
+      'meetings:view',
+      'deviations:view',
+      'treatments:view',
+      'projects:view',
+      'reports:view',
+    ],
   },
   {
     code: 'VISUALIZADOR',
     name: 'Visualizador',
     role: 'VIEWER',
-    description: 'Acesso somente leitura aos principais paineis e relatorios.',
-    permissions: ['dashboard:view', 'indicators:view', 'actions:view', 'deviations:view', 'projects:view', 'strategy:view', 'okrs:view', 'org:view'],
+    description: 'Acesso somente leitura aos principais painéis e relatórios.',
+    permissions: [
+      'dashboard:view',
+      'visualization:view',
+      'insights:view',
+      'indicators:view',
+      'indicators:history',
+      'actions:view',
+      'deviations:view',
+      'treatments:view',
+      'projects:view',
+      'strategy:view',
+      'okrs:view',
+      'org:view',
+      'org:positions:view',
+      'meetings:view',
+      'reports:view',
+    ],
   },
 ] as const;

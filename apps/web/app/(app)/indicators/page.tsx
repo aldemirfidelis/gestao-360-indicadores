@@ -55,6 +55,7 @@ import { StatusLight } from '@/components/ui/status-light';
 import { Textarea } from '@/components/ui/textarea';
 import { IndicatorResultEditor } from '@/components/platform/indicator-result-editor';
 import { api } from '@/lib/api';
+import { useAuth } from '@/components/auth/auth-provider';
 import { cn, formatDate, formatNumber, formatPercent, periodRefLabel } from '@/lib/utils';
 import {
   PERIODICITY_LABEL,
@@ -254,6 +255,15 @@ const EMPTY_FORM: IndicatorForm = {
 export default function IndicatorsPage() {
   const searchParams = useSearchParams();
   const qc = useQueryClient();
+  const { hasPermission } = useAuth();
+  const canCreate = hasPermission(['indicators:create']);
+  const canUpdate = hasPermission(['indicators:update']);
+  const canDelete = hasPermission(['indicators:delete']);
+  const canTargets = hasPermission(['indicators:targets', 'indicators:update']);
+  const canExport = hasPermission(['indicators:export', 'reports:export']);
+  const canLaunch = hasPermission(['results:launch']);
+  const canLaunchGrain = hasPermission(['results:grain', 'results:launch']);
+  const canHistory = hasPermission(['indicators:history', 'indicators:view']);
   const [filters, setFilters] = useState<Filters>({
     companyId: '',
     areaMacroId: '',
@@ -478,14 +488,18 @@ export default function IndicatorsPage() {
               <RefreshCcw className="mr-2 h-4 w-4" />
               Atualizar
             </Button>
-            <Button variant="outline" onClick={() => exportCsv(rows)}>
-              <Download className="mr-2 h-4 w-4" />
-              Exportar
-            </Button>
-            <Button onClick={openCreate}>
-              <Plus className="mr-2 h-4 w-4" />
-              Incluir Indicador
-            </Button>
+            {canExport && (
+              <Button variant="outline" onClick={() => exportCsv(rows)}>
+                <Download className="mr-2 h-4 w-4" />
+                Exportar
+              </Button>
+            )}
+            {canCreate && (
+              <Button onClick={openCreate}>
+                <Plus className="mr-2 h-4 w-4" />
+                Incluir Indicador
+              </Button>
+            )}
           </div>
         }
       />
@@ -641,7 +655,7 @@ export default function IndicatorsPage() {
         <EmptyState
           title="Nenhum indicador cadastrado"
           description="Inclua o primeiro indicador ou ajuste os filtros para encontrar registros existentes."
-          action={<Button onClick={openCreate}>Incluir Indicador</Button>}
+          action={canCreate ? <Button onClick={openCreate}>Incluir Indicador</Button> : null}
         />
       )}
 
@@ -651,6 +665,12 @@ export default function IndicatorsPage() {
             key={indicator.id}
             indicator={indicator}
             micros={microsByParent.get(indicator.id) ?? []}
+            canEdit={canUpdate}
+            canDelete={canDelete}
+            canTargets={canTargets}
+            canLaunch={canLaunch}
+            canLaunchGrain={canLaunchGrain}
+            canHistory={canHistory}
             onView={() => setViewing(indicator)}
             onEdit={() => openEdit(indicator)}
             onTarget={() => openTarget(indicator)}
@@ -796,6 +816,12 @@ function buildCumulativeAvg(values: Array<number | null | undefined>): Array<num
 function IndicatorManagementCard({
   indicator,
   micros = [],
+  canEdit = true,
+  canDelete = true,
+  canTargets = true,
+  canLaunch = true,
+  canLaunchGrain = true,
+  canHistory = true,
   onView,
   onEdit,
   onTarget,
@@ -812,6 +838,12 @@ function IndicatorManagementCard({
 }: {
   indicator: IndicatorRow;
   micros?: IndicatorRow[];
+  canEdit?: boolean;
+  canDelete?: boolean;
+  canTargets?: boolean;
+  canLaunch?: boolean;
+  canLaunchGrain?: boolean;
+  canHistory?: boolean;
   onView: () => void;
   onEdit: () => void;
   onTarget: () => void;
@@ -1086,24 +1118,38 @@ function IndicatorManagementCard({
       </div>
 
       <div className="mt-5 flex flex-wrap gap-2 border-t pt-4">
-        <Button variant="default" size="sm" onClick={onResult}>
-          <CalendarDays className="mr-1.5 h-3.5 w-3.5" />
-          Lançar Mensal
-        </Button>
-        <Button variant="outline" size="sm" onClick={() => onLaunchGrain?.('WEEKLY', grainMonth)}>
-          <CalendarDays className="mr-1.5 h-3.5 w-3.5" />
-          Lançar Semanal
-        </Button>
-        <Button variant="outline" size="sm" onClick={() => onLaunchGrain?.('DAILY', grainMonth)}>
-          <CalendarDays className="mr-1.5 h-3.5 w-3.5" />
-          Lançar Diário
-        </Button>
+        {canLaunch && (
+          <Button variant="default" size="sm" onClick={onResult}>
+            <CalendarDays className="mr-1.5 h-3.5 w-3.5" />
+            Lançar Mensal
+          </Button>
+        )}
+        {canLaunchGrain && (
+          <>
+            <Button variant="outline" size="sm" onClick={() => onLaunchGrain?.('WEEKLY', grainMonth)}>
+              <CalendarDays className="mr-1.5 h-3.5 w-3.5" />
+              Lançar Semanal
+            </Button>
+            <Button variant="outline" size="sm" onClick={() => onLaunchGrain?.('DAILY', grainMonth)}>
+              <CalendarDays className="mr-1.5 h-3.5 w-3.5" />
+              Lançar Diário
+            </Button>
+          </>
+        )}
         <div className="hidden md:block mx-1 w-px self-stretch bg-border" />
         <Button variant="outline" size="sm" onClick={onView}><Eye className="mr-1.5 h-3.5 w-3.5" />Visualizar</Button>
-        <Button variant="outline" size="sm" onClick={onEdit}><Pencil className="mr-1.5 h-3.5 w-3.5" />Editar</Button>
-        <Button variant="outline" size="sm" onClick={onTarget}>Metas</Button>
-        <Button variant="ghost" size="sm" onClick={onHistory}><History className="mr-1.5 h-3.5 w-3.5" />Histórico</Button>
-        <Button variant="ghost" size="sm" className="text-destructive hover:text-destructive ml-auto" onClick={onDelete}><Trash2 className="mr-1.5 h-3.5 w-3.5" />Inativar</Button>
+        {canEdit && (
+          <Button variant="outline" size="sm" onClick={onEdit}><Pencil className="mr-1.5 h-3.5 w-3.5" />Editar</Button>
+        )}
+        {canTargets && (
+          <Button variant="outline" size="sm" onClick={onTarget}>Metas</Button>
+        )}
+        {canHistory && (
+          <Button variant="ghost" size="sm" onClick={onHistory}><History className="mr-1.5 h-3.5 w-3.5" />Histórico</Button>
+        )}
+        {canDelete && (
+          <Button variant="ghost" size="sm" className="text-destructive hover:text-destructive ml-auto" onClick={onDelete}><Trash2 className="mr-1.5 h-3.5 w-3.5" />Inativar</Button>
+        )}
       </div>
 
       {micros.length > 0 && (
@@ -1160,6 +1206,12 @@ function MicroIndicatorRow({
   onHistory: () => void;
   onDelete: () => void;
 }) {
+  const { hasPermission } = useAuth();
+  const canEdit = hasPermission(['indicators:update']);
+  const canDelete = hasPermission(['indicators:delete']);
+  const canTargets = hasPermission(['indicators:targets', 'indicators:update']);
+  const canResult = hasPermission(['results:launch']);
+  const canHistory = hasPermission(['indicators:history', 'indicators:view']);
   const light = micro.last?.light ?? 'GRAY';
   const monthlyHistory = micro.monthlyHistory ?? [];
   const hasHistory = monthlyHistory.some((point) => point.meta !== null || point.realizado !== null);
@@ -1251,31 +1303,41 @@ function MicroIndicatorRow({
           <Eye className="h-3.5 w-3.5" />
           <span className="hidden sm:inline">Visualizar</span>
         </Button>
-        <Button variant="ghost" size="sm" className="h-7 text-xs px-2.5 gap-1.5" onClick={onEdit} title="Editar">
-          <Pencil className="h-3.5 w-3.5" />
-          <span className="hidden sm:inline">Editar</span>
-        </Button>
-        <Button variant="ghost" size="sm" className="h-7 text-xs px-2.5" onClick={onTarget}>
-          Metas
-        </Button>
-        <Button variant="ghost" size="sm" className="h-7 text-xs px-2.5" onClick={onResult}>
-          Realizados
-        </Button>
-        <Button variant="ghost" size="sm" className="h-7 text-xs px-2.5 gap-1.5" onClick={onHistory} title="Histórico">
-          <History className="h-3.5 w-3.5" />
-          <span className="hidden sm:inline">Histórico</span>
-        </Button>
+        {canEdit && (
+          <Button variant="ghost" size="sm" className="h-7 text-xs px-2.5 gap-1.5" onClick={onEdit} title="Editar">
+            <Pencil className="h-3.5 w-3.5" />
+            <span className="hidden sm:inline">Editar</span>
+          </Button>
+        )}
+        {canTargets && (
+          <Button variant="ghost" size="sm" className="h-7 text-xs px-2.5" onClick={onTarget}>
+            Metas
+          </Button>
+        )}
+        {canResult && (
+          <Button variant="ghost" size="sm" className="h-7 text-xs px-2.5" onClick={onResult}>
+            Realizados
+          </Button>
+        )}
+        {canHistory && (
+          <Button variant="ghost" size="sm" className="h-7 text-xs px-2.5 gap-1.5" onClick={onHistory} title="Histórico">
+            <History className="h-3.5 w-3.5" />
+            <span className="hidden sm:inline">Histórico</span>
+          </Button>
+        )}
         <div className="flex-1" />
-        <Button 
-          variant="ghost" 
-          size="sm" 
-          className="h-7 text-xs text-destructive hover:text-destructive hover:bg-destructive/10 px-2.5 gap-1.5 ml-auto" 
-          onClick={onDelete}
-          title="Inativar"
-        >
-          <Trash2 className="h-3.5 w-3.5" />
-          <span className="hidden sm:inline">Inativar</span>
-        </Button>
+        {canDelete && (
+          <Button
+            variant="ghost"
+            size="sm"
+            className="h-7 text-xs text-destructive hover:text-destructive hover:bg-destructive/10 px-2.5 gap-1.5 ml-auto"
+            onClick={onDelete}
+            title="Inativar"
+          >
+            <Trash2 className="h-3.5 w-3.5" />
+            <span className="hidden sm:inline">Inativar</span>
+          </Button>
+        )}
       </div>
     </div>
   );

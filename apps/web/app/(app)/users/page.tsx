@@ -94,7 +94,11 @@ type UserForm = typeof emptyForm;
 
 export default function UsersPage() {
   const qc = useQueryClient();
-  const { user: me } = useAuth();
+  const { user: me, hasPermission } = useAuth();
+  const canCreate = hasPermission(['users:create', 'users:manage']);
+  const canUpdate = hasPermission(['users:update', 'users:manage']);
+  const canDelete = hasPermission(['users:delete', 'users:manage']);
+  const canPermissions = hasPermission(['users:permissions', 'users:manage']);
   const [open, setOpen] = useState(false);
   const [search, setSearch] = useState('');
   const [form, setForm] = useState<UserForm>(emptyForm);
@@ -152,10 +156,12 @@ export default function UsersPage() {
           await api(`/users/${userId}/active`, { method: 'PATCH', json: { active: false } });
         }
       }
-      await api(`/users/${userId}/permissions`, {
-        method: 'PATCH',
-        json: { permissionKeys: form.permissionKeys },
-      });
+      if (canPermissions) {
+        await api(`/users/${userId}/permissions`, {
+          method: 'PATCH',
+          json: { permissionKeys: form.permissionKeys },
+        });
+      }
       return userId;
     },
     onSuccess: () => {
@@ -229,10 +235,12 @@ export default function UsersPage() {
         description="Cadastre usuários, vincule áreas de trabalho e ajuste permissões por módulo."
         breadcrumbs={[{ label: 'Início', href: '/' }, { label: 'Configurações' }, { label: 'Usuários' }]}
         actions={
-          <Button onClick={() => openUser()}>
-            <Plus className="mr-2 h-4 w-4" />
-            Novo usuário
-          </Button>
+          canCreate ? (
+            <Button onClick={() => openUser()}>
+              <Plus className="mr-2 h-4 w-4" />
+              Novo usuário
+            </Button>
+          ) : null
         }
       />
 
@@ -287,25 +295,31 @@ export default function UsersPage() {
                   <td><StatusBadge value={u.active ? 'ACTIVE' : 'CANCELLED'} label={u.status === 'BLOCKED' ? 'Bloqueado' : u.status === 'PENDING' ? 'Pendente' : u.active ? 'Ativo' : 'Inativo'} /></td>
                   <td className="text-right">
                     <div className="flex justify-end gap-2">
-                      <Button variant="outline" size="sm" onClick={() => openUser(u)}>
-                        <Edit className="mr-2 h-4 w-4" />
-                        Editar
-                      </Button>
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => toggleActive.mutate({ id: u.id, active: !u.active })}
-                      >
-                        {u.active ? 'Inativar' : 'Ativar'}
-                      </Button>
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => window.confirm('Confirma excluir logicamente este usuário?') && removeUser.mutate(u.id)}
-                      >
-                        <Trash2 className="mr-2 h-4 w-4" />
-                        Excluir
-                      </Button>
+                      {canUpdate && (
+                        <Button variant="outline" size="sm" onClick={() => openUser(u)}>
+                          <Edit className="mr-2 h-4 w-4" />
+                          Editar
+                        </Button>
+                      )}
+                      {canUpdate && (
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => toggleActive.mutate({ id: u.id, active: !u.active })}
+                        >
+                          {u.active ? 'Inativar' : 'Ativar'}
+                        </Button>
+                      )}
+                      {canDelete && (
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => window.confirm('Confirma excluir logicamente este usuário?') && removeUser.mutate(u.id)}
+                        >
+                          <Trash2 className="mr-2 h-4 w-4" />
+                          Excluir
+                        </Button>
+                      )}
                     </div>
                   </td>
                 </tr>
@@ -400,51 +414,57 @@ export default function UsersPage() {
               </label>
             </div>
 
-            <div className="rounded-lg border p-4">
-              <div className="mb-3 flex items-center justify-between gap-3">
-                <div>
-                  <div className="text-sm font-semibold">Permissões</div>
-                  <div className="text-xs text-muted-foreground">Marque os acessos liberados para este usuário.</div>
-                </div>
-                <Badge variant="secondary">{form.permissionKeys.length}</Badge>
-              </div>
-              <div className="max-h-[460px] space-y-4 overflow-y-auto pr-1">
-                {byModule.map(([module, items]) => (
-                  <div key={module}>
-                    <div className="mb-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground">{module}</div>
-                    <div className="space-y-2">
-                      {items.map((permission) => {
-                        const checked = form.permissionKeys.includes(permission.key);
-                        return (
-                          <label
-                            key={permission.key}
-                            className={cn('flex cursor-pointer items-start gap-3 rounded-lg border p-3 text-sm hover:bg-accent/35', checked && 'border-primary/40 bg-primary/5')}
-                          >
-                            <input
-                              type="checkbox"
-                              checked={checked}
-                              onChange={(e) =>
-                                setForm((prev) => ({
-                                  ...prev,
-                                  permissionKeys: e.target.checked
-                                    ? [...prev.permissionKeys, permission.key]
-                                    : prev.permissionKeys.filter((key) => key !== permission.key),
-                                }))
-                              }
-                              className="mt-1"
-                            />
-                            <span>
-                              <span className="block font-medium">{permission.description}</span>
-                              <span className="text-xs text-muted-foreground">{permission.key}</span>
-                            </span>
-                          </label>
-                        );
-                      })}
-                    </div>
+            {canPermissions ? (
+              <div className="rounded-lg border p-4">
+                <div className="mb-3 flex items-center justify-between gap-3">
+                  <div>
+                    <div className="text-sm font-semibold">Permissões</div>
+                    <div className="text-xs text-muted-foreground">Marque os acessos liberados para este usuário.</div>
                   </div>
-                ))}
+                  <Badge variant="secondary">{form.permissionKeys.length}</Badge>
+                </div>
+                <div className="max-h-[460px] space-y-4 overflow-y-auto pr-1">
+                  {byModule.map(([module, items]) => (
+                    <div key={module}>
+                      <div className="mb-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground">{module}</div>
+                      <div className="space-y-2">
+                        {items.map((permission) => {
+                          const checked = form.permissionKeys.includes(permission.key);
+                          return (
+                            <label
+                              key={permission.key}
+                              className={cn('flex cursor-pointer items-start gap-3 rounded-lg border p-3 text-sm hover:bg-accent/35', checked && 'border-primary/40 bg-primary/5')}
+                            >
+                              <input
+                                type="checkbox"
+                                checked={checked}
+                                onChange={(e) =>
+                                  setForm((prev) => ({
+                                    ...prev,
+                                    permissionKeys: e.target.checked
+                                      ? [...prev.permissionKeys, permission.key]
+                                      : prev.permissionKeys.filter((key) => key !== permission.key),
+                                  }))
+                                }
+                                className="mt-1"
+                              />
+                              <span>
+                                <span className="block font-medium">{permission.description}</span>
+                                <span className="text-xs text-muted-foreground">{permission.key}</span>
+                              </span>
+                            </label>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  ))}
+                </div>
               </div>
-            </div>
+            ) : (
+              <div className="rounded-lg border border-dashed p-6 text-center text-sm text-muted-foreground">
+                Você não possui permissão para alterar permissões deste usuário.
+              </div>
+            )}
           </div>
           <DialogFooter>
             <Button variant="ghost" onClick={() => setOpen(false)}>Cancelar</Button>

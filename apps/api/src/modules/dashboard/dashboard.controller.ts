@@ -2,8 +2,10 @@ import { Controller, Get, Query } from '@nestjs/common';
 import { DashboardService } from './dashboard.service';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import { AuthPayload } from '../auth/auth.types';
+import { RequirePermissions } from '../../common/decorators/permissions.decorator';
 
 @Controller('dashboard')
+@RequirePermissions('dashboard:view')
 export class DashboardController {
   constructor(private readonly service: DashboardService) {}
 

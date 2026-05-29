@@ -3,12 +3,14 @@ import { DeviationsService } from './deviations.service';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import { AuthPayload } from '../auth/auth.types';
 import { AnalysisMethod, DeviationSeverity, DeviationStatus } from '@prisma/client';
+import { RequirePermissions } from '../../common/decorators/permissions.decorator';
 
 @Controller('deviations')
 export class DeviationsController {
   constructor(private readonly service: DeviationsService) {}
 
   @Get()
+  @RequirePermissions('deviations:view')
   list(
     @CurrentUser() me: AuthPayload,
     @Query('status') status?: DeviationStatus,
@@ -18,11 +20,13 @@ export class DeviationsController {
   }
 
   @Get(':id')
+  @RequirePermissions('deviations:view')
   byId(@Param('id') id: string) {
     return this.service.getById(id);
   }
 
   @Post()
+  @RequirePermissions('deviations:create')
   open(
     @CurrentUser() me: AuthPayload,
     @Body()
@@ -52,11 +56,13 @@ export class DeviationsController {
   }
 
   @Patch(':id')
+  @RequirePermissions('deviations:update')
   update(@CurrentUser() me: AuthPayload, @Param('id') id: string, @Body() patch: any) {
     return this.service.update(id, patch, me.sub);
   }
 
   @Post(':id/causes')
+  @RequirePermissions('deviations:update')
   addCause(
     @Param('id') id: string,
     @Body() body: { description: string; category?: string; weight?: number },
@@ -66,11 +72,13 @@ export class DeviationsController {
   }
 
   @Delete('causes/:causeId')
+  @RequirePermissions('deviations:update')
   removeCause(@Param('causeId') causeId: string) {
     return this.service.removeCause(causeId);
   }
 
   @Post(':id/analyses')
+  @RequirePermissions('deviations:update')
   addAnalysis(
     @CurrentUser() me: AuthPayload,
     @Param('id') id: string,
@@ -80,6 +88,7 @@ export class DeviationsController {
   }
 
   @Post(':id/actions')
+  @RequirePermissions('actions:create')
   createAction(
     @CurrentUser() me: AuthPayload,
     @Param('id') id: string,
@@ -98,6 +107,7 @@ export class DeviationsController {
   }
 
   @Post(':id/close')
+  @RequirePermissions('deviations:close')
   close(@CurrentUser() me: AuthPayload, @Param('id') id: string) {
     return this.service.close(id, me.sub);
   }

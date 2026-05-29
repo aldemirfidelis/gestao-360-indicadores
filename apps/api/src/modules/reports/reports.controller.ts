@@ -3,8 +3,10 @@ import { Response } from 'express';
 import { ReportsService } from './reports.service';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import { AuthPayload } from '../auth/auth.types';
+import { RequirePermissions } from '../../common/decorators/permissions.decorator';
 
 @Controller('reports')
+@RequirePermissions('reports:export')
 export class ReportsController {
   constructor(private readonly service: ReportsService) {}
 

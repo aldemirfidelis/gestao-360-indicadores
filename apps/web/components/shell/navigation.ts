@@ -13,6 +13,7 @@ import {
   Home,
   LayoutDashboard,
   LineChart,
+  ListChecks,
   Map,
   Network,
   PencilLine,
@@ -20,6 +21,7 @@ import {
   ShieldCheck,
   SlidersHorizontal,
   Sparkles,
+  Stethoscope,
   Target,
   Upload,
   Users,
@@ -57,12 +59,13 @@ export const navSections: NavSection[] = [
     icon: LayoutDashboard,
     items: [
       { href: '/dashboard', label: 'Visão Geral', description: 'Resumo, pendências e atalhos', icon: Home, permissions: ['dashboard:view'], exact: true },
-      { href: '/visualization', label: 'Dashboard Executivo', description: 'Visão 360 para decisão', icon: BarChart3, permissions: ['dashboard:view'] },
+      { href: '/visualization', label: 'Dashboard Executivo', description: 'Visão 360 para decisão', icon: BarChart3, permissions: ['visualization:view', 'dashboard:view'] },
       { href: '/org', label: 'Árvore Organizacional', description: 'Áreas, setores, pilares e diretrizes', icon: Network, permissions: ['org:view'] },
       { href: '/strategy', label: 'Mapa Estratégico', description: 'Perspectivas, objetivos e impactos', icon: Map, permissions: ['strategy:view'] },
       { href: '/indicators', label: 'Indicadores', description: 'Farol, ranking e histórico', icon: Target, permissions: ['indicators:view'], exact: true },
+      { href: '/tree', label: 'Árvore de Indicadores', description: 'Causalidade entre indicadores macro e micro', icon: GitBranch, permissions: ['indicators:view'] },
       { href: '/projects', label: 'Cronogramas', description: 'Projetos, marcos e tarefas', icon: FolderKanban, permissions: ['projects:view'] },
-      { href: '/insights', label: 'Acompanhamentos', description: 'Alertas, tendências e insights', icon: Sparkles, permissions: ['dashboard:view'] },
+      { href: '/insights', label: 'Acompanhamentos', description: 'Alertas, tendências e insights', icon: Sparkles, permissions: ['insights:view'] },
     ],
   },
   {
@@ -72,8 +75,10 @@ export const navSections: NavSection[] = [
     icon: PencilLine,
     items: [
       { href: '/results', label: 'Lançar Resultado', description: 'Realizado mensal dos indicadores', icon: LineChart, permissions: ['results:launch'] },
-      { href: '/deviations', label: 'Criar Análise de Causa', description: 'Desvios, FCA e tratativas', icon: AlertTriangle, permissions: ['deviations:manage'] },
-      { href: '/imports', label: 'Registrar Evidência', description: 'Arquivos, CSV e documentos', icon: Upload, permissions: ['actions:manage', 'reports:export'] },
+      { href: '/launches', label: 'Lançamentos do Mês', description: 'Conferência rápida de lançamentos', icon: ListChecks, permissions: ['launches:view'] },
+      { href: '/deviations', label: 'Análise de Causa', description: 'Desvios, FCA e tratativas', icon: AlertTriangle, permissions: ['deviations:view'] },
+      { href: '/treatments', label: 'Tratativas', description: 'Tratamento de desvios e ações decorrentes', icon: Stethoscope, permissions: ['treatments:view'] },
+      { href: '/imports', label: 'Registrar Evidência', description: 'Arquivos, CSV e documentos', icon: Upload, permissions: ['imports:view', 'imports:create'] },
     ],
   },
   {
@@ -82,13 +87,13 @@ export const navSections: NavSection[] = [
     intent: 'management',
     icon: Building2,
     items: [
-      { href: '/organograma', label: 'Organograma de Área', description: 'Estrutura de cargos, faixas, turnos e orçamento', icon: Users, permissions: ['org:view'] },
-      { href: '/aprovacoes-cargo', label: 'Aprovações de Cargo', description: 'Solicitações de promoção e mudança de cargo', icon: ShieldCheck, permissions: ['org:view'] },
-      { href: '/eficacia', label: 'Análise de Eficácia', description: 'Validação de eficácia dos planos de ação (restrito)', icon: ClipboardCheck, permissions: ['actions:effectiveness', 'actions:view'] },
+      { href: '/organograma', label: 'Organograma de Área', description: 'Estrutura de cargos, faixas, turnos e orçamento', icon: Users, permissions: ['org:positions:view', 'org:view'] },
+      { href: '/aprovacoes-cargo', label: 'Aprovações de Cargo', description: 'Solicitações de promoção e mudança de cargo', icon: ShieldCheck, permissions: ['org:positions:approve'] },
+      { href: '/eficacia', label: 'Análise de Eficácia', description: 'Validação de eficácia dos planos de ação (restrito)', icon: ClipboardCheck, permissions: ['eficacia:view', 'actions:effectiveness'] },
       { href: '/periods', label: 'Períodos', description: 'Ano de trabalho, abertura e fechamento anual', icon: Calendar, permissions: ['settings:manage'] },
       { href: '/actions', label: 'Plano de Ação', description: 'Ações, execução, evidências e eficácia', icon: ClipboardList, permissions: ['actions:view'] },
       { href: '/meetings', label: 'Reuniões', description: 'Agenda, atas e decisões', icon: Calendar, permissions: ['meetings:view'] },
-      { href: '/okrs', label: 'OKRs', description: 'Ciclos e resultados-chave', icon: Activity, permissions: ['okrs:manage'] },
+      { href: '/okrs', label: 'OKRs', description: 'Ciclos e resultados-chave', icon: Activity, permissions: ['okrs:view'] },
     ],
   },
   {
@@ -97,7 +102,7 @@ export const navSections: NavSection[] = [
     intent: 'reports',
     icon: FileBarChart,
     items: [
-      { href: '/reports', label: 'Relatórios e Exportações', description: 'Indicadores, resultados, metas, desvios e áreas', icon: FileBarChart, permissions: ['reports:export'] },
+      { href: '/reports', label: 'Relatórios e Exportações', description: 'Indicadores, resultados, metas, desvios e áreas', icon: FileBarChart, permissions: ['reports:view', 'reports:export'] },
       { href: '/audit', label: 'Auditoria', description: 'Relatório de ações do sistema', icon: ShieldCheck, permissions: ['audit:view'] },
     ],
   },
@@ -116,7 +121,7 @@ export const mobileNavItems: NavItem[] = [
   { href: '/results', label: 'Lançar', icon: PencilLine, permissions: ['results:launch'] },
   { href: '/strategy', label: 'Mapa', icon: Map, permissions: ['strategy:view'] },
   { href: '/org', label: 'Árvore', icon: Network, permissions: ['org:view'] },
-  { href: '/reports', label: 'Relatórios', icon: FileBarChart, permissions: ['reports:export'] },
+  { href: '/reports', label: 'Relatórios', icon: FileBarChart, permissions: ['reports:view', 'reports:export'] },
   settingsNavItem,
 ];
 
@@ -134,6 +139,46 @@ export const productAreas = [
     icon: SlidersHorizontal,
   },
 ];
+
+// Mapeamento centralizado URL -> permissoes necessarias.
+// Usado pelo RouteGuard para bloquear acesso direto via URL.
+export const ROUTE_PERMISSIONS: Array<{ prefix: string; permissions: string[]; exact?: boolean }> = [
+  { prefix: '/dashboard', permissions: ['dashboard:view'] },
+  { prefix: '/visualization', permissions: ['visualization:view', 'dashboard:view'] },
+  { prefix: '/insights', permissions: ['insights:view'] },
+  { prefix: '/indicators/new', permissions: ['indicators:create'] },
+  { prefix: '/indicators', permissions: ['indicators:view'] },
+  { prefix: '/tree', permissions: ['indicators:view'] },
+  { prefix: '/strategy', permissions: ['strategy:view'] },
+  { prefix: '/org', permissions: ['org:view'] },
+  { prefix: '/organograma', permissions: ['org:positions:view', 'org:view'] },
+  { prefix: '/aprovacoes-cargo', permissions: ['org:positions:approve'] },
+  { prefix: '/projects', permissions: ['projects:view'] },
+  { prefix: '/results', permissions: ['results:launch'] },
+  { prefix: '/launches', permissions: ['launches:view'] },
+  { prefix: '/deviations', permissions: ['deviations:view'] },
+  { prefix: '/treatments', permissions: ['treatments:view'] },
+  { prefix: '/imports', permissions: ['imports:view', 'imports:create'] },
+  { prefix: '/eficacia', permissions: ['eficacia:view', 'actions:effectiveness'] },
+  { prefix: '/periods', permissions: ['settings:manage'] },
+  { prefix: '/actions', permissions: ['actions:view'] },
+  { prefix: '/meetings', permissions: ['meetings:view'] },
+  { prefix: '/okrs', permissions: ['okrs:view'] },
+  { prefix: '/reports', permissions: ['reports:view', 'reports:export'] },
+  { prefix: '/audit', permissions: ['audit:view'] },
+  { prefix: '/users', permissions: ['users:view', 'users:manage'] },
+  { prefix: '/settings', permissions: ['settings:view', 'settings:manage'] },
+];
+
+export function findRoutePermissions(pathname: string): string[] | null {
+  const ordered = [...ROUTE_PERMISSIONS].sort((a, b) => b.prefix.length - a.prefix.length);
+  for (const route of ordered) {
+    if (pathname === route.prefix || pathname.startsWith(`${route.prefix}/`)) {
+      return route.permissions;
+    }
+  }
+  return null;
+}
 
 export function visibleNavSections(user: NavUser | null | undefined) {
   return navSections
