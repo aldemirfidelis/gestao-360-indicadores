@@ -11,6 +11,7 @@ import {
   BarChart,
   CartesianGrid,
   Cell,
+  LabelList,
   Line,
   LineChart,
   ResponsiveContainer,
@@ -32,9 +33,11 @@ import {
   Pencil,
   Plus,
   RefreshCcw,
+  Save,
   Search,
   Target,
   Trash2,
+  TrendingDown,
   TrendingUp,
   UserRound,
   Sliders,
@@ -60,6 +63,7 @@ import { cn, formatDate, formatNumber, formatPercent, periodRefLabel } from '@/l
 import {
   PERIODICITY_LABEL,
   DIRECTION_LABEL,
+  DIRECTION_SHORT_LABEL,
   INDICATOR_TYPE_LABEL,
   INDICATOR_UNIT_LABEL,
   INDICATOR_STATUS_LABEL,
@@ -281,7 +285,6 @@ export default function IndicatorsPage() {
   const [viewing, setViewing] = useState<IndicatorRow | null>(null);
   const [targetEditing, setTargetEditing] = useState<IndicatorRow | null>(null);
   const [resultEditing, setResultEditing] = useState<IndicatorRow | null>(null);
-  const [grainLaunch, setGrainLaunch] = useState<{ indicator: IndicatorRow; granularity: 'WEEKLY' | 'DAILY'; month: string } | null>(null);
   const [historyIndicator, setHistoryIndicator] = useState<IndicatorRow | null>(null);
   const [filtersOpen, setFiltersOpen] = useState(false);
 
@@ -669,13 +672,11 @@ export default function IndicatorsPage() {
             canDelete={canDelete}
             canTargets={canTargets}
             canLaunch={canLaunch}
-            canLaunchGrain={canLaunchGrain}
             canHistory={canHistory}
             onView={() => setViewing(indicator)}
             onEdit={() => openEdit(indicator)}
             onTarget={() => openTarget(indicator)}
             onResult={() => openResult(indicator)}
-            onLaunchGrain={(granularity, month) => setGrainLaunch({ indicator, granularity, month })}
             onHistory={() => setHistoryIndicator(indicator)}
             onMicroView={(micro) => setViewing(micro)}
             onMicroEdit={(micro) => openEdit(micro)}
@@ -723,11 +724,6 @@ export default function IndicatorsPage() {
       <ResultDialog
         indicator={resultEditing}
         onOpenChange={(open) => !open && setResultEditing(null)}
-      />
-
-      <GrainLaunchDialog
-        state={grainLaunch}
-        onOpenChange={(open) => !open && setGrainLaunch(null)}
       />
 
       <HistoryDialog
@@ -820,13 +816,11 @@ function IndicatorManagementCard({
   canDelete = true,
   canTargets = true,
   canLaunch = true,
-  canLaunchGrain = true,
   canHistory = true,
   onView,
   onEdit,
   onTarget,
   onResult,
-  onLaunchGrain,
   onHistory,
   onDelete,
   onMicroView,
@@ -842,13 +836,11 @@ function IndicatorManagementCard({
   canDelete?: boolean;
   canTargets?: boolean;
   canLaunch?: boolean;
-  canLaunchGrain?: boolean;
   canHistory?: boolean;
   onView: () => void;
   onEdit: () => void;
   onTarget: () => void;
   onResult: () => void;
-  onLaunchGrain?: (granularity: 'WEEKLY' | 'DAILY', month: string) => void;
   onHistory: () => void;
   onDelete: () => void;
   onMicroView?: (micro: IndicatorRow) => void;
@@ -962,6 +954,17 @@ function IndicatorManagementCard({
         <div className="min-w-0 flex-1">
           <h3 className="text-2xl font-bold leading-tight">{indicator.name}</h3>
           <div className="mt-2 flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-muted-foreground">
+            <span
+              className={cn(
+                'inline-flex items-center gap-1 border px-1.5 py-0.5 text-[10px] font-medium uppercase tracking-wide',
+                indicator.direction === 'LOWER_BETTER'
+                  ? 'border-status-blue/30 bg-status-blue/10 text-status-blue'
+                  : 'border-status-green/30 bg-status-green/10 text-status-green',
+              )}
+            >
+              {indicator.direction === 'LOWER_BETTER' ? <TrendingDown className="h-3 w-3" /> : <TrendingUp className="h-3 w-3" />}
+              {DIRECTION_SHORT_LABEL[indicator.direction] ?? indicator.direction}
+            </span>
             <span className="flex items-center gap-1.5"><Target className="h-3.5 w-3.5" />{indicator.areaMacro?.name ?? '-'}</span>
             <span className="flex items-center gap-1.5"><TrendingUp className="h-3.5 w-3.5" />{indicator.areaMicro?.name ?? indicator.ownerNode.name}</span>
             <span className="flex items-center gap-1.5"><UserRound className="h-3.5 w-3.5" />{indicator.responsibleUser?.name ?? 'Sem responsável'}</span>
@@ -971,25 +974,25 @@ function IndicatorManagementCard({
         <StatusLight light={light} size="md" />
       </div>
 
-      <div className="mt-5 grid grid-cols-1 gap-5 lg:grid-cols-[280px,1fr]">
-        <div className="space-y-3">
-          <div className="rounded-lg border bg-card/60 p-3">
-            <div className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
-              Meta {viewMode === 'cumulative' ? 'acumulada' : ''} <span className="font-normal text-muted-foreground/80">({monthLabel})</span>
+      <div className="mt-5 grid grid-cols-1 gap-4 lg:grid-cols-[180px,1fr]">
+        <div className="space-y-2">
+          <div className="border border-border/60 bg-card/60 p-2">
+            <div className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">
+              Meta{viewMode === 'cumulative' ? ' acum.' : ''} <span className="font-normal text-muted-foreground/70">({monthLabel})</span>
             </div>
-            <div className="mt-1 text-2xl font-semibold">{formatNumber(metaDisplay ?? null)}</div>
+            <div className="mt-0.5 text-lg font-semibold leading-tight">{formatNumber(metaDisplay ?? null)}</div>
           </div>
-          <div className="rounded-lg border bg-card/60 p-3">
-            <div className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">Realizado {viewMode === 'cumulative' ? 'acumulado' : ''}</div>
-            <div className="mt-1 text-2xl font-semibold">
+          <div className="border border-border/60 bg-card/60 p-2">
+            <div className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">Realizado{viewMode === 'cumulative' ? ' acum.' : ''}</div>
+            <div className="mt-0.5 text-lg font-semibold leading-tight">
               {realizadoDisplay !== null && realizadoDisplay !== undefined ? formatNumber(realizadoDisplay) : '-'}
-              <span className="ml-1 text-xs font-normal text-muted-foreground">{unitText}</span>
+              <span className="ml-1 text-[10px] font-normal text-muted-foreground">{unitText}</span>
             </div>
           </div>
-          <div className="rounded-lg border bg-card/60 p-3">
-            <div className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">Atingimento</div>
-            <div className="mt-1 text-2xl font-semibold">{formatPercent(selectedPoint?.attainment ?? null)}</div>
-            <Progress value={attainment} className="mt-2 h-1.5" />
+          <div className="border border-border/60 bg-card/60 p-2">
+            <div className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">Atingimento</div>
+            <div className="mt-0.5 text-lg font-semibold leading-tight">{formatPercent(selectedPoint?.attainment ?? null)}</div>
+            <Progress value={attainment} className="mt-1 h-1" />
           </div>
         </div>
 
@@ -1046,11 +1049,11 @@ function IndicatorManagementCard({
             </div>
           </div>
 
-          <div className="h-64 rounded-md border bg-card/60 p-3">
+          <div className="h-80 border border-border/60 bg-card/60 p-3 sm:h-96">
             {hasAnyData ? (
               <ResponsiveContainer width="100%" height="100%">
                 {chartType === 'bar' ? (
-                  <BarChart data={chartData} barGap={2} onClick={onChartClick} style={{ cursor: 'pointer' }}>
+                  <BarChart data={chartData} barGap={2} margin={{ top: 24, right: 12, left: 0, bottom: 8 }} onClick={onChartClick} style={{ cursor: 'pointer' }}>
                     <CartesianGrid strokeDasharray="3 3" className="stroke-border" vertical={false} />
                     <XAxis
                       dataKey="month"
@@ -1065,7 +1068,9 @@ function IndicatorManagementCard({
                     />
                     <YAxis tick={{ fontSize: 11 }} width={48} />
                     <Tooltip content={<ChartTooltip viewMode={viewMode} />} cursor={{ fill: 'hsl(var(--muted))', opacity: 0.35 }} />
-                    <Bar dataKey="displayMeta" name="Meta" fill="#1e3a8a" radius={[3, 3, 0, 0]} />
+                    <Bar dataKey="displayMeta" name="Meta" fill="#1e3a8a" radius={[3, 3, 0, 0]}>
+                      <LabelList dataKey="displayMeta" position="top" fontSize={10} fill="#1e3a8a" formatter={(v: any) => (v === null || v === undefined ? '' : formatNumber(v))} />
+                    </Bar>
                     <Bar dataKey="displayRealizado" name="Realizado" radius={[3, 3, 0, 0]}>
                       {chartData.map((entry, index) => {
                         let color = 'hsl(var(--status-gray))';
@@ -1079,10 +1084,11 @@ function IndicatorManagementCard({
                         }
                         return <Cell key={`cell-${index}`} fill={color} />;
                       })}
+                      <LabelList dataKey="displayRealizado" position="top" fontSize={10} fill="hsl(var(--foreground))" formatter={(v: any) => (v === null || v === undefined ? '' : formatNumber(v))} />
                     </Bar>
                   </BarChart>
                 ) : (
-                  <LineChart data={chartData} onClick={onChartClick} style={{ cursor: 'pointer' }}>
+                  <LineChart data={chartData} margin={{ top: 24, right: 12, left: 0, bottom: 8 }} onClick={onChartClick} style={{ cursor: 'pointer' }}>
                     <CartesianGrid strokeDasharray="3 3" className="stroke-border" vertical={false} />
                     <XAxis
                       dataKey="month"
@@ -1097,8 +1103,12 @@ function IndicatorManagementCard({
                     />
                     <YAxis tick={{ fontSize: 11 }} width={48} />
                     <Tooltip content={<ChartTooltip viewMode={viewMode} />} cursor={{ stroke: 'hsl(var(--muted-foreground))', strokeWidth: 1, strokeDasharray: '3 3' }} />
-                    <Line type="monotone" dataKey="displayMeta" name="Meta" stroke="#1e3a8a" strokeWidth={2.5} strokeDasharray="6 4" dot={{ r: 3, fill: '#1e3a8a' }} activeDot={{ r: 5 }} />
-                    <Line type="monotone" dataKey="displayRealizado" name="Realizado" stroke="#10b981" strokeWidth={2.5} dot={{ r: 3, fill: '#10b981' }} activeDot={{ r: 5 }} />
+                    <Line type="monotone" dataKey="displayMeta" name="Meta" stroke="#1e3a8a" strokeWidth={2.5} strokeDasharray="6 4" dot={{ r: 3, fill: '#1e3a8a' }} activeDot={{ r: 5 }}>
+                      <LabelList dataKey="displayMeta" position="top" fontSize={10} fill="#1e3a8a" formatter={(v: any) => (v === null || v === undefined ? '' : formatNumber(v))} />
+                    </Line>
+                    <Line type="monotone" dataKey="displayRealizado" name="Realizado" stroke="#10b981" strokeWidth={2.5} dot={{ r: 3, fill: '#10b981' }} activeDot={{ r: 5 }}>
+                      <LabelList dataKey="displayRealizado" position="top" fontSize={10} fill="#10b981" formatter={(v: any) => (v === null || v === undefined ? '' : formatNumber(v))} />
+                    </Line>
                   </LineChart>
                 )}
               </ResponsiveContainer>
@@ -1121,20 +1131,8 @@ function IndicatorManagementCard({
         {canLaunch && (
           <Button variant="default" size="sm" onClick={onResult}>
             <CalendarDays className="mr-1.5 h-3.5 w-3.5" />
-            Lançar Mensal
+            Lançar Realizado
           </Button>
-        )}
-        {canLaunchGrain && (
-          <>
-            <Button variant="outline" size="sm" onClick={() => onLaunchGrain?.('WEEKLY', grainMonth)}>
-              <CalendarDays className="mr-1.5 h-3.5 w-3.5" />
-              Lançar Semanal
-            </Button>
-            <Button variant="outline" size="sm" onClick={() => onLaunchGrain?.('DAILY', grainMonth)}>
-              <CalendarDays className="mr-1.5 h-3.5 w-3.5" />
-              Lançar Diário
-            </Button>
-          </>
         )}
         <div className="hidden md:block mx-1 w-px self-stretch bg-border" />
         <Button variant="outline" size="sm" onClick={onView}><Eye className="mr-1.5 h-3.5 w-3.5" />Visualizar</Button>
@@ -1563,6 +1561,8 @@ function IndicatorViewDialog({ indicator, onOpenChange }: { indicator: Indicator
   );
 }
 
+type LaunchGranularity = 'MONTHLY' | 'WEEKLY' | 'DAILY';
+
 function TargetDialog({
   indicator,
   onOpenChange,
@@ -1571,24 +1571,11 @@ function TargetDialog({
   onOpenChange: (open: boolean) => void;
 }) {
   return (
-    <Dialog open={Boolean(indicator)} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-4xl">
-        <DialogHeader>
-          <DialogTitle>Alterar metas do ano</DialogTitle>
-        </DialogHeader>
-        {indicator && (
-          <IndicatorResultEditor
-            mode="target"
-            indicatorId={indicator.id}
-            fallbackName={indicator.name}
-            unitLabel={indicator.unitLabel ?? indicator.unit}
-          />
-        )}
-        <DialogFooter>
-          <Button variant="outline" onClick={() => onOpenChange(false)}>Fechar</Button>
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
+    <UnifiedLaunchDialog
+      indicator={indicator}
+      mode="target"
+      onOpenChange={onOpenChange}
+    />
   );
 }
 
@@ -1600,17 +1587,81 @@ function ResultDialog({
   onOpenChange: (open: boolean) => void;
 }) {
   return (
+    <UnifiedLaunchDialog
+      indicator={indicator}
+      mode="result"
+      onOpenChange={onOpenChange}
+    />
+  );
+}
+
+function UnifiedLaunchDialog({
+  indicator,
+  mode,
+  onOpenChange,
+}: {
+  indicator: IndicatorRow | null;
+  mode: 'result' | 'target';
+  onOpenChange: (open: boolean) => void;
+}) {
+  const [granularity, setGranularity] = useState<LaunchGranularity>('MONTHLY');
+
+  useEffect(() => {
+    if (indicator) setGranularity('MONTHLY');
+  }, [indicator?.id]);
+
+  const isResult = mode === 'result';
+  const monthlyLabel = isResult ? 'Lançar Realizado' : 'Meta Mensal';
+  const weeklyLabel = isResult ? 'Lançar Semanal' : 'Meta Semanal';
+  const dailyLabel = isResult ? 'Lançar Diário' : 'Meta Diária';
+  const title = isResult ? `Lançar Realizado · ${indicator?.name ?? ''}` : `Alterar metas · ${indicator?.name ?? ''}`;
+
+  const tabs: Array<{ key: LaunchGranularity; label: string }> = [
+    { key: 'MONTHLY', label: monthlyLabel },
+    { key: 'WEEKLY', label: weeklyLabel },
+    { key: 'DAILY', label: dailyLabel },
+  ];
+
+  return (
     <Dialog open={Boolean(indicator)} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-4xl">
         <DialogHeader>
-          <DialogTitle>Lançar resultados mensais</DialogTitle>
+          <DialogTitle>{title}</DialogTitle>
         </DialogHeader>
         {indicator && (
-          <IndicatorResultEditor
-            indicatorId={indicator.id}
-            fallbackName={indicator.name}
-            unitLabel={indicator.unitLabel ?? indicator.unit}
-          />
+          <div className="space-y-4">
+            <div className="inline-flex border border-border/60 bg-muted/40 p-0.5">
+              {tabs.map((tab) => (
+                <button
+                  key={tab.key}
+                  type="button"
+                  onClick={() => setGranularity(tab.key)}
+                  className={cn(
+                    'px-3 py-1.5 text-xs font-medium transition-colors',
+                    granularity === tab.key ? 'bg-primary text-primary-foreground' : 'text-muted-foreground hover:text-foreground',
+                  )}
+                >
+                  {tab.label}
+                </button>
+              ))}
+            </div>
+
+            {granularity === 'MONTHLY' && (
+              <IndicatorResultEditor
+                mode={mode}
+                indicatorId={indicator.id}
+                fallbackName={indicator.name}
+                unitLabel={indicator.unitLabel ?? indicator.unit}
+              />
+            )}
+            {granularity !== 'MONTHLY' && (
+              <GrainEditor
+                indicator={indicator}
+                mode={mode}
+                granularity={granularity}
+              />
+            )}
+          </div>
         )}
         <DialogFooter>
           <Button variant="outline" onClick={() => onOpenChange(false)}>Fechar</Button>
@@ -1620,28 +1671,26 @@ function ResultDialog({
   );
 }
 
-function GrainLaunchDialog({
-  state,
-  onOpenChange,
+function GrainEditor({
+  indicator,
+  mode,
+  granularity,
 }: {
-  state: { indicator: IndicatorRow; granularity: 'WEEKLY' | 'DAILY'; month: string } | null;
-  onOpenChange: (open: boolean) => void;
+  indicator: IndicatorRow;
+  mode: 'result' | 'target';
+  granularity: 'WEEKLY' | 'DAILY';
 }) {
   const qc = useQueryClient();
-  const [month, setMonth] = useState<string>(state?.month ?? currentMonthRef());
+  const [month, setMonth] = useState<string>(currentMonthRef());
   const [edits, setEdits] = useState<Record<string, string>>({});
 
   useEffect(() => {
-    if (state) {
-      setMonth(state.month);
-      setEdits({});
-    }
-  }, [state?.indicator.id, state?.granularity, state?.month]);
+    setEdits({});
+  }, [indicator.id, granularity, month]);
 
   const query = useQuery<GrainResponse>({
-    queryKey: ['grain', state?.indicator.id, state?.granularity, month],
-    enabled: Boolean(state),
-    queryFn: () => api<GrainResponse>(`/results/grain?indicatorId=${state!.indicator.id}&granularity=${state!.granularity}&month=${month}`),
+    queryKey: ['grain', indicator.id, granularity, month],
+    queryFn: () => api<GrainResponse>(`/results/grain?indicatorId=${indicator.id}&granularity=${granularity}&month=${month}`),
   });
 
   const save = useMutation({
@@ -1652,98 +1701,93 @@ function GrainLaunchDialog({
         if (trimmed === '') continue;
         const num = Number(trimmed);
         if (!Number.isFinite(num)) continue;
-        items.push({ indicatorId: state!.indicator.id, periodRef, value: num });
+        items.push({ indicatorId: indicator.id, periodRef, value: num });
       }
       if (items.length === 0) return Promise.reject(new Error('Nada para salvar'));
-      return api<{ count: number }>('/results/batch', { method: 'POST', json: { items } });
+      const endpoint = mode === 'target' ? '/results/batch' : '/results/batch';
+      return api<{ count: number }>(endpoint, { method: 'POST', json: { items } });
     },
     onSuccess: (out) => {
       toast.success(`${out.count} lançamento(s) salvos`);
       setEdits({});
-      qc.invalidateQueries({ queryKey: ['grain', state?.indicator.id] });
+      qc.invalidateQueries({ queryKey: ['grain', indicator.id] });
       qc.invalidateQueries({ queryKey: ['indicators'] });
-      qc.invalidateQueries({ queryKey: ['indicator', state?.indicator.id, 'grain'] });
+      qc.invalidateQueries({ queryKey: ['indicator', indicator.id, 'grain'] });
     },
     onError: (e: any) => toast.error(e?.message ?? 'Falha ao salvar'),
   });
 
-  if (!state) return null;
   const cells = query.data?.cells ?? [];
-  const title = state.granularity === 'WEEKLY' ? 'Lançar resultados semanais' : 'Lançar resultados diários';
   const editedCount = Object.values(edits).filter((v) => v.trim() !== '').length;
+  const valueColLabel = mode === 'target' ? 'Meta' : 'Realizado';
 
   return (
-    <Dialog open={Boolean(state)} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-4xl">
-        <DialogHeader>
-          <DialogTitle>{title} - {state.indicator.name}</DialogTitle>
-        </DialogHeader>
-        <div className="space-y-4">
-          <div className="flex flex-wrap items-center gap-3">
-            <Label className="text-xs uppercase text-muted-foreground">Mês</Label>
-            <NativeSelect value={month} onChange={(e) => { setMonth(e.target.value); setEdits({}); }} className="h-9 w-40">
-              {monthOptionsForYear(new Date().getFullYear()).map((opt) => (
-                <option key={opt.value} value={opt.value}>{opt.label}</option>
-              ))}
-            </NativeSelect>
-            <span className="text-xs text-muted-foreground">
-              {state.granularity === 'WEEKLY' ? `${cells.length} semana(s) no mês` : `${cells.length} dia(s) no mês`}
-            </span>
-          </div>
+    <div className="space-y-4">
+      <div className="flex flex-wrap items-center gap-3">
+        <Label className="text-xs uppercase text-muted-foreground">Mês</Label>
+        <NativeSelect value={month} onChange={(e) => { setMonth(e.target.value); setEdits({}); }} className="h-9 w-40">
+          {monthOptionsForYear(new Date().getFullYear()).map((opt) => (
+            <option key={opt.value} value={opt.value}>{opt.label}</option>
+          ))}
+        </NativeSelect>
+        <span className="text-xs text-muted-foreground">
+          {granularity === 'WEEKLY' ? `${cells.length} semana(s) no mês` : `${cells.length} dia(s) no mês`}
+        </span>
+      </div>
 
-          {query.isLoading && <LoadingState className="min-h-40" />}
-          {!query.isLoading && cells.length === 0 && (
-            <EmptyState title="Sem períodos" description="Selecione outro mês." />
-          )}
-          {!query.isLoading && cells.length > 0 && (
-            <div className="overflow-x-auto rounded-lg border">
-              <table className="table-modern min-w-[480px]">
-                <thead>
-                  <tr>
-                    <th className="text-left">{state.granularity === 'WEEKLY' ? 'Semana' : 'Dia'}</th>
-                    <th className="text-left">Meta</th>
-                    <th className="text-left">Realizado</th>
+      {query.isLoading && <LoadingState className="min-h-40" />}
+      {!query.isLoading && cells.length === 0 && (
+        <EmptyState title="Sem períodos" description="Selecione outro mês." />
+      )}
+      {!query.isLoading && cells.length > 0 && (
+        <div className="overflow-x-auto border">
+          <table className="table-modern min-w-[480px]">
+            <thead>
+              <tr>
+                <th className="text-left">{granularity === 'WEEKLY' ? 'Semana' : 'Dia'}</th>
+                <th className="text-left">Meta</th>
+                <th className="text-left">{valueColLabel}</th>
+              </tr>
+            </thead>
+            <tbody>
+              {cells.map((cell) => {
+                const editVal = edits[cell.periodRef] ?? '';
+                const persisted = mode === 'target' ? cell.target : cell.value;
+                const display = editVal !== ''
+                  ? editVal
+                  : persisted !== null && persisted !== undefined ? String(persisted) : '';
+                return (
+                  <tr key={cell.periodRef}>
+                    <td>
+                      <div className="font-medium">{grainPeriodLabel(cell.periodRef)}</div>
+                      <div className="text-xs text-muted-foreground">{cell.periodRef}</div>
+                    </td>
+                    <td>
+                      <div className="text-sm">{cell.target !== null ? formatNumber(cell.target) : '-'}</div>
+                    </td>
+                    <td>
+                      <Input
+                        value={display}
+                        onChange={(e) => setEdits((prev) => ({ ...prev, [cell.periodRef]: e.target.value }))}
+                        placeholder={cell.target !== null ? String(cell.target) : '-'}
+                        className="h-9 w-32 text-sm"
+                      />
+                    </td>
                   </tr>
-                </thead>
-                <tbody>
-                  {cells.map((cell) => {
-                    const editVal = edits[cell.periodRef] ?? '';
-                    const display = editVal !== ''
-                      ? editVal
-                      : cell.value !== null && cell.value !== undefined ? String(cell.value) : '';
-                    return (
-                      <tr key={cell.periodRef}>
-                        <td>
-                          <div className="font-medium">{grainPeriodLabel(cell.periodRef)}</div>
-                          <div className="text-xs text-muted-foreground">{cell.periodRef}</div>
-                        </td>
-                        <td>
-                          <div className="text-sm">{cell.target !== null ? formatNumber(cell.target) : '-'}</div>
-                        </td>
-                        <td>
-                          <Input
-                            value={display}
-                            onChange={(e) => setEdits((prev) => ({ ...prev, [cell.periodRef]: e.target.value }))}
-                            placeholder={cell.target !== null ? String(cell.target) : '-'}
-                            className="h-9 w-32 text-sm"
-                          />
-                        </td>
-                      </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
-            </div>
-          )}
+                );
+              })}
+            </tbody>
+          </table>
         </div>
-        <DialogFooter>
-          <Button variant="outline" onClick={() => onOpenChange(false)}>Fechar</Button>
-          <Button onClick={() => save.mutate()} disabled={editedCount === 0 || save.isPending}>
-            {save.isPending ? 'Salvando...' : `Salvar (${editedCount})`}
-          </Button>
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
+      )}
+
+      <div className="flex justify-end">
+        <Button onClick={() => save.mutate()} disabled={editedCount === 0 || save.isPending}>
+          <Save className="mr-2 h-4 w-4" />
+          {save.isPending ? 'Salvando...' : `Salvar (${editedCount})`}
+        </Button>
+      </div>
+    </div>
   );
 }
 

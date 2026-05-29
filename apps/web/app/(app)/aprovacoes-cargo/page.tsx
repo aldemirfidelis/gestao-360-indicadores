@@ -83,7 +83,7 @@ export default function AprovacoesCargoPage() {
       setDecisionNote('');
       qc.invalidateQueries({ queryKey: ['career-approvals'] });
     },
-    onError: (e: any) => toast.error(e?.message ?? 'Falha ao registrar decisao'),
+    onError: (e: any) => toast.error(e?.message ?? 'Falha ao registrar decisão'),
   });
 
   const cancel = useMutation({

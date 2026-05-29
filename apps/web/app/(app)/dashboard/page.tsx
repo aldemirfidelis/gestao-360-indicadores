@@ -90,7 +90,6 @@ interface WorstRow {
 }
 
 const SHORTCUT_DEFS = [
-  { id: 'results', href: '/results', label: 'Lançar resultado', icon: LineChart },
   { id: 'indicators', href: '/indicators', label: 'Gestão de Indicadores', icon: Target },
   { id: 'actions', href: '/actions', label: 'Planos de ação', icon: ClipboardList },
   { id: 'reports', href: '/reports', label: 'Exportar relatório', icon: FileBarChart },
@@ -124,12 +123,14 @@ export default function HomePage() {
     const saved = localStorage.getItem('g360-dashboard-shortcuts');
     if (saved) {
       try {
-        setSelectedShortcuts(JSON.parse(saved));
+        const parsed = JSON.parse(saved);
+        const filtered = Array.isArray(parsed) ? parsed.filter((id) => id !== 'results') : ['indicators', 'actions', 'reports'];
+        setSelectedShortcuts(filtered.length > 0 ? filtered : ['indicators', 'actions', 'reports']);
       } catch (e) {
-        setSelectedShortcuts(['results', 'indicators', 'actions', 'reports']);
+        setSelectedShortcuts(['indicators', 'actions', 'reports']);
       }
     } else {
-      setSelectedShortcuts(['results', 'indicators', 'actions', 'reports']);
+      setSelectedShortcuts(['indicators', 'actions', 'reports']);
     }
   }, []);
 
@@ -157,20 +158,12 @@ export default function HomePage() {
         title="Visão geral do Gestão 360"
         description="Resumo executivo, pendências operacionais e atalhos para lancar dados ou analisar desempenho."
         actions={
-          <>
-            <Button variant="outline" asChild>
-              <Link href="/results">
-                <Zap className="mr-2 h-4 w-4" />
-                Lançamentos
-              </Link>
-            </Button>
-            <Button asChild>
-              <Link href="/visualization">
-                <LayoutDashboard className="mr-2 h-4 w-4" />
-                Visualização
-              </Link>
-            </Button>
-          </>
+          <Button asChild>
+            <Link href="/visualization">
+              <LayoutDashboard className="mr-2 h-4 w-4" />
+              Visualização
+            </Link>
+          </Button>
         }
       />
 
@@ -222,10 +215,10 @@ export default function HomePage() {
         <MetricCard
           title="Pendências"
           value={formatNumber((pending.data?.pending ?? 0) + (ov?.overdueActions ?? 0))}
-          description="Lançamentos e ações"
+          description="Indicadores e ações"
           icon={<ClipboardList className="h-4 w-4" />}
           tone="yellow"
-          href="/results"
+          href="/indicators"
         />
       </div>
 
