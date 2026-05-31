@@ -112,16 +112,20 @@ Evolução do `pnpm audit`:
 | Momento | Crítica | Alta | Moderada | Baixa |
 |---------|--------:|-----:|---------:|------:|
 | Antes | 2 | 21 | 27 | 5 |
-| **Depois** (next@14.2.35 + jspdf@4.2.1) | **0** | **13** | **18** | **5** |
+| jspdf@4.2.1 + next@14.2.35 | 0 | 13 | 18 | 5 |
+| **Final** (+ next@15.5.18) | **0** | **7** | **11** | **3** |
 
 **Feito (verificado com `tsc --noEmit` + smoke test de geração de PDF):**
 - ✅ **jspdf** `2.5.2 → 4.2.1` + **jspdf-autotable** `3.8.4 → 5.0.8` → elimina as **2 críticas** (HTML/PDF injection, path traversal) e o XSS do dompurify transitivo. API usada (`new jsPDF`, `text`, `autoTable`, `lastAutoTable.finalY`, `save`) validada em runtime.
-- ✅ **next** `14.2.13 → 14.2.35` → último patch do major 14 (resolveu várias CVEs).
+- ✅ **next** `14.2.13 → 14.2.35 → 15.5.18` → **zera todas as CVEs do `next`** (DoS Image Optimizer, SSRF WebSocket upgrade, bypass middleware i18n, cache poisoning, XSS CSP nonce). React mantido em 18.3.1 (peer do Next 15 aceita ^18). Migração sem breaking changes de código (app é client-side com Bearer token; sem `cookies()`/`headers()`/`params` async). `next.config`: `outputFileTracingRoot` movido para top-level.
 
-**Pendente (decisão do usuário — não aplicado para não quebrar):**
-- ⚠️ **next → 15.5.16+**: as CVEs restantes do Next (DoS em Image Optimizer, SSRF em WebSocket upgrade, bypass de middleware i18n, cache poisoning) **só têm patch no major 15**. É upgrade **breaking** (App Router, APIs async de `cookies()`/`headers()`/`params`, caching) — requer migração e QA dedicados.
-- ⚠️ Transitivas de baixo risco prático (não estão no caminho de exploração do app): `multer` (não usamos upload), `lodash`/`glob`/`picomatch`/`tmp` (uso interno/build). Podem ser tratadas com `pnpm.overrides` no `package.json` raiz, com teste do build a cada override.
+**Deployado em produção** (gestao360.org) e verificado: api+web `healthy`, `/api/health` 200, headers de segurança ativos, web rodando Next 15.5.18.
+
+**Pendente (baixo risco — opcional):**
+- ⚠️ Transitivas fora do caminho de exploração do app (7 high restantes): `multer` (não usamos upload), `lodash`/`glob`/`picomatch`/`tmp` (uso interno/build). Podem ser tratadas com `pnpm.overrides` no `package.json` raiz, testando o build a cada override.
 - `esbuild`/`vite`/`webpack` — apenas dev-server; sem impacto no runtime de produção.
+
+> Nota de build: o passo `RUN chown -R node:node /app` no Dockerfile da API adiciona ~3min ao build (chown do node_modules). Otimização futura: usar `COPY --chown` nos estágios em vez de chown recursivo.
 
 ### O4. ⚠️ Endurecimento operacional do Droplet (recomendado)
 - Firewall (ufw/DO Cloud Firewall): permitir só 22, 80, 443; **bloquear acesso direto** a portas internas.
