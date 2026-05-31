@@ -77,6 +77,12 @@ COPY --from=build /app/apps/api/prisma ./apps/api/prisma
 
 WORKDIR /app/apps/api
 
+# Seguranca: roda como usuario nao-root (o usuario 'node' ja existe na imagem
+# oficial node). Evita que um RCE no processo tenha privilegios de root no
+# container. Garante leitura do app pelo usuario node.
+RUN chown -R node:node /app
+USER node
+
 # DigitalOcean injeta PORT automaticamente; default 3333
 EXPOSE 3333
 

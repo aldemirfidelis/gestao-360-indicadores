@@ -127,7 +127,14 @@ export class ImportsService {
     });
   }
 
-  async jobErrors(jobId: string) {
+  async jobErrors(jobId: string, companyId: string) {
+    // Isolamento multi-tenant: so devolve erros se o job pertencer a empresa
+    // do usuario autenticado (evita IDOR por enumeracao de jobId).
+    const job = await this.prisma.importJob.findFirst({
+      where: { id: jobId, companyId },
+      select: { id: true },
+    });
+    if (!job) return [];
     return this.prisma.importError.findMany({ where: { jobId }, orderBy: { rowIndex: 'asc' } });
   }
 

@@ -1,4 +1,5 @@
 import { Body, Controller, Get, Post, Req, UseGuards } from '@nestjs/common';
+import { Throttle } from '@nestjs/throttler';
 import { Request } from 'express';
 import { z } from 'zod';
 import { AuthService } from './auth.service';
@@ -21,6 +22,9 @@ const refreshDto = z.object({
 export class AuthController {
   constructor(private readonly auth: AuthService) {}
 
+  // Anti brute-force: limite estrito por IP (5 tentativas/min) bem abaixo
+  // do throttle global (200/min), sem depender de account lockout.
+  @Throttle({ default: { limit: 5, ttl: 60_000 } })
   @Public()
   @Post('login')
   login(
@@ -33,6 +37,7 @@ export class AuthController {
     });
   }
 
+  @Throttle({ default: { limit: 20, ttl: 60_000 } })
   @Public()
   @Post('refresh')
   refresh(@Body(new ZodValidationPipe(refreshDto)) body: z.infer<typeof refreshDto>) {

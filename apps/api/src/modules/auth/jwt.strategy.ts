@@ -3,6 +3,7 @@ import { PassportStrategy } from '@nestjs/passport';
 import { ExtractJwt, Strategy } from 'passport-jwt';
 import { AuthPayload } from './auth.types';
 import { PrismaService } from '../../prisma/prisma.service';
+import { requireSecret } from '../../common/env';
 
 @Injectable()
 export class JwtStrategy extends PassportStrategy(Strategy, 'jwt') {
@@ -10,7 +11,9 @@ export class JwtStrategy extends PassportStrategy(Strategy, 'jwt') {
     super({
       jwtFromRequest: ExtractJwt.fromAuthHeaderAsBearerToken(),
       ignoreExpiration: false,
-      secretOrKey: process.env.JWT_ACCESS_SECRET ?? 'change-me',
+      // Sem fallback: se JWT_ACCESS_SECRET faltar (ou for fraco em prod),
+      // a API nao sobe, evitando tokens forjaveis com segredo conhecido.
+      secretOrKey: requireSecret('JWT_ACCESS_SECRET'),
     });
   }
 

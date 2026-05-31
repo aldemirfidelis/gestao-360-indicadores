@@ -17,8 +17,8 @@ export class ImportsController {
 
   @Get('jobs/:id/errors')
   @RequirePermissions('imports:view')
-  errors(@Param('id') id: string) {
-    return this.service.jobErrors(id);
+  errors(@CurrentUser() me: AuthPayload, @Param('id') id: string) {
+    return this.service.jobErrors(id, me.companyId);
   }
 
   @Post('preview')

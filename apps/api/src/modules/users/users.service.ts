@@ -1,4 +1,4 @@
-import { ConflictException, Injectable, NotFoundException } from '@nestjs/common';
+import { ConflictException, ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
 import * as bcrypt from 'bcryptjs';
 import { PrismaService } from '../../prisma/prisma.service';
 import { UserCreateInput } from '@g360/shared';
@@ -62,7 +62,11 @@ export class UsersService {
     });
   }
 
-  async create(input: UserAdminCreateInput) {
+  async create(input: UserAdminCreateInput, actorIsSuperAdmin = false) {
+    // Anti-escalonamento de privilegio: apenas SUPER_ADMIN pode criar SUPER_ADMIN.
+    if (input.role === UserRoleEnum.SUPER_ADMIN && !actorIsSuperAdmin) {
+      throw new ForbiddenException('Somente um Super Admin pode atribuir o papel SUPER_ADMIN.');
+    }
     const exists = await this.prisma.user.findUnique({ where: { email: input.email } });
     if (exists) throw new ConflictException('Email ja cadastrado');
     const rounds = parseInt(process.env.BCRYPT_ROUNDS ?? '10', 10);
@@ -118,6 +122,11 @@ export class UsersService {
   ) {
     const user = await this.prisma.user.findFirst({ where: { id, deletedAt: null, ...(!isSuperAdmin ? { companyId } : {}) } });
     if (!user) throw new NotFoundException('Usuário nao encontrado');
+    // Anti-escalonamento: nao-super-admin nao pode promover ninguem (nem a si) a SUPER_ADMIN,
+    // nem rebaixar um SUPER_ADMIN existente.
+    if (!isSuperAdmin && (input.role === UserRoleEnum.SUPER_ADMIN || user.role === UserRoleEnum.SUPER_ADMIN)) {
+      throw new ForbiddenException('Somente um Super Admin pode gerenciar o papel SUPER_ADMIN.');
+    }
     await this.validateUserLinks(user.companyId, input);
 
     if (input.email && input.email.toLowerCase() !== user.email) {

@@ -24,8 +24,11 @@ export class HttpExceptionFilter implements ExceptionFilter {
       const res = exception.getResponse();
       message = typeof res === 'string' ? res : (res as object);
     } else if (exception instanceof Error) {
+      // Loga o detalhe internamente, mas NUNCA expoe a mensagem/stack crua
+      // ao cliente (pode vazar SQL, caminhos, segredos). Resposta generica.
       this.logger.error(exception.message, exception.stack);
-      message = exception.message;
+      message =
+        process.env.NODE_ENV === 'production' ? 'Internal server error' : exception.message;
     }
 
     response.status(status).json({
