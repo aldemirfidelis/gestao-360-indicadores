@@ -19,9 +19,22 @@ async function bootstrap() {
   (app.getHttpAdapter().getInstance() as any).set?.('trust proxy', 1);
 
   app.use(helmet({ crossOriginResourcePolicy: false }));
+  // Seguranca CORS: nunca combinar origem coringa com credentials=true
+  // (qualquer site poderia fazer requisicoes credenciadas). Quando a origem
+  // for '*', refletimos qualquer origem porem SEM credenciais. Para origens
+  // explicitas (recomendado em prod, ex.: https://gestao360.org), mantemos
+  // credentials habilitado.
+  const isWildcard = corsOrigin === '*';
+  if (isWildcard && process.env.NODE_ENV === 'production') {
+    // eslint-disable-next-line no-console
+    console.warn(
+      '[g360-api] AVISO DE SEGURANCA: API_CORS_ORIGIN="*" em producao. ' +
+        'Defina o dominio explicito (ex.: https://gestao360.org).',
+    );
+  }
   app.enableCors({
-    origin: corsOrigin === '*' ? true : corsOrigin.split(',').map((s) => s.trim()),
-    credentials: true,
+    origin: isWildcard ? true : corsOrigin.split(',').map((s) => s.trim()),
+    credentials: !isWildcard,
   });
   app.useGlobalPipes(
     new ValidationPipe({

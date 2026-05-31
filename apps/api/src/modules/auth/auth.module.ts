@@ -8,13 +8,19 @@ import { AuthController } from './auth.controller';
 import { JwtStrategy } from './jwt.strategy';
 import { JwtAuthGuard } from './jwt-auth.guard';
 import { RolesGuard } from '../../common/guards/roles.guard';
+import { requireSecret } from '../../common/env';
 
 @Module({
   imports: [
     PassportModule.register({ defaultStrategy: 'jwt' }),
-    JwtModule.register({
-      secret: process.env.JWT_ACCESS_SECRET ?? 'change-me',
-      signOptions: { expiresIn: process.env.JWT_ACCESS_TTL ?? '15m' },
+    // registerAsync: o segredo e resolvido na inicializacao do modulo (apos o
+    // ConfigModule carregar o .env), e nao no import-time. Sem fallback
+    // 'change-me' -> fail-fast se o segredo nao estiver configurado/for fraco.
+    JwtModule.registerAsync({
+      useFactory: () => ({
+        secret: requireSecret('JWT_ACCESS_SECRET'),
+        signOptions: { expiresIn: process.env.JWT_ACCESS_TTL ?? '15m' },
+      }),
     }),
   ],
   controllers: [AuthController],

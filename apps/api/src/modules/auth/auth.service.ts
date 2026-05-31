@@ -4,6 +4,7 @@ import * as bcrypt from 'bcryptjs';
 import { randomBytes, createHash } from 'crypto';
 import { PrismaService } from '../../prisma/prisma.service';
 import { AuthPayload } from './auth.types';
+import { requireSecret } from '../../common/env';
 
 @Injectable()
 export class AuthService {
@@ -31,7 +32,7 @@ export class AuthService {
     };
 
     const accessToken = await this.jwt.signAsync(payload, {
-      secret: process.env.JWT_ACCESS_SECRET,
+      secret: requireSecret('JWT_ACCESS_SECRET'),
       expiresIn: process.env.JWT_ACCESS_TTL ?? '15m',
     });
 
@@ -95,7 +96,7 @@ export class AuthService {
       companyId: stored.user.companyId,
     };
     const accessToken = await this.jwt.signAsync(payload, {
-      secret: process.env.JWT_ACCESS_SECRET,
+      secret: requireSecret('JWT_ACCESS_SECRET'),
       expiresIn: process.env.JWT_ACCESS_TTL ?? '15m',
     });
     return { accessToken };

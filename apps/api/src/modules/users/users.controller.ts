@@ -37,10 +37,14 @@ export class UsersController {
   @RequirePermissions('users:manage')
   @Post()
   create(@CurrentUser() me: AuthPayload, @Body(new ZodValidationPipe(userCreateSchema)) input: any) {
-    return this.service.create({
-      ...input,
-      companyId: me.role === UserRoleEnum.SUPER_ADMIN && input.companyId ? input.companyId : me.companyId,
-    });
+    const isSuperAdmin = me.role === UserRoleEnum.SUPER_ADMIN;
+    return this.service.create(
+      {
+        ...input,
+        companyId: isSuperAdmin && input.companyId ? input.companyId : me.companyId,
+      },
+      isSuperAdmin,
+    );
   }
 
   @Roles(UserRoleEnum.COMPANY_ADMIN, UserRoleEnum.SUPER_ADMIN)
