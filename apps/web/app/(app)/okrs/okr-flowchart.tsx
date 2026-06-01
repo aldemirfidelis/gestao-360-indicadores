@@ -3,11 +3,11 @@
 import { useCallback, useMemo, useRef, useState } from 'react';
 import ReactFlow, {
   Background,
-  Controls,
-  MiniMap,
   Handle,
   Position,
   MarkerType,
+  getRectOfNodes,
+  getTransformForBounds,
   type Node,
   type Edge,
   type NodeProps,
@@ -211,16 +211,29 @@ export function OkrFlowchart({
     [objectives, period],
   );
 
+  // Muda quando a ESTRUTURA muda (objetivos add/removidos) -> remonta e re-enquadra.
+  // Nao muda ao trocar de periodo (mesmos ids) -> preserva o zoom/scroll.
+  const flowKey = useMemo(() => nodes.map((n) => n.id).join('|'), [nodes]);
+
   const exportPng = useCallback(async () => {
-    if (!wrapperRef.current) return;
-    const viewport = wrapperRef.current.querySelector<HTMLElement>('.react-flow__viewport');
-    const target = viewport ?? wrapperRef.current;
+    const viewport = wrapperRef.current?.querySelector<HTMLElement>('.react-flow__viewport');
+    if (!viewport || nodes.length === 0) return;
+    // Enquadra TODO o fluxo (nao so o que esta visivel) numa imagem horizontal
+    const bounds = getRectOfNodes(nodes);
+    const imageWidth = Math.min(4096, Math.max(1280, Math.ceil(bounds.width) + 160));
+    const imageHeight = Math.min(4096, Math.max(720, Math.ceil(bounds.height) + 160));
+    const [tx, ty, tzoom] = getTransformForBounds(bounds, imageWidth, imageHeight, 0.2, 2, 0.08);
     try {
-      const dataUrl = await toPng(target, {
+      const dataUrl = await toPng(viewport, {
         backgroundColor: '#ffffff',
+        width: imageWidth,
+        height: imageHeight,
         pixelRatio: 2,
-        filter: (node) =>
-          !(node instanceof HTMLElement && (node.classList?.contains('react-flow__controls') || node.classList?.contains('react-flow__minimap'))),
+        style: {
+          width: `${imageWidth}px`,
+          height: `${imageHeight}px`,
+          transform: `translate(${tx}px, ${ty}px) scale(${tzoom})`,
+        },
       });
       const a = document.createElement('a');
       a.download = `okrs-fluxograma-${new Date().toISOString().slice(0, 10)}.png`;
@@ -229,7 +242,7 @@ export function OkrFlowchart({
     } catch {
       // silencioso: navegadores antigos podem falhar no html-to-image
     }
-  }, []);
+  }, [nodes]);
 
   if (objectives.length === 0) {
     return (
@@ -244,7 +257,7 @@ export function OkrFlowchart({
     <div className="space-y-2">
       <div className="flex flex-wrap items-center gap-1.5 rounded-md border bg-card px-2 py-1.5">
         <span className="px-1 text-xs font-medium uppercase tracking-wide text-muted-foreground">Período</span>
-        <NativeSelect className="h-8 w-[200px]" value={period} onChange={(e) => setPeriod(e.target.value)}>
+        <NativeSelect className="h-9 w-[200px] text-xs" value={period} onChange={(e) => setPeriod(e.target.value)}>
           <option value="">Atual (agora)</option>
           {periodOptions.map((w) => (
             <option key={w} value={w}>
@@ -257,15 +270,16 @@ export function OkrFlowchart({
             <RefreshCw className={cn('mr-1.5 h-3.5 w-3.5', isFetching && 'animate-spin')} />
             Atualizar
           </Button>
-          <Button size="sm" variant="outline" onClick={exportPng} title="Exportar fluxograma em PNG">
+          <Button size="sm" variant="outline" onClick={exportPng} title="Baixar todo o fluxo em PNG (enquadra automaticamente)">
             <Download className="mr-1.5 h-3.5 w-3.5" />
-            Exportar PNG
+            Baixar Fluxo
           </Button>
         </div>
       </div>
 
       <div ref={wrapperRef} className="h-[68vh] overflow-hidden rounded-lg border bg-muted/5">
         <ReactFlow
+          key={flowKey}
           nodes={nodes}
           edges={edges}
           nodeTypes={nodeTypes}
@@ -276,13 +290,6 @@ export function OkrFlowchart({
           proOptions={{ hideAttribution: true }}
         >
           <Background gap={20} size={1} color="#cbd5e1" className="opacity-45" />
-          <MiniMap
-            pannable
-            zoomable
-            nodeColor={(n) => STATUS_COLOR[(n.data as OkrNodeData)?.status] ?? '#cbd5e1'}
-            nodeStrokeColor={() => '#475569'}
-          />
-          <Controls />
         </ReactFlow>
       </div>
     </div>

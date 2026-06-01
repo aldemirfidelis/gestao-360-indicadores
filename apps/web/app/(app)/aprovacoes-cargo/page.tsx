@@ -80,7 +80,7 @@ export default function AprovacoesCargoPage() {
     onSuccess: () => {
       toast.success('Decisão registrada');
       setDecisionDialog({ open: false, row: null, decision: null });
-      setDecisionNote('');
+      setDecisionNote('');l
       qc.invalidateQueries({ queryKey: ['career-approvals'] });
     },
     onError: (e: any) => toast.error(e?.message ?? 'Falha ao registrar decisão'),

@@ -8,11 +8,11 @@ import { toast } from 'sonner';
 import ReactFlow, {
   Background,
   ConnectionMode,
-  Controls,
   Handle,
-  MiniMap,
   NodeResizer,
   Position,
+  getRectOfNodes,
+  getTransformForBounds,
   useEdgesState,
   useNodesState,
   useReactFlow,
@@ -741,18 +741,33 @@ function StrategyMapPageInner() {
   }, [map, period]);
 
   async function exportMapPng(): Promise<string | null> {
+    const viewport = canvasRef.current?.querySelector<HTMLElement>('.react-flow__viewport');
+    // Enquadra TODO o fluxo (independente do zoom/scroll atual) numa imagem horizontal
+    if (viewport && nodes.length > 0) {
+      const bounds = getRectOfNodes(nodes);
+      const imageWidth = Math.min(4096, Math.max(1280, Math.ceil(bounds.width) + 160));
+      const imageHeight = Math.min(4096, Math.max(720, Math.ceil(bounds.height) + 160));
+      const [tx, ty, tzoom] = getTransformForBounds(bounds, imageWidth, imageHeight, 0.2, 2, 0.08);
+      try {
+        return await toPng(viewport, {
+          backgroundColor: '#ffffff',
+          width: imageWidth,
+          height: imageHeight,
+          pixelRatio: 2,
+          style: {
+            width: `${imageWidth}px`,
+            height: `${imageHeight}px`,
+            transform: `translate(${tx}px, ${ty}px) scale(${tzoom})`,
+          },
+        });
+      } catch {
+        return null;
+      }
+    }
+    // Fallback: captura o que estiver visivel
     if (!canvasRef.current) return null;
     try {
-      return await toPng(canvasRef.current, {
-        backgroundColor: '#ffffff',
-        pixelRatio: 2,
-        filter: (node) =>
-          !(
-            node instanceof HTMLElement &&
-            (node.classList?.contains('react-flow__controls') ||
-              node.classList?.contains('react-flow__minimap'))
-          ),
-      });
+      return await toPng(canvasRef.current, { backgroundColor: '#ffffff', pixelRatio: 2 });
     } catch {
       return null;
     }
@@ -1303,7 +1318,7 @@ function StrategyMapPageInner() {
               </Button>
               <div className="ml-auto flex flex-wrap items-center gap-1.5">
                 <NativeSelect
-                  className="h-8 w-[168px]"
+                  className="h-9 w-[188px] text-xs"
                   value={period}
                   onChange={(e) => setPeriod(e.target.value)}
                   title="Ver faróis e dados como estavam em um período"
@@ -1319,9 +1334,9 @@ function StrategyMapPageInner() {
                   <RefreshCw className={cn('mr-1.5 h-3.5 w-3.5', mapQuery.isFetching && 'animate-spin')} />
                   Atualizar
                 </Button>
-                <Button size="sm" variant="outline" onClick={downloadMapPng} title="Exportar mapa em PNG">
+                <Button size="sm" variant="outline" onClick={downloadMapPng} title="Baixar todo o fluxo em PNG (enquadra automaticamente)">
                   <Download className="mr-1.5 h-3.5 w-3.5" />
-                  PNG
+                  Baixar Fluxo
                 </Button>
                 <Button size="sm" variant="outline" onClick={emailMapPng} title="Exportar PNG e abrir email">
                   <Mail className="mr-1.5 h-3.5 w-3.5" />
@@ -1397,15 +1412,6 @@ function StrategyMapPageInner() {
                 </defs>
               </svg>
               <Background gap={20} size={1} color="#cbd5e1" className="opacity-45" />
-              <MiniMap pannable zoomable nodeStrokeColor={() => '#475569'} nodeColor={(node) => {
-                const obj = map?.objectives.find((o) => o.id === node.id);
-                if (!obj) return '#cbd5e1';
-                if (obj.aggregateLight === 'RED') return '#dc2626';
-                if (obj.aggregateLight === 'YELLOW') return '#f59e0b';
-                if (obj.aggregateLight === 'GREEN') return '#16a34a';
-                return '#cbd5e1';
-              }} />
-              <Controls />
             </ReactFlow>
 
             <div className="absolute right-3 top-3 z-10 flex flex-wrap gap-1.5">
@@ -1418,78 +1424,6 @@ function StrategyMapPageInner() {
                 </Button>
               )}
             </div>
-
-            {/* Detalhes do item selecionado em TELA CHEIA (o painel lateral fica fora do
-                elemento fullscreen, entao replicamos um resumo como overlay dentro do canvas) */}
-            {fullscreen && (selectedObjective || selectedPerspective) && (
-              <div className="absolute left-3 top-3 z-20 max-h-[calc(100vh-1.5rem)] w-[320px] space-y-3 overflow-y-auto rounded-lg border bg-card p-4 text-sm shadow-lg">
-                <div className="flex items-start justify-between gap-2">
-                  <span className="font-semibold leading-tight">
-                    {selectedObjective?.name ?? selectedPerspective?.name}
-                  </span>
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    className="h-6 w-6 shrink-0"
-                    onClick={() => setSelectedId(null)}
-                    title="Fechar"
-                  >
-                    <X className="h-4 w-4" />
-                  </Button>
-                </div>
-                {selectedPerspective && !selectedObjective && (
-                  <p className="text-muted-foreground">
-                    {selectedPerspective.description || 'Perspectiva do mapa estratégico.'}
-                  </p>
-                )}
-                {selectedObjective && (
-                  <>
-                    <div className="flex flex-wrap items-center gap-2">
-                      <Badge variant="secondary">{selectedObjective.perspective.name}</Badge>
-                      <StatusBadge
-                        value={selectedObjective.aggregateLight}
-                        label={LIGHT_LABEL[selectedObjective.aggregateLight] ?? selectedObjective.aggregateLight}
-                      />
-                    </div>
-                    {selectedObjective.description && (
-                      <p className="text-muted-foreground">{selectedObjective.description}</p>
-                    )}
-                    <div className="grid grid-cols-3 gap-2 text-center text-xs">
-                      <div className="rounded-md border p-2">
-                        <strong className="block text-foreground">{selectedObjective.indicators.length}</strong>indic.
-                      </div>
-                      <div className="rounded-md border p-2">
-                        <strong className="block text-foreground">{selectedObjective.actionCount}</strong>ações
-                      </div>
-                      <div className="rounded-md border p-2">
-                        <strong className="block text-foreground">{selectedObjective.treatmentCount}</strong>tratativas
-                      </div>
-                    </div>
-                    {selectedObjective.indicators.length > 0 && (
-                      <div className="space-y-1">
-                        <div className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
-                          Indicadores
-                        </div>
-                        {selectedObjective.indicators.slice(0, 8).map((ind) => (
-                          <div key={ind.id} className="flex items-center justify-between gap-2 text-xs">
-                            <span className="truncate">{ind.name}</span>
-                            <span
-                              className="h-2.5 w-2.5 shrink-0 rounded-full"
-                              style={{
-                                background:
-                                  ({ GREEN: '#16a34a', YELLOW: '#f59e0b', RED: '#dc2626' } as Record<string, string>)[
-                                    ind.results?.[0]?.light ?? 'GRAY'
-                                  ] ?? '#cbd5e1',
-                              }}
-                            />
-                          </div>
-                        ))}
-                      </div>
-                    )}
-                  </>
-                )}
-              </div>
-            )}
 
             <div className="pointer-events-none absolute inset-x-3 bottom-3 z-10 flex flex-wrap items-center justify-center gap-x-5 gap-y-1 rounded-md border bg-background/95 px-4 py-1.5 text-[11px] shadow-sm backdrop-blur">
               <div className="flex items-center gap-2 font-semibold uppercase text-muted-foreground">

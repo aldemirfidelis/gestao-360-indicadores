@@ -346,41 +346,49 @@ export class StrategyService {
         objMap.set(o.id, no.id);
       }
 
-      // Vinculos (indicadores e org nodes) e relacoes entre objetivos
+      // Vinculos e relacoes em lote (menos round-trips ao Neon -> evita timeout)
+      const indicatorLinks: { objectiveId: string; indicatorId: string }[] = [];
+      const orgNodeLinks: { objectiveId: string; orgNodeId: string; kind: string }[] = [];
+      const relations: {
+        fromId: string;
+        toId: string;
+        weight: number;
+        kind: string;
+        label: string | null;
+        description: string | null;
+        active: boolean;
+      }[] = [];
       for (const o of source.objectives) {
         const newObjId = objMap.get(o.id);
         if (!newObjId) continue;
         for (const il of o.indicatorLinks) {
-          await tx.strategicObjectiveIndicator.create({
-            data: { objectiveId: newObjId, indicatorId: il.indicatorId },
-          });
+          indicatorLinks.push({ objectiveId: newObjId, indicatorId: il.indicatorId });
         }
         for (const ol of o.orgNodeLinks) {
-          await tx.strategicObjectiveOrgNode.create({
-            data: { objectiveId: newObjId, orgNodeId: ol.orgNodeId, kind: ol.kind },
-          });
+          orgNodeLinks.push({ objectiveId: newObjId, orgNodeId: ol.orgNodeId, kind: ol.kind });
         }
         for (const rel of o.outRelations) {
           const from = objMap.get(rel.fromId);
           const to = objMap.get(rel.toId);
           if (from && to) {
-            await tx.objectiveRelation.create({
-              data: {
-                fromId: from,
-                toId: to,
-                weight: rel.weight,
-                kind: rel.kind,
-                label: rel.label,
-                description: rel.description,
-                active: rel.active,
-              },
+            relations.push({
+              fromId: from,
+              toId: to,
+              weight: rel.weight,
+              kind: rel.kind,
+              label: rel.label,
+              description: rel.description,
+              active: rel.active,
             });
           }
         }
       }
+      if (indicatorLinks.length) await tx.strategicObjectiveIndicator.createMany({ data: indicatorLinks });
+      if (orgNodeLinks.length) await tx.strategicObjectiveOrgNode.createMany({ data: orgNodeLinks });
+      if (relations.length) await tx.objectiveRelation.createMany({ data: relations });
 
       return newMap;
-    });
+    }, { timeout: 60000, maxWait: 20000 });
   }
 
   async createMap(me: AuthPayload, body: MapBody) {
