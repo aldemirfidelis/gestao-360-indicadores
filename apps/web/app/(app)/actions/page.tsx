@@ -58,6 +58,23 @@ interface Options {
 
 const STATUS_LABEL = ACTION_STATUS_LABEL;
 
+const ORIGIN_LABEL: Record<string, string> = {
+  MANUAL: 'Manual',
+  INDICATOR: 'Indicador',
+  DEVIATION: 'Desvio / não conformidade',
+  NON_CONFORMITY: 'Não conformidade',
+  PREVENTIVE: 'Preventiva',
+  OBJECTIVE: 'Objetivo estratégico',
+  OKR: 'OKR',
+  MEETING: 'Reunião',
+  PROJECT: 'Projeto',
+  STRATEGIC_MAP: 'Mapa estratégico',
+  RELATIONSHIP_MAP: 'Mapa de relações',
+  FOLLOW_UP: 'Acompanhamento',
+  OCCURRENCE: 'Ocorrência',
+  AUDIT: 'Auditoria',
+};
+
 const TOOL_LABEL: Record<string, string> = {
   FIVE_WHYS: '5 Porques',
   ISHIKAWA: 'Ishikawa',
@@ -345,7 +362,7 @@ function ActionForm({ form, setForm, options }: { form: typeof emptyForm; setFor
       <div>
         <Label>Origem</Label>
         <NativeSelect value={form.origin} onChange={(e) => setForm({ ...form, origin: e.target.value })}>
-          {(options?.origins ?? ['MANUAL', 'INDICATOR', 'DEVIATION', 'MEETING', 'STRATEGIC_MAP', 'RELATIONSHIP_MAP']).map((origin) => <option key={origin} value={origin}>{origin}</option>)}
+          {(options?.origins ?? ['MANUAL', 'INDICATOR', 'DEVIATION', 'PREVENTIVE', 'MEETING', 'STRATEGIC_MAP', 'RELATIONSHIP_MAP']).map((origin) => <option key={origin} value={origin}>{ORIGIN_LABEL[origin] ?? origin}</option>)}
         </NativeSelect>
       </div>
       <SelectField label="Objetivo estratégico" value={form.strategicObjectiveId} onChange={(strategicObjectiveId) => setForm({ ...form, strategicObjectiveId })} items={options?.strategicObjectives ?? []} />

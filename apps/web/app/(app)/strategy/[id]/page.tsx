@@ -29,6 +29,7 @@ import {
   AlertTriangle,
   ArrowRight,
   Calendar,
+  ChevronDown,
   Circle,
   ClipboardList,
   Compass,
@@ -2127,6 +2128,7 @@ function ObjectiveDrawerContent({ objective }: { objective: Objective }) {
 }
 
 function IndicatorLinkedCard({ indicator }: { indicator: Indicator }) {
+  const [open, setOpen] = useState(false);
   const latest = indicator.results?.[0];
   const latestTarget = latest?.periodRef
     ? indicator.targets?.find((target) => target.periodRef === latest.periodRef)
@@ -2138,17 +2140,35 @@ function IndicatorLinkedCard({ indicator }: { indicator: Indicator }) {
   return (
     <div className="rounded-md border bg-muted/15 p-3 text-xs shadow-sm">
       <div className="flex items-start justify-between gap-2">
-        <Link href={`/indicators/${indicator.id}`} className="min-w-0 hover:underline">
-          <div className="truncate font-semibold text-foreground">
-            {indicator.code ? `${indicator.code} - ` : ''}{indicator.name}
-          </div>
-          <div className="mt-0.5 truncate text-muted-foreground">
-            {indicator.ownerNode?.name ?? indicator.responsibleUser?.name ?? 'Sem área vinculada'}
-          </div>
-        </Link>
-        <span className="flex shrink-0 items-center gap-1">
+        {/* Cabecalho clicavel: expande/recolhe o grafico e as acoes (acordeon) */}
+        <button
+          type="button"
+          onClick={() => setOpen((v) => !v)}
+          className="flex min-w-0 flex-1 items-start gap-2 text-left"
+          aria-expanded={open}
+        >
+          <ChevronDown className={cn('mt-0.5 h-3.5 w-3.5 shrink-0 text-muted-foreground transition-transform', open && 'rotate-180')} />
+          <span className="min-w-0">
+            <span className="block truncate font-semibold text-foreground">
+              {indicator.code ? `${indicator.code} - ` : ''}{indicator.name}
+            </span>
+            <span className="mt-0.5 block truncate text-muted-foreground">
+              {indicator.ownerNode?.name ?? indicator.responsibleUser?.name ?? 'Sem área vinculada'}
+            </span>
+          </span>
+        </button>
+        <span className="flex shrink-0 items-center gap-1.5">
           <StatusBadge value={latest?.light ?? 'GRAY'} label={LIGHT_LABEL[latest?.light ?? 'GRAY']} />
-          <ExternalLink className="h-3 w-3 text-muted-foreground" />
+          {/* Abre em nova aba para nao perder o mapa */}
+          <Link
+            href={`/indicators/${indicator.id}`}
+            target="_blank"
+            rel="noopener noreferrer"
+            title="Abrir indicador em nova aba"
+            className="text-muted-foreground transition hover:text-foreground"
+          >
+            <ExternalLink className="h-3.5 w-3.5" />
+          </Link>
         </span>
       </div>
 
@@ -2158,42 +2178,48 @@ function IndicatorLinkedCard({ indicator }: { indicator: Indicator }) {
         <MiniMetric label="Ating." value={formatPercent(latest?.attainment ?? null)} />
       </div>
 
-      <IndicatorSparkline indicator={indicator} />
+      {open && (
+        <>
+          <IndicatorSparkline indicator={indicator} />
 
-      <div className="mt-3 border-t pt-3">
-        <div className="mb-2 flex items-center justify-between gap-2">
-          <div className="flex items-center gap-1.5 font-semibold uppercase text-muted-foreground">
-            <ClipboardList className="h-3.5 w-3.5" />
-            Ações vinculadas ({actions.length})
-          </div>
-          {(openActions > 0 || lateActions > 0) && (
-            <div className="flex shrink-0 gap-1">
-              {openActions > 0 && <Badge variant="secondary">{openActions} abertas</Badge>}
-              {lateActions > 0 && <Badge variant="destructive">{lateActions} atrasadas</Badge>}
+          <div className="mt-3 border-t pt-3">
+            <div className="mb-2 flex items-center justify-between gap-2">
+              <div className="flex items-center gap-1.5 font-semibold uppercase text-muted-foreground">
+                <ClipboardList className="h-3.5 w-3.5" />
+                Ações vinculadas ({actions.length})
+              </div>
+              {(openActions > 0 || lateActions > 0) && (
+                <div className="flex shrink-0 gap-1">
+                  {openActions > 0 && <Badge variant="secondary">{openActions} abertas</Badge>}
+                  {lateActions > 0 && <Badge variant="destructive">{lateActions} atrasadas</Badge>}
+                </div>
+              )}
             </div>
-          )}
-        </div>
 
-        {actions.length === 0 ? (
-          <div className="rounded-md border border-dashed p-2 text-muted-foreground">
-            Nenhum plano de ação vinculado a este indicador.
-          </div>
-        ) : (
-          <div className="space-y-2">
-            {actions.slice(0, 5).map((action) => (
-              <IndicatorActionRow key={action.id} action={action} />
-            ))}
-            {actions.length > 5 && (
-              <Link
-                href={`/actions?indicatorId=${indicator.id}`}
-                className="block rounded-md border border-dashed p-2 text-center font-medium text-muted-foreground transition hover:bg-accent/35 hover:text-foreground"
-              >
-                Ver mais {actions.length - 5} ação(ões)
-              </Link>
+            {actions.length === 0 ? (
+              <div className="rounded-md border border-dashed p-2 text-muted-foreground">
+                Nenhum plano de ação vinculado a este indicador.
+              </div>
+            ) : (
+              <div className="space-y-2">
+                {actions.slice(0, 5).map((action) => (
+                  <IndicatorActionRow key={action.id} action={action} />
+                ))}
+                {actions.length > 5 && (
+                  <Link
+                    href={`/actions?indicatorId=${indicator.id}`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="block rounded-md border border-dashed p-2 text-center font-medium text-muted-foreground transition hover:bg-accent/35 hover:text-foreground"
+                  >
+                    Ver mais {actions.length - 5} ação(ões)
+                  </Link>
+                )}
+              </div>
             )}
           </div>
-        )}
-      </div>
+        </>
+      )}
     </div>
   );
 }
@@ -2207,11 +2233,11 @@ function MiniMetric({ label, value }: { label: string; value: string }) {
   );
 }
 
+const MONTH_ABBR = ['Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun', 'Jul', 'Ago', 'Set', 'Out', 'Nov', 'Dez'];
+
 function IndicatorSparkline({ indicator }: { indicator: Indicator }) {
   const data = buildIndicatorChartPoints(indicator);
   const values = data.flatMap((point) => [point.value, point.target]).filter(isFiniteNumber);
-  const latestLight = indicator.results?.[0]?.light ?? 'GRAY';
-  const stroke = LIGHT_STROKE[latestLight] ?? LIGHT_STROKE.GRAY;
 
   if (values.length === 0) {
     return (
@@ -2222,43 +2248,74 @@ function IndicatorSparkline({ indicator }: { indicator: Indicator }) {
   }
 
   const width = 320;
-  const height = 86;
-  const padding = 12;
-  const min = Math.min(...values);
-  const max = Math.max(...values);
-  const range = max - min || 1;
-  const xFor = (index: number) => padding + (index / Math.max(data.length - 1, 1)) * (width - padding * 2);
-  const yFor = (value: number) => height - padding - ((value - min) / range) * (height - padding * 2);
-  const valuePath = buildSparkPath(data.map((point, index) => ({ x: xFor(index), value: point.value })), yFor);
-  const targetPath = buildSparkPath(data.map((point, index) => ({ x: xFor(index), value: point.target })), yFor);
-  const latestPointIndex = findLastNumericIndex(data.map((point) => point.value));
-  const latestPoint = latestPointIndex >= 0 && isFiniteNumber(data[latestPointIndex]?.value)
-    ? { x: xFor(latestPointIndex), y: yFor(data[latestPointIndex].value) }
-    : null;
+  const height = 100;
+  const padX = 10;
+  const padTop = 8;
+  const padBottom = 16;
+  const maxV = Math.max(...values, 0);
+  const minV = Math.min(...values, 0);
+  const range = maxV - minV || 1;
+  const chartH = height - padTop - padBottom;
+  const yFor = (value: number) => padTop + chartH - ((value - minV) / range) * chartH;
+  const baselineY = yFor(0);
+  const n = data.length;
+  const slotW = (width - padX * 2) / Math.max(n, 1);
+  const barW = Math.max(3, Math.min(11, slotW * 0.36));
 
   return (
     <div className="mt-3 rounded-md border bg-background/60 p-2">
       <div className="mb-1 flex items-center justify-between text-[10px] uppercase text-muted-foreground">
-        <span>Evolucao</span>
-        <span>{data[0]?.periodRef ? periodRefLabel(data[0].periodRef) : '-'} - {data[data.length - 1]?.periodRef ? periodRefLabel(data[data.length - 1].periodRef) : '-'}</span>
+        <span>Realizado x Meta</span>
+        <span>
+          {data[0]?.periodRef ? periodRefLabel(data[0].periodRef) : '-'} - {data[n - 1]?.periodRef ? periodRefLabel(data[n - 1].periodRef) : '-'}
+        </span>
       </div>
-      <svg viewBox={`0 0 ${width} ${height}`} className="h-20 w-full" role="img" aria-label={`Mini gráfico de ${indicator.name}`}>
-        <line x1={padding} x2={width - padding} y1={padding} y2={padding} className="stroke-muted" strokeDasharray="2 4" />
-        <line x1={padding} x2={width - padding} y1={height / 2} y2={height / 2} className="stroke-muted" strokeDasharray="2 4" />
-        <line x1={padding} x2={width - padding} y1={height - padding} y2={height - padding} className="stroke-muted" strokeDasharray="2 4" />
-        {targetPath && (
-          <path d={targetPath} fill="none" stroke="#2563eb" strokeWidth="2" strokeDasharray="6 5" strokeLinecap="round" />
-        )}
-        {valuePath && (
-          <path d={valuePath} fill="none" stroke={stroke} strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" />
-        )}
-        {latestPoint && (
-          <circle cx={latestPoint.x} cy={latestPoint.y} r="4" fill={stroke} stroke="hsl(var(--background))" strokeWidth="2" />
-        )}
+      <svg viewBox={`0 0 ${width} ${height}`} className="h-24 w-full" role="img" aria-label={`Realizado x meta de ${indicator.name}`}>
+        <line x1={padX} x2={width - padX} y1={baselineY} y2={baselineY} className="stroke-muted" />
+        {data.map((point, index) => {
+          const cx = padX + slotW * index + slotW / 2;
+          const realColor = LIGHT_STROKE[point.light ?? 'GRAY'] ?? LIGHT_STROKE.GRAY;
+          const month = point.periodRef?.match(/^\d{4}-(\d{2})/)?.[1];
+          const monthName = month ? MONTH_ABBR[Number(month) - 1] : '';
+          return (
+            <g key={point.periodRef}>
+              {isFiniteNumber(point.target) && (
+                <rect
+                  x={cx + 1}
+                  y={Math.min(yFor(point.target), baselineY)}
+                  width={barW}
+                  height={Math.max(1, Math.abs(baselineY - yFor(point.target)))}
+                  rx="1"
+                  fill="#94a3b8"
+                  opacity="0.75"
+                />
+              )}
+              {isFiniteNumber(point.value) && (
+                <rect
+                  x={cx - barW - 1}
+                  y={Math.min(yFor(point.value), baselineY)}
+                  width={barW}
+                  height={Math.max(1, Math.abs(baselineY - yFor(point.value)))}
+                  rx="1"
+                  fill={realColor}
+                />
+              )}
+              {monthName && n <= 12 && (
+                <text x={cx} y={height - 4} textAnchor="middle" className="fill-muted-foreground" fontSize="7">
+                  {monthName}
+                </text>
+              )}
+            </g>
+          );
+        })}
       </svg>
       <div className="mt-1 flex items-center gap-3 text-[10px] text-muted-foreground">
-        <span className="inline-flex items-center gap-1"><span className="h-1.5 w-4 rounded-full" style={{ background: stroke }} /> Realizado</span>
-        <span className="inline-flex items-center gap-1"><span className="h-1.5 w-4 rounded-full bg-blue-600" /> Meta</span>
+        <span className="inline-flex items-center gap-1">
+          <span className="h-2 w-3 rounded-sm" style={{ background: LIGHT_STROKE.GREEN }} /> Realizado (cor = farol)
+        </span>
+        <span className="inline-flex items-center gap-1">
+          <span className="h-2 w-3 rounded-sm bg-slate-400" /> Meta
+        </span>
       </div>
     </div>
   );
@@ -2269,7 +2326,7 @@ function IndicatorActionRow({ action }: { action: IndicatorAction }) {
   const progress = clampPercent(action.progress);
 
   return (
-    <Link href={`/actions/${action.id}`} className="block rounded-md border bg-background/60 p-2 transition hover:bg-accent/35">
+    <Link href={`/actions/${action.id}`} target="_blank" rel="noopener noreferrer" className="block rounded-md border bg-background/60 p-2 transition hover:bg-accent/35">
       <div className="flex items-start justify-between gap-2">
         <div className="min-w-0">
           <div className="truncate font-semibold text-foreground">{action.title}</div>
@@ -2304,13 +2361,14 @@ function IndicatorActionRow({ action }: { action: IndicatorAction }) {
 }
 
 function buildIndicatorChartPoints(indicator: Indicator) {
-  const byPeriod = new Map<string, { periodRef: string; value: number | null; target: number | null }>();
+  const byPeriod = new Map<string, { periodRef: string; value: number | null; target: number | null; light: string | null }>();
   for (const result of indicator.results ?? []) {
     if (!result.periodRef) continue;
     byPeriod.set(result.periodRef, {
       periodRef: result.periodRef,
       value: isFiniteNumber(result.value) ? result.value : null,
       target: byPeriod.get(result.periodRef)?.target ?? null,
+      light: result.light ?? null,
     });
   }
   for (const target of indicator.targets ?? []) {
@@ -2319,29 +2377,11 @@ function buildIndicatorChartPoints(indicator: Indicator) {
       periodRef: target.periodRef,
       value: current?.value ?? null,
       target: isFiniteNumber(target.target) ? target.target : null,
+      light: current?.light ?? null,
     });
   }
-  return Array.from(byPeriod.values()).sort((a, b) => a.periodRef.localeCompare(b.periodRef)).slice(-6);
-}
-
-function buildSparkPath(points: Array<{ x: number; value: number | null }>, yFor: (value: number) => number) {
-  let started = false;
-  return points
-    .map((point) => {
-      if (!isFiniteNumber(point.value)) return '';
-      const command = started ? 'L' : 'M';
-      started = true;
-      return `${command} ${point.x.toFixed(1)} ${yFor(point.value).toFixed(1)}`;
-    })
-    .filter(Boolean)
-    .join(' ');
-}
-
-function findLastNumericIndex(values: Array<number | null>) {
-  for (let index = values.length - 1; index >= 0; index--) {
-    if (isFiniteNumber(values[index])) return index;
-  }
-  return -1;
+  // Ate 12 periodos (ano civil): mostra realizado E meta de Jan a Dez.
+  return Array.from(byPeriod.values()).sort((a, b) => a.periodRef.localeCompare(b.periodRef)).slice(-12);
 }
 
 function isFiniteNumber(value: unknown): value is number {

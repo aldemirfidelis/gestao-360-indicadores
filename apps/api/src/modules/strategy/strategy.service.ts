@@ -1319,8 +1319,8 @@ function indicatorSelect(periodRef?: string) {
       // sem periodRef, usa-se o resultado mais recente.
       results: periodRef
         ? { where: { periodRef }, orderBy: { periodDate: 'desc' as const }, take: 1, select: resultSelect }
-        : { orderBy: { periodDate: 'desc' as const }, take: 6, select: resultSelect },
-      targets: { orderBy: { periodRef: 'desc' as const }, take: 6, select: { target: true, periodRef: true } },
+        : { orderBy: { periodDate: 'desc' as const }, take: 12, select: resultSelect },
+      targets: { orderBy: { periodRef: 'desc' as const }, take: 12, select: { target: true, periodRef: true } },
     },
   };
 }

@@ -939,6 +939,100 @@ export class IndicatorsService {
       },
     });
   }
+
+  // ---- Anexos e comentarios de resultados lancados (armazenados no Neon, max 5 MB) ----
+
+  private async assertIndicatorInCompany(companyId: string, indicatorId: string) {
+    const ind = await this.prisma.indicator.findFirst({
+      where: { id: indicatorId, companyId },
+      select: { id: true },
+    });
+    if (!ind) throw new NotFoundException('Indicador nao encontrado');
+  }
+
+  async listResultNotes(companyId: string, indicatorId: string, periodRef: string) {
+    await this.assertIndicatorInCompany(companyId, indicatorId);
+    const [attachments, comments] = await Promise.all([
+      this.prisma.indicatorResultAttachment.findMany({
+        where: { companyId, indicatorId, periodRef },
+        select: { id: true, fileName: true, mimeType: true, sizeBytes: true, createdAt: true, createdById: true },
+        orderBy: { createdAt: 'desc' },
+      }),
+      this.prisma.indicatorResultComment.findMany({
+        where: { companyId, indicatorId, periodRef },
+        orderBy: { createdAt: 'asc' },
+      }),
+    ]);
+    return { attachments, comments };
+  }
+
+  async addResultAttachment(
+    me: AuthPayload,
+    indicatorId: string,
+    periodRef: string,
+    body: { fileName: string; mimeType?: string; dataBase64: string },
+  ) {
+    await this.assertIndicatorInCompany(me.companyId, indicatorId);
+    if (!body?.fileName || !body?.dataBase64) throw new BadRequestException('Arquivo invalido');
+    // aceita data URL ("data:...;base64,XXXX") ou base64 puro
+    const base64 = body.dataBase64.includes(',') ? body.dataBase64.split(',').pop()! : body.dataBase64;
+    const buffer = Buffer.from(base64, 'base64');
+    if (buffer.length === 0) throw new BadRequestException('Arquivo vazio');
+    const MAX_BYTES = 5 * 1024 * 1024;
+    if (buffer.length > MAX_BYTES) throw new BadRequestException('Arquivo excede o limite de 5 MB');
+    return this.prisma.indicatorResultAttachment.create({
+      data: {
+        companyId: me.companyId,
+        indicatorId,
+        periodRef,
+        fileName: body.fileName.slice(0, 255),
+        mimeType: body.mimeType ?? null,
+        sizeBytes: buffer.length,
+        data: buffer,
+        createdById: me.sub,
+      },
+      select: { id: true, fileName: true, mimeType: true, sizeBytes: true, createdAt: true },
+    });
+  }
+
+  async getResultAttachment(companyId: string, attachmentId: string) {
+    const att = await this.prisma.indicatorResultAttachment.findFirst({
+      where: { id: attachmentId, companyId },
+    });
+    if (!att) throw new NotFoundException('Anexo nao encontrado');
+    return {
+      id: att.id,
+      fileName: att.fileName,
+      mimeType: att.mimeType,
+      dataBase64: Buffer.from(att.data).toString('base64'),
+    };
+  }
+
+  async deleteResultAttachment(companyId: string, attachmentId: string) {
+    const att = await this.prisma.indicatorResultAttachment.findFirst({
+      where: { id: attachmentId, companyId },
+      select: { id: true },
+    });
+    if (!att) throw new NotFoundException('Anexo nao encontrado');
+    await this.prisma.indicatorResultAttachment.delete({ where: { id: attachmentId } });
+    return { ok: true };
+  }
+
+  async addResultComment(me: AuthPayload, indicatorId: string, periodRef: string, body: { body: string }) {
+    await this.assertIndicatorInCompany(me.companyId, indicatorId);
+    const text = (body?.body ?? '').trim();
+    if (!text) throw new BadRequestException('Comentario vazio');
+    return this.prisma.indicatorResultComment.create({
+      data: {
+        companyId: me.companyId,
+        indicatorId,
+        periodRef,
+        body: text.slice(0, 4000),
+        authorId: me.sub,
+        authorName: me.name,
+      },
+    });
+  }
 }
 
 function deriveArea(ownerNode: { id: string; name: string; type?: string; parentId?: string | null; parent?: { id: string; name: string; type?: string; parentId?: string | null } | null }) {

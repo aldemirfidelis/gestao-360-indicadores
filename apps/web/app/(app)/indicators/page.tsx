@@ -268,6 +268,7 @@ export default function IndicatorsPage() {
   const canLaunch = hasPermission(['results:launch']);
   const canLaunchGrain = hasPermission(['results:grain', 'results:launch']);
   const canHistory = hasPermission(['indicators:history', 'indicators:view']);
+  const [showActions, setShowActions] = useState(true);
   const [filters, setFilters] = useState<Filters>({
     companyId: '',
     areaMacroId: '',
@@ -662,11 +663,19 @@ export default function IndicatorsPage() {
         />
       )}
 
+      <div className="mb-3 flex justify-end">
+        <Button variant="outline" size="sm" onClick={() => setShowActions((v) => !v)}>
+          <Eye className="mr-1.5 h-3.5 w-3.5" />
+          {showActions ? 'Ocultar ações' : 'Mostrar ações'}
+        </Button>
+      </div>
+
       <div className="grid grid-cols-1 gap-4">
         {topLevelRows.map((indicator) => (
           <IndicatorManagementCard
             key={indicator.id}
             indicator={indicator}
+            showActions={showActions}
             micros={microsByParent.get(indicator.id) ?? []}
             canEdit={canUpdate}
             canDelete={canDelete}
@@ -738,6 +747,120 @@ export default function IndicatorsPage() {
 
 type IndicatorViewMode = 'monthly' | 'cumulative' | 'weekly' | 'daily';
 type IndicatorChartType = 'bar' | 's-curve';
+
+// Cor da serie "Realizado" conforme o ultimo ponto preenchido: verde dentro da meta,
+// vermelho fora (respeita a direcao do indicador). Usado na linha da Curva S.
+function realizadoSeriesColor(
+  points: Array<{ displayRealizado?: number | null; displayMeta?: number | null }>,
+  direction?: string,
+): string {
+  for (let i = points.length - 1; i >= 0; i -= 1) {
+    const r = points[i]?.displayRealizado;
+    const m = points[i]?.displayMeta;
+    if (r === null || r === undefined) continue;
+    const within = direction === 'LOWER_BETTER' ? (r ?? 0) <= (m ?? 0) : (r ?? 0) >= (m ?? 0);
+    return within ? '#10b981' : '#ef4444';
+  }
+  return '#10b981';
+}
+
+const ACTION_STATUS_PT: Record<string, string> = {
+  DRAFT: 'Rascunho',
+  NOT_STARTED: 'Não iniciada',
+  UNDER_ANALYSIS: 'Em análise',
+  IN_PROGRESS: 'Em andamento',
+  WAITING_THIRD: 'Aguard. terceiro',
+  WAITING_EVIDENCE: 'Aguard. evidência',
+  WAITING_VALIDATION: 'Aguard. validação',
+  PAUSED: 'Pausada',
+  DONE: 'Concluída',
+  DONE_LATE: 'Concluída (atraso)',
+  CANCELLED: 'Cancelada',
+  REOPENED: 'Reaberta',
+  INEFFECTIVE: 'Ineficaz',
+  EFFECTIVE: 'Eficaz',
+};
+const ACTION_DONE_SET = new Set(['DONE', 'DONE_LATE', 'CANCELLED', 'EFFECTIVE']);
+
+interface LinkedActionRow {
+  id: string;
+  title: string;
+  status: string;
+  progress: number;
+  dueDate: string | null;
+  responsibleUser?: { name: string } | null;
+}
+
+// Card com o andamento das acoes vinculadas a um indicador (abaixo de Meta/Realizado/Atingimento).
+function IndicatorLinkedActions({ indicatorId }: { indicatorId: string }) {
+  const query = useQuery<LinkedActionRow[]>({
+    queryKey: ['indicator-actions', indicatorId],
+    queryFn: () => api<LinkedActionRow[]>(`/actions?indicatorId=${indicatorId}`),
+  });
+  const actions = query.data ?? [];
+  if (query.isLoading) {
+    return (
+      <div className="mt-4 border border-border/60 bg-card/60 p-3 text-xs text-muted-foreground">
+        Carregando ações vinculadas...
+      </div>
+    );
+  }
+  if (actions.length === 0) return null;
+  const open = actions.filter((a) => !ACTION_DONE_SET.has(a.status)).length;
+  return (
+    <div className="mt-4 border border-border/60 bg-card/60 p-3">
+      <div className="mb-2 flex items-center gap-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+        <CalendarDays className="h-3.5 w-3.5" /> Ações vinculadas ({actions.length})
+        {open > 0 && (
+          <span className="rounded-full bg-status-blue/15 px-2 py-0.5 text-[10px] font-medium normal-case text-status-blue">
+            {open} em aberto
+          </span>
+        )}
+      </div>
+      <div className="grid grid-cols-1 gap-2 md:grid-cols-2">
+        {actions.map((a) => {
+          const overdue = !!a.dueDate && !ACTION_DONE_SET.has(a.status) && new Date(a.dueDate) < new Date();
+          const p = Math.max(0, Math.min(100, a.progress ?? 0));
+          return (
+            <Link
+              key={a.id}
+              href={`/actions/${a.id}`}
+              className="block rounded-md border bg-background/60 p-2 text-xs transition hover:bg-accent/35"
+            >
+              <div className="flex items-start justify-between gap-2">
+                <span className="min-w-0 truncate font-medium text-foreground">{a.title}</span>
+                <span
+                  className={cn(
+                    'shrink-0 rounded-full px-2 py-0.5 text-[10px] font-medium',
+                    ACTION_DONE_SET.has(a.status) ? 'bg-status-green/15 text-status-green' : 'bg-status-blue/15 text-status-blue',
+                  )}
+                >
+                  {ACTION_STATUS_PT[a.status] ?? a.status}
+                </span>
+              </div>
+              <div className="mt-1.5 flex items-center gap-2">
+                <div className="h-1.5 flex-1 overflow-hidden rounded-full bg-muted">
+                  <div
+                    className={cn('h-full rounded-full', overdue ? 'bg-rose-600' : 'bg-emerald-600')}
+                    style={{ width: `${p}%` }}
+                  />
+                </div>
+                <span className="w-9 text-right text-[10px] text-muted-foreground">{Math.round(p)}%</span>
+              </div>
+              <div className="mt-1 flex items-center justify-between gap-2 text-[10px] text-muted-foreground">
+                <span className="truncate">{a.responsibleUser?.name ?? 'Sem responsável'}</span>
+                <span className={cn('shrink-0', overdue && 'font-semibold text-rose-600')}>
+                  {a.dueDate ? formatDate(a.dueDate) : 'Sem prazo'}
+                  {overdue ? ' · vencida' : ''}
+                </span>
+              </div>
+            </Link>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
 
 interface ChartPoint {
   periodRef: string;
@@ -812,6 +935,7 @@ function buildCumulativeAvg(values: Array<number | null | undefined>): Array<num
 function IndicatorManagementCard({
   indicator,
   micros = [],
+  showActions = true,
   canEdit = true,
   canDelete = true,
   canTargets = true,
@@ -831,6 +955,7 @@ function IndicatorManagementCard({
   onMicroDelete,
 }: {
   indicator: IndicatorRow;
+  showActions?: boolean;
   micros?: IndicatorRow[];
   canEdit?: boolean;
   canDelete?: boolean;
@@ -1106,8 +1231,8 @@ function IndicatorManagementCard({
                     <Line type="monotone" dataKey="displayMeta" name="Meta" stroke="#1e3a8a" strokeWidth={2.5} strokeDasharray="6 4" dot={{ r: 3, fill: '#1e3a8a' }} activeDot={{ r: 5 }}>
                       <LabelList dataKey="displayMeta" position="top" fontSize={10} fill="#1e3a8a" formatter={(v: any) => (v === null || v === undefined ? '' : formatNumber(v))} />
                     </Line>
-                    <Line type="monotone" dataKey="displayRealizado" name="Realizado" stroke="#10b981" strokeWidth={2.5} dot={{ r: 3, fill: '#10b981' }} activeDot={{ r: 5 }}>
-                      <LabelList dataKey="displayRealizado" position="top" fontSize={10} fill="#10b981" formatter={(v: any) => (v === null || v === undefined ? '' : formatNumber(v))} />
+                    <Line type="monotone" dataKey="displayRealizado" name="Realizado" stroke={realizadoSeriesColor(chartData, indicator.direction)} strokeWidth={2.5} dot={{ r: 3, fill: realizadoSeriesColor(chartData, indicator.direction) }} activeDot={{ r: 5 }}>
+                      <LabelList dataKey="displayRealizado" position="top" fontSize={10} fill={realizadoSeriesColor(chartData, indicator.direction)} formatter={(v: any) => (v === null || v === undefined ? '' : formatNumber(v))} />
                     </Line>
                   </LineChart>
                 )}
@@ -1127,6 +1252,9 @@ function IndicatorManagementCard({
         </div>
       </div>
 
+      {indicator._count.actions > 0 && <IndicatorLinkedActions indicatorId={indicator.id} />}
+
+      {showActions && (
       <div className="mt-5 flex flex-wrap gap-2 border-t pt-4">
         {canLaunch && (
           <Button variant="default" size="sm" onClick={onResult}>
@@ -1149,6 +1277,7 @@ function IndicatorManagementCard({
           <Button variant="ghost" size="sm" className="text-destructive hover:text-destructive ml-auto" onClick={onDelete}><Trash2 className="mr-1.5 h-3.5 w-3.5" />Inativar</Button>
         )}
       </div>
+      )}
 
       {micros.length > 0 && (
         <div className="mt-4 border-t pt-3">
@@ -1171,6 +1300,7 @@ function IndicatorManagementCard({
                 <MicroIndicatorRow
                   key={micro.id}
                   micro={micro}
+                  showActions={showActions}
                   onView={() => onMicroView?.(micro)}
                   onEdit={() => onMicroEdit?.(micro)}
                   onTarget={() => onMicroTarget?.(micro)}
@@ -1189,6 +1319,7 @@ function IndicatorManagementCard({
 
 function MicroIndicatorRow({
   micro,
+  showActions = true,
   onView,
   onEdit,
   onTarget,
@@ -1197,6 +1328,7 @@ function MicroIndicatorRow({
   onDelete,
 }: {
   micro: IndicatorRow;
+  showActions?: boolean;
   onView: () => void;
   onEdit: () => void;
   onTarget: () => void;
@@ -1296,6 +1428,7 @@ function MicroIndicatorRow({
       </div>
 
       {/* Micro actions row */}
+      {showActions && (
       <div className="mt-1 flex flex-wrap gap-1 border-t pt-2.5">
         <Button variant="ghost" size="sm" className="h-7 text-xs px-2.5 gap-1.5" onClick={onView} title="Visualizar">
           <Eye className="h-3.5 w-3.5" />
@@ -1337,6 +1470,7 @@ function MicroIndicatorRow({
           </Button>
         )}
       </div>
+      )}
     </div>
   );
 }

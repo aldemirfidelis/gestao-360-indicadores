@@ -118,6 +118,52 @@ export class IndicatorsController {
     return this.service.upsertResult(me, id, body);
   }
 
+  // --- anexos e comentarios de um resultado lancado (chaveados por indicador + periodo) ---
+
+  @Get(':id/period/:periodRef/notes')
+  @RequirePermissions('indicators:view')
+  resultNotes(
+    @CurrentUser() me: AuthPayload,
+    @Param('id') id: string,
+    @Param('periodRef') periodRef: string,
+  ) {
+    return this.service.listResultNotes(me.companyId, id, periodRef);
+  }
+
+  @Post(':id/period/:periodRef/attachments')
+  @RequirePermissions('results:launch')
+  addResultAttachment(
+    @CurrentUser() me: AuthPayload,
+    @Param('id') id: string,
+    @Param('periodRef') periodRef: string,
+    @Body() body: { fileName: string; mimeType?: string; dataBase64: string },
+  ) {
+    return this.service.addResultAttachment(me, id, periodRef, body);
+  }
+
+  @Post(':id/period/:periodRef/comments')
+  @RequirePermissions('results:launch')
+  addResultComment(
+    @CurrentUser() me: AuthPayload,
+    @Param('id') id: string,
+    @Param('periodRef') periodRef: string,
+    @Body() body: { body: string },
+  ) {
+    return this.service.addResultComment(me, id, periodRef, body);
+  }
+
+  @Get('result-attachments/:attachmentId')
+  @RequirePermissions('indicators:view')
+  downloadResultAttachment(@CurrentUser() me: AuthPayload, @Param('attachmentId') attachmentId: string) {
+    return this.service.getResultAttachment(me.companyId, attachmentId);
+  }
+
+  @Delete('result-attachments/:attachmentId')
+  @RequirePermissions('results:launch')
+  deleteResultAttachment(@CurrentUser() me: AuthPayload, @Param('attachmentId') attachmentId: string) {
+    return this.service.deleteResultAttachment(me.companyId, attachmentId);
+  }
+
   @Delete(':id')
   @RequirePermissions('indicators:delete')
   remove(@CurrentUser() me: AuthPayload, @Param('id') id: string) {

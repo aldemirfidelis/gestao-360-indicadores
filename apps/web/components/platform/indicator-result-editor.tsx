@@ -1,10 +1,10 @@
 'use client';
 
-import { useMemo, useState } from 'react';
+import { useMemo, useRef, useState } from 'react';
 import Link from 'next/link';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
-import { AlertTriangle, ArrowDownToLine, Copy, RotateCcw, Save } from 'lucide-react';
+import { AlertTriangle, ArrowDownToLine, Copy, Download, MessageSquare, Paperclip, RotateCcw, Save, Trash2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { StatusLight } from '@/components/ui/status-light';
@@ -19,7 +19,7 @@ import {
 } from '@/components/ui/dialog';
 import { Textarea } from '@/components/ui/textarea';
 import { api } from '@/lib/api';
-import { cn, formatNumber, periodRefLabel } from '@/lib/utils';
+import { cn, formatDate, formatNumber, periodRefLabel } from '@/lib/utils';
 import { PERIODICITY_LABEL } from '@/lib/labels';
 
 interface PendingCell {
@@ -76,6 +76,7 @@ export function IndicatorResultEditor(props: IndicatorMonthlyEditorProps) {
   const [offTargetOpen, setOffTargetOpen] = useState(false);
   const [offTargets, setOffTargets] = useState<UpsertOutcome[]>([]);
   const [ignoreReason, setIgnoreReason] = useState('');
+  const [notesCell, setNotesCell] = useState<string | null>(null);
 
   const query = useQuery<PendingRow[]>({
     queryKey: ['results', 'pending', 'indicator', indicatorId],
@@ -300,15 +301,17 @@ export function IndicatorResultEditor(props: IndicatorMonthlyEditorProps) {
             <div className="text-xs text-muted-foreground">
               Acumulado calculado como media year-to-date dos períodos preenchidos.
             </div>
-            <Button
-              type="button"
-              variant="outline"
-              size="sm"
-              onClick={replicateAllFromFirstFilled}
-            >
-              <Copy className="mr-1.5 h-3.5 w-3.5" />
-              Replicar primeiro valor para os vazios
-            </Button>
+            {mode === 'target' && (
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={replicateAllFromFirstFilled}
+              >
+                <Copy className="mr-1.5 h-3.5 w-3.5" />
+                Replicar primeira meta para os vazios
+              </Button>
+            )}
           </div>
           <div className="overflow-x-auto rounded-lg border">
             <table className="table-modern min-w-[760px]">
@@ -402,15 +405,40 @@ export function IndicatorResultEditor(props: IndicatorMonthlyEditorProps) {
                         )}
                       </td>
                       <td className="text-center">
-                        <Button
-                          type="button"
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => replicateForwardFrom(cell.periodRef)}
-                          title="Replicar este valor para os meses vazios a frente"
-                        >
-                          <ArrowDownToLine className="h-4 w-4" />
-                        </Button>
+                        {mode === 'target' ? (
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => replicateForwardFrom(cell.periodRef)}
+                            title="Replicar esta meta para os meses vazios a frente"
+                          >
+                            <ArrowDownToLine className="h-4 w-4" />
+                          </Button>
+                        ) : (
+                          <div className="flex items-center justify-center gap-0.5">
+                            <Button
+                              type="button"
+                              variant="ghost"
+                              size="sm"
+                              className="h-8 w-8 p-0"
+                              onClick={() => setNotesCell(cell.periodRef)}
+                              title="Anexar arquivo"
+                            >
+                              <Paperclip className="h-4 w-4" />
+                            </Button>
+                            <Button
+                              type="button"
+                              variant="ghost"
+                              size="sm"
+                              className="h-8 w-8 p-0"
+                              onClick={() => setNotesCell(cell.periodRef)}
+                              title="Adicionar comentário"
+                            >
+                              <MessageSquare className="h-4 w-4" />
+                            </Button>
+                          </div>
+                        )}
                       </td>
                     </tr>
                   );
@@ -431,6 +459,15 @@ export function IndicatorResultEditor(props: IndicatorMonthlyEditorProps) {
           {isSaving ? 'Salvando...' : `Salvar (${stats.edited})`}
         </Button>
       </div>
+
+      {notesCell && (
+        <ResultNotesDialog
+          indicatorId={indicatorId}
+          periodRef={notesCell}
+          open={!!notesCell}
+          onClose={() => setNotesCell(null)}
+        />
+      )}
 
       <Dialog open={offTargetOpen} onOpenChange={setOffTargetOpen}>
         <DialogContent className="max-w-3xl">
@@ -515,4 +552,249 @@ function buildCumulative(values: Array<number | null | undefined>): Array<number
     out.push(count === 0 ? null : sum / count);
   }
   return out;
+}
+
+interface ResultAttachment {
+  id: string;
+  fileName: string;
+  mimeType: string | null;
+  sizeBytes: number | null;
+  createdAt: string;
+}
+interface ResultComment {
+  id: string;
+  body: string;
+  authorName: string | null;
+  createdAt: string;
+}
+interface ResultNotes {
+  attachments: ResultAttachment[];
+  comments: ResultComment[];
+}
+
+const MAX_ATTACHMENT_BYTES = 5 * 1024 * 1024;
+
+function ResultNotesDialog({
+  indicatorId,
+  periodRef,
+  open,
+  onClose,
+}: {
+  indicatorId: string;
+  periodRef: string;
+  open: boolean;
+  onClose: () => void;
+}) {
+  const qc = useQueryClient();
+  const fileRef = useRef<HTMLInputElement>(null);
+  const [comment, setComment] = useState('');
+  const encoded = encodeURIComponent(periodRef);
+  const queryKey = ['indicator-notes', indicatorId, periodRef];
+
+  const notesQuery = useQuery<ResultNotes>({
+    queryKey,
+    queryFn: () => api<ResultNotes>(`/indicators/${indicatorId}/period/${encoded}/notes`),
+    enabled: open,
+  });
+  const refresh = () => qc.invalidateQueries({ queryKey });
+
+  const uploadMut = useMutation({
+    mutationFn: async (file: File) => {
+      if (file.size > MAX_ATTACHMENT_BYTES) throw new Error('Arquivo excede o limite de 5 MB');
+      const dataBase64 = await fileToBase64(file);
+      return api(`/indicators/${indicatorId}/period/${encoded}/attachments`, {
+        method: 'POST',
+        json: { fileName: file.name, mimeType: file.type || null, dataBase64 },
+      });
+    },
+    onSuccess: () => {
+      toast.success('Anexo adicionado');
+      refresh();
+    },
+    onError: (e: any) => toast.error(e?.message ?? 'Falha ao anexar arquivo'),
+  });
+
+  const commentMut = useMutation({
+    mutationFn: () =>
+      api(`/indicators/${indicatorId}/period/${encoded}/comments`, { method: 'POST', json: { body: comment } }),
+    onSuccess: () => {
+      toast.success('Comentário adicionado');
+      setComment('');
+      refresh();
+    },
+    onError: (e: any) => toast.error(e?.message ?? 'Falha ao comentar'),
+  });
+
+  const deleteMut = useMutation({
+    mutationFn: (attId: string) => api(`/indicators/result-attachments/${attId}`, { method: 'DELETE' }),
+    onSuccess: () => {
+      toast.success('Anexo removido');
+      refresh();
+    },
+    onError: (e: any) => toast.error(e?.message ?? 'Falha ao remover anexo'),
+  });
+
+  async function downloadAttachment(attId: string) {
+    try {
+      const att = await api<{ fileName: string; mimeType: string | null; dataBase64: string }>(
+        `/indicators/result-attachments/${attId}`,
+      );
+      const blob = base64ToBlob(att.dataBase64, att.mimeType || 'application/octet-stream');
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = att.fileName;
+      a.click();
+      URL.revokeObjectURL(url);
+    } catch (e: any) {
+      toast.error(e?.message ?? 'Falha ao baixar anexo');
+    }
+  }
+
+  const data = notesQuery.data;
+
+  return (
+    <Dialog open={open} onOpenChange={(v) => !v && onClose()}>
+      <DialogContent className="max-w-lg">
+        <DialogHeader>
+          <DialogTitle>Anexos e comentários · {periodRefLabel(periodRef)}</DialogTitle>
+        </DialogHeader>
+        <div className="space-y-5">
+          <div>
+            <div className="mb-2 flex items-center justify-between gap-2">
+              <span className="flex items-center gap-1.5 text-sm font-semibold">
+                <Paperclip className="h-4 w-4" /> Anexos
+              </span>
+              <Button
+                type="button"
+                size="sm"
+                variant="outline"
+                onClick={() => fileRef.current?.click()}
+                disabled={uploadMut.isPending}
+              >
+                <Paperclip className="mr-1.5 h-3.5 w-3.5" />
+                {uploadMut.isPending ? 'Enviando...' : 'Anexar arquivo'}
+              </Button>
+              <input
+                ref={fileRef}
+                type="file"
+                className="hidden"
+                accept=".doc,.docx,.xls,.xlsx,.csv,.pdf,.png,.jpg,.jpeg,.txt,.ppt,.pptx"
+                onChange={(e) => {
+                  const f = e.target.files?.[0];
+                  if (f) uploadMut.mutate(f);
+                  e.target.value = '';
+                }}
+              />
+            </div>
+            <p className="mb-2 text-[11px] text-muted-foreground">
+              Word, Excel, CSV, PDF, imagens. Máx. 5 MB por arquivo.
+            </p>
+            {(data?.attachments.length ?? 0) === 0 ? (
+              <div className="rounded-md border border-dashed p-3 text-xs text-muted-foreground">
+                Nenhum anexo neste período.
+              </div>
+            ) : (
+              <div className="space-y-1">
+                {data!.attachments.map((a) => (
+                  <div key={a.id} className="flex items-center justify-between gap-2 rounded-md border p-2 text-xs">
+                    <button
+                      type="button"
+                      onClick={() => downloadAttachment(a.id)}
+                      className="flex min-w-0 items-center gap-2 text-left hover:underline"
+                      title="Baixar"
+                    >
+                      <Download className="h-3.5 w-3.5 shrink-0" />
+                      <span className="truncate">{a.fileName}</span>
+                      <span className="shrink-0 text-muted-foreground">{formatBytes(a.sizeBytes)}</span>
+                    </button>
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="sm"
+                      className="h-7 w-7 p-0"
+                      onClick={() => deleteMut.mutate(a.id)}
+                      title="Remover anexo"
+                    >
+                      <Trash2 className="h-3.5 w-3.5" />
+                    </Button>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+
+          <div>
+            <div className="mb-2 flex items-center gap-1.5 text-sm font-semibold">
+              <MessageSquare className="h-4 w-4" /> Comentários
+            </div>
+            {(data?.comments.length ?? 0) === 0 ? (
+              <div className="rounded-md border border-dashed p-3 text-xs text-muted-foreground">
+                Nenhum comentário neste período.
+              </div>
+            ) : (
+              <div className="space-y-2">
+                {data!.comments.map((c) => (
+                  <div key={c.id} className="rounded-md border p-2 text-xs">
+                    <div className="mb-0.5 flex items-center justify-between gap-2 text-[11px] text-muted-foreground">
+                      <span className="font-medium text-foreground">{c.authorName ?? 'Usuário'}</span>
+                      <span>{formatDate(c.createdAt)}</span>
+                    </div>
+                    <div className="whitespace-pre-wrap">{c.body}</div>
+                  </div>
+                ))}
+              </div>
+            )}
+            <div className="mt-2 flex items-end gap-2">
+              <Textarea
+                value={comment}
+                onChange={(e) => setComment(e.target.value)}
+                rows={2}
+                placeholder="Escreva um comentário..."
+              />
+              <Button
+                type="button"
+                onClick={() => commentMut.mutate()}
+                disabled={!comment.trim() || commentMut.isPending}
+              >
+                <MessageSquare className="mr-1.5 h-3.5 w-3.5" />
+                Comentar
+              </Button>
+            </div>
+          </div>
+        </div>
+        <DialogFooter>
+          <Button variant="ghost" onClick={onClose}>
+            Fechar
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+function fileToBase64(file: File): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => {
+      const result = reader.result as string;
+      resolve(result.includes(',') ? result.split(',').pop()! : result);
+    };
+    reader.onerror = () => reject(new Error('Falha ao ler o arquivo'));
+    reader.readAsDataURL(file);
+  });
+}
+
+function base64ToBlob(base64: string, mime: string): Blob {
+  const bytes = atob(base64);
+  const arr = new Uint8Array(bytes.length);
+  for (let i = 0; i < bytes.length; i += 1) arr[i] = bytes.charCodeAt(i);
+  return new Blob([arr], { type: mime });
+}
+
+function formatBytes(n?: number | null): string {
+  if (!n) return '';
+  if (n < 1024) return `${n} B`;
+  if (n < 1024 * 1024) return `${Math.round(n / 1024)} KB`;
+  return `${(n / (1024 * 1024)).toFixed(1)} MB`;
 }
