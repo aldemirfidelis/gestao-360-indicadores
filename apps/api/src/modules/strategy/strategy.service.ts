@@ -136,7 +136,7 @@ export class StrategyService {
     if (!map) throw new NotFoundException('Mapa nao encontrado');
 
     const objectiveIndicatorIds = map.objectives.flatMap((obj) => uniqueIndicators(obj).map((indicator) => indicator.id));
-    const [actionCounts, treatmentCounts, deviationCounts] = await Promise.all([
+    const [actionCounts, treatmentCounts, deviationCounts, actionDetails] = await Promise.all([
       objectiveIndicatorIds.length
         ? this.prisma.actionPlan.groupBy({
             by: ['indicatorId'],
@@ -158,15 +158,42 @@ export class StrategyService {
             _count: { _all: true },
           })
         : [],
+      objectiveIndicatorIds.length
+        ? this.prisma.actionPlan.findMany({
+            where: { indicatorId: { in: objectiveIndicatorIds }, deletedAt: null },
+            select: {
+              id: true,
+              indicatorId: true,
+              title: true,
+              status: true,
+              dueDate: true,
+              progress: true,
+              priority: true,
+              responsibleUser: { select: { id: true, name: true } },
+              ownerNode: { select: { id: true, name: true, type: true } },
+            },
+            orderBy: [{ dueDate: 'asc' }, { title: 'asc' }],
+          })
+        : [],
     ]);
     const actionsByIndicator = new Map(actionCounts.map((row) => [row.indicatorId, row._count._all]));
     const treatmentsByIndicator = new Map(treatmentCounts.map((row) => [row.indicatorId, row._count._all]));
     const deviationsByIndicator = new Map(deviationCounts.map((row) => [row.indicatorId, row._count._all]));
+    const actionDetailsByIndicator = new Map<string, typeof actionDetails>();
+    for (const action of actionDetails) {
+      if (!action.indicatorId) continue;
+      const current = actionDetailsByIndicator.get(action.indicatorId) ?? [];
+      current.push(action);
+      actionDetailsByIndicator.set(action.indicatorId, current);
+    }
 
     const baseLights = new Map<string, TrafficLight>();
     const baseAttainments = new Map<string, number | null>();
     const enrichedObjectives = map.objectives.map((obj) => {
-      const indicators = uniqueIndicators(obj);
+      const indicators = uniqueIndicators(obj).map((indicator) => ({
+        ...indicator,
+        actions: actionDetailsByIndicator.get(indicator.id) ?? [],
+      }));
       const lights = indicators.map((i) => i.results[0]?.light).filter((l): l is TrafficLight => !!l);
       const attainments = indicators.map((i) => i.results[0]?.attainment).filter((v): v is number => v !== null && v !== undefined);
       const avg = attainments.length > 0 ? attainments.reduce((a, b) => a + b, 0) / attainments.length : null;
@@ -1163,8 +1190,8 @@ function indicatorSelect() {
       ownerNodeId: true,
       ownerNode: { select: { id: true, name: true, type: true } },
       responsibleUser: { select: { id: true, name: true } },
-      results: { orderBy: { periodDate: 'desc' as const }, take: 1, select: { light: true, attainment: true, value: true, periodRef: true } },
-      targets: { orderBy: { periodRef: 'desc' as const }, take: 1, select: { target: true, periodRef: true } },
+      results: { orderBy: { periodDate: 'desc' as const }, take: 6, select: { light: true, attainment: true, value: true, periodRef: true } },
+      targets: { orderBy: { periodRef: 'desc' as const }, take: 6, select: { target: true, periodRef: true } },
     },
   };
 }

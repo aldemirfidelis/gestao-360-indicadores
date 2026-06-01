@@ -72,7 +72,8 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog';
 import { api } from '@/lib/api';
-import { cn, formatDate, formatPercent } from '@/lib/utils';
+import { cn, formatDate, formatNumber, formatPercent, periodRefLabel } from '@/lib/utils';
+import { ACTION_PRIORITY_LABEL, ACTION_STATUS_LABEL } from '@/lib/labels';
 
 interface Perspective {
   id: string;
@@ -96,8 +97,20 @@ interface Indicator {
   status?: string;
   ownerNode?: { id: string; name: string; type?: string };
   responsibleUser?: { id: string; name: string };
-  results?: { light: string; attainment: number | null; value?: number; periodRef?: string }[];
+  results?: { light: string; attainment: number | null; value?: number | null; periodRef?: string }[];
   targets?: { target: number; periodRef: string }[];
+  actions?: IndicatorAction[];
+}
+
+interface IndicatorAction {
+  id: string;
+  title: string;
+  status: string;
+  dueDate: string | null;
+  progress: number;
+  priority: string;
+  responsibleUser?: { id: string; name: string } | null;
+  ownerNode?: { id: string; name: string; type?: string } | null;
 }
 
 interface OrgNode {
@@ -204,6 +217,15 @@ const LIGHT_CLASS: Record<string, string> = {
   RED: 'border-rose-600 bg-rose-600 text-white shadow-md',
   GRAY: 'border-foreground bg-muted text-muted-foreground shadow-sm',
 };
+
+const LIGHT_STROKE: Record<string, string> = {
+  GREEN: '#16a34a',
+  YELLOW: '#f59e0b',
+  RED: '#e11d48',
+  GRAY: '#64748b',
+};
+
+const ACTION_DONE_STATUSES = new Set(['DONE', 'DONE_LATE', 'CANCELLED', 'EFFECTIVE']);
 
 interface RelationKindMeta {
   kind: string;
@@ -1957,21 +1979,9 @@ function ObjectiveDrawerContent({ objective }: { objective: Objective }) {
             Nenhum indicador vinculado a este objetivo.
           </div>
         )}
-        <div className="space-y-2">
+        <div className="space-y-3">
           {objective.indicators.map((indicator) => (
-            <Link
-              key={indicator.id}
-              href={`/indicators/${indicator.id}`}
-              className="flex items-center justify-between gap-2 rounded-md border bg-muted/20 p-2 text-xs transition hover:bg-accent/35"
-            >
-              <span className="truncate">
-                {indicator.code ? `${indicator.code} - ` : ''}{indicator.name}
-              </span>
-              <span className="flex items-center gap-1">
-                <StatusBadge value={indicator.results?.[0]?.light ?? 'GRAY'} label={LIGHT_LABEL[indicator.results?.[0]?.light ?? 'GRAY']} />
-                <ExternalLink className="h-3 w-3" />
-              </span>
-            </Link>
+            <IndicatorLinkedCard key={indicator.id} indicator={indicator} />
           ))}
         </div>
       </div>
@@ -2030,6 +2040,250 @@ function ObjectiveDrawerContent({ objective }: { objective: Objective }) {
       </div>
     </>
   );
+}
+
+function IndicatorLinkedCard({ indicator }: { indicator: Indicator }) {
+  const latest = indicator.results?.[0];
+  const latestTarget = latest?.periodRef
+    ? indicator.targets?.find((target) => target.periodRef === latest.periodRef)
+    : indicator.targets?.[0];
+  const actions = [...(indicator.actions ?? [])].sort(sortIndicatorActions);
+  const openActions = actions.filter((action) => !ACTION_DONE_STATUSES.has(action.status)).length;
+  const lateActions = actions.filter(isActionOverdue).length;
+
+  return (
+    <div className="rounded-md border bg-muted/15 p-3 text-xs shadow-sm">
+      <div className="flex items-start justify-between gap-2">
+        <Link href={`/indicators/${indicator.id}`} className="min-w-0 hover:underline">
+          <div className="truncate font-semibold text-foreground">
+            {indicator.code ? `${indicator.code} - ` : ''}{indicator.name}
+          </div>
+          <div className="mt-0.5 truncate text-muted-foreground">
+            {indicator.ownerNode?.name ?? indicator.responsibleUser?.name ?? 'Sem área vinculada'}
+          </div>
+        </Link>
+        <span className="flex shrink-0 items-center gap-1">
+          <StatusBadge value={latest?.light ?? 'GRAY'} label={LIGHT_LABEL[latest?.light ?? 'GRAY']} />
+          <ExternalLink className="h-3 w-3 text-muted-foreground" />
+        </span>
+      </div>
+
+      <div className="mt-3 grid grid-cols-3 gap-2">
+        <MiniMetric label="Realizado" value={formatNumber(latest?.value)} />
+        <MiniMetric label="Meta" value={formatNumber(latestTarget?.target)} />
+        <MiniMetric label="Ating." value={formatPercent(latest?.attainment ?? null)} />
+      </div>
+
+      <IndicatorSparkline indicator={indicator} />
+
+      <div className="mt-3 border-t pt-3">
+        <div className="mb-2 flex items-center justify-between gap-2">
+          <div className="flex items-center gap-1.5 font-semibold uppercase text-muted-foreground">
+            <ClipboardList className="h-3.5 w-3.5" />
+            Ações vinculadas ({actions.length})
+          </div>
+          {(openActions > 0 || lateActions > 0) && (
+            <div className="flex shrink-0 gap-1">
+              {openActions > 0 && <Badge variant="secondary">{openActions} abertas</Badge>}
+              {lateActions > 0 && <Badge variant="destructive">{lateActions} atrasadas</Badge>}
+            </div>
+          )}
+        </div>
+
+        {actions.length === 0 ? (
+          <div className="rounded-md border border-dashed p-2 text-muted-foreground">
+            Nenhum plano de ação vinculado a este indicador.
+          </div>
+        ) : (
+          <div className="space-y-2">
+            {actions.slice(0, 5).map((action) => (
+              <IndicatorActionRow key={action.id} action={action} />
+            ))}
+            {actions.length > 5 && (
+              <Link
+                href={`/actions?indicatorId=${indicator.id}`}
+                className="block rounded-md border border-dashed p-2 text-center font-medium text-muted-foreground transition hover:bg-accent/35 hover:text-foreground"
+              >
+                Ver mais {actions.length - 5} ação(ões)
+              </Link>
+            )}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+function MiniMetric({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="rounded-md border bg-background/60 px-2 py-1.5">
+      <div className="text-[10px] uppercase text-muted-foreground">{label}</div>
+      <div className="truncate font-semibold">{value}</div>
+    </div>
+  );
+}
+
+function IndicatorSparkline({ indicator }: { indicator: Indicator }) {
+  const data = buildIndicatorChartPoints(indicator);
+  const values = data.flatMap((point) => [point.value, point.target]).filter(isFiniteNumber);
+  const latestLight = indicator.results?.[0]?.light ?? 'GRAY';
+  const stroke = LIGHT_STROKE[latestLight] ?? LIGHT_STROKE.GRAY;
+
+  if (values.length === 0) {
+    return (
+      <div className="mt-3 rounded-md border border-dashed bg-background/50 p-3 text-center text-[11px] text-muted-foreground">
+        Sem histórico suficiente para o mini gráfico.
+      </div>
+    );
+  }
+
+  const width = 320;
+  const height = 86;
+  const padding = 12;
+  const min = Math.min(...values);
+  const max = Math.max(...values);
+  const range = max - min || 1;
+  const xFor = (index: number) => padding + (index / Math.max(data.length - 1, 1)) * (width - padding * 2);
+  const yFor = (value: number) => height - padding - ((value - min) / range) * (height - padding * 2);
+  const valuePath = buildSparkPath(data.map((point, index) => ({ x: xFor(index), value: point.value })), yFor);
+  const targetPath = buildSparkPath(data.map((point, index) => ({ x: xFor(index), value: point.target })), yFor);
+  const latestPointIndex = findLastNumericIndex(data.map((point) => point.value));
+  const latestPoint = latestPointIndex >= 0 && isFiniteNumber(data[latestPointIndex]?.value)
+    ? { x: xFor(latestPointIndex), y: yFor(data[latestPointIndex].value) }
+    : null;
+
+  return (
+    <div className="mt-3 rounded-md border bg-background/60 p-2">
+      <div className="mb-1 flex items-center justify-between text-[10px] uppercase text-muted-foreground">
+        <span>Evolucao</span>
+        <span>{data[0]?.periodRef ? periodRefLabel(data[0].periodRef) : '-'} - {data[data.length - 1]?.periodRef ? periodRefLabel(data[data.length - 1].periodRef) : '-'}</span>
+      </div>
+      <svg viewBox={`0 0 ${width} ${height}`} className="h-20 w-full" role="img" aria-label={`Mini gráfico de ${indicator.name}`}>
+        <line x1={padding} x2={width - padding} y1={padding} y2={padding} className="stroke-muted" strokeDasharray="2 4" />
+        <line x1={padding} x2={width - padding} y1={height / 2} y2={height / 2} className="stroke-muted" strokeDasharray="2 4" />
+        <line x1={padding} x2={width - padding} y1={height - padding} y2={height - padding} className="stroke-muted" strokeDasharray="2 4" />
+        {targetPath && (
+          <path d={targetPath} fill="none" stroke="#2563eb" strokeWidth="2" strokeDasharray="6 5" strokeLinecap="round" />
+        )}
+        {valuePath && (
+          <path d={valuePath} fill="none" stroke={stroke} strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" />
+        )}
+        {latestPoint && (
+          <circle cx={latestPoint.x} cy={latestPoint.y} r="4" fill={stroke} stroke="hsl(var(--background))" strokeWidth="2" />
+        )}
+      </svg>
+      <div className="mt-1 flex items-center gap-3 text-[10px] text-muted-foreground">
+        <span className="inline-flex items-center gap-1"><span className="h-1.5 w-4 rounded-full" style={{ background: stroke }} /> Realizado</span>
+        <span className="inline-flex items-center gap-1"><span className="h-1.5 w-4 rounded-full bg-blue-600" /> Meta</span>
+      </div>
+    </div>
+  );
+}
+
+function IndicatorActionRow({ action }: { action: IndicatorAction }) {
+  const overdue = isActionOverdue(action);
+  const progress = clampPercent(action.progress);
+
+  return (
+    <Link href={`/actions/${action.id}`} className="block rounded-md border bg-background/60 p-2 transition hover:bg-accent/35">
+      <div className="flex items-start justify-between gap-2">
+        <div className="min-w-0">
+          <div className="truncate font-semibold text-foreground">{action.title}</div>
+          <div className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1 text-[11px] text-muted-foreground">
+            <span className={cn('inline-flex items-center gap-1', overdue && 'font-semibold text-rose-600')}>
+              <Calendar className="h-3 w-3" />
+              {action.dueDate ? formatDate(action.dueDate) : 'Sem prazo'}
+            </span>
+            <span className="inline-flex items-center gap-1">
+              <UserCheck className="h-3 w-3" />
+              {action.responsibleUser?.name ?? action.ownerNode?.name ?? 'Sem responsável'}
+            </span>
+          </div>
+        </div>
+        <StatusBadge value={action.status} label={ACTION_STATUS_LABEL[action.status] ?? action.status} />
+      </div>
+      <div className="mt-2 flex items-center gap-2">
+        <div className="h-1.5 flex-1 overflow-hidden rounded-full bg-muted">
+          <div
+            className={cn('h-full rounded-full', overdue ? 'bg-rose-600' : 'bg-emerald-600')}
+            style={{ width: `${progress}%` }}
+          />
+        </div>
+        <span className="w-9 text-right text-[10px] font-medium text-muted-foreground">{formatNumber(progress, { maximumFractionDigits: 0 })}%</span>
+      </div>
+      <div className="mt-1 flex items-center justify-between gap-2 text-[10px] text-muted-foreground">
+        <span>Prioridade: {ACTION_PRIORITY_LABEL[action.priority] ?? action.priority}</span>
+        {overdue && <span className="font-semibold text-rose-600">Prazo vencido</span>}
+      </div>
+    </Link>
+  );
+}
+
+function buildIndicatorChartPoints(indicator: Indicator) {
+  const byPeriod = new Map<string, { periodRef: string; value: number | null; target: number | null }>();
+  for (const result of indicator.results ?? []) {
+    if (!result.periodRef) continue;
+    byPeriod.set(result.periodRef, {
+      periodRef: result.periodRef,
+      value: isFiniteNumber(result.value) ? result.value : null,
+      target: byPeriod.get(result.periodRef)?.target ?? null,
+    });
+  }
+  for (const target of indicator.targets ?? []) {
+    const current = byPeriod.get(target.periodRef);
+    byPeriod.set(target.periodRef, {
+      periodRef: target.periodRef,
+      value: current?.value ?? null,
+      target: isFiniteNumber(target.target) ? target.target : null,
+    });
+  }
+  return Array.from(byPeriod.values()).sort((a, b) => a.periodRef.localeCompare(b.periodRef)).slice(-6);
+}
+
+function buildSparkPath(points: Array<{ x: number; value: number | null }>, yFor: (value: number) => number) {
+  let started = false;
+  return points
+    .map((point) => {
+      if (!isFiniteNumber(point.value)) return '';
+      const command = started ? 'L' : 'M';
+      started = true;
+      return `${command} ${point.x.toFixed(1)} ${yFor(point.value).toFixed(1)}`;
+    })
+    .filter(Boolean)
+    .join(' ');
+}
+
+function findLastNumericIndex(values: Array<number | null>) {
+  for (let index = values.length - 1; index >= 0; index--) {
+    if (isFiniteNumber(values[index])) return index;
+  }
+  return -1;
+}
+
+function isFiniteNumber(value: unknown): value is number {
+  return typeof value === 'number' && Number.isFinite(value);
+}
+
+function sortIndicatorActions(a: IndicatorAction, b: IndicatorAction) {
+  const aDone = ACTION_DONE_STATUSES.has(a.status);
+  const bDone = ACTION_DONE_STATUSES.has(b.status);
+  if (aDone !== bDone) return aDone ? 1 : -1;
+  const aDue = a.dueDate ? new Date(a.dueDate).getTime() : Number.POSITIVE_INFINITY;
+  const bDue = b.dueDate ? new Date(b.dueDate).getTime() : Number.POSITIVE_INFINITY;
+  if (aDue !== bDue) return aDue - bDue;
+  return a.title.localeCompare(b.title);
+}
+
+function isActionOverdue(action: IndicatorAction) {
+  if (!action.dueDate || ACTION_DONE_STATUSES.has(action.status)) return false;
+  const due = new Date(action.dueDate);
+  due.setHours(23, 59, 59, 999);
+  return due.getTime() < Date.now();
+}
+
+function clampPercent(value: number | null | undefined) {
+  if (!isFiniteNumber(value)) return 0;
+  return Math.min(100, Math.max(0, value));
 }
 
 function laneOffsets(map: StrategicMap): { offsetById: Map<string, number>; heightById: Map<string, number>; widthById: Map<string, number> } {
