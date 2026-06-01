@@ -565,6 +565,12 @@ model OrgNode {
   active              Boolean       @default(true)
   position            Int           @default(0)
 
+  // Rastreio de origem para integracao/migracao de sistemas legados
+  // externalId  = chave primaria no sistema de origem (ex.: BSC "18448")
+  // externalSource = identificador da origem (ex.: "BSC 1.43")
+  externalId          String?
+  externalSource      String?
+
   responsibleUserId   String?
   responsibleUser     User?         @relation("OrgNodeResponsible", fields: [responsibleUserId], references: [id])
 
@@ -580,9 +586,11 @@ model OrgNode {
   strategicObjectiveLinks StrategicObjectiveOrgNode[]
   orgEmployees        OrgEmployee[]
 
+  @@unique([companyId, externalSource, externalId])
   @@index([companyId])
   @@index([parentId])
   @@index([branchId])
+  @@index([externalSource, externalId])
 }
 
 // =====================================================
@@ -919,6 +927,9 @@ model OKRObjective {
   cycle            OKRCycle     @relation(fields: [cycleId], references: [id], onDelete: Cascade)
   strategicObjId   String?
   strategicObj     StrategicObjective? @relation(fields: [strategicObjId], references: [id])
+  parentId         String?
+  parent           OKRObjective?  @relation("OKRObjectiveChildren", fields: [parentId], references: [id])
+  children         OKRObjective[] @relation("OKRObjectiveChildren")
   name             String
   description      String?
   ownerName        String?
@@ -934,6 +945,7 @@ model OKRObjective {
   checkins         OKRCheckin[]
 
   @@index([cycleId])
+  @@index([parentId])
 }
 
 model KeyResult {
@@ -1002,6 +1014,12 @@ model Indicator {
   weight              Float               @default(1)
   yellowToleranceP    Float               @default(10)
 
+  // Rastreio de origem para integracao/migracao de sistemas legados
+  // externalId  = chave primaria no sistema de origem (ex.: BSC "18915")
+  // externalSource = identificador da origem (ex.: "BSC 1.43")
+  externalId          String?
+  externalSource      String?
+
   createdAt           DateTime            @default(now())
   updatedAt           DateTime            @updatedAt
   deletedAt           DateTime?
@@ -1024,6 +1042,8 @@ model Indicator {
   @@index([type])
   @@index([status])
   @@unique([companyId, code])
+  @@unique([companyId, externalSource, externalId])
+  @@index([externalSource, externalId])
 }
 
 model IndicatorTarget {

@@ -40,6 +40,10 @@ export class OkrsService {
       include: {
         keyResults: true,
         strategicObj: { select: { id: true, name: true } },
+        checkins: {
+          orderBy: { createdAt: 'asc' },
+          select: { weekRef: true, progress: true, confidence: true, createdAt: true },
+        },
         _count: { select: { checkins: true } },
       },
       orderBy: { createdAt: 'asc' },
@@ -102,6 +106,7 @@ export class OkrsService {
       team?: string;
       weight?: number;
       strategicObjId?: string;
+      parentId?: string;
     },
   ) {
     return this.prisma.oKRObjective.create({
@@ -113,6 +118,7 @@ export class OkrsService {
         team: body.team ?? null,
         weight: body.weight ?? 1,
         strategicObjId: body.strategicObjId ?? null,
+        parentId: body.parentId ?? null,
       },
     });
   }

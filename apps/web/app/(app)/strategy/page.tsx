@@ -4,7 +4,7 @@ import Link from 'next/link';
 import { useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
-import { CalendarDays, Edit3, Map, Plus, Save, Trash2 } from 'lucide-react';
+import { CalendarDays, Copy, Edit3, Map, Plus, Save, Trash2 } from 'lucide-react';
 import { PageHeader } from '@/components/shell/page-header';
 import { MetricCard } from '@/components/platform/metric-card';
 import { SectionCard } from '@/components/platform/section-card';
@@ -95,6 +95,15 @@ export default function StrategyPage() {
     onError: (e: any) => toast.error(e?.message ?? 'Falha ao inativar mapa'),
   });
 
+  const duplicate = useMutation({
+    mutationFn: (mapId: string) => api(`/strategy/maps/${mapId}/duplicate`, { method: 'POST' }),
+    onSuccess: () => {
+      toast.success('Mapa duplicado');
+      qc.invalidateQueries({ queryKey: ['strategy', 'maps'] });
+    },
+    onError: (e: any) => toast.error(e?.message ?? 'Falha ao duplicar mapa'),
+  });
+
   const maps = query.data ?? [];
   const active = maps.filter((m) => m.active).length;
   const objectives = maps.reduce((sum, item) => sum + (item._count?.objectives ?? 0), 0);
@@ -173,8 +182,19 @@ export default function StrategyPage() {
               </div>
               <div className="flex gap-2">
                 {canUpdate && (
-                  <Button variant="outline" size="sm" onClick={() => openEdit(m)}>
+                  <Button variant="outline" size="sm" onClick={() => openEdit(m)} title="Editar mapa">
                     <Edit3 className="h-4 w-4" />
+                  </Button>
+                )}
+                {canCreate && (
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => duplicate.mutate(m.id)}
+                    disabled={duplicate.isPending}
+                    title="Duplicar mapa (cria uma cópia com a mesma estrutura)"
+                  >
+                    <Copy className="h-4 w-4" />
                   </Button>
                 )}
                 {canDelete && (

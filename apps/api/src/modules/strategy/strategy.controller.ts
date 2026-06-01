@@ -20,14 +20,24 @@ export class StrategyController {
   }
 
   @Get('maps/:id')
-  getMap(@CurrentUser() me: AuthPayload, @Param('id') id: string) {
-    return this.service.getMap(me.companyId, id);
+  getMap(
+    @CurrentUser() me: AuthPayload,
+    @Param('id') id: string,
+    @Query('periodRef') periodRef?: string,
+  ) {
+    return this.service.getMap(me.companyId, id, periodRef);
   }
 
   @Post('maps')
   @RequirePermissions('strategy:maps:create')
   createMap(@CurrentUser() me: AuthPayload, @Body() body: any) {
     return this.service.createMap(me, body);
+  }
+
+  @Post('maps/:id/duplicate')
+  @RequirePermissions('strategy:maps:create')
+  duplicateMap(@CurrentUser() me: AuthPayload, @Param('id') id: string) {
+    return this.service.duplicateMap(me.companyId, id);
   }
 
   @Patch('maps/:id')

@@ -22,11 +22,11 @@ export default function AppLayout({ children }: { children: ReactNode }) {
   if (!user) return null;
   const routePerms = findRoutePermissions(pathname ?? '');
   return (
-    <div className="enterprise-shell flex min-h-screen">
+    <div className="enterprise-shell flex h-screen overflow-hidden">
       <Sidebar />
       <div className="flex flex-1 flex-col min-w-0">
         <Topbar />
-        <main className="flex-1 overflow-y-auto px-4 py-6 pb-24 sm:px-6 lg:px-10 lg:py-8">
+        <main className="flex-1 overflow-y-auto px-4 py-4 pb-24 sm:px-5 lg:px-6 lg:py-5">
           {routePerms ? (
             <RoutePermissionGate permissions={routePerms}>{children}</RoutePermissionGate>
           ) : (

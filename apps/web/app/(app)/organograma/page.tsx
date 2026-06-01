@@ -8,6 +8,7 @@ import {
   Building2,
   ChevronDown,
   ChevronRight,
+  ChevronsDownUp,
   Clock,
   GripVertical,
   Pencil,
@@ -238,6 +239,19 @@ export default function OrganogramaPage() {
   function toggle(key: string, defaultOpen = true) {
     setExpanded((prev) => ({ ...prev, [key]: !(prev[key] ?? defaultOpen) }));
   }
+  function collapseAll() {
+    const next: Record<string, boolean> = {};
+    for (const { key } of orderedAreas) {
+      next[`area:${key}`] = false;
+      const entry = grouped.get(key);
+      if (entry) {
+        for (const { job } of entry.jobs.values()) {
+          next[`job:${key}::${job.id}`] = false;
+        }
+      }
+    }
+    setExpanded(next);
+  }
 
   function onDragStart(empId: string) {
     setDragEmployeeId(empId);
@@ -340,18 +354,6 @@ export default function OrganogramaPage() {
         title="Organograma de Área"
         description="Hierarquia de Áreas, Cargos e Colaboradores. Arraste a linha do colaborador para movê-lo — a alocação é salva automaticamente no cadastro."
         breadcrumbs={[{ label: 'Início', href: '/' }, { label: 'Organograma' }]}
-        actions={
-          <div className="flex gap-2">
-            <Button variant="outline" onClick={() => setJobModalOpen(true)}>
-              <Plus className="mr-2 h-4 w-4" />
-              Novo cargo
-            </Button>
-            <Button onClick={() => setEmployeeModalOpen(true)}>
-              <Plus className="mr-2 h-4 w-4" />
-              Alocar colaborador
-            </Button>
-          </div>
-        }
       />
 
       <div className="mb-6 grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
@@ -365,6 +367,22 @@ export default function OrganogramaPage() {
         title="Estrutura de pessoas"
         description="Áreas, cargos e colaboradores. Arraste o ícone da linha do colaborador para movê-lo de cargo ou área."
         contentClassName="p-3"
+        actions={
+          <div className="flex flex-wrap items-center justify-end gap-1.5">
+            <Button size="sm" variant="ghost" onClick={collapseAll} title="Recolher toda a árvore de estrutura">
+              <ChevronsDownUp className="mr-1.5 h-3.5 w-3.5" />
+              Recolher tudo
+            </Button>
+            <Button size="sm" variant="outline" onClick={() => setJobModalOpen(true)}>
+              <Plus className="mr-1.5 h-3.5 w-3.5" />
+              Novo cargo
+            </Button>
+            <Button size="sm" onClick={() => setEmployeeModalOpen(true)}>
+              <Plus className="mr-1.5 h-3.5 w-3.5" />
+              Alocar colaborador
+            </Button>
+          </div>
+        }
       >
         {organogramaQuery.isLoading && <LoadingState />}
         {!organogramaQuery.isLoading && (data?.employees.length ?? 0) === 0 && (

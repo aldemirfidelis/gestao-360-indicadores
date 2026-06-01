@@ -3,7 +3,7 @@
 import { useMemo, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
-import { ChevronRight, MessageSquare, Plus, Save, Target } from 'lucide-react';
+import { ChevronRight, GitBranch, List, MessageSquare, Plus, Save, Target } from 'lucide-react';
 import { PageHeader } from '@/components/shell/page-header';
 import { MetricCard } from '@/components/platform/metric-card';
 import { SectionCard } from '@/components/platform/section-card';
@@ -25,6 +25,7 @@ import {
 import { api } from '@/lib/api';
 import { useAuth } from '@/components/auth/auth-provider';
 import { cn, formatDate, formatNumber, formatPercent } from '@/lib/utils';
+import { OkrFlowchart } from './okr-flowchart';
 
 interface Cycle {
   id: string;
@@ -53,12 +54,14 @@ interface Objective {
   description: string | null;
   ownerName: string | null;
   team: string | null;
+  parentId: string | null;
   weight: number;
   confidence: number;
   status: string;
   progress: number;
   keyResults: KR[];
   strategicObj: { id: string; name: string } | null;
+  checkins?: { weekRef: string; progress: number; confidence: number; createdAt: string }[];
   _count?: { checkins: number };
 }
 
@@ -72,7 +75,7 @@ const STATUS_LABEL: Record<string, string> = {
 };
 
 const emptyCycle = { name: '', startsAt: new Date().toISOString().slice(0, 10), endsAt: `${new Date().getFullYear()}-12-31` };
-const emptyObjective = { name: '', description: '', ownerName: '', team: '', weight: 1 };
+const emptyObjective = { name: '', description: '', ownerName: '', team: '', weight: 1, parentId: '' };
 const emptyKr = { objectiveId: '', metric: '', unit: 'PERCENT', startValue: 0, currentValue: 0, targetValue: 100, direction: 'HIGHER_BETTER', weight: 1, responsible: '' };
 
 export default function OkrsPage() {
@@ -82,6 +85,7 @@ export default function OkrsPage() {
   const canUpdate = hasPermission(['okrs:update']);
   const canCheckin = hasPermission(['okrs:checkin', 'okrs:update']);
   const [activeCycleId, setActiveCycleId] = useState<string | null>(null);
+  const [view, setView] = useState<'list' | 'flow'>('list');
   const [cycleOpen, setCycleOpen] = useState(false);
   const [objectiveOpen, setObjectiveOpen] = useState(false);
   const [krOpen, setKrOpen] = useState(false);
@@ -116,7 +120,11 @@ export default function OkrsPage() {
   });
 
   const createObjective = useMutation({
-    mutationFn: () => api(`/okrs/cycles/${cycleId}/objectives`, { method: 'POST', json: objectiveForm }),
+    mutationFn: () =>
+      api(`/okrs/cycles/${cycleId}/objectives`, {
+        method: 'POST',
+        json: { ...objectiveForm, parentId: objectiveForm.parentId || null },
+      }),
     onSuccess: () => {
       toast.success('Objetivo criado');
       setObjectiveOpen(false);
@@ -191,13 +199,21 @@ export default function OkrsPage() {
         }
       />
 
-      <div className="mb-6 flex flex-wrap gap-2">
+      <div className="mb-6 flex flex-wrap items-center gap-2">
         {cycles.data?.map((c) => (
           <Button key={c.id} variant={c.id === cycleId ? 'default' : 'outline'} size="sm" onClick={() => setActiveCycleId(c.id)}>
             {c.name}
             <Badge variant="secondary" className="ml-2">{c._count.objectives}</Badge>
           </Button>
         ))}
+        <div className="ml-auto inline-flex items-center rounded-md border p-0.5">
+          <Button size="sm" variant={view === 'list' ? 'default' : 'ghost'} onClick={() => setView('list')}>
+            <List className="mr-1.5 h-3.5 w-3.5" /> Lista
+          </Button>
+          <Button size="sm" variant={view === 'flow' ? 'default' : 'ghost'} onClick={() => setView('flow')}>
+            <GitBranch className="mr-1.5 h-3.5 w-3.5" /> Fluxograma
+          </Button>
+        </div>
       </div>
 
       <div className="mb-6 grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
@@ -207,6 +223,7 @@ export default function OkrsPage() {
         <MetricCard title="Progresso médio" value={formatPercent(stats.progress)} description={`${stats.risk} em risco`} icon={<Target className="h-4 w-4" />} tone="yellow" />
       </div>
 
+      {view === 'list' && (
       <div className="grid gap-4">
         {objectives.data?.map((o) => (
           <SectionCard
@@ -299,6 +316,15 @@ export default function OkrsPage() {
           </SectionCard>
         ))}
       </div>
+      )}
+
+      {view === 'flow' && (
+        <OkrFlowchart
+          objectives={objectives.data ?? []}
+          onRefresh={() => objectives.refetch()}
+          isFetching={objectives.isFetching}
+        />
+      )}
 
       <Dialog open={cycleOpen} onOpenChange={setCycleOpen}>
         <DialogContent>
@@ -347,6 +373,18 @@ export default function OkrsPage() {
                 <Label>Time</Label>
                 <Input value={objectiveForm.team} onChange={(e) => setObjectiveForm({ ...objectiveForm, team: e.target.value })} />
               </div>
+            </div>
+            <div>
+              <Label>Objetivo pai (opcional)</Label>
+              <NativeSelect value={objectiveForm.parentId} onChange={(e) => setObjectiveForm({ ...objectiveForm, parentId: e.target.value })}>
+                <option value="">Nenhum (objetivo raiz)</option>
+                {objectives.data?.map((o) => (
+                  <option key={o.id} value={o.id}>
+                    {o.name}
+                  </option>
+                ))}
+              </NativeSelect>
+              <p className="mt-1 text-xs text-muted-foreground">Defina o pai para montar a hierarquia no fluxograma.</p>
             </div>
           </div>
           <DialogFooter>

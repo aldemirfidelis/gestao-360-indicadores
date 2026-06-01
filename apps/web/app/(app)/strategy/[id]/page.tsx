@@ -24,20 +24,22 @@ import ReactFlow, {
   type NodeProps,
 } from 'reactflow';
 import 'reactflow/dist/style.css';
+import { toPng } from 'html-to-image';
 import {
   AlertTriangle,
-  ArrowLeft,
   ArrowRight,
   Calendar,
   Circle,
   ClipboardList,
   Compass,
+  Download,
   ExternalLink,
   Filter,
   GripVertical,
   History,
   Layers,
   Link2,
+  Mail,
   Maximize2,
   Minimize2,
   Monitor,
@@ -46,11 +48,11 @@ import {
   Pencil,
   Plus,
   Presentation,
+  RefreshCw,
   Save,
   Search,
   ShieldAlert,
   Sliders,
-  Target,
   Trash2,
   UserCheck,
   X,
@@ -703,15 +705,18 @@ function StrategyMapPageInner() {
   const [onlyCritical, setOnlyCritical] = useState(false);
   const [onlyOverdue, setOnlyOverdue] = useState(false);
   const [onlyUnlinked, setOnlyUnlinked] = useState(false);
-  const [showIndicatorOverlay, setShowIndicatorOverlay] = useState(true);
-  const [showActionOverlay, setShowActionOverlay] = useState(true);
   const [fullscreen, setFullscreen] = useState(false);
   const [presentationMode, setPresentationMode] = useState(false);
   const [filtersOpen, setFiltersOpen] = useState(false);
+  const [period, setPeriod] = useState('');
+  const [periodOptions, setPeriodOptions] = useState<string[]>([]);
 
   const mapQuery = useQuery<StrategicMap>({
-    queryKey: ['strategy', 'map', id],
-    queryFn: () => api<StrategicMap>(`/strategy/maps/${id}`),
+    queryKey: ['strategy', 'map', id, period],
+    queryFn: () =>
+      api<StrategicMap>(`/strategy/maps/${id}${period ? `?periodRef=${encodeURIComponent(period)}` : ''}`),
+    staleTime: 30_000,
+    refetchOnWindowFocus: false,
   });
 
   const optionsQuery = useQuery<StrategyOptions>({
@@ -721,6 +726,64 @@ function StrategyMapPageInner() {
 
   const map = mapQuery.data;
   const mapRef = useRef<StrategicMap | undefined>(map);
+
+  // Lista de periodos disponiveis (derivada do modo atual, mantida ao filtrar)
+  useEffect(() => {
+    if (period !== '' || !map) return;
+    const set = new Set<string>();
+    for (const obj of map.objectives) {
+      for (const ind of obj.indicators ?? []) {
+        for (const r of ind.results ?? []) if (r.periodRef) set.add(r.periodRef);
+      }
+    }
+    const next = Array.from(set).sort().reverse();
+    if (next.length) setPeriodOptions(next);
+  }, [map, period]);
+
+  async function exportMapPng(): Promise<string | null> {
+    if (!canvasRef.current) return null;
+    try {
+      return await toPng(canvasRef.current, {
+        backgroundColor: '#ffffff',
+        pixelRatio: 2,
+        filter: (node) =>
+          !(
+            node instanceof HTMLElement &&
+            (node.classList?.contains('react-flow__controls') ||
+              node.classList?.contains('react-flow__minimap'))
+          ),
+      });
+    } catch {
+      return null;
+    }
+  }
+
+  async function downloadMapPng() {
+    const dataUrl = await exportMapPng();
+    if (!dataUrl) {
+      toast.error('Não foi possível gerar a imagem');
+      return;
+    }
+    const a = document.createElement('a');
+    a.download = `mapa-estrategico-${new Date().toISOString().slice(0, 10)}.png`;
+    a.href = dataUrl;
+    a.click();
+  }
+
+  async function emailMapPng() {
+    const dataUrl = await exportMapPng();
+    if (dataUrl) {
+      const a = document.createElement('a');
+      a.download = `mapa-estrategico-${new Date().toISOString().slice(0, 10)}.png`;
+      a.href = dataUrl;
+      a.click();
+    }
+    const subject = encodeURIComponent(`Mapa estratégico: ${mapRef.current?.name ?? ''}`);
+    const body = encodeURIComponent(
+      `Segue o mapa estratégico "${mapRef.current?.name ?? ''}"${period ? ` (período ${period})` : ' (atual)'}.\n\nA imagem PNG foi baixada — anexe-a a este email.`,
+    );
+    window.location.href = `mailto:?subject=${subject}&body=${body}`;
+  }
 
   useEffect(() => {
     mapRef.current = map;
@@ -753,13 +816,26 @@ function StrategyMapPageInner() {
     setEditingEdgeId(edgeId);
   }, []);
 
+  // Persistencia "silenciosa" de posicao/tamanho: NAO mostra toast nem invalida o
+  // mapa (o estado local do ReactFlow ja reflete a mudanca). Evita o refetch pesado
+  // no Neon a cada arrasto/resize, que era a causa do travamento ao organizar.
+  const resizeTimers = useRef<Record<string, ReturnType<typeof setTimeout>>>({});
+  const persistPerspective = useCallback((perspectiveId: string, patch: Record<string, number>) => {
+    const timers = resizeTimers.current;
+    if (timers[perspectiveId]) clearTimeout(timers[perspectiveId]);
+    timers[perspectiveId] = setTimeout(() => {
+      api(`/strategy/perspectives/${perspectiveId}`, { method: 'PATCH', json: patch }).catch(() => {});
+    }, 400);
+  }, []);
+  const persistObjective = useCallback((objectiveId: string, patch: Record<string, number>) => {
+    api(`/strategy/objectives/${objectiveId}`, { method: 'PATCH', json: patch }).catch(() => {});
+  }, []);
+
   const handlePerspectiveResize = useCallback(
     (perspectiveId: string, width: number, height: number) => {
-      updatePerspective.mutate({ perspectiveId, patch: { width, height } });
+      persistPerspective(perspectiveId, { width, height });
     },
-    // updatePerspective is stable from useMutation
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    [],
+    [persistPerspective],
   );
 
 
@@ -1122,46 +1198,6 @@ function StrategyMapPageInner() {
           title={map.name}
           description={`${formatDate(map.startsAt)} - ${formatDate(map.endsAt)}. Mapa visual integrado a indicadores, áreas, planos e rastreabilidade.`}
           breadcrumbs={[{ label: 'Mapas estratégicos', href: '/strategy' }, { label: map.name }]}
-          actions={
-            <>
-              <Button variant="outline" asChild>
-                <Link href="/strategy">
-                  <ArrowLeft className="mr-2 h-4 w-4" />
-                  Voltar
-                </Link>
-              </Button>
-              <Button variant={editMode ? 'default' : 'outline'} onClick={() => setEditMode((value) => !value)}>
-                <Pencil className="mr-2 h-4 w-4" />
-                {editMode ? 'Modo edição' : 'Modo visualização'}
-              </Button>
-              <Button variant="outline" onClick={() => setPerspectiveOpen(true)} disabled={!editMode}>
-                <Plus className="mr-2 h-4 w-4" />
-                Perspectiva
-              </Button>
-              <Button
-                onClick={() => {
-                  setObjectiveForm(defaultObjectiveForm(map.perspectives[0]?.id));
-                  setObjectiveOpen(true);
-                }}
-                disabled={!editMode || map.perspectives.length === 0}
-              >
-                <Plus className="mr-2 h-4 w-4" />
-                Objetivo
-              </Button>
-              <Button variant="outline" onClick={() => saveLayout.mutate()} disabled={!editMode || saveLayout.isPending}>
-                <Save className="mr-2 h-4 w-4" />
-                Salvar layout
-              </Button>
-              <Button variant="outline" onClick={autoLayout} disabled={!editMode}>
-                <Compass className="mr-2 h-4 w-4" />
-                Organizar
-              </Button>
-              <Button variant="outline" onClick={() => setPresentationMode(true)}>
-                <Presentation className="mr-2 h-4 w-4" />
-                Apresentar
-              </Button>
-            </>
-          }
         />
       )}
 
@@ -1210,27 +1246,11 @@ function StrategyMapPageInner() {
           >
             <Sliders className="mr-1.5 h-3.5 w-3.5" /> Sem vínculo
           </Button>
-          <div className="ml-auto flex items-center gap-1 rounded-md border bg-background p-1 text-xs">
-            <span className="px-2 text-muted-foreground">Camadas:</span>
-            <Button
-              variant={showIndicatorOverlay ? 'default' : 'ghost'}
-              size="sm"
-              onClick={() => setShowIndicatorOverlay((v) => !v)}
-            >
-              <Target className="mr-1 h-3.5 w-3.5" /> Indicadores
-            </Button>
-            <Button
-              variant={showActionOverlay ? 'default' : 'ghost'}
-              size="sm"
-              onClick={() => setShowActionOverlay((v) => !v)}
-            >
-              <ClipboardList className="mr-1 h-3.5 w-3.5" /> Ações
-            </Button>
-          </div>
           {(search || statusFilter || perspectiveFilter || onlyCritical || onlyOverdue || onlyUnlinked) && (
             <Button
               variant="ghost"
               size="sm"
+              className="ml-auto"
               onClick={() => {
                 setSearch('');
                 setStatusFilter('');
@@ -1246,8 +1266,71 @@ function StrategyMapPageInner() {
         </div>
       )}
 
-      <div className={cn('grid grid-cols-1 gap-4', presentationMode ? '' : 'xl:grid-cols-[1fr,390px]')}>
-        <SectionCard
+      <div className={cn('grid grid-cols-1 gap-3', presentationMode ? '' : 'xl:grid-cols-[1fr,390px]')}>
+        <div className="space-y-2">
+          {!presentationMode && (
+            <div className="flex flex-wrap items-center gap-1.5 rounded-md border bg-card px-2 py-1.5">
+              <Button size="sm" variant={editMode ? 'default' : 'outline'} onClick={() => setEditMode((value) => !value)}>
+                <Pencil className="mr-1.5 h-3.5 w-3.5" />
+                {editMode ? 'Modo edição' : 'Modo visualização'}
+              </Button>
+              <Button size="sm" variant="outline" onClick={() => setPerspectiveOpen(true)} disabled={!editMode}>
+                <Plus className="mr-1.5 h-3.5 w-3.5" />
+                Perspectiva
+              </Button>
+              <Button
+                size="sm"
+                onClick={() => {
+                  setObjectiveForm(defaultObjectiveForm(map.perspectives[0]?.id));
+                  setObjectiveOpen(true);
+                }}
+                disabled={!editMode || map.perspectives.length === 0}
+              >
+                <Plus className="mr-1.5 h-3.5 w-3.5" />
+                Objetivo
+              </Button>
+              <Button size="sm" variant="outline" onClick={() => saveLayout.mutate()} disabled={!editMode || saveLayout.isPending}>
+                <Save className="mr-1.5 h-3.5 w-3.5" />
+                Salvar layout
+              </Button>
+              <Button size="sm" variant="outline" onClick={autoLayout} disabled={!editMode}>
+                <Compass className="mr-1.5 h-3.5 w-3.5" />
+                Organizar
+              </Button>
+              <Button size="sm" variant="outline" onClick={() => setPresentationMode(true)}>
+                <Presentation className="mr-1.5 h-3.5 w-3.5" />
+                Apresentar
+              </Button>
+              <div className="ml-auto flex flex-wrap items-center gap-1.5">
+                <NativeSelect
+                  className="h-8 w-[168px]"
+                  value={period}
+                  onChange={(e) => setPeriod(e.target.value)}
+                  title="Ver faróis e dados como estavam em um período"
+                >
+                  <option value="">Período atual</option>
+                  {periodOptions.map((p) => (
+                    <option key={p} value={p}>
+                      {periodRefLabel(p)}
+                    </option>
+                  ))}
+                </NativeSelect>
+                <Button size="sm" variant="outline" onClick={() => mapQuery.refetch()} disabled={mapQuery.isFetching} title="Atualizar dados">
+                  <RefreshCw className={cn('mr-1.5 h-3.5 w-3.5', mapQuery.isFetching && 'animate-spin')} />
+                  Atualizar
+                </Button>
+                <Button size="sm" variant="outline" onClick={downloadMapPng} title="Exportar mapa em PNG">
+                  <Download className="mr-1.5 h-3.5 w-3.5" />
+                  PNG
+                </Button>
+                <Button size="sm" variant="outline" onClick={emailMapPng} title="Exportar PNG e abrir email">
+                  <Mail className="mr-1.5 h-3.5 w-3.5" />
+                  Email
+                </Button>
+              </div>
+            </div>
+          )}
+          <SectionCard
           title="Canvas estratégico"
           description={editMode ? 'Arraste objetivos, conecte com drag-to-connect, redimensione pelos cantos e clique nas linhas para editar.' : 'Navegue, aproxime e clique no objetivo para abrir o detalhe. Passe o mouse para ver o resumo.'}
           contentClassName="p-0"
@@ -1277,21 +1360,15 @@ function StrategyMapPageInner() {
               onNodeDragStop={(_, node) => {
                 if (!editMode) return;
                 if (node.type === 'objective') {
-                  updateObjective.mutate({
-                    objectiveId: node.id,
-                    patch: {
-                      positionX: Math.round(node.position.x),
-                      positionY: Math.round(node.position.y),
-                    },
+                  persistObjective(node.id, {
+                    positionX: Math.round(node.position.x),
+                    positionY: Math.round(node.position.y),
                   });
                 }
                 if (node.type === 'perspectiveLane') {
-                  updatePerspective.mutate({
-                    perspectiveId: node.id,
-                    patch: {
-                      positionX: Math.round(node.position.x),
-                      positionY: Math.round(node.position.y),
-                    },
+                  persistPerspective(node.id, {
+                    positionX: Math.round(node.position.x),
+                    positionY: Math.round(node.position.y),
                   });
                 }
               }}
@@ -1342,6 +1419,78 @@ function StrategyMapPageInner() {
               )}
             </div>
 
+            {/* Detalhes do item selecionado em TELA CHEIA (o painel lateral fica fora do
+                elemento fullscreen, entao replicamos um resumo como overlay dentro do canvas) */}
+            {fullscreen && (selectedObjective || selectedPerspective) && (
+              <div className="absolute left-3 top-3 z-20 max-h-[calc(100vh-1.5rem)] w-[320px] space-y-3 overflow-y-auto rounded-lg border bg-card p-4 text-sm shadow-lg">
+                <div className="flex items-start justify-between gap-2">
+                  <span className="font-semibold leading-tight">
+                    {selectedObjective?.name ?? selectedPerspective?.name}
+                  </span>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="h-6 w-6 shrink-0"
+                    onClick={() => setSelectedId(null)}
+                    title="Fechar"
+                  >
+                    <X className="h-4 w-4" />
+                  </Button>
+                </div>
+                {selectedPerspective && !selectedObjective && (
+                  <p className="text-muted-foreground">
+                    {selectedPerspective.description || 'Perspectiva do mapa estratégico.'}
+                  </p>
+                )}
+                {selectedObjective && (
+                  <>
+                    <div className="flex flex-wrap items-center gap-2">
+                      <Badge variant="secondary">{selectedObjective.perspective.name}</Badge>
+                      <StatusBadge
+                        value={selectedObjective.aggregateLight}
+                        label={LIGHT_LABEL[selectedObjective.aggregateLight] ?? selectedObjective.aggregateLight}
+                      />
+                    </div>
+                    {selectedObjective.description && (
+                      <p className="text-muted-foreground">{selectedObjective.description}</p>
+                    )}
+                    <div className="grid grid-cols-3 gap-2 text-center text-xs">
+                      <div className="rounded-md border p-2">
+                        <strong className="block text-foreground">{selectedObjective.indicators.length}</strong>indic.
+                      </div>
+                      <div className="rounded-md border p-2">
+                        <strong className="block text-foreground">{selectedObjective.actionCount}</strong>ações
+                      </div>
+                      <div className="rounded-md border p-2">
+                        <strong className="block text-foreground">{selectedObjective.treatmentCount}</strong>tratativas
+                      </div>
+                    </div>
+                    {selectedObjective.indicators.length > 0 && (
+                      <div className="space-y-1">
+                        <div className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
+                          Indicadores
+                        </div>
+                        {selectedObjective.indicators.slice(0, 8).map((ind) => (
+                          <div key={ind.id} className="flex items-center justify-between gap-2 text-xs">
+                            <span className="truncate">{ind.name}</span>
+                            <span
+                              className="h-2.5 w-2.5 shrink-0 rounded-full"
+                              style={{
+                                background:
+                                  ({ GREEN: '#16a34a', YELLOW: '#f59e0b', RED: '#dc2626' } as Record<string, string>)[
+                                    ind.results?.[0]?.light ?? 'GRAY'
+                                  ] ?? '#cbd5e1',
+                              }}
+                            />
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </>
+                )}
+              </div>
+            )}
+
             <div className="pointer-events-none absolute inset-x-3 bottom-3 z-10 flex flex-wrap items-center justify-center gap-x-5 gap-y-1 rounded-md border bg-background/95 px-4 py-1.5 text-[11px] shadow-sm backdrop-blur">
               <div className="flex items-center gap-2 font-semibold uppercase text-muted-foreground">
                 <Layers className="h-3 w-3" /> Tipos de relação:
@@ -1355,6 +1504,7 @@ function StrategyMapPageInner() {
             </div>
           </div>
         </SectionCard>
+        </div>
 
         <div className="space-y-4">
           <SectionCard title="Detalhes" description="Edite o item selecionado e acompanhe sua rastreabilidade.">

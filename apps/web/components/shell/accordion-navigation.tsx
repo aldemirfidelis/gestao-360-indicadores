@@ -92,12 +92,12 @@ export function AccordionNavigation({
                     type="button"
                     onClick={() => toggle(section.heading)}
                     className={cn(
-                      'flex w-full items-center gap-2 px-3 py-2 text-left text-[11px] font-medium uppercase tracking-[0.1em] transition-colors',
-                      sectionActive ? 'text-foreground' : 'text-muted-foreground/70 hover:text-foreground',
+                      'flex w-full items-center gap-2 px-3 py-2 text-left text-[13px] font-semibold uppercase tracking-[0.08em] transition-colors',
+                      sectionActive ? 'text-foreground' : 'text-muted-foreground/80 hover:text-foreground',
                     )}
                     title={section.description}
                   >
-                    <SectionIcon className="h-3.5 w-3.5 opacity-70" />
+                    <SectionIcon className="h-4 w-4 opacity-70" />
                     <span className="min-w-0 flex-1 truncate">{section.heading}</span>
                     <ChevronDown className={cn('h-3.5 w-3.5 transition-transform duration-200', isOpen && 'rotate-180')} />
                   </button>

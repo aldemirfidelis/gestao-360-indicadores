@@ -81,7 +81,7 @@ export class StrategyService {
     });
   }
 
-  async getMap(companyId: string, id: string) {
+  async getMap(companyId: string, id: string, periodRef?: string) {
     const map = await this.prisma.strategicMap.findFirst({
       where: { id, companyId, deletedAt: null },
       include: {
@@ -103,9 +103,9 @@ export class StrategyService {
             },
             indicatorLinks: {
               where: { deletedAt: null },
-              include: { indicator: indicatorSelect() },
+              include: { indicator: indicatorSelect(periodRef) },
             },
-            indicators: indicatorSelect(),
+            indicators: indicatorSelect(periodRef),
             outRelations: {
               where: { deletedAt: null, active: true },
               include: { to: { select: { id: true, name: true, perspectiveId: true, status: true } } },
@@ -265,6 +265,122 @@ export class StrategyService {
       }),
     ]);
     return { indicators, orgNodes, users };
+  }
+
+  async duplicateMap(companyId: string, id: string) {
+    const source = await this.prisma.strategicMap.findFirst({
+      where: { id, companyId, deletedAt: null },
+      include: {
+        perspectives: { where: { deletedAt: null } },
+        objectives: {
+          where: { deletedAt: null },
+          include: {
+            indicatorLinks: { where: { deletedAt: null } },
+            orgNodeLinks: { where: { deletedAt: null } },
+            outRelations: { where: { deletedAt: null } },
+          },
+        },
+      },
+    });
+    if (!source) throw new NotFoundException('Mapa nao encontrado');
+
+    return this.prisma.$transaction(async (tx) => {
+      const newMap = await tx.strategicMap.create({
+        data: {
+          companyId,
+          name: `${source.name} (cópia)`,
+          description: source.description,
+          startsAt: source.startsAt,
+          endsAt: source.endsAt,
+          active: true,
+        },
+      });
+
+      // Perspectivas: mapeia id antigo -> novo
+      const perspMap = new Map<string, string>();
+      for (const p of source.perspectives) {
+        const np = await tx.perspective.create({
+          data: {
+            mapId: newMap.id,
+            kind: p.kind,
+            name: p.name,
+            description: p.description,
+            color: p.color,
+            icon: p.icon,
+            position: p.position,
+            positionX: p.positionX,
+            positionY: p.positionY,
+            width: p.width,
+            height: p.height,
+            active: p.active,
+          },
+        });
+        perspMap.set(p.id, np.id);
+      }
+
+      // Objetivos: mapeia id antigo -> novo
+      const objMap = new Map<string, string>();
+      for (const o of source.objectives) {
+        const newPerspectiveId = perspMap.get(o.perspectiveId);
+        if (!newPerspectiveId) continue;
+        const no = await tx.strategicObjective.create({
+          data: {
+            mapId: newMap.id,
+            perspectiveId: newPerspectiveId,
+            name: o.name,
+            description: o.description,
+            responsible: o.responsible,
+            responsibleUserId: o.responsibleUserId,
+            ownerNodeId: o.ownerNodeId,
+            weight: o.weight,
+            status: o.status,
+            priority: o.priority,
+            position: o.position,
+            positionX: o.positionX,
+            positionY: o.positionY,
+            width: o.width,
+            height: o.height,
+            active: o.active,
+          },
+        });
+        objMap.set(o.id, no.id);
+      }
+
+      // Vinculos (indicadores e org nodes) e relacoes entre objetivos
+      for (const o of source.objectives) {
+        const newObjId = objMap.get(o.id);
+        if (!newObjId) continue;
+        for (const il of o.indicatorLinks) {
+          await tx.strategicObjectiveIndicator.create({
+            data: { objectiveId: newObjId, indicatorId: il.indicatorId },
+          });
+        }
+        for (const ol of o.orgNodeLinks) {
+          await tx.strategicObjectiveOrgNode.create({
+            data: { objectiveId: newObjId, orgNodeId: ol.orgNodeId, kind: ol.kind },
+          });
+        }
+        for (const rel of o.outRelations) {
+          const from = objMap.get(rel.fromId);
+          const to = objMap.get(rel.toId);
+          if (from && to) {
+            await tx.objectiveRelation.create({
+              data: {
+                fromId: from,
+                toId: to,
+                weight: rel.weight,
+                kind: rel.kind,
+                label: rel.label,
+                description: rel.description,
+                active: rel.active,
+              },
+            });
+          }
+        }
+      }
+
+      return newMap;
+    });
   }
 
   async createMap(me: AuthPayload, body: MapBody) {
@@ -1180,7 +1296,8 @@ export class StrategyService {
   }
 }
 
-function indicatorSelect() {
+function indicatorSelect(periodRef?: string) {
+  const resultSelect = { light: true, attainment: true, value: true, periodRef: true };
   return {
     select: {
       id: true,
@@ -1190,7 +1307,11 @@ function indicatorSelect() {
       ownerNodeId: true,
       ownerNode: { select: { id: true, name: true, type: true } },
       responsibleUser: { select: { id: true, name: true } },
-      results: { orderBy: { periodDate: 'desc' as const }, take: 6, select: { light: true, attainment: true, value: true, periodRef: true } },
+      // Com periodRef, faroi/atingimento sao calculados "como estavam" naquele periodo;
+      // sem periodRef, usa-se o resultado mais recente.
+      results: periodRef
+        ? { where: { periodRef }, orderBy: { periodDate: 'desc' as const }, take: 1, select: resultSelect }
+        : { orderBy: { periodDate: 'desc' as const }, take: 6, select: resultSelect },
       targets: { orderBy: { periodRef: 'desc' as const }, take: 6, select: { target: true, periodRef: true } },
     },
   };
