@@ -109,9 +109,27 @@ Ok "push concluido"
 if (-not $SkipDeploy) {
   Section "4/4  Deploy na Droplet ($DropletHost)"
   if (-not (Test-Path $SshKey)) { Die "chave SSH nao encontrada: $SshKey" }
-  Write-Host "Conectando e rodando 'make deploy' (git pull + build docker + up + migrate)...`n" -ForegroundColor DarkGray
-  ssh -i $SshKey -o BatchMode=yes -o ConnectTimeout=20 -o StrictHostKeyChecking=accept-new $DropletHost "cd $RemoteDir && make deploy"
-  if ($LASTEXITCODE -ne 0) { Die "deploy falhou na Droplet" }
+  Write-Host "Disparando 'make deploy' DESACOPLADO da SSH (sobrevive a quedas de conexao no build)...`n" -ForegroundColor DarkGray
+  $sshArgs = @('-i', $SshKey, '-o', 'BatchMode=yes', '-o', 'ServerAliveInterval=30', '-o', 'ConnectTimeout=20', '-o', 'StrictHostKeyChecking=accept-new', $DropletHost)
+  # Numa Droplet pequena o build longo pode resetar a SSH; setsid mantem o make deploy rodando no servidor.
+  ssh @sshArgs "cd $RemoteDir && rm -f deploy.log && setsid bash -c 'make deploy' >deploy.log 2>&1 </dev/null & echo LAUNCHED"
+  if ($LASTEXITCODE -ne 0) { Die "nao consegui iniciar o deploy na Droplet" }
+
+  Write-Host "Acompanhando deploy.log (git pull + build + up + migrate; pode levar alguns minutos)..." -ForegroundColor DarkGray
+  $deployOk = $false
+  for ($i = 0; $i -lt 50; $i++) {
+    Start-Sleep -Seconds 12
+    $state = ssh @sshArgs "cd $RemoteDir && if grep -q 'Deploy concluido' deploy.log; then echo DONE; elif grep -qiE 'ELIFECYCLE|failed to solve|Cannot connect|Exit status 1' deploy.log; then echo ERROR; else echo RUNNING; fi; tail -n 1 deploy.log"
+    Write-Host "  $state"
+    if ($state -match 'DONE') { $deployOk = $true; break }
+    if ($state -match 'ERROR') { break }
+  }
+  if (-not $deployOk) {
+    Write-Host "`n--- ultimas linhas do deploy.log ---" -ForegroundColor Yellow
+    ssh @sshArgs "cd $RemoteDir && tail -n 30 deploy.log"
+    Die "deploy nao concluiu (veja o log acima). O processo pode seguir rodando no servidor; rode o script de novo para reacompanhar."
+  }
+  ssh @sshArgs "cd $RemoteDir && docker compose -f $ComposeFile ps --format '{{.Name}} {{.Status}}'"
   Ok "deploy concluido"
 
   if ($Logs) {
