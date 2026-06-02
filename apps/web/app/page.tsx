@@ -360,8 +360,8 @@ export default function LandingPage() {
                 Da meta ao plano de ação, com responsabilidade clara em cada etapa.
               </h2>
               <p className="mt-4 text-base leading-7 text-slate-600">
-                A plataforma reduz a distância entre planejamento e execução: o resultado mensal mostra o desvio, o desvio
-                abre a tratativa, a tratativa gera ação e a ação volta para o acompanhamento de eficácia.
+                A plataforma reduz a distância entre planejamento e execução: o resultado mensal mostra o desvio, a análise
+                identifica a causa, o plano executa a ação e a ação volta para o acompanhamento de eficácia.
               </p>
             </div>
 
@@ -405,7 +405,7 @@ export default function LandingPage() {
               <div className="flex items-center justify-between border-b border-white/10 pb-4">
                 <div>
                   <p className="text-sm text-slate-300">Trilha de auditoria</p>
-                  <h3 className="mt-1 text-lg font-semibold">Tratativa do indicador OEE</h3>
+                  <h3 className="mt-1 text-lg font-semibold">Plano de ação do indicador OEE</h3>
                 </div>
                 <LockKeyhole className="h-5 w-5 text-teal-300" />
               </div>
@@ -652,7 +652,7 @@ function ProductPreview() {
             <div className="rounded-md border border-slate-200 bg-white p-4">
               <div className="mb-3 flex items-center justify-between">
                 <div>
-                  <p className="text-xs font-medium text-slate-500">Tratativas prioritárias</p>
+                  <p className="text-xs font-medium text-slate-500">Ações prioritárias</p>
                   <p className="text-sm font-semibold text-slate-950">Risco por processo</p>
                 </div>
                 <AlertTriangle className="h-4 w-4 text-amber-600" />

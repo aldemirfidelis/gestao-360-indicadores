@@ -1,10 +1,9 @@
 'use client';
 
 import { useMemo, useRef, useState } from 'react';
-import Link from 'next/link';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
-import { AlertTriangle, ArrowDownToLine, Copy, Download, MessageSquare, Paperclip, RotateCcw, Save, Trash2 } from 'lucide-react';
+import { ArrowDownToLine, Copy, Download, MessageSquare, Paperclip, RotateCcw, Save, Trash2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { StatusLight } from '@/components/ui/status-light';
@@ -48,7 +47,6 @@ interface PendingRow {
 interface UpsertOutcome {
   result: { id: string; indicatorId: string; periodRef: string };
   shouldOpenDeviation: boolean;
-  treatment?: { id: string; status: string } | null;
 }
 
 const periodicityLabels = PERIODICITY_LABEL;
@@ -73,9 +71,6 @@ export function IndicatorResultEditor(props: IndicatorMonthlyEditorProps) {
   } = props;
   const qc = useQueryClient();
   const [edits, setEdits] = useState<Record<string, string>>({});
-  const [offTargetOpen, setOffTargetOpen] = useState(false);
-  const [offTargets, setOffTargets] = useState<UpsertOutcome[]>([]);
-  const [ignoreReason, setIgnoreReason] = useState('');
   const [notesCell, setNotesCell] = useState<string | null>(null);
 
   const query = useQuery<PendingRow[]>({
@@ -130,9 +125,6 @@ export function IndicatorResultEditor(props: IndicatorMonthlyEditorProps) {
     onSuccess: (out) => {
       const reds = out.results.filter((r) => r.shouldOpenDeviation).length;
       toast.success(`${out.count} lançamentos salvos${reds ? ` - ${reds} indicador(es) em vermelho` : ''}`);
-      const treatments = out.results.filter((r) => r.shouldOpenDeviation && r.treatment);
-      setOffTargets(treatments);
-      setOffTargetOpen(treatments.length > 0);
       setEdits({});
       invalidateAfterSave();
     },
@@ -151,20 +143,6 @@ export function IndicatorResultEditor(props: IndicatorMonthlyEditorProps) {
       invalidateAfterSave();
     },
     onError: (e: any) => toast.error(e?.message ?? 'Falha ao salvar metas'),
-  });
-
-  const ignoreTreatment = useMutation({
-    mutationFn: (treatmentId: string) =>
-      api(`/treatments/${treatmentId}/ignore`, {
-        method: 'POST',
-        json: { reason: ignoreReason || 'Ignorado temporariamente no lançamento de resultado.' },
-      }),
-    onSuccess: () => {
-      toast.success('Tratativa ignorada temporariamente');
-      setIgnoreReason('');
-      setOffTargetOpen(false);
-      qc.invalidateQueries({ queryKey: ['dashboard'] });
-    },
   });
 
   function invalidateAfterSave() {
@@ -469,73 +447,6 @@ export function IndicatorResultEditor(props: IndicatorMonthlyEditorProps) {
         />
       )}
 
-      <Dialog open={offTargetOpen} onOpenChange={setOffTargetOpen}>
-        <DialogContent className="max-w-3xl">
-          <DialogHeader>
-            <DialogTitle>Indicador fora da meta detectado</DialogTitle>
-          </DialogHeader>
-          <div className="space-y-4">
-            <div className="rounded-lg border border-status-red/30 bg-status-red/10 p-4">
-              <div className="flex items-start gap-3">
-                <AlertTriangle className="mt-0.5 h-5 w-5 text-status-red" />
-                <div>
-                  <div className="font-semibold">
-                    Este indicador esta fora da meta. Deseja iniciar o tratamento?
-                  </div>
-                  <p className="mt-1 text-sm text-muted-foreground">
-                    O sistema ja registrou a rastreabilidade inicial. Você pode criar análise de causa,
-                    agendar reunião, criar plano de ação ou ignorar temporariamente com justificativa.
-                  </p>
-                </div>
-              </div>
-            </div>
-            <div className="space-y-2">
-              {offTargets.map((item) => (
-                <div
-                  key={item.treatment?.id}
-                  className="flex flex-col gap-3 rounded-lg border p-3 sm:flex-row sm:items-center sm:justify-between"
-                >
-                  <div>
-                    <div className="font-medium">{name}</div>
-                    <div className="text-xs text-muted-foreground">
-                      Período {periodRefLabel(item.result.periodRef)} - status {item.treatment?.status}
-                    </div>
-                  </div>
-                  <div className="flex flex-wrap gap-2">
-                    <Button asChild>
-                      <Link href={`/treatments/${item.treatment?.id}`}>Iniciar tratamento</Link>
-                    </Button>
-                    <Button variant="outline" asChild>
-                      <Link href={`/indicators/${item.result.indicatorId}`}>Ver histórico</Link>
-                    </Button>
-                  </div>
-                </div>
-              ))}
-            </div>
-            <div className="space-y-2">
-              <div className="text-sm font-medium">Ignorar temporariamente com justificativa</div>
-              <Textarea
-                rows={3}
-                value={ignoreReason}
-                onChange={(e) => setIgnoreReason(e.target.value)}
-                placeholder="Explique por que esta tratativa será adiada..."
-              />
-            </div>
-          </div>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setOffTargetOpen(false)}>
-              Fechar
-            </Button>
-            <Button
-              variant="destructive"
-              disabled={offTargets.length === 0 || ignoreTreatment.isPending || !ignoreReason.trim()}
-              onClick={() => offTargets[0]?.treatment?.id && ignoreTreatment.mutate(offTargets[0].treatment.id)}
-            >
-              Ignorar com justificativa
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
     </div>
   );
 }

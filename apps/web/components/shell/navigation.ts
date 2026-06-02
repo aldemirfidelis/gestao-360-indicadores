@@ -4,7 +4,6 @@ import {
   Briefcase,
   CalendarDays,
   CheckSquare,
-  ClipboardCheck,
   Compass,
   FileBarChart,
   FileSpreadsheet,
@@ -16,7 +15,6 @@ import {
   ShieldCheck,
   SlidersHorizontal,
   Sparkles,
-  Stethoscope,
   Target,
   UploadCloud,
   Users,
@@ -64,12 +62,11 @@ export const navSections: NavSection[] = [
   },
   {
     heading: 'Lançamentos',
-    description: 'Análises de causa, tratativas e evidências',
+    description: 'Análises de causa, evidências e lançamentos',
     intent: 'launch',
     icon: AlertTriangle,
     items: [
-      { href: '/deviations', label: 'Análise de Causa', description: 'Desvios, FCA e tratativas', icon: AlertTriangle, permissions: ['deviations:view'] },
-      { href: '/treatments', label: 'Tratativas', description: 'Tratamento de desvios e ações decorrentes', icon: Stethoscope, permissions: ['treatments:view'] },
+      { href: '/deviations', label: 'Análise de Causa', description: 'Desvios, FCA e planos decorrentes', icon: AlertTriangle, permissions: ['deviations:view'] },
       { href: '/imports', label: 'Registrar Evidência', description: 'Arquivos, CSV e documentos', icon: UploadCloud, permissions: ['imports:view', 'imports:create'] },
     ],
   },
@@ -80,8 +77,7 @@ export const navSections: NavSection[] = [
     icon: Briefcase,
     items: [
       { href: '/organograma', label: 'Organograma', description: 'Estrutura de cargos, faixas, turnos e orçamento', icon: Users, permissions: ['org:positions:view', 'org:view'] },
-      { href: '/aprovacoes-cargo', label: 'Aprovações de Cargo', description: 'Solicitações de promoção e mudança de cargo', icon: ShieldCheck, permissions: ['org:positions:approve'] },
-      { href: '/eficacia', label: 'Análise de Eficácia', description: 'Validação de eficácia dos planos de ação', icon: ClipboardCheck, permissions: ['eficacia:view', 'actions:effectiveness'] },
+      { href: '/aprovacoes-cargo', label: 'Aprovações', description: 'Cargo, eficácia e aprovações gerais', icon: ShieldCheck, permissions: ['org:positions:approve', 'eficacia:view', 'actions:effectiveness', 'actions:delete', 'actions:approve', 'actions:manage'] },
       { href: '/periods', label: 'Períodos', description: 'Ano de trabalho, abertura e fechamento anual', icon: CalendarDays, permissions: ['settings:manage'] },
       { href: '/actions', label: 'Plano de Ação', description: 'Ações, execução, evidências e eficácia', icon: CheckSquare, permissions: ['actions:view'] },
       { href: '/meetings', label: 'Reuniões', description: 'Agenda, atas e decisões', icon: CalendarDays, permissions: ['meetings:view'] },
@@ -143,10 +139,9 @@ export const ROUTE_PERMISSIONS: Array<{ prefix: string; permissions: string[]; e
   { prefix: '/strategy', permissions: ['strategy:view'] },
   { prefix: '/org', permissions: ['org:view'] },
   { prefix: '/organograma', permissions: ['org:positions:view', 'org:view'] },
-  { prefix: '/aprovacoes-cargo', permissions: ['org:positions:approve'] },
+  { prefix: '/aprovacoes-cargo', permissions: ['org:positions:approve', 'eficacia:view', 'actions:effectiveness', 'actions:delete', 'actions:approve', 'actions:manage'] },
   { prefix: '/projects', permissions: ['projects:view'] },
   { prefix: '/deviations', permissions: ['deviations:view'] },
-  { prefix: '/treatments', permissions: ['treatments:view'] },
   { prefix: '/imports', permissions: ['imports:view', 'imports:create'] },
   { prefix: '/eficacia', permissions: ['eficacia:view', 'actions:effectiveness'] },
   { prefix: '/periods', permissions: ['settings:manage'] },
@@ -156,6 +151,10 @@ export const ROUTE_PERMISSIONS: Array<{ prefix: string; permissions: string[]; e
   { prefix: '/reports', permissions: ['reports:view', 'reports:export'] },
   { prefix: '/audit', permissions: ['audit:view'] },
   { prefix: '/users', permissions: ['users:view', 'users:manage'] },
+  // Administração do Banco de Dados: permissão 'database:admin' nunca é concedida,
+  // logo apenas SUPER_ADMIN (que faz bypass em canAccess) acessa. Prefixo mais
+  // longo que '/settings' garante precedência em findRoutePermissions.
+  { prefix: '/settings/database', permissions: ['database:admin'] },
   { prefix: '/settings', permissions: ['settings:view', 'settings:manage'] },
 ];
 

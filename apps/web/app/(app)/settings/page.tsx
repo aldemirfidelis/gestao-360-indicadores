@@ -7,6 +7,7 @@ import { toast } from 'sonner';
 import {
   Building2,
   CheckCircle2,
+  Database,
   Edit,
   FileDown,
   GitBranch,
@@ -215,7 +216,8 @@ const nodeTypeLabels: Record<string, string> = {
 
 export default function SettingsPage() {
   const qc = useQueryClient();
-  const { hasPermission, loading: authLoading } = useAuth();
+  const { user, hasPermission, loading: authLoading } = useAuth();
+  const isSuperAdmin = user?.role === 'SUPER_ADMIN';
   const [active, setActive] = useState<ModuleKey>('parameters');
   const [paramView, setParamView] = useState<ParamView>('companies');
   const [search, setSearch] = useState('');
@@ -373,6 +375,30 @@ export default function SettingsPage() {
         })}
       </SectionCard>
 
+      {isSuperAdmin && (
+        <SectionCard
+          title="Administração avançada"
+          description="Ferramentas técnicas de banco de dados — exclusivas do Super Admin."
+          className="mb-6"
+          contentClassName="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-3"
+        >
+          <Link
+            href="/settings/database"
+            className="group flex h-full items-start gap-3 rounded-lg border bg-card p-4 shadow-sm transition-colors hover:bg-accent/35"
+          >
+            <div className="grid h-10 w-10 shrink-0 place-items-center rounded-md bg-status-red/10 text-status-red">
+              <Database className="h-5 w-5" />
+            </div>
+            <div className="min-w-0">
+              <div className="text-sm font-semibold">Banco de Dados</div>
+              <p className="mt-1 text-xs leading-relaxed text-muted-foreground">
+                Tabelas, registros, estrutura, índices, SQL, importação/exportação, backups, auditoria e diagnósticos.
+              </p>
+            </div>
+          </Link>
+        </SectionCard>
+      )}
+
       <div className="mb-6 grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-5">
         {modules.map((item) => {
           const Icon = item.icon;
@@ -460,7 +486,7 @@ export default function SettingsPage() {
       {active === 'parameters' && (
         <SectionCard
           title="Parâmetros"
-          description="Cadastros estruturais usados por empresas, filiais, hierarquia, indicadores e tratativas."
+          description="Cadastros estruturais usados por empresas, filiais, hierarquia, indicadores e planos de ação."
           actions={<ParameterActions view={paramView} onNew={(type) => setDialog({ type })} />}
           contentClassName="p-0"
         >

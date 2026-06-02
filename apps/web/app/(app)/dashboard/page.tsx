@@ -52,14 +52,6 @@ interface Overview {
   criticalDeviations: number;
   openDeviations: number;
   pendingMeetings: number;
-  openTreatmentCases: number;
-  treatmentAlerts: Array<{
-    id: string;
-    title: string;
-    periodRef: string;
-    status: string;
-    indicator: { id: string; name: string; ownerNode: { name: string } };
-  }>;
   dueSoonActions: Array<{
     id: string;
     title: string;
@@ -96,7 +88,7 @@ const SHORTCUT_DEFS = [
   { id: 'visualization', href: '/visualization', label: 'Dashboard Executivo', icon: BarChart3 },
   { id: 'org', href: '/org', label: 'Árvore Organizacional', icon: Network },
   { id: 'strategy', href: '/strategy', label: 'Mapa Estratégico', icon: Map },
-  { id: 'eficacia', href: '/eficacia', label: 'Análise de Eficácia', icon: ClipboardCheck },
+  { id: 'aprovacoes', href: '/aprovacoes-cargo?tab=eficacia', label: 'Aprovações', icon: ClipboardCheck },
   { id: 'meetings', href: '/meetings', label: 'Reuniões', icon: Calendar },
   { id: 'deviations', href: '/deviations', label: 'Criar Análise de Causa', icon: AlertTriangle },
   { id: 'organograma', href: '/organograma', label: 'Organograma de Área', icon: Users },
@@ -240,9 +232,9 @@ export default function HomePage() {
           href="/actions"
         />
         <MetricCard
-          title="Tratativas abertas"
-          value={formatNumber(ov?.openTreatmentCases)}
-          description={`${formatNumber(ov?.openDeviations)} desvios abertos`}
+          title="Desvios abertos"
+          value={formatNumber(ov?.openDeviations)}
+          description={`${formatNumber(ov?.criticalDeviations)} crítico(s)`}
           icon={<AlertTriangle className="h-4 w-4" />}
           tone="yellow"
           href="/deviations"
@@ -312,18 +304,6 @@ export default function HomePage() {
             </div>
           </div>
           <div className="space-y-3">
-            {ov?.treatmentAlerts?.map((item) => (
-              <Link key={item.id} href={`/treatments/${item.id}`} className="flex items-start justify-between gap-3 rounded-lg border border-status-orange/30 bg-status-orange/10 p-3 transition-colors hover:bg-status-orange/15">
-                <div className="min-w-0">
-                  <div className="truncate text-sm font-semibold">{item.indicator.name}</div>
-                  <div className="mt-1 flex items-center gap-2 text-xs text-muted-foreground">
-                    <AlertTriangle className="h-3.5 w-3.5" />
-                    <span>{item.indicator.ownerNode.name} - {periodRefLabel(item.periodRef)}</span>
-                  </div>
-                </div>
-                <StatusBadge value={item.status} label={treatmentStatusLabel(item.status)} tone="yellow" />
-              </Link>
-            ))}
             {worst.data?.map((w) => (
               <Link key={`${w.indicator.id}-${w.periodRef}`} href={`/indicators/${w.indicator.id}`} className="flex items-start justify-between gap-3 rounded-lg border p-3 transition-colors hover:bg-accent/35">
                 <div className="min-w-0">
@@ -436,19 +416,7 @@ export default function HomePage() {
             <Button onClick={handleSaveShortcuts}>Salvar atalhos</Button>
           </DialogFooter>
         </DialogContent>
-      </Dialog>
-    </div>
+    </Dialog>
+  </div>
   );
-}
-
-function treatmentStatusLabel(status: string) {
-  const labels: Record<string, string> = {
-    AWAITING_CAUSE_ANALYSIS: 'Sem análise',
-    CAUSE_ANALYSIS_CREATED: 'Sem reunião',
-    MEETING_SCHEDULED: 'Sem ação',
-    ACTION_PLAN_CREATED: 'Em execução',
-    ACTIONS_OVERDUE: 'Ações atrasadas',
-    UNRESOLVED: 'Não resolvido',
-  };
-  return labels[status] ?? status;
 }

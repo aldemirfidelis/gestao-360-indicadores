@@ -336,7 +336,7 @@ export class ActionsService {
 
   async updateTask(
     taskId: string,
-    patch: { title?: string; dueDate?: Date | null; startDate?: Date | null; endDate?: Date | null; assignedToId?: string | null; done?: boolean },
+    patch: { title?: string; completionNote?: string | null; dueDate?: Date | null; startDate?: Date | null; endDate?: Date | null; assignedToId?: string | null; done?: boolean },
     userId?: string,
   ) {
     const existing = await this.prisma.actionTask.findUnique({ where: { id: taskId } });
@@ -344,13 +344,16 @@ export class ActionsService {
 
     if (patch.done === true) {
       const nextEnd = patch.endDate !== undefined ? patch.endDate : existing.endDate;
-      if (!nextEnd) {
-        throw new BadRequestException('Informe a Data de Conclusao antes de marcar a tarefa como concluida.');
+      const nextNote = patch.completionNote !== undefined ? patch.completionNote : existing.completionNote;
+      if (!nextNote?.trim()) {
+        throw new BadRequestException('Informe o que foi feito para concluir a tarefa.');
       }
+      if (!nextEnd) patch.endDate = new Date();
     }
 
     const data: any = {};
     if (patch.title !== undefined) data.title = patch.title;
+    if (patch.completionNote !== undefined) data.completionNote = patch.completionNote;
     if (patch.dueDate !== undefined) data.dueDate = patch.dueDate;
     if (patch.startDate !== undefined) data.startDate = patch.startDate;
     if (patch.endDate !== undefined) data.endDate = patch.endDate;
@@ -375,13 +378,36 @@ export class ActionsService {
       title: patch.done === true ? 'Tarefa concluida' : patch.done === false ? 'Tarefa reaberta' : 'Tarefa atualizada',
       description: t.title,
       statusTo: patch.done === undefined ? undefined : patch.done ? 'DONE' : 'OPEN',
-      metadata: { startDate: t.startDate, endDate: t.endDate, assignedToId: t.assignedToId, dueDate: t.dueDate },
+      metadata: { startDate: t.startDate, endDate: t.endDate, assignedToId: t.assignedToId, dueDate: t.dueDate, completionNote: t.completionNote },
     });
     return t;
   }
 
   async toggleTask(taskId: string, done: boolean, userId?: string) {
     return this.updateTask(taskId, { done }, userId);
+  }
+
+  async deleteTask(taskId: string, userId?: string) {
+    const existing = await this.prisma.actionTask.findUnique({ where: { id: taskId } });
+    if (!existing) throw new NotFoundException('Tarefa nao encontrada');
+    const ctx = await this.actionTraceContext(existing.actionId);
+    await this.prisma.actionTask.delete({ where: { id: taskId } });
+    await this.recalcProgress(existing.actionId);
+    await this.recordHistory(existing.actionId, userId, 'TASK_DELETED', null, existing.title, null);
+    await this.audit(ctx.companyId, userId, 'TASK_DELETED', 'ActionTask', taskId, existing, null);
+    await this.traceability.record({
+      companyId: ctx.companyId,
+      indicatorId: ctx.indicatorId,
+      userId,
+      eventType: TraceEventType.TASK_UPDATED,
+      entityType: TraceEntityType.ACTION_TASK,
+      entityId: taskId,
+      relatedType: TraceEntityType.ACTION_PLAN,
+      relatedId: existing.actionId,
+      title: 'Tarefa removida do plano de acao',
+      description: existing.title,
+    });
+    return { ok: true };
   }
 
   async saveAnalysis(actionId: string, body: any, userId?: string) {
@@ -665,11 +691,93 @@ ${JSON.stringify(lastResults, null, 2)}`;
 
   async recalcProgress(actionId: string) {
     const tasks = await this.prisma.actionTask.findMany({ where: { actionId } });
-    if (tasks.length === 0) return;
+    if (tasks.length === 0) {
+      await this.prisma.actionPlan.update({ where: { id: actionId }, data: { progress: 0 } });
+      return;
+    }
     const done = tasks.filter((t) => t.done).length;
     const progress = Math.round((done / tasks.length) * 100);
     const status = progress >= 100 ? ActionStatus.WAITING_VALIDATION : ActionStatus.IN_PROGRESS;
     await this.prisma.actionPlan.update({ where: { id: actionId }, data: { progress, status } });
+  }
+
+  async requestDeletionApproval(actionId: string, companyId: string, userId?: string, reason?: string) {
+    const action = await this.prisma.actionPlan.findFirst({ where: { id: actionId, companyId, deletedAt: null } });
+    if (!action) throw new NotFoundException('Acao nao encontrada');
+
+    const existing = await this.prisma.generalApprovalRequest.findFirst({
+      where: {
+        companyId,
+        type: 'ACTION_PLAN_DELETION',
+        entityType: 'ActionPlan',
+        entityId: actionId,
+        status: 'PENDING',
+      },
+    });
+    if (existing) return (await this.hydrateGeneralApprovals([existing]))[0];
+
+    const request = await this.prisma.generalApprovalRequest.create({
+      data: {
+        companyId,
+        type: 'ACTION_PLAN_DELETION',
+        entityType: 'ActionPlan',
+        entityId: actionId,
+        title: `Eliminar plano de acao: ${action.title}`,
+        description: 'Solicitacao de eliminacao enviada para validacao da gestao.',
+        requesterId: userId ?? null,
+        reason: reason ?? null,
+      },
+    });
+    await this.recordHistory(actionId, userId, 'DELETE_REQUESTED', null, null, reason ?? 'Solicitacao enviada para aprovacao');
+    await this.audit(companyId, userId, 'DELETE_APPROVAL_REQUESTED', 'GeneralApprovalRequest', request.id, null, request);
+    await this.traceability.record({
+      companyId,
+      indicatorId: action.indicatorId,
+      userId,
+      eventType: TraceEventType.UPDATED,
+      entityType: TraceEntityType.ACTION_PLAN,
+      entityId: actionId,
+      title: 'Eliminacao do plano enviada para aprovacao',
+      description: reason ?? action.title,
+      metadata: { approvalRequestId: request.id },
+    });
+    return (await this.hydrateGeneralApprovals([request]))[0];
+  }
+
+  async listGeneralApprovals(companyId: string, userId?: string, scope: 'pending' | 'requested' | 'all' = 'pending') {
+    const where: Prisma.GeneralApprovalRequestWhereInput = {
+      companyId,
+      ...(scope === 'pending' ? { status: 'PENDING' } : {}),
+      ...(scope === 'requested' && userId ? { requesterId: userId } : {}),
+    };
+    const rows = await this.prisma.generalApprovalRequest.findMany({
+      where,
+      orderBy: [{ status: 'asc' }, { createdAt: 'desc' }],
+      take: 200,
+    });
+    return this.hydrateGeneralApprovals(rows);
+  }
+
+  async decideGeneralApproval(requestId: string, companyId: string, userId: string | undefined, decision: 'APPROVED' | 'REJECTED', decisionNote?: string) {
+    const request = await this.prisma.generalApprovalRequest.findFirst({ where: { id: requestId, companyId } });
+    if (!request) throw new NotFoundException('Solicitacao nao encontrada');
+    if (request.status !== 'PENDING') throw new BadRequestException('Esta solicitacao ja foi decidida.');
+
+    if (decision === 'APPROVED' && request.type === 'ACTION_PLAN_DELETION' && request.entityType === 'ActionPlan') {
+      await this.remove(request.entityId, userId, request.reason ?? decisionNote ?? 'Eliminacao aprovada pela gestao.');
+    }
+
+    const updated = await this.prisma.generalApprovalRequest.update({
+      where: { id: requestId },
+      data: {
+        status: decision,
+        approverId: userId ?? null,
+        decisionNote: decisionNote ?? null,
+        decidedAt: new Date(),
+      },
+    });
+    await this.audit(companyId, userId, `GENERAL_APPROVAL_${decision}`, 'GeneralApprovalRequest', requestId, request, updated);
+    return (await this.hydrateGeneralApprovals([updated]))[0];
   }
 
   async remove(id: string, userId?: string, reason?: string) {
@@ -1013,6 +1121,43 @@ ${JSON.stringify(lastResults, null, 2)}`;
         context,
       },
     ];
+  }
+
+  private async hydrateGeneralApprovals(rows: any[]) {
+    if (rows.length === 0) return [];
+    const userIds = Array.from(new Set(rows.flatMap((row) => [row.requesterId, row.approverId].filter(Boolean))));
+    const actionIds = rows
+      .filter((row) => row.entityType === 'ActionPlan')
+      .map((row) => row.entityId);
+    const [users, actions] = await Promise.all([
+      userIds.length
+        ? this.prisma.user.findMany({
+            where: { id: { in: userIds as string[] } },
+            select: { id: true, name: true, email: true, role: true },
+          })
+        : Promise.resolve([]),
+      actionIds.length
+        ? this.prisma.actionPlan.findMany({
+            where: { id: { in: actionIds } },
+            select: {
+              id: true,
+              title: true,
+              status: true,
+              deletedAt: true,
+              responsibleUser: { select: { id: true, name: true, email: true } },
+              ownerNode: { select: { id: true, name: true } },
+            },
+          })
+        : Promise.resolve([]),
+    ]);
+    const userById = new Map(users.map((user) => [user.id, user]));
+    const actionById = new Map(actions.map((action) => [action.id, action]));
+    return rows.map((row) => ({
+      ...row,
+      requester: row.requesterId ? userById.get(row.requesterId) ?? null : null,
+      approver: row.approverId ? userById.get(row.approverId) ?? null : null,
+      actionPlan: row.entityType === 'ActionPlan' ? actionById.get(row.entityId) ?? null : null,
+    }));
   }
 
   private methodToTool(method: string | null | undefined): ActionAnalysisTool | null {

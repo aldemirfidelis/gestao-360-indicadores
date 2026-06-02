@@ -25,7 +25,6 @@ import {
   BarChart3,
   CalendarDays,
   Clock3,
-  Download,
   Eye,
   FileClock,
   History,
@@ -53,7 +52,6 @@ import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { NativeSelect } from '@/components/ui/select';
-import { Progress } from '@/components/ui/progress';
 import { StatusLight } from '@/components/ui/status-light';
 import { Textarea } from '@/components/ui/textarea';
 import { IndicatorResultEditor } from '@/components/platform/indicator-result-editor';
@@ -264,7 +262,6 @@ export default function IndicatorsPage() {
   const canUpdate = hasPermission(['indicators:update']);
   const canDelete = hasPermission(['indicators:delete']);
   const canTargets = hasPermission(['indicators:targets', 'indicators:update']);
-  const canExport = hasPermission(['indicators:export', 'reports:export']);
   const canLaunch = hasPermission(['results:launch']);
   const canLaunchGrain = hasPermission(['results:grain', 'results:launch']);
   const canHistory = hasPermission(['indicators:history', 'indicators:view']);
@@ -492,12 +489,10 @@ export default function IndicatorsPage() {
               <RefreshCcw className="mr-2 h-4 w-4" />
               Atualizar
             </Button>
-            {canExport && (
-              <Button variant="outline" onClick={() => exportCsv(rows)}>
-                <Download className="mr-2 h-4 w-4" />
-                Exportar
-              </Button>
-            )}
+            <Button variant="outline" onClick={() => setShowActions((v) => !v)}>
+              <Eye className="mr-2 h-4 w-4" />
+              {showActions ? 'Ocultar Lançamentos' : 'Mostrar Lançamentos'}
+            </Button>
             {canCreate && (
               <Button onClick={openCreate}>
                 <Plus className="mr-2 h-4 w-4" />
@@ -662,13 +657,6 @@ export default function IndicatorsPage() {
           action={canCreate ? <Button onClick={openCreate}>Incluir Indicador</Button> : null}
         />
       )}
-
-      <div className="mb-3 flex justify-end">
-        <Button variant="outline" size="sm" onClick={() => setShowActions((v) => !v)}>
-          <Eye className="mr-1.5 h-3.5 w-3.5" />
-          {showActions ? 'Ocultar ações' : 'Mostrar ações'}
-        </Button>
-      </div>
 
       <div className="grid grid-cols-1 gap-4">
         {topLevelRows.map((indicator) => (
@@ -1053,12 +1041,6 @@ function IndicatorManagementCard({
       : null
     : monthlyHistory[safeSelectedIdx] ?? null;
   const light = (selectedPoint?.status as string | undefined) ?? indicator.last?.light ?? 'GRAY';
-  const baseAttainment = selectedPoint?.attainment ?? 0;
-  const attainment = Math.max(0, Math.min(100, Math.round(baseAttainment * 100)));
-  const unitText = indicator.unitLabel || UNIT_LABEL[indicator.unit] || '';
-  const monthLabel = selectedPoint
-    ? (isGrainMode ? selectedPoint.periodRef : periodRefLabel(selectedPoint.periodRef))
-    : '-';
   const hasAnyData = isGrainMode
     ? (grainQuery.data?.cells ?? []).some((c) => c.target !== null || c.value !== null)
     : monthlyHistory.some((p) => p.meta !== null || p.realizado !== null);
@@ -1069,9 +1051,6 @@ function IndicatorManagementCard({
       setSelectedIdx(idx);
     }
   }
-
-  const realizadoDisplay = viewMode === 'cumulative' ? selectedChart?.displayRealizado : selectedPoint?.realizado;
-  const metaDisplay = viewMode === 'cumulative' ? selectedChart?.displayMeta : selectedPoint?.meta;
 
   return (
     <article className="panel panel-hover flex h-full flex-col p-5">
@@ -1099,28 +1078,7 @@ function IndicatorManagementCard({
         <StatusLight light={light} size="md" />
       </div>
 
-      <div className="mt-5 grid grid-cols-1 gap-4 lg:grid-cols-[180px,1fr]">
-        <div className="space-y-2">
-          <div className="border border-border/60 bg-card/60 p-2">
-            <div className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">
-              Meta{viewMode === 'cumulative' ? ' acum.' : ''} <span className="font-normal text-muted-foreground/70">({monthLabel})</span>
-            </div>
-            <div className="mt-0.5 text-lg font-semibold leading-tight">{formatNumber(metaDisplay ?? null)}</div>
-          </div>
-          <div className="border border-border/60 bg-card/60 p-2">
-            <div className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">Realizado{viewMode === 'cumulative' ? ' acum.' : ''}</div>
-            <div className="mt-0.5 text-lg font-semibold leading-tight">
-              {realizadoDisplay !== null && realizadoDisplay !== undefined ? formatNumber(realizadoDisplay) : '-'}
-              <span className="ml-1 text-[10px] font-normal text-muted-foreground">{unitText}</span>
-            </div>
-          </div>
-          <div className="border border-border/60 bg-card/60 p-2">
-            <div className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">Atingimento</div>
-            <div className="mt-0.5 text-lg font-semibold leading-tight">{formatPercent(selectedPoint?.attainment ?? null)}</div>
-            <Progress value={attainment} className="mt-1 h-1" />
-          </div>
-        </div>
-
+      <div className="mt-5">
         <div className="flex flex-col">
           <div className="flex flex-wrap items-center justify-between gap-2 mb-2">
             <div className="flex flex-wrap items-center gap-2">
@@ -1174,7 +1132,7 @@ function IndicatorManagementCard({
             </div>
           </div>
 
-          <div className="h-80 border border-border/60 bg-card/60 p-3 sm:h-96">
+          <div className="h-96 border border-border/60 bg-card/60 p-3 sm:h-[32rem]">
             {hasAnyData ? (
               <ResponsiveContainer width="100%" height="100%">
                 {chartType === 'bar' ? (
@@ -2031,27 +1989,4 @@ function historyActionLabel(action: string) {
     UPDATE_RESULT: 'Realizado alterado',
   };
   return labels[action] ?? action;
-}
-
-function exportCsv(rows: IndicatorRow[]) {
-  const header = ['Nome', 'Código', 'Empresa', 'Área', 'Setor', 'Responsável', 'Meta Atual', 'Realizado Atual', 'Status'];
-  const lines = rows.map((row) => [
-    row.name,
-    row.code ?? '',
-    row.company.tradeName || row.company.name,
-    row.areaMacro?.name ?? '',
-    row.areaMicro?.name ?? row.ownerNode.name,
-    row.responsibleUser?.name ?? '',
-    row.currentTarget?.target ?? '',
-    row.last?.value ?? '',
-    LIGHT_LABEL[row.last?.light ?? 'GRAY'],
-  ]);
-  const csv = [header, ...lines].map((line) => line.map((cell) => `"${String(cell).replace(/"/g, '""')}"`).join(';')).join('\n');
-  const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement('a');
-  a.href = url;
-  a.download = 'indicadores.csv';
-  a.click();
-  URL.revokeObjectURL(url);
 }

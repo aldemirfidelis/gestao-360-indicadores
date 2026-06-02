@@ -1,7 +1,7 @@
 'use client';
 
-import { useParams, useRouter } from 'next/navigation';
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { useParams } from 'next/navigation';
+import { useQuery, useMutation } from '@tanstack/react-query';
 import { useState } from 'react';
 import { toast } from 'sonner';
 import {
@@ -85,13 +85,6 @@ interface TraceabilityTimeline {
   events: TraceEvent[];
 }
 
-interface CurrentTreatment {
-  id: string;
-  status: string;
-  periodRef: string;
-  title: string;
-}
-
 interface AuditLogEntry {
   id: string;
   action: string;
@@ -106,9 +99,7 @@ const STATUS_LABEL = ACTION_STATUS_LABEL;
 
 export default function IndicatorDetailPage() {
   const params = useParams<{ id: string }>();
-  const router = useRouter();
   const id = params.id;
-  const qc = useQueryClient();
   const [auditOpen, setAuditOpen] = useState(false);
 
   const detail = useQuery<IndicatorDetail>({
@@ -124,12 +115,7 @@ export default function IndicatorDetailPage() {
     queryKey: ['traceability', 'indicator', id],
     queryFn: () => api<TraceabilityTimeline>(`/traceability/indicators/${id}`),
   });
-  const lastForTreatment = detail.data?.results[detail.data.results.length - 1];
-  const currentTreatment = useQuery<CurrentTreatment | null>({
-    queryKey: ['treatment', 'indicator', id, lastForTreatment?.periodRef],
-    queryFn: () => api<CurrentTreatment | null>(`/treatments/indicators/${id}/current?periodRef=${lastForTreatment?.periodRef}`),
-    enabled: lastForTreatment?.light === 'RED',
-  });
+  const lastResult = detail.data?.results[detail.data.results.length - 1];
 
   const auditLog = useQuery<{ logs: AuditLogEntry[] }>({
     queryKey: ['indicator', id, 'history'],
@@ -137,7 +123,7 @@ export default function IndicatorDetailPage() {
     queryFn: () => api<{ logs: AuditLogEntry[] }>(`/indicators/${id}/history`),
   });
 
-  const last = lastForTreatment;
+  const last = lastResult;
 
   const openDeviation = useMutation({
     mutationFn: () =>
@@ -151,16 +137,6 @@ export default function IndicatorDetailPage() {
       }),
     onSuccess: (d) => toast.success(`Desvio #${d.number} aberto`),
     onError: (e: any) => toast.error(e?.message ?? 'Falha ao abrir desvio'),
-  });
-
-  const startTreatment = useMutation({
-    mutationFn: () => api<CurrentTreatment>(`/treatments/from-result/${last?.id}/start`, { method: 'POST' }),
-    onSuccess: (treatment) => {
-      toast.success('Tratativa iniciada');
-      qc.invalidateQueries({ queryKey: ['treatment', 'indicator', id] });
-      router.push(`/treatments/${treatment.id}`);
-    },
-    onError: (e: any) => toast.error(e?.message ?? 'Falha ao iniciar tratativa'),
   });
 
   if (detail.isLoading) return <p className="text-sm text-muted-foreground">Carregando...</p>;
@@ -184,24 +160,10 @@ export default function IndicatorDetailPage() {
         description={ind.description ?? `${ind.ownerNode?.name ?? '-'} - ${ind.code ?? '-'}`}
         actions={
           last?.light === 'RED' && (
-            <>
-              {currentTreatment.data ? (
-                <Button variant="destructive" asChild>
-                  <Link href={`/treatments/${currentTreatment.data.id}`}>
-                    <AlertTriangle className="h-4 w-4 mr-2" />
-                    Abrir tratativa
-                  </Link>
-                </Button>
-              ) : (
-                <Button variant="destructive" onClick={() => startTreatment.mutate()} disabled={startTreatment.isPending || !last?.id}>
-                  <AlertTriangle className="h-4 w-4 mr-2" />
-                  {startTreatment.isPending ? 'Iniciando...' : 'Iniciar tratativa'}
-                </Button>
-              )}
-              <Button variant="outline" onClick={() => openDeviation.mutate()} disabled={openDeviation.isPending}>
-                Abrir desvio manual
-              </Button>
-            </>
+            <Button variant="destructive" onClick={() => openDeviation.mutate()} disabled={openDeviation.isPending || !last?.id}>
+              <AlertTriangle className="mr-2 h-4 w-4" />
+              {openDeviation.isPending ? 'Abrindo...' : 'Abrir análise de causa'}
+            </Button>
           )
         }
       />
@@ -382,11 +344,11 @@ export default function IndicatorDetailPage() {
             <Button
               variant={last?.light === 'RED' ? 'destructive' : 'outline'}
               size="sm"
-              onClick={() => currentTreatment.data ? router.push(`/treatments/${currentTreatment.data.id}`) : startTreatment.mutate()}
-              disabled={!last || (last.light !== 'RED' && !currentTreatment.data) || startTreatment.isPending}
+              onClick={() => openDeviation.mutate()}
+              disabled={!last || last.light !== 'RED' || openDeviation.isPending}
             >
               <AlertTriangle className="mr-1.5 h-4 w-4" />
-              {currentTreatment.data ? 'Abrir tratativa' : 'Iniciar tratativa'}
+              Abrir análise de causa
             </Button>
             <Button variant="outline" size="sm" asChild>
               <Link href="/meetings">

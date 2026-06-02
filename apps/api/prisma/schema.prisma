@@ -1271,6 +1271,7 @@ model ActionTask {
   action       ActionPlan  @relation(fields: [actionId], references: [id], onDelete: Cascade)
   title        String
   done         Boolean     @default(false)
+  completionNote String?
   dueDate      DateTime?
   startDate    DateTime?
   endDate      DateTime?
@@ -1282,6 +1283,29 @@ model ActionTask {
 
   @@index([actionId])
   @@index([assignedToId])
+}
+
+model GeneralApprovalRequest {
+  id           String   @id @default(uuid())
+  companyId    String
+  type         String
+  entityType   String
+  entityId     String
+  title        String
+  description  String?
+  requesterId  String?
+  approverId   String?
+  status       String   @default("PENDING")
+  reason       String?
+  decisionNote String?
+  decidedAt    DateTime?
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  @@index([companyId, status])
+  @@index([entityType, entityId])
+  @@index([requesterId])
+  @@index([approverId])
 }
 
 model ActionParticipant {
@@ -2121,4 +2145,93 @@ model IndicatorResultComment {
 
   @@index([companyId])
   @@index([indicatorId, periodRef])
+}
+
+// ===========================================================================
+// Administração do Banco de Dados (Configurações > Banco de Dados)
+// Tabelas administrativas dedicadas. Sem relação Prisma com User para manter
+// o módulo desacoplado e o log imutável mesmo se o usuário for removido;
+// identidade do ator é denormalizada (userId/userEmail/userRole).
+// ===========================================================================
+
+model DbAdminAuditLog {
+  id            String   @id @default(uuid())
+  userId        String?
+  userEmail     String?
+  userRole      String?
+  submenu       String   // overview | tables | records | query | structure | indexes | import-export | backup | audit | diagnostics | settings
+  action        String   // ACCESS | DENIED | SELECT | INSERT | UPDATE | DELETE | DDL | EXPORT | IMPORT | BACKUP | RESTORE | TRUNCATE | DROP ...
+  mode          String?  // safe | advanced
+  targetTable   String?
+  targetRecordId String?
+  sqlText       String?  // comando executado (redigido quando não permitido)
+  beforeValue   String?  // JSON
+  afterValue    String?  // JSON
+  rowsAffected  Int?
+  result        String   @default("SUCCESS") // SUCCESS | ERROR | DENIED
+  message       String?
+  transactionId String?
+  backupId      String?
+  origin        String?
+  ip            String?
+  userAgent     String?
+  createdAt     DateTime @default(now())
+
+  @@index([createdAt])
+  @@index([userId, createdAt])
+  @@index([submenu, action])
+  @@index([targetTable])
+  @@index([result])
+}
+
+model DbAdminBackup {
+  id               String   @id @default(uuid())
+  userId           String?
+  userEmail        String?
+  type             String   // PRE_OP | TABLE_EXPORT | MANUAL_LOGICAL
+  reason           String?
+  relatedOperation String?
+  targetTables     String   // JSON array de nomes de tabela
+  format           String   @default("json") // json | sql
+  filePath         String
+  sizeBytes        Int      @default(0)
+  rowCount         Int      @default(0)
+  checksum         String?
+  important        Boolean  @default(false)
+  status           String   @default("AVAILABLE") // AVAILABLE | RESTORED | DELETED | CORRUPTED
+  integrityVerified Boolean @default(false)
+  createdAt        DateTime @default(now())
+
+  @@index([createdAt])
+  @@index([type])
+  @@index([status])
+}
+
+model DbAdminSavedQuery {
+  id         String   @id @default(uuid())
+  userId     String?
+  name       String
+  sql        String
+  isFavorite Boolean  @default(false)
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+  lastRunAt  DateTime?
+
+  @@index([userId])
+  @@index([isFavorite])
+}
+
+model DbAdminQueryHistory {
+  id         String   @id @default(uuid())
+  userId     String?
+  sql        String
+  mode       String   @default("safe") // safe | advanced
+  durationMs Int?
+  rowCount   Int?
+  success    Boolean  @default(true)
+  message    String?
+  createdAt  DateTime @default(now())
+
+  @@index([userId, createdAt])
+  @@index([createdAt])
 }

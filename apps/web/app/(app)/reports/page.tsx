@@ -40,7 +40,7 @@ const CSV_REPORTS = [
   { key: 'indicators', label: 'Relatorio por indicador', description: 'Catalogo completo com último realizado.', url: '/reports/indicators.csv' },
   { key: 'results', label: 'Histórico de lançamentos', description: 'Realizados, farois, metas e atingimento.', url: '/reports/results.csv' },
   { key: 'actions', label: 'Planos de ação', description: 'Status, prazos, responsáveis e prioridades.', url: '/reports/actions.csv' },
-  { key: 'deviations', label: 'Não conformidades', description: 'Severidade, tratativas, prazos e histórico.', url: '/reports/deviations.csv' },
+  { key: 'deviations', label: 'Não conformidades', description: 'Severidade, planos, prazos e histórico.', url: '/reports/deviations.csv' },
 ];
 
 export default function ReportsPage() {

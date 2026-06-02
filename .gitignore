@@ -40,3 +40,6 @@ test-results
 
 # Dumps de introspeccao do BSC legado (contem amostras de dados reais)
 apps/api/scripts/legacy-bsc/output/
+
+# Backups logicos da Administracao do Banco (podem conter dados reais)
+apps/api/storage/

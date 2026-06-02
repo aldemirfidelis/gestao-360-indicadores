@@ -3,7 +3,7 @@
 import { useMemo, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
-import { Edit, KeyRound, Plus, Save, Search, Trash2, UsersRound } from 'lucide-react';
+import { Edit, KeyRound, Plus, Save, Search, UsersRound } from 'lucide-react';
 import { PageHeader } from '@/components/shell/page-header';
 import { MetricCard } from '@/components/platform/metric-card';
 import { SectionCard } from '@/components/platform/section-card';
@@ -97,7 +97,6 @@ export default function UsersPage() {
   const { user: me, hasPermission } = useAuth();
   const canCreate = hasPermission(['users:create', 'users:manage']);
   const canUpdate = hasPermission(['users:update', 'users:manage']);
-  const canDelete = hasPermission(['users:delete', 'users:manage']);
   const canPermissions = hasPermission(['users:permissions', 'users:manage']);
   const [open, setOpen] = useState(false);
   const [search, setSearch] = useState('');
@@ -179,15 +178,6 @@ export default function UsersPage() {
       toast.success('Status atualizado');
       qc.invalidateQueries({ queryKey: ['users'] });
     },
-  });
-
-  const removeUser = useMutation({
-    mutationFn: (id: string) => api(`/users/${id}`, { method: 'DELETE' }),
-    onSuccess: () => {
-      toast.success('Usuário excluido logicamente');
-      qc.invalidateQueries({ queryKey: ['users'] });
-    },
-    onError: (e: any) => toast.error(e?.message ?? 'Falha ao excluir usuário'),
   });
 
   const active = users.data?.filter((u) => u.active).length ?? 0;
@@ -308,16 +298,6 @@ export default function UsersPage() {
                           onClick={() => toggleActive.mutate({ id: u.id, active: !u.active })}
                         >
                           {u.active ? 'Inativar' : 'Ativar'}
-                        </Button>
-                      )}
-                      {canDelete && (
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => window.confirm('Confirma excluir logicamente este usuário?') && removeUser.mutate(u.id)}
-                        >
-                          <Trash2 className="mr-2 h-4 w-4" />
-                          Excluir
                         </Button>
                       )}
                     </div>

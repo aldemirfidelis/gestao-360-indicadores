@@ -45,6 +45,15 @@ export class ActionsController {
     return this.service.options(me.companyId);
   }
 
+  @Get('general-approvals')
+  @RequirePermissions('actions:view', 'actions:delete', 'actions:approve', 'actions:manage')
+  generalApprovals(
+    @CurrentUser() me: AuthPayload,
+    @Query('scope') scope?: 'pending' | 'requested' | 'all',
+  ) {
+    return this.service.listGeneralApprovals(me.companyId, me.sub, scope);
+  }
+
   @Get(':id')
   @RequirePermissions('actions:view')
   byId(@CurrentUser() me: AuthPayload, @Param('id') id: string) {
@@ -101,16 +110,39 @@ export class ActionsController {
   updateTask(
     @CurrentUser() me: AuthPayload,
     @Param('taskId') taskId: string,
-    @Body() body: { title?: string; done?: boolean; dueDate?: string | null; startDate?: string | null; endDate?: string | null; assignedToId?: string | null },
+    @Body() body: { title?: string; done?: boolean; completionNote?: string | null; dueDate?: string | null; startDate?: string | null; endDate?: string | null; assignedToId?: string | null },
   ) {
     const patch: any = {};
     if (body.title !== undefined) patch.title = body.title;
     if (body.done !== undefined) patch.done = body.done;
+    if (body.completionNote !== undefined) patch.completionNote = body.completionNote || null;
     if (body.dueDate !== undefined) patch.dueDate = body.dueDate ? new Date(body.dueDate) : null;
     if (body.startDate !== undefined) patch.startDate = body.startDate ? new Date(body.startDate) : null;
     if (body.endDate !== undefined) patch.endDate = body.endDate ? new Date(body.endDate) : null;
     if (body.assignedToId !== undefined) patch.assignedToId = body.assignedToId || null;
     return this.service.updateTask(taskId, patch, me.sub);
+  }
+
+  @Delete('tasks/:taskId')
+  @RequirePermissions('actions:update')
+  deleteTask(@CurrentUser() me: AuthPayload, @Param('taskId') taskId: string) {
+    return this.service.deleteTask(taskId, me.sub);
+  }
+
+  @Post(':id/delete-request')
+  @RequirePermissions('actions:update', 'actions:delete')
+  requestDelete(@CurrentUser() me: AuthPayload, @Param('id') id: string, @Body() body?: { reason?: string }) {
+    return this.service.requestDeletionApproval(id, me.companyId, me.sub, body?.reason);
+  }
+
+  @Patch('general-approvals/:requestId/decision')
+  @RequirePermissions('actions:delete', 'actions:approve', 'actions:manage')
+  decideGeneralApproval(
+    @CurrentUser() me: AuthPayload,
+    @Param('requestId') requestId: string,
+    @Body() body: { decision: 'APPROVED' | 'REJECTED'; decisionNote?: string },
+  ) {
+    return this.service.decideGeneralApproval(requestId, me.companyId, me.sub, body.decision, body.decisionNote);
   }
 
   @Post(':id/analysis')

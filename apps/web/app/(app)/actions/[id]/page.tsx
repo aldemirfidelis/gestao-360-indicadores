@@ -5,7 +5,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
 import Link from 'next/link';
-import { ArrowLeft, Bot, CheckCircle2, ClipboardCheck, FileCheck2, GitBranch, MessageSquare, Plus, Save, Send, ShieldCheck, Sparkles, XCircle } from 'lucide-react';
+import { ArrowLeft, Bot, CheckCircle2, ClipboardCheck, FileCheck2, GitBranch, MessageSquare, Pencil, Plus, Save, Send, ShieldCheck, Sparkles, Trash2, XCircle } from 'lucide-react';
 import { PageHeader } from '@/components/shell/page-header';
 import { SectionCard } from '@/components/platform/section-card';
 import { StatusBadge } from '@/components/platform/status-badge';
@@ -19,6 +19,7 @@ import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { NativeSelect } from '@/components/ui/select';
 import { Progress } from '@/components/ui/progress';
+import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { api } from '@/lib/api';
 import { cn, formatDate } from '@/lib/utils';
 import { SUGGESTION_STATUS_LABEL, SUGGESTION_TYPE_LABEL, ACTION_STATUS_LABEL, ACTION_PRIORITY_LABEL, ACTION_ORIGIN_LABEL, ACTION_CRITICALITY_LABEL, EFFECTIVENESS_STATUS_LABEL, TRACE_EVENT_LABEL, TRACE_FIELD_LABEL, ANALYSIS_METHOD_LABEL } from '@/lib/labels';
@@ -58,6 +59,7 @@ interface ActionDetail {
     id: string;
     title: string;
     done: boolean;
+    completionNote: string | null;
     dueDate: string | null;
     startDate: string | null;
     endDate: string | null;
@@ -83,11 +85,14 @@ export default function ActionDetailPage() {
   const qc = useQueryClient();
   const { hasPermission } = useAuth();
   const canApproveEffectiveness = hasPermission(['actions:effectiveness', 'eficacia:approve']);
+  const canRequestDelete = hasPermission(['actions:update', 'actions:delete']);
   const [tab, setTab] = useState(tabs[0]);
   const [newTask, setNewTask] = useState<{ title: string; startDate: string; endDate: string; assignedToId: string }>({ title: '', startDate: '', endDate: '', assignedToId: '' });
   const [evidence, setEvidence] = useState({ title: '', url: '', description: '' });
   const [comment, setComment] = useState('');
   const [effectiveness, setEffectiveness] = useState({ effective: true, reopen: false, summary: '', evidence: '', achievedResult: '' });
+  const [deletePlanOpen, setDeletePlanOpen] = useState(false);
+  const [deleteReason, setDeleteReason] = useState('');
 
   const query = useQuery<ActionDetail>({
     queryKey: ['action', id],
@@ -153,6 +158,24 @@ export default function ActionDetailPage() {
       api(`/actions/tasks/${taskId}`, { method: 'PATCH', json: { done } }),
     onSuccess: () => qc.invalidateQueries({ queryKey: ['action', id] }),
     onError: (e: any) => toast.error(e?.message ?? 'Não foi possível atualizar a tarefa'),
+  });
+  const deleteTask = useMutation({
+    mutationFn: (taskId: string) => api(`/actions/tasks/${taskId}`, { method: 'DELETE' }),
+    onSuccess: () => {
+      toast.success('Tarefa excluida');
+      qc.invalidateQueries({ queryKey: ['action', id] });
+    },
+    onError: (e: any) => toast.error(e?.message ?? 'Não foi possível excluir a tarefa'),
+  });
+  const requestDeletePlan = useMutation({
+    mutationFn: () => api(`/actions/${id}/delete-request`, { method: 'POST', json: { reason: deleteReason || undefined } }),
+    onSuccess: () => {
+      toast.success('Solicitação enviada para aprovação da gestão');
+      setDeletePlanOpen(false);
+      setDeleteReason('');
+      qc.invalidateQueries({ queryKey: ['actions', 'general-approvals'] });
+    },
+    onError: (e: any) => toast.error(e?.message ?? 'Não foi possível enviar para aprovação'),
   });
   const saveAnalysis = useMutation({
     mutationFn: (payload: any) => api(`/actions/${id}/analysis`, { method: 'POST', json: payload }),
@@ -230,6 +253,12 @@ export default function ActionDetailPage() {
               <Bot className="mr-2 h-4 w-4" />
               IA assistente
             </Button>
+            {canRequestDelete && (
+              <Button variant="destructive" onClick={() => setDeletePlanOpen(true)}>
+                <Trash2 className="mr-2 h-4 w-4" />
+                Eliminar plano
+              </Button>
+            )}
           </>
         }
       />
@@ -278,7 +307,7 @@ export default function ActionDetailPage() {
                 <EditableText label="Resultado esperado (Impacto Esperado)" value={a.expectedResult ?? ''} onSave={(expectedResult) => update.mutate({ expectedResult })} />
               </div>
             </SectionCard>
-            <ExecutionCard a={a} users={users} newTask={newTask} setNewTask={setNewTask} addTask={addTask.mutate} toggleTask={toggleTask.mutate} updateTask={updateTask.mutate} />
+            <ExecutionCard a={a} users={users} newTask={newTask} setNewTask={setNewTask} addTask={addTask.mutate} toggleTask={toggleTask.mutate} updateTask={updateTask.mutate} deleteTask={deleteTask.mutate} />
           </div>
           <div className="space-y-4">
             <SectionCard title="Responsabilidade" description="Responsável, área, origem e ferramenta.">
@@ -302,7 +331,7 @@ export default function ActionDetailPage() {
       {tab === 'Origem' && <OriginTrail a={a} />}
       {tab === 'Análise de causa' && <AnalysisWorkspace action={a} onSave={saveAnalysis.mutate} saving={saveAnalysis.isPending} onAskAi={() => aiAssist.mutate('analysis')} />}
       {tab === '5W2H' && <FiveW2H action={a} onSave={saveAnalysis.mutate} saving={saveAnalysis.isPending} onAskAi={() => aiAssist.mutate('5w2h')} />}
-      {tab === 'Execução' && <ExecutionCard a={a} users={users} newTask={newTask} setNewTask={setNewTask} addTask={addTask.mutate} toggleTask={toggleTask.mutate} updateTask={updateTask.mutate} />}
+      {tab === 'Execução' && <ExecutionCard a={a} users={users} newTask={newTask} setNewTask={setNewTask} addTask={addTask.mutate} toggleTask={toggleTask.mutate} updateTask={updateTask.mutate} deleteTask={deleteTask.mutate} />}
       {tab === 'Evidências' && (
         <EvidencePanel a={a} evidence={evidence} setEvidence={setEvidence} addEvidence={() => addEvidence.mutate()} comment={comment} setComment={setComment} addComment={() => addComment.mutate()} />
       )}
@@ -322,6 +351,37 @@ export default function ActionDetailPage() {
       )}
       {tab === 'IA' && <AiPanel suggestions={a.aiSuggestions} onGenerate={(scope) => aiAssist.mutate(scope)} onDecide={(sid, status) => decideAi.mutate({ sid, status })} />}
       {tab === 'Histórico' && <HistoryPanel history={a.history} />}
+
+      <Dialog open={deletePlanOpen} onOpenChange={setDeletePlanOpen}>
+        <DialogContent className="max-w-lg">
+          <DialogHeader>
+            <DialogTitle>Eliminar plano de ação</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-3 text-sm">
+            <div className="rounded-md border bg-muted/35 p-3">
+              <div className="font-semibold">{a.title}</div>
+              <p className="mt-1 text-xs text-muted-foreground">
+                A eliminação não será feita agora. A solicitação será enviada para aprovação da gestão.
+              </p>
+            </div>
+            <div>
+              <Label>Justificativa</Label>
+              <Textarea
+                rows={3}
+                value={deleteReason}
+                onChange={(e) => setDeleteReason(e.target.value)}
+                placeholder="Explique por que este plano deve ser eliminado..."
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="ghost" onClick={() => setDeletePlanOpen(false)}>Cancelar</Button>
+            <Button variant="destructive" onClick={() => requestDeletePlan.mutate()} disabled={requestDeletePlan.isPending}>
+              {requestDeletePlan.isPending ? 'Enviando...' : 'Enviar para aprovação'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
@@ -556,6 +616,7 @@ function ExecutionCard({
   addTask,
   toggleTask,
   updateTask,
+  deleteTask,
 }: {
   a: ActionDetail;
   users: { id: string; name: string; email?: string }[];
@@ -564,120 +625,300 @@ function ExecutionCard({
   addTask: () => void;
   toggleTask: (v: { taskId: string; done: boolean }) => void;
   updateTask: (v: { taskId: string; patch: Record<string, any> }) => void;
+  deleteTask: (taskId: string) => void;
 }) {
+  const [completeDialog, setCompleteDialog] = useState<{ open: boolean; task: ActionDetail['tasks'][number] | null }>({ open: false, task: null });
+  const [completeForm, setCompleteForm] = useState({ completionNote: '', endDate: todayInput() });
+  const [editDialog, setEditDialog] = useState<{ open: boolean; task: ActionDetail['tasks'][number] | null }>({ open: false, task: null });
+  const [editForm, setEditForm] = useState({ title: '', startDate: '', endDate: '', assignedToId: '', completionNote: '' });
+  const [deleteDialog, setDeleteDialog] = useState<{ open: boolean; task: ActionDetail['tasks'][number] | null }>({ open: false, task: null });
+
+  const openCompleteDialog = (t: ActionDetail['tasks'][number]) => {
+    setCompleteForm({
+      completionNote: t.completionNote ?? '',
+      endDate: t.endDate ? t.endDate.slice(0, 10) : todayInput(),
+    });
+    setCompleteDialog({ open: true, task: t });
+  };
+
+  const openEditDialog = (t: ActionDetail['tasks'][number]) => {
+    setEditForm({
+      title: t.title,
+      startDate: t.startDate ? t.startDate.slice(0, 10) : '',
+      endDate: t.endDate ? t.endDate.slice(0, 10) : '',
+      assignedToId: t.assignedToId ?? '',
+      completionNote: t.completionNote ?? '',
+    });
+    setEditDialog({ open: true, task: t });
+  };
+
   const handleToggle = (t: ActionDetail['tasks'][number], next: boolean) => {
-    if (next && !t.endDate) {
-      toast.error('Informe a Data de Conclusao antes de marcar como concluida.');
+    if (next) {
+      openCompleteDialog(t);
       return;
     }
     toggleTask({ taskId: t.id, done: next });
   };
+
+  const submitComplete = () => {
+    if (!completeDialog.task) return;
+    if (!completeForm.completionNote.trim()) {
+      toast.error('Informe o que foi feito para concluir a tarefa.');
+      return;
+    }
+    updateTask({
+      taskId: completeDialog.task.id,
+      patch: {
+        done: true,
+        endDate: completeForm.endDate || todayInput(),
+        completionNote: completeForm.completionNote.trim(),
+      },
+    });
+    setCompleteDialog({ open: false, task: null });
+  };
+
+  const submitEdit = () => {
+    if (!editDialog.task) return;
+    if (!editForm.title.trim()) {
+      toast.error('Informe o título da tarefa.');
+      return;
+    }
+    updateTask({
+      taskId: editDialog.task.id,
+      patch: {
+        title: editForm.title.trim(),
+        startDate: editForm.startDate || null,
+        endDate: editForm.endDate || null,
+        assignedToId: editForm.assignedToId || null,
+        completionNote: editForm.completionNote || null,
+      },
+    });
+    setEditDialog({ open: false, task: null });
+  };
+
+  const submitDelete = () => {
+    if (!deleteDialog.task) return;
+    deleteTask(deleteDialog.task.id);
+    setDeleteDialog({ open: false, task: null });
+  };
+
   return (
-    <SectionCard title={`Execucao (${a.tasks.length})`} description="Cada tarefa exige Data Final para ser concluida.">
-      <div className="mb-3 grid gap-2 rounded-lg border bg-muted/30 p-3">
-        <Input
-          placeholder="Título da tarefa"
-          value={newTask.title}
-          onChange={(e) => setNewTask({ ...newTask, title: e.target.value })}
-        />
-        <div className="grid grid-cols-1 gap-2 sm:grid-cols-2 lg:grid-cols-4">
-          <div>
-            <Label className="text-[10px] uppercase text-muted-foreground">Início</Label>
-            <Input type="date" value={newTask.startDate} onChange={(e) => setNewTask({ ...newTask, startDate: e.target.value })} className="h-9" />
+    <>
+      <SectionCard title={`Execucao (${a.tasks.length})`} description="Ao concluir uma tarefa, registre o que foi feito.">
+        <div className="mb-3 grid gap-2 rounded-lg border bg-muted/30 p-3">
+          <Input
+            placeholder="Título da tarefa"
+            value={newTask.title}
+            onChange={(e) => setNewTask({ ...newTask, title: e.target.value })}
+          />
+          <div className="grid grid-cols-1 gap-2 sm:grid-cols-2 lg:grid-cols-4">
+            <div>
+              <Label className="text-[10px] uppercase text-muted-foreground">Início</Label>
+              <Input type="date" value={newTask.startDate} onChange={(e) => setNewTask({ ...newTask, startDate: e.target.value })} className="h-9" />
+            </div>
+            <div>
+              <Label className="text-[10px] uppercase text-muted-foreground">Conclusão prevista</Label>
+              <Input type="date" value={newTask.endDate} onChange={(e) => setNewTask({ ...newTask, endDate: e.target.value })} className="h-9" />
+            </div>
+            <div className="sm:col-span-2">
+              <Label className="text-[10px] uppercase text-muted-foreground">Responsável</Label>
+              <NativeSelect
+                value={newTask.assignedToId}
+                onChange={(e) => setNewTask({ ...newTask, assignedToId: e.target.value })}
+                className="h-9"
+              >
+                <option value="">Sem responsável</option>
+                {users.map((u) => (
+                  <option key={u.id} value={u.id}>{u.name}</option>
+                ))}
+              </NativeSelect>
+            </div>
           </div>
-          <div>
-            <Label className="text-[10px] uppercase text-muted-foreground">Conclusão</Label>
-            <Input type="date" value={newTask.endDate} onChange={(e) => setNewTask({ ...newTask, endDate: e.target.value })} className="h-9" />
-          </div>
-          <div className="sm:col-span-2">
-            <Label className="text-[10px] uppercase text-muted-foreground">Responsável</Label>
-            <NativeSelect
-              value={newTask.assignedToId}
-              onChange={(e) => setNewTask({ ...newTask, assignedToId: e.target.value })}
-              className="h-9"
-            >
-              <option value="">Sem responsável</option>
-              {users.map((u) => (
-                <option key={u.id} value={u.id}>{u.name}</option>
-              ))}
-            </NativeSelect>
-          </div>
+          <Button onClick={addTask} disabled={!newTask.title.trim()} className="w-full sm:w-auto sm:justify-self-end">
+            <Plus className="mr-2 h-4 w-4" /> Adicionar tarefa
+          </Button>
         </div>
-        <Button onClick={addTask} disabled={!newTask.title.trim()} className="w-full sm:w-auto sm:justify-self-end">
-          <Plus className="mr-2 h-4 w-4" /> Adicionar tarefa
-        </Button>
-      </div>
-      <div className="space-y-2">
-        {a.tasks.map((t) => {
-          const overdue = !t.done && t.endDate && new Date(t.endDate) < new Date();
-          return (
-            <div
-              key={t.id}
-              className={cn(
-                'rounded-md border p-3 text-sm',
-                t.done && 'opacity-70 bg-muted/40',
-                overdue && 'border-status-red/40',
-              )}
-            >
-              <div className="flex items-start gap-3">
-                <input
-                  type="checkbox"
-                  checked={t.done}
-                  onChange={(e) => handleToggle(t, e.target.checked)}
-                  className="mt-1 h-4 w-4 shrink-0"
-                />
-                <div className="flex-1 min-w-0">
-                  <div className={cn('font-medium', t.done && 'line-through')}>{t.title}</div>
-                  <div className="mt-2 grid grid-cols-1 gap-2 sm:grid-cols-3">
-                    <div>
-                      <Label className="text-[10px] uppercase text-muted-foreground">Início</Label>
-                      <Input
-                        type="date"
-                        defaultValue={t.startDate ? t.startDate.slice(0, 10) : ''}
-                        onBlur={(e) => {
-                          const v = e.target.value;
-                          const cur = t.startDate ? t.startDate.slice(0, 10) : '';
-                          if (v !== cur) updateTask({ taskId: t.id, patch: { startDate: v || null } });
-                        }}
-                        className="h-8"
-                      />
+        <div className="space-y-2">
+          {a.tasks.map((t) => {
+            const overdue = !t.done && t.endDate && new Date(t.endDate) < new Date();
+            return (
+              <div
+                key={t.id}
+                className={cn(
+                  'rounded-md border p-3 text-sm',
+                  t.done && 'bg-muted/40',
+                  overdue && 'border-status-red/40',
+                )}
+              >
+                <div className="flex items-start gap-3">
+                  <input
+                    type="checkbox"
+                    checked={t.done}
+                    onChange={(e) => handleToggle(t, e.target.checked)}
+                    className="mt-1 h-4 w-4 shrink-0"
+                  />
+                  <div className="min-w-0 flex-1">
+                    <div className="flex items-start justify-between gap-2">
+                      <div className={cn('font-medium', t.done && 'line-through')}>{t.title}</div>
+                      <div className="flex shrink-0 gap-1">
+                        <Button type="button" variant="ghost" size="sm" className="h-7 w-7 p-0" onClick={() => openEditDialog(t)} title="Editar tarefa">
+                          <Pencil className="h-3.5 w-3.5" />
+                        </Button>
+                        <Button type="button" variant="ghost" size="sm" className="h-7 w-7 p-0 text-status-red hover:text-status-red" onClick={() => setDeleteDialog({ open: true, task: t })} title="Excluir tarefa">
+                          <Trash2 className="h-3.5 w-3.5" />
+                        </Button>
+                      </div>
                     </div>
-                    <div>
-                      <Label className="text-[10px] uppercase text-muted-foreground">Conclusão {!t.endDate && <span className="text-status-red">*</span>}</Label>
-                      <Input
-                        type="date"
-                        defaultValue={t.endDate ? t.endDate.slice(0, 10) : ''}
-                        onBlur={(e) => {
-                          const v = e.target.value;
-                          const cur = t.endDate ? t.endDate.slice(0, 10) : '';
-                          if (v !== cur) updateTask({ taskId: t.id, patch: { endDate: v || null } });
-                        }}
-                        className={cn('h-8', !t.endDate && 'border-status-red/50')}
-                      />
+                    {t.completionNote && (
+                      <div className="mt-2 rounded-md border border-status-green/25 bg-status-green/10 p-2 text-xs">
+                        <div className="mb-1 font-semibold text-status-green">Realizado</div>
+                        <p className="whitespace-pre-wrap text-foreground">{t.completionNote}</p>
+                      </div>
+                    )}
+                    <div className="mt-2 grid grid-cols-1 gap-2 sm:grid-cols-3">
+                      <div>
+                        <Label className="text-[10px] uppercase text-muted-foreground">Início</Label>
+                        <Input
+                          type="date"
+                          defaultValue={t.startDate ? t.startDate.slice(0, 10) : ''}
+                          onBlur={(e) => {
+                            const v = e.target.value;
+                            const cur = t.startDate ? t.startDate.slice(0, 10) : '';
+                            if (v !== cur) updateTask({ taskId: t.id, patch: { startDate: v || null } });
+                          }}
+                          className="h-8"
+                        />
+                      </div>
+                      <div>
+                        <Label className="text-[10px] uppercase text-muted-foreground">Conclusão</Label>
+                        <Input
+                          type="date"
+                          defaultValue={t.endDate ? t.endDate.slice(0, 10) : ''}
+                          onBlur={(e) => {
+                            const v = e.target.value;
+                            const cur = t.endDate ? t.endDate.slice(0, 10) : '';
+                            if (v !== cur) updateTask({ taskId: t.id, patch: { endDate: v || null } });
+                          }}
+                          className="h-8"
+                        />
+                      </div>
+                      <div>
+                        <Label className="text-[10px] uppercase text-muted-foreground">Responsável</Label>
+                        <NativeSelect
+                          value={t.assignedToId ?? ''}
+                          onChange={(e) => updateTask({ taskId: t.id, patch: { assignedToId: e.target.value || null } })}
+                          className="h-8"
+                        >
+                          <option value="">Sem responsável</option>
+                          {users.map((u) => (
+                            <option key={u.id} value={u.id}>{u.name}</option>
+                          ))}
+                        </NativeSelect>
+                      </div>
                     </div>
-                    <div>
-                      <Label className="text-[10px] uppercase text-muted-foreground">Responsável</Label>
-                      <NativeSelect
-                        value={t.assignedToId ?? ''}
-                        onChange={(e) => updateTask({ taskId: t.id, patch: { assignedToId: e.target.value || null } })}
-                        className="h-8"
-                      >
-                        <option value="">Sem responsável</option>
-                        {users.map((u) => (
-                          <option key={u.id} value={u.id}>{u.name}</option>
-                        ))}
-                      </NativeSelect>
-                    </div>
+                    {overdue && <div className="mt-2 text-xs text-status-red">Tarefa atrasada</div>}
                   </div>
-                  {overdue && <div className="mt-2 text-xs text-status-red">Tarefa atrasada</div>}
                 </div>
               </div>
+            );
+          })}
+          {a.tasks.length === 0 && <EmptyState title="Nenhuma tarefa" description="Crie etapas de execucao para acompanhar o progresso automaticamente." className="border-dashed" />}
+        </div>
+      </SectionCard>
+
+      <Dialog open={completeDialog.open} onOpenChange={(open) => setCompleteDialog({ open, task: open ? completeDialog.task : null })}>
+        <DialogContent className="max-w-lg">
+          <DialogHeader>
+            <DialogTitle>Concluir tarefa</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-3">
+            <div className="rounded-md border bg-muted/35 p-3 text-sm font-semibold">{completeDialog.task?.title}</div>
+            <div>
+              <Label>Data de conclusão</Label>
+              <Input type="date" value={completeForm.endDate} onChange={(e) => setCompleteForm({ ...completeForm, endDate: e.target.value })} />
             </div>
-          );
-        })}
-        {a.tasks.length === 0 && <EmptyState title="Nenhuma tarefa" description="Crie etapas de execucao para acompanhar o progresso automaticamente." className="border-dashed" />}
-      </div>
-    </SectionCard>
+            <div>
+              <Label>O que foi feito</Label>
+              <Textarea
+                rows={4}
+                value={completeForm.completionNote}
+                onChange={(e) => setCompleteForm({ ...completeForm, completionNote: e.target.value })}
+                placeholder="Descreva a ação realizada para concluir esta tarefa..."
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="ghost" onClick={() => setCompleteDialog({ open: false, task: null })}>Cancelar</Button>
+            <Button onClick={submitComplete}>
+              <CheckCircle2 className="mr-2 h-4 w-4" />
+              Concluir tarefa
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={editDialog.open} onOpenChange={(open) => setEditDialog({ open, task: open ? editDialog.task : null })}>
+        <DialogContent className="max-w-lg">
+          <DialogHeader>
+            <DialogTitle>Editar tarefa</DialogTitle>
+          </DialogHeader>
+          <div className="grid gap-3">
+            <div>
+              <Label>Título</Label>
+              <Input value={editForm.title} onChange={(e) => setEditForm({ ...editForm, title: e.target.value })} />
+            </div>
+            <div className="grid gap-3 sm:grid-cols-2">
+              <div>
+                <Label>Início</Label>
+                <Input type="date" value={editForm.startDate} onChange={(e) => setEditForm({ ...editForm, startDate: e.target.value })} />
+              </div>
+              <div>
+                <Label>Conclusão</Label>
+                <Input type="date" value={editForm.endDate} onChange={(e) => setEditForm({ ...editForm, endDate: e.target.value })} />
+              </div>
+            </div>
+            <div>
+              <Label>Responsável</Label>
+              <NativeSelect value={editForm.assignedToId} onChange={(e) => setEditForm({ ...editForm, assignedToId: e.target.value })}>
+                <option value="">Sem responsável</option>
+                {users.map((u) => (
+                  <option key={u.id} value={u.id}>{u.name}</option>
+                ))}
+              </NativeSelect>
+            </div>
+            <div>
+              <Label>Realizado</Label>
+              <Textarea rows={3} value={editForm.completionNote} onChange={(e) => setEditForm({ ...editForm, completionNote: e.target.value })} />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="ghost" onClick={() => setEditDialog({ open: false, task: null })}>Cancelar</Button>
+            <Button onClick={submitEdit}>
+              <Save className="mr-2 h-4 w-4" />
+              Salvar tarefa
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={deleteDialog.open} onOpenChange={(open) => setDeleteDialog({ open, task: open ? deleteDialog.task : null })}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>Excluir tarefa</DialogTitle>
+          </DialogHeader>
+          <p className="text-sm text-muted-foreground">
+            Esta tarefa será removida do plano: <span className="font-semibold text-foreground">{deleteDialog.task?.title}</span>
+          </p>
+          <DialogFooter>
+            <Button variant="ghost" onClick={() => setDeleteDialog({ open: false, task: null })}>Cancelar</Button>
+            <Button variant="destructive" onClick={submitDelete}>
+              <Trash2 className="mr-2 h-4 w-4" />
+              Excluir tarefa
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+    </>
   );
 }
 
@@ -819,7 +1060,7 @@ function EffectivenessPanel({
 
       <SectionCard
         title="Sugestões da IA"
-        description="Análise de coerência sobre a eficácia da tratativa e o método aplicado."
+        description="Análise de coerência sobre a eficácia da ação e o método aplicado."
       >
         {aiSuggestions.length === 0 ? (
           <EmptyState
@@ -945,4 +1186,8 @@ function TextInput({ label, value, onChange }: { label: string; value: string; o
 
 function updateArray(rows: any[], index: number, value: any) {
   return rows.map((item, itemIndex) => (itemIndex === index ? value : item));
+}
+
+function todayInput() {
+  return new Date().toISOString().slice(0, 10);
 }

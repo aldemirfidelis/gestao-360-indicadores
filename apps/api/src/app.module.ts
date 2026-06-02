@@ -28,6 +28,7 @@ import { SearchModule } from './modules/search/search.module';
 import { TreatmentsModule } from './modules/treatments/treatments.module';
 import { AuditInterceptor } from './common/interceptors/audit.interceptor';
 import { AdminModule } from './modules/admin/admin.module';
+import { DatabaseAdminModule } from './modules/database-admin/database-admin.module';
 import { PeriodsModule } from './modules/periods/periods.module';
 import { ClosedMonthsModule } from './modules/closed-months/closed-months.module';
 import { AiModule } from './modules/ai/ai.module';
@@ -60,6 +61,7 @@ import { AiModule } from './modules/ai/ai.module';
     SearchModule,
     TreatmentsModule,
     AdminModule,
+    DatabaseAdminModule,
     PeriodsModule,
     ClosedMonthsModule,
     AiModule,

@@ -213,18 +213,13 @@ export default function MeetingDetailPage() {
       </Link>
 
       <PageHeader
-        eyebrow="Reunião de tratativa"
+        eyebrow="Reunião"
         tone="view"
         title={m.title}
         description={`${formatDateTime(m.startsAt)}${m.location ? ` - ${m.location}` : ''}`}
-        breadcrumbs={[{ label: 'Início', href: '/' }, { label: 'Reuniões', href: '/meetings' }, { label: 'Tratativa' }]}
+        breadcrumbs={[{ label: 'Início', href: '/' }, { label: 'Reuniões', href: '/meetings' }, { label: 'Reunião' }]}
         actions={
           <>
-            {m.treatment && (
-              <Button variant="outline" asChild>
-                <Link href={`/treatments/${m.treatment.id}`}>Fluxo guiado</Link>
-              </Button>
-            )}
             <Button variant="outline" onClick={() => sendInvites.mutate()} disabled={sendInvites.isPending}>
               <Send className="mr-2 h-4 w-4" />
               Enviar convite
@@ -279,7 +274,7 @@ export default function MeetingDetailPage() {
           )}
         </SectionCard>
 
-        <SectionCard title="Análise de causa" description="Resumo da causa registrada para a tratativa.">
+        <SectionCard title="Análise de causa" description="Resumo da causa registrada para a reunião.">
           {m.analysis ? (
             <div className="space-y-3">
               <StatusBadge value={m.analysis.method} label={methodLabel(m.analysis.method)} tone="yellow" />
@@ -384,7 +379,7 @@ export default function MeetingDetailPage() {
           </div>
         </SectionCard>
 
-        <SectionCard title="Plano de ação da reunião" description="Ações criadas aqui ficam vinculadas ao indicador, análise, reunião e tratativa.">
+        <SectionCard title="Plano de ação da reunião" description="Ações criadas aqui ficam vinculadas ao indicador, análise e reunião.">
           <div className="mb-4 grid grid-cols-2 gap-2 md:grid-cols-5">
             <ActionSummary label="Total" value={summary.total} />
             <ActionSummary label="Pendentes" value={summary.pending} />

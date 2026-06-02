@@ -45,7 +45,6 @@ import {
   Minimize2,
   Monitor,
   Move,
-  Network,
   Pencil,
   Plus,
   Presentation,
@@ -811,7 +810,7 @@ function StrategyMapPageInner() {
       if (perspectiveFilter && objective.perspectiveId !== perspectiveFilter) return false;
       if (statusFilter && objective.aggregateLight !== statusFilter && objective.status !== statusFilter) return false;
       if (onlyCritical && objective.aggregateLight !== 'RED') return false;
-      if (onlyOverdue && objective.actionCount === 0 && objective.treatmentCount === 0) return false;
+      if (onlyOverdue && objective.actionCount === 0) return false;
       if (onlyUnlinked && (objective.indicators.length > 0 || objective.orgNodeLinks.length > 0)) return false;
       if (!term) return true;
       return [
@@ -1250,9 +1249,9 @@ function StrategyMapPageInner() {
             variant={onlyOverdue ? 'default' : 'outline'}
             size="sm"
             onClick={() => setOnlyOverdue((v) => !v)}
-            title="Itens com ações ou tratativas em andamento"
+            title="Itens com ações em andamento"
           >
-            <Calendar className="mr-1.5 h-3.5 w-3.5" /> Com tratativa
+            <Calendar className="mr-1.5 h-3.5 w-3.5" /> Com ação
           </Button>
           <Button
             variant={onlyUnlinked ? 'default' : 'outline'}
@@ -1663,8 +1662,7 @@ function StrategyMapPageInner() {
                   </div>
                 </div>
 
-                <div className="grid grid-cols-3 gap-2 text-center text-xs">
-                  <Link className="rounded-lg border p-2 hover:bg-muted" href={`/treatments?indicatorId=${selectedObjective.indicators[0]?.id ?? ''}`}>Análise</Link>
+                <div className="grid grid-cols-2 gap-2 text-center text-xs">
                   <Link className="rounded-lg border p-2 hover:bg-muted" href={`/meetings?indicatorId=${selectedObjective.indicators[0]?.id ?? ''}`}>Reunião</Link>
                   <Link className="rounded-lg border p-2 hover:bg-muted" href={`/actions?indicatorId=${selectedObjective.indicators[0]?.id ?? ''}`}>Plano</Link>
                 </div>
@@ -2078,9 +2076,6 @@ function ObjectiveDrawerContent({ objective }: { objective: Objective }) {
         </Link>
         <Link className="rounded-md border p-2 transition hover:bg-accent/35" href={`/meetings${indicatorId ? `?indicatorId=${indicatorId}` : ''}`}>
           <Calendar className="mx-auto mb-1 h-4 w-4" /> Reuniões
-        </Link>
-        <Link className="rounded-md border p-2 transition hover:bg-accent/35" href={`/treatments${indicatorId ? `?indicatorId=${indicatorId}` : ''}`}>
-          <Network className="mx-auto mb-1 h-4 w-4" /> Tratativas ({objective.treatmentCount})
         </Link>
         <Link className="rounded-md border p-2 transition hover:bg-accent/35" href={`/deviations${indicatorId ? `?indicatorId=${indicatorId}` : ''}`}>
           <ShieldAlert className="mx-auto mb-1 h-4 w-4" /> Desvios ({objective.deviationCount})
