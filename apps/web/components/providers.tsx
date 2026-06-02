@@ -5,6 +5,7 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { ThemeProvider } from 'next-themes';
 import { Toaster } from 'sonner';
 import { AuthProvider } from '@/components/auth/auth-provider';
+import { PortalConfigProvider } from '@/components/portal-admin/portal-config-provider';
 
 export function Providers({ children }: { children: ReactNode }) {
   const [qc] = useState(
@@ -19,8 +20,10 @@ export function Providers({ children }: { children: ReactNode }) {
     <ThemeProvider attribute="class" defaultTheme="light" enableSystem>
       <QueryClientProvider client={qc}>
         <AuthProvider>
-          {children}
-          <Toaster position="top-right" richColors />
+          <PortalConfigProvider>
+            {children}
+            <Toaster position="top-right" richColors />
+          </PortalConfigProvider>
         </AuthProvider>
       </QueryClientProvider>
     </ThemeProvider>

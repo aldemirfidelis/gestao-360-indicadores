@@ -5,7 +5,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
 import Link from 'next/link';
-import { ArrowLeft, Bot, CheckCircle2, ClipboardCheck, FileCheck2, GitBranch, MessageSquare, Pencil, Plus, Save, Send, ShieldCheck, Sparkles, Trash2, XCircle } from 'lucide-react';
+import { ArrowLeft, Bot, CalendarPlus, CheckCircle2, GitBranch, Paperclip, Pencil, Plus, Save, Send, ShieldCheck, Sparkles, Trash2 } from 'lucide-react';
 import { PageHeader } from '@/components/shell/page-header';
 import { SectionCard } from '@/components/platform/section-card';
 import { StatusBadge } from '@/components/platform/status-badge';
@@ -65,6 +65,7 @@ interface ActionDetail {
     endDate: string | null;
     assignedToId: string | null;
     assignedTo: { id: string; name: string; email?: string; avatarUrl?: string | null } | null;
+    _count?: { evidences: number };
   }[];
   evidences: any[];
   comments: any[];
@@ -78,7 +79,8 @@ interface ActionDetail {
 const STATUS_LABEL = ACTION_STATUS_LABEL;
 const TOOL_LABEL = ANALYSIS_METHOD_LABEL;
 
-const tabs = ['Visão geral', 'Origem', 'Análise de causa', '5W2H', 'Execução', 'Evidências', 'Eficácia', 'IA', 'Histórico'];
+const tabs = ['Visão geral', 'Origem', 'Análise de causa', 'Execução', 'Eficácia', 'IA', 'Histórico'];
+const MAX_ATTACHMENT_BYTES = 5 * 1024 * 1024;
 
 export default function ActionDetailPage() {
   const { id } = useParams<{ id: string }>();
@@ -88,11 +90,10 @@ export default function ActionDetailPage() {
   const canRequestDelete = hasPermission(['actions:update', 'actions:delete']);
   const [tab, setTab] = useState(tabs[0]);
   const [newTask, setNewTask] = useState<{ title: string; startDate: string; endDate: string; assignedToId: string }>({ title: '', startDate: '', endDate: '', assignedToId: '' });
-  const [evidence, setEvidence] = useState({ title: '', url: '', description: '' });
-  const [comment, setComment] = useState('');
   const [effectiveness, setEffectiveness] = useState({ effective: true, reopen: false, summary: '', evidence: '', achievedResult: '' });
   const [deletePlanOpen, setDeletePlanOpen] = useState(false);
   const [deleteReason, setDeleteReason] = useState('');
+  const [meetingForm, setMeetingForm] = useState({ startsAt: '', location: '', format: 'ONLINE' });
 
   const query = useQuery<ActionDetail>({
     queryKey: ['action', id],
@@ -177,24 +178,49 @@ export default function ActionDetailPage() {
     },
     onError: (e: any) => toast.error(e?.message ?? 'Não foi possível enviar para aprovação'),
   });
+  const createMeeting = useMutation({
+    mutationFn: () =>
+      api(`/actions/${id}/meeting`, {
+        method: 'POST',
+        json: {
+          startsAt: meetingForm.startsAt || undefined,
+          location: meetingForm.location || undefined,
+          format: meetingForm.format,
+        },
+      }),
+    onSuccess: () => {
+      toast.success('Reunião marcada para o plano de ação');
+      setMeetingForm({ startsAt: '', location: '', format: 'ONLINE' });
+      qc.invalidateQueries({ queryKey: ['action', id] });
+      qc.invalidateQueries({ queryKey: ['meetings'] });
+    },
+    onError: (e: any) => toast.error(e?.message ?? 'Não foi possível marcar a reunião'),
+  });
+  const addTaskEvidence = useMutation({
+    mutationFn: async ({ taskId, file }: { taskId: string; file: File }) => {
+      if (file.size > MAX_ATTACHMENT_BYTES) throw new Error('Arquivo excede o limite de 5 MB');
+      const dataBase64 = await fileToBase64(file);
+      return api(`/actions/${id}/evidences`, {
+        method: 'POST',
+        json: {
+          taskId,
+          title: file.name,
+          fileName: file.name,
+          mimeType: file.type || null,
+          dataBase64,
+        },
+      });
+    },
+    onSuccess: () => {
+      toast.success('Evidência anexada');
+      qc.invalidateQueries({ queryKey: ['action', id] });
+    },
+    onError: (e: any) => toast.error(e?.message ?? 'Não foi possível anexar a evidência'),
+  });
   const saveAnalysis = useMutation({
     mutationFn: (payload: any) => api(`/actions/${id}/analysis`, { method: 'POST', json: payload }),
     onSuccess: () => {
       toast.success('Análise salva');
-      qc.invalidateQueries({ queryKey: ['action', id] });
-    },
-  });
-  const addEvidence = useMutation({
-    mutationFn: () => api(`/actions/${id}/evidences`, { method: 'POST', json: evidence }),
-    onSuccess: () => {
-      setEvidence({ title: '', url: '', description: '' });
-      qc.invalidateQueries({ queryKey: ['action', id] });
-    },
-  });
-  const addComment = useMutation({
-    mutationFn: () => api(`/actions/${id}/comments`, { method: 'POST', json: { comment } }),
-    onSuccess: () => {
-      setComment('');
       qc.invalidateQueries({ queryKey: ['action', id] });
     },
   });
@@ -307,7 +333,7 @@ export default function ActionDetailPage() {
                 <EditableText label="Resultado esperado (Impacto Esperado)" value={a.expectedResult ?? ''} onSave={(expectedResult) => update.mutate({ expectedResult })} />
               </div>
             </SectionCard>
-            <ExecutionCard a={a} users={users} newTask={newTask} setNewTask={setNewTask} addTask={addTask.mutate} toggleTask={toggleTask.mutate} updateTask={updateTask.mutate} deleteTask={deleteTask.mutate} />
+            <ExecutionCard a={a} users={users} newTask={newTask} setNewTask={setNewTask} addTask={addTask.mutate} toggleTask={toggleTask.mutate} updateTask={updateTask.mutate} deleteTask={deleteTask.mutate} addTaskEvidence={(payload) => addTaskEvidence.mutate(payload)} evidenceUploading={addTaskEvidence.isPending} />
           </div>
           <div className="space-y-4">
             <SectionCard title="Responsabilidade" description="Responsável, área, origem e ferramenta.">
@@ -316,6 +342,46 @@ export default function ActionDetailPage() {
               <Info label="Origem" value={ACTION_ORIGIN_LABEL[a.origin] ?? a.origin} />
               <Info label="Ferramenta" value={a.analysisTool ? TOOL_LABEL[a.analysisTool] ?? a.analysisTool : 'Não definida'} />
               <Info label="Criticidade" value={ACTION_CRITICALITY_LABEL[a.criticality] ?? a.criticality} />
+            </SectionCard>
+            <SectionCard title="Reunião do plano" description="Use a reunião para analisar causa e criar tarefas para execução.">
+              {a.meeting ? (
+                <div className="space-y-3">
+                  <div className="rounded-md border p-3 text-sm">
+                    <div className="font-semibold">{a.meeting.title}</div>
+                    <div className="mt-1 text-xs text-muted-foreground">{formatDate(a.meeting.startsAt)}</div>
+                  </div>
+                  <Button asChild className="w-full">
+                    <Link href={`/meetings/${a.meeting.id}`}>
+                      Abrir reunião
+                    </Link>
+                  </Button>
+                </div>
+              ) : (
+                <div className="space-y-3">
+                  <div>
+                    <Label>Data e hora</Label>
+                    <Input type="datetime-local" value={meetingForm.startsAt} onChange={(e) => setMeetingForm({ ...meetingForm, startsAt: e.target.value })} />
+                  </div>
+                  <div className="grid gap-2 sm:grid-cols-2">
+                    <div>
+                      <Label>Formato</Label>
+                      <NativeSelect value={meetingForm.format} onChange={(e) => setMeetingForm({ ...meetingForm, format: e.target.value })}>
+                        <option value="ONLINE">Online</option>
+                        <option value="PRESENTIAL">Presencial</option>
+                        <option value="HYBRID">Híbrida</option>
+                      </NativeSelect>
+                    </div>
+                    <div>
+                      <Label>Local ou link</Label>
+                      <Input value={meetingForm.location} onChange={(e) => setMeetingForm({ ...meetingForm, location: e.target.value })} />
+                    </div>
+                  </div>
+                  <Button onClick={() => createMeeting.mutate()} disabled={createMeeting.isPending} className="w-full">
+                    <CalendarPlus className="mr-2 h-4 w-4" />
+                    {createMeeting.isPending ? 'Marcando...' : 'Marcar reunião'}
+                  </Button>
+                </div>
+              )}
             </SectionCard>
             <SectionCard title="Prontidao da ação" description="Lacunas antes de considerar o plano robusto.">
               <div className="mb-3 text-2xl font-semibold">{a.aiReadiness.score}%</div>
@@ -330,11 +396,7 @@ export default function ActionDetailPage() {
 
       {tab === 'Origem' && <OriginTrail a={a} />}
       {tab === 'Análise de causa' && <AnalysisWorkspace action={a} onSave={saveAnalysis.mutate} saving={saveAnalysis.isPending} onAskAi={() => aiAssist.mutate('analysis')} />}
-      {tab === '5W2H' && <FiveW2H action={a} onSave={saveAnalysis.mutate} saving={saveAnalysis.isPending} onAskAi={() => aiAssist.mutate('5w2h')} />}
-      {tab === 'Execução' && <ExecutionCard a={a} users={users} newTask={newTask} setNewTask={setNewTask} addTask={addTask.mutate} toggleTask={toggleTask.mutate} updateTask={updateTask.mutate} deleteTask={deleteTask.mutate} />}
-      {tab === 'Evidências' && (
-        <EvidencePanel a={a} evidence={evidence} setEvidence={setEvidence} addEvidence={() => addEvidence.mutate()} comment={comment} setComment={setComment} addComment={() => addComment.mutate()} />
-      )}
+      {tab === 'Execução' && <ExecutionCard a={a} users={users} newTask={newTask} setNewTask={setNewTask} addTask={addTask.mutate} toggleTask={toggleTask.mutate} updateTask={updateTask.mutate} deleteTask={deleteTask.mutate} addTaskEvidence={(payload) => addTaskEvidence.mutate(payload)} evidenceUploading={addTaskEvidence.isPending} />}
       {tab === 'Eficácia' && (
         <EffectivenessPanel
           a={a}
@@ -523,91 +585,6 @@ function AnalysisWorkspace({ action, onSave, saving, onAskAi }: { action: Action
   );
 }
 
-function FiveW2H({ action, onSave, saving, onAskAi }: { action: ActionDetail; onSave: (payload: any) => void; saving: boolean; onAskAi: () => void }) {
-  const session = action.analysisSessions.find((item) => item.method === 'FIVE_W_TWO_H');
-  const [form, setForm] = useState<any>(session?.fiveW2H ?? {});
-  const set = (key: string, value: any) => setForm({ ...form, [key]: value });
-
-  return (
-    <SectionCard 
-      title="Plano de Ação 5W2H" 
-      description="Detalhe a execução da ação respondendo às perguntas do padrão 5W2H." 
-      actions={<Button variant="outline" onClick={onAskAi}><Bot className="mr-2 h-4 w-4" />Revisar 5W2H com IA</Button>}
-    >
-      <div className="grid grid-cols-1 gap-5 md:grid-cols-2">
-        <div className="rounded-xl border bg-muted/20 p-4 space-y-4">
-          <h3 className="text-sm font-bold text-primary border-b pb-1.5 uppercase tracking-wide">Os 5 &quot;W&quot;s (Direcionamento)</h3>
-          {[
-            ['what', 'What (O que será feito?)', 'Ação concreta a ser executada'],
-            ['why', 'Why (Por que será feito?)', 'Justificativa e causa raiz que a ação resolve'],
-            ['where', 'Where (Onde será feito?)', 'Local, departamento ou sistema afetado'],
-            ['who', 'Who (Quem irá fazer?)', 'Responsável ou executor da ação'],
-          ].map(([key, label, desc]) => (
-            <div key={key}>
-              <Label className="font-semibold text-xs text-foreground">{label}</Label>
-              <Input 
-                value={form[key] ?? ''} 
-                placeholder={desc} 
-                onChange={(e) => set(key, e.target.value)} 
-                className="mt-1"
-              />
-            </div>
-          ))}
-          <div>
-            <Label className="font-semibold text-xs text-foreground">When (Quando será feito? - Prazo)</Label>
-            <Input 
-              type="date" 
-              value={form.when?.slice?.(0, 10) ?? ''} 
-              onChange={(e) => set('when', e.target.value)} 
-              className="mt-1"
-            />
-          </div>
-        </div>
-
-        <div className="rounded-xl border bg-muted/20 p-4 space-y-4">
-          <h3 className="text-sm font-bold text-primary border-b pb-1.5 uppercase tracking-wide">Os 2 &quot;H&quot;s & Notas (Execução)</h3>
-          <div>
-            <Label className="font-semibold text-xs text-foreground">How (Como será feito?)</Label>
-            <Textarea 
-              rows={4} 
-              value={form.how ?? ''} 
-              placeholder="Método, ferramentas e etapas detalhadas do procedimento..." 
-              onChange={(e) => set('how', e.target.value)} 
-              className="mt-1"
-            />
-          </div>
-          <div>
-            <Label className="font-semibold text-xs text-foreground">How Much (Quanto custará?)</Label>
-            <Input 
-              type="number" 
-              value={form.howMuch ?? ''} 
-              placeholder="Custo estimado em R$" 
-              onChange={(e) => set('howMuch', e.target.value)} 
-              className="mt-1"
-            />
-          </div>
-          <div className="pt-2">
-            <Label className="font-semibold text-xs text-muted-foreground">Notas de Revisão</Label>
-            <Textarea 
-              rows={2} 
-              value={form.reviewNotes ?? ''} 
-              placeholder="Comentários adicionais da diretoria ou auditoria..." 
-              onChange={(e) => set('reviewNotes', e.target.value)} 
-              className="mt-1 bg-background/50"
-            />
-          </div>
-        </div>
-      </div>
-      <div className="mt-5 flex justify-end">
-        <Button disabled={saving} onClick={() => onSave({ method: 'FIVE_W_TWO_H', problem: action.problemDescription, rootCause: action.rootCause, fiveW2H: form })}>
-          <Save className="mr-2 h-4 w-4" />
-          {saving ? 'Gravando...' : 'Salvar Plano 5W2H'}
-        </Button>
-      </div>
-    </SectionCard>
-  );
-}
-
 function ExecutionCard({
   a,
   users,
@@ -617,6 +594,8 @@ function ExecutionCard({
   toggleTask,
   updateTask,
   deleteTask,
+  addTaskEvidence,
+  evidenceUploading,
 }: {
   a: ActionDetail;
   users: { id: string; name: string; email?: string }[];
@@ -626,6 +605,8 @@ function ExecutionCard({
   toggleTask: (v: { taskId: string; done: boolean }) => void;
   updateTask: (v: { taskId: string; patch: Record<string, any> }) => void;
   deleteTask: (taskId: string) => void;
+  addTaskEvidence: (v: { taskId: string; file: File }) => void;
+  evidenceUploading: boolean;
 }) {
   const [completeDialog, setCompleteDialog] = useState<{ open: boolean; task: ActionDetail['tasks'][number] | null }>({ open: false, task: null });
   const [completeForm, setCompleteForm] = useState({ completionNote: '', endDate: todayInput() });
@@ -741,6 +722,7 @@ function ExecutionCard({
         <div className="space-y-2">
           {a.tasks.map((t) => {
             const overdue = !t.done && t.endDate && new Date(t.endDate) < new Date();
+            const hasEvidence = (t._count?.evidences ?? 0) > 0 || a.evidences.some((evidence: any) => evidence.taskId === t.id);
             return (
               <div
                 key={t.id}
@@ -761,6 +743,21 @@ function ExecutionCard({
                     <div className="flex items-start justify-between gap-2">
                       <div className={cn('font-medium', t.done && 'line-through')}>{t.title}</div>
                       <div className="flex shrink-0 gap-1">
+                        <Button type="button" variant="ghost" size="sm" className="h-7 w-7 p-0" onClick={() => document.getElementById(`task-evidence-${t.id}`)?.click()} title="Anexar evidência" disabled={evidenceUploading}>
+                          <Paperclip className="h-3.5 w-3.5" />
+                        </Button>
+                        <input
+                          id={`task-evidence-${t.id}`}
+                          type="file"
+                          className="hidden"
+                          accept=".doc,.docx,.xls,.xlsx,.csv,.pdf,.png,.jpg,.jpeg,.txt,.ppt,.pptx"
+                          onChange={(e) => {
+                            const file = e.target.files?.[0];
+                            if (file) addTaskEvidence({ taskId: t.id, file });
+                            e.target.value = '';
+                          }}
+                          disabled={evidenceUploading}
+                        />
                         <Button type="button" variant="ghost" size="sm" className="h-7 w-7 p-0" onClick={() => openEditDialog(t)} title="Editar tarefa">
                           <Pencil className="h-3.5 w-3.5" />
                         </Button>
@@ -773,6 +770,12 @@ function ExecutionCard({
                       <div className="mt-2 rounded-md border border-status-green/25 bg-status-green/10 p-2 text-xs">
                         <div className="mb-1 font-semibold text-status-green">Realizado</div>
                         <p className="whitespace-pre-wrap text-foreground">{t.completionNote}</p>
+                      </div>
+                    )}
+                    {hasEvidence && (
+                      <div className="mt-2 inline-flex items-center gap-1 rounded-full border border-status-green/30 bg-status-green/10 px-2 py-1 text-xs font-medium text-status-green">
+                        <Paperclip className="h-3 w-3" />
+                        Evidência Anexada!
                       </div>
                     )}
                     <div className="mt-2 grid grid-cols-1 gap-2 sm:grid-cols-3">
@@ -922,33 +925,6 @@ function ExecutionCard({
   );
 }
 
-function EvidencePanel({ a, evidence, setEvidence, addEvidence, comment, setComment, addComment }: any) {
-  return (
-    <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
-      <SectionCard title="Evidencias" description="Anexe ou registre evidencias de execucao e eficacia.">
-        <div className="mb-4 grid gap-2">
-          <Input placeholder="Título da evidencia" value={evidence.title} onChange={(e) => setEvidence({ ...evidence, title: e.target.value })} />
-          <Input placeholder="URL ou referência" value={evidence.url} onChange={(e) => setEvidence({ ...evidence, url: e.target.value })} />
-          <Textarea placeholder="Descrição" value={evidence.description} onChange={(e) => setEvidence({ ...evidence, description: e.target.value })} />
-          <Button disabled={!evidence.title} onClick={addEvidence}><FileCheck2 className="mr-2 h-4 w-4" />Registrar evidencia</Button>
-        </div>
-        <div className="space-y-2">
-          {a.evidences.map((item: any) => <div key={item.id} className="rounded-lg border p-3"><div className="font-medium">{item.title}</div><div className="text-xs text-muted-foreground">{item.description ?? item.url ?? '-'}</div></div>)}
-        </div>
-      </SectionCard>
-      <SectionCard title="Comentarios" description="Histórico narrativo do acompanhamento.">
-        <div className="mb-4 grid gap-2">
-          <Textarea placeholder="Adicionar comentario..." value={comment} onChange={(e) => setComment(e.target.value)} />
-          <Button disabled={!comment} onClick={addComment}><MessageSquare className="mr-2 h-4 w-4" />Comentar</Button>
-        </div>
-        <div className="space-y-2">
-          {a.comments.map((item: any) => <div key={item.id} className="rounded-lg border p-3"><div className="text-sm">{item.comment}</div><div className="mt-1 text-xs text-muted-foreground">{formatDate(item.createdAt)}</div></div>)}
-        </div>
-      </SectionCard>
-    </div>
-  );
-}
-
 function EffectivenessPanel({
   a,
   effectiveness,
@@ -1019,39 +995,50 @@ function EffectivenessPanel({
 
         {canApprove && (
           <div className="mt-5 border-t border-border/60 pt-4">
-            <div className="mb-3 text-[11px] font-medium uppercase tracking-[0.1em] text-muted-foreground">
-              Decisão do responsável Master
-            </div>
-            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-              <label className="flex items-start gap-3 border border-border/60 p-4 text-sm transition-colors hover:bg-accent/30 cursor-pointer">
-                <input
-                  type="checkbox"
-                  checked={effectiveness.effective}
-                  onChange={(e) => setEffectiveness({ ...effectiveness, effective: e.target.checked, reopen: !e.target.checked })}
-                  className="mt-0.5 h-4 w-4 accent-foreground"
-                />
+            <div className="rounded-lg border bg-muted/25 p-4">
+              <div className="flex flex-wrap items-start justify-between gap-3">
                 <div>
-                  <span className="block font-semibold">Eficácia validada</span>
-                  <span className="text-xs text-muted-foreground">A ação eliminou a causa raiz com sucesso.</span>
+                  <div className="text-sm font-semibold">Status de eficácia</div>
+                  <p className="mt-1 text-xs text-muted-foreground">
+                    {effectiveness.reopen
+                      ? 'Ineficaz: o plano será reaberto para novas tarefas.'
+                      : effectiveness.effective
+                        ? 'Eficaz: a melhoria foi aprovada e o plano pode ser finalizado.'
+                        : 'Selecione a decisão para aplicar ao plano.'}
+                  </p>
                 </div>
-              </label>
-              <label className="flex items-start gap-3 border border-border/60 p-4 text-sm transition-colors hover:bg-accent/30 cursor-pointer">
-                <input
-                  type="checkbox"
-                  checked={effectiveness.reopen}
-                  onChange={(e) => setEffectiveness({ ...effectiveness, reopen: e.target.checked, effective: !e.target.checked })}
-                  className="mt-0.5 h-4 w-4 accent-foreground"
+                <StatusBadge
+                  value={effectiveness.reopen ? 'REOPENED' : effectiveness.effective ? 'EFFECTIVE' : a.effectivenessStatus}
+                  label={
+                    effectiveness.reopen
+                      ? 'Precisa reabrir'
+                      : effectiveness.effective
+                        ? 'Eficácia aprovada'
+                        : EFFECTIVENESS_STATUS_LABEL[a.effectivenessStatus] ?? a.effectivenessStatus
+                  }
                 />
-                <div>
-                  <span className="block font-semibold text-status-red">Reabrir plano de ação</span>
-                  <span className="text-xs text-muted-foreground">A ação foi ineficaz e o desvio continua.</span>
-                </div>
-              </label>
+              </div>
+              <div className="mt-4 flex flex-wrap gap-2">
+                <Button
+                  type="button"
+                  variant={effectiveness.effective ? 'default' : 'outline'}
+                  onClick={() => setEffectiveness({ ...effectiveness, effective: true, reopen: false })}
+                >
+                  Eficácia aprovada
+                </Button>
+                <Button
+                  type="button"
+                  variant={effectiveness.reopen ? 'destructive' : 'outline'}
+                  onClick={() => setEffectiveness({ ...effectiveness, effective: false, reopen: true })}
+                >
+                  Reabrir plano
+                </Button>
+              </div>
             </div>
             <div className="mt-4 flex justify-end">
               <Button onClick={validate} disabled={saving}>
                 <ShieldCheck className="mr-2 h-4 w-4" />
-                Registrar decisão de eficácia
+                {effectiveness.effective ? 'Finalizar Plano de Ação' : 'Aplicar'}
               </Button>
             </div>
           </div>
@@ -1190,4 +1177,16 @@ function updateArray(rows: any[], index: number, value: any) {
 
 function todayInput() {
   return new Date().toISOString().slice(0, 10);
+}
+
+function fileToBase64(file: File): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => {
+      const result = reader.result as string;
+      resolve(result.includes(',') ? result.split(',').pop()! : result);
+    };
+    reader.onerror = () => reject(new Error('Falha ao ler o arquivo'));
+    reader.readAsDataURL(file);
+  });
 }

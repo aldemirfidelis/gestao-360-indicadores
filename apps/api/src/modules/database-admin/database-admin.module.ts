@@ -11,6 +11,9 @@ import { RecordManagementService } from './services/record-management.service';
 import { QueryValidationService } from './services/query-validation.service';
 import { QueryExecutionService } from './services/query-execution.service';
 import { StructureService } from './services/structure.service';
+import { ExportService } from './services/export.service';
+import { ImportService } from './services/import.service';
+import { DbAdminSettingsService } from './services/db-admin-settings.service';
 import { SuperAdminDbGuard } from './guards/super-admin-db.guard';
 
 import { OverviewController } from './controllers/overview.controller';
@@ -20,6 +23,10 @@ import { DiagnosticsController } from './controllers/diagnostics.controller';
 import { RecordsController } from './controllers/records.controller';
 import { QueryController } from './controllers/query.controller';
 import { StructureController } from './controllers/structure.controller';
+import { ImportExportController } from './controllers/import-export.controller';
+import { BackupController } from './controllers/backup.controller';
+import { DbAuditController } from './controllers/db-audit.controller';
+import { DbSettingsController } from './controllers/db-settings.controller';
 
 /**
  * Módulo de Administração do Banco de Dados (Configurações > Banco de Dados).
@@ -27,7 +34,19 @@ import { StructureController } from './controllers/structure.controller';
  */
 @Module({
   imports: [PrismaModule],
-  controllers: [OverviewController, TablesController, SchemaController, DiagnosticsController, RecordsController, QueryController, StructureController],
+  controllers: [
+    OverviewController,
+    TablesController,
+    SchemaController,
+    DiagnosticsController,
+    RecordsController,
+    QueryController,
+    StructureController,
+    ImportExportController,
+    BackupController,
+    DbAuditController,
+    DbSettingsController,
+  ],
   providers: [
     PostgreSQLAdapter,
     SchemaInspectionService,
@@ -39,6 +58,9 @@ import { StructureController } from './controllers/structure.controller';
     QueryValidationService,
     QueryExecutionService,
     StructureService,
+    ExportService,
+    ImportService,
+    DbAdminSettingsService,
     SuperAdminDbGuard,
   ],
   exports: [PostgreSQLAdapter, SchemaInspectionService, DbAdminAuditService, BackupService],

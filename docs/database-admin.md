@@ -36,38 +36,38 @@ exclusiva do perfil **Super Admin**.
 - `DbAdminSavedQuery` — consultas salvas/favoritas.
 - `DbAdminQueryHistory` — histórico de execuções do editor SQL.
 
-## 5. Telas (12 submenus em acordeon)
-| Submenu | Rota | Status |
-|---|---|---|
-| Visão Geral | `/settings/database` | ✅ implementada |
-| Tabelas | `/settings/database/tables` | ✅ implementada (listagem, busca, ordenação, flags de protegida) |
-| Estrutura por tabela | `/settings/database/tables/[table]` | ✅ implementada (colunas, constraints, índices) |
-| Estrutura e Relacionamentos (ER) | `/settings/database/structure` | ✅ implementada (ReactFlow + export PNG/PDF) |
-| Índices e Constraints | `/settings/database/indexes` | ✅ implementada (visualização) |
-| Integridade e Diagnóstico | `/settings/database/diagnostics` | ✅ implementada (análise read-only) |
-| Editor de Registros | `/settings/database/records` | ⏳ Fase C |
-| Editor SQL | `/settings/database/sql` | ⏳ Fase D |
-| Construtor Visual de Consultas | `/settings/database/query-builder` | ⏳ Fase D |
-| Importar e Exportar | `/settings/database/import-export` | ⏳ Fase F |
-| Backup e Restauração | `/settings/database/backups` | ⏳ Fase G |
-| Auditoria administrativa | `/settings/database/audit` | ⏳ Fase G |
-| Configurações Avançadas | `/settings/database/advanced` | ⏳ Fase G |
+## 5. Telas (12 submenus em acordeon) — todas implementadas ✅
+| Submenu | Rota |
+|---|---|
+| Visão Geral | `/settings/database` |
+| Tabelas | `/settings/database/tables` |
+| Estrutura/Registros por tabela | `/settings/database/tables/[table]` |
+| Editor de Registros | `/settings/database/records` |
+| Editor SQL | `/settings/database/sql` |
+| Construtor Visual de Consultas | `/settings/database/query-builder` |
+| Estrutura e Relacionamentos (ER) | `/settings/database/structure` |
+| Índices e Constraints | `/settings/database/indexes` |
+| Importar e Exportar | `/settings/database/import-export` |
+| Backup e Restauração | `/settings/database/backups` |
+| Auditoria administrativa | `/settings/database/audit` |
+| Integridade e Diagnóstico | `/settings/database/diagnostics` |
+| Configurações Avançadas | `/settings/database/advanced` |
 
-## 6. Endpoints implementados
-- `GET /api/admin/database/overview`
-- `GET /api/admin/database/tables`
-- `GET /api/admin/database/tables/:table/schema`
-- `GET /api/admin/database/schema` · `GET /api/admin/database/relationships` · `GET /api/admin/database/indexes`
-- `GET /api/admin/database/diagnostics` · `POST /api/admin/database/diagnostics/run`
-
-(Endpoints de registros, query, import/export, backup e audit serão adicionados nas Fases C–G,
-seguindo o mesmo guard e auditoria.)
+## 6. Endpoints implementados (base `/api/admin/database`)
+- Visão Geral: `GET /overview`
+- Tabelas/estrutura: `GET /tables`, `GET /tables/:table/schema`, `GET /schema`, `GET /relationships`, `GET /indexes`
+- Registros: `GET /tables/:table/rows`, `POST /tables/:table/rows`, `PATCH /tables/:table/rows`, `POST /tables/:table/rows/delete`
+- SQL: `POST /query/validate`, `POST /query/execute`, `POST /query/explain`, `GET /query/history`, `GET/POST /query/favorites`, `DELETE /query/favorites/:id`
+- DDL: `POST /structure/preview`, `POST /structure/execute`
+- Import/Export: `POST /export`, `POST /import/preview`, `POST /import/commit`
+- Backups: `GET /backups`, `POST /backups`, `GET /backups/:id/download`, `POST /backups/:id/verify`, `POST /backups/:id/important`, `POST /backups/:id/restore`, `DELETE /backups/:id`
+- Auditoria/Diagnóstico/Config: `GET /audit`, `GET /diagnostics` + `POST /diagnostics/run`, `GET/PUT /settings`
 
 ## 7. Serviços (backend)
-`PostgreSQLAdapter`, `SchemaInspectionService`, `OverviewService`, `DiagnosticsService`,
-`DbAdminAuditService`, `SuperAdminDbGuard` (+ `SqliteAdapter` stub). Demais serviços
-(`RecordManagementService`, `QueryValidationService`, `QueryExecutionService`, `TableManagementService`,
-`BackupService`, `ImportService`, `ExportService`) entram nas próximas fases.
+`PostgreSQLAdapter` (+ `SqliteAdapter` stub), `SchemaInspectionService`, `OverviewService`,
+`DiagnosticsService`, `DbAdminAuditService`, `RecordManagementService`, `QueryValidationService`,
+`QueryExecutionService`, `StructureService`, `BackupService`, `ExportService`, `ImportService`,
+`DbAdminSettingsService`, e o guard `SuperAdminDbGuard`.
 
 ## 8. Backup/Restauração — PostgreSQL/Neon
 - Backup/restore de **banco inteiro** **não** é executado pela tela. Para recuperação completa use o
@@ -99,9 +99,14 @@ Testes unitários da lógica de segurança (sem banco):
 pnpm --filter @g360/api exec vitest run src/modules/database-admin/util/security.spec.ts
 ```
 
-## 11. Roadmap (próximas fases)
-- **C** — Editor de Registros (CRUD parametrizado, exclusão em massa, snapshot+auditoria).
-- **D** — Editor SQL (modo seguro/avançado com confirmação reforçada) + `QueryValidationService` + Construtor Visual.
-- **E** — Edição estrutural (DDL) com SQL preview, snapshot, transação, rollback e auditoria.
-- **F** — Importar/Exportar (CSV/JSON/Excel/SQL) com prévia, mapeamento e estratégias.
-- **G** — Backups (snapshots lógicos), Auditoria administrativa e Configurações Avançadas.
+## 11. Estado e melhorias futuras
+Todas as 12 telas (Fases A–G) estão implementadas. Verificação: `tsc`/`nest build`/ESLint limpos,
+17 testes unitários (security + sql-analyze) e smoke read-only contra a Neon (introspecção + bloqueio
+de escrita em transação READ ONLY confirmados).
+
+Melhorias futuras recomendadas (prioridade):
+1. Testes de integração end-to-end contra Postgres local em Docker (matriz da Seção 19) — pendente de Docker no ambiente.
+2. Snapshot lógico para SQL avançado livre (hoje cobre registros/DDL/import; SQL livre roda em transação + auditoria, sem snapshot por linha).
+3. Volume persistente para `DB_ADMIN_BACKUP_DIR` no Droplet (container é efêmero).
+4. Streaming/cursor para exportações muito grandes (hoje cap de 50k linhas).
+5. Editor de relacionamento direto pelo diagrama ER (criar FK arrastando).

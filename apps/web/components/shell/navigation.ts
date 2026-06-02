@@ -151,10 +151,11 @@ export const ROUTE_PERMISSIONS: Array<{ prefix: string; permissions: string[]; e
   { prefix: '/reports', permissions: ['reports:view', 'reports:export'] },
   { prefix: '/audit', permissions: ['audit:view'] },
   { prefix: '/users', permissions: ['users:view', 'users:manage'] },
-  // Administração do Banco de Dados: permissão 'database:admin' nunca é concedida,
-  // logo apenas SUPER_ADMIN (que faz bypass em canAccess) acessa. Prefixo mais
-  // longo que '/settings' garante precedência em findRoutePermissions.
+  // Administração do Banco / Central do Portal: permissões 'database:admin' e
+  // 'portal:admin' nunca são concedidas, logo apenas SUPER_ADMIN (bypass em
+  // canAccess) acessa. Prefixos mais longos que '/settings' têm precedência.
   { prefix: '/settings/database', permissions: ['database:admin'] },
+  { prefix: '/settings/portal', permissions: ['portal:admin'] },
   { prefix: '/settings', permissions: ['settings:view', 'settings:manage'] },
 ];
 

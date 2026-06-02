@@ -8,6 +8,10 @@ import {
   ActionStatus,
   ActionStepStatus,
   ActionToolStatus,
+  MeetingFormat,
+  MeetingKind,
+  MeetingParticipantRole,
+  MeetingStatus,
   Prisma,
   TraceEntityType,
   TraceEventType,
@@ -219,6 +223,73 @@ export class ActionsService {
       },
     });
     return action;
+  }
+
+  async createMeetingForAction(
+    actionId: string,
+    body: { startsAt?: string; title?: string; location?: string; format?: MeetingFormat; objective?: string },
+    userId?: string,
+  ) {
+    const action = await this.prisma.actionPlan.findUnique({
+      where: { id: actionId },
+      include: { meeting: true },
+    });
+    if (!action || action.deletedAt) throw new NotFoundException('AÃ§Ã£o nao encontrada');
+    if (action.meetingId && action.meeting) return this.getById(actionId);
+
+    const startsAt = body.startsAt ? new Date(body.startsAt) : new Date(Date.now() + 24 * 60 * 60 * 1000);
+    const meeting = await this.prisma.meeting.create({
+      data: {
+        companyId: action.companyId,
+        indicatorId: action.indicatorId ?? null,
+        deviationId: action.deviationId ?? null,
+        analysisId: action.analysisId ?? null,
+        treatmentId: action.treatmentId ?? null,
+        responsibleUserId: action.responsibleUserId ?? userId ?? null,
+        title: body.title?.trim() || `ReuniÃ£o do plano - ${action.title}`,
+        kind: MeetingKind.DEVIATION,
+        format: body.format ?? MeetingFormat.ONLINE,
+        status: MeetingStatus.SCHEDULED,
+        startsAt,
+        location: body.location ?? null,
+        objective: body.objective ?? `Analisar causa e definir tarefas para o plano de aÃ§Ã£o "${action.title}".`,
+      },
+    });
+
+    await this.prisma.actionPlan.update({ where: { id: actionId }, data: { meetingId: meeting.id } });
+
+    const participantIds = Array.from(new Set([action.responsibleUserId, userId].filter(Boolean))) as string[];
+    await Promise.all(
+      participantIds.map((participantId) =>
+        this.prisma.meetingParticipant.upsert({
+          where: { meetingId_userId: { meetingId: meeting.id, userId: participantId } },
+          create: {
+            meetingId: meeting.id,
+            userId: participantId,
+            role: participantId === action.responsibleUserId ? MeetingParticipantRole.RESPONSIBLE : MeetingParticipantRole.PARTICIPANT,
+          },
+          update: {},
+        }),
+      ),
+    );
+
+    await this.recordHistory(actionId, userId, 'MEETING_CREATED', null, null, meeting.title);
+    await this.audit(action.companyId, userId, 'MEETING_CREATED', 'Meeting', meeting.id, null, meeting);
+    await this.traceability.record({
+      companyId: action.companyId,
+      indicatorId: action.indicatorId,
+      userId,
+      eventType: TraceEventType.MEETING_CREATED,
+      entityType: TraceEntityType.MEETING,
+      entityId: meeting.id,
+      relatedType: TraceEntityType.ACTION_PLAN,
+      relatedId: actionId,
+      title: 'ReuniÃ£o marcada para o plano de aÃ§Ã£o',
+      description: meeting.title,
+      statusTo: meeting.status,
+      metadata: { actionId, startsAt: meeting.startsAt, format: meeting.format },
+    });
+    return this.getById(actionId);
   }
 
   async update(id: string, patch: any, userId?: string) {
@@ -467,14 +538,30 @@ export class ActionsService {
   async addEvidence(actionId: string, body: any, userId?: string) {
     const action = await this.prisma.actionPlan.findUnique({ where: { id: actionId } });
     if (!action || action.deletedAt) throw new NotFoundException('Ação nao encontrada');
+    const taskId = body.taskId || null;
+    if (taskId) {
+      const task = await this.prisma.actionTask.findFirst({ where: { id: taskId, actionId }, select: { id: true } });
+      if (!task) throw new BadRequestException('Tarefa nao pertence a este plano');
+    }
+    const base64 = body.dataBase64 ? String(body.dataBase64).split(',').pop()! : null;
+    const buffer = base64 ? Buffer.from(base64, 'base64') : null;
+    const MAX_BYTES = 5 * 1024 * 1024;
+    if (buffer && buffer.length === 0) throw new BadRequestException('Arquivo vazio');
+    if (buffer && buffer.length > MAX_BYTES) throw new BadRequestException('Arquivo excede o limite de 5 MB');
+    const title = (body.title ?? body.fileName ?? '').trim();
+    if (!title) throw new BadRequestException('Titulo da evidencia obrigatorio');
     const evidence = await this.prisma.actionEvidence.create({
       data: {
         actionId,
-        title: body.title,
+        taskId,
+        title: title.slice(0, 255),
         description: body.description ?? null,
         url: body.url ?? null,
         fileName: body.fileName ?? null,
-        fileType: body.fileType ?? null,
+        fileType: body.fileType ?? body.mimeType ?? null,
+        mimeType: body.mimeType ?? body.fileType ?? null,
+        sizeBytes: buffer ? buffer.length : body.sizeBytes ?? null,
+        data: buffer ?? undefined,
         uploadedById: userId ?? null,
       },
     });
@@ -490,11 +577,24 @@ export class ActionsService {
       eventType: TraceEventType.EVIDENCE_ADDED,
       entityType: TraceEntityType.ACTION_PLAN,
       entityId: actionId,
-      title: 'Evidencia adicionada ao plano',
+      title: taskId ? 'Evidencia adicionada a tarefa' : 'Evidencia adicionada ao plano',
       description: evidence.title,
-      metadata: { evidenceId: evidence.id, url: evidence.url },
+      metadata: { evidenceId: evidence.id, taskId, url: evidence.url, fileName: evidence.fileName },
     });
     return evidence;
+  }
+
+  async getEvidenceFile(evidenceId: string, companyId: string) {
+    const evidence = await this.prisma.actionEvidence.findFirst({
+      where: { id: evidenceId, deletedAt: null, action: { is: { companyId, deletedAt: null } } },
+    });
+    if (!evidence || !evidence.data) throw new NotFoundException('Anexo nao encontrado');
+    return {
+      id: evidence.id,
+      fileName: evidence.fileName ?? evidence.title,
+      mimeType: evidence.mimeType ?? evidence.fileType ?? null,
+      dataBase64: Buffer.from(evidence.data).toString('base64'),
+    };
   }
 
   async addComment(actionId: string, body: any, userId?: string, authorName?: string) {
@@ -842,7 +942,10 @@ ${JSON.stringify(lastResults, null, 2)}`;
       treatment: { include: { result: true } },
       tasks: {
         orderBy: { position: 'asc' },
-        include: { assignedTo: { select: { id: true, name: true, email: true, avatarUrl: true } } },
+        include: {
+          assignedTo: { select: { id: true, name: true, email: true, avatarUrl: true } },
+          _count: { select: { evidences: true } },
+        },
       },
       participants: { orderBy: { createdAt: 'asc' } },
       evidences: { where: { deletedAt: null }, orderBy: { createdAt: 'desc' } },

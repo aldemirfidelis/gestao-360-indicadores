@@ -1278,6 +1278,7 @@ model ActionTask {
   assignedToId String?
   assignedTo   User?       @relation("ActionTaskAssignee", fields: [assignedToId], references: [id])
   position     Int         @default(0)
+  evidences    ActionEvidence[]
   createdAt    DateTime    @default(now())
   updatedAt    DateTime    @updatedAt
 
@@ -1326,16 +1327,22 @@ model ActionEvidence {
   id          String     @id @default(uuid())
   actionId    String
   action      ActionPlan @relation(fields: [actionId], references: [id], onDelete: Cascade)
+  taskId      String?
+  task        ActionTask? @relation(fields: [taskId], references: [id], onDelete: SetNull)
   title       String
   description String?
   url         String?
   fileName    String?
   fileType    String?
+  mimeType    String?
+  sizeBytes   Int?
+  data        Bytes?
   uploadedById String?
   createdAt   DateTime   @default(now())
   deletedAt   DateTime?
 
   @@index([actionId])
+  @@index([taskId])
 }
 
 model ActionComment {
@@ -2233,5 +2240,251 @@ model DbAdminQueryHistory {
   createdAt  DateTime @default(now())
 
   @@index([userId, createdAt])
+  @@index([createdAt])
+}
+
+// ===========================================================================
+// Central de Administração do Portal (Configurações > Configurações Avançadas)
+// Overlay sobre módulos/páginas/menu definidos em código. Reusa o RBAC
+// (Permission/AccessProfile), AppSetting (parâmetros) e OrgNode (escopo).
+// Listas (roles/escopos/dependências) são JSON serializado em String.
+// ===========================================================================
+
+model PortalModule {
+  id                     String   @id @default(uuid())
+  code                   String   @unique
+  name                   String
+  description            String?
+  category               String?
+  icon                   String?
+  route                  String?
+  menuOrder              Int      @default(0)
+  status                 String   @default("ACTIVE") // ACTIVE|INACTIVE|HIDDEN|MAINTENANCE|EXPERIMENTAL|SCHEDULED|BLOCKED|DISCONTINUED|RESTRICTED_ROLE|RESTRICTED_SCOPE
+  version                String?
+  criticality            String   @default("medium") // low|medium|high|critical
+  dependencies           String   @default("[]")
+  allowedRoles           String   @default("[]")
+  allowedScopes          String   @default("[]")
+  systemRequired         Boolean  @default(false)
+  nonBlockable           Boolean  @default(false)
+  experimental           Boolean  @default(false)
+  unavailableMessage     String?
+  scheduledActivationAt  DateTime?
+  scheduledDeactivationAt DateTime?
+  updatedBy              String?
+  updateReason           String?
+  createdAt              DateTime @default(now())
+  updatedAt              DateTime @updatedAt
+
+  @@index([status])
+  @@index([category])
+}
+
+model PortalPage {
+  id                 String   @id @default(uuid())
+  moduleCode         String?
+  code               String   @unique
+  name               String
+  title              String?
+  route              String?
+  description        String?
+  status             String   @default("ACTIVE")
+  menuOrder          Int      @default(0)
+  component          String?
+  allowedRoles       String   @default("[]")
+  allowedScopes      String   @default("[]")
+  unavailableMessage String?
+  updatedBy          String?
+  updateReason       String?
+  createdAt          DateTime @default(now())
+  updatedAt          DateTime @updatedAt
+
+  @@index([moduleCode])
+  @@index([status])
+  @@index([route])
+}
+
+model PortalFeature {
+  id            String   @id @default(uuid())
+  moduleCode    String?
+  pageCode      String?
+  code          String   @unique
+  name          String
+  description   String?
+  status        String   @default("ACTIVE")
+  criticality   String   @default("medium")
+  allowedRoles  String   @default("[]")
+  allowedScopes String   @default("[]")
+  dependencies  String   @default("[]")
+  flagKey       String?
+  updatedBy     String?
+  updateReason  String?
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  @@index([moduleCode])
+  @@index([pageCode])
+  @@index([status])
+}
+
+model PortalFeatureFlag {
+  id                String   @id @default(uuid())
+  key               String   @unique
+  name              String
+  description       String?
+  enabled           Boolean  @default(false)
+  rolloutPercentage Int?
+  allowedRoles      String   @default("[]")
+  allowedUserIds    String   @default("[]")
+  allowedScopes     String   @default("[]")
+  environment       String?
+  experimental      Boolean  @default(false)
+  scheduledOnAt     DateTime?
+  scheduledOffAt    DateTime?
+  updatedBy         String?
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  @@index([enabled])
+}
+
+model PortalNavOverride {
+  id            String   @id @default(uuid())
+  itemKey       String   @unique // href do item ou heading da seção
+  kind          String   @default("item") // item|section
+  hidden        Boolean  @default(false)
+  order         Int?
+  labelOverride String?
+  iconOverride  String?
+  groupOverride String?
+  updatedBy     String?
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+}
+
+model PortalScopeRule {
+  id         String   @id @default(uuid())
+  targetType String   // module|page|feature
+  targetCode String
+  scopeType  String   // company|branch|orgnode|user|role
+  scopeId    String
+  effect     String   @default("allow") // allow|deny
+  createdBy  String?
+  createdAt  DateTime @default(now())
+
+  @@index([targetType, targetCode])
+}
+
+model PortalIntegration {
+  id             String   @id @default(uuid())
+  code           String   @unique
+  name           String
+  type           String
+  status         String   @default("enabled") // enabled|disabled
+  environment    String?
+  lastRunAt      DateTime?
+  lastError      String?
+  lastLatencyMs  Int?
+  recentFailures Int      @default(0)
+  configMasked   String   @default("{}")
+  updatedBy      String?
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+}
+
+model PortalAnnouncement {
+  id          String   @id @default(uuid())
+  title       String
+  message     String
+  type        String   @default("info") // info|warning|maintenance|update|urgent|training|feature
+  priority    Int      @default(0)
+  startsAt    DateTime?
+  endsAt      DateTime?
+  audienceRoles String @default("[]")
+  pages       String   @default("[]")
+  modules     String   @default("[]")
+  companies   String   @default("[]")
+  branches    String   @default("[]")
+  orgNodes    String   @default("[]")
+  display     String   @default("banner") // banner|modal
+  pinned      Boolean  @default(false)
+  dismissible Boolean  @default(true)
+  active      Boolean  @default(true)
+  createdBy   String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([active, startsAt])
+}
+
+model PortalMaintenanceWindow {
+  id             String   @id @default(uuid())
+  scope          String   @default("global") // global|module|page
+  targetCode     String?
+  message        String?
+  startsAt       DateTime?
+  endsAt         DateTime?
+  active         Boolean  @default(true)
+  allowSuperAdmin Boolean @default(true)
+  allowedUserIds String   @default("[]")
+  createdBy      String?
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  @@index([scope, active])
+}
+
+model PortalAdminAuditLog {
+  id            String   @id @default(uuid())
+  userId        String?
+  userEmail     String?
+  userRole      String?
+  tab           String
+  action        String
+  targetType    String?
+  targetCode    String?
+  beforeValue   String?
+  afterValue    String?
+  reason        String?
+  result        String   @default("SUCCESS") // SUCCESS|ERROR|DENIED
+  message       String?
+  transactionId String?
+  snapshotId    String?
+  ip            String?
+  userAgent     String?
+  createdAt     DateTime @default(now())
+
+  @@index([createdAt])
+  @@index([userId, createdAt])
+  @@index([tab, action])
+  @@index([result])
+}
+
+model PortalConfigSnapshot {
+  id              String   @id @default(uuid())
+  label           String
+  reason          String?
+  kind            String   @default("MANUAL") // MANUAL|PRE_OP|AUTO
+  data            String   // JSON do dump de configuração
+  checksum        String?
+  sizeBytes       Int      @default(0)
+  createdBy       String?
+  createdByEmail  String?
+  status          String   @default("AVAILABLE") // AVAILABLE|RESTORED|DELETED
+  restoredAt      DateTime?
+  createdAt       DateTime @default(now())
+
+  @@index([createdAt])
+  @@index([status])
+}
+
+model PortalDiagnosticRun {
+  id             String   @id @default(uuid())
+  summary        String   @default("{}")
+  findings       String   @default("[]")
+  createdBy      String?
+  createdByEmail String?
+  createdAt      DateTime @default(now())
+
   @@index([createdAt])
 }

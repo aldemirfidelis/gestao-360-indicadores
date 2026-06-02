@@ -485,7 +485,7 @@ interface ResultNotes {
 
 const MAX_ATTACHMENT_BYTES = 5 * 1024 * 1024;
 
-function ResultNotesDialog({
+export function ResultNotesDialog({
   indicatorId,
   periodRef,
   open,

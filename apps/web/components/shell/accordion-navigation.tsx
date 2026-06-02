@@ -5,6 +5,7 @@ import { usePathname } from 'next/navigation';
 import { useEffect, useMemo, useState } from 'react';
 import { ChevronDown, PanelLeftClose, PanelLeftOpen } from 'lucide-react';
 import { useAuth } from '@/components/auth/auth-provider';
+import { usePortalConfig } from '@/components/portal-admin/portal-config-provider';
 import {
   canAccessSettings,
   isActivePath,
@@ -27,7 +28,14 @@ export function AccordionNavigation({
 }) {
   const pathname = usePathname();
   const { user } = useAuth();
-  const sections = useMemo(() => visibleNavSections(user), [user]);
+  const { navHidden } = usePortalConfig();
+  const sections = useMemo(() => {
+    // Overlay do portal: remove itens ocultos/desativados pela Central de Administração.
+    // Resiliente: sem config, navHidden() retorna false e nada muda.
+    return visibleNavSections(user)
+      .map((section) => ({ ...section, items: section.items.filter((item) => !navHidden(item.href)) }))
+      .filter((section) => section.items.length > 0);
+  }, [user, navHidden]);
   const currentSection = sections.find((section) =>
     section.items.some((item) => isActivePath(pathname, item.href, item.exact)),
   );

@@ -2,21 +2,20 @@
 
 import Link from 'next/link';
 import { useParams } from 'next/navigation';
-import { useMemo, useState } from 'react';
+import type { ReactNode } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
 import {
   ArrowLeft,
-  CalendarCheck2,
   CheckCircle2,
-  ClipboardList,
   Mail,
   Plus,
+  Save,
   Send,
   Users,
 } from 'lucide-react';
 import { PageHeader } from '@/components/shell/page-header';
-import { MetricCard } from '@/components/platform/metric-card';
 import { SectionCard } from '@/components/platform/section-card';
 import { StatusBadge } from '@/components/platform/status-badge';
 import { Button } from '@/components/ui/button';
@@ -25,7 +24,18 @@ import { Label } from '@/components/ui/label';
 import { NativeSelect } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
 import { api } from '@/lib/api';
-import { cn, formatDate, formatNumber, periodRefLabel } from '@/lib/utils';
+import { formatDate, formatNumber } from '@/lib/utils';
+
+interface MeetingTask {
+  id: string;
+  title: string;
+  done: boolean;
+  startDate: string | null;
+  endDate: string | null;
+  dueDate: string | null;
+  assignedToId: string | null;
+  assignedTo: { id: string; name: string; email: string | null } | null;
+}
 
 interface MeetingDetail {
   id: string;
@@ -67,13 +77,12 @@ interface MeetingDetail {
     name: string;
     email: string;
     jobTitle: string | null;
-    área: string | null;
+    area: string | null;
     role: string;
     confirmed: boolean;
     notes: string | null;
   }[];
   agendaItems: { id: string; topic: string; notes: string | null; position: number }[];
-  decisions: { id: string; decision: string; owner: string | null; dueDate: string | null }[];
   actions: {
     id: string;
     title: string;
@@ -81,8 +90,13 @@ interface MeetingDetail {
     priority: string;
     progress: number;
     dueDate: string | null;
+    problemDescription: string | null;
+    rootCause: string | null;
+    analysisTool: string | null;
     responsibleEmail: string | null;
     responsibleUser: { id: string; name: string; email: string | null } | null;
+    tasks: MeetingTask[];
+    analysisSessions: { id: string; method: string; problem: string | null; rootCause: string | null; updatedAt: string }[];
   }[];
   emailLogs: { id: string; recipientName: string | null; recipientEmail: string; status: string; errorMessage: string | null; attempts: number; createdAt: string; sentAt: string | null }[];
   calendarInvites: { id: string; uid: string; createdAt: string }[];
@@ -90,35 +104,29 @@ interface MeetingDetail {
 
 const statusLabels: Record<string, string> = {
   SCHEDULED: 'Agendada',
-  COMPLETED: 'Concluida',
+  COMPLETED: 'Concluída',
   CANCELLED: 'Cancelada',
   NOT_STARTED: 'Não iniciada',
   IN_PROGRESS: 'Em andamento',
   WAITING_THIRD: 'Aguardando terceiros',
   PAUSED: 'Pausada',
-  DONE: 'Concluida',
-  DONE_LATE: 'Concluida fora do prazo',
+  DONE: 'Concluída',
+  DONE_LATE: 'Concluída fora do prazo',
   CRITICAL: 'Crítica',
   HIGH: 'Alta',
-  MEDIUM: 'Media',
+  MEDIUM: 'Média',
   LOW: 'Baixa',
 };
+
+const analysisMethods = ['FIVE_WHYS', 'ISHIKAWA', 'PARETO', 'PDCA', 'MASP', 'DMAIC', 'FCA', 'CAPA', 'SIMPLE'];
 
 export default function MeetingDetailPage() {
   const { id } = useParams<{ id: string }>();
   const qc = useQueryClient();
   const [agendaTopic, setAgendaTopic] = useState('');
-  const [decision, setDecision] = useState({ decision: '', owner: '', dueDate: '' });
-  const [guest, setGuest] = useState({ name: '', email: '', jobTitle: '', área: '', role: 'PARTICIPANT', notes: '' });
-  const [actionForm, setActionForm] = useState({
-    title: '',
-    description: '',
-    responsibleEmail: '',
-    dueDate: '',
-    priority: 'HIGH',
-    expectedResult: '',
-    evidenceRequired: true,
-  });
+  const [guest, setGuest] = useState({ name: '', email: '', jobTitle: '', area: '', role: 'PARTICIPANT', notes: '' });
+  const [taskForm, setTaskForm] = useState({ description: '', responsibleUserId: '', startDate: '', endDate: '' });
+  const [analysisForm, setAnalysisForm] = useState({ method: 'FIVE_WHYS', problem: '', rootCause: '' });
 
   const query = useQuery<MeetingDetail>({
     queryKey: ['meeting', id],
@@ -126,22 +134,29 @@ export default function MeetingDetailPage() {
   });
 
   const m = query.data;
+  const linkedAction = m?.actions?.[0] ?? null;
+
   const target = useMemo(() => {
     if (!m?.indicator || !m.treatment) return null;
     return m.indicator.targets.find((item) => item.periodRef === m.treatment?.periodRef)?.target ?? null;
   }, [m]);
 
-  const summary = useMemo(() => {
-    const actions = m?.actions ?? [];
-    const today = new Date();
-    return {
-      total: actions.length,
-      pending: actions.filter((a) => a.status === 'NOT_STARTED').length,
-      progress: actions.filter((a) => ['IN_PROGRESS', 'WAITING_THIRD', 'PAUSED'].includes(a.status)).length,
-      overdue: actions.filter((a) => a.dueDate && new Date(a.dueDate) < today && !['DONE', 'DONE_LATE', 'CANCELLED'].includes(a.status)).length,
-      done: actions.filter((a) => ['DONE', 'DONE_LATE'].includes(a.status)).length,
-    };
-  }, [m]);
+  const participantUsers = useMemo(() => {
+    const map = new Map<string, { id: string; name: string; email: string | null }>();
+    for (const p of m?.participants ?? []) map.set(p.user.id, p.user);
+    if (linkedAction?.responsibleUser) map.set(linkedAction.responsibleUser.id, linkedAction.responsibleUser);
+    return Array.from(map.values()).sort((a, b) => a.name.localeCompare(b.name));
+  }, [m, linkedAction]);
+
+  useEffect(() => {
+    if (!m) return;
+    const latestSession = linkedAction?.analysisSessions?.[0];
+    setAnalysisForm({
+      method: linkedAction?.analysisTool ?? latestSession?.method ?? m.analysis?.method ?? 'FIVE_WHYS',
+      problem: linkedAction?.problemDescription ?? latestSession?.problem ?? m.deviation?.title ?? m.objective ?? '',
+      rootCause: linkedAction?.rootCause ?? latestSession?.rootCause ?? m.analysis?.content ?? '',
+    });
+  }, [m?.id, linkedAction?.id, linkedAction?.analysisTool, linkedAction?.problemDescription, linkedAction?.rootCause]);
 
   const addAgenda = useMutation({
     mutationFn: () => api(`/meetings/${id}/agenda`, { method: 'POST', json: { topic: agendaTopic } }),
@@ -151,33 +166,58 @@ export default function MeetingDetailPage() {
     },
   });
 
-  const addDecision = useMutation({
-    mutationFn: () => api(`/meetings/${id}/decisions`, { method: 'POST', json: decision }),
-    onSuccess: () => {
-      toast.success('Decisão registrada');
-      setDecision({ decision: '', owner: '', dueDate: '' });
-      qc.invalidateQueries({ queryKey: ['meeting', id] });
-    },
-  });
-
   const addGuest = useMutation({
     mutationFn: () => api(`/meetings/${id}/guests`, { method: 'POST', json: guest }),
     onSuccess: () => {
       toast.success('Participante adicionado');
-      setGuest({ name: '', email: '', jobTitle: '', área: '', role: 'PARTICIPANT', notes: '' });
+      setGuest({ name: '', email: '', jobTitle: '', area: '', role: 'PARTICIPANT', notes: '' });
       qc.invalidateQueries({ queryKey: ['meeting', id] });
     },
     onError: (e: any) => toast.error(e?.message ?? 'Não foi possível adicionar participante'),
   });
 
-  const generateAction = useMutation({
-    mutationFn: () => api(`/meetings/${id}/actions`, { method: 'POST', json: actionForm }),
+  const generateTask = useMutation({
+    mutationFn: () =>
+      api(`/meetings/${id}/actions`, {
+        method: 'POST',
+        json: {
+          actionPlanId: linkedAction?.id,
+          title: taskForm.description,
+          description: taskForm.description,
+          responsibleUserId: taskForm.responsibleUserId || undefined,
+          startDate: taskForm.startDate || undefined,
+          endDate: taskForm.endDate || undefined,
+          dueDate: taskForm.endDate || undefined,
+        },
+      }),
     onSuccess: () => {
-      toast.success('Ação criada e vinculada a reunião');
-      setActionForm({ title: '', description: '', responsibleEmail: '', dueDate: '', priority: 'HIGH', expectedResult: '', evidenceRequired: true });
+      toast.success('Tarefa criada para o plano de ação');
+      setTaskForm({ description: '', responsibleUserId: '', startDate: '', endDate: '' });
       qc.invalidateQueries({ queryKey: ['meeting', id] });
+      if (linkedAction?.id) qc.invalidateQueries({ queryKey: ['action', linkedAction.id] });
       qc.invalidateQueries({ queryKey: ['actions'] });
     },
+    onError: (e: any) => toast.error(e?.message ?? 'Não foi possível criar a tarefa'),
+  });
+
+  const saveAnalysis = useMutation({
+    mutationFn: () => {
+      if (!linkedAction?.id) return Promise.reject(new Error('Nenhum plano de ação vinculado'));
+      return api(`/actions/${linkedAction.id}/analysis`, {
+        method: 'POST',
+        json: {
+          method: analysisForm.method,
+          problem: analysisForm.problem,
+          rootCause: analysisForm.rootCause,
+        },
+      });
+    },
+    onSuccess: () => {
+      toast.success('Análise de causa sincronizada com o plano');
+      qc.invalidateQueries({ queryKey: ['meeting', id] });
+      if (linkedAction?.id) qc.invalidateQueries({ queryKey: ['action', linkedAction.id] });
+    },
+    onError: (e: any) => toast.error(e?.message ?? 'Não foi possível salvar a análise'),
   });
 
   const attendance = useMutation({
@@ -198,7 +238,7 @@ export default function MeetingDetailPage() {
   const completeMeeting = useMutation({
     mutationFn: () => api(`/meetings/${id}/complete`, { method: 'POST' }),
     onSuccess: () => {
-      toast.success('Reunião concluida');
+      toast.success('Reunião concluída');
       qc.invalidateQueries({ queryKey: ['meeting', id] });
     },
   });
@@ -220,6 +260,7 @@ export default function MeetingDetailPage() {
         breadcrumbs={[{ label: 'Início', href: '/' }, { label: 'Reuniões', href: '/meetings' }, { label: 'Reunião' }]}
         actions={
           <>
+            <StatusBadge value={m.status} label={statusLabels[m.status] ?? m.status} />
             <Button variant="outline" onClick={() => sendInvites.mutate()} disabled={sendInvites.isPending}>
               <Send className="mr-2 h-4 w-4" />
               Enviar convite
@@ -232,224 +273,254 @@ export default function MeetingDetailPage() {
         }
       />
 
-      <div className="mb-6 grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
-        <MetricCard title="Status" value={statusLabels[m.status] ?? m.status} description={formatLabel(m.format)} icon={<CalendarCheck2 className="h-4 w-4" />} tone="blue" />
-        <MetricCard title="Participantes" value={m.participants.length + m.guests.length} description={`${m.participants.filter((p) => p.attended).length} presenca(s) confirmadas`} icon={<Users className="h-4 w-4" />} tone="purple" />
-        <MetricCard title="Ações criadas" value={summary.total} description={`${summary.overdue} atrasada(s), ${summary.done} concluida(s)`} icon={<ClipboardList className="h-4 w-4" />} tone={summary.overdue ? 'red' : 'green'} />
-        <MetricCard title="Convites" value={m.emailLogs.length} description={`${m.calendarInvites.length} arquivo(s) ICS`} icon={<Mail className="h-4 w-4" />} tone="neutral" />
-      </div>
-
-      <div className="grid grid-cols-1 gap-6 xl:grid-cols-[1.25fr_0.75fr]">
-        <SectionCard
-          title="Indicador tratado"
-          description="Contexto executivo da ocorrência que gerou a reunião."
-          actions={m.treatment && <StatusBadge value={m.treatment.status} label={statusLabels[m.treatment.status] ?? m.treatment.status} />}
-        >
-          {m.indicator ? (
-            <div className="grid gap-4 md:grid-cols-3">
-              <div className="rounded-lg border p-3">
-                <p className="text-[11px] font-semibold uppercase text-muted-foreground">Indicador</p>
-                <Link href={`/indicators/${m.indicator.id}`} className="mt-1 block font-semibold hover:text-primary">
-                  {m.indicator.name}
-                </Link>
-                <p className="mt-1 text-xs text-muted-foreground">{m.indicator.ownerNode.name}</p>
-              </div>
-              <div className="rounded-lg border p-3">
-                <p className="text-[11px] font-semibold uppercase text-muted-foreground">Meta x realizado</p>
-                <div className="mt-1 text-sm">
-                  Meta <strong>{formatNumber(target)}</strong> - Resultado <strong>{formatNumber(m.treatment?.result?.value)}</strong>
-                </div>
-                <p className="mt-1 text-xs text-muted-foreground">
-                  Desvio {m.treatment?.result?.deviationPct !== null && m.treatment?.result?.deviationPct !== undefined ? `${formatNumber(m.treatment.result.deviationPct)}%` : '-'}
-                </p>
-              </div>
-              <div className="rounded-lg border p-3">
-                <p className="text-[11px] font-semibold uppercase text-muted-foreground">Responsável</p>
-                <div className="mt-1 font-semibold">{m.indicator.responsibleUser?.name ?? '-'}</div>
-                <p className="mt-1 text-xs text-muted-foreground">{m.indicator.responsibleUser?.email ?? 'Sem e-mail cadastrado'}</p>
-              </div>
-            </div>
-          ) : (
-            <p className="text-sm text-muted-foreground">Está reunião ainda nao possui indicador vinculado.</p>
-          )}
-        </SectionCard>
-
-        <SectionCard title="Análise de causa" description="Resumo da causa registrada para a reunião.">
-          {m.analysis ? (
-            <div className="space-y-3">
-              <StatusBadge value={m.analysis.method} label={methodLabel(m.analysis.method)} tone="yellow" />
-              <p className="whitespace-pre-wrap text-sm text-muted-foreground">{m.analysis.content}</p>
-            </div>
-          ) : (
-            <p className="text-sm text-muted-foreground">Nenhuma análise de causa vinculada.</p>
-          )}
-        </SectionCard>
-
-        <SectionCard title="Pauta da reunião" description="Itens para conduzir a discussão, decisão e plano de ação.">
-          <div className="mb-3 flex gap-2">
-            <Input
-              placeholder="Adicionar item de pauta..."
-              value={agendaTopic}
-              onChange={(e) => setAgendaTopic(e.target.value)}
-              onKeyDown={(e) => e.key === 'Enter' && agendaTopic && addAgenda.mutate()}
-            />
-            <Button onClick={() => addAgenda.mutate()} disabled={!agendaTopic || addAgenda.isPending}>
-              <Plus className="h-4 w-4" />
-            </Button>
-          </div>
-          <ol className="space-y-2">
-            {m.agendaItems.map((a, i) => (
-              <li key={a.id} className="flex gap-3 rounded-lg border p-3 text-sm">
-                <span className="grid h-6 w-6 shrink-0 place-items-center rounded-full bg-muted text-xs text-muted-foreground">{i + 1}</span>
-                <span>{a.topic}</span>
-              </li>
-            ))}
-          </ol>
-          {m.agendaItems.length === 0 && <p className="py-4 text-center text-sm text-muted-foreground">Sem itens de pauta.</p>}
-        </SectionCard>
-
-        <SectionCard title="Participantes" description="Participantes internos, convidados externos e presencas.">
-          <div className="space-y-3">
-            {m.participants.map((p) => (
-              <label key={p.id} className="flex items-center gap-3 rounded-lg border p-3 text-sm">
-                <input
-                  type="checkbox"
-                  checked={p.attended}
-                  onChange={(e) => attendance.mutate({ userId: p.userId, attended: e.target.checked })}
+      <div className="grid grid-cols-1 gap-6 xl:grid-cols-[0.9fr_1.1fr]">
+        <div className="space-y-6">
+          <SectionCard
+            title="Indicador tratado"
+            description="Contexto do indicador e do desvio analisado nesta reunião."
+            actions={linkedAction && (
+              <Button asChild variant="outline" size="sm">
+                <Link href={`/actions/${linkedAction.id}`}>Abrir plano</Link>
+              </Button>
+            )}
+          >
+            {m.indicator ? (
+              <div className="grid gap-3 text-sm sm:grid-cols-2">
+                <InfoLine label="Indicador" value={<Link href={`/indicators/${m.indicator.id}`} className="font-semibold hover:text-primary">{m.indicator.name}</Link>} />
+                <InfoLine label="Área" value={m.indicator.ownerNode.name} />
+                <InfoLine label="Meta x realizado" value={`Meta ${formatNumber(target)} · Resultado ${formatNumber(m.treatment?.result?.value)}`} />
+                <InfoLine
+                  label="Desvio"
+                  value={m.treatment?.result?.deviationPct !== null && m.treatment?.result?.deviationPct !== undefined ? `${formatNumber(m.treatment.result.deviationPct)}%` : '-'}
                 />
-                <span className="min-w-0 flex-1">
-                  <span className="block truncate font-medium">{p.user.name}</span>
-                  <span className="block truncate text-xs text-muted-foreground">{p.user.email ?? 'Sem e-mail'} - {roleLabel(p.role)}</span>
-                </span>
-                {p.attended && <StatusBadge value="DONE" label="Presente" />}
-              </label>
-            ))}
-            {m.guests.map((g) => (
-              <div key={g.id} className="rounded-lg border p-3 text-sm">
-                <div className="flex items-start justify-between gap-3">
-                  <div className="min-w-0">
-                    <div className="truncate font-medium">{g.name}</div>
-                    <div className="truncate text-xs text-muted-foreground">{g.email} - {roleLabel(g.role)}</div>
-                  </div>
-                  <StatusBadge value={g.confirmed ? 'DONE' : 'NOT_STARTED'} label={g.confirmed ? 'Confirmado' : 'Convidado'} />
-                </div>
+                <InfoLine label="Responsável" value={m.indicator.responsibleUser?.name ?? '-'} />
+                <InfoLine label="Formato" value={formatLabel(m.format)} />
               </div>
-            ))}
+            ) : (
+              <p className="text-sm text-muted-foreground">Esta reunião ainda não possui indicador vinculado.</p>
+            )}
+          </SectionCard>
 
-            <div className="rounded-lg border bg-muted/30 p-3">
-              <div className="mb-2 text-sm font-semibold">Adicionar participante externo</div>
-              <div className="grid gap-2 md:grid-cols-2">
-                <Input placeholder="Nome" value={guest.name} onChange={(e) => setGuest({ ...guest, name: e.target.value })} />
-                <Input placeholder="E-mail" type="email" value={guest.email} onChange={(e) => setGuest({ ...guest, email: e.target.value })} />
-                <Input placeholder="Cargo" value={guest.jobTitle} onChange={(e) => setGuest({ ...guest, jobTitle: e.target.value })} />
-                <Input placeholder="Área" value={guest.área} onChange={(e) => setGuest({ ...guest, área: e.target.value })} />
-                <NativeSelect value={guest.role} onChange={(e) => setGuest({ ...guest, role: e.target.value })}>
-                  <option value="PARTICIPANT">Participante</option>
-                  <option value="RESPONSIBLE">Responsável</option>
-                  <option value="APPROVER">Aprovador</option>
-                  <option value="EXECUTOR">Executor</option>
-                  <option value="GUEST">Convidado</option>
+          <SectionCard
+            title="Análise de causa"
+            description="O método e a causa raiz salvos aqui ficam sincronizados com a análise do plano de ação."
+          >
+            <div className="space-y-3">
+              <div>
+                <Label>Método</Label>
+                <NativeSelect value={analysisForm.method} onChange={(e) => setAnalysisForm({ ...analysisForm, method: e.target.value })}>
+                  {analysisMethods.map((method) => (
+                    <option key={method} value={method}>{methodLabel(method)}</option>
+                  ))}
                 </NativeSelect>
-                <Button onClick={() => addGuest.mutate()} disabled={!guest.name || !guest.email || addGuest.isPending}>
-                  <Plus className="mr-2 h-4 w-4" />
-                  Adicionar
+              </div>
+              <div>
+                <Label>Problema tratado</Label>
+                <Textarea rows={3} value={analysisForm.problem} onChange={(e) => setAnalysisForm({ ...analysisForm, problem: e.target.value })} />
+              </div>
+              <div>
+                <Label>Causa raiz</Label>
+                <Textarea rows={4} value={analysisForm.rootCause} onChange={(e) => setAnalysisForm({ ...analysisForm, rootCause: e.target.value })} />
+              </div>
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <span className="text-xs text-muted-foreground">
+                  {linkedAction ? `Sincronizando com: ${linkedAction.title}` : 'Vincule um plano de ação para salvar a análise.'}
+                </span>
+                <Button onClick={() => saveAnalysis.mutate()} disabled={!linkedAction || saveAnalysis.isPending}>
+                  <Save className="mr-2 h-4 w-4" />
+                  {saveAnalysis.isPending ? 'Salvando...' : 'Salvar análise'}
                 </Button>
               </div>
             </div>
-          </div>
-        </SectionCard>
+          </SectionCard>
 
-        <SectionCard title="Decisões e encaminhamentos" description="Registre as decisões tomadas na reunião.">
-          <div className="mb-3 grid grid-cols-1 gap-2 sm:grid-cols-[1fr_160px_160px_auto]">
-            <Input placeholder="Decisão..." value={decision.decision} onChange={(e) => setDecision({ ...decision, decision: e.target.value })} />
-            <Input placeholder="Responsável" value={decision.owner} onChange={(e) => setDecision({ ...decision, owner: e.target.value })} />
-            <Input type="date" value={decision.dueDate} onChange={(e) => setDecision({ ...decision, dueDate: e.target.value })} />
-            <Button onClick={() => addDecision.mutate()} disabled={!decision.decision || addDecision.isPending}>
-              <Plus className="h-4 w-4" />
-            </Button>
-          </div>
-          <div className="space-y-2">
-            {m.decisions.map((d) => (
-              <div key={d.id} className="flex items-center justify-between gap-3 rounded-lg border p-3 text-sm">
-                <span className="flex-1">{d.decision}</span>
-                <span className="text-xs text-muted-foreground">{d.owner ?? '-'} {d.dueDate ? `- ${formatDate(d.dueDate)}` : ''}</span>
+          <SectionCard title="Participantes" description="Participantes internos, externos e presenças.">
+            <div className="space-y-3">
+              {m.participants.map((p) => (
+                <label key={p.id} className="flex items-center gap-3 rounded-lg border p-3 text-sm">
+                  <input
+                    type="checkbox"
+                    checked={p.attended}
+                    onChange={(e) => attendance.mutate({ userId: p.userId, attended: e.target.checked })}
+                  />
+                  <span className="min-w-0 flex-1">
+                    <span className="block truncate font-medium">{p.user.name}</span>
+                    <span className="block truncate text-xs text-muted-foreground">{roleLabel(p.role)}</span>
+                  </span>
+                  {p.attended && <StatusBadge value="DONE" label="Presente" />}
+                </label>
+              ))}
+              {m.guests.map((g) => (
+                <div key={g.id} className="rounded-lg border p-3 text-sm">
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="min-w-0">
+                      <div className="truncate font-medium">{g.name}</div>
+                      <div className="truncate text-xs text-muted-foreground">{g.email} · {roleLabel(g.role)}</div>
+                    </div>
+                    <StatusBadge value={g.confirmed ? 'DONE' : 'NOT_STARTED'} label={g.confirmed ? 'Confirmado' : 'Convidado'} />
+                  </div>
+                </div>
+              ))}
+
+              <div className="rounded-lg border bg-muted/30 p-3">
+                <div className="mb-2 flex items-center gap-2 text-sm font-semibold">
+                  <Users className="h-4 w-4" />
+                  Adicionar participante externo
+                </div>
+                <div className="grid gap-2 md:grid-cols-2">
+                  <Input placeholder="Nome" value={guest.name} onChange={(e) => setGuest({ ...guest, name: e.target.value })} />
+                  <Input placeholder="E-mail" type="email" value={guest.email} onChange={(e) => setGuest({ ...guest, email: e.target.value })} />
+                  <Input placeholder="Cargo" value={guest.jobTitle} onChange={(e) => setGuest({ ...guest, jobTitle: e.target.value })} />
+                  <Input placeholder="Área" value={guest.area} onChange={(e) => setGuest({ ...guest, area: e.target.value })} />
+                  <NativeSelect value={guest.role} onChange={(e) => setGuest({ ...guest, role: e.target.value })}>
+                    <option value="PARTICIPANT">Participante</option>
+                    <option value="RESPONSIBLE">Responsável</option>
+                    <option value="APPROVER">Aprovador</option>
+                    <option value="EXECUTOR">Executor</option>
+                    <option value="GUEST">Convidado</option>
+                  </NativeSelect>
+                  <Button onClick={() => addGuest.mutate()} disabled={!guest.name || !guest.email || addGuest.isPending}>
+                    <Plus className="mr-2 h-4 w-4" />
+                    Adicionar
+                  </Button>
+                </div>
               </div>
-            ))}
-            {m.decisions.length === 0 && <p className="py-4 text-center text-sm text-muted-foreground">Nenhuma decisão registrada.</p>}
-          </div>
-        </SectionCard>
+            </div>
+          </SectionCard>
+        </div>
 
-        <SectionCard title="Plano de ação da reunião" description="Ações criadas aqui ficam vinculadas ao indicador, análise e reunião.">
-          <div className="mb-4 grid grid-cols-2 gap-2 md:grid-cols-5">
-            <ActionSummary label="Total" value={summary.total} />
-            <ActionSummary label="Pendentes" value={summary.pending} />
-            <ActionSummary label="Em andamento" value={summary.progress} />
-            <ActionSummary label="Atrasadas" value={summary.overdue} danger />
-            <ActionSummary label="Concluídas" value={summary.done} />
-          </div>
-          <div className="space-y-2">
-            {m.actions.map((action) => (
-              <Link key={action.id} href={`/actions/${action.id}`} className="block rounded-lg border p-3 hover:bg-accent/35">
-                <div className="flex items-start justify-between gap-3">
-                  <div className="min-w-0">
-                    <div className="truncate font-medium">{action.title}</div>
-                    <div className="mt-1 text-xs text-muted-foreground">
-                      {action.responsibleUser?.name ?? action.responsibleEmail ?? 'Sem responsável'} - Prazo {formatDate(action.dueDate)}
+        <div className="space-y-6">
+          <SectionCard title="Tarefas para plano de ação" description="As tarefas criadas aqui entram direto na execução do plano vinculado.">
+            {!linkedAction ? (
+              <p className="text-sm text-muted-foreground">Esta reunião ainda não está vinculada a um plano de ação.</p>
+            ) : (
+              <div className="space-y-3">
+                <div className="flex flex-wrap items-center justify-between gap-2 rounded-md border bg-muted/30 p-3 text-sm">
+                  <div>
+                    <div className="font-semibold">{linkedAction.title}</div>
+                    <div className="text-xs text-muted-foreground">{linkedAction.tasks.length} tarefa(s) cadastrada(s)</div>
+                  </div>
+                  <StatusBadge value={linkedAction.status} label={statusLabels[linkedAction.status] ?? linkedAction.status} />
+                </div>
+
+                <div className="space-y-2">
+                  {linkedAction.tasks.map((task) => (
+                    <div key={task.id} className="rounded-lg border p-3 text-sm">
+                      <div className="flex flex-wrap items-start justify-between gap-2">
+                        <div className="min-w-0">
+                          <div className="font-medium">{task.title}</div>
+                          <div className="mt-1 text-xs text-muted-foreground">
+                            {task.assignedTo?.name ?? 'Sem responsável'} · {formatDate(task.startDate)} até {formatDate(task.endDate ?? task.dueDate)}
+                          </div>
+                        </div>
+                        <StatusBadge value={task.done ? 'DONE' : 'NOT_STARTED'} label={task.done ? 'Concluída' : 'Aberta'} />
+                      </div>
+                    </div>
+                  ))}
+                  {linkedAction.tasks.length === 0 && (
+                    <div className="rounded-md border border-dashed p-4 text-center text-sm text-muted-foreground">
+                      Nenhuma tarefa criada para este plano ainda.
+                    </div>
+                  )}
+                </div>
+
+                <div className="space-y-3 rounded-lg border bg-muted/30 p-3">
+                  <div>
+                    <Label>Descrição da tarefa</Label>
+                    <Textarea
+                      rows={3}
+                      value={taskForm.description}
+                      onChange={(e) => setTaskForm({ ...taskForm, description: e.target.value })}
+                      placeholder="Descreva a tarefa definida na reunião..."
+                    />
+                  </div>
+                  <div className="grid gap-2 md:grid-cols-3">
+                    <div>
+                      <Label>Responsável</Label>
+                      <NativeSelect value={taskForm.responsibleUserId} onChange={(e) => setTaskForm({ ...taskForm, responsibleUserId: e.target.value })}>
+                        <option value="">Sem responsável</option>
+                        {participantUsers.map((u) => (
+                          <option key={u.id} value={u.id}>{u.name}</option>
+                        ))}
+                      </NativeSelect>
+                    </div>
+                    <div>
+                      <Label>Data de início</Label>
+                      <Input type="date" value={taskForm.startDate} onChange={(e) => setTaskForm({ ...taskForm, startDate: e.target.value })} />
+                    </div>
+                    <div>
+                      <Label>Data final</Label>
+                      <Input type="date" value={taskForm.endDate} onChange={(e) => setTaskForm({ ...taskForm, endDate: e.target.value })} />
                     </div>
                   </div>
-                  <StatusBadge value={action.status} label={statusLabels[action.status] ?? action.status} />
-                </div>
-              </Link>
-            ))}
-          </div>
-          <div className="mt-4 space-y-2 rounded-lg border bg-muted/30 p-3">
-            <Label>Nova ação</Label>
-            <Input placeholder="Título da ação" value={actionForm.title} onChange={(e) => setActionForm({ ...actionForm, title: e.target.value })} />
-            <Textarea placeholder="Descrição" value={actionForm.description} onChange={(e) => setActionForm({ ...actionForm, description: e.target.value })} />
-            <div className="grid gap-2 md:grid-cols-3">
-              <Input type="email" placeholder="E-mail do responsável" value={actionForm.responsibleEmail} onChange={(e) => setActionForm({ ...actionForm, responsibleEmail: e.target.value })} />
-              <Input type="date" value={actionForm.dueDate} onChange={(e) => setActionForm({ ...actionForm, dueDate: e.target.value })} />
-              <NativeSelect value={actionForm.priority} onChange={(e) => setActionForm({ ...actionForm, priority: e.target.value })}>
-                <option value="LOW">Baixa</option>
-                <option value="MEDIUM">Media</option>
-                <option value="HIGH">Alta</option>
-                <option value="CRITICAL">Crítica</option>
-              </NativeSelect>
-            </div>
-            <Input placeholder="Resultado esperado" value={actionForm.expectedResult} onChange={(e) => setActionForm({ ...actionForm, expectedResult: e.target.value })} />
-            <Button onClick={() => generateAction.mutate()} disabled={!actionForm.title || generateAction.isPending}>
-              Criar ação vinculada
-            </Button>
-          </div>
-        </SectionCard>
-
-        <SectionCard title="Convites e logs de e-mail" description="Cada envio fica registrado para auditoria e reenvio.">
-          <div className="space-y-2">
-            {m.emailLogs.map((log) => (
-              <div key={log.id} className="rounded-lg border p-3 text-sm">
-                <div className="flex items-start justify-between gap-3">
-                  <div className="min-w-0">
-                    <div className="truncate font-medium">{log.recipientName ?? log.recipientEmail}</div>
-                    <div className="truncate text-xs text-muted-foreground">{log.recipientEmail} - {formatDateTime(log.sentAt ?? log.createdAt)}</div>
-                    {log.errorMessage && <div className="mt-1 text-xs text-status-red">{log.errorMessage}</div>}
-                  </div>
-                  <StatusBadge value={log.status} label={emailStatusLabel(log.status)} tone={log.status === 'SENT' ? 'green' : log.status === 'ERROR' ? 'red' : 'yellow'} />
+                  <Button onClick={() => generateTask.mutate()} disabled={!taskForm.description.trim() || generateTask.isPending}>
+                    <Plus className="mr-2 h-4 w-4" />
+                    {generateTask.isPending ? 'Criando...' : 'Adicionar tarefa'}
+                  </Button>
                 </div>
               </div>
-            ))}
-            {m.emailLogs.length === 0 && <p className="py-4 text-center text-sm text-muted-foreground">Nenhum convite enviado ainda.</p>}
-          </div>
-        </SectionCard>
+            )}
+          </SectionCard>
+
+          <SectionCard title="Pauta da reunião" description="Itens para conduzir a conversa e registrar os pontos tratados.">
+            <div className="mb-3 flex gap-2">
+              <Input
+                placeholder="Adicionar item de pauta..."
+                value={agendaTopic}
+                onChange={(e) => setAgendaTopic(e.target.value)}
+                onKeyDown={(e) => e.key === 'Enter' && agendaTopic && addAgenda.mutate()}
+              />
+              <Button onClick={() => addAgenda.mutate()} disabled={!agendaTopic || addAgenda.isPending}>
+                <Plus className="h-4 w-4" />
+              </Button>
+            </div>
+            <ol className="space-y-2">
+              {m.agendaItems.map((a, i) => (
+                <li key={a.id} className="flex gap-3 rounded-lg border p-3 text-sm">
+                  <span className="grid h-6 w-6 shrink-0 place-items-center rounded-full bg-muted text-xs text-muted-foreground">{i + 1}</span>
+                  <span>{a.topic}</span>
+                </li>
+              ))}
+            </ol>
+            {m.agendaItems.length === 0 && <p className="py-4 text-center text-sm text-muted-foreground">Sem itens de pauta.</p>}
+          </SectionCard>
+
+          <SectionCard title="Convites e logs de e-mail" description="Cada envio fica registrado para auditoria e reenvio.">
+            <div className="space-y-2">
+              {m.emailLogs.map((log) => (
+                <div key={log.id} className="rounded-lg border p-3 text-sm">
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="min-w-0">
+                      <div className="truncate font-medium">{log.recipientName ?? log.recipientEmail}</div>
+                      <div className="truncate text-xs text-muted-foreground">{log.recipientEmail} · {formatDateTime(log.sentAt ?? log.createdAt)}</div>
+                      {log.errorMessage && <div className="mt-1 text-xs text-status-red">{log.errorMessage}</div>}
+                    </div>
+                    <StatusBadge value={log.status} label={emailStatusLabel(log.status)} tone={log.status === 'SENT' ? 'green' : log.status === 'ERROR' ? 'red' : 'yellow'} />
+                  </div>
+                </div>
+              ))}
+              {m.emailLogs.length === 0 && (
+                <div className="rounded-md border border-dashed p-4 text-center text-sm text-muted-foreground">
+                  Nenhum convite enviado ainda.
+                </div>
+              )}
+              <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                <Mail className="h-3.5 w-3.5" />
+                {m.calendarInvites.length} arquivo(s) ICS gerado(s)
+              </div>
+            </div>
+          </SectionCard>
+        </div>
       </div>
     </div>
   );
 }
 
-function ActionSummary({ label, value, danger }: { label: string; value: number; danger?: boolean }) {
+function InfoLine({ label, value }: { label: string; value: ReactNode }) {
   return (
-    <div className={cn('rounded-lg border p-3 text-center', danger && value > 0 ? 'border-status-red/30 bg-status-red/10 text-status-red' : 'bg-background')}>
-      <div className="text-xl font-semibold">{value}</div>
+    <div>
       <div className="text-[11px] font-semibold uppercase text-muted-foreground">{label}</div>
+      <div className="mt-1">{value || '-'}</div>
     </div>
   );
 }
@@ -467,7 +538,7 @@ function formatDateTime(value: string | null | undefined) {
 
 function methodLabel(value: string) {
   const labels: Record<string, string> = {
-    FIVE_WHYS: '5 Porques',
+    FIVE_WHYS: '5 Porquês',
     ISHIKAWA: 'Ishikawa',
     PARETO: 'Pareto',
     PDCA: 'PDCA',
@@ -495,7 +566,7 @@ function formatLabel(value: string) {
   const labels: Record<string, string> = {
     ONLINE: 'Online',
     PRESENTIAL: 'Presencial',
-    HYBRID: 'Hibrida',
+    HYBRID: 'Híbrida',
   };
   return labels[value] ?? value;
 }

@@ -106,10 +106,12 @@ export class MeetingsController {
     @Param('id') id: string,
     @Body() body: {
       title: string;
+      actionPlanId?: string;
       responsibleUserId?: string;
       responsibleEmail?: string;
       dueDate?: string;
       startDate?: string;
+      endDate?: string;
       priority?: ActionPriority;
       description?: string;
       expectedResult?: string;

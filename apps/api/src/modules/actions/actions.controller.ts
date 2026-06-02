@@ -54,6 +54,12 @@ export class ActionsController {
     return this.service.listGeneralApprovals(me.companyId, me.sub, scope);
   }
 
+  @Get('evidences/:evidenceId')
+  @RequirePermissions('actions:view')
+  evidenceFile(@CurrentUser() me: AuthPayload, @Param('evidenceId') evidenceId: string) {
+    return this.service.getEvidenceFile(evidenceId, me.companyId);
+  }
+
   @Get(':id')
   @RequirePermissions('actions:view')
   byId(@CurrentUser() me: AuthPayload, @Param('id') id: string) {
@@ -83,6 +89,16 @@ export class ActionsController {
     @Body() body: { status: ActionStatus; reason?: string },
   ) {
     return this.service.changeStatus(id, body.status, me.sub, body.reason);
+  }
+
+  @Post(':id/meeting')
+  @RequirePermissions('meetings:create', 'actions:update')
+  createMeetingForAction(
+    @CurrentUser() me: AuthPayload,
+    @Param('id') id: string,
+    @Body() body: { startsAt?: string; title?: string; location?: string; format?: 'PRESENTIAL' | 'ONLINE' | 'HYBRID'; objective?: string },
+  ) {
+    return this.service.createMeetingForAction(id, body as any, me.sub);
   }
 
   @Post(':id/tasks')

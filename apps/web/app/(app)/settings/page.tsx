@@ -378,7 +378,7 @@ export default function SettingsPage() {
       {isSuperAdmin && (
         <SectionCard
           title="Administração avançada"
-          description="Ferramentas técnicas de banco de dados — exclusivas do Super Admin."
+          description="Ferramentas técnicas — exclusivas do Super Admin."
           className="mb-6"
           contentClassName="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-3"
         >
@@ -393,6 +393,20 @@ export default function SettingsPage() {
               <div className="text-sm font-semibold">Banco de Dados</div>
               <p className="mt-1 text-xs leading-relaxed text-muted-foreground">
                 Tabelas, registros, estrutura, índices, SQL, importação/exportação, backups, auditoria e diagnósticos.
+              </p>
+            </div>
+          </Link>
+          <Link
+            href="/settings/portal"
+            className="group flex h-full items-start gap-3 rounded-lg border bg-card p-4 shadow-sm transition-colors hover:bg-accent/35"
+          >
+            <div className="grid h-10 w-10 shrink-0 place-items-center rounded-md bg-status-blue/10 text-status-blue">
+              <SlidersHorizontal className="h-5 w-5" />
+            </div>
+            <div className="min-w-0">
+              <div className="text-sm font-semibold">Central de Administração do Portal</div>
+              <p className="mt-1 text-xs leading-relaxed text-muted-foreground">
+                Módulos, páginas, funcionalidades, menus, permissões, escopo, manutenção, parâmetros, integrações, comunicados e diagnóstico.
               </p>
             </div>
           </Link>

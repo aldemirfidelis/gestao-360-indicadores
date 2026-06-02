@@ -1,0 +1,90 @@
+/**
+ * Catálogo-semente do registro do portal. Fonte para popular Portal{Module,Page,Feature}.
+ * O sync é ADITIVO (upsert por code) e NUNCA apaga overrides do Super Admin.
+ * Reflete as rotas em apps/web/app/(app)/* e os grupos de navigation.ts.
+ */
+
+export interface CatalogModule {
+  code: string;
+  name: string;
+  description?: string;
+  category: string;
+  icon?: string;
+  route?: string;
+  menuOrder: number;
+  criticality: 'low' | 'medium' | 'high' | 'critical';
+  systemRequired?: boolean;
+  nonBlockable?: boolean;
+  dependencies?: string[];
+}
+
+export interface CatalogPage {
+  code: string;
+  moduleCode: string;
+  name: string;
+  title: string;
+  route: string;
+}
+
+export interface CatalogFeature {
+  code: string;
+  moduleCode: string;
+  name: string;
+  criticality?: 'low' | 'medium' | 'high' | 'critical';
+}
+
+export const CATALOG_MODULES: CatalogModule[] = [
+  { code: 'dashboard', name: 'Dashboard', category: 'Visualizações', route: '/dashboard', menuOrder: 1, criticality: 'medium' },
+  { code: 'visualization', name: 'Dashboard Executivo', category: 'Visualizações', route: '/visualization', menuOrder: 2, criticality: 'low' },
+  { code: 'org', name: 'Árvore Organizacional', category: 'Visualizações', route: '/org', menuOrder: 3, criticality: 'medium' },
+  { code: 'strategy', name: 'Mapa Estratégico', category: 'Visualizações', route: '/strategy', menuOrder: 4, criticality: 'medium' },
+  { code: 'indicators', name: 'Indicadores', category: 'Visualizações', route: '/indicators', menuOrder: 5, criticality: 'high' },
+  { code: 'projects', name: 'Cronogramas', category: 'Visualizações', route: '/projects', menuOrder: 6, criticality: 'low' },
+  { code: 'insights', name: 'Insights', category: 'Visualizações', route: '/insights', menuOrder: 7, criticality: 'low' },
+  { code: 'deviations', name: 'Análise de Causa', category: 'Lançamentos', route: '/deviations', menuOrder: 8, criticality: 'medium' },
+  { code: 'treatments', name: 'Tratativas', category: 'Lançamentos', route: '/treatments', menuOrder: 9, criticality: 'medium' },
+  { code: 'imports', name: 'Registrar Evidência', category: 'Lançamentos', route: '/imports', menuOrder: 10, criticality: 'low' },
+  { code: 'organograma', name: 'Organograma', category: 'Gestão', route: '/organograma', menuOrder: 11, criticality: 'medium' },
+  { code: 'aprovacoes-cargo', name: 'Aprovações', category: 'Gestão', route: '/aprovacoes-cargo', menuOrder: 12, criticality: 'medium' },
+  { code: 'eficacia', name: 'Análise de Eficácia', category: 'Gestão', route: '/eficacia', menuOrder: 13, criticality: 'medium' },
+  { code: 'periods', name: 'Períodos', category: 'Gestão', route: '/periods', menuOrder: 14, criticality: 'high' },
+  { code: 'actions', name: 'Plano de Ação', category: 'Gestão', route: '/actions', menuOrder: 15, criticality: 'high' },
+  { code: 'meetings', name: 'Reuniões', category: 'Gestão', route: '/meetings', menuOrder: 16, criticality: 'low' },
+  { code: 'okrs', name: 'OKRs', category: 'Gestão', route: '/okrs', menuOrder: 17, criticality: 'low' },
+  { code: 'reports', name: 'Relatórios e Exportações', category: 'Relatórios', route: '/reports', menuOrder: 18, criticality: 'medium' },
+  { code: 'audit', name: 'Auditoria', category: 'Relatórios', route: '/audit', menuOrder: 19, criticality: 'critical', systemRequired: true, nonBlockable: true },
+  { code: 'users', name: 'Usuários e Permissões', category: 'Configurações', route: '/users', menuOrder: 20, criticality: 'critical', systemRequired: true, nonBlockable: true },
+  { code: 'settings', name: 'Configurações', category: 'Configurações', route: '/settings', menuOrder: 21, criticality: 'critical', systemRequired: true, nonBlockable: true },
+  { code: 'database-admin', name: 'Administração do Banco', category: 'Configurações', route: '/settings/database', menuOrder: 22, criticality: 'critical', systemRequired: true, nonBlockable: true },
+  { code: 'portal-admin', name: 'Central de Administração do Portal', category: 'Configurações', route: '/settings/portal', menuOrder: 23, criticality: 'critical', systemRequired: true, nonBlockable: true },
+  { code: 'auth', name: 'Autenticação', category: 'Sistema', menuOrder: 99, criticality: 'critical', systemRequired: true, nonBlockable: true },
+  { code: 'access-control', name: 'Controle de Acesso', category: 'Sistema', menuOrder: 100, criticality: 'critical', systemRequired: true, nonBlockable: true },
+];
+
+export const CATALOG_PAGES: CatalogPage[] = [
+  { code: 'indicators.list', moduleCode: 'indicators', name: 'Indicadores', title: 'Indicadores', route: '/indicators' },
+  { code: 'indicators.detail', moduleCode: 'indicators', name: 'Detalhe do indicador', title: 'Indicador', route: '/indicators/[id]' },
+  { code: 'actions.list', moduleCode: 'actions', name: 'Planos de Ação', title: 'Planos de Ação', route: '/actions' },
+  { code: 'reports.list', moduleCode: 'reports', name: 'Relatórios', title: 'Relatórios e Exportações', route: '/reports' },
+  { code: 'settings.main', moduleCode: 'settings', name: 'Configurações', title: 'Configurações', route: '/settings' },
+  { code: 'database-admin.main', moduleCode: 'database-admin', name: 'Administração do Banco', title: 'Banco de Dados', route: '/settings/database' },
+  { code: 'portal-admin.main', moduleCode: 'portal-admin', name: 'Central do Portal', title: 'Central de Administração do Portal', route: '/settings/portal' },
+];
+
+export const CATALOG_FEATURES: CatalogFeature[] = [
+  { code: 'indicators.create', moduleCode: 'indicators', name: 'Criar indicador' },
+  { code: 'indicators.update', moduleCode: 'indicators', name: 'Editar indicador' },
+  { code: 'indicators.delete', moduleCode: 'indicators', name: 'Excluir indicador', criticality: 'high' },
+  { code: 'indicators.launch', moduleCode: 'indicators', name: 'Lançar resultado' },
+  { code: 'indicators.import', moduleCode: 'indicators', name: 'Importar resultados' },
+  { code: 'indicators.export', moduleCode: 'indicators', name: 'Exportar relatório' },
+  { code: 'indicators.history', moduleCode: 'indicators', name: 'Visualizar histórico' },
+  { code: 'actions.create', moduleCode: 'actions', name: 'Criar ação' },
+  { code: 'actions.update', moduleCode: 'actions', name: 'Editar ação' },
+  { code: 'actions.delete', moduleCode: 'actions', name: 'Excluir ação', criticality: 'high' },
+  { code: 'actions.complete', moduleCode: 'actions', name: 'Finalizar ação' },
+  { code: 'actions.reopen', moduleCode: 'actions', name: 'Reabrir ação' },
+  { code: 'actions.export', moduleCode: 'actions', name: 'Exportar relatório' },
+  { code: 'meetings.invite', moduleCode: 'meetings', name: 'Enviar convite ICS' },
+  { code: 'reports.export', moduleCode: 'reports', name: 'Exportar relatórios' },
+];

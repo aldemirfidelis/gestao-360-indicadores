@@ -6,10 +6,13 @@ import { isActivePath, visibleMobileItems } from '@/components/shell/navigation'
 import { useAuth } from '@/components/auth/auth-provider';
 import { cn } from '@/lib/utils';
 
+import { usePortalConfig } from '@/components/portal-admin/portal-config-provider';
+
 export function MobileNav() {
   const pathname = usePathname();
   const { user } = useAuth();
-  const items = visibleMobileItems(user);
+  const { navHidden } = usePortalConfig();
+  const items = visibleMobileItems(user).filter((item) => !navHidden(item.href));
 
   return (
     <nav className="fixed inset-x-0 bottom-0 z-40 border-t border-border/60 bg-card/95 px-1 pb-[env(safe-area-inset-bottom)] backdrop-blur lg:hidden">

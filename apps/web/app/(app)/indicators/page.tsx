@@ -28,7 +28,9 @@ import {
   Eye,
   FileClock,
   History,
+  MessageSquare,
   Minus,
+  Paperclip,
   Pencil,
   Plus,
   RefreshCcw,
@@ -54,7 +56,7 @@ import { Label } from '@/components/ui/label';
 import { NativeSelect } from '@/components/ui/select';
 import { StatusLight } from '@/components/ui/status-light';
 import { Textarea } from '@/components/ui/textarea';
-import { IndicatorResultEditor } from '@/components/platform/indicator-result-editor';
+import { IndicatorResultEditor, ResultNotesDialog } from '@/components/platform/indicator-result-editor';
 import { api } from '@/lib/api';
 import { useAuth } from '@/components/auth/auth-provider';
 import { cn, formatDate, formatNumber, formatPercent, periodRefLabel } from '@/lib/utils';
@@ -1775,9 +1777,11 @@ function GrainEditor({
   const qc = useQueryClient();
   const [month, setMonth] = useState<string>(currentMonthRef());
   const [edits, setEdits] = useState<Record<string, string>>({});
+  const [notesCell, setNotesCell] = useState<string | null>(null);
 
   useEffect(() => {
     setEdits({});
+    setNotesCell(null);
   }, [indicator.id, granularity, month]);
 
   const query = useQuery<GrainResponse>({
@@ -1839,6 +1843,7 @@ function GrainEditor({
                 <th className="text-left">{granularity === 'WEEKLY' ? 'Semana' : 'Dia'}</th>
                 <th className="text-left">Meta</th>
                 <th className="text-left">{valueColLabel}</th>
+                {mode === 'result' && <th className="text-left">Registros</th>}
               </tr>
             </thead>
             <tbody>
@@ -1865,6 +1870,34 @@ function GrainEditor({
                         className="h-9 w-32 text-sm"
                       />
                     </td>
+                    {mode === 'result' && (
+                      <td>
+                        <div className="flex gap-1">
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="sm"
+                            className="h-8 px-2"
+                            onClick={() => setNotesCell(cell.periodRef)}
+                            title="Anexos"
+                          >
+                            <Paperclip className="mr-1 h-3.5 w-3.5" />
+                            Anexo
+                          </Button>
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="sm"
+                            className="h-8 px-2"
+                            onClick={() => setNotesCell(cell.periodRef)}
+                            title="Comentários"
+                          >
+                            <MessageSquare className="mr-1 h-3.5 w-3.5" />
+                            Comentários
+                          </Button>
+                        </div>
+                      </td>
+                    )}
                   </tr>
                 );
               })}
@@ -1879,6 +1912,15 @@ function GrainEditor({
           {save.isPending ? 'Salvando...' : `Salvar (${editedCount})`}
         </Button>
       </div>
+
+      {notesCell && (
+        <ResultNotesDialog
+          indicatorId={indicator.id}
+          periodRef={notesCell}
+          open={!!notesCell}
+          onClose={() => setNotesCell(null)}
+        />
+      )}
     </div>
   );
 }

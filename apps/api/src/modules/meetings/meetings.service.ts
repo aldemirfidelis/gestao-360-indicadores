@@ -46,7 +46,16 @@ export class MeetingsService {
         guests: true,
         agendaItems: { orderBy: { position: 'asc' } },
         decisions: true,
-        actions: { include: { responsibleUser: { select: { id: true, name: true, email: true } }, tasks: true } },
+        actions: {
+          include: {
+            responsibleUser: { select: { id: true, name: true, email: true } },
+            tasks: {
+              orderBy: { position: 'asc' },
+              include: { assignedTo: { select: { id: true, name: true, email: true } } },
+            },
+            analysisSessions: { orderBy: { updatedAt: 'desc' }, take: 5 },
+          },
+        },
         emailLogs: { orderBy: { createdAt: 'desc' } },
         calendarInvites: true,
       },
@@ -227,10 +236,12 @@ export class MeetingsService {
     createdById: string,
     body: {
       title: string;
+      actionPlanId?: string;
       responsibleUserId?: string;
       responsibleEmail?: string;
       dueDate?: string;
       startDate?: string;
+      endDate?: string;
       priority?: ActionPriority;
       description?: string;
       expectedResult?: string;
@@ -238,6 +249,42 @@ export class MeetingsService {
     },
   ) {
     const meeting = await this.getById(meetingId);
+    const linkedAction =
+      meeting.actions.find((action) => action.id === body.actionPlanId) ??
+      (body.actionPlanId ? null : meeting.actions[0]);
+
+    if (linkedAction) {
+      const count = await this.prisma.actionTask.count({ where: { actionId: linkedAction.id } });
+      const title = (body.description ?? body.title ?? '').trim();
+      if (!title) throw new NotFoundException('DescriÃ§Ã£o da tarefa obrigatoria');
+      const task = await this.prisma.actionTask.create({
+        data: {
+          actionId: linkedAction.id,
+          title,
+          startDate: body.startDate ? new Date(body.startDate) : null,
+          endDate: body.endDate ? new Date(body.endDate) : body.dueDate ? new Date(body.dueDate) : null,
+          dueDate: body.dueDate ? new Date(body.dueDate) : null,
+          assignedToId: body.responsibleUserId ?? null,
+          position: count,
+        },
+        include: { assignedTo: { select: { id: true, name: true, email: true } } },
+      });
+      await this.traceability.record({
+        companyId: meeting.companyId,
+        indicatorId: meeting.indicatorId,
+        userId: createdById,
+        eventType: TraceEventType.TASK_UPDATED,
+        entityType: TraceEntityType.ACTION_TASK,
+        entityId: task.id,
+        relatedType: TraceEntityType.MEETING,
+        relatedId: meetingId,
+        title: 'Tarefa criada pela reuniÃ£o',
+        description: task.title,
+        metadata: { actionPlanId: linkedAction.id, startDate: task.startDate, endDate: task.endDate },
+      });
+      return { ...task, actionPlanId: linkedAction.id };
+    }
+
     const action = await this.prisma.actionPlan.create({
       data: {
         companyId: meeting.companyId,
@@ -246,7 +293,7 @@ export class MeetingsService {
         analysisId: meeting.analysisId ?? null,
         meetingId,
         treatmentId: meeting.treatmentId ?? null,
-        title: body.title,
+        title: body.title || body.description || `AÃ§Ã£o da reuniÃ£o ${meeting.title}`,
         description: body.description ?? `Ação gerada na reunião "${meeting.title}"`,
         origin: ActionOrigin.MEETING,
         originRefId: meetingId,
