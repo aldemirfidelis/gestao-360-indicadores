@@ -16,6 +16,10 @@ interface PortalConfigCtx {
   loading: boolean;
   /** Item deve sair do menu (oculto/desativado). Sem config => false (não esconde). */
   navHidden: (href: string) => boolean;
+  /** Seção/grupo do menu deve sair (override por heading). */
+  sectionHidden: (heading: string) => boolean;
+  /** Rótulo customizado do item de menu, se houver override. */
+  navLabel: (href: string) => string | null;
   /** Rota indisponível (manutenção/bloqueio/global). Super Admin nunca é bloqueado. */
   routeBlock: (href: string) => RouteBlock | null;
   /** Flag habilitada para o usuário. Sem config => true (não esconde feature). */
@@ -39,8 +43,12 @@ export function PortalConfigProvider({ children }: { children: ReactNode }) {
   const isSuper = user?.role === 'SUPER_ADMIN';
 
   const value = useMemo<PortalConfigCtx>(() => {
+    // Rotas ocultas: por status de módulo/página E por override de menu (aba "Menus").
     const hidden = new Set<string>();
+    const sectionHiddenSet = new Set<string>();
+    const labels = new Map<string, string>();
     const blocked: { route: string; block: RouteBlock }[] = [];
+
     if (config) {
       const items = [
         ...config.modules.map((m) => ({ route: m.route, status: m.status, hidden: m.hidden, maintenance: m.maintenance, message: m.unavailableMessage })),
@@ -52,6 +60,15 @@ export function PortalConfigProvider({ children }: { children: ReactNode }) {
         if (it.maintenance) blocked.push({ route: it.route, block: { reason: 'maintenance', message: it.message } });
         else if (HIDE_STATUSES.includes(it.status)) blocked.push({ route: it.route, block: { reason: 'blocked', message: it.message } });
       }
+      // Overrides de menu: itemKey iniciando com "/" é um item (rota); senão é heading de seção.
+      for (const ov of config.navOverrides ?? []) {
+        const isRoute = ov.itemKey.startsWith('/');
+        if (ov.hidden) {
+          if (isRoute) hidden.add(ov.itemKey);
+          else sectionHiddenSet.add(ov.itemKey);
+        }
+        if (isRoute && ov.labelOverride) labels.set(ov.itemKey, ov.labelOverride);
+      }
     }
     const globalMaint = config?.maintenance.global.active && !(isSuper && config.maintenance.global.allowSuperAdmin);
 
@@ -59,10 +76,11 @@ export function PortalConfigProvider({ children }: { children: ReactNode }) {
       config,
       loading: query.isLoading,
       navHidden: (href) => hidden.has(href),
+      sectionHidden: (heading) => sectionHiddenSet.has(heading),
+      navLabel: (href) => labels.get(href) ?? null,
       routeBlock: (href) => {
-        if (isSuper) return globalMaint ? null : null; // Super Admin nunca é bloqueado
+        if (isSuper) return null; // Super Admin nunca é bloqueado
         if (globalMaint) return { reason: 'global', message: config?.maintenance.global.message };
-        // match por rota exata ou prefixo mais longo
         const match = blocked
           .filter((b) => href === b.route || href.startsWith(`${b.route}/`))
           .sort((a, b) => b.route.length - a.route.length)[0];
@@ -79,7 +97,7 @@ export function usePortalConfig(): PortalConfigCtx {
   const ctx = useContext(Ctx);
   // Resiliência: fora do provider, retorna no-op (comportamento atual do app).
   if (!ctx) {
-    return { config: null, loading: false, navHidden: () => false, routeBlock: () => null, isFeature: () => true };
+    return { config: null, loading: false, navHidden: () => false, sectionHidden: () => false, navLabel: () => null, routeBlock: () => null, isFeature: () => true };
   }
   return ctx;
 }

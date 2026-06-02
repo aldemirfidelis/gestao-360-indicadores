@@ -28,14 +28,21 @@ export function AccordionNavigation({
 }) {
   const pathname = usePathname();
   const { user } = useAuth();
-  const { navHidden } = usePortalConfig();
+  const { navHidden, sectionHidden, navLabel } = usePortalConfig();
   const sections = useMemo(() => {
-    // Overlay do portal: remove itens ocultos/desativados pela Central de Administração.
-    // Resiliente: sem config, navHidden() retorna false e nada muda.
+    // Overlay do portal: remove seções/itens ocultos pela Central de Administração
+    // (status de módulo/página E overrides da aba "Menus") e aplica rótulos custom.
+    // Resiliente: sem config, os helpers são no-op e nada muda.
     return visibleNavSections(user)
-      .map((section) => ({ ...section, items: section.items.filter((item) => !navHidden(item.href)) }))
+      .filter((section) => !sectionHidden(section.heading))
+      .map((section) => ({
+        ...section,
+        items: section.items
+          .filter((item) => !navHidden(item.href))
+          .map((item) => ({ ...item, label: navLabel(item.href) ?? item.label })),
+      }))
       .filter((section) => section.items.length > 0);
-  }, [user, navHidden]);
+  }, [user, navHidden, sectionHidden, navLabel]);
   const currentSection = sections.find((section) =>
     section.items.some((item) => isActivePath(pathname, item.href, item.exact)),
   );
