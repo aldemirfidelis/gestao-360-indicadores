@@ -2,10 +2,12 @@
 
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
+import type { ChangeEvent } from 'react';
 import { useState } from 'react';
-import { useQuery } from '@tanstack/react-query';
-import { Building2, Check, ChevronsUpDown, Home, LifeBuoy, LogOut, Menu, Moon, Search, Sun } from 'lucide-react';
+import { useMutation, useQuery } from '@tanstack/react-query';
+import { Building2, Camera, Check, ChevronsUpDown, Home, KeyRound, LifeBuoy, LogOut, Menu, Moon, Search, Sun } from 'lucide-react';
 import { useTheme } from 'next-themes';
+import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import {
@@ -21,6 +23,7 @@ import { isActivePath, visibleNavSections } from '@/components/shell/navigation'
 import { NotificationsBell } from './notifications-bell';
 import { OnlineUsersButton } from '@/components/communication/online-users-button';
 import { MessagesButton } from '@/components/communication/messages-button';
+import { UserAvatar } from '@/components/communication/user-avatar';
 import { api } from '@/lib/api';
 import { BrandMark } from '@/components/brand/brand-mark';
 
@@ -35,19 +38,62 @@ interface SearchResult {
 
 export function Topbar() {
   const { setTheme, theme } = useTheme();
-  const { user, logout } = useAuth();
+  const { user, logout, refreshUser } = useAuth();
   const pathname = usePathname();
   const [search, setSearch] = useState('');
   const [searchOpen, setSearchOpen] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
+  const [profileOpen, setProfileOpen] = useState(false);
+  const [passwordForm, setPasswordForm] = useState({ currentPassword: '', newPassword: '', confirmPassword: '' });
   const sections = visibleNavSections(user);
   const section = sections.find((s) => s.items.some((i) => isActivePath(pathname, i.href, i.exact)));
+  const profileRole = user?.accessProfile?.name ?? user?.jobTitle ?? user?.role ?? '-';
 
   const globalSearch = useQuery<SearchResult[]>({
     queryKey: ['global-search', search],
     queryFn: () => api<SearchResult[]>(`/search?q=${encodeURIComponent(search)}&limit=6`),
     enabled: search.trim().length >= 2 && searchOpen,
   });
+
+  const avatarMutation = useMutation({
+    mutationFn: (avatarUrl: string | null) => api('/communication/me/profile', { method: 'PATCH', json: { avatarUrl } }),
+    onSuccess: async () => {
+      await refreshUser();
+      toast.success('Foto atualizada');
+    },
+    onError: (error: Error) => toast.error(error.message || 'Não foi possível atualizar a foto'),
+  });
+
+  const passwordMutation = useMutation({
+    mutationFn: async () => {
+      if (passwordForm.newPassword !== passwordForm.confirmPassword) throw new Error('Digite a senha novamente igual à nova senha.');
+      if (passwordForm.newPassword.length < 6) throw new Error('A nova senha precisa ter pelo menos 6 caracteres.');
+      return api('/auth/me/password', { method: 'PATCH', json: passwordForm });
+    },
+    onSuccess: () => {
+      setPasswordForm({ currentPassword: '', newPassword: '', confirmPassword: '' });
+      toast.success('Senha alterada');
+    },
+    onError: (error: Error) => toast.error(error.message || 'Não foi possível alterar a senha'),
+  });
+
+  const handleAvatarFile = (event: ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    event.target.value = '';
+    if (!file) return;
+    if (!file.type.startsWith('image/')) {
+      toast.error('Selecione uma imagem válida.');
+      return;
+    }
+    if (file.size > 1_500_000) {
+      toast.error('A imagem deve ter até 1,5 MB.');
+      return;
+    }
+    const reader = new FileReader();
+    reader.onload = () => avatarMutation.mutate(String(reader.result));
+    reader.onerror = () => toast.error('Não foi possível ler a imagem.');
+    reader.readAsDataURL(file);
+  };
 
   return (
     <header className="sticky top-0 z-30 flex h-14 items-center gap-3 border-b border-border/60 bg-background/95 px-3 backdrop-blur lg:px-6">
@@ -128,8 +174,10 @@ export function Topbar() {
       </div>
 
       <div className="flex items-center gap-0.5">
-        <Button variant="ghost" size="icon" className="h-9 w-9" aria-label="Ajuda">
-          <LifeBuoy className="h-4 w-4" />
+        <Button variant="ghost" size="icon" className="h-9 w-9" aria-label="Ajuda" asChild>
+          <Link href="/ajuda" title="Ajuda">
+            <LifeBuoy className="h-4 w-4" />
+          </Link>
         </Button>
         <MessagesButton />
         <OnlineUsersButton />
@@ -144,25 +192,114 @@ export function Topbar() {
           {theme === 'dark' ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
         </Button>
         {user && (
-          <div className="ml-1 flex items-center gap-2 border-l border-border/60 pl-3">
+          <div className="relative ml-1 flex items-center gap-2 border-l border-border/60 pl-3">
             <div className="hidden text-right leading-tight sm:block">
               <div className="text-xs font-medium">{user.name}</div>
-              <div className="text-[10px] text-muted-foreground">{user.accessProfile?.name ?? user.jobTitle ?? user.role}</div>
+              <div className="text-[10px] text-muted-foreground">{profileRole}</div>
             </div>
-            <div className="grid h-8 w-8 place-items-center rounded-full bg-foreground text-[11px] font-semibold text-background">
-              {user.name
-                .split(' ')
-                .slice(0, 2)
-                .map((n) => n[0])
-                .join('')}
-            </div>
+            <button
+              type="button"
+              onClick={() => setProfileOpen((open) => !open)}
+              className="rounded-full outline-none ring-offset-background transition focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+              aria-label="Abrir perfil"
+              title="Perfil"
+            >
+              <UserAvatar name={user.name} avatarUrl={user.avatarUrl} size="sm" />
+            </button>
             <Button variant="ghost" size="icon" className="h-9 w-9" onClick={logout} aria-label="Sair">
               <LogOut className="h-4 w-4" />
             </Button>
+            {profileOpen && (
+              <div className="absolute right-0 top-11 z-50 w-[330px] border border-border bg-card p-4 shadow-xl">
+                <div className="flex items-start gap-3 border-b border-border/60 pb-3">
+                  <UserAvatar name={user.name} avatarUrl={user.avatarUrl} size="lg" />
+                  <div className="min-w-0 flex-1">
+                    <div className="truncate text-sm font-semibold">{user.name}</div>
+                    <div className="truncate text-xs text-muted-foreground">{user.email}</div>
+                    <div className="mt-1 text-xs text-muted-foreground">{profileRole}</div>
+                    {user.activeCompany?.name && <div className="mt-1 truncate text-xs text-muted-foreground">{user.activeCompany.name}</div>}
+                  </div>
+                </div>
+
+                <div className="mt-3 grid grid-cols-2 gap-2 text-xs">
+                  <InfoPill label="Cargo" value={user.jobTitle ?? '-'} />
+                  <InfoPill label="Perfil" value={user.accessProfile?.name ?? user.role} />
+                </div>
+
+                <div className="mt-4 space-y-2">
+                  <div className="text-[11px] font-semibold uppercase tracking-[0.08em] text-muted-foreground">Foto</div>
+                  <div className="flex flex-wrap gap-2">
+                    <label className="inline-flex h-8 cursor-pointer items-center gap-2 rounded-md border px-3 text-xs font-medium transition-colors hover:bg-accent/35">
+                      <Camera className="h-3.5 w-3.5" />
+                      Alterar foto
+                      <input type="file" accept="image/*" className="hidden" onChange={handleAvatarFile} />
+                    </label>
+                    {user.avatarUrl && (
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="sm"
+                        className="h-8 px-3 text-xs"
+                        onClick={() => avatarMutation.mutate(null)}
+                        disabled={avatarMutation.isPending}
+                      >
+                        Remover
+                      </Button>
+                    )}
+                  </div>
+                </div>
+
+                <div className="mt-4 space-y-2 border-t border-border/60 pt-3">
+                  <div className="flex items-center gap-2 text-[11px] font-semibold uppercase tracking-[0.08em] text-muted-foreground">
+                    <KeyRound className="h-3.5 w-3.5" />
+                    Alterar senha
+                  </div>
+                  <Input
+                    type="password"
+                    value={passwordForm.currentPassword}
+                    onChange={(e) => setPasswordForm((prev) => ({ ...prev, currentPassword: e.target.value }))}
+                    placeholder="Senha atual"
+                    className="h-8 text-xs"
+                  />
+                  <Input
+                    type="password"
+                    value={passwordForm.newPassword}
+                    onChange={(e) => setPasswordForm((prev) => ({ ...prev, newPassword: e.target.value }))}
+                    placeholder="Nova senha"
+                    className="h-8 text-xs"
+                  />
+                  <Input
+                    type="password"
+                    value={passwordForm.confirmPassword}
+                    onChange={(e) => setPasswordForm((prev) => ({ ...prev, confirmPassword: e.target.value }))}
+                    placeholder="Digite a senha novamente"
+                    className="h-8 text-xs"
+                  />
+                  <Button
+                    type="button"
+                    size="sm"
+                    className="h-8 w-full text-xs"
+                    onClick={() => passwordMutation.mutate()}
+                    disabled={passwordMutation.isPending || !passwordForm.currentPassword || !passwordForm.newPassword || !passwordForm.confirmPassword}
+                  >
+                    {passwordMutation.isPending ? 'Aplicando...' : 'Aplicar'}
+                  </Button>
+                </div>
+              </div>
+            )}
           </div>
         )}
       </div>
     </header>
+  );
+}
+
+function InfoPill({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="min-w-0 rounded-md border bg-muted/30 px-2 py-1.5">
+      <div className="text-[10px] font-medium uppercase text-muted-foreground">{label}</div>
+      <div className="truncate text-xs font-medium">{value}</div>
+    </div>
   );
 }
 

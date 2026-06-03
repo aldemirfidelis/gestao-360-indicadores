@@ -18,6 +18,7 @@ import {
   Bar,
   BarChart,
   CartesianGrid,
+  Legend,
   Line,
   LineChart,
   ResponsiveContainer,
@@ -130,8 +131,9 @@ export default function VisualizationPage() {
         breadcrumbs={[{ label: 'Início', href: '/' }, { label: 'Visualização' }]}
       />
 
-      <div className="mb-6 grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
+      <div className="mb-5 grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4">
         <MetricCard
+          compact
           title="Desempenho geral"
           value={formatPercent(ov?.generalAttainment)}
           description="Atingimento médio"
@@ -139,22 +141,25 @@ export default function VisualizationPage() {
           tone="blue"
         />
         <MetricCard
+          compact
           title="Dentro da meta"
           value={formatNumber(ov?.counts.GREEN)}
           description="Indicadores verdes"
           icon={<CheckCircle2 className="h-4 w-4" />}
           tone="green"
-          href="/indicators"
+          href="/indicators?light=GREEN"
         />
         <MetricCard
+          compact
           title="Fora da meta"
           value={formatNumber(ov?.counts.RED)}
           description="Indicadores vermelhos"
           icon={<AlertTriangle className="h-4 w-4" />}
           tone="red"
-          href="/indicators"
+          href="/indicators?light=RED"
         />
         <MetricCard
+          compact
           title="Planos em aberto"
           value={formatNumber(ov?.openActions)}
           description={`${formatNumber(ov?.overdueActions)} atrasados`}
@@ -165,21 +170,30 @@ export default function VisualizationPage() {
       </div>
 
       <div className="grid grid-cols-1 gap-6 xl:grid-cols-[1.4fr,0.8fr]">
-        <SectionCard title="Evolução mensal dos indicadores" description="Atingimento médio e taxa de farol verde.">
+        <SectionCard
+          title="Evolução mensal dos indicadores"
+          description="Atingimento médio mensal e percentual de indicadores verdes no período."
+        >
           <div className="h-80">
             <ResponsiveContainer width="100%" height="100%">
               <LineChart data={evRows}>
                 <CartesianGrid strokeDasharray="3 3" className="stroke-border" />
                 <XAxis dataKey="label" tick={{ fontSize: 12 }} />
                 <YAxis tick={{ fontSize: 12 }} unit="%" />
+                <Legend verticalAlign="top" height={32} iconType="circle" wrapperStyle={{ fontSize: 12 }} />
                 <Tooltip
                   formatter={(v: number) => `${v}%`}
+                  labelFormatter={(label) => `Período ${label}`}
                   contentStyle={{ background: 'hsl(var(--card))', border: '1px solid hsl(var(--border))' }}
                 />
-                <Line type="monotone" dataKey="attainmentPct" name="Atingimento" stroke="hsl(var(--status-blue))" strokeWidth={2.5} dot={{ r: 3 }} />
-                <Line type="monotone" dataKey="greenPct" name="Farol verde" stroke="hsl(var(--status-green))" strokeWidth={2} dot={false} />
+                <Line type="monotone" dataKey="attainmentPct" name="Atingimento médio (%)" stroke="hsl(var(--status-blue))" strokeWidth={2.5} dot={{ r: 3 }} />
+                <Line type="monotone" dataKey="greenPct" name="Indicadores verdes (%)" stroke="hsl(var(--status-green))" strokeWidth={2} dot={{ r: 2 }} />
               </LineChart>
             </ResponsiveContainer>
+          </div>
+          <div className="mt-3 rounded-md border bg-muted/30 p-3 text-xs leading-relaxed text-muted-foreground">
+            Fórmula: atingimento médio = média dos atingimentos dos indicadores com resultado no mês, limitado entre 0% e 150%.
+            Indicadores verdes = indicadores com farol verde dividido pelo total de indicadores com lançamento no mês.
           </div>
         </SectionCard>
 
@@ -232,16 +246,16 @@ export default function VisualizationPage() {
             {[
               ['GREEN', 'Dentro da meta', ov?.counts.GREEN ?? 0],
               ['YELLOW', 'Atenção', ov?.counts.YELLOW ?? 0],
-              ['RED', 'Fora da meta', ov?.counts.RED ?? 0],
+              ['RED', 'Críticos', ov?.counts.RED ?? 0],
               ['GRAY', 'Sem lançamento', ov?.counts.GRAY ?? 0],
             ].map(([light, label, value]) => (
-              <div key={light} className="flex items-center justify-between rounded-lg border p-3">
+              <Link key={light} href={`/indicators?light=${light}`} className="flex items-center justify-between rounded-lg border p-3 transition-colors hover:bg-accent/35">
                 <div className="flex items-center gap-3">
                   <StatusLight light={String(light)} />
                   <span className="text-sm font-medium">{label}</span>
                 </div>
                 <span className="text-lg font-semibold">{formatNumber(Number(value))}</span>
-              </div>
+              </Link>
             ))}
           </div>
           <Button className="mt-4 w-full" variant="outline" asChild>

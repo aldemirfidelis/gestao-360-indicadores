@@ -1,5 +1,4 @@
 import {
-  AlertTriangle,
   BarChart3,
   Briefcase,
   CalendarDays,
@@ -7,20 +6,14 @@ import {
   Compass,
   FileBarChart,
   FileSpreadsheet,
-  Contact,
   GanttChartSquare,
   Goal,
   LayoutDashboard,
-  LifeBuoy,
-  MessageSquare,
   Network,
-  Plug,
   Settings,
   ShieldCheck,
-  SlidersHorizontal,
   Sparkles,
   Target,
-  UploadCloud,
   Users,
   type LucideIcon,
 } from 'lucide-react';
@@ -65,28 +58,6 @@ export const navSections: NavSection[] = [
     ],
   },
   {
-    heading: 'Comunicação',
-    description: 'Pessoas, presença e mensagens da equipe',
-    intent: 'view',
-    icon: MessageSquare,
-    items: [
-      { href: '/comunicacao', label: 'Comunicação', description: 'Conversas e mensagens da equipe', icon: MessageSquare },
-      { href: '/pessoas', label: 'Pessoas', description: 'Diretório corporativo e presença online', icon: Contact },
-      { href: '/integracoes', label: 'Integrações', description: 'Conectores internos e status operacional', icon: Plug },
-      { href: '/ajuda', label: 'Ajuda', description: 'Artigos e orientações do sistema', icon: LifeBuoy },
-    ],
-  },
-  {
-    heading: 'Lançamentos',
-    description: 'Análises de causa, evidências e lançamentos',
-    intent: 'launch',
-    icon: AlertTriangle,
-    items: [
-      { href: '/deviations', label: 'Análise de Causa', description: 'Desvios, FCA e planos decorrentes', icon: AlertTriangle, permissions: ['deviations:view'] },
-      { href: '/imports', label: 'Registrar Evidência', description: 'Arquivos, CSV e documentos', icon: UploadCloud, permissions: ['imports:view', 'imports:create'] },
-    ],
-  },
-  {
     heading: 'Gestão',
     description: 'Cadastros e objetos de gestão do dia a dia',
     intent: 'management',
@@ -127,21 +98,6 @@ export const mobileNavItems: NavItem[] = [
   { href: '/org', label: 'Árvore', icon: Network, permissions: ['org:view'] },
   { href: '/reports', label: 'Relatórios', icon: FileSpreadsheet, permissions: ['reports:view', 'reports:export'] },
   settingsNavItem,
-];
-
-export const productAreas = [
-  {
-    title: 'Visualizações',
-    description: 'Dashboards, mapas, faróis, histórico, rankings e tendências.',
-    href: '/visualization',
-    icon: LayoutDashboard,
-  },
-  {
-    title: 'Configurações',
-    description: 'Usuários, permissões, parâmetros, auditoria e preferências do sistema.',
-    href: '/settings',
-    icon: SlidersHorizontal,
-  },
 ];
 
 // Mapeamento centralizado URL -> permissoes necessarias.

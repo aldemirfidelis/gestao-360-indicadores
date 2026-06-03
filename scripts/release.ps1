@@ -9,7 +9,10 @@
       e dispara o `make deploy` na Droplet via SSH.
 
 .EXAMPLE
-  .\scripts\release.ps1 -Message "fix: ajuste no mapa"
+  # build + commit + push + deploy, tudo de uma vez (pergunta a mensagem se faltar):
+  .\scripts\release.ps1
+.EXAMPLE
+  .\scripts\release.ps1 -m "fix: ajuste no mapa"
 .EXAMPLE
   # so re-deploy do que ja esta no main (sem commitar nada):
   .\scripts\release.ps1 -SkipCommit
@@ -25,6 +28,7 @@
   Pre-requisitos: pnpm, git e a chave SSH da Droplet ja configurados.
 #>
 param(
+  [Alias('m')]
   [string]$Message,
   [switch]$FullBuild,
   [switch]$SkipVerify,
@@ -117,12 +121,16 @@ if (-not $SkipDeploy) {
 
   Write-Host "Acompanhando deploy.log (git pull + build + up + migrate; pode levar alguns minutos)..." -ForegroundColor DarkGray
   $deployOk = $false
-  for ($i = 0; $i -lt 50; $i++) {
+  # Regex de erro (grep -E). 'make: \*\*\*' = falha de make; 'Exit status [1-9]' = saida nao-zero.
+  $errorRegex = 'ELIFECYCLE|failed to solve|Cannot connect|error during connect|Error response from daemon|make: \*\*\*|Exit status [1-9]'
+  for ($i = 0; $i -lt 75; $i++) {
     Start-Sleep -Seconds 12
-    $state = ssh @sshArgs "cd $RemoteDir && if grep -q 'Deploy concluido' deploy.log; then echo DONE; elif grep -qiE 'ELIFECYCLE|failed to solve|Cannot connect|Exit status 1' deploy.log; then echo ERROR; else echo RUNNING; fi; tail -n 1 deploy.log"
-    Write-Host "  $state"
-    if ($state -match 'DONE') { $deployOk = $true; break }
-    if ($state -match 'ERROR') { break }
+    # Token EXPLICITO (STATUS=...): nunca casa com o 'DONE' do build do Docker ('#18 DONE 105s').
+    $status = ssh @sshArgs "cd $RemoteDir && if grep -q 'Deploy concluido' deploy.log; then echo STATUS=DONE; elif grep -qiE '$errorRegex' deploy.log; then echo STATUS=ERROR; else echo STATUS=RUNNING; fi"
+    $tail = (ssh @sshArgs "cd $RemoteDir && tail -n 1 deploy.log") -join ' '
+    Write-Host ("  [{0:d2}] {1}  {2}" -f $i, ($status -replace 'STATUS=', ''), $tail) -ForegroundColor DarkGray
+    if ($status -match 'STATUS=DONE')  { $deployOk = $true; break }
+    if ($status -match 'STATUS=ERROR') { break }
   }
   if (-not $deployOk) {
     Write-Host "`n--- ultimas linhas do deploy.log ---" -ForegroundColor Yellow

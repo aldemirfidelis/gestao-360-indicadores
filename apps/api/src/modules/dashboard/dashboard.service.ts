@@ -153,15 +153,43 @@ export class DashboardService {
     });
     const indicatorsForDeviations = await this.prisma.indicator.findMany({
       where: { id: { in: deviationsBySector.map((d) => d.indicatorId) } },
-      select: { id: true, ownerNode: { select: { id: true, name: true, type: true } } },
+      select: {
+        id: true,
+        ownerNode: { select: { id: true, name: true, type: true } },
+        results: { orderBy: { periodDate: 'desc' }, take: 1, select: { light: true } },
+      },
     });
     const indOwner = new Map(indicatorsForDeviations.map((i) => [i.id, i.ownerNode]));
-    const sectorBuckets = new Map<string, { nodeId: string; nodeName: string; nodeType: string; deviations: number }>();
+    const latestLight = new Map(indicatorsForDeviations.map((i) => [i.id, i.results[0]?.light ?? 'GRAY']));
+    const sectorBuckets = new Map<
+      string,
+      {
+        nodeId: string;
+        nodeName: string;
+        nodeType: string;
+        deviations: number;
+        indicatorCount: number;
+        criticalIndicators: number;
+        attentionIndicators: number;
+      }
+    >();
     deviationsBySector.forEach((row) => {
       const owner = indOwner.get(row.indicatorId);
       if (!owner) return;
-      const bucket = sectorBuckets.get(owner.id) ?? { nodeId: owner.id, nodeName: owner.name, nodeType: owner.type, deviations: 0 };
+      const bucket = sectorBuckets.get(owner.id) ?? {
+        nodeId: owner.id,
+        nodeName: owner.name,
+        nodeType: owner.type,
+        deviations: 0,
+        indicatorCount: 0,
+        criticalIndicators: 0,
+        attentionIndicators: 0,
+      };
       bucket.deviations += row._count.indicatorId;
+      bucket.indicatorCount++;
+      const light = latestLight.get(row.indicatorId);
+      if (light === 'RED') bucket.criticalIndicators++;
+      if (light === 'YELLOW') bucket.attentionIndicators++;
       sectorBuckets.set(owner.id, bucket);
     });
 

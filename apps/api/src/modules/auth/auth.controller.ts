@@ -1,4 +1,4 @@
-import { Body, Controller, Get, Post, Req, UseGuards } from '@nestjs/common';
+import { Body, Controller, Get, Patch, Post, Req, UseGuards } from '@nestjs/common';
 import { Throttle } from '@nestjs/throttler';
 import { Request } from 'express';
 import { z } from 'zod';
@@ -17,6 +17,17 @@ const loginDto = z.object({
 const refreshDto = z.object({
   refreshToken: z.string().min(10),
 });
+
+const changePasswordDto = z
+  .object({
+    currentPassword: z.string().min(1),
+    newPassword: z.string().min(6),
+    confirmPassword: z.string().min(6),
+  })
+  .refine((data) => data.newPassword === data.confirmPassword, {
+    message: 'As senhas não conferem',
+    path: ['confirmPassword'],
+  });
 
 @Controller('auth')
 export class AuthController {
@@ -59,5 +70,19 @@ export class AuthController {
   @Get('me')
   me(@CurrentUser() user: AuthPayload) {
     return this.auth.me(user);
+  }
+
+  @UseGuards(JwtAuthGuard)
+  @Patch('me/password')
+  changePassword(
+    @CurrentUser() me: AuthPayload,
+    @Body(new ZodValidationPipe(changePasswordDto)) body: z.infer<typeof changePasswordDto>,
+    @Req() req: Request,
+  ) {
+    return this.auth.changePassword(me.sub, body.currentPassword, body.newPassword, {
+      companyId: me.companyId,
+      ip: req.ip,
+      userAgent: req.headers['user-agent'],
+    });
   }
 }

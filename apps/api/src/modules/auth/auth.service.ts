@@ -147,6 +147,47 @@ export class AuthService {
     return { ok: true };
   }
 
+  async changePassword(
+    userId: string,
+    currentPassword: string,
+    newPassword: string,
+    ctx?: { companyId?: string; ip?: string; userAgent?: string },
+  ) {
+    const user = await this.prisma.user.findUnique({
+      where: { id: userId },
+      select: { id: true, companyId: true, passwordHash: true },
+    });
+    if (!user) throw new UnauthorizedException('Usuário não encontrado');
+
+    const ok = await bcrypt.compare(currentPassword, user.passwordHash);
+    if (!ok) throw new UnauthorizedException('Senha atual inválida');
+
+    const rounds = parseInt(process.env.BCRYPT_ROUNDS ?? '10', 10);
+    await this.prisma.user.update({
+      where: { id: userId },
+      data: {
+        passwordHash: await bcrypt.hash(newPassword, rounds),
+        passwordResetRequired: false,
+      },
+    });
+
+    await this.prisma.auditLog.create({
+      data: {
+        companyId: ctx?.companyId ?? user.companyId,
+        userId,
+        action: 'CHANGE_PASSWORD',
+        module: 'auth',
+        entity: 'User',
+        entityId: userId,
+        result: 'SUCCESS',
+        ip: ctx?.ip,
+        userAgent: ctx?.userAgent,
+      },
+    });
+
+    return { ok: true };
+  }
+
   private async userProfile(userId: string) {
     const user = await this.prisma.user.findUnique({
       where: { id: userId },

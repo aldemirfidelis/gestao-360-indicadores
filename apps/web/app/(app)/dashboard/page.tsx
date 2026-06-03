@@ -5,17 +5,13 @@ import { useEffect, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import {
   AlertTriangle,
-  ArrowRight,
   Building2,
   CalendarClock,
   CheckCircle2,
   ClipboardList,
   Clock,
-  LayoutDashboard,
-  LineChart,
   Plus,
   Target,
-  Zap,
   Settings,
   Calendar,
   BarChart3,
@@ -26,7 +22,6 @@ import {
   FileBarChart,
 } from 'lucide-react';
 import { PageHeader } from '@/components/shell/page-header';
-import { productAreas } from '@/components/shell/navigation';
 import { MetricCard } from '@/components/platform/metric-card';
 import { SectionCard } from '@/components/platform/section-card';
 import { StatusBadge } from '@/components/platform/status-badge';
@@ -59,7 +54,15 @@ interface Overview {
     priority: string;
     responsibleUser: { id: string; name: string } | null;
   }>;
-  sectorsWithDeviation: Array<{ nodeId: string; nodeName: string; nodeType: string; deviations: number }>;
+  sectorsWithDeviation: Array<{
+    nodeId: string;
+    nodeName: string;
+    nodeType: string;
+    deviations: number;
+    indicatorCount: number;
+    criticalIndicators: number;
+    attentionIndicators: number;
+  }>;
 }
 
 interface Pending {
@@ -105,7 +108,7 @@ export default function HomePage() {
   });
   const worst = useQuery<WorstRow[]>({
     queryKey: ['dashboard', 'worst'],
-    queryFn: () => api<WorstRow[]>('/dashboard/worst?limit=5'),
+    queryFn: () => api<WorstRow[]>('/dashboard/worst?limit=12'),
   });
 
   const [selectedShortcuts, setSelectedShortcuts] = useState<string[]>([]);
@@ -149,35 +152,7 @@ export default function HomePage() {
         eyebrow="Início"
         title="Visão geral do Gestão 360"
         description="Resumo executivo, pendências operacionais e atalhos para lancar dados ou analisar desempenho."
-        actions={
-          <Button asChild>
-            <Link href="/visualization">
-              <LayoutDashboard className="mr-2 h-4 w-4" />
-              Visualização
-            </Link>
-          </Button>
-        }
       />
-
-      <div className="mb-6 grid grid-cols-1 gap-4 lg:grid-cols-3">
-        {productAreas.map((área) => {
-          const Icon = área.icon;
-          return (
-            <Link key={área.href} href={área.href} className="panel panel-hover flex items-start gap-4 p-5">
-              <div className="grid h-11 w-11 shrink-0 place-items-center rounded-lg bg-primary text-primary-foreground">
-                <Icon className="h-5 w-5" />
-              </div>
-              <div className="min-w-0 flex-1">
-                <div className="flex items-center justify-between gap-3">
-                  <h2 className="text-base font-semibold">{área.title}</h2>
-                  <ArrowRight className="h-4 w-4 text-muted-foreground" />
-                </div>
-                <p className="mt-1 text-sm leading-relaxed text-muted-foreground">{área.description}</p>
-              </div>
-            </Link>
-          );
-        })}
-      </div>
 
       <div className="mb-6 grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
         <MetricCard
@@ -249,27 +224,27 @@ export default function HomePage() {
         />
       </div>
 
-      <div className="grid grid-cols-1 gap-6 xl:grid-cols-[1fr,380px]">
+      <div className="grid grid-cols-1 gap-6 xl:grid-cols-[1fr,340px]">
         <SectionCard
           title="Atalhos rápidos"
-          description="Personalize seus atalhos para ações frequentes."
+          description="Acesso direto às rotinas mais usadas."
           actions={
             <Button variant="ghost" size="sm" onClick={() => setIsConfigOpen(true)}>
               <Settings className="mr-1.5 h-3.5 w-3.5" />
-              Configurar
+              Editar
             </Button>
           }
-          contentClassName="grid grid-cols-1 gap-3 md:grid-cols-2"
+          contentClassName="grid grid-cols-2 gap-2 p-3 sm:grid-cols-3"
         >
           {SHORTCUT_DEFS.filter((s) => selectedShortcuts.includes(s.id)).map((item) => {
             const Icon = item.icon;
             return (
-              <Button key={item.id} variant="outline" className="h-14 justify-start gap-3 bg-background" asChild>
+              <Button key={item.id} variant="outline" className="h-10 justify-start gap-2 bg-background px-2 text-xs" asChild>
                 <Link href={item.href}>
-                  <span className="grid h-8 w-8 place-items-center rounded-md bg-muted">
-                    <Icon className="h-4 w-4" />
+                  <span className="grid h-7 w-7 shrink-0 place-items-center rounded-md bg-muted">
+                    <Icon className="h-3.5 w-3.5" />
                   </span>
-                  {item.label}
+                  <span className="truncate">{item.label}</span>
                 </Link>
               </Button>
             );
@@ -278,21 +253,21 @@ export default function HomePage() {
             type="button"
             onClick={() => setIsConfigOpen(true)}
             className={cn(
-              'group flex h-14 items-center justify-center gap-2 rounded-md border border-dashed text-sm text-muted-foreground transition hover:border-primary hover:bg-primary/5 hover:text-primary',
-              selectedShortcuts.length === 0 && 'col-span-2',
+              'group flex h-10 items-center justify-center gap-2 rounded-md border border-dashed px-2 text-xs text-muted-foreground transition hover:border-primary hover:bg-primary/5 hover:text-primary',
+              selectedShortcuts.length === 0 && 'col-span-2 sm:col-span-3',
             )}
           >
-            <span className="grid h-8 w-8 place-items-center rounded-md bg-muted text-muted-foreground transition group-hover:bg-primary/10 group-hover:text-primary">
-              <Plus className="h-4 w-4" />
+            <span className="grid h-7 w-7 place-items-center rounded-md bg-muted text-muted-foreground transition group-hover:bg-primary/10 group-hover:text-primary">
+              <Plus className="h-3.5 w-3.5" />
             </span>
-            <span className="font-medium">
+            <span className="truncate font-medium">
               {selectedShortcuts.length === 0 ? 'Adicionar seu primeiro atalho' : 'Adicionar atalho'}
             </span>
           </button>
         </SectionCard>
 
-        <SectionCard title="Alertas importantes" description="Itens que merecem acompanhamento.">
-          <div className="mb-4 rounded-lg border bg-muted/35 p-3">
+        <SectionCard title="Alertas importantes" description="Histórico recente dos itens críticos." contentClassName="p-3">
+          <div className="mb-3 rounded-lg border bg-muted/35 p-2.5">
             <div className="flex items-center justify-between gap-3">
               <div>
                 <div className="text-sm font-semibold">Lançamentos pendentes</div>
@@ -303,9 +278,9 @@ export default function HomePage() {
               <div className="text-2xl font-semibold">{formatNumber(pending.data?.pending)}</div>
             </div>
           </div>
-          <div className="space-y-3">
+          <div className="max-h-[285px] space-y-2 overflow-y-auto pr-1">
             {worst.data?.map((w) => (
-              <Link key={`${w.indicator.id}-${w.periodRef}`} href={`/indicators/${w.indicator.id}`} className="flex items-start justify-between gap-3 rounded-lg border p-3 transition-colors hover:bg-accent/35">
+              <Link key={`${w.indicator.id}-${w.periodRef}`} href={`/indicators/${w.indicator.id}`} className="flex items-start justify-between gap-3 rounded-lg border p-2.5 transition-colors hover:bg-accent/35">
                 <div className="min-w-0">
                   <div className="truncate text-sm font-semibold">{w.indicator.name}</div>
                   <div className="mt-1 flex items-center gap-2 text-xs text-muted-foreground">
@@ -351,17 +326,25 @@ export default function HomePage() {
         <SectionCard title="Setores com mais desvios" description="Onde concentrar energia gerencial agora.">
           <div className="space-y-3">
             {ov?.sectorsWithDeviation?.map((sector) => (
-              <Link key={sector.nodeId} href="/org" className="flex items-center justify-between gap-3 rounded-lg border p-3 transition-colors hover:bg-accent/35">
+              <Link key={sector.nodeId} href={`/indicators?ownerNodeId=${sector.nodeId}`} className="flex items-center justify-between gap-3 rounded-lg border p-3 transition-colors hover:bg-accent/35">
                 <div className="flex min-w-0 items-center gap-3">
                   <div className="grid h-9 w-9 shrink-0 place-items-center rounded-lg bg-status-orange/10 text-status-orange">
                     <Building2 className="h-4 w-4" />
                   </div>
                   <div className="min-w-0">
                     <div className="truncate text-sm font-semibold">{sector.nodeName}</div>
-                    <div className="text-xs text-muted-foreground">{sector.nodeType}</div>
+                    <div className="text-xs text-muted-foreground">
+                      {sector.nodeType} · {formatNumber(sector.indicatorCount)} indicador(es) · {formatNumber(sector.criticalIndicators)} crítico(s)
+                    </div>
+                    {sector.attentionIndicators > 0 && (
+                      <div className="mt-1 text-[11px] text-status-yellow">{formatNumber(sector.attentionIndicators)} em atenção</div>
+                    )}
                   </div>
                 </div>
-                <div className="text-xl font-semibold">{sector.deviations}</div>
+                <div className="text-right">
+                  <div className="text-xl font-semibold">{sector.deviations}</div>
+                  <div className="text-[10px] uppercase text-muted-foreground">desvios</div>
+                </div>
               </Link>
             ))}
             {(!ov?.sectorsWithDeviation || ov.sectorsWithDeviation.length === 0) && (

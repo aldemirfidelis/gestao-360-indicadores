@@ -25,6 +25,7 @@ interface AuthCtx {
   hasPermission: (permissions?: string | string[]) => boolean;
   login: (email: string, password: string) => Promise<void>;
   logout: () => Promise<void>;
+  refreshUser: () => Promise<AuthUser | null>;
   /** Super Admin: troca a empresa ativa (null = volta à empresa de origem) e recarrega. */
   switchCompany: (companyId: string | null) => Promise<void>;
 }
@@ -39,6 +40,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const router = useRouter();
   const pathname = usePathname();
 
+  const refreshUser = async () => {
+    const profile = await api<AuthUser & { sub?: string }>('/auth/me');
+    const normalized = { ...profile, id: profile.sub ?? profile.id, permissions: profile.permissions ?? [] };
+    setUser(normalized);
+    return normalized;
+  };
+
   useEffect(() => {
     const token = getAccessToken();
     if (!token) {
@@ -46,8 +54,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       if (!PUBLIC_PATHS.includes(pathname)) router.replace('/login');
       return;
     }
-    api<AuthUser & { sub?: string }>('/auth/me')
-      .then((u) => setUser({ ...u, id: u.sub ?? u.id, permissions: u.permissions ?? [] }))
+    refreshUser()
       .catch(() => {
         clearTokens();
         router.replace('/login');
@@ -63,10 +70,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       user: AuthUser;
     }>('/auth/login', { method: 'POST', json: { email, password } });
     setTokens(out.accessToken, out.refreshToken);
-    const profile = await api<AuthUser & { sub?: string }>('/auth/me');
-    setUser({ ...profile, id: profile.sub ?? profile.id, permissions: profile.permissions ?? out.user.permissions ?? [] });
+    const profile = await refreshUser();
     // Super Admin escolhe qual empresa administrar antes de entrar.
-    router.replace(profile.role === 'SUPER_ADMIN' ? '/selecionar-empresa' : '/dashboard');
+    router.replace(profile?.role === 'SUPER_ADMIN' ? '/selecionar-empresa' : '/dashboard');
   };
 
   const switchCompany = async (companyId: string | null) => {
@@ -96,7 +102,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     return required.some((permission) => granted.has(permission) || granted.has(`${permission.split(':')[0]}:manage`));
   };
 
-  return <Ctx.Provider value={{ user, loading, hasPermission, login, logout, switchCompany }}>{children}</Ctx.Provider>;
+  return <Ctx.Provider value={{ user, loading, hasPermission, login, logout, refreshUser, switchCompany }}>{children}</Ctx.Provider>;
 }
 
 export function useAuth(): AuthCtx {

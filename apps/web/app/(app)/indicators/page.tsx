@@ -307,6 +307,29 @@ export default function IndicatorsPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [searchParams]);
 
+  useEffect(() => {
+    if (!options.data) return;
+    const lightParam = searchParams.get('light');
+    const ownerNodeId = searchParams.get('ownerNodeId');
+    if (!lightParam && !ownerNodeId) return;
+
+    setFilters((prev) => {
+      const next = { ...prev };
+      if (lightParam && ['GREEN', 'YELLOW', 'RED', 'GRAY'].includes(lightParam)) {
+        next.light = lightParam;
+      }
+      if (ownerNodeId) {
+        const node = options.data.orgNodes.find((item) => item.id === ownerNodeId);
+        if (node) {
+          next.companyId = node.companyId;
+          next.areaMacroId = node.parentId ?? node.id;
+          next.areaMicroId = node.parentId ? node.id : '';
+        }
+      }
+      return next;
+    });
+  }, [options.data, searchParams]);
+
   const indicators = useQuery<IndicatorRow[]>({
     queryKey: ['indicators', filters],
     enabled: Boolean(options.data),
@@ -505,11 +528,11 @@ export default function IndicatorsPage() {
         }
       />
 
-      <div className="mb-6 grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
-        <MetricCard title="Total de indicadores" value={formatNumber(rows.length)} description={`${formatNumber(stats.active)} ativos`} icon={<Target className="h-4 w-4" />} tone="blue" />
-        <MetricCard title="Críticos" value={formatNumber(stats.red)} description="Fora da meta no último período" icon={<AlertTriangle className="h-4 w-4" />} tone="red" />
-        <MetricCard title="Sem responsável" value={formatNumber(stats.withoutOwner)} description="Revisar governanca" icon={<UserRound className="h-4 w-4" />} tone="yellow" />
-        <MetricCard title="Sem dados mensais" value={formatNumber(stats.withoutMonthlyData)} description="Precisam de lançamento" icon={<FileClock className="h-4 w-4" />} tone="purple" />
+      <div className="mb-5 grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4">
+        <MetricCard compact title="Total de indicadores" value={formatNumber(rows.length)} description={`${formatNumber(stats.active)} ativos`} icon={<Target className="h-4 w-4" />} tone="blue" />
+        <MetricCard compact title="Críticos" value={formatNumber(stats.red)} description="Fora da meta no último período" icon={<AlertTriangle className="h-4 w-4" />} tone="red" />
+        <MetricCard compact title="Sem responsável" value={formatNumber(stats.withoutOwner)} description="Revisar governanca" icon={<UserRound className="h-4 w-4" />} tone="yellow" />
+        <MetricCard compact title="Sem dados mensais" value={formatNumber(stats.withoutMonthlyData)} description="Precisam de lançamento" icon={<FileClock className="h-4 w-4" />} tone="purple" />
       </div>
 
       <section className="panel mb-6 p-4">
@@ -1055,11 +1078,11 @@ function IndicatorManagementCard({
   }
 
   return (
-    <article className="panel panel-hover flex h-full flex-col p-5">
-      <div className="flex items-start justify-between gap-4">
+    <article className="panel panel-hover flex h-full flex-col p-4">
+      <div className="flex items-start justify-between gap-3">
         <div className="min-w-0 flex-1">
-          <h3 className="text-2xl font-bold leading-tight">{indicator.name}</h3>
-          <div className="mt-2 flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-muted-foreground">
+          <h3 className="text-xl font-bold leading-tight">{indicator.name}</h3>
+          <div className="mt-1.5 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-muted-foreground">
             <span
               className={cn(
                 'inline-flex items-center gap-1 border px-1.5 py-0.5 text-[10px] font-medium uppercase tracking-wide',
@@ -1080,7 +1103,7 @@ function IndicatorManagementCard({
         <StatusLight light={light} size="md" />
       </div>
 
-      <div className="mt-5">
+      <div className="mt-4">
         <div className="flex flex-col">
           <div className="flex flex-wrap items-center justify-between gap-2 mb-2">
             <div className="flex flex-wrap items-center gap-2">
@@ -1134,7 +1157,7 @@ function IndicatorManagementCard({
             </div>
           </div>
 
-          <div className="h-96 border border-border/60 bg-card/60 p-3 sm:h-[32rem]">
+          <div className="h-80 border border-border/60 bg-card/60 p-2.5 sm:h-[27rem]">
             {hasAnyData ? (
               <ResponsiveContainer width="100%" height="100%">
                 {chartType === 'bar' ? (
@@ -1215,7 +1238,7 @@ function IndicatorManagementCard({
       {indicator._count.actions > 0 && <IndicatorLinkedActions indicatorId={indicator.id} />}
 
       {showActions && (
-      <div className="mt-5 flex flex-wrap gap-2 border-t pt-4">
+      <div className="mt-4 flex flex-wrap gap-2 border-t pt-3">
         {canLaunch && (
           <Button variant="default" size="sm" onClick={onResult}>
             <CalendarDays className="mr-1.5 h-3.5 w-3.5" />
@@ -1307,8 +1330,8 @@ function MicroIndicatorRow({
   const hasHistory = monthlyHistory.some((point) => point.meta !== null || point.realizado !== null);
 
   return (
-    <div className="group relative flex flex-col gap-3 rounded-lg border bg-muted/15 p-4 transition-all hover:border-primary/20 hover:bg-muted/25">
-      <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
+    <div className="group relative flex flex-col gap-2 rounded-lg border bg-muted/15 p-3 transition-all hover:border-primary/20 hover:bg-muted/25">
+      <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
         
         {/* Left Side: Indicator Metadata and Numbers */}
         <div className="flex-1 min-w-0">
@@ -1325,7 +1348,7 @@ function MicroIndicatorRow({
             {micro.name}
           </h4>
           
-          <div className="mt-2 flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-muted-foreground">
+          <div className="mt-1.5 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-muted-foreground">
             <span className="flex items-center gap-1">
               <span className="font-medium text-foreground/80">Meta:</span> 
               {formatNumber(micro.currentTarget?.target)}
@@ -1347,10 +1370,10 @@ function MicroIndicatorRow({
         </div>
 
         {/* Right Side: Mini Bar Chart Sparkline */}
-        <div className="flex items-center gap-3 self-stretch md:self-auto min-w-[170px] justify-between border-t border-muted md:border-t-0 md:pt-0 pt-3">
+        <div className="flex items-center gap-3 self-stretch md:self-auto min-w-[155px] justify-between border-t border-muted pt-2.5 md:border-t-0 md:pt-0">
           {hasHistory ? (
             <div className="flex flex-col items-center gap-0.5">
-              <div className="h-10 w-40">
+              <div className="h-9 w-36">
                 <ResponsiveContainer width="100%" height="100%">
                   <BarChart data={monthlyHistory} barGap={1}>
                     <Tooltip
@@ -1373,13 +1396,13 @@ function MicroIndicatorRow({
                   </BarChart>
                 </ResponsiveContainer>
               </div>
-              <div className="flex w-40 justify-between px-1 text-[9px] text-muted-foreground/60 select-none">
+              <div className="flex w-36 justify-between px-1 text-[9px] text-muted-foreground/60 select-none">
                 <span>Jan</span>
                 <span>Dez</span>
               </div>
             </div>
           ) : (
-            <div className="flex h-12 w-40 items-center justify-center rounded border border-dashed text-[10px] text-muted-foreground/50">
+            <div className="flex h-10 w-36 items-center justify-center rounded border border-dashed text-[10px] text-muted-foreground/50">
               Sem dados mensais
             </div>
           )}
@@ -1389,7 +1412,7 @@ function MicroIndicatorRow({
 
       {/* Micro actions row */}
       {showActions && (
-      <div className="mt-1 flex flex-wrap gap-1 border-t pt-2.5">
+      <div className="mt-1 flex flex-wrap gap-1 border-t pt-2">
         <Button variant="ghost" size="sm" className="h-7 text-xs px-2.5 gap-1.5" onClick={onView} title="Visualizar">
           <Eye className="h-3.5 w-3.5" />
           <span className="hidden sm:inline">Visualizar</span>

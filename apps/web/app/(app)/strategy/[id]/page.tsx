@@ -1285,62 +1285,73 @@ function StrategyMapPageInner() {
         <div className="space-y-2">
           {!presentationMode && (
             <div className="flex flex-wrap items-center gap-1.5 rounded-md border bg-card px-2 py-1.5">
-              <Button size="sm" variant={editMode ? 'default' : 'outline'} onClick={() => setEditMode((value) => !value)}>
-                <Pencil className="mr-1.5 h-3.5 w-3.5" />
-                {editMode ? 'Modo edição' : 'Modo visualização'}
+              <Button
+                size="icon"
+                variant={editMode ? 'default' : 'outline'}
+                className="h-9 w-9"
+                onClick={() => setEditMode((value) => !value)}
+                title={editMode ? 'Modo edição' : 'Modo visualização'}
+                aria-label={editMode ? 'Modo edição' : 'Modo visualização'}
+              >
+                {editMode ? <Pencil className="h-3.5 w-3.5" /> : <Monitor className="h-3.5 w-3.5" />}
               </Button>
-              <Button size="sm" variant="outline" onClick={() => setPerspectiveOpen(true)} disabled={!editMode}>
-                <Plus className="mr-1.5 h-3.5 w-3.5" />
-                Perspectiva
+              <Button size="icon" variant="outline" className="h-9 w-9" onClick={() => setPerspectiveOpen(true)} disabled={!editMode} title="Perspectiva" aria-label="Perspectiva">
+                <Layers className="h-3.5 w-3.5" />
               </Button>
               <Button
-                size="sm"
+                size="icon"
+                className="h-9 w-9"
                 onClick={() => {
                   setObjectiveForm(defaultObjectiveForm(map.perspectives[0]?.id));
                   setObjectiveOpen(true);
                 }}
                 disabled={!editMode || map.perspectives.length === 0}
+                title="Objetivo"
+                aria-label="Objetivo"
               >
-                <Plus className="mr-1.5 h-3.5 w-3.5" />
-                Objetivo
+                <Plus className="h-3.5 w-3.5" />
               </Button>
-              <Button size="sm" variant="outline" onClick={() => saveLayout.mutate()} disabled={!editMode || saveLayout.isPending}>
-                <Save className="mr-1.5 h-3.5 w-3.5" />
-                Salvar layout
+              <Button size="icon" variant="outline" className="h-9 w-9" onClick={() => saveLayout.mutate()} disabled={!editMode || saveLayout.isPending} title="Salvar layout" aria-label="Salvar layout">
+                <Save className="h-3.5 w-3.5" />
               </Button>
-              <Button size="sm" variant="outline" onClick={autoLayout} disabled={!editMode}>
-                <Compass className="mr-1.5 h-3.5 w-3.5" />
-                Organizar
+              <Button size="icon" variant="outline" className="h-9 w-9" onClick={autoLayout} disabled={!editMode} title="Organizar" aria-label="Organizar">
+                <Compass className="h-3.5 w-3.5" />
               </Button>
-              <Button size="sm" variant="outline" onClick={() => setPresentationMode(true)}>
-                <Presentation className="mr-1.5 h-3.5 w-3.5" />
-                Apresentar
+              <Button size="icon" variant="outline" className="h-9 w-9" onClick={() => setPresentationMode(true)} title="Apresentar" aria-label="Apresentar">
+                <Presentation className="h-3.5 w-3.5" />
               </Button>
               <div className="ml-auto flex flex-wrap items-center gap-1.5">
-                <NativeSelect
-                  className="h-9 w-[188px] text-xs"
-                  value={period}
-                  onChange={(e) => setPeriod(e.target.value)}
-                  title="Ver faróis e dados como estavam em um período"
+                <Button
+                  size="icon"
+                  variant={period === '' ? 'default' : 'outline'}
+                  className="h-9 w-9"
+                  onClick={() => setPeriod('')}
+                  title="Período atual"
+                  aria-label="Período atual"
                 >
-                  <option value="">Período atual</option>
-                  {periodOptions.map((p) => (
-                    <option key={p} value={p}>
-                      {periodRefLabel(p)}
-                    </option>
-                  ))}
-                </NativeSelect>
-                <Button size="sm" variant="outline" onClick={() => mapQuery.refetch()} disabled={mapQuery.isFetching} title="Atualizar dados">
-                  <RefreshCw className={cn('mr-1.5 h-3.5 w-3.5', mapQuery.isFetching && 'animate-spin')} />
-                  Atualizar
+                  <Calendar className="h-3.5 w-3.5" />
                 </Button>
-                <Button size="sm" variant="outline" onClick={downloadMapPng} title="Baixar todo o fluxo em PNG (enquadra automaticamente)">
-                  <Download className="mr-1.5 h-3.5 w-3.5" />
-                  Baixar Fluxo
+                {periodOptions.map((p) => (
+                  <Button
+                    key={p}
+                    size="icon"
+                    variant={period === p ? 'default' : 'outline'}
+                    className="h-9 w-9"
+                    onClick={() => setPeriod(p)}
+                    title={periodRefLabel(p)}
+                    aria-label={periodRefLabel(p)}
+                  >
+                    <Calendar className="h-3.5 w-3.5" />
+                  </Button>
+                ))}
+                <Button size="icon" variant="outline" className="h-9 w-9" onClick={() => mapQuery.refetch()} disabled={mapQuery.isFetching} title="Atualizar" aria-label="Atualizar">
+                  <RefreshCw className={cn('h-3.5 w-3.5', mapQuery.isFetching && 'animate-spin')} />
                 </Button>
-                <Button size="sm" variant="outline" onClick={emailMapPng} title="Exportar PNG e abrir email">
-                  <Mail className="mr-1.5 h-3.5 w-3.5" />
-                  Email
+                <Button size="icon" variant="outline" className="h-9 w-9" onClick={downloadMapPng} title="Baixar Fluxo" aria-label="Baixar Fluxo">
+                  <Download className="h-3.5 w-3.5" />
+                </Button>
+                <Button size="icon" variant="outline" className="h-9 w-9" onClick={emailMapPng} title="Fluxo Email" aria-label="Fluxo Email">
+                  <Mail className="h-3.5 w-3.5" />
                 </Button>
               </div>
             </div>

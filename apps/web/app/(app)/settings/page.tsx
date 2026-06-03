@@ -14,6 +14,7 @@ import {
   KeyRound,
   Layers3,
   Plus,
+  Plug,
   Save,
   ScrollText,
   Search,
@@ -366,6 +367,28 @@ export default function SettingsPage() {
             </button>
           );
         })}
+      </SectionCard>
+
+      <SectionCard
+        title="Integrações"
+        description="Conectores internos, serviços de apoio e status operacional ficam dentro de Configurações."
+        className="mb-6"
+        contentClassName="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-3"
+      >
+        <Link
+          href="/integracoes"
+          className="group flex h-full items-start gap-3 rounded-lg border bg-card p-4 shadow-sm transition-colors hover:bg-accent/35"
+        >
+          <div className="grid h-10 w-10 shrink-0 place-items-center rounded-md bg-status-blue/10 text-status-blue">
+            <Plug className="h-5 w-5" />
+          </div>
+          <div className="min-w-0">
+            <div className="text-sm font-semibold">Integrações</div>
+            <p className="mt-1 text-xs leading-relaxed text-muted-foreground">
+              Acompanhe conectores, eventos e rotinas técnicas em um local reservado à administração.
+            </p>
+          </div>
+        </Link>
       </SectionCard>
 
       {canManageUsers && (

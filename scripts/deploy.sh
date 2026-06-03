@@ -23,11 +23,12 @@ if [ ! -f ".env" ]; then
   exit 1
 fi
 
-echo "[1/4] Atualizando codigo (git pull)..."
+echo "[1/5] Atualizando codigo (git pull)..."
 git pull --ff-only
+echo "Commit em deploy: $(git rev-parse --short HEAD) - $(git log -1 --pretty=%s)"
 
 echo ""
-echo "[2/4] Build das imagens Docker (sequencial para poupar memoria)..."
+echo "[2/5] Build das imagens Docker (sequencial para poupar memoria)..."
 docker compose -f "$COMPOSE_FILE" build --pull api
 docker compose -f "$COMPOSE_FILE" build --pull web
 

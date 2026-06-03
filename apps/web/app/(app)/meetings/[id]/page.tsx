@@ -387,6 +387,55 @@ export default function MeetingDetailPage() {
               </div>
             </div>
           </SectionCard>
+
+          <SectionCard title="Pauta da reunião" description="Itens para conduzir a conversa e registrar os pontos tratados.">
+            <div className="mb-3 flex gap-2">
+              <Input
+                placeholder="Adicionar item de pauta..."
+                value={agendaTopic}
+                onChange={(e) => setAgendaTopic(e.target.value)}
+                onKeyDown={(e) => e.key === 'Enter' && agendaTopic && addAgenda.mutate()}
+              />
+              <Button onClick={() => addAgenda.mutate()} disabled={!agendaTopic || addAgenda.isPending}>
+                <Plus className="h-4 w-4" />
+              </Button>
+            </div>
+            <ol className="space-y-2">
+              {m.agendaItems.map((a, i) => (
+                <li key={a.id} className="flex gap-3 rounded-lg border p-3 text-sm">
+                  <span className="grid h-6 w-6 shrink-0 place-items-center rounded-full bg-muted text-xs text-muted-foreground">{i + 1}</span>
+                  <span>{a.topic}</span>
+                </li>
+              ))}
+            </ol>
+            {m.agendaItems.length === 0 && <p className="py-4 text-center text-sm text-muted-foreground">Sem itens de pauta.</p>}
+          </SectionCard>
+
+          <SectionCard title="Convites e logs de e-mail" description="Cada envio fica registrado para auditoria e reenvio.">
+            <div className="space-y-2">
+              {m.emailLogs.map((log) => (
+                <div key={log.id} className="rounded-lg border p-3 text-sm">
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="min-w-0">
+                      <div className="truncate font-medium">{log.recipientName ?? log.recipientEmail}</div>
+                      <div className="truncate text-xs text-muted-foreground">{log.recipientEmail} · {formatDateTime(log.sentAt ?? log.createdAt)}</div>
+                      {log.errorMessage && <div className="mt-1 text-xs text-status-red">{log.errorMessage}</div>}
+                    </div>
+                    <StatusBadge value={log.status} label={emailStatusLabel(log.status)} tone={log.status === 'SENT' ? 'green' : log.status === 'ERROR' ? 'red' : 'yellow'} />
+                  </div>
+                </div>
+              ))}
+              {m.emailLogs.length === 0 && (
+                <div className="rounded-md border border-dashed p-4 text-center text-sm text-muted-foreground">
+                  Nenhum convite enviado ainda.
+                </div>
+              )}
+              <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                <Mail className="h-3.5 w-3.5" />
+                {m.calendarInvites.length} arquivo(s) ICS gerado(s)
+              </div>
+            </div>
+          </SectionCard>
         </div>
 
         <div className="space-y-6">
@@ -460,55 +509,6 @@ export default function MeetingDetailPage() {
                 </div>
               </div>
             )}
-          </SectionCard>
-
-          <SectionCard title="Pauta da reunião" description="Itens para conduzir a conversa e registrar os pontos tratados.">
-            <div className="mb-3 flex gap-2">
-              <Input
-                placeholder="Adicionar item de pauta..."
-                value={agendaTopic}
-                onChange={(e) => setAgendaTopic(e.target.value)}
-                onKeyDown={(e) => e.key === 'Enter' && agendaTopic && addAgenda.mutate()}
-              />
-              <Button onClick={() => addAgenda.mutate()} disabled={!agendaTopic || addAgenda.isPending}>
-                <Plus className="h-4 w-4" />
-              </Button>
-            </div>
-            <ol className="space-y-2">
-              {m.agendaItems.map((a, i) => (
-                <li key={a.id} className="flex gap-3 rounded-lg border p-3 text-sm">
-                  <span className="grid h-6 w-6 shrink-0 place-items-center rounded-full bg-muted text-xs text-muted-foreground">{i + 1}</span>
-                  <span>{a.topic}</span>
-                </li>
-              ))}
-            </ol>
-            {m.agendaItems.length === 0 && <p className="py-4 text-center text-sm text-muted-foreground">Sem itens de pauta.</p>}
-          </SectionCard>
-
-          <SectionCard title="Convites e logs de e-mail" description="Cada envio fica registrado para auditoria e reenvio.">
-            <div className="space-y-2">
-              {m.emailLogs.map((log) => (
-                <div key={log.id} className="rounded-lg border p-3 text-sm">
-                  <div className="flex items-start justify-between gap-3">
-                    <div className="min-w-0">
-                      <div className="truncate font-medium">{log.recipientName ?? log.recipientEmail}</div>
-                      <div className="truncate text-xs text-muted-foreground">{log.recipientEmail} · {formatDateTime(log.sentAt ?? log.createdAt)}</div>
-                      {log.errorMessage && <div className="mt-1 text-xs text-status-red">{log.errorMessage}</div>}
-                    </div>
-                    <StatusBadge value={log.status} label={emailStatusLabel(log.status)} tone={log.status === 'SENT' ? 'green' : log.status === 'ERROR' ? 'red' : 'yellow'} />
-                  </div>
-                </div>
-              ))}
-              {m.emailLogs.length === 0 && (
-                <div className="rounded-md border border-dashed p-4 text-center text-sm text-muted-foreground">
-                  Nenhum convite enviado ainda.
-                </div>
-              )}
-              <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                <Mail className="h-3.5 w-3.5" />
-                {m.calendarInvites.length} arquivo(s) ICS gerado(s)
-              </div>
-            </div>
           </SectionCard>
         </div>
       </div>

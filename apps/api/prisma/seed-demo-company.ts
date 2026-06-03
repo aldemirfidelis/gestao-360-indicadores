@@ -522,7 +522,7 @@ async function main() {
     }
     let prevTask: string | null = null;
     for (let t = 0; t < rint(3, 5); t++) {
-      const task = await prisma.projectTask.create({
+      const task: { id: string } = await prisma.projectTask.create({
         data: {
           projectId: project.id, name: `Tarefa ${t + 1}`, startDate: new Date(startsAt.getTime() + t * 10 * 86_400_000),
           endDate: new Date(startsAt.getTime() + (t + 1) * 10 * 86_400_000), progress: rint(0, 100),
