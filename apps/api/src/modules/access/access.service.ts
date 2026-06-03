@@ -1,6 +1,7 @@
 import { ForbiddenException, Injectable } from '@nestjs/common';
 import { UserRoleEnum } from '@prisma/client';
 import { PrismaService } from '../../prisma/prisma.service';
+import { effectiveCompanyId } from '../../common/effective-company';
 import {
   AreaAction,
   AreaScope,
@@ -38,13 +39,23 @@ export class AccessService {
 
     const user = await this.prisma.user.findUnique({
       where: { id: userId },
-      select: { id: true, companyId: true, role: true, defaultNodeId: true, company: { select: { areaAccessEnabled: true } } },
+      select: {
+        id: true,
+        companyId: true,
+        activeCompanyId: true,
+        role: true,
+        defaultNodeId: true,
+        company: { select: { areaAccessEnabled: true } },
+      },
     });
     if (!user) throw new ForbiddenException('Usuário inválido.');
 
+    // Empresa efetiva: Super Admin impersonando opera no contexto da empresa ativa.
+    const companyId = effectiveCompanyId(user);
+
     const now = new Date();
     const assignments = await this.prisma.userAreaAssignment.findMany({
-      where: { userId, companyId: user.companyId },
+      where: { userId, companyId },
       select: { orgNodeId: true, validFrom: true, validUntil: true },
     });
     const activeAssignmentAreas = assignments
@@ -57,7 +68,7 @@ export class AccessService {
 
     const ctx: AccessContext = {
       userId,
-      companyId: user.companyId,
+      companyId,
       role: user.role,
       companyWide: COMPANY_WIDE_ROLES.has(user.role),
       areaAccessEnabled: user.company?.areaAccessEnabled ?? true,

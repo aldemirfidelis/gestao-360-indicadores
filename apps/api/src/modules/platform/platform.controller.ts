@@ -4,7 +4,7 @@ import { Roles } from '../../common/decorators/roles.decorator';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import { AuthPayload } from '../auth/auth.types';
 import { PlatformService } from './platform.service';
-import { CreateCompanyDto, SetCompanyStatusDto, UpdateCompanyDto } from './platform.dto';
+import { CreateCompanyDto, SetCompanyStatusDto, SwitchCompanyDto, UpdateCompanyDto } from './platform.dto';
 
 /**
  * Administração Geral da Plataforma — exclusiva do Super Admin.
@@ -24,6 +24,12 @@ export class PlatformController {
   @Get('companies')
   listCompanies() {
     return this.service.listCompanies();
+  }
+
+  /** Super Admin escolhe/entra em uma empresa para administrar (impersonação). */
+  @Post('switch')
+  switchCompany(@CurrentUser() me: AuthPayload, @Body() dto: SwitchCompanyDto) {
+    return this.service.switchCompany(me, dto.companyId ?? null);
   }
 
   @Get('companies/:id')

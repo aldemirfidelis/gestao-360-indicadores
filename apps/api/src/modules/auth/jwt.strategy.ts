@@ -4,6 +4,7 @@ import { ExtractJwt, Strategy } from 'passport-jwt';
 import { AuthPayload } from './auth.types';
 import { PrismaService } from '../../prisma/prisma.service';
 import { requireSecret } from '../../common/env';
+import { effectiveCompanyId } from '../../common/effective-company';
 
 @Injectable()
 export class JwtStrategy extends PassportStrategy(Strategy, 'jwt') {
@@ -25,17 +26,30 @@ export class JwtStrategy extends PassportStrategy(Strategy, 'jwt') {
         active: true,
         status: true,
         deletedAt: true,
+        role: true,
+        companyId: true,
+        activeCompanyId: true,
         company: { select: { status: true, deletedAt: true } },
       },
     });
     if (!user || !user.active || user.status !== 'ACTIVE' || user.deletedAt) {
       throw new UnauthorizedException('Usuário inativo');
     }
-    // Empresa suspensa/inativa bloqueia o acesso de todos os seus usuários
-    // (vale já na próxima requisição, sem esperar o token expirar).
+    // Empresa de ORIGEM suspensa/inativa bloqueia o acesso de todos os seus usuários
+    // (vale já na próxima requisição, sem esperar o token expirar). O Super Admin pode
+    // administrar empresas suspensas, mas a própria empresa de origem precisa estar ativa.
     if (!user.company || user.company.deletedAt || user.company.status !== 'ACTIVE') {
       throw new UnauthorizedException('Empresa suspensa ou inativa. Contate o administrador.');
     }
-    return payload;
+    // Empresa efetiva recalculada do banco a cada requisição (fonte da verdade) — a troca
+    // de empresa do Super Admin passa a valer imediatamente, mesmo com token antigo.
+    const companyId = effectiveCompanyId(user);
+    return {
+      ...payload,
+      role: user.role,
+      companyId,
+      homeCompanyId: user.companyId,
+      impersonating: companyId !== user.companyId,
+    };
   }
 }

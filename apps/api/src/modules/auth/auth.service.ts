@@ -5,6 +5,7 @@ import { randomBytes, createHash } from 'crypto';
 import { PrismaService } from '../../prisma/prisma.service';
 import { AuthPayload } from './auth.types';
 import { requireSecret } from '../../common/env';
+import { effectiveCompanyId } from '../../common/effective-company';
 
 @Injectable()
 export class AuthService {
@@ -30,12 +31,15 @@ export class AuthService {
       throw new UnauthorizedException('Empresa suspensa ou inativa. Contate o administrador.');
     }
 
+    const companyId = effectiveCompanyId(user);
     const payload: AuthPayload = {
       sub: user.id,
       email: user.email,
       name: user.name,
       role: user.role,
-      companyId: user.companyId,
+      companyId,
+      homeCompanyId: user.companyId,
+      impersonating: companyId !== user.companyId,
     };
 
     const accessToken = await this.jwt.signAsync(payload, {
@@ -102,12 +106,15 @@ export class AuthService {
     ) {
       throw new UnauthorizedException('Empresa suspensa ou inativa.');
     }
+    const companyId = effectiveCompanyId(stored.user);
     const payload: AuthPayload = {
       sub: stored.user.id,
       email: stored.user.email,
       name: stored.user.name,
       role: stored.user.role,
-      companyId: stored.user.companyId,
+      companyId,
+      homeCompanyId: stored.user.companyId,
+      impersonating: companyId !== stored.user.companyId,
     };
     const accessToken = await this.jwt.signAsync(payload, {
       secret: requireSecret('JWT_ACCESS_SECRET'),
@@ -149,6 +156,7 @@ export class AuthService {
         name: true,
         role: true,
         companyId: true,
+        activeCompanyId: true,
         avatarUrl: true,
         jobTitle: true,
         permissions: { select: { permission: { select: { key: true } } } },
@@ -166,12 +174,25 @@ export class AuthService {
     const permissionKeys = new Set<string>();
     user.permissions.forEach((item) => permissionKeys.add(item.permission.key));
     user.accessProfile?.permissions.forEach((item) => permissionKeys.add(item.permission.key));
+
+    const companyId = effectiveCompanyId(user);
+    const impersonating = companyId !== user.companyId;
+    // Nome da empresa efetiva (para o seletor do topo exibir "Administrando: X").
+    const activeCompany = await this.prisma.company
+      .findUnique({ where: { id: companyId }, select: { id: true, name: true, tradeName: true } })
+      .catch(() => null);
+
     return {
       id: user.id,
       email: user.email,
       name: user.name,
       role: user.role,
-      companyId: user.companyId,
+      companyId,
+      homeCompanyId: user.companyId,
+      impersonating,
+      activeCompany: activeCompany
+        ? { id: activeCompany.id, name: activeCompany.tradeName || activeCompany.name }
+        : null,
       avatarUrl: user.avatarUrl,
       jobTitle: user.jobTitle,
       accessProfile: user.accessProfile ? { id: user.accessProfile.id, code: user.accessProfile.code, name: user.accessProfile.name } : null,

@@ -10,6 +10,9 @@ export interface AuthUser {
   name: string;
   role: string;
   companyId: string;
+  homeCompanyId?: string;
+  impersonating?: boolean;
+  activeCompany?: { id: string; name: string } | null;
   avatarUrl?: string | null;
   jobTitle?: string | null;
   accessProfile?: { id: string; code: string; name: string } | null;
@@ -22,6 +25,8 @@ interface AuthCtx {
   hasPermission: (permissions?: string | string[]) => boolean;
   login: (email: string, password: string) => Promise<void>;
   logout: () => Promise<void>;
+  /** Super Admin: troca a empresa ativa (null = volta à empresa de origem) e recarrega. */
+  switchCompany: (companyId: string | null) => Promise<void>;
 }
 
 const Ctx = createContext<AuthCtx | null>(null);
@@ -60,7 +65,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setTokens(out.accessToken, out.refreshToken);
     const profile = await api<AuthUser & { sub?: string }>('/auth/me');
     setUser({ ...profile, id: profile.sub ?? profile.id, permissions: profile.permissions ?? out.user.permissions ?? [] });
-    router.replace('/dashboard');
+    // Super Admin escolhe qual empresa administrar antes de entrar.
+    router.replace(profile.role === 'SUPER_ADMIN' ? '/selecionar-empresa' : '/dashboard');
+  };
+
+  const switchCompany = async (companyId: string | null) => {
+    await api('/platform/switch', { method: 'POST', json: { companyId } });
+    // Reload duro: zera o cache do React Query e refaz todas as queries já no
+    // escopo da nova empresa efetiva (recomputada no backend a cada requisição).
+    if (typeof window !== 'undefined') window.location.assign('/dashboard');
   };
 
   const logout = async () => {
@@ -83,7 +96,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     return required.some((permission) => granted.has(permission) || granted.has(`${permission.split(':')[0]}:manage`));
   };
 
-  return <Ctx.Provider value={{ user, loading, hasPermission, login, logout }}>{children}</Ctx.Provider>;
+  return <Ctx.Provider value={{ user, loading, hasPermission, login, logout, switchCompany }}>{children}</Ctx.Provider>;
 }
 
 export function useAuth(): AuthCtx {

@@ -648,6 +648,10 @@ model User {
   defaultNodeId   String?
   defaultNode     OrgNode?       @relation("UserDefaultNode", fields: [defaultNodeId], references: [id])
 
+  // Super Admin: empresa que ele escolheu administrar no momento (impersonação).
+  // FK escalar (sem relation) p/ isolar a mudança; ignorada p/ papéis != SUPER_ADMIN.
+  activeCompanyId String?
+
   responsibleNodes           OrgNode[]                   @relation("OrgNodeResponsible")
   indicatorsResponsible      Indicator[]                 @relation("IndicatorResponsible")
   indicatorsFeeder           Indicator[]                 @relation("IndicatorFeeder")

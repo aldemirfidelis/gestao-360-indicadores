@@ -1,4 +1,4 @@
-import { IsBoolean, IsEmail, IsEnum, IsInt, IsOptional, IsString, MaxLength, Min } from 'class-validator';
+import { IsBoolean, IsEmail, IsEnum, IsInt, IsOptional, IsString, MaxLength, Min, ValidateIf } from 'class-validator';
 import { CompanyStatus } from '@prisma/client';
 
 export class CreateCompanyDto {
@@ -41,4 +41,12 @@ export class UpdateCompanyDto {
 export class SetCompanyStatusDto {
   @IsEnum(CompanyStatus)
   status!: CompanyStatus;
+}
+
+/** Troca a empresa ativa do Super Admin. `companyId: null` volta para a empresa de origem. */
+export class SwitchCompanyDto {
+  @IsOptional()
+  @ValidateIf((o) => o.companyId !== null)
+  @IsString()
+  companyId?: string | null;
 }

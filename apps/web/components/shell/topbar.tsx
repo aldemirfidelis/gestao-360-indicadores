@@ -4,7 +4,7 @@ import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { LifeBuoy, LogOut, Menu, Moon, Search, Sun } from 'lucide-react';
+import { Building2, Check, ChevronsUpDown, Home, LifeBuoy, LogOut, Menu, Moon, Search, Sun } from 'lucide-react';
 import { useTheme } from 'next-themes';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -73,6 +73,8 @@ export function Topbar() {
           {section?.heading ?? 'Início'}
         </div>
       </div>
+
+      <CompanySwitcher />
 
       <div className="relative min-w-0 flex-1 lg:max-w-xl">
         <Search className="absolute left-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground/70" />
@@ -161,6 +163,106 @@ export function Topbar() {
         )}
       </div>
     </header>
+  );
+}
+
+interface SwitcherCompany {
+  id: string;
+  name: string;
+  tradeName: string | null;
+  status: 'ACTIVE' | 'SUSPENDED' | 'INACTIVE';
+}
+
+function CompanySwitcher() {
+  const { user, switchCompany } = useAuth();
+  const [open, setOpen] = useState(false);
+  const [busy, setBusy] = useState(false);
+  const [search, setSearch] = useState('');
+
+  const companies = useQuery<SwitcherCompany[]>({
+    queryKey: ['platform-companies'],
+    queryFn: () => api<SwitcherCompany[]>('/platform/companies'),
+    enabled: open && user?.role === 'SUPER_ADMIN',
+  });
+
+  if (user?.role !== 'SUPER_ADMIN') return null;
+
+  const activeName = user.activeCompany?.name ?? 'Selecionar empresa';
+  const enter = async (companyId: string | null) => {
+    setBusy(true);
+    try {
+      await switchCompany(companyId);
+    } catch {
+      setBusy(false);
+    }
+  };
+
+  const list = (companies.data ?? []).filter((c) =>
+    [c.name, c.tradeName].filter(Boolean).join(' ').toLowerCase().includes(search.toLowerCase()),
+  );
+
+  return (
+    <Dialog open={open} onOpenChange={setOpen}>
+      <DialogTrigger asChild>
+        <Button
+          variant="outline"
+          size="sm"
+          className="hidden h-9 max-w-[220px] items-center gap-2 border-border/60 md:flex"
+          title="Trocar de empresa (Super Admin)"
+        >
+          <Building2 className="h-4 w-4 shrink-0 text-muted-foreground" />
+          <span className="truncate text-xs font-medium">{activeName}</span>
+          {user.impersonating && (
+            <span className="shrink-0 rounded bg-amber-500/15 px-1 py-0.5 text-[9px] font-semibold uppercase text-amber-600">
+              Admin
+            </span>
+          )}
+          <ChevronsUpDown className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
+        </Button>
+      </DialogTrigger>
+      <DialogContent className="max-w-lg">
+        <DialogHeader>
+          <DialogTitle>Trocar de empresa</DialogTitle>
+        </DialogHeader>
+        <p className="-mt-2 text-xs text-muted-foreground">
+          Você entra no contexto da empresa escolhida para administrar todos os seus dados.
+        </p>
+        <Input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Buscar empresa..." className="h-9" />
+        <button
+          type="button"
+          disabled={busy}
+          onClick={() => enter(null)}
+          className="flex items-center gap-2 rounded-md border border-dashed px-3 py-2 text-left text-sm transition-colors hover:bg-accent/35 disabled:opacity-60"
+        >
+          <Home className="h-4 w-4 text-muted-foreground" />
+          <span>Minha empresa de origem</span>
+        </button>
+        <div className="max-h-[50vh] space-y-1 overflow-y-auto">
+          {companies.isLoading && <div className="py-6 text-center text-sm text-muted-foreground">Carregando...</div>}
+          {list.map((c) => {
+            const isCurrent = user.companyId === c.id;
+            return (
+              <button
+                key={c.id}
+                type="button"
+                disabled={busy || isCurrent}
+                onClick={() => enter(c.id)}
+                className="flex w-full items-center justify-between gap-2 rounded-md border px-3 py-2 text-left text-sm transition-colors hover:bg-accent/35 disabled:cursor-default disabled:opacity-100"
+              >
+                <span className="min-w-0">
+                  <span className="block truncate font-medium">{c.name}</span>
+                  <span className="block truncate text-xs text-muted-foreground">{c.tradeName ?? ''}</span>
+                </span>
+                {isCurrent && <Check className="h-4 w-4 shrink-0 text-primary" />}
+              </button>
+            );
+          })}
+          {!companies.isLoading && list.length === 0 && (
+            <div className="py-6 text-center text-sm text-muted-foreground">Nenhuma empresa encontrada.</div>
+          )}
+        </div>
+      </DialogContent>
+    </Dialog>
   );
 }
 

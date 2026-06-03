@@ -1,6 +1,7 @@
 import { ConflictException, Injectable, NotFoundException } from '@nestjs/common';
 import { ActionStatus, CompanyStatus, Prisma } from '@prisma/client';
 import { PrismaService } from '../../prisma/prisma.service';
+import { AccessService } from '../access/access.service';
 import { AuthPayload } from '../auth/auth.types';
 import { CreateCompanyDto, UpdateCompanyDto } from './platform.dto';
 
@@ -10,7 +11,41 @@ const OPEN_ACTION_STATUSES = {
 
 @Injectable()
 export class PlatformService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly access: AccessService,
+  ) {}
+
+  /**
+   * Super Admin escolhe/entra em uma empresa para administrar (impersonação).
+   * `companyId === null` (ou a própria empresa de origem) volta o usuário à origem.
+   * Grava em `User.activeCompanyId`; a empresa efetiva é recomputada no `JwtStrategy.validate`
+   * a cada requisição, então a troca passa a valer no próximo request (o frontend recarrega).
+   */
+  async switchCompany(me: AuthPayload, companyId: string | null) {
+    const home = me.homeCompanyId ?? me.companyId;
+    let target: string | null = null;
+    let company: Prisma.CompanyGetPayload<object> | null;
+
+    if (companyId && companyId !== home) {
+      // Super Admin pode administrar empresas de qualquer status (inclusive suspensas).
+      company = await this.prisma.company.findFirst({ where: { id: companyId, deletedAt: null } });
+      if (!company) throw new NotFoundException('Empresa não encontrada.');
+      target = companyId;
+    } else {
+      company = await this.prisma.company.findFirst({ where: { id: home, deletedAt: null } });
+      target = null;
+    }
+
+    await this.prisma.user.update({ where: { id: me.sub }, data: { activeCompanyId: target } });
+    this.access.invalidate(me.sub);
+    await this.audit(me, target ?? home, 'SWITCH_COMPANY', { activeCompanyId: me.companyId }, { activeCompanyId: target });
+
+    return {
+      company: company ? this.serialize(company) : null,
+      impersonating: target !== null,
+    };
+  }
 
   /** Dashboard global do Super Admin: contagens agregadas da plataforma. */
   async overview() {

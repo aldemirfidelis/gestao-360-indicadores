@@ -215,6 +215,7 @@ export default function SettingsPage() {
   const [search, setSearch] = useState('');
   const [dialog, setDialog] = useState<{ type: string; record?: any } | null>(null);
   const canOpenSettings = hasPermission(['settings:view', 'settings:manage']);
+  const canManageUsers = hasPermission(['users:manage']);
 
   const query = useQuery<Bootstrap>({
     queryKey: ['admin', 'bootstrap'],
@@ -367,6 +368,30 @@ export default function SettingsPage() {
         })}
       </SectionCard>
 
+      {canManageUsers && (
+        <SectionCard
+          title="Acesso e visibilidade"
+          description="Controle de acesso por área entre setores, com simulação de acesso por usuário."
+          className="mb-6"
+          contentClassName="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-3"
+        >
+          <Link
+            href="/settings/visibilidade"
+            className="group flex h-full items-start gap-3 rounded-lg border bg-card p-4 shadow-sm transition-colors hover:bg-accent/35"
+          >
+            <div className="grid h-10 w-10 shrink-0 place-items-center rounded-md bg-status-purple/10 text-status-purple">
+              <ShieldCheck className="h-5 w-5" />
+            </div>
+            <div className="min-w-0">
+              <div className="text-sm font-semibold">Matriz de Visibilidade</div>
+              <p className="mt-1 text-xs leading-relaxed text-muted-foreground">
+                Defina quais áreas enxergam/editam dados de outras áreas, exceções por usuário e simule o acesso efetivo.
+              </p>
+            </div>
+          </Link>
+        </SectionCard>
+      )}
+
       {isSuperAdmin && (
         <SectionCard
           title="Administração avançada"
@@ -374,6 +399,20 @@ export default function SettingsPage() {
           className="mb-6"
           contentClassName="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-3"
         >
+          <Link
+            href="/settings/empresas"
+            className="group flex h-full items-start gap-3 rounded-lg border bg-card p-4 shadow-sm transition-colors hover:bg-accent/35"
+          >
+            <div className="grid h-10 w-10 shrink-0 place-items-center rounded-md bg-status-blue/10 text-status-blue">
+              <Building2 className="h-5 w-5" />
+            </div>
+            <div className="min-w-0">
+              <div className="text-sm font-semibold">Empresas (Global)</div>
+              <p className="mt-1 text-xs leading-relaxed text-muted-foreground">
+                Administração global de empresas: criar, editar, status e <strong>entrar em uma empresa</strong> para administrá-la.
+              </p>
+            </div>
+          </Link>
           <Link
             href="/settings/database"
             className="group flex h-full items-start gap-3 rounded-lg border bg-card p-4 shadow-sm transition-colors hover:bg-accent/35"
