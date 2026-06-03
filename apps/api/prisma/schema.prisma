@@ -2821,3 +2821,92 @@ model UserVisibilityException {
   @@index([userId])
   @@index([userId, targetAreaId, moduleKey])
 }
+
+// ===================== Integração com APIs externas =====================
+// SAP, Apdata, SE Suite e quaisquer outras (REST genérico/webhook), inbound e outbound.
+// Credenciais nunca em texto puro: ficam em credentialsEnc (AES-256-GCM). FKs escalares.
+
+enum IntegrationProvider {
+  SAP
+  APDATA
+  SESUITE
+  REST_GENERIC
+  WEBHOOK
+}
+
+enum IntegrationDirection {
+  INBOUND
+  OUTBOUND
+  BOTH
+}
+
+enum IntegrationAuthType {
+  NONE
+  API_KEY
+  BEARER
+  BASIC
+  OAUTH2
+}
+
+/// Conector de integração com um sistema externo (saída/entrada), por empresa.
+model ExternalIntegration {
+  id             String               @id @default(uuid())
+  companyId      String
+  name           String
+  provider       IntegrationProvider  @default(REST_GENERIC)
+  direction      IntegrationDirection @default(OUTBOUND)
+  authType       IntegrationAuthType  @default(API_KEY)
+  baseUrl        String?
+  status         String               @default("enabled") // enabled | disabled
+  credentialsEnc String? // JSON cifrado (AES-256-GCM). Nunca retornado ao cliente.
+  config         Json? // endpoints, headers, mapeamento de campos
+  lastRunAt      DateTime?
+  lastStatus     String? // SUCCESS | ERROR
+  lastError      String?
+  lastLatencyMs  Int?
+  createdById    String?
+  createdAt      DateTime             @default(now())
+  updatedAt      DateTime             @updatedAt
+  deletedAt      DateTime?
+
+  logs ExternalIntegrationLog[]
+
+  @@index([companyId])
+}
+
+/// Histórico de execuções (teste/sincronização) de um conector externo.
+model ExternalIntegrationLog {
+  id            String               @id @default(uuid())
+  integrationId String
+  integration   ExternalIntegration  @relation(fields: [integrationId], references: [id], onDelete: Cascade)
+  companyId     String
+  direction     IntegrationDirection
+  operation     String // test | push:indicators | push:results | pull:results | ...
+  status        String // SUCCESS | ERROR
+  httpStatus    Int?
+  message       String?
+  latencyMs     Int?
+  createdAt     DateTime             @default(now())
+
+  @@index([integrationId])
+  @@index([companyId])
+}
+
+/// Chave de API para sistemas externos chamarem a API pública (inbound), por empresa.
+/// Guardamos apenas o hash (sha256); a chave em si é exibida uma única vez na criação.
+model InboundApiKey {
+  id          String    @id @default(uuid())
+  companyId   String
+  name        String
+  keyHash     String    @unique
+  keyPrefix   String // primeiros caracteres p/ exibição (ex.: g360_ab12)
+  scopes      String[] // ex.: ["indicators:read","results:write"]
+  status      String    @default("active") // active | revoked
+  lastUsedAt  DateTime?
+  expiresAt   DateTime?
+  createdById String?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  @@index([companyId])
+}

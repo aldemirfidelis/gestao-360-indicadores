@@ -45,7 +45,7 @@ export class UsersService {
 
   async getById(id: string, companyId?: string, isSuperAdmin = false) {
     const user = await this.prisma.user.findFirst({
-      where: { id, deletedAt: null, ...(companyId && !isSuperAdmin ? { companyId } : {}) },
+      where: { id, deletedAt: null, ...(companyId ? { companyId } : {}) },
       include: {
         defaultNode: true,
         permissions: { select: { permission: true } },
@@ -93,7 +93,7 @@ export class UsersService {
   }
 
   async setActive(id: string, companyId: string, isSuperAdmin: boolean, active: boolean) {
-    const user = await this.prisma.user.findFirst({ where: { id, deletedAt: null, ...(!isSuperAdmin ? { companyId } : {}) }, select: { id: true } });
+    const user = await this.prisma.user.findFirst({ where: { id, deletedAt: null, companyId }, select: { id: true } });
     if (!user) throw new NotFoundException('Usuário nao encontrado');
     return this.prisma.user.update({
       where: { id },
@@ -120,7 +120,7 @@ export class UsersService {
       passwordResetRequired?: boolean;
     },
   ) {
-    const user = await this.prisma.user.findFirst({ where: { id, deletedAt: null, ...(!isSuperAdmin ? { companyId } : {}) } });
+    const user = await this.prisma.user.findFirst({ where: { id, deletedAt: null, companyId } });
     if (!user) throw new NotFoundException('Usuário nao encontrado');
     // Anti-escalonamento: nao-super-admin nao pode promover ninguem (nem a si) a SUPER_ADMIN,
     // nem rebaixar um SUPER_ADMIN existente.
@@ -170,7 +170,7 @@ export class UsersService {
 
   async setPermissions(id: string, companyId: string, isSuperAdmin: boolean, permissionKeys: string[]) {
     await this.ensurePermissionCatalog();
-    const user = await this.prisma.user.findFirst({ where: { id, deletedAt: null, ...(!isSuperAdmin ? { companyId } : {}) }, select: { id: true } });
+    const user = await this.prisma.user.findFirst({ where: { id, deletedAt: null, companyId }, select: { id: true } });
     if (!user) throw new NotFoundException('Usuário nao encontrado');
     const permissions = await this.prisma.permission.findMany({
       where: { key: { in: permissionKeys } },
@@ -190,7 +190,7 @@ export class UsersService {
   }
 
   async remove(id: string, companyId: string, isSuperAdmin: boolean) {
-    const user = await this.prisma.user.findFirst({ where: { id, deletedAt: null, ...(!isSuperAdmin ? { companyId } : {}) }, select: { id: true } });
+    const user = await this.prisma.user.findFirst({ where: { id, deletedAt: null, companyId }, select: { id: true } });
     if (!user) throw new NotFoundException('Usuário nao encontrado');
     return this.prisma.user.update({
       where: { id },

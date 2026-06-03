@@ -38,10 +38,12 @@ export class UsersController {
   @Post()
   create(@CurrentUser() me: AuthPayload, @Body(new ZodValidationPipe(userCreateSchema)) input: any) {
     const isSuperAdmin = me.role === UserRoleEnum.SUPER_ADMIN;
+    // Empresa SEMPRE da sessão (companyId efetivo). Super Admin cria na empresa em que
+    // está "dentro" (troca pelo seletor) — nunca em outra via payload.
     return this.service.create(
       {
         ...input,
-        companyId: isSuperAdmin && input.companyId ? input.companyId : me.companyId,
+        companyId: me.companyId,
       },
       isSuperAdmin,
     );

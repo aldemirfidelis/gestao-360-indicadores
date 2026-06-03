@@ -137,6 +137,7 @@ export const ROUTE_PERMISSIONS: Array<{ prefix: string; permissions: string[]; e
   { prefix: '/settings/portal', permissions: ['portal:admin'] },
   { prefix: '/settings/empresas', permissions: ['platform:admin'] },
   { prefix: '/settings/visibilidade', permissions: ['users:manage'] },
+  { prefix: '/settings/integracoes', permissions: ['settings:manage'] },
   { prefix: '/settings', permissions: ['settings:view', 'settings:manage'] },
 ];
 

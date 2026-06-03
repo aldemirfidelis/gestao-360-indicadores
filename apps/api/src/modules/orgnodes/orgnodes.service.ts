@@ -68,8 +68,9 @@ export class OrgNodesService {
     return roots;
   }
 
-  async create(input: OrgNodeAdminInput, companyId: string, isSuperAdmin = false) {
-    const scopedCompanyId = isSuperAdmin ? input.companyId : companyId;
+  async create(input: OrgNodeAdminInput, companyId: string) {
+    // Empresa sempre da sessão (companyId efetivo). Sem bypass cross-company.
+    const scopedCompanyId = companyId;
     await this.validateOrgLinks(scopedCompanyId, input);
     return this.prisma.orgNode.create({
       data: {
@@ -88,8 +89,8 @@ export class OrgNodesService {
     });
   }
 
-  async update(id: string, input: Partial<OrgNodeAdminInput>, companyId: string, isSuperAdmin = false) {
-    const node = await this.prisma.orgNode.findFirst({ where: { id, deletedAt: null, ...(!isSuperAdmin ? { companyId } : {}) } });
+  async update(id: string, input: Partial<OrgNodeAdminInput>, companyId: string) {
+    const node = await this.prisma.orgNode.findFirst({ where: { id, deletedAt: null, companyId } });
     if (!node) throw new NotFoundException('No nao encontrado');
     await this.validateOrgLinks(node.companyId, input, id);
     return this.prisma.orgNode.update({
@@ -109,8 +110,8 @@ export class OrgNodesService {
     });
   }
 
-  async move(id: string, companyId: string, isSuperAdmin: boolean, newParentId: string | null) {
-    const node = await this.prisma.orgNode.findFirst({ where: { id, deletedAt: null, ...(!isSuperAdmin ? { companyId } : {}) }, select: { id: true, companyId: true } });
+  async move(id: string, companyId: string, newParentId: string | null) {
+    const node = await this.prisma.orgNode.findFirst({ where: { id, deletedAt: null, companyId }, select: { id: true, companyId: true } });
     if (!node) throw new NotFoundException('No nao encontrado');
     if (newParentId) {
       const parent = await this.prisma.orgNode.findFirst({ where: { id: newParentId, companyId: node.companyId, deletedAt: null }, select: { id: true } });
@@ -122,8 +123,8 @@ export class OrgNodesService {
     });
   }
 
-  async remove(id: string, companyId: string, isSuperAdmin = false) {
-    const node = await this.prisma.orgNode.findFirst({ where: { id, deletedAt: null, ...(!isSuperAdmin ? { companyId } : {}) }, select: { id: true } });
+  async remove(id: string, companyId: string) {
+    const node = await this.prisma.orgNode.findFirst({ where: { id, deletedAt: null, companyId }, select: { id: true } });
     if (!node) throw new NotFoundException('No nao encontrado');
     const [children, indicators, actions, users] = await Promise.all([
       this.prisma.orgNode.count({ where: { parentId: id, deletedAt: null } }),

@@ -38,6 +38,7 @@ import { PlatformModule } from './modules/platform/platform.module';
 import { AccessModule } from './modules/access/access.module';
 import { HelpModule } from './modules/help/help.module';
 import { IntegrationsModule } from './modules/integrations/integrations.module';
+import { ExternalApiModule } from './modules/external-api/external-api.module';
 
 @Module({
   imports: [
@@ -75,6 +76,7 @@ import { IntegrationsModule } from './modules/integrations/integrations.module';
     CommunicationModule,
     HelpModule,
     IntegrationsModule,
+    ExternalApiModule,
     PlatformModule,
     AccessModule,
   ],

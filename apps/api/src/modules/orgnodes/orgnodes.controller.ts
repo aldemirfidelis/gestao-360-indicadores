@@ -26,27 +26,27 @@ export class OrgNodesController {
   @Roles(UserRoleEnum.SUPER_ADMIN, UserRoleEnum.COMPANY_ADMIN)
   @RequirePermissions('org:manage')
   create(@CurrentUser() me: AuthPayload, @Body(new ZodValidationPipe(orgNodeCreateSchema)) input: any) {
-    return this.service.create(input, me.companyId, me.role === UserRoleEnum.SUPER_ADMIN);
+    return this.service.create(input, me.companyId);
   }
 
   @Patch(':id')
   @Roles(UserRoleEnum.SUPER_ADMIN, UserRoleEnum.COMPANY_ADMIN)
   @RequirePermissions('org:manage')
   update(@CurrentUser() me: AuthPayload, @Param('id') id: string, @Body() input: any) {
-    return this.service.update(id, input, me.companyId, me.role === UserRoleEnum.SUPER_ADMIN);
+    return this.service.update(id, input, me.companyId);
   }
 
   @Patch(':id/move')
   @Roles(UserRoleEnum.SUPER_ADMIN, UserRoleEnum.COMPANY_ADMIN)
   @RequirePermissions('org:manage')
   move(@CurrentUser() me: AuthPayload, @Param('id') id: string, @Body() body: { parentId: string | null }) {
-    return this.service.move(id, me.companyId, me.role === UserRoleEnum.SUPER_ADMIN, body.parentId);
+    return this.service.move(id, me.companyId, body.parentId);
   }
 
   @Delete(':id')
   @Roles(UserRoleEnum.SUPER_ADMIN, UserRoleEnum.COMPANY_ADMIN)
   @RequirePermissions('org:manage')
   remove(@CurrentUser() me: AuthPayload, @Param('id') id: string) {
-    return this.service.remove(id, me.companyId, me.role === UserRoleEnum.SUPER_ADMIN);
+    return this.service.remove(id, me.companyId);
   }
 }

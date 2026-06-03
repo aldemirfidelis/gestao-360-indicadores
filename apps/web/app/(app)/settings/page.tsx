@@ -5,6 +5,7 @@ import { useMemo, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
 import {
+  ArrowLeftRight,
   Building2,
   CheckCircle2,
   Database,
@@ -389,6 +390,22 @@ export default function SettingsPage() {
             </p>
           </div>
         </Link>
+        {hasPermission(['settings:manage']) && (
+          <Link
+            href="/settings/integracoes"
+            className="group flex h-full items-start gap-3 rounded-lg border bg-card p-4 shadow-sm transition-colors hover:bg-accent/35"
+          >
+            <div className="grid h-10 w-10 shrink-0 place-items-center rounded-md bg-status-purple/10 text-status-purple">
+              <ArrowLeftRight className="h-5 w-5" />
+            </div>
+            <div className="min-w-0">
+              <div className="text-sm font-semibold">APIs Externas</div>
+              <p className="mt-1 text-xs leading-relaxed text-muted-foreground">
+                Conecte sistemas externos (SAP, Apdata, SE Suite e outros): conectores de saída, chaves de API de entrada e logs.
+              </p>
+            </div>
+          </Link>
+        )}
       </SectionCard>
 
       {canManageUsers && (
