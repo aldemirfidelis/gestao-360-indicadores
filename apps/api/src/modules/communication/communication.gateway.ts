@@ -39,7 +39,10 @@ type SocketUser = AuthPayload;
  * segredo do REST) e revalida o usuário no banco (ativo/status) antes de aceitar.
  * Fase 1: presença. Fase 2 adiciona eventos de conversa/mensagem.
  */
-@WebSocketGateway({ cors: wsCors })
+// path '/api/socket.io': mantém o Socket.IO sob o prefixo /api para que o proxy
+// reverso (Caddy) roteie a conexão ao container da API em produção. Em dev o
+// cliente conecta direto no host da API com o mesmo path.
+@WebSocketGateway({ path: '/api/socket.io', cors: wsCors })
 export class CommunicationGateway
   implements OnGatewayInit, OnGatewayConnection, OnGatewayDisconnect, OnModuleDestroy
 {

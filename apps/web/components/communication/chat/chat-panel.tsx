@@ -163,9 +163,13 @@ export function ChatPanel({ conversation }: { conversation: ConversationSummary 
     };
   }, [socket, conversationId, qc, user?.id]);
 
+  // Rola para o fim quando troca de conversa ou quando chega/envia a mensagem
+  // MAIS RECENTE — mas NÃO quando carregamos mensagens antigas (que entram no topo),
+  // para preservar a posição de leitura ao clicar em "Carregar anteriores".
+  const lastMessageId = allMessages[allMessages.length - 1]?.id;
   useEffect(() => {
     endRef.current?.scrollIntoView({ behavior: 'smooth', block: 'end' });
-  }, [conversationId, allMessages.length]);
+  }, [conversationId, lastMessageId]);
 
   const sendMessage = useMutation({
     mutationFn: () =>

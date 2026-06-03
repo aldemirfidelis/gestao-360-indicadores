@@ -37,7 +37,11 @@ docker compose -f "$COMPOSE_FILE" up -d --remove-orphans
 
 echo ""
 echo "[4/5] Aplicando migrations do banco..."
-docker compose -f "$COMPOSE_FILE" exec -T api node ../../node_modules/prisma/build/index.js migrate deploy
+# WORKDIR do container = /app/apps/api. Em workspaces pnpm o pacote 'prisma'
+# vive em node_modules/.pnpm/... e e exposto via symlink em ./node_modules/.bin/prisma
+# (mesmo binario usado pelo CMD do Dockerfile). O caminho antigo
+# ../../node_modules/prisma/build/index.js NAO existe no layout pnpm.
+docker compose -f "$COMPOSE_FILE" exec -T api ./node_modules/.bin/prisma migrate deploy
 
 echo ""
 echo "[5/5] Status:"

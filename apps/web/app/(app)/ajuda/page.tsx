@@ -57,7 +57,7 @@ export default function HelpCenterPage() {
     queryFn: () => api(`/help${search ? `?q=${encodeURIComponent(search)}` : ''}`),
   });
 
-  const categories = summary.data?.categories ?? [];
+  const categories = useMemo(() => summary.data?.categories ?? [], [summary.data?.categories]);
   const allArticles = useMemo(() => categories.flatMap((category) => category.articles), [categories]);
   const visibleArticles = activeCategory === 'todos'
     ? allArticles

@@ -50,7 +50,7 @@ ps: ## Status dos containers
 	$(COMPOSE) ps
 
 migrate: ## Roda prisma migrate deploy manualmente
-	$(COMPOSE) exec api node ../../node_modules/prisma/build/index.js migrate deploy
+	$(COMPOSE) exec api ./node_modules/.bin/prisma migrate deploy
 
 seed: ## Roda seed (CUIDADO: limpa e recria dados demo!)
 	$(COMPOSE) exec api npx tsx prisma/seed.ts
