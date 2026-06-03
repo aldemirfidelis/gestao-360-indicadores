@@ -604,14 +604,6 @@ export default function IndicatorsPage() {
         {filtersOpen && (
           <div className="mt-4 border-t pt-4 grid gap-3 md:grid-cols-2 xl:grid-cols-4 animate-in fade-in slide-in-from-top-2 duration-200">
             <div>
-              <Label>Empresa</Label>
-              <NativeSelect value={filters.companyId} onChange={(e) => setFilters((prev) => ({ ...prev, companyId: e.target.value, areaMacroId: '', areaMicroId: '' }))}>
-                {companies.map((company) => (
-                  <option key={company.id} value={company.id}>{company.tradeName || company.name}</option>
-                ))}
-              </NativeSelect>
-            </div>
-            <div>
               <Label>Área</Label>
               <NativeSelect value={filters.areaMacroId} onChange={(e) => setFilters((prev) => ({ ...prev, areaMacroId: e.target.value, areaMicroId: '' }))}>
                 <option value="">Todas</option>
@@ -1078,10 +1070,10 @@ function IndicatorManagementCard({
   }
 
   return (
-    <article className="panel panel-hover flex h-full flex-col p-4">
+    <article className="panel panel-hover flex h-full flex-col p-3">
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0 flex-1">
-          <h3 className="text-xl font-bold leading-tight">{indicator.name}</h3>
+          <h3 className="text-lg font-bold leading-tight">{indicator.name}</h3>
           <div className="mt-1.5 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-muted-foreground">
             <span
               className={cn(
@@ -1103,7 +1095,7 @@ function IndicatorManagementCard({
         <StatusLight light={light} size="md" />
       </div>
 
-      <div className="mt-4">
+      <div className="mt-3">
         <div className="flex flex-col">
           <div className="flex flex-wrap items-center justify-between gap-2 mb-2">
             <div className="flex flex-wrap items-center gap-2">
@@ -1157,7 +1149,7 @@ function IndicatorManagementCard({
             </div>
           </div>
 
-          <div className="h-80 border border-border/60 bg-card/60 p-2.5 sm:h-[27rem]">
+          <div className="h-[17rem] border border-border/60 bg-card/60 p-2 sm:h-[23rem]">
             {hasAnyData ? (
               <ResponsiveContainer width="100%" height="100%">
                 {chartType === 'bar' ? (

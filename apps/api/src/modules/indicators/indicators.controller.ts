@@ -24,11 +24,13 @@ export class IndicatorsController {
     @Query('status') status?: string,
     @Query('search') search?: string,
     @Query('light') light?: TrafficLight,
-    @Query('companyId') companyId?: string,
     @Query('year') year?: string,
   ) {
     return this.service.list({
-      companyId: me.role === 'SUPER_ADMIN' && companyId ? companyId : me.companyId,
+      // Empresa SEMPRE derivada da sessão (companyId efetivo). Nunca aceitar empresa
+      // do cliente — cada empresa só enxerga os próprios indicadores, inclusive o
+      // Super Admin (que troca de empresa pelo seletor, não por query param).
+      companyId: me.companyId,
       enforceUserId: me.sub,
       ownerNodeId,
       areaMacroId,

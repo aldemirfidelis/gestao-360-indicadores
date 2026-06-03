@@ -8,7 +8,6 @@ import {
   Periodicity,
   Prisma,
   TrafficLight,
-  UserRoleEnum,
 } from '@prisma/client';
 import { calcStatus, IndicatorTargetUpsertInput } from '@g360/shared';
 import { PrismaService } from '../../prisma/prisma.service';
@@ -242,7 +241,9 @@ export class IndicatorsService {
   }
 
   async options(me: AuthPayload) {
-    const companyWhere = me.role === UserRoleEnum.SUPER_ADMIN ? { deletedAt: null } : { id: me.companyId, deletedAt: null };
+    // Apenas a empresa efetiva da sessão: o seletor de empresa nos filtros não pode
+    // listar (nem permitir escolher) outras empresas. Isolamento total por empresa.
+    const companyWhere = { id: me.companyId, deletedAt: null };
     const [companies, orgNodes, users, strategicObjectives, currentPeriod] = await Promise.all([
       this.prisma.company.findMany({
         where: companyWhere,
@@ -298,7 +299,7 @@ export class IndicatorsService {
 
   async getById(id: string, me?: AuthPayload) {
     const indicator = await this.prisma.indicator.findFirst({
-      where: { id, deletedAt: null, ...(me && me.role !== UserRoleEnum.SUPER_ADMIN ? { companyId: me.companyId } : {}) },
+      where: { id, deletedAt: null, ...(me ? { companyId: me.companyId } : {}) },
       include: {
         company: { select: { id: true, name: true, tradeName: true } },
         ownerNode: {
@@ -734,9 +735,10 @@ export class IndicatorsService {
     }));
   }
 
-  private scopeCompany(me: AuthPayload, inputCompanyId?: string | null) {
-    if (me.role === UserRoleEnum.SUPER_ADMIN && cleanString(inputCompanyId)) return cleanString(inputCompanyId)!;
-    return me.companyId;
+  private scopeCompany(_me: AuthPayload, _inputCompanyId?: string | null) {
+    // Empresa SEMPRE da sessão (companyId efetivo). O Super Admin opera na empresa
+    // em que está "dentro" (impersonação) — nunca cria/escreve em outra via payload.
+    return _me.companyId;
   }
 
   private async resolveOwnerFilter(companyId: string, f: IndicatorFilter) {
@@ -896,7 +898,7 @@ export class IndicatorsService {
       where: {
         id,
         deletedAt: null,
-        ...(me.role !== UserRoleEnum.SUPER_ADMIN ? { companyId: me.companyId } : {}),
+        companyId: me.companyId,
       },
     });
     if (!indicator) throw new NotFoundException('Indicador nao encontrado');

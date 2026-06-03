@@ -1321,29 +1321,22 @@ function StrategyMapPageInner() {
                 <Presentation className="h-3.5 w-3.5" />
               </Button>
               <div className="ml-auto flex flex-wrap items-center gap-1.5">
-                <Button
-                  size="icon"
-                  variant={period === '' ? 'default' : 'outline'}
-                  className="h-9 w-9"
-                  onClick={() => setPeriod('')}
-                  title="Período atual"
-                  aria-label="Período atual"
-                >
-                  <Calendar className="h-3.5 w-3.5" />
-                </Button>
-                {periodOptions.map((p) => (
-                  <Button
-                    key={p}
-                    size="icon"
-                    variant={period === p ? 'default' : 'outline'}
-                    className="h-9 w-9"
-                    onClick={() => setPeriod(p)}
-                    title={periodRefLabel(p)}
-                    aria-label={periodRefLabel(p)}
+                {/* Período: combobox (não ícones — cada mês era um Calendar idêntico). */}
+                <div className="flex items-center gap-1.5">
+                  <Calendar className="h-3.5 w-3.5 text-muted-foreground" />
+                  <NativeSelect
+                    value={period}
+                    onChange={(e) => setPeriod(e.target.value)}
+                    className="h-9 w-[160px] text-xs"
+                    title="Período"
+                    aria-label="Período"
                   >
-                    <Calendar className="h-3.5 w-3.5" />
-                  </Button>
-                ))}
+                    <option value="">Período atual</option>
+                    {periodOptions.map((p) => (
+                      <option key={p} value={p}>{periodRefLabel(p)}</option>
+                    ))}
+                  </NativeSelect>
+                </div>
                 <Button size="icon" variant="outline" className="h-9 w-9" onClick={() => mapQuery.refetch()} disabled={mapQuery.isFetching} title="Atualizar" aria-label="Atualizar">
                   <RefreshCw className={cn('h-3.5 w-3.5', mapQuery.isFetching && 'animate-spin')} />
                 </Button>
