@@ -20,10 +20,21 @@ export class JwtStrategy extends PassportStrategy(Strategy, 'jwt') {
   async validate(payload: AuthPayload): Promise<AuthPayload> {
     const user = await this.prisma.user.findUnique({
       where: { id: payload.sub },
-      select: { id: true, active: true, status: true, deletedAt: true },
+      select: {
+        id: true,
+        active: true,
+        status: true,
+        deletedAt: true,
+        company: { select: { status: true, deletedAt: true } },
+      },
     });
     if (!user || !user.active || user.status !== 'ACTIVE' || user.deletedAt) {
       throw new UnauthorizedException('Usuário inativo');
+    }
+    // Empresa suspensa/inativa bloqueia o acesso de todos os seus usuários
+    // (vale já na próxima requisição, sem esperar o token expirar).
+    if (!user.company || user.company.deletedAt || user.company.status !== 'ACTIVE') {
+      throw new UnauthorizedException('Empresa suspensa ou inativa. Contate o administrador.');
     }
     return payload;
   }

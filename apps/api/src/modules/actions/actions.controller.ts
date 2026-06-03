@@ -27,6 +27,7 @@ export class ActionsController {
   ) {
     return this.service.list({
       companyId: me.companyId,
+      enforceUserId: me.sub,
       status,
       responsibleUserId,
       ownerNodeId,

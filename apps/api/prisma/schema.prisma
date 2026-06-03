@@ -39,6 +39,12 @@ enum UserAccessStatus {
   PENDING
 }
 
+enum CompanyStatus {
+  ACTIVE
+  SUSPENDED
+  INACTIVE
+}
+
 enum AdminRecordStatus {
   ACTIVE
   INACTIVE
@@ -464,15 +470,27 @@ enum EmailDeliveryStatus {
 // =====================================================
 
 model Company {
-  id        String    @id @default(uuid())
-  name      String
-  tradeName String?
-  cnpj      String?   @unique
-  logoUrl   String?
-  active    Boolean   @default(true)
-  createdAt DateTime  @default(now())
-  updatedAt DateTime  @updatedAt
-  deletedAt DateTime?
+  id                String        @id @default(uuid())
+  name              String
+  tradeName         String?
+  cnpj              String?       @unique
+  logoUrl           String?
+  active            Boolean       @default(true)
+  status            CompanyStatus @default(ACTIVE)
+  email             String?
+  phone             String?
+  addressLine       String?
+  city              String?
+  state             String?
+  segment           String?
+  maxUsers          Int?
+  notes             String?
+  // Quando true (padrão), a restrição de visibilidade POR ÁREA é aplicada aos
+  // usuários não-administradores. SUPER_ADMIN/COMPANY_ADMIN sempre veem a empresa toda.
+  areaAccessEnabled Boolean       @default(true)
+  createdAt         DateTime      @default(now())
+  updatedAt         DateTime      @updatedAt
+  deletedAt         DateTime?
 
   branches               Branch[]
   users                  User[]
@@ -630,44 +648,44 @@ model User {
   defaultNodeId   String?
   defaultNode     OrgNode?       @relation("UserDefaultNode", fields: [defaultNodeId], references: [id])
 
-  responsibleNodes           OrgNode[]                 @relation("OrgNodeResponsible")
-  indicatorsResponsible      Indicator[]               @relation("IndicatorResponsible")
-  indicatorsFeeder           Indicator[]               @relation("IndicatorFeeder")
-  resultsCreated             IndicatorResult[]         @relation("ResultCreatedBy")
-  deviationsResponsible      Deviation[]               @relation("DeviationResponsible")
-  actionsResponsible         ActionPlan[]              @relation("ActionResponsible")
-  actionsCreated             ActionPlan[]              @relation("ActionCreatedBy")
-  actionTasksAssigned        ActionTask[]              @relation("ActionTaskAssignee")
-  careerApprovalsRequested   OrgJobApprovalRequest[]   @relation("CareerApprovalRequester")
-  careerApprovalsToReview    OrgJobApprovalRequest[]   @relation("CareerApprovalApprover")
+  responsibleNodes           OrgNode[]                   @relation("OrgNodeResponsible")
+  indicatorsResponsible      Indicator[]                 @relation("IndicatorResponsible")
+  indicatorsFeeder           Indicator[]                 @relation("IndicatorFeeder")
+  resultsCreated             IndicatorResult[]           @relation("ResultCreatedBy")
+  deviationsResponsible      Deviation[]                 @relation("DeviationResponsible")
+  actionsResponsible         ActionPlan[]                @relation("ActionResponsible")
+  actionsCreated             ActionPlan[]                @relation("ActionCreatedBy")
+  actionTasksAssigned        ActionTask[]                @relation("ActionTaskAssignee")
+  careerApprovalsRequested   OrgJobApprovalRequest[]     @relation("CareerApprovalRequester")
+  careerApprovalsToReview    OrgJobApprovalRequest[]     @relation("CareerApprovalApprover")
   meetingParticipations      MeetingParticipant[]
   comments                   Comment[]
   notifications              Notification[]
   refreshTokens              RefreshToken[]
   auditLogs                  AuditLog[]
   permissions                UserPermission[]
-  traceabilityEvents         TraceabilityEvent[]       @relation("TraceabilityEventUser")
-  statusHistories            StatusHistory[]           @relation("StatusHistoryUser")
-  mapLayouts                 MapLayout[]               @relation("MapLayoutUpdatedBy")
-  treatmentsCreated          TreatmentCase[]           @relation("TreatmentCreatedBy")
-  meetingsResponsible        Meeting[]                 @relation("MeetingResponsible")
-  strategicMapsCreated       StrategicMap[]            @relation("StrategicMapCreatedBy")
-  strategicMapsUpdated       StrategicMap[]            @relation("StrategicMapUpdatedBy")
-  perspectivesCreated        Perspective[]             @relation("PerspectiveCreatedBy")
-  perspectivesUpdated        Perspective[]             @relation("PerspectiveUpdatedBy")
-  objectivesResponsible      StrategicObjective[]      @relation("StrategicObjectiveResponsible")
-  objectivesCreated          StrategicObjective[]      @relation("StrategicObjectiveCreatedBy")
-  objectivesUpdated          StrategicObjective[]      @relation("StrategicObjectiveUpdatedBy")
-  strategyVersions           StrategicMapVersion[]     @relation("StrategicVersionCreatedBy")
-  closedMonthsClosed         ClosedMonth[]             @relation("ClosedMonthClosedBy")
-  closedMonthsReopened       ClosedMonth[]             @relation("ClosedMonthReopenedBy")
-  conversationsCreated       Conversation[]            @relation("ConversationCreatedBy")
+  traceabilityEvents         TraceabilityEvent[]         @relation("TraceabilityEventUser")
+  statusHistories            StatusHistory[]             @relation("StatusHistoryUser")
+  mapLayouts                 MapLayout[]                 @relation("MapLayoutUpdatedBy")
+  treatmentsCreated          TreatmentCase[]             @relation("TreatmentCreatedBy")
+  meetingsResponsible        Meeting[]                   @relation("MeetingResponsible")
+  strategicMapsCreated       StrategicMap[]              @relation("StrategicMapCreatedBy")
+  strategicMapsUpdated       StrategicMap[]              @relation("StrategicMapUpdatedBy")
+  perspectivesCreated        Perspective[]               @relation("PerspectiveCreatedBy")
+  perspectivesUpdated        Perspective[]               @relation("PerspectiveUpdatedBy")
+  objectivesResponsible      StrategicObjective[]        @relation("StrategicObjectiveResponsible")
+  objectivesCreated          StrategicObjective[]        @relation("StrategicObjectiveCreatedBy")
+  objectivesUpdated          StrategicObjective[]        @relation("StrategicObjectiveUpdatedBy")
+  strategyVersions           StrategicMapVersion[]       @relation("StrategicVersionCreatedBy")
+  closedMonthsClosed         ClosedMonth[]               @relation("ClosedMonthClosedBy")
+  closedMonthsReopened       ClosedMonth[]               @relation("ClosedMonthReopenedBy")
+  conversationsCreated       Conversation[]              @relation("ConversationCreatedBy")
   conversationParticipations ConversationParticipant[]
-  messagesSent               Message[]                 @relation("MessageSender")
+  messagesSent               Message[]                   @relation("MessageSender")
   messageReactions           MessageReaction[]
-  messageAttachmentsUploaded MessageAttachment[]        @relation("MessageAttachmentUploadedBy")
-  helpFeedback                HelpFeedback[]
-  integrationPreferences      UserIntegrationPreference[]
+  messageAttachmentsUploaded MessageAttachment[]         @relation("MessageAttachmentUploadedBy")
+  helpFeedback               HelpFeedback[]
+  integrationPreferences     UserIntegrationPreference[]
   presence                   UserPresence?
   notificationPreference     NotificationPreference?
 
@@ -2704,4 +2722,98 @@ model NotificationPreference {
   quietHoursStart String? // ex.: "22:00"
   quietHoursEnd   String? // ex.: "07:00"
   updatedAt       DateTime @updatedAt
+}
+
+// =====================================================
+// Multiempresa — Visibilidade e acesso por Área
+// (FKs escalares por id; integridade tratada na camada de serviço/AccessService.
+//  Áreas/setores = OrgNode. Área principal do usuário = User.defaultNodeId.)
+// =====================================================
+
+enum AreaAssignmentType {
+  PRIMARY
+  SECONDARY
+  TEMPORARY
+  VIEWER
+}
+
+enum VisibilityLevel {
+  NONE
+  SUMMARY
+  FULL
+  CREATE
+  EDIT
+  APPROVE
+  DELETE
+  ADMIN
+}
+
+enum VisibilityEffect {
+  ALLOW
+  DENY
+}
+
+// Vínculo adicional usuário-área (além da área principal em User.defaultNodeId).
+model UserAreaAssignment {
+  id             String             @id @default(uuid())
+  userId         String
+  companyId      String
+  orgNodeId      String
+  assignmentType AreaAssignmentType @default(SECONDARY)
+  isPrimary      Boolean            @default(false)
+  validFrom      DateTime?
+  validUntil     DateTime?
+  createdAt      DateTime           @default(now())
+  updatedAt      DateTime           @updatedAt
+
+  @@unique([userId, orgNodeId])
+  @@index([companyId])
+  @@index([userId])
+  @@index([orgNodeId])
+}
+
+// Matriz de visibilidade: o que a área de origem enxerga da área de destino, por módulo.
+model AreaVisibilityRule {
+  id              String          @id @default(uuid())
+  companyId       String
+  sourceAreaId    String
+  targetAreaId    String
+  moduleKey       String // ex.: "indicators"; "*" = todos os módulos
+  visibilityLevel VisibilityLevel @default(SUMMARY)
+  canView         Boolean         @default(true)
+  canCreate       Boolean         @default(false)
+  canEdit         Boolean         @default(false)
+  canDelete       Boolean         @default(false)
+  canApprove      Boolean         @default(false)
+  canExport       Boolean         @default(false)
+  createdBy       String?
+  createdAt       DateTime        @default(now())
+  updatedAt       DateTime        @updatedAt
+
+  @@unique([companyId, sourceAreaId, targetAreaId, moduleKey])
+  @@index([companyId])
+  @@index([companyId, sourceAreaId])
+  @@index([companyId, targetAreaId])
+  @@index([moduleKey])
+}
+
+// Exceção individual (ALLOW/DENY) sobre uma área/módulo, com validade opcional.
+model UserVisibilityException {
+  id            String           @id @default(uuid())
+  companyId     String
+  userId        String
+  targetAreaId  String
+  moduleKey     String
+  permissionKey String?
+  effect        VisibilityEffect @default(ALLOW)
+  validFrom     DateTime?
+  validUntil    DateTime?
+  reason        String?
+  createdBy     String?
+  createdAt     DateTime         @default(now())
+  updatedAt     DateTime         @updatedAt
+
+  @@index([companyId])
+  @@index([userId])
+  @@index([userId, targetAreaId, moduleKey])
 }

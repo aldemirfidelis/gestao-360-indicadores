@@ -16,12 +16,19 @@ export class AuthService {
   async login(email: string, password: string, ctx?: { ip?: string; userAgent?: string }) {
     const user = await this.prisma.user.findUnique({
       where: { email: email.toLowerCase() },
+      include: { company: { select: { status: true, deletedAt: true } } },
     });
     if (!user || !user.active || user.status !== 'ACTIVE' || user.deletedAt) {
       throw new UnauthorizedException('Credenciais inválidas');
     }
     const ok = await bcrypt.compare(password, user.passwordHash);
     if (!ok) throw new UnauthorizedException('Credenciais inválidas');
+
+    // Empresa suspensa/inativa bloqueia o login (após validar credenciais,
+    // para não revelar o status da empresa a quem não tem acesso).
+    if (!user.company || user.company.deletedAt || user.company.status !== 'ACTIVE') {
+      throw new UnauthorizedException('Empresa suspensa ou inativa. Contate o administrador.');
+    }
 
     const payload: AuthPayload = {
       sub: user.id,
@@ -83,10 +90,17 @@ export class AuthService {
     const tokenHash = createHash('sha256').update(refreshToken).digest('hex');
     const stored = await this.prisma.refreshToken.findUnique({
       where: { tokenHash },
-      include: { user: true },
+      include: { user: { include: { company: { select: { status: true, deletedAt: true } } } } },
     });
     if (!stored || stored.revokedAt || stored.expiresAt < new Date() || !stored.user.active) {
       throw new UnauthorizedException('Refresh inválido');
+    }
+    if (
+      !stored.user.company ||
+      stored.user.company.deletedAt ||
+      stored.user.company.status !== 'ACTIVE'
+    ) {
+      throw new UnauthorizedException('Empresa suspensa ou inativa.');
     }
     const payload: AuthPayload = {
       sub: stored.user.id,

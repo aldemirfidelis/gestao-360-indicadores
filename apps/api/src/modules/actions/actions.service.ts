@@ -20,9 +20,11 @@ import {
 import { PrismaService } from '../../prisma/prisma.service';
 import { TraceabilityService } from '../traceability/traceability.service';
 import { GeminiService } from '../ai/gemini.service';
+import { AccessService } from '../access/access.service';
 
 interface ActionFilter {
   companyId: string;
+  enforceUserId?: string;
   status?: ActionStatus;
   responsibleUserId?: string;
   ownerNodeId?: string;
@@ -48,6 +50,7 @@ export class ActionsService {
     private readonly prisma: PrismaService,
     private readonly traceability: TraceabilityService,
     private readonly gemini: GeminiService,
+    private readonly access: AccessService,
   ) {}
 
   async list(f: ActionFilter) {
@@ -78,6 +81,15 @@ export class ActionsService {
           }
         : {}),
     };
+    // Restrição por área (visibilidade). null = sem restrição (admin/diretor/flag off).
+    if (f.enforceUserId) {
+      const permitted = await this.access.listAreaFilter(f.enforceUserId, 'action_plans', 'view');
+      if (permitted !== null) {
+        const eff = f.ownerNodeId ? permitted.filter((id) => id === f.ownerNodeId) : permitted;
+        if (eff.length === 0) return [];
+        where.ownerNodeId = { in: eff };
+      }
+    }
     return this.prisma.actionPlan.findMany({
       where,
       include: this.listInclude(),
@@ -169,6 +181,9 @@ export class ActionsService {
 
   async create(input: any, createdById: string) {
     const inferred = await this.inferLinks(input);
+    const ownerNodeId = input.ownerNodeId ?? inferred.ownerNodeId ?? null;
+    // Só pode criar plano de ação na própria área (ou área autorizada).
+    await this.access.assertCanWrite(createdById, ownerNodeId, 'action_plans', 'create');
     const action = await this.prisma.actionPlan.create({
       data: {
         companyId: input.companyId,
@@ -180,7 +195,7 @@ export class ActionsService {
         analysisId: input.analysisId ?? inferred.analysisId ?? null,
         meetingId: input.meetingId ?? inferred.meetingId ?? null,
         treatmentId: input.treatmentId ?? inferred.treatmentId ?? null,
-        ownerNodeId: input.ownerNodeId ?? inferred.ownerNodeId ?? null,
+        ownerNodeId,
         title: input.title,
         description: input.description ?? null,
         problemDescription: input.problemDescription ?? inferred.problemDescription ?? null,
@@ -295,6 +310,7 @@ export class ActionsService {
   async update(id: string, patch: any, userId?: string) {
     const before = await this.prisma.actionPlan.findUnique({ where: { id } });
     if (!before || before.deletedAt) throw new NotFoundException('Ação nao encontrada');
+    if (userId) await this.access.assertCanWrite(userId, before.ownerNodeId, 'action_plans', 'edit');
     const data = this.toActionUpdate(patch, before);
     const updated = await this.prisma.actionPlan.update({ where: { id }, data });
 
@@ -883,6 +899,7 @@ ${JSON.stringify(lastResults, null, 2)}`;
   async remove(id: string, userId?: string, reason?: string) {
     const before = await this.prisma.actionPlan.findUnique({ where: { id } });
     if (!before) throw new NotFoundException('Ação nao encontrada');
+    if (userId) await this.access.assertCanWrite(userId, before.ownerNodeId, 'action_plans', 'delete');
     const removed = await this.prisma.actionPlan.update({
       where: { id },
       data: { deletedAt: new Date(), status: ActionStatus.CANCELLED, cancelReason: reason ?? null },

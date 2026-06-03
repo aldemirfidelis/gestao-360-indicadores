@@ -29,6 +29,7 @@ export class IndicatorsController {
   ) {
     return this.service.list({
       companyId: me.role === 'SUPER_ADMIN' && companyId ? companyId : me.companyId,
+      enforceUserId: me.sub,
       ownerNodeId,
       areaMacroId,
       areaMicroId,

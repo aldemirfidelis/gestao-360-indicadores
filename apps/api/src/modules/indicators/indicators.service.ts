@@ -1,4 +1,4 @@
-import { BadRequestException, ConflictException, Injectable, NotFoundException } from '@nestjs/common';
+import { BadRequestException, ConflictException, ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
 import {
   Direction,
   FeedKind,
@@ -15,10 +15,12 @@ import { PrismaService } from '../../prisma/prisma.service';
 import { AuthPayload } from '../auth/auth.types';
 import { PeriodsService } from '../periods/periods.service';
 import { ResultsService } from '../results/results.service';
+import { AccessService } from '../access/access.service';
 import { lastNPeriodRefs, periodRefToDate } from './period.util';
 
 export interface IndicatorFilter {
   companyId: string;
+  enforceUserId?: string; // quando presente, aplica restrição de visibilidade por área
   ownerNodeId?: string;
   areaMacroId?: string;
   areaMicroId?: string;
@@ -82,10 +84,17 @@ export class IndicatorsService {
     private readonly prisma: PrismaService,
     private readonly periods: PeriodsService,
     private readonly results: ResultsService,
+    private readonly access: AccessService,
   ) {}
 
   async list(f: IndicatorFilter) {
-    const ownerNodeIds = await this.resolveOwnerFilter(f.companyId, f);
+    const filterNodeIds = await this.resolveOwnerFilter(f.companyId, f);
+    // Restrição por área (visibilidade): intersecta o filtro escolhido com as
+    // áreas que o usuário pode ver. null = sem restrição (admin/diretor/flag off).
+    const ownerNodeIds = await this.applyAreaScope(f.enforceUserId, filterNodeIds);
+    if (ownerNodeIds && ownerNodeIds.length === 0) {
+      return []; // usuário sem áreas visíveis para o filtro atual
+    }
     const currentPeriod = await this.periods.current(f.companyId);
     const year = parseYear(f.year) ?? currentPeriod.year;
     const anchor = new Date(Date.UTC(year, 11, 31, 12, 0, 0, 0));
@@ -317,12 +326,27 @@ export class IndicatorsService {
     });
     if (!indicator) throw new NotFoundException('Indicador nao encontrado');
     const area = deriveArea(indicator.ownerNode);
+
+    // Restrição por área: bloqueia acesso direto a indicador de área não permitida
+    // e aplica projeção RESUMIDA quando o nível de visibilidade for SUMMARY.
+    if (me?.sub) {
+      const permitted = await this.access.listAreaFilter(me.sub, 'indicators', 'view');
+      if (permitted && indicator.ownerNodeId && !permitted.includes(indicator.ownerNodeId)) {
+        throw new ForbiddenException('Você não tem acesso aos indicadores desta área.');
+      }
+      const level = await this.access.visibilityLevel(me.sub, 'indicators', indicator.ownerNodeId);
+      if (level === 'SUMMARY') {
+        return summarizeIndicator(indicator, area);
+      }
+    }
     return { ...indicator, areaMacro: area.areaMacro, areaMicro: area.areaMicro };
   }
 
   async create(me: AuthPayload, input: IndicatorWriteInput) {
     const companyId = this.scopeCompany(me, input.companyId);
     const data = await this.buildCreateData(companyId, input);
+    // Só pode criar indicador na própria área (ou área autorizada).
+    await this.access.assertCanWrite(me.sub, data.ownerNodeId ?? null, 'indicators', 'create');
     await this.ensureCodeAvailable(companyId, data.code ?? null);
     const parentIndicatorId = cleanString(input.parentIndicatorId);
 
@@ -351,7 +375,13 @@ export class IndicatorsService {
 
   async update(me: AuthPayload, id: string, input: IndicatorWriteInput) {
     const current = await this.findScopedIndicator(id, me);
+    // Só pode editar indicador da própria área (área atual). Se mover para outra
+    // área, precisa também poder escrever na área de destino.
+    await this.access.assertCanWrite(me.sub, current.ownerNodeId ?? null, 'indicators', 'edit');
     const data = await this.buildUpdateData(current.companyId, input);
+    if (data.ownerNodeId !== undefined && data.ownerNodeId !== current.ownerNodeId) {
+      await this.access.assertCanWrite(me.sub, (data.ownerNodeId as string) ?? null, 'indicators', 'edit');
+    }
     if (data.code !== undefined && data.code !== current.code) {
       await this.ensureCodeAvailable(current.companyId, data.code as string | null, id);
     }
@@ -390,6 +420,7 @@ export class IndicatorsService {
 
   async remove(me: AuthPayload, id: string) {
     const current = await this.findScopedIndicator(id, me);
+    await this.access.assertCanWrite(me.sub, current.ownerNodeId ?? null, 'indicators', 'delete');
     const updated = await this.prisma.indicator.update({
       where: { id },
       data: { deletedAt: new Date(), status: IndicatorStatus.INACTIVE },
@@ -736,6 +767,16 @@ export class IndicatorsService {
     return [...out];
   }
 
+  /** Intersecta o filtro de owner escolhido com as áreas visíveis ao usuário. */
+  private async applyAreaScope(userId: string | undefined, filterNodeIds: string[] | null): Promise<string[] | null> {
+    if (!userId) return filterNodeIds;
+    const permitted = await this.access.listAreaFilter(userId, 'indicators', 'view');
+    if (permitted === null) return filterNodeIds; // sem restrição (admin/diretor/flag off)
+    if (!filterNodeIds) return permitted;
+    const set = new Set(permitted);
+    return filterNodeIds.filter((id) => set.has(id));
+  }
+
   private async buildCreateData(companyId: string, input: IndicatorWriteInput): Promise<Prisma.IndicatorUncheckedCreateInput> {
     const ownerNodeId = requiredString(input.ownerNodeId, 'Selecione a area micro ou estrutura responsável');
     await this.validateLinks(companyId, {
@@ -1033,6 +1074,52 @@ export class IndicatorsService {
       },
     });
   }
+}
+
+// Projeção RESUMIDA de um indicador (visibilidade SUMMARY entre áreas):
+// expõe só status/meta/realizado/tendência/farol/% e nº de ações — sem evidências,
+// causa-raiz, comentários, custos ou descrições sensíveis.
+function summarizeIndicator(
+  indicator: {
+    id: string;
+    name: string;
+    code: string | null;
+    status: string;
+    unit: string | null;
+    unitLabel: string | null;
+    ownerNodeId: string | null;
+    results?: Array<{ periodRef: string; value: unknown; light: string | null; attainment: unknown }>;
+    targets?: Array<{ periodRef: string; target: unknown }>;
+    actions?: Array<{ status: string }>;
+  },
+  area: { areaMacro: unknown; areaMicro: unknown },
+) {
+  const results = indicator.results ?? [];
+  const targets = indicator.targets ?? [];
+  const latest = results[results.length - 1] ?? null;
+  const latestTarget = targets[targets.length - 1] ?? null;
+  const closedStatuses = new Set(['DONE', 'DONE_LATE', 'CANCELLED']);
+  const totalActions = (indicator.actions ?? []).length;
+  const openActions = (indicator.actions ?? []).filter((a) => !closedStatuses.has(a.status)).length;
+  return {
+    id: indicator.id,
+    name: indicator.name,
+    code: indicator.code,
+    status: indicator.status,
+    unit: indicator.unit,
+    unitLabel: indicator.unitLabel,
+    ownerNodeId: indicator.ownerNodeId,
+    areaMacro: area.areaMacro,
+    areaMicro: area.areaMicro,
+    summary: true, // sinaliza ao frontend que é visualização resumida
+    light: latest?.light ?? 'GRAY',
+    value: latest?.value ?? null,
+    target: latestTarget?.target ?? null,
+    attainment: latest?.attainment ?? null,
+    periodRef: latest?.periodRef ?? null,
+    totalActions,
+    openActions,
+  };
 }
 
 function deriveArea(ownerNode: { id: string; name: string; type?: string; parentId?: string | null; parent?: { id: string; name: string; type?: string; parentId?: string | null } | null }) {

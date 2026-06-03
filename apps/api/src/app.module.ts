@@ -34,6 +34,8 @@ import { PeriodsModule } from './modules/periods/periods.module';
 import { ClosedMonthsModule } from './modules/closed-months/closed-months.module';
 import { AiModule } from './modules/ai/ai.module';
 import { CommunicationModule } from './modules/communication/communication.module';
+import { PlatformModule } from './modules/platform/platform.module';
+import { AccessModule } from './modules/access/access.module';
 import { HelpModule } from './modules/help/help.module';
 import { IntegrationsModule } from './modules/integrations/integrations.module';
 
@@ -73,6 +75,8 @@ import { IntegrationsModule } from './modules/integrations/integrations.module';
     CommunicationModule,
     HelpModule,
     IntegrationsModule,
+    PlatformModule,
+    AccessModule,
   ],
   providers: [
     { provide: APP_GUARD, useClass: ThrottlerGuard },

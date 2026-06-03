@@ -1,6 +1,7 @@
 import {
   AlertTriangle,
   BarChart3,
+  Building2,
   Briefcase,
   CalendarDays,
   CheckSquare,
@@ -98,6 +99,7 @@ export const navSections: NavSection[] = [
       { href: '/actions', label: 'Plano de Ação', description: 'Ações, execução, evidências e eficácia', icon: CheckSquare, permissions: ['actions:view'] },
       { href: '/meetings', label: 'Reuniões', description: 'Agenda, atas e decisões', icon: CalendarDays, permissions: ['meetings:view'] },
       { href: '/okrs', label: 'OKRs', description: 'Ciclos e resultados-chave', icon: Goal, permissions: ['okrs:view'] },
+      { href: '/settings/visibilidade', label: 'Matriz de Visibilidade', description: 'Acesso por área entre setores e simulação', icon: ShieldCheck, permissions: ['users:manage'] },
     ],
   },
   {
@@ -108,6 +110,18 @@ export const navSections: NavSection[] = [
     items: [
       { href: '/reports', label: 'Relatórios e Exportações', description: 'Indicadores, resultados, metas, desvios e áreas', icon: FileSpreadsheet, permissions: ['reports:view', 'reports:export'] },
       { href: '/audit', label: 'Auditoria', description: 'Relatório de ações do sistema', icon: ShieldCheck, permissions: ['audit:view'] },
+    ],
+  },
+  {
+    // Exclusiva do Super Admin: 'platform:admin' nunca é concedida a ninguém,
+    // logo só o SUPER_ADMIN (bypass em canAccess) enxerga esta seção.
+    heading: 'Administração Geral',
+    description: 'Gestão global de empresas (Super Admin da Plataforma)',
+    intent: 'management',
+    icon: Building2,
+    permissions: ['platform:admin'],
+    items: [
+      { href: '/plataforma', label: 'Plataforma', description: 'Empresas, métricas globais e status', icon: Building2, permissions: ['platform:admin'], exact: true },
     ],
   },
 ];
@@ -164,6 +178,7 @@ export const ROUTE_PERMISSIONS: Array<{ prefix: string; permissions: string[]; e
   { prefix: '/actions', permissions: ['actions:view'] },
   { prefix: '/meetings', permissions: ['meetings:view'] },
   { prefix: '/okrs', permissions: ['okrs:view'] },
+  { prefix: '/plataforma', permissions: ['platform:admin'] },
   { prefix: '/reports', permissions: ['reports:view', 'reports:export'] },
   { prefix: '/audit', permissions: ['audit:view'] },
   { prefix: '/comunicacao', permissions: [] },
@@ -177,6 +192,7 @@ export const ROUTE_PERMISSIONS: Array<{ prefix: string; permissions: string[]; e
   // canAccess) acessa. Prefixos mais longos que '/settings' têm precedência.
   { prefix: '/settings/database', permissions: ['database:admin'] },
   { prefix: '/settings/portal', permissions: ['portal:admin'] },
+  { prefix: '/settings/visibilidade', permissions: ['users:manage'] },
   { prefix: '/settings', permissions: ['settings:view', 'settings:manage'] },
 ];
 
