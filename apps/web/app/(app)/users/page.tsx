@@ -1,6 +1,7 @@
 'use client';
 
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
+import { useSearchParams } from 'next/navigation';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
 import { Edit, KeyRound, Plus, Save, Search, UsersRound } from 'lucide-react';
@@ -101,6 +102,16 @@ export default function UsersPage() {
   const [open, setOpen] = useState(false);
   const [search, setSearch] = useState('');
   const [form, setForm] = useState<UserForm>(emptyForm);
+  const searchParams = useSearchParams();
+
+  // Deep-link "/users?new=1" (ex.: vindo da Central de Administração) abre o cadastro direto.
+  useEffect(() => {
+    if (searchParams.get('new') === '1' && canCreate) {
+      setForm(emptyForm);
+      setOpen(true);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [searchParams]);
 
   const users = useQuery<UserRow[]>({
     queryKey: ['users'],

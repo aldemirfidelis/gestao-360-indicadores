@@ -7,6 +7,9 @@ import ReactFlow, {
   Background,
   Controls,
   MiniMap,
+  ReactFlowProvider,
+  useEdgesState,
+  useNodesState,
   type Edge,
   type Node,
   type NodeMouseHandler,
@@ -22,13 +25,22 @@ import { api } from '@/lib/api';
 import { cn } from '@/lib/utils';
 import type { DbSchemaGraph } from '@/components/database-admin/types';
 
-const COLS = 5;
-const X_GAP = 280;
-const Y_GAP = 170;
+const COLS = 6;
+const X_GAP = 260;
+const Y_GAP = 150;
 
 export default function StructurePage() {
+  return (
+    <ReactFlowProvider>
+      <StructureFlow />
+    </ReactFlowProvider>
+  );
+}
+
+function StructureFlow() {
   const router = useRouter();
   const [search, setSearch] = useState('');
+  const [showAll, setShowAll] = useState(false);
   const flowRef = useRef<HTMLDivElement>(null);
 
   const graph = useQuery<DbSchemaGraph>({
@@ -37,10 +49,16 @@ export default function StructurePage() {
     refetchOnWindowFocus: false,
   });
 
-  const { nodes, edges } = useMemo(() => buildGraph(graph.data, search), [graph.data, search]);
+  const built = useMemo(() => buildGraph(graph.data, search, showAll), [graph.data, search, showAll]);
 
-  const [rfNodes, setRfNodes] = useState<Node[]>([]);
-  useEffect(() => setRfNodes(nodes), [nodes]);
+  const [nodes, setNodes, onNodesChange] = useNodesState([]);
+  const [edges, setEdges, onEdgesChange] = useEdgesState([]);
+
+  // Sincroniza os nós/arestas calculados com o estado controlado do ReactFlow.
+  useEffect(() => {
+    setNodes(built.nodes);
+    setEdges(built.edges);
+  }, [built, setNodes, setEdges]);
 
   const onNodeClick = useCallback<NodeMouseHandler>(
     (_e, node) => router.push(`/settings/database/tables/${encodeURIComponent(node.id)}`),
@@ -48,11 +66,9 @@ export default function StructurePage() {
   );
 
   async function exportImage(kind: 'png' | 'pdf') {
-    const el = flowRef.current?.querySelector('.react-flow__viewport') as HTMLElement | null;
-    const container = flowRef.current;
+    const container = flowRef.current?.querySelector('.react-flow__viewport') as HTMLElement | null;
     if (!container) return;
-    const target = (el?.parentElement as HTMLElement) ?? container;
-    const dataUrl = await toPng(target, { backgroundColor: '#ffffff', cacheBust: true });
+    const dataUrl = await toPng(container, { backgroundColor: '#ffffff', cacheBust: true });
     if (kind === 'png') {
       const a = document.createElement('a');
       a.href = dataUrl;
@@ -68,13 +84,16 @@ export default function StructurePage() {
     pdf.save('estrutura-banco.pdf');
   }
 
+  const totalTables = graph.data?.tables.length ?? 0;
+  const totalRels = graph.data?.relationships.length ?? 0;
+
   return (
     <div className="space-y-4">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
           <h2 className="text-lg font-semibold">Estrutura e Relacionamentos</h2>
           <p className="text-sm text-muted-foreground">
-            {graph.data ? `${graph.data.tables.length} tabelas · ${graph.data.relationships.length} relacionamentos` : 'Diagrama ER'}
+            {graph.data ? `${totalTables} tabelas · ${totalRels} relacionamentos · ${nodes.length} no diagrama` : 'Diagrama ER'}
           </p>
         </div>
         <div className="flex flex-wrap gap-2">
@@ -82,6 +101,9 @@ export default function StructurePage() {
             <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
             <Input className="w-48 pl-9" placeholder="Destacar tabela..." value={search} onChange={(e) => setSearch(e.target.value)} />
           </div>
+          <Button variant={showAll ? 'default' : 'outline'} size="sm" onClick={() => setShowAll((v) => !v)}>
+            {showAll ? 'Todas as tabelas' : 'Só relacionadas'}
+          </Button>
           <Button variant="outline" size="sm" onClick={() => graph.refetch()} disabled={graph.isFetching}>
             <RefreshCcw className={cn('mr-2 h-4 w-4', graph.isFetching && 'animate-spin')} />
             Atualizar
@@ -98,75 +120,84 @@ export default function StructurePage() {
       </div>
 
       {graph.isLoading && <LoadingState label="Montando diagrama..." />}
+      {graph.isError && (
+        <div className="rounded-lg border border-status-red/30 bg-status-red/10 p-4 text-sm">{(graph.error as Error)?.message}</div>
+      )}
 
       {graph.data && (
-        <div ref={flowRef} className="panel h-[70vh] overflow-hidden p-0">
+        <div ref={flowRef} className="h-[72vh] overflow-hidden rounded-lg border bg-muted/5">
           <ReactFlow
-            nodes={rfNodes}
+            nodes={nodes}
             edges={edges}
-            onNodesChange={(changes) => {
-              // permite arrastar livremente
-              setRfNodes((nds) =>
-                nds.map((n) => {
-                  const ch = changes.find((c: any) => c.id === n.id && c.type === 'position' && c.position);
-                  return ch && (ch as any).position ? { ...n, position: (ch as any).position } : n;
-                }),
-              );
-            }}
+            onNodesChange={onNodesChange}
+            onEdgesChange={onEdgesChange}
             onNodeClick={onNodeClick}
             fitView
-            minZoom={0.1}
+            fitViewOptions={{ padding: 0.2 }}
+            minZoom={0.05}
+            nodesDraggable
             proOptions={{ hideAttribution: true }}
           >
             <Background gap={16} />
             <Controls />
-            <MiniMap pannable zoomable />
+            <MiniMap pannable zoomable nodeStrokeWidth={3} />
           </ReactFlow>
         </div>
       )}
-      <p className="text-xs text-muted-foreground">Clique em uma tabela para abrir sua estrutura. Tabelas sem relacionamento aparecem isoladas.</p>
+      <p className="text-xs text-muted-foreground">
+        Clique em uma tabela para abrir sua estrutura. Por padrão mostra apenas tabelas com relacionamento; use “Todas as tabelas” para ver o catálogo completo.
+      </p>
     </div>
   );
 }
 
-function buildGraph(data: DbSchemaGraph | undefined, search: string): { nodes: Node[]; edges: Edge[] } {
+function buildGraph(data: DbSchemaGraph | undefined, search: string, showAll: boolean): { nodes: Node[]; edges: Edge[] } {
   if (!data) return { nodes: [], edges: [] };
   const q = search.trim().toLowerCase();
-  const nodes: Node[] = data.tables.map((t, i) => {
-    const highlighted = q && t.name.toLowerCase().includes(q);
+
+  // Tabelas com ao menos um relacionamento (origem ou destino).
+  const related = new Set<string>();
+  for (const r of data.relationships) {
+    related.add(r.sourceTable);
+    related.add(r.targetTable);
+  }
+  const tables = showAll ? data.tables : data.tables.filter((t) => related.has(t.name) || (q && t.name.toLowerCase().includes(q)));
+  const visible = new Set(tables.map((t) => t.name));
+
+  const nodes: Node[] = tables.map((t, i) => {
+    const highlighted = !!q && t.name.toLowerCase().includes(q);
     return {
       id: t.name,
       position: { x: (i % COLS) * X_GAP, y: Math.floor(i / COLS) * Y_GAP },
       data: {
         label: (
-          <div className="text-left">
+          <div className="text-left leading-tight">
             <div className="truncate text-xs font-semibold">{t.name}</div>
-            <div className="mt-0.5 text-[10px] text-muted-foreground">
-              PK: {t.primaryKey.join(', ') || '—'}
-            </div>
-            <div className="text-[10px] text-muted-foreground">{t.columnCount} col · {t.foreignKeyCount} FK</div>
+            <div className="mt-0.5 text-[10px] opacity-70">PK: {t.primaryKey.join(', ') || '—'}</div>
+            <div className="text-[10px] opacity-70">{t.columnCount} col · {t.foreignKeyCount} FK</div>
           </div>
         ),
       },
       style: {
-        width: 200,
+        width: 190,
         borderRadius: 8,
         border: `2px solid ${t.kind === 'system' ? '#eab308' : highlighted ? '#2563eb' : '#94a3b8'}`,
         background: highlighted ? '#dbeafe' : '#ffffff',
         padding: 8,
-        fontSize: 11,
-        opacity: q && !highlighted ? 0.35 : 1,
+        opacity: q && !highlighted ? 0.4 : 1,
       },
     };
   });
-  const edges: Edge[] = data.relationships.map((r) => ({
-    id: r.name,
-    source: r.sourceTable,
-    target: r.targetTable,
-    animated: false,
-    style: { stroke: '#94a3b8' },
-    label: r.sourceColumns.join(', '),
-    labelStyle: { fontSize: 9, fill: '#64748b' },
-  }));
+
+  const edges: Edge[] = data.relationships
+    .filter((r) => visible.has(r.sourceTable) && visible.has(r.targetTable))
+    .map((r) => ({
+      id: r.name,
+      source: r.sourceTable,
+      target: r.targetTable,
+      style: { stroke: '#94a3b8' },
+      labelStyle: { fontSize: 9, fill: '#64748b' },
+    }));
+
   return { nodes, edges };
 }

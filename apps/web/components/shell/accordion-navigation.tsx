@@ -3,6 +3,7 @@
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { useEffect, useMemo, useState } from 'react';
+import { useQuery } from '@tanstack/react-query';
 import { ChevronDown, PanelLeftClose, PanelLeftOpen } from 'lucide-react';
 import { useAuth } from '@/components/auth/auth-provider';
 import { usePortalConfig } from '@/components/portal-admin/portal-config-provider';
@@ -13,6 +14,8 @@ import {
   visibleNavSections,
 } from '@/components/shell/navigation';
 import { Button } from '@/components/ui/button';
+import { api } from '@/lib/api';
+import type { ConversationSummary } from '@/lib/communication/types';
 import { cn } from '@/lib/utils';
 
 export function AccordionNavigation({
@@ -46,6 +49,13 @@ export function AccordionNavigation({
   const currentSection = sections.find((section) =>
     section.items.some((item) => isActivePath(pathname, item.href, item.exact)),
   );
+  const conversations = useQuery<ConversationSummary[]>({
+    queryKey: ['conversations'],
+    queryFn: () => api('/communication/conversations'),
+    enabled: !!user,
+    refetchInterval: 30_000,
+  });
+  const unreadMessages = (conversations.data ?? []).reduce((sum, c) => sum + c.unread, 0);
   const [open, setOpen] = useState<Set<string>>(() => {
     const initial = currentSection?.heading ?? sections[0]?.heading;
     return new Set(initial ? [initial] : []);
@@ -143,6 +153,7 @@ export function AccordionNavigation({
                             const Icon = item.icon;
                             const active = sectionActive && isActivePath(pathname, item.href, item.exact);
                             const isLast = idx === section.items.length - 1;
+                            const itemUnread = item.href === '/comunicacao' ? unreadMessages : 0;
                             return (
                               <Link
                                 key={`${section.heading}-${item.href}-${item.label}`}
@@ -174,6 +185,11 @@ export function AccordionNavigation({
                                 {active && <span className="absolute left-0 top-0 h-full w-[2px] bg-foreground" />}
                                 <Icon className={cn('h-4 w-4 shrink-0', active ? 'text-foreground' : 'text-muted-foreground/80')} />
                                 <span className="min-w-0 flex-1 truncate">{item.label}</span>
+                                {itemUnread > 0 && (
+                                  <span className="grid h-5 min-w-5 shrink-0 place-items-center rounded-full bg-status-red px-1.5 text-[10px] font-semibold text-white">
+                                    {itemUnread > 99 ? '99+' : itemUnread}
+                                  </span>
+                                )}
                               </Link>
                             );
                           })}
@@ -184,6 +200,7 @@ export function AccordionNavigation({
                         {section.items.map((item) => {
                           const Icon = item.icon;
                           const active = sectionActive && isActivePath(pathname, item.href, item.exact);
+                          const itemUnread = item.href === '/comunicacao' ? unreadMessages : 0;
                           return (
                             <Link
                               key={`${section.heading}-${item.href}-${item.label}`}
@@ -199,6 +216,9 @@ export function AccordionNavigation({
                             >
                               {active && <span className="absolute left-0 top-0 h-full w-[2px] bg-foreground" />}
                               <Icon className={cn('h-4 w-4 shrink-0', active ? 'text-foreground' : 'text-muted-foreground/80')} />
+                              {itemUnread > 0 && (
+                                <span className="absolute right-2 top-1.5 h-2 w-2 rounded-full bg-status-red" />
+                              )}
                             </Link>
                           );
                         })}

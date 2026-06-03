@@ -125,6 +125,17 @@ export const PERMISSION_CATALOG = [
   // IA
   ['ai:use', 'Usar recursos de IA (Gemini)', 'IA', 'assist'],
   ['ai:status', 'Consultar status do provedor de IA', 'IA', 'view'],
+
+  // Comunicação e Diretório
+  ['communication:view', 'Acessar comunicação e mensagens', 'Comunicação', 'view'],
+  ['directory:view', 'Acessar o diretório global de pessoas', 'Comunicação', 'view'],
+  ['communication:attachments', 'Enviar anexos em mensagens', 'Comunicacao', 'create'],
+  ['communication:pin', 'Fixar conversas', 'Comunicacao', 'update'],
+  ['communication:mute', 'Silenciar conversas', 'Comunicacao', 'update'],
+  ['integrations:view', 'Visualizar integracoes disponiveis', 'Integracoes', 'view'],
+  ['integrations:manage', 'Gerenciar integracoes do sistema', 'Integracoes', 'manage'],
+  ['help:view', 'Acessar Central de Ajuda', 'Ajuda', 'view'],
+  ['help:manage', 'Administrar artigos da Central de Ajuda', 'Ajuda', 'manage'],
 ] as const;
 
 const ALL_KEYS = PERMISSION_CATALOG.map(([key]) => key);
@@ -192,6 +203,13 @@ export const DEFAULT_PROFILES = [
       'imports:create',
       'reports:view',
       'reports:export',
+      'communication:view',
+      'communication:attachments',
+      'communication:pin',
+      'communication:mute',
+      'directory:view',
+      'integrations:view',
+      'help:view',
     ],
   },
   {
@@ -214,6 +232,13 @@ export const DEFAULT_PROFILES = [
       'treatments:view',
       'projects:view',
       'reports:view',
+      'communication:view',
+      'communication:attachments',
+      'communication:pin',
+      'communication:mute',
+      'directory:view',
+      'integrations:view',
+      'help:view',
     ],
   },
   {
@@ -237,6 +262,10 @@ export const DEFAULT_PROFILES = [
       'org:positions:view',
       'meetings:view',
       'reports:view',
+      'communication:view',
+      'directory:view',
+      'integrations:view',
+      'help:view',
     ],
   },
 ] as const;

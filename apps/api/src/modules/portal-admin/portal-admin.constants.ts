@@ -5,7 +5,7 @@
 
 export const PORTAL_TABS = [
   'overview', 'modules', 'pages', 'features', 'navigation', 'permissions', 'scope',
-  'maintenance', 'parameters', 'integrations', 'announcements', 'audit', 'snapshots',
+  'maintenance', 'parameters', 'integrations', 'help', 'announcements', 'audit', 'snapshots',
   'diagnostics', 'advanced',
 ] as const;
 export type PortalTab = (typeof PORTAL_TABS)[number];

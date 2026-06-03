@@ -34,6 +34,10 @@ export interface CatalogFeature {
 }
 
 export const CATALOG_MODULES: CatalogModule[] = [
+  { code: 'communication', name: 'Comunicacao', category: 'Comunicacao', route: '/comunicacao', menuOrder: 8, criticality: 'medium' },
+  { code: 'directory', name: 'Pessoas', category: 'Comunicacao', route: '/pessoas', menuOrder: 9, criticality: 'low' },
+  { code: 'integrations', name: 'Integracoes', category: 'Comunicacao', route: '/integracoes', menuOrder: 10, criticality: 'medium' },
+  { code: 'help-center', name: 'Central de Ajuda', category: 'Comunicacao', route: '/ajuda', menuOrder: 11, criticality: 'low' },
   { code: 'dashboard', name: 'Dashboard', category: 'Visualizações', route: '/dashboard', menuOrder: 1, criticality: 'medium' },
   { code: 'visualization', name: 'Dashboard Executivo', category: 'Visualizações', route: '/visualization', menuOrder: 2, criticality: 'low' },
   { code: 'org', name: 'Árvore Organizacional', category: 'Visualizações', route: '/org', menuOrder: 3, criticality: 'medium' },
@@ -62,6 +66,10 @@ export const CATALOG_MODULES: CatalogModule[] = [
 ];
 
 export const CATALOG_PAGES: CatalogPage[] = [
+  { code: 'communication.main', moduleCode: 'communication', name: 'Comunicacao', title: 'Comunicacao', route: '/comunicacao' },
+  { code: 'directory.list', moduleCode: 'directory', name: 'Pessoas', title: 'Pessoas', route: '/pessoas' },
+  { code: 'integrations.main', moduleCode: 'integrations', name: 'Integracoes', title: 'Integracoes', route: '/integracoes' },
+  { code: 'help-center.main', moduleCode: 'help-center', name: 'Central de Ajuda', title: 'Central de Ajuda', route: '/ajuda' },
   { code: 'indicators.list', moduleCode: 'indicators', name: 'Indicadores', title: 'Indicadores', route: '/indicators' },
   { code: 'indicators.detail', moduleCode: 'indicators', name: 'Detalhe do indicador', title: 'Indicador', route: '/indicators/[id]' },
   { code: 'actions.list', moduleCode: 'actions', name: 'Planos de Ação', title: 'Planos de Ação', route: '/actions' },
@@ -72,6 +80,12 @@ export const CATALOG_PAGES: CatalogPage[] = [
 ];
 
 export const CATALOG_FEATURES: CatalogFeature[] = [
+  { code: 'communication.attachments', moduleCode: 'communication', name: 'Enviar anexos em mensagens' },
+  { code: 'communication.mute', moduleCode: 'communication', name: 'Silenciar conversas' },
+  { code: 'communication.pin', moduleCode: 'communication', name: 'Fixar conversas' },
+  { code: 'integrations.preference', moduleCode: 'integrations', name: 'Configurar preferencias de integracao' },
+  { code: 'help-center.feedback', moduleCode: 'help-center', name: 'Registrar feedback de artigo' },
+  { code: 'help-center.manage', moduleCode: 'help-center', name: 'Administrar artigos da ajuda', criticality: 'medium' },
   { code: 'indicators.create', moduleCode: 'indicators', name: 'Criar indicador' },
   { code: 'indicators.update', moduleCode: 'indicators', name: 'Editar indicador' },
   { code: 'indicators.delete', moduleCode: 'indicators', name: 'Excluir indicador', criticality: 'high' },

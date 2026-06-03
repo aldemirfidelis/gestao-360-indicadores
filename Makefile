@@ -9,7 +9,7 @@ COMPOSE := docker compose -f docker-compose.droplet.yml
 help: ## Mostra esta ajuda
 	@grep -E '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) | awk 'BEGIN {FS = ":.*?## "}; {printf "  \033[36m%-15s\033[0m %s\n", $$1, $$2}'
 
-deploy: ## Pull + build + up (deploy completo)
+deploy: ## Pull + build + up + migrate (deploy completo)
 	bash scripts/deploy.sh
 
 build: ## Build das imagens Docker (sequencial para Droplets pequenas)

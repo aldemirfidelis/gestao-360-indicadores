@@ -309,6 +309,7 @@ enum NotificationKind {
   MEETING_UPCOMING
   TARGET_MISSED
   MENTION
+  MESSAGE
 }
 
 enum IndicatorRelationKind {
@@ -463,45 +464,46 @@ enum EmailDeliveryStatus {
 // =====================================================
 
 model Company {
-  id        String   @id @default(uuid())
+  id        String    @id @default(uuid())
   name      String
   tradeName String?
-  cnpj      String?  @unique
+  cnpj      String?   @unique
   logoUrl   String?
-  active    Boolean  @default(true)
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  active    Boolean   @default(true)
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
   deletedAt DateTime?
 
-  branches            Branch[]
-  users               User[]
-  orgNodes            OrgNode[]
-  strategicMaps       StrategicMap[]
-  indicators          Indicator[]
-  okrCycles           OKRCycle[]
-  deviations          Deviation[]
-  actions             ActionPlan[]
-  projects            Project[]
-  meetings            Meeting[]
-  imports             ImportJob[]
-  auditLogs           AuditLog[]
-  notifications       Notification[]
-  appSettings         AppSetting[]
-  accessProfiles      AccessProfile[]
-  parameterCategories ParameterCategory[]
-  parameterItems      ParameterItem[]
-  traceabilityEvents  TraceabilityEvent[]
-  statusHistories     StatusHistory[]
-  relationshipMaps    RelationshipMap[]
-  treatmentCases      TreatmentCase[]
-  orgJobs             OrgJob[]
-  orgEmployees        OrgEmployee[]
-  orgJobCareerPaths   OrgJobCareerPath[]
+  branches               Branch[]
+  users                  User[]
+  orgNodes               OrgNode[]
+  strategicMaps          StrategicMap[]
+  indicators             Indicator[]
+  okrCycles              OKRCycle[]
+  deviations             Deviation[]
+  actions                ActionPlan[]
+  projects               Project[]
+  meetings               Meeting[]
+  imports                ImportJob[]
+  auditLogs              AuditLog[]
+  notifications          Notification[]
+  appSettings            AppSetting[]
+  accessProfiles         AccessProfile[]
+  parameterCategories    ParameterCategory[]
+  parameterItems         ParameterItem[]
+  traceabilityEvents     TraceabilityEvent[]
+  statusHistories        StatusHistory[]
+  relationshipMaps       RelationshipMap[]
+  treatmentCases         TreatmentCase[]
+  orgJobs                OrgJob[]
+  orgEmployees           OrgEmployee[]
+  orgJobCareerPaths      OrgJobCareerPath[]
   orgJobApprovalRequests OrgJobApprovalRequest[]
-  emailLogs           EmailLog[]
-  calendarInvites     CalendarInvite[]
-  workPeriods         WorkPeriod[]
-  closedMonths        ClosedMonth[]
+  emailLogs              EmailLog[]
+  calendarInvites        CalendarInvite[]
+  workPeriods            WorkPeriod[]
+  closedMonths           ClosedMonth[]
+  conversations          Conversation[]
 }
 
 model WorkPeriod {
@@ -528,16 +530,16 @@ model WorkPeriod {
 }
 
 model Branch {
-  id        String   @id @default(uuid())
+  id        String    @id @default(uuid())
   companyId String
-  company   Company  @relation(fields: [companyId], references: [id])
+  company   Company   @relation(fields: [companyId], references: [id])
   name      String
   code      String?
   city      String?
   state     String?
-  active    Boolean  @default(true)
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  active    Boolean   @default(true)
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
   deletedAt DateTime?
 
   orgNodes OrgNode[]
@@ -548,44 +550,44 @@ model Branch {
 }
 
 model OrgNode {
-  id                  String        @id @default(uuid())
-  companyId           String
-  company             Company       @relation(fields: [companyId], references: [id])
-  branchId            String?
-  branch              Branch?       @relation(fields: [branchId], references: [id])
-  parentId            String?
-  parent              OrgNode?      @relation("OrgNodeChildren", fields: [parentId], references: [id])
-  children            OrgNode[]     @relation("OrgNodeChildren")
+  id        String    @id @default(uuid())
+  companyId String
+  company   Company   @relation(fields: [companyId], references: [id])
+  branchId  String?
+  branch    Branch?   @relation(fields: [branchId], references: [id])
+  parentId  String?
+  parent    OrgNode?  @relation("OrgNodeChildren", fields: [parentId], references: [id])
+  children  OrgNode[] @relation("OrgNodeChildren")
 
-  name                String
-  code                String?
-  type                OrgNodeType
-  description         String?
-  color               String?
-  icon                String?
-  active              Boolean       @default(true)
-  position            Int           @default(0)
+  name        String
+  code        String?
+  type        OrgNodeType
+  description String?
+  color       String?
+  icon        String?
+  active      Boolean     @default(true)
+  position    Int         @default(0)
 
   // Rastreio de origem para integracao/migracao de sistemas legados
   // externalId  = chave primaria no sistema de origem (ex.: BSC "18448")
   // externalSource = identificador da origem (ex.: "BSC 1.43")
-  externalId          String?
-  externalSource      String?
+  externalId     String?
+  externalSource String?
 
-  responsibleUserId   String?
-  responsibleUser     User?         @relation("OrgNodeResponsible", fields: [responsibleUserId], references: [id])
+  responsibleUserId String?
+  responsibleUser   User?   @relation("OrgNodeResponsible", fields: [responsibleUserId], references: [id])
 
-  createdAt           DateTime      @default(now())
-  updatedAt           DateTime      @updatedAt
-  deletedAt           DateTime?
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  deletedAt DateTime?
 
-  indicatorsOwned     Indicator[]   @relation("IndicatorOwnerNode")
-  guidelineIndicators  Indicator[]   @relation("IndicatorGuidelineNode")
-  defaultForUsers     User[]        @relation("UserDefaultNode")
-  actions             ActionPlan[]  @relation("ActionOwnerNode")
-  strategicObjectives StrategicObjective[] @relation("StrategicObjectiveOwnerNode")
+  indicatorsOwned         Indicator[]                 @relation("IndicatorOwnerNode")
+  guidelineIndicators     Indicator[]                 @relation("IndicatorGuidelineNode")
+  defaultForUsers         User[]                      @relation("UserDefaultNode")
+  actions                 ActionPlan[]                @relation("ActionOwnerNode")
+  strategicObjectives     StrategicObjective[]        @relation("StrategicObjectiveOwnerNode")
   strategicObjectiveLinks StrategicObjectiveOrgNode[]
-  orgEmployees        OrgEmployee[]
+  orgEmployees            OrgEmployee[]
 
   @@unique([companyId, externalSource, externalId])
   @@index([companyId])
@@ -599,64 +601,75 @@ model OrgNode {
 // =====================================================
 
 model User {
-  id            String        @id @default(uuid())
-  companyId     String
-  company       Company       @relation(fields: [companyId], references: [id])
-  email         String        @unique
-  passwordHash  String
-  name          String
-  jobTitle      String?
-  phone         String?
-  avatarUrl     String?
-  role          UserRoleEnum  @default(COLLABORATOR)
-  status        UserAccessStatus @default(ACTIVE)
-  active        Boolean       @default(true)
-  lastLoginAt   DateTime?
-  passwordResetRequired Boolean @default(false)
-  invitedAt     DateTime?
-  blockedAt     DateTime?
-  createdAt     DateTime      @default(now())
-  updatedAt     DateTime      @updatedAt
-  deletedAt     DateTime?
+  id                    String           @id @default(uuid())
+  companyId             String
+  company               Company          @relation(fields: [companyId], references: [id])
+  email                 String           @unique
+  passwordHash          String
+  name                  String
+  jobTitle              String?
+  phone                 String?
+  avatarUrl             String?
+  bio                   String?
+  customStatus          String?
+  role                  UserRoleEnum     @default(COLLABORATOR)
+  status                UserAccessStatus @default(ACTIVE)
+  active                Boolean          @default(true)
+  lastLoginAt           DateTime?
+  passwordResetRequired Boolean          @default(false)
+  invitedAt             DateTime?
+  blockedAt             DateTime?
+  createdAt             DateTime         @default(now())
+  updatedAt             DateTime         @updatedAt
+  deletedAt             DateTime?
 
-  branchId      String?
-  branch        Branch?       @relation(fields: [branchId], references: [id])
+  branchId        String?
+  branch          Branch?        @relation(fields: [branchId], references: [id])
   accessProfileId String?
-  accessProfile AccessProfile? @relation(fields: [accessProfileId], references: [id])
-  defaultNodeId String?
-  defaultNode   OrgNode?      @relation("UserDefaultNode", fields: [defaultNodeId], references: [id])
+  accessProfile   AccessProfile? @relation(fields: [accessProfileId], references: [id])
+  defaultNodeId   String?
+  defaultNode     OrgNode?       @relation("UserDefaultNode", fields: [defaultNodeId], references: [id])
 
-  responsibleNodes     OrgNode[]            @relation("OrgNodeResponsible")
-  indicatorsResponsible Indicator[]         @relation("IndicatorResponsible")
-  indicatorsFeeder      Indicator[]         @relation("IndicatorFeeder")
-  resultsCreated        IndicatorResult[]   @relation("ResultCreatedBy")
-  deviationsResponsible Deviation[]         @relation("DeviationResponsible")
-  actionsResponsible    ActionPlan[]        @relation("ActionResponsible")
-  actionsCreated        ActionPlan[]        @relation("ActionCreatedBy")
-  actionTasksAssigned   ActionTask[]        @relation("ActionTaskAssignee")
-  careerApprovalsRequested OrgJobApprovalRequest[] @relation("CareerApprovalRequester")
-  careerApprovalsToReview  OrgJobApprovalRequest[] @relation("CareerApprovalApprover")
-  meetingParticipations MeetingParticipant[]
-  comments              Comment[]
-  notifications         Notification[]
-  refreshTokens         RefreshToken[]
-  auditLogs             AuditLog[]
-  permissions           UserPermission[]
-  traceabilityEvents    TraceabilityEvent[]  @relation("TraceabilityEventUser")
-  statusHistories       StatusHistory[]      @relation("StatusHistoryUser")
-  mapLayouts            MapLayout[]          @relation("MapLayoutUpdatedBy")
-  treatmentsCreated     TreatmentCase[]      @relation("TreatmentCreatedBy")
-  meetingsResponsible   Meeting[]            @relation("MeetingResponsible")
-  strategicMapsCreated  StrategicMap[]       @relation("StrategicMapCreatedBy")
-  strategicMapsUpdated  StrategicMap[]       @relation("StrategicMapUpdatedBy")
-  perspectivesCreated   Perspective[]        @relation("PerspectiveCreatedBy")
-  perspectivesUpdated   Perspective[]        @relation("PerspectiveUpdatedBy")
-  objectivesResponsible StrategicObjective[] @relation("StrategicObjectiveResponsible")
-  objectivesCreated     StrategicObjective[] @relation("StrategicObjectiveCreatedBy")
-  objectivesUpdated     StrategicObjective[] @relation("StrategicObjectiveUpdatedBy")
-  strategyVersions      StrategicMapVersion[] @relation("StrategicVersionCreatedBy")
-  closedMonthsClosed    ClosedMonth[]        @relation("ClosedMonthClosedBy")
-  closedMonthsReopened  ClosedMonth[]        @relation("ClosedMonthReopenedBy")
+  responsibleNodes           OrgNode[]                 @relation("OrgNodeResponsible")
+  indicatorsResponsible      Indicator[]               @relation("IndicatorResponsible")
+  indicatorsFeeder           Indicator[]               @relation("IndicatorFeeder")
+  resultsCreated             IndicatorResult[]         @relation("ResultCreatedBy")
+  deviationsResponsible      Deviation[]               @relation("DeviationResponsible")
+  actionsResponsible         ActionPlan[]              @relation("ActionResponsible")
+  actionsCreated             ActionPlan[]              @relation("ActionCreatedBy")
+  actionTasksAssigned        ActionTask[]              @relation("ActionTaskAssignee")
+  careerApprovalsRequested   OrgJobApprovalRequest[]   @relation("CareerApprovalRequester")
+  careerApprovalsToReview    OrgJobApprovalRequest[]   @relation("CareerApprovalApprover")
+  meetingParticipations      MeetingParticipant[]
+  comments                   Comment[]
+  notifications              Notification[]
+  refreshTokens              RefreshToken[]
+  auditLogs                  AuditLog[]
+  permissions                UserPermission[]
+  traceabilityEvents         TraceabilityEvent[]       @relation("TraceabilityEventUser")
+  statusHistories            StatusHistory[]           @relation("StatusHistoryUser")
+  mapLayouts                 MapLayout[]               @relation("MapLayoutUpdatedBy")
+  treatmentsCreated          TreatmentCase[]           @relation("TreatmentCreatedBy")
+  meetingsResponsible        Meeting[]                 @relation("MeetingResponsible")
+  strategicMapsCreated       StrategicMap[]            @relation("StrategicMapCreatedBy")
+  strategicMapsUpdated       StrategicMap[]            @relation("StrategicMapUpdatedBy")
+  perspectivesCreated        Perspective[]             @relation("PerspectiveCreatedBy")
+  perspectivesUpdated        Perspective[]             @relation("PerspectiveUpdatedBy")
+  objectivesResponsible      StrategicObjective[]      @relation("StrategicObjectiveResponsible")
+  objectivesCreated          StrategicObjective[]      @relation("StrategicObjectiveCreatedBy")
+  objectivesUpdated          StrategicObjective[]      @relation("StrategicObjectiveUpdatedBy")
+  strategyVersions           StrategicMapVersion[]     @relation("StrategicVersionCreatedBy")
+  closedMonthsClosed         ClosedMonth[]             @relation("ClosedMonthClosedBy")
+  closedMonthsReopened       ClosedMonth[]             @relation("ClosedMonthReopenedBy")
+  conversationsCreated       Conversation[]            @relation("ConversationCreatedBy")
+  conversationParticipations ConversationParticipant[]
+  messagesSent               Message[]                 @relation("MessageSender")
+  messageReactions           MessageReaction[]
+  messageAttachmentsUploaded MessageAttachment[]        @relation("MessageAttachmentUploadedBy")
+  helpFeedback                HelpFeedback[]
+  integrationPreferences      UserIntegrationPreference[]
+  presence                   UserPresence?
+  notificationPreference     NotificationPreference?
 
   @@index([companyId])
   @@index([branchId])
@@ -666,8 +679,8 @@ model User {
 }
 
 model Permission {
-  id          String           @id @default(uuid())
-  key         String           @unique // ex.: "indicators:create"
+  id          String              @id @default(uuid())
+  key         String              @unique // ex.: "indicators:create"
   description String
   module      String
   action      String
@@ -719,13 +732,13 @@ model ProfilePermission {
 }
 
 model RefreshToken {
-  id        String   @id @default(uuid())
+  id        String    @id @default(uuid())
   userId    String
-  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  tokenHash String   @unique
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  tokenHash String    @unique
   expiresAt DateTime
   revokedAt DateTime?
-  createdAt DateTime @default(now())
+  createdAt DateTime  @default(now())
   userAgent String?
   ip        String?
 
@@ -737,22 +750,22 @@ model RefreshToken {
 // =====================================================
 
 model StrategicMap {
-  id          String              @id @default(uuid())
-  companyId   String
-  company     Company             @relation(fields: [companyId], references: [id])
-  name        String
-  description String?
-  startsAt    DateTime
-  endsAt      DateTime
-  active      Boolean             @default(true)
+  id                 String    @id @default(uuid())
+  companyId          String
+  company            Company   @relation(fields: [companyId], references: [id])
+  name               String
+  description        String?
+  startsAt           DateTime
+  endsAt             DateTime
+  active             Boolean   @default(true)
   publishedVersionId String?
-  createdById String?
-  createdBy   User?               @relation("StrategicMapCreatedBy", fields: [createdById], references: [id])
-  updatedById String?
-  updatedBy   User?               @relation("StrategicMapUpdatedBy", fields: [updatedById], references: [id])
-  createdAt   DateTime            @default(now())
-  updatedAt   DateTime            @updatedAt
-  deletedAt   DateTime?
+  createdById        String?
+  createdBy          User?     @relation("StrategicMapCreatedBy", fields: [createdById], references: [id])
+  updatedById        String?
+  updatedBy          User?     @relation("StrategicMapUpdatedBy", fields: [updatedById], references: [id])
+  createdAt          DateTime  @default(now())
+  updatedAt          DateTime  @updatedAt
+  deletedAt          DateTime?
 
   perspectives Perspective[]
   objectives   StrategicObjective[]
@@ -763,73 +776,73 @@ model StrategicMap {
 }
 
 model Perspective {
-  id          String           @id @default(uuid())
+  id          String          @id @default(uuid())
   mapId       String
-  map         StrategicMap     @relation(fields: [mapId], references: [id], onDelete: Cascade)
+  map         StrategicMap    @relation(fields: [mapId], references: [id], onDelete: Cascade)
   kind        PerspectiveKind
   name        String
   description String?
   color       String?
   icon        String?
-  position    Int              @default(0)
-  positionX   Float            @default(0)
-  positionY   Float            @default(0)
-  width       Float            @default(1320)
-  height      Float            @default(230)
-  active      Boolean          @default(true)
+  position    Int             @default(0)
+  positionX   Float           @default(0)
+  positionY   Float           @default(0)
+  width       Float           @default(1320)
+  height      Float           @default(230)
+  active      Boolean         @default(true)
   createdById String?
-  createdBy   User?            @relation("PerspectiveCreatedBy", fields: [createdById], references: [id])
+  createdBy   User?           @relation("PerspectiveCreatedBy", fields: [createdById], references: [id])
   updatedById String?
-  updatedBy   User?            @relation("PerspectiveUpdatedBy", fields: [updatedById], references: [id])
-  createdAt   DateTime         @default(now())
-  updatedAt   DateTime         @updatedAt
+  updatedBy   User?           @relation("PerspectiveUpdatedBy", fields: [updatedById], references: [id])
+  createdAt   DateTime        @default(now())
+  updatedAt   DateTime        @updatedAt
   deletedAt   DateTime?
 
-  objectives  StrategicObjective[]
+  objectives StrategicObjective[]
 
   @@index([mapId])
   @@index([active])
 }
 
 model StrategicObjective {
-  id            String              @id @default(uuid())
+  id            String       @id @default(uuid())
   mapId         String
-  map           StrategicMap        @relation(fields: [mapId], references: [id], onDelete: Cascade)
+  map           StrategicMap @relation(fields: [mapId], references: [id], onDelete: Cascade)
   perspectiveId String
-  perspective   Perspective         @relation(fields: [perspectiveId], references: [id])
+  perspective   Perspective  @relation(fields: [perspectiveId], references: [id])
 
-  name          String
-  description   String?
-  responsible   String?
+  name              String
+  description       String?
+  responsible       String?
   responsibleUserId String?
-  responsibleUser   User?               @relation("StrategicObjectiveResponsible", fields: [responsibleUserId], references: [id])
-  ownerNodeId    String?
-  ownerNode      OrgNode?               @relation("StrategicObjectiveOwnerNode", fields: [ownerNodeId], references: [id])
-  weight        Float               @default(1)
-  status        ObjectiveStatus     @default(PLANNED)
-  priority      Int                 @default(3)
-  position      Int                 @default(0)
-  positionX     Float               @default(0)
-  positionY     Float               @default(0)
-  width         Float               @default(260)
-  height        Float               @default(150)
-  active        Boolean             @default(true)
-  createdById   String?
-  createdBy     User?               @relation("StrategicObjectiveCreatedBy", fields: [createdById], references: [id])
-  updatedById   String?
-  updatedBy     User?               @relation("StrategicObjectiveUpdatedBy", fields: [updatedById], references: [id])
+  responsibleUser   User?           @relation("StrategicObjectiveResponsible", fields: [responsibleUserId], references: [id])
+  ownerNodeId       String?
+  ownerNode         OrgNode?        @relation("StrategicObjectiveOwnerNode", fields: [ownerNodeId], references: [id])
+  weight            Float           @default(1)
+  status            ObjectiveStatus @default(PLANNED)
+  priority          Int             @default(3)
+  position          Int             @default(0)
+  positionX         Float           @default(0)
+  positionY         Float           @default(0)
+  width             Float           @default(260)
+  height            Float           @default(150)
+  active            Boolean         @default(true)
+  createdById       String?
+  createdBy         User?           @relation("StrategicObjectiveCreatedBy", fields: [createdById], references: [id])
+  updatedById       String?
+  updatedBy         User?           @relation("StrategicObjectiveUpdatedBy", fields: [updatedById], references: [id])
 
-  createdAt     DateTime            @default(now())
-  updatedAt     DateTime            @updatedAt
-  deletedAt     DateTime?
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  deletedAt DateTime?
 
-  indicators    Indicator[]         @relation("IndicatorStrategicObjective")
+  indicators     Indicator[]                   @relation("IndicatorStrategicObjective")
   indicatorLinks StrategicObjectiveIndicator[]
   orgNodeLinks   StrategicObjectiveOrgNode[]
-  actionPlans    ActionPlan[]       @relation("ActionStrategicObjective")
-  okrs          OKRObjective[]
-  outRelations  ObjectiveRelation[] @relation("ObjFrom")
-  inRelations   ObjectiveRelation[] @relation("ObjTo")
+  actionPlans    ActionPlan[]                  @relation("ActionStrategicObjective")
+  okrs           OKRObjective[]
+  outRelations   ObjectiveRelation[]           @relation("ObjFrom")
+  inRelations    ObjectiveRelation[]           @relation("ObjTo")
 
   @@index([mapId])
   @@index([perspectiveId])
@@ -839,32 +852,32 @@ model StrategicObjective {
 }
 
 model ObjectiveRelation {
-  id     String              @id @default(uuid())
-  fromId String
-  toId   String
-  from   StrategicObjective  @relation("ObjFrom", fields: [fromId], references: [id], onDelete: Cascade)
-  to     StrategicObjective  @relation("ObjTo", fields: [toId], references: [id], onDelete: Cascade)
-  weight Float               @default(1)
-  kind   String              @default("impacta")
-  label  String?
+  id          String             @id @default(uuid())
+  fromId      String
+  toId        String
+  from        StrategicObjective @relation("ObjFrom", fields: [fromId], references: [id], onDelete: Cascade)
+  to          StrategicObjective @relation("ObjTo", fields: [toId], references: [id], onDelete: Cascade)
+  weight      Float              @default(1)
+  kind        String             @default("impacta")
+  label       String?
   description String?
-  active Boolean             @default(true)
-  createdAt DateTime         @default(now())
-  updatedAt DateTime         @updatedAt
-  deletedAt DateTime?
+  active      Boolean            @default(true)
+  createdAt   DateTime           @default(now())
+  updatedAt   DateTime           @updatedAt
+  deletedAt   DateTime?
 
   @@unique([fromId, toId])
   @@index([active])
 }
 
 model StrategicObjectiveIndicator {
-  id          String              @id @default(uuid())
+  id          String             @id @default(uuid())
   objectiveId String
-  objective   StrategicObjective  @relation(fields: [objectiveId], references: [id], onDelete: Cascade)
+  objective   StrategicObjective @relation(fields: [objectiveId], references: [id], onDelete: Cascade)
   indicatorId String
-  indicator   Indicator           @relation(fields: [indicatorId], references: [id], onDelete: Cascade)
+  indicator   Indicator          @relation(fields: [indicatorId], references: [id], onDelete: Cascade)
   createdById String?
-  createdAt   DateTime            @default(now())
+  createdAt   DateTime           @default(now())
   deletedAt   DateTime?
 
   @@unique([objectiveId, indicatorId])
@@ -872,14 +885,14 @@ model StrategicObjectiveIndicator {
 }
 
 model StrategicObjectiveOrgNode {
-  id          String              @id @default(uuid())
+  id          String             @id @default(uuid())
   objectiveId String
-  objective   StrategicObjective  @relation(fields: [objectiveId], references: [id], onDelete: Cascade)
+  objective   StrategicObjective @relation(fields: [objectiveId], references: [id], onDelete: Cascade)
   orgNodeId   String
-  orgNode     OrgNode             @relation(fields: [orgNodeId], references: [id], onDelete: Cascade)
-  kind        String              @default("responsavel")
+  orgNode     OrgNode            @relation(fields: [orgNodeId], references: [id], onDelete: Cascade)
+  kind        String             @default("responsavel")
   createdById String?
-  createdAt   DateTime            @default(now())
+  createdAt   DateTime           @default(now())
   deletedAt   DateTime?
 
   @@unique([objectiveId, orgNodeId, kind])
@@ -887,17 +900,17 @@ model StrategicObjectiveOrgNode {
 }
 
 model StrategicMapVersion {
-  id          String              @id @default(uuid())
+  id          String       @id @default(uuid())
   mapId       String
-  map         StrategicMap        @relation(fields: [mapId], references: [id], onDelete: Cascade)
+  map         StrategicMap @relation(fields: [mapId], references: [id], onDelete: Cascade)
   version     Int
   title       String
   description String?
-  status      String              @default("DRAFT")
+  status      String       @default("DRAFT")
   snapshot    Json
   createdById String?
-  createdBy   User?               @relation("StrategicVersionCreatedBy", fields: [createdById], references: [id])
-  createdAt   DateTime            @default(now())
+  createdBy   User?        @relation("StrategicVersionCreatedBy", fields: [createdById], references: [id])
+  createdAt   DateTime     @default(now())
   publishedAt DateTime?
 
   @@unique([mapId, version])
@@ -923,46 +936,46 @@ model OKRCycle {
 }
 
 model OKRObjective {
-  id               String       @id @default(uuid())
-  cycleId          String
-  cycle            OKRCycle     @relation(fields: [cycleId], references: [id], onDelete: Cascade)
-  strategicObjId   String?
-  strategicObj     StrategicObjective? @relation(fields: [strategicObjId], references: [id])
-  parentId         String?
-  parent           OKRObjective?  @relation("OKRObjectiveChildren", fields: [parentId], references: [id])
-  children         OKRObjective[] @relation("OKRObjectiveChildren")
-  name             String
-  description      String?
-  ownerName        String?
-  team             String?
-  weight           Float        @default(1)
-  confidence       Float        @default(0.5) // 0..1
-  status           ObjectiveStatus @default(PLANNED)
-  createdAt        DateTime     @default(now())
-  updatedAt        DateTime     @updatedAt
-  deletedAt        DateTime?
+  id             String              @id @default(uuid())
+  cycleId        String
+  cycle          OKRCycle            @relation(fields: [cycleId], references: [id], onDelete: Cascade)
+  strategicObjId String?
+  strategicObj   StrategicObjective? @relation(fields: [strategicObjId], references: [id])
+  parentId       String?
+  parent         OKRObjective?       @relation("OKRObjectiveChildren", fields: [parentId], references: [id])
+  children       OKRObjective[]      @relation("OKRObjectiveChildren")
+  name           String
+  description    String?
+  ownerName      String?
+  team           String?
+  weight         Float               @default(1)
+  confidence     Float               @default(0.5) // 0..1
+  status         ObjectiveStatus     @default(PLANNED)
+  createdAt      DateTime            @default(now())
+  updatedAt      DateTime            @updatedAt
+  deletedAt      DateTime?
 
-  keyResults       KeyResult[]
-  checkins         OKRCheckin[]
+  keyResults KeyResult[]
+  checkins   OKRCheckin[]
 
   @@index([cycleId])
   @@index([parentId])
 }
 
 model KeyResult {
-  id           String       @id @default(uuid())
+  id           String        @id @default(uuid())
   objectiveId  String
-  objective    OKRObjective @relation(fields: [objectiveId], references: [id], onDelete: Cascade)
+  objective    OKRObjective  @relation(fields: [objectiveId], references: [id], onDelete: Cascade)
   metric       String
   unit         IndicatorUnit @default(QUANTITY)
   startValue   Float
   currentValue Float
   targetValue  Float
-  direction    Direction    @default(HIGHER_BETTER)
-  weight       Float        @default(1)
+  direction    Direction     @default(HIGHER_BETTER)
+  weight       Float         @default(1)
   responsible  String?
-  updatedAt    DateTime     @updatedAt
-  createdAt    DateTime     @default(now())
+  updatedAt    DateTime      @updatedAt
+  createdAt    DateTime      @default(now())
 
   @@index([objectiveId])
 }
@@ -971,9 +984,9 @@ model OKRCheckin {
   id          String       @id @default(uuid())
   objectiveId String
   objective   OKRObjective @relation(fields: [objectiveId], references: [id], onDelete: Cascade)
-  weekRef     String       // YYYY-Www
+  weekRef     String // YYYY-Www
   confidence  Float
-  progress    Float        // 0..1
+  progress    Float // 0..1
   note        String?
   createdAt   DateTime     @default(now())
 
@@ -985,104 +998,104 @@ model OKRCheckin {
 // =====================================================
 
 model Indicator {
-  id                  String              @id @default(uuid())
-  companyId           String
-  company             Company             @relation(fields: [companyId], references: [id])
-  ownerNodeId         String
-  ownerNode           OrgNode             @relation("IndicatorOwnerNode", fields: [ownerNodeId], references: [id])
-  guidelineNodeId     String?
-  guidelineNode       OrgNode?            @relation("IndicatorGuidelineNode", fields: [guidelineNodeId], references: [id])
-  responsibleUserId   String?
-  responsibleUser     User?               @relation("IndicatorResponsible", fields: [responsibleUserId], references: [id])
-  feederUserId        String?
-  feederUser          User?               @relation("IndicatorFeeder", fields: [feederUserId], references: [id])
+  id                   String              @id @default(uuid())
+  companyId            String
+  company              Company             @relation(fields: [companyId], references: [id])
+  ownerNodeId          String
+  ownerNode            OrgNode             @relation("IndicatorOwnerNode", fields: [ownerNodeId], references: [id])
+  guidelineNodeId      String?
+  guidelineNode        OrgNode?            @relation("IndicatorGuidelineNode", fields: [guidelineNodeId], references: [id])
+  responsibleUserId    String?
+  responsibleUser      User?               @relation("IndicatorResponsible", fields: [responsibleUserId], references: [id])
+  feederUserId         String?
+  feederUser           User?               @relation("IndicatorFeeder", fields: [feederUserId], references: [id])
   strategicObjectiveId String?
-  strategicObjective  StrategicObjective? @relation("IndicatorStrategicObjective", fields: [strategicObjectiveId], references: [id])
+  strategicObjective   StrategicObjective? @relation("IndicatorStrategicObjective", fields: [strategicObjectiveId], references: [id])
 
-  name                String
-  code                String?
-  description         String?
-  type                IndicatorType       @default(OPERATIONAL)
-  category            String?
-  unit                IndicatorUnit       @default(PERCENT)
-  unitLabel           String?
-  periodicity         Periodicity         @default(MONTHLY)
-  direction           Direction           @default(HIGHER_BETTER)
-  formula             String?
-  source              String?
-  feedKind            FeedKind            @default(MANUAL)
-  status              IndicatorStatus     @default(ACTIVE)
-  weight              Float               @default(1)
-  yellowToleranceP    Float               @default(10)
+  name             String
+  code             String?
+  description      String?
+  type             IndicatorType   @default(OPERATIONAL)
+  category         String?
+  unit             IndicatorUnit   @default(PERCENT)
+  unitLabel        String?
+  periodicity      Periodicity     @default(MONTHLY)
+  direction        Direction       @default(HIGHER_BETTER)
+  formula          String?
+  source           String?
+  feedKind         FeedKind        @default(MANUAL)
+  status           IndicatorStatus @default(ACTIVE)
+  weight           Float           @default(1)
+  yellowToleranceP Float           @default(10)
 
   // Rastreio de origem para integracao/migracao de sistemas legados
   // externalId  = chave primaria no sistema de origem (ex.: BSC "18915")
   // externalSource = identificador da origem (ex.: "BSC 1.43")
-  externalId          String?
-  externalSource      String?
+  externalId     String?
+  externalSource String?
 
-  createdAt           DateTime            @default(now())
-  updatedAt           DateTime            @updatedAt
-  deletedAt           DateTime?
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  deletedAt DateTime?
 
-  targets             IndicatorTarget[]
-  results             IndicatorResult[]
-  deviations          Deviation[]
-  traceabilityEvents  TraceabilityEvent[]
-  meetings            Meeting[]          @relation("MeetingIndicator")
-  actions             ActionPlan[]       @relation("ActionIndicator")
-  treatmentCases      TreatmentCase[]
-  childRelations      IndicatorTreeRelation[] @relation("RelChild")
-  parentRelations     IndicatorTreeRelation[] @relation("RelParent")
+  targets                 IndicatorTarget[]
+  results                 IndicatorResult[]
+  deviations              Deviation[]
+  traceabilityEvents      TraceabilityEvent[]
+  meetings                Meeting[]                     @relation("MeetingIndicator")
+  actions                 ActionPlan[]                  @relation("ActionIndicator")
+  treatmentCases          TreatmentCase[]
+  childRelations          IndicatorTreeRelation[]       @relation("RelChild")
+  parentRelations         IndicatorTreeRelation[]       @relation("RelParent")
   strategicObjectiveLinks StrategicObjectiveIndicator[]
-  projects            Project[]              @relation("ProjectIndicator")
+  projects                Project[]                     @relation("ProjectIndicator")
 
+  @@unique([companyId, code])
+  @@unique([companyId, externalSource, externalId])
   @@index([companyId])
   @@index([ownerNodeId])
   @@index([guidelineNodeId])
   @@index([type])
   @@index([status])
-  @@unique([companyId, code])
-  @@unique([companyId, externalSource, externalId])
   @@index([externalSource, externalId])
 }
 
 model IndicatorTarget {
-  id          String     @id @default(uuid())
+  id          String    @id @default(uuid())
   indicatorId String
-  indicator   Indicator  @relation(fields: [indicatorId], references: [id], onDelete: Cascade)
-  periodRef   String     // YYYY-MM, YYYY, etc.
+  indicator   Indicator @relation(fields: [indicatorId], references: [id], onDelete: Cascade)
+  periodRef   String // YYYY-MM, YYYY, etc.
   target      Float
   lowerBound  Float?
   upperBound  Float?
-  weight      Float      @default(1)
-  createdAt   DateTime   @default(now())
-  updatedAt   DateTime   @updatedAt
+  weight      Float     @default(1)
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
 
   @@unique([indicatorId, periodRef])
   @@index([indicatorId])
 }
 
 model IndicatorResult {
-  id              String        @id @default(uuid())
-  indicatorId     String
-  indicator       Indicator     @relation(fields: [indicatorId], references: [id], onDelete: Cascade)
-  periodRef       String
-  periodDate      DateTime      // primeiro dia do periodo, p/ ordenar
-  value           Float
-  status          ResultStatus  @default(FILLED)
-  light           TrafficLight  @default(GRAY)
-  attainment      Float?
-  deviationAbs    Float?
-  deviationPct    Float?
-  note            String?
-  evidenceUrl     String?
-  createdById     String?
-  createdBy       User?         @relation("ResultCreatedBy", fields: [createdById], references: [id])
-  createdAt       DateTime      @default(now())
-  updatedAt       DateTime      @updatedAt
-  treatmentCases  TreatmentCase[]
-  actionsGenerated ActionPlan[] @relation("ActionIndicatorResult")
+  id               String          @id @default(uuid())
+  indicatorId      String
+  indicator        Indicator       @relation(fields: [indicatorId], references: [id], onDelete: Cascade)
+  periodRef        String
+  periodDate       DateTime // primeiro dia do periodo, p/ ordenar
+  value            Float
+  status           ResultStatus    @default(FILLED)
+  light            TrafficLight    @default(GRAY)
+  attainment       Float?
+  deviationAbs     Float?
+  deviationPct     Float?
+  note             String?
+  evidenceUrl      String?
+  createdById      String?
+  createdBy        User?           @relation("ResultCreatedBy", fields: [createdById], references: [id])
+  createdAt        DateTime        @default(now())
+  updatedAt        DateTime        @updatedAt
+  treatmentCases   TreatmentCase[]
+  actionsGenerated ActionPlan[]    @relation("ActionIndicatorResult")
 
   @@unique([indicatorId, periodRef])
   @@index([indicatorId, periodDate])
@@ -1090,30 +1103,30 @@ model IndicatorResult {
 }
 
 model IndicatorTreeRelation {
-  id        String                @id @default(uuid())
-  parentId  String
-  childId   String
-  parent    Indicator             @relation("RelParent", fields: [parentId], references: [id], onDelete: Cascade)
-  child     Indicator             @relation("RelChild", fields: [childId], references: [id], onDelete: Cascade)
-  kind      IndicatorRelationKind @default(POSITIVE)
-  weight    Float                 @default(1)
+  id       String                @id @default(uuid())
+  parentId String
+  childId  String
+  parent   Indicator             @relation("RelParent", fields: [parentId], references: [id], onDelete: Cascade)
+  child    Indicator             @relation("RelChild", fields: [childId], references: [id], onDelete: Cascade)
+  kind     IndicatorRelationKind @default(POSITIVE)
+  weight   Float                 @default(1)
 
   @@unique([parentId, childId])
 }
 
 model ClosedMonth {
-  id          String   @id @default(uuid())
-  companyId   String
-  company     Company  @relation(fields: [companyId], references: [id])
-  periodRef   String   // ex: 2026-01
-  reason      String?
-  closedAt    DateTime @default(now())
-  closedById  String?
-  closedBy    User?    @relation("ClosedMonthClosedBy", fields: [closedById], references: [id])
-  reopenedAt  DateTime?
+  id           String    @id @default(uuid())
+  companyId    String
+  company      Company   @relation(fields: [companyId], references: [id])
+  periodRef    String // ex: 2026-01
+  reason       String?
+  closedAt     DateTime  @default(now())
+  closedById   String?
+  closedBy     User?     @relation("ClosedMonthClosedBy", fields: [closedById], references: [id])
+  reopenedAt   DateTime?
   reopenedById String?
-  reopenedBy  User?    @relation("ClosedMonthReopenedBy", fields: [reopenedById], references: [id])
-  deletedAt   DateTime?
+  reopenedBy   User?     @relation("ClosedMonthReopenedBy", fields: [reopenedById], references: [id])
+  deletedAt    DateTime?
 
   @@unique([companyId, periodRef])
   @@index([companyId])
@@ -1124,59 +1137,59 @@ model ClosedMonth {
 // =====================================================
 
 model Deviation {
-  id                String              @id @default(uuid())
+  id                String            @id @default(uuid())
   companyId         String
-  company           Company             @relation(fields: [companyId], references: [id])
+  company           Company           @relation(fields: [companyId], references: [id])
   indicatorId       String
-  indicator         Indicator           @relation(fields: [indicatorId], references: [id])
+  indicator         Indicator         @relation(fields: [indicatorId], references: [id])
   periodRef         String
-  number            Int                 // sequencial por empresa
+  number            Int // sequencial por empresa
   title             String
-  severity          DeviationSeverity   @default(MODERATE)
-  status            DeviationStatus     @default(OPEN)
-  method            AnalysisMethod      @default(FCA)
+  severity          DeviationSeverity @default(MODERATE)
+  status            DeviationStatus   @default(OPEN)
+  method            AnalysisMethod    @default(FCA)
   fact              String?
   rootCause         String?
   impact            String?
   responsibleUserId String?
-  responsibleUser   User?               @relation("DeviationResponsible", fields: [responsibleUserId], references: [id])
+  responsibleUser   User?             @relation("DeviationResponsible", fields: [responsibleUserId], references: [id])
   dueDate           DateTime?
-  openedAt          DateTime            @default(now())
+  openedAt          DateTime          @default(now())
   closedAt          DateTime?
-  createdAt         DateTime            @default(now())
-  updatedAt         DateTime            @updatedAt
+  createdAt         DateTime          @default(now())
+  updatedAt         DateTime          @updatedAt
   deletedAt         DateTime?
 
-  causes    DeviationCause[]
-  analyses  DeviationAnalysis[]
-  actions   ActionPlan[]        @relation("ActionFromDeviation")
-  meetings  Meeting[]           @relation("MeetingDeviation")
+  causes         DeviationCause[]
+  analyses       DeviationAnalysis[]
+  actions        ActionPlan[]        @relation("ActionFromDeviation")
+  meetings       Meeting[]           @relation("MeetingDeviation")
   treatmentCases TreatmentCase[]
 
+  @@unique([companyId, number])
   @@index([companyId])
   @@index([indicatorId])
-  @@unique([companyId, number])
 }
 
 model DeviationCause {
   id          String    @id @default(uuid())
   deviationId String
   deviation   Deviation @relation(fields: [deviationId], references: [id], onDelete: Cascade)
-  category    String?   // 6M ex.: Metodo, Maquina, MO, Material, Medida, Meio
+  category    String? // 6M ex.: Metodo, Maquina, MO, Material, Medida, Meio
   description String
   weight      Float     @default(1)
   createdAt   DateTime  @default(now())
 }
 
 model DeviationAnalysis {
-  id          String         @id @default(uuid())
-  deviationId String
-  deviation   Deviation      @relation(fields: [deviationId], references: [id], onDelete: Cascade)
-  method      AnalysisMethod
-  content     String         // texto livre ou JSON serializado
-  createdAt   DateTime       @default(now())
-  actions     ActionPlan[]    @relation("ActionFromAnalysis")
-  meetings    Meeting[]       @relation("MeetingAnalysis")
+  id             String          @id @default(uuid())
+  deviationId    String
+  deviation      Deviation       @relation(fields: [deviationId], references: [id], onDelete: Cascade)
+  method         AnalysisMethod
+  content        String // texto livre ou JSON serializado
+  createdAt      DateTime        @default(now())
+  actions        ActionPlan[]    @relation("ActionFromAnalysis")
+  meetings       Meeting[]       @relation("MeetingAnalysis")
   treatmentCases TreatmentCase[]
 }
 
@@ -1185,73 +1198,73 @@ model DeviationAnalysis {
 // =====================================================
 
 model ActionPlan {
-  id                String         @id @default(uuid())
-  companyId         String
-  company           Company        @relation(fields: [companyId], references: [id])
-  branchId          String?
-  branch            Branch?        @relation(fields: [branchId], references: [id])
-  ownerNodeId       String?
-  ownerNode         OrgNode?       @relation("ActionOwnerNode", fields: [ownerNodeId], references: [id])
-  responsibleUserId String?
-  responsibleUser   User?          @relation("ActionResponsible", fields: [responsibleUserId], references: [id])
-  createdById       String?
-  createdBy         User?          @relation("ActionCreatedBy", fields: [createdById], references: [id])
+  id                   String              @id @default(uuid())
+  companyId            String
+  company              Company             @relation(fields: [companyId], references: [id])
+  branchId             String?
+  branch               Branch?             @relation(fields: [branchId], references: [id])
+  ownerNodeId          String?
+  ownerNode            OrgNode?            @relation("ActionOwnerNode", fields: [ownerNodeId], references: [id])
+  responsibleUserId    String?
+  responsibleUser      User?               @relation("ActionResponsible", fields: [responsibleUserId], references: [id])
+  createdById          String?
+  createdBy            User?               @relation("ActionCreatedBy", fields: [createdById], references: [id])
   strategicObjectiveId String?
-  strategicObjective StrategicObjective? @relation("ActionStrategicObjective", fields: [strategicObjectiveId], references: [id])
-  indicatorId       String?
-  indicator         Indicator?     @relation("ActionIndicator", fields: [indicatorId], references: [id])
-  indicatorResultId String?
-  indicatorResult   IndicatorResult? @relation("ActionIndicatorResult", fields: [indicatorResultId], references: [id])
-  meetingId         String?
-  meeting           Meeting?       @relation("ActionFromMeeting", fields: [meetingId], references: [id])
-  analysisId        String?
-  analysis          DeviationAnalysis? @relation("ActionFromAnalysis", fields: [analysisId], references: [id])
-  treatmentId       String?
-  treatment         TreatmentCase? @relation(fields: [treatmentId], references: [id])
+  strategicObjective   StrategicObjective? @relation("ActionStrategicObjective", fields: [strategicObjectiveId], references: [id])
+  indicatorId          String?
+  indicator            Indicator?          @relation("ActionIndicator", fields: [indicatorId], references: [id])
+  indicatorResultId    String?
+  indicatorResult      IndicatorResult?    @relation("ActionIndicatorResult", fields: [indicatorResultId], references: [id])
+  meetingId            String?
+  meeting              Meeting?            @relation("ActionFromMeeting", fields: [meetingId], references: [id])
+  analysisId           String?
+  analysis             DeviationAnalysis?  @relation("ActionFromAnalysis", fields: [analysisId], references: [id])
+  treatmentId          String?
+  treatment            TreatmentCase?      @relation(fields: [treatmentId], references: [id])
 
-  title          String
-  description    String?
-  problemDescription String?
-  origin         ActionOrigin   @default(MANUAL)
-  originRefId    String?
-  analysisTool   ActionAnalysisTool?
-  rootCause      String?
-  priority       ActionPriority @default(MEDIUM)
-  criticality    ActionPriority @default(MEDIUM)
-  status         ActionStatus   @default(NOT_STARTED)
-  startDate      DateTime?
-  dueDate        DateTime?
-  completedAt    DateTime?
-  progress       Float          @default(0) // 0..100
-  estimatedCost  Float?
-  actualCost     Float?
-  responsibleEmail String?
-  evidenceRequired Boolean      @default(false)
-  expectedResult   String?
-  achievedResult   String?
-  effectivenessStatus ActionEffectivenessStatus @default(NOT_STARTED)
-  effectivenessChecklist Json?
-  effectivenessSummary   String?
-  effectivenessEvidence  String?
+  title                      String
+  description                String?
+  problemDescription         String?
+  origin                     ActionOrigin              @default(MANUAL)
+  originRefId                String?
+  analysisTool               ActionAnalysisTool?
+  rootCause                  String?
+  priority                   ActionPriority            @default(MEDIUM)
+  criticality                ActionPriority            @default(MEDIUM)
+  status                     ActionStatus              @default(NOT_STARTED)
+  startDate                  DateTime?
+  dueDate                    DateTime?
+  completedAt                DateTime?
+  progress                   Float                     @default(0) // 0..100
+  estimatedCost              Float?
+  actualCost                 Float?
+  responsibleEmail           String?
+  evidenceRequired           Boolean                   @default(false)
+  expectedResult             String?
+  achievedResult             String?
+  effectivenessStatus        ActionEffectivenessStatus @default(NOT_STARTED)
+  effectivenessChecklist     Json?
+  effectivenessSummary       String?
+  effectivenessEvidence      String?
   effectivenessValidatedById String?
-  effectivenessValidatedAt DateTime?
-  reopenedAt      DateTime?
-  cancelReason    String?
+  effectivenessValidatedAt   DateTime?
+  reopenedAt                 DateTime?
+  cancelReason               String?
 
-  deviationId    String?
-  deviation      Deviation?     @relation("ActionFromDeviation", fields: [deviationId], references: [id])
+  deviationId String?
+  deviation   Deviation? @relation("ActionFromDeviation", fields: [deviationId], references: [id])
 
-  createdAt      DateTime       @default(now())
-  updatedAt      DateTime       @updatedAt
-  deletedAt      DateTime?
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  deletedAt DateTime?
 
-  tasks          ActionTask[]
-  participants   ActionParticipant[]
-  evidences      ActionEvidence[]
-  comments       ActionComment[]
-  history        ActionHistory[]
+  tasks            ActionTask[]
+  participants     ActionParticipant[]
+  evidences        ActionEvidence[]
+  comments         ActionComment[]
+  history          ActionHistory[]
   analysisSessions ActionAnalysisSession[]
-  aiSuggestions  ActionAiSuggestion[]
+  aiSuggestions    ActionAiSuggestion[]
 
   @@index([companyId])
   @@index([branchId])
@@ -1266,28 +1279,28 @@ model ActionPlan {
 }
 
 model ActionTask {
-  id           String      @id @default(uuid())
-  actionId     String
-  action       ActionPlan  @relation(fields: [actionId], references: [id], onDelete: Cascade)
-  title        String
-  done         Boolean     @default(false)
+  id             String           @id @default(uuid())
+  actionId       String
+  action         ActionPlan       @relation(fields: [actionId], references: [id], onDelete: Cascade)
+  title          String
+  done           Boolean          @default(false)
   completionNote String?
-  dueDate      DateTime?
-  startDate    DateTime?
-  endDate      DateTime?
-  assignedToId String?
-  assignedTo   User?       @relation("ActionTaskAssignee", fields: [assignedToId], references: [id])
-  position     Int         @default(0)
-  evidences    ActionEvidence[]
-  createdAt    DateTime    @default(now())
-  updatedAt    DateTime    @updatedAt
+  dueDate        DateTime?
+  startDate      DateTime?
+  endDate        DateTime?
+  assignedToId   String?
+  assignedTo     User?            @relation("ActionTaskAssignee", fields: [assignedToId], references: [id])
+  position       Int              @default(0)
+  evidences      ActionEvidence[]
+  createdAt      DateTime         @default(now())
+  updatedAt      DateTime         @updatedAt
 
   @@index([actionId])
   @@index([assignedToId])
 }
 
 model GeneralApprovalRequest {
-  id           String   @id @default(uuid())
+  id           String    @id @default(uuid())
   companyId    String
   type         String
   entityType   String
@@ -1296,12 +1309,12 @@ model GeneralApprovalRequest {
   description  String?
   requesterId  String?
   approverId   String?
-  status       String   @default("PENDING")
+  status       String    @default("PENDING")
   reason       String?
   decisionNote String?
   decidedAt    DateTime?
-  createdAt    DateTime @default(now())
-  updatedAt    DateTime @updatedAt
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
 
   @@index([companyId, status])
   @@index([entityType, entityId])
@@ -1324,36 +1337,36 @@ model ActionParticipant {
 }
 
 model ActionEvidence {
-  id          String     @id @default(uuid())
-  actionId    String
-  action      ActionPlan @relation(fields: [actionId], references: [id], onDelete: Cascade)
-  taskId      String?
-  task        ActionTask? @relation(fields: [taskId], references: [id], onDelete: SetNull)
-  title       String
-  description String?
-  url         String?
-  fileName    String?
-  fileType    String?
-  mimeType    String?
-  sizeBytes   Int?
-  data        Bytes?
+  id           String      @id @default(uuid())
+  actionId     String
+  action       ActionPlan  @relation(fields: [actionId], references: [id], onDelete: Cascade)
+  taskId       String?
+  task         ActionTask? @relation(fields: [taskId], references: [id], onDelete: SetNull)
+  title        String
+  description  String?
+  url          String?
+  fileName     String?
+  fileType     String?
+  mimeType     String?
+  sizeBytes    Int?
+  data         Bytes?
   uploadedById String?
-  createdAt   DateTime   @default(now())
-  deletedAt   DateTime?
+  createdAt    DateTime    @default(now())
+  deletedAt    DateTime?
 
   @@index([actionId])
   @@index([taskId])
 }
 
 model ActionComment {
-  id        String     @id @default(uuid())
-  actionId  String
-  action    ActionPlan @relation(fields: [actionId], references: [id], onDelete: Cascade)
-  authorId  String?
+  id         String     @id @default(uuid())
+  actionId   String
+  action     ActionPlan @relation(fields: [actionId], references: [id], onDelete: Cascade)
+  authorId   String?
   authorName String?
-  comment   String
-  createdAt DateTime   @default(now())
-  deletedAt DateTime?
+  comment    String
+  createdAt  DateTime   @default(now())
+  deletedAt  DateTime?
 
   @@index([actionId, createdAt])
 }
@@ -1374,18 +1387,18 @@ model ActionHistory {
 }
 
 model ActionAnalysisSession {
-  id          String             @id @default(uuid())
-  actionId    String
-  action      ActionPlan         @relation(fields: [actionId], references: [id], onDelete: Cascade)
-  method      ActionAnalysisTool
-  status      ActionToolStatus   @default(DRAFT)
-  problem     String?
-  rootCause   String?
+  id                String             @id @default(uuid())
+  actionId          String
+  action            ActionPlan         @relation(fields: [actionId], references: [id], onDelete: Cascade)
+  method            ActionAnalysisTool
+  status            ActionToolStatus   @default(DRAFT)
+  problem           String?
+  rootCause         String?
   responsibleUserId String?
-  data        Json?
-  aiSummary   String?
-  createdAt   DateTime           @default(now())
-  updatedAt   DateTime           @updatedAt
+  data              Json?
+  aiSummary         String?
+  createdAt         DateTime           @default(now())
+  updatedAt         DateTime           @updatedAt
 
   fiveWhys       ActionFiveWhy[]
   ishikawaCauses ActionIshikawaCause[]
@@ -1414,87 +1427,87 @@ model ActionFiveWhy {
 }
 
 model ActionIshikawaCause {
-  id          String                @id @default(uuid())
-  sessionId   String
-  session     ActionAnalysisSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
-  category    String
-  description String
-  impact      Int                   @default(3)
-  probability Int                   @default(3)
-  evidence    String?
-  likelyRootCause Boolean           @default(false)
-  createdAt   DateTime              @default(now())
-  updatedAt   DateTime              @updatedAt
+  id              String                @id @default(uuid())
+  sessionId       String
+  session         ActionAnalysisSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  category        String
+  description     String
+  impact          Int                   @default(3)
+  probability     Int                   @default(3)
+  evidence        String?
+  likelyRootCause Boolean               @default(false)
+  createdAt       DateTime              @default(now())
+  updatedAt       DateTime              @updatedAt
 
   @@index([sessionId])
 }
 
 model ActionMaspStep {
-  id          String                @id @default(uuid())
-  sessionId   String
-  session     ActionAnalysisSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
-  step        Int
-  title       String
-  description String?
+  id                String                @id @default(uuid())
+  sessionId         String
+  session           ActionAnalysisSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  step              Int
+  title             String
+  description       String?
   responsibleUserId String?
-  dueDate     DateTime?
-  evidence    String?
-  comments    String?
-  status      ActionStepStatus      @default(PENDING)
-  validated   Boolean               @default(false)
-  createdAt   DateTime              @default(now())
-  updatedAt   DateTime              @updatedAt
+  dueDate           DateTime?
+  evidence          String?
+  comments          String?
+  status            ActionStepStatus      @default(PENDING)
+  validated         Boolean               @default(false)
+  createdAt         DateTime              @default(now())
+  updatedAt         DateTime              @updatedAt
 
   @@unique([sessionId, step])
 }
 
 model ActionPdcaStep {
-  id          String                @id @default(uuid())
-  sessionId   String
-  session     ActionAnalysisSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
-  phase       String
-  description String?
+  id                String                @id @default(uuid())
+  sessionId         String
+  session           ActionAnalysisSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  phase             String
+  description       String?
   responsibleUserId String?
-  dueDate     DateTime?
-  evidence    String?
-  comments    String?
-  status      ActionStepStatus      @default(PENDING)
-  validated   Boolean               @default(false)
-  createdAt   DateTime              @default(now())
-  updatedAt   DateTime              @updatedAt
+  dueDate           DateTime?
+  evidence          String?
+  comments          String?
+  status            ActionStepStatus      @default(PENDING)
+  validated         Boolean               @default(false)
+  createdAt         DateTime              @default(now())
+  updatedAt         DateTime              @updatedAt
 
   @@unique([sessionId, phase])
 }
 
 model ActionFiveW2H {
-  id          String                @id @default(uuid())
-  sessionId   String                @unique
-  session     ActionAnalysisSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
-  what        String?
-  why         String?
-  where       String?
-  when        DateTime?
-  who         String?
-  how         String?
-  howMuch     Float?
-  reviewNotes String?
-  completeScore Int                 @default(0)
-  updatedAt   DateTime              @updatedAt
+  id            String                @id @default(uuid())
+  sessionId     String                @unique
+  session       ActionAnalysisSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  what          String?
+  why           String?
+  where         String?
+  when          DateTime?
+  who           String?
+  how           String?
+  howMuch       Float?
+  reviewNotes   String?
+  completeScore Int                   @default(0)
+  updatedAt     DateTime              @updatedAt
 }
 
 model ActionAiSuggestion {
-  id          String                   @id @default(uuid())
-  actionId    String
-  action      ActionPlan               @relation(fields: [actionId], references: [id], onDelete: Cascade)
-  sessionId   String?
+  id             String                   @id @default(uuid())
+  actionId       String
+  action         ActionPlan               @relation(fields: [actionId], references: [id], onDelete: Cascade)
+  sessionId      String?
   suggestionType String
-  title       String
-  content     String
-  context     Json?
-  status      ActionAiSuggestionStatus @default(PENDING)
-  createdAt   DateTime                 @default(now())
-  decidedAt   DateTime?
-  decidedById String?
+  title          String
+  content        String
+  context        Json?
+  status         ActionAiSuggestionStatus @default(PENDING)
+  createdAt      DateTime                 @default(now())
+  decidedAt      DateTime?
+  decidedById    String?
 
   @@index([actionId, createdAt])
   @@index([status])
@@ -1505,24 +1518,24 @@ model ActionAiSuggestion {
 // =====================================================
 
 model Project {
-  id          String         @id @default(uuid())
+  id          String        @id @default(uuid())
   companyId   String
-  company     Company        @relation(fields: [companyId], references: [id])
+  company     Company       @relation(fields: [companyId], references: [id])
   indicatorId String?
-  indicator   Indicator?     @relation("ProjectIndicator", fields: [indicatorId], references: [id])
+  indicator   Indicator?    @relation("ProjectIndicator", fields: [indicatorId], references: [id])
   name        String
   description String?
-  status      ProjectStatus  @default(PLANNED)
+  status      ProjectStatus @default(PLANNED)
   startsAt    DateTime?
   endsAt      DateTime?
   responsible String?
   budget      Float?
-  createdAt   DateTime       @default(now())
-  updatedAt   DateTime       @updatedAt
+  createdAt   DateTime      @default(now())
+  updatedAt   DateTime      @updatedAt
   deletedAt   DateTime?
 
-  milestones  ProjectMilestone[]
-  tasks       ProjectTask[]
+  milestones ProjectMilestone[]
+  tasks      ProjectTask[]
 
   @@index([companyId])
   @@index([indicatorId])
@@ -1538,18 +1551,18 @@ model ProjectMilestone {
 }
 
 model ProjectTask {
-  id            String       @id @default(uuid())
-  projectId     String
-  project       Project      @relation(fields: [projectId], references: [id], onDelete: Cascade)
-  name          String
-  startDate     DateTime?
-  endDate       DateTime?
-  progress      Float        @default(0)
-  responsible   String?
-  dependencyId  String?
-  dependency    ProjectTask? @relation("TaskDep", fields: [dependencyId], references: [id])
-  dependents    ProjectTask[] @relation("TaskDep")
-  position      Int          @default(0)
+  id           String        @id @default(uuid())
+  projectId    String
+  project      Project       @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  name         String
+  startDate    DateTime?
+  endDate      DateTime?
+  progress     Float         @default(0)
+  responsible  String?
+  dependencyId String?
+  dependency   ProjectTask?  @relation("TaskDep", fields: [dependencyId], references: [id])
+  dependents   ProjectTask[] @relation("TaskDep")
+  position     Int           @default(0)
 }
 
 // =====================================================
@@ -1557,40 +1570,40 @@ model ProjectTask {
 // =====================================================
 
 model Meeting {
-  id          String       @id @default(uuid())
-  companyId   String
-  company     Company      @relation(fields: [companyId], references: [id])
-  indicatorId String?
-  indicator   Indicator?   @relation("MeetingIndicator", fields: [indicatorId], references: [id])
-  deviationId String?
-  deviation   Deviation?   @relation("MeetingDeviation", fields: [deviationId], references: [id])
-  analysisId  String?
-  analysis    DeviationAnalysis? @relation("MeetingAnalysis", fields: [analysisId], references: [id])
-  treatmentId String?
-  treatment   TreatmentCase? @relation("MeetingTreatment", fields: [treatmentId], references: [id])
+  id                String             @id @default(uuid())
+  companyId         String
+  company           Company            @relation(fields: [companyId], references: [id])
+  indicatorId       String?
+  indicator         Indicator?         @relation("MeetingIndicator", fields: [indicatorId], references: [id])
+  deviationId       String?
+  deviation         Deviation?         @relation("MeetingDeviation", fields: [deviationId], references: [id])
+  analysisId        String?
+  analysis          DeviationAnalysis? @relation("MeetingAnalysis", fields: [analysisId], references: [id])
+  treatmentId       String?
+  treatment         TreatmentCase?     @relation("MeetingTreatment", fields: [treatmentId], references: [id])
   responsibleUserId String?
-  responsibleUser   User?    @relation("MeetingResponsible", fields: [responsibleUserId], references: [id])
-  title       String
-  kind        MeetingKind
-  format      MeetingFormat @default(ONLINE)
-  status      MeetingStatus @default(SCHEDULED)
-  startsAt    DateTime
-  endsAt      DateTime?
-  location    String?
-  objective   String?
-  notes       String?
-  createdAt   DateTime     @default(now())
-  updatedAt   DateTime     @updatedAt
-  deletedAt   DateTime?
+  responsibleUser   User?              @relation("MeetingResponsible", fields: [responsibleUserId], references: [id])
+  title             String
+  kind              MeetingKind
+  format            MeetingFormat      @default(ONLINE)
+  status            MeetingStatus      @default(SCHEDULED)
+  startsAt          DateTime
+  endsAt            DateTime?
+  location          String?
+  objective         String?
+  notes             String?
+  createdAt         DateTime           @default(now())
+  updatedAt         DateTime           @updatedAt
+  deletedAt         DateTime?
 
-  participants  MeetingParticipant[]
-  guests         MeetingGuest[]
-  agendaItems   MeetingAgendaItem[]
-  decisions     MeetingDecision[]
-  actions       ActionPlan[]       @relation("ActionFromMeeting")
-  emailLogs     EmailLog[]
-  calendarInvites CalendarInvite[]
-  primaryForTreatments TreatmentCase[] @relation("TreatmentPrimaryMeeting")
+  participants         MeetingParticipant[]
+  guests               MeetingGuest[]
+  agendaItems          MeetingAgendaItem[]
+  decisions            MeetingDecision[]
+  actions              ActionPlan[]         @relation("ActionFromMeeting")
+  emailLogs            EmailLog[]
+  calendarInvites      CalendarInvite[]
+  primaryForTreatments TreatmentCase[]      @relation("TreatmentPrimaryMeeting")
 
   @@index([companyId])
   @@index([startsAt])
@@ -1600,49 +1613,49 @@ model Meeting {
 }
 
 model MeetingParticipant {
-  id        String   @id @default(uuid())
+  id        String                 @id @default(uuid())
   meetingId String
-  meeting   Meeting  @relation(fields: [meetingId], references: [id], onDelete: Cascade)
+  meeting   Meeting                @relation(fields: [meetingId], references: [id], onDelete: Cascade)
   userId    String
-  user      User     @relation(fields: [userId], references: [id])
+  user      User                   @relation(fields: [userId], references: [id])
   role      MeetingParticipantRole @default(PARTICIPANT)
   notes     String?
-  attended  Boolean  @default(false)
+  attended  Boolean                @default(false)
 
   @@unique([meetingId, userId])
 }
 
 model MeetingGuest {
-  id        String   @id @default(uuid())
+  id        String                 @id @default(uuid())
   meetingId String
-  meeting   Meeting  @relation(fields: [meetingId], references: [id], onDelete: Cascade)
+  meeting   Meeting                @relation(fields: [meetingId], references: [id], onDelete: Cascade)
   name      String
   email     String
   jobTitle  String?
   area      String?
   role      MeetingParticipantRole @default(GUEST)
-  confirmed Boolean  @default(false)
+  confirmed Boolean                @default(false)
   notes     String?
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  createdAt DateTime               @default(now())
+  updatedAt DateTime               @updatedAt
 
-  @@index([meetingId])
   @@unique([meetingId, email])
+  @@index([meetingId])
 }
 
 model MeetingAgendaItem {
-  id        String   @id @default(uuid())
+  id        String  @id @default(uuid())
   meetingId String
-  meeting   Meeting  @relation(fields: [meetingId], references: [id], onDelete: Cascade)
+  meeting   Meeting @relation(fields: [meetingId], references: [id], onDelete: Cascade)
   topic     String
   notes     String?
-  position  Int      @default(0)
+  position  Int     @default(0)
 }
 
 model MeetingDecision {
-  id        String   @id @default(uuid())
+  id        String    @id @default(uuid())
   meetingId String
-  meeting   Meeting  @relation(fields: [meetingId], references: [id], onDelete: Cascade)
+  meeting   Meeting   @relation(fields: [meetingId], references: [id], onDelete: Cascade)
   decision  String
   owner     String?
   dueDate   DateTime?
@@ -1653,15 +1666,15 @@ model MeetingDecision {
 // =====================================================
 
 model Attachment {
-  id         String   @id @default(uuid())
-  refTable   String   // ex.: "Deviation", "ActionPlan", "IndicatorResult"
-  refId      String
-  fileName   String
-  fileUrl    String
-  mimeType   String?
-  sizeBytes  Int?
-  createdAt  DateTime @default(now())
-  createdBy  String?
+  id        String   @id @default(uuid())
+  refTable  String // ex.: "Deviation", "ActionPlan", "IndicatorResult"
+  refId     String
+  fileName  String
+  fileUrl   String
+  mimeType  String?
+  sizeBytes Int?
+  createdAt DateTime @default(now())
+  createdBy String?
 
   @@index([refTable, refId])
 }
@@ -1699,26 +1712,26 @@ model Notification {
 // =====================================================
 
 model TraceabilityEvent {
-  id            String          @id @default(uuid())
-  companyId     String
-  company       Company         @relation(fields: [companyId], references: [id])
-  indicatorId   String?
-  indicator     Indicator?      @relation(fields: [indicatorId], references: [id])
-  userId        String?
-  user          User?           @relation("TraceabilityEventUser", fields: [userId], references: [id])
+  id          String     @id @default(uuid())
+  companyId   String
+  company     Company    @relation(fields: [companyId], references: [id])
+  indicatorId String?
+  indicator   Indicator? @relation(fields: [indicatorId], references: [id])
+  userId      String?
+  user        User?      @relation("TraceabilityEventUser", fields: [userId], references: [id])
 
-  eventType     TraceEventType
-  entityType    TraceEntityType
-  entityId      String
-  relatedType   TraceEntityType?
-  relatedId     String?
-  title         String
-  description   String?
-  statusFrom    String?
-  statusTo      String?
-  metadata      Json?
-  occurredAt    DateTime        @default(now())
-  createdAt     DateTime        @default(now())
+  eventType   TraceEventType
+  entityType  TraceEntityType
+  entityId    String
+  relatedType TraceEntityType?
+  relatedId   String?
+  title       String
+  description String?
+  statusFrom  String?
+  statusTo    String?
+  metadata    Json?
+  occurredAt  DateTime         @default(now())
+  createdAt   DateTime         @default(now())
 
   @@index([companyId, occurredAt])
   @@index([indicatorId, occurredAt])
@@ -1727,62 +1740,62 @@ model TraceabilityEvent {
 }
 
 model StatusHistory {
-  id            String          @id @default(uuid())
-  companyId     String
-  company       Company         @relation(fields: [companyId], references: [id])
-  userId        String?
-  user          User?           @relation("StatusHistoryUser", fields: [userId], references: [id])
-  entityType    TraceEntityType
-  entityId      String
-  statusFrom    String?
-  statusTo      String
-  reason        String?
-  metadata      Json?
-  createdAt     DateTime        @default(now())
+  id         String          @id @default(uuid())
+  companyId  String
+  company    Company         @relation(fields: [companyId], references: [id])
+  userId     String?
+  user       User?           @relation("StatusHistoryUser", fields: [userId], references: [id])
+  entityType TraceEntityType
+  entityId   String
+  statusFrom String?
+  statusTo   String
+  reason     String?
+  metadata   Json?
+  createdAt  DateTime        @default(now())
 
   @@index([companyId, createdAt])
   @@index([entityType, entityId])
 }
 
 model RelationshipMap {
-  id          String      @id @default(uuid())
+  id          String    @id @default(uuid())
   companyId   String
-  company     Company     @relation(fields: [companyId], references: [id])
+  company     Company   @relation(fields: [companyId], references: [id])
   name        String
   description String?
-  mode        MapMode     @default(TRACEABILITY)
-  active      Boolean     @default(true)
-  createdAt   DateTime    @default(now())
-  updatedAt   DateTime    @updatedAt
+  mode        MapMode   @default(TRACEABILITY)
+  active      Boolean   @default(true)
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
   deletedAt   DateTime?
 
-  nodes       MapNode[]
-  edges       MapEdge[]
-  layouts     MapLayout[]
+  nodes   MapNode[]
+  edges   MapEdge[]
+  layouts MapLayout[]
 
   @@index([companyId])
 }
 
 model MapNode {
-  id             String          @id @default(uuid())
-  mapId          String
-  map            RelationshipMap @relation(fields: [mapId], references: [id], onDelete: Cascade)
-  type           MapNodeType
-  refTable       String?
-  refId          String?
-  label          String
-  status         String?
-  responsible    String?
-  dueDate        DateTime?
-  positionX      Float           @default(0)
-  positionY      Float           @default(0)
-  collapsed      Boolean         @default(false)
-  data           Json?
-  createdAt      DateTime        @default(now())
-  updatedAt      DateTime        @updatedAt
+  id          String          @id @default(uuid())
+  mapId       String
+  map         RelationshipMap @relation(fields: [mapId], references: [id], onDelete: Cascade)
+  type        MapNodeType
+  refTable    String?
+  refId       String?
+  label       String
+  status      String?
+  responsible String?
+  dueDate     DateTime?
+  positionX   Float           @default(0)
+  positionY   Float           @default(0)
+  collapsed   Boolean         @default(false)
+  data        Json?
+  createdAt   DateTime        @default(now())
+  updatedAt   DateTime        @updatedAt
 
-  outgoingEdges  MapEdge[]       @relation("MapEdgeSource")
-  incomingEdges  MapEdge[]       @relation("MapEdgeTarget")
+  outgoingEdges MapEdge[] @relation("MapEdgeSource")
+  incomingEdges MapEdge[] @relation("MapEdgeTarget")
 
   @@index([mapId])
   @@index([refTable, refId])
@@ -1822,36 +1835,36 @@ model MapLayout {
 }
 
 model TreatmentCase {
-  id              String          @id @default(uuid())
-  companyId       String
-  company         Company         @relation(fields: [companyId], references: [id])
-  indicatorId     String
-  indicator       Indicator       @relation(fields: [indicatorId], references: [id])
-  resultId        String?
-  result          IndicatorResult? @relation(fields: [resultId], references: [id])
-  deviationId     String?
-  deviation       Deviation?      @relation(fields: [deviationId], references: [id])
-  analysisId      String?
-  analysis        DeviationAnalysis? @relation(fields: [analysisId], references: [id])
-  meetingId       String?
-  meeting         Meeting?        @relation("TreatmentPrimaryMeeting", fields: [meetingId], references: [id])
-  createdById     String?
-  createdBy       User?           @relation("TreatmentCreatedBy", fields: [createdById], references: [id])
+  id          String             @id @default(uuid())
+  companyId   String
+  company     Company            @relation(fields: [companyId], references: [id])
+  indicatorId String
+  indicator   Indicator          @relation(fields: [indicatorId], references: [id])
+  resultId    String?
+  result      IndicatorResult?   @relation(fields: [resultId], references: [id])
+  deviationId String?
+  deviation   Deviation?         @relation(fields: [deviationId], references: [id])
+  analysisId  String?
+  analysis    DeviationAnalysis? @relation(fields: [analysisId], references: [id])
+  meetingId   String?
+  meeting     Meeting?           @relation("TreatmentPrimaryMeeting", fields: [meetingId], references: [id])
+  createdById String?
+  createdBy   User?              @relation("TreatmentCreatedBy", fields: [createdById], references: [id])
 
-  periodRef       String
-  title           String
-  problem         String?
-  status          TreatmentStatus @default(AWAITING_CAUSE_ANALYSIS)
-  ignoredAt       DateTime?
-  ignoreReason    String?
-  resolvedAt      DateTime?
-  concludedAt     DateTime?
-  reopenedAt      DateTime?
-  createdAt       DateTime        @default(now())
-  updatedAt       DateTime        @updatedAt
+  periodRef    String
+  title        String
+  problem      String?
+  status       TreatmentStatus @default(AWAITING_CAUSE_ANALYSIS)
+  ignoredAt    DateTime?
+  ignoreReason String?
+  resolvedAt   DateTime?
+  concludedAt  DateTime?
+  reopenedAt   DateTime?
+  createdAt    DateTime        @default(now())
+  updatedAt    DateTime        @updatedAt
 
-  meetings        Meeting[]       @relation("MeetingTreatment")
-  actions         ActionPlan[]
+  meetings Meeting[]    @relation("MeetingTreatment")
+  actions  ActionPlan[]
 
   @@unique([indicatorId, periodRef])
   @@index([companyId, status])
@@ -1859,21 +1872,21 @@ model TreatmentCase {
 }
 
 model EmailLog {
-  id              String              @id @default(uuid())
-  companyId       String
-  company         Company             @relation(fields: [companyId], references: [id])
-  meetingId       String?
-  meeting         Meeting?            @relation(fields: [meetingId], references: [id])
-  recipientName   String?
-  recipientEmail  String
-  subject         String
-  body            String
-  status          EmailDeliveryStatus @default(PENDING)
-  errorMessage    String?
-  attempts        Int                 @default(0)
-  sentAt          DateTime?
-  createdAt       DateTime            @default(now())
-  updatedAt       DateTime            @updatedAt
+  id             String              @id @default(uuid())
+  companyId      String
+  company        Company             @relation(fields: [companyId], references: [id])
+  meetingId      String?
+  meeting        Meeting?            @relation(fields: [meetingId], references: [id])
+  recipientName  String?
+  recipientEmail String
+  subject        String
+  body           String
+  status         EmailDeliveryStatus @default(PENDING)
+  errorMessage   String?
+  attempts       Int                 @default(0)
+  sentAt         DateTime?
+  createdAt      DateTime            @default(now())
+  updatedAt      DateTime            @updatedAt
 
   @@index([companyId, createdAt])
   @@index([meetingId])
@@ -1881,15 +1894,15 @@ model EmailLog {
 }
 
 model CalendarInvite {
-  id          String   @id @default(uuid())
-  companyId   String
-  company     Company  @relation(fields: [companyId], references: [id])
-  meetingId   String
-  meeting     Meeting  @relation(fields: [meetingId], references: [id], onDelete: Cascade)
-  uid         String   @unique
-  icsContent  String
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  id         String   @id @default(uuid())
+  companyId  String
+  company    Company  @relation(fields: [companyId], references: [id])
+  meetingId  String
+  meeting    Meeting  @relation(fields: [meetingId], references: [id], onDelete: Cascade)
+  uid        String   @unique
+  icsContent String
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
 
   @@index([companyId])
   @@index([meetingId])
@@ -1911,15 +1924,15 @@ model ImportJob {
   startedAt  DateTime         @default(now())
   finishedAt DateTime?
 
-  errors     ImportError[]
+  errors ImportError[]
 
   @@index([companyId])
 }
 
 model ImportError {
-  id       String     @id @default(uuid())
+  id       String          @id @default(uuid())
   jobId    String
-  job      ImportJob  @relation(fields: [jobId], references: [id], onDelete: Cascade)
+  job      ImportJob       @relation(fields: [jobId], references: [id], onDelete: Cascade)
   rowIndex Int
   message  String
   status   ImportRowStatus @default(ERROR)
@@ -1931,24 +1944,24 @@ model ImportError {
 // =====================================================
 
 model AuditLog {
-  id        String   @id @default(uuid())
-  companyId String?
-  company   Company? @relation(fields: [companyId], references: [id])
-  userId    String?
-  user      User?    @relation(fields: [userId], references: [id])
-  action    String   // "CREATE", "UPDATE", "DELETE", "LOGIN" ...
-  module    String?
-  entity    String
-  entityId  String?
+  id          String   @id @default(uuid())
+  companyId   String?
+  company     Company? @relation(fields: [companyId], references: [id])
+  userId      String?
+  user        User?    @relation(fields: [userId], references: [id])
+  action      String // "CREATE", "UPDATE", "DELETE", "LOGIN" ...
+  module      String?
+  entity      String
+  entityId    String?
   recordLabel String?
-  payload   String?  // JSON serializado do diff
+  payload     String? // JSON serializado do diff
   beforeValue String?
   afterValue  String?
-  result    String?  @default("SUCCESS")
-  sessionId String?
-  ip        String?
-  userAgent String?
-  createdAt DateTime @default(now())
+  result      String?  @default("SUCCESS")
+  sessionId   String?
+  ip          String?
+  userAgent   String?
+  createdAt   DateTime @default(now())
 
   @@index([companyId, createdAt])
   @@index([userId, createdAt])
@@ -1957,17 +1970,17 @@ model AuditLog {
 }
 
 model AppSetting {
-  id        String   @id @default(uuid())
-  companyId String?
-  company   Company? @relation(fields: [companyId], references: [id])
-  key       String
-  value     String
+  id          String   @id @default(uuid())
+  companyId   String?
+  company     Company? @relation(fields: [companyId], references: [id])
+  key         String
+  value       String
   description String?
-  valueType String?  @default("text")
-  group     String?  @default("Sistema")
-  active    Boolean  @default(true)
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  valueType   String?  @default("text")
+  group       String?  @default("Sistema")
+  active      Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
 
   @@unique([companyId, key])
 }
@@ -1989,7 +2002,7 @@ model ParameterCategory {
   updatedAt   DateTime          @updatedAt
   deletedAt   DateTime?
 
-  items       ParameterItem[]
+  items ParameterItem[]
 
   @@unique([companyId, code])
   @@index([companyId, status])
@@ -2033,10 +2046,10 @@ model OrgJob {
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 
-  employees   OrgEmployee[] @relation("EmployeeCurrentJob")
-  pretendedBy OrgEmployee[] @relation("EmployeePretendedJob")
-  fromPaths   OrgJobCareerPath[] @relation("JobFrom")
-  toPaths     OrgJobCareerPath[] @relation("JobTo")
+  employees                 OrgEmployee[]           @relation("EmployeeCurrentJob")
+  pretendedBy               OrgEmployee[]           @relation("EmployeePretendedJob")
+  fromPaths                 OrgJobCareerPath[]      @relation("JobFrom")
+  toPaths                   OrgJobCareerPath[]      @relation("JobTo")
   approvalRequestsAsCurrent OrgJobApprovalRequest[] @relation("CareerApprovalCurrentJob")
   approvalRequestsAsTarget  OrgJobApprovalRequest[] @relation("CareerApprovalTargetJob")
 
@@ -2044,25 +2057,25 @@ model OrgJob {
 }
 
 model OrgEmployee {
-  id              String      @id @default(uuid())
-  companyId       String
-  company         Company     @relation(fields: [companyId], references: [id])
-  orgNodeId       String?
-  orgNode         OrgNode?    @relation(fields: [orgNodeId], references: [id])
-  registrationId  String?
-  name            String
-  jobId           String
-  job             OrgJob      @relation("EmployeeCurrentJob", fields: [jobId], references: [id])
-  jobPretendedId  String?
-  jobPretended    OrgJob?     @relation("EmployeePretendedJob", fields: [jobPretendedId], references: [id])
-  band            String      @default("B")
-  bandPretended   String      @default("B")
-  shift           String      @default("D")
-  isBudgeted      Boolean     @default(true)
-  status          String      @default("ACTIVE")
-  approvalStatus  String      @default("PENDENTE")
-  createdAt       DateTime    @default(now())
-  updatedAt       DateTime    @updatedAt
+  id             String   @id @default(uuid())
+  companyId      String
+  company        Company  @relation(fields: [companyId], references: [id])
+  orgNodeId      String?
+  orgNode        OrgNode? @relation(fields: [orgNodeId], references: [id])
+  registrationId String?
+  name           String
+  jobId          String
+  job            OrgJob   @relation("EmployeeCurrentJob", fields: [jobId], references: [id])
+  jobPretendedId String?
+  jobPretended   OrgJob?  @relation("EmployeePretendedJob", fields: [jobPretendedId], references: [id])
+  band           String   @default("B")
+  bandPretended  String   @default("B")
+  shift          String   @default("D")
+  isBudgeted     Boolean  @default(true)
+  status         String   @default("ACTIVE")
+  approvalStatus String   @default("PENDENTE")
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
 
   approvalRequests OrgJobApprovalRequest[]
 
@@ -2072,27 +2085,27 @@ model OrgEmployee {
 }
 
 model OrgJobApprovalRequest {
-  id              String           @id @default(uuid())
-  companyId       String
-  company         Company          @relation(fields: [companyId], references: [id])
-  employeeId      String
-  employee        OrgEmployee      @relation(fields: [employeeId], references: [id], onDelete: Cascade)
-  requesterId     String
-  requester       User             @relation("CareerApprovalRequester", fields: [requesterId], references: [id])
-  approverId      String
-  approver        User             @relation("CareerApprovalApprover", fields: [approverId], references: [id])
-  currentJobId    String
-  currentJob      OrgJob           @relation("CareerApprovalCurrentJob", fields: [currentJobId], references: [id])
-  targetJobId     String
-  targetJob       OrgJob           @relation("CareerApprovalTargetJob", fields: [targetJobId], references: [id])
-  currentBand     String
-  targetBand      String
-  status          String           @default("PENDING") // PENDING | APPROVED | REJECTED | CANCELLED
-  reason          String?
-  decisionNote    String?
-  decidedAt       DateTime?
-  createdAt       DateTime         @default(now())
-  updatedAt       DateTime         @updatedAt
+  id           String      @id @default(uuid())
+  companyId    String
+  company      Company     @relation(fields: [companyId], references: [id])
+  employeeId   String
+  employee     OrgEmployee @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+  requesterId  String
+  requester    User        @relation("CareerApprovalRequester", fields: [requesterId], references: [id])
+  approverId   String
+  approver     User        @relation("CareerApprovalApprover", fields: [approverId], references: [id])
+  currentJobId String
+  currentJob   OrgJob      @relation("CareerApprovalCurrentJob", fields: [currentJobId], references: [id])
+  targetJobId  String
+  targetJob    OrgJob      @relation("CareerApprovalTargetJob", fields: [targetJobId], references: [id])
+  currentBand  String
+  targetBand   String
+  status       String      @default("PENDING") // PENDING | APPROVED | REJECTED | CANCELLED
+  reason       String?
+  decisionNote String?
+  decidedAt    DateTime?
+  createdAt    DateTime    @default(now())
+  updatedAt    DateTime    @updatedAt
 
   @@index([companyId])
   @@index([employeeId])
@@ -2102,17 +2115,17 @@ model OrgJobApprovalRequest {
 }
 
 model OrgJobCareerPath {
-  id             String   @id @default(uuid())
-  companyId      String
-  company        Company  @relation(fields: [companyId], references: [id])
-  fromJobId      String
-  toJobId        String
-  fromJob        OrgJob   @relation("JobFrom", fields: [fromJobId], references: [id], onDelete: Cascade)
-  toJob          OrgJob   @relation("JobTo", fields: [toJobId], references: [id], onDelete: Cascade)
-  sourceHandle   String?  @default("right")
-  targetHandle   String?  @default("left")
-  createdAt      DateTime @default(now())
-  updatedAt      DateTime @updatedAt
+  id           String   @id @default(uuid())
+  companyId    String
+  company      Company  @relation(fields: [companyId], references: [id])
+  fromJobId    String
+  toJobId      String
+  fromJob      OrgJob   @relation("JobFrom", fields: [fromJobId], references: [id], onDelete: Cascade)
+  toJob        OrgJob   @relation("JobTo", fields: [toJobId], references: [id], onDelete: Cascade)
+  sourceHandle String?  @default("right")
+  targetHandle String?  @default("left")
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
 
   @@unique([fromJobId, toJobId])
   @@index([companyId])
@@ -2162,27 +2175,27 @@ model IndicatorResultComment {
 // ===========================================================================
 
 model DbAdminAuditLog {
-  id            String   @id @default(uuid())
-  userId        String?
-  userEmail     String?
-  userRole      String?
-  submenu       String   // overview | tables | records | query | structure | indexes | import-export | backup | audit | diagnostics | settings
-  action        String   // ACCESS | DENIED | SELECT | INSERT | UPDATE | DELETE | DDL | EXPORT | IMPORT | BACKUP | RESTORE | TRUNCATE | DROP ...
-  mode          String?  // safe | advanced
-  targetTable   String?
+  id             String   @id @default(uuid())
+  userId         String?
+  userEmail      String?
+  userRole       String?
+  submenu        String // overview | tables | records | query | structure | indexes | import-export | backup | audit | diagnostics | settings
+  action         String // ACCESS | DENIED | SELECT | INSERT | UPDATE | DELETE | DDL | EXPORT | IMPORT | BACKUP | RESTORE | TRUNCATE | DROP ...
+  mode           String? // safe | advanced
+  targetTable    String?
   targetRecordId String?
-  sqlText       String?  // comando executado (redigido quando não permitido)
-  beforeValue   String?  // JSON
-  afterValue    String?  // JSON
-  rowsAffected  Int?
-  result        String   @default("SUCCESS") // SUCCESS | ERROR | DENIED
-  message       String?
-  transactionId String?
-  backupId      String?
-  origin        String?
-  ip            String?
-  userAgent     String?
-  createdAt     DateTime @default(now())
+  sqlText        String? // comando executado (redigido quando não permitido)
+  beforeValue    String? // JSON
+  afterValue     String? // JSON
+  rowsAffected   Int?
+  result         String   @default("SUCCESS") // SUCCESS | ERROR | DENIED
+  message        String?
+  transactionId  String?
+  backupId       String?
+  origin         String?
+  ip             String?
+  userAgent      String?
+  createdAt      DateTime @default(now())
 
   @@index([createdAt])
   @@index([userId, createdAt])
@@ -2192,22 +2205,22 @@ model DbAdminAuditLog {
 }
 
 model DbAdminBackup {
-  id               String   @id @default(uuid())
-  userId           String?
-  userEmail        String?
-  type             String   // PRE_OP | TABLE_EXPORT | MANUAL_LOGICAL
-  reason           String?
-  relatedOperation String?
-  targetTables     String   // JSON array de nomes de tabela
-  format           String   @default("json") // json | sql
-  filePath         String
-  sizeBytes        Int      @default(0)
-  rowCount         Int      @default(0)
-  checksum         String?
-  important        Boolean  @default(false)
-  status           String   @default("AVAILABLE") // AVAILABLE | RESTORED | DELETED | CORRUPTED
-  integrityVerified Boolean @default(false)
-  createdAt        DateTime @default(now())
+  id                String   @id @default(uuid())
+  userId            String?
+  userEmail         String?
+  type              String // PRE_OP | TABLE_EXPORT | MANUAL_LOGICAL
+  reason            String?
+  relatedOperation  String?
+  targetTables      String // JSON array de nomes de tabela
+  format            String   @default("json") // json | sql
+  filePath          String
+  sizeBytes         Int      @default(0)
+  rowCount          Int      @default(0)
+  checksum          String?
+  important         Boolean  @default(false)
+  status            String   @default("AVAILABLE") // AVAILABLE | RESTORED | DELETED | CORRUPTED
+  integrityVerified Boolean  @default(false)
+  createdAt         DateTime @default(now())
 
   @@index([createdAt])
   @@index([type])
@@ -2215,13 +2228,13 @@ model DbAdminBackup {
 }
 
 model DbAdminSavedQuery {
-  id         String   @id @default(uuid())
+  id         String    @id @default(uuid())
   userId     String?
   name       String
   sql        String
-  isFavorite Boolean  @default(false)
-  createdAt  DateTime @default(now())
-  updatedAt  DateTime @updatedAt
+  isFavorite Boolean   @default(false)
+  createdAt  DateTime  @default(now())
+  updatedAt  DateTime  @updatedAt
   lastRunAt  DateTime?
 
   @@index([userId])
@@ -2251,30 +2264,30 @@ model DbAdminQueryHistory {
 // ===========================================================================
 
 model PortalModule {
-  id                     String   @id @default(uuid())
-  code                   String   @unique
-  name                   String
-  description            String?
-  category               String?
-  icon                   String?
-  route                  String?
-  menuOrder              Int      @default(0)
-  status                 String   @default("ACTIVE") // ACTIVE|INACTIVE|HIDDEN|MAINTENANCE|EXPERIMENTAL|SCHEDULED|BLOCKED|DISCONTINUED|RESTRICTED_ROLE|RESTRICTED_SCOPE
-  version                String?
-  criticality            String   @default("medium") // low|medium|high|critical
-  dependencies           String   @default("[]")
-  allowedRoles           String   @default("[]")
-  allowedScopes          String   @default("[]")
-  systemRequired         Boolean  @default(false)
-  nonBlockable           Boolean  @default(false)
-  experimental           Boolean  @default(false)
-  unavailableMessage     String?
-  scheduledActivationAt  DateTime?
+  id                      String    @id @default(uuid())
+  code                    String    @unique
+  name                    String
+  description             String?
+  category                String?
+  icon                    String?
+  route                   String?
+  menuOrder               Int       @default(0)
+  status                  String    @default("ACTIVE") // ACTIVE|INACTIVE|HIDDEN|MAINTENANCE|EXPERIMENTAL|SCHEDULED|BLOCKED|DISCONTINUED|RESTRICTED_ROLE|RESTRICTED_SCOPE
+  version                 String?
+  criticality             String    @default("medium") // low|medium|high|critical
+  dependencies            String    @default("[]")
+  allowedRoles            String    @default("[]")
+  allowedScopes           String    @default("[]")
+  systemRequired          Boolean   @default(false)
+  nonBlockable            Boolean   @default(false)
+  experimental            Boolean   @default(false)
+  unavailableMessage      String?
+  scheduledActivationAt   DateTime?
   scheduledDeactivationAt DateTime?
-  updatedBy              String?
-  updateReason           String?
-  createdAt              DateTime @default(now())
-  updatedAt              DateTime @updatedAt
+  updatedBy               String?
+  updateReason            String?
+  createdAt               DateTime  @default(now())
+  updatedAt               DateTime  @updatedAt
 
   @@index([status])
   @@index([category])
@@ -2328,22 +2341,22 @@ model PortalFeature {
 }
 
 model PortalFeatureFlag {
-  id                String   @id @default(uuid())
-  key               String   @unique
+  id                String    @id @default(uuid())
+  key               String    @unique
   name              String
   description       String?
-  enabled           Boolean  @default(false)
+  enabled           Boolean   @default(false)
   rolloutPercentage Int?
-  allowedRoles      String   @default("[]")
-  allowedUserIds    String   @default("[]")
-  allowedScopes     String   @default("[]")
+  allowedRoles      String    @default("[]")
+  allowedUserIds    String    @default("[]")
+  allowedScopes     String    @default("[]")
   environment       String?
-  experimental      Boolean  @default(false)
+  experimental      Boolean   @default(false)
   scheduledOnAt     DateTime?
   scheduledOffAt    DateTime?
   updatedBy         String?
-  createdAt         DateTime @default(now())
-  updatedAt         DateTime @updatedAt
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
 
   @@index([enabled])
 }
@@ -2364,9 +2377,9 @@ model PortalNavOverride {
 
 model PortalScopeRule {
   id         String   @id @default(uuid())
-  targetType String   // module|page|feature
+  targetType String // module|page|feature
   targetCode String
-  scopeType  String   // company|branch|orgnode|user|role
+  scopeType  String // company|branch|orgnode|user|role
   scopeId    String
   effect     String   @default("allow") // allow|deny
   createdBy  String?
@@ -2376,60 +2389,60 @@ model PortalScopeRule {
 }
 
 model PortalIntegration {
-  id             String   @id @default(uuid())
-  code           String   @unique
+  id             String    @id @default(uuid())
+  code           String    @unique
   name           String
   type           String
-  status         String   @default("enabled") // enabled|disabled
+  status         String    @default("enabled") // enabled|disabled
   environment    String?
   lastRunAt      DateTime?
   lastError      String?
   lastLatencyMs  Int?
-  recentFailures Int      @default(0)
-  configMasked   String   @default("{}")
+  recentFailures Int       @default(0)
+  configMasked   String    @default("{}")
   updatedBy      String?
-  createdAt      DateTime @default(now())
-  updatedAt      DateTime @updatedAt
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
 }
 
 model PortalAnnouncement {
-  id          String   @id @default(uuid())
-  title       String
-  message     String
-  type        String   @default("info") // info|warning|maintenance|update|urgent|training|feature
-  priority    Int      @default(0)
-  startsAt    DateTime?
-  endsAt      DateTime?
-  audienceRoles String @default("[]")
-  pages       String   @default("[]")
-  modules     String   @default("[]")
-  companies   String   @default("[]")
-  branches    String   @default("[]")
-  orgNodes    String   @default("[]")
-  display     String   @default("banner") // banner|modal
-  pinned      Boolean  @default(false)
-  dismissible Boolean  @default(true)
-  active      Boolean  @default(true)
-  createdBy   String?
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  id            String    @id @default(uuid())
+  title         String
+  message       String
+  type          String    @default("info") // info|warning|maintenance|update|urgent|training|feature
+  priority      Int       @default(0)
+  startsAt      DateTime?
+  endsAt        DateTime?
+  audienceRoles String    @default("[]")
+  pages         String    @default("[]")
+  modules       String    @default("[]")
+  companies     String    @default("[]")
+  branches      String    @default("[]")
+  orgNodes      String    @default("[]")
+  display       String    @default("banner") // banner|modal
+  pinned        Boolean   @default(false)
+  dismissible   Boolean   @default(true)
+  active        Boolean   @default(true)
+  createdBy     String?
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
 
   @@index([active, startsAt])
 }
 
 model PortalMaintenanceWindow {
-  id             String   @id @default(uuid())
-  scope          String   @default("global") // global|module|page
-  targetCode     String?
-  message        String?
-  startsAt       DateTime?
-  endsAt         DateTime?
-  active         Boolean  @default(true)
-  allowSuperAdmin Boolean @default(true)
-  allowedUserIds String   @default("[]")
-  createdBy      String?
-  createdAt      DateTime @default(now())
-  updatedAt      DateTime @updatedAt
+  id              String    @id @default(uuid())
+  scope           String    @default("global") // global|module|page
+  targetCode      String?
+  message         String?
+  startsAt        DateTime?
+  endsAt          DateTime?
+  active          Boolean   @default(true)
+  allowSuperAdmin Boolean   @default(true)
+  allowedUserIds  String    @default("[]")
+  createdBy       String?
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
 
   @@index([scope, active])
 }
@@ -2461,18 +2474,18 @@ model PortalAdminAuditLog {
 }
 
 model PortalConfigSnapshot {
-  id              String   @id @default(uuid())
-  label           String
-  reason          String?
-  kind            String   @default("MANUAL") // MANUAL|PRE_OP|AUTO
-  data            String   // JSON do dump de configuração
-  checksum        String?
-  sizeBytes       Int      @default(0)
-  createdBy       String?
-  createdByEmail  String?
-  status          String   @default("AVAILABLE") // AVAILABLE|RESTORED|DELETED
-  restoredAt      DateTime?
-  createdAt       DateTime @default(now())
+  id             String    @id @default(uuid())
+  label          String
+  reason         String?
+  kind           String    @default("MANUAL") // MANUAL|PRE_OP|AUTO
+  data           String // JSON do dump de configuração
+  checksum       String?
+  sizeBytes      Int       @default(0)
+  createdBy      String?
+  createdByEmail String?
+  status         String    @default("AVAILABLE") // AVAILABLE|RESTORED|DELETED
+  restoredAt     DateTime?
+  createdAt      DateTime  @default(now())
 
   @@index([createdAt])
   @@index([status])
@@ -2487,4 +2500,208 @@ model PortalDiagnosticRun {
   createdAt      DateTime @default(now())
 
   @@index([createdAt])
+}
+
+// =====================================================
+// Comunicação Corporativa + Diretório Global + Presença
+// =====================================================
+
+enum ConversationKind {
+  DIRECT
+  GROUP
+}
+
+enum ConversationRole {
+  OWNER
+  MEMBER
+}
+
+enum PresenceStatus {
+  ONLINE
+  AWAY
+  BUSY
+  DND
+  OFFLINE
+}
+
+model Conversation {
+  id                 String           @id @default(uuid())
+  companyId          String
+  company            Company          @relation(fields: [companyId], references: [id])
+  kind               ConversationKind @default(DIRECT)
+  title              String?
+  // Par ordenado "minUserId:maxUserId" para conversas DIRECT.
+  // Unique => impede criar duas conversas individuais entre as mesmas pessoas.
+  dmKey              String?          @unique
+  createdById        String
+  createdBy          User             @relation("ConversationCreatedBy", fields: [createdById], references: [id])
+  lastMessageAt      DateTime?
+  lastMessagePreview String?
+  createdAt          DateTime         @default(now())
+  updatedAt          DateTime         @updatedAt
+
+  participants ConversationParticipant[]
+  messages     Message[]
+
+  @@index([companyId])
+  @@index([lastMessageAt])
+}
+
+model ConversationParticipant {
+  conversationId String
+  conversation   Conversation     @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  userId         String
+  user           User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+  role           ConversationRole @default(MEMBER)
+  joinedAt       DateTime         @default(now())
+  lastReadAt     DateTime?
+  muted          Boolean          @default(false)
+  pinnedAt       DateTime?
+  leftAt         DateTime?
+
+  @@id([conversationId, userId])
+  @@index([userId])
+}
+
+model Message {
+  id             String       @id @default(uuid())
+  conversationId String
+  conversation   Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  senderId       String
+  sender         User         @relation("MessageSender", fields: [senderId], references: [id])
+  body           String
+  replyToId      String?
+  replyTo        Message?     @relation("MessageReply", fields: [replyToId], references: [id])
+  replies        Message[]    @relation("MessageReply")
+  editedAt       DateTime?
+  deletedAt      DateTime? // exclusão lógica
+  createdAt      DateTime     @default(now())
+
+  attachments MessageAttachment[]
+  reactions   MessageReaction[]
+
+  @@index([conversationId, createdAt])
+  @@index([senderId])
+}
+
+model MessageAttachment {
+  id           String    @id @default(uuid())
+  messageId    String
+  message      Message   @relation(fields: [messageId], references: [id], onDelete: Cascade)
+  uploadedById String?
+  uploadedBy   User?     @relation("MessageAttachmentUploadedBy", fields: [uploadedById], references: [id], onDelete: SetNull)
+  fileName     String
+  fileUrl      String?
+  mimeType     String?
+  sizeBytes    Int?
+  data         Bytes?
+  createdAt    DateTime  @default(now())
+  deletedAt    DateTime?
+
+  @@index([messageId])
+  @@index([uploadedById])
+}
+
+model MessageReaction {
+  messageId String
+  message   Message  @relation(fields: [messageId], references: [id], onDelete: Cascade)
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  emoji     String
+  createdAt DateTime @default(now())
+
+  @@id([messageId, userId, emoji])
+  @@index([messageId])
+}
+
+model UserPresence {
+  userId       String          @id
+  user         User            @relation(fields: [userId], references: [id], onDelete: Cascade)
+  status       PresenceStatus  @default(OFFLINE)
+  manualStatus PresenceStatus?
+  lastSeenAt   DateTime?
+  updatedAt    DateTime        @updatedAt
+
+  @@index([status])
+}
+
+model HelpCategory {
+  id          String        @id @default(uuid())
+  slug        String        @unique
+  title       String
+  description String?
+  icon        String?
+  position    Int           @default(0)
+  published   Boolean       @default(true)
+  createdAt   DateTime      @default(now())
+  updatedAt   DateTime      @updatedAt
+  articles    HelpArticle[]
+
+  @@index([published, position])
+}
+
+model HelpArticle {
+  id              String         @id @default(uuid())
+  categoryId      String?
+  category        HelpCategory?  @relation(fields: [categoryId], references: [id], onDelete: SetNull)
+  slug            String         @unique
+  title           String
+  summary         String?
+  body            String
+  tags            String         @default("[]")
+  roleVisibility  String         @default("[]")
+  status          String         @default("PUBLISHED")
+  flowKey         String?
+  version         Int            @default(1)
+  viewCount       Int            @default(0)
+  helpfulCount    Int            @default(0)
+  notHelpfulCount Int            @default(0)
+  updatedBy       String?
+  createdAt       DateTime       @default(now())
+  updatedAt       DateTime       @updatedAt
+  feedback        HelpFeedback[]
+
+  @@index([categoryId, status])
+  @@index([status, updatedAt])
+}
+
+model HelpFeedback {
+  id        String      @id @default(uuid())
+  articleId String
+  article   HelpArticle @relation(fields: [articleId], references: [id], onDelete: Cascade)
+  userId    String?
+  user      User?       @relation(fields: [userId], references: [id], onDelete: SetNull)
+  helpful   Boolean
+  comment   String?
+  createdAt DateTime    @default(now())
+
+  @@index([articleId])
+  @@index([userId])
+}
+
+model UserIntegrationPreference {
+  id             String    @id @default(uuid())
+  userId         String
+  user           User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  code           String
+  enabled        Boolean   @default(false)
+  config         String    @default("{}")
+  lastTestAt     DateTime?
+  lastTestStatus String?
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+
+  @@unique([userId, code])
+  @@index([userId])
+}
+
+model NotificationPreference {
+  userId          String   @id
+  user            User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  browserPush     Boolean  @default(false)
+  emailDigest     Boolean  @default(false)
+  muteMessages    Boolean  @default(false)
+  quietHoursStart String? // ex.: "22:00"
+  quietHoursEnd   String? // ex.: "07:00"
+  updatedAt       DateTime @updatedAt
 }

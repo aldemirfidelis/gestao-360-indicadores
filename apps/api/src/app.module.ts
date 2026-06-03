@@ -33,6 +33,9 @@ import { PortalAdminModule } from './modules/portal-admin/portal-admin.module';
 import { PeriodsModule } from './modules/periods/periods.module';
 import { ClosedMonthsModule } from './modules/closed-months/closed-months.module';
 import { AiModule } from './modules/ai/ai.module';
+import { CommunicationModule } from './modules/communication/communication.module';
+import { HelpModule } from './modules/help/help.module';
+import { IntegrationsModule } from './modules/integrations/integrations.module';
 
 @Module({
   imports: [
@@ -67,6 +70,9 @@ import { AiModule } from './modules/ai/ai.module';
     PeriodsModule,
     ClosedMonthsModule,
     AiModule,
+    CommunicationModule,
+    HelpModule,
+    IntegrationsModule,
   ],
   providers: [
     { provide: APP_GUARD, useClass: ThrottlerGuard },

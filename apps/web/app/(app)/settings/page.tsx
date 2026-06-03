@@ -166,14 +166,6 @@ const EMPTY_BOOTSTRAP: Bootstrap = {
   auditCount: 0,
 };
 
-const modules: Array<{ key: ModuleKey; title: string; description: string; icon: any; tone: string }> = [
-  { key: 'users', title: 'Usuários', description: 'Gerencie usuários, perfis, permissões e acessos.', icon: UsersRound, tone: 'text-status-blue bg-status-blue/10' },
-  { key: 'audit', title: 'Auditoria', description: 'Acompanhe tudo o que acontece no sistema.', icon: ScrollText, tone: 'text-status-green bg-status-green/10' },
-  { key: 'parameters', title: 'Parâmetros', description: 'Configure empresas, filiais, setores e cadastros base.', icon: SlidersHorizontal, tone: 'text-status-purple bg-status-purple/10' },
-  { key: 'security', title: 'Seguranca', description: 'Controle perfis, permissões e acessos por módulo.', icon: ShieldCheck, tone: 'text-status-red bg-status-red/10' },
-  { key: 'system', title: 'Sistema', description: 'Configure notificações, aprovações e regras globais.', icon: Settings, tone: 'text-status-yellow bg-status-yellow/10' },
-];
-
 const adminCards: Array<{ title: string; description: string; icon: any; active: ModuleKey; view?: ParamView; tone: string }> = [
   { title: 'Usuários', description: 'Acessos, status, vínculos e responsáveis.', icon: UsersRound, active: 'users', tone: 'text-status-blue bg-status-blue/10' },
   { title: 'Permissões', description: 'Regras por módulo e ações autorizadas.', icon: KeyRound, active: 'security', tone: 'text-status-purple bg-status-purple/10' },
@@ -412,29 +404,6 @@ export default function SettingsPage() {
           </Link>
         </SectionCard>
       )}
-
-      <div className="mb-6 grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-5">
-        {modules.map((item) => {
-          const Icon = item.icon;
-          return (
-            <button
-              key={item.key}
-              type="button"
-              onClick={() => setActive(item.key)}
-              className={cn(
-                'rounded-lg border bg-card p-4 text-left shadow-sm transition-colors hover:bg-accent/35',
-                active === item.key && 'border-primary/40 bg-primary/5',
-              )}
-            >
-              <div className={cn('grid h-10 w-10 place-items-center rounded-md', item.tone)}>
-                <Icon className="h-5 w-5" />
-              </div>
-              <div className="mt-4 text-sm font-semibold">{item.title}</div>
-              <p className="mt-1 text-xs leading-relaxed text-muted-foreground">{item.description}</p>
-            </button>
-          );
-        })}
-      </div>
 
       {active === 'users' && (
         <SectionCard

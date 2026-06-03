@@ -9,6 +9,8 @@ import { useAuth } from '@/components/auth/auth-provider';
 import { RoutePermissionGate } from '@/components/auth/route-permission-gate';
 import { PortalRouteGate } from '@/components/portal-admin/portal-route-gate';
 import { PortalAnnouncements } from '@/components/portal-admin/portal-announcements';
+import { RealtimeProvider } from '@/components/communication/realtime-provider';
+import { CommunicationProvider } from '@/components/communication/communication-provider';
 import { findRoutePermissions } from '@/components/shell/navigation';
 
 export default function AppLayout({ children }: { children: ReactNode }) {
@@ -24,22 +26,26 @@ export default function AppLayout({ children }: { children: ReactNode }) {
   if (!user) return null;
   const routePerms = findRoutePermissions(pathname ?? '');
   return (
-    <div className="enterprise-shell flex h-screen overflow-hidden">
-      <Sidebar />
-      <div className="flex flex-1 flex-col min-w-0">
-        <Topbar />
-        <PortalAnnouncements />
-        <main className="flex-1 overflow-y-auto px-4 py-4 pb-24 sm:px-5 lg:px-6 lg:py-5">
-          <PortalRouteGate>
-            {routePerms ? (
-              <RoutePermissionGate permissions={routePerms}>{children}</RoutePermissionGate>
-            ) : (
-              children
-            )}
-          </PortalRouteGate>
-        </main>
+    <RealtimeProvider>
+      <CommunicationProvider>
+      <div className="enterprise-shell flex h-screen overflow-hidden">
+        <Sidebar />
+        <div className="flex flex-1 flex-col min-w-0">
+          <Topbar />
+          <PortalAnnouncements />
+          <main className="flex-1 overflow-y-auto px-4 py-4 pb-24 sm:px-5 lg:px-6 lg:py-5">
+            <PortalRouteGate>
+              {routePerms ? (
+                <RoutePermissionGate permissions={routePerms}>{children}</RoutePermissionGate>
+              ) : (
+                children
+              )}
+            </PortalRouteGate>
+          </main>
+        </div>
+        <MobileNav />
       </div>
-      <MobileNav />
-    </div>
+      </CommunicationProvider>
+    </RealtimeProvider>
   );
 }

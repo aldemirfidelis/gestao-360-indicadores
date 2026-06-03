@@ -3,12 +3,14 @@ import { PrismaService } from '../../../prisma/prisma.service';
 import { AuthPayload } from '../../auth/auth.types';
 import { PortalAuditService } from './portal-audit.service';
 
-const DEFAULT_INTEGRATIONS = [
+export const DEFAULT_INTEGRATIONS = [
   { code: 'email', name: 'Envio de E-mail', type: 'email', env: 'SMTP_HOST' },
   { code: 'ics', name: 'Convites ICS / Calendário', type: 'calendar', env: null },
   { code: 'ai', name: 'Serviço de IA', type: 'ai', env: 'OPENAI_API_KEY' },
   { code: 'database', name: 'Banco de Dados', type: 'database', env: 'DATABASE_URL' },
   { code: 'storage', name: 'Armazenamento', type: 'storage', env: null },
+  { code: 'communication', name: 'Comunicacao Interna', type: 'communication', env: null },
+  { code: 'help-center', name: 'Central de Ajuda', type: 'support', env: null },
 ];
 
 @Injectable()
@@ -16,11 +18,12 @@ export class IntegrationService {
   constructor(private readonly prisma: PrismaService, private readonly audit: PortalAuditService) {}
 
   async list() {
-    const count = await this.prisma.portalIntegration.count();
-    if (count === 0) {
-      for (const d of DEFAULT_INTEGRATIONS) {
-        await this.prisma.portalIntegration.create({ data: { code: d.code, name: d.name, type: d.type, status: 'enabled', configMasked: JSON.stringify(maskEnv(d.env)) } });
-      }
+    for (const d of DEFAULT_INTEGRATIONS) {
+      await this.prisma.portalIntegration.upsert({
+        where: { code: d.code },
+        create: { code: d.code, name: d.name, type: d.type, status: 'enabled', configMasked: JSON.stringify(maskEnv(d.env)) },
+        update: { name: d.name, type: d.type, configMasked: JSON.stringify(maskEnv(d.env)) },
+      });
     }
     return this.prisma.portalIntegration.findMany({ orderBy: { name: 'asc' } });
   }

@@ -2,7 +2,7 @@
 
 import { useQuery } from '@tanstack/react-query';
 import Link from 'next/link';
-import { Shield, Users, Lock, ChevronRight, RefreshCcw } from 'lucide-react';
+import { Shield, Users, Lock, Plus, RefreshCcw } from 'lucide-react';
 import { SectionCard } from '@/components/platform/section-card';
 import { LoadingState } from '@/components/platform/loading-state';
 import { Button } from '@/components/ui/button';
@@ -39,12 +39,17 @@ export function PermissionsTab() {
     <div className="space-y-4">
       <div className="flex items-center justify-between gap-2">
         <p className="text-sm text-muted-foreground">
-          Estrutura geral de perfis e permissões do sistema (RBAC). A edição detalhada e vinculação é feita em Segurança.
+          Hub de usuários e permissões (RBAC). Crie usuários e administre as permissões individuais aqui.
         </p>
         <div className="flex gap-2">
+          <Button asChild size="sm">
+            <Link href="/users?new=1" className="flex items-center gap-1.5">
+              <Plus className="h-4 w-4" /> Novo usuário
+            </Link>
+          </Button>
           <Button asChild variant="outline" size="sm">
-            <Link href="/settings?tab=security" className="flex items-center gap-1.5">
-              Configurações de Segurança <ChevronRight className="h-4 w-4" />
+            <Link href="/users" className="flex items-center gap-1.5">
+              <Users className="h-4 w-4" /> Gerenciar usuários e permissões
             </Link>
           </Button>
           <Button variant="ghost" size="sm" onClick={() => query.refetch()} disabled={query.isFetching}>

@@ -19,6 +19,8 @@ import { useAuth } from '@/components/auth/auth-provider';
 import { AccordionNavigation } from '@/components/shell/accordion-navigation';
 import { isActivePath, visibleNavSections } from '@/components/shell/navigation';
 import { NotificationsBell } from './notifications-bell';
+import { OnlineUsersButton } from '@/components/communication/online-users-button';
+import { MessagesButton } from '@/components/communication/messages-button';
 import { api } from '@/lib/api';
 import { BrandMark } from '@/components/brand/brand-mark';
 
@@ -127,6 +129,8 @@ export function Topbar() {
         <Button variant="ghost" size="icon" className="h-9 w-9" aria-label="Ajuda">
           <LifeBuoy className="h-4 w-4" />
         </Button>
+        <MessagesButton />
+        <OnlineUsersButton />
         <NotificationsBell />
         <Button
           variant="ghost"

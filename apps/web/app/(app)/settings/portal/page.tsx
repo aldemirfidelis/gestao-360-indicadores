@@ -3,7 +3,7 @@
 import { useState } from 'react';
 import { cn } from '@/lib/utils';
 import {
-  Activity, Archive, Boxes, FileText, Flag, GitBranch, KeyRound, LayoutDashboard,
+  Activity, Archive, Boxes, FileText, Flag, GitBranch, KeyRound, LayoutDashboard, LifeBuoy,
   Megaphone, Network, Plug, ScrollText, SlidersHorizontal, Stethoscope, Wrench,
   type LucideIcon,
 } from 'lucide-react';
@@ -17,6 +17,7 @@ import { MaintenanceTab } from '@/components/portal-admin/tabs/maintenance-tab';
 import { PermissionsTab } from '@/components/portal-admin/tabs/permissions-tab';
 import { ParametersTab } from '@/components/portal-admin/tabs/parameters-tab';
 import { IntegrationsTab } from '@/components/portal-admin/tabs/integrations-tab';
+import { HelpTab } from '@/components/portal-admin/tabs/help-tab';
 import { AnnouncementsTab } from '@/components/portal-admin/tabs/announcements-tab';
 import { AuditTab } from '@/components/portal-admin/tabs/audit-tab';
 import { SnapshotsTab } from '@/components/portal-admin/tabs/snapshots-tab';
@@ -26,7 +27,7 @@ import { AdvancedTab } from '@/components/portal-admin/tabs/advanced-tab';
 type TabKey =
   | 'overview' | 'modules' | 'pages' | 'features' | 'navigation' | 'permissions' | 'scope'
   | 'maintenance' | 'parameters' | 'integrations' | 'announcements' | 'audit' | 'snapshots'
-  | 'diagnostics' | 'advanced';
+  | 'diagnostics' | 'advanced' | 'help';
 
 interface TabItem { key: TabKey; label: string; icon: LucideIcon }
 interface TabGroup { heading: string; items: TabItem[] }
@@ -61,6 +62,7 @@ const GROUPS: TabGroup[] = [
     items: [
       { key: 'maintenance', label: 'Manutenção', icon: Wrench },
       { key: 'integrations', label: 'Integrações', icon: Plug },
+      { key: 'help', label: 'Ajuda', icon: LifeBuoy },
       { key: 'announcements', label: 'Avisos e Comunicados', icon: Megaphone },
     ],
   },
@@ -85,6 +87,7 @@ const TAB_CONTENT: Record<TabKey, React.ReactNode> = {
   maintenance: <MaintenanceTab />,
   parameters: <ParametersTab />,
   integrations: <IntegrationsTab />,
+  help: <HelpTab />,
   announcements: <AnnouncementsTab />,
   audit: <AuditTab />,
   snapshots: <SnapshotsTab />,

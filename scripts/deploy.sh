@@ -32,11 +32,15 @@ docker compose -f "$COMPOSE_FILE" build --pull api
 docker compose -f "$COMPOSE_FILE" build --pull web
 
 echo ""
-echo "[3/4] Subindo containers (zero downtime quando possivel)..."
+echo "[3/5] Subindo containers (zero downtime quando possivel)..."
 docker compose -f "$COMPOSE_FILE" up -d --remove-orphans
 
 echo ""
-echo "[4/4] Status:"
+echo "[4/5] Aplicando migrations do banco..."
+docker compose -f "$COMPOSE_FILE" exec -T api node ../../node_modules/prisma/build/index.js migrate deploy
+
+echo ""
+echo "[5/5] Status:"
 docker compose -f "$COMPOSE_FILE" ps
 
 echo ""
