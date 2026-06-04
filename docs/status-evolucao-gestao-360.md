@@ -16,6 +16,9 @@
 - Documentação de rotas/APIs em `docs/ROTAS_E_APIS.md`.
 - Guia de testes em `docs/GUIA_DE_TESTES.md`.
 - Checklist de produção em `docs/CHECKLIST_PRODUCAO.md`.
+- DER textual do banco em `docs/DER_BANCO_DADOS.md`.
+- Guia consolidado de segurança em `docs/SEGURANCA.md`.
+- Matriz de gates das fases em `docs/GATES_FASES_IMPLEMENTADAS.md`.
 - Infraestrutura E2E com Playwright e smoke tests para health, landing, login e guard de rota privada.
 
 ## Em evolução
@@ -35,3 +38,4 @@
 - E2E smoke: `pnpm test:e2e -- --reporter=list` concluído com sucesso, com 4 testes.
 - Migrations aplicadas no Neon: `20260604130000_risk_register`, `20260604140000_non_conformity`, `20260604150000_document_register`.
 - Migrations pendentes no Neon: `20260604160000_audit_compliance`, `20260604170000_process_sipoc`, `20260604180000_forms_checklists`.
+- Não há FASE 8 no plano mestre FASE 0-7 desta consolidação.

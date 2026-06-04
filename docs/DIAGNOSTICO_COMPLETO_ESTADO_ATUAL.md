@@ -31,27 +31,25 @@
 
 ## 1. Sumário executivo
 
-A plataforma está **madura e operacional**. O build passa, os testes passam, o schema é
-válido e as migrations estão aplicadas em produção (Neon). A arquitetura multiempresa tem
-uma **fundação de segurança sólida** (isolamento por empresa centralizado e reavaliado a
-cada requisição). O sistema já cobre praticamente todo o ciclo estratégia → indicador →
-desvio → ação → eficácia, além de módulos avançados (Portal Admin, Database Admin,
-Comunicação, Integrações externas).
+Após as fases executadas, a plataforma está **madura e operacional no código**. O schema é
+válido, a API e o frontend passam no typecheck, os testes unitários da API cobrem o núcleo
+de segurança/fluxo/módulos corporativos e há smoke E2E com Playwright. O sistema já cobre
+o ciclo estratégia -> indicador -> desvio -> ação -> eficácia, além de PMO, reuniões,
+comunicação, integrações externas, Portal Admin, Database Admin e os módulos corporativos
+da FASE 6.
 
-As lacunas **não são de "o que existe", e sim de consolidação**:
+As lacunas atuais são de **ambiente e validação final**, não de ausência de implementação:
 
-1. **Enforcement por área incompleto** — o `AccessService` (motor de visibilidade por área)
-   está pronto e completo, mas é chamado por apenas **2 de ~20 módulos sensíveis**
-   (`indicators` e `actions`). O isolamento por **empresa** já é amplo; o por **área** não.
-2. **Menu esconde páginas reais** — `deviations`, `comunicacao`, `pessoas`, `ajuda`,
-   `integracoes` existem e funcionam, mas não aparecem na navegação lateral.
-3. **Diretórios órfãos** vazios (resíduo de refactors) poluem a leitura da árvore.
-4. **Módulos corporativos novos ausentes** (Riscos, Processos, Documentos, Auditorias de
-   compliance, Não Conformidades, Formulários) — esperado, são as FASES 6+.
+1. **Migrations pendentes no Neon** — Auditorias, Processos/SIPOC e Formulários/Checklists
+   estão no schema e no código, mas dependem de autorização para `prisma migrate deploy`.
+2. **E2E operacional completo** — a infraestrutura Playwright existe; os fluxos de negócio
+   completos devem rodar em banco de teste já migrado.
+3. **Build completo** — foi tentado no ambiente local, mas excedeu 5 minutos; repetir antes
+   de deploy em ambiente com tempo/recursos suficientes.
 
-> **Conclusão do gate da FASE 0:** o projeto está consistente o suficiente para avançar.
-> Não há falha crítica bloqueante. As próximas fases são de **consolidação e cobertura**,
-> não de reconstrução.
+> **Conclusão do gate da FASE 7:** não há FASE 8 no plano mestre usado nesta execução.
+> O que resta é operacional: autorizar/aplicar migrations, expandir E2E em banco isolado e
+> repetir build completo antes de publicar.
 
 ---
 
@@ -61,21 +59,21 @@ As lacunas **não são de "o que existe", e sim de consolidação**:
 |---|---|---|
 | Git working tree | `git status` | ✅ Limpo no início da auditoria |
 | Schema Prisma | `prisma validate` | ✅ Válido |
-| Migrations | `prisma migrate status` | ✅ 28 migrations, banco **up to date** (Neon) |
+| Migrations | `prisma migrate status` | ⚠️ 34 migrations no repo; 3 pendentes no Neon |
 | Typecheck API | `tsc --noEmit` (api) | ✅ Sem erros (exit 0) |
 | Typecheck Web | `tsc --noEmit` (web) | ✅ Sem erros (exit 0) |
-| Testes API | `vitest run` (api) | ✅ **54 testes** / 8 arquivos |
+| Testes API | `vitest run` (api) | ✅ **184 testes** / 26 arquivos |
 | Testes Shared | `vitest run` (shared) | ✅ **13 testes** / 2 arquivos |
-| Build completo | `pnpm build` | ⏳ Validado por typecheck + testes; build de produção executado à parte |
+| E2E smoke | `pnpm test:e2e -- --reporter=list` | ✅ 4 testes Playwright |
+| Build completo | `pnpm build` | ⚠️ Tentado; excedeu 5 minutos no ambiente local |
 
 **Dívida de dependências:** Prisma **5.22.0** com major **7.8.0** disponível. Upgrade é
 mudança maior (ver `pris.ly/d/major-version-upgrade`) — tratar como item planejado, não
 às cegas. Consistente com a auditoria de segurança anterior.
 
-**Cobertura de testes:** automação concentrada em **lógica pura** (access.logic,
-flag-eval, sql-analyze, crypto, effective-company, presence, dmkey) e **shared**
-(traceability, status). **Não há** testes de integração de isolamento multiempresa/área
-ponta a ponta — essa é a principal lacuna de testes (FASE 1/7).
+**Cobertura de testes:** automação cobre lógica pura, isolamento multiempresa/área em
+serviços críticos, relatórios/busca filtrados, módulos FASE 6 e shared. A lacuna restante
+é E2E operacional ponta a ponta em banco isolado já migrado.
 
 ---
 
@@ -155,10 +153,12 @@ Coluna **Área?** = aplica enforcement de visibilidade por área via AccessServi
 | **organograma (org jobs)** | ✅ cargos, aprovações | `/organograma`, `/aprovacoes-cargo` | ✅ | ✗ | FUNCIONAL | área |
 | **relationship-map** | ❌ pasta vazia | (mapa vive em strategy) | — | — | ÓRFÃO | remover pasta vazia |
 
-### Módulos corporativos novos (FASES 6+) — **AUSENTES** (esperado)
-Riscos/Oportunidades · Processos/Fluxogramas/SIPOC · Gestão Documental · Auditorias &
-Compliance · Não Conformidades · Formulários/Checklists. Nenhum modelo no schema ainda
-(exceto pontos de ancoragem já existentes: OrgNode "Processo", traceability).
+### Módulos corporativos novos (FASE 6) — **ENTREGUES NO CÓDIGO**
+Riscos/Oportunidades · Processos/SIPOC · Gestão Documental · Auditorias & Compliance ·
+Não Conformidades · Formulários/Checklists. Os modelos existem no schema, as rotas web/API
+foram documentadas e há testes unitários dos serviços. No Neon, Riscos, Não Conformidades
+e Documentos já têm migrations aplicadas; Auditorias, Processos/SIPOC e Formulários/Checklists
+aguardam autorização para migration.
 
 ---
 
@@ -195,9 +195,9 @@ mostrando **apenas módulos ativos e autorizados**.
 | 4 | Reports/Search/IA sem garantia anti-vazamento por área | Média | FASE 1/2 | ✅ resolvido |
 | 5 | Diretórios órfãos vazios | Baixa (higiene) | FASE 0/1 | ✅ resolvido |
 | 6 | Prisma 5→7 pendente | Média (manutenção) | planejado |
-| 7 | Fluxo indicador→eficácia: validar conexões ponta a ponta | Média | FASE 2 |
-| 8 | Dashboard/cards não clicáveis (drill-down) | Média (UX) | FASE 3 |
-| 9 | Módulos corporativos novos ausentes | — (planejado) | FASES 6+ |
+| 7 | Fluxo indicador→eficácia: validar conexões ponta a ponta | Média | FASE 2 | ✅ resolvido no código |
+| 8 | Dashboard/cards não clicáveis (drill-down) | Média (UX) | FASE 3 | ✅ resolvido no escopo da fase |
+| 9 | Módulos corporativos novos ausentes | — (planejado) | FASE 6 | ✅ resolvido no código; 3 migrations pendentes no Neon |
 
 ---
 
@@ -217,24 +217,26 @@ mostrando **apenas módulos ativos e autorizados**.
 > Regra: ao fim de cada fase → testes + typecheck + build + migrations + doc + **commit local
 > isolado** + relatório. **Sem push/deploy sem autorização.**
 
-- **FASE 0 (esta):** auditoria + diagnóstico. _Concluída._ Higiene opcional: remover pastas órfãs.
-- **FASE 1 — Segurança/consolidação:** aplicar `AccessService` (listAreaFilter/assertCanWrite/
-  visibilityLevel) em results, deviations, meetings, okrs, strategy, projects, reports,
-  dashboard, insights, search, orgnodes, organograma; padronizar auditoria; corrigir menu
-  (revelar ocultos, seções novas); criar testes de isolamento empresa/área.
-- **FASE 2 — Fluxo principal:** validar e fechar integrações indicador→desvio→tratativa→
-  análise→reunião→plano→tarefa→eficácia→rastreabilidade (sem páginas isoladas).
-- **FASE 3 — Estratégia/visão:** mapa (hover rico, drill-down), OKR integrado, dashboard
-  executivo com cards clicáveis, relatórios PDF/Excel por área.
-- **FASE 4 — PMO:** evoluir projects (portfólio, Gantt, curva S, status report).
-- **FASE 5 — Comunicação/Ajuda/Integrações/IA/Performance/Mobile.**
-- **FASE 6 — Novos módulos** (em etapas): Riscos → Processos → Documentos → Auditorias →
-  Não Conformidades → Formulários.
-- **FASE 7 — E2E, documentação completa, checklist de produção.**
+- **FASE 0:** auditoria + diagnóstico. _Concluída._
+- **FASE 1 — Segurança/consolidação:** `AccessService`, isolamento multiempresa/área,
+  menu e testes. _Concluída._
+- **FASE 2 — Fluxo principal:** indicador -> desvio -> análise -> reunião -> plano ->
+  tarefa -> eficácia -> rastreabilidade. _Concluída._
+- **FASE 3 — Estratégia/visão:** mapa executivo, drill-down, OKR integrado e visão
+  executiva. _Concluída._
+- **FASE 4 — PMO:** portfólio, filtros executivos e painel PMO. _Concluída._
+- **FASE 5 — Comunicação/Ajuda/Integrações/IA/Performance/Mobile:** escopo executado nas
+  entregas de comunicação, integrações e IA de reuniões. _Concluída no escopo aplicado._
+- **FASE 6 — Novos módulos:** Riscos, Não Conformidades, Documentos, Auditorias,
+  Processos/SIPOC e Formulários/Checklists. _Concluída no código; 3 migrations pendentes
+  no Neon._
+- **FASE 7 — E2E, documentação completa, checklist de produção:** Playwright smoke,
+  rotas/APIs, guia de testes, checklist, DER, segurança e gates. _Concluída no escopo
+  possível sem migrar Neon._
 
 ---
 
-### Anexo A — Inventário de migrations (28)
+### Anexo A — Inventário de migrations (34)
 `init` · `traceability_relationship_map` · `off_target_treatment_flow` ·
 `backfill_current_red_treatments` · `admin_settings_parameters` ·
 `strategic_map_workspace` · `action_plan_management_suite` · `work_periods` ·
@@ -245,14 +247,17 @@ mostrando **apenas módulos ativos e autorizados**.
 `action_task_completion_general_approvals` · `action_task_evidence` ·
 `communication_directory` · `message_attachments_help_integrations` ·
 `company_status_fields` · `area_visibility` · `user_active_company` ·
-`external_integrations`.
+`external_integrations` · `risk_register` · `non_conformity` · `document_register` ·
+`audit_compliance` · `process_sipoc` · `forms_checklists`.
 
 ### Anexo B — Documentação existente em `docs/`
 `ARQUITETURA_MULTIEMPRESA_E_PERMISSOES.md` · `INTEGRACOES_API_EXTERNAS.md` ·
 `SECURITY-AUDIT.md` · `arquitetura-gestao-360.md` · `configuracoes-administracao.md` ·
 `database-admin.md` · `documentacao-completa-projeto.md` ·
 `fluxo-tratativa-indicador-fora-meta.md` · `fluxograma-completo.{md,html}` ·
+`FASE6_MODULOS_CORPORATIVOS.md` · `ROTAS_E_APIS.md` · `GUIA_DE_TESTES.md` ·
+`CHECKLIST_PRODUCAO.md` · `DER_BANCO_DADOS.md` · `SEGURANCA.md` ·
+`GATES_FASES_IMPLEMENTADAS.md` ·
 `mapa-estrategico-integrado.md` · `mapa-estrategico-v2.md` ·
 `navegacao-menu-accordion.md` · `plano-acao-avancado.md` · `portal-admin.md` ·
-`status-evolucao-gestao-360.md`. _(Vários docs pedidos no prompt — SEGURANCA, ROTAS_E_APIS,
-DER, GUIA_DE_TESTES etc. — ainda não existem; serão criados nas fases correspondentes.)_
+`status-evolucao-gestao-360.md`.

@@ -23,6 +23,7 @@
 - Web typecheck: verde.
 - E2E smoke: 4 testes passando.
 - Prisma schema: válido.
+- Gates consolidados: `docs/GATES_FASES_IMPLEMENTADAS.md`.
 
 ## Cobertura unitária existente
 

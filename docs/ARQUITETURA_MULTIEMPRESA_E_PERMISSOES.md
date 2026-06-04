@@ -1,7 +1,8 @@
 # Arquitetura Multiempresa e Permissões por Área — Gestão 360
 
-> Status: Fases A, B e C entregues e verificadas. Itens marcados _(follow-up)_ seguem o
-> mesmo padrão já estabelecido e podem ser estendidos incrementalmente.
+> Status: consolidado após FASE 7. O enforcement por empresa/área foi aplicado ao núcleo
+> operacional e aos módulos corporativos da FASE 6; pendências restantes são E2E completo
+> em banco isolado e evoluções opcionais como RLS.
 
 ## 1. Visão geral
 O Gestão 360 é **SaaS multiempresa**: cada empresa é um ambiente isolado. O isolamento
@@ -58,9 +59,18 @@ empresa, dá área principal a quem não tinha, registra atribuições PRIMARY).
   retorna **projeção RESUMIDA** quando o nível é `SUMMARY` (nome/status/meta/realizado/farol/tendência/nº ações/%);
   `create/update/remove` exigem permissão de escrita na área.
 - **Planos de ação** (`actions.service`): `list` filtra por área; `create/update/remove` exigem escrita na área.
-- _(follow-up)_ Desvios/Análise de causa, Mapa Estratégico, Reuniões, Projetos, Relatórios: aplicar o
-  mesmo par `access.listAreaFilter(...)` (leitura) + `access.assertCanWrite(...)` (escrita) usando o campo de
-  área de cada agregado (deviation→indicator.ownerNodeId, objetivo→ownerNodeId, etc.).
+- **Desvios** (`deviations.service`): leitura/escrita usa a área do indicador vinculado, com projeção resumida
+  para visibilidade `SUMMARY`.
+- **Reuniões** (`meetings.service`): leitura/escrita usa o vínculo operacional (indicador/desvio/análise/tratativa);
+  reuniões gerais continuam visíveis no escopo da empresa.
+- **Projetos** (`projects.service`): projetos vinculados a indicador respeitam área; projetos gerais ficam no escopo
+  da empresa; mutações validam vínculos cross-company.
+- **Relatórios e busca** (`reports.service`, `search.service`): exportações e busca global filtram por áreas
+  permitidas.
+- **Módulos FASE 6** (`risks`, `nonconformities`, `documents`, `audits`, `processes`, `forms`): todos filtram por
+  empresa, validam vínculos cross-company e aplicam `AccessService` quando há área, indicador ou processo.
+- **Estratégia/OKRs/estrutura**: estratégia é company-wide por desenho, OKRs são escopados por empresa/ciclo e
+  estrutura organizacional tem escrita administrativa.
 
 ## 7. APIs
 - **Plataforma (Super Admin)** `@Roles(SUPER_ADMIN)`: `GET /platform/overview`, `GET/POST /platform/companies`,
@@ -93,11 +103,12 @@ fazem bypass — a empresa atual não trava. Para desligar a restrição numa em
 `areaAccessEnabled=false` (tela de empresas).
 
 ## 12. Como testar
-- Unitário: `pnpm -C apps/api test` (inclui `access.logic.spec.ts`).
-- Cenários do spec: 2 empresas isoladas (login/queries não cruzam); RH edita só RH e vê Segurança só com
-  regra na matriz; nível `SUMMARY` ⇒ cards sem causa/evidência; diretor vê tudo e não edita; exceção
-  temporária expira por `validUntil`; usuário/empresa inativos bloqueiam login.
-- Verificação contínua: `tsc`, `nest build`, ESLint, smoke read-only na Neon.
+- Unitário: `pnpm --filter @g360/api test` (inclui `access.logic.spec.ts` e specs de módulos sensíveis).
+- Typecheck API: `pnpm --filter @g360/api exec tsc --noEmit --pretty false`.
+- Typecheck Web: `pnpm --filter @g360/web exec tsc --noEmit`.
+- E2E smoke: `pnpm test:e2e`.
+- Cenários do spec: 2 empresas isoladas; área permitida vs negada; nível `SUMMARY`; diretor/admin;
+  exceção temporária; vínculo cross-company bloqueado; módulos FASE 6 com área/indicador/processo.
 
 ## 13. Decisões técnicas
 - Enforcement na **camada de serviço** (AccessService), não em RLS — funciona com o pool da Neon/Prisma.
@@ -114,8 +125,7 @@ fazem bypass — a empresa atual não trava. Para desligar a restrição numa em
   `components/shell/navigation.ts`.
 
 ## 15. Pendências (follow-up)
-- Estender enforcement a desvios/estratégia/reuniões/projetos/relatórios (mesmo padrão).
 - Regras de matriz por **perfil** (hoje: por área + exceções por usuário).
 - Assistente de onboarding de empresa (9 etapas).
 - RLS no Postgres como camada complementar.
-- Testes e2e dos 6 cenários em banco isolado.
+- Testes E2E operacionais completos em banco isolado, após aplicar migrations pendentes em ambiente de teste.

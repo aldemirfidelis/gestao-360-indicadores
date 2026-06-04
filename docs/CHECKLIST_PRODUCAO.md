@@ -48,6 +48,7 @@ Conferir:
 - Verificar perfis padrão em `permission-catalog.ts`.
 - Validar bloqueios de `/settings/database` e `/settings/portal`.
 - Conferir `AccessService` em módulos novos quando houver área/indicador/processo.
+- Conferir `docs/SEGURANCA.md` e `docs/ARQUITETURA_MULTIEMPRESA_E_PERMISSOES.md`.
 - Não expor `.env` em logs de CI/CD.
 
 ## Pós-deploy
@@ -58,3 +59,4 @@ Conferir:
 - Validar pelo menos um deep-link da timeline do indicador.
 - Conferir `prisma migrate status`.
 - Monitorar logs da API durante os primeiros acessos.
+- Registrar resultado final em `docs/GATES_FASES_IMPLEMENTADAS.md` se houver novo deploy ou validação completa.
