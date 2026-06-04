@@ -95,6 +95,10 @@ export class ExternalIntegrationService {
       res = await connector.push('indicators', await this.collectIndicators(row.companyId));
     } else if (operation === 'push:results') {
       res = await connector.push('results', await this.collectResults(row.companyId));
+    } else if (operation === 'push:areas') {
+      res = await connector.push('areas', await this.collectAreas(row.companyId));
+    } else if (operation === 'push:actions') {
+      res = await connector.push('actions', await this.collectActions(row.companyId));
     } else if (operation === 'pull:results') {
       res = await connector.pull('results');
       if (res.ok) await this.ingestPulledResults(row.companyId, row.createdById, res.data);
@@ -230,6 +234,32 @@ export class ExternalIntegrationService {
     }));
   }
 
+  private async collectAreas(companyId: string) {
+    const nodes = await this.prisma.orgNode.findMany({
+      where: { companyId, deletedAt: null },
+      select: { id: true, name: true, code: true, type: true, parentId: true, active: true },
+      orderBy: [{ position: 'asc' }, { name: 'asc' }],
+    });
+    return nodes.map((n) => ({ id: n.id, name: n.name, code: n.code, type: n.type, parentId: n.parentId, active: n.active }));
+  }
+
+  private async collectActions(companyId: string) {
+    const actions = await this.prisma.actionPlan.findMany({
+      where: { companyId, deletedAt: null },
+      take: 1000,
+      orderBy: { createdAt: 'desc' },
+      select: {
+        title: true, status: true, priority: true, dueDate: true, progress: true,
+        indicator: { select: { code: true } },
+        ownerNode: { select: { name: true } },
+      },
+    });
+    return actions.map((a) => ({
+      title: a.title, status: a.status, priority: a.priority, dueDate: a.dueDate, progress: a.progress,
+      indicatorCode: a.indicator?.code ?? null, area: a.ownerNode?.name ?? null,
+    }));
+  }
+
   /** Ingestão de resultados puxados de fora: { items: [{ indicatorCode, periodRef, value }] }. */
   private async ingestPulledResults(companyId: string, createdById: string | null, data: unknown) {
     const items = extractItems(data);
@@ -312,7 +342,7 @@ export class ExternalIntegrationService {
 }
 
 function dedupeScopes(scopes: string[]): string[] {
-  const allowed = new Set(['indicators:read', 'results:read', 'results:write']);
+  const allowed = new Set(['indicators:read', 'results:read', 'results:write', 'org:read', 'actions:read']);
   return Array.from(new Set((scopes ?? []).filter((s) => allowed.has(s))));
 }
 

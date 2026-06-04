@@ -36,4 +36,18 @@ export class ExternalApiController {
   results(@ApiKeyCtx() ctx: ApiKeyContext, @Body() body: ExternalResultsDto) {
     return this.service.upsertResults(ctx.companyId, body.items);
   }
+
+  /** Estrutura organizacional (áreas/setores) da empresa. */
+  @Get('areas')
+  @RequireScopes('org:read')
+  areas(@ApiKeyCtx() ctx: ApiKeyContext) {
+    return this.service.areas(ctx.companyId);
+  }
+
+  /** Planos de ação da empresa (resumo). */
+  @Get('action-plans')
+  @RequireScopes('actions:read')
+  actionPlans(@ApiKeyCtx() ctx: ApiKeyContext) {
+    return this.service.actionPlans(ctx.companyId);
+  }
 }

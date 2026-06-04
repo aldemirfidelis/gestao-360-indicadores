@@ -25,7 +25,7 @@ export class UpdateExternalIntegrationDto {
 }
 
 export class RunIntegrationDto {
-  @IsIn(['push:indicators', 'push:results', 'pull:results']) operation!: string;
+  @IsIn(['push:indicators', 'push:results', 'push:areas', 'push:actions', 'pull:results']) operation!: string;
 }
 
 export class CreateApiKeyDto {

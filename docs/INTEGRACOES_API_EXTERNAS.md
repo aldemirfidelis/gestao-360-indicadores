@@ -23,6 +23,10 @@ Cada chave tem **escopos**: `indicators:read`, `results:read`, `results:write`. 
 | GET | `/api/external/v1/health` | — | Valida a chave; retorna empresa/escopos. |
 | GET | `/api/external/v1/indicators` | `indicators:read` | Indicadores da empresa (definição + último período). |
 | POST | `/api/external/v1/results` | `results:write` | Importa realizados por `indicatorCode` + `periodRef`. |
+| GET | `/api/external/v1/areas` | `org:read` | Estrutura organizacional (áreas/setores). |
+| GET | `/api/external/v1/action-plans` | `actions:read` | Planos de ação (resumo). |
+
+Escopos disponíveis: `indicators:read`, `results:read`, `results:write`, `org:read`, `actions:read`.
 
 ### Exemplos
 ```bash
@@ -42,9 +46,9 @@ Resposta de `POST /results`: `{ "processed": N, "errors": [...] }`. O farol é r
 
 ## 3. Saída (conectores)
 Cadastre um conector escolhendo o **sistema** (SAP, Apdata, SE Suite, REST genérico, Webhook), a **direção**,
-a **autenticação** (API Key/Bearer/Basic/OAuth2) e a **URL base**. A sincronização é **manual/sob demanda**:
+a **autenticação** (API Key/Bearer/Basic/OAuth2) e a **URL base**. A sincronização é **manual/sob demanda** (menu "Sincronizar…" por conector):
 - **Testar** conexão.
-- **Enviar resultados** (`push:results`) / **Enviar indicadores** (`push:indicators`).
+- **Enviar** `push:results` / `push:indicators` / `push:areas` / `push:actions`.
 - **Puxar resultados** (`pull:results`) — o retorno `{ items: [{ indicatorCode, periodRef, value }] }` é gravado.
 
 ### Config avançada (JSON)

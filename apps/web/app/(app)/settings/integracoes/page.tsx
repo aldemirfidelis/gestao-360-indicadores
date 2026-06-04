@@ -3,7 +3,7 @@
 import { useState, type ReactNode } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
-import { ArrowLeftRight, Ban, Copy, KeyRound, Pencil, Plus, RefreshCcw, ScrollText, TestTube2, Trash2, Upload, Download } from 'lucide-react';
+import { ArrowLeftRight, Ban, Copy, KeyRound, Pencil, Plus, RefreshCcw, ScrollText, TestTube2, Trash2 } from 'lucide-react';
 import { PageHeader } from '@/components/shell/page-header';
 import { SectionCard } from '@/components/platform/section-card';
 import { Button } from '@/components/ui/button';
@@ -40,6 +40,8 @@ const SCOPES = [
   { value: 'indicators:read', label: 'Ler indicadores' },
   { value: 'results:read', label: 'Ler resultados' },
   { value: 'results:write', label: 'Gravar resultados' },
+  { value: 'org:read', label: 'Ler áreas/estrutura' },
+  { value: 'actions:read', label: 'Ler planos de ação' },
 ];
 
 interface Connector {
@@ -184,14 +186,20 @@ function ConnectorsTab() {
                       <TestTube2 className="h-3.5 w-3.5" />
                     </Button>
                     {c.direction !== 'INBOUND' && (
-                      <>
-                        <Button size="sm" variant="outline" className="h-8" title="Enviar resultados" onClick={() => run.mutate({ id: c.id, operation: 'push:results' })} disabled={run.isPending}>
-                          <Upload className="h-3.5 w-3.5" />
-                        </Button>
-                        <Button size="sm" variant="outline" className="h-8" title="Puxar resultados" onClick={() => run.mutate({ id: c.id, operation: 'pull:results' })} disabled={run.isPending}>
-                          <Download className="h-3.5 w-3.5" />
-                        </Button>
-                      </>
+                      <select
+                        className="h-8 rounded-md border border-border/60 bg-background px-1.5 text-xs"
+                        value=""
+                        disabled={run.isPending}
+                        title="Sincronizar"
+                        onChange={(e) => { const op = e.target.value; e.target.value = ''; if (op) run.mutate({ id: c.id, operation: op }); }}
+                      >
+                        <option value="">Sincronizar…</option>
+                        <option value="push:results">Enviar resultados</option>
+                        <option value="push:indicators">Enviar indicadores</option>
+                        <option value="push:areas">Enviar áreas</option>
+                        <option value="push:actions">Enviar planos de ação</option>
+                        <option value="pull:results">Puxar resultados</option>
+                      </select>
                     )}
                     <Button size="sm" variant="ghost" className="h-8" title="Logs" onClick={() => setLogsFor(c)}><ScrollText className="h-3.5 w-3.5" /></Button>
                     <Button size="sm" variant="ghost" className="h-8" title="Editar" onClick={() => setEditing(c)}><Pencil className="h-3.5 w-3.5" /></Button>

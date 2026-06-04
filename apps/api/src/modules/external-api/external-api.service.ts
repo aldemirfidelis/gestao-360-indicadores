@@ -46,6 +46,42 @@ export class ExternalApiService {
     }));
   }
 
+  /** Estrutura organizacional (áreas/setores) da empresa. */
+  async areas(companyId: string) {
+    const nodes = await this.prisma.orgNode.findMany({
+      where: { companyId, deletedAt: null },
+      orderBy: [{ position: 'asc' }, { name: 'asc' }],
+      select: { id: true, name: true, code: true, type: true, parentId: true, active: true },
+    });
+    return nodes.map((n) => ({ id: n.id, name: n.name, code: n.code, type: n.type, parentId: n.parentId, active: n.active }));
+  }
+
+  /** Planos de ação da empresa (resumo). */
+  async actionPlans(companyId: string) {
+    const actions = await this.prisma.actionPlan.findMany({
+      where: { companyId, deletedAt: null },
+      orderBy: { createdAt: 'desc' },
+      take: 500,
+      select: {
+        id: true, title: true, status: true, priority: true, dueDate: true, progress: true,
+        indicator: { select: { code: true } },
+        ownerNode: { select: { name: true } },
+        responsibleUser: { select: { name: true } },
+      },
+    });
+    return actions.map((a) => ({
+      id: a.id,
+      title: a.title,
+      status: a.status,
+      priority: a.priority,
+      dueDate: a.dueDate,
+      progress: a.progress,
+      indicatorCode: a.indicator?.code ?? null,
+      area: a.ownerNode?.name ?? null,
+      responsible: a.responsibleUser?.name ?? null,
+    }));
+  }
+
   /** Importa realizados: [{ indicatorCode, periodRef, value, note? }]. Empresa vem da chave. */
   async upsertResults(companyId: string, items: ResultInput[]) {
     const actor = await this.resolveActor(companyId);
