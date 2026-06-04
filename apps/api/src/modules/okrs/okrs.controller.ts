@@ -23,6 +23,12 @@ export class OkrsController {
     return this.service.createCycle(me.companyId, body.name, new Date(body.startsAt), new Date(body.endsAt));
   }
 
+  @Get('options')
+  @RequirePermissions('okrs:view')
+  options(@CurrentUser() me: AuthPayload) {
+    return this.service.options(me.companyId);
+  }
+
   @Get('cycles/:cycleId/objectives')
   @RequirePermissions('okrs:view')
   list(@CurrentUser() me: AuthPayload, @Param('cycleId') cycleId: string) {

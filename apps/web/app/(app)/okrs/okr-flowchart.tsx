@@ -35,6 +35,12 @@ export interface FlowObjective {
   confidence: number;
   ownerName: string | null;
   team: string | null;
+  strategicObj?: {
+    name: string;
+    ownerNode?: { name: string } | null;
+    perspective?: { name: string } | null;
+    indicators?: { id: string }[];
+  } | null;
   checkins?: Checkin[];
 }
 
@@ -68,6 +74,9 @@ interface OkrNodeData {
   progressNow: number;
   progressAt: number | null; // progresso "como estava" no período selecionado
   hasPeriod: boolean;
+  strategyLabel?: string | null;
+  areaLabel?: string | null;
+  indicatorCount?: number;
 }
 
 function OkrNode({ data }: NodeProps<OkrNodeData>) {
@@ -85,6 +94,13 @@ function OkrNode({ data }: NodeProps<OkrNodeData>) {
           <span className="line-clamp-2 text-sm font-semibold leading-tight">{data.name}</span>
         </div>
         {data.owner && <div className="truncate text-[11px] text-muted-foreground">{data.owner}</div>}
+        {data.strategyLabel && (
+          <div className="truncate text-[10px] text-muted-foreground">
+            {data.strategyLabel}
+            {data.areaLabel ? ` · ${data.areaLabel}` : ''}
+            {data.indicatorCount ? ` · ${data.indicatorCount} ind.` : ''}
+          </div>
+        )}
         <div className="h-1.5 w-full overflow-hidden rounded-full bg-muted">
           <div className="h-full rounded-full" style={{ width: `${Math.round(data.progressNow * 100)}%`, background: color }} />
         </div>
@@ -167,6 +183,9 @@ function buildGraph(objectives: FlowObjective[], periodRef: string | null): { no
           progressNow: o.progress,
           progressAt: progressAtPeriod(o, periodRef),
           hasPeriod: !!periodRef,
+          strategyLabel: o.strategicObj?.perspective?.name ?? o.strategicObj?.name ?? null,
+          areaLabel: o.strategicObj?.ownerNode?.name ?? null,
+          indicatorCount: o.strategicObj?.indicators?.length ?? 0,
         } satisfies OkrNodeData,
       });
     });

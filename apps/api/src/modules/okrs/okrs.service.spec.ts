@@ -14,7 +14,13 @@ const me: AuthPayload = {
   companyId: 'companyA',
 };
 
-function makeService(opts?: { cycle?: unknown; objective?: unknown; keyResult?: unknown }) {
+function makeService(opts?: {
+  cycle?: unknown;
+  objective?: unknown;
+  keyResult?: unknown;
+  strategicCount?: number;
+  strategicObjectives?: unknown[];
+}) {
   const prisma = {
     oKRCycle: { findFirst: vi.fn().mockResolvedValue(opts?.cycle ?? null) },
     oKRObjective: {
@@ -30,7 +36,10 @@ function makeService(opts?: { cycle?: unknown; objective?: unknown; keyResult?: 
       delete: vi.fn().mockResolvedValue({ id: 'k1' }),
     },
     oKRCheckin: { create: vi.fn().mockResolvedValue({ id: 'c1' }) },
-    strategicObjective: { count: vi.fn().mockResolvedValue(0) },
+    strategicObjective: {
+      count: vi.fn().mockResolvedValue(opts?.strategicCount ?? 0),
+      findMany: vi.fn().mockResolvedValue(opts?.strategicObjectives ?? []),
+    },
   } as any;
 
   const service = new OkrsService(prisma);
@@ -63,6 +72,36 @@ describe('OkrsService — isolamento por empresa', () => {
     await service.updateObjective(me, 'o1', { name: 'novo', cycleId: 'outro', id: 'hack' });
     const data = prisma.oKRObjective.update.mock.calls[0][0].data;
     expect(data).toEqual({ name: 'novo' });
+  });
+
+  it('updateObjective: bloqueia strategicObjId de outra empresa antes de salvar', async () => {
+    const { service, prisma } = makeService({ objective: { id: 'o1', cycleId: 'cycleA' }, strategicCount: 0 });
+    await expect(service.updateObjective(me, 'o1', { strategicObjId: 'strat-outra' })).rejects.toBeInstanceOf(NotFoundException);
+    expect(prisma.oKRObjective.update).not.toHaveBeenCalled();
+  });
+
+  it('updateObjective: objetivo pai precisa estar no mesmo ciclo', async () => {
+    const { service, prisma } = makeService({ objective: { id: 'o1', cycleId: 'cycleA' } });
+    prisma.oKRObjective.findFirst
+      .mockResolvedValueOnce({ id: 'o1', cycleId: 'cycleA' })
+      .mockResolvedValueOnce(null);
+    await expect(service.updateObjective(me, 'o1', { parentId: 'pai-de-outro-ciclo' })).rejects.toBeInstanceOf(NotFoundException);
+    expect(prisma.oKRObjective.update).not.toHaveBeenCalled();
+  });
+
+  it('options: lista objetivos estrategicos da empresa e achata indicadores', async () => {
+    const { service, prisma } = makeService({
+      strategicObjectives: [
+        {
+          id: 's1',
+          name: 'Crescer',
+          indicatorLinks: [{ indicator: { id: 'i1', name: 'Receita' } }],
+        },
+      ],
+    });
+    const res = await service.options('companyA');
+    expect(prisma.strategicObjective.findMany.mock.calls[0][0].where.map.companyId).toBe('companyA');
+    expect(res.strategicObjectives[0].indicators).toEqual([{ id: 'i1', name: 'Receita' }]);
   });
 
   it('removeKeyResult: KR de outra empresa → NotFound (sem deletar)', async () => {

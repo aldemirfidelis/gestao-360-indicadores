@@ -48,6 +48,22 @@ Incremento focado em leitura executiva e drill-down, sem criar telas paralelas:
 - A pagina `/reports` ganhou cards superiores clicaveis para indicadores, visualizacao executiva e acoes. O botao "Salvar filtro" foi desabilitado enquanto nao ha persistencia real, evitando botao ativo sem funcao.
 - Teste unitario novo: `apps/api/src/modules/strategy/strategy.service.spec.ts`, cobrindo os agregados executivos do mapa.
 
+### Continuacao FASE 3 - OKRs integrados
+
+- O modulo OKR agora expoe `GET /okrs/options`, com objetivos estrategicos ativos da empresa, mapa, perspectiva, area e indicadores vinculados.
+- A criacao de OKR na UI (`/okrs`) permite selecionar um objetivo estrategico. O OKR passa a mostrar:
+  - mapa estrategico de origem;
+  - perspectiva;
+  - area/setor;
+  - indicadores vinculados ao objetivo estrategico;
+  - link direto para abrir o mapa e links para abrir indicadores.
+- O fluxograma de OKRs tambem mostra o contexto estrategico/area/quantidade de indicadores no card de cada objetivo.
+- O backend reforcou validacoes no `PATCH /okrs/objectives/:id`:
+  - `strategicObjId` precisa pertencer a empresa da sessao;
+  - `parentId` precisa estar no mesmo ciclo OKR;
+  - campos calculados/relacionais (`progress`, `keyResults`, `strategicObj`, `checkins`, `_count`) nao sao persistidos por engano.
+- Testes de OKR ampliados de 6 para 9 casos, cobrindo opcoes, vinculo estrategico cross-company e pai fora do ciclo.
+
 Fora do escopo desta rodada (deferidos):
 
 - Diff visual entre versões + restauração.

@@ -1,5 +1,6 @@
 'use client';
 
+import Link from 'next/link';
 import { useMemo, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
@@ -48,6 +49,24 @@ interface KR {
   progress: number;
 }
 
+interface StrategicIndicator {
+  id: string;
+  name: string;
+  code: string | null;
+  ownerNode?: { id: string; name: string; type?: string } | null;
+  results?: { light: string; attainment: number | null; periodRef: string; value: number | null }[];
+}
+
+interface StrategicObjectiveRef {
+  id: string;
+  name: string;
+  status: string;
+  ownerNode?: { id: string; name: string; type?: string } | null;
+  perspective?: { id: string; name: string } | null;
+  map?: { id: string; name: string } | null;
+  indicators?: StrategicIndicator[];
+}
+
 interface Objective {
   id: string;
   name: string;
@@ -60,9 +79,13 @@ interface Objective {
   status: string;
   progress: number;
   keyResults: KR[];
-  strategicObj: { id: string; name: string } | null;
+  strategicObj: StrategicObjectiveRef | null;
   checkins?: { weekRef: string; progress: number; confidence: number; createdAt: string }[];
   _count?: { checkins: number };
+}
+
+interface OkrOptions {
+  strategicObjectives: StrategicObjectiveRef[];
 }
 
 const STATUS_LABEL: Record<string, string> = {
@@ -75,7 +98,7 @@ const STATUS_LABEL: Record<string, string> = {
 };
 
 const emptyCycle = { name: '', startsAt: new Date().toISOString().slice(0, 10), endsAt: `${new Date().getFullYear()}-12-31` };
-const emptyObjective = { name: '', description: '', ownerName: '', team: '', weight: 1, parentId: '' };
+const emptyObjective = { name: '', description: '', ownerName: '', team: '', weight: 1, parentId: '', strategicObjId: '' };
 const emptyKr = { objectiveId: '', metric: '', unit: 'PERCENT', startValue: 0, currentValue: 0, targetValue: 100, direction: 'HIGHER_BETTER', weight: 1, responsible: '' };
 
 export default function OkrsPage() {
@@ -108,6 +131,11 @@ export default function OkrsPage() {
     enabled: !!cycleId,
   });
 
+  const options = useQuery<OkrOptions>({
+    queryKey: ['okrs', 'options'],
+    queryFn: () => api<OkrOptions>('/okrs/options'),
+  });
+
   const createCycle = useMutation({
     mutationFn: () => api<Cycle>('/okrs/cycles', { method: 'POST', json: cycleForm }),
     onSuccess: (created) => {
@@ -123,7 +151,11 @@ export default function OkrsPage() {
     mutationFn: () =>
       api(`/okrs/cycles/${cycleId}/objectives`, {
         method: 'POST',
-        json: { ...objectiveForm, parentId: objectiveForm.parentId || null },
+        json: {
+          ...objectiveForm,
+          parentId: objectiveForm.parentId || null,
+          strategicObjId: objectiveForm.strategicObjId || null,
+        },
       }),
     onSuccess: () => {
       toast.success('Objetivo criado');
@@ -268,6 +300,45 @@ export default function OkrsPage() {
               </div>
             </div>
             <Progress value={o.progress * 100} className="mb-4" />
+            {o.strategicObj && (
+              <div className="mb-4 rounded-lg border bg-muted/20 p-3 text-sm">
+                <div className="flex flex-wrap items-start justify-between gap-3">
+                  <div className="min-w-0">
+                    <div className="text-xs font-semibold uppercase text-muted-foreground">Conexao estrategica</div>
+                    <div className="mt-1 font-medium">
+                      {o.strategicObj.name}
+                    </div>
+                    <div className="mt-1 flex flex-wrap gap-1.5 text-xs text-muted-foreground">
+                      {o.strategicObj.map && <Badge variant="secondary">{o.strategicObj.map.name}</Badge>}
+                      {o.strategicObj.perspective && <Badge variant="outline">{o.strategicObj.perspective.name}</Badge>}
+                      {o.strategicObj.ownerNode && <Badge variant="outline">{o.strategicObj.ownerNode.name}</Badge>}
+                    </div>
+                  </div>
+                  {o.strategicObj.map && (
+                    <Button size="sm" variant="outline" asChild>
+                      <Link href={`/strategy/${o.strategicObj.map.id}`}>Abrir mapa</Link>
+                    </Button>
+                  )}
+                </div>
+                <div className="mt-3 flex flex-wrap gap-1.5">
+                  {(o.strategicObj.indicators ?? []).length === 0 && (
+                    <span className="text-xs text-muted-foreground">Nenhum indicador vinculado ao objetivo estrategico.</span>
+                  )}
+                  {(o.strategicObj.indicators ?? []).slice(0, 6).map((indicator) => (
+                    <Link
+                      key={indicator.id}
+                      href={`/indicators/${indicator.id}`}
+                      className="rounded-full border bg-background px-2 py-1 text-xs transition hover:bg-accent/35"
+                    >
+                      {indicator.code ? `${indicator.code} - ` : ''}{indicator.name}
+                    </Link>
+                  ))}
+                  {(o.strategicObj.indicators ?? []).length > 6 && (
+                    <Badge variant="secondary">+{(o.strategicObj.indicators ?? []).length - 6}</Badge>
+                  )}
+                </div>
+              </div>
+            )}
             <div className="space-y-2">
               {o.keyResults.map((kr) => (
                 <div key={kr.id} className="grid grid-cols-1 gap-3 rounded-lg border p-3 lg:grid-cols-[1fr,120px,120px,1fr] lg:items-center">
@@ -385,6 +456,31 @@ export default function OkrsPage() {
                 ))}
               </NativeSelect>
               <p className="mt-1 text-xs text-muted-foreground">Defina o pai para montar a hierarquia no fluxograma.</p>
+            </div>
+            <div>
+              <Label>Objetivo estrategico vinculado</Label>
+              <NativeSelect
+                value={objectiveForm.strategicObjId}
+                onChange={(e) => {
+                  const strategicObjId = e.target.value;
+                  const selected = options.data?.strategicObjectives.find((item) => item.id === strategicObjId);
+                  setObjectiveForm({
+                    ...objectiveForm,
+                    strategicObjId,
+                    team: objectiveForm.team || selected?.ownerNode?.name || '',
+                  });
+                }}
+              >
+                <option value="">Sem vinculo estrategico</option>
+                {options.data?.strategicObjectives.map((obj) => (
+                  <option key={obj.id} value={obj.id}>
+                    {obj.map?.name ? `${obj.map.name} / ` : ''}{obj.perspective?.name ? `${obj.perspective.name} / ` : ''}{obj.name}
+                  </option>
+                ))}
+              </NativeSelect>
+              <p className="mt-1 text-xs text-muted-foreground">
+                O OKR herda contexto do mapa, area e indicadores vinculados ao objetivo estrategico.
+              </p>
             </div>
           </div>
           <DialogFooter>

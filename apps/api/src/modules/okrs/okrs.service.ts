@@ -19,6 +19,35 @@ interface KRComputed {
 export class OkrsService {
   constructor(private readonly prisma: PrismaService) {}
 
+  private strategicObjectiveSelect() {
+    return {
+      id: true,
+      name: true,
+      status: true,
+      ownerNode: { select: { id: true, name: true, type: true } },
+      perspective: { select: { id: true, name: true } },
+      map: { select: { id: true, name: true } },
+      indicatorLinks: {
+        where: { deletedAt: null },
+        select: {
+          indicator: {
+            select: {
+              id: true,
+              name: true,
+              code: true,
+              ownerNode: { select: { id: true, name: true, type: true } },
+              results: {
+                orderBy: { periodDate: 'desc' as const },
+                take: 1,
+                select: { light: true, attainment: true, periodRef: true, value: true },
+              },
+            },
+          },
+        },
+      },
+    };
+  }
+
   async listCycles(companyId: string) {
     return this.prisma.oKRCycle.findMany({
       where: { companyId },
@@ -35,7 +64,30 @@ export class OkrsService {
     });
   }
 
-  /** Garante que o ciclo pertence à empresa da sessão (isolamento multiempresa). */
+  async options(companyId: string) {
+    const strategicObjectives = await this.prisma.strategicObjective.findMany({
+      where: {
+        deletedAt: null,
+        active: true,
+        map: { companyId, deletedAt: null, active: true },
+      },
+      select: this.strategicObjectiveSelect(),
+      orderBy: [
+        { map: { startsAt: 'desc' } },
+        { perspective: { position: 'asc' } },
+        { position: 'asc' },
+        { name: 'asc' },
+      ],
+    });
+    return {
+      strategicObjectives: strategicObjectives.map((obj) => ({
+        ...obj,
+        indicators: obj.indicatorLinks.map((link) => link.indicator),
+      })),
+    };
+  }
+
+  /** Garante que o ciclo pertence a empresa da sessao (isolamento multiempresa). */
   private async assertCycle(companyId: string, cycleId: string) {
     const cycle = await this.prisma.oKRCycle.findFirst({ where: { id: cycleId, companyId }, select: { id: true } });
     if (!cycle) throw new NotFoundException('Ciclo OKR nao encontrado');
@@ -45,13 +97,31 @@ export class OkrsService {
   private async assertObjective(companyId: string, id: string) {
     const obj = await this.prisma.oKRObjective.findFirst({
       where: { id, deletedAt: null, cycle: { companyId } },
-      select: { id: true },
+      select: { id: true, cycleId: true },
     });
     if (!obj) throw new NotFoundException('Objetivo OKR nao encontrado');
     return obj;
   }
 
-  /** Garante que o resultado-chave pertence à empresa (via objetivo → ciclo). */
+  /** Garante que o objetivo estrategico pertence a empresa. */
+  private async assertStrategicObjective(companyId: string, strategicObjId: string) {
+    const ok = await this.prisma.strategicObjective.count({
+      where: { id: strategicObjId, deletedAt: null, map: { companyId, deletedAt: null } },
+    });
+    if (!ok) throw new NotFoundException('Objetivo estrategico nao encontrado');
+  }
+
+  /** Garante que o objetivo pai pertence ao mesmo ciclo do OKR. */
+  private async assertParentInCycle(companyId: string, parentId: string, cycleId: string, currentId?: string) {
+    if (parentId === currentId) throw new NotFoundException('Objetivo pai invalido');
+    const parent = await this.prisma.oKRObjective.findFirst({
+      where: { id: parentId, cycleId, deletedAt: null, cycle: { companyId } },
+      select: { id: true },
+    });
+    if (!parent) throw new NotFoundException('Objetivo pai nao encontrado neste ciclo');
+  }
+
+  /** Garante que o resultado-chave pertence a empresa (via objetivo -> ciclo). */
   private async assertKeyResult(companyId: string, krId: string) {
     const kr = await this.prisma.keyResult.findFirst({
       where: { id: krId, objective: { deletedAt: null, cycle: { companyId } } },
@@ -66,7 +136,7 @@ export class OkrsService {
       where: { cycleId, deletedAt: null },
       include: {
         keyResults: true,
-        strategicObj: { select: { id: true, name: true } },
+        strategicObj: { select: this.strategicObjectiveSelect() },
         checkins: {
           orderBy: { createdAt: 'asc' },
           select: { weekRef: true, progress: true, confidence: true, createdAt: true },
@@ -84,7 +154,7 @@ export class OkrsService {
       include: {
         keyResults: true,
         checkins: { orderBy: { createdAt: 'desc' }, take: 20 },
-        strategicObj: true,
+        strategicObj: { select: this.strategicObjectiveSelect() },
       },
     });
     if (!obj) throw new NotFoundException('Objetivo OKR nao encontrado');
@@ -98,7 +168,17 @@ export class OkrsService {
     }));
     const totalWeight = krs.reduce((a, k) => a + (k.weight || 1), 0) || 1;
     const overall = krs.reduce((a, k) => a + (k.progress * (k.weight || 1)) / totalWeight, 0);
-    return { ...obj, keyResults: krs, progress: overall };
+    return {
+      ...obj,
+      strategicObj: obj.strategicObj
+        ? {
+            ...obj.strategicObj,
+            indicators: (obj.strategicObj.indicatorLinks ?? []).map((link: any) => link.indicator),
+          }
+        : null,
+      keyResults: krs,
+      progress: overall,
+    };
   }
 
   krProgress(kr: {
@@ -118,7 +198,7 @@ export class OkrsService {
       const p = (startValue - currentValue) / (startValue - targetValue);
       return Math.max(0, Math.min(1, p));
     }
-    // EQUAL/RANGE: distância relativa
+    // EQUAL/RANGE: distancia relativa
     const dist = Math.abs(currentValue - targetValue);
     const base = Math.max(Math.abs(targetValue - startValue), 1);
     return Math.max(0, 1 - dist / base);
@@ -138,14 +218,8 @@ export class OkrsService {
     },
   ) {
     await this.assertCycle(me.companyId, cycleId);
-    // Vínculos opcionais precisam pertencer à mesma empresa.
-    if (body.strategicObjId) {
-      const ok = await this.prisma.strategicObjective.count({
-        where: { id: body.strategicObjId, map: { companyId: me.companyId, deletedAt: null } },
-      });
-      if (!ok) throw new NotFoundException('Objetivo estratégico nao encontrado');
-    }
-    if (body.parentId) await this.assertObjective(me.companyId, body.parentId);
+    if (body.strategicObjId) await this.assertStrategicObjective(me.companyId, body.strategicObjId);
+    if (body.parentId) await this.assertParentInCycle(me.companyId, body.parentId, cycleId);
     return this.prisma.oKRObjective.create({
       data: {
         cycleId,
@@ -161,9 +235,20 @@ export class OkrsService {
   }
 
   async updateObjective(me: AuthPayload, id: string, patch: any) {
-    await this.assertObjective(me.companyId, id);
-    // Não permite remanejar de ciclo/empresa via PATCH.
-    const { id: _i, cycleId: _c, ...safe } = patch ?? {};
+    const current = await this.assertObjective(me.companyId, id);
+    // Nao permite remanejar de ciclo/empresa via PATCH nem persistir campos calculados.
+    const {
+      id: _i,
+      cycleId: _c,
+      keyResults: _k,
+      strategicObj: _s,
+      checkins: _ch,
+      progress: _p,
+      _count: _count,
+      ...safe
+    } = patch ?? {};
+    if (safe.strategicObjId) await this.assertStrategicObjective(me.companyId, safe.strategicObjId);
+    if (safe.parentId) await this.assertParentInCycle(me.companyId, safe.parentId, current.cycleId, id);
     return this.prisma.oKRObjective.update({ where: { id }, data: safe });
   }
 
@@ -224,7 +309,6 @@ export class OkrsService {
         note: body.note ?? null,
       },
     });
-    // Atualiza objetivo
     let status: ObjectiveStatus = ObjectiveStatus.PLANNED;
     if (body.progress >= 0.95) status = ObjectiveStatus.DONE;
     else if (body.confidence >= 0.7 && body.progress >= 0.3) status = ObjectiveStatus.ON_TRACK;
