@@ -17,6 +17,7 @@ import { HealthModule } from './modules/health/health.module';
 import { StrategyModule } from './modules/strategy/strategy.module';
 import { OkrsModule } from './modules/okrs/okrs.module';
 import { ProjectsModule } from './modules/projects/projects.module';
+import { RisksModule } from './modules/risks/risks.module';
 import { MeetingsModule } from './modules/meetings/meetings.module';
 import { NotificationsModule } from './modules/notifications/notifications.module';
 import { AuditModule } from './modules/audit/audit.module';
@@ -58,6 +59,7 @@ import { ExternalApiModule } from './modules/external-api/external-api.module';
     StrategyModule,
     OkrsModule,
     ProjectsModule,
+    RisksModule,
     MeetingsModule,
     NotificationsModule,
     AuditModule,

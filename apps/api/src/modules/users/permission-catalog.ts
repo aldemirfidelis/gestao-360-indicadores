@@ -58,6 +58,13 @@ export const PERMISSION_CATALOG = [
   ['projects:delete', 'Excluir projetos', 'Projetos', 'delete'],
   ['projects:manage', 'Gerenciar projetos', 'Projetos', 'manage'],
 
+  // Riscos
+  ['risks:view', 'Visualizar registro de riscos', 'Riscos', 'view'],
+  ['risks:create', 'Registrar riscos', 'Riscos', 'create'],
+  ['risks:update', 'Editar riscos e planos de mitigacao', 'Riscos', 'update'],
+  ['risks:delete', 'Excluir riscos', 'Riscos', 'delete'],
+  ['risks:manage', 'Gerenciar registro de riscos', 'Riscos', 'manage'],
+
   // Reuniões
   ['meetings:view', 'Visualizar reuniões', 'Reuniões', 'view'],
   ['meetings:create', 'Criar reuniões', 'Reuniões', 'create'],
@@ -189,6 +196,10 @@ export const DEFAULT_PROFILES = [
       'projects:view',
       'projects:create',
       'projects:update',
+      'risks:view',
+      'risks:create',
+      'risks:update',
+      'risks:manage',
       'meetings:view',
       'meetings:create',
       'meetings:update',
@@ -231,6 +242,9 @@ export const DEFAULT_PROFILES = [
       'deviations:view',
       'treatments:view',
       'projects:view',
+      'risks:view',
+      'risks:create',
+      'risks:update',
       'reports:view',
       'communication:view',
       'communication:attachments',
@@ -256,6 +270,7 @@ export const DEFAULT_PROFILES = [
       'deviations:view',
       'treatments:view',
       'projects:view',
+      'risks:view',
       'strategy:view',
       'okrs:view',
       'org:view',

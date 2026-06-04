@@ -297,6 +297,28 @@ enum ProjectStatus {
   CANCELLED
 }
 
+enum RiskCategory {
+  STRATEGIC
+  OPERATIONAL
+  FINANCIAL
+  COMPLIANCE
+  SAFETY
+  ENVIRONMENTAL
+  QUALITY
+  PROJECT
+  PROCESS
+  OTHER
+}
+
+enum RiskStatus {
+  IDENTIFIED
+  ANALYZING
+  MITIGATING
+  MONITORING
+  ACCEPTED
+  CLOSED
+}
+
 enum MeetingKind {
   INDICATORS
   BOARD
@@ -386,6 +408,7 @@ enum TraceEntityType {
   ACTION_TASK
   PROJECT
   PROJECT_TASK
+  RISK
   ATTACHMENT
   COMMENT
   MAP_NODE
@@ -501,6 +524,7 @@ model Company {
   deviations             Deviation[]
   actions                ActionPlan[]
   projects               Project[]
+  risks                  RiskRegister[]
   meetings               Meeting[]
   imports                ImportJob[]
   auditLogs              AuditLog[]
@@ -603,6 +627,7 @@ model OrgNode {
   guidelineIndicators     Indicator[]                 @relation("IndicatorGuidelineNode")
   defaultForUsers         User[]                      @relation("UserDefaultNode")
   actions                 ActionPlan[]                @relation("ActionOwnerNode")
+  risks                   RiskRegister[]              @relation("RiskOwnerNode")
   strategicObjectives     StrategicObjective[]        @relation("StrategicObjectiveOwnerNode")
   strategicObjectiveLinks StrategicObjectiveOrgNode[]
   orgEmployees            OrgEmployee[]
@@ -659,6 +684,8 @@ model User {
   deviationsResponsible      Deviation[]                 @relation("DeviationResponsible")
   actionsResponsible         ActionPlan[]                @relation("ActionResponsible")
   actionsCreated             ActionPlan[]                @relation("ActionCreatedBy")
+  risksResponsible           RiskRegister[]              @relation("RiskResponsible")
+  risksCreated               RiskRegister[]              @relation("RiskCreatedBy")
   actionTasksAssigned        ActionTask[]                @relation("ActionTaskAssignee")
   careerApprovalsRequested   OrgJobApprovalRequest[]     @relation("CareerApprovalRequester")
   careerApprovalsToReview    OrgJobApprovalRequest[]     @relation("CareerApprovalApprover")
@@ -1071,6 +1098,7 @@ model Indicator {
   parentRelations         IndicatorTreeRelation[]       @relation("RelParent")
   strategicObjectiveLinks StrategicObjectiveIndicator[]
   projects                Project[]                     @relation("ProjectIndicator")
+  risks                   RiskRegister[]                @relation("RiskIndicator")
 
   @@unique([companyId, code])
   @@unique([companyId, externalSource, externalId])
@@ -1287,6 +1315,7 @@ model ActionPlan {
   history          ActionHistory[]
   analysisSessions ActionAnalysisSession[]
   aiSuggestions    ActionAiSuggestion[]
+  risks            RiskRegister[] @relation("RiskMitigationAction")
 
   @@index([companyId])
   @@index([branchId])
@@ -1558,6 +1587,7 @@ model Project {
 
   milestones ProjectMilestone[]
   tasks      ProjectTask[]
+  risks      RiskRegister[] @relation("RiskProject")
 
   @@index([companyId])
   @@index([indicatorId])
@@ -1585,6 +1615,49 @@ model ProjectTask {
   dependency   ProjectTask?  @relation("TaskDep", fields: [dependencyId], references: [id])
   dependents   ProjectTask[] @relation("TaskDep")
   position     Int           @default(0)
+}
+
+model RiskRegister {
+  id                 String       @id @default(uuid())
+  companyId          String
+  company            Company      @relation(fields: [companyId], references: [id])
+  orgNodeId          String?
+  orgNode            OrgNode?     @relation("RiskOwnerNode", fields: [orgNodeId], references: [id])
+  indicatorId        String?
+  indicator          Indicator?   @relation("RiskIndicator", fields: [indicatorId], references: [id])
+  projectId          String?
+  project            Project?     @relation("RiskProject", fields: [projectId], references: [id])
+  mitigationActionId String?
+  mitigationAction   ActionPlan?  @relation("RiskMitigationAction", fields: [mitigationActionId], references: [id])
+  responsibleUserId  String?
+  responsibleUser    User?        @relation("RiskResponsible", fields: [responsibleUserId], references: [id])
+  createdById        String?
+  createdBy          User?        @relation("RiskCreatedBy", fields: [createdById], references: [id])
+
+  title           String
+  description     String?
+  category        RiskCategory @default(OPERATIONAL)
+  status          RiskStatus   @default(IDENTIFIED)
+  probability     Int          @default(3)
+  impact          Int          @default(3)
+  mitigationPlan  String?
+  contingencyPlan String?
+  dueDate         DateTime?
+  identifiedAt    DateTime     @default(now())
+  closedAt        DateTime?
+  createdAt       DateTime     @default(now())
+  updatedAt       DateTime     @updatedAt
+  deletedAt       DateTime?
+
+  @@index([companyId])
+  @@index([companyId, status])
+  @@index([category])
+  @@index([orgNodeId])
+  @@index([indicatorId])
+  @@index([projectId])
+  @@index([mitigationActionId])
+  @@index([responsibleUserId])
+  @@index([dueDate])
 }
 
 // =====================================================
