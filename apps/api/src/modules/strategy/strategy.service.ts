@@ -5,6 +5,9 @@ import { AuthPayload } from '../auth/auth.types';
 
 const STRATEGY_MODULE = 'Mapa Estratégico';
 
+// Status "finais" de uma ação (não contam como aberta/atrasada no hover do mapa).
+const FINAL_ACTION_STATUSES = new Set<string>(['DONE', 'DONE_LATE', 'CANCELLED', 'EFFECTIVE', 'INEFFECTIVE']);
+
 type MapBody = {
   name?: string;
   description?: string | null;
@@ -136,7 +139,7 @@ export class StrategyService {
     if (!map) throw new NotFoundException('Mapa nao encontrado');
 
     const objectiveIndicatorIds = map.objectives.flatMap((obj) => uniqueIndicators(obj).map((indicator) => indicator.id));
-    const [actionCounts, treatmentCounts, deviationCounts, actionDetails] = await Promise.all([
+    const [actionCounts, treatmentCounts, deviationCounts, actionDetails, projectCounts] = await Promise.all([
       objectiveIndicatorIds.length
         ? this.prisma.actionPlan.groupBy({
             by: ['indicatorId'],
@@ -175,10 +178,20 @@ export class StrategyService {
             orderBy: [{ dueDate: 'asc' }, { title: 'asc' }],
           })
         : [],
+      objectiveIndicatorIds.length
+        ? this.prisma.project.groupBy({
+            by: ['indicatorId'],
+            where: { companyId: map.companyId, indicatorId: { in: objectiveIndicatorIds }, deletedAt: null },
+            _count: { _all: true },
+          })
+        : [],
     ]);
     const actionsByIndicator = new Map(actionCounts.map((row) => [row.indicatorId, row._count._all]));
     const treatmentsByIndicator = new Map(treatmentCounts.map((row) => [row.indicatorId, row._count._all]));
     const deviationsByIndicator = new Map(deviationCounts.map((row) => [row.indicatorId, row._count._all]));
+    const projectsByIndicator = new Map(
+      projectCounts.flatMap((row) => (row.indicatorId ? [[row.indicatorId, row._count._all] as const] : [])),
+    );
     const actionDetailsByIndicator = new Map<string, typeof actionDetails>();
     for (const action of actionDetails) {
       if (!action.indicatorId) continue;
@@ -189,6 +202,7 @@ export class StrategyService {
 
     const baseLights = new Map<string, TrafficLight>();
     const baseAttainments = new Map<string, number | null>();
+    const now = new Date();
     const enrichedObjectives = map.objectives.map((obj) => {
       const indicators = uniqueIndicators(obj).map((indicator) => ({
         ...indicator,
@@ -200,6 +214,12 @@ export class StrategyService {
       const baseLight = aggregateTrafficLight(lights);
       baseLights.set(obj.id, baseLight);
       baseAttainments.set(obj.id, avg);
+      // Ações abertas/atrasadas a partir dos detalhes já carregados (hover/drill-down).
+      const objActions = indicators.flatMap((i) => i.actions);
+      const openActionCount = objActions.filter((a) => !FINAL_ACTION_STATUSES.has(a.status)).length;
+      const lateActionCount = objActions.filter(
+        (a) => a.dueDate && new Date(a.dueDate) < now && !FINAL_ACTION_STATUSES.has(a.status),
+      ).length;
       return {
         ...obj,
         indicators,
@@ -207,8 +227,11 @@ export class StrategyService {
         baseLight,
         aggregateAttainment: avg,
         actionCount: indicators.reduce((sum, indicator) => sum + (actionsByIndicator.get(indicator.id) ?? 0), 0),
+        openActionCount,
+        lateActionCount,
         treatmentCount: indicators.reduce((sum, indicator) => sum + (treatmentsByIndicator.get(indicator.id) ?? 0), 0),
         deviationCount: indicators.reduce((sum, indicator) => sum + (deviationsByIndicator.get(indicator.id) ?? 0), 0),
+        projectCount: indicators.reduce((sum, indicator) => sum + (projectsByIndicator.get(indicator.id) ?? 0), 0),
       };
     });
 

@@ -24,6 +24,30 @@ sem quebrar compatibilidade com versões e ligações já cadastradas.
 | Auto-layout por perspectiva | Botão "Organizar" | Implementado |
 | Versionamento (criar/publicar) | Já existia | Mantido |
 
+## Atualizacao FASE 3 - 2026-06-04
+
+Incremento focado em leitura executiva e drill-down, sem criar telas paralelas:
+
+- `StrategyService.getMap` passou a devolver, por objetivo estrategico:
+  - `openActionCount`;
+  - `lateActionCount`;
+  - `projectCount`;
+  - alem dos contadores ja existentes de acoes, tratativas e desvios.
+- A contagem de projetos e explicitamente escopada por `companyId` do mapa, preservando isolamento multiempresa mesmo em agregados executivos.
+- O no do objetivo no React Flow ganhou hover executivo com:
+  - objetivo, perspectiva e farol agregado;
+  - responsavel e area/setor;
+  - quantidade de indicadores e atingimento agregado;
+  - indicador em foco (mais critico), meta, realizado e atingimento;
+  - acoes abertas, acoes atrasadas, desvios e projetos.
+- O drawer lateral do objetivo passou a mostrar a mesma leitura operacional e adicionou atalho para projetos.
+- O filtro "Com acao" foi refinado para usar acoes abertas (`openActionCount`) em vez da contagem historica total de acoes.
+- A pagina `/visualization` ganhou drill-down adicional:
+  - card "Desempenho geral" abre `/indicators`;
+  - barras do ranking de areas abrem `/indicators?ownerNodeId=...`.
+- A pagina `/reports` ganhou cards superiores clicaveis para indicadores, visualizacao executiva e acoes. O botao "Salvar filtro" foi desabilitado enquanto nao ha persistencia real, evitando botao ativo sem funcao.
+- Teste unitario novo: `apps/api/src/modules/strategy/strategy.service.spec.ts`, cobrindo os agregados executivos do mapa.
+
 Fora do escopo desta rodada (deferidos):
 
 - Diff visual entre versões + restauração.

@@ -139,6 +139,7 @@ export default function VisualizationPage() {
           description="Atingimento médio"
           icon={<Gauge className="h-4 w-4" />}
           tone="blue"
+          href="/indicators"
         />
         <MetricCard
           compact
@@ -235,9 +236,21 @@ export default function VisualizationPage() {
                   formatter={(v: number) => `${v}%`}
                   contentStyle={{ background: 'hsl(var(--card))', border: '1px solid hsl(var(--border))' }}
                 />
-                <Bar dataKey="attainmentPct" fill="hsl(var(--status-blue))" radius={[0, 6, 6, 0]} />
+                <Bar
+                  dataKey="attainmentPct"
+                  fill="hsl(var(--status-blue))"
+                  radius={[0, 6, 6, 0]}
+                  cursor="pointer"
+                  onClick={(entry: any) => {
+                    const nodeId = entry?.payload?.nodeId ?? entry?.nodeId;
+                    if (nodeId) window.location.href = `/indicators?ownerNodeId=${encodeURIComponent(nodeId)}`;
+                  }}
+                />
               </BarChart>
             </ResponsiveContainer>
+          </div>
+          <div className="mt-3 text-xs text-muted-foreground">
+            Clique em uma barra para abrir os indicadores daquela estrutura.
           </div>
         </SectionCard>
 

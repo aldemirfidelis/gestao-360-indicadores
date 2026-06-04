@@ -155,8 +155,11 @@ interface Objective {
   baseLight?: string;
   aggregateAttainment: number | null;
   actionCount: number;
+  openActionCount?: number;
+  lateActionCount?: number;
   treatmentCount: number;
   deviationCount: number;
+  projectCount?: number;
   indicators: Indicator[];
   orgNodeLinks: { id: string; kind: string; orgNode: OrgNode }[];
   outRelations: { id: string; kind?: string; label: string | null; to: { id: string; name: string } }[];
@@ -227,7 +230,14 @@ const LIGHT_STROKE: Record<string, string> = {
   GRAY: '#64748b',
 };
 
-const ACTION_DONE_STATUSES = new Set(['DONE', 'DONE_LATE', 'CANCELLED', 'EFFECTIVE']);
+const LIGHT_RANK: Record<string, number> = {
+  RED: 4,
+  YELLOW: 3,
+  GRAY: 2,
+  GREEN: 1,
+};
+
+const ACTION_DONE_STATUSES = new Set(['DONE', 'DONE_LATE', 'CANCELLED', 'EFFECTIVE', 'INEFFECTIVE']);
 
 interface RelationKindMeta {
   kind: string;
@@ -355,6 +365,41 @@ function PerspectiveLane({
   );
 }
 
+function pickFocusIndicator(objective: Objective) {
+  if (objective.indicators.length === 0) return null;
+  return objective.indicators.reduce((best, indicator) => {
+    const bestLatest = best.results?.[0];
+    const latest = indicator.results?.[0];
+    const bestRank = LIGHT_RANK[bestLatest?.light ?? 'GRAY'] ?? 0;
+    const rank = LIGHT_RANK[latest?.light ?? 'GRAY'] ?? 0;
+    if (rank !== bestRank) return rank > bestRank ? indicator : best;
+
+    const bestAttainment = bestLatest?.attainment ?? Number.POSITIVE_INFINITY;
+    const attainment = latest?.attainment ?? Number.POSITIVE_INFINITY;
+    return attainment < bestAttainment ? indicator : best;
+  }, objective.indicators[0]);
+}
+
+function objectiveHoverSummary(objective: Objective) {
+  const indicator = pickFocusIndicator(objective);
+  const latest = indicator?.results?.[0];
+  const latestTarget = latest?.periodRef
+    ? indicator?.targets?.find((target) => target.periodRef === latest.periodRef)
+    : indicator?.targets?.[0];
+  const actions = objective.indicators.flatMap((item) => item.actions ?? []);
+
+  return {
+    responsible: objective.responsibleUser?.name ?? objective.responsible ?? 'Sem responsável',
+    area: objective.ownerNode?.name ?? objective.orgNodeLinks[0]?.orgNode.name ?? 'Sem área vinculada',
+    indicator,
+    latest,
+    latestTarget,
+    openActions: objective.openActionCount ?? actions.filter((action) => !ACTION_DONE_STATUSES.has(action.status)).length,
+    lateActions: objective.lateActionCount ?? actions.filter(isActionOverdue).length,
+    projects: objective.projectCount ?? 0,
+  };
+}
+
 function ObjectiveNode({
   data,
   selected,
@@ -362,10 +407,12 @@ function ObjectiveNode({
   const objective = data.objective;
   const light = objective.aggregateLight;
   const isDarkColor = light === 'GREEN' || light === 'RED';
+  const summary = objectiveHoverSummary(objective);
   return (
     <div
+      tabIndex={0}
       className={cn(
-        'group flex h-full w-full flex-col rounded-lg border-2 p-3 shadow-md transition relative',
+        'group relative flex h-full w-full flex-col rounded-lg border-2 p-3 shadow-md transition focus:outline-none',
         LIGHT_CLASS[light] ?? LIGHT_CLASS.GRAY,
         (selected || data.selected) && 'ring-2 ring-primary',
       )}
@@ -408,11 +455,82 @@ function ObjectiveNode({
           {objective.name}
         </div>
         <div className={cn("text-[11px]", isDarkColor ? "text-white/80" : "text-muted-foreground")}>
-          {objective.responsibleUser?.name ?? objective.responsible ?? objective.ownerNode?.name ?? 'Sem responsável'}
+          {summary.responsible}
         </div>
         {data.editMode && (
           <GripVertical className={cn("absolute right-2 top-2 h-4 w-4 shrink-0", isDarkColor ? "text-white/70" : "text-muted-foreground")} />
         )}
+      </div>
+
+      <div className="nodrag nopan pointer-events-none absolute left-1/2 top-[calc(100%+10px)] z-50 hidden w-[340px] -translate-x-1/2 rounded-lg border bg-card p-3 text-left text-card-foreground shadow-xl group-hover:block group-focus-within:block">
+        <div className="absolute left-1/2 top-[-5px] h-2.5 w-2.5 -translate-x-1/2 rotate-45 border-l border-t bg-card" />
+        <div className="flex items-start justify-between gap-2">
+          <div className="min-w-0">
+            <div className="truncate text-sm font-semibold">{objective.name}</div>
+            <div className="mt-0.5 text-[11px] text-muted-foreground">
+              {objective.perspective.name} · {LIGHT_LABEL[light] ?? light}
+            </div>
+          </div>
+          <Badge className={cn('shrink-0 border', LIGHT_CLASS[light])} variant="outline">
+            {LIGHT_LABEL[light] ?? light}
+          </Badge>
+        </div>
+
+        <div className="mt-3 grid grid-cols-2 gap-2 text-xs">
+          <MiniMetric label="Responsável" value={summary.responsible} />
+          <MiniMetric label="Área" value={summary.area} />
+          <MiniMetric label="Indicadores" value={formatNumber(objective.indicators.length)} />
+          <MiniMetric label="Atingimento" value={formatPercent(objective.aggregateAttainment)} />
+        </div>
+
+        <div className="mt-3 rounded-md border bg-background/60 p-2 text-xs">
+          <div className="text-[10px] uppercase text-muted-foreground">Indicador em foco</div>
+          {summary.indicator ? (
+            <>
+              <div className="mt-0.5 truncate font-semibold">
+                {summary.indicator.code ? `${summary.indicator.code} - ` : ''}{summary.indicator.name}
+              </div>
+              <div className="mt-2 grid grid-cols-3 gap-2">
+                <MiniMetric label="Realizado" value={formatNumber(summary.latest?.value)} />
+                <MiniMetric label="Meta" value={formatNumber(summary.latestTarget?.target)} />
+                <MiniMetric label="Ating." value={formatPercent(summary.latest?.attainment ?? null)} />
+              </div>
+            </>
+          ) : (
+            <div className="mt-1 text-muted-foreground">Nenhum indicador vinculado.</div>
+          )}
+        </div>
+
+        <div className="mt-3 grid grid-cols-4 gap-2 text-center text-[11px]">
+          <div className="rounded-md border bg-background/60 p-2">
+            <ClipboardList className="mx-auto mb-1 h-3.5 w-3.5" />
+            <div className="font-semibold">{formatNumber(summary.openActions)}</div>
+            <div className="text-muted-foreground">abertas</div>
+          </div>
+          <div className="rounded-md border bg-background/60 p-2">
+            <Calendar className="mx-auto mb-1 h-3.5 w-3.5" />
+            <div className={cn('font-semibold', summary.lateActions > 0 && 'text-rose-600')}>
+              {formatNumber(summary.lateActions)}
+            </div>
+            <div className="text-muted-foreground">atrasadas</div>
+          </div>
+          <div className="rounded-md border bg-background/60 p-2">
+            <ShieldAlert className="mx-auto mb-1 h-3.5 w-3.5" />
+            <div className={cn('font-semibold', objective.deviationCount > 0 && 'text-rose-600')}>
+              {formatNumber(objective.deviationCount)}
+            </div>
+            <div className="text-muted-foreground">desvios</div>
+          </div>
+          <div className="rounded-md border bg-background/60 p-2">
+            <Layers className="mx-auto mb-1 h-3.5 w-3.5" />
+            <div className="font-semibold">{formatNumber(summary.projects)}</div>
+            <div className="text-muted-foreground">projetos</div>
+          </div>
+        </div>
+
+        <div className="mt-2 text-[11px] text-muted-foreground">
+          Clique no objetivo para abrir o drill-down lateral.
+        </div>
       </div>
       <Handle
         id="right"
@@ -810,7 +928,7 @@ function StrategyMapPageInner() {
       if (perspectiveFilter && objective.perspectiveId !== perspectiveFilter) return false;
       if (statusFilter && objective.aggregateLight !== statusFilter && objective.status !== statusFilter) return false;
       if (onlyCritical && objective.aggregateLight !== 'RED') return false;
-      if (onlyOverdue && objective.actionCount === 0) return false;
+      if (onlyOverdue && (objective.openActionCount ?? objective.actionCount) === 0) return false;
       if (onlyUnlinked && (objective.indicators.length > 0 || objective.orgNodeLinks.length > 0)) return false;
       if (!term) return true;
       return [
@@ -1249,9 +1367,9 @@ function StrategyMapPageInner() {
             variant={onlyOverdue ? 'default' : 'outline'}
             size="sm"
             onClick={() => setOnlyOverdue((v) => !v)}
-            title="Itens com ações em andamento"
+            title="Itens com ações abertas"
           >
-            <Calendar className="mr-1.5 h-3.5 w-3.5" /> Com ação
+            <Calendar className="mr-1.5 h-3.5 w-3.5" /> Com ação aberta
           </Button>
           <Button
             variant={onlyUnlinked ? 'default' : 'outline'}
@@ -2025,6 +2143,7 @@ function StrategyMapPageInner() {
 
 function ObjectiveDrawerContent({ objective }: { objective: Objective }) {
   const indicatorId = objective.indicators[0]?.id ?? '';
+  const summary = objectiveHoverSummary(objective);
   return (
     <>
       <div className="flex flex-wrap gap-2">
@@ -2042,12 +2161,12 @@ function ObjectiveDrawerContent({ objective }: { objective: Objective }) {
         <div className="rounded-md border p-2">
           <div className="text-muted-foreground">Responsável</div>
           <div className="font-medium">
-            {objective.responsibleUser?.name ?? objective.responsible ?? '-'}
+            {summary.responsible}
           </div>
         </div>
         <div className="rounded-md border p-2">
           <div className="text-muted-foreground">Área/Setor</div>
-          <div className="font-medium">{objective.ownerNode?.name ?? '-'}</div>
+          <div className="font-medium">{summary.area}</div>
         </div>
         <div className="rounded-md border p-2">
           <div className="text-muted-foreground">Indicadores</div>
@@ -2056,6 +2175,26 @@ function ObjectiveDrawerContent({ objective }: { objective: Objective }) {
         <div className="rounded-md border p-2">
           <div className="text-muted-foreground">Atingimento</div>
           <div className="font-medium">{formatPercent(objective.aggregateAttainment)}</div>
+        </div>
+        <div className="rounded-md border p-2">
+          <div className="text-muted-foreground">Ações abertas</div>
+          <div className="font-medium">{formatNumber(summary.openActions)}</div>
+        </div>
+        <div className="rounded-md border p-2">
+          <div className="text-muted-foreground">Ações atrasadas</div>
+          <div className={cn('font-medium', summary.lateActions > 0 && 'text-rose-600')}>
+            {formatNumber(summary.lateActions)}
+          </div>
+        </div>
+        <div className="rounded-md border p-2">
+          <div className="text-muted-foreground">Desvios</div>
+          <div className={cn('font-medium', objective.deviationCount > 0 && 'text-rose-600')}>
+            {formatNumber(objective.deviationCount)}
+          </div>
+        </div>
+        <div className="rounded-md border p-2">
+          <div className="text-muted-foreground">Projetos</div>
+          <div className="font-medium">{formatNumber(summary.projects)}</div>
         </div>
       </div>
 
@@ -2076,13 +2215,19 @@ function ObjectiveDrawerContent({ objective }: { objective: Objective }) {
       <div className="grid grid-cols-2 gap-2 text-center text-xs">
         <Link className="rounded-md border p-2 transition hover:bg-accent/35" href={`/actions${indicatorId ? `?indicatorId=${indicatorId}` : ''}`}>
           <ClipboardList className="mx-auto mb-1 h-4 w-4" />
-          Ações ({objective.actionCount})
+          Ações ({summary.openActions})
+          {summary.lateActions > 0 && (
+            <span className="mt-0.5 block font-semibold text-rose-600">{summary.lateActions} atrasada(s)</span>
+          )}
         </Link>
         <Link className="rounded-md border p-2 transition hover:bg-accent/35" href={`/meetings${indicatorId ? `?indicatorId=${indicatorId}` : ''}`}>
           <Calendar className="mx-auto mb-1 h-4 w-4" /> Reuniões
         </Link>
         <Link className="rounded-md border p-2 transition hover:bg-accent/35" href={`/deviations${indicatorId ? `?indicatorId=${indicatorId}` : ''}`}>
           <ShieldAlert className="mx-auto mb-1 h-4 w-4" /> Desvios ({objective.deviationCount})
+        </Link>
+        <Link className="rounded-md border p-2 transition hover:bg-accent/35" href="/projects">
+          <Layers className="mx-auto mb-1 h-4 w-4" /> Projetos ({summary.projects})
         </Link>
       </div>
 
