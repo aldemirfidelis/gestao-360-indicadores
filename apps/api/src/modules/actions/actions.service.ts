@@ -688,6 +688,10 @@ export class ActionsService {
     });
     await this.recordHistory(actionId, userId, 'EFFECTIVENESS', 'effectivenessStatus', action.effectivenessStatus, status);
     await this.audit(updated.companyId, userId, 'EFFECTIVENESS_VALIDATED', 'ActionPlan', actionId, action, updated);
+    // Fecha o ciclo do fluxo: a validação de eficácia repercute no status da tratativa
+    // (reabertura volta a ACTIONS_IN_PROGRESS; eficaz/ineficaz com tudo concluído →
+    // AWAITING_REEVALUATION). Sem isto, a tratativa ficava "presa" após a eficácia.
+    if (updated.treatmentId) await this.updateTreatmentFromActions(updated.treatmentId);
     await this.traceability.record({
       companyId: updated.companyId,
       indicatorId: updated.indicatorId,

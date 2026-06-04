@@ -12,7 +12,7 @@ export class TreatmentsController {
   @Get(':id')
   @RequirePermissions('treatments:view')
   byId(@CurrentUser() me: AuthPayload, @Param('id') id: string) {
-    return this.service.getById(me.companyId, id);
+    return this.service.getById(me, id);
   }
 
   @Get('indicators/:indicatorId/current')
@@ -22,19 +22,19 @@ export class TreatmentsController {
     @Param('indicatorId') indicatorId: string,
     @Query('periodRef') periodRef?: string,
   ) {
-    return this.service.currentForIndicator(me.companyId, indicatorId, periodRef);
+    return this.service.currentForIndicator(me, indicatorId, periodRef);
   }
 
   @Post('from-result/:resultId/start')
   @RequirePermissions('treatments:manage')
   startFromResult(@CurrentUser() me: AuthPayload, @Param('resultId') resultId: string) {
-    return this.service.startFromResult(me.companyId, resultId, me.sub);
+    return this.service.startFromResult(me, resultId);
   }
 
   @Post(':id/ignore')
   @RequirePermissions('treatments:ignore')
   ignore(@CurrentUser() me: AuthPayload, @Param('id') id: string, @Body() body: { reason: string }) {
-    return this.service.ignore(me.companyId, id, me.sub, body.reason);
+    return this.service.ignore(me, id, body.reason);
   }
 
   @Post(':id/analysis')
@@ -53,7 +53,7 @@ export class TreatmentsController {
       dueDate?: string;
     },
   ) {
-    return this.service.createAnalysis(me.companyId, id, me.sub, body);
+    return this.service.createAnalysis(me, id, body);
   }
 
   @Post(':id/meeting')
@@ -81,7 +81,7 @@ export class TreatmentsController {
       }>;
     },
   ) {
-    return this.service.scheduleMeeting(me.companyId, id, me.sub, body);
+    return this.service.scheduleMeeting(me, id, body);
   }
 
   @Post(':id/actions')
@@ -104,12 +104,12 @@ export class TreatmentsController {
       observations?: string;
     },
   ) {
-    return this.service.createAction(me.companyId, id, me.sub, body);
+    return this.service.createAction(me, id, body);
   }
 
   @Post(':id/reevaluate')
   @RequirePermissions('treatments:manage')
   reevaluate(@CurrentUser() me: AuthPayload, @Param('id') id: string) {
-    return this.service.reevaluate(me.companyId, id, me.sub);
+    return this.service.reevaluate(me, id);
   }
 }

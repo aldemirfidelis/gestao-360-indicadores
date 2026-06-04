@@ -357,8 +357,11 @@ export class ResultsService {
             userId: indicator.responsibleUserId,
             kind: NotificationKind.INDICATOR_OFF_TARGET,
             title: 'Indicador fora da meta',
-            body: `${indicator.name} ficou fora da meta em ${input.periodRef}. Inicie a tratativa.`,
-            link: `/treatments/${treatment.id}`,
+            body: `${indicator.name} ficou fora da meta em ${input.periodRef}. Abra a análise de causa.`,
+            // Aponta para a tela onde o fluxo é trabalhado (detalhe do indicador → "Abrir
+            // análise de causa"). A rota /treatments redireciona para /actions e perdia o
+            // contexto; o registro canônico do fluxo é o Desvio, aberto a partir do indicador.
+            link: `/indicators/${indicator.id}`,
           },
         });
       }

@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
 import {
   ActionOrigin,
   ActionPriority,
@@ -16,15 +16,37 @@ import {
 } from '@prisma/client';
 import { PrismaService } from '../../prisma/prisma.service';
 import { TraceabilityService } from '../traceability/traceability.service';
+import { AccessService } from '../access/access.service';
+import { AuthPayload } from '../auth/auth.types';
+
+// A tratativa é o hub do fluxo de indicador fora da meta: ela cria desvios, reuniões e
+// ações. A área é a do indicador; o enforcement reusa as regras do módulo de desvios.
+const MODULE = 'deviations';
 
 @Injectable()
 export class TreatmentsService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly traceability: TraceabilityService,
+    private readonly access: AccessService,
   ) {}
 
-  async getById(companyId: string, id: string) {
+  /** Bloqueia leitura de tratativa de área não permitida. */
+  private async assertReadArea(me: AuthPayload, ownerNodeId: string | null) {
+    if (!ownerNodeId) return;
+    const permitted = await this.access.listAreaFilter(me.sub, MODULE, 'view');
+    if (permitted && !permitted.includes(ownerNodeId)) {
+      throw new ForbiddenException('Você não tem acesso às tratativas desta área.');
+    }
+  }
+
+  /** Bloqueia escrita na tratativa (e nos desvios/reuniões/ações que ela gera) fora da área. */
+  private async assertWriteArea(me: AuthPayload, ownerNodeId: string | null) {
+    await this.access.assertCanWrite(me.sub, ownerNodeId, MODULE, 'edit');
+  }
+
+  async getById(me: AuthPayload, id: string) {
+    const companyId = me.companyId;
     const treatment = await this.prisma.treatmentCase.findFirst({
       where: { id, companyId },
       include: {
@@ -53,32 +75,39 @@ export class TreatmentsService {
       },
     });
     if (!treatment) throw new NotFoundException('Tratativa nao encontrada');
+    await this.assertReadArea(me, treatment.indicator?.ownerNodeId ?? null);
     return {
       ...treatment,
       alerts: this.alertsFor(treatment as any),
     };
   }
 
-  async currentForIndicator(companyId: string, indicatorId: string, periodRef?: string) {
+  async currentForIndicator(me: AuthPayload, indicatorId: string, periodRef?: string) {
     const treatment = await this.prisma.treatmentCase.findFirst({
       where: {
-        companyId,
+        companyId: me.companyId,
         indicatorId,
         ...(periodRef ? { periodRef } : {}),
         status: { notIn: [TreatmentStatus.CONCLUDED] },
       },
       orderBy: { createdAt: 'desc' },
-      select: { id: true, status: true, periodRef: true, title: true },
+      select: { id: true, status: true, periodRef: true, title: true, indicator: { select: { ownerNodeId: true } } },
     });
-    return treatment;
+    if (!treatment) return null;
+    await this.assertReadArea(me, treatment.indicator?.ownerNodeId ?? null);
+    const { indicator: _i, ...rest } = treatment;
+    return rest;
   }
 
-  async startFromResult(companyId: string, resultId: string, userId: string) {
+  async startFromResult(me: AuthPayload, resultId: string) {
+    const companyId = me.companyId;
+    const userId = me.sub;
     const result = await this.prisma.indicatorResult.findFirst({
       where: { id: resultId, indicator: { companyId } },
       include: { indicator: true },
     });
     if (!result) throw new NotFoundException('Resultado nao encontrado');
+    await this.assertWriteArea(me, result.indicator.ownerNodeId);
     const treatment = await this.prisma.treatmentCase.upsert({
       where: { indicatorId_periodRef: { indicatorId: result.indicatorId, periodRef: result.periodRef } },
       create: {
@@ -108,8 +137,11 @@ export class TreatmentsService {
     return treatment;
   }
 
-  async ignore(companyId: string, id: string, userId: string, reason: string) {
-    const treatment = await this.getTreatment(companyId, id);
+  async ignore(me: AuthPayload, id: string, reason: string) {
+    const companyId = me.companyId;
+    const userId = me.sub;
+    const treatment = await this.getTreatmentWithContext(companyId, id);
+    await this.assertWriteArea(me, treatment.indicator.ownerNodeId);
     const updated = await this.prisma.treatmentCase.update({
       where: { id },
       data: { status: TreatmentStatus.IGNORED_TEMPORARILY, ignoredAt: new Date(), ignoreReason: reason },
@@ -130,7 +162,7 @@ export class TreatmentsService {
     return updated;
   }
 
-  async createAnalysis(companyId: string, id: string, userId: string, body: {
+  async createAnalysis(me: AuthPayload, id: string, body: {
     problem: string;
     probableCause?: string;
     rootCause: string;
@@ -139,7 +171,10 @@ export class TreatmentsService {
     observations?: string;
     dueDate?: string;
   }) {
+    const companyId = me.companyId;
+    const userId = me.sub;
     const treatment = await this.getTreatmentWithContext(companyId, id);
+    await this.assertWriteArea(me, treatment.indicator.ownerNodeId);
     const deviation = treatment.deviationId
       ? await this.prisma.deviation.update({
           where: { id: treatment.deviationId },
@@ -204,7 +239,7 @@ export class TreatmentsService {
     return { treatment: updated, deviation, analysis, cause };
   }
 
-  async scheduleMeeting(companyId: string, id: string, userId: string, body: {
+  async scheduleMeeting(me: AuthPayload, id: string, body: {
     title?: string;
     startsAt: string;
     endsAt?: string;
@@ -214,7 +249,10 @@ export class TreatmentsService {
     notes?: string;
     participants?: Array<{ userId?: string; name?: string; email?: string; jobTitle?: string; area?: string; role?: MeetingParticipantRole; notes?: string }>;
   }) {
+    const companyId = me.companyId;
+    const userId = me.sub;
     const treatment = await this.getTreatmentWithContext(companyId, id);
+    await this.assertWriteArea(me, treatment.indicator.ownerNodeId);
     const indicator = treatment.indicator;
     const title = body.title || `Reunião de Tratativa - Indicador ${indicator.name}`;
     const agenda = this.defaultAgenda(treatment);
@@ -308,7 +346,7 @@ export class TreatmentsService {
     return meeting;
   }
 
-  async createAction(companyId: string, id: string, userId: string, body: {
+  async createAction(me: AuthPayload, id: string, body: {
     title: string;
     description?: string;
     responsibleUserId?: string;
@@ -321,7 +359,10 @@ export class TreatmentsService {
     expectedResult?: string;
     observations?: string;
   }) {
+    const companyId = me.companyId;
+    const userId = me.sub;
     const treatment = await this.getTreatmentWithContext(companyId, id);
+    await this.assertWriteArea(me, treatment.indicator.ownerNodeId);
     const action = await this.prisma.actionPlan.create({
       data: {
         companyId,
@@ -371,8 +412,11 @@ export class TreatmentsService {
     return action;
   }
 
-  async reevaluate(companyId: string, id: string, userId: string) {
+  async reevaluate(me: AuthPayload, id: string) {
+    const companyId = me.companyId;
+    const userId = me.sub;
     const treatment = await this.getTreatmentWithContext(companyId, id);
+    await this.assertWriteArea(me, treatment.indicator.ownerNodeId);
     const lastResult = await this.prisma.indicatorResult.findFirst({
       where: { indicatorId: treatment.indicatorId },
       orderBy: { periodDate: 'desc' },
@@ -399,12 +443,6 @@ export class TreatmentsService {
       metadata: { treatmentId: id, lastResultId: lastResult?.id, light: lastResult?.light },
     });
     return updated;
-  }
-
-  private async getTreatment(companyId: string, id: string) {
-    const treatment = await this.prisma.treatmentCase.findFirst({ where: { id, companyId } });
-    if (!treatment) throw new NotFoundException('Tratativa nao encontrada');
-    return treatment;
   }
 
   private async getTreatmentWithContext(companyId: string, id: string) {
