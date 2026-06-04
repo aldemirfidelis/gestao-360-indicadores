@@ -411,6 +411,8 @@ enum TraceEntityType {
   RISK
   NON_CONFORMITY
   DOCUMENT
+  AUDIT
+  AUDIT_FINDING
   ATTACHMENT
   COMMENT
   MAP_NODE
@@ -529,6 +531,7 @@ model Company {
   risks                  RiskRegister[]
   nonConformities        NonConformity[]
   documents              Document[]
+  audits                 Audit[]
   meetings               Meeting[]
   imports                ImportJob[]
   auditLogs              AuditLog[]
@@ -634,6 +637,7 @@ model OrgNode {
   risks                   RiskRegister[]              @relation("RiskOwnerNode")
   nonConformities         NonConformity[]             @relation("NcOwnerNode")
   documents               Document[]                  @relation("DocOrgNode")
+  audits                  Audit[]                     @relation("AuditOrgNode")
   strategicObjectives     StrategicObjective[]        @relation("StrategicObjectiveOwnerNode")
   strategicObjectiveLinks StrategicObjectiveOrgNode[]
   orgEmployees            OrgEmployee[]
@@ -697,6 +701,8 @@ model User {
   documentsOwned             Document[]                  @relation("DocOwner")
   documentsApproved          Document[]                  @relation("DocApprover")
   documentsCreated           Document[]                  @relation("DocCreatedBy")
+  auditsLed                  Audit[]                     @relation("AuditLead")
+  auditsCreated              Audit[]                     @relation("AuditCreatedBy")
   actionTasksAssigned        ActionTask[]                @relation("ActionTaskAssignee")
   careerApprovalsRequested   OrgJobApprovalRequest[]     @relation("CareerApprovalRequester")
   careerApprovalsToReview    OrgJobApprovalRequest[]     @relation("CareerApprovalApprover")
@@ -1744,6 +1750,8 @@ model NonConformity {
   updatedAt          DateTime  @updatedAt
   deletedAt          DateTime?
 
+  auditFindings AuditFinding[] @relation("FindingNc")
+
   @@unique([companyId, number])
   @@index([companyId])
   @@index([companyId, status])
@@ -1822,6 +1830,96 @@ model Document {
   @@index([indicatorId])
   @@index([ownerUserId])
   @@index([validUntil])
+}
+
+// =====================================================
+// Auditorias e compliance
+// =====================================================
+
+enum AuditType {
+  INTERNAL
+  EXTERNAL
+  PROCESS
+  SUPPLIER
+  LEGAL
+  SAFETY
+  QUALITY
+}
+
+enum AuditStatus {
+  PLANNED
+  IN_PROGRESS
+  COMPLETED
+  CANCELLED
+}
+
+enum AuditFindingType {
+  CONFORMITY
+  NONCONFORMITY
+  OBSERVATION
+  OPPORTUNITY
+}
+
+enum AuditFindingStatus {
+  OPEN
+  IN_TREATMENT
+  CLOSED
+}
+
+model Audit {
+  id                String      @id @default(uuid())
+  companyId         String
+  company           Company     @relation(fields: [companyId], references: [id])
+  number            Int // sequencial por empresa
+  orgNodeId         String?
+  orgNode           OrgNode?    @relation("AuditOrgNode", fields: [orgNodeId], references: [id])
+  leadAuditorUserId String?
+  leadAuditor       User?       @relation("AuditLead", fields: [leadAuditorUserId], references: [id])
+  createdById       String?
+  createdBy         User?       @relation("AuditCreatedBy", fields: [createdById], references: [id])
+
+  title       String
+  scope       String?
+  type        AuditType   @default(INTERNAL)
+  status      AuditStatus @default(PLANNED)
+  plannedDate DateTime?
+  startedAt   DateTime?
+  completedAt DateTime?
+  summary     String? // relatorio / conclusao
+  createdAt   DateTime    @default(now())
+  updatedAt   DateTime    @updatedAt
+  deletedAt   DateTime?
+
+  findings AuditFinding[]
+
+  @@unique([companyId, number])
+  @@index([companyId])
+  @@index([companyId, status])
+  @@index([type])
+  @@index([orgNodeId])
+  @@index([leadAuditorUserId])
+}
+
+model AuditFinding {
+  id              String                 @id @default(uuid())
+  auditId         String
+  audit           Audit                  @relation(fields: [auditId], references: [id], onDelete: Cascade)
+  nonConformityId String?
+  nonConformity   NonConformity?         @relation("FindingNc", fields: [nonConformityId], references: [id])
+
+  type           AuditFindingType       @default(OBSERVATION)
+  severity       NonConformitySeverity?
+  status         AuditFindingStatus     @default(OPEN)
+  requirement    String? // requisito / clausula auditada
+  description    String
+  evidence       String?
+  recommendation String?
+  dueDate        DateTime?
+  createdAt      DateTime               @default(now())
+  updatedAt      DateTime               @updatedAt
+
+  @@index([auditId])
+  @@index([nonConformityId])
 }
 
 // =====================================================

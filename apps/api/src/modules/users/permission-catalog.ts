@@ -79,6 +79,13 @@ export const PERMISSION_CATALOG = [
   ['doc:delete', 'Excluir documentos', 'Documentos', 'delete'],
   ['doc:manage', 'Gerenciar gestao documental', 'Documentos', 'manage'],
 
+  // Auditorias e compliance
+  ['audits:view', 'Visualizar auditorias e constatacoes', 'Auditorias', 'view'],
+  ['audits:create', 'Planejar/registrar auditorias', 'Auditorias', 'create'],
+  ['audits:update', 'Executar auditorias, constatacoes e gerar NCs', 'Auditorias', 'update'],
+  ['audits:delete', 'Excluir auditorias', 'Auditorias', 'delete'],
+  ['audits:manage', 'Gerenciar auditorias e compliance', 'Auditorias', 'manage'],
+
   // Reuniões
   ['meetings:view', 'Visualizar reuniões', 'Reuniões', 'view'],
   ['meetings:create', 'Criar reuniões', 'Reuniões', 'create'],
@@ -222,6 +229,10 @@ export const DEFAULT_PROFILES = [
       'doc:create',
       'doc:update',
       'doc:manage',
+      'audits:view',
+      'audits:create',
+      'audits:update',
+      'audits:manage',
       'meetings:view',
       'meetings:create',
       'meetings:update',
@@ -273,6 +284,7 @@ export const DEFAULT_PROFILES = [
       'doc:view',
       'doc:create',
       'doc:update',
+      'audits:view',
       'reports:view',
       'communication:view',
       'communication:attachments',
@@ -301,6 +313,7 @@ export const DEFAULT_PROFILES = [
       'risks:view',
       'nc:view',
       'doc:view',
+      'audits:view',
       'strategy:view',
       'okrs:view',
       'org:view',
