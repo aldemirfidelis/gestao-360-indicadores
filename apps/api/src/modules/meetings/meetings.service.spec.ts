@@ -18,7 +18,59 @@ const me: AuthPayload = {
   companyId: 'companyA',
 };
 
-function makeService(opts?: { meeting?: unknown; indicator?: unknown; listAreaFilter?: unknown }) {
+function meetingFixture(overrides?: Record<string, unknown>) {
+  return {
+    id: 'm1',
+    companyId: 'companyA',
+    indicatorId: 'i1',
+    title: 'Reuniao de resultado',
+    kind: 'INDICATORS',
+    status: 'SCHEDULED',
+    format: 'ONLINE',
+    startsAt: new Date('2026-06-10T10:00:00Z'),
+    endsAt: new Date('2026-06-10T11:00:00Z'),
+    location: 'Sala 1',
+    objective: 'Definir tratativa do indicador',
+    notes: null,
+    indicator: {
+      id: 'i1',
+      name: 'Produtividade',
+      code: 'KPI-01',
+      ownerNodeId: 'areaA',
+      ownerNode: { id: 'areaA', name: 'Operacao' },
+      responsibleUser: { id: 'u2', name: 'Ana', email: 'ana@x.com', jobTitle: 'Gerente' },
+      targets: [],
+    },
+    deviation: null,
+    analysis: null,
+    treatment: null,
+    participants: [
+      { id: 'mp1', userId: 'u2', attended: true, role: 'RESPONSIBLE', notes: null, user: { id: 'u2', name: 'Ana', email: 'ana@x.com' } },
+    ],
+    guests: [],
+    agendaItems: [{ id: 'a1', topic: 'Revisar resultado fora da meta', notes: null, position: 0 }],
+    decisions: [{ id: 'd1', decision: 'Abrir acao corretiva', owner: 'Ana', dueDate: new Date('2026-06-20T00:00:00Z') }],
+    actions: [
+      {
+        id: 'ap1',
+        title: 'Plano corretivo',
+        status: 'IN_PROGRESS',
+        priority: 'HIGH',
+        progress: 20,
+        rootCause: null,
+        analysisSessions: [],
+        tasks: [
+          { id: 't1', title: 'Validar causa raiz', done: false, dueDate: new Date('2026-06-18T00:00:00Z'), endDate: null, assignedTo: { name: 'Ana' } },
+        ],
+      },
+    ],
+    emailLogs: [],
+    calendarInvites: [],
+    ...overrides,
+  };
+}
+
+function makeService(opts?: { meeting?: unknown; indicator?: unknown; listAreaFilter?: unknown; gemini?: unknown }) {
   const prisma = {
     meeting: {
       findMany: vi.fn().mockResolvedValue([]),
@@ -37,9 +89,10 @@ function makeService(opts?: { meeting?: unknown; indicator?: unknown; listAreaFi
     assertCanWrite: vi.fn().mockResolvedValue(undefined),
     visibilityLevel: vi.fn().mockResolvedValue('FULL'),
   } as any;
+  const gemini = opts?.gemini ?? { isEnabled: false, generateJson: vi.fn() };
 
-  const service = new MeetingsService(prisma, traceability, access);
-  return { service, prisma, access, traceability };
+  const service = new MeetingsService(prisma, traceability, access, gemini as any);
+  return { service, prisma, access, traceability, gemini: gemini as any };
 }
 
 describe('MeetingsService — isolamento por empresa e área', () => {
@@ -121,5 +174,35 @@ describe('MeetingsService — isolamento por empresa e área', () => {
     const { service, prisma } = makeService({ meeting: null });
     await expect(service.addParticipant(me, 'm1', 'u9')).rejects.toBeInstanceOf(NotFoundException);
     expect(prisma.meetingParticipant.upsert).not.toHaveBeenCalled();
+  });
+
+  it('generateMinutes: gera fallback deterministico e exige escrita na area', async () => {
+    const { service, access, gemini } = makeService({ meeting: meetingFixture() });
+    const res = await service.generateMinutes(me, 'm1');
+    expect(res.provider).toBe('deterministic');
+    expect(res.markdown).toContain('Minuta de ata - Reuniao de resultado');
+    expect(res.actionItems.length).toBeGreaterThan(0);
+    expect(access.assertCanWrite).toHaveBeenCalledWith('user-1', 'areaA', 'meetings', 'edit');
+    expect(gemini.generateJson).not.toHaveBeenCalled();
+  });
+
+  it('generateMinutes: usa Gemini quando disponivel e normaliza a minuta', async () => {
+    const gemini = {
+      isEnabled: true,
+      generateJson: vi.fn().mockResolvedValue({
+        summary: 'Resumo gerado por IA',
+        minutes: 'Ata objetiva gerada por IA',
+        decisions: ['Decisao IA'],
+        actionItems: [{ description: 'Acao IA', owner: 'Ana', dueDate: '2026-06-30', priority: 'HIGH', source: 'ia' }],
+        risks: ['Risco IA'],
+        nextSteps: ['Proximo passo IA'],
+      }),
+    };
+    const { service } = makeService({ meeting: meetingFixture(), gemini });
+    const res = await service.generateMinutes(me, 'm1');
+    expect(gemini.generateJson).toHaveBeenCalled();
+    expect(res.provider).toBe('gemini');
+    expect(res.summary).toBe('Resumo gerado por IA');
+    expect(res.markdown).toContain('Acao IA');
   });
 });

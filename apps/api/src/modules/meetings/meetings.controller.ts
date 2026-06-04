@@ -104,6 +104,12 @@ export class MeetingsController {
     return this.service.addDecision(me, id, body.decision, body.owner, body.dueDate);
   }
 
+  @Post(':id/ai/minutes')
+  @RequirePermissions('meetings:update')
+  generateMinutes(@CurrentUser() me: AuthPayload, @Param('id') id: string) {
+    return this.service.generateMinutes(me, id);
+  }
+
   @Post(':id/actions')
   @RequirePermissions('actions:create')
   generateAction(

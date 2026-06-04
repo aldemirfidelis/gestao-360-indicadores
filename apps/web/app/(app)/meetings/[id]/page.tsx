@@ -9,10 +9,12 @@ import { toast } from 'sonner';
 import {
   ArrowLeft,
   CheckCircle2,
+  Copy,
   Mail,
   Plus,
   Save,
   Send,
+  Sparkles,
   Users,
 } from 'lucide-react';
 import { PageHeader } from '@/components/shell/page-header';
@@ -23,6 +25,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { NativeSelect } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
+import { useAuth } from '@/components/auth/auth-provider';
 import { api } from '@/lib/api';
 import { formatDate, formatNumber } from '@/lib/utils';
 
@@ -102,6 +105,18 @@ interface MeetingDetail {
   calendarInvites: { id: string; uid: string; createdAt: string }[];
 }
 
+interface AiMinutesDraft {
+  provider: 'gemini' | 'deterministic';
+  generatedAt: string;
+  summary: string;
+  minutes: string;
+  decisions: string[];
+  actionItems: { description: string; owner: string | null; dueDate: string | null; priority: string | null; source: string }[];
+  risks: string[];
+  nextSteps: string[];
+  markdown: string;
+}
+
 const statusLabels: Record<string, string> = {
   SCHEDULED: 'Agendada',
   COMPLETED: 'Concluída',
@@ -123,10 +138,13 @@ const analysisMethods = ['FIVE_WHYS', 'ISHIKAWA', 'PARETO', 'PDCA', 'MASP', 'DMA
 export default function MeetingDetailPage() {
   const { id } = useParams<{ id: string }>();
   const qc = useQueryClient();
+  const { hasPermission } = useAuth();
   const [agendaTopic, setAgendaTopic] = useState('');
   const [guest, setGuest] = useState({ name: '', email: '', jobTitle: '', area: '', role: 'PARTICIPANT', notes: '' });
   const [taskForm, setTaskForm] = useState({ description: '', responsibleUserId: '', startDate: '', endDate: '' });
   const [analysisForm, setAnalysisForm] = useState({ method: 'FIVE_WHYS', problem: '', rootCause: '' });
+  const [minutesDraft, setMinutesDraft] = useState<AiMinutesDraft | null>(null);
+  const canGenerateMinutes = hasPermission(['meetings:update']);
 
   const query = useQuery<MeetingDetail>({
     queryKey: ['meeting', id],
@@ -235,6 +253,15 @@ export default function MeetingDetailPage() {
     onError: (e: any) => toast.error(e?.message ?? 'Não foi possível enviar convites'),
   });
 
+  const generateMinutes = useMutation({
+    mutationFn: () => api<AiMinutesDraft>(`/meetings/${id}/ai/minutes`, { method: 'POST' }),
+    onSuccess: (data) => {
+      setMinutesDraft(data);
+      toast.success(data.provider === 'gemini' ? 'Minuta gerada por IA' : 'Minuta gerada por regras locais');
+    },
+    onError: (e: any) => toast.error(e?.message ?? 'Nao foi possivel gerar a minuta'),
+  });
+
   const completeMeeting = useMutation({
     mutationFn: () => api(`/meetings/${id}/complete`, { method: 'POST' }),
     onSuccess: () => {
@@ -242,6 +269,12 @@ export default function MeetingDetailPage() {
       qc.invalidateQueries({ queryKey: ['meeting', id] });
     },
   });
+
+  const copyMinutes = async () => {
+    if (!minutesDraft) return;
+    await navigator.clipboard.writeText(minutesDraft.markdown);
+    toast.success('Minuta copiada');
+  };
 
   if (query.isLoading) return <p className="text-sm text-muted-foreground">Carregando reunião...</p>;
   if (!m) return null;
@@ -439,6 +472,47 @@ export default function MeetingDetailPage() {
         </div>
 
         <div className="space-y-6">
+          {canGenerateMinutes && (
+            <SectionCard
+              title="Minuta por IA"
+              description="Gere um rascunho revisavel da ata com decisoes, pendencias e proximos passos."
+              actions={
+                <Button variant="outline" size="sm" onClick={() => generateMinutes.mutate()} disabled={generateMinutes.isPending}>
+                  <Sparkles className="mr-2 h-4 w-4" />
+                  {generateMinutes.isPending ? 'Gerando...' : 'Gerar minuta'}
+                </Button>
+              }
+            >
+              {minutesDraft ? (
+                <div className="space-y-3">
+                  <div className="flex flex-wrap items-center justify-between gap-2 rounded-md border bg-muted/30 p-3 text-xs text-muted-foreground">
+                    <span>
+                      Fonte: {minutesDraft.provider === 'gemini' ? 'Gemini' : 'regras locais'} - {formatDateTime(minutesDraft.generatedAt)}
+                    </span>
+                    <Button variant="ghost" size="sm" onClick={copyMinutes}>
+                      <Copy className="mr-2 h-4 w-4" />
+                      Copiar
+                    </Button>
+                  </div>
+                  <Textarea
+                    rows={18}
+                    value={minutesDraft.markdown}
+                    onChange={(e) => setMinutesDraft({ ...minutesDraft, markdown: e.target.value })}
+                    className="font-mono text-xs leading-relaxed"
+                  />
+                  <p className="text-xs text-muted-foreground">
+                    Revise a minuta antes de enviar ou registrar como ata oficial.
+                  </p>
+                </div>
+              ) : (
+                <div className="rounded-md border border-dashed p-4 text-sm text-muted-foreground">
+                  Nenhuma minuta gerada nesta sessao. Use o botao acima para criar um rascunho com base em pauta,
+                  participantes, decisoes e tarefas vinculadas.
+                </div>
+              )}
+            </SectionCard>
+          )}
+
           <SectionCard title="Tarefas para plano de ação" description="As tarefas criadas aqui entram direto na execução do plano vinculado.">
             {!linkedAction ? (
               <p className="text-sm text-muted-foreground">Esta reunião ainda não está vinculada a um plano de ação.</p>

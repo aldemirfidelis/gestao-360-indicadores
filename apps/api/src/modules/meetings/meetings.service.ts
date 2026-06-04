@@ -18,9 +18,30 @@ import { TraceabilityService } from '../traceability/traceability.service';
 import { AccessService } from '../access/access.service';
 import type { AreaAction } from '../access/access.logic';
 import { AuthPayload } from '../auth/auth.types';
+import { GeminiService } from '../ai/gemini.service';
 
 /** Chave de módulo usada nas regras de visibilidade por área (AccessService). */
 const MODULE = 'meetings';
+
+type MeetingMinutesActionItem = {
+  description: string;
+  owner: string | null;
+  dueDate: string | null;
+  priority: string | null;
+  source: string;
+};
+
+export type MeetingMinutesDraft = {
+  provider: 'gemini' | 'deterministic';
+  generatedAt: string;
+  summary: string;
+  minutes: string;
+  decisions: string[];
+  actionItems: MeetingMinutesActionItem[];
+  risks: string[];
+  nextSteps: string[];
+  markdown: string;
+};
 
 @Injectable()
 export class MeetingsService {
@@ -28,6 +49,7 @@ export class MeetingsService {
     private readonly prisma: PrismaService,
     private readonly traceability: TraceabilityService,
     private readonly access: AccessService,
+    private readonly gemini: GeminiService,
   ) {}
 
   /**
@@ -319,6 +341,25 @@ export class MeetingsService {
       metadata: { owner, dueDate },
     });
     return item;
+  }
+
+  async generateMinutes(me: AuthPayload, meetingId: string): Promise<MeetingMinutesDraft> {
+    const meeting = await this.getById(me, meetingId);
+    await this.assertWriteArea(me, this.areaOf(meeting), 'edit');
+
+    const fallback = this.buildDeterministicMinutes(meeting);
+    if (!this.gemini.isEnabled) return fallback;
+
+    const aiDraft = await this.gemini.generateJson<Partial<MeetingMinutesDraft>>(
+      this.buildMinutesPrompt(meeting),
+      { temperature: 0.2, maxOutputTokens: 1800 },
+    );
+    const normalized = this.normalizeMinutesDraft(aiDraft, fallback);
+    if (!normalized) return fallback;
+    return {
+      ...normalized,
+      markdown: this.renderMinutesMarkdown(meeting, normalized),
+    };
   }
 
   async generateAction(
@@ -618,5 +659,235 @@ export class MeetingsService {
 
   private isEmail(value: string) {
     return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value);
+  }
+
+  private buildMinutesPrompt(meeting: any) {
+    const context = this.minutesContext(meeting);
+    return `Voce e um secretario executivo especializado em reunioes de gestao, indicadores e planos de acao.
+Gere uma minuta de ata profissional, objetiva e revisavel em portugues do Brasil.
+Nao invente fatos. Quando uma informacao nao existir no contexto, marque como "Pendente".
+Priorize decisoes, responsaveis, prazos, riscos e proximos passos.
+
+Responda no schema JSON:
+{
+  "summary": "Resumo executivo em ate 4 linhas",
+  "minutes": "Minuta textual da ata em Markdown curto",
+  "decisions": ["decisao 1"],
+  "actionItems": [
+    { "description": "acao", "owner": "responsavel ou null", "dueDate": "YYYY-MM-DD ou null", "priority": "LOW|MEDIUM|HIGH|CRITICAL ou null", "source": "agenda|decisao|plano|ia" }
+  ],
+  "risks": ["risco ou pendencia"],
+  "nextSteps": ["proximo passo"]
+}
+
+CONTEXTO:
+${JSON.stringify(context, null, 2)}`;
+  }
+
+  private minutesContext(meeting: any) {
+    return {
+      meeting: {
+        title: meeting.title,
+        kind: meeting.kind,
+        status: meeting.status,
+        objective: meeting.objective,
+        notes: meeting.notes,
+        startsAt: meeting.startsAt,
+        endsAt: meeting.endsAt,
+        location: meeting.location,
+      },
+      indicator: meeting.indicator
+        ? {
+            code: meeting.indicator.code,
+            name: meeting.indicator.name,
+            area: meeting.indicator.ownerNode?.name,
+            responsible: meeting.indicator.responsibleUser?.name,
+          }
+        : null,
+      deviation: meeting.deviation
+        ? {
+            number: meeting.deviation.number,
+            title: meeting.deviation.title,
+            status: meeting.deviation.status,
+            severity: meeting.deviation.severity,
+          }
+        : null,
+      treatment: meeting.treatment
+        ? {
+            periodRef: meeting.treatment.periodRef,
+            status: meeting.treatment.status,
+            result: meeting.treatment.result
+              ? {
+                  value: meeting.treatment.result.value,
+                  deviationPct: meeting.treatment.result.deviationPct,
+                  light: meeting.treatment.result.light,
+                }
+              : null,
+          }
+        : null,
+      analysis: meeting.analysis
+        ? {
+            method: meeting.analysis.method,
+            content: meeting.analysis.content,
+          }
+        : null,
+      agenda: (meeting.agendaItems ?? []).map((item: any) => ({ topic: item.topic, notes: item.notes })),
+      decisions: (meeting.decisions ?? []).map((item: any) => ({
+        decision: item.decision,
+        owner: item.owner,
+        dueDate: item.dueDate,
+      })),
+      participants: (meeting.participants ?? []).map((item: any) => ({
+        name: item.user?.name,
+        role: item.role,
+        attended: item.attended,
+      })),
+      guests: (meeting.guests ?? []).map((item: any) => ({
+        name: item.name,
+        role: item.role,
+        confirmed: item.confirmed,
+      })),
+      actions: (meeting.actions ?? []).map((action: any) => ({
+        title: action.title,
+        status: action.status,
+        priority: action.priority,
+        progress: action.progress,
+        rootCause: action.rootCause ?? action.analysisSessions?.[0]?.rootCause ?? null,
+        tasks: (action.tasks ?? []).map((task: any) => ({
+          title: task.title,
+          done: task.done,
+          owner: task.assignedTo?.name,
+          dueDate: task.dueDate ?? task.endDate,
+        })),
+      })),
+    };
+  }
+
+  private buildDeterministicMinutes(meeting: any): MeetingMinutesDraft {
+    const decisions = (meeting.decisions ?? []).map((item: any) => this.asText(item.decision)).filter(Boolean);
+    const decisionActions = (meeting.decisions ?? []).map((item: any) => ({
+      description: this.asText(item.decision) || 'Decisao a detalhar',
+      owner: this.nullableText(item.owner),
+      dueDate: item.dueDate ? new Date(item.dueDate).toISOString().slice(0, 10) : null,
+      priority: null,
+      source: 'decisao',
+    }));
+    const taskActions = (meeting.actions ?? []).flatMap((action: any) =>
+      (action.tasks ?? []).map((task: any) => ({
+        description: this.asText(task.title) || action.title || 'Tarefa a detalhar',
+        owner: this.nullableText(task.assignedTo?.name),
+        dueDate: task.dueDate || task.endDate ? new Date(task.dueDate ?? task.endDate).toISOString().slice(0, 10) : null,
+        priority: this.nullableText(action.priority),
+        source: 'plano',
+      })),
+    );
+    const actionItems = [...decisionActions, ...taskActions].slice(0, 12);
+    const agenda = (meeting.agendaItems ?? []).map((item: any) => this.asText(item.topic)).filter(Boolean);
+    const participants = [
+      ...(meeting.participants ?? []).map((item: any) => item.user?.name),
+      ...(meeting.guests ?? []).map((item: any) => item.name),
+    ].filter(Boolean);
+    const risks = [
+      ...(meeting.actions?.length ? [] : ['Nenhum plano de acao vinculado a reuniao.']),
+      ...(meeting.analysis?.content || meeting.actions?.some((action: any) => action.rootCause || action.analysisSessions?.[0]?.rootCause)
+        ? []
+        : ['Causa raiz ainda nao consolidada.']),
+    ];
+    const nextSteps = actionItems.length
+      ? actionItems.slice(0, 5).map((item) => item.description)
+      : ['Registrar decisoes, responsaveis e prazos antes de concluir a reuniao.'];
+
+    const draft: MeetingMinutesDraft = {
+      provider: 'deterministic',
+      generatedAt: new Date().toISOString(),
+      summary: `Reuniao "${meeting.title}" com ${participants.length} participante(s), ${agenda.length} item(ns) de pauta, ${decisions.length} decisao(oes) e ${actionItems.length} acao(oes) mapeada(s).`,
+      minutes: [
+        `A reuniao tratou ${meeting.objective || meeting.indicator?.name || meeting.deviation?.title || 'os temas previstos em pauta'}.`,
+        agenda.length ? `Pauta abordada: ${agenda.join('; ')}.` : 'Pauta formal nao registrada.',
+        decisions.length ? `Decisoes registradas: ${decisions.join('; ')}.` : 'Nenhuma decisao formal registrada ate o momento.',
+      ].join('\n'),
+      decisions: decisions.length ? decisions : ['Nenhuma decisao formal registrada.'],
+      actionItems,
+      risks: risks.length ? risks : ['Sem riscos adicionais identificados no registro atual.'],
+      nextSteps,
+      markdown: '',
+    };
+    return { ...draft, markdown: this.renderMinutesMarkdown(meeting, draft) };
+  }
+
+  private normalizeMinutesDraft(aiDraft: Partial<MeetingMinutesDraft> | null, fallback: MeetingMinutesDraft): MeetingMinutesDraft | null {
+    if (!aiDraft || typeof aiDraft !== 'object') return null;
+    const draft: MeetingMinutesDraft = {
+      provider: 'gemini',
+      generatedAt: new Date().toISOString(),
+      summary: this.asText(aiDraft.summary) || fallback.summary,
+      minutes: this.asText(aiDraft.minutes) || fallback.minutes,
+      decisions: this.stringList(aiDraft.decisions, fallback.decisions),
+      actionItems: this.actionItemList(aiDraft.actionItems, fallback.actionItems),
+      risks: this.stringList(aiDraft.risks, fallback.risks),
+      nextSteps: this.stringList(aiDraft.nextSteps, fallback.nextSteps),
+      markdown: '',
+    };
+    return draft;
+  }
+
+  private actionItemList(value: unknown, fallback: MeetingMinutesActionItem[]) {
+    if (!Array.isArray(value)) return fallback;
+    const items = value
+      .map((item: any) => ({
+        description: this.asText(item?.description ?? item?.title) || '',
+        owner: this.nullableText(item?.owner),
+        dueDate: this.nullableText(item?.dueDate),
+        priority: this.nullableText(item?.priority),
+        source: this.asText(item?.source) || 'ia',
+      }))
+      .filter((item) => item.description)
+      .slice(0, 12);
+    return items.length ? items : fallback;
+  }
+
+  private stringList(value: unknown, fallback: string[]) {
+    if (!Array.isArray(value)) return fallback;
+    const items = value.map((item) => this.asText(item)).filter(Boolean).slice(0, 12);
+    return items.length ? items : fallback;
+  }
+
+  private renderMinutesMarkdown(meeting: any, draft: MeetingMinutesDraft) {
+    const actionLines = draft.actionItems.length
+      ? draft.actionItems.map((item) => `- ${item.description}${item.owner ? ` | Resp.: ${item.owner}` : ''}${item.dueDate ? ` | Prazo: ${item.dueDate}` : ''}`)
+      : ['- Nenhuma acao mapeada.'];
+    return [
+      `# Minuta de ata - ${meeting.title}`,
+      '',
+      `Gerada em: ${new Date(draft.generatedAt).toLocaleString('pt-BR')}`,
+      `Fonte: ${draft.provider === 'gemini' ? 'Gemini' : 'regras locais'}`,
+      '',
+      '## Resumo executivo',
+      draft.summary,
+      '',
+      '## Ata',
+      draft.minutes,
+      '',
+      '## Decisoes',
+      ...draft.decisions.map((item) => `- ${item}`),
+      '',
+      '## Acoes e responsaveis',
+      ...actionLines,
+      '',
+      '## Riscos e pendencias',
+      ...draft.risks.map((item) => `- ${item}`),
+      '',
+      '## Proximos passos',
+      ...draft.nextSteps.map((item) => `- ${item}`),
+    ].join('\n');
+  }
+
+  private asText(value: unknown) {
+    return typeof value === 'string' ? value.trim() : '';
+  }
+
+  private nullableText(value: unknown) {
+    const text = this.asText(value);
+    return text && text !== '-' ? text : null;
   }
 }
