@@ -12,6 +12,10 @@
     "build": "pnpm shared:build && pnpm --filter @g360/api build && pnpm --filter @g360/web build",
     "lint": "pnpm -r lint",
     "test": "pnpm -r test",
+    "test:e2e": "playwright test",
+    "e2e": "playwright test",
+    "e2e:install": "playwright install chromium",
+    "e2e:ui": "playwright test --ui",
     "db:up": "docker compose up -d postgres redis",
     "db:down": "docker compose down",
     "db:migrate": "pnpm --filter @g360/api prisma:migrate",
@@ -24,8 +28,9 @@
     "docker:web": "docker build -f apps/web/Dockerfile -t g360-web ."
   },
   "devDependencies": {
-    "typescript": "^5.5.4",
-    "prettier": "^3.3.3"
+    "@playwright/test": "^1.60.0",
+    "prettier": "^3.3.3",
+    "typescript": "^5.5.4"
   },
   "engines": {
     "node": ">=20",

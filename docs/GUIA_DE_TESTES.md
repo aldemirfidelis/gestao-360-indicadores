@@ -9,19 +9,22 @@
 | API typecheck | `pnpm --filter @g360/api exec tsc --noEmit --pretty false` |
 | Web typecheck | `pnpm --filter @g360/web exec tsc --noEmit` |
 | Shared | `pnpm --filter @g360/shared test` |
+| E2E smoke | `pnpm test:e2e` |
+| Instalar Chromium E2E | `pnpm e2e:install` |
 | Prisma validate | `pnpm --filter @g360/api exec prisma validate` |
 | Prisma status | `pnpm --filter @g360/api exec prisma migrate status` |
 
 ## Validação atual
 
-Última validação executada durante a FASE 7 documental:
+Última validação executada durante a FASE 7:
 
 - API tests: 26 arquivos, 184 testes passando.
 - API typecheck: verde.
 - Web typecheck: verde.
+- E2E smoke: 4 testes passando.
 - Prisma schema: válido.
 
-## Cobertura existente
+## Cobertura unitária existente
 
 Os testes unitários de serviço cobrem os fluxos críticos de:
 
@@ -34,20 +37,28 @@ Os testes unitários de serviço cobrem os fluxos críticos de:
 
 ## E2E
 
-Ainda não há Playwright/Cypress configurado no repo.
+Playwright está configurado no workspace root em `playwright.config.ts`.
 
-Recomendação para a próxima etapa:
+Cobertura smoke atual:
 
-1. Adicionar Playwright em workspace root.
-2. Criar fixture de login com empresa demo.
-3. Cobrir smoke flows:
-   - login;
-   - indicador fora da meta -> desvio -> ação -> eficácia;
-   - risco vinculado a indicador;
-   - auditoria -> constatação -> NC;
-   - processo/SIPOC com etapa;
-   - formulário/checklist com preenchimento.
-4. Rodar E2E contra ambiente local sem tocar no Neon de produção.
+- `GET /api/health` sem autenticação;
+- landing pública;
+- página `/login`;
+- rota privada sem token redirecionando para `/login`.
+
+Comandos:
+
+1. `pnpm e2e:install` para baixar Chromium na máquina.
+2. `pnpm test:e2e` para rodar os smoke tests.
+3. `pnpm e2e:ui` para depuração interativa.
+
+Próxima expansão recomendada após aplicar as migrations pendentes no banco de teste:
+
+- indicador fora da meta -> desvio -> ação -> eficácia;
+- risco vinculado a indicador;
+- auditoria -> constatação -> NC;
+- processo/SIPOC com etapa;
+- formulário/checklist com preenchimento.
 
 ## Cuidados
 

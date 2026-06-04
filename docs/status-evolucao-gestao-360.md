@@ -16,13 +16,14 @@
 - Documentação de rotas/APIs em `docs/ROTAS_E_APIS.md`.
 - Guia de testes em `docs/GUIA_DE_TESTES.md`.
 - Checklist de produção em `docs/CHECKLIST_PRODUCAO.md`.
+- Infraestrutura E2E com Playwright e smoke tests para health, landing, login e guard de rota privada.
 
 ## Em evolução
 
 - Integração direta com Google Calendar ou Microsoft Outlook. Hoje o sistema gera convite ICS e registra o envio.
 - Relatórios avançados em Excel/PDF com modelos executivos personalizados.
 - Editor visual avançado do mapa estratégico com experiência de canvas livre.
-- Testes automatizados de ponta a ponta cobrindo os fluxos operacionais críticos.
+- Expandir testes E2E para fluxos operacionais completos após aplicar migrations pendentes em banco de teste.
 - Aplicar no Neon as migrations pendentes de Auditorias, Processos/SIPOC e Formulários/Checklists após autorização.
 - Refinamento contínuo de textos antigos que ainda estejam sem acentuação em telas legadas.
 
@@ -31,5 +32,6 @@
 - Frontend: `pnpm --filter @g360/web exec tsc --noEmit` concluído com sucesso.
 - API: `pnpm --filter @g360/api exec tsc --noEmit --pretty false` concluído com sucesso.
 - Testes API: `pnpm --filter @g360/api test` concluído com sucesso, com 26 arquivos e 184 testes.
+- E2E smoke: `pnpm test:e2e -- --reporter=list` concluído com sucesso, com 4 testes.
 - Migrations aplicadas no Neon: `20260604130000_risk_register`, `20260604140000_non_conformity`, `20260604150000_document_register`.
 - Migrations pendentes no Neon: `20260604160000_audit_compliance`, `20260604170000_process_sipoc`, `20260604180000_forms_checklists`.

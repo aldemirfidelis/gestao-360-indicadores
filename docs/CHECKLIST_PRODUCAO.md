@@ -8,6 +8,7 @@
 - Rodar `pnpm --filter @g360/api exec tsc --noEmit --pretty false`.
 - Rodar `pnpm --filter @g360/web exec tsc --noEmit`.
 - Rodar `pnpm --filter @g360/api test`.
+- Rodar `pnpm test:e2e` quando o Chromium do Playwright já estiver instalado (`pnpm e2e:install`).
 - Rodar `pnpm build` quando o ambiente local tiver recursos suficientes para build completo.
 
 ## Migrations
