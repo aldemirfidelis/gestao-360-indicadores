@@ -413,6 +413,8 @@ enum TraceEntityType {
   DOCUMENT
   AUDIT
   AUDIT_FINDING
+  PROCESS
+  PROCESS_STEP
   ATTACHMENT
   COMMENT
   MAP_NODE
@@ -532,6 +534,7 @@ model Company {
   nonConformities        NonConformity[]
   documents              Document[]
   audits                 Audit[]
+  processes              Process[]
   meetings               Meeting[]
   imports                ImportJob[]
   auditLogs              AuditLog[]
@@ -638,6 +641,7 @@ model OrgNode {
   nonConformities         NonConformity[]             @relation("NcOwnerNode")
   documents               Document[]                  @relation("DocOrgNode")
   audits                  Audit[]                     @relation("AuditOrgNode")
+  processes               Process[]                   @relation("ProcessOrgNode")
   strategicObjectives     StrategicObjective[]        @relation("StrategicObjectiveOwnerNode")
   strategicObjectiveLinks StrategicObjectiveOrgNode[]
   orgEmployees            OrgEmployee[]
@@ -703,6 +707,8 @@ model User {
   documentsCreated           Document[]                  @relation("DocCreatedBy")
   auditsLed                  Audit[]                     @relation("AuditLead")
   auditsCreated              Audit[]                     @relation("AuditCreatedBy")
+  processesOwned             Process[]                   @relation("ProcessOwner")
+  processesCreated           Process[]                   @relation("ProcessCreatedBy")
   actionTasksAssigned        ActionTask[]                @relation("ActionTaskAssignee")
   careerApprovalsRequested   OrgJobApprovalRequest[]     @relation("CareerApprovalRequester")
   careerApprovalsToReview    OrgJobApprovalRequest[]     @relation("CareerApprovalApprover")
@@ -1118,6 +1124,7 @@ model Indicator {
   risks                   RiskRegister[]                @relation("RiskIndicator")
   nonConformities         NonConformity[]               @relation("NcIndicator")
   documents               Document[]                    @relation("DocIndicator")
+  processes               Process[]                     @relation("ProcessIndicator")
 
   @@unique([companyId, code])
   @@unique([companyId, externalSource, externalId])
@@ -1920,6 +1927,78 @@ model AuditFinding {
 
   @@index([auditId])
   @@index([nonConformityId])
+}
+
+// =====================================================
+// Processos e SIPOC
+// =====================================================
+
+enum ProcessType {
+  CORE // finalistico / primario
+  SUPPORT // apoio
+  MANAGEMENT // gerencial / estrategico
+}
+
+enum ProcessStatus {
+  DRAFT // mapeamento em rascunho
+  ACTIVE // vigente
+  UNDER_REVIEW // em revisao
+  ARCHIVED // arquivado
+}
+
+model Process {
+  id          String        @id @default(uuid())
+  companyId   String
+  company     Company       @relation(fields: [companyId], references: [id])
+  number      Int // sequencial por empresa
+  code        String? // codigo do processo (ex.: PR-001)
+  orgNodeId   String?
+  orgNode     OrgNode?      @relation("ProcessOrgNode", fields: [orgNodeId], references: [id])
+  indicatorId String?
+  indicator   Indicator?    @relation("ProcessIndicator", fields: [indicatorId], references: [id])
+  ownerUserId String?
+  owner       User?         @relation("ProcessOwner", fields: [ownerUserId], references: [id])
+  createdById String?
+  createdBy   User?         @relation("ProcessCreatedBy", fields: [createdById], references: [id])
+
+  name        String
+  description String?
+  objective   String? // objetivo do processo
+  type        ProcessType   @default(CORE)
+  status      ProcessStatus @default(DRAFT)
+  version     String? // versao do mapeamento (ex.: "1.0")
+  // SIPOC (texto livre, um por linha)
+  suppliers   String? // fornecedores
+  inputs      String? // entradas
+  outputs     String? // saidas
+  customers   String? // clientes
+  createdAt   DateTime      @default(now())
+  updatedAt   DateTime      @updatedAt
+  deletedAt   DateTime?
+
+  steps ProcessStep[]
+
+  @@unique([companyId, number])
+  @@index([companyId])
+  @@index([companyId, status])
+  @@index([type])
+  @@index([orgNodeId])
+  @@index([indicatorId])
+  @@index([ownerUserId])
+}
+
+model ProcessStep {
+  id          String   @id @default(uuid())
+  processId   String
+  process     Process  @relation(fields: [processId], references: [id], onDelete: Cascade)
+  order       Int // ordem da etapa no fluxo
+  name        String
+  description String?
+  responsible String? // papel/area responsavel pela etapa (texto livre)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([processId])
 }
 
 // =====================================================

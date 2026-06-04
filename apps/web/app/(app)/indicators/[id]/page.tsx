@@ -72,6 +72,8 @@ interface TraceEvent {
   eventType: string;
   entityType: string;
   entityId: string;
+  relatedType?: string | null;
+  relatedId?: string | null;
   title: string;
   description: string | null;
   statusFrom?: string | null;
@@ -511,6 +513,8 @@ function eventHref(event: TraceEvent) {
   if (event.entityType === 'RISK') return `/risks?focus=${event.entityId}`;
   if (event.entityType === 'NON_CONFORMITY') return `/nonconformities?focus=${event.entityId}`;
   if (event.entityType === 'DOCUMENT') return `/documents?focus=${event.entityId}`;
+  if (event.entityType === 'PROCESS') return `/processes?focus=${event.entityId}`;
+  if (event.entityType === 'PROCESS_STEP') return `/processes?focus=${event.relatedId ?? event.entityId}`;
   return '#';
 }
 

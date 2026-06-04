@@ -86,6 +86,13 @@ export const PERMISSION_CATALOG = [
   ['audits:delete', 'Excluir auditorias', 'Auditorias', 'delete'],
   ['audits:manage', 'Gerenciar auditorias e compliance', 'Auditorias', 'manage'],
 
+  // Processos e SIPOC
+  ['processes:view', 'Visualizar processos e SIPOC', 'Processos', 'view'],
+  ['processes:create', 'Mapear processos', 'Processos', 'create'],
+  ['processes:update', 'Editar processos, SIPOC e etapas', 'Processos', 'update'],
+  ['processes:delete', 'Arquivar/excluir processos', 'Processos', 'delete'],
+  ['processes:manage', 'Gerenciar processos e SIPOC', 'Processos', 'manage'],
+
   // Reuniões
   ['meetings:view', 'Visualizar reuniões', 'Reuniões', 'view'],
   ['meetings:create', 'Criar reuniões', 'Reuniões', 'create'],
@@ -233,6 +240,10 @@ export const DEFAULT_PROFILES = [
       'audits:create',
       'audits:update',
       'audits:manage',
+      'processes:view',
+      'processes:create',
+      'processes:update',
+      'processes:manage',
       'meetings:view',
       'meetings:create',
       'meetings:update',
@@ -285,6 +296,9 @@ export const DEFAULT_PROFILES = [
       'doc:create',
       'doc:update',
       'audits:view',
+      'processes:view',
+      'processes:create',
+      'processes:update',
       'reports:view',
       'communication:view',
       'communication:attachments',
@@ -314,6 +328,7 @@ export const DEFAULT_PROFILES = [
       'nc:view',
       'doc:view',
       'audits:view',
+      'processes:view',
       'strategy:view',
       'okrs:view',
       'org:view',
