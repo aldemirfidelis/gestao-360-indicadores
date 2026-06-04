@@ -13,6 +13,9 @@
 - Auditorias conectam constatações a Não Conformidades; Processos/SIPOC conectam área, processo, indicador e etapas; Formulários/Checklists conectam templates, campos, preenchimentos e respostas.
 - Documentação do fluxo de tratativa em `docs/fluxo-tratativa-indicador-fora-meta.md`.
 - Documentação da FASE 6 em `docs/FASE6_MODULOS_CORPORATIVOS.md`.
+- Documentação de rotas/APIs em `docs/ROTAS_E_APIS.md`.
+- Guia de testes em `docs/GUIA_DE_TESTES.md`.
+- Checklist de produção em `docs/CHECKLIST_PRODUCAO.md`.
 
 ## Em evolução
 
