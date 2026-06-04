@@ -1,6 +1,7 @@
 'use client';
 
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
+import { useSearchParams } from 'next/navigation';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
 import { AlertTriangle, CalendarClock, CheckCircle2, Edit, Filter, Plus, ShieldAlert, Trash2, X } from 'lucide-react';
@@ -150,6 +151,7 @@ const EMPTY_FORM: RiskForm = {
 
 export default function RisksPage() {
   const qc = useQueryClient();
+  const searchParams = useSearchParams();
   const { hasPermission } = useAuth();
   const canCreate = hasPermission(['risks:create']);
   const canUpdate = hasPermission(['risks:update']);
@@ -250,6 +252,21 @@ export default function RisksPage() {
     setEditing(null);
     setForm(EMPTY_FORM);
   };
+
+  // Deep-link: /risks?focus=<id> (ex.: vindo da linha do tempo de um indicador) abre o
+  // risco para visualização/edição assim que a lista carrega. Só dispara uma vez por id.
+  const focusId = searchParams.get('focus');
+  const focusedRef = useRef<string | null>(null);
+  useEffect(() => {
+    if (!focusId || focusedRef.current === focusId) return;
+    const target = risks.find((r) => r.id === focusId);
+    if (target) {
+      focusedRef.current = focusId;
+      openEdit(target);
+    }
+    // openEdit é estável dentro do render; risks muda quando a lista chega.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [focusId, risks]);
 
   return (
     <div>

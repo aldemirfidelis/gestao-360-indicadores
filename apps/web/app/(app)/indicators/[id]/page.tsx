@@ -508,6 +508,7 @@ function eventHref(event: TraceEvent) {
   if (event.entityType === 'ACTION_PLAN') return `/actions/${event.entityId}`;
   if (event.entityType === 'DEVIATION') return `/deviations/${event.entityId}`;
   if (event.entityType === 'MEETING') return `/meetings/${event.entityId}`;
+  if (event.entityType === 'RISK') return `/risks?focus=${event.entityId}`;
   return '#';
 }
 
