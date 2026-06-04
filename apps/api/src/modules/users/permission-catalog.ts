@@ -65,6 +65,13 @@ export const PERMISSION_CATALOG = [
   ['risks:delete', 'Excluir riscos', 'Riscos', 'delete'],
   ['risks:manage', 'Gerenciar registro de riscos', 'Riscos', 'manage'],
 
+  // Nao conformidades
+  ['nc:view', 'Visualizar nao conformidades', 'Nao Conformidades', 'view'],
+  ['nc:create', 'Registrar nao conformidades', 'Nao Conformidades', 'create'],
+  ['nc:update', 'Editar nao conformidades e acoes corretivas', 'Nao Conformidades', 'update'],
+  ['nc:delete', 'Excluir nao conformidades', 'Nao Conformidades', 'delete'],
+  ['nc:manage', 'Gerenciar nao conformidades', 'Nao Conformidades', 'manage'],
+
   // Reuniões
   ['meetings:view', 'Visualizar reuniões', 'Reuniões', 'view'],
   ['meetings:create', 'Criar reuniões', 'Reuniões', 'create'],
@@ -200,6 +207,10 @@ export const DEFAULT_PROFILES = [
       'risks:create',
       'risks:update',
       'risks:manage',
+      'nc:view',
+      'nc:create',
+      'nc:update',
+      'nc:manage',
       'meetings:view',
       'meetings:create',
       'meetings:update',
@@ -245,6 +256,9 @@ export const DEFAULT_PROFILES = [
       'risks:view',
       'risks:create',
       'risks:update',
+      'nc:view',
+      'nc:create',
+      'nc:update',
       'reports:view',
       'communication:view',
       'communication:attachments',
@@ -271,6 +285,7 @@ export const DEFAULT_PROFILES = [
       'treatments:view',
       'projects:view',
       'risks:view',
+      'nc:view',
       'strategy:view',
       'okrs:view',
       'org:view',

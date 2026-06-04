@@ -409,6 +409,7 @@ enum TraceEntityType {
   PROJECT
   PROJECT_TASK
   RISK
+  NON_CONFORMITY
   ATTACHMENT
   COMMENT
   MAP_NODE
@@ -525,6 +526,7 @@ model Company {
   actions                ActionPlan[]
   projects               Project[]
   risks                  RiskRegister[]
+  nonConformities        NonConformity[]
   meetings               Meeting[]
   imports                ImportJob[]
   auditLogs              AuditLog[]
@@ -628,6 +630,7 @@ model OrgNode {
   defaultForUsers         User[]                      @relation("UserDefaultNode")
   actions                 ActionPlan[]                @relation("ActionOwnerNode")
   risks                   RiskRegister[]              @relation("RiskOwnerNode")
+  nonConformities         NonConformity[]             @relation("NcOwnerNode")
   strategicObjectives     StrategicObjective[]        @relation("StrategicObjectiveOwnerNode")
   strategicObjectiveLinks StrategicObjectiveOrgNode[]
   orgEmployees            OrgEmployee[]
@@ -686,6 +689,8 @@ model User {
   actionsCreated             ActionPlan[]                @relation("ActionCreatedBy")
   risksResponsible           RiskRegister[]              @relation("RiskResponsible")
   risksCreated               RiskRegister[]              @relation("RiskCreatedBy")
+  ncResponsible              NonConformity[]             @relation("NcResponsible")
+  ncCreated                  NonConformity[]             @relation("NcCreatedBy")
   actionTasksAssigned        ActionTask[]                @relation("ActionTaskAssignee")
   careerApprovalsRequested   OrgJobApprovalRequest[]     @relation("CareerApprovalRequester")
   careerApprovalsToReview    OrgJobApprovalRequest[]     @relation("CareerApprovalApprover")
@@ -1099,6 +1104,7 @@ model Indicator {
   strategicObjectiveLinks StrategicObjectiveIndicator[]
   projects                Project[]                     @relation("ProjectIndicator")
   risks                   RiskRegister[]                @relation("RiskIndicator")
+  nonConformities         NonConformity[]               @relation("NcIndicator")
 
   @@unique([companyId, code])
   @@unique([companyId, externalSource, externalId])
@@ -1212,9 +1218,10 @@ model Deviation {
 
   causes         DeviationCause[]
   analyses       DeviationAnalysis[]
-  actions        ActionPlan[]        @relation("ActionFromDeviation")
-  meetings       Meeting[]           @relation("MeetingDeviation")
-  treatmentCases TreatmentCase[]
+  actions         ActionPlan[]        @relation("ActionFromDeviation")
+  meetings        Meeting[]           @relation("MeetingDeviation")
+  treatmentCases  TreatmentCase[]
+  nonConformities NonConformity[]     @relation("NcDeviation")
 
   @@unique([companyId, number])
   @@index([companyId])
@@ -1316,6 +1323,7 @@ model ActionPlan {
   analysisSessions ActionAnalysisSession[]
   aiSuggestions    ActionAiSuggestion[]
   risks            RiskRegister[] @relation("RiskMitigationAction")
+  nonConformities  NonConformity[] @relation("NcCorrectiveAction")
 
   @@index([companyId])
   @@index([branchId])
@@ -1656,6 +1664,87 @@ model RiskRegister {
   @@index([indicatorId])
   @@index([projectId])
   @@index([mitigationActionId])
+  @@index([responsibleUserId])
+  @@index([dueDate])
+}
+
+// =====================================================
+// Nao conformidades (CAPA)
+// =====================================================
+
+enum NonConformityStatus {
+  OPEN // registrada
+  TRIAGE // triagem / classificacao
+  ANALYSIS // analise de causa raiz
+  ACTION // acao corretiva em andamento
+  VERIFICATION // verificacao de eficacia
+  CLOSED // encerrada
+  CANCELLED
+}
+
+enum NonConformitySource {
+  INDICATOR
+  AUDIT
+  PROCESS
+  CUSTOMER
+  SUPPLIER
+  PROJECT
+  CHECKLIST
+  INSPECTION
+  DOCUMENT
+  MANUAL
+  OTHER
+}
+
+enum NonConformitySeverity {
+  MINOR
+  MAJOR
+  CRITICAL
+}
+
+model NonConformity {
+  id                 String      @id @default(uuid())
+  companyId          String
+  company            Company     @relation(fields: [companyId], references: [id])
+  number             Int // sequencial por empresa
+  orgNodeId          String?
+  orgNode            OrgNode?    @relation("NcOwnerNode", fields: [orgNodeId], references: [id])
+  indicatorId        String?
+  indicator          Indicator?  @relation("NcIndicator", fields: [indicatorId], references: [id])
+  deviationId        String?
+  deviation          Deviation?  @relation("NcDeviation", fields: [deviationId], references: [id])
+  correctiveActionId String?
+  correctiveAction   ActionPlan? @relation("NcCorrectiveAction", fields: [correctiveActionId], references: [id])
+  responsibleUserId  String?
+  responsibleUser    User?       @relation("NcResponsible", fields: [responsibleUserId], references: [id])
+  createdById        String?
+  createdBy          User?       @relation("NcCreatedBy", fields: [createdById], references: [id])
+
+  title              String
+  description        String?
+  source             NonConformitySource   @default(INDICATOR)
+  severity           NonConformitySeverity @default(MAJOR)
+  status             NonConformityStatus   @default(OPEN)
+  immediateAction    String? // contencao / disposicao imediata
+  rootCause          String?
+  correctivePlan     String?
+  effectivenessCheck String? // verificacao de eficacia
+  effectivenessOk    Boolean?
+  dueDate            DateTime?
+  identifiedAt       DateTime  @default(now())
+  closedAt           DateTime?
+  createdAt          DateTime  @default(now())
+  updatedAt          DateTime  @updatedAt
+  deletedAt          DateTime?
+
+  @@unique([companyId, number])
+  @@index([companyId])
+  @@index([companyId, status])
+  @@index([source])
+  @@index([orgNodeId])
+  @@index([indicatorId])
+  @@index([deviationId])
+  @@index([correctiveActionId])
   @@index([responsibleUserId])
   @@index([dueDate])
 }
