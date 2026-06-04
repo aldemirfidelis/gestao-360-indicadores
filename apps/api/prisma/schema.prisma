@@ -415,6 +415,8 @@ enum TraceEntityType {
   AUDIT_FINDING
   PROCESS
   PROCESS_STEP
+  FORM_TEMPLATE
+  FORM_SUBMISSION
   ATTACHMENT
   COMMENT
   MAP_NODE
@@ -535,6 +537,8 @@ model Company {
   documents              Document[]
   audits                 Audit[]
   processes              Process[]
+  formTemplates          FormTemplate[]
+  formSubmissions        FormSubmission[]
   meetings               Meeting[]
   imports                ImportJob[]
   auditLogs              AuditLog[]
@@ -642,6 +646,8 @@ model OrgNode {
   documents               Document[]                  @relation("DocOrgNode")
   audits                  Audit[]                     @relation("AuditOrgNode")
   processes               Process[]                   @relation("ProcessOrgNode")
+  formTemplates           FormTemplate[]              @relation("FormTemplateOrgNode")
+  formSubmissions         FormSubmission[]            @relation("FormSubmissionOrgNode")
   strategicObjectives     StrategicObjective[]        @relation("StrategicObjectiveOwnerNode")
   strategicObjectiveLinks StrategicObjectiveOrgNode[]
   orgEmployees            OrgEmployee[]
@@ -709,6 +715,10 @@ model User {
   auditsCreated              Audit[]                     @relation("AuditCreatedBy")
   processesOwned             Process[]                   @relation("ProcessOwner")
   processesCreated           Process[]                   @relation("ProcessCreatedBy")
+  formTemplatesOwned         FormTemplate[]              @relation("FormTemplateOwner")
+  formTemplatesCreated       FormTemplate[]              @relation("FormTemplateCreatedBy")
+  formSubmissionsSubmitted   FormSubmission[]            @relation("FormSubmissionSubmittedBy")
+  formSubmissionsReviewed    FormSubmission[]            @relation("FormSubmissionReviewedBy")
   actionTasksAssigned        ActionTask[]                @relation("ActionTaskAssignee")
   careerApprovalsRequested   OrgJobApprovalRequest[]     @relation("CareerApprovalRequester")
   careerApprovalsToReview    OrgJobApprovalRequest[]     @relation("CareerApprovalApprover")
@@ -1125,6 +1135,8 @@ model Indicator {
   nonConformities         NonConformity[]               @relation("NcIndicator")
   documents               Document[]                    @relation("DocIndicator")
   processes               Process[]                     @relation("ProcessIndicator")
+  formTemplates           FormTemplate[]                @relation("FormTemplateIndicator")
+  formSubmissions         FormSubmission[]              @relation("FormSubmissionIndicator")
 
   @@unique([companyId, code])
   @@unique([companyId, externalSource, externalId])
@@ -1976,7 +1988,9 @@ model Process {
   updatedAt   DateTime      @updatedAt
   deletedAt   DateTime?
 
-  steps ProcessStep[]
+  steps           ProcessStep[]
+  formTemplates   FormTemplate[]   @relation("FormTemplateProcess")
+  formSubmissions FormSubmission[] @relation("FormSubmissionProcess")
 
   @@unique([companyId, number])
   @@index([companyId])
@@ -1999,6 +2013,151 @@ model ProcessStep {
   updatedAt   DateTime @updatedAt
 
   @@index([processId])
+}
+
+// =====================================================
+// Formularios e checklists
+// =====================================================
+
+enum FormTemplateType {
+  FORM
+  CHECKLIST
+  INSPECTION
+  AUDIT_CHECKLIST
+  PROCESS_CHECKLIST
+  SURVEY
+  OTHER
+}
+
+enum FormTemplateStatus {
+  DRAFT
+  ACTIVE
+  ARCHIVED
+}
+
+enum FormFieldType {
+  TEXT
+  TEXTAREA
+  NUMBER
+  DATE
+  BOOLEAN
+  SELECT
+  MULTISELECT
+}
+
+enum FormSubmissionStatus {
+  DRAFT
+  SUBMITTED
+  REVIEWED
+}
+
+model FormTemplate {
+  id          String   @id @default(uuid())
+  companyId   String
+  company     Company  @relation(fields: [companyId], references: [id])
+  number      Int
+  code        String?
+  orgNodeId   String?
+  orgNode     OrgNode? @relation("FormTemplateOrgNode", fields: [orgNodeId], references: [id])
+  processId   String?
+  process     Process? @relation("FormTemplateProcess", fields: [processId], references: [id])
+  indicatorId String?
+  indicator   Indicator? @relation("FormTemplateIndicator", fields: [indicatorId], references: [id])
+  ownerUserId String?
+  owner       User?    @relation("FormTemplateOwner", fields: [ownerUserId], references: [id])
+  createdById String?
+  createdBy   User?    @relation("FormTemplateCreatedBy", fields: [createdById], references: [id])
+
+  title       String
+  description String?
+  type        FormTemplateType   @default(FORM)
+  status      FormTemplateStatus @default(DRAFT)
+  version     String?
+  createdAt   DateTime           @default(now())
+  updatedAt   DateTime           @updatedAt
+  deletedAt   DateTime?
+
+  fields      FormField[]
+  submissions FormSubmission[]
+
+  @@unique([companyId, number])
+  @@index([companyId])
+  @@index([companyId, status])
+  @@index([type])
+  @@index([orgNodeId])
+  @@index([processId])
+  @@index([indicatorId])
+  @@index([ownerUserId])
+}
+
+model FormField {
+  id          String        @id @default(uuid())
+  templateId  String
+  template    FormTemplate  @relation(fields: [templateId], references: [id], onDelete: Cascade)
+  order       Int
+  label       String
+  type        FormFieldType @default(TEXT)
+  required    Boolean       @default(false)
+  options     String?
+  helpText    String?
+  createdAt   DateTime      @default(now())
+  updatedAt   DateTime      @updatedAt
+
+  answers FormAnswer[]
+
+  @@index([templateId])
+}
+
+model FormSubmission {
+  id            String               @id @default(uuid())
+  companyId     String
+  company       Company              @relation(fields: [companyId], references: [id])
+  templateId    String
+  template      FormTemplate         @relation(fields: [templateId], references: [id])
+  orgNodeId     String?
+  orgNode       OrgNode?             @relation("FormSubmissionOrgNode", fields: [orgNodeId], references: [id])
+  processId     String?
+  process       Process?             @relation("FormSubmissionProcess", fields: [processId], references: [id])
+  indicatorId   String?
+  indicator     Indicator?           @relation("FormSubmissionIndicator", fields: [indicatorId], references: [id])
+  submittedById String?
+  submittedBy   User?                @relation("FormSubmissionSubmittedBy", fields: [submittedById], references: [id])
+  reviewedById  String?
+  reviewedBy    User?                @relation("FormSubmissionReviewedBy", fields: [reviewedById], references: [id])
+
+  title       String?
+  status      FormSubmissionStatus @default(DRAFT)
+  notes       String?
+  submittedAt DateTime?
+  reviewedAt  DateTime?
+  createdAt   DateTime             @default(now())
+  updatedAt   DateTime             @updatedAt
+  deletedAt   DateTime?
+
+  answers FormAnswer[]
+
+  @@index([companyId])
+  @@index([templateId])
+  @@index([companyId, status])
+  @@index([orgNodeId])
+  @@index([processId])
+  @@index([indicatorId])
+  @@index([submittedById])
+}
+
+model FormAnswer {
+  id           String         @id @default(uuid())
+  submissionId String
+  submission   FormSubmission @relation(fields: [submissionId], references: [id], onDelete: Cascade)
+  fieldId      String?
+  field        FormField?     @relation(fields: [fieldId], references: [id], onDelete: SetNull)
+  fieldLabel   String
+  value        String?
+  createdAt    DateTime       @default(now())
+  updatedAt    DateTime       @updatedAt
+
+  @@index([submissionId])
+  @@index([fieldId])
 }
 
 // =====================================================

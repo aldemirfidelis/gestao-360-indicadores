@@ -22,6 +22,7 @@ import { NonConformitiesModule } from './modules/nonconformities/nonconformities
 import { DocumentsModule } from './modules/documents/documents.module';
 import { AuditsModule } from './modules/audits/audits.module';
 import { ProcessesModule } from './modules/processes/processes.module';
+import { FormsModule } from './modules/forms/forms.module';
 import { MeetingsModule } from './modules/meetings/meetings.module';
 import { NotificationsModule } from './modules/notifications/notifications.module';
 import { AuditModule } from './modules/audit/audit.module';
@@ -68,6 +69,7 @@ import { ExternalApiModule } from './modules/external-api/external-api.module';
     DocumentsModule,
     AuditsModule,
     ProcessesModule,
+    FormsModule,
     MeetingsModule,
     NotificationsModule,
     AuditModule,

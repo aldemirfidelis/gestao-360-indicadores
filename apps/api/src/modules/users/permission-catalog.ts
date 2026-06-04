@@ -93,6 +93,13 @@ export const PERMISSION_CATALOG = [
   ['processes:delete', 'Arquivar/excluir processos', 'Processos', 'delete'],
   ['processes:manage', 'Gerenciar processos e SIPOC', 'Processos', 'manage'],
 
+  // Formularios e checklists
+  ['forms:view', 'Visualizar formularios e checklists', 'Formularios', 'view'],
+  ['forms:create', 'Criar formularios e checklists', 'Formularios', 'create'],
+  ['forms:update', 'Editar formularios e registrar preenchimentos', 'Formularios', 'update'],
+  ['forms:delete', 'Excluir formularios', 'Formularios', 'delete'],
+  ['forms:manage', 'Gerenciar formularios e checklists', 'Formularios', 'manage'],
+
   // Reuniões
   ['meetings:view', 'Visualizar reuniões', 'Reuniões', 'view'],
   ['meetings:create', 'Criar reuniões', 'Reuniões', 'create'],
@@ -244,6 +251,10 @@ export const DEFAULT_PROFILES = [
       'processes:create',
       'processes:update',
       'processes:manage',
+      'forms:view',
+      'forms:create',
+      'forms:update',
+      'forms:manage',
       'meetings:view',
       'meetings:create',
       'meetings:update',
@@ -299,6 +310,9 @@ export const DEFAULT_PROFILES = [
       'processes:view',
       'processes:create',
       'processes:update',
+      'forms:view',
+      'forms:create',
+      'forms:update',
       'reports:view',
       'communication:view',
       'communication:attachments',
@@ -329,6 +343,7 @@ export const DEFAULT_PROFILES = [
       'doc:view',
       'audits:view',
       'processes:view',
+      'forms:view',
       'strategy:view',
       'okrs:view',
       'org:view',

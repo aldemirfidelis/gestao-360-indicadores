@@ -515,6 +515,8 @@ function eventHref(event: TraceEvent) {
   if (event.entityType === 'DOCUMENT') return `/documents?focus=${event.entityId}`;
   if (event.entityType === 'PROCESS') return `/processes?focus=${event.entityId}`;
   if (event.entityType === 'PROCESS_STEP') return `/processes?focus=${event.relatedId ?? event.entityId}`;
+  if (event.entityType === 'FORM_TEMPLATE') return `/forms?focus=${event.entityId}`;
+  if (event.entityType === 'FORM_SUBMISSION') return `/forms?focus=${event.relatedId ?? event.entityId}`;
   return '#';
 }
 
