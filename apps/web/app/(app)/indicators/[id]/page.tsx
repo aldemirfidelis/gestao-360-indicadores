@@ -510,6 +510,7 @@ function eventHref(event: TraceEvent) {
   if (event.entityType === 'MEETING') return `/meetings/${event.entityId}`;
   if (event.entityType === 'RISK') return `/risks?focus=${event.entityId}`;
   if (event.entityType === 'NON_CONFORMITY') return `/nonconformities?focus=${event.entityId}`;
+  if (event.entityType === 'DOCUMENT') return `/documents?focus=${event.entityId}`;
   return '#';
 }
 

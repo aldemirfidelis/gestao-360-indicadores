@@ -72,6 +72,13 @@ export const PERMISSION_CATALOG = [
   ['nc:delete', 'Excluir nao conformidades', 'Nao Conformidades', 'delete'],
   ['nc:manage', 'Gerenciar nao conformidades', 'Nao Conformidades', 'manage'],
 
+  // Documentos
+  ['doc:view', 'Visualizar documentos', 'Documentos', 'view'],
+  ['doc:create', 'Criar documentos', 'Documentos', 'create'],
+  ['doc:update', 'Editar documentos e revisoes', 'Documentos', 'update'],
+  ['doc:delete', 'Excluir documentos', 'Documentos', 'delete'],
+  ['doc:manage', 'Gerenciar gestao documental', 'Documentos', 'manage'],
+
   // Reuniões
   ['meetings:view', 'Visualizar reuniões', 'Reuniões', 'view'],
   ['meetings:create', 'Criar reuniões', 'Reuniões', 'create'],
@@ -211,6 +218,10 @@ export const DEFAULT_PROFILES = [
       'nc:create',
       'nc:update',
       'nc:manage',
+      'doc:view',
+      'doc:create',
+      'doc:update',
+      'doc:manage',
       'meetings:view',
       'meetings:create',
       'meetings:update',
@@ -259,6 +270,9 @@ export const DEFAULT_PROFILES = [
       'nc:view',
       'nc:create',
       'nc:update',
+      'doc:view',
+      'doc:create',
+      'doc:update',
       'reports:view',
       'communication:view',
       'communication:attachments',
@@ -286,6 +300,7 @@ export const DEFAULT_PROFILES = [
       'projects:view',
       'risks:view',
       'nc:view',
+      'doc:view',
       'strategy:view',
       'okrs:view',
       'org:view',

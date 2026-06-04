@@ -19,6 +19,7 @@ import { OkrsModule } from './modules/okrs/okrs.module';
 import { ProjectsModule } from './modules/projects/projects.module';
 import { RisksModule } from './modules/risks/risks.module';
 import { NonConformitiesModule } from './modules/nonconformities/nonconformities.module';
+import { DocumentsModule } from './modules/documents/documents.module';
 import { MeetingsModule } from './modules/meetings/meetings.module';
 import { NotificationsModule } from './modules/notifications/notifications.module';
 import { AuditModule } from './modules/audit/audit.module';
@@ -62,6 +63,7 @@ import { ExternalApiModule } from './modules/external-api/external-api.module';
     ProjectsModule,
     RisksModule,
     NonConformitiesModule,
+    DocumentsModule,
     MeetingsModule,
     NotificationsModule,
     AuditModule,
