@@ -8,6 +8,13 @@ import { AuthPayload } from '../auth/auth.types';
 // Projetos não têm área própria: derivam do indicador vinculado (quando houver).
 // Projetos sem indicador são "gerais" (company-wide) e não restringem por área.
 const MODULE = 'projects';
+const FINAL_PROJECT_STATUSES = new Set<ProjectStatus>([ProjectStatus.DONE, ProjectStatus.CANCELLED]);
+
+type ProjectListFilters = {
+  indicatorId?: string;
+  status?: ProjectStatus;
+  search?: string;
+};
 
 @Injectable()
 export class ProjectsService {
@@ -34,20 +41,79 @@ export class ProjectsService {
     return project;
   }
 
-  async list(me: AuthPayload) {
+  private expectedProgress(startsAt?: Date | string | null, endsAt?: Date | string | null, now = new Date()) {
+    if (!startsAt || !endsAt) return null;
+    const start = new Date(startsAt).getTime();
+    const end = new Date(endsAt).getTime();
+    const current = now.getTime();
+    if (!Number.isFinite(start) || !Number.isFinite(end) || end <= start) return null;
+    if (current <= start) return 0;
+    if (current >= end) return 100;
+    return Math.round(((current - start) / (end - start)) * 100);
+  }
+
+  private enrichProject(p: any) {
+    const now = new Date();
+    const progressOverall = this.projectProgress(p as any);
+    const milestones = p.milestones ?? [];
+    const tasks = p.tasks ?? [];
+    const milestonesDone = milestones.filter((m: any) => m.done).length;
+    const milestonesOverdue = milestones.filter((m: any) => !m.done && m.dueDate && new Date(m.dueDate) < now).length;
+    const tasksOverdue = tasks.filter((t: any) => (t.progress ?? 0) < 100 && t.endDate && new Date(t.endDate) < now).length;
+    const expectedProgress = this.expectedProgress(p.startsAt, p.endsAt, now);
+    const scheduleVariance = expectedProgress === null ? null : progressOverall - expectedProgress;
+    const isFinal = FINAL_PROJECT_STATUSES.has(p.status);
+    const isPastEnd = Boolean(p.endsAt && new Date(p.endsAt) < now && !isFinal);
+    const pmoStatus = isFinal
+      ? 'FINALIZED'
+      : isPastEnd || milestonesOverdue > 0 || tasksOverdue > 0
+        ? 'CRITICAL'
+        : scheduleVariance !== null && scheduleVariance < -15
+          ? 'AT_RISK'
+          : 'ON_TRACK';
+
+    return {
+      ...p,
+      progressOverall,
+      expectedProgress,
+      scheduleVariance,
+      pmoStatus,
+      milestonesDone,
+      milestonesOverdue,
+      tasksOverdue,
+    };
+  }
+
+  async list(me: AuthPayload, filters: ProjectListFilters = {}) {
     const permitted = await this.access.listAreaFilter(me.sub, MODULE, 'view');
+    const and: any[] = [];
+    if (permitted) {
+      and.push({ OR: [{ indicatorId: null }, { indicator: { ownerNodeId: { in: permitted } } }] });
+    }
+    const term = filters.search?.trim();
+    if (term) {
+      and.push({
+        OR: [
+          { name: { contains: term, mode: 'insensitive' } },
+          { description: { contains: term, mode: 'insensitive' } },
+          { responsible: { contains: term, mode: 'insensitive' } },
+          { indicator: { name: { contains: term, mode: 'insensitive' } } },
+          { indicator: { code: { contains: term, mode: 'insensitive' } } },
+        ],
+      });
+    }
     const items = await this.prisma.project.findMany({
       where: {
         companyId: me.companyId,
         deletedAt: null,
-        ...(permitted
-          ? { OR: [{ indicatorId: null }, { indicator: { ownerNodeId: { in: permitted } } }] }
-          : {}),
+        ...(filters.indicatorId ? { indicatorId: filters.indicatorId } : {}),
+        ...(filters.status ? { status: filters.status } : {}),
+        ...(and.length ? { AND: and } : {}),
       },
       include: {
         _count: { select: { tasks: true, milestones: true } },
         milestones: { orderBy: { dueDate: 'asc' } },
-        tasks: { select: { progress: true } },
+        tasks: { select: { progress: true, startDate: true, endDate: true } },
         indicator: {
           select: {
             id: true,
@@ -62,10 +128,72 @@ export class ProjectsService {
       },
       orderBy: { createdAt: 'desc' },
     });
-    return items.map((p) => ({
-      ...p,
-      progressOverall: this.projectProgress(p as any),
-    }));
+    return items.map((p) => this.enrichProject(p));
+  }
+
+  async portfolio(me: AuthPayload, filters: ProjectListFilters = {}) {
+    const projects = await this.list(me, filters);
+    const activeProjects = projects.filter((p: any) => !FINAL_PROJECT_STATUSES.has(p.status));
+    const statusCounts = Object.fromEntries(Object.values(ProjectStatus).map((status) => [status, 0])) as Record<ProjectStatus, number>;
+    for (const p of projects as any[]) statusCounts[p.status as ProjectStatus]++;
+    const budgetTotal = projects.reduce((sum: number, p: any) => sum + (p.budget ?? 0), 0);
+    const activeBudget = activeProjects.reduce((sum: number, p: any) => sum + (p.budget ?? 0), 0);
+    const avgProgress = projects.length
+      ? Math.round(projects.reduce((sum: number, p: any) => sum + p.progressOverall, 0) / projects.length)
+      : 0;
+    const milestonesTotal = projects.reduce((sum: number, p: any) => sum + (p.milestones?.length ?? 0), 0);
+    const milestonesDone = projects.reduce((sum: number, p: any) => sum + (p.milestonesDone ?? 0), 0);
+    const milestonesOverdue = projects.reduce((sum: number, p: any) => sum + (p.milestonesOverdue ?? 0), 0);
+    const tasksTotal = projects.reduce((sum: number, p: any) => sum + (p._count?.tasks ?? p.tasks?.length ?? 0), 0);
+    const tasksOverdue = projects.reduce((sum: number, p: any) => sum + (p.tasksOverdue ?? 0), 0);
+    const behindSchedule = projects.filter((p: any) => p.pmoStatus === 'AT_RISK').length;
+    const criticalProjects = (projects as any[])
+      .filter((p) => p.pmoStatus === 'CRITICAL' || p.pmoStatus === 'AT_RISK')
+      .sort((a, b) => {
+        const order = { CRITICAL: 0, AT_RISK: 1 } as Record<string, number>;
+        return (order[a.pmoStatus] ?? 9) - (order[b.pmoStatus] ?? 9);
+      })
+      .slice(0, 8)
+      .map((p) => ({
+        id: p.id,
+        name: p.name,
+        status: p.status,
+        pmoStatus: p.pmoStatus,
+        responsible: p.responsible,
+        endsAt: p.endsAt,
+        progressOverall: p.progressOverall,
+        expectedProgress: p.expectedProgress,
+        scheduleVariance: p.scheduleVariance,
+        milestonesOverdue: p.milestonesOverdue,
+        tasksOverdue: p.tasksOverdue,
+        indicator: p.indicator ? { id: p.indicator.id, name: p.indicator.name, code: p.indicator.code } : null,
+      }));
+    return {
+      totalProjects: projects.length,
+      activeProjects: activeProjects.length,
+      statusCounts,
+      budgetTotal,
+      activeBudget,
+      avgProgress,
+      milestonesTotal,
+      milestonesDone,
+      milestonesOverdue,
+      tasksTotal,
+      tasksOverdue,
+      behindSchedule,
+      criticalProjects,
+      timeline: (projects as any[]).map((p) => ({
+        id: p.id,
+        name: p.name,
+        status: p.status,
+        pmoStatus: p.pmoStatus,
+        startsAt: p.startsAt,
+        endsAt: p.endsAt,
+        progressOverall: p.progressOverall,
+        expectedProgress: p.expectedProgress,
+        indicator: p.indicator ? { id: p.indicator.id, name: p.indicator.name, code: p.indicator.code } : null,
+      })),
+    };
   }
 
   private projectProgress(p: { milestones: { done: boolean }[]; tasks?: { progress: number }[] }) {
@@ -107,7 +235,7 @@ export class ProjectsService {
         throw new ForbiddenException('Você não tem acesso aos projetos desta área.');
       }
     }
-    return { ...proj, progressOverall: this.projectProgress(proj as any) };
+    return this.enrichProject(proj);
   }
 
   async create(me: AuthPayload, body: { name: string; description?: string; startsAt?: string; endsAt?: string; responsible?: string; budget?: number; status?: ProjectStatus; indicatorId?: string }) {
@@ -156,10 +284,15 @@ export class ProjectsService {
     return this.prisma.project.update({ where: { id }, data });
   }
 
-  async listIndicators(companyId: string) {
+  async listIndicators(me: AuthPayload) {
+    const permitted = await this.access.listAreaFilter(me.sub, MODULE, 'view');
     return this.prisma.indicator.findMany({
-      where: { companyId, deletedAt: null },
-      select: { id: true, name: true, code: true, unit: true, unitLabel: true, direction: true },
+      where: {
+        companyId: me.companyId,
+        deletedAt: null,
+        ...(permitted ? { ownerNodeId: { in: permitted } } : {}),
+      },
+      select: { id: true, name: true, code: true, unit: true, unitLabel: true, direction: true, ownerNodeId: true },
       orderBy: { name: 'asc' },
     });
   }

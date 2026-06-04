@@ -1,4 +1,4 @@
-import { Body, Controller, Delete, Get, Param, Patch, Post } from '@nestjs/common';
+import { Body, Controller, Delete, Get, Param, Patch, Post, Query } from '@nestjs/common';
 import { ProjectsService } from './projects.service';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import { AuthPayload } from '../auth/auth.types';
@@ -10,14 +10,30 @@ export class ProjectsController {
 
   @Get()
   @RequirePermissions('projects:view')
-  list(@CurrentUser() me: AuthPayload) {
-    return this.service.list(me);
+  list(
+    @CurrentUser() me: AuthPayload,
+    @Query('indicatorId') indicatorId?: string,
+    @Query('status') status?: any,
+    @Query('search') search?: string,
+  ) {
+    return this.service.list(me, { indicatorId, status, search });
   }
 
   @Get('indicators')
   @RequirePermissions('projects:view')
   listIndicators(@CurrentUser() me: AuthPayload) {
-    return this.service.listIndicators(me.companyId);
+    return this.service.listIndicators(me);
+  }
+
+  @Get('portfolio')
+  @RequirePermissions('projects:view')
+  portfolio(
+    @CurrentUser() me: AuthPayload,
+    @Query('indicatorId') indicatorId?: string,
+    @Query('status') status?: any,
+    @Query('search') search?: string,
+  ) {
+    return this.service.portfolio(me, { indicatorId, status, search });
   }
 
   @Get(':id')

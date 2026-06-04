@@ -2226,7 +2226,7 @@ function ObjectiveDrawerContent({ objective }: { objective: Objective }) {
         <Link className="rounded-md border p-2 transition hover:bg-accent/35" href={`/deviations${indicatorId ? `?indicatorId=${indicatorId}` : ''}`}>
           <ShieldAlert className="mx-auto mb-1 h-4 w-4" /> Desvios ({objective.deviationCount})
         </Link>
-        <Link className="rounded-md border p-2 transition hover:bg-accent/35" href="/projects">
+        <Link className="rounded-md border p-2 transition hover:bg-accent/35" href={`/projects${indicatorId ? `?indicatorId=${indicatorId}` : ''}`}>
           <Layers className="mx-auto mb-1 h-4 w-4" /> Projetos ({summary.projects})
         </Link>
       </div>

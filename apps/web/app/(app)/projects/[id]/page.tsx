@@ -5,7 +5,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useState } from 'react';
 import Link from 'next/link';
 import { toast } from 'sonner';
-import { ArrowLeft, Plus, Target, TrendingUp, TrendingDown } from 'lucide-react';
+import { AlertTriangle, ArrowLeft, Clock3, Plus, Target, TrendingUp, TrendingDown } from 'lucide-react';
 import { PageHeader } from '@/components/shell/page-header';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -34,6 +34,8 @@ interface Task {
   dependencyId: string | null;
   dependency: { id: string; name: string } | null;
 }
+
+type PmoStatus = 'ON_TRACK' | 'AT_RISK' | 'CRITICAL' | 'FINALIZED';
 
 interface LinkedIndicator {
   id: string;
@@ -65,11 +67,31 @@ interface ProjectDetail {
   responsible: string | null;
   budget: number | null;
   progressOverall: number;
+  expectedProgress: number | null;
+  scheduleVariance: number | null;
+  pmoStatus: PmoStatus;
+  milestonesDone: number;
+  milestonesOverdue: number;
+  tasksOverdue: number;
   indicatorId: string | null;
   indicator: LinkedIndicator | null;
   milestones: Milestone[];
   tasks: Task[];
 }
+
+const PMO_LABEL: Record<PmoStatus, string> = {
+  ON_TRACK: 'No prazo',
+  AT_RISK: 'Em risco',
+  CRITICAL: 'Critico',
+  FINALIZED: 'Finalizado',
+};
+
+const PMO_CLASS: Record<PmoStatus, string> = {
+  ON_TRACK: 'pill-green',
+  AT_RISK: 'pill-yellow',
+  CRITICAL: 'pill-red',
+  FINALIZED: 'pill-gray',
+};
 
 export default function ProjectDetailPage() {
   const { id } = useParams<{ id: string }>();
@@ -130,6 +152,9 @@ export default function ProjectDetailPage() {
   if (query.isLoading) return <p className="text-sm text-muted-foreground">Carregando...</p>;
   if (!query.data) return null;
   const p = query.data;
+  const varianceLabel = p.scheduleVariance === null
+    ? '-'
+    : `${p.scheduleVariance > 0 ? '+' : ''}${p.scheduleVariance}%`;
 
   return (
     <div>
@@ -166,6 +191,54 @@ export default function ProjectDetailPage() {
           </CardContent>
         </Card>
       </div>
+
+      <Card className="mb-6">
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <Clock3 className="h-4 w-4" /> Status PMO
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="mb-4 flex flex-wrap items-start justify-between gap-3">
+            <div>
+              <span className={cn('pill', PMO_CLASS[p.pmoStatus])}>{PMO_LABEL[p.pmoStatus]}</span>
+              <p className="mt-2 text-sm text-muted-foreground">
+                Status calculado por prazo, progresso planejado, marcos e tarefas vencidas.
+              </p>
+            </div>
+            {(p.milestonesOverdue > 0 || p.tasksOverdue > 0) && (
+              <div className="inline-flex items-center gap-2 rounded-md border border-status-red/30 bg-status-red/10 px-3 py-2 text-sm text-status-red">
+                <AlertTriangle className="h-4 w-4" />
+                Pendencias vencidas
+              </div>
+            )}
+          </div>
+          <div className="grid gap-3 sm:grid-cols-4">
+            <div className="rounded-md border p-3">
+              <div className="text-[10px] uppercase text-muted-foreground">Planejado</div>
+              <div className="font-semibold">{p.expectedProgress === null ? '-' : `${p.expectedProgress}%`}</div>
+            </div>
+            <div className="rounded-md border p-3">
+              <div className="text-[10px] uppercase text-muted-foreground">Variacao</div>
+              <div className={cn('font-semibold', (p.scheduleVariance ?? 0) < -15 && 'text-status-red')}>
+                {varianceLabel}
+              </div>
+            </div>
+            <div className="rounded-md border p-3">
+              <div className="text-[10px] uppercase text-muted-foreground">Marcos vencidos</div>
+              <div className={cn('font-semibold', p.milestonesOverdue > 0 && 'text-status-red')}>
+                {p.milestonesOverdue}
+              </div>
+            </div>
+            <div className="rounded-md border p-3">
+              <div className="text-[10px] uppercase text-muted-foreground">Tarefas vencidas</div>
+              <div className={cn('font-semibold', p.tasksOverdue > 0 && 'text-status-red')}>
+                {p.tasksOverdue}
+              </div>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
 
       <Card className="mb-6">
         <CardHeader>
