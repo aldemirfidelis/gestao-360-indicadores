@@ -25,58 +25,59 @@ export class OkrsController {
 
   @Get('cycles/:cycleId/objectives')
   @RequirePermissions('okrs:view')
-  list(@Param('cycleId') cycleId: string) {
-    return this.service.listObjectives(cycleId);
+  list(@CurrentUser() me: AuthPayload, @Param('cycleId') cycleId: string) {
+    return this.service.listObjectives(me, cycleId);
   }
 
   @Get('objectives/:id')
   @RequirePermissions('okrs:view')
-  objective(@Param('id') id: string) {
-    return this.service.getObjective(id);
+  objective(@CurrentUser() me: AuthPayload, @Param('id') id: string) {
+    return this.service.getObjective(me, id);
   }
 
   @Post('cycles/:cycleId/objectives')
   @RequirePermissions('okrs:create')
-  create(@Param('cycleId') cycleId: string, @Body() body: any) {
-    return this.service.createObjective(cycleId, body);
+  create(@CurrentUser() me: AuthPayload, @Param('cycleId') cycleId: string, @Body() body: any) {
+    return this.service.createObjective(me, cycleId, body);
   }
 
   @Patch('objectives/:id')
   @RequirePermissions('okrs:update')
-  update(@Param('id') id: string, @Body() body: any) {
-    return this.service.updateObjective(id, body);
+  update(@CurrentUser() me: AuthPayload, @Param('id') id: string, @Body() body: any) {
+    return this.service.updateObjective(me, id, body);
   }
 
   @Delete('objectives/:id')
   @RequirePermissions('okrs:delete')
-  remove(@Param('id') id: string) {
-    return this.service.removeObjective(id);
+  remove(@CurrentUser() me: AuthPayload, @Param('id') id: string) {
+    return this.service.removeObjective(me, id);
   }
 
   @Post('objectives/:id/krs')
   @RequirePermissions('okrs:update')
-  addKR(@Param('id') id: string, @Body() body: any) {
-    return this.service.addKeyResult(id, body);
+  addKR(@CurrentUser() me: AuthPayload, @Param('id') id: string, @Body() body: any) {
+    return this.service.addKeyResult(me, id, body);
   }
 
   @Patch('krs/:krId')
   @RequirePermissions('okrs:update')
-  updateKR(@Param('krId') krId: string, @Body() body: any) {
-    return this.service.updateKeyResult(krId, body);
+  updateKR(@CurrentUser() me: AuthPayload, @Param('krId') krId: string, @Body() body: any) {
+    return this.service.updateKeyResult(me, krId, body);
   }
 
   @Delete('krs/:krId')
   @RequirePermissions('okrs:delete')
-  removeKR(@Param('krId') krId: string) {
-    return this.service.removeKeyResult(krId);
+  removeKR(@CurrentUser() me: AuthPayload, @Param('krId') krId: string) {
+    return this.service.removeKeyResult(me, krId);
   }
 
   @Post('objectives/:id/checkin')
   @RequirePermissions('okrs:checkin')
   checkin(
+    @CurrentUser() me: AuthPayload,
     @Param('id') id: string,
     @Body() body: { weekRef: string; confidence: number; progress: number; note?: string },
   ) {
-    return this.service.checkin(id, body);
+    return this.service.checkin(me, id, body);
   }
 }

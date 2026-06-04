@@ -1,9 +1,10 @@
-import { ConflictException, Injectable, NotFoundException } from '@nestjs/common';
+import { ConflictException, ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../../prisma/prisma.service';
 import { calcStatus } from '@g360/shared';
 import { IndicatorResultUpsertInput } from '@g360/shared';
 import {
   Direction,
+  Indicator,
   NotificationKind,
   ResultStatus,
   TraceEntityType,
@@ -15,6 +16,12 @@ import { lastNPeriodRefs, periodRefToDate, periodRefsForYear, periodRefsForMonth
 import { TraceabilityService } from '../traceability/traceability.service';
 import { PeriodsService } from '../periods/periods.service';
 import { ClosedMonthsService } from '../closed-months/closed-months.service';
+import { AccessService } from '../access/access.service';
+import { AuthPayload } from '../auth/auth.types';
+
+// Resultados são um aspecto do INDICADOR: a visibilidade/escrita por área segue as
+// mesmas regras do indicador dono (mesma chave de módulo no AccessService).
+const MODULE = 'indicators';
 
 interface ResultSaveOutcome {
   result: any;
@@ -29,6 +36,7 @@ export class ResultsService {
     private readonly traceability: TraceabilityService,
     private readonly periods: PeriodsService,
     private readonly closedMonths: ClosedMonthsService,
+    private readonly access: AccessService,
   ) {}
 
   /**
@@ -39,16 +47,24 @@ export class ResultsService {
    * (compatível com a versão antiga).
    */
   async pendingByCompany(
-    companyId: string,
+    me: AuthPayload,
     opts: { year?: number; points?: number; ownerNodeId?: string; indicatorId?: string } = {},
   ) {
+    const companyId = me.companyId;
     const { ownerNodeId, indicatorId } = opts;
+    // Restrição por área: limita aos indicadores das áreas visíveis ao usuário.
+    const permitted = await this.access.listAreaFilter(me.sub, MODULE, 'view');
+    let nodeFilter: string[] | null = permitted; // null = sem restrição
+    if (ownerNodeId) {
+      if (permitted && !permitted.includes(ownerNodeId)) return []; // área não permitida
+      nodeFilter = [ownerNodeId];
+    }
     const indicators = await this.prisma.indicator.findMany({
       where: {
         companyId,
         deletedAt: null,
         status: 'ACTIVE',
-        ...(ownerNodeId ? { ownerNodeId } : {}),
+        ...(nodeFilter ? { ownerNodeId: { in: nodeFilter } } : {}),
         ...(indicatorId ? { id: indicatorId } : {}),
       },
       select: {
@@ -123,11 +139,12 @@ export class ResultsService {
    * dia/semana em qualquer indicador.
    */
   async grainByMonth(
-    companyId: string,
+    me: AuthPayload,
     indicatorId: string,
     granularity: 'DAILY' | 'WEEKLY' | 'BIWEEKLY' | 'MONTHLY',
     monthRef: string,
   ) {
+    const companyId = me.companyId;
     const indicator = await this.prisma.indicator.findFirst({
       where: { id: indicatorId, companyId, deletedAt: null },
       select: {
@@ -138,10 +155,16 @@ export class ResultsService {
         unitLabel: true,
         periodicity: true,
         direction: true,
+        ownerNodeId: true,
         ownerNode: { select: { id: true, name: true } },
       },
     });
     if (!indicator) throw new NotFoundException('Indicador nao encontrado');
+    // Restrição por área (leitura): bloqueia acesso direto a indicador de área não permitida.
+    const permitted = await this.access.listAreaFilter(me.sub, MODULE, 'view');
+    if (permitted && indicator.ownerNodeId && !permitted.includes(indicator.ownerNodeId)) {
+      throw new ForbiddenException('Você não tem acesso a este indicador.');
+    }
 
     const refs = periodRefsForMonth(granularity, monthRef);
     const [targets, results] = await Promise.all([
@@ -178,12 +201,42 @@ export class ResultsService {
     };
   }
 
-  async upsert(input: IndicatorResultUpsertInput, userId: string): Promise<ResultSaveOutcome> {
-    const indicator = await this.prisma.indicator.findUnique({
-      where: { id: input.indicatorId },
+  /** Lançamento por usuário: isolamento por empresa + escrita por área. */
+  async upsert(me: AuthPayload, input: IndicatorResultUpsertInput): Promise<ResultSaveOutcome> {
+    const indicator = await this.loadIndicatorForWrite(me.companyId, input.indicatorId);
+    // Lançar resultado é escrita: exige poder editar a área do indicador.
+    await this.access.assertCanWrite(me.sub, indicator.ownerNodeId, MODULE, 'edit');
+    return this.applyResult(indicator, input, me.sub);
+  }
+
+  /**
+   * Lançamento por integração CONFIÁVEL (API por chave / conector): a empresa vem da
+   * credencial e o ator é um usuário privilegiado da própria empresa. O isolamento por
+   * EMPRESA é mantido; a visibilidade por ÁREA não se aplica (escrita company-wide).
+   */
+  async upsertSystem(
+    companyId: string,
+    input: IndicatorResultUpsertInput,
+    actorUserId: string,
+  ): Promise<ResultSaveOutcome> {
+    const indicator = await this.loadIndicatorForWrite(companyId, input.indicatorId);
+    return this.applyResult(indicator, input, actorUserId);
+  }
+
+  /** Carrega o indicador garantindo que pertence à empresa (defesa contra id de outra empresa). */
+  private async loadIndicatorForWrite(companyId: string, indicatorId: string): Promise<Indicator> {
+    const indicator = await this.prisma.indicator.findFirst({
+      where: { id: indicatorId, companyId, deletedAt: null },
     });
     if (!indicator) throw new NotFoundException('Indicador nao encontrado');
+    return indicator;
+  }
 
+  private async applyResult(
+    indicator: Indicator,
+    input: IndicatorResultUpsertInput,
+    userId: string,
+  ): Promise<ResultSaveOutcome> {
     if (await this.closedMonths.isMonthClosed(indicator.companyId, input.periodRef)) {
       throw new ConflictException(
         `O período ${input.periodRef} esta fechado para lançamentos. Solicite a reabertura ao administrador.`,
@@ -351,7 +404,14 @@ export class ResultsService {
     };
   }
 
-  async approve(id: string, approve: boolean) {
+  async approve(me: AuthPayload, id: string, approve: boolean) {
+    // Isolamento por empresa via o indicador dono + escrita de aprovação por área.
+    const result = await this.prisma.indicatorResult.findFirst({
+      where: { id, indicator: { companyId: me.companyId, deletedAt: null } },
+      include: { indicator: { select: { ownerNodeId: true } } },
+    });
+    if (!result) throw new NotFoundException('Resultado nao encontrado');
+    await this.access.assertCanWrite(me.sub, result.indicator.ownerNodeId, MODULE, 'approve');
     return this.prisma.indicatorResult.update({
       where: { id },
       data: { status: approve ? ResultStatus.APPROVED : ResultStatus.REJECTED },

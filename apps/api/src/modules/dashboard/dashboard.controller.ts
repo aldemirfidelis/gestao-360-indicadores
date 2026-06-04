@@ -11,26 +11,26 @@ export class DashboardController {
 
   @Get('overview')
   overview(@CurrentUser() me: AuthPayload) {
-    return this.service.overview(me.companyId);
+    return this.service.overview(me);
   }
 
   @Get('ranking')
   ranking(@CurrentUser() me: AuthPayload, @Query('limit') limit?: string) {
-    return this.service.ranking(me.companyId, limit ? parseInt(limit, 10) : 10);
+    return this.service.ranking(me, limit ? parseInt(limit, 10) : 10);
   }
 
   @Get('evolution')
   evolution(@CurrentUser() me: AuthPayload, @Query('months') months?: string) {
-    return this.service.evolution(me.companyId, months ? parseInt(months, 10) : 12);
+    return this.service.evolution(me, months ? parseInt(months, 10) : 12);
   }
 
   @Get('worst')
   worst(@CurrentUser() me: AuthPayload, @Query('limit') limit?: string) {
-    return this.service.worst(me.companyId, limit ? parseInt(limit, 10) : 8);
+    return this.service.worst(me, limit ? parseInt(limit, 10) : 8);
   }
 
   @Get('pending')
   pending(@CurrentUser() me: AuthPayload) {
-    return this.service.pendingFillCount(me.companyId);
+    return this.service.pendingFillCount(me);
   }
 }

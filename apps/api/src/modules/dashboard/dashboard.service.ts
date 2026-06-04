@@ -3,21 +3,51 @@ import { PrismaService } from '../../prisma/prisma.service';
 import { ActionStatus, DeviationStatus, TrafficLight, TreatmentStatus } from '@prisma/client';
 import { lastNPeriodRefs } from '../indicators/period.util';
 import { PeriodsService } from '../periods/periods.service';
+import { AccessService } from '../access/access.service';
+import { AuthPayload } from '../auth/auth.types';
+
+// O dashboard agrega dados dos indicadores/ações/desvios: para usuários restritos por
+// área, os números refletem apenas as áreas visíveis (não vaza agregado de outras áreas).
+const MODULE = 'dashboard';
 
 @Injectable()
 export class DashboardService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly periods: PeriodsService,
+    private readonly access: AccessService,
   ) {}
 
-  async overview(companyId: string) {
+  /** Conjunto de fragmentos de `where` por área (vazios quando não há restrição). */
+  private async areaFilters(me: AuthPayload) {
+    const permitted = await this.access.listAreaFilter(me.sub, MODULE, 'view');
+    return {
+      /** Para queries diretas sobre Indicator / ActionPlan (têm ownerNodeId). */
+      ownerArea: permitted ? { ownerNodeId: { in: permitted } } : {},
+      /** Para queries cujo escopo de área vem do indicador relacionado. */
+      viaIndicator: permitted ? { indicator: { ownerNodeId: { in: permitted } } } : {},
+      /** Para reuniões (gerais sem vínculo + área permitida). */
+      meeting: permitted
+        ? {
+            OR: [
+              { indicatorId: null, deviationId: null },
+              { indicator: { ownerNodeId: { in: permitted } } },
+              { deviation: { indicator: { ownerNodeId: { in: permitted } } } },
+            ],
+          }
+        : {},
+    };
+  }
+
+  async overview(me: AuthPayload) {
+    const companyId = me.companyId;
+    const { ownerArea, viaIndicator, meeting } = await this.areaFilters(me);
     const totalIndicators = await this.prisma.indicator.count({
-      where: { companyId, deletedAt: null, status: 'ACTIVE' },
+      where: { companyId, deletedAt: null, status: 'ACTIVE', ...ownerArea },
     });
 
     const lastResults = await this.prisma.indicatorResult.findMany({
-      where: { indicator: { companyId, deletedAt: null, status: 'ACTIVE' } },
+      where: { indicator: { companyId, deletedAt: null, status: 'ACTIVE', ...ownerArea } },
       orderBy: { periodDate: 'desc' },
       distinct: ['indicatorId'],
       select: { indicatorId: true, light: true, attainment: true },
@@ -62,6 +92,7 @@ export class DashboardService {
           companyId,
           deletedAt: null,
           status: { notIn: [ActionStatus.DONE, ActionStatus.DONE_LATE, ActionStatus.CANCELLED] },
+          ...ownerArea,
         },
       }),
       this.prisma.actionPlan.count({
@@ -70,6 +101,7 @@ export class DashboardService {
           deletedAt: null,
           dueDate: { lt: new Date() },
           status: { notIn: [ActionStatus.DONE, ActionStatus.DONE_LATE, ActionStatus.CANCELLED] },
+          ...ownerArea,
         },
       }),
       this.prisma.actionPlan.count({
@@ -77,6 +109,7 @@ export class DashboardService {
           companyId,
           deletedAt: null,
           status: { in: [ActionStatus.DONE, ActionStatus.DONE_LATE] },
+          ...ownerArea,
         },
       }),
       this.prisma.deviation.count({
@@ -87,6 +120,7 @@ export class DashboardService {
           status: {
             notIn: [DeviationStatus.CLOSED, DeviationStatus.CLOSED_LATE, DeviationStatus.CANCELLED],
           },
+          ...viaIndicator,
         },
       }),
       this.prisma.deviation.count({
@@ -94,6 +128,7 @@ export class DashboardService {
           companyId,
           deletedAt: null,
           status: { notIn: [DeviationStatus.CLOSED, DeviationStatus.CLOSED_LATE, DeviationStatus.CANCELLED] },
+          ...viaIndicator,
         },
       }),
       this.prisma.meeting.count({
@@ -101,6 +136,7 @@ export class DashboardService {
           companyId,
           deletedAt: null,
           startsAt: { gte: now, lte: soon },
+          ...meeting,
         },
       }),
       this.prisma.actionPlan.findMany({
@@ -109,6 +145,7 @@ export class DashboardService {
           deletedAt: null,
           dueDate: { gte: now, lte: soon },
           status: { notIn: [ActionStatus.DONE, ActionStatus.DONE_LATE, ActionStatus.CANCELLED] },
+          ...ownerArea,
         },
         include: { responsibleUser: { select: { id: true, name: true } } },
         orderBy: { dueDate: 'asc' },
@@ -118,6 +155,7 @@ export class DashboardService {
         where: {
           companyId,
           status: { notIn: [TreatmentStatus.RESOLVED, TreatmentStatus.CONCLUDED, TreatmentStatus.IGNORED_TEMPORARILY] },
+          ...viaIndicator,
         },
       }),
       this.prisma.treatmentCase.findMany({
@@ -133,6 +171,7 @@ export class DashboardService {
               TreatmentStatus.UNRESOLVED,
             ],
           },
+          ...viaIndicator,
         },
         include: { indicator: { select: { id: true, name: true, ownerNode: { select: { name: true } } } } },
         orderBy: { updatedAt: 'desc' },
@@ -146,6 +185,7 @@ export class DashboardService {
         companyId,
         deletedAt: null,
         status: { notIn: [DeviationStatus.CLOSED, DeviationStatus.CLOSED_LATE, DeviationStatus.CANCELLED] },
+        ...viaIndicator,
       },
       _count: { indicatorId: true },
       orderBy: { _count: { indicatorId: 'desc' } },
@@ -215,9 +255,10 @@ export class DashboardService {
   /**
    * Ranking de areas por % medio de atingimento (últimos resultados).
    */
-  async ranking(companyId: string, limit = 10) {
+  async ranking(me: AuthPayload, limit = 10) {
+    const { ownerArea } = await this.areaFilters(me);
     const indicators = await this.prisma.indicator.findMany({
-      where: { companyId, deletedAt: null, status: 'ACTIVE' },
+      where: { companyId: me.companyId, deletedAt: null, status: 'ACTIVE', ...ownerArea },
       select: { id: true, ownerNodeId: true, weight: true },
     });
     if (indicators.length === 0) return [];
@@ -287,12 +328,14 @@ export class DashboardService {
   /**
    * Evolucao mensal: media de atingimento por mes nos últimos N meses.
    */
-  async evolution(companyId: string, months = 12) {
+  async evolution(me: AuthPayload, months = 12) {
+    const companyId = me.companyId;
+    const { ownerArea } = await this.areaFilters(me);
     const anchor = await this.periods.currentAnchorDate(companyId);
     const refs = lastNPeriodRefs('MONTHLY', months, anchor);
     const results = await this.prisma.indicatorResult.findMany({
       where: {
-        indicator: { companyId, deletedAt: null },
+        indicator: { companyId, deletedAt: null, ...ownerArea },
         periodRef: { in: refs },
       },
       select: { periodRef: true, attainment: true, light: true },
@@ -323,10 +366,11 @@ export class DashboardService {
   /**
    * Lista resumida dos piores indicadores no momento (vermelhos).
    */
-  async worst(companyId: string, limit = 8) {
+  async worst(me: AuthPayload, limit = 8) {
+    const { ownerArea } = await this.areaFilters(me);
     const reds = await this.prisma.indicatorResult.findMany({
       where: {
-        indicator: { companyId, deletedAt: null, status: 'ACTIVE' },
+        indicator: { companyId: me.companyId, deletedAt: null, status: 'ACTIVE', ...ownerArea },
         light: 'RED',
       },
       orderBy: { periodDate: 'desc' },
@@ -358,15 +402,17 @@ export class DashboardService {
       }));
   }
 
-  async pendingFillCount(companyId: string) {
+  async pendingFillCount(me: AuthPayload) {
+    const companyId = me.companyId;
+    const { ownerArea } = await this.areaFilters(me);
     const periodRef = await this.periods.currentMonthlyRef(companyId);
     const active = await this.prisma.indicator.count({
-      where: { companyId, deletedAt: null, status: 'ACTIVE', periodicity: 'MONTHLY' },
+      where: { companyId, deletedAt: null, status: 'ACTIVE', periodicity: 'MONTHLY', ...ownerArea },
     });
     const filled = await this.prisma.indicatorResult.count({
       where: {
         periodRef,
-        indicator: { companyId, deletedAt: null, status: 'ACTIVE', periodicity: 'MONTHLY' },
+        indicator: { companyId, deletedAt: null, status: 'ACTIVE', periodicity: 'MONTHLY', ...ownerArea },
       },
     });
     return { periodRef, total: active, filled, pending: Math.max(0, active - filled) };

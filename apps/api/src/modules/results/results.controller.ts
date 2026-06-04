@@ -26,7 +26,7 @@ export class ResultsController {
   ) {
     const parsedYear = year ? parseInt(year, 10) : undefined;
     const parsedPoints = points ? parseInt(points, 10) : undefined;
-    return this.service.pendingByCompany(me.companyId, {
+    return this.service.pendingByCompany(me, {
       year: Number.isFinite(parsedYear) ? parsedYear : undefined,
       points: Number.isFinite(parsedPoints) ? parsedPoints : undefined,
       ownerNodeId,
@@ -46,7 +46,7 @@ export class ResultsController {
     const g = (allowed as readonly string[]).includes(granularity)
       ? (granularity as (typeof allowed)[number])
       : 'MONTHLY';
-    return this.service.grainByMonth(me.companyId, indicatorId, g, month);
+    return this.service.grainByMonth(me, indicatorId, g, month);
   }
 
   @Post()
@@ -55,7 +55,7 @@ export class ResultsController {
     @CurrentUser() me: AuthPayload,
     @Body(new ZodValidationPipe(indicatorResultUpsertSchema)) input: any,
   ) {
-    return this.service.upsert(input, me.sub);
+    return this.service.upsert(me, input);
   }
 
   @Post('batch')
@@ -66,14 +66,14 @@ export class ResultsController {
   ) {
     const out = [];
     for (const item of body.items) {
-      out.push(await this.service.upsert(item, me.sub));
+      out.push(await this.service.upsert(me, item));
     }
     return { count: out.length, results: out };
   }
 
   @Post(':id/approve')
   @RequirePermissions('results:approve')
-  approve(@Param('id') id: string, @Body() body: { approve: boolean }) {
-    return this.service.approve(id, body.approve);
+  approve(@CurrentUser() me: AuthPayload, @Param('id') id: string, @Body() body: { approve: boolean }) {
+    return this.service.approve(me, id, body.approve);
   }
 }

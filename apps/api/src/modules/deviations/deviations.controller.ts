@@ -16,13 +16,13 @@ export class DeviationsController {
     @Query('status') status?: DeviationStatus,
     @Query('indicatorId') indicatorId?: string,
   ) {
-    return this.service.list(me.companyId, status, indicatorId);
+    return this.service.list(me, status, indicatorId);
   }
 
   @Get(':id')
   @RequirePermissions('deviations:view')
-  byId(@Param('id') id: string) {
-    return this.service.getById(id);
+  byId(@CurrentUser() me: AuthPayload, @Param('id') id: string) {
+    return this.service.getById(me, id);
   }
 
   @Post()
@@ -58,7 +58,7 @@ export class DeviationsController {
   @Patch(':id')
   @RequirePermissions('deviations:update')
   update(@CurrentUser() me: AuthPayload, @Param('id') id: string, @Body() patch: any) {
-    return this.service.update(id, patch, me.sub);
+    return this.service.update(me, id, patch);
   }
 
   @Post(':id/causes')
@@ -68,13 +68,13 @@ export class DeviationsController {
     @Body() body: { description: string; category?: string; weight?: number },
     @CurrentUser() me: AuthPayload,
   ) {
-    return this.service.addCause(id, body.description, body.category, body.weight ?? 1, me.sub);
+    return this.service.addCause(me, id, body.description, body.category, body.weight ?? 1);
   }
 
   @Delete('causes/:causeId')
   @RequirePermissions('deviations:update')
-  removeCause(@Param('causeId') causeId: string) {
-    return this.service.removeCause(causeId);
+  removeCause(@CurrentUser() me: AuthPayload, @Param('causeId') causeId: string) {
+    return this.service.removeCause(me, causeId);
   }
 
   @Post(':id/analyses')
@@ -84,7 +84,7 @@ export class DeviationsController {
     @Param('id') id: string,
     @Body() body: { method: AnalysisMethod; content: string },
   ) {
-    return this.service.addAnalysis(id, body.method, body.content, me.sub);
+    return this.service.addAnalysis(me, id, body.method, body.content);
   }
 
   @Post(':id/actions')
@@ -103,12 +103,12 @@ export class DeviationsController {
       estimatedCost?: number | null;
     },
   ) {
-    return this.service.createAction(id, me.sub, body);
+    return this.service.createAction(me, id, body);
   }
 
   @Post(':id/close')
   @RequirePermissions('deviations:close')
   close(@CurrentUser() me: AuthPayload, @Param('id') id: string) {
-    return this.service.close(id, me.sub);
+    return this.service.close(me, id);
   }
 }

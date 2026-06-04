@@ -12,13 +12,13 @@ export class MeetingsController {
   @Get()
   @RequirePermissions('meetings:view')
   list(@CurrentUser() me: AuthPayload) {
-    return this.service.list(me.companyId);
+    return this.service.list(me);
   }
 
   @Get(':id')
   @RequirePermissions('meetings:view')
-  byId(@Param('id') id: string) {
-    return this.service.getById(id);
+  byId(@CurrentUser() me: AuthPayload, @Param('id') id: string) {
+    return this.service.getById(me, id);
   }
 
   @Post()
@@ -42,19 +42,19 @@ export class MeetingsController {
       objective?: string;
     },
   ) {
-    return this.service.create(me.companyId, body, me.sub);
+    return this.service.create(me, body);
   }
 
   @Patch(':id')
   @RequirePermissions('meetings:update')
-  update(@Param('id') id: string, @Body() body: any) {
-    return this.service.update(id, body);
+  update(@CurrentUser() me: AuthPayload, @Param('id') id: string, @Body() body: any) {
+    return this.service.update(me, id, body);
   }
 
   @Delete(':id')
   @RequirePermissions('meetings:delete')
-  remove(@Param('id') id: string) {
-    return this.service.remove(id);
+  remove(@CurrentUser() me: AuthPayload, @Param('id') id: string) {
+    return this.service.remove(me, id);
   }
 
   @Post(':id/participants')
@@ -64,7 +64,7 @@ export class MeetingsController {
     @Param('id') id: string,
     @Body() body: { userId: string; role?: MeetingParticipantRole; notes?: string },
   ) {
-    return this.service.addParticipant(id, body.userId, body.role, body.notes, me.sub);
+    return this.service.addParticipant(me, id, body.userId, body.role, body.notes);
   }
 
   @Post(':id/guests')
@@ -74,19 +74,24 @@ export class MeetingsController {
     @Param('id') id: string,
     @Body() body: { name: string; email: string; jobTitle?: string; area?: string; role?: MeetingParticipantRole; notes?: string },
   ) {
-    return this.service.addGuest(id, body, me.sub);
+    return this.service.addGuest(me, id, body);
   }
 
   @Patch(':id/participants/:userId')
   @RequirePermissions('meetings:update')
-  attendance(@Param('id') id: string, @Param('userId') userId: string, @Body() body: { attended: boolean }) {
-    return this.service.markAttendance(id, userId, body.attended);
+  attendance(
+    @CurrentUser() me: AuthPayload,
+    @Param('id') id: string,
+    @Param('userId') userId: string,
+    @Body() body: { attended: boolean },
+  ) {
+    return this.service.markAttendance(me, id, userId, body.attended);
   }
 
   @Post(':id/agenda')
   @RequirePermissions('meetings:update')
-  addAgenda(@Param('id') id: string, @Body() body: { topic: string; notes?: string }) {
-    return this.service.addAgendaItem(id, body.topic, body.notes);
+  addAgenda(@CurrentUser() me: AuthPayload, @Param('id') id: string, @Body() body: { topic: string; notes?: string }) {
+    return this.service.addAgendaItem(me, id, body.topic, body.notes);
   }
 
   @Post(':id/decisions')
@@ -96,7 +101,7 @@ export class MeetingsController {
     @Param('id') id: string,
     @Body() body: { decision: string; owner?: string; dueDate?: string },
   ) {
-    return this.service.addDecision(id, body.decision, body.owner, body.dueDate, me.sub);
+    return this.service.addDecision(me, id, body.decision, body.owner, body.dueDate);
   }
 
   @Post(':id/actions')
@@ -118,18 +123,18 @@ export class MeetingsController {
       evidenceRequired?: boolean;
     },
   ) {
-    return this.service.generateAction(id, me.sub, body);
+    return this.service.generateAction(me, id, body);
   }
 
   @Post(':id/invitations/send')
   @RequirePermissions('meetings:complete')
   sendInvites(@CurrentUser() me: AuthPayload, @Param('id') id: string) {
-    return this.service.sendInvites(id, me.sub);
+    return this.service.sendInvites(me, id);
   }
 
   @Post(':id/complete')
   @RequirePermissions('meetings:complete')
   complete(@CurrentUser() me: AuthPayload, @Param('id') id: string) {
-    return this.service.complete(id, me.sub);
+    return this.service.complete(me, id);
   }
 }

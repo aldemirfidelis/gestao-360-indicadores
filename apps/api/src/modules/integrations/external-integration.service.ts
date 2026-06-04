@@ -275,7 +275,7 @@ export class ExternalIntegrationService {
         select: { id: true },
       });
       if (!indicator) continue;
-      await this.results.upsert({ indicatorId: indicator.id, periodRef, value }, actor).catch(() => undefined);
+      await this.results.upsertSystem(companyId, { indicatorId: indicator.id, periodRef, value }, actor).catch(() => undefined);
     }
   }
 

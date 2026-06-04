@@ -9,6 +9,6 @@ export class SearchController {
 
   @Get()
   global(@CurrentUser() me: AuthPayload, @Query('q') q = '', @Query('limit') limit?: string) {
-    return this.service.global(me.companyId, q, limit ? parseInt(limit, 10) : 8);
+    return this.service.global(me, q, limit ? parseInt(limit, 10) : 8);
   }
 }

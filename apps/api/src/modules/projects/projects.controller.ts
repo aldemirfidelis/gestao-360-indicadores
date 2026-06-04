@@ -11,7 +11,7 @@ export class ProjectsController {
   @Get()
   @RequirePermissions('projects:view')
   list(@CurrentUser() me: AuthPayload) {
-    return this.service.list(me.companyId);
+    return this.service.list(me);
   }
 
   @Get('indicators')
@@ -22,55 +22,55 @@ export class ProjectsController {
 
   @Get(':id')
   @RequirePermissions('projects:view')
-  byId(@Param('id') id: string) {
-    return this.service.getById(id);
+  byId(@CurrentUser() me: AuthPayload, @Param('id') id: string) {
+    return this.service.getById(me, id);
   }
 
   @Post()
   @RequirePermissions('projects:create')
   create(@CurrentUser() me: AuthPayload, @Body() body: any) {
-    return this.service.create(me.companyId, body);
+    return this.service.create(me, body);
   }
 
   @Patch(':id')
   @RequirePermissions('projects:update')
-  update(@Param('id') id: string, @Body() body: any) {
-    return this.service.update(id, body);
+  update(@CurrentUser() me: AuthPayload, @Param('id') id: string, @Body() body: any) {
+    return this.service.update(me, id, body);
   }
 
   @Delete(':id')
   @RequirePermissions('projects:delete')
-  remove(@Param('id') id: string) {
-    return this.service.remove(id);
+  remove(@CurrentUser() me: AuthPayload, @Param('id') id: string) {
+    return this.service.remove(me, id);
   }
 
   @Post(':id/milestones')
   @RequirePermissions('projects:update')
-  addMilestone(@Param('id') id: string, @Body() body: { name: string; dueDate: string }) {
-    return this.service.addMilestone(id, body.name, body.dueDate);
+  addMilestone(@CurrentUser() me: AuthPayload, @Param('id') id: string, @Body() body: { name: string; dueDate: string }) {
+    return this.service.addMilestone(me, id, body.name, body.dueDate);
   }
 
   @Patch('milestones/:id')
   @RequirePermissions('projects:update')
-  toggleMilestone(@Param('id') id: string, @Body() body: { done: boolean }) {
-    return this.service.toggleMilestone(id, body.done);
+  toggleMilestone(@CurrentUser() me: AuthPayload, @Param('id') id: string, @Body() body: { done: boolean }) {
+    return this.service.toggleMilestone(me, id, body.done);
   }
 
   @Post(':id/tasks')
   @RequirePermissions('projects:update')
-  addTask(@Param('id') id: string, @Body() body: any) {
-    return this.service.addTask(id, body);
+  addTask(@CurrentUser() me: AuthPayload, @Param('id') id: string, @Body() body: any) {
+    return this.service.addTask(me, id, body);
   }
 
   @Patch('tasks/:id')
   @RequirePermissions('projects:update')
-  updateTask(@Param('id') id: string, @Body() body: any) {
-    return this.service.updateTask(id, body);
+  updateTask(@CurrentUser() me: AuthPayload, @Param('id') id: string, @Body() body: any) {
+    return this.service.updateTask(me, id, body);
   }
 
   @Delete('tasks/:id')
   @RequirePermissions('projects:update')
-  removeTask(@Param('id') id: string) {
-    return this.service.removeTask(id);
+  removeTask(@CurrentUser() me: AuthPayload, @Param('id') id: string) {
+    return this.service.removeTask(me, id);
   }
 }

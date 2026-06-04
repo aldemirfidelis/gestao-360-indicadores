@@ -1,6 +1,7 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../../prisma/prisma.service';
 import { Direction, IndicatorUnit, ObjectiveStatus } from '@prisma/client';
+import { AuthPayload } from '../auth/auth.types';
 
 interface KRComputed {
   id: string;
@@ -34,7 +35,33 @@ export class OkrsService {
     });
   }
 
-  async listObjectives(cycleId: string) {
+  /** Garante que o ciclo pertence à empresa da sessão (isolamento multiempresa). */
+  private async assertCycle(companyId: string, cycleId: string) {
+    const cycle = await this.prisma.oKRCycle.findFirst({ where: { id: cycleId, companyId }, select: { id: true } });
+    if (!cycle) throw new NotFoundException('Ciclo OKR nao encontrado');
+  }
+
+  /** Carrega o objetivo isolado por empresa (via ciclo). */
+  private async assertObjective(companyId: string, id: string) {
+    const obj = await this.prisma.oKRObjective.findFirst({
+      where: { id, deletedAt: null, cycle: { companyId } },
+      select: { id: true },
+    });
+    if (!obj) throw new NotFoundException('Objetivo OKR nao encontrado');
+    return obj;
+  }
+
+  /** Garante que o resultado-chave pertence à empresa (via objetivo → ciclo). */
+  private async assertKeyResult(companyId: string, krId: string) {
+    const kr = await this.prisma.keyResult.findFirst({
+      where: { id: krId, objective: { deletedAt: null, cycle: { companyId } } },
+      select: { id: true },
+    });
+    if (!kr) throw new NotFoundException('Resultado-chave nao encontrado');
+  }
+
+  async listObjectives(me: AuthPayload, cycleId: string) {
+    await this.assertCycle(me.companyId, cycleId);
     const objs = await this.prisma.oKRObjective.findMany({
       where: { cycleId, deletedAt: null },
       include: {
@@ -51,9 +78,9 @@ export class OkrsService {
     return objs.map((o) => this.enrich(o));
   }
 
-  async getObjective(id: string) {
+  async getObjective(me: AuthPayload, id: string) {
     const obj = await this.prisma.oKRObjective.findFirst({
-      where: { id, deletedAt: null },
+      where: { id, deletedAt: null, cycle: { companyId: me.companyId } },
       include: {
         keyResults: true,
         checkins: { orderBy: { createdAt: 'desc' }, take: 20 },
@@ -98,6 +125,7 @@ export class OkrsService {
   }
 
   async createObjective(
+    me: AuthPayload,
     cycleId: string,
     body: {
       name: string;
@@ -109,6 +137,15 @@ export class OkrsService {
       parentId?: string;
     },
   ) {
+    await this.assertCycle(me.companyId, cycleId);
+    // Vínculos opcionais precisam pertencer à mesma empresa.
+    if (body.strategicObjId) {
+      const ok = await this.prisma.strategicObjective.count({
+        where: { id: body.strategicObjId, map: { companyId: me.companyId, deletedAt: null } },
+      });
+      if (!ok) throw new NotFoundException('Objetivo estratégico nao encontrado');
+    }
+    if (body.parentId) await this.assertObjective(me.companyId, body.parentId);
     return this.prisma.oKRObjective.create({
       data: {
         cycleId,
@@ -123,15 +160,20 @@ export class OkrsService {
     });
   }
 
-  async updateObjective(id: string, patch: any) {
-    return this.prisma.oKRObjective.update({ where: { id }, data: patch });
+  async updateObjective(me: AuthPayload, id: string, patch: any) {
+    await this.assertObjective(me.companyId, id);
+    // Não permite remanejar de ciclo/empresa via PATCH.
+    const { id: _i, cycleId: _c, ...safe } = patch ?? {};
+    return this.prisma.oKRObjective.update({ where: { id }, data: safe });
   }
 
-  async removeObjective(id: string) {
+  async removeObjective(me: AuthPayload, id: string) {
+    await this.assertObjective(me.companyId, id);
     return this.prisma.oKRObjective.update({ where: { id }, data: { deletedAt: new Date() } });
   }
 
   async addKeyResult(
+    me: AuthPayload,
     objectiveId: string,
     body: {
       metric: string;
@@ -144,6 +186,7 @@ export class OkrsService {
       responsible?: string;
     },
   ) {
+    await this.assertObjective(me.companyId, objectiveId);
     return this.prisma.keyResult.create({
       data: {
         objectiveId,
@@ -159,15 +202,19 @@ export class OkrsService {
     });
   }
 
-  async updateKeyResult(id: string, patch: any) {
-    return this.prisma.keyResult.update({ where: { id }, data: patch });
+  async updateKeyResult(me: AuthPayload, id: string, patch: any) {
+    await this.assertKeyResult(me.companyId, id);
+    const { id: _i, objectiveId: _o, ...safe } = patch ?? {};
+    return this.prisma.keyResult.update({ where: { id }, data: safe });
   }
 
-  async removeKeyResult(id: string) {
+  async removeKeyResult(me: AuthPayload, id: string) {
+    await this.assertKeyResult(me.companyId, id);
     return this.prisma.keyResult.delete({ where: { id } });
   }
 
-  async checkin(objectiveId: string, body: { weekRef: string; confidence: number; progress: number; note?: string }) {
+  async checkin(me: AuthPayload, objectiveId: string, body: { weekRef: string; confidence: number; progress: number; note?: string }) {
+    await this.assertObjective(me.companyId, objectiveId);
     const ck = await this.prisma.oKRCheckin.create({
       data: {
         objectiveId,

@@ -1,5 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { PrismaService } from '../../prisma/prisma.service';
+import { AccessService } from '../access/access.service';
+import { AuthPayload } from '../auth/auth.types';
 
 function toCsv(rows: Record<string, unknown>[]): string {
   if (rows.length === 0) return '';
@@ -62,11 +64,27 @@ function areaLabels(ownerNode: any) {
 
 @Injectable()
 export class ReportsService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly access: AccessService,
+  ) {}
 
-  async indicatorsCsv(companyId: string) {
+  /**
+   * Áreas exportáveis pelo usuário (ação 'export'). null = sem restrição (admin/diretor).
+   * Anti-vazamento: exportações NUNCA podem incluir áreas fora do escopo do usuário.
+   */
+  private exportAreas(me: AuthPayload, moduleKey: string) {
+    return this.access.listAreaFilter(me.sub, moduleKey, 'export');
+  }
+
+  async indicatorsCsv(me: AuthPayload) {
+    const permitted = await this.exportAreas(me, 'indicators');
     const items = await this.prisma.indicator.findMany({
-      where: { companyId, deletedAt: null },
+      where: {
+        companyId: me.companyId,
+        deletedAt: null,
+        ...(permitted ? { ownerNodeId: { in: permitted } } : {}),
+      },
       include: {
         ownerNode: ownerNodeReportSelect,
         responsibleUser: { select: { name: true } },
@@ -97,10 +115,11 @@ export class ReportsService {
     return toCsv(rows);
   }
 
-  async resultsCsv(companyId: string, periodFrom?: string, periodTo?: string) {
+  async resultsCsv(me: AuthPayload, periodFrom?: string, periodTo?: string) {
+    const permitted = await this.exportAreas(me, 'indicators');
     const results = await this.prisma.indicatorResult.findMany({
       where: {
-        indicator: { companyId, deletedAt: null },
+        indicator: { companyId: me.companyId, deletedAt: null, ...(permitted ? { ownerNodeId: { in: permitted } } : {}) },
         ...(periodFrom ? { periodRef: { gte: periodFrom } } : {}),
         ...(periodTo ? { periodRef: { lte: periodTo } } : {}),
       },
@@ -128,9 +147,10 @@ export class ReportsService {
     return toCsv(rows);
   }
 
-  async actionsCsv(companyId: string) {
+  async actionsCsv(me: AuthPayload) {
+    const permitted = await this.exportAreas(me, 'actions');
     const items = await this.prisma.actionPlan.findMany({
-      where: { companyId, deletedAt: null },
+      where: { companyId: me.companyId, deletedAt: null, ...(permitted ? { ownerNodeId: { in: permitted } } : {}) },
       include: {
         responsibleUser: { select: { name: true } },
         ownerNode: ownerNodeReportSelect,
@@ -175,9 +195,14 @@ export class ReportsService {
     return toCsv(rows);
   }
 
-  async deviationsCsv(companyId: string) {
+  async deviationsCsv(me: AuthPayload) {
+    const permitted = await this.exportAreas(me, 'deviations');
     const items = await this.prisma.deviation.findMany({
-      where: { companyId, deletedAt: null },
+      where: {
+        companyId: me.companyId,
+        deletedAt: null,
+        ...(permitted ? { indicator: { ownerNodeId: { in: permitted } } } : {}),
+      },
       include: {
         indicator: { select: { code: true, name: true } },
         responsibleUser: { select: { name: true } },

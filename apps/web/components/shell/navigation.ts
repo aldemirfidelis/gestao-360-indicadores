@@ -1,6 +1,8 @@
 import {
+  AlertTriangle,
   BarChart3,
   Briefcase,
+  Building2,
   CalendarDays,
   CheckSquare,
   Compass,
@@ -9,11 +11,16 @@ import {
   GanttChartSquare,
   Goal,
   LayoutDashboard,
+  LifeBuoy,
+  MessageSquare,
   Network,
+  Plug,
   Settings,
   ShieldCheck,
   Sparkles,
   Target,
+  Upload,
+  UserCircle,
   Users,
   type LucideIcon,
 } from 'lucide-react';
@@ -58,6 +65,29 @@ export const navSections: NavSection[] = [
     ],
   },
   {
+    heading: 'Comunicação',
+    description: 'Conversas, diretório de pessoas, integrações e ajuda',
+    intent: 'view',
+    icon: MessageSquare,
+    items: [
+      { href: '/comunicacao', label: 'Conversas', description: 'Mensagens diretas e presença', icon: MessageSquare },
+      { href: '/pessoas', label: 'Pessoas', description: 'Diretório e perfis da empresa', icon: Users },
+      { href: '/perfil', label: 'Meu Perfil', description: 'Status, preferências e dados', icon: UserCircle },
+      { href: '/integracoes', label: 'Integrações', description: 'Preferências de e-mail, calendário e IA', icon: Plug },
+      { href: '/ajuda', label: 'Ajuda', description: 'Central de ajuda e artigos', icon: LifeBuoy },
+    ],
+  },
+  {
+    heading: 'Lançamentos',
+    description: 'Entradas e tratamento do dia a dia',
+    intent: 'launch',
+    icon: Upload,
+    items: [
+      { href: '/deviations', label: 'Desvios', description: 'Indicadores fora da meta, causas e tratativas', icon: AlertTriangle, permissions: ['deviations:view'] },
+      { href: '/imports', label: 'Importações', description: 'Importação estruturada de dados', icon: Upload, permissions: ['imports:view', 'imports:create'] },
+    ],
+  },
+  {
     heading: 'Gestão',
     description: 'Cadastros e objetos de gestão do dia a dia',
     intent: 'management',
@@ -79,6 +109,16 @@ export const navSections: NavSection[] = [
     items: [
       { href: '/reports', label: 'Relatórios e Exportações', description: 'Indicadores, resultados, metas, desvios e áreas', icon: FileSpreadsheet, permissions: ['reports:view', 'reports:export'] },
       { href: '/audit', label: 'Auditoria', description: 'Relatório de ações do sistema', icon: ShieldCheck, permissions: ['audit:view'] },
+    ],
+  },
+  {
+    heading: 'Administração',
+    description: 'Gestão global da plataforma (multiempresa)',
+    intent: 'management',
+    icon: Building2,
+    permissions: ['platform:admin'],
+    items: [
+      { href: '/plataforma', label: 'Plataforma', description: 'Visão geral e administração de empresas', icon: Building2, permissions: ['platform:admin'] },
     ],
   },
 ];

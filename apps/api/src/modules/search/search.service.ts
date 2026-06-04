@@ -1,14 +1,30 @@
 import { Injectable } from '@nestjs/common';
 import { PrismaService } from '../../prisma/prisma.service';
+import { AccessService } from '../access/access.service';
+import { AuthPayload } from '../auth/auth.types';
 
 @Injectable()
 export class SearchService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly access: AccessService,
+  ) {}
 
-  async global(companyId: string, q: string, limit = 8) {
+  async global(me: AuthPayload, q: string, limit = 8) {
     const term = q.trim();
     if (term.length < 2) return [];
+    const companyId = me.companyId;
     const contains = { contains: term, mode: 'insensitive' as const };
+
+    // Busca não pode vazar registros de áreas fora do escopo do usuário.
+    // Cada domínio usa sua própria chave de módulo (null = sem restrição).
+    const [pInd, pAct, pDev, pMeet, pOrg] = await Promise.all([
+      this.access.listAreaFilter(me.sub, 'indicators', 'view'),
+      this.access.listAreaFilter(me.sub, 'actions', 'view'),
+      this.access.listAreaFilter(me.sub, 'deviations', 'view'),
+      this.access.listAreaFilter(me.sub, 'meetings', 'view'),
+      this.access.listAreaFilter(me.sub, 'org', 'view'),
+    ]);
 
     const [indicators, orgNodes, actions, deviations, meetings, users, objectives] = await Promise.all([
       this.prisma.indicator.findMany({
@@ -16,6 +32,7 @@ export class SearchService {
           companyId,
           deletedAt: null,
           OR: [{ name: contains }, { code: contains }, { description: contains }],
+          ...(pInd ? { ownerNodeId: { in: pInd } } : {}),
         },
         select: {
           id: true,
@@ -27,22 +44,54 @@ export class SearchService {
         take: limit,
       }),
       this.prisma.orgNode.findMany({
-        where: { companyId, deletedAt: null, OR: [{ name: contains }, { code: contains }, { description: contains }] },
+        where: {
+          companyId,
+          deletedAt: null,
+          OR: [{ name: contains }, { code: contains }, { description: contains }],
+          ...(pOrg ? { id: { in: pOrg } } : {}),
+        },
         select: { id: true, name: true, type: true },
         take: limit,
       }),
       this.prisma.actionPlan.findMany({
-        where: { companyId, deletedAt: null, OR: [{ title: contains }, { description: contains }] },
+        where: {
+          companyId,
+          deletedAt: null,
+          OR: [{ title: contains }, { description: contains }],
+          ...(pAct ? { ownerNodeId: { in: pAct } } : {}),
+        },
         select: { id: true, title: true, status: true, dueDate: true, responsibleUser: { select: { name: true } } },
         take: limit,
       }),
       this.prisma.deviation.findMany({
-        where: { companyId, deletedAt: null, OR: [{ title: contains }, { fact: contains }, { rootCause: contains }] },
+        where: {
+          companyId,
+          deletedAt: null,
+          OR: [{ title: contains }, { fact: contains }, { rootCause: contains }],
+          ...(pDev ? { indicator: { ownerNodeId: { in: pDev } } } : {}),
+        },
         select: { id: true, number: true, title: true, status: true, severity: true, indicator: { select: { name: true } } },
         take: limit,
       }),
       this.prisma.meeting.findMany({
-        where: { companyId, deletedAt: null, OR: [{ title: contains }, { notes: contains }, { location: contains }] },
+        where: {
+          companyId,
+          deletedAt: null,
+          AND: [
+            { OR: [{ title: contains }, { notes: contains }, { location: contains }] },
+            ...(pMeet
+              ? [
+                  {
+                    OR: [
+                      { indicatorId: null, deviationId: null },
+                      { indicator: { ownerNodeId: { in: pMeet } } },
+                      { deviation: { indicator: { ownerNodeId: { in: pMeet } } } },
+                    ],
+                  },
+                ]
+              : []),
+          ],
+        },
         select: { id: true, title: true, startsAt: true, kind: true },
         take: limit,
       }),

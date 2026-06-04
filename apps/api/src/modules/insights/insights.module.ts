@@ -12,7 +12,7 @@ class InsightsController {
 
   @Get()
   list(@CurrentUser() me: AuthPayload) {
-    return this.service.generate(me.companyId);
+    return this.service.generate(me);
   }
 }
 

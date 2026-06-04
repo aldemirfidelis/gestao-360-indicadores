@@ -101,7 +101,7 @@ export class ExternalApiService {
         continue;
       }
       try {
-        await this.results.upsert({ indicatorId: indicator.id, periodRef, value, note: it.note }, actor);
+        await this.results.upsertSystem(companyId, { indicatorId: indicator.id, periodRef, value, note: it.note }, actor);
         processed += 1;
       } catch (e) {
         errors.push({ indicatorCode: code, periodRef, error: (e as Error).message?.slice(0, 160) ?? 'Falha ao gravar.' });

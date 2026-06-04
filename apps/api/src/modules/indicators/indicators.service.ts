@@ -533,7 +533,7 @@ export class IndicatorsService {
     const before = await this.prisma.indicatorResult.findUnique({
       where: { indicatorId_periodRef: { indicatorId: id, periodRef } },
     });
-    const out = await this.results.upsert({ indicatorId: id, periodRef, value, note: cleanString(body.note) ?? null }, me.sub);
+    const out = await this.results.upsert(me, { indicatorId: id, periodRef, value, note: cleanString(body.note) ?? null });
     await this.audit(
       me,
       before ? 'UPDATE_RESULT' : 'CREATE_RESULT',

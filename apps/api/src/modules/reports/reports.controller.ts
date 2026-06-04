@@ -12,7 +12,7 @@ export class ReportsController {
 
   @Get('indicators.csv')
   async indicators(@CurrentUser() me: AuthPayload, @Res() res: Response) {
-    const csv = await this.service.indicatorsCsv(me.companyId);
+    const csv = await this.service.indicatorsCsv(me);
     this.sendCsv(res, 'indicadores.csv', csv);
   }
 
@@ -23,19 +23,19 @@ export class ReportsController {
     @Query('from') from?: string,
     @Query('to') to?: string,
   ) {
-    const csv = await this.service.resultsCsv(me.companyId, from, to);
+    const csv = await this.service.resultsCsv(me, from, to);
     this.sendCsv(res, 'lançamentos.csv', csv);
   }
 
   @Get('actions.csv')
   async actions(@CurrentUser() me: AuthPayload, @Res() res: Response) {
-    const csv = await this.service.actionsCsv(me.companyId);
+    const csv = await this.service.actionsCsv(me);
     this.sendCsv(res, 'ações.csv', csv);
   }
 
   @Get('deviations.csv')
   async deviations(@CurrentUser() me: AuthPayload, @Res() res: Response) {
-    const csv = await this.service.deviationsCsv(me.companyId);
+    const csv = await this.service.deviationsCsv(me);
     this.sendCsv(res, 'desvios.csv', csv);
   }
 

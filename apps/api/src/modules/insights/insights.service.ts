@@ -2,6 +2,12 @@ import { Injectable, Logger } from '@nestjs/common';
 import { PrismaService } from '../../prisma/prisma.service';
 import { ActionStatus, DeviationStatus, TrafficLight } from '@prisma/client';
 import { GeminiService } from '../ai/gemini.service';
+import { AccessService } from '../access/access.service';
+import { AuthPayload } from '../auth/auth.types';
+
+// Filtro de área (null = sem restrição). Insights (e o contexto enviado à IA) jamais
+// podem incluir indicadores/desvios de áreas fora do escopo do usuário.
+type AreaScope = string[] | null;
 
 export interface InsightItem {
   id: string;
@@ -57,30 +63,38 @@ export class InsightsService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly gemini: GeminiService,
+    private readonly access: AccessService,
   ) {}
 
-  async generate(companyId: string): Promise<InsightItem[]> {
-    const baseInsights = await this.generateRuleBased(companyId);
+  /** ownerNodeId-filter para spread dentro de um where de Indicator (ou aninhado). */
+  private indArea(area: AreaScope) {
+    return area ? { ownerNodeId: { in: area } } : {};
+  }
+
+  async generate(me: AuthPayload): Promise<InsightItem[]> {
+    const area = await this.access.listAreaFilter(me.sub, 'insights', 'view');
+    const companyId = me.companyId;
+    const baseInsights = await this.generateRuleBased(companyId, area);
     if (!this.gemini.isEnabled) return baseInsights;
 
-    const enriched = await this.tryGeminiEnrichment(companyId, baseInsights);
+    const enriched = await this.tryGeminiEnrichment(companyId, area, baseInsights);
     return enriched ?? baseInsights;
   }
 
   // -------- regras deterministicas (fallback / base) --------
 
-  private async generateRuleBased(companyId: string): Promise<InsightItem[]> {
+  private async generateRuleBased(companyId: string, area: AreaScope): Promise<InsightItem[]> {
     const out: InsightItem[] = [];
-    out.push(await this.executiveSummary(companyId));
-    out.push(...(await this.worsening(companyId)));
-    out.push(...(await this.causeSuggestions(companyId)));
-    out.push(...(await this.actionSuggestions(companyId)));
+    out.push(await this.executiveSummary(companyId, area));
+    out.push(...(await this.worsening(companyId, area)));
+    out.push(...(await this.causeSuggestions(companyId, area)));
+    out.push(...(await this.actionSuggestions(companyId, area)));
     return out.map((i) => ({ ...i, source: i.source ?? 'rules' }));
   }
 
-  private async executiveSummary(companyId: string): Promise<InsightItem> {
+  private async executiveSummary(companyId: string, area: AreaScope): Promise<InsightItem> {
     const last = await this.prisma.indicatorResult.findMany({
-      where: { indicator: { companyId, deletedAt: null } },
+      where: { indicator: { companyId, deletedAt: null, ...this.indArea(area) } },
       orderBy: { periodDate: 'desc' },
       distinct: ['indicatorId'],
       select: { light: true, attainment: true },
@@ -98,10 +112,17 @@ export class InsightsService {
         deletedAt: null,
         dueDate: { lt: new Date() },
         status: { notIn: [ActionStatus.DONE, ActionStatus.DONE_LATE, ActionStatus.CANCELLED] },
+        ...this.indArea(area),
       },
     });
     const criticalDev = await this.prisma.deviation.count({
-      where: { companyId, deletedAt: null, severity: 'CRITICAL', status: { notIn: [DeviationStatus.CLOSED, DeviationStatus.CLOSED_LATE, DeviationStatus.CANCELLED] } },
+      where: {
+        companyId,
+        deletedAt: null,
+        severity: 'CRITICAL',
+        status: { notIn: [DeviationStatus.CLOSED, DeviationStatus.CLOSED_LATE, DeviationStatus.CANCELLED] },
+        ...(area ? { indicator: { ownerNodeId: { in: area } } } : {}),
+      },
     });
     const total = last.length;
     const greenRate = total ? Math.round(((counts.GREEN ?? 0) / total) * 100) : 0;
@@ -119,9 +140,9 @@ export class InsightsService {
     };
   }
 
-  private async worsening(companyId: string): Promise<InsightItem[]> {
+  private async worsening(companyId: string, area: AreaScope): Promise<InsightItem[]> {
     const indicators = await this.prisma.indicator.findMany({
-      where: { companyId, deletedAt: null, status: 'ACTIVE' },
+      where: { companyId, deletedAt: null, status: 'ACTIVE', ...this.indArea(area) },
       select: {
         id: true,
         name: true,
@@ -148,12 +169,13 @@ export class InsightsService {
     return out.slice(0, 5);
   }
 
-  private async causeSuggestions(companyId: string): Promise<InsightItem[]> {
+  private async causeSuggestions(companyId: string, area: AreaScope): Promise<InsightItem[]> {
     const devs = await this.prisma.deviation.findMany({
       where: {
         companyId,
         deletedAt: null,
         status: { in: [DeviationStatus.OPEN, DeviationStatus.IN_ANALYSIS] },
+        ...(area ? { indicator: { ownerNodeId: { in: area } } } : {}),
       },
       include: {
         indicator: { select: { id: true, name: true, type: true } },
@@ -176,9 +198,9 @@ export class InsightsService {
       });
   }
 
-  private async actionSuggestions(companyId: string): Promise<InsightItem[]> {
+  private async actionSuggestions(companyId: string, area: AreaScope): Promise<InsightItem[]> {
     const reds = await this.prisma.indicatorResult.findMany({
-      where: { indicator: { companyId, deletedAt: null }, light: 'RED' },
+      where: { indicator: { companyId, deletedAt: null, ...this.indArea(area) }, light: 'RED' },
       distinct: ['indicatorId'],
       orderBy: { periodDate: 'desc' },
       include: { indicator: { select: { id: true, name: true, type: true } } },
@@ -201,9 +223,10 @@ export class InsightsService {
 
   private async tryGeminiEnrichment(
     companyId: string,
+    area: AreaScope,
     baseInsights: InsightItem[],
   ): Promise<InsightItem[] | null> {
-    const context = await this.buildCompanyContext(companyId);
+    const context = await this.buildCompanyContext(companyId, area);
     if (context.indicators.length === 0) return null;
 
     const prompt = this.buildInsightsPrompt(context);
@@ -283,9 +306,9 @@ export class InsightsService {
     return out;
   }
 
-  private async buildCompanyContext(companyId: string) {
+  private async buildCompanyContext(companyId: string, area: AreaScope) {
     const indicators = await this.prisma.indicator.findMany({
-      where: { companyId, deletedAt: null, status: 'ACTIVE' },
+      where: { companyId, deletedAt: null, status: 'ACTIVE', ...this.indArea(area) },
       select: {
         id: true,
         name: true,
@@ -308,6 +331,7 @@ export class InsightsService {
         companyId,
         deletedAt: null,
         status: { in: [DeviationStatus.OPEN, DeviationStatus.IN_ANALYSIS, DeviationStatus.WAITING_ACTION] },
+        ...(area ? { indicator: { ownerNodeId: { in: area } } } : {}),
       },
       select: {
         id: true,

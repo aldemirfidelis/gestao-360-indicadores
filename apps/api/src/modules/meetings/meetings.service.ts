@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
 import nodemailer from 'nodemailer';
 import { PrismaService } from '../../prisma/prisma.service';
 import {
@@ -15,17 +15,69 @@ import {
   TreatmentStatus,
 } from '@prisma/client';
 import { TraceabilityService } from '../traceability/traceability.service';
+import { AccessService } from '../access/access.service';
+import type { AreaAction } from '../access/access.logic';
+import { AuthPayload } from '../auth/auth.types';
+
+/** Chave de módulo usada nas regras de visibilidade por área (AccessService). */
+const MODULE = 'meetings';
 
 @Injectable()
 export class MeetingsService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly traceability: TraceabilityService,
+    private readonly access: AccessService,
   ) {}
 
-  async list(companyId: string) {
+  /**
+   * A reunião não tem área própria: ela é derivada do indicador associado
+   * (diretamente ou via desvio). Reuniões "gerais" (sem vínculo) não têm área e,
+   * portanto, não são restringidas por área — apenas pela permissão e pela empresa.
+   */
+  private areaOf(m: {
+    indicator?: { ownerNodeId: string | null } | null;
+    deviation?: { indicator?: { ownerNodeId: string | null } | null } | null;
+  }): string | null {
+    return m.indicator?.ownerNodeId ?? m.deviation?.indicator?.ownerNodeId ?? null;
+  }
+
+  /** Carrega a reunião isolada por EMPRESA (defesa contra id de outra empresa) + área. */
+  private async loadScoped(id: string, companyId: string) {
+    const meeting = await this.prisma.meeting.findFirst({
+      where: { id, companyId, deletedAt: null },
+      include: {
+        indicator: { select: { ownerNodeId: true } },
+        deviation: { select: { indicator: { select: { ownerNodeId: true } } } },
+      },
+    });
+    if (!meeting) throw new NotFoundException('Reunião nao encontrada');
+    return meeting;
+  }
+
+  /** Enforce de escrita por área (no-op para reuniões gerais sem área). */
+  private async assertWriteArea(me: AuthPayload, area: string | null, action: AreaAction) {
+    if (area) await this.access.assertCanWrite(me.sub, area, MODULE, action);
+  }
+
+  async list(me: AuthPayload) {
+    const permitted = await this.access.listAreaFilter(me.sub, MODULE, 'view');
     return this.prisma.meeting.findMany({
-      where: { companyId, deletedAt: null },
+      where: {
+        companyId: me.companyId,
+        deletedAt: null,
+        // Restrição por área: reuniões gerais (sem indicador/desvio) sempre visíveis;
+        // reuniões vinculadas só se a área do indicador estiver entre as permitidas.
+        ...(permitted
+          ? {
+              OR: [
+                { indicatorId: null, deviationId: null },
+                { indicator: { ownerNodeId: { in: permitted } } },
+                { deviation: { indicator: { ownerNodeId: { in: permitted } } } },
+              ],
+            }
+          : {}),
+      },
       include: {
         _count: { select: { participants: true, agendaItems: true, decisions: true } },
       },
@@ -33,12 +85,12 @@ export class MeetingsService {
     });
   }
 
-  async getById(id: string) {
+  async getById(me: AuthPayload, id: string) {
     const meeting = await this.prisma.meeting.findFirst({
-      where: { id, deletedAt: null },
+      where: { id, companyId: me.companyId, deletedAt: null },
       include: {
         indicator: { include: { ownerNode: true, responsibleUser: { select: { id: true, name: true, email: true, jobTitle: true } }, targets: true } },
-        deviation: true,
+        deviation: { include: { indicator: { select: { ownerNodeId: true } } } },
         analysis: true,
         treatment: { include: { result: true } },
         responsibleUser: { select: { id: true, name: true, email: true } },
@@ -61,11 +113,19 @@ export class MeetingsService {
       },
     });
     if (!meeting) throw new NotFoundException('Reunião nao encontrada');
+    // Restrição por área (leitura): bloqueia acesso direto a reunião de área não permitida.
+    const area = this.areaOf(meeting);
+    if (area) {
+      const permitted = await this.access.listAreaFilter(me.sub, MODULE, 'view');
+      if (permitted && !permitted.includes(area)) {
+        throw new ForbiddenException('Você não tem acesso às reuniões desta área.');
+      }
+    }
     return meeting;
   }
 
   async create(
-    companyId: string,
+    me: AuthPayload,
     body: {
       title: string;
       kind: MeetingKind;
@@ -82,8 +142,30 @@ export class MeetingsService {
       status?: MeetingStatus;
       objective?: string;
     },
-    createdById?: string,
   ) {
+    const companyId = me.companyId;
+    const createdById = me.sub;
+    // Vínculos precisam pertencer à MESMA empresa (nunca confiar em ids do frontend).
+    let area: string | null = null;
+    if (body.indicatorId) {
+      const ind = await this.prisma.indicator.findFirst({
+        where: { id: body.indicatorId, companyId, deletedAt: null },
+        select: { ownerNodeId: true },
+      });
+      if (!ind) throw new NotFoundException('Indicador nao encontrado');
+      area = ind.ownerNodeId;
+    }
+    if (body.deviationId) {
+      const dev = await this.prisma.deviation.findFirst({
+        where: { id: body.deviationId, companyId, deletedAt: null },
+        include: { indicator: { select: { ownerNodeId: true } } },
+      });
+      if (!dev) throw new NotFoundException('Desvio nao encontrado');
+      area = area ?? dev.indicator?.ownerNodeId ?? null;
+    }
+    // Só pode agendar reunião vinculada a uma área que o usuário possa atuar.
+    await this.assertWriteArea(me, area, 'create');
+
     const meeting = await this.prisma.meeting.create({
       data: {
         companyId,
@@ -117,51 +199,60 @@ export class MeetingsService {
     return meeting;
   }
 
-  async update(id: string, patch: any) {
-    return this.prisma.meeting.update({ where: { id }, data: patch });
+  async update(me: AuthPayload, id: string, patch: any) {
+    const meeting = await this.loadScoped(id, me.companyId);
+    await this.assertWriteArea(me, this.areaOf(meeting), 'edit');
+    // Campos que mudam o vínculo/área não são reatribuídos aqui (segurança):
+    // remoção via blocklist evita escalonamento de área por PATCH.
+    const { companyId: _c, id: _i, indicatorId: _ind, deviationId: _d, ...safe } = patch ?? {};
+    return this.prisma.meeting.update({ where: { id }, data: safe });
   }
 
-  async remove(id: string) {
+  async remove(me: AuthPayload, id: string) {
+    const meeting = await this.loadScoped(id, me.companyId);
+    await this.assertWriteArea(me, this.areaOf(meeting), 'delete');
     return this.prisma.meeting.update({ where: { id }, data: { deletedAt: new Date() } });
   }
 
   async addParticipant(
+    me: AuthPayload,
     meetingId: string,
     userId: string,
     role: MeetingParticipantRole = MeetingParticipantRole.PARTICIPANT,
     notes?: string,
-    actorId?: string,
   ) {
+    const meeting = await this.loadScoped(meetingId, me.companyId);
+    await this.assertWriteArea(me, this.areaOf(meeting), 'edit');
     const participant = await this.prisma.meetingParticipant.upsert({
       where: { meetingId_userId: { meetingId, userId } },
       create: { meetingId, userId, role, notes: notes ?? null },
       update: { role, notes: notes ?? null },
     });
-    const meeting = await this.prisma.meeting.findUnique({ where: { id: meetingId } });
-    if (meeting) {
-      await this.traceability.record({
-        companyId: meeting.companyId,
-        indicatorId: meeting.indicatorId,
-        userId: actorId,
-        eventType: TraceEventType.PARTICIPANT_ADDED,
-        entityType: TraceEntityType.MEETING,
-        entityId: meetingId,
-        title: 'Participante adicionado a reunião',
-        description: userId,
-        metadata: { role },
-      });
-    }
+    await this.traceability.record({
+      companyId: me.companyId,
+      userId: me.sub,
+      eventType: TraceEventType.PARTICIPANT_ADDED,
+      entityType: TraceEntityType.MEETING,
+      entityId: meetingId,
+      title: 'Participante adicionado a reunião',
+      description: userId,
+      metadata: { role },
+    });
     return participant;
   }
 
-  async markAttendance(meetingId: string, userId: string, attended: boolean) {
+  async markAttendance(me: AuthPayload, meetingId: string, userId: string, attended: boolean) {
+    const meeting = await this.loadScoped(meetingId, me.companyId);
+    await this.assertWriteArea(me, this.areaOf(meeting), 'edit');
     return this.prisma.meetingParticipant.update({
       where: { meetingId_userId: { meetingId, userId } },
       data: { attended },
     });
   }
 
-  async addAgendaItem(meetingId: string, topic: string, notes?: string) {
+  async addAgendaItem(me: AuthPayload, meetingId: string, topic: string, notes?: string) {
+    const meeting = await this.loadScoped(meetingId, me.companyId);
+    await this.assertWriteArea(me, this.areaOf(meeting), 'edit');
     const count = await this.prisma.meetingAgendaItem.count({ where: { meetingId } });
     return this.prisma.meetingAgendaItem.create({
       data: { meetingId, topic, notes: notes ?? null, position: count },
@@ -169,13 +260,13 @@ export class MeetingsService {
   }
 
   async addGuest(
+    me: AuthPayload,
     meetingId: string,
     body: { name: string; email: string; jobTitle?: string; area?: string; role?: MeetingParticipantRole; notes?: string },
-    actorId?: string,
   ) {
     if (!this.isEmail(body.email)) throw new NotFoundException('E-mail inválido');
-    const meeting = await this.prisma.meeting.findUnique({ where: { id: meetingId } });
-    if (!meeting) throw new NotFoundException('Reunião nao encontrada');
+    const meeting = await this.loadScoped(meetingId, me.companyId);
+    await this.assertWriteArea(me, this.areaOf(meeting), 'edit');
     const guest = await this.prisma.meetingGuest.upsert({
       where: { meetingId_email: { meetingId, email: body.email.toLowerCase() } },
       create: {
@@ -198,7 +289,7 @@ export class MeetingsService {
     await this.traceability.record({
       companyId: meeting.companyId,
       indicatorId: meeting.indicatorId,
-      userId: actorId,
+      userId: me.sub,
       eventType: TraceEventType.PARTICIPANT_ADDED,
       entityType: TraceEntityType.MEETING,
       entityId: meetingId,
@@ -209,31 +300,30 @@ export class MeetingsService {
     return guest;
   }
 
-  async addDecision(meetingId: string, decision: string, owner?: string, dueDate?: string, userId?: string) {
+  async addDecision(me: AuthPayload, meetingId: string, decision: string, owner?: string, dueDate?: string) {
+    const meeting = await this.loadScoped(meetingId, me.companyId);
+    await this.assertWriteArea(me, this.areaOf(meeting), 'edit');
     const item = await this.prisma.meetingDecision.create({
       data: { meetingId, decision, owner: owner ?? null, dueDate: dueDate ? new Date(dueDate) : null },
     });
-    const meeting = await this.prisma.meeting.findUnique({ where: { id: meetingId } });
-    if (meeting) {
-      await this.traceability.record({
-        companyId: meeting.companyId,
-        userId,
-        eventType: TraceEventType.MEETING_DECISION,
-        entityType: TraceEntityType.MEETING_DECISION,
-        entityId: item.id,
-        relatedType: TraceEntityType.MEETING,
-        relatedId: meetingId,
-        title: 'Decisão registrada em reunião',
-        description: decision,
-        metadata: { owner, dueDate },
-      });
-    }
+    await this.traceability.record({
+      companyId: me.companyId,
+      userId: me.sub,
+      eventType: TraceEventType.MEETING_DECISION,
+      entityType: TraceEntityType.MEETING_DECISION,
+      entityId: item.id,
+      relatedType: TraceEntityType.MEETING,
+      relatedId: meetingId,
+      title: 'Decisão registrada em reunião',
+      description: decision,
+      metadata: { owner, dueDate },
+    });
     return item;
   }
 
   async generateAction(
+    me: AuthPayload,
     meetingId: string,
-    createdById: string,
     body: {
       title: string;
       actionPlanId?: string;
@@ -248,7 +338,8 @@ export class MeetingsService {
       evidenceRequired?: boolean;
     },
   ) {
-    const meeting = await this.getById(meetingId);
+    const meeting = await this.getById(me, meetingId);
+    await this.assertWriteArea(me, this.areaOf(meeting), 'edit');
     const linkedAction =
       meeting.actions.find((action) => action.id === body.actionPlanId) ??
       (body.actionPlanId ? null : meeting.actions[0]);
@@ -272,7 +363,7 @@ export class MeetingsService {
       await this.traceability.record({
         companyId: meeting.companyId,
         indicatorId: meeting.indicatorId,
-        userId: createdById,
+        userId: me.sub,
         eventType: TraceEventType.TASK_UPDATED,
         entityType: TraceEntityType.ACTION_TASK,
         entityId: task.id,
@@ -305,7 +396,7 @@ export class MeetingsService {
         dueDate: body.dueDate ? new Date(body.dueDate) : null,
         evidenceRequired: body.evidenceRequired ?? true,
         expectedResult: body.expectedResult ?? null,
-        createdById,
+        createdById: me.sub,
       },
     });
     if (meeting.treatmentId) {
@@ -317,7 +408,7 @@ export class MeetingsService {
     await this.traceability.record({
       companyId: meeting.companyId,
       indicatorId: meeting.indicatorId,
-      userId: createdById,
+      userId: me.sub,
       eventType: TraceEventType.ACTION_CREATED,
       entityType: TraceEntityType.ACTION_PLAN,
       entityId: action.id,
@@ -331,8 +422,9 @@ export class MeetingsService {
     return action;
   }
 
-  async complete(meetingId: string, actorId?: string) {
-    const meeting = await this.getById(meetingId);
+  async complete(me: AuthPayload, meetingId: string) {
+    const meeting = await this.getById(me, meetingId);
+    await this.assertWriteArea(me, this.areaOf(meeting), 'edit');
     const updated = await this.prisma.meeting.update({
       where: { id: meetingId },
       data: { status: MeetingStatus.COMPLETED },
@@ -346,7 +438,7 @@ export class MeetingsService {
     await this.traceability.record({
       companyId: meeting.companyId,
       indicatorId: meeting.indicatorId,
-      userId: actorId,
+      userId: me.sub,
       eventType: TraceEventType.MEETING_COMPLETED,
       entityType: TraceEntityType.MEETING,
       entityId: meetingId,
@@ -359,8 +451,9 @@ export class MeetingsService {
     return updated;
   }
 
-  async sendInvites(meetingId: string, actorId?: string) {
-    const meeting = await this.getById(meetingId);
+  async sendInvites(me: AuthPayload, meetingId: string) {
+    const meeting = await this.getById(me, meetingId);
+    await this.assertWriteArea(me, this.areaOf(meeting), 'edit');
     const recipients = [
       ...meeting.participants.map((p) => ({ name: p.user.name, email: p.user.email })),
       ...meeting.guests.map((g) => ({ name: g.name, email: g.email })),
@@ -381,7 +474,7 @@ export class MeetingsService {
     await this.traceability.record({
       companyId: meeting.companyId,
       indicatorId: meeting.indicatorId,
-      userId: actorId,
+      userId: me.sub,
       eventType: TraceEventType.CALENDAR_INVITE_CREATED,
       entityType: TraceEntityType.MEETING,
       entityId: meetingId,
@@ -413,7 +506,7 @@ export class MeetingsService {
       await this.traceability.record({
         companyId: meeting.companyId,
         indicatorId: meeting.indicatorId,
-        userId: actorId,
+        userId: me.sub,
         eventType: delivery.status === EmailDeliveryStatus.SENT ? TraceEventType.EMAIL_INVITE_SENT : TraceEventType.EMAIL_INVITE_FAILED,
         entityType: TraceEntityType.MEETING,
         entityId: meetingId,
