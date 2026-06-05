@@ -10,7 +10,7 @@
  *
  * Rodar:  pnpm -C apps/api exec tsx prisma/seed-demo-company.ts
  */
-import { PrismaClient, UserRoleEnum, Prisma } from '@prisma/client';
+import { PrismaClient, UserRoleEnum, Prisma, FormFieldType } from '@prisma/client';
 import * as bcrypt from 'bcryptjs';
 import { calcStatus } from '@g360/shared';
 
@@ -81,8 +81,58 @@ const ACTION_POOL = ['Plano de redução de perdas', 'Ação corretiva de manute
 const DEVIATION_POOL = ['Desvio de meta de produção', 'Não conformidade ambiental', 'Desvio de eficiência de moagem', 'Parada não programada de equipamento', 'Desvio de meta de segurança', 'Desvio de qualidade do produto'];
 const SIX_M = ['Método', 'Máquina', 'Mão de obra', 'Material', 'Medida', 'Meio ambiente'];
 
+// ---------- catálogos dos módulos corporativos (FASE 6/7) ----------
+const RISK_POOL = [
+  'Falha em equipamento crítico da moenda', 'Parada não programada da caldeira',
+  'Não conformidade ambiental em efluentes', 'Acidente de trabalho com afastamento',
+  'Atraso na colheita por chuvas', 'Variação no preço do açúcar e do etanol',
+  'Indisponibilidade de mão de obra especializada', 'Falha no fornecimento de insumos',
+  'Vazamento em tanque de armazenamento', 'Perda de eficiência por incrustação',
+  'Risco de incêndio em área industrial', 'Quebra de contrato de fornecimento de cana',
+];
+const DOC_POOL = [
+  'Política de Qualidade', 'Procedimento de Operação da Moenda', 'Instrução de Trabalho - Caldeira',
+  'Manual de Segurança Industrial', 'Procedimento de Controle Ambiental', 'Política de Recursos Humanos',
+  'Procedimento de Manutenção Preventiva', 'Instrução de Análise de Laboratório',
+  'Manual de Boas Práticas de Fabricação', 'Procedimento de Expedição', 'Política de Meio Ambiente',
+  'Procedimento de Gestão de Não Conformidades',
+];
+const PROCESS_POOL = [
+  'Moagem de Cana', 'Produção de Etanol', 'Produção de Açúcar', 'Geração de Energia (Cogeração)',
+  'Manutenção Industrial', 'Gestão de Pessoas', 'Controle de Qualidade', 'Gestão Ambiental',
+  'Logística de Expedição', 'Suprimentos e Compras',
+];
+const AUDIT_POOL = [
+  'Auditoria Interna ISO 9001', 'Auditoria Ambiental ISO 14001', 'Auditoria de Segurança do Trabalho',
+  'Auditoria de Processos Industriais', 'Auditoria de Fornecedores', 'Auditoria de Boas Práticas',
+];
+const FORM_POOL = [
+  'Checklist de Inspeção de Segurança', 'Formulário de Análise Crítica', 'Checklist de Partida da Caldeira',
+  'Inspeção de EPI', 'Checklist de Limpeza Industrial', 'Formulário de Registro de Ocorrência',
+  'Checklist de Manutenção Preventiva', 'Pesquisa de Clima Organizacional',
+];
+const SUPPLIERS_POOL = ['Área Agrícola (CCT)', 'Fornecedores de cana', 'Almoxarifado', 'Laboratório', 'Manutenção'];
+const INPUTS_POOL = ['Cana-de-açúcar', 'Insumos químicos', 'Energia elétrica', 'Vapor de processo', 'Ordens de serviço'];
+const OUTPUTS_POOL = ['Etanol hidratado', 'Açúcar VHP', 'Energia exportada', 'Relatórios de qualidade', 'Bagaço'];
+const CUSTOMERS_POOL = ['Distribuidoras', 'Mercado interno', 'Exportação', 'Áreas internas', 'Concessionária de energia'];
+
 function randomName() {
   return `${pick(FIRST_NAMES)} ${pick(LAST_NAMES)}`;
+}
+
+/** Escolhe n itens distintos de um pool e junta um por linha (formato SIPOC / texto livre). */
+const pickLines = <T>(a: T[], n: number) => [...new Set(Array.from({ length: n }, () => pick(a)))].join('\n');
+
+/** Valor fictício plausível para a resposta de um campo de formulário, por tipo. */
+function answerFor(type: string): string {
+  switch (type) {
+    case 'BOOLEAN': return pick(['Sim', 'Não']);
+    case 'NUMBER': return String(rint(20, 120));
+    case 'DATE': return new Date(Date.now() - rint(0, 30) * 86_400_000).toISOString().slice(0, 10);
+    case 'SELECT': return pick(['Conforme', 'Não conforme', 'Não aplicável']);
+    case 'TEXTAREA': return 'Sem observações relevantes (fictício).';
+    default: return randomName();
+  }
 }
 
 // alvo plausível por unidade/direção
@@ -145,6 +195,15 @@ async function main() {
 
   // 2) WIPE (escopo demo) — filhos antes de pais; usuários demo são preservados (upsert depois)
   console.log('Limpando dados anteriores da Empresa Demonstração...');
+  // Módulos corporativos (FASE 6/7) — apagados ANTES de indicadores/ações/projetos/orgNodes
+  // por causa das FKs. Ordem: dependentes primeiro.
+  await prisma.formSubmission.deleteMany({ where: { companyId } }); // cascata answers
+  await prisma.formTemplate.deleteMany({ where: { companyId } }); // cascata fields (+ submissions já apagadas)
+  await prisma.audit.deleteMany({ where: { companyId } }); // cascata findings (que referenciam NCs)
+  await prisma.nonConformity.deleteMany({ where: { companyId } });
+  await prisma.riskRegister.deleteMany({ where: { companyId } });
+  await prisma.document.deleteMany({ where: { companyId } });
+  await prisma.process.deleteMany({ where: { companyId } }); // cascata steps (+ forms já apagados)
   await prisma.userVisibilityException.deleteMany({ where: { companyId } });
   await prisma.areaVisibilityRule.deleteMany({ where: { companyId } });
   await prisma.userAreaAssignment.deleteMany({ where: { companyId } });
@@ -392,6 +451,7 @@ async function main() {
   const actionTitle = namer(ACTION_POOL);
   const ACTION_STATUS = ['NOT_STARTED', 'IN_PROGRESS', 'IN_PROGRESS', 'WAITING_EVIDENCE', 'DONE', 'DONE'] as const;
   const PRIORITY = ['LOW', 'MEDIUM', 'HIGH', 'CRITICAL'] as const;
+  const actionIds: string[] = [];
   for (let i = 0; i < 8; i++) {
     const status = pick([...ACTION_STATUS]);
     const start = new Date(Date.now() - rint(10, 120) * 86_400_000);
@@ -409,6 +469,7 @@ async function main() {
       },
       select: { id: true },
     });
+    actionIds.push(action.id);
     const taskCount = rint(2, 4);
     for (let t = 0; t < taskCount; t++) {
       await prisma.actionTask.create({
@@ -425,6 +486,7 @@ async function main() {
   const devTitle = namer(DEVIATION_POOL);
   const DEV_SEV = ['LOW', 'MODERATE', 'CRITICAL'] as const;
   const DEV_STATUS = ['OPEN', 'IN_ANALYSIS', 'WAITING_ACTION', 'IN_PROGRESS', 'CLOSED'] as const;
+  const deviationIds: string[] = [];
   for (let i = 0; i < 6; i++) {
     const dev = await prisma.deviation.create({
       data: {
@@ -436,6 +498,7 @@ async function main() {
       },
       select: { id: true },
     });
+    deviationIds.push(dev.id);
     const causeCount = rint(1, 3);
     for (let c = 0; c < causeCount; c++) {
       await prisma.deviationCause.create({ data: { deviationId: dev.id, category: pick(SIX_M), description: 'Causa potencial identificada (fictícia).', weight: rfloat(0.5, 1) } });
@@ -505,6 +568,7 @@ async function main() {
 
   // 13) Projetos
   const projName = namer(PROJECT_POOL);
+  const projectIds: string[] = [];
   for (let i = 0; i < 3; i++) {
     const startsAt = new Date(Date.now() - rint(30, 180) * 86_400_000);
     const project = await prisma.project.create({
@@ -517,6 +581,7 @@ async function main() {
       },
       select: { id: true },
     });
+    projectIds.push(project.id);
     for (let m = 0; m < rint(2, 4); m++) {
       await prisma.projectMilestone.create({ data: { projectId: project.id, name: `Marco ${m + 1}`, dueDate: new Date(startsAt.getTime() + (m + 1) * rint(20, 45) * 86_400_000), done: chance(0.5) } });
     }
@@ -551,7 +616,229 @@ async function main() {
     });
   }
 
-  // 15) Resumo + verificação de que a Goiasa não mudou
+  // ---------- módulos corporativos (FASE 6/7) ----------
+
+  // 15) Riscos (RiskRegister)
+  const riskTitle = namer([...RISK_POOL]);
+  const RISK_CAT = ['STRATEGIC', 'OPERATIONAL', 'OPERATIONAL', 'FINANCIAL', 'COMPLIANCE', 'SAFETY', 'ENVIRONMENTAL', 'QUALITY', 'PROCESS'] as const;
+  const RISK_STATUS = ['IDENTIFIED', 'ANALYZING', 'MITIGATING', 'MONITORING', 'ACCEPTED', 'CLOSED'] as const;
+  for (let i = 0; i < 8; i++) {
+    const status = pick([...RISK_STATUS]);
+    const identifiedAt = new Date(Date.now() - rint(10, 200) * 86_400_000);
+    await prisma.riskRegister.create({
+      data: {
+        companyId, orgNodeId: pick(areaIds),
+        indicatorId: chance(0.6) ? pick(allIndIds) : null,
+        projectId: projectIds.length && chance(0.4) ? pick(projectIds) : null,
+        mitigationActionId: actionIds.length && chance(0.4) ? pick(actionIds) : null,
+        responsibleUserId: pick(userIds), createdById: pick(userIds),
+        title: riskTitle(), description: 'Risco identificado para demonstração.',
+        category: pick([...RISK_CAT]), status, probability: rint(1, 5), impact: rint(1, 5),
+        mitigationPlan: 'Plano de mitigação fictício (controles e barreiras de proteção).',
+        contingencyPlan: chance(0.6) ? 'Plano de contingência fictício para o cenário materializado.' : null,
+        dueDate: new Date(identifiedAt.getTime() + rint(30, 180) * 86_400_000),
+        identifiedAt,
+        closedAt: status === 'CLOSED' ? new Date(identifiedAt.getTime() + rint(20, 120) * 86_400_000) : null,
+      },
+    });
+  }
+
+  // 16) Não conformidades (CAPA)
+  const ncTitle = namer([...DEVIATION_POOL, 'Reclamação de cliente', 'Falha em auditoria interna', 'Desvio de procedimento operacional']);
+  const NC_SOURCE = ['INDICATOR', 'AUDIT', 'PROCESS', 'CUSTOMER', 'SUPPLIER', 'CHECKLIST', 'INSPECTION', 'MANUAL'] as const;
+  const NC_SEV = ['MINOR', 'MAJOR', 'MAJOR', 'CRITICAL'] as const;
+  const NC_STATUS = ['OPEN', 'TRIAGE', 'ANALYSIS', 'ACTION', 'VERIFICATION', 'CLOSED'] as const;
+  const ncIds: string[] = [];
+  for (let i = 0; i < 6; i++) {
+    const status = pick([...NC_STATUS]);
+    const advanced = ['ANALYSIS', 'ACTION', 'VERIFICATION', 'CLOSED'].includes(status);
+    const verifying = ['VERIFICATION', 'CLOSED'].includes(status);
+    const identifiedAt = new Date(Date.now() - rint(5, 150) * 86_400_000);
+    const nc = await prisma.nonConformity.create({
+      data: {
+        companyId, number: i + 1, orgNodeId: pick(areaIds),
+        indicatorId: chance(0.6) ? pick(allIndIds) : null,
+        deviationId: deviationIds.length && chance(0.4) ? pick(deviationIds) : null,
+        correctiveActionId: actionIds.length && chance(0.5) ? pick(actionIds) : null,
+        responsibleUserId: pick(userIds), createdById: pick(userIds),
+        title: ncTitle(), description: 'Não conformidade fictícia para demonstração.',
+        source: pick([...NC_SOURCE]), severity: pick([...NC_SEV]), status,
+        immediateAction: 'Contenção/disposição imediata aplicada (fictícia).',
+        rootCause: advanced ? 'Causa raiz identificada via análise (fictícia).' : null,
+        correctivePlan: advanced ? 'Plano de ação corretiva definido (fictício).' : null,
+        effectivenessCheck: verifying ? 'Verificação de eficácia realizada após a ação corretiva.' : null,
+        effectivenessOk: verifying ? chance(0.7) : null,
+        dueDate: new Date(identifiedAt.getTime() + rint(20, 120) * 86_400_000),
+        identifiedAt,
+        closedAt: status === 'CLOSED' ? new Date(identifiedAt.getTime() + rint(15, 100) * 86_400_000) : null,
+      },
+      select: { id: true },
+    });
+    ncIds.push(nc.id);
+  }
+
+  // 17) Documentos (Gestão Documental)
+  const docTitle = namer([...DOC_POOL]);
+  const DOC_TYPE = ['POLICY', 'PROCEDURE', 'PROCEDURE', 'INSTRUCTION', 'MANUAL', 'FORM', 'RECORD'] as const;
+  const DOC_STATUS = ['DRAFT', 'REVIEW', 'APPROVED', 'PUBLISHED', 'PUBLISHED', 'OBSOLETE'] as const;
+  const DOC_PREFIX: Record<string, string> = { POLICY: 'POL', PROCEDURE: 'PRO', INSTRUCTION: 'IT', MANUAL: 'MAN', FORM: 'FOR', TEMPLATE: 'TMP', RECORD: 'REG', EXTERNAL: 'EXT', OTHER: 'DOC' };
+  for (let i = 0; i < 10; i++) {
+    const type = pick([...DOC_TYPE]);
+    const status = pick([...DOC_STATUS]);
+    const approved = ['APPROVED', 'PUBLISHED', 'OBSOLETE'].includes(status);
+    const published = ['PUBLISHED', 'OBSOLETE'].includes(status);
+    const validFrom = published ? new Date(Date.now() - rint(30, 400) * 86_400_000) : null;
+    await prisma.document.create({
+      data: {
+        companyId, number: i + 1, code: `${DOC_PREFIX[type]}-${String(i + 1).padStart(3, '0')}`,
+        orgNodeId: pick(areaIds), indicatorId: chance(0.3) ? pick(allIndIds) : null,
+        ownerUserId: pick(userIds), approverUserId: approved ? pick(userIds) : null, createdById: pick(userIds),
+        title: docTitle(), description: 'Documento fictício para demonstração.',
+        type, status, version: rint(1, 4),
+        content: '# Documento de Demonstração\n\nConteúdo fictício em **markdown** para fins de demonstração.\n\n1. Objetivo\n2. Aplicação\n3. Responsabilidades\n4. Procedimento',
+        changeNote: chance(0.5) ? 'Revisão periódica do documento (fictícia).' : null,
+        validFrom, validUntil: validFrom ? new Date(validFrom.getTime() + rint(180, 730) * 86_400_000) : null,
+        reviewIntervalMonths: pick([6, 12, 12, 24]),
+        approvedAt: approved ? new Date(Date.now() - rint(20, 380) * 86_400_000) : null,
+        publishedAt: published ? validFrom : null,
+      },
+    });
+  }
+
+  // 18) Auditorias e achados (Audit + AuditFinding)
+  const auditTitle = namer([...AUDIT_POOL]);
+  const AUDIT_TYPE = ['INTERNAL', 'INTERNAL', 'EXTERNAL', 'PROCESS', 'SUPPLIER', 'SAFETY', 'QUALITY'] as const;
+  const AUDIT_STATUS = ['PLANNED', 'IN_PROGRESS', 'COMPLETED', 'COMPLETED'] as const;
+  const FINDING_TYPE = ['CONFORMITY', 'NONCONFORMITY', 'OBSERVATION', 'OPPORTUNITY'] as const;
+  const FINDING_STATUS = ['OPEN', 'IN_TREATMENT', 'CLOSED'] as const;
+  const REQ_POOL = ['ISO 9001 - 8.5', 'ISO 14001 - 6.1', 'NR-12', 'Procedimento interno PR-001', 'ISO 45001 - 8.1'];
+  for (let i = 0; i < 4; i++) {
+    const status = pick([...AUDIT_STATUS]);
+    const started = ['IN_PROGRESS', 'COMPLETED'].includes(status);
+    const completed = status === 'COMPLETED';
+    const plannedDate = new Date(Date.now() - rint(0, 120) * 86_400_000);
+    const audit = await prisma.audit.create({
+      data: {
+        companyId, number: i + 1, orgNodeId: pick(areaIds),
+        leadAuditorUserId: pick(userIds), createdById: pick(userIds),
+        title: auditTitle(), scope: 'Escopo de auditoria fictício (processos, requisitos e registros).',
+        type: pick([...AUDIT_TYPE]), status, plannedDate,
+        startedAt: started ? plannedDate : null,
+        completedAt: completed ? new Date(plannedDate.getTime() + rint(1, 10) * 86_400_000) : null,
+        summary: completed ? 'Conclusão da auditoria: pontos fortes e oportunidades de melhoria identificados (fictício).' : null,
+      },
+      select: { id: true },
+    });
+    for (let f = 0; f < rint(2, 4); f++) {
+      const ftype = pick([...FINDING_TYPE]);
+      const isNc = ftype === 'NONCONFORMITY';
+      await prisma.auditFinding.create({
+        data: {
+          auditId: audit.id,
+          nonConformityId: isNc && ncIds.length && chance(0.6) ? pick(ncIds) : null,
+          type: ftype, severity: isNc ? pick([...NC_SEV]) : null, status: pick([...FINDING_STATUS]),
+          requirement: pick(REQ_POOL), description: 'Constatação de auditoria fictícia para demonstração.',
+          evidence: chance(0.7) ? 'Evidência objetiva registrada durante a auditoria (fictícia).' : null,
+          recommendation: chance(0.6) ? 'Recomendação de melhoria para o processo auditado (fictícia).' : null,
+          dueDate: isNc ? new Date(Date.now() + rint(10, 90) * 86_400_000) : null,
+        },
+      });
+    }
+  }
+
+  // 19) Processos e SIPOC (Process + ProcessStep)
+  const processName = namer([...PROCESS_POOL]);
+  const PROC_TYPE = ['CORE', 'CORE', 'SUPPORT', 'MANAGEMENT'] as const;
+  const PROC_STATUS = ['DRAFT', 'ACTIVE', 'ACTIVE', 'UNDER_REVIEW', 'ARCHIVED'] as const;
+  const STEP_VERBS = ['Receber', 'Preparar', 'Executar', 'Inspecionar', 'Registrar', 'Aprovar', 'Expedir'];
+  for (let i = 0; i < 6; i++) {
+    const proc = await prisma.process.create({
+      data: {
+        companyId, number: i + 1, code: `PR-${String(i + 1).padStart(3, '0')}`,
+        orgNodeId: pick(areaIds), indicatorId: chance(0.5) ? pick(allIndIds) : null,
+        ownerUserId: pick(userIds), createdById: pick(userIds),
+        name: processName(), description: 'Processo mapeado para demonstração.',
+        objective: 'Garantir a execução padronizada e eficiente do processo (fictício).',
+        type: pick([...PROC_TYPE]), status: pick([...PROC_STATUS]), version: pick(['1.0', '1.1', '2.0']),
+        suppliers: pickLines(SUPPLIERS_POOL, rint(2, 3)), inputs: pickLines(INPUTS_POOL, rint(2, 3)),
+        outputs: pickLines(OUTPUTS_POOL, rint(2, 3)), customers: pickLines(CUSTOMERS_POOL, rint(2, 3)),
+      },
+      select: { id: true },
+    });
+    for (let s = 0; s < rint(3, 5); s++) {
+      await prisma.processStep.create({
+        data: {
+          processId: proc.id, order: s + 1,
+          name: `${pick(STEP_VERBS)} ${pick(['materiais', 'produto', 'documentação', 'amostra', 'lote'])}`,
+          description: 'Etapa do fluxo do processo (fictícia).', responsible: pick(AREA_POOL),
+        },
+      });
+    }
+  }
+
+  // 20) Formulários e checklists (FormTemplate + FormField + FormSubmission + FormAnswer)
+  const formTitle = namer([...FORM_POOL]);
+  const FORM_TYPE = ['FORM', 'CHECKLIST', 'CHECKLIST', 'INSPECTION', 'AUDIT_CHECKLIST', 'SURVEY'] as const;
+  const FORM_STATUS = ['DRAFT', 'ACTIVE', 'ACTIVE', 'ARCHIVED'] as const;
+  const SUB_STATUS = ['DRAFT', 'SUBMITTED', 'SUBMITTED', 'REVIEWED'] as const;
+  const FIELD_DEFS: { label: string; type: FormFieldType; options?: string }[] = [
+    { label: 'Data da verificação', type: 'DATE' },
+    { label: 'Responsável pela inspeção', type: 'TEXT' },
+    { label: 'Equipamento em conformidade?', type: 'BOOLEAN' },
+    { label: 'Temperatura registrada (°C)', type: 'NUMBER' },
+    { label: 'Condição geral', type: 'SELECT', options: 'Conforme\nNão conforme\nNão aplicável' },
+    { label: 'Observações', type: 'TEXTAREA' },
+  ];
+  for (let i = 0; i < 5; i++) {
+    const template = await prisma.formTemplate.create({
+      data: {
+        companyId, number: i + 1, code: `FRM-${String(i + 1).padStart(3, '0')}`,
+        orgNodeId: pick(areaIds), indicatorId: chance(0.3) ? pick(allIndIds) : null,
+        ownerUserId: pick(userIds), createdById: pick(userIds),
+        title: formTitle(), description: 'Modelo de formulário/checklist fictício.',
+        type: pick([...FORM_TYPE]), status: pick([...FORM_STATUS]), version: pick(['1.0', '1.1', '2.0']),
+      },
+      select: { id: true },
+    });
+    const chosen = FIELD_DEFS.slice(0, rint(3, FIELD_DEFS.length));
+    const fields: { id: string; label: string; type: string }[] = [];
+    for (let fi = 0; fi < chosen.length; fi++) {
+      const fd = chosen[fi];
+      const field = await prisma.formField.create({
+        data: {
+          templateId: template.id, order: fi + 1, label: fd.label, type: fd.type,
+          required: chance(0.5), options: fd.options ?? null,
+          helpText: chance(0.3) ? 'Campo de preenchimento (fictício).' : null,
+        },
+        select: { id: true, label: true, type: true },
+      });
+      fields.push(field);
+    }
+    for (let s = 0; s < rint(1, 3); s++) {
+      const status = pick([...SUB_STATUS]);
+      const submitted = ['SUBMITTED', 'REVIEWED'].includes(status);
+      const reviewed = status === 'REVIEWED';
+      const submittedAt = submitted ? new Date(Date.now() - rint(1, 60) * 86_400_000) : null;
+      const submission = await prisma.formSubmission.create({
+        data: {
+          companyId, templateId: template.id, orgNodeId: pick(areaIds),
+          indicatorId: chance(0.2) ? pick(allIndIds) : null,
+          submittedById: pick(userIds), reviewedById: reviewed ? pick(userIds) : null,
+          title: `Preenchimento ${s + 1}`, status,
+          notes: chance(0.4) ? 'Observações gerais do preenchimento (fictícias).' : null,
+          submittedAt, reviewedAt: reviewed && submittedAt ? new Date(submittedAt.getTime() + rint(1, 10) * 86_400_000) : null,
+        },
+        select: { id: true },
+      });
+      for (const field of fields) {
+        await prisma.formAnswer.create({
+          data: { submissionId: submission.id, fieldId: field.id, fieldLabel: field.label, value: answerFor(field.type) },
+        });
+      }
+    }
+  }
+
+  // 21) Resumo + verificação de que a Goiasa não mudou
   const after = await snapshot(companyId);
   const goiasaAfter = await snapshot(goiasa.id);
   const goiasaUnchanged = JSON.stringify(goiasaBefore) === JSON.stringify(goiasaAfter);
@@ -568,7 +855,7 @@ async function main() {
 }
 
 async function snapshot(companyId: string) {
-  const [orgNode, branch, user, indicator, indicatorTarget, indicatorResult, strategicMap, perspective, strategicObjective, actionPlan, deviation, meeting, project, okrCycle, orgJob, orgEmployee] = await Promise.all([
+  const [orgNode, branch, user, indicator, indicatorTarget, indicatorResult, strategicMap, perspective, strategicObjective, actionPlan, deviation, meeting, project, okrCycle, orgJob, orgEmployee, risk, nonConformity, document, audit, auditFinding, process, formTemplate, formSubmission] = await Promise.all([
     prisma.orgNode.count({ where: { companyId, deletedAt: null } }),
     prisma.branch.count({ where: { companyId, deletedAt: null } }),
     prisma.user.count({ where: { companyId, deletedAt: null } }),
@@ -585,8 +872,16 @@ async function snapshot(companyId: string) {
     prisma.oKRCycle.count({ where: { companyId } }),
     prisma.orgJob.count({ where: { companyId } }),
     prisma.orgEmployee.count({ where: { companyId } }),
+    prisma.riskRegister.count({ where: { companyId, deletedAt: null } }),
+    prisma.nonConformity.count({ where: { companyId, deletedAt: null } }),
+    prisma.document.count({ where: { companyId, deletedAt: null } }),
+    prisma.audit.count({ where: { companyId, deletedAt: null } }),
+    prisma.auditFinding.count({ where: { audit: { companyId } } }),
+    prisma.process.count({ where: { companyId, deletedAt: null } }),
+    prisma.formTemplate.count({ where: { companyId, deletedAt: null } }),
+    prisma.formSubmission.count({ where: { companyId, deletedAt: null } }),
   ]);
-  return { orgNode, branch, user, indicator, indicatorTarget, indicatorResult, strategicMap, perspective, strategicObjective, actionPlan, deviation, meeting, project, okrCycle, orgJob, orgEmployee };
+  return { orgNode, branch, user, indicator, indicatorTarget, indicatorResult, strategicMap, perspective, strategicObjective, actionPlan, deviation, meeting, project, okrCycle, orgJob, orgEmployee, risk, nonConformity, document, audit, auditFinding, process, formTemplate, formSubmission };
 }
 
 main()
