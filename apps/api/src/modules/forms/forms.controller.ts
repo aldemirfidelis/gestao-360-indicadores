@@ -28,10 +28,64 @@ export class FormsController {
     return this.service.summary(me);
   }
 
+  @Get('dashboard')
+  @RequirePermissions('forms:dashboard')
+  dashboard(@CurrentUser() me: AuthPayload) {
+    return this.service.dashboard(me);
+  }
+
+  @Get('library')
+  @RequirePermissions('forms:templates')
+  library(@CurrentUser() me: AuthPayload) {
+    return this.service.library(me);
+  }
+
   @Get('options')
   @RequirePermissions('forms:view')
   options(@CurrentUser() me: AuthPayload) {
     return this.service.options(me);
+  }
+
+  @Get('executions')
+  @RequirePermissions('forms:execute')
+  executions(
+    @CurrentUser() me: AuthPayload,
+    @Query('status') status?: string,
+    @Query('templateId') templateId?: string,
+    @Query('assignedToId') assignedToId?: string,
+    @Query('search') search?: string,
+  ) {
+    return this.service.listExecutions(me, { status, templateId, assignedToId, search });
+  }
+
+  @Post('executions')
+  @RequirePermissions('forms:execute')
+  createExecution(@CurrentUser() me: AuthPayload, @Body() body: any) {
+    return this.service.createExecution(me, body);
+  }
+
+  @Get('executions/:executionId')
+  @RequirePermissions('forms:execute')
+  executionById(@CurrentUser() me: AuthPayload, @Param('executionId') executionId: string) {
+    return this.service.getExecution(me, executionId);
+  }
+
+  @Post('executions/:executionId/responses')
+  @RequirePermissions('forms:execute')
+  saveExecutionResponses(@CurrentUser() me: AuthPayload, @Param('executionId') executionId: string, @Body() body: any) {
+    return this.service.saveExecutionResponses(me, executionId, body);
+  }
+
+  @Post('executions/:executionId/complete')
+  @RequirePermissions('forms:execute')
+  completeExecution(@CurrentUser() me: AuthPayload, @Param('executionId') executionId: string, @Body() body: any) {
+    return this.service.completeExecution(me, executionId, body);
+  }
+
+  @Post('ai/suggestions')
+  @RequirePermissions('forms:ai')
+  createAiSuggestions(@CurrentUser() me: AuthPayload, @Body() body: any) {
+    return this.service.createAiSuggestions(me, body);
   }
 
   @Get(':id')
@@ -40,10 +94,34 @@ export class FormsController {
     return this.service.getById(me, id);
   }
 
+  @Get(':id/builder')
+  @RequirePermissions('forms:builder')
+  builder(@CurrentUser() me: AuthPayload, @Param('id') id: string) {
+    return this.service.builder(me, id);
+  }
+
   @Post()
   @RequirePermissions('forms:create')
   create(@CurrentUser() me: AuthPayload, @Body() body: any) {
     return this.service.create(me, body);
+  }
+
+  @Post(':id/versions')
+  @RequirePermissions('forms:versions')
+  createVersion(@CurrentUser() me: AuthPayload, @Param('id') id: string, @Body() body: any) {
+    return this.service.createVersion(me, id, body);
+  }
+
+  @Post(':id/publish')
+  @RequirePermissions('forms:publish')
+  publish(@CurrentUser() me: AuthPayload, @Param('id') id: string, @Body() body: any) {
+    return this.service.publish(me, id, body);
+  }
+
+  @Post(':id/duplicate')
+  @RequirePermissions('forms:create')
+  duplicate(@CurrentUser() me: AuthPayload, @Param('id') id: string, @Body() body: any) {
+    return this.service.duplicate(me, id, body);
   }
 
   @Patch(':id')
@@ -74,5 +152,29 @@ export class FormsController {
   @RequirePermissions('forms:update')
   updateSubmission(@CurrentUser() me: AuthPayload, @Param('submissionId') submissionId: string, @Body() body: any) {
     return this.service.updateSubmission(me, submissionId, body);
+  }
+
+  @Post('submissions/:submissionId/evidence')
+  @RequirePermissions('forms:evidence')
+  addEvidence(@CurrentUser() me: AuthPayload, @Param('submissionId') submissionId: string, @Body() body: any) {
+    return this.service.addEvidence(me, submissionId, body);
+  }
+
+  @Post('submissions/:submissionId/signatures')
+  @RequirePermissions('forms:execute')
+  sign(@CurrentUser() me: AuthPayload, @Param('submissionId') submissionId: string, @Body() body: any) {
+    return this.service.signSubmission(me, submissionId, body);
+  }
+
+  @Post('submissions/:submissionId/approvals')
+  @RequirePermissions('forms:approve')
+  approve(@CurrentUser() me: AuthPayload, @Param('submissionId') submissionId: string, @Body() body: any) {
+    return this.service.approveSubmission(me, submissionId, body);
+  }
+
+  @Post('submissions/:submissionId/issues')
+  @RequirePermissions('forms:issues')
+  createIssue(@CurrentUser() me: AuthPayload, @Param('submissionId') submissionId: string, @Body() body: any) {
+    return this.service.createIssue(me, submissionId, body);
   }
 }

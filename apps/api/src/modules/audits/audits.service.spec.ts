@@ -33,6 +33,13 @@ function makeService(opts?: {
       update: vi.fn().mockResolvedValue({ id: 'f1', nonConformityId: 'nc1', status: 'IN_TREATMENT', nonConformity: { id: 'nc1', number: 5, title: 'NC', status: 'OPEN' } }),
       delete: vi.fn().mockResolvedValue({ id: 'f1' }),
     },
+    auditFindingClassification: { findFirst: vi.fn().mockResolvedValue(null) },
+    auditFollowUp: { create: vi.fn().mockResolvedValue({ id: 'fu1' }) },
+    auditTimelineEvent: { create: vi.fn().mockResolvedValue({ id: 'tl1' }) },
+    auditProgram: { findFirst: vi.fn().mockResolvedValue(null) },
+    auditTypeConfig: { findFirst: vi.fn().mockResolvedValue(null) },
+    auditUniverseItem: { findFirst: vi.fn().mockResolvedValue(null) },
+    auditorProfile: { findFirst: vi.fn().mockResolvedValue(null) },
     orgNode: { findFirst: vi.fn().mockResolvedValue(opts?.orgNode ?? null), findMany: vi.fn().mockResolvedValue([]) },
     user: { findFirst: vi.fn().mockResolvedValue(opts?.user ?? null), findMany: vi.fn().mockResolvedValue([]) },
   };
@@ -44,8 +51,16 @@ function makeService(opts?: {
     assertCanWrite: vi.fn().mockResolvedValue(undefined),
   } as any;
   const nonconformities = { create: vi.fn().mockResolvedValue({ id: 'nc1', number: 5, title: 'NC gerada' }) } as any;
+  const codes = {
+    ensureDefaults: vi.fn().mockResolvedValue(undefined),
+    nextAuditCode: vi.fn().mockResolvedValue({ number: 1, code: 'AUD-2026-0001' }),
+    nextCode: vi.fn().mockResolvedValue('CONST-2026-0001'),
+    listTypes: vi.fn().mockResolvedValue([]),
+  } as any;
+  const risk = { calculate: vi.fn().mockResolvedValue({ score: 50, level: 'MODERATE', recommendedFrequencyDays: 365, criteriaValues: {}, formulaSnapshot: 'test' }) } as any;
+  const storage = { putText: vi.fn().mockResolvedValue({ storageProvider: 'TEST', storageKey: 'k', fileName: 'f.txt', mimeType: 'text/plain', sizeBytes: 1, hashSha256: 'h' }) } as any;
 
-  const service = new AuditsService(prisma, traceability, access, nonconformities);
+  const service = new AuditsService(prisma, traceability, access, nonconformities, codes, risk, storage);
   return { service, prisma, access, nonconformities };
 }
 

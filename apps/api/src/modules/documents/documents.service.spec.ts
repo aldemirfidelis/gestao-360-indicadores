@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { ConflictException, ForbiddenException, NotFoundException } from '@nestjs/common';
-import { UserRoleEnum } from '@prisma/client';
+import { BadRequestException, ConflictException, ForbiddenException, NotFoundException } from '@nestjs/common';
+import { DocumentType, UserRoleEnum } from '@prisma/client';
 import { DocumentsService } from './documents.service';
 import type { AuthPayload } from '../auth/auth.types';
 
@@ -20,13 +20,55 @@ function makeService(opts?: {
   indicator?: unknown;
   user?: unknown;
 }) {
+  const hasDocOverride = Object.prototype.hasOwnProperty.call(opts ?? {}, 'doc');
+  const scopedDoc = hasDocOverride ? opts?.doc : baseDoc();
   const prisma: any = {
     document: {
       findMany: vi.fn().mockResolvedValue(opts?.docs ?? []),
-      findFirst: vi.fn().mockResolvedValue(opts?.doc ?? null),
-      create: vi.fn().mockResolvedValue({ id: 'd1', number: 1, companyId: 'companyA', title: 'Doc', status: 'PUBLISHED', type: 'PROCEDURE', version: 1, indicatorId: opts?.indicator ? 'i1' : null }),
+      findFirst: vi.fn(async (args: any) => {
+        if (args?.where?.id) return scopedDoc;
+        if (args?.orderBy?.number) return null;
+        if (args?.where?.code) return null;
+        return scopedDoc;
+      }),
+      create: vi.fn(async ({ data }: any) => baseDoc({ ...data, id: 'd1', number: data.number ?? 1, indicatorId: opts?.indicator ? 'i1' : null })),
       update: vi.fn().mockResolvedValue({ id: 'd1', number: 1, companyId: 'companyA', title: 'Doc', status: 'APPROVED', type: 'PROCEDURE', version: 1, indicatorId: null }),
+      count: vi.fn().mockResolvedValue(0),
     },
+    documentTypeConfig: {
+      count: vi.fn().mockResolvedValue(1),
+      findMany: vi.fn().mockResolvedValue([]),
+      findFirst: vi.fn().mockResolvedValue(null),
+      create: vi.fn().mockResolvedValue({ id: 'dt1', category: DocumentType.PROCEDURE, prefix: 'PRO', defaultValidityDays: 365, alertDays: 30 }),
+      update: vi.fn().mockResolvedValue({ id: 'dt1' }),
+    },
+    documentTemplate: { findMany: vi.fn().mockResolvedValue([]), create: vi.fn().mockResolvedValue({ id: 'tpl1' }) },
+    documentVersion: {
+      findMany: vi.fn().mockResolvedValue([]),
+      findFirst: vi.fn().mockResolvedValue(null),
+      create: vi.fn().mockResolvedValue({ id: 'v1', revisionNumber: 0, versionLabel: 'Rev. 00', docxFileId: null, status: 'DRAFT' }),
+      update: vi.fn().mockResolvedValue({ id: 'v1' }),
+      updateMany: vi.fn().mockResolvedValue({ count: 0 }),
+      count: vi.fn().mockResolvedValue(0),
+    },
+    documentFile: {
+      findMany: vi.fn().mockResolvedValue([]),
+      findFirst: vi.fn().mockResolvedValue(null),
+      create: vi.fn().mockResolvedValue({ id: 'f1', kind: 'DOCX', versionId: 'v1', fileName: 'doc.docx', mimeType: null, contentText: 'x', storageKey: 'k' }),
+      count: vi.fn().mockResolvedValue(0),
+    },
+    documentStatusHistory: { findMany: vi.fn().mockResolvedValue([]), create: vi.fn().mockResolvedValue({ id: 'h1' }) },
+    documentWorkflow: { findMany: vi.fn().mockResolvedValue([]), create: vi.fn().mockResolvedValue({ id: 'wf1' }) },
+    documentWorkflowStep: { create: vi.fn().mockResolvedValue({ id: 'wfs1' }) },
+    documentApproval: { findMany: vi.fn().mockResolvedValue([]), create: vi.fn().mockResolvedValue({ id: 'a1' }) },
+    documentReviewRequest: { findMany: vi.fn().mockResolvedValue([]), create: vi.fn().mockResolvedValue({ id: 'rr1' }) },
+    documentComment: { findMany: vi.fn().mockResolvedValue([]), create: vi.fn().mockResolvedValue({ id: 'c1' }) },
+    documentAuditLog: { findMany: vi.fn().mockResolvedValue([]), create: vi.fn().mockResolvedValue({ id: 'al1' }) },
+    documentExternalMetadata: { findUnique: vi.fn().mockResolvedValue(null) },
+    documentTagRelation: { findMany: vi.fn().mockResolvedValue([]) },
+    documentReadConfirmation: { create: vi.fn().mockResolvedValue({ id: 'rc1' }) },
+    documentEditorSession: { create: vi.fn().mockResolvedValue({ id: 'es1' }) },
+    documentAutosaveCheckpoint: { create: vi.fn().mockResolvedValue({ id: 'cp1' }) },
     orgNode: { findFirst: vi.fn().mockResolvedValue(opts?.orgNode ?? null), findMany: vi.fn().mockResolvedValue([]) },
     indicator: { findFirst: vi.fn().mockResolvedValue(opts?.indicator ?? null), findMany: vi.fn().mockResolvedValue([]) },
     user: { findFirst: vi.fn().mockResolvedValue(opts?.user ?? null), findMany: vi.fn().mockResolvedValue([]) },
@@ -38,9 +80,25 @@ function makeService(opts?: {
     listAreaFilter: vi.fn().mockResolvedValue(opts?.listAreaFilter ?? null),
     assertCanWrite: vi.fn().mockResolvedValue(undefined),
   } as any;
+  const codes = {
+    ensureDefaultTypes: vi.fn().mockResolvedValue(undefined),
+    listTypes: vi.fn().mockResolvedValue([]),
+    createType: vi.fn(),
+    updateType: vi.fn(),
+    resolveType: vi.fn().mockResolvedValue({ id: 'dt1', category: DocumentType.PROCEDURE, prefix: 'PRO', defaultValidityDays: 365, alertDays: 30 }),
+    nextCode: vi.fn().mockResolvedValue({ code: 'PRO-001', typeConfig: { id: 'dt1', category: DocumentType.PROCEDURE, prefix: 'PRO', defaultValidityDays: 365, alertDays: 30 } }),
+  } as any;
+  const editor = {
+    status: vi.fn().mockReturnValue({ configured: false, provider: 'manual', mode: 'MANUAL', url: null, autosave: false, concurrentEditing: false }),
+    openPayload: vi.fn().mockReturnValue({ configured: false, provider: 'manual', mode: 'MANUAL', url: null, autosave: false, concurrentEditing: false }),
+  } as any;
+  const storage = {
+    putText: vi.fn().mockResolvedValue({ storageProvider: 'LOCAL', storageKey: 'k', fileName: 'doc.docx', mimeType: 'text/plain', sizeBytes: 10, hashSha256: 'hash' }),
+    readText: vi.fn().mockResolvedValue('conteudo'),
+  } as any;
 
-  const service = new DocumentsService(prisma, traceability, access);
-  return { service, prisma, traceability, access };
+  const service = new DocumentsService(prisma, traceability, access, codes, editor, storage);
+  return { service, prisma, traceability, access, codes, storage };
 }
 
 describe('DocumentsService - gestao documental', () => {
@@ -96,16 +154,22 @@ describe('DocumentsService - gestao documental', () => {
     await expect(service.getById(me, 'd1')).rejects.toBeInstanceOf(ForbiddenException);
   });
 
-  it('create: valida vinculos, numera por empresa e publica com timestamps', async () => {
-    const { service, prisma, access } = makeService({ indicator: { ownerNodeId: 'areaA' }, user: { id: 'u2' } });
-    await service.create(me, { title: 'Politica de Seguranca', indicatorId: 'i1', ownerUserId: 'u2', status: 'PUBLISHED', type: 'POLICY' });
+  it('create: valida vinculos, gera codigo por empresa e cria versao/arquivo inicial', async () => {
+    const { service, prisma, access, codes, storage } = makeService({ indicator: { ownerNodeId: 'areaA' }, user: { id: 'u2' } });
+    await service.create(me, { title: 'Procedimento de Seguranca', indicatorId: 'i1', ownerUserId: 'u2', type: 'PROCEDURE' });
     expect(access.assertCanWrite).toHaveBeenCalledWith('user-1', 'areaA', 'documents', 'create');
+    expect(codes.nextCode).toHaveBeenCalled();
+    expect(storage.putText).toHaveBeenCalled();
     const data = prisma.document.create.mock.calls[0][0].data;
     expect(data.companyId).toBe('companyA');
     expect(data.number).toBe(1);
+    expect(data.code).toBe('PRO-001');
+    expect(data.status).toBe('DRAFT');
     expect(data.createdById).toBe('user-1');
-    expect(data.publishedAt).toBeInstanceOf(Date);
-    expect(data.approvedAt).toBeInstanceOf(Date);
+    expect(data.publishedAt).toBeNull();
+    expect(data.approvedAt).toBeNull();
+    expect(prisma.documentVersion.create).toHaveBeenCalled();
+    expect(prisma.documentFile.create).toHaveBeenCalled();
   });
 
   it('create: indicador de outra empresa -> NotFound e nao grava', async () => {
@@ -120,15 +184,19 @@ describe('DocumentsService - gestao documental', () => {
     expect(prisma.document.create).not.toHaveBeenCalled();
   });
 
-  it('update: nao persiste id/companyId forjados e aprova com approvedAt', async () => {
+  it('update: nao persiste id/companyId forjados em metadados', async () => {
     const { service, prisma } = makeService({ doc: baseDoc({ orgNodeId: null, approvedAt: null, publishedAt: null }) });
-    await service.update(me, 'd1', { id: 'hack', companyId: 'companyB', status: 'APPROVED', title: 'Rev2' });
+    await service.update(me, 'd1', { id: 'hack', companyId: 'companyB', title: 'Rev2' });
     const data = prisma.document.update.mock.calls[0][0].data;
     expect(data.id).toBeUndefined();
     expect(data.companyId).toBeUndefined();
     expect(data.title).toBe('Rev2');
-    expect(data.approvedAt).toBeInstanceOf(Date);
-    expect(data.publishedAt).toBeNull();
+  });
+
+  it('update: bloqueia alteracao direta de status', async () => {
+    const { service, prisma } = makeService({ doc: baseDoc({ orgNodeId: null }) });
+    await expect(service.update(me, 'd1', { status: 'APPROVED' })).rejects.toBeInstanceOf(BadRequestException);
+    expect(prisma.document.update).not.toHaveBeenCalled();
   });
 });
 

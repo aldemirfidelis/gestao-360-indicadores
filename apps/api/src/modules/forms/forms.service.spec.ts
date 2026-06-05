@@ -1,6 +1,8 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { BadRequestException, ConflictException, ForbiddenException, NotFoundException } from '@nestjs/common';
 import { UserRoleEnum } from '@prisma/client';
+import { FormCodeService } from './form-code.service';
+import { FormStorageService } from './form-storage.service';
 import { FormsService } from './forms.service';
 import type { AuthPayload } from '../auth/auth.types';
 
@@ -34,9 +36,35 @@ function makeService(opts?: {
       create: vi.fn().mockImplementation((args: any) => Promise.resolve(baseTemplate({ id: 'f1', number: 1, title: args.data.title, status: args.data.status, fields: args.data.fields?.create ?? [] }))),
       update: vi.fn().mockResolvedValue(baseTemplate({ id: 'f1', number: 1, title: 'Checklist revisado', status: 'ACTIVE' })),
     },
+    formTypeConfig: {
+      findFirst: vi.fn().mockResolvedValue(null),
+      findMany: vi.fn().mockResolvedValue([]),
+      upsert: vi.fn().mockImplementation((args: any) => Promise.resolve({ id: `type-${args.create.code}`, ...args.create })),
+    },
+    formCategory: {
+      findFirst: vi.fn().mockResolvedValue(null),
+      findMany: vi.fn().mockResolvedValue([]),
+      upsert: vi.fn().mockImplementation((args: any) => Promise.resolve({ id: `cat-${args.create.name}`, ...args.create })),
+    },
+    formFolder: {
+      findFirst: vi.fn().mockResolvedValue(null),
+      findMany: vi.fn().mockResolvedValue([]),
+      upsert: vi.fn().mockImplementation((args: any) => Promise.resolve({ id: `folder-${args.create.name}`, ...args.create })),
+    },
+    formTag: {
+      findMany: vi.fn().mockResolvedValue([]),
+      upsert: vi.fn().mockImplementation((args: any) => Promise.resolve({ id: `tag-${args.create.name}`, ...args.create })),
+    },
+    formReusableBlock: { findMany: vi.fn().mockResolvedValue([]) },
+    formTemplateVersion: {
+      findFirst: vi.fn().mockResolvedValue(null),
+      create: vi.fn().mockImplementation((args: any) => Promise.resolve({ id: 'version-1', versionNumber: args.data.versionNumber, versionLabel: args.data.versionLabel, status: args.data.status })),
+    },
     formField: {
       deleteMany: vi.fn().mockResolvedValue({ count: 1 }),
       createMany: vi.fn().mockResolvedValue({ count: 1 }),
+      updateMany: vi.fn().mockResolvedValue({ count: 1 }),
+      count: vi.fn().mockResolvedValue(1),
     },
     formSubmission: {
       findMany: vi.fn().mockResolvedValue([]),
@@ -44,11 +72,20 @@ function makeService(opts?: {
       findUniqueOrThrow: vi.fn().mockResolvedValue(opts?.submission ?? baseSubmission()),
       create: vi.fn().mockImplementation((args: any) => Promise.resolve(baseSubmission({ status: args.data.status, answers: args.data.answers?.create ?? [] }))),
       update: vi.fn().mockResolvedValue(baseSubmission({ status: 'REVIEWED' })),
+      count: vi.fn().mockResolvedValue(0),
     },
     formAnswer: {
       deleteMany: vi.fn().mockResolvedValue({ count: 1 }),
       createMany: vi.fn().mockResolvedValue({ count: 1 }),
     },
+    formOperationalRecord: {
+      count: vi.fn().mockResolvedValue(0),
+      create: vi.fn().mockResolvedValue({ id: 'record-1', code: 'REG-00001', title: 'Ronda 01' }),
+    },
+    formRecordTimeline: { create: vi.fn().mockResolvedValue({ id: 'timeline-1' }) },
+    formExecution: { findMany: vi.fn().mockResolvedValue([]), count: vi.fn().mockResolvedValue(0) },
+    formIssue: { count: vi.fn().mockResolvedValue(0) },
+    formApproval: { count: vi.fn().mockResolvedValue(0) },
     orgNode: { findFirst: vi.fn().mockResolvedValue(opts?.orgNode ?? null), findMany: vi.fn().mockResolvedValue([]) },
     process: { findFirst: vi.fn().mockResolvedValue(opts?.process ?? null), findMany: vi.fn().mockResolvedValue([]) },
     indicator: { findFirst: vi.fn().mockResolvedValue(opts?.indicator ?? null), findMany: vi.fn().mockResolvedValue([]) },
@@ -62,7 +99,7 @@ function makeService(opts?: {
     assertCanWrite: vi.fn().mockResolvedValue(undefined),
   } as any;
 
-  const service = new FormsService(prisma, traceability, access);
+  const service = new FormsService(prisma, traceability, access, new FormCodeService(), new FormStorageService());
   return { service, prisma, traceability, access };
 }
 

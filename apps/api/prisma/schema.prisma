@@ -1795,16 +1795,57 @@ enum DocumentType {
   FORM
   TEMPLATE
   RECORD
+  INTERNAL_STANDARD
+  GUIDELINE
+  REGULATION
+  FLOWCHART
+  PLAN
+  REPORT
+  CHECKLIST
+  TECHNICAL_SPECIFICATION
   EXTERNAL
   OTHER
 }
 
 enum DocumentStatus {
   DRAFT // rascunho
-  REVIEW // em revisao
+  IN_DEVELOPMENT // em elaboracao
+  WAITING_REVIEW // aguardando revisao
+  REVIEW // legado: em revisao
+  IN_REVIEW // em revisao
+  ADJUSTMENTS_REQUESTED // ajustes solicitados
+  REVIEWED // revisado
+  WAITING_APPROVAL // aguardando aprovacao
+  IN_APPROVAL // em aprovacao
+  REJECTED // reprovado
   APPROVED // aprovado
+  SCHEDULED_PUBLICATION // agendado para publicacao
   PUBLISHED // publicado / vigente
+  NEAR_EXPIRATION // proximo do vencimento
+  EXPIRED // vencido
+  PERIODIC_REVIEW // em revisao periodica
+  REPLACED // substituido
   OBSOLETE // obsoleto
+  ARCHIVED // arquivado
+  CANCELLED // cancelado
+}
+
+enum DocumentFileKind {
+  DOCX
+  PDF
+  TEMPLATE
+  ATTACHMENT
+  EVIDENCE
+  IMAGE
+  TEMPORARY
+}
+
+enum DocumentApprovalDecision {
+  PENDING
+  APPROVED
+  REJECTED
+  ADJUSTMENTS_REQUESTED
+  DELEGATED
 }
 
 model Document {
@@ -1841,6 +1882,28 @@ model Document {
   updatedAt            DateTime       @updatedAt
   deletedAt            DateTime?
 
+  versions             DocumentVersion[]
+  files                DocumentFile[]
+  statusHistory        DocumentStatusHistory[]
+  workflows            DocumentWorkflow[]
+  workflowSteps        DocumentWorkflowStep[]
+  approvals            DocumentApproval[]
+  reviewRequests       DocumentReviewRequest[]
+  comments             DocumentComment[]
+  relations            DocumentRelation[]
+  permissions          DocumentPermission[]
+  distributions        DocumentDistribution[]
+  readConfirmations    DocumentReadConfirmation[]
+  downloadLogs         DocumentDownloadLog[]
+  viewLogs             DocumentViewLog[]
+  shareLinks           DocumentShareLink[]
+  notifications        DocumentNotification[]
+  auditLogs            DocumentAuditLog[]
+  externalMetadata     DocumentExternalMetadata?
+  editorSessions       DocumentEditorSession[]
+  autosaveCheckpoints  DocumentAutosaveCheckpoint[]
+  tagRelations         DocumentTagRelation[]
+
   @@unique([companyId, number])
   @@index([companyId])
   @@index([companyId, status])
@@ -1849,6 +1912,573 @@ model Document {
   @@index([indicatorId])
   @@index([ownerUserId])
   @@index([validUntil])
+}
+
+model DocumentTypeConfig {
+  id                     String       @id @default(uuid())
+  companyId              String
+  name                   String
+  sigla                  String
+  description            String?
+  category               DocumentType @default(PROCEDURE)
+  prefix                 String
+  codePattern            String       @default("{{PREFIX}}-{{SEQ}}")
+  sequenceScope          String       @default("TYPE")
+  digits                 Int          @default(3)
+  nextNumber             Int          @default(1)
+  resetYearly            Boolean      @default(false)
+  currentYear            Int?
+  defaultTemplateId      String?
+  defaultValidityDays    Int?
+  alertDays              Int          @default(30)
+  requiresPeriodicReview Boolean      @default(true)
+  editable               Boolean      @default(true)
+  allowManualCode        Boolean      @default(false)
+  createOnlyByRequest    Boolean      @default(false)
+  approvalFlow           Json?
+  customFields           Json?
+  active                 Boolean      @default(true)
+  createdById            String?
+  updatedById            String?
+  createdAt              DateTime     @default(now())
+  updatedAt              DateTime     @updatedAt
+  deletedAt              DateTime?
+
+  @@unique([companyId, sigla])
+  @@index([companyId, active])
+  @@index([companyId, prefix])
+  @@map("document_types")
+}
+
+model DocumentCodeRule {
+  id            String   @id @default(uuid())
+  companyId     String
+  typeConfigId  String?
+  name          String
+  prefix        String
+  pattern       String   @default("{{PREFIX}}-{{SEQ}}")
+  sequenceScope String   @default("TYPE")
+  digits        Int      @default(3)
+  nextNumber    Int      @default(1)
+  resetYearly   Boolean  @default(false)
+  currentYear   Int?
+  active        Boolean  @default(true)
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+  deletedAt     DateTime?
+
+  @@unique([companyId, name])
+  @@index([companyId, active])
+  @@index([typeConfigId])
+  @@map("document_code_rules")
+}
+
+model DocumentTemplate {
+  id           String   @id @default(uuid())
+  companyId    String
+  typeConfigId String?
+  name         String
+  description  String?
+  version      Int      @default(1)
+  isDefault    Boolean  @default(false)
+  active       Boolean  @default(true)
+  storageKey   String?
+  fileName     String?
+  mimeType     String?
+  sizeBytes    Int?
+  hashSha256   String?
+  content      String?
+  placeholders Json?
+  createdById  String?
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+  deletedAt    DateTime?
+
+  @@index([companyId, active])
+  @@index([typeConfigId, isDefault])
+  @@map("document_templates")
+}
+
+model DocumentVersion {
+  id              String         @id @default(uuid())
+  companyId       String
+  documentId      String
+  document        Document       @relation(fields: [documentId], references: [id], onDelete: Cascade)
+  revisionNumber  Int
+  versionLabel    String
+  status          DocumentStatus @default(DRAFT)
+  changeReason    String?
+  changeSummary   String?
+  docxFileId      String?
+  pdfFileId       String?
+  publicationDate DateTime?
+  expirationDate  DateTime?
+  createdById     String?
+  publishedById   String?
+  createdAt       DateTime       @default(now())
+  updatedAt       DateTime       @updatedAt
+  deletedAt       DateTime?
+
+  @@unique([documentId, revisionNumber])
+  @@index([companyId, status])
+  @@index([documentId, createdAt])
+  @@map("document_versions")
+}
+
+model DocumentFile {
+  id              String           @id @default(uuid())
+  companyId       String
+  documentId      String?
+  document        Document?        @relation(fields: [documentId], references: [id], onDelete: Cascade)
+  versionId       String?
+  templateId      String?
+  kind            DocumentFileKind
+  storageProvider String           @default("LOCAL")
+  storageKey      String
+  fileName        String
+  mimeType        String?
+  sizeBytes       Int?
+  hashSha256      String?
+  contentText     String?
+  protected       Boolean          @default(false)
+  createdById     String?
+  createdAt       DateTime         @default(now())
+  deletedAt       DateTime?
+
+  @@index([companyId, kind])
+  @@index([documentId, kind])
+  @@index([versionId])
+  @@index([storageKey])
+  @@map("document_files")
+}
+
+model DocumentStatusHistory {
+  id          String   @id @default(uuid())
+  companyId   String
+  documentId  String
+  document    Document @relation(fields: [documentId], references: [id], onDelete: Cascade)
+  versionId   String?
+  userId      String?
+  statusFrom  String?
+  statusTo    String
+  comment     String?
+  metadata    Json?
+  createdAt   DateTime @default(now())
+
+  @@index([companyId, createdAt])
+  @@index([documentId, createdAt])
+  @@map("document_status_history")
+}
+
+model DocumentWorkflow {
+  id           String   @id @default(uuid())
+  companyId    String
+  documentId   String?
+  document     Document? @relation(fields: [documentId], references: [id], onDelete: Cascade)
+  typeConfigId String?
+  name         String
+  mode         String   @default("SEQUENTIAL")
+  active       Boolean  @default(true)
+  steps        Json?
+  createdById  String?
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+  deletedAt    DateTime?
+
+  @@index([companyId, active])
+  @@index([documentId])
+  @@map("document_workflows")
+}
+
+model DocumentWorkflowStep {
+  id          String   @id @default(uuid())
+  companyId   String
+  workflowId  String?
+  documentId  String
+  document    Document @relation(fields: [documentId], references: [id], onDelete: Cascade)
+  versionId   String?
+  stepOrder   Int      @default(1)
+  role        String?
+  userId      String?
+  dueAt       DateTime?
+  decision    String   @default("PENDING")
+  comment     String?
+  decidedAt   DateTime?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([companyId, decision])
+  @@index([documentId, stepOrder])
+  @@map("document_workflow_steps")
+}
+
+model DocumentApproval {
+  id             String                   @id @default(uuid())
+  companyId      String
+  documentId     String
+  document       Document                 @relation(fields: [documentId], references: [id], onDelete: Cascade)
+  versionId      String?
+  approverUserId String?
+  approverRole   String?
+  approvalOrder  Int                      @default(1)
+  decision       DocumentApprovalDecision @default(PENDING)
+  statusFrom     String?
+  statusTo       String?
+  comment        String?
+  ip             String?
+  sessionId      String?
+  evidenceFileId String?
+  decidedAt      DateTime?
+  createdAt      DateTime                 @default(now())
+
+  @@index([companyId, decision])
+  @@index([documentId, approvalOrder])
+  @@index([approverUserId, decision])
+  @@map("document_approvals")
+}
+
+model DocumentReviewRequest {
+  id             String   @id @default(uuid())
+  companyId      String
+  documentId     String
+  document       Document @relation(fields: [documentId], references: [id], onDelete: Cascade)
+  versionId      String?
+  reviewerUserId String?
+  authorUserId   String?
+  status         String   @default("OPEN")
+  comment        String
+  dueAt          DateTime?
+  answeredAt     DateTime?
+  answer         String?
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  @@index([companyId, status])
+  @@index([documentId, createdAt])
+  @@index([reviewerUserId, status])
+  @@map("document_review_requests")
+}
+
+model DocumentComment {
+  id         String   @id @default(uuid())
+  companyId  String
+  documentId String
+  document   Document @relation(fields: [documentId], references: [id], onDelete: Cascade)
+  versionId  String?
+  parentId   String?
+  userId     String?
+  body       String
+  resolvedAt DateTime?
+  createdAt  DateTime @default(now())
+
+  @@index([companyId, createdAt])
+  @@index([documentId, createdAt])
+  @@map("document_comments")
+}
+
+model DocumentCommentMention {
+  id        String   @id @default(uuid())
+  commentId String
+  userId    String
+  createdAt DateTime @default(now())
+
+  @@unique([commentId, userId])
+  @@map("document_comment_mentions")
+}
+
+model DocumentRelation {
+  id                String   @id @default(uuid())
+  companyId         String
+  documentId        String
+  document          Document @relation(fields: [documentId], references: [id], onDelete: Cascade)
+  relatedEntityType String
+  relatedEntityId   String
+  relationKind      String   @default("RELATED")
+  createdById       String?
+  createdAt         DateTime @default(now())
+
+  @@unique([documentId, relatedEntityType, relatedEntityId, relationKind])
+  @@index([companyId, relatedEntityType, relatedEntityId])
+  @@map("document_relations")
+}
+
+model DocumentPermission {
+  id           String   @id @default(uuid())
+  companyId    String
+  documentId   String?
+  document     Document? @relation(fields: [documentId], references: [id], onDelete: Cascade)
+  typeConfigId String?
+  userId       String?
+  orgNodeId    String?
+  groupId      String?
+  permission   String
+  allowed      Boolean  @default(true)
+  createdAt    DateTime @default(now())
+
+  @@index([companyId, permission])
+  @@index([documentId])
+  @@index([userId])
+  @@map("document_permissions")
+}
+
+model DocumentAccessGroup {
+  id          String   @id @default(uuid())
+  companyId   String
+  name        String
+  description String?
+  active      Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  deletedAt   DateTime?
+
+  @@unique([companyId, name])
+  @@map("document_access_groups")
+}
+
+model DocumentAccessGroupUser {
+  id        String   @id @default(uuid())
+  groupId   String
+  userId    String
+  createdAt DateTime @default(now())
+
+  @@unique([groupId, userId])
+  @@map("document_access_group_users")
+}
+
+model DocumentDistribution {
+  id                   String   @id @default(uuid())
+  companyId            String
+  documentId           String
+  document             Document @relation(fields: [documentId], references: [id], onDelete: Cascade)
+  versionId            String?
+  userId               String?
+  orgNodeId            String?
+  groupId              String?
+  dueAt                DateTime?
+  requireConfirmation  Boolean  @default(true)
+  requireQuiz          Boolean  @default(false)
+  trainingRef          String?
+  sentAt               DateTime @default(now())
+  createdById          String?
+
+  @@index([companyId, dueAt])
+  @@index([documentId])
+  @@index([userId])
+  @@map("document_distributions")
+}
+
+model DocumentReadConfirmation {
+  id             String   @id @default(uuid())
+  companyId      String
+  documentId     String
+  document       Document @relation(fields: [documentId], references: [id], onDelete: Cascade)
+  versionId      String?
+  distributionId String?
+  userId         String
+  readAt         DateTime @default(now())
+  confirmedAt    DateTime?
+  quizScore      Float?
+  status         String   @default("READ")
+
+  @@index([companyId, status])
+  @@index([documentId, userId])
+  @@map("document_read_confirmations")
+}
+
+model DocumentDownloadLog {
+  id         String   @id @default(uuid())
+  companyId  String
+  documentId String
+  document   Document @relation(fields: [documentId], references: [id], onDelete: Cascade)
+  versionId  String?
+  fileId     String?
+  userId     String?
+  action     String   @default("DOWNLOAD")
+  ip         String?
+  userAgent  String?
+  createdAt  DateTime @default(now())
+
+  @@index([companyId, createdAt])
+  @@index([documentId, createdAt])
+  @@map("document_download_logs")
+}
+
+model DocumentViewLog {
+  id         String   @id @default(uuid())
+  companyId  String
+  documentId String
+  document   Document @relation(fields: [documentId], references: [id], onDelete: Cascade)
+  versionId  String?
+  fileId     String?
+  userId     String?
+  origin     String?
+  ip         String?
+  userAgent  String?
+  createdAt  DateTime @default(now())
+
+  @@index([companyId, createdAt])
+  @@index([documentId, createdAt])
+  @@map("document_view_logs")
+}
+
+model DocumentShareLink {
+  id         String   @id @default(uuid())
+  companyId  String
+  documentId String
+  document   Document @relation(fields: [documentId], references: [id], onDelete: Cascade)
+  versionId  String?
+  tokenHash  String
+  permission String   @default("VIEW")
+  expiresAt  DateTime
+  revokedAt  DateTime?
+  createdById String?
+  createdAt  DateTime @default(now())
+
+  @@unique([tokenHash])
+  @@index([companyId, expiresAt])
+  @@index([documentId])
+  @@map("document_share_links")
+}
+
+model DocumentNotification {
+  id         String   @id @default(uuid())
+  companyId  String
+  documentId String
+  document   Document @relation(fields: [documentId], references: [id], onDelete: Cascade)
+  userId     String
+  title      String
+  message    String?
+  kind       String
+  priority   String   @default("NORMAL")
+  link       String?
+  readAt     DateTime?
+  createdAt  DateTime @default(now())
+
+  @@index([companyId, createdAt])
+  @@index([userId, readAt])
+  @@map("document_notifications")
+}
+
+model DocumentAuditLog {
+  id          String   @id @default(uuid())
+  companyId   String
+  documentId  String
+  document    Document @relation(fields: [documentId], references: [id], onDelete: Cascade)
+  versionId   String?
+  userId      String?
+  action      String
+  beforeValue Json?
+  afterValue  Json?
+  reason      String?
+  ip          String?
+  userAgent   String?
+  sessionId   String?
+  origin      String?
+  result      String   @default("SUCCESS")
+  errorMessage String?
+  createdAt   DateTime @default(now())
+
+  @@index([companyId, createdAt])
+  @@index([documentId, createdAt])
+  @@index([action, result])
+  @@map("document_audit_logs")
+}
+
+model DocumentExternalMetadata {
+  id                  String   @id @default(uuid())
+  companyId           String
+  documentId          String   @unique
+  document            Document @relation(fields: [documentId], references: [id], onDelete: Cascade)
+  issuer              String?
+  responsibleAgency   String?
+  externalNumber      String?
+  issueDate           DateTime?
+  expirationDate      DateTime?
+  sourceLink          String?
+  internalOwnerUserId String?
+  requiresRenewal     Boolean  @default(false)
+  alertDays           Int?
+  metadata            Json?
+
+  @@index([companyId, expirationDate])
+  @@map("document_external_metadata")
+}
+
+model DocumentRetentionRule {
+  id           String   @id @default(uuid())
+  companyId    String
+  typeConfigId String?
+  name         String
+  retentionDays Int?
+  disposition  String?
+  active       Boolean  @default(true)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  @@index([companyId, active])
+  @@map("document_retention_rules")
+}
+
+model DocumentEditorSession {
+  id          String   @id @default(uuid())
+  companyId   String
+  documentId  String
+  document    Document @relation(fields: [documentId], references: [id], onDelete: Cascade)
+  versionId   String?
+  userId      String?
+  provider    String
+  status      String   @default("OPEN")
+  startedAt   DateTime @default(now())
+  endedAt     DateTime?
+  metadata    Json?
+
+  @@index([companyId, status])
+  @@index([documentId, startedAt])
+  @@map("document_editor_sessions")
+}
+
+model DocumentAutosaveCheckpoint {
+  id          String   @id @default(uuid())
+  companyId   String
+  documentId  String
+  document    Document @relation(fields: [documentId], references: [id], onDelete: Cascade)
+  versionId   String?
+  userId      String?
+  content     String?
+  fileId      String?
+  checksum    String?
+  createdAt   DateTime @default(now())
+
+  @@index([companyId, createdAt])
+  @@index([documentId, createdAt])
+  @@map("document_autosave_checkpoints")
+}
+
+model DocumentTag {
+  id        String   @id @default(uuid())
+  companyId String
+  name      String
+  color     String?
+  createdAt DateTime @default(now())
+
+  relations DocumentTagRelation[]
+
+  @@unique([companyId, name])
+  @@map("document_tags")
+}
+
+model DocumentTagRelation {
+  id         String      @id @default(uuid())
+  companyId  String
+  documentId String
+  document   Document    @relation(fields: [documentId], references: [id], onDelete: Cascade)
+  tagId      String
+  tag        DocumentTag @relation(fields: [tagId], references: [id], onDelete: Cascade)
+  createdAt  DateTime    @default(now())
+
+  @@unique([documentId, tagId])
+  @@index([companyId, tagId])
+  @@map("document_tag_relations")
 }
 
 // =====================================================
@@ -1863,26 +2493,184 @@ enum AuditType {
   LEGAL
   SAFETY
   QUALITY
+  CERTIFICATION
+  MAINTENANCE
+  RECERTIFICATION
+  PRODUCT
+  MANAGEMENT_SYSTEM
+  DOCUMENTAL
+  OPERATIONAL
+  INTEGRATED
+  COMPLIANCE
+  INTERNAL_CONTROLS
+  PROJECT
+  EXTRAORDINARY
+  FOLLOW_UP
+  INSPECTION
+  DIAGNOSTIC
+  REMOTE
+  PRESENTIAL
+  HYBRID
 }
 
 enum AuditStatus {
+  DRAFT
+  WAITING_APPROVAL
   PLANNED
+  SCHEDULED
+  PREPARATION
+  READY_EXECUTION
   IN_PROGRESS
+  WAITING_COMPLEMENT
+  LEAD_REVIEW
+  WAITING_AUDITED_RESPONSE
+  REPORT_ISSUED
+  FOLLOW_UP
   COMPLETED
+  CLOSED
+  SUSPENDED
   CANCELLED
+  RESCHEDULED
 }
 
 enum AuditFindingType {
   CONFORMITY
+  PARTIAL_CONFORMITY
   NONCONFORMITY
   OBSERVATION
   OPPORTUNITY
+  STRENGTH
+  GOOD_PRACTICE
+  RECOMMENDATION
+  IDENTIFIED_RISK
+  DEVIATION
+  MINOR_NONCONFORMITY
+  MAJOR_NONCONFORMITY
+  CRITICAL_NONCONFORMITY
+  DOCUMENT_PENDING
+  INSUFFICIENT_EVIDENCE
+  NOT_VERIFIED
 }
 
 enum AuditFindingStatus {
+  DRAFT
   OPEN
+  UNDER_REVIEW
+  WAITING_AUDITED_RESPONSE
+  ACTION_REQUIRED
   IN_TREATMENT
+  CONVERTED_TO_NC
+  IN_FOLLOW_UP
   CLOSED
+  CANCELLED
+}
+
+enum AuditModality {
+  PRESENTIAL
+  REMOTE
+  HYBRID
+}
+
+enum AuditProgramStatus {
+  DRAFT
+  WAITING_APPROVAL
+  APPROVED
+  ACTIVE
+  COMPLETED
+  CANCELLED
+  ARCHIVED
+}
+
+enum AuditUniverseItemKind {
+  COMPANY
+  BRANCH
+  AREA
+  SECTOR
+  PROCESS
+  SUBPROCESS
+  ACTIVITY
+  PROJECT
+  CONTRACT
+  SUPPLIER
+  OPERATIONAL_UNIT
+  DOCUMENT
+  LEGAL_REQUIREMENT
+  STANDARD
+  INTERNAL_CONTROL
+  RISK
+  INDICATOR
+  STRATEGIC_OBJECTIVE
+  STAKEHOLDER
+  CUSTOM
+}
+
+enum AuditRiskLevel {
+  LOW
+  MODERATE
+  HIGH
+  CRITICAL
+}
+
+enum AuditorKind {
+  INTERNAL
+  EXTERNAL
+}
+
+enum AuditorStatus {
+  ACTIVE
+  INACTIVE
+  SUSPENDED
+  EXPIRED
+}
+
+enum AuditChecklistTemplateStatus {
+  DRAFT
+  IN_REVIEW
+  APPROVED
+  ARCHIVED
+}
+
+enum AuditChecklistResponseKind {
+  CONFORMING
+  NONCONFORMING
+  PARTIALLY_CONFORMING
+  NOT_APPLICABLE
+  NOT_VERIFIED
+  PENDING_EVIDENCE
+  OPPORTUNITY
+  OBSERVATION
+  GOOD_PRACTICE
+}
+
+enum AuditEvidenceStatus {
+  ACTIVE
+  UNDER_REVIEW
+  APPROVED
+  REJECTED
+  ARCHIVED
+}
+
+enum AuditApprovalDecision {
+  PENDING
+  APPROVED
+  REJECTED
+  ADJUSTMENTS_REQUESTED
+}
+
+enum AuditFollowUpStatus {
+  OPEN
+  IN_PROGRESS
+  EFFECTIVE
+  INEFFECTIVE
+  CLOSED
+  CANCELLED
+}
+
+enum AuditAiSuggestionStatus {
+  PENDING
+  ACCEPTED
+  REJECTED
+  APPLIED
 }
 
 model Audit {
@@ -1890,6 +2678,10 @@ model Audit {
   companyId         String
   company           Company     @relation(fields: [companyId], references: [id])
   number            Int // sequencial por empresa
+  code              String?
+  programId         String?
+  typeConfigId      String?
+  universeItemId    String?
   orgNodeId         String?
   orgNode           OrgNode?    @relation("AuditOrgNode", fields: [orgNodeId], references: [id])
   leadAuditorUserId String?
@@ -1897,48 +2689,866 @@ model Audit {
   createdById       String?
   createdBy         User?       @relation("AuditCreatedBy", fields: [createdById], references: [id])
 
-  title       String
-  scope       String?
-  type        AuditType   @default(INTERNAL)
-  status      AuditStatus @default(PLANNED)
-  plannedDate DateTime?
-  startedAt   DateTime?
-  completedAt DateTime?
-  summary     String? // relatorio / conclusao
-  createdAt   DateTime    @default(now())
-  updatedAt   DateTime    @updatedAt
-  deletedAt   DateTime?
+  title            String
+  scope            String?
+  objective        String?
+  criteria         String?
+  methodology      String?
+  origin           String?
+  type             AuditType     @default(INTERNAL)
+  modality         AuditModality @default(PRESENTIAL)
+  status           AuditStatus   @default(PLANNED)
+  plannedDate      DateTime?
+  plannedStartAt   DateTime?
+  plannedEndAt     DateTime?
+  executedAt       DateTime?
+  startedAt        DateTime?
+  completedAt      DateTime?
+  closedAt         DateTime?
+  estimatedHours   Float?
+  actualHours      Float?
+  locations        Json?
+  agenda           Json?
+  team             Json?
+  auditees         Json?
+  approvers        Json?
+  observers        Json?
+  standards        Json?
+  requirements     Json?
+  documents        Json?
+  risks            Json?
+  meetingUrl       String?
+  version          Int           @default(1)
+  score            Float?
+  result           String?
+  opinion          String?
+  summary          String? // relatorio / conclusao
+  followUpPlan     String?
+  confidentiality  String        @default("INTERNAL")
+  cancelledReason  String?
+  rescheduleReason String?
+  createdAt        DateTime      @default(now())
+  updatedAt        DateTime      @updatedAt
+  deletedAt        DateTime?
 
-  findings AuditFinding[]
+  findings            AuditFinding[]
+  checklistExecutions AuditChecklistExecution[]
+  evidence            AuditEvidence[]
+  reports             AuditReport[]
+  approvals           AuditApproval[]
+  followUps           AuditFollowUp[]
+  timelineEvents      AuditTimelineEvent[]
+  externalAccesses    AuditExternalAccess[]
+  aiSuggestions       AuditAiSuggestion[]
 
   @@unique([companyId, number])
+  @@unique([companyId, code])
   @@index([companyId])
   @@index([companyId, status])
+  @@index([programId])
+  @@index([typeConfigId])
+  @@index([universeItemId])
   @@index([type])
   @@index([orgNodeId])
   @@index([leadAuditorUserId])
+  @@index([plannedDate])
 }
 
 model AuditFinding {
   id              String                 @id @default(uuid())
+  companyId       String
   auditId         String
   audit           Audit                  @relation(fields: [auditId], references: [id], onDelete: Cascade)
   nonConformityId String?
   nonConformity   NonConformity?         @relation("FindingNc", fields: [nonConformityId], references: [id])
 
+  code           String?
   type           AuditFindingType       @default(OBSERVATION)
   severity       NonConformitySeverity?
   status         AuditFindingStatus     @default(OPEN)
   requirement    String? // requisito / clausula auditada
+  standardId     String?
+  requirementId  String?
+  orgNodeId      String?
+  processId      String?
+  supplierId     String?
+  checklistExecutionId String?
+  checklistItemId String?
   description    String
+  conditionFound String?
+  expectedCriteria String?
+  riskImpact     String?
+  classificationId String?
+  responsibleUserId String?
+  auditorUserId  String?
+  auditedUserId  String?
+  criticality    String?
+  recurrence     Boolean                @default(false)
+  similarFindingIds String[]             @default([])
+  actionPlanIds  String[]               @default([])
+  documentIds    String[]               @default([])
+  indicatorIds   String[]               @default([])
+  riskIds        String[]               @default([])
   evidence       String?
   recommendation String?
   dueDate        DateTime?
+  approvedAt     DateTime?
+  approvedById   String?
   createdAt      DateTime               @default(now())
   updatedAt      DateTime               @updatedAt
+  deletedAt      DateTime?
 
+  @@unique([companyId, code])
+  @@index([companyId])
   @@index([auditId])
   @@index([nonConformityId])
+  @@index([status])
+  @@index([type])
+  @@index([orgNodeId])
+  @@index([responsibleUserId])
+  @@index([dueDate])
+}
+
+model AuditProgram {
+  id             String             @id @default(uuid())
+  companyId      String
+  code           String
+  number         Int
+  name           String
+  description    String?
+  status         AuditProgramStatus @default(DRAFT)
+  cycleKind      String?
+  branchId       String?
+  ownerUserId    String?
+  approverUserId String?
+  startsAt       DateTime?
+  endsAt         DateTime?
+  approvedAt     DateTime?
+  approvedById   String?
+  objectives     Json?
+  standards      Json?
+  orgNodeIds     String[]           @default([])
+  processIds     String[]           @default([])
+  supplierIds    String[]           @default([])
+  documentIds    String[]           @default([])
+  riskIds        String[]           @default([])
+  indicatorIds   String[]           @default([])
+  estimatedHours Float?
+  budget         Float?
+  version        Int                @default(1)
+  attachments    Json?
+  comments       String?
+  createdById    String?
+  updatedById    String?
+  createdAt      DateTime           @default(now())
+  updatedAt      DateTime           @updatedAt
+  deletedAt      DateTime?
+
+  revisions AuditProgramRevision[]
+
+  @@unique([companyId, code])
+  @@unique([companyId, number])
+  @@index([companyId])
+  @@index([companyId, status])
+  @@index([ownerUserId])
+  @@index([approverUserId])
+  @@index([startsAt, endsAt])
+}
+
+model AuditProgramRevision {
+  id          String   @id @default(uuid())
+  companyId   String
+  programId   String
+  program     AuditProgram @relation(fields: [programId], references: [id], onDelete: Cascade)
+  version     Int
+  reason      String
+  summary     String?
+  snapshot    Json?
+  createdById String?
+  approvedById String?
+  approvedAt  DateTime?
+  createdAt   DateTime @default(now())
+
+  @@unique([programId, version])
+  @@index([companyId])
+  @@index([programId])
+}
+
+model AuditTypeConfig {
+  id                  String        @id @default(uuid())
+  companyId           String
+  name                String
+  code                String
+  prefix              String
+  description         String?
+  category            AuditType     @default(INTERNAL)
+  defaultModality     AuditModality @default(PRESENTIAL)
+  color               String?
+  icon                String?
+  codePattern         String        @default("AUD-{{YEAR}}-{{SEQ}}")
+  digits              Int           @default(4)
+  nextNumber          Int           @default(1)
+  active              Boolean       @default(true)
+  requiresChecklist   Boolean       @default(false)
+  requiresLeadAuditor Boolean       @default(true)
+  allowsRemote        Boolean       @default(true)
+  allowsMultipleStandards Boolean   @default(true)
+  workflow            Json?
+  rules               Json?
+  createdById         String?
+  updatedById         String?
+  createdAt           DateTime      @default(now())
+  updatedAt           DateTime      @updatedAt
+  deletedAt           DateTime?
+
+  @@unique([companyId, code])
+  @@index([companyId])
+  @@index([companyId, active])
+  @@index([category])
+}
+
+model AuditUniverseItem {
+  id                       String                @id @default(uuid())
+  companyId                String
+  code                     String
+  name                     String
+  kind                     AuditUniverseItemKind @default(AREA)
+  description              String?
+  branchId                 String?
+  orgNodeId                String?
+  processId                String?
+  supplierId               String?
+  documentId               String?
+  riskId                   String?
+  indicatorId              String?
+  strategicObjectiveId     String?
+  ownerUserId              String?
+  riskScore                Float                 @default(0)
+  riskLevel                AuditRiskLevel        @default(LOW)
+  priority                 Int                   @default(0)
+  recommendedFrequencyDays Int?
+  lastAuditAt              DateTime?
+  nextSuggestedAuditAt     DateTime?
+  manualOverride           Boolean               @default(false)
+  overrideJustification    String?
+  riskFactors              Json?
+  status                   String                @default("ACTIVE")
+  createdById              String?
+  updatedById              String?
+  createdAt                DateTime              @default(now())
+  updatedAt                DateTime              @updatedAt
+  deletedAt                DateTime?
+
+  scores AuditRiskScore[]
+
+  @@unique([companyId, code])
+  @@index([companyId])
+  @@index([companyId, kind])
+  @@index([companyId, riskLevel])
+  @@index([orgNodeId])
+  @@index([processId])
+  @@index([supplierId])
+  @@index([riskId])
+  @@index([indicatorId])
+}
+
+model AuditRiskCriterion {
+  id              String   @id @default(uuid())
+  companyId       String
+  name            String
+  key             String
+  description     String?
+  weight          Float    @default(1)
+  minScore        Int      @default(1)
+  maxScore        Int      @default(5)
+  defaultScore    Int      @default(3)
+  formulaVariable String?
+  active          Boolean  @default(true)
+  createdById     String?
+  updatedById     String?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+  deletedAt       DateTime?
+
+  @@unique([companyId, key])
+  @@index([companyId])
+  @@index([companyId, active])
+}
+
+model AuditRiskScore {
+  id                       String            @id @default(uuid())
+  companyId                String
+  universeItemId           String
+  universeItem             AuditUniverseItem @relation(fields: [universeItemId], references: [id], onDelete: Cascade)
+  calculatedScore          Float
+  level                    AuditRiskLevel
+  criteriaValues           Json?
+  formulaSnapshot          String?
+  recommendedFrequencyDays Int?
+  changedById              String?
+  justification            String?
+  createdAt                DateTime          @default(now())
+
+  @@index([companyId])
+  @@index([universeItemId, createdAt])
+  @@index([level])
+}
+
+model AuditorProfile {
+  id                String        @id @default(uuid())
+  companyId         String
+  userId            String?
+  kind              AuditorKind   @default(INTERNAL)
+  status            AuditorStatus @default(ACTIVE)
+  name              String
+  email             String?
+  companyName       String?
+  phone             String?
+  orgNodeIds        String[]      @default([])
+  allowedAreaIds    String[]      @default([])
+  restrictedAreaIds String[]      @default([])
+  specialties       String[]      @default([])
+  standards         String[]      @default([])
+  competenceLevel   Int           @default(1)
+  workloadHours     Float         @default(0)
+  conflictPolicy    String        @default("WARN")
+  availability      Json?
+  notes             String?
+  docs              Json?
+  createdById       String?
+  updatedById       String?
+  createdAt         DateTime      @default(now())
+  updatedAt         DateTime      @updatedAt
+  deletedAt         DateTime?
+
+  competencies  AuditorCompetency[]
+  certifications AuditorCertification[]
+  availabilities AuditorAvailability[]
+  conflicts      AuditorConflict[]
+
+  @@unique([companyId, userId])
+  @@index([companyId])
+  @@index([companyId, status])
+  @@index([userId])
+}
+
+model AuditorCompetency {
+  id               String         @id @default(uuid())
+  companyId        String
+  auditorProfileId String
+  auditor          AuditorProfile @relation(fields: [auditorProfileId], references: [id], onDelete: Cascade)
+  name             String
+  standardCode     String?
+  requirement      String?
+  level            Int            @default(1)
+  validFrom        DateTime?
+  validUntil       DateTime?
+  evidenceDocumentIds String[]     @default([])
+  status           String         @default("VALID")
+  createdAt        DateTime       @default(now())
+  updatedAt        DateTime       @updatedAt
+  deletedAt        DateTime?
+
+  @@index([companyId])
+  @@index([auditorProfileId])
+  @@index([standardCode])
+  @@index([validUntil])
+}
+
+model AuditorCertification {
+  id               String         @id @default(uuid())
+  companyId        String
+  auditorProfileId String
+  auditor          AuditorProfile @relation(fields: [auditorProfileId], references: [id], onDelete: Cascade)
+  name             String
+  issuer           String?
+  certificateNumber String?
+  validFrom        DateTime?
+  validUntil       DateTime?
+  documentIds      String[]       @default([])
+  status           String         @default("VALID")
+  createdAt        DateTime       @default(now())
+  updatedAt        DateTime       @updatedAt
+  deletedAt        DateTime?
+
+  @@index([companyId])
+  @@index([auditorProfileId])
+  @@index([validUntil])
+}
+
+model AuditorAvailability {
+  id               String         @id @default(uuid())
+  companyId        String
+  auditorProfileId String
+  auditor          AuditorProfile @relation(fields: [auditorProfileId], references: [id], onDelete: Cascade)
+  startsAt         DateTime
+  endsAt           DateTime
+  status           String         @default("AVAILABLE")
+  notes            String?
+  createdAt        DateTime       @default(now())
+
+  @@index([companyId])
+  @@index([auditorProfileId, startsAt, endsAt])
+}
+
+model AuditorConflict {
+  id               String         @id @default(uuid())
+  companyId        String
+  auditorProfileId String
+  auditor          AuditorProfile @relation(fields: [auditorProfileId], references: [id], onDelete: Cascade)
+  auditId          String?
+  orgNodeId        String?
+  conflictType     String
+  severity         String         @default("WARN")
+  description      String?
+  justification    String?
+  approvedById     String?
+  approvedAt       DateTime?
+  status           String         @default("OPEN")
+  createdAt        DateTime       @default(now())
+  updatedAt        DateTime       @updatedAt
+
+  @@index([companyId])
+  @@index([auditorProfileId])
+  @@index([auditId])
+  @@index([orgNodeId])
+}
+
+model AuditStandard {
+  id            String   @id @default(uuid())
+  companyId     String
+  code          String
+  name          String
+  version       String?
+  description   String?
+  issuer        String?
+  effectiveFrom DateTime?
+  effectiveUntil DateTime?
+  status        String   @default("ACTIVE")
+  documents     Json?
+  controls      Json?
+  risks          Json?
+  createdById   String?
+  updatedById   String?
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+  deletedAt     DateTime?
+
+  requirements AuditRequirement[]
+
+  @@unique([companyId, code, version])
+  @@index([companyId])
+  @@index([companyId, status])
+}
+
+model AuditRequirement {
+  id            String        @id @default(uuid())
+  companyId     String
+  standardId    String
+  standard      AuditStandard @relation(fields: [standardId], references: [id], onDelete: Cascade)
+  clause        String
+  code          String?
+  title         String
+  description   String?
+  evidenceExpected Json?
+  controls      Json?
+  risks         Json?
+  status        String        @default("ACTIVE")
+  createdAt     DateTime      @default(now())
+  updatedAt     DateTime      @updatedAt
+  deletedAt     DateTime?
+
+  @@unique([standardId, clause])
+  @@index([companyId])
+  @@index([standardId])
+}
+
+model AuditFindingClassification {
+  id             String           @id @default(uuid())
+  companyId      String
+  name           String
+  code           String
+  findingType    AuditFindingType @default(OBSERVATION)
+  severity       NonConformitySeverity?
+  color          String?
+  level          Int              @default(1)
+  requiresNc     Boolean          @default(false)
+  requiresAction Boolean          @default(false)
+  active         Boolean          @default(true)
+  rules          Json?
+  createdById    String?
+  updatedById    String?
+  createdAt      DateTime         @default(now())
+  updatedAt      DateTime         @updatedAt
+  deletedAt      DateTime?
+
+  @@unique([companyId, code])
+  @@index([companyId])
+  @@index([companyId, active])
+}
+
+model AuditChecklistTemplate {
+  id              String                       @id @default(uuid())
+  companyId       String
+  code            String
+  name            String
+  description     String?
+  status          AuditChecklistTemplateStatus @default(DRAFT)
+  version         Int                          @default(1)
+  auditType       AuditType?
+  modality        AuditModality?
+  standardId      String?
+  orgNodeId       String?
+  processId       String?
+  supplierId      String?
+  requiresApproval Boolean                     @default(false)
+  approvedAt      DateTime?
+  approvedById    String?
+  createdById     String?
+  updatedById     String?
+  createdAt       DateTime                     @default(now())
+  updatedAt       DateTime                     @updatedAt
+  deletedAt       DateTime?
+
+  sections AuditChecklistSection[]
+
+  @@unique([companyId, code])
+  @@index([companyId])
+  @@index([companyId, status])
+  @@index([auditType])
+  @@index([standardId])
+}
+
+model AuditChecklistSection {
+  id          String                 @id @default(uuid())
+  companyId   String
+  templateId  String
+  template    AuditChecklistTemplate @relation(fields: [templateId], references: [id], onDelete: Cascade)
+  title       String
+  description String?
+  position    Int                    @default(0)
+  weight      Float                  @default(1)
+  createdAt   DateTime               @default(now())
+  updatedAt   DateTime               @updatedAt
+
+  items AuditChecklistItem[]
+
+  @@index([companyId])
+  @@index([templateId, position])
+}
+
+model AuditChecklistItem {
+  id               String                @id @default(uuid())
+  companyId        String
+  sectionId        String
+  section          AuditChecklistSection @relation(fields: [sectionId], references: [id], onDelete: Cascade)
+  code             String?
+  question         String
+  instructions     String?
+  examples         String?
+  requirementId    String?
+  responseType     String                @default("SELECT")
+  options          Json?
+  weight           Float                 @default(1)
+  criticality      String?
+  evidenceRequired Boolean               @default(false)
+  commentRequired  Boolean               @default(false)
+  mandatory        Boolean               @default(true)
+  conditionalRules Json?
+  position         Int                   @default(0)
+  createdAt        DateTime              @default(now())
+  updatedAt        DateTime              @updatedAt
+  deletedAt        DateTime?
+
+  @@index([companyId])
+  @@index([sectionId, position])
+  @@index([requirementId])
+}
+
+model AuditChecklistExecution {
+  id              String   @id @default(uuid())
+  companyId       String
+  auditId         String
+  audit           Audit    @relation(fields: [auditId], references: [id], onDelete: Cascade)
+  templateId      String?
+  code            String
+  status          String   @default("DRAFT")
+  progress        Float    @default(0)
+  assignedToUserId String?
+  startedAt       DateTime?
+  completedAt     DateTime?
+  autosaveToken   String?
+  version         Int      @default(1)
+  currentSectionId String?
+  createdById     String?
+  updatedById     String?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+  deletedAt       DateTime?
+
+  responses AuditChecklistResponse[]
+
+  @@unique([companyId, code])
+  @@index([companyId])
+  @@index([auditId])
+  @@index([templateId])
+  @@index([status])
+}
+
+model AuditChecklistResponse {
+  id                  String                 @id @default(uuid())
+  companyId           String
+  executionId         String
+  execution           AuditChecklistExecution @relation(fields: [executionId], references: [id], onDelete: Cascade)
+  auditId             String
+  itemId              String?
+  itemCode            String?
+  response            AuditChecklistResponseKind?
+  valueText           String?
+  valueNumber         Float?
+  valueDate           DateTime?
+  comments            String?
+  attachments         Json?
+  evidenceIds         String[]               @default([])
+  findingId           String?
+  markedForReview     Boolean                @default(false)
+  answeredById        String?
+  answeredAt          DateTime?
+  createdAt           DateTime               @default(now())
+  updatedAt           DateTime               @updatedAt
+
+  @@unique([executionId, itemId])
+  @@index([companyId])
+  @@index([executionId])
+  @@index([auditId])
+  @@index([findingId])
+}
+
+model AuditEvidence {
+  id                   String              @id @default(uuid())
+  companyId            String
+  auditId              String
+  audit                Audit               @relation(fields: [auditId], references: [id], onDelete: Cascade)
+  findingId            String?
+  checklistExecutionId String?
+  checklistItemId      String?
+  nonConformityId      String?
+  code                 String
+  fileName             String?
+  fileUrl              String?
+  mimeType             String?
+  sizeBytes            Int?
+  hashSha256           String?
+  description          String?
+  type                 String?
+  origin               String?
+  authorUserId         String?
+  location             String?
+  confidentiality      String              @default("INTERNAL")
+  status               AuditEvidenceStatus @default(ACTIVE)
+  version              Int                 @default(1)
+  storageProvider      String?
+  storageKey           String?
+  retentionUntil       DateTime?
+  createdAt            DateTime            @default(now())
+  updatedAt            DateTime            @updatedAt
+  deletedAt            DateTime?
+
+  @@unique([companyId, code])
+  @@index([companyId])
+  @@index([auditId])
+  @@index([findingId])
+  @@index([checklistExecutionId])
+  @@index([nonConformityId])
+}
+
+model AuditReport {
+  id               String   @id @default(uuid())
+  companyId        String
+  auditId          String
+  audit            Audit    @relation(fields: [auditId], references: [id], onDelete: Cascade)
+  code             String
+  title            String
+  status           String   @default("DRAFT")
+  version          Int      @default(1)
+  summary          String?
+  executiveSummary String?
+  findingsSummary  String?
+  conclusions      String?
+  recommendations  String?
+  score            Float?
+  result           String?
+  issuedAt         DateTime?
+  approvedAt       DateTime?
+  createdById      String?
+  approvedById     String?
+  documentId       String?
+  data             Json?
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+  deletedAt        DateTime?
+
+  @@unique([companyId, code])
+  @@index([companyId])
+  @@index([auditId])
+  @@index([status])
+  @@index([documentId])
+}
+
+model AuditApproval {
+  id             String                @id @default(uuid())
+  companyId      String
+  auditId        String
+  audit          Audit                 @relation(fields: [auditId], references: [id], onDelete: Cascade)
+  stage          String
+  decision       AuditApprovalDecision @default(PENDING)
+  approverUserId String?
+  approvalOrder  Int                   @default(1)
+  statusFrom     String?
+  statusTo       String?
+  comment        String?
+  decidedAt      DateTime?
+  createdAt      DateTime              @default(now())
+
+  @@index([companyId])
+  @@index([auditId])
+  @@index([approverUserId])
+  @@index([decision])
+}
+
+model AuditFollowUp {
+  id                  String              @id @default(uuid())
+  companyId           String
+  auditId             String
+  audit               Audit               @relation(fields: [auditId], references: [id], onDelete: Cascade)
+  findingId           String?
+  nonConformityId     String?
+  actionPlanId        String?
+  responsibleUserId   String?
+  title               String
+  description         String?
+  status              AuditFollowUpStatus @default(OPEN)
+  dueDate             DateTime?
+  completedAt         DateTime?
+  effectivenessStatus String?
+  verificationNotes   String?
+  createdById         String?
+  updatedById         String?
+  createdAt           DateTime            @default(now())
+  updatedAt           DateTime            @updatedAt
+  deletedAt           DateTime?
+
+  @@index([companyId])
+  @@index([auditId])
+  @@index([findingId])
+  @@index([nonConformityId])
+  @@index([actionPlanId])
+  @@index([responsibleUserId])
+  @@index([dueDate])
+}
+
+model AuditTimelineEvent {
+  id          String   @id @default(uuid())
+  companyId   String
+  auditId     String?
+  audit       Audit?   @relation(fields: [auditId], references: [id], onDelete: Cascade)
+  findingId   String?
+  entityType  String
+  entityId    String?
+  userId      String?
+  action      String
+  title       String
+  description String?
+  beforeValue Json?
+  afterValue  Json?
+  comment     String?
+  metadata    Json?
+  createdAt   DateTime @default(now())
+
+  @@index([companyId])
+  @@index([auditId, createdAt])
+  @@index([findingId])
+  @@index([entityType, entityId])
+  @@index([createdAt])
+}
+
+model AuditWorkflow {
+  id          String   @id @default(uuid())
+  companyId   String
+  name        String
+  description String?
+  entityType  String   @default("AUDIT")
+  active      Boolean  @default(true)
+  steps       Json?
+  transitions Json?
+  rules       Json?
+  createdById String?
+  updatedById String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  deletedAt   DateTime?
+
+  @@index([companyId])
+  @@index([companyId, active])
+}
+
+model AuditNotificationRule {
+  id          String   @id @default(uuid())
+  companyId   String
+  name        String
+  event       String
+  active      Boolean  @default(true)
+  config      Json?
+  createdById String?
+  updatedById String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  deletedAt   DateTime?
+
+  @@index([companyId])
+  @@index([companyId, event])
+}
+
+model AuditExternalAccess {
+  id          String    @id @default(uuid())
+  companyId   String
+  auditId     String
+  audit       Audit     @relation(fields: [auditId], references: [id], onDelete: Cascade)
+  email       String
+  userId      String?
+  tokenHash   String
+  scopes      String[]  @default([])
+  validFrom   DateTime?
+  validUntil  DateTime?
+  revokedAt   DateTime?
+  createdById String?
+  createdAt   DateTime  @default(now())
+
+  @@unique([tokenHash])
+  @@index([companyId])
+  @@index([auditId])
+  @@index([email])
+}
+
+model AuditAiSuggestion {
+  id             String                  @id @default(uuid())
+  companyId      String
+  auditId        String?
+  audit          Audit?                  @relation(fields: [auditId], references: [id], onDelete: Cascade)
+  findingId      String?
+  suggestionType String
+  title          String
+  content        String
+  context        Json?
+  status         AuditAiSuggestionStatus @default(PENDING)
+  createdAt      DateTime                @default(now())
+  decidedAt      DateTime?
+  decidedById    String?
+
+  @@index([companyId])
+  @@index([auditId, createdAt])
+  @@index([findingId])
+  @@index([status])
 }
 
 // =====================================================
@@ -2022,142 +3632,1325 @@ model ProcessStep {
 enum FormTemplateType {
   FORM
   CHECKLIST
+  OPERATIONAL_RECORD
   INSPECTION
   AUDIT_CHECKLIST
   PROCESS_CHECKLIST
+  DAILY_RECORD
+  SHIFT_LOG
+  OCCURRENCE
+  ROUND
+  MAINTENANCE
+  SAFETY
+  QUALITY
+  ENVIRONMENT
+  HR
   SURVEY
+  SUPPLIER
+  PROJECT
+  EXTERNAL
+  PUBLIC
   OTHER
 }
 
 enum FormTemplateStatus {
   DRAFT
+  IN_DEVELOPMENT
+  WAITING_REVIEW
+  IN_REVIEW
+  ADJUSTMENTS_REQUESTED
+  WAITING_APPROVAL
+  APPROVED
+  PUBLISHED
   ACTIVE
+  SUSPENDED
+  OBSOLETE
   ARCHIVED
 }
 
 enum FormFieldType {
+  TITLE
+  SUBTITLE
+  INFO
+  WARNING
   TEXT
+  RICH_TEXT
   TEXTAREA
   NUMBER
+  INTEGER
+  DECIMAL
+  CURRENCY
+  PERCENT
+  SCORE
+  SCALE
+  MEASUREMENT
+  TEMPERATURE
+  DURATION
   DATE
+  TIME
+  DATETIME
+  PERIOD
+  MONTH
+  YEAR
   BOOLEAN
+  YES_NO
+  CONFORMITY
   SELECT
   MULTISELECT
+  RADIO
+  CHECKBOX
+  LIKERT
+  STARS
+  STATUS
+  MATRIX
+  TABLE
+  USER
+  TEAM
+  COMPANY
+  BRANCH
+  ORG_NODE
+  PROCESS
+  PROJECT
+  SUPPLIER
+  DOCUMENT
+  RISK
+  INDICATOR
+  ACTION_PLAN
+  AUDIT
+  NON_CONFORMITY
+  ATTACHMENT
+  PHOTO
+  VIDEO
+  AUDIO
+  SIGNATURE
+  LINK
+  QR_CODE
+  BARCODE
+  LOCATION
+  MAP
+  ASSET
+  VEHICLE
+  AUTO_CODE
+  SECTION
+  PAGE
+  GROUP
+  TABS
+  ACCORDION
+  REPEATER
+  SUBFORM
+  FORMULA
+  CALCULATED
+  APPROVAL_BLOCK
+  EVIDENCE_BLOCK
 }
 
 enum FormSubmissionStatus {
   DRAFT
+  ASSIGNED
+  IN_PROGRESS
   SUBMITTED
+  WAITING_CORRECTION
+  WAITING_APPROVAL
+  APPROVED
+  REJECTED
   REVIEWED
+  CLOSED
+  CANCELLED
+}
+
+enum FormScheduleStatus {
+  ACTIVE
+  PAUSED
+  COMPLETED
+  CANCELLED
+}
+
+enum FormExecutionStatus {
+  PLANNED
+  ASSIGNED
+  IN_PROGRESS
+  WAITING_APPROVAL
+  COMPLETED
+  CLOSED
+  CANCELLED
+  OVERDUE
+}
+
+enum FormOperationalRecordStatus {
+  OPEN
+  COMPLETED
+  VALIDATED
+  ARCHIVED
+  CANCELLED
+}
+
+enum FormIssueStatus {
+  OPEN
+  IN_PROGRESS
+  WAITING_ACTION
+  RESOLVED
+  CANCELLED
+}
+
+enum FormEvidenceStatus {
+  ACTIVE
+  UNDER_REVIEW
+  APPROVED
+  REJECTED
+  ARCHIVED
+}
+
+enum FormApprovalDecision {
+  PENDING
+  APPROVED
+  REJECTED
+  ADJUSTMENTS_REQUESTED
+}
+
+enum FormExternalLinkStatus {
+  ACTIVE
+  EXPIRED
+  REVOKED
+}
+
+enum FormOfflineSyncStatus {
+  PENDING
+  SYNCED
+  CONFLICT
+  ERROR
+}
+
+enum FormAiSuggestionStatus {
+  PENDING
+  ACCEPTED
+  REJECTED
+  APPLIED
 }
 
 model FormTemplate {
-  id          String   @id @default(uuid())
-  companyId   String
-  company     Company  @relation(fields: [companyId], references: [id])
-  number      Int
-  code        String?
-  orgNodeId   String?
-  orgNode     OrgNode? @relation("FormTemplateOrgNode", fields: [orgNodeId], references: [id])
-  processId   String?
-  process     Process? @relation("FormTemplateProcess", fields: [processId], references: [id])
-  indicatorId String?
-  indicator   Indicator? @relation("FormTemplateIndicator", fields: [indicatorId], references: [id])
-  ownerUserId String?
-  owner       User?    @relation("FormTemplateOwner", fields: [ownerUserId], references: [id])
-  createdById String?
-  createdBy   User?    @relation("FormTemplateCreatedBy", fields: [createdById], references: [id])
+  id               String   @id @default(uuid())
+  companyId        String
+  company          Company  @relation(fields: [companyId], references: [id])
+  number           Int
+  code             String?
+  typeConfigId     String?
+  typeConfig       FormTypeConfig? @relation(fields: [typeConfigId], references: [id], onDelete: SetNull)
+  categoryId       String?
+  category         FormCategory? @relation(fields: [categoryId], references: [id], onDelete: SetNull)
+  folderId         String?
+  folder           FormFolder? @relation(fields: [folderId], references: [id], onDelete: SetNull)
+  currentVersionId String?
+  parentTemplateId String?
+  replacedById     String?
+  orgNodeId        String?
+  orgNode          OrgNode? @relation("FormTemplateOrgNode", fields: [orgNodeId], references: [id])
+  processId        String?
+  process          Process? @relation("FormTemplateProcess", fields: [processId], references: [id])
+  indicatorId      String?
+  indicator        Indicator? @relation("FormTemplateIndicator", fields: [indicatorId], references: [id])
+  ownerUserId      String?
+  owner            User?    @relation("FormTemplateOwner", fields: [ownerUserId], references: [id])
+  createdById      String?
+  createdBy        User?    @relation("FormTemplateCreatedBy", fields: [createdById], references: [id])
 
-  title       String
-  description String?
-  type        FormTemplateType   @default(FORM)
-  status      FormTemplateStatus @default(DRAFT)
-  version     String?
-  createdAt   DateTime           @default(now())
-  updatedAt   DateTime           @updatedAt
-  deletedAt   DateTime?
+  title              String
+  description        String?
+  purpose            String?
+  instructions       String?
+  type               FormTemplateType   @default(FORM)
+  status             FormTemplateStatus @default(DRAFT)
+  version            String?
+  globalTemplate     Boolean            @default(false)
+  reusable           Boolean            @default(true)
+  favorite           Boolean            @default(false)
+  confidentiality    String             @default("INTERNAL")
+  retentionDays      Int?
+  estimatedMinutes   Int?
+  reviewPeriodDays   Int?
+  validFrom          DateTime?
+  validUntil         DateTime?
+  approvedAt         DateTime?
+  approvedById       String?
+  publishedAt        DateTime?
+  publishedById      String?
+  suspendedAt        DateTime?
+  obsoleteAt         DateTime?
+  printLayoutId      String?
+  workflow           Json?
+  rules              Json?
+  formulas           Json?
+  permissions        Json?
+  settings           Json?
+  integrations       Json?
+  tags               String[]           @default([])
+  updatedById        String?
+  createdAt          DateTime           @default(now())
+  updatedAt          DateTime           @updatedAt
+  deletedAt          DateTime?
 
-  fields      FormField[]
-  submissions FormSubmission[]
+  versions           FormTemplateVersion[] @relation("FormTemplateVersions")
+  sections           FormTemplateSection[]
+  fields             FormField[]
+  tagRelations       FormTemplateTagRelation[]
+  ruleDefinitions    FormTemplateRule[]
+  formulaDefinitions FormTemplateFormula[]
+  workflows          FormWorkflow[]
+  permissionRules    FormPermission[]
+  printLayouts       FormPrintLayout[]
+  schedules          FormSchedule[]
+  executions         FormExecution[]
+  submissions        FormSubmission[]
+  operationalRecords FormOperationalRecord[]
+  issues             FormIssue[]
+  externalLinks      FormExternalLink[]
+  qrCodes            FormQrCode[]
+  kiosks             FormKiosk[]
+  aiSuggestions      FormAiSuggestion[]
 
   @@unique([companyId, number])
   @@index([companyId])
   @@index([companyId, status])
+  @@index([companyId, code])
+  @@index([typeConfigId])
+  @@index([categoryId])
+  @@index([folderId])
+  @@index([currentVersionId])
   @@index([type])
   @@index([orgNodeId])
   @@index([processId])
   @@index([indicatorId])
   @@index([ownerUserId])
+  @@index([validUntil])
 }
 
 model FormField {
-  id          String        @id @default(uuid())
-  templateId  String
-  template    FormTemplate  @relation(fields: [templateId], references: [id], onDelete: Cascade)
-  order       Int
-  label       String
-  type        FormFieldType @default(TEXT)
-  required    Boolean       @default(false)
-  options     String?
-  helpText    String?
-  createdAt   DateTime      @default(now())
-  updatedAt   DateTime      @updatedAt
+  id                String        @id @default(uuid())
+  templateId        String
+  template          FormTemplate  @relation(fields: [templateId], references: [id], onDelete: Cascade)
+  templateVersionId String?
+  templateVersion   FormTemplateVersion? @relation(fields: [templateVersionId], references: [id], onDelete: SetNull)
+  sectionId         String?
+  section           FormTemplateSection? @relation(fields: [sectionId], references: [id], onDelete: SetNull)
+  order             Int
+  code              String?
+  label             String
+  type              FormFieldType @default(TEXT)
+  required          Boolean       @default(false)
+  readOnly          Boolean       @default(false)
+  hidden            Boolean       @default(false)
+  repeatable        Boolean       @default(false)
+  evidenceRequired  Boolean       @default(false)
+  commentRequired   Boolean       @default(false)
+  options           String?
+  helpText          String?
+  placeholder       String?
+  defaultValue      String?
+  minValue          Float?
+  maxValue          Float?
+  minLength         Int?
+  maxLength         Int?
+  weight            Float         @default(1)
+  score             Float?
+  criticality       String?
+  validation        Json?
+  conditionalRules  Json?
+  formula           String?
+  dataSource        Json?
+  metadata          Json?
+  createdAt         DateTime      @default(now())
+  updatedAt         DateTime      @updatedAt
+  deletedAt         DateTime?
 
-  answers FormAnswer[]
+  optionsV2     FormFieldOption[]
+  answers       FormAnswer[]
+  responseItems FormExecutionResponseItem[]
 
   @@index([templateId])
+  @@index([templateVersionId])
+  @@index([sectionId])
+  @@index([code])
 }
 
 model FormSubmission {
-  id            String               @id @default(uuid())
-  companyId     String
-  company       Company              @relation(fields: [companyId], references: [id])
-  templateId    String
-  template      FormTemplate         @relation(fields: [templateId], references: [id])
-  orgNodeId     String?
-  orgNode       OrgNode?             @relation("FormSubmissionOrgNode", fields: [orgNodeId], references: [id])
-  processId     String?
-  process       Process?             @relation("FormSubmissionProcess", fields: [processId], references: [id])
-  indicatorId   String?
-  indicator     Indicator?           @relation("FormSubmissionIndicator", fields: [indicatorId], references: [id])
-  submittedById String?
-  submittedBy   User?                @relation("FormSubmissionSubmittedBy", fields: [submittedById], references: [id])
-  reviewedById  String?
-  reviewedBy    User?                @relation("FormSubmissionReviewedBy", fields: [reviewedById], references: [id])
+  id                String               @id @default(uuid())
+  companyId         String
+  company           Company              @relation(fields: [companyId], references: [id])
+  templateId        String
+  template          FormTemplate         @relation(fields: [templateId], references: [id])
+  templateVersionId String?
+  templateVersion   FormTemplateVersion? @relation(fields: [templateVersionId], references: [id], onDelete: SetNull)
+  executionId       String?
+  execution         FormExecution?       @relation(fields: [executionId], references: [id], onDelete: SetNull)
+  orgNodeId         String?
+  orgNode           OrgNode?             @relation("FormSubmissionOrgNode", fields: [orgNodeId], references: [id])
+  processId         String?
+  process           Process?             @relation("FormSubmissionProcess", fields: [processId], references: [id])
+  indicatorId       String?
+  indicator         Indicator?           @relation("FormSubmissionIndicator", fields: [indicatorId], references: [id])
+  submittedById     String?
+  submittedBy       User?                @relation("FormSubmissionSubmittedBy", fields: [submittedById], references: [id])
+  reviewedById      String?
+  reviewedBy        User?                @relation("FormSubmissionReviewedBy", fields: [reviewedById], references: [id])
 
-  title       String?
-  status      FormSubmissionStatus @default(DRAFT)
-  notes       String?
-  submittedAt DateTime?
-  reviewedAt  DateTime?
-  createdAt   DateTime             @default(now())
-  updatedAt   DateTime             @updatedAt
-  deletedAt   DateTime?
+  code             String?
+  title            String?
+  status           FormSubmissionStatus @default(DRAFT)
+  notes            String?
+  assignedToId     String?
+  dueDate          DateTime?
+  scheduledAt      DateTime?
+  startedAt        DateTime?
+  submittedAt      DateTime?
+  completedAt      DateTime?
+  reviewedAt       DateTime?
+  approvedAt       DateTime?
+  score            Float?
+  classification   String?
+  locked           Boolean              @default(false)
+  source           String?
+  originEntityType String?
+  originEntityId   String?
+  deviceInfo       Json?
+  location         Json?
+  snapshot         Json?
+  createdAt        DateTime             @default(now())
+  updatedAt        DateTime             @updatedAt
+  deletedAt        DateTime?
 
-  answers FormAnswer[]
+  answers           FormAnswer[]
+  responseItems     FormExecutionResponseItem[]
+  evidence          FormEvidence[]
+  signatures        FormSignature[]
+  approvals         FormApproval[]
+  operationalRecord FormOperationalRecord?
+  issues            FormIssue[]
+  timelineEvents    FormRecordTimeline[]
+  aiSuggestions     FormAiSuggestion[]
 
   @@index([companyId])
   @@index([templateId])
+  @@index([templateVersionId])
+  @@index([executionId])
   @@index([companyId, status])
+  @@index([companyId, code])
   @@index([orgNodeId])
   @@index([processId])
   @@index([indicatorId])
   @@index([submittedById])
+  @@index([assignedToId])
+  @@index([dueDate])
 }
 
 model FormAnswer {
-  id           String         @id @default(uuid())
-  submissionId String
-  submission   FormSubmission @relation(fields: [submissionId], references: [id], onDelete: Cascade)
-  fieldId      String?
-  field        FormField?     @relation(fields: [fieldId], references: [id], onDelete: SetNull)
-  fieldLabel   String
-  value        String?
-  createdAt    DateTime       @default(now())
-  updatedAt    DateTime       @updatedAt
+  id              String         @id @default(uuid())
+  submissionId    String
+  submission      FormSubmission @relation(fields: [submissionId], references: [id], onDelete: Cascade)
+  fieldId         String?
+  field           FormField?     @relation(fields: [fieldId], references: [id], onDelete: SetNull)
+  sectionId       String?
+  section         FormTemplateSection? @relation(fields: [sectionId], references: [id], onDelete: SetNull)
+  parentAnswerId  String?
+  fieldCode       String?
+  fieldLabel      String
+  fieldType       String?
+  fieldOrder      Int?
+  value           String?
+  valueJson       Json?
+  valueNumber     Float?
+  valueDate       DateTime?
+  score           Float?
+  critical        Boolean        @default(false)
+  requiresEvidence Boolean       @default(false)
+  rowIndex        Int?
+  createdById     String?
+  createdAt       DateTime       @default(now())
+  updatedAt       DateTime       @updatedAt
 
   @@index([submissionId])
   @@index([fieldId])
+  @@index([sectionId])
+  @@index([fieldCode])
+}
+
+model FormTypeConfig {
+  id                    String           @id @default(uuid())
+  companyId             String
+  name                  String
+  code                  String
+  description           String?
+  category              FormTemplateType @default(FORM)
+  color                 String?
+  icon                  String?
+  purpose               String?
+  defaultWorkflow       Json?
+  defaultPermissions    Json?
+  fillRules             Json?
+  approvalRules         Json?
+  printRules            Json?
+  reportTemplate        Json?
+  requiredFields        Json?
+  retentionDays         Int?
+  confidentiality       String           @default("INTERNAL")
+  integrations          Json?
+  active                Boolean          @default(true)
+  createdById           String?
+  updatedById           String?
+  createdAt             DateTime         @default(now())
+  updatedAt             DateTime         @updatedAt
+  deletedAt             DateTime?
+
+  templates         FormTemplate[]
+  retentionPolicies FormRetentionPolicy[]
+
+  @@unique([companyId, code])
+  @@index([companyId])
+  @@index([companyId, active])
+}
+
+model FormCategory {
+  id          String   @id @default(uuid())
+  companyId   String
+  parentId    String?
+  parent      FormCategory? @relation("FormCategoryTree", fields: [parentId], references: [id], onDelete: SetNull)
+  name        String
+  description String?
+  color       String?
+  icon        String?
+  active      Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  deletedAt   DateTime?
+
+  children  FormCategory[] @relation("FormCategoryTree")
+  templates FormTemplate[]
+
+  @@unique([companyId, name])
+  @@index([companyId, active])
+  @@index([parentId])
+}
+
+model FormFolder {
+  id          String   @id @default(uuid())
+  companyId   String
+  parentId    String?
+  parent      FormFolder? @relation("FormFolderTree", fields: [parentId], references: [id], onDelete: SetNull)
+  name        String
+  description String?
+  path        String?
+  active      Boolean  @default(true)
+  createdById String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  deletedAt   DateTime?
+
+  children  FormFolder[] @relation("FormFolderTree")
+  templates FormTemplate[]
+
+  @@unique([companyId, name, parentId])
+  @@index([companyId, active])
+  @@index([parentId])
+}
+
+model FormTag {
+  id        String   @id @default(uuid())
+  companyId String
+  name      String
+  color     String?
+  createdAt DateTime @default(now())
+
+  relations FormTemplateTagRelation[]
+
+  @@unique([companyId, name])
+  @@index([companyId])
+}
+
+model FormTemplateTagRelation {
+  id         String       @id @default(uuid())
+  companyId  String
+  templateId String
+  template   FormTemplate @relation(fields: [templateId], references: [id], onDelete: Cascade)
+  tagId      String
+  tag        FormTag      @relation(fields: [tagId], references: [id], onDelete: Cascade)
+  createdAt  DateTime     @default(now())
+
+  @@unique([templateId, tagId])
+  @@index([companyId, tagId])
+}
+
+model FormTemplateVersion {
+  id              String             @id @default(uuid())
+  companyId       String
+  templateId      String
+  template        FormTemplate       @relation("FormTemplateVersions", fields: [templateId], references: [id], onDelete: Cascade)
+  versionNumber   Int
+  versionLabel    String
+  code            String?
+  status          FormTemplateStatus @default(DRAFT)
+  changeReason    String?
+  changeSummary   String?
+  builderSnapshot Json?
+  fieldsSnapshot  Json?
+  workflow        Json?
+  rules           Json?
+  formulas        Json?
+  approvedAt      DateTime?
+  approvedById    String?
+  publishedAt     DateTime?
+  publishedById   String?
+  createdById     String?
+  createdAt       DateTime           @default(now())
+  updatedAt       DateTime           @updatedAt
+  deletedAt       DateTime?
+
+  sections    FormTemplateSection[]
+  fields      FormField[]
+  submissions FormSubmission[]
+  executions  FormExecution[]
+  rulesV2     FormTemplateRule[]
+  formulasV2  FormTemplateFormula[]
+  approvals   FormApproval[]
+
+  @@unique([templateId, versionNumber])
+  @@index([companyId, status])
+  @@index([templateId, createdAt])
+}
+
+model FormTemplateSection {
+  id                String               @id @default(uuid())
+  companyId         String
+  templateId        String
+  template          FormTemplate         @relation(fields: [templateId], references: [id], onDelete: Cascade)
+  templateVersionId String?
+  templateVersion   FormTemplateVersion? @relation(fields: [templateVersionId], references: [id], onDelete: Cascade)
+  parentSectionId   String?
+  code              String?
+  title             String
+  description       String?
+  position          Int                  @default(0)
+  columns           Int                  @default(1)
+  repeatable        Boolean              @default(false)
+  collapsed         Boolean              @default(false)
+  visibleWhen       Json?
+  metadata          Json?
+  createdAt         DateTime             @default(now())
+  updatedAt         DateTime             @updatedAt
+  deletedAt         DateTime?
+
+  fields  FormField[]
+  answers FormAnswer[]
+
+  @@index([companyId])
+  @@index([templateId, position])
+  @@index([templateVersionId])
+  @@index([parentSectionId])
+}
+
+model FormFieldOption {
+  id        String    @id @default(uuid())
+  companyId String
+  fieldId   String
+  field     FormField @relation(fields: [fieldId], references: [id], onDelete: Cascade)
+  label     String
+  value     String
+  color     String?
+  score     Float?
+  position  Int       @default(0)
+  metadata  Json?
+  active    Boolean   @default(true)
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+
+  @@unique([fieldId, value])
+  @@index([companyId])
+  @@index([fieldId, position])
+}
+
+model FormReusableBlock {
+  id          String   @id @default(uuid())
+  companyId   String
+  categoryId  String?
+  name        String
+  description String?
+  blockType   String   @default("SECTION")
+  fields      Json?
+  rules       Json?
+  active      Boolean  @default(true)
+  createdById String?
+  updatedById String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  deletedAt   DateTime?
+
+  @@unique([companyId, name])
+  @@index([companyId, active])
+}
+
+model FormTemplateRule {
+  id                String               @id @default(uuid())
+  companyId         String
+  templateId        String
+  template          FormTemplate         @relation(fields: [templateId], references: [id], onDelete: Cascade)
+  templateVersionId String?
+  templateVersion   FormTemplateVersion? @relation(fields: [templateVersionId], references: [id], onDelete: Cascade)
+  name              String
+  event             String
+  priority          Int                  @default(0)
+  condition         Json?
+  actions           Json?
+  active            Boolean              @default(true)
+  createdAt         DateTime             @default(now())
+  updatedAt         DateTime             @updatedAt
+  deletedAt         DateTime?
+
+  @@index([companyId, active])
+  @@index([templateId])
+  @@index([templateVersionId])
+}
+
+model FormTemplateFormula {
+  id                String               @id @default(uuid())
+  companyId         String
+  templateId        String
+  template          FormTemplate         @relation(fields: [templateId], references: [id], onDelete: Cascade)
+  templateVersionId String?
+  templateVersion   FormTemplateVersion? @relation(fields: [templateVersionId], references: [id], onDelete: Cascade)
+  name              String
+  code              String
+  expression        String
+  resultFieldCode   String?
+  variables         Json?
+  active            Boolean              @default(true)
+  createdAt         DateTime             @default(now())
+  updatedAt         DateTime             @updatedAt
+  deletedAt         DateTime?
+
+  @@unique([templateId, code])
+  @@index([companyId, active])
+  @@index([templateVersionId])
+}
+
+model FormWorkflow {
+  id          String   @id @default(uuid())
+  companyId   String
+  templateId  String?
+  template    FormTemplate? @relation(fields: [templateId], references: [id], onDelete: Cascade)
+  name        String
+  entityType  String   @default("FORM_SUBMISSION")
+  mode        String   @default("SEQUENTIAL")
+  steps       Json?
+  transitions Json?
+  rules       Json?
+  active      Boolean  @default(true)
+  createdById String?
+  updatedById String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  deletedAt   DateTime?
+
+  @@index([companyId, active])
+  @@index([templateId])
+}
+
+model FormPermission {
+  id          String   @id @default(uuid())
+  companyId   String
+  templateId  String?
+  template    FormTemplate? @relation(fields: [templateId], references: [id], onDelete: Cascade)
+  userId      String?
+  orgNodeId   String?
+  groupId     String?
+  role        String?
+  permission  String
+  allowed     Boolean  @default(true)
+  createdAt   DateTime @default(now())
+
+  @@index([companyId, permission])
+  @@index([templateId])
+  @@index([userId])
+  @@index([orgNodeId])
+}
+
+model FormPrintLayout {
+  id          String   @id @default(uuid())
+  companyId   String
+  templateId  String?
+  template    FormTemplate? @relation(fields: [templateId], references: [id], onDelete: Cascade)
+  name        String
+  description String?
+  layout      Json?
+  isDefault   Boolean  @default(false)
+  active      Boolean  @default(true)
+  createdById String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  deletedAt   DateTime?
+
+  @@index([companyId, active])
+  @@index([templateId, isDefault])
+}
+
+model FormSchedule {
+  id              String             @id @default(uuid())
+  companyId       String
+  templateId      String
+  template        FormTemplate       @relation(fields: [templateId], references: [id], onDelete: Cascade)
+  name            String
+  description     String?
+  status          FormScheduleStatus @default(ACTIVE)
+  frequency       String
+  cronExpression  String?
+  startsAt        DateTime?
+  endsAt          DateTime?
+  nextRunAt       DateTime?
+  lastRunAt       DateTime?
+  timezone        String?
+  assigneeUserIds String[]           @default([])
+  orgNodeIds      String[]           @default([])
+  processIds      String[]           @default([])
+  targetRules     Json?
+  createdById     String?
+  updatedById     String?
+  createdAt       DateTime           @default(now())
+  updatedAt       DateTime           @updatedAt
+  deletedAt       DateTime?
+
+  executions FormExecution[]
+
+  @@index([companyId, status])
+  @@index([templateId])
+  @@index([nextRunAt])
+}
+
+model FormExecution {
+  id                String               @id @default(uuid())
+  companyId         String
+  templateId        String
+  template          FormTemplate         @relation(fields: [templateId], references: [id])
+  templateVersionId String?
+  templateVersion   FormTemplateVersion? @relation(fields: [templateVersionId], references: [id], onDelete: SetNull)
+  scheduleId        String?
+  schedule          FormSchedule?        @relation(fields: [scheduleId], references: [id], onDelete: SetNull)
+  code              String
+  title             String
+  status            FormExecutionStatus  @default(PLANNED)
+  targetEntityType  String?
+  targetEntityId    String?
+  assignedToId      String?
+  assignedTeamId    String?
+  orgNodeId         String?
+  processId         String?
+  indicatorId       String?
+  dueDate           DateTime?
+  scheduledAt       DateTime?
+  startedAt         DateTime?
+  completedAt       DateTime?
+  approvedAt        DateTime?
+  progress          Float                @default(0)
+  score             Float?
+  classification    String?
+  autosaveToken     String?
+  offlineEnabled    Boolean              @default(false)
+  locked            Boolean              @default(false)
+  snapshot          Json?
+  createdById       String?
+  updatedById       String?
+  createdAt         DateTime             @default(now())
+  updatedAt         DateTime             @updatedAt
+  deletedAt         DateTime?
+
+  assignments    FormExecutionAssignment[]
+  responseItems  FormExecutionResponseItem[]
+  submissions    FormSubmission[]
+  evidence       FormEvidence[]
+  operationalRecords FormOperationalRecord[]
+  issues         FormIssue[]
+  timelineEvents FormRecordTimeline[]
+
+  @@unique([companyId, code])
+  @@index([companyId, status])
+  @@index([templateId])
+  @@index([templateVersionId])
+  @@index([scheduleId])
+  @@index([assignedToId])
+  @@index([dueDate])
+  @@index([targetEntityType, targetEntityId])
+}
+
+model FormExecutionAssignment {
+  id            String        @id @default(uuid())
+  companyId     String
+  executionId   String
+  execution     FormExecution @relation(fields: [executionId], references: [id], onDelete: Cascade)
+  userId        String?
+  teamId        String?
+  role          String        @default("EXECUTOR")
+  status        String        @default("ASSIGNED")
+  assignedAt    DateTime      @default(now())
+  acceptedAt    DateTime?
+  completedAt   DateTime?
+  dueDate       DateTime?
+  createdById   String?
+
+  @@index([companyId, status])
+  @@index([executionId])
+  @@index([userId])
+}
+
+model FormExecutionResponseItem {
+  id            String         @id @default(uuid())
+  companyId     String
+  executionId   String
+  execution     FormExecution  @relation(fields: [executionId], references: [id], onDelete: Cascade)
+  submissionId  String?
+  submission    FormSubmission? @relation(fields: [submissionId], references: [id], onDelete: SetNull)
+  fieldId       String?
+  field         FormField?     @relation(fields: [fieldId], references: [id], onDelete: SetNull)
+  fieldCode     String?
+  fieldLabel    String
+  valueText     String?
+  valueJson     Json?
+  valueNumber   Float?
+  valueDate     DateTime?
+  score         Float?
+  comment       String?
+  attachments   Json?
+  evidenceIds   String[]       @default([])
+  answeredById  String?
+  answeredAt    DateTime?
+  createdAt     DateTime       @default(now())
+  updatedAt     DateTime       @updatedAt
+
+  @@index([companyId])
+  @@index([executionId])
+  @@index([submissionId])
+  @@index([fieldId])
+  @@index([fieldCode])
+}
+
+model FormEvidence {
+  id            String             @id @default(uuid())
+  companyId     String
+  submissionId  String?
+  submission    FormSubmission?    @relation(fields: [submissionId], references: [id], onDelete: SetNull)
+  executionId   String?
+  execution     FormExecution?     @relation(fields: [executionId], references: [id], onDelete: SetNull)
+  issueId       String?
+  issue         FormIssue?         @relation(fields: [issueId], references: [id], onDelete: SetNull)
+  code          String
+  fileName      String?
+  fileUrl       String?
+  mimeType      String?
+  sizeBytes     Int?
+  hashSha256    String?
+  description   String?
+  type          String?
+  origin        String?
+  authorUserId  String?
+  location      Json?
+  metadata      Json?
+  status        FormEvidenceStatus @default(ACTIVE)
+  storageProvider String?
+  storageKey    String?
+  retentionUntil DateTime?
+  createdAt     DateTime          @default(now())
+  updatedAt     DateTime          @updatedAt
+  deletedAt     DateTime?
+
+  @@unique([companyId, code])
+  @@index([companyId])
+  @@index([submissionId])
+  @@index([executionId])
+  @@index([issueId])
+  @@index([status])
+}
+
+model FormSignature {
+  id           String         @id @default(uuid())
+  companyId    String
+  submissionId String
+  submission   FormSubmission @relation(fields: [submissionId], references: [id], onDelete: Cascade)
+  signerUserId String?
+  signerName   String
+  signerEmail  String?
+  role         String?
+  method       String         @default("ELECTRONIC")
+  signatureKey String?
+  ip           String?
+  userAgent    String?
+  metadata     Json?
+  signedAt     DateTime       @default(now())
+
+  @@index([companyId])
+  @@index([submissionId])
+  @@index([signerUserId])
+}
+
+model FormApproval {
+  id                String               @id @default(uuid())
+  companyId         String
+  submissionId      String
+  submission        FormSubmission       @relation(fields: [submissionId], references: [id], onDelete: Cascade)
+  templateVersionId String?
+  templateVersion   FormTemplateVersion? @relation(fields: [templateVersionId], references: [id], onDelete: SetNull)
+  stage             String
+  decision          FormApprovalDecision @default(PENDING)
+  approverUserId    String?
+  approvalOrder     Int                  @default(1)
+  statusFrom        String?
+  statusTo          String?
+  comment           String?
+  decidedAt         DateTime?
+  createdAt         DateTime             @default(now())
+
+  @@index([companyId, decision])
+  @@index([submissionId, approvalOrder])
+  @@index([templateVersionId])
+  @@index([approverUserId])
+}
+
+model FormOperationalRecord {
+  id              String                      @id @default(uuid())
+  companyId       String
+  templateId      String
+  template        FormTemplate                @relation(fields: [templateId], references: [id])
+  submissionId    String?                     @unique
+  submission      FormSubmission?             @relation(fields: [submissionId], references: [id], onDelete: SetNull)
+  executionId     String?
+  execution       FormExecution?              @relation(fields: [executionId], references: [id], onDelete: SetNull)
+  code            String
+  title           String
+  status          FormOperationalRecordStatus @default(OPEN)
+  recordDate      DateTime                    @default(now())
+  periodRef       String?
+  orgNodeId       String?
+  processId       String?
+  indicatorId     String?
+  targetEntityType String?
+  targetEntityId  String?
+  summary         String?
+  score           Float?
+  classification  String?
+  data            Json?
+  immutableSnapshot Json?
+  createdById     String?
+  validatedById   String?
+  validatedAt     DateTime?
+  archivedAt      DateTime?
+  createdAt       DateTime                    @default(now())
+  updatedAt       DateTime                    @updatedAt
+  deletedAt       DateTime?
+
+  corrections    FormRecordCorrection[]
+  timelineEvents FormRecordTimeline[]
+  issues         FormIssue[]
+
+  @@unique([companyId, code])
+  @@index([companyId, status])
+  @@index([templateId])
+  @@index([executionId])
+  @@index([recordDate])
+  @@index([orgNodeId])
+  @@index([processId])
+}
+
+model FormRecordCorrection {
+  id          String                @id @default(uuid())
+  companyId   String
+  recordId    String
+  record      FormOperationalRecord @relation(fields: [recordId], references: [id], onDelete: Cascade)
+  requestedById String?
+  assignedToId String?
+  reason      String
+  beforeValue Json?
+  afterValue  Json?
+  status      String                @default("OPEN")
+  dueDate     DateTime?
+  completedAt DateTime?
+  createdAt   DateTime              @default(now())
+  updatedAt   DateTime              @updatedAt
+
+  @@index([companyId, status])
+  @@index([recordId])
+  @@index([assignedToId])
+}
+
+model FormRecordTimeline {
+  id            String                 @id @default(uuid())
+  companyId     String
+  recordId      String?
+  record        FormOperationalRecord? @relation(fields: [recordId], references: [id], onDelete: Cascade)
+  submissionId  String?
+  submission    FormSubmission?        @relation(fields: [submissionId], references: [id], onDelete: Cascade)
+  executionId   String?
+  execution     FormExecution?         @relation(fields: [executionId], references: [id], onDelete: Cascade)
+  issueId       String?
+  issue         FormIssue?             @relation(fields: [issueId], references: [id], onDelete: Cascade)
+  entityType    String
+  entityId      String?
+  userId        String?
+  action        String
+  title         String
+  description   String?
+  beforeValue   Json?
+  afterValue    Json?
+  metadata      Json?
+  createdAt     DateTime               @default(now())
+
+  @@index([companyId, createdAt])
+  @@index([recordId, createdAt])
+  @@index([submissionId, createdAt])
+  @@index([executionId, createdAt])
+  @@index([issueId])
+}
+
+model FormIssue {
+  id              String                  @id @default(uuid())
+  companyId       String
+  templateId      String?
+  template        FormTemplate?           @relation(fields: [templateId], references: [id], onDelete: SetNull)
+  submissionId    String?
+  submission      FormSubmission?         @relation(fields: [submissionId], references: [id], onDelete: SetNull)
+  executionId     String?
+  execution       FormExecution?          @relation(fields: [executionId], references: [id], onDelete: SetNull)
+  recordId        String?
+  record          FormOperationalRecord?  @relation(fields: [recordId], references: [id], onDelete: SetNull)
+  actionPlanId    String?
+  nonConformityId String?
+  code            String
+  title           String
+  description     String?
+  status          FormIssueStatus         @default(OPEN)
+  severity        String?
+  fieldCode       String?
+  responsibleUserId String?
+  dueDate         DateTime?
+  resolvedAt      DateTime?
+  createdById     String?
+  createdAt       DateTime                @default(now())
+  updatedAt       DateTime                @updatedAt
+  deletedAt       DateTime?
+
+  evidence       FormEvidence[]
+  timelineEvents FormRecordTimeline[]
+
+  @@unique([companyId, code])
+  @@index([companyId, status])
+  @@index([templateId])
+  @@index([submissionId])
+  @@index([executionId])
+  @@index([recordId])
+  @@index([actionPlanId])
+  @@index([nonConformityId])
+  @@index([responsibleUserId])
+  @@index([dueDate])
+}
+
+model FormExternalLink {
+  id          String                 @id @default(uuid())
+  companyId   String
+  templateId  String
+  template    FormTemplate           @relation(fields: [templateId], references: [id], onDelete: Cascade)
+  name        String
+  tokenHash   String
+  scopes      String[]               @default([])
+  status      FormExternalLinkStatus @default(ACTIVE)
+  validFrom   DateTime?
+  validUntil  DateTime?
+  maxUses     Int?
+  uses        Int                    @default(0)
+  allowedDomains String[]            @default([])
+  metadata    Json?
+  createdById String?
+  revokedAt   DateTime?
+  createdAt   DateTime               @default(now())
+
+  @@unique([tokenHash])
+  @@index([companyId, status])
+  @@index([templateId])
+  @@index([validUntil])
+}
+
+model FormQrCode {
+  id          String       @id @default(uuid())
+  companyId   String
+  templateId  String
+  template    FormTemplate @relation(fields: [templateId], references: [id], onDelete: Cascade)
+  code        String
+  label       String?
+  targetUrl   String?
+  targetEntityType String?
+  targetEntityId   String?
+  active      Boolean      @default(true)
+  metadata    Json?
+  createdById String?
+  createdAt   DateTime     @default(now())
+  updatedAt   DateTime     @updatedAt
+  deletedAt   DateTime?
+
+  @@unique([companyId, code])
+  @@index([companyId, active])
+  @@index([templateId])
+  @@index([targetEntityType, targetEntityId])
+}
+
+model FormKiosk {
+  id          String       @id @default(uuid())
+  companyId   String
+  templateId  String?
+  template    FormTemplate? @relation(fields: [templateId], references: [id], onDelete: SetNull)
+  name        String
+  location    String?
+  deviceCode  String?
+  settings    Json?
+  active      Boolean      @default(true)
+  createdById String?
+  createdAt   DateTime     @default(now())
+  updatedAt   DateTime     @updatedAt
+  deletedAt   DateTime?
+
+  @@unique([companyId, name])
+  @@index([companyId, active])
+  @@index([templateId])
+}
+
+model FormOfflineSyncQueue {
+  id              String                @id @default(uuid())
+  companyId       String
+  userId          String?
+  deviceId        String?
+  entityType      String
+  entityId        String?
+  operation       String
+  payload         Json?
+  status          FormOfflineSyncStatus @default(PENDING)
+  errorMessage    String?
+  syncedAt        DateTime?
+  createdAt       DateTime              @default(now())
+  updatedAt       DateTime              @updatedAt
+
+  conflicts FormOfflineSyncConflict[]
+
+  @@index([companyId, status])
+  @@index([userId])
+  @@index([deviceId])
+  @@index([entityType, entityId])
+}
+
+model FormOfflineSyncConflict {
+  id          String               @id @default(uuid())
+  companyId   String
+  queueId     String?
+  queue       FormOfflineSyncQueue? @relation(fields: [queueId], references: [id], onDelete: Cascade)
+  entityType  String
+  entityId    String?
+  localValue  Json?
+  serverValue Json?
+  resolution  String?
+  resolvedById String?
+  resolvedAt  DateTime?
+  createdAt   DateTime             @default(now())
+
+  @@index([companyId])
+  @@index([queueId])
+  @@index([entityType, entityId])
+}
+
+model FormNotificationRule {
+  id          String   @id @default(uuid())
+  companyId   String
+  name        String
+  event       String
+  active      Boolean  @default(true)
+  config      Json?
+  createdById String?
+  updatedById String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  deletedAt   DateTime?
+
+  @@unique([companyId, name])
+  @@index([companyId, event])
+  @@index([companyId, active])
+}
+
+model FormExportJob {
+  id          String   @id @default(uuid())
+  companyId   String
+  target      String
+  format      String
+  filters     Json?
+  status      String   @default("PENDING")
+  fileUrl     String?
+  errorMessage String?
+  requestedById String?
+  startedAt   DateTime?
+  completedAt DateTime?
+  createdAt   DateTime @default(now())
+
+  @@index([companyId, status])
+  @@index([requestedById])
+  @@index([createdAt])
+}
+
+model FormImportJob {
+  id          String   @id @default(uuid())
+  companyId   String
+  target      String
+  fileName    String?
+  fileUrl     String?
+  status      String   @default("PENDING")
+  totalRows   Int      @default(0)
+  importedRows Int     @default(0)
+  errorRows   Int      @default(0)
+  errors      Json?
+  requestedById String?
+  startedAt   DateTime?
+  completedAt DateTime?
+  createdAt   DateTime @default(now())
+
+  @@index([companyId, status])
+  @@index([requestedById])
+}
+
+model FormAiSuggestion {
+  id             String                 @id @default(uuid())
+  companyId      String
+  templateId     String?
+  template       FormTemplate?          @relation(fields: [templateId], references: [id], onDelete: Cascade)
+  submissionId   String?
+  submission     FormSubmission?        @relation(fields: [submissionId], references: [id], onDelete: Cascade)
+  suggestionType String
+  title          String
+  content        String
+  context        Json?
+  status         FormAiSuggestionStatus @default(PENDING)
+  createdAt      DateTime               @default(now())
+  decidedAt      DateTime?
+  decidedById    String?
+
+  @@index([companyId, status])
+  @@index([templateId, createdAt])
+  @@index([submissionId, createdAt])
+}
+
+model FormRetentionPolicy {
+  id           String   @id @default(uuid())
+  companyId    String
+  typeConfigId String?
+  typeConfig   FormTypeConfig? @relation(fields: [typeConfigId], references: [id], onDelete: SetNull)
+  templateId   String?
+  name         String
+  retentionDays Int?
+  disposition  String?
+  active       Boolean  @default(true)
+  createdById  String?
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+  deletedAt    DateTime?
+
+  @@index([companyId, active])
+  @@index([typeConfigId])
+  @@index([templateId])
 }
 
 // =====================================================
