@@ -230,11 +230,11 @@ export default function UsersPage() {
   return (
     <div>
       <PageHeader
-        eyebrow="Configurações"
+        eyebrow="Empresa"
         tone="admin"
-        title="Usuários e permissões"
-        description="Cadastre usuários, vincule áreas de trabalho e ajuste permissões por módulo."
-        breadcrumbs={[{ label: 'Início', href: '/' }, { label: 'Configurações' }, { label: 'Usuários' }]}
+        title="Usuários da empresa"
+        description="Crie e mantenha usuários vinculados somente à empresa atual."
+        breadcrumbs={[{ label: 'Início', href: '/' }, { label: 'Usuários' }]}
         actions={
           canCreate ? (
             <Button onClick={() => openUser()}>
@@ -248,16 +248,16 @@ export default function UsersPage() {
       <div className="mb-6 grid grid-cols-1 gap-4 sm:grid-cols-3">
         <MetricCard title="Usuários" value={formatNumber(users.data?.length)} description="Cadastrados" icon={<UsersRound className="h-4 w-4" />} tone="blue" />
         <MetricCard title="Ativos" value={formatNumber(active)} description="Com acesso liberado" icon={<UsersRound className="h-4 w-4" />} tone="green" />
-        <MetricCard title="Administradores" value={formatNumber(admins)} description="Permissões elevadas" icon={<KeyRound className="h-4 w-4" />} tone="purple" />
+        <MetricCard title="Administradores" value={formatNumber(admins)} description="Perfil administrativo" icon={<KeyRound className="h-4 w-4" />} tone="purple" />
       </div>
 
-      <SectionCard title="Equipe" description="Clique em editar para alterar cadastro e permissões." contentClassName="p-0">
+      <SectionCard title="Equipe" description="Cadastros e acessos da empresa atual." contentClassName="p-0">
         <div className="border-b p-3">
           <div className="relative max-w-xl">
             <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
             <Input
               className="pl-9"
-              placeholder="Pesquisar por nome, e-mail, perfil, empresa, filial ou setor..."
+              placeholder="Pesquisar por nome, e-mail, perfil, filial ou setor..."
               value={search}
               onChange={(e) => setSearch(e.target.value)}
             />

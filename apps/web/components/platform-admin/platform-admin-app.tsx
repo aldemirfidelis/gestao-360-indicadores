@@ -7,6 +7,7 @@ import { toast } from 'sonner';
 import {
   Activity,
   AlertTriangle,
+  ArrowRight,
   Building2,
   Database,
   Flag,
@@ -18,6 +19,7 @@ import {
   Search,
   ServerCog,
   ShieldCheck,
+  SlidersHorizontal,
   Users,
   Wrench,
   type LucideIcon,
@@ -33,7 +35,7 @@ import {
   platformAdminApi,
 } from '@/lib/platform-admin-api';
 
-type SectionKey = 'dashboard' | 'companies' | 'modules' | 'plans' | 'users' | 'security' | 'technical' | 'audit';
+type SectionKey = 'dashboard' | 'settings' | 'companies' | 'modules' | 'plans' | 'users' | 'security' | 'technical' | 'audit';
 
 interface SectionItem {
   key: SectionKey;
@@ -101,6 +103,7 @@ interface AuditRow {
 
 const SECTIONS: SectionItem[] = [
   { key: 'dashboard', label: 'Dashboard', icon: LayoutDashboard },
+  { key: 'settings', label: 'Configuracoes', icon: SlidersHorizontal },
   { key: 'companies', label: 'Empresas', icon: Building2 },
   { key: 'modules', label: 'Matriz de Modulos', icon: PackageCheck },
   { key: 'plans', label: 'Planos', icon: ListChecks },
@@ -122,6 +125,64 @@ const MODULE_STATUSES = [
   'EXPERIMENTAL',
   'HERDADO_DO_PLANO',
   'SOBRESCRITO_MANUALMENTE',
+];
+
+const SETTINGS_AREAS: Array<{
+  title: string;
+  description: string;
+  action: string;
+  target: SectionKey;
+  icon: LucideIcon;
+}> = [
+  {
+    title: 'Empresas',
+    description: 'Cadastro, status, contrato, saude e limites ficam centralizados por empresa.',
+    action: 'Abrir empresas',
+    target: 'companies',
+    icon: Building2,
+  },
+  {
+    title: 'Modulos e menus',
+    description: 'Liberacao de modulos, paginas, visibilidade e comportamento por cliente.',
+    action: 'Abrir matriz',
+    target: 'modules',
+    icon: PackageCheck,
+  },
+  {
+    title: 'Planos',
+    description: 'Pacotes comerciais, limites padrao e conjunto inicial de modulos.',
+    action: 'Abrir planos',
+    target: 'plans',
+    icon: ListChecks,
+  },
+  {
+    title: 'Usuarios globais',
+    description: 'Consulta, bloqueio e revogacao de sessoes dos usuarios das empresas.',
+    action: 'Abrir usuarios',
+    target: 'users',
+    icon: Users,
+  },
+  {
+    title: 'Seguranca e suporte',
+    description: 'Sessoes abertas, suporte somente leitura e controles operacionais.',
+    action: 'Abrir seguranca',
+    target: 'security',
+    icon: ShieldCheck,
+  },
+  {
+    title: 'Banco e integracoes',
+    description: 'Saude do banco, backups, ambientes, flags, integracoes e jobs.',
+    action: 'Abrir tecnico',
+    target: 'technical',
+    icon: ServerCog,
+  },
+  {
+    title: 'Auditoria',
+    description: 'Trilha administrativa global de acoes, resultados e justificativas.',
+    action: 'Abrir auditoria',
+    target: 'audit',
+    icon: Activity,
+  },
 ];
 
 export function PlatformAdminApp() {
@@ -218,6 +279,7 @@ export function PlatformAdminApp() {
 
         <div className="min-h-0 flex-1 overflow-y-auto p-4 lg:p-6">
           {section === 'dashboard' && <DashboardSection />}
+          {section === 'settings' && <SettingsSection onNavigate={setSection} />}
           {section === 'companies' && <CompaniesSection />}
           {section === 'modules' && <ModulesSection />}
           {section === 'plans' && <PlansSection />}
@@ -228,6 +290,53 @@ export function PlatformAdminApp() {
         </div>
       </section>
     </main>
+  );
+}
+
+function SettingsSection({ onNavigate }: { onNavigate: (section: SectionKey) => void }) {
+  return (
+    <div className="space-y-4">
+      <Panel title="Configuracoes da plataforma" icon={SlidersHorizontal}>
+        <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+          {SETTINGS_AREAS.map((area) => {
+            const Icon = area.icon;
+            return (
+              <button
+                key={area.title}
+                type="button"
+                onClick={() => onNavigate(area.target)}
+                className="group flex h-full flex-col border bg-white p-4 text-left transition-colors hover:border-[#101820] hover:bg-[#f8fafb]"
+              >
+                <div className="flex items-center justify-between gap-3">
+                  <Icon className="h-5 w-5 text-muted-foreground" />
+                  <ArrowRight className="h-4 w-4 text-muted-foreground transition-transform group-hover:translate-x-0.5" />
+                </div>
+                <div className="mt-4 text-sm font-semibold">{area.title}</div>
+                <div className="mt-2 flex-1 text-xs leading-5 text-muted-foreground">{area.description}</div>
+                <div className="mt-4 text-xs font-semibold uppercase tracking-[0.12em] text-[#101820]">{area.action}</div>
+              </button>
+            );
+          })}
+        </div>
+      </Panel>
+
+      <div className="grid gap-4 xl:grid-cols-2">
+        <Panel title="Escopo das empresas" icon={Users}>
+          <div className="space-y-2 text-sm">
+            <Row label="Portal da empresa" value="Usuarios da propria empresa" />
+            <Row label="Rotas antigas /settings" value="Redirecionadas para /users" />
+            <Row label="Administracao global" value="Portal Admin Global" />
+          </div>
+        </Panel>
+        <Panel title="Controles centralizados" icon={ShieldCheck}>
+          <div className="space-y-2 text-sm">
+            <Row label="Empresas, planos e modulos" value="Portal Admin Global" />
+            <Row label="Portal, menus e visibilidade" value="Matriz de Modulos" />
+            <Row label="Banco, integracoes e auditoria" value="Desenvolvimento e Auditoria" />
+          </div>
+        </Panel>
+      </div>
+    </div>
   );
 }
 

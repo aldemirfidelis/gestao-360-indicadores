@@ -9,7 +9,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { api, ApiError } from '@/lib/api';
 import { cn } from '@/lib/utils';
-import { navSections, settingsNavItem, type NavSection, type NavItem } from '@/components/shell/navigation';
+import { companyUsersNavItem, navSections, type NavSection, type NavItem } from '@/components/shell/navigation';
 import { useState } from 'react';
 
 interface NavOverride {
@@ -220,16 +220,16 @@ export function NavigationTab() {
             );
           })}
 
-          {/* Item avulso: Configurações */}
+          {/* Item avulso: usuários da empresa */}
           {(() => {
-            const confOverride = overridesMap.get(settingsNavItem.href);
+            const confOverride = overridesMap.get(companyUsersNavItem.href);
             const isConfHidden = confOverride?.hidden ?? false;
             const confOrder = confOverride?.order ?? null;
-            const confLabel = editingLabels[settingsNavItem.href] ?? confOverride?.labelOverride ?? settingsNavItem.label;
+            const confLabel = editingLabels[companyUsersNavItem.href] ?? confOverride?.labelOverride ?? companyUsersNavItem.label;
 
             return (
               <SectionCard
-                title="Itens Globais / Sistema"
+                title="Itens Globais / Empresa"
                 description="Item de rodapé do menu lateral."
                 className={cn(isConfHidden && 'opacity-60 bg-muted/10')}
               >
@@ -248,18 +248,18 @@ export function NavigationTab() {
                       <tr className={cn(isConfHidden && 'opacity-50 line-through bg-muted/5')}>
                         <td>
                           <div className="flex items-center gap-2">
-                            <settingsNavItem.icon className="h-4 w-4 text-muted-foreground" />
-                            <span className="font-medium text-sm">{settingsNavItem.label}</span>
+                            <companyUsersNavItem.icon className="h-4 w-4 text-muted-foreground" />
+                            <span className="font-medium text-sm">{companyUsersNavItem.label}</span>
                           </div>
                         </td>
-                        <td className="font-mono text-xs text-muted-foreground">{settingsNavItem.href}</td>
+                        <td className="font-mono text-xs text-muted-foreground">{companyUsersNavItem.href}</td>
                         <td>
                           <Input
                             type="number"
                             className="w-16 h-7 text-xs"
                             defaultValue={confOrder ?? ''}
                             placeholder="Std"
-                            onBlur={(e) => handleOrderChange(settingsNavItem.href, e.target.value)}
+                            onBlur={(e) => handleOrderChange(companyUsersNavItem.href, e.target.value)}
                           />
                         </td>
                         <td>
@@ -267,13 +267,13 @@ export function NavigationTab() {
                             <Input
                               className="h-8 text-xs max-w-[200px]"
                               value={confLabel}
-                              onChange={(e) => setEditingLabels({ ...editingLabels, [settingsNavItem.href]: e.target.value })}
+                              onChange={(e) => setEditingLabels({ ...editingLabels, [companyUsersNavItem.href]: e.target.value })}
                             />
-                            {editingLabels[settingsNavItem.href] !== undefined && editingLabels[settingsNavItem.href] !== (confOverride?.labelOverride ?? settingsNavItem.label) && (
+                            {editingLabels[companyUsersNavItem.href] !== undefined && editingLabels[companyUsersNavItem.href] !== (confOverride?.labelOverride ?? companyUsersNavItem.label) && (
                               <Button
                                 variant="ghost"
                                 size="sm"
-                                onClick={() => handleSaveLabel(settingsNavItem.href, settingsNavItem.label)}
+                                onClick={() => handleSaveLabel(companyUsersNavItem.href, companyUsersNavItem.label)}
                                 title="Salvar rótulo"
                               >
                                 <Save className="h-3.5 w-3.5 text-primary" />
@@ -286,7 +286,7 @@ export function NavigationTab() {
                             <Button
                               variant="ghost"
                               size="sm"
-                              onClick={() => handleToggleHidden(settingsNavItem.href, isConfHidden)}
+                              onClick={() => handleToggleHidden(companyUsersNavItem.href, isConfHidden)}
                               title={isConfHidden ? 'Exibir' : 'Ocultar'}
                             >
                               {isConfHidden ? <EyeOff className="h-3.5 w-3.5 text-muted-foreground" /> : <Eye className="h-3.5 w-3.5 text-primary" />}
@@ -295,7 +295,7 @@ export function NavigationTab() {
                               <Button
                                 variant="ghost"
                                 size="sm"
-                                onClick={() => removeMut.mutate(settingsNavItem.href)}
+                                onClick={() => removeMut.mutate(companyUsersNavItem.href)}
                                 title="Restaurar padrão"
                               >
                                 <Undo2 className="h-3.5 w-3.5 text-destructive" />

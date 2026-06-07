@@ -111,13 +111,21 @@ export const settingsNavItem: NavItem = {
   permissions: ['settings:view', 'settings:manage'],
 };
 
+export const companyUsersNavItem: NavItem = {
+  href: '/users',
+  label: 'Usuários',
+  description: 'Criação e manutenção dos usuários da própria empresa',
+  icon: Users,
+  permissions: ['users:view', 'users:manage'],
+};
+
 export const mobileNavItems: NavItem[] = [
   { href: '/', label: 'Visão', icon: LayoutDashboard, permissions: ['dashboard:view'], exact: true },
   { href: '/indicators', label: 'Indicadores', icon: Target, permissions: ['indicators:view'], exact: true },
   { href: '/strategy', label: 'Mapa', icon: Compass, permissions: ['strategy:view'] },
   { href: '/org', label: 'Árvore', icon: Network, permissions: ['org:view'] },
   { href: '/reports', label: 'Relatórios', icon: FileSpreadsheet, permissions: ['reports:view', 'reports:export'] },
-  settingsNavItem,
+  companyUsersNavItem,
 ];
 
 // Mapeamento centralizado URL -> permissoes necessarias.
@@ -149,22 +157,21 @@ export const ROUTE_PERMISSIONS: Array<{ prefix: string; permissions: string[]; e
   { prefix: '/plataforma', permissions: ['platform:admin'] },
   { prefix: '/selecionar-empresa', permissions: ['platform:admin'] },
   { prefix: '/reports', permissions: ['reports:view', 'reports:export'] },
-  { prefix: '/audit', permissions: ['audit:view'] },
+  { prefix: '/audit', permissions: ['users:view', 'users:manage'] },
   { prefix: '/comunicacao', permissions: [] },
   { prefix: '/pessoas', permissions: [] },
   { prefix: '/perfil', permissions: [] },
   { prefix: '/integracoes', permissions: [] },
   { prefix: '/ajuda', permissions: [] },
   { prefix: '/users', permissions: ['users:view', 'users:manage'] },
-  // Administração do Banco / Central do Portal: permissões 'database:admin' e
-  // 'portal:admin' nunca são concedidas, logo apenas SUPER_ADMIN (bypass em
-  // canAccess) acessa. Prefixos mais longos que '/settings' têm precedência.
-  { prefix: '/settings/database', permissions: ['database:admin'] },
-  { prefix: '/settings/portal', permissions: ['portal:admin'] },
-  { prefix: '/settings/empresas', permissions: ['platform:admin'] },
-  { prefix: '/settings/visibilidade', permissions: ['users:manage'] },
-  { prefix: '/settings/integracoes', permissions: ['settings:manage'] },
-  { prefix: '/settings', permissions: ['settings:view', 'settings:manage'] },
+  // Rotas antigas de Configurações no app da empresa. O layout de /settings
+  // redireciona para /users; o restante foi centralizado no Portal Admin Global.
+  { prefix: '/settings/database', permissions: ['users:view', 'users:manage'] },
+  { prefix: '/settings/portal', permissions: ['users:view', 'users:manage'] },
+  { prefix: '/settings/empresas', permissions: ['users:view', 'users:manage'] },
+  { prefix: '/settings/visibilidade', permissions: ['users:view', 'users:manage'] },
+  { prefix: '/settings/integracoes', permissions: ['users:view', 'users:manage'] },
+  { prefix: '/settings', permissions: ['users:view', 'users:manage'] },
 ];
 
 export function findRoutePermissions(pathname: string): string[] | null {
@@ -192,6 +199,10 @@ export function visibleMobileItems(user: NavUser | null | undefined) {
 
 export function canAccessSettings(user: NavUser | null | undefined) {
   return canAccess(user, settingsNavItem.permissions);
+}
+
+export function canAccessCompanyUsers(user: NavUser | null | undefined) {
+  return canAccess(user, companyUsersNavItem.permissions);
 }
 
 export function canAccess(user: NavUser | null | undefined, permissions?: string[]) {

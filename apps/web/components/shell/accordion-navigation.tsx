@@ -8,9 +8,9 @@ import { ChevronDown, PanelLeftClose, PanelLeftOpen } from 'lucide-react';
 import { useAuth } from '@/components/auth/auth-provider';
 import { usePortalConfig } from '@/components/portal-admin/portal-config-provider';
 import {
-  canAccessSettings,
+  canAccessCompanyUsers,
+  companyUsersNavItem,
   isActivePath,
-  settingsNavItem,
   visibleNavSections,
 } from '@/components/shell/navigation';
 import { Button } from '@/components/ui/button';
@@ -60,9 +60,9 @@ export function AccordionNavigation({
     const initial = currentSection?.heading ?? sections[0]?.heading;
     return new Set(initial ? [initial] : []);
   });
-  const showSettings = canAccessSettings(user);
-  const SettingsIcon = settingsNavItem.icon;
-  const settingsActive = isActivePath(pathname, settingsNavItem.href);
+  const showCompanyUsers = canAccessCompanyUsers(user);
+  const CompanyUsersIcon = companyUsersNavItem.icon;
+  const companyUsersActive = isActivePath(pathname, companyUsersNavItem.href);
 
   useEffect(() => {
     if (!currentSection) return;
@@ -232,23 +232,23 @@ export function AccordionNavigation({
         </div>
       </div>
 
-      {showSettings && (
+      {showCompanyUsers && (
         <div className={cn('border-t border-border/60 p-2', collapsed && !mobile && 'px-1')}>
           <Link
-            href={settingsNavItem.href}
+            href={companyUsersNavItem.href}
             onClick={onNavigate}
-            title={collapsed ? settingsNavItem.label : settingsNavItem.description}
+            title={collapsed ? companyUsersNavItem.label : companyUsersNavItem.description}
             className={cn(
               'relative flex items-center gap-2.5 px-3 py-2 text-sm transition-colors',
-              settingsActive
+              companyUsersActive
                 ? 'bg-foreground/[0.06] font-medium text-foreground'
                 : 'text-muted-foreground hover:bg-foreground/[0.04] hover:text-foreground',
               collapsed && !mobile && 'justify-center px-2',
             )}
           >
-            {settingsActive && <span className="absolute left-0 top-0 h-full w-[2px] bg-foreground" />}
-            <SettingsIcon className={cn('h-4 w-4 shrink-0', settingsActive ? 'text-foreground' : 'text-muted-foreground/80')} />
-            {(!collapsed || mobile) && <span className="min-w-0 flex-1 truncate">{settingsNavItem.label}</span>}
+            {companyUsersActive && <span className="absolute left-0 top-0 h-full w-[2px] bg-foreground" />}
+            <CompanyUsersIcon className={cn('h-4 w-4 shrink-0', companyUsersActive ? 'text-foreground' : 'text-muted-foreground/80')} />
+            {(!collapsed || mobile) && <span className="min-w-0 flex-1 truncate">{companyUsersNavItem.label}</span>}
           </Link>
         </div>
       )}
