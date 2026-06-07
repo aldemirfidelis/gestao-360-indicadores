@@ -1,7 +1,7 @@
 'use client';
 
 import Link from 'next/link';
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
 import {
@@ -211,13 +211,22 @@ const nodeTypeLabels: Record<string, string> = {
 export default function SettingsPage() {
   const qc = useQueryClient();
   const { user, hasPermission, loading: authLoading } = useAuth();
-  const isSuperAdmin = user?.role === 'SUPER_ADMIN';
+  const [platformAdminContext, setPlatformAdminContext] = useState(false);
+  const isSuperAdmin = user?.role === 'SUPER_ADMIN' || platformAdminContext;
   const [active, setActive] = useState<ModuleKey>('parameters');
   const [paramView, setParamView] = useState<ParamView>('companies');
   const [search, setSearch] = useState('');
   const [dialog, setDialog] = useState<{ type: string; record?: any } | null>(null);
-  const canOpenSettings = hasPermission(['settings:view', 'settings:manage']);
-  const canManageUsers = hasPermission(['users:manage']);
+  const canOpenSettings = platformAdminContext || hasPermission(['settings:view', 'settings:manage']);
+  const canManageSettings = platformAdminContext || hasPermission(['settings:manage']);
+  const canManageUsers = platformAdminContext || hasPermission(['users:manage']);
+
+  useEffect(() => {
+    setPlatformAdminContext(
+      window.location.pathname.startsWith('/platform-admin') &&
+      Boolean(window.localStorage.getItem('g360.platformAdmin.accessToken')),
+    );
+  }, []);
 
   const query = useQuery<Bootstrap>({
     queryKey: ['admin', 'bootstrap'],
@@ -280,7 +289,7 @@ export default function SettingsPage() {
     onError: (e: any) => toast.error(e?.message ?? 'Não foi possível excluir'),
   });
 
-  if (authLoading || (canOpenSettings && query.isPending && query.fetchStatus !== 'idle')) {
+  if ((!platformAdminContext && authLoading) || (canOpenSettings && query.isPending && query.fetchStatus !== 'idle')) {
     return <LoadingState label="Carregando configurações..." />;
   }
 
@@ -390,7 +399,7 @@ export default function SettingsPage() {
             </p>
           </div>
         </Link>
-        {hasPermission(['settings:manage']) && (
+        {canManageSettings && (
           <Link
             href="/settings/integracoes"
             className="group flex h-full items-start gap-3 rounded-lg border bg-card p-4 shadow-sm transition-colors hover:bg-accent/35"

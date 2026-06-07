@@ -11,6 +11,12 @@ import { PlatformAdminRequired } from './decorators/platform-permissions.decorat
 import { CurrentPlatformAdmin } from './decorators/current-platform-admin.decorator';
 import { PlatformAdminIdentity } from './platform-admin.types';
 
+function platformCompanyHeader(req?: Request) {
+  const raw = req?.headers['x-platform-company-id'];
+  if (Array.isArray(raw)) return raw[0];
+  return raw ? String(raw) : undefined;
+}
+
 const loginDto = z.object({
   email: z.string().email(),
   password: z.string().min(1),
@@ -167,8 +173,8 @@ export class PlatformAdminController {
 
   @Get('users')
   @PlatformAdminRequired('platform.users.view')
-  users(@Query('q') q?: string, @Query('companyId') companyId?: string, @Query('status') status?: string) {
-    return this.service.listUsers({ q, companyId, status });
+  users(@Req() req: Request, @Query('q') q?: string, @Query('companyId') companyId?: string, @Query('status') status?: string) {
+    return this.service.listUsers({ q, companyId: companyId ?? platformCompanyHeader(req), status });
   }
 
   @Patch('users/:id/status')

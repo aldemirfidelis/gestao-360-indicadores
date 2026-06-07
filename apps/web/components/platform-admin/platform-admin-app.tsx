@@ -1,15 +1,18 @@
 'use client';
 
-import { useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState, type MouseEvent } from 'react';
 import { useRouter } from 'next/navigation';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
 import {
   Activity,
   AlertTriangle,
+  ArrowLeftRight,
   ArrowRight,
   Building2,
+  ChevronDown,
   Database,
+  Eye,
   Flag,
   LayoutDashboard,
   ListChecks,
@@ -19,6 +22,7 @@ import {
   Search,
   ServerCog,
   ShieldCheck,
+  Settings2,
   SlidersHorizontal,
   Users,
   Wrench,
@@ -28,6 +32,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { NativeSelect } from '@/components/ui/select';
+import { dbAdminNav, DB_ADMIN_BASE } from '@/components/database-admin/nav';
 import { cn } from '@/lib/utils';
 import {
   clearPlatformAdminTokens,
@@ -35,8 +40,53 @@ import {
   getPlatformAdminRefreshToken,
   platformAdminApi,
 } from '@/lib/platform-admin-api';
+import GeneralSettingsPage from '@/app/(app)/settings/page';
+import ExternalIntegrationsPage from '@/app/(app)/settings/integracoes/page';
+import VisibilitySettingsPage from '@/app/(app)/settings/visibilidade/page';
+import PortalAdminPage from '@/app/(app)/settings/portal/page';
+import DatabaseOverviewPage from '@/app/(app)/settings/database/page';
+import DatabaseTablesPage from '@/app/(app)/settings/database/tables/page';
+import { TableDetailContent } from '@/components/database-admin/table-detail-content';
+import DatabaseRecordsPage from '@/app/(app)/settings/database/records/page';
+import DatabaseSqlPage from '@/app/(app)/settings/database/sql/page';
+import DatabaseQueryBuilderPage from '@/app/(app)/settings/database/query-builder/page';
+import DatabaseStructurePage from '@/app/(app)/settings/database/structure/page';
+import DatabaseIndexesPage from '@/app/(app)/settings/database/indexes/page';
+import DatabaseImportExportPage from '@/app/(app)/settings/database/import-export/page';
+import DatabaseBackupsPage from '@/app/(app)/settings/database/backups/page';
+import DatabaseAuditPage from '@/app/(app)/settings/database/audit/page';
+import DatabaseDiagnosticsPage from '@/app/(app)/settings/database/diagnostics/page';
+import DatabaseAdvancedPage from '@/app/(app)/settings/database/advanced/page';
 
-type SectionKey = 'dashboard' | 'settings' | 'companies' | 'modules' | 'plans' | 'users' | 'security' | 'technical' | 'audit';
+type SectionKey =
+  | 'dashboard'
+  | 'settings'
+  | 'generalSettings'
+  | 'visibilityAdmin'
+  | 'externalIntegrations'
+  | 'databaseAdmin'
+  | 'portalAdmin'
+  | 'companies'
+  | 'modules'
+  | 'plans'
+  | 'users'
+  | 'security'
+  | 'technical'
+  | 'audit';
+
+type DatabaseAdminTab =
+  | 'overview'
+  | 'tables'
+  | 'records'
+  | 'sql'
+  | 'query-builder'
+  | 'structure'
+  | 'indexes'
+  | 'import-export'
+  | 'backups'
+  | 'audit'
+  | 'diagnostics'
+  | 'advanced';
 
 interface SectionItem {
   key: SectionKey;
@@ -122,6 +172,11 @@ interface AuditRow {
 const SECTIONS: SectionItem[] = [
   { key: 'dashboard', label: 'Dashboard', icon: LayoutDashboard },
   { key: 'settings', label: 'Configuracoes', icon: SlidersHorizontal },
+  { key: 'generalSettings', label: 'Config. Gerais', icon: Settings2 },
+  { key: 'visibilityAdmin', label: 'Visibilidade', icon: Eye },
+  { key: 'externalIntegrations', label: 'APIs Externas', icon: ArrowLeftRight },
+  { key: 'databaseAdmin', label: 'Banco de Dados', icon: Database },
+  { key: 'portalAdmin', label: 'Central do Portal', icon: Wrench },
   { key: 'companies', label: 'Empresas', icon: Building2 },
   { key: 'modules', label: 'Matriz de Modulos', icon: PackageCheck },
   { key: 'plans', label: 'Planos', icon: ListChecks },
@@ -146,6 +201,22 @@ const MODULE_STATUSES = [
 ];
 
 const COMPANY_CORE_MODULE_CODES = new Set(['users']);
+const PLATFORM_COMPANY_CONTEXT_KEY = 'g360.platformAdmin.companyId';
+const LEGACY_COMPANY_SECTIONS = new Set<SectionKey>(['generalSettings', 'visibilityAdmin', 'externalIntegrations']);
+const DATABASE_ADMIN_TABS = new Set<DatabaseAdminTab>([
+  'overview',
+  'tables',
+  'records',
+  'sql',
+  'query-builder',
+  'structure',
+  'indexes',
+  'import-export',
+  'backups',
+  'audit',
+  'diagnostics',
+  'advanced',
+]);
 
 const EMPTY_PLAN_FORM = {
   code: '',
@@ -170,6 +241,41 @@ const SETTINGS_AREAS: Array<{
   target: SectionKey;
   icon: LucideIcon;
 }> = [
+  {
+    title: 'Configuracoes gerais',
+    description: 'Usuarios, perfis de acesso, permissoes, parametros, empresas, filiais e sistema.',
+    action: 'Abrir configuracoes',
+    target: 'generalSettings',
+    icon: Settings2,
+  },
+  {
+    title: 'Matriz de visibilidade',
+    description: 'Controle de acesso entre areas, excecoes por usuario e simulacao por empresa.',
+    action: 'Abrir visibilidade',
+    target: 'visibilityAdmin',
+    icon: Eye,
+  },
+  {
+    title: 'APIs externas',
+    description: 'Conectores, chaves de API, credenciais cifradas, testes, execucoes e logs.',
+    action: 'Abrir APIs',
+    target: 'externalIntegrations',
+    icon: ArrowLeftRight,
+  },
+  {
+    title: 'Banco de dados',
+    description: 'Menu completo com tabelas, registros, SQL, estrutura, indices, importacao, backup e diagnostico.',
+    action: 'Abrir banco',
+    target: 'databaseAdmin',
+    icon: Database,
+  },
+  {
+    title: 'Central do Portal',
+    description: 'Modulos, paginas, funcionalidades, menus, escopo, manutencao, snapshots e parametros avancados.',
+    action: 'Abrir portal',
+    target: 'portalAdmin',
+    icon: Wrench,
+  },
   {
     title: 'Empresas',
     description: 'Cadastro, status, contrato, saude e limites ficam centralizados por empresa.',
@@ -225,16 +331,75 @@ export function PlatformAdminApp() {
   const router = useRouter();
   const queryClient = useQueryClient();
   const [section, setSection] = useState<SectionKey>('dashboard');
+  const [databaseTab, setDatabaseTab] = useState<DatabaseAdminTab>('overview');
+  const [databaseTable, setDatabaseTable] = useState<string | null>(null);
+  const [settingsCompanyId, setSettingsCompanyId] = useState('');
 
   const me = useQuery({
     queryKey: ['platform-admin', 'me'],
     queryFn: () => platformAdminApi<PlatformProfile>('/auth/me'),
     retry: false,
   });
+  const companyContext = useQuery({
+    queryKey: ['platform-admin', 'company-context'],
+    queryFn: () => platformAdminApi<{ rows: CompanyRow[]; total: number }>('/companies?take=500'),
+    enabled: Boolean(me.data),
+  });
+
+  const setSettingsCompanyContext = useCallback((companyId: string) => {
+    setSettingsCompanyId(companyId);
+    if (typeof window !== 'undefined') {
+      window.localStorage.setItem(PLATFORM_COMPANY_CONTEXT_KEY, companyId);
+    }
+    void queryClient.invalidateQueries({ queryKey: ['admin'] });
+    void queryClient.invalidateQueries({ queryKey: ['access-areas'] });
+    void queryClient.invalidateQueries({ queryKey: ['access-modules'] });
+    void queryClient.invalidateQueries({ queryKey: ['access-matrix'] });
+    void queryClient.invalidateQueries({ queryKey: ['access-simulate'] });
+    void queryClient.invalidateQueries({ queryKey: ['access-user-areas'] });
+    void queryClient.invalidateQueries({ queryKey: ['users-list'] });
+    void queryClient.invalidateQueries({ queryKey: ['ext-connectors'] });
+    void queryClient.invalidateQueries({ queryKey: ['ext-keys'] });
+    void queryClient.invalidateQueries({ queryKey: ['ext-logs'] });
+  }, [queryClient]);
 
   useEffect(() => {
     if (!getPlatformAdminAccessToken()) router.replace('/platform-admin/login');
   }, [router]);
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    setSettingsCompanyId(window.localStorage.getItem(PLATFORM_COMPANY_CONTEXT_KEY) ?? '');
+  }, []);
+
+  useEffect(() => {
+    const rows = companyContext.data?.rows ?? [];
+    if (rows.length === 0) return;
+    const stored = settingsCompanyId || (typeof window !== 'undefined' ? window.localStorage.getItem(PLATFORM_COMPANY_CONTEXT_KEY) ?? '' : '');
+    const selected = rows.some((company) => company.id === stored) ? stored : rows[0].id;
+    if (selected !== settingsCompanyId) {
+      setSettingsCompanyContext(selected);
+    }
+  }, [companyContext.data?.rows, settingsCompanyId, setSettingsCompanyContext]);
+
+  useEffect(() => {
+    const handleDatabaseTab = (event: Event) => {
+      const detail = (event as CustomEvent<unknown>).detail;
+      if (isDatabaseAdminTab(detail)) {
+        setSection('databaseAdmin');
+        setDatabaseTab(detail);
+        setDatabaseTable(null);
+        return;
+      }
+      if (isDatabaseNavigationDetail(detail)) {
+        setSection('databaseAdmin');
+        setDatabaseTab(detail.tab);
+        setDatabaseTable(detail.table ?? null);
+      }
+    };
+    window.addEventListener('platform-admin:database-tab', handleDatabaseTab);
+    return () => window.removeEventListener('platform-admin:database-tab', handleDatabaseTab);
+  }, []);
 
   useEffect(() => {
     if (me.isError) {
@@ -257,6 +422,47 @@ export function PlatformAdminApp() {
     await platformAdminApi('/auth/logout', { method: 'POST', json: { refreshToken } }).catch(() => undefined);
     clearPlatformAdminTokens();
     router.replace('/platform-admin/login');
+  }
+
+  function handleLegacyNavigation(event: MouseEvent<HTMLDivElement>) {
+    const target = event.target as HTMLElement | null;
+    const anchor = target?.closest('a[href]') as HTMLAnchorElement | null;
+    if (!anchor) return;
+
+    const href = anchor.getAttribute('href');
+    if (!href || href.startsWith('mailto:') || href.startsWith('tel:') || href.startsWith('#')) return;
+
+    const url = new URL(anchor.href);
+    if (url.origin !== window.location.origin) return;
+
+    const path = url.pathname;
+    let next: SectionKey | null = null;
+
+    if (path.startsWith('/settings/database')) {
+      next = 'databaseAdmin';
+      setDatabaseTable(null);
+      setDatabaseTab(tabFromDatabasePath(path));
+      const tableName = tableNameFromDatabasePath(path);
+      if (tableName) setDatabaseTable(tableName);
+    } else if (path.startsWith('/settings/portal')) {
+      next = 'portalAdmin';
+    } else if (path.startsWith('/settings/visibilidade')) {
+      next = 'visibilityAdmin';
+    } else if (path.startsWith('/settings/integracoes') || path.startsWith('/integracoes')) {
+      next = 'externalIntegrations';
+    } else if (path.startsWith('/settings/empresas')) {
+      next = 'companies';
+    } else if (path.startsWith('/users')) {
+      next = 'users';
+    } else if (path.startsWith('/audit')) {
+      next = 'audit';
+    } else if (path === '/settings') {
+      next = 'generalSettings';
+    }
+
+    if (!next) return;
+    event.preventDefault();
+    setSection(next);
   }
 
   if (me.isLoading) {
@@ -303,6 +509,23 @@ export function PlatformAdminApp() {
             <div className="text-xs text-muted-foreground">Ambiente interno separado das empresas clientes</div>
           </div>
           <div className="flex items-center gap-2">
+            {LEGACY_COMPANY_SECTIONS.has(section) && (
+              <div className="hidden min-w-[260px] items-center gap-2 md:flex">
+                <Label className="whitespace-nowrap text-xs text-muted-foreground">Empresa</Label>
+                <NativeSelect
+                  className="h-9"
+                  value={settingsCompanyId}
+                  onChange={(event) => setSettingsCompanyContext(event.target.value)}
+                  disabled={companyContext.isLoading}
+                >
+                  {(companyContext.data?.rows ?? []).map((company) => (
+                    <option key={company.id} value={company.id}>
+                      {company.tradeName || company.name}
+                    </option>
+                  ))}
+                </NativeSelect>
+              </div>
+            )}
             <Button variant="outline" size="sm" onClick={() => sync.mutate()} disabled={sync.isPending}>
               <PlayCircle className="mr-2 h-4 w-4" />
               Sincronizar
@@ -313,9 +536,24 @@ export function PlatformAdminApp() {
           </div>
         </header>
 
-        <div className="min-h-0 flex-1 overflow-y-auto p-4 lg:p-6">
+        <div className="min-h-0 flex-1 overflow-y-auto p-4 lg:p-6" onClickCapture={handleLegacyNavigation}>
           {section === 'dashboard' && <DashboardSection />}
           {section === 'settings' && <SettingsSection onNavigate={setSection} />}
+          {section === 'generalSettings' && <GeneralSettingsSection />}
+          {section === 'visibilityAdmin' && <VisibilitySettingsSection />}
+          {section === 'externalIntegrations' && <ExternalIntegrationsSection />}
+          {section === 'databaseAdmin' && (
+            <DatabaseAdminSection
+              tab={databaseTab}
+              tableName={databaseTable}
+              onTabChange={(nextTab) => {
+                setDatabaseTable(null);
+                setDatabaseTab(nextTab);
+              }}
+              onTableBack={() => setDatabaseTable(null)}
+            />
+          )}
+          {section === 'portalAdmin' && <PortalAdminSection />}
           {section === 'companies' && <CompaniesSection />}
           {section === 'modules' && <ModulesSection />}
           {section === 'plans' && <PlansSection />}
@@ -372,6 +610,151 @@ function SettingsSection({ onNavigate }: { onNavigate: (section: SectionKey) => 
           </div>
         </Panel>
       </div>
+    </div>
+  );
+}
+
+const DATABASE_ADMIN_PAGES: Record<DatabaseAdminTab, React.ReactNode> = {
+  overview: <DatabaseOverviewPage />,
+  tables: <DatabaseTablesPage />,
+  records: <DatabaseRecordsPage />,
+  sql: <DatabaseSqlPage />,
+  'query-builder': <DatabaseQueryBuilderPage />,
+  structure: <DatabaseStructurePage />,
+  indexes: <DatabaseIndexesPage />,
+  'import-export': <DatabaseImportExportPage />,
+  backups: <DatabaseBackupsPage />,
+  audit: <DatabaseAuditPage />,
+  diagnostics: <DatabaseDiagnosticsPage />,
+  advanced: <DatabaseAdvancedPage />,
+};
+
+function tabFromDatabaseHref(href: string): DatabaseAdminTab {
+  const raw = href.replace(DB_ADMIN_BASE, '').replace(/^\//, '');
+  const segment = raw.split('/').filter(Boolean)[0] || 'overview';
+  return isDatabaseAdminTab(segment) ? segment : 'overview';
+}
+
+function tabFromDatabasePath(path: string): DatabaseAdminTab {
+  const raw = path.replace(DB_ADMIN_BASE, '').replace(/^\/+/, '');
+  const segment = raw.split('/').filter(Boolean)[0] || 'overview';
+  return isDatabaseAdminTab(segment) ? segment : 'overview';
+}
+
+function tableNameFromDatabasePath(path: string) {
+  const prefix = `${DB_ADMIN_BASE}/tables/`;
+  if (!path.startsWith(prefix)) return null;
+  const value = path.slice(prefix.length).split('/').filter(Boolean)[0];
+  return value ? decodeURIComponent(value) : null;
+}
+
+function isDatabaseAdminTab(value: unknown): value is DatabaseAdminTab {
+  return typeof value === 'string' && DATABASE_ADMIN_TABS.has(value as DatabaseAdminTab);
+}
+
+function isDatabaseNavigationDetail(value: unknown): value is { tab: DatabaseAdminTab; table?: string | null } {
+  if (!value || typeof value !== 'object') return false;
+  const detail = value as { tab?: unknown; table?: unknown };
+  return isDatabaseAdminTab(detail.tab) && (detail.table === undefined || detail.table === null || typeof detail.table === 'string');
+}
+
+function GeneralSettingsSection() {
+  return (
+    <div className="rounded-sm border bg-white p-4">
+      <GeneralSettingsPage />
+    </div>
+  );
+}
+
+function VisibilitySettingsSection() {
+  return (
+    <div className="rounded-sm border bg-white p-4">
+      <VisibilitySettingsPage />
+    </div>
+  );
+}
+
+function ExternalIntegrationsSection() {
+  return (
+    <div className="rounded-sm border bg-white p-4">
+      <ExternalIntegrationsPage />
+    </div>
+  );
+}
+
+function PortalAdminSection() {
+  return (
+    <div className="rounded-sm border bg-white p-4">
+      <PortalAdminPage />
+    </div>
+  );
+}
+
+function DatabaseAdminSection({
+  tab,
+  tableName,
+  onTabChange,
+  onTableBack,
+}: {
+  tab: DatabaseAdminTab;
+  tableName: string | null;
+  onTabChange: (tab: DatabaseAdminTab) => void;
+  onTableBack: () => void;
+}) {
+  const active = dbAdminNav.find((item) => tabFromDatabaseHref(item.href) === tab);
+  const [open, setOpen] = useState(true);
+
+  return (
+    <div className="grid grid-cols-1 gap-4 xl:grid-cols-[280px,1fr]">
+      <aside className="xl:sticky xl:top-4 xl:self-start">
+        <div className="overflow-hidden border bg-white">
+          <button
+            type="button"
+            onClick={() => setOpen((value) => !value)}
+            className="flex w-full items-center justify-between gap-2 border-b px-4 py-3 text-left"
+          >
+            <div className="flex items-center gap-2 text-sm font-semibold">
+              <Database className="h-4 w-4 text-muted-foreground" />
+              Banco de Dados
+            </div>
+            <div className="mt-1 text-xs text-muted-foreground">Administração completa do banco</div>
+            <ChevronDown className={cn('h-4 w-4 transition-transform', !open && '-rotate-90')} />
+          </button>
+          {open && (
+          <nav className="max-h-[calc(100vh-190px)] overflow-y-auto p-2">
+            {dbAdminNav.map((item) => {
+              const Icon = item.icon;
+              const itemTab = tabFromDatabaseHref(item.href);
+              const selected = itemTab === tab;
+              return (
+                <button
+                  key={item.href}
+                  type="button"
+                  onClick={() => onTabChange(itemTab)}
+                  className={cn(
+                    'flex w-full items-start gap-2.5 px-2.5 py-2 text-left text-sm transition-colors',
+                    selected ? 'bg-[#101820] text-white' : 'text-muted-foreground hover:bg-muted hover:text-foreground',
+                  )}
+                >
+                  <Icon className={cn('mt-0.5 h-4 w-4 shrink-0', selected ? 'text-white' : 'text-muted-foreground')} />
+                  <span className="min-w-0">
+                    <span className="block font-medium leading-tight">{item.label}</span>
+                    <span className={cn('block text-[11px]', selected ? 'text-white/70' : 'text-muted-foreground')}>{item.description}</span>
+                  </span>
+                </button>
+              );
+            })}
+          </nav>
+          )}
+        </div>
+      </aside>
+      <section className="min-w-0 rounded-sm border bg-white p-4">
+        <div className="mb-4 border-b pb-3">
+          <h2 className="text-base font-semibold">{active?.label ?? 'Banco de Dados'}</h2>
+          <p className="text-sm text-muted-foreground">{active?.description ?? 'Administração técnica do banco.'}</p>
+        </div>
+        {tableName ? <TableDetailContent table={tableName} onBack={onTableBack} /> : DATABASE_ADMIN_PAGES[tab]}
+      </section>
     </div>
   );
 }

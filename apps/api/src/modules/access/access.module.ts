@@ -8,6 +8,6 @@ import { AccessAdminController } from './access-admin.controller';
 @Module({
   controllers: [AccessAdminController],
   providers: [AccessService, AccessAdminService],
-  exports: [AccessService],
+  exports: [AccessService, AccessAdminService],
 })
 export class AccessModule {}

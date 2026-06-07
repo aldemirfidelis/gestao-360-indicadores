@@ -9,5 +9,6 @@ import { HelpService } from './help.service';
   imports: [PortalAdminModule],
   controllers: [HelpController, AdminHelpController],
   providers: [HelpService, SuperAdminPortalGuard],
+  exports: [HelpService],
 })
 export class HelpModule {}

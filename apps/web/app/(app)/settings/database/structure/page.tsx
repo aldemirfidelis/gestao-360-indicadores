@@ -61,7 +61,13 @@ function StructureFlow() {
   }, [built, setNodes, setEdges]);
 
   const onNodeClick = useCallback<NodeMouseHandler>(
-    (_e, node) => router.push(`/settings/database/tables/${encodeURIComponent(node.id)}`),
+    (_e, node) => {
+      if (window.location.pathname.startsWith('/platform-admin')) {
+        window.dispatchEvent(new CustomEvent('platform-admin:database-tab', { detail: { tab: 'tables', table: String(node.id) } }));
+        return;
+      }
+      router.push(`/settings/database/tables/${encodeURIComponent(node.id)}`);
+    },
     [router],
   );
 

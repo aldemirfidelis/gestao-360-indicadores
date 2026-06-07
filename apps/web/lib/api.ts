@@ -6,6 +6,10 @@ export interface ApiOptions extends RequestInit {
 
 const TOKEN_KEY = 'g360.accessToken';
 const REFRESH_KEY = 'g360.refreshToken';
+const PLATFORM_ACCESS_KEY = 'g360.platformAdmin.accessToken';
+const PLATFORM_REFRESH_KEY = 'g360.platformAdmin.refreshToken';
+const PLATFORM_COMPANY_CONTEXT_KEY = 'g360.platformAdmin.companyId';
+const PLATFORM_BRIDGED_PREFIXES = ['/admin/', '/access/', '/integrations/external', '/users'];
 
 export function getAccessToken(): string | null {
   if (typeof window === 'undefined') return null;
@@ -57,13 +61,47 @@ async function refreshAccess(): Promise<boolean> {
   }
 }
 
+function isPlatformAdminContext(path: string) {
+  if (typeof window === 'undefined') return false;
+  if (!window.location.pathname.startsWith('/platform-admin')) return false;
+  if (!window.localStorage.getItem(PLATFORM_ACCESS_KEY)) return false;
+  const pathname = path.split('?')[0];
+  return PLATFORM_BRIDGED_PREFIXES.some((prefix) => pathname === prefix.replace(/\/$/, '') || pathname.startsWith(prefix));
+}
+
+async function refreshPlatformAdminAccess(): Promise<boolean> {
+  if (typeof window === 'undefined') return false;
+  const refreshToken = window.localStorage.getItem(PLATFORM_REFRESH_KEY);
+  if (!refreshToken) return false;
+  try {
+    const res = await fetch(`${API_URL}/platform-admin/auth/refresh`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ refreshToken }),
+    });
+    if (!res.ok) return false;
+    const data = (await res.json()) as { accessToken: string };
+    window.localStorage.setItem(PLATFORM_ACCESS_KEY, data.accessToken);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
 export async function api<T>(path: string, opts: ApiOptions = {}): Promise<T> {
   const headers = new Headers(opts.headers);
   if (opts.json !== undefined) {
     headers.set('content-type', 'application/json');
   }
-  const token = getAccessToken();
+  const platformAdminContext = isPlatformAdminContext(path);
+  const token = platformAdminContext && typeof window !== 'undefined'
+    ? window.localStorage.getItem(PLATFORM_ACCESS_KEY)
+    : getAccessToken();
   if (token) headers.set('authorization', `Bearer ${token}`);
+  if (platformAdminContext && typeof window !== 'undefined') {
+    const companyId = window.localStorage.getItem(PLATFORM_COMPANY_CONTEXT_KEY);
+    if (companyId) headers.set('x-platform-company-id', companyId);
+  }
 
   const init: RequestInit = {
     ...opts,
@@ -71,12 +109,15 @@ export async function api<T>(path: string, opts: ApiOptions = {}): Promise<T> {
     body: opts.json !== undefined ? JSON.stringify(opts.json) : opts.body,
   };
 
-  let res = await fetch(`${API_URL}${path}`, init);
+  const resolvedPath = platformAdminContext ? `/platform-admin${path}` : path;
+  let res = await fetch(`${API_URL}${resolvedPath}`, init);
 
-  if (res.status === 401 && (await refreshAccess())) {
-    const t2 = getAccessToken();
+  if (res.status === 401 && (platformAdminContext ? await refreshPlatformAdminAccess() : await refreshAccess())) {
+    const t2 = platformAdminContext && typeof window !== 'undefined'
+      ? window.localStorage.getItem(PLATFORM_ACCESS_KEY)
+      : getAccessToken();
     if (t2) headers.set('authorization', `Bearer ${t2}`);
-    res = await fetch(`${API_URL}${path}`, { ...init, headers });
+    res = await fetch(`${API_URL}${resolvedPath}`, { ...init, headers });
   }
 
   const text = await res.text();

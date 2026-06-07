@@ -63,6 +63,20 @@ import { DbSettingsController } from './controllers/db-settings.controller';
     DbAdminSettingsService,
     SuperAdminDbGuard,
   ],
-  exports: [PostgreSQLAdapter, SchemaInspectionService, DbAdminAuditService, BackupService],
+  exports: [
+    PostgreSQLAdapter,
+    SchemaInspectionService,
+    DbAdminAuditService,
+    OverviewService,
+    DiagnosticsService,
+    BackupService,
+    RecordManagementService,
+    QueryValidationService,
+    QueryExecutionService,
+    StructureService,
+    ExportService,
+    ImportService,
+    DbAdminSettingsService,
+  ],
 })
 export class DatabaseAdminModule {}

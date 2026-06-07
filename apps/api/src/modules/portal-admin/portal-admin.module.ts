@@ -52,6 +52,22 @@ import { PortalManageController } from './controllers/portal-manage.controller';
     FeatureFlagGuard,
     { provide: APP_GUARD, useClass: PortalGateGuard },
   ],
-  exports: [PortalConfigService, FeatureFlagService, PortalAuditService, RegistryService, FeatureFlagGuard],
+  exports: [
+    PortalAuditService,
+    FeatureFlagService,
+    RegistryService,
+    PortalConfigService,
+    PortalOverviewService,
+    NavigationService,
+    ScopeService,
+    MaintenanceService,
+    ParameterService,
+    IntegrationService,
+    AnnouncementService,
+    SnapshotService,
+    PortalDiagnosticsService,
+    PermissionViewService,
+    FeatureFlagGuard,
+  ],
 })
 export class PortalAdminModule {}
