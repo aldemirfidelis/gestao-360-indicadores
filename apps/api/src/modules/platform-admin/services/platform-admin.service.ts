@@ -15,11 +15,14 @@ interface CompanyInput {
   cnpj?: string | null;
   email?: string | null;
   phone?: string | null;
+  addressLine?: string | null;
   city?: string | null;
   state?: string | null;
   segment?: string | null;
   maxUsers?: number | null;
   notes?: string | null;
+  status?: string | null;
+  areaAccessEnabled?: boolean | null;
   lifecycleStatus?: string;
   planCode?: string | null;
   internalCode?: string | null;
@@ -236,7 +239,7 @@ export class PlatformAdminService {
       if (dup) throw new ConflictException('Ja existe empresa com este CNPJ.');
     }
 
-    const companyStatus = input.lifecycleStatus === 'SUSPENDED' ? CompanyStatus.SUSPENDED : CompanyStatus.ACTIVE;
+    const companyStatus = parseCompanyStatus(input.status ?? input.lifecycleStatus);
     const company = await this.prisma.company.create({
       data: {
         name: input.name,
@@ -244,11 +247,13 @@ export class PlatformAdminService {
         cnpj: input.cnpj ?? null,
         email: input.email ?? null,
         phone: input.phone ?? null,
+        addressLine: input.addressLine ?? null,
         city: input.city ?? null,
         state: input.state ?? null,
         segment: input.segment ?? null,
         maxUsers: input.maxUsers ?? null,
         notes: input.notes ?? null,
+        areaAccessEnabled: input.areaAccessEnabled ?? true,
         status: companyStatus,
         active: companyStatus === CompanyStatus.ACTIVE,
       },
@@ -278,8 +283,16 @@ export class PlatformAdminService {
     }
 
     const data: Prisma.CompanyUpdateInput = {};
-    for (const key of ['name', 'tradeName', 'cnpj', 'email', 'phone', 'city', 'state', 'segment', 'maxUsers', 'notes'] as const) {
+    for (const key of ['name', 'tradeName', 'cnpj', 'email', 'phone', 'addressLine', 'city', 'state', 'segment', 'maxUsers', 'notes'] as const) {
       if (key in input) (data as Record<string, unknown>)[key] = input[key] ?? null;
+    }
+    if (input.areaAccessEnabled !== undefined && input.areaAccessEnabled !== null) {
+      data.areaAccessEnabled = Boolean(input.areaAccessEnabled);
+    }
+    if (input.status !== undefined && input.status !== null) {
+      const companyStatus = parseCompanyStatus(input.status);
+      data.status = companyStatus;
+      data.active = companyStatus === CompanyStatus.ACTIVE;
     }
     const company = await this.prisma.company.update({ where: { id }, data });
     const profile = await this.upsertCompanyProfile(id, input, user);
@@ -882,11 +895,13 @@ export class PlatformAdminService {
       logoUrl: company.logoUrl,
       email: company.email,
       phone: company.phone,
+      addressLine: company.addressLine,
       city: company.city,
       state: company.state,
       segment: company.segment,
       maxUsers: company.maxUsers,
       notes: company.notes,
+      areaAccessEnabled: company.areaAccessEnabled,
       active: company.active,
       status: company.status,
       createdAt: company.createdAt,
@@ -1073,6 +1088,12 @@ function toDate(value: unknown): Date | null {
 function stringOrNull(value: unknown): string | null {
   if (value === undefined || value === null || value === '') return null;
   return String(value);
+}
+
+function parseCompanyStatus(value?: string | null) {
+  if (value === 'SUSPENDED') return CompanyStatus.SUSPENDED;
+  if (value === 'INACTIVE') return CompanyStatus.INACTIVE;
+  return CompanyStatus.ACTIVE;
 }
 
 function numberOrNull(value: unknown): number | null {

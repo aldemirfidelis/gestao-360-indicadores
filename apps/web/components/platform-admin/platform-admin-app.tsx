@@ -17,8 +17,11 @@ import {
   LayoutDashboard,
   ListChecks,
   LogOut,
+  Network,
   PackageCheck,
+  Pencil,
   PlayCircle,
+  Plus,
   Search,
   ServerCog,
   ShieldCheck,
@@ -29,9 +32,11 @@ import {
   type LucideIcon,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { NativeSelect } from '@/components/ui/select';
+import { Textarea } from '@/components/ui/textarea';
 import { dbAdminNav, DB_ADMIN_BASE } from '@/components/database-admin/nav';
 import { cn } from '@/lib/utils';
 import {
@@ -44,6 +49,7 @@ import GeneralSettingsPage from '@/app/(app)/settings/page';
 import ExternalIntegrationsPage from '@/app/(app)/settings/integracoes/page';
 import VisibilitySettingsPage from '@/app/(app)/settings/visibilidade/page';
 import PortalAdminPage from '@/app/(app)/settings/portal/page';
+import OrgPage from '@/app/(app)/org/page';
 import DatabaseOverviewPage from '@/app/(app)/settings/database/page';
 import DatabaseTablesPage from '@/app/(app)/settings/database/tables/page';
 import { TableDetailContent } from '@/components/database-admin/table-detail-content';
@@ -64,8 +70,10 @@ type SectionKey =
   | 'generalSettings'
   | 'visibilityAdmin'
   | 'externalIntegrations'
+  | 'orgStructure'
   | 'databaseAdmin'
   | 'portalAdmin'
+  | 'companyAudit'
   | 'companies'
   | 'modules'
   | 'plans'
@@ -108,7 +116,17 @@ interface CompanyRow {
   name: string;
   tradeName?: string | null;
   cnpj?: string | null;
+  email?: string | null;
+  phone?: string | null;
+  addressLine?: string | null;
+  city?: string | null;
+  state?: string | null;
+  segment?: string | null;
+  maxUsers?: number | null;
+  notes?: string | null;
+  active?: boolean;
   status: string;
+  areaAccessEnabled?: boolean;
   createdAt: string;
   profile?: {
     internalCode?: string | null;
@@ -169,14 +187,33 @@ interface AuditRow {
   createdAt: string;
 }
 
+interface CompanyAuditEntry {
+  id: string;
+  action: string;
+  module: string | null;
+  entity: string;
+  entityId: string | null;
+  recordLabel: string | null;
+  payload: string | null;
+  beforeValue: string | null;
+  afterValue: string | null;
+  result: string | null;
+  ip: string | null;
+  userAgent: string | null;
+  createdAt: string;
+  user: { id: string; name: string; email: string } | null;
+}
+
 const SECTIONS: SectionItem[] = [
   { key: 'dashboard', label: 'Dashboard', icon: LayoutDashboard },
   { key: 'settings', label: 'Configuracoes', icon: SlidersHorizontal },
   { key: 'generalSettings', label: 'Config. Gerais', icon: Settings2 },
   { key: 'visibilityAdmin', label: 'Visibilidade', icon: Eye },
   { key: 'externalIntegrations', label: 'APIs Externas', icon: ArrowLeftRight },
+  { key: 'orgStructure', label: 'Areas e Setores', icon: Network },
   { key: 'databaseAdmin', label: 'Banco de Dados', icon: Database },
   { key: 'portalAdmin', label: 'Central do Portal', icon: Wrench },
+  { key: 'companyAudit', label: 'Auditoria Empresa', icon: Activity },
   { key: 'companies', label: 'Empresas', icon: Building2 },
   { key: 'modules', label: 'Matriz de Modulos', icon: PackageCheck },
   { key: 'plans', label: 'Planos', icon: ListChecks },
@@ -200,9 +237,14 @@ const MODULE_STATUSES = [
   'SOBRESCRITO_MANUALMENTE',
 ];
 
+const COMPANY_STATUSES = ['ACTIVE', 'SUSPENDED', 'INACTIVE'] as const;
+const COMPANY_LIFECYCLE_STATUSES = ['ACTIVE', 'IMPLEMENTATION', 'TRIAL', 'SUSPENDED', 'INACTIVE'] as const;
+const COMPANY_PLAN_CODES = ['ESSENCIAL', 'PROFISSIONAL', 'CORPORATIVO', 'ENTERPRISE', 'PERSONALIZADO'];
 const COMPANY_CORE_MODULE_CODES = new Set(['users']);
 const PLATFORM_COMPANY_CONTEXT_KEY = 'g360.platformAdmin.companyId';
-const LEGACY_COMPANY_SECTIONS = new Set<SectionKey>(['generalSettings', 'visibilityAdmin', 'externalIntegrations']);
+const PORTAL_ADMIN_TAB_KEY = 'g360.platformAdmin.portalTab';
+const PORTAL_ADMIN_TAB_EVENT = 'platform-admin:portal-tab';
+const LEGACY_COMPANY_SECTIONS = new Set<SectionKey>(['generalSettings', 'visibilityAdmin', 'externalIntegrations', 'orgStructure', 'companyAudit']);
 const DATABASE_ADMIN_TABS = new Set<DatabaseAdminTab>([
   'overview',
   'tables',
@@ -217,6 +259,26 @@ const DATABASE_ADMIN_TABS = new Set<DatabaseAdminTab>([
   'diagnostics',
   'advanced',
 ]);
+
+const EMPTY_COMPANY_FORM = {
+  name: '',
+  tradeName: '',
+  cnpj: '',
+  email: '',
+  phone: '',
+  segment: '',
+  addressLine: '',
+  city: '',
+  state: '',
+  maxUsers: '',
+  status: 'ACTIVE',
+  lifecycleStatus: 'ACTIVE',
+  areaAccessEnabled: true,
+  planCode: 'ESSENCIAL',
+  notes: '',
+};
+
+type CompanyForm = typeof EMPTY_COMPANY_FORM;
 
 const EMPTY_PLAN_FORM = {
   code: '',
@@ -254,6 +316,13 @@ const SETTINGS_AREAS: Array<{
     action: 'Abrir visibilidade',
     target: 'visibilityAdmin',
     icon: Eye,
+  },
+  {
+    title: 'Areas e Setores',
+    description: 'Arvore hierarquica da empresa, responsaveis, codigos, cores e status dos nos.',
+    action: 'Abrir estrutura',
+    target: 'orgStructure',
+    icon: Network,
   },
   {
     title: 'APIs externas',
@@ -319,10 +388,10 @@ const SETTINGS_AREAS: Array<{
     icon: ServerCog,
   },
   {
-    title: 'Auditoria',
-    description: 'Trilha administrativa global de acoes, resultados e justificativas.',
+    title: 'Auditoria da empresa',
+    description: 'Trilha de acessos, alteracoes, permissoes, parametros e registros da empresa selecionada.',
     action: 'Abrir auditoria',
-    target: 'audit',
+    target: 'companyAudit',
     icon: Activity,
   },
 ];
@@ -358,9 +427,12 @@ export function PlatformAdminApp() {
     void queryClient.invalidateQueries({ queryKey: ['access-simulate'] });
     void queryClient.invalidateQueries({ queryKey: ['access-user-areas'] });
     void queryClient.invalidateQueries({ queryKey: ['users-list'] });
+    void queryClient.invalidateQueries({ queryKey: ['users'] });
+    void queryClient.invalidateQueries({ queryKey: ['orgnodes'] });
     void queryClient.invalidateQueries({ queryKey: ['ext-connectors'] });
     void queryClient.invalidateQueries({ queryKey: ['ext-keys'] });
     void queryClient.invalidateQueries({ queryKey: ['ext-logs'] });
+    void queryClient.invalidateQueries({ queryKey: ['platform-admin-company-audit'] });
   }, [queryClient]);
 
   useEffect(() => {
@@ -424,6 +496,11 @@ export function PlatformAdminApp() {
     router.replace('/platform-admin/login');
   }
 
+  function openPortalAdminTab(tab: string) {
+    window.localStorage.setItem(PORTAL_ADMIN_TAB_KEY, tab);
+    window.dispatchEvent(new CustomEvent(PORTAL_ADMIN_TAB_EVENT, { detail: tab }));
+  }
+
   function handleLegacyNavigation(event: MouseEvent<HTMLDivElement>) {
     const target = event.target as HTMLElement | null;
     const anchor = target?.closest('a[href]') as HTMLAnchorElement | null;
@@ -448,14 +525,19 @@ export function PlatformAdminApp() {
       next = 'portalAdmin';
     } else if (path.startsWith('/settings/visibilidade')) {
       next = 'visibilityAdmin';
-    } else if (path.startsWith('/settings/integracoes') || path.startsWith('/integracoes')) {
+    } else if (path.startsWith('/settings/integracoes')) {
       next = 'externalIntegrations';
+    } else if (path.startsWith('/integracoes')) {
+      next = 'portalAdmin';
+      openPortalAdminTab('integrations');
     } else if (path.startsWith('/settings/empresas')) {
       next = 'companies';
+    } else if (path.startsWith('/org')) {
+      next = 'orgStructure';
     } else if (path.startsWith('/users')) {
       next = 'users';
     } else if (path.startsWith('/audit')) {
-      next = 'audit';
+      next = 'companyAudit';
     } else if (path === '/settings') {
       next = 'generalSettings';
     }
@@ -542,6 +624,7 @@ export function PlatformAdminApp() {
           {section === 'generalSettings' && <GeneralSettingsSection />}
           {section === 'visibilityAdmin' && <VisibilitySettingsSection />}
           {section === 'externalIntegrations' && <ExternalIntegrationsSection />}
+          {section === 'orgStructure' && <OrgStructureSection />}
           {section === 'databaseAdmin' && (
             <DatabaseAdminSection
               tab={databaseTab}
@@ -554,6 +637,7 @@ export function PlatformAdminApp() {
             />
           )}
           {section === 'portalAdmin' && <PortalAdminSection />}
+          {section === 'companyAudit' && <CompanyAuditSection />}
           {section === 'companies' && <CompaniesSection />}
           {section === 'modules' && <ModulesSection />}
           {section === 'plans' && <PlansSection />}
@@ -682,10 +766,161 @@ function ExternalIntegrationsSection() {
   );
 }
 
+function OrgStructureSection() {
+  return (
+    <div className="rounded-sm border bg-white p-4">
+      <OrgPage />
+    </div>
+  );
+}
+
 function PortalAdminSection() {
   return (
     <div className="rounded-sm border bg-white p-4">
       <PortalAdminPage />
+    </div>
+  );
+}
+
+function CompanyAuditSection() {
+  const [filters, setFilters] = useState({ q: '', entity: '', action: '', module: '', userId: '', from: '', to: '' });
+  const [selected, setSelected] = useState<CompanyAuditEntry | null>(null);
+  const params = useMemo(() => {
+    const search = new URLSearchParams();
+    Object.entries(filters).forEach(([key, value]) => value && search.set(key, value));
+    search.set('limit', '500');
+    return search.toString();
+  }, [filters]);
+  const audit = useQuery({
+    queryKey: ['platform-admin-company-audit', filters],
+    queryFn: () => platformAdminApi<CompanyAuditEntry[]>(`/company-audit?${params}`),
+  });
+  const users = useMemo(() => {
+    const map = new Map<string, { id: string; name: string; email: string }>();
+    (audit.data ?? []).forEach((row) => row.user && map.set(row.user.id, row.user));
+    return Array.from(map.values()).sort((a, b) => a.name.localeCompare(b.name, 'pt-BR'));
+  }, [audit.data]);
+  const modules = useMemo(() => Array.from(new Set((audit.data ?? []).map((row) => row.module).filter(Boolean))) as string[], [audit.data]);
+
+  async function downloadCsv() {
+    const csv = await platformAdminApi<string>('/company-audit/exports/csv');
+    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = 'auditoria-empresa.csv';
+    link.click();
+    URL.revokeObjectURL(url);
+  }
+
+  return (
+    <div className="space-y-4">
+      <Panel
+        title="Filtros da auditoria da empresa"
+        icon={Activity}
+        actions={<Button size="sm" variant="outline" onClick={downloadCsv}>Exportar CSV</Button>}
+      >
+        <div className="grid grid-cols-1 gap-3 lg:grid-cols-6">
+          <div className="relative lg:col-span-2">
+            <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+            <Input className="pl-9" placeholder="Pesquisar no log..." value={filters.q} onChange={(event) => setFilters({ ...filters, q: event.target.value })} />
+          </div>
+          <NativeSelect value={filters.action} onChange={(event) => setFilters({ ...filters, action: event.target.value })}>
+            <option value="">Todas as acoes</option>
+            <option value="LOGIN">Login</option>
+            <option value="LOGOUT">Logout</option>
+            <option value="CREATE">Criacao</option>
+            <option value="UPDATE">Edicao</option>
+            <option value="DELETE">Exclusao</option>
+            <option value="PERMISSION_CHANGE">Permissao</option>
+          </NativeSelect>
+          <NativeSelect value={filters.module} onChange={(event) => setFilters({ ...filters, module: event.target.value })}>
+            <option value="">Todos os modulos</option>
+            {modules.map((module) => <option key={module} value={module}>{module}</option>)}
+          </NativeSelect>
+          <NativeSelect value={filters.userId} onChange={(event) => setFilters({ ...filters, userId: event.target.value })}>
+            <option value="">Todos usuarios</option>
+            {users.map((user) => <option key={user.id} value={user.id}>{user.name}</option>)}
+          </NativeSelect>
+          <Input type="date" value={filters.from} onChange={(event) => setFilters({ ...filters, from: event.target.value })} />
+          <Input type="date" value={filters.to} onChange={(event) => setFilters({ ...filters, to: event.target.value })} />
+        </div>
+      </Panel>
+
+      <Panel title={`Eventos auditados (${audit.data?.length ?? 0})`}>
+        <div className="overflow-x-auto">
+          <table className="table-modern">
+            <thead>
+              <tr>
+                <th>Quando</th>
+                <th>Usuario</th>
+                <th>Acao</th>
+                <th>Modulo</th>
+                <th>Registro afetado</th>
+                <th>Resultado</th>
+                <th>IP / sessao</th>
+                <th />
+              </tr>
+            </thead>
+            <tbody>
+              {(audit.data ?? []).map((entry) => (
+                <tr key={entry.id}>
+                  <td className="text-xs text-muted-foreground">{formatDate(entry.createdAt)}</td>
+                  <td>
+                    {entry.user ? (
+                      <div>
+                        <div className="font-medium">{entry.user.name}</div>
+                        <div className="text-xs text-muted-foreground">{entry.user.email}</div>
+                      </div>
+                    ) : (
+                      <span className="text-muted-foreground">Sistema</span>
+                    )}
+                  </td>
+                  <td>{entry.action}</td>
+                  <td>{entry.module ?? '-'}</td>
+                  <td>
+                    <div className="flex flex-col">
+                      <span>{entry.recordLabel ?? entry.entity}</span>
+                      {entry.entityId && <span className="mt-0.5 max-w-[220px] truncate font-mono text-[10px] text-muted-foreground">{entry.entityId}</span>}
+                    </div>
+                  </td>
+                  <td><Status value={entry.result ?? 'SUCCESS'} /></td>
+                  <td className="text-xs text-muted-foreground">
+                    <div>{entry.ip ?? '-'}</div>
+                    <div className="max-w-[260px] truncate">{entry.userAgent ?? ''}</div>
+                  </td>
+                  <td className="text-right">
+                    <Button variant="outline" size="sm" onClick={() => setSelected(entry)}>Detalhe</Button>
+                  </td>
+                </tr>
+              ))}
+              {audit.isLoading && <tr><td colSpan={8} className="px-4 py-8 text-center text-sm text-muted-foreground">Carregando...</td></tr>}
+            </tbody>
+          </table>
+        </div>
+        {!audit.isLoading && (audit.data?.length ?? 0) === 0 && <EmptyState title="Nenhum registro encontrado" />}
+      </Panel>
+
+      <Dialog open={!!selected} onOpenChange={(open) => !open && setSelected(null)}>
+        <DialogContent className="max-w-4xl">
+          <DialogHeader>
+            <DialogTitle>Detalhe da auditoria</DialogTitle>
+          </DialogHeader>
+          {selected && (
+            <div className="space-y-4">
+              <div className="grid grid-cols-1 gap-3 md:grid-cols-4">
+                <AuditDetail label="Acao" value={selected.action} />
+                <AuditDetail label="Modulo" value={selected.module ?? '-'} />
+                <AuditDetail label="Entidade" value={selected.entity} />
+                <AuditDetail label="Resultado" value={selected.result ?? 'SUCCESS'} />
+              </div>
+              <AuditPayload title="Valor anterior" value={selected.beforeValue} />
+              <AuditPayload title="Valor novo / payload" value={selected.afterValue ?? selected.payload} />
+              <AuditPayload title="Metadados" value={selected.payload} />
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
@@ -841,7 +1076,9 @@ function CompaniesSection() {
   const queryClient = useQueryClient();
   const [q, setQ] = useState('');
   const [selectedId, setSelectedId] = useState<string | null>(null);
-  const [form, setForm] = useState({ name: '', tradeName: '', cnpj: '', planCode: 'ESSENCIAL', lifecycleStatus: 'ACTIVE' });
+  const [editingCompanyId, setEditingCompanyId] = useState<string | null>(null);
+  const [dialogMode, setDialogMode] = useState<'create' | 'edit' | null>(null);
+  const [form, setForm] = useState<CompanyForm>(EMPTY_COMPANY_FORM);
   const companies = useQuery({
     queryKey: ['platform-admin', 'companies', q],
     queryFn: () => platformAdminApi<{ rows: CompanyRow[]; total: number }>(`/companies${q ? `?q=${encodeURIComponent(q)}` : ''}`),
@@ -851,14 +1088,22 @@ function CompaniesSection() {
     queryFn: () => platformAdminApi<{ company: CompanyRow; profile: CompanyRow['profile']; usage: Record<string, number>; users: unknown[]; modules: { module: ModuleCatalog; assignment: { status: string; note?: string | null } | null }[]; logs: AuditRow[] }>(`/companies/${selectedId}`),
     enabled: Boolean(selectedId),
   });
-  const create = useMutation({
-    mutationFn: () => platformAdminApi('/companies', { method: 'POST', json: form }),
-    onSuccess: () => {
-      toast.success('Empresa cadastrada');
-      setForm({ name: '', tradeName: '', cnpj: '', planCode: 'ESSENCIAL', lifecycleStatus: 'ACTIVE' });
-      void queryClient.invalidateQueries({ queryKey: ['platform-admin', 'companies'] });
+  const save = useMutation({
+    mutationFn: () => {
+      const payload = companyFormPayload(form);
+      return editingCompanyId
+        ? platformAdminApi(`/companies/${editingCompanyId}`, { method: 'PATCH', json: payload })
+        : platformAdminApi('/companies', { method: 'POST', json: payload });
     },
-    onError: (err) => toast.error(err instanceof Error ? err.message : 'Falha ao cadastrar'),
+    onSuccess: () => {
+      toast.success(editingCompanyId ? 'Empresa atualizada' : 'Empresa cadastrada');
+      setDialogMode(null);
+      setEditingCompanyId(null);
+      setForm(EMPTY_COMPANY_FORM);
+      void queryClient.invalidateQueries({ queryKey: ['platform-admin', 'companies'] });
+      void queryClient.invalidateQueries({ queryKey: ['platform-admin', 'company'] });
+    },
+    onError: (err) => toast.error(err instanceof Error ? err.message : 'Falha ao salvar empresa'),
   });
   const status = useMutation({
     mutationFn: ({ id, next }: { id: string; next: string }) =>
@@ -870,91 +1115,235 @@ function CompaniesSection() {
     },
   });
 
-  return (
-    <div className="grid gap-4 xl:grid-cols-[1fr,390px]">
-      <div className="space-y-4">
-        <Panel title="Empresas" actions={<SearchBox value={q} onChange={setQ} />}>
-          <div className="overflow-x-auto">
-            <table className="table-modern">
-              <thead>
-                <tr>
-                  <th>Empresa</th>
-                  <th>CNPJ</th>
-                  <th>Plano</th>
-                  <th>Status</th>
-                  <th>Usuarios</th>
-                  <th>Modulos</th>
-                  <th>Ultimo acesso</th>
-                  <th>Acoes</th>
-                </tr>
-              </thead>
-              <tbody>
-                {(companies.data?.rows ?? []).map((company) => (
-                  <tr key={company.id}>
-                    <td>
-                      <button type="button" className="text-left font-medium hover:underline" onClick={() => setSelectedId(company.id)}>
-                        {company.tradeName || company.name}
-                      </button>
-                      <div className="text-xs text-muted-foreground">{company.profile?.internalCode ?? company.name}</div>
-                    </td>
-                    <td>{company.cnpj ?? '-'}</td>
-                    <td>{company.profile?.planCode ?? '-'}</td>
-                    <td><Status value={company.profile?.lifecycleStatus ?? company.status} /></td>
-                    <td>{company.usage.users}</td>
-                    <td>{company.usage.modules}</td>
-                    <td>{formatDate(company.usage.lastAccessAt)}</td>
-                    <td className="space-x-1 whitespace-nowrap">
-                      <Button size="sm" variant="outline" onClick={() => status.mutate({ id: company.id, next: 'ACTIVE' })}>Ativar</Button>
-                      <Button size="sm" variant="outline" onClick={() => status.mutate({ id: company.id, next: 'SUSPENDED' })}>Suspender</Button>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        </Panel>
+  function openCreate() {
+    setEditingCompanyId(null);
+    setForm(EMPTY_COMPANY_FORM);
+    setDialogMode('create');
+  }
 
-        {detail.data && (
-          <Panel title={`Detalhe: ${detail.data.company.tradeName || detail.data.company.name}`}>
-            <div className="grid gap-4 xl:grid-cols-3">
-              <div className="space-y-2 text-sm">
-                <Row label="Plano" value={detail.data.profile?.planCode ?? '-'} />
-                <Row label="Saude" value={`${detail.data.profile?.healthScore ?? 0}%`} />
-                <Row label="Contrato" value={formatDate(detail.data.profile?.contractEndsAt)} />
+  function openEdit(company: CompanyRow, profile: CompanyRow['profile'] = company.profile) {
+    setEditingCompanyId(company.id);
+    setForm(companyToForm(company, profile));
+    setDialogMode('edit');
+  }
+
+  return (
+    <>
+      <div className="grid gap-4 xl:grid-cols-[1fr,390px]">
+        <div className="space-y-4">
+          <Panel
+            title="Empresas"
+            actions={
+              <div className="flex flex-col gap-2 sm:flex-row">
+                <SearchBox value={q} onChange={setQ} />
+                <Button size="sm" onClick={openCreate}>
+                  <Plus className="mr-2 h-4 w-4" />
+                  Nova empresa
+                </Button>
               </div>
-              <div className="space-y-2 text-sm">
-                {Object.entries(detail.data.usage).map(([key, value]) => <Row key={key} label={key} value={value} />)}
-              </div>
-              <div className="space-y-2">
-                {detail.data.modules.slice(0, 8).map((item) => (
-                  <div key={item.module.code} className="flex items-center justify-between border px-2 py-1 text-xs">
-                    <span>{item.module.name}</span>
-                    <Status value={item.assignment?.status ?? 'HERDADO_DO_PLANO'} />
-                  </div>
-                ))}
-              </div>
+            }
+          >
+            <div className="overflow-x-auto">
+              <table className="table-modern">
+                <thead>
+                  <tr>
+                    <th>Empresa</th>
+                    <th>CNPJ</th>
+                    <th>Plano</th>
+                    <th>Status</th>
+                    <th>Usuarios</th>
+                    <th>Modulos</th>
+                    <th>Ultimo acesso</th>
+                    <th>Acoes</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {(companies.data?.rows ?? []).map((company) => (
+                    <tr key={company.id}>
+                      <td>
+                        <button type="button" className="text-left font-medium hover:underline" onClick={() => setSelectedId(company.id)}>
+                          {company.tradeName || company.name}
+                        </button>
+                        <div className="text-xs text-muted-foreground">{company.profile?.internalCode ?? company.name}</div>
+                      </td>
+                      <td>{company.cnpj ?? '-'}</td>
+                      <td>{company.profile?.planCode ?? '-'}</td>
+                      <td><Status value={company.profile?.lifecycleStatus ?? company.status} /></td>
+                      <td>{company.usage.users}</td>
+                      <td>{company.usage.modules}</td>
+                      <td>{formatDate(company.usage.lastAccessAt)}</td>
+                      <td className="space-x-1 whitespace-nowrap">
+                        <Button size="sm" variant="outline" onClick={() => openEdit(company)}>
+                          <Pencil className="mr-2 h-4 w-4" />
+                          Editar
+                        </Button>
+                        <Button size="sm" variant="outline" onClick={() => status.mutate({ id: company.id, next: 'ACTIVE' })}>Ativar</Button>
+                        <Button size="sm" variant="outline" onClick={() => status.mutate({ id: company.id, next: 'SUSPENDED' })}>Suspender</Button>
+                        <Button size="sm" variant="outline" onClick={() => status.mutate({ id: company.id, next: 'INACTIVE' })}>Inativar</Button>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
             </div>
           </Panel>
-        )}
+
+          {detail.data && (
+            <Panel
+              title={`Detalhe: ${detail.data.company.tradeName || detail.data.company.name}`}
+              actions={
+                <Button size="sm" variant="outline" onClick={() => openEdit(detail.data.company, detail.data.profile)}>
+                  <Pencil className="mr-2 h-4 w-4" />
+                  Editar cadastro
+                </Button>
+              }
+            >
+              <div className="grid gap-4 xl:grid-cols-3">
+                <div className="space-y-2 text-sm">
+                  <Row label="Razao social" value={detail.data.company.name} />
+                  <Row label="Nome fantasia" value={detail.data.company.tradeName ?? '-'} />
+                  <Row label="CNPJ" value={detail.data.company.cnpj ?? '-'} />
+                  <Row label="E-mail" value={detail.data.company.email ?? '-'} />
+                  <Row label="Telefone" value={detail.data.company.phone ?? '-'} />
+                  <Row label="Segmento" value={detail.data.company.segment ?? '-'} />
+                  <Row label="Plano" value={detail.data.profile?.planCode ?? '-'} />
+                  <Row label="Saude" value={`${detail.data.profile?.healthScore ?? 0}%`} />
+                  <Row label="Contrato" value={formatDate(detail.data.profile?.contractEndsAt)} />
+                </div>
+                <div className="space-y-2 text-sm">
+                  <Row label="Endereco" value={detail.data.company.addressLine ?? '-'} />
+                  <Row label="Cidade" value={detail.data.company.city ?? '-'} />
+                  <Row label="UF" value={detail.data.company.state ?? '-'} />
+                  <Row label="Max. usuarios" value={detail.data.company.maxUsers ?? '-'} />
+                  <Row label="Status empresa" value={<Status value={detail.data.company.status} />} />
+                  <Row label="Status implantacao" value={<Status value={detail.data.profile?.lifecycleStatus ?? detail.data.company.status} />} />
+                  <Row label="Controle por area" value={detail.data.company.areaAccessEnabled === false ? 'Desativado' : 'Ativado'} />
+                  {Object.entries(detail.data.usage).map(([key, value]) => <Row key={key} label={key} value={value} />)}
+                </div>
+                <div className="space-y-2">
+                  {detail.data.modules.slice(0, 8).map((item) => (
+                    <div key={item.module.code} className="flex items-center justify-between border px-2 py-1 text-xs">
+                      <span>{item.module.name}</span>
+                      <Status value={item.assignment?.status ?? 'HERDADO_DO_PLANO'} />
+                    </div>
+                  ))}
+                  {detail.data.company.notes && <div className="border bg-muted/20 p-3 text-xs leading-5 text-muted-foreground">{detail.data.company.notes}</div>}
+                </div>
+              </div>
+            </Panel>
+          )}
+        </div>
+
+        <Panel title="Cadastro completo de empresas" icon={Building2}>
+          <div className="space-y-3 text-sm">
+            <p className="text-xs leading-5 text-muted-foreground">
+              Cadastro, contato, endereco, limite de usuarios, status, plano, implantacao, controle por area e observacoes ficam centralizados aqui.
+            </p>
+            <Button className="w-full" onClick={openCreate}>
+              <Plus className="mr-2 h-4 w-4" />
+              Nova empresa
+            </Button>
+            <div className="space-y-2 pt-2">
+              <Row label="Campos cadastrais" value="Razao, fantasia, CNPJ, contato" />
+              <Row label="Endereco" value="Logradouro, cidade e UF" />
+              <Row label="Governanca" value="Status, plano e implantacao" />
+              <Row label="Permissoes por area" value="Ativar/desativar por empresa" />
+            </div>
+          </div>
+        </Panel>
       </div>
 
-      <Panel title="Cadastrar empresa">
-        <div className="space-y-3">
-          <Field label="Razao social" value={form.name} onChange={(value) => setForm((prev) => ({ ...prev, name: value }))} />
-          <Field label="Nome fantasia" value={form.tradeName} onChange={(value) => setForm((prev) => ({ ...prev, tradeName: value }))} />
-          <Field label="CNPJ" value={form.cnpj} onChange={(value) => setForm((prev) => ({ ...prev, cnpj: value }))} />
-          <Label className="text-xs">Plano</Label>
-          <select className="h-10 w-full border bg-background px-3 text-sm" value={form.planCode} onChange={(event) => setForm((prev) => ({ ...prev, planCode: event.target.value }))}>
-            {['ESSENCIAL', 'PROFISSIONAL', 'CORPORATIVO', 'ENTERPRISE', 'PERSONALIZADO'].map((plan) => <option key={plan}>{plan}</option>)}
-          </select>
-          <Label className="text-xs">Status de implantacao</Label>
-          <select className="h-10 w-full border bg-background px-3 text-sm" value={form.lifecycleStatus} onChange={(event) => setForm((prev) => ({ ...prev, lifecycleStatus: event.target.value }))}>
-            {['ACTIVE', 'IMPLEMENTATION', 'TRIAL', 'SUSPENDED'].map((item) => <option key={item}>{item}</option>)}
-          </select>
-          <Button className="w-full" onClick={() => create.mutate()} disabled={create.isPending || !form.name}>Cadastrar</Button>
+      <CompanyFormDialog
+        open={dialogMode !== null}
+        mode={dialogMode ?? 'create'}
+        form={form}
+        setForm={setForm}
+        saving={save.isPending}
+        onClose={() => {
+          setDialogMode(null);
+          setEditingCompanyId(null);
+          setForm(EMPTY_COMPANY_FORM);
+        }}
+        onSave={() => save.mutate()}
+      />
+    </>
+  );
+}
+
+function CompanyFormDialog({
+  open,
+  mode,
+  form,
+  setForm,
+  saving,
+  onClose,
+  onSave,
+}: {
+  open: boolean;
+  mode: 'create' | 'edit';
+  form: CompanyForm;
+  setForm: React.Dispatch<React.SetStateAction<CompanyForm>>;
+  saving: boolean;
+  onClose: () => void;
+  onSave: () => void;
+}) {
+  const update = <K extends keyof CompanyForm>(key: K, value: CompanyForm[K]) => setForm((current) => ({ ...current, [key]: value }));
+
+  return (
+    <Dialog open={open} onOpenChange={(nextOpen) => !nextOpen && onClose()}>
+      <DialogContent className="max-w-4xl">
+        <DialogHeader>
+          <DialogTitle>{mode === 'edit' ? 'Editar empresa' : 'Nova empresa'}</DialogTitle>
+        </DialogHeader>
+        <div className="grid gap-4 md:grid-cols-2">
+          <Field label="Razao social" value={form.name} onChange={(value) => update('name', value)} />
+          <Field label="Nome fantasia" value={form.tradeName} onChange={(value) => update('tradeName', value)} />
+          <Field label="CNPJ" value={form.cnpj} onChange={(value) => update('cnpj', value)} />
+          <Field label="E-mail" value={form.email} onChange={(value) => update('email', value)} />
+          <Field label="Telefone" value={form.phone} onChange={(value) => update('phone', value)} />
+          <Field label="Segmento" value={form.segment} onChange={(value) => update('segment', value)} />
+          <div className="md:col-span-2">
+            <Field label="Endereco" value={form.addressLine} onChange={(value) => update('addressLine', value)} />
+          </div>
+          <Field label="Cidade" value={form.city} onChange={(value) => update('city', value)} />
+          <Field label="UF" value={form.state} onChange={(value) => update('state', value.toUpperCase().slice(0, 2))} />
+          <div className="space-y-1.5">
+            <Label className="text-xs">Limite de usuarios</Label>
+            <Input type="number" min={0} value={form.maxUsers} onChange={(event) => update('maxUsers', event.target.value)} />
+          </div>
+          <div className="space-y-1.5">
+            <Label className="text-xs">Plano</Label>
+            <NativeSelect value={form.planCode} onChange={(event) => update('planCode', event.target.value)}>
+              {COMPANY_PLAN_CODES.map((plan) => <option key={plan} value={plan}>{plan}</option>)}
+            </NativeSelect>
+          </div>
+          <div className="space-y-1.5">
+            <Label className="text-xs">Status da empresa</Label>
+            <NativeSelect value={form.status} onChange={(event) => update('status', event.target.value)}>
+              {COMPANY_STATUSES.map((status) => <option key={status} value={status}>{status}</option>)}
+            </NativeSelect>
+          </div>
+          <div className="space-y-1.5">
+            <Label className="text-xs">Status de implantacao</Label>
+            <NativeSelect value={form.lifecycleStatus} onChange={(event) => update('lifecycleStatus', event.target.value)}>
+              {COMPANY_LIFECYCLE_STATUSES.map((status) => <option key={status} value={status}>{status}</option>)}
+            </NativeSelect>
+          </div>
+          <label className="flex items-center gap-2 border bg-muted/20 px-3 py-2 text-sm">
+            <input type="checkbox" checked={form.areaAccessEnabled} onChange={(event) => update('areaAccessEnabled', event.target.checked)} />
+            Controle de visibilidade por area ativo
+          </label>
+          <div className="md:col-span-2 space-y-1.5">
+            <Label className="text-xs">Observacoes</Label>
+            <Textarea rows={4} value={form.notes} onChange={(event) => update('notes', event.target.value)} />
+          </div>
         </div>
-      </Panel>
-    </div>
+        <DialogFooter>
+          <Button variant="outline" onClick={onClose}>Cancelar</Button>
+          <Button disabled={saving || !form.name.trim()} onClick={onSave}>{saving ? 'Salvando...' : 'Salvar'}</Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
   );
 }
 
@@ -1415,6 +1804,79 @@ function AuditSection() {
       <AuditTable rows={audit.data?.rows ?? []} />
     </Panel>
   );
+}
+
+function companyToForm(company: CompanyRow, profile: CompanyRow['profile'] = company.profile): CompanyForm {
+  return {
+    name: company.name ?? '',
+    tradeName: company.tradeName ?? '',
+    cnpj: company.cnpj ?? '',
+    email: company.email ?? '',
+    phone: company.phone ?? '',
+    segment: company.segment ?? '',
+    addressLine: company.addressLine ?? '',
+    city: company.city ?? '',
+    state: company.state ?? '',
+    maxUsers: company.maxUsers === null || company.maxUsers === undefined ? '' : String(company.maxUsers),
+    status: company.status ?? 'ACTIVE',
+    lifecycleStatus: profile?.lifecycleStatus ?? company.status ?? 'ACTIVE',
+    areaAccessEnabled: company.areaAccessEnabled !== false,
+    planCode: profile?.planCode ?? 'ESSENCIAL',
+    notes: company.notes ?? '',
+  };
+}
+
+function companyFormPayload(form: CompanyForm) {
+  const maxUsers = form.maxUsers.trim() ? Number(form.maxUsers) : null;
+  return {
+    name: form.name.trim(),
+    tradeName: blankToNull(form.tradeName),
+    cnpj: blankToNull(form.cnpj),
+    email: blankToNull(form.email),
+    phone: blankToNull(form.phone),
+    segment: blankToNull(form.segment),
+    addressLine: blankToNull(form.addressLine),
+    city: blankToNull(form.city),
+    state: blankToNull(form.state),
+    maxUsers: Number.isFinite(maxUsers) ? maxUsers : null,
+    status: form.status,
+    lifecycleStatus: form.lifecycleStatus,
+    areaAccessEnabled: form.areaAccessEnabled,
+    planCode: form.planCode,
+    notes: blankToNull(form.notes),
+  };
+}
+
+function blankToNull(value: string) {
+  const trimmed = value.trim();
+  return trimmed ? trimmed : null;
+}
+
+function AuditDetail({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="border bg-muted/25 p-3">
+      <div className="text-xs text-muted-foreground">{label}</div>
+      <div className="mt-1 truncate text-sm font-semibold">{value}</div>
+    </div>
+  );
+}
+
+function AuditPayload({ title, value }: { title: string; value: string | null }) {
+  return (
+    <div>
+      <div className="mb-1 text-sm font-semibold">{title}</div>
+      <pre className="max-h-56 overflow-auto border bg-muted/35 p-3 text-xs">{prettyAuditValue(value)}</pre>
+    </div>
+  );
+}
+
+function prettyAuditValue(value: string | null) {
+  if (!value) return '-';
+  try {
+    return JSON.stringify(JSON.parse(value), null, 2);
+  } catch {
+    return value;
+  }
 }
 
 function Panel({ title, children, actions, icon: Icon }: { title: string; children: React.ReactNode; actions?: React.ReactNode; icon?: LucideIcon }) {

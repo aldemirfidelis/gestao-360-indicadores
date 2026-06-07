@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { cn } from '@/lib/utils';
 import {
   Activity, Archive, Boxes, FileText, Flag, GitBranch, KeyRound, LayoutDashboard, LifeBuoy,
@@ -95,9 +95,29 @@ const TAB_CONTENT: Record<TabKey, React.ReactNode> = {
   advanced: <AdvancedTab />,
 };
 
+const PORTAL_ADMIN_TAB_KEY = 'g360.platformAdmin.portalTab';
+const PORTAL_ADMIN_TAB_EVENT = 'platform-admin:portal-tab';
+const TAB_KEYS = new Set<TabKey>(Object.keys(TAB_CONTENT) as TabKey[]);
+
 export default function PortalAdminPage() {
   const [tab, setTab] = useState<TabKey>('overview');
   const activeLabel = GROUPS.flatMap((g) => g.items).find((i) => i.key === tab)?.label ?? '';
+
+  useEffect(() => {
+    function applyTab(value: unknown) {
+      if (typeof value === 'string' && TAB_KEYS.has(value as TabKey)) setTab(value as TabKey);
+    }
+
+    const stored = window.localStorage.getItem(PORTAL_ADMIN_TAB_KEY);
+    if (stored) {
+      applyTab(stored);
+      window.localStorage.removeItem(PORTAL_ADMIN_TAB_KEY);
+    }
+
+    const listener = (event: Event) => applyTab((event as CustomEvent<unknown>).detail);
+    window.addEventListener(PORTAL_ADMIN_TAB_EVENT, listener);
+    return () => window.removeEventListener(PORTAL_ADMIN_TAB_EVENT, listener);
+  }, []);
 
   return (
     <div className="grid grid-cols-1 gap-6 lg:grid-cols-[248px,1fr]">

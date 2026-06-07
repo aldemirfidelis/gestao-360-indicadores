@@ -6,13 +6,16 @@ import { AccessModule } from '../access/access.module';
 import { DatabaseAdminModule } from '../database-admin/database-admin.module';
 import { HelpModule } from '../help/help.module';
 import { IntegrationsModule } from '../integrations/integrations.module';
+import { OrgNodesModule } from '../orgnodes/orgnodes.module';
 import { PortalAdminModule } from '../portal-admin/portal-admin.module';
 import { PlatformAdminController } from './platform-admin.controller';
 import {
   PlatformAdminLegacyAccessController,
+  PlatformAdminLegacyCompanyAuditController,
   PlatformAdminLegacyDatabaseController,
   PlatformAdminLegacyExternalIntegrationsController,
   PlatformAdminLegacyHelpController,
+  PlatformAdminLegacyOrgNodesController,
   PlatformAdminLegacyPortalController,
   PlatformAdminLegacySettingsController,
 } from './platform-admin-legacy.controller';
@@ -31,6 +34,7 @@ import { PlatformAdminBootstrapService } from './services/platform-admin-bootstr
     DatabaseAdminModule,
     HelpModule,
     IntegrationsModule,
+    OrgNodesModule,
     PortalAdminModule,
   ],
   controllers: [
@@ -41,6 +45,8 @@ import { PlatformAdminBootstrapService } from './services/platform-admin-bootstr
     PlatformAdminLegacyAccessController,
     PlatformAdminLegacyExternalIntegrationsController,
     PlatformAdminLegacyHelpController,
+    PlatformAdminLegacyOrgNodesController,
+    PlatformAdminLegacyCompanyAuditController,
   ],
   providers: [
     PlatformAdminAuthGuard,

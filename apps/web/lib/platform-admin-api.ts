@@ -2,6 +2,7 @@ const API_URL = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:3333/api';
 
 const ACCESS_KEY = 'g360.platformAdmin.accessToken';
 const REFRESH_KEY = 'g360.platformAdmin.refreshToken';
+const COMPANY_CONTEXT_KEY = 'g360.platformAdmin.companyId';
 
 export interface PlatformAdminApiOptions extends RequestInit {
   json?: unknown;
@@ -52,6 +53,10 @@ export async function platformAdminApi<T>(path: string, opts: PlatformAdminApiOp
   if (opts.json !== undefined) headers.set('content-type', 'application/json');
   const token = getPlatformAdminAccessToken();
   if (token) headers.set('authorization', `Bearer ${token}`);
+  if (typeof window !== 'undefined') {
+    const companyId = window.localStorage.getItem(COMPANY_CONTEXT_KEY);
+    if (companyId) headers.set('x-platform-company-id', companyId);
+  }
 
   const init: RequestInit = {
     ...opts,

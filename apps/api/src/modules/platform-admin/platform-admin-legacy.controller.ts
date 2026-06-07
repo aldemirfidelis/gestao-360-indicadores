@@ -1,6 +1,6 @@
-import { BadRequestException, Body, Controller, Delete, Get, Param, Patch, Post, Put, Query, Req } from '@nestjs/common';
+import { BadRequestException, Body, Controller, Delete, Get, Header, Param, Patch, Post, Put, Query, Req } from '@nestjs/common';
 import { Request } from 'express';
-import { UserRoleEnum } from '@prisma/client';
+import { Prisma, UserRoleEnum } from '@prisma/client';
 import { PrismaService } from '../../prisma/prisma.service';
 import { AuthPayload } from '../auth/auth.types';
 import { Public } from '../auth/public.decorator';
@@ -23,6 +23,7 @@ import { DB_ADMIN_LIMITS } from '../database-admin/database-admin.constants';
 import type { FilterCondition } from '../database-admin/util/where-builder';
 import { HelpService } from '../help/help.service';
 import { ExternalIntegrationService } from '../integrations/external-integration.service';
+import { OrgNodesService } from '../orgnodes/orgnodes.service';
 import { PortalOverviewService } from '../portal-admin/services/portal-overview.service';
 import { RegistryService } from '../portal-admin/services/registry.service';
 import { FeatureFlagService } from '../portal-admin/services/feature-flag.service';
@@ -73,6 +74,44 @@ async function resolveCompanyId(prisma: PrismaService, req?: Request, preferredC
 
 async function asScopedAuth(prisma: PrismaService, user: PlatformAdminIdentity, req?: Request, preferredCompanyId?: string | null) {
   return asAuthPayload(user, await resolveCompanyId(prisma, req, preferredCompanyId));
+}
+
+function companyAuditWhere(
+  companyId: string,
+  filters: { entity?: string; action?: string; module?: string; userId?: string; q?: string; from?: string; to?: string },
+): Prisma.AuditLogWhereInput {
+  return {
+    companyId,
+    ...(filters.entity ? { entity: filters.entity } : {}),
+    ...(filters.action ? { action: filters.action } : {}),
+    ...(filters.module ? { module: filters.module } : {}),
+    ...(filters.userId ? { userId: filters.userId } : {}),
+    ...(filters.from || filters.to
+      ? {
+          createdAt: {
+            ...(filters.from ? { gte: new Date(filters.from) } : {}),
+            ...(filters.to ? { lte: new Date(filters.to) } : {}),
+          },
+        }
+      : {}),
+    ...(filters.q
+      ? {
+          OR: [
+            { entity: { contains: filters.q, mode: Prisma.QueryMode.insensitive } },
+            { module: { contains: filters.q, mode: Prisma.QueryMode.insensitive } },
+            { action: { contains: filters.q, mode: Prisma.QueryMode.insensitive } },
+            { recordLabel: { contains: filters.q, mode: Prisma.QueryMode.insensitive } },
+            { payload: { contains: filters.q, mode: Prisma.QueryMode.insensitive } },
+            { beforeValue: { contains: filters.q, mode: Prisma.QueryMode.insensitive } },
+            { afterValue: { contains: filters.q, mode: Prisma.QueryMode.insensitive } },
+          ],
+        }
+      : {}),
+  };
+}
+
+function csvAuditValue(value: string) {
+  return `"${String(value).replace(/"/g, '""')}"`;
 }
 
 @Public()
@@ -263,6 +302,103 @@ export class PlatformAdminLegacyAccessController {
   @Get('simulate/:userId')
   simulate(@Param('userId') userId: string) {
     return this.access.simulate(userId);
+  }
+}
+
+@Public()
+@Controller('platform-admin/orgnodes')
+@PlatformAdminRequired()
+export class PlatformAdminLegacyOrgNodesController {
+  constructor(
+    private readonly orgNodes: OrgNodesService,
+    private readonly prisma: PrismaService,
+  ) {}
+
+  @Get()
+  async list(@Req() req: Request) {
+    return this.orgNodes.listFlat(await resolveCompanyId(this.prisma, req));
+  }
+
+  @Get('tree')
+  async tree(@Req() req: Request) {
+    return this.orgNodes.tree(await resolveCompanyId(this.prisma, req));
+  }
+
+  @Post()
+  async create(@Req() req: Request, @Body() body: any) {
+    const companyId = await resolveCompanyId(this.prisma, req, body?.companyId);
+    return this.orgNodes.create(body, companyId);
+  }
+
+  @Patch(':id')
+  async update(@Req() req: Request, @Param('id') id: string, @Body() body: any) {
+    return this.orgNodes.update(id, body, await resolveCompanyId(this.prisma, req));
+  }
+
+  @Patch(':id/move')
+  async move(@Req() req: Request, @Param('id') id: string, @Body() body: { parentId?: string | null }) {
+    return this.orgNodes.move(id, await resolveCompanyId(this.prisma, req), body?.parentId ?? null);
+  }
+
+  @Delete(':id')
+  async remove(@Req() req: Request, @Param('id') id: string) {
+    return this.orgNodes.remove(id, await resolveCompanyId(this.prisma, req));
+  }
+}
+
+@Public()
+@Controller('platform-admin/company-audit')
+@PlatformAdminRequired('platform.audit_logs.view')
+export class PlatformAdminLegacyCompanyAuditController {
+  constructor(private readonly prisma: PrismaService) {}
+
+  @Get()
+  async list(
+    @Req() req: Request,
+    @Query('entity') entity?: string,
+    @Query('action') action?: string,
+    @Query('module') module?: string,
+    @Query('userId') userId?: string,
+    @Query('q') q?: string,
+    @Query('from') from?: string,
+    @Query('to') to?: string,
+    @Query('limit') limit?: string,
+  ) {
+    return this.prisma.auditLog.findMany({
+      where: companyAuditWhere(await resolveCompanyId(this.prisma, req), { entity, action, module, userId, q, from, to }),
+      include: { user: { select: { id: true, name: true, email: true } } },
+      orderBy: { createdAt: 'desc' },
+      take: limit ? parseInt(limit, 10) : 500,
+    });
+  }
+
+  @Get('exports/csv')
+  @Header('content-type', 'text/csv; charset=utf-8')
+  @Header('content-disposition', 'attachment; filename="auditoria-empresa.csv"')
+  async exportCsv(@Req() req: Request, @Query('limit') limit?: string) {
+    const rows = await this.prisma.auditLog.findMany({
+      where: { companyId: await resolveCompanyId(this.prisma, req) },
+      include: { user: { select: { name: true, email: true } } },
+      orderBy: { createdAt: 'desc' },
+      take: limit ? parseInt(limit, 10) : 1000,
+    });
+    const header = ['data_hora', 'usuario', 'email', 'acao', 'modulo', 'entidade', 'registro', 'resultado', 'ip'];
+    return [
+      header.join(';'),
+      ...rows.map((row) =>
+        [
+          row.createdAt.toISOString(),
+          row.user?.name ?? '',
+          row.user?.email ?? '',
+          row.action,
+          row.module ?? '',
+          row.entity,
+          row.entityId ?? '',
+          row.result ?? '',
+          row.ip ?? '',
+        ].map(csvAuditValue).join(';'),
+      ),
+    ].join('\n');
   }
 }
 
