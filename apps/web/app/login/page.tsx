@@ -24,7 +24,7 @@ export default function LoginPage() {
   const [busy, setBusy] = useState(false);
   const form = useForm<Form>({
     resolver: zodResolver(schema),
-    defaultValues: { email: 'admin@demo.com', password: 'admin123' },
+    defaultValues: { email: 'demo@demo.com', password: '123456' },
   });
 
   const onSubmit = async (data: Form) => {

@@ -310,13 +310,25 @@ async function main() {
 
   // ---------------- Usuarios ----------------
   console.log('[seed] criando usuarios...');
-  const hash = await bcrypt.hash('admin123', 10);
+  const hash = await bcrypt.hash('123456', 10);
   const admin = await prisma.user.create({
+    data: {
+      companyId: company.id,
+      email: 'demo@demo.com',
+      passwordHash: hash,
+      name: 'Aldemir Admin',
+      role: UserRoleEnum.SUPER_ADMIN,
+      jobTitle: 'Administrador',
+      defaultNodeId: directorate.id,
+    },
+  });
+
+  await prisma.user.create({
     data: {
       companyId: company.id,
       email: 'admin@demo.com',
       passwordHash: hash,
-      name: 'Aldemir Admin',
+      name: 'Administrador Demo',
       role: UserRoleEnum.SUPER_ADMIN,
       jobTitle: 'Administrador',
       defaultNodeId: directorate.id,
@@ -1056,7 +1068,8 @@ async function main() {
     actions: await prisma.actionPlan.count(),
   };
   console.log('[seed] OK', totals);
-  console.log('[seed] Login: admin@demo.com / admin123');
+  console.log('[seed] Login: demo@demo.com / 123456');
+  console.log('[seed] Login alternativo: admin@demo.com / 123456');
   console.log('[seed] Portal Admin Global: platform@demo.com / admin123');
 }
 
