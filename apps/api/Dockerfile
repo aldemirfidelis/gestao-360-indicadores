@@ -80,7 +80,10 @@ WORKDIR /app/apps/api
 # Seguranca: roda como usuario nao-root (o usuario 'node' ja existe na imagem
 # oficial node). Evita que um RCE no processo tenha privilegios de root no
 # container. Garante leitura do app pelo usuario node.
-RUN chown -R node:node /app
+# storage/: arquivos binarios controlados (DOCX/PDF do GED). Criado como node
+# para que o volume nomeado (docker-compose) inicialize com permissao de escrita.
+RUN mkdir -p /app/apps/api/storage/documents \
+    && chown -R node:node /app
 USER node
 
 # DigitalOcean injeta PORT automaticamente; default 3333

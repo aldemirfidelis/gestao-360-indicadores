@@ -38,6 +38,28 @@ export class DocumentStorageService {
     return readFile(this.resolveKey(storageKey), 'utf8');
   }
 
+  /** Persiste conteudo binario (ex.: DOCX real editado no Collabora). */
+  async putBinary(companyId: string, folder: string, fileName: string, content: Buffer, mimeType: string): Promise<StoredDocumentFile> {
+    const safeName = sanitizeFileName(fileName);
+    const key = `${companyId}/${sanitizePathPart(folder)}/${Date.now()}-${randomUUID()}-${safeName}`;
+    const target = this.resolveKey(key);
+    await mkdir(dirname(target), { recursive: true });
+    await writeFile(target, content);
+    const info = await stat(target);
+    return {
+      storageProvider: this.provider,
+      storageKey: key,
+      fileName: safeName,
+      mimeType,
+      sizeBytes: info.size,
+      hashSha256: sha256Buffer(content),
+    };
+  }
+
+  async readBinary(storageKey: string): Promise<Buffer> {
+    return readFile(this.resolveKey(storageKey));
+  }
+
   private resolveKey(storageKey: string) {
     const target = resolve(this.root, storageKey);
     if (!target.startsWith(this.root)) {
@@ -48,6 +70,10 @@ export class DocumentStorageService {
 }
 
 export function sha256(value: string) {
+  return createHash('sha256').update(value).digest('hex');
+}
+
+export function sha256Buffer(value: Buffer) {
   return createHash('sha256').update(value).digest('hex');
 }
 

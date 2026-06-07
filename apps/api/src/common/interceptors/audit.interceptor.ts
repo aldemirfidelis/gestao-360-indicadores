@@ -19,7 +19,14 @@ export class AuditInterceptor implements NestInterceptor {
     const req = context.switchToHttp().getRequest<Request & { user?: AuthPayload }>();
     const action = METHOD_ACTION[req.method];
     const startedAt = Date.now();
-    if (!action || req.path?.includes('/api/health') || req.path?.includes('/api/auth/refresh')) {
+    // /api/wopi: chamadas do servidor Collabora (lock/save). Tem auditoria
+    // propria (EDITOR_SAVE) e corpo binario que nao deve ser serializado aqui.
+    if (
+      !action ||
+      req.path?.includes('/api/health') ||
+      req.path?.includes('/api/auth/refresh') ||
+      req.path?.includes('/api/wopi')
+    ) {
       return next.handle();
     }
 

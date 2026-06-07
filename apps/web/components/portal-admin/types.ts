@@ -114,7 +114,7 @@ export interface PortalConfig {
   role: string;
   flags: Record<string, boolean>;
   maintenance: { global: { active: boolean; message?: string | null; allowSuperAdmin?: boolean }; modules: (string | null)[]; pages: (string | null)[] };
-  modules: { code: string; status: string; route: string | null; hidden: boolean; maintenance: boolean; unavailable: boolean; unavailableMessage: string | null }[];
+  modules: { code: string; status: string; route: string | null; hidden: boolean; maintenance: boolean; unavailable: boolean; unavailableMessage: string | null; companyModuleStatus?: string | null; companyModuleReadOnly?: boolean }[];
   pages: { code: string; route: string | null; status: string; hidden: boolean; maintenance: boolean; unavailable: boolean; unavailableMessage: string | null }[];
   navOverrides: { itemKey: string; kind: string; hidden: boolean; order: number | null; labelOverride: string | null; iconOverride: string | null; groupOverride: string | null }[];
   announcements: { id: string; title: string; message: string; type: string; display: string; pinned: boolean; dismissible: boolean }[];

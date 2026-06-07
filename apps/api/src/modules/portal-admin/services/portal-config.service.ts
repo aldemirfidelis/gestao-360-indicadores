@@ -24,13 +24,14 @@ export class PortalConfigService {
     const env = process.env.NODE_ENV ?? 'development';
     const isSuper = user.role === 'SUPER_ADMIN';
 
-    const [flags, modules, pages, navOverrides, maintenanceWindows, announcements] = await Promise.all([
+    const [flags, modules, pages, navOverrides, maintenanceWindows, announcements, companyModules] = await Promise.all([
       this.flags.evaluateAllForUser({ userId: user.sub, role: user.role, environment: env, scopeIds: this.scopeIdsOf(user), now }),
       this.prisma.portalModule.findMany(),
       this.prisma.portalPage.findMany(),
       this.prisma.portalNavOverride.findMany(),
       this.prisma.portalMaintenanceWindow.findMany({ where: { active: true } }),
       this.prisma.portalAnnouncement.findMany({ where: { active: true } }),
+      user.companyId ? this.prisma.platformCompanyModule.findMany({ where: { companyId: user.companyId } }).catch(() => []) : Promise.resolve([]),
     ]);
 
     const activeMaint = maintenanceWindows.filter((w) => withinWindow(w.startsAt, w.endsAt, now));
@@ -44,13 +45,19 @@ export class PortalConfigService {
         modules: activeMaint.filter((w) => w.scope === 'module').map((w) => w.targetCode),
         pages: activeMaint.filter((w) => w.scope === 'page').map((w) => w.targetCode),
       },
-      modules: modules.map((m) => ({
-        code: m.code, status: m.status, route: m.route, category: m.category,
-        hidden: m.status === 'HIDDEN', maintenance: m.status === 'MAINTENANCE',
-        unavailable: ['INACTIVE', 'BLOCKED', 'DISCONTINUED', 'MAINTENANCE'].includes(m.status),
-        unavailableMessage: m.unavailableMessage,
-        allowedRoles: parseArray(m.allowedRoles),
-      })),
+      modules: modules.map((m) => {
+        const companyModule = companyModules.find((item) => item.moduleCode === m.code);
+        const effectiveStatus = toPortalStatus(companyModule?.status ?? m.status);
+        return {
+          code: m.code, status: effectiveStatus, route: m.route, category: m.category,
+          hidden: effectiveStatus === 'HIDDEN', maintenance: effectiveStatus === 'MAINTENANCE',
+          unavailable: ['INACTIVE', 'BLOCKED', 'DISCONTINUED', 'MAINTENANCE'].includes(effectiveStatus),
+          unavailableMessage: companyModule?.note ?? m.unavailableMessage,
+          companyModuleStatus: companyModule?.status ?? null,
+          companyModuleReadOnly: companyModule?.readOnly ?? false,
+          allowedRoles: parseArray(m.allowedRoles),
+        };
+      }),
       pages: pages.map((p) => ({
         code: p.code, route: p.route, status: p.status,
         hidden: p.status === 'HIDDEN', maintenance: p.status === 'MAINTENANCE',
@@ -85,4 +92,12 @@ function audienceMatches(a: { audienceRoles: string; companies: string }, user: 
   if (roles.length > 0 && !roles.includes(user.role)) return false;
   if (companies.length > 0 && !companies.includes(user.companyId)) return false;
   return true;
+}
+
+function toPortalStatus(status: string): string {
+  const normalized = status.toUpperCase();
+  if (['BLOQUEADO', 'SUSPENSO', 'BLOCKED', 'SUSPENDED'].includes(normalized)) return 'BLOCKED';
+  if (['INATIVO', 'INACTIVE'].includes(normalized)) return 'INACTIVE';
+  if (['MANUTENCAO', 'MAINTENANCE'].includes(normalized)) return 'MAINTENANCE';
+  return status;
 }

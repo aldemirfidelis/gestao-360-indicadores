@@ -160,6 +160,19 @@ interface DocDetail extends Doc {
   tags: Array<{ id: string; name: string; color: string | null }>;
 }
 
+interface EditorSession {
+  configured: boolean;
+  provider: string;
+  mode: 'ONLINE' | 'MANUAL';
+  message?: string;
+  documentId: string;
+  fileId: string | null;
+  editorUrl: string | null;
+  accessToken: string | null;
+  accessTokenTtl: number;
+  wopiSrc: string | null;
+}
+
 interface DocSummary {
   total: number;
   published: number;
@@ -316,6 +329,7 @@ export default function DocumentsPage() {
   const [typeForm, setTypeForm] = useState({ name: 'Procedimento', sigla: 'PRO', prefix: 'PRO', category: 'PROCEDURE' as DocType, digits: '3', defaultValidityDays: '365', alertDays: '30' });
   const [templateForm, setTemplateForm] = useState({ name: '', typeConfigId: '', content: '' });
   const [draftContent, setDraftContent] = useState('');
+  const [editorSession, setEditorSession] = useState<EditorSession | null>(null);
 
   const listQuery = useQuery<Doc[]>({
     queryKey: ['documents', filters],
@@ -405,6 +419,20 @@ export default function DocumentsPage() {
       invalidate(qc);
     },
     onError: (e: any) => toast.error(e?.message ?? 'Falha ao salvar checkpoint'),
+  });
+
+  const openEditor = useMutation({
+    mutationFn: (id: string) => api<EditorSession>(`/documents/${id}/editor/open`, { method: 'POST', json: {} }),
+    onSuccess: (session) => {
+      if (session.editorUrl && session.accessToken) {
+        setEditorSession(session);
+      } else {
+        toast.message('Editor online indisponivel', {
+          description: session.message ?? 'Use download/upload de nova versao.',
+        });
+      }
+    },
+    onError: (e: any) => toast.error(e?.message ?? 'Nao foi possivel abrir o editor'),
   });
 
   const upload = useMutation({
@@ -801,8 +829,8 @@ export default function DocumentsPage() {
                       <Button onClick={() => autosave.mutate({ id: detail.id, content: draftContent })} disabled={!isEditable(detail.status) || autosave.isPending || !canUpdate}>
                         <Save className="mr-2 h-4 w-4" />Salvar checkpoint
                       </Button>
-                      <Button variant="outline" onClick={() => workflow.mutate({ id: detail.id, action: 'editor/open' })}>
-                        <Edit className="mr-2 h-4 w-4" />Abrir editor
+                      <Button variant="outline" onClick={() => openEditor.mutate(detail.id)} disabled={openEditor.isPending}>
+                        <Edit className="mr-2 h-4 w-4" />{detail.editor.configured ? 'Abrir editor online' : 'Abrir editor'}
                       </Button>
                     </div>
                   </div>
@@ -892,7 +920,45 @@ export default function DocumentsPage() {
           )}
         </DialogContent>
       </Dialog>
+
+      <CollaboraEditorDialog session={editorSession} onClose={() => { setEditorSession(null); invalidate(qc); }} />
     </div>
+  );
+}
+
+function CollaboraEditorDialog({ session, onClose }: { session: EditorSession | null; onClose: () => void }) {
+  const formRef = useRef<HTMLFormElement>(null);
+
+  useEffect(() => {
+    if (session?.editorUrl) {
+      // O frame WOPI exige um POST com o access_token; submetemos apos montar.
+      const timer = setTimeout(() => formRef.current?.submit(), 0);
+      return () => clearTimeout(timer);
+    }
+  }, [session?.editorUrl, session?.accessToken]);
+
+  if (!session?.editorUrl) return null;
+
+  return (
+    <Dialog open onOpenChange={(o) => { if (!o) onClose(); }}>
+      <DialogContent className="flex h-[92vh] w-[96vw] max-w-[96vw] flex-col gap-0 overflow-hidden p-0">
+        <DialogHeader className="border-b px-4 py-3">
+          <DialogTitle className="text-sm">Editor DOCX online — {session.provider}</DialogTitle>
+        </DialogHeader>
+        <div className="relative min-h-0 flex-1">
+          <form ref={formRef} action={session.editorUrl} method="post" target="g360-collabora-frame" className="hidden">
+            <input type="hidden" name="access_token" value={session.accessToken ?? ''} />
+            <input type="hidden" name="access_token_ttl" value={String(session.accessTokenTtl ?? 0)} />
+          </form>
+          <iframe
+            name="g360-collabora-frame"
+            title="Editor de documento"
+            className="h-full w-full border-0"
+            allow="clipboard-read; clipboard-write; fullscreen"
+          />
+        </div>
+      </DialogContent>
+    </Dialog>
   );
 }
 

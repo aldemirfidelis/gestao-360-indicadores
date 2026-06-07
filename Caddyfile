@@ -48,6 +48,34 @@ gestao360.org {
 }
 
 # =====================================================
+# Collabora Online (editor DOCX) — subdominio dedicado
+# =====================================================
+# - DNS: crie um registro A collabora.gestao360.org -> IP do droplet
+# - Caddy emite SSL automatico (Let's Encrypt) e faz a terminacao TLS;
+#   o container roda em HTTP (ssl.termination=true).
+# - O reverse_proxy do Caddy ja faz upgrade de WebSocket automaticamente,
+#   necessario para o protocolo do Collabora (/cool/.../ws).
+# - Mantenha este bloco comentado ate o DNS estar pronto; caso contrario o
+#   Caddy tentara emitir certificado para um host ainda indisponivel.
+# - Para habilitar, remova os comentarios abaixo e suba o profile collabora:
+#   docker compose -f docker-compose.droplet.yml --profile collabora up -d collabora
+# collabora.gestao360.org {
+#     encode zstd gzip
+#
+#     log {
+#         output stdout
+#         format console
+#     }
+#
+#     reverse_proxy collabora:9980 {
+#         header_up Host {host}
+#         header_up X-Real-IP {remote_host}
+#         header_up X-Forwarded-For {remote_host}
+#         header_up X-Forwarded-Proto {scheme}
+#     }
+# }
+
+# =====================================================
 # Exemplo com dominio (descomente quando aplicavel)
 # =====================================================
 # gestao.suaempresa.com.br {

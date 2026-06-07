@@ -5894,6 +5894,478 @@ model PortalDiagnosticRun {
 // Comunicação Corporativa + Diretório Global + Presença
 // =====================================================
 
+// ===========================================================================
+// Portal Admin Global
+// Ambiente interno e separado para administradores da plataforma Gestao 360.
+// Mantem autenticacao, RBAC, auditoria e operacao tecnica fora do portal das
+// empresas. Status/listas complexas usam String para evoluir sem migrations
+// destrutivas em ambientes ja existentes.
+// ===========================================================================
+
+model PlatformAdminUser {
+  id                    String   @id @default(uuid())
+  email                 String   @unique
+  passwordHash          String
+  name                  String
+  jobTitle              String?
+  phone                 String?
+  avatarUrl             String?
+  status                String   @default("ACTIVE") // ACTIVE|INACTIVE|BLOCKED|PENDING
+  mfaEnabled            Boolean  @default(false)
+  passwordResetRequired Boolean  @default(false)
+  lastLoginAt           DateTime?
+  createdAt             DateTime @default(now())
+  updatedAt             DateTime @updatedAt
+  deletedAt             DateTime?
+
+  roles    PlatformAdminUserRole[]
+  sessions PlatformAdminSession[]
+
+  @@index([status])
+  @@index([deletedAt])
+}
+
+model PlatformAdminRole {
+  id          String   @id @default(uuid())
+  code        String   @unique
+  name        String
+  description String?
+  status      String   @default("ACTIVE")
+  system      Boolean  @default(false)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  deletedAt   DateTime?
+
+  permissions PlatformAdminRolePermission[]
+  users       PlatformAdminUserRole[]
+
+  @@index([status])
+}
+
+model PlatformAdminPermission {
+  id          String   @id @default(uuid())
+  key         String   @unique
+  description String
+  group       String
+  action      String
+  createdAt   DateTime @default(now())
+
+  roles PlatformAdminRolePermission[]
+
+  @@index([group])
+}
+
+model PlatformAdminRolePermission {
+  roleId       String
+  permissionId String
+  role         PlatformAdminRole       @relation(fields: [roleId], references: [id], onDelete: Cascade)
+  permission   PlatformAdminPermission @relation(fields: [permissionId], references: [id], onDelete: Cascade)
+  grantedAt    DateTime                @default(now())
+
+  @@id([roleId, permissionId])
+}
+
+model PlatformAdminUserRole {
+  userId    String
+  roleId    String
+  user      PlatformAdminUser @relation(fields: [userId], references: [id], onDelete: Cascade)
+  role      PlatformAdminRole @relation(fields: [roleId], references: [id], onDelete: Cascade)
+  grantedAt DateTime          @default(now())
+  grantedBy String?
+
+  @@id([userId, roleId])
+}
+
+model PlatformAdminSession {
+  id               String            @id @default(uuid())
+  userId           String
+  user             PlatformAdminUser @relation(fields: [userId], references: [id], onDelete: Cascade)
+  refreshTokenHash String            @unique
+  ip               String?
+  userAgent        String?
+  lastSeenAt       DateTime?
+  expiresAt        DateTime
+  revokedAt        DateTime?
+  createdAt        DateTime          @default(now())
+
+  @@index([userId])
+  @@index([expiresAt])
+  @@index([revokedAt])
+}
+
+model PlatformAccessLog {
+  id        String   @id @default(uuid())
+  userId    String?
+  userEmail String?
+  action    String
+  result    String   @default("SUCCESS") // SUCCESS|ERROR|DENIED
+  message   String?
+  ip        String?
+  userAgent String?
+  path      String?
+  createdAt DateTime @default(now())
+
+  @@index([userId, createdAt])
+  @@index([result, createdAt])
+}
+
+model PlatformAuditLog {
+  id            String   @id @default(uuid())
+  userId        String?
+  userEmail     String?
+  roleCodes     String   @default("[]")
+  permissionKey String?
+  companyId     String?
+  moduleCode    String?
+  targetType    String?
+  targetId      String?
+  targetLabel   String?
+  action        String
+  beforeValue   String?
+  afterValue    String?
+  justification String?
+  result        String   @default("SUCCESS")
+  sessionId     String?
+  environment   String?
+  correlationId String?
+  ip            String?
+  userAgent     String?
+  createdAt     DateTime @default(now())
+
+  @@index([createdAt])
+  @@index([userId, createdAt])
+  @@index([companyId, createdAt])
+  @@index([moduleCode, createdAt])
+  @@index([result])
+}
+
+model PlatformCompanyProfile {
+  id                  String   @id @default(uuid())
+  companyId           String   @unique
+  internalCode        String?  @unique
+  lifecycleStatus     String   @default("ACTIVE") // ACTIVE|SUSPENDED|IMPLEMENTATION|TRIAL|INACTIVE
+  planCode            String?
+  commercialOwner     String?
+  implementationOwner String?
+  primaryContactName  String?
+  primaryContactEmail String?
+  contractStartAt     DateTime?
+  contractEndsAt      DateTime?
+  trialEndsAt         DateTime?
+  storageLimitMb      Int?
+  storageUsedMb       Int      @default(0)
+  maxBranches         Int?
+  maxDocuments        Int?
+  maxForms            Int?
+  maxIndicators       Int?
+  maxIntegrations     Int?
+  healthScore         Int      @default(100)
+  notes               String?
+  createdAt           DateTime @default(now())
+  updatedAt           DateTime @updatedAt
+
+  @@index([lifecycleStatus])
+  @@index([planCode])
+}
+
+model PlatformCompanyStatusHistory {
+  id             String   @id @default(uuid())
+  companyId      String
+  previousStatus String?
+  newStatus      String
+  reason         String?
+  changedBy      String?
+  changedByEmail String?
+  createdAt      DateTime @default(now())
+
+  @@index([companyId, createdAt])
+}
+
+model PlatformPlan {
+  id                String   @id @default(uuid())
+  code              String   @unique
+  name              String
+  description       String?
+  status            String   @default("ACTIVE")
+  setupPriceCents   Int      @default(0)
+  monthlyPriceCents Int      @default(0)
+  defaultUsers      Int?
+  defaultBranches   Int?
+  storageLimitMb    Int?
+  supportLevel      String?
+  sla               String?
+  trialDays         Int?
+  billingRules      String?
+  customizations    String?
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+  deletedAt         DateTime?
+
+  modules PlatformPlanModule[]
+
+  @@index([status])
+}
+
+model PlatformPlanModule {
+  planId     String
+  moduleCode String
+  included   Boolean      @default(true)
+  optional   Boolean      @default(false)
+  limits     String?
+  createdAt  DateTime     @default(now())
+  plan       PlatformPlan @relation(fields: [planId], references: [id], onDelete: Cascade)
+
+  @@id([planId, moduleCode])
+  @@index([moduleCode])
+}
+
+model PlatformCompanyPlanOverride {
+  id             String   @id @default(uuid())
+  companyId      String
+  planCode       String?
+  field          String
+  previousValue  String?
+  newValue       String?
+  reason         String?
+  changedBy      String?
+  changedByEmail String?
+  createdAt      DateTime @default(now())
+
+  @@index([companyId, createdAt])
+  @@index([planCode])
+}
+
+model PlatformContract {
+  id                String   @id @default(uuid())
+  companyId         String
+  planCode          String?
+  status            String   @default("ACTIVE")
+  startsAt          DateTime?
+  endsAt            DateTime?
+  renewalAt         DateTime?
+  monthlyValueCents Int?
+  setupValueCents   Int?
+  notes             String?
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+  deletedAt         DateTime?
+
+  @@index([companyId])
+  @@index([status])
+  @@index([endsAt])
+}
+
+model PlatformModuleCatalog {
+  id               String   @id @default(uuid())
+  code             String   @unique
+  name             String
+  description      String?
+  category         String?
+  icon             String?
+  route            String?
+  version          String?
+  globalStatus     String   @default("ACTIVE")
+  availability     String   @default("[]")
+  dependencies     String   @default("[]")
+  internalFeatures String   @default("[]")
+  technicalOwner   String?
+  experimental     Boolean  @default(false)
+  documentation    String?
+  changelog        String?
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+
+  @@index([globalStatus])
+  @@index([category])
+}
+
+model PlatformCompanyModule {
+  id                    String   @id @default(uuid())
+  companyId             String
+  moduleCode            String
+  status                String   @default("HERDADO_DO_PLANO")
+  readOnly              Boolean  @default(false)
+  activationScheduledAt DateTime?
+  expirationScheduledAt DateTime?
+  trialEndsAt           DateTime?
+  inheritedFromPlan     Boolean  @default(true)
+  manuallyOverridden    Boolean  @default(false)
+  note                  String?
+  updatedBy             String?
+  updatedByEmail        String?
+  updatedAt             DateTime @updatedAt
+  createdAt             DateTime @default(now())
+
+  @@unique([companyId, moduleCode])
+  @@index([moduleCode])
+  @@index([status])
+}
+
+model PlatformCompanyModuleHistory {
+  id             String   @id @default(uuid())
+  companyId      String
+  moduleCode     String
+  previousStatus String?
+  newStatus      String
+  reason         String?
+  note           String?
+  changedBy      String?
+  changedByEmail String?
+  createdAt      DateTime @default(now())
+
+  @@index([companyId, moduleCode, createdAt])
+}
+
+model PlatformFeatureFlagTarget {
+  id         String   @id @default(uuid())
+  flagKey    String
+  targetType String
+  targetCode String
+  enabled    Boolean  @default(true)
+  percentage Int?
+  startsAt   DateTime?
+  endsAt     DateTime?
+  createdBy  String?
+  createdAt  DateTime @default(now())
+
+  @@unique([flagKey, targetType, targetCode])
+  @@index([flagKey])
+}
+
+model PlatformSupportSession {
+  id               String    @id @default(uuid())
+  companyId        String
+  adminUserId      String
+  adminEmail       String
+  reason           String
+  justification    String
+  readOnly         Boolean   @default(true)
+  requiresApproval Boolean   @default(false)
+  approvedBy       String?
+  startsAt         DateTime  @default(now())
+  expiresAt        DateTime
+  endedAt          DateTime?
+  createdAt        DateTime  @default(now())
+
+  @@index([companyId])
+  @@index([adminUserId])
+  @@index([expiresAt])
+}
+
+model PlatformEnvironment {
+  id             String   @id @default(uuid())
+  code           String   @unique
+  name           String
+  status         String   @default("ACTIVE")
+  currentVersion String?
+  publishedAt    DateTime?
+  owner          String?
+  settings       String   @default("{}")
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+}
+
+model PlatformRelease {
+  id              String   @id @default(uuid())
+  environmentCode String
+  version         String
+  status          String   @default("PUBLISHED")
+  publishedAt     DateTime?
+  responsible     String?
+  changes         String?
+  migrations      String?
+  testResult      String?
+  rollbackInfo    String?
+  createdAt       DateTime @default(now())
+
+  @@index([environmentCode, createdAt])
+}
+
+model PlatformMigrationRecord {
+  id              String   @id @default(uuid())
+  name            String
+  environmentCode String?
+  status          String   @default("APPLIED")
+  appliedAt       DateTime?
+  checksum        String?
+  notes           String?
+  createdAt       DateTime @default(now())
+
+  @@index([status])
+  @@index([environmentCode])
+}
+
+model PlatformBackup {
+  id              String   @id @default(uuid())
+  environmentCode String?
+  companyId       String?
+  status          String   @default("SCHEDULED")
+  startedAt       DateTime?
+  finishedAt      DateTime?
+  sizeBytes       Int?
+  locationMasked  String?
+  createdBy       String?
+  createdAt       DateTime @default(now())
+
+  @@index([environmentCode, createdAt])
+  @@index([companyId, createdAt])
+  @@index([status])
+}
+
+model PlatformIntegrationConfig {
+  id              String   @id @default(uuid())
+  code            String
+  name            String
+  companyId       String?
+  environmentCode String?
+  status          String   @default("ACTIVE")
+  lastSyncAt      DateTime?
+  lastError       String?
+  lastUsedAt      DateTime?
+  owner           String?
+  maskedSecret    String?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  @@unique([code, companyId, environmentCode])
+  @@index([status])
+}
+
+model PlatformJob {
+  id          String   @id @default(uuid())
+  code        String
+  name        String
+  companyId   String?
+  moduleCode  String?
+  status      String   @default("WAITING")
+  attempts    Int      @default(0)
+  durationMs  Int?
+  error       String?
+  scheduledAt DateTime?
+  startedAt   DateTime?
+  finishedAt  DateTime?
+  createdAt   DateTime @default(now())
+
+  @@index([status])
+  @@index([companyId])
+  @@index([moduleCode])
+}
+
+model PlatformHealthCheck {
+  id        String   @id @default(uuid())
+  code      String
+  name      String
+  category  String
+  status    String   @default("UNKNOWN")
+  latencyMs Int?
+  message   String?
+  checkedAt DateTime @default(now())
+
+  @@index([category])
+  @@index([status])
+  @@index([checkedAt])
+}
+
 enum ConversationKind {
   DIRECT
   GROUP

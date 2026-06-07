@@ -33,6 +33,7 @@ interface AuthCtx {
 const Ctx = createContext<AuthCtx | null>(null);
 
 const PUBLIC_PATHS = ['/', '/login'];
+const PUBLIC_PREFIXES = ['/platform-admin'];
 
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<AuthUser | null>(null);
@@ -51,7 +52,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const token = getAccessToken();
     if (!token) {
       setLoading(false);
-      if (!PUBLIC_PATHS.includes(pathname)) router.replace('/login');
+      if (!PUBLIC_PATHS.includes(pathname) && !PUBLIC_PREFIXES.some((prefix) => pathname.startsWith(prefix))) {
+        router.replace('/login');
+      }
       return;
     }
     refreshUser()

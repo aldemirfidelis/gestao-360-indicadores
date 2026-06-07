@@ -93,21 +93,60 @@ Os endpoints continuam usando permissoes consolidadas onde isso preserva compati
 
 - `DOCUMENT_STORAGE_PROVIDER`: `LOCAL` por padrao.
 - `DOCUMENT_STORAGE_PATH`: caminho privado para arquivos, padrao `storage/documents`.
-- `DOCUMENT_EDITOR_PROVIDER`: `manual` por padrao. Exemplos futuros: `onlyoffice`, `collabora`.
-- `DOCUMENT_EDITOR_URL`: URL do provedor online, quando configurado.
+- `DOCUMENT_EDITOR_PROVIDER`: `manual` por padrao; `collabora` ativa o editor online (WOPI).
+- `DOCUMENT_EDITOR_URL`: URL publica do servidor Collabora Online (ex.: `https://collabora.gestao360.org`).
+- `DOCUMENT_EDITOR_WOPI_BASE`: URL publica da API (host WOPI) que o Collabora usa para ler/salvar o DOCX. Deve incluir o prefixo `/api` (ex.: `https://gestao360.org/api`).
+- `DOCUMENT_EDITOR_JWT_SECRET`: segredo HMAC que assina o `access_token` WOPI. Se ausente, cai para `JWT_ACCESS_SECRET`. Gere com `openssl rand -base64 48`.
+- `DOCUMENT_EDITOR_TOKEN_TTL_MS` (opcional): validade do `access_token`, padrao 10h.
+- `COLLABORA_ADMIN_USER` / `COLLABORA_ADMIN_PASSWORD`: console admin do Collabora (usadas no docker-compose).
 
 Documentos corporativos nao sao gravados em `public/` e nao recebem URL publica direta.
 
 ## Editor DOCX
 
-A camada `DocumentEditorService` retorna modo `ONLINE` somente quando `DOCUMENT_EDITOR_PROVIDER` e `DOCUMENT_EDITOR_URL` estao configurados. Sem isso, a UI opera em modo manual:
+`DocumentEditorService` opera em modo `ONLINE` quando `DOCUMENT_EDITOR_PROVIDER != manual` e `DOCUMENT_EDITOR_URL` + `DOCUMENT_EDITOR_WOPI_BASE` estao definidos. Sem isso, a UI mantem o modo manual:
 
 - visualizar metadados/conteudo;
 - baixar arquivo controlado;
 - enviar nova versao;
 - registrar substituicao e auditoria.
 
-Nao foi afirmada integracao funcional com ONLYOFFICE, Collabora ou Microsoft Office Web porque nenhum servidor externo foi configurado/testado nesta entrega.
+### Integracao Collabora Online (WOPI)
+
+O provedor `collabora` implementa um **host WOPI** dentro da propria API:
+
+- `POST /documents/:id/editor/open` (autenticado): garante um DOCX binario real para a revisao (gerando um `.docx` valido a partir do conteudo quando necessario), cria a sessao do editor, emite um `access_token` assinado (HMAC) e devolve a `editorUrl` do Collabora ja com o `WOPISrc`.
+- O frontend abre um dialog com `<iframe>` e submete um formulario `POST` com `access_token`/`access_token_ttl` para a `editorUrl`.
+- O servidor Collabora chama de volta o host WOPI (rotas `@Public`, validadas pelo token):
+  - `GET /api/wopi/files/:id` — CheckFileInfo (metadados/permissoes).
+  - `GET /api/wopi/files/:id/contents` — GetFile (bytes do DOCX).
+  - `POST /api/wopi/files/:id/contents` — PutFile (salva a nova versao binaria + checkpoint + auditoria `EDITOR_SAVE`).
+  - `POST /api/wopi/files/:id` — Lock/Unlock/RefreshLock/GetLock (edicao colaborativa).
+- O corpo de `PutFile` chega como `octet-stream`; como o Nest so faz parse de JSON/urlencoded, o `WopiController` le o stream binario bruto diretamente da requisicao.
+- Os DOCX binarios ficam apenas no storage (sem `contentText`); por isso o `download` controlado e binario-safe e o volume de storage e obrigatorio em producao.
+
+### Passo a passo (droplet)
+
+1. DNS: crie `collabora.gestao360.org` (A) apontando para o IP do droplet.
+2. No `Caddyfile`, descomente o bloco `collabora.gestao360.org` somente depois do DNS estar resolvendo para o droplet.
+3. `.env`: defina `DOCUMENT_EDITOR_PROVIDER=collabora`, `DOCUMENT_EDITOR_URL`, `DOCUMENT_EDITOR_WOPI_BASE`, `DOCUMENT_EDITOR_JWT_SECRET` e `COLLABORA_ADMIN_*` (ver `.env.droplet.example`).
+4. Suba a stack principal: `docker compose -f docker-compose.droplet.yml up -d` (mantem API, web, Caddy e o volume `g360_storage`).
+5. Suba o Collabora pelo profile dedicado: `docker compose -f docker-compose.droplet.yml --profile collabora up -d collabora`.
+6. O Caddy publica o subdominio e emite TLS automatico; o Collabora roda em HTTP com `ssl.termination=true`.
+7. Valide a discovery: `curl https://collabora.gestao360.org/hosting/discovery`.
+8. Abra um documento em rascunho > aba Documento > "Abrir editor online".
+
+### Dev local (opcional)
+
+O Collabora roda em container e precisa alcancar a API do host. Use
+`DOCUMENT_EDITOR_WOPI_BASE=http://host.docker.internal:3333/api`,
+`DOCUMENT_EDITOR_URL=http://localhost:9980` e suba o CODE com
+`--o:ssl.enable=false`. O `aliasgroup1` do Collabora deve incluir o host WOPI.
+
+### Limitacoes
+
+- Os locks WOPI sao mantidos em memoria (1 instancia da API). Para multiplas replicas, migrar o lock store para Redis.
+- O `.docx` semeado a partir do conteudo textual e um OOXML minimo (paragrafos); a formatacao rica passa a ser produzida no proprio editor.
 
 ## Armazenamento
 
@@ -172,7 +211,7 @@ Cobertura focada atual:
 
 ## Limitacoes conhecidas
 
-- O provider local gera conteudo controlado em formato textual com MIME de DOCX/PDF para a fundacao GED; conversao binaria DOCX/PDF real depende de integrar um motor externo ou biblioteca especifica.
-- O editor online esta desacoplado, mas nao integrado a um servidor externo nesta entrega.
+- O provider local gera conteudo controlado em formato textual com MIME de DOCX/PDF para a fundacao GED; o editor online passa a gravar DOCX binario real (OOXML) via Collabora. A geracao automatica de PDF oficial binario ainda depende de motor externo.
+- O editor online (Collabora/WOPI) esta integrado e funcional quando o servidor Collabora esta configurado e alcancavel; locks ficam em memoria (1 instancia).
 - Os guards ainda usam permissoes consolidadas (`doc:update`, `doc:manage`) em algumas rotas; o catalogo granular ja existe para refinamento futuro.
 - A rotina de vencimento esta exposta como job manual; agendamento automatico deve ser conectado ao BullMQ/cron da infraestrutura.

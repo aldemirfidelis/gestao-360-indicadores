@@ -45,6 +45,7 @@ import { AccessModule } from './modules/access/access.module';
 import { HelpModule } from './modules/help/help.module';
 import { IntegrationsModule } from './modules/integrations/integrations.module';
 import { ExternalApiModule } from './modules/external-api/external-api.module';
+import { PlatformAdminGlobalModule } from './modules/platform-admin/platform-admin.module';
 
 @Module({
   imports: [
@@ -90,6 +91,7 @@ import { ExternalApiModule } from './modules/external-api/external-api.module';
     IntegrationsModule,
     ExternalApiModule,
     PlatformModule,
+    PlatformAdminGlobalModule,
     AccessModule,
   ],
   providers: [

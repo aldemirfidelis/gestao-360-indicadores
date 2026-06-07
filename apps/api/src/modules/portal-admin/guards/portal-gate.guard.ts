@@ -4,6 +4,8 @@ import { PortalConfigService } from '../services/portal-config.service';
 import { PORTAL_GATE_KEY, PortalGateMetadata } from '../decorators/portal-gate.decorator';
 import { IS_PUBLIC_KEY } from '../../auth/jwt-auth.guard';
 import { AuthPayload } from '../../auth/auth.types';
+import { PrismaService } from '../../../prisma/prisma.service';
+import { canUseCompanyModule } from '../../platform-admin/platform-admin.access';
 
 /**
  * Enforcement de módulos/páginas/funcionalidades + manutenção, derivado da
@@ -20,6 +22,7 @@ export class PortalGateGuard implements CanActivate {
   constructor(
     private readonly reflector: Reflector,
     private readonly configService: PortalConfigService,
+    private readonly prisma: PrismaService,
   ) {}
 
   async canActivate(context: ExecutionContext): Promise<boolean> {
@@ -27,8 +30,6 @@ export class PortalGateGuard implements CanActivate {
     const user: AuthPayload | undefined = req.user;
 
     // Super Admin nunca é bloqueado.
-    if (user?.role === 'SUPER_ADMIN') return true;
-
     const isPublic = this.reflector.getAllAndOverride<boolean>(IS_PUBLIC_KEY, [context.getHandler(), context.getClass()]);
     if (isPublic) return true;
 
@@ -42,6 +43,20 @@ export class PortalGateGuard implements CanActivate {
     }
     // Nenhum recurso identificado => não há o que aplicar (não bloqueia login/config/etc.).
     if (!moduleCode && !pageCode && !featureCode) return true;
+
+    if (moduleCode && user?.companyId) {
+      const assignment = await this.prisma.platformCompanyModule
+        .findUnique({ where: { companyId_moduleCode: { companyId: user.companyId, moduleCode } } })
+        .catch(() => null);
+      if (assignment) {
+        const decision = canUseCompanyModule(assignment.status, req.method);
+        if (!decision.allowed) {
+          throw new ForbiddenException(assignment.note || decision.reason || `O modulo "${moduleCode}" nao esta disponivel para esta empresa.`);
+        }
+      }
+    }
+
+    if (user?.role === 'SUPER_ADMIN') return true;
 
     try {
       const config = await this.configService.getEffectiveConfig(user ?? anonymous());

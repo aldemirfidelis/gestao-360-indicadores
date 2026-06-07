@@ -20,8 +20,9 @@ import { AccessService } from '../access/access.service';
 import type { AreaAction } from '../access/access.logic';
 import { AuthPayload } from '../auth/auth.types';
 import { DocumentCodeService } from './document-code.service';
-import { DocumentEditorService } from './document-editor.service';
+import { DocumentEditorService, WopiTokenPayload } from './document-editor.service';
 import { DocumentStorageService, sha256 } from './document-storage.service';
+import { buildDocx } from './docx.util';
 
 const MODULE = 'documents';
 const DOCX_MIME = 'application/vnd.openxmlformats-officedocument.wordprocessingml.document';
@@ -854,22 +855,179 @@ export class DocumentsService {
   async openEditor(me: AuthPayload, id: string) {
     const doc = await this.loadScoped(id, me.companyId);
     await this.assertViewArea(me, doc);
-    const latestDocx = await this.prisma.documentFile.findFirst({
-      where: { companyId: me.companyId, documentId: id, kind: DocumentFileKind.DOCX, deletedAt: null },
-      orderBy: { createdAt: 'desc' },
+
+    // Sem provedor online configurado: mantem o fluxo manual (download/upload).
+    if (!this.editor.isOnline()) {
+      const latestDocx = await this.prisma.documentFile.findFirst({
+        where: { companyId: me.companyId, documentId: id, kind: DocumentFileKind.DOCX, deletedAt: null },
+        orderBy: { createdAt: 'desc' },
+      });
+      return this.editor.buildSession({
+        documentId: id,
+        fileId: latestDocx?.id ?? '',
+        fileName: latestDocx?.fileName ?? `${doc.code ?? doc.number}.docx`,
+        companyId: me.companyId,
+        userId: me.sub,
+        userName: me.name,
+        canWrite: false,
+      });
+    }
+
+    const canWrite = await this.canWriteDoc(me, doc);
+    const file = await this.ensureEditableDocxFile(me, doc);
+    const session = await this.editor.buildSession({
+      documentId: id,
+      fileId: file.id,
+      fileName: file.fileName,
+      companyId: me.companyId,
+      userId: me.sub,
+      userName: me.name,
+      canWrite,
     });
     await this.prisma.documentEditorSession.create({
       data: {
         companyId: me.companyId,
         documentId: id,
-        versionId: latestDocx?.versionId ?? null,
+        versionId: file.versionId ?? null,
         userId: me.sub,
-        provider: this.editor.status().provider,
+        provider: this.editor.provider,
         status: 'OPEN',
-        metadata: this.editor.openPayload(id, latestDocx?.id ?? null),
+        metadata: jsonOrNull({ fileId: file.id, mode: session.mode, online: Boolean(session.editorUrl) }),
       },
     });
-    return this.editor.openPayload(id, latestDocx?.id ?? null);
+    return session;
+  }
+
+  /** Indica se o usuario pode editar o documento (status editavel + escopo de area). */
+  private async canWriteDoc(me: AuthPayload, doc: any): Promise<boolean> {
+    if (!EDITABLE_STATUSES.has(doc.status)) return false;
+    const area = this.areaOf(doc);
+    if (!area) return true;
+    try {
+      await this.access.assertCanWrite(me.sub, area, MODULE, 'edit');
+      return true;
+    } catch {
+      return false;
+    }
+  }
+
+  /**
+   * Garante um DOCX binario real (OOXML) para o editor online. Se o documento
+   * so tinha conteudo textual (fundacao GED) ou nao tinha DOCX, gera um .docx
+   * valido semeado com o texto atual e o vincula a revisao corrente.
+   */
+  private async ensureEditableDocxFile(me: AuthPayload, doc: any) {
+    const existing = await this.prisma.documentFile.findFirst({
+      where: { companyId: me.companyId, documentId: doc.id, kind: DocumentFileKind.DOCX, deletedAt: null },
+      orderBy: { createdAt: 'desc' },
+    });
+    // DOCX binario real = sem contentText e com chave de storage.
+    if (existing && existing.contentText == null && existing.storageKey) return existing;
+
+    const seedText = doc.content ?? existing?.contentText ?? '';
+    const buffer = buildDocx(seedText);
+    const version = await this.ensureLatestVersion(doc, me.sub);
+    const stored = await this.storage.putBinary(
+      me.companyId,
+      `documents/${doc.id}/editor`,
+      `${doc.code ?? doc.number}.docx`,
+      buffer,
+      DOCX_MIME,
+    );
+    return this.prisma.$transaction(async (tx) => {
+      const item = await tx.documentFile.create({
+        data: {
+          companyId: me.companyId,
+          documentId: doc.id,
+          versionId: version.id,
+          kind: DocumentFileKind.DOCX,
+          createdById: me.sub,
+          contentText: null,
+          ...stored,
+        },
+      });
+      await tx.documentVersion.update({ where: { id: version.id }, data: { docxFileId: item.id } });
+      await this.auditTx(tx, me, doc.id, 'EDITOR_SEED', null, { fileId: item.id }, 'Geracao de DOCX editavel para o editor online');
+      return item;
+    });
+  }
+
+  // --------------------------- Host WOPI (Collabora) ------------------------
+  // Endpoints publicos validados pelo access_token assinado (sem JWT de usuario).
+
+  private async wopiResolveFile(token: WopiTokenPayload) {
+    const file = await this.prisma.documentFile.findFirst({
+      where: { id: token.fileId, companyId: token.companyId, deletedAt: null },
+    });
+    if (!file) throw new NotFoundException('Arquivo nao encontrado.');
+    const doc = await this.prisma.document.findFirst({
+      where: { id: file.documentId ?? token.documentId, companyId: token.companyId, deletedAt: null },
+    });
+    if (!doc) throw new NotFoundException('Documento nao encontrado.');
+    return { file, doc };
+  }
+
+  /** WOPI CheckFileInfo: metadados que o Collabora usa para abrir o arquivo. */
+  async wopiCheckFileInfo(token: WopiTokenPayload) {
+    const { file, doc } = await this.wopiResolveFile(token);
+    const editable = EDITABLE_STATUSES.has(doc.status) && token.canWrite;
+    return {
+      BaseFileName: file.fileName,
+      Size: file.sizeBytes ?? 0,
+      Version: file.hashSha256 ?? String(file.createdAt.getTime()),
+      OwnerId: doc.ownerUserId ?? doc.createdById ?? 'system',
+      UserId: token.userId,
+      UserFriendlyName: token.userName || 'Usuario',
+      UserCanWrite: editable,
+      UserCanNotWriteRelative: true,
+      SupportsUpdate: true,
+      SupportsLocks: true,
+      SupportsGetLock: true,
+      LastModifiedTime: file.createdAt.toISOString(),
+    };
+  }
+
+  /** WOPI GetFile: bytes do DOCX. Converte conteudo legado em DOCX on-the-fly. */
+  async wopiGetFile(token: WopiTokenPayload): Promise<Buffer> {
+    const { file } = await this.wopiResolveFile(token);
+    if (file.contentText != null) return buildDocx(file.contentText);
+    return this.storage.readBinary(file.storageKey);
+  }
+
+  /** WOPI PutFile: persiste a nova versao binaria salva no editor. */
+  async wopiPutFile(token: WopiTokenPayload, content: Buffer) {
+    const { file, doc } = await this.wopiResolveFile(token);
+    if (!token.canWrite || !EDITABLE_STATUSES.has(doc.status)) {
+      throw new ConflictException('Documento bloqueado para edicao.');
+    }
+    const stored = await this.storage.putBinary(token.companyId, `documents/${doc.id}/editor`, file.fileName, content, DOCX_MIME);
+    await this.prisma.$transaction(async (tx) => {
+      await tx.documentFile.update({
+        where: { id: file.id },
+        data: {
+          storageProvider: stored.storageProvider,
+          storageKey: stored.storageKey,
+          sizeBytes: stored.sizeBytes,
+          hashSha256: stored.hashSha256,
+          mimeType: DOCX_MIME,
+          contentText: null,
+        },
+      });
+      await tx.documentAutosaveCheckpoint.create({
+        data: { companyId: token.companyId, documentId: doc.id, versionId: file.versionId, userId: token.userId, fileId: file.id, checksum: stored.hashSha256 },
+      });
+      await tx.documentAuditLog.create({
+        data: {
+          companyId: token.companyId,
+          documentId: doc.id,
+          userId: token.userId,
+          action: 'EDITOR_SAVE',
+          afterValue: jsonOrNull({ fileId: file.id, size: stored.sizeBytes, hash: stored.hashSha256 }),
+          reason: 'Salvo via editor online (Collabora)',
+        },
+      });
+    });
+    return { version: stored.hashSha256 };
   }
 
   async uploadFile(me: AuthPayload, id: string, body: any) {
@@ -910,7 +1068,9 @@ export class DocumentsService {
     await this.assertViewArea(me, doc);
     const file = await this.prisma.documentFile.findFirst({ where: { id: fileId, documentId: id, companyId: me.companyId, deletedAt: null } });
     if (!file) throw new NotFoundException('Arquivo nao encontrado.');
-    const content = file.contentText ?? (await this.storage.readText(file.storageKey));
+    // Arquivos legados guardam o texto em contentText; arquivos binarios
+    // (ex.: DOCX salvo pelo Collabora) ficam apenas no storage.
+    const content = file.contentText != null ? Buffer.from(file.contentText, 'utf8') : await this.storage.readBinary(file.storageKey);
     await this.prisma.$transaction(async (tx) => {
       await tx.documentDownloadLog.create({
         data: {
@@ -925,7 +1085,7 @@ export class DocumentsService {
       });
       await this.auditTx(tx, me, id, 'DOWNLOAD', null, { fileId: file.id, kind: file.kind }, 'Download controlado', context);
     });
-    return { file, content: Buffer.from(content, 'utf8'), mimeType: file.mimeType ?? mimeFor(file.kind) };
+    return { file, content, mimeType: file.mimeType ?? mimeFor(file.kind) };
   }
 
   async addComment(me: AuthPayload, id: string, body: any) {

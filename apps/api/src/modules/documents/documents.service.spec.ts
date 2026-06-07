@@ -55,6 +55,7 @@ function makeService(opts?: {
       findMany: vi.fn().mockResolvedValue([]),
       findFirst: vi.fn().mockResolvedValue(null),
       create: vi.fn().mockResolvedValue({ id: 'f1', kind: 'DOCX', versionId: 'v1', fileName: 'doc.docx', mimeType: null, contentText: 'x', storageKey: 'k' }),
+      update: vi.fn().mockResolvedValue({ id: 'f1' }),
       count: vi.fn().mockResolvedValue(0),
     },
     documentStatusHistory: { findMany: vi.fn().mockResolvedValue([]), create: vi.fn().mockResolvedValue({ id: 'h1' }) },
@@ -95,6 +96,8 @@ function makeService(opts?: {
   const storage = {
     putText: vi.fn().mockResolvedValue({ storageProvider: 'LOCAL', storageKey: 'k', fileName: 'doc.docx', mimeType: 'text/plain', sizeBytes: 10, hashSha256: 'hash' }),
     readText: vi.fn().mockResolvedValue('conteudo'),
+    putBinary: vi.fn().mockResolvedValue({ storageProvider: 'LOCAL', storageKey: 'kbin', fileName: 'doc.docx', mimeType: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document', sizeBytes: 123, hashSha256: 'hbin' }),
+    readBinary: vi.fn().mockResolvedValue(Buffer.from('BINARY-DOCX')),
   } as any;
 
   const service = new DocumentsService(prisma, traceability, access, codes, editor, storage);
@@ -197,6 +200,64 @@ describe('DocumentsService - gestao documental', () => {
     const { service, prisma } = makeService({ doc: baseDoc({ orgNodeId: null }) });
     await expect(service.update(me, 'd1', { status: 'APPROVED' })).rejects.toBeInstanceOf(BadRequestException);
     expect(prisma.document.update).not.toHaveBeenCalled();
+  });
+
+  // ---- Host WOPI (editor online Collabora) ----
+
+  const wopiToken = (over: Partial<Record<string, unknown>> = {}) => ({
+    fileId: 'F1',
+    documentId: 'd1',
+    companyId: 'companyA',
+    userId: 'user-1',
+    userName: 'Ana',
+    canWrite: true,
+    exp: Date.now() + 60_000,
+    ...over,
+  }) as any;
+
+  it('wopiGetFile: arquivo binario -> le do storage (sem corromper)', async () => {
+    const { service, prisma, storage } = makeService();
+    prisma.documentFile.findFirst = vi.fn().mockResolvedValue({ id: 'F1', documentId: 'd1', companyId: 'companyA', contentText: null, storageKey: 'k1', fileName: 'PRO-001.docx', sizeBytes: 100, hashSha256: 'h', createdAt: new Date() });
+    const buf = await service.wopiGetFile(wopiToken());
+    expect(storage.readBinary).toHaveBeenCalledWith('k1');
+    expect(buf.toString()).toBe('BINARY-DOCX');
+  });
+
+  it('wopiGetFile: conteudo legado textual -> gera DOCX (assinatura PK)', async () => {
+    const { service, prisma, storage } = makeService();
+    prisma.documentFile.findFirst = vi.fn().mockResolvedValue({ id: 'F1', documentId: 'd1', companyId: 'companyA', contentText: 'texto legado', storageKey: 'k', fileName: 'x.docx', createdAt: new Date() });
+    const buf = await service.wopiGetFile(wopiToken());
+    expect(storage.readBinary).not.toHaveBeenCalled();
+    expect(buf.subarray(0, 2).toString()).toBe('PK'); // ZIP/OOXML
+  });
+
+  it('wopiPutFile: doc editavel -> grava versao binaria + checkpoint + auditoria', async () => {
+    const { service, prisma, storage } = makeService({ doc: baseDoc({ status: 'DRAFT' }) });
+    prisma.documentFile.findFirst = vi.fn().mockResolvedValue({ id: 'F1', documentId: 'd1', companyId: 'companyA', contentText: null, storageKey: 'old', versionId: 'v1', fileName: 'x.docx', createdAt: new Date() });
+    await service.wopiPutFile(wopiToken(), Buffer.from('NOVO-DOCX'));
+    expect(storage.putBinary).toHaveBeenCalled();
+    expect(prisma.documentFile.update.mock.calls[0][0].data.storageKey).toBe('kbin');
+    expect(prisma.documentAutosaveCheckpoint.create).toHaveBeenCalled();
+    expect(prisma.documentAuditLog.create.mock.calls[0][0].data.action).toBe('EDITOR_SAVE');
+  });
+
+  it('wopiPutFile: doc nao editavel -> Conflict e nao grava', async () => {
+    const { service, prisma, storage } = makeService({ doc: baseDoc({ status: 'PUBLISHED' }) });
+    prisma.documentFile.findFirst = vi.fn().mockResolvedValue({ id: 'F1', documentId: 'd1', companyId: 'companyA', contentText: null, storageKey: 'old', versionId: 'v1', fileName: 'x.docx', createdAt: new Date() });
+    await expect(service.wopiPutFile(wopiToken(), Buffer.from('x'))).rejects.toBeInstanceOf(ConflictException);
+    expect(storage.putBinary).not.toHaveBeenCalled();
+  });
+
+  it('wopiCheckFileInfo: UserCanWrite reflete status editavel + escopo do token', async () => {
+    const { service, prisma } = makeService({ doc: baseDoc({ status: 'DRAFT' }) });
+    prisma.documentFile.findFirst = vi.fn().mockResolvedValue({ id: 'F1', documentId: 'd1', companyId: 'companyA', contentText: null, storageKey: 'k', fileName: 'PRO-001.docx', sizeBytes: 42, hashSha256: 'h9', createdAt: new Date() });
+    const writable = await service.wopiCheckFileInfo(wopiToken({ canWrite: true }));
+    expect(writable.BaseFileName).toBe('PRO-001.docx');
+    expect(writable.Size).toBe(42);
+    expect(writable.UserCanWrite).toBe(true);
+    expect(writable.SupportsLocks).toBe(true);
+    const readonly = await service.wopiCheckFileInfo(wopiToken({ canWrite: false }));
+    expect(readonly.UserCanWrite).toBe(false);
   });
 });
 

@@ -4,6 +4,7 @@ import * as bcrypt from 'bcryptjs';
 import { calcStatus } from '@g360/shared';
 import { dateToPeriodRef, lastNPeriodRefs, periodRefToDate } from '../src/modules/indicators/period.util';
 import { PERMISSION_CATALOG, DEFAULT_PROFILES } from '../src/modules/users/permission-catalog';
+import { PLATFORM_MODULES, PLATFORM_PERMISSIONS, PLATFORM_PLANS, PLATFORM_ROLES } from '../src/modules/platform-admin/platform-admin.catalog';
 
 const prisma = new PrismaClient();
 
@@ -48,6 +49,32 @@ const indicatorSeeds: IndicatorSeed[] = [
 async function main() {
   console.log('[seed] limpando dados existentes...');
   await prisma.$transaction([
+    prisma.platformAdminRolePermission.deleteMany(),
+    prisma.platformAdminUserRole.deleteMany(),
+    prisma.platformAdminSession.deleteMany(),
+    prisma.platformAccessLog.deleteMany(),
+    prisma.platformAuditLog.deleteMany(),
+    prisma.platformAdminUser.deleteMany(),
+    prisma.platformAdminRole.deleteMany(),
+    prisma.platformAdminPermission.deleteMany(),
+    prisma.platformCompanyModuleHistory.deleteMany(),
+    prisma.platformCompanyModule.deleteMany(),
+    prisma.platformFeatureFlagTarget.deleteMany(),
+    prisma.platformSupportSession.deleteMany(),
+    prisma.platformPlanModule.deleteMany(),
+    prisma.platformCompanyPlanOverride.deleteMany(),
+    prisma.platformContract.deleteMany(),
+    prisma.platformCompanyStatusHistory.deleteMany(),
+    prisma.platformCompanyProfile.deleteMany(),
+    prisma.platformPlan.deleteMany(),
+    prisma.platformModuleCatalog.deleteMany(),
+    prisma.platformRelease.deleteMany(),
+    prisma.platformEnvironment.deleteMany(),
+    prisma.platformMigrationRecord.deleteMany(),
+    prisma.platformBackup.deleteMany(),
+    prisma.platformIntegrationConfig.deleteMany(),
+    prisma.platformJob.deleteMany(),
+    prisma.platformHealthCheck.deleteMany(),
     prisma.documentTagRelation.deleteMany(),
     prisma.documentTag.deleteMany(),
     prisma.documentAutosaveCheckpoint.deleteMany(),
@@ -832,6 +859,191 @@ async function main() {
     }
   }
 
+  // ---------------- Portal Admin Global ----------------
+  console.log('[seed] criando Portal Admin Global...');
+  await prisma.platformAdminPermission.createMany({
+    skipDuplicates: true,
+    data: PLATFORM_PERMISSIONS.map(([key, description, group, action]) => ({
+      key,
+      description,
+      group,
+      action,
+    })),
+  });
+  const platformPermissions = await prisma.platformAdminPermission.findMany({ select: { id: true, key: true } });
+  const platformPermissionByKey = new Map(platformPermissions.map((permission) => [permission.key, permission.id]));
+
+  for (const role of PLATFORM_ROLES) {
+    const createdRole = await prisma.platformAdminRole.create({
+      data: {
+        code: role.code,
+        name: role.name,
+        description: role.description,
+        system: true,
+      },
+    });
+    const rolePermissions = role.permissions
+      .map((key) => platformPermissionByKey.get(key))
+      .filter((id): id is string => Boolean(id))
+      .map((permissionId) => ({ roleId: createdRole.id, permissionId }));
+    if (rolePermissions.length > 0) {
+      await prisma.platformAdminRolePermission.createMany({ data: rolePermissions, skipDuplicates: true });
+    }
+  }
+
+  const ownerRole = await prisma.platformAdminRole.findUniqueOrThrow({ where: { code: 'PLATFORM_OWNER' } });
+  const platformOwner = await prisma.platformAdminUser.create({
+    data: {
+      email: 'platform@demo.com',
+      passwordHash: hash,
+      name: 'Gestao 360 Platform Owner',
+      jobTitle: 'Platform Owner',
+      status: 'ACTIVE',
+    },
+  });
+  await prisma.platformAdminUserRole.create({
+    data: { userId: platformOwner.id, roleId: ownerRole.id },
+  });
+
+  await prisma.platformModuleCatalog.createMany({
+    skipDuplicates: true,
+    data: PLATFORM_MODULES.map((module) => ({
+      code: module.code,
+      name: module.name,
+      description: module.description,
+      category: module.category,
+      icon: module.icon,
+      route: module.route,
+      version: module.version,
+      globalStatus: 'ACTIVE',
+      availability: JSON.stringify(['ESSENCIAL', 'PROFISSIONAL', 'CORPORATIVO', 'ENTERPRISE']),
+      dependencies: JSON.stringify(module.dependencies),
+      technicalOwner: module.technicalOwner,
+      experimental: module.experimental,
+      documentation: module.route ? `docs:${module.route}` : null,
+      changelog: JSON.stringify([{ version: module.version, note: 'Catalogo inicial' }]),
+    })),
+  });
+
+  for (const plan of PLATFORM_PLANS) {
+    const createdPlan = await prisma.platformPlan.create({
+      data: {
+        code: plan.code,
+        name: plan.name,
+        setupPriceCents: plan.setupPriceCents,
+        monthlyPriceCents: plan.monthlyPriceCents,
+        defaultUsers: plan.defaultUsers,
+        defaultBranches: plan.defaultBranches,
+        storageLimitMb: plan.storageLimitMb,
+        supportLevel: plan.supportLevel,
+        sla: plan.sla,
+        trialDays: plan.trialDays,
+      },
+    });
+    if (plan.modules.length > 0) {
+      await prisma.platformPlanModule.createMany({
+        data: plan.modules.map((moduleCode) => ({ planId: createdPlan.id, moduleCode, included: true })),
+        skipDuplicates: true,
+      });
+    }
+  }
+
+  const demoPlan = PLATFORM_PLANS.find((plan) => plan.code === 'PROFISSIONAL')!;
+  await prisma.platformCompanyProfile.create({
+    data: {
+      companyId: company.id,
+      internalCode: 'G360-0001',
+      lifecycleStatus: 'IMPLEMENTATION',
+      planCode: demoPlan.code,
+      commercialOwner: 'Comercial Gestao 360',
+      implementationOwner: 'Implantacao Gestao 360',
+      primaryContactName: admin.name,
+      primaryContactEmail: admin.email,
+      contractStartAt: new Date('2026-06-01'),
+      contractEndsAt: new Date('2027-06-01'),
+      storageLimitMb: demoPlan.storageLimitMb,
+      maxBranches: demoPlan.defaultBranches,
+      maxDocuments: 5000,
+      maxForms: 500,
+      maxIndicators: 1000,
+      maxIntegrations: 10,
+      healthScore: 92,
+    },
+  });
+  await prisma.platformContract.create({
+    data: {
+      companyId: company.id,
+      planCode: demoPlan.code,
+      status: 'ACTIVE',
+      startsAt: new Date('2026-06-01'),
+      endsAt: new Date('2027-06-01'),
+      renewalAt: new Date('2027-05-01'),
+      monthlyValueCents: demoPlan.monthlyPriceCents,
+      setupValueCents: demoPlan.setupPriceCents,
+      notes: 'Contrato demo criado pelo seed.',
+    },
+  });
+  const demoPlanModules = new Set<string>(demoPlan.modules);
+  await prisma.platformCompanyModule.createMany({
+    skipDuplicates: true,
+    data: PLATFORM_MODULES.map((module) => ({
+      companyId: company.id,
+      moduleCode: module.code,
+      status: demoPlanModules.has(module.code) ? 'HERDADO_DO_PLANO' : 'BLOQUEADO',
+      inheritedFromPlan: true,
+      manuallyOverridden: false,
+      note: demoPlanModules.has(module.code) ? null : 'Modulo fora do plano Profissional.',
+      updatedBy: platformOwner.id,
+      updatedByEmail: platformOwner.email,
+    })),
+  });
+
+  await prisma.platformEnvironment.createMany({
+    skipDuplicates: true,
+    data: [
+      { code: 'development', name: 'Desenvolvimento', currentVersion: '0.1.0', owner: 'Engineering' },
+      { code: 'staging', name: 'Homologacao', currentVersion: '0.1.0', owner: 'QA' },
+      { code: 'production', name: 'Producao', currentVersion: '0.1.0', owner: 'SRE' },
+    ],
+  });
+  await prisma.platformRelease.create({
+    data: {
+      environmentCode: 'production',
+      version: '0.1.0',
+      status: 'PUBLISHED',
+      publishedAt: new Date(),
+      responsible: platformOwner.email,
+      changes: 'Seed inicial do Portal Admin Global.',
+      testResult: 'PENDING_VALIDATION',
+    },
+  });
+  await prisma.platformBackup.create({
+    data: {
+      environmentCode: 'production',
+      status: 'SUCCESS',
+      startedAt: new Date(Date.now() - 2 * 60 * 60 * 1000),
+      finishedAt: new Date(Date.now() - 2 * 60 * 60 * 1000 + 90_000),
+      sizeBytes: 128_000_000,
+      locationMasked: 's3://g360-backups/prod/***/backup.dump',
+      createdBy: platformOwner.email,
+    },
+  });
+  await prisma.platformIntegrationConfig.createMany({
+    skipDuplicates: true,
+    data: [
+      { code: 'smtp', name: 'SMTP Transacional', environmentCode: 'production', status: 'ACTIVE', owner: 'SRE', maskedSecret: 'smtp-****-demo' },
+      { code: 'gemini', name: 'Servico de IA', environmentCode: 'production', status: 'ACTIVE', owner: 'Engineering', maskedSecret: 'AIza****demo' },
+      { code: 'calendar-google', name: 'Google Calendar', companyId: company.id, environmentCode: 'production', status: 'PENDING', owner: 'Implantacao' },
+    ],
+  });
+  await prisma.platformHealthCheck.createMany({
+    data: [
+      { code: 'api', name: 'API NestJS', category: 'application', status: 'ONLINE', latencyMs: 35, message: 'OK' },
+      { code: 'database', name: 'PostgreSQL', category: 'database', status: 'ONLINE', latencyMs: 12, message: 'OK' },
+      { code: 'jobs', name: 'Processamentos', category: 'jobs', status: 'UNKNOWN', message: 'Fila ainda nao configurada no seed' },
+    ],
+  });
+
   // ---------------- Resumo ----------------
   const totals = {
     companies: await prisma.company.count(),
@@ -845,6 +1057,7 @@ async function main() {
   };
   console.log('[seed] OK', totals);
   console.log('[seed] Login: admin@demo.com / admin123');
+  console.log('[seed] Portal Admin Global: platform@demo.com / admin123');
 }
 
 main()
