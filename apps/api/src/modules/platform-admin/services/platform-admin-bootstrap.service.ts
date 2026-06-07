@@ -73,8 +73,12 @@ export class PlatformAdminBootstrapService implements OnApplicationBootstrap {
 
   /** Cria o primeiro PLATFORM_OWNER quando nao existe nenhum usuario interno. */
   private async ensureOwner(): Promise<void> {
-    const count = await this.prisma.platformAdminUser.count();
-    if (count > 0) return;
+    const email = (process.env.PLATFORM_ADMIN_BOOTSTRAP_EMAIL ?? 'platform@gestao360.org').trim().toLowerCase();
+    const name = process.env.PLATFORM_ADMIN_BOOTSTRAP_NAME ?? 'Platform Owner';
+    const provided = process.env.PLATFORM_ADMIN_BOOTSTRAP_PASSWORD;
+    const generated = !provided || provided.trim() === '';
+    const password = generated ? randomBytes(12).toString('base64url') : provided;
+    const rounds = parseInt(process.env.BCRYPT_ROUNDS ?? '10', 10) || 10;
 
     const ownerRole = await this.prisma.platformAdminRole.findUnique({ where: { code: 'PLATFORM_OWNER' } });
     if (!ownerRole) {
@@ -82,12 +86,14 @@ export class PlatformAdminBootstrapService implements OnApplicationBootstrap {
       return;
     }
 
-    const email = (process.env.PLATFORM_ADMIN_BOOTSTRAP_EMAIL ?? 'platform@gestao360.org').trim().toLowerCase();
-    const name = process.env.PLATFORM_ADMIN_BOOTSTRAP_NAME ?? 'Platform Owner';
-    const provided = process.env.PLATFORM_ADMIN_BOOTSTRAP_PASSWORD;
-    const generated = !provided || provided.trim() === '';
-    const password = generated ? randomBytes(12).toString('base64url') : provided;
-    const rounds = parseInt(process.env.BCRYPT_ROUNDS ?? '10', 10) || 10;
+    const count = await this.prisma.platformAdminUser.count();
+    if (count > 0) {
+      if (!generated) {
+        await this.promoteDemoOwnerIfNeeded({ email, name, password, rounds, ownerRoleId: ownerRole.id, userCount: count });
+      }
+      return;
+    }
+
     const passwordHash = await bcrypt.hash(password, rounds);
 
     const owner = await this.prisma.platformAdminUser.create({
@@ -103,5 +109,42 @@ export class PlatformAdminBootstrapService implements OnApplicationBootstrap {
     } else {
       this.logger.log(`[Portal Admin Global] Usuario inicial criado: ${email}`);
     }
+  }
+
+  private async promoteDemoOwnerIfNeeded(params: {
+    email: string;
+    name: string;
+    password: string;
+    rounds: number;
+    ownerRoleId: string;
+    userCount: number;
+  }): Promise<void> {
+    const demoEmail = 'platform@demo.com';
+    if (params.email === demoEmail || params.userCount !== 1) return;
+
+    const demoOwner = await this.prisma.platformAdminUser.findUnique({ where: { email: demoEmail } });
+    if (!demoOwner) return;
+
+    const desiredOwner = await this.prisma.platformAdminUser.findUnique({ where: { email: params.email } });
+    if (desiredOwner) return;
+
+    const passwordHash = await bcrypt.hash(params.password, params.rounds);
+    await this.prisma.platformAdminUser.update({
+      where: { id: demoOwner.id },
+      data: {
+        email: params.email,
+        name: params.name,
+        passwordHash,
+        status: 'ACTIVE',
+        passwordResetRequired: false,
+        deletedAt: null,
+      },
+    });
+    await this.prisma.platformAdminUserRole.upsert({
+      where: { userId_roleId: { userId: demoOwner.id, roleId: params.ownerRoleId } },
+      create: { userId: demoOwner.id, roleId: params.ownerRoleId },
+      update: {},
+    });
+    this.logger.warn(`[Portal Admin Global] Usuario demo promovido para credencial bootstrap configurada: ${params.email}`);
   }
 }
