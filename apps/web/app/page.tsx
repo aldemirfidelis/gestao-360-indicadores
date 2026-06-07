@@ -9,29 +9,20 @@ import {
   Check,
   ClipboardCheck,
   Database,
-  FileBarChart,
   FileText,
-  Flag,
   GitBranch,
-  LayoutDashboard,
   ListChecks,
-  LockKeyhole,
   Map,
   Network,
-  Plug,
   ShieldCheck,
   Sparkles,
   Target,
   Users,
-  Wrench,
 } from 'lucide-react';
 import { BrandLogo } from '@/components/brand/brand-mark';
 import { Button } from '@/components/ui/button';
 import { useAuth } from '@/components/auth/auth-provider';
 import { cn } from '@/lib/utils';
-
-const DEMO_EMAIL = 'demo@demo.com';
-const DEMO_PASSWORD = '123456';
 
 const NAV_LINKS = [
   { href: '#modulos', label: 'Modulos' },
@@ -90,8 +81,8 @@ const MODULES = [
   },
   {
     icon: Boxes,
-    title: 'Portal Admin Global',
-    desc: 'Planos, modulos por empresa, bloqueios, usuarios globais, banco de dados e parametros.',
+    title: 'Administracao central',
+    desc: 'Planos, modulos por empresa, bloqueios, limites, banco de dados e parametros do contrato.',
   },
 ];
 
@@ -106,7 +97,7 @@ const CONNECTIONS = [
 const BEST_FEATURES = [
   'Controle de modulos por empresa: libere Modulo X e Y para uma cliente e bloqueie o restante.',
   'Planos claros e customizaveis: usuarios, limites, modulos incluidos e opcionais.',
-  'Banco de dados administravel pelo Portal Admin com tabelas, registros, SQL, backup e diagnostico.',
+  'Banco de dados administravel pela equipe autorizada com tabelas, registros, SQL, backup e diagnostico.',
   'Rastreabilidade ponta a ponta: quem alterou, quando, em qual modulo e qual dado foi afetado.',
   'Conectores internos e APIs externas para integrar indicadores, documentos, IA, e-mail e rotinas de apoio.',
   'Permissoes por area para empresas controlarem seus usuarios sem acessar configuracoes globais.',
@@ -161,7 +152,7 @@ const PLANS = [
       'Composicao de modulos sob demanda',
       'Usuarios, unidades e limites customizados',
       'Integrações planejadas com sistemas internos',
-      'Portal Admin configurado para o contrato',
+      'Administracao central configurada para o contrato',
       'Acompanhamento tecnico de implantacao',
       'Roadmap por prioridade do cliente',
     ],
@@ -188,9 +179,6 @@ export default function LandingPage() {
             ))}
           </nav>
           <div className="flex items-center gap-2">
-            <Button asChild variant="outline" className="hidden sm:inline-flex">
-              <Link href="/platform-admin/login">Portal Admin</Link>
-            </Button>
             <Button asChild className="bg-emerald-600 hover:bg-emerald-700">
               <Link href={accessHref}>
                 {accessLabel}
@@ -202,10 +190,9 @@ export default function LandingPage() {
       </header>
 
       <main>
-        <section className="relative isolate min-h-[760px] overflow-hidden bg-[#101820] text-white">
-          <HeroScene />
-          <div className="relative z-10 mx-auto flex min-h-[760px] max-w-7xl flex-col justify-center px-4 py-20 sm:px-6 lg:px-8">
-            <div className="max-w-3xl">
+        <section className="bg-[#101820] text-white">
+          <div className="mx-auto grid min-h-[720px] max-w-7xl gap-10 px-4 py-16 sm:px-6 lg:grid-cols-[0.95fr,1.05fr] lg:items-center lg:px-8 lg:py-20">
+            <div className="min-w-0">
               <div className="mb-5 inline-flex items-center gap-2 border border-white/20 bg-white/10 px-3 py-1.5 text-sm font-medium text-white">
                 <Sparkles className="h-4 w-4 text-emerald-300" />
                 Plataforma completa de gestao por indicadores
@@ -214,7 +201,7 @@ export default function LandingPage() {
                 Gestao 360
               </h1>
               <p className="mt-6 max-w-2xl text-lg leading-8 text-slate-200">
-                Conecte estrategia, indicadores, metas, desvios, planos de acao, auditoria, documentos, processos e Portal Admin em um unico ambiente operacional.
+                Conecte estrategia, indicadores, metas, desvios, planos de acao, auditoria, documentos e processos em um unico ambiente operacional.
               </p>
               <div className="mt-8 flex flex-col gap-3 sm:flex-row">
                 <Button asChild size="lg" className="h-12 bg-emerald-500 px-7 text-base text-slate-950 hover:bg-emerald-400">
@@ -227,22 +214,18 @@ export default function LandingPage() {
                   <a href="#planos">Ver planos e modulos</a>
                 </Button>
               </div>
-              <div className="mt-6 flex w-fit flex-wrap gap-2 border border-emerald-300/40 bg-emerald-300/10 px-3 py-2 text-sm text-emerald-100">
-                <span>Demo preenchida:</span>
-                <strong>{DEMO_EMAIL}</strong>
-                <span>senha</span>
-                <strong>{DEMO_PASSWORD}</strong>
+
+              <div className="mt-10 grid gap-3 sm:grid-cols-2">
+                {METRICS.map((metric) => (
+                  <div key={metric.label} className="border border-white/15 bg-white/10 p-4">
+                    <div className="text-2xl font-semibold">{metric.value}</div>
+                    <div className="mt-1 text-sm text-slate-300">{metric.label}</div>
+                  </div>
+                ))}
               </div>
             </div>
 
-            <div className="mt-14 grid max-w-5xl gap-3 sm:grid-cols-2 lg:grid-cols-4">
-              {METRICS.map((metric) => (
-                <div key={metric.label} className="border border-white/15 bg-white/10 p-4">
-                  <div className="text-2xl font-semibold">{metric.value}</div>
-                  <div className="mt-1 text-sm text-slate-300">{metric.label}</div>
-                </div>
-              ))}
-            </div>
+            <HeroDashboard />
           </div>
         </section>
 
@@ -251,7 +234,7 @@ export default function LandingPage() {
             <SectionIntro
               eyebrow="Modulos"
               title="Tudo que a operacao precisa, trabalhando na mesma base."
-              desc="A plataforma nao e apenas um painel. Cada modulo conversa com usuarios, areas, indicadores, evidencias, permissoes, auditoria e Portal Admin."
+              desc="A plataforma nao e apenas um painel. Cada modulo conversa com usuarios, areas, indicadores, evidencias, permissoes e auditoria."
             />
             <div className="mt-10 grid gap-4 md:grid-cols-2 xl:grid-cols-3">
               {MODULES.map((module) => (
@@ -309,11 +292,11 @@ export default function LandingPage() {
             <SectionIntro
               eyebrow="Governanca"
               title="Administracao clara para empresas e para o dono da plataforma."
-              desc="As empresas ficam com controle dos proprios usuarios. O Portal Admin centraliza planos, modulos, banco de dados, integracoes, menus, auditoria, parametros e suporte."
+              desc="As empresas ficam com controle dos proprios usuarios. A administracao central cuida de planos, modulos, banco de dados, integracoes, menus, auditoria, parametros e suporte."
             />
             <div className="mt-10 grid gap-4 lg:grid-cols-3">
               <GovernanceBlock icon={<Users className="h-5 w-5" />} title="Empresa cliente" desc="Cria e administra usuarios da propria empresa, respeitando permissoes e visibilidade por area." />
-              <GovernanceBlock icon={<Boxes className="h-5 w-5" />} title="Portal Admin" desc="Gerencia planos, modulos liberados, status da empresa, limites, paginas, menus e integracoes." />
+              <GovernanceBlock icon={<Boxes className="h-5 w-5" />} title="Administracao central" desc="Gerencia planos, modulos liberados, status da empresa, limites, paginas, menus e integracoes." />
               <GovernanceBlock icon={<Database className="h-5 w-5" />} title="Banco de dados" desc="Acesso administrativo a tabelas, registros, SQL, estrutura, indices, importacao, backups e diagnosticos." />
             </div>
           </div>
@@ -340,11 +323,9 @@ export default function LandingPage() {
             <div>
               <p className="text-sm font-semibold text-emerald-300">Demo pronta para teste</p>
               <h2 className="mt-3 max-w-3xl text-3xl font-semibold leading-tight">
-                Entre agora e veja indicadores, planos de acao, auditoria, documentos e Portal Admin funcionando juntos.
+                Entre agora e veja indicadores, planos de acao, auditoria, documentos e processos funcionando juntos.
               </h2>
-              <p className="mt-4 text-slate-300">
-                Login preenchido automaticamente: {DEMO_EMAIL} / {DEMO_PASSWORD}
-              </p>
+              <p className="mt-4 text-slate-300">A demo abre com o formulario de acesso ja preparado para teste.</p>
             </div>
             <Button asChild size="lg" className="h-12 bg-emerald-500 px-7 text-base text-slate-950 hover:bg-emerald-400">
               <Link href={accessHref}>
@@ -377,64 +358,66 @@ export default function LandingPage() {
   );
 }
 
-function HeroScene() {
+function HeroDashboard() {
   return (
-    <div className="pointer-events-none absolute inset-0 opacity-95" aria-hidden="true">
-      <div className="absolute inset-0 bg-[#101820]" />
-      <div className="absolute right-[-120px] top-16 hidden w-[760px] border border-white/10 bg-white/[0.04] p-4 shadow-2xl lg:block">
-        <div className="grid grid-cols-[1.15fr,0.85fr] gap-4">
-          <div className="space-y-4">
-            <ScenePanel title="Performance por area">
-              <div className="space-y-3">
-                {[
-                  ['Operacao', '91%', 'bg-emerald-400'],
-                  ['Qualidade', '84%', 'bg-sky-400'],
-                  ['Manutencao', '72%', 'bg-amber-400'],
-                  ['Seguranca', '67%', 'bg-rose-400'],
-                ].map(([label, value, color]) => (
-                  <div key={label} className="grid grid-cols-[100px,1fr,44px] items-center gap-3 text-xs">
-                    <span className="text-slate-300">{label}</span>
-                    <span className="h-2 bg-white/10">
-                      <span className={cn('block h-2', color)} style={{ width: value }} />
-                    </span>
-                    <span className="text-right text-white">{value}</span>
-                  </div>
-                ))}
-              </div>
-            </ScenePanel>
-            <ScenePanel title="Planos de acao">
-              <div className="grid grid-cols-3 gap-3 text-center text-xs">
-                <SceneMetric label="Abertos" value="38" tone="text-amber-300" />
-                <SceneMetric label="No prazo" value="81%" tone="text-emerald-300" />
-                <SceneMetric label="Criticos" value="6" tone="text-rose-300" />
-              </div>
-            </ScenePanel>
-          </div>
-          <div className="space-y-4">
-            <ScenePanel title="Modulos ativos">
-              <div className="grid grid-cols-2 gap-2 text-xs">
-                {['Indicadores', 'OKRs', 'Auditoria', 'Documentos', 'Riscos', 'Formularios'].map((item) => (
-                  <span key={item} className="border border-white/10 bg-white/5 px-2 py-2 text-slate-200">{item}</span>
-                ))}
-              </div>
-            </ScenePanel>
-            <ScenePanel title="Auditoria">
-              <div className="space-y-2 text-xs text-slate-300">
-                <div className="flex justify-between"><span>LOGIN</span><span className="text-emerald-300">SUCCESS</span></div>
-                <div className="flex justify-between"><span>MODULE_UPDATE</span><span className="text-sky-300">SYNC</span></div>
-                <div className="flex justify-between"><span>BACKUP</span><span className="text-emerald-300">OK</span></div>
-              </div>
-            </ScenePanel>
-          </div>
+    <div className="min-w-0 border border-white/10 bg-white/[0.04] p-4 shadow-2xl">
+      <div className="mb-4 flex items-center justify-between border-b border-white/10 pb-4">
+        <div>
+          <div className="text-sm font-semibold text-white">Painel executivo</div>
+          <div className="mt-1 text-xs text-slate-400">Indicadores, acoes e auditoria conectados</div>
+        </div>
+        <span className="border border-emerald-300/40 bg-emerald-300/10 px-2 py-1 text-xs text-emerald-200">Online</span>
+      </div>
+      <div className="grid gap-4 xl:grid-cols-[1.15fr,0.85fr]">
+        <div className="space-y-4">
+          <ScenePanel title="Performance por area">
+            <div className="space-y-3">
+              {[
+                ['Operacao', '91%', 'bg-emerald-400'],
+                ['Qualidade', '84%', 'bg-sky-400'],
+                ['Manutencao', '72%', 'bg-amber-400'],
+                ['Seguranca', '67%', 'bg-rose-400'],
+              ].map(([label, value, color]) => (
+                <div key={label} className="grid grid-cols-[94px,1fr,42px] items-center gap-3 text-xs">
+                  <span className="text-slate-300">{label}</span>
+                  <span className="h-2 bg-white/10">
+                    <span className={cn('block h-2', color)} style={{ width: value }} />
+                  </span>
+                  <span className="text-right text-white">{value}</span>
+                </div>
+              ))}
+            </div>
+          </ScenePanel>
+          <ScenePanel title="Planos de acao">
+            <div className="grid grid-cols-3 gap-3 text-center text-xs">
+              <SceneMetric label="Abertos" value="38" tone="text-amber-300" />
+              <SceneMetric label="No prazo" value="81%" tone="text-emerald-300" />
+              <SceneMetric label="Criticos" value="6" tone="text-rose-300" />
+            </div>
+          </ScenePanel>
+        </div>
+        <div className="space-y-4">
+          <ScenePanel title="Modulos ativos">
+            <div className="grid grid-cols-2 gap-2 text-xs">
+              {['Indicadores', 'OKRs', 'Auditoria', 'Documentos', 'Riscos', 'Formularios'].map((item) => (
+                <span key={item} className="border border-white/10 bg-white/5 px-2 py-2 text-slate-200">{item}</span>
+              ))}
+            </div>
+          </ScenePanel>
+          <ScenePanel title="Auditoria">
+            <div className="space-y-2 text-xs text-slate-300">
+              <div className="flex justify-between gap-3"><span>LOGIN</span><span className="text-emerald-300">SUCCESS</span></div>
+              <div className="flex justify-between gap-3"><span>RESULT_UPDATE</span><span className="text-sky-300">SYNC</span></div>
+              <div className="flex justify-between gap-3"><span>BACKUP</span><span className="text-emerald-300">OK</span></div>
+            </div>
+          </ScenePanel>
         </div>
       </div>
-      <div className="absolute bottom-12 left-[52%] hidden w-[520px] border border-white/10 bg-white/[0.035] p-4 lg:block">
-        <div className="grid grid-cols-4 gap-3 text-center text-xs">
-          <SceneMetric label="Usuarios" value="148" tone="text-white" />
-          <SceneMetric label="Indicadores" value="420" tone="text-white" />
-          <SceneMetric label="Acoes" value="1.2k" tone="text-white" />
-          <SceneMetric label="Logs" value="24k" tone="text-white" />
-        </div>
+      <div className="mt-4 grid grid-cols-2 gap-3 text-center text-xs sm:grid-cols-4">
+        <SceneMetric label="Usuarios" value="148" tone="text-white" />
+        <SceneMetric label="Indicadores" value="420" tone="text-white" />
+        <SceneMetric label="Acoes" value="1.2k" tone="text-white" />
+        <SceneMetric label="Logs" value="24k" tone="text-white" />
       </div>
     </div>
   );
