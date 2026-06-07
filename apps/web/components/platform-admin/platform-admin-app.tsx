@@ -27,6 +27,7 @@ import {
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { NativeSelect } from '@/components/ui/select';
 import { cn } from '@/lib/utils';
 import {
   clearPlatformAdminTokens,
@@ -89,6 +90,23 @@ interface MatrixCompany {
   modules: { moduleCode: string; status: string; readOnly: boolean; note?: string | null }[];
 }
 
+interface PlanRow {
+  id: string;
+  code: string;
+  name: string;
+  description?: string | null;
+  status?: string;
+  monthlyPriceCents: number;
+  setupPriceCents?: number;
+  defaultUsers?: number | null;
+  defaultBranches?: number | null;
+  storageLimitMb?: number | null;
+  supportLevel?: string | null;
+  sla?: string | null;
+  trialDays?: number | null;
+  modules: { moduleCode: string; included: boolean; optional?: boolean; limits?: string | null }[];
+}
+
 interface AuditRow {
   id: string;
   userEmail?: string | null;
@@ -126,6 +144,24 @@ const MODULE_STATUSES = [
   'HERDADO_DO_PLANO',
   'SOBRESCRITO_MANUALMENTE',
 ];
+
+const COMPANY_CORE_MODULE_CODES = new Set(['users']);
+
+const EMPTY_PLAN_FORM = {
+  code: '',
+  name: '',
+  monthlyPriceCents: '0',
+  setupPriceCents: '0',
+  defaultUsers: '',
+  defaultBranches: '',
+  storageLimitMb: '',
+  supportLevel: '',
+  sla: '',
+  trialDays: '',
+  moduleCodes: [] as string[],
+};
+
+type PlanForm = typeof EMPTY_PLAN_FORM;
 
 const SETTINGS_AREAS: Array<{
   title: string;
@@ -542,9 +578,14 @@ function CompaniesSection() {
 function ModulesSection() {
   const queryClient = useQueryClient();
   const [change, setChange] = useState<Record<string, string>>({});
+  const [applyForm, setApplyForm] = useState({ companyId: '', planCode: 'ESSENCIAL' });
   const matrix = useQuery({
     queryKey: ['platform-admin', 'module-matrix'],
     queryFn: () => platformAdminApi<{ modules: ModuleCatalog[]; companies: MatrixCompany[] }>('/module-matrix'),
+  });
+  const plans = useQuery({
+    queryKey: ['platform-admin', 'plans', 'module-apply'],
+    queryFn: () => platformAdminApi<PlanRow[]>('/plans'),
   });
   const update = useMutation({
     mutationFn: ({ companyId, moduleCode, status }: { companyId: string; moduleCode: string; status: string }) =>
@@ -555,13 +596,50 @@ function ModulesSection() {
     },
     onError: (err) => toast.error(err instanceof Error ? err.message : 'Falha ao atualizar modulo'),
   });
+  const applyPlan = useMutation({
+    mutationFn: () => platformAdminApi(`/companies/${applyForm.companyId}/modules/apply-plan/${applyForm.planCode}`, { method: 'POST' }),
+    onSuccess: () => {
+      toast.success('Plano aplicado a empresa');
+      setChange({});
+      void queryClient.invalidateQueries({ queryKey: ['platform-admin', 'module-matrix'] });
+      void queryClient.invalidateQueries({ queryKey: ['platform-admin', 'companies'] });
+    },
+    onError: (err) => toast.error(err instanceof Error ? err.message : 'Falha ao aplicar plano'),
+  });
 
   if (matrix.isLoading) return <LoadingGrid />;
   if (!matrix.data) return <EmptyState title="Matriz indisponivel" />;
-  const modules = matrix.data.modules.slice(0, 12);
+  const modules = matrix.data.modules;
 
   return (
     <div className="space-y-4">
+      <Panel title="Aplicar plano em uma empresa" icon={ListChecks}>
+        <div className="grid gap-3 lg:grid-cols-[1fr,260px,auto]">
+          <div>
+            <Label className="text-xs">Empresa</Label>
+            <NativeSelect value={applyForm.companyId} onChange={(event) => setApplyForm((prev) => ({ ...prev, companyId: event.target.value }))}>
+              <option value="">Selecione a empresa</option>
+              {matrix.data.companies.map((company) => (
+                <option key={company.id} value={company.id}>{company.tradeName || company.name}</option>
+              ))}
+            </NativeSelect>
+          </div>
+          <div>
+            <Label className="text-xs">Plano</Label>
+            <NativeSelect value={applyForm.planCode} onChange={(event) => setApplyForm((prev) => ({ ...prev, planCode: event.target.value }))}>
+              {(plans.data ?? []).map((plan) => (
+                <option key={plan.code} value={plan.code}>{plan.name} ({plan.code})</option>
+              ))}
+            </NativeSelect>
+          </div>
+          <div className="flex items-end">
+            <Button className="w-full lg:w-auto" disabled={!applyForm.companyId || !applyForm.planCode || applyPlan.isPending} onClick={() => applyPlan.mutate()}>
+              Aplicar e bloquear fora do plano
+            </Button>
+          </div>
+        </div>
+      </Panel>
+
       <Panel title="Catalogo de modulos">
         <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
           {matrix.data.modules.map((module) => (
@@ -579,7 +657,7 @@ function ModulesSection() {
 
       <Panel title="Matriz de modulos por empresa">
         <div className="overflow-x-auto">
-          <table className="table-modern min-w-[980px]">
+          <table className="table-modern min-w-[1280px]">
             <thead>
               <tr>
                 <th>Empresa</th>
@@ -594,13 +672,20 @@ function ModulesSection() {
                     const current = company.modules.find((item) => item.moduleCode === module.code)?.status ?? 'HERDADO_DO_PLANO';
                     const key = `${company.id}:${module.code}`;
                     const selected = change[key] ?? current;
+                    const isCore = COMPANY_CORE_MODULE_CODES.has(module.code);
                     return (
                       <td key={key} className="min-w-[190px]">
                         <div className="flex items-center gap-2">
-                          <select className="h-8 flex-1 border bg-background px-2 text-xs" value={selected} onChange={(event) => setChange((prev) => ({ ...prev, [key]: event.target.value }))}>
+                          <select
+                            className="h-8 flex-1 border bg-background px-2 text-xs"
+                            value={selected}
+                            disabled={isCore}
+                            title={isCore ? 'Modulo essencial da empresa' : undefined}
+                            onChange={(event) => setChange((prev) => ({ ...prev, [key]: event.target.value }))}
+                          >
                             {MODULE_STATUSES.map((status) => <option key={status}>{status}</option>)}
                           </select>
-                          <Button size="sm" variant="outline" disabled={selected === current || update.isPending} onClick={() => update.mutate({ companyId: company.id, moduleCode: module.code, status: selected })}>Salvar</Button>
+                          <Button size="sm" variant="outline" disabled={isCore || selected === current || update.isPending} onClick={() => update.mutate({ companyId: company.id, moduleCode: module.code, status: selected })}>Salvar</Button>
                         </div>
                       </td>
                     );
@@ -617,33 +702,104 @@ function ModulesSection() {
 
 function PlansSection() {
   const queryClient = useQueryClient();
-  const [form, setForm] = useState({ code: '', name: '', monthlyPriceCents: '0', defaultUsers: '' });
+  const [form, setForm] = useState<PlanForm>(EMPTY_PLAN_FORM);
   const plans = useQuery({
     queryKey: ['platform-admin', 'plans'],
-    queryFn: () => platformAdminApi<Array<{ code: string; name: string; monthlyPriceCents: number; defaultUsers?: number | null; modules: unknown[] }>>('/plans'),
+    queryFn: () => platformAdminApi<PlanRow[]>('/plans'),
+  });
+  const modules = useQuery({
+    queryKey: ['platform-admin', 'modules', 'plans'],
+    queryFn: () => platformAdminApi<ModuleCatalog[]>('/modules'),
   });
   const save = useMutation({
-    mutationFn: () => platformAdminApi('/plans', { method: 'POST', json: { ...form, monthlyPriceCents: Number(form.monthlyPriceCents), defaultUsers: form.defaultUsers ? Number(form.defaultUsers) : null } }),
+    mutationFn: () => platformAdminApi('/plans', {
+      method: 'POST',
+      json: {
+        ...form,
+        monthlyPriceCents: Number(form.monthlyPriceCents || 0),
+        setupPriceCents: Number(form.setupPriceCents || 0),
+        defaultUsers: form.defaultUsers ? Number(form.defaultUsers) : null,
+        defaultBranches: form.defaultBranches ? Number(form.defaultBranches) : null,
+        storageLimitMb: form.storageLimitMb ? Number(form.storageLimitMb) : null,
+        trialDays: form.trialDays ? Number(form.trialDays) : null,
+        moduleCodes: Array.from(new Set([...form.moduleCodes, ...Array.from(COMPANY_CORE_MODULE_CODES)])),
+      },
+    }),
     onSuccess: () => {
       toast.success('Plano salvo');
-      setForm({ code: '', name: '', monthlyPriceCents: '0', defaultUsers: '' });
+      setForm(EMPTY_PLAN_FORM);
       void queryClient.invalidateQueries({ queryKey: ['platform-admin', 'plans'] });
+      void queryClient.invalidateQueries({ queryKey: ['platform-admin', 'module-matrix'] });
     },
   });
+  const moduleByCode = useMemo(() => new Map((modules.data ?? []).map((module) => [module.code, module])), [modules.data]);
+  const modulesByCategory = useMemo(() => {
+    const grouped = new Map<string, ModuleCatalog[]>();
+    (modules.data ?? []).forEach((module) => {
+      const category = module.category ?? 'Outros';
+      if (!grouped.has(category)) grouped.set(category, []);
+      grouped.get(category)!.push(module);
+    });
+    return Array.from(grouped.entries());
+  }, [modules.data]);
+  const selectedModules = new Set(form.moduleCodes);
+
+  function editPlan(plan: PlanRow) {
+    setForm({
+      code: plan.code,
+      name: plan.name,
+      monthlyPriceCents: String(plan.monthlyPriceCents ?? 0),
+      setupPriceCents: String(plan.setupPriceCents ?? 0),
+      defaultUsers: plan.defaultUsers == null ? '' : String(plan.defaultUsers),
+      defaultBranches: plan.defaultBranches == null ? '' : String(plan.defaultBranches),
+      storageLimitMb: plan.storageLimitMb == null ? '' : String(plan.storageLimitMb),
+      supportLevel: plan.supportLevel ?? '',
+      sla: plan.sla ?? '',
+      trialDays: plan.trialDays == null ? '' : String(plan.trialDays),
+      moduleCodes: Array.from(new Set([...plan.modules.filter((module) => module.included).map((module) => module.moduleCode), ...Array.from(COMPANY_CORE_MODULE_CODES)])),
+    });
+  }
+
+  function toggleModule(code: string) {
+    if (COMPANY_CORE_MODULE_CODES.has(code)) return;
+    setForm((prev) => ({
+      ...prev,
+      moduleCodes: prev.moduleCodes.includes(code)
+        ? prev.moduleCodes.filter((item) => item !== code)
+        : [...prev.moduleCodes, code],
+    }));
+  }
+
   return (
-    <div className="grid gap-4 xl:grid-cols-[1fr,360px]">
+    <div className="grid gap-4 xl:grid-cols-[1fr,420px]">
       <Panel title="Planos comerciais">
         <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
-          {(plans.data ?? []).map((plan) => (
-            <div key={plan.code} className="border bg-white p-4">
-              <div className="flex items-center justify-between">
-                <div className="font-semibold">{plan.name}</div>
-                <Status value={plan.code} />
+          {(plans.data ?? []).map((plan) => {
+            const included = plan.modules.filter((module) => module.included);
+            const names = included
+              .map((module) => moduleByCode.get(module.moduleCode)?.name ?? module.moduleCode)
+              .slice(0, 7);
+            return (
+              <div key={plan.code} className="border bg-white p-4">
+                <div className="flex items-center justify-between gap-3">
+                  <div className="min-w-0">
+                    <div className="truncate font-semibold">{plan.name}</div>
+                    <div className="text-xs text-muted-foreground">{plan.code}</div>
+                  </div>
+                  <Status value={plan.status ?? 'ACTIVE'} />
+                </div>
+                <div className="mt-3 text-2xl font-semibold">{formatMoney(plan.monthlyPriceCents)}</div>
+                <div className="mt-2 text-sm text-muted-foreground">
+                  {plan.defaultUsers ?? 'Ilimitado'} usuarios · {included.length} modulos inclusos
+                </div>
+                <div className="mt-3 flex flex-wrap gap-1">
+                  {names.map((name) => <span key={name} className="pill pill-gray">{name}</span>)}
+                  {included.length > names.length && <span className="pill pill-gray">+{included.length - names.length}</span>}
+                </div>
+                <Button className="mt-4 w-full" size="sm" variant="outline" onClick={() => editPlan(plan)}>Editar plano</Button>
               </div>
-              <div className="mt-3 text-2xl font-semibold">{formatMoney(plan.monthlyPriceCents)}</div>
-              <div className="mt-2 text-sm text-muted-foreground">{plan.defaultUsers ?? 'Ilimitado'} usuarios · {plan.modules.length} modulos</div>
-            </div>
-          ))}
+            );
+          })}
         </div>
       </Panel>
       <Panel title="Novo ou atualizar plano">
@@ -651,8 +807,54 @@ function PlansSection() {
           <Field label="Codigo" value={form.code} onChange={(value) => setForm((prev) => ({ ...prev, code: value.toUpperCase() }))} />
           <Field label="Nome" value={form.name} onChange={(value) => setForm((prev) => ({ ...prev, name: value }))} />
           <Field label="Mensalidade em centavos" value={form.monthlyPriceCents} onChange={(value) => setForm((prev) => ({ ...prev, monthlyPriceCents: value }))} />
-          <Field label="Usuarios padrao" value={form.defaultUsers} onChange={(value) => setForm((prev) => ({ ...prev, defaultUsers: value }))} />
+          <Field label="Implantacao em centavos" value={form.setupPriceCents} onChange={(value) => setForm((prev) => ({ ...prev, setupPriceCents: value }))} />
+          <div className="grid gap-3 sm:grid-cols-2">
+            <Field label="Usuarios padrao" value={form.defaultUsers} onChange={(value) => setForm((prev) => ({ ...prev, defaultUsers: value }))} />
+            <Field label="Filiais padrao" value={form.defaultBranches} onChange={(value) => setForm((prev) => ({ ...prev, defaultBranches: value }))} />
+          </div>
+          <div className="grid gap-3 sm:grid-cols-2">
+            <Field label="Storage MB" value={form.storageLimitMb} onChange={(value) => setForm((prev) => ({ ...prev, storageLimitMb: value }))} />
+            <Field label="Dias trial" value={form.trialDays} onChange={(value) => setForm((prev) => ({ ...prev, trialDays: value }))} />
+          </div>
+          <Field label="Suporte" value={form.supportLevel} onChange={(value) => setForm((prev) => ({ ...prev, supportLevel: value }))} />
+          <Field label="SLA" value={form.sla} onChange={(value) => setForm((prev) => ({ ...prev, sla: value }))} />
+          <div className="rounded-sm border">
+            <div className="flex items-center justify-between border-b px-3 py-2">
+              <div className="text-xs font-semibold uppercase tracking-[0.12em] text-muted-foreground">Modulos inclusos</div>
+              <div className="text-xs text-muted-foreground">{selectedModules.size} selecionados</div>
+            </div>
+            <div className="max-h-[420px] overflow-y-auto p-3">
+              {modulesByCategory.map(([category, items]) => (
+                <div key={category} className="mb-4 last:mb-0">
+                  <div className="mb-2 text-xs font-semibold text-muted-foreground">{category}</div>
+                  <div className="grid gap-2">
+                    {items.map((module) => {
+                      const core = COMPANY_CORE_MODULE_CODES.has(module.code);
+                      const checked = core || selectedModules.has(module.code);
+                      return (
+                        <label key={module.code} className={cn('flex cursor-pointer items-start gap-2 border px-3 py-2 text-sm', checked && 'border-[#101820] bg-[#f8fafb]', core && 'cursor-not-allowed opacity-80')}>
+                          <input
+                            type="checkbox"
+                            className="mt-1"
+                            checked={checked}
+                            disabled={core}
+                            onChange={() => toggleModule(module.code)}
+                          />
+                          <span className="min-w-0">
+                            <span className="block font-medium">{module.name}</span>
+                            <span className="block text-xs text-muted-foreground">{module.code}{core ? ' · essencial da empresa' : ''}</span>
+                          </span>
+                        </label>
+                      );
+                    })}
+                  </div>
+                </div>
+              ))}
+              {(modules.data ?? []).length === 0 && <EmptyState title="Catalogo de modulos indisponivel" />}
+            </div>
+          </div>
           <Button className="w-full" disabled={!form.code || !form.name || save.isPending} onClick={() => save.mutate()}>Salvar plano</Button>
+          <Button className="w-full" variant="ghost" onClick={() => setForm(EMPTY_PLAN_FORM)}>Limpar formulario</Button>
         </div>
       </Panel>
     </div>

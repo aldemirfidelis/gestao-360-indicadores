@@ -7,6 +7,7 @@ import { PLATFORM_MODULES, PLATFORM_PLANS } from '../platform-admin.catalog';
 
 const ACTIVE_MODULE_STATUSES = ['ATIVO', 'ACTIVE', 'HERDADO_DO_PLANO', 'EM_IMPLANTACAO', 'EM_TESTE', 'EXPERIMENTAL'];
 const BLOCKED_MODULE_STATUSES = ['BLOQUEADO', 'SUSPENSO', 'BLOCKED', 'SUSPENDED'];
+const COMPANY_CORE_MODULES = new Set(['auth', 'access-control', 'users']);
 
 interface CompanyInput {
   name?: string;
@@ -375,6 +376,9 @@ export class PlatformAdminService {
     await this.ensureModuleCatalog();
     const module = await this.prisma.platformModuleCatalog.findUnique({ where: { code: moduleCode } });
     if (!module) throw new NotFoundException('Modulo nao encontrado.');
+    if (COMPANY_CORE_MODULES.has(moduleCode) && BLOCKED_MODULE_STATUSES.includes(input.status)) {
+      throw new ConflictException('Modulo essencial da empresa nao pode ser bloqueado.');
+    }
 
     const before = await this.prisma.platformCompanyModule.findUnique({ where: { companyId_moduleCode: { companyId, moduleCode } } });
     const updated = await this.prisma.platformCompanyModule.upsert({
@@ -435,22 +439,28 @@ export class PlatformAdminService {
   }
 
   async applyPlanDefaults(companyId: string, planCode: string, user: PlatformAdminIdentity) {
-    const plan = await this.prisma.platformPlan.findUnique({ where: { code: planCode }, include: { modules: true } });
+    await this.ensureModuleCatalog();
+    const [plan, catalogModules] = await Promise.all([
+      this.prisma.platformPlan.findUnique({ where: { code: planCode }, include: { modules: true } }),
+      this.prisma.platformModuleCatalog.findMany({ select: { code: true } }),
+    ]);
     if (!plan) return;
-    for (const module of plan.modules) {
+    const included = new Set(plan.modules.filter((module) => module.included).map((module) => module.moduleCode));
+    for (const module of catalogModules) {
+      const planIncludesModule = included.has(module.code) || COMPANY_CORE_MODULES.has(module.code);
       await this.prisma.platformCompanyModule.upsert({
-        where: { companyId_moduleCode: { companyId, moduleCode: module.moduleCode } },
+        where: { companyId_moduleCode: { companyId, moduleCode: module.code } },
         create: {
           companyId,
-          moduleCode: module.moduleCode,
-          status: module.included ? 'HERDADO_DO_PLANO' : 'BLOQUEADO',
+          moduleCode: module.code,
+          status: planIncludesModule ? 'HERDADO_DO_PLANO' : 'BLOQUEADO',
           inheritedFromPlan: true,
           manuallyOverridden: false,
           updatedBy: user.sub,
           updatedByEmail: user.email,
         },
         update: {
-          status: module.included ? 'HERDADO_DO_PLANO' : 'BLOQUEADO',
+          status: planIncludesModule ? 'HERDADO_DO_PLANO' : 'BLOQUEADO',
           inheritedFromPlan: true,
           manuallyOverridden: false,
           updatedBy: user.sub,
@@ -466,10 +476,13 @@ export class PlatformAdminService {
   }
 
   async upsertPlan(user: PlatformAdminIdentity, input: Record<string, unknown>) {
+    await this.ensureModuleCatalog();
     const code = String(input.code ?? '').trim().toUpperCase();
     const name = String(input.name ?? '').trim();
     if (!code || !name) throw new ConflictException('Codigo e nome do plano sao obrigatorios.');
     const before = await this.prisma.platformPlan.findUnique({ where: { code }, include: { modules: true } });
+    const hasModuleInput = 'moduleCodes' in input || 'modules' in input;
+    const selectedModuleCodes = moduleCodeArray(input.moduleCodes ?? input.modules);
     const plan = await this.prisma.platformPlan.upsert({
       where: { code },
       create: {
@@ -498,6 +511,10 @@ export class PlatformAdminService {
         trialDays: numberOrNull(input.trialDays),
       },
     });
+    if (hasModuleInput) {
+      await this.syncPlanModules(plan.id, selectedModuleCodes);
+    }
+    const updated = await this.prisma.platformPlan.findUnique({ where: { id: plan.id }, include: { modules: true } });
     await this.audit.record({
       user,
       action: before ? 'PLAN_UPDATE' : 'PLAN_CREATE',
@@ -506,9 +523,9 @@ export class PlatformAdminService {
       targetId: plan.id,
       targetLabel: plan.name,
       beforeValue: before,
-      afterValue: plan,
+      afterValue: updated ?? plan,
     });
-    return plan;
+    return updated ?? plan;
   }
 
   async listUsers(params: { q?: string; companyId?: string; status?: string }) {
@@ -1008,6 +1025,29 @@ export class PlatformAdminService {
     }
   }
 
+  private async syncPlanModules(planId: string, selectedModuleCodes: string[]) {
+    const catalogModules = await this.prisma.platformModuleCatalog.findMany({ select: { code: true } });
+    const catalogCodes = new Set(catalogModules.map((module) => module.code));
+    const includedCodes = new Set(
+      selectedModuleCodes
+        .map((code) => code.trim())
+        .filter((code) => code && catalogCodes.has(code)),
+    );
+    for (const core of COMPANY_CORE_MODULES) {
+      if (catalogCodes.has(core)) includedCodes.add(core);
+    }
+    await this.prisma.$transaction([
+      this.prisma.platformPlanModule.deleteMany({ where: { planId } }),
+      this.prisma.platformPlanModule.createMany({
+        data: catalogModules.map((module) => ({
+          planId,
+          moduleCode: module.code,
+          included: includedCodes.has(module.code),
+        })),
+      }),
+    ]);
+  }
+
   private async ensureEnvironments() {
     const envs = [
       { code: 'development', name: 'Desenvolvimento' },
@@ -1043,4 +1083,17 @@ function numberOrNull(value: unknown): number | null {
 
 function numberOrZero(value: unknown): number {
   return numberOrNull(value) ?? 0;
+}
+
+function moduleCodeArray(value: unknown): string[] {
+  if (Array.isArray(value)) {
+    return value.map((item) => String(item)).filter(Boolean);
+  }
+  if (typeof value === 'string') {
+    return value
+      .split(',')
+      .map((item) => item.trim())
+      .filter(Boolean);
+  }
+  return [];
 }
