@@ -43,3 +43,7 @@ apps/api/scripts/legacy-bsc/output/
 
 # Backups logicos da Administracao do Banco (podem conter dados reais)
 apps/api/storage/
+
+# Dumps/backups do Postgres local da droplet (migracao Neon->local e backup diario)
+db-backups/
+*.dump
