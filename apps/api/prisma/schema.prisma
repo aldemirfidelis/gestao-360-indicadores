@@ -548,6 +548,12 @@ model Company {
   fsStandardVersions     FoodSafetyStandardVersion[]  @relation("FsStdVersionCompany")
   fsRequirements         FoodSafetyRequirement[]      @relation("FsRequirementCompany")
   fsRequirementAssessments FoodSafetyRequirementAssessment[] @relation("FsReqAssessmentCompany")
+  fsSuppliers            FoodSafetySupplier[]         @relation("FsSupplierCompany")
+  fsMaterials            FoodSafetyMaterial[]         @relation("FsMaterialCompany")
+  fsLots                 FoodSafetyLot[]              @relation("FsLotCompany")
+  fsTraceLinks           FoodSafetyTraceLink[]        @relation("FsTraceLinkCompany")
+  fsRecalls              FoodSafetyRecall[]           @relation("FsRecallCompany")
+  fsRecallItems          FoodSafetyRecallItem[]       @relation("FsRecallItemCompany")
   formTemplates          FormTemplate[]
   formSubmissions        FormSubmission[]
   meetings               Meeting[]
@@ -659,6 +665,7 @@ model OrgNode {
   processes               Process[]                   @relation("ProcessOrgNode")
   fsPrograms              FoodSafetyProgram[]         @relation("FsProgramOrgNode")
   fsProcesses             FoodSafetyProcess[]         @relation("FsProcessOrgNode")
+  fsSuppliers             FoodSafetySupplier[]        @relation("FsSupplierOrgNode")
   formTemplates           FormTemplate[]              @relation("FormTemplateOrgNode")
   formSubmissions         FormSubmission[]            @relation("FormSubmissionOrgNode")
   strategicObjectives     StrategicObjective[]        @relation("StrategicObjectiveOwnerNode")
@@ -737,6 +744,8 @@ model User {
   fsMonitoringRecorded       FoodSafetyMonitoringRecord[] @relation("FsMonitoringRecordedBy")
   fsRequirementsResponsible  FoodSafetyRequirement[]      @relation("FsRequirementResponsible")
   fsReqAssessmentsResponsible FoodSafetyRequirementAssessment[] @relation("FsReqAssessmentResponsible")
+  fsSuppliersResponsible     FoodSafetySupplier[]         @relation("FsSupplierResponsible")
+  fsRecallsResponsible       FoodSafetyRecall[]           @relation("FsRecallResponsible")
   formTemplatesOwned         FormTemplate[]              @relation("FormTemplateOwner")
   formTemplatesCreated       FormTemplate[]              @relation("FormTemplateCreatedBy")
   formSubmissionsSubmitted   FormSubmission[]            @relation("FormSubmissionSubmittedBy")
@@ -6825,6 +6834,10 @@ model FoodSafetyProgram {
   deletedAt   DateTime?
 
   processes FoodSafetyProcess[]
+  suppliers FoodSafetySupplier[]
+  materials FoodSafetyMaterial[]
+  lots      FoodSafetyLot[]
+  recalls   FoodSafetyRecall[]
 
   @@unique([companyId, code])
   @@index([companyId])
@@ -6865,6 +6878,8 @@ model FoodSafetyProcess {
 
   steps   FoodSafetyProcessStep[]
   hazards FoodSafetyHazard[]
+  lots    FoodSafetyLot[]       @relation("FsLotProcess")
+  traces  FoodSafetyTraceLink[] @relation("FsTraceProcess")
 
   @@unique([companyId, number])
   @@index([companyId])
@@ -6895,6 +6910,7 @@ model FoodSafetyProcessStep {
   deletedAt      DateTime?
 
   hazards FoodSafetyHazard[]
+  traces  FoodSafetyTraceLink[] @relation("FsTraceStep")
 
   @@index([companyId])
   @@index([processId])
@@ -7188,4 +7204,293 @@ model FoodSafetyRequirementAssessment {
   @@index([companyId])
   @@index([requirementId])
   @@index([result])
+}
+
+// ----- Cadeia: fornecedores, materiais, lotes, rastreabilidade e recall (Fase 4) ----
+
+enum FoodSafetySupplierStatus {
+  PROSPECT
+  APPROVED
+  CONDITIONAL
+  BLOCKED
+  INACTIVE
+}
+
+enum FoodSafetySupplierCriticality {
+  LOW
+  MEDIUM
+  HIGH
+  CRITICAL
+}
+
+enum FoodSafetyMaterialCategory {
+  RAW_MATERIAL
+  INGREDIENT
+  PACKAGING
+  PROCESS_AID
+  FINISHED_PRODUCT
+  OTHER
+}
+
+enum FoodSafetyMaterialStatus {
+  ACTIVE
+  UNDER_REVIEW
+  BLOCKED
+  INACTIVE
+}
+
+enum FoodSafetyLotType {
+  RECEIVED
+  PRODUCED
+  SHIPPED
+  INTERNAL_TRANSFER
+}
+
+enum FoodSafetyLotStatus {
+  QUARANTINED
+  RELEASED
+  BLOCKED
+  CONSUMED
+  EXPIRED
+  RECALLED
+}
+
+enum FoodSafetyTraceEventType {
+  RECEIPT
+  CONSUMPTION
+  PRODUCTION
+  TRANSFER
+  SHIPMENT
+  RETURN
+  DISPOSAL
+}
+
+enum FoodSafetyRecallStatus {
+  DRAFT
+  SIMULATION
+  ACTIVE
+  CLOSED
+  CANCELLED
+}
+
+enum FoodSafetyRecallSeverity {
+  LOW
+  MEDIUM
+  HIGH
+  CRITICAL
+}
+
+enum FoodSafetyRecallItemStatus {
+  PENDING
+  NOTIFIED
+  RETURNED
+  DISPOSED
+  RELEASED
+}
+
+model FoodSafetySupplier {
+  id                String                         @id @default(uuid())
+  companyId         String
+  company           Company                        @relation("FsSupplierCompany", fields: [companyId], references: [id])
+  programId         String?
+  program           FoodSafetyProgram?             @relation(fields: [programId], references: [id])
+  orgNodeId         String?
+  orgNode           OrgNode?                       @relation("FsSupplierOrgNode", fields: [orgNodeId], references: [id])
+  responsibleUserId String?
+  responsible       User?                          @relation("FsSupplierResponsible", fields: [responsibleUserId], references: [id])
+  code              String?
+  name              String
+  legalName         String?
+  taxId             String?
+  contactName       String?
+  contactEmail      String?
+  contactPhone      String?
+  address           String?
+  suppliedCategories String?
+  criticality       FoodSafetySupplierCriticality  @default(MEDIUM)
+  status            FoodSafetySupplierStatus       @default(PROSPECT)
+  score             Float?
+  documentsStatus   String?
+  lastAuditAt       DateTime?
+  nextReviewAt      DateTime?
+  notes             String?
+  createdAt         DateTime                       @default(now())
+  updatedAt         DateTime                       @updatedAt
+  deletedAt         DateTime?
+
+  materials FoodSafetyMaterial[]
+  lots      FoodSafetyLot[]
+
+  @@unique([companyId, code])
+  @@index([companyId])
+  @@index([programId])
+  @@index([orgNodeId])
+  @@index([status])
+  @@index([criticality])
+}
+
+model FoodSafetyMaterial {
+  id                String                     @id @default(uuid())
+  companyId         String
+  company           Company                    @relation("FsMaterialCompany", fields: [companyId], references: [id])
+  programId         String?
+  program           FoodSafetyProgram?         @relation(fields: [programId], references: [id])
+  supplierId        String?
+  supplier          FoodSafetySupplier?        @relation(fields: [supplierId], references: [id])
+  code              String?
+  name              String
+  category          FoodSafetyMaterialCategory @default(RAW_MATERIAL)
+  unit              String?
+  specification     String?
+  storageCondition  String?
+  allergens         String?
+  hazards           String?
+  requiredDocuments String?
+  shelfLifeDays     Int?
+  status            FoodSafetyMaterialStatus   @default(ACTIVE)
+  createdAt         DateTime                   @default(now())
+  updatedAt         DateTime                   @updatedAt
+  deletedAt         DateTime?
+
+  lots FoodSafetyLot[]
+
+  @@unique([companyId, code])
+  @@index([companyId])
+  @@index([programId])
+  @@index([supplierId])
+  @@index([category])
+  @@index([status])
+}
+
+model FoodSafetyLot {
+  id              String              @id @default(uuid())
+  companyId       String
+  company         Company             @relation("FsLotCompany", fields: [companyId], references: [id])
+  programId       String?
+  program         FoodSafetyProgram?  @relation(fields: [programId], references: [id])
+  materialId      String?
+  material        FoodSafetyMaterial? @relation(fields: [materialId], references: [id])
+  supplierId      String?
+  supplier        FoodSafetySupplier? @relation(fields: [supplierId], references: [id])
+  processId       String?
+  process         FoodSafetyProcess?  @relation("FsLotProcess", fields: [processId], references: [id])
+  code            String
+  type            FoodSafetyLotType   @default(RECEIVED)
+  status          FoodSafetyLotStatus @default(QUARANTINED)
+  quantity        Float?
+  unit            String?
+  receivedAt      DateTime?
+  producedAt      DateTime?
+  expiresAt       DateTime?
+  storageLocation String?
+  customerName    String?
+  destination     String?
+  certificateUrl  String?
+  notes           String?
+  createdAt       DateTime            @default(now())
+  updatedAt       DateTime            @updatedAt
+  deletedAt       DateTime?
+
+  outgoingTraceLinks FoodSafetyTraceLink[]  @relation("FsTraceFromLot")
+  incomingTraceLinks FoodSafetyTraceLink[]  @relation("FsTraceToLot")
+  recallRoots        FoodSafetyRecall[]     @relation("FsRecallRootLot")
+  recallItems        FoodSafetyRecallItem[]
+
+  @@unique([companyId, code])
+  @@index([companyId])
+  @@index([programId])
+  @@index([materialId])
+  @@index([supplierId])
+  @@index([processId])
+  @@index([status])
+  @@index([type])
+}
+
+model FoodSafetyTraceLink {
+  id          String                   @id @default(uuid())
+  companyId   String
+  company     Company                  @relation("FsTraceLinkCompany", fields: [companyId], references: [id])
+  fromLotId   String?
+  fromLot     FoodSafetyLot?           @relation("FsTraceFromLot", fields: [fromLotId], references: [id])
+  toLotId     String?
+  toLot       FoodSafetyLot?           @relation("FsTraceToLot", fields: [toLotId], references: [id])
+  processId   String?
+  process     FoodSafetyProcess?       @relation("FsTraceProcess", fields: [processId], references: [id])
+  stepId      String?
+  step        FoodSafetyProcessStep?   @relation("FsTraceStep", fields: [stepId], references: [id])
+  eventType   FoodSafetyTraceEventType @default(PRODUCTION)
+  quantity    Float?
+  unit        String?
+  occurredAt  DateTime                 @default(now())
+  notes       String?
+  createdAt   DateTime                 @default(now())
+  updatedAt   DateTime                 @updatedAt
+  deletedAt   DateTime?
+
+  @@index([companyId])
+  @@index([fromLotId])
+  @@index([toLotId])
+  @@index([processId])
+  @@index([eventType])
+}
+
+model FoodSafetyRecall {
+  id                String                   @id @default(uuid())
+  companyId         String
+  company           Company                  @relation("FsRecallCompany", fields: [companyId], references: [id])
+  programId         String?
+  program           FoodSafetyProgram?       @relation(fields: [programId], references: [id])
+  rootLotId         String?
+  rootLot           FoodSafetyLot?           @relation("FsRecallRootLot", fields: [rootLotId], references: [id])
+  responsibleUserId String?
+  responsible       User?                    @relation("FsRecallResponsible", fields: [responsibleUserId], references: [id])
+  code              String?
+  title             String
+  reason            String?
+  severity          FoodSafetyRecallSeverity @default(MEDIUM)
+  status            FoodSafetyRecallStatus   @default(SIMULATION)
+  scopeDescription  String?
+  affectedQuantity  Float?
+  unit              String?
+  initiatedAt       DateTime                 @default(now())
+  closedAt          DateTime?
+  actions           String?
+  notes             String?
+  createdAt         DateTime                 @default(now())
+  updatedAt         DateTime                 @updatedAt
+  deletedAt         DateTime?
+
+  items FoodSafetyRecallItem[]
+
+  @@unique([companyId, code])
+  @@index([companyId])
+  @@index([programId])
+  @@index([rootLotId])
+  @@index([status])
+  @@index([severity])
+}
+
+model FoodSafetyRecallItem {
+  id          String                     @id @default(uuid())
+  companyId   String
+  company     Company                    @relation("FsRecallItemCompany", fields: [companyId], references: [id])
+  recallId    String
+  recall      FoodSafetyRecall           @relation(fields: [recallId], references: [id])
+  lotId       String
+  lot         FoodSafetyLot              @relation(fields: [lotId], references: [id])
+  status      FoodSafetyRecallItemStatus @default(PENDING)
+  quantity    Float?
+  unit        String?
+  disposition String?
+  notifiedAt  DateTime?
+  notes       String?
+  createdAt   DateTime                   @default(now())
+  updatedAt   DateTime                   @updatedAt
+  deletedAt   DateTime?
+
+  @@unique([recallId, lotId])
+  @@index([companyId])
+  @@index([recallId])
+  @@index([lotId])
+  @@index([status])
 }

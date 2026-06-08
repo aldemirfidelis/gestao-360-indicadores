@@ -5,13 +5,23 @@ import {
   FoodSafetyControlType,
   FoodSafetyHazardCategory,
   FoodSafetyHazardStatus,
+  FoodSafetyLotStatus,
+  FoodSafetyLotType,
+  FoodSafetyMaterialCategory,
+  FoodSafetyMaterialStatus,
   FoodSafetyMonitoringResult,
   FoodSafetyProcessStatus,
   FoodSafetyProgramStatus,
+  FoodSafetyRecallItemStatus,
+  FoodSafetyRecallSeverity,
+  FoodSafetyRecallStatus,
   FoodSafetyRequirementCriticality,
   FoodSafetyRiskLevel,
   FoodSafetyStandardVersionStatus,
   FoodSafetyStepType,
+  FoodSafetySupplierCriticality,
+  FoodSafetySupplierStatus,
+  FoodSafetyTraceEventType,
   Prisma,
 } from '@prisma/client';
 import { PrismaService } from '../../prisma/prisma.service';
@@ -439,6 +449,16 @@ export class FoodSafetyService {
       riskLevels: Object.values(FoodSafetyRiskLevel),
       controlTypes: Object.values(FoodSafetyControlType),
       hazardStatuses: Object.values(FoodSafetyHazardStatus),
+      supplierStatuses: Object.values(FoodSafetySupplierStatus),
+      supplierCriticalities: Object.values(FoodSafetySupplierCriticality),
+      materialCategories: Object.values(FoodSafetyMaterialCategory),
+      materialStatuses: Object.values(FoodSafetyMaterialStatus),
+      lotTypes: Object.values(FoodSafetyLotType),
+      lotStatuses: Object.values(FoodSafetyLotStatus),
+      traceEventTypes: Object.values(FoodSafetyTraceEventType),
+      recallStatuses: Object.values(FoodSafetyRecallStatus),
+      recallSeverities: Object.values(FoodSafetyRecallSeverity),
+      recallItemStatuses: Object.values(FoodSafetyRecallItemStatus),
       visibilities: VISIBILITIES,
     };
   }
@@ -1106,6 +1126,658 @@ export class FoodSafetyService {
       applicable,
       compliancePct,
       byResult,
+    };
+  }
+
+  // ----------------------------- cadeia / fornecedores / recall ------------
+  private parseSupplierStatus(v?: string): FoodSafetySupplierStatus | undefined {
+    if (!v) return undefined;
+    if (!Object.values(FoodSafetySupplierStatus).includes(v as FoodSafetySupplierStatus)) throw new BadRequestException('Status de fornecedor invalido.');
+    return v as FoodSafetySupplierStatus;
+  }
+  private parseSupplierCriticality(v?: string): FoodSafetySupplierCriticality | undefined {
+    if (!v) return undefined;
+    if (!Object.values(FoodSafetySupplierCriticality).includes(v as FoodSafetySupplierCriticality)) throw new BadRequestException('Criticidade de fornecedor invalida.');
+    return v as FoodSafetySupplierCriticality;
+  }
+  private parseMaterialCategory(v?: string): FoodSafetyMaterialCategory | undefined {
+    if (!v) return undefined;
+    if (!Object.values(FoodSafetyMaterialCategory).includes(v as FoodSafetyMaterialCategory)) throw new BadRequestException('Categoria de material invalida.');
+    return v as FoodSafetyMaterialCategory;
+  }
+  private parseMaterialStatus(v?: string): FoodSafetyMaterialStatus | undefined {
+    if (!v) return undefined;
+    if (!Object.values(FoodSafetyMaterialStatus).includes(v as FoodSafetyMaterialStatus)) throw new BadRequestException('Status de material invalido.');
+    return v as FoodSafetyMaterialStatus;
+  }
+  private parseLotType(v?: string): FoodSafetyLotType | undefined {
+    if (!v) return undefined;
+    if (!Object.values(FoodSafetyLotType).includes(v as FoodSafetyLotType)) throw new BadRequestException('Tipo de lote invalido.');
+    return v as FoodSafetyLotType;
+  }
+  private parseLotStatus(v?: string): FoodSafetyLotStatus | undefined {
+    if (!v) return undefined;
+    if (!Object.values(FoodSafetyLotStatus).includes(v as FoodSafetyLotStatus)) throw new BadRequestException('Status de lote invalido.');
+    return v as FoodSafetyLotStatus;
+  }
+  private parseTraceEventType(v?: string): FoodSafetyTraceEventType | undefined {
+    if (!v) return undefined;
+    if (!Object.values(FoodSafetyTraceEventType).includes(v as FoodSafetyTraceEventType)) throw new BadRequestException('Tipo de evento de rastreabilidade invalido.');
+    return v as FoodSafetyTraceEventType;
+  }
+  private parseRecallStatus(v?: string): FoodSafetyRecallStatus | undefined {
+    if (!v) return undefined;
+    if (!Object.values(FoodSafetyRecallStatus).includes(v as FoodSafetyRecallStatus)) throw new BadRequestException('Status de recall invalido.');
+    return v as FoodSafetyRecallStatus;
+  }
+  private parseRecallSeverity(v?: string): FoodSafetyRecallSeverity | undefined {
+    if (!v) return undefined;
+    if (!Object.values(FoodSafetyRecallSeverity).includes(v as FoodSafetyRecallSeverity)) throw new BadRequestException('Severidade de recall invalida.');
+    return v as FoodSafetyRecallSeverity;
+  }
+  private parseRecallItemStatus(v?: string): FoodSafetyRecallItemStatus | undefined {
+    if (!v) return undefined;
+    if (!Object.values(FoodSafetyRecallItemStatus).includes(v as FoodSafetyRecallItemStatus)) throw new BadRequestException('Status de item de recall invalido.');
+    return v as FoodSafetyRecallItemStatus;
+  }
+
+  private supplierInclude() {
+    return {
+      program: { select: { id: true, name: true, code: true } },
+      orgNode: { select: { id: true, name: true, type: true } },
+      responsible: { select: { id: true, name: true, email: true } },
+      _count: { select: { materials: true, lots: true } },
+    } satisfies Prisma.FoodSafetySupplierInclude;
+  }
+
+  private materialInclude() {
+    return {
+      program: { select: { id: true, name: true, code: true } },
+      supplier: { select: { id: true, name: true, code: true, status: true, criticality: true } },
+      _count: { select: { lots: true } },
+    } satisfies Prisma.FoodSafetyMaterialInclude;
+  }
+
+  private lotInclude() {
+    return {
+      program: { select: { id: true, name: true, code: true } },
+      material: { select: { id: true, name: true, code: true, category: true, allergens: true } },
+      supplier: { select: { id: true, name: true, code: true, status: true } },
+      process: { select: { id: true, name: true, code: true, orgNodeId: true, programId: true } },
+      _count: { select: { outgoingTraceLinks: true, incomingTraceLinks: true, recallItems: true } },
+    } satisfies Prisma.FoodSafetyLotInclude;
+  }
+
+  private traceLinkInclude() {
+    return {
+      fromLot: { include: { material: { select: { id: true, name: true, code: true } }, supplier: { select: { id: true, name: true, code: true } } } },
+      toLot: { include: { material: { select: { id: true, name: true, code: true } }, supplier: { select: { id: true, name: true, code: true } } } },
+      process: { select: { id: true, name: true, code: true } },
+      step: { select: { id: true, number: true, name: true } },
+    } satisfies Prisma.FoodSafetyTraceLinkInclude;
+  }
+
+  private recallInclude() {
+    return {
+      program: { select: { id: true, name: true, code: true } },
+      rootLot: { include: { material: { select: { id: true, name: true, code: true } }, supplier: { select: { id: true, name: true, code: true } } } },
+      responsible: { select: { id: true, name: true, email: true } },
+      items: {
+        where: { deletedAt: null },
+        include: { lot: { include: { material: { select: { id: true, name: true, code: true } }, supplier: { select: { id: true, name: true, code: true } } } } },
+        orderBy: { createdAt: 'asc' as const },
+      },
+    } satisfies Prisma.FoodSafetyRecallInclude;
+  }
+
+  private async validateProgram(me: AuthPayload, programId: string | null) {
+    if (!programId) return null;
+    await this.getProgram(me, programId);
+    return programId;
+  }
+
+  private async loadSupplier(me: AuthPayload, id: string) {
+    const supplier = await this.prisma.foodSafetySupplier.findFirst({
+      where: { id, companyId: me.companyId, deletedAt: null },
+      include: this.supplierInclude(),
+    });
+    if (!supplier) throw new NotFoundException('Fornecedor nao encontrado');
+    return supplier;
+  }
+
+  async listSuppliers(me: AuthPayload, filters: { programId?: string; status?: string; criticality?: string; search?: string } = {}) {
+    const status = this.parseSupplierStatus(filters.status);
+    const criticality = this.parseSupplierCriticality(filters.criticality);
+    const permitted = await this.access.listAreaFilter(me.sub, MODULE, 'view');
+    const and: Prisma.FoodSafetySupplierWhereInput[] = [];
+    if (permitted) and.push({ OR: [{ orgNodeId: null }, { orgNodeId: { in: permitted } }] });
+    const term = filters.search?.trim();
+    if (term) {
+      and.push({
+        OR: [
+          { name: { contains: term, mode: 'insensitive' } },
+          { legalName: { contains: term, mode: 'insensitive' } },
+          { code: { contains: term, mode: 'insensitive' } },
+          { taxId: { contains: term, mode: 'insensitive' } },
+        ],
+      });
+    }
+    return this.prisma.foodSafetySupplier.findMany({
+      where: {
+        companyId: me.companyId,
+        deletedAt: null,
+        ...(filters.programId ? { programId: filters.programId } : {}),
+        ...(status ? { status } : {}),
+        ...(criticality ? { criticality } : {}),
+        ...(and.length ? { AND: and } : {}),
+      },
+      include: this.supplierInclude(),
+      orderBy: [{ criticality: 'desc' }, { name: 'asc' }],
+    });
+  }
+
+  async createSupplier(me: AuthPayload, body: any) {
+    const orgNodeId = await this.validateOrgNode(me.companyId, this.id(body?.orgNodeId));
+    await this.assertProcessWriteArea(me, orgNodeId, 'create');
+    return this.prisma.foodSafetySupplier.create({
+      data: {
+        companyId: me.companyId,
+        programId: await this.validateProgram(me, this.id(body?.programId)),
+        orgNodeId,
+        responsibleUserId: await this.validateUser(me.companyId, this.id(body?.responsibleUserId)),
+        code: this.nullableText(body?.code) ?? null,
+        name: this.requiredText(body?.name, 'Nome do fornecedor'),
+        legalName: this.nullableText(body?.legalName) ?? null,
+        taxId: this.nullableText(body?.taxId) ?? null,
+        contactName: this.nullableText(body?.contactName) ?? null,
+        contactEmail: this.nullableText(body?.contactEmail) ?? null,
+        contactPhone: this.nullableText(body?.contactPhone) ?? null,
+        address: this.nullableText(body?.address) ?? null,
+        suppliedCategories: this.nullableText(body?.suppliedCategories) ?? null,
+        criticality: this.parseSupplierCriticality(body?.criticality) ?? FoodSafetySupplierCriticality.MEDIUM,
+        status: this.parseSupplierStatus(body?.status) ?? FoodSafetySupplierStatus.PROSPECT,
+        score: this.optionalFloat(body?.score) ?? null,
+        documentsStatus: this.nullableText(body?.documentsStatus) ?? null,
+        lastAuditAt: this.optionalDate(body?.lastAuditAt) ?? null,
+        nextReviewAt: this.optionalDate(body?.nextReviewAt) ?? null,
+        notes: this.nullableText(body?.notes) ?? null,
+      },
+      include: this.supplierInclude(),
+    });
+  }
+
+  async updateSupplier(me: AuthPayload, id: string, patch: any) {
+    const before = await this.loadSupplier(me, id);
+    await this.assertProcessWriteArea(me, before.orgNodeId, 'edit');
+    const data: Prisma.FoodSafetySupplierUpdateInput = {};
+    if ('programId' in (patch ?? {})) data.program = this.id(patch.programId) ? { connect: { id: await this.validateProgram(me, this.id(patch.programId)) as string } } : { disconnect: true };
+    if ('orgNodeId' in (patch ?? {})) {
+      const orgNodeId = await this.validateOrgNode(me.companyId, this.id(patch.orgNodeId));
+      await this.assertProcessWriteArea(me, orgNodeId, 'edit');
+      data.orgNode = orgNodeId ? { connect: { id: orgNodeId } } : { disconnect: true };
+    }
+    if ('responsibleUserId' in (patch ?? {})) {
+      const responsibleUserId = await this.validateUser(me.companyId, this.id(patch.responsibleUserId));
+      data.responsible = responsibleUserId ? { connect: { id: responsibleUserId } } : { disconnect: true };
+    }
+    if ('name' in (patch ?? {})) data.name = this.requiredText(patch.name, 'Nome do fornecedor');
+    if ('code' in (patch ?? {})) data.code = this.nullableText(patch.code);
+    if ('legalName' in (patch ?? {})) data.legalName = this.nullableText(patch.legalName);
+    if ('taxId' in (patch ?? {})) data.taxId = this.nullableText(patch.taxId);
+    if ('contactName' in (patch ?? {})) data.contactName = this.nullableText(patch.contactName);
+    if ('contactEmail' in (patch ?? {})) data.contactEmail = this.nullableText(patch.contactEmail);
+    if ('contactPhone' in (patch ?? {})) data.contactPhone = this.nullableText(patch.contactPhone);
+    if ('address' in (patch ?? {})) data.address = this.nullableText(patch.address);
+    if ('suppliedCategories' in (patch ?? {})) data.suppliedCategories = this.nullableText(patch.suppliedCategories);
+    if ('criticality' in (patch ?? {})) data.criticality = this.parseSupplierCriticality(patch.criticality);
+    if ('status' in (patch ?? {})) data.status = this.parseSupplierStatus(patch.status);
+    if ('score' in (patch ?? {})) data.score = this.optionalFloat(patch.score);
+    if ('documentsStatus' in (patch ?? {})) data.documentsStatus = this.nullableText(patch.documentsStatus);
+    if ('lastAuditAt' in (patch ?? {})) data.lastAuditAt = this.optionalDate(patch.lastAuditAt);
+    if ('nextReviewAt' in (patch ?? {})) data.nextReviewAt = this.optionalDate(patch.nextReviewAt);
+    if ('notes' in (patch ?? {})) data.notes = this.nullableText(patch.notes);
+    return this.prisma.foodSafetySupplier.update({ where: { id }, data, include: this.supplierInclude() });
+  }
+
+  async removeSupplier(me: AuthPayload, id: string) {
+    const supplier = await this.loadSupplier(me, id);
+    await this.assertProcessWriteArea(me, supplier.orgNodeId, 'delete');
+    return this.prisma.foodSafetySupplier.update({ where: { id }, data: { deletedAt: new Date() }, include: this.supplierInclude() });
+  }
+
+  private async loadMaterial(me: AuthPayload, id: string) {
+    const material = await this.prisma.foodSafetyMaterial.findFirst({
+      where: { id, companyId: me.companyId, deletedAt: null },
+      include: this.materialInclude(),
+    });
+    if (!material) throw new NotFoundException('Materia-prima/material nao encontrado');
+    return material;
+  }
+
+  async listMaterials(me: AuthPayload, filters: { programId?: string; supplierId?: string; category?: string; status?: string; search?: string } = {}) {
+    const category = this.parseMaterialCategory(filters.category);
+    const status = this.parseMaterialStatus(filters.status);
+    const term = filters.search?.trim();
+    return this.prisma.foodSafetyMaterial.findMany({
+      where: {
+        companyId: me.companyId,
+        deletedAt: null,
+        ...(filters.programId ? { programId: filters.programId } : {}),
+        ...(filters.supplierId ? { supplierId: filters.supplierId } : {}),
+        ...(category ? { category } : {}),
+        ...(status ? { status } : {}),
+        ...(term ? { OR: [{ name: { contains: term, mode: 'insensitive' } }, { code: { contains: term, mode: 'insensitive' } }, { specification: { contains: term, mode: 'insensitive' } }] } : {}),
+      },
+      include: this.materialInclude(),
+      orderBy: [{ category: 'asc' }, { name: 'asc' }],
+    });
+  }
+
+  async createMaterial(me: AuthPayload, body: any) {
+    const supplierId = this.id(body?.supplierId);
+    const supplier = supplierId ? await this.loadSupplier(me, supplierId) : null;
+    const programId = await this.validateProgram(me, this.id(body?.programId) ?? supplier?.programId ?? null);
+    return this.prisma.foodSafetyMaterial.create({
+      data: {
+        companyId: me.companyId,
+        programId,
+        supplierId,
+        code: this.nullableText(body?.code) ?? null,
+        name: this.requiredText(body?.name, 'Nome do material'),
+        category: this.parseMaterialCategory(body?.category) ?? FoodSafetyMaterialCategory.RAW_MATERIAL,
+        unit: this.nullableText(body?.unit) ?? null,
+        specification: this.nullableText(body?.specification) ?? null,
+        storageCondition: this.nullableText(body?.storageCondition) ?? null,
+        allergens: this.nullableText(body?.allergens) ?? null,
+        hazards: this.nullableText(body?.hazards) ?? null,
+        requiredDocuments: this.nullableText(body?.requiredDocuments) ?? null,
+        shelfLifeDays: this.optionalInt(body?.shelfLifeDays, 1) ?? null,
+        status: this.parseMaterialStatus(body?.status) ?? FoodSafetyMaterialStatus.ACTIVE,
+      },
+      include: this.materialInclude(),
+    });
+  }
+
+  async updateMaterial(me: AuthPayload, id: string, patch: any) {
+    await this.loadMaterial(me, id);
+    const data: any = {};
+    if ('programId' in (patch ?? {})) data.programId = await this.validateProgram(me, this.id(patch.programId));
+    if ('supplierId' in (patch ?? {})) {
+      const supplierId = this.id(patch.supplierId);
+      if (supplierId) await this.loadSupplier(me, supplierId);
+      data.supplierId = supplierId;
+    }
+    if ('code' in (patch ?? {})) data.code = this.nullableText(patch.code);
+    if ('name' in (patch ?? {})) data.name = this.requiredText(patch.name, 'Nome do material');
+    if ('category' in (patch ?? {})) data.category = this.parseMaterialCategory(patch.category);
+    if ('unit' in (patch ?? {})) data.unit = this.nullableText(patch.unit);
+    if ('specification' in (patch ?? {})) data.specification = this.nullableText(patch.specification);
+    if ('storageCondition' in (patch ?? {})) data.storageCondition = this.nullableText(patch.storageCondition);
+    if ('allergens' in (patch ?? {})) data.allergens = this.nullableText(patch.allergens);
+    if ('hazards' in (patch ?? {})) data.hazards = this.nullableText(patch.hazards);
+    if ('requiredDocuments' in (patch ?? {})) data.requiredDocuments = this.nullableText(patch.requiredDocuments);
+    if ('shelfLifeDays' in (patch ?? {})) data.shelfLifeDays = this.optionalInt(patch.shelfLifeDays, 1);
+    if ('status' in (patch ?? {})) data.status = this.parseMaterialStatus(patch.status);
+    return this.prisma.foodSafetyMaterial.update({ where: { id }, data, include: this.materialInclude() });
+  }
+
+  async removeMaterial(me: AuthPayload, id: string) {
+    await this.loadMaterial(me, id);
+    return this.prisma.foodSafetyMaterial.update({ where: { id }, data: { deletedAt: new Date() }, include: this.materialInclude() });
+  }
+
+  private async loadLot(me: AuthPayload, id: string) {
+    const lot = await this.prisma.foodSafetyLot.findFirst({
+      where: { id, companyId: me.companyId, deletedAt: null },
+      include: this.lotInclude(),
+    });
+    if (!lot) throw new NotFoundException('Lote nao encontrado');
+    return lot;
+  }
+
+  async listLots(me: AuthPayload, filters: { programId?: string; materialId?: string; supplierId?: string; type?: string; status?: string; search?: string } = {}) {
+    const type = this.parseLotType(filters.type);
+    const status = this.parseLotStatus(filters.status);
+    const term = filters.search?.trim();
+    return this.prisma.foodSafetyLot.findMany({
+      where: {
+        companyId: me.companyId,
+        deletedAt: null,
+        ...(filters.programId ? { programId: filters.programId } : {}),
+        ...(filters.materialId ? { materialId: filters.materialId } : {}),
+        ...(filters.supplierId ? { supplierId: filters.supplierId } : {}),
+        ...(type ? { type } : {}),
+        ...(status ? { status } : {}),
+        ...(term ? { OR: [{ code: { contains: term, mode: 'insensitive' } }, { storageLocation: { contains: term, mode: 'insensitive' } }, { customerName: { contains: term, mode: 'insensitive' } }] } : {}),
+      },
+      include: this.lotInclude(),
+      orderBy: [{ createdAt: 'desc' }],
+      take: 300,
+    });
+  }
+
+  async createLot(me: AuthPayload, body: any) {
+    const materialId = this.id(body?.materialId);
+    const material = materialId ? await this.loadMaterial(me, materialId) : null;
+    const supplierId = this.id(body?.supplierId) ?? material?.supplierId ?? null;
+    if (supplierId) await this.loadSupplier(me, supplierId);
+    const processId = this.id(body?.processId);
+    const process = processId ? await this.loadProcess(me, processId) : null;
+    if (process) await this.assertProcessWriteArea(me, process.orgNodeId, 'create');
+    const programId = await this.validateProgram(me, this.id(body?.programId) ?? material?.programId ?? process?.programId ?? null);
+    return this.prisma.foodSafetyLot.create({
+      data: {
+        companyId: me.companyId,
+        programId,
+        materialId,
+        supplierId,
+        processId,
+        code: this.requiredText(body?.code, 'Codigo do lote'),
+        type: this.parseLotType(body?.type) ?? FoodSafetyLotType.RECEIVED,
+        status: this.parseLotStatus(body?.status) ?? FoodSafetyLotStatus.QUARANTINED,
+        quantity: this.optionalFloat(body?.quantity) ?? null,
+        unit: this.nullableText(body?.unit) ?? material?.unit ?? null,
+        receivedAt: this.optionalDate(body?.receivedAt) ?? null,
+        producedAt: this.optionalDate(body?.producedAt) ?? null,
+        expiresAt: this.optionalDate(body?.expiresAt) ?? null,
+        storageLocation: this.nullableText(body?.storageLocation) ?? null,
+        customerName: this.nullableText(body?.customerName) ?? null,
+        destination: this.nullableText(body?.destination) ?? null,
+        certificateUrl: this.nullableText(body?.certificateUrl) ?? null,
+        notes: this.nullableText(body?.notes) ?? null,
+      },
+      include: this.lotInclude(),
+    });
+  }
+
+  async updateLot(me: AuthPayload, id: string, patch: any) {
+    const before = await this.loadLot(me, id);
+    await this.assertProcessWriteArea(me, before.process?.orgNodeId ?? null, 'edit');
+    const data: any = {};
+    if ('programId' in (patch ?? {})) data.programId = await this.validateProgram(me, this.id(patch.programId));
+    if ('materialId' in (patch ?? {})) {
+      const materialId = this.id(patch.materialId);
+      if (materialId) await this.loadMaterial(me, materialId);
+      data.materialId = materialId;
+    }
+    if ('supplierId' in (patch ?? {})) {
+      const supplierId = this.id(patch.supplierId);
+      if (supplierId) await this.loadSupplier(me, supplierId);
+      data.supplierId = supplierId;
+    }
+    if ('processId' in (patch ?? {})) {
+      const processId = this.id(patch.processId);
+      const process = processId ? await this.loadProcess(me, processId) : null;
+      if (process) await this.assertProcessWriteArea(me, process.orgNodeId, 'edit');
+      data.processId = processId;
+    }
+    if ('code' in (patch ?? {})) data.code = this.requiredText(patch.code, 'Codigo do lote');
+    if ('type' in (patch ?? {})) data.type = this.parseLotType(patch.type);
+    if ('status' in (patch ?? {})) data.status = this.parseLotStatus(patch.status);
+    if ('quantity' in (patch ?? {})) data.quantity = this.optionalFloat(patch.quantity);
+    if ('unit' in (patch ?? {})) data.unit = this.nullableText(patch.unit);
+    if ('receivedAt' in (patch ?? {})) data.receivedAt = this.optionalDate(patch.receivedAt);
+    if ('producedAt' in (patch ?? {})) data.producedAt = this.optionalDate(patch.producedAt);
+    if ('expiresAt' in (patch ?? {})) data.expiresAt = this.optionalDate(patch.expiresAt);
+    if ('storageLocation' in (patch ?? {})) data.storageLocation = this.nullableText(patch.storageLocation);
+    if ('customerName' in (patch ?? {})) data.customerName = this.nullableText(patch.customerName);
+    if ('destination' in (patch ?? {})) data.destination = this.nullableText(patch.destination);
+    if ('certificateUrl' in (patch ?? {})) data.certificateUrl = this.nullableText(patch.certificateUrl);
+    if ('notes' in (patch ?? {})) data.notes = this.nullableText(patch.notes);
+    return this.prisma.foodSafetyLot.update({ where: { id }, data, include: this.lotInclude() });
+  }
+
+  async removeLot(me: AuthPayload, id: string) {
+    const lot = await this.loadLot(me, id);
+    await this.assertProcessWriteArea(me, lot.process?.orgNodeId ?? null, 'delete');
+    return this.prisma.foodSafetyLot.update({ where: { id }, data: { deletedAt: new Date() }, include: this.lotInclude() });
+  }
+
+  async listTraceLinks(me: AuthPayload, filters: { lotId?: string; programId?: string } = {}) {
+    return this.prisma.foodSafetyTraceLink.findMany({
+      where: {
+        companyId: me.companyId,
+        deletedAt: null,
+        ...(filters.lotId ? { OR: [{ fromLotId: filters.lotId }, { toLotId: filters.lotId }] } : {}),
+        ...(filters.programId ? { OR: [{ fromLot: { programId: filters.programId } }, { toLot: { programId: filters.programId } }] } : {}),
+      },
+      include: this.traceLinkInclude(),
+      orderBy: { occurredAt: 'desc' },
+      take: 300,
+    });
+  }
+
+  async createTraceLink(me: AuthPayload, body: any) {
+    const fromLotId = this.id(body?.fromLotId);
+    const toLotId = this.id(body?.toLotId);
+    if (!fromLotId && !toLotId) throw new BadRequestException('Informe ao menos um lote de origem ou destino.');
+    if (fromLotId && toLotId && fromLotId === toLotId) throw new BadRequestException('Origem e destino devem ser lotes diferentes.');
+    if (fromLotId) await this.loadLot(me, fromLotId);
+    if (toLotId) await this.loadLot(me, toLotId);
+    let processId = this.id(body?.processId);
+    const stepId = this.id(body?.stepId);
+    if (stepId) {
+      const step = await this.loadStep(me, stepId);
+      if (processId && step.processId !== processId) throw new BadRequestException('Etapa nao pertence ao processo informado.');
+      processId = step.processId;
+    }
+    const process = processId ? await this.loadProcess(me, processId) : null;
+    if (process) await this.assertProcessWriteArea(me, process.orgNodeId, 'edit');
+    return this.prisma.foodSafetyTraceLink.create({
+      data: {
+        companyId: me.companyId,
+        fromLotId,
+        toLotId,
+        processId,
+        stepId,
+        eventType: this.parseTraceEventType(body?.eventType) ?? FoodSafetyTraceEventType.PRODUCTION,
+        quantity: this.optionalFloat(body?.quantity) ?? null,
+        unit: this.nullableText(body?.unit) ?? null,
+        occurredAt: this.optionalDate(body?.occurredAt) ?? new Date(),
+        notes: this.nullableText(body?.notes) ?? null,
+      },
+      include: this.traceLinkInclude(),
+    });
+  }
+
+  async traceLot(me: AuthPayload, lotId: string, depth?: string | number) {
+    const rootLot = await this.loadLot(me, lotId);
+    const maxDepth = Math.min(this.optionalInt(depth ?? 4, 1) ?? 4, 8);
+    const links = await this.prisma.foodSafetyTraceLink.findMany({
+      where: { companyId: me.companyId, deletedAt: null },
+      include: this.traceLinkInclude(),
+      orderBy: { occurredAt: 'asc' },
+      take: 1000,
+    });
+    const backward: Array<{ depth: number; link: unknown }> = [];
+    const forward: Array<{ depth: number; link: unknown }> = [];
+    const visitedBack = new Set<string>([lotId]);
+    const visitedForward = new Set<string>([lotId]);
+    const seenBackLinks = new Set<string>();
+    const seenForwardLinks = new Set<string>();
+
+    let frontier = [lotId];
+    for (let level = 1; level <= maxDepth && frontier.length; level++) {
+      const next: string[] = [];
+      for (const link of links) {
+        if (link.toLotId && frontier.includes(link.toLotId) && link.fromLotId && !seenBackLinks.has(link.id)) {
+          seenBackLinks.add(link.id);
+          backward.push({ depth: level, link });
+          if (!visitedBack.has(link.fromLotId)) {
+            visitedBack.add(link.fromLotId);
+            next.push(link.fromLotId);
+          }
+        }
+      }
+      frontier = next;
+    }
+
+    frontier = [lotId];
+    for (let level = 1; level <= maxDepth && frontier.length; level++) {
+      const next: string[] = [];
+      for (const link of links) {
+        if (link.fromLotId && frontier.includes(link.fromLotId) && link.toLotId && !seenForwardLinks.has(link.id)) {
+          seenForwardLinks.add(link.id);
+          forward.push({ depth: level, link });
+          if (!visitedForward.has(link.toLotId)) {
+            visitedForward.add(link.toLotId);
+            next.push(link.toLotId);
+          }
+        }
+      }
+      frontier = next;
+    }
+
+    return {
+      rootLot,
+      depth: maxDepth,
+      backward,
+      forward,
+      backwardLotIds: Array.from(visitedBack).filter((id) => id !== lotId),
+      forwardLotIds: Array.from(visitedForward).filter((id) => id !== lotId),
+      impactedLotIds: Array.from(new Set([lotId, ...visitedForward])),
+    };
+  }
+
+  private async loadRecall(me: AuthPayload, id: string) {
+    const recall = await this.prisma.foodSafetyRecall.findFirst({
+      where: { id, companyId: me.companyId, deletedAt: null },
+      include: this.recallInclude(),
+    });
+    if (!recall) throw new NotFoundException('Recall nao encontrado');
+    return recall;
+  }
+
+  async listRecalls(me: AuthPayload, filters: { programId?: string; status?: string; search?: string } = {}) {
+    const status = this.parseRecallStatus(filters.status);
+    const term = filters.search?.trim();
+    return this.prisma.foodSafetyRecall.findMany({
+      where: {
+        companyId: me.companyId,
+        deletedAt: null,
+        ...(filters.programId ? { programId: filters.programId } : {}),
+        ...(status ? { status } : {}),
+        ...(term ? { OR: [{ title: { contains: term, mode: 'insensitive' } }, { code: { contains: term, mode: 'insensitive' } }, { reason: { contains: term, mode: 'insensitive' } }] } : {}),
+      },
+      include: this.recallInclude(),
+      orderBy: { initiatedAt: 'desc' },
+    });
+  }
+
+  async createRecall(me: AuthPayload, body: any) {
+    const rootLotId = this.id(body?.rootLotId);
+    const rootLot = rootLotId ? await this.loadLot(me, rootLotId) : null;
+    const explicitItemIds = Array.isArray(body?.itemLotIds) ? body.itemLotIds.map((x: unknown) => this.id(x)).filter(Boolean) as string[] : [];
+    const tracedIds = rootLotId && explicitItemIds.length === 0 ? (await this.traceLot(me, rootLotId, 5)).impactedLotIds : [];
+    const itemLotIds = Array.from(new Set([...(rootLotId ? [rootLotId] : []), ...explicitItemIds, ...tracedIds]));
+    for (const id of itemLotIds) await this.loadLot(me, id);
+    const programId = await this.validateProgram(me, this.id(body?.programId) ?? rootLot?.programId ?? null);
+    const responsibleUserId = await this.validateUser(me.companyId, this.id(body?.responsibleUserId));
+    return this.prisma.foodSafetyRecall.create({
+      data: {
+        companyId: me.companyId,
+        programId,
+        rootLotId,
+        responsibleUserId,
+        code: this.nullableText(body?.code) ?? null,
+        title: this.requiredText(body?.title, 'Titulo do recall'),
+        reason: this.nullableText(body?.reason) ?? null,
+        severity: this.parseRecallSeverity(body?.severity) ?? FoodSafetyRecallSeverity.MEDIUM,
+        status: this.parseRecallStatus(body?.status) ?? FoodSafetyRecallStatus.SIMULATION,
+        scopeDescription: this.nullableText(body?.scopeDescription) ?? null,
+        affectedQuantity: this.optionalFloat(body?.affectedQuantity) ?? null,
+        unit: this.nullableText(body?.unit) ?? rootLot?.unit ?? null,
+        initiatedAt: this.optionalDate(body?.initiatedAt) ?? new Date(),
+        closedAt: this.optionalDate(body?.closedAt) ?? null,
+        actions: this.nullableText(body?.actions) ?? null,
+        notes: this.nullableText(body?.notes) ?? null,
+        items: itemLotIds.length ? { create: itemLotIds.map((lotId) => ({ companyId: me.companyId, lotId })) } : undefined,
+      },
+      include: this.recallInclude(),
+    });
+  }
+
+  async updateRecall(me: AuthPayload, id: string, patch: any) {
+    await this.loadRecall(me, id);
+    const data: any = {};
+    if ('programId' in (patch ?? {})) data.programId = await this.validateProgram(me, this.id(patch.programId));
+    if ('rootLotId' in (patch ?? {})) {
+      const rootLotId = this.id(patch.rootLotId);
+      if (rootLotId) await this.loadLot(me, rootLotId);
+      data.rootLotId = rootLotId;
+    }
+    if ('responsibleUserId' in (patch ?? {})) data.responsibleUserId = await this.validateUser(me.companyId, this.id(patch.responsibleUserId));
+    if ('code' in (patch ?? {})) data.code = this.nullableText(patch.code);
+    if ('title' in (patch ?? {})) data.title = this.requiredText(patch.title, 'Titulo do recall');
+    if ('reason' in (patch ?? {})) data.reason = this.nullableText(patch.reason);
+    if ('severity' in (patch ?? {})) data.severity = this.parseRecallSeverity(patch.severity);
+    if ('status' in (patch ?? {})) data.status = this.parseRecallStatus(patch.status);
+    if ('scopeDescription' in (patch ?? {})) data.scopeDescription = this.nullableText(patch.scopeDescription);
+    if ('affectedQuantity' in (patch ?? {})) data.affectedQuantity = this.optionalFloat(patch.affectedQuantity);
+    if ('unit' in (patch ?? {})) data.unit = this.nullableText(patch.unit);
+    if ('initiatedAt' in (patch ?? {})) data.initiatedAt = this.optionalDate(patch.initiatedAt);
+    if ('closedAt' in (patch ?? {})) data.closedAt = this.optionalDate(patch.closedAt);
+    if ('actions' in (patch ?? {})) data.actions = this.nullableText(patch.actions);
+    if ('notes' in (patch ?? {})) data.notes = this.nullableText(patch.notes);
+    return this.prisma.foodSafetyRecall.update({ where: { id }, data, include: this.recallInclude() });
+  }
+
+  async addRecallItem(me: AuthPayload, recallId: string, body: any) {
+    await this.loadRecall(me, recallId);
+    const lotId = this.requiredText(body?.lotId, 'Lote');
+    await this.loadLot(me, lotId);
+    return this.prisma.foodSafetyRecallItem.create({
+      data: {
+        companyId: me.companyId,
+        recallId,
+        lotId,
+        status: this.parseRecallItemStatus(body?.status) ?? FoodSafetyRecallItemStatus.PENDING,
+        quantity: this.optionalFloat(body?.quantity) ?? null,
+        unit: this.nullableText(body?.unit) ?? null,
+        disposition: this.nullableText(body?.disposition) ?? null,
+        notifiedAt: this.optionalDate(body?.notifiedAt) ?? null,
+        notes: this.nullableText(body?.notes) ?? null,
+      },
+      include: { lot: { include: { material: true, supplier: true } } },
+    });
+  }
+
+  async updateRecallItem(me: AuthPayload, id: string, patch: any) {
+    const item = await this.prisma.foodSafetyRecallItem.findFirst({ where: { id, companyId: me.companyId, deletedAt: null } });
+    if (!item) throw new NotFoundException('Item de recall nao encontrado');
+    const data: any = {};
+    if ('status' in (patch ?? {})) data.status = this.parseRecallItemStatus(patch.status);
+    if ('quantity' in (patch ?? {})) data.quantity = this.optionalFloat(patch.quantity);
+    if ('unit' in (patch ?? {})) data.unit = this.nullableText(patch.unit);
+    if ('disposition' in (patch ?? {})) data.disposition = this.nullableText(patch.disposition);
+    if ('notifiedAt' in (patch ?? {})) data.notifiedAt = this.optionalDate(patch.notifiedAt);
+    if ('notes' in (patch ?? {})) data.notes = this.nullableText(patch.notes);
+    return this.prisma.foodSafetyRecallItem.update({ where: { id }, data, include: { lot: { include: { material: true, supplier: true } } } });
+  }
+
+  async supplyChainSummary(me: AuthPayload, programId?: string) {
+    const [suppliers, materials, lots, recalls] = await Promise.all([
+      this.prisma.foodSafetySupplier.findMany({ where: { companyId: me.companyId, deletedAt: null, ...(programId ? { programId } : {}) }, select: { status: true, criticality: true } }),
+      this.prisma.foodSafetyMaterial.findMany({ where: { companyId: me.companyId, deletedAt: null, ...(programId ? { programId } : {}) }, select: { status: true, category: true } }),
+      this.prisma.foodSafetyLot.findMany({ where: { companyId: me.companyId, deletedAt: null, ...(programId ? { programId } : {}) }, select: { status: true, type: true, expiresAt: true } }),
+      this.prisma.foodSafetyRecall.findMany({ where: { companyId: me.companyId, deletedAt: null, ...(programId ? { programId } : {}) }, select: { status: true, severity: true } }),
+    ]);
+    const today = new Date();
+    const expiringLots = lots.filter((l) => l.expiresAt && l.expiresAt.getTime() <= today.getTime() + 30 * 86400000).length;
+    return {
+      suppliers: suppliers.length,
+      suppliersApproved: suppliers.filter((s) => s.status === FoodSafetySupplierStatus.APPROVED).length,
+      suppliersBlocked: suppliers.filter((s) => s.status === FoodSafetySupplierStatus.BLOCKED).length,
+      criticalSuppliers: suppliers.filter((s) => s.criticality === FoodSafetySupplierCriticality.CRITICAL).length,
+      materials: materials.length,
+      materialsBlocked: materials.filter((m) => m.status === FoodSafetyMaterialStatus.BLOCKED).length,
+      lots: lots.length,
+      lotsBlocked: lots.filter((l) => l.status === FoodSafetyLotStatus.BLOCKED).length,
+      lotsRecalled: lots.filter((l) => l.status === FoodSafetyLotStatus.RECALLED).length,
+      expiringLots,
+      recalls: recalls.length,
+      activeRecalls: recalls.filter((r) => r.status === FoodSafetyRecallStatus.ACTIVE || r.status === FoodSafetyRecallStatus.SIMULATION).length,
+      criticalRecalls: recalls.filter((r) => r.severity === FoodSafetyRecallSeverity.CRITICAL).length,
     };
   }
 }

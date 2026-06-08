@@ -289,4 +289,152 @@ export class FoodSafetyController {
   assessRequirement(@CurrentUser() me: AuthPayload, @Param('id') id: string, @Body() body: any) {
     return this.service.assessRequirement(me, id, body);
   }
+
+  // ----- cadeia: fornecedores, materiais, lotes, rastreabilidade e recall -----
+  @Get('supply-chain-summary')
+  @RequirePermissions('fsms:view')
+  supplyChainSummary(@CurrentUser() me: AuthPayload, @Query('programId') programId?: string) {
+    return this.service.supplyChainSummary(me, programId);
+  }
+
+  @Get('suppliers')
+  @RequirePermissions('fsms:view')
+  listSuppliers(
+    @CurrentUser() me: AuthPayload,
+    @Query('programId') programId?: string,
+    @Query('status') status?: string,
+    @Query('criticality') criticality?: string,
+    @Query('search') search?: string,
+  ) {
+    return this.service.listSuppliers(me, { programId, status, criticality, search });
+  }
+
+  @Post('suppliers')
+  @RequirePermissions('fsms:create')
+  createSupplier(@CurrentUser() me: AuthPayload, @Body() body: any) {
+    return this.service.createSupplier(me, body);
+  }
+
+  @Patch('suppliers/:id')
+  @RequirePermissions('fsms:update')
+  updateSupplier(@CurrentUser() me: AuthPayload, @Param('id') id: string, @Body() body: any) {
+    return this.service.updateSupplier(me, id, body);
+  }
+
+  @Delete('suppliers/:id')
+  @RequirePermissions('fsms:delete')
+  removeSupplier(@CurrentUser() me: AuthPayload, @Param('id') id: string) {
+    return this.service.removeSupplier(me, id);
+  }
+
+  @Get('materials')
+  @RequirePermissions('fsms:view')
+  listMaterials(
+    @CurrentUser() me: AuthPayload,
+    @Query('programId') programId?: string,
+    @Query('supplierId') supplierId?: string,
+    @Query('category') category?: string,
+    @Query('status') status?: string,
+    @Query('search') search?: string,
+  ) {
+    return this.service.listMaterials(me, { programId, supplierId, category, status, search });
+  }
+
+  @Post('materials')
+  @RequirePermissions('fsms:create')
+  createMaterial(@CurrentUser() me: AuthPayload, @Body() body: any) {
+    return this.service.createMaterial(me, body);
+  }
+
+  @Patch('materials/:id')
+  @RequirePermissions('fsms:update')
+  updateMaterial(@CurrentUser() me: AuthPayload, @Param('id') id: string, @Body() body: any) {
+    return this.service.updateMaterial(me, id, body);
+  }
+
+  @Delete('materials/:id')
+  @RequirePermissions('fsms:delete')
+  removeMaterial(@CurrentUser() me: AuthPayload, @Param('id') id: string) {
+    return this.service.removeMaterial(me, id);
+  }
+
+  @Get('lots')
+  @RequirePermissions('fsms:view')
+  listLots(
+    @CurrentUser() me: AuthPayload,
+    @Query('programId') programId?: string,
+    @Query('materialId') materialId?: string,
+    @Query('supplierId') supplierId?: string,
+    @Query('type') type?: string,
+    @Query('status') status?: string,
+    @Query('search') search?: string,
+  ) {
+    return this.service.listLots(me, { programId, materialId, supplierId, type, status, search });
+  }
+
+  @Post('lots')
+  @RequirePermissions('fsms:create')
+  createLot(@CurrentUser() me: AuthPayload, @Body() body: any) {
+    return this.service.createLot(me, body);
+  }
+
+  @Patch('lots/:id')
+  @RequirePermissions('fsms:update')
+  updateLot(@CurrentUser() me: AuthPayload, @Param('id') id: string, @Body() body: any) {
+    return this.service.updateLot(me, id, body);
+  }
+
+  @Delete('lots/:id')
+  @RequirePermissions('fsms:delete')
+  removeLot(@CurrentUser() me: AuthPayload, @Param('id') id: string) {
+    return this.service.removeLot(me, id);
+  }
+
+  @Get('lots/:id/trace')
+  @RequirePermissions('fsms:view')
+  traceLot(@CurrentUser() me: AuthPayload, @Param('id') id: string, @Query('depth') depth?: string) {
+    return this.service.traceLot(me, id, depth);
+  }
+
+  @Get('trace-links')
+  @RequirePermissions('fsms:view')
+  listTraceLinks(@CurrentUser() me: AuthPayload, @Query('lotId') lotId?: string, @Query('programId') programId?: string) {
+    return this.service.listTraceLinks(me, { lotId, programId });
+  }
+
+  @Post('trace-links')
+  @RequirePermissions('fsms:create')
+  createTraceLink(@CurrentUser() me: AuthPayload, @Body() body: any) {
+    return this.service.createTraceLink(me, body);
+  }
+
+  @Get('recalls')
+  @RequirePermissions('fsms:view')
+  listRecalls(@CurrentUser() me: AuthPayload, @Query('programId') programId?: string, @Query('status') status?: string, @Query('search') search?: string) {
+    return this.service.listRecalls(me, { programId, status, search });
+  }
+
+  @Post('recalls')
+  @RequirePermissions('fsms:create')
+  createRecall(@CurrentUser() me: AuthPayload, @Body() body: any) {
+    return this.service.createRecall(me, body);
+  }
+
+  @Patch('recalls/:id')
+  @RequirePermissions('fsms:update')
+  updateRecall(@CurrentUser() me: AuthPayload, @Param('id') id: string, @Body() body: any) {
+    return this.service.updateRecall(me, id, body);
+  }
+
+  @Post('recalls/:id/items')
+  @RequirePermissions('fsms:create')
+  addRecallItem(@CurrentUser() me: AuthPayload, @Param('id') id: string, @Body() body: any) {
+    return this.service.addRecallItem(me, id, body);
+  }
+
+  @Patch('recall-items/:id')
+  @RequirePermissions('fsms:update')
+  updateRecallItem(@CurrentUser() me: AuthPayload, @Param('id') id: string, @Body() body: any) {
+    return this.service.updateRecallItem(me, id, body);
+  }
 }

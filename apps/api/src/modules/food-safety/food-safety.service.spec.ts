@@ -35,6 +35,16 @@ function makeService(opts?: {
   version?: unknown;
   requirements?: unknown[];
   requirement?: unknown;
+  suppliers?: unknown[];
+  supplier?: unknown;
+  materials?: unknown[];
+  material?: unknown;
+  lots?: unknown[];
+  lot?: unknown;
+  traceLinks?: unknown[];
+  recalls?: unknown[];
+  recall?: unknown;
+  recallItem?: unknown;
 }) {
   const defaultMatrix = { id: 'm1', companyId: 'companyA', severityScale: 5, probabilityScale: 5, useDetection: false, detectionScale: 5, thresholdLow: 4, thresholdModerate: 9, thresholdHigh: 15 };
   const prisma: any = {
@@ -103,6 +113,39 @@ function makeService(opts?: {
     },
     foodSafetyRequirementAssessment: {
       create: vi.fn().mockImplementation((args: any) => Promise.resolve({ id: 'as1', ...args.data })),
+    },
+    foodSafetySupplier: {
+      findMany: vi.fn().mockResolvedValue(opts?.suppliers ?? []),
+      findFirst: vi.fn().mockResolvedValue(opts?.supplier ?? null),
+      create: vi.fn().mockImplementation((args: any) => Promise.resolve({ id: 'sup1', ...args.data })),
+      update: vi.fn().mockImplementation((args: any) => Promise.resolve({ id: 'sup1', ...args.data })),
+    },
+    foodSafetyMaterial: {
+      findMany: vi.fn().mockResolvedValue(opts?.materials ?? []),
+      findFirst: vi.fn().mockResolvedValue(opts?.material ?? null),
+      create: vi.fn().mockImplementation((args: any) => Promise.resolve({ id: 'mat1', ...args.data })),
+      update: vi.fn().mockImplementation((args: any) => Promise.resolve({ id: 'mat1', ...args.data })),
+    },
+    foodSafetyLot: {
+      findMany: vi.fn().mockResolvedValue(opts?.lots ?? []),
+      findFirst: vi.fn().mockResolvedValue(opts?.lot ?? null),
+      create: vi.fn().mockImplementation((args: any) => Promise.resolve({ id: 'lot1', ...args.data })),
+      update: vi.fn().mockImplementation((args: any) => Promise.resolve({ id: 'lot1', ...args.data })),
+    },
+    foodSafetyTraceLink: {
+      findMany: vi.fn().mockResolvedValue(opts?.traceLinks ?? []),
+      create: vi.fn().mockImplementation((args: any) => Promise.resolve({ id: 'tl1', ...args.data })),
+    },
+    foodSafetyRecall: {
+      findMany: vi.fn().mockResolvedValue(opts?.recalls ?? []),
+      findFirst: vi.fn().mockResolvedValue(opts?.recall ?? null),
+      create: vi.fn().mockImplementation((args: any) => Promise.resolve({ id: 'rec1', ...args.data, items: args.data.items?.create ?? [] })),
+      update: vi.fn().mockImplementation((args: any) => Promise.resolve({ id: 'rec1', ...args.data })),
+    },
+    foodSafetyRecallItem: {
+      findFirst: vi.fn().mockResolvedValue(opts?.recallItem ?? null),
+      create: vi.fn().mockImplementation((args: any) => Promise.resolve({ id: 'ri1', ...args.data })),
+      update: vi.fn().mockImplementation((args: any) => Promise.resolve({ id: 'ri1', ...args.data })),
     },
     orgNode: { findFirst: vi.fn().mockResolvedValue(opts?.orgNode ?? null), findMany: vi.fn().mockResolvedValue([]) },
     user: { findFirst: vi.fn().mockResolvedValue(opts?.user ?? null), findMany: vi.fn().mockResolvedValue([]) },
@@ -325,5 +368,65 @@ describe('FoodSafetyService - Fase 1 (programas/processos/etapas)', () => {
     expect(prisma.foodSafetyStandardVersion.updateMany).toHaveBeenCalledWith(
       expect.objectContaining({ where: expect.objectContaining({ standardId: 'std1', status: 'ACTIVE' }), data: { status: 'SUPERSEDED' } }),
     );
+  });
+
+  it('createSupplier: valida area, responsavel e grava escopo da empresa', async () => {
+    const { service, prisma, access } = makeService({ program: { id: 'pg1', companyId: 'companyA' }, orgNode: { id: 'areaA' }, user: { id: 'u2' } });
+    await service.createSupplier(me, { programId: 'pg1', orgNodeId: 'areaA', responsibleUserId: 'u2', name: 'Fornecedor A', criticality: 'CRITICAL', status: 'APPROVED' });
+    expect(access.assertCanWrite).toHaveBeenCalledWith('user-1', 'areaA', 'food-safety', 'create');
+    const data = prisma.foodSafetySupplier.create.mock.calls[0][0].data;
+    expect(data.companyId).toBe('companyA');
+    expect(data.programId).toBe('pg1');
+    expect(data.responsibleUserId).toBe('u2');
+    expect(data.criticality).toBe('CRITICAL');
+    expect(data.status).toBe('APPROVED');
+  });
+
+  it('createLot: herda fornecedor/unidade do material e checa processo', async () => {
+    const { service, prisma, access } = makeService({
+      material: { id: 'mat1', companyId: 'companyA', supplierId: 'sup1', programId: 'pg1', unit: 'kg' },
+      supplier: { id: 'sup1', companyId: 'companyA' },
+      process: { id: 'pr1', companyId: 'companyA', programId: 'pg1', orgNodeId: 'areaA', steps: [] },
+      program: { id: 'pg1', companyId: 'companyA' },
+    });
+    await service.createLot(me, { materialId: 'mat1', processId: 'pr1', code: 'LT-001', type: 'RECEIVED', quantity: 100 });
+    expect(access.assertCanWrite).toHaveBeenCalledWith('user-1', 'areaA', 'food-safety', 'create');
+    const data = prisma.foodSafetyLot.create.mock.calls[0][0].data;
+    expect(data.companyId).toBe('companyA');
+    expect(data.programId).toBe('pg1');
+    expect(data.supplierId).toBe('sup1');
+    expect(data.unit).toBe('kg');
+    expect(data.status).toBe('QUARANTINED');
+  });
+
+  it('traceLot: monta rastreabilidade para tras e para frente por profundidade', async () => {
+    const { service } = makeService({
+      lot: { id: 'lotB', companyId: 'companyA', code: 'B' },
+      traceLinks: [
+        { id: 'l1', fromLotId: 'lotA', toLotId: 'lotB' },
+        { id: 'l2', fromLotId: 'lotB', toLotId: 'lotC' },
+        { id: 'l3', fromLotId: 'lotC', toLotId: 'lotD' },
+      ],
+    });
+    const res = await service.traceLot(me, 'lotB', 2);
+    expect(res.backwardLotIds).toEqual(['lotA']);
+    expect(res.forwardLotIds).toEqual(['lotC', 'lotD']);
+    expect(res.forward).toHaveLength(2);
+  });
+
+  it('createRecall: sem itens explicitos usa trace forward para simular lotes impactados', async () => {
+    const { service, prisma } = makeService({
+      lot: { id: 'lotB', companyId: 'companyA', code: 'B', programId: 'pg1', unit: 'kg' },
+      program: { id: 'pg1', companyId: 'companyA' },
+      traceLinks: [
+        { id: 'l1', fromLotId: 'lotB', toLotId: 'lotC' },
+        { id: 'l2', fromLotId: 'lotC', toLotId: 'lotD' },
+      ],
+    });
+    await service.createRecall(me, { rootLotId: 'lotB', title: 'Simulado lote B', severity: 'HIGH' });
+    const data = prisma.foodSafetyRecall.create.mock.calls[0][0].data;
+    expect(data.status).toBe('SIMULATION');
+    expect(data.rootLotId).toBe('lotB');
+    expect(data.items.create.map((x: any) => x.lotId)).toEqual(['lotB', 'lotC', 'lotD']);
   });
 });
