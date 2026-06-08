@@ -1,6 +1,7 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, Logger } from '@nestjs/common';
 import { PrismaService } from '../../prisma/prisma.service';
 import { Prisma, TraceEntityType, TraceEventType } from '@prisma/client';
+import { ModuleRef } from '@nestjs/core';
 
 export interface TraceabilityRecordInput {
   companyId: string;
@@ -21,7 +22,12 @@ export interface TraceabilityRecordInput {
 
 @Injectable()
 export class TraceabilityService {
-  constructor(private readonly prisma: PrismaService) {}
+  private readonly logger = new Logger(TraceabilityService.name);
+
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly moduleRef: ModuleRef
+  ) {}
 
   async record(input: TraceabilityRecordInput) {
     const event = await this.prisma.traceabilityEvent.create({
@@ -68,6 +74,63 @@ export class TraceabilityService {
         payload: input.metadata ? JSON.stringify(input.metadata) : null,
       },
     });
+
+    // Forward as domain event to the Workflow engine
+    try {
+      const { WorkflowEventDispatcher } = await import('../automations/services/workflow-dispatcher.service');
+      const dispatcher = this.moduleRef.get(WorkflowEventDispatcher, { strict: false });
+      if (dispatcher) {
+        const entityMap: Record<string, string> = {
+          INDICATOR: 'indicator',
+          INDICATOR_RESULT: 'indicator_result',
+          ACTION_PLAN: 'action',
+          ACTION_TASK: 'action_task',
+          DOCUMENT: 'document',
+          AUDIT: 'audit',
+          NON_CONFORMITY: 'nonconformity',
+          FORM_SUBMISSION: 'checklist',
+          RISK: 'risk',
+          TRAINING: 'training',
+        };
+
+        const eventMap: Record<string, string> = {
+          CREATED: 'created',
+          UPDATED: 'updated',
+          STATUS_CHANGED: 'status_changed',
+          RESULT_RECORDED: 'result_recorded',
+          OFF_TARGET_ALERT: 'out_of_target',
+        };
+
+        const entity = entityMap[input.entityType] || input.entityType.toLowerCase();
+        const eventTypeStr = eventMap[input.eventType] || input.eventType.toLowerCase();
+        const mappedType = `${entity}.${eventTypeStr}`;
+
+        // Asynchronously dispatch event
+        setImmediate(() => {
+          dispatcher.dispatchEvent(
+            input.companyId,
+            mappedType,
+            input.entityType,
+            input.entityId,
+            {
+              userId: input.userId,
+              indicatorId: input.indicatorId,
+              relatedType: input.relatedType,
+              relatedId: input.relatedId,
+              title: input.title,
+              description: input.description,
+              statusFrom: input.statusFrom,
+              statusTo: input.statusTo,
+              ...(input.metadata ? (input.metadata as any) : {}),
+            }
+          ).catch((err) => {
+            this.logger.error(`Failed to dispatch workflow event ${mappedType}: ${err.message}`);
+          });
+        });
+      }
+    } catch (err) {
+      // Dispatcher module or service might not be initialized
+    }
 
     return event;
   }

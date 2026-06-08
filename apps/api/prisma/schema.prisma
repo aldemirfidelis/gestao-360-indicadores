@@ -577,6 +577,26 @@ model Company {
   workPeriods            WorkPeriod[]
   closedMonths           ClosedMonth[]
   conversations          Conversation[]
+
+  relationshipLinks      RelationshipLink[]           @relation("RelationshipCompany")
+  impactAnalyses         ImpactAnalysis[]             @relation("ImpactAnalysisCompany")
+  impactAnalysisItems    ImpactAnalysisItem[]         @relation("ImpactItemCompany")
+  relationshipAuditLogs  RelationshipAuditLog[]       @relation("RelationAuditCompany")
+
+  workflowDefinitions   WorkflowDefinition[]    @relation("WorkflowDefCompany")
+  workflowVersions      WorkflowVersion[]       @relation("WorkflowVerCompany")
+  workflowNodes         WorkflowNode[]          @relation("WorkflowNodeCompany")
+  workflowEdges         WorkflowEdge[]          @relation("WorkflowEdgeCompany")
+  workflowInstances     WorkflowInstance[]      @relation("WorkflowInstCompany")
+  workflowNodeExecutions WorkflowNodeExecution[] @relation("WorkflowNodeExecCompany")
+  workflowEvents        WorkflowEvent[]         @relation("WorkflowEventCompany")
+  workflowTimers        WorkflowTimer[]         @relation("WorkflowTimerCompany")
+  workflowApprovals     WorkflowApproval[]      @relation("WorkflowApprovCompany")
+  workflowTasks         WorkflowTask[]          @relation("WorkflowTaskCompany")
+  workflowTemplates     WorkflowTemplate[]      @relation("WorkflowTempCompany")
+  workflowExecutionLogs WorkflowExecutionLog[]  @relation("WorkflowLogCompany")
+  workflowDeadLetters   WorkflowDeadLetter[]    @relation("WorkflowDLCompany")
+  workflowIntegrations  WorkflowIntegration[]   @relation("WorkflowIntegCompany")
 }
 
 model WorkPeriod {
@@ -783,6 +803,23 @@ model User {
   integrationPreferences     UserIntegrationPreference[]
   presence                   UserPresence?
   notificationPreference     NotificationPreference?
+
+  relationshipLinksCreated RelationshipLink[]     @relation("RelationshipCreatedBy")
+  impactAnalysesCreated    ImpactAnalysis[]       @relation("ImpactAnalysisCreatedBy")
+  impactAnalysesApproved   ImpactAnalysis[]       @relation("ImpactAnalysisApprovedBy")
+  impactAnalysisItems      ImpactAnalysisItem[]   @relation("ImpactItemResponsible")
+  relationshipAuditLogs    RelationshipAuditLog[] @relation("RelationAuditPerformedBy")
+
+  workflowDefinitionsCreated    WorkflowDefinition[] @relation("WorkflowDefCreatedBy")
+  workflowDefinitionsUpdated    WorkflowDefinition[] @relation("WorkflowDefUpdatedBy")
+  workflowVersionsCreated       WorkflowVersion[]    @relation("WorkflowVerCreatedBy")
+  workflowVersionsPublished     WorkflowVersion[]    @relation("WorkflowVerPublishedBy")
+  workflowApprovalsRequested    WorkflowApproval[]   @relation("WorkflowApprovRequester")
+  workflowApprovalsApproved     WorkflowApproval[]   @relation("WorkflowApprovApprover")
+  workflowTasksResponsible      WorkflowTask[]       @relation("WorkflowTaskResponsible")
+  workflowTasksSubstitute       WorkflowTask[]       @relation("WorkflowTaskSubstitute")
+  workflowTemplatesCreated      WorkflowTemplate[]   @relation("WorkflowTempCreatedBy")
+  workflowDeadLettersResolved   WorkflowDeadLetter[] @relation("WorkflowDLResolvedBy")
 
   @@index([companyId])
   @@index([branchId])
@@ -7493,4 +7530,434 @@ model FoodSafetyRecallItem {
   @@index([recallId])
   @@index([lotId])
   @@index([status])
+}
+
+// =====================================================
+// Visão 360° e Análise de Impacto
+// =====================================================
+
+model RelationshipLink {
+  id                 String    @id @default(uuid())
+  companyId          String
+  company            Company   @relation("RelationshipCompany", fields: [companyId], references: [id])
+  sourceEntityType   String    // ex.: "INDICATOR", "PROCESS", "DOCUMENT", etc.
+  sourceEntityId     String
+  targetEntityType   String
+  targetEntityId     String
+  relationshipType   String    // ex.: "pertence_a", "depende_de", "impacta", "controlado_por"
+  direction          String    @default("DIRECT") // "DIRECT" ou "INDIRECT"
+  criticality        String    @default("MEDIUM") // "CRITICAL", "HIGH", "MEDIUM", "LOW", "INFO"
+  isMandatory        Boolean   @default(false)
+  originType         String    @default("MANUAL") // "AUTOMATIC" ou "MANUAL"
+  originReference    String?
+  notes              String?
+  createdById        String?
+  createdBy          User?     @relation("RelationshipCreatedBy", fields: [createdById], references: [id])
+  createdAt          DateTime  @default(now())
+  updatedAt          DateTime  @updatedAt
+  deletedAt          DateTime?
+
+  @@index([companyId])
+  @@index([sourceEntityType, sourceEntityId])
+  @@index([targetEntityType, targetEntityId])
+}
+
+model ImpactAnalysis {
+  id                   String               @id @default(uuid())
+  companyId            String
+  company              Company              @relation("ImpactAnalysisCompany", fields: [companyId], references: [id])
+  sourceEntityType     String
+  sourceEntityId       String
+  operationType        String               // "CREATE", "UPDATE", "DELETE", "INACTIVE"
+  changeSummary        String
+  previousValues       String?              // JSON stringificado contendo os campos anteriores
+  newValues            String?              // JSON stringificado contendo os novos valores
+  impactLevel          String               @default("MEDIUM") // "CRITICAL", "HIGH", "MEDIUM", "LOW", "INFO"
+  affectedRecordsCount Int                  @default(0)
+  status               String               @default("PENDING") // "PENDING", "APPROVED", "REJECTED", "COMPLETED"
+  justification        String?
+  createdById          String?
+  createdBy            User?                @relation("ImpactAnalysisCreatedBy", fields: [createdById], references: [id])
+  createdAt            DateTime             @default(now())
+  approvedById         String?
+  approvedBy           User?                @relation("ImpactAnalysisApprovedBy", fields: [approvedById], references: [id])
+  approvedAt           DateTime?
+  items                ImpactAnalysisItem[]
+
+  @@index([companyId])
+  @@index([sourceEntityType, sourceEntityId])
+}
+
+model ImpactAnalysisItem {
+  id                String         @id @default(uuid())
+  companyId         String
+  company           Company        @relation("ImpactItemCompany", fields: [companyId], references: [id])
+  impactAnalysisId  String
+  impactAnalysis    ImpactAnalysis @relation(fields: [impactAnalysisId], references: [id], onDelete: Cascade)
+  affectedEntityType String
+  affectedEntityId   String
+  relationshipPath  String?        // ex.: "Processo A -> Indicador B"
+  impactReason      String?
+  impactLevel       String         @default("MEDIUM")
+  recommendedAction String?
+  requiresReview    Boolean        @default(false)
+  requiresTask      Boolean        @default(false)
+  responsibleUserId String?
+  responsibleUser   User?          @relation("ImpactItemResponsible", fields: [responsibleUserId], references: [id])
+  status            String         @default("PENDING") // "PENDING", "DONE", "CANCELLED"
+  dueDate           DateTime?
+  createdAt         DateTime       @default(now())
+
+  @@index([companyId])
+  @@index([impactAnalysisId])
+  @@index([affectedEntityType, affectedEntityId])
+}
+
+model RelationshipAuditLog {
+  id            String    @id @default(uuid())
+  companyId     String
+  company       Company   @relation("RelationAuditCompany", fields: [companyId], references: [id])
+  entityType    String
+  entityId      String
+  eventType     String    // "LINK_CREATED", "LINK_REMOVED", "IMPACT_APPROVED"
+  previousValues String?
+  newValues     String?
+  performedById String?
+  performedBy   User?     @relation("RelationAuditPerformedBy", fields: [performedById], references: [id])
+  performedAt   DateTime  @default(now())
+  ipAddress     String?
+  userAgent     String?
+  notes         String?
+
+  @@index([companyId])
+  @@index([entityType, entityId])
+}
+
+// =====================================================
+// Central de Automações e Workflows
+// =====================================================
+
+model WorkflowDefinition {
+  id                 String            @id @default(uuid())
+  companyId          String
+  company            Company           @relation("WorkflowDefCompany", fields: [companyId], references: [id], onDelete: Cascade)
+  name               String
+  description        String?
+  module             String            // e.g. "INDICATORS", "DOCUMENTS", "AUDITS", etc.
+  category           String            // e.g. "NOTIFICATION", "APPROVAL", "TASK", "INTEGRATION"
+  scopeType          String            @default("COMPANY") // "COMPANY", "BRANCH", "UNIT", "GLOBAL"
+  scopeId            String?
+  status             String            @default("DRAFT") // "DRAFT", "ACTIVE", "INACTIVE", "ARCHIVED"
+  activeVersionId    String?
+  createdById        String?
+  createdBy          User?             @relation("WorkflowDefCreatedBy", fields: [createdById], references: [id])
+  updatedById        String?
+  updatedBy          User?             @relation("WorkflowDefUpdatedBy", fields: [updatedById], references: [id])
+  createdAt          DateTime          @default(now())
+  updatedAt          DateTime          @updatedAt
+  deletedAt          DateTime?
+
+  versions           WorkflowVersion[] @relation("WorkflowDefVersions")
+  instances          WorkflowInstance[] @relation("WorkflowDefInstances")
+
+  @@index([companyId])
+  @@index([status])
+}
+
+model WorkflowVersion {
+  id                    String            @id @default(uuid())
+  companyId             String
+  company               Company           @relation("WorkflowVerCompany", fields: [companyId], references: [id], onDelete: Cascade)
+  workflowDefinitionId  String
+  workflowDefinition    WorkflowDefinition @relation("WorkflowDefVersions", fields: [workflowDefinitionId], references: [id], onDelete: Cascade)
+  versionNumber         Int
+  status                String            @default("DRAFT") // "DRAFT", "PUBLISHED", "ARCHIVED"
+  canvasData            String            // JSON stringified ReactFlow nodes & edges
+  configurationSnapshot String            // JSON stringified variables configuration
+  changeSummary         String?
+  createdById           String?
+  createdBy             User?             @relation("WorkflowVerCreatedBy", fields: [createdById], references: [id])
+  publishedById         String?
+  publishedBy           User?             @relation("WorkflowVerPublishedBy", fields: [publishedById], references: [id])
+  createdAt             DateTime          @default(now())
+  updatedAt             DateTime          @updatedAt
+  publishedAt           DateTime?
+  archivedAt            DateTime?
+
+  nodes                 WorkflowNode[]    @relation("WorkflowVerNodes")
+  edges                 WorkflowEdge[]    @relation("WorkflowVerEdges")
+  instances             WorkflowInstance[] @relation("WorkflowVerInstances")
+
+  @@unique([workflowDefinitionId, versionNumber])
+  @@index([companyId])
+}
+
+model WorkflowNode {
+  id                String          @id @default(uuid())
+  companyId         String
+  company           Company         @relation("WorkflowNodeCompany", fields: [companyId], references: [id], onDelete: Cascade)
+  workflowVersionId String
+  workflowVersion   WorkflowVersion @relation("WorkflowVerNodes", fields: [workflowVersionId], references: [id], onDelete: Cascade)
+  nodeKey           String          // Unique key on the canvas (e.g. "trigger-1", "node-2")
+  nodeType          String          // "TRIGGER", "CONDITION", "ACTION", "LOGIC", "RESPONSIBLE", "HUMAN_TASK", "APPROVAL", "TIMER", "INTEGRATION", "TERMINAL"
+  blockType         String          // e.g. "indicator.out_of_target", "action.create"
+  name              String
+  positionX         Float
+  positionY         Float
+  configuration     String          // JSON stringified config properties
+  inputSchema       String?
+  outputSchema      String?
+  createdAt         DateTime        @default(now())
+  updatedAt         DateTime        @updatedAt
+
+  @@unique([workflowVersionId, nodeKey])
+  @@index([companyId])
+}
+
+model WorkflowEdge {
+  id                String          @id @default(uuid())
+  companyId         String
+  company           Company         @relation("WorkflowEdgeCompany", fields: [companyId], references: [id], onDelete: Cascade)
+  workflowVersionId String
+  workflowVersion   WorkflowVersion @relation("WorkflowVerEdges", fields: [workflowVersionId], references: [id], onDelete: Cascade)
+  sourceNodeKey     String
+  targetNodeKey     String
+  sourceHandle      String?
+  targetHandle      String?
+  conditionLabel    String?
+  metadata          String?         // JSON stringified metadata
+  createdAt         DateTime        @default(now())
+
+  @@index([companyId])
+  @@index([workflowVersionId])
+}
+
+model WorkflowInstance {
+  id                   String                 @id @default(uuid())
+  companyId            String
+  company              Company                @relation("WorkflowInstCompany", fields: [companyId], references: [id], onDelete: Cascade)
+  workflowDefinitionId String
+  workflowDefinition   WorkflowDefinition     @relation("WorkflowDefInstances", fields: [workflowDefinitionId], references: [id], onDelete: Cascade)
+  workflowVersionId    String
+  workflowVersion      WorkflowVersion        @relation("WorkflowVerInstances", fields: [workflowVersionId], references: [id], onDelete: Cascade)
+  sourceEventId        String?
+  sourceEntityType     String?                // e.g. "INDICATOR", "DOCUMENT", "AUDIT"
+  sourceEntityId       String?
+  status               String                 @default("RUNNING") // "RUNNING", "COMPLETED", "FAILED", "CANCELLED"
+  currentState         String                 @default("{}")      // JSON stringified variables snapshot
+  priority             String                 @default("MEDIUM")  // "LOW", "MEDIUM", "HIGH", "CRITICAL"
+  startedAt            DateTime               @default(now())
+  completedAt          DateTime?
+  failedAt             DateTime?
+  cancelledAt          DateTime?
+  createdAt            DateTime               @default(now())
+  updatedAt            DateTime               @updatedAt
+
+  nodeExecutions       WorkflowNodeExecution[] @relation("WorkflowInstNodes")
+  timers               WorkflowTimer[]        @relation("WorkflowInstTimers")
+  approvals            WorkflowApproval[]     @relation("WorkflowInstApprovals")
+  tasks                WorkflowTask[]         @relation("WorkflowInstTasks")
+  logs                 WorkflowExecutionLog[] @relation("WorkflowInstLogs")
+  deadLetters          WorkflowDeadLetter[]   @relation("WorkflowInstDeadLetters")
+
+  @@index([companyId])
+  @@index([status])
+  @@index([sourceEntityType, sourceEntityId])
+}
+
+model WorkflowNodeExecution {
+  id                 String           @id @default(uuid())
+  companyId          String
+  company            Company          @relation("WorkflowNodeExecCompany", fields: [companyId], references: [id], onDelete: Cascade)
+  workflowInstanceId String
+  workflowInstance   WorkflowInstance @relation("WorkflowInstNodes", fields: [workflowInstanceId], references: [id], onDelete: Cascade)
+  nodeKey            String
+  nodeType           String
+  status             String           @default("PENDING") // "PENDING", "RUNNING", "COMPLETED", "FAILED", "SKIPPED"
+  attemptNumber      Int              @default(1)
+  inputData          String?          // JSON string
+  outputData         String?          // JSON string
+  errorMessage       String?
+  startedAt          DateTime         @default(now())
+  completedAt        DateTime?
+  nextRetryAt        DateTime?
+  createdAt          DateTime         @default(now())
+
+  logs               WorkflowExecutionLog[] @relation("WorkflowNodeExecLogs")
+
+  @@index([companyId])
+  @@index([workflowInstanceId, nodeKey])
+  @@index([status])
+}
+
+model WorkflowEvent {
+  id             String    @id @default(uuid())
+  companyId      String
+  company        Company   @relation("WorkflowEventCompany", fields: [companyId], references: [id], onDelete: Cascade)
+  eventType      String    // e.g. "indicator.out_of_target"
+  entityType     String
+  entityId       String
+  eventPayload   String    // JSON stringified payload
+  idempotencyKey String    @unique
+  status         String    @default("PENDING") // "PENDING", "PROCESSED", "FAILED"
+  occurredAt     DateTime  @default(now())
+  processedAt    DateTime?
+  attemptCount   Int       @default(0)
+  nextRetryAt    DateTime?
+  errorMessage   String?
+  createdAt      DateTime  @default(now())
+
+  @@index([companyId])
+  @@index([status])
+}
+
+model WorkflowTimer {
+  id                 String           @id @default(uuid())
+  companyId          String
+  company            Company          @relation("WorkflowTimerCompany", fields: [companyId], references: [id], onDelete: Cascade)
+  workflowInstanceId String
+  workflowInstance   WorkflowInstance @relation("WorkflowInstTimers", fields: [workflowInstanceId], references: [id], onDelete: Cascade)
+  nodeKey            String
+  timerType          String           // "DELAY", "DURATION", "DATE"
+  scheduledAt        DateTime
+  executedAt         DateTime?
+  status             String           @default("SCHEDULED") // "SCHEDULED", "EXECUTED", "CANCELLED"
+  payload            String?          // JSON stringified variables snapshot
+  createdAt          DateTime         @default(now())
+
+  @@index([companyId])
+  @@index([status, scheduledAt])
+  @@index([workflowInstanceId])
+}
+
+model WorkflowApproval {
+  id                 String           @id @default(uuid())
+  companyId          String
+  company            Company          @relation("WorkflowApprovCompany", fields: [companyId], references: [id], onDelete: Cascade)
+  workflowInstanceId String
+  workflowInstance   WorkflowInstance @relation("WorkflowInstApprovals", fields: [workflowInstanceId], references: [id], onDelete: Cascade)
+  nodeKey            String
+  approvalType       String           // "SIMPLE", "SEQUENTIAL", "PARALLEL", "MAJORITY", "UNANIMOUS"
+  requesterId        String?
+  requester          User?            @relation("WorkflowApprovRequester", fields: [requesterId], references: [id])
+  approverId         String?
+  approver           User?            @relation("WorkflowApprovApprover", fields: [approverId], references: [id])
+  approverGroupId    String?          // Or sector/role grouping
+  status             String           @default("PENDING") // "PENDING", "APPROVED", "REJECTED", "CHANGES_REQUESTED", "DELEGATED", "CANCELLED"
+  decision           String?          // "APPROVED", "REJECTED", "CHANGES"
+  comments           String?
+  dueAt              DateTime?
+  respondedAt        DateTime?
+  createdAt          DateTime         @default(now())
+
+  @@index([companyId])
+  @@index([status])
+  @@index([workflowInstanceId])
+  @@index([approverId])
+}
+
+model WorkflowTask {
+  id                    String           @id @default(uuid())
+  companyId             String
+  company               Company          @relation("WorkflowTaskCompany", fields: [companyId], references: [id], onDelete: Cascade)
+  workflowInstanceId    String
+  workflowInstance      WorkflowInstance @relation("WorkflowInstTasks", fields: [workflowInstanceId], references: [id], onDelete: Cascade)
+  nodeKey               String
+  title                 String
+  description           String?
+  type                  String           @default("OPERATIONAL")
+  priority              String           @default("MEDIUM")
+  criticity             String           @default("MEDIUM")
+  responsibleId         String?
+  responsible           User?            @relation("WorkflowTaskResponsible", fields: [responsibleId], references: [id])
+  responsibleSubstituteId String?
+  responsibleSubstitute User?            @relation("WorkflowTaskSubstitute", fields: [responsibleSubstituteId], references: [id])
+  status                String           @default("PENDING") // "PENDING", "IN_PROGRESS", "DONE", "CANCELLED", "OVERDUE"
+  dueAt                 DateTime?
+  completedAt           DateTime?
+  requiredEvidence      Boolean          @default(false)
+  escalationLevel       Int              @default(0)
+  originType            String?
+  originId              String?
+  createdAt             DateTime         @default(now())
+  updatedAt             DateTime         @updatedAt
+
+  @@index([companyId])
+  @@index([status])
+  @@index([workflowInstanceId])
+  @@index([responsibleId])
+}
+
+model WorkflowTemplate {
+  id          String   @id @default(uuid())
+  companyId   String?  // null if global template
+  company     Company? @relation("WorkflowTempCompany", fields: [companyId], references: [id], onDelete: Cascade)
+  name        String
+  description String?
+  module      String
+  category    String
+  templateData String   // JSON string of nodes & edges
+  isGlobal    Boolean  @default(false)
+  status      String   @default("ACTIVE")
+  createdById String?
+  createdBy   User?    @relation("WorkflowTempCreatedBy", fields: [createdById], references: [id])
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([companyId])
+  @@index([status])
+}
+
+model WorkflowExecutionLog {
+  id                 String                 @id @default(uuid())
+  companyId          String
+  company            Company                @relation("WorkflowLogCompany", fields: [companyId], references: [id], onDelete: Cascade)
+  workflowInstanceId String
+  workflowInstance   WorkflowInstance       @relation("WorkflowInstLogs", fields: [workflowInstanceId], references: [id], onDelete: Cascade)
+  nodeExecutionId    String?
+  nodeExecution      WorkflowNodeExecution? @relation("WorkflowNodeExecLogs", fields: [nodeExecutionId], references: [id])
+  level              String                 @default("INFO") // "INFO", "WARNING", "ERROR"
+  eventType          String
+  message            String
+  details            String?
+  createdAt          DateTime               @default(now())
+
+  @@index([companyId])
+  @@index([workflowInstanceId])
+}
+
+model WorkflowDeadLetter {
+  id                 String           @id @default(uuid())
+  companyId          String
+  company            Company          @relation("WorkflowDLCompany", fields: [companyId], references: [id], onDelete: Cascade)
+  workflowInstanceId String
+  workflowInstance   WorkflowInstance       @relation("WorkflowInstDeadLetters", fields: [workflowInstanceId], references: [id], onDelete: Cascade)
+  nodeExecutionId    String?
+  errorType          String
+  errorMessage       String
+  payload            String           // JSON stringified execution state
+  attempts           Int              @default(0)
+  status             String           @default("UNRESOLVED") // "UNRESOLVED", "RESOLVED", "IGNORED"
+  resolvedById       String?
+  resolvedBy         User?            @relation("WorkflowDLResolvedBy", fields: [resolvedById], references: [id])
+  resolvedAt         DateTime?
+  createdAt          DateTime         @default(now())
+
+  @@index([companyId])
+  @@index([status])
+}
+
+model WorkflowIntegration {
+  id                     String    @id @default(uuid())
+  companyId              String
+  company                Company   @relation("WorkflowIntegCompany", fields: [companyId], references: [id], onDelete: Cascade)
+  name                   String
+  integrationType        String    // "EMAIL", "WEBHOOK", "TEAMS", "SLACK", etc.
+  configurationReference String    // JSON stringified config (credentials, urls, encrypted secrets)
+  status                 String    @default("ACTIVE")
+  createdById            String?
+  createdAt              DateTime  @default(now())
+  updatedAt              DateTime  @updatedAt
+
+  @@index([companyId])
 }

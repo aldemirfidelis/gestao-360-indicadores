@@ -44,6 +44,7 @@ import {
   Maximize2,
   Minimize2,
   Monitor,
+  Network,
   Move,
   Pencil,
   Plus,
@@ -77,6 +78,7 @@ import {
 import { api, ApiError } from '@/lib/api';
 import { cn, formatDate, formatNumber, formatPercent, periodRefLabel } from '@/lib/utils';
 import { ACTION_PRIORITY_LABEL, ACTION_STATUS_LABEL } from '@/lib/labels';
+import { useVision360 } from '@/components/ui/vision360-context';
 
 interface Perspective {
   id: string;
@@ -726,6 +728,7 @@ export default function StrategyMapPage() {
 
 function StrategyMapPageInner() {
   const { id } = useParams<{ id: string }>();
+  const { open: openVision360 } = useVision360();
   const qc = useQueryClient();
   const reactFlow = useReactFlow();
   const { user } = useAuth();
@@ -1657,6 +1660,9 @@ function StrategyMapPageInner() {
                         <span className="truncate">{indicator.code ? `${indicator.code} - ` : ''}{indicator.name}</span>
                         <div className="flex items-center gap-1">
                           <StatusBadge value={indicator.results?.[0]?.light ?? 'GRAY'} label={LIGHT_LABEL[indicator.results?.[0]?.light ?? 'GRAY'] ?? (indicator.results?.[0]?.light ?? 'GRAY')} />
+                          <Button variant="ghost" size="sm" onClick={() => openVision360('INDICATOR', indicator.id)} title="Visão 360°">
+                            <Network className="h-3.5 w-3.5 text-primary" />
+                          </Button>
                           <Button variant="ghost" size="sm" asChild>
                             <Link href={`/indicators/${indicator.id}`}>
                               <Maximize2 className="h-3.5 w-3.5" />

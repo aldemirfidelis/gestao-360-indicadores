@@ -47,6 +47,8 @@ import { HelpModule } from './modules/help/help.module';
 import { IntegrationsModule } from './modules/integrations/integrations.module';
 import { ExternalApiModule } from './modules/external-api/external-api.module';
 import { PlatformAdminGlobalModule } from './modules/platform-admin/platform-admin.module';
+import { Vision360Module } from './modules/vision360/vision360.module';
+import { AutomationsModule } from './modules/automations/automations.module';
 
 @Module({
   imports: [
@@ -95,6 +97,8 @@ import { PlatformAdminGlobalModule } from './modules/platform-admin/platform-adm
     PlatformModule,
     PlatformAdminGlobalModule,
     AccessModule,
+    Vision360Module,
+    AutomationsModule,
   ],
   providers: [
     { provide: APP_GUARD, useClass: ThrottlerGuard },

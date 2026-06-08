@@ -12,6 +12,8 @@ import { PortalAnnouncements } from '@/components/portal-admin/portal-announceme
 import { RealtimeProvider } from '@/components/communication/realtime-provider';
 import { CommunicationProvider } from '@/components/communication/communication-provider';
 import { findRoutePermissions } from '@/components/shell/navigation';
+import { Vision360Provider } from '@/components/ui/vision360-context';
+import { Vision360Sidebar } from '@/components/ui/vision360-sidebar';
 
 export default function AppLayout({ children }: { children: ReactNode }) {
   const { user, loading } = useAuth();
@@ -28,23 +30,26 @@ export default function AppLayout({ children }: { children: ReactNode }) {
   return (
     <RealtimeProvider>
       <CommunicationProvider>
-      <div className="enterprise-shell flex h-screen overflow-hidden">
-        <Sidebar />
-        <div className="flex flex-1 flex-col min-w-0">
-          <Topbar />
-          <PortalAnnouncements />
-          <main className="flex-1 overflow-y-auto px-4 py-4 pb-24 sm:px-5 lg:px-6 lg:py-5">
-            <PortalRouteGate>
-              {routePerms ? (
-                <RoutePermissionGate permissions={routePerms}>{children}</RoutePermissionGate>
-              ) : (
-                children
-              )}
-            </PortalRouteGate>
-          </main>
-        </div>
-        <MobileNav />
-      </div>
+        <Vision360Provider>
+          <div className="enterprise-shell flex h-screen overflow-hidden">
+            <Sidebar />
+            <div className="flex flex-1 flex-col min-w-0">
+              <Topbar />
+              <PortalAnnouncements />
+              <main className="flex-1 overflow-y-auto px-4 py-4 pb-24 sm:px-5 lg:px-6 lg:py-5">
+                <PortalRouteGate>
+                  {routePerms ? (
+                    <RoutePermissionGate permissions={routePerms}>{children}</RoutePermissionGate>
+                  ) : (
+                    children
+                  )}
+                </PortalRouteGate>
+              </main>
+            </div>
+            <MobileNav />
+            <Vision360Sidebar />
+          </div>
+        </Vision360Provider>
       </CommunicationProvider>
     </RealtimeProvider>
   );

@@ -48,6 +48,8 @@ import { PageHeader } from '@/components/shell/page-header';
 import { MetricCard } from '@/components/platform/metric-card';
 import { EmptyState } from '@/components/platform/empty-state';
 import { LoadingState } from '@/components/platform/loading-state';
+import { useVision360 } from '@/components/ui/vision360-context';
+import { ImpactConfirmationModal } from '@/components/ui/impact-confirmation-modal';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
@@ -287,6 +289,78 @@ export default function IndicatorsPage() {
   const [resultEditing, setResultEditing] = useState<IndicatorRow | null>(null);
   const [historyIndicator, setHistoryIndicator] = useState<IndicatorRow | null>(null);
   const [filtersOpen, setFiltersOpen] = useState(false);
+  const [impactModalConfig, setImpactModalConfig] = useState<{
+    isOpen: boolean;
+    entityType: string;
+    entityId: string;
+    operationType: 'UPDATE' | 'DELETE' | 'INACTIVE';
+    changeSummary: string;
+    onConfirm: (payload: { justification: string; affectedItems: any[] }) => void;
+  } | null>(null);
+
+  const handleSaveSubmit = () => {
+    if (!form.id) {
+      saveIndicator.mutate();
+      return;
+    }
+    setImpactModalConfig({
+      isOpen: true,
+      entityType: 'INDICATOR',
+      entityId: form.id,
+      operationType: 'UPDATE',
+      changeSummary: `Edição cadastral do indicador "${form.name}" (Código: ${form.code || 'sem código'})`,
+      onConfirm: async (payload) => {
+        try {
+          await api('/vision360/impact-analysis', {
+            method: 'POST',
+            json: {
+              sourceEntityType: 'INDICATOR',
+              sourceEntityId: form.id,
+              operationType: 'UPDATE',
+              changeSummary: `Edição cadastral do indicador "${form.name}"`,
+              justification: payload.justification,
+              impactLevel: payload.affectedItems.some(i => i.impactLevel === 'CRITICAL' || i.impactLevel === 'HIGH') ? 'HIGH' : 'MEDIUM',
+              affectedItems: payload.affectedItems,
+            }
+          });
+          saveIndicator.mutate();
+          setImpactModalConfig(null);
+        } catch (err: any) {
+          toast.error(err.message || 'Erro ao registrar análise de impacto.');
+        }
+      }
+    });
+  };
+
+  const handleDeleteTrigger = (indicator: IndicatorRow) => {
+    setImpactModalConfig({
+      isOpen: true,
+      entityType: 'INDICATOR',
+      entityId: indicator.id,
+      operationType: 'DELETE',
+      changeSummary: `Exclusão lógica do indicador "${indicator.name}" (Código: ${indicator.code || 'sem código'})`,
+      onConfirm: async (payload) => {
+        try {
+          await api('/vision360/impact-analysis', {
+            method: 'POST',
+            json: {
+              sourceEntityType: 'INDICATOR',
+              sourceEntityId: indicator.id,
+              operationType: 'DELETE',
+              changeSummary: `Exclusão lógica do indicador "${indicator.name}"`,
+              justification: payload.justification,
+              impactLevel: payload.affectedItems.some(i => i.impactLevel === 'CRITICAL' || i.impactLevel === 'HIGH') ? 'HIGH' : 'MEDIUM',
+              affectedItems: payload.affectedItems,
+            }
+          });
+          deleteIndicator.mutate(indicator);
+          setImpactModalConfig(null);
+        } catch (err: any) {
+          toast.error(err.message || 'Erro ao registrar análise de impacto.');
+        }
+      }
+    });
+  };
 
   const options = useQuery<IndicatorOptions>({
     queryKey: ['indicators', 'options'],
@@ -697,16 +771,8 @@ export default function IndicatorsPage() {
             onMicroTarget={(micro) => openTarget(micro)}
             onMicroResult={(micro) => openResult(micro)}
             onMicroHistory={(micro) => setHistoryIndicator(micro)}
-            onMicroDelete={(micro) => {
-              if (window.confirm('Inativar este indicador? A exclusão será lógica e o histórico será preservado.')) {
-                deleteIndicator.mutate(micro);
-              }
-            }}
-            onDelete={() => {
-              if (window.confirm('Inativar este indicador? A exclusão será lógica e o histórico será preservado.')) {
-                deleteIndicator.mutate(indicator);
-              }
-            }}
+            onMicroDelete={(micro) => handleDeleteTrigger(micro)}
+            onDelete={() => handleDeleteTrigger(indicator)}
           />
         ))}
       </div>
@@ -725,7 +791,7 @@ export default function IndicatorsPage() {
         parentIndicatorOptions={rows.filter((row) => row.id !== form.id)}
         options={options.data}
         isSaving={saveIndicator.isPending}
-        onSave={() => saveIndicator.mutate()}
+        onSave={handleSaveSubmit}
       />
 
       <IndicatorViewDialog indicator={viewing} onOpenChange={(open) => !open && setViewing(null)} />
@@ -746,6 +812,18 @@ export default function IndicatorsPage() {
         isLoading={history.isLoading}
         onOpenChange={(open) => !open && setHistoryIndicator(null)}
       />
+
+      {impactModalConfig && (
+        <ImpactConfirmationModal
+          isOpen={impactModalConfig.isOpen}
+          onClose={() => setImpactModalConfig(null)}
+          onConfirm={impactModalConfig.onConfirm}
+          entityType={impactModalConfig.entityType}
+          entityId={impactModalConfig.entityId}
+          operationType={impactModalConfig.operationType}
+          changeSummary={impactModalConfig.changeSummary}
+        />
+      )}
     </div>
   );
 }

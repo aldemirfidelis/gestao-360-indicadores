@@ -24,6 +24,7 @@ import { StatusBadge } from '@/components/platform/status-badge';
 import { api } from '@/lib/api';
 import { formatNumber, formatPercent, periodRefLabel } from '@/lib/utils';
 import { PERIODICITY_LABEL, DIRECTION_LABEL, ACTION_STATUS_LABEL, MEETING_STATUS_LABEL, TRACE_EVENT_LABEL } from '@/lib/labels';
+import { useVision360 } from '@/components/ui/vision360-context';
 
 interface IndicatorDetail {
   id: string;
@@ -103,6 +104,7 @@ export default function IndicatorDetailPage() {
   const params = useParams<{ id: string }>();
   const id = params.id;
   const [auditOpen, setAuditOpen] = useState(false);
+  const { open: openVision360 } = useVision360();
 
   const detail = useQuery<IndicatorDetail>({
     queryKey: ['indicator', id],
@@ -161,12 +163,17 @@ export default function IndicatorDetailPage() {
         title={ind.name}
         description={ind.description ?? `${ind.ownerNode?.name ?? '-'} - ${ind.code ?? '-'}`}
         actions={
-          last?.light === 'RED' && (
-            <Button variant="destructive" onClick={() => openDeviation.mutate()} disabled={openDeviation.isPending || !last?.id}>
-              <AlertTriangle className="mr-2 h-4 w-4" />
-              {openDeviation.isPending ? 'Abrindo...' : 'Abrir análise de causa'}
+          <div className="flex items-center gap-2">
+            <Button variant="outline" className="gap-1.5" onClick={() => openVision360('INDICATOR', ind.id)}>
+              <Network className="h-4 w-4 text-primary" /> Visão 360°
             </Button>
-          )
+            {last?.light === 'RED' && (
+              <Button variant="destructive" onClick={() => openDeviation.mutate()} disabled={openDeviation.isPending || !last?.id}>
+                <AlertTriangle className="mr-2 h-4 w-4" />
+                {openDeviation.isPending ? 'Abrindo...' : 'Abrir análise de causa'}
+              </Button>
+            )}
+          </div>
         }
       />
 

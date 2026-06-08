@@ -47,6 +47,7 @@ import {
 import { api } from '@/lib/api';
 import { cn, formatNumber } from '@/lib/utils';
 import { useAuth } from '@/components/auth/auth-provider';
+import { useVision360 } from '@/components/ui/vision360-context';
 
 interface TreeNode {
   id: string;
@@ -368,6 +369,7 @@ function OrgNode({
   onRemove: (id: string) => void;
 }) {
   const [open, setOpen] = useState(level < 2);
+  const { open: openVision360 } = useVision360();
   const Icon = node.icon && ICONS[node.icon] ? ICONS[node.icon] : Building2;
 
   return (
@@ -403,6 +405,14 @@ function OrgNode({
         </button>
         <div className="flex items-center gap-2">
           <Badge variant="secondary" className="hidden sm:inline-flex">{node.indicatorsCount} ind.</Badge>
+          <button
+            onClick={() => openVision360('ORG_NODE', node.id)}
+            className="rounded-md border bg-card px-2 py-1 text-xs text-primary hover:bg-primary/5 inline-flex items-center gap-1 shadow-sm transition"
+            title="Visão 360°"
+          >
+            <Network className="h-3 w-3 text-primary" />
+            <span className="hidden sm:inline">360°</span>
+          </button>
           <StatusBadge value={node.active ? 'ACTIVE' : 'CANCELLED'} label={node.active ? 'Ativo' : 'Inativo'} className="hidden md:inline-flex" />
           <button
             onClick={() => onEdit(node)}

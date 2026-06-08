@@ -18,6 +18,7 @@ import {
   History,
   Layers,
   MessageSquare,
+  Network,
   Plus,
   RotateCcw,
   Save,
@@ -43,6 +44,8 @@ import { Textarea } from '@/components/ui/textarea';
 import { useAuth } from '@/components/auth/auth-provider';
 import { api, getAccessToken } from '@/lib/api';
 import { cn, formatDate, formatNumber } from '@/lib/utils';
+import { useVision360 } from '@/components/ui/vision360-context';
+import { ImpactConfirmationModal } from '@/components/ui/impact-confirmation-modal';
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:3333/api';
 
@@ -330,6 +333,78 @@ export default function DocumentsPage() {
   const [templateForm, setTemplateForm] = useState({ name: '', typeConfigId: '', content: '' });
   const [draftContent, setDraftContent] = useState('');
   const [editorSession, setEditorSession] = useState<EditorSession | null>(null);
+  const [impactModalConfig, setImpactModalConfig] = useState<{
+    isOpen: boolean;
+    entityType: string;
+    entityId: string;
+    operationType: 'UPDATE' | 'DELETE' | 'INACTIVE';
+    changeSummary: string;
+    onConfirm: (payload: { justification: string; affectedItems: any[] }) => void;
+  } | null>(null);
+
+  const handleSaveSubmit = () => {
+    if (!editing) {
+      save.mutate();
+      return;
+    }
+    setImpactModalConfig({
+      isOpen: true,
+      entityType: 'DOCUMENT',
+      entityId: editing.id,
+      operationType: 'UPDATE',
+      changeSummary: `Edição cadastral do documento "${form.title}" (Código: ${form.code || 'sem código'})`,
+      onConfirm: async (payload) => {
+        try {
+          await api('/vision360/impact-analysis', {
+            method: 'POST',
+            json: {
+              sourceEntityType: 'DOCUMENT',
+              sourceEntityId: editing.id,
+              operationType: 'UPDATE',
+              changeSummary: `Edição cadastral do documento "${form.title}"`,
+              justification: payload.justification,
+              impactLevel: payload.affectedItems.some(i => i.impactLevel === 'CRITICAL' || i.impactLevel === 'HIGH') ? 'HIGH' : 'MEDIUM',
+              affectedItems: payload.affectedItems,
+            }
+          });
+          save.mutate();
+          setImpactModalConfig(null);
+        } catch (err: any) {
+          toast.error(err.message || 'Erro ao registrar análise de impacto.');
+        }
+      }
+    });
+  };
+
+  const handleRemoveTrigger = (id: string, title: string) => {
+    setImpactModalConfig({
+      isOpen: true,
+      entityType: 'DOCUMENT',
+      entityId: id,
+      operationType: 'DELETE',
+      changeSummary: `Exclusão do documento "${title}"`,
+      onConfirm: async (payload) => {
+        try {
+          await api('/vision360/impact-analysis', {
+            method: 'POST',
+            json: {
+              sourceEntityType: 'DOCUMENT',
+              sourceEntityId: id,
+              operationType: 'DELETE',
+              changeSummary: `Exclusão do documento "${title}"`,
+              justification: payload.justification,
+              impactLevel: payload.affectedItems.some(i => i.impactLevel === 'CRITICAL' || i.impactLevel === 'HIGH') ? 'HIGH' : 'MEDIUM',
+              affectedItems: payload.affectedItems,
+            }
+          });
+          remove.mutate(id);
+          setImpactModalConfig(null);
+        } catch (err: any) {
+          toast.error(err.message || 'Erro ao registrar análise de impacto.');
+        }
+      }
+    });
+  };
 
   const listQuery = useQuery<Doc[]>({
     queryKey: ['documents', filters],
@@ -590,7 +665,7 @@ export default function DocumentsPage() {
               </Card>
             )}
             {items.map((doc) => (
-              <DocumentCard key={doc.id} doc={doc} canUpdate={canUpdate} canDelete={canDelete} onView={() => setDetailId(doc.id)} onEdit={() => openEdit(doc)} onRemove={() => remove.mutate(doc.id)} removing={remove.isPending} />
+              <DocumentCard key={doc.id} doc={doc} canUpdate={canUpdate} canDelete={canDelete} onView={() => setDetailId(doc.id)} onEdit={() => openEdit(doc)} onRemove={() => handleRemoveTrigger(doc.id, doc.title)} removing={remove.isPending} />
             ))}
           </div>
         </TabsContent>
@@ -774,7 +849,7 @@ export default function DocumentsPage() {
 
           <DialogFooter>
             <Button variant="outline" onClick={closeDialog}>Cancelar</Button>
-            <Button onClick={() => save.mutate()} disabled={save.isPending || !form.title.trim()}>
+            <Button onClick={handleSaveSubmit} disabled={save.isPending || !form.title.trim()}>
               {save.isPending ? 'Salvando...' : 'Salvar documento'}
             </Button>
           </DialogFooter>
@@ -922,6 +997,18 @@ export default function DocumentsPage() {
       </Dialog>
 
       <CollaboraEditorDialog session={editorSession} onClose={() => { setEditorSession(null); invalidate(qc); }} />
+
+      {impactModalConfig && (
+        <ImpactConfirmationModal
+          isOpen={impactModalConfig.isOpen}
+          onClose={() => setImpactModalConfig(null)}
+          onConfirm={impactModalConfig.onConfirm}
+          entityType={impactModalConfig.entityType}
+          entityId={impactModalConfig.entityId}
+          operationType={impactModalConfig.operationType}
+          changeSummary={impactModalConfig.changeSummary}
+        />
+      )}
     </div>
   );
 }
@@ -963,6 +1050,7 @@ function CollaboraEditorDialog({ session, onClose }: { session: EditorSession | 
 }
 
 function DocumentCard({ doc, canUpdate, canDelete, onView, onEdit, onRemove, removing }: { doc: Doc; canUpdate: boolean; canDelete: boolean; onView: () => void; onEdit: () => void; onRemove: () => void; removing: boolean }) {
+  const { open: openVision360 } = useVision360();
   return (
     <Card className={cn('overflow-hidden', doc.isExpired && 'border-status-red/40', doc.needsReview && !doc.isExpired && 'border-status-yellow/50')}>
       <CardContent className="p-4">
@@ -978,10 +1066,11 @@ function DocumentCard({ doc, canUpdate, canDelete, onView, onEdit, onRemove, rem
             <p className="mt-1 line-clamp-2 text-sm text-muted-foreground">{doc.description || 'Sem descricao registrada.'}</p>
           </div>
           <div className="flex shrink-0 items-center gap-1">
+            <Button variant="ghost" size="icon" onClick={() => openVision360('DOCUMENT', doc.id)} title="Visão 360°"><Network className="h-4 w-4 text-primary" /></Button>
             <Button variant="ghost" size="icon" onClick={onView} title="Abrir documento"><Eye className="h-4 w-4" /></Button>
             {canUpdate && <Button variant="ghost" size="icon" onClick={onEdit} title="Editar metadados"><Edit className="h-4 w-4" /></Button>}
             {canDelete && (
-              <Button variant="ghost" size="icon" onClick={() => window.confirm('Excluir este documento?') && onRemove()} disabled={removing} title="Excluir documento">
+              <Button variant="ghost" size="icon" onClick={onRemove} disabled={removing} title="Excluir documento">
                 <Trash2 className="h-4 w-4" />
               </Button>
             )}

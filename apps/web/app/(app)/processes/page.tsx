@@ -19,6 +19,8 @@ import { Textarea } from '@/components/ui/textarea';
 import { useAuth } from '@/components/auth/auth-provider';
 import { api } from '@/lib/api';
 import { cn, formatNumber } from '@/lib/utils';
+import { useVision360 } from '@/components/ui/vision360-context';
+import { ImpactConfirmationModal } from '@/components/ui/impact-confirmation-modal';
 
 type ProcessType = 'CORE' | 'SUPPORT' | 'MANAGEMENT';
 type ProcessStatus = 'DRAFT' | 'ACTIVE' | 'UNDER_REVIEW' | 'ARCHIVED';
@@ -143,6 +145,7 @@ export default function ProcessesPage() {
   const qc = useQueryClient();
   const searchParams = useSearchParams();
   const { hasPermission } = useAuth();
+  const { open: openVision360 } = useVision360();
   const canCreate = hasPermission(['processes:create']);
   const canUpdate = hasPermission(['processes:update']);
   const canDelete = hasPermission(['processes:delete']);
@@ -154,6 +157,78 @@ export default function ProcessesPage() {
   const [stepProcessId, setStepProcessId] = useState<string | null>(null);
   const [form, setForm] = useState<ProcessForm>(EMPTY_FORM);
   const [stepForm, setStepForm] = useState<StepForm>(EMPTY_STEP);
+  const [impactModalConfig, setImpactModalConfig] = useState<{
+    isOpen: boolean;
+    entityType: string;
+    entityId: string;
+    operationType: 'UPDATE' | 'DELETE' | 'INACTIVE';
+    changeSummary: string;
+    onConfirm: (payload: { justification: string; affectedItems: any[] }) => void;
+  } | null>(null);
+
+  const handleSaveSubmit = () => {
+    if (!editing) {
+      saveProcess.mutate();
+      return;
+    }
+    setImpactModalConfig({
+      isOpen: true,
+      entityType: 'PROCESS',
+      entityId: editing.id,
+      operationType: 'UPDATE',
+      changeSummary: `Edição cadastral do processo "${form.name}" (Código: ${form.code || 'sem código'})`,
+      onConfirm: async (payload) => {
+        try {
+          await api('/vision360/impact-analysis', {
+            method: 'POST',
+            json: {
+              sourceEntityType: 'PROCESS',
+              sourceEntityId: editing.id,
+              operationType: 'UPDATE',
+              changeSummary: `Edição cadastral do processo "${form.name}"`,
+              justification: payload.justification,
+              impactLevel: payload.affectedItems.some(i => i.impactLevel === 'CRITICAL' || i.impactLevel === 'HIGH') ? 'HIGH' : 'MEDIUM',
+              affectedItems: payload.affectedItems,
+            }
+          });
+          saveProcess.mutate();
+          setImpactModalConfig(null);
+        } catch (err: any) {
+          toast.error(err.message || 'Erro ao registrar análise de impacto.');
+        }
+      }
+    });
+  };
+
+  const handleDeleteTrigger = (id: string, name: string) => {
+    setImpactModalConfig({
+      isOpen: true,
+      entityType: 'PROCESS',
+      entityId: id,
+      operationType: 'DELETE',
+      changeSummary: `Exclusão do processo "${name}"`,
+      onConfirm: async (payload) => {
+        try {
+          await api('/vision360/impact-analysis', {
+            method: 'POST',
+            json: {
+              sourceEntityType: 'PROCESS',
+              sourceEntityId: id,
+              operationType: 'DELETE',
+              changeSummary: `Exclusão do processo "${name}"`,
+              justification: payload.justification,
+              impactLevel: payload.affectedItems.some(i => i.impactLevel === 'CRITICAL' || i.impactLevel === 'HIGH') ? 'HIGH' : 'MEDIUM',
+              affectedItems: payload.affectedItems,
+            }
+          });
+          deleteProcess.mutate(id);
+          setImpactModalConfig(null);
+        } catch (err: any) {
+          toast.error(err.message || 'Erro ao registrar análise de impacto.');
+        }
+      }
+    });
+  };
 
   const listQuery = useQuery<ProcessItem[]>({ queryKey: ['processes', filters], queryFn: () => api<ProcessItem[]>(`/processes${toQueryString(filters)}`) });
   const summaryQuery = useQuery<ProcessSummary>({ queryKey: ['processes', 'summary'], queryFn: () => api<ProcessSummary>('/processes/summary') });
@@ -343,9 +418,12 @@ export default function ProcessesPage() {
                     </p>
                   </button>
                   <div className="flex flex-wrap gap-2">
+                    <Button size="sm" variant="outline" onClick={() => openVision360('PROCESS', item.id)} className="gap-1.5">
+                      <Network className="h-4 w-4 text-primary" /> 360°
+                    </Button>
                     {canUpdate ? <Button size="sm" variant="outline" onClick={() => openStep(item.id)}><Plus className="mr-2 h-4 w-4" /> Etapa</Button> : null}
                     {canUpdate ? <Button size="sm" variant="outline" onClick={() => openEdit(item)}><Edit className="mr-2 h-4 w-4" /> Editar</Button> : null}
-                    {canDelete ? <Button size="sm" variant="outline" className="text-status-red" onClick={() => deleteProcess.mutate(item.id)}><Trash2 className="mr-2 h-4 w-4" /> Excluir</Button> : null}
+                    {canDelete ? <Button size="sm" variant="outline" className="text-status-red" onClick={() => handleDeleteTrigger(item.id, item.name)}><Trash2 className="mr-2 h-4 w-4" /> Excluir</Button> : null}
                   </div>
                 </div>
 
@@ -440,7 +518,7 @@ export default function ProcessesPage() {
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setProcessOpen(false)}>Cancelar</Button>
-            <Button onClick={() => saveProcess.mutate()} disabled={!form.name.trim() || saveProcess.isPending}>Salvar</Button>
+            <Button onClick={handleSaveSubmit} disabled={!form.name.trim() || saveProcess.isPending}>Salvar</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
@@ -462,6 +540,18 @@ export default function ProcessesPage() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {impactModalConfig && (
+        <ImpactConfirmationModal
+          isOpen={impactModalConfig.isOpen}
+          onClose={() => setImpactModalConfig(null)}
+          onConfirm={impactModalConfig.onConfirm}
+          entityType={impactModalConfig.entityType}
+          entityId={impactModalConfig.entityId}
+          operationType={impactModalConfig.operationType}
+          changeSummary={impactModalConfig.changeSummary}
+        />
+      )}
     </div>
   );
 }

@@ -229,6 +229,20 @@ export const PERMISSION_CATALOG = [
   ['integrations:manage', 'Gerenciar integracoes do sistema', 'Integracoes', 'manage'],
   ['help:view', 'Acessar Central de Ajuda', 'Ajuda', 'view'],
   ['help:manage', 'Administrar artigos da Central de Ajuda', 'Ajuda', 'manage'],
+
+  // Visão 360°
+  ['vision360:view', 'Visualizar a Visão 360° do registro', 'Visão 360°', 'view'],
+  ['vision360:manage', 'Criar, editar e remover vínculos na Visão 360°', 'Visão 360°', 'manage'],
+  ['vision360:impact', 'Simular e validar análise de impacto', 'Visão 360°', 'manage'],
+
+  // Central de Automações e Workflows
+  ['automations:view', 'Acessar Central de Automações e ver fluxos', 'Automações', 'view'],
+  ['automations:manage', 'Criar, editar, validar e simular fluxos', 'Automações', 'manage'],
+  ['automations:publish', 'Publicar e gerenciar versões de fluxos', 'Automações', 'publish'],
+  ['automations:execute', 'Disparar, cancelar, retomar e reprocessar execuções', 'Automações', 'manage'],
+  ['automations:approve', 'Decidir sobre etapas de aprovação humana', 'Automações', 'approve'],
+  ['automations:integrations', 'Configurar integrações e ver credenciais mascaradas', 'Automações', 'manage'],
+  ['automations:admin', 'Administrar biblioteca de blocos e modelos globais', 'Automações', 'manage'],
 ] as const;
 
 const ALL_KEYS = PERMISSION_CATALOG.map(([key]) => key);
@@ -358,6 +372,12 @@ export const DEFAULT_PROFILES = [
       'directory:view',
       'integrations:view',
       'help:view',
+      'vision360:view',
+      'vision360:manage',
+      'vision360:impact',
+      'automations:view',
+      'automations:execute',
+      'automations:approve',
     ],
   },
   {
@@ -409,6 +429,9 @@ export const DEFAULT_PROFILES = [
       'directory:view',
       'integrations:view',
       'help:view',
+      'vision360:view',
+      'automations:view',
+      'automations:approve',
     ],
   },
   {
@@ -445,6 +468,8 @@ export const DEFAULT_PROFILES = [
       'directory:view',
       'integrations:view',
       'help:view',
+      'vision360:view',
+      'automations:view',
     ],
   },
 ] as const;

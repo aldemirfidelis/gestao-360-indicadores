@@ -59,6 +59,7 @@ export const navSections: NavSection[] = [
       { href: '/indicators', label: 'Indicadores', description: 'Farol, ranking e histórico', icon: Target, permissions: ['indicators:view'], exact: true },
       { href: '/projects', label: 'Cronogramas', description: 'Projetos, marcos e tarefas', icon: GanttChartSquare, permissions: ['projects:view'] },
       { href: '/insights', label: 'Insights', description: 'Alertas, tendências e insights', icon: Sparkles, permissions: ['insights:view'] },
+      { href: '/central-impactos', label: 'Central de Impactos', description: 'Análise 360° e simulações de impacto', icon: AlertTriangle, permissions: ['vision360:view'] },
     ],
   },
   {
@@ -90,6 +91,7 @@ export const navSections: NavSection[] = [
       { href: '/forms', label: 'Formulários', description: 'Templates, checklists e preenchimentos', icon: FileSpreadsheet, permissions: ['forms:view'] },
       { href: '/meetings', label: 'Reuniões', description: 'Agenda, atas e decisões', icon: CalendarDays, permissions: ['meetings:view'] },
       { href: '/okrs', label: 'OKRs', description: 'Ciclos e resultados-chave', icon: Goal, permissions: ['okrs:view'] },
+      { href: '/central-automacoes', label: 'Central de Automações', description: 'Motor visual de automações e workflows', icon: Sparkles, permissions: ['automations:view'] },
     ],
   },
   {
@@ -124,6 +126,8 @@ export const mobileNavItems: NavItem[] = [
 // Usado pelo RouteGuard para bloquear acesso direto via URL.
 export const ROUTE_PERMISSIONS: Array<{ prefix: string; permissions: string[]; exact?: boolean }> = [
   { prefix: '/dashboard', permissions: ['dashboard:view'] },
+  { prefix: '/central-automacoes', permissions: ['automations:view'] },
+  { prefix: '/central-impactos', permissions: ['vision360:view'] },
   { prefix: '/visualization', permissions: ['visualization:view', 'dashboard:view'] },
   { prefix: '/insights', permissions: ['insights:view'] },
   { prefix: '/indicators/new', permissions: ['indicators:create'] },
