@@ -429,4 +429,69 @@ describe('FoodSafetyService - Fase 1 (programas/processos/etapas)', () => {
     expect(data.rootLotId).toBe('lotB');
     expect(data.items.create.map((x: any) => x.lotId)).toEqual(['lotB', 'lotC', 'lotD']);
   });
+
+  it('supplierScorecard: calcula score e drivers de risco de fornecedor', async () => {
+    const { service } = makeService({
+      suppliers: [
+        {
+          id: 'sup1',
+          code: 'F1',
+          name: 'Fornecedor Critico',
+          status: 'CONDITIONAL',
+          criticality: 'CRITICAL',
+          score: null,
+          documentsStatus: 'pendente',
+          nextReviewAt: new Date('2020-01-01'),
+          materials: [{ status: 'BLOCKED' }],
+          lots: [{ status: 'BLOCKED' }],
+          responsible: null,
+        },
+      ],
+    });
+    const rows = await service.supplierScorecard(me);
+    expect(rows[0].score).toBeLessThan(50);
+    expect(rows[0].riskLevel).toBe('CRITICAL');
+    expect(rows[0].drivers).toContain('Revisao vencida');
+  });
+
+  it('assistantInsights: gera recomendacao quando ha fornecedor critico', async () => {
+    const { service } = makeService({
+      processes: [],
+      hazards: [],
+      requirements: [],
+      suppliers: [
+        {
+          id: 'sup1',
+          name: 'Fornecedor Bloqueado',
+          status: 'BLOCKED',
+          criticality: 'HIGH',
+          score: null,
+          documentsStatus: null,
+          nextReviewAt: null,
+          materials: [],
+          lots: [],
+          responsible: null,
+        },
+      ],
+    });
+    const result = await service.assistantInsights(me);
+    expect(result.insights.some((i) => i.title === 'Fornecedores com score de risco')).toBe(true);
+  });
+
+  it('exportData: exporta fornecedores em CSV', async () => {
+    const { service } = makeService({
+      suppliers: [{ id: 'sup1', code: 'F1', name: 'Fornecedor A', status: 'APPROVED', criticality: 'LOW', score: 92, documentsStatus: 'ok', nextReviewAt: null }],
+    });
+    const result = await service.exportData(me, 'suppliers');
+    expect(result.filename).toContain('fornecedores');
+    expect(result.content).toContain('Fornecedor A');
+    expect(result.rowCount).toBe(1);
+  });
+
+  it('importData: importa fornecedores em lote e reporta criados', async () => {
+    const { service, prisma } = makeService({ program: { id: 'pg1', companyId: 'companyA' } });
+    const result = await service.importData(me, { dataset: 'suppliers', programId: 'pg1', rows: [{ name: 'Novo fornecedor' }] });
+    expect(result.created).toBe(1);
+    expect(prisma.foodSafetySupplier.create).toHaveBeenCalled();
+  });
 });

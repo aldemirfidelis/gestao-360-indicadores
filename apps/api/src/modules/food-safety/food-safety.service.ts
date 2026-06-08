@@ -1780,4 +1780,260 @@ export class FoodSafetyService {
       criticalRecalls: recalls.filter((r) => r.severity === FoodSafetyRecallSeverity.CRITICAL).length,
     };
   }
+
+  // ----------------------------- inteligencia / import-export (Fase 5) -----
+  private clampScore(value: number) {
+    return Math.max(0, Math.min(100, Math.round(value)));
+  }
+
+  private csvValue(value: unknown) {
+    if (value === null || value === undefined) return '';
+    const text = String(value).replace(/\r?\n/g, ' ').replace(/"/g, '""');
+    return `"${text}"`;
+  }
+
+  private toCsv(headers: string[], rows: unknown[][]) {
+    return [headers.map((h) => this.csvValue(h)).join(';'), ...rows.map((row) => row.map((v) => this.csvValue(v)).join(';'))].join('\n');
+  }
+
+  private supplierComputedScore(supplier: {
+    status: FoodSafetySupplierStatus;
+    criticality: FoodSafetySupplierCriticality;
+    score: number | null;
+    documentsStatus: string | null;
+    nextReviewAt: Date | null;
+    materials?: Array<{ status: FoodSafetyMaterialStatus }>;
+    lots?: Array<{ status: FoodSafetyLotStatus }>;
+  }) {
+    if (supplier.score != null) return this.clampScore(supplier.score);
+    const statusBase: Record<FoodSafetySupplierStatus, number> = {
+      [FoodSafetySupplierStatus.APPROVED]: 90,
+      [FoodSafetySupplierStatus.CONDITIONAL]: 70,
+      [FoodSafetySupplierStatus.PROSPECT]: 55,
+      [FoodSafetySupplierStatus.INACTIVE]: 35,
+      [FoodSafetySupplierStatus.BLOCKED]: 10,
+    };
+    let score = statusBase[supplier.status] ?? 60;
+    if (supplier.criticality === FoodSafetySupplierCriticality.CRITICAL) score -= 10;
+    if (supplier.criticality === FoodSafetySupplierCriticality.HIGH) score -= 5;
+    const doc = supplier.documentsStatus?.toLowerCase() ?? '';
+    if (doc.includes('venc') || doc.includes('pend') || doc.includes('expired') || doc.includes('reprov')) score -= 15;
+    if (doc.includes('ok') || doc.includes('valid') || doc.includes('regular')) score += 5;
+    const blockedLots = (supplier.lots ?? []).filter((l) => l.status === FoodSafetyLotStatus.BLOCKED || l.status === FoodSafetyLotStatus.RECALLED).length;
+    const blockedMaterials = (supplier.materials ?? []).filter((m) => m.status === FoodSafetyMaterialStatus.BLOCKED).length;
+    score -= Math.min(25, blockedLots * 10);
+    score -= Math.min(20, blockedMaterials * 10);
+    if (supplier.nextReviewAt && supplier.nextReviewAt.getTime() < Date.now()) score -= 15;
+    return this.clampScore(score);
+  }
+
+  async supplierScorecard(me: AuthPayload, programId?: string) {
+    const suppliers = await this.prisma.foodSafetySupplier.findMany({
+      where: { companyId: me.companyId, deletedAt: null, ...(programId ? { programId } : {}) },
+      include: {
+        responsible: { select: { id: true, name: true, email: true } },
+        materials: { where: { deletedAt: null }, select: { id: true, status: true } },
+        lots: { where: { deletedAt: null }, select: { id: true, status: true } },
+      },
+      orderBy: { name: 'asc' },
+    });
+    return suppliers.map((s) => {
+      const computedScore = this.supplierComputedScore(s);
+      const blockedLots = s.lots.filter((l) => l.status === FoodSafetyLotStatus.BLOCKED || l.status === FoodSafetyLotStatus.RECALLED).length;
+      const blockedMaterials = s.materials.filter((m) => m.status === FoodSafetyMaterialStatus.BLOCKED).length;
+      const reviewOverdue = Boolean(s.nextReviewAt && s.nextReviewAt.getTime() < Date.now());
+      const riskLevel = computedScore < 50 || s.status === FoodSafetySupplierStatus.BLOCKED ? 'CRITICAL' : computedScore < 70 ? 'HIGH' : computedScore < 85 ? 'MEDIUM' : 'LOW';
+      const drivers = [
+        s.status !== FoodSafetySupplierStatus.APPROVED ? `Status ${s.status}` : null,
+        s.criticality === FoodSafetySupplierCriticality.CRITICAL ? 'Fornecedor critico' : null,
+        blockedLots > 0 ? `${blockedLots} lote(s) bloqueado(s)/recolhido(s)` : null,
+        blockedMaterials > 0 ? `${blockedMaterials} material(is) bloqueado(s)` : null,
+        reviewOverdue ? 'Revisao vencida' : null,
+        s.documentsStatus ? `Documentos: ${s.documentsStatus}` : null,
+      ].filter(Boolean);
+      return {
+        id: s.id,
+        code: s.code,
+        name: s.name,
+        status: s.status,
+        criticality: s.criticality,
+        score: computedScore,
+        riskLevel,
+        materials: s.materials.length,
+        lots: s.lots.length,
+        blockedLots,
+        blockedMaterials,
+        reviewOverdue,
+        responsible: s.responsible,
+        drivers,
+      };
+    }).sort((a, b) => a.score - b.score || a.name.localeCompare(b.name));
+  }
+
+  async intelligenceDashboard(me: AuthPayload, programId?: string) {
+    const [overview, chain, compliance, scorecard, monitoringRecords, recalls] = await Promise.all([
+      this.summary(me, programId),
+      this.supplyChainSummary(me, programId),
+      this.complianceSummary(me),
+      this.supplierScorecard(me, programId),
+      this.prisma.foodSafetyMonitoringRecord.findMany({
+        where: {
+          companyId: me.companyId,
+          deletedAt: null,
+          ...(programId ? { controlPlan: { hazard: { process: { programId } } } } : {}),
+        },
+        include: {
+          controlPlan: {
+            select: {
+              controlType: true,
+              parameter: true,
+              hazard: { select: { name: true, process: { select: { id: true, name: true, programId: true } } } },
+            },
+          },
+          recordedBy: { select: { id: true, name: true } },
+        },
+        orderBy: { measuredAt: 'desc' },
+        take: 50,
+      }),
+      this.prisma.foodSafetyRecall.findMany({
+        where: { companyId: me.companyId, deletedAt: null, ...(programId ? { programId } : {}), status: { in: [FoodSafetyRecallStatus.ACTIVE, FoodSafetyRecallStatus.SIMULATION] } },
+        select: { id: true, title: true, status: true, severity: true, initiatedAt: true },
+        orderBy: { initiatedAt: 'desc' },
+        take: 10,
+      }),
+    ]);
+    const monitoring = {
+      total: monitoringRecords.length,
+      ok: monitoringRecords.filter((r) => r.result === FoodSafetyMonitoringResult.OK).length,
+      alert: monitoringRecords.filter((r) => r.result === FoodSafetyMonitoringResult.ALERT).length,
+      out: monitoringRecords.filter((r) => r.result === FoodSafetyMonitoringResult.OUT).length,
+      lotBlocked: monitoringRecords.filter((r) => r.lotBlocked).length,
+      recentOut: monitoringRecords.filter((r) => r.result === FoodSafetyMonitoringResult.OUT).slice(0, 5),
+    };
+    const supplierAverageScore = scorecard.length ? Math.round(scorecard.reduce((sum, s) => sum + s.score, 0) / scorecard.length) : 0;
+    const riskScore = this.clampScore(
+      100
+      - (overview.hazardsCritical ?? 0) * 10
+      - (overview.hazardsHigh ?? 0) * 4
+      - monitoring.out * 6
+      - chain.suppliersBlocked * 8
+      - chain.activeRecalls * 12
+      - compliance.notMet * 4
+      - compliance.partial * 2,
+    );
+    return {
+      overview,
+      chain,
+      compliance,
+      monitoring,
+      supplierAverageScore,
+      supplierRiskCount: scorecard.filter((s) => s.riskLevel === 'CRITICAL' || s.riskLevel === 'HIGH').length,
+      riskScore,
+      activeRecalls: recalls,
+      generatedAt: new Date().toISOString(),
+    };
+  }
+
+  async assistantInsights(me: AuthPayload, programId?: string) {
+    const [dashboard, scorecard] = await Promise.all([this.intelligenceDashboard(me, programId), this.supplierScorecard(me, programId)]);
+    const insights: Array<{ severity: 'LOW' | 'MEDIUM' | 'HIGH' | 'CRITICAL'; title: string; description: string; action: string; area: string }> = [];
+    if (dashboard.monitoring.out > 0) {
+      insights.push({
+        severity: 'CRITICAL',
+        title: 'Monitoramentos fora do limite',
+        description: `${dashboard.monitoring.out} registro(s) recente(s) ficaram fora do limite, com ${dashboard.monitoring.lotBlocked} lote(s) sinalizado(s) para bloqueio.`,
+        action: 'Priorizar NCs abertas automaticamente, confirmar contencao e validar eficacia das acoes.',
+        area: 'Monitoramento PPR/PPRO/PCC',
+      });
+    }
+    if ((dashboard.overview.hazardsCritical ?? 0) > 0 || (dashboard.overview.hazardsHigh ?? 0) > 0) {
+      insights.push({
+        severity: (dashboard.overview.hazardsCritical ?? 0) > 0 ? 'CRITICAL' : 'HIGH',
+        title: 'Perigos APPCC em nivel elevado',
+        description: `${dashboard.overview.hazardsCritical ?? 0} perigo(s) critico(s) e ${dashboard.overview.hazardsHigh ?? 0} alto(s) permanecem na matriz.`,
+        action: 'Revisar controles preventivos, limites e classificacao PPR/PPRO/PCC dos processos afetados.',
+        area: 'Perigos / APPCC',
+      });
+    }
+    const riskySuppliers = scorecard.filter((s) => s.riskLevel === 'CRITICAL' || s.riskLevel === 'HIGH').slice(0, 5);
+    if (riskySuppliers.length > 0) {
+      insights.push({
+        severity: riskySuppliers.some((s) => s.riskLevel === 'CRITICAL') ? 'CRITICAL' : 'HIGH',
+        title: 'Fornecedores com score de risco',
+        description: riskySuppliers.map((s) => `${s.name} (${s.score})`).join(', '),
+        action: 'Reavaliar homologacao, documentos, auditorias e bloqueios antes de novos recebimentos.',
+        area: 'Fornecedores',
+      });
+    }
+    if (dashboard.chain.activeRecalls > 0) {
+      insights.push({
+        severity: 'CRITICAL',
+        title: 'Recall ou simulado ativo',
+        description: `${dashboard.chain.activeRecalls} recall(s)/simulacao(oes) aguardam acompanhamento.`,
+        action: 'Conferir lotes impactados, comunicacoes, disposicao e encerramento formal.',
+        area: 'Rastreabilidade e Recall',
+      });
+    }
+    if (dashboard.compliance.compliancePct < 80 && dashboard.compliance.requirements > 0) {
+      insights.push({
+        severity: dashboard.compliance.compliancePct < 60 ? 'HIGH' : 'MEDIUM',
+        title: 'Conformidade normativa abaixo do alvo',
+        description: `Conformidade atual em ${dashboard.compliance.compliancePct}% sobre ${dashboard.compliance.applicable} requisito(s) aplicavel(is).`,
+        action: 'Avaliar requisitos pendentes/nao atendidos e abrir plano de adequacao para responsaveis.',
+        area: 'Compliance',
+      });
+    }
+    if (insights.length === 0) {
+      insights.push({
+        severity: 'LOW',
+        title: 'Sem alertas criticos no momento',
+        description: 'Os sinais recentes nao indicam desvios criticos acumulados.',
+        action: 'Manter rotina de monitoramento, revisoes e simulados programados.',
+        area: 'Visao Geral',
+      });
+    }
+    return { generatedAt: new Date().toISOString(), insights };
+  }
+
+  async exportData(me: AuthPayload, dataset: string, programId?: string) {
+    const normalized = String(dataset || 'suppliers');
+    if (normalized === 'suppliers') {
+      const rows = await this.listSuppliers(me, { programId });
+      const csv = this.toCsv(['codigo', 'nome', 'status', 'criticidade', 'score', 'documentos', 'proxima_revisao'], rows.map((r) => [r.code, r.name, r.status, r.criticality, r.score, r.documentsStatus, r.nextReviewAt?.toISOString?.() ?? r.nextReviewAt]));
+      return { filename: 'food-safety-fornecedores.csv', mimeType: 'text/csv;charset=utf-8', encoding: 'utf8', content: csv, rowCount: rows.length };
+    }
+    if (normalized === 'materials') {
+      const rows = await this.listMaterials(me, { programId });
+      const csv = this.toCsv(['codigo', 'nome', 'categoria', 'status', 'fornecedor', 'alergenicos', 'documentos'], rows.map((r) => [r.code, r.name, r.category, r.status, r.supplier?.name, r.allergens, r.requiredDocuments]));
+      return { filename: 'food-safety-materiais.csv', mimeType: 'text/csv;charset=utf-8', encoding: 'utf8', content: csv, rowCount: rows.length };
+    }
+    if (normalized === 'lots') {
+      const rows = await this.listLots(me, { programId });
+      const csv = this.toCsv(['lote', 'tipo', 'status', 'material', 'fornecedor', 'quantidade', 'unidade', 'validade'], rows.map((r) => [r.code, r.type, r.status, r.material?.name, r.supplier?.name, r.quantity, r.unit, r.expiresAt?.toISOString?.() ?? r.expiresAt]));
+      return { filename: 'food-safety-lotes.csv', mimeType: 'text/csv;charset=utf-8', encoding: 'utf8', content: csv, rowCount: rows.length };
+    }
+    throw new BadRequestException('Dataset de exportacao invalido.');
+  }
+
+  async importData(me: AuthPayload, body: any) {
+    const dataset = String(body?.dataset ?? '');
+    const rows = Array.isArray(body?.rows) ? body.rows : [];
+    if (!rows.length) throw new BadRequestException('Informe linhas para importar.');
+    const programId = await this.validateProgram(me, this.id(body?.programId));
+    let created = 0;
+    const errors: Array<{ row: number; message: string }> = [];
+    for (let i = 0; i < rows.length; i++) {
+      try {
+        const row = { ...rows[i], programId };
+        if (dataset === 'suppliers') await this.createSupplier(me, row);
+        else if (dataset === 'materials') await this.createMaterial(me, row);
+        else if (dataset === 'lots') await this.createLot(me, row);
+        else throw new BadRequestException('Dataset de importacao invalido.');
+        created++;
+      } catch (e: any) {
+        errors.push({ row: i + 1, message: e?.message ?? 'Erro ao importar linha' });
+      }
+    }
+    return { dataset, created, errors, total: rows.length };
+  }
 }

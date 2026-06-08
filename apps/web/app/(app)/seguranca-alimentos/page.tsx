@@ -15,6 +15,7 @@ import ReactFlow, {
 import 'reactflow/dist/style.css';
 import {
   AlertTriangle,
+  Brain,
   CheckSquare,
   ClipboardCheck,
   ClipboardList,
@@ -43,6 +44,7 @@ import { NativeSelect } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
 import { useAuth } from '@/components/auth/auth-provider';
 import { ComplianceTab } from '@/components/food-safety/compliance-tab';
+import { IntelligenceTab } from '@/components/food-safety/intelligence-tab';
 import { SupplyChainTab } from '@/components/food-safety/supply-chain-tab';
 import { api } from '@/lib/api';
 import { cn, formatDate, formatNumber } from '@/lib/utils';
@@ -282,7 +284,7 @@ const RISK_LEVEL_CLASS: Record<RiskLevel, string> = {
 };
 const CONTROL_TYPE_LABEL: Record<ControlType, string> = { NONE: '—', PRP: 'PPR', OPRP: 'PPRO', CCP: 'PCC' };
 
-type TabKey = 'overview' | 'processes' | 'hazards' | 'monitoring' | 'compliance' | 'chain' | 'flow' | 'matrix';
+type TabKey = 'overview' | 'processes' | 'hazards' | 'monitoring' | 'compliance' | 'chain' | 'intelligence' | 'flow' | 'matrix';
 const TABS: Array<{ key: TabKey; label: string; icon: typeof Network }> = [
   { key: 'overview', label: 'Visão Geral', icon: ShieldCheck },
   { key: 'processes', label: 'Processos', icon: ListChecks },
@@ -290,6 +292,7 @@ const TABS: Array<{ key: TabKey; label: string; icon: typeof Network }> = [
   { key: 'monitoring', label: 'Monitoramento', icon: GaugeCircle },
   { key: 'compliance', label: 'Compliance', icon: ClipboardCheck },
   { key: 'chain', label: 'Cadeia e Recall', icon: Truck },
+  { key: 'intelligence', label: 'Inteligencia', icon: Brain },
   { key: 'flow', label: 'Fluxograma', icon: Workflow },
   { key: 'matrix', label: 'Matriz Geral', icon: Layers3 },
 ];
@@ -449,6 +452,7 @@ export default function SegurancaAlimentosPage() {
           )}
           {tab === 'compliance' && <ComplianceTab canManage={canManage} users={options.data?.users ?? []} />}
           {tab === 'chain' && <SupplyChainTab programId={programId} canManage={canManage} users={options.data?.users ?? []} processes={processes.data ?? []} />}
+          {tab === 'intelligence' && <IntelligenceTab programId={programId} canManage={canManage} />}
           {tab === 'flow' && (
             <FlowTab processes={processes.data ?? []} canManage={canManage} onOpen={(p) => setProcessDialog(p)} onChanged={invalidate} />
           )}

@@ -437,4 +437,35 @@ export class FoodSafetyController {
   updateRecallItem(@CurrentUser() me: AuthPayload, @Param('id') id: string, @Body() body: any) {
     return this.service.updateRecallItem(me, id, body);
   }
+
+  // ----- inteligencia executiva, score e import/export -----
+  @Get('intelligence-dashboard')
+  @RequirePermissions('fsms:view')
+  intelligenceDashboard(@CurrentUser() me: AuthPayload, @Query('programId') programId?: string) {
+    return this.service.intelligenceDashboard(me, programId);
+  }
+
+  @Get('supplier-scorecard')
+  @RequirePermissions('fsms:view')
+  supplierScorecard(@CurrentUser() me: AuthPayload, @Query('programId') programId?: string) {
+    return this.service.supplierScorecard(me, programId);
+  }
+
+  @Get('assistant-insights')
+  @RequirePermissions('fsms:view')
+  assistantInsights(@CurrentUser() me: AuthPayload, @Query('programId') programId?: string) {
+    return this.service.assistantInsights(me, programId);
+  }
+
+  @Get('export')
+  @RequirePermissions('fsms:export')
+  exportData(@CurrentUser() me: AuthPayload, @Query('dataset') dataset: string, @Query('programId') programId?: string) {
+    return this.service.exportData(me, dataset, programId);
+  }
+
+  @Post('import')
+  @RequirePermissions('fsms:create')
+  importData(@CurrentUser() me: AuthPayload, @Body() body: any) {
+    return this.service.importData(me, body);
+  }
 }
