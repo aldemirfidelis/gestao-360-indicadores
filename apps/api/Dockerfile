@@ -11,7 +11,7 @@ ARG NODE_VERSION=20.17-alpine
 FROM node:${NODE_VERSION} AS base
 ENV PNPM_HOME="/pnpm" \
     PATH="/pnpm:$PATH" \
-    NODE_OPTIONS="--enable-source-maps"
+    NODE_OPTIONS="--max-old-space-size=1536 --enable-source-maps"
 # openssl: necessario para Prisma + Neon (SSL obrigatorio)
 # libc6-compat: compatibilidade glibc para alguns binarios nativos
 RUN apk add --no-cache libc6-compat openssl ca-certificates \

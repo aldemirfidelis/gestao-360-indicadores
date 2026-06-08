@@ -10,6 +10,7 @@ ARG NODE_VERSION=20.17-alpine
 FROM node:${NODE_VERSION} AS base
 ENV PNPM_HOME="/pnpm" \
     PATH="/pnpm:$PATH" \
+    NODE_OPTIONS="--max-old-space-size=1536" \
     NEXT_TELEMETRY_DISABLED=1
 RUN apk add --no-cache libc6-compat \
     && corepack enable \
