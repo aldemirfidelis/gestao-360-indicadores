@@ -38,12 +38,14 @@ if [ ! -f ".env" ]; then
   exit 1
 fi
 
-# Carrega variaveis do .env (sem expor no log).
-set -a; . ./.env; set +a
+# Le variaveis do .env de forma SEGURA. NAO usamos 'source/. ./.env' porque o
+# .env pode conter valores com espacos (ex.: PLATFORM_ADMIN_BOOTSTRAP_NAME=Platform
+# Owner), que o bash interpretaria como comando e quebraria com 'set -e'.
+read_env() { [ -f .env ] && sed -nE "s/^$1=//p" .env | head -1 | sed -E 's/^"//; s/"$//'; }
 
-NEON_SOURCE_URL="${1:-${NEON_SOURCE_URL:-}}"
-POSTGRES_USER="${POSTGRES_USER:-g360}"
-POSTGRES_DB="${POSTGRES_DB:-g360}"
+NEON_SOURCE_URL="${1:-$(read_env NEON_SOURCE_URL)}"
+POSTGRES_USER="$(read_env POSTGRES_USER)"; POSTGRES_USER="${POSTGRES_USER:-g360}"
+POSTGRES_DB="$(read_env POSTGRES_DB)"; POSTGRES_DB="${POSTGRES_DB:-g360}"
 
 if [ -z "$NEON_SOURCE_URL" ]; then
   echo "Erro: defina NEON_SOURCE_URL no .env (URL DIRECT da Neon, sem -pooler) ou passe como argumento." >&2

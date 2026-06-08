@@ -29,9 +29,16 @@ BACKUP_DIR="${BACKUP_DIR:-./db-backups}"
 KEEP="${KEEP:-14}"
 
 cd "$(dirname "$0")/.."
-[ -f ".env" ] && { set -a; . ./.env; set +a; }
-POSTGRES_USER="${POSTGRES_USER:-g360}"
-POSTGRES_DB="${POSTGRES_DB:-g360}"
+# Le o .env de forma SEGURA (sem 'source', que quebra com valores com espacos,
+# ex.: PLATFORM_ADMIN_BOOTSTRAP_NAME=Platform Owner).
+read_env() { [ -f .env ] && sed -nE "s/^$1=//p" .env | head -1 | sed -E 's/^"//; s/"$//'; }
+POSTGRES_USER="$(read_env POSTGRES_USER)"; POSTGRES_USER="${POSTGRES_USER:-g360}"
+POSTGRES_DB="$(read_env POSTGRES_DB)"; POSTGRES_DB="${POSTGRES_DB:-g360}"
+OFFSITE_BACKUP="$(read_env OFFSITE_BACKUP)"
+S3_ENDPOINT="$(read_env S3_ENDPOINT)"
+S3_BUCKET="$(read_env S3_BUCKET)"
+export AWS_ACCESS_KEY_ID="$(read_env AWS_ACCESS_KEY_ID)"
+export AWS_SECRET_ACCESS_KEY="$(read_env AWS_SECRET_ACCESS_KEY)"
 
 mkdir -p "$BACKUP_DIR"
 STAMP="$(date +%Y%m%d-%H%M%S)"
