@@ -113,8 +113,8 @@ Plataforma cuida de build/deploy/SSL/escala. Veja **[DEPLOY.md](./DEPLOY.md)**.
 - Prisma com `directUrl` (pgbouncer-safe) e `binaryTargets` Alpine
 
 **Credenciais demo:**
-- `demo@demo.com` / `123456` (admin completo)
-- `admin@demo.com` / `123456` (admin alternativo)
+- `demo@demo.com` / `123456` (gestor da Empresa Demonstração)
+- `admin@demo.com` / `123456` (admin da demonstração)
 - `diretoria@demo.com` / `123456` (diretoria)
 - `gestor.prod@demo.com` / `123456` (gestor de Producao) — e assim para cada area
 

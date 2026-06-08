@@ -311,19 +311,19 @@ async function main() {
   // ---------------- Usuarios ----------------
   console.log('[seed] criando usuarios...');
   const hash = await bcrypt.hash('123456', 10);
-  const admin = await prisma.user.create({
+  const demoUser = await prisma.user.create({
     data: {
       companyId: company.id,
       email: 'demo@demo.com',
       passwordHash: hash,
-      name: 'Aldemir Admin',
-      role: UserRoleEnum.SUPER_ADMIN,
-      jobTitle: 'Administrador',
+      name: 'Usuario Demonstracao',
+      role: UserRoleEnum.MANAGER,
+      jobTitle: 'Gestor de Demonstracao',
       defaultNodeId: directorate.id,
     },
   });
 
-  await prisma.user.create({
+  const admin = await prisma.user.create({
     data: {
       companyId: company.id,
       email: 'admin@demo.com',
@@ -866,6 +866,12 @@ async function main() {
     if (profile.code === 'SUPER_ADMIN') {
       await prisma.user.update({
         where: { id: admin.id },
+        data: { accessProfileId: created.id },
+      });
+    }
+    if (profile.code === 'GESTOR') {
+      await prisma.user.update({
+        where: { id: demoUser.id },
         data: { accessProfileId: created.id },
       });
     }
