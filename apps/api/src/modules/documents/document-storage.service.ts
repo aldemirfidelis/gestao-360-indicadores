@@ -79,12 +79,12 @@ export function sha256Buffer(value: Buffer) {
 
 function sanitizeFileName(value: string) {
   const clean = basename(value || 'documento.txt')
-    .replace(/[^\w.\-]+/g, '-')
+    .replace(/[^\w.-]+/g, '-')
     .replace(/-+/g, '-')
     .slice(0, 140);
   return clean || 'documento.txt';
 }
 
 function sanitizePathPart(value: string) {
-  return (value || 'geral').replace(/[^\w\-]+/g, '-').slice(0, 80) || 'geral';
+  return (value || 'geral').replace(/[^\w-]+/g, '-').slice(0, 80) || 'geral';
 }

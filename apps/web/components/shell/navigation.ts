@@ -14,7 +14,6 @@ import {
   Goal,
   LayoutDashboard,
   Network,
-  Settings,
   ShieldCheck,
   Sparkles,
   Target,
@@ -103,14 +102,6 @@ export const navSections: NavSection[] = [
   },
 ];
 
-export const settingsNavItem: NavItem = {
-  href: '/settings',
-  label: 'Configurações',
-  description: 'Usuários, permissões, auditoria, parâmetros e sistema',
-  icon: Settings,
-  permissions: ['settings:view', 'settings:manage'],
-};
-
 export const companyUsersNavItem: NavItem = {
   href: '/users',
   label: 'Usuários',
@@ -195,10 +186,6 @@ export function visibleNavSections(user: NavUser | null | undefined) {
 
 export function visibleMobileItems(user: NavUser | null | undefined) {
   return mobileNavItems.filter((item) => canAccess(user, item.permissions));
-}
-
-export function canAccessSettings(user: NavUser | null | undefined) {
-  return canAccess(user, settingsNavItem.permissions);
 }
 
 export function canAccessCompanyUsers(user: NavUser | null | undefined) {

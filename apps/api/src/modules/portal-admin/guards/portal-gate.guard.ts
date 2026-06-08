@@ -29,9 +29,15 @@ export class PortalGateGuard implements CanActivate {
     const req = context.switchToHttp().getRequest();
     const user: AuthPayload | undefined = req.user;
 
-    // Super Admin nunca é bloqueado.
     const isPublic = this.reflector.getAllAndOverride<boolean>(IS_PUBLIC_KEY, [context.getHandler(), context.getClass()]);
     if (isPublic) return true;
+
+    // Super Admin nunca é bloqueado — consistente com o overlay do frontend, que
+    // sempre libera todos os módulos/páginas/funcionalidades para o Super Admin.
+    // Precisa vir ANTES do gate de licença por empresa, senão um Super Admin
+    // (inclusive personificando uma empresa) veria o recurso no menu mas tomaria
+    // 403 na API — inconsistência frontend/backend.
+    if (user?.role === 'SUPER_ADMIN') return true;
 
     const gateMeta = this.reflector.getAllAndOverride<PortalGateMetadata | undefined>(PORTAL_GATE_KEY, [context.getHandler(), context.getClass()]);
     let moduleCode = gateMeta?.module;
@@ -55,8 +61,6 @@ export class PortalGateGuard implements CanActivate {
         }
       }
     }
-
-    if (user?.role === 'SUPER_ADMIN') return true;
 
     try {
       const config = await this.configService.getEffectiveConfig(user ?? anonymous());

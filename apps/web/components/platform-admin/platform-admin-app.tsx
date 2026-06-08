@@ -396,6 +396,29 @@ const SETTINGS_AREAS: Array<{
   },
 ];
 
+/**
+ * Raizes de queryKey cujo conteudo depende da empresa ativa selecionada no
+ * Portal Admin Global (header `x-platform-company-id`). Sao descartadas ao
+ * trocar de empresa para nao vazar dados entre empresas/areas. NAO inclui as
+ * consultas globais (`db-admin`, `platform-admin`, `platform-companies`,
+ * `platform-overview`), que independem da empresa selecionada.
+ */
+const COMPANY_SCOPED_QUERY_ROOTS = new Set<string>([
+  'admin',
+  'access-areas',
+  'access-modules',
+  'access-matrix',
+  'access-simulate',
+  'access-user-areas',
+  'users',
+  'users-list',
+  'orgnodes',
+  'ext-connectors',
+  'ext-keys',
+  'ext-logs',
+  'platform-admin-company-audit',
+]);
+
 export function PlatformAdminApp() {
   const router = useRouter();
   const queryClient = useQueryClient();
@@ -420,19 +443,17 @@ export function PlatformAdminApp() {
     if (typeof window !== 'undefined') {
       window.localStorage.setItem(PLATFORM_COMPANY_CONTEXT_KEY, companyId);
     }
-    void queryClient.invalidateQueries({ queryKey: ['admin'] });
-    void queryClient.invalidateQueries({ queryKey: ['access-areas'] });
-    void queryClient.invalidateQueries({ queryKey: ['access-modules'] });
-    void queryClient.invalidateQueries({ queryKey: ['access-matrix'] });
-    void queryClient.invalidateQueries({ queryKey: ['access-simulate'] });
-    void queryClient.invalidateQueries({ queryKey: ['access-user-areas'] });
-    void queryClient.invalidateQueries({ queryKey: ['users-list'] });
-    void queryClient.invalidateQueries({ queryKey: ['users'] });
-    void queryClient.invalidateQueries({ queryKey: ['orgnodes'] });
-    void queryClient.invalidateQueries({ queryKey: ['ext-connectors'] });
-    void queryClient.invalidateQueries({ queryKey: ['ext-keys'] });
-    void queryClient.invalidateQueries({ queryKey: ['ext-logs'] });
-    void queryClient.invalidateQueries({ queryKey: ['platform-admin-company-audit'] });
+    // Ao trocar a empresa ativa, DESCARTA (nao apenas invalida) o cache das
+    // consultas com escopo de empresa. Com invalidateQueries, uma secao ja
+    // carregada continuaria exibindo os dados da empresa anterior durante o
+    // refetch — um vazamento visual de uma empresa/area para outra. Com
+    // removeQueries o dado obsoleto e descartado: consultas ativas recarregam
+    // imediatamente e as inativas montam em estado de carregamento. As demais
+    // (db-admin e os metadados do proprio Portal Admin Global) sao globais e
+    // permanecem em cache para evitar refetches caros e desnecessarios.
+    void queryClient.removeQueries({
+      predicate: (query) => COMPANY_SCOPED_QUERY_ROOTS.has(String(query.queryKey[0] ?? '')),
+    });
   }, [queryClient]);
 
   useEffect(() => {

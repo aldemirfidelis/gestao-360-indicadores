@@ -51,12 +51,12 @@ export function sha256(value: string) {
 
 function sanitizeFileName(value: string) {
   const clean = basename(value || 'evidencia.txt')
-    .replace(/[^\w.\-]+/g, '-')
+    .replace(/[^\w.-]+/g, '-')
     .replace(/-+/g, '-')
     .slice(0, 140);
   return clean || 'evidencia.txt';
 }
 
 function sanitizePathPart(value: string) {
-  return (value || 'geral').replace(/[^\w\-]+/g, '-').slice(0, 80) || 'geral';
+  return (value || 'geral').replace(/[^\w-]+/g, '-').slice(0, 80) || 'geral';
 }
