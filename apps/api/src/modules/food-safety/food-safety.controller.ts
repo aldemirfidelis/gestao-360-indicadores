@@ -205,4 +205,88 @@ export class FoodSafetyController {
   recordMonitoring(@CurrentUser() me: AuthPayload, @Param('id') id: string, @Body() body: any) {
     return this.service.recordMonitoring(me, id, body);
   }
+
+  // ----- compliance: normas, versoes, requisitos, avaliacoes -----
+  @Get('standards')
+  @RequirePermissions('fsms:view')
+  listStandards(@CurrentUser() me: AuthPayload, @Query('search') search?: string) {
+    return this.service.listStandards(me, { search });
+  }
+
+  @Post('standards')
+  @RequirePermissions('fsms:create')
+  createStandard(@CurrentUser() me: AuthPayload, @Body() body: any) {
+    return this.service.createStandard(me, body);
+  }
+
+  @Patch('standards/:id')
+  @RequirePermissions('fsms:update')
+  updateStandard(@CurrentUser() me: AuthPayload, @Param('id') id: string, @Body() body: any) {
+    return this.service.updateStandard(me, id, body);
+  }
+
+  @Delete('standards/:id')
+  @RequirePermissions('fsms:delete')
+  removeStandard(@CurrentUser() me: AuthPayload, @Param('id') id: string) {
+    return this.service.removeStandard(me, id);
+  }
+
+  @Post('standard-versions')
+  @RequirePermissions('fsms:create')
+  createVersion(@CurrentUser() me: AuthPayload, @Body() body: any) {
+    return this.service.createVersion(me, body);
+  }
+
+  @Patch('standard-versions/:id')
+  @RequirePermissions('fsms:update')
+  updateVersion(@CurrentUser() me: AuthPayload, @Param('id') id: string, @Body() body: any) {
+    return this.service.updateVersion(me, id, body);
+  }
+
+  @Delete('standard-versions/:id')
+  @RequirePermissions('fsms:delete')
+  removeVersion(@CurrentUser() me: AuthPayload, @Param('id') id: string) {
+    return this.service.removeVersion(me, id);
+  }
+
+  @Get('compliance-summary')
+  @RequirePermissions('fsms:view')
+  complianceSummary(@CurrentUser() me: AuthPayload, @Query('standardVersionId') standardVersionId?: string) {
+    return this.service.complianceSummary(me, standardVersionId);
+  }
+
+  @Get('requirements')
+  @RequirePermissions('fsms:view')
+  listRequirements(
+    @CurrentUser() me: AuthPayload,
+    @Query('standardVersionId') standardVersionId?: string,
+    @Query('result') result?: string,
+    @Query('search') search?: string,
+  ) {
+    return this.service.listRequirements(me, { standardVersionId, result, search });
+  }
+
+  @Post('requirements')
+  @RequirePermissions('fsms:create')
+  createRequirement(@CurrentUser() me: AuthPayload, @Body() body: any) {
+    return this.service.createRequirement(me, body);
+  }
+
+  @Patch('requirements/:id')
+  @RequirePermissions('fsms:update')
+  updateRequirement(@CurrentUser() me: AuthPayload, @Param('id') id: string, @Body() body: any) {
+    return this.service.updateRequirement(me, id, body);
+  }
+
+  @Delete('requirements/:id')
+  @RequirePermissions('fsms:delete')
+  removeRequirement(@CurrentUser() me: AuthPayload, @Param('id') id: string) {
+    return this.service.removeRequirement(me, id);
+  }
+
+  @Post('requirements/:id/assess')
+  @RequirePermissions('fsms:update')
+  assessRequirement(@CurrentUser() me: AuthPayload, @Param('id') id: string, @Body() body: any) {
+    return this.service.assessRequirement(me, id, body);
+  }
 }

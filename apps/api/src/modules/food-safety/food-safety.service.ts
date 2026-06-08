@@ -1,5 +1,6 @@
 import { BadRequestException, ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
 import {
+  FoodSafetyComplianceResult,
   FoodSafetyControlPlanStatus,
   FoodSafetyControlType,
   FoodSafetyHazardCategory,
@@ -7,7 +8,9 @@ import {
   FoodSafetyMonitoringResult,
   FoodSafetyProcessStatus,
   FoodSafetyProgramStatus,
+  FoodSafetyRequirementCriticality,
   FoodSafetyRiskLevel,
+  FoodSafetyStandardVersionStatus,
   FoodSafetyStepType,
   Prisma,
 } from '@prisma/client';
@@ -845,5 +848,264 @@ export class FoodSafetyService {
       },
       include: { recordedBy: { select: { id: true, name: true } } },
     });
+  }
+
+  // ----------------------------- compliance / requisitos --------------------
+  private parseVersionStatus(v?: string): FoodSafetyStandardVersionStatus | undefined {
+    if (!v) return undefined;
+    if (!Object.values(FoodSafetyStandardVersionStatus).includes(v as FoodSafetyStandardVersionStatus)) throw new BadRequestException('Status de versao invalido.');
+    return v as FoodSafetyStandardVersionStatus;
+  }
+  private parseComplianceResult(v?: string): FoodSafetyComplianceResult | undefined {
+    if (!v) return undefined;
+    if (!Object.values(FoodSafetyComplianceResult).includes(v as FoodSafetyComplianceResult)) throw new BadRequestException('Resultado de avaliacao invalido.');
+    return v as FoodSafetyComplianceResult;
+  }
+  private parseCriticality(v?: string): FoodSafetyRequirementCriticality | undefined {
+    if (!v) return undefined;
+    if (!Object.values(FoodSafetyRequirementCriticality).includes(v as FoodSafetyRequirementCriticality)) throw new BadRequestException('Criticidade invalida.');
+    return v as FoodSafetyRequirementCriticality;
+  }
+
+  // --- normas (catalogo) ---
+  async listStandards(me: AuthPayload, filters: { search?: string } = {}) {
+    const term = filters.search?.trim();
+    return this.prisma.foodSafetyStandard.findMany({
+      where: {
+        companyId: me.companyId,
+        deletedAt: null,
+        ...(term
+          ? { OR: [{ name: { contains: term, mode: 'insensitive' } }, { code: { contains: term, mode: 'insensitive' } }, { origin: { contains: term, mode: 'insensitive' } }] }
+          : {}),
+      },
+      include: {
+        versions: { where: { deletedAt: null }, orderBy: { createdAt: 'desc' }, select: { id: true, versionLabel: true, status: true, effectiveDate: true, _count: { select: { requirements: true } } } },
+      },
+      orderBy: [{ name: 'asc' }],
+    });
+  }
+
+  private async loadStandard(me: AuthPayload, id: string) {
+    const std = await this.prisma.foodSafetyStandard.findFirst({ where: { id, companyId: me.companyId, deletedAt: null } });
+    if (!std) throw new NotFoundException('Norma nao encontrada');
+    return std;
+  }
+
+  async createStandard(me: AuthPayload, body: any) {
+    return this.prisma.foodSafetyStandard.create({
+      data: {
+        companyId: me.companyId,
+        name: this.requiredText(body?.name, 'Nome'),
+        code: this.nullableText(body?.code) ?? null,
+        origin: this.nullableText(body?.origin) ?? null,
+        description: this.nullableText(body?.description) ?? null,
+        active: body?.active === undefined ? true : Boolean(body.active),
+      },
+    });
+  }
+
+  async updateStandard(me: AuthPayload, id: string, patch: any) {
+    await this.loadStandard(me, id);
+    const data: any = {};
+    if ('name' in (patch ?? {})) data.name = this.requiredText(patch.name, 'Nome');
+    if ('code' in (patch ?? {})) data.code = this.nullableText(patch.code);
+    if ('origin' in (patch ?? {})) data.origin = this.nullableText(patch.origin);
+    if ('description' in (patch ?? {})) data.description = this.nullableText(patch.description);
+    if ('active' in (patch ?? {})) data.active = Boolean(patch.active);
+    return this.prisma.foodSafetyStandard.update({ where: { id }, data });
+  }
+
+  async removeStandard(me: AuthPayload, id: string) {
+    await this.loadStandard(me, id);
+    return this.prisma.foodSafetyStandard.update({ where: { id }, data: { deletedAt: new Date() } });
+  }
+
+  // --- versoes ---
+  private async loadVersion(me: AuthPayload, id: string) {
+    const version = await this.prisma.foodSafetyStandardVersion.findFirst({
+      where: { id, companyId: me.companyId, deletedAt: null },
+      include: { standard: { select: { id: true, name: true, code: true } } },
+    });
+    if (!version) throw new NotFoundException('Versao da norma nao encontrada');
+    return version;
+  }
+
+  async createVersion(me: AuthPayload, body: any) {
+    const standardId = this.requiredText(body?.standardId, 'Norma');
+    await this.loadStandard(me, standardId);
+    return this.prisma.foodSafetyStandardVersion.create({
+      data: {
+        companyId: me.companyId,
+        standardId,
+        versionLabel: this.requiredText(body?.versionLabel, 'Versao'),
+        effectiveDate: this.optionalDate(body?.effectiveDate) ?? null,
+        status: this.parseVersionStatus(body?.status) ?? FoodSafetyStandardVersionStatus.DRAFT,
+        notes: this.nullableText(body?.notes) ?? null,
+      },
+      include: { standard: { select: { id: true, name: true, code: true } } },
+    });
+  }
+
+  async updateVersion(me: AuthPayload, id: string, patch: any) {
+    const before = await this.loadVersion(me, id);
+    const data: any = {};
+    if ('versionLabel' in (patch ?? {})) data.versionLabel = this.requiredText(patch.versionLabel, 'Versao');
+    if ('effectiveDate' in (patch ?? {})) data.effectiveDate = this.optionalDate(patch.effectiveDate);
+    if ('notes' in (patch ?? {})) data.notes = this.nullableText(patch.notes);
+    const status = 'status' in (patch ?? {}) ? this.parseVersionStatus(patch.status) : undefined;
+    if (status && status === FoodSafetyStandardVersionStatus.ACTIVE) {
+      return this.prisma.$transaction(async (tx) => {
+        await tx.foodSafetyStandardVersion.updateMany({
+          where: { companyId: me.companyId, standardId: before.standardId, status: FoodSafetyStandardVersionStatus.ACTIVE, id: { not: id } },
+          data: { status: FoodSafetyStandardVersionStatus.SUPERSEDED },
+        });
+        return tx.foodSafetyStandardVersion.update({ where: { id }, data: { ...data, status }, include: { standard: { select: { id: true, name: true, code: true } } } });
+      });
+    }
+    if (status) data.status = status;
+    return this.prisma.foodSafetyStandardVersion.update({ where: { id }, data, include: { standard: { select: { id: true, name: true, code: true } } } });
+  }
+
+  async removeVersion(me: AuthPayload, id: string) {
+    await this.loadVersion(me, id);
+    return this.prisma.foodSafetyStandardVersion.update({ where: { id }, data: { deletedAt: new Date() } });
+  }
+
+  // --- requisitos ---
+  private requirementInclude() {
+    return {
+      standardVersion: { select: { id: true, versionLabel: true, standard: { select: { id: true, name: true, code: true } } } },
+      responsible: { select: { id: true, name: true, email: true } },
+      assessments: {
+        where: { deletedAt: null },
+        orderBy: { createdAt: 'desc' as const },
+        take: 1,
+        include: { responsible: { select: { id: true, name: true } } },
+      },
+    } satisfies Prisma.FoodSafetyRequirementInclude;
+  }
+
+  private async loadRequirement(me: AuthPayload, id: string) {
+    const req = await this.prisma.foodSafetyRequirement.findFirst({
+      where: { id, companyId: me.companyId, deletedAt: null },
+      include: this.requirementInclude(),
+    });
+    if (!req) throw new NotFoundException('Requisito nao encontrado');
+    return req;
+  }
+
+  async listRequirements(me: AuthPayload, filters: { standardVersionId?: string; result?: string; search?: string } = {}) {
+    const term = filters.search?.trim();
+    const result = this.parseComplianceResult(filters.result);
+    const items = await this.prisma.foodSafetyRequirement.findMany({
+      where: {
+        companyId: me.companyId,
+        deletedAt: null,
+        ...(filters.standardVersionId ? { standardVersionId: filters.standardVersionId } : {}),
+        ...(term
+          ? { OR: [{ title: { contains: term, mode: 'insensitive' } }, { code: { contains: term, mode: 'insensitive' } }, { chapter: { contains: term, mode: 'insensitive' } }] }
+          : {}),
+      },
+      include: this.requirementInclude(),
+      orderBy: [{ chapter: 'asc' }, { code: 'asc' }, { createdAt: 'asc' }],
+    });
+    if (!result) return items;
+    return items.filter((r) => (r.assessments[0]?.result ?? FoodSafetyComplianceResult.PENDING) === result);
+  }
+
+  async createRequirement(me: AuthPayload, body: any) {
+    const standardVersionId = this.requiredText(body?.standardVersionId, 'Versao da norma');
+    await this.loadVersion(me, standardVersionId);
+    const responsibleUserId = await this.validateUser(me.companyId, this.id(body?.responsibleUserId));
+    return this.prisma.foodSafetyRequirement.create({
+      data: {
+        companyId: me.companyId,
+        standardVersionId,
+        responsibleUserId,
+        title: this.requiredText(body?.title, 'Titulo'),
+        code: this.nullableText(body?.code) ?? null,
+        chapter: this.nullableText(body?.chapter) ?? null,
+        item: this.nullableText(body?.item) ?? null,
+        subitem: this.nullableText(body?.subitem) ?? null,
+        description: this.nullableText(body?.description) ?? null,
+        applicability: this.nullableText(body?.applicability) ?? null,
+        evidenceRequired: this.nullableText(body?.evidenceRequired) ?? null,
+        criticality: this.parseCriticality(body?.criticality) ?? FoodSafetyRequirementCriticality.MEDIUM,
+        periodicityDays: this.optionalInt(body?.periodicityDays, 1) ?? null,
+        active: body?.active === undefined ? true : Boolean(body.active),
+      },
+      include: this.requirementInclude(),
+    });
+  }
+
+  async updateRequirement(me: AuthPayload, id: string, patch: any) {
+    await this.loadRequirement(me, id);
+    const data: any = {};
+    if ('title' in (patch ?? {})) data.title = this.requiredText(patch.title, 'Titulo');
+    if ('code' in (patch ?? {})) data.code = this.nullableText(patch.code);
+    if ('chapter' in (patch ?? {})) data.chapter = this.nullableText(patch.chapter);
+    if ('item' in (patch ?? {})) data.item = this.nullableText(patch.item);
+    if ('subitem' in (patch ?? {})) data.subitem = this.nullableText(patch.subitem);
+    if ('description' in (patch ?? {})) data.description = this.nullableText(patch.description);
+    if ('applicability' in (patch ?? {})) data.applicability = this.nullableText(patch.applicability);
+    if ('evidenceRequired' in (patch ?? {})) data.evidenceRequired = this.nullableText(patch.evidenceRequired);
+    if ('criticality' in (patch ?? {})) data.criticality = this.parseCriticality(patch.criticality);
+    if ('periodicityDays' in (patch ?? {})) data.periodicityDays = this.optionalInt(patch.periodicityDays, 1);
+    if ('active' in (patch ?? {})) data.active = Boolean(patch.active);
+    if ('responsibleUserId' in (patch ?? {})) data.responsibleUserId = await this.validateUser(me.companyId, this.id(patch.responsibleUserId));
+    return this.prisma.foodSafetyRequirement.update({ where: { id }, data, include: this.requirementInclude() });
+  }
+
+  async removeRequirement(me: AuthPayload, id: string) {
+    await this.loadRequirement(me, id);
+    return this.prisma.foodSafetyRequirement.update({ where: { id }, data: { deletedAt: new Date() } });
+  }
+
+  // --- avaliacoes (cada avaliacao e um registro no historico; a mais recente vale) ---
+  async assessRequirement(me: AuthPayload, requirementId: string, body: any) {
+    const req = await this.loadRequirement(me, requirementId);
+    const result = this.parseComplianceResult(body?.result) ?? FoodSafetyComplianceResult.PENDING;
+    const responsibleUserId = await this.validateUser(me.companyId, this.id(body?.responsibleUserId));
+    const periodicity = req.periodicityDays ?? null;
+    const assessedAt = this.optionalDate(body?.assessedAt) ?? new Date();
+    let nextAssessmentAt = this.optionalDate(body?.nextAssessmentAt) ?? null;
+    if (!nextAssessmentAt && periodicity) nextAssessmentAt = new Date(assessedAt.getTime() + periodicity * 86400000);
+    return this.prisma.foodSafetyRequirementAssessment.create({
+      data: {
+        companyId: me.companyId,
+        requirementId,
+        responsibleUserId,
+        result,
+        evidence: this.nullableText(body?.evidence) ?? null,
+        notes: this.nullableText(body?.notes) ?? null,
+        assessedAt,
+        nextAssessmentAt,
+      },
+      include: { responsible: { select: { id: true, name: true } } },
+    });
+  }
+
+  async complianceSummary(me: AuthPayload, standardVersionId?: string) {
+    const reqs = await this.prisma.foodSafetyRequirement.findMany({
+      where: { companyId: me.companyId, deletedAt: null, active: true, ...(standardVersionId ? { standardVersionId } : {}) },
+      include: { assessments: { where: { deletedAt: null }, orderBy: { createdAt: 'desc' }, take: 1, select: { result: true } } },
+    });
+    const byResult = Object.fromEntries(Object.values(FoodSafetyComplianceResult).map((r) => [r, 0])) as Record<FoodSafetyComplianceResult, number>;
+    for (const r of reqs) {
+      byResult[r.assessments[0]?.result ?? FoodSafetyComplianceResult.PENDING]++;
+    }
+    const applicable = reqs.length - byResult[FoodSafetyComplianceResult.NOT_APPLICABLE];
+    const compliancePct = applicable > 0 ? Math.round((byResult[FoodSafetyComplianceResult.MET] / applicable) * 100) : 0;
+    return {
+      requirements: reqs.length,
+      met: byResult[FoodSafetyComplianceResult.MET],
+      partial: byResult[FoodSafetyComplianceResult.PARTIAL],
+      notMet: byResult[FoodSafetyComplianceResult.NOT_MET],
+      notApplicable: byResult[FoodSafetyComplianceResult.NOT_APPLICABLE],
+      pending: byResult[FoodSafetyComplianceResult.PENDING],
+      applicable,
+      compliancePct,
+      byResult,
+    };
   }
 }

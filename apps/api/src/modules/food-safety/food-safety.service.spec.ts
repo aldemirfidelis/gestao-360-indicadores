@@ -29,6 +29,12 @@ function makeService(opts?: {
   controlPlan?: unknown;
   controlPlans?: unknown[];
   records?: unknown[];
+  standards?: unknown[];
+  standard?: unknown;
+  versions?: unknown[];
+  version?: unknown;
+  requirements?: unknown[];
+  requirement?: unknown;
 }) {
   const defaultMatrix = { id: 'm1', companyId: 'companyA', severityScale: 5, probabilityScale: 5, useDetection: false, detectionScale: 5, thresholdLow: 4, thresholdModerate: 9, thresholdHigh: 15 };
   const prisma: any = {
@@ -75,6 +81,28 @@ function makeService(opts?: {
     foodSafetyMonitoringRecord: {
       findMany: vi.fn().mockResolvedValue(opts?.records ?? []),
       create: vi.fn().mockImplementation((args: any) => Promise.resolve({ id: 'mr1', ...args.data })),
+    },
+    foodSafetyStandard: {
+      findMany: vi.fn().mockResolvedValue(opts?.standards ?? []),
+      findFirst: vi.fn().mockResolvedValue(opts?.standard ?? null),
+      create: vi.fn().mockImplementation((args: any) => Promise.resolve({ id: 'std1', ...args.data })),
+      update: vi.fn().mockImplementation((args: any) => Promise.resolve({ id: 'std1', ...args.data })),
+    },
+    foodSafetyStandardVersion: {
+      findMany: vi.fn().mockResolvedValue(opts?.versions ?? []),
+      findFirst: vi.fn().mockResolvedValue(opts?.version ?? null),
+      create: vi.fn().mockImplementation((args: any) => Promise.resolve({ id: 'ver1', ...args.data })),
+      update: vi.fn().mockImplementation((args: any) => Promise.resolve({ id: 'ver1', ...args.data })),
+      updateMany: vi.fn().mockResolvedValue({ count: 0 }),
+    },
+    foodSafetyRequirement: {
+      findMany: vi.fn().mockResolvedValue(opts?.requirements ?? []),
+      findFirst: vi.fn().mockResolvedValue(opts?.requirement ?? null),
+      create: vi.fn().mockImplementation((args: any) => Promise.resolve({ id: 'req1', ...args.data })),
+      update: vi.fn().mockImplementation((args: any) => Promise.resolve({ id: 'req1', ...args.data })),
+    },
+    foodSafetyRequirementAssessment: {
+      create: vi.fn().mockImplementation((args: any) => Promise.resolve({ id: 'as1', ...args.data })),
     },
     orgNode: { findFirst: vi.fn().mockResolvedValue(opts?.orgNode ?? null), findMany: vi.fn().mockResolvedValue([]) },
     user: { findFirst: vi.fn().mockResolvedValue(opts?.user ?? null), findMany: vi.fn().mockResolvedValue([]) },
@@ -262,5 +290,40 @@ describe('FoodSafetyService - Fase 1 (programas/processos/etapas)', () => {
     expect(data.result).toBe('OK');
     expect(data.lotBlocked).toBe(false);
     expect(data.nonConformityId).toBeNull();
+  });
+
+  it('complianceSummary: % conformidade usa aplicaveis (total - NA)', async () => {
+    const { service } = makeService({
+      requirements: [
+        { id: 'r1', assessments: [{ result: 'MET' }] },
+        { id: 'r2', assessments: [{ result: 'PARTIAL' }] },
+        { id: 'r3', assessments: [{ result: 'NOT_APPLICABLE' }] },
+        { id: 'r4', assessments: [] },
+      ],
+    });
+    const res = await service.complianceSummary(me);
+    expect(res.requirements).toBe(4);
+    expect(res.notApplicable).toBe(1);
+    expect(res.applicable).toBe(3);
+    expect(res.met).toBe(1);
+    expect(res.pending).toBe(1);
+    expect(res.compliancePct).toBe(33); // 1 de 3 aplicaveis
+  });
+
+  it('assessRequirement: cria avaliacao e calcula proxima por periodicidade', async () => {
+    const { service, prisma } = makeService({ requirement: { id: 'r1', companyId: 'companyA', periodicityDays: 30, assessments: [] } });
+    await service.assessRequirement(me, 'r1', { result: 'MET', assessedAt: '2026-01-01' });
+    const data = prisma.foodSafetyRequirementAssessment.create.mock.calls[0][0].data;
+    expect(data.result).toBe('MET');
+    expect(data.requirementId).toBe('r1');
+    expect(data.nextAssessmentAt).toBeInstanceOf(Date);
+  });
+
+  it('updateVersion -> ACTIVE: supersede as demais versoes ativas da norma', async () => {
+    const { service, prisma } = makeService({ version: { id: 'ver1', companyId: 'companyA', standardId: 'std1', standard: {} } });
+    await service.updateVersion(me, 'ver1', { status: 'ACTIVE' });
+    expect(prisma.foodSafetyStandardVersion.updateMany).toHaveBeenCalledWith(
+      expect.objectContaining({ where: expect.objectContaining({ standardId: 'std1', status: 'ACTIVE' }), data: { status: 'SUPERSEDED' } }),
+    );
   });
 });

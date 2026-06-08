@@ -544,6 +544,10 @@ model Company {
   fsHazards              FoodSafetyHazard[]      @relation("FsHazardCompany")
   fsControlPlans         FoodSafetyControlPlan[] @relation("FsControlPlanCompany")
   fsMonitoringRecords    FoodSafetyMonitoringRecord[] @relation("FsMonitoringCompany")
+  fsStandards            FoodSafetyStandard[]         @relation("FsStandardCompany")
+  fsStandardVersions     FoodSafetyStandardVersion[]  @relation("FsStdVersionCompany")
+  fsRequirements         FoodSafetyRequirement[]      @relation("FsRequirementCompany")
+  fsRequirementAssessments FoodSafetyRequirementAssessment[] @relation("FsReqAssessmentCompany")
   formTemplates          FormTemplate[]
   formSubmissions        FormSubmission[]
   meetings               Meeting[]
@@ -731,6 +735,8 @@ model User {
   fsHazardsResponsible       FoodSafetyHazard[]          @relation("FsHazardResponsible")
   fsControlPlansResponsible  FoodSafetyControlPlan[]      @relation("FsControlPlanResponsible")
   fsMonitoringRecorded       FoodSafetyMonitoringRecord[] @relation("FsMonitoringRecordedBy")
+  fsRequirementsResponsible  FoodSafetyRequirement[]      @relation("FsRequirementResponsible")
+  fsReqAssessmentsResponsible FoodSafetyRequirementAssessment[] @relation("FsReqAssessmentResponsible")
   formTemplatesOwned         FormTemplate[]              @relation("FormTemplateOwner")
   formTemplatesCreated       FormTemplate[]              @relation("FormTemplateCreatedBy")
   formSubmissionsSubmitted   FormSubmission[]            @relation("FormSubmissionSubmittedBy")
@@ -7069,5 +7075,117 @@ model FoodSafetyMonitoringRecord {
 
   @@index([companyId])
   @@index([controlPlanId])
+  @@index([result])
+}
+
+// ----- Compliance: catalogo normativo versionado + requisitos (Fase 3) ----
+
+enum FoodSafetyStandardVersionStatus {
+  DRAFT
+  ACTIVE
+  SUPERSEDED
+}
+
+enum FoodSafetyComplianceResult {
+  PENDING
+  MET
+  PARTIAL
+  NOT_MET
+  NOT_APPLICABLE
+}
+
+enum FoodSafetyRequirementCriticality {
+  LOW
+  MEDIUM
+  HIGH
+}
+
+// Norma/regulamento administravel (ISO 22000, BRCGS, SQF, ANVISA, interno, cliente...).
+model FoodSafetyStandard {
+  id          String    @id @default(uuid())
+  companyId   String
+  company     Company   @relation("FsStandardCompany", fields: [companyId], references: [id])
+  code        String?
+  name        String
+  origin      String?
+  description String?
+  active      Boolean   @default(true)
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  deletedAt   DateTime?
+
+  versions FoodSafetyStandardVersion[]
+
+  @@index([companyId])
+}
+
+model FoodSafetyStandardVersion {
+  id            String                          @id @default(uuid())
+  companyId     String
+  company       Company                         @relation("FsStdVersionCompany", fields: [companyId], references: [id])
+  standardId    String
+  standard      FoodSafetyStandard              @relation(fields: [standardId], references: [id])
+  versionLabel  String
+  effectiveDate DateTime?
+  status        FoodSafetyStandardVersionStatus @default(DRAFT)
+  notes         String?
+  createdAt     DateTime                        @default(now())
+  updatedAt     DateTime                        @updatedAt
+  deletedAt     DateTime?
+
+  requirements FoodSafetyRequirement[]
+
+  @@index([companyId])
+  @@index([standardId])
+}
+
+model FoodSafetyRequirement {
+  id                String                           @id @default(uuid())
+  companyId         String
+  company           Company                          @relation("FsRequirementCompany", fields: [companyId], references: [id])
+  standardVersionId String
+  standardVersion   FoodSafetyStandardVersion        @relation(fields: [standardVersionId], references: [id])
+  responsibleUserId String?
+  responsible       User?                            @relation("FsRequirementResponsible", fields: [responsibleUserId], references: [id])
+  code              String?
+  chapter           String?
+  item              String?
+  subitem           String?
+  title             String
+  description       String?
+  applicability     String?
+  evidenceRequired  String?
+  criticality       FoodSafetyRequirementCriticality @default(MEDIUM)
+  periodicityDays   Int?
+  active            Boolean                          @default(true)
+  createdAt         DateTime                         @default(now())
+  updatedAt         DateTime                         @updatedAt
+  deletedAt         DateTime?
+
+  assessments FoodSafetyRequirementAssessment[]
+
+  @@index([companyId])
+  @@index([standardVersionId])
+}
+
+model FoodSafetyRequirementAssessment {
+  id                String                     @id @default(uuid())
+  companyId         String
+  company           Company                    @relation("FsReqAssessmentCompany", fields: [companyId], references: [id])
+  requirementId     String
+  requirement       FoodSafetyRequirement      @relation(fields: [requirementId], references: [id])
+  responsibleUserId String?
+  responsible       User?                      @relation("FsReqAssessmentResponsible", fields: [responsibleUserId], references: [id])
+  result            FoodSafetyComplianceResult @default(PENDING)
+  evidence          String?
+  notes             String?
+  assessedAt        DateTime?
+  nextAssessmentAt  DateTime?
+  createdAt         DateTime                   @default(now())
+  updatedAt         DateTime                   @updatedAt
+  deletedAt         DateTime?
+
+  @@index([companyId])
+  @@index([requirementId])
   @@index([result])
 }

@@ -41,6 +41,7 @@ import { Label } from '@/components/ui/label';
 import { NativeSelect } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
 import { useAuth } from '@/components/auth/auth-provider';
+import { ComplianceTab } from '@/components/food-safety/compliance-tab';
 import { api } from '@/lib/api';
 import { cn, formatDate, formatNumber } from '@/lib/utils';
 
@@ -279,12 +280,13 @@ const RISK_LEVEL_CLASS: Record<RiskLevel, string> = {
 };
 const CONTROL_TYPE_LABEL: Record<ControlType, string> = { NONE: '—', PRP: 'PPR', OPRP: 'PPRO', CCP: 'PCC' };
 
-type TabKey = 'overview' | 'processes' | 'hazards' | 'monitoring' | 'flow' | 'matrix';
+type TabKey = 'overview' | 'processes' | 'hazards' | 'monitoring' | 'compliance' | 'flow' | 'matrix';
 const TABS: Array<{ key: TabKey; label: string; icon: typeof Network }> = [
   { key: 'overview', label: 'Visão Geral', icon: ShieldCheck },
   { key: 'processes', label: 'Processos', icon: ListChecks },
   { key: 'hazards', label: 'Perigos / APPCC', icon: AlertTriangle },
   { key: 'monitoring', label: 'Monitoramento', icon: GaugeCircle },
+  { key: 'compliance', label: 'Compliance', icon: ClipboardCheck },
   { key: 'flow', label: 'Fluxograma', icon: Workflow },
   { key: 'matrix', label: 'Matriz Geral', icon: Layers3 },
 ];
@@ -442,6 +444,7 @@ export default function SegurancaAlimentosPage() {
               onRecord={(p) => setRecordPlan(p)}
             />
           )}
+          {tab === 'compliance' && <ComplianceTab canManage={canManage} users={options.data?.users ?? []} />}
           {tab === 'flow' && (
             <FlowTab processes={processes.data ?? []} canManage={canManage} onOpen={(p) => setProcessDialog(p)} onChanged={invalidate} />
           )}
