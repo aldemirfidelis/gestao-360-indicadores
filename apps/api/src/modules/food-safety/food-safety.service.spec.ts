@@ -26,6 +26,9 @@ function makeService(opts?: {
   hazards?: unknown[];
   hazard?: unknown;
   lastHazard?: unknown;
+  controlPlan?: unknown;
+  controlPlans?: unknown[];
+  records?: unknown[];
 }) {
   const defaultMatrix = { id: 'm1', companyId: 'companyA', severityScale: 5, probabilityScale: 5, useDetection: false, detectionScale: 5, thresholdLow: 4, thresholdModerate: 9, thresholdHigh: 15 };
   const prisma: any = {
@@ -63,6 +66,16 @@ function makeService(opts?: {
       create: vi.fn().mockImplementation((args: any) => Promise.resolve({ id: 'h1', ...args.data })),
       update: vi.fn().mockImplementation((args: any) => Promise.resolve({ id: 'h1', ...args.data })),
     },
+    foodSafetyControlPlan: {
+      findMany: vi.fn().mockResolvedValue(opts?.controlPlans ?? []),
+      findFirst: vi.fn().mockResolvedValue(opts?.controlPlan ?? null),
+      create: vi.fn().mockImplementation((args: any) => Promise.resolve({ id: 'cp1', ...args.data })),
+      update: vi.fn().mockImplementation((args: any) => Promise.resolve({ id: 'cp1', ...args.data })),
+    },
+    foodSafetyMonitoringRecord: {
+      findMany: vi.fn().mockResolvedValue(opts?.records ?? []),
+      create: vi.fn().mockImplementation((args: any) => Promise.resolve({ id: 'mr1', ...args.data })),
+    },
     orgNode: { findFirst: vi.fn().mockResolvedValue(opts?.orgNode ?? null), findMany: vi.fn().mockResolvedValue([]) },
     user: { findFirst: vi.fn().mockResolvedValue(opts?.user ?? null), findMany: vi.fn().mockResolvedValue([]) },
   };
@@ -73,8 +86,9 @@ function makeService(opts?: {
     assertCanWrite: vi.fn().mockResolvedValue(undefined),
   } as any;
 
-  const service = new FoodSafetyService(prisma, access);
-  return { service, prisma, access };
+  const nonConformities = { create: vi.fn().mockResolvedValue({ id: 'nc1', number: 1 }) } as any;
+  const service = new FoodSafetyService(prisma, access, nonConformities);
+  return { service, prisma, access, nonConformities };
 }
 
 describe('FoodSafetyService - Fase 1 (programas/processos/etapas)', () => {
@@ -201,5 +215,52 @@ describe('FoodSafetyService - Fase 1 (programas/processos/etapas)', () => {
     expect(where.companyId).toBe('companyA');
     expect(where.processId).toBe('pr1');
     expect(where.AND[0].process.OR).toContainEqual({ orgNodeId: { in: ['areaA'] } });
+  });
+
+  it('createControlPlan: herda controlType do perigo e checa area', async () => {
+    const { service, prisma, access } = makeService({
+      hazard: { id: 'h1', companyId: 'companyA', controlType: 'OPRP', process: { orgNodeId: 'areaA' }, steps: [] },
+    });
+    await service.createControlPlan(me, { hazardId: 'h1', parameter: 'pH' });
+    expect(access.assertCanWrite).toHaveBeenCalledWith('user-1', 'areaA', 'food-safety', 'create');
+    const data = prisma.foodSafetyControlPlan.create.mock.calls[0][0].data;
+    expect(data.controlType).toBe('OPRP');
+    expect(data.requiresNonConformity).toBe(true);
+  });
+
+  const planFixture = (over: Record<string, unknown> = {}) => ({
+    id: 'cp1',
+    companyId: 'companyA',
+    controlType: 'CCP',
+    requiresLotBlock: true,
+    requiresNonConformity: true,
+    criticalMin: 70,
+    criticalMax: null,
+    alertMin: null,
+    alertMax: null,
+    parameter: 'Temperatura',
+    correction: 'Reprocessar',
+    hazard: { name: 'Salmonella', process: { id: 'pr1', name: 'Cozimento', orgNodeId: 'areaA' } },
+    ...over,
+  });
+
+  it('recordMonitoring: valor fora do limite -> OUT, bloqueia lote e abre NC', async () => {
+    const { service, prisma, nonConformities } = makeService({ controlPlan: planFixture() });
+    await service.recordMonitoring(me, 'cp1', { valueNum: 65 });
+    expect(nonConformities.create).toHaveBeenCalledWith(me, expect.objectContaining({ source: 'PROCESS', severity: 'CRITICAL', orgNodeId: 'areaA' }));
+    const data = prisma.foodSafetyMonitoringRecord.create.mock.calls[0][0].data;
+    expect(data.result).toBe('OUT');
+    expect(data.lotBlocked).toBe(true);
+    expect(data.nonConformityId).toBe('nc1');
+  });
+
+  it('recordMonitoring: valor dentro do limite -> OK, sem NC', async () => {
+    const { service, prisma, nonConformities } = makeService({ controlPlan: planFixture() });
+    await service.recordMonitoring(me, 'cp1', { valueNum: 75 });
+    expect(nonConformities.create).not.toHaveBeenCalled();
+    const data = prisma.foodSafetyMonitoringRecord.create.mock.calls[0][0].data;
+    expect(data.result).toBe('OK');
+    expect(data.lotBlocked).toBe(false);
+    expect(data.nonConformityId).toBeNull();
   });
 });

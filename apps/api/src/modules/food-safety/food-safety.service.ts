@@ -1,8 +1,10 @@
 import { BadRequestException, ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
 import {
+  FoodSafetyControlPlanStatus,
   FoodSafetyControlType,
   FoodSafetyHazardCategory,
   FoodSafetyHazardStatus,
+  FoodSafetyMonitoringResult,
   FoodSafetyProcessStatus,
   FoodSafetyProgramStatus,
   FoodSafetyRiskLevel,
@@ -13,6 +15,7 @@ import { PrismaService } from '../../prisma/prisma.service';
 import { AccessService } from '../access/access.service';
 import type { AreaAction } from '../access/access.logic';
 import { AuthPayload } from '../auth/auth.types';
+import { NonConformitiesService } from '../nonconformities/nonconformities.service';
 
 /**
  * Modulo Seguranca dos Alimentos (FSMS) — Fase 1 (Fundacao).
@@ -30,6 +33,7 @@ export class FoodSafetyService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly access: AccessService,
+    private readonly nonConformities: NonConformitiesService,
   ) {}
 
   // ----------------------------- helpers ------------------------------------
@@ -653,5 +657,193 @@ export class FoodSafetyService {
     const hazard = await this.loadHazard(me, id);
     await this.assertProcessWriteArea(me, hazard.process.orgNodeId, 'delete');
     return this.prisma.foodSafetyHazard.update({ where: { id }, data: { deletedAt: new Date() } });
+  }
+
+  // ----------------------------- controle operacional (PPR/PPRO/PCC) --------
+  private parseControlPlanStatus(v?: string): FoodSafetyControlPlanStatus | undefined {
+    if (!v) return undefined;
+    if (!Object.values(FoodSafetyControlPlanStatus).includes(v as FoodSafetyControlPlanStatus)) throw new BadRequestException('Status de plano invalido.');
+    return v as FoodSafetyControlPlanStatus;
+  }
+  private parseResult(v?: string): FoodSafetyMonitoringResult | undefined {
+    if (!v) return undefined;
+    if (!Object.values(FoodSafetyMonitoringResult).includes(v as FoodSafetyMonitoringResult)) throw new BadRequestException('Resultado de monitoramento invalido.');
+    return v as FoodSafetyMonitoringResult;
+  }
+
+  private planInclude() {
+    return {
+      hazard: {
+        select: {
+          id: true,
+          number: true,
+          name: true,
+          controlType: true,
+          process: { select: { id: true, name: true, code: true, orgNodeId: true, programId: true } },
+          step: { select: { id: true, name: true } },
+        },
+      },
+      responsible: { select: { id: true, name: true, email: true } },
+      _count: { select: { records: true } },
+    } satisfies Prisma.FoodSafetyControlPlanInclude;
+  }
+
+  private async loadControlPlan(me: AuthPayload, id: string) {
+    const plan = await this.prisma.foodSafetyControlPlan.findFirst({
+      where: { id, companyId: me.companyId, deletedAt: null },
+      include: this.planInclude(),
+    });
+    if (!plan) throw new NotFoundException('Plano de controle nao encontrado');
+    return plan;
+  }
+
+  async listControlPlans(me: AuthPayload, filters: { hazardId?: string; programId?: string; status?: string } = {}) {
+    const permitted = await this.access.listAreaFilter(me.sub, MODULE, 'view');
+    const and: Prisma.FoodSafetyControlPlanWhereInput[] = [];
+    if (permitted) and.push({ hazard: { process: { OR: [{ orgNodeId: null }, { orgNodeId: { in: permitted } }] } } });
+    if (filters.programId) and.push({ hazard: { process: { programId: filters.programId } } });
+    return this.prisma.foodSafetyControlPlan.findMany({
+      where: {
+        companyId: me.companyId,
+        deletedAt: null,
+        ...(filters.hazardId ? { hazardId: filters.hazardId } : {}),
+        ...(this.parseControlPlanStatus(filters.status) ? { status: this.parseControlPlanStatus(filters.status) } : {}),
+        ...(and.length ? { AND: and } : {}),
+      },
+      include: this.planInclude(),
+      orderBy: [{ controlType: 'asc' }, { createdAt: 'desc' }],
+    });
+  }
+
+  async getControlPlan(me: AuthPayload, id: string) {
+    return this.loadControlPlan(me, id);
+  }
+
+  private controlPlanData(body: any) {
+    return {
+      parameter: this.nullableText(body?.parameter) ?? null,
+      unit: this.nullableText(body?.unit) ?? null,
+      criticalLimitText: this.nullableText(body?.criticalLimitText) ?? null,
+      criticalMin: this.optionalFloat(body?.criticalMin) ?? null,
+      criticalMax: this.optionalFloat(body?.criticalMax) ?? null,
+      alertMin: this.optionalFloat(body?.alertMin) ?? null,
+      alertMax: this.optionalFloat(body?.alertMax) ?? null,
+      method: this.nullableText(body?.method) ?? null,
+      instrument: this.nullableText(body?.instrument) ?? null,
+      frequency: this.nullableText(body?.frequency) ?? null,
+      correction: this.nullableText(body?.correction) ?? null,
+      correctiveAction: this.nullableText(body?.correctiveAction) ?? null,
+      requiresLotBlock: Boolean(body?.requiresLotBlock),
+      requiresNonConformity: body?.requiresNonConformity === undefined ? true : Boolean(body.requiresNonConformity),
+    };
+  }
+
+  async createControlPlan(me: AuthPayload, body: any) {
+    const hazardId = this.requiredText(body?.hazardId, 'Perigo');
+    const hazard = await this.loadHazard(me, hazardId);
+    await this.assertProcessWriteArea(me, hazard.process.orgNodeId, 'create');
+    const responsibleUserId = await this.validateUser(me.companyId, this.id(body?.responsibleUserId));
+    const controlType = this.parseControlType(body?.controlType) ?? hazard.controlType ?? FoodSafetyControlType.CCP;
+    return this.prisma.foodSafetyControlPlan.create({
+      data: {
+        companyId: me.companyId,
+        hazardId,
+        responsibleUserId,
+        controlType,
+        status: this.parseControlPlanStatus(body?.status) ?? FoodSafetyControlPlanStatus.ACTIVE,
+        ...this.controlPlanData(body),
+      },
+      include: this.planInclude(),
+    });
+  }
+
+  async updateControlPlan(me: AuthPayload, id: string, patch: any) {
+    const before = await this.loadControlPlan(me, id);
+    await this.assertProcessWriteArea(me, before.hazard.process?.orgNodeId ?? null, 'edit');
+    const data: any = {};
+    const fields = this.controlPlanData(patch);
+    for (const key of Object.keys(fields) as (keyof typeof fields)[]) {
+      if (key in (patch ?? {})) data[key] = fields[key];
+    }
+    if ('controlType' in (patch ?? {})) data.controlType = this.parseControlType(patch.controlType);
+    if ('status' in (patch ?? {})) data.status = this.parseControlPlanStatus(patch.status);
+    if ('responsibleUserId' in (patch ?? {})) data.responsibleUserId = await this.validateUser(me.companyId, this.id(patch.responsibleUserId));
+    return this.prisma.foodSafetyControlPlan.update({ where: { id }, data, include: this.planInclude() });
+  }
+
+  async removeControlPlan(me: AuthPayload, id: string) {
+    const plan = await this.loadControlPlan(me, id);
+    await this.assertProcessWriteArea(me, plan.hazard.process?.orgNodeId ?? null, 'delete');
+    return this.prisma.foodSafetyControlPlan.update({ where: { id }, data: { deletedAt: new Date() } });
+  }
+
+  private evaluateMonitoring(
+    plan: { criticalMin: number | null; criticalMax: number | null; alertMin: number | null; alertMax: number | null },
+    valueNum: number | null,
+  ): FoodSafetyMonitoringResult {
+    if (valueNum == null) return FoodSafetyMonitoringResult.OK;
+    if ((plan.criticalMin != null && valueNum < plan.criticalMin) || (plan.criticalMax != null && valueNum > plan.criticalMax)) {
+      return FoodSafetyMonitoringResult.OUT;
+    }
+    if ((plan.alertMin != null && valueNum < plan.alertMin) || (plan.alertMax != null && valueNum > plan.alertMax)) {
+      return FoodSafetyMonitoringResult.ALERT;
+    }
+    return FoodSafetyMonitoringResult.OK;
+  }
+
+  async listRecords(me: AuthPayload, controlPlanId: string) {
+    await this.loadControlPlan(me, controlPlanId); // garante escopo
+    return this.prisma.foodSafetyMonitoringRecord.findMany({
+      where: { companyId: me.companyId, controlPlanId, deletedAt: null },
+      include: { recordedBy: { select: { id: true, name: true } } },
+      orderBy: { measuredAt: 'desc' },
+      take: 200,
+    });
+  }
+
+  async recordMonitoring(me: AuthPayload, controlPlanId: string, body: any) {
+    const plan = await this.loadControlPlan(me, controlPlanId);
+    await this.assertProcessWriteArea(me, plan.hazard.process?.orgNodeId ?? null, 'edit');
+    const valueNum = this.optionalFloat(body?.valueNum) ?? null;
+    let result = this.evaluateMonitoring(plan, valueNum);
+    // Sem valor numerico (limite textual), aceita classificacao manual.
+    if (valueNum == null && body?.result) result = this.parseResult(body.result) ?? result;
+
+    const isOut = result === FoodSafetyMonitoringResult.OUT;
+    const lotBlocked = isOut && plan.requiresLotBlock;
+    let nonConformityId: string | null = null;
+
+    if (isOut && plan.requiresNonConformity) {
+      try {
+        const nc = (await this.nonConformities.create(me, {
+          title: `Desvio de monitoramento — ${plan.parameter ?? plan.hazard.name}`,
+          description: `Valor "${valueNum ?? this.nullableText(body?.valueText) ?? '-'}" fora do limite no controle ${plan.controlType} do processo "${plan.hazard.process?.name ?? '-'}".`,
+          source: 'PROCESS',
+          severity: plan.controlType === FoodSafetyControlType.CCP ? 'CRITICAL' : 'MAJOR',
+          orgNodeId: plan.hazard.process?.orgNodeId ?? null,
+          immediateAction: plan.correction ?? null,
+        })) as { id?: string };
+        nonConformityId = nc?.id ?? null;
+      } catch {
+        // Nao bloqueia o registro do monitoramento se a abertura da NC falhar.
+      }
+    }
+
+    return this.prisma.foodSafetyMonitoringRecord.create({
+      data: {
+        companyId: me.companyId,
+        controlPlanId,
+        recordedById: me.sub,
+        measuredAt: this.optionalDate(body?.measuredAt) ?? new Date(),
+        valueNum,
+        valueText: this.nullableText(body?.valueText) ?? null,
+        result,
+        notes: this.nullableText(body?.notes) ?? null,
+        evidenceUrl: this.nullableText(body?.evidenceUrl) ?? null,
+        lotBlocked,
+        nonConformityId,
+      },
+      include: { recordedBy: { select: { id: true, name: true } } },
+    });
   }
 }

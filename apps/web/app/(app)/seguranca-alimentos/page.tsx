@@ -1,5 +1,6 @@
 'use client';
 
+import Link from 'next/link';
 import { useEffect, useMemo, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
@@ -14,7 +15,12 @@ import ReactFlow, {
 import 'reactflow/dist/style.css';
 import {
   AlertTriangle,
+  CheckSquare,
+  ClipboardCheck,
   ClipboardList,
+  FileText,
+  FileWarning,
+  GaugeCircle,
   Layers3,
   ListChecks,
   Network,
@@ -36,7 +42,7 @@ import { NativeSelect } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
 import { useAuth } from '@/components/auth/auth-provider';
 import { api } from '@/lib/api';
-import { cn, formatNumber } from '@/lib/utils';
+import { cn, formatDate, formatNumber } from '@/lib/utils';
 
 // ----------------------------- tipos --------------------------------------
 type ProgramStatus = 'ACTIVE' | 'DRAFT' | 'ARCHIVED';
@@ -199,6 +205,60 @@ interface RiskMatrix {
   thresholdHigh: number;
 }
 
+type ControlPlanStatus = 'ACTIVE' | 'INACTIVE';
+type MonitoringResult = 'OK' | 'ALERT' | 'OUT';
+
+interface ControlPlan {
+  id: string;
+  hazardId: string;
+  controlType: ControlType;
+  parameter: string | null;
+  unit: string | null;
+  criticalLimitText: string | null;
+  criticalMin: number | null;
+  criticalMax: number | null;
+  alertMin: number | null;
+  alertMax: number | null;
+  method: string | null;
+  instrument: string | null;
+  frequency: string | null;
+  correction: string | null;
+  correctiveAction: string | null;
+  requiresLotBlock: boolean;
+  requiresNonConformity: boolean;
+  status: ControlPlanStatus;
+  responsibleUserId: string | null;
+  hazard: { id: string; number: number; name: string; controlType: ControlType; process: { id: string; name: string; orgNodeId: string | null } | null; step: { id: string; name: string } | null } | null;
+  responsible: UserRef | null;
+  _count?: { records: number };
+}
+
+interface MonitoringRecord {
+  id: string;
+  measuredAt: string;
+  valueNum: number | null;
+  valueText: string | null;
+  result: MonitoringResult;
+  notes: string | null;
+  lotBlocked: boolean;
+  nonConformityId: string | null;
+  recordedBy: { id: string; name: string } | null;
+}
+
+const RESULT_LABEL: Record<MonitoringResult, string> = { OK: 'Dentro do limite', ALERT: 'Alerta', OUT: 'Fora do limite' };
+const RESULT_CLASS: Record<MonitoringResult, string> = {
+  OK: 'bg-emerald-100 text-emerald-700',
+  ALERT: 'bg-amber-100 text-amber-700',
+  OUT: 'bg-rose-100 text-rose-700',
+};
+
+function computeResultClient(plan: ControlPlan, valueNum: number | null): MonitoringResult {
+  if (valueNum == null) return 'OK';
+  if ((plan.criticalMin != null && valueNum < plan.criticalMin) || (plan.criticalMax != null && valueNum > plan.criticalMax)) return 'OUT';
+  if ((plan.alertMin != null && valueNum < plan.alertMin) || (plan.alertMax != null && valueNum > plan.alertMax)) return 'ALERT';
+  return 'OK';
+}
+
 const HAZARD_CATEGORY_LABEL: Record<HazardCategory, string> = {
   BIOLOGICAL: 'Biológico',
   CHEMICAL: 'Químico',
@@ -219,13 +279,23 @@ const RISK_LEVEL_CLASS: Record<RiskLevel, string> = {
 };
 const CONTROL_TYPE_LABEL: Record<ControlType, string> = { NONE: '—', PRP: 'PPR', OPRP: 'PPRO', CCP: 'PCC' };
 
-type TabKey = 'overview' | 'processes' | 'hazards' | 'flow' | 'matrix';
+type TabKey = 'overview' | 'processes' | 'hazards' | 'monitoring' | 'flow' | 'matrix';
 const TABS: Array<{ key: TabKey; label: string; icon: typeof Network }> = [
   { key: 'overview', label: 'Visão Geral', icon: ShieldCheck },
   { key: 'processes', label: 'Processos', icon: ListChecks },
   { key: 'hazards', label: 'Perigos / APPCC', icon: AlertTriangle },
+  { key: 'monitoring', label: 'Monitoramento', icon: GaugeCircle },
   { key: 'flow', label: 'Fluxograma', icon: Workflow },
   { key: 'matrix', label: 'Matriz Geral', icon: Layers3 },
+];
+
+// Reuso dos modulos corporativos existentes (integracao da Fase 1).
+const SHORTCUTS: Array<{ href: string; title: string; description: string; icon: typeof Network; tone: string }> = [
+  { href: '/documents', title: 'Documentos', description: 'Manuais, POPs, procedimentos, registros e evidências (GED).', icon: FileText, tone: 'bg-status-blue/10 text-status-blue' },
+  { href: '/actions', title: 'Tarefas e planos de ação', description: 'Ações corretivas, prazos, responsáveis e eficácia.', icon: CheckSquare, tone: 'bg-status-green/10 text-status-green' },
+  { href: '/audits', title: 'Auditorias e inspeções', description: 'Auditorias, checklists, constatações e geração de NCs.', icon: ClipboardCheck, tone: 'bg-status-purple/10 text-status-purple' },
+  { href: '/nonconformities', title: 'Não conformidades', description: 'NCs, análise de causa, ação corretiva e verificação.', icon: FileWarning, tone: 'bg-status-red/10 text-status-red' },
+  { href: '/forms', title: 'Formulários e checklists', description: 'Monitoramentos, checklists digitais e preenchimentos.', icon: ClipboardList, tone: 'bg-status-yellow/10 text-status-yellow' },
 ];
 
 // ----------------------------- página -------------------------------------
@@ -239,6 +309,8 @@ export default function SegurancaAlimentosPage() {
   const [processDialog, setProcessDialog] = useState<Process | 'new' | null>(null);
   const [hazardDialog, setHazardDialog] = useState<Hazard | 'new' | null>(null);
   const [matrixDialog, setMatrixDialog] = useState(false);
+  const [planDialog, setPlanDialog] = useState<ControlPlan | 'new' | null>(null);
+  const [recordPlan, setRecordPlan] = useState<ControlPlan | null>(null);
 
   const programs = useQuery<Program[]>({ queryKey: ['fsms', 'programs'], queryFn: () => api('/food-safety/programs') });
   const options = useQuery<Options>({ queryKey: ['fsms', 'options'], queryFn: () => api('/food-safety/options') });
@@ -262,6 +334,7 @@ export default function SegurancaAlimentosPage() {
   });
   const hazardsAll = useQuery<Hazard[]>({ queryKey: ['fsms', 'hazards'], queryFn: () => api('/food-safety/hazards'), enabled: !!programId });
   const riskMatrix = useQuery<RiskMatrix>({ queryKey: ['fsms', 'risk-matrix'], queryFn: () => api('/food-safety/risk-matrix') });
+  const controlPlans = useQuery<ControlPlan[]>({ queryKey: ['fsms', 'control-plans', programId], queryFn: () => api(`/food-safety/control-plans?programId=${programId}`), enabled: !!programId });
   const hazards = (hazardsAll.data ?? []).filter((h) => h.process?.programId === programId);
 
   function invalidate() {
@@ -358,6 +431,17 @@ export default function SegurancaAlimentosPage() {
               onConfig={() => setMatrixDialog(true)}
             />
           )}
+          {tab === 'monitoring' && (
+            <MonitoramentoTab
+              plans={controlPlans.data ?? []}
+              loading={controlPlans.isPending}
+              canManage={canManage}
+              hasHazards={hazards.length > 0}
+              onNew={() => setPlanDialog('new')}
+              onEdit={(p) => setPlanDialog(p)}
+              onRecord={(p) => setRecordPlan(p)}
+            />
+          )}
           {tab === 'flow' && (
             <FlowTab processes={processes.data ?? []} canManage={canManage} onOpen={(p) => setProcessDialog(p)} onChanged={invalidate} />
           )}
@@ -407,6 +491,19 @@ export default function SegurancaAlimentosPage() {
       {matrixDialog && (
         <RiskMatrixDialog matrix={riskMatrix.data} canManage={canManage} onClose={() => setMatrixDialog(false)} onSaved={() => { setMatrixDialog(false); invalidate(); }} />
       )}
+      {planDialog && (
+        <ControlPlanDialog
+          record={planDialog === 'new' ? null : planDialog}
+          hazards={hazards}
+          options={options.data}
+          canManage={canManage}
+          onClose={() => setPlanDialog(null)}
+          onSaved={() => { setPlanDialog(null); invalidate(); }}
+        />
+      )}
+      {recordPlan && (
+        <RecordDialog plan={recordPlan} canManage={canManage} onClose={() => setRecordPlan(null)} onSaved={() => { setRecordPlan(null); invalidate(); }} />
+      )}
     </div>
   );
 }
@@ -446,6 +543,35 @@ function OverviewTab({ program, summary }: { program: Program | null; summary?: 
             <Pill label="Aguardando aprovação" value={summary?.pendingApproval ?? 0} />
             <Pill label="Publicado" value={summary?.published ?? 0} />
             <Pill label="Obsoleto" value={summary?.obsolete ?? 0} />
+          </div>
+          <div className="mb-2 mt-4 font-semibold text-foreground">Perigos e controles</div>
+          <div className="flex flex-wrap gap-2">
+            <Pill label="Perigos" value={summary?.hazards ?? 0} />
+            <Pill label="Críticos" value={summary?.hazardsCritical ?? 0} />
+            <Pill label="Alto risco" value={summary?.hazardsHigh ?? 0} />
+            <Pill label="PCC" value={summary?.ccp ?? 0} />
+            <Pill label="PPRO" value={summary?.oprp ?? 0} />
+          </div>
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardContent className="p-5">
+          <div className="text-sm font-semibold">Documentos, tarefas e integrações</div>
+          <p className="mb-3 mt-1 text-xs text-muted-foreground">Atalhos para os módulos corporativos integrados à segurança dos alimentos.</p>
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-3">
+            {SHORTCUTS.map((s) => {
+              const Icon = s.icon;
+              return (
+                <Link key={s.href} href={s.href} className="group flex items-start gap-3 rounded-lg border bg-card p-3 transition-colors hover:bg-accent/35">
+                  <div className={cn('grid h-10 w-10 shrink-0 place-items-center rounded-md', s.tone)}><Icon className="h-5 w-5" /></div>
+                  <div className="min-w-0">
+                    <div className="text-sm font-semibold">{s.title}</div>
+                    <p className="mt-0.5 text-xs leading-relaxed text-muted-foreground">{s.description}</p>
+                  </div>
+                </Link>
+              );
+            })}
           </div>
         </CardContent>
       </Card>
@@ -1215,6 +1341,270 @@ function RiskMatrixDialog({ matrix, canManage, onClose, onSaved }: { matrix?: Ri
         <DialogFooter>
           <Button variant="ghost" onClick={onClose}>Fechar</Button>
           {canManage && <Button disabled={save.isPending} onClick={() => save.mutate()}>{save.isPending ? 'Salvando...' : 'Salvar'}</Button>}
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+// ----------------------------- Monitoramento (PPR/PPRO/PCC) ---------------
+function limitText(p: ControlPlan): string {
+  const parts: string[] = [];
+  if (p.criticalMin != null) parts.push(`≥ ${p.criticalMin}`);
+  if (p.criticalMax != null) parts.push(`≤ ${p.criticalMax}`);
+  return parts.length ? `${parts.join(' e ')}${p.unit ? ` ${p.unit}` : ''}` : '—';
+}
+
+function MonitoramentoTab({
+  plans,
+  loading,
+  canManage,
+  hasHazards,
+  onNew,
+  onEdit,
+  onRecord,
+}: {
+  plans: ControlPlan[];
+  loading: boolean;
+  canManage: boolean;
+  hasHazards: boolean;
+  onNew: () => void;
+  onEdit: (p: ControlPlan) => void;
+  onRecord: (p: ControlPlan) => void;
+}) {
+  return (
+    <Card>
+      <CardContent className="p-0">
+        <div className="flex items-center justify-between border-b p-3">
+          <div className="text-sm font-semibold">Monitoramento de controles (PPR / PPRO / PCC)</div>
+          {canManage && <Button size="sm" onClick={onNew} disabled={!hasHazards}><Plus className="mr-2 h-4 w-4" />Novo plano</Button>}
+        </div>
+        {!hasHazards && <div className="border-b bg-amber-50 p-2 text-center text-xs text-amber-700">Cadastre perigos na aba &quot;Perigos / APPCC&quot; antes de criar planos de monitoramento.</div>}
+        <div className="overflow-x-auto">
+          <table className="table-modern">
+            <thead>
+              <tr>
+                <th className="text-left">Controle</th>
+                <th className="text-left">Perigo / Processo</th>
+                <th className="text-left">Parâmetro</th>
+                <th className="text-left">Limite crítico</th>
+                <th className="text-left">Frequência</th>
+                <th className="text-left">Registros</th>
+                <th className="text-right">Ações</th>
+              </tr>
+            </thead>
+            <tbody>
+              {loading ? (
+                <tr><td colSpan={7} className="p-6 text-center text-sm text-muted-foreground">Carregando...</td></tr>
+              ) : plans.length === 0 ? (
+                <tr><td colSpan={7} className="p-6 text-center text-sm text-muted-foreground">Nenhum plano de monitoramento. Crie a partir de um perigo classificado (PCC/PPRO).</td></tr>
+              ) : (
+                plans.map((p) => (
+                  <tr key={p.id}>
+                    <td><Badge variant="outline">{CONTROL_TYPE_LABEL[p.controlType]}</Badge></td>
+                    <td className="text-sm">{p.hazard?.name ?? '—'}<div className="text-xs text-muted-foreground">{p.hazard?.process?.name ?? ''}</div></td>
+                    <td>{p.parameter ?? '—'}{p.unit ? ` (${p.unit})` : ''}</td>
+                    <td className="text-sm">{p.criticalLimitText ?? limitText(p)}</td>
+                    <td className="text-sm">{p.frequency ?? '—'}</td>
+                    <td>{p._count?.records ?? 0}</td>
+                    <td className="text-right">
+                      <div className="flex justify-end gap-2">
+                        {canManage && <Button size="sm" onClick={() => onRecord(p)}>Registrar</Button>}
+                        <Button variant="outline" size="sm" onClick={() => onEdit(p)}>{canManage ? 'Editar' : 'Ver'}</Button>
+                      </div>
+                    </td>
+                  </tr>
+                ))
+              )}
+            </tbody>
+          </table>
+        </div>
+      </CardContent>
+    </Card>
+  );
+}
+
+function ControlPlanDialog({
+  record,
+  hazards,
+  options,
+  canManage,
+  onClose,
+  onSaved,
+}: {
+  record: ControlPlan | null;
+  hazards: Hazard[];
+  options?: Options;
+  canManage: boolean;
+  onClose: () => void;
+  onSaved: () => void;
+}) {
+  const [form, setForm] = useState({
+    hazardId: record?.hazardId ?? (hazards[0]?.id ?? ''),
+    controlType: (record?.controlType ?? hazards[0]?.controlType ?? 'CCP') as ControlType,
+    parameter: record?.parameter ?? '',
+    unit: record?.unit ?? '',
+    criticalLimitText: record?.criticalLimitText ?? '',
+    criticalMin: record?.criticalMin != null ? String(record.criticalMin) : '',
+    criticalMax: record?.criticalMax != null ? String(record.criticalMax) : '',
+    alertMin: record?.alertMin != null ? String(record.alertMin) : '',
+    alertMax: record?.alertMax != null ? String(record.alertMax) : '',
+    method: record?.method ?? '',
+    instrument: record?.instrument ?? '',
+    frequency: record?.frequency ?? '',
+    correction: record?.correction ?? '',
+    correctiveAction: record?.correctiveAction ?? '',
+    requiresLotBlock: record?.requiresLotBlock ?? false,
+    requiresNonConformity: record?.requiresNonConformity ?? true,
+    responsibleUserId: record?.responsibleUserId ?? '',
+    status: (record?.status ?? 'ACTIVE') as ControlPlanStatus,
+  });
+  const save = useMutation({
+    mutationFn: () => {
+      const payload = {
+        ...form,
+        parameter: form.parameter || null,
+        unit: form.unit || null,
+        criticalLimitText: form.criticalLimitText || null,
+        criticalMin: form.criticalMin || null,
+        criticalMax: form.criticalMax || null,
+        alertMin: form.alertMin || null,
+        alertMax: form.alertMax || null,
+        method: form.method || null,
+        instrument: form.instrument || null,
+        frequency: form.frequency || null,
+        correction: form.correction || null,
+        correctiveAction: form.correctiveAction || null,
+        responsibleUserId: form.responsibleUserId || null,
+      };
+      return record
+        ? api(`/food-safety/control-plans/${record.id}`, { method: 'PATCH', json: payload })
+        : api('/food-safety/control-plans', { method: 'POST', json: payload });
+    },
+    onSuccess: () => { toast.success('Plano de controle salvo'); onSaved(); },
+    onError: (e: any) => toast.error(e?.message ?? 'Falha ao salvar'),
+  });
+
+  return (
+    <Dialog open onOpenChange={(o) => !o && onClose()}>
+      <DialogContent className="max-h-[88vh] max-w-3xl overflow-y-auto">
+        <DialogHeader><DialogTitle>{record ? 'Plano de controle' : 'Novo plano de controle'}</DialogTitle></DialogHeader>
+        <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+          <div>
+            <Label className="field-required">Perigo</Label>
+            <NativeSelect value={form.hazardId} onChange={(e) => { const h = hazards.find((x) => x.id === e.target.value); setForm({ ...form, hazardId: e.target.value, controlType: (h?.controlType ?? form.controlType) as ControlType }); }} disabled={!canManage || !!record}>
+              {hazards.map((h) => <option key={h.id} value={h.id}>{h.name}{h.controlType !== 'NONE' ? ` (${CONTROL_TYPE_LABEL[h.controlType]})` : ''}</option>)}
+            </NativeSelect>
+          </div>
+          <div>
+            <Label>Tipo de controle</Label>
+            <NativeSelect value={form.controlType} onChange={(e) => setForm({ ...form, controlType: e.target.value as ControlType })} disabled={!canManage}>
+              <option value="PRP">PPR</option>
+              <option value="OPRP">PPRO</option>
+              <option value="CCP">PCC</option>
+            </NativeSelect>
+          </div>
+          <div><Label>Parâmetro</Label><Input value={form.parameter} onChange={(e) => setForm({ ...form, parameter: e.target.value })} disabled={!canManage} placeholder="Ex.: Temperatura" /></div>
+          <div><Label>Unidade</Label><Input value={form.unit} onChange={(e) => setForm({ ...form, unit: e.target.value })} disabled={!canManage} placeholder="°C, pH, ppm..." /></div>
+          <div className="rounded-lg border p-3 md:col-span-2">
+            <div className="mb-2 text-sm font-semibold">Limites</div>
+            <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+              <div><Label>Crítico mín.</Label><Input type="number" value={form.criticalMin} onChange={(e) => setForm({ ...form, criticalMin: e.target.value })} disabled={!canManage} /></div>
+              <div><Label>Crítico máx.</Label><Input type="number" value={form.criticalMax} onChange={(e) => setForm({ ...form, criticalMax: e.target.value })} disabled={!canManage} /></div>
+              <div><Label>Alerta mín.</Label><Input type="number" value={form.alertMin} onChange={(e) => setForm({ ...form, alertMin: e.target.value })} disabled={!canManage} /></div>
+              <div><Label>Alerta máx.</Label><Input type="number" value={form.alertMax} onChange={(e) => setForm({ ...form, alertMax: e.target.value })} disabled={!canManage} /></div>
+            </div>
+            <div className="mt-2"><Label>Limite crítico (texto, opcional)</Label><Input value={form.criticalLimitText} onChange={(e) => setForm({ ...form, criticalLimitText: e.target.value })} disabled={!canManage} placeholder="Ex.: ≥ 72°C por 15s" /></div>
+          </div>
+          <div><Label>Método de medição</Label><Input value={form.method} onChange={(e) => setForm({ ...form, method: e.target.value })} disabled={!canManage} /></div>
+          <div><Label>Instrumento</Label><Input value={form.instrument} onChange={(e) => setForm({ ...form, instrument: e.target.value })} disabled={!canManage} /></div>
+          <div><Label>Frequência</Label><Input value={form.frequency} onChange={(e) => setForm({ ...form, frequency: e.target.value })} disabled={!canManage} placeholder="Ex.: a cada lote / 2h" /></div>
+          <div>
+            <Label>Responsável</Label>
+            <NativeSelect value={form.responsibleUserId} onChange={(e) => setForm({ ...form, responsibleUserId: e.target.value })} disabled={!canManage}>
+              <option value="">—</option>
+              {(options?.users ?? []).map((u) => <option key={u.id} value={u.id}>{u.name}</option>)}
+            </NativeSelect>
+          </div>
+          <div className="md:col-span-2"><Label>Ação imediata no desvio</Label><Textarea rows={2} value={form.correction} onChange={(e) => setForm({ ...form, correction: e.target.value })} disabled={!canManage} /></div>
+          <div className="md:col-span-2"><Label>Ação corretiva</Label><Textarea rows={2} value={form.correctiveAction} onChange={(e) => setForm({ ...form, correctiveAction: e.target.value })} disabled={!canManage} /></div>
+          <label className="flex items-center gap-2 text-sm"><input type="checkbox" checked={form.requiresLotBlock} onChange={(e) => setForm({ ...form, requiresLotBlock: e.target.checked })} disabled={!canManage} />Bloquear lote no desvio</label>
+          <label className="flex items-center gap-2 text-sm"><input type="checkbox" checked={form.requiresNonConformity} onChange={(e) => setForm({ ...form, requiresNonConformity: e.target.checked })} disabled={!canManage} />Abrir NC automática no desvio</label>
+        </div>
+        <DialogFooter>
+          <Button variant="ghost" onClick={onClose}>Fechar</Button>
+          {canManage && <Button disabled={!form.hazardId || save.isPending} onClick={() => save.mutate()}>{save.isPending ? 'Salvando...' : 'Salvar'}</Button>}
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+function RecordDialog({ plan, canManage, onClose, onSaved }: { plan: ControlPlan; canManage: boolean; onClose: () => void; onSaved: () => void }) {
+  const [valueNum, setValueNum] = useState('');
+  const [valueText, setValueText] = useState('');
+  const [notes, setNotes] = useState('');
+  const records = useQuery<MonitoringRecord[]>({ queryKey: ['fsms', 'records', plan.id], queryFn: () => api(`/food-safety/control-plans/${plan.id}/records`) });
+  const preview = computeResultClient(plan, valueNum ? Number(valueNum) : null);
+
+  const save = useMutation({
+    mutationFn: () => api<MonitoringRecord>(`/food-safety/control-plans/${plan.id}/records`, { method: 'POST', json: { valueNum: valueNum || null, valueText: valueText || null, notes: notes || null } }),
+    onSuccess: (rec) => {
+      if (rec?.result === 'OUT') toast.error('Desvio registrado (fora do limite). Não conformidade aberta automaticamente.');
+      else toast.success('Monitoramento registrado');
+      onSaved();
+    },
+    onError: (e: any) => toast.error(e?.message ?? 'Falha ao registrar'),
+  });
+
+  return (
+    <Dialog open onOpenChange={(o) => !o && onClose()}>
+      <DialogContent className="max-w-2xl">
+        <DialogHeader><DialogTitle>Registrar monitoramento — {plan.parameter ?? plan.hazard?.name}</DialogTitle></DialogHeader>
+        <div className="rounded-md border bg-muted/20 p-3 text-xs text-muted-foreground">
+          <Badge variant="outline" className="mr-2">{CONTROL_TYPE_LABEL[plan.controlType]}</Badge>
+          Limite crítico: <span className="font-medium text-foreground">{plan.criticalLimitText ?? limitText(plan)}</span>
+          {plan.frequency ? <> · Frequência: {plan.frequency}</> : null}
+        </div>
+        {canManage && (
+          <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
+            <div><Label>Valor medido</Label><Input type="number" value={valueNum} onChange={(e) => setValueNum(e.target.value)} placeholder={plan.unit ?? ''} /></div>
+            <div><Label>Ou valor (texto)</Label><Input value={valueText} onChange={(e) => setValueText(e.target.value)} placeholder="Conforme / Não conforme" /></div>
+            <div className="md:col-span-2"><Label>Observações</Label><Textarea rows={2} value={notes} onChange={(e) => setNotes(e.target.value)} /></div>
+            <div className="md:col-span-2 flex items-center justify-between rounded-md border p-2">
+              <span className="text-xs text-muted-foreground">Resultado previsto</span>
+              <span className={cn('rounded px-2 py-1 text-sm font-semibold', RESULT_CLASS[preview])}>{RESULT_LABEL[preview]}</span>
+            </div>
+            {preview === 'OUT' && plan.requiresNonConformity && <div className="md:col-span-2 text-xs text-rose-600">Ao salvar, será aberta uma não conformidade automaticamente{plan.requiresLotBlock ? ' e o lote será sinalizado para bloqueio' : ''}.</div>}
+          </div>
+        )}
+
+        <div className="mt-2">
+          <div className="mb-1 text-sm font-semibold">Últimos registros</div>
+          <div className="max-h-56 overflow-y-auto rounded-md border">
+            <table className="table-modern">
+              <thead><tr><th className="text-left">Quando</th><th className="text-left">Valor</th><th className="text-left">Resultado</th><th className="text-left">Por</th></tr></thead>
+              <tbody>
+                {(records.data ?? []).length === 0 ? (
+                  <tr><td colSpan={4} className="p-3 text-center text-xs text-muted-foreground">Sem registros ainda.</td></tr>
+                ) : (
+                  (records.data ?? []).map((r) => (
+                    <tr key={r.id}>
+                      <td className="text-xs">{formatDate(r.measuredAt)}</td>
+                      <td className="text-sm">{r.valueNum ?? r.valueText ?? '—'}</td>
+                      <td><span className={cn('rounded px-2 py-0.5 text-xs font-medium', RESULT_CLASS[r.result])}>{RESULT_LABEL[r.result]}</span>{r.lotBlocked ? <span className="ml-1 text-[10px] text-rose-600">lote bloqueado</span> : null}</td>
+                      <td className="text-xs">{r.recordedBy?.name ?? '—'}</td>
+                    </tr>
+                  ))
+                )}
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        <DialogFooter>
+          <Button variant="ghost" onClick={onClose}>Fechar</Button>
+          {canManage && <Button disabled={(!valueNum && !valueText) || save.isPending} onClick={() => save.mutate()}>{save.isPending ? 'Registrando...' : 'Registrar'}</Button>}
         </DialogFooter>
       </DialogContent>
     </Dialog>

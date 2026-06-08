@@ -157,4 +157,52 @@ export class FoodSafetyController {
   removeHazard(@CurrentUser() me: AuthPayload, @Param('id') id: string) {
     return this.service.removeHazard(me, id);
   }
+
+  // ----- controle operacional (PPR/PPRO/PCC) -----
+  @Get('control-plans')
+  @RequirePermissions('fsms:view')
+  listControlPlans(
+    @CurrentUser() me: AuthPayload,
+    @Query('hazardId') hazardId?: string,
+    @Query('programId') programId?: string,
+    @Query('status') status?: string,
+  ) {
+    return this.service.listControlPlans(me, { hazardId, programId, status });
+  }
+
+  @Get('control-plans/:id')
+  @RequirePermissions('fsms:view')
+  getControlPlan(@CurrentUser() me: AuthPayload, @Param('id') id: string) {
+    return this.service.getControlPlan(me, id);
+  }
+
+  @Post('control-plans')
+  @RequirePermissions('fsms:create')
+  createControlPlan(@CurrentUser() me: AuthPayload, @Body() body: any) {
+    return this.service.createControlPlan(me, body);
+  }
+
+  @Patch('control-plans/:id')
+  @RequirePermissions('fsms:update')
+  updateControlPlan(@CurrentUser() me: AuthPayload, @Param('id') id: string, @Body() body: any) {
+    return this.service.updateControlPlan(me, id, body);
+  }
+
+  @Delete('control-plans/:id')
+  @RequirePermissions('fsms:delete')
+  removeControlPlan(@CurrentUser() me: AuthPayload, @Param('id') id: string) {
+    return this.service.removeControlPlan(me, id);
+  }
+
+  @Get('control-plans/:id/records')
+  @RequirePermissions('fsms:view')
+  listRecords(@CurrentUser() me: AuthPayload, @Param('id') id: string) {
+    return this.service.listRecords(me, id);
+  }
+
+  @Post('control-plans/:id/records')
+  @RequirePermissions('fsms:update')
+  recordMonitoring(@CurrentUser() me: AuthPayload, @Param('id') id: string, @Body() body: any) {
+    return this.service.recordMonitoring(me, id, body);
+  }
 }

@@ -542,6 +542,8 @@ model Company {
   fsProcessSteps         FoodSafetyProcessStep[] @relation("FsStepCompany")
   fsRiskMatrices         FoodSafetyRiskMatrix[]  @relation("FsRiskMatrixCompany")
   fsHazards              FoodSafetyHazard[]      @relation("FsHazardCompany")
+  fsControlPlans         FoodSafetyControlPlan[] @relation("FsControlPlanCompany")
+  fsMonitoringRecords    FoodSafetyMonitoringRecord[] @relation("FsMonitoringCompany")
   formTemplates          FormTemplate[]
   formSubmissions        FormSubmission[]
   meetings               Meeting[]
@@ -727,6 +729,8 @@ model User {
   fsProcessesOwned           FoodSafetyProcess[]         @relation("FsProcessOwner")
   fsProcessesCreated         FoodSafetyProcess[]         @relation("FsProcessCreatedBy")
   fsHazardsResponsible       FoodSafetyHazard[]          @relation("FsHazardResponsible")
+  fsControlPlansResponsible  FoodSafetyControlPlan[]      @relation("FsControlPlanResponsible")
+  fsMonitoringRecorded       FoodSafetyMonitoringRecord[] @relation("FsMonitoringRecordedBy")
   formTemplatesOwned         FormTemplate[]              @relation("FormTemplateOwner")
   formTemplatesCreated       FormTemplate[]              @relation("FormTemplateCreatedBy")
   formSubmissionsSubmitted   FormSubmission[]            @relation("FormSubmissionSubmittedBy")
@@ -6981,10 +6985,89 @@ model FoodSafetyHazard {
   updatedAt            DateTime                 @updatedAt
   deletedAt            DateTime?
 
+  controlPlans FoodSafetyControlPlan[]
+
   @@unique([companyId, number])
   @@index([companyId])
   @@index([processId])
   @@index([stepId])
   @@index([category])
   @@index([controlType])
+}
+
+// ----- Controle operacional: PPR/PPRO/PCC (Fase 2) ------------------------
+
+enum FoodSafetyControlPlanStatus {
+  ACTIVE
+  INACTIVE
+}
+
+enum FoodSafetyMonitoringResult {
+  OK
+  ALERT
+  OUT
+}
+
+// Plano de monitoramento de um controle (PPR/PPRO/PCC) ligado a um perigo:
+// parametro, limites criticos/alerta, metodo, frequencia e acoes no desvio.
+model FoodSafetyControlPlan {
+  id                    String                      @id @default(uuid())
+  companyId             String
+  company               Company                     @relation("FsControlPlanCompany", fields: [companyId], references: [id])
+  hazardId              String
+  hazard                FoodSafetyHazard            @relation(fields: [hazardId], references: [id])
+  responsibleUserId     String?
+  responsible           User?                       @relation("FsControlPlanResponsible", fields: [responsibleUserId], references: [id])
+  controlType           FoodSafetyControlType       @default(CCP)
+  parameter             String?
+  unit                  String?
+  criticalLimitText     String?
+  criticalMin           Float?
+  criticalMax           Float?
+  alertMin              Float?
+  alertMax              Float?
+  method                String?
+  instrument            String?
+  frequency             String?
+  correction            String?
+  correctiveAction      String?
+  requiresLotBlock      Boolean                     @default(false)
+  requiresNonConformity Boolean                     @default(true)
+  status                FoodSafetyControlPlanStatus @default(ACTIVE)
+  createdAt             DateTime                    @default(now())
+  updatedAt             DateTime                    @updatedAt
+  deletedAt             DateTime?
+
+  records FoodSafetyMonitoringRecord[]
+
+  @@index([companyId])
+  @@index([hazardId])
+  @@index([companyId, status])
+}
+
+// Registro (execucao) de um monitoramento, com resultado calculado vs limites.
+// Em desvio (OUT) pode bloquear lote e gerar nao conformidade (modulo nonconformities).
+model FoodSafetyMonitoringRecord {
+  id              String                     @id @default(uuid())
+  companyId       String
+  company         Company                    @relation("FsMonitoringCompany", fields: [companyId], references: [id])
+  controlPlanId   String
+  controlPlan     FoodSafetyControlPlan      @relation(fields: [controlPlanId], references: [id])
+  recordedById    String?
+  recordedBy      User?                      @relation("FsMonitoringRecordedBy", fields: [recordedById], references: [id])
+  measuredAt      DateTime                   @default(now())
+  valueNum        Float?
+  valueText       String?
+  result          FoodSafetyMonitoringResult @default(OK)
+  notes           String?
+  evidenceUrl     String?
+  lotBlocked      Boolean                    @default(false)
+  nonConformityId String?
+  createdAt       DateTime                   @default(now())
+  updatedAt       DateTime                   @updatedAt
+  deletedAt       DateTime?
+
+  @@index([companyId])
+  @@index([controlPlanId])
+  @@index([result])
 }
