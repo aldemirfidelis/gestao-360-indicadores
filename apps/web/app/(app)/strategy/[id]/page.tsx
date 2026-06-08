@@ -58,6 +58,7 @@ import {
   X,
 } from 'lucide-react';
 import { PageHeader } from '@/components/shell/page-header';
+import { useAuth } from '@/components/auth/auth-provider';
 import { SectionCard } from '@/components/platform/section-card';
 import { StatusBadge } from '@/components/platform/status-badge';
 import { Button } from '@/components/ui/button';
@@ -73,7 +74,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
-import { api } from '@/lib/api';
+import { api, ApiError } from '@/lib/api';
 import { cn, formatDate, formatNumber, formatPercent, periodRefLabel } from '@/lib/utils';
 import { ACTION_PRIORITY_LABEL, ACTION_STATUS_LABEL } from '@/lib/labels';
 
@@ -795,6 +796,8 @@ function StrategyMapPageInner() {
   const { id } = useParams<{ id: string }>();
   const qc = useQueryClient();
   const reactFlow = useReactFlow();
+  const { user } = useAuth();
+  const authScope = `${user?.id ?? 'anon'}:${user?.companyId ?? 'none'}`;
   const canvasRef = useRef<HTMLDivElement | null>(null);
   const [nodes, setNodes, onNodesChange] = useNodesState([]);
   const [edges, setEdges, onEdgesChange] = useEdgesState([]);
@@ -830,7 +833,7 @@ function StrategyMapPageInner() {
   const [periodOptions, setPeriodOptions] = useState<string[]>([]);
 
   const mapQuery = useQuery<StrategicMap>({
-    queryKey: ['strategy', 'map', id, period],
+    queryKey: ['strategy', 'map', authScope, id, period],
     queryFn: () =>
       api<StrategicMap>(`/strategy/maps/${id}${period ? `?periodRef=${encodeURIComponent(period)}` : ''}`),
     staleTime: 30_000,
@@ -838,11 +841,11 @@ function StrategyMapPageInner() {
   });
 
   const optionsQuery = useQuery<StrategyOptions>({
-    queryKey: ['strategy', 'options'],
+    queryKey: ['strategy', 'options', authScope],
     queryFn: () => api<StrategyOptions>('/strategy/options'),
   });
 
-  const map = mapQuery.data;
+  const map = mapQuery.isError ? undefined : mapQuery.data;
   const mapRef = useRef<StrategicMap | undefined>(map);
 
   // Lista de periodos disponiveis (derivada do modo atual, mantida ao filtrar)
@@ -1049,7 +1052,7 @@ function StrategyMapPageInner() {
   }, [selectedPerspective, selectedObjective]);
 
   const invalidate = () => {
-    qc.invalidateQueries({ queryKey: ['strategy', 'map', id] });
+    qc.invalidateQueries({ queryKey: ['strategy', 'map', authScope, id] });
   };
 
   const createPerspective = useMutation({
@@ -1320,6 +1323,24 @@ function StrategyMapPageInner() {
   }, [editingRelation?.id]);
 
   if (mapQuery.isLoading) return <p className="text-sm text-muted-foreground">Carregando mapa estratégico...</p>;
+  if (mapQuery.isError) {
+    const status = mapQuery.error instanceof ApiError ? mapQuery.error.status : undefined;
+    const description = status === 404 || status === 403
+      ? 'Este mapa nao pertence a sua empresa ou voce nao tem permissao para acessa-lo.'
+      : 'Nao foi possivel carregar o mapa agora.';
+    return (
+      <SectionCard title="Mapa indisponivel" description={description}>
+        <div className="flex flex-wrap items-center gap-2">
+          <Button asChild>
+            <Link href="/strategy">Voltar aos mapas da minha empresa</Link>
+          </Button>
+          <Button variant="outline" onClick={() => mapQuery.refetch()}>
+            Tentar novamente
+          </Button>
+        </div>
+      </SectionCard>
+    );
+  }
   if (!map) return null;
 
   return (

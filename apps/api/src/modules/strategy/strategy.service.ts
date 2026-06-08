@@ -98,11 +98,11 @@ export class StrategyService {
           where: { deletedAt: null },
           include: {
             perspective: true,
-            responsibleUser: { select: { id: true, name: true, email: true } },
-            ownerNode: { select: { id: true, name: true, type: true } },
+            responsibleUser: { select: { id: true, name: true, email: true, companyId: true } },
+            ownerNode: { select: { id: true, name: true, type: true, companyId: true } },
             orgNodeLinks: {
               where: { deletedAt: null },
-              include: { orgNode: { select: { id: true, name: true, type: true } } },
+              include: { orgNode: { select: { id: true, name: true, type: true, companyId: true } } },
             },
             indicatorLinks: {
               where: { deletedAt: null },
@@ -111,11 +111,11 @@ export class StrategyService {
             indicators: indicatorSelect(periodRef),
             outRelations: {
               where: { deletedAt: null, active: true },
-              include: { to: { select: { id: true, name: true, perspectiveId: true, status: true } } },
+              include: { to: { select: { id: true, name: true, mapId: true, perspectiveId: true, status: true } } },
             },
             inRelations: {
               where: { deletedAt: null, active: true },
-              include: { from: { select: { id: true, name: true, perspectiveId: true, status: true } } },
+              include: { from: { select: { id: true, name: true, mapId: true, perspectiveId: true, status: true } } },
             },
           },
           orderBy: [{ perspective: { position: 'asc' } }, { position: 'asc' }, { name: 'asc' }],
@@ -138,32 +138,32 @@ export class StrategyService {
     });
     if (!map) throw new NotFoundException('Mapa nao encontrado');
 
-    const objectiveIndicatorIds = map.objectives.flatMap((obj) => uniqueIndicators(obj).map((indicator) => indicator.id));
+    const objectiveIndicatorIds = map.objectives.flatMap((obj) => uniqueIndicators(obj, map.companyId).map((indicator) => indicator.id));
     const [actionCounts, treatmentCounts, deviationCounts, actionDetails, projectCounts] = await Promise.all([
       objectiveIndicatorIds.length
         ? this.prisma.actionPlan.groupBy({
             by: ['indicatorId'],
-            where: { indicatorId: { in: objectiveIndicatorIds }, deletedAt: null },
+            where: { companyId: map.companyId, indicatorId: { in: objectiveIndicatorIds }, deletedAt: null },
             _count: { _all: true },
           })
         : [],
       objectiveIndicatorIds.length
         ? this.prisma.treatmentCase.groupBy({
             by: ['indicatorId'],
-            where: { indicatorId: { in: objectiveIndicatorIds } },
+            where: { companyId: map.companyId, indicatorId: { in: objectiveIndicatorIds } },
             _count: { _all: true },
           })
         : [],
       objectiveIndicatorIds.length
         ? this.prisma.deviation.groupBy({
             by: ['indicatorId'],
-            where: { indicatorId: { in: objectiveIndicatorIds }, deletedAt: null },
+            where: { companyId: map.companyId, indicatorId: { in: objectiveIndicatorIds }, deletedAt: null },
             _count: { _all: true },
           })
         : [],
       objectiveIndicatorIds.length
         ? this.prisma.actionPlan.findMany({
-            where: { indicatorId: { in: objectiveIndicatorIds }, deletedAt: null },
+            where: { companyId: map.companyId, indicatorId: { in: objectiveIndicatorIds }, deletedAt: null },
             select: {
               id: true,
               indicatorId: true,
@@ -203,11 +203,15 @@ export class StrategyService {
     const baseLights = new Map<string, TrafficLight>();
     const baseAttainments = new Map<string, number | null>();
     const now = new Date();
+    const mapObjectiveIds = new Set(map.objectives.map((obj) => obj.id));
     const enrichedObjectives = map.objectives.map((obj) => {
-      const indicators = uniqueIndicators(obj).map((indicator) => ({
+      const indicators = uniqueIndicators(obj, map.companyId).map((indicator) => ({
         ...indicator,
         actions: actionDetailsByIndicator.get(indicator.id) ?? [],
       }));
+      const orgNodeLinks = obj.orgNodeLinks.filter((link) => link.orgNode.companyId === map.companyId);
+      const outRelations = obj.outRelations.filter((relation) => relation.to.mapId === map.id && mapObjectiveIds.has(relation.to.id));
+      const inRelations = obj.inRelations.filter((relation) => relation.from.mapId === map.id && mapObjectiveIds.has(relation.from.id));
       const lights = indicators.map((i) => i.results[0]?.light).filter((l): l is TrafficLight => !!l);
       const attainments = indicators.map((i) => i.results[0]?.attainment).filter((v): v is number => v !== null && v !== undefined);
       const avg = attainments.length > 0 ? attainments.reduce((a, b) => a + b, 0) / attainments.length : null;
@@ -222,6 +226,11 @@ export class StrategyService {
       ).length;
       return {
         ...obj,
+        responsibleUser: obj.responsibleUser?.companyId === map.companyId ? obj.responsibleUser : null,
+        ownerNode: obj.ownerNode?.companyId === map.companyId ? obj.ownerNode : null,
+        orgNodeLinks,
+        outRelations,
+        inRelations,
         indicators,
         indicatorLinks: undefined,
         baseLight,
@@ -1332,12 +1341,13 @@ function indicatorSelect(periodRef?: string) {
   return {
     select: {
       id: true,
+      companyId: true,
       name: true,
       code: true,
       status: true,
       ownerNodeId: true,
-      ownerNode: { select: { id: true, name: true, type: true } },
-      responsibleUser: { select: { id: true, name: true } },
+      ownerNode: { select: { id: true, name: true, type: true, companyId: true } },
+      responsibleUser: { select: { id: true, name: true, companyId: true } },
       // Com periodRef, faroi/atingimento sao calculados "como estavam" naquele periodo;
       // sem periodRef, usa-se o resultado mais recente.
       results: periodRef
@@ -1348,10 +1358,15 @@ function indicatorSelect(periodRef?: string) {
   };
 }
 
-function uniqueIndicators(obj: { indicators?: any[]; indicatorLinks?: Array<{ indicator: any }> }) {
+function uniqueIndicators(obj: { indicators?: any[]; indicatorLinks?: Array<{ indicator: any }> }, companyId?: string) {
   const map = new Map<string, any>();
-  for (const indicator of obj.indicators ?? []) map.set(indicator.id, indicator);
-  for (const link of obj.indicatorLinks ?? []) map.set(link.indicator.id, link.indicator);
+  for (const indicator of obj.indicators ?? []) {
+    if (indicator && (!companyId || indicator.companyId === companyId)) map.set(indicator.id, indicator);
+  }
+  for (const link of obj.indicatorLinks ?? []) {
+    const indicator = link.indicator;
+    if (indicator && (!companyId || indicator.companyId === companyId)) map.set(indicator.id, indicator);
+  }
   return Array.from(map.values());
 }
 

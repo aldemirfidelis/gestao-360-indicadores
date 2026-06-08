@@ -2,6 +2,7 @@
 
 import { createContext, useContext, useEffect, useState, ReactNode } from 'react';
 import { useRouter, usePathname } from 'next/navigation';
+import { useQueryClient } from '@tanstack/react-query';
 import { api, clearTokens, getAccessToken, setTokens } from '@/lib/api';
 
 export interface AuthUser {
@@ -40,11 +41,17 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [loading, setLoading] = useState(true);
   const router = useRouter();
   const pathname = usePathname();
+  const queryClient = useQueryClient();
 
   const refreshUser = async () => {
     const profile = await api<AuthUser & { sub?: string }>('/auth/me');
     const normalized = { ...profile, id: profile.sub ?? profile.id, permissions: profile.permissions ?? [] };
-    setUser(normalized);
+    setUser((current) => {
+      if (current && !sameAuthScope(current, normalized)) {
+        queryClient.clear();
+      }
+      return normalized;
+    });
     return normalized;
   };
 
@@ -60,6 +67,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     refreshUser()
       .catch(() => {
         clearTokens();
+        queryClient.clear();
         router.replace('/login');
       })
       .finally(() => setLoading(false));
@@ -67,12 +75,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const login = async (email: string, password: string) => {
+    queryClient.clear();
+    setUser(null);
     const out = await api<{
       accessToken: string;
       refreshToken: string;
       user: AuthUser;
     }>('/auth/login', { method: 'POST', json: { email, password } });
     setTokens(out.accessToken, out.refreshToken);
+    queryClient.clear();
     const profile = await refreshUser();
     // Super Admin escolhe qual empresa administrar antes de entrar.
     router.replace(profile?.role === 'SUPER_ADMIN' ? '/selecionar-empresa' : '/dashboard');
@@ -80,6 +91,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const switchCompany = async (companyId: string | null) => {
     await api('/platform/switch', { method: 'POST', json: { companyId } });
+    queryClient.clear();
     // Reload duro: zera o cache do React Query e refaz todas as queries já no
     // escopo da nova empresa efetiva (recomputada no backend a cada requisição).
     if (typeof window !== 'undefined') window.location.assign('/dashboard');
@@ -92,6 +104,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       /* no-op */
     }
     clearTokens();
+    queryClient.clear();
     setUser(null);
     router.replace('/login');
   };
@@ -112,4 +125,14 @@ export function useAuth(): AuthCtx {
   const ctx = useContext(Ctx);
   if (!ctx) throw new Error('useAuth fora de AuthProvider');
   return ctx;
+}
+
+function sameAuthScope(a: AuthUser, b: AuthUser) {
+  return (
+    a.id === b.id &&
+    a.companyId === b.companyId &&
+    a.homeCompanyId === b.homeCompanyId &&
+    a.role === b.role &&
+    Boolean(a.impersonating) === Boolean(b.impersonating)
+  );
 }

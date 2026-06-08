@@ -20,15 +20,20 @@ describe('StrategyService — mapa executivo enriquecido', () => {
           objectives: [
             {
               id: 'obj-1',
+              responsibleUser: null,
+              ownerNode: null,
+              orgNodeLinks: [],
               indicatorLinks: [],
               indicators: [
                 {
                   id: 'ind-1',
+                  companyId: 'companyA',
                   results: [{ light: TrafficLight.RED, attainment: 0.4, value: 40, periodRef: '2026-06' }],
                   targets: [{ target: 100, periodRef: '2026-06' }],
                 },
               ],
               outRelations: [],
+              inRelations: [],
             },
           ],
         }),
@@ -57,6 +62,10 @@ describe('StrategyService — mapa executivo enriquecido', () => {
     const objective = result.objectives[0] as any;
 
     expect(prisma.project.groupBy.mock.calls[0][0].where.companyId).toBe('companyA');
+    expect(prisma.actionPlan.groupBy.mock.calls[0][0].where.companyId).toBe('companyA');
+    expect(prisma.actionPlan.findMany.mock.calls[0][0].where.companyId).toBe('companyA');
+    expect(prisma.treatmentCase.groupBy.mock.calls[0][0].where.companyId).toBe('companyA');
+    expect(prisma.deviation.groupBy.mock.calls[0][0].where.companyId).toBe('companyA');
     expect(objective.actionCount).toBe(3);
     expect(objective.openActionCount).toBe(2);
     expect(objective.lateActionCount).toBe(1);
