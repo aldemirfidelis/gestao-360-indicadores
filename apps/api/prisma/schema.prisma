@@ -537,6 +537,9 @@ model Company {
   documents              Document[]
   audits                 Audit[]
   processes              Process[]
+  fsPrograms             FoodSafetyProgram[]     @relation("FsProgramCompany")
+  fsProcesses            FoodSafetyProcess[]     @relation("FsProcessCompany")
+  fsProcessSteps         FoodSafetyProcessStep[] @relation("FsStepCompany")
   formTemplates          FormTemplate[]
   formSubmissions        FormSubmission[]
   meetings               Meeting[]
@@ -646,6 +649,8 @@ model OrgNode {
   documents               Document[]                  @relation("DocOrgNode")
   audits                  Audit[]                     @relation("AuditOrgNode")
   processes               Process[]                   @relation("ProcessOrgNode")
+  fsPrograms              FoodSafetyProgram[]         @relation("FsProgramOrgNode")
+  fsProcesses             FoodSafetyProcess[]         @relation("FsProcessOrgNode")
   formTemplates           FormTemplate[]              @relation("FormTemplateOrgNode")
   formSubmissions         FormSubmission[]            @relation("FormSubmissionOrgNode")
   strategicObjectives     StrategicObjective[]        @relation("StrategicObjectiveOwnerNode")
@@ -715,6 +720,10 @@ model User {
   auditsCreated              Audit[]                     @relation("AuditCreatedBy")
   processesOwned             Process[]                   @relation("ProcessOwner")
   processesCreated           Process[]                   @relation("ProcessCreatedBy")
+  fsProgramsOwned            FoodSafetyProgram[]         @relation("FsProgramOwner")
+  fsProgramsCreated          FoodSafetyProgram[]         @relation("FsProgramCreatedBy")
+  fsProcessesOwned           FoodSafetyProcess[]         @relation("FsProcessOwner")
+  fsProcessesCreated         FoodSafetyProcess[]         @relation("FsProcessCreatedBy")
   formTemplatesOwned         FormTemplate[]              @relation("FormTemplateOwner")
   formTemplatesCreated       FormTemplate[]              @relation("FormTemplateCreatedBy")
   formSubmissionsSubmitted   FormSubmission[]            @relation("FormSubmissionSubmittedBy")
@@ -6747,4 +6756,130 @@ model InboundApiKey {
   updatedAt   DateTime  @updatedAt
 
   @@index([companyId])
+}
+
+// =====================================================
+// Modulo: Seguranca dos Alimentos (FSMS) — Fase 1 (Fundacao)
+// Programas, processos e etapas. Multiempresa + soft-delete, no mesmo padrao
+// dos demais modulos. Perigos/APPCC, PPR/PPRO/PCC, requisitos versionados,
+// fornecedores e rastreabilidade/recall entram nas fases seguintes.
+// =====================================================
+
+enum FoodSafetyProgramStatus {
+  ACTIVE
+  DRAFT
+  ARCHIVED
+}
+
+enum FoodSafetyProcessStatus {
+  DRAFT
+  IN_ANALYSIS
+  IN_REVIEW
+  PENDING_APPROVAL
+  APPROVED
+  PUBLISHED
+  OBSOLETE
+}
+
+enum FoodSafetyStepType {
+  RECEIVING
+  STORAGE
+  PROCESSING
+  PACKAGING
+  TRANSPORT
+  DISTRIBUTION
+  OTHER
+}
+
+model FoodSafetyProgram {
+  id          String                  @id @default(uuid())
+  companyId   String
+  company     Company                 @relation("FsProgramCompany", fields: [companyId], references: [id])
+  orgNodeId   String?
+  orgNode     OrgNode?                @relation("FsProgramOrgNode", fields: [orgNodeId], references: [id])
+  ownerUserId String?
+  owner       User?                   @relation("FsProgramOwner", fields: [ownerUserId], references: [id])
+  createdById String?
+  createdBy   User?                   @relation("FsProgramCreatedBy", fields: [createdById], references: [id])
+  code        String?
+  name        String
+  description String?
+  scope       String?
+  visibility  String                  @default("PRIVATE") // PUBLIC | PRIVATE | RESTRICTED
+  status      FoodSafetyProgramStatus @default(ACTIVE)
+  createdAt   DateTime                @default(now())
+  updatedAt   DateTime                @updatedAt
+  deletedAt   DateTime?
+
+  processes FoodSafetyProcess[]
+
+  @@unique([companyId, code])
+  @@index([companyId])
+  @@index([companyId, status])
+  @@index([orgNodeId])
+  @@index([ownerUserId])
+}
+
+model FoodSafetyProcess {
+  id                    String                  @id @default(uuid())
+  companyId             String
+  company               Company                 @relation("FsProcessCompany", fields: [companyId], references: [id])
+  programId             String
+  program               FoodSafetyProgram       @relation(fields: [programId], references: [id])
+  orgNodeId             String?
+  orgNode               OrgNode?                @relation("FsProcessOrgNode", fields: [orgNodeId], references: [id])
+  ownerUserId           String?
+  owner                 User?                   @relation("FsProcessOwner", fields: [ownerUserId], references: [id])
+  createdById           String?
+  createdBy             User?                   @relation("FsProcessCreatedBy", fields: [createdById], references: [id])
+  number                Int
+  code                  String?
+  name                  String
+  description           String?
+  objective             String?
+  productName           String?
+  productionLine        String?
+  version               String?
+  status                FoodSafetyProcessStatus @default(DRAFT)
+  positionX             Float?
+  positionY             Float?
+  lastReviewAt          DateTime?
+  nextReviewAt          DateTime?
+  reviewPeriodicityDays Int?
+  createdAt             DateTime                @default(now())
+  updatedAt             DateTime                @updatedAt
+  deletedAt             DateTime?
+
+  steps FoodSafetyProcessStep[]
+
+  @@unique([companyId, number])
+  @@index([companyId])
+  @@index([companyId, status])
+  @@index([programId])
+  @@index([orgNodeId])
+  @@index([ownerUserId])
+}
+
+model FoodSafetyProcessStep {
+  id             String             @id @default(uuid())
+  companyId      String
+  company        Company            @relation("FsStepCompany", fields: [companyId], references: [id])
+  processId      String
+  process        FoodSafetyProcess  @relation(fields: [processId], references: [id])
+  number         Int
+  code           String?
+  name           String
+  description    String?
+  type           FoodSafetyStepType @default(OTHER)
+  inputs         String?
+  outputs        String?
+  positionX      Float?
+  positionY      Float?
+  isControlPoint Boolean            @default(false)
+  createdAt      DateTime           @default(now())
+  updatedAt      DateTime           @updatedAt
+  deletedAt      DateTime?
+
+  @@index([companyId])
+  @@index([processId])
 }

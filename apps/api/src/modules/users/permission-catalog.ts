@@ -119,6 +119,14 @@ export const PERMISSION_CATALOG = [
   ['processes:delete', 'Arquivar/excluir processos', 'Processos', 'delete'],
   ['processes:manage', 'Gerenciar processos e SIPOC', 'Processos', 'manage'],
 
+  // Seguranca dos Alimentos (FSMS)
+  ['fsms:view', 'Visualizar Seguranca dos Alimentos', 'Seguranca dos Alimentos', 'view'],
+  ['fsms:create', 'Criar registros de Seguranca dos Alimentos', 'Seguranca dos Alimentos', 'create'],
+  ['fsms:update', 'Editar registros de Seguranca dos Alimentos', 'Seguranca dos Alimentos', 'update'],
+  ['fsms:delete', 'Excluir registros de Seguranca dos Alimentos', 'Seguranca dos Alimentos', 'delete'],
+  ['fsms:approve', 'Aprovar/publicar registros de Seguranca dos Alimentos', 'Seguranca dos Alimentos', 'approve'],
+  ['fsms:manage', 'Gerenciar o modulo de Seguranca dos Alimentos', 'Seguranca dos Alimentos', 'manage'],
+
   // Formularios e checklists
   ['forms:view', 'Visualizar formularios e checklists', 'Formularios', 'view'],
   ['forms:create', 'Criar formularios e checklists', 'Formularios', 'create'],
@@ -302,6 +310,12 @@ export const DEFAULT_PROFILES = [
       'processes:create',
       'processes:update',
       'processes:manage',
+      'fsms:view',
+      'fsms:create',
+      'fsms:update',
+      'fsms:delete',
+      'fsms:approve',
+      'fsms:manage',
       'forms:view',
       'forms:create',
       'forms:update',
