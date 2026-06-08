@@ -100,6 +100,7 @@ interface SectionItem {
   key: SectionKey;
   label: string;
   icon: LucideIcon;
+  group: string;
 }
 
 interface PlatformProfile {
@@ -204,23 +205,27 @@ interface CompanyAuditEntry {
   user: { id: string; name: string; email: string } | null;
 }
 
+// Barra lateral agrupada por contexto. A antiga aba "Configuracoes" (landing de
+// cards) foi removida por duplicar a propria barra — cada destino segue aqui.
 const SECTIONS: SectionItem[] = [
-  { key: 'dashboard', label: 'Dashboard', icon: LayoutDashboard },
-  { key: 'settings', label: 'Configuracoes', icon: SlidersHorizontal },
-  { key: 'generalSettings', label: 'Config. Gerais', icon: Settings2 },
-  { key: 'visibilityAdmin', label: 'Visibilidade', icon: Eye },
-  { key: 'externalIntegrations', label: 'APIs Externas', icon: ArrowLeftRight },
-  { key: 'orgStructure', label: 'Areas e Setores', icon: Network },
-  { key: 'databaseAdmin', label: 'Banco de Dados', icon: Database },
-  { key: 'portalAdmin', label: 'Central do Portal', icon: Wrench },
-  { key: 'companyAudit', label: 'Auditoria Empresa', icon: Activity },
-  { key: 'companies', label: 'Empresas', icon: Building2 },
-  { key: 'modules', label: 'Matriz de Modulos', icon: PackageCheck },
-  { key: 'plans', label: 'Planos', icon: ListChecks },
-  { key: 'users', label: 'Usuarios', icon: Users },
-  { key: 'security', label: 'Seguranca e Suporte', icon: ShieldCheck },
-  { key: 'technical', label: 'Desenvolvimento', icon: ServerCog },
-  { key: 'audit', label: 'Auditoria', icon: Activity },
+  { key: 'dashboard', label: 'Dashboard', icon: LayoutDashboard, group: 'Geral' },
+  // Gestao dos clientes da plataforma (global, independe da empresa selecionada).
+  { key: 'companies', label: 'Empresas', icon: Building2, group: 'Plataforma' },
+  { key: 'modules', label: 'Matriz de Modulos', icon: PackageCheck, group: 'Plataforma' },
+  { key: 'plans', label: 'Planos', icon: ListChecks, group: 'Plataforma' },
+  { key: 'users', label: 'Usuarios', icon: Users, group: 'Plataforma' },
+  { key: 'security', label: 'Seguranca e Suporte', icon: ShieldCheck, group: 'Plataforma' },
+  // Operam sobre a empresa selecionada no seletor do topo.
+  { key: 'generalSettings', label: 'Config. Gerais', icon: Settings2, group: 'Empresa selecionada' },
+  { key: 'visibilityAdmin', label: 'Visibilidade', icon: Eye, group: 'Empresa selecionada' },
+  { key: 'orgStructure', label: 'Areas e Setores', icon: Network, group: 'Empresa selecionada' },
+  { key: 'externalIntegrations', label: 'APIs Externas', icon: ArrowLeftRight, group: 'Empresa selecionada' },
+  { key: 'companyAudit', label: 'Auditoria Empresa', icon: Activity, group: 'Empresa selecionada' },
+  // Ferramentas tecnicas/globais.
+  { key: 'databaseAdmin', label: 'Banco de Dados', icon: Database, group: 'Tecnico' },
+  { key: 'portalAdmin', label: 'Central do Portal', icon: Wrench, group: 'Tecnico' },
+  { key: 'technical', label: 'Desenvolvimento', icon: ServerCog, group: 'Tecnico' },
+  { key: 'audit', label: 'Auditoria', icon: Activity, group: 'Tecnico' },
 ];
 
 const MODULE_STATUSES = [
@@ -580,22 +585,27 @@ export function PlatformAdminApp() {
           <div className="mt-1 text-lg font-semibold">Portal Admin Global</div>
         </div>
         <nav className="min-h-0 flex-1 overflow-y-auto p-2">
-          {SECTIONS.map((item) => {
+          {SECTIONS.map((item, idx) => {
             const Icon = item.icon;
             const active = section === item.key;
+            const showHeading = idx === 0 || SECTIONS[idx - 1].group !== item.group;
             return (
-              <button
-                key={item.key}
-                type="button"
-                onClick={() => setSection(item.key)}
-                className={cn(
-                  'flex w-full items-center gap-3 px-3 py-2.5 text-left text-sm transition-colors',
-                  active ? 'bg-white text-[#101820]' : 'text-white/70 hover:bg-white/10 hover:text-white',
+              <div key={item.key}>
+                {showHeading && (
+                  <div className="px-3 pb-1 pt-3 text-[10px] font-semibold uppercase tracking-[0.14em] text-white/35">{item.group}</div>
                 )}
-              >
-                <Icon className="h-4 w-4 shrink-0" />
-                <span>{item.label}</span>
-              </button>
+                <button
+                  type="button"
+                  onClick={() => setSection(item.key)}
+                  className={cn(
+                    'flex w-full items-center gap-3 px-3 py-2.5 text-left text-sm transition-colors',
+                    active ? 'bg-white text-[#101820]' : 'text-white/70 hover:bg-white/10 hover:text-white',
+                  )}
+                >
+                  <Icon className="h-4 w-4 shrink-0" />
+                  <span>{item.label}</span>
+                </button>
+              </div>
             );
           })}
         </nav>
@@ -641,7 +651,6 @@ export function PlatformAdminApp() {
 
         <div className="min-h-0 flex-1 overflow-y-auto p-4 lg:p-6" onClickCapture={handleLegacyNavigation}>
           {section === 'dashboard' && <DashboardSection />}
-          {section === 'settings' && <SettingsSection onNavigate={setSection} />}
           {section === 'generalSettings' && <GeneralSettingsSection />}
           {section === 'visibilityAdmin' && <VisibilitySettingsSection />}
           {section === 'externalIntegrations' && <ExternalIntegrationsSection />}

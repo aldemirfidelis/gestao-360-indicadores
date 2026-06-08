@@ -379,6 +379,8 @@ export default function SettingsPage() {
         })}
       </SectionCard>
 
+      {/* No Portal Admin Global, estes atalhos ja existem na barra lateral. */}
+      {!platformAdminContext && (
       <SectionCard
         title="Integrações"
         description="Conectores internos, serviços de apoio e status operacional ficam dentro de Configurações."
@@ -416,8 +418,9 @@ export default function SettingsPage() {
           </Link>
         )}
       </SectionCard>
+      )}
 
-      {canManageUsers && (
+      {!platformAdminContext && canManageUsers && (
         <SectionCard
           title="Acesso e visibilidade"
           description="Controle de acesso por área entre setores, com simulação de acesso por usuário."
@@ -441,7 +444,7 @@ export default function SettingsPage() {
         </SectionCard>
       )}
 
-      {isSuperAdmin && (
+      {!platformAdminContext && isSuperAdmin && (
         <SectionCard
           title="Administração avançada"
           description="Ferramentas técnicas — exclusivas do Super Admin."
