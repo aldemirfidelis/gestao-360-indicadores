@@ -463,76 +463,8 @@ function ObjectiveNode({
         )}
       </div>
 
-      <div className="nodrag nopan pointer-events-none absolute left-1/2 top-[calc(100%+10px)] z-50 hidden w-[340px] -translate-x-1/2 rounded-lg border bg-card p-3 text-left text-card-foreground shadow-xl group-hover:block group-focus-within:block">
-        <div className="absolute left-1/2 top-[-5px] h-2.5 w-2.5 -translate-x-1/2 rotate-45 border-l border-t bg-card" />
-        <div className="flex items-start justify-between gap-2">
-          <div className="min-w-0">
-            <div className="truncate text-sm font-semibold">{objective.name}</div>
-            <div className="mt-0.5 text-[11px] text-muted-foreground">
-              {objective.perspective.name} · {LIGHT_LABEL[light] ?? light}
-            </div>
-          </div>
-          <Badge className={cn('shrink-0 border', LIGHT_CLASS[light])} variant="outline">
-            {LIGHT_LABEL[light] ?? light}
-          </Badge>
-        </div>
-
-        <div className="mt-3 grid grid-cols-2 gap-2 text-xs">
-          <MiniMetric label="Responsável" value={summary.responsible} />
-          <MiniMetric label="Área" value={summary.area} />
-          <MiniMetric label="Indicadores" value={formatNumber(objective.indicators.length)} />
-          <MiniMetric label="Atingimento" value={formatPercent(objective.aggregateAttainment)} />
-        </div>
-
-        <div className="mt-3 rounded-md border bg-background/60 p-2 text-xs">
-          <div className="text-[10px] uppercase text-muted-foreground">Indicador em foco</div>
-          {summary.indicator ? (
-            <>
-              <div className="mt-0.5 truncate font-semibold">
-                {summary.indicator.code ? `${summary.indicator.code} - ` : ''}{summary.indicator.name}
-              </div>
-              <div className="mt-2 grid grid-cols-3 gap-2">
-                <MiniMetric label="Realizado" value={formatNumber(summary.latest?.value)} />
-                <MiniMetric label="Meta" value={formatNumber(summary.latestTarget?.target)} />
-                <MiniMetric label="Ating." value={formatPercent(summary.latest?.attainment ?? null)} />
-              </div>
-            </>
-          ) : (
-            <div className="mt-1 text-muted-foreground">Nenhum indicador vinculado.</div>
-          )}
-        </div>
-
-        <div className="mt-3 grid grid-cols-4 gap-2 text-center text-[11px]">
-          <div className="rounded-md border bg-background/60 p-2">
-            <ClipboardList className="mx-auto mb-1 h-3.5 w-3.5" />
-            <div className="font-semibold">{formatNumber(summary.openActions)}</div>
-            <div className="text-muted-foreground">abertas</div>
-          </div>
-          <div className="rounded-md border bg-background/60 p-2">
-            <Calendar className="mx-auto mb-1 h-3.5 w-3.5" />
-            <div className={cn('font-semibold', summary.lateActions > 0 && 'text-rose-600')}>
-              {formatNumber(summary.lateActions)}
-            </div>
-            <div className="text-muted-foreground">atrasadas</div>
-          </div>
-          <div className="rounded-md border bg-background/60 p-2">
-            <ShieldAlert className="mx-auto mb-1 h-3.5 w-3.5" />
-            <div className={cn('font-semibold', objective.deviationCount > 0 && 'text-rose-600')}>
-              {formatNumber(objective.deviationCount)}
-            </div>
-            <div className="text-muted-foreground">desvios</div>
-          </div>
-          <div className="rounded-md border bg-background/60 p-2">
-            <Layers className="mx-auto mb-1 h-3.5 w-3.5" />
-            <div className="font-semibold">{formatNumber(summary.projects)}</div>
-            <div className="text-muted-foreground">projetos</div>
-          </div>
-        </div>
-
-        <div className="mt-2 text-[11px] text-muted-foreground">
-          Clique no objetivo para abrir o drill-down lateral.
-        </div>
-      </div>
+      {/* Tooltip flutuante de hover removido a pedido (sem usabilidade). Os
+          detalhes do objetivo ficam no painel lateral (drill-down) ao clicar. */}
       <Handle
         id="right"
         type="source"
