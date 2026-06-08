@@ -13,12 +13,14 @@ import ReactFlow, {
 } from 'reactflow';
 import 'reactflow/dist/style.css';
 import {
+  AlertTriangle,
   ClipboardList,
   Layers3,
   ListChecks,
   Network,
   Plus,
   ShieldCheck,
+  SlidersHorizontal,
   Trash2,
   Workflow,
 } from 'lucide-react';
@@ -103,6 +105,11 @@ interface Summary {
   obsolete: number;
   steps: number;
   controlPoints: number;
+  hazards?: number;
+  hazardsCritical?: number;
+  hazardsHigh?: number;
+  ccp?: number;
+  oprp?: number;
 }
 
 interface Options {
@@ -111,6 +118,10 @@ interface Options {
   programStatuses: ProgramStatus[];
   processStatuses: ProcessStatus[];
   stepTypes: StepType[];
+  hazardCategories: HazardCategory[];
+  riskLevels: RiskLevel[];
+  controlTypes: ControlType[];
+  hazardStatuses: HazardStatus[];
   visibilities: string[];
 }
 
@@ -143,10 +154,76 @@ const STEP_TYPE_LABEL: Record<StepType, string> = {
 };
 const PROGRAM_STATUS_LABEL: Record<ProgramStatus, string> = { ACTIVE: 'Ativo', DRAFT: 'Rascunho', ARCHIVED: 'Arquivado' };
 
-type TabKey = 'overview' | 'processes' | 'flow' | 'matrix';
+type HazardCategory = 'BIOLOGICAL' | 'CHEMICAL' | 'PHYSICAL' | 'ALLERGENIC' | 'RADIOLOGICAL' | 'FRAUD' | 'SABOTAGE' | 'CROSS_CONTAMINATION' | 'OTHER';
+type RiskLevel = 'LOW' | 'MODERATE' | 'HIGH' | 'CRITICAL';
+type ControlType = 'NONE' | 'PRP' | 'OPRP' | 'CCP';
+type HazardStatus = 'OPEN' | 'ASSESSED' | 'CONTROLLED' | 'ARCHIVED';
+
+interface Hazard {
+  id: string;
+  number: number;
+  code: string | null;
+  category: HazardCategory;
+  name: string;
+  description: string | null;
+  source: string | null;
+  consequence: string | null;
+  justification: string | null;
+  severity: number | null;
+  probability: number | null;
+  detection: number | null;
+  riskIndex: number | null;
+  riskLevel: RiskLevel | null;
+  controlType: ControlType;
+  controlJustification: string | null;
+  existingControls: string | null;
+  additionalControls: string | null;
+  status: HazardStatus;
+  processId: string;
+  stepId: string | null;
+  responsibleUserId: string | null;
+  process: { id: string; number: number; name: string; code: string | null; orgNodeId: string | null; programId: string } | null;
+  step: { id: string; number: number; name: string } | null;
+  responsible: UserRef | null;
+}
+
+interface RiskMatrix {
+  id: string;
+  name: string;
+  severityScale: number;
+  probabilityScale: number;
+  useDetection: boolean;
+  detectionScale: number;
+  thresholdLow: number;
+  thresholdModerate: number;
+  thresholdHigh: number;
+}
+
+const HAZARD_CATEGORY_LABEL: Record<HazardCategory, string> = {
+  BIOLOGICAL: 'Biológico',
+  CHEMICAL: 'Químico',
+  PHYSICAL: 'Físico',
+  ALLERGENIC: 'Alergênico',
+  RADIOLOGICAL: 'Radiológico',
+  FRAUD: 'Fraude',
+  SABOTAGE: 'Sabotagem',
+  CROSS_CONTAMINATION: 'Contaminação cruzada',
+  OTHER: 'Outro',
+};
+const RISK_LEVEL_LABEL: Record<RiskLevel, string> = { LOW: 'Baixo', MODERATE: 'Moderado', HIGH: 'Alto', CRITICAL: 'Crítico' };
+const RISK_LEVEL_CLASS: Record<RiskLevel, string> = {
+  LOW: 'bg-emerald-100 text-emerald-700',
+  MODERATE: 'bg-amber-100 text-amber-700',
+  HIGH: 'bg-orange-100 text-orange-700',
+  CRITICAL: 'bg-rose-100 text-rose-700',
+};
+const CONTROL_TYPE_LABEL: Record<ControlType, string> = { NONE: '—', PRP: 'PPR', OPRP: 'PPRO', CCP: 'PCC' };
+
+type TabKey = 'overview' | 'processes' | 'hazards' | 'flow' | 'matrix';
 const TABS: Array<{ key: TabKey; label: string; icon: typeof Network }> = [
   { key: 'overview', label: 'Visão Geral', icon: ShieldCheck },
   { key: 'processes', label: 'Processos', icon: ListChecks },
+  { key: 'hazards', label: 'Perigos / APPCC', icon: AlertTriangle },
   { key: 'flow', label: 'Fluxograma', icon: Workflow },
   { key: 'matrix', label: 'Matriz Geral', icon: Layers3 },
 ];
@@ -160,6 +237,8 @@ export default function SegurancaAlimentosPage() {
   const [programId, setProgramId] = useState<string>('');
   const [programDialog, setProgramDialog] = useState<Program | 'new' | null>(null);
   const [processDialog, setProcessDialog] = useState<Process | 'new' | null>(null);
+  const [hazardDialog, setHazardDialog] = useState<Hazard | 'new' | null>(null);
+  const [matrixDialog, setMatrixDialog] = useState(false);
 
   const programs = useQuery<Program[]>({ queryKey: ['fsms', 'programs'], queryFn: () => api('/food-safety/programs') });
   const options = useQuery<Options>({ queryKey: ['fsms', 'options'], queryFn: () => api('/food-safety/options') });
@@ -181,6 +260,9 @@ export default function SegurancaAlimentosPage() {
     queryFn: () => api(`/food-safety/summary?programId=${programId}`),
     enabled: !!programId,
   });
+  const hazardsAll = useQuery<Hazard[]>({ queryKey: ['fsms', 'hazards'], queryFn: () => api('/food-safety/hazards'), enabled: !!programId });
+  const riskMatrix = useQuery<RiskMatrix>({ queryKey: ['fsms', 'risk-matrix'], queryFn: () => api('/food-safety/risk-matrix') });
+  const hazards = (hazardsAll.data ?? []).filter((h) => h.process?.programId === programId);
 
   function invalidate() {
     void qc.invalidateQueries({ queryKey: ['fsms'] });
@@ -266,10 +348,20 @@ export default function SegurancaAlimentosPage() {
               onEdit={(p) => setProcessDialog(p)}
             />
           )}
+          {tab === 'hazards' && (
+            <PerigosTab
+              hazards={hazards}
+              loading={hazardsAll.isPending}
+              canManage={canManage}
+              onNew={() => setHazardDialog('new')}
+              onEdit={(h) => setHazardDialog(h)}
+              onConfig={() => setMatrixDialog(true)}
+            />
+          )}
           {tab === 'flow' && (
             <FlowTab processes={processes.data ?? []} canManage={canManage} onOpen={(p) => setProcessDialog(p)} onChanged={invalidate} />
           )}
-          {tab === 'matrix' && <MatrixTab processes={processes.data ?? []} />}
+          {tab === 'matrix' && <MatrixTab processes={processes.data ?? []} hazards={hazards} />}
         </>
       )}
 
@@ -297,6 +389,23 @@ export default function SegurancaAlimentosPage() {
             invalidate();
           }}
         />
+      )}
+      {hazardDialog && (
+        <HazardDialog
+          record={hazardDialog === 'new' ? null : hazardDialog}
+          processes={processes.data ?? []}
+          options={options.data}
+          matrix={riskMatrix.data}
+          canManage={canManage}
+          onClose={() => setHazardDialog(null)}
+          onSaved={() => {
+            setHazardDialog(null);
+            invalidate();
+          }}
+        />
+      )}
+      {matrixDialog && (
+        <RiskMatrixDialog matrix={riskMatrix.data} canManage={canManage} onClose={() => setMatrixDialog(false)} onSaved={() => { setMatrixDialog(false); invalidate(); }} />
       )}
     </div>
   );
@@ -533,44 +642,66 @@ function FlowCanvas({ processes, canManage, onOpen, onChanged }: { processes: Pr
   );
 }
 
-// ----------------------------- Matriz Geral -------------------------------
-function MatrixTab({ processes }: { processes: Process[] }) {
-  const rows = useMemo(
-    () =>
-      processes.flatMap((p) =>
-        (p.steps.length ? p.steps : [null]).map((s) => ({ process: p, step: s as Step | null })),
-      ),
-    [processes],
-  );
+// ----------------------------- Matriz Geral (APPCC) -----------------------
+function MatrixTab({ processes, hazards }: { processes: Process[]; hazards: Hazard[] }) {
+  const rows = useMemo(() => {
+    const byStep = new Map<string, Hazard[]>();
+    const byProcessNoStep = new Map<string, Hazard[]>();
+    for (const h of hazards) {
+      if (h.stepId) byStep.set(h.stepId, [...(byStep.get(h.stepId) ?? []), h]);
+      else byProcessNoStep.set(h.processId, [...(byProcessNoStep.get(h.processId) ?? []), h]);
+    }
+    const out: Array<{ p: Process; s: Step | null; h: Hazard | null }> = [];
+    for (const p of processes) {
+      for (const h of byProcessNoStep.get(p.id) ?? []) out.push({ p, s: null, h });
+      for (const s of p.steps) {
+        const hs = byStep.get(s.id) ?? [];
+        if (hs.length === 0) out.push({ p, s, h: null });
+        else for (const h of hs) out.push({ p, s, h });
+      }
+      if (p.steps.length === 0 && (byProcessNoStep.get(p.id) ?? []).length === 0) out.push({ p, s: null, h: null });
+    }
+    return out;
+  }, [processes, hazards]);
+
   return (
     <Card>
       <CardContent className="p-0">
+        <div className="border-b p-2 text-xs text-muted-foreground">
+          Matriz APPCC: cada linha é uma etapa/perigo. Linhas &quot;sem perigo analisado&quot; indicam lacunas a tratar.
+        </div>
         <div className="overflow-x-auto">
           <table className="table-modern">
             <thead>
               <tr>
                 <th className="text-left">Processo</th>
                 <th className="text-left">Etapa</th>
-                <th className="text-left">Tipo</th>
-                <th className="text-left">Entradas</th>
-                <th className="text-left">Saídas</th>
-                <th className="text-left">Ponto de controle</th>
-                <th className="text-left">Status do processo</th>
+                <th className="text-left">Perigo</th>
+                <th className="text-left">Categoria</th>
+                <th className="text-center">Sev</th>
+                <th className="text-center">Prob</th>
+                <th className="text-center">Índice</th>
+                <th className="text-left">Nível</th>
+                <th className="text-left">Controle</th>
+                <th className="text-left">Controles existentes</th>
               </tr>
             </thead>
             <tbody>
               {rows.length === 0 ? (
-                <tr><td colSpan={7} className="p-6 text-center text-sm text-muted-foreground">Sem etapas para exibir. Cadastre processos e etapas.</td></tr>
+                <tr><td colSpan={10} className="p-6 text-center text-sm text-muted-foreground">Cadastre processos, etapas e perigos para montar a matriz.</td></tr>
               ) : (
-                rows.map(({ process: p, step: s }, i) => (
-                  <tr key={`${p.id}-${s?.id ?? i}`}>
+                rows.map(({ p, s, h }, i) => (
+                  <tr key={`${p.id}-${s?.id ?? 'np'}-${h?.id ?? i}`}>
                     <td className="font-medium">{p.code ? `${p.code} · ` : ''}{p.name}</td>
-                    <td>{s ? `${s.number}. ${s.name}` : <span className="text-muted-foreground">— sem etapas —</span>}</td>
-                    <td>{s ? STEP_TYPE_LABEL[s.type] : '—'}</td>
-                    <td className="max-w-[16rem] truncate text-sm">{s?.inputs ?? '—'}</td>
-                    <td className="max-w-[16rem] truncate text-sm">{s?.outputs ?? '—'}</td>
-                    <td>{s?.isControlPoint ? <Badge className="border-emerald-300 bg-emerald-50 text-emerald-700" variant="outline">PC</Badge> : '—'}</td>
-                    <td><span className={cn('pill', PROCESS_STATUS_CLASS[p.status])}>{PROCESS_STATUS_LABEL[p.status]}</span></td>
+                    <td>{s ? `${s.number}. ${s.name}` : <span className="text-muted-foreground">Processo</span>}</td>
+                    <td>{h ? h.name : <span className="text-muted-foreground">— sem perigo analisado —</span>}</td>
+                    <td>{h ? HAZARD_CATEGORY_LABEL[h.category] : '—'}</td>
+                    <td className="text-center">{h?.severity ?? '—'}</td>
+                    <td className="text-center">{h?.probability ?? '—'}</td>
+                    <td className="text-center font-semibold">{h?.riskIndex ?? '—'}</td>
+                    <td>{h?.riskLevel ? <span className={cn('rounded px-2 py-0.5 text-xs font-medium', RISK_LEVEL_CLASS[h.riskLevel])}>{RISK_LEVEL_LABEL[h.riskLevel]}</span> : '—'}</td>
+                    <td>{h && h.controlType !== 'NONE' ? <Badge variant="outline">{CONTROL_TYPE_LABEL[h.controlType]}</Badge> : '—'}</td>
+                    <td className="max-w-[16rem] truncate text-sm">{h?.existingControls ?? '—'}</td>
                   </tr>
                 ))
               )}
@@ -818,6 +949,272 @@ function ProcessDialog({
         <DialogFooter>
           <Button variant="ghost" onClick={onClose}>Fechar</Button>
           {canManage && <Button disabled={!form.name.trim() || save.isPending} onClick={() => save.mutate()}>{save.isPending ? 'Salvando...' : 'Salvar'}</Button>}
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+// ----------------------------- Perigos / APPCC ----------------------------
+function computeRiskClient(matrix: RiskMatrix | undefined, sev: number | null, prob: number | null, det: number | null): { index: number | null; level: RiskLevel | null } {
+  if (!matrix || sev == null || prob == null) return { index: null, level: null };
+  let index = sev * prob;
+  if (matrix.useDetection && det != null) index *= det;
+  let level: RiskLevel;
+  if (index <= matrix.thresholdLow) level = 'LOW';
+  else if (index <= matrix.thresholdModerate) level = 'MODERATE';
+  else if (index <= matrix.thresholdHigh) level = 'HIGH';
+  else level = 'CRITICAL';
+  return { index, level };
+}
+
+function PerigosTab({
+  hazards,
+  loading,
+  canManage,
+  onNew,
+  onEdit,
+  onConfig,
+}: {
+  hazards: Hazard[];
+  loading: boolean;
+  canManage: boolean;
+  onNew: () => void;
+  onEdit: (h: Hazard) => void;
+  onConfig: () => void;
+}) {
+  return (
+    <Card>
+      <CardContent className="p-0">
+        <div className="flex items-center justify-between border-b p-3">
+          <div className="text-sm font-semibold">Perigos e análise APPCC</div>
+          <div className="flex gap-2">
+            <Button variant="outline" size="sm" onClick={onConfig}><SlidersHorizontal className="mr-2 h-4 w-4" />Matriz de risco</Button>
+            {canManage && <Button size="sm" onClick={onNew}><Plus className="mr-2 h-4 w-4" />Novo perigo</Button>}
+          </div>
+        </div>
+        <div className="overflow-x-auto">
+          <table className="table-modern">
+            <thead>
+              <tr>
+                <th className="text-left">Perigo</th>
+                <th className="text-left">Categoria</th>
+                <th className="text-left">Processo / Etapa</th>
+                <th className="text-left">Risco</th>
+                <th className="text-left">Controle</th>
+                <th className="text-right">Ações</th>
+              </tr>
+            </thead>
+            <tbody>
+              {loading ? (
+                <tr><td colSpan={6} className="p-6 text-center text-sm text-muted-foreground">Carregando...</td></tr>
+              ) : hazards.length === 0 ? (
+                <tr><td colSpan={6} className="p-6 text-center text-sm text-muted-foreground">Nenhum perigo cadastrado. Use &quot;Novo perigo&quot; para iniciar a análise APPCC.</td></tr>
+              ) : (
+                hazards.map((h) => (
+                  <tr key={h.id}>
+                    <td><div className="font-medium">{h.code ? `${h.code} · ` : ''}{h.name}</div><div className="text-xs text-muted-foreground">#{h.number}</div></td>
+                    <td>{HAZARD_CATEGORY_LABEL[h.category]}</td>
+                    <td className="text-sm">{h.process?.name ?? '—'}{h.step ? ` · ${h.step.name}` : ''}</td>
+                    <td>{h.riskLevel ? <span className={cn('rounded px-2 py-0.5 text-xs font-medium', RISK_LEVEL_CLASS[h.riskLevel])}>{RISK_LEVEL_LABEL[h.riskLevel]}{h.riskIndex != null ? ` (${h.riskIndex})` : ''}</span> : <span className="text-xs text-muted-foreground">não avaliado</span>}</td>
+                    <td>{h.controlType !== 'NONE' ? <Badge variant="outline">{CONTROL_TYPE_LABEL[h.controlType]}</Badge> : '—'}</td>
+                    <td className="text-right"><Button variant="outline" size="sm" onClick={() => onEdit(h)}>{canManage ? 'Abrir' : 'Ver'}</Button></td>
+                  </tr>
+                ))
+              )}
+            </tbody>
+          </table>
+        </div>
+      </CardContent>
+    </Card>
+  );
+}
+
+function HazardDialog({
+  record,
+  processes,
+  options,
+  matrix,
+  canManage,
+  onClose,
+  onSaved,
+}: {
+  record: Hazard | null;
+  processes: Process[];
+  options?: Options;
+  matrix?: RiskMatrix;
+  canManage: boolean;
+  onClose: () => void;
+  onSaved: () => void;
+}) {
+  const [form, setForm] = useState({
+    processId: record?.processId ?? (processes[0]?.id ?? ''),
+    stepId: record?.stepId ?? '',
+    category: record?.category ?? ('BIOLOGICAL' as HazardCategory),
+    name: record?.name ?? '',
+    code: record?.code ?? '',
+    source: record?.source ?? '',
+    consequence: record?.consequence ?? '',
+    justification: record?.justification ?? '',
+    severity: record?.severity != null ? String(record.severity) : '',
+    probability: record?.probability != null ? String(record.probability) : '',
+    detection: record?.detection != null ? String(record.detection) : '',
+    controlType: record?.controlType ?? ('NONE' as ControlType),
+    controlJustification: record?.controlJustification ?? '',
+    existingControls: record?.existingControls ?? '',
+    additionalControls: record?.additionalControls ?? '',
+    status: record?.status ?? ('OPEN' as HazardStatus),
+    responsibleUserId: record?.responsibleUserId ?? '',
+  });
+  const selectedProcess = processes.find((p) => p.id === form.processId);
+  const preview = computeRiskClient(matrix, form.severity ? Number(form.severity) : null, form.probability ? Number(form.probability) : null, form.detection ? Number(form.detection) : null);
+  const scale = (n: number) => Array.from({ length: n }, (_, i) => i + 1);
+
+  const save = useMutation({
+    mutationFn: () => {
+      const payload = {
+        ...form,
+        code: form.code || null,
+        stepId: form.stepId || null,
+        responsibleUserId: form.responsibleUserId || null,
+        severity: form.severity || null,
+        probability: form.probability || null,
+        detection: form.detection || null,
+      };
+      return record
+        ? api(`/food-safety/hazards/${record.id}`, { method: 'PATCH', json: payload })
+        : api('/food-safety/hazards', { method: 'POST', json: payload });
+    },
+    onSuccess: () => { toast.success('Perigo salvo'); onSaved(); },
+    onError: (e: any) => toast.error(e?.message ?? 'Falha ao salvar'),
+  });
+
+  return (
+    <Dialog open onOpenChange={(o) => !o && onClose()}>
+      <DialogContent className="max-h-[88vh] max-w-3xl overflow-y-auto">
+        <DialogHeader><DialogTitle>{record ? `Perigo #${record.number}` : 'Novo perigo'}</DialogTitle></DialogHeader>
+        <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+          <div>
+            <Label className="field-required">Processo</Label>
+            <NativeSelect value={form.processId} onChange={(e) => setForm({ ...form, processId: e.target.value, stepId: '' })} disabled={!canManage || !!record}>
+              {processes.map((p) => <option key={p.id} value={p.id}>{p.code ? `${p.code} · ` : ''}{p.name}</option>)}
+            </NativeSelect>
+          </div>
+          <div>
+            <Label>Etapa (opcional)</Label>
+            <NativeSelect value={form.stepId} onChange={(e) => setForm({ ...form, stepId: e.target.value })} disabled={!canManage}>
+              <option value="">— processo todo —</option>
+              {(selectedProcess?.steps ?? []).map((s) => <option key={s.id} value={s.id}>{s.number}. {s.name}</option>)}
+            </NativeSelect>
+          </div>
+          <div>
+            <Label>Categoria</Label>
+            <NativeSelect value={form.category} onChange={(e) => setForm({ ...form, category: e.target.value as HazardCategory })} disabled={!canManage}>
+              {(options?.hazardCategories ?? (Object.keys(HAZARD_CATEGORY_LABEL) as HazardCategory[])).map((c) => <option key={c} value={c}>{HAZARD_CATEGORY_LABEL[c]}</option>)}
+            </NativeSelect>
+          </div>
+          <div><Label>Código</Label><Input value={form.code} onChange={(e) => setForm({ ...form, code: e.target.value })} disabled={!canManage} /></div>
+          <div className="md:col-span-2"><Label className="field-required">Perigo</Label><Input value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} disabled={!canManage} placeholder="Ex.: Salmonella spp." /></div>
+          <div className="md:col-span-2"><Label>Origem / causa provável</Label><Textarea rows={2} value={form.source} onChange={(e) => setForm({ ...form, source: e.target.value })} disabled={!canManage} /></div>
+          <div className="md:col-span-2"><Label>Consequência</Label><Textarea rows={2} value={form.consequence} onChange={(e) => setForm({ ...form, consequence: e.target.value })} disabled={!canManage} /></div>
+
+          <div className="rounded-lg border p-3 md:col-span-2">
+            <div className="mb-2 text-sm font-semibold">Avaliação de risco</div>
+            <div className="flex flex-wrap items-end gap-3">
+              <div><Label>Severidade</Label><NativeSelect className="w-24" value={form.severity} onChange={(e) => setForm({ ...form, severity: e.target.value })} disabled={!canManage}><option value="">—</option>{scale(matrix?.severityScale ?? 5).map((n) => <option key={n} value={n}>{n}</option>)}</NativeSelect></div>
+              <div><Label>Probabilidade</Label><NativeSelect className="w-24" value={form.probability} onChange={(e) => setForm({ ...form, probability: e.target.value })} disabled={!canManage}><option value="">—</option>{scale(matrix?.probabilityScale ?? 5).map((n) => <option key={n} value={n}>{n}</option>)}</NativeSelect></div>
+              {matrix?.useDetection && <div><Label>Detecção</Label><NativeSelect className="w-24" value={form.detection} onChange={(e) => setForm({ ...form, detection: e.target.value })} disabled={!canManage}><option value="">—</option>{scale(matrix?.detectionScale ?? 5).map((n) => <option key={n} value={n}>{n}</option>)}</NativeSelect></div>}
+              <div className="ml-auto text-right">
+                <div className="text-[11px] uppercase text-muted-foreground">Risco calculado</div>
+                {preview.level ? <span className={cn('mt-1 inline-block rounded px-2 py-1 text-sm font-semibold', RISK_LEVEL_CLASS[preview.level])}>{RISK_LEVEL_LABEL[preview.level]} · {preview.index}</span> : <span className="text-sm text-muted-foreground">defina severidade e probabilidade</span>}
+              </div>
+            </div>
+            <div className="mt-2"><Label>Justificativa técnica</Label><Textarea rows={2} value={form.justification} onChange={(e) => setForm({ ...form, justification: e.target.value })} disabled={!canManage} /></div>
+          </div>
+
+          <div>
+            <Label>Classificação do controle</Label>
+            <NativeSelect value={form.controlType} onChange={(e) => setForm({ ...form, controlType: e.target.value as ControlType })} disabled={!canManage}>
+              <option value="NONE">Não classificado</option>
+              <option value="PRP">PPR — Programa de Pré-Requisito</option>
+              <option value="OPRP">PPRO — Pré-Requisito Operacional</option>
+              <option value="CCP">PCC — Ponto Crítico de Controle</option>
+            </NativeSelect>
+          </div>
+          <div>
+            <Label>Status</Label>
+            <NativeSelect value={form.status} onChange={(e) => setForm({ ...form, status: e.target.value as HazardStatus })} disabled={!canManage}>
+              <option value="OPEN">Aberto</option>
+              <option value="ASSESSED">Avaliado</option>
+              <option value="CONTROLLED">Controlado</option>
+              <option value="ARCHIVED">Arquivado</option>
+            </NativeSelect>
+          </div>
+          <div className="md:col-span-2"><Label>Justificativa da classificação (árvore decisória)</Label><Textarea rows={2} value={form.controlJustification} onChange={(e) => setForm({ ...form, controlJustification: e.target.value })} disabled={!canManage} /></div>
+          <div className="md:col-span-2"><Label>Controles existentes</Label><Textarea rows={2} value={form.existingControls} onChange={(e) => setForm({ ...form, existingControls: e.target.value })} disabled={!canManage} /></div>
+          <div className="md:col-span-2"><Label>Controles adicionais</Label><Textarea rows={2} value={form.additionalControls} onChange={(e) => setForm({ ...form, additionalControls: e.target.value })} disabled={!canManage} /></div>
+        </div>
+        <DialogFooter>
+          <Button variant="ghost" onClick={onClose}>Fechar</Button>
+          {canManage && <Button disabled={!form.name.trim() || !form.processId || save.isPending} onClick={() => save.mutate()}>{save.isPending ? 'Salvando...' : 'Salvar'}</Button>}
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+function RiskMatrixDialog({ matrix, canManage, onClose, onSaved }: { matrix?: RiskMatrix; canManage: boolean; onClose: () => void; onSaved: () => void }) {
+  const [form, setForm] = useState({
+    name: matrix?.name ?? 'Matriz padrao',
+    severityScale: String(matrix?.severityScale ?? 5),
+    probabilityScale: String(matrix?.probabilityScale ?? 5),
+    useDetection: matrix?.useDetection ?? false,
+    detectionScale: String(matrix?.detectionScale ?? 5),
+    thresholdLow: String(matrix?.thresholdLow ?? 4),
+    thresholdModerate: String(matrix?.thresholdModerate ?? 9),
+    thresholdHigh: String(matrix?.thresholdHigh ?? 15),
+  });
+  const save = useMutation({
+    mutationFn: () =>
+      api('/food-safety/risk-matrix', {
+        method: 'PATCH',
+        json: {
+          name: form.name,
+          severityScale: Number(form.severityScale),
+          probabilityScale: Number(form.probabilityScale),
+          useDetection: form.useDetection,
+          detectionScale: Number(form.detectionScale),
+          thresholdLow: Number(form.thresholdLow),
+          thresholdModerate: Number(form.thresholdModerate),
+          thresholdHigh: Number(form.thresholdHigh),
+        },
+      }),
+    onSuccess: () => { toast.success('Matriz de risco salva'); onSaved(); },
+    onError: (e: any) => toast.error(e?.message ?? 'Falha ao salvar'),
+  });
+  const numField = (k: string, label: string) => (
+    <div><Label>{label}</Label><Input type="number" min={1} value={String((form as Record<string, unknown>)[k] ?? '')} onChange={(e) => setForm({ ...form, [k]: e.target.value })} disabled={!canManage} /></div>
+  );
+  return (
+    <Dialog open onOpenChange={(o) => !o && onClose()}>
+      <DialogContent className="max-w-xl">
+        <DialogHeader><DialogTitle>Matriz de risco</DialogTitle></DialogHeader>
+        <p className="text-xs text-muted-foreground">
+          Índice = Severidade × Probabilidade{form.useDetection ? ' × Detecção' : ''}. As faixas definem o nível (índice ≤ baixo → Baixo; ≤ moderado → Moderado; ≤ alto → Alto; acima → Crítico).
+        </p>
+        <div className="grid grid-cols-2 gap-3">
+          <div className="col-span-2"><Label>Nome</Label><Input value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} disabled={!canManage} /></div>
+          {numField('severityScale', 'Escala de severidade')}
+          {numField('probabilityScale', 'Escala de probabilidade')}
+          <label className="col-span-2 flex items-center gap-2 text-sm"><input type="checkbox" checked={form.useDetection} onChange={(e) => setForm({ ...form, useDetection: e.target.checked })} disabled={!canManage} />Usar fator de detecção</label>
+          {form.useDetection && numField('detectionScale', 'Escala de detecção')}
+          {numField('thresholdLow', 'Limite Baixo (≤)')}
+          {numField('thresholdModerate', 'Limite Moderado (≤)')}
+          {numField('thresholdHigh', 'Limite Alto (≤)')}
+        </div>
+        <DialogFooter>
+          <Button variant="ghost" onClick={onClose}>Fechar</Button>
+          {canManage && <Button disabled={save.isPending} onClick={() => save.mutate()}>{save.isPending ? 'Salvando...' : 'Salvar'}</Button>}
         </DialogFooter>
       </DialogContent>
     </Dialog>

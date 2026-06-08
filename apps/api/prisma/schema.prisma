@@ -540,6 +540,8 @@ model Company {
   fsPrograms             FoodSafetyProgram[]     @relation("FsProgramCompany")
   fsProcesses            FoodSafetyProcess[]     @relation("FsProcessCompany")
   fsProcessSteps         FoodSafetyProcessStep[] @relation("FsStepCompany")
+  fsRiskMatrices         FoodSafetyRiskMatrix[]  @relation("FsRiskMatrixCompany")
+  fsHazards              FoodSafetyHazard[]      @relation("FsHazardCompany")
   formTemplates          FormTemplate[]
   formSubmissions        FormSubmission[]
   meetings               Meeting[]
@@ -724,6 +726,7 @@ model User {
   fsProgramsCreated          FoodSafetyProgram[]         @relation("FsProgramCreatedBy")
   fsProcessesOwned           FoodSafetyProcess[]         @relation("FsProcessOwner")
   fsProcessesCreated         FoodSafetyProcess[]         @relation("FsProcessCreatedBy")
+  fsHazardsResponsible       FoodSafetyHazard[]          @relation("FsHazardResponsible")
   formTemplatesOwned         FormTemplate[]              @relation("FormTemplateOwner")
   formTemplatesCreated       FormTemplate[]              @relation("FormTemplateCreatedBy")
   formSubmissionsSubmitted   FormSubmission[]            @relation("FormSubmissionSubmittedBy")
@@ -6850,7 +6853,8 @@ model FoodSafetyProcess {
   updatedAt             DateTime                @updatedAt
   deletedAt             DateTime?
 
-  steps FoodSafetyProcessStep[]
+  steps   FoodSafetyProcessStep[]
+  hazards FoodSafetyHazard[]
 
   @@unique([companyId, number])
   @@index([companyId])
@@ -6880,6 +6884,107 @@ model FoodSafetyProcessStep {
   updatedAt      DateTime           @updatedAt
   deletedAt      DateTime?
 
+  hazards FoodSafetyHazard[]
+
   @@index([companyId])
   @@index([processId])
+}
+
+// ----- Perigos / Analise APPCC (Fase 1, incremento 3) ---------------------
+
+enum FoodSafetyHazardCategory {
+  BIOLOGICAL
+  CHEMICAL
+  PHYSICAL
+  ALLERGENIC
+  RADIOLOGICAL
+  FRAUD
+  SABOTAGE
+  CROSS_CONTAMINATION
+  OTHER
+}
+
+enum FoodSafetyRiskLevel {
+  LOW
+  MODERATE
+  HIGH
+  CRITICAL
+}
+
+enum FoodSafetyControlType {
+  NONE
+  PRP // Programa de Pre-Requisito
+  OPRP // Programa de Pre-Requisito Operacional (PPRO)
+  CCP // Ponto Critico de Controle (PCC)
+}
+
+enum FoodSafetyHazardStatus {
+  OPEN
+  ASSESSED
+  CONTROLLED
+  ARCHIVED
+}
+
+// Matriz de risco configuravel por empresa (escalas e faixas dos niveis).
+model FoodSafetyRiskMatrix {
+  id                String    @id @default(uuid())
+  companyId         String
+  company           Company   @relation("FsRiskMatrixCompany", fields: [companyId], references: [id])
+  name              String    @default("Matriz padrao")
+  severityScale     Int       @default(5)
+  probabilityScale  Int       @default(5)
+  useDetection      Boolean   @default(false)
+  detectionScale    Int       @default(5)
+  // limites superiores (inclusivos) do indice de risco para cada nivel
+  thresholdLow      Int       @default(4)
+  thresholdModerate Int       @default(9)
+  thresholdHigh     Int       @default(15)
+  active            Boolean   @default(true)
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+  deletedAt         DateTime?
+
+  @@index([companyId])
+}
+
+// Perigo analisado em um processo/etapa, com avaliacao de risco e classificacao
+// do controle (PRP/PPRO/PCC). Monitoramento detalhado e limites entram na Fase 2.
+model FoodSafetyHazard {
+  id                   String                   @id @default(uuid())
+  companyId            String
+  company              Company                  @relation("FsHazardCompany", fields: [companyId], references: [id])
+  processId            String
+  process              FoodSafetyProcess        @relation(fields: [processId], references: [id])
+  stepId               String?
+  step                 FoodSafetyProcessStep?   @relation(fields: [stepId], references: [id])
+  responsibleUserId    String?
+  responsible          User?                    @relation("FsHazardResponsible", fields: [responsibleUserId], references: [id])
+  number               Int
+  code                 String?
+  category             FoodSafetyHazardCategory @default(BIOLOGICAL)
+  name                 String
+  description          String?
+  source               String?
+  consequence          String?
+  justification        String?
+  severity             Int?
+  probability          Int?
+  detection            Int?
+  riskIndex            Int?
+  riskLevel            FoodSafetyRiskLevel?
+  controlType          FoodSafetyControlType    @default(NONE)
+  controlJustification String?
+  existingControls     String?
+  additionalControls   String?
+  status               FoodSafetyHazardStatus   @default(OPEN)
+  createdAt            DateTime                 @default(now())
+  updatedAt            DateTime                 @updatedAt
+  deletedAt            DateTime?
+
+  @@unique([companyId, number])
+  @@index([companyId])
+  @@index([processId])
+  @@index([stepId])
+  @@index([category])
+  @@index([controlType])
 }

@@ -22,7 +22,12 @@ function makeService(opts?: {
   listAreaFilter?: unknown;
   orgNode?: unknown;
   user?: unknown;
+  matrix?: unknown;
+  hazards?: unknown[];
+  hazard?: unknown;
+  lastHazard?: unknown;
 }) {
+  const defaultMatrix = { id: 'm1', companyId: 'companyA', severityScale: 5, probabilityScale: 5, useDetection: false, detectionScale: 5, thresholdLow: 4, thresholdModerate: 9, thresholdHigh: 15 };
   const prisma: any = {
     foodSafetyProgram: {
       findMany: vi.fn().mockResolvedValue(opts?.programs ?? []),
@@ -43,6 +48,20 @@ function makeService(opts?: {
       findFirst: vi.fn().mockResolvedValue(opts?.step ?? null),
       create: vi.fn().mockImplementation((args: any) => Promise.resolve({ id: 'st1', ...args.data })),
       update: vi.fn().mockImplementation((args: any) => Promise.resolve({ id: 'st1', ...args.data })),
+    },
+    foodSafetyRiskMatrix: {
+      findFirst: vi.fn().mockResolvedValue(opts?.matrix ?? defaultMatrix),
+      create: vi.fn().mockImplementation((args: any) => Promise.resolve({ id: 'm1', ...args.data })),
+      update: vi.fn().mockImplementation((args: any) => Promise.resolve({ id: 'm1', ...args.data })),
+    },
+    foodSafetyHazard: {
+      findMany: vi.fn().mockResolvedValue(opts?.hazards ?? []),
+      findFirst: vi.fn().mockImplementation((args: any) => {
+        if (args?.orderBy?.number) return Promise.resolve(opts?.lastHazard ?? null);
+        return Promise.resolve(opts?.hazard ?? null);
+      }),
+      create: vi.fn().mockImplementation((args: any) => Promise.resolve({ id: 'h1', ...args.data })),
+      update: vi.fn().mockImplementation((args: any) => Promise.resolve({ id: 'h1', ...args.data })),
     },
     orgNode: { findFirst: vi.fn().mockResolvedValue(opts?.orgNode ?? null), findMany: vi.fn().mockResolvedValue([]) },
     user: { findFirst: vi.fn().mockResolvedValue(opts?.user ?? null), findMany: vi.fn().mockResolvedValue([]) },
@@ -147,5 +166,40 @@ describe('FoodSafetyService - Fase 1 (programas/processos/etapas)', () => {
     expect(res.draft).toBe(1);
     expect(res.steps).toBe(3);
     expect(res.controlPoints).toBe(2);
+  });
+
+  it('createHazard: calcula indice/nivel de risco, numera e checa area', async () => {
+    const { service, prisma, access } = makeService({
+      process: { id: 'pr1', companyId: 'companyA', orgNodeId: 'areaA', steps: [] },
+      lastHazard: { number: 2 },
+    });
+    await service.createHazard(me, { processId: 'pr1', name: 'Salmonella', category: 'BIOLOGICAL', severity: 4, probability: 3, controlType: 'CCP' });
+    expect(access.assertCanWrite).toHaveBeenCalledWith('user-1', 'areaA', 'food-safety', 'create');
+    const data = prisma.foodSafetyHazard.create.mock.calls[0][0].data;
+    expect(data.companyId).toBe('companyA');
+    expect(data.number).toBe(3);
+    expect(data.riskIndex).toBe(12); // 4 x 3
+    expect(data.riskLevel).toBe('HIGH'); // 9 < 12 <= 15
+    expect(data.controlType).toBe('CCP');
+  });
+
+  it('createHazard: severidade fora da escala -> erro e nao grava', async () => {
+    const { service, prisma } = makeService({ process: { id: 'pr1', companyId: 'companyA', orgNodeId: null, steps: [] } });
+    await expect(service.createHazard(me, { processId: 'pr1', name: 'X', severity: 9 })).rejects.toThrow();
+    expect(prisma.foodSafetyHazard.create).not.toHaveBeenCalled();
+  });
+
+  it('updateRiskMatrix: limites nao crescentes -> erro', async () => {
+    const { service } = makeService();
+    await expect(service.updateRiskMatrix(me, { thresholdLow: 10, thresholdModerate: 5 })).rejects.toThrow();
+  });
+
+  it('listHazards: aplica filtro de area no processo', async () => {
+    const { service, prisma } = makeService({ listAreaFilter: ['areaA'] });
+    await service.listHazards(me, { processId: 'pr1' });
+    const where = prisma.foodSafetyHazard.findMany.mock.calls[0][0].where;
+    expect(where.companyId).toBe('companyA');
+    expect(where.processId).toBe('pr1');
+    expect(where.AND[0].process.OR).toContainEqual({ orgNodeId: { in: ['areaA'] } });
   });
 });

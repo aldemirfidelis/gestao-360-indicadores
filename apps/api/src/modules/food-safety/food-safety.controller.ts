@@ -106,4 +106,55 @@ export class FoodSafetyController {
   removeStep(@CurrentUser() me: AuthPayload, @Param('stepId') stepId: string) {
     return this.service.removeStep(me, stepId);
   }
+
+  // ----- matriz de risco -----
+  @Get('risk-matrix')
+  @RequirePermissions('fsms:view')
+  getRiskMatrix(@CurrentUser() me: AuthPayload) {
+    return this.service.getRiskMatrix(me);
+  }
+
+  @Patch('risk-matrix')
+  @RequirePermissions('fsms:update')
+  updateRiskMatrix(@CurrentUser() me: AuthPayload, @Body() body: any) {
+    return this.service.updateRiskMatrix(me, body);
+  }
+
+  // ----- perigos / APPCC -----
+  @Get('hazards')
+  @RequirePermissions('fsms:view')
+  listHazards(
+    @CurrentUser() me: AuthPayload,
+    @Query('processId') processId?: string,
+    @Query('stepId') stepId?: string,
+    @Query('category') category?: string,
+    @Query('status') status?: string,
+    @Query('search') search?: string,
+  ) {
+    return this.service.listHazards(me, { processId, stepId, category, status, search });
+  }
+
+  @Get('hazards/:id')
+  @RequirePermissions('fsms:view')
+  getHazard(@CurrentUser() me: AuthPayload, @Param('id') id: string) {
+    return this.service.getHazard(me, id);
+  }
+
+  @Post('hazards')
+  @RequirePermissions('fsms:create')
+  createHazard(@CurrentUser() me: AuthPayload, @Body() body: any) {
+    return this.service.createHazard(me, body);
+  }
+
+  @Patch('hazards/:id')
+  @RequirePermissions('fsms:update')
+  updateHazard(@CurrentUser() me: AuthPayload, @Param('id') id: string, @Body() body: any) {
+    return this.service.updateHazard(me, id, body);
+  }
+
+  @Delete('hazards/:id')
+  @RequirePermissions('fsms:delete')
+  removeHazard(@CurrentUser() me: AuthPayload, @Param('id') id: string) {
+    return this.service.removeHazard(me, id);
+  }
 }

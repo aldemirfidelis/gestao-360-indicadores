@@ -1,5 +1,14 @@
 import { BadRequestException, ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
-import { FoodSafetyProcessStatus, FoodSafetyProgramStatus, FoodSafetyStepType, Prisma } from '@prisma/client';
+import {
+  FoodSafetyControlType,
+  FoodSafetyHazardCategory,
+  FoodSafetyHazardStatus,
+  FoodSafetyProcessStatus,
+  FoodSafetyProgramStatus,
+  FoodSafetyRiskLevel,
+  FoodSafetyStepType,
+  Prisma,
+} from '@prisma/client';
 import { PrismaService } from '../../prisma/prisma.service';
 import { AccessService } from '../access/access.service';
 import type { AreaAction } from '../access/access.logic';
@@ -367,6 +376,20 @@ export class FoodSafetyService {
       steps += p.steps.length;
       controlPoints += p.steps.filter((s) => s.isControlPoint).length;
     }
+
+    const hazards = await this.prisma.foodSafetyHazard.findMany({
+      where: { companyId: me.companyId, deletedAt: null, ...(programId ? { process: { programId } } : {}) },
+      select: { riskLevel: true, controlType: true },
+    });
+    const byLevel = Object.fromEntries(Object.values(FoodSafetyRiskLevel).map((l) => [l, 0])) as Record<FoodSafetyRiskLevel, number>;
+    let ccp = 0;
+    let oprp = 0;
+    for (const h of hazards) {
+      if (h.riskLevel) byLevel[h.riskLevel]++;
+      if (h.controlType === FoodSafetyControlType.CCP) ccp++;
+      if (h.controlType === FoodSafetyControlType.OPRP) oprp++;
+    }
+
     return {
       processes: processes.length,
       published: byStatus[FoodSafetyProcessStatus.PUBLISHED] ?? 0,
@@ -377,6 +400,12 @@ export class FoodSafetyService {
       steps,
       controlPoints,
       byStatus,
+      hazards: hazards.length,
+      hazardsCritical: byLevel[FoodSafetyRiskLevel.CRITICAL] ?? 0,
+      hazardsHigh: byLevel[FoodSafetyRiskLevel.HIGH] ?? 0,
+      ccp,
+      oprp,
+      hazardsByLevel: byLevel,
     };
   }
 
@@ -399,7 +428,230 @@ export class FoodSafetyService {
       programStatuses: Object.values(FoodSafetyProgramStatus),
       processStatuses: Object.values(FoodSafetyProcessStatus),
       stepTypes: Object.values(FoodSafetyStepType),
+      hazardCategories: Object.values(FoodSafetyHazardCategory),
+      riskLevels: Object.values(FoodSafetyRiskLevel),
+      controlTypes: Object.values(FoodSafetyControlType),
+      hazardStatuses: Object.values(FoodSafetyHazardStatus),
       visibilities: VISIBILITIES,
     };
+  }
+
+  // ----------------------------- matriz de risco ----------------------------
+  async getRiskMatrix(me: AuthPayload) {
+    const existing = await this.prisma.foodSafetyRiskMatrix.findFirst({
+      where: { companyId: me.companyId, deletedAt: null, active: true },
+    });
+    if (existing) return existing;
+    return this.prisma.foodSafetyRiskMatrix.create({ data: { companyId: me.companyId } });
+  }
+
+  async updateRiskMatrix(me: AuthPayload, patch: any) {
+    const matrix = await this.getRiskMatrix(me);
+    const data: any = {};
+    if ('name' in (patch ?? {})) data.name = this.requiredText(patch.name, 'Nome');
+    if ('severityScale' in (patch ?? {})) data.severityScale = this.scale(patch.severityScale, 'Escala de severidade');
+    if ('probabilityScale' in (patch ?? {})) data.probabilityScale = this.scale(patch.probabilityScale, 'Escala de probabilidade');
+    if ('detectionScale' in (patch ?? {})) data.detectionScale = this.scale(patch.detectionScale, 'Escala de deteccao');
+    if ('useDetection' in (patch ?? {})) data.useDetection = Boolean(patch.useDetection);
+    if ('thresholdLow' in (patch ?? {})) data.thresholdLow = this.scale(patch.thresholdLow, 'Limite baixo');
+    if ('thresholdModerate' in (patch ?? {})) data.thresholdModerate = this.scale(patch.thresholdModerate, 'Limite moderado');
+    if ('thresholdHigh' in (patch ?? {})) data.thresholdHigh = this.scale(patch.thresholdHigh, 'Limite alto');
+    const low = data.thresholdLow ?? matrix.thresholdLow;
+    const mod = data.thresholdModerate ?? matrix.thresholdModerate;
+    const high = data.thresholdHigh ?? matrix.thresholdHigh;
+    if (!(low < mod && mod < high)) throw new BadRequestException('Os limites devem ser crescentes: baixo < moderado < alto.');
+    return this.prisma.foodSafetyRiskMatrix.update({ where: { id: matrix.id }, data });
+  }
+
+  private scale(value: unknown, field: string): number {
+    const n = Math.round(Number(value));
+    if (!Number.isFinite(n) || n < 1) throw new BadRequestException(`${field} deve ser um numero >= 1.`);
+    return n;
+  }
+
+  private scaleValue(value: unknown, max: number): number | null {
+    if (value === undefined || value === null || value === '') return null;
+    const n = Math.round(Number(value));
+    if (!Number.isFinite(n)) throw new BadRequestException('Valor de escala invalido.');
+    if (n < 1 || n > max) throw new BadRequestException(`Valor deve estar entre 1 e ${max}.`);
+    return n;
+  }
+
+  private computeRisk(
+    matrix: { useDetection: boolean; thresholdLow: number; thresholdModerate: number; thresholdHigh: number },
+    severity: number | null,
+    probability: number | null,
+    detection: number | null,
+  ): { riskIndex: number | null; riskLevel: FoodSafetyRiskLevel | null } {
+    if (severity == null || probability == null) return { riskIndex: null, riskLevel: null };
+    let index = severity * probability;
+    if (matrix.useDetection && detection != null) index *= detection;
+    let level: FoodSafetyRiskLevel;
+    if (index <= matrix.thresholdLow) level = FoodSafetyRiskLevel.LOW;
+    else if (index <= matrix.thresholdModerate) level = FoodSafetyRiskLevel.MODERATE;
+    else if (index <= matrix.thresholdHigh) level = FoodSafetyRiskLevel.HIGH;
+    else level = FoodSafetyRiskLevel.CRITICAL;
+    return { riskIndex: index, riskLevel: level };
+  }
+
+  // ----------------------------- perigos / APPCC ----------------------------
+  private parseCategory(v?: string): FoodSafetyHazardCategory | undefined {
+    if (!v) return undefined;
+    if (!Object.values(FoodSafetyHazardCategory).includes(v as FoodSafetyHazardCategory)) throw new BadRequestException('Categoria de perigo invalida.');
+    return v as FoodSafetyHazardCategory;
+  }
+  private parseControlType(v?: string): FoodSafetyControlType | undefined {
+    if (!v) return undefined;
+    if (!Object.values(FoodSafetyControlType).includes(v as FoodSafetyControlType)) throw new BadRequestException('Tipo de controle invalido.');
+    return v as FoodSafetyControlType;
+  }
+  private parseHazardStatus(v?: string): FoodSafetyHazardStatus | undefined {
+    if (!v) return undefined;
+    if (!Object.values(FoodSafetyHazardStatus).includes(v as FoodSafetyHazardStatus)) throw new BadRequestException('Status de perigo invalido.');
+    return v as FoodSafetyHazardStatus;
+  }
+
+  private hazardInclude() {
+    return {
+      process: { select: { id: true, number: true, name: true, code: true, orgNodeId: true, programId: true } },
+      step: { select: { id: true, number: true, name: true } },
+      responsible: { select: { id: true, name: true, email: true } },
+    } satisfies Prisma.FoodSafetyHazardInclude;
+  }
+
+  private async loadHazard(me: AuthPayload, id: string) {
+    const hazard = await this.prisma.foodSafetyHazard.findFirst({
+      where: { id, companyId: me.companyId, deletedAt: null },
+      include: this.hazardInclude(),
+    });
+    if (!hazard) throw new NotFoundException('Perigo nao encontrado');
+    return hazard;
+  }
+
+  async listHazards(me: AuthPayload, filters: { processId?: string; stepId?: string; category?: string; status?: string; search?: string } = {}) {
+    const permitted = await this.access.listAreaFilter(me.sub, MODULE, 'view');
+    const and: Prisma.FoodSafetyHazardWhereInput[] = [];
+    if (permitted) and.push({ process: { OR: [{ orgNodeId: null }, { orgNodeId: { in: permitted } }] } });
+    const term = filters.search?.trim();
+    if (term) {
+      and.push({
+        OR: [
+          { name: { contains: term, mode: 'insensitive' } },
+          { code: { contains: term, mode: 'insensitive' } },
+          { description: { contains: term, mode: 'insensitive' } },
+          { source: { contains: term, mode: 'insensitive' } },
+        ],
+      });
+    }
+    return this.prisma.foodSafetyHazard.findMany({
+      where: {
+        companyId: me.companyId,
+        deletedAt: null,
+        ...(filters.processId ? { processId: filters.processId } : {}),
+        ...(filters.stepId ? { stepId: filters.stepId } : {}),
+        ...(this.parseCategory(filters.category) ? { category: this.parseCategory(filters.category) } : {}),
+        ...(this.parseHazardStatus(filters.status) ? { status: this.parseHazardStatus(filters.status) } : {}),
+        ...(and.length ? { AND: and } : {}),
+      },
+      include: this.hazardInclude(),
+      orderBy: [{ number: 'desc' }],
+    });
+  }
+
+  async getHazard(me: AuthPayload, id: string) {
+    return this.loadHazard(me, id);
+  }
+
+  async createHazard(me: AuthPayload, body: any) {
+    const processId = this.requiredText(body?.processId, 'Processo');
+    const proc = await this.loadProcess(me, processId);
+    await this.assertProcessWriteArea(me, proc.orgNodeId, 'create');
+    const stepId = this.id(body?.stepId);
+    if (stepId && !proc.steps.some((s) => s.id === stepId)) throw new BadRequestException('Etapa nao pertence ao processo informado.');
+    const responsibleUserId = await this.validateUser(me.companyId, this.id(body?.responsibleUserId));
+    const matrix = await this.getRiskMatrix(me);
+    const severity = this.scaleValue(body?.severity, matrix.severityScale);
+    const probability = this.scaleValue(body?.probability, matrix.probabilityScale);
+    const detection = matrix.useDetection ? this.scaleValue(body?.detection, matrix.detectionScale) : null;
+    const risk = this.computeRisk(matrix, severity, probability, detection);
+
+    return this.prisma.$transaction(async (tx) => {
+      const last = await tx.foodSafetyHazard.findFirst({ where: { companyId: me.companyId }, orderBy: { number: 'desc' }, select: { number: true } });
+      return tx.foodSafetyHazard.create({
+        data: {
+          companyId: me.companyId,
+          processId,
+          stepId,
+          responsibleUserId,
+          number: (last?.number ?? 0) + 1,
+          code: this.nullableText(body?.code) ?? null,
+          category: this.parseCategory(body?.category) ?? FoodSafetyHazardCategory.BIOLOGICAL,
+          name: this.requiredText(body?.name, 'Nome do perigo'),
+          description: this.nullableText(body?.description) ?? null,
+          source: this.nullableText(body?.source) ?? null,
+          consequence: this.nullableText(body?.consequence) ?? null,
+          justification: this.nullableText(body?.justification) ?? null,
+          severity,
+          probability,
+          detection,
+          riskIndex: risk.riskIndex,
+          riskLevel: risk.riskLevel,
+          controlType: this.parseControlType(body?.controlType) ?? FoodSafetyControlType.NONE,
+          controlJustification: this.nullableText(body?.controlJustification) ?? null,
+          existingControls: this.nullableText(body?.existingControls) ?? null,
+          additionalControls: this.nullableText(body?.additionalControls) ?? null,
+          status: this.parseHazardStatus(body?.status) ?? FoodSafetyHazardStatus.OPEN,
+        },
+        include: this.hazardInclude(),
+      });
+    });
+  }
+
+  async updateHazard(me: AuthPayload, id: string, patch: any) {
+    const before = await this.loadHazard(me, id);
+    await this.assertProcessWriteArea(me, before.process.orgNodeId, 'edit');
+    const matrix = await this.getRiskMatrix(me);
+    const data: any = {};
+    if ('stepId' in (patch ?? {})) {
+      const stepId = this.id(patch.stepId);
+      if (stepId) {
+        const step = await this.prisma.foodSafetyProcessStep.findFirst({ where: { id: stepId, processId: before.processId, deletedAt: null }, select: { id: true } });
+        if (!step) throw new BadRequestException('Etapa nao pertence ao processo do perigo.');
+      }
+      data.stepId = stepId;
+    }
+    if ('responsibleUserId' in (patch ?? {})) data.responsibleUserId = await this.validateUser(me.companyId, this.id(patch.responsibleUserId));
+    if ('code' in (patch ?? {})) data.code = this.nullableText(patch.code);
+    if ('category' in (patch ?? {})) data.category = this.parseCategory(patch.category);
+    if ('name' in (patch ?? {})) data.name = this.requiredText(patch.name, 'Nome do perigo');
+    if ('description' in (patch ?? {})) data.description = this.nullableText(patch.description);
+    if ('source' in (patch ?? {})) data.source = this.nullableText(patch.source);
+    if ('consequence' in (patch ?? {})) data.consequence = this.nullableText(patch.consequence);
+    if ('justification' in (patch ?? {})) data.justification = this.nullableText(patch.justification);
+    if ('controlType' in (patch ?? {})) data.controlType = this.parseControlType(patch.controlType);
+    if ('controlJustification' in (patch ?? {})) data.controlJustification = this.nullableText(patch.controlJustification);
+    if ('existingControls' in (patch ?? {})) data.existingControls = this.nullableText(patch.existingControls);
+    if ('additionalControls' in (patch ?? {})) data.additionalControls = this.nullableText(patch.additionalControls);
+    if ('status' in (patch ?? {})) data.status = this.parseHazardStatus(patch.status);
+
+    const touchesRisk = ['severity', 'probability', 'detection'].some((k) => k in (patch ?? {}));
+    if (touchesRisk) {
+      const severity = 'severity' in patch ? this.scaleValue(patch.severity, matrix.severityScale) : before.severity;
+      const probability = 'probability' in patch ? this.scaleValue(patch.probability, matrix.probabilityScale) : before.probability;
+      const detection = matrix.useDetection ? ('detection' in patch ? this.scaleValue(patch.detection, matrix.detectionScale) : before.detection) : null;
+      const risk = this.computeRisk(matrix, severity, probability, detection);
+      data.severity = severity;
+      data.probability = probability;
+      data.detection = detection;
+      data.riskIndex = risk.riskIndex;
+      data.riskLevel = risk.riskLevel;
+    }
+    return this.prisma.foodSafetyHazard.update({ where: { id }, data, include: this.hazardInclude() });
+  }
+
+  async removeHazard(me: AuthPayload, id: string) {
+    const hazard = await this.loadHazard(me, id);
+    await this.assertProcessWriteArea(me, hazard.process.orgNodeId, 'delete');
+    return this.prisma.foodSafetyHazard.update({ where: { id }, data: { deletedAt: new Date() } });
   }
 }
