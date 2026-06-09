@@ -72,6 +72,8 @@ export class WorkItemAggregationService {
         this.collectDocuments(me).catch((e) => this.warn('documents', e)),
         this.collectRisks(me).catch((e) => this.warn('risks', e)),
         this.collectNonConformities(me).catch((e) => this.warn('nonconformities', e)),
+        this.collectIndicatorsOffTarget(me).catch((e) => this.warn('indicators', e)),
+        this.collectNotifications(me).catch((e) => this.warn('notifications', e)),
       ])
     ).flat();
 
@@ -387,5 +389,78 @@ export class WorkItemAggregationService {
       sourceCreatedAt: nc.createdAt,
       sourceUpdatedAt: nc.updatedAt,
     }));
+  }
+
+  private async collectIndicatorsOffTarget(me: AuthPayload): Promise<WorkItemDraft[]> {
+    const reds = await this.prisma.indicatorResult.findMany({
+      where: { light: 'RED', indicator: { companyId: me.companyId, deletedAt: null, status: 'ACTIVE', responsibleUserId: me.sub } },
+      orderBy: { periodDate: 'desc' },
+      distinct: ['indicatorId'],
+      take: 50,
+      select: {
+        value: true, attainment: true, deviationPct: true, periodRef: true,
+        indicator: { select: { id: true, name: true, code: true, ownerNodeId: true } },
+      },
+    });
+    return reds.map((r) => ({
+      sourceModule: 'indicators',
+      sourceEntityType: 'INDICATOR',
+      sourceEntityId: r.indicator.id,
+      itemType: 'INDICATOR_OFF_TARGET',
+      title: `${r.indicator.code ? r.indicator.code + ' · ' : ''}${r.indicator.name}`,
+      summary: `Fora da meta (${r.periodRef})${r.deviationPct != null ? ` · desvio ${Math.round(r.deviationPct)}%` : ''}`,
+      status: 'OPEN',
+      criticality: 'HIGH',
+      dueAt: null,
+      assignedUserId: me.sub,
+      orgNodeId: r.indicator.ownerNodeId,
+      recommendedAction: 'Registrar análise de causa e/ou criar plano de ação',
+      availableActions: [
+        { key: 'open', label: 'Abrir indicador', href: `/indicators/${r.indicator.id}` },
+        { key: 'vision360', label: 'Abrir Visão 360°', inline: true },
+      ],
+      context: { periodRef: r.periodRef, value: r.value, attainment: r.attainment, deviationPct: r.deviationPct },
+    }));
+  }
+
+  private async collectNotifications(me: AuthPayload): Promise<WorkItemDraft[]> {
+    const notes = await this.prisma.notification.findMany({
+      where: { companyId: me.companyId, userId: me.sub, readAt: null },
+      orderBy: { createdAt: 'desc' },
+      take: 50,
+      select: { id: true, kind: true, title: true, body: true, link: true, createdAt: true },
+    });
+    const map: Record<string, { type: string; crit: string }> = {
+      MENTION: { type: 'MENTION', crit: 'MEDIUM' },
+      MESSAGE: { type: 'MESSAGE', crit: 'LOW' },
+      DEVIATION_CRITICAL: { type: 'ALERT', crit: 'HIGH' },
+      ACTION_OVERDUE: { type: 'ALERT', crit: 'HIGH' },
+      ACTION_DUE_SOON: { type: 'ALERT', crit: 'MEDIUM' },
+      INDICATOR_OFF_TARGET: { type: 'ALERT', crit: 'MEDIUM' },
+      TARGET_MISSED: { type: 'ALERT', crit: 'MEDIUM' },
+      PROJECT_LATE: { type: 'ALERT', crit: 'MEDIUM' },
+    };
+    return notes.map((n) => {
+      const m = map[n.kind as string] ?? { type: 'ALERT', crit: 'LOW' };
+      return {
+        sourceModule: 'notifications',
+        sourceEntityType: 'NOTIFICATION',
+        sourceEntityId: n.id,
+        itemType: m.type,
+        title: n.title,
+        summary: n.body ?? null,
+        status: 'OPEN',
+        criticality: m.crit,
+        dueAt: null,
+        assignedUserId: me.sub,
+        recommendedAction: m.type === 'MESSAGE' || m.type === 'MENTION' ? 'Ler e responder' : 'Verificar o alerta',
+        availableActions: [
+          { key: 'markRead', label: 'Marcar como lida', inline: true },
+          ...(n.link ? [{ key: 'open', label: 'Abrir', href: n.link }] : []),
+        ],
+        context: { kind: n.kind },
+        sourceCreatedAt: n.createdAt,
+      };
+    });
   }
 }

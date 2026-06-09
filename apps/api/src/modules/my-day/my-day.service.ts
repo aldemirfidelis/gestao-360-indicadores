@@ -3,6 +3,7 @@ import { PrismaService } from '../../prisma/prisma.service';
 import { AuthPayload } from '../auth/auth.types';
 import { WorkItemAggregationService } from './work-item-aggregation.service';
 import { WorkflowApprovalService } from '../automations/services/workflow-approval.service';
+import { ActionsService } from '../actions/actions.service';
 
 const REFRESH_TTL_MS = 30_000;
 
@@ -23,6 +24,7 @@ export class MyDayService {
     private readonly prisma: PrismaService,
     private readonly aggregation: WorkItemAggregationService,
     private readonly approvals: WorkflowApprovalService,
+    private readonly actions: ActionsService,
   ) {}
 
   private refreshKey(me: AuthPayload) {
@@ -80,6 +82,18 @@ export class MyDayService {
       return { ok: true, message: 'Decisão registrada.' };
     }
 
+    if (action === 'complete' && item.sourceEntityType === 'ACTION_PLAN') {
+      await this.actions.changeStatus(item.sourceEntityId, 'DONE' as any, me.sub);
+      await this.ensureFresh(me, true);
+      return { ok: true, message: 'Tarefa concluída.' };
+    }
+
+    if (action === 'markread' && item.sourceEntityType === 'NOTIFICATION') {
+      await this.prisma.notification.updateMany({ where: { id: item.sourceEntityId, userId: me.sub }, data: { readAt: new Date() } });
+      await this.ensureFresh(me, true);
+      return { ok: true, message: 'Marcada como lida.' };
+    }
+
     // Acoes nao tratadas no servidor: encaminha para o modulo de origem (mantendo contexto).
     const actions = (item.availableActions as Array<{ key: string; href?: string }> | null) ?? [];
     const match = actions.find((a) => a.key === action) ?? actions.find((a) => a.key === 'open');
@@ -94,7 +108,7 @@ export class MyDayService {
     const dayStart = new Date(); dayStart.setHours(0, 0, 0, 0);
     const dayEnd = new Date(); dayEnd.setHours(23, 59, 59, 999);
 
-    const [pending, overdue, dueToday, approvals, risksCritical, documentsToReview, meetingsToday, unreadMessages] =
+    const [pending, overdue, dueToday, approvals, risksCritical, documentsToReview, meetingsToday, unreadMessages, indicatorsOffTarget] =
       await Promise.all([
         this.prisma.workItemIndex.count({ where: { ...base, status: { notIn: ['DONE', 'ARCHIVED'] } } }),
         this.prisma.workItemIndex.count({ where: { ...base, overdueDays: { gt: 0 } } }),
@@ -104,11 +118,12 @@ export class MyDayService {
         this.prisma.workItemIndex.count({ where: { ...base, itemType: 'DOCUMENT_REVIEW' } }),
         this.prisma.workItemIndex.count({ where: { ...base, itemType: 'MEETING' } }),
         this.prisma.notification.count({ where: { companyId: me.companyId, userId: me.sub, readAt: null } }),
+        this.prisma.workItemIndex.count({ where: { ...base, itemType: 'INDICATOR_OFF_TARGET' } }),
       ]);
 
     return {
       pending, overdue, dueToday, approvals,
-      indicatorsOffTarget: 0, risksCritical, documentsToReview,
+      indicatorsOffTarget, risksCritical, documentsToReview,
       trainingsPending: 0, meetingsToday, unreadMessages,
     };
   }

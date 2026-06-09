@@ -5,8 +5,8 @@ import { useRouter } from 'next/navigation';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
 import {
-  AlertTriangle, CalendarDays, CheckCircle2, CheckSquare, FileText, FileWarning,
-  Inbox, RefreshCw, Search, ShieldAlert, Sparkles, Stamp, Workflow,
+  AlertTriangle, AtSign, CalendarDays, CheckCircle2, CheckSquare, FileText, FileWarning,
+  Inbox, MessageSquare, RefreshCw, Search, ShieldAlert, Target, Stamp, Workflow,
 } from 'lucide-react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -55,6 +55,10 @@ const TYPE_META: Record<string, { label: string; icon: typeof Inbox }> = {
   RISK_CRITICAL: { label: 'Risco', icon: ShieldAlert },
   MEETING: { label: 'Reunião', icon: CalendarDays },
   NONCONFORMITY: { label: 'Não conformidade', icon: FileWarning },
+  INDICATOR_OFF_TARGET: { label: 'Indicador', icon: Target },
+  ALERT: { label: 'Alerta', icon: AlertTriangle },
+  MESSAGE: { label: 'Mensagem', icon: MessageSquare },
+  MENTION: { label: 'Menção', icon: AtSign },
 };
 const PRIORITY_META: Record<string, { label: string; cls: string }> = {
   CRITICAL: { label: 'Crítica', cls: 'bg-rose-100 text-rose-700' },
@@ -65,7 +69,7 @@ const PRIORITY_META: Record<string, { label: string; cls: string }> = {
 };
 const VISION360_TYPE: Record<string, string> = {
   ACTION_PLAN: 'ACTION_PLAN', DOCUMENT: 'DOCUMENT', RISK_REGISTER: 'RISK',
-  NON_CONFORMITY: 'NON_CONFORMITY', MEETING: 'MEETING',
+  NON_CONFORMITY: 'NON_CONFORMITY', MEETING: 'MEETING', INDICATOR: 'INDICATOR',
 };
 const TABS = [
   { key: 'priorities', label: 'Prioridades' },
@@ -115,12 +119,13 @@ export default function MeuDiaPage() {
     if (t) vision.open(t, it.sourceEntityId);
     else toast.info('Visão 360° indisponível para este tipo de item');
   }
-  function pickCard(type: 'pending' | 'overdue' | 'today' | 'approvals' | 'risksCritical' | 'documentsToReview' | 'meetingsToday') {
+  function pickCard(type: 'pending' | 'overdue' | 'today' | 'approvals' | 'indicators' | 'risksCritical' | 'documentsToReview' | 'meetingsToday') {
     setTypeFilter(null);
     if (type === 'pending') setTab('pending');
     else if (type === 'overdue') setTab('overdue');
     else if (type === 'today') setTab('today');
     else if (type === 'approvals') { setTab('priorities'); setTypeFilter('APPROVAL'); }
+    else if (type === 'indicators') { setTab('priorities'); setTypeFilter('INDICATOR_OFF_TARGET'); }
     else if (type === 'risksCritical') { setTab('priorities'); setTypeFilter('RISK_CRITICAL'); }
     else if (type === 'documentsToReview') { setTab('priorities'); setTypeFilter('DOCUMENT_REVIEW'); }
     else if (type === 'meetingsToday') { setTab('priorities'); setTypeFilter('MEETING'); }
@@ -132,6 +137,7 @@ export default function MeuDiaPage() {
     { key: 'overdue', label: 'Vencidos', value: s?.overdue ?? 0, cls: 'text-rose-600' },
     { key: 'today', label: 'Vencendo hoje', value: s?.dueToday ?? 0, cls: 'text-amber-600' },
     { key: 'approvals', label: 'Aprovações', value: s?.approvals ?? 0, cls: 'text-indigo-600' },
+    { key: 'indicators', label: 'Indicadores', value: s?.indicatorsOffTarget ?? 0, cls: 'text-fuchsia-600' },
     { key: 'risksCritical', label: 'Riscos críticos', value: s?.risksCritical ?? 0, cls: 'text-orange-600' },
     { key: 'documentsToReview', label: 'Documentos', value: s?.documentsToReview ?? 0, cls: 'text-sky-600' },
     { key: 'meetingsToday', label: 'Reuniões hoje', value: s?.meetingsToday ?? 0, cls: 'text-emerald-600' },
@@ -167,7 +173,7 @@ export default function MeuDiaPage() {
       </div>
 
       {/* Resumo */}
-      <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-7">
+      <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-8">
         {cards.map((c) => (
           <button key={c.key} type="button" onClick={() => pickCard(c.key as any)}
             className="rounded-lg border bg-card p-3 text-left transition-colors hover:border-primary/40 hover:bg-accent/30">
@@ -257,8 +263,9 @@ function ActNowDialog({ item, onClose, onDone, onOpen, onVision }: {
   item: WorkItem; onClose: () => void; onDone: () => void; onOpen: () => void; onVision: () => void;
 }) {
   const [justification, setJustification] = useState('');
-  const inlineActions = (item.availableActions ?? []).filter((a) => a.inline && ['approve', 'reject', 'changes'].includes(a.key));
   const isApproval = item.itemType === 'APPROVAL';
+  const isTask = ['TASK', 'OVERDUE_ACTION'].includes(item.itemType) && item.sourceEntityType === 'ACTION_PLAN';
+  const isNotification = item.sourceEntityType === 'NOTIFICATION';
 
   const act = useMutation({
     mutationFn: (action: string) => api(`/my-day/items/${item.id}/action`, { method: 'POST', json: { action, justification } }),
@@ -291,6 +298,16 @@ function ActNowDialog({ item, onClose, onDone, onOpen, onVision }: {
               <Button variant="outline" className="border-rose-300 text-rose-600" disabled={act.isPending} onClick={() => act.mutate('reject')}>Reprovar</Button>
               <Button variant="outline" disabled={act.isPending} onClick={() => act.mutate('changes')}>Solicitar ajustes</Button>
             </div>
+          </div>
+        ) : isTask ? (
+          <div className="space-y-2">
+            <p className="text-sm text-muted-foreground">Conclua a tarefa aqui, ou abra o registro para atualizar progresso, anexar evidências e comentar.</p>
+            <Button disabled={act.isPending} onClick={() => act.mutate('complete')}>Concluir tarefa</Button>
+          </div>
+        ) : isNotification ? (
+          <div className="space-y-2">
+            <p className="text-sm text-muted-foreground">{item.summary || 'Notificação'}</p>
+            <Button disabled={act.isPending} onClick={() => act.mutate('markRead')}>Marcar como lida</Button>
           </div>
         ) : (
           <p className="text-sm text-muted-foreground">

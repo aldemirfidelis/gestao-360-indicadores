@@ -16,6 +16,8 @@ function makePrisma(over: { actions?: unknown[] } = {}) {
     document: empty(),
     riskRegister: empty(),
     nonConformity: empty(),
+    indicatorResult: empty(),
+    notification: empty(),
     workItemIndex: {
       upsert: vi.fn().mockResolvedValue({}),
       deleteMany: vi.fn().mockResolvedValue({ count: 0 }),
