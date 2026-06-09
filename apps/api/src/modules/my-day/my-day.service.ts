@@ -1,4 +1,5 @@
 import { BadRequestException, Injectable, NotFoundException, OnModuleInit } from '@nestjs/common';
+import { randomUUID } from 'crypto';
 import { PrismaService } from '../../prisma/prisma.service';
 import { AuthPayload } from '../auth/auth.types';
 import { WorkItemAggregationService } from './work-item-aggregation.service';
@@ -227,6 +228,34 @@ export class MyDayService implements OnModuleInit {
       create: { companyId: me.companyId, userId: me.sub, ...data },
       update: data,
     });
+  }
+
+  // ---------- filtros salvos (armazenados em UserDashboardPreference.savedFilters) ----------
+
+  async listSavedFilters(me: AuthPayload): Promise<any[]> {
+    const pref = await this.getPreferences(me);
+    return Array.isArray((pref as any).savedFilters) ? (pref as any).savedFilters : [];
+  }
+
+  async addSavedFilter(me: AuthPayload, dto: Record<string, any>) {
+    const list = await this.listSavedFilters(me);
+    const entry = {
+      id: randomUUID(),
+      name: (dto.name ?? 'Filtro').toString().slice(0, 60),
+      view: dto.view ?? null,
+      tab: dto.tab ?? null,
+      itemType: dto.itemType ?? null,
+      priority: dto.priority ?? null,
+      q: dto.q ?? null,
+    };
+    await this.setPreferences(me, { savedFilters: [...list, entry].slice(0, 30) });
+    return entry;
+  }
+
+  async removeSavedFilter(me: AuthPayload, id: string) {
+    const list = await this.listSavedFilters(me);
+    await this.setPreferences(me, { savedFilters: list.filter((f: any) => f.id !== id) });
+    return { ok: true };
   }
 
   private defaultPreferences() {

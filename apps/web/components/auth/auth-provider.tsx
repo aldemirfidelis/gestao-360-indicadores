@@ -86,7 +86,21 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     queryClient.clear();
     const profile = await refreshUser();
     // Super Admin escolhe qual empresa administrar antes de entrar.
-    router.replace(profile?.role === 'SUPER_ADMIN' ? '/selecionar-empresa' : '/meu-dia');
+    if (profile?.role === 'SUPER_ADMIN') {
+      router.replace('/selecionar-empresa');
+      return;
+    }
+    // Pagina inicial padrao = Meu Dia, respeitando a preferencia do usuario.
+    let landing = '/meu-dia';
+    try {
+      const pref: any = await api('/my-day/preferences');
+      if (pref?.landingPage && typeof pref.landingPage === 'string' && pref.landingPage.startsWith('/')) {
+        landing = pref.landingPage;
+      }
+    } catch {
+      /* mantem o padrao */
+    }
+    router.replace(landing);
   };
 
   const switchCompany = async (companyId: string | null) => {

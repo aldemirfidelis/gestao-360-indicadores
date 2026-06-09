@@ -1,12 +1,12 @@
 'use client';
 
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
 import {
-  AlertTriangle, AtSign, CalendarDays, CheckCircle2, CheckSquare, FileText, FileWarning,
-  Inbox, MessageSquare, RefreshCw, Search, ShieldAlert, Target, Stamp, Users, Workflow,
+  AlertTriangle, AtSign, Bookmark, CalendarDays, CheckCircle2, CheckSquare, Columns3, FileText, FileWarning,
+  Inbox, LayoutList, MessageSquare, Plus, RefreshCw, Search, ShieldAlert, SlidersHorizontal, Table2, Target, Stamp, Users, Workflow,
 } from 'lucide-react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -15,6 +15,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { NativeSelect } from '@/components/ui/select';
 import { useAuth } from '@/components/auth/auth-provider';
 import { useVision360 } from '@/components/ui/vision360-context';
 import { api } from '@/lib/api';
@@ -37,6 +38,7 @@ interface WorkItem {
   sourceEntityId: string;
   workflowInstanceId?: string | null;
   requiresDecision: boolean;
+  isBlocking?: boolean;
   recommendedAction?: string | null;
   availableActions?: Array<{ key: string; label: string; kind?: string; inline?: boolean; requiresJustification?: boolean; href?: string | null }> | null;
 }
@@ -97,6 +99,12 @@ export default function MeuDiaPage() {
   const [typeFilter, setTypeFilter] = useState<string | null>(null);
   const [q, setQ] = useState('');
   const [actOn, setActOn] = useState<WorkItem | null>(null);
+  const [view, setView] = useState<'list' | 'table' | 'kanban'>('list');
+  const [compact, setCompact] = useState(false);
+  const [hiddenCards, setHiddenCards] = useState<string[]>([]);
+  const [prefsOpen, setPrefsOpen] = useState(false);
+  const [saveOpen, setSaveOpen] = useState(false);
+  const prefsInit = useRef(false);
 
   const overview = useQuery<{ summary: Summary; isManager: boolean }>({ queryKey: ['my-day', 'overview'], queryFn: () => api('/my-day') });
   const itemsQuery = useQuery<{ rows: WorkItem[]; total: number }>({
@@ -108,6 +116,38 @@ export default function MeuDiaPage() {
     mutationFn: () => api('/my-day/refresh', { method: 'POST' }),
     onSuccess: () => { void qc.invalidateQueries({ queryKey: ['my-day'] }); toast.success('Atualizado'); },
   });
+
+  const prefs = useQuery<any>({ queryKey: ['my-day', 'preferences'], queryFn: () => api('/my-day/preferences') });
+  const savedFilters = useQuery<any[]>({ queryKey: ['my-day', 'saved-filters'], queryFn: () => api('/my-day/saved-filters') });
+
+  useEffect(() => {
+    if (prefsInit.current || !prefs.data) return;
+    prefsInit.current = true;
+    if (prefs.data.defaultView === 'table' || prefs.data.defaultView === 'kanban' || prefs.data.defaultView === 'list') setView(prefs.data.defaultView);
+    if (prefs.data.compactMode) setCompact(true);
+    const hidden = prefs.data.visibleWidgets?.hidden;
+    if (Array.isArray(hidden)) setHiddenCards(hidden);
+  }, [prefs.data]);
+
+  const savePrefs = useMutation({
+    mutationFn: (patch: any) => api('/my-day/preferences', { method: 'PUT', json: patch }),
+    onSuccess: () => { void qc.invalidateQueries({ queryKey: ['my-day', 'preferences'] }); setPrefsOpen(false); toast.success('Preferências salvas'); },
+  });
+  const addFilter = useMutation({
+    mutationFn: (body: any) => api('/my-day/saved-filters', { method: 'POST', json: body }),
+    onSuccess: () => { void qc.invalidateQueries({ queryKey: ['my-day', 'saved-filters'] }); setSaveOpen(false); toast.success('Filtro salvo'); },
+  });
+  const delFilter = useMutation({
+    mutationFn: (id: string) => api(`/my-day/saved-filters/${id}`, { method: 'DELETE' }),
+    onSuccess: () => void qc.invalidateQueries({ queryKey: ['my-day', 'saved-filters'] }),
+  });
+
+  function applyFilter(f: any) {
+    if (f.view) setView(f.view);
+    setTab(f.tab || 'priorities');
+    setTypeFilter(f.itemType || null);
+    setQ(f.q || '');
+  }
 
   function invalidate() { void qc.invalidateQueries({ queryKey: ['my-day'] }); }
   function openItem(it: WorkItem) {
@@ -180,7 +220,7 @@ export default function MeuDiaPage() {
 
       {/* Resumo */}
       <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-8">
-        {cards.map((c) => (
+        {cards.filter((c) => !hiddenCards.includes(c.key)).map((c) => (
           <button key={c.key} type="button" onClick={() => pickCard(c.key as any)}
             className="rounded-lg border bg-card p-3 text-left transition-colors hover:border-primary/40 hover:bg-accent/30">
             <div className="text-[11px] uppercase tracking-wide text-muted-foreground">{c.label}</div>
@@ -207,6 +247,26 @@ export default function MeuDiaPage() {
         )}
       </div>
 
+      {/* Toolbar: visualização + filtros salvos + personalizar */}
+      <div className="flex flex-wrap items-center gap-2">
+        <div className="inline-flex rounded-md border p-0.5">
+          {([['list', LayoutList, 'Lista'], ['table', Table2, 'Tabela'], ['kanban', Columns3, 'Kanban']] as const).map(([v, Ic, lbl]) => (
+            <button key={v} type="button" onClick={() => setView(v)}
+              className={cn('inline-flex items-center gap-1 rounded px-2 py-1 text-xs', view === v ? 'bg-primary text-primary-foreground' : 'text-muted-foreground hover:text-foreground')}>
+              <Ic className="h-3.5 w-3.5" />{lbl}
+            </button>
+          ))}
+        </div>
+        {(savedFilters.data ?? []).length > 0 && (
+          <NativeSelect className="h-8 w-44 text-xs" value="" onChange={(e) => { const f = (savedFilters.data ?? []).find((x) => x.id === e.target.value); if (f) applyFilter(f); }}>
+            <option value="">Filtros salvos…</option>
+            {(savedFilters.data ?? []).map((f) => <option key={f.id} value={f.id}>{f.name}</option>)}
+          </NativeSelect>
+        )}
+        <Button variant="ghost" size="sm" onClick={() => setSaveOpen(true)}><Bookmark className="mr-1 h-3.5 w-3.5" />Salvar filtro</Button>
+        <Button variant="ghost" size="sm" className="ml-auto" onClick={() => setPrefsOpen(true)}><SlidersHorizontal className="mr-1 h-3.5 w-3.5" />Personalizar</Button>
+      </div>
+
       {/* Lista de itens */}
       <div className="space-y-2">
         {itemsQuery.isPending ? (
@@ -217,6 +277,10 @@ export default function MeuDiaPage() {
             <div className="mt-2 text-base font-semibold">Nada por aqui</div>
             <p className="mx-auto mt-1 max-w-md text-sm text-muted-foreground">Nenhum item para esta visão. Aproveite para adiantar outras frentes.</p>
           </CardContent></Card>
+        ) : view === 'table' ? (
+          <ItemsTable rows={rows} onAct={setActOn} />
+        ) : view === 'kanban' ? (
+          <ItemsKanban rows={rows} onAct={setActOn} />
         ) : (
           rows.map((it) => {
             const meta = TYPE_META[it.itemType] ?? { label: it.itemType, icon: Inbox };
@@ -224,7 +288,7 @@ export default function MeuDiaPage() {
             const prio = PRIORITY_META[it.priority] ?? PRIORITY_META.MEDIUM;
             return (
               <Card key={it.id} className={cn(it.overdueDays > 0 && 'border-l-4 border-l-rose-400')}>
-                <CardContent className="flex flex-wrap items-start gap-3 p-3">
+                <CardContent className={cn('flex flex-wrap items-start gap-3', compact ? 'p-2' : 'p-3')}>
                   <div className="grid h-9 w-9 shrink-0 place-items-center rounded-md bg-muted text-muted-foreground"><Icon className="h-4 w-4" /></div>
                   <div className="min-w-0 flex-1">
                     <div className="flex flex-wrap items-center gap-2">
@@ -256,6 +320,27 @@ export default function MeuDiaPage() {
         )}
       </div>
 
+      {prefsOpen && (
+        <PersonalizeDialog
+          initial={{ view, compact, hiddenCards, landingPage: prefs.data?.landingPage ?? '/meu-dia' }}
+          cards={cards.map((c) => ({ key: c.key, label: c.label }))}
+          saving={savePrefs.isPending}
+          onClose={() => setPrefsOpen(false)}
+          onSave={(p) => {
+            setView(p.view); setCompact(p.compact); setHiddenCards(p.hiddenCards);
+            savePrefs.mutate({ defaultView: p.view, compactMode: p.compact, visibleWidgets: { hidden: p.hiddenCards }, landingPage: p.landingPage });
+          }}
+        />
+      )}
+      {saveOpen && (
+        <SaveFilterDialog
+          saving={addFilter.isPending}
+          existing={savedFilters.data ?? []}
+          onDelete={(id) => delFilter.mutate(id)}
+          onClose={() => setSaveOpen(false)}
+          onSave={(name) => addFilter.mutate({ name, view, tab, itemType: typeFilter, q })}
+        />
+      )}
       {actOn && (
         <ActNowDialog item={actOn} onClose={() => setActOn(null)} onDone={() => { setActOn(null); invalidate(); }}
           onOpen={() => { openItem(actOn); setActOn(null); }}
@@ -326,6 +411,173 @@ function ActNowDialog({ item, onClose, onDone, onOpen, onVision }: {
           {VISION360_TYPE[item.sourceEntityType] && <Button variant="outline" onClick={onVision}>Abrir Visão 360°</Button>}
           <Button variant="outline" onClick={onOpen}>Abrir registro</Button>
         </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+function ItemsTable({ rows, onAct }: { rows: WorkItem[]; onAct: (it: WorkItem) => void }) {
+  return (
+    <div className="overflow-x-auto rounded-lg border">
+      <table className="w-full text-sm">
+        <thead className="bg-muted/40 text-xs text-muted-foreground">
+          <tr>
+            <th className="px-3 py-2 text-left">Prioridade</th>
+            <th className="px-3 py-2 text-left">Tipo</th>
+            <th className="px-3 py-2 text-left">Item</th>
+            <th className="px-3 py-2 text-left">Prazo</th>
+            <th className="px-3 py-2 text-right">Ação</th>
+          </tr>
+        </thead>
+        <tbody>
+          {rows.map((it) => {
+            const prio = PRIORITY_META[it.priority] ?? PRIORITY_META.MEDIUM;
+            const meta = TYPE_META[it.itemType] ?? { label: it.itemType, icon: Inbox };
+            return (
+              <tr key={it.id} className="border-t">
+                <td className="px-3 py-2"><span className={cn('rounded px-1.5 py-0.5 text-[11px] font-medium', prio.cls)}>{prio.label}</span></td>
+                <td className="px-3 py-2 text-xs text-muted-foreground">{meta.label}</td>
+                <td className="px-3 py-2"><div className="font-medium">{it.title}</div>{it.summary && <div className="text-xs text-muted-foreground">{it.summary}</div>}</td>
+                <td className="px-3 py-2 text-xs">{it.overdueDays > 0 ? <span className="text-rose-600">atrasado {it.overdueDays}d</span> : it.dueAt ? formatDate(it.dueAt) : '—'}</td>
+                <td className="px-3 py-2 text-right"><Button size="sm" onClick={() => onAct(it)}>Agir</Button></td>
+              </tr>
+            );
+          })}
+        </tbody>
+      </table>
+    </div>
+  );
+}
+
+const KANBAN_LANES = [
+  { key: 'new', label: 'Novo' },
+  { key: 'progress', label: 'Em andamento' },
+  { key: 'waiting', label: 'Aguardando' },
+  { key: 'blocked', label: 'Bloqueado' },
+];
+function laneOf(it: WorkItem): string {
+  if (it.isBlocking) return 'blocked';
+  if (it.itemType === 'APPROVAL') return 'waiting';
+  if (it.status === 'IN_PROGRESS') return 'progress';
+  return 'new';
+}
+function ItemsKanban({ rows, onAct }: { rows: WorkItem[]; onAct: (it: WorkItem) => void }) {
+  return (
+    <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+      {KANBAN_LANES.map((lane) => {
+        const items = rows.filter((it) => laneOf(it) === lane.key);
+        return (
+          <div key={lane.key} className="rounded-lg border bg-muted/20 p-2">
+            <div className="mb-2 flex items-center justify-between px-1 text-xs font-semibold text-muted-foreground">
+              <span>{lane.label}</span><span>{items.length}</span>
+            </div>
+            <div className="space-y-2">
+              {items.map((it) => {
+                const prio = PRIORITY_META[it.priority] ?? PRIORITY_META.MEDIUM;
+                return (
+                  <button key={it.id} type="button" onClick={() => onAct(it)}
+                    className={cn('w-full rounded-md border bg-card p-2 text-left hover:border-primary/40', it.overdueDays > 0 && 'border-l-2 border-l-rose-400')}>
+                    <div className="flex items-center gap-1.5">
+                      <span className={cn('rounded px-1 py-0.5 text-[10px] font-medium', prio.cls)}>{prio.label}</span>
+                      <span className="text-[10px] uppercase text-muted-foreground">{TYPE_META[it.itemType]?.label ?? it.itemType}</span>
+                    </div>
+                    <div className="mt-1 line-clamp-2 text-xs font-medium">{it.title}</div>
+                    {it.overdueDays > 0 && <div className="mt-0.5 text-[10px] text-rose-600">atrasado {it.overdueDays}d</div>}
+                  </button>
+                );
+              })}
+              {items.length === 0 && <div className="px-1 py-4 text-center text-[11px] text-muted-foreground">—</div>}
+            </div>
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
+function PersonalizeDialog({ initial, cards, saving, onClose, onSave }: {
+  initial: { view: 'list' | 'table' | 'kanban'; compact: boolean; hiddenCards: string[]; landingPage: string };
+  cards: Array<{ key: string; label: string }>;
+  saving: boolean;
+  onClose: () => void;
+  onSave: (p: { view: 'list' | 'table' | 'kanban'; compact: boolean; hiddenCards: string[]; landingPage: string }) => void;
+}) {
+  const [view, setView] = useState(initial.view);
+  const [compact, setCompact] = useState(initial.compact);
+  const [hidden, setHidden] = useState<string[]>(initial.hiddenCards);
+  const [landing, setLanding] = useState(initial.landingPage || '/meu-dia');
+  const toggleCard = (key: string) => setHidden((h) => (h.includes(key) ? h.filter((k) => k !== key) : [...h, key]));
+  return (
+    <Dialog open onOpenChange={(o) => !o && onClose()}>
+      <DialogContent className="max-w-lg">
+        <DialogHeader><DialogTitle>Personalizar Meu Dia</DialogTitle></DialogHeader>
+        <div className="space-y-4">
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <Label>Visualização padrão</Label>
+              <NativeSelect value={view} onChange={(e) => setView(e.target.value as any)}>
+                <option value="list">Lista</option><option value="table">Tabela</option><option value="kanban">Kanban</option>
+              </NativeSelect>
+            </div>
+            <div>
+              <Label>Página inicial</Label>
+              <NativeSelect value={landing} onChange={(e) => setLanding(e.target.value)}>
+                <option value="/meu-dia">Meu Dia</option>
+                <option value="/dashboard">Visão Geral</option>
+                <option value="/visualization">Dashboard Executivo</option>
+                <option value="/strategy">Mapa Estratégico</option>
+                <option value="/indicators">Indicadores</option>
+              </NativeSelect>
+            </div>
+          </div>
+          <label className="flex items-center gap-2 text-sm">
+            <input type="checkbox" checked={compact} onChange={(e) => setCompact(e.target.checked)} />Modo compacto
+          </label>
+          <div>
+            <Label>Cards de resumo visíveis</Label>
+            <div className="mt-1 grid grid-cols-2 gap-1.5">
+              {cards.map((c) => (
+                <label key={c.key} className="flex items-center gap-2 text-sm">
+                  <input type="checkbox" checked={!hidden.includes(c.key)} onChange={() => toggleCard(c.key)} />{c.label}
+                </label>
+              ))}
+            </div>
+          </div>
+        </div>
+        <DialogFooter>
+          <Button variant="ghost" onClick={onClose}>Cancelar</Button>
+          <Button disabled={saving} onClick={() => onSave({ view, compact, hiddenCards: hidden, landingPage: landing })}>Salvar</Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+function SaveFilterDialog({ saving, existing, onDelete, onClose, onSave }: {
+  saving: boolean; existing: any[]; onDelete: (id: string) => void; onClose: () => void; onSave: (name: string) => void;
+}) {
+  const [name, setName] = useState('');
+  return (
+    <Dialog open onOpenChange={(o) => !o && onClose()}>
+      <DialogContent className="max-w-md">
+        <DialogHeader><DialogTitle>Filtros salvos</DialogTitle></DialogHeader>
+        <div className="space-y-3">
+          <div className="flex gap-2">
+            <Input placeholder="Nome do filtro atual" value={name} onChange={(e) => setName(e.target.value)} />
+            <Button disabled={!name.trim() || saving} onClick={() => onSave(name.trim())}><Plus className="mr-1 h-4 w-4" />Salvar</Button>
+          </div>
+          {existing.length > 0 && (
+            <div className="space-y-1">
+              {existing.map((f) => (
+                <div key={f.id} className="flex items-center justify-between rounded-md border px-2 py-1.5 text-sm">
+                  <span>{f.name}</span>
+                  <button type="button" className="text-xs text-rose-600" onClick={() => onDelete(f.id)}>Remover</button>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+        <DialogFooter><Button variant="ghost" onClick={onClose}>Fechar</Button></DialogFooter>
       </DialogContent>
     </Dialog>
   );

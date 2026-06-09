@@ -1,4 +1,4 @@
-import { Body, Controller, Get, Param, Post, Put, Query } from '@nestjs/common';
+import { Body, Controller, Delete, Get, Param, Post, Put, Query } from '@nestjs/common';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import { AuthPayload } from '../auth/auth.types';
 import { MyDayService, MyDayItemsQuery } from './my-day.service';
@@ -81,5 +81,20 @@ export class MyDayController {
   @Put('preferences')
   setPreferences(@CurrentUser() me: AuthPayload, @Body() body: Record<string, any>) {
     return this.service.setPreferences(me, body);
+  }
+
+  @Get('saved-filters')
+  savedFilters(@CurrentUser() me: AuthPayload) {
+    return this.service.listSavedFilters(me);
+  }
+
+  @Post('saved-filters')
+  addSavedFilter(@CurrentUser() me: AuthPayload, @Body() body: Record<string, any>) {
+    return this.service.addSavedFilter(me, body);
+  }
+
+  @Delete('saved-filters/:id')
+  removeSavedFilter(@CurrentUser() me: AuthPayload, @Param('id') id: string) {
+    return this.service.removeSavedFilter(me, id);
   }
 }
