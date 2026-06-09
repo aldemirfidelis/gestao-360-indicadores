@@ -31,6 +31,24 @@ export class PrizeCalcController {
     return this.calc.results(me.companyId, competenceId);
   }
 
+  @Post('competence/:competenceId/submit-review')
+  @RequirePermissions('prize:calc:run')
+  submitReview(@CurrentUser() me: AuthPayload, @Param('competenceId') competenceId: string) {
+    return this.calc.conference(me, competenceId, 'SUBMIT_REVIEW');
+  }
+
+  @Post('competence/:competenceId/approve')
+  @RequirePermissions('prize:calc:approve')
+  approve(@CurrentUser() me: AuthPayload, @Param('competenceId') competenceId: string, @Body() body: { comment?: string }) {
+    return this.calc.conference(me, competenceId, 'APPROVE', body?.comment);
+  }
+
+  @Post('competence/:competenceId/reject')
+  @RequirePermissions('prize:calc:approve')
+  reject(@CurrentUser() me: AuthPayload, @Param('competenceId') competenceId: string, @Body() body: { comment: string }) {
+    return this.calc.conference(me, competenceId, 'REJECT', body?.comment);
+  }
+
   @Get('result/:resultId/memory')
   @RequirePermissions('prize:view')
   memory(@CurrentUser() me: AuthPayload, @Param('resultId') resultId: string) {

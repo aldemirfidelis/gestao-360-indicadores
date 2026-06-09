@@ -121,6 +121,7 @@ export const navSections: NavSection[] = [
       { href: '/gestao-premio/colaboradores', label: 'Colaboradores Elegíveis', description: 'Base elegível por competência (Apdata), snapshot e conciliação', icon: UserCheck, permissions: ['prize:view'] },
       { href: '/gestao-premio/apuracao', label: 'Apuração Mensal', description: 'Motor de cálculo, memória de cálculo e conferência', icon: Calculator, permissions: ['prize:view'] },
       { href: '/gestao-premio/moderadores', label: 'Moderadores', description: 'Regras de redução individual (faltas, atestados, medidas, acidentes)', icon: SlidersHorizontal, permissions: ['prize:view'] },
+      { href: '/gestao-premio/ajustes', label: 'Ajustes e Exceções', description: 'Ajustes manuais, exceções e transitoriedade de área', icon: SlidersHorizontal, permissions: ['prize:view'] },
       { href: '/gestao-premio/integracoes', label: 'Integrações', description: 'Conectores Apdata/BSC/Folha, testes e jobs', icon: Plug, permissions: ['prize:view'] },
     ],
   },

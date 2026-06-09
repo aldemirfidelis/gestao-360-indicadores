@@ -282,9 +282,10 @@ justificativa.
   e UI de evidências pendentes (API de evidência já existe).
 - Tendência e impacto financeiro no Previsto × Realizado (dependem de histórico e
   do Motor de Cálculo da Fase 4).
-- Fase 4: motor + apuração + memória prontos; **telas de ajustes/exceções/
-  transitoriedade** têm API completa, faltando a UI dedicada (inc. 2). Conferência
-  formal (workflow de aprovação da apuração) pendente.
+- Fase 4 (inc. 2 concluída): telas dedicadas de **ajustes/exceções/transitoriedade**
+  (`/gestao-premio/ajustes`, com abas) e **workflow de conferência** da apuração
+  (enviar p/ conferência → aprovar/reprovar, com segregação: quem roda não aprova)
+  já entregues. Pendência residual: notificações automáticas da conferência.
 
 ### Próximas fases (não iniciadas)
 - **Fase 5 — Folha**: geração de lote (rubrica/verba), retorno e conciliação.

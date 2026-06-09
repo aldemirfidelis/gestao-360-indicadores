@@ -30,6 +30,7 @@ export default function PrizeApuracaoPage() {
   const qc = useQueryClient();
   const { hasPermission } = useAuth();
   const canRun = hasPermission(['prize:calc:run']);
+  const canApprove = hasPermission(['prize:calc:approve']);
 
   const [competenceId, setCompetenceId] = useState('');
   const [memoryFor, setMemoryFor] = useState<string | null>(null);
@@ -37,7 +38,7 @@ export default function PrizeApuracaoPage() {
   const { data: competences = [] } = useQuery({ queryKey: ['prize-competences-ref'], queryFn: () => api<CompetenceRef[]>('/prize/competences') });
   const { data, isLoading } = useQuery({
     queryKey: ['prize-calc-results', competenceId],
-    queryFn: () => api<{ run: Run | null; results: Result[] }>(`/prize/calc/competence/${competenceId}/results`),
+    queryFn: () => api<{ run: Run | null; results: Result[]; competenceStatus: string | null }>(`/prize/calc/competence/${competenceId}/results`),
     enabled: !!competenceId,
   });
   const { data: memory } = useQuery({
@@ -57,7 +58,22 @@ export default function PrizeApuracaoPage() {
     onError: (e: ApiError) => toast.error(e.message),
   });
 
+  const conference = useMutation({
+    mutationFn: ({ action, comment }: { action: string; comment?: string }) =>
+      api(`/prize/calc/competence/${competenceId}/${action}`, { method: 'POST', json: comment ? { comment } : {} }),
+    onSuccess: () => { toast.success('Conferência atualizada'); qc.invalidateQueries({ queryKey: ['prize-calc-results'] }); },
+    onError: (e: ApiError) => toast.error(e.message),
+  });
+
   const runData = data?.run;
+  const compStatus = data?.competenceStatus ?? null;
+  const COMP_STATUS: Record<string, { label: string; variant: any }> = {
+    CLOSED_FOR_CALC: { label: 'Fechada p/ cálculo', variant: 'outline' },
+    IN_CALCULATION: { label: 'Em apuração', variant: 'default' },
+    IN_REVIEW: { label: 'Em conferência', variant: 'default' },
+    IN_APPROVAL: { label: 'Em aprovação', variant: 'default' },
+    APPROVED: { label: 'Aprovada', variant: 'default' },
+  };
 
   return (
     <div>
@@ -99,6 +115,25 @@ export default function PrizeApuracaoPage() {
         <Card><CardContent className="py-12 text-center text-sm text-muted-foreground">Nenhuma apuração rodada. Clique em "Rodar apuração" (requer base elegível importada).</CardContent></Card>
       ) : (
         <div className="space-y-4">
+          <Card>
+            <CardContent className="flex flex-wrap items-center justify-between gap-3 p-4">
+              <div className="flex items-center gap-2 text-sm">
+                <span className="font-medium">Conferência:</span>
+                {compStatus && COMP_STATUS[compStatus] ? <Badge variant={COMP_STATUS[compStatus].variant}>{COMP_STATUS[compStatus].label}</Badge> : <span className="text-muted-foreground">—</span>}
+              </div>
+              <div className="flex gap-2">
+                {canRun && compStatus !== 'IN_REVIEW' && compStatus !== 'APPROVED' && (
+                  <Button size="sm" variant="outline" onClick={() => conference.mutate({ action: 'submit-review' })} disabled={conference.isPending}>Enviar p/ conferência</Button>
+                )}
+                {canApprove && (compStatus === 'IN_REVIEW' || compStatus === 'IN_APPROVAL') && (
+                  <>
+                    <Button size="sm" onClick={() => conference.mutate({ action: 'approve' })} disabled={conference.isPending}>Aprovar apuração</Button>
+                    <Button size="sm" variant="outline" onClick={() => { const c = window.prompt('Comentário da reprovação (obrigatório):'); if (c?.trim()) conference.mutate({ action: 'reject', comment: c }); }} disabled={conference.isPending}>Reprovar</Button>
+                  </>
+                )}
+              </div>
+            </CardContent>
+          </Card>
           <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
             <Card><CardContent className="p-4"><div className="text-2xl font-semibold">{runData.totalEmployees}</div><div className="text-xs text-muted-foreground">Colaboradores · v{runData.version}</div></CardContent></Card>
             <Card><CardContent className="p-4"><div className="text-xl font-semibold">{money(runData.totalGross)}</div><div className="text-xs text-muted-foreground">Prêmio bruto</div></CardContent></Card>

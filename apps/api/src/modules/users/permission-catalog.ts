@@ -265,6 +265,7 @@ export const PERMISSION_CATALOG = [
   ['prize:actuals:manage', 'Lançar e importar o realizado', 'Gestão de Prêmio', 'create'],
   ['prize:actuals:close', 'Fechar e reabrir o realizado do período', 'Gestão de Prêmio', 'approve'],
   ['prize:calc:run', 'Executar e reprocessar a apuração do prêmio', 'Gestão de Prêmio', 'manage'],
+  ['prize:calc:approve', 'Conferir e aprovar a apuração (alçada)', 'Gestão de Prêmio', 'approve'],
   ['prize:adjustments:manage', 'Solicitar ajustes manuais e exceções', 'Gestão de Prêmio', 'create'],
   ['prize:adjustments:approve', 'Aprovar ajustes manuais e exceções', 'Gestão de Prêmio', 'approve'],
   ['prize:payroll:manage', 'Gerar e conciliar lotes para a folha', 'Gestão de Prêmio', 'manage'],

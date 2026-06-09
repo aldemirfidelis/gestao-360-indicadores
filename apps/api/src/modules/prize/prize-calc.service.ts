@@ -140,14 +140,45 @@ export class PrizeCalcService {
     return this.run(me, competenceId, reason);
   }
 
+  /** Conferencia/aprovacao da apuracao (workflow formal sobre a competencia). */
+  async conference(me: AuthPayload, competenceId: string, action: 'SUBMIT_REVIEW' | 'APPROVE' | 'REJECT', comment?: string) {
+    const competence = await this.prisma.prizeCompetence.findFirst({ where: { id: competenceId, companyId: me.companyId } });
+    if (!competence) throw new NotFoundException('Competência não encontrada');
+    const run = await this.prisma.prizeCalculationRun.findFirst({
+      where: { companyId: me.companyId, competenceId, status: { in: ['SUCCESS', 'PARTIAL'] } },
+      orderBy: { version: 'desc' },
+    });
+    if (!run) throw new BadRequestException('Rode a apuração antes da conferência');
+
+    if (action === 'SUBMIT_REVIEW') {
+      const updated = await this.prisma.prizeCompetence.update({ where: { id: competenceId }, data: { status: 'IN_REVIEW' } });
+      await this.audit.log(me, { action: 'SUBMIT_REVIEW', entityType: 'CALC_RUN', entityId: run.id, competenceId, after: { status: 'IN_REVIEW' } });
+      return updated;
+    }
+    if (action === 'REJECT') {
+      if (!comment?.trim()) throw new BadRequestException('Comentário é obrigatório ao reprovar a apuração');
+      const updated = await this.prisma.prizeCompetence.update({ where: { id: competenceId }, data: { status: 'CLOSED_FOR_CALC' } });
+      await this.audit.log(me, { action: 'REJECT', entityType: 'CALC_RUN', entityId: run.id, competenceId, after: { status: 'CLOSED_FOR_CALC' }, justification: comment });
+      return updated;
+    }
+    // APPROVE — segregacao: quem rodou a apuracao nao aprova a propria
+    if (run.createdById && run.createdById === me.sub) {
+      throw new BadRequestException('Quem executou a apuração não pode aprová-la (segregação de função)');
+    }
+    const updated = await this.prisma.prizeCompetence.update({ where: { id: competenceId }, data: { status: 'APPROVED' } });
+    await this.audit.log(me, { action: 'APPROVE', entityType: 'CALC_RUN', entityId: run.id, competenceId, after: { status: 'APPROVED' }, justification: comment ?? null });
+    return updated;
+  }
+
   async results(companyId: string, competenceId: string) {
+    const competence = await this.prisma.prizeCompetence.findFirst({ where: { id: competenceId, companyId }, select: { status: true } });
     const run = await this.prisma.prizeCalculationRun.findFirst({
       where: { companyId, competenceId, status: { in: ['SUCCESS', 'PARTIAL'] } },
       orderBy: { version: 'desc' },
     });
-    if (!run) return { run: null, results: [] };
+    if (!run) return { run: null, results: [], competenceStatus: competence?.status ?? null };
     const results = await this.prisma.prizeCalculationResult.findMany({ where: { runId: run.id }, orderBy: { name: 'asc' } });
-    return { run, results };
+    return { run, results, competenceStatus: competence?.status ?? null };
   }
 
   async memory(companyId: string, resultId: string) {
