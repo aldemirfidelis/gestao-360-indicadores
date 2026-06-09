@@ -1,14 +1,15 @@
 import type { Metadata } from 'next';
 
-export const SITE_NAME = 'Gestao 360';
-export const PRODUCT_NAME = 'Gestao 360';
+export const SITE_NAME = 'Gestão 360';
+export const PRODUCT_NAME = 'Gestão 360';
 export const DEFAULT_SITE_URL = 'https://gestao360.org';
 export const SITE_URL = (process.env.NEXT_PUBLIC_SITE_URL ?? DEFAULT_SITE_URL).replace(/\/$/, '');
 export const DEFAULT_OG_IMAGE = '/brand/social-preview.svg';
+export const DEMO_PATH = '/login?demo=1';
 export const WHATSAPP_NUMBER = process.env.NEXT_PUBLIC_WHATSAPP_NUMBER ?? '5564981009108';
 export const WHATSAPP_MESSAGE =
   process.env.NEXT_PUBLIC_WHATSAPP_MESSAGE ??
-  'Ola, tenho interesse em conhecer melhor o Gestao 360.';
+  'Gostei do Gestão 360. Quero receber uma proposta ou conversar sobre uma solução para as necessidades da minha empresa.';
 export const WHATSAPP_URL = `https://wa.me/${WHATSAPP_NUMBER}?text=${encodeURIComponent(WHATSAPP_MESSAGE)}`;
 
 export type PublicPageKind = 'solution' | 'segment' | 'article' | 'guide' | 'institutional';
@@ -55,13 +56,13 @@ export const solutionPages: PublicPage[] = [
   {
     slug: 'gestao-de-indicadores',
     path: '/solucoes/gestao-de-indicadores',
-    title: 'Gestao de indicadores',
-    seoTitle: 'Sistema de gestao de indicadores, metas e resultados | Gestao 360',
+    title: 'Gestão de indicadores',
+    seoTitle: 'Sistema de gestão de indicadores, metas e resultados | Gestão 360',
     description:
-      'Controle indicadores, metas, resultados, farois, responsaveis e planos de acao em uma plataforma integrada.',
+      'Controle indicadores, metas, resultados, faróis, responsáveis e planos de ação em uma plataforma integrada.',
     eyebrow: 'Indicadores e metas',
     summary:
-      'Acompanhe KPIs por empresa, filial, area, processo e responsavel, conectando resultado, analise e acao corretiva.',
+      'Acompanhe KPIs por empresa, filial, área, processo e responsável, conectando resultado, análise e ação corretiva.',
     problem:
       'Muitas empresas ainda consolidam indicadores por planilhas, sem trilha de auditoria, dono claro ou relacao direta com planos de acao.',
     benefits: [
@@ -93,13 +94,13 @@ export const solutionPages: PublicPage[] = [
   {
     slug: 'planejamento-estrategico',
     path: '/solucoes/planejamento-estrategico',
-    title: 'Planejamento estrategico',
-    seoTitle: 'Software para planejamento estrategico, BSC e OKRs | Gestao 360',
+    title: 'Planejamento estratégico',
+    seoTitle: 'Software para planejamento estratégico, BSC e OKRs | Gestão 360',
     description:
-      'Conecte diretrizes, pilares, objetivos, OKRs, indicadores e iniciativas para acompanhar estrategia e execucao.',
-    eyebrow: 'Estrategia e execucao',
+      'Conecte diretrizes, pilares, objetivos, OKRs, indicadores e iniciativas para acompanhar estratégia e execução.',
+    eyebrow: 'Estratégia e execução',
     summary:
-      'Organize objetivos estrategicos e acompanhe se a rotina operacional esta realmente contribuindo para o plano da empresa.',
+      'Organize objetivos estratégicos e acompanhe se a rotina operacional está realmente contribuindo para o plano da empresa.',
     problem:
       'Planos estrategicos perdem forca quando ficam separados dos indicadores, responsaveis, reunioes e iniciativas de execucao.',
     benefits: [
@@ -127,13 +128,13 @@ export const solutionPages: PublicPage[] = [
   {
     slug: 'planos-de-acao',
     path: '/solucoes/planos-de-acao',
-    title: 'Planos de acao',
-    seoTitle: 'Sistema de planos de acao, 5W2H e acompanhamento | Gestao 360',
+    title: 'Planos de ação',
+    seoTitle: 'Sistema de planos de ação, 5W2H e acompanhamento | Gestão 360',
     description:
-      'Gerencie planos de acao com responsaveis, prazos, evidencias, eficacia e rastreabilidade.',
-    eyebrow: 'Execucao rastreavel',
+      'Gerencie planos de ação com responsáveis, prazos, evidências, eficácia e rastreabilidade.',
+    eyebrow: 'Execução rastreável',
     summary:
-      'Transforme decisoes e desvios em acoes acompanhaveis, com dono, prazo, evidencias e historico.',
+      'Transforme decisões e desvios em ações acompanháveis, com dono, prazo, evidências e histórico.',
     problem:
       'Acoes combinadas em reunioes ou auditorias se perdem quando nao ha visibilidade, cobranca e evidencia de conclusao.',
     benefits: [
@@ -142,7 +143,7 @@ export const solutionPages: PublicPage[] = [
       'Acompanha eficacia quando aplicavel.',
       'Integra acoes com indicadores, desvios, auditorias e reunioes.',
     ],
-    features: ['5W2H', 'Tarefas', 'Evidencias', 'Aprovacoes', 'Eficacia'],
+    features: ['5W2H', 'Tarefas', 'Evidências', 'Aprovações', 'Eficácia'],
     useCases: ['Plano corretivo de auditoria.', 'Tratativa de desvio de indicador.', 'Acompanhamento de melhoria continua.'],
     faq: [
       {
@@ -161,13 +162,13 @@ export const solutionPages: PublicPage[] = [
   {
     slug: 'gestao-da-qualidade',
     path: '/solucoes/gestao-da-qualidade',
-    title: 'Gestao da qualidade',
-    seoTitle: 'Sistema de gestao da qualidade, evidencias e melhoria continua | Gestao 360',
+    title: 'Gestão da qualidade',
+    seoTitle: 'Sistema de gestão da qualidade, evidências e melhoria contínua | Gestão 360',
     description:
-      'Integre processos, documentos, auditorias, nao conformidades, analises de causa e planos de acao.',
+      'Integre processos, documentos, auditorias, não conformidades, análises de causa e planos de ação.',
     eyebrow: 'Qualidade e melhoria',
     summary:
-      'Conecte registros de qualidade em uma trilha unica, evitando informacoes soltas e controles paralelos.',
+      'Conecte registros de qualidade em uma trilha única, evitando informações soltas e controles paralelos.',
     problem:
       'Sistemas separados dificultam enxergar a relacao entre processo, requisito, documento, desvio, causa e acao.',
     benefits: [
@@ -196,12 +197,12 @@ export const solutionPages: PublicPage[] = [
     slug: 'auditorias',
     path: '/solucoes/auditorias',
     title: 'Auditorias',
-    seoTitle: 'Sistema de auditorias internas, achados e planos corretivos | Gestao 360',
+    seoTitle: 'Sistema de auditorias internas, achados e planos corretivos | Gestão 360',
     description:
-      'Planeje auditorias, registre achados, relacione evidencias e acompanhe planos corretivos.',
+      'Planeje auditorias, registre achados, relacione evidências e acompanhe planos corretivos.',
     eyebrow: 'Auditoria e conformidade',
     summary:
-      'Organize auditorias e acompanhe achados ate a tratativa, mantendo rastreabilidade de decisoes e evidencias.',
+      'Organize auditorias e acompanhe achados até a tratativa, mantendo rastreabilidade de decisões e evidências.',
     problem:
       'Achados de auditoria perdem prioridade quando nao sao conectados a responsaveis, prazos e acompanhamento gerencial.',
     benefits: [
@@ -210,7 +211,7 @@ export const solutionPages: PublicPage[] = [
       'Gera planos de acao vinculados.',
       'Apoia acompanhamento de pendencias e reincidencias.',
     ],
-    features: ['Plano de auditoria', 'Achados', 'Evidencias', 'Riscos', 'Planos corretivos'],
+    features: ['Plano de auditoria', 'Achados', 'Evidências', 'Riscos', 'Planos corretivos'],
     useCases: ['Auditoria interna.', 'Checklist de conformidade.', 'Acompanhamento de achados por area.'],
     faq: [
       {
@@ -229,13 +230,13 @@ export const solutionPages: PublicPage[] = [
   {
     slug: 'gestao-de-documentos',
     path: '/solucoes/gestao-de-documentos',
-    title: 'Gestao de documentos',
-    seoTitle: 'Gestao de documentos corporativos, revisoes e aprovacao | Gestao 360',
+    title: 'Gestão de documentos',
+    seoTitle: 'Gestão de documentos corporativos, revisões e aprovação | Gestão 360',
     description:
-      'Controle documentos, revisoes, aprovacoes, anexos e rastreabilidade em uma base corporativa.',
-    eyebrow: 'Documentos e revisoes',
+      'Controle documentos, revisões, aprovações, anexos e rastreabilidade em uma base corporativa.',
+    eyebrow: 'Documentos e revisões',
     summary:
-      'Controle documentos importantes com ciclo de revisao, responsaveis, status, anexos e visibilidade por area.',
+      'Controle documentos importantes com ciclo de revisão, responsáveis, status, anexos e visibilidade por área.',
     problem:
       'Documentos em pastas soltas dificultam saber qual versao esta vigente, quem aprovou e onde o documento e utilizado.',
     benefits: [
@@ -263,22 +264,22 @@ export const solutionPages: PublicPage[] = [
   {
     slug: 'formularios-e-checklists',
     path: '/solucoes/formularios-e-checklists',
-    title: 'Formularios e checklists',
-    seoTitle: 'Formularios digitais e checklists operacionais | Gestao 360',
+    title: 'Formulários e checklists',
+    seoTitle: 'Formulários digitais e checklists operacionais | Gestão 360',
     description:
-      'Digitalize coletas, formularios e checklists com evidencias, aprovacao e rastreabilidade.',
+      'Digitalize coletas, formulários e checklists com evidências, aprovação e rastreabilidade.',
     eyebrow: 'Coleta operacional',
     summary:
-      'Padronize coletas e verificacoes de rotina, reduzindo retrabalho e facilitando analise posterior.',
+      'Padronize coletas e verificações de rotina, reduzindo retrabalho e facilitando análise posterior.',
     problem:
-      'Formularios em papel ou planilhas dificultam padronizacao, historico, evidencias e visibilidade gerencial.',
+      'Formulários em papel ou planilhas dificultam padronização, histórico, evidências e visibilidade gerencial.',
     benefits: [
       'Padroniza perguntas, respostas e evidencias.',
       'Permite acompanhamento por status e responsavel.',
       'Conecta reprovacoes a acoes e nao conformidades.',
       'Facilita consulta historica por unidade e processo.',
     ],
-    features: ['Templates', 'Execucoes', 'Evidencias', 'Checklists', 'Acompanhamento'],
+    features: ['Templates', 'Execuções', 'Evidências', 'Checklists', 'Acompanhamento'],
     useCases: ['Inspecao operacional.', 'Checklist de qualidade.', 'Coletas de rotina por turno.'],
     faq: [
       {
@@ -289,7 +290,7 @@ export const solutionPages: PublicPage[] = [
       {
         question: 'Os formularios sao publicos?',
         answer:
-          'Nao. Formularios operacionais fazem parte do portal autenticado e respeitam permissao e tenant.',
+          'Não. Formulários operacionais fazem parte do portal autenticado e respeitam permissão e tenant.',
       },
     ],
     kind: 'solution',
@@ -297,22 +298,22 @@ export const solutionPages: PublicPage[] = [
   {
     slug: 'gestao-de-riscos',
     path: '/solucoes/gestao-de-riscos',
-    title: 'Gestao de riscos',
-    seoTitle: 'Sistema de gestao de riscos, controles e evidencias | Gestao 360',
+    title: 'Gestão de riscos',
+    seoTitle: 'Sistema de gestão de riscos, controles e evidências | Gestão 360',
     description:
-      'Registre riscos, controles, planos de mitigacao, evidencias e conexoes com processos e indicadores.',
+      'Registre riscos, controles, planos de mitigação, evidências e conexões com processos e indicadores.',
     eyebrow: 'Riscos e controles',
     summary:
       'Acompanhe riscos relevantes, seus controles e impactos relacionados a processos, indicadores e auditorias.',
     problem:
-      'Riscos mantidos em planilhas perdem atualizacao e ficam distantes das evidencias e dos controles executados.',
+      'Riscos mantidos em planilhas perdem atualização e ficam distantes das evidências e dos controles executados.',
     benefits: [
       'Relaciona riscos a processos e indicadores.',
       'Registra criticidade, controles e acoes.',
       'Apoia visao 360 dos impactos.',
       'Ajuda gestores a priorizar riscos criticos.',
     ],
-    features: ['Registro de risco', 'Controles', 'Impactos', 'Planos de mitigacao', 'Evidencias'],
+    features: ['Registro de risco', 'Controles', 'Impactos', 'Planos de mitigação', 'Evidências'],
     useCases: ['Matriz de riscos por processo.', 'Risco critico em indicador.', 'Acompanhamento de controles internos.'],
     faq: [
       {
@@ -331,13 +332,13 @@ export const solutionPages: PublicPage[] = [
   {
     slug: 'seguranca-dos-alimentos',
     path: '/solucoes/seguranca-dos-alimentos',
-    title: 'Seguranca dos alimentos',
-    seoTitle: 'Gestao de seguranca dos alimentos e rastreabilidade | Gestao 360',
+    title: 'Segurança dos alimentos',
+    seoTitle: 'Gestão de segurança dos alimentos e rastreabilidade | Gestão 360',
     description:
-      'Apoie controles de seguranca dos alimentos, rastreabilidade, fornecedores, lotes e programas operacionais.',
-    eyebrow: 'Modulo especializado',
+      'Apoie controles de segurança dos alimentos, rastreabilidade, fornecedores, lotes e programas operacionais.',
+    eyebrow: 'Módulo especializado',
     summary:
-      'Organize controles especificos de alimentos e bebidas, com rastreabilidade e conexao com qualidade.',
+      'Organize controles específicos de alimentos e bebidas, com rastreabilidade e conexão com qualidade.',
     problem:
       'Controles de seguranca dos alimentos exigem evidencias consistentes e rastreabilidade entre fornecedores, lotes e ocorrencias.',
     benefits: [
@@ -352,7 +353,7 @@ export const solutionPages: PublicPage[] = [
       {
         question: 'Este modulo substitui uma certificacao?',
         answer:
-          'Nao. Ele apoia controles, evidencias e rastreabilidade. A conformidade final depende dos processos, auditorias e requisitos aplicaveis.',
+          'Não. Ele apoia controles, evidências e rastreabilidade. A conformidade final depende dos processos, auditorias e requisitos aplicáveis.',
       },
       {
         question: 'Ha rastreabilidade de lotes?',
@@ -386,7 +387,7 @@ export const solutionPages: PublicPage[] = [
       {
         question: 'Os dashboards sao apenas visuais?',
         answer:
-          'Nao. Eles se conectam aos registros de origem para permitir investigacao, acao e rastreabilidade.',
+          'Não. Eles se conectam aos registros de origem para permitir investigação, ação e rastreabilidade.',
       },
       {
         question: 'Ha uma central diaria de prioridades?',
@@ -448,13 +449,13 @@ export const solutionPages: PublicPage[] = [
       'Apoia permissoes por perfil e area.',
       'Mantem administracao global separada do portal operacional.',
     ],
-    features: ['Tenants', 'Filiais', 'Modulos por empresa', 'Permissoes', 'Portal Admin Global'],
+    features: ['Tenants', 'Filiais', 'Módulos por empresa', 'Permissões', 'Portal Admin Global'],
     useCases: ['Grupo empresarial.', 'Consultoria com clientes distintos.', 'Unidades operacionais com governanca central.'],
     faq: [
       {
         question: 'Um usuario comum acessa dados de outra empresa?',
         answer:
-          'Nao. A plataforma respeita tenant, autenticao e autorizacao. Conteudo privado nao e publicado em paginas publicas.',
+          'Não. A plataforma respeita tenant, autenticação e autorização. Conteúdo privado não é publicado em páginas públicas.',
       },
       {
         question: 'E possivel bloquear modulos por empresa?',
@@ -470,13 +471,13 @@ export const segmentPages: PublicPage[] = [
   {
     slug: 'industria',
     path: '/segmentos/industria',
-    title: 'Industria',
-    seoTitle: 'Gestao de indicadores e planos de acao para industria | Gestao 360',
+    title: 'Indústria',
+    seoTitle: 'Gestão de indicadores e planos de ação para indústria | Gestão 360',
     description:
-      'Use o Gestao 360 para conectar indicadores industriais, desvios, planos de acao, documentos, auditorias e riscos.',
+      'Use o Gestão 360 para conectar indicadores industriais, desvios, planos de ação, documentos, auditorias e riscos.',
     eyebrow: 'Segmento',
     summary:
-      'Para industrias que precisam acompanhar metas, qualidade, seguranca, processos e planos de acao em uma rotina integrada.',
+      'Para indústrias que precisam acompanhar metas, qualidade, segurança, processos e planos de ação em uma rotina integrada.',
     problem:
       'Areas industriais lidam com muitos indicadores, desvios e evidencias espalhados entre planilhas, reunioes e documentos.',
     benefits: ['Integra indicadores e planos.', 'Apoia auditorias e documentos.', 'Organiza riscos e desvios.', 'Melhora visibilidade por area.'],
@@ -491,17 +492,17 @@ export const segmentPages: PublicPage[] = [
   {
     slug: 'agronegocio',
     path: '/segmentos/agronegocio',
-    title: 'Agronegocio',
-    seoTitle: 'Gestao corporativa para agronegocio e agroindustria | Gestao 360',
+    title: 'Agronegócio',
+    seoTitle: 'Gestão corporativa para agronegócio e agroindústria | Gestão 360',
     description:
-      'Organize indicadores, processos, qualidade, riscos, planos e evidencias em operacoes do agronegocio.',
+      'Organize indicadores, processos, qualidade, riscos, planos e evidências em operações do agronegócio.',
     eyebrow: 'Segmento',
     summary:
-      'Uma base integrada para acompanhar operacoes com multiplas unidades, indicadores produtivos e rotinas de melhoria.',
+      'Uma base integrada para acompanhar operações com múltiplas unidades, indicadores produtivos e rotinas de melhoria.',
     problem:
       'Operacoes agroindustriais precisam consolidar dados de areas diferentes sem perder rastreabilidade e dono da acao.',
     benefits: ['Acompanha unidades e areas.', 'Centraliza evidencias.', 'Conecta indicadores e tratativas.', 'Apoia governanca operacional.'],
-    features: ['Multiunidade', 'Indicadores', 'Planos', 'Documentos', 'Seguranca dos alimentos'],
+    features: ['Multiunidade', 'Indicadores', 'Planos', 'Documentos', 'Segurança dos alimentos'],
     useCases: ['Indicadores agricolas e industriais.', 'Controle de documentos.', 'Tratativas de desvios por unidade.'],
     faq: [
       { question: 'Permite gestao multiunidade?', answer: 'Sim. A estrutura multiempresa e por filiais atende cenarios com varias unidades.' },
@@ -513,19 +514,19 @@ export const segmentPages: PublicPage[] = [
     slug: 'alimentos-e-bebidas',
     path: '/segmentos/alimentos-e-bebidas',
     title: 'Alimentos e bebidas',
-    seoTitle: 'Gestao para alimentos e bebidas, qualidade e rastreabilidade | Gestao 360',
+    seoTitle: 'Gestão para alimentos e bebidas, qualidade e rastreabilidade | Gestão 360',
     description:
-      'Controle qualidade, documentos, formularios, rastreabilidade, lotes, auditorias e planos de acao no setor de alimentos e bebidas.',
+      'Controle qualidade, documentos, formulários, rastreabilidade, lotes, auditorias e planos de ação no setor de alimentos e bebidas.',
     eyebrow: 'Segmento',
     summary:
-      'Para empresas que precisam unir seguranca dos alimentos, qualidade, evidencias e melhoria continua.',
+      'Para empresas que precisam unir segurança dos alimentos, qualidade, evidências e melhoria contínua.',
     problem:
       'O setor exige evidencias confiaveis, rastreabilidade e resposta rapida a desvios sem depender de controles isolados.',
     benefits: ['Apoia rastreabilidade.', 'Organiza evidencias.', 'Integra NC e CAPA.', 'Controla documentos e auditorias.'],
     features: ['Rastreabilidade', 'Documentos', 'Checklists', 'Auditorias', 'Planos corretivos'],
     useCases: ['Controle de lotes.', 'Tratativa de desvios.', 'Checklists de qualidade e seguranca dos alimentos.'],
     faq: [
-      { question: 'A plataforma substitui auditorias externas?', answer: 'Nao. Ela apoia organizacao, evidencias e acompanhamento para os processos da empresa.' },
+      { question: 'A plataforma substitui auditorias externas?', answer: 'Não. Ela apoia organização, evidências e acompanhamento para os processos da empresa.' },
       { question: 'Pode registrar lotes?', answer: 'Sim. O modulo de seguranca dos alimentos possui estrutura de lotes e eventos.' },
     ],
     kind: 'segment',
@@ -533,13 +534,13 @@ export const segmentPages: PublicPage[] = [
   {
     slug: 'servicos',
     path: '/segmentos/servicos',
-    title: 'Servicos',
-    seoTitle: 'Gestao de indicadores e planos para empresas de servicos | Gestao 360',
+    title: 'Serviços',
+    seoTitle: 'Gestão de indicadores e planos para empresas de serviços | Gestão 360',
     description:
-      'Acompanhe desempenho, processos, tarefas, documentos, riscos e planos de acao em empresas de servicos.',
+      'Acompanhe desempenho, processos, tarefas, documentos, riscos e planos de ação em empresas de serviços.',
     eyebrow: 'Segmento',
     summary:
-      'Para operacoes de servicos que precisam padronizar processos, acompanhar metas e dar visibilidade a pendencias.',
+      'Para operações de serviços que precisam padronizar processos, acompanhar metas e dar visibilidade a pendências.',
     problem:
       'Empresas de servicos frequentemente perdem controle quando demandas, reunioes, documentos e indicadores ficam separados.',
     benefits: ['Centraliza prioridades.', 'Acompanha indicadores de atendimento.', 'Organiza documentos e responsabilidades.', 'Facilita governanca por area.'],
@@ -554,13 +555,13 @@ export const segmentPages: PublicPage[] = [
   {
     slug: 'gestao-corporativa',
     path: '/segmentos/gestao-corporativa',
-    title: 'Gestao corporativa',
-    seoTitle: 'Plataforma de gestao corporativa integrada | Gestao 360',
+    title: 'Gestão corporativa',
+    seoTitle: 'Plataforma de gestão corporativa integrada | Gestão 360',
     description:
-      'Conecte estrategia, execucao, indicadores, governanca, documentos, riscos e melhoria continua.',
+      'Conecte estratégia, execução, indicadores, governança, documentos, riscos e melhoria contínua.',
     eyebrow: 'Segmento',
     summary:
-      'Para grupos e areas corporativas que precisam de uma visao integrada entre estrategia, execucao e controle.',
+      'Para grupos e áreas corporativas que precisam de uma visão integrada entre estratégia, execução e controle.',
     problem:
       'Gestores precisam decidir com contexto, mas os dados costumam estar fragmentados entre sistemas, planilhas e reunioes.',
     benefits: ['Unifica contexto de gestao.', 'Conecta estrategia e execucao.', 'Apoia governanca e auditoria.', 'Respeita permissoes e escopo.'],
@@ -575,12 +576,12 @@ export const segmentPages: PublicPage[] = [
 ];
 
 export const moduleHighlights = [
-  'Meu Dia: caixa de entrada corporativa com prioridades, prazos, delegacoes e recomendacoes assistidas.',
-  'Visao 360 do registro: contexto, vinculos, impactos, historico e registros relacionados autorizados.',
-  'Central de Automacoes: workflows, tarefas, aprovacoes, escalonamentos e historico.',
-  'Portal Admin Global: empresas, planos, modulos, usuarios, auditoria e saude tecnica.',
-  'GED e documentos: revisoes, editor online quando configurado, anexos e rastreabilidade.',
-  'Seguranca dos alimentos: programas, lotes, fornecedores e eventos de rastreabilidade.',
+  'Meu Dia: caixa de entrada corporativa com prioridades, prazos, delegações e recomendações assistidas.',
+  'Visão 360 do registro: contexto, vínculos, impactos, histórico e registros relacionados autorizados.',
+  'Central de Automações: workflows, tarefas, aprovações, escalonamentos e histórico.',
+  'Portal Admin Global: empresas, planos, módulos, usuários, auditoria e saúde técnica.',
+  'GED e documentos: revisões, editor online quando configurado, anexos e rastreabilidade.',
+  'Segurança dos alimentos: programas, lotes, fornecedores e eventos de rastreabilidade.',
 ];
 
 export const faqPage: FaqItem[] = [
@@ -600,9 +601,9 @@ export const faqPage: FaqItem[] = [
       'Ha recursos assistidos por IA em pontos especificos, como resumo e recomendacoes do Meu Dia. A IA nao aprova, rejeita ou conclui tarefas automaticamente.',
   },
   {
-    question: 'Como solicitar uma demonstracao?',
+    question: 'Como acessar a demonstração?',
     answer:
-      'Use o formulario de contato ou o botao de WhatsApp. A equipe pode entender o contexto da empresa e indicar os modulos mais adequados.',
+      'Use o botão "Acesse a Demonstração" para entrar no ambiente de exemplo. Se fizer sentido, o WhatsApp fica disponível para proposta ou solução sob medida.',
   },
 ];
 
@@ -646,7 +647,7 @@ export const articlePages: ArticlePage[] = [
     ],
     faq: [
       { question: 'Quantos indicadores uma area deve ter?', answer: 'Nao existe numero universal. O melhor conjunto e aquele que apoia decisoes relevantes sem gerar ruido operacional.' },
-      { question: 'Todo indicador precisa de plano de acao?', answer: 'Nao. Planos devem surgir quando ha desvio relevante, risco, recorrencia ou decisao de melhoria.' },
+      { question: 'Todo indicador precisa de plano de ação?', answer: 'Não. Planos devem surgir quando há desvio relevante, risco, recorrência ou decisão de melhoria.' },
     ],
     related: ['/solucoes/gestao-de-indicadores', '/solucoes/planos-de-acao', '/solucoes/dashboards-executivos'],
   },
@@ -730,7 +731,7 @@ export const articlePages: ArticlePage[] = [
     ],
     faq: [
       { question: 'CAPA e plano de acao sao a mesma coisa?', answer: 'CAPA e um processo de acao corretiva/preventiva. O plano de acao e o instrumento para executar e acompanhar etapas.' },
-      { question: 'A integracao ajuda auditorias futuras?', answer: 'Sim. Historico e evidencias reduzem retrabalho e melhoram demonstracao de controle.' },
+      { question: 'A integração ajuda auditorias futuras?', answer: 'Sim. Histórico e evidências reduzem retrabalho e melhoram demonstração de controle.' },
     ],
     related: ['/solucoes/auditorias', '/solucoes/gestao-de-nao-conformidades', '/solucoes/gestao-da-qualidade'],
   },
@@ -891,7 +892,7 @@ export function softwareJsonLd() {
       price: '0',
       priceCurrency: 'BRL',
       availability: 'https://schema.org/InStock',
-      description: 'Demonstracao comercial sob solicitacao.',
+      description: 'Demonstração disponível para avaliação inicial.',
     },
   };
 }

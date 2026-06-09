@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
@@ -13,8 +13,8 @@ import { useAuth } from '@/components/auth/auth-provider';
 import { BrandMark } from '@/components/brand/brand-mark';
 
 const schema = z.object({
-  email: z.string().email('E-mail inválido'),
-  password: z.string().min(6, 'Mínimo de 6 caracteres'),
+  email: z.string().email('E-mail inválido.'),
+  password: z.string().min(6, 'Mínimo de 6 caracteres.'),
 });
 
 type Form = z.infer<typeof schema>;
@@ -22,18 +22,42 @@ type Form = z.infer<typeof schema>;
 export default function LoginPage() {
   const { login } = useAuth();
   const [busy, setBusy] = useState(false);
+  const [demoMode, setDemoMode] = useState(false);
   const form = useForm<Form>({
     resolver: zodResolver(schema),
     defaultValues: { email: 'demo@demo.com', password: '123456' },
   });
 
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    let cameFromDemoButton = params.get('demo') === '1';
+
+    try {
+      cameFromDemoButton = cameFromDemoButton || window.sessionStorage.getItem('g360.demoEntry') !== null;
+    } catch {
+      cameFromDemoButton = cameFromDemoButton || params.get('demo') === '1';
+    }
+
+    if (cameFromDemoButton) {
+      setDemoMode(true);
+      try {
+        window.sessionStorage.setItem(
+          'g360.demoAccessIntent',
+          JSON.stringify({ page: window.location.pathname, detectedAt: new Date().toISOString() }),
+        );
+      } catch {
+        /* Storage pode estar bloqueado; a demonstração continua acessível. */
+      }
+    }
+  }, []);
+
   const onSubmit = async (data: Form) => {
     setBusy(true);
     try {
       await login(data.email, data.password);
-      toast.success('Bem-vindo de volta!');
+      toast.success(demoMode ? 'Demonstração acessada.' : 'Bem-vindo de volta!');
     } catch (err) {
-      toast.error('Credenciais inválidas');
+      toast.error('Credenciais inválidas.');
     } finally {
       setBusy(false);
     }
@@ -57,7 +81,6 @@ export default function LoginPage() {
             transformar dados em decisão.
           </p>
         </div>
-       
       </div>
 
       <div className="flex items-center justify-center p-6">
@@ -67,8 +90,12 @@ export default function LoginPage() {
               <BrandMark className="h-10 w-10" />
               <span className="text-base font-semibold">Gestão 360</span>
             </div>
-            <CardTitle>Entrar</CardTitle>
-            <CardDescription>Use suas credenciais para acessar a plataforma.</CardDescription>
+            <CardTitle>{demoMode ? 'Acesse a demonstração' : 'Entrar'}</CardTitle>
+            <CardDescription>
+              {demoMode
+                ? 'Use a conta de demonstração já preenchida para conhecer a plataforma.'
+                : 'Use suas credenciais para acessar a plataforma.'}
+            </CardDescription>
           </CardHeader>
           <CardContent>
             <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
@@ -87,7 +114,7 @@ export default function LoginPage() {
                 )}
               </div>
               <Button type="submit" disabled={busy} className="w-full">
-                {busy ? 'Entrando...' : 'Entrar'}
+                {busy ? 'Entrando...' : demoMode ? 'Entrar na demonstração' : 'Entrar'}
               </Button>
             </form>
           </CardContent>
