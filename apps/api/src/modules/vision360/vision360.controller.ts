@@ -102,6 +102,16 @@ export class Vision360Controller {
     res.send(buffer);
   }
 
+  @Get('search')
+  @RequirePermissions('vision360:view')
+  async searchEntities(
+    @CurrentUser() me: AuthPayload,
+    @Query('type') type: string,
+    @Query('q') q: string,
+  ) {
+    return this.service.searchEntities(me.companyId, type ?? '', q ?? '');
+  }
+
   @Patch('impact-items/:id/resolve')
   @RequirePermissions('vision360:impact')
   async resolvePendingImpact(

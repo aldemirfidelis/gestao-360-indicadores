@@ -1,14 +1,16 @@
-import React, { useState, useMemo } from 'react';
+'use client';
+
+import React, { useState, useMemo, useEffect, useCallback } from 'react';
 import { useQuery, useMutation } from '@tanstack/react-query';
 import { toast } from 'sonner';
 import {
   Network, Copy, ExternalLink, X, Search, ChevronDown, Plus, Trash2,
   AlertTriangle, Calendar, ScrollText, Users, CheckCircle2, Clock,
   FileSpreadsheet, ShieldAlert, BookOpen, GraduationCap, ClipboardList,
-  History, Building2, HelpCircle
+  History, Building2, HelpCircle, Loader2
 } from 'lucide-react';
 import { useVision360 } from './vision360-context';
-import { api } from '@/lib/api';
+import { api, getAccessToken } from '@/lib/api';
 import { Button } from './button';
 import { Input } from './input';
 import { Badge } from './badge';
@@ -52,27 +54,106 @@ interface Vision360Data {
   }[];
 }
 
+interface EntitySearchResult {
+  id: string;
+  name: string;
+  code: string | null;
+  status: string;
+}
+
+/** Mapeia tipo de entidade → rota do Next.js */
+function getEntityRoute(type: string, id: string): { url: string; hasDetail: boolean } {
+  const t = (type ?? '').toUpperCase();
+  const detail: Record<string, string> = {
+    INDICATOR: `/indicators/${id}`,
+    ACTION_PLAN: `/actions/${id}`,
+    MEETING: `/meetings/${id}`,
+    PROJECT: `/projects/${id}`,
+    DEVIATION: `/deviations/${id}`,
+  };
+  const list: Record<string, string> = {
+    PROCESS: '/processes',
+    DOCUMENT: '/documents',
+    RISK: '/risks',
+    RISK_REGISTER: '/risks',
+    NON_CONFORMITY: '/nonconformities',
+    AUDIT: '/audits',
+    ORG_NODE: '/organograma',
+    SECTOR: '/organograma',
+    AREA: '/organograma',
+    FORM: '/forms',
+    MEETING: '/meetings',
+    PROJECT: '/projects',
+  };
+  if (detail[t]) return { url: detail[t], hasDetail: true };
+  if (list[t]) return { url: list[t], hasDetail: false };
+  return { url: `/${t.toLowerCase()}s/${id}`, hasDetail: true };
+}
+
 const SECTION_KEYS = [
   'origem', 'vinculos', 'dependencias', 'impactos', 'registrosImpactados',
   'responsaveis', 'indicadores', 'riscos', 'auditorias', 'documentos',
   'requisitos', 'treinamentos', 'formularios', 'reunioes', 'acoes', 'historico'
 ];
 
+const RELATIONSHIP_TYPES = [
+  { value: 'pertence_a', label: 'Pertence a' },
+  { value: 'depende_de', label: 'Depende de' },
+  { value: 'impacta', label: 'Impacta' },
+  { value: 'originou', label: 'Originou' },
+  { value: 'trata', label: 'Trata / Endereça' },
+  { value: 'monitora', label: 'Monitora' },
+  { value: 'atende', label: 'Atende / Cumpre' },
+  { value: 'controlado_por', label: 'É controlado por' },
+  { value: 'suporta', label: 'Suporta / Habilita' },
+  { value: 'referencia', label: 'Referencia' },
+  { value: 'utiliza_documento', label: 'Utiliza documento' },
+  { value: 'exige_treinamento', label: 'Exige treinamento' },
+  { value: 'discussao_reuniao', label: 'Discutido em Reunião' },
+];
+
 export const Vision360Sidebar: React.FC = () => {
   const { isOpen, entityType, entityId, historyStack, close, navigateTo, goBack } = useVision360();
   const [searchTerm, setSearchTerm] = useState('');
-  const [activeFilter, setActiveFilter] = useState('ALL'); // ALL, DIRECT, DEPENDENCY, IMPACT, CRITICAL, OVERDUE, etc.
+  const [activeFilter, setActiveFilter] = useState('ALL');
   const [openSections, setOpenSections] = useState<Record<string, boolean>>({ origem: true, vinculos: true });
   const [linkModalOpen, setLinkModalOpen] = useState(false);
 
-  // Form para novo vinculo manual
+  // Form para novo vínculo manual
   const [newLink, setNewLink] = useState({
     targetEntityType: 'INDICATOR',
     targetEntityId: '',
+    targetEntityName: '',
     relationshipType: 'pertence_a',
     criticality: 'MEDIUM',
     isMandatory: false,
     notes: ''
+  });
+
+  // Busca de entidade no modal
+  const [entitySearch, setEntitySearch] = useState('');
+  const [entitySearchDebounced, setEntitySearchDebounced] = useState('');
+
+  useEffect(() => {
+    const t = setTimeout(() => setEntitySearchDebounced(entitySearch), 300);
+    return () => clearTimeout(t);
+  }, [entitySearch]);
+
+  // Reseta busca ao trocar tipo
+  useEffect(() => {
+    setEntitySearch('');
+    setEntitySearchDebounced('');
+    setNewLink((prev) => ({ ...prev, targetEntityId: '', targetEntityName: '' }));
+  }, [newLink.targetEntityType]);
+
+  const { data: searchResults, isFetching: searchLoading } = useQuery<EntitySearchResult[]>({
+    queryKey: ['vision360-search', newLink.targetEntityType, entitySearchDebounced],
+    queryFn: () =>
+      api<EntitySearchResult[]>(
+        `/vision360/search?type=${newLink.targetEntityType}&q=${encodeURIComponent(entitySearchDebounced)}`
+      ),
+    enabled: linkModalOpen,
+    staleTime: 10_000,
   });
 
   const { data, isLoading, refetch } = useQuery<Vision360Data>({
@@ -110,34 +191,55 @@ export const Vision360Sidebar: React.FC = () => {
 
   const copyDirectLink = () => {
     if (!data) return;
-    const url = `${window.location.origin}/${data.summary.type.toLowerCase()}s/${data.summary.id}`;
-    navigator.clipboard.writeText(url);
+    const { url } = getEntityRoute(data.summary.type, data.summary.id);
+    const fullUrl = `${window.location.origin}${url}`;
+    navigator.clipboard.writeText(fullUrl);
     toast.success('Link copiado para a área de transferência!');
   };
 
   const openFullPage = () => {
     if (!data) return;
-    const route = `/${data.summary.type.toLowerCase()}s/${data.summary.id}`;
-    window.location.href = route;
+    const { url } = getEntityRoute(data.summary.type, data.summary.id);
+    window.location.href = url;
   };
 
-  const downloadXlsxReport = () => {
+  const downloadXlsxReport = useCallback(async () => {
     if (!entityType || !entityId) return;
-    window.open(`${process.env.NEXT_PUBLIC_API_URL}/vision360/export-xlsx?type=${entityType}&id=${entityId}`);
-  };
+    try {
+      const token = getAccessToken();
+      const apiUrl = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:3333/api';
+      const res = await fetch(
+        `${apiUrl}/vision360/export-xlsx?type=${entityType}&id=${entityId}`,
+        { headers: token ? { authorization: `Bearer ${token}` } : {} }
+      );
+      if (!res.ok) {
+        toast.error('Erro ao gerar planilha');
+        return;
+      }
+      const blob = await res.blob();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `visao360-${entityType.toLowerCase()}-${entityId.slice(0, 8)}.xlsx`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+    } catch {
+      toast.error('Erro ao baixar planilha');
+    }
+  }, [entityType, entityId]);
 
   // Filtragem e Pesquisa de Vínculos
   const filteredRelationships = useMemo(() => {
     if (!data) return [];
     return data.relationships.filter((rel) => {
-      // 1. Pesquisa
       const matchesSearch =
         rel.targetName.toLowerCase().includes(searchTerm.toLowerCase()) ||
         (rel.targetCode && rel.targetCode.toLowerCase().includes(searchTerm.toLowerCase()));
 
       if (!matchesSearch) return false;
 
-      // 2. Filtros Rápidos
       if (activeFilter === 'ALL') return true;
       if (activeFilter === 'DIRECT') return rel.direction === 'DIRECT';
       if (activeFilter === 'DEPENDENCIES') return rel.relationshipType.includes('depende_de') || rel.isMandatory;
@@ -146,17 +248,26 @@ export const Vision360Sidebar: React.FC = () => {
       if (activeFilter === 'RISKS') return rel.targetType === 'RISK' || rel.targetType === 'RISK_REGISTER';
       if (activeFilter === 'DOCUMENTS') return rel.targetType === 'DOCUMENT';
       if (activeFilter === 'ACTIONS') return rel.targetType === 'ACTION_PLAN';
-      
+
       return true;
     });
   }, [data, searchTerm, activeFilter]);
+
+  const selectEntity = (item: EntitySearchResult) => {
+    setNewLink((prev) => ({ ...prev, targetEntityId: item.id, targetEntityName: item.name }));
+    setEntitySearch('');
+  };
+
+  const clearSelectedEntity = () => {
+    setNewLink((prev) => ({ ...prev, targetEntityId: '', targetEntityName: '' }));
+  };
 
   if (!isOpen) return null;
 
   return (
     <>
       <div className="fixed inset-y-0 right-0 z-40 flex w-full max-w-[460px] flex-col border-l border-border bg-background/95 shadow-2xl backdrop-blur-md transition-all duration-300">
-        
+
         {/* Cabeçalho Fixo */}
         <div className="sticky top-0 z-10 border-b border-border bg-card/65 p-4 shadow-sm">
           <div className="flex items-start justify-between gap-3">
@@ -197,7 +308,7 @@ export const Vision360Sidebar: React.FC = () => {
               <h3 className="mt-1.5 text-base font-bold text-foreground leading-tight">
                 {data.summary.name}
               </h3>
-              
+
               <div className="mt-2 grid grid-cols-2 gap-2 text-xs text-muted-foreground">
                 <div>Responsável: <strong className="text-foreground">{data.summary.responsibleName ?? 'Sem responsável'}</strong></div>
                 <div>Estrutura: <strong className="text-foreground">{data.summary.orgNodeName ?? 'Empresa Geral'}</strong></div>
@@ -205,8 +316,15 @@ export const Vision360Sidebar: React.FC = () => {
 
               {/* Botões rápidos */}
               <div className="mt-3 flex items-center gap-1.5 border-t pt-3">
-                <Button variant="outline" size="sm" className="h-8 text-xs flex-1 gap-1" onClick={openFullPage}>
-                  <ExternalLink className="h-3 w-3" /> Acessar Página
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="h-8 text-xs flex-1 gap-1"
+                  onClick={openFullPage}
+                  title={getEntityRoute(data.summary.type, data.summary.id).hasDetail ? 'Abrir página do registro' : 'Abrir lista da categoria'}
+                >
+                  <ExternalLink className="h-3 w-3" />
+                  {getEntityRoute(data.summary.type, data.summary.id).hasDetail ? 'Acessar Página' : 'Ver na Lista'}
                 </Button>
                 <Button variant="outline" size="sm" className="h-8 text-xs flex-1 gap-1" onClick={copyDirectLink}>
                   <Copy className="h-3 w-3" /> Copiar Link
@@ -258,7 +376,7 @@ export const Vision360Sidebar: React.FC = () => {
 
         {/* Lista de Blocos Acordeons com Scroll */}
         <div className="flex-1 overflow-y-auto p-4 space-y-3 pb-24">
-          
+
           {/* Seção 1: Origem e Contexto */}
           <div className="rounded-lg border border-border bg-card shadow-sm overflow-hidden">
             <button
@@ -341,7 +459,7 @@ export const Vision360Sidebar: React.FC = () => {
                               <span>Resp: {rel.targetResponsible ?? '-'}</span>
                             </div>
                           </div>
-                          
+
                           <div className="flex flex-col items-end gap-1.5">
                             <StatusLight light={rel.targetStatus as any} />
                             {rel.originType === 'MANUAL' ? (
@@ -390,7 +508,7 @@ export const Vision360Sidebar: React.FC = () => {
               return false;
             }) : [];
 
-            if (items.length === 0 && !sec.isAudit) return null; // Oculta acordeons vazios
+            if (items.length === 0 && !sec.isAudit) return null;
 
             return (
               <div key={sec.key} className="rounded-lg border border-border bg-card shadow-sm overflow-hidden">
@@ -442,17 +560,25 @@ export const Vision360Sidebar: React.FC = () => {
       </div>
 
       {/* Modal: Vincular Registro Manual */}
-      <Dialog open={linkModalOpen} onOpenChange={setLinkModalOpen}>
+      <Dialog open={linkModalOpen} onOpenChange={(open) => {
+        setLinkModalOpen(open);
+        if (!open) {
+          setEntitySearch('');
+          setNewLink({ targetEntityType: 'INDICATOR', targetEntityId: '', targetEntityName: '', relationshipType: 'pertence_a', criticality: 'MEDIUM', isMandatory: false, notes: '' });
+        }
+      }}>
         <DialogContent className="max-w-md">
           <DialogHeader>
             <DialogTitle>Vincular Novo Registro</DialogTitle>
           </DialogHeader>
           <div className="space-y-4 py-3">
+
+            {/* Tipo de entidade */}
             <div>
               <Label>Tipo de Entidade</Label>
               <select
                 value={newLink.targetEntityType}
-                onChange={(e) => setNewLink({ ...newLink, targetEntityType: e.target.value })}
+                onChange={(e) => setNewLink((prev) => ({ ...prev, targetEntityType: e.target.value }))}
                 className="w-full rounded-md border bg-background px-3 py-2 text-sm shadow-sm"
               >
                 <option value="INDICATOR">Indicador</option>
@@ -468,31 +594,85 @@ export const Vision360Sidebar: React.FC = () => {
               </select>
             </div>
 
+            {/* Busca de entidade — combobox com resultados */}
             <div>
-              <Label>ID do Registro de Destino</Label>
-              <Input
-                value={newLink.targetEntityId}
-                onChange={(e) => setNewLink({ ...newLink, targetEntityId: e.target.value })}
-                placeholder="Insira o ID (UUID) do registro"
-                className="h-9"
-              />
+              <Label>Registro de Destino</Label>
+              {newLink.targetEntityId ? (
+                /* Entidade já selecionada */
+                <div className="mt-1 flex items-center justify-between rounded-md border bg-muted/30 px-3 py-2 text-sm">
+                  <span className="font-medium text-foreground truncate">{newLink.targetEntityName}</span>
+                  <button
+                    onClick={clearSelectedEntity}
+                    className="ml-2 shrink-0 text-muted-foreground hover:text-destructive"
+                    title="Limpar seleção"
+                  >
+                    <X className="h-3.5 w-3.5" />
+                  </button>
+                </div>
+              ) : (
+                /* Campo de busca + lista de resultados */
+                <div className="relative mt-1">
+                  <div className="relative">
+                    <Search className="absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground/60" />
+                    <Input
+                      value={entitySearch}
+                      onChange={(e) => setEntitySearch(e.target.value)}
+                      placeholder="Buscar por nome ou código..."
+                      className="h-9 pl-8 text-sm"
+                      autoFocus
+                    />
+                    {searchLoading && (
+                      <Loader2 className="absolute right-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 animate-spin text-muted-foreground/60" />
+                    )}
+                  </div>
+
+                  {/* Lista de resultados */}
+                  {searchResults && searchResults.length > 0 && (
+                    <div className="mt-1 max-h-48 overflow-y-auto rounded-md border bg-popover shadow-md">
+                      {searchResults.map((item) => (
+                        <button
+                          key={item.id}
+                          className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm hover:bg-muted transition-colors"
+                          onClick={() => selectEntity(item)}
+                        >
+                          <div className="min-w-0 flex-1">
+                            <div className="font-medium text-foreground truncate">{item.name}</div>
+                            {item.code && (
+                              <div className="text-[10px] font-mono text-muted-foreground">{item.code}</div>
+                            )}
+                          </div>
+                          <StatusLight light={item.status as any} size="sm" />
+                        </button>
+                      ))}
+                    </div>
+                  )}
+
+                  {searchResults && searchResults.length === 0 && entitySearchDebounced && !searchLoading && (
+                    <div className="mt-1 rounded-md border bg-popover px-3 py-3 text-center text-sm text-muted-foreground">
+                      Nenhum registro encontrado
+                    </div>
+                  )}
+
+                  {!entitySearchDebounced && !searchLoading && (
+                    <p className="mt-1 text-[11px] text-muted-foreground">
+                      Digite para buscar — serão exibidos até 20 resultados.
+                    </p>
+                  )}
+                </div>
+              )}
             </div>
 
+            {/* Tipo de Relacionamento */}
             <div>
               <Label>Tipo de Relacionamento</Label>
               <select
                 value={newLink.relationshipType}
-                onChange={(e) => setNewLink({ ...newLink, relationshipType: e.target.value })}
+                onChange={(e) => setNewLink((prev) => ({ ...prev, relationshipType: e.target.value }))}
                 className="w-full rounded-md border bg-background px-3 py-2 text-sm shadow-sm"
               >
-                <option value="pertence_a">Pertence a</option>
-                <option value="depende_de">Depende de</option>
-                <option value="impacta">Impacta</option>
-                <option value="atende">Atende</option>
-                <option value="controlado_por">É controlado por</option>
-                <option value="exige_treinamento">Exige treinamento</option>
-                <option value="utiliza_documento">Utiliza documento</option>
-                <option value="discussao_reuniao">Discutido em Reunião</option>
+                {RELATIONSHIP_TYPES.map((rt) => (
+                  <option key={rt.value} value={rt.value}>{rt.label}</option>
+                ))}
               </select>
             </div>
 
@@ -501,7 +681,7 @@ export const Vision360Sidebar: React.FC = () => {
                 <Label>Criticidade</Label>
                 <select
                   value={newLink.criticality}
-                  onChange={(e) => setNewLink({ ...newLink, criticality: e.target.value })}
+                  onChange={(e) => setNewLink((prev) => ({ ...prev, criticality: e.target.value }))}
                   className="w-full rounded-md border bg-background px-3 py-2 text-sm shadow-sm"
                 >
                   <option value="CRITICAL">Crítico</option>
@@ -516,7 +696,7 @@ export const Vision360Sidebar: React.FC = () => {
                   type="checkbox"
                   id="isMandatory"
                   checked={newLink.isMandatory}
-                  onChange={(e) => setNewLink({ ...newLink, isMandatory: e.target.checked })}
+                  onChange={(e) => setNewLink((prev) => ({ ...prev, isMandatory: e.target.checked }))}
                   className="rounded border-gray-300 text-primary focus:ring-primary h-4 w-4"
                 />
                 <Label htmlFor="isMandatory" className="cursor-pointer">Obrigatório?</Label>
@@ -527,7 +707,7 @@ export const Vision360Sidebar: React.FC = () => {
               <Label>Observações</Label>
               <Textarea
                 value={newLink.notes}
-                onChange={(e) => setNewLink({ ...newLink, notes: e.target.value })}
+                onChange={(e) => setNewLink((prev) => ({ ...prev, notes: e.target.value }))}
                 placeholder="Descreva observações ou motivo do relacionamento"
                 rows={3}
               />
@@ -540,10 +720,15 @@ export const Vision360Sidebar: React.FC = () => {
               onClick={() => addLinkMutation.mutate({
                 sourceEntityType: entityType,
                 sourceEntityId: entityId,
-                ...newLink
+                targetEntityType: newLink.targetEntityType,
+                targetEntityId: newLink.targetEntityId,
+                relationshipType: newLink.relationshipType,
+                criticality: newLink.criticality,
+                isMandatory: newLink.isMandatory,
+                notes: newLink.notes,
               })}
             >
-              Vincular
+              {addLinkMutation.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : 'Vincular'}
             </Button>
           </DialogFooter>
         </DialogContent>

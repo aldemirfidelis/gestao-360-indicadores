@@ -839,6 +839,125 @@ export class Vision360Service {
     return Buffer.from(buffer);
   }
 
+  async searchEntities(
+    companyId: string,
+    type: string,
+    q: string,
+  ): Promise<{ id: string; name: string; code: string | null; status: string }[]> {
+    const t = type.toUpperCase();
+    const search = q.trim();
+    const TAKE = 20;
+
+    const textWhere = (nameField: string, codeField?: string) => {
+      if (!search) return {};
+      const conditions: any[] = [{ [nameField]: { contains: search, mode: 'insensitive' as const } }];
+      if (codeField) conditions.push({ [codeField]: { contains: search, mode: 'insensitive' as const } });
+      return { OR: conditions };
+    };
+
+    if (t === 'INDICATOR') {
+      const rows = await this.prisma.indicator.findMany({
+        where: { companyId, deletedAt: null, ...textWhere('name', 'code') },
+        take: TAKE,
+        select: { id: true, name: true, code: true, status: true },
+        orderBy: { name: 'asc' },
+      });
+      return rows.map((r) => ({ id: r.id, name: r.name, code: r.code ?? null, status: r.status }));
+    }
+
+    if (t === 'PROCESS') {
+      const rows = await this.prisma.process.findMany({
+        where: { companyId, deletedAt: null, ...textWhere('name', 'code') },
+        take: TAKE,
+        select: { id: true, name: true, code: true, status: true },
+        orderBy: { name: 'asc' },
+      });
+      return rows.map((r) => ({ id: r.id, name: r.name, code: r.code ?? null, status: r.status }));
+    }
+
+    if (t === 'DOCUMENT') {
+      const rows = await this.prisma.document.findMany({
+        where: { companyId, deletedAt: null, ...textWhere('title', 'code') },
+        take: TAKE,
+        select: { id: true, title: true, code: true, status: true },
+        orderBy: { title: 'asc' },
+      });
+      return rows.map((r) => ({ id: r.id, name: r.title, code: r.code ?? null, status: r.status }));
+    }
+
+    if (t === 'RISK' || t === 'RISK_REGISTER') {
+      const rows = await this.prisma.riskRegister.findMany({
+        where: { companyId, deletedAt: null, ...(search ? { title: { contains: search, mode: 'insensitive' as const } } : {}) },
+        take: TAKE,
+        select: { id: true, title: true, status: true },
+        orderBy: { title: 'asc' },
+      });
+      return rows.map((r) => ({ id: r.id, name: r.title, code: null, status: r.status }));
+    }
+
+    if (t === 'NON_CONFORMITY') {
+      const rows = await this.prisma.nonConformity.findMany({
+        where: { companyId, deletedAt: null, ...(search ? { title: { contains: search, mode: 'insensitive' as const } } : {}) },
+        take: TAKE,
+        select: { id: true, title: true, status: true },
+        orderBy: { title: 'asc' },
+      });
+      return rows.map((r) => ({ id: r.id, name: r.title, code: null, status: r.status }));
+    }
+
+    if (t === 'ACTION_PLAN') {
+      const rows = await this.prisma.actionPlan.findMany({
+        where: { companyId, deletedAt: null, ...(search ? { title: { contains: search, mode: 'insensitive' as const } } : {}) },
+        take: TAKE,
+        select: { id: true, title: true, status: true },
+        orderBy: { title: 'asc' },
+      });
+      return rows.map((r) => ({ id: r.id, name: r.title, code: null, status: r.status }));
+    }
+
+    if (t === 'MEETING') {
+      const rows = await this.prisma.meeting.findMany({
+        where: { companyId, deletedAt: null, ...(search ? { title: { contains: search, mode: 'insensitive' as const } } : {}) },
+        take: TAKE,
+        select: { id: true, title: true, status: true },
+        orderBy: { title: 'asc' },
+      });
+      return rows.map((r) => ({ id: r.id, name: r.title, code: null, status: r.status }));
+    }
+
+    if (t === 'PROJECT') {
+      const rows = await this.prisma.project.findMany({
+        where: { companyId, deletedAt: null, ...(search ? { name: { contains: search, mode: 'insensitive' as const } } : {}) },
+        take: TAKE,
+        select: { id: true, name: true, status: true },
+        orderBy: { name: 'asc' },
+      });
+      return rows.map((r) => ({ id: r.id, name: r.name, code: null, status: r.status }));
+    }
+
+    if (t === 'DEVIATION') {
+      const rows = await this.prisma.deviation.findMany({
+        where: { companyId, deletedAt: null, ...(search ? { title: { contains: search, mode: 'insensitive' as const } } : {}) },
+        take: TAKE,
+        select: { id: true, title: true, number: true, status: true },
+        orderBy: { title: 'asc' },
+      });
+      return rows.map((r) => ({ id: r.id, name: r.title, code: `DESV-${r.number}`, status: r.status }));
+    }
+
+    if (t === 'AUDIT') {
+      const rows = await this.prisma.audit.findMany({
+        where: { companyId, deletedAt: null, ...textWhere('title', 'code') },
+        take: TAKE,
+        select: { id: true, title: true, code: true, number: true, status: true },
+        orderBy: { title: 'asc' },
+      });
+      return rows.map((r) => ({ id: r.id, name: r.title, code: r.code ?? `AUD-${r.number}`, status: r.status }));
+    }
+
+    return [];
+  }
+
   async resolvePendingImpact(companyId: string, itemId: string, resolvedById: string) {
     const item = await this.prisma.impactAnalysisItem.findFirst({
       where: { id: itemId, companyId, status: 'PENDING' },
