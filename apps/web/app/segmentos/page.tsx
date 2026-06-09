@@ -5,16 +5,16 @@ import { ListingGrid, PageHero } from '@/components/marketing/content-blocks';
 import { breadcrumbJsonLd, publicMetadata, segmentPages, webPageJsonLd } from '@/lib/public-site';
 
 export const metadata: Metadata = publicMetadata({
-  title: 'Segmentos atendidos pelo Gestao 360',
-  description: 'Veja como o Gestao 360 pode apoiar industria, agronegocio, alimentos e bebidas, servicos e gestao corporativa.',
+  title: 'Segmentos atendidos pelo Gestão 360',
+  description: 'Veja como o Gestão 360 pode apoiar indústria, agronegócio, alimentos e bebidas, serviços e gestão corporativa.',
   path: '/segmentos',
 });
 
 export default function SegmentosPage() {
   return (
     <PublicShell>
-      <JsonLd data={[webPageJsonLd({ title: 'Segmentos', description: metadata.description as string, path: '/segmentos' }), breadcrumbJsonLd([{ name: 'Inicio', path: '/' }, { name: 'Segmentos', path: '/segmentos' }])]} />
-      <PageHero eyebrow="Segmentos" title="Gestao corporativa integrada para diferentes operacoes." description="Conteudo organizado por contexto de uso, sem prometer resultados sem diagnostico do processo da empresa." />
+      <JsonLd data={[webPageJsonLd({ title: 'Segmentos', description: metadata.description as string, path: '/segmentos' }), breadcrumbJsonLd([{ name: 'Início', path: '/' }, { name: 'Segmentos', path: '/segmentos' }])]} />
+      <PageHero eyebrow="Segmentos" title="Gestão corporativa integrada para diferentes operações." description="Conteúdo organizado por contexto de uso, sem prometer resultados sem diagnóstico do processo da empresa." />
       <section className="bg-slate-50 py-16">
         <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
           <ListingGrid pages={segmentPages} />

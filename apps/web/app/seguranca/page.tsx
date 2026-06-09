@@ -5,23 +5,23 @@ import { PageHero } from '@/components/marketing/content-blocks';
 import { breadcrumbJsonLd, publicMetadata, webPageJsonLd } from '@/lib/public-site';
 
 export const metadata: Metadata = publicMetadata({
-  title: 'Seguranca, permissoes e rastreabilidade',
-  description: 'Entenda os principios de seguranca do Gestao 360: autenticacao, tenant, permissoes, auditoria, historico e separacao entre publico e privado.',
+  title: 'Segurança, permissões e rastreabilidade',
+  description: 'Entenda os princípios de segurança do Gestão 360: autenticação, tenant, permissões, auditoria, histórico e separação entre público e privado.',
   path: '/seguranca',
 });
 
 const items = [
-  ['Separacao publico/privado', 'Paginas institucionais sao publicas. Portal, APIs, dashboards e dados de clientes exigem autenticacao.'],
-  ['Tenant e permissoes', 'Registros operacionais respeitam empresa, usuario, perfil, modulo e escopo de area configurado.'],
-  ['Auditoria', 'A plataforma registra historico de eventos e alteracoes conforme modulo, usuario e permissao.'],
-  ['SEO seguro', 'Robots e noindex reduzem rastreamento indevido, mas nao substituem autenticacao e autorizacao.'],
+  ['Separação público/privado', 'Páginas institucionais são públicas. Portal, APIs, dashboards e dados de clientes exigem autenticação.'],
+  ['Tenant e permissões', 'Registros operacionais respeitam empresa, usuário, perfil, módulo e escopo de área configurado.'],
+  ['Auditoria', 'A plataforma registra histórico de eventos e alterações conforme módulo, usuário e permissão.'],
+  ['SEO seguro', 'Robots e noindex reduzem rastreamento indevido, mas não substituem autenticação e autorização.'],
 ];
 
 export default function SegurancaPage() {
   return (
     <PublicShell>
-      <JsonLd data={[webPageJsonLd({ title: 'Seguranca', description: metadata.description as string, path: '/seguranca' }), breadcrumbJsonLd([{ name: 'Inicio', path: '/' }, { name: 'Seguranca', path: '/seguranca' }])]} />
-      <PageHero eyebrow="Seguranca" title="Conteudo publico sem exposicao de dados corporativos." description="A arquitetura publica foi organizada para SEO sem publicar telas internas, APIs, dashboards ou informacoes de clientes." />
+      <JsonLd data={[webPageJsonLd({ title: 'Segurança', description: metadata.description as string, path: '/seguranca' }), breadcrumbJsonLd([{ name: 'Início', path: '/' }, { name: 'Segurança', path: '/seguranca' }])]} />
+      <PageHero eyebrow="Segurança" title="Conteúdo público sem exposição de dados corporativos." description="A arquitetura pública foi organizada para SEO sem publicar telas internas, APIs, dashboards ou informações de clientes." />
       <section className="bg-slate-50 py-16">
         <div className="mx-auto grid max-w-7xl gap-4 px-4 sm:px-6 md:grid-cols-2 lg:px-8">
           {items.map(([title, text]) => (

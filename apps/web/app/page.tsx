@@ -1,3 +1,4 @@
+import Image from 'next/image';
 import Link from 'next/link';
 import type { Metadata } from 'next';
 import { ArrowRight, CheckCircle2, ClipboardList, FileSearch, LineChart, Network, ShieldCheck, Workflow } from 'lucide-react';
@@ -59,31 +60,23 @@ export default function HomePage() {
   return (
     <PublicShell>
       <JsonLd data={[organizationJsonLd(), websiteJsonLd(), softwareJsonLd(), webPageJsonLd({ title: 'Gestão 360', description: metadata.description as string, path: '/' }), faqJsonLd(faq)]} />
-      <section className="relative min-h-[680px] overflow-hidden bg-slate-950 text-white">
-        <div className="absolute inset-0 opacity-90" aria-hidden="true">
-          <div className="h-full w-full bg-[linear-gradient(115deg,rgba(15,23,42,0.96)_0%,rgba(15,23,42,0.78)_43%,rgba(20,184,166,0.32)_100%)]" />
-          <div className="absolute inset-y-0 right-0 hidden w-[58%] border-l border-white/10 bg-slate-900/70 lg:block">
-            <div className="grid h-full grid-cols-2 gap-px bg-white/10 p-8">
-              {['Indicadores fora da meta', 'Planos em atraso', 'Riscos críticos', 'Auditorias abertas', 'Documentos em revisão', 'Meu Dia'].map((label, index) => (
-                <div key={label} className="bg-slate-950/70 p-5">
-                  <div className="text-xs uppercase tracking-[0.16em] text-slate-400">{label}</div>
-                  <div className="mt-5 h-2 bg-slate-700">
-                    <div className={index % 2 === 0 ? 'h-2 w-2/3 bg-emerald-400' : 'h-2 w-1/2 bg-amber-400'} />
-                  </div>
-                  <div className="mt-5 grid grid-cols-3 gap-2">
-                    <span className="h-12 bg-white/10" />
-                    <span className="h-12 bg-white/10" />
-                    <span className="h-12 bg-white/10" />
-                  </div>
-                </div>
-              ))}
-            </div>
-          </div>
+      <section className="relative min-h-[calc(100svh-5rem)] overflow-hidden bg-slate-950 text-white lg:min-h-[620px]">
+        <div className="absolute inset-0" aria-hidden="true">
+          <Image
+            src="/brand/landing-hero-bg.png"
+            alt=""
+            fill
+            priority
+            sizes="100vw"
+            className="object-cover"
+          />
+          <div className="absolute inset-0 bg-[linear-gradient(90deg,rgba(2,6,23,0.92)_0%,rgba(15,23,42,0.82)_42%,rgba(15,23,42,0.38)_100%)]" />
+          <div className="absolute inset-x-0 bottom-0 h-28 bg-gradient-to-t from-slate-950/75 to-transparent" />
         </div>
-        <div className="relative mx-auto flex min-h-[680px] max-w-7xl items-center px-4 py-16 sm:px-6 lg:px-8">
+        <div className="relative mx-auto flex min-h-[calc(100svh-5rem)] max-w-7xl items-center px-4 py-14 sm:px-6 lg:min-h-[620px] lg:px-8">
           <div className="max-w-3xl">
             <p className="text-sm font-semibold uppercase tracking-[0.18em] text-emerald-300">Plataforma SaaS B2B modular</p>
-            <h1 className="mt-5 max-w-4xl text-5xl font-semibold leading-[1.02] sm:text-6xl lg:text-7xl">
+            <h1 className="mt-5 max-w-4xl text-4xl font-semibold leading-[1.05] sm:text-5xl lg:text-6xl">
               Gestão estratégica, indicadores e planos de ação conectados em uma única plataforma.
             </h1>
             <p className="mt-6 max-w-2xl text-lg leading-8 text-slate-200">

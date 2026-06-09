@@ -6,23 +6,23 @@ import { breadcrumbJsonLd, publicMetadata, webPageJsonLd } from '@/lib/public-si
 
 export const metadata: Metadata = publicMetadata({
   title: 'Termos de uso',
-  description: 'Termos publicos iniciais de uso do site institucional do Gestao 360 e orientacoes sobre demonstracao comercial.',
+  description: 'Termos públicos iniciais de uso do site institucional do Gestão 360 ? orientações sobre demonstração comercial.',
   path: '/termos-de-uso',
 });
 
 const sections = [
-  ['Uso do site', 'As paginas publicas apresentam informacoes institucionais e comerciais sobre a plataforma Gestao 360. O acesso ao portal operacional exige credenciais autorizadas.'],
-  ['Demonstracao', 'Solicitacoes de demonstracao nao constituem contrato, proposta vinculante ou garantia de resultado. O escopo comercial deve ser validado em atendimento especifico.'],
-  ['Conteudo', 'O conteudo publico tem finalidade informativa. Funcionalidades citadas refletem modulos existentes ou preparados no projeto, sem promessa de aderencia automatica a normas especificas.'],
-  ['Responsabilidades', 'Usuarios autenticados devem respeitar politicas internas, permissoes e regras de uso definidas pela empresa contratante.'],
-  ['Revisao juridica', 'Este texto deve ser revisado pelo responsavel juridico/comercial antes de publicacao definitiva como contrato formal.'],
+  ['Uso do site', 'As páginas públicas apresentam informações institucionais e comerciais sobre a plataforma Gestão 360. O acesso ao portal operacional exige credenciais autorizadas.'],
+  ['Demonstração', 'Solicitacoes de demonstração não constituem contrato, proposta vinculante ou garantia de resultado. O escopo comercial deve ser validado em atendimento específico.'],
+  ['Conteúdo', 'O conteúdo público tem finalidade informativa. Funcionalidades citadas refletem módulos existentes ou preparados no projeto, sem promessa de aderência automática a normas específicas.'],
+  ['Responsabilidades', 'Usuários autenticados devem respeitar políticas internas, permissões e regras de uso definidas pela empresa contratante.'],
+  ['Revisão jurídica', 'Este texto deve ser revisado pelo responsável jurídico/comercial antes de publicação definitiva como contrato formal.'],
 ];
 
 export default function TermsPage() {
   return (
     <PublicShell>
-      <JsonLd data={[webPageJsonLd({ title: 'Termos de uso', description: metadata.description as string, path: '/termos-de-uso' }), breadcrumbJsonLd([{ name: 'Inicio', path: '/' }, { name: 'Termos de uso', path: '/termos-de-uso' }])]} />
-      <PageHero eyebrow="Termos" title="Termos de uso do site institucional." description="Regras iniciais para uso das paginas publicas, contato comercial e separacao entre conteudo institucional e portal autenticado." />
+      <JsonLd data={[webPageJsonLd({ title: 'Termos de uso', description: metadata.description as string, path: '/termos-de-uso' }), breadcrumbJsonLd([{ name: 'Início', path: '/' }, { name: 'Termos de uso', path: '/termos-de-uso' }])]} />
+      <PageHero eyebrow="Termos" title="Termos de uso do site institucional." description="Regras iniciais para uso das páginas públicas, contato comercial e separação entre conteúdo institucional e portal autenticado." />
       <section className="bg-white py-16">
         <div className="mx-auto max-w-3xl space-y-8 px-4 sm:px-6 lg:px-8">
           {sections.map(([title, text]) => (

@@ -75,7 +75,7 @@ export function PublicShell({ children }: { children: ReactNode }) {
           <div>
             <BrandLogo />
             <p className="mt-4 max-w-md text-sm leading-6 text-slate-300">
-              Plataforma SaaS B2B para gestão corporativa integrada, indicadores, estratégia, planos de ação,
+              Plataforma B2B para gestão corporativa integrada, indicadores, estratégia, planos de ação,
               documentos, auditorias, riscos e melhoria contínua.
             </p>
             <div className="mt-6 grid grid-cols-2 gap-3 text-xs text-slate-300 sm:grid-cols-4">
@@ -103,7 +103,7 @@ export function PublicShell({ children }: { children: ReactNode }) {
           </div>
         </div>
         <div className="border-t border-white/10 px-4 py-4 text-center text-xs text-slate-400">
-          Gestão 360. Conteúdo público separado do portal autenticado. Dados de clientes não são indexáveis.
+          Gestão 360 © 2026 Todos os direitos reservados.
         </div>
       </footer>
     </div>

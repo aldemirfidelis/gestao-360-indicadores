@@ -5,25 +5,25 @@ import { PageHero } from '@/components/marketing/content-blocks';
 import { breadcrumbJsonLd, publicMetadata, webPageJsonLd } from '@/lib/public-site';
 
 export const metadata: Metadata = publicMetadata({
-  title: 'Recursos do Gestao 360',
-  description: 'Conheca recursos de rastreabilidade, dashboards, permissoes, automacoes, Meu Dia, Visao 360, auditoria e seguranca no Gestao 360.',
+  title: 'Recursos do Gestão 360',
+  description: 'Conheça recursos de rastreabilidade, dashboards, permissões, automacoes, Meu Dia, Visão 360, auditoria e segurança no Gestão 360.',
   path: '/recursos',
 });
 
 const resources = [
-  ['Meu Dia', 'Central diaria de prioridades, prazos, delegacoes, acompanhamento e recomendacoes assistidas.'],
-  ['Visao 360', 'Painel de contexto do registro com vinculos, impactos, historico e registros relacionados autorizados.'],
-  ['Automacoes', 'Fluxos, tarefas, aprovacoes, historico, escalonamentos e acompanhamento de execucoes.'],
-  ['Rastreabilidade', 'Historico de alteracoes, responsaveis, evidencias e trilha de auditoria por modulo.'],
-  ['Permissoes', 'Controle por perfil, modulo, empresa, area e escopo de visibilidade.'],
+  ['Meu Dia', 'Central diária de prioridades, prazos, delegacoes, acompanhamento e recomendações assistidas.'],
+  ['Visão 360', 'Painel de contexto do registro com vínculos, impactos, histórico e registros relacionados autorizados.'],
+  ['Automacoes', 'Fluxos, tarefas, aprovações, histórico, escalonamentos e acompanhamento de execuções.'],
+  ['Rastreabilidade', 'Histórico de alterações, responsáveis, evidências e trilha de auditoria por módulo.'],
+  ['Permissoes', 'Controle por perfil, módulo, empresa, área e escopo de visibilidade.'],
   ['Dashboards', 'Visoes executivas e operacionais conectadas aos registros de origem.'],
 ];
 
 export default function RecursosPage() {
   return (
     <PublicShell>
-      <JsonLd data={[webPageJsonLd({ title: 'Recursos', description: metadata.description as string, path: '/recursos' }), breadcrumbJsonLd([{ name: 'Inicio', path: '/' }, { name: 'Recursos', path: '/recursos' }])]} />
-      <PageHero eyebrow="Recursos" title="Recursos que conectam contexto, execucao e governanca." description="A plataforma foi desenhada para reduzir navegacao desnecessaria e dar rastreabilidade a decisoes, acoes e evidencias." />
+      <JsonLd data={[webPageJsonLd({ title: 'Recursos', description: metadata.description as string, path: '/recursos' }), breadcrumbJsonLd([{ name: 'Início', path: '/' }, { name: 'Recursos', path: '/recursos' }])]} />
+      <PageHero eyebrow="Recursos" title="Recursos que conectam contexto, execução e governança." description="A plataforma foi desenhada para reduzir navegação desnecessária e dar rastreabilidade a decisões, ações e evidências." />
       <section className="bg-slate-50 py-16">
         <div className="mx-auto grid max-w-7xl gap-4 px-4 sm:px-6 md:grid-cols-2 lg:grid-cols-3 lg:px-8">
           {resources.map(([title, text]) => (

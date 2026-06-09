@@ -5,7 +5,7 @@ const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 export async function POST(req: NextRequest) {
   const body = await req.json().catch(() => null);
   if (!body || typeof body !== 'object') {
-    return NextResponse.json({ ok: false, message: 'Formulario invalido.' }, { status: 400 });
+    return NextResponse.json({ ok: false, message: 'Formulário inválido.' }, { status: 400 });
   }
 
   const data = body as Record<string, unknown>;
@@ -21,11 +21,11 @@ export async function POST(req: NextRequest) {
   const privacy = String(data.privacy ?? '').trim();
 
   if (!name || !company || !emailRegex.test(email) || !segment || message.length < 10 || privacy !== 'accepted') {
-    return NextResponse.json({ ok: false, message: 'Preencha os campos obrigatorios e aceite a politica de privacidade.' }, { status: 400 });
+    return NextResponse.json({ ok: false, message: 'Preencha os campos obrigatórios e aceite a política de privacidade.' }, { status: 400 });
   }
 
   // Primeiro MVP de captura: registra um resumo operacional sem expor dados em codigo.
-  // Integracoes futuras podem encaminhar para CRM/e-mail usando variaveis de ambiente.
+  // Integrações futuras podem encaminhar para CRM/e-mail usando variáveis de ambiente.
   console.info('public_contact_form_submit', {
     company,
     emailDomain: email.split('@')[1] ?? null,

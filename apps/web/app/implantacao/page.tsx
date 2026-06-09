@@ -5,24 +5,24 @@ import { PageHero } from '@/components/marketing/content-blocks';
 import { breadcrumbJsonLd, publicMetadata, webPageJsonLd } from '@/lib/public-site';
 
 export const metadata: Metadata = publicMetadata({
-  title: 'Implantacao e onboarding do Gestao 360',
-  description: 'Veja uma abordagem realista de implantacao do Gestao 360: diagnostico, configuracao, dados, pilotos, treinamento e evolucao.',
+  title: 'Implantação e onboarding do Gestão 360',
+  description: 'Veja uma abordagem realista de implantação do Gestão 360: diagnóstico, configuração, dados, pilotos, treinamento e evolução.',
   path: '/implantacao',
 });
 
 const steps = [
-  ['Diagnostico', 'Entendimento de empresas, areas, indicadores, documentos, processos e prioridades.'],
-  ['Configuracao', 'Parametros, usuarios, permissoes, modulos, empresas e estruturas organizacionais.'],
-  ['Carga inicial', 'Importacao ou cadastro de dados essenciais, evitando migrar controles sem curadoria.'],
-  ['Piloto assistido', 'Uso por area ou processo prioritario antes de expandir a plataforma.'],
-  ['Evolucao', 'Ajuste de rotinas, conteudos, dashboards e indicadores conforme maturidade da gestao.'],
+  ['Diagnóstico', 'Entendimento de empresas, áreas, indicadores, documentos, processos e prioridades.'],
+  ['Configuração', 'Parâmetros, usuários, permissões, módulos, empresas e estruturas organizacionais.'],
+  ['Carga inicial', 'Importação ou cadastro de dados essenciais, evitando migrar controles sem curadoria.'],
+  ['Piloto assistido', 'Uso por área ou processo prioritário antes de expandir a plataforma.'],
+  ['Evolução', 'Ajuste de rotinas, conteúdos, dashboards e indicadores conforme maturidade da gestão.'],
 ];
 
 export default function ImplantacaoPage() {
   return (
     <PublicShell>
-      <JsonLd data={[webPageJsonLd({ title: 'Implantacao', description: metadata.description as string, path: '/implantacao' }), breadcrumbJsonLd([{ name: 'Inicio', path: '/' }, { name: 'Implantacao', path: '/implantacao' }])]} />
-      <PageHero eyebrow="Implantacao" title="Implantacao gradual, com foco em valor e governanca." description="A plataforma deve entrar na rotina de gestao sem prometer resultado automatico. O valor vem da combinacao entre processo, dados e acompanhamento." />
+      <JsonLd data={[webPageJsonLd({ title: 'Implantação', description: metadata.description as string, path: '/implantacao' }), breadcrumbJsonLd([{ name: 'Início', path: '/' }, { name: 'Implantação', path: '/implantacao' }])]} />
+      <PageHero eyebrow="Implantação" title="Implantação gradual, com foco em valor e governança." description="A plataforma deve entrar na rotina de gestão sem prometer resultado automático. O valor vem da combinação entre processo, dados e acompanhamento." />
       <section className="bg-white py-16">
         <div className="mx-auto max-w-5xl px-4 sm:px-6 lg:px-8">
           <div className="grid gap-3">

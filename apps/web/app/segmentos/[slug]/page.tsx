@@ -22,7 +22,7 @@ export default async function SegmentDetailPage({ params }: { params: Promise<{ 
   if (!page) notFound();
   return (
     <PublicShell>
-      <JsonLd data={[webPageJsonLd({ title: page.title, description: page.description, path: page.path }), faqJsonLd(page.faq), breadcrumbJsonLd([{ name: 'Inicio', path: '/' }, { name: 'Segmentos', path: '/segmentos' }, { name: page.title, path: page.path }])]} />
+      <JsonLd data={[webPageJsonLd({ title: page.title, description: page.description, path: page.path }), faqJsonLd(page.faq), breadcrumbJsonLd([{ name: 'Início', path: '/' }, { name: 'Segmentos', path: '/segmentos' }, { name: page.title, path: page.path }])]} />
       <PageHero eyebrow={page.eyebrow} title={page.title} description={page.summary} />
       <PublicPageBody page={page} related={solutionPages.slice(0, 3)} />
     </PublicShell>

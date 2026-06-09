@@ -23,7 +23,7 @@ export default async function ArticlePage({ params }: { params: Promise<{ slug: 
   if (!article) notFound();
   return (
     <PublicShell>
-      <JsonLd data={[articleJsonLd(article), faqJsonLd(article.faq), breadcrumbJsonLd([{ name: 'Inicio', path: '/' }, { name: 'Conteudos', path: '/conteudos' }, { name: 'Artigos', path: '/conteudos/artigos' }, { name: article.title, path: article.path }])]} />
+      <JsonLd data={[articleJsonLd(article), faqJsonLd(article.faq), breadcrumbJsonLd([{ name: 'Início', path: '/' }, { name: 'Conteúdos', path: '/conteudos' }, { name: 'Artigos', path: '/conteudos/artigos' }, { name: article.title, path: article.path }])]} />
       <PageHero eyebrow={article.category} title={article.title} description={article.intro} />
       <article className="bg-white py-16">
         <div className="mx-auto max-w-3xl px-4 sm:px-6 lg:px-8">
@@ -42,7 +42,7 @@ export default async function ArticlePage({ params }: { params: Promise<{ slug: 
           </div>
           <div className="mt-10 border border-emerald-200 bg-emerald-50 p-5">
             <h2 className="font-semibold text-slate-950">Proximo passo</h2>
-            <p className="mt-2 text-sm leading-6 text-slate-700">Veja as solucoes relacionadas para entender como esse tema pode ser operacionalizado dentro do Gestao 360.</p>
+            <p className="mt-2 text-sm leading-6 text-slate-700">Veja as soluções relacionadas para entender como esse tema pode ser operacionalizado dentro do Gestão 360.</p>
             <div className="mt-4 flex flex-wrap gap-2">
               {article.related.map((href) => <Link key={href} href={href} className="border border-emerald-300 bg-white px-3 py-2 text-sm font-semibold text-emerald-800">{href.replace('/solucoes/', '').replaceAll('-', ' ')}</Link>)}
             </div>
