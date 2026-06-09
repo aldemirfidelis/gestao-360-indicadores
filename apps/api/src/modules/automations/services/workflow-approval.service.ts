@@ -1,11 +1,15 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { PrismaService } from '../../../prisma/prisma.service';
+import { WorkItemEventBus } from '../../my-day/work-item-event-bus';
 
 @Injectable()
 export class WorkflowApprovalService {
   private readonly logger = new Logger(WorkflowApprovalService.name);
 
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly workItemBus: WorkItemEventBus,
+  ) {}
 
   async createApproval(
     instance: any,
@@ -55,6 +59,7 @@ export class WorkflowApprovalService {
       });
     }
 
+    this.workItemBus.markDirty(companyId, [approverId], 'approval.created');
     return approval;
   }
 
@@ -142,6 +147,7 @@ export class WorkflowApprovalService {
       });
     }
 
+    this.workItemBus.markDirty(companyId, [approval.approverId, approval.requesterId], 'approval.decided');
     return updatedApproval;
   }
 }

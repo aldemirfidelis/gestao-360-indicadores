@@ -1,11 +1,15 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { PrismaService } from '../../../prisma/prisma.service';
+import { WorkItemEventBus } from '../../my-day/work-item-event-bus';
 
 @Injectable()
 export class WorkflowTaskService {
   private readonly logger = new Logger(WorkflowTaskService.name);
 
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly workItemBus: WorkItemEventBus,
+  ) {}
 
   async createTask(
     instance: any,
@@ -69,6 +73,7 @@ export class WorkflowTaskService {
       });
     }
 
+    this.workItemBus.markDirty(companyId, [responsibleId], 'task.created');
     return task;
   }
 

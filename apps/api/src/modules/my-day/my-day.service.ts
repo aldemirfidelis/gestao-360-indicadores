@@ -1,9 +1,10 @@
-import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
+import { BadRequestException, Injectable, NotFoundException, OnModuleInit } from '@nestjs/common';
 import { PrismaService } from '../../prisma/prisma.service';
 import { AuthPayload } from '../auth/auth.types';
 import { WorkItemAggregationService } from './work-item-aggregation.service';
 import { WorkflowApprovalService } from '../automations/services/workflow-approval.service';
 import { ActionsService } from '../actions/actions.service';
+import { WorkItemEventBus } from './work-item-event-bus';
 
 const REFRESH_TTL_MS = 30_000;
 
@@ -17,15 +18,40 @@ export interface MyDayItemsQuery {
 }
 
 @Injectable()
-export class MyDayService {
+export class MyDayService implements OnModuleInit {
   private readonly lastRefresh = new Map<string, number>();
+  private readonly dirty = new Map<string, { companyId: string; userId: string }>();
+  private flushTimer: NodeJS.Timeout | null = null;
 
   constructor(
     private readonly prisma: PrismaService,
     private readonly aggregation: WorkItemAggregationService,
     private readonly approvals: WorkflowApprovalService,
     private readonly actions: ActionsService,
+    private readonly bus: WorkItemEventBus,
   ) {}
+
+  /** Assina o bus: quando um registro muda, agenda rebuild incremental do(s) usuario(s). */
+  onModuleInit(): void {
+    this.bus.onDirty((e) => {
+      for (const userId of e.userIds) this.dirty.set(`${e.companyId}:${userId}`, { companyId: e.companyId, userId });
+      if (!this.flushTimer) this.flushTimer = setTimeout(() => void this.flushDirty(), 1500);
+    });
+  }
+
+  private async flushDirty(): Promise<void> {
+    this.flushTimer = null;
+    const batch = [...this.dirty.values()];
+    this.dirty.clear();
+    for (const { companyId, userId } of batch) {
+      try {
+        await this.aggregation.rebuildFor(companyId, userId);
+        this.lastRefresh.set(`${companyId}:${userId}`, Date.now());
+      } catch {
+        // resiliencia: erro de um usuario nao impede os demais
+      }
+    }
+  }
 
   private refreshKey(me: AuthPayload) {
     return `${me.companyId}:${me.sub}`;

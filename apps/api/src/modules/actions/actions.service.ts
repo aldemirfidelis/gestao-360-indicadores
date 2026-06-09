@@ -19,6 +19,7 @@ import {
 } from '@prisma/client';
 import { PrismaService } from '../../prisma/prisma.service';
 import { TraceabilityService } from '../traceability/traceability.service';
+import { WorkItemEventBus } from '../my-day/work-item-event-bus';
 import { GeminiService } from '../ai/gemini.service';
 import { AccessService } from '../access/access.service';
 
@@ -51,6 +52,7 @@ export class ActionsService {
     private readonly traceability: TraceabilityService,
     private readonly gemini: GeminiService,
     private readonly access: AccessService,
+    private readonly workItemBus: WorkItemEventBus,
   ) {}
 
   async list(f: ActionFilter) {
@@ -237,6 +239,7 @@ export class ActionsService {
         analysisTool: action.analysisTool,
       },
     });
+    this.workItemBus.markDirty(action.companyId, [action.responsibleUserId], 'action.created');
     return action;
   }
 
@@ -382,6 +385,7 @@ export class ActionsService {
       statusTo: updated.status,
       metadata: { progress: updated.progress, completedAt: updated.completedAt, reason },
     });
+    this.workItemBus.markDirty(action.companyId, [action.responsibleUserId, updated.responsibleUserId], 'action.status');
     return updated;
   }
 

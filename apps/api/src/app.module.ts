@@ -50,6 +50,7 @@ import { PlatformAdminGlobalModule } from './modules/platform-admin/platform-adm
 import { Vision360Module } from './modules/vision360/vision360.module';
 import { AutomationsModule } from './modules/automations/automations.module';
 import { MyDayModule } from './modules/my-day/my-day.module';
+import { WorkItemEventsModule } from './modules/my-day/work-item-event-bus';
 
 @Module({
   imports: [
@@ -98,6 +99,7 @@ import { MyDayModule } from './modules/my-day/my-day.module';
     PlatformModule,
     PlatformAdminGlobalModule,
     AccessModule,
+    WorkItemEventsModule,
     Vision360Module,
     AutomationsModule,
     MyDayModule,

@@ -138,6 +138,11 @@ export class WorkItemAggregationService {
     return drafts.length;
   }
 
+  /** Reconstroi a fatia de um usuario arbitrario (bus de eventos / visao de equipe). */
+  async rebuildFor(companyId: string, userId: string): Promise<number> {
+    return this.rebuildForUser({ sub: userId, companyId, email: '', name: '', role: 'VIEWER' as any });
+  }
+
   private warn(source: string, e: unknown): WorkItemDraft[] {
     this.logger.warn(`Falha ao coletar ${source}: ${(e as Error)?.message}`);
     return [];
@@ -240,6 +245,7 @@ export class WorkItemAggregationService {
       workflowInstanceId: ap.workflowInstanceId,
       workflowNodeKey: ap.nodeKey,
       requiresDecision: true,
+      isBlocking: true,
       recommendedAction: 'Aprovar, reprovar ou solicitar ajustes',
       availableActions: [
         { key: 'approve', label: 'Aprovar', kind: 'primary', inline: true },
