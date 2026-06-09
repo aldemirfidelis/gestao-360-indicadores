@@ -4,7 +4,6 @@ import { ReactNode } from 'react';
 import { Inter } from 'next/font/google';
 import { Providers } from '@/components/providers';
 import { AnalyticsScripts } from '@/components/marketing/analytics';
-import { WhatsAppButton } from '@/components/marketing/whatsapp-button';
 import { DEFAULT_OG_IMAGE, SITE_NAME, SITE_URL, absoluteUrl } from '@/lib/public-site';
 
 const inter = Inter({
@@ -50,7 +49,6 @@ export default function RootLayout({ children }: { children: ReactNode }) {
       <body className="min-h-screen bg-background font-sans antialiased">
         <Providers>{children}</Providers>
         <AnalyticsScripts />
-        <WhatsAppButton />
       </body>
     </html>
   );

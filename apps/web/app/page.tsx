@@ -5,6 +5,7 @@ import { ArrowRight, CheckCircle2, ClipboardList, FileSearch, LineChart, Network
 import { PublicShell } from '@/components/marketing/public-shell';
 import { JsonLd } from '@/components/marketing/json-ld';
 import { DemoLink } from '@/components/marketing/demo-link';
+import { WhatsAppButton } from '@/components/marketing/whatsapp-button';
 import {
   faqJsonLd,
   moduleHighlights,
@@ -215,6 +216,7 @@ export default function HomePage() {
           </div>
         </div>
       </section>
+      <WhatsAppButton />
     </PublicShell>
   );
 }
