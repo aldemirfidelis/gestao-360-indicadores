@@ -8559,3 +8559,137 @@ model PrizeActualEvidence {
 
   @@index([actualResultId])
 }
+
+// =====================================================
+// Gestao de Premio - Fase 3: Base Elegivel + Conectores (Apdata)
+// Conectores desacoplados (API/arquivo/manual). Snapshot imutavel por
+// competencia (lotVersion). Segredos por referencia (env/cofre), nunca em claro.
+// =====================================================
+
+enum PrizeConnectorType {
+  API
+  FILE_CSV
+  FILE_XLSX
+  DB_BRIDGE
+  MANUAL
+}
+
+enum PrizeJobStatus {
+  PENDING
+  RUNNING
+  SUCCESS
+  ERROR
+  PARTIAL
+}
+
+model PrizeIntegrationConfig {
+  id             String             @id @default(uuid())
+  companyId      String
+  kind           String // APDATA_ELIGIBLE | APDATA_EVENTS | BSC | PAYROLL
+  name           String
+  type           PrizeConnectorType @default(MANUAL)
+  active         Boolean            @default(true)
+  config         Json? // endpoint, mapeamentos (NAO armazenar segredos aqui)
+  secretRef      String? // nome da variavel de ambiente / cofre (NUNCA o segredo)
+  schedule       String?
+  lastRunAt      DateTime?
+  nextRunAt      DateTime?
+  lastStatus     String?
+  processedTotal Int                @default(0)
+  notes          String?
+  createdById    String?
+  createdAt      DateTime           @default(now())
+  updatedAt      DateTime           @updatedAt
+
+  jobs PrizeIntegrationJob[]
+
+  @@unique([companyId, kind, name])
+  @@index([companyId])
+  @@index([companyId, kind])
+}
+
+model PrizeIntegrationJob {
+  id           String                  @id @default(uuid())
+  companyId    String
+  configId     String?
+  config       PrizeIntegrationConfig? @relation(fields: [configId], references: [id], onDelete: SetNull)
+  kind         String
+  competenceId String?
+  type         PrizeConnectorType      @default(MANUAL)
+  status       PrizeJobStatus          @default(PENDING)
+  processed    Int                     @default(0)
+  errorsCount  Int                     @default(0)
+  retries      Int                     @default(0)
+  lotVersion   Int                     @default(1)
+  startedAt    DateTime?
+  finishedAt   DateTime?
+  log          String?
+  summary      Json?
+  createdById  String?
+  createdAt    DateTime                @default(now())
+
+  @@index([companyId])
+  @@index([companyId, kind])
+  @@index([competenceId])
+}
+
+model PrizeEmployeeSnapshot {
+  id              String             @id @default(uuid())
+  companyId       String
+  competenceId    String
+  batchId         String
+  lotVersion      Int                @default(1)
+  current         Boolean            @default(true)
+  registration    String
+  name            String
+  cpfMasked       String?
+  bond            String?
+  branchRef       String?
+  unitRef         String?
+  positionRef     String?
+  functionRef     String?
+  areaRef         String?
+  sectorRef       String?
+  costCenterRef   String?
+  baseSalary      Decimal?           @db.Decimal(14, 2)
+  admissionDate   DateTime?
+  terminationDate DateTime?
+  situation       String             @default("ACTIVE")
+  workedDays      Int?
+  eligible        Boolean            @default(true)
+  blocked         Boolean            @default(false)
+  source          PrizeConnectorType @default(MANUAL)
+  raw             Json?
+  importedAt      DateTime           @default(now())
+  createdById     String?
+
+  events PrizeEmployeeEvent[]
+
+  @@unique([competenceId, registration, lotVersion])
+  @@index([companyId])
+  @@index([competenceId])
+  @@index([competenceId, current])
+}
+
+model PrizeEmployeeEvent {
+  id           String                 @id @default(uuid())
+  companyId    String
+  competenceId String
+  snapshotId   String?
+  snapshot     PrizeEmployeeSnapshot? @relation(fields: [snapshotId], references: [id], onDelete: Cascade)
+  registration String
+  type         String // FALTA | ATESTADO | MEDIDA_DISCIPLINAR | SUSPENSAO | ACIDENTE | TREINAMENTO | AFASTAMENTO | GRATIFICACAO | MOVIMENTACAO
+  date         DateTime?
+  days         Int?
+  value        Decimal?               @db.Decimal(14, 2)
+  description  String?
+  source       PrizeConnectorType     @default(MANUAL)
+  raw          Json?
+  batchId      String?
+  createdAt    DateTime               @default(now())
+
+  @@index([companyId])
+  @@index([competenceId])
+  @@index([snapshotId])
+  @@index([competenceId, registration])
+}

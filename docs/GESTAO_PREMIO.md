@@ -5,9 +5,34 @@
 > Fechamento → Base Elegível → Eventos → Transitoriedade → Ajustes → Exceções →
 > Cálculo → Conferência → Aprovação → Folha → Espelho → Auditoria**.
 >
-> Documento vivo. Cobre a **Fase 1 (Fundação + Governança de Anexos)** e a
-> **Fase 2 (Lançamento do Realizado + Previsto × Realizado)**, entregues e
-> validadas. As fases seguintes estão no backlog residual (seção 7).
+> Documento vivo. Cobre as Fases **1 (Fundação + Governança)**, **2 (Realizado +
+> Previsto × Realizado)** e **3 (Base Elegível / Apdata + Snapshot + Conciliação)**,
+> entregues e validadas. As fases seguintes estão no backlog residual (seção 7).
+
+## 0.1. Fase 3 — Base Elegível (Apdata) + Snapshot + Conciliação (entregue)
+
+- **Banco** (aditivo): enums `PrizeConnectorType`, `PrizeJobStatus` + tabelas
+  `PrizeIntegrationConfig`, `PrizeIntegrationJob`, `PrizeEmployeeSnapshot`,
+  `PrizeEmployeeEvent`. Migração `20260609190000_prize_eligible`.
+- **Conectores desacoplados** (`/gestao-premio/integracoes`): Apdata (base/eventos),
+  BSC e Folha; tipos API/CSV/XLSX/banco/manual. **Segredos por referência**
+  (`secretRef` = nome de env var/cofre) — nunca armazenados em claro; resposta
+  redige a referência (`hasSecret`). Teste de conector valida credencial/endpoint
+  sem expor valores. Sem conector real → **importação assistida por arquivo/mock**.
+- **Base elegível** (`/gestao-premio/colaboradores`): import por competência com
+  **snapshot imutável por lote** (`lotVersion`, `current`), **CPF mascarado**
+  (`***.456.789-**`) e **salário protegido** por `prize:salary:view`. Eventos
+  (faltas/atestados/medidas/acidentes/treinamento…) importados junto, alimentando
+  proporcionalidade/moderadores da Fase 4.
+- **Conciliação**: cada import compara o lote entrante com o corrente e reporta
+  inclusões, exclusões, alterações (cargo/área/CC/situação/salário) e pendências
+  (sem salário, sem cargo, desligados). Helper puro `reconcile`/`maskCpf` testado.
+- **Permissão**: `prize:eligible:manage` (importar/conciliar); conectores sob
+  `prize:admin`. **Checklist de fechamento**: item "base elegível" disponível.
+- **Testes**: `prize-eligible.util.spec.ts` (masking, conciliação, mock).
+- **Isolamento de trabalho**: esta fase foi desenvolvida em git **worktree**
+  dedicada (`.claude/worktrees/gestao-premio`) no branch `feat/gestao-premio`,
+  sem tocar no `main`.
 
 ## 0. Fase 2 — Lançamento do Realizado + Previsto × Realizado (entregue)
 
@@ -226,8 +251,6 @@ justificativa.
   do Motor de Cálculo da Fase 4).
 
 ### Próximas fases (não iniciadas)
-- **Fase 3 — Base elegível (Apdata)**: conector configurável, snapshot imutável
-  por competência, conciliação de divergências.
 - **Fase 4 — Motor de cálculo**: 20 etapas, memória de cálculo auditável,
   reprocessamento controlado; moderadores, proporcionalidade, transitoriedade,
   ajustes manuais, exceções (impossibilidade/treinamento/desligamento),

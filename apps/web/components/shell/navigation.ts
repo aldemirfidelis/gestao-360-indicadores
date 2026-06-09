@@ -22,6 +22,8 @@ import {
   Gauge,
   ClipboardList,
   TrendingUp,
+  UserCheck,
+  Plug,
   Upload,
   Users,
   type LucideIcon,
@@ -114,6 +116,8 @@ export const navSections: NavSection[] = [
       { href: '/gestao-premio/indicadores', label: 'Indicadores', description: 'Indicadores, metas, zeros, pesos e faixas', icon: Target, permissions: ['prize:view'] },
       { href: '/gestao-premio/realizado', label: 'Lançamento do Realizado', description: 'Lançar/importar o realizado por indicador e competência', icon: ClipboardList, permissions: ['prize:view'] },
       { href: '/gestao-premio/previsto-realizado', label: 'Previsto × Realizado', description: 'Acompanhamento de desvios e atingimento antes do fechamento', icon: TrendingUp, permissions: ['prize:view'] },
+      { href: '/gestao-premio/colaboradores', label: 'Colaboradores Elegíveis', description: 'Base elegível por competência (Apdata), snapshot e conciliação', icon: UserCheck, permissions: ['prize:view'] },
+      { href: '/gestao-premio/integracoes', label: 'Integrações', description: 'Conectores Apdata/BSC/Folha, testes e jobs', icon: Plug, permissions: ['prize:view'] },
     ],
   },
   {
