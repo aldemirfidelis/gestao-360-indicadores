@@ -13,6 +13,7 @@ import {
   GanttChartSquare,
   Goal,
   LayoutDashboard,
+  ListTodo,
   Network,
   ShieldCheck,
   Sparkles,
@@ -52,6 +53,7 @@ export const navSections: NavSection[] = [
     intent: 'view',
     icon: LayoutDashboard,
     items: [
+      { href: '/meu-dia', label: 'Meu Dia', description: 'Central de trabalho: tudo que exige sua atenção hoje', icon: ListTodo, permissions: [], exact: true },
       { href: '/dashboard', label: 'Visão Geral', description: 'Resumo, pendências e atalhos', icon: LayoutDashboard, permissions: ['dashboard:view'], exact: true },
       { href: '/visualization', label: 'Dashboard Executivo', description: 'Visão 360 para decisão', icon: BarChart3, permissions: ['visualization:view', 'dashboard:view'] },
       { href: '/org', label: 'Árvore Organizacional', description: 'Áreas, setores, pilares e diretrizes', icon: Network, permissions: ['org:view'] },
@@ -125,6 +127,7 @@ export const mobileNavItems: NavItem[] = [
 // Mapeamento centralizado URL -> permissoes necessarias.
 // Usado pelo RouteGuard para bloquear acesso direto via URL.
 export const ROUTE_PERMISSIONS: Array<{ prefix: string; permissions: string[]; exact?: boolean }> = [
+  { prefix: '/meu-dia', permissions: [] },
   { prefix: '/dashboard', permissions: ['dashboard:view'] },
   { prefix: '/central-automacoes', permissions: ['automations:view'] },
   { prefix: '/central-impactos', permissions: ['vision360:view'] },

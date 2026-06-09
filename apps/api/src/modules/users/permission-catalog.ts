@@ -243,6 +243,13 @@ export const PERMISSION_CATALOG = [
   ['automations:approve', 'Decidir sobre etapas de aprovação humana', 'Automações', 'approve'],
   ['automations:integrations', 'Configurar integrações e ver credenciais mascaradas', 'Automações', 'manage'],
   ['automations:admin', 'Administrar biblioteca de blocos e modelos globais', 'Automações', 'manage'],
+
+  // Central de Trabalho "Meu Dia"
+  ['myday:view', 'Visualizar a Central de Trabalho Meu Dia', 'Meu Dia', 'view'],
+  ['myday:act', 'Executar ações rápidas na Central Meu Dia', 'Meu Dia', 'manage'],
+  ['myday:configure', 'Configurar preferências pessoais do Meu Dia', 'Meu Dia', 'manage'],
+  ['myday:team', 'Visualizar o Meu Dia da equipe (gestor)', 'Meu Dia', 'view'],
+  ['myday:admin', 'Administrar regras de prioridade e categorias do Meu Dia', 'Meu Dia', 'manage'],
 ] as const;
 
 const ALL_KEYS = PERMISSION_CATALOG.map(([key]) => key);

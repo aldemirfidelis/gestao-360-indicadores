@@ -86,7 +86,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     queryClient.clear();
     const profile = await refreshUser();
     // Super Admin escolhe qual empresa administrar antes de entrar.
-    router.replace(profile?.role === 'SUPER_ADMIN' ? '/selecionar-empresa' : '/dashboard');
+    router.replace(profile?.role === 'SUPER_ADMIN' ? '/selecionar-empresa' : '/meu-dia');
   };
 
   const switchCompany = async (companyId: string | null) => {

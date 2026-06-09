@@ -49,6 +49,7 @@ import { ExternalApiModule } from './modules/external-api/external-api.module';
 import { PlatformAdminGlobalModule } from './modules/platform-admin/platform-admin.module';
 import { Vision360Module } from './modules/vision360/vision360.module';
 import { AutomationsModule } from './modules/automations/automations.module';
+import { MyDayModule } from './modules/my-day/my-day.module';
 
 @Module({
   imports: [
@@ -99,6 +100,7 @@ import { AutomationsModule } from './modules/automations/automations.module';
     AccessModule,
     Vision360Module,
     AutomationsModule,
+    MyDayModule,
   ],
   providers: [
     { provide: APP_GUARD, useClass: ThrottlerGuard },

@@ -597,6 +597,8 @@ model Company {
   workflowExecutionLogs WorkflowExecutionLog[]  @relation("WorkflowLogCompany")
   workflowDeadLetters   WorkflowDeadLetter[]    @relation("WorkflowDLCompany")
   workflowIntegrations  WorkflowIntegration[]   @relation("WorkflowIntegCompany")
+  workItemIndexes          WorkItemIndex[]           @relation("WorkItemCompany")
+  userDashboardPreferences UserDashboardPreference[] @relation("DashboardPrefCompany")
 }
 
 model WorkPeriod {
@@ -7960,4 +7962,106 @@ model WorkflowIntegration {
   updatedAt              DateTime  @updatedAt
 
   @@index([companyId])
+}
+
+// =====================================================
+// Central de Trabalho "Meu Dia" (Work Inbox)
+// Projecao de leitura/priorizacao que REFERENCIA os registros originais
+// (nunca os duplica como fonte oficial). Atualizada por agregacao/eventos.
+// =====================================================
+
+enum WorkItemPriorityLevel {
+  CRITICAL
+  HIGH
+  MEDIUM
+  LOW
+  INFO
+}
+
+/// Indice unificado de itens de trabalho. Cada linha aponta para o registro de
+/// origem (sourceEntityType + sourceEntityId). Os detalhes vivem nos modulos.
+model WorkItemIndex {
+  id                  String                @id @default(uuid())
+  companyId           String
+  company             Company               @relation("WorkItemCompany", fields: [companyId], references: [id], onDelete: Cascade)
+
+  // <sourceEntityType>:<sourceEntityId>:<itemType>:<assignedUserId|group|*>
+  dedupeKey           String                @unique
+
+  sourceModule        String
+  sourceEntityType    String
+  sourceEntityId      String
+  sourceEventId       String?
+  workflowInstanceId  String?
+  workflowNodeKey     String?
+
+  itemType            String
+  title               String
+  summary             String?
+  status              String                @default("OPEN") // OPEN | IN_PROGRESS | WAITING | BLOCKED | DONE | ARCHIVED
+  priority            WorkItemPriorityLevel @default(MEDIUM)
+  priorityScore       Int                   @default(0)
+  priorityReason      String?
+  criticality         String?
+  dueAt               DateTime?
+  overdueDays         Int                   @default(0)
+  slaStatus           String?               // ON_TRACK | DUE_SOON | OVERDUE | NONE
+
+  assignedUserId      String?
+  assignedGroupId     String?
+  requesterUserId     String?
+  managerUserId       String?
+
+  branchId            String?               // unidade
+  orgNodeId           String?               // area/setor
+  processId           String?
+
+  contextData         Json?
+  availableActions    Json?
+  recommendedAction   String?
+  requiresDecision    Boolean               @default(false)
+  requiresEvidence    Boolean               @default(false)
+  isBlocking          Boolean               @default(false)
+  isExternal          Boolean               @default(false)
+  isDelegated         Boolean               @default(false)
+  delegatedFromUserId String?
+
+  sourceCreatedAt     DateTime?
+  sourceUpdatedAt     DateTime?
+  completedAt         DateTime?
+  archivedAt          DateTime?
+  refreshedAt         DateTime              @default(now())
+  createdAt           DateTime              @default(now())
+  updatedAt           DateTime              @updatedAt
+
+  @@index([companyId, assignedUserId, status])
+  @@index([companyId, status, dueAt])
+  @@index([companyId, priority])
+  @@index([companyId, itemType])
+  @@index([assignedUserId, status])
+  @@index([dueAt])
+}
+
+/// Preferencias pessoais da Central "Meu Dia" (pagina inicial, widgets, etc.).
+model UserDashboardPreference {
+  id                  String   @id @default(uuid())
+  companyId           String
+  company             Company  @relation("DashboardPrefCompany", fields: [companyId], references: [id], onDelete: Cascade)
+  userId              String
+  landingPage         String?  @default("/meu-dia")
+  defaultView         String?  @default("list")
+  visibleWidgets      Json?
+  widgetOrder         Json?
+  savedFilters        Json?
+  defaultCompanyId    String?
+  defaultUnitId       String?
+  compactMode         Boolean  @default(false)
+  aiEnabled           Boolean  @default(true)
+  dailySummaryEnabled Boolean  @default(false)
+  dailySummaryTime    String?
+  createdAt           DateTime @default(now())
+  updatedAt           DateTime @updatedAt
+
+  @@unique([companyId, userId])
+  @@index([userId])
 }
