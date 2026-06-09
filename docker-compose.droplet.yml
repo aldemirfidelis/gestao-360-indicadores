@@ -120,11 +120,9 @@ services:
   collabora:
     image: collabora/code:latest
     container_name: g360-collabora
-    # Mantem o Collabora fora do deploy padrao ate o DNS collabora.gestao360.org
-    # estar apontando para o droplet. Habilite com:
-    # docker compose -f docker-compose.droplet.yml --profile collabora up -d collabora
-    profiles:
-      - collabora
+    # Collabora habilitado como servico PADRAO do deploy (DNS collabora.gestao360.org
+    # ativo + cert emitido). Sem 'profiles' para que o deploy.sh (up -d --remove-orphans)
+    # NAO o trate como orfao e o preserve/gerencie a cada deploy.
     restart: unless-stopped
     environment:
       # Dominios (regex) autorizados a embutir/usar o editor = host WOPI.
