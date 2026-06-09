@@ -5,8 +5,8 @@ import { useRouter } from 'next/navigation';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
 import {
-  AlertTriangle, AtSign, Bookmark, CalendarDays, CheckCircle2, CheckSquare, Clock3, Columns3, FileText, FileWarning,
-  Inbox, LayoutList, MessageSquare, Pin, Plus, RefreshCw, Search, ShieldAlert, SlidersHorizontal, Table2, Target, Stamp, UserPlus, Users, Workflow,
+  AlertTriangle, AtSign, Bookmark, CalendarDays, CheckCircle2, CheckSquare, Clock3, Columns3, EyeOff, FileText, FileWarning,
+  Inbox, LayoutList, MessageSquare, Pin, Plus, RefreshCw, Search, ShieldAlert, SlidersHorizontal, Sparkles, Table2, Target, Stamp, ThumbsDown, ThumbsUp, UserPlus, Users, Workflow,
 } from 'lucide-react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -101,6 +101,14 @@ interface DelegationPayload {
   users: Array<{ id: string; name: string; email: string; jobTitle?: string | null }>;
 }
 
+interface AssistantResult {
+  enabled: boolean;
+  disclaimer: string;
+  generatedAt: string;
+  summary: string | null;
+  recommendations: Array<{ key: string; severity: 'CRITICAL' | 'HIGH' | 'MEDIUM' | 'INFO'; title: string; explanation: string; suggestion: string; relatedItemIds?: string[]; pattern?: string }>;
+}
+
 function greeting() {
   const h = new Date().getHours();
   if (h < 12) return 'Bom dia';
@@ -140,6 +148,7 @@ export default function MeuDiaPage() {
   const prefs = useQuery<any>({ queryKey: ['my-day', 'preferences'], queryFn: () => api('/my-day/preferences') });
   const savedFilters = useQuery<any[]>({ queryKey: ['my-day', 'saved-filters'], queryFn: () => api('/my-day/saved-filters') });
   const delegations = useQuery<DelegationPayload>({ queryKey: ['my-day', 'delegations'], queryFn: () => api('/my-day/delegations'), enabled: delegationsOpen });
+  const assistant = useQuery<AssistantResult>({ queryKey: ['my-day', 'assistant'], queryFn: () => api('/my-day/assistant') });
 
   useEffect(() => {
     if (prefsInit.current || !prefs.data) return;
@@ -181,6 +190,14 @@ export default function MeuDiaPage() {
     mutationFn: (id: string) => api(`/my-day/delegations/${id}`, { method: 'DELETE' }),
     onSuccess: () => { void qc.invalidateQueries({ queryKey: ['my-day', 'delegations'] }); invalidate(); toast.success('Delegacao encerrada'); },
     onError: (e: any) => toast.error(e?.message ?? 'Falha ao encerrar delegacao'),
+  });
+  const hideRecommendation = useMutation({
+    mutationFn: (key: string) => api(`/my-day/assistant/${encodeURIComponent(key)}/hide`, { method: 'POST' }),
+    onSuccess: () => { void qc.invalidateQueries({ queryKey: ['my-day', 'assistant'] }); toast.success('Recomendacao ocultada'); },
+  });
+  const feedbackRecommendation = useMutation({
+    mutationFn: ({ key, helpful }: { key: string; helpful: boolean }) => api(`/my-day/assistant/${encodeURIComponent(key)}/feedback`, { method: 'POST', json: { helpful } }),
+    onSuccess: () => toast.success('Feedback registrado'),
   });
 
   function applyFilter(f: any) {
@@ -318,6 +335,14 @@ export default function MeuDiaPage() {
         <Button variant="ghost" size="sm" className="ml-auto" onClick={() => setPrefsOpen(true)}><SlidersHorizontal className="mr-1 h-3.5 w-3.5" />Personalizar</Button>
       </div>
 
+      <AssistantPanel
+        data={assistant.data}
+        loading={assistant.isPending}
+        onRefresh={() => void qc.invalidateQueries({ queryKey: ['my-day', 'assistant'] })}
+        onHide={(key) => hideRecommendation.mutate(key)}
+        onFeedback={(key, helpful) => feedbackRecommendation.mutate({ key, helpful })}
+      />
+
       {/* Lista de itens */}
       <div className="space-y-2">
         {itemsQuery.isPending ? (
@@ -423,6 +448,57 @@ export default function MeuDiaPage() {
           onVision={() => { openVision(actOn); setActOn(null); }} />
       )}
     </div>
+  );
+}
+
+function AssistantPanel({ data, loading, onRefresh, onHide, onFeedback }: {
+  data?: AssistantResult;
+  loading: boolean;
+  onRefresh: () => void;
+  onHide: (key: string) => void;
+  onFeedback: (key: string, helpful: boolean) => void;
+}) {
+  if (loading) return <div className="h-24 animate-pulse rounded-lg border bg-muted/30" />;
+  if (!data) return null;
+  return (
+    <Card className="border-primary/20">
+      <CardContent className="p-3">
+        <div className="flex flex-wrap items-start gap-3">
+          <div className="grid h-9 w-9 shrink-0 place-items-center rounded-md bg-primary/10 text-primary"><Sparkles className="h-4 w-4" /></div>
+          <div className="min-w-0 flex-1">
+            <div className="flex flex-wrap items-center gap-2">
+              <div className="text-sm font-semibold">Resumo assistido do Meu Dia</div>
+              {!data.enabled && <Badge variant="outline">Desativado</Badge>}
+            </div>
+            <p className="mt-1 text-xs text-muted-foreground">{data.disclaimer}</p>
+            {data.summary && <p className="mt-2 text-sm">{data.summary}</p>}
+          </div>
+          <Button size="sm" variant="outline" onClick={onRefresh}><RefreshCw className="mr-1 h-4 w-4" />Atualizar</Button>
+        </div>
+        {data.enabled && data.recommendations.length > 0 && (
+          <div className="mt-3 grid gap-2 lg:grid-cols-2">
+            {data.recommendations.map((rec) => {
+              const cls = PRIORITY_META[rec.severity]?.cls ?? PRIORITY_META.INFO.cls;
+              return (
+                <div key={rec.key} className="rounded-md border p-3">
+                  <div className="flex flex-wrap items-center gap-2">
+                    <span className={cn('rounded px-1.5 py-0.5 text-[11px] font-medium', cls)}>{rec.severity}</span>
+                    <span className="text-sm font-medium">{rec.title}</span>
+                  </div>
+                  <p className="mt-1 text-xs text-muted-foreground">{rec.explanation}</p>
+                  <p className="mt-2 text-sm text-primary">{rec.suggestion}</p>
+                  <div className="mt-2 flex flex-wrap gap-1">
+                    <Button size="sm" variant="ghost" onClick={() => onFeedback(rec.key, true)}><ThumbsUp className="mr-1 h-3.5 w-3.5" />Util</Button>
+                    <Button size="sm" variant="ghost" onClick={() => onFeedback(rec.key, false)}><ThumbsDown className="mr-1 h-3.5 w-3.5" />Nao util</Button>
+                    <Button size="sm" variant="ghost" onClick={() => onHide(rec.key)}><EyeOff className="mr-1 h-3.5 w-3.5" />Ocultar</Button>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        )}
+      </CardContent>
+    </Card>
   );
 }
 

@@ -19,6 +19,16 @@ export interface MyDayItemsQuery {
   pageSize?: number;
 }
 
+interface AssistantRecommendation {
+  key: string;
+  severity: 'CRITICAL' | 'HIGH' | 'MEDIUM' | 'INFO';
+  title: string;
+  explanation: string;
+  suggestion: string;
+  relatedItemIds?: string[];
+  pattern?: string;
+}
+
 @Injectable()
 export class MyDayService implements OnModuleInit {
   private readonly lastRefresh = new Map<string, number>();
@@ -89,6 +99,93 @@ export class MyDayService implements OnModuleInit {
     return this.queryItems(me, query);
   }
 
+  async getAssistantSummary(me: AuthPayload) {
+    await this.ensureFresh(me);
+    const enabled = await this.isAssistantEnabled(me);
+    if (!enabled) {
+      return {
+        enabled: false,
+        disclaimer: 'IA assistiva desativada para este usuario ou empresa.',
+        generatedAt: new Date().toISOString(),
+        summary: null,
+        recommendations: [],
+      };
+    }
+    const [summary, priorities, overdue, dueToday, hidden] = await Promise.all([
+      this.computeSummary(me),
+      this.queryItems(me, { tab: 'priorities', pageSize: 80 }),
+      this.queryItems(me, { tab: 'overdue', pageSize: 80 }),
+      this.queryItems(me, { tab: 'today', pageSize: 80 }),
+      this.prisma.myDayAssistantLog.findMany({
+        where: { companyId: me.companyId, userId: me.sub, hidden: true },
+        select: { recommendationKey: true },
+      }),
+    ]);
+    const hiddenKeys = new Set(hidden.map((h) => h.recommendationKey));
+    const recommendations = this.buildRecommendations(summary, priorities.rows, overdue.rows, dueToday.rows).filter((r) => !hiddenKeys.has(r.key));
+    for (const rec of recommendations) {
+      await this.prisma.myDayAssistantLog.upsert({
+        where: { companyId_userId_recommendationKey: { companyId: me.companyId, userId: me.sub, recommendationKey: rec.key } },
+        create: {
+          companyId: me.companyId,
+          userId: me.sub,
+          recommendationKey: rec.key,
+          title: rec.title,
+          severity: rec.severity,
+          suggestion: rec.suggestion,
+          explanation: rec.explanation,
+          contextData: { relatedItemIds: rec.relatedItemIds ?? [], pattern: rec.pattern ?? null },
+        },
+        update: {
+          title: rec.title,
+          severity: rec.severity,
+          suggestion: rec.suggestion,
+          explanation: rec.explanation,
+          contextData: { relatedItemIds: rec.relatedItemIds ?? [], pattern: rec.pattern ?? null },
+          generatedAt: new Date(),
+        },
+      });
+    }
+    return {
+      enabled: true,
+      disclaimer: 'Sugestao assistida por IA. Avalie o contexto antes de executar qualquer acao. A decisao final e do usuario.',
+      generatedAt: new Date().toISOString(),
+      summary: this.assistedSummary(summary),
+      recommendations,
+    };
+  }
+
+  async hideAssistantRecommendation(me: AuthPayload, key: string) {
+    await this.prisma.myDayAssistantLog.upsert({
+      where: { companyId_userId_recommendationKey: { companyId: me.companyId, userId: me.sub, recommendationKey: key } },
+      create: { companyId: me.companyId, userId: me.sub, recommendationKey: key, title: key, severity: 'INFO', hidden: true },
+      update: { hidden: true, interactedAt: new Date() },
+    });
+    return { ok: true };
+  }
+
+  async feedbackAssistantRecommendation(me: AuthPayload, key: string, dto: Record<string, any>) {
+    await this.prisma.myDayAssistantLog.upsert({
+      where: { companyId_userId_recommendationKey: { companyId: me.companyId, userId: me.sub, recommendationKey: key } },
+      create: {
+        companyId: me.companyId,
+        userId: me.sub,
+        recommendationKey: key,
+        title: key,
+        severity: 'INFO',
+        helpful: typeof dto.helpful === 'boolean' ? dto.helpful : null,
+        feedback: dto.feedback ? String(dto.feedback).slice(0, 500) : null,
+        interactedAt: new Date(),
+      },
+      update: {
+        helpful: typeof dto.helpful === 'boolean' ? dto.helpful : null,
+        feedback: dto.feedback ? String(dto.feedback).slice(0, 500) : null,
+        interactedAt: new Date(),
+      },
+    });
+    return { ok: true };
+  }
+
   async getItem(me: AuthPayload, id: string) {
     const item = await this.prisma.workItemIndex.findFirst({
       where: { id, companyId: me.companyId, assignedUserId: me.sub },
@@ -156,6 +253,100 @@ export class MyDayService implements OnModuleInit {
       indicatorsOffTarget, risksCritical, documentsToReview,
       trainingsPending: 0, meetingsToday, unreadMessages,
     };
+  }
+
+  private async isAssistantEnabled(me: AuthPayload) {
+    const [pref, setting] = await Promise.all([
+      this.getPreferences(me),
+      this.prisma.appSetting.findUnique({ where: { companyId_key: { companyId: me.companyId, key: 'myday.ai.enabled' } } }).catch(() => null),
+    ]);
+    const companyOff = setting && ['false', '0', 'off', 'disabled'].includes(String(setting.value).toLowerCase());
+    return !companyOff && (pref as any).aiEnabled !== false;
+  }
+
+  private assistedSummary(summary: any) {
+    const parts: string[] = [];
+    if (summary.overdue > 0) parts.push(`${summary.overdue} vencido(s)`);
+    if (summary.dueToday > 0) parts.push(`${summary.dueToday} vencendo hoje`);
+    if (summary.approvals > 0) parts.push(`${summary.approvals} aprovacao(oes)`);
+    if (summary.risksCritical > 0) parts.push(`${summary.risksCritical} risco(s) critico(s)`);
+    if (summary.indicatorsOffTarget > 0) parts.push(`${summary.indicatorsOffTarget} indicador(es) fora da meta`);
+    if (parts.length === 0) return 'Sem concentracao critica no momento. Mantenha a rotina de acompanhamento.';
+    return `Seu dia concentra ${parts.join(', ')}. Comece pelos bloqueios, prazos vencidos e decisoes que liberam outras pessoas.`;
+  }
+
+  private buildRecommendations(summary: any, priorities: any[], overdue: any[], dueToday: any[]): AssistantRecommendation[] {
+    const out: AssistantRecommendation[] = [];
+    const critical = priorities.filter((i) => i.priority === 'CRITICAL');
+    const blocking = priorities.filter((i) => i.isBlocking);
+    const approvals = priorities.filter((i) => i.itemType === 'APPROVAL');
+    const delegated = priorities.filter((i) => i.isDelegated);
+    if (summary.overdue >= 3 || overdue.length >= 3) {
+      out.push({
+        key: 'overdue-cluster',
+        severity: summary.overdue >= 6 ? 'CRITICAL' : 'HIGH',
+        title: 'Concentracao de itens vencidos',
+        explanation: `${summary.overdue} item(ns) estao vencidos. Padrao detectado: acumulo de prazos atrasados na sua caixa de trabalho.`,
+        suggestion: 'Revise os vencidos em bloco, conclua os rapidos e justifique/replaneje os que dependem de terceiros.',
+        relatedItemIds: overdue.slice(0, 8).map((i) => i.id),
+        pattern: 'overdue',
+      });
+    }
+    if (blocking.length > 0 || approvals.length > 0) {
+      out.push({
+        key: 'blocking-decisions',
+        severity: blocking.length > 0 ? 'HIGH' : 'MEDIUM',
+        title: 'Decisoes podem destravar fluxos',
+        explanation: `${approvals.length} aprovacao(oes) e ${blocking.length} item(ns) bloqueante(s) aparecem entre suas prioridades.`,
+        suggestion: 'Trate primeiro aprovacoes e bloqueios. A IA nao aprova nem rejeita; apenas sugere a ordem de analise.',
+        relatedItemIds: [...blocking, ...approvals].slice(0, 8).map((i) => i.id),
+        pattern: 'blocking',
+      });
+    }
+    if (critical.length > 0) {
+      out.push({
+        key: 'critical-first',
+        severity: 'CRITICAL',
+        title: 'Prioridade critica no topo',
+        explanation: `${critical.length} item(ns) critico(s) exigem atencao antes dos demais por risco, prazo ou impacto.`,
+        suggestion: 'Abra a Visao 360 dos itens criticos antes de executar acao irreversivel e registre justificativa quando houver decisao.',
+        relatedItemIds: critical.slice(0, 8).map((i) => i.id),
+        pattern: 'critical',
+      });
+    }
+    if (dueToday.length > 0) {
+      out.push({
+        key: 'due-today',
+        severity: 'MEDIUM',
+        title: 'Prazos de hoje',
+        explanation: `${dueToday.length} item(ns) vencem hoje e podem virar atraso no proximo ciclo.`,
+        suggestion: 'Reserve uma janela curta para liquidar itens de baixo esforco e fixe os que precisam de acompanhamento.',
+        relatedItemIds: dueToday.slice(0, 8).map((i) => i.id),
+        pattern: 'due_today',
+      });
+    }
+    if (delegated.length > 0) {
+      out.push({
+        key: 'delegated-coverage',
+        severity: 'INFO',
+        title: 'Cobertura por delegacao ativa',
+        explanation: `${delegated.length} item(ns) chegaram por substituicao temporaria.`,
+        suggestion: 'Priorize itens delegados com prazo curto e combine criterios de decisao com o responsavel original.',
+        relatedItemIds: delegated.slice(0, 8).map((i) => i.id),
+        pattern: 'delegation',
+      });
+    }
+    if (out.length === 0) {
+      out.push({
+        key: 'steady-state',
+        severity: 'INFO',
+        title: 'Rotina sob controle',
+        explanation: 'Nao ha padrao critico acumulado nos itens retornados agora.',
+        suggestion: 'Mantenha os itens importantes fixados e revise proximos prazos ao fim do dia.',
+        pattern: 'steady',
+      });
+    }
+    return out.slice(0, 6);
   }
 
   private async queryItems(me: AuthPayload, query: MyDayItemsQuery) {

@@ -57,6 +57,21 @@ export class MyDayController {
     return this.service.getItems(me, query);
   }
 
+  @Get('assistant')
+  assistant(@CurrentUser() me: AuthPayload) {
+    return this.service.getAssistantSummary(me);
+  }
+
+  @Post('assistant/:key/hide')
+  hideAssistant(@CurrentUser() me: AuthPayload, @Param('key') key: string) {
+    return this.service.hideAssistantRecommendation(me, key);
+  }
+
+  @Post('assistant/:key/feedback')
+  feedbackAssistant(@CurrentUser() me: AuthPayload, @Param('key') key: string, @Body() body: Record<string, any>) {
+    return this.service.feedbackAssistantRecommendation(me, key, body);
+  }
+
   @Get('items/:id')
   item(@CurrentUser() me: AuthPayload, @Param('id') id: string) {
     return this.service.getItem(me, id);

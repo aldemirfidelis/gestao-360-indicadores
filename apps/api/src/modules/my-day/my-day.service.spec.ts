@@ -41,6 +41,11 @@ function makeService(over: Record<string, any> = {}) {
       findUnique: vi.fn().mockResolvedValue(null),
       upsert: vi.fn().mockResolvedValue({}),
     },
+    appSetting: { findUnique: vi.fn().mockResolvedValue(null) },
+    myDayAssistantLog: {
+      findMany: vi.fn().mockResolvedValue([]),
+      upsert: vi.fn().mockResolvedValue({ id: 'ai1' }),
+    },
     notification: { count: vi.fn().mockResolvedValue(0), updateMany: vi.fn().mockResolvedValue({ count: 1 }) },
   };
   const svc = new MyDayService(
@@ -73,5 +78,13 @@ describe('MyDayService - Fase 4 inc.2', () => {
   it('createDelegation rejeita delegar para si mesmo', async () => {
     const { svc } = makeService();
     await expect(svc.createDelegation(me, { delegateUserId: 'u1' })).rejects.toThrow('substituto');
+  });
+
+  it('getAssistantSummary gera recomendacao e registra auditoria', async () => {
+    const { svc, prisma } = makeService();
+    const result = await svc.getAssistantSummary(me);
+    expect(result.enabled).toBe(true);
+    expect(result.recommendations.length).toBeGreaterThan(0);
+    expect(prisma.myDayAssistantLog.upsert).toHaveBeenCalled();
   });
 });
