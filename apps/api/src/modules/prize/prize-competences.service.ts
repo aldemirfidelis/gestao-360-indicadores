@@ -215,22 +215,29 @@ export class PrizeCompetencesService {
       this.prisma.prizeIndicator.findMany({ where: { programId, companyId, deletedAt: null }, select: { id: true } }),
     ]);
     const indicatorIds = indicators.map((i) => i.id);
-    const [paramsCount, rangesCount] = await Promise.all([
+    const [paramsCount, rangesCount, actualsWithValue] = await Promise.all([
       indicatorIds.length
         ? this.prisma.prizeIndicatorParameter.count({
             where: { indicatorId: { in: indicatorIds }, OR: [{ competenceId }, { competenceId: null }] },
           })
         : Promise.resolve(0),
       indicatorIds.length ? this.prisma.prizeIndicatorRange.count({ where: { indicatorId: { in: indicatorIds } } }) : Promise.resolve(0),
+      this.prisma.prizeActualResult.findMany({
+        where: { competenceId, realized: { not: null } },
+        select: { indicatorId: true },
+        distinct: ['indicatorId'],
+      }),
     ]);
+    const indicatorsWithActual = actualsWithValue.length;
+    const actualsComplete = indicators.length > 0 && indicatorsWithActual >= indicators.length;
 
     const items: ChecklistItem[] = [
       { key: 'effective_annex', label: 'Anexo vigente para o programa', status: effectiveAnnex > 0 ? 'OK' : 'PENDING', blocking: true },
       { key: 'indicators', label: 'Indicadores cadastrados', status: indicators.length > 0 ? 'OK' : 'PENDING', blocking: true },
       { key: 'targets', label: 'Metas e zeros preenchidos', status: paramsCount > 0 ? 'OK' : 'PENDING', blocking: true, detail: `${paramsCount} parâmetro(s)` },
       { key: 'ranges', label: 'Faixas configuradas', status: rangesCount > 0 ? 'OK' : 'PENDING', blocking: true, detail: `${rangesCount} faixa(s)` },
-      // Itens das proximas fases (visiveis, nao bloqueantes na Fase 1)
-      { key: 'actuals', label: 'Realizados completos', status: 'PENDING', blocking: false, detail: 'Disponível na fase de Lançamento do Realizado' },
+      { key: 'actuals', label: 'Realizados completos', status: actualsComplete ? 'OK' : 'PENDING', blocking: true, detail: `${indicatorsWithActual}/${indicators.length} indicador(es) com realizado` },
+      // Itens das proximas fases (visiveis, nao bloqueantes ate serem implementados)
       { key: 'eligible_base', label: 'Base elegível importada (Apdata)', status: 'PENDING', blocking: false, detail: 'Disponível na fase de Integração Apdata' },
       { key: 'events', label: 'Eventos e moderadores conciliados', status: 'PENDING', blocking: false, detail: 'Disponível na fase de Apuração' },
       { key: 'adjustments', label: 'Ajustes manuais e exceções aprovados', status: 'PENDING', blocking: false, detail: 'Disponível na fase de Ajustes/Exceções' },

@@ -8308,6 +8308,7 @@ model PrizeCompetence {
   updatedAt          DateTime              @updatedAt
 
   parameters PrizeIndicatorParameter[]
+  actuals    PrizeActualResult[]
 
   @@unique([programId, year, month])
   @@index([companyId])
@@ -8419,6 +8420,7 @@ model PrizeIndicator {
 
   parameters PrizeIndicatorParameter[]
   ranges     PrizeIndicatorRange[]
+  actuals    PrizeActualResult[]
 
   @@unique([programId, code])
   @@index([companyId])
@@ -8493,4 +8495,67 @@ model PrizeAuditLog {
   @@index([companyId, entityType, entityId])
   @@index([companyId, createdAt])
   @@index([competenceId])
+}
+
+// =====================================================
+// Gestao de Premio - Fase 2: Lancamento do Realizado
+// =====================================================
+
+enum PrizeActualStatus {
+  NOT_STARTED
+  IN_FILLING
+  PENDING
+  IN_VALIDATION
+  PRE_CLOSE
+  CLOSED
+  REOPENED
+  CORRECTED
+}
+
+model PrizeActualResult {
+  id                String            @id @default(uuid())
+  companyId         String
+  competenceId      String
+  competence        PrizeCompetence   @relation(fields: [competenceId], references: [id], onDelete: Cascade)
+  indicatorId       String
+  indicator         PrizeIndicator    @relation(fields: [indicatorId], references: [id], onDelete: Cascade)
+  parameterId       String?
+  scopeKey          String            @default("")
+  year              Int
+  month             Int               @default(0)
+  week              Int               @default(0)
+  day               Int               @default(0)
+  realized          Decimal?          @db.Decimal(18, 4)
+  accumulated       Decimal?          @db.Decimal(18, 4)
+  source            PrizeIndicatorSource @default(MANUAL)
+  status            PrizeActualStatus @default(IN_FILLING)
+  comment           String?
+  justification     String?
+  responsibleUserId String?
+  createdById       String?
+  closedAt          DateTime?
+  closedById        String?
+  createdAt         DateTime          @default(now())
+  updatedAt         DateTime          @updatedAt
+
+  evidences PrizeActualEvidence[]
+
+  @@unique([competenceId, indicatorId, scopeKey, week, day])
+  @@index([companyId])
+  @@index([competenceId])
+  @@index([indicatorId])
+  @@index([competenceId, status])
+}
+
+model PrizeActualEvidence {
+  id            String            @id @default(uuid())
+  actualResultId String
+  actualResult  PrizeActualResult @relation(fields: [actualResultId], references: [id], onDelete: Cascade)
+  fileName      String
+  fileUrl       String?
+  note          String?
+  uploadedById  String?
+  createdAt     DateTime          @default(now())
+
+  @@index([actualResultId])
 }

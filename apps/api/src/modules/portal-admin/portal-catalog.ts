@@ -92,6 +92,8 @@ export const CATALOG_PAGES: CatalogPage[] = [
   { code: 'prize.competences', moduleCode: 'prize', name: 'Competências', title: 'Competências', route: '/gestao-premio/competencias' },
   { code: 'prize.annexes', moduleCode: 'prize', name: 'Anexos e Regras', title: 'Anexos e Regras', route: '/gestao-premio/anexos' },
   { code: 'prize.indicators', moduleCode: 'prize', name: 'Indicadores do Prêmio', title: 'Indicadores do Prêmio', route: '/gestao-premio/indicadores' },
+  { code: 'prize.actuals', moduleCode: 'prize', name: 'Lançamento do Realizado', title: 'Lançamento do Realizado', route: '/gestao-premio/realizado' },
+  { code: 'prize.previsto-realizado', moduleCode: 'prize', name: 'Previsto x Realizado', title: 'Previsto x Realizado', route: '/gestao-premio/previsto-realizado' },
   { code: 'settings.main', moduleCode: 'settings', name: 'Configurações', title: 'Configurações', route: '/settings' },
   { code: 'database-admin.main', moduleCode: 'database-admin', name: 'Administração do Banco', title: 'Banco de Dados', route: '/settings/database' },
   { code: 'portal-admin.main', moduleCode: 'portal-admin', name: 'Central do Portal', title: 'Central de Administração do Portal', route: '/settings/portal' },

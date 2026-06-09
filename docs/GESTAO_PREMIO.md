@@ -5,8 +5,32 @@
 > Fechamento → Base Elegível → Eventos → Transitoriedade → Ajustes → Exceções →
 > Cálculo → Conferência → Aprovação → Folha → Espelho → Auditoria**.
 >
-> Documento vivo. Esta versão cobre a **Fase 1 (Fundação + Governança de Anexos)**
-> entregue e validada. As fases seguintes estão no backlog residual (seção 7).
+> Documento vivo. Cobre a **Fase 1 (Fundação + Governança de Anexos)** e a
+> **Fase 2 (Lançamento do Realizado + Previsto × Realizado)**, entregues e
+> validadas. As fases seguintes estão no backlog residual (seção 7).
+
+## 0. Fase 2 — Lançamento do Realizado + Previsto × Realizado (entregue)
+
+O Gestão 360 passa a ser a **fonte oficial do realizado**.
+
+- **Banco** (aditivo): enum `PrizeActualStatus` + tabelas `PrizeActualResult` e
+  `PrizeActualEvidence`. Migração `20260609180000_prize_actuals`. Realizado é
+  único por `(competência, indicador, escopo, semana, dia)`.
+- **Lançamento do Realizado** (`/gestao-premio/realizado`): grade editável por
+  indicador/competência, salvamento em lote, validações (competência travada,
+  indicador inativo, alteração de realizado em validação exige justificativa),
+  status do realizado (`IN_FILLING → PENDING → IN_VALIDATION → PRE_CLOSE → CLOSED
+  → REOPENED → CORRECTED`), **fechamento do realizado** (trava) e **reabertura
+  controlada** (alçada `prize:actuals:close` + justificativa). Evidências por
+  lançamento (API).
+- **Previsto × Realizado** (`/gestao-premio/previsto-realizado`): por competência,
+  compara meta/zero × realizado e calcula **desvio, % de atingimento e faixa
+  alcançada** (helper puro `evaluateActual`, testado). Resumo (com realizado /
+  sem realizado / fora da meta) e atalhos para Análise de Causa e Plano de Ação.
+- **Checklist de fechamento** da competência agora valida **realizado completo**
+  (item impeditivo real: nº de indicadores com realizado).
+- **Testes**: `prize-evaluation.spec.ts` (6 casos de atingimento/faixa). Suíte
+  total **257 verdes**.
 
 ---
 
@@ -196,11 +220,12 @@ justificativa.
 ### Parcialmente concluído / fundação pronta
 - Dashboard com drill-down completo e gráficos (cards prontos; gráficos pendentes).
 - Wizard de criação de anexo em 12 passos (CRUD/governança pronta; wizard pendente).
+- Realizado: lançamento manual + grade prontos; **importação em massa (XLSX/CSV)**
+  e UI de evidências pendentes (API de evidência já existe).
+- Tendência e impacto financeiro no Previsto × Realizado (dependem de histórico e
+  do Motor de Cálculo da Fase 4).
 
 ### Próximas fases (não iniciadas)
-- **Fase 2 — Realizado**: lançamento manual + importação em massa, validações,
-  status, fechamento e reabertura do realizado; Previsto x Realizado + integração
-  com Planos de Ação/Análise de Causa.
 - **Fase 3 — Base elegível (Apdata)**: conector configurável, snapshot imutável
   por competência, conciliação de divergências.
 - **Fase 4 — Motor de cálculo**: 20 etapas, memória de cálculo auditável,
