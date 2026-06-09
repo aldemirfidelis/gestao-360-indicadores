@@ -577,6 +577,8 @@ model Company {
   workPeriods            WorkPeriod[]
   closedMonths           ClosedMonth[]
   conversations          Conversation[]
+  userDelegations        UserDelegation[]          @relation("UserDelegationCompany")
+  workItemFollows        WorkItemFollow[]          @relation("WorkItemFollowCompany")
 
   relationshipLinks      RelationshipLink[]           @relation("RelationshipCompany")
   impactAnalyses         ImpactAnalysis[]             @relation("ImpactAnalysisCompany")
@@ -805,6 +807,9 @@ model User {
   integrationPreferences     UserIntegrationPreference[]
   presence                   UserPresence?
   notificationPreference     NotificationPreference?
+  delegationsGiven           UserDelegation[] @relation("UserDelegationDelegator")
+  delegationsReceived        UserDelegation[] @relation("UserDelegationDelegate")
+  workItemFollows            WorkItemFollow[] @relation("WorkItemFollowUser")
 
   relationshipLinksCreated RelationshipLink[]     @relation("RelationshipCreatedBy")
   impactAnalysesCreated    ImpactAnalysis[]       @relation("ImpactAnalysisCreatedBy")
@@ -8064,4 +8069,55 @@ model UserDashboardPreference {
 
   @@unique([companyId, userId])
   @@index([userId])
+}
+
+/// Substituicao temporaria: permite que outro usuario trate itens do Meu Dia
+/// do delegante durante um periodo. Nao altera a fonte oficial dos registros.
+model UserDelegation {
+  id              String   @id @default(uuid())
+  companyId       String
+  company         Company  @relation("UserDelegationCompany", fields: [companyId], references: [id], onDelete: Cascade)
+  delegatorUserId String
+  delegator       User     @relation("UserDelegationDelegator", fields: [delegatorUserId], references: [id], onDelete: Cascade)
+  delegateUserId  String
+  delegate        User     @relation("UserDelegationDelegate", fields: [delegateUserId], references: [id], onDelete: Cascade)
+  startsAt        DateTime
+  endsAt          DateTime?
+  scope           Json?
+  reason          String?
+  status          String   @default("ACTIVE")
+  createdById     String?
+  revokedAt       DateTime?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  @@unique([companyId, delegatorUserId, delegateUserId, startsAt])
+  @@index([companyId, delegatorUserId, status])
+  @@index([companyId, delegateUserId, status])
+  @@index([startsAt, endsAt])
+}
+
+/// Acompanhamento pessoal de um item da Central. Referencia a origem real
+/// (sourceEntityType/sourceEntityId/itemType) para sobreviver a rebuilds.
+model WorkItemFollow {
+  id               String   @id @default(uuid())
+  companyId        String
+  company          Company  @relation("WorkItemFollowCompany", fields: [companyId], references: [id], onDelete: Cascade)
+  userId           String
+  user             User     @relation("WorkItemFollowUser", fields: [userId], references: [id], onDelete: Cascade)
+  sourceModule     String
+  sourceEntityType String
+  sourceEntityId   String
+  itemType         String
+  titleSnapshot    String?
+  pinned           Boolean  @default(false)
+  note             String?
+  followedAt       DateTime @default(now())
+  pinnedAt         DateTime?
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+
+  @@unique([companyId, userId, sourceEntityType, sourceEntityId, itemType])
+  @@index([companyId, userId, pinned])
+  @@index([sourceEntityType, sourceEntityId])
 }

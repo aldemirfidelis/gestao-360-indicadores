@@ -5,8 +5,8 @@ import { useRouter } from 'next/navigation';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
 import {
-  AlertTriangle, AtSign, Bookmark, CalendarDays, CheckCircle2, CheckSquare, Columns3, FileText, FileWarning,
-  Inbox, LayoutList, MessageSquare, Plus, RefreshCw, Search, ShieldAlert, SlidersHorizontal, Table2, Target, Stamp, Users, Workflow,
+  AlertTriangle, AtSign, Bookmark, CalendarDays, CheckCircle2, CheckSquare, Clock3, Columns3, FileText, FileWarning,
+  Inbox, LayoutList, MessageSquare, Pin, Plus, RefreshCw, Search, ShieldAlert, SlidersHorizontal, Table2, Target, Stamp, UserPlus, Users, Workflow,
 } from 'lucide-react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -41,6 +41,13 @@ interface WorkItem {
   isBlocking?: boolean;
   recommendedAction?: string | null;
   availableActions?: Array<{ key: string; label: string; kind?: string; inline?: boolean; requiresJustification?: boolean; href?: string | null }> | null;
+  contextData?: { delegatedFromName?: string; delegationReason?: string } | null;
+  isDelegated?: boolean;
+  delegatedFromUserId?: string | null;
+  isFollowed?: boolean;
+  isPinned?: boolean;
+  followedAt?: string | null;
+  pinnedAt?: string | null;
 }
 interface Summary {
   pending: number; overdue: number; dueToday: number; approvals: number;
@@ -82,6 +89,18 @@ const TABS = [
   { key: 'upcoming', label: 'Próximos prazos' },
 ];
 
+const EXTRA_TABS = [
+  { key: 'delegated', label: 'Delegados' },
+  { key: 'following', label: 'Acompanhando' },
+  { key: 'pinned', label: 'Fixados' },
+];
+
+interface DelegationPayload {
+  given: Array<{ id: string; status: string; startsAt: string; endsAt?: string | null; reason?: string | null; delegate: { id: string; name: string; email: string } }>;
+  received: Array<{ id: string; status: string; startsAt: string; endsAt?: string | null; reason?: string | null; delegator: { id: string; name: string; email: string } }>;
+  users: Array<{ id: string; name: string; email: string; jobTitle?: string | null }>;
+}
+
 function greeting() {
   const h = new Date().getHours();
   if (h < 12) return 'Bom dia';
@@ -99,11 +118,12 @@ export default function MeuDiaPage() {
   const [typeFilter, setTypeFilter] = useState<string | null>(null);
   const [q, setQ] = useState('');
   const [actOn, setActOn] = useState<WorkItem | null>(null);
-  const [view, setView] = useState<'list' | 'table' | 'kanban'>('list');
+  const [view, setView] = useState<'list' | 'table' | 'kanban' | 'calendar' | 'timeline'>('list');
   const [compact, setCompact] = useState(false);
   const [hiddenCards, setHiddenCards] = useState<string[]>([]);
   const [prefsOpen, setPrefsOpen] = useState(false);
   const [saveOpen, setSaveOpen] = useState(false);
+  const [delegationsOpen, setDelegationsOpen] = useState(false);
   const prefsInit = useRef(false);
 
   const overview = useQuery<{ summary: Summary; isManager: boolean }>({ queryKey: ['my-day', 'overview'], queryFn: () => api('/my-day') });
@@ -119,11 +139,12 @@ export default function MeuDiaPage() {
 
   const prefs = useQuery<any>({ queryKey: ['my-day', 'preferences'], queryFn: () => api('/my-day/preferences') });
   const savedFilters = useQuery<any[]>({ queryKey: ['my-day', 'saved-filters'], queryFn: () => api('/my-day/saved-filters') });
+  const delegations = useQuery<DelegationPayload>({ queryKey: ['my-day', 'delegations'], queryFn: () => api('/my-day/delegations'), enabled: delegationsOpen });
 
   useEffect(() => {
     if (prefsInit.current || !prefs.data) return;
     prefsInit.current = true;
-    if (prefs.data.defaultView === 'table' || prefs.data.defaultView === 'kanban' || prefs.data.defaultView === 'list') setView(prefs.data.defaultView);
+    if (['table', 'kanban', 'list', 'calendar', 'timeline'].includes(prefs.data.defaultView)) setView(prefs.data.defaultView);
     if (prefs.data.compactMode) setCompact(true);
     const hidden = prefs.data.visibleWidgets?.hidden;
     if (Array.isArray(hidden)) setHiddenCards(hidden);
@@ -141,6 +162,26 @@ export default function MeuDiaPage() {
     mutationFn: (id: string) => api(`/my-day/saved-filters/${id}`, { method: 'DELETE' }),
     onSuccess: () => void qc.invalidateQueries({ queryKey: ['my-day', 'saved-filters'] }),
   });
+  const followMut = useMutation({
+    mutationFn: ({ id, pinned }: { id: string; pinned: boolean }) => api(`/my-day/items/${id}/follow`, { method: 'POST', json: { pinned } }),
+    onSuccess: () => { invalidate(); toast.success('Acompanhamento atualizado'); },
+    onError: (e: any) => toast.error(e?.message ?? 'Falha ao acompanhar item'),
+  });
+  const unfollowMut = useMutation({
+    mutationFn: (id: string) => api(`/my-day/items/${id}/follow`, { method: 'DELETE' }),
+    onSuccess: () => { invalidate(); toast.success('Item removido do acompanhamento'); },
+    onError: (e: any) => toast.error(e?.message ?? 'Falha ao remover acompanhamento'),
+  });
+  const createDelegation = useMutation({
+    mutationFn: (body: any) => api('/my-day/delegations', { method: 'POST', json: body }),
+    onSuccess: () => { void qc.invalidateQueries({ queryKey: ['my-day', 'delegations'] }); toast.success('Delegacao criada'); },
+    onError: (e: any) => toast.error(e?.message ?? 'Falha ao criar delegacao'),
+  });
+  const revokeDelegation = useMutation({
+    mutationFn: (id: string) => api(`/my-day/delegations/${id}`, { method: 'DELETE' }),
+    onSuccess: () => { void qc.invalidateQueries({ queryKey: ['my-day', 'delegations'] }); invalidate(); toast.success('Delegacao encerrada'); },
+    onError: (e: any) => toast.error(e?.message ?? 'Falha ao encerrar delegacao'),
+  });
 
   function applyFilter(f: any) {
     if (f.view) setView(f.view);
@@ -150,6 +191,13 @@ export default function MeuDiaPage() {
   }
 
   function invalidate() { void qc.invalidateQueries({ queryKey: ['my-day'] }); }
+  function toggleFollow(it: WorkItem) {
+    if (it.isFollowed && !it.isPinned) unfollowMut.mutate(it.id);
+    else followMut.mutate({ id: it.id, pinned: false });
+  }
+  function togglePin(it: WorkItem) {
+    followMut.mutate({ id: it.id, pinned: !it.isPinned });
+  }
   function openItem(it: WorkItem) {
     const href = it.availableActions?.find((a) => a.key === 'open')?.href;
     if (href) router.push(href);
@@ -212,6 +260,9 @@ export default function MeuDiaPage() {
               <Users className="mr-2 h-4 w-4" />Equipe
             </Button>
           )}
+          <Button variant="outline" size="sm" onClick={() => setDelegationsOpen(true)}>
+            <UserPlus className="mr-2 h-4 w-4" />Delegacoes
+          </Button>
           <Button variant="outline" size="sm" onClick={() => refresh.mutate()} disabled={refresh.isPending}>
             <RefreshCw className={cn('mr-2 h-4 w-4', refresh.isPending && 'animate-spin')} />Atualizar
           </Button>
@@ -231,7 +282,7 @@ export default function MeuDiaPage() {
 
       {/* Abas */}
       <div className="flex flex-wrap gap-1 border-b">
-        {TABS.map((t) => (
+        {[...TABS, ...EXTRA_TABS].map((t) => (
           <button key={t.key} type="button"
             onClick={() => { setTab(t.key); setTypeFilter(null); }}
             className={cn('px-3 py-2 text-sm font-medium transition-colors',
@@ -250,7 +301,7 @@ export default function MeuDiaPage() {
       {/* Toolbar: visualização + filtros salvos + personalizar */}
       <div className="flex flex-wrap items-center gap-2">
         <div className="inline-flex rounded-md border p-0.5">
-          {([['list', LayoutList, 'Lista'], ['table', Table2, 'Tabela'], ['kanban', Columns3, 'Kanban']] as const).map(([v, Ic, lbl]) => (
+          {([['list', LayoutList, 'Lista'], ['table', Table2, 'Tabela'], ['kanban', Columns3, 'Kanban'], ['calendar', CalendarDays, 'Calendario'], ['timeline', Clock3, 'Timeline']] as const).map(([v, Ic, lbl]) => (
             <button key={v} type="button" onClick={() => setView(v)}
               className={cn('inline-flex items-center gap-1 rounded px-2 py-1 text-xs', view === v ? 'bg-primary text-primary-foreground' : 'text-muted-foreground hover:text-foreground')}>
               <Ic className="h-3.5 w-3.5" />{lbl}
@@ -278,9 +329,13 @@ export default function MeuDiaPage() {
             <p className="mx-auto mt-1 max-w-md text-sm text-muted-foreground">Nenhum item para esta visão. Aproveite para adiantar outras frentes.</p>
           </CardContent></Card>
         ) : view === 'table' ? (
-          <ItemsTable rows={rows} onAct={setActOn} />
+          <ItemsTable rows={rows} onAct={setActOn} onFollow={toggleFollow} onPin={togglePin} />
         ) : view === 'kanban' ? (
-          <ItemsKanban rows={rows} onAct={setActOn} />
+          <ItemsKanban rows={rows} onAct={setActOn} onFollow={toggleFollow} onPin={togglePin} />
+        ) : view === 'calendar' ? (
+          <ItemsCalendar rows={rows} onAct={setActOn} onFollow={toggleFollow} onPin={togglePin} />
+        ) : view === 'timeline' ? (
+          <ItemsTimeline rows={rows} onAct={setActOn} onFollow={toggleFollow} onPin={togglePin} />
         ) : (
           rows.map((it) => {
             const meta = TYPE_META[it.itemType] ?? { label: it.itemType, icon: Inbox };
@@ -295,6 +350,8 @@ export default function MeuDiaPage() {
                       <span className={cn('rounded px-1.5 py-0.5 text-[11px] font-medium', prio.cls)}>{prio.label}</span>
                       <span className="text-[11px] uppercase tracking-wide text-muted-foreground">{meta.label}</span>
                       {it.overdueDays > 0 && <Badge variant="outline" className="border-rose-300 text-rose-600">Atrasado {it.overdueDays}d</Badge>}
+                      {it.isDelegated && <Badge variant="outline">Delegado por {it.contextData?.delegatedFromName ?? 'usuario'}</Badge>}
+                      {it.isPinned && <Badge variant="outline">Fixado</Badge>}
                       {it.dueAt && it.overdueDays === 0 && <span className="text-xs text-muted-foreground">vence {formatDate(it.dueAt)}</span>}
                     </div>
                     <div className="mt-1 truncate font-medium">{it.title}</div>
@@ -305,6 +362,14 @@ export default function MeuDiaPage() {
                     {it.priorityReason && <div className="mt-0.5 text-[11px] text-muted-foreground">{it.priorityReason}</div>}
                   </div>
                   <div className="flex shrink-0 flex-col gap-1.5">
+                    <div className="flex gap-1">
+                      <Button size="sm" variant={it.isFollowed ? 'secondary' : 'outline'} onClick={() => toggleFollow(it)} title="Acompanhar">
+                        <Bookmark className="h-4 w-4" />
+                      </Button>
+                      <Button size="sm" variant={it.isPinned ? 'secondary' : 'outline'} onClick={() => togglePin(it)} title="Fixar">
+                        <Pin className="h-4 w-4" />
+                      </Button>
+                    </div>
                     <Button size="sm" onClick={() => setActOn(it)}>Agir agora</Button>
                     {VISION360_TYPE[it.sourceEntityType] && (
                       <Button size="sm" variant="outline" onClick={() => openVision(it)}>Visão 360°</Button>
@@ -339,6 +404,17 @@ export default function MeuDiaPage() {
           onDelete={(id) => delFilter.mutate(id)}
           onClose={() => setSaveOpen(false)}
           onSave={(name) => addFilter.mutate({ name, view, tab, itemType: typeFilter, q })}
+        />
+      )}
+      {delegationsOpen && (
+        <DelegationsDialog
+          data={delegations.data}
+          loading={delegations.isPending}
+          creating={createDelegation.isPending}
+          revoking={revokeDelegation.isPending}
+          onClose={() => setDelegationsOpen(false)}
+          onCreate={(body) => createDelegation.mutate(body)}
+          onRevoke={(id) => revokeDelegation.mutate(id)}
         />
       )}
       {actOn && (
@@ -416,7 +492,7 @@ function ActNowDialog({ item, onClose, onDone, onOpen, onVision }: {
   );
 }
 
-function ItemsTable({ rows, onAct }: { rows: WorkItem[]; onAct: (it: WorkItem) => void }) {
+function ItemsTable({ rows, onAct, onFollow, onPin }: { rows: WorkItem[]; onAct: (it: WorkItem) => void; onFollow: (it: WorkItem) => void; onPin: (it: WorkItem) => void }) {
   return (
     <div className="overflow-x-auto rounded-lg border">
       <table className="w-full text-sm">
@@ -439,7 +515,13 @@ function ItemsTable({ rows, onAct }: { rows: WorkItem[]; onAct: (it: WorkItem) =
                 <td className="px-3 py-2 text-xs text-muted-foreground">{meta.label}</td>
                 <td className="px-3 py-2"><div className="font-medium">{it.title}</div>{it.summary && <div className="text-xs text-muted-foreground">{it.summary}</div>}</td>
                 <td className="px-3 py-2 text-xs">{it.overdueDays > 0 ? <span className="text-rose-600">atrasado {it.overdueDays}d</span> : it.dueAt ? formatDate(it.dueAt) : '—'}</td>
-                <td className="px-3 py-2 text-right"><Button size="sm" onClick={() => onAct(it)}>Agir</Button></td>
+                <td className="px-3 py-2 text-right">
+                  <div className="inline-flex items-center gap-1">
+                    <Button size="sm" variant={it.isFollowed ? 'secondary' : 'outline'} onClick={() => onFollow(it)}><Bookmark className="h-4 w-4" /></Button>
+                    <Button size="sm" variant={it.isPinned ? 'secondary' : 'outline'} onClick={() => onPin(it)}><Pin className="h-4 w-4" /></Button>
+                    <Button size="sm" onClick={() => onAct(it)}>Agir</Button>
+                  </div>
+                </td>
               </tr>
             );
           })}
@@ -461,7 +543,7 @@ function laneOf(it: WorkItem): string {
   if (it.status === 'IN_PROGRESS') return 'progress';
   return 'new';
 }
-function ItemsKanban({ rows, onAct }: { rows: WorkItem[]; onAct: (it: WorkItem) => void }) {
+function ItemsKanban({ rows, onAct, onFollow, onPin }: { rows: WorkItem[]; onAct: (it: WorkItem) => void; onFollow: (it: WorkItem) => void; onPin: (it: WorkItem) => void }) {
   return (
     <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
       {KANBAN_LANES.map((lane) => {
@@ -475,7 +557,7 @@ function ItemsKanban({ rows, onAct }: { rows: WorkItem[]; onAct: (it: WorkItem) 
               {items.map((it) => {
                 const prio = PRIORITY_META[it.priority] ?? PRIORITY_META.MEDIUM;
                 return (
-                  <button key={it.id} type="button" onClick={() => onAct(it)}
+                  <div key={it.id}
                     className={cn('w-full rounded-md border bg-card p-2 text-left hover:border-primary/40', it.overdueDays > 0 && 'border-l-2 border-l-rose-400')}>
                     <div className="flex items-center gap-1.5">
                       <span className={cn('rounded px-1 py-0.5 text-[10px] font-medium', prio.cls)}>{prio.label}</span>
@@ -483,7 +565,12 @@ function ItemsKanban({ rows, onAct }: { rows: WorkItem[]; onAct: (it: WorkItem) 
                     </div>
                     <div className="mt-1 line-clamp-2 text-xs font-medium">{it.title}</div>
                     {it.overdueDays > 0 && <div className="mt-0.5 text-[10px] text-rose-600">atrasado {it.overdueDays}d</div>}
-                  </button>
+                    <div className="mt-2 flex items-center gap-1">
+                      <Button size="sm" variant={it.isFollowed ? 'secondary' : 'outline'} onClick={() => onFollow(it)}><Bookmark className="h-3.5 w-3.5" /></Button>
+                      <Button size="sm" variant={it.isPinned ? 'secondary' : 'outline'} onClick={() => onPin(it)}><Pin className="h-3.5 w-3.5" /></Button>
+                      <Button size="sm" className="ml-auto" onClick={() => onAct(it)}>Agir</Button>
+                    </div>
+                  </div>
                 );
               })}
               {items.length === 0 && <div className="px-1 py-4 text-center text-[11px] text-muted-foreground">—</div>}
@@ -495,12 +582,161 @@ function ItemsKanban({ rows, onAct }: { rows: WorkItem[]; onAct: (it: WorkItem) 
   );
 }
 
+function dayKey(value?: string | null) {
+  if (!value) return 'Sem prazo';
+  const d = new Date(value);
+  if (Number.isNaN(d.getTime())) return 'Sem prazo';
+  return d.toISOString().slice(0, 10);
+}
+
+function ItemsCalendar({ rows, onAct, onFollow, onPin }: { rows: WorkItem[]; onAct: (it: WorkItem) => void; onFollow: (it: WorkItem) => void; onPin: (it: WorkItem) => void }) {
+  const groups = useMemo(() => {
+    const map = new Map<string, WorkItem[]>();
+    for (const row of rows) {
+      const key = dayKey(row.dueAt);
+      map.set(key, [...(map.get(key) ?? []), row]);
+    }
+    return [...map.entries()].sort(([a], [b]) => (a === 'Sem prazo' ? 1 : b === 'Sem prazo' ? -1 : a.localeCompare(b)));
+  }, [rows]);
+  return (
+    <div className="grid gap-3 lg:grid-cols-2">
+      {groups.map(([key, items]) => (
+        <Card key={key}>
+          <CardContent className="p-3">
+            <div className="mb-2 flex items-center justify-between text-sm font-semibold">
+              <span>{key === 'Sem prazo' ? key : formatDate(key)}</span>
+              <span className="text-xs text-muted-foreground">{items.length} item(ns)</span>
+            </div>
+            <div className="space-y-2">
+              {items.map((it) => <MiniWorkItem key={it.id} item={it} onAct={onAct} onFollow={onFollow} onPin={onPin} />)}
+            </div>
+          </CardContent>
+        </Card>
+      ))}
+    </div>
+  );
+}
+
+function ItemsTimeline({ rows, onAct, onFollow, onPin }: { rows: WorkItem[]; onAct: (it: WorkItem) => void; onFollow: (it: WorkItem) => void; onPin: (it: WorkItem) => void }) {
+  const ordered = [...rows].sort((a, b) => {
+    const da = a.dueAt ? new Date(a.dueAt).getTime() : Number.MAX_SAFE_INTEGER;
+    const db = b.dueAt ? new Date(b.dueAt).getTime() : Number.MAX_SAFE_INTEGER;
+    return da - db || b.overdueDays - a.overdueDays;
+  });
+  return (
+    <div className="space-y-2">
+      {ordered.map((it) => (
+        <div key={it.id} className="grid gap-3 rounded-lg border bg-card p-3 sm:grid-cols-[140px_1fr]">
+          <div className="text-xs text-muted-foreground">
+            {it.overdueDays > 0 ? <span className="font-medium text-rose-600">Atrasado {it.overdueDays}d</span> : it.dueAt ? formatDate(it.dueAt) : 'Sem prazo'}
+          </div>
+          <MiniWorkItem item={it} onAct={onAct} onFollow={onFollow} onPin={onPin} unframed />
+        </div>
+      ))}
+    </div>
+  );
+}
+
+function MiniWorkItem({ item, onAct, onFollow, onPin, unframed }: { item: WorkItem; onAct: (it: WorkItem) => void; onFollow: (it: WorkItem) => void; onPin: (it: WorkItem) => void; unframed?: boolean }) {
+  const prio = PRIORITY_META[item.priority] ?? PRIORITY_META.MEDIUM;
+  return (
+    <div className={cn(!unframed && 'rounded-md border p-2')}>
+      <div className="flex flex-wrap items-center gap-1.5">
+        <span className={cn('rounded px-1.5 py-0.5 text-[11px] font-medium', prio.cls)}>{prio.label}</span>
+        <span className="text-[11px] uppercase text-muted-foreground">{TYPE_META[item.itemType]?.label ?? item.itemType}</span>
+        {item.isDelegated && <Badge variant="outline">Delegado</Badge>}
+        {item.isPinned && <Badge variant="outline">Fixado</Badge>}
+      </div>
+      <div className="mt-1 text-sm font-medium">{item.title}</div>
+      {item.summary && <div className="text-xs text-muted-foreground">{item.summary}</div>}
+      <div className="mt-2 flex flex-wrap gap-1">
+        <Button size="sm" variant={item.isFollowed ? 'secondary' : 'outline'} onClick={() => onFollow(item)}><Bookmark className="h-4 w-4" /></Button>
+        <Button size="sm" variant={item.isPinned ? 'secondary' : 'outline'} onClick={() => onPin(item)}><Pin className="h-4 w-4" /></Button>
+        <Button size="sm" onClick={() => onAct(item)}>Agir</Button>
+      </div>
+    </div>
+  );
+}
+
+function DelegationsDialog({ data, loading, creating, revoking, onClose, onCreate, onRevoke }: {
+  data?: DelegationPayload;
+  loading: boolean;
+  creating: boolean;
+  revoking: boolean;
+  onClose: () => void;
+  onCreate: (body: any) => void;
+  onRevoke: (id: string) => void;
+}) {
+  const [delegateUserId, setDelegateUserId] = useState('');
+  const [startsAt, setStartsAt] = useState(() => new Date().toISOString().slice(0, 16));
+  const [endsAt, setEndsAt] = useState('');
+  const [reason, setReason] = useState('');
+  const users = data?.users ?? [];
+  return (
+    <Dialog open onOpenChange={(o) => !o && onClose()}>
+      <DialogContent className="max-w-3xl">
+        <DialogHeader><DialogTitle>Delegacoes e substituicoes</DialogTitle></DialogHeader>
+        {loading ? (
+          <div className="h-32 animate-pulse rounded-md bg-muted/40" />
+        ) : (
+          <div className="grid gap-4 lg:grid-cols-2">
+            <div className="space-y-3">
+              <div className="text-sm font-semibold">Delegar meus itens</div>
+              <div>
+                <Label>Substituto</Label>
+                <NativeSelect value={delegateUserId} onChange={(e) => setDelegateUserId(e.target.value)}>
+                  <option value="">Selecione...</option>
+                  {users.map((u) => <option key={u.id} value={u.id}>{u.name} - {u.email}</option>)}
+                </NativeSelect>
+              </div>
+              <div className="grid grid-cols-2 gap-2">
+                <div><Label>Inicio</Label><Input type="datetime-local" value={startsAt} onChange={(e) => setStartsAt(e.target.value)} /></div>
+                <div><Label>Fim</Label><Input type="datetime-local" value={endsAt} onChange={(e) => setEndsAt(e.target.value)} /></div>
+              </div>
+              <div><Label>Motivo</Label><Textarea rows={3} value={reason} onChange={(e) => setReason(e.target.value)} placeholder="Ferias, ausencia, cobertura operacional..." /></div>
+              <Button disabled={!delegateUserId || creating} onClick={() => onCreate({ delegateUserId, startsAt, endsAt: endsAt || null, reason })}>Criar delegacao</Button>
+            </div>
+            <div className="space-y-3">
+              <div>
+                <div className="text-sm font-semibold">Minhas delegacoes</div>
+                <div className="mt-2 space-y-2">
+                  {(data?.given ?? []).length === 0 ? <p className="text-xs text-muted-foreground">Nenhuma delegacao criada.</p> : data!.given.map((d) => (
+                    <div key={d.id} className="rounded-md border p-2 text-sm">
+                      <div className="font-medium">{d.delegate.name}</div>
+                      <div className="text-xs text-muted-foreground">{formatDate(d.startsAt)} ate {d.endsAt ? formatDate(d.endsAt) : 'sem fim'} - {d.status}</div>
+                      {d.reason && <div className="mt-1 text-xs">{d.reason}</div>}
+                      {d.status === 'ACTIVE' && <Button size="sm" variant="outline" className="mt-2" disabled={revoking} onClick={() => onRevoke(d.id)}>Encerrar</Button>}
+                    </div>
+                  ))}
+                </div>
+              </div>
+              <div>
+                <div className="text-sm font-semibold">Recebidas</div>
+                <div className="mt-2 space-y-2">
+                  {(data?.received ?? []).length === 0 ? <p className="text-xs text-muted-foreground">Nenhuma substituicao recebida.</p> : data!.received.map((d) => (
+                    <div key={d.id} className="rounded-md border p-2 text-sm">
+                      <div className="font-medium">{d.delegator.name}</div>
+                      <div className="text-xs text-muted-foreground">{formatDate(d.startsAt)} ate {d.endsAt ? formatDate(d.endsAt) : 'sem fim'} - {d.status}</div>
+                      {d.reason && <div className="mt-1 text-xs">{d.reason}</div>}
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+        <DialogFooter><Button variant="ghost" onClick={onClose}>Fechar</Button></DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
 function PersonalizeDialog({ initial, cards, saving, onClose, onSave }: {
-  initial: { view: 'list' | 'table' | 'kanban'; compact: boolean; hiddenCards: string[]; landingPage: string };
+  initial: { view: 'list' | 'table' | 'kanban' | 'calendar' | 'timeline'; compact: boolean; hiddenCards: string[]; landingPage: string };
   cards: Array<{ key: string; label: string }>;
   saving: boolean;
   onClose: () => void;
-  onSave: (p: { view: 'list' | 'table' | 'kanban'; compact: boolean; hiddenCards: string[]; landingPage: string }) => void;
+  onSave: (p: { view: 'list' | 'table' | 'kanban' | 'calendar' | 'timeline'; compact: boolean; hiddenCards: string[]; landingPage: string }) => void;
 }) {
   const [view, setView] = useState(initial.view);
   const [compact, setCompact] = useState(initial.compact);
@@ -516,7 +752,7 @@ function PersonalizeDialog({ initial, cards, saving, onClose, onSave }: {
             <div>
               <Label>Visualização padrão</Label>
               <NativeSelect value={view} onChange={(e) => setView(e.target.value as any)}>
-                <option value="list">Lista</option><option value="table">Tabela</option><option value="kanban">Kanban</option>
+                <option value="list">Lista</option><option value="table">Tabela</option><option value="kanban">Kanban</option><option value="calendar">Calendario</option><option value="timeline">Timeline</option>
               </NativeSelect>
             </div>
             <div>

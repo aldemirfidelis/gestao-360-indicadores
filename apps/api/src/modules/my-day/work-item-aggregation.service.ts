@@ -27,6 +27,8 @@ interface WorkItemDraft {
   requiresEvidence?: boolean;
   isBlocking?: boolean;
   isExternal?: boolean;
+  isDelegated?: boolean;
+  delegatedFromUserId?: string | null;
   recommendedAction?: string | null;
   availableActions: WorkItemAction[];
   context?: Record<string, unknown> | null;
@@ -63,19 +65,30 @@ export class WorkItemAggregationService {
     const companyId = me.companyId;
     const now = new Date();
 
-    const drafts = (
-      await Promise.all([
-        this.collectActions(me).catch((e) => this.warn('actions', e)),
-        this.collectWorkflowTasks(me).catch((e) => this.warn('workflow-tasks', e)),
-        this.collectApprovals(me).catch((e) => this.warn('approvals', e)),
-        this.collectMeetingsToday(me).catch((e) => this.warn('meetings', e)),
-        this.collectDocuments(me).catch((e) => this.warn('documents', e)),
-        this.collectRisks(me).catch((e) => this.warn('risks', e)),
-        this.collectNonConformities(me).catch((e) => this.warn('nonconformities', e)),
-        this.collectIndicatorsOffTarget(me).catch((e) => this.warn('indicators', e)),
-        this.collectNotifications(me).catch((e) => this.warn('notifications', e)),
-      ])
-    ).flat();
+    const drafts = await this.collectSources(me);
+    const delegations = await this.activeDelegations(me, now);
+    for (const delegation of delegations) {
+      const delegated = await this.collectSources({
+        sub: delegation.delegatorUserId,
+        companyId,
+        email: delegation.delegator.email,
+        name: delegation.delegator.name,
+        role: delegation.delegator.role as any,
+      });
+      drafts.push(...delegated.map((d) => ({
+        ...d,
+        assignedUserId: me.sub,
+        isDelegated: true,
+        delegatedFromUserId: delegation.delegatorUserId,
+        context: {
+          ...(d.context ?? {}),
+          delegationId: delegation.id,
+          delegatedFromUserId: delegation.delegatorUserId,
+          delegatedFromName: delegation.delegator.name,
+          delegationReason: delegation.reason,
+        },
+      })));
+    }
 
     const seenKeys: string[] = [];
     for (const d of drafts) {
@@ -119,6 +132,8 @@ export class WorkItemAggregationService {
         requiresEvidence: !!d.requiresEvidence,
         isBlocking: !!d.isBlocking,
         isExternal: !!d.isExternal,
+        isDelegated: !!d.isDelegated,
+        delegatedFromUserId: d.delegatedFromUserId ?? null,
         sourceCreatedAt: d.sourceCreatedAt ?? null,
         sourceUpdatedAt: d.sourceUpdatedAt ?? null,
         refreshedAt: now,
@@ -136,6 +151,40 @@ export class WorkItemAggregationService {
     });
 
     return drafts.length;
+  }
+
+  private async collectSources(me: AuthPayload): Promise<WorkItemDraft[]> {
+    return (
+      await Promise.all([
+        this.collectActions(me).catch((e) => this.warn('actions', e)),
+        this.collectWorkflowTasks(me).catch((e) => this.warn('workflow-tasks', e)),
+        this.collectApprovals(me).catch((e) => this.warn('approvals', e)),
+        this.collectMeetingsToday(me).catch((e) => this.warn('meetings', e)),
+        this.collectDocuments(me).catch((e) => this.warn('documents', e)),
+        this.collectRisks(me).catch((e) => this.warn('risks', e)),
+        this.collectNonConformities(me).catch((e) => this.warn('nonconformities', e)),
+        this.collectIndicatorsOffTarget(me).catch((e) => this.warn('indicators', e)),
+        this.collectNotifications(me).catch((e) => this.warn('notifications', e)),
+      ])
+    ).flat();
+  }
+
+  private async activeDelegations(me: AuthPayload, now: Date) {
+    return this.prisma.userDelegation.findMany({
+      where: {
+        companyId: me.companyId,
+        delegateUserId: me.sub,
+        status: 'ACTIVE',
+        startsAt: { lte: now },
+        OR: [{ endsAt: null }, { endsAt: { gte: now } }],
+      },
+      select: {
+        id: true,
+        delegatorUserId: true,
+        reason: true,
+        delegator: { select: { id: true, name: true, email: true, role: true } },
+      },
+    });
   }
 
   /** Reconstroi a fatia de um usuario arbitrario (bus de eventos / visao de equipe). */

@@ -67,6 +67,36 @@ export class MyDayController {
     return this.service.executeAction(me, id, body);
   }
 
+  @Post('items/:id/follow')
+  followItem(@CurrentUser() me: AuthPayload, @Param('id') id: string, @Body() body: Record<string, any>) {
+    return this.service.followItem(me, id, body);
+  }
+
+  @Delete('items/:id/follow')
+  unfollowItem(@CurrentUser() me: AuthPayload, @Param('id') id: string) {
+    return this.service.unfollowItem(me, id);
+  }
+
+  @Get('follows')
+  follows(@CurrentUser() me: AuthPayload) {
+    return this.service.listFollows(me);
+  }
+
+  @Get('delegations')
+  delegations(@CurrentUser() me: AuthPayload) {
+    return this.service.listDelegations(me);
+  }
+
+  @Post('delegations')
+  createDelegation(@CurrentUser() me: AuthPayload, @Body() body: Record<string, any>) {
+    return this.service.createDelegation(me, body);
+  }
+
+  @Delete('delegations/:id')
+  revokeDelegation(@CurrentUser() me: AuthPayload, @Param('id') id: string) {
+    return this.service.revokeDelegation(me, id);
+  }
+
   @Post('refresh')
   async refresh(@CurrentUser() me: AuthPayload) {
     await this.service.ensureFresh(me, true);

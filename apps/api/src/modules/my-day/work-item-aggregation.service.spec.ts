@@ -18,6 +18,7 @@ function makePrisma(over: { actions?: unknown[] } = {}) {
     nonConformity: empty(),
     indicatorResult: empty(),
     notification: empty(),
+    userDelegation: { findMany: vi.fn().mockResolvedValue([]) },
     workItemIndex: {
       upsert: vi.fn().mockResolvedValue({}),
       deleteMany: vi.fn().mockResolvedValue({ count: 0 }),
@@ -56,5 +57,35 @@ describe('WorkItemAggregationService', () => {
     expect(count).toBe(0);
     expect(prisma.workItemIndex.upsert).not.toHaveBeenCalled();
     expect(prisma.workItemIndex.deleteMany).toHaveBeenCalledTimes(1);
+  });
+
+  it('materializa itens delegados para o substituto sem alterar a origem', async () => {
+    const future = new Date(Date.now() + 5 * 86_400_000);
+    const prisma = makePrisma();
+    prisma.userDelegation.findMany.mockResolvedValue([{
+      id: 'del1',
+      delegatorUserId: 'u2',
+      reason: 'Ferias',
+      delegator: { id: 'u2', name: 'Delegante', email: 'd@x.com', role: UserRoleEnum.COLLABORATOR },
+    }]);
+    prisma.actionPlan.findMany.mockImplementation(({ where }: any) => {
+      if (where.responsibleUserId === 'u2') return Promise.resolve([{
+        id: 'a2', title: 'Plano delegado', status: 'IN_PROGRESS', criticality: 'HIGH', priority: 'HIGH',
+        dueDate: future, ownerNodeId: 'n1', progress: 10, evidenceRequired: false, origin: 'MANUAL',
+        createdAt: new Date(), updatedAt: new Date(),
+      }]);
+      return Promise.resolve([]);
+    });
+    const svc = new WorkItemAggregationService(prisma, new WorkItemPriorityService());
+
+    const count = await svc.rebuildForUser(me);
+
+    expect(count).toBe(1);
+    const arg = prisma.workItemIndex.upsert.mock.calls[0][0];
+    expect(arg.where.dedupeKey).toBe('ACTION_PLAN:a2:TASK:u1');
+    expect(arg.create.assignedUserId).toBe('u1');
+    expect(arg.create.isDelegated).toBe(true);
+    expect(arg.create.delegatedFromUserId).toBe('u2');
+    expect(arg.create.contextData.delegatedFromName).toBe('Delegante');
   });
 });

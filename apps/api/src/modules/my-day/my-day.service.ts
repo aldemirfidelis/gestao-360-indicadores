@@ -1,4 +1,4 @@
-import { BadRequestException, Injectable, NotFoundException, OnModuleInit } from '@nestjs/common';
+import { BadRequestException, ForbiddenException, Injectable, NotFoundException, OnModuleInit } from '@nestjs/common';
 import { randomUUID } from 'crypto';
 import { PrismaService } from '../../prisma/prisma.service';
 import { AuthPayload } from '../auth/auth.types';
@@ -162,6 +162,7 @@ export class MyDayService implements OnModuleInit {
     const where: any = { companyId: me.companyId, assignedUserId: me.sub };
     const dayStart = new Date(); dayStart.setHours(0, 0, 0, 0);
     const dayEnd = new Date(); dayEnd.setHours(23, 59, 59, 999);
+    let followFilter: Array<{ sourceEntityType: string; sourceEntityId: string; itemType: string }> | null = null;
 
     switch (query.tab) {
       case 'overdue': where.overdueDays = { gt: 0 }; break;
@@ -173,15 +174,28 @@ export class MyDayService implements OnModuleInit {
         break;
       }
       case 'pending': where.status = { notIn: ['DONE', 'ARCHIVED'] }; break;
+      case 'delegated': where.isDelegated = true; break;
+      case 'following':
+      case 'pinned': {
+        const follows = await this.prisma.workItemFollow.findMany({
+          where: { companyId: me.companyId, userId: me.sub, ...(query.tab === 'pinned' ? { pinned: true } : {}) },
+          select: { sourceEntityType: true, sourceEntityId: true, itemType: true },
+        });
+        followFilter = follows;
+        where.OR = follows.map((f) => ({ sourceEntityType: f.sourceEntityType, sourceEntityId: f.sourceEntityId, itemType: f.itemType }));
+        break;
+      }
       default: break; // priorities / all
     }
+    if (followFilter && followFilter.length === 0) return { rows: [], total: 0, page: 1, pageSize: Math.min(100, Math.max(5, Number(query.pageSize) || 25)) };
     if (query.itemType) where.itemType = query.itemType;
     if (query.priority) where.priority = query.priority;
     if (query.q?.trim()) {
-      where.OR = [
+      const searchOr = [
         { title: { contains: query.q.trim(), mode: 'insensitive' } },
         { summary: { contains: query.q.trim(), mode: 'insensitive' } },
       ];
+      where.AND = [...(where.AND ?? []), { OR: searchOr }];
     }
 
     const page = Math.max(1, Number(query.page) || 1);
@@ -196,7 +210,155 @@ export class MyDayService implements OnModuleInit {
       }),
       this.prisma.workItemIndex.count({ where }),
     ]);
-    return { rows, total, page, pageSize };
+    const enriched = await this.attachFollowState(me, rows);
+    enriched.sort((a: any, b: any) => Number(b.isPinned) - Number(a.isPinned) || b.priorityScore - a.priorityScore);
+    return { rows: enriched, total, page, pageSize };
+  }
+
+  private followKey(row: { sourceEntityType: string; sourceEntityId: string; itemType: string }) {
+    return `${row.sourceEntityType}:${row.sourceEntityId}:${row.itemType}`;
+  }
+
+  private async attachFollowState(me: AuthPayload, rows: any[]) {
+    if (!rows.length) return rows;
+    const follows = await this.prisma.workItemFollow.findMany({
+      where: {
+        companyId: me.companyId,
+        userId: me.sub,
+        OR: rows.map((r) => ({ sourceEntityType: r.sourceEntityType, sourceEntityId: r.sourceEntityId, itemType: r.itemType })),
+      },
+    });
+    const byKey = new Map(follows.map((f) => [this.followKey(f), f]));
+    return rows.map((row) => {
+      const f = byKey.get(this.followKey(row));
+      return {
+        ...row,
+        isFollowed: !!f,
+        isPinned: !!f?.pinned,
+        followNote: f?.note ?? null,
+        followedAt: f?.followedAt ?? null,
+        pinnedAt: f?.pinnedAt ?? null,
+      };
+    });
+  }
+
+  // ---------- delegacoes ----------
+
+  async listDelegationUsers(me: AuthPayload) {
+    return this.prisma.user.findMany({
+      where: { companyId: me.companyId, id: { not: me.sub }, deletedAt: null, status: 'ACTIVE', active: true },
+      orderBy: { name: 'asc' },
+      select: { id: true, name: true, email: true, jobTitle: true },
+      take: 200,
+    });
+  }
+
+  async listDelegations(me: AuthPayload) {
+    const [given, received, users] = await Promise.all([
+      this.prisma.userDelegation.findMany({
+        where: { companyId: me.companyId, delegatorUserId: me.sub, status: { not: 'REVOKED' } },
+        include: { delegate: { select: { id: true, name: true, email: true } } },
+        orderBy: [{ status: 'asc' }, { startsAt: 'desc' }],
+      }),
+      this.prisma.userDelegation.findMany({
+        where: { companyId: me.companyId, delegateUserId: me.sub, status: { not: 'REVOKED' } },
+        include: { delegator: { select: { id: true, name: true, email: true } } },
+        orderBy: [{ status: 'asc' }, { startsAt: 'desc' }],
+      }),
+      this.listDelegationUsers(me),
+    ]);
+    return { given, received, users };
+  }
+
+  async createDelegation(me: AuthPayload, dto: Record<string, any>) {
+    const delegateUserId = String(dto.delegateUserId ?? '');
+    if (!delegateUserId || delegateUserId === me.sub) throw new BadRequestException('Informe um substituto valido.');
+    const delegate = await this.prisma.user.findFirst({
+      where: { id: delegateUserId, companyId: me.companyId, deletedAt: null, status: 'ACTIVE', active: true },
+      select: { id: true },
+    });
+    if (!delegate) throw new NotFoundException('Substituto nao encontrado.');
+    const startsAt = dto.startsAt ? new Date(dto.startsAt) : new Date();
+    const endsAt = dto.endsAt ? new Date(dto.endsAt) : null;
+    if (Number.isNaN(startsAt.getTime()) || (endsAt && Number.isNaN(endsAt.getTime()))) throw new BadRequestException('Periodo invalido.');
+    if (endsAt && endsAt <= startsAt) throw new BadRequestException('O fim da delegacao deve ser posterior ao inicio.');
+    const row = await this.prisma.userDelegation.create({
+      data: {
+        companyId: me.companyId,
+        delegatorUserId: me.sub,
+        delegateUserId,
+        startsAt,
+        endsAt,
+        reason: dto.reason ? String(dto.reason).slice(0, 500) : null,
+        scope: dto.scope ?? null,
+        createdById: me.sub,
+      },
+    });
+    return row;
+  }
+
+  async revokeDelegation(me: AuthPayload, id: string) {
+    const row = await this.prisma.userDelegation.findFirst({ where: { id, companyId: me.companyId } });
+    if (!row) throw new NotFoundException('Delegacao nao encontrada.');
+    if (row.delegatorUserId !== me.sub && row.delegateUserId !== me.sub) throw new ForbiddenException('Sem acesso a esta delegacao.');
+    return this.prisma.userDelegation.update({ where: { id }, data: { status: 'REVOKED', revokedAt: new Date() } });
+  }
+
+  // ---------- acompanhar / fixar ----------
+
+  async listFollows(me: AuthPayload) {
+    return this.prisma.workItemFollow.findMany({
+      where: { companyId: me.companyId, userId: me.sub },
+      orderBy: [{ pinned: 'desc' }, { followedAt: 'desc' }],
+    });
+  }
+
+  async followItem(me: AuthPayload, id: string, dto: Record<string, any>) {
+    const item = await this.getItem(me, id);
+    const pinned = !!dto.pinned;
+    return this.prisma.workItemFollow.upsert({
+      where: {
+        companyId_userId_sourceEntityType_sourceEntityId_itemType: {
+          companyId: me.companyId,
+          userId: me.sub,
+          sourceEntityType: item.sourceEntityType,
+          sourceEntityId: item.sourceEntityId,
+          itemType: item.itemType,
+        },
+      },
+      create: {
+        companyId: me.companyId,
+        userId: me.sub,
+        sourceModule: item.sourceModule,
+        sourceEntityType: item.sourceEntityType,
+        sourceEntityId: item.sourceEntityId,
+        itemType: item.itemType,
+        titleSnapshot: item.title,
+        pinned,
+        pinnedAt: pinned ? new Date() : null,
+        note: dto.note ? String(dto.note).slice(0, 500) : null,
+      },
+      update: {
+        titleSnapshot: item.title,
+        pinned,
+        pinnedAt: pinned ? new Date() : null,
+        note: dto.note === undefined ? undefined : dto.note ? String(dto.note).slice(0, 500) : null,
+      },
+    });
+  }
+
+  async unfollowItem(me: AuthPayload, id: string) {
+    const item = await this.getItem(me, id);
+    await this.prisma.workItemFollow.deleteMany({
+      where: {
+        companyId: me.companyId,
+        userId: me.sub,
+        sourceEntityType: item.sourceEntityType,
+        sourceEntityId: item.sourceEntityId,
+        itemType: item.itemType,
+      },
+    });
+    return { ok: true };
   }
 
   // ---------- preferencias ----------

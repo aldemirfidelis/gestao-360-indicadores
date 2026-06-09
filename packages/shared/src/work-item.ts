@@ -79,6 +79,11 @@ export interface UnifiedWorkItem {
   isBlocking: boolean;
   isExternal: boolean;
   isDelegated: boolean;
+  delegatedFromUserId?: string | null;
+  isFollowed?: boolean;
+  isPinned?: boolean;
+  followedAt?: string | null;
+  pinnedAt?: string | null;
   sourceCreatedAt?: string | null;
   sourceUpdatedAt?: string | null;
   completedAt?: string | null;
