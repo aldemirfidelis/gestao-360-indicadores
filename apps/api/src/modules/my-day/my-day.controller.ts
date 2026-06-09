@@ -2,6 +2,7 @@ import { Body, Controller, Get, Param, Post, Put, Query } from '@nestjs/common';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import { AuthPayload } from '../auth/auth.types';
 import { MyDayService, MyDayItemsQuery } from './my-day.service';
+import { MyDayTeamService, TeamItemsQuery } from './my-day-team.service';
 
 /**
  * Central de Trabalho "Meu Dia". Landing universal: qualquer usuario autenticado
@@ -10,7 +11,36 @@ import { MyDayService, MyDayItemsQuery } from './my-day.service';
  */
 @Controller('my-day')
 export class MyDayController {
-  constructor(private readonly service: MyDayService) {}
+  constructor(
+    private readonly service: MyDayService,
+    private readonly team: MyDayTeamService,
+  ) {}
+
+  // ----- Meu Dia da Equipe (gestores) -----
+  @Get('team')
+  teamOverview(@CurrentUser() me: AuthPayload) {
+    return this.team.getOverview(me);
+  }
+
+  @Get('team/summary')
+  teamSummary(@CurrentUser() me: AuthPayload) {
+    return this.team.getSummary(me);
+  }
+
+  @Get('team/items')
+  teamItems(@CurrentUser() me: AuthPayload, @Query() query: TeamItemsQuery) {
+    return this.team.getItems(me, query);
+  }
+
+  @Get('team/workload')
+  teamWorkload(@CurrentUser() me: AuthPayload) {
+    return this.team.getWorkload(me);
+  }
+
+  @Get('team/bottlenecks')
+  teamBottlenecks(@CurrentUser() me: AuthPayload) {
+    return this.team.getBottlenecks(me);
+  }
 
   @Get()
   overview(@CurrentUser() me: AuthPayload) {

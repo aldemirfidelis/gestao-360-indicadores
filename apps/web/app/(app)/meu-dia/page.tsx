@@ -6,7 +6,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
 import {
   AlertTriangle, AtSign, CalendarDays, CheckCircle2, CheckSquare, FileText, FileWarning,
-  Inbox, MessageSquare, RefreshCw, Search, ShieldAlert, Target, Stamp, Workflow,
+  Inbox, MessageSquare, RefreshCw, Search, ShieldAlert, Target, Stamp, Users, Workflow,
 } from 'lucide-react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -98,7 +98,7 @@ export default function MeuDiaPage() {
   const [q, setQ] = useState('');
   const [actOn, setActOn] = useState<WorkItem | null>(null);
 
-  const summary = useQuery<Summary>({ queryKey: ['my-day', 'summary'], queryFn: () => api('/my-day/summary') });
+  const overview = useQuery<{ summary: Summary; isManager: boolean }>({ queryKey: ['my-day', 'overview'], queryFn: () => api('/my-day') });
   const itemsQuery = useQuery<{ rows: WorkItem[]; total: number }>({
     queryKey: ['my-day', 'items', tab, typeFilter, q],
     queryFn: () => api(`/my-day/items?tab=${tab}${typeFilter ? `&itemType=${typeFilter}` : ''}${q.trim() ? `&q=${encodeURIComponent(q.trim())}` : ''}`),
@@ -131,7 +131,8 @@ export default function MeuDiaPage() {
     else if (type === 'meetingsToday') { setTab('priorities'); setTypeFilter('MEETING'); }
   }
 
-  const s = summary.data;
+  const s = overview.data?.summary;
+  const isManager = overview.data?.isManager;
   const cards = useMemo(() => ([
     { key: 'pending', label: 'Pendentes', value: s?.pending ?? 0, cls: 'text-slate-700' },
     { key: 'overdue', label: 'Vencidos', value: s?.overdue ?? 0, cls: 'text-rose-600' },
@@ -166,6 +167,11 @@ export default function MeuDiaPage() {
             <Search className="pointer-events-none absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
             <Input className="h-9 w-56 pl-8" placeholder="Buscar nos meus itens..." value={q} onChange={(e) => setQ(e.target.value)} />
           </div>
+          {isManager && (
+            <Button variant="outline" size="sm" onClick={() => router.push('/meu-dia/equipe')}>
+              <Users className="mr-2 h-4 w-4" />Equipe
+            </Button>
+          )}
           <Button variant="outline" size="sm" onClick={() => refresh.mutate()} disabled={refresh.isPending}>
             <RefreshCw className={cn('mr-2 h-4 w-4', refresh.isPending && 'animate-spin')} />Atualizar
           </Button>

@@ -5,6 +5,7 @@ import { WorkItemAggregationService } from './work-item-aggregation.service';
 import { WorkflowApprovalService } from '../automations/services/workflow-approval.service';
 import { ActionsService } from '../actions/actions.service';
 import { WorkItemEventBus } from './work-item-event-bus';
+import { MyDayTeamService } from './my-day-team.service';
 
 const REFRESH_TTL_MS = 30_000;
 
@@ -29,6 +30,7 @@ export class MyDayService implements OnModuleInit {
     private readonly approvals: WorkflowApprovalService,
     private readonly actions: ActionsService,
     private readonly bus: WorkItemEventBus,
+    private readonly team: MyDayTeamService,
   ) {}
 
   /** Assina o bus: quando um registro muda, agenda rebuild incremental do(s) usuario(s). */
@@ -68,11 +70,12 @@ export class MyDayService implements OnModuleInit {
 
   async getOverview(me: AuthPayload) {
     await this.ensureFresh(me);
-    const [summary, items] = await Promise.all([
+    const [summary, items, isManager] = await Promise.all([
       this.computeSummary(me),
       this.queryItems(me, { tab: 'priorities', pageSize: 25 }),
+      this.team.isManager(me),
     ]);
-    return { generatedAt: new Date().toISOString(), summary, items: items.rows, total: items.total };
+    return { generatedAt: new Date().toISOString(), isManager, summary, items: items.rows, total: items.total };
   }
 
   async getSummary(me: AuthPayload) {
