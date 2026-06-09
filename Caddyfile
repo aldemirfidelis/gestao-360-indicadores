@@ -57,23 +57,23 @@ gestao360.org {
 #   necessario para o protocolo do Collabora (/cool/.../ws).
 # - Mantenha este bloco comentado ate o DNS estar pronto; caso contrario o
 #   Caddy tentara emitir certificado para um host ainda indisponivel.
-# - Para habilitar, remova os comentarios abaixo e suba o profile collabora:
+# - Habilitado: o profile collabora deve estar no ar:
 #   docker compose -f docker-compose.droplet.yml --profile collabora up -d collabora
-# collabora.gestao360.org {
-#     encode zstd gzip
-#
-#     log {
-#         output stdout
-#         format console
-#     }
-#
-#     reverse_proxy collabora:9980 {
-#         header_up Host {host}
-#         header_up X-Real-IP {remote_host}
-#         header_up X-Forwarded-For {remote_host}
-#         header_up X-Forwarded-Proto {scheme}
-#     }
-# }
+collabora.gestao360.org {
+    encode zstd gzip
+
+    log {
+        output stdout
+        format console
+    }
+
+    reverse_proxy collabora:9980 {
+        header_up Host {host}
+        header_up X-Real-IP {remote_host}
+        header_up X-Forwarded-For {remote_host}
+        header_up X-Forwarded-Proto {scheme}
+    }
+}
 
 # =====================================================
 # Exemplo com dominio (descomente quando aplicavel)
