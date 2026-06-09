@@ -14,6 +14,7 @@ import {
   Database,
   Eye,
   Flag,
+  Globe2,
   LayoutDashboard,
   ListChecks,
   LogOut,
@@ -24,6 +25,7 @@ import {
   Plus,
   Search,
   ServerCog,
+  Save,
   ShieldCheck,
   Settings2,
   SlidersHorizontal,
@@ -73,6 +75,7 @@ type SectionKey =
   | 'orgStructure'
   | 'databaseAdmin'
   | 'portalAdmin'
+  | 'seoPresence'
   | 'companyAudit'
   | 'companies'
   | 'modules'
@@ -213,6 +216,7 @@ const SECTIONS: SectionItem[] = [
   { key: 'companies', label: 'Empresas', icon: Building2, group: 'Plataforma' },
   { key: 'modules', label: 'Matriz de Modulos', icon: PackageCheck, group: 'Plataforma' },
   { key: 'plans', label: 'Planos', icon: ListChecks, group: 'Plataforma' },
+  { key: 'seoPresence', label: 'SEO e Presenca Digital', icon: Globe2, group: 'Plataforma' },
   { key: 'users', label: 'Usuarios', icon: Users, group: 'Plataforma' },
   { key: 'security', label: 'Seguranca e Suporte', icon: ShieldCheck, group: 'Plataforma' },
   // Operam sobre a empresa selecionada no seletor do topo.
@@ -671,6 +675,7 @@ export function PlatformAdminApp() {
           {section === 'companies' && <CompaniesSection />}
           {section === 'modules' && <ModulesSection />}
           {section === 'plans' && <PlansSection />}
+          {section === 'seoPresence' && <SeoPresenceSection />}
           {section === 'users' && <UsersSection />}
           {section === 'security' && <SecuritySection />}
           {section === 'technical' && <TechnicalSection />}
@@ -1021,6 +1026,121 @@ function DatabaseAdminSection({
         {tableName ? <TableDetailContent table={tableName} onBack={onTableBack} /> : DATABASE_ADMIN_PAGES[tab]}
       </section>
     </div>
+  );
+}
+
+interface SeoPresencePayload {
+  settings: Record<string, string>;
+  publicUrls: string[];
+  protectedPrefixes: string[];
+  robotsPolicy: { oaiSearchBot: string; gptBot: string };
+  generatedFiles: Record<string, string>;
+}
+
+function SeoPresenceSection() {
+  const qc = useQueryClient();
+  const seo = useQuery({
+    queryKey: ['platform-admin', 'seo-presence'],
+    queryFn: () => platformAdminApi<SeoPresencePayload>('/seo-presence'),
+  });
+  const [form, setForm] = useState<Record<string, string>>({});
+
+  useEffect(() => {
+    if (seo.data?.settings) setForm(seo.data.settings);
+  }, [seo.data?.settings]);
+
+  const save = useMutation({
+    mutationFn: () => platformAdminApi<SeoPresencePayload>('/seo-presence', { method: 'PATCH', json: form }),
+    onSuccess: () => {
+      toast.success('SEO e presenca digital atualizados');
+      void qc.invalidateQueries({ queryKey: ['platform-admin', 'seo-presence'] });
+    },
+    onError: (err) => toast.error(err instanceof Error ? err.message : 'Falha ao salvar SEO'),
+  });
+
+  if (seo.isLoading) return <LoadingGrid />;
+  const files = seo.data?.generatedFiles ?? {};
+
+  return (
+    <div className="space-y-4">
+      <Panel
+        title="SEO e Presenca Digital"
+        icon={Globe2}
+        actions={<Button size="sm" onClick={() => save.mutate()} disabled={save.isPending}><Save className="mr-2 h-4 w-4" />Salvar</Button>}
+      >
+        <div className="grid gap-4 lg:grid-cols-2">
+          <SeoField label="Titulo padrao" value={form.defaultTitle} onChange={(value) => setForm({ ...form, defaultTitle: value })} />
+          <SeoField label="Nome do produto" value={form.productName} onChange={(value) => setForm({ ...form, productName: value })} />
+          <SeoField label="Dominio principal" value={form.primaryDomain} onChange={(value) => setForm({ ...form, primaryDomain: value })} />
+          <SeoField label="Imagem social padrao" value={form.defaultSocialImage} onChange={(value) => setForm({ ...form, defaultSocialImage: value })} />
+          <SeoField label="Google Analytics 4" value={form.gaMeasurementId} onChange={(value) => setForm({ ...form, gaMeasurementId: value })} />
+          <SeoField label="Google Tag Manager" value={form.gtmId} onChange={(value) => setForm({ ...form, gtmId: value })} />
+          <SeoField label="Codigo Search Console" value={form.googleVerification} onChange={(value) => setForm({ ...form, googleVerification: value })} />
+          <SeoField label="Codigo Bing Webmaster" value={form.bingVerification} onChange={(value) => setForm({ ...form, bingVerification: value })} />
+          <SeoField label="Numero WhatsApp" value={form.whatsappNumber} onChange={(value) => setForm({ ...form, whatsappNumber: value })} />
+          <SeoField label="Chave IndexNow" value={form.indexNowKey} onChange={(value) => setForm({ ...form, indexNowKey: value })} />
+          <label className="grid gap-1.5 text-sm lg:col-span-2">
+            <span className="font-medium">Descricao padrao</span>
+            <Textarea value={form.defaultDescription ?? ''} onChange={(event) => setForm({ ...form, defaultDescription: event.target.value })} rows={3} />
+          </label>
+          <label className="grid gap-1.5 text-sm lg:col-span-2">
+            <span className="font-medium">Mensagem inicial do WhatsApp</span>
+            <Textarea value={form.whatsappMessage ?? ''} onChange={(event) => setForm({ ...form, whatsappMessage: event.target.value })} rows={2} />
+          </label>
+          <label className="grid gap-1.5 text-sm">
+            <span className="font-medium">IndexNow</span>
+            <NativeSelect value={form.indexNowEnabled ?? 'false'} onChange={(event) => setForm({ ...form, indexNowEnabled: event.target.value })}>
+              <option value="false">Desativado</option>
+              <option value="true">Ativado</option>
+            </NativeSelect>
+          </label>
+          <label className="grid gap-1.5 text-sm">
+            <span className="font-medium">Botao flutuante WhatsApp</span>
+            <NativeSelect value={form.floatingWhatsappEnabled ?? 'true'} onChange={(event) => setForm({ ...form, floatingWhatsappEnabled: event.target.value })}>
+              <option value="true">Ativado</option>
+              <option value="false">Desativado</option>
+            </NativeSelect>
+          </label>
+        </div>
+      </Panel>
+
+      <div className="grid gap-4 xl:grid-cols-2">
+        <Panel title="Arquivos publicados" icon={Globe2}>
+          <div className="grid gap-2 text-sm">
+            {Object.entries(files).map(([label, href]) => <Row key={label} label={label} value={href} />)}
+          </div>
+        </Panel>
+        <Panel title="Politica de rastreadores" icon={ShieldCheck}>
+          <div className="space-y-2 text-sm">
+            <Row label="OAI-SearchBot" value={seo.data?.robotsPolicy.oaiSearchBot ?? '-'} />
+            <Row label="GPTBot" value={seo.data?.robotsPolicy.gptBot ?? '-'} />
+            <Row label="Observacao" value="Robots nao substitui autenticacao nem autorizacao." />
+          </div>
+        </Panel>
+      </div>
+
+      <div className="grid gap-4 xl:grid-cols-2">
+        <Panel title="Rotas publicas indexaveis">
+          <div className="flex flex-wrap gap-2">
+            {(seo.data?.publicUrls ?? []).map((url) => <span key={url} className="pill pill-green">{url}</span>)}
+          </div>
+        </Panel>
+        <Panel title="Prefixos protegidos / noindex">
+          <div className="flex flex-wrap gap-2">
+            {(seo.data?.protectedPrefixes ?? []).map((url) => <span key={url} className="pill pill-red">{url}</span>)}
+          </div>
+        </Panel>
+      </div>
+    </div>
+  );
+}
+
+function SeoField({ label, value, onChange }: { label: string; value?: string; onChange: (value: string) => void }) {
+  return (
+    <label className="grid gap-1.5 text-sm">
+      <span className="font-medium">{label}</span>
+      <Input value={value ?? ''} onChange={(event) => onChange(event.target.value)} />
+    </label>
   );
 }
 

@@ -8,6 +8,25 @@ import { PLATFORM_MODULES, PLATFORM_PLANS } from '../platform-admin.catalog';
 const ACTIVE_MODULE_STATUSES = ['ATIVO', 'ACTIVE', 'HERDADO_DO_PLANO', 'EM_IMPLANTACAO', 'EM_TESTE', 'EXPERIMENTAL'];
 const BLOCKED_MODULE_STATUSES = ['BLOQUEADO', 'SUSPENSO', 'BLOCKED', 'SUSPENDED'];
 const COMPANY_CORE_MODULES = new Set(['auth', 'access-control', 'users']);
+const SEO_GROUP = 'SEO_PRESENCE';
+const SEO_DEFAULTS: Record<string, string> = {
+  defaultTitle: 'Gestao 360 | Plataforma de gestao corporativa integrada',
+  defaultDescription: 'Plataforma SaaS B2B para indicadores, estrategia, planos de acao, documentos, auditorias, riscos e melhoria continua.',
+  productName: 'Gestao 360',
+  primaryDomain: 'https://gestao360.org',
+  defaultSocialImage: '/brand/social-preview.svg',
+  googleVerification: '',
+  bingVerification: '',
+  gaMeasurementId: '',
+  gtmId: '',
+  indexNowEnabled: 'false',
+  indexNowKey: '',
+  whatsappNumber: '5564981009108',
+  whatsappMessage: 'Ola, tenho interesse em conhecer melhor o Gestao 360.',
+  floatingWhatsappEnabled: 'true',
+  oaiSearchBotPolicy: 'allow_public',
+  gptBotPolicy: 'disallow_training_by_default',
+};
 
 interface CompanyInput {
   name?: string;
@@ -157,6 +176,66 @@ export class PlatformAdminService {
       health,
       recentAudit,
     };
+  }
+
+  async getSeoPresence() {
+    const rows = await this.prisma.appSetting.findMany({
+      where: { companyId: null, group: SEO_GROUP },
+      orderBy: { key: 'asc' },
+    });
+    const settings = { ...SEO_DEFAULTS };
+    for (const row of rows) settings[row.key] = row.value;
+    return {
+      settings,
+      publicUrls: [
+        '/',
+        '/solucoes',
+        '/modulos',
+        '/segmentos',
+        '/recursos',
+        '/conteudos',
+        '/sobre',
+        '/contato',
+        '/politica-de-privacidade',
+        '/termos-de-uso',
+      ],
+      protectedPrefixes: ['/login', '/platform-admin', '/api', '/dashboard', '/meu-dia', '/settings', '/users'],
+      robotsPolicy: {
+        oaiSearchBot: 'Allowed for public pages.',
+        gptBot: 'Disallowed by default until owner explicitly opts into model training.',
+      },
+      generatedFiles: {
+        sitemap: `${settings.primaryDomain.replace(/\/$/, '')}/sitemap.xml`,
+        robots: `${settings.primaryDomain.replace(/\/$/, '')}/robots.txt`,
+        llms: `${settings.primaryDomain.replace(/\/$/, '')}/llms.txt`,
+        indexNowKey: `${settings.primaryDomain.replace(/\/$/, '')}/indexnow-key.txt`,
+      },
+    };
+  }
+
+  async updateSeoPresence(user: PlatformAdminIdentity, body: Record<string, unknown>) {
+    const entries = Object.entries(SEO_DEFAULTS)
+      .map(([key, fallback]) => [key, body[key] === undefined || body[key] === null ? fallback : String(body[key]).slice(0, 1000)] as const);
+    for (const [key, value] of entries) {
+      const existing = await this.prisma.appSetting.findFirst({ where: { companyId: null, key, group: SEO_GROUP } });
+      if (existing) {
+        await this.prisma.appSetting.update({ where: { id: existing.id }, data: { value, active: true } });
+      } else {
+        await this.prisma.appSetting.create({
+          data: {
+            companyId: null,
+            group: SEO_GROUP,
+            key,
+            value,
+            valueType: key.toLowerCase().includes('enabled') ? 'boolean' : 'text',
+            description: `SEO e Presenca Digital: ${key}`,
+            active: true,
+          },
+        });
+      }
+    }
+    await this.audit.record({ user, action: 'UPDATE_SEO_PRESENCE', targetType: 'AppSetting', targetLabel: SEO_GROUP });
+    return this.getSeoPresence();
   }
 
   async listCompanies(params: { q?: string; status?: string; plan?: string; skip?: number; take?: number }) {

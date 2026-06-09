@@ -1,507 +1,233 @@
-'use client';
-
 import Link from 'next/link';
-import type { ReactNode } from 'react';
+import type { Metadata } from 'next';
+import { ArrowRight, CheckCircle2, ClipboardList, FileSearch, LineChart, Network, ShieldCheck, Workflow } from 'lucide-react';
+import { PublicShell } from '@/components/marketing/public-shell';
+import { JsonLd } from '@/components/marketing/json-ld';
+import { ContactForm } from '@/components/marketing/contact-form';
 import {
-  ArrowRight,
-  BarChart3,
-  Boxes,
-  Check,
-  ClipboardCheck,
-  Database,
-  FileText,
-  GitBranch,
-  ListChecks,
-  Map,
-  Network,
-  ShieldCheck,
-  Sparkles,
-  Target,
-  Users,
-} from 'lucide-react';
-import { BrandLogo } from '@/components/brand/brand-mark';
-import { Button } from '@/components/ui/button';
-import { useAuth } from '@/components/auth/auth-provider';
-import { cn } from '@/lib/utils';
+  WHATSAPP_URL,
+  faqJsonLd,
+  moduleHighlights,
+  organizationJsonLd,
+  publicMetadata,
+  segmentPages,
+  softwareJsonLd,
+  solutionPages,
+  webPageJsonLd,
+  websiteJsonLd,
+} from '@/lib/public-site';
 
-const NAV_LINKS = [
-  { href: '#modulos', label: 'Modulos' },
-  { href: '#conexoes', label: 'Conexoes' },
-  { href: '#governanca', label: 'Governanca' },
-  { href: '#planos', label: 'Planos' },
+export const metadata: Metadata = publicMetadata({
+  title: 'Gestao 360 | Gestao estrategica, indicadores e planos de acao',
+  description:
+    'Plataforma SaaS B2B para gestao corporativa integrada: indicadores, planejamento estrategico, planos de acao, documentos, auditorias, riscos e melhoria continua.',
+  path: '/',
+});
+
+const challenges = [
+  'Indicadores espalhados em planilhas e sem responsavel claro.',
+  'Planos de acao sem evidencia, historico ou verificacao de eficacia.',
+  'Auditorias, documentos, riscos e nao conformidades tratados em controles isolados.',
+  'Gestores sem visao diaria das prioridades e bloqueios da equipe.',
 ];
 
-const METRICS = [
-  { label: 'Modulos conectados', value: '12+' },
-  { label: 'Fluxos auditaveis', value: '100%' },
-  { label: 'Controle por empresa', value: 'Global' },
-  { label: 'Demo pronta', value: 'Agora' },
+const flow = [
+  ['Estruture', 'Empresas, filiais, areas, setores, processos e permissoes.'],
+  ['Acompanhe', 'Indicadores, metas, dashboards, reunioes e desvios.'],
+  ['Trate', 'Analise de causa, planos de acao, evidencias e aprovacoes.'],
+  ['Aprenda', 'Historico, auditoria, visao 360, riscos e recomendacoes assistidas.'],
 ];
 
-const MODULES = [
+const faq = [
   {
-    icon: Target,
-    title: 'Indicadores e metas',
-    desc: 'KPIs, metas, farois, tolerancias, responsaveis, periodicidade e historico de resultados.',
+    question: 'O Gestao 360 expõe dados de clientes em paginas publicas?',
+    answer:
+      'Nao. O conteudo publico e institucional. Dashboards, registros, documentos, APIs e areas administrativas exigem autenticacao e autorizacao.',
   },
   {
-    icon: Map,
-    title: 'Estrategia e BSC',
-    desc: 'Mapas estrategicos, perspectivas, objetivos e conexao entre estrategia e rotina operacional.',
+    question: 'A plataforma substitui todos os sistemas da empresa?',
+    answer:
+      'Nao necessariamente. O Gestao 360 atua como camada integrada de gestao, acompanhamento, evidencias e execucao. Integracoes podem conectar sistemas existentes quando fizer sentido.',
   },
   {
-    icon: ListChecks,
-    title: 'Planos de acao',
-    desc: 'Acoes, tarefas, evidencias, eficacia, aprovacao e acompanhamento por prazo e responsavel.',
-  },
-  {
-    icon: ClipboardCheck,
-    title: 'Desvios, NC e causa raiz',
-    desc: 'FCA, 5 porques, Ishikawa, MASP, CAPA, DMAIC e trilha ate a solucao validada.',
-  },
-  {
-    icon: FileText,
-    title: 'Documentos e formularios',
-    desc: 'Controle documental, revisoes, formularios, coletas, aprovacoes e evidencias anexadas.',
-  },
-  {
-    icon: Network,
-    title: 'Areas, processos e organograma',
-    desc: 'Estrutura por empresa, unidade, area, processo, responsavel e regra de visibilidade.',
-  },
-  {
-    icon: BarChart3,
-    title: 'Dashboards executivos',
-    desc: 'Visao de performance, atrasos, riscos, desvios, plano de acao e tendencia mensal.',
-  },
-  {
-    icon: ShieldCheck,
-    title: 'Auditoria e permissoes',
-    desc: 'Perfis, permissoes, escopo por area, logs de alteracao e rastreabilidade por usuario.',
-  },
-  {
-    icon: Boxes,
-    title: 'Administracao central',
-    desc: 'Planos, modulos por empresa, bloqueios, limites, banco de dados e parametros do contrato.',
+    question: 'Como funciona a demonstracao?',
+    answer:
+      'A equipe entende o contexto da empresa, apresenta os modulos relevantes e indica um caminho de implantacao sem prometer resultados sem avaliacao previa.',
   },
 ];
 
-const CONNECTIONS = [
-  { title: 'Estrutura da empresa', desc: 'Empresas, filiais, areas, setores, processos e responsaveis.' },
-  { title: 'Acesso e visibilidade', desc: 'Usuarios, perfis, permissoes, matriz de area e excecoes.' },
-  { title: 'Gestao de resultado', desc: 'Indicadores, metas, OKRs, dashboards, reunioes e relatorios.' },
-  { title: 'Tratativa de desvio', desc: 'Analise de causa, planos de acao, evidencias, NC e eficacia.' },
-  { title: 'Governanca do portal', desc: 'Planos, modulos, paginas, menus, integracoes, banco e auditoria.' },
-];
-
-const BEST_FEATURES = [
-  'Controle de modulos por empresa: libere Modulo X e Y para uma cliente e bloqueie o restante.',
-  'Planos claros e customizaveis: usuarios, limites, modulos incluidos e opcionais.',
-  'Banco de dados administravel pela equipe autorizada com tabelas, registros, SQL, backup e diagnostico.',
-  'Rastreabilidade ponta a ponta: quem alterou, quando, em qual modulo e qual dado foi afetado.',
-  'Conectores internos e APIs externas para integrar indicadores, documentos, IA, e-mail e rotinas de apoio.',
-  'Permissoes por area para empresas controlarem seus usuarios sem acessar configuracoes globais.',
-];
-
-const PLANS = [
-  {
-    name: 'Essencial',
-    users: 'Ate 25 usuarios',
-    fit: 'Para empresas que querem sair das planilhas e padronizar a rotina de indicadores.',
-    details: [
-      'Indicadores, metas, resultados e farois',
-      'Planos de acao e evidencias',
-      'Usuarios da propria empresa',
-      'Dashboards operacionais',
-      'Importacao por planilha',
-      'Permissoes basicas por perfil',
-    ],
-  },
-  {
-    name: 'Profissional',
-    users: 'Ate 150 usuarios',
-    fit: 'Para operacoes que precisam conectar estrategia, areas, desvios e melhoria continua.',
-    details: [
-      'Tudo do Essencial',
-      'Mapa estrategico, OKRs e reunioes',
-      'Analise de causa e nao conformidades',
-      'Matriz de visibilidade por area',
-      'APIs externas e conectores internos',
-      'Auditoria e relatorios completos',
-    ],
-    highlighted: true,
-  },
-  {
-    name: 'Corporativo',
-    users: 'Usuarios sob medida',
-    fit: 'Para grupos com multiplas unidades, governanca avancada e necessidade de suporte dedicado.',
-    details: [
-      'Tudo do Profissional',
-      'Modulos por empresa e unidade',
-      'Limites customizados de usuarios e dados',
-      'Ambientes, snapshots e manutencao',
-      'Politicas avancadas de acesso',
-      'Implantacao assistida',
-    ],
-  },
-  {
-    name: 'Personalizado',
-    users: 'Modelo flexivel',
-    fit: 'Para cenarios com regras especificas, modulos dedicados, integracoes e operacao assistida.',
-    details: [
-      'Composicao de modulos sob demanda',
-      'Usuarios, unidades e limites customizados',
-      'Integrações planejadas com sistemas internos',
-      'Administracao central configurada para o contrato',
-      'Acompanhamento tecnico de implantacao',
-      'Roadmap por prioridade do cliente',
-    ],
-  },
-];
-
-export default function LandingPage() {
-  const { user } = useAuth();
-  const accessHref = user ? '/dashboard' : '/login';
-  const accessLabel = user ? 'Ir para dashboard' : 'Acessar demo agora';
-
+export default function HomePage() {
   return (
-    <div className="min-h-screen bg-white text-slate-950">
-      <header className="sticky top-0 z-50 border-b border-slate-200 bg-white/95 backdrop-blur">
-        <div className="mx-auto flex h-16 max-w-7xl items-center justify-between px-4 sm:px-6 lg:px-8">
-          <Link href="/" className="flex items-center" title="Gestao 360">
-            <BrandLogo />
-          </Link>
-          <nav className="hidden items-center gap-6 lg:flex">
-            {NAV_LINKS.map((link) => (
-              <a key={link.href} href={link.href} className="text-sm font-medium text-slate-600 transition-colors hover:text-slate-950">
-                {link.label}
-              </a>
-            ))}
-          </nav>
-          <div className="flex items-center gap-2">
-            <Button asChild className="bg-emerald-600 hover:bg-emerald-700">
-              <Link href={accessHref}>
-                {accessLabel}
-                <ArrowRight className="ml-2 h-4 w-4" />
-              </Link>
-            </Button>
-          </div>
-        </div>
-      </header>
-
-      <main>
-        <section className="bg-[#101820] text-white">
-          <div className="mx-auto grid min-h-[720px] max-w-7xl gap-10 px-4 py-16 sm:px-6 lg:grid-cols-[0.95fr,1.05fr] lg:items-center lg:px-8 lg:py-20">
-            <div className="min-w-0">
-              <div className="mb-5 inline-flex items-center gap-2 border border-white/20 bg-white/10 px-3 py-1.5 text-sm font-medium text-white">
-                <Sparkles className="h-4 w-4 text-emerald-300" />
-                Plataforma completa de gestao por indicadores
-              </div>
-              <h1 className="text-5xl font-semibold leading-none sm:text-6xl lg:text-7xl">
-                Gestao 360
-              </h1>
-              <p className="mt-6 max-w-2xl text-lg leading-8 text-slate-200">
-                Conecte estrategia, indicadores, metas, desvios, planos de acao, auditoria, documentos e processos em um unico ambiente operacional.
-              </p>
-              <div className="mt-8 flex flex-col gap-3 sm:flex-row">
-                <Button asChild size="lg" className="h-12 bg-emerald-500 px-7 text-base text-slate-950 hover:bg-emerald-400">
-                  <Link href={accessHref}>
-                    Acessar demo agora
-                    <ArrowRight className="ml-2 h-5 w-5" />
-                  </Link>
-                </Button>
-                <Button asChild size="lg" variant="outline" className="h-12 border-white/40 bg-white/10 px-7 text-base text-white hover:bg-white hover:text-slate-950">
-                  <a href="#planos">Ver planos e modulos</a>
-                </Button>
-              </div>
-
-              <div className="mt-10 grid gap-3 sm:grid-cols-2">
-                {METRICS.map((metric) => (
-                  <div key={metric.label} className="border border-white/15 bg-white/10 p-4">
-                    <div className="text-2xl font-semibold">{metric.value}</div>
-                    <div className="mt-1 text-sm text-slate-300">{metric.label}</div>
+    <PublicShell>
+      <JsonLd data={[organizationJsonLd(), websiteJsonLd(), softwareJsonLd(), webPageJsonLd({ title: 'Gestao 360', description: metadata.description as string, path: '/' }), faqJsonLd(faq)]} />
+      <section className="relative min-h-[680px] overflow-hidden bg-slate-950 text-white">
+        <div className="absolute inset-0 opacity-90" aria-hidden="true">
+          <div className="h-full w-full bg-[linear-gradient(115deg,rgba(15,23,42,0.96)_0%,rgba(15,23,42,0.78)_43%,rgba(20,184,166,0.32)_100%)]" />
+          <div className="absolute inset-y-0 right-0 hidden w-[58%] border-l border-white/10 bg-slate-900/70 lg:block">
+            <div className="grid h-full grid-cols-2 gap-px bg-white/10 p-8">
+              {['Indicadores fora da meta', 'Planos em atraso', 'Riscos criticos', 'Auditorias abertas', 'Documentos em revisao', 'Meu Dia'].map((label, index) => (
+                <div key={label} className="bg-slate-950/70 p-5">
+                  <div className="text-xs uppercase tracking-[0.16em] text-slate-400">{label}</div>
+                  <div className="mt-5 h-2 bg-slate-700">
+                    <div className={index % 2 === 0 ? 'h-2 w-2/3 bg-emerald-400' : 'h-2 w-1/2 bg-amber-400'} />
                   </div>
-                ))}
-              </div>
-            </div>
-
-            <HeroDashboard />
-          </div>
-        </section>
-
-        <section id="modulos" className="py-16 lg:py-20">
-          <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
-            <SectionIntro
-              eyebrow="Modulos"
-              title="Tudo que a operacao precisa, trabalhando na mesma base."
-              desc="A plataforma nao e apenas um painel. Cada modulo conversa com usuarios, areas, indicadores, evidencias, permissoes e auditoria."
-            />
-            <div className="mt-10 grid gap-4 md:grid-cols-2 xl:grid-cols-3">
-              {MODULES.map((module) => (
-                <ModuleCard key={module.title} icon={<module.icon className="h-5 w-5" />} title={module.title} desc={module.desc} />
-              ))}
-            </div>
-          </div>
-        </section>
-
-        <section id="conexoes" className="border-y border-slate-200 bg-slate-50 py-16 lg:py-20">
-          <div className="mx-auto grid max-w-7xl gap-10 px-4 sm:px-6 lg:grid-cols-[0.85fr,1.15fr] lg:px-8">
-            <div>
-              <SectionIntro
-                eyebrow="Conexoes"
-                title="O melhor da plataforma esta na ligacao entre os modulos."
-                desc="Um resultado fora da meta pode abrir desvio, gerar analise de causa, criar plano de acao, receber evidencias, aparecer no dashboard e ficar auditado."
-                compact
-              />
-              <div className="mt-8 grid gap-3">
-                {BEST_FEATURES.map((item) => (
-                  <div key={item} className="flex items-start gap-3 border border-slate-200 bg-white p-4">
-                    <Check className="mt-1 h-4 w-4 shrink-0 text-emerald-700" />
-                    <span className="text-sm leading-6 text-slate-700">{item}</span>
+                  <div className="mt-5 grid grid-cols-3 gap-2">
+                    <span className="h-12 bg-white/10" />
+                    <span className="h-12 bg-white/10" />
+                    <span className="h-12 bg-white/10" />
                   </div>
-                ))}
-              </div>
-            </div>
-            <div className="border border-slate-200 bg-white p-5">
-              <div className="flex items-center gap-2 border-b border-slate-200 pb-4 text-sm font-semibold">
-                <GitBranch className="h-4 w-4 text-emerald-700" />
-                Fluxo conectado
-              </div>
-              <div className="mt-5 space-y-4">
-                {CONNECTIONS.map((item, index) => (
-                  <div key={item.title} className="grid grid-cols-[42px,1fr] gap-4">
-                    <div className="relative">
-                      <div className="grid h-9 w-9 place-items-center border border-emerald-200 bg-emerald-50 text-sm font-semibold text-emerald-800">
-                        {index + 1}
-                      </div>
-                      {index < CONNECTIONS.length - 1 && <div className="absolute left-[18px] top-10 h-8 w-px bg-slate-200" />}
-                    </div>
-                    <div className="pb-2">
-                      <h3 className="font-semibold text-slate-950">{item.title}</h3>
-                      <p className="mt-1 text-sm leading-6 text-slate-600">{item.desc}</p>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </div>
-          </div>
-        </section>
-
-        <section id="governanca" className="py-16 lg:py-20">
-          <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
-            <SectionIntro
-              eyebrow="Governanca"
-              title="Administracao clara para empresas e para o dono da plataforma."
-              desc="As empresas ficam com controle dos proprios usuarios. A administracao central cuida de planos, modulos, banco de dados, integracoes, menus, auditoria, parametros e suporte."
-            />
-            <div className="mt-10 grid gap-4 lg:grid-cols-3">
-              <GovernanceBlock icon={<Users className="h-5 w-5" />} title="Empresa cliente" desc="Cria e administra usuarios da propria empresa, respeitando permissoes e visibilidade por area." />
-              <GovernanceBlock icon={<Boxes className="h-5 w-5" />} title="Administracao central" desc="Gerencia planos, modulos liberados, status da empresa, limites, paginas, menus e integracoes." />
-              <GovernanceBlock icon={<Database className="h-5 w-5" />} title="Banco de dados" desc="Acesso administrativo a tabelas, registros, SQL, estrutura, indices, importacao, backups e diagnosticos." />
-            </div>
-          </div>
-        </section>
-
-        <section id="planos" className="border-y border-slate-200 bg-slate-50 py-16 lg:py-20">
-          <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
-            <SectionIntro
-              eyebrow="Planos"
-              title="Planos sem pegadinha: modulos, usuarios e limites ficam claros."
-              desc="Os valores foram retirados da landing. O foco aqui e mostrar o escopo de cada plano e facilitar a comparacao."
-              center
-            />
-            <div className="mt-10 grid gap-5 lg:grid-cols-4">
-              {PLANS.map((plan) => (
-                <PlanCard key={plan.name} plan={plan} />
-              ))}
-            </div>
-          </div>
-        </section>
-
-        <section className="bg-[#101820] py-16 text-white lg:py-20">
-          <div className="mx-auto grid max-w-7xl gap-8 px-4 sm:px-6 lg:grid-cols-[1fr,auto] lg:items-center lg:px-8">
-            <div>
-              <p className="text-sm font-semibold text-emerald-300">Demo pronta para teste</p>
-              <h2 className="mt-3 max-w-3xl text-3xl font-semibold leading-tight">
-                Entre agora e veja indicadores, planos de acao, auditoria, documentos e processos funcionando juntos.
-              </h2>
-              <p className="mt-4 text-slate-300">A demo abre com o formulario de acesso ja preparado para teste.</p>
-            </div>
-            <Button asChild size="lg" className="h-12 bg-emerald-500 px-7 text-base text-slate-950 hover:bg-emerald-400">
-              <Link href={accessHref}>
-                Acessar demo agora
-                <ArrowRight className="ml-2 h-5 w-5" />
-              </Link>
-            </Button>
-          </div>
-        </section>
-      </main>
-
-      <footer className="border-t border-slate-200 bg-white py-10">
-        <div className="mx-auto flex max-w-7xl flex-col gap-6 px-4 sm:px-6 md:flex-row md:items-center md:justify-between lg:px-8">
-          <div>
-            <BrandLogo />
-            <p className="mt-3 max-w-xl text-sm leading-6 text-slate-600">
-              Gestao 360 conecta estrategia, execucao, melhoria continua e administracao global em uma plataforma modular.
-            </p>
-          </div>
-          <div className="flex flex-wrap gap-2 text-sm">
-            {NAV_LINKS.map((link) => (
-              <a key={link.href} href={link.href} className="border border-slate-200 px-3 py-2 text-slate-700 hover:border-slate-400">
-                {link.label}
-              </a>
-            ))}
-          </div>
-        </div>
-      </footer>
-    </div>
-  );
-}
-
-function HeroDashboard() {
-  return (
-    <div className="min-w-0 border border-white/10 bg-white/[0.04] p-4 shadow-2xl">
-      <div className="mb-4 flex items-center justify-between border-b border-white/10 pb-4">
-        <div>
-          <div className="text-sm font-semibold text-white">Painel executivo</div>
-          <div className="mt-1 text-xs text-slate-400">Indicadores, acoes e auditoria conectados</div>
-        </div>
-        <span className="border border-emerald-300/40 bg-emerald-300/10 px-2 py-1 text-xs text-emerald-200">Online</span>
-      </div>
-      <div className="grid gap-4 xl:grid-cols-[1.15fr,0.85fr]">
-        <div className="space-y-4">
-          <ScenePanel title="Performance por area">
-            <div className="space-y-3">
-              {[
-                ['Operacao', '91%', 'bg-emerald-400'],
-                ['Qualidade', '84%', 'bg-sky-400'],
-                ['Manutencao', '72%', 'bg-amber-400'],
-                ['Seguranca', '67%', 'bg-rose-400'],
-              ].map(([label, value, color]) => (
-                <div key={label} className="grid grid-cols-[94px,1fr,42px] items-center gap-3 text-xs">
-                  <span className="text-slate-300">{label}</span>
-                  <span className="h-2 bg-white/10">
-                    <span className={cn('block h-2', color)} style={{ width: value }} />
-                  </span>
-                  <span className="text-right text-white">{value}</span>
                 </div>
               ))}
             </div>
-          </ScenePanel>
-          <ScenePanel title="Planos de acao">
-            <div className="grid grid-cols-3 gap-3 text-center text-xs">
-              <SceneMetric label="Abertos" value="38" tone="text-amber-300" />
-              <SceneMetric label="No prazo" value="81%" tone="text-emerald-300" />
-              <SceneMetric label="Criticos" value="6" tone="text-rose-300" />
-            </div>
-          </ScenePanel>
-        </div>
-        <div className="space-y-4">
-          <ScenePanel title="Modulos ativos">
-            <div className="grid grid-cols-2 gap-2 text-xs">
-              {['Indicadores', 'OKRs', 'Auditoria', 'Documentos', 'Riscos', 'Formularios'].map((item) => (
-                <span key={item} className="border border-white/10 bg-white/5 px-2 py-2 text-slate-200">{item}</span>
-              ))}
-            </div>
-          </ScenePanel>
-          <ScenePanel title="Auditoria">
-            <div className="space-y-2 text-xs text-slate-300">
-              <div className="flex justify-between gap-3"><span>LOGIN</span><span className="text-emerald-300">SUCCESS</span></div>
-              <div className="flex justify-between gap-3"><span>RESULT_UPDATE</span><span className="text-sky-300">SYNC</span></div>
-              <div className="flex justify-between gap-3"><span>BACKUP</span><span className="text-emerald-300">OK</span></div>
-            </div>
-          </ScenePanel>
-        </div>
-      </div>
-      <div className="mt-4 grid grid-cols-2 gap-3 text-center text-xs sm:grid-cols-4">
-        <SceneMetric label="Usuarios" value="148" tone="text-white" />
-        <SceneMetric label="Indicadores" value="420" tone="text-white" />
-        <SceneMetric label="Acoes" value="1.2k" tone="text-white" />
-        <SceneMetric label="Logs" value="24k" tone="text-white" />
-      </div>
-    </div>
-  );
-}
-
-function ScenePanel({ title, children }: { title: string; children: ReactNode }) {
-  return (
-    <div className="border border-white/10 bg-[#16232d]/90 p-4">
-      <div className="mb-4 flex items-center justify-between text-xs font-semibold text-white">
-        <span>{title}</span>
-        <span className="h-2 w-2 bg-emerald-300" />
-      </div>
-      {children}
-    </div>
-  );
-}
-
-function SceneMetric({ label, value, tone }: { label: string; value: string; tone: string }) {
-  return (
-    <div className="border border-white/10 bg-white/5 p-3">
-      <div className={cn('text-lg font-semibold', tone)}>{value}</div>
-      <div className="mt-1 text-slate-400">{label}</div>
-    </div>
-  );
-}
-
-function SectionIntro({ eyebrow, title, desc, center, compact }: { eyebrow: string; title: string; desc: string; center?: boolean; compact?: boolean }) {
-  return (
-    <div className={cn(center && 'mx-auto text-center', compact ? 'max-w-xl' : 'max-w-3xl')}>
-      <p className="text-sm font-semibold text-emerald-700">{eyebrow}</p>
-      <h2 className="mt-3 text-3xl font-semibold leading-tight text-slate-950">{title}</h2>
-      <p className="mt-4 text-base leading-7 text-slate-600">{desc}</p>
-    </div>
-  );
-}
-
-function ModuleCard({ icon, title, desc }: { icon: ReactNode; title: string; desc: string }) {
-  return (
-    <article className="border border-slate-200 bg-white p-5 shadow-sm">
-      <div className="flex items-start gap-3">
-        <div className="grid h-10 w-10 shrink-0 place-items-center bg-slate-100 text-slate-800">{icon}</div>
-        <div>
-          <h3 className="text-base font-semibold text-slate-950">{title}</h3>
-          <p className="mt-2 text-sm leading-6 text-slate-600">{desc}</p>
-        </div>
-      </div>
-    </article>
-  );
-}
-
-function GovernanceBlock({ icon, title, desc }: { icon: ReactNode; title: string; desc: string }) {
-  return (
-    <article className="border border-slate-200 bg-white p-6 shadow-sm">
-      <div className="grid h-11 w-11 place-items-center bg-slate-100 text-slate-800">{icon}</div>
-      <h3 className="mt-5 text-lg font-semibold text-slate-950">{title}</h3>
-      <p className="mt-3 text-sm leading-6 text-slate-600">{desc}</p>
-    </article>
-  );
-}
-
-function PlanCard({ plan }: { plan: (typeof PLANS)[number] }) {
-  return (
-    <article className={cn('flex border bg-white p-5 shadow-sm', plan.highlighted ? 'border-emerald-700 ring-1 ring-emerald-700' : 'border-slate-200')}>
-      <div className="flex min-h-full w-full flex-col">
-        <div className="flex items-start justify-between gap-3">
-          <div>
-            <h3 className="text-lg font-semibold text-slate-950">{plan.name}</h3>
-            <p className="mt-2 text-sm font-medium text-emerald-700">{plan.users}</p>
           </div>
-          {plan.highlighted && <span className="bg-emerald-50 px-2 py-1 text-xs font-semibold text-emerald-800">Mais completo</span>}
         </div>
-        <p className="mt-4 text-sm leading-6 text-slate-600">{plan.fit}</p>
-        <ul className="mt-5 flex-1 space-y-3">
-          {plan.details.map((detail) => (
-            <li key={detail} className="flex items-start gap-2 text-sm leading-6 text-slate-700">
-              <Check className="mt-1 h-4 w-4 shrink-0 text-emerald-700" />
-              <span>{detail}</span>
-            </li>
-          ))}
-        </ul>
-        <Button asChild className={cn('mt-6 w-full', plan.highlighted ? 'bg-emerald-600 hover:bg-emerald-700' : 'bg-slate-900 hover:bg-slate-800')}>
-          <Link href="/login">Testar na demo</Link>
-        </Button>
-      </div>
-    </article>
+        <div className="relative mx-auto flex min-h-[680px] max-w-7xl items-center px-4 py-16 sm:px-6 lg:px-8">
+          <div className="max-w-3xl">
+            <p className="text-sm font-semibold uppercase tracking-[0.18em] text-emerald-300">Plataforma SaaS B2B modular</p>
+            <h1 className="mt-5 max-w-4xl text-5xl font-semibold leading-[1.02] sm:text-6xl lg:text-7xl">
+              Gestao estrategica, indicadores e planos de acao conectados em uma unica plataforma.
+            </h1>
+            <p className="mt-6 max-w-2xl text-lg leading-8 text-slate-200">
+              O Gestao 360 integra planejamento, acompanhamento, tratativas, evidencias e rastreabilidade para transformar dados corporativos em decisoes acompanhaveis.
+            </p>
+            <div className="mt-8 flex flex-col gap-3 sm:flex-row">
+              <Link href="/contato" className="inline-flex h-12 items-center justify-center gap-2 bg-emerald-400 px-6 text-sm font-semibold text-slate-950 hover:bg-emerald-300">
+                Solicitar demonstracao
+                <ArrowRight className="h-4 w-4" />
+              </Link>
+              <a href={WHATSAPP_URL} target="_blank" rel="noopener noreferrer" className="inline-flex h-12 items-center justify-center border border-white/30 px-6 text-sm font-semibold text-white hover:bg-white hover:text-slate-950">
+                Falar pelo WhatsApp
+              </a>
+              <Link href="/modulos" className="inline-flex h-12 items-center justify-center border border-white/30 px-6 text-sm font-semibold text-white hover:bg-white hover:text-slate-950">
+                Conhecer modulos
+              </Link>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section className="border-b border-slate-200 bg-white py-16">
+        <div className="mx-auto grid max-w-7xl gap-8 px-4 sm:px-6 lg:grid-cols-[0.8fr,1.2fr] lg:px-8">
+          <SectionIntro eyebrow="Problemas reais" title="Menos controles paralelos. Mais contexto para decidir." />
+          <div className="grid gap-3 sm:grid-cols-2">
+            {challenges.map((item) => (
+              <div key={item} className="flex gap-3 border border-slate-200 p-4">
+                <CheckCircle2 className="mt-0.5 h-5 w-5 shrink-0 text-emerald-600" />
+                <p className="text-sm leading-6 text-slate-700">{item}</p>
+              </div>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      <section className="bg-slate-50 py-20">
+        <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
+          <SectionIntro eyebrow="Solucoes" title="Paginas e modulos pensados para a rotina de gestao." />
+          <div className="mt-10 grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+            {solutionPages.slice(0, 9).map((page) => (
+              <Link key={page.slug} href={page.path} className="group border border-slate-200 bg-white p-5 hover:border-slate-950">
+                <div className="text-xs font-semibold uppercase tracking-[0.14em] text-emerald-700">{page.eyebrow}</div>
+                <h2 className="mt-3 text-xl font-semibold text-slate-950">{page.title}</h2>
+                <p className="mt-3 text-sm leading-6 text-slate-600">{page.summary}</p>
+                <span className="mt-5 inline-flex items-center gap-2 text-sm font-semibold text-slate-950">
+                  Ver solucao <ArrowRight className="h-4 w-4 transition-transform group-hover:translate-x-1" />
+                </span>
+              </Link>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      <section className="bg-white py-20">
+        <div className="mx-auto grid max-w-7xl gap-10 px-4 sm:px-6 lg:grid-cols-[0.9fr,1.1fr] lg:px-8">
+          <div>
+            <SectionIntro eyebrow="Fluxo integrado" title="Da estrategia a execucao, com trilha de auditoria." />
+            <p className="mt-5 text-base leading-7 text-slate-600">
+              A plataforma nao duplica a operacao em paineis soltos. Ela conecta registros de origem, responsaveis, prazos, historico, impactos e evidencias.
+            </p>
+          </div>
+          <div className="grid gap-3">
+            {flow.map(([title, text], index) => (
+              <div key={title} className="grid grid-cols-[48px,1fr] gap-4 border border-slate-200 bg-slate-50 p-4">
+                <div className="grid h-12 w-12 place-items-center bg-slate-950 text-sm font-semibold text-white">{index + 1}</div>
+                <div>
+                  <h2 className="font-semibold text-slate-950">{title}</h2>
+                  <p className="mt-1 text-sm leading-6 text-slate-600">{text}</p>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      <section className="bg-slate-950 py-20 text-white">
+        <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
+          <SectionIntro eyebrow="Modulos disponiveis" title="Uma base modular para crescer sem perder governanca." inverted />
+          <div className="mt-10 grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+            {moduleHighlights.map((item, index) => {
+              const icons = [LineChart, Network, Workflow, ShieldCheck, FileSearch, ClipboardList];
+              const Icon = icons[index] ?? LineChart;
+              return (
+                <div key={item} className="border border-white/10 bg-white/[0.03] p-5">
+                  <Icon className="h-5 w-5 text-emerald-300" />
+                  <p className="mt-4 text-sm leading-6 text-slate-200">{item}</p>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      </section>
+
+      <section className="bg-white py-20">
+        <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
+          <SectionIntro eyebrow="Segmentos" title="Aplicavel a diferentes operacoes corporativas." />
+          <div className="mt-10 grid gap-4 md:grid-cols-2 lg:grid-cols-5">
+            {segmentPages.map((segment) => (
+              <Link key={segment.slug} href={segment.path} className="border border-slate-200 p-5 hover:border-slate-950">
+                <h2 className="text-lg font-semibold">{segment.title}</h2>
+                <p className="mt-3 text-sm leading-6 text-slate-600">{segment.summary}</p>
+              </Link>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      <section className="bg-slate-50 py-20">
+        <div className="mx-auto grid max-w-7xl gap-10 px-4 sm:px-6 lg:grid-cols-[0.9fr,1.1fr] lg:px-8">
+          <div>
+            <SectionIntro eyebrow="Contato" title="Veja como o Gestao 360 se encaixa na sua rotina." />
+            <p className="mt-5 text-sm leading-6 text-slate-600">
+              Informe seu contexto. O retorno comercial deve focar nos modulos que ja existem e no caminho realista de implantacao.
+            </p>
+          </div>
+          <div className="border border-slate-200 bg-white p-5">
+            <ContactForm compact />
+          </div>
+        </div>
+      </section>
+
+      <section className="bg-white py-20">
+        <div className="mx-auto max-w-4xl px-4 sm:px-6 lg:px-8">
+          <SectionIntro eyebrow="Perguntas frequentes" title="Respostas diretas para compradores e gestores." />
+          <div className="mt-8 divide-y divide-slate-200 border-y border-slate-200">
+            {faq.map((item) => (
+              <div key={item.question} className="py-5">
+                <h2 className="font-semibold text-slate-950">{item.question}</h2>
+                <p className="mt-2 text-sm leading-6 text-slate-600">{item.answer}</p>
+              </div>
+            ))}
+          </div>
+        </div>
+      </section>
+    </PublicShell>
+  );
+}
+
+function SectionIntro({ eyebrow, title, inverted = false }: { eyebrow: string; title: string; inverted?: boolean }) {
+  return (
+    <div>
+      <p className={inverted ? 'text-sm font-semibold uppercase tracking-[0.18em] text-emerald-300' : 'text-sm font-semibold uppercase tracking-[0.18em] text-emerald-700'}>{eyebrow}</p>
+      <h2 className={inverted ? 'mt-3 max-w-3xl text-3xl font-semibold tracking-tight text-white sm:text-4xl' : 'mt-3 max-w-3xl text-3xl font-semibold tracking-tight text-slate-950 sm:text-4xl'}>{title}</h2>
+    </div>
   );
 }

@@ -87,6 +87,8 @@ services:
       args:
         # NEXT_PUBLIC_* precisa estar no build (Next inlina)
         NEXT_PUBLIC_API_URL: /api
+        NEXT_PUBLIC_SITE_URL: ${NEXT_PUBLIC_SITE_URL:-https://gestao360.org}
+        NEXT_PUBLIC_WHATSAPP_NUMBER: ${NEXT_PUBLIC_WHATSAPP_NUMBER:-5564981009108}
         NEXT_PUBLIC_APP_NAME: "Gestão 360"
     image: g360-web:latest
     container_name: g360-web
@@ -95,6 +97,10 @@ services:
       NODE_ENV: production
       PORT: "3000"
       HOSTNAME: "0.0.0.0"
+      NEXT_PUBLIC_SITE_URL: ${NEXT_PUBLIC_SITE_URL:-https://gestao360.org}
+      NEXT_PUBLIC_WHATSAPP_NUMBER: ${NEXT_PUBLIC_WHATSAPP_NUMBER:-5564981009108}
+      INDEXNOW_ENABLED: ${INDEXNOW_ENABLED:-0}
+      INDEXNOW_KEY: ${INDEXNOW_KEY:-}
     networks:
       - g360
     expose:

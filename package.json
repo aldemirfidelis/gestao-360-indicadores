@@ -23,6 +23,7 @@
     "db:reset": "pnpm --filter @g360/api prisma:reset",
     "deploy:migrate": "pnpm --filter @g360/api deploy:migrate",
     "deploy:seed": "pnpm --filter @g360/api deploy:seed",
+    "indexnow:submit": "node scripts/indexnow-submit.mjs",
     "setup": "pnpm install && pnpm shared:build && pnpm db:up && pnpm db:migrate && pnpm db:seed",
     "docker:api": "docker build -f apps/api/Dockerfile -t g360-api .",
     "docker:web": "docker build -f apps/web/Dockerfile -t g360-web ."

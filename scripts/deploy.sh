@@ -45,6 +45,14 @@ echo "[4/5] Aplicando migrations do banco..."
 docker compose -f "$COMPOSE_FILE" exec -T api ./node_modules/.bin/prisma migrate deploy
 
 echo ""
+echo "[4.5/5] IndexNow (opcional)..."
+if [ "${INDEXNOW_ENABLED:-0}" = "1" ]; then
+  docker compose -f "$COMPOSE_FILE" exec -T web node /app/scripts/indexnow-submit.mjs || true
+else
+  echo "IndexNow desativado (defina INDEXNOW_ENABLED=1 e INDEXNOW_KEY para ativar)."
+fi
+
+echo ""
 echo "[5/5] Status:"
 docker compose -f "$COMPOSE_FILE" ps
 

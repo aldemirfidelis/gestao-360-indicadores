@@ -76,6 +76,18 @@ export class PlatformAdminController {
     return this.service.dashboard();
   }
 
+  @Get('seo-presence')
+  @PlatformAdminRequired('platform.dashboard.view')
+  seoPresence() {
+    return this.service.getSeoPresence();
+  }
+
+  @Patch('seo-presence')
+  @PlatformAdminRequired('platform.internal_users.manage')
+  updateSeoPresence(@CurrentPlatformAdmin() user: PlatformAdminIdentity, @Body() body: Record<string, unknown>) {
+    return this.service.updateSeoPresence(user, body);
+  }
+
   @Get('companies')
   @PlatformAdminRequired('platform.companies.view')
   companies(

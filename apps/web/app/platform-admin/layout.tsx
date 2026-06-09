@@ -1,11 +1,11 @@
 import type { Metadata } from 'next';
 import { ReactNode } from 'react';
-import { AppShell } from './app-shell';
 
 export const metadata: Metadata = {
+  title: 'Portal Admin Global',
   robots: { index: false, follow: false },
 };
 
-export default function AppLayout({ children }: { children: ReactNode }) {
-  return <AppShell>{children}</AppShell>;
+export default function PlatformAdminLayout({ children }: { children: ReactNode }) {
+  return children;
 }
