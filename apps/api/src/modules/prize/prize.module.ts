@@ -6,6 +6,7 @@ import { PrizeAnnexesController } from './prize-annexes.controller';
 import { PrizeIndicatorsController } from './prize-indicators.controller';
 import { PrizeActualsController } from './prize-actuals.controller';
 import { PrizeEligibleController } from './prize-eligible.controller';
+import { PrizeCalcController } from './prize-calc.controller';
 import { PrizeAuditService } from './prize-audit.service';
 import { PrizeOverviewService } from './prize-overview.service';
 import { PrizeProgramsService } from './prize-programs.service';
@@ -16,6 +17,8 @@ import { PrizeActualsService } from './prize-actuals.service';
 import { PrizePrevistoRealizadoService } from './prize-previsto-realizado.service';
 import { PrizeEligibleService } from './prize-eligible.service';
 import { PrizeConnectorsService } from './prize-connectors.service';
+import { PrizeCalcService } from './prize-calc.service';
+import { PrizeCalcConfigService } from './prize-calc-config.service';
 
 /**
  * Gestao de Premio (Remuneracao Variavel) - Fase 1.
@@ -30,6 +33,7 @@ import { PrizeConnectorsService } from './prize-connectors.service';
     PrizeIndicatorsController,
     PrizeActualsController,
     PrizeEligibleController,
+    PrizeCalcController,
   ],
   providers: [
     PrizeAuditService,
@@ -42,7 +46,9 @@ import { PrizeConnectorsService } from './prize-connectors.service';
     PrizePrevistoRealizadoService,
     PrizeEligibleService,
     PrizeConnectorsService,
+    PrizeCalcService,
+    PrizeCalcConfigService,
   ],
-  exports: [PrizeAuditService, PrizeAnnexesService, PrizeCompetencesService, PrizeActualsService],
+  exports: [PrizeAuditService, PrizeAnnexesService, PrizeCompetencesService, PrizeActualsService, PrizeCalcService],
 })
 export class PrizeModule {}

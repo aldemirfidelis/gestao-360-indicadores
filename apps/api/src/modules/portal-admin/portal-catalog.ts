@@ -96,6 +96,8 @@ export const CATALOG_PAGES: CatalogPage[] = [
   { code: 'prize.previsto-realizado', moduleCode: 'prize', name: 'Previsto x Realizado', title: 'Previsto x Realizado', route: '/gestao-premio/previsto-realizado' },
   { code: 'prize.eligible', moduleCode: 'prize', name: 'Colaboradores Elegíveis', title: 'Colaboradores Elegíveis', route: '/gestao-premio/colaboradores' },
   { code: 'prize.connectors', moduleCode: 'prize', name: 'Integrações do Prêmio', title: 'Integrações do Prêmio', route: '/gestao-premio/integracoes' },
+  { code: 'prize.calc', moduleCode: 'prize', name: 'Apuração Mensal', title: 'Apuração Mensal', route: '/gestao-premio/apuracao' },
+  { code: 'prize.moderators', moduleCode: 'prize', name: 'Moderadores', title: 'Moderadores', route: '/gestao-premio/moderadores' },
   { code: 'settings.main', moduleCode: 'settings', name: 'Configurações', title: 'Configurações', route: '/settings' },
   { code: 'database-admin.main', moduleCode: 'database-admin', name: 'Administração do Banco', title: 'Banco de Dados', route: '/settings/database' },
   { code: 'portal-admin.main', moduleCode: 'portal-admin', name: 'Central do Portal', title: 'Central de Administração do Portal', route: '/settings/portal' },

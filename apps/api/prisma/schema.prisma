@@ -8693,3 +8693,213 @@ model PrizeEmployeeEvent {
   @@index([snapshotId])
   @@index([competenceId, registration])
 }
+
+// =====================================================
+// Gestao de Premio - Fase 4: Motor de Calculo + suportes
+// Regras parametrizaveis (nada de percentual fixo de empresa no codigo).
+// Memoria de calculo auditavel (PrizeCalculationLine). Reprocesso versionado.
+// =====================================================
+
+enum PrizeCalcRunStatus {
+  PENDING
+  RUNNING
+  SUCCESS
+  PARTIAL
+  ERROR
+  SUPERSEDED
+}
+
+enum PrizeAdjustmentStatus {
+  DRAFT
+  REQUESTED
+  IN_ANALYSIS
+  APPROVED
+  REJECTED
+  APPLIED
+  CANCELLED
+}
+
+enum PrizeExceptionType {
+  IMPOSSIBILITY
+  TRAINING
+  TERMINATION
+  OTHER
+}
+
+enum PrizeExceptionStatus {
+  DRAFT
+  REQUESTED
+  APPROVED
+  REJECTED
+  APPLIED
+}
+
+model PrizeModeratorRule {
+  id               String    @id @default(uuid())
+  companyId        String
+  programId        String?
+  name             String
+  eventType        String // FALTA | ATESTADO | MEDIDA_DISCIPLINAR | SUSPENSAO | ACIDENTE | ...
+  criterion        String? // PER_OCCURRENCE | PER_DAY | ANY
+  reductionPercent Decimal?  @db.Decimal(9, 4) // % de reducao sobre o premio
+  reductionValue   Decimal?  @db.Decimal(14, 2) // reducao em valor fixo
+  cap              Decimal?  @db.Decimal(9, 4) // teto de reducao acumulada (%)
+  cumulative       Boolean   @default(true)
+  priority         Int       @default(0)
+  requiresApproval Boolean   @default(false)
+  active           Boolean   @default(true)
+  validFrom        DateTime?
+  validTo          DateTime?
+  notes            String?
+  createdById      String?
+  createdAt        DateTime  @default(now())
+  updatedAt        DateTime  @updatedAt
+
+  @@index([companyId])
+  @@index([companyId, programId])
+  @@index([companyId, eventType])
+}
+
+model PrizeManualAdjustment {
+  id            String                @id @default(uuid())
+  companyId     String
+  competenceId  String
+  registration  String
+  field         String // AREA | POSITION | SALARY | DAYS | ELIGIBILITY | POTENTIAL | FINAL_VALUE
+  previousValue String?
+  newValue      String?
+  amount        Decimal?              @db.Decimal(14, 2)
+  reason        String
+  evidenceRef   String?
+  status        PrizeAdjustmentStatus @default(REQUESTED)
+  requestedById String?
+  decidedById   String?
+  decidedAt     DateTime?
+  comment       String?
+  createdAt     DateTime              @default(now())
+  updatedAt     DateTime              @updatedAt
+
+  @@index([companyId, competenceId])
+  @@index([competenceId, registration])
+  @@index([status])
+}
+
+model PrizeException {
+  id                 String               @id @default(uuid())
+  companyId          String
+  competenceId       String
+  registration       String?
+  type               PrizeExceptionType
+  scope              String? // ALL | indicatorId | area
+  avgMonths          Int?                 @default(6)
+  gratificationValue Decimal?             @db.Decimal(14, 2)
+  reason             String
+  evidenceRef        String?
+  status             PrizeExceptionStatus @default(REQUESTED)
+  requestedById      String?
+  decidedById        String?
+  decidedAt          DateTime?
+  createdAt          DateTime             @default(now())
+  updatedAt          DateTime             @updatedAt
+
+  @@index([companyId, competenceId])
+  @@index([competenceId, registration])
+  @@index([status])
+}
+
+model PrizeTemporaryAllocation {
+  id             String    @id @default(uuid())
+  companyId      String
+  competenceId   String
+  registration   String
+  originArea     String?
+  originPosition String?
+  destArea       String?
+  destPosition   String?
+  costCenterRef  String?
+  startDate      DateTime?
+  endDate        DateTime?
+  days           Int       @default(0)
+  ruleApplied    String? // KEEP_ORIGIN | APPLY_DEST | PROPORTIONAL
+  hasRight       Boolean   @default(true)
+  reason         String?
+  evidenceRef    String?
+  status         String    @default("REGISTERED")
+  createdById    String?
+  createdAt      DateTime  @default(now())
+
+  @@index([companyId, competenceId])
+  @@index([competenceId, registration])
+}
+
+model PrizeCalculationRun {
+  id              String              @id @default(uuid())
+  companyId       String
+  competenceId    String
+  version         Int
+  status          PrizeCalcRunStatus  @default(PENDING)
+  engineVersion   String
+  params          Json?
+  totalEmployees  Int                 @default(0)
+  totalGross      Decimal?            @db.Decimal(16, 2)
+  totalReductions Decimal?            @db.Decimal(16, 2)
+  totalFinal      Decimal?            @db.Decimal(16, 2)
+  errorsCount     Int                 @default(0)
+  reason          String?
+  startedAt       DateTime?
+  finishedAt      DateTime?
+  createdById     String?
+  createdAt       DateTime            @default(now())
+
+  results PrizeCalculationResult[]
+
+  @@unique([competenceId, version])
+  @@index([companyId])
+  @@index([competenceId])
+  @@index([competenceId, status])
+}
+
+model PrizeCalculationResult {
+  id              String                  @id @default(uuid())
+  companyId       String
+  runId           String
+  run             PrizeCalculationRun     @relation(fields: [runId], references: [id], onDelete: Cascade)
+  competenceId    String
+  registration    String
+  name            String
+  baseSalary      Decimal?                @db.Decimal(14, 2)
+  potential       Decimal?                @db.Decimal(14, 2)
+  weightedGain    Decimal?                @db.Decimal(9, 4)
+  proportionality Decimal?                @db.Decimal(9, 4)
+  grossValue      Decimal?                @db.Decimal(14, 2)
+  totalReductions Decimal?                @db.Decimal(14, 2)
+  adjustments     Decimal?                @db.Decimal(14, 2)
+  gratification   Decimal?                @db.Decimal(14, 2)
+  finalValue      Decimal?                @db.Decimal(14, 2)
+  blocked         Boolean                 @default(false)
+  blockReason     String?
+  exceptionType   String?
+  hash            String?
+  createdAt       DateTime                @default(now())
+
+  lines PrizeCalculationLine[]
+
+  @@index([runId])
+  @@index([companyId, competenceId])
+  @@index([competenceId, registration])
+}
+
+model PrizeCalculationLine {
+  id        String                 @id @default(uuid())
+  resultId  String
+  result    PrizeCalculationResult @relation(fields: [resultId], references: [id], onDelete: Cascade)
+  step      Int
+  code      String
+  label     String
+  detail    String?
+  value     Decimal?               @db.Decimal(18, 4)
+  data      Json?
+  createdAt DateTime               @default(now())
+
+  @@index([resultId])
+}

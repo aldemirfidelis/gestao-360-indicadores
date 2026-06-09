@@ -6,8 +6,41 @@
 > Cálculo → Conferência → Aprovação → Folha → Espelho → Auditoria**.
 >
 > Documento vivo. Cobre as Fases **1 (Fundação + Governança)**, **2 (Realizado +
-> Previsto × Realizado)** e **3 (Base Elegível / Apdata + Snapshot + Conciliação)**,
-> entregues e validadas. As fases seguintes estão no backlog residual (seção 7).
+> Previsto × Realizado)**, **3 (Base Elegível / Apdata + Snapshot + Conciliação)**
+> e **4 (Motor de Cálculo + Apuração)**, entregues e validadas. As fases seguintes
+> estão no backlog residual (seção 7).
+
+## 0.2. Fase 4 — Motor de Cálculo + Apuração (entregue)
+
+> **Calibração:** revisados TODOS os arquivos da pasta `Gestao_premio` (PDF, DOCX,
+> XLSX, PPTX, .bpm). Os documentos definem o **conjunto completo de regras/etapas**
+> (idêntico ao processo GOIASA), porém **não fixam percentuais** — por exigência
+> dos requisitos, os valores são **parametrizáveis** e vivem no anexo + nas regras
+> de moderador. Único default fixo: **média de 6 meses** (configurável) para
+> impossibilidade. Logo, o motor sai calibrado nas regras; os números entram pela
+> configuração (multiempresa, sem hardcode).
+
+- **Banco** (aditivo): 4 enums + 7 tabelas (`PrizeModeratorRule`,
+  `PrizeManualAdjustment`, `PrizeException`, `PrizeTemporaryAllocation`,
+  `PrizeCalculationRun`, `PrizeCalculationResult`, `PrizeCalculationLine`).
+  Migração `20260609200000_prize_calc_engine`.
+- **Motor PURO** (`prize-calc-engine.ts`, `computePrize`): etapas do procedimento
+  (potencial → atingimento ponderado por faixa → resultado-base → proporcionalidade
+  → indicadores individuais/comportamentais → bruto → moderadores → ajustes →
+  exceções → teto/piso → arredondamento → final), com **memória de cálculo**
+  (linhas auditáveis) e hash do processamento. Determinístico e 100% testado
+  (`prize-calc-engine.spec.ts`, 10 cenários).
+- **Orquestração** (`prize-calc.service.ts`): carrega snapshot elegível + anexo
+  vigente (match por cargo/área) + indicadores + realizado + eventos + regras +
+  ajustes/exceções aprovados; roda o motor por colaborador; persiste run/result/
+  line. **Reprocesso versionado** (run anterior → SUPERSEDED, nunca sobrescreve);
+  impossibilidade usa média histórica das competências anteriores.
+- **Configuração e governança** (`prize-calc-config.service.ts`): moderadores
+  (CRUD parametrizável), ajustes manuais e exceções com **fluxo de aprovação e
+  segregação** (quem solicita não aprova o próprio ajuste), transitoriedade.
+- **Frontend**: `/gestao-premio/apuracao` (rodar/reprocessar + resultados +
+  **memória de cálculo** por colaborador) e `/gestao-premio/moderadores` (config).
+- **Testes**: suíte total **274 verdes**. tsc verde (api+web).
 
 ## 0.1. Fase 3 — Base Elegível (Apdata) + Snapshot + Conciliação (entregue)
 
@@ -249,12 +282,11 @@ justificativa.
   e UI de evidências pendentes (API de evidência já existe).
 - Tendência e impacto financeiro no Previsto × Realizado (dependem de histórico e
   do Motor de Cálculo da Fase 4).
+- Fase 4: motor + apuração + memória prontos; **telas de ajustes/exceções/
+  transitoriedade** têm API completa, faltando a UI dedicada (inc. 2). Conferência
+  formal (workflow de aprovação da apuração) pendente.
 
 ### Próximas fases (não iniciadas)
-- **Fase 4 — Motor de cálculo**: 20 etapas, memória de cálculo auditável,
-  reprocessamento controlado; moderadores, proporcionalidade, transitoriedade,
-  ajustes manuais, exceções (impossibilidade/treinamento/desligamento),
-  indicadores comportamentais.
 - **Fase 5 — Folha**: geração de lote (rubrica/verba), retorno e conciliação.
 - **Fase 6 — Espelho do prêmio (PDF)**: demonstrativo individual com memória de
   cálculo, emissão em lote, publicação e ciência.
