@@ -8150,3 +8150,347 @@ model MyDayAssistantLog {
   @@index([companyId, userId, hidden])
   @@index([generatedAt])
 }
+
+// =====================================================
+// Gestao de Premio (Remuneracao Variavel) - Fase 1
+// Governanca de Anexos, Programas, Competencias e Indicadores.
+// Tenancy por companyId (scalar). FKs externas (User/OrgNode) sao colunas
+// escalares + constraints aplicadas na migration SQL; relacoes internas do
+// modulo usam @relation. Toda regra de negocio fica no backend (servico).
+// =====================================================
+
+enum PrizeProgramStatus {
+  DRAFT
+  ACTIVE
+  INACTIVE
+  ARCHIVED
+}
+
+enum PrizePeriodicity {
+  MONTHLY
+  WEEKLY
+  DAILY
+  QUARTERLY
+  SEMIANNUAL
+  ANNUAL
+}
+
+enum PrizeCompetenceStatus {
+  PLANNED
+  OPEN
+  FILLING
+  IN_VALIDATION
+  PRE_CLOSE
+  CLOSED_FOR_CALC
+  IN_CALCULATION
+  IN_REVIEW
+  IN_APPROVAL
+  APPROVED
+  SENT_TO_PAYROLL
+  PAYSLIPS_PUBLISHED
+  CLOSED
+}
+
+enum PrizeAnnexStatus {
+  DRAFT
+  IN_ELABORATION
+  IN_VALIDATION
+  IN_APPROVAL
+  APPROVED
+  EFFECTIVE
+  SUPERSEDED
+  ARCHIVED
+}
+
+enum PrizeApprovalStatus {
+  PENDING
+  APPROVED
+  REJECTED
+  RETURNED
+}
+
+enum PrizeIndicatorKind {
+  COLLECTIVE
+  INDIVIDUAL
+  BEHAVIORAL_COLLECTIVE
+  BEHAVIORAL_INDIVIDUAL
+}
+
+enum PrizeIndicatorDirection {
+  HIGHER_BETTER
+  LOWER_BETTER
+  TARGET
+}
+
+enum PrizeIndicatorSource {
+  MANUAL
+  BSC
+  INTERNAL_API
+  FILE_IMPORT
+  AUTO_CALC
+}
+
+model PrizeProgram {
+  id                  String             @id @default(uuid())
+  companyId           String
+  orgNodeId           String?
+  code                String
+  name                String
+  description         String?
+  programType         String?
+  periodicity         PrizePeriodicity   @default(MONTHLY)
+  currency            String             @default("BRL")
+  validFrom           DateTime?
+  validTo             DateTime?
+  status              PrizeProgramStatus @default(DRAFT)
+  roundingRule        String?
+  closeDay            Int?
+  approvalDeadlineDay Int?
+  payrollDeadlineDay  Int?
+  defaultRubric       String?
+  ownerUserId         String?
+  approvers           Json?
+  eligibility         Json?
+  notes               String?
+  createdById         String?
+  createdAt           DateTime           @default(now())
+  updatedAt           DateTime           @updatedAt
+  deletedAt           DateTime?
+
+  versions    PrizeProgramVersion[]
+  competences PrizeCompetence[]
+  annexes     PrizeAnnex[]
+  indicators  PrizeIndicator[]
+
+  @@unique([companyId, code])
+  @@index([companyId])
+  @@index([companyId, status])
+  @@index([orgNodeId])
+}
+
+model PrizeProgramVersion {
+  id          String       @id @default(uuid())
+  programId   String
+  program     PrizeProgram @relation(fields: [programId], references: [id], onDelete: Cascade)
+  version     Int
+  snapshot    Json
+  note        String?
+  createdById String?
+  createdAt   DateTime     @default(now())
+
+  @@unique([programId, version])
+  @@index([programId])
+}
+
+model PrizeCompetence {
+  id                 String                @id @default(uuid())
+  companyId          String
+  programId          String
+  program            PrizeProgram          @relation(fields: [programId], references: [id], onDelete: Cascade)
+  year               Int
+  month              Int
+  label              String
+  startDate          DateTime?
+  endDate            DateTime?
+  launchDeadline     DateTime?
+  validationDeadline DateTime?
+  approvalDeadline   DateTime?
+  payrollDate        DateTime?
+  paymentDate        DateTime?
+  status             PrizeCompetenceStatus @default(PLANNED)
+  responsibles       Json?
+  checklist          Json?
+  notes              String?
+  closedAt           DateTime?
+  closedById         String?
+  createdById        String?
+  createdAt          DateTime              @default(now())
+  updatedAt          DateTime              @updatedAt
+
+  parameters PrizeIndicatorParameter[]
+
+  @@unique([programId, year, month])
+  @@index([companyId])
+  @@index([companyId, status])
+  @@index([programId, year, month])
+}
+
+model PrizeAnnex {
+  id               String       @id @default(uuid())
+  companyId        String
+  programId        String
+  program          PrizeProgram @relation(fields: [programId], references: [id], onDelete: Cascade)
+  code             String
+  name             String
+  orgNodeId        String?
+  positionRef      String?
+  costCenterRef    String?
+  currentVersionId String?
+  notes            String?
+  createdById      String?
+  createdAt        DateTime     @default(now())
+  updatedAt        DateTime     @updatedAt
+  deletedAt        DateTime?
+
+  versions PrizeAnnexVersion[]
+
+  @@unique([companyId, code])
+  @@index([companyId])
+  @@index([programId])
+  @@index([orgNodeId])
+}
+
+model PrizeAnnexVersion {
+  id                    String               @id @default(uuid())
+  annexId               String
+  annex                 PrizeAnnex           @relation(fields: [annexId], references: [id], onDelete: Cascade)
+  version               Int
+  status                PrizeAnnexStatus     @default(DRAFT)
+  effectiveFrom         DateTime?
+  effectiveTo           DateTime?
+  salaryPercent         Decimal?             @db.Decimal(9, 4)
+  gainPotential         Decimal?             @db.Decimal(14, 2)
+  gainChance            Decimal?             @db.Decimal(9, 4)
+  formula               Json?
+  rules                 Json?
+  criteria              Json?
+  changeReason          String?
+  createdById           String?
+  submittedAt           DateTime?
+  approvedAt            DateTime?
+  supersededAt          DateTime?
+  supersededByVersionId String?
+  createdAt             DateTime             @default(now())
+  updatedAt             DateTime             @updatedAt
+
+  approvals  PrizeAnnexApproval[]
+  indicators PrizeIndicator[]
+
+  @@unique([annexId, version])
+  @@index([annexId])
+  @@index([status])
+  @@index([annexId, status])
+}
+
+model PrizeAnnexApproval {
+  id             String              @id @default(uuid())
+  annexVersionId String
+  annexVersion   PrizeAnnexVersion   @relation(fields: [annexVersionId], references: [id], onDelete: Cascade)
+  stepOrder      Int                 @default(1)
+  approverUserId String?
+  approverRole   String?
+  status         PrizeApprovalStatus @default(PENDING)
+  comment        String?
+  decidedById    String?
+  decidedAt      DateTime?
+  createdAt      DateTime            @default(now())
+
+  @@index([annexVersionId])
+  @@index([status])
+}
+
+model PrizeIndicator {
+  id             String                  @id @default(uuid())
+  companyId      String
+  programId      String
+  program        PrizeProgram            @relation(fields: [programId], references: [id], onDelete: Cascade)
+  annexVersionId String?
+  annexVersion   PrizeAnnexVersion?      @relation(fields: [annexVersionId], references: [id], onDelete: SetNull)
+  code           String
+  name           String
+  description    String?
+  unit           String?
+  kind           PrizeIndicatorKind      @default(COLLECTIVE)
+  direction      PrizeIndicatorDirection @default(HIGHER_BETTER)
+  source         PrizeIndicatorSource    @default(MANUAL)
+  bscNumber      String?
+  weight         Decimal?                @db.Decimal(9, 4)
+  formula        String?
+  roundingRule   String?
+  orgNodeId      String?
+  positionRef    String?
+  costCenterRef  String?
+  periodicity    PrizePeriodicity        @default(MONTHLY)
+  status         String                  @default("ACTIVE")
+  createdById    String?
+  createdAt      DateTime                @default(now())
+  updatedAt      DateTime                @updatedAt
+  deletedAt      DateTime?
+
+  parameters PrizeIndicatorParameter[]
+  ranges     PrizeIndicatorRange[]
+
+  @@unique([programId, code])
+  @@index([companyId])
+  @@index([programId])
+  @@index([annexVersionId])
+}
+
+model PrizeIndicatorParameter {
+  id           String           @id @default(uuid())
+  indicatorId  String
+  indicator    PrizeIndicator   @relation(fields: [indicatorId], references: [id], onDelete: Cascade)
+  competenceId String?
+  competence   PrizeCompetence? @relation(fields: [competenceId], references: [id], onDelete: SetNull)
+  year         Int?
+  month        Int?
+  week         Int?
+  day          Int?
+  scopeKey     String?
+  target       Decimal?         @db.Decimal(18, 4)
+  zero         Decimal?         @db.Decimal(18, 4)
+  weight       Decimal?         @db.Decimal(9, 4)
+  changeReason String?
+  createdById  String?
+  createdAt    DateTime         @default(now())
+  updatedAt    DateTime         @updatedAt
+
+  ranges PrizeIndicatorRange[] @relation("ParamRanges")
+
+  @@index([indicatorId])
+  @@index([competenceId])
+  @@index([indicatorId, year, month])
+}
+
+model PrizeIndicatorRange {
+  id                 String                   @id @default(uuid())
+  indicatorId        String
+  indicator          PrizeIndicator           @relation(fields: [indicatorId], references: [id], onDelete: Cascade)
+  parameterId        String?
+  parameter          PrizeIndicatorParameter? @relation("ParamRanges", fields: [parameterId], references: [id], onDelete: SetNull)
+  orderIndex         Int                      @default(0)
+  minLimit           Decimal?                 @db.Decimal(18, 4)
+  maxLimit           Decimal?                 @db.Decimal(18, 4)
+  achievementPercent Decimal?                 @db.Decimal(9, 4)
+  gainPercent        Decimal?                 @db.Decimal(9, 4)
+  weight             Decimal?                 @db.Decimal(9, 4)
+  behaviorAbove      String?
+  behaviorBelow      String?
+  cap                Decimal?                 @db.Decimal(9, 4)
+  floor              Decimal?                 @db.Decimal(9, 4)
+  cumulative         Boolean                  @default(false)
+  createdAt          DateTime                 @default(now())
+
+  @@index([indicatorId])
+  @@index([parameterId])
+}
+
+model PrizeAuditLog {
+  id            String   @id @default(uuid())
+  companyId     String
+  userId        String?
+  userEmail     String?
+  action        String
+  entityType    String
+  entityId      String
+  competenceId  String?
+  before        Json?
+  after         Json?
+  justification String?
+  ip            String?
+  createdAt     DateTime @default(now())
+
+  @@index([companyId, entityType, entityId])
+  @@index([companyId, createdAt])
+  @@index([competenceId])
+}

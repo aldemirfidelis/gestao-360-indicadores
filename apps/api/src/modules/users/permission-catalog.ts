@@ -250,6 +250,27 @@ export const PERMISSION_CATALOG = [
   ['myday:configure', 'Configurar preferências pessoais do Meu Dia', 'Meu Dia', 'manage'],
   ['myday:team', 'Visualizar o Meu Dia da equipe (gestor)', 'Meu Dia', 'view'],
   ['myday:admin', 'Administrar regras de prioridade e categorias do Meu Dia', 'Meu Dia', 'manage'],
+
+  // Gestão de Prêmio (Remuneração Variável)
+  ['prize:view', 'Visualizar Gestão de Prêmio', 'Gestão de Prêmio', 'view'],
+  ['prize:programs:manage', 'Cadastrar e gerenciar programas de prêmio', 'Gestão de Prêmio', 'manage'],
+  ['prize:competences:manage', 'Gerenciar competências (planejar, abrir, editar)', 'Gestão de Prêmio', 'manage'],
+  ['prize:competences:close', 'Fechar competência (checklist de fechamento)', 'Gestão de Prêmio', 'approve'],
+  ['prize:competences:reopen', 'Reabrir competência fechada (alçada)', 'Gestão de Prêmio', 'approve'],
+  ['prize:annex:manage', 'Criar e editar anexos e versões de regras', 'Gestão de Prêmio', 'manage'],
+  ['prize:annex:submit', 'Enviar anexo para validação/aprovação', 'Gestão de Prêmio', 'update'],
+  ['prize:annex:approve', 'Aprovar, reprovar ou devolver anexos', 'Gestão de Prêmio', 'approve'],
+  ['prize:indicators:manage', 'Gerenciar indicadores, metas, zeros e faixas', 'Gestão de Prêmio', 'manage'],
+  ['prize:actuals:manage', 'Lançar e importar o realizado', 'Gestão de Prêmio', 'create'],
+  ['prize:actuals:close', 'Fechar e reabrir o realizado do período', 'Gestão de Prêmio', 'approve'],
+  ['prize:calc:run', 'Executar e reprocessar a apuração do prêmio', 'Gestão de Prêmio', 'manage'],
+  ['prize:adjustments:manage', 'Solicitar ajustes manuais e exceções', 'Gestão de Prêmio', 'create'],
+  ['prize:adjustments:approve', 'Aprovar ajustes manuais e exceções', 'Gestão de Prêmio', 'approve'],
+  ['prize:payroll:manage', 'Gerar e conciliar lotes para a folha', 'Gestão de Prêmio', 'manage'],
+  ['prize:payslip:publish', 'Emitir e publicar espelhos do prêmio', 'Gestão de Prêmio', 'publish'],
+  ['prize:reports:view', 'Visualizar relatórios e auditoria do prêmio', 'Gestão de Prêmio', 'view'],
+  ['prize:salary:view', 'Consultar dados salariais e valores individuais', 'Gestão de Prêmio', 'view'],
+  ['prize:admin', 'Administrar configurações e integrações do módulo de prêmio', 'Gestão de Prêmio', 'manage'],
 ] as const;
 
 const ALL_KEYS = PERMISSION_CATALOG.map(([key]) => key);
@@ -385,6 +406,16 @@ export const DEFAULT_PROFILES = [
       'automations:view',
       'automations:execute',
       'automations:approve',
+      // Gestão de Prêmio: gestor opera, mas NÃO aprova anexos/ajustes nem vê salário (segregação)
+      'prize:view',
+      'prize:programs:manage',
+      'prize:competences:manage',
+      'prize:annex:manage',
+      'prize:annex:submit',
+      'prize:indicators:manage',
+      'prize:actuals:manage',
+      'prize:adjustments:manage',
+      'prize:reports:view',
     ],
   },
   {

@@ -51,6 +51,7 @@ import { Vision360Module } from './modules/vision360/vision360.module';
 import { AutomationsModule } from './modules/automations/automations.module';
 import { MyDayModule } from './modules/my-day/my-day.module';
 import { WorkItemEventsModule } from './modules/my-day/work-item-event-bus';
+import { PrizeModule } from './modules/prize/prize.module';
 
 @Module({
   imports: [
@@ -103,6 +104,7 @@ import { WorkItemEventsModule } from './modules/my-day/work-item-event-bus';
     Vision360Module,
     AutomationsModule,
     MyDayModule,
+    PrizeModule,
   ],
   providers: [
     { provide: APP_GUARD, useClass: ThrottlerGuard },
