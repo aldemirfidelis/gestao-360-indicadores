@@ -101,6 +101,8 @@ export const CATALOG_PAGES: CatalogPage[] = [
   { code: 'prize.adjustments', moduleCode: 'prize', name: 'Ajustes e Exceções', title: 'Ajustes e Exceções', route: '/gestao-premio/ajustes' },
   { code: 'prize.payroll', moduleCode: 'prize', name: 'Integração com a Folha', title: 'Integração com a Folha', route: '/gestao-premio/folha' },
   { code: 'prize.payslips', moduleCode: 'prize', name: 'Espelhos do Prêmio', title: 'Espelhos do Prêmio', route: '/gestao-premio/espelhos' },
+  { code: 'prize.reports', moduleCode: 'prize', name: 'Relatórios do Prêmio', title: 'Relatórios do Prêmio', route: '/gestao-premio/relatorios' },
+  { code: 'prize.audit', moduleCode: 'prize', name: 'Auditoria do Prêmio', title: 'Auditoria do Prêmio', route: '/gestao-premio/auditoria' },
   { code: 'settings.main', moduleCode: 'settings', name: 'Configurações', title: 'Configurações', route: '/settings' },
   { code: 'database-admin.main', moduleCode: 'database-admin', name: 'Administração do Banco', title: 'Banco de Dados', route: '/settings/database' },
   { code: 'portal-admin.main', moduleCode: 'portal-admin', name: 'Central do Portal', title: 'Central de Administração do Portal', route: '/settings/portal' },

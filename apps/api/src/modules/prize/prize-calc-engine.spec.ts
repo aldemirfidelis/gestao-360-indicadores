@@ -106,6 +106,36 @@ describe('computePrize — motor de cálculo', () => {
     expect(blocked.finalValue).toBe(0);
   });
 
+  it('transitoriedade sem direito ao prêmio bloqueia o pagamento', () => {
+    const r = computePrize(input({
+      gainPotential: 1000, salaryPercent: null,
+      allocations: [{ destArea: 'Logistica', days: 30, ruleApplied: 'APPLY_DEST', hasRight: false }],
+    }));
+    expect(r.blocked).toBe(true);
+    expect(r.finalValue).toBe(0);
+    expect(r.lines.find((l) => l.code === 'TRANSIT')).toBeTruthy();
+  });
+
+  it('transitoriedade com direito registra trilha e mantém o prêmio', () => {
+    const r = computePrize(input({
+      gainPotential: 1000, salaryPercent: null,
+      allocations: [{ destArea: 'Qualidade', days: 10, ruleApplied: 'APPLY_DEST', hasRight: true }],
+    }));
+    expect(r.blocked).toBe(false);
+    expect(r.finalValue).toBe(1000);
+    expect(r.lines.find((l) => l.code === 'TRANSIT')?.detail).toContain('direito: sim');
+  });
+
+  it('desligamento registra exceção e mantém proporcionalidade pelos dias', () => {
+    const r = computePrize(input({
+      gainPotential: 1000, salaryPercent: null, workedDays: 15,
+      exception: { type: 'TERMINATION' },
+    }));
+    expect(r.exceptionType).toBe('TERMINATION');
+    expect(r.finalValue).toBe(500); // 1000 × 0.5
+    expect(r.lines.find((l) => l.code === 'EXC_TERM')).toBeTruthy();
+  });
+
   it('gera memória de cálculo com etapas', () => {
     const r = computePrize(input({ gainPotential: 1000, salaryPercent: null }));
     expect(r.lines.length).toBeGreaterThan(3);

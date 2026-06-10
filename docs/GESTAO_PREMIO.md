@@ -5,11 +5,32 @@
 > Fechamento → Base Elegível → Eventos → Transitoriedade → Ajustes → Exceções →
 > Cálculo → Conferência → Aprovação → Folha → Espelho → Auditoria**.
 >
-> Documento vivo. Cobre as Fases **1 (Fundação + Governança)**, **2 (Realizado +
-> Previsto × Realizado)**, **3 (Base Elegível / Apdata + Snapshot + Conciliação)**,
-> **4 (Motor de Cálculo + Apuração + Conferência)**, **5 (Integração com a Folha)**
-> e **6 (Espelho do Prêmio)**, entregues e validadas. Só a **Fase 7** (Relatórios +
-> Super Admin + IA) está no backlog residual (seção 7).
+> Documento vivo. **Módulo completo (Fases 1 a 7)** entregue e validado: Fundação +
+> Governança, Realizado + Previsto × Realizado, Base Elegível (Apdata), Motor de
+> Cálculo + Conferência, Folha, Espelho (PDF) e Relatórios + Auditoria + IA assistiva.
+> Conformidade conferida contra os documentos e o prompt — ver seção 8.
+
+## 0.5. Fase 7 — Relatórios + Auditoria + IA assistiva (entregue)
+
+- **Relatórios** (`/gestao-premio/relatorios`): apuração por colaborador +
+  agregações por **área / cargo / centro de custo** + totais; exportação **CSV**;
+  aba **operacionais** (pendências: anexos sem aprovação, indicadores sem
+  realizado, competências abertas, lotes rejeitados, espelhos não publicados,
+  ciência pendente). `prize-reports.service` (sem dados fixos).
+- **Auditoria** (`/gestao-premio/auditoria`): trilha imutável (`PrizeAuditLog`)
+  com filtro por entidade — quem/o quê/quando/por quê.
+- **IA assistiva** (`prize-ai.service`, reusa `GeminiService`): explica a memória
+  de cálculo de um colaborador e gera resumo executivo da competência. **Sempre
+  como recomendação** (`recommendation: true`), nunca altera valores/regras;
+  **fallback determinístico** (rule-based) quando não há chave de IA configurada.
+- **Conformidade do motor corrigida**: **transitoriedade** (registro por dias,
+  direito sim/não → bloqueio, trilha na memória) e **desligamento** (proporcional
+  por dias, registrado) agora ligados ao `computePrize` e à orquestração
+  (engine specs cobrindo ambos).
+- **Super Admin**: o módulo `prize` está no catálogo da plataforma
+  (`CATALOG_MODULES` → `PLATFORM_MODULES`), habilitável/bloqueável por empresa e
+  incluído nos planos — gerenciável pelo Portal Admin Global existente.
+- **Testes**: suíte total **280 verdes**. tsc verde (api+web).
 
 ## 0.4. Fase 6 — Espelho do Prêmio (PDF) (entregue)
 
@@ -326,12 +347,65 @@ justificativa.
   (enviar p/ conferência → aprovar/reprovar, com segregação: quem roda não aprova)
   já entregues. Pendência residual: notificações automáticas da conferência.
 
-### Próximas fases (não iniciadas)
-- **Fase 7 — Relatórios, Super Admin (seção Gestão de Prêmio), automações e IA
-  assistiva**.
+### Residual (refinamentos — não impeditivos)
+- Importação em massa **XLSX/CSV** do realizado e da base elegível pela UI (a API
+  já aceita linhas parseadas; falta o parser de arquivo no front).
+- **Notificações automáticas** (§26) por e-mail/sistema dos eventos do ciclo
+  (DESEJÁVEL na matriz; trilha de auditoria já cobre o registro).
+- Transitoriedade **multi-segmento** com re-apuração por indicadores da área de
+  destino (hoje: registro por dias + direito sim/não + proporcional + trilha).
+- Painel **dedicado** do módulo no Super Admin com métricas de consumo (hoje:
+  habilitar/bloquear por empresa + planos via Portal Admin Global).
+- Wizard de anexo em 12 passos e UI de evidências (CRUD/API prontos).
 
 ### Depende de credencial / regra externa
 - Endpoints/credenciais reais do Apdata e da Folha (até lá: importação assistida
-  por arquivo + mocks documentados).
+  por arquivo + mocks documentados — sem simular integração real).
 - Percentuais e critérios específicos de moderadores/faixas (parametrizáveis —
   não fixados em código).
+
+---
+
+## 8. Conformidade (vs. documentos `Gestao_premio` e prompt de 38 seções)
+
+Conferência dos 36 critérios de aceite (§36 do prompt) e dos 25 requisitos
+indispensáveis (matriz POC). **Legenda:** ✓ atendido · ◐ atendido com refinamento
+residual.
+
+| # | Critério de aceite | Status | Onde |
+|---|---|---|---|
+| 1 | Módulo integrado ao Gestão 360 | ✓ | menu, RBAC, catálogo |
+| 2 | Menu e navegação completos | ✓ | seção "Gestão de Prêmio" (18 telas) |
+| 3 | Empresas isoladas | ✓ | `companyId` em todas as queries |
+| 4 | Anexos com workflow e versões | ✓ | Fase 1 |
+| 5 | Uma versão vigente por contexto | ✓ | publish supersede + overlap |
+| 6 | Metas/zeros/faixas/pesos parametrizáveis | ✓ | Indicadores |
+| 7 | Realizado lançado e importado | ◐ | manual+grade ✓; import XLSX UI residual |
+| 8 | Realizado fechado bloqueado | ✓ | Fase 2 |
+| 9 | Reabertura com justificativa e alçada | ✓ | Fases 2/4 |
+| 10 | Competência com checklist | ✓ | Fase 1/2 |
+| 11 | Apdata com adaptador | ✓ | conectores (mock/arquivo) |
+| 12 | Importação manual de contingência | ✓ | Fase 3 |
+| 13 | Snapshot por competência | ✓ | `PrizeEmployeeSnapshot` (lote) |
+| 14 | Divergências conciliáveis | ✓ | `reconcile` |
+| 15 | Motor versionado | ✓ | `PrizeCalculationRun` (SUPERSEDED) |
+| 16 | Memória de cálculo | ✓ | `PrizeCalculationLine` |
+| 17 | Moderadores aplicados | ✓ | regras parametrizáveis |
+| 18 | Transitoriedade funcional | ◐ | dias+direito+proporcional+trilha; multi-segmento residual |
+| 19 | Ajustes manuais auditados | ✓ | aprovação+segregação |
+| 20 | Exceções tratadas | ✓ | impossibilidade/treinamento/desligamento |
+| 21 | Treinamento contemplado | ✓ | engine (gratificação) |
+| 22 | Desligamentos tratados | ✓ | engine (proporcional) |
+| 23 | Saída para folha | ✓ | Fase 5 |
+| 24 | Retorno conciliado | ✓ | Fase 5 |
+| 25 | PDF do espelho | ✓ | Fase 6 (jsPDF) |
+| 26 | Relatórios | ✓ | Fase 7 |
+| 27 | Trilha de auditoria | ✓ | `PrizeAuditLog` + tela |
+| 28 | Alertas | ◐ | trilha ✓; notificações automáticas residual (DESEJÁVEL) |
+| 29 | Permissões granulares | ✓ | 22 chaves `prize:*` |
+| 30 | Segregação de função | ✓ | anexo/ajuste/conferência |
+| 31 | Salário não exposto | ✓ | `prize:salary:view` |
+| 32 | Testes documentados | ✓ | 280 testes (engine, governança, conciliação, folha) |
+| 33 | Documentação técnica | ✓ | este documento |
+| 34 | Migrations seguras | ✓ | 8 migrações aditivas/reversíveis |
+| 35 | Funcionalidades existentes intactas | ✓ | suíte completa verde; worktree isolada |

@@ -28,7 +28,7 @@ export class PrizeCalcService {
     const competence = await this.prisma.prizeCompetence.findFirst({ where: { id: competenceId, companyId: me.companyId } });
     if (!competence) throw new NotFoundException('Competência não encontrada');
 
-    const [snapshot, indicators, actuals, events, moderatorRules, adjustments, exceptions, effectiveVersions, program] = await Promise.all([
+    const [snapshot, indicators, actuals, events, moderatorRules, adjustments, exceptions, allocations, effectiveVersions, program] = await Promise.all([
       this.prisma.prizeEmployeeSnapshot.findMany({ where: { companyId: me.companyId, competenceId, current: true } }),
       this.prisma.prizeIndicator.findMany({ where: { companyId: me.companyId, programId: competence.programId, deletedAt: null }, include: { ranges: true } }),
       this.prisma.prizeActualResult.findMany({ where: { companyId: me.companyId, competenceId } }),
@@ -36,6 +36,7 @@ export class PrizeCalcService {
       this.prisma.prizeModeratorRule.findMany({ where: { companyId: me.companyId, active: true, OR: [{ programId: null }, { programId: competence.programId }] } }),
       this.prisma.prizeManualAdjustment.findMany({ where: { companyId: me.companyId, competenceId, status: 'APPROVED' } }),
       this.prisma.prizeException.findMany({ where: { companyId: me.companyId, competenceId, status: 'APPROVED' } }),
+      this.prisma.prizeTemporaryAllocation.findMany({ where: { companyId: me.companyId, competenceId } }),
       this.prisma.prizeAnnexVersion.findMany({ where: { status: 'EFFECTIVE', annex: { companyId: me.companyId, programId: competence.programId } }, include: { annex: true } }),
       this.prisma.prizeProgram.findFirst({ where: { id: competence.programId } }),
     ]);
@@ -50,6 +51,8 @@ export class PrizeCalcService {
     for (const a of adjustments) { const arr = adjByReg.get(a.registration) ?? []; arr.push(a); adjByReg.set(a.registration, arr); }
     const excByReg = new Map<string, typeof exceptions>();
     for (const x of exceptions) { if (!x.registration) continue; const arr = excByReg.get(x.registration) ?? []; arr.push(x); excByReg.set(x.registration, arr); }
+    const allocByReg = new Map<string, typeof allocations>();
+    for (const al of allocations) { const arr = allocByReg.get(al.registration) ?? []; arr.push(al); allocByReg.set(al.registration, arr); }
 
     // versao do run
     const lastRun = await this.prisma.prizeCalculationRun.aggregate({ where: { competenceId }, _max: { version: true } });
@@ -101,6 +104,7 @@ export class PrizeCalcService {
           moderatorRules: moderatorRules.map((r) => ({ name: r.name, eventType: r.eventType, criterion: r.criterion, reductionPercent: num(r.reductionPercent), reductionValue: num(r.reductionValue), cap: num(r.cap), cumulative: r.cumulative, priority: r.priority })),
           adjustments: (adjByReg.get(emp.registration) ?? []).map((a) => ({ field: a.field, amount: num(a.amount) })),
           exception: exc ? { type: exc.type as any, avgMonths: exc.avgMonths, gratificationValue: num(exc.gratificationValue) } : null,
+          allocations: (allocByReg.get(emp.registration) ?? []).map((a) => ({ destArea: a.destArea, destPosition: a.destPosition, days: a.days, ruleApplied: a.ruleApplied, hasRight: a.hasRight })),
           historicalAverage,
           blockedByService: (!annexVersion ? { reason: 'Sem anexo vigente para o contexto' } : emp.blocked || !emp.eligible ? { reason: 'Colaborador bloqueado/não elegível' } : null),
           config: { periodDays: 30, roundingRule, cap: null, floor: null },

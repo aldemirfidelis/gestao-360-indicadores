@@ -26,6 +26,7 @@ export interface EngineModeratorRule {
 }
 export interface EngineAdjustment { field: string; amount?: number | null }
 export interface EngineException { type: 'IMPOSSIBILITY' | 'TRAINING' | 'TERMINATION' | 'OTHER'; avgMonths?: number | null; gratificationValue?: number | null }
+export interface EngineAllocation { destArea?: string | null; destPosition?: string | null; days?: number | null; ruleApplied?: string | null; hasRight: boolean }
 export interface EngineConfig {
   periodDays: number; // dias do periodo (default 30)
   roundingRule: string; // HALF_UP_2 | FLOOR_2 | HALF_UP_0
@@ -44,6 +45,7 @@ export interface EngineInput {
   moderatorRules: EngineModeratorRule[];
   adjustments: EngineAdjustment[];
   exception?: EngineException | null;
+  allocations?: EngineAllocation[]; // transitoriedade de area (por dias)
   historicalAverage?: number | null; // media dos ultimos N meses (para IMPOSSIBILITY)
   blockedByService?: { reason: string } | null; // bloqueio externo (ex.: nao elegivel)
   config: EngineConfig;
@@ -139,6 +141,24 @@ export function computePrize(input: EngineInput): EngineOutput {
   const proportionality = input.workedDays != null ? Math.max(0, Math.min(1, input.workedDays / periodDays)) : 1;
   base = base * proportionality;
   add(8, 'PROPORTION', 'Proporcionalidade', round(proportionality, 'HALF_UP_2'), `${input.workedDays ?? periodDays}/${periodDays} dias`);
+
+  // 9. Transitoriedade de area (segmenta por dias; registra trilha; direito sim/nao)
+  if (input.allocations?.length) {
+    for (const a of input.allocations) {
+      add(9, 'TRANSIT', `Transitoriedade: ${a.destArea ?? a.destPosition ?? 'área destino'}`, a.days ?? null, `${a.ruleApplied ?? 'APPLY_DEST'} · ${a.days ?? 0} dia(s) · direito: ${a.hasRight ? 'sim' : 'não'}`);
+    }
+    // Sem direito ao premio em todos os periodos de alocacao -> bloqueia.
+    if (input.allocations.every((a) => !a.hasRight)) {
+      add(19, 'FINAL', 'Prêmio final', 0, 'Bloqueado por transitoriedade sem direito ao prêmio');
+      return { potential: round(potential, cfg.roundingRule), weightedGain: round(weightedGain, 'HALF_UP_2'), proportionality: round(proportionality, 'HALF_UP_2'), grossValue: 0, totalReductions: 0, adjustments: 0, gratification: 0, finalValue: 0, blocked: true, blockReason: 'Transitoriedade sem direito ao prêmio', exceptionType, lines };
+    }
+  }
+
+  // Desligamento no periodo: premio proporcional aos dias trabalhados (ja aplicado).
+  if (input.exception?.type === 'TERMINATION') {
+    exceptionType = 'TERMINATION';
+    add(9, 'EXC_TERM', 'Desligamento no período', round(base, cfg.roundingRule), 'Prêmio proporcional aos dias efetivamente trabalhados');
+  }
 
   // 10-11. Indicadores individuais e comportamentais (fatores multiplicativos)
   const individuals = input.indicators.filter((i) => i.kind === 'INDIVIDUAL');
