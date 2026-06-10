@@ -11,6 +11,41 @@
 > Conformidade conferida contra os documentos e o prompt — ver seção 8.
 > **Em produção** no droplet (PostgreSQL local; 6+1 migrações aplicadas).
 
+## 0.7. Consolidação de reuso — menos telas, plataforma como fonte única (entregue)
+
+> Revisão pós-entrega a pedido do produto: o módulo havia criado telas/fluxos
+> paralelos onde a plataforma já tinha recurso equivalente. Princípio aplicado:
+> **o prêmio PARAMETRIZA; o cadastro e o lançamento vivem nos módulos nativos.**
+
+- **Indicadores (reuso real do módulo nativo)**: o caminho PADRÃO de criação
+  agora é **selecionar um indicador do catálogo da plataforma** — nome, unidade,
+  sentido, descrição e nº BSC são **herdados no backend** (`create` resolve o
+  nativo e preenche; `GET /prize/indicators/platform-options` expõe o catálogo
+  sob `prize:view`, sem exigir `indicators:view`). O formulário manual virou
+  exceção explícita ("indicador exclusivo do prêmio"). A tela foi reposicionada
+  como **parametrização** (metas/zeros/pesos/faixas) e cada item exibe badge
+  `🔗 Plataforma` ou `Exclusivo do prêmio`.
+- **Realizado sync-first**: "Sincronizar da plataforma" é a ação primária; a
+  grade **bloqueia digitação manual para indicadores vinculados** (corrige-se na
+  origem — módulo Lançamentos — e sincroniza). Lançamento manual continua apenas
+  para indicadores exclusivos do prêmio.
+- **Menos telas (16 → 13 rotas no menu)**, sem perder função:
+  - `previsto-realizado` → aba "Previsto × Realizado" dentro de **Realizado**
+    (as duas telas já consumiam o MESMO endpoint);
+  - `moderadores` → aba "Moderadores" dentro de **Ajustes e Exceções**;
+  - `auditoria` → aba "Auditoria" dentro de **Relatórios e Auditoria**.
+  As rotas antigas fazem `redirect()` (favoritos não quebram).
+- **Sem mudança de banco**: nenhuma migração nova; `PrizeIndicator` permanece
+  como tabela de parametrização (peso/tipo/faixas por programa), agora vinculada
+  ao `Indicator` nativo por `platformIndicatorId` como caminho padrão.
+- **Validação**: tsc verde (api+web); suíte API **283 verdes**.
+- **Duplicação remanescente (decisão documentada)**: `PrizeIntegrationConfig`
+  (conectores do prêmio com `secretRef` por env) coexiste com o framework de
+  integrações da plataforma (`ExternalIntegration`, credenciais cifradas,
+  provider APDATA). O prompt (§31) pedia conectores dedicados por empresa com
+  jobs por competência; recomendação futura: convergir credenciais para
+  `ExternalIntegration` mantendo `PrizeIntegrationJob` para os lotes.
+
 ## 0.6. Upgrade de Automação — zero planilha no fluxo padrão (entregue)
 
 > Princípio: **todo lançamento acontece na plataforma ou chega por API**;

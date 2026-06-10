@@ -19,7 +19,7 @@ interface Indicator {
   id: string; code: string; name: string; unit: string | null; kind: string; direction: string; source: string;
   weight: string | null; bscNumber: string | null; platformIndicatorId: string | null; _count?: { parameters: number; ranges: number };
 }
-interface PlatformIndicatorRef { id: string; name: string; code: string | null }
+interface PlatformIndicatorRef { id: string; name: string; code: string | null; unit: string | null; direction: string; bscNumber: string | null }
 interface Parameter { id: string; year: number | null; month: number | null; scopeKey: string | null; target: string | null; zero: string | null; weight: string | null }
 interface Range { id: string; orderIndex: number; minLimit: string | null; maxLimit: string | null; achievementPercent: string | null; gainPercent: string | null }
 interface IndicatorDetail extends Indicator { parameters: Parameter[]; ranges: Range[] }
@@ -28,7 +28,7 @@ const KIND: Record<string, string> = { COLLECTIVE: 'Coletivo', INDIVIDUAL: 'Indi
 const DIRECTION: Record<string, string> = { HIGHER_BETTER: 'Maior melhor', LOWER_BETTER: 'Menor melhor', TARGET: 'Alvo exato' };
 const SOURCE: Record<string, string> = { MANUAL: 'Manual', BSC: 'BSC', INTERNAL_API: 'API interna', FILE_IMPORT: 'Arquivo', AUTO_CALC: 'Cálculo' };
 
-const emptyInd = { programId: '', code: '', name: '', unit: '', kind: 'COLLECTIVE', direction: 'HIGHER_BETTER', source: 'MANUAL', weight: '', bscNumber: '', platformIndicatorId: '' };
+const emptyInd = { programId: '', code: '', name: '', unit: '', kind: 'COLLECTIVE', direction: 'HIGHER_BETTER', source: 'MANUAL', weight: '', bscNumber: '', platformIndicatorId: '', manual: false };
 const emptyParam = { year: new Date().getFullYear(), month: new Date().getMonth() + 1, scopeKey: '', target: '', zero: '', weight: '', changeReason: '' };
 const emptyRange = { orderIndex: 0, minLimit: '', maxLimit: '', achievementPercent: '', gainPercent: '' };
 
@@ -45,10 +45,11 @@ export default function PrizeIndicatorsPage() {
   const [rangeForm, setRangeForm] = useState(emptyRange);
 
   const { data: programs = [] } = useQuery({ queryKey: ['prize-programs-ref'], queryFn: () => api<any[]>('/prize/programs') });
-  // Indicadores nativos da plataforma p/ vínculo (sincronização automática do realizado)
+  // Catálogo nativo da plataforma: caminho PADRÃO de criação (reuso, sem recadastro).
+  // Endpoint do próprio prêmio: não exige a permissão indicators:view.
   const { data: platformIndicators = [] } = useQuery({
     queryKey: ['platform-indicators-ref'],
-    queryFn: () => api<PlatformIndicatorRef[]>('/indicators'),
+    queryFn: () => api<PlatformIndicatorRef[]>('/prize/indicators/platform-options'),
     enabled: open,
     staleTime: 60_000,
   });
@@ -66,8 +67,15 @@ export default function PrizeIndicatorsPage() {
   const onErr = (e: ApiError) => toast.error(e.message);
 
   const createInd = useMutation({
-    mutationFn: () => api('/prize/indicators', { method: 'POST', json: { ...form, weight: form.weight ? Number(form.weight) : null, platformIndicatorId: form.platformIndicatorId || null } }),
-    onSuccess: () => { toast.success('Indicador criado'); invalidate(); setOpen(false); }, onError: onErr,
+    mutationFn: () => {
+      const { manual, ...payload } = form;
+      // Vinculado: o backend herda nome/unidade/sentido do indicador nativo.
+      const json = manual
+        ? { ...payload, platformIndicatorId: null }
+        : { programId: payload.programId, kind: payload.kind, weight: payload.weight, platformIndicatorId: payload.platformIndicatorId || null };
+      return api('/prize/indicators', { method: 'POST', json: { ...json, weight: form.weight ? Number(form.weight) : null } });
+    },
+    onSuccess: () => { toast.success('Indicador adicionado ao programa'); invalidate(); setOpen(false); }, onError: onErr,
   });
   const removeInd = useMutation({
     mutationFn: (id: string) => api(`/prize/indicators/${id}`, { method: 'DELETE' }),
@@ -103,10 +111,10 @@ export default function PrizeIndicatorsPage() {
       <PageHeader
         title="Indicadores do Prêmio"
         eyebrow="Gestão de Prêmio"
-        description="Indicadores coletivos, individuais e comportamentais com metas, zeros, pesos e faixas variáveis por período."
+        description="Parametrização do prêmio (metas, zeros, pesos e faixas) sobre os indicadores da plataforma — o cadastro do indicador continua único, no módulo Indicadores."
         tone="view"
         breadcrumbs={[{ label: 'Gestão de Prêmio', href: '/gestao-premio' }, { label: 'Indicadores' }]}
-        actions={canManage ? <Button onClick={() => { setForm({ ...emptyInd, programId: programFilter || programs[0]?.id || '' }); setOpen(true); }}><Plus className="mr-1 h-4 w-4" />Novo indicador</Button> : undefined}
+        actions={canManage ? <Button onClick={() => { setForm({ ...emptyInd, programId: programFilter || programs[0]?.id || '' }); setOpen(true); }}><Plus className="mr-1 h-4 w-4" />Adicionar indicador</Button> : undefined}
       />
 
       <div className="mb-4 flex items-center gap-2">
@@ -137,9 +145,12 @@ export default function PrizeIndicatorsPage() {
                         <span className="text-xs font-mono text-muted-foreground">{ind.code}</span>
                         <span className="font-medium">{ind.name}</span>
                         <Badge variant="secondary">{KIND[ind.kind] ?? ind.kind}</Badge>
+                        {ind.platformIndicatorId
+                          ? <Badge variant="outline" className="border-emerald-300 text-emerald-700">🔗 Plataforma</Badge>
+                          : <Badge variant="outline">Exclusivo do prêmio</Badge>}
                       </div>
                       <p className="text-xs text-muted-foreground">
-                        {DIRECTION[ind.direction]} · {SOURCE[ind.source]}{ind.unit ? ` · ${ind.unit}` : ''}{ind.weight ? ` · peso ${ind.weight}` : ''}{ind.bscNumber ? ` · BSC ${ind.bscNumber}` : ''}{ind.platformIndicatorId ? ' · 🔗 sincronizado da plataforma' : ''}
+                        {DIRECTION[ind.direction]} · {SOURCE[ind.source]}{ind.unit ? ` · ${ind.unit}` : ''}{ind.weight ? ` · peso ${ind.weight}` : ''}{ind.bscNumber ? ` · BSC ${ind.bscNumber}` : ''}{ind.platformIndicatorId ? ' · realizado sincroniza dos Lançamentos' : ' · realizado manual'}
                       </p>
                     </div>
                     <div className="flex shrink-0 items-center gap-2">
@@ -204,10 +215,10 @@ export default function PrizeIndicatorsPage() {
         </div>
       )}
 
-      {/* Create indicator dialog */}
+      {/* Adicionar indicador ao programa: o caminho padrão é REUSAR o catálogo da plataforma */}
       <Dialog open={open} onOpenChange={setOpen}>
         <DialogContent className="max-w-lg">
-          <DialogHeader><DialogTitle>Novo indicador</DialogTitle></DialogHeader>
+          <DialogHeader><DialogTitle>Adicionar indicador ao programa</DialogTitle></DialogHeader>
           <div className="space-y-3">
             <div><Label>Programa *</Label>
               <NativeSelect value={form.programId} onChange={(e) => setForm({ ...form, programId: e.target.value })}>
@@ -215,42 +226,63 @@ export default function PrizeIndicatorsPage() {
                 {programs.map((p) => <option key={p.id} value={p.id}>{p.code} — {p.name}</option>)}
               </NativeSelect>
             </div>
-            <div className="grid grid-cols-2 gap-3">
-              <div><Label>Código</Label><Input value={form.code} onChange={(e) => setForm({ ...form, code: e.target.value })} placeholder="auto (IND-001)" /></div>
-              <div><Label>Unidade</Label><Input value={form.unit} onChange={(e) => setForm({ ...form, unit: e.target.value })} placeholder="%, ton, R$…" /></div>
-            </div>
-            <div><Label>Nome *</Label><Input value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} /></div>
+
+            {!form.manual ? (
+              <div>
+                <Label>Indicador da plataforma *</Label>
+                <NativeSelect value={form.platformIndicatorId} onChange={(e) => setForm({ ...form, platformIndicatorId: e.target.value })}>
+                  <option value="">Selecione no catálogo…</option>
+                  {platformIndicators.map((pi) => <option key={pi.id} value={pi.id}>{pi.code ? `${pi.code} — ` : ''}{pi.name}</option>)}
+                </NativeSelect>
+                <p className="mt-1 text-xs text-muted-foreground">
+                  Nome, unidade e sentido vêm do cadastro único do módulo Indicadores, e o realizado sincroniza
+                  automaticamente dos Lançamentos (ou da API externa) — sem recadastro e sem planilha.
+                  Indicador ainda não existe? Cadastre em <a href="/indicators/new" className="underline">Indicadores</a> e volte aqui.
+                </p>
+              </div>
+            ) : (
+              <>
+                <div className="grid grid-cols-2 gap-3">
+                  <div><Label>Código</Label><Input value={form.code} onChange={(e) => setForm({ ...form, code: e.target.value })} placeholder="auto (IND-001)" /></div>
+                  <div><Label>Unidade</Label><Input value={form.unit} onChange={(e) => setForm({ ...form, unit: e.target.value })} placeholder="%, ton, R$…" /></div>
+                </div>
+                <div><Label>Nome *</Label><Input value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} /></div>
+                <div className="grid grid-cols-2 gap-3">
+                  <div><Label>Sentido</Label>
+                    <NativeSelect value={form.direction} onChange={(e) => setForm({ ...form, direction: e.target.value })}>
+                      {Object.entries(DIRECTION).map(([k, v]) => <option key={k} value={k}>{v}</option>)}
+                    </NativeSelect>
+                  </div>
+                  <div><Label>Fonte</Label>
+                    <NativeSelect value={form.source} onChange={(e) => setForm({ ...form, source: e.target.value })}>
+                      {Object.entries(SOURCE).map(([k, v]) => <option key={k} value={k}>{v}</option>)}
+                    </NativeSelect>
+                  </div>
+                </div>
+                <div><Label>Nº BSC (opcional)</Label><Input value={form.bscNumber} onChange={(e) => setForm({ ...form, bscNumber: e.target.value })} /></div>
+              </>
+            )}
+
             <div className="grid grid-cols-2 gap-3">
               <div><Label>Tipo</Label>
                 <NativeSelect value={form.kind} onChange={(e) => setForm({ ...form, kind: e.target.value })}>
                   {Object.entries(KIND).map(([k, v]) => <option key={k} value={k}>{v}</option>)}
                 </NativeSelect>
               </div>
-              <div><Label>Sentido</Label>
-                <NativeSelect value={form.direction} onChange={(e) => setForm({ ...form, direction: e.target.value })}>
-                  {Object.entries(DIRECTION).map(([k, v]) => <option key={k} value={k}>{v}</option>)}
-                </NativeSelect>
-              </div>
-              <div><Label>Fonte</Label>
-                <NativeSelect value={form.source} onChange={(e) => setForm({ ...form, source: e.target.value })}>
-                  {Object.entries(SOURCE).map(([k, v]) => <option key={k} value={k}>{v}</option>)}
-                </NativeSelect>
-              </div>
               <div><Label>Peso (%)</Label><Input type="number" value={form.weight} onChange={(e) => setForm({ ...form, weight: e.target.value })} /></div>
             </div>
-            <div><Label>Nº BSC (opcional)</Label><Input value={form.bscNumber} onChange={(e) => setForm({ ...form, bscNumber: e.target.value })} /></div>
-            <div>
-              <Label>Indicador da plataforma (sincronização automática)</Label>
-              <NativeSelect value={form.platformIndicatorId} onChange={(e) => setForm({ ...form, platformIndicatorId: e.target.value })}>
-                <option value="">Sem vínculo (lançamento manual)</option>
-                {platformIndicators.map((pi) => <option key={pi.id} value={pi.id}>{pi.code ? `${pi.code} — ` : ''}{pi.name}</option>)}
-              </NativeSelect>
-              <p className="mt-1 text-xs text-muted-foreground">Vinculando, o realizado vem automaticamente do módulo Lançamentos (ou da API externa) — sem redigitação e sem planilha.</p>
-            </div>
+
+            <label className="flex items-center gap-2 text-xs text-muted-foreground">
+              <input type="checkbox" checked={form.manual} onChange={(e) => setForm({ ...form, manual: e.target.checked })} />
+              Indicador exclusivo do prêmio (exceção: não existe no catálogo da plataforma; realizado será manual)
+            </label>
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setOpen(false)}>Cancelar</Button>
-            <Button onClick={() => createInd.mutate()} disabled={createInd.isPending || !form.programId || !form.name.trim()}>{createInd.isPending ? 'Criando…' : 'Criar'}</Button>
+            <Button
+              onClick={() => createInd.mutate()}
+              disabled={createInd.isPending || !form.programId || (form.manual ? !form.name.trim() : !form.platformIndicatorId)}
+            >{createInd.isPending ? 'Adicionando…' : 'Adicionar'}</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>

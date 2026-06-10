@@ -20,6 +20,13 @@ export class PrizeIndicatorsController {
     return this.service.list(me.companyId, { programId, annexVersionId, kind, q });
   }
 
+  // Catalogo nativo p/ vinculo (reuso do modulo Indicadores). Antes de :id.
+  @Get('platform-options')
+  @RequirePermissions('prize:view')
+  platformOptions(@CurrentUser() me: AuthPayload) {
+    return this.service.listPlatformOptions(me.companyId);
+  }
+
   @Get(':id')
   @RequirePermissions('prize:view')
   get(@CurrentUser() me: AuthPayload, @Param('id') id: string) {

@@ -59,6 +59,7 @@ export class PrizePrevistoRealizadoService {
         unit: ind.unit,
         kind: ind.kind,
         weight: num(ind.weight),
+        platformIndicatorId: ind.platformIndicatorId,
         actualId: actual?.id ?? null,
         actualStatus: actual?.status ?? null,
         ...evalResult,

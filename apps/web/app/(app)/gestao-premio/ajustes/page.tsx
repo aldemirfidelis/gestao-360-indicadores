@@ -3,7 +3,7 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useState } from 'react';
 import { toast } from 'sonner';
-import { SlidersHorizontal, Plus, CheckCircle2, XCircle } from 'lucide-react';
+import { SlidersHorizontal, Plus, CheckCircle2, XCircle, Trash2 } from 'lucide-react';
 import { PageHeader } from '@/components/shell/page-header';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -21,27 +21,40 @@ interface CompetenceRef { id: string; label: string; program: { code: string; na
 interface Adjustment { id: string; registration: string; field: string; amount: string | null; reason: string; status: string }
 interface Exception { id: string; registration: string | null; type: string; avgMonths: number | null; gratificationValue: string | null; reason: string; status: string }
 interface Allocation { id: string; registration: string; originArea: string | null; destArea: string | null; destPosition: string | null; days: number; ruleApplied: string | null; hasRight: boolean }
+interface Moderator {
+  id: string; name: string; eventType: string; criterion: string | null; reductionPercent: string | null;
+  reductionValue: string | null; cap: string | null; cumulative: boolean; priority: number; active: boolean;
+}
 
 const ADJ_STATUS: Record<string, any> = { REQUESTED: 'secondary', APPROVED: 'default', REJECTED: 'destructive', APPLIED: 'default', CANCELLED: 'outline' };
 const EXC_TYPE: Record<string, string> = { IMPOSSIBILITY: 'Impossibilidade de apuração', TRAINING: 'Treinamento', TERMINATION: 'Desligamento', OTHER: 'Outra' };
+const MOD_EVENT_TYPES = ['FALTA', 'ATESTADO', 'MEDIDA_DISCIPLINAR', 'SUSPENSAO', 'ACIDENTE'];
+const MOD_EVENT_LABEL: Record<string, string> = { FALTA: 'Falta', ATESTADO: 'Atestado', MEDIDA_DISCIPLINAR: 'Medida disciplinar', SUSPENSAO: 'Suspensão', ACIDENTE: 'Acidente (ato inseguro)' };
+const MOD_CRITERIA: Record<string, string> = { ANY: 'Por ocorrência', PER_DAY: 'Por dia', PER_OCCURRENCE: 'Por evento' };
+const emptyModForm = { name: '', eventType: 'FALTA', criterion: 'PER_DAY', reductionPercent: '', reductionValue: '', cap: '', cumulative: true, priority: 0, active: true };
 
 export default function PrizeAdjustmentsPage() {
   const qc = useQueryClient();
   const { hasPermission } = useAuth();
   const canManage = hasPermission(['prize:adjustments:manage']);
   const canApprove = hasPermission(['prize:adjustments:approve']);
+  const canAdmin = hasPermission(['prize:admin']);
 
   const [competenceId, setCompetenceId] = useState('');
   const [tab, setTab] = useState('adjustments');
-  const [dialog, setDialog] = useState<null | 'adj' | 'exc' | 'alloc'>(null);
+  const [dialog, setDialog] = useState<null | 'adj' | 'exc' | 'alloc' | 'mod'>(null);
   const [adjForm, setAdjForm] = useState({ registration: '', field: 'FINAL_VALUE', amount: '', reason: '' });
   const [excForm, setExcForm] = useState({ type: 'IMPOSSIBILITY', registration: '', avgMonths: 6, gratificationValue: '', reason: '' });
   const [allocForm, setAllocForm] = useState({ registration: '', originArea: '', destArea: '', destPosition: '', days: 0, ruleApplied: 'APPLY_DEST', hasRight: true, reason: '' });
+  const [editingMod, setEditingMod] = useState<Moderator | null>(null);
+  const [modForm, setModForm] = useState(emptyModForm);
 
   const { data: competences = [] } = useQuery({ queryKey: ['prize-competences-ref'], queryFn: () => api<CompetenceRef[]>('/prize/competences') });
   const { data: adjustments = [] } = useQuery({ queryKey: ['prize-adj', competenceId], queryFn: () => api<Adjustment[]>(`/prize/calc/competence/${competenceId}/adjustments`), enabled: !!competenceId });
   const { data: exceptions = [] } = useQuery({ queryKey: ['prize-exc', competenceId], queryFn: () => api<Exception[]>(`/prize/calc/competence/${competenceId}/exceptions`), enabled: !!competenceId });
   const { data: allocations = [] } = useQuery({ queryKey: ['prize-alloc', competenceId], queryFn: () => api<Allocation[]>(`/prize/calc/competence/${competenceId}/allocations`), enabled: !!competenceId });
+  // Regras de moderador valem para a empresa toda (não dependem de competência).
+  const { data: moderators = [] } = useQuery({ queryKey: ['prize-moderators'], queryFn: () => api<Moderator[]>('/prize/calc/moderators') });
 
   const inval = (k: string) => qc.invalidateQueries({ queryKey: [k] });
   const onErr = (e: ApiError) => toast.error(e.message);
@@ -51,13 +64,26 @@ export default function PrizeAdjustmentsPage() {
   const createExc = useMutation({ mutationFn: () => api(`/prize/calc/competence/${competenceId}/exceptions`, { method: 'POST', json: { ...excForm, registration: excForm.registration || null, gratificationValue: excForm.gratificationValue ? Number(excForm.gratificationValue) : null } }), onSuccess: () => { toast.success('Exceção solicitada'); inval('prize-exc'); setDialog(null); }, onError: onErr });
   const decideExc = useMutation({ mutationFn: ({ id, decision }: { id: string; decision: string }) => api(`/prize/calc/exceptions/${id}/decide`, { method: 'PATCH', json: { decision } }), onSuccess: () => { toast.success('Decisão registrada'); inval('prize-exc'); }, onError: onErr });
   const createAlloc = useMutation({ mutationFn: () => api(`/prize/calc/competence/${competenceId}/allocations`, { method: 'POST', json: { ...allocForm, days: Number(allocForm.days) || 0 } }), onSuccess: () => { toast.success('Transitoriedade registrada'); inval('prize-alloc'); setDialog(null); }, onError: onErr });
+  const saveMod = useMutation({
+    mutationFn: () => {
+      const payload = {
+        name: modForm.name, eventType: modForm.eventType, criterion: modForm.criterion,
+        reductionPercent: modForm.reductionPercent ? Number(modForm.reductionPercent) : null,
+        reductionValue: modForm.reductionValue ? Number(modForm.reductionValue) : null,
+        cap: modForm.cap ? Number(modForm.cap) : null, cumulative: modForm.cumulative, priority: Number(modForm.priority) || 0, active: modForm.active,
+      };
+      return editingMod ? api(`/prize/calc/moderators/${editingMod.id}`, { method: 'PATCH', json: payload }) : api('/prize/calc/moderators', { method: 'POST', json: payload });
+    },
+    onSuccess: () => { toast.success(editingMod ? 'Regra atualizada' : 'Regra criada'); inval('prize-moderators'); setDialog(null); }, onError: onErr,
+  });
+  const removeMod = useMutation({ mutationFn: (id: string) => api(`/prize/calc/moderators/${id}`, { method: 'DELETE' }), onSuccess: () => { toast.success('Regra removida'); inval('prize-moderators'); }, onError: onErr });
 
   return (
     <div>
       <PageHeader
-        title="Ajustes, Exceções e Transitoriedade"
+        title="Ajustes, Exceções e Moderadores"
         eyebrow="Gestão de Prêmio"
-        description="Insumos governados do cálculo: ajustes manuais e exceções com aprovação/segregação, e alocações temporárias por dias."
+        description="Insumos governados do cálculo: ajustes manuais e exceções com aprovação/segregação, alocações temporárias e regras de moderador (perdas individuais)."
         tone="view"
         breadcrumbs={[{ label: 'Gestão de Prêmio', href: '/gestao-premio' }, { label: 'Ajustes e Exceções' }]}
       />
@@ -70,17 +96,28 @@ export default function PrizeAdjustmentsPage() {
         </NativeSelect>
       </div>
 
-      {!competenceId ? (
-        <Card><CardContent className="flex flex-col items-center gap-3 py-12 text-center">
-          <SlidersHorizontal className="h-10 w-10 text-muted-foreground/50" />
-          <p className="text-sm text-muted-foreground">Selecione uma competência.</p>
-        </CardContent></Card>
+      {!competenceId && tab !== 'moderators' ? (
+        <div className="space-y-3">
+          <Tabs value={tab} onValueChange={setTab}>
+            <TabsList>
+              <TabsTrigger value="adjustments">Ajustes</TabsTrigger>
+              <TabsTrigger value="exceptions">Exceções</TabsTrigger>
+              <TabsTrigger value="allocations">Transitoriedade</TabsTrigger>
+              <TabsTrigger value="moderators">Moderadores ({moderators.length})</TabsTrigger>
+            </TabsList>
+          </Tabs>
+          <Card><CardContent className="flex flex-col items-center gap-3 py-12 text-center">
+            <SlidersHorizontal className="h-10 w-10 text-muted-foreground/50" />
+            <p className="text-sm text-muted-foreground">Selecione uma competência (regras de moderador não precisam de competência).</p>
+          </CardContent></Card>
+        </div>
       ) : (
         <Tabs value={tab} onValueChange={setTab}>
           <TabsList>
-            <TabsTrigger value="adjustments">Ajustes ({adjustments.length})</TabsTrigger>
-            <TabsTrigger value="exceptions">Exceções ({exceptions.length})</TabsTrigger>
-            <TabsTrigger value="allocations">Transitoriedade ({allocations.length})</TabsTrigger>
+            <TabsTrigger value="adjustments">Ajustes{competenceId ? ` (${adjustments.length})` : ''}</TabsTrigger>
+            <TabsTrigger value="exceptions">Exceções{competenceId ? ` (${exceptions.length})` : ''}</TabsTrigger>
+            <TabsTrigger value="allocations">Transitoriedade{competenceId ? ` (${allocations.length})` : ''}</TabsTrigger>
+            <TabsTrigger value="moderators">Moderadores ({moderators.length})</TabsTrigger>
           </TabsList>
 
           {/* AJUSTES */}
@@ -153,8 +190,76 @@ export default function PrizeAdjustmentsPage() {
               )}
             </CardContent></Card>
           </TabsContent>
+
+          {/* MODERADORES (regras por empresa — aplicadas pelo motor após o resultado-base) */}
+          <TabsContent value="moderators" className="mt-3">
+            {canAdmin && <div className="mb-3"><Button size="sm" onClick={() => { setEditingMod(null); setModForm(emptyModForm); setDialog('mod'); }}><Plus className="mr-1 h-4 w-4" />Nova regra</Button></div>}
+            <Card><CardContent className="overflow-x-auto p-0">
+              {moderators.length === 0 ? <p className="py-8 text-center text-sm text-muted-foreground">Nenhuma regra de moderador. Sem regras, o motor não aplica reduções.</p> : (
+                <table className="w-full text-sm">
+                  <thead className="border-b border-border/60 bg-muted/40 text-xs text-muted-foreground">
+                    <tr><th className="px-3 py-2 text-left">Regra</th><th className="px-3 py-2 text-left">Evento</th><th className="px-3 py-2 text-left">Critério</th><th className="px-3 py-2 text-right">Redução</th><th className="px-3 py-2 text-right">Teto</th><th className="px-3 py-2 text-left">Cumul.</th><th className="px-3 py-2"></th></tr>
+                  </thead>
+                  <tbody>
+                    {moderators.map((m) => (
+                      <tr key={m.id} className="border-b border-border/40">
+                        <td className="px-3 py-2 font-medium">{m.name}{!m.active && <Badge variant="outline" className="ml-2">inativa</Badge>}</td>
+                        <td className="px-3 py-2">{MOD_EVENT_LABEL[m.eventType] ?? m.eventType}</td>
+                        <td className="px-3 py-2 text-muted-foreground">{MOD_CRITERIA[m.criterion ?? 'ANY'] ?? m.criterion}</td>
+                        <td className="px-3 py-2 text-right">{m.reductionPercent ? `${m.reductionPercent}%` : m.reductionValue ? `R$ ${m.reductionValue}` : '—'}</td>
+                        <td className="px-3 py-2 text-right text-muted-foreground">{m.cap ? `${m.cap}%` : '—'}</td>
+                        <td className="px-3 py-2">{m.cumulative ? 'Sim' : 'Não'}</td>
+                        <td className="px-3 py-2 text-right">
+                          {canAdmin && <>
+                            <Button size="sm" variant="ghost" onClick={() => { setEditingMod(m); setModForm({ name: m.name, eventType: m.eventType, criterion: m.criterion ?? 'PER_DAY', reductionPercent: m.reductionPercent ?? '', reductionValue: m.reductionValue ?? '', cap: m.cap ?? '', cumulative: m.cumulative, priority: m.priority, active: m.active }); setDialog('mod'); }}>Editar</Button>
+                            <Button size="sm" variant="ghost" onClick={() => removeMod.mutate(m.id)}><Trash2 className="h-3.5 w-3.5" /></Button>
+                          </>}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              )}
+            </CardContent></Card>
+          </TabsContent>
         </Tabs>
       )}
+
+      {/* Dialog Moderador */}
+      <Dialog open={dialog === 'mod'} onOpenChange={(o) => !o && setDialog(null)}>
+        <DialogContent className="max-w-lg">
+          <DialogHeader><DialogTitle>{editingMod ? 'Editar regra' : 'Nova regra de moderador'}</DialogTitle></DialogHeader>
+          <div className="space-y-3">
+            <div><Label>Nome *</Label><Input value={modForm.name} onChange={(e) => setModForm({ ...modForm, name: e.target.value })} placeholder="Ex.: Falta injustificada" /></div>
+            <div className="grid grid-cols-2 gap-3">
+              <div><Label>Evento</Label>
+                <NativeSelect value={modForm.eventType} onChange={(e) => setModForm({ ...modForm, eventType: e.target.value })}>
+                  {MOD_EVENT_TYPES.map((t) => <option key={t} value={t}>{MOD_EVENT_LABEL[t]}</option>)}
+                </NativeSelect>
+              </div>
+              <div><Label>Critério</Label>
+                <NativeSelect value={modForm.criterion} onChange={(e) => setModForm({ ...modForm, criterion: e.target.value })}>
+                  {Object.entries(MOD_CRITERIA).map(([k, v]) => <option key={k} value={k}>{v}</option>)}
+                </NativeSelect>
+              </div>
+            </div>
+            <div className="grid grid-cols-3 gap-3">
+              <div><Label>Redução (%)</Label><Input type="number" value={modForm.reductionPercent} onChange={(e) => setModForm({ ...modForm, reductionPercent: e.target.value })} /></div>
+              <div><Label>Redução (R$)</Label><Input type="number" value={modForm.reductionValue} onChange={(e) => setModForm({ ...modForm, reductionValue: e.target.value })} /></div>
+              <div><Label>Teto (%)</Label><Input type="number" value={modForm.cap} onChange={(e) => setModForm({ ...modForm, cap: e.target.value })} /></div>
+            </div>
+            <div className="grid grid-cols-2 gap-3">
+              <div><Label>Prioridade</Label><Input type="number" value={modForm.priority} onChange={(e) => setModForm({ ...modForm, priority: Number(e.target.value) })} /></div>
+              <label className="mt-6 flex items-center gap-2 text-sm"><input type="checkbox" checked={modForm.cumulative} onChange={(e) => setModForm({ ...modForm, cumulative: e.target.checked })} />Cumulativa</label>
+            </div>
+            <p className="text-xs text-muted-foreground">Informe % OU valor fixo. O motor aplica a regra para cada evento do colaborador na competência.</p>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setDialog(null)}>Cancelar</Button>
+            <Button onClick={() => saveMod.mutate()} disabled={saveMod.isPending || !modForm.name.trim()}>{saveMod.isPending ? 'Salvando…' : 'Salvar'}</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       {/* Dialog Ajuste */}
       <Dialog open={dialog === 'adj'} onOpenChange={(o) => !o && setDialog(null)}>

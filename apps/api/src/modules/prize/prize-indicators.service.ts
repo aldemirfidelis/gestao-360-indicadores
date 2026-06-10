@@ -1,8 +1,21 @@
 import { BadRequestException, ConflictException, Injectable, NotFoundException } from '@nestjs/common';
-import { PrizeIndicatorDirection, PrizeIndicatorKind, PrizeIndicatorSource } from '@prisma/client';
+import { Direction, IndicatorUnit, PrizeIndicatorDirection, PrizeIndicatorKind, PrizeIndicatorSource } from '@prisma/client';
 import { PrismaService } from '../../prisma/prisma.service';
 import { AuthPayload } from '../auth/auth.types';
 import { PrizeAuditService } from './prize-audit.service';
+
+// Mapeia o cadastro nativo (modulo Indicadores) para o vocabulario do premio,
+// permitindo herdar nome/unidade/sentido sem redigitar.
+const DIRECTION_FROM_PLATFORM: Record<Direction, PrizeIndicatorDirection> = {
+  HIGHER_BETTER: 'HIGHER_BETTER',
+  LOWER_BETTER: 'LOWER_BETTER',
+  EQUAL_TARGET: 'TARGET',
+  RANGE: 'TARGET',
+};
+const UNIT_LABEL: Record<IndicatorUnit, string> = {
+  PERCENT: '%', CURRENCY: 'R$', QUANTITY: 'qtde', HOURS: 'h', DAYS: 'dias',
+  TONS: 'ton', LITERS: 'L', INDEX: 'índice', TEXT: '', CUSTOM: '',
+};
 
 export interface UpsertIndicatorDto {
   programId?: string;
@@ -61,6 +74,36 @@ export class PrizeIndicatorsService {
     private readonly audit: PrizeAuditService,
   ) {}
 
+  /**
+   * Indicadores NATIVOS da plataforma disponiveis para vinculo. Exposto sob
+   * permissao do premio (nao exige indicators:view) para o seletor da tela:
+   * o caminho padrao e REAPROVEITAR o catalogo unico, nao recriar indicador.
+   */
+  async listPlatformOptions(companyId: string) {
+    const indicators = await this.prisma.indicator.findMany({
+      where: { companyId, deletedAt: null, status: 'ACTIVE' },
+      select: { id: true, code: true, name: true, unit: true, unitLabel: true, direction: true, externalSource: true, externalId: true },
+      orderBy: { name: 'asc' },
+    });
+    return indicators.map((i) => ({
+      id: i.id,
+      code: i.code,
+      name: i.name,
+      unit: i.unitLabel?.trim() || UNIT_LABEL[i.unit],
+      direction: DIRECTION_FROM_PLATFORM[i.direction],
+      bscNumber: i.externalSource?.toUpperCase().startsWith('BSC') ? i.externalId : null,
+    }));
+  }
+
+  private async getPlatformIndicator(companyId: string, platformIndicatorId: string) {
+    const native = await this.prisma.indicator.findFirst({
+      where: { id: platformIndicatorId, companyId, deletedAt: null },
+      select: { id: true, code: true, name: true, description: true, unit: true, unitLabel: true, direction: true, externalSource: true, externalId: true },
+    });
+    if (!native) throw new NotFoundException('Indicador da plataforma não encontrado');
+    return native;
+  }
+
   async list(companyId: string, query: { programId?: string; annexVersionId?: string; kind?: string; q?: string } = {}) {
     return this.prisma.prizeIndicator.findMany({
       where: {
@@ -93,9 +136,15 @@ export class PrizeIndicatorsService {
 
   async create(me: AuthPayload, dto: UpsertIndicatorDto) {
     if (!dto.programId) throw new BadRequestException('Programa é obrigatório');
-    if (!dto.name?.trim()) throw new BadRequestException('Nome do indicador é obrigatório');
     const program = await this.prisma.prizeProgram.findFirst({ where: { id: dto.programId, companyId: me.companyId, deletedAt: null } });
     if (!program) throw new NotFoundException('Programa de prêmio não encontrado');
+
+    // Caminho padrao: vincular um indicador NATIVO e herdar o cadastro
+    // (nome/unidade/sentido/descricao). Apenas a parametrizacao do premio
+    // (tipo/peso/metas/zeros/faixas) vive aqui — o indicador continua unico.
+    const native = dto.platformIndicatorId ? await this.getPlatformIndicator(me.companyId, dto.platformIndicatorId) : null;
+    const name = dto.name?.trim() || native?.name;
+    if (!name) throw new BadRequestException('Nome do indicador é obrigatório');
 
     const code = (dto.code ?? '').trim() || (await this.nextCode(me.companyId, dto.programId));
     const dup = await this.prisma.prizeIndicator.findFirst({ where: { programId: dto.programId, code, deletedAt: null } });
@@ -107,14 +156,14 @@ export class PrizeIndicatorsService {
         programId: dto.programId,
         annexVersionId: dto.annexVersionId ?? null,
         code,
-        name: dto.name.trim(),
-        description: dto.description ?? null,
-        unit: dto.unit ?? null,
+        name,
+        description: dto.description ?? native?.description ?? null,
+        unit: dto.unit ?? (native ? native.unitLabel?.trim() || UNIT_LABEL[native.unit] || null : null),
         kind: dto.kind ?? 'COLLECTIVE',
-        direction: dto.direction ?? 'HIGHER_BETTER',
-        source: dto.source ?? 'MANUAL',
-        bscNumber: dto.bscNumber ?? null,
-        platformIndicatorId: dto.platformIndicatorId ?? null,
+        direction: dto.direction ?? (native ? DIRECTION_FROM_PLATFORM[native.direction] : 'HIGHER_BETTER'),
+        source: dto.source ?? (native ? 'INTERNAL_API' : 'MANUAL'),
+        bscNumber: dto.bscNumber ?? (native?.externalSource?.toUpperCase().startsWith('BSC') ? native.externalId : null),
+        platformIndicatorId: native?.id ?? null,
         weight: dto.weight ?? null,
         formula: dto.formula ?? null,
         roundingRule: dto.roundingRule ?? null,
@@ -132,6 +181,7 @@ export class PrizeIndicatorsService {
 
   async update(me: AuthPayload, id: string, dto: UpsertIndicatorDto) {
     const current = await this.get(me.companyId, id);
+    if (dto.platformIndicatorId) await this.getPlatformIndicator(me.companyId, dto.platformIndicatorId);
     const updated = await this.prisma.prizeIndicator.update({
       where: { id },
       data: {
