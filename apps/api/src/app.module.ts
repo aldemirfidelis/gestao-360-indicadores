@@ -23,6 +23,7 @@ import { DocumentsModule } from './modules/documents/documents.module';
 import { AuditsModule } from './modules/audits/audits.module';
 import { ProcessesModule } from './modules/processes/processes.module';
 import { FoodSafetyModule } from './modules/food-safety/food-safety.module';
+import { AssetSecurityModule } from './modules/asset-security/asset-security.module';
 import { FormsModule } from './modules/forms/forms.module';
 import { MeetingsModule } from './modules/meetings/meetings.module';
 import { NotificationsModule } from './modules/notifications/notifications.module';
@@ -77,6 +78,7 @@ import { PrizeModule } from './modules/prize/prize.module';
     AuditsModule,
     ProcessesModule,
     FoodSafetyModule,
+    AssetSecurityModule,
     FormsModule,
     MeetingsModule,
     NotificationsModule,
