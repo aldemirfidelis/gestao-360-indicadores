@@ -137,7 +137,7 @@ export default function PrizePayslipsPage() {
       ) : isLoading ? (
         <div className="py-10 text-center text-sm text-muted-foreground">Carregando…</div>
       ) : payslips.length === 0 ? (
-        <Card><CardContent className="py-12 text-center text-sm text-muted-foreground">Nenhum espelho emitido. Clique em "Emitir espelhos" (requer apuração rodada).</CardContent></Card>
+        <Card><CardContent className="py-12 text-center text-sm text-muted-foreground">Nenhum espelho emitido. Clique em “Emitir espelhos” (requer apuração rodada).</CardContent></Card>
       ) : (
         <Card>
           <CardContent className="overflow-x-auto p-0">

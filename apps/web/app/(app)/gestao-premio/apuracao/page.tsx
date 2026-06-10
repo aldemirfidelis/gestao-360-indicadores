@@ -112,7 +112,7 @@ export default function PrizeApuracaoPage() {
       ) : isLoading ? (
         <div className="py-10 text-center text-sm text-muted-foreground">Carregando…</div>
       ) : !runData ? (
-        <Card><CardContent className="py-12 text-center text-sm text-muted-foreground">Nenhuma apuração rodada. Clique em "Rodar apuração" (requer base elegível importada).</CardContent></Card>
+        <Card><CardContent className="py-12 text-center text-sm text-muted-foreground">Nenhuma apuração rodada. Clique em “Rodar apuração” (requer base elegível importada).</CardContent></Card>
       ) : (
         <div className="space-y-4">
           <Card>
