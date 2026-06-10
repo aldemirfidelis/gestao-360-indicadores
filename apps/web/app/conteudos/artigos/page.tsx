@@ -6,16 +6,16 @@ import { PageHero } from '@/components/marketing/content-blocks';
 import { articlePages, breadcrumbJsonLd, publicMetadata, webPageJsonLd } from '@/lib/public-site';
 
 export const metadata: Metadata = publicMetadata({
-  title: 'Artigos sobre indicadores, planos de acao e qualidade',
-  description: 'Artigos do Gestao 360 para gestores que buscam melhorar indicadores, planos de acao, auditorias, documentos e governanca.',
+  title: 'Artigos sobre indicadores, planos de ação e qualidade',
+  description: 'Artigos do Gestão 360 para gestores que buscam melhorar indicadores, planos de ação, auditorias, documentos e governança.',
   path: '/conteudos/artigos',
 });
 
 export default function ArtigosPage() {
   return (
     <PublicShell>
-      <JsonLd data={[webPageJsonLd({ title: 'Artigos', description: metadata.description as string, path: '/conteudos/artigos' }), breadcrumbJsonLd([{ name: 'Inicio', path: '/' }, { name: 'Conteudos', path: '/conteudos' }, { name: 'Artigos', path: '/conteudos/artigos' }])]} />
-      <PageHero eyebrow="Artigos" title="Leituras para transformar controle em rotina de gestao." description="Conteudos originais, com autoria institucional e data de revisao, sem textos ocultos ou promessas artificiais." />
+      <JsonLd data={[webPageJsonLd({ title: 'Artigos', description: metadata.description as string, path: '/conteudos/artigos' }), breadcrumbJsonLd([{ name: 'Início', path: '/' }, { name: 'Conteúdos', path: '/conteudos' }, { name: 'Artigos', path: '/conteudos/artigos' }])]} />
+      <PageHero eyebrow="Artigos" title="Leituras para transformar controle em rotina de gestão." description="Conteúdos originais, com autoria institucional e data de revisão, sem textos ocultos ou promessas artificiais." />
       <section className="bg-slate-50 py-16">
         <div className="mx-auto grid max-w-7xl gap-4 px-4 sm:px-6 md:grid-cols-3 lg:px-8">
           {articlePages.map((article) => (

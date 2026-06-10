@@ -6,19 +6,19 @@ import { PageHero } from '@/components/marketing/content-blocks';
 import { articlePages, breadcrumbJsonLd, publicMetadata, webPageJsonLd } from '@/lib/public-site';
 
 export const metadata: Metadata = publicMetadata({
-  title: 'Conteudos sobre gestao, indicadores e melhoria continua',
-  description: 'Artigos, guias e perguntas frequentes sobre indicadores, planejamento, planos de acao, auditorias, documentos, qualidade e governanca.',
+  title: 'Conteúdos sobre gestão, indicadores e melhoria contínua',
+  description: 'Artigos, guias e perguntas frequentes sobre indicadores, planejamento, planos de ação, auditorias, documentos, qualidade e governança.',
   path: '/conteudos',
 });
 
 export default function ConteudosPage() {
   return (
     <PublicShell>
-      <JsonLd data={[webPageJsonLd({ title: 'Conteudos', description: metadata.description as string, path: '/conteudos' }), breadcrumbJsonLd([{ name: 'Inicio', path: '/' }, { name: 'Conteudos', path: '/conteudos' }])]} />
-      <PageHero eyebrow="Conteudos" title="Centro de conteudo para gestao corporativa." description="Materiais publicos para ajudar gestores a estruturar indicadores, planos de acao, qualidade, documentos e melhoria continua." />
+      <JsonLd data={[webPageJsonLd({ title: 'Conteúdos', description: metadata.description as string, path: '/conteudos' }), breadcrumbJsonLd([{ name: 'Início', path: '/' }, { name: 'Conteúdos', path: '/conteudos' }])]} />
+      <PageHero eyebrow="Conteúdos" title="Centro de conteúdo para gestão corporativa." description="Materiais públicos para ajudar gestores a estruturar indicadores, planos de ação, qualidade, documentos e melhoria contínua." />
       <section className="bg-slate-50 py-16">
         <div className="mx-auto grid max-w-7xl gap-4 px-4 sm:px-6 md:grid-cols-3 lg:px-8">
-          <HubCard href="/conteudos/artigos" title="Artigos" text="Conteudos práticos sobre temas de gestao e execucao." />
+          <HubCard href="/conteudos/artigos" title="Artigos" text="Conteúdos práticos sobre temas de gestão e execução." />
           <HubCard href="/conteudos/guias" title="Guias" text="Materiais orientativos para estruturar rotinas e controles." />
           <HubCard href="/conteudos/perguntas-frequentes" title="Perguntas frequentes" text="Respostas objetivas para compradores e gestores." />
         </div>

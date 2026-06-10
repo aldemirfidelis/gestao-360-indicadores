@@ -1,6 +1,7 @@
 import Link from 'next/link';
 import { ArrowRight, CheckCircle2 } from 'lucide-react';
-import { WHATSAPP_URL, type FaqItem, type PublicPage } from '@/lib/public-site';
+import type { FaqItem, PublicPage } from '@/lib/public-site';
+import { DemoLink } from './demo-link';
 
 export function PageHero({ eyebrow, title, description }: { eyebrow: string; title: string; description: string }) {
   return (
@@ -10,12 +11,9 @@ export function PageHero({ eyebrow, title, description }: { eyebrow: string; tit
         <h1 className="mt-4 max-w-4xl text-4xl font-semibold tracking-tight sm:text-5xl">{title}</h1>
         <p className="mt-5 max-w-3xl text-lg leading-8 text-slate-200">{description}</p>
         <div className="mt-8 flex flex-col gap-3 sm:flex-row">
-          <Link href="/contato" className="inline-flex h-11 items-center justify-center gap-2 bg-emerald-400 px-5 text-sm font-semibold text-slate-950 hover:bg-emerald-300">
-            Solicitar demonstracao <ArrowRight className="h-4 w-4" />
-          </Link>
-          <a href={WHATSAPP_URL} target="_blank" rel="noopener noreferrer" className="inline-flex h-11 items-center justify-center border border-white/30 px-5 text-sm font-semibold text-white hover:bg-white hover:text-slate-950">
-            Falar pelo WhatsApp
-          </a>
+          <DemoLink source="public_page_hero" className="inline-flex h-11 items-center justify-center gap-2 bg-emerald-400 px-5 text-sm font-semibold text-slate-950 hover:bg-emerald-300">
+            Acesse a Demonstração <ArrowRight className="h-4 w-4" />
+          </DemoLink>
         </div>
       </div>
     </section>
@@ -79,7 +77,7 @@ export function PublicPageBody({ page, related }: { page: PublicPage; related?: 
       {related && related.length > 0 && (
         <section className="bg-slate-50 py-16">
           <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
-            <h2 className="text-3xl font-semibold tracking-tight text-slate-950">Tambem pode ajudar</h2>
+            <h2 className="text-3xl font-semibold tracking-tight text-slate-950">Também pode ajudar</h2>
             <div className="mt-8">
               <ListingGrid pages={related} />
             </div>

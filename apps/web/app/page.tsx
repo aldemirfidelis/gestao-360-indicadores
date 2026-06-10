@@ -1,11 +1,12 @@
+import Image from 'next/image';
 import Link from 'next/link';
 import type { Metadata } from 'next';
 import { ArrowRight, CheckCircle2, ClipboardList, FileSearch, LineChart, Network, ShieldCheck, Workflow } from 'lucide-react';
 import { PublicShell } from '@/components/marketing/public-shell';
 import { JsonLd } from '@/components/marketing/json-ld';
-import { ContactForm } from '@/components/marketing/contact-form';
+import { DemoLink } from '@/components/marketing/demo-link';
+import { WhatsAppButton } from '@/components/marketing/whatsapp-button';
 import {
-  WHATSAPP_URL,
   faqJsonLd,
   moduleHighlights,
   organizationJsonLd,
@@ -18,88 +19,77 @@ import {
 } from '@/lib/public-site';
 
 export const metadata: Metadata = publicMetadata({
-  title: 'Gestao 360 | Gestao estrategica, indicadores e planos de acao',
+  title: 'Gestão 360 | Gestão estratégica, indicadores e planos de ação',
   description:
-    'Plataforma SaaS B2B para gestao corporativa integrada: indicadores, planejamento estrategico, planos de acao, documentos, auditorias, riscos e melhoria continua.',
+    'Plataforma SaaS B2B para gestão corporativa integrada: indicadores, planejamento estratégico, planos de ação, documentos, auditorias, riscos e melhoria contínua.',
   path: '/',
 });
 
 const challenges = [
-  'Indicadores espalhados em planilhas e sem responsavel claro.',
-  'Planos de acao sem evidencia, historico ou verificacao de eficacia.',
-  'Auditorias, documentos, riscos e nao conformidades tratados em controles isolados.',
-  'Gestores sem visao diaria das prioridades e bloqueios da equipe.',
+  'Indicadores espalhados em planilhas e sem responsável claro.',
+  'Planos de ação sem evidência, histórico ou verificação de eficácia.',
+  'Auditorias, documentos, riscos e não conformidades tratados em controles isolados.',
+  'Gestores sem visão diária das prioridades e bloqueios da equipe.',
 ];
 
 const flow = [
-  ['Estruture', 'Empresas, filiais, areas, setores, processos e permissoes.'],
-  ['Acompanhe', 'Indicadores, metas, dashboards, reunioes e desvios.'],
-  ['Trate', 'Analise de causa, planos de acao, evidencias e aprovacoes.'],
-  ['Aprenda', 'Historico, auditoria, visao 360, riscos e recomendacoes assistidas.'],
+  ['Estruture', 'Empresas, filiais, áreas, setores, processos e permissões.'],
+  ['Acompanhe', 'Indicadores, metas, dashboards, reuniões e desvios.'],
+  ['Trate', 'Análise de causa, planos de ação, evidências e aprovações.'],
+  ['Aprenda', 'Histórico, auditoria, visão 360, riscos e recomendações assistidas.'],
 ];
 
 const faq = [
   {
-    question: 'O Gestao 360 expõe dados de clientes em paginas publicas?',
+    question: 'O Gestão 360 expõe dados de clientes em páginas públicas?',
     answer:
-      'Nao. O conteudo publico e institucional. Dashboards, registros, documentos, APIs e areas administrativas exigem autenticacao e autorizacao.',
+      'Não. O conteúdo público é institucional. Dashboards, registros, documentos, APIs e áreas administrativas exigem autenticação e autorização.',
   },
   {
     question: 'A plataforma substitui todos os sistemas da empresa?',
     answer:
-      'Nao necessariamente. O Gestao 360 atua como camada integrada de gestao, acompanhamento, evidencias e execucao. Integracoes podem conectar sistemas existentes quando fizer sentido.',
+      'Não necessariamente. O Gestão 360 atua como camada integrada de gestão, acompanhamento, evidências e execução. Integrações podem conectar sistemas existentes quando fizer sentido.',
   },
   {
-    question: 'Como funciona a demonstracao?',
+    question: 'Como funciona a demonstração?',
     answer:
-      'A equipe entende o contexto da empresa, apresenta os modulos relevantes e indica um caminho de implantacao sem prometer resultados sem avaliacao previa.',
+      'A demonstração permite conhecer a plataforma com dados de exemplo e avaliar quais módulos fazem sentido para a rotina da empresa.',
   },
 ];
 
 export default function HomePage() {
   return (
     <PublicShell>
-      <JsonLd data={[organizationJsonLd(), websiteJsonLd(), softwareJsonLd(), webPageJsonLd({ title: 'Gestao 360', description: metadata.description as string, path: '/' }), faqJsonLd(faq)]} />
-      <section className="relative min-h-[680px] overflow-hidden bg-slate-950 text-white">
-        <div className="absolute inset-0 opacity-90" aria-hidden="true">
-          <div className="h-full w-full bg-[linear-gradient(115deg,rgba(15,23,42,0.96)_0%,rgba(15,23,42,0.78)_43%,rgba(20,184,166,0.32)_100%)]" />
-          <div className="absolute inset-y-0 right-0 hidden w-[58%] border-l border-white/10 bg-slate-900/70 lg:block">
-            <div className="grid h-full grid-cols-2 gap-px bg-white/10 p-8">
-              {['Indicadores fora da meta', 'Planos em atraso', 'Riscos criticos', 'Auditorias abertas', 'Documentos em revisao', 'Meu Dia'].map((label, index) => (
-                <div key={label} className="bg-slate-950/70 p-5">
-                  <div className="text-xs uppercase tracking-[0.16em] text-slate-400">{label}</div>
-                  <div className="mt-5 h-2 bg-slate-700">
-                    <div className={index % 2 === 0 ? 'h-2 w-2/3 bg-emerald-400' : 'h-2 w-1/2 bg-amber-400'} />
-                  </div>
-                  <div className="mt-5 grid grid-cols-3 gap-2">
-                    <span className="h-12 bg-white/10" />
-                    <span className="h-12 bg-white/10" />
-                    <span className="h-12 bg-white/10" />
-                  </div>
-                </div>
-              ))}
-            </div>
-          </div>
+      <JsonLd data={[organizationJsonLd(), websiteJsonLd(), softwareJsonLd(), webPageJsonLd({ title: 'Gestão 360', description: metadata.description as string, path: '/' }), faqJsonLd(faq)]} />
+      <section className="relative min-h-[calc(100svh-5rem)] overflow-hidden bg-slate-950 text-white lg:min-h-[620px]">
+        <div className="absolute inset-0" aria-hidden="true">
+          <Image
+            src="/brand/landing-hero-bg.png"
+            alt=""
+            fill
+            priority
+            sizes="100vw"
+            className="object-cover"
+          />
+          <div className="absolute inset-0 bg-[linear-gradient(90deg,rgba(2,6,23,0.92)_0%,rgba(15,23,42,0.82)_42%,rgba(15,23,42,0.38)_100%)]" />
+          <div className="absolute inset-x-0 bottom-0 h-28 bg-gradient-to-t from-slate-950/75 to-transparent" />
         </div>
-        <div className="relative mx-auto flex min-h-[680px] max-w-7xl items-center px-4 py-16 sm:px-6 lg:px-8">
+        <div className="relative mx-auto flex min-h-[calc(100svh-5rem)] max-w-7xl items-center px-4 py-14 sm:px-6 lg:min-h-[620px] lg:px-8">
           <div className="max-w-3xl">
             <p className="text-sm font-semibold uppercase tracking-[0.18em] text-emerald-300">Plataforma SaaS B2B modular</p>
-            <h1 className="mt-5 max-w-4xl text-5xl font-semibold leading-[1.02] sm:text-6xl lg:text-7xl">
-              Gestao estrategica, indicadores e planos de acao conectados em uma unica plataforma.
+            <h1 className="mt-5 max-w-4xl text-4xl font-semibold leading-[1.05] sm:text-5xl lg:text-6xl">
+              Gestão estratégica, indicadores e planos de ação conectados em uma única plataforma.
             </h1>
             <p className="mt-6 max-w-2xl text-lg leading-8 text-slate-200">
-              O Gestao 360 integra planejamento, acompanhamento, tratativas, evidencias e rastreabilidade para transformar dados corporativos em decisoes acompanhaveis.
+              O Gestão 360 integra planejamento, acompanhamento, tratativas, evidências e rastreabilidade para transformar dados corporativos em decisões acompanháveis.
             </p>
             <div className="mt-8 flex flex-col gap-3 sm:flex-row">
-              <Link href="/contato" className="inline-flex h-12 items-center justify-center gap-2 bg-emerald-400 px-6 text-sm font-semibold text-slate-950 hover:bg-emerald-300">
-                Solicitar demonstracao
+              <DemoLink source="home_hero" className="inline-flex h-12 items-center justify-center gap-2 bg-emerald-400 px-6 text-sm font-semibold text-slate-950 hover:bg-emerald-300">
+                Acesse a Demonstração
                 <ArrowRight className="h-4 w-4" />
-              </Link>
-              <a href={WHATSAPP_URL} target="_blank" rel="noopener noreferrer" className="inline-flex h-12 items-center justify-center border border-white/30 px-6 text-sm font-semibold text-white hover:bg-white hover:text-slate-950">
-                Falar pelo WhatsApp
-              </a>
+              </DemoLink>
               <Link href="/modulos" className="inline-flex h-12 items-center justify-center border border-white/30 px-6 text-sm font-semibold text-white hover:bg-white hover:text-slate-950">
-                Conhecer modulos
+                Conhecer módulos
               </Link>
             </div>
           </div>
@@ -122,7 +112,7 @@ export default function HomePage() {
 
       <section className="bg-slate-50 py-20">
         <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
-          <SectionIntro eyebrow="Solucoes" title="Paginas e modulos pensados para a rotina de gestao." />
+          <SectionIntro eyebrow="Soluções" title="Páginas e módulos pensados para a rotina de gestão." />
           <div className="mt-10 grid gap-4 md:grid-cols-2 xl:grid-cols-3">
             {solutionPages.slice(0, 9).map((page) => (
               <Link key={page.slug} href={page.path} className="group border border-slate-200 bg-white p-5 hover:border-slate-950">
@@ -130,7 +120,7 @@ export default function HomePage() {
                 <h2 className="mt-3 text-xl font-semibold text-slate-950">{page.title}</h2>
                 <p className="mt-3 text-sm leading-6 text-slate-600">{page.summary}</p>
                 <span className="mt-5 inline-flex items-center gap-2 text-sm font-semibold text-slate-950">
-                  Ver solucao <ArrowRight className="h-4 w-4 transition-transform group-hover:translate-x-1" />
+                  Ver solução <ArrowRight className="h-4 w-4 transition-transform group-hover:translate-x-1" />
                 </span>
               </Link>
             ))}
@@ -141,9 +131,9 @@ export default function HomePage() {
       <section className="bg-white py-20">
         <div className="mx-auto grid max-w-7xl gap-10 px-4 sm:px-6 lg:grid-cols-[0.9fr,1.1fr] lg:px-8">
           <div>
-            <SectionIntro eyebrow="Fluxo integrado" title="Da estrategia a execucao, com trilha de auditoria." />
+            <SectionIntro eyebrow="Fluxo integrado" title="Da estratégia à execução, com trilha de auditoria." />
             <p className="mt-5 text-base leading-7 text-slate-600">
-              A plataforma nao duplica a operacao em paineis soltos. Ela conecta registros de origem, responsaveis, prazos, historico, impactos e evidencias.
+              A plataforma não duplica a operação em painéis soltos. Ela conecta registros de origem, responsáveis, prazos, histórico, impactos e evidências.
             </p>
           </div>
           <div className="grid gap-3">
@@ -162,7 +152,7 @@ export default function HomePage() {
 
       <section className="bg-slate-950 py-20 text-white">
         <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
-          <SectionIntro eyebrow="Modulos disponiveis" title="Uma base modular para crescer sem perder governanca." inverted />
+          <SectionIntro eyebrow="Módulos disponíveis" title="Uma base modular para crescer sem perder governança." inverted />
           <div className="mt-10 grid gap-4 md:grid-cols-2 xl:grid-cols-3">
             {moduleHighlights.map((item, index) => {
               const icons = [LineChart, Network, Workflow, ShieldCheck, FileSearch, ClipboardList];
@@ -180,7 +170,7 @@ export default function HomePage() {
 
       <section className="bg-white py-20">
         <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
-          <SectionIntro eyebrow="Segmentos" title="Aplicavel a diferentes operacoes corporativas." />
+          <SectionIntro eyebrow="Segmentos" title="Aplicável a diferentes operações corporativas." />
           <div className="mt-10 grid gap-4 md:grid-cols-2 lg:grid-cols-5">
             {segmentPages.map((segment) => (
               <Link key={segment.slug} href={segment.path} className="border border-slate-200 p-5 hover:border-slate-950">
@@ -195,13 +185,20 @@ export default function HomePage() {
       <section className="bg-slate-50 py-20">
         <div className="mx-auto grid max-w-7xl gap-10 px-4 sm:px-6 lg:grid-cols-[0.9fr,1.1fr] lg:px-8">
           <div>
-            <SectionIntro eyebrow="Contato" title="Veja como o Gestao 360 se encaixa na sua rotina." />
+            <SectionIntro eyebrow="Demonstração" title="Acesse um ambiente de exemplo e veja a plataforma em uso." />
             <p className="mt-5 text-sm leading-6 text-slate-600">
-              Informe seu contexto. O retorno comercial deve focar nos modulos que ja existem e no caminho realista de implantacao.
+              Use a demonstração para navegar por indicadores, planos, documentos, auditorias e rotinas de acompanhamento com dados fictícios.
             </p>
           </div>
-          <div className="border border-slate-200 bg-white p-5">
-            <ContactForm compact />
+          <div className="border border-slate-200 bg-white p-6">
+            <h2 className="text-2xl font-semibold tracking-tight text-slate-950">Entre direto na demonstração.</h2>
+            <p className="mt-3 text-sm leading-6 text-slate-600">
+              O acesso abre a tela de entrada com a conta de demonstração já preenchida. Assim você pode conhecer o produto antes de conversar com a equipe.
+            </p>
+            <DemoLink source="home_demo_section" className="mt-6 inline-flex h-12 items-center justify-center gap-2 bg-slate-950 px-6 text-sm font-semibold text-white hover:bg-emerald-700">
+              Acesse a Demonstração
+              <ArrowRight className="h-4 w-4" />
+            </DemoLink>
           </div>
         </div>
       </section>
@@ -219,6 +216,7 @@ export default function HomePage() {
           </div>
         </div>
       </section>
+      <WhatsAppButton />
     </PublicShell>
   );
 }

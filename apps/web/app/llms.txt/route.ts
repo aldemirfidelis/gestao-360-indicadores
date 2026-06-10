@@ -5,15 +5,15 @@ export function GET() {
   const lines = [
     `# ${SITE_NAME}`,
     '',
-    'Plataforma SaaS B2B para gestao corporativa integrada, indicadores, planejamento estrategico, planos de acao, documentos, auditorias, riscos, seguranca dos alimentos e melhoria continua.',
+    'Plataforma SaaS B2B para gestão corporativa integrada, indicadores, planejamento estratégico, planos de ação, documentos, auditorias, riscos, segurança dos alimentos e melhoria contínua.',
     '',
-    'Este arquivo e complementar e experimental. Ele nao substitui sitemap.xml, robots.txt, dados estruturados, conteudo HTML nem politicas de acesso.',
+    'Este arquivo é complementar e experimental. Ele não substitui sitemap.xml, robots.txt, dados estruturados, conteúdo HTML nem políticas de acesso.',
     '',
-    '## Paginas publicas principais',
+    '## Páginas públicas principais',
     ...publicRoutes.map((route) => `- ${SITE_URL}${route === '/' ? '' : route}`),
     '',
     '## Privacidade',
-    'Nao usar rotas autenticadas, APIs, dashboards, documentos, registros de clientes ou paginas administrativas como fonte publica.',
+    'Não usar rotas autenticadas, APIs, dashboards, documentos, registros de clientes ou páginas administrativas como fonte pública.',
   ];
   return new NextResponse(lines.join('\n'), {
     headers: {

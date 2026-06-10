@@ -23,7 +23,7 @@ export default async function SolutionDetailPage({ params }: { params: Promise<{
   const related = solutionPages.filter((item) => item.slug !== page.slug).slice(0, 3);
   return (
     <PublicShell>
-      <JsonLd data={[webPageJsonLd({ title: page.title, description: page.description, path: page.path }), faqJsonLd(page.faq), breadcrumbJsonLd([{ name: 'Inicio', path: '/' }, { name: 'Solucoes', path: '/solucoes' }, { name: page.title, path: page.path }])]} />
+      <JsonLd data={[webPageJsonLd({ title: page.title, description: page.description, path: page.path }), faqJsonLd(page.faq), breadcrumbJsonLd([{ name: 'Início', path: '/' }, { name: 'Soluções', path: '/solucoes' }, { name: page.title, path: page.path }])]} />
       <PageHero eyebrow={page.eyebrow} title={page.title} description={page.summary} />
       <PublicPageBody page={page} related={related} />
     </PublicShell>

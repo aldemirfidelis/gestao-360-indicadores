@@ -2,25 +2,24 @@ import Link from 'next/link';
 import type { ReactNode } from 'react';
 import { ArrowRight, BarChart3, FileText, Layers3, ShieldCheck } from 'lucide-react';
 import { BrandLogo } from '@/components/brand/brand-mark';
-import { WHATSAPP_URL } from '@/lib/public-site';
-import { WhatsAppButton } from './whatsapp-button';
+import { DEMO_PATH } from '@/lib/public-site';
+import { DemoLink } from './demo-link';
 
 const nav = [
-  { href: '/solucoes', label: 'Solucoes' },
-  { href: '/modulos', label: 'Modulos' },
+  { href: '/solucoes', label: 'Soluções' },
+  { href: '/modulos', label: 'Módulos' },
   { href: '/segmentos', label: 'Segmentos' },
   { href: '/recursos', label: 'Recursos' },
-  { href: '/conteudos', label: 'Conteudos' },
-  { href: '/contato', label: 'Contato' },
+  { href: '/conteudos', label: 'Conteúdos' },
 ];
 
 const footerGroups = [
   {
-    title: 'Solucoes',
+    title: 'Soluções',
     links: [
       ['Indicadores', '/solucoes/gestao-de-indicadores'],
-      ['Planejamento estrategico', '/solucoes/planejamento-estrategico'],
-      ['Planos de acao', '/solucoes/planos-de-acao'],
+      ['Planejamento estratégico', '/solucoes/planejamento-estrategico'],
+      ['Planos de ação', '/solucoes/planos-de-acao'],
       ['Qualidade', '/solucoes/gestao-da-qualidade'],
       ['Riscos', '/solucoes/gestao-de-riscos'],
     ],
@@ -29,19 +28,19 @@ const footerGroups = [
     title: 'Institucional',
     links: [
       ['Sobre', '/sobre'],
-      ['Seguranca', '/seguranca'],
-      ['Implantacao', '/implantacao'],
+      ['Segurança', '/seguranca'],
+      ['Implantação', '/implantacao'],
       ['Suporte', '/suporte'],
-      ['Contato', '/contato'],
+      ['Demonstração', DEMO_PATH],
     ],
   },
   {
-    title: 'Conteudos',
+    title: 'Conteúdos',
     links: [
       ['Artigos', '/conteudos/artigos'],
       ['Guias', '/conteudos/guias'],
       ['Perguntas frequentes', '/conteudos/perguntas-frequentes'],
-      ['Politica de privacidade', '/politica-de-privacidade'],
+      ['Política de privacidade', '/politica-de-privacidade'],
       ['Termos de uso', '/termos-de-uso'],
     ],
   },
@@ -52,10 +51,10 @@ export function PublicShell({ children }: { children: ReactNode }) {
     <div className="min-h-screen bg-white text-slate-950">
       <header className="sticky top-0 z-40 border-b border-slate-200 bg-white/95 backdrop-blur">
         <div className="mx-auto flex h-16 max-w-7xl items-center justify-between gap-4 px-4 sm:px-6 lg:px-8">
-          <Link href="/" aria-label="Pagina inicial do Gestao 360" className="shrink-0">
+          <Link href="/" aria-label="Página inicial do Gestão 360" className="shrink-0">
             <BrandLogo />
           </Link>
-          <nav aria-label="Navegacao principal" className="hidden items-center gap-6 lg:flex">
+          <nav aria-label="Navegação principal" className="hidden items-center gap-6 lg:flex">
             {nav.map((item) => (
               <Link key={item.href} href={item.href} className="text-sm font-semibold text-slate-600 hover:text-slate-950">
                 {item.label}
@@ -63,21 +62,10 @@ export function PublicShell({ children }: { children: ReactNode }) {
             ))}
           </nav>
           <div className="flex items-center gap-2">
-            <a
-              href={WHATSAPP_URL}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="hidden border border-emerald-600 px-3 py-2 text-sm font-semibold text-emerald-700 hover:bg-emerald-50 sm:inline-flex"
-            >
-              WhatsApp
-            </a>
-            <Link href="/login" className="border border-slate-300 px-3 py-2 text-sm font-semibold text-slate-700 hover:border-slate-950">
-              Login
-            </Link>
-            <Link href="/contato" className="inline-flex items-center gap-2 bg-slate-950 px-3 py-2 text-sm font-semibold text-white hover:bg-emerald-700">
-              Demonstracao
+            <DemoLink source="public_header" className="inline-flex items-center gap-2 bg-slate-950 px-3 py-2 text-sm font-semibold text-white hover:bg-emerald-700">
+              Acesse a Demonstração
               <ArrowRight className="h-4 w-4" />
-            </Link>
+            </DemoLink>
           </div>
         </div>
       </header>
@@ -87,14 +75,14 @@ export function PublicShell({ children }: { children: ReactNode }) {
           <div>
             <BrandLogo />
             <p className="mt-4 max-w-md text-sm leading-6 text-slate-300">
-              Plataforma SaaS B2B para gestao corporativa integrada, indicadores, estrategia, planos de acao,
-              documentos, auditorias, riscos e melhoria continua.
+              Plataforma B2B para gestão corporativa integrada, indicadores, estratégia, planos de ação,
+              documentos, auditorias, riscos e melhoria contínua.
             </p>
             <div className="mt-6 grid grid-cols-2 gap-3 text-xs text-slate-300 sm:grid-cols-4">
               <FooterMetric icon={<BarChart3 className="h-4 w-4" />} label="Indicadores" />
               <FooterMetric icon={<Layers3 className="h-4 w-4" />} label="Modular" />
-              <FooterMetric icon={<ShieldCheck className="h-4 w-4" />} label="Permissoes" />
-              <FooterMetric icon={<FileText className="h-4 w-4" />} label="Evidencias" />
+              <FooterMetric icon={<ShieldCheck className="h-4 w-4" />} label="Permissões" />
+              <FooterMetric icon={<FileText className="h-4 w-4" />} label="Evidências" />
             </div>
           </div>
           <div className="grid gap-8 sm:grid-cols-3">
@@ -115,10 +103,9 @@ export function PublicShell({ children }: { children: ReactNode }) {
           </div>
         </div>
         <div className="border-t border-white/10 px-4 py-4 text-center text-xs text-slate-400">
-          Gestao 360. Conteudo publico separado do portal autenticado. Dados de clientes nao sao indexaveis.
+          Gestão 360 © 2026 Todos os direitos reservados.
         </div>
       </footer>
-      <WhatsAppButton />
     </div>
   );
 }
