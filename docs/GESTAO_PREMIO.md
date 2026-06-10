@@ -6,9 +6,29 @@
 > Cálculo → Conferência → Aprovação → Folha → Espelho → Auditoria**.
 >
 > Documento vivo. Cobre as Fases **1 (Fundação + Governança)**, **2 (Realizado +
-> Previsto × Realizado)**, **3 (Base Elegível / Apdata + Snapshot + Conciliação)**
-> e **4 (Motor de Cálculo + Apuração)**, entregues e validadas. As fases seguintes
-> estão no backlog residual (seção 7).
+> Previsto × Realizado)**, **3 (Base Elegível / Apdata + Snapshot + Conciliação)**,
+> **4 (Motor de Cálculo + Apuração + Conferência)** e **5 (Integração com a Folha)**,
+> entregues e validadas. As fases seguintes estão no backlog residual (seção 7).
+
+## 0.3. Fase 5 — Integração com a Folha (entregue)
+
+- **Banco** (aditivo): enums `PrizePayrollBatchStatus`/`PrizePayrollItemStatus` +
+  tabelas `PrizePayrollBatch`/`PrizePayrollBatchItem`. Migração
+  `20260609210000_prize_payroll`.
+- **Geração de lote** a partir da apuração (run SUCCESS/PARTIAL): itens com
+  matrícula, nome, **rubrica/verba**, valor final, status; bloqueados (valor 0)
+  entram como `BLOCKED` com motivo e ficam fora do arquivo. Código do lote por
+  competência. Helper puro `buildPayrollItems`/`payrollToCsv`/`reconcileReturn`
+  (testado).
+- **Saída desacoplada**: exportação **CSV** (download autenticado, BOM UTF-8,
+  separador `;`), pronta para arquivo/interface/API.
+- **Envio + retorno**: marcar enviado com **protocolo** (move competência →
+  `SENT_TO_PAYROLL`); **importar retorno** (matrícula;status;código;mensagem),
+  conciliação automática (aceitos/rejeitados/não-encontrados), contagem de
+  rejeições, cancelamento de lote.
+- **Frontend** `/gestao-premio/folha`: monitoramento de lotes, itens, export,
+  envio e conciliação do retorno. Permissão `prize:payroll:manage`.
+- **Testes**: suíte total **277 verdes**. tsc verde (api+web).
 
 ## 0.2. Fase 4 — Motor de Cálculo + Apuração (entregue)
 
@@ -288,7 +308,6 @@ justificativa.
   já entregues. Pendência residual: notificações automáticas da conferência.
 
 ### Próximas fases (não iniciadas)
-- **Fase 5 — Folha**: geração de lote (rubrica/verba), retorno e conciliação.
 - **Fase 6 — Espelho do prêmio (PDF)**: demonstrativo individual com memória de
   cálculo, emissão em lote, publicação e ciência.
 - **Fase 7 — Relatórios, Super Admin (seção Gestão de Prêmio), automações e IA

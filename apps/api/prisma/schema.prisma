@@ -8903,3 +8903,73 @@ model PrizeCalculationLine {
 
   @@index([resultId])
 }
+
+// =====================================================
+// Gestao de Premio - Fase 5: Integracao com a Folha
+// Lote de saida (rubrica/verba) + retorno conciliavel. Sem acoplamento a um
+// unico canal: gera arquivo (CSV/XLSX), interface ou API; retorno por importacao.
+// =====================================================
+
+enum PrizePayrollBatchStatus {
+  DRAFT
+  GENERATED
+  SENT
+  RETURNED
+  RECONCILED
+  CANCELLED
+}
+
+enum PrizePayrollItemStatus {
+  PENDING
+  SENT
+  ACCEPTED
+  REJECTED
+  BLOCKED
+}
+
+model PrizePayrollBatch {
+  id           String                  @id @default(uuid())
+  companyId    String
+  competenceId String
+  runId        String?
+  code         String
+  rubric       String?
+  status       PrizePayrollBatchStatus @default(GENERATED)
+  protocol     String?
+  totalItems   Int                     @default(0)
+  totalValue   Decimal?                @db.Decimal(16, 2)
+  rejectedCount Int                    @default(0)
+  notes        String?
+  generatedAt  DateTime?
+  sentAt        DateTime?
+  returnedAt   DateTime?
+  createdById  String?
+  createdAt    DateTime                @default(now())
+  updatedAt    DateTime                @updatedAt
+
+  items PrizePayrollBatchItem[]
+
+  @@index([companyId])
+  @@index([companyId, competenceId])
+  @@index([status])
+}
+
+model PrizePayrollBatchItem {
+  id            String                 @id @default(uuid())
+  companyId     String
+  batchId       String
+  batch         PrizePayrollBatch      @relation(fields: [batchId], references: [id], onDelete: Cascade)
+  registration  String
+  name          String
+  rubric        String?
+  value         Decimal                @db.Decimal(14, 2)
+  status        PrizePayrollItemStatus @default(PENDING)
+  blockReason   String?
+  calcResultId  String?
+  returnCode    String?
+  returnMessage String?
+  createdAt     DateTime               @default(now())
+
+  @@index([batchId])
+  @@index([batchId, status])
+}
