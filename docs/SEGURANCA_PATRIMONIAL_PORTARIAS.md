@@ -12,7 +12,7 @@ Foi criada a base corporativa do modulo `asset-security` com:
 
 - pacote comercial ativavel por empresa/unidade no catalogo do Portal Admin;
 - permissoes granulares `asset-security:*` vinculadas aos perfis existentes;
-- menu lateral "Seguranca Patrimonial" com visoes de operacao, pessoas/veiculos, autorizacoes, rondas, ativos e configuracoes;
+- item unico "Seguranca Patrimonial" dentro do menu Gestao, com abas internas para operacao, pessoas/veiculos, autorizacoes, rondas, ativos e configuracoes;
 - modelo de dados proprio para portarias, postos, pessoas, prestadores, veiculos, documentos obrigatorios, autorizacoes, movimentos, materiais, chaves/crachas, correspondencias, bloqueios, ocorrencias, rondas, troca de turno, livro eletronico, QR Codes, sincronizacao offline e auditoria;
 - API NestJS protegida por `PortalGate`, `@RequirePermissions` e escopo multiempresa;
 - tela operacional em `/seguranca-patrimonial`;

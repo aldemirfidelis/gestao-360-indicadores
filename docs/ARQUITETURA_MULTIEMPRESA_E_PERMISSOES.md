@@ -35,8 +35,8 @@ Dois eixos de acesso, independentes:
 | `UserVisibilityException` | exceção individual ALLOW/DENY por área/módulo, com validade e justificativa |
 
 Migrations: `20260603100000_company_status_fields`, `20260603110000_area_visibility` (aditivas).
-Backfill idempotente: `apps/api/prisma/backfill-area-access.ts` (cria "Área não classificada" por
-empresa, dá área principal a quem não tinha, registra atribuições PRIMARY).
+Backfill idempotente: `apps/api/prisma/backfill-area-access.ts` (não cria área provisória; registra
+atribuições PRIMARY somente quando o usuário já possui uma área real em `defaultNodeId`).
 
 ## 4. Perfis e bypass
 - `SUPER_ADMIN`, `COMPANY_ADMIN` → **companyWide** (enxergam/editam toda a empresa; bypass de área).
@@ -97,9 +97,10 @@ empresa, dá área principal a quem não tinha, registra atribuições PRIMARY).
 `beforeValue`/`afterValue`/`module`/`entity`/`result`, **incluindo tentativas negadas** (`result=DENIED`).
 
 ## 11. Migração e compatibilidade
-Migrations aditivas (nada apagado). Empresa atual = padrão (dados já com `companyId`). Backfill cria
-"Área não classificada" e atribui áreas. `areaAccessEnabled` nasce `true`; `SUPER_ADMIN/COMPANY_ADMIN`
-fazem bypass — a empresa atual não trava. Para desligar a restrição numa empresa, basta
+Migrations aditivas. Empresa atual = padrão (dados já com `companyId`). Backfill preserva usuários sem
+área principal e não recria "Área não classificada"; vínculos inválidos devem ser tratados por migration
+auditável ou por realocação explícita. `areaAccessEnabled` nasce `true`; `SUPER_ADMIN/COMPANY_ADMIN`
+fazem bypass - a empresa atual não trava. Para desligar a restrição numa empresa, basta
 `areaAccessEnabled=false` (tela de empresas).
 
 ## 12. Como testar

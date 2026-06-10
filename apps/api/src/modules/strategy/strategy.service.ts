@@ -957,7 +957,12 @@ export class StrategyService {
       ]);
 
       const [gPessoas, gAdmPl, gAdmJr, coordSr, analistaSr] = createdJobs;
-      const firstNode = await this.prisma.orgNode.findFirst({ where: { companyId, active: true } });
+      const candidateNodes = await this.prisma.orgNode.findMany({
+        where: { companyId, active: true, deletedAt: null },
+        orderBy: [{ position: 'asc' }, { name: 'asc' }],
+        select: { id: true, name: true },
+      });
+      const firstNode = candidateNodes.find((node) => normalizeOrgNodeName(node.name) !== 'area nao classificada') ?? candidateNodes[0] ?? null;
       const nodeId = firstNode?.id ?? null;
 
       await Promise.all([
@@ -1055,11 +1060,15 @@ export class StrategyService {
   }) {
     let finalOrgNodeId = body.orgNodeId || null;
 
-    if (!finalOrgNodeId && body.orgNodeName?.trim()) {
+    const requestedOrgNodeName = body.orgNodeName?.trim();
+    if (!finalOrgNodeId && requestedOrgNodeName) {
+      if (normalizeOrgNodeName(requestedOrgNodeName) === 'area nao classificada') {
+        throw new ConflictException('Area nao classificada nao pode ser criada automaticamente. Selecione um setor real da estrutura.');
+      }
       const existing = await this.prisma.orgNode.findFirst({
         where: {
           companyId: me.companyId,
-          name: { equals: body.orgNodeName.trim(), mode: 'insensitive' },
+          name: { equals: requestedOrgNodeName, mode: 'insensitive' },
           deletedAt: null,
         },
       });
@@ -1069,7 +1078,7 @@ export class StrategyService {
         const created = await this.prisma.orgNode.create({
           data: {
             companyId: me.companyId,
-            name: body.orgNodeName.trim(),
+            name: requestedOrgNodeName,
             type: 'AREA',
             active: true,
           },
@@ -1395,6 +1404,15 @@ function uniqueIds(ids: string[]) {
 function normalizeNullable(value: string | null | undefined) {
   if (value === undefined) return undefined;
   return value || null;
+}
+
+function normalizeOrgNodeName(value: string) {
+  return value
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .trim()
+    .toLowerCase()
+    .replace(/\s+/g, ' ');
 }
 
 function stringify(value: unknown) {

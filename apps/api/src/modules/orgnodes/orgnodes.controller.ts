@@ -13,40 +13,108 @@ export class OrgNodesController {
   constructor(private readonly service: OrgNodesService) {}
 
   @Get()
+  @RequirePermissions('org:view')
   list(@CurrentUser() me: AuthPayload) {
     return this.service.listFlat(me.companyId);
   }
 
   @Get('tree')
+  @RequirePermissions('org:view')
   tree(@CurrentUser() me: AuthPayload) {
     return this.service.tree(me.companyId);
+  }
+
+  @Get(':id/removal-impact')
+  @Roles(UserRoleEnum.SUPER_ADMIN, UserRoleEnum.COMPANY_ADMIN)
+  @RequirePermissions('org:manage')
+  removalImpact(@CurrentUser() me: AuthPayload, @Param('id') id: string) {
+    return this.service.removalImpact(id, me.companyId);
+  }
+
+  @Get(':id')
+  @RequirePermissions('org:view')
+  detail(@CurrentUser() me: AuthPayload, @Param('id') id: string) {
+    return this.service.detail(id, me);
   }
 
   @Post()
   @Roles(UserRoleEnum.SUPER_ADMIN, UserRoleEnum.COMPANY_ADMIN)
   @RequirePermissions('org:manage')
   create(@CurrentUser() me: AuthPayload, @Body(new ZodValidationPipe(orgNodeCreateSchema)) input: any) {
-    return this.service.create(input, me.companyId);
+    return this.service.create(input, me.companyId, me.sub);
   }
 
   @Patch(':id')
   @Roles(UserRoleEnum.SUPER_ADMIN, UserRoleEnum.COMPANY_ADMIN)
   @RequirePermissions('org:manage')
   update(@CurrentUser() me: AuthPayload, @Param('id') id: string, @Body() input: any) {
-    return this.service.update(id, input, me.companyId);
+    return this.service.update(id, input, me.companyId, me.sub);
   }
 
   @Patch(':id/move')
   @Roles(UserRoleEnum.SUPER_ADMIN, UserRoleEnum.COMPANY_ADMIN)
   @RequirePermissions('org:manage')
   move(@CurrentUser() me: AuthPayload, @Param('id') id: string, @Body() body: { parentId: string | null }) {
-    return this.service.move(id, me.companyId, body.parentId);
+    return this.service.move(id, me.companyId, body.parentId, me.sub);
   }
 
   @Delete(':id')
   @Roles(UserRoleEnum.SUPER_ADMIN, UserRoleEnum.COMPANY_ADMIN)
   @RequirePermissions('org:manage')
   remove(@CurrentUser() me: AuthPayload, @Param('id') id: string) {
-    return this.service.remove(id, me.companyId);
+    return this.service.remove(id, me.companyId, me.sub);
+  }
+
+  @Post(':id/activities')
+  @Roles(UserRoleEnum.SUPER_ADMIN, UserRoleEnum.COMPANY_ADMIN)
+  @RequirePermissions('org:manage')
+  createActivity(@CurrentUser() me: AuthPayload, @Param('id') id: string, @Body() body: any) {
+    return this.service.createActivity(me, id, body);
+  }
+
+  @Patch(':id/activities/:activityId')
+  @Roles(UserRoleEnum.SUPER_ADMIN, UserRoleEnum.COMPANY_ADMIN)
+  @RequirePermissions('org:manage')
+  updateActivity(@CurrentUser() me: AuthPayload, @Param('id') id: string, @Param('activityId') activityId: string, @Body() body: any) {
+    return this.service.updateActivity(me, id, activityId, body);
+  }
+
+  @Delete(':id/activities/:activityId')
+  @Roles(UserRoleEnum.SUPER_ADMIN, UserRoleEnum.COMPANY_ADMIN)
+  @RequirePermissions('org:manage')
+  removeActivity(@CurrentUser() me: AuthPayload, @Param('id') id: string, @Param('activityId') activityId: string) {
+    return this.service.removeActivity(me, id, activityId);
+  }
+
+  @Post(':id/activities/:activityId/items')
+  @Roles(UserRoleEnum.SUPER_ADMIN, UserRoleEnum.COMPANY_ADMIN)
+  @RequirePermissions('org:manage')
+  createActivityItem(@CurrentUser() me: AuthPayload, @Param('id') id: string, @Param('activityId') activityId: string, @Body() body: any) {
+    return this.service.createActivityItem(me, id, activityId, body);
+  }
+
+  @Patch(':id/activities/:activityId/items/:itemId')
+  @Roles(UserRoleEnum.SUPER_ADMIN, UserRoleEnum.COMPANY_ADMIN)
+  @RequirePermissions('org:manage')
+  updateActivityItem(
+    @CurrentUser() me: AuthPayload,
+    @Param('id') id: string,
+    @Param('activityId') activityId: string,
+    @Param('itemId') itemId: string,
+    @Body() body: any,
+  ) {
+    return this.service.updateActivityItem(me, id, activityId, itemId, body);
+  }
+
+  @Delete(':id/activities/:activityId/items/:itemId')
+  @Roles(UserRoleEnum.SUPER_ADMIN, UserRoleEnum.COMPANY_ADMIN)
+  @RequirePermissions('org:manage')
+  removeActivityItem(
+    @CurrentUser() me: AuthPayload,
+    @Param('id') id: string,
+    @Param('activityId') activityId: string,
+    @Param('itemId') itemId: string,
+  ) {
+    return this.service.removeActivityItem(me, id, activityId, itemId);
   }
 }
