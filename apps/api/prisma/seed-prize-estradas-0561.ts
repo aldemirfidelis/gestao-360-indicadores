@@ -10,7 +10,6 @@ import {
   PrismaClient,
   PrizeIndicatorDirection,
 } from '@prisma/client';
-import { suggestRanges } from '../src/modules/prize/prize-ranges.util';
 
 const prisma = new PrismaClient();
 
@@ -76,6 +75,59 @@ const MODERATOR_DEFAULTS = [
 ];
 
 type Tx = Prisma.TransactionClient;
+
+interface SuggestedRange {
+  orderIndex: number;
+  minLimit: number | null;
+  maxLimit: number | null;
+  achievementPercent: number;
+  gainPercent: number;
+}
+
+function round(value: number, decimals: number) {
+  const factor = 10 ** decimals;
+  return Math.round(value * factor) / factor;
+}
+
+function suggestRanges(input: {
+  zero: number;
+  target: number;
+  direction: 'HIGHER_BETTER' | 'LOWER_BETTER';
+  count: number;
+  decimals: number;
+}): SuggestedRange[] {
+  const { zero, target, direction, count, decimals } = input;
+  const gap = 10 ** -decimals;
+  const steps = count - 1;
+  const percent = (index: number) => round((index / steps) * 100, 4);
+
+  if (!Number.isInteger(count) || count < 2 || count > 6) throw new Error('Quantidade de faixas deve estar entre 2 e 6.');
+  if (direction === 'HIGHER_BETTER' && target <= zero) throw new Error('Meta deve ser maior que zero para indicador maior-melhor.');
+  if (direction === 'LOWER_BETTER' && target >= zero) throw new Error('Meta deve ser menor que zero para indicador menor-melhor.');
+
+  if (direction === 'HIGHER_BETTER') {
+    const ranges: SuggestedRange[] = [
+      { orderIndex: 0, minLimit: 0, maxLimit: round(zero, decimals), achievementPercent: 0, gainPercent: 0 },
+    ];
+    const stepSize = (target - zero) / steps;
+    for (let index = 1; index <= steps; index++) {
+      const minLimit = index === 1 ? round(zero + gap, decimals) : round((ranges[index - 1].maxLimit as number) + gap, decimals);
+      const maxLimit = index === steps ? round(target, decimals) : round(minLimit + stepSize - gap, decimals);
+      ranges.push({ orderIndex: index, minLimit, maxLimit, achievementPercent: percent(index), gainPercent: percent(index) });
+    }
+    return ranges;
+  }
+
+  const ranges: SuggestedRange[] = new Array(count);
+  const stepSize = (zero - target) / steps;
+  ranges[0] = { orderIndex: 0, minLimit: round(zero, decimals), maxLimit: null, achievementPercent: 0, gainPercent: 0 };
+  for (let index = steps; index >= 1; index--) {
+    const minLimit = index === steps ? round(target, decimals) : round((ranges[index + 1].maxLimit as number) + gap, decimals);
+    const maxLimit = index === 1 ? round(zero - gap, decimals) : round(minLimit + stepSize - gap, decimals);
+    ranges[index] = { orderIndex: index, minLimit, maxLimit, achievementPercent: percent(index), gainPercent: percent(index) };
+  }
+  return ranges;
+}
 
 function argValue(name: string) {
   const prefix = `--${name}=`;
