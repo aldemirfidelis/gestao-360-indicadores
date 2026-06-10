@@ -407,5 +407,5 @@ residual.
 | 31 | Salário não exposto | ✓ | `prize:salary:view` |
 | 32 | Testes documentados | ✓ | 280 testes (engine, governança, conciliação, folha) |
 | 33 | Documentação técnica | ✓ | este documento |
-| 34 | Migrations seguras | ✓ | 8 migrações aditivas/reversíveis |
+| 34 | Migrations seguras | ✓ | 6 migrações aditivas/reversíveis |
 | 35 | Funcionalidades existentes intactas | ✓ | suíte completa verde; worktree isolada |
