@@ -3,6 +3,7 @@ import { Direction, IndicatorUnit, PrizeIndicatorDirection, PrizeIndicatorKind, 
 import { PrismaService } from '../../prisma/prisma.service';
 import { AuthPayload } from '../auth/auth.types';
 import { PrizeAuditService } from './prize-audit.service';
+import { suggestRanges, SuggestedRange } from './prize-ranges.util';
 
 // Mapeia o cadastro nativo (modulo Indicadores) para o vocabulario do premio,
 // permitindo herdar nome/unidade/sentido sem redigitar.
@@ -269,6 +270,82 @@ export class PrizeIndicatorsService {
     });
     await this.audit.log(me, { action: 'SET_RANGE', entityType: 'RANGE', entityId: range.id, after: range });
     return range;
+  }
+
+  /**
+   * Sugere faixas no modelo da planilha oficial (distribuição linear zero→meta,
+   * faixa 0 com 0%, %pago linear). NÃO persiste — o usuário revisa e aplica.
+   * zero/meta podem vir do corpo ou do parâmetro mais recente do indicador.
+   */
+  async suggestIndicatorRanges(
+    me: AuthPayload,
+    indicatorId: string,
+    dto: { zero?: number | null; target?: number | null; count?: number; decimals?: number },
+  ): Promise<{ direction: string; zero: number; target: number; ranges: SuggestedRange[] }> {
+    const indicator = await this.get(me.companyId, indicatorId);
+    if (indicator.direction === 'TARGET') {
+      throw new BadRequestException('Geração automática de faixas vale para indicadores "maior melhor" ou "menor melhor"');
+    }
+    let zero = dto.zero ?? null;
+    let target = dto.target ?? null;
+    if (zero === null || target === null) {
+      const param = indicator.parameters[0]; // mais recente (ordenado desc no get)
+      if (param) {
+        zero = zero ?? (param.zero !== null ? Number(param.zero) : null);
+        target = target ?? (param.target !== null ? Number(param.target) : null);
+      }
+    }
+    if (zero === null || target === null) {
+      throw new BadRequestException('Informe Zero e Meta (ou cadastre um parâmetro de meta/zero para o indicador)');
+    }
+    try {
+      const ranges = suggestRanges({
+        zero,
+        target,
+        direction: indicator.direction === 'LOWER_BETTER' ? 'LOWER_BETTER' : 'HIGHER_BETTER',
+        count: dto.count ?? 6,
+        decimals: dto.decimals ?? 2,
+      });
+      return { direction: indicator.direction, zero, target, ranges };
+    } catch (e: any) {
+      throw new BadRequestException(e.message);
+    }
+  }
+
+  /** Aplica um conjunto de faixas de uma vez (substituindo as existentes quando solicitado). */
+  async applyRanges(me: AuthPayload, indicatorId: string, ranges: RangeDto[], replaceExisting: boolean) {
+    const current = await this.get(me.companyId, indicatorId);
+    if (!ranges?.length) throw new BadRequestException('Nenhuma faixa para aplicar');
+    await this.prisma.$transaction(async (tx) => {
+      if (replaceExisting) await tx.prizeIndicatorRange.deleteMany({ where: { indicatorId } });
+      for (const r of ranges) {
+        await tx.prizeIndicatorRange.create({
+          data: {
+            indicatorId,
+            parameterId: r.parameterId ?? null,
+            orderIndex: r.orderIndex ?? 0,
+            minLimit: r.minLimit ?? null,
+            maxLimit: r.maxLimit ?? null,
+            achievementPercent: r.achievementPercent ?? null,
+            gainPercent: r.gainPercent ?? null,
+            weight: r.weight ?? null,
+            behaviorAbove: r.behaviorAbove ?? null,
+            behaviorBelow: r.behaviorBelow ?? null,
+            cap: r.cap ?? null,
+            floor: r.floor ?? null,
+            cumulative: r.cumulative ?? false,
+          },
+        });
+      }
+    });
+    await this.audit.log(me, {
+      action: 'SET_RANGES_BULK',
+      entityType: 'INDICATOR',
+      entityId: indicatorId,
+      before: { ranges: current.ranges.length },
+      after: { ranges: ranges.length, replaced: replaceExisting },
+    });
+    return this.get(me.companyId, indicatorId);
   }
 
   async removeRange(me: AuthPayload, indicatorId: string, rangeId: string) {

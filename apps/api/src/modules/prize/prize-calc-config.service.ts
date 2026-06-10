@@ -44,6 +44,36 @@ export class PrizeCalcConfigService {
     return r;
   }
 
+  /**
+   * Carrega as regras de moderador do MODELO OFICIAL (planilhas Bases_calculo,
+   * fórmula AE do VBA CALCULO): falta 34%/dia, suspensão 34%/dia, medida
+   * disciplinar 50%/ocorrência (advertência verbal não conta — não a lance
+   * como evento), acidente com afastamento 50%/ocorrência e atestado 20%/dia
+   * com a 1ª ocorrência abonada. São criadas como regras NORMAIS, editáveis —
+   * nada fica fixo em código. Não duplica tipos que já tenham regra ativa.
+   */
+  async seedDefaultModerators(me: AuthPayload) {
+    const DEFAULTS = [
+      { name: 'Falta (modelo oficial)', eventType: 'FALTA', criterion: 'PER_DAY', reductionPercent: 34, notes: 'Planilha CALCULO: 34% por dia de falta (justificada ou não)' },
+      { name: 'Suspensão (modelo oficial)', eventType: 'SUSPENSAO', criterion: 'PER_DAY', reductionPercent: 34, notes: 'Planilha CALCULO: 34% por dia de suspensão' },
+      { name: 'Medida disciplinar (modelo oficial)', eventType: 'MEDIDA_DISCIPLINAR', criterion: 'PER_OCCURRENCE', reductionPercent: 50, notes: 'Planilha CALCULO: 50% por medida (advertência verbal não conta)' },
+      { name: 'Acidente com afastamento (modelo oficial)', eventType: 'ACIDENTE', criterion: 'PER_OCCURRENCE', reductionPercent: 50, notes: 'Planilha CALCULO: 50% por acidente do tipo "com afastamento"' },
+      { name: 'Atestado (modelo oficial)', eventType: 'ATESTADO', criterion: 'PER_DAY_AFTER_FIRST', reductionPercent: 20, notes: 'Planilha CALCULO/DatasAtestados: 20% por dia de atestado, com o 1º atestado (mais antigo) abonado' },
+    ];
+    const existing = await this.prisma.prizeModeratorRule.findMany({ where: { companyId: me.companyId, active: true }, select: { eventType: true } });
+    const existingTypes = new Set(existing.map((e) => e.eventType));
+    let created = 0;
+    for (const d of DEFAULTS) {
+      if (existingTypes.has(d.eventType)) continue;
+      const r = await this.prisma.prizeModeratorRule.create({
+        data: { ...d, companyId: me.companyId, cumulative: true, priority: 0, requiresApproval: false, active: true, createdById: me.sub },
+      });
+      await this.audit.log(me, { action: 'CREATE', entityType: 'MODERATOR_RULE', entityId: r.id, after: r, justification: 'Seed do modelo oficial (planilhas Bases_calculo)' });
+      created++;
+    }
+    return { created, skipped: DEFAULTS.length - created };
+  }
+
   async removeModerator(me: AuthPayload, id: string) {
     const cur = await this.prisma.prizeModeratorRule.findFirst({ where: { id, companyId: me.companyId } });
     if (!cur) throw new NotFoundException('Regra não encontrada');

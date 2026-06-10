@@ -2,9 +2,20 @@
  * Avaliacao Previsto x Realizado (pura, sem banco — testavel isoladamente).
  * Dado o realizado, o parametro vigente (meta/zero) e as faixas do indicador,
  * calcula desvio, percentual de atingimento, faixa alcancada e percentual de
- * ganho. O impacto financeiro no premio e responsabilidade do motor de calculo
- * (Fase 4); aqui produzimos apenas a leitura de desempenho.
+ * ganho. O impacto financeiro no premio e responsabilidade do motor de calculo;
+ * aqui produzimos apenas a leitura de desempenho.
+ *
+ * Semantica das faixas CALIBRADA pelas planilhas oficiais (Bases_calculo —
+ * modulos VBA FaixaAtingida/modRealizadosFaixas):
+ *  - limites INCLUSIVOS nos dois extremos (realizado >= min E <= max);
+ *  - faixas sao DEGRAUS discretos (sem interpolacao entre faixas);
+ *  - EXTRAPOLACAO por sentido do indicador: realizado acima de todas as faixas
+ *    atinge a faixa TOPO quando "quanto maior, melhor" (e a faixa ZERO quando
+ *    "quanto menor, melhor"); abaixo de todas, o inverso;
+ *  - interpolacao linear zero->meta APENAS quando o indicador nao tem faixas.
  */
+export type EvalDirection = 'HIGHER_BETTER' | 'LOWER_BETTER' | 'TARGET';
+
 export interface EvalParam {
   target?: number | null;
   zero?: number | null;
@@ -44,6 +55,7 @@ export function evaluateActual(
   realized: number | null | undefined,
   param: EvalParam | null | undefined,
   ranges: EvalRange[] = [],
+  direction: EvalDirection = 'HIGHER_BETTER',
 ): EvalResult {
   const target = param?.target ?? null;
   const zero = param?.zero ?? null;
@@ -55,26 +67,48 @@ export function evaluateActual(
   const deviation = target !== null ? realized - target : null;
   const deviationPercent = target !== null && target !== 0 ? (realized - target) / Math.abs(target) * 100 : null;
 
-  // Faixa: primeira (por orderIndex) cujos limites contem o realizado.
+  // Faixa: primeira (por orderIndex) cujos limites contem o realizado (inclusivo).
   const sorted = [...ranges].sort((a, b) => (a.orderIndex ?? 0) - (b.orderIndex ?? 0));
-  const matched = sorted.find(
+  let matched = sorted.find(
     (r) =>
       (r.minLimit === null || r.minLimit === undefined || realized >= r.minLimit) &&
       (r.maxLimit === null || r.maxLimit === undefined || realized <= r.maxLimit),
   );
+
+  // Extrapolacao (regra das planilhas): fora de todas as faixas, o realizado
+  // cai na faixa TOPO ou na faixa ZERO conforme o sentido do indicador.
+  if (!matched && sorted.length > 0 && direction !== 'TARGET') {
+    const zeroRange = sorted[0];
+    const topRange = sorted[sorted.length - 1];
+    const mins = sorted.map((r) => r.minLimit).filter((v): v is number => v !== null && v !== undefined);
+    const maxs = sorted.map((r) => r.maxLimit).filter((v): v is number => v !== null && v !== undefined);
+    const globalMin = mins.length ? Math.min(...mins) : null;
+    const globalMax = maxs.length ? Math.max(...maxs) : null;
+    const aboveAll = globalMax !== null && realized > globalMax;
+    const belowAll = globalMin !== null && realized < globalMin;
+    if (direction === 'HIGHER_BETTER') {
+      if (aboveAll) matched = topRange;
+      else if (belowAll) matched = zeroRange;
+    } else {
+      // LOWER_BETTER: extrapolar para baixo e MELHOR (topo); para cima e pior (zero).
+      if (belowAll) matched = topRange;
+      else if (aboveAll) matched = zeroRange;
+    }
+  }
 
   let achievementPercent: number | null = null;
   let gainPercent: number | null = null;
   let label: string | null = null;
 
   if (matched) {
-    achievementPercent = matched.achievementPercent ?? null;
+    achievementPercent = matched.achievementPercent ?? matched.gainPercent ?? null;
     gainPercent = matched.gainPercent ?? null;
     label = rangeLabel(matched);
   }
 
-  // Sem faixa explicita: interpolacao linear entre zero (0%) e meta (100%).
-  if (achievementPercent === null && target !== null && zero !== null && target !== zero) {
+  // Interpolacao linear zero->meta SOMENTE quando o indicador nao tem faixas
+  // (com faixas, o modelo e degrau — planilha oficial nao interpola).
+  if (ranges.length === 0 && achievementPercent === null && target !== null && zero !== null && target !== zero) {
     const pct = ((realized - zero) / (target - zero)) * 100;
     achievementPercent = Math.max(0, pct);
   }

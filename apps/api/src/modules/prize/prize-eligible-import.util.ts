@@ -94,7 +94,13 @@ export const EVENT_TEMPLATE_HEADERS = ['matricula', 'tipo', 'data', 'dias', 'val
 // Tipos de evento que o motor/moderadores reconhecem. Tipo desconhecido e ERRO:
 // um evento com tipo errado nao casaria com nenhuma regra e silenciosamente
 // deixaria de reduzir o premio (pagamento indevido).
-export const KNOWN_EVENT_TYPES = ['FALTA', 'ATESTADO', 'MEDIDA_DISCIPLINAR', 'SUSPENSAO', 'ACIDENTE', 'TREINAMENTO'] as const;
+// FALTA..TREINAMENTO alimentam moderadores; FERIAS/LICENCA/AFASTAMENTO/
+// AUXILIO_DOENCA reduzem os DIAS DE DIREITO (planilha CALCULO, coluna AD —
+// categorias do Apdata "FALTAS E ATESTADOS").
+export const KNOWN_EVENT_TYPES = [
+  'FALTA', 'ATESTADO', 'MEDIDA_DISCIPLINAR', 'SUSPENSAO', 'ACIDENTE', 'TREINAMENTO',
+  'FERIAS', 'LICENCA', 'AFASTAMENTO', 'AUXILIO_DOENCA',
+] as const;
 
 const SITUATION_MAP: Record<string, string> = {
   ATIVO: 'ACTIVE', ACTIVE: 'ACTIVE',
@@ -327,12 +333,16 @@ export function parseEligibleRows(rawRows: Array<Record<string, unknown>>): Pars
 // ---- parse de eventos ----
 
 const EVENT_TYPE_ALIASES: Record<string, string> = {
-  FALTA: 'FALTA', FALTAS: 'FALTA', FALTA_INJUSTIFICADA: 'FALTA',
+  FALTA: 'FALTA', FALTAS: 'FALTA', FALTA_INJUSTIFICADA: 'FALTA', FALTA_JUSTIFICADA: 'FALTA',
   ATESTADO: 'ATESTADO', ATESTADOS: 'ATESTADO', ATESTADO_MEDICO: 'ATESTADO',
   MEDIDA_DISCIPLINAR: 'MEDIDA_DISCIPLINAR', MEDIDA: 'MEDIDA_DISCIPLINAR', ADVERTENCIA: 'MEDIDA_DISCIPLINAR',
   SUSPENSAO: 'SUSPENSAO', SUSPENSOES: 'SUSPENSAO',
   ACIDENTE: 'ACIDENTE', ACIDENTE_DE_TRABALHO: 'ACIDENTE', ACIDENTE_ATO_INSEGURO: 'ACIDENTE',
   TREINAMENTO: 'TREINAMENTO',
+  FERIAS: 'FERIAS',
+  LICENCA: 'LICENCA', LICENCA_MATERNIDADE: 'LICENCA', LICENCA_PATERNIDADE: 'LICENCA', LICENCA_NAO_REMUNERADA: 'LICENCA',
+  AFASTAMENTO: 'AFASTAMENTO', AFASTADO: 'AFASTAMENTO', APOSENTADORIA_INVALIDEZ: 'AFASTAMENTO', RECLUSAO: 'AFASTAMENTO',
+  AUXILIO_DOENCA: 'AUXILIO_DOENCA', AUX_DOENCA: 'AUXILIO_DOENCA', DIAS_EM_AUX_DOENCA: 'AUXILIO_DOENCA',
 };
 
 export function parseEventRows(
@@ -385,7 +395,7 @@ export function parseEventRows(
       errors.push({ row: rowNum, column: 'dias', message: 'Dias deve ser inteiro entre 0 e 31' });
       return;
     }
-    if (days === null && ['FALTA', 'ATESTADO', 'SUSPENSAO', 'TREINAMENTO'].includes(type)) {
+    if (days === null && ['FALTA', 'ATESTADO', 'SUSPENSAO', 'TREINAMENTO', 'FERIAS', 'LICENCA', 'AFASTAMENTO', 'AUXILIO_DOENCA'].includes(type)) {
       warnings.push({ row: rowNum, column: 'dias', message: `Evento ${type} sem quantidade de dias — moderador/proporcionalidade por dia não será aplicado` });
     }
 

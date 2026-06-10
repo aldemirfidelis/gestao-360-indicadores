@@ -31,6 +31,7 @@ const SOURCE: Record<string, string> = { MANUAL: 'Manual', BSC: 'BSC', INTERNAL_
 const emptyInd = { programId: '', code: '', name: '', unit: '', kind: 'COLLECTIVE', direction: 'HIGHER_BETTER', source: 'MANUAL', weight: '', bscNumber: '', platformIndicatorId: '', manual: false };
 const emptyParam = { year: new Date().getFullYear(), month: new Date().getMonth() + 1, scopeKey: '', target: '', zero: '', weight: '', changeReason: '' };
 const emptyRange = { orderIndex: 0, minLimit: '', maxLimit: '', achievementPercent: '', gainPercent: '' };
+const emptyGen = { zero: '', target: '', count: 6 };
 
 export default function PrizeIndicatorsPage() {
   const qc = useQueryClient();
@@ -43,6 +44,7 @@ export default function PrizeIndicatorsPage() {
   const [selected, setSelected] = useState<string | null>(null);
   const [paramForm, setParamForm] = useState(emptyParam);
   const [rangeForm, setRangeForm] = useState(emptyRange);
+  const [genForm, setGenForm] = useState(emptyGen);
 
   const { data: programs = [] } = useQuery({ queryKey: ['prize-programs-ref'], queryFn: () => api<any[]>('/prize/programs') });
   // Catálogo nativo da plataforma: caminho PADRÃO de criação (reuso, sem recadastro).
@@ -104,6 +106,26 @@ export default function PrizeIndicatorsPage() {
   const removeRange = useMutation({
     mutationFn: ({ indicatorId, rangeId }: { indicatorId: string; rangeId: string }) => api(`/prize/indicators/${indicatorId}/ranges/${rangeId}`, { method: 'DELETE' }),
     onSuccess: () => { toast.success('Faixa removida'); invalidate(); }, onError: onErr,
+  });
+  // Gerador do modelo oficial (planilha): sugere zero→meta e aplica após confirmação.
+  const generateRanges = useMutation({
+    mutationFn: async (indicatorId: string) => {
+      const suggestion = await api<{ direction: string; zero: number; target: number; ranges: any[] }>(
+        `/prize/indicators/${indicatorId}/ranges/suggest`,
+        { method: 'POST', json: { zero: genForm.zero ? Number(genForm.zero) : null, target: genForm.target ? Number(genForm.target) : null, count: Number(genForm.count) || 6 } },
+      );
+      const resumo = suggestion.ranges
+        .map((r) => `Faixa ${r.orderIndex}: [${r.minLimit ?? '−∞'} a ${r.maxLimit ?? '+∞'}] → ${r.gainPercent}%`)
+        .join('\n');
+      const hasExisting = (detail?.ranges.length ?? 0) > 0;
+      const ok = window.confirm(
+        `Faixas sugeridas (zero ${suggestion.zero} → meta ${suggestion.target}):\n\n${resumo}\n\n${hasExisting ? 'ATENÇÃO: as faixas atuais serão SUBSTITUÍDAS. ' : ''}Aplicar?`,
+      );
+      if (!ok) return null;
+      return api(`/prize/indicators/${indicatorId}/ranges/bulk`, { method: 'POST', json: { ranges: suggestion.ranges, replaceExisting: true } });
+    },
+    onSuccess: (r) => { if (r) { toast.success('Faixas geradas (modelo oficial)'); invalidate(); } },
+    onError: onErr,
   });
 
   return (
@@ -203,6 +225,15 @@ export default function PrizeIndicatorsPage() {
                             <Input type="number" placeholder="% atingimento" value={rangeForm.achievementPercent} onChange={(e) => setRangeForm({ ...rangeForm, achievementPercent: e.target.value })} />
                             <Input type="number" placeholder="% ganho" value={rangeForm.gainPercent} onChange={(e) => setRangeForm({ ...rangeForm, gainPercent: e.target.value })} />
                             <Button size="sm" className="col-span-2" variant="outline" onClick={() => addRange.mutate(ind.id)} disabled={addRange.isPending}>Adicionar faixa</Button>
+                            <div className="col-span-2 mt-1 rounded border border-dashed border-border/60 p-2">
+                              <p className="mb-1 text-xs text-muted-foreground">Gerar pelo modelo oficial (distribuição linear zero→meta, faixa 0 = 0%, %pago linear):</p>
+                              <div className="grid grid-cols-4 gap-2">
+                                <Input type="number" placeholder="Zero" value={genForm.zero} onChange={(e) => setGenForm({ ...genForm, zero: e.target.value })} title="Vazio = usa o parâmetro mais recente" />
+                                <Input type="number" placeholder="Meta" value={genForm.target} onChange={(e) => setGenForm({ ...genForm, target: e.target.value })} title="Vazio = usa o parâmetro mais recente" />
+                                <Input type="number" placeholder="Qtde (2-6)" value={genForm.count} onChange={(e) => setGenForm({ ...genForm, count: Number(e.target.value) })} />
+                                <Button size="sm" variant="outline" onClick={() => generateRanges.mutate(ind.id)} disabled={generateRanges.isPending}>{generateRanges.isPending ? 'Gerando…' : 'Gerar faixas'}</Button>
+                              </div>
+                            </div>
                           </div>
                         )}
                       </div>

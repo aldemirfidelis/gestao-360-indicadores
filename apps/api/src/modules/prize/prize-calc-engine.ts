@@ -1,10 +1,18 @@
-import { evaluateActual } from './prize-evaluation';
+import { evaluateActual, EvalDirection } from './prize-evaluation';
 
 /**
  * Motor de calculo do premio (PURO — sem banco, deterministico, testavel).
- * Implementa as etapas do procedimento GOIASA (prompt secao 14.1). NENHUM
- * percentual de empresa e fixado aqui: todos os valores vem da entrada (anexo,
- * faixas, regras de moderador, excecoes), tornando o motor multiempresa.
+ * Implementa as etapas do procedimento GOIASA (prompt secao 14.1), CALIBRADO
+ * pelas planilhas oficiais de Bases_calculo (VBA CALCULO/FaixaAtingida):
+ *  - peso do indicador e PERCENTUAL DO POTENCIAL (ganho = Σ peso×%pago/100,
+ *    sem normalizacao — pesos devem somar 100; divergencia gera aviso na
+ *    memoria de calculo);
+ *  - mes comercial de 30 dias (proporcionalidade = diasDireito/30; admissao no
+ *    mes = 30 − dia + 1);
+ *  - moderadores multiplicativos por tipo de evento, com criterio
+ *    PER_DAY_AFTER_FIRST (1a ocorrencia abonada — regra do atestado).
+ * NENHUM percentual de empresa e fixado aqui: todos os valores vem da entrada
+ * (anexo, faixas, regras de moderador, excecoes), tornando o motor multiempresa.
  * Produz o valor final + a MEMORIA DE CALCULO (lines) auditavel.
  */
 
@@ -13,13 +21,14 @@ export interface EngineIndicator {
   code: string;
   name: string;
   kind: 'COLLECTIVE' | 'INDIVIDUAL' | 'BEHAVIORAL_COLLECTIVE' | 'BEHAVIORAL_INDIVIDUAL';
+  direction?: EvalDirection;
   weight: number | null;
   realized: number | null;
   target: number | null;
   zero: number | null;
   ranges: Array<{ orderIndex?: number; minLimit?: number | null; maxLimit?: number | null; achievementPercent?: number | null; gainPercent?: number | null }>;
 }
-export interface EngineEvent { type: string; days?: number | null }
+export interface EngineEvent { type: string; days?: number | null; date?: string | null }
 export interface EngineModeratorRule {
   name: string; eventType: string; criterion?: string | null;
   reductionPercent?: number | null; reductionValue?: number | null; cap?: number | null; cumulative: boolean; priority: number;
@@ -76,21 +85,62 @@ function round(v: number, rule: string): number {
   }
 }
 
-function weightedGainOf(indicators: EngineIndicator[]): { gain: number; perIndicator: Array<{ code: string; gain: number; weight: number }> } {
+/**
+ * Ganho ponderado no modelo das planilhas: peso = % do potencial; ganho do
+ * indicador = peso × %pago(faixa atingida); total = Σ(peso×ganho)/100. Sem
+ * normalizacao por Σpesos — se os pesos nao somarem 100, paga-se exatamente a
+ * fracao configurada (e o motor sinaliza a divergencia). Pesos todos ausentes
+ * -> partes iguais somando 100.
+ */
+function weightedGainOf(indicators: EngineIndicator[]): {
+  gain: number;
+  weightSum: number;
+  perIndicator: Array<{ code: string; gain: number; weight: number }>;
+} {
+  if (indicators.length === 0) {
+    // Sem indicadores avaliaveis -> 100% (o potencial do anexo e o premio).
+    return { gain: 100, weightSum: 100, perIndicator: [] };
+  }
+  const allNull = indicators.every((i) => i.weight === null || i.weight === undefined);
   const per: Array<{ code: string; gain: number; weight: number }> = [];
   let sumW = 0;
   let sumWG = 0;
   for (const ind of indicators) {
-    const ev = evaluateActual(ind.realized, { target: ind.target, zero: ind.zero }, ind.ranges);
+    const ev = evaluateActual(ind.realized, { target: ind.target, zero: ind.zero }, ind.ranges, ind.direction ?? 'HIGHER_BETTER');
     const gain = ev.gainPercent ?? ev.achievementPercent ?? 0;
-    const w = ind.weight ?? 1;
+    const w = allNull ? 100 / indicators.length : ind.weight ?? 0;
     per.push({ code: ind.code, gain, weight: w });
     sumW += w;
     sumWG += w * gain;
   }
-  // Sem indicadores avaliaveis -> 100% (o potencial do anexo e o premio).
-  const gain = indicators.length === 0 ? 100 : sumW > 0 ? sumWG / sumW : 0;
-  return { gain, perIndicator: per };
+  return { gain: sumWG / 100, weightSum: sumW, perIndicator: per };
+}
+
+/** Tipos de evento que reduzem os DIAS DE DIREITO (planilha: coluna AD). Atestado NAO reduz dias — ele modera. */
+export const ABSENCE_EVENT_TYPES = ['FALTA', 'SUSPENSAO', 'FERIAS', 'LICENCA', 'AFASTAMENTO', 'AUXILIO_DOENCA'];
+
+/**
+ * Dias-base do mes comercial (30) conforme a data de admissao — regra
+ * DiasNoMesRegraApuracao da planilha: admitido depois do mes = 0; antes = 30;
+ * dentro do mes = 30 − dia + 1.
+ */
+export function commercialDaysFromAdmission(admissionDate: Date | string | null | undefined, year: number, month: number): number {
+  if (!admissionDate) return 30;
+  const adm = admissionDate instanceof Date ? admissionDate : new Date(admissionDate);
+  if (Number.isNaN(adm.getTime())) return 30;
+  const ay = adm.getUTCFullYear();
+  const am = adm.getUTCMonth() + 1;
+  if (ay > year || (ay === year && am > month)) return 0;
+  if (ay < year || (ay === year && am < month)) return 30;
+  return Math.max(0, 30 - adm.getUTCDate() + 1);
+}
+
+/** Dias de direito = dias-base − Σ dias dos eventos de ausencia (clamp ≥ 0). */
+export function deriveEntitledDays(baseDays: number, events: EngineEvent[], absenceTypes: string[] = ABSENCE_EVENT_TYPES): number {
+  const absent = events
+    .filter((e) => absenceTypes.includes(e.type))
+    .reduce((s, e) => s + (e.days ?? 0), 0);
+  return Math.max(0, Math.round((baseDays - absent) * 100) / 100);
 }
 
 export function computePrize(input: EngineInput): EngineOutput {
@@ -115,10 +165,14 @@ export function computePrize(input: EngineInput): EngineOutput {
     input.gainPotential != null ? 'Potencial fixo do anexo' : `Salário ${input.baseSalary ?? 0} × ${input.salaryPercent ?? 0}%`);
 
   // 4-7. Indicadores coletivos -> atingimento ponderado -> resultado-base
+  // (modelo planilha: peso e % do potencial; ganho total = Σ peso×%pago / 100)
   const collectives = input.indicators.filter((i) => i.kind === 'COLLECTIVE');
-  const { gain: weightedGain, perIndicator } = weightedGainOf(collectives);
-  perIndicator.forEach((p) => add(5, 'IND_COLL', `Indicador coletivo ${p.code}`, p.gain, `peso ${p.weight} · ganho ${p.gain}%`));
-  add(7, 'WEIGHTED_GAIN', 'Atingimento ponderado (coletivo)', round(weightedGain, 'HALF_UP_2'), `${collectives.length} indicador(es)`);
+  const { gain: weightedGain, weightSum, perIndicator } = weightedGainOf(collectives);
+  perIndicator.forEach((p) => add(5, 'IND_COLL', `Indicador coletivo ${p.code}`, p.gain, `peso ${p.weight}% · %pago ${p.gain}% · parcela ${round((p.weight * p.gain) / 100, 'HALF_UP_2')}%`));
+  if (collectives.length > 0 && Math.abs(weightSum - 100) > 0.01) {
+    add(6, 'WEIGHT_WARN', 'Atenção: pesos dos indicadores coletivos não somam 100%', round(weightSum, 'HALF_UP_2'), `Soma dos pesos = ${weightSum}% — o prêmio pagará no máximo essa fração do potencial`);
+  }
+  add(7, 'WEIGHTED_GAIN', 'Atingimento ponderado (coletivo)', round(weightedGain, 'HALF_UP_2'), `${collectives.length} indicador(es) · Σ peso×%pago/100`);
 
   let base = potential * (weightedGain / 100);
 
@@ -188,25 +242,53 @@ export function computePrize(input: EngineInput): EngineOutput {
     return { potential: round(potential, cfg.roundingRule), weightedGain: round(weightedGain, 'HALF_UP_2'), proportionality: round(proportionality, 'HALF_UP_2'), grossValue: 0, totalReductions: 0, adjustments: 0, gratification, finalValue: 0, blocked: true, blockReason: 'Treinamento', exceptionType, lines };
   }
 
-  // 12. Moderadores (reducoes individuais)
+  // 12. Moderadores (reducoes individuais) — agregados por TIPO de evento,
+  // como na planilha (fator = 1 − Σ reducoes, clamp em 0 via min(Σ, bruto)).
+  // Criterios: PER_DAY (por dia), PER_OCCURRENCE/ANY (por ocorrencia) e
+  // PER_DAY_AFTER_FIRST (por dia, com a 1a ocorrencia — a mais antiga —
+  // abonada: regra do atestado na planilha CALCULO/DatasAtestados).
   let totalReductions = 0;
-  const rulesByType = new Map<string, EngineModeratorRule[]>();
-  for (const r of input.moderatorRules) {
-    const arr = rulesByType.get(r.eventType) ?? [];
-    arr.push(r);
-    rulesByType.set(r.eventType, arr);
-  }
+  const eventsByType = new Map<string, EngineEvent[]>();
   for (const ev of input.events) {
-    const rules = (rulesByType.get(ev.type) ?? []).sort((a, b) => a.priority - b.priority);
+    const arr = eventsByType.get(ev.type) ?? [];
+    arr.push(ev);
+    eventsByType.set(ev.type, arr);
+  }
+  for (const [type, occurrences] of eventsByType) {
+    const rules = input.moderatorRules.filter((r) => r.eventType === type).sort((a, b) => a.priority - b.priority);
     for (const rule of rules) {
-      const factor = rule.criterion === 'PER_DAY' ? (ev.days ?? 1) : 1;
+      let factor: number;
+      let detail: string;
+      if (rule.criterion === 'PER_DAY') {
+        factor = occurrences.reduce((s, e) => s + (e.days ?? 1), 0);
+        detail = `${occurrences.length} evento(s) · ${factor} dia(s)`;
+      } else if (rule.criterion === 'PER_DAY_AFTER_FIRST') {
+        if (occurrences.length <= 1) {
+          factor = 0;
+          detail = `${occurrences.length} evento(s) · 1ª ocorrência abonada`;
+        } else {
+          const sorted = [...occurrences].sort((a, b) => {
+            const da = a.date ? Date.parse(a.date) : Number.POSITIVE_INFINITY;
+            const db = b.date ? Date.parse(b.date) : Number.POSITIVE_INFINITY;
+            return da - db;
+          });
+          const totalDays = sorted.reduce((s, e) => s + (e.days ?? 1), 0);
+          factor = Math.max(0, totalDays - (sorted[0].days ?? 1));
+          detail = `${occurrences.length} evento(s) · ${totalDays} dia(s) − ${sorted[0].days ?? 1} (1ª ocorrência abonada) = ${factor}`;
+        }
+      } else {
+        factor = occurrences.length;
+        detail = `${occurrences.length} ocorrência(s)`;
+      }
       let reduction = 0;
       if (rule.reductionValue != null) reduction = rule.reductionValue * factor;
       else if (rule.reductionPercent != null) reduction = grossValue * (rule.reductionPercent / 100) * factor;
       if (rule.cap != null) reduction = Math.min(reduction, grossValue * (rule.cap / 100));
       reduction = round(reduction, cfg.roundingRule);
-      totalReductions += reduction;
-      add(12, 'MODERATOR', `Moderador: ${rule.name}`, -reduction, `Evento ${ev.type}${ev.days ? ` (${ev.days}d)` : ''}`);
+      if (reduction !== 0 || factor > 0) {
+        totalReductions += reduction;
+        add(12, 'MODERATOR', `Moderador: ${rule.name}`, -reduction, `Evento ${type} · ${detail}`);
+      }
       if (!rule.cumulative) break;
     }
   }
@@ -239,4 +321,7 @@ export function computePrize(input: EngineInput): EngineOutput {
   };
 }
 
-export const PRIZE_ENGINE_VERSION = '1.0.0';
+// 1.1.0: calibracao pelas planilhas oficiais (Bases_calculo): pesos como % do
+// potencial (sem normalizacao), extrapolacao de faixa por sentido, moderadores
+// agregados por tipo + criterio PER_DAY_AFTER_FIRST, dias de direito base 30.
+export const PRIZE_ENGINE_VERSION = '1.1.0';

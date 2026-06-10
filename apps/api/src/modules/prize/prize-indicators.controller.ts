@@ -69,6 +69,28 @@ export class PrizeIndicatorsController {
     return this.service.setRange(me, id, dto);
   }
 
+  // Gerador de faixas (modelo da planilha oficial): sugere sem persistir.
+  @Post(':id/ranges/suggest')
+  @RequirePermissions('prize:indicators:manage')
+  suggestRanges(
+    @CurrentUser() me: AuthPayload,
+    @Param('id') id: string,
+    @Body() dto: { zero?: number | null; target?: number | null; count?: number; decimals?: number },
+  ) {
+    return this.service.suggestIndicatorRanges(me, id, dto);
+  }
+
+  // Aplica um conjunto de faixas de uma vez (ex.: o resultado do suggest revisado).
+  @Post(':id/ranges/bulk')
+  @RequirePermissions('prize:indicators:manage')
+  applyRanges(
+    @CurrentUser() me: AuthPayload,
+    @Param('id') id: string,
+    @Body() body: { ranges: RangeDto[]; replaceExisting?: boolean },
+  ) {
+    return this.service.applyRanges(me, id, body.ranges ?? [], body.replaceExisting ?? false);
+  }
+
   @Delete(':id/ranges/:rangeId')
   @RequirePermissions('prize:indicators:manage')
   removeRange(@CurrentUser() me: AuthPayload, @Param('id') id: string, @Param('rangeId') rangeId: string) {

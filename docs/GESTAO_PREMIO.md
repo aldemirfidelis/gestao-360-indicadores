@@ -11,6 +11,63 @@
 > Conformidade conferida contra os documentos e o prompt — ver seção 8.
 > **Em produção** no droplet (PostgreSQL local; 6+1 migrações aplicadas).
 
+## 0.9. Calibração do motor pelas planilhas oficiais (Bases_calculo) (entregue)
+
+> Engenharia reversa COMPLETA dos 5 arquivos de `Gestao_premio/Bases_calculo`
+> (VBA extraído de BaseAnexos.xlsm, Ferramenta Calculo, Ferramenta de Apuração,
+> Ferramenta de Criação de Faixas; anexo real PREMIO ESTRADAS 0561). O motor
+> agora replica a semântica EXATA do processo legado — engine **v1.1.0**.
+
+**Regras extraídas do VBA (fonte da verdade do processo):**
+- **Faixas** (FaixaAtingida/modRealizadosFaixas): degraus discretos com limites
+  INCLUSIVOS; faixa 0 explícita pagando 0%; **extrapolação por sentido** —
+  acima de todas → faixa TOPO ("maior melhor") / faixa ZERO ("menor melhor"),
+  abaixo de todas → o inverso. SEM interpolação entre faixas.
+- **Ganho** = %PAGO(faixa atingida) × salário_possível_indicador, onde
+  salário_possível_indicador = potencial_total × peso/100. **Peso é % do
+  potencial** (Σ pesos = 100; sem normalização — pagar exatamente a fração).
+- **Fórmulas do CALCULO (R1C1)**: DiasDireito = max(30 − faltas − acid.trab −
+  aux.doença − afastamentos − férias − licenças − suspensão − outros, 0)
+  (atestado NÃO reduz dias); Moderadores = max(1 − 0,34×(faltas+susp) −
+  0,5×medidas − 0,5×acidentes − 0,2×diasAtestadoDesc, 0); Possível/Atingido =
+  salário × % / **30** × DiasDireito (mês comercial); Final = Atingido × Moder.
+- **Atestados** (DatasAtestados): o atestado MAIS ANTIGO do período é abonado;
+  apenas os dias dos demais descontam (20%/dia).
+- **Admissão no mês**: dias-base = 30 − dia + 1 (antes do mês = 30; depois = 0).
+- **Medidas**: "Advertência Verbal" NÃO conta. **Acidentes**: só "com Afastamento".
+- **Sugestão de faixas** (SugerirFaixas): distribuição LINEAR zero→meta em N
+  faixas (2..6), %pago linear = f/(N−1), gap = 1 unidade da precisão decimal.
+
+**Mudanças aplicadas no módulo (sem migração de banco):**
+- `prize-evaluation.ts`: extrapolação por sentido do indicador; interpolação
+  linear SÓ quando o indicador não tem faixas (com faixas = degrau).
+- `prize-calc-engine.ts` (**v1.1.0**): pesos como % do potencial (aviso
+  WEIGHT_WARN na memória quando Σ≠100); moderadores agregados por tipo com novo
+  critério **PER_DAY_AFTER_FIRST** (1ª ocorrência abonada — regra do atestado);
+  helpers puros `commercialDaysFromAdmission` (30−dia+1) e `deriveEntitledDays`
+  (dias de direito = base − ausências; atestado fora).
+- `prize-calc.service.ts`: passa direção + datas dos eventos; deriva dias de
+  direito (admissão + ausências) quando o snapshot não traz `workedDays`.
+- **Gerador de faixas** (réplica da Ferramenta de Criação de Faixas):
+  `prize-ranges.util.ts` + `POST /prize/indicators/:id/ranges/suggest` e
+  `/ranges/bulk`; UI na tela Indicadores ("Gerar faixas" — zero/meta/qtde, com
+  prévia e confirmação; usa o parâmetro vigente quando não informado).
+- **Seed de moderadores do modelo oficial** (`POST /prize/calc/moderators/
+  seed-defaults` + botão na aba Moderadores): falta 34%/dia, suspensão 34%/dia,
+  medida 50%/ocorrência, acidente 50%/ocorrência, atestado 20%/dia c/ 1º
+  abonado — criadas como regras normais EDITÁVEIS (nada fixo em código).
+- **Eventos de ausência** no import: + FERIAS, LICENCA, AFASTAMENTO,
+  AUXILIO_DOENCA (categorias do Apdata "FALTAS E ATESTADOS"; reduzem dias de
+  direito; aliases licença maternidade/paternidade/não remunerada etc.).
+- **Testes**: +17 (golden tests com os números REAIS da planilha: zero 95/meta
+  100/peso 60/potencial 8,33% → 4,998%; faixas exatas do Base_SE; extrapolação;
+  atestado abonado; fórmula AE composta). Suíte **319 verdes**; tsc/lint ok.
+
+**Pendência de fidelidade (residual, documentada):** duplo impacto de
+falta/suspensão (reduz dias E modera 34%) é reproduzido ao usar eventos de
+ausência + regras seed. A planilha também diferencia "Gera Cálculo?/Gera
+Espelho?" por colaborador — coberto por elegível/bloqueado no snapshot.
+
 ## 0.8. Importação manual da base elegível (CSV/XLSX) — contingência do Apdata (entregue)
 
 > Requisito reaberto por decisão de produto (antes "arquivo só via API"): enquanto

@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { computePrize, EngineInput } from './prize-calc-engine';
+import { commercialDaysFromAdmission, computePrize, deriveEntitledDays, EngineInput } from './prize-calc-engine';
 
 const baseConfig = { periodDays: 30, roundingRule: 'HALF_UP_2' as const, cap: null, floor: null };
 
@@ -25,17 +25,81 @@ describe('computePrize — motor de cálculo', () => {
     expect(r.finalValue).toBe(1500);
   });
 
-  it('atingimento ponderado por faixa define o resultado-base', () => {
+  it('atingimento ponderado: peso é % do potencial (Σ peso×%pago/100, modelo planilha)', () => {
     const r = computePrize(input({
       gainPotential: 1000, salaryPercent: null,
       indicators: [
-        { indicatorId: 'a', code: 'A', name: 'A', kind: 'COLLECTIVE', weight: 1, realized: 100, target: 100, zero: 80, ranges: fullRange }, // ganho 100
-        { indicatorId: 'b', code: 'B', name: 'B', kind: 'COLLECTIVE', weight: 1, realized: 90, target: 100, zero: 80, ranges: fullRange }, // ganho 60
+        { indicatorId: 'a', code: 'A', name: 'A', kind: 'COLLECTIVE', weight: 50, realized: 100, target: 100, zero: 80, ranges: fullRange }, // ganho 100
+        { indicatorId: 'b', code: 'B', name: 'B', kind: 'COLLECTIVE', weight: 50, realized: 90, target: 100, zero: 80, ranges: fullRange }, // ganho 60
       ],
     }));
-    expect(r.weightedGain).toBe(80); // média (100+60)/2
+    expect(r.weightedGain).toBe(80); // 50×100/100 + 50×60/100
     expect(r.grossValue).toBe(800); // 1000 × 80%
     expect(r.finalValue).toBe(800);
+  });
+
+  it('pesos que não somam 100% pagam exatamente a fração configurada (com aviso na memória)', () => {
+    const r = computePrize(input({
+      gainPotential: 1000, salaryPercent: null,
+      indicators: [
+        { indicatorId: 'a', code: 'A', name: 'A', kind: 'COLLECTIVE', weight: 60, realized: 100, target: 100, zero: 80, ranges: fullRange }, // só 60% do potencial
+      ],
+    }));
+    expect(r.weightedGain).toBe(60);
+    expect(r.finalValue).toBe(600);
+    expect(r.lines.find((l) => l.code === 'WEIGHT_WARN')).toBeTruthy();
+  });
+
+  it('pesos ausentes = partes iguais somando 100', () => {
+    const r = computePrize(input({
+      gainPotential: 1000, salaryPercent: null,
+      indicators: [
+        { indicatorId: 'a', code: 'A', name: 'A', kind: 'COLLECTIVE', weight: null, realized: 100, target: 100, zero: 80, ranges: fullRange },
+        { indicatorId: 'b', code: 'B', name: 'B', kind: 'COLLECTIVE', weight: null, realized: 90, target: 100, zero: 80, ranges: fullRange },
+      ],
+    }));
+    expect(r.weightedGain).toBe(80); // (100+60)/2
+    expect(r.lines.find((l) => l.code === 'WEIGHT_WARN')).toBeFalsy();
+  });
+
+  // GOLDEN TEST — réplica da planilha oficial (Base_SE/GANHO_ATINGIDO):
+  // indicador 22782, zero 95, meta 100, peso 60, potencial 8,33% do salário,
+  // 6 faixas lineares, realizado 100 → faixa topo (100%) → atingido = 60% do
+  // potencial = 4,998% do salário (planilha: GANHO_ATINGIDO 4,998%).
+  it('GOLDEN planilha: peso 60 × faixa topo = 4,998% do salário', () => {
+    const faixas = [
+      { orderIndex: 0, minLimit: 0, maxLimit: 95, achievementPercent: 0, gainPercent: 0 },
+      { orderIndex: 1, minLimit: 95.01, maxLimit: 96, achievementPercent: 20, gainPercent: 20 },
+      { orderIndex: 2, minLimit: 96.01, maxLimit: 97, achievementPercent: 40, gainPercent: 40 },
+      { orderIndex: 3, minLimit: 97.01, maxLimit: 98, achievementPercent: 60, gainPercent: 60 },
+      { orderIndex: 4, minLimit: 98.01, maxLimit: 99, achievementPercent: 80, gainPercent: 80 },
+      { orderIndex: 5, minLimit: 99.01, maxLimit: 100, achievementPercent: 100, gainPercent: 100 },
+    ];
+    const r = computePrize(input({
+      baseSalary: 3000, salaryPercent: 8.33, gainPotential: null,
+      indicators: [
+        { indicatorId: 'a', code: '22782', name: '% CONF ISSMA', kind: 'COLLECTIVE', direction: 'HIGHER_BETTER', weight: 60, realized: 100, target: 100, zero: 95, ranges: faixas },
+      ],
+    }));
+    // potencial = 3000 × 8,33% = 249,90; atingido = 60% → 149,94 = 4,998% de 3000
+    expect(r.potential).toBe(249.9);
+    expect(r.weightedGain).toBe(60);
+    expect(r.finalValue).toBe(149.94);
+  });
+
+  it('GOLDEN planilha: extrapolação acima da última faixa paga o topo', () => {
+    const faixas = [
+      { orderIndex: 0, minLimit: 0, maxLimit: 95, gainPercent: 0 },
+      { orderIndex: 5, minLimit: 99.01, maxLimit: 100, gainPercent: 100 },
+    ];
+    const r = computePrize(input({
+      gainPotential: 1000, salaryPercent: null,
+      indicators: [
+        { indicatorId: 'a', code: 'A', name: 'A', kind: 'COLLECTIVE', direction: 'HIGHER_BETTER', weight: 100, realized: 104.2, target: 100, zero: 95, ranges: faixas },
+      ],
+    }));
+    expect(r.weightedGain).toBe(100);
+    expect(r.finalValue).toBe(1000);
   });
 
   it('proporcionalidade reduz pelo período trabalhado', () => {
@@ -141,5 +205,67 @@ describe('computePrize — motor de cálculo', () => {
     expect(r.lines.length).toBeGreaterThan(3);
     expect(r.lines.find((l) => l.code === 'POTENTIAL')).toBeTruthy();
     expect(r.lines.find((l) => l.code === 'FINAL')).toBeTruthy();
+  });
+
+  // ---- Regra do atestado (planilha DatasAtestados): 1ª ocorrência abonada ----
+  it('PER_DAY_AFTER_FIRST: atestado único não desconta', () => {
+    const r = computePrize(input({
+      gainPotential: 1000, salaryPercent: null,
+      events: [{ type: 'ATESTADO', days: 3, date: '2026-03-05' }],
+      moderatorRules: [{ name: 'Atestado', eventType: 'ATESTADO', criterion: 'PER_DAY_AFTER_FIRST', reductionPercent: 20, reductionValue: null, cap: null, cumulative: true, priority: 0 }],
+    }));
+    expect(r.totalReductions).toBe(0);
+    expect(r.finalValue).toBe(1000);
+  });
+
+  it('PER_DAY_AFTER_FIRST: múltiplos atestados descontam total menos o mais antigo', () => {
+    const r = computePrize(input({
+      gainPotential: 1000, salaryPercent: null,
+      events: [
+        { type: 'ATESTADO', days: 2, date: '2026-03-20' },
+        { type: 'ATESTADO', days: 3, date: '2026-03-02' }, // mais antigo: abonado
+      ],
+      moderatorRules: [{ name: 'Atestado', eventType: 'ATESTADO', criterion: 'PER_DAY_AFTER_FIRST', reductionPercent: 20, reductionValue: null, cap: null, cumulative: true, priority: 0 }],
+    }));
+    // total 5 dias − 3 (mais antigo) = 2 dias × 20% = 40% de 1000
+    expect(r.totalReductions).toBe(400);
+    expect(r.finalValue).toBe(600);
+  });
+
+  it('moderadores do modelo oficial compõem como na fórmula da planilha (AE)', () => {
+    // 1 falta (1d) + 1 medida: fator = 1 − 0,34 − 0,5 = 0,16 → final = bruto × 0,16
+    const r = computePrize(input({
+      gainPotential: 1000, salaryPercent: null,
+      events: [
+        { type: 'FALTA', days: 1 },
+        { type: 'MEDIDA_DISCIPLINAR' },
+      ],
+      moderatorRules: [
+        { name: 'Falta', eventType: 'FALTA', criterion: 'PER_DAY', reductionPercent: 34, reductionValue: null, cap: null, cumulative: true, priority: 0 },
+        { name: 'Medida', eventType: 'MEDIDA_DISCIPLINAR', criterion: 'PER_OCCURRENCE', reductionPercent: 50, reductionValue: null, cap: null, cumulative: true, priority: 0 },
+      ],
+    }));
+    expect(r.totalReductions).toBe(840); // 340 + 500
+    expect(r.finalValue).toBe(160);
+  });
+});
+
+describe('dias de direito (mês comercial de 30 dias — regra da planilha)', () => {
+  it('admissão antes do mês = 30; depois do mês = 0; no mês = 30 − dia + 1', () => {
+    expect(commercialDaysFromAdmission('2025-01-10', 2026, 3)).toBe(30);
+    expect(commercialDaysFromAdmission('2026-04-01', 2026, 3)).toBe(0);
+    expect(commercialDaysFromAdmission('2026-03-11', 2026, 3)).toBe(20); // 30−11+1
+    expect(commercialDaysFromAdmission('2026-03-31', 2026, 3)).toBe(0); // 30−31+1 → 0
+    expect(commercialDaysFromAdmission(null, 2026, 3)).toBe(30);
+  });
+
+  it('ausências reduzem os dias; atestado NÃO reduz (ele modera)', () => {
+    const events = [
+      { type: 'FERIAS', days: 10 },
+      { type: 'FALTA', days: 2 },
+      { type: 'ATESTADO', days: 5 }, // não entra
+    ];
+    expect(deriveEntitledDays(30, events)).toBe(18); // 30 − 10 − 2
+    expect(deriveEntitledDays(5, [{ type: 'AFASTAMENTO', days: 12 }])).toBe(0); // clamp
   });
 });

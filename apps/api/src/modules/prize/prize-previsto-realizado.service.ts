@@ -51,6 +51,7 @@ export class PrizePrevistoRealizadoService {
           achievementPercent: num(r.achievementPercent),
           gainPercent: num(r.gainPercent),
         })),
+        ind.direction,
       );
       rows.push({
         indicatorId: ind.id,

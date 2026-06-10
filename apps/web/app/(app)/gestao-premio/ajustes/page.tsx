@@ -30,7 +30,7 @@ const ADJ_STATUS: Record<string, any> = { REQUESTED: 'secondary', APPROVED: 'def
 const EXC_TYPE: Record<string, string> = { IMPOSSIBILITY: 'Impossibilidade de apuração', TRAINING: 'Treinamento', TERMINATION: 'Desligamento', OTHER: 'Outra' };
 const MOD_EVENT_TYPES = ['FALTA', 'ATESTADO', 'MEDIDA_DISCIPLINAR', 'SUSPENSAO', 'ACIDENTE'];
 const MOD_EVENT_LABEL: Record<string, string> = { FALTA: 'Falta', ATESTADO: 'Atestado', MEDIDA_DISCIPLINAR: 'Medida disciplinar', SUSPENSAO: 'Suspensão', ACIDENTE: 'Acidente (ato inseguro)' };
-const MOD_CRITERIA: Record<string, string> = { ANY: 'Por ocorrência', PER_DAY: 'Por dia', PER_OCCURRENCE: 'Por evento' };
+const MOD_CRITERIA: Record<string, string> = { ANY: 'Por ocorrência', PER_DAY: 'Por dia', PER_OCCURRENCE: 'Por evento', PER_DAY_AFTER_FIRST: 'Por dia (1ª ocorrência abonada)' };
 const emptyModForm = { name: '', eventType: 'FALTA', criterion: 'PER_DAY', reductionPercent: '', reductionValue: '', cap: '', cumulative: true, priority: 0, active: true };
 
 export default function PrizeAdjustmentsPage() {
@@ -77,6 +77,11 @@ export default function PrizeAdjustmentsPage() {
     onSuccess: () => { toast.success(editingMod ? 'Regra atualizada' : 'Regra criada'); inval('prize-moderators'); setDialog(null); }, onError: onErr,
   });
   const removeMod = useMutation({ mutationFn: (id: string) => api(`/prize/calc/moderators/${id}`, { method: 'DELETE' }), onSuccess: () => { toast.success('Regra removida'); inval('prize-moderators'); }, onError: onErr });
+  const seedMods = useMutation({
+    mutationFn: () => api<{ created: number; skipped: number }>('/prize/calc/moderators/seed-defaults', { method: 'POST' }),
+    onSuccess: (r) => { toast.success(`Modelo oficial carregado: ${r.created} regra(s) criada(s)${r.skipped ? `, ${r.skipped} já existiam` : ''}`); inval('prize-moderators'); },
+    onError: onErr,
+  });
 
   return (
     <div>
@@ -193,7 +198,14 @@ export default function PrizeAdjustmentsPage() {
 
           {/* MODERADORES (regras por empresa — aplicadas pelo motor após o resultado-base) */}
           <TabsContent value="moderators" className="mt-3">
-            {canAdmin && <div className="mb-3"><Button size="sm" onClick={() => { setEditingMod(null); setModForm(emptyModForm); setDialog('mod'); }}><Plus className="mr-1 h-4 w-4" />Nova regra</Button></div>}
+            {canAdmin && (
+              <div className="mb-3 flex gap-2">
+                <Button size="sm" onClick={() => { setEditingMod(null); setModForm(emptyModForm); setDialog('mod'); }}><Plus className="mr-1 h-4 w-4" />Nova regra</Button>
+                <Button size="sm" variant="outline" onClick={() => seedMods.mutate()} disabled={seedMods.isPending}>
+                  {seedMods.isPending ? 'Carregando…' : 'Carregar modelo oficial (planilha)'}
+                </Button>
+              </div>
+            )}
             <Card><CardContent className="overflow-x-auto p-0">
               {moderators.length === 0 ? <p className="py-8 text-center text-sm text-muted-foreground">Nenhuma regra de moderador. Sem regras, o motor não aplica reduções.</p> : (
                 <table className="w-full text-sm">

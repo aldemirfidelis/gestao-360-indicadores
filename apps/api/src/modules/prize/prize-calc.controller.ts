@@ -68,6 +68,13 @@ export class PrizeCalcController {
     return this.config.upsertModerator(me, null, dto);
   }
 
+  // Carrega as regras do modelo oficial (planilhas) — editáveis depois.
+  @Post('moderators/seed-defaults')
+  @RequirePermissions('prize:admin')
+  seedModerators(@CurrentUser() me: AuthPayload) {
+    return this.config.seedDefaultModerators(me);
+  }
+
   @Patch('moderators/:id')
   @RequirePermissions('prize:admin')
   updateModerator(@CurrentUser() me: AuthPayload, @Param('id') id: string, @Body() dto: any) {

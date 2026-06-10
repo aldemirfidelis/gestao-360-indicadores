@@ -48,4 +48,39 @@ describe('evaluateActual — Previsto x Realizado', () => {
     const r = evaluateActual(90, { target: 100, zero: 0 }, []);
     expect(r.deviationPercent).toBe(-10);
   });
+
+  // ---- Extrapolação (regra das planilhas FaixaAtingida/modRealizadosFaixas) ----
+  const faixasPlanilha = [
+    { orderIndex: 0, minLimit: 0, maxLimit: 95, achievementPercent: 0, gainPercent: 0 },
+    { orderIndex: 1, minLimit: 95.01, maxLimit: 96, achievementPercent: 20, gainPercent: 20 },
+    { orderIndex: 5, minLimit: 99.01, maxLimit: 100, achievementPercent: 100, gainPercent: 100 },
+  ];
+
+  it('extrapolação acima de todas as faixas atinge o TOPO (maior melhor)', () => {
+    const r = evaluateActual(103.5, { target: 100, zero: 95 }, faixasPlanilha, 'HIGHER_BETTER');
+    expect(r.gainPercent).toBe(100);
+  });
+
+  it('extrapolação abaixo de todas as faixas cai na faixa ZERO (maior melhor)', () => {
+    const r = evaluateActual(-2, { target: 100, zero: 95 }, faixasPlanilha, 'HIGHER_BETTER');
+    expect(r.gainPercent).toBe(0);
+  });
+
+  it('quanto menor melhor: extrapolar para baixo atinge o TOPO; para cima, a ZERO', () => {
+    const faixasMenor = [
+      { orderIndex: 0, minLimit: 20, maxLimit: null, achievementPercent: 0, gainPercent: 0 }, // pior: acima do zero
+      { orderIndex: 1, minLimit: 15.01, maxLimit: 19.99, achievementPercent: 50, gainPercent: 50 },
+      { orderIndex: 2, minLimit: 10, maxLimit: 15, achievementPercent: 100, gainPercent: 100 }, // melhor: na meta
+    ];
+    const melhor = evaluateActual(5, { target: 10, zero: 20 }, faixasMenor, 'LOWER_BETTER');
+    expect(melhor.gainPercent).toBe(100);
+    // valor entre faixas (gap) acima do máximo pagante e abaixo do min da faixa 0 -> pior faixa
+    const pior = evaluateActual(19.995, { target: 10, zero: 20 }, faixasMenor, 'LOWER_BETTER');
+    expect(pior.gainPercent).toBe(0);
+  });
+
+  it('com faixas cadastradas NÃO interpola: valor dentro da faixa paga o % da faixa', () => {
+    const r = evaluateActual(95.5, { target: 100, zero: 95 }, faixasPlanilha, 'HIGHER_BETTER');
+    expect(r.gainPercent).toBe(20); // degrau da faixa 1, não interpolação
+  });
 });

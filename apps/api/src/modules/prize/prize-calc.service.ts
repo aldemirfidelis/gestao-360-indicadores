@@ -3,7 +3,7 @@ import { Prisma } from '@prisma/client';
 import { PrismaService } from '../../prisma/prisma.service';
 import { AuthPayload } from '../auth/auth.types';
 import { PrizeAuditService } from './prize-audit.service';
-import { computePrize, EngineIndicator, EngineInput, PRIZE_ENGINE_VERSION } from './prize-calc-engine';
+import { commercialDaysFromAdmission, computePrize, deriveEntitledDays, EngineIndicator, EngineInput, PRIZE_ENGINE_VERSION } from './prize-calc-engine';
 
 function num(v: any): number | null {
   if (v === null || v === undefined) return null;
@@ -75,7 +75,7 @@ export class PrizeCalcService {
         const engInds: EngineIndicator[] = applicableInds.map((i) => {
           const act = actualByIndicator.get(i.id);
           return {
-            indicatorId: i.id, code: i.code, name: i.name, kind: i.kind as any, weight: num(i.weight),
+            indicatorId: i.id, code: i.code, name: i.name, kind: i.kind as any, direction: i.direction as any, weight: num(i.weight),
             realized: act ? num(act.realized) : null,
             target: act?.parameterId ? null : null, zero: null,
             ranges: i.ranges.map((r) => ({ orderIndex: r.orderIndex, minLimit: num(r.minLimit), maxLimit: num(r.maxLimit), achievementPercent: num(r.achievementPercent), gainPercent: num(r.gainPercent) })),
@@ -95,12 +95,25 @@ export class PrizeCalcService {
         let historicalAverage: number | null = null;
         if (exc?.type === 'IMPOSSIBILITY') historicalAverage = await this.historicalAverage(me.companyId, competence.programId, emp.registration, exc.avgMonths ?? 6, competenceId);
 
+        // Dias de direito (regra da planilha): usa o valor importado quando
+        // existe; senao deriva = base 30 comercial (ajustada pela admissao no
+        // mes) − dias de eventos de ausencia. Atestado nao reduz dias (modera).
+        const empEvents = (eventsByReg.get(emp.registration) ?? []).map((e) => ({
+          type: e.type,
+          days: e.days ?? null,
+          date: e.date ? e.date.toISOString().slice(0, 10) : null,
+        }));
+        const entitledDays = emp.workedDays ?? deriveEntitledDays(
+          commercialDaysFromAdmission(emp.admissionDate, competence.year, competence.month),
+          empEvents,
+        );
+
         const input: EngineInput = {
           registration: emp.registration, name: emp.name,
           baseSalary: num(emp.baseSalary), salaryPercent: num(annexVersion?.salaryPercent), gainPotential: num(annexVersion?.gainPotential),
-          workedDays: emp.workedDays ?? null,
+          workedDays: entitledDays,
           indicators: engInds,
-          events: (eventsByReg.get(emp.registration) ?? []).map((e) => ({ type: e.type, days: e.days ?? null })),
+          events: empEvents,
           moderatorRules: moderatorRules.map((r) => ({ name: r.name, eventType: r.eventType, criterion: r.criterion, reductionPercent: num(r.reductionPercent), reductionValue: num(r.reductionValue), cap: num(r.cap), cumulative: r.cumulative, priority: r.priority })),
           adjustments: (adjByReg.get(emp.registration) ?? []).map((a) => ({ field: a.field, amount: num(a.amount) })),
           exception: exc ? { type: exc.type as any, avgMonths: exc.avgMonths, gratificationValue: num(exc.gratificationValue) } : null,
