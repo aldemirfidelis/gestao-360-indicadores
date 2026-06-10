@@ -7,8 +7,27 @@
 >
 > Documento vivo. Cobre as Fases **1 (Fundação + Governança)**, **2 (Realizado +
 > Previsto × Realizado)**, **3 (Base Elegível / Apdata + Snapshot + Conciliação)**,
-> **4 (Motor de Cálculo + Apuração + Conferência)** e **5 (Integração com a Folha)**,
-> entregues e validadas. As fases seguintes estão no backlog residual (seção 7).
+> **4 (Motor de Cálculo + Apuração + Conferência)**, **5 (Integração com a Folha)**
+> e **6 (Espelho do Prêmio)**, entregues e validadas. Só a **Fase 7** (Relatórios +
+> Super Admin + IA) está no backlog residual (seção 7).
+
+## 0.4. Fase 6 — Espelho do Prêmio (PDF) (entregue)
+
+- **Banco** (aditivo): enum `PrizePayslipStatus` + tabela `PrizePayslip`.
+  Migração `20260609220000_prize_payslip`. **Snapshot congelado** (`data`) por
+  **versão** — publicar nunca sobrescreve um espelho publicado (gera nova versão;
+  a anterior vira `SUPERSEDED`).
+- **Emissão em lote** a partir da apuração: cada espelho congela colaborador
+  (matrícula, área, cargo, CC, salário, dias), resumo do prêmio (potencial,
+  atingimento, proporcionalidade, bruto, reduções, ajustes, gratificação, final)
+  e a **memória de cálculo** completa, com versão do cálculo + hash + data.
+- **PDF no cliente** (jsPDF + autoTable, já no projeto): demonstrativo profissional
+  gerado a partir do snapshot — download/impressão sem dependência nova no backend.
+- **Publicação** (individual ou em lote, move competência → `PAYSLIPS_PUBLISHED`)
+  e **controle de ciência** (colaborador confirma recebimento). Permissão
+  `prize:payslip:publish` para emitir/publicar; ciência por `prize:view`.
+- **Frontend** `/gestao-premio/espelhos`: emitir, publicar, baixar PDF e dar ciência.
+- **Testes**: suíte prize 31 verdes (guard + utilitários). tsc verde (api+web).
 
 ## 0.3. Fase 5 — Integração com a Folha (entregue)
 
@@ -308,8 +327,6 @@ justificativa.
   já entregues. Pendência residual: notificações automáticas da conferência.
 
 ### Próximas fases (não iniciadas)
-- **Fase 6 — Espelho do prêmio (PDF)**: demonstrativo individual com memória de
-  cálculo, emissão em lote, publicação e ciência.
 - **Fase 7 — Relatórios, Super Admin (seção Gestão de Prêmio), automações e IA
   assistiva**.
 

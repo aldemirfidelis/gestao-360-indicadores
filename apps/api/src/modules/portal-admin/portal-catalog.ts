@@ -100,6 +100,7 @@ export const CATALOG_PAGES: CatalogPage[] = [
   { code: 'prize.moderators', moduleCode: 'prize', name: 'Moderadores', title: 'Moderadores', route: '/gestao-premio/moderadores' },
   { code: 'prize.adjustments', moduleCode: 'prize', name: 'Ajustes e Exceções', title: 'Ajustes e Exceções', route: '/gestao-premio/ajustes' },
   { code: 'prize.payroll', moduleCode: 'prize', name: 'Integração com a Folha', title: 'Integração com a Folha', route: '/gestao-premio/folha' },
+  { code: 'prize.payslips', moduleCode: 'prize', name: 'Espelhos do Prêmio', title: 'Espelhos do Prêmio', route: '/gestao-premio/espelhos' },
   { code: 'settings.main', moduleCode: 'settings', name: 'Configurações', title: 'Configurações', route: '/settings' },
   { code: 'database-admin.main', moduleCode: 'database-admin', name: 'Administração do Banco', title: 'Banco de Dados', route: '/settings/database' },
   { code: 'portal-admin.main', moduleCode: 'portal-admin', name: 'Central do Portal', title: 'Central de Administração do Portal', route: '/settings/portal' },

@@ -8973,3 +8973,42 @@ model PrizePayrollBatchItem {
   @@index([batchId])
   @@index([batchId, status])
 }
+
+// =====================================================
+// Gestao de Premio - Fase 6: Espelho do Premio (Demonstrativo)
+// Snapshot imutavel por versao. Publicar nao sobrescreve: gera nova versao.
+// PDF e renderizado no cliente (jsPDF) a partir do snapshot congelado (data).
+// =====================================================
+
+enum PrizePayslipStatus {
+  DRAFT
+  GENERATED
+  PUBLISHED
+  SUPERSEDED
+}
+
+model PrizePayslip {
+  id               String             @id @default(uuid())
+  companyId        String
+  competenceId     String
+  calcRunId        String?
+  calcResultId     String?
+  registration     String
+  name             String
+  version          Int
+  status           PrizePayslipStatus @default(GENERATED)
+  data             Json // snapshot congelado do demonstrativo + memoria de calculo
+  finalValue       Decimal?           @db.Decimal(14, 2)
+  publishedAt      DateTime?
+  publishedById    String?
+  acknowledgedAt   DateTime?
+  acknowledgedById String?
+  createdById      String?
+  createdAt        DateTime           @default(now())
+  updatedAt        DateTime           @updatedAt
+
+  @@unique([competenceId, registration, version])
+  @@index([companyId, competenceId])
+  @@index([competenceId, registration])
+  @@index([status])
+}

@@ -124,6 +124,7 @@ export const navSections: NavSection[] = [
       { href: '/gestao-premio/moderadores', label: 'Moderadores', description: 'Regras de redução individual (faltas, atestados, medidas, acidentes)', icon: SlidersHorizontal, permissions: ['prize:view'] },
       { href: '/gestao-premio/ajustes', label: 'Ajustes e Exceções', description: 'Ajustes manuais, exceções e transitoriedade de área', icon: SlidersHorizontal, permissions: ['prize:view'] },
       { href: '/gestao-premio/folha', label: 'Integração com a Folha', description: 'Lote de pagamento (rubrica/verba), exportação e retorno', icon: Banknote, permissions: ['prize:view'] },
+      { href: '/gestao-premio/espelhos', label: 'Espelhos do Prêmio', description: 'Demonstrativo individual (PDF), publicação e ciência', icon: FileText, permissions: ['prize:view'] },
       { href: '/gestao-premio/integracoes', label: 'Integrações', description: 'Conectores Apdata/BSC/Folha, testes e jobs', icon: Plug, permissions: ['prize:view'] },
     ],
   },
