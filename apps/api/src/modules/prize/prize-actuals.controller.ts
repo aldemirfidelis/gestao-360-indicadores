@@ -4,13 +4,22 @@ import { RequirePermissions } from '../../common/decorators/permissions.decorato
 import { AuthPayload } from '../auth/auth.types';
 import { LaunchActualDto, PrizeActualsService } from './prize-actuals.service';
 import { PrizePrevistoRealizadoService } from './prize-previsto-realizado.service';
+import { PrizeSyncService } from './prize-sync.service';
 
 @Controller('prize/actuals')
 export class PrizeActualsController {
   constructor(
     private readonly service: PrizeActualsService,
     private readonly pxr: PrizePrevistoRealizadoService,
+    private readonly sync: PrizeSyncService,
   ) {}
+
+  /** Sincroniza o realizado a partir dos indicadores nativos vinculados (sem planilha). */
+  @Post('competence/:competenceId/sync')
+  @RequirePermissions('prize:actuals:manage')
+  syncFromPlatform(@CurrentUser() me: AuthPayload, @Param('competenceId') competenceId: string) {
+    return this.sync.syncActuals(me, competenceId);
+  }
 
   @Get('competence/:competenceId')
   @RequirePermissions('prize:view')

@@ -3,7 +3,7 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useState } from 'react';
 import { toast } from 'sonner';
-import { Calculator, PlayCircle, RotateCcw, FileText, Lock } from 'lucide-react';
+import { Calculator, PlayCircle, RotateCcw, FileText, Lock, Zap } from 'lucide-react';
 import { PageHeader } from '@/components/shell/page-header';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -65,6 +65,17 @@ export default function PrizeApuracaoPage() {
     onError: (e: ApiError) => toast.error(e.message),
   });
 
+  const autopilot = useMutation({
+    mutationFn: () => api<any>(`/prize/competences/${competenceId}/autopilot`, { method: 'POST', json: { runCalc: true } }),
+    onSuccess: (r) => {
+      const s = r.sync;
+      if (r.calcRun) toast.success(`Autopilot: ${s.synced} realizado(s) sincronizado(s) · apuração v${r.calcRun.version} concluída (${r.calcRun.totalEmployees} colab.)`);
+      else toast.warning(`Autopilot: ${s.synced} sincronizado(s), apuração não rodou — ${r.calcSkipped ?? 'verifique o checklist'}`);
+      qc.invalidateQueries({ queryKey: ['prize-calc-results'] });
+    },
+    onError: (e: ApiError) => toast.error(e.message),
+  });
+
   const runData = data?.run;
   const compStatus = data?.competenceStatus ?? null;
   const COMP_STATUS: Record<string, { label: string; variant: any }> = {
@@ -93,8 +104,11 @@ export default function PrizeApuracaoPage() {
         </NativeSelect>
         {canRun && competenceId && (
           <div className="ml-auto flex gap-2">
+            <Button onClick={() => autopilot.mutate()} disabled={autopilot.isPending} title="Sincroniza o realizado da plataforma, valida o checklist e apura automaticamente">
+              <Zap className="mr-1 h-4 w-4" />{autopilot.isPending ? 'Executando…' : 'Autopilot'}
+            </Button>
             {!runData ? (
-              <Button onClick={() => run.mutate()} disabled={run.isPending}><PlayCircle className="mr-1 h-4 w-4" />{run.isPending ? 'Apurando…' : 'Rodar apuração'}</Button>
+              <Button variant="outline" onClick={() => run.mutate()} disabled={run.isPending}><PlayCircle className="mr-1 h-4 w-4" />{run.isPending ? 'Apurando…' : 'Rodar apuração'}</Button>
             ) : (
               <Button variant="outline" onClick={() => { const r = window.prompt('Justificativa para reprocessar (obrigatória):'); if (r?.trim()) reprocess.mutate(r); }} disabled={reprocess.isPending}>
                 <RotateCcw className="mr-1 h-4 w-4" />Reprocessar

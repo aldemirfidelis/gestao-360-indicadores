@@ -3,7 +3,7 @@ import { Throttle } from '@nestjs/throttler';
 import { Public } from '../auth/public.decorator';
 import { ApiKeyCtx, ApiKeyContext, ApiKeyGuard, RequireScopes } from './api-key.guard';
 import { ExternalApiService } from './external-api.service';
-import { ExternalResultsDto } from './external-api.dto';
+import { ExternalPrizeEligibleDto, ExternalPrizeEventsDto, ExternalResultsDto } from './external-api.dto';
 
 /**
  * API pública para sistemas externos (SAP, Apdata, SE Suite, etc.).
@@ -49,5 +49,25 @@ export class ExternalApiController {
   @RequireScopes('actions:read')
   actionPlans(@ApiKeyCtx() ctx: ApiKeyContext) {
     return this.service.actionPlans(ctx.companyId);
+  }
+
+  // ----- Gestão de Prêmio (push direto do Apdata/folha, sem arquivos) -----
+
+  /**
+   * Push da base elegível da competência (programCode + year/month): cria snapshot
+   * imutável por lote e devolve a conciliação (novos/saíram/alterados/pendências).
+   * Auto-cria a competência se ainda não existir.
+   */
+  @Post('prize/eligible')
+  @RequireScopes('prize:write')
+  prizeEligible(@ApiKeyCtx() ctx: ApiKeyContext, @Body() body: ExternalPrizeEligibleDto) {
+    return this.service.prizeEligiblePush(ctx.companyId, body);
+  }
+
+  /** Push de eventos (faltas, atestados, medidas, acidentes, treinamento) da competência. */
+  @Post('prize/events')
+  @RequireScopes('prize:write')
+  prizeEvents(@ApiKeyCtx() ctx: ApiKeyContext, @Body() body: ExternalPrizeEventsDto) {
+    return this.service.prizeEventsPush(ctx.companyId, body);
   }
 }

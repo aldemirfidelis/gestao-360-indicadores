@@ -3,10 +3,21 @@ import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import { RequirePermissions } from '../../common/decorators/permissions.decorator';
 import { AuthPayload } from '../auth/auth.types';
 import { PrizeCompetencesService, UpsertCompetenceDto } from './prize-competences.service';
+import { PrizeSyncService } from './prize-sync.service';
 
 @Controller('prize/competences')
 export class PrizeCompetencesController {
-  constructor(private readonly service: PrizeCompetencesService) {}
+  constructor(
+    private readonly service: PrizeCompetencesService,
+    private readonly sync: PrizeSyncService,
+  ) {}
+
+  /** Autopilot: sincroniza realizado da plataforma + checklist + (opcional) apuração. */
+  @Post(':id/autopilot')
+  @RequirePermissions('prize:calc:run')
+  autopilot(@CurrentUser() me: AuthPayload, @Param('id') id: string, @Body() body: { runCalc?: boolean }) {
+    return this.sync.autopilot(me, id, { runCalc: body?.runCalc ?? true });
+  }
 
   @Get()
   @RequirePermissions('prize:view')

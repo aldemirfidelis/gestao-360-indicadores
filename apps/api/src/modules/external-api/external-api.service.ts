@@ -1,6 +1,9 @@
-import { ForbiddenException, Injectable } from '@nestjs/common';
+import { ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../../prisma/prisma.service';
 import { ResultsService } from '../results/results.service';
+import { PrizeEligibleService } from '../prize/prize-eligible.service';
+import { AuthPayload } from '../auth/auth.types';
+import { ExternalPrizeEligibleDto, ExternalPrizeEventsDto } from './external-api.dto';
 
 interface ResultInput {
   indicatorCode?: string;
@@ -9,12 +12,56 @@ interface ResultInput {
   note?: string;
 }
 
+/** Identidade sintetica para trilha de auditoria das chamadas via chave de API. */
+function apiActor(companyId: string): AuthPayload {
+  return { sub: 'external-api', email: 'external-api@system', name: 'API Externa', role: 'ANALYST' as AuthPayload['role'], companyId };
+}
+
 @Injectable()
 export class ExternalApiService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly results: ResultsService,
+    private readonly prizeEligible: PrizeEligibleService,
   ) {}
+
+  /** Resolve (ou cria) a competencia do premio por codigo do programa + ano/mes. */
+  private async resolvePrizeCompetence(companyId: string, programCode: string, year: number, month: number) {
+    const program = await this.prisma.prizeProgram.findFirst({ where: { companyId, code: programCode, deletedAt: null } });
+    if (!program) throw new NotFoundException(`Programa de prêmio ${programCode} não encontrado`);
+    const existing = await this.prisma.prizeCompetence.findFirst({ where: { programId: program.id, year, month } });
+    if (existing) return existing;
+    // Auto-cria a competencia: o push externo nao depende de passo manual previo.
+    return this.prisma.prizeCompetence.create({
+      data: {
+        companyId, programId: program.id, year, month,
+        label: `${year}-${String(month).padStart(2, '0')}`, status: 'FILLING',
+      },
+    });
+  }
+
+  /** Push da base elegivel (Apdata): snapshot imutavel por lote + conciliacao automatica. */
+  async prizeEligiblePush(companyId: string, dto: ExternalPrizeEligibleDto) {
+    const competence = await this.resolvePrizeCompetence(companyId, dto.programCode, dto.year, dto.month);
+    const result = await this.prizeEligible.import(apiActor(companyId), competence.id, {
+      source: 'API',
+      rows: dto.employees,
+      events: dto.events,
+    });
+    return {
+      competenceId: competence.id,
+      label: competence.label,
+      job: { id: result.job.id, lotVersion: result.job.lotVersion, processed: result.job.processed },
+      reconciliation: result.reconciliation,
+    };
+  }
+
+  /** Push de eventos (faltas/atestados/medidas/acidentes) sem novo lote de snapshot. */
+  async prizeEventsPush(companyId: string, dto: ExternalPrizeEventsDto) {
+    const competence = await this.resolvePrizeCompetence(companyId, dto.programCode, dto.year, dto.month);
+    const result = await this.prizeEligible.appendEvents(apiActor(companyId), competence.id, dto.events, 'API');
+    return { competenceId: competence.id, label: competence.label, ...result };
+  }
 
   /** Indicadores da empresa (código, definição, meta/realizado do último período). */
   async indicators(companyId: string) {

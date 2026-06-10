@@ -27,6 +27,7 @@ import { PrizePayrollService } from './prize-payroll.service';
 import { PrizePayslipService } from './prize-payslip.service';
 import { PrizeReportsService } from './prize-reports.service';
 import { PrizeAiService } from './prize-ai.service';
+import { PrizeSyncService } from './prize-sync.service';
 
 /**
  * Gestao de Premio (Remuneracao Variavel).
@@ -64,7 +65,8 @@ import { PrizeAiService } from './prize-ai.service';
     PrizePayslipService,
     PrizeReportsService,
     PrizeAiService,
+    PrizeSyncService,
   ],
-  exports: [PrizeAuditService, PrizeAnnexesService, PrizeCompetencesService, PrizeActualsService, PrizeCalcService, PrizePayrollService],
+  exports: [PrizeAuditService, PrizeAnnexesService, PrizeCompetencesService, PrizeActualsService, PrizeCalcService, PrizePayrollService, PrizeEligibleService, PrizeSyncService],
 })
 export class PrizeModule {}

@@ -17,8 +17,9 @@ import { useAuth } from '@/components/auth/auth-provider';
 
 interface Indicator {
   id: string; code: string; name: string; unit: string | null; kind: string; direction: string; source: string;
-  weight: string | null; bscNumber: string | null; _count?: { parameters: number; ranges: number };
+  weight: string | null; bscNumber: string | null; platformIndicatorId: string | null; _count?: { parameters: number; ranges: number };
 }
+interface PlatformIndicatorRef { id: string; name: string; code: string | null }
 interface Parameter { id: string; year: number | null; month: number | null; scopeKey: string | null; target: string | null; zero: string | null; weight: string | null }
 interface Range { id: string; orderIndex: number; minLimit: string | null; maxLimit: string | null; achievementPercent: string | null; gainPercent: string | null }
 interface IndicatorDetail extends Indicator { parameters: Parameter[]; ranges: Range[] }
@@ -27,7 +28,7 @@ const KIND: Record<string, string> = { COLLECTIVE: 'Coletivo', INDIVIDUAL: 'Indi
 const DIRECTION: Record<string, string> = { HIGHER_BETTER: 'Maior melhor', LOWER_BETTER: 'Menor melhor', TARGET: 'Alvo exato' };
 const SOURCE: Record<string, string> = { MANUAL: 'Manual', BSC: 'BSC', INTERNAL_API: 'API interna', FILE_IMPORT: 'Arquivo', AUTO_CALC: 'Cálculo' };
 
-const emptyInd = { programId: '', code: '', name: '', unit: '', kind: 'COLLECTIVE', direction: 'HIGHER_BETTER', source: 'MANUAL', weight: '', bscNumber: '' };
+const emptyInd = { programId: '', code: '', name: '', unit: '', kind: 'COLLECTIVE', direction: 'HIGHER_BETTER', source: 'MANUAL', weight: '', bscNumber: '', platformIndicatorId: '' };
 const emptyParam = { year: new Date().getFullYear(), month: new Date().getMonth() + 1, scopeKey: '', target: '', zero: '', weight: '', changeReason: '' };
 const emptyRange = { orderIndex: 0, minLimit: '', maxLimit: '', achievementPercent: '', gainPercent: '' };
 
@@ -44,6 +45,13 @@ export default function PrizeIndicatorsPage() {
   const [rangeForm, setRangeForm] = useState(emptyRange);
 
   const { data: programs = [] } = useQuery({ queryKey: ['prize-programs-ref'], queryFn: () => api<any[]>('/prize/programs') });
+  // Indicadores nativos da plataforma p/ vínculo (sincronização automática do realizado)
+  const { data: platformIndicators = [] } = useQuery({
+    queryKey: ['platform-indicators-ref'],
+    queryFn: () => api<PlatformIndicatorRef[]>('/indicators'),
+    enabled: open,
+    staleTime: 60_000,
+  });
   const { data: indicators = [], isLoading } = useQuery({
     queryKey: ['prize-indicators', programFilter],
     queryFn: () => api<Indicator[]>(`/prize/indicators${programFilter ? `?programId=${programFilter}` : ''}`),
@@ -58,7 +66,7 @@ export default function PrizeIndicatorsPage() {
   const onErr = (e: ApiError) => toast.error(e.message);
 
   const createInd = useMutation({
-    mutationFn: () => api('/prize/indicators', { method: 'POST', json: { ...form, weight: form.weight ? Number(form.weight) : null } }),
+    mutationFn: () => api('/prize/indicators', { method: 'POST', json: { ...form, weight: form.weight ? Number(form.weight) : null, platformIndicatorId: form.platformIndicatorId || null } }),
     onSuccess: () => { toast.success('Indicador criado'); invalidate(); setOpen(false); }, onError: onErr,
   });
   const removeInd = useMutation({
@@ -131,7 +139,7 @@ export default function PrizeIndicatorsPage() {
                         <Badge variant="secondary">{KIND[ind.kind] ?? ind.kind}</Badge>
                       </div>
                       <p className="text-xs text-muted-foreground">
-                        {DIRECTION[ind.direction]} · {SOURCE[ind.source]}{ind.unit ? ` · ${ind.unit}` : ''}{ind.weight ? ` · peso ${ind.weight}` : ''}{ind.bscNumber ? ` · BSC ${ind.bscNumber}` : ''}
+                        {DIRECTION[ind.direction]} · {SOURCE[ind.source]}{ind.unit ? ` · ${ind.unit}` : ''}{ind.weight ? ` · peso ${ind.weight}` : ''}{ind.bscNumber ? ` · BSC ${ind.bscNumber}` : ''}{ind.platformIndicatorId ? ' · 🔗 sincronizado da plataforma' : ''}
                       </p>
                     </div>
                     <div className="flex shrink-0 items-center gap-2">
@@ -231,6 +239,14 @@ export default function PrizeIndicatorsPage() {
               <div><Label>Peso (%)</Label><Input type="number" value={form.weight} onChange={(e) => setForm({ ...form, weight: e.target.value })} /></div>
             </div>
             <div><Label>Nº BSC (opcional)</Label><Input value={form.bscNumber} onChange={(e) => setForm({ ...form, bscNumber: e.target.value })} /></div>
+            <div>
+              <Label>Indicador da plataforma (sincronização automática)</Label>
+              <NativeSelect value={form.platformIndicatorId} onChange={(e) => setForm({ ...form, platformIndicatorId: e.target.value })}>
+                <option value="">Sem vínculo (lançamento manual)</option>
+                {platformIndicators.map((pi) => <option key={pi.id} value={pi.id}>{pi.code ? `${pi.code} — ` : ''}{pi.name}</option>)}
+              </NativeSelect>
+              <p className="mt-1 text-xs text-muted-foreground">Vinculando, o realizado vem automaticamente do módulo Lançamentos (ou da API externa) — sem redigitação e sem planilha.</p>
+            </div>
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setOpen(false)}>Cancelar</Button>

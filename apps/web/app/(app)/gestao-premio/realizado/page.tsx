@@ -3,7 +3,7 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useEffect, useState } from 'react';
 import { toast } from 'sonner';
-import { ClipboardList, Save, Lock, Unlock } from 'lucide-react';
+import { ClipboardList, Save, Lock, Unlock, RefreshCw } from 'lucide-react';
 import { PageHeader } from '@/components/shell/page-header';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -74,6 +74,14 @@ export default function PrizeActualsPage() {
     onSuccess: () => { toast.success('Realizado reaberto'); qc.invalidateQueries({ queryKey: ['prize-pxr'] }); },
     onError: (e: ApiError) => toast.error(e.message),
   });
+  const syncFromPlatform = useMutation({
+    mutationFn: () => api<{ synced: number; unchanged: number; linked: number; missingResult: any[]; unlinked: any[] }>(`/prize/actuals/competence/${competenceId}/sync`, { method: 'POST' }),
+    onSuccess: (s) => {
+      toast.success(`Sincronizado: ${s.synced} atualizado(s), ${s.unchanged} já em dia${s.missingResult.length ? ` · ${s.missingResult.length} sem lançamento no período` : ''}${s.unlinked.length ? ` · ${s.unlinked.length} sem vínculo` : ''}`);
+      qc.invalidateQueries({ queryKey: ['prize-pxr'] });
+    },
+    onError: (e: ApiError) => toast.error(e.message),
+  });
 
   return (
     <div>
@@ -93,6 +101,11 @@ export default function PrizeActualsPage() {
         </NativeSelect>
         {competence && locked && <Badge variant="outline"><Lock className="mr-1 h-3 w-3" />Competência travada</Badge>}
         <div className="ml-auto flex gap-2">
+          {canManage && competenceId && !locked && (
+            <Button variant="outline" onClick={() => syncFromPlatform.mutate()} disabled={syncFromPlatform.isPending}>
+              <RefreshCw className="mr-1 h-4 w-4" />{syncFromPlatform.isPending ? 'Sincronizando…' : 'Sincronizar da plataforma'}
+            </Button>
+          )}
           {canManage && competenceId && !locked && (
             <Button onClick={() => saveGrid.mutate()} disabled={saveGrid.isPending || Object.keys(draft).length === 0}>
               <Save className="mr-1 h-4 w-4" />Salvar lançamentos

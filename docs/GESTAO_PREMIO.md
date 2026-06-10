@@ -9,6 +9,33 @@
 > Governança, Realizado + Previsto × Realizado, Base Elegível (Apdata), Motor de
 > Cálculo + Conferência, Folha, Espelho (PDF) e Relatórios + Auditoria + IA assistiva.
 > Conformidade conferida contra os documentos e o prompt — ver seção 8.
+> **Em produção** no droplet (PostgreSQL local; 6+1 migrações aplicadas).
+
+## 0.6. Upgrade de Automação — zero planilha no fluxo padrão (entregue)
+
+> Princípio: **todo lançamento acontece na plataforma ou chega por API**;
+> arquivo/planilha vira contingência, nunca o caminho padrão.
+
+- **Realizado 100% automático**: `PrizeIndicator.platformIndicatorId` vincula o
+  indicador do prêmio ao **indicador nativo** (módulo Indicadores/Lançamentos).
+  `PrizeSyncService.syncActuals` puxa `IndicatorResult` do período da competência
+  (mesmo `periodRef`), grava via `launch` oficial (respeita travas, parâmetro
+  vigente, trilha) e só atualiza o que mudou. O BSC legado já desemboca nesses
+  indicadores (`externalSource`), e sistemas externos já podem postar resultados
+  via `POST /external/v1/results` — ou seja, **uma única fonte alimenta o prêmio**.
+  Botão "Sincronizar da plataforma" na tela do Realizado; vínculo configurável
+  no cadastro do indicador do prêmio (migração `20260610100000`).
+- **Base elegível por API (sem arquivo)**: `POST /external/v1/prize/eligible`
+  (escopo `prize:write`) — o Apdata/folha empurra colaboradores + eventos por
+  `programCode + year/month`; a competência é **auto-criada** se não existir;
+  snapshot imutável por lote + conciliação automática na resposta. CPF mascarado
+  ao persistir. `POST /external/v1/prize/events` anexa eventos (faltas/atestados/
+  medidas/acidentes) sem novo lote. Identidade sintética "API Externa" na trilha.
+- **Autopilot da competência** (`POST /prize/competences/:id/autopilot`, botão na
+  Apuração): sincroniza realizado → roda checklist → **apura automaticamente** se
+  não houver pendência impeditiva (explica o motivo quando não roda). Nunca fecha
+  competência nem publica espelho sozinho — etapas de alçada continuam humanas.
+- **Testes**: `prize-sync.service.spec.ts` (3 cenários). Suíte total **283 verdes**.
 
 ## 0.5. Fase 7 — Relatórios + Auditoria + IA assistiva (entregue)
 
@@ -348,8 +375,9 @@ justificativa.
   já entregues. Pendência residual: notificações automáticas da conferência.
 
 ### Residual (refinamentos — não impeditivos)
-- Importação em massa **XLSX/CSV** do realizado e da base elegível pela UI (a API
-  já aceita linhas parseadas; falta o parser de arquivo no front).
+- Importação **XLSX/CSV** pela UI: **despriorizada por decisão de produto** —
+  o fluxo padrão é lançamento na plataforma + push por API (seção 0.6); arquivo
+  fica como contingência via API (`rows` parseadas) se um dia for necessário.
 - **Notificações automáticas** (§26) por e-mail/sistema dos eventos do ciclo
   (DESEJÁVEL na matriz; trilha de auditoria já cobre o registro).
 - Transitoriedade **multi-segmento** com re-apuração por indicadores da área de

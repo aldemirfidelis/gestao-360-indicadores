@@ -8405,6 +8405,11 @@ model PrizeIndicator {
   direction      PrizeIndicatorDirection @default(HIGHER_BETTER)
   source         PrizeIndicatorSource    @default(MANUAL)
   bscNumber      String?
+  // Vinculo com o indicador NATIVO da plataforma (modulo Indicadores/Lancamentos).
+  // Quando preenchido, o realizado do premio e sincronizado automaticamente de
+  // IndicatorResult (periodRef = label da competencia), eliminando redigitacao
+  // e planilhas: lancou na plataforma (ou via API externa /results), flui p/ ca.
+  platformIndicatorId String?
   weight         Decimal?                @db.Decimal(9, 4)
   formula        String?
   roundingRule   String?
@@ -8426,6 +8431,7 @@ model PrizeIndicator {
   @@index([companyId])
   @@index([programId])
   @@index([annexVersionId])
+  @@index([platformIndicatorId])
 }
 
 model PrizeIndicatorParameter {

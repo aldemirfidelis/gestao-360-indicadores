@@ -15,6 +15,7 @@ export interface UpsertIndicatorDto {
   direction?: PrizeIndicatorDirection;
   source?: PrizeIndicatorSource;
   bscNumber?: string | null;
+  platformIndicatorId?: string | null;
   weight?: number | null;
   formula?: string | null;
   roundingRule?: string | null;
@@ -113,6 +114,7 @@ export class PrizeIndicatorsService {
         direction: dto.direction ?? 'HIGHER_BETTER',
         source: dto.source ?? 'MANUAL',
         bscNumber: dto.bscNumber ?? null,
+        platformIndicatorId: dto.platformIndicatorId ?? null,
         weight: dto.weight ?? null,
         formula: dto.formula ?? null,
         roundingRule: dto.roundingRule ?? null,
@@ -141,6 +143,7 @@ export class PrizeIndicatorsService {
         direction: dto.direction ?? undefined,
         source: dto.source ?? undefined,
         bscNumber: dto.bscNumber ?? undefined,
+        platformIndicatorId: dto.platformIndicatorId !== undefined ? dto.platformIndicatorId : undefined,
         weight: dto.weight ?? undefined,
         formula: dto.formula ?? undefined,
         roundingRule: dto.roundingRule ?? undefined,

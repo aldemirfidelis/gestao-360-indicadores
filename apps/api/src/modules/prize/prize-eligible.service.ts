@@ -118,6 +118,34 @@ export class PrizeEligibleService {
     }
   }
 
+  /** Anexa eventos (faltas/atestados/etc.) ao snapshot corrente sem gerar novo lote — usado pela API externa. */
+  async appendEvents(
+    me: AuthPayload,
+    competenceId: string,
+    events: Array<{ registration: string; type: string; date?: string; days?: number; value?: number; description?: string }>,
+    source: PrizeConnectorType = 'API',
+  ) {
+    await this.getCompetence(me.companyId, competenceId);
+    if (!events?.length) throw new BadRequestException('Nenhum evento para registrar');
+    let created = 0;
+    for (const ev of events) {
+      if (!ev.registration?.trim() || !ev.type?.trim()) continue;
+      const snap = await this.prisma.prizeEmployeeSnapshot.findFirst({
+        where: { competenceId, registration: ev.registration, current: true },
+      });
+      await this.prisma.prizeEmployeeEvent.create({
+        data: {
+          companyId: me.companyId, competenceId, snapshotId: snap?.id ?? null, registration: ev.registration,
+          type: ev.type, date: ev.date ? new Date(ev.date) : null, days: ev.days ?? null, value: ev.value ?? null,
+          description: ev.description ?? null, source,
+        },
+      });
+      created++;
+    }
+    await this.audit.log(me, { action: 'APPEND_EVENTS', entityType: 'ELIGIBLE_BATCH', entityId: competenceId, competenceId, after: { created, source } });
+    return { created };
+  }
+
   async listSnapshot(me: AuthPayload, competenceId: string) {
     await this.getCompetence(me.companyId, competenceId);
     const canSalary = await this.canSeeSalary(me);
