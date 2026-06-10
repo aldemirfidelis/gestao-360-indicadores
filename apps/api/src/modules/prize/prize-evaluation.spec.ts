@@ -1,5 +1,26 @@
 import { describe, it, expect } from 'vitest';
-import { evaluateActual } from './prize-evaluation';
+import { evaluateActual, selectRangesForParameter } from './prize-evaluation';
+
+describe('selectRangesForParameter — faixas por competência (indicador mensal)', () => {
+  const ranges = [
+    { parameterId: 'jan', orderIndex: 0, gainPercent: 0 },
+    { parameterId: 'jan', orderIndex: 1, gainPercent: 100 },
+    { parameterId: 'fev', orderIndex: 0, gainPercent: 0 },
+    { parameterId: 'fev', orderIndex: 1, gainPercent: 100 },
+  ];
+  it('usa só as faixas do parâmetro ativo', () => {
+    expect(selectRangesForParameter(ranges, 'jan').every((r) => r.parameterId === 'jan')).toBe(true);
+    expect(selectRangesForParameter(ranges, 'fev')).toHaveLength(2);
+  });
+  it('indicador fixo (faixas globais sem parameterId) ignora o parâmetro', () => {
+    const globals = [{ parameterId: null, orderIndex: 0 }, { orderIndex: 1 }];
+    expect(selectRangesForParameter(globals, 'jan')).toHaveLength(2);
+  });
+  it('sem faixas do parâmetro ativo cai nas globais', () => {
+    const mixed = [{ parameterId: null, orderIndex: 0 }, { parameterId: 'jan', orderIndex: 1 }];
+    expect(selectRangesForParameter(mixed, 'mar')).toEqual([{ parameterId: null, orderIndex: 0 }]);
+  });
+});
 
 describe('evaluateActual — Previsto x Realizado', () => {
   it('sem realizado retorna hasActual=false', () => {

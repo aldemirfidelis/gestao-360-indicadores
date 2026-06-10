@@ -2,8 +2,9 @@
 
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useState } from 'react';
+import Link from 'next/link';
 import { toast } from 'sonner';
-import { Plus, FileSignature, GitBranch, Send, CheckCircle2, RotateCcw, Upload } from 'lucide-react';
+import { Plus, FileSignature, GitBranch, Send, CheckCircle2, RotateCcw, Upload, Target } from 'lucide-react';
 import { PageHeader } from '@/components/shell/page-header';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -161,7 +162,12 @@ export default function PrizeAnnexesPage() {
                     <div className="mt-4 space-y-2 border-t border-border/60 pt-3">
                       <div className="flex items-center justify-between">
                         <h4 className="text-sm font-medium">Versões</h4>
-                        {canManage && <Button size="sm" variant="outline" onClick={() => newVersion.mutate(a.id)}><GitBranch className="mr-1 h-3.5 w-3.5" />Nova versão</Button>}
+                        <div className="flex gap-2">
+                          <Link href={`/gestao-premio/indicadores?programId=${a.program.id}`}>
+                            <Button size="sm" variant="ghost"><Target className="mr-1 h-3.5 w-3.5" />Indicadores e faixas</Button>
+                          </Link>
+                          {canManage && <Button size="sm" variant="outline" onClick={() => newVersion.mutate(a.id)}><GitBranch className="mr-1 h-3.5 w-3.5" />Nova versão</Button>}
+                        </div>
                       </div>
                       {detail.versions.map((v) => (
                         <div key={v.id} className="rounded-md border border-border/60 p-3">

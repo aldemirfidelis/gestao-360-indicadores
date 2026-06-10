@@ -45,6 +45,27 @@ function round2(n: number | null | undefined): number | null {
   return Math.round(n * 100) / 100;
 }
 
+/**
+ * Seleciona as faixas aplicaveis a um parametro (competencia/mes). Indicadores
+ * cujas metas/faixas MUDAM por mes (ex.: "Chamado Problema" do anexo 0561) tem
+ * faixas vinculadas ao parametro vigente (parameterId). Regra:
+ *  - se ha faixas vinculadas ao parametro ativo, usa SO essas;
+ *  - senao, usa as faixas globais (parameterId nulo) — modelo de indicador fixo;
+ *  - fallback: todas (compatibilidade com dados sem parameterId).
+ * 100% compativel com indicadores de faixa unica (sem parameterId).
+ */
+export function selectRangesForParameter<T extends { parameterId?: string | null }>(
+  ranges: T[],
+  parameterId: string | null | undefined,
+): T[] {
+  if (parameterId) {
+    const scoped = ranges.filter((r) => r.parameterId === parameterId);
+    if (scoped.length) return scoped;
+  }
+  const globals = ranges.filter((r) => !r.parameterId);
+  return globals.length ? globals : ranges;
+}
+
 function rangeLabel(r: EvalRange): string {
   const lo = r.minLimit === null || r.minLimit === undefined ? '-∞' : String(r.minLimit);
   const hi = r.maxLimit === null || r.maxLimit === undefined ? '+∞' : String(r.maxLimit);

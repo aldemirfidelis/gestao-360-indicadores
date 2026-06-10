@@ -1,6 +1,6 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../../prisma/prisma.service';
-import { evaluateActual } from './prize-evaluation';
+import { evaluateActual, selectRangesForParameter } from './prize-evaluation';
 import { PrizeActualsService } from './prize-actuals.service';
 
 function num(v: any): number | null {
@@ -41,10 +41,12 @@ export class PrizePrevistoRealizadoService {
     for (const ind of indicators) {
       const param = await this.actuals.resolveParameter(ind.id, competence.year, competence.month, competenceId, scopeKey);
       const actual = actualByIndicator.get(ind.id);
+      // Faixas vigentes do mes: vinculadas ao parametro (indicador mensal) ou globais.
+      const ranges = selectRangesForParameter(ind.ranges, param?.id);
       const evalResult = evaluateActual(
         num(actual?.realized),
         param ? { target: num(param.target), zero: num(param.zero) } : null,
-        ind.ranges.map((r) => ({
+        ranges.map((r) => ({
           orderIndex: r.orderIndex,
           minLimit: num(r.minLimit),
           maxLimit: num(r.maxLimit),

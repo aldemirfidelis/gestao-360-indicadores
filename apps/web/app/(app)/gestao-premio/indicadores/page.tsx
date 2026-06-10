@@ -2,6 +2,7 @@
 
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useState } from 'react';
+import { useSearchParams } from 'next/navigation';
 import { toast } from 'sonner';
 import { Plus, Target, Trash2, SlidersHorizontal } from 'lucide-react';
 import { PageHeader } from '@/components/shell/page-header';
@@ -38,7 +39,8 @@ export default function PrizeIndicatorsPage() {
   const { hasPermission } = useAuth();
   const canManage = hasPermission(['prize:indicators:manage']);
 
-  const [programFilter, setProgramFilter] = useState('');
+  const searchParams = useSearchParams();
+  const [programFilter, setProgramFilter] = useState(searchParams.get('programId') ?? '');
   const [open, setOpen] = useState(false);
   const [form, setForm] = useState(emptyInd);
   const [selected, setSelected] = useState<string | null>(null);

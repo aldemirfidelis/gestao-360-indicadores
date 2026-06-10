@@ -4,6 +4,7 @@ import { PrismaService } from '../../prisma/prisma.service';
 import { AuthPayload } from '../auth/auth.types';
 import { PrizeAuditService } from './prize-audit.service';
 import { commercialDaysFromAdmission, computePrize, deriveEntitledDays, EngineIndicator, EngineInput, PRIZE_ENGINE_VERSION } from './prize-calc-engine';
+import { selectRangesForParameter } from './prize-evaluation';
 
 function num(v: any): number | null {
   if (v === null || v === undefined) return null;
@@ -74,11 +75,14 @@ export class PrizeCalcService {
         const applicableInds = indicators.filter((i) => !i.annexVersionId || i.annexVersionId === annexVersion?.id);
         const engInds: EngineIndicator[] = applicableInds.map((i) => {
           const act = actualByIndicator.get(i.id);
+          // Faixas vigentes da competencia: as vinculadas ao parametro do
+          // realizado (indicador com metas/faixas mensais) ou as globais.
+          const ranges = selectRangesForParameter(i.ranges, act?.parameterId);
           return {
             indicatorId: i.id, code: i.code, name: i.name, kind: i.kind as any, direction: i.direction as any, weight: num(i.weight),
             realized: act ? num(act.realized) : null,
-            target: act?.parameterId ? null : null, zero: null,
-            ranges: i.ranges.map((r) => ({ orderIndex: r.orderIndex, minLimit: num(r.minLimit), maxLimit: num(r.maxLimit), achievementPercent: num(r.achievementPercent), gainPercent: num(r.gainPercent) })),
+            target: null, zero: null,
+            ranges: ranges.map((r) => ({ orderIndex: r.orderIndex, minLimit: num(r.minLimit), maxLimit: num(r.maxLimit), achievementPercent: num(r.achievementPercent), gainPercent: num(r.gainPercent) })),
           };
         });
         // metas/zeros do parametro vinculado ao realizado
