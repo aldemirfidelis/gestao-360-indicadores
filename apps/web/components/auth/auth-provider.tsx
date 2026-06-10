@@ -34,7 +34,7 @@ interface AuthCtx {
 const Ctx = createContext<AuthCtx | null>(null);
 
 const PUBLIC_PATHS = ['/', '/login'];
-const PUBLIC_PREFIXES = ['/platform-admin'];
+const PUBLIC_PREFIXES = ['/platform-admin', '/portal-seguranca'];
 
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<AuthUser | null>(null);

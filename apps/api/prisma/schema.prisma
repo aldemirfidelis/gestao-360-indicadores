@@ -8150,3 +8150,913 @@ model MyDayAssistantLog {
   @@index([companyId, userId, hidden])
   @@index([generatedAt])
 }
+
+// =====================================================
+// Seguranca Patrimonial e Portarias
+// Fundacao operacional multiempresa para portarias, acessos,
+// visitantes, prestadores, veiculos, rondas, ocorrencias, QR/offline
+// e auditoria. As referencias a Company/Branch/OrgNode/User ficam como
+// IDs escalares para evitar acoplamento excessivo do schema central; as
+// migrations criam as FKs principais e a API valida escopo por tenant.
+// =====================================================
+
+enum SecurityPackageStatus {
+  ENABLED
+  DISABLED
+  TRIAL
+  READ_ONLY
+  BLOCKED
+  EXPIRED
+}
+
+enum SecurityRecordStatus {
+  ACTIVE
+  INACTIVE
+  BLOCKED
+  ARCHIVED
+}
+
+enum SecurityPersonType {
+  VISITOR
+  CONTRACTOR
+  DRIVER
+  PASSENGER
+  EMPLOYEE
+  THIRD_PARTY
+  SUPPLIER
+  REPRESENTATIVE
+  AUTHORITY
+  GUEST
+  BLOCKED
+}
+
+enum SecurityDocumentStatus {
+  VALID
+  EXPIRING
+  EXPIRED
+  MISSING
+  IN_REVIEW
+  REJECTED
+  BLOCKED
+  NOT_REQUIRED
+}
+
+enum SecurityAuthorizationStatus {
+  DRAFT
+  REQUESTED
+  WAITING_DOCUMENTS
+  WAITING_APPROVAL
+  APPROVED
+  REJECTED
+  CANCELLED
+  EXPIRED
+  USED
+  PARTIALLY_USED
+}
+
+enum SecurityMovementType {
+  PERSON_ENTRY
+  PERSON_EXIT
+  VEHICLE_ENTRY
+  VEHICLE_EXIT
+  MATERIAL_ENTRY
+  MATERIAL_EXIT
+  EQUIPMENT_ENTRY
+  EQUIPMENT_EXIT
+  CARGO
+  UNLOADING
+  CORRESPONDENCE
+  KEY_LOAN
+  KEY_RETURN
+  BADGE_DELIVERY
+  BADGE_RETURN
+}
+
+enum SecurityMovementStatus {
+  OPEN
+  CLOSED
+  PENDING
+  BLOCKED
+  CANCELLED
+  OVERDUE
+}
+
+enum SecurityIncidentSeverity {
+  LOW
+  MEDIUM
+  HIGH
+  CRITICAL
+  EMERGENCY
+}
+
+enum SecurityIncidentStatus {
+  OPEN
+  IN_PROGRESS
+  WAITING_ACTION
+  CLOSED
+  CANCELLED
+}
+
+enum SecurityRoundStatus {
+  PLANNED
+  IN_PROGRESS
+  DONE
+  LATE
+  MISSED
+  CANCELLED
+}
+
+enum SecurityShiftHandoverStatus {
+  NOT_STARTED
+  IN_PROGRESS
+  WAITING_REVIEW
+  WAITING_ACCEPTANCE
+  COMPLETED
+  COMPLETED_WITH_PENDING
+}
+
+enum SecurityCustodyItemType {
+  KEY
+  BADGE
+}
+
+enum SecurityCustodyStatus {
+  AVAILABLE
+  LOANED
+  OVERDUE
+  LOST
+  BLOCKED
+  MAINTENANCE
+  INACTIVE
+}
+
+enum SecurityQrStatus {
+  ACTIVE
+  EXPIRED
+  REVOKED
+  USED
+  BLOCKED
+}
+
+enum SecurityOfflineSyncStatus {
+  PENDING
+  SYNCED
+  CONFLICT
+  ERROR
+}
+
+enum SecurityRecordOrigin {
+  WEB
+  MOBILE
+  PORTAL
+  API
+  IMPORT
+  OFFLINE
+}
+
+model SecurityPackageActivation {
+  id                  String                @id @default(uuid())
+  companyId           String
+  unitId              String?
+  code                String                @default("asset-security")
+  status              SecurityPackageStatus @default(TRIAL)
+  enabledFeatures     String[]              @default([])
+  limits              Json?
+  settings            Json?
+  trialStartedAt      DateTime?
+  trialEndsAt         DateTime?
+  activatedAt         DateTime?
+  blockedAt           DateTime?
+  blockReason         String?
+  commercialPlanCode  String?
+  configuredById      String?
+  createdAt           DateTime              @default(now())
+  updatedAt           DateTime              @updatedAt
+  deletedAt           DateTime?
+
+  @@index([companyId])
+  @@index([companyId, unitId])
+  @@index([companyId, status])
+}
+
+model SecurityGate {
+  id                  String               @id @default(uuid())
+  companyId           String
+  branchId            String?
+  unitId              String?
+  code                String?
+  name                String
+  address             String?
+  location            String?
+  type                String
+  workingHours        Json?
+  shifts              Json?
+  responsibleUserIds  String[]             @default([])
+  supervisorUserIds   String[]             @default([])
+  allowedAccessTypes  String[]             @default([])
+  flowCapabilities    String[]             @default([])
+  authorizedAreaIds   String[]             @default([])
+  rules               Json?
+  requiredDocumentIds String[]             @default([])
+  checklistTemplateIds String[]            @default([])
+  contacts            Json?
+  notes               String?
+  status              SecurityRecordStatus @default(ACTIVE)
+  activatedAt         DateTime?
+  createdById         String?
+  updatedById         String?
+  createdAt           DateTime             @default(now())
+  updatedAt           DateTime             @updatedAt
+  deletedAt           DateTime?
+
+  @@unique([companyId, code])
+  @@index([companyId])
+  @@index([companyId, status])
+  @@index([branchId])
+  @@index([unitId])
+}
+
+model SecurityPost {
+  id                    String               @id @default(uuid())
+  companyId             String
+  unitId                String?
+  gateId                String?
+  routeId               String?
+  code                  String?
+  name                  String
+  location              String?
+  type                  String?
+  schedule              String?
+  criticality           String               @default("MEDIUM")
+  responsibleUserId     String?
+  equipmentRequired     String[]             @default([])
+  radio                 String?
+  phone                 String?
+  qrCodeToken           String?
+  checklistTemplateId   String?
+  instructions          String?
+  emergencyContacts     Json?
+  currentResponsibleId  String?
+  currentShiftStartedAt DateTime?
+  currentShiftEndsAt    DateTime?
+  lastOpenedAt          DateTime?
+  lastClosedAt          DateTime?
+  pendingCount          Int                  @default(0)
+  notes                 String?
+  status                SecurityRecordStatus @default(ACTIVE)
+  createdById           String?
+  updatedById           String?
+  createdAt             DateTime             @default(now())
+  updatedAt             DateTime             @updatedAt
+  deletedAt             DateTime?
+
+  @@unique([companyId, code])
+  @@index([companyId])
+  @@index([companyId, status])
+  @@index([gateId])
+  @@index([unitId])
+  @@index([routeId])
+}
+
+model SecurityPerson {
+  id                  String                 @id @default(uuid())
+  companyId           String
+  type                SecurityPersonType
+  code                String?
+  name                String
+  socialName          String?
+  documentType        String?
+  documentNumber      String?
+  documentMasked      String?
+  birthDate           DateTime?
+  contractorCompanyId String?
+  originCompanyName   String?
+  jobTitle            String?
+  phone               String?
+  email               String?
+  photoUrl            String?
+  notes               String?
+  vehicleIds          String[]               @default([])
+  documentIds         String[]               @default([])
+  documentStatus      SecurityDocumentStatus @default(NOT_REQUIRED)
+  documentValidUntil  DateTime?
+  restrictions        Json?
+  status              SecurityRecordStatus   @default(ACTIVE)
+  lgpdConsentAt       DateTime?
+  createdById         String?
+  updatedById         String?
+  createdAt           DateTime               @default(now())
+  updatedAt           DateTime               @updatedAt
+  deletedAt           DateTime?
+
+  @@index([companyId])
+  @@index([companyId, type])
+  @@index([companyId, status])
+  @@index([companyId, documentNumber])
+  @@index([contractorCompanyId])
+  @@index([documentStatus])
+}
+
+model SecurityContractorCompany {
+  id                    String                 @id @default(uuid())
+  companyId             String
+  legalName             String
+  tradeName             String?
+  cnpj                  String?
+  contractCode          String?
+  managerUserId         String?
+  unitIds               String[]               @default([])
+  serviceTypes          String[]               @default([])
+  requiredDocuments     Json?
+  deliveredDocuments    Json?
+  documentStatus        SecurityDocumentStatus @default(MISSING)
+  alertDaysBefore       Int                    @default(30)
+  blockReason           String?
+  notes                 String?
+  status                SecurityRecordStatus   @default(ACTIVE)
+  createdById           String?
+  updatedById           String?
+  createdAt             DateTime               @default(now())
+  updatedAt             DateTime               @updatedAt
+  deletedAt             DateTime?
+
+  @@unique([companyId, cnpj])
+  @@index([companyId])
+  @@index([companyId, status])
+  @@index([documentStatus])
+}
+
+model SecurityVehicle {
+  id                    String                 @id @default(uuid())
+  companyId             String
+  type                  String
+  plate                 String
+  model                 String?
+  brand                 String?
+  color                 String?
+  year                  Int?
+  companyName           String?
+  ownerName             String?
+  defaultDriverPersonId String?
+  documentStatus        SecurityDocumentStatus @default(NOT_REQUIRED)
+  documentValidUntil    DateTime?
+  notes                 String?
+  blockReason           String?
+  status                SecurityRecordStatus   @default(ACTIVE)
+  createdById           String?
+  updatedById           String?
+  createdAt             DateTime               @default(now())
+  updatedAt             DateTime               @updatedAt
+  deletedAt             DateTime?
+
+  @@unique([companyId, plate])
+  @@index([companyId])
+  @@index([companyId, status])
+  @@index([defaultDriverPersonId])
+  @@index([documentStatus])
+}
+
+model SecurityDocumentRequirement {
+  id               String               @id @default(uuid())
+  companyId        String
+  scopeType        String
+  scopeId          String?
+  personType       SecurityPersonType?
+  vehicleType      String?
+  serviceType      String?
+  cargoType        String?
+  criticality      String?
+  name             String
+  documentKind     String
+  required         Boolean              @default(true)
+  blockOnMissing   Boolean              @default(false)
+  warningDays      Int                  @default(30)
+  rules            Json?
+  status           SecurityRecordStatus @default(ACTIVE)
+  createdById      String?
+  updatedById      String?
+  createdAt        DateTime             @default(now())
+  updatedAt        DateTime             @updatedAt
+  deletedAt        DateTime?
+
+  @@index([companyId])
+  @@index([companyId, scopeType])
+  @@index([companyId, status])
+}
+
+model SecurityAuthorization {
+  id                    String                      @id @default(uuid())
+  companyId             String
+  code                  String?
+  personId              String?
+  contractorCompanyId   String?
+  unitId                String?
+  gateId                String?
+  requestedById         String?
+  internalResponsibleId String?
+  vehicleId             String?
+  approverId            String?
+  status                SecurityAuthorizationStatus @default(REQUESTED)
+  source                SecurityRecordOrigin        @default(WEB)
+  reason                String?
+  destinationAreaId     String?
+  scheduledStartAt      DateTime?
+  scheduledEndAt        DateTime?
+  maxStayMinutes        Int?
+  allowedPeriodText     String?
+  passengerPersonIds    String[]                    @default([])
+  materialRefs          Json?
+  documentRefs          Json?
+  attachments           Json?
+  qrCodeToken           String?
+  qrExpiresAt           DateTime?
+  approvedAt            DateTime?
+  rejectedAt            DateTime?
+  cancelReason          String?
+  notes                 String?
+  createdById           String?
+  updatedById           String?
+  createdAt             DateTime                    @default(now())
+  updatedAt             DateTime                    @updatedAt
+  deletedAt             DateTime?
+
+  @@unique([companyId, code])
+  @@index([companyId])
+  @@index([companyId, status])
+  @@index([personId])
+  @@index([vehicleId])
+  @@index([gateId])
+  @@index([scheduledStartAt, scheduledEndAt])
+}
+
+model SecurityExternalInvite {
+  id                String               @id @default(uuid())
+  companyId         String
+  authorizationId   String?
+  token             String               @unique
+  requesterName     String?
+  requesterEmail    String?
+  status            SecurityRecordStatus @default(ACTIVE)
+  responseData      Json?
+  acceptedTermsAt   DateTime?
+  privacyAcceptedAt DateTime?
+  expiresAt         DateTime
+  submittedAt       DateTime?
+  createdAt         DateTime             @default(now())
+  updatedAt         DateTime             @updatedAt
+  deletedAt         DateTime?
+
+  @@index([companyId])
+  @@index([authorizationId])
+  @@index([status, expiresAt])
+}
+
+model SecurityAccessMovement {
+  id                    String                    @id @default(uuid())
+  companyId             String
+  unitId                String?
+  gateId                String?
+  postId                String?
+  authorizationId       String?
+  personId              String?
+  vehicleId             String?
+  contractorCompanyId   String?
+  code                  String?
+  movementType          SecurityMovementType
+  category              String?
+  documentSnapshot      Json?
+  originCompanyName     String?
+  reason                String?
+  internalResponsibleId String?
+  destinationAreaId     String?
+  plate                 String?
+  trailerPlate          String?
+  driverPersonId        String?
+  passengerPersonIds    String[]                  @default([])
+  materialRefs          Json?
+  equipmentRefs         Json?
+  cargoRefs             Json?
+  qrCodeToken           String?
+  expectedEntryAt       DateTime?
+  expectedExitAt        DateTime?
+  entryAt               DateTime?
+  exitAt                DateTime?
+  durationMinutes       Int?
+  maxStayMinutes        Int?
+  status                SecurityMovementStatus    @default(OPEN)
+  exceptionReason       String?
+  exceptionJustification String?
+  exceptionApprovedById String?
+  notes                 String?
+  attachments           Json?
+  photoUrl              String?
+  evidenceRefs          Json?
+  registeredById        String?
+  exitRegisteredById    String?
+  origin                SecurityRecordOrigin      @default(WEB)
+  offlineSyncId         String?
+  syncStatus            SecurityOfflineSyncStatus @default(SYNCED)
+  deviceInfo            Json?
+  logs                  Json?
+  createdAt             DateTime                  @default(now())
+  updatedAt             DateTime                  @updatedAt
+  deletedAt             DateTime?
+
+  @@unique([companyId, code])
+  @@index([companyId])
+  @@index([companyId, status])
+  @@index([companyId, movementType])
+  @@index([gateId])
+  @@index([postId])
+  @@index([personId])
+  @@index([vehicleId])
+  @@index([entryAt])
+  @@index([exitAt])
+  @@index([expectedExitAt])
+}
+
+model SecurityMaterialMovement {
+  id                 String                 @id @default(uuid())
+  companyId          String
+  movementId         String?
+  authorizationId    String?
+  vehicleId          String?
+  driverPersonId     String?
+  responsibleUserId  String?
+  type               SecurityMovementType
+  code               String?
+  description        String
+  quantity           Float?
+  unit               String?
+  origin             String?
+  destination        String?
+  supplierName       String?
+  carrierName        String?
+  fiscalDocument     String?
+  purchaseOrder      String?
+  workOrder          String?
+  photos             Json?
+  documents          Json?
+  alertCode          String?
+  status             SecurityMovementStatus @default(PENDING)
+  notes              String?
+  occurredAt         DateTime               @default(now())
+  createdById        String?
+  updatedById        String?
+  createdAt          DateTime               @default(now())
+  updatedAt          DateTime               @updatedAt
+  deletedAt          DateTime?
+
+  @@index([companyId])
+  @@index([companyId, status])
+  @@index([movementId])
+  @@index([authorizationId])
+  @@index([occurredAt])
+}
+
+model SecurityCustodyItem {
+  id                  String                  @id @default(uuid())
+  companyId           String
+  unitId              String?
+  gateId              String?
+  itemType            SecurityCustodyItemType
+  code                String
+  description         String
+  location            String?
+  responsibleUserId   String?
+  holderPersonId      String?
+  holderUserId        String?
+  loanedAt            DateTime?
+  expectedReturnAt    DateTime?
+  returnedAt          DateTime?
+  purpose             String?
+  authorizationId     String?
+  notes               String?
+  status              SecurityCustodyStatus   @default(AVAILABLE)
+  createdById         String?
+  updatedById         String?
+  createdAt           DateTime                @default(now())
+  updatedAt           DateTime                @updatedAt
+  deletedAt           DateTime?
+
+  @@unique([companyId, code])
+  @@index([companyId])
+  @@index([companyId, itemType])
+  @@index([companyId, status])
+  @@index([holderPersonId])
+  @@index([expectedReturnAt])
+}
+
+model SecurityCorrespondence {
+  id                   String               @id @default(uuid())
+  companyId            String
+  unitId               String?
+  gateId               String?
+  sender               String?
+  recipient            String?
+  recipientUserId      String?
+  carrierName          String?
+  trackingCode         String?
+  type                 String?
+  receivedById         String?
+  receivedAt           DateTime             @default(now())
+  pickedUpByName       String?
+  pickedUpById         String?
+  pickedUpAt           DateTime?
+  acknowledgement      String?
+  evidence             Json?
+  photoUrl             String?
+  notes                String?
+  status               SecurityRecordStatus @default(ACTIVE)
+  createdAt            DateTime             @default(now())
+  updatedAt            DateTime             @updatedAt
+  deletedAt            DateTime?
+
+  @@index([companyId])
+  @@index([companyId, status])
+  @@index([gateId])
+  @@index([trackingCode])
+  @@index([receivedAt])
+}
+
+model SecurityBlocklist {
+  id                String               @id @default(uuid())
+  companyId         String
+  personId          String?
+  vehicleId         String?
+  documentNumber    String?
+  plate             String?
+  reason            String
+  severity          SecurityIncidentSeverity @default(HIGH)
+  startsAt          DateTime             @default(now())
+  endsAt            DateTime?
+  approvedById      String?
+  evidence          Json?
+  notes             String?
+  status            SecurityRecordStatus @default(ACTIVE)
+  createdById       String?
+  updatedById       String?
+  createdAt         DateTime             @default(now())
+  updatedAt         DateTime             @updatedAt
+  deletedAt         DateTime?
+
+  @@index([companyId])
+  @@index([companyId, status])
+  @@index([personId])
+  @@index([vehicleId])
+  @@index([documentNumber])
+  @@index([plate])
+}
+
+model SecurityIncident {
+  id                   String                 @id @default(uuid())
+  companyId            String
+  unitId               String?
+  gateId               String?
+  postId               String?
+  movementId           String?
+  roundExecutionId     String?
+  actionPlanId         String?
+  code                 String?
+  title                String
+  type                 String?
+  severity             SecurityIncidentSeverity @default(MEDIUM)
+  status               SecurityIncidentStatus @default(OPEN)
+  description          String?
+  immediateAction      String?
+  rootCauseHypothesis  String?
+  responsibleUserId    String?
+  dueAt                DateTime?
+  closedAt             DateTime?
+  closedById           String?
+  evidence             Json?
+  aiSummary            String?
+  notes                String?
+  createdById          String?
+  updatedById          String?
+  createdAt            DateTime               @default(now())
+  updatedAt            DateTime               @updatedAt
+  deletedAt            DateTime?
+
+  @@unique([companyId, code])
+  @@index([companyId])
+  @@index([companyId, status])
+  @@index([companyId, severity])
+  @@index([gateId])
+  @@index([postId])
+  @@index([dueAt])
+}
+
+model SecurityRoundRoute {
+  id                 String               @id @default(uuid())
+  companyId          String
+  unitId             String?
+  gateId             String?
+  code               String?
+  name               String
+  description        String?
+  frequencyMinutes   Int?
+  toleranceMinutes   Int                  @default(10)
+  responsibleUserId  String?
+  checklistTemplateId String?
+  instructions       String?
+  status             SecurityRecordStatus @default(ACTIVE)
+  createdById        String?
+  updatedById        String?
+  createdAt          DateTime             @default(now())
+  updatedAt          DateTime             @updatedAt
+  deletedAt          DateTime?
+
+  @@unique([companyId, code])
+  @@index([companyId])
+  @@index([companyId, status])
+  @@index([gateId])
+  @@index([unitId])
+}
+
+model SecurityRoundCheckpoint {
+  id              String               @id @default(uuid())
+  companyId       String
+  routeId         String
+  postId          String?
+  code            String?
+  name            String
+  location        String?
+  position        Int                  @default(0)
+  qrCodeToken     String?
+  requiredEvidence Boolean             @default(false)
+  instructions    String?
+  status          SecurityRecordStatus @default(ACTIVE)
+  createdAt       DateTime             @default(now())
+  updatedAt       DateTime             @updatedAt
+  deletedAt       DateTime?
+
+  @@index([companyId])
+  @@index([routeId])
+  @@index([postId])
+  @@index([status])
+}
+
+model SecurityRoundExecution {
+  id                    String              @id @default(uuid())
+  companyId             String
+  routeId               String?
+  postId                String?
+  assignedUserId        String?
+  startedById           String?
+  finishedById          String?
+  scheduledAt           DateTime?
+  startedAt             DateTime?
+  finishedAt            DateTime?
+  status                SecurityRoundStatus @default(PLANNED)
+  visitedCheckpointIds  String[]            @default([])
+  missedCheckpointIds   String[]            @default([])
+  checklistSubmissionId String?
+  evidence              Json?
+  offlineSyncId         String?
+  notes                 String?
+  createdAt             DateTime            @default(now())
+  updatedAt             DateTime            @updatedAt
+  deletedAt             DateTime?
+
+  @@index([companyId])
+  @@index([companyId, status])
+  @@index([routeId])
+  @@index([postId])
+  @@index([scheduledAt])
+}
+
+model SecurityShiftHandover {
+  id                   String                      @id @default(uuid())
+  companyId            String
+  unitId               String?
+  gateId               String?
+  postId               String?
+  outgoingUserId       String?
+  incomingUserId       String?
+  shiftName            String?
+  startedAt            DateTime                    @default(now())
+  finishedAt           DateTime?
+  status               SecurityShiftHandoverStatus @default(NOT_STARTED)
+  summary              String?
+  pendingItems         Json?
+  checklistSubmissionId String?
+  evidence             Json?
+  acceptedAt           DateTime?
+  acceptedById         String?
+  notes                String?
+  createdAt            DateTime                    @default(now())
+  updatedAt            DateTime                    @updatedAt
+  deletedAt            DateTime?
+
+  @@index([companyId])
+  @@index([companyId, status])
+  @@index([gateId])
+  @@index([postId])
+  @@index([startedAt])
+}
+
+model SecurityLogBookEntry {
+  id          String               @id @default(uuid())
+  companyId   String
+  unitId      String?
+  gateId      String?
+  postId      String?
+  occurredAt  DateTime             @default(now())
+  title       String
+  entryType   String
+  description String?
+  attachments Json?
+  acknowledgedByIds String[]       @default([])
+  status      SecurityRecordStatus @default(ACTIVE)
+  createdById String?
+  updatedById String?
+  createdAt   DateTime             @default(now())
+  updatedAt   DateTime             @updatedAt
+  deletedAt   DateTime?
+
+  @@index([companyId])
+  @@index([companyId, status])
+  @@index([gateId])
+  @@index([postId])
+  @@index([occurredAt])
+}
+
+model SecurityQrCode {
+  id            String           @id @default(uuid())
+  companyId     String
+  token         String           @unique
+  entityType    String
+  entityId      String
+  purpose       String
+  status        SecurityQrStatus @default(ACTIVE)
+  expiresAt     DateTime?
+  usedAt        DateTime?
+  issuedById    String?
+  metadata      Json?
+  createdAt     DateTime         @default(now())
+  updatedAt     DateTime         @updatedAt
+  deletedAt     DateTime?
+
+  @@index([companyId])
+  @@index([companyId, entityType, entityId])
+  @@index([status])
+  @@index([expiresAt])
+}
+
+model SecurityOfflineSync {
+  id              String                    @id @default(uuid())
+  companyId       String
+  localId         String
+  entityType      String
+  entityId        String?
+  operation       String
+  payload         Json
+  status          SecurityOfflineSyncStatus @default(PENDING)
+  conflictReason  String?
+  errorMessage    String?
+  localCreatedAt  DateTime?
+  syncedAt        DateTime?
+  deviceId        String?
+  deviceInfo      Json?
+  createdById     String?
+  createdAt       DateTime                  @default(now())
+  updatedAt       DateTime                  @updatedAt
+
+  @@unique([companyId, localId])
+  @@index([companyId])
+  @@index([companyId, status])
+  @@index([entityType, entityId])
+}
+
+model SecurityAuditLog {
+  id               String   @id @default(uuid())
+  companyId        String
+  unitId           String?
+  gateId           String?
+  postId           String?
+  userId           String?
+  userRole         String?
+  action           String
+  entity           String
+  entityId         String?
+  recordLabel      String?
+  beforeValue      Json?
+  afterValue       Json?
+  reason           String?
+  justification    String?
+  approverId       String?
+  evidence         Json?
+  origin           SecurityRecordOrigin @default(WEB)
+  ip               String?
+  deviceInfo       Json?
+  offline          Boolean  @default(false)
+  syncedAt         DateTime?
+  createdAt        DateTime @default(now())
+
+  @@index([companyId, createdAt])
+  @@index([userId, createdAt])
+  @@index([entity, entityId])
+  @@index([gateId])
+  @@index([postId])
+}

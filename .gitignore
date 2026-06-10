@@ -47,3 +47,6 @@ apps/api/storage/
 # Dumps/backups do Postgres local da droplet (migracao Neon->local e backup diario)
 db-backups/
 *.dump
+
+# Documentos internos com dados reais (LGPD - nunca commitar)
+Gestao_premio/
