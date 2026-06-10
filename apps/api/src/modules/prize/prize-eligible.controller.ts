@@ -1,8 +1,9 @@
-import { Body, Controller, Get, Param, Patch, Post, Query } from '@nestjs/common';
+import { Body, Controller, Get, Param, Patch, Post, Query, Res } from '@nestjs/common';
+import { Response } from 'express';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import { RequirePermissions } from '../../common/decorators/permissions.decorator';
 import { AuthPayload } from '../auth/auth.types';
-import { ImportEligibleDto, PrizeEligibleService } from './prize-eligible.service';
+import { FileImportPayload, ImportEligibleDto, PrizeEligibleService } from './prize-eligible.service';
 import { PrizeConnectorsService, UpsertConnectorDto } from './prize-connectors.service';
 
 @Controller('prize/eligible')
@@ -35,6 +36,32 @@ export class PrizeEligibleController {
   @RequirePermissions('prize:eligible:manage')
   import(@CurrentUser() me: AuthPayload, @Param('competenceId') competenceId: string, @Body() dto: ImportEligibleDto) {
     return this.service.import(me, competenceId, dto);
+  }
+
+  // ----- importacao manual por arquivo (CSV/XLSX) — contingencia do Apdata -----
+
+  /** Valida e simula (dry-run): nada e gravado. */
+  @Post('competence/:competenceId/import/preview')
+  @RequirePermissions('prize:eligible:manage')
+  importPreview(@CurrentUser() me: AuthPayload, @Param('competenceId') competenceId: string, @Body() payload: FileImportPayload) {
+    return this.service.previewImport(me, competenceId, payload);
+  }
+
+  /** Commit: revalida no servidor; rejeita o arquivo inteiro se houver erro. */
+  @Post('competence/:competenceId/import/file')
+  @RequirePermissions('prize:eligible:manage')
+  importFile(@CurrentUser() me: AuthPayload, @Param('competenceId') competenceId: string, @Body() payload: FileImportPayload) {
+    return this.service.importFromFile(me, competenceId, payload);
+  }
+
+  /** Modelo XLSX (abas Colaboradores + Eventos + Instrucoes). */
+  @Get('template')
+  @RequirePermissions('prize:eligible:manage')
+  async template(@Res() res: Response) {
+    const buffer = await this.service.buildTemplate();
+    res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+    res.setHeader('Content-Disposition', 'attachment; filename=modelo-base-elegivel.xlsx');
+    res.send(buffer);
   }
 
   @Patch('employee/:snapshotId/eligibility')

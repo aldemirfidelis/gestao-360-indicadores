@@ -11,6 +11,49 @@
 > Conformidade conferida contra os documentos e o prompt — ver seção 8.
 > **Em produção** no droplet (PostgreSQL local; 6+1 migrações aplicadas).
 
+## 0.8. Importação manual da base elegível (CSV/XLSX) — contingência do Apdata (entregue)
+
+> Requisito reaberto por decisão de produto (antes "arquivo só via API"): enquanto
+> o conector Apdata não está ligado, a planilha é o caminho de contingência
+> OFICIAL — com rigor de folha de pagamento (módulo paga gente; não pode errar).
+
+- **Campos conforme a documentação** (matriz POC itens "Integração com Apdata"):
+  base elegível = matrícula, nome, CPF, vínculo, filial, unidade, cargo, função,
+  área/lotação, setor, centro de custo, salário base, admissão, desligamento,
+  situação, dias trabalhados; eventos = FALTA, ATESTADO, MEDIDA_DISCIPLINAR,
+  SUSPENSAO, ACIDENTE, TREINAMENTO (dias/valor/data/descrição).
+- **Parser/validador PURO** (`prize-eligible-import.util.ts`, 19 testes):
+  cabeçalhos tolerantes a acento/caixa ("Matrícula", "Centro de Custo");
+  **CPF com validação de dígito verificador** (inválido = erro, nunca mascarado
+  em silêncio); números pt-BR ("3.500,75") e en; datas dd/mm/aaaa, ISO, Date e
+  **serial Excel**; matrícula duplicada no arquivo = erro; dias 0..31; situação
+  normalizada (ATIVO/DESLIGADO/AFASTADO/FÉRIAS/TREINAMENTO) com avisos de
+  inconsistência (desligado sem data etc.); **tipo de evento desconhecido =
+  ERRO** (tipo errado não casaria com regra de moderador → pagamento indevido);
+  colunas desconhecidas reportadas (typo).
+- **Fluxo em 2 etapas, tudo-ou-nada**: `POST /prize/eligible/competence/:id/`
+  `import/preview` (dry-run: erros/avisos por linha+coluna + **prévia da
+  conciliação** contra o lote atual, nada gravado) → `import/file` (commit;
+  **revalida tudo no servidor** e rejeita o arquivo inteiro se houver 1 erro).
+  Reusa o `import()` oficial: snapshot imutável por lote, CPF mascarado,
+  conciliação, trilha de auditoria. Arquivo só de eventos = modo
+  `EVENTS_APPEND` (anexa ao lote corrente via `appendEvents`).
+- **Formatos**: CSV (parse no cliente com papaparse, `dynamicTyping` OFF para
+  preservar zeros à esquerda de matrícula/CPF) e **XLSX** (base64 → exceljs no
+  servidor; abas `Colaboradores` + `Eventos`). **Modelo XLSX para download**
+  (`GET /prize/eligible/template`): abas Colaboradores/Eventos com exemplo
+  fictício + aba Instruções.
+- **UI** (`/gestao-premio/colaboradores`): Baixar modelo → upload → prévia
+  (badges válido/erros, lista por linha/coluna, avisos, colunas ignoradas,
+  conciliação simulada) → **Confirmar importação** (só habilita com 0 erros).
+- **Benchmark de mercado** (verificação de contexto): o desenho segue o padrão
+  dos ICMs líderes (Xactly Incent, Varicent, CaptivateIQ, SAP SuccessFactors
+  Incentive Mgmt; nacionais AchieveMore/Mereo): plano versionado → motor de
+  cálculo auditável c/ memória → statement individual → integração folha →
+  trilha completa. Diferenciais já contemplados: preview antes de commit,
+  versionamento de reprocesso (nunca sobrescrever), segregação de função.
+- **Testes**: suíte API **302 verdes** (19 novos). tsc verde (api+web); lint verde.
+
 ## 0.7. Consolidação de reuso — menos telas, plataforma como fonte única (entregue)
 
 > Revisão pós-entrega a pedido do produto: o módulo havia criado telas/fluxos
