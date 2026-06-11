@@ -240,6 +240,7 @@ const emptyNode = {
 };
 
 type NodeForm = typeof emptyNode;
+type OrgTreeScope = 'mine' | 'all';
 
 export default function OrgPage() {
   const searchParams = useSearchParams();
@@ -250,14 +251,17 @@ export default function OrgPage() {
   const [activityForm, setActivityForm] = useState({ id: '', title: '', description: '', orderIndex: 1, isActive: true });
   const [itemDialogOpen, setItemDialogOpen] = useState(false);
   const [itemForm, setItemForm] = useState({ id: '', activityId: '', description: '', orderIndex: 1, isActive: true });
+  const [manualTreeScope, setManualTreeScope] = useState<OrgTreeScope | null>(null);
   const qc = useQueryClient();
   const { user, hasPermission } = useAuth();
   const createMode = searchParams.get('create');
   const canManageOrg = user?.role === 'SUPER_ADMIN' || user?.role === 'COMPANY_ADMIN' || hasPermission('org:manage');
+  const canViewAllOrg = canManageOrg || user?.role === 'DIRECTOR' || hasPermission('org:view_all');
+  const treeScope: OrgTreeScope = canViewAllOrg ? manualTreeScope ?? 'all' : 'mine';
 
   const tree = useQuery<TreeNode[]>({
-    queryKey: ['orgnodes', 'tree'],
-    queryFn: () => api<TreeNode[]>('/orgnodes/tree'),
+    queryKey: ['orgnodes', 'tree', treeScope],
+    queryFn: () => api<TreeNode[]>(`/orgnodes/tree?scope=${treeScope}`),
   });
   const detail = useQuery<OrgNodeDetail>({
     queryKey: ['orgnodes', 'detail', selectedNodeId],
@@ -265,8 +269,8 @@ export default function OrgPage() {
     enabled: Boolean(selectedNodeId),
   });
   const flat = useQuery<FlatNode[]>({
-    queryKey: ['orgnodes'],
-    queryFn: () => api<FlatNode[]>('/orgnodes'),
+    queryKey: ['orgnodes', 'flat', treeScope],
+    queryFn: () => api<FlatNode[]>(`/orgnodes?scope=${treeScope}`),
   });
   const users = useQuery<UserRow[]>({
     queryKey: ['users'],
@@ -282,6 +286,12 @@ export default function OrgPage() {
       responsible: items.filter((n) => n.responsibleUser).length,
     };
   }, [tree.data]);
+
+  useEffect(() => {
+    if (!selectedNodeId || !tree.data) return;
+    const visibleIds = new Set(flatten(tree.data).map((node) => node.id));
+    if (!visibleIds.has(selectedNodeId)) setSelectedNodeId(null);
+  }, [selectedNodeId, tree.data]);
 
   const saveNode = useMutation({
     mutationFn: () => {
@@ -508,11 +518,29 @@ export default function OrgPage() {
         description="Modelo livre para organizar Áreas e os indicadores vinculados a cada pilar."
         breadcrumbs={[{ label: 'Início', href: '/' }, { label: 'Visualização', href: '/visualization' }, { label: 'Arvore de gestão' }]}
         actions={
-          canManageOrg ? (
-            <Button onClick={() => openNode()}>
-              <Plus className="mr-2 h-4 w-4" />
-              Novo item
-            </Button>
+          canViewAllOrg || canManageOrg ? (
+            <div className="flex w-full flex-col gap-2 sm:w-auto sm:flex-row sm:items-center">
+              {canViewAllOrg && (
+                <div className="flex items-center gap-2">
+                  <Eye className="h-4 w-4 text-muted-foreground" />
+                  <NativeSelect
+                    aria-label="Visibilidade da arvore"
+                    className="h-9 min-w-[180px] sm:w-[190px]"
+                    value={treeScope}
+                    onChange={(event) => setManualTreeScope(event.target.value as OrgTreeScope)}
+                  >
+                    <option value="mine">Minhas areas</option>
+                    <option value="all">Todos os setores</option>
+                  </NativeSelect>
+                </div>
+              )}
+              {canManageOrg && (
+                <Button onClick={() => openNode()}>
+                  <Plus className="mr-2 h-4 w-4" />
+                  Novo item
+                </Button>
+              )}
+            </div>
           ) : null
         }
       />

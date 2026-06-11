@@ -1,9 +1,10 @@
-import { BadRequestException, ConflictException, Injectable, NotFoundException } from '@nestjs/common';
+import { BadRequestException, ConflictException, ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
 import { ActionStatus, Prisma, UserRoleEnum } from '@prisma/client';
 import { OrgNodeCreateInput } from '@g360/shared';
 import { PrismaService } from '../../prisma/prisma.service';
 import { AuthPayload } from '../auth/auth.types';
 import { AccessService } from '../access/access.service';
+import { filterOrgNodesWithAncestors, type OrgNodeLink } from './orgnodes.visibility';
 
 type OrgNodeAdminInput = OrgNodeCreateInput & {
   branchId?: string | null;
@@ -39,7 +40,10 @@ export interface OrgTreeNode {
   children: OrgTreeNode[];
 }
 
+export type OrgTreeScope = 'mine' | 'all';
+
 const MODULE = 'org';
+const ORG_VIEW_ALL_PERMISSION = 'org:view_all';
 const CLOSED_ACTION_STATUSES: ActionStatus[] = [
   ActionStatus.DONE,
   ActionStatus.DONE_LATE,
@@ -65,8 +69,24 @@ export class OrgNodesService {
     });
   }
 
+  async listFlatForUser(me: AuthPayload, scope?: OrgTreeScope) {
+    const flat = await this.listFlat(me.companyId);
+    const visibleIds = await this.resolveVisibleOrgNodeIds(me, flat, scope);
+    if (!visibleIds) return flat;
+    return flat.filter((node) => visibleIds.has(node.id));
+  }
+
   async tree(companyId: string): Promise<OrgTreeNode[]> {
     const flat = await this.listFlat(companyId);
+    return this.buildTree(flat);
+  }
+
+  async treeForUser(me: AuthPayload, scope?: OrgTreeScope): Promise<OrgTreeNode[]> {
+    const flat = await this.listFlatForUser(me, scope);
+    return this.buildTree(flat);
+  }
+
+  private buildTree(flat: Awaited<ReturnType<OrgNodesService['listFlat']>>): OrgTreeNode[] {
     const byId = new Map<string, OrgTreeNode>();
     flat.forEach((n) => {
       byId.set(n.id, {
@@ -118,13 +138,18 @@ export class OrgNodesService {
     });
     if (!node) throw new NotFoundException('No organizacional nao encontrado');
 
+    const allNodes = await this.prisma.orgNode.findMany({
+      where: { companyId: me.companyId, deletedAt: null },
+      select: { id: true, parentId: true, name: true, type: true },
+    });
+    await this.assertCanViewOrgNode(me, node.id, allNodes);
+
     const [
       childrenCount,
       usersCount,
       employeesCount,
       indicatorsCount,
       openActionsCount,
-      allNodes,
     ] = await Promise.all([
       this.prisma.orgNode.count({ where: { parentId: id, companyId: me.companyId, deletedAt: null } }),
       this.prisma.user.count({ where: { defaultNodeId: id, companyId: me.companyId, deletedAt: null } }),
@@ -137,10 +162,6 @@ export class OrgNodesService {
           deletedAt: null,
           status: { notIn: CLOSED_ACTION_STATUSES },
         },
-      }),
-      this.prisma.orgNode.findMany({
-        where: { companyId: me.companyId, deletedAt: null },
-        select: { id: true, parentId: true, name: true, type: true },
       }),
     ]);
 
@@ -156,6 +177,73 @@ export class OrgNodesService {
       },
       canEdit: me.role === UserRoleEnum.SUPER_ADMIN || me.role === UserRoleEnum.COMPANY_ADMIN,
     };
+  }
+
+  private async assertCanViewOrgNode(me: AuthPayload, orgNodeId: string, allNodes?: OrgNodeLink[]) {
+    const visibleIds = await this.resolveVisibleOrgNodeIds(me, allNodes, undefined);
+    if (visibleIds && !visibleIds.has(orgNodeId)) {
+      throw new ForbiddenException('Voce nao tem permissao para visualizar esta area da arvore organizacional.');
+    }
+  }
+
+  private async resolveVisibleOrgNodeIds(me: AuthPayload, allNodes?: OrgNodeLink[], requestedScope?: OrgTreeScope): Promise<Set<string> | null> {
+    const ctx = await this.access.getContext(me.sub);
+    if (!ctx.areaAccessEnabled) return null;
+
+    const canViewAll = await this.canViewAllOrg(me);
+    const scope = requestedScope ?? (canViewAll ? 'all' : 'mine');
+    if (scope === 'all') {
+      if (!canViewAll) {
+        throw new ForbiddenException('Voce nao tem permissao para visualizar todos os setores.');
+      }
+      return null;
+    }
+
+    let scopedIds: string[];
+    if (ctx.companyWide || ctx.role === UserRoleEnum.DIRECTOR) {
+      scopedIds = await this.access.expandWithDescendants(ctx.companyId, ctx.ownAreaIds);
+    } else {
+      scopedIds = (await this.access.listAreaFilter(me.sub, MODULE, 'view')) ?? [];
+    }
+    if (scopedIds.length === 0) return new Set();
+
+    const nodes =
+      allNodes ??
+      (await this.prisma.orgNode.findMany({
+        where: { companyId: me.companyId, deletedAt: null },
+        select: { id: true, parentId: true },
+      }));
+    return new Set(filterOrgNodesWithAncestors(nodes, scopedIds).map((node) => node.id));
+  }
+
+  private async canViewAllOrg(me: AuthPayload) {
+    if (
+      me.role === UserRoleEnum.SUPER_ADMIN ||
+      me.role === UserRoleEnum.COMPANY_ADMIN ||
+      me.role === UserRoleEnum.DIRECTOR
+    ) {
+      return true;
+    }
+    const keys = await this.getPermissionKeys(me.sub);
+    return keys.has(ORG_VIEW_ALL_PERMISSION) || keys.has('org:manage');
+  }
+
+  private async getPermissionKeys(userId: string) {
+    const user = await this.prisma.user.findUnique({
+      where: { id: userId },
+      select: {
+        permissions: { select: { permission: { select: { key: true } } } },
+        accessProfile: {
+          select: {
+            permissions: { select: { permission: { select: { key: true } } } },
+          },
+        },
+      },
+    });
+    const keys = new Set<string>();
+    user?.permissions.forEach((item) => keys.add(item.permission.key));
+    user?.accessProfile?.permissions.forEach((item) => keys.add(item.permission.key));
+    return keys;
   }
 
   async create(input: OrgNodeAdminInput, companyId: string, actorId?: string | null) {

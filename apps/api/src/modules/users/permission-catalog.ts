@@ -204,6 +204,7 @@ export const PERMISSION_CATALOG = [
 
   // Estrutura organizacional
   ['org:view', 'Visualizar estrutura organizacional', 'Estrutura', 'view'],
+  ['org:view_all', 'Visualizar todos os setores da estrutura organizacional', 'Estrutura', 'view'],
   ['org:manage', 'Gerenciar estrutura organizacional', 'Estrutura', 'manage'],
   ['org:positions:view', 'Visualizar organograma de cargos', 'Estrutura', 'view'],
   ['org:positions:manage', 'Gerenciar organograma de cargos', 'Estrutura', 'manage'],

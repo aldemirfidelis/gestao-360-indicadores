@@ -1,5 +1,5 @@
-import { Body, Controller, Delete, Get, Param, Patch, Post } from '@nestjs/common';
-import { OrgNodesService } from './orgnodes.service';
+import { Body, Controller, Delete, Get, Param, Patch, Post, Query } from '@nestjs/common';
+import { OrgNodesService, type OrgTreeScope } from './orgnodes.service';
 import { ZodValidationPipe } from '../../common/pipes/zod-validation.pipe';
 import { orgNodeCreateSchema } from '@g360/shared';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
@@ -13,15 +13,15 @@ export class OrgNodesController {
   constructor(private readonly service: OrgNodesService) {}
 
   @Get()
-  @RequirePermissions('org:view')
-  list(@CurrentUser() me: AuthPayload) {
-    return this.service.listFlat(me.companyId);
+  @RequirePermissions('org:view', 'org:view_all')
+  list(@CurrentUser() me: AuthPayload, @Query('scope') scope?: OrgTreeScope) {
+    return this.service.listFlatForUser(me, scope);
   }
 
   @Get('tree')
-  @RequirePermissions('org:view')
-  tree(@CurrentUser() me: AuthPayload) {
-    return this.service.tree(me.companyId);
+  @RequirePermissions('org:view', 'org:view_all')
+  tree(@CurrentUser() me: AuthPayload, @Query('scope') scope?: OrgTreeScope) {
+    return this.service.treeForUser(me, scope);
   }
 
   @Get(':id/removal-impact')
@@ -32,7 +32,7 @@ export class OrgNodesController {
   }
 
   @Get(':id')
-  @RequirePermissions('org:view')
+  @RequirePermissions('org:view', 'org:view_all')
   detail(@CurrentUser() me: AuthPayload, @Param('id') id: string) {
     return this.service.detail(id, me);
   }
