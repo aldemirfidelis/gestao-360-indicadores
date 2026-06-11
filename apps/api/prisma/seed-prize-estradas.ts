@@ -186,7 +186,8 @@ async function main() {
   // ---------------------------------------------------------------------------
   console.log('\n== 5. Indicadores do prêmio, parâmetros e faixas ==');
   const dataPath = path.join(__dirname, 'data', 'prize-estradas-0561.json');
-  const data = JSON.parse(fs.readFileSync(dataPath, 'utf8')) as Record<string, IndJson>;
+  // ﻿ remove BOM (UTF-8) caso o arquivo tenha sido salvo com marca de ordem de bytes.
+  const data = JSON.parse(fs.readFileSync(dataPath, 'utf8').replace(/^﻿/, '')) as Record<string, IndJson>;
 
   async function wireIndicator(nativeId: string, code: string, name: string, dir: string, unit: string, json: IndJson, monthly: boolean) {
     const pind = await prisma.prizeIndicator.create({
