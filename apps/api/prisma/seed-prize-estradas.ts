@@ -168,14 +168,16 @@ async function main() {
   await audit('PUBLISH', 'ANNEX_VERSION', version.id, { status: 'EFFECTIVE' });
   console.log(`  + Anexo ${annex.code} v${version.version} VIGENTE (salário possível 8,33%)`);
 
+  const competences: Array<{ id: string; month: number }> = [];
   for (let m = 1; m <= 12; m++) {
     const label = `2026-${String(m).padStart(2, '0')}`;
-    await prisma.prizeCompetence.create({
+    const c = await prisma.prizeCompetence.create({
       data: {
         companyId, programId: program.id, year: 2026, month: m, label, status: 'OPEN',
         startDate: new Date(Date.UTC(2026, m - 1, 1)), endDate: new Date(Date.UTC(2026, m, 0)), createdById: actorId,
       },
     });
+    competences.push({ id: c.id, month: m });
   }
   console.log('  + 12 competências (2026-01 … 2026-12)');
 
@@ -190,43 +192,30 @@ async function main() {
     const pind = await prisma.prizeIndicator.create({
       data: {
         companyId, programId: program.id, annexVersionId: version.id, platformIndicatorId: nativeId,
-        code, name, kind: 'COLLECTIVE', direction: dir as any, unit, weight: 50,
+        code, name, kind: 'COLLECTIVE', direction: dir as any, unit, weight: 50, bscNumber: code,
         source: 'INTERNAL_API', status: 'ACTIVE', createdById: actorId,
       },
     });
 
-    let paramCount = 0;
+    // Um parâmetro POR COMPETÊNCIA (zero/meta) + faixas vinculadas a ele. Para
+    // 22780 (fixo) todos os meses usam os mesmos valores; para 32131 (variável)
+    // cada mês usa a sua linha da planilha. resolveParameter casa pelo
+    // competenceId e o motor usa as faixas daquele parâmetro (faixas por mês).
     let rangeCount = 0;
-    if (!monthly) {
-      // 22780: zero/meta e faixas FIXOS o ano todo → 1 parâmetro anual (mês nulo)
-      const mjan = json.months[0];
+    for (const comp of competences) {
+      const mo = monthly ? json.months.find((x) => x.month === comp.month)! : json.months[0];
       const param = await prisma.prizeIndicatorParameter.create({
-        data: { indicatorId: pind.id, year: 2026, month: null, target: mjan.meta, zero: mjan.zero, weight: 50, changeReason: 'Anexo 0561 (fixo 2026)', createdById: actorId },
+        data: { indicatorId: pind.id, competenceId: comp.id, year: 2026, month: comp.month, target: mo.meta, zero: mo.zero, weight: 50, changeReason: `Anexo 0561 (${comp.month}/2026)`, createdById: actorId },
       });
-      paramCount++;
-      for (const f of mjan.faixas) {
+      for (const f of mo.faixas) {
         await prisma.prizeIndicatorRange.create({
           data: { indicatorId: pind.id, parameterId: param.id, orderIndex: f.orderIndex, minLimit: f.minLimit, maxLimit: f.maxLimit, achievementPercent: f.gainPercent, gainPercent: f.gainPercent },
         });
         rangeCount++;
       }
-    } else {
-      // 32131: zero/meta e faixas MUDAM por mês → 1 parâmetro + 6 faixas por mês
-      for (const mo of json.months) {
-        const param = await prisma.prizeIndicatorParameter.create({
-          data: { indicatorId: pind.id, year: 2026, month: mo.month, target: mo.meta, zero: mo.zero, weight: 50, changeReason: `Anexo 0561 (mês ${mo.month})`, createdById: actorId },
-        });
-        paramCount++;
-        for (const f of mo.faixas) {
-          await prisma.prizeIndicatorRange.create({
-            data: { indicatorId: pind.id, parameterId: param.id, orderIndex: f.orderIndex, minLimit: f.minLimit, maxLimit: f.maxLimit, achievementPercent: f.gainPercent, gainPercent: f.gainPercent },
-          });
-          rangeCount++;
-        }
-      }
     }
     await audit('CREATE', 'INDICATOR', pind.id, { code, weight: 50, platformIndicatorId: nativeId });
-    console.log(`  + ${code} — ${name} (peso 50%, ${paramCount} parâmetro(s), ${rangeCount} faixa(s))`);
+    console.log(`  + ${code} — ${name} (peso 50%, ${competences.length} parâmetros, ${rangeCount} faixas)`);
   }
 
   await wireIndicator(nat22780.id, '22780', '% CONF ISSMA - ESTRADAS', 'HIGHER_BETTER', '%', data['22780'], false);
