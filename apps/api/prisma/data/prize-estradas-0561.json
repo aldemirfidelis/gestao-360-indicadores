@@ -1,0 +1,1050 @@
+﻿{
+    "22780":  {
+                  "code":  "22780",
+                  "class":  "Quanto maior, melhor",
+                  "unid":  "%",
+                  "peso":  50,
+                  "months":  [
+                                 {
+                                     "month":  1,
+                                     "zero":  95,
+                                     "meta":  100,
+                                     "faixas":  [
+                                                    {
+                                                        "orderIndex":  0,
+                                                        "minLimit":  0,
+                                                        "maxLimit":  95,
+                                                        "gainPercent":  0
+                                                    },
+                                                    {
+                                                        "orderIndex":  1,
+                                                        "minLimit":  95.01,
+                                                        "maxLimit":  96,
+                                                        "gainPercent":  20
+                                                    },
+                                                    {
+                                                        "orderIndex":  2,
+                                                        "minLimit":  96.01,
+                                                        "maxLimit":  97,
+                                                        "gainPercent":  40
+                                                    },
+                                                    {
+                                                        "orderIndex":  3,
+                                                        "minLimit":  97.01,
+                                                        "maxLimit":  98,
+                                                        "gainPercent":  60
+                                                    },
+                                                    {
+                                                        "orderIndex":  4,
+                                                        "minLimit":  98.01,
+                                                        "maxLimit":  99,
+                                                        "gainPercent":  80
+                                                    },
+                                                    {
+                                                        "orderIndex":  5,
+                                                        "minLimit":  99.01,
+                                                        "maxLimit":  100,
+                                                        "gainPercent":  100
+                                                    }
+                                                ]
+                                 },
+                                 {
+                                     "month":  2,
+                                     "zero":  95,
+                                     "meta":  100,
+                                     "faixas":  [
+                                                    {
+                                                        "orderIndex":  0,
+                                                        "minLimit":  0,
+                                                        "maxLimit":  95,
+                                                        "gainPercent":  0
+                                                    },
+                                                    {
+                                                        "orderIndex":  1,
+                                                        "minLimit":  95.01,
+                                                        "maxLimit":  96,
+                                                        "gainPercent":  20
+                                                    },
+                                                    {
+                                                        "orderIndex":  2,
+                                                        "minLimit":  96.01,
+                                                        "maxLimit":  97,
+                                                        "gainPercent":  40
+                                                    },
+                                                    {
+                                                        "orderIndex":  3,
+                                                        "minLimit":  97.01,
+                                                        "maxLimit":  98,
+                                                        "gainPercent":  60
+                                                    },
+                                                    {
+                                                        "orderIndex":  4,
+                                                        "minLimit":  98.01,
+                                                        "maxLimit":  99,
+                                                        "gainPercent":  80
+                                                    },
+                                                    {
+                                                        "orderIndex":  5,
+                                                        "minLimit":  99.01,
+                                                        "maxLimit":  100,
+                                                        "gainPercent":  100
+                                                    }
+                                                ]
+                                 },
+                                 {
+                                     "month":  3,
+                                     "zero":  95,
+                                     "meta":  100,
+                                     "faixas":  [
+                                                    {
+                                                        "orderIndex":  0,
+                                                        "minLimit":  0,
+                                                        "maxLimit":  95,
+                                                        "gainPercent":  0
+                                                    },
+                                                    {
+                                                        "orderIndex":  1,
+                                                        "minLimit":  95.01,
+                                                        "maxLimit":  96,
+                                                        "gainPercent":  20
+                                                    },
+                                                    {
+                                                        "orderIndex":  2,
+                                                        "minLimit":  96.01,
+                                                        "maxLimit":  97,
+                                                        "gainPercent":  40
+                                                    },
+                                                    {
+                                                        "orderIndex":  3,
+                                                        "minLimit":  97.01,
+                                                        "maxLimit":  98,
+                                                        "gainPercent":  60
+                                                    },
+                                                    {
+                                                        "orderIndex":  4,
+                                                        "minLimit":  98.01,
+                                                        "maxLimit":  99,
+                                                        "gainPercent":  80
+                                                    },
+                                                    {
+                                                        "orderIndex":  5,
+                                                        "minLimit":  99.01,
+                                                        "maxLimit":  100,
+                                                        "gainPercent":  100
+                                                    }
+                                                ]
+                                 },
+                                 {
+                                     "month":  4,
+                                     "zero":  95,
+                                     "meta":  100,
+                                     "faixas":  [
+                                                    {
+                                                        "orderIndex":  0,
+                                                        "minLimit":  0,
+                                                        "maxLimit":  95,
+                                                        "gainPercent":  0
+                                                    },
+                                                    {
+                                                        "orderIndex":  1,
+                                                        "minLimit":  95.01,
+                                                        "maxLimit":  96,
+                                                        "gainPercent":  20
+                                                    },
+                                                    {
+                                                        "orderIndex":  2,
+                                                        "minLimit":  96.01,
+                                                        "maxLimit":  97,
+                                                        "gainPercent":  40
+                                                    },
+                                                    {
+                                                        "orderIndex":  3,
+                                                        "minLimit":  97.01,
+                                                        "maxLimit":  98,
+                                                        "gainPercent":  60
+                                                    },
+                                                    {
+                                                        "orderIndex":  4,
+                                                        "minLimit":  98.01,
+                                                        "maxLimit":  99,
+                                                        "gainPercent":  80
+                                                    },
+                                                    {
+                                                        "orderIndex":  5,
+                                                        "minLimit":  99.01,
+                                                        "maxLimit":  100,
+                                                        "gainPercent":  100
+                                                    }
+                                                ]
+                                 },
+                                 {
+                                     "month":  5,
+                                     "zero":  95,
+                                     "meta":  100,
+                                     "faixas":  [
+                                                    {
+                                                        "orderIndex":  0,
+                                                        "minLimit":  0,
+                                                        "maxLimit":  95,
+                                                        "gainPercent":  0
+                                                    },
+                                                    {
+                                                        "orderIndex":  1,
+                                                        "minLimit":  95.01,
+                                                        "maxLimit":  96,
+                                                        "gainPercent":  20
+                                                    },
+                                                    {
+                                                        "orderIndex":  2,
+                                                        "minLimit":  96.01,
+                                                        "maxLimit":  97,
+                                                        "gainPercent":  40
+                                                    },
+                                                    {
+                                                        "orderIndex":  3,
+                                                        "minLimit":  97.01,
+                                                        "maxLimit":  98,
+                                                        "gainPercent":  60
+                                                    },
+                                                    {
+                                                        "orderIndex":  4,
+                                                        "minLimit":  98.01,
+                                                        "maxLimit":  99,
+                                                        "gainPercent":  80
+                                                    },
+                                                    {
+                                                        "orderIndex":  5,
+                                                        "minLimit":  99.01,
+                                                        "maxLimit":  100,
+                                                        "gainPercent":  100
+                                                    }
+                                                ]
+                                 },
+                                 {
+                                     "month":  6,
+                                     "zero":  95,
+                                     "meta":  100,
+                                     "faixas":  [
+                                                    {
+                                                        "orderIndex":  0,
+                                                        "minLimit":  0,
+                                                        "maxLimit":  95,
+                                                        "gainPercent":  0
+                                                    },
+                                                    {
+                                                        "orderIndex":  1,
+                                                        "minLimit":  95.01,
+                                                        "maxLimit":  96,
+                                                        "gainPercent":  20
+                                                    },
+                                                    {
+                                                        "orderIndex":  2,
+                                                        "minLimit":  96.01,
+                                                        "maxLimit":  97,
+                                                        "gainPercent":  40
+                                                    },
+                                                    {
+                                                        "orderIndex":  3,
+                                                        "minLimit":  97.01,
+                                                        "maxLimit":  98,
+                                                        "gainPercent":  60
+                                                    },
+                                                    {
+                                                        "orderIndex":  4,
+                                                        "minLimit":  98.01,
+                                                        "maxLimit":  99,
+                                                        "gainPercent":  80
+                                                    },
+                                                    {
+                                                        "orderIndex":  5,
+                                                        "minLimit":  99.01,
+                                                        "maxLimit":  100,
+                                                        "gainPercent":  100
+                                                    }
+                                                ]
+                                 },
+                                 {
+                                     "month":  7,
+                                     "zero":  95,
+                                     "meta":  100,
+                                     "faixas":  [
+                                                    {
+                                                        "orderIndex":  0,
+                                                        "minLimit":  0,
+                                                        "maxLimit":  95,
+                                                        "gainPercent":  0
+                                                    },
+                                                    {
+                                                        "orderIndex":  1,
+                                                        "minLimit":  95.01,
+                                                        "maxLimit":  96,
+                                                        "gainPercent":  20
+                                                    },
+                                                    {
+                                                        "orderIndex":  2,
+                                                        "minLimit":  96.01,
+                                                        "maxLimit":  97,
+                                                        "gainPercent":  40
+                                                    },
+                                                    {
+                                                        "orderIndex":  3,
+                                                        "minLimit":  97.01,
+                                                        "maxLimit":  98,
+                                                        "gainPercent":  60
+                                                    },
+                                                    {
+                                                        "orderIndex":  4,
+                                                        "minLimit":  98.01,
+                                                        "maxLimit":  99,
+                                                        "gainPercent":  80
+                                                    },
+                                                    {
+                                                        "orderIndex":  5,
+                                                        "minLimit":  99.01,
+                                                        "maxLimit":  100,
+                                                        "gainPercent":  100
+                                                    }
+                                                ]
+                                 },
+                                 {
+                                     "month":  8,
+                                     "zero":  95,
+                                     "meta":  100,
+                                     "faixas":  [
+                                                    {
+                                                        "orderIndex":  0,
+                                                        "minLimit":  0,
+                                                        "maxLimit":  95,
+                                                        "gainPercent":  0
+                                                    },
+                                                    {
+                                                        "orderIndex":  1,
+                                                        "minLimit":  95.01,
+                                                        "maxLimit":  96,
+                                                        "gainPercent":  20
+                                                    },
+                                                    {
+                                                        "orderIndex":  2,
+                                                        "minLimit":  96.01,
+                                                        "maxLimit":  97,
+                                                        "gainPercent":  40
+                                                    },
+                                                    {
+                                                        "orderIndex":  3,
+                                                        "minLimit":  97.01,
+                                                        "maxLimit":  98,
+                                                        "gainPercent":  60
+                                                    },
+                                                    {
+                                                        "orderIndex":  4,
+                                                        "minLimit":  98.01,
+                                                        "maxLimit":  99,
+                                                        "gainPercent":  80
+                                                    },
+                                                    {
+                                                        "orderIndex":  5,
+                                                        "minLimit":  99.01,
+                                                        "maxLimit":  100,
+                                                        "gainPercent":  100
+                                                    }
+                                                ]
+                                 },
+                                 {
+                                     "month":  9,
+                                     "zero":  95,
+                                     "meta":  100,
+                                     "faixas":  [
+                                                    {
+                                                        "orderIndex":  0,
+                                                        "minLimit":  0,
+                                                        "maxLimit":  95,
+                                                        "gainPercent":  0
+                                                    },
+                                                    {
+                                                        "orderIndex":  1,
+                                                        "minLimit":  95.01,
+                                                        "maxLimit":  96,
+                                                        "gainPercent":  20
+                                                    },
+                                                    {
+                                                        "orderIndex":  2,
+                                                        "minLimit":  96.01,
+                                                        "maxLimit":  97,
+                                                        "gainPercent":  40
+                                                    },
+                                                    {
+                                                        "orderIndex":  3,
+                                                        "minLimit":  97.01,
+                                                        "maxLimit":  98,
+                                                        "gainPercent":  60
+                                                    },
+                                                    {
+                                                        "orderIndex":  4,
+                                                        "minLimit":  98.01,
+                                                        "maxLimit":  99,
+                                                        "gainPercent":  80
+                                                    },
+                                                    {
+                                                        "orderIndex":  5,
+                                                        "minLimit":  99.01,
+                                                        "maxLimit":  100,
+                                                        "gainPercent":  100
+                                                    }
+                                                ]
+                                 },
+                                 {
+                                     "month":  10,
+                                     "zero":  95,
+                                     "meta":  100,
+                                     "faixas":  [
+                                                    {
+                                                        "orderIndex":  0,
+                                                        "minLimit":  0,
+                                                        "maxLimit":  95,
+                                                        "gainPercent":  0
+                                                    },
+                                                    {
+                                                        "orderIndex":  1,
+                                                        "minLimit":  95.01,
+                                                        "maxLimit":  96,
+                                                        "gainPercent":  20
+                                                    },
+                                                    {
+                                                        "orderIndex":  2,
+                                                        "minLimit":  96.01,
+                                                        "maxLimit":  97,
+                                                        "gainPercent":  40
+                                                    },
+                                                    {
+                                                        "orderIndex":  3,
+                                                        "minLimit":  97.01,
+                                                        "maxLimit":  98,
+                                                        "gainPercent":  60
+                                                    },
+                                                    {
+                                                        "orderIndex":  4,
+                                                        "minLimit":  98.01,
+                                                        "maxLimit":  99,
+                                                        "gainPercent":  80
+                                                    },
+                                                    {
+                                                        "orderIndex":  5,
+                                                        "minLimit":  99.01,
+                                                        "maxLimit":  100,
+                                                        "gainPercent":  100
+                                                    }
+                                                ]
+                                 },
+                                 {
+                                     "month":  11,
+                                     "zero":  95,
+                                     "meta":  100,
+                                     "faixas":  [
+                                                    {
+                                                        "orderIndex":  0,
+                                                        "minLimit":  0,
+                                                        "maxLimit":  95,
+                                                        "gainPercent":  0
+                                                    },
+                                                    {
+                                                        "orderIndex":  1,
+                                                        "minLimit":  95.01,
+                                                        "maxLimit":  96,
+                                                        "gainPercent":  20
+                                                    },
+                                                    {
+                                                        "orderIndex":  2,
+                                                        "minLimit":  96.01,
+                                                        "maxLimit":  97,
+                                                        "gainPercent":  40
+                                                    },
+                                                    {
+                                                        "orderIndex":  3,
+                                                        "minLimit":  97.01,
+                                                        "maxLimit":  98,
+                                                        "gainPercent":  60
+                                                    },
+                                                    {
+                                                        "orderIndex":  4,
+                                                        "minLimit":  98.01,
+                                                        "maxLimit":  99,
+                                                        "gainPercent":  80
+                                                    },
+                                                    {
+                                                        "orderIndex":  5,
+                                                        "minLimit":  99.01,
+                                                        "maxLimit":  100,
+                                                        "gainPercent":  100
+                                                    }
+                                                ]
+                                 },
+                                 {
+                                     "month":  12,
+                                     "zero":  95,
+                                     "meta":  100,
+                                     "faixas":  [
+                                                    {
+                                                        "orderIndex":  0,
+                                                        "minLimit":  0,
+                                                        "maxLimit":  95,
+                                                        "gainPercent":  0
+                                                    },
+                                                    {
+                                                        "orderIndex":  1,
+                                                        "minLimit":  95.01,
+                                                        "maxLimit":  96,
+                                                        "gainPercent":  20
+                                                    },
+                                                    {
+                                                        "orderIndex":  2,
+                                                        "minLimit":  96.01,
+                                                        "maxLimit":  97,
+                                                        "gainPercent":  40
+                                                    },
+                                                    {
+                                                        "orderIndex":  3,
+                                                        "minLimit":  97.01,
+                                                        "maxLimit":  98,
+                                                        "gainPercent":  60
+                                                    },
+                                                    {
+                                                        "orderIndex":  4,
+                                                        "minLimit":  98.01,
+                                                        "maxLimit":  99,
+                                                        "gainPercent":  80
+                                                    },
+                                                    {
+                                                        "orderIndex":  5,
+                                                        "minLimit":  99.01,
+                                                        "maxLimit":  100,
+                                                        "gainPercent":  100
+                                                    }
+                                                ]
+                                 }
+                             ]
+              },
+    "32131":  {
+                  "code":  "32131",
+                  "class":  "Quanto menor, melhor",
+                  "unid":  "qtd",
+                  "peso":  50,
+                  "months":  [
+                                 {
+                                     "month":  1,
+                                     "zero":  20.7609756097561,
+                                     "meta":  19,
+                                     "faixas":  [
+                                                    {
+                                                        "orderIndex":  0,
+                                                        "minLimit":  20.76,
+                                                        "maxLimit":  41.52,
+                                                        "gainPercent":  0
+                                                    },
+                                                    {
+                                                        "orderIndex":  1,
+                                                        "minLimit":  20.4,
+                                                        "maxLimit":  20.75,
+                                                        "gainPercent":  20
+                                                    },
+                                                    {
+                                                        "orderIndex":  2,
+                                                        "minLimit":  20.05,
+                                                        "maxLimit":  20.39,
+                                                        "gainPercent":  40
+                                                    },
+                                                    {
+                                                        "orderIndex":  3,
+                                                        "minLimit":  19.7,
+                                                        "maxLimit":  20.04,
+                                                        "gainPercent":  60
+                                                    },
+                                                    {
+                                                        "orderIndex":  4,
+                                                        "minLimit":  19.35,
+                                                        "maxLimit":  19.69,
+                                                        "gainPercent":  80
+                                                    },
+                                                    {
+                                                        "orderIndex":  5,
+                                                        "minLimit":  19,
+                                                        "maxLimit":  19.34,
+                                                        "gainPercent":  100
+                                                    }
+                                                ]
+                                 },
+                                 {
+                                     "month":  2,
+                                     "zero":  14.204878048780488,
+                                     "meta":  13,
+                                     "faixas":  [
+                                                    {
+                                                        "orderIndex":  0,
+                                                        "minLimit":  14.2,
+                                                        "maxLimit":  28.4,
+                                                        "gainPercent":  0
+                                                    },
+                                                    {
+                                                        "orderIndex":  1,
+                                                        "minLimit":  13.96,
+                                                        "maxLimit":  14.19,
+                                                        "gainPercent":  20
+                                                    },
+                                                    {
+                                                        "orderIndex":  2,
+                                                        "minLimit":  13.72,
+                                                        "maxLimit":  13.95,
+                                                        "gainPercent":  40
+                                                    },
+                                                    {
+                                                        "orderIndex":  3,
+                                                        "minLimit":  13.48,
+                                                        "maxLimit":  13.71,
+                                                        "gainPercent":  60
+                                                    },
+                                                    {
+                                                        "orderIndex":  4,
+                                                        "minLimit":  13.24,
+                                                        "maxLimit":  13.47,
+                                                        "gainPercent":  80
+                                                    },
+                                                    {
+                                                        "orderIndex":  5,
+                                                        "minLimit":  13,
+                                                        "maxLimit":  13.23,
+                                                        "gainPercent":  100
+                                                    }
+                                                ]
+                                 },
+                                 {
+                                     "month":  3,
+                                     "zero":  19.668292682926829,
+                                     "meta":  18,
+                                     "faixas":  [
+                                                    {
+                                                        "orderIndex":  0,
+                                                        "minLimit":  19.67,
+                                                        "maxLimit":  39.34,
+                                                        "gainPercent":  0
+                                                    },
+                                                    {
+                                                        "orderIndex":  1,
+                                                        "minLimit":  19.32,
+                                                        "maxLimit":  19.66,
+                                                        "gainPercent":  20
+                                                    },
+                                                    {
+                                                        "orderIndex":  2,
+                                                        "minLimit":  18.99,
+                                                        "maxLimit":  19.31,
+                                                        "gainPercent":  40
+                                                    },
+                                                    {
+                                                        "orderIndex":  3,
+                                                        "minLimit":  18.66,
+                                                        "maxLimit":  18.98,
+                                                        "gainPercent":  60
+                                                    },
+                                                    {
+                                                        "orderIndex":  4,
+                                                        "minLimit":  18.33,
+                                                        "maxLimit":  18.65,
+                                                        "gainPercent":  80
+                                                    },
+                                                    {
+                                                        "orderIndex":  5,
+                                                        "minLimit":  18,
+                                                        "maxLimit":  18.32,
+                                                        "gainPercent":  100
+                                                    }
+                                                ]
+                                 },
+                                 {
+                                     "month":  4,
+                                     "zero":  16.243902439024389,
+                                     "meta":  15,
+                                     "faixas":  [
+                                                    {
+                                                        "orderIndex":  0,
+                                                        "minLimit":  16.24,
+                                                        "maxLimit":  32.48,
+                                                        "gainPercent":  0
+                                                    },
+                                                    {
+                                                        "orderIndex":  1,
+                                                        "minLimit":  16,
+                                                        "maxLimit":  16.23,
+                                                        "gainPercent":  20
+                                                    },
+                                                    {
+                                                        "orderIndex":  2,
+                                                        "minLimit":  15.75,
+                                                        "maxLimit":  15.99,
+                                                        "gainPercent":  40
+                                                    },
+                                                    {
+                                                        "orderIndex":  3,
+                                                        "minLimit":  15.5,
+                                                        "maxLimit":  15.74,
+                                                        "gainPercent":  60
+                                                    },
+                                                    {
+                                                        "orderIndex":  4,
+                                                        "minLimit":  15.25,
+                                                        "maxLimit":  15.49,
+                                                        "gainPercent":  80
+                                                    },
+                                                    {
+                                                        "orderIndex":  5,
+                                                        "minLimit":  15,
+                                                        "maxLimit":  15.24,
+                                                        "gainPercent":  100
+                                                    }
+                                                ]
+                                 },
+                                 {
+                                     "month":  5,
+                                     "zero":  19.492682926829268,
+                                     "meta":  18,
+                                     "faixas":  [
+                                                    {
+                                                        "orderIndex":  0,
+                                                        "minLimit":  19.49,
+                                                        "maxLimit":  38.98,
+                                                        "gainPercent":  0
+                                                    },
+                                                    {
+                                                        "orderIndex":  1,
+                                                        "minLimit":  19.2,
+                                                        "maxLimit":  19.48,
+                                                        "gainPercent":  20
+                                                    },
+                                                    {
+                                                        "orderIndex":  2,
+                                                        "minLimit":  18.9,
+                                                        "maxLimit":  19.19,
+                                                        "gainPercent":  40
+                                                    },
+                                                    {
+                                                        "orderIndex":  3,
+                                                        "minLimit":  18.6,
+                                                        "maxLimit":  18.89,
+                                                        "gainPercent":  60
+                                                    },
+                                                    {
+                                                        "orderIndex":  4,
+                                                        "minLimit":  18.3,
+                                                        "maxLimit":  18.59,
+                                                        "gainPercent":  80
+                                                    },
+                                                    {
+                                                        "orderIndex":  5,
+                                                        "minLimit":  18,
+                                                        "maxLimit":  18.29,
+                                                        "gainPercent":  100
+                                                    }
+                                                ]
+                                 },
+                                 {
+                                     "month":  6,
+                                     "zero":  17.326829268292684,
+                                     "meta":  16,
+                                     "faixas":  [
+                                                    {
+                                                        "orderIndex":  0,
+                                                        "minLimit":  17.33,
+                                                        "maxLimit":  34.66,
+                                                        "gainPercent":  0
+                                                    },
+                                                    {
+                                                        "orderIndex":  1,
+                                                        "minLimit":  17.08,
+                                                        "maxLimit":  17.32,
+                                                        "gainPercent":  20
+                                                    },
+                                                    {
+                                                        "orderIndex":  2,
+                                                        "minLimit":  16.81,
+                                                        "maxLimit":  17.07,
+                                                        "gainPercent":  40
+                                                    },
+                                                    {
+                                                        "orderIndex":  3,
+                                                        "minLimit":  16.54,
+                                                        "maxLimit":  16.8,
+                                                        "gainPercent":  60
+                                                    },
+                                                    {
+                                                        "orderIndex":  4,
+                                                        "minLimit":  16.27,
+                                                        "maxLimit":  16.53,
+                                                        "gainPercent":  80
+                                                    },
+                                                    {
+                                                        "orderIndex":  5,
+                                                        "minLimit":  16,
+                                                        "maxLimit":  16.26,
+                                                        "gainPercent":  100
+                                                    }
+                                                ]
+                                 },
+                                 {
+                                     "month":  7,
+                                     "zero":  22.741463414634147,
+                                     "meta":  21,
+                                     "faixas":  [
+                                                    {
+                                                        "orderIndex":  0,
+                                                        "minLimit":  22.74,
+                                                        "maxLimit":  45.48,
+                                                        "gainPercent":  0
+                                                    },
+                                                    {
+                                                        "orderIndex":  1,
+                                                        "minLimit":  22.4,
+                                                        "maxLimit":  22.73,
+                                                        "gainPercent":  20
+                                                    },
+                                                    {
+                                                        "orderIndex":  2,
+                                                        "minLimit":  22.05,
+                                                        "maxLimit":  22.39,
+                                                        "gainPercent":  40
+                                                    },
+                                                    {
+                                                        "orderIndex":  3,
+                                                        "minLimit":  21.7,
+                                                        "maxLimit":  22.04,
+                                                        "gainPercent":  60
+                                                    },
+                                                    {
+                                                        "orderIndex":  4,
+                                                        "minLimit":  21.35,
+                                                        "maxLimit":  21.69,
+                                                        "gainPercent":  80
+                                                    },
+                                                    {
+                                                        "orderIndex":  5,
+                                                        "minLimit":  21,
+                                                        "maxLimit":  21.34,
+                                                        "gainPercent":  100
+                                                    }
+                                                ]
+                                 },
+                                 {
+                                     "month":  8,
+                                     "zero":  23.824390243902439,
+                                     "meta":  22,
+                                     "faixas":  [
+                                                    {
+                                                        "orderIndex":  0,
+                                                        "minLimit":  23.82,
+                                                        "maxLimit":  47.64,
+                                                        "gainPercent":  0
+                                                    },
+                                                    {
+                                                        "orderIndex":  1,
+                                                        "minLimit":  23.44,
+                                                        "maxLimit":  23.81,
+                                                        "gainPercent":  20
+                                                    },
+                                                    {
+                                                        "orderIndex":  2,
+                                                        "minLimit":  23.08,
+                                                        "maxLimit":  23.43,
+                                                        "gainPercent":  40
+                                                    },
+                                                    {
+                                                        "orderIndex":  3,
+                                                        "minLimit":  22.72,
+                                                        "maxLimit":  23.07,
+                                                        "gainPercent":  60
+                                                    },
+                                                    {
+                                                        "orderIndex":  4,
+                                                        "minLimit":  22.36,
+                                                        "maxLimit":  22.71,
+                                                        "gainPercent":  80
+                                                    },
+                                                    {
+                                                        "orderIndex":  5,
+                                                        "minLimit":  22,
+                                                        "maxLimit":  22.35,
+                                                        "gainPercent":  100
+                                                    }
+                                                ]
+                                 },
+                                 {
+                                     "month":  9,
+                                     "zero":  14.078048780487805,
+                                     "meta":  13,
+                                     "faixas":  [
+                                                    {
+                                                        "orderIndex":  0,
+                                                        "minLimit":  14.08,
+                                                        "maxLimit":  28.16,
+                                                        "gainPercent":  0
+                                                    },
+                                                    {
+                                                        "orderIndex":  1,
+                                                        "minLimit":  13.88,
+                                                        "maxLimit":  14.07,
+                                                        "gainPercent":  20
+                                                    },
+                                                    {
+                                                        "orderIndex":  2,
+                                                        "minLimit":  13.66,
+                                                        "maxLimit":  13.87,
+                                                        "gainPercent":  40
+                                                    },
+                                                    {
+                                                        "orderIndex":  3,
+                                                        "minLimit":  13.44,
+                                                        "maxLimit":  13.65,
+                                                        "gainPercent":  60
+                                                    },
+                                                    {
+                                                        "orderIndex":  4,
+                                                        "minLimit":  13.22,
+                                                        "maxLimit":  13.43,
+                                                        "gainPercent":  80
+                                                    },
+                                                    {
+                                                        "orderIndex":  5,
+                                                        "minLimit":  13,
+                                                        "maxLimit":  13.21,
+                                                        "gainPercent":  100
+                                                    }
+                                                ]
+                                 },
+                                 {
+                                     "month":  10,
+                                     "zero":  19.492682926829268,
+                                     "meta":  18,
+                                     "faixas":  [
+                                                    {
+                                                        "orderIndex":  0,
+                                                        "minLimit":  19.49,
+                                                        "maxLimit":  38.98,
+                                                        "gainPercent":  0
+                                                    },
+                                                    {
+                                                        "orderIndex":  1,
+                                                        "minLimit":  19.2,
+                                                        "maxLimit":  19.48,
+                                                        "gainPercent":  20
+                                                    },
+                                                    {
+                                                        "orderIndex":  2,
+                                                        "minLimit":  18.9,
+                                                        "maxLimit":  19.19,
+                                                        "gainPercent":  40
+                                                    },
+                                                    {
+                                                        "orderIndex":  3,
+                                                        "minLimit":  18.6,
+                                                        "maxLimit":  18.89,
+                                                        "gainPercent":  60
+                                                    },
+                                                    {
+                                                        "orderIndex":  4,
+                                                        "minLimit":  18.3,
+                                                        "maxLimit":  18.59,
+                                                        "gainPercent":  80
+                                                    },
+                                                    {
+                                                        "orderIndex":  5,
+                                                        "minLimit":  18,
+                                                        "maxLimit":  18.29,
+                                                        "gainPercent":  100
+                                                    }
+                                                ]
+                                 },
+                                 {
+                                     "month":  11,
+                                     "zero":  19.492682926829268,
+                                     "meta":  18,
+                                     "faixas":  [
+                                                    {
+                                                        "orderIndex":  0,
+                                                        "minLimit":  19.49,
+                                                        "maxLimit":  38.98,
+                                                        "gainPercent":  0
+                                                    },
+                                                    {
+                                                        "orderIndex":  1,
+                                                        "minLimit":  19.2,
+                                                        "maxLimit":  19.48,
+                                                        "gainPercent":  20
+                                                    },
+                                                    {
+                                                        "orderIndex":  2,
+                                                        "minLimit":  18.9,
+                                                        "maxLimit":  19.19,
+                                                        "gainPercent":  40
+                                                    },
+                                                    {
+                                                        "orderIndex":  3,
+                                                        "minLimit":  18.6,
+                                                        "maxLimit":  18.89,
+                                                        "gainPercent":  60
+                                                    },
+                                                    {
+                                                        "orderIndex":  4,
+                                                        "minLimit":  18.3,
+                                                        "maxLimit":  18.59,
+                                                        "gainPercent":  80
+                                                    },
+                                                    {
+                                                        "orderIndex":  5,
+                                                        "minLimit":  18,
+                                                        "maxLimit":  18.29,
+                                                        "gainPercent":  100
+                                                    }
+                                                ]
+                                 },
+                                 {
+                                     "month":  12,
+                                     "zero":  15.160975609756097,
+                                     "meta":  14,
+                                     "faixas":  [
+                                                    {
+                                                        "orderIndex":  0,
+                                                        "minLimit":  15.16,
+                                                        "maxLimit":  30.32,
+                                                        "gainPercent":  0
+                                                    },
+                                                    {
+                                                        "orderIndex":  1,
+                                                        "minLimit":  14.92,
+                                                        "maxLimit":  15.15,
+                                                        "gainPercent":  20
+                                                    },
+                                                    {
+                                                        "orderIndex":  2,
+                                                        "minLimit":  14.69,
+                                                        "maxLimit":  14.91,
+                                                        "gainPercent":  40
+                                                    },
+                                                    {
+                                                        "orderIndex":  3,
+                                                        "minLimit":  14.46,
+                                                        "maxLimit":  14.68,
+                                                        "gainPercent":  60
+                                                    },
+                                                    {
+                                                        "orderIndex":  4,
+                                                        "minLimit":  14.23,
+                                                        "maxLimit":  14.45,
+                                                        "gainPercent":  80
+                                                    },
+                                                    {
+                                                        "orderIndex":  5,
+                                                        "minLimit":  14,
+                                                        "maxLimit":  14.22,
+                                                        "gainPercent":  100
+                                                    }
+                                                ]
+                                 }
+                             ]
+              }
+}

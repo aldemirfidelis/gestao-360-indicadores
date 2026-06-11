@@ -55,6 +55,9 @@ migrate: ## Roda prisma migrate deploy manualmente
 seed: ## Roda seed (CUIDADO: limpa e recria dados demo!)
 	$(COMPOSE) exec api npx tsx prisma/seed.ts
 
+seed-prize-estradas: ## Popula o exemplo do anexo 0561 (Prêmio Estradas) na empresa real
+	$(COMPOSE) exec -T api npx tsx prisma/seed-prize-estradas.ts
+
 shell-api: ## Shell dentro do container API
 	$(COMPOSE) exec api sh
 
