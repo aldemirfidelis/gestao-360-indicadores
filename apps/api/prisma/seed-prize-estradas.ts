@@ -76,6 +76,20 @@ async function main() {
   const areaAgricola = await upsertOrgNode('Área Agrícola', 'AREA', root?.id ?? null);
   const setorEstradas = await upsertOrgNode('Setor Estradas', 'SECTOR', areaAgricola.id);
 
+  // Remove nós DUPLICADOS criados por outro seed (ex.: Codex marca
+  // externalSource='PRIZE_SEED_0561'). Identificado pela MARCA, não por ID
+  // inferido. Antes de remover, repõe indicadores/atividades no setor canônico.
+  const dupNodes = await prisma.orgNode.findMany({
+    where: { companyId, externalSource: 'PRIZE_SEED_0561', deletedAt: null, id: { notIn: [areaAgricola.id, setorEstradas.id] } },
+  });
+  for (const d of dupNodes) {
+    const moved = await prisma.indicator.updateMany({ where: { ownerNodeId: d.id, deletedAt: null }, data: { ownerNodeId: setorEstradas.id } });
+    await prisma.organizationalUnitActivity.updateMany({ where: { organizationalUnitId: d.id, deletedAt: null }, data: { deletedAt: new Date() } });
+    await prisma.orgNode.update({ where: { id: d.id }, data: { deletedAt: new Date() } });
+    await audit('REMOVE_DUP', 'ORG_NODE', d.id, { name: d.name, indicadoresRepontados: moved.count });
+    console.log(`  − nó duplicado removido: ${d.name} (${d.type})${moved.count ? ` · ${moved.count} indicador(es) repontado(s)` : ''}`);
+  }
+
   // ---------------------------------------------------------------------------
   // 2. Indicadores NATIVOS (módulo Visualizações) — donos = Setor Estradas
   // ---------------------------------------------------------------------------
@@ -84,7 +98,16 @@ async function main() {
     code: string; name: string; unit: IndicatorUnit; unitLabel?: string; direction: Direction;
   }) {
     const existing = await prisma.indicator.findFirst({ where: { companyId, code: opts.code, deletedAt: null } });
-    if (existing) { console.log(`  reusa indicador: ${opts.code} — ${existing.name}`); return existing; }
+    if (existing) {
+      // Garante o dono correto (Setor Estradas) mesmo em indicador pré-existente.
+      if (existing.ownerNodeId !== setorEstradas.id) {
+        await prisma.indicator.update({ where: { id: existing.id }, data: { ownerNodeId: setorEstradas.id } });
+        console.log(`  ~ reusa indicador ${opts.code} (dono ajustado p/ Setor Estradas)`);
+      } else {
+        console.log(`  reusa indicador: ${opts.code} — ${existing.name}`);
+      }
+      return existing;
+    }
     const created = await prisma.indicator.create({
       data: {
         companyId, ownerNodeId: setorEstradas.id, name: opts.name, code: opts.code,

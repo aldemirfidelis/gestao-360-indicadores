@@ -22,5 +22,6 @@
     "moduleResolution": "node"
   },
   "include": ["src/**/*", "prisma/**/*"],
-  "exclude": ["node_modules", "dist", "test"]
+  "comment": "seed-prize-estradas-demo.ts roda via tsx e importa de dist/ (sem .d.ts); fora do build.",
+  "exclude": ["node_modules", "dist", "test", "prisma/seed-prize-estradas-demo.ts"]
 }
