@@ -19,6 +19,12 @@ export class PrizeCalcController {
     return this.calc.run(me, competenceId);
   }
 
+  @Post('competence/:competenceId/run-v2')
+  @RequirePermissions('prize:calc:run')
+  runV2(@CurrentUser() me: AuthPayload, @Param('competenceId') competenceId: string) {
+    return this.calc.runV2(me, competenceId);
+  }
+
   @Post('competence/:competenceId/reprocess')
   @RequirePermissions('prize:calc:run')
   reprocess(@CurrentUser() me: AuthPayload, @Param('competenceId') competenceId: string, @Body() body: { reason: string }) {

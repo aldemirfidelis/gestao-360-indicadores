@@ -5,6 +5,8 @@ import { AuthPayload } from '../auth/auth.types';
 import { PrizeAuditService } from './prize-audit.service';
 import { commercialDaysFromAdmission, computePrize, deriveEntitledDays, EngineIndicator, EngineInput, PRIZE_ENGINE_VERSION } from './prize-calc-engine';
 import { selectRangesForParameter } from './prize-evaluation';
+import { computeV2Individual, evaluateV2Cell } from './prize-v2-engine';
+import { normalizeRuleKey } from './prize-rule-matrix.util';
 
 function num(v: any): number | null {
   if (v === null || v === undefined) return null;
@@ -156,6 +158,279 @@ export class PrizeCalcService {
     return finished;
   }
 
+  async runV2(me: AuthPayload, competenceId: string, reason?: string) {
+    const competence = await this.prisma.prizeCompetence.findFirst({ where: { id: competenceId, companyId: me.companyId } });
+    if (!competence) throw new NotFoundException('Competencia nao encontrada');
+
+    const [
+      snapshot,
+      effectiveVersions,
+      catalogActuals,
+      aliases,
+      events,
+      moderatorRules,
+      adjustments,
+      program,
+    ] = await Promise.all([
+      this.prisma.prizeEmployeeSnapshot.findMany({ where: { companyId: me.companyId, competenceId, current: true } }),
+      this.prisma.prizeAnnexVersion.findMany({
+        where: { status: 'EFFECTIVE', annex: { companyId: me.companyId, programId: competence.programId } },
+        include: {
+          annex: true,
+          ruleGroups: {
+            where: { active: true, deletedAt: null },
+            include: {
+              indicators: {
+                where: { active: true, deletedAt: null },
+                orderBy: [{ sortOrder: 'asc' }, { createdAt: 'asc' }],
+                include: {
+                  catalog: true,
+                  parameters: {
+                    where: { year: competence.year, month: competence.month },
+                    include: { bands: { orderBy: { orderIndex: 'asc' } } },
+                  },
+                },
+              },
+            },
+          },
+        },
+      }),
+      this.prisma.prizeCatalogActualResult.findMany({ where: { companyId: me.companyId, competenceId } }),
+      this.prisma.prizeRuleAlias.findMany({ where: { companyId: me.companyId, active: true } }),
+      this.prisma.prizeEmployeeEvent.findMany({ where: { companyId: me.companyId, competenceId } }),
+      this.prisma.prizeModeratorRule.findMany({ where: { companyId: me.companyId, active: true, OR: [{ programId: null }, { programId: competence.programId }] } }),
+      this.prisma.prizeManualAdjustment.findMany({ where: { companyId: me.companyId, competenceId, status: 'APPROVED' } }),
+      this.prisma.prizeProgram.findFirst({ where: { id: competence.programId } }),
+    ]);
+
+    if (snapshot.length === 0) throw new BadRequestException('Importe a base elegivel (Apdata) antes de apurar');
+
+    const groups = effectiveVersions.flatMap((version) =>
+      version.ruleGroups.map((group) => ({ ...group, annexVersionId: version.id, annex: version.annex })),
+    );
+    if (groups.length === 0) {
+      throw new BadRequestException('Cadastre regras v2 em matriz para pelo menos um anexo vigente antes de rodar a apuracao do setor');
+    }
+
+    const lastRun = await this.prisma.prizeCalculationRun.aggregate({ where: { competenceId }, _max: { version: true } });
+    const version = (lastRun._max.version ?? 0) + 1;
+    await this.prisma.prizeCalculationRun.updateMany({
+      where: { competenceId, status: { in: ['SUCCESS', 'PARTIAL', 'ERROR'] } },
+      data: { status: 'SUPERSEDED' },
+    });
+    const run = await this.prisma.prizeCalculationRun.create({
+      data: {
+        companyId: me.companyId,
+        competenceId,
+        version,
+        status: 'RUNNING',
+        engineVersion: `${PRIZE_ENGINE_VERSION}-v2`,
+        params: { roundingRule: program?.roundingRule ?? 'HALF_UP_2', periodDays: 30, model: 'MATRIX_RULES' },
+        startedAt: new Date(),
+        createdById: me.sub,
+        reason: reason ?? null,
+      },
+    });
+
+    const actualByCatalog = new Map(catalogActuals.map((actual) => [actual.catalogId, actual]));
+    const cellRows: Prisma.PrizeCellResultCreateManyInput[] = [];
+    const cellIndex = new Map<string, Array<{ possibleSalaryPercent: number; achievedSalaryPercent: number; groupName: string }>>();
+    let pendingCells = 0;
+
+    for (const group of groups) {
+      const areaRefs = group.areaRefs.length ? group.areaRefs : ['*'];
+      const positionRefs = group.positionRefs.length ? group.positionRefs : ['*'];
+      const possibleSalaryPercent = num(group.salaryPercent) ?? 0;
+      const output = evaluateV2Cell({
+        possibleSalaryPercent,
+        indicators: group.indicators.map((indicator) => {
+          const parameter = indicator.parameters[0] ?? null;
+          const actual = actualByCatalog.get(indicator.catalogId);
+          return {
+            code: indicator.catalog.code,
+            name: indicator.catalog.name,
+            direction: indicator.catalog.direction as any,
+            weight: num(indicator.weight) ?? 0,
+            realized: actual ? num(actual.realized) : null,
+            zero: parameter ? num(parameter.zero) : null,
+            target: parameter ? num(parameter.target) : null,
+            bands: (parameter?.bands ?? []).map((band) => ({
+              orderIndex: band.orderIndex,
+              minLimit: num(band.minLimit),
+              maxLimit: num(band.maxLimit),
+              achievementPercent: num(band.achievementPercent),
+              gainPercent: num(band.gainPercent),
+            })),
+          };
+        }),
+      });
+      if (output.pending) pendingCells += areaRefs.length * positionRefs.length;
+      for (const areaRef of areaRefs) {
+        for (const positionRef of positionRefs) {
+          const normalizedAreaKey = normalizeRuleKey(areaRef);
+          const normalizedPositionKey = normalizeRuleKey(positionRef);
+          const key = this.cellKey(normalizedAreaKey, normalizedPositionKey);
+          const indexed = cellIndex.get(key) ?? [];
+          indexed.push({
+            possibleSalaryPercent: output.possibleSalaryPercent,
+            achievedSalaryPercent: output.achievedSalaryPercent,
+            groupName: group.name,
+          });
+          cellIndex.set(key, indexed);
+          cellRows.push({
+            companyId: me.companyId,
+            runId: run.id,
+            competenceId,
+            groupId: group.id,
+            annexVersionId: group.annexVersionId,
+            areaRef,
+            positionRef,
+            normalizedAreaKey,
+            normalizedPositionKey,
+            possibleSalaryPercent: output.possibleSalaryPercent,
+            achievedSalaryPercent: output.achievedSalaryPercent,
+            weightedGainPercent: output.weightedGainPercent,
+            status: output.pending ? 'PENDING_INPUT' : 'CALCULATED',
+            details: output as unknown as Prisma.InputJsonValue,
+          });
+        }
+      }
+    }
+
+    if (cellRows.length === 0) {
+      await this.prisma.prizeCalculationRun.update({
+        where: { id: run.id },
+        data: { status: 'ERROR', errorsCount: 1, finishedAt: new Date(), params: { reason: 'NO_CELLS' } },
+      });
+      throw new BadRequestException('As regras v2 nao geraram nenhuma celula area x cargo');
+    }
+    await this.prisma.prizeCellResult.createMany({ data: cellRows });
+
+    if (pendingCells > 0) {
+      const finished = await this.prisma.prizeCalculationRun.update({
+        where: { id: run.id },
+        data: { status: 'ERROR', errorsCount: pendingCells, finishedAt: new Date() },
+      });
+      await this.audit.log(me, { action: 'CALC_RUN_V2_BLOCKED', entityType: 'CALC_RUN', entityId: run.id, competenceId, after: { pendingCells } });
+      return { ...finished, pendingCells, blockedReason: 'Existem celulas com realizado, zero, meta ou faixas pendentes' };
+    }
+
+    const unmatchedRows: Prisma.PrizeUnmatchedEmployeeCreateManyInput[] = [];
+    const employeeMatch = new Map<string, { possibleSalaryPercent: number; achievedSalaryPercent: number; groupName: string }>();
+    for (const emp of snapshot) {
+      if (emp.blocked || !emp.eligible) continue;
+      const normalizedAreaKey = this.resolveRuleKey(emp.areaRef, 'AREA', aliases);
+      const normalizedPositionKey = this.resolveRuleKey(emp.positionRef, 'POSITION', aliases);
+      const matches = cellIndex.get(this.cellKey(normalizedAreaKey, normalizedPositionKey)) ?? [];
+      if (matches.length !== 1) {
+        unmatchedRows.push({
+          companyId: me.companyId,
+          runId: run.id,
+          competenceId,
+          registration: emp.registration,
+          name: emp.name,
+          areaRef: emp.areaRef,
+          positionRef: emp.positionRef,
+          normalizedAreaKey,
+          normalizedPositionKey,
+          reason: matches.length > 1 ? 'Mais de uma combinacao area-cargo aplicavel' : 'Sem combinacao area-cargo aplicavel',
+        });
+      } else {
+        employeeMatch.set(emp.registration, matches[0]);
+      }
+    }
+
+    if (unmatchedRows.length > 0) {
+      await this.prisma.prizeUnmatchedEmployee.createMany({ data: unmatchedRows });
+      const finished = await this.prisma.prizeCalculationRun.update({
+        where: { id: run.id },
+        data: { status: 'ERROR', totalEmployees: snapshot.length, errorsCount: unmatchedRows.length, finishedAt: new Date() },
+      });
+      await this.audit.log(me, { action: 'CALC_RUN_V2_BLOCKED', entityType: 'CALC_RUN', entityId: run.id, competenceId, after: { unmatched: unmatchedRows.length } });
+      return { ...finished, unmatched: unmatchedRows.length, blockedReason: 'Existem colaboradores sem regra area-cargo deterministica' };
+    }
+
+    const roundingRule = program?.roundingRule ?? 'HALF_UP_2';
+    const eventsByReg = new Map<string, typeof events>();
+    for (const e of events) { const arr = eventsByReg.get(e.registration) ?? []; arr.push(e); eventsByReg.set(e.registration, arr); }
+    const adjByReg = new Map<string, typeof adjustments>();
+    for (const a of adjustments) { const arr = adjByReg.get(a.registration) ?? []; arr.push(a); adjByReg.set(a.registration, arr); }
+
+    let totalGross = 0, totalRed = 0, totalFinal = 0, errors = 0;
+    for (const emp of snapshot) {
+      try {
+        const match = employeeMatch.get(emp.registration);
+        const empEvents = (eventsByReg.get(emp.registration) ?? []).map((e) => ({
+          type: e.type,
+          days: e.days ?? null,
+          date: e.date ? e.date.toISOString().slice(0, 10) : null,
+        }));
+        const entitledDays = emp.workedDays ?? deriveEntitledDays(
+          commercialDaysFromAdmission(emp.admissionDate, competence.year, competence.month),
+          empEvents,
+        );
+        const blockedReason = emp.blocked || !emp.eligible
+          ? 'Colaborador bloqueado/nao elegivel'
+          : !match
+            ? 'Sem combinacao area-cargo aplicavel'
+            : null;
+
+        const out = computeV2Individual({
+          registration: emp.registration,
+          name: emp.name,
+          baseSalary: num(emp.baseSalary),
+          possibleSalaryPercent: match?.possibleSalaryPercent ?? 0,
+          achievedSalaryPercent: match?.achievedSalaryPercent ?? 0,
+          entitledDays,
+          events: empEvents,
+          moderatorRules: moderatorRules.map((r) => ({ name: r.name, eventType: r.eventType, criterion: r.criterion, reductionPercent: num(r.reductionPercent), reductionValue: num(r.reductionValue), cap: num(r.cap), cumulative: r.cumulative, priority: r.priority })),
+          adjustments: (adjByReg.get(emp.registration) ?? []).map((a) => ({ field: a.field, amount: num(a.amount) })),
+          roundingRule,
+          blockedReason,
+        });
+
+        const hash = this.hash(`${run.id}:${emp.registration}:${out.finalValue}:${out.grossValue}`);
+        const result = await this.prisma.prizeCalculationResult.create({
+          data: {
+            companyId: me.companyId,
+            runId: run.id,
+            competenceId,
+            registration: emp.registration,
+            name: emp.name,
+            baseSalary: emp.baseSalary,
+            potential: out.possible,
+            weightedGain: out.weightedGain,
+            proportionality: Math.round((entitledDays / 30) * 10000) / 10000,
+            grossValue: out.grossValue,
+            totalReductions: out.totalReductions,
+            adjustments: out.adjustments,
+            gratification: out.gratification,
+            finalValue: out.finalValue,
+            blocked: out.blocked,
+            blockReason: out.blockReason ?? null,
+            exceptionType: out.exceptionType ?? null,
+            hash,
+          },
+        });
+        if (out.lines.length) {
+          await this.prisma.prizeCalculationLine.createMany({
+            data: out.lines.map((l) => ({ resultId: result.id, step: l.step, code: l.code, label: l.label, detail: l.detail ?? null, value: l.value ?? null, data: (l as any).data ?? undefined })),
+          });
+        }
+        totalGross += out.grossValue; totalRed += out.totalReductions; totalFinal += out.finalValue;
+      } catch {
+        errors++;
+      }
+    }
+
+    const finished = await this.prisma.prizeCalculationRun.update({
+      where: { id: run.id },
+      data: { status: errors > 0 ? 'PARTIAL' : 'SUCCESS', totalEmployees: snapshot.length, totalGross, totalReductions: totalRed, totalFinal, errorsCount: errors, finishedAt: new Date() },
+    });
+    await this.audit.log(me, { action: 'CALC_RUN_V2', entityType: 'CALC_RUN', entityId: run.id, competenceId, after: { version, totalFinal, employees: snapshot.length, cells: cellRows.length } });
+    return finished;
+  }
+
   async reprocess(me: AuthPayload, competenceId: string, reason: string) {
     if (!reason?.trim()) throw new BadRequestException('Justificativa é obrigatória para reprocessar');
     return this.run(me, competenceId, reason);
@@ -194,7 +469,7 @@ export class PrizeCalcService {
   async results(companyId: string, competenceId: string) {
     const competence = await this.prisma.prizeCompetence.findFirst({ where: { id: competenceId, companyId }, select: { status: true } });
     const run = await this.prisma.prizeCalculationRun.findFirst({
-      where: { companyId, competenceId, status: { in: ['SUCCESS', 'PARTIAL'] } },
+      where: { companyId, competenceId, status: { in: ['SUCCESS', 'PARTIAL', 'ERROR'] } },
       orderBy: { version: 'desc' },
     });
     if (!run) return { run: null, results: [], competenceStatus: competence?.status ?? null };
@@ -234,5 +509,16 @@ export class PrizeCalcService {
     let h = 0;
     for (let i = 0; i < s.length; i++) { h = (h * 31 + s.charCodeAt(i)) | 0; }
     return `c${(h >>> 0).toString(16)}`;
+  }
+
+  private resolveRuleKey(value: string | null, kind: 'AREA' | 'POSITION', aliases: Array<any>) {
+    const normalized = normalizeRuleKey(value);
+    const alias = aliases.find((a) => a.kind === kind && a.normalizedKey === normalized);
+    if (!alias) return normalized;
+    return normalizeRuleKey(alias.canonicalRef ?? alias.canonicalName ?? value);
+  }
+
+  private cellKey(areaKey: string, positionKey: string) {
+    return `${areaKey}::${positionKey}`;
   }
 }

@@ -11,6 +11,7 @@ import { Badge } from '@/components/ui/badge';
 import { Label } from '@/components/ui/label';
 import { NativeSelect } from '@/components/ui/select';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { api, ApiError } from '@/lib/api';
 import { useAuth } from '@/components/auth/auth-provider';
 
@@ -23,8 +24,15 @@ interface Result {
 }
 interface MemoryLine { id: string; step: number; code: string; label: string; detail: string | null; value: string | null }
 interface Memory extends Result { lines: MemoryLine[] }
+interface CellResult {
+  id: string; areaRef: string; positionRef: string; possibleSalaryPercent: string; achievedSalaryPercent: string;
+  weightedGainPercent: string | null; status: string; group?: { name: string };
+}
+interface UnmatchedEmployee { id: string; registration: string; name: string; areaRef: string | null; positionRef: string | null; reason: string }
 
 const money = (v: string | null) => v == null ? '—' : Number(v).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
+
+const percent = (v: string | number | null | undefined) => v == null ? '-' : `${Number(v).toLocaleString('pt-BR', { maximumFractionDigits: 4 })}%`;
 
 export default function PrizeApuracaoPage() {
   const qc = useQueryClient();
@@ -41,6 +49,16 @@ export default function PrizeApuracaoPage() {
     queryFn: () => api<{ run: Run | null; results: Result[]; competenceStatus: string | null }>(`/prize/calc/competence/${competenceId}/results`),
     enabled: !!competenceId,
   });
+  const { data: cellData } = useQuery({
+    queryKey: ['prize-v2-cells', competenceId],
+    queryFn: () => api<{ run: Run | null; cells: CellResult[] }>(`/prize/rules/competence/${competenceId}/cells`),
+    enabled: !!competenceId,
+  });
+  const { data: unmatchedData } = useQuery({
+    queryKey: ['prize-v2-unmatched', competenceId],
+    queryFn: () => api<{ run: Run | null; unmatched: UnmatchedEmployee[] }>(`/prize/rules/competence/${competenceId}/unmatched`),
+    enabled: !!competenceId,
+  });
   const { data: memory } = useQuery({
     queryKey: ['prize-calc-memory', memoryFor],
     queryFn: () => api<Memory>(`/prize/calc/result/${memoryFor}/memory`),
@@ -50,6 +68,17 @@ export default function PrizeApuracaoPage() {
   const run = useMutation({
     mutationFn: () => api(`/prize/calc/competence/${competenceId}/run`, { method: 'POST' }),
     onSuccess: (r: any) => { toast.success(`Apuração v${r.version} concluída: ${r.totalEmployees} colaborador(es)`); qc.invalidateQueries({ queryKey: ['prize-calc-results'] }); },
+    onError: (e: ApiError) => toast.error(e.message),
+  });
+  const runV2 = useMutation({
+    mutationFn: () => api<any>(`/prize/calc/competence/${competenceId}/run-v2`, { method: 'POST' }),
+    onSuccess: (r) => {
+      if (r.blockedReason) toast.warning(`V2 bloqueada: ${r.blockedReason}`);
+      else toast.success(`Setor apurado na v2: ${r.totalEmployees} colaborador(es)`);
+      qc.invalidateQueries({ queryKey: ['prize-calc-results'] });
+      qc.invalidateQueries({ queryKey: ['prize-v2-cells'] });
+      qc.invalidateQueries({ queryKey: ['prize-v2-unmatched'] });
+    },
     onError: (e: ApiError) => toast.error(e.message),
   });
   const reprocess = useMutation({
@@ -107,6 +136,9 @@ export default function PrizeApuracaoPage() {
             <Button onClick={() => autopilot.mutate()} disabled={autopilot.isPending} title="Sincroniza o realizado da plataforma, valida o checklist e apura automaticamente">
               <Zap className="mr-1 h-4 w-4" />{autopilot.isPending ? 'Executando…' : 'Autopilot'}
             </Button>
+            <Button onClick={() => runV2.mutate()} disabled={runV2.isPending} title="Apura a competencia inteira pela matriz area-cargo">
+              <PlayCircle className="mr-1 h-4 w-4" />{runV2.isPending ? 'Apurando setor...' : 'Rodar setor v2'}
+            </Button>
             {!runData ? (
               <Button variant="outline" onClick={() => run.mutate()} disabled={run.isPending}><PlayCircle className="mr-1 h-4 w-4" />{run.isPending ? 'Apurando…' : 'Rodar apuração'}</Button>
             ) : (
@@ -129,6 +161,77 @@ export default function PrizeApuracaoPage() {
         <Card><CardContent className="py-12 text-center text-sm text-muted-foreground">Nenhuma apuração rodada. Clique em “Rodar apuração” (requer base elegível importada).</CardContent></Card>
       ) : (
         <div className="space-y-4">
+          <Tabs defaultValue="cells">
+            <TabsList>
+              <TabsTrigger value="cells">Regua coletiva</TabsTrigger>
+              <TabsTrigger value="unmatched">Nao-casados</TabsTrigger>
+            </TabsList>
+            <TabsContent value="cells">
+              <Card>
+                <CardContent className="overflow-x-auto p-0">
+                  <table className="w-full text-sm">
+                    <thead className="border-b border-border/60 bg-muted/40 text-xs text-muted-foreground">
+                      <tr>
+                        <th className="px-3 py-2 text-left">Area</th>
+                        <th className="px-3 py-2 text-left">Cargo</th>
+                        <th className="px-3 py-2 text-left">Combinacao</th>
+                        <th className="px-3 py-2 text-right">% possivel</th>
+                        <th className="px-3 py-2 text-right">% atingido</th>
+                        <th className="px-3 py-2 text-right">Ating.</th>
+                        <th className="px-3 py-2 text-left">Status</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {(cellData?.cells ?? []).map((cell) => (
+                        <tr key={cell.id} className={`border-b border-border/40 ${cell.status !== 'CALCULATED' ? 'bg-amber-50/50' : ''}`}>
+                          <td className="px-3 py-2">{cell.areaRef}</td>
+                          <td className="px-3 py-2">{cell.positionRef}</td>
+                          <td className="px-3 py-2 text-muted-foreground">{cell.group?.name ?? '-'}</td>
+                          <td className="px-3 py-2 text-right">{percent(cell.possibleSalaryPercent)}</td>
+                          <td className="px-3 py-2 text-right font-medium">{percent(cell.achievedSalaryPercent)}</td>
+                          <td className="px-3 py-2 text-right">{percent(cell.weightedGainPercent)}</td>
+                          <td className="px-3 py-2"><Badge variant={cell.status === 'CALCULATED' ? 'secondary' : 'outline'}>{cell.status}</Badge></td>
+                        </tr>
+                      ))}
+                      {(cellData?.cells ?? []).length === 0 && (
+                        <tr><td colSpan={7} className="px-3 py-8 text-center text-sm text-muted-foreground">Nenhuma regua v2 materializada para esta competencia.</td></tr>
+                      )}
+                    </tbody>
+                  </table>
+                </CardContent>
+              </Card>
+            </TabsContent>
+            <TabsContent value="unmatched">
+              <Card>
+                <CardContent className="overflow-x-auto p-0">
+                  <table className="w-full text-sm">
+                    <thead className="border-b border-border/60 bg-muted/40 text-xs text-muted-foreground">
+                      <tr>
+                        <th className="px-3 py-2 text-left">Colaborador</th>
+                        <th className="px-3 py-2 text-left">Area</th>
+                        <th className="px-3 py-2 text-left">Cargo</th>
+                        <th className="px-3 py-2 text-left">Motivo</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {(unmatchedData?.unmatched ?? []).map((u) => (
+                        <tr key={u.id} className="border-b border-border/40 bg-red-50/40">
+                          <td className="px-3 py-2"><div className="font-medium">{u.name}</div><div className="font-mono text-xs text-muted-foreground">{u.registration}</div></td>
+                          <td className="px-3 py-2">{u.areaRef ?? '-'}</td>
+                          <td className="px-3 py-2">{u.positionRef ?? '-'}</td>
+                          <td className="px-3 py-2 text-muted-foreground">{u.reason}</td>
+                        </tr>
+                      ))}
+                      {(unmatchedData?.unmatched ?? []).length === 0 && (
+                        <tr><td colSpan={4} className="px-3 py-8 text-center text-sm text-muted-foreground">Nenhum nao-casado no ultimo processamento v2.</td></tr>
+                      )}
+                    </tbody>
+                  </table>
+                </CardContent>
+              </Card>
+            </TabsContent>
+          </Tabs>
+
           <Card>
             <CardContent className="flex flex-wrap items-center justify-between gap-3 p-4">
               <div className="flex items-center gap-2 text-sm">
