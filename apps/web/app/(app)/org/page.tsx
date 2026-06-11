@@ -31,6 +31,41 @@ import {
   Users,
   Wrench,
   X,
+  Building,
+  Landmark,
+  UserCheck,
+  GraduationCap,
+  Briefcase,
+  LineChart,
+  PieChart,
+  TrendingUp,
+  Megaphone,
+  Compass,
+  Activity,
+  Cpu,
+  HardDrive,
+  Database,
+  ShieldCheck,
+  HeartPulse,
+  ShoppingBag,
+  Scale,
+  Search,
+  Award,
+  HelpCircle,
+  Phone,
+  Globe,
+  Flame,
+  Droplet,
+  Lightbulb,
+  FileText,
+  Calendar,
+  Lock,
+  Eye,
+  Key,
+  Workflow,
+  Layers,
+  Presentation,
+  CheckCircle,
 } from 'lucide-react';
 import { PageHeader } from '@/components/shell/page-header';
 import { MetricCard } from '@/components/platform/metric-card';
@@ -134,6 +169,41 @@ const ICONS: Record<string, any> = {
   Server,
   Boxes,
   Target,
+  Building,
+  Landmark,
+  UserCheck,
+  GraduationCap,
+  Briefcase,
+  LineChart,
+  PieChart,
+  TrendingUp,
+  Megaphone,
+  Compass,
+  Activity,
+  Cpu,
+  HardDrive,
+  Database,
+  ShieldCheck,
+  HeartPulse,
+  ShoppingBag,
+  Scale,
+  Search,
+  Award,
+  HelpCircle,
+  Phone,
+  Globe,
+  Flame,
+  Droplet,
+  Lightbulb,
+  FileText,
+  Calendar,
+  Lock,
+  Eye,
+  Key,
+  Workflow,
+  Layers,
+  Presentation,
+  CheckCircle,
 };
 
 const TYPE_LABEL: Record<string, string> = {
@@ -484,7 +554,6 @@ export default function OrgPage() {
           loading={detail.isLoading}
           canManage={canManageOrg && Boolean(detail.data?.canEdit ?? true)}
           onClose={() => setSelectedNodeId(null)}
-          onEdit={() => detail.data && openNode(detail.data)}
           onAddActivity={() => openActivityDialog()}
           onEditActivity={openActivityDialog}
           onToggleActivity={(activity) => updateActivity.mutate({ id: activity.id, body: { isActive: !activity.isActive } })}
@@ -552,6 +621,35 @@ export default function OrgPage() {
                 <option value="true">Ativo</option>
                 <option value="false">Inativo</option>
               </NativeSelect>
+            </div>
+            <div className="md:col-span-2">
+              <div className="flex items-center justify-between">
+                <Label>Ícone</Label>
+                <span className="text-xs text-muted-foreground font-medium">Selecione o ícone representativo</span>
+              </div>
+              <div className="mt-2 rounded-lg border border-border bg-muted/20 p-3">
+                <div className="grid grid-cols-6 gap-2 sm:grid-cols-8 md:grid-cols-10 max-h-[160px] overflow-y-auto p-1 bg-background rounded border border-border/60">
+                  {Object.entries(ICONS).map(([name, IconComponent]) => {
+                    const isSelected = form.icon === name;
+                    return (
+                      <button
+                        key={name}
+                        type="button"
+                        onClick={() => setForm({ ...form, icon: name })}
+                        className={cn(
+                          "flex h-10 w-10 items-center justify-center rounded-lg border transition-all duration-200",
+                          isSelected 
+                            ? "border-primary bg-primary/10 text-primary ring-2 ring-primary/20 scale-105" 
+                            : "border-border/50 text-muted-foreground hover:bg-accent hover:text-foreground hover:scale-105"
+                        )}
+                        title={name}
+                      >
+                        <IconComponent className="h-5 w-5" />
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
             </div>
             <div className="md:col-span-2">
               <Label>Descrição</Label>
@@ -752,7 +850,6 @@ function OrgDetailPanel({
   loading,
   canManage,
   onClose,
-  onEdit,
   onAddActivity,
   onEditActivity,
   onToggleActivity,
@@ -768,7 +865,6 @@ function OrgDetailPanel({
   loading: boolean;
   canManage: boolean;
   onClose: () => void;
-  onEdit: () => void;
   onAddActivity: () => void;
   onEditActivity: (activity: OrgActivity) => void;
   onToggleActivity: (activity: OrgActivity) => void;
@@ -781,8 +877,8 @@ function OrgDetailPanel({
   onRemoveItem: (activityId: string, item: ActivityItem) => void;
 }) {
   const { open: openVision360 } = useVision360();
+  const [isEditing, setIsEditing] = useState(false);
   const Icon = detail?.icon && ICONS[detail.icon] ? ICONS[detail.icon] : Building2;
-  const breadcrumb = detail?.breadcrumb?.map((item) => item.name).join(' > ') ?? '';
 
   return (
     <div className="fixed inset-0 z-40">
@@ -801,14 +897,6 @@ function OrgDetailPanel({
                 Detalhes da estrutura
               </div>
               <h2 className="truncate text-xl font-semibold">{loading ? 'Carregando...' : detail?.name}</h2>
-              {detail && (
-                <div className="mt-1 flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
-                  <span>{TYPE_LABEL[detail.type] ?? detail.type}</span>
-                  <span>•</span>
-                  <span>{detail.company.tradeName ?? detail.company.name}</span>
-                  <StatusBadge value={detail.active ? 'ACTIVE' : 'CANCELLED'} label={detail.active ? 'Ativo' : 'Inativo'} />
-                </div>
-              )}
             </div>
           </div>
           <Button variant="ghost" size="icon" onClick={onClose} title="Fechar" aria-label="Fechar">
@@ -820,58 +908,24 @@ function OrgDetailPanel({
           {loading && <LoadingState />}
           {!loading && detail && (
             <div className="space-y-4">
-              {breadcrumb && (
-                <div className="rounded-md border border-border/60 bg-muted/30 px-3 py-2 text-xs text-muted-foreground">
-                  {breadcrumb}
+              {detail.description && (
+                <div className="rounded-lg border border-border/60 p-4 bg-muted/10">
+                  <div className="mb-2 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                    Descrição do setor
+                  </div>
+                  <p className="text-sm leading-relaxed text-muted-foreground whitespace-pre-wrap break-words">
+                    {detail.description}
+                  </p>
                 </div>
               )}
 
-              <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
-                <MiniStat label="Setores" value={detail.counts.children} />
-                <MiniStat label="Pessoas" value={detail.counts.users + detail.counts.employees} />
-                <MiniStat label="Indicadores" value={detail.counts.indicators} />
-                <MiniStat label="Acoes abertas" value={detail.counts.openActions} />
-              </div>
-
-              <div className="rounded-md border border-border/60 p-3">
-                <div className="mb-3 flex items-center gap-2 text-sm font-semibold">
-                  <UserCog className="h-4 w-4 text-muted-foreground" />
-                  Dados e responsabilidades
-                </div>
-                <div className="grid gap-3 text-sm sm:grid-cols-2">
-                  <DetailRow label="Empresa" value={detail.company.tradeName ?? detail.company.name} />
-                  <DetailRow label="Unidade / filial" value={detail.branch?.name ?? 'Nao vinculada'} />
-                  <DetailRow label="Area superior" value={detail.parent?.name ?? 'Raiz da estrutura'} />
-                  <DetailRow label="Gestor responsavel" value={detail.responsibleUser?.name ?? 'Sem responsavel'} />
-                  <DetailRow label="Codigo" value={detail.code ?? 'Sem codigo'} />
-                  <DetailRow label="Status" value={detail.active ? 'Ativo' : 'Inativo'} />
-                </div>
-                {detail.description && (
-                  <div className="mt-3 border-t border-border/60 pt-3 text-sm leading-relaxed text-muted-foreground">
-                    {detail.description}
-                  </div>
-                )}
-                <div className="mt-3 flex flex-wrap gap-2">
-                  {canManage && (
-                    <Button size="sm" variant="outline" onClick={onEdit}>
-                      <Edit3 className="mr-1.5 h-3.5 w-3.5" />
-                      Editar
-                    </Button>
-                  )}
-                  <Button size="sm" onClick={() => openVision360('ORG_NODE', detail.id)}>
-                    <Network className="mr-1.5 h-3.5 w-3.5" />
-                    Visao 360°
-                  </Button>
-                </div>
-              </div>
-
               <div className="rounded-md border border-border/60">
-                <div className="flex items-center justify-between gap-3 border-b border-border/60 px-3 py-2">
+                <div className="flex items-center justify-between gap-3 border-b border-border/60 px-3 py-2 bg-muted/10">
                   <div>
                     <div className="text-sm font-semibold">Principais responsabilidades</div>
                     <div className="text-xs text-muted-foreground">Blocos e topicos vinculados somente a este item organizacional.</div>
                   </div>
-                  {canManage && (
+                  {canManage && isEditing && (
                     <Button size="sm" variant="outline" onClick={onAddActivity}>
                       <Plus className="mr-1.5 h-3.5 w-3.5" />
                       Bloco
@@ -888,17 +942,17 @@ function OrgDetailPanel({
                     {detail.activities.map((activity, index) => (
                       <div key={activity.id} className={cn('p-3', !activity.isActive && 'opacity-60')}>
                         <div className="flex items-start justify-between gap-3">
-                          <div className="min-w-0">
+                          <div className="min-w-0 flex-1">
                             <div className="flex items-center gap-2">
                               <span className="grid h-6 w-6 shrink-0 place-items-center rounded-md bg-muted text-xs font-semibold">
                                 {index + 1}
                               </span>
-                              <div className="min-w-0 truncate text-sm font-semibold">{activity.title}</div>
+                              <div className="min-w-0 text-sm font-semibold whitespace-pre-wrap break-words flex-1">{activity.title}</div>
                               {!activity.isActive && <Badge variant="secondary">Inativo</Badge>}
                             </div>
-                            {activity.description && <p className="mt-2 text-xs leading-relaxed text-muted-foreground">{activity.description}</p>}
+                            {activity.description && <p className="mt-2 text-xs leading-relaxed text-muted-foreground whitespace-pre-wrap break-words">{activity.description}</p>}
                           </div>
-                          {canManage && (
+                          {canManage && isEditing && (
                             <div className="flex shrink-0 items-center gap-1">
                               <IconAction title="Subir" onClick={() => onMoveActivity(activity, -1)}><ArrowUp className="h-3.5 w-3.5" /></IconAction>
                               <IconAction title="Descer" onClick={() => onMoveActivity(activity, 1)}><ArrowDown className="h-3.5 w-3.5" /></IconAction>
@@ -914,11 +968,11 @@ function OrgDetailPanel({
                         <div className="mt-3 space-y-2">
                           {activity.items.map((item) => (
                             <div key={item.id} className={cn('flex items-start justify-between gap-2 rounded-md bg-muted/30 px-3 py-2 text-sm', !item.isActive && 'opacity-60')}>
-                              <div className="min-w-0 leading-relaxed">
+                              <div className="min-w-0 leading-relaxed whitespace-pre-wrap break-words flex-1">
                                 <span className="mr-2 text-xs font-semibold text-muted-foreground">{item.orderIndex}.</span>
                                 {item.description}
                               </div>
-                              {canManage && (
+                              {canManage && isEditing && (
                                 <div className="flex shrink-0 items-center gap-1">
                                   <IconAction title="Subir" onClick={() => onMoveItem(activity.id, item, -1)}><ArrowUp className="h-3.5 w-3.5" /></IconAction>
                                   <IconAction title="Descer" onClick={() => onMoveItem(activity.id, item, 1)}><ArrowDown className="h-3.5 w-3.5" /></IconAction>
@@ -931,10 +985,10 @@ function OrgDetailPanel({
                               )}
                             </div>
                           ))}
-                          {canManage && (
+                          {canManage && isEditing && (
                             <Button size="sm" variant="ghost" onClick={() => onAddItem(activity.id)}>
                               <Plus className="mr-1.5 h-3.5 w-3.5" />
-                              Topico
+                              Tópico
                             </Button>
                           )}
                         </div>
@@ -946,25 +1000,32 @@ function OrgDetailPanel({
             </div>
           )}
         </div>
+
+        {!loading && detail && (
+          <div className="border-t border-border/60 bg-muted/20 p-4 flex gap-2 justify-end shrink-0">
+            {canManage && (
+              <Button
+                size="sm"
+                variant={isEditing ? 'default' : 'outline'}
+                onClick={() => setIsEditing(!isEditing)}
+                className="shadow-sm"
+              >
+                <Edit3 className="mr-1.5 h-3.5 w-3.5" />
+                {isEditing ? 'Visualizar' : 'Editar responsabilidades'}
+              </Button>
+            )}
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={() => openVision360('ORG_NODE', detail.id)}
+              className="shadow-sm"
+            >
+              <Network className="mr-1.5 h-3.5 w-3.5" />
+              Visão 360°
+            </Button>
+          </div>
+        )}
       </aside>
-    </div>
-  );
-}
-
-function MiniStat({ label, value }: { label: string; value: number }) {
-  return (
-    <div className="rounded-md border border-border/60 bg-card px-3 py-2">
-      <div className="text-lg font-semibold">{formatNumber(value)}</div>
-      <div className="truncate text-[11px] text-muted-foreground">{label}</div>
-    </div>
-  );
-}
-
-function DetailRow({ label, value }: { label: string; value: string }) {
-  return (
-    <div className="min-w-0">
-      <div className="text-[10px] font-semibold uppercase tracking-[0.08em] text-muted-foreground">{label}</div>
-      <div className="truncate font-medium">{value}</div>
     </div>
   );
 }
