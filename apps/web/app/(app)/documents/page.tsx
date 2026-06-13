@@ -131,7 +131,6 @@ interface DocDetail extends Doc {
     autosave: boolean;
     concurrentEditing: boolean;
     message?: string;
-    recommendationUrl?: string | null;
   };
   versions: Array<{
     id: string;
@@ -185,7 +184,6 @@ interface EditorSession {
   provider: string;
   mode: 'ONLINE' | 'MANUAL';
   message?: string;
-  recommendationUrl?: string | null;
   documentId: string;
   fileId: string | null;
   editorUrl: string | null;
@@ -1033,11 +1031,6 @@ export default function DocumentsPage() {
                     {!detail.editor.configured && (
                       <div className="rounded-md border border-status-yellow/40 bg-status-yellow/5 p-3 text-sm text-muted-foreground">
                         <div>{detail.editor.message}</div>
-                        {detail.editor.recommendationUrl && (
-                          <a className="mt-2 inline-block text-primary underline" href={detail.editor.recommendationUrl} target="_blank" rel="noreferrer">
-                            Ver planos Microsoft 365
-                          </a>
-                        )}
                       </div>
                     )}
 

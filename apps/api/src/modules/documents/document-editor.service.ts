@@ -9,7 +9,6 @@ export interface DocumentEditorStatus {
   autosave: boolean;
   concurrentEditing: boolean;
   message?: string;
-  recommendationUrl?: string | null;
 }
 
 /** Conteúdo assinado dentro do access_token WOPI (stateless). */
@@ -36,9 +35,7 @@ export interface EditorSession extends DocumentEditorStatus {
 const MANUAL_MESSAGE =
   'Editor DOCX online não configurado. Use download/upload de nova versão ou configure Microsoft 365 para edição segura via WOPI.';
 const MICROSOFT_MESSAGE =
-  'Microsoft 365 para web não configurado. Configure DOCUMENT_EDITOR_PROVIDER=microsoft_365, DOCUMENT_EDITOR_WOPI_BASE e MICROSOFT_365_WOPI_ACTION_URL. Para empresas sem licença Microsoft 365, recomendamos contratar a licença corporativa antes de liberar edição online.';
-const MICROSOFT_RECOMMENDATION_URL =
-  'https://www.microsoft.com/pt-br/microsoft-365/business/microsoft-365-plans-and-pricing';
+  'Microsoft 365 para web não configurado. Configure DOCUMENT_EDITOR_PROVIDER=microsoft_365, DOCUMENT_EDITOR_WOPI_BASE e MICROSOFT_365_WOPI_ACTION_URL.';
 
 const DISCOVERY_TTL_MS = 60 * 60 * 1000; // 1h
 const DEFAULT_TOKEN_TTL_MS = 10 * 60 * 60 * 1000; // 10h
@@ -104,7 +101,6 @@ export class DocumentEditorService {
       autosave: online,
       concurrentEditing: online,
       message,
-      recommendationUrl: this.provider === 'microsoft_365' || !online ? MICROSOFT_RECOMMENDATION_URL : null,
     };
   }
 
