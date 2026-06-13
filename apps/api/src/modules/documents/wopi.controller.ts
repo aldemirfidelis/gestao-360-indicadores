@@ -6,7 +6,7 @@ import { DocumentEditorService, WopiTokenPayload } from './document-editor.servi
 import { DocumentsService } from './documents.service';
 
 /**
- * Host WOPI para o Collabora Online.
+ * Host WOPI para editores online (Microsoft 365 para web, Collabora, etc.).
  *
  * O Document Server chama estes endpoints (publicos) usando o `access_token`
  * assinado que emitimos em `POST /documents/:id/editor/open`. Nao ha JWT de
@@ -15,7 +15,7 @@ import { DocumentsService } from './documents.service';
  * Protocolo: https://docs.collaboraonline.com/ (WOPI: CheckFileInfo, GetFile,
  * PutFile e operacoes de Lock).
  *
- * SkipThrottle: o Collabora chama estes endpoints periodicamente (lock/save)
+ * SkipThrottle: o editor chama estes endpoints periodicamente (lock/save)
  * a partir de um unico IP; o rate limit global por IP nao se aplica aqui.
  */
 @SkipThrottle()

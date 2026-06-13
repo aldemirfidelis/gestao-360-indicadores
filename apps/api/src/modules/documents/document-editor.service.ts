@@ -3,12 +3,13 @@ import { createHmac, timingSafeEqual } from 'crypto';
 
 export interface DocumentEditorStatus {
   configured: boolean;
-  provider: string;
+  provider: 'microsoft_365' | 'collabora' | 'onlyoffice' | 'manual' | string;
   mode: 'ONLINE' | 'MANUAL';
   url: string | null;
   autosave: boolean;
   concurrentEditing: boolean;
   message?: string;
+  recommendationUrl?: string | null;
 }
 
 /** Conteudo assinado dentro do access_token WOPI (stateless). */
@@ -26,14 +27,18 @@ export interface WopiTokenPayload {
 export interface EditorSession extends DocumentEditorStatus {
   documentId: string;
   fileId: string | null;
-  editorUrl: string | null; // URL do Collabora com WOPISrc embutido
+  editorUrl: string | null; // URL do editor WOPI com WOPISrc embutido
   accessToken: string | null;
   accessTokenTtl: number; // epoch em ms (contrato WOPI)
   wopiSrc: string | null;
 }
 
 const MANUAL_MESSAGE =
-  'Editor DOCX online nao configurado. Use download/upload de nova versao ate configurar DOCUMENT_EDITOR_PROVIDER e DOCUMENT_EDITOR_URL.';
+  'Editor DOCX online nao configurado. Use download/upload de nova versao ou configure Microsoft 365 para edicao segura via WOPI.';
+const MICROSOFT_MESSAGE =
+  'Microsoft 365 para web nao configurado. Configure DOCUMENT_EDITOR_PROVIDER=microsoft_365, DOCUMENT_EDITOR_WOPI_BASE e MICROSOFT_365_WOPI_ACTION_URL. Para empresas sem licenca Microsoft 365, recomendamos contratar a licenca corporativa antes de liberar edicao online.';
+const MICROSOFT_RECOMMENDATION_URL =
+  'https://www.microsoft.com/pt-br/microsoft-365/business/microsoft-365-plans-and-pricing';
 
 const DISCOVERY_TTL_MS = 60 * 60 * 1000; // 1h
 const DEFAULT_TOKEN_TTL_MS = 10 * 60 * 60 * 1000; // 10h
@@ -41,25 +46,32 @@ const DEFAULT_TOKEN_TTL_MS = 10 * 60 * 60 * 1000; // 10h
 @Injectable()
 export class DocumentEditorService {
   private readonly logger = new Logger('DocumentEditorService');
-  /** Cache da discovery do Collabora: ext (docx) -> urlsrc do editor. */
+  /** Cache da discovery WOPI: ext (docx) -> urlsrc do editor. */
   private discoveryCache: { fetchedAt: number; actions: Map<string, string> } | null = null;
   /** Locks WOPI em memoria (1 instancia). fileId -> { lock, expiresAt }. */
   private readonly locks = new Map<string, { lock: string; expiresAt: number }>();
 
   get provider(): string {
-    return (process.env.DOCUMENT_EDITOR_PROVIDER ?? 'manual').trim().toLowerCase();
+    const raw = (process.env.DOCUMENT_EDITOR_PROVIDER ?? 'manual').trim().toLowerCase().replace(/[\s-]+/g, '_');
+    if (['microsoft', 'microsoft365', 'microsoft_365', 'office', 'office_online', 'office_for_web'].includes(raw)) return 'microsoft_365';
+    if (raw === 'collabora_online') return 'collabora';
+    return raw || 'manual';
   }
 
-  /** URL publica do Document Server (Collabora/ONLYOFFICE), sem barra final. */
+  /** URL publica do editor WOPI ou action URL Microsoft, sem barra final. */
   get serverUrl(): string | null {
-    const raw = (process.env.DOCUMENT_EDITOR_URL ?? '').trim();
+    const raw =
+      this.provider === 'microsoft_365'
+        ? (process.env.MICROSOFT_365_WOPI_ACTION_URL ?? process.env.DOCUMENT_EDITOR_URL ?? '').trim()
+        : (process.env.DOCUMENT_EDITOR_URL ?? '').trim();
     return raw ? raw.replace(/\/+$/, '') : null;
   }
 
   /**
    * Base publica da API que o Document Server usa para chamar o host WOPI
-   * (ex.: https://gestao360.org/api). Precisa ser alcancavel pelo container
-   * do Collabora. Sem ela, o editor online nao consegue ler/salvar o arquivo.
+   * (ex.: https://gestao360.org/api). Precisa ser alcancavel pelo Microsoft 365
+   * para web ou pelo document server. Sem ela, o editor online nao consegue
+   * ler/salvar o arquivo.
    */
   get wopiBase(): string | null {
     const explicit = (process.env.DOCUMENT_EDITOR_WOPI_BASE ?? '').trim();
@@ -77,7 +89,9 @@ export class DocumentEditorService {
     if (!online) {
       if (this.provider !== 'manual' && this.serverUrl && !this.wopiBase) {
         message =
-          'DOCUMENT_EDITOR_WOPI_BASE ausente: defina a URL publica da API (ex.: https://seu-dominio/api) que o servidor Collabora deve usar para ler/salvar os documentos.';
+          'DOCUMENT_EDITOR_WOPI_BASE ausente: defina a URL publica da API (ex.: https://seu-dominio/api) que o editor WOPI deve usar para ler/salvar os documentos.';
+      } else if (this.provider === 'microsoft_365') {
+        message = MICROSOFT_MESSAGE;
       } else {
         message = MANUAL_MESSAGE;
       }
@@ -90,6 +104,7 @@ export class DocumentEditorService {
       autosave: online,
       concurrentEditing: online,
       message,
+      recommendationUrl: this.provider === 'microsoft_365' || !online ? MICROSOFT_RECOMMENDATION_URL : null,
     };
   }
 
@@ -152,7 +167,7 @@ export class DocumentEditorService {
 
   /**
    * Monta a sessao do editor online: minta o access_token e resolve a URL do
-   * editor (Collabora) com o WOPISrc embutido, apontando para o host WOPI.
+   * editor WOPI com o WOPISrc embutido, apontando para o host WOPI.
    */
   async buildSession(input: {
     documentId: string;
@@ -183,14 +198,17 @@ export class DocumentEditorService {
     try {
       const urlsrc = await this.resolveEditorUrl(input.fileName);
       if (urlsrc) {
-        const sep = urlsrc.includes('?') ? (urlsrc.endsWith('?') || urlsrc.endsWith('&') ? '' : '&') : '?';
-        editorUrl = `${urlsrc}${sep}WOPISrc=${encodeURIComponent(wopiSrc)}&lang=pt-BR&closebutton=1`;
+        editorUrl = appendEditorParams(urlsrc, wopiSrc, this.provider);
       } else {
-        message = 'Nao foi possivel resolver a URL do editor a partir da discovery do Collabora.';
+        message = this.provider === 'microsoft_365'
+          ? 'Nao foi possivel resolver a action URL do Microsoft 365 para web.'
+          : 'Nao foi possivel resolver a URL do editor a partir da discovery WOPI.';
       }
     } catch (err) {
-      this.logger.error(`Falha ao contatar a discovery do Collabora: ${(err as Error).message}`);
-      message = 'Servidor Collabora inacessivel (discovery). Verifique DOCUMENT_EDITOR_URL e a rede.';
+      this.logger.error(`Falha ao resolver editor WOPI: ${(err as Error).message}`);
+      message = this.provider === 'microsoft_365'
+        ? 'Microsoft 365 para web inacessivel ou action URL invalida. Verifique MICROSOFT_365_WOPI_ACTION_URL.'
+        : 'Servidor de documentos inacessivel (discovery). Verifique DOCUMENT_EDITOR_URL e a rede.';
     }
 
     return {
@@ -205,12 +223,19 @@ export class DocumentEditorService {
 
   /**
    * Resolve o urlsrc do editor para a extensao do arquivo via discovery do
-   * Collabora (`/hosting/discovery`), com cache de 1h.
+   * document server (`/hosting/discovery`), com cache de 1h.
    */
   private async resolveEditorUrl(fileName: string): Promise<string | null> {
+    if (this.provider === 'microsoft_365') return this.resolveMicrosoftEditorUrl();
     const ext = (fileName.split('.').pop() ?? 'docx').toLowerCase();
     const actions = await this.loadDiscovery();
     return actions.get(ext) ?? actions.get('docx') ?? null;
+  }
+
+  private resolveMicrosoftEditorUrl(): string | null {
+    const actionUrl = this.serverUrl;
+    if (!actionUrl) return null;
+    return actionUrl;
   }
 
   private async loadDiscovery(): Promise<Map<string, string>> {
@@ -268,7 +293,7 @@ function safeEqual(a: string, b: string): boolean {
 
 /**
  * Extrai do XML de discovery o mapa extensao -> urlsrc, preferindo a acao de
- * edicao (name="edit"). Tolerante ao formato (Collabora e ONLYOFFICE).
+ * edicao (name="edit"). Tolerante ao formato de document servers WOPI.
  */
 function parseDiscovery(xml: string): Map<string, string> {
   const actions = new Map<string, string>();
@@ -303,4 +328,12 @@ function decodeXmlEntities(value: string): string {
     .replace(/&apos;/g, "'")
     .replace(/&lt;/g, '<')
     .replace(/&gt;/g, '>');
+}
+
+function appendEditorParams(urlsrc: string, wopiSrc: string, provider: string): string {
+  if (urlsrc.includes('{wopiSrc}')) return urlsrc.replace('{wopiSrc}', encodeURIComponent(wopiSrc));
+  if (urlsrc.includes('{WOPISrc}')) return urlsrc.replace('{WOPISrc}', encodeURIComponent(wopiSrc));
+  const sep = urlsrc.includes('?') ? (urlsrc.endsWith('?') || urlsrc.endsWith('&') ? '' : '&') : '?';
+  const locale = provider === 'microsoft_365' ? '&ui=pt-BR&rs=pt-BR' : '&lang=pt-BR&closebutton=1';
+  return `${urlsrc}${sep}WOPISrc=${encodeURIComponent(wopiSrc)}${locale}`;
 }

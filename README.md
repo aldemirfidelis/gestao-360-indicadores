@@ -75,6 +75,8 @@ O Mapa Estrategico editavel, com perspectivas, objetivos, indicadores, permissoe
 
 A nova navegacao lateral em accordion, com grupos por Visualizacoes, Lancamentos, Gestao, Relatorios e Configuracoes separadas por engrenagem, esta documentada em **[docs/navegacao-menu-accordion.md](./docs/navegacao-menu-accordion.md)**.
 
+O modulo corporativo de Cargos e Salarios, que substitui Organograma no menu e adiciona catalogo, estrutura, tabelas salariais, enquadramento, movimentacoes, permissoes e auditoria, esta documentado em **[MODULO_CARGOS_E_SALARIOS.md](./MODULO_CARGOS_E_SALARIOS.md)**.
+
 O modulo avancado de Plano de Acao, com origem ponta a ponta, ferramentas de analise, IA assistente, evidencias, eficacia e vinculo com Arvore Organizacional/Mapa Estrategico, esta documentado em **[docs/plano-acao-avancado.md](./docs/plano-acao-avancado.md)**.
 
 ## Deploy em producao

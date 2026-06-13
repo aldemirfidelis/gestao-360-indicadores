@@ -61,6 +61,8 @@ const TYPE_META: Record<string, { label: string; icon: typeof Inbox }> = {
   WORKFLOW_TASK: { label: 'Tarefa de fluxo', icon: Workflow },
   APPROVAL: { label: 'Aprovação', icon: Stamp },
   DOCUMENT_REVIEW: { label: 'Documento', icon: FileText },
+  DOCUMENT_EDIT_APPROVAL: { label: 'Liberar documento', icon: FileText },
+  DOCUMENT_EDIT: { label: 'Editar documento', icon: FileText },
   RISK_CRITICAL: { label: 'Risco', icon: ShieldAlert },
   MEETING: { label: 'Reunião', icon: CalendarDays },
   NONCONFORMITY: { label: 'Não conformidade', icon: FileWarning },
@@ -232,7 +234,7 @@ export default function MeuDiaPage() {
     else if (type === 'approvals') { setTab('priorities'); setTypeFilter('APPROVAL'); }
     else if (type === 'indicators') { setTab('priorities'); setTypeFilter('INDICATOR_OFF_TARGET'); }
     else if (type === 'risksCritical') { setTab('priorities'); setTypeFilter('RISK_CRITICAL'); }
-    else if (type === 'documentsToReview') { setTab('priorities'); setTypeFilter('DOCUMENT_REVIEW'); }
+    else if (type === 'documentsToReview') { setTab('priorities'); setTypeFilter('DOCUMENTS'); }
     else if (type === 'meetingsToday') { setTab('priorities'); setTypeFilter('MEETING'); }
   }
 
@@ -509,6 +511,8 @@ function ActNowDialog({ item, onClose, onDone, onOpen, onVision }: {
   const isApproval = item.itemType === 'APPROVAL';
   const isTask = ['TASK', 'OVERDUE_ACTION'].includes(item.itemType) && item.sourceEntityType === 'ACTION_PLAN';
   const isNotification = item.sourceEntityType === 'NOTIFICATION';
+  const isDocumentEditApproval = item.itemType === 'DOCUMENT_EDIT_APPROVAL';
+  const isDocumentEdit = item.itemType === 'DOCUMENT_EDIT';
 
   const act = useMutation({
     mutationFn: (action: string) => api(`/my-day/items/${item.id}/action`, { method: 'POST', json: { action, justification } }),
@@ -541,6 +545,22 @@ function ActNowDialog({ item, onClose, onDone, onOpen, onVision }: {
               <Button variant="outline" className="border-rose-300 text-rose-600" disabled={act.isPending} onClick={() => act.mutate('reject')}>Reprovar</Button>
               <Button variant="outline" disabled={act.isPending} onClick={() => act.mutate('changes')}>Solicitar ajustes</Button>
             </div>
+          </div>
+        ) : isDocumentEditApproval ? (
+          <div className="space-y-3">
+            <div>
+              <Label>Justificativa <span className="text-xs text-muted-foreground">(obrigatoria para rejeitar)</span></Label>
+              <Textarea rows={3} value={justification} onChange={(e) => setJustification(e.target.value)} placeholder="Oriente o solicitante, quando necessario." />
+            </div>
+            <div className="flex flex-wrap gap-2">
+              <Button disabled={act.isPending} onClick={() => act.mutate('approve')}>Liberar edicao</Button>
+              <Button variant="outline" className="border-rose-300 text-rose-600" disabled={act.isPending} onClick={() => act.mutate('reject')}>Rejeitar</Button>
+            </div>
+          </div>
+        ) : isDocumentEdit ? (
+          <div className="space-y-2">
+            <p className="text-sm text-muted-foreground">Abra o documento para editar online. Ao finalizar, marque a tarefa como concluida.</p>
+            <Button disabled={act.isPending} onClick={() => act.mutate('complete')}>Concluir edicao</Button>
           </div>
         ) : isTask ? (
           <div className="space-y-2">

@@ -55,6 +55,11 @@ function makeService(over: Record<string, any> = {}) {
     {} as any,
     { onDirty: vi.fn() } as any,
     { isManager: vi.fn().mockResolvedValue(false) } as any,
+    {
+      approveEditRequest: vi.fn(),
+      rejectEditRequest: vi.fn(),
+      completeEditRequest: vi.fn(),
+    } as any,
   );
   return { svc, prisma };
 }

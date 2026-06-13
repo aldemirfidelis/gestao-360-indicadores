@@ -63,6 +63,13 @@ function makeService(opts?: {
     documentWorkflowStep: { create: vi.fn().mockResolvedValue({ id: 'wfs1' }) },
     documentApproval: { findMany: vi.fn().mockResolvedValue([]), create: vi.fn().mockResolvedValue({ id: 'a1' }) },
     documentReviewRequest: { findMany: vi.fn().mockResolvedValue([]), create: vi.fn().mockResolvedValue({ id: 'rr1' }) },
+    documentEditRequest: {
+      create: vi.fn().mockResolvedValue({ id: 'er1' }),
+      findFirst: vi.fn().mockResolvedValue(null),
+      findMany: vi.fn().mockResolvedValue([]),
+      update: vi.fn().mockResolvedValue({ id: 'er1' }),
+      updateMany: vi.fn().mockResolvedValue({ count: 0 }),
+    },
     documentComment: { findMany: vi.fn().mockResolvedValue([]), create: vi.fn().mockResolvedValue({ id: 'c1' }) },
     documentAuditLog: { findMany: vi.fn().mockResolvedValue([]), create: vi.fn().mockResolvedValue({ id: 'al1' }) },
     documentExternalMetadata: { findUnique: vi.fn().mockResolvedValue(null) },
@@ -99,8 +106,9 @@ function makeService(opts?: {
     putBinary: vi.fn().mockResolvedValue({ storageProvider: 'LOCAL', storageKey: 'kbin', fileName: 'doc.docx', mimeType: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document', sizeBytes: 123, hashSha256: 'hbin' }),
     readBinary: vi.fn().mockResolvedValue(Buffer.from('BINARY-DOCX')),
   } as any;
+  const workItems = { markDirty: vi.fn() } as any;
 
-  const service = new DocumentsService(prisma, traceability, access, codes, editor, storage);
+  const service = new DocumentsService(prisma, traceability, access, codes, editor, storage, workItems);
   return { service, prisma, traceability, access, codes, storage };
 }
 
@@ -202,7 +210,7 @@ describe('DocumentsService - gestao documental', () => {
     expect(prisma.document.update).not.toHaveBeenCalled();
   });
 
-  // ---- Host WOPI (editor online Collabora) ----
+  // ---- Host WOPI (editor online) ----
 
   const wopiToken = (over: Partial<Record<string, unknown>> = {}) => ({
     fileId: 'F1',

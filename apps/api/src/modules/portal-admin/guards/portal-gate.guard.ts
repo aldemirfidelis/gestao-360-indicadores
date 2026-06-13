@@ -145,6 +145,7 @@ export class PortalGateGuard implements CanActivate {
       ['/api/wopi', 'documents'],
       ['/api/audits', 'audits'],
       ['/api/processes', 'processes'],
+      ['/api/cargos-salarios', 'compensation'],
       ['/api/food-safety', 'food-safety'],
       ['/api/asset-security', 'asset-security'],
       ['/api/forms', 'forms'],

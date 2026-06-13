@@ -100,6 +100,24 @@ export class DocumentsController {
     return this.service.options(me).then((options) => options.editor);
   }
 
+  @Post('edit-requests/:requestId/approve')
+  @RequirePermissions('doc:view')
+  approveEditRequest(@CurrentUser() me: AuthPayload, @Param('requestId') requestId: string, @Body() body: any) {
+    return this.service.approveEditRequest(me, requestId, body);
+  }
+
+  @Post('edit-requests/:requestId/reject')
+  @RequirePermissions('doc:view')
+  rejectEditRequest(@CurrentUser() me: AuthPayload, @Param('requestId') requestId: string, @Body() body: any) {
+    return this.service.rejectEditRequest(me, requestId, body);
+  }
+
+  @Post('edit-requests/:requestId/complete')
+  @RequirePermissions('doc:view')
+  completeEditRequest(@CurrentUser() me: AuthPayload, @Param('requestId') requestId: string, @Body() body: any) {
+    return this.service.completeEditRequest(me, requestId, body);
+  }
+
   @Post('jobs/expiration')
   @RequirePermissions('doc:manage')
   runExpirationJob(@CurrentUser() me: AuthPayload) {
@@ -140,6 +158,12 @@ export class DocumentsController {
   @RequirePermissions('doc:view')
   openEditor(@CurrentUser() me: AuthPayload, @Param('id') id: string) {
     return this.service.openEditor(me, id);
+  }
+
+  @Post(':id/edit-requests')
+  @RequirePermissions('doc:view')
+  requestEdit(@CurrentUser() me: AuthPayload, @Param('id') id: string, @Body() body: any) {
+    return this.service.requestEdit(me, id, body);
   }
 
   @Post(':id/autosave')

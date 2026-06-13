@@ -38,7 +38,7 @@ export class DocumentStorageService {
     return readFile(this.resolveKey(storageKey), 'utf8');
   }
 
-  /** Persiste conteudo binario (ex.: DOCX real editado no Collabora). */
+  /** Persiste conteudo binario (ex.: DOCX real editado por editor WOPI). */
   async putBinary(companyId: string, folder: string, fileName: string, content: Buffer, mimeType: string): Promise<StoredDocumentFile> {
     const safeName = sanitizeFileName(fileName);
     const key = `${companyId}/${sanitizePathPart(folder)}/${Date.now()}-${randomUUID()}-${safeName}`;

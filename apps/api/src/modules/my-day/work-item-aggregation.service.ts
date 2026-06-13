@@ -342,17 +342,33 @@ export class WorkItemAggregationService {
   }
 
   private async collectDocuments(me: AuthPayload): Promise<WorkItemDraft[]> {
-    const rows = await this.prisma.document.findMany({
-      where: {
-        companyId: me.companyId, deletedAt: null,
-        OR: [
-          { approverUserId: me.sub, status: { in: DOC_APPROVAL_STATUS as any } },
-          { ownerUserId: me.sub, status: { in: DOC_REVIEW_STATUS as any } },
-        ],
-      },
-      select: { id: true, code: true, title: true, status: true, version: true, orgNodeId: true, approverUserId: true, createdAt: true, updatedAt: true },
-    });
-    return rows.map((d) => {
+    const [rows, editRequests] = await Promise.all([
+      this.prisma.document.findMany({
+        where: {
+          companyId: me.companyId, deletedAt: null,
+          OR: [
+            { approverUserId: me.sub, status: { in: DOC_APPROVAL_STATUS as any } },
+            { ownerUserId: me.sub, status: { in: DOC_REVIEW_STATUS as any } },
+          ],
+        },
+        select: { id: true, code: true, title: true, status: true, version: true, orgNodeId: true, approverUserId: true, createdAt: true, updatedAt: true },
+      }),
+      this.prisma.documentEditRequest.findMany({
+        where: {
+          companyId: me.companyId,
+          OR: [
+            { operatorUserId: me.sub, status: 'REQUESTED' },
+            { requesterUserId: me.sub, status: { in: ['APPROVED', 'IN_PROGRESS'] } },
+          ],
+        },
+        include: {
+          document: { select: { id: true, code: true, title: true, status: true, version: true, orgNodeId: true, createdAt: true, updatedAt: true } },
+          requester: { select: { id: true, name: true, email: true } },
+          operator: { select: { id: true, name: true, email: true } },
+        },
+      }),
+    ]);
+    const documentTasks = rows.map((d) => {
       const isApproval = d.approverUserId === me.sub && (DOC_APPROVAL_STATUS as string[]).includes(d.status as string);
       const expired = d.status === 'EXPIRED' || d.status === 'NEAR_EXPIRATION';
       return {
@@ -379,6 +395,54 @@ export class WorkItemAggregationService {
         sourceUpdatedAt: d.updatedAt,
       };
     });
+    const editTasks = editRequests.map((r) => {
+      const isOperatorTask = r.operatorUserId === me.sub && r.status === 'REQUESTED';
+      const d = r.document;
+      const availableActions: WorkItemAction[] = isOperatorTask
+        ? [
+            { key: 'approve', label: 'Liberar edicao', kind: 'primary', inline: true },
+            { key: 'reject', label: 'Rejeitar', kind: 'danger', inline: true, requiresJustification: true },
+            { key: 'open', label: 'Abrir documento', href: `/documents?focus=${d.id}` },
+          ]
+        : [
+            { key: 'open', label: 'Editar documento', href: `/documents?focus=${d.id}&edit=1` },
+            { key: 'complete', label: 'Concluir edicao', inline: true },
+          ];
+      return {
+        sourceModule: 'documents',
+        sourceEntityType: 'DOCUMENT_EDIT_REQUEST',
+        sourceEntityId: r.id,
+        itemType: isOperatorTask ? 'DOCUMENT_EDIT_APPROVAL' : 'DOCUMENT_EDIT',
+        title: isOperatorTask
+          ? `Liberar edicao: ${d.code ? d.code + ' - ' : ''}${d.title}`
+          : `Editar documento: ${d.code ? d.code + ' - ' : ''}${d.title}`,
+        summary: isOperatorTask
+          ? `Solicitante: ${r.requester?.name ?? 'Usuario'} - ${r.reason ?? 'Sem justificativa'}`
+          : `Liberado para edicao online - ${r.status}`,
+        status: r.status,
+        criticality: isOperatorTask ? 'HIGH' : 'MEDIUM',
+        dueAt: r.expiresAt,
+        assignedUserId: me.sub,
+        requesterUserId: r.requesterUserId,
+        orgNodeId: d.orgNodeId,
+        requiresDecision: isOperatorTask,
+        isBlocking: isOperatorTask,
+        recommendedAction: isOperatorTask ? 'Aprovar ou rejeitar a edicao do documento' : 'Abrir o documento e editar no Microsoft 365',
+        availableActions,
+        context: {
+          documentId: d.id,
+          code: d.code,
+          version: d.version,
+          status: d.status,
+          reason: r.reason,
+          requesterName: r.requester?.name,
+          operatorName: r.operator?.name,
+        },
+        sourceCreatedAt: r.createdAt,
+        sourceUpdatedAt: r.updatedAt,
+      };
+    });
+    return [...documentTasks, ...editTasks];
   }
 
   private async collectRisks(me: AuthPayload): Promise<WorkItemDraft[]> {

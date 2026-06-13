@@ -53,6 +53,7 @@ import { AutomationsModule } from './modules/automations/automations.module';
 import { MyDayModule } from './modules/my-day/my-day.module';
 import { WorkItemEventsModule } from './modules/my-day/work-item-event-bus';
 import { PrizeModule } from './modules/prize/prize.module';
+import { CompensationModule } from './modules/compensation/compensation.module';
 
 @Module({
   imports: [
@@ -107,6 +108,7 @@ import { PrizeModule } from './modules/prize/prize.module';
     AutomationsModule,
     MyDayModule,
     PrizeModule,
+    CompensationModule,
   ],
   providers: [
     { provide: APP_GUARD, useClass: ThrottlerGuard },

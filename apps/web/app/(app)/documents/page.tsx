@@ -131,6 +131,7 @@ interface DocDetail extends Doc {
     autosave: boolean;
     concurrentEditing: boolean;
     message?: string;
+    recommendationUrl?: string | null;
   };
   versions: Array<{
     id: string;
@@ -158,6 +159,22 @@ interface DocDetail extends Doc {
   statusHistory: Array<{ id: string; statusFrom: string | null; statusTo: string; comment: string | null; createdAt: string }>;
   approvals: Array<{ id: string; decision: string; approverUserId: string | null; comment: string | null; decidedAt: string | null; createdAt: string }>;
   reviewRequests: Array<{ id: string; status: string; comment: string; dueAt: string | null; answer: string | null; createdAt: string }>;
+  editRequests: Array<{
+    id: string;
+    status: 'REQUESTED' | 'APPROVED' | 'REJECTED' | 'IN_PROGRESS' | 'COMPLETED' | 'CANCELLED';
+    reason: string | null;
+    decisionNote: string | null;
+    requesterUserId: string;
+    operatorUserId: string | null;
+    approvedAt: string | null;
+    rejectedAt: string | null;
+    completedAt: string | null;
+    expiresAt: string | null;
+    createdAt: string;
+    requester?: { id: string; name: string; email: string } | null;
+    operator?: { id: string; name: string; email: string } | null;
+    decidedBy?: { id: string; name: string; email: string } | null;
+  }>;
   comments: Array<{ id: string; body: string; userId: string | null; resolvedAt: string | null; createdAt: string }>;
   auditLogs: Array<{ id: string; action: string; reason: string | null; result: string; createdAt: string }>;
   tags: Array<{ id: string; name: string; color: string | null }>;
@@ -168,6 +185,7 @@ interface EditorSession {
   provider: string;
   mode: 'ONLINE' | 'MANUAL';
   message?: string;
+  recommendationUrl?: string | null;
   documentId: string;
   fileId: string | null;
   editorUrl: string | null;
@@ -319,7 +337,7 @@ const EMPTY_FORM: DocForm = {
 export default function DocumentsPage() {
   const qc = useQueryClient();
   const searchParams = useSearchParams();
-  const { hasPermission } = useAuth();
+  const { hasPermission, user } = useAuth();
   const canCreate = hasPermission(['doc:create']);
   const canUpdate = hasPermission(['doc:update']);
   const canDelete = hasPermission(['doc:delete']);
@@ -333,6 +351,9 @@ export default function DocumentsPage() {
   const [templateForm, setTemplateForm] = useState({ name: '', typeConfigId: '', content: '' });
   const [draftContent, setDraftContent] = useState('');
   const [editorSession, setEditorSession] = useState<EditorSession | null>(null);
+  const [viewer, setViewer] = useState<{ url: string; fileId: string; fileName: string } | null>(null);
+  const [viewerLoading, setViewerLoading] = useState(false);
+  const autoOpenEditorRef = useRef<string | null>(null);
   const [impactModalConfig, setImpactModalConfig] = useState<{
     isOpen: boolean;
     entityType: string;
@@ -429,10 +450,46 @@ export default function DocumentsPage() {
   const summary = summaryQuery.data;
   const options = optionsQuery.data;
   const detail = detailQuery.data ?? null;
+  const latestDocx = useMemo(() => detail?.files.find((file) => file.kind === 'DOCX') ?? null, [detail?.files]);
+  const latestPdf = useMemo(() => detail?.files.find((file) => file.kind === 'PDF') ?? null, [detail?.files]);
+  const myActiveEditRequest = useMemo(() => {
+    if (!detail || !user?.id) return null;
+    return detail.editRequests.find((request) =>
+      request.requesterUserId === user.id && ['APPROVED', 'IN_PROGRESS'].includes(request.status),
+    ) ?? null;
+  }, [detail, user?.id]);
+  const canEditOnline = canUpdate || Boolean(myActiveEditRequest);
 
   useEffect(() => {
     if (detail) setDraftContent(detail.content ?? '');
   }, [detail?.id, detail?.content]);
+
+  useEffect(() => {
+    let cancelled = false;
+    let objectUrl: string | null = null;
+    setViewer(null);
+    if (!detail || !latestPdf) {
+      setViewerLoading(false);
+      return;
+    }
+    setViewerLoading(true);
+    fetchControlledBlob(detail.id, latestPdf.id)
+      .then((blob) => {
+        if (cancelled) return;
+        objectUrl = URL.createObjectURL(blob);
+        setViewer({ url: objectUrl, fileId: latestPdf.id, fileName: latestPdf.fileName });
+      })
+      .catch(() => {
+        if (!cancelled) toast.error('Nao foi possivel carregar a visualizacao do PDF');
+      })
+      .finally(() => {
+        if (!cancelled) setViewerLoading(false);
+      });
+    return () => {
+      cancelled = true;
+      if (objectUrl) URL.revokeObjectURL(objectUrl);
+    };
+  }, [detail?.id, latestPdf?.id]);
 
   const save = useMutation({
     mutationFn: () => {
@@ -508,6 +565,33 @@ export default function DocumentsPage() {
       }
     },
     onError: (e: any) => toast.error(e?.message ?? 'Nao foi possivel abrir o editor'),
+  });
+
+  useEffect(() => {
+    if (!detail || searchParams.get('edit') !== '1' || autoOpenEditorRef.current === detail.id) return;
+    autoOpenEditorRef.current = detail.id;
+    openEditor.mutate(detail.id);
+  }, [detail?.id, searchParams]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  const requestEdit = useMutation({
+    mutationFn: ({ id, reason }: { id: string; reason?: string }) =>
+      api(`/documents/${id}/edit-requests`, { method: 'POST', json: { reason } }),
+    onSuccess: () => {
+      toast.success('Solicitacao enviada ao operador');
+      invalidate(qc);
+    },
+    onError: (e: any) => toast.error(e?.message ?? 'Nao foi possivel solicitar edicao'),
+  });
+
+  const decideEdit = useMutation({
+    mutationFn: ({ requestId, action, note }: { requestId: string; action: 'approve' | 'reject' | 'complete'; note?: string }) =>
+      api(`/documents/edit-requests/${requestId}/${action}`, { method: 'POST', json: { note } }),
+    onSuccess: (_, variables) => {
+      toast.success(variables.action === 'approve' ? 'Edicao liberada' : variables.action === 'reject' ? 'Solicitacao rejeitada' : 'Edicao concluida');
+      invalidate(qc);
+      void qc.invalidateQueries({ queryKey: ['my-day'] });
+    },
+    onError: (e: any) => toast.error(e?.message ?? 'Nao foi possivel atualizar a solicitacao'),
   });
 
   const upload = useMutation({
@@ -863,11 +947,12 @@ export default function DocumentsPage() {
           </DialogHeader>
           {!detail && <div className="p-6 text-sm text-muted-foreground">Carregando documento...</div>}
           {detail && (
-            <Tabs defaultValue="geral">
+            <Tabs defaultValue="visualizacao">
               <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
                 <TabsList>
+                  <TabsTrigger value="visualizacao">Visualizacao</TabsTrigger>
                   <TabsTrigger value="geral">Geral</TabsTrigger>
-                  <TabsTrigger value="documento">Documento</TabsTrigger>
+                  <TabsTrigger value="documento">Edicao</TabsTrigger>
                   <TabsTrigger value="revisoes">Revisoes</TabsTrigger>
                   <TabsTrigger value="aprovacoes">Aprovacoes</TabsTrigger>
                   <TabsTrigger value="auditoria">Auditoria</TabsTrigger>
@@ -875,6 +960,90 @@ export default function DocumentsPage() {
                 </TabsList>
                 <WorkflowActions doc={detail} canUpdate={canUpdate} pending={workflow.isPending} run={(action, body) => workflow.mutate({ id: detail.id, action, body })} />
               </div>
+
+              <TabsContent value="visualizacao">
+                <div className="grid grid-cols-1 gap-4 lg:grid-cols-[1fr,320px]">
+                  <div className="min-h-[420px] rounded-md border bg-muted/10">
+                    {viewerLoading && <div className="p-6 text-sm text-muted-foreground">Carregando visualizacao...</div>}
+                    {!viewerLoading && viewer && (
+                      <iframe title={`Visualizacao de ${viewer.fileName}`} src={viewer.url} className="h-[64vh] min-h-[420px] w-full rounded-md border-0" />
+                    )}
+                    {!viewerLoading && !viewer && (
+                      <div className="h-full min-h-[420px] overflow-auto p-5">
+                        <div className="mb-3 text-xs uppercase text-muted-foreground">Previa textual controlada</div>
+                        <pre className="whitespace-pre-wrap break-words text-sm leading-6 text-foreground">{detail.content || detail.description || 'Este documento ainda nao possui PDF publicado para visualizacao interna.'}</pre>
+                      </div>
+                    )}
+                  </div>
+                  <div className="space-y-3">
+                    <div className="rounded-md border p-3">
+                      <div className="text-sm font-semibold">Acoes do documento</div>
+                      <div className="mt-1 text-xs text-muted-foreground">A abertura padrao e somente leitura. Edicao online exige liberacao.</div>
+                      <div className="mt-3 space-y-2">
+                        {latestDocx && (
+                          <Button variant="outline" className="w-full justify-start" onClick={() => downloadControlled(detail.id, latestDocx.id, latestDocx.fileName)}>
+                            <Download className="mr-2 h-4 w-4" />Baixar DOCX
+                          </Button>
+                        )}
+                        <Button variant="outline" className="w-full justify-start" disabled={requestEdit.isPending} onClick={() => {
+                          const reason = window.prompt('Descreva o motivo da revisao/edicao');
+                          if (reason === null) return;
+                          requestEdit.mutate({ id: detail.id, reason: reason || undefined });
+                        }}>
+                          <Send className="mr-2 h-4 w-4" />Solicitar edicao
+                        </Button>
+                        <Button className="w-full justify-start" disabled={!canEditOnline || openEditor.isPending} onClick={() => openEditor.mutate(detail.id)}>
+                          <Edit className="mr-2 h-4 w-4" />Editar no Microsoft 365
+                        </Button>
+                        {myActiveEditRequest && (
+                          <Button variant="outline" className="w-full justify-start" disabled={decideEdit.isPending} onClick={() => decideEdit.mutate({ requestId: myActiveEditRequest.id, action: 'complete' })}>
+                            <CheckCircle2 className="mr-2 h-4 w-4" />Concluir edicao
+                          </Button>
+                        )}
+                      </div>
+                    </div>
+
+                    {!detail.editor.configured && (
+                      <div className="rounded-md border border-status-yellow/40 bg-status-yellow/5 p-3 text-sm text-muted-foreground">
+                        <div>{detail.editor.message}</div>
+                        {detail.editor.recommendationUrl && (
+                          <a className="mt-2 inline-block text-primary underline" href={detail.editor.recommendationUrl} target="_blank" rel="noreferrer">
+                            Ver planos Microsoft 365
+                          </a>
+                        )}
+                      </div>
+                    )}
+
+                    <div className="rounded-md border p-3">
+                      <div className="mb-2 text-sm font-semibold">Liberacoes de edicao</div>
+                      {detail.editRequests.length === 0 && <div className="text-sm text-muted-foreground">Nenhuma solicitacao registrada.</div>}
+                      <div className="space-y-2">
+                        {detail.editRequests.slice(0, 5).map((request) => {
+                          const canDecide = request.status === 'REQUESTED' && (request.operatorUserId === user?.id || canUpdate);
+                          return (
+                            <div key={request.id} className="rounded-md border p-2">
+                              <div className="flex items-center justify-between gap-2">
+                                <span className="text-xs font-medium">{request.requester?.name ?? 'Solicitante'}</span>
+                                <Badge variant="outline">{request.status}</Badge>
+                              </div>
+                              {request.reason && <div className="mt-1 text-xs text-muted-foreground">{request.reason}</div>}
+                              {canDecide && (
+                                <div className="mt-2 flex gap-2">
+                                  <Button size="sm" disabled={decideEdit.isPending} onClick={() => decideEdit.mutate({ requestId: request.id, action: 'approve' })}>Liberar</Button>
+                                  <Button size="sm" variant="outline" disabled={decideEdit.isPending} onClick={() => {
+                                    const note = window.prompt('Justificativa da rejeicao');
+                                    if (note) decideEdit.mutate({ requestId: request.id, action: 'reject', note });
+                                  }}>Rejeitar</Button>
+                                </div>
+                              )}
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </TabsContent>
 
               <TabsContent value="geral">
                 <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
@@ -904,8 +1073,8 @@ export default function DocumentsPage() {
                       <Button onClick={() => autosave.mutate({ id: detail.id, content: draftContent })} disabled={!isEditable(detail.status) || autosave.isPending || !canUpdate}>
                         <Save className="mr-2 h-4 w-4" />Salvar checkpoint
                       </Button>
-                      <Button variant="outline" onClick={() => openEditor.mutate(detail.id)} disabled={openEditor.isPending}>
-                        <Edit className="mr-2 h-4 w-4" />{detail.editor.configured ? 'Abrir editor online' : 'Abrir editor'}
+                      <Button variant="outline" onClick={() => openEditor.mutate(detail.id)} disabled={openEditor.isPending || !canEditOnline}>
+                        <Edit className="mr-2 h-4 w-4" />{detail.editor.configured ? 'Editar no Microsoft 365' : 'Abrir editor'}
                       </Button>
                     </div>
                   </div>
@@ -996,7 +1165,7 @@ export default function DocumentsPage() {
         </DialogContent>
       </Dialog>
 
-      <CollaboraEditorDialog session={editorSession} onClose={() => { setEditorSession(null); invalidate(qc); }} />
+      <OnlineEditorDialog session={editorSession} onClose={() => { setEditorSession(null); invalidate(qc); }} />
 
       {impactModalConfig && (
         <ImpactConfirmationModal
@@ -1013,7 +1182,7 @@ export default function DocumentsPage() {
   );
 }
 
-function CollaboraEditorDialog({ session, onClose }: { session: EditorSession | null; onClose: () => void }) {
+function OnlineEditorDialog({ session, onClose }: { session: EditorSession | null; onClose: () => void }) {
   const formRef = useRef<HTMLFormElement>(null);
 
   useEffect(() => {
@@ -1033,12 +1202,12 @@ function CollaboraEditorDialog({ session, onClose }: { session: EditorSession | 
           <DialogTitle className="text-sm">Editor DOCX online — {session.provider}</DialogTitle>
         </DialogHeader>
         <div className="relative min-h-0 flex-1">
-          <form ref={formRef} action={session.editorUrl} method="post" target="g360-collabora-frame" className="hidden">
+          <form ref={formRef} action={session.editorUrl} method="post" target="g360-editor-frame" className="hidden">
             <input type="hidden" name="access_token" value={session.accessToken ?? ''} />
             <input type="hidden" name="access_token_ttl" value={String(session.accessTokenTtl ?? 0)} />
           </form>
           <iframe
-            name="g360-collabora-frame"
+            name="g360-editor-frame"
             title="Editor de documento"
             className="h-full w-full border-0"
             allow="clipboard-read; clipboard-write; fullscreen"
@@ -1229,21 +1398,26 @@ function formatBytes(value: number | null | undefined) {
 }
 
 async function downloadControlled(documentId: string, fileId: string, fileName: string) {
+  try {
+    const blob = await fetchControlledBlob(documentId, fileId);
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = fileName;
+    link.click();
+    URL.revokeObjectURL(url);
+  } catch {
+    toast.error('Nao foi possivel baixar o arquivo');
+  }
+}
+
+async function fetchControlledBlob(documentId: string, fileId: string) {
   const token = getAccessToken();
   const res = await fetch(`${API_URL}/documents/${documentId}/files/${fileId}/download`, {
     headers: token ? { authorization: `Bearer ${token}` } : undefined,
   });
-  if (!res.ok) {
-    toast.error('Nao foi possivel baixar o arquivo');
-    return;
-  }
-  const blob = await res.blob();
-  const url = URL.createObjectURL(blob);
-  const link = document.createElement('a');
-  link.href = url;
-  link.download = fileName;
-  link.click();
-  URL.revokeObjectURL(url);
+  if (!res.ok) throw new Error('Falha ao baixar arquivo');
+  return res.blob();
 }
 
 function invalidate(qc: ReturnType<typeof useQueryClient>) {

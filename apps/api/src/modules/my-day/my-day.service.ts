@@ -7,6 +7,7 @@ import { WorkflowApprovalService } from '../automations/services/workflow-approv
 import { ActionsService } from '../actions/actions.service';
 import { WorkItemEventBus } from './work-item-event-bus';
 import { MyDayTeamService } from './my-day-team.service';
+import { DocumentsService } from '../documents/documents.service';
 
 const REFRESH_TTL_MS = 30_000;
 
@@ -42,6 +43,7 @@ export class MyDayService implements OnModuleInit {
     private readonly actions: ActionsService,
     private readonly bus: WorkItemEventBus,
     private readonly team: MyDayTeamService,
+    private readonly documents: DocumentsService,
   ) {}
 
   /** Assina o bus: quando um registro muda, agenda rebuild incremental do(s) usuario(s). */
@@ -221,6 +223,25 @@ export class MyDayService implements OnModuleInit {
       return { ok: true, message: 'Marcada como lida.' };
     }
 
+    if (item.sourceEntityType === 'DOCUMENT_EDIT_REQUEST') {
+      if (action === 'approve') {
+        await this.documents.approveEditRequest(me, item.sourceEntityId, { note: dto.justification });
+        await this.ensureFresh(me, true);
+        return { ok: true, message: 'Edicao liberada.' };
+      }
+      if (action === 'reject') {
+        if (!dto.justification?.trim()) throw new BadRequestException('Justificativa obrigatoria para rejeitar a edicao.');
+        await this.documents.rejectEditRequest(me, item.sourceEntityId, { note: dto.justification });
+        await this.ensureFresh(me, true);
+        return { ok: true, message: 'Solicitacao rejeitada.' };
+      }
+      if (action === 'complete') {
+        await this.documents.completeEditRequest(me, item.sourceEntityId, { note: dto.justification });
+        await this.ensureFresh(me, true);
+        return { ok: true, message: 'Edicao concluida.' };
+      }
+    }
+
     // Acoes nao tratadas no servidor: encaminha para o modulo de origem (mantendo contexto).
     const actions = (item.availableActions as Array<{ key: string; href?: string }> | null) ?? [];
     const match = actions.find((a) => a.key === action) ?? actions.find((a) => a.key === 'open');
@@ -242,7 +263,7 @@ export class MyDayService implements OnModuleInit {
         this.prisma.workItemIndex.count({ where: { ...base, dueAt: { gte: dayStart, lte: dayEnd } } }),
         this.prisma.workItemIndex.count({ where: { ...base, itemType: 'APPROVAL' } }),
         this.prisma.workItemIndex.count({ where: { ...base, itemType: 'RISK_CRITICAL' } }),
-        this.prisma.workItemIndex.count({ where: { ...base, itemType: 'DOCUMENT_REVIEW' } }),
+        this.prisma.workItemIndex.count({ where: { ...base, itemType: { in: ['DOCUMENT_REVIEW', 'DOCUMENT_EDIT', 'DOCUMENT_EDIT_APPROVAL'] } } }),
         this.prisma.workItemIndex.count({ where: { ...base, itemType: 'MEETING' } }),
         this.prisma.notification.count({ where: { companyId: me.companyId, userId: me.sub, readAt: null } }),
         this.prisma.workItemIndex.count({ where: { ...base, itemType: 'INDICATOR_OFF_TARGET' } }),
@@ -379,7 +400,8 @@ export class MyDayService implements OnModuleInit {
       default: break; // priorities / all
     }
     if (followFilter && followFilter.length === 0) return { rows: [], total: 0, page: 1, pageSize: Math.min(100, Math.max(5, Number(query.pageSize) || 25)) };
-    if (query.itemType) where.itemType = query.itemType;
+    if (query.itemType === 'DOCUMENTS') where.itemType = { in: ['DOCUMENT_REVIEW', 'DOCUMENT_EDIT', 'DOCUMENT_EDIT_APPROVAL'] };
+    else if (query.itemType) where.itemType = query.itemType;
     if (query.priority) where.priority = query.priority;
     if (query.q?.trim()) {
       const searchOr = [

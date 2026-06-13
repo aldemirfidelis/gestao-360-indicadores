@@ -15,6 +15,11 @@ export function middleware(request: NextRequest) {
     return NextResponse.redirect(url, 301);
   }
 
+  if (url.pathname === '/organograma') {
+    url.pathname = '/cargos-salarios/estrutura-quadro';
+    return NextResponse.redirect(url, 307);
+  }
+
   const response = NextResponse.next();
   if (privateRoutePrefixes.some((prefix) => url.pathname === prefix || url.pathname.startsWith(`${prefix}/`))) {
     response.headers.set('x-robots-tag', 'noindex, nofollow');

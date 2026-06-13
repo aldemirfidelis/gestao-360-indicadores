@@ -23,6 +23,7 @@ import { DocumentCodeService } from './document-code.service';
 import { DocumentEditorService, WopiTokenPayload } from './document-editor.service';
 import { DocumentStorageService, sha256 } from './document-storage.service';
 import { buildDocx } from './docx.util';
+import { WorkItemEventBus } from '../my-day/work-item-event-bus';
 
 const MODULE = 'documents';
 const DOCX_MIME = 'application/vnd.openxmlformats-officedocument.wordprocessingml.document';
@@ -56,6 +57,9 @@ const EDITABLE_STATUSES = new Set<DocumentStatus>([
   DocumentStatus.ADJUSTMENTS_REQUESTED,
   DocumentStatus.REJECTED,
 ]);
+
+const ACTIVE_EDIT_REQUEST_STATUSES = ['REQUESTED', 'APPROVED', 'IN_PROGRESS'];
+const APPROVED_EDIT_REQUEST_STATUSES = ['APPROVED', 'IN_PROGRESS'];
 
 const COMMENT_REQUIRED = new Set<DocumentStatus>([
   DocumentStatus.ADJUSTMENTS_REQUESTED,
@@ -103,6 +107,7 @@ export class DocumentsService {
     private readonly codes: DocumentCodeService,
     private readonly editor: DocumentEditorService,
     private readonly storage: DocumentStorageService,
+    private readonly workItems: WorkItemEventBus,
   ) {}
 
   private include() {
@@ -359,13 +364,23 @@ export class DocumentsService {
   async getById(me: AuthPayload, id: string) {
     const doc = await this.loadScoped(id, me.companyId);
     await this.assertViewArea(me, doc);
-    const [versions, files, statusHistory, approvals, reviewRequests, comments, auditLogs, externalMetadata, tagRelations] =
+    const [versions, files, statusHistory, approvals, reviewRequests, editRequests, comments, auditLogs, externalMetadata, tagRelations] =
       await Promise.all([
         this.prisma.documentVersion.findMany({ where: { documentId: id, companyId: me.companyId, deletedAt: null }, orderBy: { revisionNumber: 'desc' } }),
         this.prisma.documentFile.findMany({ where: { documentId: id, companyId: me.companyId, deletedAt: null }, orderBy: { createdAt: 'desc' } }),
         this.prisma.documentStatusHistory.findMany({ where: { documentId: id, companyId: me.companyId }, orderBy: { createdAt: 'desc' }, take: 100 }),
         this.prisma.documentApproval.findMany({ where: { documentId: id, companyId: me.companyId }, orderBy: [{ approvalOrder: 'asc' }, { createdAt: 'asc' }] }),
         this.prisma.documentReviewRequest.findMany({ where: { documentId: id, companyId: me.companyId }, orderBy: { createdAt: 'desc' } }),
+        this.prisma.documentEditRequest.findMany({
+          where: { documentId: id, companyId: me.companyId },
+          include: {
+            requester: { select: { id: true, name: true, email: true } },
+            operator: { select: { id: true, name: true, email: true } },
+            decidedBy: { select: { id: true, name: true, email: true } },
+          },
+          orderBy: { createdAt: 'desc' },
+          take: 50,
+        }),
         this.prisma.documentComment.findMany({ where: { documentId: id, companyId: me.companyId }, orderBy: { createdAt: 'desc' } }),
         this.prisma.documentAuditLog.findMany({ where: { documentId: id, companyId: me.companyId }, orderBy: { createdAt: 'desc' }, take: 100 }),
         this.prisma.documentExternalMetadata.findUnique({ where: { documentId: id } }),
@@ -379,6 +394,7 @@ export class DocumentsService {
       statusHistory,
       approvals,
       reviewRequests,
+      editRequests,
       comments,
       auditLogs,
       externalMetadata,
@@ -832,6 +848,152 @@ export class DocumentsService {
     return this.getById(me, created.id);
   }
 
+  async requestEdit(me: AuthPayload, id: string, body: any = {}) {
+    const doc = await this.loadScoped(id, me.companyId);
+    await this.assertViewArea(me, doc);
+    const existing = await this.prisma.documentEditRequest.findFirst({
+      where: {
+        companyId: me.companyId,
+        documentId: id,
+        requesterUserId: me.sub,
+        status: { in: ACTIVE_EDIT_REQUEST_STATUSES },
+      },
+      include: {
+        requester: { select: { id: true, name: true, email: true } },
+        operator: { select: { id: true, name: true, email: true } },
+        decidedBy: { select: { id: true, name: true, email: true } },
+      },
+      orderBy: { createdAt: 'desc' },
+    });
+    if (existing) return existing;
+
+    const operatorUserId = await this.resolveEditOperator(me, doc, body?.operatorUserId);
+    const latest = await this.prisma.documentVersion.findFirst({
+      where: { companyId: me.companyId, documentId: id, deletedAt: null },
+      orderBy: { revisionNumber: 'desc' },
+    });
+    const reason = this.nullableText(body?.reason) ?? 'Solicitacao de liberacao para revisao/edicao do documento.';
+    const expiresAt = this.optionalDate(body?.expiresAt, 'Prazo da liberacao') ?? null;
+    const request = await this.prisma.documentEditRequest.create({
+      data: {
+        companyId: me.companyId,
+        documentId: id,
+        versionId: latest?.id ?? null,
+        requesterUserId: me.sub,
+        operatorUserId,
+        reason,
+        expiresAt,
+      },
+      include: {
+        requester: { select: { id: true, name: true, email: true } },
+        operator: { select: { id: true, name: true, email: true } },
+        decidedBy: { select: { id: true, name: true, email: true } },
+      },
+    });
+    await this.audit(me, id, 'EDIT_REQUESTED', null, { requestId: request.id, operatorUserId }, reason);
+    this.workItems.markDirty(me.companyId, [operatorUserId, me.sub], 'document-edit-requested');
+    return request;
+  }
+
+  async approveEditRequest(me: AuthPayload, requestId: string, body: any = {}) {
+    const request = await this.loadEditRequest(me.companyId, requestId);
+    await this.assertCanDecideEditRequest(me, request);
+    if (request.status !== 'REQUESTED') throw new ConflictException('Esta solicitacao nao esta pendente.');
+
+    const note = this.nullableText(body?.note ?? body?.comment);
+    const approved = await this.prisma.$transaction(async (tx) => {
+      let versionId = request.versionId;
+      let document = request.document;
+      if (!EDITABLE_STATUSES.has(document.status as DocumentStatus)) {
+        const revision = await this.createRevisionForEditRequestTx(tx, me, document, note ?? request.reason ?? 'Liberacao de edicao online');
+        versionId = revision.version.id;
+        document = revision.document;
+      } else if (!versionId) {
+        const latest = await this.ensureLatestVersionTx(tx, document, me.sub);
+        versionId = latest.id;
+      }
+
+      const updated = await tx.documentEditRequest.update({
+        where: { id: request.id },
+        data: {
+          status: 'APPROVED',
+          versionId,
+          decidedById: me.sub,
+          decisionNote: note,
+          approvedAt: new Date(),
+        },
+        include: {
+          requester: { select: { id: true, name: true, email: true } },
+          operator: { select: { id: true, name: true, email: true } },
+          decidedBy: { select: { id: true, name: true, email: true } },
+        },
+      });
+      await this.auditTx(
+        tx,
+        me,
+        document.id,
+        'EDIT_REQUEST_APPROVED',
+        { requestId: request.id, status: request.status },
+        { requestId: request.id, status: 'APPROVED', versionId },
+        note ?? 'Liberacao de edicao online',
+      );
+      return updated;
+    });
+    this.workItems.markDirty(me.companyId, [request.operatorUserId, request.requesterUserId, me.sub], 'document-edit-approved');
+    return approved;
+  }
+
+  async rejectEditRequest(me: AuthPayload, requestId: string, body: any = {}) {
+    const request = await this.loadEditRequest(me.companyId, requestId);
+    await this.assertCanDecideEditRequest(me, request);
+    if (request.status !== 'REQUESTED') throw new ConflictException('Esta solicitacao nao esta pendente.');
+    const note = this.requiredText(body?.note ?? body?.comment, 'Justificativa');
+    const rejected = await this.prisma.$transaction(async (tx) => {
+      const updated = await tx.documentEditRequest.update({
+        where: { id: request.id },
+        data: { status: 'REJECTED', decidedById: me.sub, decisionNote: note, rejectedAt: new Date() },
+        include: {
+          requester: { select: { id: true, name: true, email: true } },
+          operator: { select: { id: true, name: true, email: true } },
+          decidedBy: { select: { id: true, name: true, email: true } },
+        },
+      });
+      await this.auditTx(tx, me, request.documentId, 'EDIT_REQUEST_REJECTED', { requestId: request.id }, { requestId: request.id, status: 'REJECTED' }, note);
+      return updated;
+    });
+    this.workItems.markDirty(me.companyId, [request.operatorUserId, request.requesterUserId, me.sub], 'document-edit-rejected');
+    return rejected;
+  }
+
+  async completeEditRequest(me: AuthPayload, requestId: string, body: any = {}) {
+    const request = await this.loadEditRequest(me.companyId, requestId);
+    const canClose =
+      request.requesterUserId === me.sub ||
+      request.operatorUserId === me.sub ||
+      ['SUPER_ADMIN', 'COMPANY_ADMIN'].includes(String(me.role));
+    if (!canClose) throw new ForbiddenException('Somente o solicitante ou operador pode concluir esta edicao.');
+    if (request.status === 'COMPLETED') return request;
+    if (!APPROVED_EDIT_REQUEST_STATUSES.includes(request.status)) {
+      throw new ConflictException('Somente solicitacoes liberadas podem ser concluidas.');
+    }
+    const note = this.nullableText(body?.note ?? body?.comment);
+    const completed = await this.prisma.$transaction(async (tx) => {
+      const updated = await tx.documentEditRequest.update({
+        where: { id: request.id },
+        data: { status: 'COMPLETED', decisionNote: note ?? request.decisionNote, completedAt: new Date() },
+        include: {
+          requester: { select: { id: true, name: true, email: true } },
+          operator: { select: { id: true, name: true, email: true } },
+          decidedBy: { select: { id: true, name: true, email: true } },
+        },
+      });
+      await this.auditTx(tx, me, request.documentId, 'EDIT_REQUEST_COMPLETED', { requestId: request.id }, { requestId: request.id }, note ?? 'Edicao concluida');
+      return updated;
+    });
+    this.workItems.markDirty(me.companyId, [request.operatorUserId, request.requesterUserId, me.sub], 'document-edit-completed');
+    return completed;
+  }
+
   async autosave(me: AuthPayload, id: string, body: any = {}) {
     const doc = await this.loadScoped(id, me.companyId);
     await this.assertWriteArea(me, this.areaOf(doc), 'edit');
@@ -873,8 +1035,18 @@ export class DocumentsService {
       });
     }
 
-    const canWrite = await this.canWriteDoc(me, doc);
-    const file = await this.ensureEditableDocxFile(me, doc);
+    const approvedRequest = await this.findApprovedEditRequest(me, doc.id);
+    const canWrite = (await this.canWriteDoc(me, doc)) || Boolean(approvedRequest);
+    let editableDoc = doc;
+    if (approvedRequest && !EDITABLE_STATUSES.has(doc.status)) {
+      const updated = await this.prisma.$transaction(async (tx) => {
+        const revision = await this.createRevisionForEditRequestTx(tx, me, doc, approvedRequest.reason ?? 'Liberacao de edicao online');
+        await tx.documentEditRequest.update({ where: { id: approvedRequest.id }, data: { versionId: revision.version.id } });
+        return revision.document;
+      });
+      editableDoc = updated;
+    }
+    const file = await this.ensureEditableDocxFile(me, editableDoc);
     const session = await this.editor.buildSession({
       documentId: id,
       fileId: file.id,
@@ -892,9 +1064,13 @@ export class DocumentsService {
         userId: me.sub,
         provider: this.editor.provider,
         status: 'OPEN',
-        metadata: jsonOrNull({ fileId: file.id, mode: session.mode, online: Boolean(session.editorUrl) }),
+        metadata: jsonOrNull({ fileId: file.id, mode: session.mode, online: Boolean(session.editorUrl), editRequestId: approvedRequest?.id ?? null }),
       },
     });
+    if (approvedRequest?.status === 'APPROVED') {
+      await this.prisma.documentEditRequest.update({ where: { id: approvedRequest.id }, data: { status: 'IN_PROGRESS' } });
+      this.workItems.markDirty(me.companyId, [approvedRequest.requesterUserId, approvedRequest.operatorUserId], 'document-edit-started');
+    }
     return session;
   }
 
@@ -952,7 +1128,7 @@ export class DocumentsService {
     });
   }
 
-  // --------------------------- Host WOPI (Collabora) ------------------------
+  // --------------------------- Host WOPI (editor online) --------------------
   // Endpoints publicos validados pelo access_token assinado (sem JWT de usuario).
 
   private async wopiResolveFile(token: WopiTokenPayload) {
@@ -967,7 +1143,7 @@ export class DocumentsService {
     return { file, doc };
   }
 
-  /** WOPI CheckFileInfo: metadados que o Collabora usa para abrir o arquivo. */
+  /** WOPI CheckFileInfo: metadados que o editor usa para abrir o arquivo. */
   async wopiCheckFileInfo(token: WopiTokenPayload) {
     const { file, doc } = await this.wopiResolveFile(token);
     const editable = EDITABLE_STATUSES.has(doc.status) && token.canWrite;
@@ -1023,10 +1199,20 @@ export class DocumentsService {
           userId: token.userId,
           action: 'EDITOR_SAVE',
           afterValue: jsonOrNull({ fileId: file.id, size: stored.sizeBytes, hash: stored.hashSha256 }),
-          reason: 'Salvo via editor online (Collabora)',
+          reason: `Salvo via editor online (${this.editor.provider})`,
         },
       });
+      await tx.documentEditRequest.updateMany({
+        where: {
+          companyId: token.companyId,
+          documentId: doc.id,
+          requesterUserId: token.userId,
+          status: { in: ['APPROVED', 'IN_PROGRESS'] },
+        },
+        data: { status: 'IN_PROGRESS' },
+      });
     });
+    this.workItems.markDirty(token.companyId, [token.userId], 'document-editor-save');
     return { version: stored.hashSha256 };
   }
 
@@ -1069,7 +1255,7 @@ export class DocumentsService {
     const file = await this.prisma.documentFile.findFirst({ where: { id: fileId, documentId: id, companyId: me.companyId, deletedAt: null } });
     if (!file) throw new NotFoundException('Arquivo nao encontrado.');
     // Arquivos legados guardam o texto em contentText; arquivos binarios
-    // (ex.: DOCX salvo pelo Collabora) ficam apenas no storage.
+    // (ex.: DOCX salvo por editor WOPI) ficam apenas no storage.
     const content = file.contentText != null ? Buffer.from(file.contentText, 'utf8') : await this.storage.readBinary(file.storageKey);
     await this.prisma.$transaction(async (tx) => {
       await tx.documentDownloadLog.create({
@@ -1170,6 +1356,106 @@ export class DocumentsService {
       editor: this.editor.status(),
       generatedAt: new Date(),
     };
+  }
+
+  private async loadEditRequest(companyId: string, requestId: string) {
+    const request = await this.prisma.documentEditRequest.findFirst({
+      where: { id: requestId, companyId },
+      include: {
+        document: { include: this.include() },
+        requester: { select: { id: true, name: true, email: true } },
+        operator: { select: { id: true, name: true, email: true } },
+        decidedBy: { select: { id: true, name: true, email: true } },
+      },
+    });
+    if (!request) throw new NotFoundException('Solicitacao de edicao nao encontrada.');
+    return request;
+  }
+
+  private async resolveEditOperator(me: AuthPayload, doc: any, explicitUserId: unknown): Promise<string> {
+    const requested = this.id(explicitUserId);
+    const candidate = requested ?? [doc.ownerUserId, doc.approverUserId, doc.createdById, me.sub].find(Boolean);
+    if (!candidate) throw new BadRequestException('Defina um operador para liberar a edicao.');
+    const user = await this.prisma.user.findFirst({
+      where: { id: candidate, companyId: me.companyId, deletedAt: null, active: true, status: 'ACTIVE' },
+      select: { id: true },
+    });
+    if (!user) throw new NotFoundException('Operador nao encontrado ou inativo.');
+    return user.id;
+  }
+
+  private async assertCanDecideEditRequest(me: AuthPayload, request: any) {
+    const doc = request.document;
+    if (request.operatorUserId === me.sub || doc.ownerUserId === me.sub || doc.approverUserId === me.sub || doc.createdById === me.sub) return;
+    if (['SUPER_ADMIN', 'COMPANY_ADMIN'].includes(String(me.role))) return;
+    const area = this.areaOf(doc);
+    if (area) {
+      try {
+        await this.access.assertCanWrite(me.sub, area, MODULE, 'edit');
+        return;
+      } catch {
+        // segue para Forbidden abaixo
+      }
+    }
+    throw new ForbiddenException('Voce nao pode liberar edicao deste documento.');
+  }
+
+  private async findApprovedEditRequest(me: AuthPayload, documentId: string) {
+    return this.prisma.documentEditRequest.findFirst({
+      where: {
+        companyId: me.companyId,
+        documentId,
+        requesterUserId: me.sub,
+        status: { in: APPROVED_EDIT_REQUEST_STATUSES },
+        OR: [{ expiresAt: null }, { expiresAt: { gte: new Date() } }],
+      },
+      orderBy: { approvedAt: 'desc' },
+    });
+  }
+
+  private async createRevisionForEditRequestTx(tx: Tx, me: AuthPayload, doc: any, reason: string) {
+    const latest = await this.ensureLatestVersionTx(tx, doc, me.sub);
+    const nextRevisionNumber = latest.revisionNumber + 1;
+    const versionLabel = `Rev. ${String(nextRevisionNumber).padStart(2, '0')}`;
+    const sourceFile = latest.docxFileId
+      ? await tx.documentFile.findFirst({ where: { id: latest.docxFileId, companyId: me.companyId, deletedAt: null } })
+      : await tx.documentFile.findFirst({ where: { documentId: doc.id, companyId: me.companyId, kind: DocumentFileKind.DOCX, deletedAt: null }, orderBy: { createdAt: 'desc' } });
+    const sourceContent = sourceFile?.contentText ?? doc.content ?? generatedDocumentBody(doc.title, doc.code ?? `#${doc.number}`, versionLabel);
+    const content = `${sourceContent}\n\nHistorico da revisao liberada: ${reason}\n`;
+    const version = await tx.documentVersion.create({
+      data: {
+        companyId: me.companyId,
+        documentId: doc.id,
+        revisionNumber: nextRevisionNumber,
+        versionLabel,
+        status: DocumentStatus.IN_DEVELOPMENT,
+        changeReason: reason,
+        expirationDate: doc.validUntil,
+        createdById: me.sub,
+      },
+    });
+    const stored = await this.storage.putText(me.companyId, `documents/${doc.id}/rev-${nextRevisionNumber}`, `${doc.code ?? doc.number}-${versionLabel}.docx`, content, DOCX_MIME);
+    const file = await tx.documentFile.create({
+      data: {
+        companyId: me.companyId,
+        documentId: doc.id,
+        versionId: version.id,
+        kind: DocumentFileKind.DOCX,
+        protected: false,
+        createdById: me.sub,
+        contentText: content,
+        ...stored,
+      },
+    });
+    await tx.documentVersion.update({ where: { id: version.id }, data: { docxFileId: file.id } });
+    const document = await tx.document.update({
+      where: { id: doc.id },
+      data: { version: doc.version + 1, status: DocumentStatus.IN_DEVELOPMENT, content, changeNote: reason },
+      include: this.include(),
+    });
+    await this.recordStatusTx(tx, me, doc.id, doc.status, DocumentStatus.IN_DEVELOPMENT, reason, { versionId: version.id, source: 'EDIT_REQUEST' });
+    await this.auditTx(tx, me, doc.id, 'CREATE_REVISION_FOR_EDIT_REQUEST', { latestVersionId: latest.id }, { versionId: version.id, revisionNumber: nextRevisionNumber }, reason);
+    return { document, version, file };
   }
 
   private assertEditableMetadata(doc: any, patch: any) {

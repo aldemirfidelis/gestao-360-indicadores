@@ -935,6 +935,12 @@ export class StrategyService {
     if (!exists) throw new NotFoundException('Area, setor ou processo nao encontrado para esta empresa');
   }
 
+  private async assertOrgJobInCompany(companyId: string, id?: string | null) {
+    if (!id) return;
+    const exists = await this.prisma.orgJob.count({ where: { id, companyId } });
+    if (!exists) throw new NotFoundException('Cargo nao encontrado para esta empresa');
+  }
+
   private async assertUserInCompany(companyId: string, id?: string | null) {
     if (!id) return;
     const exists = await this.prisma.user.count({ where: { id, companyId, deletedAt: null } });
@@ -1117,8 +1123,18 @@ export class StrategyService {
     isBudgeted?: boolean;
     status?: string;
     approvalStatus?: string;
+    justification?: string;
+    effectiveAt?: string | Date;
   }) {
-    return this.prisma.orgEmployee.update({
+    const before = await this.prisma.orgEmployee.findFirst({
+      where: { id, companyId: me.companyId },
+    });
+    if (!before) throw new NotFoundException('Colaborador nao encontrado');
+    if (body.orgNodeId) await this.assertOrgNodeInCompany(me.companyId, body.orgNodeId);
+    if (body.jobId) await this.assertOrgJobInCompany(me.companyId, body.jobId);
+    if (body.jobPretendedId) await this.assertOrgJobInCompany(me.companyId, body.jobPretendedId);
+
+    const updated = await this.prisma.orgEmployee.update({
       where: { id },
       data: {
         name: body.name,
@@ -1134,6 +1150,28 @@ export class StrategyService {
         approvalStatus: body.approvalStatus,
       },
     });
+
+    const movedArea = body.orgNodeId !== undefined && (body.orgNodeId || null) !== (before.orgNodeId || null);
+    const movedJob = body.jobId !== undefined && body.jobId !== before.jobId;
+    if (movedArea || movedJob) {
+      await this.prisma.compensationAllocationHistory.create({
+        data: {
+          companyId: me.companyId,
+          employeeId: id,
+          fromOrgNodeId: before.orgNodeId,
+          toOrgNodeId: updated.orgNodeId,
+          fromJobId: before.jobId,
+          toJobId: updated.jobId,
+          reason: 'ALTERACAO_QUADRO',
+          justification: body.justification?.trim() || 'Ajuste direto pela Estrutura e Quadro',
+          effectiveAt: body.effectiveAt ? new Date(body.effectiveAt) : new Date(),
+          changedById: me.sub,
+        },
+      });
+    }
+
+    await this.audit(me, 'UPDATE', 'OrgEmployee', id, before, updated, updated.name);
+    return updated;
   }
 
   async removeEmployee(me: AuthPayload, id: string) {

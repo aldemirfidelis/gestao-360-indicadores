@@ -62,6 +62,7 @@ export const navSections: NavSection[] = [
     icon: LayoutDashboard,
     items: [
       { href: '/meu-dia', label: 'Meu Dia', description: 'Central de trabalho: tudo que exige sua atenção hoje', icon: ListTodo, permissions: [], exact: true },
+      { href: '/tarefas', label: 'Tarefas', description: 'Tarefas do usuário, incluindo documentos liberados para edição', icon: ClipboardCheck, permissions: [], exact: true },
       { href: '/dashboard', label: 'Visão Geral', description: 'Resumo, pendências e atalhos', icon: LayoutDashboard, permissions: ['dashboard:view'], exact: true },
       { href: '/visualization', label: 'Dashboard Executivo', description: 'Visão 360 para decisão', icon: BarChart3, permissions: ['visualization:view', 'dashboard:view'] },
       { href: '/org', label: 'Árvore Organizacional', description: 'Áreas, setores, pilares e diretrizes', icon: Network, permissions: ['org:view', 'org:view_all'] },
@@ -83,12 +84,20 @@ export const navSections: NavSection[] = [
     ],
   },
   {
+    heading: 'Gestao de Pessoas',
+    description: 'Quadro, cargos, faixas, movimentacoes e remuneracao',
+    intent: 'management',
+    icon: Users,
+    items: [
+      { href: '/cargos-salarios', label: 'Cargos e Salarios', description: 'Estrutura, catalogo, tabelas salariais e movimentacoes', icon: Briefcase, permissions: ['compensation:view', 'org:positions:view'] },
+    ],
+  },
+  {
     heading: 'Gestão',
     description: 'Cadastros e objetos de gestão do dia a dia',
     intent: 'management',
     icon: Briefcase,
     items: [
-      { href: '/organograma', label: 'Organograma', description: 'Estrutura de cargos, faixas, turnos e orçamento', icon: Users, permissions: ['org:positions:view', 'org:view'] },
       { href: '/aprovacoes-cargo', label: 'Aprovações', description: 'Cargo, eficácia e aprovações gerais', icon: ShieldCheck, permissions: ['org:positions:approve', 'eficacia:view', 'actions:effectiveness', 'actions:delete', 'actions:approve', 'actions:manage'] },
       { href: '/periods', label: 'Períodos', description: 'Ano de trabalho, abertura e fechamento anual', icon: CalendarDays, permissions: ['settings:manage'] },
       { href: '/actions', label: 'Plano de Ação', description: 'Ações, execução, evidências e eficácia', icon: CheckSquare, permissions: ['actions:view'] },
@@ -158,6 +167,7 @@ export const mobileNavItems: NavItem[] = [
 // Usado pelo RouteGuard para bloquear acesso direto via URL.
 export const ROUTE_PERMISSIONS: Array<{ prefix: string; permissions: string[]; exact?: boolean }> = [
   { prefix: '/meu-dia', permissions: [] },
+  { prefix: '/tarefas', permissions: [] },
   { prefix: '/dashboard', permissions: ['dashboard:view'] },
   { prefix: '/central-automacoes', permissions: ['automations:view'] },
   { prefix: '/central-impactos', permissions: ['vision360:view'] },
@@ -167,7 +177,8 @@ export const ROUTE_PERMISSIONS: Array<{ prefix: string; permissions: string[]; e
   { prefix: '/indicators', permissions: ['indicators:view'] },
   { prefix: '/strategy', permissions: ['strategy:view'] },
   { prefix: '/org', permissions: ['org:view', 'org:view_all'] },
-  { prefix: '/organograma', permissions: ['org:positions:view', 'org:view'] },
+  { prefix: '/cargos-salarios', permissions: ['compensation:view', 'org:positions:view'] },
+  { prefix: '/organograma', permissions: ['compensation:view', 'org:positions:view', 'org:view'] },
   { prefix: '/aprovacoes-cargo', permissions: ['org:positions:approve', 'eficacia:view', 'actions:effectiveness', 'actions:delete', 'actions:approve', 'actions:manage'] },
   { prefix: '/projects', permissions: ['projects:view'] },
   { prefix: '/deviations', permissions: ['deviations:view'] },

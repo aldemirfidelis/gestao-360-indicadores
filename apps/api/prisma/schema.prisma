@@ -523,63 +523,77 @@ model Company {
   updatedAt         DateTime      @updatedAt
   deletedAt         DateTime?
 
-  branches                 Branch[]
-  users                    User[]
-  orgNodes                 OrgNode[]
-  strategicMaps            StrategicMap[]
-  indicators               Indicator[]
-  okrCycles                OKRCycle[]
-  deviations               Deviation[]
-  actions                  ActionPlan[]
-  projects                 Project[]
-  risks                    RiskRegister[]
-  nonConformities          NonConformity[]
-  documents                Document[]
-  audits                   Audit[]
-  processes                Process[]
-  fsPrograms               FoodSafetyProgram[]               @relation("FsProgramCompany")
-  fsProcesses              FoodSafetyProcess[]               @relation("FsProcessCompany")
-  fsProcessSteps           FoodSafetyProcessStep[]           @relation("FsStepCompany")
-  fsRiskMatrices           FoodSafetyRiskMatrix[]            @relation("FsRiskMatrixCompany")
-  fsHazards                FoodSafetyHazard[]                @relation("FsHazardCompany")
-  fsControlPlans           FoodSafetyControlPlan[]           @relation("FsControlPlanCompany")
-  fsMonitoringRecords      FoodSafetyMonitoringRecord[]      @relation("FsMonitoringCompany")
-  fsStandards              FoodSafetyStandard[]              @relation("FsStandardCompany")
-  fsStandardVersions       FoodSafetyStandardVersion[]       @relation("FsStdVersionCompany")
-  fsRequirements           FoodSafetyRequirement[]           @relation("FsRequirementCompany")
-  fsRequirementAssessments FoodSafetyRequirementAssessment[] @relation("FsReqAssessmentCompany")
-  fsSuppliers              FoodSafetySupplier[]              @relation("FsSupplierCompany")
-  fsMaterials              FoodSafetyMaterial[]              @relation("FsMaterialCompany")
-  fsLots                   FoodSafetyLot[]                   @relation("FsLotCompany")
-  fsTraceLinks             FoodSafetyTraceLink[]             @relation("FsTraceLinkCompany")
-  fsRecalls                FoodSafetyRecall[]                @relation("FsRecallCompany")
-  fsRecallItems            FoodSafetyRecallItem[]            @relation("FsRecallItemCompany")
-  formTemplates            FormTemplate[]
-  formSubmissions          FormSubmission[]
-  meetings                 Meeting[]
-  imports                  ImportJob[]
-  auditLogs                AuditLog[]
-  notifications            Notification[]
-  appSettings              AppSetting[]
-  accessProfiles           AccessProfile[]
-  parameterCategories      ParameterCategory[]
-  parameterItems           ParameterItem[]
-  traceabilityEvents       TraceabilityEvent[]
-  statusHistories          StatusHistory[]
-  relationshipMaps         RelationshipMap[]
-  treatmentCases           TreatmentCase[]
-  orgJobs                  OrgJob[]
-  orgEmployees             OrgEmployee[]
-  orgJobCareerPaths        OrgJobCareerPath[]
-  orgJobApprovalRequests   OrgJobApprovalRequest[]
-  emailLogs                EmailLog[]
-  calendarInvites          CalendarInvite[]
-  workPeriods              WorkPeriod[]
-  closedMonths             ClosedMonth[]
-  conversations            Conversation[]
-  userDelegations          UserDelegation[]                  @relation("UserDelegationCompany")
-  workItemFollows          WorkItemFollow[]                  @relation("WorkItemFollowCompany")
-  myDayAssistantLogs       MyDayAssistantLog[]               @relation("MyDayAssistantCompany")
+  branches                    Branch[]
+  users                       User[]
+  orgNodes                    OrgNode[]
+  strategicMaps               StrategicMap[]
+  indicators                  Indicator[]
+  okrCycles                   OKRCycle[]
+  deviations                  Deviation[]
+  actions                     ActionPlan[]
+  projects                    Project[]
+  risks                       RiskRegister[]
+  nonConformities             NonConformity[]
+  documents                   Document[]
+  documentEditRequests        DocumentEditRequest[]             @relation("DocumentEditRequestCompany")
+  audits                      Audit[]
+  processes                   Process[]
+  fsPrograms                  FoodSafetyProgram[]               @relation("FsProgramCompany")
+  fsProcesses                 FoodSafetyProcess[]               @relation("FsProcessCompany")
+  fsProcessSteps              FoodSafetyProcessStep[]           @relation("FsStepCompany")
+  fsRiskMatrices              FoodSafetyRiskMatrix[]            @relation("FsRiskMatrixCompany")
+  fsHazards                   FoodSafetyHazard[]                @relation("FsHazardCompany")
+  fsControlPlans              FoodSafetyControlPlan[]           @relation("FsControlPlanCompany")
+  fsMonitoringRecords         FoodSafetyMonitoringRecord[]      @relation("FsMonitoringCompany")
+  fsStandards                 FoodSafetyStandard[]              @relation("FsStandardCompany")
+  fsStandardVersions          FoodSafetyStandardVersion[]       @relation("FsStdVersionCompany")
+  fsRequirements              FoodSafetyRequirement[]           @relation("FsRequirementCompany")
+  fsRequirementAssessments    FoodSafetyRequirementAssessment[] @relation("FsReqAssessmentCompany")
+  fsSuppliers                 FoodSafetySupplier[]              @relation("FsSupplierCompany")
+  fsMaterials                 FoodSafetyMaterial[]              @relation("FsMaterialCompany")
+  fsLots                      FoodSafetyLot[]                   @relation("FsLotCompany")
+  fsTraceLinks                FoodSafetyTraceLink[]             @relation("FsTraceLinkCompany")
+  fsRecalls                   FoodSafetyRecall[]                @relation("FsRecallCompany")
+  fsRecallItems               FoodSafetyRecallItem[]            @relation("FsRecallItemCompany")
+  formTemplates               FormTemplate[]
+  formSubmissions             FormSubmission[]
+  meetings                    Meeting[]
+  imports                     ImportJob[]
+  auditLogs                   AuditLog[]
+  notifications               Notification[]
+  appSettings                 AppSetting[]
+  accessProfiles              AccessProfile[]
+  parameterCategories         ParameterCategory[]
+  parameterItems              ParameterItem[]
+  traceabilityEvents          TraceabilityEvent[]
+  statusHistories             StatusHistory[]
+  relationshipMaps            RelationshipMap[]
+  treatmentCases              TreatmentCase[]
+  orgJobs                     OrgJob[]
+  orgEmployees                OrgEmployee[]
+  orgJobCareerPaths           OrgJobCareerPath[]
+  orgJobApprovalRequests      OrgJobApprovalRequest[]
+  compensationJobCatalogs     CompensationJobCatalog[]
+  compensationJobVersions     CompensationJobCatalogVersion[]
+  compensationDescriptions    CompensationJobDescription[]
+  compensationSalaryTables    CompensationSalaryTable[]
+  compensationSalaryRanges    CompensationSalaryRange[]
+  compensationPositions       CompensationPosition[]
+  compensationAllocations     CompensationAllocationHistory[]
+  compensationSalarySnapshots CompensationSalarySnapshot[]
+  compensationMovements       CompensationMovementRequest[]
+  compensationBudgets         CompensationBudget[]
+  compensationCycles          CompensationCycle[]
+  compensationSalarySurveys   CompensationSalarySurvey[]
+  compensationSimulations     CompensationSimulation[]
+  emailLogs                   EmailLog[]
+  calendarInvites             CalendarInvite[]
+  workPeriods                 WorkPeriod[]
+  closedMonths                ClosedMonth[]
+  conversations               Conversation[]
+  userDelegations             UserDelegation[]                  @relation("UserDelegationCompany")
+  workItemFollows             WorkItemFollow[]                  @relation("WorkItemFollowCompany")
+  myDayAssistantLogs          MyDayAssistantLog[]               @relation("MyDayAssistantCompany")
 
   relationshipLinks     RelationshipLink[]     @relation("RelationshipCompany")
   impactAnalyses        ImpactAnalysis[]       @relation("ImpactAnalysisCompany")
@@ -799,6 +813,9 @@ model User {
   documentsOwned              Document[]                        @relation("DocOwner")
   documentsApproved           Document[]                        @relation("DocApprover")
   documentsCreated            Document[]                        @relation("DocCreatedBy")
+  documentEditRequestsMade    DocumentEditRequest[]             @relation("DocumentEditRequester")
+  documentEditRequestsToDecide DocumentEditRequest[]            @relation("DocumentEditOperator")
+  documentEditRequestsDecided DocumentEditRequest[]             @relation("DocumentEditDecider")
   auditsLed                   Audit[]                           @relation("AuditLead")
   auditsCreated               Audit[]                           @relation("AuditCreatedBy")
   processesOwned              Process[]                         @relation("ProcessOwner")
@@ -2009,6 +2026,7 @@ model Document {
   workflowSteps       DocumentWorkflowStep[]
   approvals           DocumentApproval[]
   reviewRequests      DocumentReviewRequest[]
+  editRequests        DocumentEditRequest[]
   comments            DocumentComment[]
   relations           DocumentRelation[]
   permissions         DocumentPermission[]
@@ -2277,6 +2295,36 @@ model DocumentReviewRequest {
   @@index([documentId, createdAt])
   @@index([reviewerUserId, status])
   @@map("document_review_requests")
+}
+
+model DocumentEditRequest {
+  id              String   @id @default(uuid())
+  companyId       String
+  company         Company  @relation("DocumentEditRequestCompany", fields: [companyId], references: [id])
+  documentId      String
+  document        Document @relation(fields: [documentId], references: [id], onDelete: Cascade)
+  versionId       String?
+  requesterUserId String
+  requester       User     @relation("DocumentEditRequester", fields: [requesterUserId], references: [id])
+  operatorUserId  String?
+  operator        User?    @relation("DocumentEditOperator", fields: [operatorUserId], references: [id])
+  decidedById     String?
+  decidedBy       User?    @relation("DocumentEditDecider", fields: [decidedById], references: [id])
+  status          String   @default("REQUESTED") // REQUESTED | APPROVED | REJECTED | IN_PROGRESS | COMPLETED | CANCELLED
+  reason          String?
+  decisionNote    String?
+  approvedAt      DateTime?
+  rejectedAt      DateTime?
+  completedAt     DateTime?
+  expiresAt       DateTime?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  @@index([companyId, status])
+  @@index([documentId, status])
+  @@index([requesterUserId, status])
+  @@index([operatorUserId, status])
+  @@map("document_edit_requests")
 }
 
 model DocumentComment {
@@ -5637,6 +5685,419 @@ model OrgJobCareerPath {
 
   @@unique([fromJobId, toJobId])
   @@index([companyId])
+}
+
+model CompensationJobCatalog {
+  id                String    @id @default(uuid())
+  companyId         String
+  company           Company   @relation(fields: [companyId], references: [id])
+  orgJobId          String?
+  code              String
+  name              String
+  summary           String?
+  family            String?
+  careerTrack       String?
+  hierarchyLevel    String?
+  grade             String?
+  salaryBand        String?
+  cbo               String?
+  jobType           String    @default("administrativo")
+  defaultOrgNodeId  String?
+  defaultCostCenter String?
+  managerUserId     String?
+  unionCategory     String?
+  workSchedule      String?
+  shift             String?
+  modality          String?
+  criticality       String?
+  status            String    @default("ACTIVE")
+  effectiveFrom     DateTime?
+  inactiveAt        DateTime?
+  inactiveReason    String?
+  currentVersion    Int       @default(1)
+  createdById       String?
+  updatedById       String?
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+  deletedAt         DateTime?
+
+  versions     CompensationJobCatalogVersion[]
+  descriptions CompensationJobDescription[]
+  salaryRanges CompensationSalaryRange[]
+  positions    CompensationPosition[]
+
+  @@unique([companyId, code])
+  @@unique([companyId, orgJobId])
+  @@index([companyId, status])
+  @@index([companyId, name])
+  @@map("compensation_job_catalogs")
+}
+
+model CompensationJobCatalogVersion {
+  id           String                 @id @default(uuid())
+  companyId    String
+  company      Company                @relation(fields: [companyId], references: [id])
+  jobCatalogId String
+  jobCatalog   CompensationJobCatalog @relation(fields: [jobCatalogId], references: [id], onDelete: Cascade)
+  version      Int
+  snapshot     Json
+  changeReason String?
+  changedById  String?
+  createdAt    DateTime               @default(now())
+
+  @@unique([jobCatalogId, version])
+  @@index([companyId, createdAt])
+  @@map("compensation_job_catalog_versions")
+}
+
+model CompensationJobDescription {
+  id                   String                 @id @default(uuid())
+  companyId            String
+  company              Company                @relation(fields: [companyId], references: [id])
+  jobCatalogId         String
+  jobCatalog           CompensationJobCatalog @relation(fields: [jobCatalogId], references: [id], onDelete: Cascade)
+  version              Int
+  status               String                 @default("DRAFT")
+  mission              String?
+  responsibilities     String?
+  detailedActivities   String?
+  expectedDeliverables String?
+  relatedIndicators    Json?
+  technicalSkills      String?
+  behavioralSkills     String?
+  minimumEducation     String?
+  desiredEducation     String?
+  requiredExperience   String?
+  requiredCourses      String?
+  certifications       String?
+  knowledge            String?
+  tools                String?
+  occupationalRisks    String?
+  epis                 String?
+  legalRequirements    String?
+  workSchedule         String?
+  workEnvironment      String?
+  autonomyLevel        String?
+  directReports        String?
+  immediateSuperior    String?
+  internalInterfaces   String?
+  externalInterfaces   String?
+  notes                String?
+  attachments          Json?
+  evidences            Json?
+  preparedById         String?
+  approverIds          String[]               @default([])
+  createdById          String?
+  updatedById          String?
+  publishedAt          DateTime?
+  replacedAt           DateTime?
+  createdAt            DateTime               @default(now())
+  updatedAt            DateTime               @updatedAt
+  deletedAt            DateTime?
+
+  @@unique([jobCatalogId, version])
+  @@index([companyId, status])
+  @@index([companyId, jobCatalogId])
+  @@map("compensation_job_descriptions")
+}
+
+model CompensationSalaryTable {
+  id            String    @id @default(uuid())
+  companyId     String
+  company       Company   @relation(fields: [companyId], references: [id])
+  code          String
+  name          String
+  unitId        String?
+  region        String?
+  unionCategory String?
+  tableType     String?
+  currency      String    @default("BRL")
+  effectiveFrom DateTime
+  effectiveTo   DateTime?
+  version       Int       @default(1)
+  status        String    @default("DRAFT")
+  responsibleId String?
+  justification String?
+  attachments   Json?
+  createdById   String?
+  updatedById   String?
+  publishedAt   DateTime?
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+  deletedAt     DateTime?
+
+  ranges CompensationSalaryRange[]
+
+  @@unique([companyId, code, version])
+  @@index([companyId, status])
+  @@index([companyId, effectiveFrom, effectiveTo])
+  @@map("compensation_salary_tables")
+}
+
+model CompensationSalaryRange {
+  id             String                  @id @default(uuid())
+  companyId      String
+  company        Company                 @relation(fields: [companyId], references: [id])
+  salaryTableId  String
+  salaryTable    CompensationSalaryTable @relation(fields: [salaryTableId], references: [id], onDelete: Cascade)
+  jobCatalogId   String?
+  jobCatalog     CompensationJobCatalog? @relation(fields: [jobCatalogId], references: [id])
+  orgJobId       String?
+  family         String?
+  grade          String?
+  level          String?
+  band           String
+  step           String?
+  minSalary      Decimal                 @db.Decimal(14, 2)
+  midpointSalary Decimal                 @db.Decimal(14, 2)
+  maxSalary      Decimal                 @db.Decimal(14, 2)
+  amplitude      Decimal?                @db.Decimal(8, 4)
+  levelPercent   Decimal?                @db.Decimal(8, 4)
+  benefits       Json?
+  notes          String?
+  createdAt      DateTime                @default(now())
+  updatedAt      DateTime                @updatedAt
+
+  salarySnapshots CompensationSalarySnapshot[]
+
+  @@index([companyId, band])
+  @@index([companyId, jobCatalogId])
+  @@index([salaryTableId])
+  @@map("compensation_salary_ranges")
+}
+
+model CompensationPosition {
+  id                String                  @id @default(uuid())
+  companyId         String
+  company           Company                 @relation(fields: [companyId], references: [id])
+  code              String
+  jobCatalogId      String?
+  jobCatalog        CompensationJobCatalog? @relation(fields: [jobCatalogId], references: [id])
+  orgJobId          String?
+  orgNodeId         String?
+  costCenter        String?
+  shift             String?
+  band              String?
+  plannedSalary     Decimal?                @db.Decimal(14, 2)
+  budgetAmount      Decimal?                @db.Decimal(14, 2)
+  status            String                  @default("OPEN")
+  positionType      String                  @default("PERMANENT")
+  budgetStatus      String                  @default("IN_BUDGET")
+  currentEmployeeId String?
+  plannedOpenAt     DateTime?
+  activeFrom        DateTime?
+  inactiveAt        DateTime?
+  inactiveReason    String?
+  createdById       String?
+  updatedById       String?
+  createdAt         DateTime                @default(now())
+  updatedAt         DateTime                @updatedAt
+  deletedAt         DateTime?
+
+  allocations        CompensationAllocationHistory[] @relation("PositionAllocations")
+  movementsAsCurrent CompensationMovementRequest[]   @relation("MovementCurrentPosition")
+  movementsAsTarget  CompensationMovementRequest[]   @relation("MovementTargetPosition")
+
+  @@unique([companyId, code])
+  @@index([companyId, status])
+  @@index([companyId, orgNodeId])
+  @@index([companyId, currentEmployeeId])
+  @@map("compensation_positions")
+}
+
+model CompensationAllocationHistory {
+  id             String                @id @default(uuid())
+  companyId      String
+  company        Company               @relation(fields: [companyId], references: [id])
+  positionId     String?
+  position       CompensationPosition? @relation("PositionAllocations", fields: [positionId], references: [id])
+  employeeId     String?
+  fromOrgNodeId  String?
+  toOrgNodeId    String?
+  fromJobId      String?
+  toJobId        String?
+  fromPositionId String?
+  toPositionId   String?
+  reason         String
+  justification  String
+  effectiveAt    DateTime
+  changedById    String?
+  createdAt      DateTime              @default(now())
+
+  @@index([companyId, employeeId, createdAt])
+  @@index([companyId, positionId])
+  @@map("compensation_allocation_history")
+}
+
+model CompensationSalarySnapshot {
+  id            String                   @id @default(uuid())
+  companyId     String
+  company       Company                  @relation(fields: [companyId], references: [id])
+  employeeId    String
+  orgJobId      String?
+  jobCatalogId  String?
+  salaryTableId String?
+  salaryRangeId String?
+  salaryRange   CompensationSalaryRange? @relation(fields: [salaryRangeId], references: [id])
+  currentSalary Decimal                  @db.Decimal(14, 2)
+  effectiveFrom DateTime
+  effectiveTo   DateTime?
+  reason        String?
+  createdById   String?
+  createdAt     DateTime                 @default(now())
+
+  @@index([companyId, employeeId, effectiveFrom])
+  @@index([companyId, salaryRangeId])
+  @@map("compensation_salary_snapshots")
+}
+
+model CompensationMovementRequest {
+  id                String                @id @default(uuid())
+  companyId         String
+  company           Company               @relation(fields: [companyId], references: [id])
+  protocol          String
+  type              String
+  employeeId        String?
+  currentPositionId String?
+  currentPosition   CompensationPosition? @relation("MovementCurrentPosition", fields: [currentPositionId], references: [id])
+  targetPositionId  String?
+  targetPosition    CompensationPosition? @relation("MovementTargetPosition", fields: [targetPositionId], references: [id])
+  currentJobId      String?
+  targetJobId       String?
+  currentBand       String?
+  targetBand        String?
+  currentSalary     Decimal?              @db.Decimal(14, 2)
+  proposedSalary    Decimal?              @db.Decimal(14, 2)
+  changePercent     Decimal?              @db.Decimal(8, 4)
+  effectiveAt       DateTime
+  reason            String
+  justification     String
+  monthlyImpact     Decimal?              @db.Decimal(14, 2)
+  annualImpact      Decimal?              @db.Decimal(14, 2)
+  costCenter        String?
+  availableBudget   Decimal?              @db.Decimal(14, 2)
+  requesterId       String
+  managerUserId     String?
+  status            String                @default("REQUESTED")
+  approvalSteps     Json?
+  attachments       Json?
+  evidences         Json?
+  notes             String?
+  decidedAt         DateTime?
+  appliedAt         DateTime?
+  createdAt         DateTime              @default(now())
+  updatedAt         DateTime              @updatedAt
+
+  @@unique([companyId, protocol])
+  @@index([companyId, status])
+  @@index([companyId, employeeId])
+  @@index([companyId, requesterId])
+  @@map("compensation_movement_requests")
+}
+
+model CompensationBudget {
+  id               String    @id @default(uuid())
+  companyId        String
+  company          Company   @relation(fields: [companyId], references: [id])
+  periodRef        String
+  orgNodeId        String?
+  costCenter       String?
+  plannedHeadcount Int       @default(0)
+  plannedPayroll   Decimal   @default(0) @db.Decimal(14, 2)
+  plannedBenefits  Decimal   @default(0) @db.Decimal(14, 2)
+  plannedCharges   Decimal   @default(0) @db.Decimal(14, 2)
+  status           String    @default("ACTIVE")
+  createdById      String?
+  updatedById      String?
+  createdAt        DateTime  @default(now())
+  updatedAt        DateTime  @updatedAt
+  deletedAt        DateTime?
+
+  @@unique([companyId, periodRef, orgNodeId, costCenter])
+  @@index([companyId, periodRef])
+  @@map("compensation_budgets")
+}
+
+model CompensationCycle {
+  id               String    @id @default(uuid())
+  companyId        String
+  company          Company   @relation(fields: [companyId], references: [id])
+  name             String
+  referencePeriod  String
+  criteria         String?
+  guidelinePercent Decimal?  @db.Decimal(8, 4)
+  totalBudget      Decimal?  @db.Decimal(14, 2)
+  areaBudgets      Json?
+  calendar         Json?
+  workflow         Json?
+  eligibilityRules Json?
+  status           String    @default("DRAFT")
+  createdById      String?
+  updatedById      String?
+  createdAt        DateTime  @default(now())
+  updatedAt        DateTime  @updatedAt
+  deletedAt        DateTime?
+
+  @@index([companyId, status])
+  @@index([companyId, referencePeriod])
+  @@map("compensation_cycles")
+}
+
+model CompensationSalarySurvey {
+  id                   String    @id @default(uuid())
+  companyId            String
+  company              Company   @relation(fields: [companyId], references: [id])
+  source               String
+  provider             String?
+  periodRef            String
+  region               String?
+  segment              String?
+  companySize          String?
+  internalJobCatalogId String?
+  marketJobName        String
+  minSalary            Decimal?  @db.Decimal(14, 2)
+  medianSalary         Decimal?  @db.Decimal(14, 2)
+  averageSalary        Decimal?  @db.Decimal(14, 2)
+  percentile25         Decimal?  @db.Decimal(14, 2)
+  percentile50         Decimal?  @db.Decimal(14, 2)
+  percentile75         Decimal?  @db.Decimal(14, 2)
+  percentile90         Decimal?  @db.Decimal(14, 2)
+  benefits             Json?
+  notes                String?
+  attachments          Json?
+  createdById          String?
+  createdAt            DateTime  @default(now())
+  updatedAt            DateTime  @updatedAt
+  deletedAt            DateTime?
+
+  @@index([companyId, periodRef])
+  @@index([companyId, internalJobCatalogId])
+  @@map("compensation_salary_surveys")
+}
+
+model CompensationSimulation {
+  id            String    @id @default(uuid())
+  companyId     String
+  company       Company   @relation(fields: [companyId], references: [id])
+  name          String
+  scenarioType  String
+  status        String    @default("DRAFT")
+  assumptions   Json?
+  results       Json?
+  monthlyImpact Decimal?  @db.Decimal(14, 2)
+  annualImpact  Decimal?  @db.Decimal(14, 2)
+  affectedCount Int       @default(0)
+  approvedById  String?
+  approvedAt    DateTime?
+  movementId    String?
+  createdById   String?
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+  deletedAt     DateTime?
+
+  @@index([companyId, status])
+  @@index([companyId, scenarioType])
+  @@map("compensation_simulations")
 }
 
 // =====================================================

@@ -20,6 +20,7 @@ import {
   Users,
 } from 'lucide-react';
 import { PageHeader } from '@/components/shell/page-header';
+import { CompensationModuleNav } from '@/components/compensation/module-nav';
 import { MetricCard } from '@/components/platform/metric-card';
 import { SectionCard } from '@/components/platform/section-card';
 import { EmptyState } from '@/components/platform/empty-state';
@@ -136,8 +137,8 @@ export default function OrganogramaPage() {
   const [approvalForm, setApprovalForm] = useState({ approverId: '', reason: '' });
 
   const organogramaQuery = useQuery<OrganogramaData>({
-    queryKey: ['strategy', 'organograma'],
-    queryFn: () => api<OrganogramaData>('/strategy/organograma'),
+    queryKey: ['compensation', 'estrutura-quadro'],
+    queryFn: () => api<OrganogramaData>('/cargos-salarios/estrutura-quadro'),
   });
   const optionsQuery = useQuery<StrategyOptions>({
     queryKey: ['strategy', 'options'],
@@ -154,7 +155,7 @@ export default function OrganogramaPage() {
   const areasAndSectors = useMemo(() => orgNodes.filter((n) => n.type === 'SECTOR' || n.type === 'AREA'), [orgNodes]);
 
   const invalidate = () => {
-    qc.invalidateQueries({ queryKey: ['strategy', 'organograma'] });
+    qc.invalidateQueries({ queryKey: ['compensation', 'estrutura-quadro'] });
     qc.invalidateQueries({ queryKey: ['strategy', 'options'] });
   };
 
@@ -277,8 +278,25 @@ export default function OrganogramaPage() {
       onDragEnd();
       return;
     }
+    const confirmed = window.confirm(`Mover ${emp.name} para o novo cargo/area?`);
+    if (!confirmed) {
+      onDragEnd();
+      return;
+    }
+    const justification = window.prompt('Informe a justificativa obrigatoria para a movimentacao:')?.trim();
+    if (!justification) {
+      toast.error('Justificativa obrigatoria para movimentar colaborador');
+      onDragEnd();
+      return;
+    }
+    const effectiveAt = window.prompt('Data de vigencia (AAAA-MM-DD):', new Date().toISOString().slice(0, 10))?.trim();
+    if (!effectiveAt) {
+      toast.error('Data de vigencia obrigatoria');
+      onDragEnd();
+      return;
+    }
     updateEmployee.mutate(
-      { id: emp.id, orgNodeId: targetOrgNodeId, jobId },
+      { id: emp.id, orgNodeId: targetOrgNodeId, jobId, justification, effectiveAt },
       {
         onSuccess: () => {
           const areaLabel = targetOrgNodeId ? areasAndSectors.find((a) => a.id === targetOrgNodeId)?.name ?? 'Área' : 'Sem área';
@@ -351,10 +369,11 @@ export default function OrganogramaPage() {
       <PageHeader
         eyebrow="Gestão de Pessoas"
         tone="view"
-        title="Organograma de Área"
-        description="Hierarquia de Áreas, Cargos e Colaboradores. Arraste a linha do colaborador para movê-lo — a alocação é salva automaticamente no cadastro."
-        breadcrumbs={[{ label: 'Início', href: '/' }, { label: 'Organograma' }]}
+        title="Estrutura e Quadro"
+        description="Hierarquia de áreas, cargos, posições, vagas e colaboradores dentro do módulo de Cargos e Salários."
+        breadcrumbs={[{ label: 'Início', href: '/' }, { label: 'Cargos e Salários', href: '/cargos-salarios' }, { label: 'Estrutura e Quadro' }]}
       />
+      <CompensationModuleNav />
 
       <div className="mb-6 grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
         <MetricCard title="Total" value={formatNumber(stats.total)} description="Colaboradores e vagas" icon={<Users className="h-4 w-4" />} tone="blue" />
