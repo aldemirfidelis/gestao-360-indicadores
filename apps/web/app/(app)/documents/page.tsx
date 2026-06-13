@@ -251,22 +251,22 @@ interface DocForm {
 
 const STATUS_LABEL: Record<DocStatus, string> = {
   DRAFT: 'Rascunho',
-  IN_DEVELOPMENT: 'Em elaboracao',
-  WAITING_REVIEW: 'Aguardando revisao',
-  REVIEW: 'Em revisao',
-  IN_REVIEW: 'Em revisao',
+  IN_DEVELOPMENT: 'Em elaboração',
+  WAITING_REVIEW: 'Aguardando revisão',
+  REVIEW: 'Em revisão',
+  IN_REVIEW: 'Em revisão',
   ADJUSTMENTS_REQUESTED: 'Ajustes solicitados',
   REVIEWED: 'Revisado',
-  WAITING_APPROVAL: 'Aguardando aprovacao',
-  IN_APPROVAL: 'Em aprovacao',
+  WAITING_APPROVAL: 'Aguardando aprovação',
+  IN_APPROVAL: 'Em aprovação',
   REJECTED: 'Reprovado',
   APPROVED: 'Aprovado',
-  SCHEDULED_PUBLICATION: 'Publicacao agendada',
+  SCHEDULED_PUBLICATION: 'Publicação agendada',
   PUBLISHED: 'Publicado',
   NEAR_EXPIRATION: 'Proximo do vencimento',
   EXPIRED: 'Vencido',
-  PERIODIC_REVIEW: 'Revisao periodica',
-  REPLACED: 'Substituido',
+  PERIODIC_REVIEW: 'Revisão periódica',
+  REPLACED: 'Substituído',
   OBSOLETE: 'Obsoleto',
   ARCHIVED: 'Arquivado',
   CANCELLED: 'Cancelado',
@@ -277,7 +277,7 @@ const TYPE_LABEL: Record<DocType, string> = {
   PROCEDURE: 'Procedimento',
   INSTRUCTION: 'Instrucao',
   MANUAL: 'Manual',
-  FORM: 'Formulario',
+  FORM: 'Formulário',
   TEMPLATE: 'Modelo',
   RECORD: 'Registro',
   INTERNAL_STANDARD: 'Norma interna',
@@ -285,9 +285,9 @@ const TYPE_LABEL: Record<DocType, string> = {
   REGULATION: 'Regulamento',
   FLOWCHART: 'Fluxograma',
   PLAN: 'Plano',
-  REPORT: 'Relatorio',
+  REPORT: 'Relatório',
   CHECKLIST: 'Checklist',
-  TECHNICAL_SPECIFICATION: 'Especificacao tecnica',
+  TECHNICAL_SPECIFICATION: 'Especificação técnica',
   EXTERNAL: 'Externo',
   OTHER: 'Outro',
 };
@@ -482,7 +482,7 @@ export default function DocumentsPage() {
         setViewer({ url: objectUrl, fileId: latestPdf.id, fileName: latestPdf.fileName });
       })
       .catch(() => {
-        if (!cancelled) toast.error('Nao foi possivel carregar a visualizacao do PDF');
+        if (!cancelled) toast.error('Não foi possível carregar a visualização do PDF');
       })
       .finally(() => {
         if (!cancelled) setViewerLoading(false);
@@ -523,7 +523,7 @@ export default function DocumentsPage() {
       setDetailId(doc.id);
       invalidate(qc);
     },
-    onError: (e: any) => toast.error(e?.message ?? 'Nao foi possivel salvar o documento'),
+    onError: (e: any) => toast.error(e?.message ?? 'Não foi possível salvar o documento'),
   });
 
   const remove = useMutation({
@@ -532,7 +532,7 @@ export default function DocumentsPage() {
       toast.success('Documento excluido');
       invalidate(qc);
     },
-    onError: (e: any) => toast.error(e?.message ?? 'Nao foi possivel excluir o documento'),
+    onError: (e: any) => toast.error(e?.message ?? 'Não foi possível excluir o documento'),
   });
 
   const workflow = useMutation({
@@ -543,7 +543,7 @@ export default function DocumentsPage() {
       setDetailId(doc.id);
       invalidate(qc);
     },
-    onError: (e: any) => toast.error(e?.message ?? 'Nao foi possivel executar a acao'),
+    onError: (e: any) => toast.error(e?.message ?? 'Não foi possível executar a ação'),
   });
 
   const autosave = useMutation({
@@ -562,11 +562,11 @@ export default function DocumentsPage() {
         setEditorSession(session);
       } else {
         toast.message('Editor online indisponivel', {
-          description: session.message ?? 'Use download/upload de nova versao.',
+          description: session.message ?? 'Use download/upload de nova versão.',
         });
       }
     },
-    onError: (e: any) => toast.error(e?.message ?? 'Nao foi possivel abrir o editor'),
+    onError: (e: any) => toast.error(e?.message ?? 'Não foi possível abrir o editor'),
   });
 
   useEffect(() => {
@@ -579,34 +579,34 @@ export default function DocumentsPage() {
     mutationFn: ({ id, reason }: { id: string; reason?: string }) =>
       api(`/documents/${id}/edit-requests`, { method: 'POST', json: { reason } }),
     onSuccess: () => {
-      toast.success('Solicitacao enviada ao operador');
+      toast.success('Solicitação enviada ao operador');
       invalidate(qc);
     },
-    onError: (e: any) => toast.error(e?.message ?? 'Nao foi possivel solicitar edicao'),
+    onError: (e: any) => toast.error(e?.message ?? 'Não foi possível solicitar edição'),
   });
 
   const grantEdit = useMutation({
     mutationFn: ({ id, requesterUserId, reason, expiresAt }: { id: string; requesterUserId: string; reason?: string; expiresAt?: string }) =>
       api(`/documents/${id}/edit-requests/grant`, { method: 'POST', json: { requesterUserId, reason, expiresAt: expiresAt || undefined } }),
     onSuccess: () => {
-      toast.success('Edicao enviada para o usuario');
+      toast.success('Edição enviada para o usuário');
       setGrantOpen(false);
       setGrantForm({ requesterUserId: '', reason: '', expiresAt: '' });
       invalidate(qc);
       void qc.invalidateQueries({ queryKey: ['my-day'] });
     },
-    onError: (e: any) => toast.error(e?.message ?? 'Nao foi possivel liberar edicao'),
+    onError: (e: any) => toast.error(e?.message ?? 'Não foi possível liberar edição'),
   });
 
   const decideEdit = useMutation({
     mutationFn: ({ requestId, action, note }: { requestId: string; action: 'approve' | 'reject' | 'complete'; note?: string }) =>
       api(`/documents/edit-requests/${requestId}/${action}`, { method: 'POST', json: { note } }),
     onSuccess: (_, variables) => {
-      toast.success(variables.action === 'approve' ? 'Edicao liberada' : variables.action === 'reject' ? 'Solicitacao rejeitada' : 'Edicao concluida');
+      toast.success(variables.action === 'approve' ? 'Edição liberada' : variables.action === 'reject' ? 'Solicitação rejeitada' : 'Edição concluida');
       invalidate(qc);
       void qc.invalidateQueries({ queryKey: ['my-day'] });
     },
-    onError: (e: any) => toast.error(e?.message ?? 'Nao foi possivel atualizar a solicitacao'),
+    onError: (e: any) => toast.error(e?.message ?? 'Não foi possível atualizar a solicitação'),
   });
 
   const upload = useMutation({
@@ -616,7 +616,7 @@ export default function DocumentsPage() {
       toast.success('Arquivo registrado');
       invalidate(qc);
     },
-    onError: (e: any) => toast.error(e?.message ?? 'Nao foi possivel registrar o arquivo'),
+    onError: (e: any) => toast.error(e?.message ?? 'Não foi possível registrar o arquivo'),
   });
 
   const createType = useMutation({
@@ -634,7 +634,7 @@ export default function DocumentsPage() {
       toast.success('Tipo cadastrado');
       qc.invalidateQueries({ queryKey: ['documents', 'options'] });
     },
-    onError: (e: any) => toast.error(e?.message ?? 'Nao foi possivel cadastrar o tipo'),
+    onError: (e: any) => toast.error(e?.message ?? 'Não foi possível cadastrar o tipo'),
   });
 
   const createTemplate = useMutation({
@@ -648,7 +648,7 @@ export default function DocumentsPage() {
       setTemplateForm({ name: '', typeConfigId: '', content: '' });
       qc.invalidateQueries({ queryKey: ['documents', 'options'] });
     },
-    onError: (e: any) => toast.error(e?.message ?? 'Nao foi possivel cadastrar o template'),
+    onError: (e: any) => toast.error(e?.message ?? 'Não foi possível cadastrar o template'),
   });
 
   const openCreate = () => {
@@ -703,14 +703,14 @@ export default function DocumentsPage() {
     <div>
       <PageHeader
         title="Documentos"
-        description="GED corporativo com codigos, revisoes, validade, aprovacao e publicacao controlada."
+        description="GED corporativo com códigos, revisões, validade, aprovação e publicação controlada."
         actions={canCreate ? <Button onClick={openCreate}><Plus className="mr-2 h-4 w-4" />Novo documento</Button> : null}
       />
 
       <div className="mb-6 grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-5">
         <MetricCard title="Publicados" value={formatNumber(summary?.published)} description={`${formatNumber(summary?.total)} no acervo`} icon={<FileText className="h-4 w-4" />} tone="green" />
-        <MetricCard title="Em elaboracao" value={formatNumber(summary?.draft)} description="Rascunho, ajustes ou revisao" icon={<Edit className="h-4 w-4" />} tone="blue" />
-        <MetricCard title="Aguardando aprovacao" value={formatNumber(summary?.waitingApproval)} description="Fluxo pendente" icon={<ShieldCheck className="h-4 w-4" />} tone={(summary?.waitingApproval ?? 0) > 0 ? 'purple' : 'green'} />
+        <MetricCard title="Em elaboração" value={formatNumber(summary?.draft)} description="Rascunho, ajustes ou revisão" icon={<Edit className="h-4 w-4" />} tone="blue" />
+        <MetricCard title="Aguardando aprovação" value={formatNumber(summary?.waitingApproval)} description="Fluxo pendente" icon={<ShieldCheck className="h-4 w-4" />} tone={(summary?.waitingApproval ?? 0) > 0 ? 'purple' : 'green'} />
         <MetricCard title="Vencidos" value={formatNumber(summary?.expired)} description="Publicados fora da validade" icon={<CalendarClock className="h-4 w-4" />} tone={(summary?.expired ?? 0) > 0 ? 'red' : 'green'} />
         <MetricCard title="A revisar" value={formatNumber(summary?.needsReview)} description="Vencem no alerta" icon={<RotateCcw className="h-4 w-4" />} tone={(summary?.needsReview ?? 0) > 0 ? 'yellow' : 'green'} />
       </div>
@@ -719,7 +719,7 @@ export default function DocumentsPage() {
         <TabsList>
           <TabsTrigger value="acervo"><Layers className="mr-2 h-4 w-4" />Acervo</TabsTrigger>
           <TabsTrigger value="matriz"><Table2 className="mr-2 h-4 w-4" />Matriz</TabsTrigger>
-          {canManage && <TabsTrigger value="config"><Settings className="mr-2 h-4 w-4" />Configuracoes</TabsTrigger>}
+          {canManage && <TabsTrigger value="config"><Settings className="mr-2 h-4 w-4" />Configurações</TabsTrigger>}
         </TabsList>
 
         <TabsContent value="acervo">
@@ -728,8 +728,8 @@ export default function DocumentsPage() {
               <CardContent className="p-4">
                 <div className="mb-3 flex items-center justify-between gap-2">
                   <div>
-                    <div className="text-sm font-semibold">Validade / revisao</div>
-                    <div className="text-xs text-muted-foreground">Documentos vencidos ou proximos da revisao.</div>
+                    <div className="text-sm font-semibold">Validade / revisão</div>
+                    <div className="text-xs text-muted-foreground">Documentos vencidos ou próximos da revisão.</div>
                   </div>
                   <CalendarClock className="h-4 w-4 text-muted-foreground" />
                 </div>
@@ -741,7 +741,7 @@ export default function DocumentsPage() {
                     <button key={doc.id} onClick={() => setDetailId(doc.id)} className="flex w-full items-start justify-between gap-3 rounded-md border p-3 text-left hover:bg-muted/40">
                       <div className="min-w-0">
                         <div className="truncate text-sm font-medium">{doc.code ? `${doc.code} - ` : ''}{doc.title}</div>
-                        <div className="mt-1 text-xs text-muted-foreground">{TYPE_LABEL[doc.type]} - {doc.owner?.name ?? 'Sem dono'} - validade {formatDate(doc.validUntil)}</div>
+                        <div className="mt-1 text-xs text-muted-foreground">{TYPE_LABEL[doc.type]} - {doc.owner?.name ?? 'Sem responsável'} - validade {formatDate(doc.validUntil)}</div>
                       </div>
                       <Badge variant="outline" className={doc.isExpired ? 'border-status-red/40 text-status-red' : 'border-status-yellow/40 text-status-yellow'}>
                         {doc.isExpired ? 'Vencido' : `${doc.daysToExpire}d`}
@@ -775,15 +775,15 @@ export default function DocumentsPage() {
               <table className="w-full min-w-[980px] text-sm">
                 <thead className="border-b bg-muted/40 text-xs text-muted-foreground">
                   <tr>
-                    <th className="px-4 py-3 text-left font-medium">Codigo</th>
+                    <th className="px-4 py-3 text-left font-medium">Código</th>
                     <th className="px-4 py-3 text-left font-medium">Titulo</th>
                     <th className="px-4 py-3 text-left font-medium">Tipo</th>
                     <th className="px-4 py-3 text-left font-medium">Status</th>
-                    <th className="px-4 py-3 text-left font-medium">Area</th>
-                    <th className="px-4 py-3 text-left font-medium">Responsavel</th>
-                    <th className="px-4 py-3 text-left font-medium">Revisao</th>
+                    <th className="px-4 py-3 text-left font-medium">Área</th>
+                    <th className="px-4 py-3 text-left font-medium">Responsável</th>
+                    <th className="px-4 py-3 text-left font-medium">Revisão</th>
                     <th className="px-4 py-3 text-left font-medium">Validade</th>
-                    <th className="px-4 py-3 text-right font-medium">Acoes</th>
+                    <th className="px-4 py-3 text-right font-medium">Ações</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -814,7 +814,7 @@ export default function DocumentsPage() {
               <Card>
                 <CardContent className="space-y-4 p-4">
                   <div className="flex items-center justify-between">
-                    <div className="text-sm font-semibold">Tipos e codigos</div>
+                    <div className="text-sm font-semibold">Tipos e códigos</div>
                     <Badge variant="outline">{formatNumber(options?.typeConfigs.length)} tipos</Badge>
                   </div>
                   <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
@@ -833,7 +833,7 @@ export default function DocumentsPage() {
                       <div key={type.id} className="flex items-center justify-between rounded-md border p-3">
                         <div>
                           <div className="text-sm font-medium">{type.name}</div>
-                          <div className="text-xs text-muted-foreground">{type.prefix}-001 - proximo {type.nextNumber}</div>
+                          <div className="text-xs text-muted-foreground">{type.prefix}-001 - próximo {type.nextNumber}</div>
                         </div>
                         <Badge variant={type.active ? 'secondary' : 'outline'}>{TYPE_LABEL[type.category]}</Badge>
                       </div>
@@ -876,7 +876,7 @@ export default function DocumentsPage() {
             <TabsList>
               <TabsTrigger value="geral">Geral</TabsTrigger>
               <TabsTrigger value="vinculos">Vinculos</TabsTrigger>
-              <TabsTrigger value="conteudo">Conteudo</TabsTrigger>
+              <TabsTrigger value="conteudo">Conteúdo</TabsTrigger>
             </TabsList>
             <TabsContent value="geral" className="grid grid-cols-1 gap-4 md:grid-cols-2">
               <div className="md:col-span-2">
@@ -900,7 +900,7 @@ export default function DocumentsPage() {
                 </NativeSelect>
               </div>
               <div>
-                <Label>Codigo manual</Label>
+                <Label>Código manual</Label>
                 <Input placeholder={selectedType ? `${selectedType.prefix}-001` : 'Gerado automaticamente'} value={form.code} onChange={(e) => setForm((f) => ({ ...f, code: e.target.value }))} />
               </div>
               <div>
@@ -908,7 +908,7 @@ export default function DocumentsPage() {
                 <Input type="number" min={1} value={form.version} onChange={(e) => setForm((f) => ({ ...f, version: e.target.value }))} />
               </div>
               <div>
-                <Label>Vigencia</Label>
+                <Label>Vigência</Label>
                 <Input type="date" value={form.validFrom} onChange={(e) => setForm((f) => ({ ...f, validFrom: e.target.value }))} />
               </div>
               <div>
@@ -916,17 +916,17 @@ export default function DocumentsPage() {
                 <Input type="date" value={form.validUntil} onChange={(e) => setForm((f) => ({ ...f, validUntil: e.target.value }))} />
               </div>
               <div className="md:col-span-2">
-                <Label>Descricao</Label>
+                <Label>Descrição</Label>
                 <Textarea rows={2} value={form.description} onChange={(e) => setForm((f) => ({ ...f, description: e.target.value }))} />
               </div>
             </TabsContent>
             <TabsContent value="vinculos" className="grid grid-cols-1 gap-4 md:grid-cols-2">
-              <SelectField label="Area/processo" value={form.orgNodeId} onChange={(value) => setForm((f) => ({ ...f, orgNodeId: value }))} empty="Sem area direta" items={(options?.orgNodes ?? []).map((item) => ({ value: item.id, label: item.name }))} />
+              <SelectField label="Área/processo" value={form.orgNodeId} onChange={(value) => setForm((f) => ({ ...f, orgNodeId: value }))} empty="Sem área direta" items={(options?.orgNodes ?? []).map((item) => ({ value: item.id, label: item.name }))} />
               <SelectField label="Indicador relacionado" value={form.indicatorId} onChange={(value) => setForm((f) => ({ ...f, indicatorId: value }))} empty="Sem indicador" items={(options?.indicators ?? []).map((item) => ({ value: item.id, label: `${item.code ? `[${item.code}] ` : ''}${item.name}` }))} />
-              <SelectField label="Responsavel" value={form.ownerUserId} onChange={(value) => setForm((f) => ({ ...f, ownerUserId: value }))} empty="Sem responsavel" items={(options?.users ?? []).map((item) => ({ value: item.id, label: item.name }))} />
+              <SelectField label="Responsável" value={form.ownerUserId} onChange={(value) => setForm((f) => ({ ...f, ownerUserId: value }))} empty="Sem responsável" items={(options?.users ?? []).map((item) => ({ value: item.id, label: item.name }))} />
               <SelectField label="Aprovador" value={form.approverUserId} onChange={(value) => setForm((f) => ({ ...f, approverUserId: value }))} empty="Sem aprovador" items={(options?.users ?? []).map((item) => ({ value: item.id, label: item.name }))} />
               <div>
-                <Label>Intervalo de revisao (meses)</Label>
+                <Label>Intervalo de revisão (meses)</Label>
                 <Input type="number" min={1} value={form.reviewIntervalMonths} onChange={(e) => setForm((f) => ({ ...f, reviewIntervalMonths: e.target.value }))} />
               </div>
               <div>
@@ -936,11 +936,11 @@ export default function DocumentsPage() {
             </TabsContent>
             <TabsContent value="conteudo" className="space-y-4">
               <div>
-                <Label>Conteudo inicial</Label>
+                <Label>Conteúdo inicial</Label>
                 <Textarea rows={8} value={form.content} onChange={(e) => setForm((f) => ({ ...f, content: e.target.value }))} />
               </div>
               <div>
-                <Label>Nota de alteracao</Label>
+                <Label>Nota de alteração</Label>
                 <Input value={form.changeNote} onChange={(e) => setForm((f) => ({ ...f, changeNote: e.target.value }))} />
               </div>
             </TabsContent>
@@ -962,38 +962,38 @@ export default function DocumentsPage() {
           </DialogHeader>
           {!detail && <div className="p-6 text-sm text-muted-foreground">Carregando documento...</div>}
           {detail && (
-            <Tabs defaultValue="visualizacao">
+            <Tabs defaultValue="visualização">
               <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
                 <TabsList>
-                  <TabsTrigger value="visualizacao">Visualizacao</TabsTrigger>
+                  <TabsTrigger value="visualização">Visualização</TabsTrigger>
                   <TabsTrigger value="geral">Geral</TabsTrigger>
-                  <TabsTrigger value="documento">Edicao</TabsTrigger>
-                  <TabsTrigger value="revisoes">Revisoes</TabsTrigger>
-                  <TabsTrigger value="aprovacoes">Aprovacoes</TabsTrigger>
+                  <TabsTrigger value="documento">Edição</TabsTrigger>
+                  <TabsTrigger value="revisoes">Revisões</TabsTrigger>
+                  <TabsTrigger value="aprovacoes">Aprovações</TabsTrigger>
                   <TabsTrigger value="auditoria">Auditoria</TabsTrigger>
                   <TabsTrigger value="distribuicao">Distribuicao</TabsTrigger>
                 </TabsList>
                 <WorkflowActions doc={detail} canUpdate={canUpdate} pending={workflow.isPending} run={(action, body) => workflow.mutate({ id: detail.id, action, body })} />
               </div>
 
-              <TabsContent value="visualizacao">
+              <TabsContent value="visualização">
                 <div className="grid grid-cols-1 gap-4 lg:grid-cols-[1fr,320px]">
                   <div className="min-h-[420px] rounded-md border bg-muted/10">
-                    {viewerLoading && <div className="p-6 text-sm text-muted-foreground">Carregando visualizacao...</div>}
+                    {viewerLoading && <div className="p-6 text-sm text-muted-foreground">Carregando visualização...</div>}
                     {!viewerLoading && viewer && (
-                      <iframe title={`Visualizacao de ${viewer.fileName}`} src={viewer.url} className="h-[64vh] min-h-[420px] w-full rounded-md border-0" />
+                      <iframe title={`Visualização de ${viewer.fileName}`} src={viewer.url} className="h-[64vh] min-h-[420px] w-full rounded-md border-0" />
                     )}
                     {!viewerLoading && !viewer && (
                       <div className="h-full min-h-[420px] overflow-auto p-5">
-                        <div className="mb-3 text-xs uppercase text-muted-foreground">Previa textual controlada</div>
-                        <pre className="whitespace-pre-wrap break-words text-sm leading-6 text-foreground">{detail.content || detail.description || 'Este documento ainda nao possui PDF publicado para visualizacao interna.'}</pre>
+                        <div className="mb-3 text-xs uppercase text-muted-foreground">Prévia textual controlada</div>
+                        <pre className="whitespace-pre-wrap break-words text-sm leading-6 text-foreground">{detail.content || detail.description || 'Este documento ainda não possui PDF publicado para visualização interna.'}</pre>
                       </div>
                     )}
                   </div>
                   <div className="space-y-3">
                     <div className="rounded-md border p-3">
-                      <div className="text-sm font-semibold">Acoes do documento</div>
-                      <div className="mt-1 text-xs text-muted-foreground">A abertura padrao e somente leitura. Edicao online exige liberacao.</div>
+                      <div className="text-sm font-semibold">Ações do documento</div>
+                      <div className="mt-1 text-xs text-muted-foreground">A abertura padrao e somente leitura. Edição online exige liberação.</div>
                       <div className="mt-3 space-y-2">
                         {latestDocx && (
                           <Button variant="outline" className="w-full justify-start" onClick={() => downloadControlled(detail.id, latestDocx.id, latestDocx.fileName)}>
@@ -1002,11 +1002,11 @@ export default function DocumentsPage() {
                         )}
                         {!myActiveEditRequest && (
                           <Button variant="outline" className="w-full justify-start" disabled={requestEdit.isPending} onClick={() => {
-                            const reason = window.prompt('Descreva o motivo da revisao/edicao');
+                            const reason = window.prompt('Descreva o motivo da revisão/edição');
                             if (reason === null) return;
                             requestEdit.mutate({ id: detail.id, reason: reason || undefined });
                           }}>
-                            <Send className="mr-2 h-4 w-4" />Solicitar edicao
+                            <Send className="mr-2 h-4 w-4" />Solicitar edição
                           </Button>
                         )}
                         {myActiveEditRequest && (
@@ -1024,7 +1024,7 @@ export default function DocumentsPage() {
                         )}
                         {myActiveEditRequest && (
                           <Button variant="outline" className="w-full justify-start" disabled={decideEdit.isPending} onClick={() => decideEdit.mutate({ requestId: myActiveEditRequest.id, action: 'complete' })}>
-                            <CheckCircle2 className="mr-2 h-4 w-4" />Concluir edicao
+                            <CheckCircle2 className="mr-2 h-4 w-4" />Concluir edição
                           </Button>
                         )}
                       </div>
@@ -1042,8 +1042,8 @@ export default function DocumentsPage() {
                     )}
 
                     <div className="rounded-md border p-3">
-                      <div className="mb-2 text-sm font-semibold">Liberacoes de edicao</div>
-                      {detail.editRequests.length === 0 && <div className="text-sm text-muted-foreground">Nenhuma solicitacao registrada.</div>}
+                      <div className="mb-2 text-sm font-semibold">Liberações de edição</div>
+                      {detail.editRequests.length === 0 && <div className="text-sm text-muted-foreground">Nenhuma solicitação registrada.</div>}
                       <div className="space-y-2">
                         {detail.editRequests.slice(0, 5).map((request) => {
                           const canDecide = request.status === 'REQUESTED' && (request.operatorUserId === user?.id || canUpdate);
@@ -1076,15 +1076,15 @@ export default function DocumentsPage() {
                 <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
                   <InfoTile label="Status" value={<Badge variant="outline" className={STATUS_CLASS[detail.status]}>{STATUS_LABEL[detail.status]}</Badge>} />
                   <InfoTile label="Tipo" value={TYPE_LABEL[detail.type]} />
-                  <InfoTile label="Revisao atual" value={`v${detail.version}`} />
-                  <InfoTile label="Area" value={detail.orgNode?.name ?? '-'} />
-                  <InfoTile label="Responsavel" value={detail.owner?.name ?? '-'} />
+                  <InfoTile label="Revisão atual" value={`v${detail.version}`} />
+                  <InfoTile label="Área" value={detail.orgNode?.name ?? '-'} />
+                  <InfoTile label="Responsável" value={detail.owner?.name ?? '-'} />
                   <InfoTile label="Aprovador" value={detail.approver?.name ?? '-'} />
-                  <InfoTile label="Publicacao" value={formatDate(detail.publishedAt)} />
+                  <InfoTile label="Publicação" value={formatDate(detail.publishedAt)} />
                   <InfoTile label="Validade" value={formatDate(detail.validUntil)} />
                   <InfoTile label="Editor" value={detail.editor.configured ? detail.editor.provider : 'Manual'} />
                 </div>
-                <div className="mt-4 rounded-md border p-4 text-sm text-muted-foreground">{detail.description ?? 'Sem descricao registrada.'}</div>
+                <div className="mt-4 rounded-md border p-4 text-sm text-muted-foreground">{detail.description ?? 'Sem descrição registrada.'}</div>
               </TabsContent>
 
               <TabsContent value="documento">
@@ -1133,7 +1133,7 @@ export default function DocumentsPage() {
                     ))}
                     {canUpdate && (
                       <Button variant="outline" className="w-full" onClick={() => {
-                        const content = window.prompt('Conteudo do arquivo');
+                        const content = window.prompt('Conteúdo do arquivo');
                         if (!content) return;
                         upload.mutate({ id: detail.id, kind: 'DOCX', fileName: `${detail.code ?? detail.number}.docx`, content });
                       }}>
@@ -1162,14 +1162,14 @@ export default function DocumentsPage() {
                     title: `Ajuste ${item.status}`,
                     meta: `${formatDate(item.createdAt)} - prazo ${formatDate(item.dueAt)}`,
                     body: item.comment,
-                  }))} empty="Nenhuma solicitacao de ajuste." />
+                  }))} empty="Nenhuma solicitação de ajuste." />
                   <Timeline items={detail.approvals.map((item) => ({
                     id: item.id,
                     icon: <CheckCircle2 className="h-4 w-4" />,
                     title: item.decision,
                     meta: item.decidedAt ? formatDate(item.decidedAt) : formatDate(item.createdAt),
                     body: item.comment,
-                  }))} empty="Nenhuma aprovacao registrada." />
+                  }))} empty="Nenhuma aprovação registrada." />
                 </div>
               </TabsContent>
 
@@ -1177,7 +1177,7 @@ export default function DocumentsPage() {
                 <Timeline items={[...detail.statusHistory.map((item) => ({
                   id: item.id,
                   icon: <History className="h-4 w-4" />,
-                  title: `${item.statusFrom ?? 'Inicio'} -> ${item.statusTo}`,
+                  title: `${item.statusFrom ?? 'Início'} -> ${item.statusTo}`,
                   meta: formatDate(item.createdAt),
                   body: item.comment,
                 })), ...detail.auditLogs.map((item) => ({
@@ -1191,7 +1191,7 @@ export default function DocumentsPage() {
 
               <TabsContent value="distribuicao">
                 <div className="rounded-md border p-4 text-sm text-muted-foreground">
-                  Confirmacoes de leitura ficam registradas por revisao. 
+                  Confirmações de leitura ficam registradas por revisão.
                   <Button className="ml-0 mt-3 sm:ml-3 sm:mt-0" variant="outline" onClick={() => api(`/documents/${detail.id}/read-confirmations`, { method: 'POST', json: {} }).then(() => toast.success('Leitura confirmada')).then(() => invalidate(qc))}>
                     <CheckCircle2 className="mr-2 h-4 w-4" />Confirmar leitura
                   </Button>
@@ -1205,27 +1205,27 @@ export default function DocumentsPage() {
       <Dialog open={grantOpen} onOpenChange={setGrantOpen}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>Liberar edicao do documento</DialogTitle>
+            <DialogTitle>Liberar edição do documento</DialogTitle>
           </DialogHeader>
           <div className="space-y-4">
             <div className="rounded-md border bg-muted/30 p-3 text-sm text-muted-foreground">
-              O usuario recebera a tarefa para editar o documento. A abertura online so fica disponivel depois desta liberacao.
+              O usuário receberá a tarefa para editar o documento. A abertura online só fica disponível depois desta liberação.
             </div>
             <div>
-              <Label>Usuario responsavel pela edicao</Label>
+              <Label>Usuário responsável pela edição</Label>
               <NativeSelect value={grantForm.requesterUserId} onChange={(event) => setGrantForm((form) => ({ ...form, requesterUserId: event.target.value }))}>
-                <option value="">Selecione o usuario</option>
+                <option value="">Selecione o usuário</option>
                 {(options?.users ?? []).map((item) => (
                   <option key={item.id} value={item.id}>{item.name} - {item.email}</option>
                 ))}
               </NativeSelect>
             </div>
             <div>
-              <Label>Motivo ou orientacao</Label>
+              <Label>Motivo ou orientação</Label>
               <Textarea rows={3} value={grantForm.reason} onChange={(event) => setGrantForm((form) => ({ ...form, reason: event.target.value }))} placeholder="Informe o que deve ser revisado ou alterado." />
             </div>
             <div>
-              <Label>Prazo da liberacao</Label>
+              <Label>Prazo da liberação</Label>
               <Input type="date" value={grantForm.expiresAt} onChange={(event) => setGrantForm((form) => ({ ...form, expiresAt: event.target.value }))} />
             </div>
           </div>
@@ -1235,7 +1235,7 @@ export default function DocumentsPage() {
               disabled={!detail || !grantForm.requesterUserId || grantEdit.isPending}
               onClick={() => detail && grantEdit.mutate({ id: detail.id, requesterUserId: grantForm.requesterUserId, reason: grantForm.reason || undefined, expiresAt: grantForm.expiresAt || undefined })}
             >
-              {grantEdit.isPending ? 'Enviando...' : 'Enviar para edicao'}
+              {grantEdit.isPending ? 'Enviando...' : 'Enviar para edição'}
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -1308,7 +1308,7 @@ function DocumentCard({ doc, canUpdate, canDelete, onView, onEdit, onRemove, rem
               <Badge variant="outline">v{doc.version}</Badge>
             </div>
             <h2 className="mt-3 truncate text-base font-semibold">{doc.title}</h2>
-            <p className="mt-1 line-clamp-2 text-sm text-muted-foreground">{doc.description || 'Sem descricao registrada.'}</p>
+            <p className="mt-1 line-clamp-2 text-sm text-muted-foreground">{doc.description || 'Sem descrição registrada.'}</p>
           </div>
           <div className="flex shrink-0 items-center gap-1">
             <Button variant="ghost" size="icon" onClick={() => openVision360('DOCUMENT', doc.id)} title="Visão 360°"><Network className="h-4 w-4 text-primary" /></Button>
@@ -1322,8 +1322,8 @@ function DocumentCard({ doc, canUpdate, canDelete, onView, onEdit, onRemove, rem
           </div>
         </div>
         <div className="mt-4 grid grid-cols-1 gap-2 text-xs text-muted-foreground sm:grid-cols-2">
-          <div>Area/processo: <span className="text-foreground">{doc.orgNode?.name ?? '-'}</span></div>
-          <div>Responsavel: <span className="text-foreground">{doc.owner?.name ?? '-'}</span></div>
+          <div>Área/processo: <span className="text-foreground">{doc.orgNode?.name ?? '-'}</span></div>
+          <div>Responsável: <span className="text-foreground">{doc.owner?.name ?? '-'}</span></div>
           <div>Aprovador: <span className="text-foreground">{doc.approver?.name ?? '-'}</span></div>
           <div>Validade: <span className={cn('text-foreground', doc.isExpired && 'text-status-red')}>{formatDate(doc.validUntil)}</span></div>
         </div>
@@ -1338,7 +1338,7 @@ function FiltersCard({ filters, setFilters }: { filters: { search: string; statu
       <CardContent className="p-4">
         <div className="mb-3 flex items-center gap-2 text-sm font-semibold"><Filter className="h-4 w-4" />Filtros</div>
         <div className="space-y-3">
-          <Input placeholder="Buscar por titulo, codigo, conteudo..." value={filters.search} onChange={(e) => setFilters((f) => ({ ...f, search: e.target.value }))} />
+          <Input placeholder="Buscar por título, código, conteúdo..." value={filters.search} onChange={(e) => setFilters((f) => ({ ...f, search: e.target.value }))} />
           <NativeSelect value={filters.status} onChange={(e) => setFilters((f) => ({ ...f, status: e.target.value }))}>
             <option value="">Todos os status</option>
             {Object.entries(STATUS_LABEL).map(([value, label]) => <option key={value} value={value}>{label}</option>)}
@@ -1368,24 +1368,24 @@ function WorkflowActions({ doc, canUpdate, pending, run }: { doc: DocDetail; can
   const comment = (label: string) => window.prompt(label) ?? '';
   return (
     <div className="flex flex-wrap gap-2">
-      {isEditable(doc.status) && <Button size="sm" disabled={pending} onClick={() => run('submit-review')}><Send className="mr-2 h-4 w-4" />Enviar revisao</Button>}
-      {doc.status === 'WAITING_REVIEW' && <Button size="sm" disabled={pending} onClick={() => run('start-review')}><Eye className="mr-2 h-4 w-4" />Iniciar revisao</Button>}
+      {isEditable(doc.status) && <Button size="sm" disabled={pending} onClick={() => run('submit-review')}><Send className="mr-2 h-4 w-4" />Enviar revisão</Button>}
+      {doc.status === 'WAITING_REVIEW' && <Button size="sm" disabled={pending} onClick={() => run('start-review')}><Eye className="mr-2 h-4 w-4" />Iniciar revisão</Button>}
       {(doc.status === 'IN_REVIEW' || doc.status === 'REVIEW') && (
         <>
           <Button size="sm" variant="outline" disabled={pending} onClick={() => {
-            const value = comment('Comentario dos ajustes');
+            const value = comment('Comentário dos ajustes');
             if (value) run('request-adjustments', { comment: value });
           }}><AlertTriangle className="mr-2 h-4 w-4" />Ajustes</Button>
           <Button size="sm" disabled={pending} onClick={() => run('complete-review')}><CheckCircle2 className="mr-2 h-4 w-4" />Revisado</Button>
         </>
       )}
-      {doc.status === 'REVIEWED' && <Button size="sm" disabled={pending} onClick={() => run('send-approval')}><ShieldCheck className="mr-2 h-4 w-4" />Enviar aprovacao</Button>}
-      {doc.status === 'WAITING_APPROVAL' && <Button size="sm" disabled={pending} onClick={() => run('start-approval')}><ShieldCheck className="mr-2 h-4 w-4" />Iniciar aprovacao</Button>}
+      {doc.status === 'REVIEWED' && <Button size="sm" disabled={pending} onClick={() => run('send-approval')}><ShieldCheck className="mr-2 h-4 w-4" />Enviar aprovação</Button>}
+      {doc.status === 'WAITING_APPROVAL' && <Button size="sm" disabled={pending} onClick={() => run('start-approval')}><ShieldCheck className="mr-2 h-4 w-4" />Iniciar aprovação</Button>}
       {doc.status === 'IN_APPROVAL' && (
         <>
           <Button size="sm" disabled={pending} onClick={() => run('approve')}><CheckCircle2 className="mr-2 h-4 w-4" />Aprovar</Button>
           <Button size="sm" variant="outline" disabled={pending} onClick={() => {
-            const value = comment('Motivo da reprovacao');
+            const value = comment('Motivo da reprovação');
             if (value) run('reject', { comment: value });
           }}><X className="mr-2 h-4 w-4" />Reprovar</Button>
         </>
@@ -1394,9 +1394,9 @@ function WorkflowActions({ doc, canUpdate, pending, run }: { doc: DocDetail; can
       {doc.status === 'PUBLISHED' && (
         <>
           <Button size="sm" variant="outline" disabled={pending} onClick={() => {
-            const value = comment('Motivo da nova revisao');
+            const value = comment('Motivo da nova revisão');
             if (value) run('new-revision', { reason: value });
-          }}><RotateCcw className="mr-2 h-4 w-4" />Nova revisao</Button>
+          }}><RotateCcw className="mr-2 h-4 w-4" />Nova revisão</Button>
           <Button size="sm" variant="outline" disabled={pending} onClick={() => {
             const value = comment('Motivo da obsolescencia');
             if (value) run('obsolete', { comment: value });
@@ -1483,7 +1483,7 @@ async function downloadControlled(documentId: string, fileId: string, fileName: 
     link.click();
     URL.revokeObjectURL(url);
   } catch {
-    toast.error('Nao foi possivel baixar o arquivo');
+    toast.error('Não foi possível baixar o arquivo');
   }
 }
 

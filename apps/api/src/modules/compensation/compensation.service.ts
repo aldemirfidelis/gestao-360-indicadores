@@ -3,7 +3,7 @@ import { Prisma, UserRoleEnum } from '@prisma/client';
 import { PrismaService } from '../../prisma/prisma.service';
 import { AuthPayload } from '../auth/auth.types';
 
-const MODULE_NAME = 'Cargos e Salarios';
+const MODULE_NAME = 'Cargos e Salários';
 
 const JOB_STATUSES = ['ACTIVE', 'INACTIVE', 'DRAFT'] as const;
 const DESCRIPTION_STATUSES = [
@@ -261,11 +261,11 @@ export class CompensationService {
   }
 
   async createJob(me: AuthPayload, body: Record<string, unknown>) {
-    const name = requiredString(body.name, 'Nome do cargo e obrigatorio');
+    const name = requiredString(body.name, 'Nome do cargo e obrigatório');
     const duplicate = await this.prisma.compensationJobCatalog.findFirst({
       where: { companyId: me.companyId, name: { equals: name, mode: 'insensitive' }, deletedAt: null },
     });
-    if (duplicate) throw new ConflictException('Ja existe cargo com este nome');
+    if (duplicate) throw new ConflictException('Já existe cargo com este nome');
     const code = cleanString(body.code) || (await this.nextJobCode(me.companyId));
     const data = this.jobDataFromBody(body, {});
 
@@ -274,7 +274,7 @@ export class CompensationService {
       const job = await tx.compensationJobCatalog.create({
         data: { ...data, companyId: me.companyId, orgJobId, code, name, createdById: me.sub, updatedById: me.sub },
       });
-      await this.createJobVersion(tx, me, job, 'Criacao do cargo');
+      await this.createJobVersion(tx, me, job, 'Criação do cargo');
       return job;
     });
     await this.audit(me, 'CREATE', 'CompensationJobCatalog', created.id, null, created, created.name);
@@ -288,7 +288,7 @@ export class CompensationService {
       const duplicate = await this.prisma.compensationJobCatalog.findFirst({
         where: { companyId: me.companyId, id: { not: id }, name: { equals: requestedName, mode: 'insensitive' }, deletedAt: null },
       });
-      if (duplicate) throw new ConflictException('Ja existe cargo com este nome');
+      if (duplicate) throw new ConflictException('Já existe cargo com este nome');
     }
 
     const updated = await this.prisma.$transaction(async (tx) => {
@@ -363,7 +363,7 @@ export class CompensationService {
         where: { id },
         data: { currentVersion: { increment: 1 }, updatedById: me.sub },
       });
-      await this.createJobVersion(tx, me, job, reason || 'Nova versao');
+      await this.createJobVersion(tx, me, job, reason || 'Nova versão');
       return job;
     });
     await this.audit(me, 'VERSION', 'CompensationJobCatalog', id, before, updated, updated.name, reason);
@@ -371,7 +371,7 @@ export class CompensationService {
   }
 
   async inactivateJob(me: AuthPayload, id: string, reason: string) {
-    if (!reason.trim()) throw new BadRequestException('Justificativa obrigatoria para inativar cargo');
+    if (!reason.trim()) throw new BadRequestException('Justificativa obrigatória para inativar cargo');
     const before = await this.getJob(me, id);
     const linked = await this.prisma.compensationPosition.count({ where: { companyId: me.companyId, jobCatalogId: id, deletedAt: null } });
     const updated = await this.prisma.compensationJobCatalog.update({
@@ -411,7 +411,7 @@ export class CompensationService {
   }
 
   async createDescription(me: AuthPayload, body: Record<string, unknown>) {
-    const jobCatalogId = requiredString(body.jobCatalogId, 'Cargo obrigatorio');
+    const jobCatalogId = requiredString(body.jobCatalogId, 'Cargo obrigatório');
     await this.getJob(me, jobCatalogId);
     const latest = await this.prisma.compensationJobDescription.findFirst({
       where: { companyId: me.companyId, jobCatalogId },
@@ -430,27 +430,27 @@ export class CompensationService {
         updatedById: me.sub,
       },
     });
-    await this.audit(me, 'CREATE', 'CompensationJobDescription', created.id, null, created, `Descricao ${created.version}`);
+    await this.audit(me, 'CREATE', 'CompensationJobDescription', created.id, null, created, `Descrição ${created.version}`);
     return created;
   }
 
   async updateDescription(me: AuthPayload, id: string, body: Record<string, unknown>) {
     const before = await this.getDescription(me, id);
-    if (before.status === 'PUBLISHED') throw new ConflictException('Descricao publicada deve gerar nova versao');
+    if (before.status === 'PUBLISHED') throw new ConflictException('Descrição publicada deve gerar nova versão');
     const updated = await this.prisma.compensationJobDescription.update({
       where: { id },
       data: { ...this.descriptionDataFromBody(body), updatedById: me.sub },
     });
-    await this.audit(me, 'UPDATE', 'CompensationJobDescription', id, before, updated, `Descricao ${updated.version}`);
+    await this.audit(me, 'UPDATE', 'CompensationJobDescription', id, before, updated, `Descrição ${updated.version}`);
     return updated;
   }
 
   async changeDescriptionStatus(me: AuthPayload, id: string, status: string, reason: string) {
     const before = await this.getDescription(me, id);
-    if (!DESCRIPTION_STATUSES.includes(status as any)) throw new BadRequestException('Status de descricao invalido');
+    if (!DESCRIPTION_STATUSES.includes(status as any)) throw new BadRequestException('Status de descrição inválido');
     const allowed = DESCRIPTION_TRANSITIONS[before.status] ?? [];
     if (!allowed.includes(status) && before.status !== status) {
-      throw new ConflictException(`Transicao de ${before.status} para ${status} nao permitida`);
+      throw new ConflictException(`Transição de ${before.status} para ${status} não permitida`);
     }
 
     const updated = await this.prisma.$transaction(async (tx) => {
@@ -469,7 +469,7 @@ export class CompensationService {
         },
       });
     });
-    await this.audit(me, 'STATUS_CHANGE', 'CompensationJobDescription', id, before, updated, `Descricao ${updated.version}`, reason);
+    await this.audit(me, 'STATUS_CHANGE', 'CompensationJobDescription', id, before, updated, `Descrição ${updated.version}`, reason);
     return updated;
   }
 
@@ -488,8 +488,8 @@ export class CompensationService {
 
   async createSalaryTable(me: AuthPayload, body: Record<string, unknown>) {
     const code = cleanString(body.code) || (await this.nextSalaryTableCode(me.companyId));
-    const name = requiredString(body.name, 'Nome da tabela salarial e obrigatorio');
-    const effectiveFrom = requiredDate(body.effectiveFrom, 'Vigencia inicial obrigatoria');
+    const name = requiredString(body.name, 'Nome da tabela salarial e obrigatório');
+    const effectiveFrom = requiredDate(body.effectiveFrom, 'Vigência inicial obrigatória');
     const created = await this.prisma.$transaction(async (tx) => {
       const table = await tx.compensationSalaryTable.create({
         data: {
@@ -524,7 +524,7 @@ export class CompensationService {
   async updateSalaryTable(me: AuthPayload, id: string, body: Record<string, unknown>) {
     const before = await this.getSalaryTable(me, id);
     if (before.status === 'PUBLISHED' && Object.keys(body).some((key) => key !== 'status')) {
-      throw new ConflictException('Tabela publicada nao deve ser sobrescrita. Gere nova revisao.');
+      throw new ConflictException('Tabela publicada não deve ser sobrescrita. Gere nova revisão.');
     }
     const updated = await this.prisma.compensationSalaryTable.update({
       where: { id },
@@ -685,17 +685,17 @@ export class CompensationService {
   }
 
   async createMovement(me: AuthPayload, body: Record<string, unknown>) {
-    const type = requiredString(body.type, 'Tipo de movimentacao obrigatorio');
-    const reason = requiredString(body.reason, 'Motivo obrigatorio');
-    const justification = requiredString(body.justification, 'Justificativa obrigatoria');
-    const effectiveAt = requiredDate(body.effectiveAt, 'Data de vigencia obrigatoria');
+    const type = requiredString(body.type, 'Tipo de movimentação obrigatório');
+    const reason = requiredString(body.reason, 'Motivo obrigatório');
+    const justification = requiredString(body.justification, 'Justificativa obrigatória');
+    const effectiveAt = requiredDate(body.effectiveAt, 'Data de vigência obrigatória');
     const currentSalary = money(body.currentSalary);
     const proposedSalary = money(body.proposedSalary);
     const monthlyImpact = proposedSalary !== null && currentSalary !== null ? proposedSalary.minus(currentSalary) : null;
     const annualImpact = monthlyImpact ? monthlyImpact.mul(12) : null;
     const availableBudget = money(body.availableBudget);
     if (monthlyImpact && monthlyImpact.gt(0) && availableBudget && monthlyImpact.gt(availableBudget)) {
-      throw new ConflictException('Orcamento insuficiente para a movimentacao');
+      throw new ConflictException('Orçamento insuficiente para a movimentação');
     }
     const status = monthlyImpact && monthlyImpact.gt(0) && !availableBudget ? 'PENDING_BUDGET' : 'REQUESTED';
     const protocol = await this.nextMovementProtocol(me.companyId);
@@ -736,7 +736,7 @@ export class CompensationService {
 
   async decideMovement(me: AuthPayload, id: string, decision: 'APPROVED' | 'REJECTED', note: string) {
     const before = await this.getMovement(me, id);
-    if (MOVEMENT_FINAL_STATUSES.has(before.status)) throw new ConflictException('Movimentacao ja finalizada');
+    if (MOVEMENT_FINAL_STATUSES.has(before.status)) throw new ConflictException('Movimentação já finalizada');
     const updated = await this.prisma.compensationMovementRequest.update({
       where: { id },
       data: {
@@ -752,7 +752,7 @@ export class CompensationService {
 
   async applyMovement(me: AuthPayload, id: string) {
     const before = await this.getMovement(me, id);
-    if (before.status !== 'APPROVED') throw new ConflictException('Apenas movimentacoes aprovadas podem ser aplicadas');
+    if (before.status !== 'APPROVED') throw new ConflictException('Apenas movimentações aprovadas podem ser aplicadas');
     const updated = await this.prisma.$transaction(async (tx) => {
       if (before.employeeId) {
         await tx.orgEmployee.updateMany({
@@ -829,8 +829,8 @@ export class CompensationService {
   async createCycle(me: AuthPayload, body: Record<string, unknown>) {
     const data = {
       companyId: me.companyId,
-      name: requiredString(body.name, 'Nome do ciclo obrigatorio'),
-      referencePeriod: requiredString(body.referencePeriod, 'Periodo de referencia obrigatorio'),
+      name: requiredString(body.name, 'Nome do ciclo obrigatório'),
+      referencePeriod: requiredString(body.referencePeriod, 'Período de referência obrigatório'),
       criteria: cleanString(body.criteria),
       guidelinePercent: ratioValue(body.guidelinePercent),
       totalBudget: money(body.totalBudget),
@@ -865,7 +865,7 @@ export class CompensationService {
   async createBudget(me: AuthPayload, body: Record<string, unknown>) {
     const data = {
       companyId: me.companyId,
-      periodRef: requiredString(body.periodRef, 'Periodo obrigatorio'),
+      periodRef: requiredString(body.periodRef, 'Período obrigatório'),
       orgNodeId: cleanString(body.orgNodeId),
       costCenter: cleanString(body.costCenter),
       plannedHeadcount: intValue(body.plannedHeadcount) ?? 0,
@@ -898,14 +898,14 @@ export class CompensationService {
   async createSalarySurvey(me: AuthPayload, body: Record<string, unknown>) {
     const data = {
       companyId: me.companyId,
-      source: requiredString(body.source, 'Fonte da pesquisa obrigatoria'),
+      source: requiredString(body.source, 'Fonte da pesquisa obrigatória'),
       provider: cleanString(body.provider),
-      periodRef: requiredString(body.periodRef, 'Periodo obrigatorio'),
+      periodRef: requiredString(body.periodRef, 'Período obrigatório'),
       region: cleanString(body.region),
       segment: cleanString(body.segment),
       companySize: cleanString(body.companySize),
       internalJobCatalogId: cleanString(body.internalJobCatalogId),
-      marketJobName: requiredString(body.marketJobName, 'Cargo de mercado obrigatorio'),
+      marketJobName: requiredString(body.marketJobName, 'Cargo de mercado obrigatório'),
       minSalary: money(body.minSalary),
       medianSalary: money(body.medianSalary),
       averageSalary: money(body.averageSalary),
@@ -941,8 +941,8 @@ export class CompensationService {
     const annualImpact = money(body.annualImpact) ?? (monthlyImpact ? monthlyImpact.mul(12) : null);
     const data = {
       companyId: me.companyId,
-      name: requiredString(body.name, 'Nome da simulacao obrigatorio'),
-      scenarioType: requiredString(body.scenarioType, 'Tipo de cenario obrigatorio'),
+      name: requiredString(body.name, 'Nome da simulação obrigatório'),
+      scenarioType: requiredString(body.scenarioType, 'Tipo de cenário obrigatório'),
       status: optionalString(body.status) ?? 'DRAFT',
       assumptions: jsonValue(body.assumptions),
       results: jsonValue(body.results),
@@ -959,7 +959,7 @@ export class CompensationService {
 
   async approveSimulation(me: AuthPayload, id: string) {
     const before = await this.prisma.compensationSimulation.findFirst({ where: { id, companyId: me.companyId, deletedAt: null } });
-    if (!before) throw new NotFoundException('Simulacao nao encontrada');
+    if (!before) throw new NotFoundException('Simulação não encontrada');
     const updated = await this.prisma.compensationSimulation.update({
       where: { id },
       data: { status: 'APPROVED', approvedById: me.sub, approvedAt: new Date() },
@@ -1020,13 +1020,13 @@ export class CompensationService {
         value: JSON.stringify(settings),
         valueType: 'json',
         group: MODULE_NAME,
-        description: 'Configuracoes do modulo de Cargos e Salarios',
+        description: 'Configurações do módulo de Cargos e Salários',
       },
       update: {
         value: JSON.stringify(settings),
         valueType: 'json',
         group: MODULE_NAME,
-        description: 'Configuracoes do modulo de Cargos e Salarios',
+        description: 'Configurações do módulo de Cargos e Salários',
         active: true,
       },
     });
@@ -1046,12 +1046,12 @@ export class CompensationService {
     ]);
     return [
       { slug: 'estrutura-quadro', name: 'Estrutura organizacional e quadro atual', records: positions, exportable: true },
-      { slug: 'catalogo-cargos', name: 'Catalogo de cargos', records: jobs, exportable: true },
-      { slug: 'descricoes-cargos', name: 'Descricoes de cargos', records: descriptions, exportable: true },
+      { slug: 'catalogo-cargos', name: 'Catálogo de cargos', records: jobs, exportable: true },
+      { slug: 'descricoes-cargos', name: 'Descrições de cargos', records: descriptions, exportable: true },
       { slug: 'tabelas-salariais', name: 'Tabelas salariais vigentes', records: salaryTables, exportable: true },
       { slug: 'enquadramento-salarial', name: 'Enquadramento salarial', records: snapshots, exportable: true },
-      { slug: 'movimentacoes', name: 'Movimentacoes salariais', records: movements, exportable: true },
-      { slug: 'auditoria', name: 'Historico de alteracoes e auditoria sensivel', records: 0, exportable: true },
+      { slug: 'movimentacoes', name: 'Movimentações salariais', records: movements, exportable: true },
+      { slug: 'auditoria', name: 'Histórico de alterações e auditoria sensível', records: 0, exportable: true },
     ];
   }
 
@@ -1097,7 +1097,7 @@ export class CompensationService {
           jobCatalogId: created.id,
           version: 1,
           snapshot: this.jobSnapshot(created),
-          changeReason: 'Migracao automatica do organograma',
+          changeReason: 'Migração automática do organograma',
           changedById: me.sub,
         },
       });
@@ -1135,13 +1135,13 @@ export class CompensationService {
 
   private async getJob(me: AuthPayload, id: string) {
     const job = await this.prisma.compensationJobCatalog.findFirst({ where: { id, companyId: me.companyId, deletedAt: null } });
-    if (!job) throw new NotFoundException('Cargo nao encontrado');
+    if (!job) throw new NotFoundException('Cargo não encontrado');
     return job;
   }
 
   private async getDescription(me: AuthPayload, id: string) {
     const description = await this.prisma.compensationJobDescription.findFirst({ where: { id, companyId: me.companyId, deletedAt: null } });
-    if (!description) throw new NotFoundException('Descricao de cargo nao encontrada');
+    if (!description) throw new NotFoundException('Descrição de cargo não encontrada');
     return description;
   }
 
@@ -1150,19 +1150,19 @@ export class CompensationService {
       where: { id, companyId: me.companyId, deletedAt: null },
       include: { ranges: true },
     });
-    if (!table) throw new NotFoundException('Tabela salarial nao encontrada');
+    if (!table) throw new NotFoundException('Tabela salarial não encontrada');
     return table;
   }
 
   private async getMovement(me: AuthPayload, id: string) {
     const movement = await this.prisma.compensationMovementRequest.findFirst({ where: { id, companyId: me.companyId } });
-    if (!movement) throw new NotFoundException('Movimentacao nao encontrada');
+    if (!movement) throw new NotFoundException('Movimentação não encontrada');
     return movement;
   }
 
   private jobDataFromBody(body: Record<string, unknown>, defaults: { name?: string; code?: string }) {
     const status = cleanString(body.status);
-    if (status && !JOB_STATUSES.includes(status as any)) throw new BadRequestException('Status de cargo invalido');
+    if (status && !JOB_STATUSES.includes(status as any)) throw new BadRequestException('Status de cargo inválido');
     return {
       code: defaults.code ?? optionalString(body.code),
       name: defaults.name ?? optionalString(body.name),
@@ -1221,11 +1221,11 @@ export class CompensationService {
   }
 
   private async createRange(tx: Pick<PrismaService, 'compensationSalaryRange'>, me: AuthPayload, salaryTableId: string, body: Record<string, unknown>) {
-    const minSalary = requiredMoney(body.minSalary, 'Salario minimo obrigatorio');
-    const midpointSalary = requiredMoney(body.midpointSalary, 'Ponto medio obrigatorio');
-    const maxSalary = requiredMoney(body.maxSalary, 'Salario maximo obrigatorio');
+    const minSalary = requiredMoney(body.minSalary, 'Salário mínimo obrigatório');
+    const midpointSalary = requiredMoney(body.midpointSalary, 'Ponto médio obrigatório');
+    const maxSalary = requiredMoney(body.maxSalary, 'Salário máximo obrigatório');
     if (minSalary.gt(midpointSalary) || midpointSalary.gt(maxSalary)) {
-      throw new BadRequestException('Faixa salarial invalida: minimo <= medio <= maximo');
+      throw new BadRequestException('Faixa salarial inválida: mínimo <= médio <= máximo');
     }
     return tx.compensationSalaryRange.create({
       data: {
@@ -1236,7 +1236,7 @@ export class CompensationService {
         family: cleanString(body.family),
         grade: cleanString(body.grade),
         level: cleanString(body.level),
-        band: requiredString(body.band, 'Faixa obrigatoria'),
+        band: requiredString(body.band, 'Faixa obrigatória'),
         step: cleanString(body.step),
         minSalary,
         midpointSalary,
@@ -1251,8 +1251,8 @@ export class CompensationService {
 
   private classifyEmployeeSalary(employee: { id: string; orgNode?: { name: string } | null }, snapshot?: any) {
     const range = snapshot?.salaryRange;
-    if (!snapshot) return { employeeId: employee.id, areaName: employee.orgNode?.name ?? 'Sem area', situation: 'PENDENTE_ANALISE', compaRatio: null, positioningPercent: null };
-    if (!range) return { employeeId: employee.id, areaName: employee.orgNode?.name ?? 'Sem area', situation: 'SEM_TABELA', compaRatio: null, positioningPercent: null };
+    if (!snapshot) return { employeeId: employee.id, areaName: employee.orgNode?.name ?? 'Sem área', situation: 'PENDENTE_ANALISE', compaRatio: null, positioningPercent: null };
+    if (!range) return { employeeId: employee.id, areaName: employee.orgNode?.name ?? 'Sem área', situation: 'SEM_TABELA', compaRatio: null, positioningPercent: null };
     const salary = toNumber(snapshot.currentSalary);
     const min = toNumber(range.minSalary);
     const mid = toNumber(range.midpointSalary);
@@ -1268,7 +1268,7 @@ export class CompensationService {
     else if (compaRatio !== null && compaRatio > 1) situation = 'ACIMA_DO_PONTO_MEDIO';
     return {
       employeeId: employee.id,
-      areaName: employee.orgNode?.name ?? 'Sem area',
+      areaName: employee.orgNode?.name ?? 'Sem área',
       situation,
       compaRatio: compaRatio === null ? null : roundRatio(compaRatio),
       positioningPercent: positioningPercent === null ? null : roundRatio(positioningPercent),
@@ -1425,7 +1425,7 @@ function optionalDate(value: unknown) {
   if (value === undefined) return undefined;
   if (value === null || value === '') return null;
   const date = new Date(String(value));
-  if (Number.isNaN(date.getTime())) throw new BadRequestException('Data invalida');
+  if (Number.isNaN(date.getTime())) throw new BadRequestException('Data inválida');
   return date;
 }
 
@@ -1438,14 +1438,14 @@ function requiredDate(value: unknown, message: string) {
 function intValue(value: unknown) {
   if (value === undefined || value === null || value === '') return undefined;
   const number = Number(value);
-  if (!Number.isInteger(number)) throw new BadRequestException('Numero inteiro invalido');
+  if (!Number.isInteger(number)) throw new BadRequestException('Número inteiro inválido');
   return number;
 }
 
 function money(value: unknown) {
   if (value === undefined || value === null || value === '') return null;
   const number = Number(value);
-  if (!Number.isFinite(number)) throw new BadRequestException('Valor monetario invalido');
+  if (!Number.isFinite(number)) throw new BadRequestException('Valor monetário inválido');
   return new Prisma.Decimal(number);
 }
 
@@ -1547,7 +1547,7 @@ function latestByEmployee<T extends { employeeId: string }>(snapshots: T[]) {
 
 function countBy<T>(items: T[], getKey: (item: T) => string | null | undefined) {
   return items.reduce<Record<string, number>>((acc, item) => {
-    const key = getKey(item) || 'Nao informado';
+    const key = getKey(item) || 'Não informado';
     acc[key] = (acc[key] ?? 0) + 1;
     return acc;
   }, {});
@@ -1564,7 +1564,7 @@ function groupByArea(positions: Array<{ orgNodeId: string | null; status: string
     const areaEmployees = employees.filter((employee) => (employee.orgNodeId ?? 'none') === id);
     return {
       id,
-      name: id === 'none' ? 'Sem area' : names.get(id) ?? id,
+      name: id === 'none' ? 'Sem área' : names.get(id) ?? id,
       plannedPositions: areaPositions.length,
       realizedEmployees: areaEmployees.filter((employee: any) => employee.status !== 'VACANT').length,
       openPositions: areaPositions.filter((position) => POSITION_OPEN_STATUSES.has(position.status)).length,

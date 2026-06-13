@@ -63,59 +63,59 @@ export default function ConfiguracoesCargosSalariosPage() {
         },
       }),
     onSuccess: () => {
-      toast.success('Configuracoes salvas');
+      toast.success('Configurações salvas');
       qc.invalidateQueries({ queryKey: ['compensation', 'settings'] });
     },
-    onError: (error: any) => toast.error(error?.message ?? 'Falha ao salvar configuracoes'),
+    onError: (error: any) => toast.error(error?.message ?? 'Falha ao salvar configurações'),
   });
 
   return (
     <div>
       <PageHeader
-        eyebrow="Cargos e Salarios"
-        title="Configuracoes"
-        description="Parametros operacionais do modulo de cargos, salarios, movimentacoes e governanca salarial."
-        breadcrumbs={[{ label: 'Inicio', href: '/' }, { label: 'Cargos e Salarios', href: '/cargos-salarios' }, { label: 'Configuracoes' }]}
+        eyebrow="Cargos e Salários"
+        title="Configurações"
+        description="Parâmetros operacionais do módulo de cargos, salários, movimentações e governança salarial."
+        breadcrumbs={[{ label: 'Início', href: '/' }, { label: 'Cargos e Salários', href: '/cargos-salarios' }, { label: 'Configurações' }]}
       />
       <CompensationModuleNav />
 
       {settingsQuery.isLoading && <LoadingState />}
-      <SectionCard title="Parametros do modulo" description={`Ultima atualizacao: ${formatDate(settingsQuery.data?.updatedAt)}`}>
+      <SectionCard title="Parâmetros do módulo" description={`Última atualização: ${formatDate(settingsQuery.data?.updatedAt)}`}>
         <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
           <div>
-            <Label>Diretriz padrao de merito (%)</Label>
+            <Label>Diretriz padrão de mérito (%)</Label>
             <Input type="number" value={form.meritGuidelinePercent} onChange={(event) => setForm({ ...form, meritGuidelinePercent: event.target.value })} />
           </div>
           <div>
-            <Label>Exigir orcamento nas movimentacoes</Label>
+            <Label>Exigir orçamento nas movimentações</Label>
             <NativeSelect value={form.requireBudgetForMovements} onChange={(event) => setForm({ ...form, requireBudgetForMovements: event.target.value })}>
               <option value="true">Sim</option>
-              <option value="false">Nao</option>
+              <option value="false">Não</option>
             </NativeSelect>
           </div>
           <div>
-            <Label>Aprovacao para publicar tabela</Label>
+            <Label>Aprovação para publicar tabela</Label>
             <NativeSelect value={form.requireApprovalForSalaryTable} onChange={(event) => setForm({ ...form, requireApprovalForSalaryTable: event.target.value })}>
               <option value="true">Sim</option>
-              <option value="false">Nao</option>
+              <option value="false">Não</option>
             </NativeSelect>
           </div>
           <div>
             <Label>Visibilidade salarial</Label>
             <NativeSelect value={form.salaryVisibility} onChange={(event) => setForm({ ...form, salaryVisibility: event.target.value })}>
-              <option value="restricted">Restrita por permissao</option>
+              <option value="restricted">Restrita por permissão</option>
               <option value="management">Gestores e RH</option>
-              <option value="open">Aberta para usuarios do modulo</option>
+              <option value="open">Aberta para usuários do módulo</option>
             </NativeSelect>
           </div>
           <div>
-            <Label>Revisao de descricoes (meses)</Label>
+            <Label>Revisão de descricoes (meses)</Label>
             <Input type="number" value={form.reviewCadenceMonths} onChange={(event) => setForm({ ...form, reviewCadenceMonths: event.target.value })} />
           </div>
           <div className="flex items-end">
             <Button onClick={() => saveSettings.mutate()} disabled={saveSettings.isPending}>
               <Save className="mr-2 h-4 w-4" />
-              Salvar configuracoes
+              Salvar configurações
             </Button>
           </div>
         </div>

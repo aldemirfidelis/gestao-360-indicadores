@@ -89,7 +89,7 @@ export const navSections: NavSection[] = [
     intent: 'management',
     icon: Briefcase,
     items: [
-      { href: '/cargos-salarios', label: 'Cargos e Salarios', description: 'Estrutura, catalogo, tabelas salariais e movimentacoes', icon: Briefcase, permissions: ['compensation:view', 'org:positions:view'] },
+      { href: '/cargos-salarios', label: 'Cargos e Salários', description: 'Estrutura, catálogo, tabelas salariais e movimentações', icon: Briefcase, permissions: ['compensation:view', 'org:positions:view'] },
       { href: '/aprovacoes-cargo', label: 'Aprovações', description: 'Cargo, eficácia e aprovações gerais', icon: ShieldCheck, permissions: ['org:positions:approve', 'eficacia:view', 'actions:effectiveness', 'actions:delete', 'actions:approve', 'actions:manage'] },
       { href: '/periods', label: 'Períodos', description: 'Ano de trabalho, abertura e fechamento anual', icon: CalendarDays, permissions: ['settings:manage'] },
       { href: '/actions', label: 'Plano de Ação', description: 'Ações, execução, evidências e eficácia', icon: CheckSquare, permissions: ['actions:view'] },
@@ -97,7 +97,7 @@ export const navSections: NavSection[] = [
       { href: '/nonconformities', label: 'Não Conformidades', description: 'NCs, causa raiz, ação corretiva e eficácia', icon: FileWarning, permissions: ['nc:view'] },
       { href: '/documents', label: 'Documentos', description: 'Políticas, procedimentos, validade e aprovação', icon: FileText, permissions: ['doc:view'] },
       { href: '/audits', label: 'Auditorias', description: 'Auditorias, constatações e geração de NCs', icon: ClipboardCheck, permissions: ['audits:view'] },
-      { href: '/processes', label: 'Processos', description: 'Mapeamento SIPOC, fluxo e donos', icon: Network, permissions: ['processes:view'] },
+      { href: '/processes', label: 'Processos', description: 'Mapeamento SIPOC, fluxo e responsáveis', icon: Network, permissions: ['processes:view'] },
       { href: '/seguranca-alimentos', label: 'Segurança dos Alimentos', description: 'Programas, processos, perigos e controles (FSMS)', icon: ShieldCheck, permissions: ['fsms:view'] },
       { href: '/seguranca-patrimonial', label: 'Segurança Patrimonial', description: 'Portarias, acessos, rondas, ocorrencias e permanencia', icon: ShieldCheck, permissions: ['asset-security:view'], exact: true },
       { href: '/forms', label: 'Formulários', description: 'Templates, checklists e preenchimentos', icon: FileSpreadsheet, permissions: ['forms:view'] },

@@ -50,7 +50,7 @@ export default function CiclosMeritoPage() {
         },
       }),
     onSuccess: () => {
-      toast.success('Ciclo de merito cadastrado');
+      toast.success('Ciclo de mérito cadastrado');
       setForm({ name: '', referencePeriod: String(new Date().getFullYear()), guidelinePercent: '5', totalBudget: '', status: 'DRAFT', criteria: '' });
       qc.invalidateQueries({ queryKey: ['compensation', 'cycles'] });
     },
@@ -60,10 +60,10 @@ export default function CiclosMeritoPage() {
   return (
     <div>
       <PageHeader
-        eyebrow="Cargos e Salarios"
-        title="Ciclos de Merito"
-        description="Planejamento de campanhas de merito com diretriz, orcamento, criterios e status de execucao."
-        breadcrumbs={[{ label: 'Inicio', href: '/' }, { label: 'Cargos e Salarios', href: '/cargos-salarios' }, { label: 'Ciclos de Merito' }]}
+        eyebrow="Cargos e Salários"
+        title="Ciclos de Mérito"
+        description="Planejamento de campanhas de mérito com diretriz, orçamento, critérios e status de execução."
+        breadcrumbs={[{ label: 'Início', href: '/' }, { label: 'Cargos e Salários', href: '/cargos-salarios' }, { label: 'Ciclos de Mérito' }]}
       />
       <CompensationModuleNav />
 
@@ -74,7 +74,7 @@ export default function CiclosMeritoPage() {
             <Input value={form.name} onChange={(event) => setForm({ ...form, name: event.target.value })} />
           </div>
           <div>
-            <Label>Periodo</Label>
+            <Label>Período</Label>
             <Input value={form.referencePeriod} onChange={(event) => setForm({ ...form, referencePeriod: event.target.value })} />
           </div>
           <div>
@@ -82,7 +82,7 @@ export default function CiclosMeritoPage() {
             <Input type="number" value={form.guidelinePercent} onChange={(event) => setForm({ ...form, guidelinePercent: event.target.value })} />
           </div>
           <div>
-            <Label>Orcamento total</Label>
+            <Label>Orçamento total</Label>
             <Input type="number" value={form.totalBudget} onChange={(event) => setForm({ ...form, totalBudget: event.target.value })} />
           </div>
           <div>
@@ -90,7 +90,7 @@ export default function CiclosMeritoPage() {
             <NativeSelect value={form.status} onChange={(event) => setForm({ ...form, status: event.target.value })}>
               <option value="DRAFT">Rascunho</option>
               <option value="OPEN">Aberto</option>
-              <option value="IN_APPROVAL">Em aprovacao</option>
+              <option value="IN_APPROVAL">Em aprovação</option>
               <option value="APPROVED">Aprovado</option>
               <option value="CLOSED">Encerrado</option>
             </NativeSelect>
@@ -115,9 +115,9 @@ export default function CiclosMeritoPage() {
             <thead className="border-b text-xs uppercase text-muted-foreground">
               <tr>
                 <th className="py-2 text-left">Ciclo</th>
-                <th className="py-2 text-left">Periodo</th>
+                <th className="py-2 text-left">Período</th>
                 <th className="py-2 text-right">Diretriz</th>
-                <th className="py-2 text-right">Orcamento</th>
+                <th className="py-2 text-right">Orçamento</th>
                 <th className="py-2 text-left">Status</th>
                 <th className="py-2 text-left">Criado em</th>
               </tr>

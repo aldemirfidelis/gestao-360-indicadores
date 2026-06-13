@@ -62,11 +62,11 @@ export default function MovimentacoesPage() {
   const createMovement = useMutation({
     mutationFn: () => api('/cargos-salarios/movements', { method: 'POST', json: numericPayload(form) }),
     onSuccess: () => {
-      toast.success('Movimentacao solicitada');
+      toast.success('Movimentação solicitada');
       setForm({ type: 'PROMOCAO', employeeId: '', targetJobId: '', currentBand: '', targetBand: '', currentSalary: '', proposedSalary: '', availableBudget: '', effectiveAt: new Date().toISOString().slice(0, 10), reason: '', justification: '' });
       qc.invalidateQueries({ queryKey: ['compensation', 'movements'] });
     },
-    onError: (error: any) => toast.error(error?.message ?? 'Falha ao solicitar movimentacao'),
+    onError: (error: any) => toast.error(error?.message ?? 'Falha ao solicitar movimentação'),
   });
 
   const selectedEmployee = structureQuery.data?.employees.find((employee) => employee.id === form.employeeId);
@@ -74,25 +74,25 @@ export default function MovimentacoesPage() {
   return (
     <div>
       <PageHeader
-        eyebrow="Cargos e Salarios"
-        title="Movimentacoes"
-        description="Solicitacoes de promocao, enquadramento, transferencia, alteracao de faixa e demais impactos no quadro."
-        breadcrumbs={[{ label: 'Inicio', href: '/' }, { label: 'Cargos e Salarios', href: '/cargos-salarios' }, { label: 'Movimentacoes' }]}
+        eyebrow="Cargos e Salários"
+        title="Movimentações"
+        description="Solicitacoes de promocao, enquadramento, transferencia, alteração de faixa e demais impactos no quadro."
+        breadcrumbs={[{ label: 'Início', href: '/' }, { label: 'Cargos e Salários', href: '/cargos-salarios' }, { label: 'Movimentações' }]}
       />
       <CompensationModuleNav />
 
-      <SectionCard title="Nova solicitacao">
+      <SectionCard title="Nova solicitação">
         <div className="grid grid-cols-1 gap-3 lg:grid-cols-4">
           <div>
             <Label>Tipo</Label>
             <NativeSelect value={form.type} onChange={(event) => setForm({ ...form, type: event.target.value })}>
               <option value="ADMISSAO">Admissao</option>
               <option value="PROMOCAO">Promocao</option>
-              <option value="MERITO">Merito</option>
+              <option value="MERITO">Mérito</option>
               <option value="ENQUADRAMENTO">Enquadramento</option>
-              <option value="TRANSFERENCIA_AREA">Transferencia de area</option>
-              <option value="ALTERACAO_CARGO">Alteracao de cargo</option>
-              <option value="ALTERACAO_FAIXA">Alteracao de faixa</option>
+              <option value="TRANSFERENCIA_AREA">Transferência de área</option>
+              <option value="ALTERACAO_CARGO">Alteração de cargo</option>
+              <option value="ALTERACAO_FAIXA">Alteração de faixa</option>
               <option value="DESLIGAMENTO">Desligamento</option>
             </NativeSelect>
           </div>
@@ -111,12 +111,12 @@ export default function MovimentacoesPage() {
           <div>
             <Label>Cargo pretendido</Label>
             <NativeSelect value={form.targetJobId} onChange={(event) => setForm({ ...form, targetJobId: event.target.value })}>
-              <option value="">Sem alteracao</option>
+              <option value="">Sem alteração</option>
               {(optionsQuery.data?.jobs ?? []).map((job) => <option key={job.id} value={job.orgJobId ?? job.id}>{job.name}</option>)}
             </NativeSelect>
           </div>
           <div>
-            <Label>Vigencia</Label>
+            <Label>Vigência</Label>
             <Input type="date" value={form.effectiveAt} onChange={(event) => setForm({ ...form, effectiveAt: event.target.value })} />
           </div>
           <div>
@@ -128,15 +128,15 @@ export default function MovimentacoesPage() {
             <Input value={form.targetBand} onChange={(event) => setForm({ ...form, targetBand: event.target.value })} />
           </div>
           <div>
-            <Label>Salario atual</Label>
+            <Label>Salário atual</Label>
             <Input type="number" value={form.currentSalary} onChange={(event) => setForm({ ...form, currentSalary: event.target.value })} />
           </div>
           <div>
-            <Label>Salario proposto</Label>
+            <Label>Salário proposto</Label>
             <Input type="number" value={form.proposedSalary} onChange={(event) => setForm({ ...form, proposedSalary: event.target.value })} />
           </div>
           <div>
-            <Label>Orcamento disponivel</Label>
+            <Label>Orçamento disponível</Label>
             <Input type="number" value={form.availableBudget} onChange={(event) => setForm({ ...form, availableBudget: event.target.value })} />
           </div>
           <div className="lg:col-span-3">
@@ -144,7 +144,7 @@ export default function MovimentacoesPage() {
             <Input value={form.reason} onChange={(event) => setForm({ ...form, reason: event.target.value })} />
           </div>
           <div className="lg:col-span-4">
-            <Label>Justificativa obrigatoria</Label>
+            <Label>Justificativa obrigatória</Label>
             <Textarea rows={3} value={form.justification} onChange={(event) => setForm({ ...form, justification: event.target.value })} />
           </div>
           <div className="lg:col-span-4">
@@ -164,7 +164,7 @@ export default function MovimentacoesPage() {
               <tr>
                 <th className="py-2 text-left">Protocolo</th>
                 <th className="py-2 text-left">Tipo</th>
-                <th className="py-2 text-left">Vigencia</th>
+                <th className="py-2 text-left">Vigência</th>
                 <th className="py-2 text-left">Motivo</th>
                 <th className="py-2 text-right">Impacto mensal</th>
                 <th className="py-2 text-left">Status</th>
@@ -197,4 +197,3 @@ function numericPayload(form: Record<string, string>) {
     }),
   );
 }
-

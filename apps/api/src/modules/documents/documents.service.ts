@@ -133,7 +133,7 @@ export class DocumentsService {
     if (!area) return;
     const permitted = await this.access.listAreaFilter(me.sub, MODULE, 'view');
     if (permitted && !permitted.includes(area)) {
-      throw new ForbiddenException('Voce nao tem acesso aos documentos desta area.');
+      throw new ForbiddenException('Você não tem acesso aos documentos desta área.');
     }
   }
 
@@ -155,7 +155,7 @@ export class DocumentsService {
   private parseStatus(value?: string): DocumentStatus | undefined {
     if (!value) return undefined;
     if (!Object.values(DocumentStatus).includes(value as DocumentStatus)) {
-      throw new BadRequestException('Status de documento invalido.');
+      throw new BadRequestException('Status de documento inválido.');
     }
     return value as DocumentStatus;
   }
@@ -163,7 +163,7 @@ export class DocumentsService {
   private parseType(value?: string): DocumentType | undefined {
     if (!value) return undefined;
     if (!Object.values(DocumentType).includes(value as DocumentType)) {
-      throw new BadRequestException('Tipo de documento invalido.');
+      throw new BadRequestException('Tipo de documento inválido.');
     }
     return value as DocumentType;
   }
@@ -171,14 +171,14 @@ export class DocumentsService {
   private parseFileKind(value?: string): DocumentFileKind {
     if (!value) return DocumentFileKind.ATTACHMENT;
     if (!Object.values(DocumentFileKind).includes(value as DocumentFileKind)) {
-      throw new BadRequestException('Tipo de arquivo invalido.');
+      throw new BadRequestException('Tipo de arquivo inválido.');
     }
     return value as DocumentFileKind;
   }
 
   private requiredText(value: unknown, field: string) {
     const text = String(value ?? '').trim();
-    if (!text) throw new BadRequestException(`${field} e obrigatorio.`);
+    if (!text) throw new BadRequestException(`${field} e obrigatório.`);
     return text;
   }
 
@@ -197,7 +197,7 @@ export class DocumentsService {
     if (value === undefined) return undefined;
     if (value === null || value === '') return null;
     const n = Number(value);
-    if (!Number.isFinite(n)) throw new BadRequestException('Valor numerico invalido.');
+    if (!Number.isFinite(n)) throw new BadRequestException('Valor numérico inválido.');
     return Math.max(min, Math.round(n));
   }
 
@@ -205,7 +205,7 @@ export class DocumentsService {
     if (value === undefined) return undefined;
     if (value === null || value === '') return null;
     const d = new Date(String(value));
-    if (Number.isNaN(d.getTime())) throw new BadRequestException(`${field} invalido.`);
+    if (Number.isNaN(d.getTime())) throw new BadRequestException(`${field} inválido.`);
     return d;
   }
 
@@ -225,7 +225,7 @@ export class DocumentsService {
       where: { id, companyId, deletedAt: null },
       include: this.include(),
     });
-    if (!doc) throw new NotFoundException('Documento nao encontrado');
+    if (!doc) throw new NotFoundException('Documento não encontrado');
     return doc;
   }
 
@@ -329,7 +329,7 @@ export class DocumentsService {
     const items = (await this.list(me)) as any[];
     const byArea = new Map<string, number>();
     for (const doc of items) {
-      const key = doc.orgNode?.name ?? 'Sem area';
+      const key = doc.orgNode?.name ?? 'Sem área';
       byArea.set(key, (byArea.get(key) ?? 0) + 1);
     }
     return {
@@ -466,7 +466,7 @@ export class DocumentsService {
     const typeConfigId = this.id(body?.typeConfigId);
     if (typeConfigId) {
       const exists = await this.prisma.documentTypeConfig.findFirst({ where: { id: typeConfigId, companyId: me.companyId, deletedAt: null } });
-      if (!exists) throw new NotFoundException('Tipo de documento nao encontrado.');
+      if (!exists) throw new NotFoundException('Tipo de documento não encontrado.');
     }
     const stored = await this.storage.putText(me.companyId, 'templates', `${name}.docx`, content, DOCX_MIME);
     return this.prisma.documentTemplate.create({
@@ -542,9 +542,9 @@ export class DocumentsService {
         : await this.codes.nextCode(tx, me.companyId, typeConfigId, type);
       if (manualCode) {
         const duplicate = await tx.document.findFirst({ where: { companyId: me.companyId, code: manualCode, deletedAt: null }, select: { id: true } });
-        if (duplicate) throw new ConflictException('Ja existe documento com este codigo nesta empresa.');
+        if (duplicate) throw new ConflictException('Já existe documento com este código nesta empresa.');
       }
-      const validFrom = this.optionalDate(body?.validFrom, 'Inicio de vigencia') ?? null;
+      const validFrom = this.optionalDate(body?.validFrom, 'Início de vigência') ?? null;
       const validUntil =
         this.optionalDate(body?.validUntil, 'Validade') ??
         (codeResult.typeConfig.defaultValidityDays ? addDays(validFrom ?? new Date(), codeResult.typeConfig.defaultValidityDays) : null);
@@ -565,7 +565,7 @@ export class DocumentsService {
           version: 1,
           content: this.nullableText(body?.content) ?? generatedDocumentBody(title, codeResult.code, 'Rev. 00'),
           externalUrl: this.nullableText(body?.externalUrl) ?? null,
-          changeNote: this.nullableText(body?.changeNote) ?? 'Criacao inicial',
+          changeNote: this.nullableText(body?.changeNote) ?? 'Criação inicial',
           validFrom,
           validUntil,
           reviewIntervalMonths: this.optionalInt(body?.reviewIntervalMonths) ?? null,
@@ -583,7 +583,7 @@ export class DocumentsService {
           revisionNumber: 0,
           versionLabel: 'Rev. 00',
           status: DocumentStatus.DRAFT,
-          changeReason: 'Criacao inicial',
+          changeReason: 'Criação inicial',
           changeSummary: doc.changeNote,
           expirationDate: validUntil,
           createdById: me.sub,
@@ -605,7 +605,7 @@ export class DocumentsService {
       });
       await tx.documentVersion.update({ where: { id: version.id }, data: { docxFileId: file.id } });
       await this.recordStatusTx(tx, me, doc.id, null, DocumentStatus.DRAFT, 'Documento criado', { versionId: version.id });
-      await this.auditTx(tx, me, doc.id, 'CREATE', null, { code: doc.code, title: doc.title, type: doc.type }, 'Criacao do documento');
+      await this.auditTx(tx, me, doc.id, 'CREATE', null, { code: doc.code, title: doc.title, type: doc.type }, 'Criação do documento');
       return doc;
     });
 
@@ -647,7 +647,7 @@ export class DocumentsService {
       const code = this.nullableText(patch.code);
       if (code && code !== before.code) {
         const duplicate = await this.prisma.document.findFirst({ where: { companyId: me.companyId, code, deletedAt: null, id: { not: id } } });
-        if (duplicate) throw new ConflictException('Ja existe documento com este codigo nesta empresa.');
+        if (duplicate) throw new ConflictException('Já existe documento com este código nesta empresa.');
       }
       data.code = code;
     }
@@ -656,13 +656,13 @@ export class DocumentsService {
     if ('content' in (patch ?? {})) data.content = this.nullableText(patch.content);
     if ('externalUrl' in (patch ?? {})) data.externalUrl = this.nullableText(patch.externalUrl);
     if ('changeNote' in (patch ?? {})) data.changeNote = this.nullableText(patch.changeNote);
-    if ('validFrom' in (patch ?? {})) data.validFrom = this.optionalDate(patch.validFrom, 'Inicio de vigencia');
+    if ('validFrom' in (patch ?? {})) data.validFrom = this.optionalDate(patch.validFrom, 'Início de vigência');
     if ('validUntil' in (patch ?? {})) data.validUntil = this.optionalDate(patch.validUntil, 'Validade');
     if ('reviewIntervalMonths' in (patch ?? {})) data.reviewIntervalMonths = this.optionalInt(patch.reviewIntervalMonths);
 
     const updated = await this.prisma.$transaction(async (tx) => {
       const doc = await tx.document.update({ where: { id }, data, include: this.include() });
-      await this.auditTx(tx, me, doc.id, 'UPDATE_METADATA', before, data, this.nullableText(patch?.reason) ?? 'Atualizacao de metadados');
+      await this.auditTx(tx, me, doc.id, 'UPDATE_METADATA', before, data, this.nullableText(patch?.reason) ?? 'Atualização de metadados');
       return doc;
     });
 
@@ -710,9 +710,9 @@ export class DocumentsService {
     const doc = await this.loadScoped(id, me.companyId);
     await this.assertWriteArea(me, this.areaOf(doc), 'edit');
     const comment = this.nullableText(body?.comment);
-    if (COMMENT_REQUIRED.has(to) && !comment) throw new BadRequestException('Comentario obrigatorio para esta transicao.');
+    if (COMMENT_REQUIRED.has(to) && !comment) throw new BadRequestException('Comentário obrigatório para esta transição.');
     if (!TRANSITIONS[doc.status]?.includes(to)) {
-      throw new ConflictException(`Transicao de ${doc.status} para ${to} nao permitida.`);
+      throw new ConflictException(`Transição de ${doc.status} para ${to} não permitida.`);
     }
     if (to === DocumentStatus.PUBLISHED) return this.publish(me, id, body);
 
@@ -727,7 +727,7 @@ export class DocumentsService {
       await tx.documentVersion.update({ where: { id: version.id }, data: { status: to } });
       await this.recordWorkflowArtifactsTx(tx, me, doc, version.id, to, body, comment);
       await this.recordStatusTx(tx, me, doc.id, doc.status, to, comment, { versionId: version.id });
-      await this.auditTx(tx, me, doc.id, 'STATUS_CHANGE', { status: doc.status }, { status: to }, comment ?? 'Transicao de status');
+      await this.auditTx(tx, me, doc.id, 'STATUS_CHANGE', { status: doc.status }, { status: to }, comment ?? 'Transição de status');
       return item;
     });
 
@@ -790,7 +790,7 @@ export class DocumentsService {
         include: this.include(),
       });
       await this.recordStatusTx(tx, me, doc.id, doc.status, DocumentStatus.PUBLISHED, this.nullableText(body?.comment), { versionId: version.id, pdfFileId: pdf.id });
-      await this.auditTx(tx, me, doc.id, 'PUBLISH', { status: doc.status }, { status: DocumentStatus.PUBLISHED, pdfFileId: pdf.id }, this.nullableText(body?.comment) ?? 'Publicacao oficial');
+      await this.auditTx(tx, me, doc.id, 'PUBLISH', { status: doc.status }, { status: DocumentStatus.PUBLISHED, pdfFileId: pdf.id }, this.nullableText(body?.comment) ?? 'Publicação oficial');
       return item;
     });
     return this.getById(me, published.id);
@@ -799,7 +799,7 @@ export class DocumentsService {
   async createRevision(me: AuthPayload, id: string, body: any = {}) {
     const doc = await this.loadScoped(id, me.companyId);
     await this.assertWriteArea(me, this.areaOf(doc), 'edit');
-    const reason = this.requiredText(body?.reason, 'Motivo da nova revisao');
+    const reason = this.requiredText(body?.reason, 'Motivo da nova revisão');
     const created = await this.prisma.$transaction(async (tx) => {
       const latest = await this.ensureLatestVersionTx(tx, doc, me.sub);
       const nextRevisionNumber = latest.revisionNumber + 1;
@@ -808,7 +808,7 @@ export class DocumentsService {
         ? await tx.documentFile.findFirst({ where: { id: latest.docxFileId, companyId: me.companyId, deletedAt: null } })
         : await tx.documentFile.findFirst({ where: { documentId: doc.id, companyId: me.companyId, kind: DocumentFileKind.DOCX, deletedAt: null }, orderBy: { createdAt: 'desc' } });
       const sourceContent = sourceFile?.contentText ?? doc.content ?? generatedDocumentBody(doc.title, doc.code ?? `#${doc.number}`, versionLabel);
-      const content = `${sourceContent}\n\nHistorico da nova revisao: ${reason}\n`;
+      const content = `${sourceContent}\n\nHistórico da nova revisão: ${reason}\n`;
       const version = await tx.documentVersion.create({
         data: {
           companyId: me.companyId,
@@ -872,8 +872,8 @@ export class DocumentsService {
       where: { companyId: me.companyId, documentId: id, deletedAt: null },
       orderBy: { revisionNumber: 'desc' },
     });
-    const reason = this.nullableText(body?.reason) ?? 'Solicitacao de liberacao para revisao/edicao do documento.';
-    const expiresAt = this.optionalDate(body?.expiresAt, 'Prazo da liberacao') ?? null;
+    const reason = this.nullableText(body?.reason) ?? 'Solicitação de liberação para revisão/edição do documento.';
+    const expiresAt = this.optionalDate(body?.expiresAt, 'Prazo da liberação') ?? null;
     const request = await this.prisma.documentEditRequest.create({
       data: {
         companyId: me.companyId,
@@ -900,15 +900,15 @@ export class DocumentsService {
     await this.assertViewArea(me, doc);
     await this.assertCanOperateDocumentEdit(me, doc);
 
-    const requesterUserId = this.requiredText(body?.requesterUserId, 'Usuario para edicao');
+    const requesterUserId = this.requiredText(body?.requesterUserId, 'Usuário para edição');
     const requester = await this.prisma.user.findFirst({
       where: { id: requesterUserId, companyId: me.companyId, deletedAt: null, active: true, status: 'ACTIVE' },
       select: { id: true },
     });
-    if (!requester) throw new NotFoundException('Usuario solicitante nao encontrado ou inativo.');
+    if (!requester) throw new NotFoundException('Usuário solicitante não encontrado ou inativo.');
 
-    const note = this.nullableText(body?.note ?? body?.reason) ?? 'Liberacao direta de edicao pelo operador.';
-    const expiresAt = this.optionalDate(body?.expiresAt, 'Prazo da liberacao') ?? null;
+    const note = this.nullableText(body?.note ?? body?.reason) ?? 'Liberação direta de edição pelo operador.';
+    const expiresAt = this.optionalDate(body?.expiresAt, 'Prazo da liberação') ?? null;
     const existing = await this.prisma.documentEditRequest.findFirst({
       where: {
         companyId: me.companyId,
@@ -991,14 +991,14 @@ export class DocumentsService {
   async approveEditRequest(me: AuthPayload, requestId: string, body: any = {}) {
     const request = await this.loadEditRequest(me.companyId, requestId);
     await this.assertCanDecideEditRequest(me, request);
-    if (request.status !== 'REQUESTED') throw new ConflictException('Esta solicitacao nao esta pendente.');
+    if (request.status !== 'REQUESTED') throw new ConflictException('Esta solicitação não esta pendente.');
 
     const note = this.nullableText(body?.note ?? body?.comment);
     const approved = await this.prisma.$transaction(async (tx) => {
       let versionId = request.versionId;
       let document = request.document;
       if (!EDITABLE_STATUSES.has(document.status as DocumentStatus)) {
-        const revision = await this.createRevisionForEditRequestTx(tx, me, document, note ?? request.reason ?? 'Liberacao de edicao online');
+        const revision = await this.createRevisionForEditRequestTx(tx, me, document, note ?? request.reason ?? 'Liberação de edição online');
         versionId = revision.version.id;
         document = revision.document;
       } else if (!versionId) {
@@ -1028,7 +1028,7 @@ export class DocumentsService {
         'EDIT_REQUEST_APPROVED',
         { requestId: request.id, status: request.status },
         { requestId: request.id, status: 'APPROVED', versionId },
-        note ?? 'Liberacao de edicao online',
+        note ?? 'Liberação de edição online',
       );
       return updated;
     });
@@ -1039,7 +1039,7 @@ export class DocumentsService {
   async rejectEditRequest(me: AuthPayload, requestId: string, body: any = {}) {
     const request = await this.loadEditRequest(me.companyId, requestId);
     await this.assertCanDecideEditRequest(me, request);
-    if (request.status !== 'REQUESTED') throw new ConflictException('Esta solicitacao nao esta pendente.');
+    if (request.status !== 'REQUESTED') throw new ConflictException('Esta solicitação não esta pendente.');
     const note = this.requiredText(body?.note ?? body?.comment, 'Justificativa');
     const rejected = await this.prisma.$transaction(async (tx) => {
       const updated = await tx.documentEditRequest.update({
@@ -1064,7 +1064,7 @@ export class DocumentsService {
       request.requesterUserId === me.sub ||
       request.operatorUserId === me.sub ||
       ['SUPER_ADMIN', 'COMPANY_ADMIN'].includes(String(me.role));
-    if (!canClose) throw new ForbiddenException('Somente o solicitante ou operador pode concluir esta edicao.');
+    if (!canClose) throw new ForbiddenException('Somente o solicitante ou operador pode concluir esta edição.');
     if (request.status === 'COMPLETED') return request;
     if (!APPROVED_EDIT_REQUEST_STATUSES.includes(request.status)) {
       throw new ConflictException('Somente solicitacoes liberadas podem ser concluidas.');
@@ -1080,7 +1080,7 @@ export class DocumentsService {
           decidedBy: { select: { id: true, name: true, email: true } },
         },
       });
-      await this.auditTx(tx, me, request.documentId, 'EDIT_REQUEST_COMPLETED', { requestId: request.id }, { requestId: request.id }, note ?? 'Edicao concluida');
+      await this.auditTx(tx, me, request.documentId, 'EDIT_REQUEST_COMPLETED', { requestId: request.id }, { requestId: request.id }, note ?? 'Edição concluida');
       return updated;
     });
     this.workItems.markDirty(me.companyId, [request.operatorUserId, request.requesterUserId, me.sub], 'document-edit-completed');
@@ -1091,9 +1091,9 @@ export class DocumentsService {
     const doc = await this.loadScoped(id, me.companyId);
     await this.assertWriteArea(me, this.areaOf(doc), 'edit');
     if (!EDITABLE_STATUSES.has(doc.status)) {
-      throw new ConflictException('Documento bloqueado para edicao. Crie uma nova revisao para alterar uma versao publicada/aprovada.');
+      throw new ConflictException('Documento bloqueado para edição. Crie uma nova revisão para alterar uma versão publicada/aprovada.');
     }
-    const content = this.requiredText(body?.content, 'Conteudo');
+    const content = this.requiredText(body?.content, 'Conteúdo');
     const saved = await this.prisma.$transaction(async (tx) => {
       const version = await this.ensureLatestVersionTx(tx, doc, me.sub);
       const checksum = sha256(content);
@@ -1112,10 +1112,10 @@ export class DocumentsService {
     await this.assertViewArea(me, doc);
     const approvedRequest = await this.findApprovedEditRequest(me, doc.id);
     if (!approvedRequest) {
-      throw new ForbiddenException('Edicao online precisa de liberacao do operador.');
+      throw new ForbiddenException('Edição online precisa de liberação do operador.');
     }
 
-    // Sem provedor online configurado: mantem o fluxo manual (download/upload).
+    // Sem provedor online configurado: mantém o fluxo manual (download/upload).
     if (!this.editor.isOnline()) {
       const latestDocx = await this.prisma.documentFile.findFirst({
         where: { companyId: me.companyId, documentId: id, kind: DocumentFileKind.DOCX, deletedAt: null },
@@ -1135,7 +1135,7 @@ export class DocumentsService {
     let editableDoc = doc;
     if (approvedRequest && !EDITABLE_STATUSES.has(doc.status)) {
       const updated = await this.prisma.$transaction(async (tx) => {
-        const revision = await this.createRevisionForEditRequestTx(tx, me, doc, approvedRequest.reason ?? 'Liberacao de edicao online');
+        const revision = await this.createRevisionForEditRequestTx(tx, me, doc, approvedRequest.reason ?? 'Liberação de edição online');
         await tx.documentEditRequest.update({ where: { id: approvedRequest.id }, data: { versionId: revision.version.id } });
         return revision.document;
       });
@@ -1169,7 +1169,7 @@ export class DocumentsService {
     return session;
   }
 
-  /** Indica se o usuario pode editar o documento (status editavel + escopo de area). */
+  /** Indica se o usuário pode editar o documento (status editável + escopo de área). */
   private async canWriteDoc(me: AuthPayload, doc: any): Promise<boolean> {
     if (!EDITABLE_STATUSES.has(doc.status)) return false;
     const area = this.areaOf(doc);
@@ -1184,8 +1184,8 @@ export class DocumentsService {
 
   /**
    * Garante um DOCX binario real (OOXML) para o editor online. Se o documento
-   * so tinha conteudo textual (fundacao GED) ou nao tinha DOCX, gera um .docx
-   * valido semeado com o texto atual e o vincula a revisao corrente.
+   * só tinha conteúdo textual (fundação GED) ou não tinha DOCX, gera um .docx
+   * válido semeado com o texto atual e o vincula a revisão corrente.
    */
   private async ensureEditableDocxFile(me: AuthPayload, doc: any) {
     const existing = await this.prisma.documentFile.findFirst({
@@ -1218,23 +1218,23 @@ export class DocumentsService {
         },
       });
       await tx.documentVersion.update({ where: { id: version.id }, data: { docxFileId: item.id } });
-      await this.auditTx(tx, me, doc.id, 'EDITOR_SEED', null, { fileId: item.id }, 'Geracao de DOCX editavel para o editor online');
+      await this.auditTx(tx, me, doc.id, 'EDITOR_SEED', null, { fileId: item.id }, 'Geração de DOCX editável para o editor online');
       return item;
     });
   }
 
   // --------------------------- Host WOPI (editor online) --------------------
-  // Endpoints publicos validados pelo access_token assinado (sem JWT de usuario).
+  // Endpoints públicos validados pelo access_token assinado (sem JWT de usuário).
 
   private async wopiResolveFile(token: WopiTokenPayload) {
     const file = await this.prisma.documentFile.findFirst({
       where: { id: token.fileId, companyId: token.companyId, deletedAt: null },
     });
-    if (!file) throw new NotFoundException('Arquivo nao encontrado.');
+    if (!file) throw new NotFoundException('Arquivo não encontrado.');
     const doc = await this.prisma.document.findFirst({
       where: { id: file.documentId ?? token.documentId, companyId: token.companyId, deletedAt: null },
     });
-    if (!doc) throw new NotFoundException('Documento nao encontrado.');
+    if (!doc) throw new NotFoundException('Documento não encontrado.');
     return { file, doc };
   }
 
@@ -1248,7 +1248,7 @@ export class DocumentsService {
       Version: file.hashSha256 ?? String(file.createdAt.getTime()),
       OwnerId: doc.ownerUserId ?? doc.createdById ?? 'system',
       UserId: token.userId,
-      UserFriendlyName: token.userName || 'Usuario',
+      UserFriendlyName: token.userName || 'Usuário',
       UserCanWrite: editable,
       UserCanNotWriteRelative: true,
       SupportsUpdate: true,
@@ -1258,18 +1258,18 @@ export class DocumentsService {
     };
   }
 
-  /** WOPI GetFile: bytes do DOCX. Converte conteudo legado em DOCX on-the-fly. */
+  /** WOPI GetFile: bytes do DOCX. Converte conteúdo legado em DOCX on-the-fly. */
   async wopiGetFile(token: WopiTokenPayload): Promise<Buffer> {
     const { file } = await this.wopiResolveFile(token);
     if (file.contentText != null) return buildDocx(file.contentText);
     return this.storage.readBinary(file.storageKey);
   }
 
-  /** WOPI PutFile: persiste a nova versao binaria salva no editor. */
+  /** WOPI PutFile: persiste a nova versão binária salva no editor. */
   async wopiPutFile(token: WopiTokenPayload, content: Buffer) {
     const { file, doc } = await this.wopiResolveFile(token);
     if (!token.canWrite || !EDITABLE_STATUSES.has(doc.status)) {
-      throw new ConflictException('Documento bloqueado para edicao.');
+      throw new ConflictException('Documento bloqueado para edição.');
     }
     const stored = await this.storage.putBinary(token.companyId, `documents/${doc.id}/editor`, file.fileName, content, DOCX_MIME);
     await this.prisma.$transaction(async (tx) => {
@@ -1316,9 +1316,9 @@ export class DocumentsService {
     await this.assertWriteArea(me, this.areaOf(doc), 'edit');
     const kind = this.parseFileKind(body?.kind);
     if (kind === DocumentFileKind.DOCX && !EDITABLE_STATUSES.has(doc.status)) {
-      throw new ConflictException('DOCX editavel so pode ser substituido em rascunho/elaboracao/ajustes.');
+      throw new ConflictException('DOCX editável só pode ser substituído em rascunho/elaboração/ajustes.');
     }
-    const content = this.requiredText(body?.content, 'Conteudo do arquivo');
+    const content = this.requiredText(body?.content, 'Conteúdo do arquivo');
     const fileName = this.requiredText(body?.fileName, 'Nome do arquivo');
     const mimeType = this.nullableText(body?.mimeType) ?? mimeFor(kind);
     const latest = await this.ensureLatestVersion(doc, me.sub);
@@ -1348,7 +1348,7 @@ export class DocumentsService {
     const doc = await this.loadScoped(id, me.companyId);
     await this.assertViewArea(me, doc);
     const file = await this.prisma.documentFile.findFirst({ where: { id: fileId, documentId: id, companyId: me.companyId, deletedAt: null } });
-    if (!file) throw new NotFoundException('Arquivo nao encontrado.');
+    if (!file) throw new NotFoundException('Arquivo não encontrado.');
     // Arquivos legados guardam o texto em contentText; arquivos binarios
     // (ex.: DOCX salvo por editor WOPI) ficam apenas no storage.
     const content = file.contentText != null ? Buffer.from(file.contentText, 'utf8') : await this.storage.readBinary(file.storageKey);
@@ -1379,10 +1379,10 @@ export class DocumentsService {
         versionId: this.id(body?.versionId),
         parentId: this.id(body?.parentId),
         userId: me.sub,
-        body: this.requiredText(body?.body, 'Comentario'),
+        body: this.requiredText(body?.body, 'Comentário'),
       },
     });
-    await this.audit(me, id, 'COMMENT', null, { commentId: comment.id }, 'Comentario interno');
+    await this.audit(me, id, 'COMMENT', null, { commentId: comment.id }, 'Comentário interno');
     return comment;
   }
 
@@ -1423,7 +1423,7 @@ export class DocumentsService {
       if (!to || doc.status === to) continue;
       await this.prisma.$transaction(async (tx) => {
         await tx.document.update({ where: { id: doc.id }, data: { status: to } });
-        await this.recordStatusTx(tx, me, doc.id, doc.status, to, 'Atualizacao automatica de vencimento');
+        await this.recordStatusTx(tx, me, doc.id, doc.status, to, 'Atualização automática de vencimento');
         await this.auditTx(tx, me, doc.id, 'EXPIRATION_JOB', { status: doc.status }, { status: to }, 'Rotina de vencimento');
       });
       processed++;
@@ -1463,19 +1463,19 @@ export class DocumentsService {
         decidedBy: { select: { id: true, name: true, email: true } },
       },
     });
-    if (!request) throw new NotFoundException('Solicitacao de edicao nao encontrada.');
+    if (!request) throw new NotFoundException('Solicitação de edição não encontrada.');
     return request;
   }
 
   private async resolveEditOperator(me: AuthPayload, doc: any, explicitUserId: unknown): Promise<string> {
     const requested = this.id(explicitUserId);
     const candidate = requested ?? [doc.ownerUserId, doc.approverUserId, doc.createdById, me.sub].find(Boolean);
-    if (!candidate) throw new BadRequestException('Defina um operador para liberar a edicao.');
+    if (!candidate) throw new BadRequestException('Defina um operador para liberar a edição.');
     const user = await this.prisma.user.findFirst({
       where: { id: candidate, companyId: me.companyId, deletedAt: null, active: true, status: 'ACTIVE' },
       select: { id: true },
     });
-    if (!user) throw new NotFoundException('Operador nao encontrado ou inativo.');
+    if (!user) throw new NotFoundException('Operador não encontrado ou inativo.');
     return user.id;
   }
 
@@ -1491,7 +1491,7 @@ export class DocumentsService {
         // segue para Forbidden abaixo
       }
     }
-    throw new ForbiddenException('Voce nao pode liberar edicao deste documento.');
+    throw new ForbiddenException('Você não pode liberar edição deste documento.');
   }
 
   private async assertCanDecideEditRequest(me: AuthPayload, request: any) {
@@ -1520,7 +1520,7 @@ export class DocumentsService {
       ? await tx.documentFile.findFirst({ where: { id: latest.docxFileId, companyId: me.companyId, deletedAt: null } })
       : await tx.documentFile.findFirst({ where: { documentId: doc.id, companyId: me.companyId, kind: DocumentFileKind.DOCX, deletedAt: null }, orderBy: { createdAt: 'desc' } });
     const sourceContent = sourceFile?.contentText ?? doc.content ?? generatedDocumentBody(doc.title, doc.code ?? `#${doc.number}`, versionLabel);
-    const content = `${sourceContent}\n\nHistorico da revisao liberada: ${reason}\n`;
+    const content = `${sourceContent}\n\nHistórico da revisão liberada: ${reason}\n`;
     const version = await tx.documentVersion.create({
       data: {
         companyId: me.companyId,
@@ -1561,7 +1561,7 @@ export class DocumentsService {
     if (EDITABLE_STATUSES.has(doc.status)) return;
     const restricted = ['title', 'code', 'description', 'type', 'content', 'externalUrl'];
     if (restricted.some((field) => field in (patch ?? {}))) {
-      throw new ConflictException('Documento bloqueado. Crie uma nova revisao para alterar conteudo ou metadados principais.');
+      throw new ConflictException('Documento bloqueado. Crie uma nova revisão para alterar conteúdo ou metadados principais.');
     }
   }
 
@@ -1576,23 +1576,23 @@ export class DocumentsService {
 
     if (ids.orgNodeId) {
       const orgNode = await this.prisma.orgNode.findFirst({ where: { id: ids.orgNodeId, companyId, deletedAt: null }, select: { id: true } });
-      if (!orgNode) throw new NotFoundException('Area ou processo nao encontrado');
+      if (!orgNode) throw new NotFoundException('Área ou processo não encontrado');
       areas.push(orgNode.id);
     }
     if (ids.indicatorId) {
       const indicator = await this.prisma.indicator.findFirst({ where: { id: ids.indicatorId, companyId, deletedAt: null }, select: { ownerNodeId: true } });
-      if (!indicator) throw new NotFoundException('Indicador nao encontrado');
+      if (!indicator) throw new NotFoundException('Indicador não encontrado');
       if (indicator.ownerNodeId) areas.push(indicator.ownerNodeId);
     }
     for (const userId of [ids.ownerUserId, ids.approverUserId]) {
       if (!userId) continue;
       const user = await this.prisma.user.findFirst({ where: { id: userId, companyId, deletedAt: null, active: true }, select: { id: true } });
-      if (!user) throw new NotFoundException('Usuario (dono/aprovador) nao encontrado');
+      if (!user) throw new NotFoundException('Usuário (responsável/aprovador) não encontrado');
     }
 
     const uniqueAreas = Array.from(new Set(areas.filter(Boolean)));
     if (uniqueAreas.length > 1) {
-      throw new ConflictException('Vinculos do documento pertencem a areas diferentes.');
+      throw new ConflictException('Vínculos do documento pertencem a áreas diferentes.');
     }
     return { ids, area: uniqueAreas[0] ?? null };
   }
@@ -1757,26 +1757,26 @@ function renderDocxText(doc: any, revision: string) {
 
 function generatedDocumentBody(title: string, code: string, revision: string, description = '', content = '') {
   return [
-    `Codigo: ${code}`,
+    `Código: ${code}`,
     `Titulo: ${title}`,
-    `Revisao: ${revision}`,
+    `Revisão: ${revision}`,
     `Data: ${new Date().toISOString().slice(0, 10)}`,
     '',
     description,
     '',
-    content || 'Conteudo inicial do documento.',
+    content || 'Conteúdo inicial do documento.',
   ].join('\n');
 }
 
 function renderPdfText(doc: any, revision: string, watermark?: string | null) {
   return [
     '%PDF-1.4',
-    `% Gestao 360 - PDF oficial controlado`,
-    `Codigo: ${doc.code ?? `#${doc.number}`}`,
+    `% Gestão 360 - PDF oficial controlado`,
+    `Código: ${doc.code ?? `#${doc.number}`}`,
     `Titulo: ${doc.title}`,
-    `Revisao: ${revision}`,
+    `Revisão: ${revision}`,
     `Publicado em: ${new Date().toISOString()}`,
-    doc.validUntil ? `Validade: ${new Date(doc.validUntil).toISOString().slice(0, 10)}` : 'Validade: nao definida',
+    doc.validUntil ? `Validade: ${new Date(doc.validUntil).toISOString().slice(0, 10)}` : 'Validade: não definida',
     watermark ? `Marca d'agua: ${watermark}` : '',
     '',
     doc.content ?? '',
@@ -1788,13 +1788,13 @@ function defaultTemplateContent() {
   return [
     '{{company_name}}',
     '{{document_code}} - {{document_title}}',
-    'Revisao: {{revision}}',
+    'Revisão: {{revision}}',
     'Autor: {{author_name}}',
-    'Responsavel: {{responsible_name}}',
+    'Responsável: {{responsible_name}}',
     '',
     '{{revision_history}}',
     '',
-    'Conteudo do documento...',
+    'Conteúdo do documento...',
   ].join('\n');
 }
 

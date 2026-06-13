@@ -55,32 +55,32 @@ export default function SimulacoesPage() {
         },
       }),
     onSuccess: () => {
-      toast.success('Simulacao cadastrada');
+      toast.success('Simulação cadastrada');
       setForm({ name: '', scenarioType: 'MERITO', monthlyImpact: '', annualImpact: '', affectedCount: '', assumptions: '', results: '' });
       qc.invalidateQueries({ queryKey: ['compensation', 'simulations'] });
     },
-    onError: (error: any) => toast.error(error?.message ?? 'Falha ao cadastrar simulacao'),
+    onError: (error: any) => toast.error(error?.message ?? 'Falha ao cadastrar simulação'),
   });
   const approveSimulation = useMutation({
     mutationFn: (id: string) => api(`/cargos-salarios/simulations/${id}/approve`, { method: 'PATCH', json: {} }),
     onSuccess: () => {
-      toast.success('Simulacao aprovada');
+      toast.success('Simulação aprovada');
       qc.invalidateQueries({ queryKey: ['compensation', 'simulations'] });
     },
-    onError: (error: any) => toast.error(error?.message ?? 'Falha ao aprovar simulacao'),
+    onError: (error: any) => toast.error(error?.message ?? 'Falha ao aprovar simulação'),
   });
 
   return (
     <div>
       <PageHeader
-        eyebrow="Cargos e Salarios"
-        title="Simulacoes"
-        description="Cenarios de impacto para merito, enquadramento, promocao, headcount e reestruturacao."
-        breadcrumbs={[{ label: 'Inicio', href: '/' }, { label: 'Cargos e Salarios', href: '/cargos-salarios' }, { label: 'Simulacoes' }]}
+        eyebrow="Cargos e Salários"
+        title="Simulações"
+        description="Cenarios de impacto para mérito, enquadramento, promocao, headcount e reestruturação."
+        breadcrumbs={[{ label: 'Início', href: '/' }, { label: 'Cargos e Salários', href: '/cargos-salarios' }, { label: 'Simulações' }]}
       />
       <CompensationModuleNav />
 
-      <SectionCard title="Nova simulacao">
+      <SectionCard title="Nova simulação">
         <div className="grid grid-cols-1 gap-3 lg:grid-cols-5">
           <div className="lg:col-span-2">
             <Label>Nome</Label>
@@ -89,11 +89,11 @@ export default function SimulacoesPage() {
           <div>
             <Label>Cenario</Label>
             <NativeSelect value={form.scenarioType} onChange={(event) => setForm({ ...form, scenarioType: event.target.value })}>
-              <option value="MERITO">Merito</option>
+              <option value="MERITO">Mérito</option>
               <option value="ENQUADRAMENTO">Enquadramento</option>
               <option value="PROMOCAO">Promocao</option>
               <option value="HEADCOUNT">Headcount</option>
-              <option value="REESTRUTURACAO">Reestruturacao</option>
+              <option value="REESTRUTURACAO">Reestruturação</option>
             </NativeSelect>
           </div>
           <div>
@@ -115,13 +115,13 @@ export default function SimulacoesPage() {
           <div className="lg:col-span-5">
             <Button onClick={() => createSimulation.mutate()} disabled={!form.name || !form.scenarioType || createSimulation.isPending}>
               <Save className="mr-2 h-4 w-4" />
-              Salvar simulacao
+              Salvar simulação
             </Button>
           </div>
         </div>
       </SectionCard>
 
-      <SectionCard title="Simulacoes cadastradas" className="mt-4">
+      <SectionCard title="Simulações cadastradas" className="mt-4">
         {simulationsQuery.isLoading && <LoadingState />}
         <div className="overflow-x-auto">
           <table className="w-full min-w-[820px] text-sm">
@@ -133,7 +133,7 @@ export default function SimulacoesPage() {
                 <th className="py-2 text-right">Impacto mensal</th>
                 <th className="py-2 text-right">Impacto anual</th>
                 <th className="py-2 text-left">Status</th>
-                <th className="py-2 text-right">Acao</th>
+                <th className="py-2 text-right">Ação</th>
               </tr>
             </thead>
             <tbody>

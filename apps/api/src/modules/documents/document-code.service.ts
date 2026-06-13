@@ -16,7 +16,7 @@ const DEFAULT_TYPES: Array<{
   { name: 'Procedimento', sigla: 'PRO', prefix: 'PRO', category: DocumentType.PROCEDURE, defaultValidityDays: 365 },
   { name: 'Instrucao de Trabalho', sigla: 'IT', prefix: 'IT', category: DocumentType.INSTRUCTION, defaultValidityDays: 365 },
   { name: 'Registro', sigla: 'REG', prefix: 'REG', category: DocumentType.RECORD, defaultValidityDays: 1825 },
-  { name: 'Formulario', sigla: 'FOR', prefix: 'FOR', category: DocumentType.FORM, defaultValidityDays: 365 },
+  { name: 'Formulário', sigla: 'FOR', prefix: 'FOR', category: DocumentType.FORM, defaultValidityDays: 365 },
   { name: 'Manual', sigla: 'MAN', prefix: 'MAN', category: DocumentType.MANUAL, defaultValidityDays: 730 },
   { name: 'Documento Externo', sigla: 'EXT', prefix: 'EXT', category: DocumentType.EXTERNAL, defaultValidityDays: 365 },
 ];
@@ -87,14 +87,14 @@ export class DocumentCodeService {
         },
       });
     } catch (error: any) {
-      if (error?.code === 'P2002') throw new ConflictException('Ja existe tipo de documento com esta sigla nesta empresa.');
+      if (error?.code === 'P2002') throw new ConflictException('Já existe tipo de documento com esta sigla nesta empresa.');
       throw error;
     }
   }
 
   async updateType(me: AuthPayload, id: string, patch: any) {
     const before = await this.prisma.documentTypeConfig.findFirst({ where: { id, companyId: me.companyId, deletedAt: null } });
-    if (!before) throw new NotFoundException('Tipo de documento nao encontrado.');
+    if (!before) throw new NotFoundException('Tipo de documento não encontrado.');
     const data: Prisma.DocumentTypeConfigUpdateInput = {};
     if ('name' in (patch ?? {})) data.name = requiredText(patch.name, 'Nome');
     if ('sigla' in (patch ?? {})) data.sigla = requiredText(patch.sigla, 'Sigla').toUpperCase();
@@ -118,7 +118,7 @@ export class DocumentCodeService {
     try {
       return await this.prisma.documentTypeConfig.update({ where: { id }, data });
     } catch (error: any) {
-      if (error?.code === 'P2002') throw new ConflictException('Ja existe tipo de documento com esta sigla nesta empresa.');
+      if (error?.code === 'P2002') throw new ConflictException('Já existe tipo de documento com esta sigla nesta empresa.');
       throw error;
     }
   }
@@ -126,7 +126,7 @@ export class DocumentCodeService {
   async resolveType(companyId: string, typeConfigId: string | null | undefined, type: DocumentType, tx: Tx = this.prisma) {
     if (typeConfigId) {
       const config = await tx.documentTypeConfig.findFirst({ where: { id: typeConfigId, companyId, deletedAt: null, active: true } });
-      if (!config) throw new NotFoundException('Tipo de documento configurado nao encontrado.');
+      if (!config) throw new NotFoundException('Tipo de documento configurado não encontrado.');
       return config;
     }
     let config = await tx.documentTypeConfig.findFirst({
@@ -165,7 +165,7 @@ export class DocumentCodeService {
         return { code, typeConfig: config };
       }
     }
-    throw new ConflictException('Nao foi possivel gerar um codigo unico para este tipo de documento.');
+    throw new ConflictException('Não foi possível gerar um código único para este tipo de documento.');
   }
 }
 
@@ -179,7 +179,7 @@ function formatCode(pattern: string, prefix: string, digits: number, next: numbe
 
 function requiredText(value: unknown, field: string) {
   const text = String(value ?? '').trim();
-  if (!text) throw new BadRequestException(`${field} e obrigatorio.`);
+  if (!text) throw new BadRequestException(`${field} e obrigatório.`);
   return text;
 }
 
@@ -192,7 +192,7 @@ function nullableText(value: unknown) {
 function positiveInt(value: unknown, fallback: number) {
   if (value === undefined || value === null || value === '') return fallback;
   const n = Number(value);
-  if (!Number.isFinite(n) || n < 1) throw new BadRequestException('Valor numerico invalido.');
+  if (!Number.isFinite(n) || n < 1) throw new BadRequestException('Valor numérico inválido.');
   return Math.round(n);
 }
 
@@ -204,7 +204,7 @@ function optionalPositiveInt(value: unknown) {
 function parseType(value: unknown): DocumentType | undefined {
   if (!value) return undefined;
   if (!Object.values(DocumentType).includes(value as DocumentType)) {
-    throw new BadRequestException('Tipo de documento invalido.');
+    throw new BadRequestException('Tipo de documento inválido.');
   }
   return value as DocumentType;
 }

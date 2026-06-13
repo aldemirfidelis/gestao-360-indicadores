@@ -61,16 +61,16 @@ export default function EnquadramentoPage() {
   return (
     <div>
       <PageHeader
-        eyebrow="Cargos e Salarios"
+        eyebrow="Cargos e Salários"
         title="Enquadramento Salarial"
-        description="Analise de salario atual contra minimo, ponto medio e maximo da faixa, com compa-ratio calculado no backend."
-        breadcrumbs={[{ label: 'Inicio', href: '/' }, { label: 'Cargos e Salarios', href: '/cargos-salarios' }, { label: 'Enquadramento' }]}
+        description="Análise de salário atual contra mínimo, ponto médio e máximo da faixa, com compa-ratio calculado no backend."
+        breadcrumbs={[{ label: 'Início', href: '/' }, { label: 'Cargos e Salários', href: '/cargos-salarios' }, { label: 'Enquadramento' }]}
       />
       <CompensationModuleNav />
 
       <SectionCard title="Filtros">
         <div className="max-w-sm">
-          <Label>Situacao</Label>
+          <Label>Situação</Label>
           <NativeSelect value={situation} onChange={(event) => setSituation(event.target.value)}>
             <option value="">Todas</option>
             {situations.filter(Boolean).map((item) => <option key={item} value={item}>{item}</option>)}
@@ -86,13 +86,13 @@ export default function EnquadramentoPage() {
               <tr>
                 <th className="py-2 text-left">Matricula</th>
                 <th className="py-2 text-left">Colaborador</th>
-                <th className="py-2 text-left">Area</th>
+                <th className="py-2 text-left">Área</th>
                 <th className="py-2 text-left">Cargo</th>
                 <th className="py-2 text-left">Faixa</th>
-                <th className="py-2 text-right">Salario</th>
+                <th className="py-2 text-right">Salário</th>
                 <th className="py-2 text-right">Min / Medio / Max</th>
                 <th className="py-2 text-right">Compa</th>
-                <th className="py-2 text-left">Situacao</th>
+                <th className="py-2 text-left">Situação</th>
               </tr>
             </thead>
             <tbody>

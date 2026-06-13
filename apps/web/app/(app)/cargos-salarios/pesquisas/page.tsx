@@ -71,14 +71,14 @@ export default function PesquisasSalariaisPage() {
   return (
     <div>
       <PageHeader
-        eyebrow="Cargos e Salarios"
+        eyebrow="Cargos e Salários"
         title="Pesquisas Salariais"
-        description="Cadastro de referencias de mercado por fonte, periodo, regiao, segmento e cargo."
-        breadcrumbs={[{ label: 'Inicio', href: '/' }, { label: 'Cargos e Salarios', href: '/cargos-salarios' }, { label: 'Pesquisas Salariais' }]}
+        description="Cadastro de referências de mercado por fonte, período, região, segmento e cargo."
+        breadcrumbs={[{ label: 'Início', href: '/' }, { label: 'Cargos e Salários', href: '/cargos-salarios' }, { label: 'Pesquisas Salariais' }]}
       />
       <CompensationModuleNav />
 
-      <SectionCard title="Nova referencia de mercado">
+      <SectionCard title="Nova referência de mercado">
         <div className="grid grid-cols-1 gap-3 lg:grid-cols-6">
           <div>
             <Label>Fonte</Label>
@@ -89,11 +89,11 @@ export default function PesquisasSalariaisPage() {
             <Input value={form.provider} onChange={(event) => setForm({ ...form, provider: event.target.value })} />
           </div>
           <div>
-            <Label>Periodo</Label>
+            <Label>Período</Label>
             <Input type="month" value={form.periodRef} onChange={(event) => setForm({ ...form, periodRef: event.target.value })} />
           </div>
           <div>
-            <Label>Regiao</Label>
+            <Label>Região</Label>
             <Input value={form.region} onChange={(event) => setForm({ ...form, region: event.target.value })} />
           </div>
           <div>
@@ -112,19 +112,19 @@ export default function PesquisasSalariaisPage() {
             <Input value={form.marketJobName} onChange={(event) => setForm({ ...form, marketJobName: event.target.value })} />
           </div>
           <div>
-            <Label>Minimo</Label>
+            <Label>Mínimo</Label>
             <Input type="number" value={form.minSalary} onChange={(event) => setForm({ ...form, minSalary: event.target.value })} />
           </div>
           <div>
-            <Label>Mediana</Label>
+            <Label>Médiana</Label>
             <Input type="number" value={form.medianSalary} onChange={(event) => setForm({ ...form, medianSalary: event.target.value })} />
           </div>
           <div>
-            <Label>Media</Label>
+            <Label>Média</Label>
             <Input type="number" value={form.averageSalary} onChange={(event) => setForm({ ...form, averageSalary: event.target.value })} />
           </div>
           <div className="lg:col-span-6">
-            <Label>Observacoes</Label>
+            <Label>Observações</Label>
             <Textarea rows={2} value={form.notes} onChange={(event) => setForm({ ...form, notes: event.target.value })} />
           </div>
           <div className="lg:col-span-6">
@@ -136,20 +136,20 @@ export default function PesquisasSalariaisPage() {
         </div>
       </SectionCard>
 
-      <SectionCard title="Referencias cadastradas" className="mt-4">
+      <SectionCard title="Referências cadastradas" className="mt-4">
         {surveysQuery.isLoading && <LoadingState />}
         <div className="overflow-x-auto">
           <table className="w-full min-w-[920px] text-sm">
             <thead className="border-b text-xs uppercase text-muted-foreground">
               <tr>
-                <th className="py-2 text-left">Periodo</th>
+                <th className="py-2 text-left">Período</th>
                 <th className="py-2 text-left">Fonte</th>
                 <th className="py-2 text-left">Cargo mercado</th>
                 <th className="py-2 text-left">Cargo interno</th>
-                <th className="py-2 text-left">Regiao</th>
-                <th className="py-2 text-right">Minimo</th>
-                <th className="py-2 text-right">Mediana</th>
-                <th className="py-2 text-right">Media</th>
+                <th className="py-2 text-left">Região</th>
+                <th className="py-2 text-right">Mínimo</th>
+                <th className="py-2 text-right">Médiana</th>
+                <th className="py-2 text-right">Média</th>
               </tr>
             </thead>
             <tbody>

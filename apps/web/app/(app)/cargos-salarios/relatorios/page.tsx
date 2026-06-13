@@ -33,14 +33,14 @@ export default function RelatoriosPage() {
   return (
     <div>
       <PageHeader
-        eyebrow="Cargos e Salarios"
-        title="Relatorios e Auditoria"
-        description="Central de relatorios do modulo e ultimos eventos de rastreabilidade."
-        breadcrumbs={[{ label: 'Inicio', href: '/' }, { label: 'Cargos e Salarios', href: '/cargos-salarios' }, { label: 'Relatorios' }]}
+        eyebrow="Cargos e Salários"
+        title="Relatórios e Auditoria"
+        description="Central de relatorios do módulo e ultimos eventos de rastreabilidade."
+        breadcrumbs={[{ label: 'Início', href: '/' }, { label: 'Cargos e Salários', href: '/cargos-salarios' }, { label: 'Relatórios' }]}
       />
       <CompensationModuleNav />
 
-      <SectionCard title="Relatorios disponiveis">
+      <SectionCard title="Relatórios disponiveis">
         {reportsQuery.isLoading && <LoadingState />}
         <div className="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-3">
           {(reportsQuery.data ?? []).map((report) => (
@@ -64,7 +64,7 @@ export default function RelatoriosPage() {
             <thead className="border-b text-xs uppercase text-muted-foreground">
               <tr>
                 <th className="py-2 text-left">Data</th>
-                <th className="py-2 text-left">Acao</th>
+                <th className="py-2 text-left">Ação</th>
                 <th className="py-2 text-left">Entidade</th>
                 <th className="py-2 text-left">Registro</th>
                 <th className="py-2 text-left">Resultado</th>

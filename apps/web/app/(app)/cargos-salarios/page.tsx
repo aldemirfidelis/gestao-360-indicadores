@@ -62,18 +62,18 @@ export default function CargosSalariosPage() {
   return (
     <div>
       <PageHeader
-        eyebrow="Gestao"
+        eyebrow="Gestão"
         tone="view"
-        title="Cargos e Salarios"
-        description="Painel de quadro, cargos, faixas salariais, orcamento e movimentacoes de pessoas."
-        breadcrumbs={[{ label: 'Inicio', href: '/' }, { label: 'Cargos e Salarios' }]}
+        title="Cargos e Salários"
+        description="Painel de quadro, cargos, faixas salariais, orçamento e movimentações de pessoas."
+        breadcrumbs={[{ label: 'Início', href: '/' }, { label: 'Cargos e Salários' }]}
       />
       <CompensationModuleNav />
 
-      <SectionCard title="Filtros" description="Os indicadores abaixo respeitam empresa, permissao e escopo do usuario.">
+      <SectionCard title="Filtros" description="Os indicadores abaixo respeitam empresa, permissão e escopo do usuário.">
         <div className="grid grid-cols-1 gap-3 md:grid-cols-3">
           <div>
-            <Label>Area ou setor</Label>
+            <Label>Área ou setor</Label>
             <NativeSelect value={orgNodeId} onChange={(event) => setOrgNodeId(event.target.value)}>
               <option value="">Todas</option>
               {(optionsQuery.data?.orgNodes ?? []).map((node) => (
@@ -95,7 +95,7 @@ export default function CargosSalariosPage() {
             </NativeSelect>
           </div>
           <div>
-            <Label>Periodo</Label>
+            <Label>Período</Label>
             <NativeSelect value={overviewQuery.data?.periodRef ?? ''} disabled>
               <option>{overviewQuery.data?.periodRef ?? 'Atual'}</option>
             </NativeSelect>
@@ -109,17 +109,17 @@ export default function CargosSalariosPage() {
         <>
           <div className="my-6 grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
             <MetricCard title="Colaboradores" value={formatNumber(cards.allocatedEmployees)} description="Alocados no quadro" icon={<Users className="h-4 w-4" />} tone="blue" href="/cargos-salarios/estrutura-quadro" />
-            <MetricCard title="Posicoes previstas" value={formatNumber(cards.plannedPositions)} description={`${formatNumber(cards.occupiedPositions)} ocupadas`} icon={<Building2 className="h-4 w-4" />} tone="green" href="/cargos-salarios/estrutura-quadro" />
-            <MetricCard title="Vagas abertas" value={formatNumber(cards.openPositions)} description="Posicoes sem ocupante" icon={<Briefcase className="h-4 w-4" />} tone="yellow" href="/cargos-salarios/estrutura-quadro" />
-            <MetricCard title="Pendencias" value={formatNumber(cards.pendingApprovals)} description="Movimentacoes aguardando fluxo" icon={<GitPullRequestArrow className="h-4 w-4" />} tone="purple" href="/cargos-salarios/movimentacoes" />
-            <MetricCard title="Dentro do orcamento" value={formatNumber(cards.positionsInBudget)} description={`${formatNumber(cards.positionsOutOfBudget)} fora do orcado`} icon={<BarChart3 className="h-4 w-4" />} tone="green" href="/cargos-salarios/estrutura-quadro" />
-            <MetricCard title="Abaixo da faixa" value={formatNumber(cards.employeesBelowRange)} description="Requer analise de enquadramento" icon={<FileBarChart className="h-4 w-4" />} tone="red" href="/cargos-salarios/enquadramento?situation=ABAIXO_DA_FAIXA" />
+            <MetricCard title="Posições previstas" value={formatNumber(cards.plannedPositions)} description={`${formatNumber(cards.occupiedPositions)} ocupadas`} icon={<Building2 className="h-4 w-4" />} tone="green" href="/cargos-salarios/estrutura-quadro" />
+            <MetricCard title="Vagas abertas" value={formatNumber(cards.openPositions)} description="Posições sem ocupante" icon={<Briefcase className="h-4 w-4" />} tone="yellow" href="/cargos-salarios/estrutura-quadro" />
+            <MetricCard title="Pendências" value={formatNumber(cards.pendingApprovals)} description="Movimentações aguardando fluxo" icon={<GitPullRequestArrow className="h-4 w-4" />} tone="purple" href="/cargos-salarios/movimentacoes" />
+            <MetricCard title="Dentro do orçamento" value={formatNumber(cards.positionsInBudget)} description={`${formatNumber(cards.positionsOutOfBudget)} fora do orçado`} icon={<BarChart3 className="h-4 w-4" />} tone="green" href="/cargos-salarios/estrutura-quadro" />
+            <MetricCard title="Abaixo da faixa" value={formatNumber(cards.employeesBelowRange)} description="Requer análise de enquadramento" icon={<FileBarChart className="h-4 w-4" />} tone="red" href="/cargos-salarios/enquadramento?situation=ABAIXO_DA_FAIXA" />
             <MetricCard title="Dentro da faixa" value={formatNumber(cards.employeesInRange)} description="Compa-ratio adequado" icon={<FileBarChart className="h-4 w-4" />} tone="blue" href="/cargos-salarios/enquadramento?situation=DENTRO_DA_FAIXA" />
-            <MetricCard title="Orcamento x realizado" value={overview.salaryMasked ? 'Restrito' : formatNumber(cards.budgetVariation, { style: 'currency', currency: 'BRL' })} description="Variacao do periodo" icon={<BarChart3 className="h-4 w-4" />} tone="purple" />
+            <MetricCard title="Orçamento x realizado" value={overview.salaryMasked ? 'Restrito' : formatNumber(cards.budgetVariation, { style: 'currency', currency: 'BRL' })} description="Variação do período" icon={<BarChart3 className="h-4 w-4" />} tone="purple" />
           </div>
 
           <div className="grid grid-cols-1 gap-4 xl:grid-cols-2">
-            <ChartCard title="Quadro previsto x realizado por area">
+            <ChartCard title="Quadro previsto x realizado por área">
               <ResponsiveContainer width="100%" height={280}>
                 <BarChart data={overview.charts.plannedVsRealizedByArea}>
                   <CartesianGrid strokeDasharray="3 3" vertical={false} />
@@ -160,7 +160,7 @@ export default function CargosSalariosPage() {
               </ResponsiveContainer>
             </ChartCard>
 
-            <ChartCard title="Movimentacoes por tipo">
+            <ChartCard title="Movimentações por tipo">
               <ResponsiveContainer width="100%" height={260}>
                 <BarChart data={overview.charts.movementsByType}>
                   <CartesianGrid strokeDasharray="3 3" vertical={false} />

@@ -45,24 +45,24 @@ export default function DescricoesPage() {
   const createDescription = useMutation({
     mutationFn: () => api('/cargos-salarios/descriptions', { method: 'POST', json: form }),
     onSuccess: () => {
-      toast.success('Descricao criada');
+      toast.success('Descrição criada');
       setForm({ jobCatalogId: '', mission: '', responsibilities: '', technicalSkills: '', behavioralSkills: '' });
       qc.invalidateQueries({ queryKey: ['compensation', 'descriptions'] });
     },
-    onError: (error: any) => toast.error(error?.message ?? 'Falha ao criar descricao'),
+    onError: (error: any) => toast.error(error?.message ?? 'Falha ao criar descrição'),
   });
 
   return (
     <div>
       <PageHeader
-        eyebrow="Cargos e Salarios"
-        title="Descricoes de Cargos"
-        description="Elaboracao e versionamento das descricoes, com status de workflow controlado no backend."
-        breadcrumbs={[{ label: 'Inicio', href: '/' }, { label: 'Cargos e Salarios', href: '/cargos-salarios' }, { label: 'Descricoes' }]}
+        eyebrow="Cargos e Salários"
+        title="Descrições de Cargos"
+        description="Elaboração e versionamento das descricoes, com status de workflow controlado no backend."
+        breadcrumbs={[{ label: 'Início', href: '/' }, { label: 'Cargos e Salários', href: '/cargos-salarios' }, { label: 'Descrições' }]}
       />
       <CompensationModuleNav />
 
-      <SectionCard title="Nova versao de descricao">
+      <SectionCard title="Nova versão de descrição">
         <div className="grid grid-cols-1 gap-3 lg:grid-cols-2">
           <div className="lg:col-span-2">
             <Label>Cargo</Label>
@@ -82,7 +82,7 @@ export default function DescricoesPage() {
             <Textarea rows={4} value={form.responsibilities} onChange={(event) => setForm({ ...form, responsibilities: event.target.value })} />
           </div>
           <div>
-            <Label>Competencias tecnicas</Label>
+            <Label>Competencias técnicas</Label>
             <Textarea rows={3} value={form.technicalSkills} onChange={(event) => setForm({ ...form, technicalSkills: event.target.value })} />
           </div>
           <div>
@@ -92,13 +92,13 @@ export default function DescricoesPage() {
           <div className="lg:col-span-2">
             <Button onClick={() => createDescription.mutate()} disabled={!form.jobCatalogId || createDescription.isPending}>
               <Save className="mr-2 h-4 w-4" />
-              Criar descricao
+              Criar descrição
             </Button>
           </div>
         </div>
       </SectionCard>
 
-      <SectionCard title="Descricoes cadastradas" className="mt-4">
+      <SectionCard title="Descrições cadastradas" className="mt-4">
         {descriptionsQuery.isLoading && <LoadingState />}
         <div className="space-y-3">
           {(descriptionsQuery.data ?? []).map((item) => (

@@ -54,14 +54,14 @@ export default function CatalogoCargosPage() {
   return (
     <div>
       <PageHeader
-        eyebrow="Cargos e Salarios"
-        title="Catalogo de Cargos"
+        eyebrow="Cargos e Salários"
+        title="Catálogo de Cargos"
         description="Cadastro estrutural reutilizavel dos cargos, com versionamento e vinculos ao quadro."
-        breadcrumbs={[{ label: 'Inicio', href: '/' }, { label: 'Cargos e Salarios', href: '/cargos-salarios' }, { label: 'Catalogo' }]}
+        breadcrumbs={[{ label: 'Início', href: '/' }, { label: 'Cargos e Salários', href: '/cargos-salarios' }, { label: 'Catálogo' }]}
       />
       <CompensationModuleNav />
 
-      <SectionCard title="Novo cargo" description="O codigo e gerado automaticamente quando deixado em branco.">
+      <SectionCard title="Novo cargo" description="O código é gerado automaticamente quando deixado em branco.">
         <div className="grid grid-cols-1 gap-3 lg:grid-cols-6">
           <div className="lg:col-span-2">
             <Label>Nome do cargo</Label>
@@ -87,12 +87,12 @@ export default function CatalogoCargosPage() {
               <option value="tecnico">Tecnico</option>
               <option value="especialista">Especialista</option>
               <option value="lideranca">Lideranca</option>
-              <option value="gestao">Gestao</option>
+              <option value="gestao">Gestão</option>
               <option value="executivo">Executivo</option>
             </NativeSelect>
           </div>
           <div className="lg:col-span-5">
-            <Label>Descricao resumida</Label>
+            <Label>Descrição resumida</Label>
             <Textarea rows={2} value={form.summary} onChange={(event) => setForm({ ...form, summary: event.target.value })} />
           </div>
           <div className="flex items-end">
@@ -110,7 +110,7 @@ export default function CatalogoCargosPage() {
           <table className="w-full min-w-[820px] text-sm">
             <thead className="border-b text-xs uppercase text-muted-foreground">
               <tr>
-                <th className="py-2 text-left">Codigo</th>
+                <th className="py-2 text-left">Código</th>
                 <th className="py-2 text-left">Cargo</th>
                 <th className="py-2 text-left">Familia</th>
                 <th className="py-2 text-left">Grade/Faixa</th>

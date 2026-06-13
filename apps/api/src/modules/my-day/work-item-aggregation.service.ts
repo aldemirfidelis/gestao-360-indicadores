@@ -4,7 +4,7 @@ import { AuthPayload } from '../auth/auth.types';
 import { WorkItemPriorityService } from './work-item-priority.service';
 import type { WorkItemAction } from '@g360/shared';
 
-/** Item "rascunho" coletado de um modulo de origem, antes da priorizacao. */
+/** Item "rascunho" coletado de um modulo de origem, antes da priorização. */
 interface WorkItemDraft {
   sourceModule: string;
   sourceEntityType: string;
@@ -46,9 +46,9 @@ const DOC_APPROVAL_STATUS = ['WAITING_APPROVAL', 'IN_APPROVAL'];
 const DOC_REVIEW_STATUS = ['WAITING_REVIEW', 'ADJUSTMENTS_REQUESTED', 'PERIODIC_REVIEW', 'NEAR_EXPIRATION', 'EXPIRED'];
 
 /**
- * Camada central de leitura/agregacao da Central "Meu Dia".
- * Consulta os modulos AUTORIZADOS, consolida itens relevantes do usuario e
- * mantem a projecao WorkItemIndex (que SEMPRE referencia o registro original).
+ * Camada central de leitura/agregação da Central "Meu Dia".
+ * Consulta os módulos AUTORIZADOS, consolida itens relevantes do usuário e
+ * mantém a projeção WorkItemIndex (que SEMPRE referencia o registro original).
  * Nunca duplica o registro de origem como fonte oficial.
  */
 @Injectable()
@@ -60,7 +60,7 @@ export class WorkItemAggregationService {
     private readonly priority: WorkItemPriorityService,
   ) {}
 
-  /** Reconstroi a fatia do indice pertencente ao usuario, a partir das fontes. */
+  /** Reconstrói a fatia do índice pertencente ao usuário, a partir das fontes. */
   async rebuildForUser(me: AuthPayload): Promise<number> {
     const companyId = me.companyId;
     const now = new Date();
@@ -145,7 +145,7 @@ export class WorkItemAggregationService {
       });
     }
 
-    // Remove itens que nao estao mais pendentes para este usuario (resolvidos na origem).
+    // Remove itens que não estão mais pendentes para este usuário (resolvidos na origem).
     await this.prisma.workItemIndex.deleteMany({
       where: { companyId, assignedUserId: me.sub, dedupeKey: { notIn: seenKeys.length ? seenKeys : ['__none__'] } },
     });
@@ -187,7 +187,7 @@ export class WorkItemAggregationService {
     });
   }
 
-  /** Reconstroi a fatia de um usuario arbitrario (bus de eventos / visao de equipe). */
+  /** Reconstrói a fatia de um usuário arbitrário (bus de eventos / visão de equipe). */
   async rebuildFor(companyId: string, userId: string): Promise<number> {
     return this.rebuildForUser({ sub: userId, companyId, email: '', name: '', role: 'VIEWER' as any });
   }
@@ -400,13 +400,13 @@ export class WorkItemAggregationService {
       const d = r.document;
       const availableActions: WorkItemAction[] = isOperatorTask
         ? [
-            { key: 'approve', label: 'Liberar edicao', kind: 'primary', inline: true },
+            { key: 'approve', label: 'Liberar edição', kind: 'primary', inline: true },
             { key: 'reject', label: 'Rejeitar', kind: 'danger', inline: true, requiresJustification: true },
             { key: 'open', label: 'Abrir documento', href: `/documents?focus=${d.id}` },
           ]
         : [
             { key: 'open', label: 'Editar documento', href: `/documents?focus=${d.id}&edit=1` },
-            { key: 'complete', label: 'Concluir edicao', inline: true },
+            { key: 'complete', label: 'Concluir edição', inline: true },
           ];
       return {
         sourceModule: 'documents',
@@ -414,11 +414,11 @@ export class WorkItemAggregationService {
         sourceEntityId: r.id,
         itemType: isOperatorTask ? 'DOCUMENT_EDIT_APPROVAL' : 'DOCUMENT_EDIT',
         title: isOperatorTask
-          ? `Liberar edicao: ${d.code ? d.code + ' - ' : ''}${d.title}`
+          ? `Liberar edição: ${d.code ? d.code + ' - ' : ''}${d.title}`
           : `Editar documento: ${d.code ? d.code + ' - ' : ''}${d.title}`,
         summary: isOperatorTask
-          ? `Solicitante: ${r.requester?.name ?? 'Usuario'} - ${r.reason ?? 'Sem justificativa'}`
-          : `Liberado para edicao online - ${r.status}`,
+          ? `Solicitante: ${r.requester?.name ?? 'Usuário'} - ${r.reason ?? 'Sem justificativa'}`
+          : `Liberado para edição online - ${r.status}`,
         status: r.status,
         criticality: isOperatorTask ? 'HIGH' : 'MEDIUM',
         dueAt: r.expiresAt,
@@ -427,7 +427,7 @@ export class WorkItemAggregationService {
         orgNodeId: d.orgNodeId,
         requiresDecision: isOperatorTask,
         isBlocking: isOperatorTask,
-        recommendedAction: isOperatorTask ? 'Aprovar ou rejeitar a edicao do documento' : 'Abrir o documento e editar',
+        recommendedAction: isOperatorTask ? 'Aprovar ou rejeitar a edição do documento' : 'Abrir o documento e editar',
         availableActions,
         context: {
           documentId: d.id,

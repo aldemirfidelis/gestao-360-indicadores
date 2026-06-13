@@ -25,30 +25,30 @@ export default function AprovacoesCargosSalariosPage() {
   const runAction = useMutation({
     mutationFn: ({ url, method, body }: { url: string; method: 'PATCH' | 'POST'; body?: Record<string, unknown> }) => api(url, { method, json: body ?? {} }),
     onSuccess: () => {
-      toast.success('Aprovacao atualizada');
+      toast.success('Aprovação atualizada');
       qc.invalidateQueries({ queryKey: ['compensation', 'approvals'] });
       qc.invalidateQueries({ queryKey: ['compensation', 'movements'] });
       qc.invalidateQueries({ queryKey: ['compensation', 'salary-tables'] });
       qc.invalidateQueries({ queryKey: ['compensation', 'simulations'] });
     },
-    onError: (error: any) => toast.error(error?.message ?? 'Falha ao atualizar aprovacao'),
+    onError: (error: any) => toast.error(error?.message ?? 'Falha ao atualizar aprovação'),
   });
   const data = approvalsQuery.data;
 
   return (
     <div>
       <PageHeader
-        eyebrow="Cargos e Salarios"
-        title="Aprovacoes"
-        description="Fila integrada de movimentacoes, descricoes, tabelas salariais e simulacoes do modulo."
-        breadcrumbs={[{ label: 'Inicio', href: '/' }, { label: 'Cargos e Salarios', href: '/cargos-salarios' }, { label: 'Aprovacoes' }]}
+        eyebrow="Cargos e Salários"
+        title="Aprovações"
+        description="Fila integrada de movimentações, descrições, tabelas salariais e simulações do módulo."
+        breadcrumbs={[{ label: 'Início', href: '/' }, { label: 'Cargos e Salários', href: '/cargos-salarios' }, { label: 'Aprovações' }]}
       />
       <CompensationModuleNav />
 
       {approvalsQuery.isLoading && <LoadingState />}
 
       <div className="grid grid-cols-1 gap-4 xl:grid-cols-2">
-        <SectionCard title={`Movimentacoes (${data?.movements.length ?? 0})`}>
+        <SectionCard title={`Movimentações (${data?.movements.length ?? 0})`}>
           <div className="space-y-2">
             {(data?.movements ?? []).map((movement) => (
               <div key={movement.id} className="rounded-md border p-3">
@@ -85,7 +85,7 @@ export default function AprovacoesCargosSalariosPage() {
           </div>
         </SectionCard>
 
-        <SectionCard title={`Descricoes de cargos (${data?.descriptions.length ?? 0})`}>
+        <SectionCard title={`Descrições de cargos (${data?.descriptions.length ?? 0})`}>
           <div className="space-y-2">
             {(data?.descriptions ?? []).map((description) => (
               <div key={description.id} className="rounded-md border p-3">
@@ -130,7 +130,7 @@ export default function AprovacoesCargosSalariosPage() {
           </div>
         </SectionCard>
 
-        <SectionCard title={`Simulacoes (${data?.simulations.length ?? 0})`}>
+        <SectionCard title={`Simulações (${data?.simulations.length ?? 0})`}>
           <div className="space-y-2">
             {(data?.simulations ?? []).map((simulation) => (
               <div key={simulation.id} className="rounded-md border p-3">
@@ -143,7 +143,7 @@ export default function AprovacoesCargosSalariosPage() {
                 </div>
                 <div className="mt-3">
                   <Button size="sm" variant="outline" onClick={() => runAction.mutate({ url: `/cargos-salarios/simulations/${simulation.id}/approve`, method: 'PATCH' })} disabled={runAction.isPending}>
-                    Aprovar simulacao
+                    Aprovar simulação
                   </Button>
                 </div>
               </div>

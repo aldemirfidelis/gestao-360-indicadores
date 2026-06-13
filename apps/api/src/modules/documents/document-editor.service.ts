@@ -12,7 +12,7 @@ export interface DocumentEditorStatus {
   recommendationUrl?: string | null;
 }
 
-/** Conteudo assinado dentro do access_token WOPI (stateless). */
+/** Conteúdo assinado dentro do access_token WOPI (stateless). */
 export interface WopiTokenPayload {
   fileId: string;
   documentId: string;
@@ -34,9 +34,9 @@ export interface EditorSession extends DocumentEditorStatus {
 }
 
 const MANUAL_MESSAGE =
-  'Editor DOCX online nao configurado. Use download/upload de nova versao ou configure Microsoft 365 para edicao segura via WOPI.';
+  'Editor DOCX online não configurado. Use download/upload de nova versão ou configure Microsoft 365 para edição segura via WOPI.';
 const MICROSOFT_MESSAGE =
-  'Microsoft 365 para web nao configurado. Configure DOCUMENT_EDITOR_PROVIDER=microsoft_365, DOCUMENT_EDITOR_WOPI_BASE e MICROSOFT_365_WOPI_ACTION_URL. Para empresas sem licenca Microsoft 365, recomendamos contratar a licenca corporativa antes de liberar edicao online.';
+  'Microsoft 365 para web não configurado. Configure DOCUMENT_EDITOR_PROVIDER=microsoft_365, DOCUMENT_EDITOR_WOPI_BASE e MICROSOFT_365_WOPI_ACTION_URL. Para empresas sem licença Microsoft 365, recomendamos contratar a licença corporativa antes de liberar edição online.';
 const MICROSOFT_RECOMMENDATION_URL =
   'https://www.microsoft.com/pt-br/microsoft-365/business/microsoft-365-plans-and-pricing';
 
@@ -58,7 +58,7 @@ export class DocumentEditorService {
     return raw || 'manual';
   }
 
-  /** URL publica do editor WOPI ou action URL Microsoft, sem barra final. */
+  /** URL pública do editor WOPI ou action URL Microsoft, sem barra final. */
   get serverUrl(): string | null {
     const raw =
       this.provider === 'microsoft_365'
@@ -68,9 +68,9 @@ export class DocumentEditorService {
   }
 
   /**
-   * Base publica da API que o Document Server usa para chamar o host WOPI
-   * (ex.: https://gestao360.org/api). Precisa ser alcancavel pelo Microsoft 365
-   * para web ou pelo document server. Sem ela, o editor online nao consegue
+   * Base pública da API que o Document Server usa para chamar o host WOPI
+   * (ex.: https://gestao360.org/api). Precisa ser alcançável pelo Microsoft 365
+   * para web ou pelo document server. Sem ela, o editor online não consegue
    * ler/salvar o arquivo.
    */
   get wopiBase(): string | null {
@@ -89,7 +89,7 @@ export class DocumentEditorService {
     if (!online) {
       if (this.provider !== 'manual' && this.serverUrl && !this.wopiBase) {
         message =
-          'DOCUMENT_EDITOR_WOPI_BASE ausente: defina a URL publica da API (ex.: https://seu-dominio/api) que o editor WOPI deve usar para ler/salvar os documentos.';
+          'DOCUMENT_EDITOR_WOPI_BASE ausente: defina a URL pública da API (ex.: https://seu-dominio/api) que o editor WOPI deve usar para ler/salvar os documentos.';
       } else if (this.provider === 'microsoft_365') {
         message = MICROSOFT_MESSAGE;
       } else {
@@ -201,14 +201,14 @@ export class DocumentEditorService {
         editorUrl = appendEditorParams(urlsrc, wopiSrc, this.provider);
       } else {
         message = this.provider === 'microsoft_365'
-          ? 'Nao foi possivel resolver a action URL do Microsoft 365 para web.'
-          : 'Nao foi possivel resolver a URL do editor a partir da discovery WOPI.';
+          ? 'Não foi possível resolver a action URL do Microsoft 365 para web.'
+          : 'Não foi possível resolver a URL do editor a partir da discovery WOPI.';
       }
     } catch (err) {
       this.logger.error(`Falha ao resolver editor WOPI: ${(err as Error).message}`);
       message = this.provider === 'microsoft_365'
-        ? 'Microsoft 365 para web inacessivel ou action URL invalida. Verifique MICROSOFT_365_WOPI_ACTION_URL.'
-        : 'Servidor de documentos inacessivel (discovery). Verifique DOCUMENT_EDITOR_URL e a rede.';
+        ? 'Microsoft 365 para web inacessível ou action URL inválida. Verifique MICROSOFT_365_WOPI_ACTION_URL.'
+        : 'Servidor de documentos inacessível (discovery). Verifique DOCUMENT_EDITOR_URL e a rede.';
     }
 
     return {
@@ -222,7 +222,7 @@ export class DocumentEditorService {
   }
 
   /**
-   * Resolve o urlsrc do editor para a extensao do arquivo via discovery do
+   * Resolve o urlsrc do editor para a extensão do arquivo via discovery do
    * document server (`/hosting/discovery`), com cache de 1h.
    */
   private async resolveEditorUrl(fileName: string): Promise<string | null> {
@@ -292,8 +292,8 @@ function safeEqual(a: string, b: string): boolean {
 }
 
 /**
- * Extrai do XML de discovery o mapa extensao -> urlsrc, preferindo a acao de
- * edicao (name="edit"). Tolerante ao formato de document servers WOPI.
+ * Extrai do XML de discovery o mapa extensão -> urlsrc, preferindo a ação de
+ * edição (name="edit"). Tolerante ao formato de document servers WOPI.
  */
 function parseDiscovery(xml: string): Map<string, string> {
   const actions = new Map<string, string>();

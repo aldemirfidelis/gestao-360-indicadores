@@ -75,10 +75,10 @@ export default function TabelasSalariaisPage() {
   return (
     <div>
       <PageHeader
-        eyebrow="Cargos e Salarios"
+        eyebrow="Cargos e Salários"
         title="Tabelas Salariais"
-        description="Tabelas com vigencia, versao e faixas. Alteracoes em tabela publicada exigem nova revisao."
-        breadcrumbs={[{ label: 'Inicio', href: '/' }, { label: 'Cargos e Salarios', href: '/cargos-salarios' }, { label: 'Tabelas Salariais' }]}
+        description="Tabelas com vigência, versão e faixas. Alterações em tabela publicada exigem nova revisão."
+        breadcrumbs={[{ label: 'Início', href: '/' }, { label: 'Cargos e Salários', href: '/cargos-salarios' }, { label: 'Tabelas Salariais' }]}
       />
       <CompensationModuleNav />
 
@@ -89,7 +89,7 @@ export default function TabelasSalariaisPage() {
             <Input value={form.name} onChange={(event) => setForm({ ...form, name: event.target.value })} />
           </div>
           <div>
-            <Label>Vigencia inicial</Label>
+            <Label>Vigência inicial</Label>
             <Input type="date" value={form.effectiveFrom} onChange={(event) => setForm({ ...form, effectiveFrom: event.target.value })} />
           </div>
           <div>
@@ -104,11 +104,11 @@ export default function TabelasSalariaisPage() {
             <Input value={form.band} onChange={(event) => setForm({ ...form, band: event.target.value })} />
           </div>
           <div>
-            <Label>Minimo</Label>
+            <Label>Mínimo</Label>
             <Input type="number" value={form.minSalary} onChange={(event) => setForm({ ...form, minSalary: event.target.value })} />
           </div>
           <div>
-            <Label>Ponto medio</Label>
+            <Label>Ponto médio</Label>
             <Input type="number" value={form.midpointSalary} onChange={(event) => setForm({ ...form, midpointSalary: event.target.value })} />
           </div>
           <div>
@@ -130,9 +130,9 @@ export default function TabelasSalariaisPage() {
           <table className="w-full min-w-[840px] text-sm">
             <thead className="border-b text-xs uppercase text-muted-foreground">
               <tr>
-                <th className="py-2 text-left">Codigo</th>
+                <th className="py-2 text-left">Código</th>
                 <th className="py-2 text-left">Nome</th>
-                <th className="py-2 text-left">Vigencia</th>
+                <th className="py-2 text-left">Vigência</th>
                 <th className="py-2 text-left">Versao</th>
                 <th className="py-2 text-left">Faixas</th>
                 <th className="py-2 text-left">Status</th>

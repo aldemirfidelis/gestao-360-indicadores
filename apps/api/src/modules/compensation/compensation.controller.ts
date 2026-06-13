@@ -58,7 +58,7 @@ export class CompensationController {
   @Post('jobs/:id/version')
   @RequirePermissions('compensation:jobs:update', ...MANAGE)
   versionJob(@CurrentUser() me: AuthPayload, @Param('id') id: string, @Body() body: Record<string, unknown>) {
-    return this.service.versionJob(me, id, String(body.reason ?? 'Nova versao'));
+    return this.service.versionJob(me, id, String(body.reason ?? 'Nova versão'));
   }
 
   @Patch('jobs/:id/inactivate')
@@ -130,7 +130,7 @@ export class CompensationController {
   @Post('salary-tables/:id/revision')
   @RequirePermissions('compensation:salary-table:update', ...MANAGE)
   createSalaryTableRevision(@CurrentUser() me: AuthPayload, @Param('id') id: string, @Body() body: Record<string, unknown>) {
-    return this.service.createSalaryTableRevision(me, id, String(body.justification ?? 'Nova revisao'));
+    return this.service.createSalaryTableRevision(me, id, String(body.justification ?? 'Nova revisão'));
   }
 
   @Get('enquadramento')
