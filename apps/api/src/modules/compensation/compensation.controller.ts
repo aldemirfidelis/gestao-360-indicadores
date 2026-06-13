@@ -169,6 +169,78 @@ export class CompensationController {
     return this.service.applyMovement(me, id);
   }
 
+  @Get('cycles')
+  @RequirePermissions(...VIEW)
+  listCycles(@CurrentUser() me: AuthPayload, @Query() query: Record<string, string | undefined>) {
+    return this.service.listCycles(me, query);
+  }
+
+  @Post('cycles')
+  @RequirePermissions(...MANAGE)
+  createCycle(@CurrentUser() me: AuthPayload, @Body() body: Record<string, unknown>) {
+    return this.service.createCycle(me, body);
+  }
+
+  @Get('budgets')
+  @RequirePermissions(...VIEW)
+  listBudgets(@CurrentUser() me: AuthPayload, @Query() query: Record<string, string | undefined>) {
+    return this.service.listBudgets(me, query);
+  }
+
+  @Post('budgets')
+  @RequirePermissions(...MANAGE)
+  createBudget(@CurrentUser() me: AuthPayload, @Body() body: Record<string, unknown>) {
+    return this.service.createBudget(me, body);
+  }
+
+  @Get('salary-surveys')
+  @RequirePermissions(...VIEW)
+  listSalarySurveys(@CurrentUser() me: AuthPayload, @Query() query: Record<string, string | undefined>) {
+    return this.service.listSalarySurveys(me, query);
+  }
+
+  @Post('salary-surveys')
+  @RequirePermissions(...MANAGE)
+  createSalarySurvey(@CurrentUser() me: AuthPayload, @Body() body: Record<string, unknown>) {
+    return this.service.createSalarySurvey(me, body);
+  }
+
+  @Get('simulations')
+  @RequirePermissions(...VIEW)
+  listSimulations(@CurrentUser() me: AuthPayload, @Query() query: Record<string, string | undefined>) {
+    return this.service.listSimulations(me, query);
+  }
+
+  @Post('simulations')
+  @RequirePermissions(...MANAGE)
+  createSimulation(@CurrentUser() me: AuthPayload, @Body() body: Record<string, unknown>) {
+    return this.service.createSimulation(me, body);
+  }
+
+  @Patch('simulations/:id/approve')
+  @RequirePermissions(...MANAGE)
+  approveSimulation(@CurrentUser() me: AuthPayload, @Param('id') id: string) {
+    return this.service.approveSimulation(me, id);
+  }
+
+  @Get('approvals')
+  @RequirePermissions(...VIEW)
+  approvals(@CurrentUser() me: AuthPayload) {
+    return this.service.approvals(me);
+  }
+
+  @Get('settings')
+  @RequirePermissions(...VIEW)
+  settings(@CurrentUser() me: AuthPayload) {
+    return this.service.settings(me);
+  }
+
+  @Patch('settings')
+  @RequirePermissions(...MANAGE)
+  saveSettings(@CurrentUser() me: AuthPayload, @Body() body: Record<string, unknown>) {
+    return this.service.saveSettings(me, body);
+  }
+
   @Get('reports')
   @RequirePermissions('compensation:reports:view', ...VIEW)
   reports(@CurrentUser() me: AuthPayload) {
@@ -181,4 +253,3 @@ export class CompensationController {
     return this.service.auditTimeline(me, query);
   }
 }
-

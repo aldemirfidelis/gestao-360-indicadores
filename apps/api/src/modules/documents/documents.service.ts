@@ -895,6 +895,99 @@ export class DocumentsService {
     return request;
   }
 
+  async grantEditRequest(me: AuthPayload, id: string, body: any = {}) {
+    const doc = await this.loadScoped(id, me.companyId);
+    await this.assertViewArea(me, doc);
+    await this.assertCanOperateDocumentEdit(me, doc);
+
+    const requesterUserId = this.requiredText(body?.requesterUserId, 'Usuario para edicao');
+    const requester = await this.prisma.user.findFirst({
+      where: { id: requesterUserId, companyId: me.companyId, deletedAt: null, active: true, status: 'ACTIVE' },
+      select: { id: true },
+    });
+    if (!requester) throw new NotFoundException('Usuario solicitante nao encontrado ou inativo.');
+
+    const note = this.nullableText(body?.note ?? body?.reason) ?? 'Liberacao direta de edicao pelo operador.';
+    const expiresAt = this.optionalDate(body?.expiresAt, 'Prazo da liberacao') ?? null;
+    const existing = await this.prisma.documentEditRequest.findFirst({
+      where: {
+        companyId: me.companyId,
+        documentId: id,
+        requesterUserId,
+        status: { in: ACTIVE_EDIT_REQUEST_STATUSES },
+      },
+      orderBy: { createdAt: 'desc' },
+    });
+
+    if (existing?.status === 'APPROVED' || existing?.status === 'IN_PROGRESS') {
+      return this.loadEditRequest(me.companyId, existing.id);
+    }
+
+    const granted = await this.prisma.$transaction(async (tx) => {
+      let versionId = existing?.versionId ?? null;
+      let document = doc;
+      if (!EDITABLE_STATUSES.has(document.status as DocumentStatus)) {
+        const revision = await this.createRevisionForEditRequestTx(tx, me, document, note);
+        versionId = revision.version.id;
+        document = revision.document;
+      } else if (!versionId) {
+        const latest = await this.ensureLatestVersionTx(tx, document, me.sub);
+        versionId = latest.id;
+      }
+
+      const include = {
+        requester: { select: { id: true, name: true, email: true } },
+        operator: { select: { id: true, name: true, email: true } },
+        decidedBy: { select: { id: true, name: true, email: true } },
+      };
+
+      const request = existing
+        ? await tx.documentEditRequest.update({
+            where: { id: existing.id },
+            data: {
+              status: 'APPROVED',
+              versionId,
+              operatorUserId: me.sub,
+              decidedById: me.sub,
+              decisionNote: note,
+              approvedAt: new Date(),
+              expiresAt,
+            },
+            include,
+          })
+        : await tx.documentEditRequest.create({
+            data: {
+              companyId: me.companyId,
+              documentId: id,
+              versionId,
+              requesterUserId,
+              operatorUserId: me.sub,
+              decidedById: me.sub,
+              status: 'APPROVED',
+              reason: note,
+              decisionNote: note,
+              approvedAt: new Date(),
+              expiresAt,
+            },
+            include,
+          });
+
+      await this.auditTx(
+        tx,
+        me,
+        document.id,
+        'EDIT_REQUEST_GRANTED',
+        existing ? { requestId: existing.id, status: existing.status } : null,
+        { requestId: request.id, status: 'APPROVED', requesterUserId, versionId },
+        note,
+      );
+      return request;
+    });
+
+    this.workItems.markDirty(me.companyId, [requesterUserId, me.sub], 'document-edit-granted');
+    return granted;
+  }
+
   async approveEditRequest(me: AuthPayload, requestId: string, body: any = {}) {
     const request = await this.loadEditRequest(me.companyId, requestId);
     await this.assertCanDecideEditRequest(me, request);
@@ -1017,6 +1110,10 @@ export class DocumentsService {
   async openEditor(me: AuthPayload, id: string) {
     const doc = await this.loadScoped(id, me.companyId);
     await this.assertViewArea(me, doc);
+    const approvedRequest = await this.findApprovedEditRequest(me, doc.id);
+    if (!approvedRequest) {
+      throw new ForbiddenException('Edicao online precisa de liberacao do operador.');
+    }
 
     // Sem provedor online configurado: mantem o fluxo manual (download/upload).
     if (!this.editor.isOnline()) {
@@ -1031,12 +1128,10 @@ export class DocumentsService {
         companyId: me.companyId,
         userId: me.sub,
         userName: me.name,
-        canWrite: false,
+        canWrite: true,
       });
     }
 
-    const approvedRequest = await this.findApprovedEditRequest(me, doc.id);
-    const canWrite = (await this.canWriteDoc(me, doc)) || Boolean(approvedRequest);
     let editableDoc = doc;
     if (approvedRequest && !EDITABLE_STATUSES.has(doc.status)) {
       const updated = await this.prisma.$transaction(async (tx) => {
@@ -1051,11 +1146,11 @@ export class DocumentsService {
       documentId: id,
       fileId: file.id,
       fileName: file.fileName,
-      companyId: me.companyId,
-      userId: me.sub,
-      userName: me.name,
-      canWrite,
-    });
+        companyId: me.companyId,
+        userId: me.sub,
+        userName: me.name,
+        canWrite: true,
+      });
     await this.prisma.documentEditorSession.create({
       data: {
         companyId: me.companyId,
@@ -1384,9 +1479,8 @@ export class DocumentsService {
     return user.id;
   }
 
-  private async assertCanDecideEditRequest(me: AuthPayload, request: any) {
-    const doc = request.document;
-    if (request.operatorUserId === me.sub || doc.ownerUserId === me.sub || doc.approverUserId === me.sub || doc.createdById === me.sub) return;
+  private async assertCanOperateDocumentEdit(me: AuthPayload, doc: any) {
+    if (doc.ownerUserId === me.sub || doc.approverUserId === me.sub || doc.createdById === me.sub) return;
     if (['SUPER_ADMIN', 'COMPANY_ADMIN'].includes(String(me.role))) return;
     const area = this.areaOf(doc);
     if (area) {
@@ -1398,6 +1492,11 @@ export class DocumentsService {
       }
     }
     throw new ForbiddenException('Voce nao pode liberar edicao deste documento.');
+  }
+
+  private async assertCanDecideEditRequest(me: AuthPayload, request: any) {
+    if (request.operatorUserId === me.sub) return;
+    await this.assertCanOperateDocumentEdit(me, request.document);
   }
 
   private async findApprovedEditRequest(me: AuthPayload, documentId: string) {

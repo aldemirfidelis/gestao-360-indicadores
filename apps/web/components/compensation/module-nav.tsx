@@ -2,7 +2,6 @@
 
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { Badge } from '@/components/ui/badge';
 import { cn } from '@/lib/utils';
 
 const sections = [
@@ -13,16 +12,13 @@ const sections = [
   { label: 'Tabelas Salariais', href: '/cargos-salarios/tabelas-salariais' },
   { label: 'Enquadramento', href: '/cargos-salarios/enquadramento' },
   { label: 'Movimentacoes', href: '/cargos-salarios/movimentacoes' },
+  { label: 'Ciclos de Merito', href: '/cargos-salarios/ciclos' },
+  { label: 'Orcamento de Pessoal', href: '/cargos-salarios/orcamento' },
+  { label: 'Pesquisas Salariais', href: '/cargos-salarios/pesquisas' },
+  { label: 'Simulacoes', href: '/cargos-salarios/simulacoes' },
+  { label: 'Aprovacoes', href: '/cargos-salarios/aprovacoes' },
+  { label: 'Configuracoes', href: '/cargos-salarios/configuracoes' },
   { label: 'Relatorios', href: '/cargos-salarios/relatorios' },
-] as const;
-
-const planned = [
-  'Ciclos de Merito',
-  'Orcamento de Pessoal',
-  'Pesquisas Salariais',
-  'Simulacoes',
-  'Aprovacoes',
-  'Configuracoes',
 ] as const;
 
 export function CompensationModuleNav() {
@@ -44,12 +40,6 @@ export function CompensationModuleNav() {
           </Link>
         );
       })}
-      {planned.map((label) => (
-        <Badge key={label} variant="outline" className="rounded-md px-2.5 py-1 text-[11px] text-muted-foreground">
-          {label}
-        </Badge>
-      ))}
     </div>
   );
 }
-

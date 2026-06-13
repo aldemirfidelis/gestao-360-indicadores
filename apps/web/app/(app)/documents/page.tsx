@@ -349,6 +349,8 @@ export default function DocumentsPage() {
   const [form, setForm] = useState<DocForm>(EMPTY_FORM);
   const [typeForm, setTypeForm] = useState({ name: 'Procedimento', sigla: 'PRO', prefix: 'PRO', category: 'PROCEDURE' as DocType, digits: '3', defaultValidityDays: '365', alertDays: '30' });
   const [templateForm, setTemplateForm] = useState({ name: '', typeConfigId: '', content: '' });
+  const [grantOpen, setGrantOpen] = useState(false);
+  const [grantForm, setGrantForm] = useState({ requesterUserId: '', reason: '', expiresAt: '' });
   const [draftContent, setDraftContent] = useState('');
   const [editorSession, setEditorSession] = useState<EditorSession | null>(null);
   const [viewer, setViewer] = useState<{ url: string; fileId: string; fileName: string } | null>(null);
@@ -458,7 +460,7 @@ export default function DocumentsPage() {
       request.requesterUserId === user.id && ['APPROVED', 'IN_PROGRESS'].includes(request.status),
     ) ?? null;
   }, [detail, user?.id]);
-  const canEditOnline = canUpdate || Boolean(myActiveEditRequest);
+  const canEditOnline = Boolean(myActiveEditRequest);
 
   useEffect(() => {
     if (detail) setDraftContent(detail.content ?? '');
@@ -568,10 +570,10 @@ export default function DocumentsPage() {
   });
 
   useEffect(() => {
-    if (!detail || searchParams.get('edit') !== '1' || autoOpenEditorRef.current === detail.id) return;
+    if (!detail || !myActiveEditRequest || searchParams.get('edit') !== '1' || autoOpenEditorRef.current === detail.id) return;
     autoOpenEditorRef.current = detail.id;
     openEditor.mutate(detail.id);
-  }, [detail?.id, searchParams]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [detail?.id, myActiveEditRequest?.id, searchParams]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const requestEdit = useMutation({
     mutationFn: ({ id, reason }: { id: string; reason?: string }) =>
@@ -581,6 +583,19 @@ export default function DocumentsPage() {
       invalidate(qc);
     },
     onError: (e: any) => toast.error(e?.message ?? 'Nao foi possivel solicitar edicao'),
+  });
+
+  const grantEdit = useMutation({
+    mutationFn: ({ id, requesterUserId, reason, expiresAt }: { id: string; requesterUserId: string; reason?: string; expiresAt?: string }) =>
+      api(`/documents/${id}/edit-requests/grant`, { method: 'POST', json: { requesterUserId, reason, expiresAt: expiresAt || undefined } }),
+    onSuccess: () => {
+      toast.success('Edicao enviada para o usuario');
+      setGrantOpen(false);
+      setGrantForm({ requesterUserId: '', reason: '', expiresAt: '' });
+      invalidate(qc);
+      void qc.invalidateQueries({ queryKey: ['my-day'] });
+    },
+    onError: (e: any) => toast.error(e?.message ?? 'Nao foi possivel liberar edicao'),
   });
 
   const decideEdit = useMutation({
@@ -985,16 +1000,28 @@ export default function DocumentsPage() {
                             <Download className="mr-2 h-4 w-4" />Baixar DOCX
                           </Button>
                         )}
-                        <Button variant="outline" className="w-full justify-start" disabled={requestEdit.isPending} onClick={() => {
-                          const reason = window.prompt('Descreva o motivo da revisao/edicao');
-                          if (reason === null) return;
-                          requestEdit.mutate({ id: detail.id, reason: reason || undefined });
-                        }}>
-                          <Send className="mr-2 h-4 w-4" />Solicitar edicao
-                        </Button>
-                        <Button className="w-full justify-start" disabled={!canEditOnline || openEditor.isPending} onClick={() => openEditor.mutate(detail.id)}>
-                          <Edit className="mr-2 h-4 w-4" />Editar no Microsoft 365
-                        </Button>
+                        {!myActiveEditRequest && (
+                          <Button variant="outline" className="w-full justify-start" disabled={requestEdit.isPending} onClick={() => {
+                            const reason = window.prompt('Descreva o motivo da revisao/edicao');
+                            if (reason === null) return;
+                            requestEdit.mutate({ id: detail.id, reason: reason || undefined });
+                          }}>
+                            <Send className="mr-2 h-4 w-4" />Solicitar edicao
+                          </Button>
+                        )}
+                        {myActiveEditRequest && (
+                          <Button className="w-full justify-start" disabled={!canEditOnline || openEditor.isPending} onClick={() => openEditor.mutate(detail.id)}>
+                            <Edit className="mr-2 h-4 w-4" />Editar Documento
+                          </Button>
+                        )}
+                        {canUpdate && (
+                          <Button className="w-full justify-start" onClick={() => {
+                            setGrantForm({ requesterUserId: '', reason: '', expiresAt: '' });
+                            setGrantOpen(true);
+                          }}>
+                            <Edit className="mr-2 h-4 w-4" />Editar Documento
+                          </Button>
+                        )}
                         {myActiveEditRequest && (
                           <Button variant="outline" className="w-full justify-start" disabled={decideEdit.isPending} onClick={() => decideEdit.mutate({ requestId: myActiveEditRequest.id, action: 'complete' })}>
                             <CheckCircle2 className="mr-2 h-4 w-4" />Concluir edicao
@@ -1073,9 +1100,19 @@ export default function DocumentsPage() {
                       <Button onClick={() => autosave.mutate({ id: detail.id, content: draftContent })} disabled={!isEditable(detail.status) || autosave.isPending || !canUpdate}>
                         <Save className="mr-2 h-4 w-4" />Salvar checkpoint
                       </Button>
-                      <Button variant="outline" onClick={() => openEditor.mutate(detail.id)} disabled={openEditor.isPending || !canEditOnline}>
-                        <Edit className="mr-2 h-4 w-4" />{detail.editor.configured ? 'Editar no Microsoft 365' : 'Abrir editor'}
-                      </Button>
+                      {myActiveEditRequest && (
+                        <Button variant="outline" onClick={() => openEditor.mutate(detail.id)} disabled={openEditor.isPending || !canEditOnline}>
+                          <Edit className="mr-2 h-4 w-4" />Editar Documento
+                        </Button>
+                      )}
+                      {canUpdate && (
+                        <Button variant="outline" onClick={() => {
+                          setGrantForm({ requesterUserId: '', reason: '', expiresAt: '' });
+                          setGrantOpen(true);
+                        }}>
+                          <Edit className="mr-2 h-4 w-4" />Editar Documento
+                        </Button>
+                      )}
                     </div>
                   </div>
                   <div className="space-y-3">
@@ -1162,6 +1199,45 @@ export default function DocumentsPage() {
               </TabsContent>
             </Tabs>
           )}
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={grantOpen} onOpenChange={setGrantOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Liberar edicao do documento</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div className="rounded-md border bg-muted/30 p-3 text-sm text-muted-foreground">
+              O usuario recebera a tarefa para editar o documento. A abertura online so fica disponivel depois desta liberacao.
+            </div>
+            <div>
+              <Label>Usuario responsavel pela edicao</Label>
+              <NativeSelect value={grantForm.requesterUserId} onChange={(event) => setGrantForm((form) => ({ ...form, requesterUserId: event.target.value }))}>
+                <option value="">Selecione o usuario</option>
+                {(options?.users ?? []).map((item) => (
+                  <option key={item.id} value={item.id}>{item.name} - {item.email}</option>
+                ))}
+              </NativeSelect>
+            </div>
+            <div>
+              <Label>Motivo ou orientacao</Label>
+              <Textarea rows={3} value={grantForm.reason} onChange={(event) => setGrantForm((form) => ({ ...form, reason: event.target.value }))} placeholder="Informe o que deve ser revisado ou alterado." />
+            </div>
+            <div>
+              <Label>Prazo da liberacao</Label>
+              <Input type="date" value={grantForm.expiresAt} onChange={(event) => setGrantForm((form) => ({ ...form, expiresAt: event.target.value }))} />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setGrantOpen(false)}>Cancelar</Button>
+            <Button
+              disabled={!detail || !grantForm.requesterUserId || grantEdit.isPending}
+              onClick={() => detail && grantEdit.mutate({ id: detail.id, requesterUserId: grantForm.requesterUserId, reason: grantForm.reason || undefined, expiresAt: grantForm.expiresAt || undefined })}
+            >
+              {grantEdit.isPending ? 'Enviando...' : 'Enviar para edicao'}
+            </Button>
+          </DialogFooter>
         </DialogContent>
       </Dialog>
 

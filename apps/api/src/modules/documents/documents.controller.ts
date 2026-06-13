@@ -160,6 +160,12 @@ export class DocumentsController {
     return this.service.openEditor(me, id);
   }
 
+  @Post(':id/edit-requests/grant')
+  @RequirePermissions('doc:view')
+  grantEditRequest(@CurrentUser() me: AuthPayload, @Param('id') id: string, @Body() body: any) {
+    return this.service.grantEditRequest(me, id, body);
+  }
+
   @Post(':id/edit-requests')
   @RequirePermissions('doc:view')
   requestEdit(@CurrentUser() me: AuthPayload, @Param('id') id: string, @Body() body: any) {

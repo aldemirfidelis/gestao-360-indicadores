@@ -427,7 +427,7 @@ export class WorkItemAggregationService {
         orgNodeId: d.orgNodeId,
         requiresDecision: isOperatorTask,
         isBlocking: isOperatorTask,
-        recommendedAction: isOperatorTask ? 'Aprovar ou rejeitar a edicao do documento' : 'Abrir o documento e editar no Microsoft 365',
+        recommendedAction: isOperatorTask ? 'Aprovar ou rejeitar a edicao do documento' : 'Abrir o documento e editar',
         availableActions,
         context: {
           documentId: d.id,

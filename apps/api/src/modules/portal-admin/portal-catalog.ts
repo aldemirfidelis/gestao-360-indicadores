@@ -48,7 +48,7 @@ export const CATALOG_MODULES: CatalogModule[] = [
   { code: 'deviations', name: 'Análise de Causa', category: 'Lançamentos', route: '/deviations', menuOrder: 8, criticality: 'medium' },
   { code: 'treatments', name: 'Tratativas', category: 'Lançamentos', route: '/treatments', menuOrder: 9, criticality: 'medium' },
   { code: 'imports', name: 'Registrar Evidência', category: 'Lançamentos', route: '/imports', menuOrder: 10, criticality: 'low' },
-  { code: 'compensation', name: 'Cargos e Salarios', description: 'Plano de cargos, quadro, tabelas salariais e movimentacoes', category: 'Gestao de Pessoas', route: '/cargos-salarios', menuOrder: 11, criticality: 'high' },
+  { code: 'compensation', name: 'Cargos e Salarios', description: 'Plano de cargos, quadro, tabelas salariais e movimentacoes', category: 'GestÃ£o', route: '/cargos-salarios', menuOrder: 11, criticality: 'high' },
   { code: 'aprovacoes-cargo', name: 'Aprovações', category: 'Gestão', route: '/aprovacoes-cargo', menuOrder: 12, criticality: 'medium' },
   { code: 'eficacia', name: 'Análise de Eficácia', category: 'Gestão', route: '/eficacia', menuOrder: 13, criticality: 'medium' },
   { code: 'periods', name: 'Períodos', category: 'Gestão', route: '/periods', menuOrder: 14, criticality: 'high' },

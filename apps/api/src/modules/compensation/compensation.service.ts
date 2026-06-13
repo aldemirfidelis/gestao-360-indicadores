@@ -19,6 +19,14 @@ const DESCRIPTION_STATUSES = [
 const MOVEMENT_FINAL_STATUSES = new Set(['APPLIED', 'REJECTED', 'CANCELLED']);
 const POSITION_OPEN_STATUSES = new Set(['OPEN', 'VACANT', 'FUTURE_OPENING', 'IN_APPROVAL']);
 const POSITION_OCCUPIED_STATUSES = new Set(['OCCUPIED', 'ACTIVE']);
+const COMPENSATION_SETTINGS_KEY = 'compensation.settings';
+const DEFAULT_COMPENSATION_SETTINGS = {
+  meritGuidelinePercent: 0.05,
+  requireBudgetForMovements: true,
+  requireApprovalForSalaryTable: true,
+  salaryVisibility: 'restricted',
+  reviewCadenceMonths: 12,
+};
 
 const DESCRIPTION_TRANSITIONS: Record<string, string[]> = {
   DRAFT: ['IN_REVIEW', 'INACTIVE'],
@@ -805,6 +813,227 @@ export class CompensationService {
     return updated;
   }
 
+  async listCycles(me: AuthPayload, query: Record<string, string | undefined>) {
+    await this.ensureBaseline(me);
+    return this.prisma.compensationCycle.findMany({
+      where: {
+        companyId: me.companyId,
+        deletedAt: null,
+        ...(query.status ? { status: query.status } : {}),
+        ...(query.referencePeriod ? { referencePeriod: query.referencePeriod } : {}),
+      },
+      orderBy: [{ referencePeriod: 'desc' }, { createdAt: 'desc' }],
+    });
+  }
+
+  async createCycle(me: AuthPayload, body: Record<string, unknown>) {
+    const data = {
+      companyId: me.companyId,
+      name: requiredString(body.name, 'Nome do ciclo obrigatorio'),
+      referencePeriod: requiredString(body.referencePeriod, 'Periodo de referencia obrigatorio'),
+      criteria: cleanString(body.criteria),
+      guidelinePercent: ratioValue(body.guidelinePercent),
+      totalBudget: money(body.totalBudget),
+      areaBudgets: jsonValue(body.areaBudgets),
+      calendar: jsonValue(body.calendar),
+      workflow: jsonValue(body.workflow),
+      eligibilityRules: jsonValue(body.eligibilityRules),
+      status: optionalString(body.status) ?? 'DRAFT',
+      createdById: me.sub,
+      updatedById: me.sub,
+    };
+    const created = await this.prisma.compensationCycle.create({ data });
+    await this.audit(me, 'CYCLE_CREATED', 'CompensationCycle', created.id, null, created, created.name);
+    return created;
+  }
+
+  async listBudgets(me: AuthPayload, query: Record<string, string | undefined>) {
+    await this.ensureBaseline(me);
+    return this.prisma.compensationBudget.findMany({
+      where: {
+        companyId: me.companyId,
+        deletedAt: null,
+        ...(query.periodRef ? { periodRef: query.periodRef } : {}),
+        ...(query.orgNodeId ? { orgNodeId: query.orgNodeId } : {}),
+        ...(query.costCenter ? { costCenter: query.costCenter } : {}),
+        ...(query.status ? { status: query.status } : {}),
+      },
+      orderBy: [{ periodRef: 'desc' }, { costCenter: 'asc' }, { createdAt: 'desc' }],
+    });
+  }
+
+  async createBudget(me: AuthPayload, body: Record<string, unknown>) {
+    const data = {
+      companyId: me.companyId,
+      periodRef: requiredString(body.periodRef, 'Periodo obrigatorio'),
+      orgNodeId: cleanString(body.orgNodeId),
+      costCenter: cleanString(body.costCenter),
+      plannedHeadcount: intValue(body.plannedHeadcount) ?? 0,
+      plannedPayroll: money(body.plannedPayroll) ?? new Prisma.Decimal(0),
+      plannedBenefits: money(body.plannedBenefits) ?? new Prisma.Decimal(0),
+      plannedCharges: money(body.plannedCharges) ?? new Prisma.Decimal(0),
+      status: optionalString(body.status) ?? 'ACTIVE',
+      createdById: me.sub,
+      updatedById: me.sub,
+    };
+    const created = await this.prisma.compensationBudget.create({ data });
+    await this.audit(me, 'BUDGET_CREATED', 'CompensationBudget', created.id, null, created, created.periodRef);
+    return created;
+  }
+
+  async listSalarySurveys(me: AuthPayload, query: Record<string, string | undefined>) {
+    await this.ensureBaseline(me);
+    return this.prisma.compensationSalarySurvey.findMany({
+      where: {
+        companyId: me.companyId,
+        deletedAt: null,
+        ...(query.periodRef ? { periodRef: query.periodRef } : {}),
+        ...(query.internalJobCatalogId ? { internalJobCatalogId: query.internalJobCatalogId } : {}),
+        ...(query.source ? { source: query.source } : {}),
+      },
+      orderBy: [{ periodRef: 'desc' }, { marketJobName: 'asc' }],
+    });
+  }
+
+  async createSalarySurvey(me: AuthPayload, body: Record<string, unknown>) {
+    const data = {
+      companyId: me.companyId,
+      source: requiredString(body.source, 'Fonte da pesquisa obrigatoria'),
+      provider: cleanString(body.provider),
+      periodRef: requiredString(body.periodRef, 'Periodo obrigatorio'),
+      region: cleanString(body.region),
+      segment: cleanString(body.segment),
+      companySize: cleanString(body.companySize),
+      internalJobCatalogId: cleanString(body.internalJobCatalogId),
+      marketJobName: requiredString(body.marketJobName, 'Cargo de mercado obrigatorio'),
+      minSalary: money(body.minSalary),
+      medianSalary: money(body.medianSalary),
+      averageSalary: money(body.averageSalary),
+      percentile25: money(body.percentile25),
+      percentile50: money(body.percentile50),
+      percentile75: money(body.percentile75),
+      percentile90: money(body.percentile90),
+      benefits: jsonValue(body.benefits),
+      notes: cleanString(body.notes),
+      attachments: jsonValue(body.attachments),
+      createdById: me.sub,
+    };
+    const created = await this.prisma.compensationSalarySurvey.create({ data });
+    await this.audit(me, 'SALARY_SURVEY_CREATED', 'CompensationSalarySurvey', created.id, null, created, created.marketJobName);
+    return created;
+  }
+
+  async listSimulations(me: AuthPayload, query: Record<string, string | undefined>) {
+    await this.ensureBaseline(me);
+    return this.prisma.compensationSimulation.findMany({
+      where: {
+        companyId: me.companyId,
+        deletedAt: null,
+        ...(query.status ? { status: query.status } : {}),
+        ...(query.scenarioType ? { scenarioType: query.scenarioType } : {}),
+      },
+      orderBy: [{ status: 'asc' }, { createdAt: 'desc' }],
+    });
+  }
+
+  async createSimulation(me: AuthPayload, body: Record<string, unknown>) {
+    const monthlyImpact = money(body.monthlyImpact);
+    const annualImpact = money(body.annualImpact) ?? (monthlyImpact ? monthlyImpact.mul(12) : null);
+    const data = {
+      companyId: me.companyId,
+      name: requiredString(body.name, 'Nome da simulacao obrigatorio'),
+      scenarioType: requiredString(body.scenarioType, 'Tipo de cenario obrigatorio'),
+      status: optionalString(body.status) ?? 'DRAFT',
+      assumptions: jsonValue(body.assumptions),
+      results: jsonValue(body.results),
+      monthlyImpact,
+      annualImpact,
+      affectedCount: intValue(body.affectedCount) ?? 0,
+      movementId: cleanString(body.movementId),
+      createdById: me.sub,
+    };
+    const created = await this.prisma.compensationSimulation.create({ data });
+    await this.audit(me, 'SIMULATION_CREATED', 'CompensationSimulation', created.id, null, created, created.name);
+    return created;
+  }
+
+  async approveSimulation(me: AuthPayload, id: string) {
+    const before = await this.prisma.compensationSimulation.findFirst({ where: { id, companyId: me.companyId, deletedAt: null } });
+    if (!before) throw new NotFoundException('Simulacao nao encontrada');
+    const updated = await this.prisma.compensationSimulation.update({
+      where: { id },
+      data: { status: 'APPROVED', approvedById: me.sub, approvedAt: new Date() },
+    });
+    await this.audit(me, 'SIMULATION_APPROVED', 'CompensationSimulation', id, before, updated, updated.name);
+    return updated;
+  }
+
+  async approvals(me: AuthPayload) {
+    await this.ensureBaseline(me);
+    const [movements, descriptions, salaryTables, simulations] = await Promise.all([
+      this.prisma.compensationMovementRequest.findMany({
+        where: { companyId: me.companyId, status: { notIn: Array.from(MOVEMENT_FINAL_STATUSES) } },
+        orderBy: [{ status: 'asc' }, { createdAt: 'desc' }],
+        take: 50,
+      }),
+      this.prisma.compensationJobDescription.findMany({
+        where: { companyId: me.companyId, deletedAt: null, status: { in: ['IN_REVIEW', 'IN_APPROVAL', 'APPROVED'] } },
+        include: { jobCatalog: { select: { id: true, code: true, name: true } } },
+        orderBy: [{ status: 'asc' }, { updatedAt: 'desc' }],
+        take: 50,
+      }),
+      this.prisma.compensationSalaryTable.findMany({
+        where: { companyId: me.companyId, deletedAt: null, status: { not: 'PUBLISHED' } },
+        include: { ranges: true },
+        orderBy: [{ status: 'asc' }, { updatedAt: 'desc' }],
+        take: 50,
+      }),
+      this.prisma.compensationSimulation.findMany({
+        where: { companyId: me.companyId, deletedAt: null, status: { notIn: ['APPROVED', 'CANCELLED'] } },
+        orderBy: [{ status: 'asc' }, { createdAt: 'desc' }],
+        take: 50,
+      }),
+    ]);
+    return { movements, descriptions, salaryTables, simulations };
+  }
+
+  async settings(me: AuthPayload) {
+    const record = await this.prisma.appSetting.findUnique({
+      where: { companyId_key: { companyId: me.companyId, key: COMPENSATION_SETTINGS_KEY } },
+    });
+    return {
+      key: COMPENSATION_SETTINGS_KEY,
+      settings: parseSettings(record?.value),
+      updatedAt: record?.updatedAt ?? null,
+    };
+  }
+
+  async saveSettings(me: AuthPayload, body: Record<string, unknown>) {
+    const input = isPlainObject(body.settings) ? body.settings : body;
+    const current = await this.settings(me);
+    const settings = { ...current.settings, ...input };
+    const saved = await this.prisma.appSetting.upsert({
+      where: { companyId_key: { companyId: me.companyId, key: COMPENSATION_SETTINGS_KEY } },
+      create: {
+        companyId: me.companyId,
+        key: COMPENSATION_SETTINGS_KEY,
+        value: JSON.stringify(settings),
+        valueType: 'json',
+        group: MODULE_NAME,
+        description: 'Configuracoes do modulo de Cargos e Salarios',
+      },
+      update: {
+        value: JSON.stringify(settings),
+        valueType: 'json',
+        group: MODULE_NAME,
+        description: 'Configuracoes do modulo de Cargos e Salarios',
+        active: true,
+      },
+    });
+    await this.audit(me, 'SETTINGS_UPDATED', 'AppSetting', saved.id, current.settings, settings, COMPENSATION_SETTINGS_KEY);
+    return { key: COMPENSATION_SETTINGS_KEY, settings, updatedAt: saved.updatedAt };
+  }
+
   async reports(me: AuthPayload) {
     await this.ensureBaseline(me);
     const [jobs, positions, descriptions, salaryTables, movements, snapshots] = await Promise.all([
@@ -1220,6 +1449,12 @@ function money(value: unknown) {
   return new Prisma.Decimal(number);
 }
 
+function ratioValue(value: unknown) {
+  const decimal = money(value);
+  if (!decimal) return null;
+  return decimal.gt(1) ? decimal.div(100) : decimal;
+}
+
 function requiredMoney(value: unknown, message: string) {
   const decimal = money(value);
   if (!decimal) throw new BadRequestException(message);
@@ -1244,6 +1479,20 @@ function arrayValue(value: unknown) {
 function stringify(value: unknown) {
   if (value === null || value === undefined) return null;
   return JSON.stringify(value, (_key, item) => (typeof item === 'bigint' ? item.toString() : item));
+}
+
+function isPlainObject(value: unknown): value is Record<string, unknown> {
+  return Boolean(value && typeof value === 'object' && !Array.isArray(value));
+}
+
+function parseSettings(value: string | null | undefined) {
+  if (!value) return { ...DEFAULT_COMPENSATION_SETTINGS };
+  try {
+    const parsed = JSON.parse(value);
+    return isPlainObject(parsed) ? { ...DEFAULT_COMPENSATION_SETTINGS, ...parsed } : { ...DEFAULT_COMPENSATION_SETTINGS };
+  } catch {
+    return { ...DEFAULT_COMPENSATION_SETTINGS };
+  }
 }
 
 function toNumber(value: unknown) {

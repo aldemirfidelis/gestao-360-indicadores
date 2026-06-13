@@ -84,20 +84,12 @@ export const navSections: NavSection[] = [
     ],
   },
   {
-    heading: 'Gestao de Pessoas',
-    description: 'Quadro, cargos, faixas, movimentacoes e remuneracao',
-    intent: 'management',
-    icon: Users,
-    items: [
-      { href: '/cargos-salarios', label: 'Cargos e Salarios', description: 'Estrutura, catalogo, tabelas salariais e movimentacoes', icon: Briefcase, permissions: ['compensation:view', 'org:positions:view'] },
-    ],
-  },
-  {
     heading: 'Gestão',
     description: 'Cadastros e objetos de gestão do dia a dia',
     intent: 'management',
     icon: Briefcase,
     items: [
+      { href: '/cargos-salarios', label: 'Cargos e Salarios', description: 'Estrutura, catalogo, tabelas salariais e movimentacoes', icon: Briefcase, permissions: ['compensation:view', 'org:positions:view'] },
       { href: '/aprovacoes-cargo', label: 'Aprovações', description: 'Cargo, eficácia e aprovações gerais', icon: ShieldCheck, permissions: ['org:positions:approve', 'eficacia:view', 'actions:effectiveness', 'actions:delete', 'actions:approve', 'actions:manage'] },
       { href: '/periods', label: 'Períodos', description: 'Ano de trabalho, abertura e fechamento anual', icon: CalendarDays, permissions: ['settings:manage'] },
       { href: '/actions', label: 'Plano de Ação', description: 'Ações, execução, evidências e eficácia', icon: CheckSquare, permissions: ['actions:view'] },

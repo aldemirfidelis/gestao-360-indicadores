@@ -62,7 +62,7 @@ export default function CargosSalariosPage() {
   return (
     <div>
       <PageHeader
-        eyebrow="Gestao de Pessoas"
+        eyebrow="Gestao"
         tone="view"
         title="Cargos e Salarios"
         description="Painel de quadro, cargos, faixas salariais, orcamento e movimentacoes de pessoas."
