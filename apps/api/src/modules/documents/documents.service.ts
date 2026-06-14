@@ -991,7 +991,7 @@ export class DocumentsService {
   async approveEditRequest(me: AuthPayload, requestId: string, body: any = {}) {
     const request = await this.loadEditRequest(me.companyId, requestId);
     await this.assertCanDecideEditRequest(me, request);
-    if (request.status !== 'REQUESTED') throw new ConflictException('Esta solicitação não esta pendente.');
+    if (request.status !== 'REQUESTED') throw new ConflictException('Esta solicitação não está pendente.');
 
     const note = this.nullableText(body?.note ?? body?.comment);
     const approved = await this.prisma.$transaction(async (tx) => {
@@ -1039,7 +1039,7 @@ export class DocumentsService {
   async rejectEditRequest(me: AuthPayload, requestId: string, body: any = {}) {
     const request = await this.loadEditRequest(me.companyId, requestId);
     await this.assertCanDecideEditRequest(me, request);
-    if (request.status !== 'REQUESTED') throw new ConflictException('Esta solicitação não esta pendente.');
+    if (request.status !== 'REQUESTED') throw new ConflictException('Esta solicitação não está pendente.');
     const note = this.requiredText(body?.note ?? body?.comment, 'Justificativa');
     const rejected = await this.prisma.$transaction(async (tx) => {
       const updated = await tx.documentEditRequest.update({
@@ -1067,7 +1067,7 @@ export class DocumentsService {
     if (!canClose) throw new ForbiddenException('Somente o solicitante ou operador pode concluir esta edição.');
     if (request.status === 'COMPLETED') return request;
     if (!APPROVED_EDIT_REQUEST_STATUSES.includes(request.status)) {
-      throw new ConflictException('Somente solicitacoes liberadas podem ser concluidas.');
+      throw new ConflictException('Somente solicitações liberadas podem ser concluídas.');
     }
     const note = this.nullableText(body?.note ?? body?.comment);
     const completed = await this.prisma.$transaction(async (tx) => {
@@ -1080,7 +1080,7 @@ export class DocumentsService {
           decidedBy: { select: { id: true, name: true, email: true } },
         },
       });
-      await this.auditTx(tx, me, request.documentId, 'EDIT_REQUEST_COMPLETED', { requestId: request.id }, { requestId: request.id }, note ?? 'Edição concluida');
+      await this.auditTx(tx, me, request.documentId, 'EDIT_REQUEST_COMPLETED', { requestId: request.id }, { requestId: request.id }, note ?? 'Edição concluída');
       return updated;
     });
     this.workItems.markDirty(me.companyId, [request.operatorUserId, request.requesterUserId, me.sub], 'document-edit-completed');
@@ -1146,11 +1146,11 @@ export class DocumentsService {
       documentId: id,
       fileId: file.id,
       fileName: file.fileName,
-        companyId: me.companyId,
-        userId: me.sub,
-        userName: me.name,
-        canWrite: true,
-      });
+      companyId: me.companyId,
+      userId: me.sub,
+      userName: me.name,
+      canWrite: true,
+    });
     await this.prisma.documentEditorSession.create({
       data: {
         companyId: me.companyId,
@@ -1165,6 +1165,53 @@ export class DocumentsService {
     if (approvedRequest?.status === 'APPROVED') {
       await this.prisma.documentEditRequest.update({ where: { id: approvedRequest.id }, data: { status: 'IN_PROGRESS' } });
       this.workItems.markDirty(me.companyId, [approvedRequest.requesterUserId, approvedRequest.operatorUserId], 'document-edit-started');
+    }
+    return session;
+  }
+
+  async openWordDesktopEditor(me: AuthPayload, id: string) {
+    const doc = await this.loadScoped(id, me.companyId);
+    await this.assertViewArea(me, doc);
+    const approvedRequest = await this.findApprovedEditRequest(me, doc.id);
+    if (!approvedRequest) {
+      throw new ForbiddenException('Edição no Word instalado precisa de liberação do operador.');
+    }
+
+    let editableDoc = doc;
+    if (!EDITABLE_STATUSES.has(doc.status)) {
+      const updated = await this.prisma.$transaction(async (tx) => {
+        const revision = await this.createRevisionForEditRequestTx(tx, me, doc, approvedRequest.reason ?? 'Liberação de edição no Word instalado');
+        await tx.documentEditRequest.update({ where: { id: approvedRequest.id }, data: { versionId: revision.version.id } });
+        return revision.document;
+      });
+      editableDoc = updated;
+    }
+
+    const file = await this.ensureEditableDocxFile(me, editableDoc);
+    const session = this.editor.buildDesktopSession({
+      documentId: id,
+      fileId: file.id,
+      fileName: file.fileName,
+      companyId: me.companyId,
+      userId: me.sub,
+      userName: me.name,
+      canWrite: true,
+    });
+
+    await this.prisma.documentEditorSession.create({
+      data: {
+        companyId: me.companyId,
+        documentId: id,
+        versionId: file.versionId ?? null,
+        userId: me.sub,
+        provider: 'word_desktop',
+        status: 'OPEN',
+        metadata: jsonOrNull({ fileId: file.id, mode: session.mode, dav: Boolean(session.davUrl), editRequestId: approvedRequest.id }),
+      },
+    });
+    if (approvedRequest.status === 'APPROVED') {
+      await this.prisma.documentEditRequest.update({ where: { id: approvedRequest.id }, data: { status: 'IN_PROGRESS' } });
+      this.workItems.markDirty(me.companyId, [approvedRequest.requesterUserId, approvedRequest.operatorUserId], 'document-edit-started-word');
     }
     return session;
   }
@@ -1267,6 +1314,15 @@ export class DocumentsService {
 
   /** WOPI PutFile: persiste a nova versão binária salva no editor. */
   async wopiPutFile(token: WopiTokenPayload, content: Buffer) {
+    return this.saveEditedBinary(token, content, `Salvo via editor online (${this.editor.provider})`);
+  }
+
+  /** WebDAV PutFile: persiste a nova versão binária salva pelo Word instalado. */
+  async webDavPutFile(token: WopiTokenPayload, content: Buffer) {
+    return this.saveEditedBinary(token, content, 'Salvo via Word instalado (WebDAV)');
+  }
+
+  private async saveEditedBinary(token: WopiTokenPayload, content: Buffer, reason: string) {
     const { file, doc } = await this.wopiResolveFile(token);
     if (!token.canWrite || !EDITABLE_STATUSES.has(doc.status)) {
       throw new ConflictException('Documento bloqueado para edição.');
@@ -1294,7 +1350,7 @@ export class DocumentsService {
           userId: token.userId,
           action: 'EDITOR_SAVE',
           afterValue: jsonOrNull({ fileId: file.id, size: stored.sizeBytes, hash: stored.hashSha256 }),
-          reason: `Salvo via editor online (${this.editor.provider})`,
+          reason,
         },
       });
       await tx.documentEditRequest.updateMany({

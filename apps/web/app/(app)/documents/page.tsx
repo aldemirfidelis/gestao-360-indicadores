@@ -192,6 +192,20 @@ interface EditorSession {
   wopiSrc: string | null;
 }
 
+interface DesktopEditorSession {
+  configured: boolean;
+  provider: 'word_desktop';
+  mode: 'DESKTOP';
+  documentId: string;
+  fileId: string | null;
+  fileName: string | null;
+  davUrl: string | null;
+  msWordUrl: string | null;
+  accessToken: string | null;
+  accessTokenTtl: number;
+  message?: string;
+}
+
 interface DocSummary {
   total: number;
   published: number;
@@ -559,7 +573,7 @@ export default function DocumentsPage() {
       if (session.editorUrl && session.accessToken) {
         setEditorSession(session);
       } else {
-        toast.message('Editor online indisponivel', {
+        toast.message('Editor online indisponível', {
           description: session.message ?? 'Use download/upload de nova versão.',
         });
       }
@@ -572,6 +586,25 @@ export default function DocumentsPage() {
     autoOpenEditorRef.current = detail.id;
     openEditor.mutate(detail.id);
   }, [detail?.id, myActiveEditRequest?.id, searchParams]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  const openWordDesktop = useMutation({
+    mutationFn: (id: string) => api<DesktopEditorSession>(`/documents/${id}/editor/open-word`, { method: 'POST', json: {} }),
+    onSuccess: (session) => {
+      if (session.msWordUrl) {
+        toast.success('Abrindo no Word instalado', {
+          description: 'Se o navegador pedir permissão, confirme a abertura do Microsoft Word.',
+        });
+        window.location.href = session.msWordUrl;
+        invalidate(qc);
+        void qc.invalidateQueries({ queryKey: ['my-day'] });
+      } else {
+        toast.message('Word instalado indisponível', {
+          description: session.message ?? 'Não foi possível montar a URL WebDAV segura.',
+        });
+      }
+    },
+    onError: (e: any) => toast.error(e?.message ?? 'Não foi possível abrir no Word instalado'),
+  });
 
   const requestEdit = useMutation({
     mutationFn: ({ id, reason }: { id: string; reason?: string }) =>
@@ -600,7 +633,7 @@ export default function DocumentsPage() {
     mutationFn: ({ requestId, action, note }: { requestId: string; action: 'approve' | 'reject' | 'complete'; note?: string }) =>
       api(`/documents/edit-requests/${requestId}/${action}`, { method: 'POST', json: { note } }),
     onSuccess: (_, variables) => {
-      toast.success(variables.action === 'approve' ? 'Edição liberada' : variables.action === 'reject' ? 'Solicitação rejeitada' : 'Edição concluida');
+      toast.success(variables.action === 'approve' ? 'Edição liberada' : variables.action === 'reject' ? 'Solicitação rejeitada' : 'Edição concluída');
       invalidate(qc);
       void qc.invalidateQueries({ queryKey: ['my-day'] });
     },
@@ -823,7 +856,7 @@ export default function DocumentsPage() {
                       {Object.entries(TYPE_LABEL).map(([value, label]) => <option key={value} value={value}>{label}</option>)}
                     </NativeSelect>
                     <Input type="number" min={1} placeholder="Digitos" value={typeForm.digits} onChange={(e) => setTypeForm((f) => ({ ...f, digits: e.target.value }))} />
-                    <Input type="number" min={1} placeholder="Validade padrao" value={typeForm.defaultValidityDays} onChange={(e) => setTypeForm((f) => ({ ...f, defaultValidityDays: e.target.value }))} />
+                    <Input type="number" min={1} placeholder="Validade padrão" value={typeForm.defaultValidityDays} onChange={(e) => setTypeForm((f) => ({ ...f, defaultValidityDays: e.target.value }))} />
                   </div>
                   <Button onClick={() => createType.mutate()} disabled={createType.isPending || !typeForm.name.trim()}><Plus className="mr-2 h-4 w-4" />Cadastrar tipo</Button>
                   <div className="space-y-2">
@@ -991,7 +1024,7 @@ export default function DocumentsPage() {
                   <div className="space-y-3">
                     <div className="rounded-md border p-3">
                       <div className="text-sm font-semibold">Ações do documento</div>
-                      <div className="mt-1 text-xs text-muted-foreground">A abertura padrao e somente leitura. Edição online exige liberação.</div>
+                      <div className="mt-1 text-xs text-muted-foreground">A abertura padrão é somente leitura. A edição exige liberação.</div>
                       <div className="mt-3 space-y-2">
                         {latestDocx && (
                           <Button variant="outline" className="w-full justify-start" onClick={() => downloadControlled(detail.id, latestDocx.id, latestDocx.fileName)}>
@@ -1010,6 +1043,11 @@ export default function DocumentsPage() {
                         {myActiveEditRequest && (
                           <Button className="w-full justify-start" disabled={!canEditOnline || openEditor.isPending} onClick={() => openEditor.mutate(detail.id)}>
                             <Edit className="mr-2 h-4 w-4" />Editar Documento
+                          </Button>
+                        )}
+                        {myActiveEditRequest && (
+                          <Button variant="outline" className="w-full justify-start" disabled={!canEditOnline || openWordDesktop.isPending} onClick={() => openWordDesktop.mutate(detail.id)}>
+                            <Edit className="mr-2 h-4 w-4" />Abrir no Word instalado
                           </Button>
                         )}
                         {canUpdate && (
@@ -1096,6 +1134,11 @@ export default function DocumentsPage() {
                       {myActiveEditRequest && (
                         <Button variant="outline" onClick={() => openEditor.mutate(detail.id)} disabled={openEditor.isPending || !canEditOnline}>
                           <Edit className="mr-2 h-4 w-4" />Editar Documento
+                        </Button>
+                      )}
+                      {myActiveEditRequest && (
+                        <Button variant="outline" onClick={() => openWordDesktop.mutate(detail.id)} disabled={openWordDesktop.isPending || !canEditOnline}>
+                          <Edit className="mr-2 h-4 w-4" />Abrir no Word instalado
                         </Button>
                       )}
                       {canUpdate && (
@@ -1202,7 +1245,7 @@ export default function DocumentsPage() {
           </DialogHeader>
           <div className="space-y-4">
             <div className="rounded-md border bg-muted/30 p-3 text-sm text-muted-foreground">
-              O usuário receberá a tarefa para editar o documento. A abertura online só fica disponível depois desta liberação.
+              O usuário receberá a tarefa para editar o documento. A abertura para edição só fica disponível depois desta liberação.
             </div>
             <div>
               <Label>Usuário responsável pela edição</Label>

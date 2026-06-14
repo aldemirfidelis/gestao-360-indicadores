@@ -160,6 +160,12 @@ export class DocumentsController {
     return this.service.openEditor(me, id);
   }
 
+  @Post(':id/editor/open-word')
+  @RequirePermissions('doc:view')
+  openWordDesktopEditor(@CurrentUser() me: AuthPayload, @Param('id') id: string) {
+    return this.service.openWordDesktopEditor(me, id);
+  }
+
   @Post(':id/edit-requests/grant')
   @RequirePermissions('doc:view')
   grantEditRequest(@CurrentUser() me: AuthPayload, @Param('id') id: string, @Body() body: any) {

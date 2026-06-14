@@ -32,10 +32,27 @@ export interface EditorSession extends DocumentEditorStatus {
   wopiSrc: string | null;
 }
 
+/** Sessao para edicao no Word instalado usando URL ms-word + WebDAV seguro. */
+export interface DesktopEditorSession {
+  configured: boolean;
+  provider: 'word_desktop';
+  mode: 'DESKTOP';
+  documentId: string;
+  fileId: string | null;
+  fileName: string | null;
+  davUrl: string | null;
+  msWordUrl: string | null;
+  accessToken: string | null;
+  accessTokenTtl: number;
+  message?: string;
+}
+
 const MANUAL_MESSAGE =
   'Editor DOCX online não configurado. Use download/upload de nova versão ou configure Microsoft 365 para edição segura via WOPI.';
 const MICROSOFT_MESSAGE =
   'Microsoft 365 para web não configurado. Configure DOCUMENT_EDITOR_PROVIDER=microsoft_365, DOCUMENT_EDITOR_WOPI_BASE e MICROSOFT_365_WOPI_ACTION_URL.';
+const DESKTOP_WORD_MESSAGE =
+  'Edição no Word instalado indisponível. Configure DOCUMENT_EDITOR_DAV_BASE ou DOCUMENT_EDITOR_WOPI_BASE com a URL pública da API.';
 
 const DISCOVERY_TTL_MS = 60 * 60 * 1000; // 1h
 const DEFAULT_TOKEN_TTL_MS = 10 * 60 * 60 * 1000; // 10h
@@ -73,6 +90,20 @@ export class DocumentEditorService {
   get wopiBase(): string | null {
     const explicit = (process.env.DOCUMENT_EDITOR_WOPI_BASE ?? '').trim();
     if (explicit) return explicit.replace(/\/+$/, '');
+    return null;
+  }
+
+  /** Base publica da API para WebDAV (ex.: https://gestao360.org/api). */
+  get davBase(): string | null {
+    const explicit = (
+      process.env.DOCUMENT_EDITOR_DAV_BASE ??
+      process.env.DOCUMENT_EDITOR_WOPI_BASE ??
+      process.env.PUBLIC_API_URL ??
+      process.env.API_PUBLIC_URL ??
+      ''
+    ).trim();
+    if (explicit) return explicit.replace(/\/+$/, '');
+    if (process.env.NODE_ENV !== 'production') return 'http://localhost:3333/api';
     return null;
   }
 
@@ -214,6 +245,56 @@ export class DocumentEditorService {
       accessTokenTtl: exp,
       wopiSrc,
       message: editorUrl ? base.message : message,
+    };
+  }
+
+  buildDesktopSession(input: {
+    documentId: string;
+    fileId: string;
+    fileName: string;
+    companyId: string;
+    userId: string;
+    userName: string;
+    canWrite: boolean;
+  }): DesktopEditorSession {
+    const base = this.davBase;
+    if (!base) {
+      return {
+        configured: false,
+        provider: 'word_desktop',
+        mode: 'DESKTOP',
+        documentId: input.documentId,
+        fileId: input.fileId,
+        fileName: input.fileName,
+        davUrl: null,
+        msWordUrl: null,
+        accessToken: null,
+        accessTokenTtl: 0,
+        message: DESKTOP_WORD_MESSAGE,
+      };
+    }
+
+    const { token, exp } = this.mintToken({
+      fileId: input.fileId,
+      documentId: input.documentId,
+      companyId: input.companyId,
+      userId: input.userId,
+      userName: input.userName,
+      canWrite: input.canWrite,
+    });
+    const fileName = input.fileName.toLowerCase().endsWith('.docx') ? input.fileName : `${input.fileName}.docx`;
+    const davUrl = `${base}/dav/files/${encodeURIComponent(input.fileId)}/${encodeURIComponent(fileName)}?access_token=${encodeURIComponent(token)}`;
+    return {
+      configured: true,
+      provider: 'word_desktop',
+      mode: 'DESKTOP',
+      documentId: input.documentId,
+      fileId: input.fileId,
+      fileName,
+      davUrl,
+      msWordUrl: `ms-word:ofe|u|${davUrl}`,
+      accessToken: token,
+      accessTokenTtl: exp,
     };
   }
 
