@@ -11,14 +11,28 @@ async function bootstrap() {
   const port = parseInt(process.env.PORT ?? process.env.API_PORT ?? '3333', 10);
   const prefix = process.env.API_PREFIX ?? 'api';
   const corsOrigin = process.env.API_CORS_ORIGIN ?? 'http://localhost:3000';
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const expressApp = app.getHttpAdapter().getInstance() as any;
 
   app.setGlobalPrefix(prefix);
   // Atras de proxy (DO App Platform / Render / Vercel)
   // permite req.ip resolver corretamente
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  (app.getHttpAdapter().getInstance() as any).set?.('trust proxy', 1);
+  expressApp.set?.('trust proxy', 1);
 
   app.use(helmet({ crossOriginResourcePolicy: false }));
+  // O middleware global de CORS responde OPTIONS com 204 antes dos controllers.
+  // Para o Word local via WebDAV, OPTIONS precisa anunciar DAV/MS-Author-Via.
+  expressApp.use?.(`/${prefix}/dav`, (req: any, res: any, next: any) => {
+    if (String(req.method).toUpperCase() !== 'OPTIONS') {
+      next();
+      return;
+    }
+    res.setHeader('dav', '1,2');
+    res.setHeader('ms-author-via', 'DAV');
+    res.setHeader('allow', 'OPTIONS, GET, HEAD, PUT, PROPFIND, LOCK, UNLOCK');
+    res.setHeader('accept-ranges', 'bytes');
+    res.status(200).end();
+  });
   // Seguranca CORS: nunca combinar origem coringa com credentials=true
   // (qualquer site poderia fazer requisicoes credenciadas). Quando a origem
   // for '*', refletimos qualquer origem porem SEM credenciais. Para origens
