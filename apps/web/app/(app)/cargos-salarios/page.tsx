@@ -9,6 +9,7 @@ import { PageHeader } from '@/components/shell/page-header';
 import { MetricCard } from '@/components/platform/metric-card';
 import { SectionCard } from '@/components/platform/section-card';
 import { LoadingState } from '@/components/platform/loading-state';
+import { EmptyState } from '@/components/platform/empty-state';
 import { NativeSelect } from '@/components/ui/select';
 import { Label } from '@/components/ui/label';
 import { api } from '@/lib/api';
@@ -26,6 +27,7 @@ interface Overview {
     budgetPlannedVsRealized: Array<{ name: string; planned: number; realized: number }>;
     movementsByType: Array<{ name: string; value: number }>;
     correctionPriorities: Array<{ name: string; value: number }>;
+    compaRatioAverage: number | null;
   };
 }
 
@@ -105,7 +107,15 @@ export default function CargosSalariosPage() {
 
       {overviewQuery.isLoading && <LoadingState />}
 
-      {overview && cards && (
+      {overview && cards && (cards.allocatedEmployees ?? 0) === 0 && (cards.plannedPositions ?? 0) === 0 && (
+        <EmptyState
+          className="my-6"
+          title="Sem dados para o período"
+          description="Cadastre o quadro, cargos e faixas salariais para ver os indicadores deste módulo."
+        />
+      )}
+
+      {overview && cards && ((cards.allocatedEmployees ?? 0) > 0 || (cards.plannedPositions ?? 0) > 0) && (
         <>
           <div className="my-6 grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
             <MetricCard title="Colaboradores" value={formatNumber(cards.allocatedEmployees)} description="Alocados no quadro" icon={<Users className="h-4 w-4" />} tone="blue" href="/cargos-salarios/estrutura-quadro" />
@@ -116,6 +126,7 @@ export default function CargosSalariosPage() {
             <MetricCard title="Abaixo da faixa" value={formatNumber(cards.employeesBelowRange)} description="Requer análise de enquadramento" icon={<FileBarChart className="h-4 w-4" />} tone="red" href="/cargos-salarios/enquadramento?situation=ABAIXO_DA_FAIXA" />
             <MetricCard title="Dentro da faixa" value={formatNumber(cards.employeesInRange)} description="Compa-ratio adequado" icon={<FileBarChart className="h-4 w-4" />} tone="blue" href="/cargos-salarios/enquadramento?situation=DENTRO_DA_FAIXA" />
             <MetricCard title="Orçamento x realizado" value={overview.salaryMasked ? 'Restrito' : formatNumber(cards.budgetVariation, { style: 'currency', currency: 'BRL' })} description="Variação do período" icon={<BarChart3 className="h-4 w-4" />} tone="purple" />
+            <MetricCard title="Compa-ratio médio" value={overview.charts.compaRatioAverage == null ? (overview.salaryMasked ? 'Restrito' : '-') : formatNumber(overview.charts.compaRatioAverage)} description="Salário médio vs. ponto médio" icon={<FileBarChart className="h-4 w-4" />} tone="blue" href="/cargos-salarios/enquadramento" />
           </div>
 
           <div className="grid grid-cols-1 gap-4 xl:grid-cols-2">

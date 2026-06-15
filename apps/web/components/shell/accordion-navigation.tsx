@@ -122,8 +122,8 @@ export function AccordionNavigation({
                     )}
                     title={section.description}
                   >
-                    <SectionIcon className="h-4 w-4 opacity-70" />
-                    <span className="min-w-0 flex-1 truncate">{section.heading}</span>
+                    <SectionIcon className="h-4 w-4 shrink-0 opacity-70" />
+                    <span className="min-w-0 flex-1 leading-tight line-clamp-2">{section.heading}</span>
                     <ChevronDown className={cn('h-3.5 w-3.5 transition-transform duration-200', isOpen && 'rotate-180')} />
                   </button>
                 )}
@@ -184,7 +184,7 @@ export function AccordionNavigation({
                                 )}
                                 {active && <span className="absolute left-0 top-0 h-full w-[2px] bg-foreground" />}
                                 <Icon className={cn('h-4 w-4 shrink-0', active ? 'text-foreground' : 'text-muted-foreground/80')} />
-                                <span className="min-w-0 flex-1 truncate">{item.label}</span>
+                                <span className="min-w-0 flex-1 leading-tight line-clamp-2">{item.label}</span>
                                 {itemUnread > 0 && (
                                   <span className="grid h-5 min-w-5 shrink-0 place-items-center rounded-full bg-status-red px-1.5 text-[10px] font-semibold text-white">
                                     {itemUnread > 99 ? '99+' : itemUnread}
@@ -248,7 +248,7 @@ export function AccordionNavigation({
           >
             {companyUsersActive && <span className="absolute left-0 top-0 h-full w-[2px] bg-foreground" />}
             <CompanyUsersIcon className={cn('h-4 w-4 shrink-0', companyUsersActive ? 'text-foreground' : 'text-muted-foreground/80')} />
-            {(!collapsed || mobile) && <span className="min-w-0 flex-1 truncate">{companyUsersNavItem.label}</span>}
+            {(!collapsed || mobile) && <span className="min-w-0 flex-1 leading-tight line-clamp-2">{companyUsersNavItem.label}</span>}
           </Link>
         </div>
       )}

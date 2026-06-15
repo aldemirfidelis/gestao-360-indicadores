@@ -12,6 +12,11 @@ const me: AuthPayload = {
   companyId: 'company-1',
 };
 
+// Stub do NotificationsService: as notificacoes sao best-effort e nao afetam os testes.
+const notificationsStub: any = { create: vi.fn().mockResolvedValue({}) };
+// Stub do DocumentsService: usado apenas no export para o GED.
+const documentsStub: any = { create: vi.fn().mockResolvedValue({ id: 'doc-1', code: 'DOC-1' }) };
+
 describe('CompensationService', () => {
   it('masks individual salary when user has no nominal permission', async () => {
     const prisma: any = {
@@ -29,7 +34,7 @@ describe('CompensationService', () => {
       },
       compensationPosition: { findMany: vi.fn().mockResolvedValue([]) },
     };
-    const service = new CompensationService(prisma);
+    const service = new CompensationService(prisma, notificationsStub, documentsStub);
     (service as any).ensureBaseline = vi.fn();
     (service as any).hasAnyPermission = vi.fn().mockResolvedValue(false);
     (service as any).latestSalarySnapshots = vi.fn().mockResolvedValue([
@@ -55,7 +60,7 @@ describe('CompensationService', () => {
   });
 
   it('blocks movement when proposed impact exceeds available budget', async () => {
-    const service = new CompensationService({} as any);
+    const service = new CompensationService({} as any, notificationsStub, documentsStub);
 
     await expect(
       service.createMovement(me, {
@@ -76,7 +81,7 @@ describe('CompensationService', () => {
       compensationMovementRequest: { create: vi.fn().mockResolvedValue(created) },
       auditLog: { create: vi.fn().mockResolvedValue({ id: 'audit-1' }) },
     };
-    const service = new CompensationService(prisma);
+    const service = new CompensationService(prisma, notificationsStub, documentsStub);
     (service as any).nextMovementProtocol = vi.fn().mockResolvedValue('MOV-2026-0001');
 
     const result = await service.createMovement(me, {
@@ -101,6 +106,50 @@ describe('CompensationService', () => {
         }),
       }),
     );
+  });
+
+  it('advances multi-tier approval: stays IN_APPROVAL until the last step approves', async () => {
+    const prisma: any = {
+      compensationMovementRequest: { update: vi.fn().mockImplementation(({ data }: any) => ({ id: 'mov-1', protocol: 'MOV-1', ...data })) },
+      auditLog: { create: vi.fn().mockResolvedValue({ id: 'a' }) },
+    };
+    const service = new CompensationService(prisma, notificationsStub, documentsStub);
+    (service as any).getMovement = vi.fn().mockResolvedValue({
+      id: 'mov-1',
+      protocol: 'MOV-1',
+      status: 'REQUESTED',
+      requesterId: 'req-1',
+      notes: null,
+      approvalSteps: [
+        { role: 'RH', status: 'PENDING' },
+        { role: 'GESTOR', status: 'PENDING' },
+      ],
+    });
+
+    const afterFirst = await service.decideMovement(me, 'mov-1', 'APPROVED', '');
+    expect(afterFirst.status).toBe('IN_APPROVAL');
+    const stepsAfterFirst = afterFirst.approvalSteps as any[];
+    expect(stepsAfterFirst[0].status).toBe('APPROVED');
+    expect(stepsAfterFirst[1].status).toBe('PENDING');
+  });
+
+  it('rejects a movement at any approval step', async () => {
+    const prisma: any = {
+      compensationMovementRequest: { update: vi.fn().mockImplementation(({ data }: any) => ({ id: 'mov-2', protocol: 'MOV-2', ...data })) },
+      auditLog: { create: vi.fn().mockResolvedValue({ id: 'a' }) },
+    };
+    const service = new CompensationService(prisma, notificationsStub, documentsStub);
+    (service as any).getMovement = vi.fn().mockResolvedValue({
+      id: 'mov-2',
+      protocol: 'MOV-2',
+      status: 'IN_APPROVAL',
+      requesterId: 'req-1',
+      notes: null,
+      approvalSteps: [{ role: 'RH', status: 'APPROVED' }, { role: 'GESTOR', status: 'PENDING' }],
+    });
+
+    const rejected = await service.decideMovement(me, 'mov-2', 'REJECTED', 'Fora da política');
+    expect(rejected.status).toBe('REJECTED');
   });
 });
 

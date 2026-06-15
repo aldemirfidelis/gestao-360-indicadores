@@ -154,11 +154,93 @@ A arquitetura ja separa as entidades de cargo, posicao, faixa, salario e movimen
 - `apps/web/app/(app)/cargos-salarios/*`
 - `apps/web/app/(app)/organograma/page.tsx`
 
+## Fase 1 - Overhaul de frontend (mercado)
+
+Reformulacao das telas-nucleo para deixarem de ser "cadastro cru" e ganharem profundidade
+de produto de mercado (Salary.com/CompAnalyst, Ravio, Payscale, beqom, CompUp). Sem migracao
+de banco: as analises novas sao compostas no cliente a partir dos endpoints existentes.
+
+Helpers e componentes compartilhados:
+
+- `apps/web/lib/compensation/{types,format,analytics,print-description}.ts`: tipos, formatacao
+  monetaria com mascaramento, funcoes puras (KPIs de enquadramento, distribuicao/penetracao de
+  compa-ratio, equidade por area/cargo/faixa, posicionamento de mercado, estrutura salarial e
+  matriz de merito) e impressao de descricao.
+- `apps/web/components/compensation/{salary-structure-chart,compa-ratio-chart,job-detail-dialog,merit-matrix,description-editor-dialog}.tsx`.
+
+Telas reformuladas:
+
+- **Visao Geral**: KPI de compa-ratio medio + empty states.
+- **Catalogo**: busca/filtros, dialog de detalhe (dados/versoes/descricoes/vinculos) com acoes
+  (editar/duplicar/versionar/inativar/reativar) e matriz de arquitetura familia x grade.
+- **Tabelas Salariais**: grafico de estrutura (min->medio->max), amplitude/progressao/sobreposicao,
+  gerenciar faixas, publicar e gerar revisao.
+- **Enquadramento**: KPIs, dispersao compa-ratio x penetracao, histogramas, equidade por dimensao,
+  posicionamento de mercado (pesquisa x ponto medio interno) e export CSV.
+- **Descricoes**: editor estruturado completo, edicao, workflow (transicoes), impressao.
+- **Ciclos de Merito**: matriz desempenho x compa-ratio configuravel + simulador de impacto
+  (persistida em `CompensationCycle.workflow.meritMatrix`).
+
+Limitacoes honestas: equidade por genero/raca pendente (sem campo demografico em `OrgEmployee`);
+a matriz de merito usa distribuicao de desempenho assumida (sem rating por colaborador na Fase 1).
+
+## Fase 2 - Overhaul das telas operacionais
+
+Mesmo tratamento aplicado as 7 telas restantes (sem migracao de banco; tudo via endpoints existentes):
+
+- **Movimentacoes**: KPIs (pendentes/aprovadas/aplicadas/impacto), filtros por status e tipo, e o
+  fluxo completo **aprovar/rejeitar/aplicar** visivel na propria lista (antes era so leitura),
+  gated por `movements:approve` e `movements:execute`. Rejeicao pede motivo.
+- **Aprovacoes**: caixa unificada com KPIs por tipo, rotulos PT, empty states, rejeicao com motivo
+  e acoes gated por permissao.
+- **Orcamento**: KPIs (headcount/folha/custo total) + **planejado x realizado** (via overview),
+  grafico de folha por area, filtro por periodo.
+- **Pesquisas**: formulario ganhou **percentis P25/P50/P75/P90** (alimentam o posicionamento de
+  mercado no Enquadramento), filtro por cargo e empty states.
+- **Simulacoes**: KPIs (cenarios/aprovados/pessoas/impacto anual), filtros e rotulos.
+- **Configuracoes**: textos de ajuda por politica, gating por permissao.
+- **Relatorios**: auditoria com filtro por entidade, rotulos PT de acao/entidade e **export CSV**.
+
+Rotulos e tons compartilhados em `apps/web/lib/compensation/types.ts`
+(`MOVEMENT_*`, `SIMULATION_STATUS_LABELS`, `SCENARIO_LABELS`, `movementStatusTone`).
+
+## Fase 3 - Itens cross-module (sem migracao)
+
+- **Edicao de ciclo**: novo `PATCH /cargos-salarios/cycles/:id` (`updateCycle`) + UI para editar/atualizar
+  a matriz de um ciclo existente sem recriar (botoes "Atualizar ciclo" / "Salvar como novo").
+- **Notificacoes**: `CompensationService` injeta `NotificationsService` (kind `MESSAGE`, best-effort).
+  Avisa o gestor quando uma movimentacao entra na fila e o solicitante a cada decisao/aplicacao.
+- **Aprovacao multi-alcada**: `createMovement` aceita `approvalSteps` (ex.: `['RH','GESTOR','DIRETORIA']`);
+  `decideMovement` avanca a primeira etapa pendente e so marca `APPROVED` apos a ultima (status
+  intermediario `IN_APPROVAL`); qualquer rejeicao encerra. UI: selecao de alcadas na solicitacao e
+  cadeia de status em Movimentacoes/Aprovacoes. Coberto por testes em `compensation.service.spec.ts`.
+- **Export DOCX**: `GET /cargos-salarios/descriptions/:id/docx` gera um `.docx` real via
+  `documents/docx.util.ts` (`buildDocx`), retornado como base64; botao "Word" na tela de Descricoes.
+- **Importacao assistida CSV**: wizard no Catalogo (`components/compensation/import-jobs-dialog.tsx`)
+  com `papaparse`, preview/validacao linha a linha e criacao em lote via `POST /jobs` (sem migracao;
+  o modulo `imports` nativo e dirigido por enum `ImportTargetKind`, que exigiria migracao).
+
+## Fase 4 - Complementos do modulo (sem migracao)
+
+- **Importacao XLSX**: o wizard do Catalogo agora aceita `.xlsx` (SheetJS/`xlsx` no web) alem de CSV,
+  com a mesma previa/validacao linha a linha.
+- **Notificar todos os aprovadores**: `createMovement` busca os usuarios aptos a aprovar
+  (`findApproverUserIds`: permissao direta ou via perfil de acesso, ou papel SUPER_ADMIN/COMPANY_ADMIN)
+  e notifica todos eles (alem do gestor informado), sempre best-effort.
+- **Export para o GED (edicao online)**: `POST /cargos-salarios/descriptions/:id/document`
+  (`exportDescriptionToGed`) cria um documento controlado no GED a partir da descricao, reutilizando
+  `DocumentsService.create`; a edicao online (Collabora/WOPI) ocorre no proprio modulo de Documentos,
+  pelo fluxo de liberacao existente. Botao "Enviar ao GED" na tela de Descricoes.
+  Observacao: o Collabora edita o `.docx` no GED; as edicoes nao retornam aos campos estruturados
+  da descricao (export controlado, nao edicao in-place).
+
 ## Riscos e proximos passos
 
-- Completar fluxos visuais de aprovacao em multiplas alcadas.
-- Adicionar importacao assistida com validacao linha a linha.
-- Criar paginas dedicadas para ciclos, orcamento, pesquisas salariais, simulacoes, aprovacao e configuracoes.
-- Expandir testes e2e para o redirect `/organograma` e responsividade das novas telas.
-- Integrar notificacoes do modulo com Meu Dia e Central de Impactos.
+- Equidade por genero/raca (requer campo demografico em `OrgEmployee` - migracao; nao autorizada).
+- Integrar a matriz de merito com fonte real de avaliacao de desempenho (nao existe modulo dedicado).
+- Importacao assistida tambem para faixas/colaboradores.
+- Notificacao "por alcada" exata (mapear papel RH/GESTOR/DIRETORIA -> usuarios; hoje notifica todo o
+  pool de aprovadores).
+- Edicao in-place online da descricao estruturada (limitacao inerente ao WOPI sobre `.docx`).
+- Expandir testes e2e.
 

@@ -12,8 +12,11 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { NativeSelect } from '@/components/ui/select';
+import { useAuth } from '@/components/auth/auth-provider';
 import { api } from '@/lib/api';
 import { formatDate } from '@/lib/utils';
+
+const MANAGE_PERMS = ['compensation:manage', 'org:positions:manage'];
 
 interface SettingsResponse {
   key: string;
@@ -29,6 +32,8 @@ interface SettingsResponse {
 
 export default function ConfiguracoesCargosSalariosPage() {
   const qc = useQueryClient();
+  const { hasPermission } = useAuth();
+  const canManage = hasPermission(MANAGE_PERMS);
   const settingsQuery = useQuery<SettingsResponse>({ queryKey: ['compensation', 'settings'], queryFn: () => api('/cargos-salarios/settings') });
   const settings = settingsQuery.data?.settings;
   const [form, setForm] = useState({
@@ -74,52 +79,61 @@ export default function ConfiguracoesCargosSalariosPage() {
       <PageHeader
         eyebrow="Cargos e Salários"
         title="Configurações"
-        description="Parâmetros operacionais do módulo de cargos, salários, movimentações e governança salarial."
+        description="Políticas e governança do módulo: diretriz de mérito, exigência de orçamento, visibilidade salarial e cadência de revisão."
         breadcrumbs={[{ label: 'Início', href: '/' }, { label: 'Cargos e Salários', href: '/cargos-salarios' }, { label: 'Configurações' }]}
       />
       <CompensationModuleNav />
 
       {settingsQuery.isLoading && <LoadingState />}
-      <SectionCard title="Parâmetros do módulo" description={`Última atualização: ${formatDate(settingsQuery.data?.updatedAt)}`}>
-        <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
-          <div>
-            <Label>Diretriz padrão de mérito (%)</Label>
-            <Input type="number" value={form.meritGuidelinePercent} onChange={(event) => setForm({ ...form, meritGuidelinePercent: event.target.value })} />
-          </div>
-          <div>
-            <Label>Exigir orçamento nas movimentações</Label>
-            <NativeSelect value={form.requireBudgetForMovements} onChange={(event) => setForm({ ...form, requireBudgetForMovements: event.target.value })}>
+
+      <SectionCard title="Governança salarial" description="Regras aplicadas a movimentações e tabelas salariais.">
+        <fieldset disabled={!canManage} className="grid grid-cols-1 gap-5 lg:grid-cols-2">
+          <Field label="Diretriz padrão de mérito (%)" hint="Percentual de referência usado como guardrail nos ciclos de mérito.">
+            <Input type="number" value={form.meritGuidelinePercent} onChange={(e) => setForm({ ...form, meritGuidelinePercent: e.target.value })} />
+          </Field>
+          <Field label="Revisão de descrições (meses)" hint="Periodicidade sugerida para revisar as descrições de cargo.">
+            <Input type="number" value={form.reviewCadenceMonths} onChange={(e) => setForm({ ...form, reviewCadenceMonths: e.target.value })} />
+          </Field>
+          <Field label="Exigir orçamento nas movimentações" hint="Bloqueia movimentações com impacto acima do orçamento disponível.">
+            <NativeSelect value={form.requireBudgetForMovements} onChange={(e) => setForm({ ...form, requireBudgetForMovements: e.target.value })}>
               <option value="true">Sim</option>
               <option value="false">Não</option>
             </NativeSelect>
-          </div>
-          <div>
-            <Label>Aprovação para publicar tabela</Label>
-            <NativeSelect value={form.requireApprovalForSalaryTable} onChange={(event) => setForm({ ...form, requireApprovalForSalaryTable: event.target.value })}>
+          </Field>
+          <Field label="Aprovação para publicar tabela" hint="Exige permissão de aprovação para publicar tabelas salariais.">
+            <NativeSelect value={form.requireApprovalForSalaryTable} onChange={(e) => setForm({ ...form, requireApprovalForSalaryTable: e.target.value })}>
               <option value="true">Sim</option>
               <option value="false">Não</option>
             </NativeSelect>
-          </div>
-          <div>
-            <Label>Visibilidade salarial</Label>
-            <NativeSelect value={form.salaryVisibility} onChange={(event) => setForm({ ...form, salaryVisibility: event.target.value })}>
+          </Field>
+          <Field label="Visibilidade salarial" hint="Define quem enxerga valores salariais individuais no módulo.">
+            <NativeSelect value={form.salaryVisibility} onChange={(e) => setForm({ ...form, salaryVisibility: e.target.value })}>
               <option value="restricted">Restrita por permissão</option>
               <option value="management">Gestores e RH</option>
               <option value="open">Aberta para usuários do módulo</option>
             </NativeSelect>
-          </div>
-          <div>
-            <Label>Revisão de descricoes (meses)</Label>
-            <Input type="number" value={form.reviewCadenceMonths} onChange={(event) => setForm({ ...form, reviewCadenceMonths: event.target.value })} />
-          </div>
-          <div className="flex items-end">
+          </Field>
+        </fieldset>
+
+        {canManage && (
+          <div className="mt-5 flex items-center justify-between border-t pt-4">
+            <span className="text-xs text-muted-foreground">Última atualização: {formatDate(settingsQuery.data?.updatedAt)}</span>
             <Button onClick={() => saveSettings.mutate()} disabled={saveSettings.isPending}>
-              <Save className="mr-2 h-4 w-4" />
-              Salvar configurações
+              <Save className="mr-2 h-4 w-4" /> Salvar configurações
             </Button>
           </div>
-        </div>
+        )}
       </SectionCard>
+    </div>
+  );
+}
+
+function Field({ label, hint, children }: { label: string; hint?: string; children: React.ReactNode }) {
+  return (
+    <div>
+      <Label>{label}</Label>
+      {children}
+      {hint && <p className="mt-1 text-xs text-muted-foreground">{hint}</p>}
     </div>
   );
 }

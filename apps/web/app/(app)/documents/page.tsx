@@ -192,19 +192,6 @@ interface EditorSession {
   wopiSrc: string | null;
 }
 
-interface DesktopEditorSession {
-  configured: boolean;
-  provider: 'word_desktop';
-  mode: 'DESKTOP';
-  documentId: string;
-  fileId: string | null;
-  fileName: string | null;
-  davUrl: string | null;
-  msWordUrl: string | null;
-  accessToken: string | null;
-  accessTokenTtl: number;
-  message?: string;
-}
 
 interface DocSummary {
   total: number;
@@ -586,25 +573,6 @@ export default function DocumentsPage() {
     autoOpenEditorRef.current = detail.id;
     openEditor.mutate(detail.id);
   }, [detail?.id, myActiveEditRequest?.id, searchParams]); // eslint-disable-line react-hooks/exhaustive-deps
-
-  const openWordDesktop = useMutation({
-    mutationFn: (id: string) => api<DesktopEditorSession>(`/documents/${id}/editor/open-word`, { method: 'POST', json: {} }),
-    onSuccess: (session) => {
-      if (session.msWordUrl) {
-        toast.success('Abrindo no Word instalado', {
-          description: 'Se o navegador pedir permissão, confirme a abertura do Microsoft Word.',
-        });
-        window.location.href = session.msWordUrl;
-        invalidate(qc);
-        void qc.invalidateQueries({ queryKey: ['my-day'] });
-      } else {
-        toast.message('Word instalado indisponível', {
-          description: session.message ?? 'Não foi possível montar a URL WebDAV segura.',
-        });
-      }
-    },
-    onError: (e: any) => toast.error(e?.message ?? 'Não foi possível abrir no Word instalado'),
-  });
 
   const requestEdit = useMutation({
     mutationFn: ({ id, reason }: { id: string; reason?: string }) =>
@@ -1045,11 +1013,6 @@ export default function DocumentsPage() {
                             <Edit className="mr-2 h-4 w-4" />Editar Documento
                           </Button>
                         )}
-                        {myActiveEditRequest && (
-                          <Button variant="outline" className="w-full justify-start" disabled={!canEditOnline || openWordDesktop.isPending} onClick={() => openWordDesktop.mutate(detail.id)}>
-                            <Edit className="mr-2 h-4 w-4" />Abrir no Word instalado
-                          </Button>
-                        )}
                         {canUpdate && (
                           <Button className="w-full justify-start" onClick={() => {
                             setGrantForm({ requesterUserId: '', reason: '', expiresAt: '' });
@@ -1134,11 +1097,6 @@ export default function DocumentsPage() {
                       {myActiveEditRequest && (
                         <Button variant="outline" onClick={() => openEditor.mutate(detail.id)} disabled={openEditor.isPending || !canEditOnline}>
                           <Edit className="mr-2 h-4 w-4" />Editar Documento
-                        </Button>
-                      )}
-                      {myActiveEditRequest && (
-                        <Button variant="outline" onClick={() => openWordDesktop.mutate(detail.id)} disabled={openWordDesktop.isPending || !canEditOnline}>
-                          <Edit className="mr-2 h-4 w-4" />Abrir no Word instalado
                         </Button>
                       )}
                       {canUpdate && (

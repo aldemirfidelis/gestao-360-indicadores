@@ -97,6 +97,23 @@ export class CompensationController {
     return this.service.changeDescriptionStatus(me, id, String(body.status ?? ''), String(body.reason ?? ''));
   }
 
+  @Get('descriptions/:id/docx')
+  @RequirePermissions('compensation:descriptions:view', ...VIEW)
+  async descriptionDocx(@CurrentUser() me: AuthPayload, @Param('id') id: string) {
+    const { filename, buffer } = await this.service.descriptionDocx(me, id);
+    return {
+      filename,
+      contentType: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+      base64: buffer.toString('base64'),
+    };
+  }
+
+  @Post('descriptions/:id/document')
+  @RequirePermissions('compensation:descriptions:update', ...MANAGE)
+  exportDescriptionToGed(@CurrentUser() me: AuthPayload, @Param('id') id: string) {
+    return this.service.exportDescriptionToGed(me, id);
+  }
+
   @Get('salary-tables')
   @RequirePermissions('compensation:salary-table:view', ...VIEW)
   listSalaryTables(@CurrentUser() me: AuthPayload, @Query() query: Record<string, string | undefined>) {
@@ -179,6 +196,12 @@ export class CompensationController {
   @RequirePermissions(...MANAGE)
   createCycle(@CurrentUser() me: AuthPayload, @Body() body: Record<string, unknown>) {
     return this.service.createCycle(me, body);
+  }
+
+  @Patch('cycles/:id')
+  @RequirePermissions(...MANAGE)
+  updateCycle(@CurrentUser() me: AuthPayload, @Param('id') id: string, @Body() body: Record<string, unknown>) {
+    return this.service.updateCycle(me, id, body);
   }
 
   @Get('budgets')

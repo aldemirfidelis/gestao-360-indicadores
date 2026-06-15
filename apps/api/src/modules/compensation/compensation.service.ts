@@ -1,7 +1,10 @@
 import { BadRequestException, ConflictException, Injectable, NotFoundException } from '@nestjs/common';
-import { Prisma, UserRoleEnum } from '@prisma/client';
+import { NotificationKind, Prisma, UserRoleEnum } from '@prisma/client';
 import { PrismaService } from '../../prisma/prisma.service';
 import { AuthPayload } from '../auth/auth.types';
+import { NotificationsService } from '../notifications/notifications.service';
+import { buildDocx } from '../documents/docx.util';
+import { DocumentsService } from '../documents/documents.service';
 
 const MODULE_NAME = 'Cargos e Salários';
 
@@ -41,7 +44,40 @@ const DESCRIPTION_TRANSITIONS: Record<string, string[]> = {
 
 @Injectable()
 export class CompensationService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly notifications: NotificationsService,
+    private readonly documents: DocumentsService,
+  ) {}
+
+  // Notifica um usuario com tolerancia a falha (notificacao nunca quebra o fluxo principal).
+  private async notifySafe(companyId: string, userId: string | null | undefined, title: string, body: string, link: string) {
+    if (!userId) return;
+    try {
+      await this.notifications.create(companyId, userId, NotificationKind.MESSAGE, title, body, link);
+    } catch {
+      /* no-op: a notificacao e best-effort */
+    }
+  }
+
+  // Usuarios da empresa aptos a aprovar (permissao direta ou via perfil de acesso, ou papel admin).
+  private async findApproverUserIds(companyId: string, keys: string[]): Promise<string[]> {
+    const users = await this.prisma.user.findMany({
+      where: {
+        companyId,
+        active: true,
+        deletedAt: null,
+        OR: [
+          { role: { in: [UserRoleEnum.SUPER_ADMIN, UserRoleEnum.COMPANY_ADMIN] } },
+          { permissions: { some: { permission: { key: { in: keys } } } } },
+          { accessProfile: { permissions: { some: { permission: { key: { in: keys } } } } } },
+        ],
+      },
+      select: { id: true },
+      take: 50,
+    });
+    return users.map((user) => user.id);
+  }
 
   async options(me: AuthPayload) {
     await this.ensureBaseline(me);
@@ -698,6 +734,7 @@ export class CompensationService {
       throw new ConflictException('Orçamento insuficiente para a movimentação');
     }
     const status = monthlyImpact && monthlyImpact.gt(0) && !availableBudget ? 'PENDING_BUDGET' : 'REQUESTED';
+    const approvalSteps = buildApprovalSteps(body.approvalSteps);
     const protocol = await this.nextMovementProtocol(me.companyId);
     const created = await this.prisma.compensationMovementRequest.create({
       data: {
@@ -724,29 +761,76 @@ export class CompensationService {
         requesterId: me.sub,
         managerUserId: cleanString(body.managerUserId),
         status,
-        approvalSteps: jsonValue(body.approvalSteps) ?? [{ status: 'PENDING', role: 'RH' }],
+        approvalSteps: approvalSteps as unknown as Prisma.InputJsonValue,
         attachments: jsonValue(body.attachments),
         evidences: jsonValue(body.evidences),
         notes: cleanString(body.notes),
       },
     });
     await this.audit(me, 'MOVEMENT_REQUESTED', 'CompensationMovementRequest', created.id, null, created, created.protocol, justification);
+    // Notifica todos os aprovadores da empresa (e o gestor informado) sobre a nova fila.
+    // Bloco best-effort: qualquer falha aqui nao deve impedir a criacao da movimentacao.
+    try {
+      const firstStep = approvalSteps[0];
+      const approverIds = await this.findApproverUserIds(me.companyId, ['compensation:movements:approve', 'compensation:manage']);
+      const recipients = new Set<string>(approverIds);
+      const managerId = cleanString(body.managerUserId);
+      if (managerId) recipients.add(managerId);
+      recipients.delete(me.sub); // nao notifica o proprio solicitante
+      for (const userId of recipients) {
+        await this.notifySafe(
+          me.companyId,
+          userId,
+          `Movimentação ${created.protocol} aguardando aprovação`,
+          `${type} · ${reason}${firstStep ? ` · Alçada: ${firstStep.role}` : ''}`,
+          '/cargos-salarios/aprovacoes',
+        );
+      }
+    } catch {
+      /* notificacao best-effort */
+    }
     return created;
   }
 
   async decideMovement(me: AuthPayload, id: string, decision: 'APPROVED' | 'REJECTED', note: string) {
     const before = await this.getMovement(me, id);
     if (MOVEMENT_FINAL_STATUSES.has(before.status)) throw new ConflictException('Movimentação já finalizada');
+
+    // Aprovacao multi-alcada: avanca a primeira etapa pendente da cadeia.
+    const steps = normalizeApprovalSteps(before.approvalSteps);
+    const pendingIndex = steps.findIndex((step) => step.status === 'PENDING');
+    const decidedStep = pendingIndex >= 0 ? steps[pendingIndex] : null;
+    if (decidedStep) {
+      decidedStep.status = decision;
+      decidedStep.approverId = me.sub;
+      decidedStep.decidedAt = new Date().toISOString();
+      decidedStep.note = note || undefined;
+    }
+    const remainingPending = steps.some((step) => step.status === 'PENDING');
+    // Status final: rejeitado encerra; aprovado so vira APPROVED quando nao ha mais alcadas.
+    const nextStatus = decision === 'REJECTED' ? 'REJECTED' : remainingPending ? 'IN_APPROVAL' : 'APPROVED';
+    const isFinal = nextStatus === 'REJECTED' || nextStatus === 'APPROVED';
+
     const updated = await this.prisma.compensationMovementRequest.update({
       where: { id },
       data: {
-        status: decision,
-        decidedAt: new Date(),
+        status: nextStatus,
+        decidedAt: isFinal ? new Date() : null,
         notes: note || before.notes,
-        approvalSteps: [{ status: decision, approverId: me.sub, decidedAt: new Date().toISOString(), note }],
+        approvalSteps: steps as unknown as Prisma.InputJsonValue,
       },
     });
     await this.audit(me, `MOVEMENT_${decision}`, 'CompensationMovementRequest', id, before, updated, updated.protocol, note);
+
+    // Avisa o solicitante sobre o andamento.
+    const label = decision === 'REJECTED' ? 'rejeitada' : remainingPending ? 'avançou de alçada' : 'aprovada';
+    await this.notifySafe(
+      me.companyId,
+      before.requesterId,
+      `Movimentação ${before.protocol} ${label}`,
+      decidedStep ? `Alçada ${decidedStep.role}: ${decision === 'REJECTED' ? 'rejeitada' : 'aprovada'}${note ? ` · ${note}` : ''}` : note || '',
+      '/cargos-salarios/movimentacoes',
+    );
     return updated;
   }
 
@@ -810,7 +894,73 @@ export class CompensationService {
       });
     });
     await this.audit(me, 'MOVEMENT_APPLIED', 'CompensationMovementRequest', id, before, updated, updated.protocol);
+    await this.notifySafe(
+      me.companyId,
+      before.requesterId,
+      `Movimentação ${before.protocol} aplicada`,
+      `${before.type} · vigência ${before.effectiveAt.toLocaleDateString('pt-BR')}`,
+      '/cargos-salarios/movimentacoes',
+    );
     return updated;
+  }
+
+  // Monta o conteudo textual de uma descricao (reutilizado por export DOCX e export para o GED).
+  private async buildDescriptionContent(me: AuthPayload, id: string): Promise<{ title: string; code: string; text: string }> {
+    const description = await this.prisma.compensationJobDescription.findFirst({
+      where: { id, companyId: me.companyId, deletedAt: null },
+      include: { jobCatalog: { select: { code: true, name: true } } },
+    });
+    if (!description) throw new NotFoundException('Descrição não encontrada');
+    const title = description.jobCatalog ? `${description.jobCatalog.code} - ${description.jobCatalog.name}` : 'Descrição de cargo';
+    const sections: Array<[string, string | null]> = [
+      ['Missão do cargo', description.mission],
+      ['Principais responsabilidades', description.responsibilities],
+      ['Atividades detalhadas', description.detailedActivities],
+      ['Entregas esperadas', description.expectedDeliverables],
+      ['Competências técnicas', description.technicalSkills],
+      ['Competências comportamentais', description.behavioralSkills],
+      ['Conhecimentos', description.knowledge],
+      ['Ferramentas e sistemas', description.tools],
+      ['Formação mínima', description.minimumEducation],
+      ['Formação desejada', description.desiredEducation],
+      ['Experiência exigida', description.requiredExperience],
+      ['Cursos exigidos', description.requiredCourses],
+      ['Certificações', description.certifications],
+      ['Requisitos legais', description.legalRequirements],
+      ['Superior imediato', description.immediateSuperior],
+      ['Subordinados diretos', description.directReports],
+      ['Nível de autonomia', description.autonomyLevel],
+      ['Ambiente de trabalho', description.workEnvironment],
+      ['Interfaces internas', description.internalInterfaces],
+      ['Interfaces externas', description.externalInterfaces],
+      ['Riscos ocupacionais', description.occupationalRisks],
+      ['EPIs', description.epis],
+      ['Observações', description.notes],
+    ];
+    const lines: string[] = [title, `Versão ${description.version} · ${description.status}`, ''];
+    for (const [label, value] of sections) {
+      if (value && value.trim()) lines.push(label.toUpperCase(), value, '');
+    }
+    return { title, code: description.jobCatalog?.code ?? id, text: lines.join('\n') };
+  }
+
+  async descriptionDocx(me: AuthPayload, id: string): Promise<{ filename: string; buffer: Buffer }> {
+    const { code, text } = await this.buildDescriptionContent(me, id);
+    await this.audit(me, 'EXPORT', 'CompensationJobDescription', id, null, { format: 'docx' }, code);
+    return { filename: `descricao-${code}.docx`, buffer: buildDocx(text) };
+  }
+
+  // Exporta a descricao como documento controlado no GED, onde pode ser editado online
+  // (Collabora/WOPI) pelo fluxo de liberacao do proprio modulo de documentos.
+  async exportDescriptionToGed(me: AuthPayload, id: string): Promise<{ documentId: string; code: string | null }> {
+    const { title, text } = await this.buildDescriptionContent(me, id);
+    const doc = await this.documents.create(me, {
+      title: `Descrição de cargo - ${title}`,
+      content: text,
+      changeNote: 'Gerado a partir do módulo Cargos e Salários',
+    });
+    await this.audit(me, 'EXPORT_GED', 'CompensationJobDescription', id, null, { documentId: doc.id, code: doc.code }, title);
+    return { documentId: doc.id, code: doc.code };
   }
 
   async listCycles(me: AuthPayload, query: Record<string, string | undefined>) {
@@ -845,6 +995,26 @@ export class CompensationService {
     const created = await this.prisma.compensationCycle.create({ data });
     await this.audit(me, 'CYCLE_CREATED', 'CompensationCycle', created.id, null, created, created.name);
     return created;
+  }
+
+  async updateCycle(me: AuthPayload, id: string, body: Record<string, unknown>) {
+    const before = await this.prisma.compensationCycle.findFirst({ where: { id, companyId: me.companyId, deletedAt: null } });
+    if (!before) throw new NotFoundException('Ciclo não encontrado');
+    // Atualiza apenas os campos enviados (permite salvar somente a matriz no workflow).
+    const data: Prisma.CompensationCycleUpdateInput = { updatedById: me.sub };
+    if (body.name !== undefined) data.name = requiredString(body.name, 'Nome do ciclo obrigatório');
+    if (body.referencePeriod !== undefined) data.referencePeriod = requiredString(body.referencePeriod, 'Período de referência obrigatório');
+    if (body.criteria !== undefined) data.criteria = cleanString(body.criteria);
+    if (body.guidelinePercent !== undefined) data.guidelinePercent = ratioValue(body.guidelinePercent);
+    if (body.totalBudget !== undefined) data.totalBudget = money(body.totalBudget);
+    if (body.areaBudgets !== undefined) data.areaBudgets = jsonValue(body.areaBudgets) ?? Prisma.JsonNull;
+    if (body.calendar !== undefined) data.calendar = jsonValue(body.calendar) ?? Prisma.JsonNull;
+    if (body.workflow !== undefined) data.workflow = jsonValue(body.workflow) ?? Prisma.JsonNull;
+    if (body.eligibilityRules !== undefined) data.eligibilityRules = jsonValue(body.eligibilityRules) ?? Prisma.JsonNull;
+    if (body.status !== undefined) data.status = optionalString(body.status) ?? before.status;
+    const updated = await this.prisma.compensationCycle.update({ where: { id }, data });
+    await this.audit(me, 'CYCLE_UPDATED', 'CompensationCycle', id, before, updated, updated.name);
+    return updated;
   }
 
   async listBudgets(me: AuthPayload, query: Record<string, string | undefined>) {
@@ -1401,6 +1571,52 @@ export class CompensationService {
       },
     });
   }
+}
+
+interface ApprovalStep {
+  role: string;
+  status: 'PENDING' | 'APPROVED' | 'REJECTED';
+  approverId?: string;
+  decidedAt?: string;
+  note?: string;
+}
+
+// Monta a cadeia de alcadas a partir do corpo (array de strings de papel ou objetos).
+// Sem entrada valida, usa uma unica alcada de RH (compatibilidade com o fluxo anterior).
+function buildApprovalSteps(raw: unknown): ApprovalStep[] {
+  const arr = Array.isArray(raw) ? raw : null;
+  if (!arr || arr.length === 0) return [{ role: 'RH', status: 'PENDING' }];
+  const steps = arr
+    .map((item): ApprovalStep | null => {
+      if (typeof item === 'string') {
+        const role = item.trim();
+        return role ? { role, status: 'PENDING' } : null;
+      }
+      if (item && typeof item === 'object') {
+        const role = String((item as Record<string, unknown>).role ?? '').trim();
+        return role ? { role, status: 'PENDING' } : null;
+      }
+      return null;
+    })
+    .filter((step): step is ApprovalStep => step !== null);
+  return steps.length ? steps : [{ role: 'RH', status: 'PENDING' }];
+}
+
+// Le a cadeia gravada (Json) de forma resiliente, sem chaves undefined.
+function normalizeApprovalSteps(raw: unknown): ApprovalStep[] {
+  const arr = Array.isArray(raw) ? raw : null;
+  if (!arr || arr.length === 0) return [{ role: 'RH', status: 'PENDING' }];
+  return arr.map((item) => {
+    const obj = (item && typeof item === 'object' ? item : {}) as Record<string, unknown>;
+    const step: ApprovalStep = {
+      role: String(obj.role ?? 'RH'),
+      status: (['PENDING', 'APPROVED', 'REJECTED'].includes(String(obj.status)) ? String(obj.status) : 'PENDING') as ApprovalStep['status'],
+    };
+    if (obj.approverId) step.approverId = String(obj.approverId);
+    if (obj.decidedAt) step.decidedAt = String(obj.decidedAt);
+    if (obj.note) step.note = String(obj.note);
+    return step;
+  });
 }
 
 function cleanString(value: unknown) {
