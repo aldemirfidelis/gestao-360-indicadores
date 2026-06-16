@@ -255,8 +255,8 @@ const RELATION_KINDS: RelationKindMeta[] = [
   { kind: 'depende', label: 'Depende de', description: 'A so avanca quando B avanca', color: '#9333ea' },
   { kind: 'medido_por', label: 'E medido por', description: 'A e mensurado pelo indicador/objetivo B', color: '#0ea5e9' },
   { kind: 'gera_acao', label: 'Gera ação', description: 'A motiva um plano de ação em B', color: '#f97316' },
-  { kind: 'vinculado', label: 'Está vinculado a', description: 'Ligacao livre entre A e B', color: '#64748b' },
-  { kind: 'responsável', label: 'Responsável por', description: 'A responde pela execucao de B', color: '#db2777' },
+  { kind: 'vinculado', label: 'Está vinculado a', description: 'Ligação livre entre A e B', color: '#64748b' },
+  { kind: 'responsável', label: 'Responsável por', description: 'A responde pela execução de B', color: '#db2777' },
 ];
 
 const RELATION_KIND_MAP = new Map(RELATION_KINDS.map((rel) => [rel.kind, rel]));
@@ -1095,13 +1095,13 @@ function StrategyMapPageInner() {
         },
       }),
     onSuccess: () => {
-      toast.success('Ligacao criada');
+      toast.success('Ligação criada');
       setPendingConnection(null);
       setPendingLabel('');
       setPendingKind('impacta');
       invalidate();
     },
-    onError: (e: any) => toast.error(e?.message ?? 'Falha ao criar ligacao'),
+    onError: (e: any) => toast.error(e?.message ?? 'Falha ao criar ligação'),
   });
 
   const updateRelation = useMutation({
@@ -1111,11 +1111,11 @@ function StrategyMapPageInner() {
         json: { kind, label: label || kindMeta(kind).label, description },
       }),
     onSuccess: () => {
-      toast.success('Ligacao atualizada');
+      toast.success('Ligação atualizada');
       setEditingEdgeId(null);
       invalidate();
     },
-    onError: (e: any) => toast.error(e?.message ?? 'Falha ao atualizar ligacao'),
+    onError: (e: any) => toast.error(e?.message ?? 'Falha ao atualizar ligação'),
   });
   const updateRelationMutateRef = useRef(updateRelation.mutate);
 
@@ -1173,7 +1173,7 @@ function StrategyMapPageInner() {
   const removeRelation = useMutation({
     mutationFn: (relationId: string) => api(`/strategy/relations/${relationId}`, { method: 'DELETE' }),
     onSuccess: () => {
-      toast.success('Ligacao removida');
+      toast.success('Ligação removida');
       invalidate();
     },
   });
@@ -1261,10 +1261,10 @@ function StrategyMapPageInner() {
   if (mapQuery.isError) {
     const status = mapQuery.error instanceof ApiError ? mapQuery.error.status : undefined;
     const description = status === 404 || status === 403
-      ? 'Este mapa nao pertence a sua empresa ou voce nao tem permissao para acessa-lo.'
-      : 'Nao foi possivel carregar o mapa agora.';
+      ? 'Este mapa não pertence a sua empresa ou você não tem permissão para acessa-lo.'
+      : 'Não foi possível carregar o mapa agora.';
     return (
-      <SectionCard title="Mapa indisponivel" description={description}>
+      <SectionCard title="Mapa indisponível" description={description}>
         <div className="flex flex-wrap items-center gap-2">
           <Button asChild>
             <Link href="/strategy">Voltar aos mapas da minha empresa</Link>
@@ -1497,7 +1497,7 @@ function StrategyMapPageInner() {
                 {fullscreen ? <Minimize2 className="h-3.5 w-3.5" /> : <Maximize2 className="h-3.5 w-3.5" />}
               </Button>
               {presentationMode && (
-                <Button variant="outline" size="sm" onClick={() => setPresentationMode(false)} title="Sair do modo apresentacao">
+                <Button variant="outline" size="sm" onClick={() => setPresentationMode(false)} title="Sair do modo apresentação">
                   <Monitor className="h-3.5 w-3.5" />
                 </Button>
               )}
@@ -1921,7 +1921,7 @@ function StrategyMapPageInner() {
       <Dialog open={Boolean(pendingConnection)} onOpenChange={(open) => !open && setPendingConnection(null)}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>Nova ligacao estratégica</DialogTitle>
+            <DialogTitle>Nova ligação estratégica</DialogTitle>
           </DialogHeader>
           <div className="space-y-3">
             <p className="text-sm text-muted-foreground">
@@ -1969,7 +1969,7 @@ function StrategyMapPageInner() {
         </DialogContent>
       </Dialog>
 
-      {/* Dialog: editar/excluir uma ligacao existente */}
+      {/* Dialog: editar/excluir uma ligação existente */}
       <Dialog
         open={Boolean(editingEdgeId)}
         onOpenChange={(open) => {
@@ -1978,7 +1978,7 @@ function StrategyMapPageInner() {
       >
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>Editar ligacao</DialogTitle>
+            <DialogTitle>Editar ligação</DialogTitle>
           </DialogHeader>
           {editingRelation && (
             <div className="space-y-3">
@@ -2049,7 +2049,7 @@ function StrategyMapPageInner() {
               className="text-destructive hover:text-destructive"
               disabled={!editingEdgeId || removeRelation.isPending}
               onClick={() => {
-                if (editingEdgeId && window.confirm('Remover esta ligacao?')) {
+                if (editingEdgeId && window.confirm('Remover esta ligação?')) {
                   removeRelation.mutate(editingEdgeId);
                   setEditingEdgeId(null);
                 }
@@ -2073,7 +2073,7 @@ function StrategyMapPageInner() {
                 });
               }}
             >
-              <Save className="mr-2 h-4 w-4" /> Salvar ligacao
+              <Save className="mr-2 h-4 w-4" /> Salvar ligação
             </Button>
           </DialogFooter>
         </DialogContent>

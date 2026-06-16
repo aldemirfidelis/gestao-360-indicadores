@@ -61,11 +61,11 @@ export default function TarefasPage() {
         router.push(res.redirect);
         return;
       }
-      toast.success(res?.message ?? 'Acao registrada');
+      toast.success(res?.message ?? 'Ação registrada');
       void qc.invalidateQueries({ queryKey: ['tasks'] });
       void qc.invalidateQueries({ queryKey: ['my-day'] });
     },
-    onError: (e: any) => toast.error(e?.message ?? 'Nao foi possivel executar a acao'),
+    onError: (e: any) => toast.error(e?.message ?? 'Não foi possível executar a ação'),
   });
 
   const rows = items.data?.rows ?? [];
@@ -84,7 +84,7 @@ export default function TarefasPage() {
     <div className="space-y-5">
       <PageHeader
         title="Tarefas"
-        description="Caixa de trabalho do usuario, com uma secao dedicada a documentos e espaco para novos tipos de tarefa."
+        description="Caixa de trabalho do usuário, com uma seção dedicada a documentos e espaco para novos tipos de tarefa."
         actions={<Button variant="outline" onClick={() => refresh.mutate()} disabled={refresh.isPending}><RefreshCw className="mr-2 h-4 w-4" />Atualizar</Button>}
       />
 
@@ -96,7 +96,7 @@ export default function TarefasPage() {
 
         <TabsContent value={section} className="space-y-3">
           {items.isLoading && <div className="rounded-md border p-6 text-sm text-muted-foreground">Carregando tarefas...</div>}
-          {!items.isLoading && rows.length === 0 && <div className="rounded-md border border-dashed p-6 text-sm text-muted-foreground">Nenhuma tarefa pendente nesta secao.</div>}
+          {!items.isLoading && rows.length === 0 && <div className="rounded-md border border-dashed p-6 text-sm text-muted-foreground">Nenhuma tarefa pendente nesta seção.</div>}
           {rows.map((item) => (
             <Card key={item.id}>
               <CardContent className="flex flex-col gap-3 p-4 lg:flex-row lg:items-center lg:justify-between">

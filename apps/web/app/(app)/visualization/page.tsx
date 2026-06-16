@@ -110,7 +110,7 @@ export default function VisualizationPage() {
       <PageHeader
         eyebrow="Visualização"
         tone="view"
-        title="Dashboard Executivo Gestão 360"
+        title="Painel Executivo Gestão 360"
         description="Panorama de desempenho, farois, planos de ação, rankings e alertas para tomada de decisão."
         actions={
           <>

@@ -13,7 +13,7 @@ export const metadata: Metadata = publicMetadata({
 const sections = [
   ['Dados de contato', 'O formulário público coleta dados informados voluntariamente para retorno comercial. O sistema registra apenas o necessário para acompanhamento da solicitação.'],
   ['Analytics', 'Scripts de analytics só são carregados quando IDs públicos forem configurados por variáveis de ambiente. Eventos evitam dados pessoais desnecessários.'],
-  ['Portal autenticado', 'Dados corporativos, documentos, indicadores, usuários e dashboards ficam em áreas autenticadas e protegidas por permissão.'],
+  ['Portal autenticado', 'Dados corporativos, documentos, indicadores, usuários e painéis ficam em áreas autenticadas e protegidas por permissão.'],
   ['Cookies e preferencias', 'Preferencias locais, como fechar o balao do WhatsApp, podem ser salvas no navegador para melhorar a experiencia.'],
   ['Revisão', 'Esta página deve ser revisada juridicamente pelo proprietário antes de uso comercial definitivo.'],
 ];

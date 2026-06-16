@@ -29,20 +29,20 @@ interface IntegrationConfig {
 }
 
 const CONNECTOR_TEMPLATES = [
-  { type: 'WEBHOOK', label: 'Custom HTTP Webhook', desc: 'Envie payloads JSON para qualquer endpoint HTTP/HTTPS.', icon: Globe, color: 'text-emerald-500 bg-emerald-500/10' },
+  { type: 'WEBHOOK', label: 'Chamada HTTP personalizada', desc: 'Envie dados JSON para qualquer endereço HTTP/HTTPS.', icon: Globe, color: 'text-emerald-500 bg-emerald-500/10' },
   { type: 'EMAIL', label: 'Servidor SMTP / SendGrid', desc: 'Envie notificações estruturadas por e-mail para destinatários corporativos.', icon: Mail, color: 'text-blue-500 bg-blue-500/10' },
-  { type: 'SLACK', label: 'Slack Webhooks', desc: 'Publique alertas automáticos em canais específicos de comunicação do Slack.', icon: Slack, color: 'text-purple-500 bg-purple-500/10' },
-  { type: 'TEAMS', label: 'Microsoft Teams Webhooks', desc: 'Envie Adaptive Cards e notificações para chats ou canais no MS Teams.', icon: MessageSquare, color: 'text-indigo-500 bg-indigo-500/10' },
+  { type: 'SLACK', label: 'Alertas no Slack', desc: 'Publique alertas automáticos em canais específicos de comunicação do Slack.', icon: Slack, color: 'text-purple-500 bg-purple-500/10' },
+  { type: 'TEAMS', label: 'Alertas no Microsoft Teams', desc: 'Envie cartões adaptativos e notificações para conversas ou canais no Microsoft Teams.', icon: MessageSquare, color: 'text-indigo-500 bg-indigo-500/10' },
 ];
 
 export default function IntegrationsConfigPage() {
   const [integrations, setIntegrations] = useState<IntegrationConfig[]>([
     {
       id: 'int-1',
-      name: 'Webhook de Sincronização ERP',
+      name: 'Sincronização ERP por chamada HTTP',
       type: 'WEBHOOK',
       status: 'ACTIVE',
-      endpoint: 'https://api.empresa.com/v1/workflows/sync',
+      endpoint: 'https://api.empresa.com/v1/fluxos/sincronizar',
       lastTriggered: '2026-06-08T15:24:00Z',
     },
     {
@@ -88,7 +88,7 @@ export default function IntegrationsConfigPage() {
       <PageHeader
         eyebrow="Central de Automações"
         title="Integrações & Conectores"
-        description="Configure canais externos de comunicação, credenciais de Webhooks e webhooks de chat para que o motor visual envie dados para outros sistemas."
+        description="Configure canais externos de comunicação, credenciais de chamadas HTTP e canais de conversa para que o motor visual envie dados para outros sistemas."
       />
 
       <div className="flex-1 grid grid-cols-1 lg:grid-cols-[1fr,400px] gap-6 min-h-0 w-full overflow-hidden">
@@ -226,7 +226,7 @@ export default function IntegrationsConfigPage() {
                 </div>
 
                 <div className="space-y-1">
-                  <span className="text-[10px] font-bold text-muted-foreground uppercase">Endpoint / URI</span>
+                  <span className="text-[10px] font-bold text-muted-foreground uppercase">Endereço / URI</span>
                   <input
                     type="text"
                     value={selectedItem.endpoint}

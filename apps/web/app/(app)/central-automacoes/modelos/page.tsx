@@ -69,7 +69,7 @@ export default function TemplatesCatalogPage() {
       case 'AUDITS':
         return 'Auditorias';
       case 'FORMS':
-        return 'Checklists e Formulários';
+        return 'Listas de verificação e Formulários';
       case 'ACTIONS':
         return 'Planos de Ação';
       default:

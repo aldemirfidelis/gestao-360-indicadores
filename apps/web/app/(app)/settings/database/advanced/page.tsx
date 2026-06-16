@@ -62,7 +62,7 @@ export default function AdvancedSettingsPage() {
                 <Item k="Página máx." v={d.defaults.limits.maxPageSize} />
                 <Item k="Timeout seguro (ms)" v={d.defaults.limits.safeStatementTimeoutMs} />
                 <Item k="Timeout avançado (ms)" v={d.defaults.limits.advancedStatementTimeoutMs} />
-                <Item k="Máx. linhas snapshot" v={d.defaults.limits.maxSnapshotRows} />
+                <Item k="Máx. linhas do retrato" v={d.defaults.limits.maxSnapshotRows} />
               </dl>
             </SectionCard>
           </div>

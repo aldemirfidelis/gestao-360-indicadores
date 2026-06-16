@@ -6,17 +6,17 @@ import { breadcrumbJsonLd, publicMetadata, webPageJsonLd } from '@/lib/public-si
 
 export const metadata: Metadata = publicMetadata({
   title: 'Recursos do Gestão 360',
-  description: 'Conheça recursos de rastreabilidade, dashboards, permissões, automacoes, Meu Dia, Visão 360, auditoria e segurança no Gestão 360.',
+  description: 'Conheça recursos de rastreabilidade, painéis, permissões, automações, Meu Dia, Visão 360, auditoria e segurança no Gestão 360.',
   path: '/recursos',
 });
 
 const resources = [
-  ['Meu Dia', 'Central diária de prioridades, prazos, delegacoes, acompanhamento e recomendações assistidas.'],
+  ['Meu Dia', 'Central diária de prioridades, prazos, delegações, acompanhamento e recomendações assistidas.'],
   ['Visão 360', 'Painel de contexto do registro com vínculos, impactos, histórico e registros relacionados autorizados.'],
-  ['Automacoes', 'Fluxos, tarefas, aprovações, histórico, escalonamentos e acompanhamento de execuções.'],
+  ['Automações', 'Fluxos, tarefas, aprovações, histórico, escalonamentos e acompanhamento de execuções.'],
   ['Rastreabilidade', 'Histórico de alterações, responsáveis, evidências e trilha de auditoria por módulo.'],
-  ['Permissoes', 'Controle por perfil, módulo, empresa, área e escopo de visibilidade.'],
-  ['Dashboards', 'Visoes executivas e operacionais conectadas aos registros de origem.'],
+  ['Permissões', 'Controle por perfil, módulo, empresa, área e escopo de visibilidade.'],
+  ['Painéis', 'Visões executivas e operacionais conectadas aos registros de origem.'],
 ];
 
 export default function RecursosPage() {

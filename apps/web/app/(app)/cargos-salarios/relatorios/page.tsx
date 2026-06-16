@@ -85,7 +85,7 @@ export default function RelatoriosPage() {
       a.recordLabel ?? a.entityId ?? '',
       a.result ?? 'SUCCESS',
     ]);
-    downloadCsv(`auditoria-cargos-salarios-${new Date().toISOString().slice(0, 10)}.csv`, [header, ...body]);
+    downloadCsv(`auditoria-cargos-salários-${new Date().toISOString().slice(0, 10)}.csv`, [header, ...body]);
   }
 
   return (

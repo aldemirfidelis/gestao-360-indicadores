@@ -61,7 +61,7 @@ const AUDIT_LOGS_MOCK: AuditLog[] = [
     versionNumber: null,
     action: 'CREATE',
     actorName: 'Aldemir Fidelis (Admin)',
-    changeSummary: 'Criação inicial da definição de fluxo importada de template padrão.',
+    changeSummary: 'Criação inicial da definição de fluxo importada de modelo padrão.',
     createdAt: '2026-06-07T09:12:00-03:00',
   },
   {

@@ -48,10 +48,10 @@ export default function WorkflowsList() {
     mutationFn: (id: string) => api(`/automations/workflows/${id}/duplicate`, { method: 'POST' }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['automations', 'workflows'] });
-      toast.success('Workflow duplicado com sucesso!');
+      toast.success('Fluxo de trabalho duplicado com sucesso!');
     },
     onError: (err: any) => {
-      toast.error(`Falha ao duplicar workflow: ${err.message}`);
+      toast.error(`Falha ao duplicar fluxo de trabalho: ${err.message}`);
     },
   });
 
@@ -60,7 +60,7 @@ export default function WorkflowsList() {
     mutationFn: (id: string) => api(`/automations/workflows/${id}`, { method: 'DELETE' }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['automations', 'workflows'] });
-      toast.success('Workflow arquivado com sucesso!');
+      toast.success('Fluxo de trabalho arquivado com sucesso!');
     },
     onError: (err: any) => {
       toast.error(`Falha ao arquivar: ${err.message}`);

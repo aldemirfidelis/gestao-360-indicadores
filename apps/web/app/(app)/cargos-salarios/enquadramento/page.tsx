@@ -129,7 +129,7 @@ export default function EnquadramentoPage() {
       {fitQuery.isLoading && <LoadingState />}
 
       {!fitQuery.isLoading && allRows.length === 0 && (
-        <EmptyState title="Sem colaboradores para analisar" description="Cadastre colaboradores, faixas e snapshots salariais para ver o enquadramento." />
+        <EmptyState title="Sem colaboradores para analisar" description="Cadastre colaboradores, faixas e retratos salariais para ver o enquadramento." />
       )}
 
       {allRows.length > 0 && (

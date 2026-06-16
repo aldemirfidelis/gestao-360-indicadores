@@ -170,7 +170,7 @@ export default function SegurancaPatrimonialPage() {
         eyebrow="Corporativo"
         tone="admin"
         title="Segurança Patrimonial e Portarias"
-        description="Controle de portarias, acessos, visitantes, prestadores, veículos, rondas, ocorrências, chaves, crachás, QR Code e operação offline."
+        description="Controle de portarias, acessos, visitantes, prestadores, veículos, rondas, ocorrências, chaves, crachás, código QR e operação sem conexão."
         breadcrumbs={[{ label: 'Início', href: '/' }, { label: 'Segurança Patrimonial' }]}
         actions={
           <div className="flex flex-wrap gap-2">
@@ -382,7 +382,7 @@ function OverviewTab({
       <div className="grid gap-2 md:grid-cols-2 xl:grid-cols-4">
         {[
           ['operation', DoorOpen, 'Operação em tempo real', 'Registrar entrada/saída, consultar presentes e conciliar pendências.'],
-          ['authorizations', QrCode, 'Autorizações e QR Code', 'Pré-cadastro, convites externos, aprovação e documentos.'],
+          ['authorizations', QrCode, 'Autorizações e código QR', 'Pré-cadastro, convites externos, aprovação e documentos.'],
           ['rounds', RadioTower, 'Rondas e ocorrências', 'Roteiros, pontos de controle, ocorrências e livro eletrônico.'],
           ['assets', KeyRound, 'Materiais, chaves e crachás', 'Movimentação de bens, empréstimos, devoluções e correspondências.'],
         ].map(([key, Icon, title, desc]) => {
@@ -462,7 +462,7 @@ function OperationTab({
       <div className="grid gap-3 md:grid-cols-4">
         <ActionButton disabled={!canOperate} icon={DoorOpen} title="Registrar entrada" text="Pessoa, veículo, material ou carga" onClick={() => onDialog(entryDialog(optionValues))} />
         <ActionButton disabled={!canOperate} icon={CheckCircle2} title="Registrar saída" text="Baixa por código, pessoa ou placa" onClick={() => onDialog(exitDialog(optionValues))} />
-        <ActionButton disabled={!canOperate} icon={QrCode} title="Validar QR Code" text="Conferir convite ou autorização" onClick={onQr} />
+        <ActionButton disabled={!canOperate} icon={QrCode} title="Validar código QR" text="Conferir convite ou autorização" onClick={onQr} />
         <ActionButton disabled={!canOperate} icon={FileWarning} title="Ocorrência" text="Registrar fato relevante" onClick={() => onDialog(incidentDialog(optionValues))} />
       </div>
 
@@ -792,7 +792,7 @@ function SettingsTab({ gates, posts, packageConfig, summary, loading, canManage,
     { key: 'documents', label: 'Exigência documental' },
     { key: 'blocklist', label: 'Lista de bloqueio' },
     ...(canManage ? [{ key: 'audit' as SettingsSub, label: 'Auditoria' }] : []),
-    ...(canOffline ? [{ key: 'offline' as SettingsSub, label: 'Offline' }] : []),
+    ...(canOffline ? [{ key: 'offline' as SettingsSub, label: 'Sem conexão' }] : []),
   ];
   return (
     <div className="space-y-4">
@@ -808,7 +808,7 @@ function SettingsTab({ gates, posts, packageConfig, summary, loading, canManage,
                   <p className="text-sm text-muted-foreground">
                     Status: <span className="font-medium text-foreground">{labelFor(packageConfig?.status ?? 'ENABLED', PACKAGE_STATUS_LABELS)}</span>. Recursos ativos: {(packageConfig?.enabledFeatures ?? []).join(', ') || 'todos'}.
                   </p>
-                  <p className="mt-1 text-xs text-muted-foreground">Fila de sincronização offline: {formatNumber(summary?.offlinePending ?? 0)} pendência(s).</p>
+                  <p className="mt-1 text-xs text-muted-foreground">Fila de sincronização sem conexão: {formatNumber(summary?.offlinePending ?? 0)} pendência(s).</p>
                 </div>
                 {canManage && <Button variant="outline" onClick={() => onDialog(packageDialog(optionValues, packageConfig))}>Configurar pacote</Button>}
               </div>
@@ -882,22 +882,22 @@ function QrValidateDialog({ onClose }: { onClose: () => void }) {
   const validate = useMutation({
     mutationFn: (value: string) => api<AnyRecord>(`/asset-security/qrcodes/validate/${encodeURIComponent(value)}`),
     onSuccess: (data) => setResult(data),
-    onError: (e: any) => { setResult(null); toast.error(e?.message ?? 'QR Code não encontrado'); },
+    onError: (e: any) => { setResult(null); toast.error(e?.message ?? 'código QR não encontrado'); },
   });
   return (
     <Dialog open onOpenChange={(v) => !v && onClose()}>
       <DialogContent className="max-w-md">
-        <DialogHeader><DialogTitle>Validar QR Code</DialogTitle></DialogHeader>
+        <DialogHeader><DialogTitle>Validar código QR</DialogTitle></DialogHeader>
         <div className="space-y-3">
           <div>
-            <Label>Token do QR Code</Label>
+            <Label>Token do código QR</Label>
             <Input value={token} placeholder="Cole ou digite o token lido" onChange={(e) => { setToken(e.target.value); setResult(null); }} />
           </div>
           {result && (
             <div className={cn('rounded-md border p-3 text-sm', result.valid ? 'border-status-green/40 bg-status-green/5' : 'border-status-red/40 bg-status-red/5')}>
               <div className="flex items-center gap-2 font-medium">
                 {result.valid ? <CheckCircle2 className="h-4 w-4 text-status-green" /> : <AlertTriangle className="h-4 w-4 text-status-red" />}
-                {result.valid ? 'QR Code válido' : `Inválido${result.reason ? ` — ${labelFor(String(result.reason))}` : ''}`}
+                {result.valid ? 'código QR válido' : `Inválido${result.reason ? ` — ${labelFor(String(result.reason))}` : ''}`}
               </div>
               {result.qr && (
                 <div className="mt-2 text-xs text-muted-foreground">

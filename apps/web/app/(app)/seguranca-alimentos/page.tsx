@@ -292,7 +292,7 @@ const TABS: Array<{ key: TabKey; label: string; icon: typeof Network }> = [
   { key: 'monitoring', label: 'Monitoramento', icon: GaugeCircle },
   { key: 'compliance', label: 'Compliance', icon: ClipboardCheck },
   { key: 'chain', label: 'Cadeia e Recall', icon: Truck },
-  { key: 'intelligence', label: 'Inteligencia', icon: Brain },
+  { key: 'intelligence', label: 'Inteligência', icon: Brain },
   { key: 'flow', label: 'Fluxograma', icon: Workflow },
   { key: 'matrix', label: 'Matriz Geral', icon: Layers3 },
 ];
@@ -301,9 +301,9 @@ const TABS: Array<{ key: TabKey; label: string; icon: typeof Network }> = [
 const SHORTCUTS: Array<{ href: string; title: string; description: string; icon: typeof Network; tone: string }> = [
   { href: '/documents', title: 'Documentos', description: 'Manuais, POPs, procedimentos, registros e evidências (GED).', icon: FileText, tone: 'bg-status-blue/10 text-status-blue' },
   { href: '/actions', title: 'Tarefas e planos de ação', description: 'Ações corretivas, prazos, responsáveis e eficácia.', icon: CheckSquare, tone: 'bg-status-green/10 text-status-green' },
-  { href: '/audits', title: 'Auditorias e inspeções', description: 'Auditorias, checklists, constatações e geração de NCs.', icon: ClipboardCheck, tone: 'bg-status-purple/10 text-status-purple' },
+  { href: '/audits', title: 'Auditorias e inspeções', description: 'Auditorias, listas de verificação, constatações e geração de NCs.', icon: ClipboardCheck, tone: 'bg-status-purple/10 text-status-purple' },
   { href: '/nonconformities', title: 'Não conformidades', description: 'NCs, análise de causa, ação corretiva e verificação.', icon: FileWarning, tone: 'bg-status-red/10 text-status-red' },
-  { href: '/forms', title: 'Formulários e checklists', description: 'Monitoramentos, checklists digitais e preenchimentos.', icon: ClipboardList, tone: 'bg-status-yellow/10 text-status-yellow' },
+  { href: '/forms', title: 'Formulários e listas de verificação', description: 'Monitoramentos, listas de verificação digitais e preenchimentos.', icon: ClipboardList, tone: 'bg-status-yellow/10 text-status-yellow' },
 ];
 
 // ----------------------------- página -------------------------------------
@@ -1041,7 +1041,7 @@ function ProcessDialog({
             </NativeSelect>
           </div>
           <div>
-            <Label>Status (workflow)</Label>
+            <Label>Status (fluxo de trabalho)</Label>
             <NativeSelect value={form.status} onChange={(e) => setForm({ ...form, status: e.target.value as ProcessStatus })} disabled={!canManage}>
               {(options?.processStatuses ?? Object.keys(PROCESS_STATUS_LABEL)).map((s) => <option key={s} value={s}>{PROCESS_STATUS_LABEL[s as ProcessStatus] ?? s}</option>)}
             </NativeSelect>
@@ -1302,7 +1302,7 @@ function HazardDialog({
 
 function RiskMatrixDialog({ matrix, canManage, onClose, onSaved }: { matrix?: RiskMatrix; canManage: boolean; onClose: () => void; onSaved: () => void }) {
   const [form, setForm] = useState({
-    name: matrix?.name ?? 'Matriz padrao',
+    name: matrix?.name ?? 'Matriz padrão',
     severityScale: String(matrix?.severityScale ?? 5),
     probabilityScale: String(matrix?.probabilityScale ?? 5),
     useDetection: matrix?.useDetection ?? false,

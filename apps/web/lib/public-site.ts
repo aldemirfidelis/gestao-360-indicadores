@@ -71,7 +71,7 @@ export const solutionPages: PublicPage[] = [
       'Conecta desvios a análises de causa, reuniões e ações.',
       'Apoia rituais de acompanhamento gerencial com dados rastreáveis.',
     ],
-    features: ['KPI e metas', 'Farol de desempenho', 'Histórico de resultados', 'Dashboards', 'Planos vinculados'],
+    features: ['KPI e metas', 'Farol de desempenho', 'Histórico de resultados', 'Painéis', 'Planos vinculados'],
     useCases: [
       'Reuniões mensais de performance.',
       'Acompanhamento de metas por unidade.',
@@ -212,7 +212,7 @@ export const solutionPages: PublicPage[] = [
       'Apoia acompanhamento de pendências e reincidências.',
     ],
     features: ['Plano de auditoria', 'Achados', 'Evidências', 'Riscos', 'Planos corretivos'],
-    useCases: ['Auditoria interna.', 'Checklist de conformidade.', 'Acompanhamento de achados por área.'],
+    useCases: ['Auditoria interna.', 'Lista de verificação de conformidade.', 'Acompanhamento de achados por área.'],
     faq: [
       {
         question: 'A auditoria fica conectada aos planos de ação?',
@@ -245,7 +245,7 @@ export const solutionPages: PublicPage[] = [
       'Apoia aprovação e publicação controlada.',
       'Relaciona documentos a processos, auditorias e formulários.',
     ],
-    features: ['Controle documental', 'Revisões', 'Aprovações', 'Anexos', 'Editor online quando configurado'],
+    features: ['Controle documental', 'Revisões', 'Aprovações', 'Anexos', 'Editor pela web quando configurado'],
     useCases: ['Procedimentos internos.', 'Políticas corporativas.', 'Documentos de processo e qualidade.'],
     faq: [
       {
@@ -264,10 +264,10 @@ export const solutionPages: PublicPage[] = [
   {
     slug: 'formularios-e-checklists',
     path: '/solucoes/formularios-e-checklists',
-    title: 'Formulários e checklists',
-    seoTitle: 'Formulários digitais e checklists operacionais | Gestão 360',
+    title: 'Formulários e listas de verificação',
+    seoTitle: 'Formulários digitais e listas de verificação operacionais | Gestão 360',
     description:
-      'Digitalize coletas, formulários e checklists com evidências, aprovação e rastreabilidade.',
+      'Digitalize coletas, formulários e listas de verificação com evidências, aprovação e rastreabilidade.',
     eyebrow: 'Coleta operacional',
     summary:
       'Padronize coletas e verificações de rotina, reduzindo retrabalho e facilitando análise posterior.',
@@ -279,11 +279,11 @@ export const solutionPages: PublicPage[] = [
       'Conecta reprovações a ações e não conformidades.',
       'Facilita consulta histórica por unidade e processo.',
     ],
-    features: ['Templates', 'Execuções', 'Evidências', 'Checklists', 'Acompanhamento'],
-    useCases: ['Inspeção operacional.', 'Checklist de qualidade.', 'Coletas de rotina por turno.'],
+    features: ['Modelos', 'Execuções', 'Evidências', 'Listas de verificação', 'Acompanhamento'],
+    useCases: ['Inspeção operacional.', 'Lista de verificação de qualidade.', 'Coletas de rotina por turno.'],
     faq: [
       {
-        question: 'O checklist pode gerar ação?',
+        question: 'A lista de verificação pode gerar ação?',
         answer:
           'Sim. Um resultado reprovado pode ser conectado a planos de ação ou tratativas, conforme configuração.',
       },
@@ -348,7 +348,7 @@ export const solutionPages: PublicPage[] = [
       'Conecta ocorrências a tratativas e ações.',
     ],
     features: ['Programas', 'Lotes', 'Fornecedores', 'Rastreabilidade', 'Tratativas'],
-    useCases: ['Indústria de alimentos.', 'Bebidas e agroindustria.', 'Controle de rastreabilidade por lote.'],
+    useCases: ['Indústria de alimentos.', 'Bebidas e agroindústria.', 'Controle de rastreabilidade por lote.'],
     faq: [
       {
         question: 'Este módulo substitui uma certificação?',
@@ -366,15 +366,15 @@ export const solutionPages: PublicPage[] = [
   {
     slug: 'dashboards-executivos',
     path: '/solucoes/dashboards-executivos',
-    title: 'Dashboards executivos',
-    seoTitle: 'Dashboards executivos para indicadores, riscos e planos | Gestão 360',
+    title: 'Painéis executivos',
+    seoTitle: 'Painéis executivos para indicadores, riscos e planos | Gestão 360',
     description:
-      'Visualize desempenho, atrasos, prioridades, riscos e planos de ação em dashboards corporativos.',
+      'Visualize desempenho, atrasos, prioridades, riscos e planos de ação em painéis corporativos.',
     eyebrow: 'Visão executiva',
     summary:
-      'Acompanhe performance e pendências em visoes gerenciais conectadas aos registros de origem.',
+      'Acompanhe performance e pendências em visões gerenciais conectadas aos registros de origem.',
     problem:
-      'Dashboards isolados mostram números, mas não permitem entender causa, dono, prazo e ação relacionada.',
+      'Painéis isolados mostram números, mas não permitem entender causa, dono, prazo e ação relacionada.',
     benefits: [
       'Mostra indicadores e pendências relevantes.',
       'Permite navegar para registros de origem.',
@@ -382,10 +382,10 @@ export const solutionPages: PublicPage[] = [
       'Apoia reuniões executivas com dados consistentes.',
     ],
     features: ['Painel gerencial', 'Meu Dia', 'Visão de equipe', 'Alertas', 'Filtros'],
-    useCases: ['Reuniao de diretoria.', 'Gestão de pendências.', 'Acompanhamento de metas e planos.'],
+    useCases: ['Reunião de diretoria.', 'Gestão de pendências.', 'Acompanhamento de metas e planos.'],
     faq: [
       {
-        question: 'Os dashboards são apenas visuais?',
+        question: 'Os painéis são apenas visuais?',
         answer:
           'Não. Eles se conectam aos registros de origem para permitir investigação, ação e rastreabilidade.',
       },
@@ -410,12 +410,12 @@ export const solutionPages: PublicPage[] = [
     problem:
       'Sem processo integrado, não conformidades geram registros desconectados e baixa confiabilidade na verificação de eficácia.',
     benefits: [
-      'Padroniza registro e classificacao.',
+      'Padroniza registro e classificação.',
       'Relaciona causa, ação corretiva e evidência.',
       'Acompanha prazos e responsáveis.',
       'Mantém histórico para auditorias e reincidências.',
     ],
-    features: ['Registro de NC', 'Análise de causa', 'CAPA', 'Eficacia', 'Histórico'],
+    features: ['Registro de NC', 'Análise de causa', 'CAPA', 'Eficácia', 'Histórico'],
     useCases: ['NC interna.', 'Desvio de processo.', 'Tratativa de auditoria ou cliente.'],
     faq: [
       {
@@ -426,7 +426,7 @@ export const solutionPages: PublicPage[] = [
       {
         question: 'Posso acompanhar reincidências?',
         answer:
-          'Os registros historicos e vínculos ajudam a analisar recorrencia por área, processo ou tipo.',
+          'Os registros históricos e vínculos ajudam a analisar recorrência por área, processo ou tipo.',
       },
     ],
     kind: 'solution',
@@ -449,18 +449,18 @@ export const solutionPages: PublicPage[] = [
       'Apoia permissões por perfil e área.',
       'Mantém administração global separada do portal operacional.',
     ],
-    features: ['Tenants', 'Filiais', 'Módulos por empresa', 'Permissões', 'Portal Admin Global'],
+    features: ['Ambientes', 'Filiais', 'Módulos por empresa', 'Permissões', 'Portal Administrativo Global'],
     useCases: ['Grupo empresarial.', 'Consultoria com clientes distintos.', 'Unidades operacionais com governança central.'],
     faq: [
       {
         question: 'Um usuário comum acessa dados de outra empresa?',
         answer:
-          'Não. A plataforma respeita tenant, autenticação e autorização. Conteúdo privado não é publicado em páginas públicas.',
+          'Não. A plataforma respeita ambiente, autenticação e autorização. Conteúdo privado não é publicado em páginas públicas.',
       },
       {
         question: 'É possível bloquear módulos por empresa?',
         answer:
-          'Sim. O Portal Admin Global possui controle de módulos e planos por empresa.',
+          'Sim. O Portal Administrativo Global possui controle de módulos e planos por empresa.',
       },
     ],
     kind: 'solution',
@@ -477,11 +477,11 @@ export const segmentPages: PublicPage[] = [
       'Use o Gestão 360 para conectar indicadores industriais, desvios, planos de ação, documentos, auditorias e riscos.',
     eyebrow: 'Segmento',
     summary:
-      'Para industrias que precisam acompanhar metas, qualidade, segurança, processos e planos de ação em uma rotina integrada.',
+      'Para indústrias que precisam acompanhar metas, qualidade, segurança, processos e planos de ação em uma rotina integrada.',
     problem:
       'áreas industriais lidam com muitos indicadores, desvios e evidências espalhados entre planilhas, reuniões e documentos.',
     benefits: ['Integra indicadores e planos.', 'Apoia auditorias e documentos.', 'Organiza riscos e desvios.', 'Melhora visibilidade por área.'],
-    features: ['Indicadores industriais', 'Planos de ação', 'Não conformidades', 'Auditorias', 'Dashboards'],
+    features: ['Indicadores industriais', 'Planos de ação', 'Não conformidades', 'Auditorias', 'Painéis'],
     useCases: ['OEE e produtividade.', 'Desvios de qualidade.', 'Reuniões de performance industrial.'],
     faq: [
       { question: 'Serve para chão de fábrica?', answer: 'Serve como apoio de gestão e acompanhamento. A coleta operacional depende da configuração dos formulários e processos.' },
@@ -493,7 +493,7 @@ export const segmentPages: PublicPage[] = [
     slug: 'agronegocio',
     path: '/segmentos/agronegocio',
     title: 'Agronegócio',
-    seoTitle: 'Gestão corporativa para agronegócio e agroindustria | Gestão 360',
+    seoTitle: 'Gestão corporativa para agronegócio e agroindústria | Gestão 360',
     description:
       'Organize indicadores, processos, qualidade, riscos, planos e evidências em operações do agronegócio.',
     eyebrow: 'Segmento',
@@ -503,7 +503,7 @@ export const segmentPages: PublicPage[] = [
       'Operações agroindustriais precisam consolidar dados de áreas diferentes sem perder rastreabilidade e dono da ação.',
     benefits: ['Acompanha unidades e áreas.', 'Centraliza evidências.', 'Conecta indicadores e tratativas.', 'Apoia governança operacional.'],
     features: ['Multiunidade', 'Indicadores', 'Planos', 'Documentos', 'Segurança dos alimentos'],
-    useCases: ['Indicadores agricolas e industriais.', 'Controle de documentos.', 'Tratativas de desvios por unidade.'],
+    useCases: ['Indicadores agrícolas e industriais.', 'Controle de documentos.', 'Tratativas de desvios por unidade.'],
     faq: [
       { question: 'Permite gestão multiunidade?', answer: 'Sim. A estrutura multiempresa e por filiais atende cenários com várias unidades.' },
       { question: 'Tem módulo para alimentos?', answer: 'Sim. Há recursos especializados para segurança dos alimentos e rastreabilidade.' },
@@ -523,8 +523,8 @@ export const segmentPages: PublicPage[] = [
     problem:
       'O setor exige evidências confiaveis, rastreabilidade e resposta rápida a desvios sem depender de controles isolados.',
     benefits: ['Apoia rastreabilidade.', 'Organiza evidências.', 'Integra NC e CAPA.', 'Controla documentos e auditorias.'],
-    features: ['Rastreabilidade', 'Documentos', 'Checklists', 'Auditorias', 'Planos corretivos'],
-    useCases: ['Controle de lotes.', 'Tratativa de desvios.', 'Checklists de qualidade e segurança dos alimentos.'],
+    features: ['Rastreabilidade', 'Documentos', 'Listas de verificação', 'Auditorias', 'Planos corretivos'],
+    useCases: ['Controle de lotes.', 'Tratativa de desvios.', 'Listas de verificação de qualidade e segurança dos alimentos.'],
     faq: [
       { question: 'A plataforma substitui auditorias externas?', answer: 'Não. Ela apoia organização, evidências e acompanhamento para os processos da empresa.' },
       { question: 'Pode registrar lotes?', answer: 'Sim. O módulo de segurança dos alimentos possui estrutura de lotes e eventos.' },
@@ -565,7 +565,7 @@ export const segmentPages: PublicPage[] = [
     problem:
       'Gestores precisam decidir com contexto, mas os dados costumam estar fragmentados entre sistemas, planilhas e reuniões.',
     benefits: ['Unifica contexto de gestão.', 'Conecta estratégia e execução.', 'Apoia governança e auditoria.', 'Respeita permissões e escopo.'],
-    features: ['Estrategia', 'Dashboards', 'Riscos', 'Auditoria', 'Portal Admin Global'],
+    features: ['Estratégia', 'Painéis', 'Riscos', 'Auditoria', 'Portal Administrativo Global'],
     useCases: ['Comitê executivo.', 'Gestão por metas.', 'Governança multiempresa.'],
     faq: [
       { question: 'O sistema atende vários departamentos?', answer: 'Sim. Ele foi desenhado para áreas, setores, processos e responsáveis.' },
@@ -578,9 +578,9 @@ export const segmentPages: PublicPage[] = [
 export const moduleHighlights = [
   'Meu Dia: caixa de entrada corporativa com prioridades, prazos, delegações e recomendações assistidas.',
   'Visão 360 do registro: contexto, vínculos, impactos, histórico e registros relacionados autorizados.',
-  'Central de Automações: workflows, tarefas, aprovações, escalonamentos e histórico.',
-  'Portal Admin Global: empresas, planos, módulos, usuários, auditoria e saúde técnica.',
-  'GED e documentos: revisões, editor online quando configurado, anexos e rastreabilidade.',
+  'Central de Automações: fluxos de trabalho, tarefas, aprovações, escalonamentos e histórico.',
+  'Portal Administrativo Global: empresas, planos, módulos, usuários, auditoria e saúde técnica.',
+  'GED e documentos: revisões, editor pela web quando configurado, anexos e rastreabilidade.',
   'Segurança dos alimentos: programas, lotes, fornecedores e eventos de rastreabilidade.',
 ];
 
@@ -588,12 +588,12 @@ export const faqPage: FaqItem[] = [
   {
     question: 'O Gestão 360 é uma plataforma SaaS?',
     answer:
-      'Sim. O produto foi estruturado como plataforma SaaS B2B modular, com portal autenticado, isolamento por empresa e módulos ativaveis conforme contrato.',
+      'Sim. O produto foi estruturado como plataforma SaaS B2B modular, com portal autenticado, isolamento por empresa e módulos ativáveis conforme contrato.',
   },
   {
     question: 'Quais páginas são públicas?',
     answer:
-      'As páginas institucionais, soluções, segmentos, conteúdos, contato, termos e política são públicas. Dashboards, dados de clientes, APIs e administração exigem autenticação.',
+      'As páginas institucionais, soluções, segmentos, conteúdos, contato, termos e política são públicas. Painéis, dados de clientes, APIs e administração exigem autenticação.',
   },
   {
     question: 'A plataforma usa inteligência artificial?',
@@ -621,7 +621,7 @@ export const articlePages: ArticlePage[] = [
     updatedAt: '2026-06-09',
     readingTime: '8 min',
     intro:
-      'Indicadores bons reduzem discussao subjetiva e aumentam clareza sobre prioridade. O desafio e desenhar uma estrutura que possa ser acompanhada e auditada ao longo do tempo.',
+      'Indicadores bons reduzem discussão subjetiva e aumentam clareza sobre prioridade. O desafio e desenhar uma estrutura que possa ser acompanhada e auditada ao longo do tempo.',
     sections: [
       {
         title: 'Comece pelo objetivo de gestão',
@@ -633,7 +633,7 @@ export const articlePages: ArticlePage[] = [
       {
         title: 'Defina dono, meta e tolerância',
         body: [
-          'Cada indicador precisa ter responsável, meta, unidade de medida, periodo, fonte e critério de leitura. Sem isso, a empresa mede, mas não gerencia.',
+          'Cada indicador precisa ter responsável, meta, unidade de medida, período, fonte e critério de leitura. Sem isso, a empresa mede, mas não gerencia.',
           'Também é importante registrar tolerâncias e regras de farol para diferenciar variação normal de desvio que exige ação.',
         ],
       },
@@ -712,7 +712,7 @@ export const articlePages: ArticlePage[] = [
         title: 'Trate achados como parte de um fluxo',
         body: [
           'Um achado deve ter origem, contexto, criticidade, responsável e caminho de tratativa claro.',
-          'Quando esse fluxo fica visivel, gestores acompanham pendências sem depender de cobrancas manuais.',
+          'Quando esse fluxo fica visível, gestores acompanham pendências sem depender de cobranças manuais.',
         ],
       },
       {

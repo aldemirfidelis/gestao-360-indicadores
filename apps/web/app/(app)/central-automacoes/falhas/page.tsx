@@ -82,7 +82,7 @@ export default function FailuresPage() {
       <PageHeader
         eyebrow="Central de Automações"
         title="Falhas e Pendências Técnicas"
-        description="Gerencie erros operacionais retidos na fila Dead-Letter Queue (DLQ), analise payloads de entrada e force o reprocessamento manual."
+        description="Gerencie erros operacionais retidos na fila de mensagens com falha (DLQ), com análise dos dados de entrada e reprocessamento manual."
       />
 
       <div className="flex-1 grid grid-cols-1 lg:grid-cols-[1fr,420px] gap-6 min-h-0 w-full overflow-hidden">
@@ -251,7 +251,7 @@ export default function FailuresPage() {
                     </span>
                   </div>
                   <div className="col-span-2 border-t pt-2 mt-1">
-                    <span className="block text-muted-foreground">Workflow Instance ID</span>
+                    <span className="block text-muted-foreground">Fluxo de trabalho Instance ID</span>
                     <span className="font-mono text-foreground select-all break-all block">{selectedItem.workflowInstanceId}</span>
                   </div>
                   {selectedItem.nodeExecutionId && (
@@ -278,10 +278,10 @@ export default function FailuresPage() {
                   </div>
                 </div>
 
-                {/* Payload context */}
+                {/* Contexto de execução */}
                 <div className="space-y-1.5 flex-1 flex flex-col min-h-0">
                   <label className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider flex items-center justify-between">
-                    <span>Contexto de Execução (Payload)</span>
+                    <span>Contexto de execução (dados técnicos)</span>
                     <span className="text-[9px] font-normal lowercase text-muted-foreground">(estado das variáveis)</span>
                   </label>
                   <pre className="flex-1 p-3 bg-muted/40 border border-dashed rounded-lg text-[10px] font-mono overflow-auto leading-relaxed text-foreground select-all max-h-[300px]">

@@ -77,18 +77,18 @@ export default function HelpCenterPage() {
         json: { helpful },
       }),
     onSuccess: () => {
-      toast.success('Feedback registrado.');
+      toast.success('Retorno registrado.');
       qc.invalidateQueries({ queryKey: ['help'] });
       if (selected) qc.invalidateQueries({ queryKey: ['help', 'article', selected] });
     },
-    onError: (e: any) => toast.error(e?.message ?? 'Nao foi possivel registrar o feedback'),
+    onError: (e: any) => toast.error(e?.message ?? 'Não foi possível registrar o retorno'),
   });
 
   return (
     <div className="space-y-4">
       <PageHeader
         title="Central de Ajuda"
-        description="Artigos, fluxos e respostas para usar o Gestao 360 no dia a dia."
+        description="Artigos, fluxos e respostas para usar o Gestão 360 no dia a dia."
         eyebrow="Suporte"
       />
 
@@ -175,14 +175,14 @@ export default function HelpCenterPage() {
               </div>
               <div className="flex flex-wrap items-center justify-between gap-3 border-t pt-3">
                 <div className="text-xs text-muted-foreground">
-                  {article.data.helpfulCount} marcaram como util · {article.data.notHelpfulCount} marcaram como nao util
+                  {article.data.helpfulCount} marcaram como útil · {article.data.notHelpfulCount} marcaram como não útil
                 </div>
                 <div className="flex gap-2">
                   <Button variant="outline" size="sm" onClick={() => feedback.mutate(true)} disabled={feedback.isPending}>
-                    <ThumbsUp className="mr-2 h-4 w-4" /> Util
+                    <ThumbsUp className="mr-2 h-4 w-4" /> Útil
                   </Button>
                   <Button variant="outline" size="sm" onClick={() => feedback.mutate(false)} disabled={feedback.isPending}>
-                    <ThumbsDown className="mr-2 h-4 w-4" /> Nao util
+                    <ThumbsDown className="mr-2 h-4 w-4" /> Não útil
                   </Button>
                 </div>
               </div>

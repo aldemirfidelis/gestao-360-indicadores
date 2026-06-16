@@ -100,7 +100,7 @@ export default function PrizeCompetencesPage() {
       <PageHeader
         title="Competências"
         eyebrow="Gestão de Prêmio"
-        description="Ciclo mensal do prêmio: planejamento, validação, checklist e fechamento controlado."
+        description="Ciclo mensal do prêmio: planejamento, validação, lista de verificação e fechamento controlado."
         tone="view"
         breadcrumbs={[{ label: 'Gestão de Prêmio', href: '/gestao-premio' }, { label: 'Competências' }]}
         actions={canManage ? <Button onClick={() => { setForm({ ...form, programId: programFilter || programs[0]?.id || '' }); setOpen(true); }}><Plus className="mr-1 h-4 w-4" />Nova competência</Button> : undefined}
@@ -139,7 +139,7 @@ export default function PrizeCompetencesPage() {
                     <Badge variant={st.variant}>{st.label}</Badge>
                   </div>
                   <div className="flex flex-wrap gap-2">
-                    <Button size="sm" variant="outline" onClick={() => setChecklistFor(c)}><ListChecks className="mr-1 h-3.5 w-3.5" />Checklist</Button>
+                    <Button size="sm" variant="outline" onClick={() => setChecklistFor(c)}><ListChecks className="mr-1 h-3.5 w-3.5" />Lista de verificação</Button>
                     {canManage && !st.locked && c.status !== 'PLANNED' && (
                       <Button size="sm" variant="ghost" onClick={() => transition.mutate({ id: c.id, status: 'IN_VALIDATION' })}>Validar</Button>
                     )}
@@ -190,7 +190,7 @@ export default function PrizeCompetencesPage() {
       {/* Checklist dialog */}
       <Dialog open={!!checklistFor} onOpenChange={(o) => !o && setChecklistFor(null)}>
         <DialogContent className="max-w-lg">
-          <DialogHeader><DialogTitle>Checklist de fechamento — {checklistFor && `${MONTHS[checklistFor.month - 1]}/${checklistFor.year}`}</DialogTitle></DialogHeader>
+          <DialogHeader><DialogTitle>Lista de verificação de fechamento — {checklistFor && `${MONTHS[checklistFor.month - 1]}/${checklistFor.year}`}</DialogTitle></DialogHeader>
           {!checklist ? (
             <p className="py-6 text-center text-sm text-muted-foreground">Carregando…</p>
           ) : (

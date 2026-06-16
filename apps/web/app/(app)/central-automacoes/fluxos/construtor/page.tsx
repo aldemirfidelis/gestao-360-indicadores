@@ -51,13 +51,13 @@ const BLOCKS_CATALOG = [
   { type: 'HUMAN_TASK', blockType: 'human.task', label: 'Criar Tarefa Humana', icon: 'CheckSquare', color: 'bg-sky-500/10 border-sky-500 text-sky-500' },
   { type: 'APPROVAL', blockType: 'human.approval', label: 'Solicitar Aprovação', icon: 'ShieldCheck', color: 'bg-indigo-500/10 border-indigo-500 text-indigo-500' },
 
-  { type: 'TIMER', blockType: 'logic.timer', label: 'Aguardar (Delay/Timer)', icon: 'Clock', color: 'bg-teal-500/10 border-teal-500 text-teal-500' },
+  { type: 'TIMER', blockType: 'logic.timer', label: 'Aguardar (atraso/temporizador)', icon: 'Clock', color: 'bg-teal-500/10 border-teal-500 text-teal-500' },
 
   { type: 'ACTION', blockType: 'action.deviation.create', label: 'Criar Desvio (FCA)', icon: 'AlertCircle', color: 'bg-pink-500/10 border-pink-500 text-pink-500' },
   { type: 'ACTION', blockType: 'action.plan.create', label: 'Criar Plano de Ação', icon: 'ClipboardList', color: 'bg-rose-500/10 border-rose-500 text-rose-500' },
   { type: 'ACTION', blockType: 'action.meeting.create', label: 'Agendar Reunião', icon: 'Calendar', color: 'bg-violet-500/10 border-violet-500 text-violet-500' },
 
-  { type: 'INTEGRATION', blockType: 'integration.webhook', label: 'Disparar Webhook API', icon: 'Globe', color: 'bg-emerald-500/10 border-emerald-500 text-emerald-500' },
+  { type: 'INTEGRATION', blockType: 'integration.webhook', label: 'Disparar chamada de API', icon: 'Globe', color: 'bg-emerald-500/10 border-emerald-500 text-emerald-500' },
   { type: 'INTEGRATION', blockType: 'integration.email', label: 'Enviar Alerta de E-mail', icon: 'Mail', color: 'bg-cyan-500/10 border-cyan-500 text-cyan-500' },
 ];
 
@@ -282,7 +282,7 @@ export default function WorkflowBuilder() {
       });
     },
     onSuccess: () => {
-      toast.success('Workflow publicado e ativado com sucesso!');
+      toast.success('Fluxo de trabalho publicado e ativado com sucesso!');
       refetch();
     },
     onError: (err: any) => {
@@ -553,7 +553,7 @@ export default function WorkflowBuilder() {
                           <option value="gt">Maior que</option>
                           <option value="lt">Menor que</option>
                           <option value="contains">Contém</option>
-                          <option value="empty">Está Vazio</option>
+                          <option value="empty">Está vazio</option>
                         </select>
                       </div>
                       <div>
@@ -611,14 +611,14 @@ export default function WorkflowBuilder() {
                   </div>
                 )}
 
-                {/* Webhook Configurator */}
+                {/* Configurador HTTP */}
                 {selectedNode.data?.blockType === 'integration.webhook' && (
                   <div className="border rounded-lg p-3 bg-muted/20 space-y-3">
-                    <label className="text-[10px] font-bold text-muted-foreground uppercase block">Configurar Endpoint Webhook</label>
+                    <label className="text-[10px] font-bold text-muted-foreground uppercase block">Configurar endereço HTTP</label>
                     <div className="space-y-2">
                       <input
                         type="text"
-                        placeholder="https://api.exemplo.com/webhook"
+                        placeholder="https://api.exemplo.com/evento"
                         value={selectedNode.data?.config?.url || ''}
                         onChange={(e) => handleUpdateNodeConfig({ ...selectedNode.data?.config, url: e.target.value })}
                         className="w-full px-2 py-1.5 text-xs bg-background border rounded focus:outline-none"
@@ -633,7 +633,7 @@ export default function WorkflowBuilder() {
                         <option value="GET">GET</option>
                       </select>
                       <div>
-                        <label className="text-[9px] font-bold text-muted-foreground uppercase block mb-1">Payload JSON Template</label>
+                        <label className="text-[9px] font-bold text-muted-foreground uppercase block mb-1">Modelo de dados JSON</label>
                         <textarea
                           placeholder='{"id": "{{id}}", "event": "indicador_alerta"}'
                           value={selectedNode.data?.config?.body || ''}

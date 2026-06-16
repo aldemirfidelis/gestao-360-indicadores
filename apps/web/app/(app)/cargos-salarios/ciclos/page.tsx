@@ -194,7 +194,7 @@ export default function CiclosMeritoPage() {
         {fitQuery.isLoading ? (
           <LoadingState />
         ) : rows.length === 0 ? (
-          <EmptyState title="Sem população para simular" description="Cadastre colaboradores e snapshots salariais para simular o impacto da matriz." />
+          <EmptyState title="Sem população para simular" description="Cadastre colaboradores e retratos salariais para simular o impacto da matriz." />
         ) : (
           <MeritMatrix
             key={reloadKey}

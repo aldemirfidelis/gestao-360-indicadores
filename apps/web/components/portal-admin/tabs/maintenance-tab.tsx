@@ -171,7 +171,7 @@ export function MaintenanceTab() {
 
               <div className="flex items-center justify-between border rounded p-2.5 bg-muted/10">
                 <div>
-                  <Label className="font-semibold cursor-pointer select-none" htmlFor="maint-super">Bypass Super Admin</Label>
+                  <Label className="font-semibold cursor-pointer select-none" htmlFor="maint-super">Bypass superadministrador</Label>
                   <p className="text-[11px] text-muted-foreground">Permite acesso excepcional de Super Admins.</p>
                 </div>
                 <input

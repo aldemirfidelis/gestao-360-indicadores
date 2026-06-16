@@ -193,7 +193,7 @@ export function IndicatorResultEditor(props: IndicatorMonthlyEditorProps) {
     const rawValue =
       localSource !== undefined && localSource.trim() !== '' ? localSource : readValue(source);
     if (rawValue === null || rawValue === undefined || String(rawValue).trim() === '') {
-      toast.message('Preencha esta celula antes de replicar.');
+      toast.message('Preencha esta célula antes de replicar.');
       return;
     }
     const next: Record<string, string> = { ...edits };
@@ -270,14 +270,14 @@ export function IndicatorResultEditor(props: IndicatorMonthlyEditorProps) {
       {!query.isLoading && cells.length === 0 && (
         <EmptyState
           title="Sem períodos disponíveis"
-          description="O indicador esta inativo ou ainda nao possui períodos cadastrados para o ano atual."
+          description="O indicador está inativo ou ainda não possui períodos cadastrados para o ano atual."
         />
       )}
       {!query.isLoading && cells.length > 0 && (
         <>
           <div className="flex flex-wrap items-center justify-between gap-2">
             <div className="text-xs text-muted-foreground">
-              Acumulado calculado como media year-to-date dos períodos preenchidos.
+              Acumulado calculado como média year-to-date dos períodos preenchidos.
             </div>
             {mode === 'target' && (
               <Button
@@ -299,12 +299,12 @@ export function IndicatorResultEditor(props: IndicatorMonthlyEditorProps) {
                   <th className="text-left">{editingLabel}</th>
                   <th className="text-left">
                     {editingLabel} acum.
-                    <span className="ml-1 text-[10px] font-normal text-muted-foreground">(media YTD)</span>
+                    <span className="ml-1 text-[10px] font-normal text-muted-foreground">(média YTD)</span>
                   </th>
                   <th className="text-left">{otherLabel}</th>
                   <th className="text-left">
                     {otherLabel} acum.
-                    <span className="ml-1 text-[10px] font-normal text-muted-foreground">(media YTD)</span>
+                    <span className="ml-1 text-[10px] font-normal text-muted-foreground">(média YTD)</span>
                   </th>
                   <th className="text-center">Farol</th>
                   <th className="text-center">Ações</th>

@@ -24,7 +24,7 @@ export default function PlatformAdminLoginPage() {
         json: { email, password },
       });
       setPlatformAdminTokens(out.accessToken, out.refreshToken);
-      toast.success('Portal Admin Global conectado');
+      toast.success('Portal Administrativo Global conectado');
       router.replace('/platform-admin');
     } catch (err) {
       toast.error(err instanceof Error ? err.message : 'Credenciais invalidas');
@@ -42,14 +42,14 @@ export default function PlatformAdminLoginPage() {
               <ShieldCheck className="h-5 w-5" />
             </div>
             <div>
-              <div className="text-sm font-semibold uppercase tracking-[0.18em] text-white/60">Gestao 360</div>
-              <div className="text-lg font-semibold">Portal Admin Global</div>
+              <div className="text-sm font-semibold uppercase tracking-[0.18em] text-white/60">Gestão 360</div>
+              <div className="text-lg font-semibold">Portal Administrativo Global</div>
             </div>
           </div>
           <div className="max-w-xl py-16">
             <h1 className="text-4xl font-semibold leading-tight">Central interna da plataforma</h1>
             <p className="mt-4 max-w-lg text-sm leading-6 text-white/70">
-              Acesso separado para administracao tecnica, suporte, implantacao, planos, modulos e auditoria da plataforma.
+              Acesso separado para administração técnica, suporte, implantação, planos, módulos e auditoria da plataforma.
             </p>
           </div>
           <div className="text-xs text-white/45">Ambiente separado das telas operacionais das empresas.</div>

@@ -12,7 +12,7 @@ export function PhasePlaceholder({ title, phase, items }: { title: string; phase
     <div className="space-y-6">
       <div>
         <h2 className="text-lg font-semibold">{title}</h2>
-        <p className="text-sm text-muted-foreground">Tela prevista no roadmap desta funcionalidade.</p>
+        <p className="text-sm text-muted-foreground">Tela prevista no roteiro desta funcionalidade.</p>
       </div>
       <SectionCard title={`Em desenvolvimento — ${phase}`} description="Esta área ainda não está ativa para evitar botões sem funcionamento real.">
         <div className="flex items-start gap-3 rounded-lg border border-dashed p-5 text-sm text-muted-foreground">

@@ -260,7 +260,7 @@ export const ANALYSIS_METHOD_LABEL: Record<string, string> = {
   PRIORITIZATION_MATRIX: 'Matriz de priorização',
   BRAINSTORMING: 'Brainstorming',
   ROOT_CAUSE: 'Causa raiz',
-  EFFECTIVENESS_CHECKLIST: 'Checklist de eficácia',
+  EFFECTIVENESS_CHECKLIST: 'Lista de verificação de eficácia',
 };
 
 export const EFFECTIVENESS_STATUS_LABEL: Record<string, string> = {

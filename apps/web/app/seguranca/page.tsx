@@ -11,7 +11,7 @@ export const metadata: Metadata = publicMetadata({
 });
 
 const items = [
-  ['Separação público/privado', 'Páginas institucionais são públicas. Portal, APIs, dashboards e dados de clientes exigem autenticação.'],
+  ['Separação público/privado', 'Páginas institucionais são públicas. Portal, APIs, painéis e dados de clientes exigem autenticação.'],
   ['Tenant e permissões', 'Registros operacionais respeitam empresa, usuário, perfil, módulo e escopo de área configurado.'],
   ['Auditoria', 'A plataforma registra histórico de eventos e alterações conforme módulo, usuário e permissão.'],
   ['SEO seguro', 'Robots e noindex reduzem rastreamento indevido, mas não substituem autenticação e autorização.'],
@@ -21,7 +21,7 @@ export default function SegurancaPage() {
   return (
     <PublicShell>
       <JsonLd data={[webPageJsonLd({ title: 'Segurança', description: metadata.description as string, path: '/seguranca' }), breadcrumbJsonLd([{ name: 'Início', path: '/' }, { name: 'Segurança', path: '/seguranca' }])]} />
-      <PageHero eyebrow="Segurança" title="Conteúdo público sem exposição de dados corporativos." description="A arquitetura pública foi organizada para SEO sem publicar telas internas, APIs, dashboards ou informações de clientes." />
+      <PageHero eyebrow="Segurança" title="Conteúdo público sem exposição de dados corporativos." description="A arquitetura pública foi organizada para SEO sem publicar telas internas, APIs, painéis ou informações de clientes." />
       <section className="bg-slate-50 py-16">
         <div className="mx-auto grid max-w-7xl gap-4 px-4 sm:px-6 md:grid-cols-2 lg:px-8">
           {items.map(([title, text]) => (

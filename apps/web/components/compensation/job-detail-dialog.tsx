@@ -21,7 +21,7 @@ import {
   type JobCatalog,
 } from '@/lib/compensation/types';
 
-const JOB_TYPES = ['administrativo', 'operacional', 'tecnico', 'especialista', 'lideranca', 'gestao', 'executivo'];
+const JOB_TYPES = ['administrativo', 'operacional', 'técnico', 'especialista', 'lideranca', 'gestão', 'executivo'];
 
 const editableFields = (job: JobCatalog) => ({
   name: job.name,
@@ -87,7 +87,7 @@ export function JobDetailDialog({
   const version = useMutation({
     mutationFn: (changeReason: string) => api(`/cargos-salarios/jobs/${job!.id}/version`, { method: 'POST', json: { reason: changeReason } }),
     onSuccess: () => {
-      toast.success('Nova versao registrada');
+      toast.success('Nova versão registrada');
       invalidate();
       onClose();
     },
@@ -130,9 +130,9 @@ export function JobDetailDialog({
         <Tabs defaultValue="dados">
           <TabsList>
             <TabsTrigger value="dados">Dados</TabsTrigger>
-            <TabsTrigger value="versoes">Versoes ({job._count?.versions ?? job.currentVersion})</TabsTrigger>
-            <TabsTrigger value="descricoes">Descricoes ({job._count?.descriptions ?? 0})</TabsTrigger>
-            <TabsTrigger value="vinculos">Vinculos</TabsTrigger>
+            <TabsTrigger value="versoes">Versões ({job._count?.versions ?? job.currentVersion})</TabsTrigger>
+            <TabsTrigger value="descricoes">Descrições ({job._count?.descriptions ?? 0})</TabsTrigger>
+            <TabsTrigger value="vinculos">Vínculos</TabsTrigger>
           </TabsList>
 
           <TabsContent value="dados">
@@ -142,7 +142,7 @@ export function JobDetailDialog({
                 <Input value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} />
               </div>
               <div>
-                <Label>Familia</Label>
+                <Label>Família</Label>
                 <Input value={form.family} onChange={(e) => setForm({ ...form, family: e.target.value })} />
               </div>
               <div>
@@ -150,7 +150,7 @@ export function JobDetailDialog({
                 <Input value={form.careerTrack} onChange={(e) => setForm({ ...form, careerTrack: e.target.value })} />
               </div>
               <div>
-                <Label>Nivel hierarquico</Label>
+                <Label>Nível hierarquico</Label>
                 <Input value={form.hierarchyLevel} onChange={(e) => setForm({ ...form, hierarchyLevel: e.target.value })} />
               </div>
               <div>
@@ -178,15 +178,15 @@ export function JobDetailDialog({
               <div>
                 <Label>Criticidade</Label>
                 <NativeSelect value={form.criticality} onChange={(e) => setForm({ ...form, criticality: e.target.value })}>
-                  <option value="">Nao definida</option>
+                  <option value="">Não definida</option>
                   <option value="LOW">Baixa</option>
-                  <option value="MEDIUM">Media</option>
+                  <option value="MEDIUM">Média</option>
                   <option value="HIGH">Alta</option>
-                  <option value="CRITICAL">Critica</option>
+                  <option value="CRITICAL">Crítica</option>
                 </NativeSelect>
               </div>
               <div className="sm:col-span-2">
-                <Label>Descricao resumida</Label>
+                <Label>Descrição resumida</Label>
                 <Textarea rows={2} value={form.summary} onChange={(e) => setForm({ ...form, summary: e.target.value })} />
               </div>
             </fieldset>
@@ -197,7 +197,7 @@ export function JobDetailDialog({
 
           <TabsContent value="versoes">
             {(job.versions ?? []).length === 0 ? (
-              <EmptyState title="Sem versoes registradas" />
+              <EmptyState title="Sem versões registradas" />
             ) : (
               <ul className="space-y-2">
                 {(job.versions ?? []).map((v) => (
@@ -215,12 +215,12 @@ export function JobDetailDialog({
 
           <TabsContent value="descricoes">
             {descriptions.length === 0 ? (
-              <EmptyState title="Nenhuma descricao para este cargo" />
+              <EmptyState title="Nenhuma descrição para este cargo" />
             ) : (
               <ul className="space-y-2">
                 {descriptions.map((d) => (
                   <li key={d.id} className="flex items-center justify-between border-b border-border/60 pb-2 text-sm">
-                    <span>Versao {d.version}</span>
+                    <span>Versão {d.version}</span>
                     <StatusBadge value={d.status} label={DESCRIPTION_STATUS_LABELS[d.status] ?? d.status} />
                   </li>
                 ))}
@@ -231,9 +231,9 @@ export function JobDetailDialog({
           <TabsContent value="vinculos">
             <div className="grid grid-cols-2 gap-3 text-sm sm:grid-cols-4">
               <Stat label="Colaboradores" value={job.linkedEmployees ?? 0} />
-              <Stat label="Posicoes" value={job._count?.positions ?? 0} />
+              <Stat label="Posições" value={job._count?.positions ?? 0} />
               <Stat label="Faixas salariais" value={job._count?.salaryRanges ?? 0} />
-              <Stat label="Descricoes" value={job._count?.descriptions ?? 0} />
+              <Stat label="Descrições" value={job._count?.descriptions ?? 0} />
             </div>
           </TabsContent>
         </Tabs>
@@ -249,7 +249,7 @@ export function JobDetailDialog({
                     Cancelar
                   </Button>
                   <Button variant="destructive" size="sm" disabled={!reason.trim() || inactivate.isPending} onClick={() => inactivate.mutate()}>
-                    Confirmar inativacao
+                    Confirmar inativação
                   </Button>
                 </div>
               </div>
@@ -259,8 +259,8 @@ export function JobDetailDialog({
                   <Button variant="outline" size="sm" onClick={() => duplicate.mutate()} disabled={duplicate.isPending}>
                     <Copy className="mr-1.5 h-3.5 w-3.5" /> Duplicar
                   </Button>
-                  <Button variant="outline" size="sm" onClick={() => version.mutate('Nova versao')} disabled={version.isPending}>
-                    <History className="mr-1.5 h-3.5 w-3.5" /> Nova versao
+                  <Button variant="outline" size="sm" onClick={() => version.mutate('Nova versão')} disabled={version.isPending}>
+                    <History className="mr-1.5 h-3.5 w-3.5" /> Nova versão
                   </Button>
                   {isActive ? (
                     <Button variant="outline" size="sm" className="text-status-red" onClick={() => setInactivating(true)}>
@@ -273,7 +273,7 @@ export function JobDetailDialog({
                   )}
                 </div>
                 <Button size="sm" onClick={() => update.mutate()} disabled={update.isPending}>
-                  <Save className="mr-1.5 h-3.5 w-3.5" /> Salvar alteracoes
+                  <Save className="mr-1.5 h-3.5 w-3.5" /> Salvar alterações
                 </Button>
               </div>
             )}

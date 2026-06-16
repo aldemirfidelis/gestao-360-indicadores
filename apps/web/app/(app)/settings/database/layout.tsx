@@ -29,10 +29,10 @@ export default function DatabaseAdminLayout({ children }: { children: ReactNode 
           description="Área restrita."
           breadcrumbs={[{ label: 'Início', href: '/' }, { label: 'Configurações', href: '/settings' }, { label: 'Banco de Dados' }]}
         />
-        <SectionCard title="Acesso restrito ao Super Admin" description="Somente o Super Admin pode administrar o banco de dados.">
+        <SectionCard title="Acesso restrito ao superadministrador" description="Somente o superadministrador pode administrar o banco de dados.">
           <div className="rounded-lg border border-dashed p-8 text-center text-sm text-muted-foreground">
             <ShieldAlert className="mx-auto mb-3 h-8 w-8 opacity-50" />
-            Esta área manipula diretamente o banco de dados e é exclusiva do perfil Super Admin.
+            Esta área manipula diretamente o banco de dados e é exclusiva do perfil superadministrador.
           </div>
         </SectionCard>
       </div>

@@ -53,8 +53,8 @@ export function OnlineUsersButton() {
         size="icon"
         className="relative h-9 w-9"
         onClick={() => setOpen((v) => !v)}
-        aria-label="Pessoas online"
-        title="Pessoas online"
+        aria-label="Pessoas conectadas"
+        title="Pessoas conectadas"
       >
         <Users className="h-4 w-4" />
         {onlineCount > 0 && (
@@ -68,19 +68,19 @@ export function OnlineUsersButton() {
         <div className="absolute right-0 top-11 z-50 w-80 overflow-hidden rounded-lg border border-border bg-card shadow-lg">
           <div className="flex items-center justify-between border-b border-border/60 px-3 py-2">
             <span className="text-xs font-medium uppercase tracking-[0.12em] text-muted-foreground">
-              {onlineCount} {onlineCount === 1 ? 'pessoa online' : 'pessoas online'}
+              {onlineCount} {onlineCount === 1 ? 'pessoa conectada' : 'pessoas conectadas'}
             </span>
             <Link href="/pessoas" onClick={() => setOpen(false)} className="text-xs text-foreground underline-offset-2 hover:underline">
               Ver todos
             </Link>
           </div>
           <div className="p-2">
-            <Input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Buscar pessoa online..." className="h-8 text-sm" />
+            <Input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Buscar pessoa conectada..." className="h-8 text-sm" />
           </div>
           <div className="max-h-[360px] overflow-y-auto p-1">
             {online.isLoading && <div className="px-3 py-6 text-center text-sm text-muted-foreground">Carregando...</div>}
             {!online.isLoading && items.length === 0 && (
-              <div className="px-3 py-6 text-center text-sm text-muted-foreground">Ninguém online no momento.</div>
+              <div className="px-3 py-6 text-center text-sm text-muted-foreground">Ninguém conectado no momento.</div>
             )}
             {items.map((u) => (
               <div key={u.id} className="flex items-center gap-2.5 rounded-md px-2 py-1.5 hover:bg-muted">

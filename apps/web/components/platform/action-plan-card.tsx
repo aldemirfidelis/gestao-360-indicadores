@@ -19,7 +19,7 @@ export interface ActionPlanCardData {
 
 const priorityLabel: Record<string, string> = {
   LOW: 'Baixa',
-  MEDIUM: 'Media',
+  MEDIUM: 'Média',
   HIGH: 'Alta',
   CRITICAL: 'Crítica',
 };
@@ -82,11 +82,11 @@ function statusLabel(status: string) {
     UNDER_ANALYSIS: 'Em análise',
     IN_PROGRESS: 'Em andamento',
     WAITING_THIRD: 'Aguardando',
-    WAITING_EVIDENCE: 'Aguardando evidencia',
+    WAITING_EVIDENCE: 'Aguardando evidência',
     WAITING_VALIDATION: 'Aguardando validação',
     PAUSED: 'Pausada',
-    DONE: 'Concluida',
-    DONE_LATE: 'Concluida tarde',
+    DONE: 'Concluída',
+    DONE_LATE: 'Concluída tarde',
     CANCELLED: 'Cancelada',
     REOPENED: 'Reaberta',
     INEFFECTIVE: 'Ineficaz',

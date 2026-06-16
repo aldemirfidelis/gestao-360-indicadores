@@ -15,7 +15,7 @@ const steps = [
   ['Configuração', 'Parâmetros, usuários, permissões, módulos, empresas e estruturas organizacionais.'],
   ['Carga inicial', 'Importação ou cadastro de dados essenciais, evitando migrar controles sem curadoria.'],
   ['Piloto assistido', 'Uso por área ou processo prioritário antes de expandir a plataforma.'],
-  ['Evolução', 'Ajuste de rotinas, conteúdos, dashboards e indicadores conforme maturidade da gestão.'],
+  ['Evolução', 'Ajuste de rotinas, conteúdos, painéis e indicadores conforme maturidade da gestão.'],
 ];
 
 export default function ImplantacaoPage() {

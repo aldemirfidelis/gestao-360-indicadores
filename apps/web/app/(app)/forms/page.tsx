@@ -252,17 +252,17 @@ interface TemplateForm {
 }
 
 const TYPE_LABEL: Record<string, string> = {
-  FORM: 'Formulario',
-  CHECKLIST: 'Checklist',
+  FORM: 'Formulário',
+  CHECKLIST: 'Lista de verificação',
   OPERATIONAL_RECORD: 'Registro operacional',
   INSPECTION: 'Inspecao',
-  AUDIT_CHECKLIST: 'Checklist de auditoria',
-  PROCESS_CHECKLIST: 'Checklist de processo',
+  AUDIT_CHECKLIST: 'Lista de verificação de auditoria',
+  PROCESS_CHECKLIST: 'Lista de verificação de processo',
   DAILY_RECORD: 'Registro diario',
   SHIFT_LOG: 'Passagem de turno',
-  OCCURRENCE: 'Ocorrencia',
+  OCCURRENCE: 'Ocorrência',
   ROUND: 'Ronda',
-  MAINTENANCE: 'Manutencao',
+  MAINTENANCE: 'Manutenção',
   SAFETY: 'Seguranca',
   QUALITY: 'Qualidade',
   ENVIRONMENT: 'Meio ambiente',
@@ -271,17 +271,17 @@ const TYPE_LABEL: Record<string, string> = {
   SUPPLIER: 'Fornecedor',
   PROJECT: 'Projeto',
   EXTERNAL: 'Externo',
-  PUBLIC: 'Publico',
+  PUBLIC: 'Público',
   OTHER: 'Outro',
 };
 
 const STATUS_LABEL: Record<string, string> = {
   DRAFT: 'Rascunho',
   IN_DEVELOPMENT: 'Em desenvolvimento',
-  WAITING_REVIEW: 'Aguardando revisao',
-  IN_REVIEW: 'Em revisao',
+  WAITING_REVIEW: 'Aguardando revisão',
+  IN_REVIEW: 'Em revisão',
   ADJUSTMENTS_REQUESTED: 'Ajustes solicitados',
-  WAITING_APPROVAL: 'Aguardando aprovacao',
+  WAITING_APPROVAL: 'Aguardando aprovação',
   APPROVED: 'Aprovado',
   PUBLISHED: 'Publicado',
   ACTIVE: 'Ativo',
@@ -294,7 +294,7 @@ const FIELD_LABEL: Record<string, string> = {
   TEXT: 'Texto curto',
   RICH_TEXT: 'Texto rico',
   TEXTAREA: 'Texto longo',
-  NUMBER: 'Numero',
+  NUMBER: 'Número',
   INTEGER: 'Inteiro',
   DECIMAL: 'Decimal',
   CURRENCY: 'Moeda',
@@ -302,17 +302,17 @@ const FIELD_LABEL: Record<string, string> = {
   DATE: 'Data',
   TIME: 'Hora',
   DATETIME: 'Data e hora',
-  BOOLEAN: 'Sim/Nao',
-  YES_NO: 'Sim/Nao',
+  BOOLEAN: 'Sim/Não',
+  YES_NO: 'Sim/Não',
   CONFORMITY: 'Conformidade',
-  SELECT: 'Selecao',
-  MULTISELECT: 'Multipla selecao',
+  SELECT: 'Seleção',
+  MULTISELECT: 'Múltipla seleção',
   RADIO: 'Radio',
   CHECKBOX: 'Checkbox',
   PHOTO: 'Foto',
   ATTACHMENT: 'Anexo',
   SIGNATURE: 'Assinatura',
-  LOCATION: 'Localizacao',
+  LOCATION: 'Localização',
   FORMULA: 'Formula',
   CALCULATED: 'Calculado',
 };
@@ -322,8 +322,8 @@ const SUBMISSION_LABEL: Record<string, string> = {
   ASSIGNED: 'Atribuido',
   IN_PROGRESS: 'Em preenchimento',
   SUBMITTED: 'Enviado',
-  WAITING_CORRECTION: 'Aguardando correcao',
-  WAITING_APPROVAL: 'Aguardando aprovacao',
+  WAITING_CORRECTION: 'Aguardando correção',
+  WAITING_APPROVAL: 'Aguardando aprovação',
   APPROVED: 'Aprovado',
   REJECTED: 'Rejeitado',
   REVIEWED: 'Revisado',
@@ -334,9 +334,9 @@ const SUBMISSION_LABEL: Record<string, string> = {
 const EXECUTION_LABEL: Record<string, string> = {
   PLANNED: 'Planejada',
   ASSIGNED: 'Atribuida',
-  IN_PROGRESS: 'Em execucao',
-  WAITING_APPROVAL: 'Aguardando aprovacao',
-  COMPLETED: 'Concluida',
+  IN_PROGRESS: 'Em execução',
+  WAITING_APPROVAL: 'Aguardando aprovação',
+  COMPLETED: 'Concluída',
   CLOSED: 'Fechada',
   CANCELLED: 'Cancelada',
   OVERDUE: 'Atrasada',
@@ -467,7 +467,7 @@ export default function FormsPage() {
       return editing ? api<FormTemplate>(`/forms/${editing.id}`, { method: 'PATCH', json: payload }) : api<FormTemplate>('/forms', { method: 'POST', json: payload });
     },
     onSuccess: (saved) => {
-      toast.success(editing ? 'Formulario atualizado' : 'Formulario criado');
+      toast.success(editing ? 'Formulário atualizado' : 'Formulário criado');
       setTemplateOpen(false);
       setEditing(null);
       setSelectedId(saved.id);
@@ -479,7 +479,7 @@ export default function FormsPage() {
   const deleteTemplate = useMutation({
     mutationFn: (id: string) => api(`/forms/${id}`, { method: 'DELETE' }),
     onSuccess: () => {
-      toast.success('Formulario removido');
+      toast.success('Formulário removido');
       setSelectedId(null);
       invalidate();
     },
@@ -487,9 +487,9 @@ export default function FormsPage() {
   });
 
   const publishTemplate = useMutation({
-    mutationFn: (id: string) => api<FormTemplate>(`/forms/${id}/publish`, { method: 'POST', json: { changeReason: 'Publicacao pela tela de formularios' } }),
+    mutationFn: (id: string) => api<FormTemplate>(`/forms/${id}/publish`, { method: 'POST', json: { changeReason: 'Publicação pela tela de formulários' } }),
     onSuccess: () => {
-      toast.success('Formulario publicado');
+      toast.success('Formulário publicado');
       invalidate();
     },
     onError: (err: Error) => toast.error(err.message),
@@ -506,9 +506,9 @@ export default function FormsPage() {
   });
 
   const createVersion = useMutation({
-    mutationFn: (id: string) => api(`/forms/${id}/versions`, { method: 'POST', json: { changeReason: 'Versao criada pelo construtor' } }),
+    mutationFn: (id: string) => api(`/forms/${id}/versions`, { method: 'POST', json: { changeReason: 'Versão criada pelo construtor' } }),
     onSuccess: () => {
-      toast.success('Versao criada');
+      toast.success('Versão criada');
       invalidate();
     },
     onError: (err: Error) => toast.error(err.message),
@@ -516,7 +516,7 @@ export default function FormsPage() {
 
   const submitForm = useMutation({
     mutationFn: () => {
-      if (!selected) throw new Error('Formulario nao selecionado');
+      if (!selected) throw new Error('Formulário não selecionado');
       return api<FormSubmission>(`/forms/${selected.id}/submissions`, {
         method: 'POST',
         json: {
@@ -540,7 +540,7 @@ export default function FormsPage() {
 
   const createExecution = useMutation({
     mutationFn: () => {
-      if (!selected) throw new Error('Formulario nao selecionado');
+      if (!selected) throw new Error('Formulário não selecionado');
       return api<FormExecution>('/forms/executions', {
         method: 'POST',
         json: {
@@ -553,7 +553,7 @@ export default function FormsPage() {
       });
     },
     onSuccess: () => {
-      toast.success('Execucao criada');
+      toast.success('Execução criada');
       setExecutionOpen(false);
       setExecutionForm({ title: '', assignedToId: '', dueDate: '', offlineEnabled: false });
       invalidate();
@@ -563,9 +563,9 @@ export default function FormsPage() {
 
   const saveResponses = useMutation({
     mutationFn: () => {
-      if (!selectedExecution) throw new Error('Execucao nao selecionada');
+      if (!selectedExecution) throw new Error('Execução não selecionada');
       const template = templates.find((item) => item.id === selectedExecution.templateId);
-      if (!template) throw new Error('Template da execucao nao carregado');
+      if (!template) throw new Error('Modelo da execução não carregado');
       return api<FormExecution>(`/forms/executions/${selectedExecution.id}/responses`, {
         method: 'POST',
         json: {
@@ -585,7 +585,7 @@ export default function FormsPage() {
   const completeExecution = useMutation({
     mutationFn: (id: string) => api<FormExecution>(`/forms/executions/${id}/complete`, { method: 'POST', json: {} }),
     onSuccess: () => {
-      toast.success('Execucao concluida');
+      toast.success('Execução concluída');
       invalidate();
     },
     onError: (err: Error) => toast.error(err.message),
@@ -593,11 +593,11 @@ export default function FormsPage() {
 
   const addEvidence = useMutation({
     mutationFn: () => {
-      if (!selectedSubmission) throw new Error('Preenchimento nao selecionado');
+      if (!selectedSubmission) throw new Error('Preenchimento não selecionado');
       return api(`/forms/submissions/${selectedSubmission.id}/evidence`, { method: 'POST', json: evidenceForm });
     },
     onSuccess: () => {
-      toast.success('Evidencia adicionada');
+      toast.success('Evidência adicionada');
       setEvidenceOpen(false);
       setEvidenceForm({ fileName: '', fileUrl: '', description: '', type: 'ATTACHMENT' });
       invalidate();
@@ -616,11 +616,11 @@ export default function FormsPage() {
 
   const approveSubmission = useMutation({
     mutationFn: () => {
-      if (!selectedSubmission) throw new Error('Preenchimento nao selecionado');
+      if (!selectedSubmission) throw new Error('Preenchimento não selecionado');
       return api(`/forms/submissions/${selectedSubmission.id}/approvals`, { method: 'POST', json: approvalForm });
     },
     onSuccess: () => {
-      toast.success('Aprovacao registrada');
+      toast.success('Aprovação registrada');
       setApprovalOpen(false);
       setApprovalForm({ decision: 'APPROVED', comment: '' });
       invalidate();
@@ -630,11 +630,11 @@ export default function FormsPage() {
 
   const createIssue = useMutation({
     mutationFn: () => {
-      if (!selectedSubmission) throw new Error('Preenchimento nao selecionado');
+      if (!selectedSubmission) throw new Error('Preenchimento não selecionado');
       return api(`/forms/submissions/${selectedSubmission.id}/issues`, { method: 'POST', json: issueForm });
     },
     onSuccess: () => {
-      toast.success('Pendencia criada');
+      toast.success('Pendência criada');
       setIssueOpen(false);
       setIssueForm({ title: '', description: '', severity: 'MEDIUM', responsibleUserId: '', dueDate: '' });
       invalidate();
@@ -644,11 +644,11 @@ export default function FormsPage() {
 
   const createAiSuggestions = useMutation({
     mutationFn: () => {
-      if (!selected) throw new Error('Formulario nao selecionado');
+      if (!selected) throw new Error('Formulário não selecionado');
       return api('/forms/ai/suggestions', { method: 'POST', json: { templateId: selected.id } });
     },
     onSuccess: () => {
-      toast.success('Sugestoes geradas');
+      toast.success('Sugestões geradas');
       invalidate();
     },
     onError: (err: Error) => toast.error(err.message),
@@ -740,12 +740,12 @@ export default function FormsPage() {
   return (
     <div className="space-y-6">
       <PageHeader
-        title="Formularios e Checklists"
-        description="Templates versionados, execucoes, evidencias, aprovacoes e registros operacionais digitais."
+        title="Formulários e Listas de verificação"
+        description="Modelos versionados, execuções, evidências, aprovações e registros operacionais digitais."
         actions={
           <div className="flex flex-wrap gap-2">
-            {selected && canExecute ? <Button variant="outline" onClick={() => openExecution(selected)} disabled={!isExecutable(selected)}><Play className="mr-2 h-4 w-4" /> Execucao</Button> : null}
-            {canCreate ? <Button onClick={openCreate}><Plus className="mr-2 h-4 w-4" /> Novo template</Button> : null}
+            {selected && canExecute ? <Button variant="outline" onClick={() => openExecution(selected)} disabled={!isExecutable(selected)}><Play className="mr-2 h-4 w-4" /> Execução</Button> : null}
+            {canCreate ? <Button onClick={openCreate}><Plus className="mr-2 h-4 w-4" /> Novo modelo</Button> : null}
           </div>
         }
       />
@@ -753,25 +753,25 @@ export default function FormsPage() {
       <Tabs value={tab} onValueChange={setTab}>
         <TabsList>
           <TabsTrigger value="dashboard">Painel</TabsTrigger>
-          <TabsTrigger value="templates">Templates</TabsTrigger>
+          <TabsTrigger value="templates">Modelos</TabsTrigger>
           <TabsTrigger value="builder">Construtor</TabsTrigger>
-          <TabsTrigger value="executions">Execucoes</TabsTrigger>
+          <TabsTrigger value="executions">Execuções</TabsTrigger>
           <TabsTrigger value="records">Registros</TabsTrigger>
-          <TabsTrigger value="settings">Configuracoes</TabsTrigger>
+          <TabsTrigger value="settings">Configurações</TabsTrigger>
         </TabsList>
 
         <TabsContent value="dashboard" className="space-y-4">
           <div className="grid gap-3 md:grid-cols-4">
-            <MetricCard title="Templates" value={formatNumber(dashboard?.total)} description={`${formatNumber(dashboard?.active)} ativos/publicados`} icon={<LayoutTemplate className="h-4 w-4" />} tone="blue" />
-            <MetricCard title="Execucoes" value={formatNumber(dashboard?.executions)} description={`${formatNumber(dashboard?.overdueExecutions)} atrasadas`} icon={<ListChecks className="h-4 w-4" />} tone="yellow" />
+            <MetricCard title="Modelos" value={formatNumber(dashboard?.total)} description={`${formatNumber(dashboard?.active)} ativos/publicados`} icon={<LayoutTemplate className="h-4 w-4" />} tone="blue" />
+            <MetricCard title="Execuções" value={formatNumber(dashboard?.executions)} description={`${formatNumber(dashboard?.overdueExecutions)} atrasadas`} icon={<ListChecks className="h-4 w-4" />} tone="yellow" />
             <MetricCard title="Registros" value={formatNumber(dashboard?.records)} description={`${formatNumber(dashboard?.submissions)} preenchimentos`} icon={<FileCheck className="h-4 w-4" />} tone="green" />
-            <MetricCard title="Pendencias" value={formatNumber(dashboard?.openIssues)} description={`${formatNumber(dashboard?.pendingApprovals)} aprovacoes pendentes`} icon={<ShieldCheck className="h-4 w-4" />} tone="red" />
+            <MetricCard title="Pendências" value={formatNumber(dashboard?.openIssues)} description={`${formatNumber(dashboard?.pendingApprovals)} aprovações pendentes`} icon={<ShieldCheck className="h-4 w-4" />} tone="red" />
           </div>
           <div className="grid gap-4 lg:grid-cols-[1fr_1fr]">
             <Card><CardContent className="space-y-3 p-4">
-              <SectionTitle icon={<Play className="h-4 w-4" />} title="Execucoes recentes" />
+              <SectionTitle icon={<Play className="h-4 w-4" />} title="Execuções recentes" />
               {(dashboard?.recentExecutions ?? []).map((execution) => <ExecutionRow key={execution.id} execution={execution} onResponses={canExecute ? openExecutionResponse : undefined} onComplete={canExecute ? (id) => completeExecution.mutate(id) : undefined} />)}
-              {!dashboard?.recentExecutions?.length ? <EmptyText>Sem execucoes recentes.</EmptyText> : null}
+              {!dashboard?.recentExecutions?.length ? <EmptyText>Sem execuções recentes.</EmptyText> : null}
             </CardContent></Card>
             <Card><CardContent className="space-y-3 p-4">
               <SectionTitle icon={<Archive className="h-4 w-4" />} title="Registros recentes" />
@@ -793,8 +793,8 @@ export default function FormsPage() {
         <TabsContent value="templates" className="space-y-4">
           <Filters filters={filters} setFilters={setFilters} options={options} />
           <div className="grid gap-4">
-            {listQuery.isLoading ? <Card><CardContent className="p-6 text-sm text-muted-foreground">Carregando formularios...</CardContent></Card> : null}
-            {!listQuery.isLoading && templates.length === 0 ? <Card><CardContent className="p-6 text-sm text-muted-foreground">Nenhum formulario encontrado.</CardContent></Card> : null}
+            {listQuery.isLoading ? <Card><CardContent className="p-6 text-sm text-muted-foreground">Carregando formulários...</CardContent></Card> : null}
+            {!listQuery.isLoading && templates.length === 0 ? <Card><CardContent className="p-6 text-sm text-muted-foreground">Nenhum formulário encontrado.</CardContent></Card> : null}
             {templates.map((item) => (
               <TemplateCard
                 key={item.id}
@@ -825,14 +825,14 @@ export default function FormsPage() {
             </CardContent></Card>
             <Card><CardContent className="space-y-4 p-4">
               <div className="flex flex-wrap items-center justify-between gap-2">
-                <SectionTitle icon={<Edit className="h-4 w-4" />} title={selected ? selected.title : 'Selecione um template'} />
+                <SectionTitle icon={<Edit className="h-4 w-4" />} title={selected ? selected.title : 'Selecione um modelo'} />
                 <div className="flex flex-wrap gap-2">
                   {selected && canUpdate ? <Button size="sm" variant="outline" onClick={() => openEdit(selected)}><Edit className="mr-2 h-4 w-4" /> Editar estrutura</Button> : null}
-                  {selected && canBuilder ? <Button size="sm" variant="outline" onClick={() => createVersion.mutate(selected.id)}><History className="mr-2 h-4 w-4" /> Nova versao</Button> : null}
-                  {selected && canAi ? <Button size="sm" variant="outline" onClick={() => createAiSuggestions.mutate()}><Sparkles className="mr-2 h-4 w-4" /> Sugestoes</Button> : null}
+                  {selected && canBuilder ? <Button size="sm" variant="outline" onClick={() => createVersion.mutate(selected.id)}><History className="mr-2 h-4 w-4" /> Nova versão</Button> : null}
+                  {selected && canAi ? <Button size="sm" variant="outline" onClick={() => createAiSuggestions.mutate()}><Sparkles className="mr-2 h-4 w-4" /> Sugestões</Button> : null}
                 </div>
               </div>
-              {!selected ? <EmptyText>Escolha um template na aba Templates para visualizar o construtor.</EmptyText> : null}
+              {!selected ? <EmptyText>Escolha um modelo na aba Modelos para visualizar o construtor.</EmptyText> : null}
               {selected?.sections?.length ? selected.sections.map((section) => (
                 <div key={section.id} className="space-y-2 rounded-md border p-3">
                   <div className="flex flex-wrap items-center gap-2">
@@ -844,19 +844,19 @@ export default function FormsPage() {
               )) : selected?.fields.map((field) => <FieldPreview key={field.id} field={field} />)}
             </CardContent></Card>
             <Card><CardContent className="space-y-4 p-4">
-              <SectionTitle icon={<ShieldCheck className="h-4 w-4" />} title="Governanca" />
-              <MiniList title="Versoes" items={(selectedBuilder?.template.versions ?? selected?.versions ?? []).map((v) => `${v.versionLabel} - ${label(STATUS_LABEL, v.status)}`)} empty="Sem versoes." />
+              <SectionTitle icon={<ShieldCheck className="h-4 w-4" />} title="Governança" />
+              <MiniList title="Versões" items={(selectedBuilder?.template.versions ?? selected?.versions ?? []).map((v) => `${v.versionLabel} - ${label(STATUS_LABEL, v.status)}`)} empty="Sem versões." />
               <MiniList title="Regras" items={(selectedBuilder?.rules ?? []).map((r) => `${r.name} - ${r.event}`)} empty="Sem regras configuradas." />
               <MiniList title="Formulas" items={(selectedBuilder?.formulas ?? []).map((f) => `${f.code}: ${f.expression}`)} empty="Sem formulas configuradas." />
               <MiniList title="QR e externo" items={[...(selectedBuilder?.qrCodes ?? []).map((q) => `QR ${q.code}`), ...(selectedBuilder?.externalLinks ?? []).map((l) => `${l.name} - ${l.status}`)]} empty="Sem acesso externo." />
-              <MiniList title="IA" items={(selectedBuilder?.aiSuggestions ?? []).map((s) => s.title)} empty="Sem sugestoes." />
+              <MiniList title="IA" items={(selectedBuilder?.aiSuggestions ?? []).map((s) => s.title)} empty="Sem sugestões." />
             </CardContent></Card>
           </div>
         </TabsContent>
 
         <TabsContent value="executions" className="space-y-4">
           <Card><CardContent className="flex flex-col gap-3 p-4 md:flex-row md:items-end">
-            <Field label="Buscar"><Input value={executionFilters.search} onChange={(e) => setExecutionFilters((f) => ({ ...f, search: e.target.value }))} placeholder="Codigo, titulo ou template" /></Field>
+            <Field label="Buscar"><Input value={executionFilters.search} onChange={(e) => setExecutionFilters((f) => ({ ...f, search: e.target.value }))} placeholder="Código, título ou modelo" /></Field>
             <Field label="Status">
               <NativeSelect value={executionFilters.status} onChange={(e) => setExecutionFilters((f) => ({ ...f, status: e.target.value }))}>
                 <option value="">Todos</option>
@@ -867,14 +867,14 @@ export default function FormsPage() {
           </CardContent></Card>
           <div className="grid gap-3">
             {(executionsQuery.data ?? []).map((execution) => <ExecutionRow key={execution.id} execution={execution} onResponses={canExecute ? openExecutionResponse : undefined} onComplete={canExecute ? (id) => completeExecution.mutate(id) : undefined} />)}
-            {!executionsQuery.isLoading && !(executionsQuery.data ?? []).length ? <Card><CardContent className="p-6 text-sm text-muted-foreground">Nenhuma execucao encontrada.</CardContent></Card> : null}
+            {!executionsQuery.isLoading && !(executionsQuery.data ?? []).length ? <Card><CardContent className="p-6 text-sm text-muted-foreground">Nenhuma execução encontrada.</CardContent></Card> : null}
           </div>
         </TabsContent>
 
         <TabsContent value="records" className="space-y-4">
           <Card><CardContent className="space-y-3 p-4">
             <SectionTitle icon={<FileCheck className="h-4 w-4" />} title={selected ? `Registros de ${selected.title}` : 'Registros operacionais'} />
-            {!selected ? <EmptyText>Selecione um template para ver preenchimentos, registros, evidencias e pendencias.</EmptyText> : null}
+            {!selected ? <EmptyText>Selecione um modelo para ver preenchimentos, registros, evidências e pendências.</EmptyText> : null}
             {selectedSubmissions.map((submission) => (
               <SubmissionRecord
                 key={submission.id}
@@ -897,7 +897,7 @@ export default function FormsPage() {
             <CatalogPanel icon={<Tags className="h-4 w-4" />} title="Tags" items={(options?.tags ?? []).map((item) => item.name)} />
           </div>
           <div className="grid gap-4 lg:grid-cols-3">
-            <CatalogPanel icon={<LayoutTemplate className="h-4 w-4" />} title="Blocos reutilizaveis" items={(options?.reusableBlocks ?? []).map((item) => `${item.name} - ${item.blockType}`)} />
+            <CatalogPanel icon={<LayoutTemplate className="h-4 w-4" />} title="Blocos reutilizáveis" items={(options?.reusableBlocks ?? []).map((item) => `${item.name} - ${item.blockType}`)} />
             <CatalogPanel icon={<QrCode className="h-4 w-4" />} title="QR/externo" items={(selectedBuilder?.qrCodes ?? []).map((item) => item.code)} />
             <CatalogPanel icon={<Bot className="h-4 w-4" />} title="Assistente" items={(selectedBuilder?.aiSuggestions ?? []).map((item) => item.title)} />
           </div>
@@ -926,12 +926,12 @@ export default function FormsPage() {
 
       <Dialog open={evidenceOpen} onOpenChange={setEvidenceOpen}>
         <DialogContent className="max-w-xl">
-          <DialogHeader><DialogTitle>Adicionar evidencia</DialogTitle></DialogHeader>
+          <DialogHeader><DialogTitle>Adicionar evidência</DialogTitle></DialogHeader>
           <div className="grid gap-3 py-2">
             <Field label="Nome do arquivo"><Input value={evidenceForm.fileName} onChange={(e) => setEvidenceForm({ ...evidenceForm, fileName: e.target.value })} /></Field>
             <Field label="URL ou chave"><Input value={evidenceForm.fileUrl} onChange={(e) => setEvidenceForm({ ...evidenceForm, fileUrl: e.target.value })} /></Field>
             <Field label="Tipo"><Input value={evidenceForm.type} onChange={(e) => setEvidenceForm({ ...evidenceForm, type: e.target.value })} /></Field>
-            <Field label="Descricao"><Textarea value={evidenceForm.description} onChange={(e) => setEvidenceForm({ ...evidenceForm, description: e.target.value })} rows={3} /></Field>
+            <Field label="Descrição"><Textarea value={evidenceForm.description} onChange={(e) => setEvidenceForm({ ...evidenceForm, description: e.target.value })} rows={3} /></Field>
           </div>
           <DialogFooter><Button variant="outline" onClick={() => setEvidenceOpen(false)}>Cancelar</Button><Button onClick={() => addEvidence.mutate()} disabled={addEvidence.isPending || (!evidenceForm.fileName && !evidenceForm.fileUrl)}><Paperclip className="mr-2 h-4 w-4" /> Anexar</Button></DialogFooter>
         </DialogContent>
@@ -941,7 +941,7 @@ export default function FormsPage() {
         <DialogContent className="max-w-xl">
           <DialogHeader><DialogTitle>Aprovar registro</DialogTitle></DialogHeader>
           <div className="grid gap-3 py-2">
-            <Field label="Decisao">
+            <Field label="Decisão">
               <NativeSelect value={approvalForm.decision} onChange={(e) => setApprovalForm({ ...approvalForm, decision: e.target.value })}>
                 {(options?.approvalDecisions ?? ['APPROVED', 'REJECTED', 'ADJUSTMENTS_REQUESTED']).map((decision) => <option key={decision} value={decision}>{decision}</option>)}
               </NativeSelect>
@@ -954,12 +954,12 @@ export default function FormsPage() {
 
       <Dialog open={issueOpen} onOpenChange={setIssueOpen}>
         <DialogContent className="max-w-xl">
-          <DialogHeader><DialogTitle>Criar pendencia</DialogTitle></DialogHeader>
+          <DialogHeader><DialogTitle>Criar pendência</DialogTitle></DialogHeader>
           <div className="grid gap-3 py-2">
-            <Field label="Titulo"><Input value={issueForm.title} onChange={(e) => setIssueForm({ ...issueForm, title: e.target.value })} /></Field>
-            <Field label="Responsavel">
+            <Field label="Título"><Input value={issueForm.title} onChange={(e) => setIssueForm({ ...issueForm, title: e.target.value })} /></Field>
+            <Field label="Responsável">
               <NativeSelect value={issueForm.responsibleUserId} onChange={(e) => setIssueForm({ ...issueForm, responsibleUserId: e.target.value })}>
-                <option value="">Sem responsavel</option>
+                <option value="">Sem responsável</option>
                 {options?.users.map((user) => <option key={user.id} value={user.id}>{user.name}</option>)}
               </NativeSelect>
             </Field>
@@ -967,7 +967,7 @@ export default function FormsPage() {
               <Field label="Severidade"><Input value={issueForm.severity} onChange={(e) => setIssueForm({ ...issueForm, severity: e.target.value })} /></Field>
               <Field label="Prazo"><Input type="date" value={issueForm.dueDate} onChange={(e) => setIssueForm({ ...issueForm, dueDate: e.target.value })} /></Field>
             </div>
-            <Field label="Descricao"><Textarea value={issueForm.description} onChange={(e) => setIssueForm({ ...issueForm, description: e.target.value })} rows={3} /></Field>
+            <Field label="Descrição"><Textarea value={issueForm.description} onChange={(e) => setIssueForm({ ...issueForm, description: e.target.value })} rows={3} /></Field>
           </div>
           <DialogFooter><Button variant="outline" onClick={() => setIssueOpen(false)}>Cancelar</Button><Button onClick={() => createIssue.mutate()} disabled={createIssue.isPending || !issueForm.title.trim()}><ListChecks className="mr-2 h-4 w-4" /> Criar</Button></DialogFooter>
         </DialogContent>
@@ -980,7 +980,7 @@ function Filters({ filters, setFilters, options }: { filters: Record<string, str
   return (
     <Card>
       <CardContent className="flex flex-col gap-3 p-4 md:flex-row md:items-end">
-        <Field label="Buscar"><Input value={filters.search} onChange={(e) => setFilters((f: any) => ({ ...f, search: e.target.value }))} placeholder="Titulo, codigo, descricao, campo ou tag" /></Field>
+        <Field label="Buscar"><Input value={filters.search} onChange={(e) => setFilters((f: any) => ({ ...f, search: e.target.value }))} placeholder="Título, código, descrição, campo ou tag" /></Field>
         <Field label="Status">
           <NativeSelect value={filters.status} onChange={(e) => setFilters((f: any) => ({ ...f, status: e.target.value }))}>
             <option value="">Todos</option>
@@ -1021,14 +1021,14 @@ function TemplateCard({ item, selected, onSelect, onSubmit, onExecution, onEdit,
               <Badge variant="secondary">{label(TYPE_LABEL, item.type)}</Badge>
               {item.version ? <Badge variant="outline">v{item.version}</Badge> : null}
             </div>
-            <p className="mt-1 text-sm text-muted-foreground">{item.description || item.purpose || 'Sem descricao.'}</p>
+            <p className="mt-1 text-sm text-muted-foreground">{item.description || item.purpose || 'Sem descrição.'}</p>
             <p className="mt-1 text-xs text-muted-foreground">
-              {item.orgNode?.name ?? item.process?.name ?? 'Formulario geral'}{item.indicator ? ` | Indicador: ${item.indicator.code ? `${item.indicator.code} - ` : ''}${item.indicator.name}` : ''}{item.owner ? ` | Dono: ${item.owner.name}` : ''}
+              {item.orgNode?.name ?? item.process?.name ?? 'Formulário geral'}{item.indicator ? ` | Indicador: ${item.indicator.code ? `${item.indicator.code} - ` : ''}${item.indicator.name}` : ''}{item.owner ? ` | Dono: ${item.owner.name}` : ''}
             </p>
           </button>
           <div className="flex flex-wrap gap-2">
             {onSubmit ? <Button size="sm" variant="outline" onClick={() => onSubmit(item)} disabled={!isExecutable(item) || item.fields.length === 0}><Send className="mr-2 h-4 w-4" /> Preencher</Button> : null}
-            {onExecution ? <Button size="sm" variant="outline" onClick={() => onExecution(item)} disabled={!isExecutable(item)}><Play className="mr-2 h-4 w-4" /> Execucao</Button> : null}
+            {onExecution ? <Button size="sm" variant="outline" onClick={() => onExecution(item)} disabled={!isExecutable(item)}><Play className="mr-2 h-4 w-4" /> Execução</Button> : null}
             {onPublish ? <Button size="sm" variant="outline" onClick={() => onPublish(item.id)} disabled={item.fields.length === 0 || item.status === 'PUBLISHED'}><CheckCircle2 className="mr-2 h-4 w-4" /> Publicar</Button> : null}
             {onDuplicate ? <Button size="sm" variant="outline" onClick={() => onDuplicate(item.id)}><Copy className="mr-2 h-4 w-4" /> Copiar</Button> : null}
             {onEdit ? <Button size="sm" variant="outline" onClick={() => onEdit(item)}><Edit className="mr-2 h-4 w-4" /> Editar</Button> : null}
@@ -1038,8 +1038,8 @@ function TemplateCard({ item, selected, onSelect, onSubmit, onExecution, onEdit,
         <div className="grid gap-2 md:grid-cols-5">
           <MiniStat label="Campos" value={item.fieldsCount} />
           <MiniStat label="Obrigatorios" value={item.requiredFieldsCount ?? item.fields.filter((field) => field.required).length} />
-          <MiniStat label="Versoes" value={item.versionsCount ?? item.versions?.length ?? 0} />
-          <MiniStat label="Execucoes" value={item.executionsCount ?? 0} />
+          <MiniStat label="Versões" value={item.versionsCount ?? item.versions?.length ?? 0} />
+          <MiniStat label="Execuções" value={item.executionsCount ?? 0} />
           <MiniStat label="Registros" value={item.submissionsCount} />
         </div>
         {selected ? (
@@ -1050,7 +1050,7 @@ function TemplateCard({ item, selected, onSelect, onSubmit, onExecution, onEdit,
               {!item.fields.length ? <EmptyText>Nenhum campo configurado.</EmptyText> : null}
             </div>
             <div className="space-y-2 rounded-md border bg-background/60 p-3">
-              <SectionTitle icon={<History className="h-4 w-4" />} title="Versoes e metadados" />
+              <SectionTitle icon={<History className="h-4 w-4" />} title="Versões e metadados" />
               <MetaLine label="Tipo" value={item.typeConfig?.name ?? label(TYPE_LABEL, item.type)} />
               <MetaLine label="Categoria" value={item.category?.name ?? '-'} />
               <MetaLine label="Pasta" value={item.folder?.name ?? '-'} />
@@ -1088,7 +1088,7 @@ function ExecutionRow({ execution, onResponses, onComplete }: { execution: FormE
           <MiniStat label="Respostas" value={execution.responsesCount ?? execution.responseItems?.length ?? 0} />
           <MiniStat label="Registros" value={execution.recordsCount ?? 0} />
           <MiniStat label="Submissoes" value={execution.submissionsCount ?? 0} />
-          <MiniStat label="Pendencias" value={execution.openIssues ?? 0} />
+          <MiniStat label="Pendências" value={execution.openIssues ?? 0} />
         </div>
       </CardContent>
     </Card>
@@ -1112,21 +1112,21 @@ function SubmissionRecord({ submission, onEvidence, onSign, onApprove, onIssue }
             {submission.templateVersion ? <Badge variant="secondary">v{submission.templateVersion.versionLabel}</Badge> : null}
             {submission.operationalRecord ? <Badge variant="outline">{submission.operationalRecord.code}</Badge> : null}
           </div>
-          <p className="mt-1 text-xs text-muted-foreground">{submission.submittedBy?.name ?? 'Usuario'} | {formatDate(submission.submittedAt ?? submission.completedAt ?? submission.reviewedAt)}</p>
+          <p className="mt-1 text-xs text-muted-foreground">{submission.submittedBy?.name ?? 'Usuário'} | {formatDate(submission.submittedAt ?? submission.completedAt ?? submission.reviewedAt)}</p>
         </div>
         <div className="flex flex-wrap gap-2">
-          {onEvidence ? <Button size="sm" variant="outline" onClick={() => onEvidence(submission)}><Paperclip className="mr-2 h-4 w-4" /> Evidencia</Button> : null}
+          {onEvidence ? <Button size="sm" variant="outline" onClick={() => onEvidence(submission)}><Paperclip className="mr-2 h-4 w-4" /> Evidência</Button> : null}
           {onSign ? <Button size="sm" variant="outline" onClick={() => onSign(submission)}><PenLine className="mr-2 h-4 w-4" /> Assinar</Button> : null}
           {onApprove ? <Button size="sm" variant="outline" onClick={() => onApprove(submission)}><ShieldCheck className="mr-2 h-4 w-4" /> Aprovar</Button> : null}
-          {onIssue ? <Button size="sm" variant="outline" onClick={() => onIssue(submission)}><ListChecks className="mr-2 h-4 w-4" /> Pendencia</Button> : null}
+          {onIssue ? <Button size="sm" variant="outline" onClick={() => onIssue(submission)}><ListChecks className="mr-2 h-4 w-4" /> Pendência</Button> : null}
         </div>
       </div>
       <div className="grid gap-2 md:grid-cols-5">
         <MiniStat label="Respostas" value={submission.answersCount} />
-        <MiniStat label="Evidencias" value={submission.evidenceCount ?? submission.evidence?.length ?? 0} />
+        <MiniStat label="Evidências" value={submission.evidenceCount ?? submission.evidence?.length ?? 0} />
         <MiniStat label="Assinaturas" value={submission.signaturesCount ?? submission.signatures?.length ?? 0} />
-        <MiniStat label="Aprovacoes" value={submission.approvalsCount ?? submission.approvals?.length ?? 0} />
-        <MiniStat label="Pendencias" value={submission.openIssues ?? submission.issues?.length ?? 0} />
+        <MiniStat label="Aprovações" value={submission.approvalsCount ?? submission.approvals?.length ?? 0} />
+        <MiniStat label="Pendências" value={submission.openIssues ?? submission.issues?.length ?? 0} />
       </div>
       <div className="grid gap-2 md:grid-cols-2">
         {submission.answers.slice(0, 6).map((answer) => <MetaLine key={answer.id} label={answer.fieldLabel} value={answer.value ?? '-'} />)}
@@ -1151,23 +1151,23 @@ function TemplateDialog({ open, setOpen, editing, form, setForm, options, update
   return (
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogContent className="max-h-[92vh] max-w-6xl overflow-y-auto">
-        <DialogHeader><DialogTitle>{editing ? 'Editar formulario' : 'Novo formulario'}</DialogTitle></DialogHeader>
+        <DialogHeader><DialogTitle>{editing ? 'Editar formulário' : 'Novo formulário'}</DialogTitle></DialogHeader>
         <div className="grid gap-4 py-2">
           <div className="grid gap-3 md:grid-cols-[1fr_160px_160px_170px]">
-            <Field label="Titulo"><Input value={form.title} onChange={(e) => setForm({ ...form, title: e.target.value })} /></Field>
-            <Field label="Codigo"><Input value={form.code} onChange={(e) => setForm({ ...form, code: e.target.value })} /></Field>
-            <Field label="Versao"><Input value={form.version} onChange={(e) => setForm({ ...form, version: e.target.value })} /></Field>
+            <Field label="Título"><Input value={form.title} onChange={(e) => setForm({ ...form, title: e.target.value })} /></Field>
+            <Field label="Código"><Input value={form.code} onChange={(e) => setForm({ ...form, code: e.target.value })} /></Field>
+            <Field label="Versão"><Input value={form.version} onChange={(e) => setForm({ ...form, version: e.target.value })} /></Field>
             <Field label="Confidencialidade"><Input value={form.confidentiality} onChange={(e) => setForm({ ...form, confidentiality: e.target.value })} /></Field>
           </div>
           <div className="grid gap-3 md:grid-cols-4">
             <Field label="Tipo"><NativeSelect value={form.type} onChange={(e) => setForm({ ...form, type: e.target.value })}>{(options?.types ?? Object.keys(TYPE_LABEL)).map((value) => <option key={value} value={value}>{label(TYPE_LABEL, value)}</option>)}</NativeSelect></Field>
             <Field label="Status"><NativeSelect value={form.status} onChange={(e) => setForm({ ...form, status: e.target.value })}>{(options?.statuses ?? Object.keys(STATUS_LABEL)).map((value) => <option key={value} value={value}>{label(STATUS_LABEL, value)}</option>)}</NativeSelect></Field>
-            <Field label="Tipo configurado"><NativeSelect value={form.typeConfigId} onChange={(e) => setForm({ ...form, typeConfigId: e.target.value })}><option value="">Automatico</option>{options?.typeConfigs.map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}</NativeSelect></Field>
+            <Field label="Tipo configurado"><NativeSelect value={form.typeConfigId} onChange={(e) => setForm({ ...form, typeConfigId: e.target.value })}><option value="">Automático</option>{options?.typeConfigs.map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}</NativeSelect></Field>
             <Field label="Categoria"><NativeSelect value={form.categoryId} onChange={(e) => setForm({ ...form, categoryId: e.target.value })}><option value="">Sem categoria</option>{options?.categories.map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}</NativeSelect></Field>
           </div>
           <div className="grid gap-3 md:grid-cols-4">
             <Field label="Pasta"><NativeSelect value={form.folderId} onChange={(e) => setForm({ ...form, folderId: e.target.value })}><option value="">Sem pasta</option>{options?.folders.map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}</NativeSelect></Field>
-            <Field label="Area"><NativeSelect value={form.orgNodeId} onChange={(e) => setForm({ ...form, orgNodeId: e.target.value })}><option value="">Geral</option>{options?.orgNodes.map((node) => <option key={node.id} value={node.id}>{node.name}</option>)}</NativeSelect></Field>
+            <Field label="Área"><NativeSelect value={form.orgNodeId} onChange={(e) => setForm({ ...form, orgNodeId: e.target.value })}><option value="">Geral</option>{options?.orgNodes.map((node) => <option key={node.id} value={node.id}>{node.name}</option>)}</NativeSelect></Field>
             <Field label="Dono"><NativeSelect value={form.ownerUserId} onChange={(e) => setForm({ ...form, ownerUserId: e.target.value })}><option value="">Sem dono</option>{options?.users.map((user) => <option key={user.id} value={user.id}>{user.name}</option>)}</NativeSelect></Field>
             <Field label="Tempo min."><Input type="number" min={0} value={form.estimatedMinutes} onChange={(e) => setForm({ ...form, estimatedMinutes: e.target.value })} /></Field>
           </div>
@@ -1175,13 +1175,13 @@ function TemplateDialog({ open, setOpen, editing, form, setForm, options, update
             <Field label="Processo"><NativeSelect value={form.processId} onChange={(e) => setForm({ ...form, processId: e.target.value })}><option value="">Sem processo</option>{options?.processes.map((process) => <option key={process.id} value={process.id}>#{process.number} {process.code ? `${process.code} - ` : ''}{process.name}</option>)}</NativeSelect></Field>
             <Field label="Indicador"><NativeSelect value={form.indicatorId} onChange={(e) => setForm({ ...form, indicatorId: e.target.value })}><option value="">Sem indicador</option>{options?.indicators.map((indicator) => <option key={indicator.id} value={indicator.id}>{indicator.code ? `${indicator.code} - ` : ''}{indicator.name}</option>)}</NativeSelect></Field>
           </div>
-          <Field label="Descricao"><Textarea value={form.description} onChange={(e) => setForm({ ...form, description: e.target.value })} rows={2} /></Field>
+          <Field label="Descrição"><Textarea value={form.description} onChange={(e) => setForm({ ...form, description: e.target.value })} rows={2} /></Field>
           <div className="grid gap-3 md:grid-cols-2">
             <Field label="Finalidade"><Textarea value={form.purpose} onChange={(e) => setForm({ ...form, purpose: e.target.value })} rows={2} /></Field>
-            <Field label="Instrucoes"><Textarea value={form.instructions} onChange={(e) => setForm({ ...form, instructions: e.target.value })} rows={2} /></Field>
+            <Field label="Instruções"><Textarea value={form.instructions} onChange={(e) => setForm({ ...form, instructions: e.target.value })} rows={2} /></Field>
           </div>
           <div className="grid gap-3 md:grid-cols-2">
-            <Field label="Tags"><Input value={form.tags} onChange={(e) => setForm({ ...form, tags: e.target.value })} placeholder="Critico, recorrente, externo" /></Field>
+            <Field label="Tags"><Input value={form.tags} onChange={(e) => setForm({ ...form, tags: e.target.value })} placeholder="Crítico, recorrente, externo" /></Field>
             <Field label="Retencao dias"><Input type="number" min={0} value={form.retentionDays} onChange={(e) => setForm({ ...form, retentionDays: e.target.value })} /></Field>
           </div>
           <div className="space-y-3 rounded-md border p-3">
@@ -1192,15 +1192,15 @@ function TemplateDialog({ open, setOpen, editing, form, setForm, options, update
             {form.fields.map((field, index) => (
               <div key={`${index}-${field.order}`} className="grid gap-3 rounded-md border p-3 md:grid-cols-[70px_100px_1fr_170px_150px_40px]">
                 <Field label="Ordem"><Input type="number" min={1} value={field.order} onChange={(e) => updateField(index, { order: e.target.value })} /></Field>
-                <Field label="Codigo"><Input value={field.code} onChange={(e) => updateField(index, { code: e.target.value })} /></Field>
-                <Field label="Rotulo"><Input value={field.label} onChange={(e) => updateField(index, { label: e.target.value })} /></Field>
+                <Field label="Código"><Input value={field.code} onChange={(e) => updateField(index, { code: e.target.value })} /></Field>
+                <Field label="Rótulo"><Input value={field.label} onChange={(e) => updateField(index, { label: e.target.value })} /></Field>
                 <Field label="Tipo"><NativeSelect value={field.type} onChange={(e) => updateField(index, { type: e.target.value })}>{(options?.fieldTypes ?? FIELD_TYPES).map((value) => <option key={value} value={value}>{label(FIELD_LABEL, value)}</option>)}</NativeSelect></Field>
                 <Field label="Criticidade"><Input value={field.criticality} onChange={(e) => updateField(index, { criticality: e.target.value })} /></Field>
                 <Button type="button" variant="outline" size="sm" className="mt-6 text-status-red" onClick={() => removeField(index)} disabled={form.fields.length === 1}><Trash2 className="h-4 w-4" /></Button>
                 <label className="flex items-center gap-2 text-sm"><input type="checkbox" checked={field.required} onChange={(e) => updateField(index, { required: e.target.checked })} /> Obrigatorio</label>
-                <label className="flex items-center gap-2 text-sm"><input type="checkbox" checked={field.evidenceRequired} onChange={(e) => updateField(index, { evidenceRequired: e.target.checked })} /> Evidencia</label>
+                <label className="flex items-center gap-2 text-sm"><input type="checkbox" checked={field.evidenceRequired} onChange={(e) => updateField(index, { evidenceRequired: e.target.checked })} /> Evidência</label>
                 <label className="flex items-center gap-2 text-sm"><input type="checkbox" checked={field.commentRequired} onChange={(e) => updateField(index, { commentRequired: e.target.checked })} /> Comentario</label>
-                <div className="md:col-span-2"><Field label="Opcoes"><Textarea value={field.options} onChange={(e) => updateField(index, { options: e.target.value })} rows={2} /></Field></div>
+                <div className="md:col-span-2"><Field label="Opções"><Textarea value={field.options} onChange={(e) => updateField(index, { options: e.target.value })} rows={2} /></Field></div>
                 <div className="md:col-span-3"><Field label="Ajuda"><Input value={field.helpText} onChange={(e) => updateField(index, { helpText: e.target.value })} /></Field></div>
               </div>
             ))}
@@ -1233,13 +1233,13 @@ function SubmissionDialog({ open, setOpen, selected, title, setTitle, notes, set
       <DialogContent className="max-h-[92vh] max-w-3xl overflow-y-auto">
         <DialogHeader><DialogTitle>Preencher {selected?.title}</DialogTitle></DialogHeader>
         <div className="grid gap-4 py-2">
-          <Field label="Titulo do preenchimento"><Input value={title} onChange={(e) => setTitle(e.target.value)} /></Field>
+          <Field label="Título do preenchimento"><Input value={title} onChange={(e) => setTitle(e.target.value)} /></Field>
           {selected?.fields.map((field) => (
             <Field key={field.id} label={`${field.order}. ${field.label}${field.required ? ' *' : ''}`}>
               <AnswerInput field={field} value={answers[field.id] ?? ''} onChange={(value) => setAnswers((current: Record<string, string>) => ({ ...current, [field.id]: value }))} />
             </Field>
           ))}
-          <Field label="Observacoes"><Textarea value={notes} onChange={(e) => setNotes(e.target.value)} rows={3} /></Field>
+          <Field label="Observações"><Textarea value={notes} onChange={(e) => setNotes(e.target.value)} rows={3} /></Field>
         </div>
         <DialogFooter><Button variant="outline" onClick={() => setOpen(false)}>Cancelar</Button><Button onClick={submit} disabled={saving}><Send className="mr-2 h-4 w-4" /> Registrar</Button></DialogFooter>
       </DialogContent>
@@ -1260,13 +1260,13 @@ function ExecutionDialog({ open, setOpen, selected, options, form, setForm, save
   return (
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogContent className="max-w-xl">
-        <DialogHeader><DialogTitle>Criar execucao</DialogTitle></DialogHeader>
+        <DialogHeader><DialogTitle>Criar execução</DialogTitle></DialogHeader>
         <div className="grid gap-3 py-2">
           <p className="text-sm text-muted-foreground">{selected?.title}</p>
-          <Field label="Titulo"><Input value={form.title} onChange={(e) => setForm({ ...form, title: e.target.value })} /></Field>
-          <Field label="Responsavel"><NativeSelect value={form.assignedToId} onChange={(e) => setForm({ ...form, assignedToId: e.target.value })}><option value="">Sem responsavel</option>{options?.users.map((user) => <option key={user.id} value={user.id}>{user.name}</option>)}</NativeSelect></Field>
+          <Field label="Título"><Input value={form.title} onChange={(e) => setForm({ ...form, title: e.target.value })} /></Field>
+          <Field label="Responsável"><NativeSelect value={form.assignedToId} onChange={(e) => setForm({ ...form, assignedToId: e.target.value })}><option value="">Sem responsável</option>{options?.users.map((user) => <option key={user.id} value={user.id}>{user.name}</option>)}</NativeSelect></Field>
           <Field label="Prazo"><Input type="date" value={form.dueDate} onChange={(e) => setForm({ ...form, dueDate: e.target.value })} /></Field>
-          <label className="flex items-center gap-2 text-sm"><input type="checkbox" checked={form.offlineEnabled} onChange={(e) => setForm({ ...form, offlineEnabled: e.target.checked })} /> Permitir offline</label>
+          <label className="flex items-center gap-2 text-sm"><input type="checkbox" checked={form.offlineEnabled} onChange={(e) => setForm({ ...form, offlineEnabled: e.target.checked })} /> Permitir sem conexão</label>
         </div>
         <DialogFooter><Button variant="outline" onClick={() => setOpen(false)}>Cancelar</Button><Button onClick={save} disabled={saving || !selected}><Play className="mr-2 h-4 w-4" /> Criar</Button></DialogFooter>
       </DialogContent>
@@ -1287,9 +1287,9 @@ function ExecutionResponseDialog({ open, setOpen, execution, template, answers, 
   return (
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogContent className="max-h-[92vh] max-w-3xl overflow-y-auto">
-        <DialogHeader><DialogTitle>Respostas da execucao {execution?.code}</DialogTitle></DialogHeader>
+        <DialogHeader><DialogTitle>Respostas da execução {execution?.code}</DialogTitle></DialogHeader>
         <div className="grid gap-4 py-2">
-          {!template ? <EmptyText>Template da execucao nao esta carregado na lista atual.</EmptyText> : null}
+          {!template ? <EmptyText>Modelo da execução não está carregado na lista atual.</EmptyText> : null}
           {template?.fields.map((field) => (
             <Field key={field.id} label={`${field.order}. ${field.label}${field.required ? ' *' : ''}`}>
               <AnswerInput field={field} value={answers[field.id] ?? ''} onChange={(value) => setAnswers((current: Record<string, string>) => ({ ...current, [field.id]: value }))} />
@@ -1327,10 +1327,10 @@ function FieldPreview({ field }: { field: FormField }) {
         <Badge variant="secondary">{label(FIELD_LABEL, field.type)}</Badge>
         {field.code ? <Badge variant="outline">{field.code}</Badge> : null}
         {field.required ? <Badge variant="outline" className="border-red-300 text-red-700">Obrigatorio</Badge> : null}
-        {field.evidenceRequired ? <Badge variant="outline" className="border-amber-300 text-amber-700">Evidencia</Badge> : null}
+        {field.evidenceRequired ? <Badge variant="outline" className="border-amber-300 text-amber-700">Evidência</Badge> : null}
       </div>
       {field.helpText ? <p className="mt-1 text-sm text-muted-foreground">{field.helpText}</p> : null}
-      {field.options ? <p className="mt-1 text-xs text-muted-foreground">Opcoes: {splitOptions(field.options).join(', ')}</p> : null}
+      {field.options ? <p className="mt-1 text-xs text-muted-foreground">Opções: {splitOptions(field.options).join(', ')}</p> : null}
     </div>
   );
 }
@@ -1375,8 +1375,8 @@ function AnswerInput({ field, value, onChange }: { field: FormField; value: stri
   if (field.type === 'DATE') return <Input type="date" value={value} onChange={(e) => onChange(e.target.value)} />;
   if (field.type === 'TIME') return <Input type="time" value={value} onChange={(e) => onChange(e.target.value)} />;
   if (field.type === 'DATETIME') return <Input type="datetime-local" value={value} onChange={(e) => onChange(e.target.value)} />;
-  if (['BOOLEAN', 'YES_NO'].includes(field.type)) return <NativeSelect value={value} onChange={(e) => onChange(e.target.value)}><option value="">Selecione</option><option value="Sim">Sim</option><option value="Nao">Nao</option></NativeSelect>;
-  if (field.type === 'CONFORMITY') return <NativeSelect value={value} onChange={(e) => onChange(e.target.value)}><option value="">Selecione</option><option value="Conforme">Conforme</option><option value="Nao conforme">Nao conforme</option><option value="Nao aplicavel">Nao aplicavel</option></NativeSelect>;
+  if (['BOOLEAN', 'YES_NO'].includes(field.type)) return <NativeSelect value={value} onChange={(e) => onChange(e.target.value)}><option value="">Selecione</option><option value="Sim">Sim</option><option value="Nao">Não</option></NativeSelect>;
+  if (field.type === 'CONFORMITY') return <NativeSelect value={value} onChange={(e) => onChange(e.target.value)}><option value="">Selecione</option><option value="Conforme">Conforme</option><option value="Nao conforme">Não conforme</option><option value="Nao aplicavel">Não aplicável</option></NativeSelect>;
   if (['SELECT', 'RADIO', 'STATUS'].includes(field.type) && options.length) return <NativeSelect value={value} onChange={(e) => onChange(e.target.value)}><option value="">Selecione</option>{options.map((option) => <option key={option} value={option}>{option}</option>)}</NativeSelect>;
   return <Input value={value} onChange={(e) => onChange(e.target.value)} placeholder={['MULTISELECT', 'CHECKBOX'].includes(field.type) ? 'Separe valores por virgula' : field.helpText ?? undefined} />;
 }

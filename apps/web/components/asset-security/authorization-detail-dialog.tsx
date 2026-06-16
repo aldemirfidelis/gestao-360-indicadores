@@ -115,7 +115,7 @@ export function AuthorizationDetailDialog({
         {materials.length > 0 && <Field label="Materiais">{materials.join(', ')}</Field>}
 
         <div className="rounded-md border bg-muted/20 p-3">
-          <div className="mb-2 flex items-center gap-2 text-sm font-medium"><QrCode className="h-4 w-4" />QR Code de acesso</div>
+          <div className="mb-2 flex items-center gap-2 text-sm font-medium"><QrCode className="h-4 w-4" />código QR de acesso</div>
           {a.qrCodeToken ? (
             <div className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
               <code className="rounded bg-background px-2 py-1">{a.qrCodeToken}</code>

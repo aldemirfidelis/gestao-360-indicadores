@@ -37,7 +37,7 @@ interface Overview {
 }
 
 const CSV_REPORTS = [
-  { key: 'indicators', label: 'Relatorio por indicador', description: 'Catalogo completo com último realizado.', url: '/reports/indicators.csv' },
+  { key: 'indicators', label: 'Relatório por indicador', description: 'Catálogo completo com último realizado.', url: '/reports/indicators.csv' },
   { key: 'results', label: 'Histórico de lançamentos', description: 'Realizados, farois, metas e atingimento.', url: '/reports/results.csv' },
   { key: 'actions', label: 'Planos de ação', description: 'Status, prazos, responsáveis e prioridades.', url: '/reports/actions.csv' },
   { key: 'deviations', label: 'Não conformidades', description: 'Severidade, planos, prazos e histórico.', url: '/reports/deviations.csv' },
@@ -69,7 +69,7 @@ export default function ReportsPage() {
       a.download = filename;
       a.click();
       URL.revokeObjectURL(url);
-      toast.success('Download iniciado');
+      toast.success('Baixar iniciado');
     } catch (e: any) {
       toast.error(`Falha ao baixar: ${e.message}`);
     }
@@ -83,7 +83,7 @@ export default function ReportsPage() {
     const doc = new jsPDF({ orientation: 'portrait', unit: 'pt' });
     const o = overview.data;
     doc.setFontSize(18);
-    doc.text('Relatorio Executivo - Gestão 360 Indicadores', 40, 50);
+    doc.text('Relatório Executivo - Gestão 360 Indicadores', 40, 50);
     doc.setFontSize(10);
     doc.setTextColor(100);
     doc.text(`Período: ${periodRefLabel(period)} | Escopo: ${scope} | Gerado em ${formatDate(new Date())}`, 40, 68);
@@ -129,7 +129,7 @@ export default function ReportsPage() {
       styles: { fontSize: 8 },
     });
 
-    doc.save(`relatorio-executivo-${new Date().toISOString().slice(0, 10)}.pdf`);
+    doc.save(`relatório-executivo-${new Date().toISOString().slice(0, 10)}.pdf`);
     toast.success('PDF gerado');
   };
 
@@ -164,7 +164,7 @@ export default function ReportsPage() {
 
       <FilterBar
         actions={
-          <Button variant="outline" size="sm" disabled title="Filtros salvos serao ativados quando houver persistencia configurada.">
+          <Button variant="outline" size="sm" disabled title="Filtros salvos serão ativados quando houver persistencia configurada.">
             <Save className="mr-2 h-4 w-4" />
             Salvar filtro
           </Button>

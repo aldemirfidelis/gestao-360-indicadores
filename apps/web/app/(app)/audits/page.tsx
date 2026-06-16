@@ -157,18 +157,18 @@ interface AuditOptions {
 
 const STATUS_LABEL: Record<string, string> = {
   DRAFT: 'Rascunho',
-  WAITING_APPROVAL: 'Aguardando aprovacao',
+  WAITING_APPROVAL: 'Aguardando aprovação',
   PLANNED: 'Planejada',
   SCHEDULED: 'Agendada',
-  PREPARATION: 'Preparacao',
+  PREPARATION: 'Preparação',
   READY_EXECUTION: 'Pronta',
-  IN_PROGRESS: 'Execucao',
-  WAITING_COMPLEMENT: 'Complementacao',
-  LEAD_REVIEW: 'Revisao lider',
-  WAITING_AUDITED_RESPONSE: 'Manifestacao',
-  REPORT_ISSUED: 'Relatorio emitido',
-  FOLLOW_UP: 'Follow-up',
-  COMPLETED: 'Concluida',
+  IN_PROGRESS: 'Execução',
+  WAITING_COMPLEMENT: 'Complementação',
+  LEAD_REVIEW: 'Revisão líder',
+  WAITING_AUDITED_RESPONSE: 'Manifestação',
+  REPORT_ISSUED: 'Relatório emitido',
+  FOLLOW_UP: 'Acompanhamento',
+  COMPLETED: 'Concluída',
   CLOSED: 'Encerrada',
   SUSPENDED: 'Suspensa',
   CANCELLED: 'Cancelada',
@@ -207,7 +207,7 @@ const EMPTY_AUDIT = {
 const EMPTY_PROGRAM = { name: '', status: 'DRAFT', startsAt: '', endsAt: '', ownerUserId: '', approverUserId: '', estimatedHours: '', budget: '', description: '' };
 const EMPTY_UNIVERSE = { name: '', kind: 'AREA', orgNodeId: '', ownerUserId: '', impact: '3', probability: '3', recurrence: '2', regulatory_requirement: '2', strategic_relevance: '3', description: '' };
 const EMPTY_AUDITOR = { userId: '', name: '', kind: 'INTERNAL', status: 'ACTIVE', competenceLevel: '3', standards: '', notes: '' };
-const EMPTY_CHECKLIST = { name: '', auditType: 'INTERNAL', status: 'DRAFT', standardId: '', questions: 'O requisito foi atendido?\nHa evidencia objetiva registrada?' };
+const EMPTY_CHECKLIST = { name: '', auditType: 'INTERNAL', status: 'DRAFT', standardId: '', questions: 'O requisito foi atendido?\nHa evidência objetiva registrada?' };
 const EMPTY_FINDING = { classificationId: '', type: 'OBSERVATION', severity: '', description: '', conditionFound: '', expectedCriteria: '', evidence: '', recommendation: '', dueDate: '' };
 const EMPTY_EVIDENCE = { description: '', type: 'TEXT', fileName: '', content: '' };
 const EMPTY_REPORT = { title: '', summary: '', executiveSummary: '', issue: false };
@@ -263,92 +263,92 @@ export default function AuditsPage() {
   const saveAudit = useMutation({
     mutationFn: () => api<Audit>('/audits', { method: 'POST', json: auditPayload(auditForm) }),
     onSuccess: () => { toast.success('Auditoria criada'); setAuditOpen(false); setAuditForm(EMPTY_AUDIT); invalidate(); },
-    onError: (e: any) => toast.error(e?.message ?? 'Nao foi possivel salvar a auditoria'),
+    onError: (e: any) => toast.error(e?.message ?? 'Não foi possível salvar a auditoria'),
   });
   const deleteAudit = useMutation({
     mutationFn: (id: string) => api<Audit>(`/audits/${id}`, { method: 'DELETE' }),
     onSuccess: () => { toast.success('Auditoria excluida logicamente'); invalidate(); },
-    onError: (e: any) => toast.error(e?.message ?? 'Nao foi possivel excluir'),
+    onError: (e: any) => toast.error(e?.message ?? 'Não foi possível excluir'),
   });
   const transitionAudit = useMutation({
     mutationFn: ({ id, status, reason }: { id: string; status: string; reason?: string }) => api<Audit>(`/audits/${id}/transition`, { method: 'POST', json: { status, reason } }),
     onSuccess: () => { toast.success('Fluxo atualizado'); invalidate(); },
-    onError: (e: any) => toast.error(e?.message ?? 'Nao foi possivel alterar status'),
+    onError: (e: any) => toast.error(e?.message ?? 'Não foi possível alterar status'),
   });
   const saveProgram = useMutation({
     mutationFn: () => api('/audits/programs', { method: 'POST', json: programPayload(programForm) }),
     onSuccess: () => { toast.success('Programa criado'); setProgramOpen(false); setProgramForm(EMPTY_PROGRAM); invalidate(); },
-    onError: (e: any) => toast.error(e?.message ?? 'Nao foi possivel criar o programa'),
+    onError: (e: any) => toast.error(e?.message ?? 'Não foi possível criar o programa'),
   });
   const saveUniverse = useMutation({
     mutationFn: () => api('/audits/universe', { method: 'POST', json: universePayload(universeForm) }),
     onSuccess: () => { toast.success('Item auditavel criado'); setUniverseOpen(false); setUniverseForm(EMPTY_UNIVERSE); invalidate(); },
-    onError: (e: any) => toast.error(e?.message ?? 'Nao foi possivel criar o item auditavel'),
+    onError: (e: any) => toast.error(e?.message ?? 'Não foi possível criar o item auditavel'),
   });
   const saveAuditor = useMutation({
     mutationFn: () => api('/audits/auditors', { method: 'POST', json: auditorPayload(auditorForm) }),
     onSuccess: () => { toast.success('Auditor cadastrado'); setAuditorOpen(false); setAuditorForm(EMPTY_AUDITOR); invalidate(); },
-    onError: (e: any) => toast.error(e?.message ?? 'Nao foi possivel cadastrar auditor'),
+    onError: (e: any) => toast.error(e?.message ?? 'Não foi possível cadastrar auditor'),
   });
   const saveChecklist = useMutation({
     mutationFn: () => api('/audits/checklist-templates', { method: 'POST', json: checklistPayload(checklistForm) }),
-    onSuccess: () => { toast.success('Modelo de checklist criado'); setChecklistOpen(false); setChecklistForm(EMPTY_CHECKLIST); invalidate(); },
-    onError: (e: any) => toast.error(e?.message ?? 'Nao foi possivel criar checklist'),
+    onSuccess: () => { toast.success('Modelo de lista de verificação criado'); setChecklistOpen(false); setChecklistForm(EMPTY_CHECKLIST); invalidate(); },
+    onError: (e: any) => toast.error(e?.message ?? 'Não foi possível criar lista de verificação'),
   });
   const addFinding = useMutation({
     mutationFn: () => api<Finding>(`/audits/${selectedId}/findings`, { method: 'POST', json: findingPayload(findingForm) }),
-    onSuccess: () => { toast.success('Constatacao registrada'); setFindingForm(EMPTY_FINDING); invalidate(); },
-    onError: (e: any) => toast.error(e?.message ?? 'Nao foi possivel registrar constatacao'),
+    onSuccess: () => { toast.success('Constatação registrada'); setFindingForm(EMPTY_FINDING); invalidate(); },
+    onError: (e: any) => toast.error(e?.message ?? 'Não foi possível registrar constatação'),
   });
   const generateNc = useMutation({
     mutationFn: (id: string) => api<Finding>(`/audits/findings/${id}/nonconformity`, { method: 'POST', json: {} }),
-    onSuccess: () => { toast.success('NC gerada a partir da constatacao'); invalidate(); },
+    onSuccess: () => { toast.success('NC gerada a partir da constatação'); invalidate(); },
     onError: (e: any) => toast.error(e?.message ?? 'Falha ao gerar NC'),
   });
   const addEvidence = useMutation({
     mutationFn: () => api(`/audits/${selectedId}/evidence`, { method: 'POST', json: evidencePayload(evidenceForm) }),
-    onSuccess: () => { toast.success('Evidencia registrada'); setEvidenceForm(EMPTY_EVIDENCE); invalidate(); },
-    onError: (e: any) => toast.error(e?.message ?? 'Nao foi possivel registrar evidencia'),
+    onSuccess: () => { toast.success('Evidência registrada'); setEvidenceForm(EMPTY_EVIDENCE); invalidate(); },
+    onError: (e: any) => toast.error(e?.message ?? 'Não foi possível registrar evidência'),
   });
   const startChecklist = useMutation({
     mutationFn: () => api(`/audits/${selectedId}/checklists`, { method: 'POST', json: { templateId: selectedTemplateId || null } }),
-    onSuccess: () => { toast.success('Execucao de checklist iniciada'); setSelectedTemplateId(''); invalidate(); },
-    onError: (e: any) => toast.error(e?.message ?? 'Nao foi possivel iniciar checklist'),
+    onSuccess: () => { toast.success('Execução de lista de verificação iniciada'); setSelectedTemplateId(''); invalidate(); },
+    onError: (e: any) => toast.error(e?.message ?? 'Não foi possível iniciar lista de verificação'),
   });
   const generateReport = useMutation({
     mutationFn: () => api(`/audits/${selectedId}/report`, { method: 'POST', json: reportPayload(reportForm) }),
-    onSuccess: () => { toast.success('Relatorio gerado'); setReportForm(EMPTY_REPORT); invalidate(); },
-    onError: (e: any) => toast.error(e?.message ?? 'Nao foi possivel gerar relatorio'),
+    onSuccess: () => { toast.success('Relatório gerado'); setReportForm(EMPTY_REPORT); invalidate(); },
+    onError: (e: any) => toast.error(e?.message ?? 'Não foi possível gerar relatório'),
   });
   const createAi = useMutation({
     mutationFn: () => api(`/audits/${selectedId}/ai/suggestions`, { method: 'POST', json: {} }),
-    onSuccess: () => { toast.success('Sugestoes criadas para validacao humana'); invalidate(); },
-    onError: (e: any) => toast.error(e?.message ?? 'Nao foi possivel criar sugestoes'),
+    onSuccess: () => { toast.success('Sugestões criadas para validação humana'); invalidate(); },
+    onError: (e: any) => toast.error(e?.message ?? 'Não foi possível criar sugestões'),
   });
 
   return (
     <div>
       <PageHeader
         title="Auditorias e Compliance"
-        description="Programas, planejamento por risco, execucao, evidencias, constatacoes, NCs, follow-up e relatorios."
+        description="Programas, planejamento por risco, execução, evidências, constatações, NCs, acompanhamento e relatórios."
         actions={canCreate ? <Button onClick={() => setAuditOpen(true)}><Plus className="mr-2 h-4 w-4" />Nova auditoria</Button> : null}
       />
 
       <div className="mb-6 grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-5">
         <MetricCard title="Em aberto" value={formatNumber(dashboard?.summary.open)} description={`${formatNumber(dashboard?.summary.total)} no total`} icon={<ClipboardCheck className="h-4 w-4" />} tone="blue" />
-        <MetricCard title="Concluidas" value={formatNumber(dashboard?.summary.completed)} description="Concluidas ou encerradas" icon={<CheckCircle2 className="h-4 w-4" />} tone="green" />
-        <MetricCard title="Atrasadas" value={formatNumber(dashboard?.summary.overdueAudits)} description={`${formatNumber(dashboard?.summary.overdueFindings)} constatacoes vencidas`} icon={<AlertTriangle className="h-4 w-4" />} tone={(dashboard?.summary.overdueAudits ?? 0) > 0 ? 'red' : 'green'} />
-        <MetricCard title="Constatacoes" value={formatNumber(dashboard?.summary.openFindings)} description={`${formatNumber(dashboard?.summary.criticalFindings)} criticas`} icon={<ClipboardList className="h-4 w-4" />} tone="yellow" />
-        <MetricCard title="NCs a gerar" value={formatNumber(dashboard?.summary.pendingNc)} description="Constatacoes sem NC" icon={<FileCheck2 className="h-4 w-4" />} tone={(dashboard?.summary.pendingNc ?? 0) > 0 ? 'red' : 'green'} />
+        <MetricCard title="Concluídas" value={formatNumber(dashboard?.summary.completed)} description="Concluídas ou encerradas" icon={<CheckCircle2 className="h-4 w-4" />} tone="green" />
+        <MetricCard title="Atrasadas" value={formatNumber(dashboard?.summary.overdueAudits)} description={`${formatNumber(dashboard?.summary.overdueFindings)} constatações vencidas`} icon={<AlertTriangle className="h-4 w-4" />} tone={(dashboard?.summary.overdueAudits ?? 0) > 0 ? 'red' : 'green'} />
+        <MetricCard title="Constatações" value={formatNumber(dashboard?.summary.openFindings)} description={`${formatNumber(dashboard?.summary.criticalFindings)} críticas`} icon={<ClipboardList className="h-4 w-4" />} tone="yellow" />
+        <MetricCard title="NCs a gerar" value={formatNumber(dashboard?.summary.pendingNc)} description="Constatações sem NC" icon={<FileCheck2 className="h-4 w-4" />} tone={(dashboard?.summary.pendingNc ?? 0) > 0 ? 'red' : 'green'} />
       </div>
 
       <Tabs defaultValue="dashboard" className="space-y-4">
         <TabsList className="flex h-auto flex-wrap">
-          <TabsTrigger value="dashboard"><BarChart3 className="mr-2 h-4 w-4" />Dashboard</TabsTrigger>
+          <TabsTrigger value="dashboard"><BarChart3 className="mr-2 h-4 w-4" />Painel</TabsTrigger>
           <TabsTrigger value="audits"><ClipboardCheck className="mr-2 h-4 w-4" />Auditorias</TabsTrigger>
           <TabsTrigger value="programs"><CalendarClock className="mr-2 h-4 w-4" />Programas</TabsTrigger>
           <TabsTrigger value="universe"><Radar className="mr-2 h-4 w-4" />Universo</TabsTrigger>
-          <TabsTrigger value="checklists"><ListChecks className="mr-2 h-4 w-4" />Checklists</TabsTrigger>
+          <TabsTrigger value="checklists"><ListChecks className="mr-2 h-4 w-4" />Listas de verificação</TabsTrigger>
           <TabsTrigger value="auditors"><UserCheck className="mr-2 h-4 w-4" />Auditores</TabsTrigger>
           <TabsTrigger value="standards"><Library className="mr-2 h-4 w-4" />Normas</TabsTrigger>
         </TabsList>
@@ -359,8 +359,8 @@ export default function AuditsPage() {
               <CardContent className="p-4">
                 <div className="mb-3 flex items-center justify-between">
                   <div>
-                    <div className="text-sm font-semibold">Cobertura por area</div>
-                    <div className="text-xs text-muted-foreground">Total, abertas e constatacoes criticas.</div>
+                    <div className="text-sm font-semibold">Cobertura por área</div>
+                    <div className="text-xs text-muted-foreground">Total, abertas e constatações críticas.</div>
                   </div>
                   <Gauge className="h-4 w-4 text-muted-foreground" />
                 </div>
@@ -447,7 +447,7 @@ export default function AuditsPage() {
           <Card>
             <CardContent className="p-4">
               <div className="grid grid-cols-1 gap-3 md:grid-cols-5">
-                <Input placeholder="Buscar por titulo, codigo, escopo..." value={filters.search} onChange={(e) => setFilters((f) => ({ ...f, search: e.target.value }))} />
+                <Input placeholder="Buscar por título, código, escopo..." value={filters.search} onChange={(e) => setFilters((f) => ({ ...f, search: e.target.value }))} />
                 <NativeSelect value={filters.status} onChange={(e) => setFilters((f) => ({ ...f, status: e.target.value }))}>
                   <option value="">Todos os status</option>
                   {(options?.statuses ?? []).map((status) => <option key={status} value={status}>{STATUS_LABEL[status] ?? label(status)}</option>)}
@@ -487,7 +487,7 @@ export default function AuditsPage() {
                     {canDelete && <Button variant="ghost" size="icon" onClick={() => window.confirm('Excluir esta auditoria?') && deleteAudit.mutate(audit.id)} disabled={deleteAudit.isPending} title="Excluir"><Trash2 className="h-4 w-4" /></Button>}
                   </div>
                   <div className="mt-4 grid grid-cols-2 gap-2 text-xs text-muted-foreground sm:grid-cols-4">
-                    <div>Area: <span className="text-foreground">{audit.orgNode?.name ?? '-'}</span></div>
+                    <div>Área: <span className="text-foreground">{audit.orgNode?.name ?? '-'}</span></div>
                     <div>Auditor: <span className="text-foreground">{audit.leadAuditor?.name ?? '-'}</span></div>
                     <div>Data: <span className="text-foreground">{formatDate(audit.plannedDate)}</span></div>
                     <div>NCs: <span className={cn('text-foreground', audit.pendingNc > 0 && 'text-status-red')}>{audit.ncCount}{audit.pendingNc > 0 ? ` (${audit.pendingNc})` : ''}</span></div>
@@ -514,7 +514,7 @@ export default function AuditsPage() {
                     <Badge variant="secondary">{label(program.status)}</Badge>
                   </div>
                   <h3 className="mt-3 text-base font-semibold">{program.name}</h3>
-                  <p className="mt-1 line-clamp-2 text-sm text-muted-foreground">{program.description || 'Sem descricao.'}</p>
+                  <p className="mt-1 line-clamp-2 text-sm text-muted-foreground">{program.description || 'Sem descrição.'}</p>
                   <div className="mt-3 text-xs text-muted-foreground">{formatDate(program.startsAt)} - {formatDate(program.endsAt)}</div>
                 </CardContent>
               </Card>
@@ -545,7 +545,7 @@ export default function AuditsPage() {
         </TabsContent>
 
         <TabsContent value="checklists" className="space-y-4">
-          <SectionHeader title="Modelos de checklist" action={canManage ? <Button onClick={() => setChecklistOpen(true)}><Plus className="mr-2 h-4 w-4" />Novo checklist</Button> : null} />
+          <SectionHeader title="Modelos de lista de verificação" action={canManage ? <Button onClick={() => setChecklistOpen(true)}><Plus className="mr-2 h-4 w-4" />Nova lista de verificação</Button> : null} />
           <div className="grid grid-cols-1 gap-4 xl:grid-cols-3">
             {(checklistsQuery.data ?? []).map((template) => (
               <Card key={template.id}>
@@ -555,7 +555,7 @@ export default function AuditsPage() {
                     <Badge variant="secondary">{label(template.status)}</Badge>
                   </div>
                   <h3 className="mt-3 text-base font-semibold">{template.name}</h3>
-                  <p className="mt-1 text-sm text-muted-foreground">{template.sections?.length ?? 0} secoes - {(template.sections ?? []).reduce((acc: number, s: any) => acc + (s.items?.length ?? 0), 0)} perguntas</p>
+                  <p className="mt-1 text-sm text-muted-foreground">{template.sections?.length ?? 0} seções - {(template.sections ?? []).reduce((acc: number, s: any) => acc + (s.items?.length ?? 0), 0)} perguntas</p>
                 </CardContent>
               </Card>
             ))}
@@ -563,7 +563,7 @@ export default function AuditsPage() {
         </TabsContent>
 
         <TabsContent value="auditors" className="space-y-4">
-          <SectionHeader title="Auditores e competencias" action={canManage ? <Button onClick={() => setAuditorOpen(true)}><Plus className="mr-2 h-4 w-4" />Novo auditor</Button> : null} />
+          <SectionHeader title="Auditores e competências" action={canManage ? <Button onClick={() => setAuditorOpen(true)}><Plus className="mr-2 h-4 w-4" />Novo auditor</Button> : null} />
           <div className="grid grid-cols-1 gap-4 xl:grid-cols-3">
             {(auditorsQuery.data ?? []).map((auditor: any) => (
               <Card key={auditor.id}>
@@ -574,7 +574,7 @@ export default function AuditsPage() {
                   </div>
                   <h3 className="mt-3 text-base font-semibold">{auditor.name}</h3>
                   <p className="mt-1 text-sm text-muted-foreground">{auditor.email || auditor.companyName || 'Sem contato.'}</p>
-                  <div className="mt-3 text-xs text-muted-foreground">{auditor.competencies?.length ?? 0} competencias - {auditor.certifications?.length ?? 0} certificacoes</div>
+                  <div className="mt-3 text-xs text-muted-foreground">{auditor.competencies?.length ?? 0} competências - {auditor.certifications?.length ?? 0} certificacoes</div>
                 </CardContent>
               </Card>
             ))}
@@ -589,7 +589,7 @@ export default function AuditsPage() {
                 <CardContent className="p-4">
                   <div className="flex items-center justify-between gap-2">
                     <Badge variant="outline">{standard.code}</Badge>
-                    <Badge variant="secondary">{standard.version || 'Sem versao'}</Badge>
+                    <Badge variant="secondary">{standard.version || 'Sem versão'}</Badge>
                   </div>
                   <h3 className="mt-3 text-base font-semibold">{standard.name}</h3>
                   <p className="mt-1 text-sm text-muted-foreground">{standard.requirements?.length ?? 0} requisitos cadastrados</p>
@@ -615,19 +615,19 @@ export default function AuditsPage() {
           {selected && (
             <Tabs defaultValue="overview" className="space-y-4">
               <TabsList className="flex h-auto flex-wrap">
-                <TabsTrigger value="overview">Visao geral</TabsTrigger>
-                <TabsTrigger value="checklist">Checklist</TabsTrigger>
-                <TabsTrigger value="evidence">Evidencias</TabsTrigger>
-                <TabsTrigger value="findings">Constatacoes</TabsTrigger>
-                <TabsTrigger value="report">Relatorio</TabsTrigger>
-                <TabsTrigger value="history">Historico</TabsTrigger>
+                <TabsTrigger value="overview">Visão geral</TabsTrigger>
+                <TabsTrigger value="checklist">Lista de verificação</TabsTrigger>
+                <TabsTrigger value="evidence">Evidências</TabsTrigger>
+                <TabsTrigger value="findings">Constatações</TabsTrigger>
+                <TabsTrigger value="report">Relatório</TabsTrigger>
+                <TabsTrigger value="history">Histórico</TabsTrigger>
                 <TabsTrigger value="ai">IA</TabsTrigger>
               </TabsList>
 
               <TabsContent value="overview" className="grid grid-cols-1 gap-4 md:grid-cols-3">
                 <InfoBox label="Status" value={STATUS_LABEL[selected.status] ?? label(selected.status)} />
-                <InfoBox label="Area" value={selected.orgNode?.name ?? '-'} />
-                <InfoBox label="Auditor lider" value={selected.leadAuditor?.name ?? '-'} />
+                <InfoBox label="Área" value={selected.orgNode?.name ?? '-'} />
+                <InfoBox label="Auditor líder" value={selected.leadAuditor?.name ?? '-'} />
                 <InfoBox label="Programa" value={selectedDetail?.program?.name ?? '-'} />
                 <InfoBox label="Item auditavel" value={selectedDetail?.universeItem?.name ?? '-'} />
                 <InfoBox label="Data planejada" value={formatDate(selected.plannedDate)} />
@@ -646,7 +646,7 @@ export default function AuditsPage() {
                         <option value="">Sem modelo</option>
                         {(options?.checklistTemplates ?? []).map((template) => <option key={template.id} value={template.id}>{template.code ? `${template.code} - ` : ''}{template.name}</option>)}
                       </NativeSelect>
-                      <Button onClick={() => startChecklist.mutate()} disabled={startChecklist.isPending}><ListChecks className="mr-2 h-4 w-4" />Iniciar checklist</Button>
+                      <Button onClick={() => startChecklist.mutate()} disabled={startChecklist.isPending}><ListChecks className="mr-2 h-4 w-4" />Iniciar lista de verificação</Button>
                     </div>
                   </div>
                 )}
@@ -660,18 +660,18 @@ export default function AuditsPage() {
                     <div className="mt-1 text-xs text-muted-foreground">{formatNumber(execution.progress)}% preenchido - {execution.responses?.length ?? 0} respostas</div>
                   </div>
                 ))}
-                {(detailQuery.data?.checklistExecutions ?? []).length === 0 && <EmptyLine text="Nenhuma execucao de checklist iniciada." />}
+                {(detailQuery.data?.checklistExecutions ?? []).length === 0 && <EmptyLine text="Nenhuma execução de lista de verificação iniciada." />}
               </TabsContent>
 
               <TabsContent value="evidence" className="space-y-3">
                 {canUpdate && (
                   <div className="rounded-md border p-3">
                     <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
-                      <Input placeholder="Descricao" value={evidenceForm.description} onChange={(e) => setEvidenceForm((f) => ({ ...f, description: e.target.value }))} />
+                      <Input placeholder="Descrição" value={evidenceForm.description} onChange={(e) => setEvidenceForm((f) => ({ ...f, description: e.target.value }))} />
                       <Input placeholder="Nome do arquivo" value={evidenceForm.fileName} onChange={(e) => setEvidenceForm((f) => ({ ...f, fileName: e.target.value }))} />
-                      <Textarea className="md:col-span-2" rows={3} placeholder="Conteudo textual da evidencia" value={evidenceForm.content} onChange={(e) => setEvidenceForm((f) => ({ ...f, content: e.target.value }))} />
+                      <Textarea className="md:col-span-2" rows={3} placeholder="Conteúdo textual da evidência" value={evidenceForm.content} onChange={(e) => setEvidenceForm((f) => ({ ...f, content: e.target.value }))} />
                     </div>
-                    <div className="mt-3 flex justify-end"><Button onClick={() => addEvidence.mutate()} disabled={addEvidence.isPending || !evidenceForm.description.trim()}><FileText className="mr-2 h-4 w-4" />Adicionar evidencia</Button></div>
+                    <div className="mt-3 flex justify-end"><Button onClick={() => addEvidence.mutate()} disabled={addEvidence.isPending || !evidenceForm.description.trim()}><FileText className="mr-2 h-4 w-4" />Adicionar evidência</Button></div>
                   </div>
                 )}
                 {(detailQuery.data?.evidence ?? []).map((item) => (
@@ -687,7 +687,7 @@ export default function AuditsPage() {
 
               <TabsContent value="findings" className="space-y-3">
                 <div className="max-h-[42vh] space-y-3 overflow-y-auto pr-1">
-                  {(selected.findings ?? []).length === 0 && <EmptyLine text="Nenhuma constatacao registrada." />}
+                  {(selected.findings ?? []).length === 0 && <EmptyLine text="Nenhuma constatação registrada." />}
                   {(selected.findings ?? []).map((finding) => (
                     <div key={finding.id} className="rounded-md border p-3">
                       <div className="flex items-start justify-between gap-2">
@@ -707,18 +707,18 @@ export default function AuditsPage() {
                 </div>
                 {canUpdate && (
                   <div className="rounded-md border bg-muted/30 p-3">
-                    <div className="mb-2 text-sm font-semibold">Nova constatacao</div>
+                    <div className="mb-2 text-sm font-semibold">Nova constatação</div>
                     <div className="grid grid-cols-1 gap-3 md:grid-cols-3">
                       <NativeSelect value={findingForm.classificationId} onChange={(e) => setFindingForm((f) => ({ ...f, classificationId: e.target.value }))}>
-                        <option value="">Classificacao livre</option>
+                        <option value="">Classificação livre</option>
                         {(options?.classifications ?? []).map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
                       </NativeSelect>
                       <NativeSelect value={findingForm.type} onChange={(e) => setFindingForm((f) => ({ ...f, type: e.target.value }))}>{(options?.findingTypes ?? []).map((type) => <option key={type} value={type}>{label(type)}</option>)}</NativeSelect>
                       <NativeSelect value={findingForm.severity} onChange={(e) => setFindingForm((f) => ({ ...f, severity: e.target.value }))}><option value="">Sem severidade</option>{(options?.severities ?? []).map((s) => <option key={s} value={s}>{label(s)}</option>)}</NativeSelect>
-                      <Textarea className="md:col-span-3" rows={2} placeholder="Descricao objetiva" value={findingForm.description} onChange={(e) => setFindingForm((f) => ({ ...f, description: e.target.value }))} />
-                      <Textarea className="md:col-span-3" rows={2} placeholder="Evidencia objetiva" value={findingForm.evidence} onChange={(e) => setFindingForm((f) => ({ ...f, evidence: e.target.value }))} />
+                      <Textarea className="md:col-span-3" rows={2} placeholder="Descrição objetiva" value={findingForm.description} onChange={(e) => setFindingForm((f) => ({ ...f, description: e.target.value }))} />
+                      <Textarea className="md:col-span-3" rows={2} placeholder="Evidência objetiva" value={findingForm.evidence} onChange={(e) => setFindingForm((f) => ({ ...f, evidence: e.target.value }))} />
                     </div>
-                    <div className="mt-3 flex justify-end"><Button onClick={() => addFinding.mutate()} disabled={addFinding.isPending || !findingForm.description.trim()}>Adicionar constatacao</Button></div>
+                    <div className="mt-3 flex justify-end"><Button onClick={() => addFinding.mutate()} disabled={addFinding.isPending || !findingForm.description.trim()}>Adicionar constatação</Button></div>
                   </div>
                 )}
               </TabsContent>
@@ -727,11 +727,11 @@ export default function AuditsPage() {
                 {canUpdate && (
                   <div className="rounded-md border p-3">
                     <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
-                      <Input placeholder="Titulo do relatorio" value={reportForm.title} onChange={(e) => setReportForm((f) => ({ ...f, title: e.target.value }))} />
+                      <Input placeholder="Título do relatório" value={reportForm.title} onChange={(e) => setReportForm((f) => ({ ...f, title: e.target.value }))} />
                       <NativeSelect value={reportForm.issue ? 'yes' : 'no'} onChange={(e) => setReportForm((f) => ({ ...f, issue: e.target.value === 'yes' }))}><option value="no">Minuta</option><option value="yes">Emitir agora</option></NativeSelect>
                       <Textarea className="md:col-span-2" rows={3} placeholder="Resumo executivo" value={reportForm.executiveSummary} onChange={(e) => setReportForm((f) => ({ ...f, executiveSummary: e.target.value }))} />
                     </div>
-                    <div className="mt-3 flex justify-end"><Button onClick={() => generateReport.mutate()} disabled={generateReport.isPending}><FileText className="mr-2 h-4 w-4" />Gerar relatorio</Button></div>
+                    <div className="mt-3 flex justify-end"><Button onClick={() => generateReport.mutate()} disabled={generateReport.isPending}><FileText className="mr-2 h-4 w-4" />Gerar relatório</Button></div>
                   </div>
                 )}
                 {(detailQuery.data?.reports ?? []).map((report) => (
@@ -743,7 +743,7 @@ export default function AuditsPage() {
               </TabsContent>
 
               <TabsContent value="history" className="space-y-2">
-                {(detailQuery.data?.timeline ?? []).length === 0 && <EmptyLine text="Sem historico registrado." />}
+                {(detailQuery.data?.timeline ?? []).length === 0 && <EmptyLine text="Sem histórico registrado." />}
                 {(detailQuery.data?.timeline ?? []).map((event) => (
                   <div key={event.id} className="rounded-md border p-3 text-sm">
                     <div className="font-medium">{event.title}</div>
@@ -753,14 +753,14 @@ export default function AuditsPage() {
               </TabsContent>
 
               <TabsContent value="ai" className="space-y-3">
-                {canUpdate && <Button onClick={() => createAi.mutate()} disabled={createAi.isPending}><Sparkles className="mr-2 h-4 w-4" />Criar sugestoes</Button>}
+                {canUpdate && <Button onClick={() => createAi.mutate()} disabled={createAi.isPending}><Sparkles className="mr-2 h-4 w-4" />Criar sugestões</Button>}
                 {(detailQuery.data?.aiSuggestions ?? []).map((item) => (
                   <div key={item.id} className="rounded-md border p-3 text-sm">
                     <div className="flex items-center justify-between gap-2"><span className="font-medium">{item.title}</span><Badge variant="outline">{label(item.status)}</Badge></div>
                     <p className="mt-2 text-muted-foreground">{item.content}</p>
                   </div>
                 ))}
-                {(detailQuery.data?.aiSuggestions ?? []).length === 0 && <EmptyLine text="Nenhuma sugestao registrada." />}
+                {(detailQuery.data?.aiSuggestions ?? []).length === 0 && <EmptyLine text="Nenhuma sugestão registrada." />}
               </TabsContent>
             </Tabs>
           )}
@@ -777,13 +777,13 @@ function AuditDialog({ open, onOpenChange, form, setForm, options, onSave, savin
       <DialogContent className="max-w-3xl">
         <DialogHeader><DialogTitle>Nova auditoria</DialogTitle></DialogHeader>
         <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-          <Field label="Titulo" className="md:col-span-2"><Input value={form.title} onChange={(e) => setForm((f: any) => ({ ...f, title: e.target.value }))} /></Field>
+          <Field label="Título" className="md:col-span-2"><Input value={form.title} onChange={(e) => setForm((f: any) => ({ ...f, title: e.target.value }))} /></Field>
           <Field label="Tipo"><NativeSelect value={form.type} onChange={(e) => setForm((f: any) => ({ ...f, type: e.target.value }))}>{(options?.types ?? ['INTERNAL']).map((v: string) => <option key={v} value={v}>{label(v)}</option>)}</NativeSelect></Field>
           <Field label="Modalidade"><NativeSelect value={form.modality} onChange={(e) => setForm((f: any) => ({ ...f, modality: e.target.value }))}>{(options?.modalities ?? ['PRESENTIAL']).map((v: string) => <option key={v} value={v}>{label(v)}</option>)}</NativeSelect></Field>
           <Field label="Programa"><NativeSelect value={form.programId} onChange={(e) => setForm((f: any) => ({ ...f, programId: e.target.value }))}><option value="">Sem programa</option>{(options?.programs ?? []).map((i: OptionItem) => <option key={i.id} value={i.id}>{i.code ? `${i.code} - ` : ''}{i.name}</option>)}</NativeSelect></Field>
           <Field label="Item auditavel"><NativeSelect value={form.universeItemId} onChange={(e) => setForm((f: any) => ({ ...f, universeItemId: e.target.value }))}><option value="">Sem item</option>{(options?.universeItems ?? []).map((i: OptionItem) => <option key={i.id} value={i.id}>{i.name}</option>)}</NativeSelect></Field>
-          <Field label="Area/processo"><NativeSelect value={form.orgNodeId} onChange={(e) => setForm((f: any) => ({ ...f, orgNodeId: e.target.value }))}><option value="">Sem area direta</option>{(options?.orgNodes ?? []).map((i: OptionItem) => <option key={i.id} value={i.id}>{i.name}</option>)}</NativeSelect></Field>
-          <Field label="Auditor lider"><NativeSelect value={form.leadAuditorUserId} onChange={(e) => setForm((f: any) => ({ ...f, leadAuditorUserId: e.target.value }))}><option value="">Sem auditor</option>{(options?.users ?? []).map((i: OptionItem) => <option key={i.id} value={i.id}>{i.name}</option>)}</NativeSelect></Field>
+          <Field label="Area/processo"><NativeSelect value={form.orgNodeId} onChange={(e) => setForm((f: any) => ({ ...f, orgNodeId: e.target.value }))}><option value="">Sem área direta</option>{(options?.orgNodes ?? []).map((i: OptionItem) => <option key={i.id} value={i.id}>{i.name}</option>)}</NativeSelect></Field>
+          <Field label="Auditor líder"><NativeSelect value={form.leadAuditorUserId} onChange={(e) => setForm((f: any) => ({ ...f, leadAuditorUserId: e.target.value }))}><option value="">Sem auditor</option>{(options?.users ?? []).map((i: OptionItem) => <option key={i.id} value={i.id}>{i.name}</option>)}</NativeSelect></Field>
           <Field label="Data planejada"><Input type="date" value={form.plannedDate} onChange={(e) => setForm((f: any) => ({ ...f, plannedDate: e.target.value }))} /></Field>
           <Field label="Horas estimadas"><Input type="number" min="0" step="0.5" value={form.estimatedHours} onChange={(e) => setForm((f: any) => ({ ...f, estimatedHours: e.target.value }))} /></Field>
           <Field label="Objetivo" className="md:col-span-2"><Textarea rows={2} value={form.objective} onChange={(e) => setForm((f: any) => ({ ...f, objective: e.target.value }))} /></Field>
@@ -803,13 +803,13 @@ function ProgramDialog({ open, onOpenChange, form, setForm, options, onSave, sav
         <DialogHeader><DialogTitle>Novo programa</DialogTitle></DialogHeader>
         <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
           <Field label="Nome" className="md:col-span-2"><Input value={form.name} onChange={(e) => setForm((f: any) => ({ ...f, name: e.target.value }))} /></Field>
-          <Field label="Responsavel"><NativeSelect value={form.ownerUserId} onChange={(e) => setForm((f: any) => ({ ...f, ownerUserId: e.target.value }))}><option value="">Usuario atual</option>{(options?.users ?? []).map((i: OptionItem) => <option key={i.id} value={i.id}>{i.name}</option>)}</NativeSelect></Field>
+          <Field label="Responsável"><NativeSelect value={form.ownerUserId} onChange={(e) => setForm((f: any) => ({ ...f, ownerUserId: e.target.value }))}><option value="">Usuário atual</option>{(options?.users ?? []).map((i: OptionItem) => <option key={i.id} value={i.id}>{i.name}</option>)}</NativeSelect></Field>
           <Field label="Aprovador"><NativeSelect value={form.approverUserId} onChange={(e) => setForm((f: any) => ({ ...f, approverUserId: e.target.value }))}><option value="">Sem aprovador</option>{(options?.users ?? []).map((i: OptionItem) => <option key={i.id} value={i.id}>{i.name}</option>)}</NativeSelect></Field>
           <Field label="Inicio"><Input type="date" value={form.startsAt} onChange={(e) => setForm((f: any) => ({ ...f, startsAt: e.target.value }))} /></Field>
           <Field label="Fim"><Input type="date" value={form.endsAt} onChange={(e) => setForm((f: any) => ({ ...f, endsAt: e.target.value }))} /></Field>
           <Field label="Horas estimadas"><Input type="number" value={form.estimatedHours} onChange={(e) => setForm((f: any) => ({ ...f, estimatedHours: e.target.value }))} /></Field>
-          <Field label="Orcamento"><Input type="number" value={form.budget} onChange={(e) => setForm((f: any) => ({ ...f, budget: e.target.value }))} /></Field>
-          <Field label="Descricao" className="md:col-span-2"><Textarea rows={3} value={form.description} onChange={(e) => setForm((f: any) => ({ ...f, description: e.target.value }))} /></Field>
+          <Field label="Orçamento"><Input type="number" value={form.budget} onChange={(e) => setForm((f: any) => ({ ...f, budget: e.target.value }))} /></Field>
+          <Field label="Descrição" className="md:col-span-2"><Textarea rows={3} value={form.description} onChange={(e) => setForm((f: any) => ({ ...f, description: e.target.value }))} /></Field>
         </div>
         <DialogFooter><Button variant="outline" onClick={() => onOpenChange(false)}>Cancelar</Button><Button onClick={onSave} disabled={saving || !form.name.trim()}>Salvar</Button></DialogFooter>
       </DialogContent>
@@ -825,11 +825,11 @@ function UniverseDialog({ open, onOpenChange, form, setForm, options, onSave, sa
         <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
           <Field label="Nome" className="md:col-span-2"><Input value={form.name} onChange={(e) => setForm((f: any) => ({ ...f, name: e.target.value }))} /></Field>
           <Field label="Tipo"><NativeSelect value={form.kind} onChange={(e) => setForm((f: any) => ({ ...f, kind: e.target.value }))}>{(options?.universeKinds ?? ['AREA']).map((v: string) => <option key={v} value={v}>{label(v)}</option>)}</NativeSelect></Field>
-          <Field label="Area"><NativeSelect value={form.orgNodeId} onChange={(e) => setForm((f: any) => ({ ...f, orgNodeId: e.target.value }))}><option value="">Sem area</option>{(options?.orgNodes ?? []).map((i: OptionItem) => <option key={i.id} value={i.id}>{i.name}</option>)}</NativeSelect></Field>
+          <Field label="Área"><NativeSelect value={form.orgNodeId} onChange={(e) => setForm((f: any) => ({ ...f, orgNodeId: e.target.value }))}><option value="">Sem área</option>{(options?.orgNodes ?? []).map((i: OptionItem) => <option key={i.id} value={i.id}>{i.name}</option>)}</NativeSelect></Field>
           {['impact', 'probability', 'recurrence', 'regulatory_requirement', 'strategic_relevance'].map((key) => (
             <Field key={key} label={label(key)}><Input type="number" min="1" max="5" value={form[key]} onChange={(e) => setForm((f: any) => ({ ...f, [key]: e.target.value }))} /></Field>
           ))}
-          <Field label="Descricao" className="md:col-span-2"><Textarea rows={3} value={form.description} onChange={(e) => setForm((f: any) => ({ ...f, description: e.target.value }))} /></Field>
+          <Field label="Descrição" className="md:col-span-2"><Textarea rows={3} value={form.description} onChange={(e) => setForm((f: any) => ({ ...f, description: e.target.value }))} /></Field>
         </div>
         <DialogFooter><Button variant="outline" onClick={() => onOpenChange(false)}>Cancelar</Button><Button onClick={onSave} disabled={saving || !form.name.trim()}>Salvar</Button></DialogFooter>
       </DialogContent>
@@ -843,12 +843,12 @@ function AuditorDialog({ open, onOpenChange, form, setForm, options, onSave, sav
       <DialogContent className="max-w-2xl">
         <DialogHeader><DialogTitle>Novo auditor</DialogTitle></DialogHeader>
         <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-          <Field label="Usuario vinculado"><NativeSelect value={form.userId} onChange={(e) => setForm((f: any) => ({ ...f, userId: e.target.value }))}><option value="">Auditor externo/manual</option>{(options?.users ?? []).map((i: OptionItem) => <option key={i.id} value={i.id}>{i.name}</option>)}</NativeSelect></Field>
+          <Field label="Usuário vinculado"><NativeSelect value={form.userId} onChange={(e) => setForm((f: any) => ({ ...f, userId: e.target.value }))}><option value="">Auditor externo/manual</option>{(options?.users ?? []).map((i: OptionItem) => <option key={i.id} value={i.id}>{i.name}</option>)}</NativeSelect></Field>
           <Field label="Nome"><Input value={form.name} onChange={(e) => setForm((f: any) => ({ ...f, name: e.target.value }))} /></Field>
           <Field label="Tipo"><NativeSelect value={form.kind} onChange={(e) => setForm((f: any) => ({ ...f, kind: e.target.value }))}><option value="INTERNAL">Interno</option><option value="EXTERNAL">Externo</option></NativeSelect></Field>
-          <Field label="Competencia"><Input type="number" min="1" max="5" value={form.competenceLevel} onChange={(e) => setForm((f: any) => ({ ...f, competenceLevel: e.target.value }))} /></Field>
+          <Field label="Competência"><Input type="number" min="1" max="5" value={form.competenceLevel} onChange={(e) => setForm((f: any) => ({ ...f, competenceLevel: e.target.value }))} /></Field>
           <Field label="Normas dominadas" className="md:col-span-2"><Input placeholder="ISO 9001, ISO 14001..." value={form.standards} onChange={(e) => setForm((f: any) => ({ ...f, standards: e.target.value }))} /></Field>
-          <Field label="Observacoes" className="md:col-span-2"><Textarea rows={3} value={form.notes} onChange={(e) => setForm((f: any) => ({ ...f, notes: e.target.value }))} /></Field>
+          <Field label="Observações" className="md:col-span-2"><Textarea rows={3} value={form.notes} onChange={(e) => setForm((f: any) => ({ ...f, notes: e.target.value }))} /></Field>
         </div>
         <DialogFooter><Button variant="outline" onClick={() => onOpenChange(false)}>Cancelar</Button><Button onClick={onSave} disabled={saving || (!form.name.trim() && !form.userId)}>Salvar</Button></DialogFooter>
       </DialogContent>
@@ -860,7 +860,7 @@ function ChecklistDialog({ open, onOpenChange, form, setForm, options, onSave, s
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-2xl">
-        <DialogHeader><DialogTitle>Novo modelo de checklist</DialogTitle></DialogHeader>
+        <DialogHeader><DialogTitle>Novo modelo de lista de verificação</DialogTitle></DialogHeader>
         <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
           <Field label="Nome" className="md:col-span-2"><Input value={form.name} onChange={(e) => setForm((f: any) => ({ ...f, name: e.target.value }))} /></Field>
           <Field label="Tipo"><NativeSelect value={form.auditType} onChange={(e) => setForm((f: any) => ({ ...f, auditType: e.target.value }))}>{(options?.types ?? ['INTERNAL']).map((v: string) => <option key={v} value={v}>{label(v)}</option>)}</NativeSelect></Field>
@@ -895,7 +895,7 @@ function AuditLine({ audit, onClick }: { audit: Audit; onClick: () => void }) {
         <span className="truncate text-sm font-medium">{audit.code ?? `#${audit.number}`} {audit.title}</span>
         <Badge variant="outline" className={STATUS_CLASS[audit.status]}>{STATUS_LABEL[audit.status] ?? label(audit.status)}</Badge>
       </div>
-      <div className="mt-1 text-xs text-muted-foreground">{audit.orgNode?.name ?? 'Sem area'} - {formatDate(audit.plannedDate)}</div>
+      <div className="mt-1 text-xs text-muted-foreground">{audit.orgNode?.name ?? 'Sem área'} - {formatDate(audit.plannedDate)}</div>
     </button>
   );
 }

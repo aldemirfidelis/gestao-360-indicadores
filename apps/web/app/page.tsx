@@ -34,7 +34,7 @@ const challenges = [
 
 const flow = [
   ['Estruture', 'Empresas, filiais, áreas, setores, processos e permissões.'],
-  ['Acompanhe', 'Indicadores, metas, dashboards, reuniões e desvios.'],
+  ['Acompanhe', 'Indicadores, metas, painéis, reuniões e desvios.'],
   ['Trate', 'Análise de causa, planos de ação, evidências e aprovações.'],
   ['Aprenda', 'Histórico, auditoria, visão 360, riscos e recomendações assistidas.'],
 ];
@@ -43,7 +43,7 @@ const faq = [
   {
     question: 'O Gestão 360 expõe dados de clientes em páginas públicas?',
     answer:
-      'Não. O conteúdo público é institucional. Dashboards, registros, documentos, APIs e áreas administrativas exigem autenticação e autorização.',
+      'Não. O conteúdo público é institucional. Painéis, registros, documentos, APIs e áreas administrativas exigem autenticação e autorização.',
   },
   {
     question: 'A plataforma substitui todos os sistemas da empresa?',

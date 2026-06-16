@@ -77,7 +77,7 @@ export default function LoginPage() {
             Estratégia, indicadores e execução em um único lugar.
           </h1>
           <p className="text-primary-foreground/80">
-            Metas, planos de ação, reuniões, rastreabilidade e dashboards executivos. Tudo conectado para
+            Metas, planos de ação, reuniões, rastreabilidade e painéis executivos. Tudo conectado para
             transformar dados em decisão.
           </p>
         </div>

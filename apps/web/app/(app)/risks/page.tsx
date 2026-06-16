@@ -89,7 +89,7 @@ interface RiskForm {
 
 const STATUS_LABEL: Record<RiskStatus, string> = {
   IDENTIFIED: 'Identificado',
-  ANALYZING: 'Em analise',
+  ANALYZING: 'Em análise',
   MITIGATING: 'Mitigando',
   MONITORING: 'Monitorando',
   ACCEPTED: 'Aceito',
@@ -113,7 +113,7 @@ const LEVEL_LABEL: Record<RiskLevel, string> = {
   LOW: 'Baixo',
   MODERATE: 'Moderado',
   HIGH: 'Alto',
-  CRITICAL: 'Critico',
+  CRITICAL: 'Crítico',
 };
 
 const LEVEL_CLASS: Record<RiskLevel, string> = {
@@ -208,7 +208,7 @@ export default function RisksPage() {
       closeDialog();
       invalidateRisks(qc);
     },
-    onError: (e: any) => toast.error(e?.message ?? 'Nao foi possivel salvar o risco'),
+    onError: (e: any) => toast.error(e?.message ?? 'Não foi possível salvar o risco'),
   });
 
   const deleteRisk = useMutation({
@@ -217,7 +217,7 @@ export default function RisksPage() {
       toast.success('Risco excluido');
       invalidateRisks(qc);
     },
-    onError: (e: any) => toast.error(e?.message ?? 'Nao foi possivel excluir o risco'),
+    onError: (e: any) => toast.error(e?.message ?? 'Não foi possível excluir o risco'),
   });
 
   const openCreate = () => {
@@ -272,13 +272,13 @@ export default function RisksPage() {
     <div>
       <PageHeader
         title="Riscos"
-        description="Registro corporativo de riscos, impacto, probabilidade e planos de mitigacao."
+        description="Registro corporativo de riscos, impacto, probabilidade e planos de mitigação."
         actions={canCreate ? <Button onClick={openCreate}><Plus className="mr-2 h-4 w-4" />Novo risco</Button> : null}
       />
 
       <div className="mb-6 grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
         <MetricCard title="Riscos abertos" value={formatNumber(summary?.openRisks)} description={`${formatNumber(summary?.totalRisks)} registrados`} icon={<ShieldAlert className="h-4 w-4" />} tone="blue" />
-        <MetricCard title="Criticos" value={formatNumber(summary?.criticalRisks)} description="Score acima de 16" icon={<AlertTriangle className="h-4 w-4" />} tone={(summary?.criticalRisks ?? 0) > 0 ? 'red' : 'green'} />
+        <MetricCard title="Críticos" value={formatNumber(summary?.criticalRisks)} description="Score acima de 16" icon={<AlertTriangle className="h-4 w-4" />} tone={(summary?.criticalRisks ?? 0) > 0 ? 'red' : 'green'} />
         <MetricCard title="Mitigacoes vencidas" value={formatNumber(summary?.overdueMitigations)} description="Riscos abertos com prazo expirado" icon={<CalendarClock className="h-4 w-4" />} tone={(summary?.overdueMitigations ?? 0) > 0 ? 'yellow' : 'green'} />
         <MetricCard title="Score medio" value={formatNumber(summary?.avgScore, { maximumFractionDigits: 1 })} description="Probabilidade x impacto" icon={<CheckCircle2 className="h-4 w-4" />} tone="purple" />
       </div>
@@ -289,7 +289,7 @@ export default function RisksPage() {
             <div className="mb-3 flex items-center justify-between gap-2">
               <div>
                 <div className="text-sm font-semibold">Riscos prioritarios</div>
-                <div className="text-xs text-muted-foreground">Maior severidade entre os riscos visiveis para voce.</div>
+                <div className="text-xs text-muted-foreground">Maior severidade entre os riscos visiveis para você.</div>
               </div>
               <AlertTriangle className="h-4 w-4 text-muted-foreground" />
             </div>
@@ -302,7 +302,7 @@ export default function RisksPage() {
                   <div className="min-w-0">
                     <div className="truncate text-sm font-medium">{risk.title}</div>
                     <div className="mt-1 text-xs text-muted-foreground">
-                      {CATEGORY_LABEL[risk.category]} - {risk.responsibleUser?.name ?? 'Sem responsavel'} - prazo {formatDate(risk.dueDate)}
+                      {CATEGORY_LABEL[risk.category]} - {risk.responsibleUser?.name ?? 'Sem responsável'} - prazo {formatDate(risk.dueDate)}
                     </div>
                     {risk.indicator && <div className="mt-1 text-[11px] text-primary">KPI {risk.indicator.code ? `[${risk.indicator.code}] ` : ''}{risk.indicator.name}</div>}
                   </div>
@@ -320,7 +320,7 @@ export default function RisksPage() {
           <CardContent className="p-4">
             <div className="mb-3 flex items-center gap-2 text-sm font-semibold"><Filter className="h-4 w-4" />Filtros</div>
             <div className="space-y-3">
-              <Input placeholder="Buscar por titulo, plano, KPI..." value={filters.search} onChange={(e) => setFilters((f) => ({ ...f, search: e.target.value }))} />
+              <Input placeholder="Buscar por título, plano, KPI..." value={filters.search} onChange={(e) => setFilters((f) => ({ ...f, search: e.target.value }))} />
               <NativeSelect value={filters.status} onChange={(e) => setFilters((f) => ({ ...f, status: e.target.value }))}>
                 <option value="">Todos os status</option>
                 {Object.entries(STATUS_LABEL).map(([value, label]) => <option key={value} value={value}>{label}</option>)}
@@ -358,7 +358,7 @@ export default function RisksPage() {
                     <Badge variant="secondary">{CATEGORY_LABEL[risk.category]}</Badge>
                   </div>
                   <h2 className="mt-3 truncate text-base font-semibold">{risk.title}</h2>
-                  <p className="mt-1 line-clamp-2 text-sm text-muted-foreground">{risk.description || 'Sem descricao registrada.'}</p>
+                  <p className="mt-1 line-clamp-2 text-sm text-muted-foreground">{risk.description || 'Sem descrição registrada.'}</p>
                 </div>
                 <div className="flex shrink-0 items-center gap-1">
                   {canUpdate && <Button variant="ghost" size="icon" onClick={() => openEdit(risk)} title="Editar risco"><Edit className="h-4 w-4" /></Button>}
@@ -393,11 +393,11 @@ export default function RisksPage() {
               <Progress className="mt-3" value={(risk.score / 25) * 100} />
 
               <div className="mt-4 grid grid-cols-1 gap-2 text-xs text-muted-foreground sm:grid-cols-2">
-                <div>Area/processo: <span className="text-foreground">{risk.orgNode?.name ?? '-'}</span></div>
-                <div>Responsavel: <span className="text-foreground">{risk.responsibleUser?.name ?? '-'}</span></div>
+                <div>Área/processo: <span className="text-foreground">{risk.orgNode?.name ?? '-'}</span></div>
+                <div>Responsável: <span className="text-foreground">{risk.responsibleUser?.name ?? '-'}</span></div>
                 <div>KPI: <span className="text-foreground">{risk.indicator ? `${risk.indicator.code ? `[${risk.indicator.code}] ` : ''}${risk.indicator.name}` : '-'}</span></div>
                 <div>Projeto: <span className="text-foreground">{risk.project?.name ?? '-'}</span></div>
-                <div>Mitigacao ate: <span className={cn('text-foreground', risk.isOverdue && 'text-status-yellow')}>{formatDate(risk.dueDate)}</span></div>
+                <div>Mitigacao até: <span className={cn('text-foreground', risk.isOverdue && 'text-status-yellow')}>{formatDate(risk.dueDate)}</span></div>
                 <div>Plano vinculado: <span className="text-foreground">{risk.mitigationAction?.title ?? '-'}</span></div>
               </div>
             </CardContent>
@@ -413,7 +413,7 @@ export default function RisksPage() {
 
           <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
             <div className="md:col-span-2">
-              <Label>Titulo</Label>
+              <Label>Título</Label>
               <Input value={form.title} onChange={(e) => setForm((f) => ({ ...f, title: e.target.value }))} />
             </div>
             <div>
@@ -441,16 +441,16 @@ export default function RisksPage() {
               </NativeSelect>
             </div>
             <div>
-              <Label>Area/processo</Label>
+              <Label>Área/processo</Label>
               <NativeSelect value={form.orgNodeId} onChange={(e) => setForm((f) => ({ ...f, orgNodeId: e.target.value }))}>
-                <option value="">Sem area direta</option>
+                <option value="">Sem área direta</option>
                 {(options?.orgNodes ?? []).map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}
               </NativeSelect>
             </div>
             <div>
-              <Label>Responsavel</Label>
+              <Label>Responsável</Label>
               <NativeSelect value={form.responsibleUserId} onChange={(e) => setForm((f) => ({ ...f, responsibleUserId: e.target.value }))}>
-                <option value="">Sem responsavel</option>
+                <option value="">Sem responsável</option>
                 {(options?.users ?? []).map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}
               </NativeSelect>
             </div>
@@ -469,22 +469,22 @@ export default function RisksPage() {
               </NativeSelect>
             </div>
             <div>
-              <Label>Plano de mitigacao</Label>
+              <Label>Plano de mitigação</Label>
               <NativeSelect value={form.mitigationActionId} onChange={(e) => setForm((f) => ({ ...f, mitigationActionId: e.target.value }))}>
                 <option value="">Sem plano vinculado</option>
                 {(options?.actions ?? []).map((item) => <option key={item.id} value={item.id}>{item.title}</option>)}
               </NativeSelect>
             </div>
             <div>
-              <Label>Prazo da mitigacao</Label>
+              <Label>Prazo da mitigação</Label>
               <Input type="date" value={form.dueDate} onChange={(e) => setForm((f) => ({ ...f, dueDate: e.target.value }))} />
             </div>
             <div className="md:col-span-2">
-              <Label>Descricao</Label>
+              <Label>Descrição</Label>
               <Textarea rows={3} value={form.description} onChange={(e) => setForm((f) => ({ ...f, description: e.target.value }))} />
             </div>
             <div>
-              <Label>Plano de mitigacao</Label>
+              <Label>Plano de mitigação</Label>
               <Textarea rows={3} value={form.mitigationPlan} onChange={(e) => setForm((f) => ({ ...f, mitigationPlan: e.target.value }))} />
             </div>
             <div>

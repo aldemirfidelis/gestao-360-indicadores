@@ -129,7 +129,7 @@ export function MeritMatrix({
           Impacto simulado
         </div>
         <div className="grid grid-cols-1 gap-4 p-4 sm:grid-cols-3">
-          <Kpi label="Colaboradores elegiveis" value={formatNumber(result.totalHeadcount)} />
+          <Kpi label="Colaboradores elegíveis" value={formatNumber(result.totalHeadcount)} />
           <Kpi
             label="Aumento medio ponderado"
             value={`${formatNumber(result.weightedAvgIncreasePct, { maximumFractionDigits: 2 })}%`}
@@ -140,7 +140,7 @@ export function MeritMatrix({
             label="Custo anual estimado"
             value={result.hasSalaryData ? formatMoney(result.totalCost, { currency }) : 'Restrito'}
             tone={totalBudget != null && result.totalCost != null && result.totalCost > totalBudget ? 'red' : 'neutral'}
-            hint={totalBudget != null ? `Orcamento: ${formatMoney(totalBudget, { currency })}` : undefined}
+            hint={totalBudget != null ? `Orçamento: ${formatMoney(totalBudget, { currency })}` : undefined}
           />
         </div>
         <div className="overflow-x-auto border-t">

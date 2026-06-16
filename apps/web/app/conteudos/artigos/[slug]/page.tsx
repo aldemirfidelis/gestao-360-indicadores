@@ -4,11 +4,13 @@ import { notFound } from 'next/navigation';
 import { PublicShell } from '@/components/marketing/public-shell';
 import { JsonLd } from '@/components/marketing/json-ld';
 import { FaqBlock, PageHero } from '@/components/marketing/content-blocks';
-import { articleJsonLd, articlePages, breadcrumbJsonLd, faqJsonLd, getArticle, publicMetadata } from '@/lib/public-site';
+import { articleJsonLd, articlePages, breadcrumbJsonLd, faqJsonLd, getArticle, publicMetadata, solutionPages } from '@/lib/public-site';
 
 export function generateStaticParams() {
   return articlePages.map((article) => ({ slug: article.slug }));
 }
+
+const relatedTitles = new Map(solutionPages.map((page) => [page.path, page.title]));
 
 export async function generateMetadata({ params }: { params: Promise<{ slug: string }> }): Promise<Metadata> {
   const { slug } = await params;
@@ -41,10 +43,10 @@ export default async function ArticlePage({ params }: { params: Promise<{ slug: 
             ))}
           </div>
           <div className="mt-10 border border-emerald-200 bg-emerald-50 p-5">
-            <h2 className="font-semibold text-slate-950">Proximo passo</h2>
+            <h2 className="font-semibold text-slate-950">Próximo passo</h2>
             <p className="mt-2 text-sm leading-6 text-slate-700">Veja as soluções relacionadas para entender como esse tema pode ser operacionalizado dentro do Gestão 360.</p>
             <div className="mt-4 flex flex-wrap gap-2">
-              {article.related.map((href) => <Link key={href} href={href} className="border border-emerald-300 bg-white px-3 py-2 text-sm font-semibold text-emerald-800">{href.replace('/solucoes/', '').replaceAll('-', ' ')}</Link>)}
+              {article.related.map((href) => <Link key={href} href={href} className="border border-emerald-300 bg-white px-3 py-2 text-sm font-semibold text-emerald-800">{relatedTitles.get(href) ?? href.replace('/solucoes/', '').replaceAll('-', ' ')}</Link>)}
             </div>
           </div>
         </div>

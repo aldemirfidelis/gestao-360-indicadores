@@ -6,7 +6,7 @@ import { breadcrumbJsonLd, moduleHighlights, publicMetadata, solutionPages, webP
 
 export const metadata: Metadata = publicMetadata({
   title: 'Módulos do Gestão 360',
-  description: 'Conheça os módulos do Gestão 360 para Meu Dia, indicadores, planos, documentos, auditorias, riscos, automacoes, qualidade e administração global.',
+  description: 'Conheça os módulos do Gestão 360 para Meu Dia, indicadores, planos, documentos, auditorias, riscos, automações, qualidade e administração global.',
   path: '/modulos',
 });
 

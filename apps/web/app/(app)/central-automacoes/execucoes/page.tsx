@@ -89,7 +89,7 @@ export default function ExecutionsTracker() {
       <PageHeader
         eyebrow="Central de Automações"
         title="Histórico de Execuções"
-        description="Monitore as instâncias de workflows disparadas pelos eventos do sistema e inspecione logs técnicos passo a passo."
+        description="Monitore as instâncias de fluxos de trabalho disparadas pelos eventos do sistema e inspecione registros técnicos passo a passo."
       />
 
       <div className="flex-1 grid grid-cols-1 lg:grid-cols-[380px,1fr] gap-6 min-h-0 w-full overflow-hidden">
@@ -233,7 +233,7 @@ export default function ExecutionsTracker() {
 
                   {/* Execution Audit logs */}
                   <div>
-                    <h4 className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider mb-2">Logs Técnicos da Engine</h4>
+                    <h4 className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider mb-2">Registros Técnicos da Engine</h4>
                     <div className="border rounded-lg overflow-hidden bg-background text-[10px] font-mono divide-y">
                       {details.logs.map((log: any) => (
                         <div key={log.id} className="p-2.5 flex items-start gap-3 hover:bg-muted/10">

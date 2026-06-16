@@ -133,7 +133,7 @@ export default function AutomationsOverview() {
       <PageHeader
         eyebrow="Central de Automações"
         title="Painel de Controle e Monitoramento"
-        description="Acompanhe a integridade das automações corporativas, volume de execuções de workflows, tarefas pendentes, aprovações de SLAs e alertas técnicos de falhas."
+        description="Acompanhe a integridade das automações corporativas, volume de execuções de fluxos de trabalho, tarefas pendentes, aprovações de SLAs e alertas técnicos de falhas."
       />
 
       {/* Cards de Métricas */}
@@ -241,7 +241,7 @@ export default function AutomationsOverview() {
           )}
         </SectionCard>
 
-        <SectionCard title="Próximas Atividades de Fluxo" description="Responsabilidades e prazos agendados por workflows." contentClassName="p-4 flex flex-col justify-center items-center h-full min-h-[160px]">
+        <SectionCard title="Próximas Atividades de Fluxo" description="Responsabilidades e prazos agendados por fluxos de trabalho." contentClassName="p-4 flex flex-col justify-center items-center h-full min-h-[160px]">
           <FolderDot className="h-8 w-8 text-primary opacity-60 mb-2" />
           <div className="text-xs text-muted-foreground text-center max-w-sm">
             As tarefas humanas associadas a prazos de SLAs podem ser visualizadas e gerenciadas na aba <strong className="text-foreground">Tarefas Geradas</strong>.

@@ -21,7 +21,7 @@ export default function RecordsPage() {
     <div className="space-y-6">
       <div>
         <h2 className="text-lg font-semibold">Editor de Registros</h2>
-        <p className="text-sm text-muted-foreground">Selecione uma tabela para visualizar e editar registros (CRUD com snapshot e auditoria).</p>
+        <p className="text-sm text-muted-foreground">Selecione uma tabela para visualizar e editar registros (CRUD com retrato e auditoria).</p>
       </div>
 
       <SectionCard title="Tabela" description="Escolha a tabela a editar.">
@@ -39,7 +39,7 @@ export default function RecordsPage() {
       </SectionCard>
 
       {table && (
-        <SectionCard title={`Registros · ${table}`} description="Busca, paginação, edição, duplicação e exclusão (individual e em massa).">
+        <SectionCard title={`Registros · ${table}`} description="Busca, páginação, edição, duplicação e exclusão (individual e em massa).">
           <RecordEditor table={table} />
         </SectionCard>
       )}

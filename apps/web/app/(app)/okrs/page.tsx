@@ -187,7 +187,7 @@ export default function OkrsPage() {
         },
       }),
     onSuccess: () => {
-      toast.success('Check-in registrado');
+      toast.success('Atualização registrada');
       setCheckinObj(null);
       qc.invalidateQueries({ queryKey: ['okrs'] });
     },
@@ -295,7 +295,7 @@ export default function OkrsPage() {
                 <div className="text-xl font-semibold">{o.weight}</div>
               </div>
               <div>
-                <div className="text-xs text-muted-foreground">Check-ins</div>
+                <div className="text-xs text-muted-foreground">Atualizações</div>
                 <div className="text-xl font-semibold">{o._count?.checkins ?? 0}</div>
               </div>
             </div>
@@ -304,7 +304,7 @@ export default function OkrsPage() {
               <div className="mb-4 rounded-lg border bg-muted/20 p-3 text-sm">
                 <div className="flex flex-wrap items-start justify-between gap-3">
                   <div className="min-w-0">
-                    <div className="text-xs font-semibold uppercase text-muted-foreground">Conexao estrategica</div>
+                    <div className="text-xs font-semibold uppercase text-muted-foreground">Conexão estrategica</div>
                     <div className="mt-1 font-medium">
                       {o.strategicObj.name}
                     </div>
@@ -322,7 +322,7 @@ export default function OkrsPage() {
                 </div>
                 <div className="mt-3 flex flex-wrap gap-1.5">
                   {(o.strategicObj.indicators ?? []).length === 0 && (
-                    <span className="text-xs text-muted-foreground">Nenhum indicador vinculado ao objetivo estrategico.</span>
+                    <span className="text-xs text-muted-foreground">Nenhum indicador vinculado ao objetivo estratégico.</span>
                   )}
                   {(o.strategicObj.indicators ?? []).slice(0, 6).map((indicator) => (
                     <Link
@@ -380,7 +380,7 @@ export default function OkrsPage() {
                   }}
                 >
                   <MessageSquare className="mr-2 h-4 w-4" />
-                  Check-in
+                  Atualizar andamento
                 </Button>
               </div>
             )}
@@ -437,11 +437,11 @@ export default function OkrsPage() {
             </div>
             <div className="grid grid-cols-2 gap-3">
               <div>
-                <Label>Owner</Label>
+                <Label>Responsável</Label>
                 <Input value={objectiveForm.ownerName} onChange={(e) => setObjectiveForm({ ...objectiveForm, ownerName: e.target.value })} />
               </div>
               <div>
-                <Label>Time</Label>
+                <Label>Equipe</Label>
                 <Input value={objectiveForm.team} onChange={(e) => setObjectiveForm({ ...objectiveForm, team: e.target.value })} />
               </div>
             </div>
@@ -458,7 +458,7 @@ export default function OkrsPage() {
               <p className="mt-1 text-xs text-muted-foreground">Defina o pai para montar a hierarquia no fluxograma.</p>
             </div>
             <div>
-              <Label>Objetivo estrategico vinculado</Label>
+              <Label>Objetivo estratégico vinculado</Label>
               <NativeSelect
                 value={objectiveForm.strategicObjId}
                 onChange={(e) => {
@@ -471,7 +471,7 @@ export default function OkrsPage() {
                   });
                 }}
               >
-                <option value="">Sem vinculo estrategico</option>
+                <option value="">Sem vínculo estratégico</option>
                 {options.data?.strategicObjectives.map((obj) => (
                   <option key={obj.id} value={obj.id}>
                     {obj.map?.name ? `${obj.map.name} / ` : ''}{obj.perspective?.name ? `${obj.perspective.name} / ` : ''}{obj.name}
@@ -479,7 +479,7 @@ export default function OkrsPage() {
                 ))}
               </NativeSelect>
               <p className="mt-1 text-xs text-muted-foreground">
-                O OKR herda contexto do mapa, area e indicadores vinculados ao objetivo estrategico.
+                O OKR herda contexto do mapa, área e indicadores vinculados ao objetivo estratégico.
               </p>
             </div>
           </div>
@@ -536,7 +536,7 @@ export default function OkrsPage() {
 
       <Dialog open={!!checkinObj} onOpenChange={(v) => !v && setCheckinObj(null)}>
         <DialogContent>
-          <DialogHeader><DialogTitle>Check-in semanal</DialogTitle></DialogHeader>
+          <DialogHeader><DialogTitle>Atualização semanal</DialogTitle></DialogHeader>
           {checkinObj && (
             <div className="space-y-4">
               <p className="text-sm font-medium">{checkinObj.name}</p>

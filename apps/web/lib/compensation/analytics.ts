@@ -74,7 +74,7 @@ export function compaRatioDistribution(rows: FitRow[]): Array<{ name: string; va
   return COMPA_BANDS.map((band, idx) => ({ name: band.label, value: counts[idx] }));
 }
 
-/** Histograma de penetracao na faixa em blocos de 20%. */
+/** Histograma de penetração na faixa em blocos de 20%. */
 export function penetrationHistogram(rows: FitRow[]): Array<{ name: string; value: number }> {
   const buckets = [
     { name: '0–20%', min: -Infinity, max: 20 },
@@ -106,7 +106,7 @@ export interface EquityRow {
 
 export function equityByDimension(rows: FitRow[], dimension: EquityDimension): EquityRow[] {
   const keyOf = (r: FitRow) => {
-    if (dimension === 'area') return r.orgNode?.name ?? 'Sem area';
+    if (dimension === 'area') return r.orgNode?.name ?? 'Sem área';
     if (dimension === 'job') return r.job?.name ?? 'Sem cargo';
     return r.band ?? 'Sem faixa';
   };
@@ -263,7 +263,7 @@ export const PERFORMANCE_LEVELS: PerformanceLevel[] = [
   { key: 'p4', label: 'Excepcional' },
 ];
 
-// Matriz padrao (em %): linhas = desempenho, colunas = COMPA_BANDS.
+// Matriz padrão (em %): linhas = desempenho, colunas = COMPA_BANDS.
 // Quem esta abaixo da faixa (compa baixo) e tem bom desempenho recebe o maior aumento.
 export const DEFAULT_MERIT_MATRIX: number[][] = [
   [0, 0, 0, 0, 0], // Abaixo do esperado
@@ -334,7 +334,7 @@ export function jobArchitecture(jobs: Array<{ family: string | null; grade: stri
   const gradeSet = new Set<string>();
   const counts: Record<string, Record<string, number>> = {};
   for (const job of jobs) {
-    const family = job.family || 'Sem familia';
+    const family = job.family || 'Sem família';
     const grade = job.grade || 'Sem grade';
     familySet.add(family);
     gradeSet.add(grade);

@@ -13,7 +13,7 @@ import { EmptyState } from '@/components/platform/empty-state';
 import { api } from '@/lib/api';
 import { downloadCsv } from '@/lib/compensation/format';
 
-const JOB_TYPES = ['administrativo', 'operacional', 'tecnico', 'especialista', 'lideranca', 'gestao', 'executivo'];
+const JOB_TYPES = ['administrativo', 'operacional', 'técnico', 'especialista', 'lideranca', 'gestão', 'executivo'];
 
 // Mapeamento de cabeçalhos aceitos (PT/EN) -> campo do cargo.
 const HEADER_ALIASES: Record<string, string> = {
@@ -98,7 +98,7 @@ export function ImportJobsDialog({ open, onClose }: { open: boolean; onClose: ()
 
   function downloadTemplate() {
     downloadCsv('modelo-cargos.csv', [
-      ['nome', 'familia', 'grade', 'faixa', 'tipo', 'resumo'],
+      ['nome', 'família', 'grade', 'faixa', 'tipo', 'resumo'],
       ['Analista de RH', 'Recursos Humanos', 'III', 'B', 'administrativo', 'Apoio aos processos de RH'],
     ]);
   }
@@ -157,7 +157,7 @@ export function ImportJobsDialog({ open, onClose }: { open: boolean; onClose: ()
           <EmptyState
             className="mt-2"
             title="Selecione um CSV ou XLSX"
-            description="Colunas aceitas: nome (obrigatório), familia, grade, faixa, tipo, resumo. Baixe o modelo para o formato correto."
+            description="Colunas aceitas: nome (obrigatório), família, grade, faixa, tipo, resumo. Baixe o modelo para o formato correto."
           />
         ) : (
           <>

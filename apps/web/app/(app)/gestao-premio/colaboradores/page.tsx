@@ -194,7 +194,7 @@ export default function PrizeEligiblePage() {
       <PageHeader
         title="Colaboradores Elegíveis"
         eyebrow="Gestão de Prêmio"
-        description="Base elegível por competência (Apdata). Snapshot imutável por lote, CPF mascarado e conciliação de divergências."
+        description="Base elegível por competência (Apdata). Retrato imutável por lote, CPF mascarado e conciliação de divergências."
         tone="view"
         breadcrumbs={[{ label: 'Gestão de Prêmio', href: '/gestao-premio' }, { label: 'Colaboradores Elegíveis' }]}
       />

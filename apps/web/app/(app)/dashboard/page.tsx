@@ -88,7 +88,7 @@ const SHORTCUT_DEFS = [
   { id: 'indicators', href: '/indicators', label: 'Gestão de Indicadores', icon: Target },
   { id: 'actions', href: '/actions', label: 'Planos de ação', icon: ClipboardList },
   { id: 'reports', href: '/reports', label: 'Exportar relatório', icon: FileBarChart },
-  { id: 'visualization', href: '/visualization', label: 'Dashboard Executivo', icon: BarChart3 },
+  { id: 'visualization', href: '/visualization', label: 'Painel Executivo', icon: BarChart3 },
   { id: 'org', href: '/org', label: 'Árvore Organizacional', icon: Network },
   { id: 'strategy', href: '/strategy', label: 'Mapa Estratégico', icon: Map },
   { id: 'aprovacoes', href: '/aprovacoes-cargo?tab=eficacia', label: 'Aprovações', icon: ClipboardCheck },

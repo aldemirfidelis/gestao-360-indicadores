@@ -43,7 +43,7 @@ export default function IntegrationsPage() {
       toast.success('Preferencia atualizada.');
       qc.invalidateQueries({ queryKey: ['integrations'] });
     },
-    onError: (e: any) => toast.error(e?.message ?? 'Nao foi possivel salvar a preferencia'),
+    onError: (e: any) => toast.error(e?.message ?? 'Não foi possível salvar a preferencia'),
   });
 
   const rows = query.data ?? [];
@@ -123,7 +123,7 @@ export default function IntegrationsPage() {
                 ) : (
                   <div className="flex items-center gap-2 rounded-md border border-status-green/25 bg-status-green/5 p-2 text-xs text-status-green">
                     <ShieldCheck className="h-4 w-4" />
-                    <span>{portalEnabled ? 'Sem falhas recentes registradas.' : 'Desativado pelo Super Admin.'}</span>
+                    <span>{portalEnabled ? 'Sem falhas recentes registradas.' : 'Desativado pelo superadministrador.'}</span>
                   </div>
                 )}
               </div>

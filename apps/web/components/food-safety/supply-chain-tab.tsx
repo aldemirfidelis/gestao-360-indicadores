@@ -169,7 +169,7 @@ const SUPPLIER_STATUS_LABEL: Record<SupplierStatus, string> = {
   BLOCKED: 'Bloqueado',
   INACTIVE: 'Inativo',
 };
-const CRIT_LABEL: Record<SupplierCriticality | RecallSeverity, string> = { LOW: 'Baixa', MEDIUM: 'Media', HIGH: 'Alta', CRITICAL: 'Critica' };
+const CRIT_LABEL: Record<SupplierCriticality | RecallSeverity, string> = { LOW: 'Baixa', MEDIUM: 'Média', HIGH: 'Alta', CRITICAL: 'Crítica' };
 const MATERIAL_CATEGORY_LABEL: Record<MaterialCategory, string> = {
   RAW_MATERIAL: 'Materia-prima',
   INGREDIENT: 'Ingrediente',
@@ -178,10 +178,10 @@ const MATERIAL_CATEGORY_LABEL: Record<MaterialCategory, string> = {
   FINISHED_PRODUCT: 'Produto acabado',
   OTHER: 'Outro',
 };
-const MATERIAL_STATUS_LABEL: Record<MaterialStatus, string> = { ACTIVE: 'Ativo', UNDER_REVIEW: 'Em revisao', BLOCKED: 'Bloqueado', INACTIVE: 'Inativo' };
-const LOT_TYPE_LABEL: Record<LotType, string> = { RECEIVED: 'Recebido', PRODUCED: 'Produzido', SHIPPED: 'Expedido', INTERNAL_TRANSFER: 'Transferencia' };
+const MATERIAL_STATUS_LABEL: Record<MaterialStatus, string> = { ACTIVE: 'Ativo', UNDER_REVIEW: 'Em revisão', BLOCKED: 'Bloqueado', INACTIVE: 'Inativo' };
+const LOT_TYPE_LABEL: Record<LotType, string> = { RECEIVED: 'Recebido', PRODUCED: 'Produzido', SHIPPED: 'Expedido', INTERNAL_TRANSFER: 'Transferência' };
 const LOT_STATUS_LABEL: Record<LotStatus, string> = { QUARANTINED: 'Quarentena', RELEASED: 'Liberado', BLOCKED: 'Bloqueado', CONSUMED: 'Consumido', EXPIRED: 'Vencido', RECALLED: 'Recolhido' };
-const TRACE_EVENT_LABEL: Record<TraceEventType, string> = { RECEIPT: 'Recebimento', CONSUMPTION: 'Consumo', PRODUCTION: 'Producao', TRANSFER: 'Transferencia', SHIPMENT: 'Expedicao', RETURN: 'Retorno', DISPOSAL: 'Descarte' };
+const TRACE_EVENT_LABEL: Record<TraceEventType, string> = { RECEIPT: 'Recebimento', CONSUMPTION: 'Consumo', PRODUCTION: 'Produção', TRANSFER: 'Transferência', SHIPMENT: 'Expedição', RETURN: 'Retorno', DISPOSAL: 'Descarte' };
 const RECALL_STATUS_LABEL: Record<RecallStatus, string> = { DRAFT: 'Rascunho', SIMULATION: 'Simulado', ACTIVE: 'Ativo', CLOSED: 'Encerrado', CANCELLED: 'Cancelado' };
 
 const STATUS_CLASS: Record<string, string> = {
@@ -267,7 +267,7 @@ export function SupplyChainTab({
             {canManage && view === 'suppliers' && <Button size="sm" onClick={() => setSupplierDialog('new')}><Plus className="mr-2 h-4 w-4" />Fornecedor</Button>}
             {canManage && view === 'materials' && <Button size="sm" onClick={() => setMaterialDialog('new')}><Plus className="mr-2 h-4 w-4" />Material</Button>}
             {canManage && view === 'lots' && <Button size="sm" onClick={() => setLotDialog('new')}><Plus className="mr-2 h-4 w-4" />Lote</Button>}
-            {canManage && view === 'trace' && <Button size="sm" onClick={() => setTraceDialog(true)}><Link2 className="mr-2 h-4 w-4" />Vinculo</Button>}
+            {canManage && view === 'trace' && <Button size="sm" onClick={() => setTraceDialog(true)}><Link2 className="mr-2 h-4 w-4" />Vínculo</Button>}
             {canManage && view === 'recalls' && <Button size="sm" onClick={() => { setRecallRootId(rows.lots[0]?.id ?? ''); setRecallDialog('new'); }}><RefreshCw className="mr-2 h-4 w-4" />Recall</Button>}
           </div>
         </CardContent>
@@ -394,7 +394,7 @@ function LotsTable({
             <td>{l.quantity != null ? `${formatNumber(l.quantity)} ${l.unit ?? ''}` : '-'}</td>
             <td><StatusBadge value={l.status} label={LOT_STATUS_LABEL[l.status]} /></td>
             <td className="text-xs">{l.expiresAt ? formatDate(l.expiresAt) : '-'}</td>
-            <td className="text-xs">{(l._count?.incomingTraceLinks ?? 0) + (l._count?.outgoingTraceLinks ?? 0)} vinculos</td>
+            <td className="text-xs">{(l._count?.incomingTraceLinks ?? 0) + (l._count?.outgoingTraceLinks ?? 0)} vínculos</td>
             <td className="text-right">
               <div className="flex justify-end gap-2">
                 <Button variant="outline" size="sm" onClick={() => onTrace(l)}>Rastrear</Button>
@@ -411,7 +411,7 @@ function LotsTable({
 
 function RecallsTable({ rows, loading, canManage, onEdit }: { rows: Recall[]; loading: boolean; canManage: boolean; onEdit: (row: Recall) => void }) {
   return (
-    <DataCard title="Simulacoes e recalls">
+    <DataCard title="Simulações e recalls">
       <TableShell loading={loading} empty="Nenhum recall registrado." colSpan={7}>
         {rows.map((r) => (
           <tr key={r.id}>
@@ -451,8 +451,8 @@ function TableShell({ loading, empty, colSpan, children }: { loading: boolean; e
           <th className="text-left">Origem</th>
           <th className="text-left">Qtd/Score</th>
           <th className="text-left">Status</th>
-          <th className="text-left">Vinculos</th>
-          <th className="text-right">Acoes</th>
+          <th className="text-left">Vínculos</th>
+          <th className="text-right">Ações</th>
         </tr>
       </thead>
       <tbody>
@@ -481,17 +481,17 @@ function TracePanel({ lots, canManage, onLink, onRecall }: { lots: Lot[]; canMan
               {lots.map((l) => <option key={l.id} value={l.id}>{l.code} - {l.material?.name ?? LOT_TYPE_LABEL[l.type]}</option>)}
             </NativeSelect>
           </div>
-          {canManage && <Button variant="outline" onClick={onLink}><Link2 className="mr-2 h-4 w-4" />Novo vinculo</Button>}
+          {canManage && <Button variant="outline" onClick={onLink}><Link2 className="mr-2 h-4 w-4" />Novo vínculo</Button>}
           {canManage && root && <Button onClick={() => onRecall(root.id)}><RefreshCw className="mr-2 h-4 w-4" />Simular recall</Button>}
         </CardContent>
       </Card>
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
-        <TraceColumn title="Para tras" rows={trace.data?.backward ?? []} direction="backward" loading={trace.isPending} />
+        <TraceColumn title="Para trás" rows={trace.data?.backward ?? []} direction="backward" loading={trace.isPending} />
         <TraceColumn title="Para frente" rows={trace.data?.forward ?? []} direction="forward" loading={trace.isPending} />
       </div>
       {trace.data && (
         <div className="rounded-md border bg-muted/20 p-3 text-sm">
-          Lotes impactados na simulacao: <span className="font-semibold">{trace.data.impactedLotIds.length}</span>
+          Lotes impactados na simulação: <span className="font-semibold">{trace.data.impactedLotIds.length}</span>
         </div>
       )}
     </div>
@@ -504,13 +504,13 @@ function TraceColumn({ title, rows, direction, loading }: { title: string; rows:
       <CardContent className="p-0">
         <div className="border-b p-3 text-sm font-semibold">{title}</div>
         <div className="space-y-2 p-3">
-          {loading ? <div className="text-sm text-muted-foreground">Carregando...</div> : rows.length === 0 ? <div className="text-sm text-muted-foreground">Sem vinculos.</div> : rows.map(({ depth, link }) => {
+          {loading ? <div className="text-sm text-muted-foreground">Carregando...</div> : rows.length === 0 ? <div className="text-sm text-muted-foreground">Sem vínculos.</div> : rows.map(({ depth, link }) => {
             const lot = direction === 'backward' ? link.fromLot : link.toLot;
             return (
               <div key={link.id} className="rounded-md border p-2 text-sm">
                 <div className="flex items-center justify-between gap-2">
                   <div className="font-medium">{lotLabel(lot)}</div>
-                  <Badge variant="outline">nivel {depth}</Badge>
+                  <Badge variant="outline">nível {depth}</Badge>
                 </div>
                 <div className="mt-1 text-xs text-muted-foreground">{TRACE_EVENT_LABEL[link.eventType]}{link.process ? ` - ${link.process.name}` : ''}{link.quantity != null ? ` - ${formatNumber(link.quantity)} ${link.unit ?? ''}` : ''}</div>
               </div>
@@ -557,17 +557,17 @@ function SupplierDialog({ record, programId, users, canManage, onClose, onSaved 
       <DialogContent className="max-h-[88vh] max-w-2xl overflow-y-auto">
         <DialogHeader><DialogTitle>{record ? 'Fornecedor' : 'Novo fornecedor'}</DialogTitle></DialogHeader>
         <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
-          <div><Label>Codigo</Label><Input value={form.code} onChange={(e) => setForm({ ...form, code: e.target.value })} disabled={!canManage} /></div>
+          <div><Label>Código</Label><Input value={form.code} onChange={(e) => setForm({ ...form, code: e.target.value })} disabled={!canManage} /></div>
           <div><Label className="field-required">Nome</Label><Input value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} disabled={!canManage} /></div>
-          <div><Label>Razao social</Label><Input value={form.legalName} onChange={(e) => setForm({ ...form, legalName: e.target.value })} disabled={!canManage} /></div>
+          <div><Label>Razão social</Label><Input value={form.legalName} onChange={(e) => setForm({ ...form, legalName: e.target.value })} disabled={!canManage} /></div>
           <div><Label>CNPJ/ID</Label><Input value={form.taxId} onChange={(e) => setForm({ ...form, taxId: e.target.value })} disabled={!canManage} /></div>
           <div><Label>Contato</Label><Input value={form.contactName} onChange={(e) => setForm({ ...form, contactName: e.target.value })} disabled={!canManage} /></div>
           <div><Label>Email</Label><Input value={form.contactEmail} onChange={(e) => setForm({ ...form, contactEmail: e.target.value })} disabled={!canManage} /></div>
           <div><Label>Criticidade</Label><NativeSelect value={form.criticality} onChange={(e) => setForm({ ...form, criticality: e.target.value as SupplierCriticality })} disabled={!canManage}>{(['LOW', 'MEDIUM', 'HIGH', 'CRITICAL'] as SupplierCriticality[]).map((x) => <option key={x} value={x}>{CRIT_LABEL[x]}</option>)}</NativeSelect></div>
           <div><Label>Status</Label><NativeSelect value={form.status} onChange={(e) => setForm({ ...form, status: e.target.value as SupplierStatus })} disabled={!canManage}>{(['PROSPECT', 'APPROVED', 'CONDITIONAL', 'BLOCKED', 'INACTIVE'] as SupplierStatus[]).map((x) => <option key={x} value={x}>{SUPPLIER_STATUS_LABEL[x]}</option>)}</NativeSelect></div>
           <div><Label>Score</Label><Input type="number" value={form.score} onChange={(e) => setForm({ ...form, score: e.target.value })} disabled={!canManage} /></div>
-          <div><Label>Proxima revisao</Label><Input type="date" value={form.nextReviewAt} onChange={(e) => setForm({ ...form, nextReviewAt: e.target.value })} disabled={!canManage} /></div>
-          <div><Label>Responsavel</Label><NativeSelect value={form.responsibleUserId} onChange={(e) => setForm({ ...form, responsibleUserId: e.target.value })} disabled={!canManage}><option value="">-</option>{users.map((u) => <option key={u.id} value={u.id}>{u.name}</option>)}</NativeSelect></div>
+          <div><Label>Próxima revisão</Label><Input type="date" value={form.nextReviewAt} onChange={(e) => setForm({ ...form, nextReviewAt: e.target.value })} disabled={!canManage} /></div>
+          <div><Label>Responsável</Label><NativeSelect value={form.responsibleUserId} onChange={(e) => setForm({ ...form, responsibleUserId: e.target.value })} disabled={!canManage}><option value="">-</option>{users.map((u) => <option key={u.id} value={u.id}>{u.name}</option>)}</NativeSelect></div>
           <div><Label>Status documental</Label><Input value={form.documentsStatus} onChange={(e) => setForm({ ...form, documentsStatus: e.target.value })} disabled={!canManage} /></div>
           <div className="md:col-span-2"><Label>Categorias fornecidas</Label><Input value={form.suppliedCategories} onChange={(e) => setForm({ ...form, suppliedCategories: e.target.value })} disabled={!canManage} /></div>
           <div className="md:col-span-2"><Label>Notas</Label><Textarea rows={2} value={form.notes} onChange={(e) => setForm({ ...form, notes: e.target.value })} disabled={!canManage} /></div>
@@ -606,18 +606,18 @@ function MaterialDialog({ record, programId, suppliers, canManage, onClose, onSa
       <DialogContent className="max-h-[88vh] max-w-2xl overflow-y-auto">
         <DialogHeader><DialogTitle>{record ? 'Material' : 'Novo material'}</DialogTitle></DialogHeader>
         <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
-          <div><Label>Codigo</Label><Input value={form.code} onChange={(e) => setForm({ ...form, code: e.target.value })} disabled={!canManage} /></div>
+          <div><Label>Código</Label><Input value={form.code} onChange={(e) => setForm({ ...form, code: e.target.value })} disabled={!canManage} /></div>
           <div><Label className="field-required">Nome</Label><Input value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} disabled={!canManage} /></div>
           <div><Label>Categoria</Label><NativeSelect value={form.category} onChange={(e) => setForm({ ...form, category: e.target.value as MaterialCategory })} disabled={!canManage}>{Object.entries(MATERIAL_CATEGORY_LABEL).map(([k, v]) => <option key={k} value={k}>{v}</option>)}</NativeSelect></div>
           <div><Label>Fornecedor</Label><NativeSelect value={form.supplierId} onChange={(e) => setForm({ ...form, supplierId: e.target.value })} disabled={!canManage}><option value="">-</option>{suppliers.map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}</NativeSelect></div>
           <div><Label>Unidade</Label><Input value={form.unit} onChange={(e) => setForm({ ...form, unit: e.target.value })} disabled={!canManage} /></div>
           <div><Label>Status</Label><NativeSelect value={form.status} onChange={(e) => setForm({ ...form, status: e.target.value as MaterialStatus })} disabled={!canManage}>{Object.entries(MATERIAL_STATUS_LABEL).map(([k, v]) => <option key={k} value={k}>{v}</option>)}</NativeSelect></div>
-          <div><Label>Vida util (dias)</Label><Input type="number" value={form.shelfLifeDays} onChange={(e) => setForm({ ...form, shelfLifeDays: e.target.value })} disabled={!canManage} /></div>
+          <div><Label>Vida útil (dias)</Label><Input type="number" value={form.shelfLifeDays} onChange={(e) => setForm({ ...form, shelfLifeDays: e.target.value })} disabled={!canManage} /></div>
           <div><Label>Alergenicos</Label><Input value={form.allergens} onChange={(e) => setForm({ ...form, allergens: e.target.value })} disabled={!canManage} /></div>
-          <div className="md:col-span-2"><Label>Especificacao</Label><Textarea rows={2} value={form.specification} onChange={(e) => setForm({ ...form, specification: e.target.value })} disabled={!canManage} /></div>
+          <div className="md:col-span-2"><Label>Especificação</Label><Textarea rows={2} value={form.specification} onChange={(e) => setForm({ ...form, specification: e.target.value })} disabled={!canManage} /></div>
           <div className="md:col-span-2"><Label>Condicao de armazenamento</Label><Input value={form.storageCondition} onChange={(e) => setForm({ ...form, storageCondition: e.target.value })} disabled={!canManage} /></div>
           <div className="md:col-span-2"><Label>Perigos associados</Label><Input value={form.hazards} onChange={(e) => setForm({ ...form, hazards: e.target.value })} disabled={!canManage} /></div>
-          <div className="md:col-span-2"><Label>Documentos obrigatorios</Label><Input value={form.requiredDocuments} onChange={(e) => setForm({ ...form, requiredDocuments: e.target.value })} disabled={!canManage} /></div>
+          <div className="md:col-span-2"><Label>Documentos obrigatórios</Label><Input value={form.requiredDocuments} onChange={(e) => setForm({ ...form, requiredDocuments: e.target.value })} disabled={!canManage} /></div>
         </div>
         <DialogFooter><Button variant="ghost" onClick={onClose}>Fechar</Button>{canManage && <Button disabled={!form.name.trim() || save.isPending} onClick={() => save.mutate()}>{save.isPending ? 'Salvando...' : 'Salvar'}</Button>}</DialogFooter>
       </DialogContent>
@@ -657,7 +657,7 @@ function LotDialog({ record, programId, suppliers, materials, processes, canMana
       <DialogContent className="max-h-[88vh] max-w-2xl overflow-y-auto">
         <DialogHeader><DialogTitle>{record ? 'Lote' : 'Novo lote'}</DialogTitle></DialogHeader>
         <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
-          <div><Label className="field-required">Codigo do lote</Label><Input value={form.code} onChange={(e) => setForm({ ...form, code: e.target.value })} disabled={!canManage} /></div>
+          <div><Label className="field-required">Código do lote</Label><Input value={form.code} onChange={(e) => setForm({ ...form, code: e.target.value })} disabled={!canManage} /></div>
           <div><Label>Tipo</Label><NativeSelect value={form.type} onChange={(e) => setForm({ ...form, type: e.target.value as LotType })} disabled={!canManage}>{Object.entries(LOT_TYPE_LABEL).map(([k, v]) => <option key={k} value={k}>{v}</option>)}</NativeSelect></div>
           <div><Label>Status</Label><NativeSelect value={form.status} onChange={(e) => setForm({ ...form, status: e.target.value as LotStatus })} disabled={!canManage}>{Object.entries(LOT_STATUS_LABEL).map(([k, v]) => <option key={k} value={k}>{v}</option>)}</NativeSelect></div>
           <div><Label>Material</Label><NativeSelect value={form.materialId} onChange={(e) => { const mat = materials.find((m) => m.id === e.target.value); setForm({ ...form, materialId: e.target.value, supplierId: form.supplierId || mat?.supplierId || '', unit: form.unit || mat?.unit || '' }); }} disabled={!canManage}><option value="">-</option>{materials.map((m) => <option key={m.id} value={m.id}>{m.name}</option>)}</NativeSelect></div>
@@ -694,13 +694,13 @@ function TraceLinkDialog({ lots, processes, canManage, onClose, onSaved }: { lot
   const selectedProcess = processes.find((p) => p.id === form.processId);
   const save = useMutation({
     mutationFn: () => api('/food-safety/trace-links', { method: 'POST', json: { ...form, fromLotId: form.fromLotId || null, toLotId: form.toLotId || null, processId: form.processId || null, stepId: form.stepId || null, quantity: form.quantity || null, unit: form.unit || null, occurredAt: form.occurredAt || null, notes: form.notes || null } }),
-    onSuccess: () => { toast.success('Vinculo de rastreabilidade salvo'); onSaved(); },
-    onError: (e: any) => toast.error(e?.message ?? 'Falha ao salvar vinculo'),
+    onSuccess: () => { toast.success('Vínculo de rastreabilidade salvo'); onSaved(); },
+    onError: (e: any) => toast.error(e?.message ?? 'Falha ao salvar vínculo'),
   });
   return (
     <Dialog open onOpenChange={(o) => !o && onClose()}>
       <DialogContent className="max-w-2xl">
-        <DialogHeader><DialogTitle>Vinculo de rastreabilidade</DialogTitle></DialogHeader>
+        <DialogHeader><DialogTitle>Vínculo de rastreabilidade</DialogTitle></DialogHeader>
         <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
           <div><Label>Lote origem</Label><NativeSelect value={form.fromLotId} onChange={(e) => setForm({ ...form, fromLotId: e.target.value })} disabled={!canManage}><option value="">-</option>{lots.map((l) => <option key={l.id} value={l.id}>{lotLabel(l)}</option>)}</NativeSelect></div>
           <div><Label>Lote destino</Label><NativeSelect value={form.toLotId} onChange={(e) => setForm({ ...form, toLotId: e.target.value })} disabled={!canManage}><option value="">-</option>{lots.map((l) => <option key={l.id} value={l.id}>{lotLabel(l)}</option>)}</NativeSelect></div>
@@ -738,7 +738,7 @@ function RecallDialog({ record, programId, rootLotId, lots, users, canManage, on
       const payload = { ...form, programId, code: form.code || null, rootLotId: form.rootLotId || null, reason: form.reason || null, scopeDescription: form.scopeDescription || null, affectedQuantity: form.affectedQuantity || null, unit: form.unit || null, responsibleUserId: form.responsibleUserId || null, actions: form.actions || null, notes: form.notes || null };
       return record ? api(`/food-safety/recalls/${record.id}`, { method: 'PATCH', json: payload }) : api('/food-safety/recalls', { method: 'POST', json: payload });
     },
-    onSuccess: () => { toast.success(record ? 'Recall atualizado' : 'Simulacao de recall criada'); onSaved(); },
+    onSuccess: () => { toast.success(record ? 'Recall atualizado' : 'Simulação de recall criada'); onSaved(); },
     onError: (e: any) => toast.error(e?.message ?? 'Falha ao salvar recall'),
   });
   const title = form.title.trim() || (form.rootLotId ? `Recall ${lots.find((l) => l.id === form.rootLotId)?.code ?? ''}` : '');
@@ -748,19 +748,19 @@ function RecallDialog({ record, programId, rootLotId, lots, users, canManage, on
   return (
     <Dialog open onOpenChange={(o) => !o && onClose()}>
       <DialogContent className="max-h-[88vh] max-w-2xl overflow-y-auto">
-        <DialogHeader><DialogTitle>{record ? 'Recall' : 'Nova simulacao de recall'}</DialogTitle></DialogHeader>
+        <DialogHeader><DialogTitle>{record ? 'Recall' : 'Nova simulação de recall'}</DialogTitle></DialogHeader>
         <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
-          <div><Label>Codigo</Label><Input value={form.code} onChange={(e) => setForm({ ...form, code: e.target.value })} disabled={!canManage} /></div>
+          <div><Label>Código</Label><Input value={form.code} onChange={(e) => setForm({ ...form, code: e.target.value })} disabled={!canManage} /></div>
           <div><Label>Lote raiz</Label><NativeSelect value={form.rootLotId} onChange={(e) => setForm({ ...form, rootLotId: e.target.value })} disabled={!canManage || !!record}><option value="">-</option>{lots.map((l) => <option key={l.id} value={l.id}>{lotLabel(l)}</option>)}</NativeSelect></div>
-          <div className="md:col-span-2"><Label className="field-required">Titulo</Label><Input value={form.title} onChange={(e) => setForm({ ...form, title: e.target.value })} disabled={!canManage} /></div>
+          <div className="md:col-span-2"><Label className="field-required">Título</Label><Input value={form.title} onChange={(e) => setForm({ ...form, title: e.target.value })} disabled={!canManage} /></div>
           <div><Label>Severidade</Label><NativeSelect value={form.severity} onChange={(e) => setForm({ ...form, severity: e.target.value as RecallSeverity })} disabled={!canManage}>{(['LOW', 'MEDIUM', 'HIGH', 'CRITICAL'] as RecallSeverity[]).map((x) => <option key={x} value={x}>{CRIT_LABEL[x]}</option>)}</NativeSelect></div>
           <div><Label>Status</Label><NativeSelect value={form.status} onChange={(e) => setForm({ ...form, status: e.target.value as RecallStatus })} disabled={!canManage}>{Object.entries(RECALL_STATUS_LABEL).map(([k, v]) => <option key={k} value={k}>{v}</option>)}</NativeSelect></div>
           <div><Label>Qtd. afetada</Label><Input type="number" value={form.affectedQuantity} onChange={(e) => setForm({ ...form, affectedQuantity: e.target.value })} disabled={!canManage} /></div>
           <div><Label>Unidade</Label><Input value={form.unit} onChange={(e) => setForm({ ...form, unit: e.target.value })} disabled={!canManage} /></div>
-          <div><Label>Responsavel</Label><NativeSelect value={form.responsibleUserId} onChange={(e) => setForm({ ...form, responsibleUserId: e.target.value })} disabled={!canManage}><option value="">-</option>{users.map((u) => <option key={u.id} value={u.id}>{u.name}</option>)}</NativeSelect></div>
+          <div><Label>Responsável</Label><NativeSelect value={form.responsibleUserId} onChange={(e) => setForm({ ...form, responsibleUserId: e.target.value })} disabled={!canManage}><option value="">-</option>{users.map((u) => <option key={u.id} value={u.id}>{u.name}</option>)}</NativeSelect></div>
           <div className="md:col-span-2"><Label>Motivo</Label><Textarea rows={2} value={form.reason} onChange={(e) => setForm({ ...form, reason: e.target.value })} disabled={!canManage} /></div>
           <div className="md:col-span-2"><Label>Escopo</Label><Textarea rows={2} value={form.scopeDescription} onChange={(e) => setForm({ ...form, scopeDescription: e.target.value })} disabled={!canManage} /></div>
-          <div className="md:col-span-2"><Label>Acoes</Label><Textarea rows={2} value={form.actions} onChange={(e) => setForm({ ...form, actions: e.target.value })} disabled={!canManage} /></div>
+          <div className="md:col-span-2"><Label>Ações</Label><Textarea rows={2} value={form.actions} onChange={(e) => setForm({ ...form, actions: e.target.value })} disabled={!canManage} /></div>
         </div>
         {record?.items?.length ? (
           <div className="mt-3 rounded-md border">

@@ -36,7 +36,7 @@ export default function DatabaseOverviewPage() {
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
           <h2 className="text-lg font-semibold">Visão Geral</h2>
-          <p className="text-sm text-muted-foreground">Dashboard técnico do banco de dados em uso.</p>
+          <p className="text-sm text-muted-foreground">Painel técnico do banco de dados em uso.</p>
         </div>
         <div className="flex flex-wrap gap-2">
           <Button variant="outline" onClick={() => overview.refetch()} disabled={overview.isFetching}>
@@ -80,7 +80,7 @@ export default function DatabaseOverviewPage() {
             />
             <MetricCard
               title="Conexão"
-              value={data.connection.ok ? 'Online' : 'Offline'}
+              value={data.connection.ok ? 'Conectado' : 'Sem conexão'}
               description={data.connection.ok ? `${data.connection.latencyMs} ms` : 'Sem resposta'}
               icon={<Activity className="h-4 w-4" />}
               tone={data.connection.ok ? 'green' : 'red'}
@@ -192,7 +192,7 @@ export default function DatabaseOverviewPage() {
 
           <p className="text-xs text-muted-foreground">
             Backup/restore de banco inteiro: este projeto usa PostgreSQL gerenciado (Neon). Para recuperação completa use o
-            branching/Point-in-Time-Recovery da Neon. Snapshots lógicos por operação ficam em Backup e Restauração.
+            ramificações e recuperação em ponto no tempo da Neon. Retratos lógicos por operação ficam em Backup e Restauração.
           </p>
         </>
       )}

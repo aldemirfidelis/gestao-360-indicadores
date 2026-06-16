@@ -103,7 +103,7 @@ export function EmergencyPanel({ open, onClose }: { open: boolean; onClose: () =
 
         {report.data?.lastOfflineSyncAt && (
           <p className="text-xs text-muted-foreground">
-            Última sincronização offline: {new Date(report.data.lastOfflineSyncAt).toLocaleString('pt-BR')}
+            Última sincronização sem conexão: {new Date(report.data.lastOfflineSyncAt).toLocaleString('pt-BR')}
           </p>
         )}
 

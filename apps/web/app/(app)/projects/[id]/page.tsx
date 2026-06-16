@@ -82,7 +82,7 @@ interface ProjectDetail {
 const PMO_LABEL: Record<PmoStatus, string> = {
   ON_TRACK: 'No prazo',
   AT_RISK: 'Em risco',
-  CRITICAL: 'Critico',
+  CRITICAL: 'Crítico',
   FINALIZED: 'Finalizado',
 };
 
@@ -209,7 +209,7 @@ export default function ProjectDetailPage() {
             {(p.milestonesOverdue > 0 || p.tasksOverdue > 0) && (
               <div className="inline-flex items-center gap-2 rounded-md border border-status-red/30 bg-status-red/10 px-3 py-2 text-sm text-status-red">
                 <AlertTriangle className="h-4 w-4" />
-                Pendencias vencidas
+                Pendências vencidas
               </div>
             )}
           </div>
@@ -219,7 +219,7 @@ export default function ProjectDetailPage() {
               <div className="font-semibold">{p.expectedProgress === null ? '-' : `${p.expectedProgress}%`}</div>
             </div>
             <div className="rounded-md border p-3">
-              <div className="text-[10px] uppercase text-muted-foreground">Variacao</div>
+              <div className="text-[10px] uppercase text-muted-foreground">Variação</div>
               <div className={cn('font-semibold', (p.scheduleVariance ?? 0) < -15 && 'text-status-red')}>
                 {varianceLabel}
               </div>

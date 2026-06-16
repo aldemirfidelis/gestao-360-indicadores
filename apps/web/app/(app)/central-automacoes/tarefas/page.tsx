@@ -66,7 +66,7 @@ export default function WorkflowTasksPage() {
       <PageHeader
         eyebrow="Central de Automações"
         title="Tarefas Geradas"
-        description="Acompanhe e execute as tarefas humanas delegadas para você por regras de workflows automáticos."
+        description="Acompanhe e execute as tarefas humanas delegadas para você por regras de fluxos de trabalho automáticos."
       />
 
       <div className="grid grid-cols-1 lg:grid-cols-[1fr,340px] gap-6 items-start">

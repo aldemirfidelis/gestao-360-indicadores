@@ -51,7 +51,7 @@ export default function PermissionsMatrixPage() {
     {
       role: 'VISUALIZADOR',
       label: 'Auditores (Leitura)',
-      desc: 'Perfis de leitura rápida e auditorias. Apenas acompanham logs sem interações.',
+      desc: 'Perfis de leitura rápida e auditorias. Apenas acompanham registros sem interações.',
       view: true,
       manage: false,
       publish: false,
@@ -175,7 +175,7 @@ export default function PermissionsMatrixPage() {
           <div className="space-y-1">
             <strong className="text-foreground">Importante: Regra de Herança Multiempresa</strong>
             <p className="text-[11px]">
-              O isolamento no nível de banco de dados (`companyId`) precede qualquer alteração nessa matriz. Administradores globais e usuários qualificados só terão acesso aos workflows cadastrados sob a sua empresa ativa, mesmo com todas as flags ativas.
+              O isolamento no nível de banco de dados (`companyId`) precede qualquer alteração nessa matriz. Administradores globais e usuários qualificados só terão acesso aos fluxos de trabalho cadastrados sob a sua empresa ativa, mesmo com todas as opções ativas.
             </p>
           </div>
         </div>

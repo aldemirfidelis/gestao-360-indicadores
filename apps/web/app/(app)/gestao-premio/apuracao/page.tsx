@@ -99,7 +99,7 @@ export default function PrizeApuracaoPage() {
     onSuccess: (r) => {
       const s = r.sync;
       if (r.calcRun) toast.success(`Autopilot: ${s.synced} realizado(s) sincronizado(s) · apuração v${r.calcRun.version} concluída (${r.calcRun.totalEmployees} colab.)`);
-      else toast.warning(`Autopilot: ${s.synced} sincronizado(s), apuração não rodou — ${r.calcSkipped ?? 'verifique o checklist'}`);
+      else toast.warning(`Autopilot: ${s.synced} sincronizado(s), apuração não rodou — ${r.calcSkipped ?? 'verifique a lista de verificação'}`);
       qc.invalidateQueries({ queryKey: ['prize-calc-results'] });
     },
     onError: (e: ApiError) => toast.error(e.message),
@@ -133,10 +133,10 @@ export default function PrizeApuracaoPage() {
         </NativeSelect>
         {canRun && competenceId && (
           <div className="ml-auto flex gap-2">
-            <Button onClick={() => autopilot.mutate()} disabled={autopilot.isPending} title="Sincroniza o realizado da plataforma, valida o checklist e apura automaticamente">
+            <Button onClick={() => autopilot.mutate()} disabled={autopilot.isPending} title="Sincroniza o realizado da plataforma, valida a lista de verificação e apura automaticamente">
               <Zap className="mr-1 h-4 w-4" />{autopilot.isPending ? 'Executando…' : 'Autopilot'}
             </Button>
-            <Button onClick={() => runV2.mutate()} disabled={runV2.isPending} title="Apura a competencia inteira pela matriz area-cargo">
+            <Button onClick={() => runV2.mutate()} disabled={runV2.isPending} title="Apura a competência inteira pela matriz área-cargo">
               <PlayCircle className="mr-1 h-4 w-4" />{runV2.isPending ? 'Apurando setor...' : 'Rodar setor v2'}
             </Button>
             {!runData ? (
@@ -163,8 +163,8 @@ export default function PrizeApuracaoPage() {
         <div className="space-y-4">
           <Tabs defaultValue="cells">
             <TabsList>
-              <TabsTrigger value="cells">Regua coletiva</TabsTrigger>
-              <TabsTrigger value="unmatched">Nao-casados</TabsTrigger>
+              <TabsTrigger value="cells">Régua coletiva</TabsTrigger>
+              <TabsTrigger value="unmatched">Não casados</TabsTrigger>
             </TabsList>
             <TabsContent value="cells">
               <Card>
@@ -172,10 +172,10 @@ export default function PrizeApuracaoPage() {
                   <table className="w-full text-sm">
                     <thead className="border-b border-border/60 bg-muted/40 text-xs text-muted-foreground">
                       <tr>
-                        <th className="px-3 py-2 text-left">Area</th>
+                        <th className="px-3 py-2 text-left">Área</th>
                         <th className="px-3 py-2 text-left">Cargo</th>
-                        <th className="px-3 py-2 text-left">Combinacao</th>
-                        <th className="px-3 py-2 text-right">% possivel</th>
+                        <th className="px-3 py-2 text-left">Combinação</th>
+                        <th className="px-3 py-2 text-right">% possível</th>
                         <th className="px-3 py-2 text-right">% atingido</th>
                         <th className="px-3 py-2 text-right">Ating.</th>
                         <th className="px-3 py-2 text-left">Status</th>
@@ -194,7 +194,7 @@ export default function PrizeApuracaoPage() {
                         </tr>
                       ))}
                       {(cellData?.cells ?? []).length === 0 && (
-                        <tr><td colSpan={7} className="px-3 py-8 text-center text-sm text-muted-foreground">Nenhuma regua v2 materializada para esta competencia.</td></tr>
+                        <tr><td colSpan={7} className="px-3 py-8 text-center text-sm text-muted-foreground">Nenhuma régua v2 materializada para esta competência.</td></tr>
                       )}
                     </tbody>
                   </table>
@@ -208,7 +208,7 @@ export default function PrizeApuracaoPage() {
                     <thead className="border-b border-border/60 bg-muted/40 text-xs text-muted-foreground">
                       <tr>
                         <th className="px-3 py-2 text-left">Colaborador</th>
-                        <th className="px-3 py-2 text-left">Area</th>
+                        <th className="px-3 py-2 text-left">Área</th>
                         <th className="px-3 py-2 text-left">Cargo</th>
                         <th className="px-3 py-2 text-left">Motivo</th>
                       </tr>
@@ -223,7 +223,7 @@ export default function PrizeApuracaoPage() {
                         </tr>
                       ))}
                       {(unmatchedData?.unmatched ?? []).length === 0 && (
-                        <tr><td colSpan={4} className="px-3 py-8 text-center text-sm text-muted-foreground">Nenhum nao-casado no ultimo processamento v2.</td></tr>
+                        <tr><td colSpan={4} className="px-3 py-8 text-center text-sm text-muted-foreground">Nenhum não casado no último processamento v2.</td></tr>
                       )}
                     </tbody>
                   </table>

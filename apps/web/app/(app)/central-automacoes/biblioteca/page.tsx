@@ -114,7 +114,7 @@ const BLOCKS_LIBRARY: BlockInfo[] = [
   {
     type: 'TIMER',
     blockType: 'logic.timer',
-    label: 'Aguardar (Delay/Timer)',
+    label: 'Aguardar (atraso/temporizador)',
     description: 'Pausa a execução do fluxo por um período determinado de dias, horas ou até uma data específica.',
     inputs: ['timerType (enum)', 'durationDays (number)', 'durationHours (number)'],
     outputs: ['Nenhum (Retoma o fluxo após término)'],
@@ -144,8 +144,8 @@ const BLOCKS_LIBRARY: BlockInfo[] = [
   {
     type: 'INTEGRATION',
     blockType: 'integration.webhook',
-    label: 'Disparar Webhook API',
-    description: 'Realiza chamadas HTTP POST/PUT externas enviando as variáveis do workflow para outros sistemas da empresa.',
+    label: 'Disparar chamada de API',
+    description: 'Realiza chamadas HTTP POST/PUT externas enviando as variáveis do fluxo de trabalho para outros sistemas da empresa.',
     inputs: ['url (string)', 'method (enum)', 'headers (JSON)', 'body (JSON)'],
     outputs: ['statusCode', 'responseBody', 'integrationSuccess'],
     color: 'bg-emerald-500/10 border-emerald-500 text-emerald-500',

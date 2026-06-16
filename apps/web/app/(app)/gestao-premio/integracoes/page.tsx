@@ -89,7 +89,7 @@ export default function PrizeConnectorsPage() {
                 </div>
                 <div className="flex flex-wrap gap-x-4 text-xs text-muted-foreground">
                   <span>{c.hasSecret ? 'Credencial referenciada' : 'Sem credencial'}</span>
-                  <span>{c._count.jobs} job(s)</span>
+                  <span>{c._count.jobs} rotina(s)</span>
                   <span>{c.processedTotal} processados</span>
                 </div>
                 {canAdmin && <Button size="sm" variant="outline" onClick={() => test.mutate(c.id)} disabled={test.isPending}><PlayCircle className="mr-1 h-3.5 w-3.5" />Testar</Button>}
@@ -142,7 +142,7 @@ export default function PrizeConnectorsPage() {
               </div>
             </div>
             <div><Label>Nome *</Label><Input value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} placeholder="Ex.: Apdata Produção" /></div>
-            <div><Label>Endpoint (se API)</Label><Input value={form.endpoint} onChange={(e) => setForm({ ...form, endpoint: e.target.value })} placeholder="https://…" /></div>
+            <div><Label>Endereço (se API)</Label><Input value={form.endpoint} onChange={(e) => setForm({ ...form, endpoint: e.target.value })} placeholder="https://…" /></div>
             <div>
               <Label>Referência da credencial (variável de ambiente)</Label>
               <Input value={form.secretRef} onChange={(e) => setForm({ ...form, secretRef: e.target.value })} placeholder="Ex.: APDATA_API_TOKEN" />

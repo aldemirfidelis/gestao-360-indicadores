@@ -65,7 +65,7 @@ interface AdminBootstrapLite {
 }
 
 const ROLE_LABEL: Record<string, string> = {
-  SUPER_ADMIN: 'Super Admin',
+  SUPER_ADMIN: 'superadministrador',
   COMPANY_ADMIN: 'Admin',
   DIRECTOR: 'Diretoria',
   MANAGER: 'Gestor',

@@ -100,7 +100,7 @@ const SEVERITY_CLASS: Record<Severity, string> = {
   HIGH: 'bg-orange-100 text-orange-700',
   CRITICAL: 'bg-rose-100 text-rose-700',
 };
-const SEVERITY_LABEL: Record<Severity, string> = { LOW: 'Baixa', MEDIUM: 'Media', HIGH: 'Alta', CRITICAL: 'Critica' };
+const SEVERITY_LABEL: Record<Severity, string> = { LOW: 'Baixa', MEDIUM: 'Média', HIGH: 'Alta', CRITICAL: 'Crítica' };
 const DATASET_LABEL: Record<Dataset, string> = { suppliers: 'Fornecedores', materials: 'Materiais', lots: 'Lotes' };
 
 export function IntelligenceTab({ programId, canManage }: { programId: string; canManage: boolean }) {
@@ -126,7 +126,7 @@ export function IntelligenceTab({ programId, canManage }: { programId: string; c
   return (
     <div className="space-y-4">
       <div className="grid grid-cols-2 gap-3 lg:grid-cols-5">
-        <HealthCard label="Saude FSMS" value={data?.riskScore ?? 0} />
+        <HealthCard label="Saúde FSMS" value={data?.riskScore ?? 0} />
         <Metric label="Conformidade" value={`${data?.compliance.compliancePct ?? 0}%`} />
         <Metric label="Score fornecedores" value={data?.supplierAverageScore ?? 0} />
         <Metric label="Desvios recentes" value={data?.monitoring.out ?? 0} risk={(data?.monitoring.out ?? 0) > 0} />
@@ -137,8 +137,8 @@ export function IntelligenceTab({ programId, canManage }: { programId: string; c
         <CardContent className="flex flex-wrap items-end gap-3 p-4">
           <Brain className="h-5 w-5 text-primary" />
           <div className="mr-auto">
-            <div className="text-sm font-semibold">Inteligencia operacional</div>
-            <div className="text-xs text-muted-foreground">Dashboard calculado, score de fornecedores, recomendacoes e import/export.</div>
+            <div className="text-sm font-semibold">Inteligência operacional</div>
+            <div className="text-xs text-muted-foreground">Painel calculado, score de fornecedores, recomendacoes e import/export.</div>
           </div>
           <div>
             <Label>Dataset</Label>
@@ -189,7 +189,7 @@ export function IntelligenceTab({ programId, canManage }: { programId: string; c
           <CardContent className="p-0">
             <div className="border-b p-3 text-sm font-semibold">Sinais executivos</div>
             <div className="grid grid-cols-2 gap-3 p-3">
-              <Signal label="Perigos criticos" value={data?.overview.hazardsCritical ?? 0} />
+              <Signal label="Perigos críticos" value={data?.overview.hazardsCritical ?? 0} />
               <Signal label="Perigos altos" value={data?.overview.hazardsHigh ?? 0} />
               <Signal label="PCC" value={data?.overview.ccp ?? 0} />
               <Signal label="PPRO" value={data?.overview.oprp ?? 0} />
@@ -315,7 +315,7 @@ function ImportDialog({ dataset, programId, onClose, onImported }: { dataset: Da
       try {
         rows = JSON.parse(content);
       } catch {
-        throw new Error('JSON invalido.');
+        throw new Error('JSON inválido.');
       }
       return api<{ created: number; errors: Array<{ row: number; message: string }>; total: number }>('/food-safety/import', { method: 'POST', json: { dataset, programId, rows } });
     },

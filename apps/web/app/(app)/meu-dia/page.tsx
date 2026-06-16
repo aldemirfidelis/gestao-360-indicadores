@@ -185,21 +185,21 @@ export default function MeuDiaPage() {
   });
   const createDelegation = useMutation({
     mutationFn: (body: any) => api('/my-day/delegations', { method: 'POST', json: body }),
-    onSuccess: () => { void qc.invalidateQueries({ queryKey: ['my-day', 'delegations'] }); toast.success('Delegacao criada'); },
-    onError: (e: any) => toast.error(e?.message ?? 'Falha ao criar delegacao'),
+    onSuccess: () => { void qc.invalidateQueries({ queryKey: ['my-day', 'delegations'] }); toast.success('Delegação criada'); },
+    onError: (e: any) => toast.error(e?.message ?? 'Falha ao criar delegação'),
   });
   const revokeDelegation = useMutation({
     mutationFn: (id: string) => api(`/my-day/delegations/${id}`, { method: 'DELETE' }),
-    onSuccess: () => { void qc.invalidateQueries({ queryKey: ['my-day', 'delegations'] }); invalidate(); toast.success('Delegacao encerrada'); },
-    onError: (e: any) => toast.error(e?.message ?? 'Falha ao encerrar delegacao'),
+    onSuccess: () => { void qc.invalidateQueries({ queryKey: ['my-day', 'delegations'] }); invalidate(); toast.success('Delegação encerrada'); },
+    onError: (e: any) => toast.error(e?.message ?? 'Falha ao encerrar delegação'),
   });
   const hideRecommendation = useMutation({
     mutationFn: (key: string) => api(`/my-day/assistant/${encodeURIComponent(key)}/hide`, { method: 'POST' }),
-    onSuccess: () => { void qc.invalidateQueries({ queryKey: ['my-day', 'assistant'] }); toast.success('Recomendacao ocultada'); },
+    onSuccess: () => { void qc.invalidateQueries({ queryKey: ['my-day', 'assistant'] }); toast.success('Recomendação ocultada'); },
   });
   const feedbackRecommendation = useMutation({
     mutationFn: ({ key, helpful }: { key: string; helpful: boolean }) => api(`/my-day/assistant/${encodeURIComponent(key)}/feedback`, { method: 'POST', json: { helpful } }),
-    onSuccess: () => toast.success('Feedback registrado'),
+    onSuccess: () => toast.success('Retorno registrado'),
   });
 
   function applyFilter(f: any) {
@@ -320,7 +320,7 @@ export default function MeuDiaPage() {
       {/* Toolbar: visualização + filtros salvos + personalizar */}
       <div className="flex flex-wrap items-center gap-2">
         <div className="inline-flex rounded-md border p-0.5">
-          {([['list', LayoutList, 'Lista'], ['table', Table2, 'Tabela'], ['kanban', Columns3, 'Kanban'], ['calendar', CalendarDays, 'Calendario'], ['timeline', Clock3, 'Timeline']] as const).map(([v, Ic, lbl]) => (
+          {([['list', LayoutList, 'Lista'], ['table', Table2, 'Tabela'], ['kanban', Columns3, 'Kanban'], ['calendar', CalendarDays, 'Calendário'], ['timeline', Clock3, 'Linha do tempo']] as const).map(([v, Ic, lbl]) => (
             <button key={v} type="button" onClick={() => setView(v)}
               className={cn('inline-flex items-center gap-1 rounded px-2 py-1 text-xs', view === v ? 'bg-primary text-primary-foreground' : 'text-muted-foreground hover:text-foreground')}>
               <Ic className="h-3.5 w-3.5" />{lbl}
@@ -377,7 +377,7 @@ export default function MeuDiaPage() {
                       <span className={cn('rounded px-1.5 py-0.5 text-[11px] font-medium', prio.cls)}>{prio.label}</span>
                       <span className="text-[11px] uppercase tracking-wide text-muted-foreground">{meta.label}</span>
                       {it.overdueDays > 0 && <Badge variant="outline" className="border-rose-300 text-rose-600">Atrasado {it.overdueDays}d</Badge>}
-                      {it.isDelegated && <Badge variant="outline">Delegado por {it.contextData?.delegatedFromName ?? 'usuario'}</Badge>}
+                      {it.isDelegated && <Badge variant="outline">Delegado por {it.contextData?.delegatedFromName ?? 'usuário'}</Badge>}
                       {it.isPinned && <Badge variant="outline">Fixado</Badge>}
                       {it.dueAt && it.overdueDays === 0 && <span className="text-xs text-muted-foreground">vence {formatDate(it.dueAt)}</span>}
                     </div>
@@ -490,8 +490,8 @@ function AssistantPanel({ data, loading, onRefresh, onHide, onFeedback }: {
                   <p className="mt-1 text-xs text-muted-foreground">{rec.explanation}</p>
                   <p className="mt-2 text-sm text-primary">{rec.suggestion}</p>
                   <div className="mt-2 flex flex-wrap gap-1">
-                    <Button size="sm" variant="ghost" onClick={() => onFeedback(rec.key, true)}><ThumbsUp className="mr-1 h-3.5 w-3.5" />Util</Button>
-                    <Button size="sm" variant="ghost" onClick={() => onFeedback(rec.key, false)}><ThumbsDown className="mr-1 h-3.5 w-3.5" />Nao util</Button>
+                    <Button size="sm" variant="ghost" onClick={() => onFeedback(rec.key, true)}><ThumbsUp className="mr-1 h-3.5 w-3.5" />Útil</Button>
+                    <Button size="sm" variant="ghost" onClick={() => onFeedback(rec.key, false)}><ThumbsDown className="mr-1 h-3.5 w-3.5" />Não útil</Button>
                     <Button size="sm" variant="ghost" onClick={() => onHide(rec.key)}><EyeOff className="mr-1 h-3.5 w-3.5" />Ocultar</Button>
                   </div>
                 </div>
@@ -550,17 +550,17 @@ function ActNowDialog({ item, onClose, onDone, onOpen, onVision }: {
           <div className="space-y-3">
             <div>
               <Label>Justificativa <span className="text-xs text-muted-foreground">(obrigatoria para rejeitar)</span></Label>
-              <Textarea rows={3} value={justification} onChange={(e) => setJustification(e.target.value)} placeholder="Oriente o solicitante, quando necessario." />
+              <Textarea rows={3} value={justification} onChange={(e) => setJustification(e.target.value)} placeholder="Oriente o solicitante, quando necessário." />
             </div>
             <div className="flex flex-wrap gap-2">
-              <Button disabled={act.isPending} onClick={() => act.mutate('approve')}>Liberar edicao</Button>
+              <Button disabled={act.isPending} onClick={() => act.mutate('approve')}>Liberar edição</Button>
               <Button variant="outline" className="border-rose-300 text-rose-600" disabled={act.isPending} onClick={() => act.mutate('reject')}>Rejeitar</Button>
             </div>
           </div>
         ) : isDocumentEdit ? (
           <div className="space-y-2">
-            <p className="text-sm text-muted-foreground">Abra o documento para editar online. Ao finalizar, marque a tarefa como concluida.</p>
-            <Button disabled={act.isPending} onClick={() => act.mutate('complete')}>Concluir edicao</Button>
+            <p className="text-sm text-muted-foreground">Abra o documento para editar pela web. Ao finalizar, marque a tarefa como concluída.</p>
+            <Button disabled={act.isPending} onClick={() => act.mutate('complete')}>Concluir edição</Button>
           </div>
         ) : isTask ? (
           <div className="space-y-2">
@@ -790,16 +790,16 @@ function DelegationsDialog({ data, loading, creating, revoking, onClose, onCreat
                 <div><Label>Fim</Label><Input type="datetime-local" value={endsAt} onChange={(e) => setEndsAt(e.target.value)} /></div>
               </div>
               <div><Label>Motivo</Label><Textarea rows={3} value={reason} onChange={(e) => setReason(e.target.value)} placeholder="Ferias, ausencia, cobertura operacional..." /></div>
-              <Button disabled={!delegateUserId || creating} onClick={() => onCreate({ delegateUserId, startsAt, endsAt: endsAt || null, reason })}>Criar delegacao</Button>
+              <Button disabled={!delegateUserId || creating} onClick={() => onCreate({ delegateUserId, startsAt, endsAt: endsAt || null, reason })}>Criar delegação</Button>
             </div>
             <div className="space-y-3">
               <div>
-                <div className="text-sm font-semibold">Minhas delegacoes</div>
+                <div className="text-sm font-semibold">Minhas delegações</div>
                 <div className="mt-2 space-y-2">
-                  {(data?.given ?? []).length === 0 ? <p className="text-xs text-muted-foreground">Nenhuma delegacao criada.</p> : data!.given.map((d) => (
+                  {(data?.given ?? []).length === 0 ? <p className="text-xs text-muted-foreground">Nenhuma delegação criada.</p> : data!.given.map((d) => (
                     <div key={d.id} className="rounded-md border p-2 text-sm">
                       <div className="font-medium">{d.delegate.name}</div>
-                      <div className="text-xs text-muted-foreground">{formatDate(d.startsAt)} ate {d.endsAt ? formatDate(d.endsAt) : 'sem fim'} - {d.status}</div>
+                      <div className="text-xs text-muted-foreground">{formatDate(d.startsAt)} até {d.endsAt ? formatDate(d.endsAt) : 'sem fim'} - {d.status}</div>
                       {d.reason && <div className="mt-1 text-xs">{d.reason}</div>}
                       {d.status === 'ACTIVE' && <Button size="sm" variant="outline" className="mt-2" disabled={revoking} onClick={() => onRevoke(d.id)}>Encerrar</Button>}
                     </div>
@@ -812,7 +812,7 @@ function DelegationsDialog({ data, loading, creating, revoking, onClose, onCreat
                   {(data?.received ?? []).length === 0 ? <p className="text-xs text-muted-foreground">Nenhuma substituicao recebida.</p> : data!.received.map((d) => (
                     <div key={d.id} className="rounded-md border p-2 text-sm">
                       <div className="font-medium">{d.delegator.name}</div>
-                      <div className="text-xs text-muted-foreground">{formatDate(d.startsAt)} ate {d.endsAt ? formatDate(d.endsAt) : 'sem fim'} - {d.status}</div>
+                      <div className="text-xs text-muted-foreground">{formatDate(d.startsAt)} até {d.endsAt ? formatDate(d.endsAt) : 'sem fim'} - {d.status}</div>
                       {d.reason && <div className="mt-1 text-xs">{d.reason}</div>}
                     </div>
                   ))}
@@ -848,7 +848,7 @@ function PersonalizeDialog({ initial, cards, saving, onClose, onSave }: {
             <div>
               <Label>Visualização padrão</Label>
               <NativeSelect value={view} onChange={(e) => setView(e.target.value as any)}>
-                <option value="list">Lista</option><option value="table">Tabela</option><option value="kanban">Kanban</option><option value="calendar">Calendario</option><option value="timeline">Timeline</option>
+                <option value="list">Lista</option><option value="table">Tabela</option><option value="kanban">Kanban</option><option value="calendar">Calendário</option><option value="timeline">Linha do tempo</option>
               </NativeSelect>
             </div>
             <div>
@@ -856,7 +856,7 @@ function PersonalizeDialog({ initial, cards, saving, onClose, onSave }: {
               <NativeSelect value={landing} onChange={(e) => setLanding(e.target.value)}>
                 <option value="/meu-dia">Meu Dia</option>
                 <option value="/dashboard">Visão Geral</option>
-                <option value="/visualization">Dashboard Executivo</option>
+                <option value="/visualization">Painel Executivo</option>
                 <option value="/strategy">Mapa Estratégico</option>
                 <option value="/indicators">Indicadores</option>
               </NativeSelect>

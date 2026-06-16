@@ -210,7 +210,7 @@ export function ChatPanel({ conversation }: { conversation: ConversationSummary 
         json: { pinned },
       }),
     onSuccess: () => qc.invalidateQueries({ queryKey: ['conversations'] }),
-    onError: (e: any) => toast.error(e?.message ?? 'Nao foi possivel atualizar a fixacao'),
+    onError: (e: any) => toast.error(e?.message ?? 'Não foi possível atualizar a fixação'),
   });
 
   const muteConversation = useMutation({
@@ -220,7 +220,7 @@ export function ChatPanel({ conversation }: { conversation: ConversationSummary 
         json: { muted },
       }),
     onSuccess: () => qc.invalidateQueries({ queryKey: ['conversations'] }),
-    onError: (e: any) => toast.error(e?.message ?? 'Nao foi possivel atualizar as notificacoes'),
+    onError: (e: any) => toast.error(e?.message ?? 'Não foi possível atualizar as notificações'),
   });
 
   const editMessage = useMutation({
@@ -329,7 +329,7 @@ export function ChatPanel({ conversation }: { conversation: ConversationSummary 
           size="sm"
           variant="ghost"
           className="h-9 w-9 p-0"
-          title={conversation.muted ? 'Ativar notificacoes' : 'Silenciar conversa'}
+          title={conversation.muted ? 'Ativar notificações' : 'Silenciar conversa'}
           onClick={() => muteConversation.mutate(!conversation.muted)}
           disabled={muteConversation.isPending}
         >
@@ -596,10 +596,10 @@ function AttachmentList({ attachments, mine }: { attachments: MessageAttachment[
       } else if (payload.fileUrl) {
         window.open(payload.fileUrl, '_blank', 'noopener,noreferrer');
       } else {
-        toast.error('Arquivo indisponivel.');
+        toast.error('Arquivo indisponível.');
       }
     } catch (e: any) {
-      toast.error(e?.message ?? 'Nao foi possivel baixar o anexo');
+      toast.error(e?.message ?? 'Não foi possível baixar o anexo');
     } finally {
       setLoadingId(null);
     }

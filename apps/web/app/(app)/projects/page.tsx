@@ -112,7 +112,7 @@ const STATUS_LABEL: Record<string, string> = {
 const PMO_LABEL: Record<Project['pmoStatus'], string> = {
   ON_TRACK: 'No prazo',
   AT_RISK: 'Em risco',
-  CRITICAL: 'Critico',
+  CRITICAL: 'Crítico',
   FINALIZED: 'Finalizado',
 };
 
@@ -200,7 +200,7 @@ export default function ProjectsPage() {
       qc.invalidateQueries({ queryKey: ['projects'] });
       router.push(`/projects/${project.id}`);
     },
-    onError: (e: any) => toast.error(e?.message ?? 'Nao foi possivel criar o projeto'),
+    onError: (e: any) => toast.error(e?.message ?? 'Não foi possível criar o projeto'),
   });
 
   return (
@@ -214,7 +214,7 @@ export default function ProjectsPage() {
       <div className="mb-6 grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
         <MetricCard title="Projetos ativos" value={formatNumber(pmo?.activeProjects)} description={`${formatNumber(pmo?.totalProjects)} no portfolio`} icon={<FolderKanban className="h-4 w-4" />} tone="blue" />
         <MetricCard title="Marcos vencidos" value={formatNumber(pmo?.milestonesOverdue)} description={`${formatNumber(pmo?.milestonesDone)} de ${formatNumber(pmo?.milestonesTotal)} concluidos`} icon={<AlertTriangle className="h-4 w-4" />} tone={(pmo?.milestonesOverdue ?? 0) > 0 ? 'red' : 'green'} />
-        <MetricCard title="Orcamento ativo" value={formatNumber(pmo?.activeBudget, { style: 'currency', currency: 'BRL' })} description={`Total ${formatNumber(pmo?.budgetTotal, { style: 'currency', currency: 'BRL' })}`} icon={<Wallet className="h-4 w-4" />} tone="purple" />
+        <MetricCard title="Orçamento ativo" value={formatNumber(pmo?.activeBudget, { style: 'currency', currency: 'BRL' })} description={`Total ${formatNumber(pmo?.budgetTotal, { style: 'currency', currency: 'BRL' })}`} icon={<Wallet className="h-4 w-4" />} tone="purple" />
         <MetricCard title="Progresso medio" value={`${formatNumber(pmo?.avgProgress, { maximumFractionDigits: 0 })}%`} description={`${formatNumber(pmo?.behindSchedule)} abaixo do plano`} icon={<Clock3 className="h-4 w-4" />} tone="yellow" />
       </div>
 
@@ -224,14 +224,14 @@ export default function ProjectsPage() {
             <div className="mb-3 flex items-center justify-between gap-2">
               <div>
                 <div className="text-sm font-semibold">Painel PMO</div>
-                <div className="text-xs text-muted-foreground">Projetos criticos e em risco no portfolio autorizado.</div>
+                <div className="text-xs text-muted-foreground">Projetos críticos e em risco no portfolio autorizado.</div>
               </div>
               <BarChart3 className="h-4 w-4 text-muted-foreground" />
             </div>
             <div className="space-y-2">
               {(pmo?.criticalProjects ?? []).length === 0 && (
                 <div className="rounded-md border border-dashed p-3 text-sm text-muted-foreground">
-                  Nenhum projeto critico no momento.
+                  Nenhum projeto crítico no momento.
                 </div>
               )}
               {(pmo?.criticalProjects ?? []).slice(0, 5).map((project) => (
@@ -239,7 +239,7 @@ export default function ProjectsPage() {
                   <div className="min-w-0">
                     <div className="truncate text-sm font-medium">{project.name}</div>
                     <div className="mt-1 text-xs text-muted-foreground">
-                      {project.responsible ?? 'Sem responsavel'} - fim {formatDate(project.endsAt)}
+                      {project.responsible ?? 'Sem responsável'} - fim {formatDate(project.endsAt)}
                     </div>
                     {project.indicator && (
                       <div className="mt-1 text-[11px] text-primary">
@@ -267,7 +267,7 @@ export default function ProjectsPage() {
               <Input
                 value={filters.search}
                 onChange={(e) => setFilters((prev) => ({ ...prev, search: e.target.value }))}
-                placeholder="Buscar projeto, responsavel ou KPI"
+                placeholder="Buscar projeto, responsável ou KPI"
               />
               <NativeSelect value={filters.status} onChange={(e) => setFilters((prev) => ({ ...prev, status: e.target.value }))}>
                 <option value="">Todos os status</option>
@@ -344,11 +344,11 @@ export default function ProjectsPage() {
                   </div>
                   <div className="mt-3 grid grid-cols-2 gap-3 text-xs text-muted-foreground">
                     <div>
-                      <div className="text-[10px] uppercase">Responsavel</div>
-                      <div className="truncate text-foreground">{p.responsible ?? 'Nao definido'}</div>
+                      <div className="text-[10px] uppercase">Responsável</div>
+                      <div className="truncate text-foreground">{p.responsible ?? 'Não definido'}</div>
                     </div>
                     <div>
-                      <div className="text-[10px] uppercase">Orcamento</div>
+                      <div className="text-[10px] uppercase">Orçamento</div>
                       <div className="text-foreground">
                         {p.budget ? formatNumber(p.budget, { style: 'currency', currency: 'BRL' }) : '-'}
                       </div>
@@ -365,7 +365,7 @@ export default function ProjectsPage() {
                     <Progress value={p.progressOverall} />
                     {p.expectedProgress !== null && (
                       <div className="mt-1 text-[11px] text-muted-foreground">
-                        Planejado: {p.expectedProgress}% - variacao {p.scheduleVariance != null && p.scheduleVariance > 0 ? '+' : ''}{p.scheduleVariance ?? 0}%
+                        Planejado: {p.expectedProgress}% - variação {p.scheduleVariance != null && p.scheduleVariance > 0 ? '+' : ''}{p.scheduleVariance ?? 0}%
                       </div>
                     )}
                   </div>
@@ -394,25 +394,25 @@ export default function ProjectsPage() {
               <Input
                 value={form.name}
                 onChange={(e) => setForm({ ...form, name: e.target.value })}
-                placeholder="Ex.: Implantacao do plano de melhoria operacional"
+                placeholder="Ex.: Implantação do plano de melhoria operacional"
               />
             </div>
             <div className="space-y-2">
-              <Label>Descricao</Label>
+              <Label>Descrição</Label>
               <Textarea
                 rows={4}
                 value={form.description}
                 onChange={(e) => setForm({ ...form, description: e.target.value })}
-                placeholder="Escopo, objetivo, entregas esperadas e observacoes..."
+                placeholder="Escopo, objetivo, entregas esperadas e observações..."
               />
             </div>
             <div className="grid gap-3 sm:grid-cols-2">
               <div className="space-y-2">
-                <Label>Responsavel</Label>
+                <Label>Responsável</Label>
                 <Input
                   value={form.responsible}
                   onChange={(e) => setForm({ ...form, responsible: e.target.value })}
-                  placeholder="Nome do responsavel"
+                  placeholder="Nome do responsável"
                 />
               </div>
               <div className="space-y-2">
@@ -445,7 +445,7 @@ export default function ProjectsPage() {
                 />
               </div>
               <div className="space-y-2">
-                <Label>Orcamento</Label>
+                <Label>Orçamento</Label>
                 <Input
                   type="number"
                   min="0"
@@ -469,7 +469,7 @@ export default function ProjectsPage() {
                 ))}
               </NativeSelect>
               <p className="text-xs text-muted-foreground">
-                O progresso do projeto sera comparado com este KPI no detalhe do projeto.
+                O progresso do projeto será comparado com este KPI no detalhe do projeto.
               </p>
             </div>
           </div>

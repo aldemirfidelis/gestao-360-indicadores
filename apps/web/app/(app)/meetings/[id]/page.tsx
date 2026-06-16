@@ -259,7 +259,7 @@ export default function MeetingDetailPage() {
       setMinutesDraft(data);
       toast.success(data.provider === 'gemini' ? 'Minuta gerada por IA' : 'Minuta gerada por regras locais');
     },
-    onError: (e: any) => toast.error(e?.message ?? 'Nao foi possivel gerar a minuta'),
+    onError: (e: any) => toast.error(e?.message ?? 'Não foi possível gerar a minuta'),
   });
 
   const completeMeeting = useMutation({
@@ -444,7 +444,7 @@ export default function MeetingDetailPage() {
             {m.agendaItems.length === 0 && <p className="py-4 text-center text-sm text-muted-foreground">Sem itens de pauta.</p>}
           </SectionCard>
 
-          <SectionCard title="Convites e logs de e-mail" description="Cada envio fica registrado para auditoria e reenvio.">
+          <SectionCard title="Convites e registros de e-mail" description="Cada envio fica registrado para auditoria e reenvio.">
             <div className="space-y-2">
               {m.emailLogs.map((log) => (
                 <div key={log.id} className="rounded-lg border p-3 text-sm">
@@ -475,7 +475,7 @@ export default function MeetingDetailPage() {
           {canGenerateMinutes && (
             <SectionCard
               title="Minuta por IA"
-              description="Gere um rascunho revisavel da ata com decisoes, pendencias e proximos passos."
+              description="Gere um rascunho revisavel da ata com decisões, pendências e proximos passos."
               actions={
                 <Button variant="outline" size="sm" onClick={() => generateMinutes.mutate()} disabled={generateMinutes.isPending}>
                   <Sparkles className="mr-2 h-4 w-4" />
@@ -506,8 +506,8 @@ export default function MeetingDetailPage() {
                 </div>
               ) : (
                 <div className="rounded-md border border-dashed p-4 text-sm text-muted-foreground">
-                  Nenhuma minuta gerada nesta sessao. Use o botao acima para criar um rascunho com base em pauta,
-                  participantes, decisoes e tarefas vinculadas.
+                  Nenhuma minuta gerada nesta sessão. Use o botao acima para criar um rascunho com base em pauta,
+                  participantes, decisões e tarefas vinculadas.
                 </div>
               )}
             </SectionCard>
@@ -638,7 +638,7 @@ function roleLabel(value: string) {
 
 function formatLabel(value: string) {
   const labels: Record<string, string> = {
-    ONLINE: 'Online',
+    ONLINE: 'Remota',
     PRESENTIAL: 'Presencial',
     HYBRID: 'Híbrida',
   };

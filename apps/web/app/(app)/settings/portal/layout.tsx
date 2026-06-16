@@ -23,10 +23,10 @@ export default function PortalAdminLayout({ children }: { children: ReactNode })
           description="Área restrita."
           breadcrumbs={[{ label: 'Início', href: '/' }, { label: 'Configurações', href: '/settings' }, { label: 'Central do Portal' }]}
         />
-        <SectionCard title="Acesso restrito ao Super Admin" description="Somente o Super Admin pode administrar o portal.">
+        <SectionCard title="Acesso restrito ao superadministrador" description="Somente o superadministrador pode administrar o portal.">
           <div className="rounded-lg border border-dashed p-8 text-center text-sm text-muted-foreground">
             <ShieldAlert className="mx-auto mb-3 h-8 w-8 opacity-50" />
-            Esta central controla módulos, páginas, funcionalidades e comportamento do portal — exclusiva do Super Admin.
+            Esta central controla módulos, páginas, funcionalidades e comportamento do portal — exclusiva do superadministrador.
           </div>
         </SectionCard>
       </div>
@@ -39,7 +39,7 @@ export default function PortalAdminLayout({ children }: { children: ReactNode })
         eyebrow="Configurações"
         tone="admin"
         title="Central de Administração do Portal"
-        description="Painel mestre: módulos, páginas, funcionalidades, menus, permissões, escopo, manutenção, parâmetros, integrações, comunicados, snapshots e diagnóstico."
+        description="Painel mestre: módulos, páginas, funcionalidades, menus, permissões, escopo, manutenção, parâmetros, integrações, comunicados, históricos e diagnóstico."
         breadcrumbs={[{ label: 'Início', href: '/' }, { label: 'Configurações', href: '/settings' }, { label: 'Central do Portal' }]}
       />
       {children}

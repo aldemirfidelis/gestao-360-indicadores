@@ -345,7 +345,7 @@ function CompanySwitcher() {
           variant="outline"
           size="sm"
           className="hidden h-9 max-w-[220px] items-center gap-2 border-border/60 md:flex"
-          title="Trocar de empresa (Super Admin)"
+          title="Trocar de empresa (superadministrador)"
         >
           <Building2 className="h-4 w-4 shrink-0 text-muted-foreground" />
           <span className="truncate text-xs font-medium">{activeName}</span>

@@ -19,7 +19,7 @@ import { compaRatioDistribution, penetrationHistogram } from '@/lib/compensation
 import { EmptyState } from '@/components/platform/empty-state';
 import { formatNumber } from '@/lib/utils';
 
-const MASKED_MESSAGE = 'Distribuicao numerica indisponivel sem permissao de salario individual.';
+const MASKED_MESSAGE = 'Distribuição numérica indisponível sem permissão de salário individual.';
 
 /** Distribuicao de colaboradores por faixa de compa-ratio. */
 export function CompaRatioDistributionChart({ rows, masked }: { rows: FitRow[]; masked: boolean }) {
@@ -45,11 +45,11 @@ export function CompaRatioDistributionChart({ rows, masked }: { rows: FitRow[]; 
   );
 }
 
-/** Histograma de penetracao na faixa (0-100%). */
+/** Histograma de penetração na faixa (0-100%). */
 export function PenetrationHistogram({ rows, masked }: { rows: FitRow[]; masked: boolean }) {
   if (masked) return <EmptyState title="Restrito" description={MASKED_MESSAGE} />;
   const data = penetrationHistogram(rows);
-  if (data.every((d) => d.value === 0)) return <EmptyState title="Sem dados de penetracao" />;
+  if (data.every((d) => d.value === 0)) return <EmptyState title="Sem dados de penetração" />;
   return (
     <ResponsiveContainer width="100%" height={260}>
       <BarChart data={data}>
@@ -63,7 +63,7 @@ export function PenetrationHistogram({ rows, masked }: { rows: FitRow[]; masked:
   );
 }
 
-/** Dispersao compa-ratio (X) x penetracao na faixa (Y) por colaborador. */
+/** Dispersão compa-ratio (X) x penetração na faixa (Y) por colaborador. */
 export function CompaRatioScatter({ rows, masked }: { rows: FitRow[]; masked: boolean }) {
   if (masked) return <EmptyState title="Restrito" description={MASKED_MESSAGE} />;
   const data = rows
@@ -75,7 +75,7 @@ export function CompaRatioScatter({ rows, masked }: { rows: FitRow[]; masked: bo
       <ScatterChart margin={{ left: 8, right: 16, top: 8, bottom: 8 }}>
         <CartesianGrid strokeDasharray="3 3" />
         <XAxis type="number" dataKey="x" name="Compa-ratio" domain={[0.6, 1.4]} tick={{ fontSize: 11 }} tickFormatter={(v) => formatNumber(v)} />
-        <YAxis type="number" dataKey="y" name="Penetracao" unit="%" domain={[0, 100]} tick={{ fontSize: 11 }} />
+        <YAxis type="number" dataKey="y" name="Penetração" unit="%" domain={[0, 100]} tick={{ fontSize: 11 }} />
         <ZAxis range={[60, 60]} />
         <ReferenceLine x={1} stroke="#16a34a" strokeDasharray="4 4" label={{ value: 'medio', fontSize: 10, position: 'top' }} />
         <Tooltip
@@ -87,7 +87,7 @@ export function CompaRatioScatter({ rows, masked }: { rows: FitRow[]; masked: bo
               <div className="rounded-md border bg-background p-2 text-xs shadow-md">
                 <div className="font-medium">{p.name}</div>
                 <div className="text-muted-foreground">Compa-ratio {formatNumber(p.x)}</div>
-                <div className="text-muted-foreground">Penetracao {formatNumber(p.y, { maximumFractionDigits: 0 })}%</div>
+                <div className="text-muted-foreground">Penetração {formatNumber(p.y, { maximumFractionDigits: 0 })}%</div>
               </div>
             );
           }}

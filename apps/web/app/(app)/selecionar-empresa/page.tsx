@@ -72,7 +72,7 @@ export default function SelecionarEmpresaPage() {
         <div className="text-[11px] font-medium uppercase tracking-[0.14em] text-muted-foreground">Administração Geral</div>
         <h1 className="text-2xl font-semibold">Selecione a empresa que deseja administrar</h1>
         <p className="text-sm text-muted-foreground">
-          Como Super Admin, você entra no contexto de uma empresa para gerenciar todos os seus dados.
+          Como superadministrador, você entra no contexto de uma empresa para gerenciar todos os seus dados.
           Pode trocar de empresa a qualquer momento pelo seletor no topo.
         </p>
       </div>

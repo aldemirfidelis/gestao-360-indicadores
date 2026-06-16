@@ -30,7 +30,7 @@ export function ComingSoon({ title, description, features }: Props) {
             <div>
               <h2 className="text-lg font-semibold">Módulo em desenvolvimento</h2>
               <p className="text-sm text-muted-foreground">
-                A modelagem de dados ja esta pronta no backend e este módulo entra na próxima fase do roadmap.
+                A modelagem de dados já está pronta no backend e este módulo entra na próxima fase do roteiro.
               </p>
             </div>
           </div>

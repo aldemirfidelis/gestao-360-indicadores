@@ -207,7 +207,7 @@ export default function AuditPage() {
                 <Detail label="Resultado" value={selected.result ?? 'SUCCESS'} />
               </div>
               <Payload title="Valor anterior" value={selected.beforeValue} />
-              <Payload title="Valor novo / payload" value={selected.afterValue ?? selected.payload} />
+              <Payload title="Valor novo / dados técnicos" value={selected.afterValue ?? selected.payload} />
               <Payload title="Metadados" value={selected.payload} />
             </div>
           )}

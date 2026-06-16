@@ -39,7 +39,7 @@ interface DirectoryPage {
 }
 
 const ROLE_LABEL: Record<string, string> = {
-  SUPER_ADMIN: 'Super Admin',
+  SUPER_ADMIN: 'superadministrador',
   COMPANY_ADMIN: 'Admin',
   DIRECTOR: 'Diretor',
   MANAGER: 'Gestor',
@@ -126,7 +126,7 @@ export default function PessoasPage() {
         </div>
         <div className="flex items-center gap-2">
           <Badge variant="secondary" className="gap-1.5">
-            <Wifi className="h-3.5 w-3.5 text-emerald-500" /> {onlineCount} online
+            <Wifi className="h-3.5 w-3.5 text-emerald-500" /> {onlineCount} conectados
           </Badge>
           <div className="flex overflow-hidden rounded-md border border-border/60">
             <button
@@ -193,7 +193,7 @@ export default function PessoasPage() {
           onClick={() => setOnlineOnly((v) => !v)}
           className="h-9"
         >
-          <Wifi className="mr-1.5 h-4 w-4" /> Somente online
+          <Wifi className="mr-1.5 h-4 w-4" /> Somente conectados
         </Button>
       </div>
 
@@ -235,7 +235,7 @@ export default function PessoasPage() {
 }
 
 function lastSeenLabel(user: DirectoryUser, status: PresenceStatus) {
-  if (status === 'ONLINE') return 'Online agora';
+  if (status === 'ONLINE') return 'Conectado agora';
   const ref = user.presence.lastSeenAt ?? user.lastLoginAt;
   if (!ref) return 'Sem acesso recente';
   try {

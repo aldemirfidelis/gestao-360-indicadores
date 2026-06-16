@@ -11,7 +11,7 @@ export default function PlataformaRedirect() {
   }, [router]);
   return (
     <div className="flex min-h-[40vh] items-center justify-center text-sm text-muted-foreground">
-      Redirecionando para o Portal Admin Global...
+      Redirecionando para o Portal Administrativo Global...
     </div>
   );
 }

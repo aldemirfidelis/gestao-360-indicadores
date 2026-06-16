@@ -91,9 +91,9 @@ function getEntityRoute(type: string, id: string): { url: string; hasDetail: boo
 }
 
 const SECTION_KEYS = [
-  'origem', 'vinculos', 'dependencias', 'impactos', 'registrosImpactados',
-  'responsaveis', 'indicadores', 'riscos', 'auditorias', 'documentos',
-  'requisitos', 'treinamentos', 'formularios', 'reunioes', 'acoes', 'historico'
+  'origem', 'vínculos', 'dependencias', 'impactos', 'registrosImpactados',
+  'responsáveis', 'indicadores', 'riscos', 'auditorias', 'documentos',
+  'requisitos', 'treinamentos', 'formulários', 'reuniões', 'ações', 'histórico'
 ];
 
 const RELATIONSHIP_TYPES = [
@@ -106,7 +106,7 @@ const RELATIONSHIP_TYPES = [
   { value: 'atende', label: 'Atende / Cumpre' },
   { value: 'controlado_por', label: 'É controlado por' },
   { value: 'suporta', label: 'Suporta / Habilita' },
-  { value: 'referencia', label: 'Referencia' },
+  { value: 'referencia', label: 'Referência' },
   { value: 'utiliza_documento', label: 'Utiliza documento' },
   { value: 'exige_treinamento', label: 'Exige treinamento' },
   { value: 'discussao_reuniao', label: 'Discutido em Reunião' },
@@ -417,7 +417,7 @@ export const Vision360Sidebar: React.FC = () => {
           {/* Seção 2: Vínculos Diretos e Manuais */}
           <div className="rounded-lg border border-border bg-card shadow-sm overflow-hidden">
             <button
-              onClick={() => toggleSection('vinculos')}
+              onClick={() => toggleSection('vínculos')}
               className="flex w-full items-center justify-between p-3 text-left font-semibold text-foreground hover:bg-muted/30"
             >
               <span className="flex items-center gap-2 text-xs uppercase tracking-wider text-muted-foreground">
@@ -496,7 +496,7 @@ export const Vision360Sidebar: React.FC = () => {
             { key: 'documentos', label: 'Documentos do GED', icon: ScrollText, targetType: 'DOCUMENT' },
             { key: 'requisitos', label: 'Requisitos Legais/Normativos', icon: BookOpen, targetType: 'REQUISITO' },
             { key: 'treinamentos', label: 'Treinamentos e Competências', icon: GraduationCap, targetType: 'TREINAMENTO' },
-            { key: 'formularios', label: 'Formulários e Checklists', icon: ClipboardList, targetType: 'FORM' },
+            { key: 'formularios', label: 'Formulários e Listas de verificação', icon: ClipboardList, targetType: 'FORM' },
             { key: 'reunioes', label: 'Decisões em Reuniões', icon: Users, targetType: 'MEETING' },
             { key: 'acoes', label: 'Planos de Ação e Tarefas', icon: ClipboardList, targetType: 'ACTION_PLAN' },
             { key: 'historico', label: 'Trilha de Histórico & Auditoria', icon: History, isAudit: true },
@@ -518,7 +518,7 @@ export const Vision360Sidebar: React.FC = () => {
                 >
                   <span className="flex items-center gap-2 text-xs uppercase tracking-wider text-muted-foreground">
                     <sec.icon className="h-4 w-4 text-primary" />
-                    {sec.label} ({sec.isAudit ? 'Logs' : items.length})
+                    {sec.label} ({sec.isAudit ? 'Registros' : items.length})
                   </span>
                   <ChevronDown className={`h-4 w-4 text-muted-foreground transition-transform ${openSections[sec.key] ? 'rotate-180' : ''}`} />
                 </button>

@@ -111,7 +111,7 @@ const TYPE_LABEL: Record<ProcessType, string> = {
 const STATUS_LABEL: Record<ProcessStatus, string> = {
   DRAFT: 'Rascunho',
   ACTIVE: 'Ativo',
-  UNDER_REVIEW: 'Em revisao',
+  UNDER_REVIEW: 'Em revisão',
   ARCHIVED: 'Arquivado',
 };
 
@@ -290,7 +290,7 @@ export default function ProcessesPage() {
 
   const saveStep = useMutation({
     mutationFn: () => {
-      if (!stepProcessId && !stepForm.id) throw new Error('Processo nao selecionado');
+      if (!stepProcessId && !stepForm.id) throw new Error('Processo não selecionado');
       const payload = {
         order: stepForm.order ? Number(stepForm.order) : undefined,
         name: stepForm.name,
@@ -361,14 +361,14 @@ export default function ProcessesPage() {
     <div className="space-y-6">
       <PageHeader
         title="Processos e SIPOC"
-        description="Mapeie processos, entradas, saidas, clientes, fornecedores e etapas operacionais."
+        description="Mapeie processos, entradas, saídas, clientes, fornecedores e etapas operacionais."
         actions={canCreate ? <Button onClick={openCreate}><Plus className="mr-2 h-4 w-4" /> Novo processo</Button> : null}
       />
 
       <div className="grid gap-3 md:grid-cols-4">
         <MetricCard title="Processos" value={formatNumber(summary?.total)} description="Mapeamentos registrados" icon={<Network className="h-4 w-4" />} tone="blue" />
         <MetricCard title="Ativos" value={formatNumber(summary?.active)} description="Processos vigentes" icon={<ListChecks className="h-4 w-4" />} tone="green" />
-        <MetricCard title="Em revisao" value={formatNumber(summary?.underReview)} description="Ajustes pendentes" icon={<Edit className="h-4 w-4" />} tone="yellow" />
+        <MetricCard title="Em revisão" value={formatNumber(summary?.underReview)} description="Ajustes pendentes" icon={<Edit className="h-4 w-4" />} tone="yellow" />
         <MetricCard title="Sem etapas" value={formatNumber(summary?.withoutSteps)} description={`${formatNumber(summary?.mappedSteps)} etapas mapeadas`} icon={<Filter className="h-4 w-4" />} tone="red" />
       </div>
 
@@ -376,7 +376,7 @@ export default function ProcessesPage() {
         <CardContent className="flex flex-col gap-3 p-4 md:flex-row md:items-end">
           <div className="grid flex-1 gap-2">
             <Label>Buscar</Label>
-            <Input value={filters.search} onChange={(e) => setFilters((f) => ({ ...f, search: e.target.value }))} placeholder="Nome, codigo, objetivo ou etapa" />
+            <Input value={filters.search} onChange={(e) => setFilters((f) => ({ ...f, search: e.target.value }))} placeholder="Nome, código, objetivo ou etapa" />
           </div>
           <div className="grid gap-2 md:w-44">
             <Label>Status</Label>
@@ -430,7 +430,7 @@ export default function ProcessesPage() {
                 <div className="grid gap-3 md:grid-cols-4">
                   <SipocBlock title="Fornecedores" value={item.suppliers} />
                   <SipocBlock title="Entradas" value={item.inputs} />
-                  <SipocBlock title="Saidas" value={item.outputs} />
+                  <SipocBlock title="Saídas" value={item.outputs} />
                   <SipocBlock title="Clientes" value={item.customers} />
                 </div>
 
@@ -447,7 +447,7 @@ export default function ProcessesPage() {
                           <div className="min-w-0">
                             <p className="font-medium">{step.order}. {step.name}</p>
                             {step.description ? <p className="text-sm text-muted-foreground">{step.description}</p> : null}
-                            {step.responsible ? <p className="text-xs text-muted-foreground">Responsavel: {step.responsible}</p> : null}
+                            {step.responsible ? <p className="text-xs text-muted-foreground">Responsável: {step.responsible}</p> : null}
                           </div>
                           {canUpdate ? (
                             <div className="flex gap-2">
@@ -472,8 +472,8 @@ export default function ProcessesPage() {
           <div className="grid gap-4 py-2">
             <div className="grid gap-3 md:grid-cols-[1fr_160px_160px]">
               <Field label="Nome"><Input value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} /></Field>
-              <Field label="Codigo"><Input value={form.code} onChange={(e) => setForm({ ...form, code: e.target.value })} /></Field>
-              <Field label="Versao"><Input value={form.version} onChange={(e) => setForm({ ...form, version: e.target.value })} /></Field>
+              <Field label="Código"><Input value={form.code} onChange={(e) => setForm({ ...form, code: e.target.value })} /></Field>
+              <Field label="Versão"><Input value={form.version} onChange={(e) => setForm({ ...form, version: e.target.value })} /></Field>
             </div>
             <div className="grid gap-3 md:grid-cols-3">
               <Field label="Tipo">
@@ -494,7 +494,7 @@ export default function ProcessesPage() {
               </Field>
             </div>
             <div className="grid gap-3 md:grid-cols-2">
-              <Field label="Area / processo">
+              <Field label="Área / processo">
                 <NativeSelect value={form.orgNodeId} onChange={(e) => setForm({ ...form, orgNodeId: e.target.value })}>
                   <option value="">Geral</option>
                   {options?.orgNodes.map((node) => <option key={node.id} value={node.id}>{node.name}</option>)}
@@ -508,11 +508,11 @@ export default function ProcessesPage() {
               </Field>
             </div>
             <Field label="Objetivo"><Textarea value={form.objective} onChange={(e) => setForm({ ...form, objective: e.target.value })} rows={2} /></Field>
-            <Field label="Descricao"><Textarea value={form.description} onChange={(e) => setForm({ ...form, description: e.target.value })} rows={2} /></Field>
+            <Field label="Descrição"><Textarea value={form.description} onChange={(e) => setForm({ ...form, description: e.target.value })} rows={2} /></Field>
             <div className="grid gap-3 md:grid-cols-2">
               <Field label="Fornecedores"><Textarea value={form.suppliers} onChange={(e) => setForm({ ...form, suppliers: e.target.value })} rows={4} /></Field>
               <Field label="Entradas"><Textarea value={form.inputs} onChange={(e) => setForm({ ...form, inputs: e.target.value })} rows={4} /></Field>
-              <Field label="Saidas"><Textarea value={form.outputs} onChange={(e) => setForm({ ...form, outputs: e.target.value })} rows={4} /></Field>
+              <Field label="Saídas"><Textarea value={form.outputs} onChange={(e) => setForm({ ...form, outputs: e.target.value })} rows={4} /></Field>
               <Field label="Clientes"><Textarea value={form.customers} onChange={(e) => setForm({ ...form, customers: e.target.value })} rows={4} /></Field>
             </div>
           </div>
@@ -531,8 +531,8 @@ export default function ProcessesPage() {
               <Field label="Ordem"><Input type="number" min={1} value={stepForm.order} onChange={(e) => setStepForm({ ...stepForm, order: e.target.value })} /></Field>
               <Field label="Nome"><Input value={stepForm.name} onChange={(e) => setStepForm({ ...stepForm, name: e.target.value })} /></Field>
             </div>
-            <Field label="Responsavel"><Input value={stepForm.responsible} onChange={(e) => setStepForm({ ...stepForm, responsible: e.target.value })} /></Field>
-            <Field label="Descricao"><Textarea value={stepForm.description} onChange={(e) => setStepForm({ ...stepForm, description: e.target.value })} rows={3} /></Field>
+            <Field label="Responsável"><Input value={stepForm.responsible} onChange={(e) => setStepForm({ ...stepForm, responsible: e.target.value })} /></Field>
+            <Field label="Descrição"><Textarea value={stepForm.description} onChange={(e) => setStepForm({ ...stepForm, description: e.target.value })} rows={3} /></Field>
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setStepOpen(false)}>Cancelar</Button>
@@ -570,7 +570,7 @@ function SipocBlock({ title, value }: { title: string; value: string | null }) {
           {items.slice(0, 5).map((item, index) => <li key={`${title}-${index}`}>{item}</li>)}
           {items.length > 5 ? <li className="text-xs text-muted-foreground">+{items.length - 5} item(ns)</li> : null}
         </ul>
-      ) : <p className="mt-2 text-sm text-muted-foreground">Nao informado</p>}
+      ) : <p className="mt-2 text-sm text-muted-foreground">Não informado</p>}
     </div>
   );
 }

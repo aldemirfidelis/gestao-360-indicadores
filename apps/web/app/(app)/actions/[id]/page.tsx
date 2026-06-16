@@ -305,7 +305,7 @@ export default function ActionDetailPage() {
             ))}
           </NativeSelect>
         </Mini>
-        <Mini title="Eficacia">
+        <Mini title="Eficácia">
           <div className="mt-1"><StatusBadge value={a.effectivenessStatus} label={EFFECTIVENESS_STATUS_LABEL[a.effectivenessStatus] ?? a.effectivenessStatus} /></div>
         </Mini>
         <Mini title="Progresso">
@@ -366,7 +366,7 @@ export default function ActionDetailPage() {
                     <div>
                       <Label>Formato</Label>
                       <NativeSelect value={meetingForm.format} onChange={(e) => setMeetingForm({ ...meetingForm, format: e.target.value })}>
-                        <option value="ONLINE">Online</option>
+                        <option value="ONLINE">Conectado</option>
                         <option value="PRESENTIAL">Presencial</option>
                         <option value="HYBRID">Híbrida</option>
                       </NativeSelect>
@@ -515,9 +515,9 @@ function AnalysisWorkspace({ action, onSave, saving, onAskAi }: { action: Action
   const [method, setMethod] = useState(action.analysisTool ?? session?.method ?? 'FIVE_WHYS');
   const [problem, setProblem] = useState(session?.problem ?? action.problemDescription ?? '');
   const [rootCause, setRootCause] = useState(session?.rootCause ?? action.rootCause ?? '');
-  const [fiveWhys, setFiveWhys] = useState<any[]>(session?.fiveWhys?.length ? session.fiveWhys : Array.from({ length: 5 }, (_v, i) => ({ position: i + 1, question: `${i + 1}o por que?`, answer: '', evidence: '' })));
-  const [ishikawa, setIshikawa] = useState<any[]>(session?.ishikawaCauses?.length ? session.ishikawaCauses : ['Metodo', 'Máquina', 'Mao de obra', 'Material', 'Meio ambiente', 'Medicao'].map((category) => ({ category, description: '', impact: 3, probability: 3, evidence: '' })));
-  const [maspSteps, setMaspSteps] = useState<any[]>(session?.maspSteps?.length ? session.maspSteps : ['Identificação do problema', 'Observacao', 'Análise', 'Plano de ação', 'Execucao', 'Verificação', 'Padronizacao', 'Conclusão'].map((title, i) => ({ step: i + 1, title, description: '', status: 'PENDING' })));
+  const [fiveWhys, setFiveWhys] = useState<any[]>(session?.fiveWhys?.length ? session.fiveWhys : Array.from({ length: 5 }, (_v, i) => ({ position: i + 1, question: `${i + 1}º por quê?`, answer: '', evidence: '' })));
+  const [ishikawa, setIshikawa] = useState<any[]>(session?.ishikawaCauses?.length ? session.ishikawaCauses : ['Método', 'Máquina', 'Mão de obra', 'Material', 'Meio ambiente', 'Medição'].map((category) => ({ category, description: '', impact: 3, probability: 3, evidence: '' })));
+  const [maspSteps, setMaspSteps] = useState<any[]>(session?.maspSteps?.length ? session.maspSteps : ['Identificação do problema', 'Observação', 'Análise', 'Plano de ação', 'Execução', 'Verificação', 'Padronização', 'Conclusão'].map((title, i) => ({ step: i + 1, title, description: '', status: 'PENDING' })));
   const [pdcaSteps, setPdcaSteps] = useState<any[]>(session?.pdcaSteps?.length ? session.pdcaSteps : ['PLAN', 'DO', 'CHECK', 'ACT'].map((phase) => ({ phase, description: '', status: 'PENDING' })));
 
   return (
@@ -543,12 +543,12 @@ function AnalysisWorkspace({ action, onSave, saving, onAskAi }: { action: Action
         <div className="space-y-3">
           {fiveWhys.map((item, index) => (
             <div key={index} className="grid gap-3 rounded-lg border p-3 md:grid-cols-[120px,1fr,1fr]">
-              <div className="text-sm font-semibold">{index + 1}o por que?</div>
+              <div className="text-sm font-semibold">{index + 1}º por quê?</div>
               <Input value={item.answer ?? ''} placeholder="Resposta" onChange={(e) => setFiveWhys(updateArray(fiveWhys, index, { ...item, answer: e.target.value }))} />
-              <Input value={item.evidence ?? ''} placeholder="Evidencia" onChange={(e) => setFiveWhys(updateArray(fiveWhys, index, { ...item, evidence: e.target.value }))} />
+              <Input value={item.evidence ?? ''} placeholder="Evidência" onChange={(e) => setFiveWhys(updateArray(fiveWhys, index, { ...item, evidence: e.target.value }))} />
             </div>
           ))}
-          <Button variant="outline" onClick={() => setFiveWhys([...fiveWhys, { position: fiveWhys.length + 1, question: `${fiveWhys.length + 1}o por que?`, answer: '', evidence: '' }])}>Adicionar por que</Button>
+          <Button variant="outline" onClick={() => setFiveWhys([...fiveWhys, { position: fiveWhys.length + 1, question: `${fiveWhys.length + 1}º por quê?`, answer: '', evidence: '' }])}>Adicionar por quê</Button>
         </div>
       )}
 
@@ -572,7 +572,7 @@ function AnalysisWorkspace({ action, onSave, saving, onAskAi }: { action: Action
       {!['FIVE_WHYS', 'ISHIKAWA', 'MASP', 'PDCA'].includes(method) && <GenericAnalysis method={method} session={session} />}
 
       <div className="mt-4">
-        <Label>Causa raiz provavel</Label>
+        <Label>Causa raiz provável</Label>
         <Textarea rows={3} value={rootCause} onChange={(e) => setRootCause(e.target.value)} />
       </div>
       <div className="mt-4 flex justify-end">
@@ -685,7 +685,7 @@ function ExecutionCard({
 
   return (
     <>
-      <SectionCard title={`Execucao (${a.tasks.length})`} description="Ao concluir uma tarefa, registre o que foi feito.">
+      <SectionCard title={`Execução (${a.tasks.length})`} description="Ao concluir uma tarefa, registre o que foi feito.">
         <div className="mb-3 grid gap-2 rounded-lg border bg-muted/30 p-3">
           <Input
             placeholder="Título da tarefa"
@@ -825,7 +825,7 @@ function ExecutionCard({
               </div>
             );
           })}
-          {a.tasks.length === 0 && <EmptyState title="Nenhuma tarefa" description="Crie etapas de execucao para acompanhar o progresso automaticamente." className="border-dashed" />}
+          {a.tasks.length === 0 && <EmptyState title="Nenhuma tarefa" description="Crie etapas de execução para acompanhar o progresso automaticamente." className="border-dashed" />}
         </div>
       </SectionCard>
 
@@ -1075,9 +1075,9 @@ function EffectivenessPanel({
 
 function AiPanel({ suggestions, onGenerate, onDecide }: { suggestions: any[]; onGenerate: (scope: string) => void; onDecide: (id: string, status: string) => void }) {
   return (
-    <SectionCard title="IA assistente" description="Sugestões ficam pendentes ate o usuário aceitar ou rejeitar." actions={<Button onClick={() => onGenerate('general')}><Bot className="mr-2 h-4 w-4" />Gerar sugestões</Button>}>
+    <SectionCard title="IA assistente" description="Sugestões ficam pendentes até o usuário aceitar ou rejeitar." actions={<Button onClick={() => onGenerate('general')}><Bot className="mr-2 h-4 w-4" />Gerar sugestões</Button>}>
       <div className="space-y-3">
-        {suggestions.length === 0 && <EmptyState title="Nenhuma sugestão gerada" description="Peça apoio da IA para revisar causa, ação e eficacia." />}
+        {suggestions.length === 0 && <EmptyState title="Nenhuma sugestão gerada" description="Peça apoio da IA para revisar causa, ação e eficácia." />}
         {suggestions.map((item) => (
           <div key={item.id} className="rounded-lg border p-4">
             <div className="flex flex-wrap items-start justify-between gap-2">

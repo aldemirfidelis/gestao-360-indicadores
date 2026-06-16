@@ -239,7 +239,7 @@ export default function PeriodsPage() {
         </SectionCard>
 
         <SectionCard
-          title="Calendario anual"
+          title="Calendário anual"
           description="Cada período anual sempre cobre 01/01 a 31/12 do respectivo ano."
           actions={
             <Button variant="outline" size="sm" onClick={() => createNext.mutate()} disabled={createNext.isPending}>
@@ -346,7 +346,7 @@ export default function PeriodsPage() {
                 {(closedMonths.data ?? []).length === 0 && (
                   <tr>
                     <td colSpan={6} className="px-4 py-6 text-center text-sm text-muted-foreground">
-                      Nenhum mes fechado ate o momento.
+                      Nenhum mes fechado até o momento.
                     </td>
                   </tr>
                 )}

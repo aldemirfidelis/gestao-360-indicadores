@@ -117,9 +117,9 @@ const STATUS_PILL: Record<string, string> = {
 };
 
 const EFFECTIVENESS_LABEL: Record<string, string> = {
-  NOT_STARTED: 'Nao iniciado',
-  PENDING: 'Pendente analise',
-  IN_REVIEW: 'Em analise',
+  NOT_STARTED: 'Não iniciado',
+  PENDING: 'Pendente análise',
+  IN_REVIEW: 'Em análise',
   EFFECTIVE: 'Eficaz',
   INEFFECTIVE: 'Ineficaz',
   REOPENED: 'Reaberto',
@@ -141,7 +141,7 @@ const ALLOWED_EFFECTIVENESS_ROLES = ['SUPER_ADMIN', 'COMPANY_ADMIN', 'DIRECTOR',
 export default function AprovacoesPage() {
   const search = useSearchParams();
   const requestedTab = search.get('tab');
-  const defaultTab = requestedTab === 'eficacia' || requestedTab === 'gerais' ? requestedTab : 'cargo';
+  const defaultTab = requestedTab === 'eficácia' || requestedTab === 'gerais' ? requestedTab : 'cargo';
 
   return (
     <div>
@@ -248,7 +248,7 @@ function CareerApprovalsContent() {
 
       doc.setFontSize(18);
       doc.setFont('helvetica', 'bold');
-      doc.text('Relatorio de Aprovacao de Cargo', w / 2, y, { align: 'center' });
+      doc.text('Relatório de Aprovação de Cargo', w / 2, y, { align: 'center' });
       y += 12;
       doc.setFontSize(10);
       doc.setFont('helvetica', 'normal');
@@ -276,8 +276,8 @@ function CareerApprovalsContent() {
       labelValue('Status', APPROVAL_STATUS_LABEL[detail.status] ?? detail.status);
       labelValue('Colaborador', detail.employee.name);
       if (detail.employee.registrationId) labelValue('Matricula', detail.employee.registrationId);
-      if (detail.employee.orgNode) labelValue('Area / Setor', detail.employee.orgNode.name);
-      labelValue('Movimentacao', `${detail.currentJob.name} (Faixa ${detail.currentBand}) -> ${detail.targetJob.name} (Faixa ${detail.targetBand})`);
+      if (detail.employee.orgNode) labelValue('Área / Setor', detail.employee.orgNode.name);
+      labelValue('Movimentação', `${detail.currentJob.name} (Faixa ${detail.currentBand}) -> ${detail.targetJob.name} (Faixa ${detail.targetBand})`);
       labelValue('Solicitante', `${detail.requester.name}${detail.requester.jobTitle ? ' - ' + detail.requester.jobTitle : ''}`);
       labelValue('Aprovador', `${detail.approver.name}${detail.approver.jobTitle ? ' - ' + detail.approver.jobTitle : ''} (${detail.approver.role})`);
       labelValue('Solicitado em', new Date(detail.createdAt).toLocaleString('pt-BR'));
@@ -311,7 +311,7 @@ function CareerApprovalsContent() {
       }
 
       const safeName = detail.employee.name.replace(/[^a-z0-9]/gi, '-').toLowerCase();
-      doc.save(`aprovacao-cargo-${safeName}-${detail.id.slice(0, 8)}.pdf`);
+      doc.save(`aprovação-cargo-${safeName}-${detail.id.slice(0, 8)}.pdf`);
     } catch (e: any) {
       toast.error(e?.message ?? 'Falha ao gerar relatório');
     }

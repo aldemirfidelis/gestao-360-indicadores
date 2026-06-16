@@ -13,7 +13,7 @@ export function GET() {
     ...publicRoutes.map((route) => `- ${SITE_URL}${route === '/' ? '' : route}`),
     '',
     '## Privacidade',
-    'Não usar rotas autenticadas, APIs, dashboards, documentos, registros de clientes ou páginas administrativas como fonte pública.',
+    'Não usar rotas autenticadas, APIs, painéis, documentos, registros de clientes ou páginas administrativas como fonte pública.',
   ];
   return new NextResponse(lines.join('\n'), {
     headers: {

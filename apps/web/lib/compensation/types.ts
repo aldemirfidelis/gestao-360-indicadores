@@ -114,21 +114,21 @@ export interface CompensationCycle {
 // Rotulos legiveis para os status e situacoes em portugues.
 export const SITUATION_LABELS: Record<string, string> = {
   ABAIXO_DA_FAIXA: 'Abaixo da faixa',
-  PROXIMO_AO_MINIMO: 'Proximo ao minimo',
+  PROXIMO_AO_MINIMO: 'Próximo ao mínimo',
   DENTRO_DA_FAIXA: 'Dentro da faixa',
-  PROXIMO_AO_PONTO_MEDIO: 'Proximo ao ponto medio',
+  PROXIMO_AO_PONTO_MEDIO: 'Próximo ao ponto medio',
   ACIMA_DO_PONTO_MEDIO: 'Acima do ponto medio',
-  PROXIMO_AO_TETO: 'Proximo ao teto',
+  PROXIMO_AO_TETO: 'Próximo ao teto',
   ACIMA_DA_FAIXA: 'Acima da faixa',
   SEM_TABELA: 'Sem tabela',
-  PENDENTE_ANALISE: 'Pendente de analise',
+  PENDENTE_ANALISE: 'Pendente de análise',
 };
 
 export const DESCRIPTION_STATUS_LABELS: Record<string, string> = {
   DRAFT: 'Rascunho',
-  IN_REVIEW: 'Em revisao',
+  IN_REVIEW: 'Em revisão',
   ADJUSTMENTS_REQUESTED: 'Ajustes solicitados',
-  IN_APPROVAL: 'Em aprovacao',
+  IN_APPROVAL: 'Em aprovação',
   APPROVED: 'Aprovada',
   PUBLISHED: 'Publicada',
   REPLACED: 'Substituida',

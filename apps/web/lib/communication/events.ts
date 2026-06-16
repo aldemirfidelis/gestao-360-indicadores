@@ -32,11 +32,11 @@ export const WS = {
 export type PresenceStatus = 'ONLINE' | 'AWAY' | 'BUSY' | 'DND' | 'OFFLINE';
 
 export const PRESENCE_LABEL: Record<PresenceStatus, string> = {
-  ONLINE: 'Online',
+  ONLINE: 'Conectado',
   AWAY: 'Ausente',
   BUSY: 'Ocupado',
   DND: 'Não perturbe',
-  OFFLINE: 'Offline',
+  OFFLINE: 'Sem conexão',
 };
 
 // Classes Tailwind para o "dot" de presença.

@@ -22,7 +22,7 @@ const PROVIDERS = [
   { value: 'SAP', label: 'SAP' },
   { value: 'APDATA', label: 'Apdata' },
   { value: 'SESUITE', label: 'SE Suite' },
-  { value: 'WEBHOOK', label: 'Webhook' },
+  { value: 'WEBHOOK', label: 'Chamada HTTP' },
 ];
 const DIRECTIONS = [
   { value: 'OUTBOUND', label: 'Saída (enviamos)' },
@@ -201,7 +201,7 @@ function ConnectorsTab() {
                         <option value="pull:results">Puxar resultados</option>
                       </select>
                     )}
-                    <Button size="sm" variant="ghost" className="h-8" title="Logs" onClick={() => setLogsFor(c)}><ScrollText className="h-3.5 w-3.5" /></Button>
+                    <Button size="sm" variant="ghost" className="h-8" title="Registros" onClick={() => setLogsFor(c)}><ScrollText className="h-3.5 w-3.5" /></Button>
                     <Button size="sm" variant="ghost" className="h-8" title="Editar" onClick={() => setEditing(c)}><Pencil className="h-3.5 w-3.5" /></Button>
                     <Button size="sm" variant="ghost" className="h-8 text-destructive" title="Remover" onClick={() => { if (window.confirm('Remover este conector?')) remove.mutate(c.id); }}><Trash2 className="h-3.5 w-3.5" /></Button>
                   </div>
@@ -325,7 +325,7 @@ function LogsDialog({ connector, onClose }: { connector: Connector; onClose: () 
   return (
     <Dialog open onOpenChange={(o) => !o && onClose()}>
       <DialogContent className="max-w-2xl">
-        <DialogHeader><DialogTitle>Logs — {connector.name}</DialogTitle></DialogHeader>
+        <DialogHeader><DialogTitle>Registros — {connector.name}</DialogTitle></DialogHeader>
         <div className="max-h-[60vh] space-y-1 overflow-y-auto">
           {query.isLoading && <div className="py-6 text-center text-sm text-muted-foreground">Carregando...</div>}
           {rows.map((l) => (

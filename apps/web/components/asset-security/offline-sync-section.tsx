@@ -20,15 +20,15 @@ export function OfflineSyncSection() {
 
   return (
     <SectionCard
-      title={`Sincronização offline (${pending} pendente${pending === 1 ? '' : 's'})`}
-      description="Fila de registros capturados pelo app de portaria em modo offline."
+      title={`Sincronização sem conexão (${pending} pendente${pending === 1 ? '' : 's'})`}
+      description="Fila de registros capturados pelo app de portaria em modo sem conexão."
       contentClassName="p-0"
       actions={<Button size="sm" variant="outline" onClick={() => list.refetch()}><RefreshCw className={cn('mr-2 h-4 w-4', list.isFetching && 'animate-spin')} />Atualizar</Button>}
     >
       {list.isPending ? (
         <div className="p-6 text-center text-sm text-muted-foreground">Carregando…</div>
       ) : rows.length === 0 ? (
-        <EmptyState title="Fila vazia" description="Nenhum registro offline pendente de sincronização." className="border-0" />
+        <EmptyState title="Fila vazia" description="Nenhum registro sem conexão pendente de sincronização." className="border-0" />
       ) : (
         <div className="max-h-[60vh] overflow-auto">
           <table className="table-modern">

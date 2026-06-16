@@ -87,7 +87,7 @@ const ESCALATION_EVENTS_MOCK: EscalationEvent[] = [
   },
   {
     id: 'esc-3',
-    workflowName: 'Checklist reprovado',
+    workflowName: 'Lista de verificação reprovada',
     taskTitle: 'Investigar bloqueio do lote de fabricação #451',
     responsibleName: 'João Santos',
     dueAt: '2026-05-28T09:00:00Z',
@@ -234,7 +234,7 @@ export default function SlaMonitoringPage() {
 
                     <h4 className="text-xs font-semibold text-foreground truncate">{event.taskTitle}</h4>
                     <p className="text-[10px] text-muted-foreground truncate">
-                      Workflow: {event.workflowName} • Responsável: {event.responsibleName}
+                      Fluxo de trabalho: {event.workflowName} • Responsável: {event.responsibleName}
                     </p>
                   </div>
 
@@ -294,7 +294,7 @@ export default function SlaMonitoringPage() {
                           <div>
                             <span className="font-bold block text-destructive">Notificação de Alerta Superior Enviada</span>
                             <span className="text-muted-foreground leading-relaxed mt-1 block">
-                              Como a tarefa não foi concluída em {ev.overdueDays} dias, um e-mail de alerta automático contendo o payload e a justificativa foi remetido para a gerência imediata do colaborador.
+                              Como a tarefa não foi concluída em {ev.overdueDays} dias, um e-mail de alerta automático contendo os dados técnicos e a justificativa foi remetido para a gerência imediata do colaborador.
                             </span>
                           </div>
                         </div>

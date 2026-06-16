@@ -93,9 +93,9 @@ interface NcForm {
 const STATUS_LABEL: Record<NcStatus, string> = {
   OPEN: 'Registrada',
   TRIAGE: 'Triagem',
-  ANALYSIS: 'Analise de causa',
-  ACTION: 'Acao corretiva',
-  VERIFICATION: 'Verificacao',
+  ANALYSIS: 'Análise de causa',
+  ACTION: 'Ação corretiva',
+  VERIFICATION: 'Verificação',
   CLOSED: 'Encerrada',
   CANCELLED: 'Cancelada',
 };
@@ -107,7 +107,7 @@ const SOURCE_LABEL: Record<NcSource, string> = {
   CUSTOMER: 'Cliente',
   SUPPLIER: 'Fornecedor',
   PROJECT: 'Projeto',
-  CHECKLIST: 'Checklist',
+  CHECKLIST: 'Lista de verificação',
   INSPECTION: 'Inspecao',
   DOCUMENT: 'Documento',
   MANUAL: 'Manual',
@@ -117,7 +117,7 @@ const SOURCE_LABEL: Record<NcSource, string> = {
 const SEVERITY_LABEL: Record<NcSeverity, string> = {
   MINOR: 'Menor',
   MAJOR: 'Maior',
-  CRITICAL: 'Critica',
+  CRITICAL: 'Crítica',
 };
 
 const SEVERITY_CLASS: Record<NcSeverity, string> = {
@@ -210,20 +210,20 @@ export default function NonConformitiesPage() {
         : api<NonConformity>('/nonconformities', { method: 'POST', json: payload });
     },
     onSuccess: () => {
-      toast.success(editing ? 'Nao conformidade atualizada' : 'Nao conformidade registrada');
+      toast.success(editing ? 'Não conformidade atualizada' : 'Não conformidade registrada');
       closeDialog();
       invalidate(qc);
     },
-    onError: (e: any) => toast.error(e?.message ?? 'Nao foi possivel salvar a NC'),
+    onError: (e: any) => toast.error(e?.message ?? 'Não foi possível salvar a NC'),
   });
 
   const remove = useMutation({
     mutationFn: (id: string) => api<NonConformity>(`/nonconformities/${id}`, { method: 'DELETE' }),
     onSuccess: () => {
-      toast.success('Nao conformidade excluida');
+      toast.success('Não conformidade excluida');
       invalidate(qc);
     },
-    onError: (e: any) => toast.error(e?.message ?? 'Nao foi possivel excluir a NC'),
+    onError: (e: any) => toast.error(e?.message ?? 'Não foi possível excluir a NC'),
   });
 
   const openCreate = () => {
@@ -277,16 +277,16 @@ export default function NonConformitiesPage() {
   return (
     <div>
       <PageHeader
-        title="Nao Conformidades"
-        description="Registro de NCs com contencao, analise de causa, acao corretiva e verificacao de eficacia."
+        title="Não Conformidades"
+        description="Registro de NCs com contenção, análise de causa, ação corretiva e verificação de eficácia."
         actions={canCreate ? <Button onClick={openCreate}><Plus className="mr-2 h-4 w-4" />Nova NC</Button> : null}
       />
 
       <div className="mb-6 grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
         <MetricCard title="NCs abertas" value={formatNumber(summary?.open)} description={`${formatNumber(summary?.total)} registradas`} icon={<FileWarning className="h-4 w-4" />} tone="blue" />
-        <MetricCard title="Criticas" value={formatNumber(summary?.critical)} description="Severidade critica em aberto" icon={<AlertTriangle className="h-4 w-4" />} tone={(summary?.critical ?? 0) > 0 ? 'red' : 'green'} />
+        <MetricCard title="Críticas" value={formatNumber(summary?.critical)} description="Severidade crítica em aberto" icon={<AlertTriangle className="h-4 w-4" />} tone={(summary?.critical ?? 0) > 0 ? 'red' : 'green'} />
         <MetricCard title="Prazos vencidos" value={formatNumber(summary?.overdue)} description="NCs abertas fora do prazo" icon={<CalendarClock className="h-4 w-4" />} tone={(summary?.overdue ?? 0) > 0 ? 'yellow' : 'green'} />
-        <MetricCard title="Eficazes" value={formatNumber(summary?.effective)} description="Acao corretiva verificada" icon={<CheckCircle2 className="h-4 w-4" />} tone="purple" />
+        <MetricCard title="Eficazes" value={formatNumber(summary?.effective)} description="Ação corretiva verificada" icon={<CheckCircle2 className="h-4 w-4" />} tone="purple" />
       </div>
 
       <div className="mb-6 grid grid-cols-1 gap-4 xl:grid-cols-[1fr,360px]">
@@ -295,7 +295,7 @@ export default function NonConformitiesPage() {
             <div className="mb-3 flex items-center justify-between gap-2">
               <div>
                 <div className="text-sm font-semibold">NCs prioritarias</div>
-                <div className="text-xs text-muted-foreground">Maior severidade entre as NCs visiveis para voce.</div>
+                <div className="text-xs text-muted-foreground">Maior severidade entre as NCs visiveis para você.</div>
               </div>
               <AlertTriangle className="h-4 w-4 text-muted-foreground" />
             </div>
@@ -308,7 +308,7 @@ export default function NonConformitiesPage() {
                   <div className="min-w-0">
                     <div className="truncate text-sm font-medium">#{nc.number} {nc.title}</div>
                     <div className="mt-1 text-xs text-muted-foreground">
-                      {SOURCE_LABEL[nc.source]} - {nc.responsibleUser?.name ?? 'Sem responsavel'} - prazo {formatDate(nc.dueDate)}
+                      {SOURCE_LABEL[nc.source]} - {nc.responsibleUser?.name ?? 'Sem responsável'} - prazo {formatDate(nc.dueDate)}
                     </div>
                     {nc.indicator && <div className="mt-1 text-[11px] text-primary">KPI {nc.indicator.code ? `[${nc.indicator.code}] ` : ''}{nc.indicator.name}</div>}
                   </div>
@@ -326,7 +326,7 @@ export default function NonConformitiesPage() {
           <CardContent className="p-4">
             <div className="mb-3 flex items-center gap-2 text-sm font-semibold"><Filter className="h-4 w-4" />Filtros</div>
             <div className="space-y-3">
-              <Input placeholder="Buscar por titulo, causa, KPI..." value={filters.search} onChange={(e) => setFilters((f) => ({ ...f, search: e.target.value }))} />
+              <Input placeholder="Buscar por título, causa, KPI..." value={filters.search} onChange={(e) => setFilters((f) => ({ ...f, search: e.target.value }))} />
               <NativeSelect value={filters.status} onChange={(e) => setFilters((f) => ({ ...f, status: e.target.value }))}>
                 <option value="">Todos os status</option>
                 {Object.entries(STATUS_LABEL).map(([value, label]) => <option key={value} value={value}>{label}</option>)}
@@ -349,7 +349,7 @@ export default function NonConformitiesPage() {
         {items.length === 0 && (
           <Card className="xl:col-span-2">
             <CardContent className="p-8 text-center text-sm text-muted-foreground">
-              {listQuery.isLoading ? 'Carregando nao conformidades...' : 'Nenhuma NC encontrada para os filtros atuais.'}
+              {listQuery.isLoading ? 'Carregando não conformidades...' : 'Nenhuma NC encontrada para os filtros atuais.'}
             </CardContent>
           </Card>
         )}
@@ -365,7 +365,7 @@ export default function NonConformitiesPage() {
                     <Badge variant="secondary">{SOURCE_LABEL[nc.source]}</Badge>
                   </div>
                   <h2 className="mt-3 truncate text-base font-semibold">{nc.title}</h2>
-                  <p className="mt-1 line-clamp-2 text-sm text-muted-foreground">{nc.description || 'Sem descricao registrada.'}</p>
+                  <p className="mt-1 line-clamp-2 text-sm text-muted-foreground">{nc.description || 'Sem descrição registrada.'}</p>
                 </div>
                 <div className="flex shrink-0 items-center gap-1">
                   {canUpdate && <Button variant="ghost" size="icon" onClick={() => openEdit(nc)} title="Editar NC"><Edit className="h-4 w-4" /></Button>}
@@ -373,7 +373,7 @@ export default function NonConformitiesPage() {
                     <Button
                       variant="ghost"
                       size="icon"
-                      onClick={() => window.confirm('Excluir esta nao conformidade?') && remove.mutate(nc.id)}
+                      onClick={() => window.confirm('Excluir esta não conformidade?') && remove.mutate(nc.id)}
                       disabled={remove.isPending}
                       title="Excluir NC"
                     >
@@ -384,12 +384,12 @@ export default function NonConformitiesPage() {
               </div>
 
               <div className="mt-4 grid grid-cols-1 gap-2 text-xs text-muted-foreground sm:grid-cols-2">
-                <div>Area/processo: <span className="text-foreground">{nc.orgNode?.name ?? '-'}</span></div>
-                <div>Responsavel: <span className="text-foreground">{nc.responsibleUser?.name ?? '-'}</span></div>
+                <div>Área/processo: <span className="text-foreground">{nc.orgNode?.name ?? '-'}</span></div>
+                <div>Responsável: <span className="text-foreground">{nc.responsibleUser?.name ?? '-'}</span></div>
                 <div>KPI: <span className="text-foreground">{nc.indicator ? `${nc.indicator.code ? `[${nc.indicator.code}] ` : ''}${nc.indicator.name}` : '-'}</span></div>
                 <div>Desvio: <span className="text-foreground">{nc.deviation ? `#${nc.deviation.number}` : '-'}</span></div>
                 <div>Prazo: <span className={cn('text-foreground', nc.isOverdue && 'text-status-yellow')}>{formatDate(nc.dueDate)}</span></div>
-                <div>Acao corretiva: <span className="text-foreground">{nc.correctiveAction?.title ?? '-'}</span></div>
+                <div>Ação corretiva: <span className="text-foreground">{nc.correctiveAction?.title ?? '-'}</span></div>
               </div>
 
               {(nc.rootCause || nc.effectivenessOk !== null) && (
@@ -397,7 +397,7 @@ export default function NonConformitiesPage() {
                   {nc.rootCause && <div><span className="text-muted-foreground">Causa raiz: </span>{nc.rootCause}</div>}
                   {nc.effectivenessOk !== null && (
                     <div className={cn('mt-1 font-medium', nc.effectivenessOk ? 'text-status-green' : 'text-status-red')}>
-                      Eficacia: {nc.effectivenessOk ? 'verificada (eficaz)' : 'reprovada'}
+                      Eficácia: {nc.effectivenessOk ? 'verificada (eficaz)' : 'reprovada'}
                     </div>
                   )}
                 </div>
@@ -410,12 +410,12 @@ export default function NonConformitiesPage() {
       <Dialog open={open} onOpenChange={(v) => (v ? setOpen(true) : closeDialog())}>
         <DialogContent className="max-w-3xl">
           <DialogHeader>
-            <DialogTitle>{editing ? `Editar NC #${editing.number}` : 'Nova nao conformidade'}</DialogTitle>
+            <DialogTitle>{editing ? `Editar NC #${editing.number}` : 'Nova não conformidade'}</DialogTitle>
           </DialogHeader>
 
           <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
             <div className="md:col-span-2">
-              <Label>Titulo</Label>
+              <Label>Título</Label>
               <Input value={form.title} onChange={(e) => setForm((f) => ({ ...f, title: e.target.value }))} />
             </div>
             <div>
@@ -441,16 +441,16 @@ export default function NonConformitiesPage() {
               <Input type="date" value={form.dueDate} onChange={(e) => setForm((f) => ({ ...f, dueDate: e.target.value }))} />
             </div>
             <div>
-              <Label>Area/processo</Label>
+              <Label>Área/processo</Label>
               <NativeSelect value={form.orgNodeId} onChange={(e) => setForm((f) => ({ ...f, orgNodeId: e.target.value }))}>
-                <option value="">Sem area direta</option>
+                <option value="">Sem área direta</option>
                 {(options?.orgNodes ?? []).map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}
               </NativeSelect>
             </div>
             <div>
-              <Label>Responsavel</Label>
+              <Label>Responsável</Label>
               <NativeSelect value={form.responsibleUserId} onChange={(e) => setForm((f) => ({ ...f, responsibleUserId: e.target.value }))}>
-                <option value="">Sem responsavel</option>
+                <option value="">Sem responsável</option>
                 {(options?.users ?? []).map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}
               </NativeSelect>
             </div>
@@ -469,26 +469,26 @@ export default function NonConformitiesPage() {
               </NativeSelect>
             </div>
             <div>
-              <Label>Acao corretiva (plano)</Label>
+              <Label>Ação corretiva (plano)</Label>
               <NativeSelect value={form.correctiveActionId} onChange={(e) => setForm((f) => ({ ...f, correctiveActionId: e.target.value }))}>
                 <option value="">Sem plano vinculado</option>
                 {(options?.actions ?? []).map((item) => <option key={item.id} value={item.id}>{item.title}</option>)}
               </NativeSelect>
             </div>
             <div>
-              <Label>Eficacia verificada?</Label>
+              <Label>Eficácia verificada?</Label>
               <NativeSelect value={form.effectivenessOk} onChange={(e) => setForm((f) => ({ ...f, effectivenessOk: e.target.value }))}>
-                <option value="">Nao avaliada</option>
+                <option value="">Não avaliada</option>
                 <option value="true">Eficaz</option>
                 <option value="false">Ineficaz</option>
               </NativeSelect>
             </div>
             <div className="md:col-span-2">
-              <Label>Descricao</Label>
+              <Label>Descrição</Label>
               <Textarea rows={2} value={form.description} onChange={(e) => setForm((f) => ({ ...f, description: e.target.value }))} />
             </div>
             <div className="md:col-span-2">
-              <Label>Acao imediata / contencao</Label>
+              <Label>Ação imediata / contenção</Label>
               <Textarea rows={2} value={form.immediateAction} onChange={(e) => setForm((f) => ({ ...f, immediateAction: e.target.value }))} />
             </div>
             <div>
@@ -500,7 +500,7 @@ export default function NonConformitiesPage() {
               <Textarea rows={3} value={form.correctivePlan} onChange={(e) => setForm((f) => ({ ...f, correctivePlan: e.target.value }))} />
             </div>
             <div className="md:col-span-2">
-              <Label>Verificacao de eficacia</Label>
+              <Label>Verificação de eficácia</Label>
               <Textarea rows={2} value={form.effectivenessCheck} onChange={(e) => setForm((f) => ({ ...f, effectivenessCheck: e.target.value }))} />
             </div>
           </div>

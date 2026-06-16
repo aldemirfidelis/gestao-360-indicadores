@@ -76,7 +76,7 @@ export function AuditLogSection({ users }: { users: Opt }) {
                   <td className="whitespace-nowrap text-xs">{formatDateTime(r.createdAt)}</td>
                   <td className="text-xs font-medium">{ACTION_LABELS[r.action] ?? r.action}</td>
                   <td className="max-w-[280px] truncate text-xs">{r.recordLabel ?? r.entityId ?? r.entity}</td>
-                  <td className="text-xs">{r.userId ? (userMap.get(r.userId) ?? '—') : (r.offline ? 'Offline' : '—')}</td>
+                  <td className="text-xs">{r.userId ? (userMap.get(r.userId) ?? '—') : (r.offline ? 'Sem conexão' : '—')}</td>
                   <td className="text-xs text-muted-foreground">{r.origin ?? '—'}</td>
                 </tr>
               ))}

@@ -76,7 +76,7 @@ export default function DescricoesPage() {
   async function sendToGed(record: DescriptionRecord) {
     try {
       const res = await api<{ documentId: string; code: string | null }>(`/cargos-salarios/descriptions/${record.id}/document`, { method: 'POST' });
-      toast.success(`Documento ${res.code ?? ''} criado no GED. Edite online por lá.`);
+      toast.success(`Documento ${res.code ?? ''} criado no GED. Edite pela web por lá.`);
       router.push('/documents');
     } catch (error: any) {
       toast.error(error?.message ?? 'Falha ao enviar ao GED');
@@ -101,7 +101,7 @@ export default function DescricoesPage() {
       <PageHeader
         eyebrow="Cargos e Salários"
         title="Descrições de Cargos"
-        description="Elaboração e versionamento das descrições com workflow de revisão, aprovação e publicação."
+        description="Elaboração e versionamento das descrições com fluxo de trabalho de revisão, aprovação e publicação."
         breadcrumbs={[{ label: 'Início', href: '/' }, { label: 'Cargos e Salários', href: '/cargos-salarios' }, { label: 'Descrições' }]}
       />
       <CompensationModuleNav />
@@ -181,7 +181,7 @@ export default function DescricoesPage() {
                         <Button variant="ghost" size="sm" onClick={() => setEditor({ mode: 'edit', record: item })}>
                           <Pencil className="mr-1.5 h-3.5 w-3.5" /> Editar
                         </Button>
-                        <Button variant="ghost" size="sm" onClick={() => sendToGed(item)} title="Cria um documento controlado no GED, editável online (Collabora)">
+                        <Button variant="ghost" size="sm" onClick={() => sendToGed(item)} title="Cria um documento controlado no GED, editável pela web (Collabora)">
                           <Send className="mr-1.5 h-3.5 w-3.5" /> Enviar ao GED
                         </Button>
                       </>

@@ -110,7 +110,7 @@ export function HelpTab() {
     <div className="grid gap-4 xl:grid-cols-[360px_1fr]">
       <SectionCard
         title="Artigos"
-        description="Conteudo exibido na Central de Ajuda."
+        description="Conteúdo exibido na Central de Ajuda."
         actions={
           <Button size="sm" onClick={startNew}>
             <Plus className="mr-2 h-4 w-4" /> Novo
@@ -146,7 +146,7 @@ export function HelpTab() {
 
       <SectionCard
         title={form.id ? 'Editar artigo' : 'Novo artigo'}
-        description="Alteracoes salvas aqui aparecem na Central de Ajuda."
+        description="Alterações salvas aqui aparecem na Central de Ajuda."
         actions={
           <Button onClick={() => save.mutate()} disabled={save.isPending || !form.title.trim() || !form.body.trim()}>
             <Save className="mr-2 h-4 w-4" /> Salvar
@@ -155,12 +155,12 @@ export function HelpTab() {
       >
         <div className="grid gap-3 md:grid-cols-2">
           <div className="space-y-1.5">
-            <Label>Titulo</Label>
+            <Label>Título</Label>
             <Input value={form.title} onChange={(e) => setForm((current) => ({ ...current, title: e.target.value }))} />
           </div>
           <div className="space-y-1.5">
             <Label>Slug</Label>
-            <Input value={form.slug} onChange={(e) => setForm((current) => ({ ...current, slug: e.target.value }))} placeholder="gerado pelo titulo" />
+            <Input value={form.slug} onChange={(e) => setForm((current) => ({ ...current, slug: e.target.value }))} placeholder="gerado pelo título" />
           </div>
           <div className="space-y-1.5">
             <Label>Categoria</Label>
@@ -187,13 +187,13 @@ export function HelpTab() {
             <Input value={form.tags} onChange={(e) => setForm((current) => ({ ...current, tags: e.target.value }))} placeholder="separadas por virgula" />
           </div>
           <div className="space-y-1.5 md:col-span-2">
-            <Label>Conteudo</Label>
+            <Label>Conteúdo</Label>
             <Textarea value={form.body} onChange={(e) => setForm((current) => ({ ...current, body: e.target.value }))} rows={12} />
           </div>
         </div>
         <div className="mt-4 flex items-center gap-2 rounded-md border bg-muted/20 px-3 py-2 text-xs text-muted-foreground">
           <BookOpen className="h-4 w-4" />
-          Artigos publicados ficam disponiveis em /ajuda para usuarios autenticados.
+          Artigos publicados ficam disponíveis em /ajuda para usuários autenticados.
         </div>
       </SectionCard>
     </div>

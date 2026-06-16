@@ -102,7 +102,7 @@ export function NotificationsBell() {
           <DialogHeader>
             <DialogTitle>Notificações</DialogTitle>
             <DialogDescription>
-              {unread > 0 ? `${unread} nao lida(s)` : 'Tudo em dia.'}
+              {unread > 0 ? `${unread} não lida(s)` : 'Tudo em dia.'}
             </DialogDescription>
           </DialogHeader>
 

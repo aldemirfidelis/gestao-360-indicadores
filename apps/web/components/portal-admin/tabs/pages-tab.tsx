@@ -16,7 +16,7 @@ import { cn } from '@/lib/utils';
 import { PORTAL_STATUS_TONE, type PortalPageRow } from '@/components/portal-admin/types';
 
 const ROLES = [
-  { value: 'SUPER_ADMIN', label: 'Super Admin' },
+  { value: 'SUPER_ADMIN', label: 'superadministrador' },
   { value: 'COMPANY_ADMIN', label: 'Admin da Empresa' },
   { value: 'DIRECTOR', label: 'Diretor' },
   { value: 'MANAGER', label: 'Gestor' },

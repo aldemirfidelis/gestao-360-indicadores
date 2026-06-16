@@ -127,7 +127,7 @@ function ImportCard({ tables }: { tables: TableSummary[] }) {
   }
 
   return (
-    <SectionCard title="Importar" description="CSV ou JSON. Pré-visualize, mapeie colunas, escolha a estratégia. Tudo roda em transação com snapshot.">
+    <SectionCard title="Importar" description="CSV ou JSON. Pré-visualize, mapeie colunas, escolha a estratégia. Tudo roda em transação com retrato.">
       <div className="space-y-3">
         <div className="grid grid-cols-1 gap-3 md:grid-cols-3">
           <div>
@@ -208,7 +208,7 @@ function ImportCard({ tables }: { tables: TableSummary[] }) {
         {report && (
           <div className="rounded-lg border border-status-green/30 bg-status-green/10 p-3 text-sm">
             <div className="font-medium">Resultado: +{report.inserted} inserido(s) · {report.skipped} ignorado(s) · {report.failed} falha(s) de {report.totalRows}</div>
-            {report.backupId && <div className="text-xs text-muted-foreground">Snapshot criado antes da operação.</div>}
+            {report.backupId && <div className="text-xs text-muted-foreground">Retrato criado antes da operação.</div>}
             {report.errors.length > 0 && (
               <details className="mt-2 text-xs">
                 <summary className="cursor-pointer">Ver {report.errors.length} erro(s)</summary>

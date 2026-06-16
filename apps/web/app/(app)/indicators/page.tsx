@@ -605,7 +605,7 @@ export default function IndicatorsPage() {
       <div className="mb-5 grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4">
         <MetricCard compact title="Total de indicadores" value={formatNumber(rows.length)} description={`${formatNumber(stats.active)} ativos`} icon={<Target className="h-4 w-4" />} tone="blue" />
         <MetricCard compact title="Críticos" value={formatNumber(stats.red)} description="Fora da meta no último período" icon={<AlertTriangle className="h-4 w-4" />} tone="red" />
-        <MetricCard compact title="Sem responsável" value={formatNumber(stats.withoutOwner)} description="Revisar governanca" icon={<UserRound className="h-4 w-4" />} tone="yellow" />
+        <MetricCard compact title="Sem responsável" value={formatNumber(stats.withoutOwner)} description="Revisar governança" icon={<UserRound className="h-4 w-4" />} tone="yellow" />
         <MetricCard compact title="Sem dados mensais" value={formatNumber(stats.withoutMonthlyData)} description="Precisam de lançamento" icon={<FileClock className="h-4 w-4" />} tone="purple" />
       </div>
 
@@ -1598,7 +1598,7 @@ function IndicatorFormDialog({
           </Field>
           <Field label="Indicador macro (pai)">
             <NativeSelect value={form.parentIndicatorId} onChange={(e) => patchForm(setForm, { parentIndicatorId: e.target.value })}>
-              <option value="">Sem vínculo (indicador macro proprio)</option>
+              <option value="">Sem vínculo (indicador macro próprio)</option>
               {parentIndicatorOptions.map((row) => (
                 <option key={row.id} value={row.id}>
                   {row.code ? `${row.code} - ` : ''}{row.name}
@@ -1693,7 +1693,7 @@ function IndicatorFormDialog({
           <Field label="Categoria">
             <Input value={form.category} onChange={(e) => patchForm(setForm, { category: e.target.value })} placeholder="Opcional" />
           </Field>
-          <Field label="Descrição e observacoes" className="md:col-span-2 xl:col-span-3">
+          <Field label="Descrição e observações" className="md:col-span-2 xl:col-span-3">
             <Textarea rows={3} value={form.description} onChange={(e) => patchForm(setForm, { description: e.target.value })} />
           </Field>
         </div>

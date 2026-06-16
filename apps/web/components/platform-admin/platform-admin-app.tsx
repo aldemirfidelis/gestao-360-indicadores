@@ -211,25 +211,25 @@ interface CompanyAuditEntry {
 // Barra lateral agrupada por contexto. A antiga aba "Configuracoes" (landing de
 // cards) foi removida por duplicar a propria barra — cada destino segue aqui.
 const SECTIONS: SectionItem[] = [
-  { key: 'dashboard', label: 'Dashboard', icon: LayoutDashboard, group: 'Geral' },
+  { key: 'dashboard', label: 'Painel', icon: LayoutDashboard, group: 'Geral' },
   // Gestao dos clientes da plataforma (global, independe da empresa selecionada).
   { key: 'companies', label: 'Empresas', icon: Building2, group: 'Plataforma' },
-  { key: 'modules', label: 'Matriz de Modulos', icon: PackageCheck, group: 'Plataforma' },
+  { key: 'modules', label: 'Matriz de Módulos', icon: PackageCheck, group: 'Plataforma' },
   { key: 'plans', label: 'Planos', icon: ListChecks, group: 'Plataforma' },
   { key: 'seoPresence', label: 'SEO e Presenca Digital', icon: Globe2, group: 'Plataforma' },
-  { key: 'users', label: 'Usuarios', icon: Users, group: 'Plataforma' },
+  { key: 'users', label: 'Usuários', icon: Users, group: 'Plataforma' },
   { key: 'security', label: 'Seguranca e Suporte', icon: ShieldCheck, group: 'Plataforma' },
   // Operam sobre a empresa selecionada no seletor do topo.
   { key: 'generalSettings', label: 'Config. Gerais', icon: Settings2, group: 'Empresa selecionada' },
   { key: 'visibilityAdmin', label: 'Visibilidade', icon: Eye, group: 'Empresa selecionada' },
-  { key: 'orgStructure', label: 'Areas e Setores', icon: Network, group: 'Empresa selecionada' },
+  { key: 'orgStructure', label: 'Áreas e Setores', icon: Network, group: 'Empresa selecionada' },
   { key: 'externalIntegrations', label: 'APIs Externas', icon: ArrowLeftRight, group: 'Empresa selecionada' },
   { key: 'companyAudit', label: 'Auditoria Empresa', icon: Activity, group: 'Empresa selecionada' },
   // Ferramentas tecnicas/globais.
-  { key: 'databaseAdmin', label: 'Banco de Dados', icon: Database, group: 'Tecnico' },
-  { key: 'portalAdmin', label: 'Central do Portal', icon: Wrench, group: 'Tecnico' },
-  { key: 'technical', label: 'Desenvolvimento', icon: ServerCog, group: 'Tecnico' },
-  { key: 'audit', label: 'Auditoria', icon: Activity, group: 'Tecnico' },
+  { key: 'databaseAdmin', label: 'Banco de Dados', icon: Database, group: 'Técnico' },
+  { key: 'portalAdmin', label: 'Central do Portal', icon: Wrench, group: 'Técnico' },
+  { key: 'technical', label: 'Desenvolvimento', icon: ServerCog, group: 'Técnico' },
+  { key: 'audit', label: 'Auditoria', icon: Activity, group: 'Técnico' },
 ];
 
 const MODULE_STATUSES = [
@@ -313,92 +313,92 @@ const SETTINGS_AREAS: Array<{
   icon: LucideIcon;
 }> = [
   {
-    title: 'Configuracoes gerais',
-    description: 'Usuarios, perfis de acesso, permissoes, parametros, empresas, filiais e sistema.',
-    action: 'Abrir configuracoes',
+    title: 'Configurações gerais',
+    description: 'Usuários, perfis de acesso, permissões, parâmetros, empresas, filiais e sistema.',
+    action: 'Abrir configurações',
     target: 'generalSettings',
     icon: Settings2,
   },
   {
     title: 'Matriz de visibilidade',
-    description: 'Controle de acesso entre areas, excecoes por usuario e simulacao por empresa.',
+    description: 'Controle de acesso entre áreas, excecoes por usuário e simulação por empresa.',
     action: 'Abrir visibilidade',
     target: 'visibilityAdmin',
     icon: Eye,
   },
   {
-    title: 'Areas e Setores',
-    description: 'Arvore hierarquica da empresa, responsaveis, codigos, cores e status dos nos.',
+    title: 'Áreas e Setores',
+    description: 'Arvore hierarquica da empresa, responsáveis, códigos, cores e status dos nos.',
     action: 'Abrir estrutura',
     target: 'orgStructure',
     icon: Network,
   },
   {
     title: 'APIs externas',
-    description: 'Conectores, chaves de API, credenciais cifradas, testes, execucoes e logs.',
+    description: 'Conectores, chaves de API, credenciais cifradas, testes, execuções e registros.',
     action: 'Abrir APIs',
     target: 'externalIntegrations',
     icon: ArrowLeftRight,
   },
   {
     title: 'Banco de dados',
-    description: 'Menu completo com tabelas, registros, SQL, estrutura, indices, importacao, backup e diagnostico.',
+    description: 'Menu completo com tabelas, registros, SQL, estrutura, índices, importação, backup e diagnostico.',
     action: 'Abrir banco',
     target: 'databaseAdmin',
     icon: Database,
   },
   {
     title: 'Central do Portal',
-    description: 'Modulos, paginas, funcionalidades, menus, escopo, manutencao, snapshots e parametros avancados.',
+    description: 'Módulos, páginas, funcionalidades, menus, escopo, manutenção, históricos e parâmetros avançados.',
     action: 'Abrir portal',
     target: 'portalAdmin',
     icon: Wrench,
   },
   {
     title: 'Empresas',
-    description: 'Cadastro, status, contrato, saude e limites ficam centralizados por empresa.',
+    description: 'Cadastro, status, contrato, saúde e limites ficam centralizados por empresa.',
     action: 'Abrir empresas',
     target: 'companies',
     icon: Building2,
   },
   {
-    title: 'Modulos e menus',
-    description: 'Liberacao de modulos, paginas, visibilidade e comportamento por cliente.',
+    title: 'Módulos e menus',
+    description: 'Liberação de módulos, páginas, visibilidade e comportamento por cliente.',
     action: 'Abrir matriz',
     target: 'modules',
     icon: PackageCheck,
   },
   {
     title: 'Planos',
-    description: 'Pacotes comerciais, limites padrao e conjunto inicial de modulos.',
+    description: 'Pacotes comerciais, limites padrão e conjunto inicial de módulos.',
     action: 'Abrir planos',
     target: 'plans',
     icon: ListChecks,
   },
   {
-    title: 'Usuarios globais',
-    description: 'Consulta, bloqueio e revogacao de sessoes dos usuarios das empresas.',
-    action: 'Abrir usuarios',
+    title: 'Usuários globais',
+    description: 'Consulta, bloqueio e revogação de sessões dos usuários das empresas.',
+    action: 'Abrir usuários',
     target: 'users',
     icon: Users,
   },
   {
-    title: 'Seguranca e suporte',
-    description: 'Sessoes abertas, suporte somente leitura e controles operacionais.',
-    action: 'Abrir seguranca',
+    title: 'Segurança e suporte',
+    description: 'Sessões abertas, suporte somente leitura e controles operacionais.',
+    action: 'Abrir segurança',
     target: 'security',
     icon: ShieldCheck,
   },
   {
-    title: 'Banco e integracoes',
-    description: 'Saude do banco, backups, ambientes, flags, integracoes e jobs.',
-    action: 'Abrir tecnico',
+    title: 'Banco e integrações',
+    description: 'Saúde do banco, backups, ambientes, opções, integrações e rotinas.',
+    action: 'Abrir técnico',
     target: 'technical',
     icon: ServerCog,
   },
   {
     title: 'Auditoria da empresa',
-    description: 'Trilha de acessos, alteracoes, permissoes, parametros e registros da empresa selecionada.',
+    description: 'Trilha de acessos, alterações, permissões, parâmetros e registros da empresa selecionada.',
     action: 'Abrir auditoria',
     target: 'companyAudit',
     icon: Activity,
@@ -513,7 +513,7 @@ export function PlatformAdminApp() {
   const sync = useMutation({
     mutationFn: () => platformAdminApi('/sync-foundation', { method: 'POST' }),
     onSuccess: () => {
-      toast.success('Fundacao sincronizada');
+      toast.success('Fundação sincronizada');
       void queryClient.invalidateQueries({ queryKey: ['platform-admin'] });
     },
     onError: (err) => toast.error(err instanceof Error ? err.message : 'Falha ao sincronizar'),
@@ -578,15 +578,15 @@ export function PlatformAdminApp() {
   }
 
   if (me.isLoading) {
-    return <div className="grid min-h-screen place-items-center bg-[#f4f7f8] text-sm text-muted-foreground">Carregando Portal Admin Global...</div>;
+    return <div className="grid min-h-screen place-items-center bg-[#f4f7f8] text-sm text-muted-foreground">Carregando Portal Administrativo Global...</div>;
   }
 
   return (
     <main className="flex h-screen overflow-hidden bg-[#f4f7f8] text-foreground">
       <aside className="hidden w-[280px] shrink-0 border-r bg-[#101820] text-white lg:flex lg:flex-col">
         <div className="border-b border-white/10 px-5 py-4">
-          <div className="text-xs font-semibold uppercase tracking-[0.18em] text-white/45">Gestao 360</div>
-          <div className="mt-1 text-lg font-semibold">Portal Admin Global</div>
+          <div className="text-xs font-semibold uppercase tracking-[0.18em] text-white/45">Gestão 360</div>
+          <div className="mt-1 text-lg font-semibold">Portal Administrativo Global</div>
         </div>
         <nav className="min-h-0 flex-1 overflow-y-auto p-2">
           {SECTIONS.map((item, idx) => {
@@ -689,7 +689,7 @@ export function PlatformAdminApp() {
 function SettingsSection({ onNavigate }: { onNavigate: (section: SectionKey) => void }) {
   return (
     <div className="space-y-4">
-      <Panel title="Configuracoes da plataforma" icon={SlidersHorizontal}>
+      <Panel title="Configurações da plataforma" icon={SlidersHorizontal}>
         <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
           {SETTINGS_AREAS.map((area) => {
             const Icon = area.icon;
@@ -716,16 +716,16 @@ function SettingsSection({ onNavigate }: { onNavigate: (section: SectionKey) => 
       <div className="grid gap-4 xl:grid-cols-2">
         <Panel title="Escopo das empresas" icon={Users}>
           <div className="space-y-2 text-sm">
-            <Row label="Portal da empresa" value="Usuarios da propria empresa" />
+            <Row label="Portal da empresa" value="Usuários da própria empresa" />
             <Row label="Rotas antigas /settings" value="Redirecionadas para /users" />
-            <Row label="Administracao global" value="Portal Admin Global" />
+            <Row label="Administração global" value="Portal Admin Global" />
           </div>
         </Panel>
         <Panel title="Controles centralizados" icon={ShieldCheck}>
           <div className="space-y-2 text-sm">
-            <Row label="Empresas, planos e modulos" value="Portal Admin Global" />
+            <Row label="Empresas, planos e módulos" value="Portal Admin Global" />
             <Row label="Portal, menus e visibilidade" value="Matriz de Modulos" />
-            <Row label="Banco, integracoes e auditoria" value="Desenvolvimento e Auditoria" />
+            <Row label="Banco, integrações e auditoria" value="Desenvolvimento e Auditoria" />
           </div>
         </Panel>
       </div>
@@ -861,20 +861,20 @@ function CompanyAuditSection() {
             <Input className="pl-9" placeholder="Pesquisar no log..." value={filters.q} onChange={(event) => setFilters({ ...filters, q: event.target.value })} />
           </div>
           <NativeSelect value={filters.action} onChange={(event) => setFilters({ ...filters, action: event.target.value })}>
-            <option value="">Todas as acoes</option>
+            <option value="">Todas as ações</option>
             <option value="LOGIN">Login</option>
             <option value="LOGOUT">Logout</option>
-            <option value="CREATE">Criacao</option>
-            <option value="UPDATE">Edicao</option>
-            <option value="DELETE">Exclusao</option>
-            <option value="PERMISSION_CHANGE">Permissao</option>
+            <option value="CREATE">Criação</option>
+            <option value="UPDATE">Edição</option>
+            <option value="DELETE">Exclusão</option>
+            <option value="PERMISSION_CHANGE">Permissão</option>
           </NativeSelect>
           <NativeSelect value={filters.module} onChange={(event) => setFilters({ ...filters, module: event.target.value })}>
-            <option value="">Todos os modulos</option>
+            <option value="">Todos os módulos</option>
             {modules.map((module) => <option key={module} value={module}>{module}</option>)}
           </NativeSelect>
           <NativeSelect value={filters.userId} onChange={(event) => setFilters({ ...filters, userId: event.target.value })}>
-            <option value="">Todos usuarios</option>
+            <option value="">Todos usuários</option>
             {users.map((user) => <option key={user.id} value={user.id}>{user.name}</option>)}
           </NativeSelect>
           <Input type="date" value={filters.from} onChange={(event) => setFilters({ ...filters, from: event.target.value })} />
@@ -888,12 +888,12 @@ function CompanyAuditSection() {
             <thead>
               <tr>
                 <th>Quando</th>
-                <th>Usuario</th>
-                <th>Acao</th>
-                <th>Modulo</th>
+                <th>Usuário</th>
+                <th>Ação</th>
+                <th>Módulo</th>
                 <th>Registro afetado</th>
                 <th>Resultado</th>
-                <th>IP / sessao</th>
+                <th>IP / sessão</th>
                 <th />
               </tr>
             </thead>
@@ -944,13 +944,13 @@ function CompanyAuditSection() {
           {selected && (
             <div className="space-y-4">
               <div className="grid grid-cols-1 gap-3 md:grid-cols-4">
-                <AuditDetail label="Acao" value={selected.action} />
-                <AuditDetail label="Modulo" value={selected.module ?? '-'} />
+                <AuditDetail label="Ação" value={selected.action} />
+                <AuditDetail label="Módulo" value={selected.module ?? '-'} />
                 <AuditDetail label="Entidade" value={selected.entity} />
                 <AuditDetail label="Resultado" value={selected.result ?? 'SUCCESS'} />
               </div>
               <AuditPayload title="Valor anterior" value={selected.beforeValue} />
-              <AuditPayload title="Valor novo / payload" value={selected.afterValue ?? selected.payload} />
+              <AuditPayload title="Valor novo / dados técnicos" value={selected.afterValue ?? selected.payload} />
               <AuditPayload title="Metadados" value={selected.payload} />
             </div>
           )}
@@ -1069,18 +1069,18 @@ function SeoPresenceSection() {
         actions={<Button size="sm" onClick={() => save.mutate()} disabled={save.isPending}><Save className="mr-2 h-4 w-4" />Salvar</Button>}
       >
         <div className="grid gap-4 lg:grid-cols-2">
-          <SeoField label="Titulo padrao" value={form.defaultTitle} onChange={(value) => setForm({ ...form, defaultTitle: value })} />
+          <SeoField label="Título padrão" value={form.defaultTitle} onChange={(value) => setForm({ ...form, defaultTitle: value })} />
           <SeoField label="Nome do produto" value={form.productName} onChange={(value) => setForm({ ...form, productName: value })} />
           <SeoField label="Dominio principal" value={form.primaryDomain} onChange={(value) => setForm({ ...form, primaryDomain: value })} />
-          <SeoField label="Imagem social padrao" value={form.defaultSocialImage} onChange={(value) => setForm({ ...form, defaultSocialImage: value })} />
+          <SeoField label="Imagem social padrão" value={form.defaultSocialImage} onChange={(value) => setForm({ ...form, defaultSocialImage: value })} />
           <SeoField label="Google Analytics 4" value={form.gaMeasurementId} onChange={(value) => setForm({ ...form, gaMeasurementId: value })} />
           <SeoField label="Google Tag Manager" value={form.gtmId} onChange={(value) => setForm({ ...form, gtmId: value })} />
-          <SeoField label="Codigo Search Console" value={form.googleVerification} onChange={(value) => setForm({ ...form, googleVerification: value })} />
-          <SeoField label="Codigo Bing Webmaster" value={form.bingVerification} onChange={(value) => setForm({ ...form, bingVerification: value })} />
-          <SeoField label="Numero WhatsApp" value={form.whatsappNumber} onChange={(value) => setForm({ ...form, whatsappNumber: value })} />
+          <SeoField label="Código Search Console" value={form.googleVerification} onChange={(value) => setForm({ ...form, googleVerification: value })} />
+          <SeoField label="Código Bing Webmaster" value={form.bingVerification} onChange={(value) => setForm({ ...form, bingVerification: value })} />
+          <SeoField label="Número WhatsApp" value={form.whatsappNumber} onChange={(value) => setForm({ ...form, whatsappNumber: value })} />
           <SeoField label="Chave IndexNow" value={form.indexNowKey} onChange={(value) => setForm({ ...form, indexNowKey: value })} />
           <label className="grid gap-1.5 text-sm lg:col-span-2">
-            <span className="font-medium">Descricao padrao</span>
+            <span className="font-medium">Descrição padrão</span>
             <Textarea value={form.defaultDescription ?? ''} onChange={(event) => setForm({ ...form, defaultDescription: event.target.value })} rows={3} />
           </label>
           <label className="grid gap-1.5 text-sm lg:col-span-2">
@@ -1110,17 +1110,17 @@ function SeoPresenceSection() {
             {Object.entries(files).map(([label, href]) => <Row key={label} label={label} value={href} />)}
           </div>
         </Panel>
-        <Panel title="Politica de rastreadores" icon={ShieldCheck}>
+        <Panel title="Política de rastreadores" icon={ShieldCheck}>
           <div className="space-y-2 text-sm">
             <Row label="OAI-SearchBot" value={seo.data?.robotsPolicy.oaiSearchBot ?? '-'} />
             <Row label="GPTBot" value={seo.data?.robotsPolicy.gptBot ?? '-'} />
-            <Row label="Observacao" value="Robots nao substitui autenticacao nem autorizacao." />
+            <Row label="Observação" value="Robots não substitui autenticação nem autorização." />
           </div>
         </Panel>
       </div>
 
       <div className="grid gap-4 xl:grid-cols-2">
-        <Panel title="Rotas publicas indexaveis">
+        <Panel title="Rotas públicas indexáveis">
           <div className="flex flex-wrap gap-2">
             {(seo.data?.publicUrls ?? []).map((url) => <span key={url} className="pill pill-green">{url}</span>)}
           </div>
@@ -1157,19 +1157,19 @@ function DashboardSection() {
   });
 
   if (dashboard.isLoading) return <LoadingGrid />;
-  if (!dashboard.data) return <EmptyState title="Dashboard indisponivel" />;
+  if (!dashboard.data) return <EmptyState title="Painel indisponível" />;
 
   const cards = dashboard.data.cards;
   const metricKeys = [
     ['totalCompanies', 'Empresas'],
     ['activeCompanies', 'Ativas'],
     ['suspendedCompanies', 'Suspensas'],
-    ['implementationCompanies', 'Implantacao'],
+    ['implementationCompanies', 'Implantação'],
     ['trialCompanies', 'Teste'],
-    ['totalUsers', 'Usuarios'],
+    ['totalUsers', 'Usuários'],
     ['activeUsers7d', 'Ativos 7d'],
     ['activeUsers30d', 'Ativos 30d'],
-    ['onlineUsers', 'Online agora'],
+    ['onlineUsers', 'Conectados agora'],
     ['accessesToday', 'Acessos hoje'],
     ['accessesMonth', 'Acessos mes'],
     ['recentErrors', 'Erros recentes'],
@@ -1194,20 +1194,20 @@ function DashboardSection() {
             ))}
           </div>
         </Panel>
-        <Panel title="Saude tecnica">
+        <Panel title="Saúde técnica">
           <div className="grid gap-2 text-sm">
             <Row label="Banco" value={dashboard.data.health.status} />
             <Row label="Ambiente" value={dashboard.data.health.environment} />
             <Row label="Tabelas" value={dashboard.data.health.tables} />
-            <Row label="Resposta media" value={`${dashboard.data.health.responseMs} ms`} />
-            <Row label="Versao publicada" value={cards.currentVersion ?? '-'} />
-            <Row label="Ultimo backup" value={formatDate(cards.lastBackupAt)} />
+            <Row label="Resposta média" value={`${dashboard.data.health.responseMs} ms`} />
+            <Row label="Versão publicada" value={cards.currentVersion ?? '-'} />
+            <Row label="Último backup" value={formatDate(cards.lastBackupAt)} />
           </div>
         </Panel>
       </div>
 
       <div className="grid gap-4 xl:grid-cols-2">
-        <Panel title="Modulos mais utilizados">
+        <Panel title="Módulos mais utilizados">
           <Bars data={dashboard.data.charts.modulesMostUsed.map((item) => ({ label: item.moduleCode, value: item.companies }))} />
         </Panel>
         <Panel title="Empresas por plano">
@@ -1257,7 +1257,7 @@ function CompaniesSection() {
   });
   const status = useMutation({
     mutationFn: ({ id, next }: { id: string; next: string }) =>
-      platformAdminApi(`/companies/${id}/status`, { method: 'PATCH', json: { status: next, reason: `Alteracao via Portal Admin Global para ${next}` } }),
+      platformAdminApi(`/companies/${id}/status`, { method: 'PATCH', json: { status: next, reason: `Alteração via Portal Administrativo Global para ${next}` } }),
     onSuccess: () => {
       toast.success('Status atualizado');
       void queryClient.invalidateQueries({ queryKey: ['platform-admin', 'companies'] });
@@ -1301,10 +1301,10 @@ function CompaniesSection() {
                     <th>CNPJ</th>
                     <th>Plano</th>
                     <th>Status</th>
-                    <th>Usuarios</th>
-                    <th>Modulos</th>
-                    <th>Ultimo acesso</th>
-                    <th>Acoes</th>
+                    <th>Usuários</th>
+                    <th>Módulos</th>
+                    <th>Último acesso</th>
+                    <th>Ações</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -1350,24 +1350,24 @@ function CompaniesSection() {
             >
               <div className="grid gap-4 xl:grid-cols-3">
                 <div className="space-y-2 text-sm">
-                  <Row label="Razao social" value={detail.data.company.name} />
+                  <Row label="Razão social" value={detail.data.company.name} />
                   <Row label="Nome fantasia" value={detail.data.company.tradeName ?? '-'} />
                   <Row label="CNPJ" value={detail.data.company.cnpj ?? '-'} />
                   <Row label="E-mail" value={detail.data.company.email ?? '-'} />
                   <Row label="Telefone" value={detail.data.company.phone ?? '-'} />
                   <Row label="Segmento" value={detail.data.company.segment ?? '-'} />
                   <Row label="Plano" value={detail.data.profile?.planCode ?? '-'} />
-                  <Row label="Saude" value={`${detail.data.profile?.healthScore ?? 0}%`} />
+                  <Row label="Saúde" value={`${detail.data.profile?.healthScore ?? 0}%`} />
                   <Row label="Contrato" value={formatDate(detail.data.profile?.contractEndsAt)} />
                 </div>
                 <div className="space-y-2 text-sm">
-                  <Row label="Endereco" value={detail.data.company.addressLine ?? '-'} />
+                  <Row label="Endereço" value={detail.data.company.addressLine ?? '-'} />
                   <Row label="Cidade" value={detail.data.company.city ?? '-'} />
                   <Row label="UF" value={detail.data.company.state ?? '-'} />
-                  <Row label="Max. usuarios" value={detail.data.company.maxUsers ?? '-'} />
+                  <Row label="Max. usuários" value={detail.data.company.maxUsers ?? '-'} />
                   <Row label="Status empresa" value={<Status value={detail.data.company.status} />} />
-                  <Row label="Status implantacao" value={<Status value={detail.data.profile?.lifecycleStatus ?? detail.data.company.status} />} />
-                  <Row label="Controle por area" value={detail.data.company.areaAccessEnabled === false ? 'Desativado' : 'Ativado'} />
+                  <Row label="Status implantação" value={<Status value={detail.data.profile?.lifecycleStatus ?? detail.data.company.status} />} />
+                  <Row label="Controle por área" value={detail.data.company.areaAccessEnabled === false ? 'Desativado' : 'Ativado'} />
                   {Object.entries(detail.data.usage).map(([key, value]) => <Row key={key} label={key} value={value} />)}
                 </div>
                 <div className="space-y-2">
@@ -1387,17 +1387,17 @@ function CompaniesSection() {
         <Panel title="Cadastro completo de empresas" icon={Building2}>
           <div className="space-y-3 text-sm">
             <p className="text-xs leading-5 text-muted-foreground">
-              Cadastro, contato, endereco, limite de usuarios, status, plano, implantacao, controle por area e observacoes ficam centralizados aqui.
+              Cadastro, contato, endereço, limite de usuários, status, plano, implantação, controle por área e observações ficam centralizados aqui.
             </p>
             <Button className="w-full" onClick={openCreate}>
               <Plus className="mr-2 h-4 w-4" />
               Nova empresa
             </Button>
             <div className="space-y-2 pt-2">
-              <Row label="Campos cadastrais" value="Razao, fantasia, CNPJ, contato" />
-              <Row label="Endereco" value="Logradouro, cidade e UF" />
-              <Row label="Governanca" value="Status, plano e implantacao" />
-              <Row label="Permissoes por area" value="Ativar/desativar por empresa" />
+              <Row label="Campos cadastrais" value="Razão, fantasia, CNPJ, contato" />
+              <Row label="Endereço" value="Logradouro, cidade e UF" />
+              <Row label="Governança" value="Status, plano e implantação" />
+              <Row label="Permissões por área" value="Ativar/desativar por empresa" />
             </div>
           </div>
         </Panel>
@@ -1446,19 +1446,19 @@ function CompanyFormDialog({
           <DialogTitle>{mode === 'edit' ? 'Editar empresa' : 'Nova empresa'}</DialogTitle>
         </DialogHeader>
         <div className="grid gap-4 md:grid-cols-2">
-          <Field label="Razao social" value={form.name} onChange={(value) => update('name', value)} />
+          <Field label="Razão social" value={form.name} onChange={(value) => update('name', value)} />
           <Field label="Nome fantasia" value={form.tradeName} onChange={(value) => update('tradeName', value)} />
           <Field label="CNPJ" value={form.cnpj} onChange={(value) => update('cnpj', value)} />
           <Field label="E-mail" value={form.email} onChange={(value) => update('email', value)} />
           <Field label="Telefone" value={form.phone} onChange={(value) => update('phone', value)} />
           <Field label="Segmento" value={form.segment} onChange={(value) => update('segment', value)} />
           <div className="md:col-span-2">
-            <Field label="Endereco" value={form.addressLine} onChange={(value) => update('addressLine', value)} />
+            <Field label="Endereço" value={form.addressLine} onChange={(value) => update('addressLine', value)} />
           </div>
           <Field label="Cidade" value={form.city} onChange={(value) => update('city', value)} />
           <Field label="UF" value={form.state} onChange={(value) => update('state', value.toUpperCase().slice(0, 2))} />
           <div className="space-y-1.5">
-            <Label className="text-xs">Limite de usuarios</Label>
+            <Label className="text-xs">Limite de usuários</Label>
             <Input type="number" min={0} value={form.maxUsers} onChange={(event) => update('maxUsers', event.target.value)} />
           </div>
           <div className="space-y-1.5">
@@ -1474,17 +1474,17 @@ function CompanyFormDialog({
             </NativeSelect>
           </div>
           <div className="space-y-1.5">
-            <Label className="text-xs">Status de implantacao</Label>
+            <Label className="text-xs">Status de implantação</Label>
             <NativeSelect value={form.lifecycleStatus} onChange={(event) => update('lifecycleStatus', event.target.value)}>
               {COMPANY_LIFECYCLE_STATUSES.map((status) => <option key={status} value={status}>{status}</option>)}
             </NativeSelect>
           </div>
           <label className="flex items-center gap-2 border bg-muted/20 px-3 py-2 text-sm">
             <input type="checkbox" checked={form.areaAccessEnabled} onChange={(event) => update('areaAccessEnabled', event.target.checked)} />
-            Controle de visibilidade por area ativo
+            Controle de visibilidade por área ativo
           </label>
           <div className="md:col-span-2 space-y-1.5">
-            <Label className="text-xs">Observacoes</Label>
+            <Label className="text-xs">Observações</Label>
             <Textarea rows={4} value={form.notes} onChange={(event) => update('notes', event.target.value)} />
           </div>
         </div>
@@ -1511,12 +1511,12 @@ function ModulesSection() {
   });
   const update = useMutation({
     mutationFn: ({ companyId, moduleCode, status }: { companyId: string; moduleCode: string; status: string }) =>
-      platformAdminApi(`/companies/${companyId}/modules/${moduleCode}`, { method: 'PATCH', json: { status, reason: `Alteracao de modulo para ${status}` } }),
+      platformAdminApi(`/companies/${companyId}/modules/${moduleCode}`, { method: 'PATCH', json: { status, reason: `Alteração de módulo para ${status}` } }),
     onSuccess: () => {
-      toast.success('Modulo atualizado');
+      toast.success('Módulo atualizado');
       void queryClient.invalidateQueries({ queryKey: ['platform-admin', 'module-matrix'] });
     },
-    onError: (err) => toast.error(err instanceof Error ? err.message : 'Falha ao atualizar modulo'),
+    onError: (err) => toast.error(err instanceof Error ? err.message : 'Falha ao atualizar módulo'),
   });
   const applyPlan = useMutation({
     mutationFn: () => platformAdminApi(`/companies/${applyForm.companyId}/modules/apply-plan/${applyForm.planCode}`, { method: 'POST' }),
@@ -1530,7 +1530,7 @@ function ModulesSection() {
   });
 
   if (matrix.isLoading) return <LoadingGrid />;
-  if (!matrix.data) return <EmptyState title="Matriz indisponivel" />;
+  if (!matrix.data) return <EmptyState title="Matriz indisponível" />;
   const modules = matrix.data.modules;
 
   return (
@@ -1562,7 +1562,7 @@ function ModulesSection() {
         </div>
       </Panel>
 
-      <Panel title="Catalogo de modulos">
+      <Panel title="Catálogo de módulos">
         <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
           {matrix.data.modules.map((module) => (
             <div key={module.code} className="border bg-white p-3 text-sm">
@@ -1577,7 +1577,7 @@ function ModulesSection() {
         </div>
       </Panel>
 
-      <Panel title="Matriz de modulos por empresa">
+      <Panel title="Matriz de módulos por empresa">
         <div className="overflow-x-auto">
           <table className="table-modern min-w-[1280px]">
             <thead>
@@ -1602,7 +1602,7 @@ function ModulesSection() {
                             className="h-8 flex-1 border bg-background px-2 text-xs"
                             value={selected}
                             disabled={isCore}
-                            title={isCore ? 'Modulo essencial da empresa' : undefined}
+                            title={isCore ? 'Módulo essencial da empresa' : undefined}
                             onChange={(event) => setChange((prev) => ({ ...prev, [key]: event.target.value }))}
                           >
                             {MODULE_STATUSES.map((status) => <option key={status}>{status}</option>)}
@@ -1712,7 +1712,7 @@ function PlansSection() {
                 </div>
                 <div className="mt-3 text-2xl font-semibold">{formatMoney(plan.monthlyPriceCents)}</div>
                 <div className="mt-2 text-sm text-muted-foreground">
-                  {plan.defaultUsers ?? 'Ilimitado'} usuarios · {included.length} modulos inclusos
+                  {plan.defaultUsers ?? 'Ilimitado'} usuários · {included.length} módulos inclusos
                 </div>
                 <div className="mt-3 flex flex-wrap gap-1">
                   {names.map((name) => <span key={name} className="pill pill-gray">{name}</span>)}
@@ -1726,13 +1726,13 @@ function PlansSection() {
       </Panel>
       <Panel title="Novo ou atualizar plano">
         <div className="space-y-3">
-          <Field label="Codigo" value={form.code} onChange={(value) => setForm((prev) => ({ ...prev, code: value.toUpperCase() }))} />
+          <Field label="Código" value={form.code} onChange={(value) => setForm((prev) => ({ ...prev, code: value.toUpperCase() }))} />
           <Field label="Nome" value={form.name} onChange={(value) => setForm((prev) => ({ ...prev, name: value }))} />
           <Field label="Mensalidade em centavos" value={form.monthlyPriceCents} onChange={(value) => setForm((prev) => ({ ...prev, monthlyPriceCents: value }))} />
-          <Field label="Implantacao em centavos" value={form.setupPriceCents} onChange={(value) => setForm((prev) => ({ ...prev, setupPriceCents: value }))} />
+          <Field label="Implantação em centavos" value={form.setupPriceCents} onChange={(value) => setForm((prev) => ({ ...prev, setupPriceCents: value }))} />
           <div className="grid gap-3 sm:grid-cols-2">
-            <Field label="Usuarios padrao" value={form.defaultUsers} onChange={(value) => setForm((prev) => ({ ...prev, defaultUsers: value }))} />
-            <Field label="Filiais padrao" value={form.defaultBranches} onChange={(value) => setForm((prev) => ({ ...prev, defaultBranches: value }))} />
+            <Field label="Usuários padrão" value={form.defaultUsers} onChange={(value) => setForm((prev) => ({ ...prev, defaultUsers: value }))} />
+            <Field label="Filiais padrão" value={form.defaultBranches} onChange={(value) => setForm((prev) => ({ ...prev, defaultBranches: value }))} />
           </div>
           <div className="grid gap-3 sm:grid-cols-2">
             <Field label="Storage MB" value={form.storageLimitMb} onChange={(value) => setForm((prev) => ({ ...prev, storageLimitMb: value }))} />
@@ -1742,7 +1742,7 @@ function PlansSection() {
           <Field label="SLA" value={form.sla} onChange={(value) => setForm((prev) => ({ ...prev, sla: value }))} />
           <div className="rounded-sm border">
             <div className="flex items-center justify-between border-b px-3 py-2">
-              <div className="text-xs font-semibold uppercase tracking-[0.12em] text-muted-foreground">Modulos inclusos</div>
+              <div className="text-xs font-semibold uppercase tracking-[0.12em] text-muted-foreground">Módulos inclusos</div>
               <div className="text-xs text-muted-foreground">{selectedModules.size} selecionados</div>
             </div>
             <div className="max-h-[420px] overflow-y-auto p-3">
@@ -1772,11 +1772,11 @@ function PlansSection() {
                   </div>
                 </div>
               ))}
-              {(modules.data ?? []).length === 0 && <EmptyState title="Catalogo de modulos indisponivel" />}
+              {(modules.data ?? []).length === 0 && <EmptyState title="Catálogo de módulos indisponível" />}
             </div>
           </div>
           <Button className="w-full" disabled={!form.code || !form.name || save.isPending} onClick={() => save.mutate()}>Salvar plano</Button>
-          <Button className="w-full" variant="ghost" onClick={() => setForm(EMPTY_PLAN_FORM)}>Limpar formulario</Button>
+          <Button className="w-full" variant="ghost" onClick={() => setForm(EMPTY_PLAN_FORM)}>Limpar formulário</Button>
         </div>
       </Panel>
     </div>
@@ -1793,30 +1793,30 @@ function UsersSection() {
   const setStatus = useMutation({
     mutationFn: ({ id, status }: { id: string; status: string }) => platformAdminApi(`/users/${id}/status`, { method: 'PATCH', json: { status } }),
     onSuccess: () => {
-      toast.success('Usuario atualizado');
+      toast.success('Usuário atualizado');
       void queryClient.invalidateQueries({ queryKey: ['platform-admin', 'users'] });
     },
   });
   const revoke = useMutation({
     mutationFn: (id: string) => platformAdminApi(`/users/${id}/revoke-sessions`, { method: 'POST' }),
     onSuccess: () => {
-      toast.success('Sessoes revogadas');
+      toast.success('Sessões revogadas');
       void queryClient.invalidateQueries({ queryKey: ['platform-admin', 'users'] });
     },
   });
   return (
-    <Panel title="Usuarios das empresas" actions={<SearchBox value={q} onChange={setQ} />}>
+    <Panel title="Usuários das empresas" actions={<SearchBox value={q} onChange={setQ} />}>
       <div className="overflow-x-auto">
         <table className="table-modern">
           <thead>
             <tr>
-              <th>Usuario</th>
+              <th>Usuário</th>
               <th>Empresa</th>
               <th>Perfil</th>
               <th>Status</th>
-              <th>Ultimo acesso</th>
-              <th>Sessoes</th>
-              <th>Acoes</th>
+              <th>Último acesso</th>
+              <th>Sessões</th>
+              <th>Ações</th>
             </tr>
           </thead>
           <tbody>
@@ -1843,7 +1843,7 @@ function UsersSection() {
 
 function SecuritySection() {
   const queryClient = useQueryClient();
-  const [support, setSupport] = useState({ companyId: '', reason: 'Diagnostico tecnico', justification: '', minutes: '60' });
+  const [support, setSupport] = useState({ companyId: '', reason: 'Diagnostico técnico', justification: '', minutes: '60' });
   const sessions = useQuery({
     queryKey: ['platform-admin', 'sessions'],
     queryFn: () => platformAdminApi<{ companySessions: unknown[]; adminSessions: unknown[] }>('/sessions'),
@@ -1863,10 +1863,10 @@ function SecuritySection() {
   });
   return (
     <div className="grid gap-4 xl:grid-cols-2">
-      <Panel title="Sessoes abertas">
+      <Panel title="Sessões abertas">
         <div className="grid gap-3 sm:grid-cols-2">
-          <Metric label="Sessoes de empresas" value={sessions.data?.companySessions.length ?? 0} />
-          <Metric label="Sessoes internas" value={sessions.data?.adminSessions.length ?? 0} />
+          <Metric label="Sessões de empresas" value={sessions.data?.companySessions.length ?? 0} />
+          <Metric label="Sessões internas" value={sessions.data?.adminSessions.length ?? 0} />
         </div>
       </Panel>
       <Panel title="Modo seguro de suporte">
@@ -1902,7 +1902,7 @@ function TechnicalSection() {
           <Row label="Migracoes rastreadas" value={database.data?.migrations.length ?? 0} />
         </div>
       </Panel>
-      <Panel title="Ambientes e versoes" icon={ServerCog}>
+      <Panel title="Ambientes e versões" icon={ServerCog}>
         <div className="space-y-2">
           {(envs.data?.environments ?? []).map((env) => (
             <div key={env.code} className="flex items-center justify-between border px-3 py-2 text-sm">
@@ -1923,7 +1923,7 @@ function TechnicalSection() {
           {(flags.data?.flags ?? []).length === 0 && <EmptyState title="Nenhuma flag cadastrada" />}
         </div>
       </Panel>
-      <Panel title="Integracoes e jobs" icon={Wrench}>
+      <Panel title="Integrações e jobs" icon={Wrench}>
         <div className="grid gap-3">
           {(integrations.data ?? []).map((item) => (
             <div key={item.code} className="flex items-center justify-between border px-3 py-2 text-sm">
@@ -2097,10 +2097,10 @@ function AuditTable({ rows }: { rows: AuditRow[] }) {
         <thead>
           <tr>
             <th>Quando</th>
-            <th>Usuario</th>
-            <th>Acao</th>
+            <th>Usuário</th>
+            <th>Ação</th>
             <th>Alvo</th>
-            <th>Modulo</th>
+            <th>Módulo</th>
             <th>Resultado</th>
           </tr>
         </thead>

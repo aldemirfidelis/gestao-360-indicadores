@@ -6,7 +6,7 @@ import { breadcrumbJsonLd, publicMetadata, solutionPages, webPageJsonLd } from '
 
 export const metadata: Metadata = publicMetadata({
   title: 'Soluções de gestão corporativa integrada',
-  description: 'Conheça as soluções do Gestão 360 para indicadores, estratégia, planos de ação, qualidade, documentos, auditorias, riscos e dashboards.',
+  description: 'Conheça as soluções do Gestão 360 para indicadores, estratégia, planos de ação, qualidade, documentos, auditorias, riscos e painéis.',
   path: '/solucoes',
 });
 

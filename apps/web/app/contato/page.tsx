@@ -34,7 +34,7 @@ export default function ContatoPage() {
             <div className="border border-slate-200 bg-white p-6">
               <h2 className="text-xl font-semibold text-slate-950">Privacidade</h2>
               <p className="mt-3 text-sm leading-6 text-slate-600">
-                O formulário foi preparado para retorno comercial. Dados internos, dashboards e registros de clientes continuam protegidos no portal autenticado.
+                O formulário foi preparado para retorno comercial. Dados internos, painéis e registros de clientes continuam protegidos no portal autenticado.
               </p>
             </div>
           </aside>

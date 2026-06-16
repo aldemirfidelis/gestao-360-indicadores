@@ -31,7 +31,7 @@ interface ScopeOptions {
 }
 
 const ROLES = [
-  { value: 'SUPER_ADMIN', label: 'Super Admin' },
+  { value: 'SUPER_ADMIN', label: 'superadministrador' },
   { value: 'COMPANY_ADMIN', label: 'Admin da Empresa' },
   { value: 'DIRECTOR', label: 'Diretor' },
   { value: 'MANAGER', label: 'Gestor' },

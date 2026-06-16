@@ -79,7 +79,7 @@ export function RecordEditor({ table }: { table: string }) {
         json: { keys },
       }),
     onSuccess: (res) => {
-      toast.success(`${res.deleted} registro(s) excluído(s).${res.backupId ? ' Snapshot criado.' : ''}`);
+      toast.success(`${res.deleted} registro(s) excluído(s).${res.backupId ? ' Retrato criado.' : ''}`);
       setSelected(new Set());
       qc.invalidateQueries({ queryKey: ['db-admin', 'rows', table] });
     },
@@ -109,12 +109,12 @@ export function RecordEditor({ table }: { table: string }) {
     if (!data) return;
     const keys = data.rows.filter((r) => selected.has(rowKeyId(r))).map(rowKey);
     if (keys.length === 0) return;
-    if (window.confirm(`Excluir ${keys.length} registro(s) de "${table}"? Um snapshot automático será criado. Esta ação é irreversível pela interface (use o backup para restaurar).`)) {
+    if (window.confirm(`Excluir ${keys.length} registro(s) de "${table}"? Um retrato automático será criado. Esta ação é irreversível pela interface (use o backup para restaurar).`)) {
       deleteMut.mutate(keys);
     }
   }
   function confirmDeleteRow(row: Record<string, unknown>) {
-    if (window.confirm(`Excluir este registro de "${table}"? Um snapshot automático será criado.`)) {
+    if (window.confirm(`Excluir este registro de "${table}"? Um retrato automático será criado.`)) {
       deleteMut.mutate([rowKey(row)]);
     }
   }

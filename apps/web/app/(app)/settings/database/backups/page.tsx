@@ -73,7 +73,7 @@ export default function BackupsPage() {
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
           <h2 className="text-lg font-semibold">Backup e Restauração</h2>
-          <p className="text-sm text-muted-foreground">Snapshots lógicos por tabela/operação. Restauração lógica reinsere linhas (ON CONFLICT DO NOTHING).</p>
+          <p className="text-sm text-muted-foreground">Retratos lógicos por tabela/operação. Restauração lógica reinsere linhas (ON CONFLICT DO NOTHING).</p>
         </div>
         <Button variant="outline" onClick={() => backups.refetch()} disabled={backups.isFetching}>
           <RefreshCcw className={cn('mr-2 h-4 w-4', backups.isFetching && 'animate-spin')} /> Atualizar
@@ -82,10 +82,10 @@ export default function BackupsPage() {
 
       <div className="flex items-center gap-2 rounded-lg border border-status-blue/30 bg-status-blue/10 p-3 text-sm">
         <ShieldCheck className="h-4 w-4 text-status-blue" />
-        <span>Recuperação de <strong>banco inteiro</strong> não é feita aqui — use o <strong>branching/Point-in-Time-Recovery da Neon</strong>. Esta tela faz backups <strong>lógicos</strong> (por tabela).</span>
+        <span>Recuperação de <strong>banco inteiro</strong> não é feita aqui — use as <strong>ramificações e a recuperação em ponto no tempo da Neon</strong>. Esta tela faz backups <strong>lógicos</strong> (por tabela).</span>
       </div>
 
-      <SectionCard title="Criar backup lógico" description="Snapshot manual de uma tabela.">
+      <SectionCard title="Criar backup lógico" description="Retrato manual de uma tabela.">
         <div className="flex flex-wrap items-end gap-3">
           <div className="min-w-[260px]">
             <Label>Tabela</Label>
@@ -100,9 +100,9 @@ export default function BackupsPage() {
         </div>
       </SectionCard>
 
-      <SectionCard title="Backups" description="Snapshots lógicos registrados." contentClassName="p-0">
+      <SectionCard title="Backups" description="Retratos lógicos registrados." contentClassName="p-0">
         {backups.isLoading && <LoadingState label="Lendo backups..." />}
-        {!backups.isLoading && (backups.data ?? []).length === 0 && <EmptyState title="Nenhum backup" description="Crie um backup ou execute uma operação destrutiva (gera snapshot automático)." className="border-0 bg-transparent" />}
+        {!backups.isLoading && (backups.data ?? []).length === 0 && <EmptyState title="Nenhum backup" description="Crie um backup ou execute uma operação destrutiva (gera retrato automático)." className="border-0 bg-transparent" />}
         {(backups.data ?? []).length > 0 && (
           <div className="overflow-x-auto">
             <table className="table-modern">
@@ -153,7 +153,7 @@ export default function BackupsPage() {
           <DialogContent>
             <DialogHeader><DialogTitle className="text-status-red">Restaurar backup (lógico)</DialogTitle></DialogHeader>
             <div className="space-y-3 text-sm">
-              <p>Reinsere as linhas do snapshot em <strong className="font-mono">{safeTables(restore.row.targetTables)}</strong> (ON CONFLICT DO NOTHING). Um snapshot preventivo do estado atual é criado.</p>
+              <p>Reinsere as linhas do retrato em <strong className="font-mono">{safeTables(restore.row.targetTables)}</strong> (ON CONFLICT DO NOTHING). Um retrato preventivo do estado atual é criado.</p>
               <p className="text-xs text-muted-foreground">{formatDate(restore.row.createdAt)} · {formatNumber(restore.row.rowCount)} linha(s) · {prettySize(restore.row.sizeBytes)}</p>
               <div>
                 <Label className="text-status-red">Digite: <span className="font-mono">CONFIRMAR ALTERAÇÃO CRÍTICA</span></Label>

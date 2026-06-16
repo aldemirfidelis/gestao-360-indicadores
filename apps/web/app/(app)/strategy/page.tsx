@@ -37,9 +37,9 @@ interface StrategicMap {
 
 const defaultPerspectives = [
   { name: 'Financeira', color: '#16a34a', icon: 'F', description: 'Resultados economicos e sustentabilidade financeira.' },
-  { name: 'Clientes', color: '#2563eb', icon: 'C', description: 'Valor percebido, mercado, relacionamento e satisfacao.' },
-  { name: 'Processos Internos', color: '#f59e0b', icon: 'P', description: 'Excelencia operacional, qualidade, produtividade e seguranca.' },
-  { name: 'Pessoas e Aprendizado', color: '#7c3aed', icon: 'A', description: 'Capacidades, cultura, inovacao e desenvolvimento.' },
+  { name: 'Clientes', color: '#2563eb', icon: 'C', description: 'Valor percebido, mercado, relacionamento e satisfação.' },
+  { name: 'Processos Internos', color: '#f59e0b', icon: 'P', description: 'Excelência operacional, qualidade, produtividade e segurança.' },
+  { name: 'Pessoas e Aprendizado', color: '#7c3aed', icon: 'A', description: 'Capacidades, cultura, inovação e desenvolvimento.' },
 ];
 
 export default function StrategyPage() {

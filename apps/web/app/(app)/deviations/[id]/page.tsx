@@ -99,7 +99,7 @@ export default function DeviationDetailPage() {
     queryFn: () => api<UserOption[]>('/users'),
   });
 
-  const [newCause, setNewCause] = useState({ category: 'Metodo', description: '' });
+  const [newCause, setNewCause] = useState({ category: 'Método', description: '' });
   const [newAnalysis, setNewAnalysis] = useState({ method: 'FIVE_WHYS', content: '' });
   const [actionOpen, setActionOpen] = useState(false);
   const [actionForm, setActionForm] = useState({
@@ -119,7 +119,7 @@ export default function DeviationDetailPage() {
   const addCause = useMutation({
     mutationFn: () => api(`/deviations/${id}/causes`, { method: 'POST', json: newCause }),
     onSuccess: () => {
-      setNewCause({ category: 'Metodo', description: '' });
+      setNewCause({ category: 'Método', description: '' });
       qc.invalidateQueries({ queryKey: ['deviation', id] });
     },
   });
@@ -251,7 +251,7 @@ export default function DeviationDetailPage() {
         </Card>
         <Card>
           <CardContent className="p-4 space-y-2">
-            <div className="text-xs uppercase text-muted-foreground">Metodo de análise</div>
+            <div className="text-xs uppercase text-muted-foreground">Método de análise</div>
             <NativeSelect
               value={d.method}
               onChange={(e) => update.mutate({ method: e.target.value })}
@@ -273,7 +273,7 @@ export default function DeviationDetailPage() {
           <CardContent className="space-y-3">
             <Textarea
               defaultValue={d.fact ?? ''}
-              placeholder="Descreva objetivamente o que aconteceu (números, datas, evidencias)..."
+              placeholder="Descreva objetivamente o que aconteceu (números, datas, evidências)..."
               onBlur={(e) => {
                 if (e.target.value !== (d.fact ?? '')) {
                   update.mutate({ fact: e.target.value });
@@ -408,7 +408,7 @@ export default function DeviationDetailPage() {
         <CardContent>
           {d.actions.length === 0 && (
             <p className="text-sm text-muted-foreground">
-              Nenhuma ação vinculada. Use o botão acima para criar uma ação ja conectada a este desvio.
+              Nenhuma ação vinculada. Use o botão acima para criar uma ação já conectada a este desvio.
             </p>
           )}
           <div className="space-y-2">
@@ -453,7 +453,7 @@ export default function DeviationDetailPage() {
                 rows={5}
                 value={actionForm.description}
                 onChange={(e) => setActionForm({ ...actionForm, description: e.target.value })}
-                placeholder="Contexto da causa, evidencia e orientacao da ação..."
+                placeholder="Contexto da causa, evidência e orientação da ação..."
               />
             </div>
             <div className="grid gap-3 sm:grid-cols-3">

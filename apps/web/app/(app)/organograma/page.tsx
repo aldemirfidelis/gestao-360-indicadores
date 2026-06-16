@@ -243,7 +243,7 @@ export default function OrganogramaPage() {
   function collapseAll() {
     const next: Record<string, boolean> = {};
     for (const { key } of orderedAreas) {
-      next[`area:${key}`] = false;
+      next[`área:${key}`] = false;
       const entry = grouped.get(key);
       if (entry) {
         for (const { job } of entry.jobs.values()) {
@@ -278,20 +278,20 @@ export default function OrganogramaPage() {
       onDragEnd();
       return;
     }
-    const confirmed = window.confirm(`Mover ${emp.name} para o novo cargo/area?`);
+    const confirmed = window.confirm(`Mover ${emp.name} para o novo cargo/área?`);
     if (!confirmed) {
       onDragEnd();
       return;
     }
-    const justification = window.prompt('Informe a justificativa obrigatoria para a movimentacao:')?.trim();
+    const justification = window.prompt('Informe a justificativa obrigatoria para a movimentação:')?.trim();
     if (!justification) {
       toast.error('Justificativa obrigatoria para movimentar colaborador');
       onDragEnd();
       return;
     }
-    const effectiveAt = window.prompt('Data de vigencia (AAAA-MM-DD):', new Date().toISOString().slice(0, 10))?.trim();
+    const effectiveAt = window.prompt('Data de vigência (AAAA-MM-DD):', new Date().toISOString().slice(0, 10))?.trim();
     if (!effectiveAt) {
-      toast.error('Data de vigencia obrigatoria');
+      toast.error('Data de vigência obrigatoria');
       onDragEnd();
       return;
     }
@@ -417,7 +417,7 @@ export default function OrganogramaPage() {
             if (!entry) return null;
             const totalEmps = Array.from(entry.jobs.values()).reduce((acc, j) => acc + j.employees.length, 0);
             if (key === UNLINKED_KEY && totalEmps === 0) return null;
-            const areaOpen = isOpen(`area:${key}`);
+            const areaOpen = isOpen(`área:${key}`);
             const areaLabel = area?.name ?? 'Sem área definida';
             const responsavel = area ? '' : '';
 
@@ -429,7 +429,7 @@ export default function OrganogramaPage() {
                   style={{ paddingLeft: '0.5rem' }}
                 >
                   <button
-                    onClick={() => toggle(`area:${key}`)}
+                    onClick={() => toggle(`área:${key}`)}
                     className="grid h-7 w-7 place-items-center text-muted-foreground hover:bg-background hover:text-foreground"
                     aria-label={areaOpen ? 'Recolher' : 'Expandir'}
                   >
@@ -439,7 +439,7 @@ export default function OrganogramaPage() {
                       <span className="h-1.5 w-1.5 rounded-full bg-muted-foreground/50" />
                     )}
                   </button>
-                  <button onClick={() => toggle(`area:${key}`)} className="flex min-w-0 items-center gap-3 text-left">
+                  <button onClick={() => toggle(`área:${key}`)} className="flex min-w-0 items-center gap-3 text-left">
                     <span
                       className="grid h-9 w-9 shrink-0 place-items-center text-white"
                       style={{ backgroundColor: AREA_COLOR }}

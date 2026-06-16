@@ -33,7 +33,7 @@ export default function EngineSettingsPage() {
       <PageHeader
         eyebrow="Central de Automações"
         title="Configurações do Motor"
-        description="Configure variáveis de infraestrutura do motor de workflows, concorrência de temporizadores, regras de fila (DLQ) e parâmetros de execução global."
+        description="Configure variáveis de infraestrutura do motor de fluxos de trabalho, concorrência de temporizadores, regras de fila (DLQ) e parâmetros de execução global."
       />
 
       <div className="max-w-4xl space-y-6 overflow-y-auto pr-1">
@@ -80,7 +80,7 @@ export default function EngineSettingsPage() {
                   />
                 </div>
                 <span className="text-[10px] text-muted-foreground block">
-                  Tentativas de processamento antes de redirecionar um nó falho para a Dead-Letter Queue (DLQ).
+                  Tentativas de processamento antes de redirecionar um nó falho para a fila de mensagens com falha (DLQ).
                 </span>
               </div>
 
@@ -88,7 +88,7 @@ export default function EngineSettingsPage() {
               <div className="space-y-1.5">
                 <label className="text-[11px] font-bold text-foreground flex items-center gap-1.5 uppercase">
                   <Cpu className="h-3.5 w-3.5 text-primary" />
-                  Intervalo de Reprocessamento (Backoff)
+                  Intervalo de Reprocessamento
                 </label>
                 <div className="flex items-center gap-4">
                   <input
@@ -132,14 +132,14 @@ export default function EngineSettingsPage() {
         </SectionCard>
 
         {/* System parameters */}
-        <SectionCard title="Notificações e Auditoria" description="Habilite logs verbose e avisos por e-mail de SLAs.">
+        <SectionCard title="Notificações e Auditoria" description="Habilite registros detalhados e avisos por e-mail de SLAs.">
           <div className="p-5 space-y-4">
             {/* Email notification */}
             <div className="flex items-center justify-between p-4 border rounded-xl bg-card">
               <div className="space-y-0.5">
                 <span className="text-xs font-bold text-foreground block">Enviar E-mails de SLA</span>
                 <span className="text-[10px] text-muted-foreground">
-                  Gera disparos de e-mail ao notificar ou escalar tarefas de workflow pendentes.
+                  Gera disparos de e-mail ao notificar ou escalar tarefas de fluxo de trabalho pendentes.
                 </span>
               </div>
               <input
@@ -153,9 +153,9 @@ export default function EngineSettingsPage() {
             {/* Verbose Debug Logs */}
             <div className="flex items-center justify-between p-4 border rounded-xl bg-card">
               <div className="space-y-0.5">
-                <span className="text-xs font-bold text-foreground block">Logs de Depuração Verbosos</span>
+                <span className="text-xs font-bold text-foreground block">Registros de Depuração Verbosos</span>
                 <span className="text-[10px] text-muted-foreground">
-                  Grava logs técnicos estendidos da engine na tabela `WorkflowExecutionLog` para fins de auditoria detalhada.
+                  Grava registros técnicos estendidos da engine na tabela `WorkflowExecutionLog` para fins de auditoria detalhada.
                 </span>
               </div>
               <input

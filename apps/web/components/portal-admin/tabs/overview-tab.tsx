@@ -40,7 +40,7 @@ export function OverviewTab() {
             <Tile icon={<Plug className="h-4 w-4" />} label="Integrações" value={d.integrations.total} sub={`${d.integrations.failing} c/ falha`} />
             <Tile icon={<Users className="h-4 w-4" />} label="Perfis" value={d.roles} sub={`${d.superAdmins} super admin`} />
             <Tile icon={<ScrollText className="h-4 w-4" />} label="Mudanças (7d)" value={d.recentChanges} sub={`${d.scheduledChanges} programadas`} />
-            <Tile icon={<ShieldCheck className="h-4 w-4" />} label="Avisos ativos" value={d.activeAnnouncements} sub={d.lastSnapshot ? 'Backup ✓' : 'Sem backup'} />
+            <Tile icon={<ShieldCheck className="h-4 w-4" />} label="Avisos ativos" value={d.activeAnnouncements} sub={d.lastSnapshot ? 'Cópia ✓' : 'Sem cópia'} />
           </div>
 
           <SectionCard title="Últimas ações administrativas" description="Registro recente da central." contentClassName="p-0">

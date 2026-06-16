@@ -104,10 +104,10 @@ export default function SecurityPortalInvitePage() {
         }),
       }),
     onSuccess: () => {
-      toast.success('Dados enviados para validacao da portaria.');
+      toast.success('Dados enviados para validação da portaria.');
       void invite.refetch();
     },
-    onError: (err) => toast.error(err instanceof Error ? err.message : 'Nao foi possivel enviar os dados.'),
+    onError: (err) => toast.error(err instanceof Error ? err.message : 'Não foi possível enviar os dados.'),
   });
 
   const canSubmit = Boolean(form.visitorName.trim() && form.documentNumber.trim() && form.acceptedTerms && form.privacyAccepted);
@@ -119,8 +119,8 @@ export default function SecurityPortalInvitePage() {
           <div className="flex items-center gap-3">
             <BrandMark className="h-10 w-10" />
             <div>
-              <p className="text-sm font-semibold">Gestao 360</p>
-              <p className="text-xs text-muted-foreground">Portal externo de seguranca patrimonial</p>
+              <p className="text-sm font-semibold">Gestão 360</p>
+              <p className="text-xs text-muted-foreground">Portal externo de segurança patrimonial</p>
             </div>
           </div>
           <Badge variant="secondary" className="gap-1"><ShieldCheck className="h-3.5 w-3.5" /> Convite seguro</Badge>
@@ -129,28 +129,28 @@ export default function SecurityPortalInvitePage() {
         <section className="grid flex-1 gap-6 py-6 lg:grid-cols-[0.85fr_1.15fr]">
           <aside className="space-y-4">
             <div>
-              <h1 className="text-2xl font-semibold tracking-tight">Pre-cadastro de acesso</h1>
+              <h1 className="text-2xl font-semibold tracking-tight">Pré-cadastro de acesso</h1>
               <p className="mt-2 text-sm text-muted-foreground">
-                Envie seus dados para agilizar a validacao documental e a liberacao na portaria.
+                Envie seus dados para agilizar a validação documental e a liberação na portaria.
               </p>
             </div>
 
             <Card>
               <CardHeader>
-                <CardTitle>Autorizacao</CardTitle>
+                <CardTitle>Autorização</CardTitle>
                 <CardDescription>Dados recebidos da empresa solicitante.</CardDescription>
               </CardHeader>
               <CardContent className="space-y-3 text-sm">
                 {invite.isLoading ? (
                   <p className="text-muted-foreground">Carregando convite...</p>
                 ) : invite.isError ? (
-                  <p className="text-destructive">Convite expirado, removido ou invalido.</p>
+                  <p className="text-destructive">Convite expirado, removido ou inválido.</p>
                 ) : (
                   <>
-                    <Info icon={BadgeCheck} label="Codigo" value={invite.data?.authorization?.code ?? invite.data?.token} />
+                    <Info icon={BadgeCheck} label="Código" value={invite.data?.authorization?.code ?? invite.data?.token} />
                     <Info icon={CalendarClock} label="Validade" value={formatDate(invite.data?.expiresAt)} />
                     <Info icon={FileText} label="Motivo" value={invite.data?.authorization?.reason ?? 'Acesso autorizado'} />
-                    <Info icon={CalendarClock} label="Periodo" value={periodText(invite.data)} />
+                    <Info icon={CalendarClock} label="Período" value={periodText(invite.data)} />
                     {invite.data?.requesterName ? <Info icon={ShieldCheck} label="Solicitante" value={invite.data.requesterName} /> : null}
                   </>
                 )}
@@ -161,7 +161,7 @@ export default function SecurityPortalInvitePage() {
           <Card>
             <CardHeader>
               <CardTitle>Dados do visitante, prestador ou motorista</CardTitle>
-              <CardDescription>Campos obrigatorios sao marcados com asterisco.</CardDescription>
+              <CardDescription>Campos obrigatórios são marcados com asterisco.</CardDescription>
             </CardHeader>
             <CardContent>
               <form className="grid gap-4 md:grid-cols-2" onSubmit={(event) => { event.preventDefault(); if (canSubmit) submit.mutate(); }}>
@@ -170,26 +170,26 @@ export default function SecurityPortalInvitePage() {
                 <Field label="Telefone" value={form.phone} onChange={(value) => setFormValue(setForm, 'phone', value)} />
                 <Field label="E-mail" value={form.email} onChange={(value) => setFormValue(setForm, 'email', value)} />
                 <Field label="Empresa de origem" value={form.originCompanyName} onChange={(value) => setFormValue(setForm, 'originCompanyName', value)} />
-                <Field label="Placa do veiculo" value={form.vehiclePlate} onChange={(value) => setFormValue(setForm, 'vehiclePlate', value.toUpperCase())} />
-                <Field label="Modelo do veiculo" value={form.vehicleModel} onChange={(value) => setFormValue(setForm, 'vehicleModel', value)} />
+                <Field label="Placa do veículo" value={form.vehiclePlate} onChange={(value) => setFormValue(setForm, 'vehiclePlate', value.toUpperCase())} />
+                <Field label="Modelo do veículo" value={form.vehicleModel} onChange={(value) => setFormValue(setForm, 'vehicleModel', value)} />
                 <Field label="Acompanhantes" value={form.companions} onChange={(value) => setFormValue(setForm, 'companions', value)} />
                 <LongField label="Materiais, ferramentas ou cargas" value={form.materialsDescription} onChange={(value) => setFormValue(setForm, 'materialsDescription', value)} />
-                <LongField label="Documentos/evidencias enviados" value={form.documentEvidence} onChange={(value) => setFormValue(setForm, 'documentEvidence', value)} />
-                <LongField label="Observacoes" value={form.notes} onChange={(value) => setFormValue(setForm, 'notes', value)} />
+                <LongField label="Documentos/evidências enviados" value={form.documentEvidence} onChange={(value) => setFormValue(setForm, 'documentEvidence', value)} />
+                <LongField label="Observações" value={form.notes} onChange={(value) => setFormValue(setForm, 'notes', value)} />
 
                 <label className="flex gap-3 text-sm md:col-span-2">
                   <input className="mt-1 h-4 w-4" type="checkbox" checked={form.acceptedTerms} onChange={(event) => setFormValue(setForm, 'acceptedTerms', event.target.checked)} />
-                  <span>Confirmo que as informacoes enviadas sao verdadeiras e aceito as regras de acesso da unidade.</span>
+                  <span>Confirmo que as informações enviadas são verdadeiras e aceito as regras de acesso da unidade.</span>
                 </label>
                 <label className="flex gap-3 text-sm md:col-span-2">
                   <input className="mt-1 h-4 w-4" type="checkbox" checked={form.privacyAccepted} onChange={(event) => setFormValue(setForm, 'privacyAccepted', event.target.checked)} />
-                  <span>Autorizo o tratamento dos dados informados para fins de seguranca patrimonial, controle de acesso e auditoria.</span>
+                  <span>Autorizo o tratamento dos dados informados para fins de segurança patrimonial, controle de acesso e auditoria.</span>
                 </label>
 
                 <div className="flex flex-col gap-3 border-t pt-4 md:col-span-2 sm:flex-row sm:items-center sm:justify-between">
-                  <p className="text-xs text-muted-foreground">A portaria pode solicitar documento fisico e validacoes adicionais no momento da entrada.</p>
+                  <p className="text-xs text-muted-foreground">A portaria pode solicitar documento físico e validações adicionais no momento da entrada.</p>
                   <Button type="submit" disabled={!canSubmit || submit.isPending || invite.isError}>
-                    {submit.isPending ? 'Enviando...' : 'Enviar pre-cadastro'}
+                    {submit.isPending ? 'Enviando...' : 'Enviar pré-cadastro'}
                   </Button>
                 </div>
               </form>
@@ -266,7 +266,7 @@ function periodText(invite?: Invite) {
   if (invite?.authorization?.allowedPeriodText) return invite.authorization.allowedPeriodText;
   const start = invite?.authorization?.scheduledStartAt ? formatDate(invite.authorization.scheduledStartAt) : null;
   const end = invite?.authorization?.scheduledEndAt ? formatDate(invite.authorization.scheduledEndAt) : null;
-  return [start, end].filter(Boolean).join(' ate ') || 'Conforme autorizacao';
+  return [start, end].filter(Boolean).join(' até ') || 'Conforme autorização';
 }
 
 function setFormValue<K extends keyof FormState>(setForm: (updater: (prev: FormState) => FormState) => void, key: K, value: FormState[K]) {

@@ -262,7 +262,7 @@ const STATUS_LABEL: Record<DocStatus, string> = {
   APPROVED: 'Aprovado',
   SCHEDULED_PUBLICATION: 'Publicação agendada',
   PUBLISHED: 'Publicado',
-  NEAR_EXPIRATION: 'Proximo do vencimento',
+  NEAR_EXPIRATION: 'Próximo do vencimento',
   EXPIRED: 'Vencido',
   PERIODIC_REVIEW: 'Revisão periódica',
   REPLACED: 'Substituído',
@@ -272,9 +272,9 @@ const STATUS_LABEL: Record<DocStatus, string> = {
 };
 
 const TYPE_LABEL: Record<DocType, string> = {
-  POLICY: 'Politica',
+  POLICY: 'Política',
   PROCEDURE: 'Procedimento',
-  INSTRUCTION: 'Instrucao',
+  INSTRUCTION: 'Instrução',
   MANUAL: 'Manual',
   FORM: 'Formulário',
   TEMPLATE: 'Modelo',
@@ -285,7 +285,7 @@ const TYPE_LABEL: Record<DocType, string> = {
   FLOWCHART: 'Fluxograma',
   PLAN: 'Plano',
   REPORT: 'Relatório',
-  CHECKLIST: 'Checklist',
+  CHECKLIST: 'Lista de verificação',
   TECHNICAL_SPECIFICATION: 'Especificação técnica',
   EXTERNAL: 'Externo',
   OTHER: 'Outro',
@@ -560,8 +560,8 @@ export default function DocumentsPage() {
       if (session.editorUrl && session.accessToken) {
         setEditorSession(session);
       } else {
-        toast.message('Editor online indisponível', {
-          description: session.message ?? 'Use download/upload de nova versão.',
+        toast.message('Editor pela web indisponível', {
+          description: session.message ?? 'Use baixar/envio de nova versão.',
         });
       }
     },
@@ -643,11 +643,11 @@ export default function DocumentsPage() {
         json: { name: templateForm.name, typeConfigId: templateForm.typeConfigId || null, content: templateForm.content || null },
       }),
     onSuccess: () => {
-      toast.success('Template cadastrado');
+      toast.success('Modelo cadastrado');
       setTemplateForm({ name: '', typeConfigId: '', content: '' });
       qc.invalidateQueries({ queryKey: ['documents', 'options'] });
     },
-    onError: (e: any) => toast.error(e?.message ?? 'Não foi possível cadastrar o template'),
+    onError: (e: any) => toast.error(e?.message ?? 'Não foi possível cadastrar o modelo'),
   });
 
   const openCreate = () => {
@@ -775,7 +775,7 @@ export default function DocumentsPage() {
                 <thead className="border-b bg-muted/40 text-xs text-muted-foreground">
                   <tr>
                     <th className="px-4 py-3 text-left font-medium">Código</th>
-                    <th className="px-4 py-3 text-left font-medium">Titulo</th>
+                    <th className="px-4 py-3 text-left font-medium">Título</th>
                     <th className="px-4 py-3 text-left font-medium">Tipo</th>
                     <th className="px-4 py-3 text-left font-medium">Status</th>
                     <th className="px-4 py-3 text-left font-medium">Área</th>
@@ -844,19 +844,19 @@ export default function DocumentsPage() {
               <Card>
                 <CardContent className="space-y-4 p-4">
                   <div className="flex items-center justify-between">
-                    <div className="text-sm font-semibold">Templates DOCX</div>
-                    <Badge variant="outline">{formatNumber(options?.templates.length)} templates</Badge>
+                    <div className="text-sm font-semibold">Modelos DOCX</div>
+                    <Badge variant="outline">{formatNumber(options?.templates.length)} modelos</Badge>
                   </div>
-                  <Input placeholder="Nome do template" value={templateForm.name} onChange={(e) => setTemplateForm((f) => ({ ...f, name: e.target.value }))} />
+                  <Input placeholder="Nome do modelo" value={templateForm.name} onChange={(e) => setTemplateForm((f) => ({ ...f, name: e.target.value }))} />
                   <NativeSelect value={templateForm.typeConfigId} onChange={(e) => setTemplateForm((f) => ({ ...f, typeConfigId: e.target.value }))}>
                     <option value="">Sem tipo vinculado</option>
                     {(options?.typeConfigs ?? []).map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}
                   </NativeSelect>
                   <Textarea rows={6} placeholder="{{document_code}} - {{document_title}}" value={templateForm.content} onChange={(e) => setTemplateForm((f) => ({ ...f, content: e.target.value }))} />
-                  <Button onClick={() => createTemplate.mutate()} disabled={createTemplate.isPending || !templateForm.name.trim()}><Upload className="mr-2 h-4 w-4" />Cadastrar template</Button>
+                  <Button onClick={() => createTemplate.mutate()} disabled={createTemplate.isPending || !templateForm.name.trim()}><Upload className="mr-2 h-4 w-4" />Cadastrar modelo</Button>
                   <div className="rounded-md border p-3 text-sm">
                     <div className="font-medium">Editor DOCX</div>
-                    <div className="mt-1 text-xs text-muted-foreground">{options?.editor.configured ? `${options.editor.provider} configurado` : 'Modo manual de download/upload'}</div>
+                    <div className="mt-1 text-xs text-muted-foreground">{options?.editor.configured ? `${options.editor.provider} configurado` : 'Modo manual de baixar/envio'}</div>
                   </div>
                 </CardContent>
               </Card>
@@ -874,12 +874,12 @@ export default function DocumentsPage() {
           <Tabs defaultValue="geral">
             <TabsList>
               <TabsTrigger value="geral">Geral</TabsTrigger>
-              <TabsTrigger value="vinculos">Vinculos</TabsTrigger>
+              <TabsTrigger value="vinculos">Vínculos</TabsTrigger>
               <TabsTrigger value="conteudo">Conteúdo</TabsTrigger>
             </TabsList>
             <TabsContent value="geral" className="grid grid-cols-1 gap-4 md:grid-cols-2">
               <div className="md:col-span-2">
-                <Label>Titulo</Label>
+                <Label>Título</Label>
                 <Input value={form.title} onChange={(e) => setForm((f) => ({ ...f, title: e.target.value }))} />
               </div>
               <div>
@@ -903,7 +903,7 @@ export default function DocumentsPage() {
                 <Input placeholder={selectedType ? `${selectedType.prefix}-001` : 'Gerado automaticamente'} value={form.code} onChange={(e) => setForm((f) => ({ ...f, code: e.target.value }))} />
               </div>
               <div>
-                <Label>Versao</Label>
+                <Label>Versão</Label>
                 <Input type="number" min={1} value={form.version} onChange={(e) => setForm((f) => ({ ...f, version: e.target.value }))} />
               </div>
               <div>
@@ -1269,7 +1269,7 @@ function OnlineEditorDialog({ session, onClose }: { session: EditorSession | nul
     <Dialog open onOpenChange={(o) => { if (!o) onClose(); }}>
       <DialogContent className="flex h-[92vh] w-[96vw] max-w-[96vw] flex-col gap-0 overflow-hidden p-0">
         <DialogHeader className="border-b px-4 py-3">
-          <DialogTitle className="text-sm">Editor DOCX online — {session.provider}</DialogTitle>
+          <DialogTitle className="text-sm">Editor DOCX pela web — {session.provider}</DialogTitle>
         </DialogHeader>
         <div className="relative min-h-0 flex-1">
           <form ref={formRef} action={session.editorUrl} method="post" target="g360-editor-frame" className="hidden">

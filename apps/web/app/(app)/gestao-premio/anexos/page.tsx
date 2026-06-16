@@ -114,7 +114,7 @@ export default function PrizeAnnexesPage() {
       <PageHeader
         title="Anexos e Regras"
         eyebrow="Gestão de Prêmio"
-        description="Governança dos anexos: versões, vigência única, workflow de aprovação e trilha de auditoria."
+        description="Governança dos anexos: versões, vigência única, fluxo de trabalho de aprovação e trilha de auditoria."
         tone="view"
         breadcrumbs={[{ label: 'Gestão de Prêmio', href: '/gestao-premio' }, { label: 'Anexos e Regras' }]}
         actions={canManage ? <Button onClick={openCreate}><Plus className="mr-1 h-4 w-4" />Novo anexo</Button> : undefined}

@@ -20,7 +20,7 @@ export default function SobrePage() {
           <div className="space-y-6 text-base leading-8 text-slate-700">
             <p>O Gestão 360 é uma plataforma SaaS B2B modular para gestão corporativa integrada. Ela conecta empresas, filiais, áreas, processos, indicadores, metas, reuniões, planos de ação, documentos, auditorias, riscos e evidências.</p>
             <p>O objetivo público do site e explicar a plataforma de forma clara, sem prometer resultados que dependem de implantação, maturidade de processo ou contexto da empresa.</p>
-            <p>Dados de clientes, dashboards, documentos e telas administrativas permanecem no portal autenticado e não fazem parte da arquitetura pública indexavel.</p>
+            <p>Dados de clientes, painéis, documentos e telas administrativas permanecem no portal autenticado e não fazem parte da arquitetura pública indexável.</p>
           </div>
         </div>
       </section>

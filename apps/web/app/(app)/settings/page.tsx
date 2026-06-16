@@ -172,7 +172,7 @@ const adminCards: Array<{ title: string; description: string; icon: any; active:
   { title: 'Usuários', description: 'Acessos, status, vínculos e responsáveis.', icon: UsersRound, active: 'users', tone: 'text-status-blue bg-status-blue/10' },
   { title: 'Permissões', description: 'Regras por módulo e ações autorizadas.', icon: KeyRound, active: 'security', tone: 'text-status-purple bg-status-purple/10' },
   { title: 'Perfis de acesso', description: 'Perfis corporativos e permissões agrupadas.', icon: ShieldCheck, active: 'security', tone: 'text-status-red bg-status-red/10' },
-  { title: 'Auditoria', description: 'Logs por usuário, data, módulo e resultado.', icon: ScrollText, active: 'audit', tone: 'text-status-green bg-status-green/10' },
+  { title: 'Auditoria', description: 'Registros por usuário, data, módulo e resultado.', icon: ScrollText, active: 'audit', tone: 'text-status-green bg-status-green/10' },
   { title: 'Parâmetros', description: 'Tipos, status, prioridades e cadastros base.', icon: SlidersHorizontal, active: 'parameters', view: 'categories', tone: 'text-status-yellow bg-status-yellow/10' },
   { title: 'Empresas', description: 'Empresas, dados cadastrais e status.', icon: Building2, active: 'parameters', view: 'companies', tone: 'text-status-blue bg-status-blue/10' },
   { title: 'Filiais', description: 'Unidades de negócio e localizações.', icon: GitBranch, active: 'parameters', view: 'branches', tone: 'text-status-purple bg-status-purple/10' },
@@ -182,7 +182,7 @@ const adminCards: Array<{ title: string; description: string; icon: any; active:
 ];
 
 const roleLabels: Record<string, string> = {
-  SUPER_ADMIN: 'Super Admin',
+  SUPER_ADMIN: 'superadministrador',
   COMPANY_ADMIN: 'Admin',
   DIRECTOR: 'Diretor',
   MANAGER: 'Gestor',
@@ -204,8 +204,8 @@ const nodeTypeLabels: Record<string, string> = {
   MACROPROCESS: 'Macroprocesso',
   PROCESS: 'Processo',
   DIRECTORATE: 'Diretoria',
-  MANAGEMENT: 'Gerencia',
-  COORDINATION: 'Coordenacao',
+  MANAGEMENT: 'Gerência',
+  COORDINATION: 'Coordenação',
 };
 
 export default function SettingsPage() {
@@ -306,7 +306,7 @@ export default function SettingsPage() {
         <SectionCard title="Acesso restrito" description="Seu perfil não possui permissão para visualizar Configurações.">
           <div className="rounded-lg border border-dashed p-8 text-center text-sm text-muted-foreground">
             <ShieldCheck className="mx-auto mb-3 h-8 w-8 opacity-50" />
-            Solicite ao Super Admin a permissão adequada para acessar usuários, auditoria, parâmetros, segurança ou sistema.
+            Solicite ao superadministrador a permissão adequada para acessar usuários, auditoria, parâmetros, segurança ou sistema.
           </div>
         </SectionCard>
       </div>
@@ -316,7 +316,7 @@ export default function SettingsPage() {
   return (
     <div>
       <PageHeader
-        eyebrow="Administracao"
+        eyebrow="Administração"
         tone="admin"
         title="Configurações"
         description="Central administrativa para usuários, auditoria, parâmetros, segurança e regras do sistema."
@@ -412,7 +412,7 @@ export default function SettingsPage() {
             <div className="min-w-0">
               <div className="text-sm font-semibold">APIs Externas</div>
               <p className="mt-1 text-xs leading-relaxed text-muted-foreground">
-                Conecte sistemas externos (SAP, Apdata, SE Suite e outros): conectores de saída, chaves de API de entrada e logs.
+                Conecte sistemas externos (SAP, Apdata, SE Suite e outros): conectores de saída, chaves de API de entrada e registros.
               </p>
             </div>
           </Link>
@@ -447,7 +447,7 @@ export default function SettingsPage() {
       {!platformAdminContext && isSuperAdmin && (
         <SectionCard
           title="Administração avançada"
-          description="Ferramentas técnicas — exclusivas do Super Admin."
+          description="Ferramentas técnicas — exclusivas do superadministrador."
           className="mb-6"
           contentClassName="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-3"
         >
@@ -536,7 +536,7 @@ export default function SettingsPage() {
       {active === 'audit' && (
         <SectionCard
           title="Auditoria"
-          description="Logs automaticos de ações, acessos, alterações de permissões e parametrizacoes."
+          description="Registros automáticos de ações, acessos, alterações de permissões e parametrizações."
           actions={
             <div className="flex gap-2">
               <Button asChild variant="outline" size="sm">
@@ -653,7 +653,7 @@ export default function SettingsPage() {
           {paramView === 'items' && (
             <>
               <Toolbar search={search} setSearch={setSearch} placeholder="Pesquisar item, código, categoria ou módulo..." />
-              <DataTable headers={['Parametro', 'Categoria', 'Descrição', 'Status', 'Atualizado', 'Ações']} empty="Nenhum item encontrado.">
+              <DataTable headers={['Parâmetro', 'Categoria', 'Descrição', 'Status', 'Atualizado', 'Ações']} empty="Nenhum item encontrado.">
                 {allItems
                   .filter((item) => [item.name, item.code, item.category.name, item.category.module ?? ''].join(' ').toLowerCase().includes(search.toLowerCase()))
                   .map((item) => (
@@ -704,10 +704,10 @@ export default function SettingsPage() {
         <SectionCard
           title="Sistema"
           description="Regras globais, notificações, aprovações e preferencias da plataforma."
-          actions={<Button onClick={() => setDialog({ type: 'setting' })}><Plus className="mr-2 h-4 w-4" />Novo parametro</Button>}
+          actions={<Button onClick={() => setDialog({ type: 'setting' })}><Plus className="mr-2 h-4 w-4" />Novo parâmetro</Button>}
           contentClassName="p-0"
         >
-          <DataTable headers={['Chave', 'Grupo', 'Valor', 'Tipo', 'Status', 'Ações']} empty="Nenhum parametro de sistema cadastrado.">
+          <DataTable headers={['Chave', 'Grupo', 'Valor', 'Tipo', 'Status', 'Ações']} empty="Nenhum parâmetro de sistema cadastrado.">
             {data?.settings.map((setting) => (
               <tr key={setting.id}>
                 <td>
@@ -891,10 +891,10 @@ function AdminDialog({
   const titleMap: Record<string, string> = {
     company: 'Empresa',
     branch: 'Filial',
-    category: 'Categoria de parametro',
-    item: 'Item de parametro',
+    category: 'Categoria de parâmetro',
+    item: 'Item de parâmetro',
     profile: 'Perfil de acesso',
-    setting: 'Parametro do sistema',
+    setting: 'Parâmetro do sistema',
   };
 
   return (

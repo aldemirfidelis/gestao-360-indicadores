@@ -14,7 +14,7 @@ export default function IntegrationsMigratedLayout(_props: { children: ReactNode
   return (
     <div className="grid min-h-[320px] place-items-center text-sm text-muted-foreground">
       <div className="border border-border/60 bg-card px-5 py-4">
-        Integrações administrativas movidas para o Portal Admin Global. Redirecionando...
+        Integrações administrativas movidas para o Portal Administrativo Global. Redirecionando...
       </div>
     </div>
   );

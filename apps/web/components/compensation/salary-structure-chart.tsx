@@ -23,10 +23,10 @@ export function SalaryStructureChart({
   const structure = salaryStructure(ranges);
 
   if (masked) {
-    return <EmptyState title="Valores restritos" description="Voce nao possui permissao para visualizar valores salariais." />;
+    return <EmptyState title="Valores restritos" description="Você não possui permissão para visualizar valores salariais." />;
   }
   if (structure.length === 0) {
-    return <EmptyState title="Sem faixas cadastradas" description="Adicione faixas com minimo, ponto medio e maximo para ver a estrutura." />;
+    return <EmptyState title="Sem faixas cadastradas" description="Adicione faixas com mínimo, ponto medio e maximo para ver a estrutura." />;
   }
 
   const data = structure.map((row) => ({
@@ -55,7 +55,7 @@ export function SalaryStructureChart({
                 <div className="rounded-md border bg-background p-2 text-xs shadow-md">
                   <div className="font-medium">{row.label}</div>
                   <div className="mt-1 grid grid-cols-[auto_auto] gap-x-3">
-                    <span className="text-muted-foreground">Minimo</span>
+                    <span className="text-muted-foreground">Mínimo</span>
                     <span className="text-right tabular-nums">{formatMoney(row.min, { currency })}</span>
                     <span className="text-muted-foreground">Ponto medio</span>
                     <span className="text-right tabular-nums">{formatMoney(row.mid, { currency })}</span>

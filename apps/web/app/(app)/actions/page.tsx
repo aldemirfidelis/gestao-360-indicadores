@@ -87,7 +87,7 @@ const TOOL_LABEL: Record<string, string> = {
   PRIORITIZATION_MATRIX: 'Matriz de priorização',
   BRAINSTORMING: 'Brainstorming',
   ROOT_CAUSE: 'Causa raiz',
-  EFFECTIVENESS_CHECKLIST: 'Checklist de eficácia',
+  EFFECTIVENESS_CHECKLIST: 'Lista de verificação de eficácia',
 };
 
 const COLUMNS = ['DRAFT', 'UNDER_ANALYSIS', 'IN_PROGRESS', 'WAITING_VALIDATION', 'EFFECTIVE'];
@@ -273,7 +273,7 @@ export default function ActionsPage() {
       )}
 
       {!query.isLoading && actions.length > 0 && view === 'list' && (
-        <SectionCard title="Lista de planos" description="Visão tabular para priorizacao, rastreabilidade e cobrança." contentClassName="p-0">
+        <SectionCard title="Lista de planos" description="Visão tabular para priorização, rastreabilidade e cobrança." contentClassName="p-0">
           <div className="overflow-x-auto">
             <table className="table-modern">
               <thead>
@@ -378,7 +378,7 @@ function ActionForm({ form, setForm, options }: { form: typeof emptyForm; setFor
           {(selectedIndicator?.results ?? []).map((result) => <option key={result.id} value={result.id}>{result.periodRef} - {result.value} ({result.light})</option>)}
         </NativeSelect>
       </div>
-      <SelectField label="Desvio / nao conformidade" value={form.deviationId} onChange={(deviationId) => {
+      <SelectField label="Desvio / não conformidade" value={form.deviationId} onChange={(deviationId) => {
         const deviation = options?.deviations.find((item) => item.id === deviationId);
         setForm({ ...form, deviationId, origin: deviationId ? 'DEVIATION' : form.origin, indicatorId: deviation?.indicatorId ?? form.indicatorId, analysisTool: deviation?.method === 'FIVE_WHYS' ? 'FIVE_WHYS' : deviation?.method ?? form.analysisTool });
       }} items={(options?.deviations ?? []).map((item) => ({ id: item.id, name: `#${item.number} - ${item.title}` }))} />
@@ -411,7 +411,7 @@ function ActionForm({ form, setForm, options }: { form: typeof emptyForm; setFor
         <Text label="Ação proposta" value={form.description} onChange={(description) => setForm({ ...form, description })} />
       </div>
       <div className="md:col-span-2">
-        <Text label="Resultado esperado / criterio de eficacia" value={form.expectedResult} onChange={(expectedResult) => setForm({ ...form, expectedResult })} />
+        <Text label="Resultado esperado / criterio de eficácia" value={form.expectedResult} onChange={(expectedResult) => setForm({ ...form, expectedResult })} />
       </div>
     </div>
   );

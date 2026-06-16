@@ -92,7 +92,7 @@ export default function ApprovalsPage() {
                 >
                   <div>
                     <div className="text-[10px] font-semibold text-muted-foreground uppercase">
-                      Workflow: {item.workflowInstance.workflowDefinition.name}
+                      Fluxo de trabalho: {item.workflowInstance.workflowDefinition.name}
                     </div>
                     <h4 className="text-xs font-semibold text-foreground mt-1">Aprovação de Etapa ({item.approvalType})</h4>
                     <div className="text-[10px] text-muted-foreground mt-2">

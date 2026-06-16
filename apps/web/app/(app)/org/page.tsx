@@ -529,7 +529,7 @@ export default function OrgPage() {
                     value={treeScope}
                     onChange={(event) => setManualTreeScope(event.target.value as OrgTreeScope)}
                   >
-                    <option value="mine">Minhas areas</option>
+                    <option value="mine">Minhas áreas</option>
                     <option value="all">Todos os setores</option>
                   </NativeSelect>
                 </div>
@@ -549,10 +549,10 @@ export default function OrgPage() {
         <MetricCard title="Nos da estrutura" value={formatNumber(stats.total)} description="Valores, áreas e pilares" icon={<Network className="h-4 w-4" />} tone="blue" />
         <MetricCard title="Ativos" value={formatNumber(stats.active)} description="Liberados para uso" icon={<BadgeCheck className="h-4 w-4" />} tone="green" />
         <MetricCard title="Indicadores vinculados" value={formatNumber(stats.indicators)} description="Distribuidos por pilar" icon={<Target className="h-4 w-4" />} tone="purple" />
-        <MetricCard title="Com responsável" value={formatNumber(stats.responsible)} description="Governanca atribuida" icon={<UserRound className="h-4 w-4" />} tone="yellow" />
+        <MetricCard title="Com responsável" value={formatNumber(stats.responsible)} description="Governança atribuída" icon={<UserRound className="h-4 w-4" />} tone="yellow" />
       </div>
 
-      <SectionCard title="Estrutura de gestão" description="Dados da estrutura, responsaveis e responsabilidades por setor." contentClassName="p-3">
+      <SectionCard title="Estrutura de gestão" description="Dados da estrutura, responsáveis e responsabilidades por setor." contentClassName="p-3">
         {tree.isLoading && <LoadingState />}
         {!tree.isLoading && (tree.data?.length ?? 0) === 0 && (
           <EmptyState title="Nenhuma estrutura cadastrada" description="Crie Valores, Diretrizes, Áreas e Pilares para vincular indicadores." />
@@ -701,7 +701,7 @@ export default function OrgPage() {
           </DialogHeader>
           <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
             <div className="md:col-span-2">
-              <Label>Titulo</Label>
+              <Label>Título</Label>
               <Input value={activityForm.title} onChange={(e) => setActivityForm({ ...activityForm, title: e.target.value })} />
             </div>
             <div>
@@ -716,7 +716,7 @@ export default function OrgPage() {
               </NativeSelect>
             </div>
             <div className="md:col-span-2">
-              <Label>Descricao</Label>
+              <Label>Descrição</Label>
               <Textarea rows={3} value={activityForm.description} onChange={(e) => setActivityForm({ ...activityForm, description: e.target.value })} />
             </div>
           </div>
@@ -737,7 +737,7 @@ export default function OrgPage() {
           </DialogHeader>
           <div className="grid grid-cols-1 gap-4 md:grid-cols-[1fr,140px]">
             <div>
-              <Label>Descricao</Label>
+              <Label>Descrição</Label>
               <Textarea rows={3} value={itemForm.description} onChange={(e) => setItemForm({ ...itemForm, description: e.target.value })} />
             </div>
             <div className="grid gap-4">
@@ -963,7 +963,7 @@ function OrgDetailPanel({
 
                 {detail.activities.length === 0 ? (
                   <div className="p-4">
-                    <EmptyState title="Sem responsabilidades cadastradas" description="Este item ainda nao possui atividades institucionais registradas." />
+                    <EmptyState title="Sem responsabilidades cadastradas" description="Este item ainda não possui atividades institucionais registradas." />
                   </div>
                 ) : (
                   <div className="divide-y divide-border/60">

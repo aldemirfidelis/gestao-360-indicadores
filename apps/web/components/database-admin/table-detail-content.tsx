@@ -45,7 +45,7 @@ export function TableDetailContent({ table, onBack }: { table: string; onBack?: 
           )}
           <div>
             <h2 className="font-mono text-lg font-semibold">{table}</h2>
-            <p className="text-sm text-muted-foreground">Estrutura da tabela (colunas, constraints e indices).</p>
+            <p className="text-sm text-muted-foreground">Estrutura da tabela (colunas, constraints e índices).</p>
           </div>
         </div>
         <div className="flex gap-2">
@@ -76,7 +76,7 @@ export function TableDetailContent({ table, onBack }: { table: string; onBack?: 
 
       {schema.isLoading && <LoadingState label="Lendo estrutura..." />}
       {schema.isError && (
-        <SectionCard title="Falha" description="Nao foi possivel ler a estrutura.">
+        <SectionCard title="Falha" description="Não foi possível ler a estrutura.">
           <div className="rounded-lg border border-status-red/30 bg-status-red/10 p-4 text-sm">{(schema.error as Error)?.message}</div>
         </SectionCard>
       )}
@@ -92,7 +92,7 @@ export function TableDetailContent({ table, onBack }: { table: string; onBack?: 
                     <th className="text-left">Coluna</th>
                     <th className="text-left">Tipo</th>
                     <th className="text-left">Nulo?</th>
-                    <th className="text-left">Padrao</th>
+                    <th className="text-left">Padrão</th>
                     <th className="text-left">Chave</th>
                   </tr>
                 </thead>
@@ -105,7 +105,7 @@ export function TableDetailContent({ table, onBack }: { table: string; onBack?: 
                         {column.dataType}
                         {column.maxLength ? `(${column.maxLength})` : ''}
                       </td>
-                      <td>{column.nullable ? <span className="text-muted-foreground">sim</span> : <span className="text-status-red">nao</span>}</td>
+                      <td>{column.nullable ? <span className="text-muted-foreground">sim</span> : <span className="text-status-red">não</span>}</td>
                       <td className="max-w-[220px] truncate font-mono text-xs text-muted-foreground">{column.default ?? '-'}</td>
                       <td>
                         <div className="flex gap-1">
@@ -152,7 +152,7 @@ export function TableDetailContent({ table, onBack }: { table: string; onBack?: 
               </div>
             </SectionCard>
 
-            <SectionCard title="Indices" description={`${data.indexes.length} indice(s).`} contentClassName="p-0">
+            <SectionCard title="Índices" description={`${data.indexes.length} índice(s).`} contentClassName="p-0">
               <div className="overflow-x-auto">
                 <table className="table-modern">
                   <thead>
@@ -167,7 +167,7 @@ export function TableDetailContent({ table, onBack }: { table: string; onBack?: 
                       <tr key={index.name}>
                         <td className="font-mono text-xs">{index.name}</td>
                         <td className="font-mono text-xs">{index.columns.join(', ')}</td>
-                        <td>{index.isUnique ? 'sim' : 'nao'}</td>
+                        <td>{index.isUnique ? 'sim' : 'não'}</td>
                       </tr>
                     ))}
                   </tbody>
@@ -176,7 +176,7 @@ export function TableDetailContent({ table, onBack }: { table: string; onBack?: 
             </SectionCard>
           </div>
 
-          <SectionCard title="Registros" description="Leitura paginada, inclusao, edicao, duplicacao e exclusao (individual e em massa) com snapshot e auditoria.">
+          <SectionCard title="Registros" description="Leitura paginada, inclusão, edição, duplicação e exclusão (individual e em massa) com retrato e auditoria.">
             <RecordEditor table={table} />
           </SectionCard>
         </>

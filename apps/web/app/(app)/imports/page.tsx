@@ -82,7 +82,7 @@ export default function ImportsPage() {
       json: { target, fileName, rows },
     }),
     onSuccess: (out) => {
-      toast.success(`Importação concluida: ${out.okRows}/${out.totalRows} linhas`);
+      toast.success(`Importação concluída: ${out.okRows}/${out.totalRows} linhas`);
       qc.invalidateQueries({ queryKey: ['imports', 'jobs'] });
       qc.invalidateQueries({ queryKey: ['indicators'] });
       qc.invalidateQueries({ queryKey: ['dashboard'] });
