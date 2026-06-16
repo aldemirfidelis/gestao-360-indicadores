@@ -6,7 +6,6 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
 import {
   AlertTriangle,
-  BookOpen,
   CarFront,
   CheckCircle2,
   DoorOpen,
@@ -19,14 +18,16 @@ import {
   QrCode,
   RadioTower,
   Search,
-  ShieldCheck,
+  ShieldAlert,
   Users,
 } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 import { PageHeader } from '@/components/shell/page-header';
 import { MetricCard } from '@/components/platform/metric-card';
+import { SectionCard } from '@/components/platform/section-card';
+import { EmptyState } from '@/components/platform/empty-state';
+import { StatusBadge } from '@/components/platform/status-badge';
 import { Card, CardContent } from '@/components/ui/card';
-import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
@@ -35,54 +36,46 @@ import { NativeSelect } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
 import { useAuth } from '@/components/auth/auth-provider';
 import { api } from '@/lib/api';
-import { cn, formatDate, formatNumber } from '@/lib/utils';
+import { cn, formatNumber } from '@/lib/utils';
+import {
+  AUTH_STATUS_LABELS,
+  CUSTODY_STATUS_LABELS,
+  CUSTODY_TYPE_LABELS,
+  DOCUMENT_STATUS_LABELS,
+  INCIDENT_SEVERITY_LABELS,
+  MOVEMENT_STATUS_LABELS,
+  MOVEMENT_TYPE_LABELS,
+  PACKAGE_STATUS_LABELS,
+  PERSON_TYPE_LABELS,
+  RECORD_STATUS_LABELS,
+  labelFor,
+  statusTone,
+  toOptions,
+} from '@/lib/asset-security/labels';
+import { dwellMinutes, formatDateTime, formatDuration } from '@/lib/asset-security/format';
+import { averageDwellMinutes, documentCompliance, roundsCompliance } from '@/lib/asset-security/analytics';
+import { MovementFlowChart } from '@/components/asset-security/movement-flow-chart';
+import { IncidentBreakdownChart } from '@/components/asset-security/incident-breakdown-chart';
+import { EmergencyPanel } from '@/components/asset-security/emergency-panel';
+import { MovementDetailDialog } from '@/components/asset-security/movement-detail-dialog';
+import { AuthorizationDetailDialog } from '@/components/asset-security/authorization-detail-dialog';
+import { IncidentsSection } from '@/components/asset-security/incidents-section';
+import { RoundsSection } from '@/components/asset-security/rounds-section';
+import { ShiftHandoverSection } from '@/components/asset-security/shift-handover-section';
+import { CorrespondenceSection } from '@/components/asset-security/correspondence-section';
+import { DocumentRequirementsSection } from '@/components/asset-security/document-requirements-section';
+import { BlocklistSection } from '@/components/asset-security/blocklist-section';
+import { AuditLogSection } from '@/components/asset-security/audit-log-section';
+import { OfflineSyncSection } from '@/components/asset-security/offline-sync-section';
+import type {
+  AnyRecord,
+  AssistantInsightsResponse,
+  SecurityMovement,
+  SecurityOptions,
+  SecuritySummary,
+} from '@/lib/asset-security/types';
 
 type TabKey = 'overview' | 'operation' | 'people' | 'authorizations' | 'rounds' | 'assets' | 'settings';
-type AnyRecord = Record<string, any>;
-
-interface Summary {
-  gates: number;
-  posts: number;
-  peoplePresent: number;
-  vehiclesPresent: number;
-  todayEntries: number;
-  todayExits: number;
-  pendingExits: number;
-  overduePresence: number;
-  expiredOrInvalidDocuments: number;
-  authorizationsPending: number;
-  openIncidents: number;
-  criticalIncidents: number;
-  lateRounds: number;
-  custodyPending: number;
-  correspondenceWaiting: number;
-  offlinePending: number;
-  activeBlocklistItems: number;
-  generatedAt: string;
-}
-
-interface Options {
-  branches: AnyRecord[];
-  orgNodes: AnyRecord[];
-  users: AnyRecord[];
-  gates: AnyRecord[];
-  posts: AnyRecord[];
-  people: AnyRecord[];
-  contractorCompanies: AnyRecord[];
-  vehicles: AnyRecord[];
-  roundRoutes: AnyRecord[];
-  formTemplates: AnyRecord[];
-  packageFeatures: string[];
-  gateTypes: string[];
-  vehicleTypes: string[];
-  recordStatuses: string[];
-  personTypes: string[];
-  documentStatuses: string[];
-  authorizationStatuses: string[];
-  incidentSeverities: string[];
-  custodyTypes: string[];
-  custodyStatuses: string[];
-}
 
 interface DialogField {
   name: string;
@@ -102,31 +95,15 @@ interface EntityDialogState {
   success: string;
 }
 
-const TABS: Array<{ key: TabKey; label: string; icon: typeof LayoutDashboard }> = [
-  { key: 'overview', label: 'Visao Geral', icon: LayoutDashboard },
-  { key: 'operation', label: 'Operacao', icon: DoorOpen },
-  { key: 'people', label: 'Pessoas e Veiculos', icon: Users },
-  { key: 'authorizations', label: 'Autorizacoes', icon: QrCode },
-  { key: 'rounds', label: 'Rondas e Ocorrencias', icon: RadioTower },
+const TABS: Array<{ key: TabKey; label: string; icon: LucideIcon }> = [
+  { key: 'overview', label: 'Visão Geral', icon: LayoutDashboard },
+  { key: 'operation', label: 'Operação', icon: DoorOpen },
+  { key: 'people', label: 'Pessoas e Veículos', icon: Users },
+  { key: 'authorizations', label: 'Autorizações', icon: QrCode },
+  { key: 'rounds', label: 'Rondas e Ocorrências', icon: RadioTower },
   { key: 'assets', label: 'Materiais e Chaves', icon: KeyRound },
-  { key: 'settings', label: 'Configuracoes', icon: PackageCheck },
+  { key: 'settings', label: 'Configurações', icon: PackageCheck },
 ];
-
-const STATUS_CLASS: Record<string, string> = {
-  ACTIVE: 'bg-emerald-100 text-emerald-700',
-  APPROVED: 'bg-emerald-100 text-emerald-700',
-  OPEN: 'bg-blue-100 text-blue-700',
-  IN_PROGRESS: 'bg-blue-100 text-blue-700',
-  REQUESTED: 'bg-amber-100 text-amber-700',
-  WAITING_APPROVAL: 'bg-amber-100 text-amber-700',
-  WAITING_DOCUMENTS: 'bg-amber-100 text-amber-700',
-  OVERDUE: 'bg-rose-100 text-rose-700',
-  BLOCKED: 'bg-rose-100 text-rose-700',
-  CRITICAL: 'bg-rose-100 text-rose-700',
-  EMERGENCY: 'bg-rose-100 text-rose-700',
-  CLOSED: 'bg-zinc-100 text-zinc-700',
-  DONE: 'bg-emerald-100 text-emerald-700',
-};
 
 export default function SegurancaPatrimonialPage() {
   const qc = useQueryClient();
@@ -136,31 +113,41 @@ export default function SegurancaPatrimonialPage() {
   const canOperate = hasPermission(['asset-security:entry', 'asset-security:exit', 'asset-security:update']);
   const canApprove = hasPermission(['asset-security:approve', 'asset-security:manage']);
   const canManage = hasPermission(['asset-security:manage']);
+  const canUpdate = hasPermission(['asset-security:update', 'asset-security:manage']);
+  const canIncident = hasPermission(['asset-security:incident', 'asset-security:manage']);
+  const canRounds = hasPermission(['asset-security:rounds', 'asset-security:manage']);
+  const canHandover = hasPermission(['asset-security:handover', 'asset-security:manage']);
+  const canBlock = hasPermission(['asset-security:block', 'asset-security:manage']);
+  const canOffline = hasPermission(['asset-security:offline', 'asset-security:manage']);
   const initialTab = isTab(searchParams.get('tab')) ? (searchParams.get('tab') as TabKey) : 'overview';
   const [tab, setTab] = useState<TabKey>(initialTab);
   const [dialog, setDialog] = useState<EntityDialogState | null>(null);
   const [search, setSearch] = useState('');
+  const [emergencyOpen, setEmergencyOpen] = useState(false);
+  const [qrOpen, setQrOpen] = useState(false);
+  const [detail, setDetail] = useState<SecurityMovement | null>(null);
 
   useEffect(() => {
     const next = isTab(searchParams.get('tab')) ? (searchParams.get('tab') as TabKey) : 'overview';
     setTab(next);
   }, [searchParams]);
 
-  const summary = useQuery<Summary>({ queryKey: ['asset-security', 'summary'], queryFn: () => api('/asset-security/summary') });
-  const options = useQuery<Options>({ queryKey: ['asset-security', 'options'], queryFn: () => api('/asset-security/options') });
+  const summary = useQuery<SecuritySummary>({ queryKey: ['asset-security', 'summary'], queryFn: () => api('/asset-security/summary') });
+  const options = useQuery<SecurityOptions>({ queryKey: ['asset-security', 'options'], queryFn: () => api('/asset-security/options') });
   const gates = useQuery<AnyRecord[]>({ queryKey: ['asset-security', 'gates'], queryFn: () => api('/asset-security/gates') });
   const posts = useQuery<AnyRecord[]>({ queryKey: ['asset-security', 'posts'], queryFn: () => api('/asset-security/posts') });
   const people = useQuery<AnyRecord[]>({ queryKey: ['asset-security', 'people', search], queryFn: () => api(`/asset-security/people${search ? `?search=${encodeURIComponent(search)}` : ''}`) });
   const vehicles = useQuery<AnyRecord[]>({ queryKey: ['asset-security', 'vehicles', search], queryFn: () => api(`/asset-security/vehicles${search ? `?search=${encodeURIComponent(search)}` : ''}`) });
   const authorizations = useQuery<AnyRecord[]>({ queryKey: ['asset-security', 'authorizations'], queryFn: () => api('/asset-security/authorizations') });
-  const present = useQuery<AnyRecord[]>({ queryKey: ['asset-security', 'present'], queryFn: () => api('/asset-security/present?take=200') });
-  const pending = useQuery<AnyRecord[]>({ queryKey: ['asset-security', 'pending-exits'], queryFn: () => api('/asset-security/pending-exits?take=200') });
-  const incidents = useQuery<AnyRecord[]>({ queryKey: ['asset-security', 'incidents'], queryFn: () => api('/asset-security/incidents') });
-  const roundRoutes = useQuery<AnyRecord[]>({ queryKey: ['asset-security', 'round-routes'], queryFn: () => api('/asset-security/round-routes') });
+  const present = useQuery<SecurityMovement[]>({ queryKey: ['asset-security', 'present'], queryFn: () => api('/asset-security/present?take=300'), refetchInterval: tab === 'operation' ? 30_000 : false });
+  const pending = useQuery<SecurityMovement[]>({ queryKey: ['asset-security', 'pending-exits'], queryFn: () => api('/asset-security/pending-exits?take=300') });
+  const movements = useQuery<SecurityMovement[]>({ queryKey: ['asset-security', 'movements'], queryFn: () => api('/asset-security/movements?take=400') });
+  const incidents = useQuery<AnyRecord[]>({ queryKey: ['asset-security', 'incidents'], queryFn: () => api('/asset-security/incidents?take=200') });
+  const roundExecutions = useQuery<AnyRecord[]>({ queryKey: ['asset-security', 'round-executions'], queryFn: () => api('/asset-security/round-executions?take=200') });
   const custody = useQuery<AnyRecord[]>({ queryKey: ['asset-security', 'custody'], queryFn: () => api('/asset-security/custody-items') });
   const materials = useQuery<AnyRecord[]>({ queryKey: ['asset-security', 'materials'], queryFn: () => api('/asset-security/materials') });
   const logbook = useQuery<AnyRecord[]>({ queryKey: ['asset-security', 'logbook'], queryFn: () => api('/asset-security/logbook') });
-  const insights = useQuery<AnyRecord>({ queryKey: ['asset-security', 'assistant-insights'], queryFn: () => api('/asset-security/assistant-insights') });
+  const insights = useQuery<AssistantInsightsResponse>({ queryKey: ['asset-security', 'assistant-insights'], queryFn: () => api('/asset-security/assistant-insights') });
   const packageConfig = useQuery<AnyRecord>({ queryKey: ['asset-security', 'package'], queryFn: () => api('/asset-security/package'), enabled: canManage });
 
   function invalidate() {
@@ -182,14 +169,16 @@ export default function SegurancaPatrimonialPage() {
       <PageHeader
         eyebrow="Corporativo"
         tone="admin"
-        title="Seguranca Patrimonial e Portarias"
-        description="Controle de portarias, acessos, visitantes, prestadores, veiculos, rondas, ocorrencias, chaves, crachas, QR Code e operacao offline."
-        breadcrumbs={[{ label: 'Inicio', href: '/' }, { label: 'Seguranca Patrimonial' }]}
+        title="Segurança Patrimonial e Portarias"
+        description="Controle de portarias, acessos, visitantes, prestadores, veículos, rondas, ocorrências, chaves, crachás, QR Code e operação offline."
+        breadcrumbs={[{ label: 'Início', href: '/' }, { label: 'Segurança Patrimonial' }]}
         actions={
           <div className="flex flex-wrap gap-2">
             {canOperate && <Button onClick={() => setDialog(entryDialog(optionValues))}><DoorOpen className="mr-2 h-4 w-4" />Registrar entrada</Button>}
-            {canOperate && <Button variant="outline" onClick={() => setDialog(exitDialog(optionValues))}><CheckCircle2 className="mr-2 h-4 w-4" />Registrar saida</Button>}
-            <Button variant="outline" onClick={() => downloadExport('present')}><Download className="mr-2 h-4 w-4" />Presentes</Button>
+            {canOperate && <Button variant="outline" onClick={() => setDialog(exitDialog(optionValues))}><CheckCircle2 className="mr-2 h-4 w-4" />Registrar saída</Button>}
+            <Button variant="outline" className="border-status-red/40 text-status-red hover:bg-status-red/5" onClick={() => setEmergencyOpen(true)}>
+              <ShieldAlert className="mr-2 h-4 w-4" />Emergência
+            </Button>
           </div>
         }
       />
@@ -212,17 +201,30 @@ export default function SegurancaPatrimonialPage() {
       </div>
 
       {tab === 'overview' && (
-        <OverviewTab summary={summary.data} insights={insights.data} loading={summary.isPending} onTab={selectTab} />
+        <OverviewTab
+          summary={summary.data}
+          insights={insights.data}
+          movements={movements.data ?? []}
+          incidents={incidents.data ?? []}
+          roundExecutions={roundExecutions.data ?? []}
+          totalRecords={(options.data?.people?.length ?? 0) + (options.data?.vehicles?.length ?? 0) + (options.data?.contractorCompanies?.length ?? 0)}
+          loading={summary.isPending}
+          onTab={selectTab}
+          onEmergency={() => setEmergencyOpen(true)}
+        />
       )}
 
       {tab === 'operation' && (
         <OperationTab
           present={present.data ?? []}
           pending={pending.data ?? []}
+          gates={gates.data ?? []}
           loading={present.isPending || pending.isPending}
           canOperate={canOperate}
           optionValues={optionValues}
           onDialog={setDialog}
+          onDetail={setDetail}
+          onQr={() => setQrOpen(true)}
         />
       )}
 
@@ -254,13 +256,12 @@ export default function SegurancaPatrimonialPage() {
 
       {tab === 'rounds' && (
         <RoundsTab
-          incidents={incidents.data ?? []}
-          routes={roundRoutes.data ?? []}
           logbook={logbook.data ?? []}
-          loading={incidents.isPending || roundRoutes.isPending}
-          canCreate={canOperate}
+          loading={logbook.isPending}
           optionValues={optionValues}
-          onDialog={setDialog}
+          canIncident={canIncident}
+          canRounds={canRounds}
+          canHandover={canHandover}
         />
       )}
 
@@ -270,6 +271,7 @@ export default function SegurancaPatrimonialPage() {
           materials={materials.data ?? []}
           loading={custody.isPending || materials.isPending}
           canCreate={canOperate}
+          canUpdate={canUpdate}
           optionValues={optionValues}
           onDialog={setDialog}
           onChanged={invalidate}
@@ -281,106 +283,251 @@ export default function SegurancaPatrimonialPage() {
           gates={gates.data ?? []}
           posts={posts.data ?? []}
           packageConfig={packageConfig.data}
+          summary={summary.data}
           loading={gates.isPending || posts.isPending}
           canManage={canManage}
+          canBlock={canBlock}
+          canOffline={canOffline}
           optionValues={optionValues}
           onDialog={setDialog}
         />
       )}
 
       {dialog && <EntityDialog state={dialog} onClose={() => setDialog(null)} onSaved={() => { setDialog(null); invalidate(); }} />}
+      <EmergencyPanel open={emergencyOpen} onClose={() => setEmergencyOpen(false)} />
+      {qrOpen && <QrValidateDialog onClose={() => setQrOpen(false)} />}
+      <MovementDetailDialog movement={detail} onClose={() => setDetail(null)} />
     </div>
   );
 }
 
-function OverviewTab({ summary, insights, loading, onTab }: { summary?: Summary; insights?: AnyRecord; loading: boolean; onTab: (tab: TabKey) => void }) {
+/* ------------------------------- Visão Geral ------------------------------ */
+
+function OverviewTab({
+  summary,
+  insights,
+  movements,
+  incidents,
+  roundExecutions,
+  totalRecords,
+  loading,
+  onTab,
+  onEmergency,
+}: {
+  summary?: SecuritySummary;
+  insights?: AssistantInsightsResponse;
+  movements: SecurityMovement[];
+  incidents: AnyRecord[];
+  roundExecutions: AnyRecord[];
+  totalRecords: number;
+  loading: boolean;
+  onTab: (tab: TabKey) => void;
+  onEmergency: () => void;
+}) {
   const s = summary;
+  const docs = documentCompliance(s?.expiredOrInvalidDocuments ?? 0, totalRecords);
+  const rounds = roundsCompliance(roundExecutions);
+  const avgDwell = averageDwellMinutes(movements);
+
   return (
     <div className="space-y-4">
       <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
-        <MetricCard title="Pessoas presentes" value={loading ? '...' : formatNumber(s?.peoplePresent ?? 0)} description="Dentro das unidades agora" icon={<Users className="h-4 w-4" />} tone="blue" href="/seguranca-patrimonial?tab=operation" />
-        <MetricCard title="Veiculos presentes" value={loading ? '...' : formatNumber(s?.vehiclesPresent ?? 0)} description="Com entrada aberta" icon={<CarFront className="h-4 w-4" />} tone="purple" href="/seguranca-patrimonial?tab=operation" />
-        <MetricCard title="Pendencias de saida" value={loading ? '...' : formatNumber(s?.pendingExits ?? 0)} description={`${s?.overduePresence ?? 0} com permanencia excedida`} icon={<AlertTriangle className="h-4 w-4" />} tone={(s?.overduePresence ?? 0) > 0 ? 'red' : 'yellow'} href="/seguranca-patrimonial?tab=operation" />
-        <MetricCard title="Ocorrencias abertas" value={loading ? '...' : formatNumber(s?.openIncidents ?? 0)} description={`${s?.criticalIncidents ?? 0} criticas`} icon={<FileWarning className="h-4 w-4" />} tone={(s?.criticalIncidents ?? 0) > 0 ? 'red' : 'neutral'} href="/seguranca-patrimonial?tab=rounds" />
-        <MetricCard title="Entradas hoje" value={loading ? '...' : formatNumber(s?.todayEntries ?? 0)} description={`${s?.todayExits ?? 0} saidas no dia`} icon={<DoorOpen className="h-4 w-4" />} tone="green" />
-        <MetricCard title="Documentos invalidos" value={loading ? '...' : formatNumber(s?.expiredOrInvalidDocuments ?? 0)} description="Pessoas, empresas ou veiculos" icon={<FileWarning className="h-4 w-4" />} tone={(s?.expiredOrInvalidDocuments ?? 0) > 0 ? 'red' : 'neutral'} />
-        <MetricCard title="Rondas atrasadas" value={loading ? '...' : formatNumber(s?.lateRounds ?? 0)} description="Atrasadas ou incompletas" icon={<RadioTower className="h-4 w-4" />} tone={(s?.lateRounds ?? 0) > 0 ? 'yellow' : 'neutral'} href="/seguranca-patrimonial?tab=rounds" />
-        <MetricCard title="Fila offline" value={loading ? '...' : formatNumber(s?.offlinePending ?? 0)} description="Pendencias de sincronizacao" icon={<ShieldCheck className="h-4 w-4" />} tone={(s?.offlinePending ?? 0) > 0 ? 'yellow' : 'neutral'} />
+        <MetricCard title="Pessoas presentes" value={loading ? '…' : formatNumber(s?.peoplePresent ?? 0)} description="Dentro das unidades agora" icon={<Users className="h-4 w-4" />} tone="blue" href="/seguranca-patrimonial?tab=operation" />
+        <MetricCard title="Veículos presentes" value={loading ? '…' : formatNumber(s?.vehiclesPresent ?? 0)} description="Com entrada em aberto" icon={<CarFront className="h-4 w-4" />} tone="purple" href="/seguranca-patrimonial?tab=operation" />
+        <MetricCard title="Pendências de saída" value={loading ? '…' : formatNumber(s?.pendingExits ?? 0)} description={`${s?.overduePresence ?? 0} com permanência excedida`} icon={<AlertTriangle className="h-4 w-4" />} tone={(s?.overduePresence ?? 0) > 0 ? 'red' : 'yellow'} href="/seguranca-patrimonial?tab=operation" />
+        <MetricCard title="Ocorrências abertas" value={loading ? '…' : formatNumber(s?.openIncidents ?? 0)} description={`${s?.criticalIncidents ?? 0} críticas`} icon={<FileWarning className="h-4 w-4" />} tone={(s?.criticalIncidents ?? 0) > 0 ? 'red' : 'neutral'} href="/seguranca-patrimonial?tab=rounds" />
+        <MetricCard title="Entradas hoje" value={loading ? '…' : formatNumber(s?.todayEntries ?? 0)} description={`${s?.todayExits ?? 0} saídas no dia`} icon={<DoorOpen className="h-4 w-4" />} tone="green" />
+        <MetricCard title="Permanência média" value={loading ? '…' : formatDuration(avgDwell)} description="Movimentações encerradas" icon={<DoorOpen className="h-4 w-4" />} tone="neutral" />
+        <MetricCard title="Documentos inválidos" value={loading ? '…' : formatNumber(s?.expiredOrInvalidDocuments ?? 0)} description="Pessoas, empresas ou veículos" icon={<FileWarning className="h-4 w-4" />} tone={(s?.expiredOrInvalidDocuments ?? 0) > 0 ? 'red' : 'neutral'} />
+        <MetricCard title="Rondas atrasadas" value={loading ? '…' : formatNumber(s?.lateRounds ?? 0)} description="Atrasadas ou incompletas" icon={<RadioTower className="h-4 w-4" />} tone={(s?.lateRounds ?? 0) > 0 ? 'yellow' : 'neutral'} href="/seguranca-patrimonial?tab=rounds" />
       </div>
 
-      <div className="grid gap-4 lg:grid-cols-[1.2fr_0.8fr]">
-        <Card>
-          <CardContent className="p-4">
-            <div className="mb-3 flex items-center justify-between">
-              <div>
-                <h2 className="text-base font-semibold">Atalhos operacionais</h2>
-                <p className="text-sm text-muted-foreground">Fluxos principais do ciclo cadastro, autorizacao, entrada, permanencia, saida e tratativa.</p>
-              </div>
-            </div>
-            <div className="grid gap-2 md:grid-cols-2">
-              {[
-                ['operation', DoorOpen, 'Operacao em tempo real', 'Registrar entrada/saida, consultar presentes e conciliar pendencias.'],
-                ['authorizations', QrCode, 'Autorizacoes e QR Code', 'Pre-cadastro, convites externos, aprovacao e documentos.'],
-                ['rounds', RadioTower, 'Rondas e ocorrencias', 'Roteiros, pontos de controle, ocorrencias e livro eletronico.'],
-                ['assets', KeyRound, 'Materiais, chaves e crachas', 'Movimentacao de bens, emprestimos, devolucoes e correspondencias.'],
-              ].map(([key, Icon, title, desc]) => (
-                <button key={String(key)} type="button" onClick={() => onTab(key as TabKey)} className="rounded-md border p-3 text-left transition-colors hover:bg-muted/50">
-                  <div className="mb-2 flex items-center gap-2 text-sm font-semibold"><Icon className="h-4 w-4 text-primary" />{String(title)}</div>
-                  <p className="text-xs leading-relaxed text-muted-foreground">{String(desc)}</p>
-                </button>
-              ))}
-            </div>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardContent className="p-4">
-            <h2 className="text-base font-semibold">IA assistiva</h2>
-            <p className="mb-3 text-sm text-muted-foreground">Recomendacoes sinalizadas como apoio; decisoes criticas continuam humanas.</p>
-            <div className="space-y-2">
-              {((insights?.insights as AnyRecord[] | undefined) ?? []).map((item, index) => (
-                <div key={`${item.title}-${index}`} className="rounded-md border p-3">
-                  <div className="mb-1 flex items-center justify-between gap-2">
-                    <span className="text-sm font-semibold">{item.title}</span>
-                    <StatusBadge value={String(item.severity)} />
-                  </div>
-                  <p className="text-xs text-muted-foreground">{item.description}</p>
-                  <p className="mt-2 text-xs">{item.recommendation}</p>
+      <div className="grid gap-4 xl:grid-cols-2">
+        <SectionCard title="Fluxo de acessos (14 dias)" description="Entradas e saídas registradas por dia.">
+          <MovementFlowChart movements={movements} />
+        </SectionCard>
+        <SectionCard title="Ocorrências por severidade" description="Distribuição das ocorrências registradas.">
+          <IncidentBreakdownChart incidents={incidents} />
+        </SectionCard>
+      </div>
+
+      <div className="grid gap-4 lg:grid-cols-[1fr_1fr]">
+        <SectionCard title="Conformidade" description="Indicadores de regularidade operacional.">
+          <div className="space-y-4">
+            <ComplianceRow bar={docs} />
+            <ComplianceRow bar={rounds} />
+          </div>
+        </SectionCard>
+
+        <SectionCard
+          title="IA assistiva"
+          description="Recomendações de apoio; decisões críticas continuam humanas."
+        >
+          <div className="space-y-2">
+            {(insights?.insights ?? []).length === 0 && <EmptyState title="Sem sinais" description="Nenhuma recomendação no momento." />}
+            {(insights?.insights ?? []).map((item, index) => (
+              <div key={`${item.title}-${index}`} className="rounded-md border p-3">
+                <div className="mb-1 flex items-center justify-between gap-2">
+                  <span className="text-sm font-semibold">{item.title}</span>
+                  <StatusBadge value={item.severity} label={labelFor(item.severity, INCIDENT_SEVERITY_LABELS)} tone={statusTone(item.severity)} />
                 </div>
-              ))}
+                <p className="text-xs text-muted-foreground">{item.description}</p>
+                <p className="mt-2 text-xs">{item.recommendation}</p>
+              </div>
+            ))}
+          </div>
+        </SectionCard>
+      </div>
+
+      <div className="grid gap-2 md:grid-cols-2 xl:grid-cols-4">
+        {[
+          ['operation', DoorOpen, 'Operação em tempo real', 'Registrar entrada/saída, consultar presentes e conciliar pendências.'],
+          ['authorizations', QrCode, 'Autorizações e QR Code', 'Pré-cadastro, convites externos, aprovação e documentos.'],
+          ['rounds', RadioTower, 'Rondas e ocorrências', 'Roteiros, pontos de controle, ocorrências e livro eletrônico.'],
+          ['assets', KeyRound, 'Materiais, chaves e crachás', 'Movimentação de bens, empréstimos, devoluções e correspondências.'],
+        ].map(([key, Icon, title, desc]) => {
+          const I = Icon as LucideIcon;
+          return (
+            <button key={String(key)} type="button" onClick={() => onTab(key as TabKey)} className="rounded-md border bg-card p-3 text-left transition-colors hover:bg-muted/50">
+              <div className="mb-2 flex items-center gap-2 text-sm font-semibold"><I className="h-4 w-4 text-primary" />{String(title)}</div>
+              <p className="text-xs leading-relaxed text-muted-foreground">{String(desc)}</p>
+            </button>
+          );
+        })}
+      </div>
+
+      <Card className="border-status-red/30">
+        <CardContent className="flex flex-col items-start justify-between gap-3 p-4 sm:flex-row sm:items-center">
+          <div className="flex items-center gap-3">
+            <ShieldAlert className="h-6 w-6 text-status-red" />
+            <div>
+              <div className="text-sm font-semibold">Plano de emergência e evacuação</div>
+              <p className="text-xs text-muted-foreground">Chamada ao vivo dos presentes para conferência de evacuação, com exportação de ata.</p>
             </div>
-          </CardContent>
-        </Card>
+          </div>
+          <Button variant="outline" className="border-status-red/40 text-status-red hover:bg-status-red/5" onClick={onEmergency}>
+            Abrir chamada de emergência
+          </Button>
+        </CardContent>
+      </Card>
+    </div>
+  );
+}
+
+function ComplianceRow({ bar }: { bar: { label: string; ok: number; total: number; percent: number } }) {
+  const tone = bar.percent >= 90 ? 'bg-status-green' : bar.percent >= 70 ? 'bg-status-yellow' : 'bg-status-red';
+  return (
+    <div>
+      <div className="mb-1 flex items-center justify-between text-sm">
+        <span className="font-medium">{bar.label}</span>
+        <span className="tabular-nums text-muted-foreground">{bar.ok}/{bar.total} · {bar.percent}%</span>
+      </div>
+      <div className="h-2 w-full overflow-hidden rounded-full bg-muted">
+        <div className={cn('h-full rounded-full transition-all', tone)} style={{ width: `${bar.percent}%` }} />
       </div>
     </div>
   );
 }
 
-function OperationTab({ present, pending, loading, canOperate, optionValues, onDialog }: { present: AnyRecord[]; pending: AnyRecord[]; loading: boolean; canOperate: boolean; optionValues: ReturnType<typeof buildOptions>; onDialog: (d: EntityDialogState) => void }) {
+/* -------------------------------- Operação -------------------------------- */
+
+function OperationTab({
+  present,
+  pending,
+  gates,
+  loading,
+  canOperate,
+  optionValues,
+  onDialog,
+  onDetail,
+  onQr,
+}: {
+  present: SecurityMovement[];
+  pending: SecurityMovement[];
+  gates: AnyRecord[];
+  loading: boolean;
+  canOperate: boolean;
+  optionValues: ReturnType<typeof buildOptions>;
+  onDialog: (d: EntityDialogState) => void;
+  onDetail: (m: SecurityMovement) => void;
+  onQr: () => void;
+}) {
+  const [gateId, setGateId] = useState('');
+  const filterByGate = (rows: SecurityMovement[]) => (gateId ? rows.filter((r) => r.gate?.id === gateId) : rows);
+  const presentRows = filterByGate(present);
+  const pendingRows = filterByGate(pending);
+
   return (
     <div className="space-y-4">
       <div className="grid gap-3 md:grid-cols-4">
-        <ActionButton disabled={!canOperate} icon={DoorOpen} title="Registrar entrada" text="Pessoa, veiculo, material ou carga" onClick={() => onDialog(entryDialog(optionValues))} />
-        <ActionButton disabled={!canOperate} icon={CheckCircle2} title="Registrar saida" text="Baixa por codigo, pessoa ou placa" onClick={() => onDialog(exitDialog(optionValues))} />
-        <ActionButton disabled={!canOperate} icon={QrCode} title="Ler QR Code" text="Validar convite ou autorizacao" onClick={() => onDialog(validateQrDialog())} />
-        <ActionButton disabled={!canOperate} icon={FileWarning} title="Ocorrencia" text="Registrar fato relevante" onClick={() => onDialog(incidentDialog(optionValues))} />
+        <ActionButton disabled={!canOperate} icon={DoorOpen} title="Registrar entrada" text="Pessoa, veículo, material ou carga" onClick={() => onDialog(entryDialog(optionValues))} />
+        <ActionButton disabled={!canOperate} icon={CheckCircle2} title="Registrar saída" text="Baixa por código, pessoa ou placa" onClick={() => onDialog(exitDialog(optionValues))} />
+        <ActionButton disabled={!canOperate} icon={QrCode} title="Validar QR Code" text="Conferir convite ou autorização" onClick={onQr} />
+        <ActionButton disabled={!canOperate} icon={FileWarning} title="Ocorrência" text="Registrar fato relevante" onClick={() => onDialog(incidentDialog(optionValues))} />
       </div>
+
+      <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+        <div className="sm:w-72">
+          <NativeSelect value={gateId} onChange={(e) => setGateId(e.target.value)}>
+            <option value="">Todas as portarias</option>
+            {gates.map((g) => <option key={g.id} value={g.id}>{g.name}</option>)}
+          </NativeSelect>
+        </div>
+        <Button variant="outline" size="sm" onClick={() => downloadExport('present')}><Download className="mr-2 h-4 w-4" />Exportar presentes</Button>
+      </div>
+
       <div className="grid gap-4 xl:grid-cols-2">
-        <Card>
-          <CardContent className="p-0">
-            <TableHeader title="Pessoas e veiculos presentes" count={present.length} />
-            <MovementTable rows={present} loading={loading} empty="Nenhuma entrada aberta." />
-          </CardContent>
-        </Card>
-        <Card>
-          <CardContent className="p-0">
-            <TableHeader title="Pendencias de saida" count={pending.length} />
-            <MovementTable rows={pending} loading={loading} empty="Sem pendencias de saida." />
-          </CardContent>
-        </Card>
+        <SectionCard title={`Presentes (${presentRows.length})`} description="Pessoas e veículos com entrada em aberto." contentClassName="p-0">
+          <MovementTable rows={presentRows} loading={loading} empty="Nenhuma entrada em aberto." onDetail={onDetail} />
+        </SectionCard>
+        <SectionCard title={`Pendências de saída (${pendingRows.length})`} description="Sem saída registrada ou previsão excedida." contentClassName="p-0">
+          <MovementTable rows={pendingRows} loading={loading} empty="Sem pendências de saída." onDetail={onDetail} />
+        </SectionCard>
       </div>
     </div>
   );
 }
+
+function MovementTable({ rows, loading, empty, onDetail }: { rows: SecurityMovement[]; loading: boolean; empty: string; onDetail: (m: SecurityMovement) => void }) {
+  if (loading) return <div className="p-6 text-center text-sm text-muted-foreground">Carregando…</div>;
+  if (!rows.length) return <EmptyState title={empty} className="border-0" />;
+  return (
+    <div className="overflow-x-auto">
+      <table className="table-modern">
+        <thead>
+          <tr>
+            <th className="text-left">Código</th>
+            <th className="text-left">Pessoa / placa</th>
+            <th className="text-left">Portaria</th>
+            <th className="text-left">Entrada</th>
+            <th className="text-left">Permanência</th>
+            <th className="text-left">Status</th>
+          </tr>
+        </thead>
+        <tbody>
+          {rows.map((row) => {
+            const dwell = dwellMinutes(row.entryAt, row.exitAt);
+            return (
+              <tr key={row.id} className="cursor-pointer hover:bg-muted/40" onClick={() => onDetail(row)}>
+                <td className="font-medium">{row.code ?? '—'}</td>
+                <td>
+                  {row.person?.name ?? row.plate ?? row.vehicle?.plate ?? '—'}
+                  <div className="text-xs text-muted-foreground">{row.contractorCompany?.tradeName ?? row.originCompanyName ?? ''}</div>
+                </td>
+                <td>{row.gate?.name ?? '—'}</td>
+                <td className="text-xs">{formatDateTime(row.entryAt)}</td>
+                <td className={cn('text-xs tabular-nums', row.overdue && 'font-semibold text-status-red')}>{formatDuration(dwell)}</td>
+                <td><StatusBadge value={row.overdue ? 'OVERDUE' : row.status} label={row.overdue ? 'Excedida' : labelFor(row.status, MOVEMENT_STATUS_LABELS)} tone={row.overdue ? 'red' : statusTone(row.status)} /></td>
+              </tr>
+            );
+          })}
+        </tbody>
+      </table>
+    </div>
+  );
+}
+
+/* ---------------------------- Pessoas e Veículos -------------------------- */
 
 function PeopleTab({ people, vehicles, contractorCompanies, loading, search, setSearch, canCreate, optionValues, onDialog }: { people: AnyRecord[]; vehicles: AnyRecord[]; contractorCompanies: AnyRecord[]; loading: boolean; search: string; setSearch: (v: string) => void; canCreate: boolean; optionValues: ReturnType<typeof buildOptions>; onDialog: (d: EntityDialogState) => void }) {
   return (
@@ -393,56 +540,113 @@ function PeopleTab({ people, vehicles, contractorCompanies, loading, search, set
         {canCreate && (
           <div className="flex flex-wrap gap-2">
             <Button onClick={() => onDialog(personDialog(optionValues))}><Plus className="mr-2 h-4 w-4" />Pessoa</Button>
-            <Button variant="outline" onClick={() => onDialog(vehicleDialog(optionValues))}><CarFront className="mr-2 h-4 w-4" />Veiculo</Button>
-            <Button variant="outline" onClick={() => onDialog(contractorDialog(optionValues))}>Empresa prestadora</Button>
+            <Button variant="outline" onClick={() => onDialog(vehicleDialog(optionValues))}><CarFront className="mr-2 h-4 w-4" />Veículo</Button>
+            <Button variant="outline" onClick={() => onDialog(contractorDialog())}>Empresa prestadora</Button>
           </div>
         )}
       </div>
       <div className="grid gap-4 xl:grid-cols-[1.15fr_0.85fr]">
-        <Card><CardContent className="p-0"><TableHeader title="Pessoas cadastradas" count={people.length} /><PeopleTable rows={people} loading={loading} /></CardContent></Card>
+        <SectionCard title={`Pessoas cadastradas (${people.length})`} contentClassName="p-0">
+          <PeopleTable rows={people} loading={loading} canCreate={canCreate} onDialog={onDialog} optionValues={optionValues} />
+        </SectionCard>
         <div className="space-y-4">
-          <Card><CardContent className="p-0"><TableHeader title="Veiculos" count={vehicles.length} /><VehicleTable rows={vehicles} loading={loading} /></CardContent></Card>
-          <Card><CardContent className="p-0"><TableHeader title="Empresas prestadoras" count={contractorCompanies.length} /><SimpleRows rows={contractorCompanies} primary="tradeName" secondary="legalName" status="documentStatus" empty="Nenhuma empresa prestadora." /></CardContent></Card>
+          <SectionCard title={`Veículos (${vehicles.length})`} contentClassName="p-0">
+            <VehicleTable rows={vehicles} loading={loading} canCreate={canCreate} onDialog={onDialog} optionValues={optionValues} />
+          </SectionCard>
+          <SectionCard title={`Empresas prestadoras (${contractorCompanies.length})`} contentClassName="p-0">
+            <SimpleRows rows={contractorCompanies} primary="tradeName" secondary="legalName" statusKey="documentStatus" statusMap={DOCUMENT_STATUS_LABELS} empty="Nenhuma empresa prestadora." />
+          </SectionCard>
         </div>
       </div>
     </div>
   );
 }
 
+function PeopleTable({ rows, loading, canCreate, onDialog, optionValues }: { rows: AnyRecord[]; loading: boolean; canCreate: boolean; onDialog: (d: EntityDialogState) => void; optionValues: ReturnType<typeof buildOptions> }) {
+  if (loading) return <div className="p-6 text-center text-sm text-muted-foreground">Carregando…</div>;
+  if (!rows.length) return <EmptyState title="Nenhuma pessoa cadastrada." className="border-0" />;
+  return (
+    <div className="overflow-x-auto">
+      <table className="table-modern">
+        <thead><tr><th className="text-left">Nome</th><th className="text-left">Tipo</th><th className="text-left">Documento</th><th className="text-left">Docs</th><th className="text-left">Situação</th><th /></tr></thead>
+        <tbody>
+          {rows.map((row) => (
+            <tr key={row.id}>
+              <td className="font-medium">{row.name}</td>
+              <td>{labelFor(row.type, PERSON_TYPE_LABELS)}</td>
+              <td>{row.documentMasked ?? '—'}</td>
+              <td><StatusBadge value={row.documentStatus} label={labelFor(row.documentStatus, DOCUMENT_STATUS_LABELS)} tone={statusTone(row.documentStatus)} /></td>
+              <td><StatusBadge value={row.status} label={labelFor(row.status, RECORD_STATUS_LABELS)} tone={statusTone(row.status)} /></td>
+              <td className="text-right">{canCreate && <Button size="sm" variant="ghost" onClick={() => onDialog(personDialog(optionValues, row))}>Editar</Button>}</td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  );
+}
+
+function VehicleTable({ rows, loading, canCreate, onDialog, optionValues }: { rows: AnyRecord[]; loading: boolean; canCreate: boolean; onDialog: (d: EntityDialogState) => void; optionValues: ReturnType<typeof buildOptions> }) {
+  if (loading) return <div className="p-6 text-center text-sm text-muted-foreground">Carregando…</div>;
+  if (!rows.length) return <EmptyState title="Nenhum veículo cadastrado." className="border-0" />;
+  return (
+    <div className="overflow-x-auto">
+      <table className="table-modern">
+        <thead><tr><th className="text-left">Placa</th><th className="text-left">Tipo</th><th className="text-left">Modelo</th><th className="text-left">Docs</th><th /></tr></thead>
+        <tbody>
+          {rows.map((row) => (
+            <tr key={row.id}>
+              <td className="font-medium">{row.plate}</td>
+              <td>{row.type}</td>
+              <td>{row.model ?? '—'}</td>
+              <td><StatusBadge value={row.documentStatus} label={labelFor(row.documentStatus, DOCUMENT_STATUS_LABELS)} tone={statusTone(row.documentStatus)} /></td>
+              <td className="text-right">{canCreate && <Button size="sm" variant="ghost" onClick={() => onDialog(vehicleDialog(optionValues, row))}>Editar</Button>}</td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  );
+}
+
+/* ------------------------------ Autorizações ------------------------------ */
+
 function AuthorizationsTab({ rows, loading, canCreate, canApprove, optionValues, onDialog, onChanged }: { rows: AnyRecord[]; loading: boolean; canCreate: boolean; canApprove: boolean; optionValues: ReturnType<typeof buildOptions>; onDialog: (d: EntityDialogState) => void; onChanged: () => void }) {
+  const [detail, setDetail] = useState<AnyRecord | null>(null);
   const decision = useMutation({
     mutationFn: ({ id, action }: { id: string; action: 'approve' | 'reject' }) => api(`/asset-security/authorizations/${id}/${action}`, { method: 'POST', json: {} }),
-    onSuccess: () => { toast.success('Autorizacao atualizada'); onChanged(); },
+    onSuccess: () => { toast.success('Autorização atualizada'); onChanged(); },
     onError: (e: any) => toast.error(e?.message ?? 'Falha ao atualizar'),
   });
-  const invite = useMutation({
-    mutationFn: (id: string) => api<AnyRecord>(`/asset-security/authorizations/${id}/external-invite`, { method: 'POST', json: {} }),
-    onSuccess: (data) => { toast.success(`Convite gerado: ${data.publicUrl}`); onChanged(); },
-    onError: (e: any) => toast.error(e?.message ?? 'Falha ao gerar convite'),
-  });
+  const pendingStatuses = ['REQUESTED', 'WAITING_APPROVAL', 'WAITING_DOCUMENTS'];
   return (
-    <Card>
-      <CardContent className="p-0">
-        <div className="flex items-center justify-between border-b p-3">
-          <TableTitle title="Autorizacoes e pre-cadastros" count={rows.length} />
-          {canCreate && <Button size="sm" onClick={() => onDialog(authorizationDialog(optionValues))}><Plus className="mr-2 h-4 w-4" />Nova autorizacao</Button>}
-        </div>
+    <SectionCard
+      title={`Autorizações e pré-cadastros (${rows.length})`}
+      description="Pré-cadastro, aprovação e convite externo de visitantes/prestadores. Clique para ver o detalhe."
+      contentClassName="p-0"
+      actions={canCreate && <Button size="sm" onClick={() => onDialog(authorizationDialog(optionValues))}><Plus className="mr-2 h-4 w-4" />Nova autorização</Button>}
+    >
+      {loading ? (
+        <div className="p-6 text-center text-sm text-muted-foreground">Carregando…</div>
+      ) : rows.length === 0 ? (
+        <EmptyState title="Nenhuma autorização." className="border-0" />
+      ) : (
         <div className="overflow-x-auto">
           <table className="table-modern">
-            <thead><tr><th className="text-left">Codigo</th><th className="text-left">Pessoa</th><th className="text-left">Veiculo</th><th className="text-left">Periodo</th><th className="text-left">Status</th><th className="text-right">Acoes</th></tr></thead>
+            <thead><tr><th className="text-left">Código</th><th className="text-left">Pessoa</th><th className="text-left">Veículo</th><th className="text-left">Período</th><th className="text-left">Status</th><th className="text-right">Ações</th></tr></thead>
             <tbody>
-              {loading ? <LoadingRow colSpan={6} /> : rows.length === 0 ? <EmptyRow colSpan={6} text="Nenhuma autorizacao." /> : rows.map((row) => (
-                <tr key={row.id}>
-                  <td className="font-medium">{row.code ?? '-'}</td>
-                  <td>{row.person?.name ?? '-'}</td>
-                  <td>{row.vehicle?.plate ?? '-'}</td>
-                  <td className="text-xs">{formatDate(row.scheduledStartAt)}<br />{formatDate(row.scheduledEndAt)}</td>
-                  <td><StatusBadge value={row.status} /></td>
+              {rows.map((row) => (
+                <tr key={row.id} className="cursor-pointer hover:bg-muted/40" onClick={() => setDetail(row)}>
+                  <td className="font-medium">{row.code ?? '—'}</td>
+                  <td>{row.person?.name ?? '—'}</td>
+                  <td>{row.vehicle?.plate ?? '—'}</td>
+                  <td className="text-xs">{formatDateTime(row.scheduledStartAt)}<br />{formatDateTime(row.scheduledEndAt)}</td>
+                  <td><StatusBadge value={row.status} label={labelFor(row.status, AUTH_STATUS_LABELS)} tone={statusTone(row.status)} /></td>
                   <td className="text-right">
                     <div className="flex justify-end gap-2">
-                      {canApprove && ['REQUESTED', 'WAITING_APPROVAL', 'WAITING_DOCUMENTS'].includes(row.status) && <Button size="sm" variant="outline" disabled={decision.isPending} onClick={() => decision.mutate({ id: row.id, action: 'approve' })}>Aprovar</Button>}
-                      {canApprove && ['REQUESTED', 'WAITING_APPROVAL', 'WAITING_DOCUMENTS'].includes(row.status) && <Button size="sm" variant="outline" disabled={decision.isPending} onClick={() => decision.mutate({ id: row.id, action: 'reject' })}>Reprovar</Button>}
-                      {canCreate && <Button size="sm" variant="ghost" disabled={invite.isPending} onClick={() => invite.mutate(row.id)}>Convite</Button>}
+                      {canApprove && pendingStatuses.includes(row.status) && <Button size="sm" variant="outline" disabled={decision.isPending} onClick={(e) => { e.stopPropagation(); decision.mutate({ id: row.id, action: 'approve' }); }}>Aprovar</Button>}
+                      {canApprove && pendingStatuses.includes(row.status) && <Button size="sm" variant="outline" disabled={decision.isPending} onClick={(e) => { e.stopPropagation(); decision.mutate({ id: row.id, action: 'reject' }); }}>Reprovar</Button>}
+                      <Button size="sm" variant="ghost" onClick={(e) => { e.stopPropagation(); setDetail(row); }}>Detalhe</Button>
                     </div>
                   </td>
                 </tr>
@@ -450,120 +654,271 @@ function AuthorizationsTab({ rows, loading, canCreate, canApprove, optionValues,
             </tbody>
           </table>
         </div>
-      </CardContent>
-    </Card>
+      )}
+      {detail && (
+        <AuthorizationDetailDialog
+          authorization={detail}
+          peopleOptions={optionValues.people}
+          userOptions={optionValues.users}
+          canApprove={canApprove}
+          canCreate={canCreate}
+          onChanged={onChanged}
+          onClose={() => setDetail(null)}
+        />
+      )}
+    </SectionCard>
   );
 }
 
-function RoundsTab({ incidents, routes, logbook, loading, canCreate, optionValues, onDialog }: { incidents: AnyRecord[]; routes: AnyRecord[]; logbook: AnyRecord[]; loading: boolean; canCreate: boolean; optionValues: ReturnType<typeof buildOptions>; onDialog: (d: EntityDialogState) => void }) {
+/* --------------------------- Rondas e Ocorrências ------------------------- */
+
+type RoundsSub = 'incidents' | 'rounds' | 'handover' | 'logbook';
+
+function RoundsTab({ logbook, loading, optionValues, canIncident, canRounds, canHandover }: { logbook: AnyRecord[]; loading: boolean; optionValues: ReturnType<typeof buildOptions>; canIncident: boolean; canRounds: boolean; canHandover: boolean }) {
+  const [sub, setSub] = useState<RoundsSub>('incidents');
+  const subTabs: Array<{ key: RoundsSub; label: string }> = [
+    { key: 'incidents', label: 'Ocorrências' },
+    { key: 'rounds', label: 'Rondas' },
+    { key: 'handover', label: 'Passagem de turno' },
+    { key: 'logbook', label: 'Livro eletrônico' },
+  ];
   return (
-    <div className="grid gap-4 xl:grid-cols-[1fr_0.9fr]">
-      <Card>
-        <CardContent className="p-0">
-          <div className="flex items-center justify-between border-b p-3">
-            <TableTitle title="Ocorrencias" count={incidents.length} />
-            {canCreate && <Button size="sm" onClick={() => onDialog(incidentDialog(optionValues))}><Plus className="mr-2 h-4 w-4" />Ocorrencia</Button>}
-          </div>
-          <SimpleRows rows={incidents} primary="title" secondary="description" status="severity" empty="Nenhuma ocorrencia." loading={loading} />
-        </CardContent>
-      </Card>
-      <div className="space-y-4">
-        <Card>
-          <CardContent className="p-0">
-            <div className="flex items-center justify-between border-b p-3">
-              <TableTitle title="Rotas de ronda" count={routes.length} />
-              {canCreate && <Button size="sm" variant="outline" onClick={() => onDialog(roundRouteDialog(optionValues))}>Nova rota</Button>}
-            </div>
-            <SimpleRows rows={routes} primary="name" secondary="description" status="status" empty="Nenhuma rota." loading={loading} />
-          </CardContent>
-        </Card>
-        <Card><CardContent className="p-0"><TableHeader title="Livro eletronico" count={logbook.length} /><SimpleRows rows={logbook} primary="title" secondary="description" status="entryType" empty="Sem registros no livro." /></CardContent></Card>
-      </div>
+    <div className="space-y-4">
+      <SubTabBar tabs={subTabs} active={sub} onSelect={setSub} />
+      {sub === 'incidents' && <IncidentsSection gates={optionValues.gates} posts={optionValues.posts} users={optionValues.users} canIncident={canIncident} />}
+      {sub === 'rounds' && <RoundsSection gates={optionValues.gates} users={optionValues.users} canRounds={canRounds} />}
+      {sub === 'handover' && <ShiftHandoverSection gates={optionValues.gates} posts={optionValues.posts} users={optionValues.users} canHandover={canHandover} />}
+      {sub === 'logbook' && (
+        <SectionCard title={`Livro eletrônico (${logbook.length})`} description="Registros e ocorrências do livro de portaria." contentClassName="p-0">
+          <SimpleRows rows={logbook} primary="title" secondary="description" statusKey="entryType" empty="Sem registros no livro." loading={loading} />
+        </SectionCard>
+      )}
     </div>
   );
 }
 
-function AssetsTab({ custody, materials, loading, canCreate, optionValues, onDialog, onChanged }: { custody: AnyRecord[]; materials: AnyRecord[]; loading: boolean; canCreate: boolean; optionValues: ReturnType<typeof buildOptions>; onDialog: (d: EntityDialogState) => void; onChanged: () => void }) {
+function SubTabBar<T extends string>({ tabs, active, onSelect }: { tabs: Array<{ key: T; label: string }>; active: T; onSelect: (key: T) => void }) {
+  return (
+    <div className="inline-flex flex-wrap items-center gap-1 rounded-md border bg-muted/35 p-1">
+      {tabs.map((t) => (
+        <button
+          key={t.key}
+          type="button"
+          onClick={() => onSelect(t.key)}
+          className={cn('inline-flex h-8 items-center justify-center rounded px-3 text-xs font-medium transition-colors', active === t.key ? 'bg-background text-foreground shadow-sm' : 'text-muted-foreground hover:text-foreground')}
+        >
+          {t.label}
+        </button>
+      ))}
+    </div>
+  );
+}
+
+/* --------------------------- Materiais e Chaves --------------------------- */
+
+type AssetsSub = 'items' | 'correspondence';
+
+function AssetsTab({ custody, materials, loading, canCreate, canUpdate, optionValues, onDialog, onChanged }: { custody: AnyRecord[]; materials: AnyRecord[]; loading: boolean; canCreate: boolean; canUpdate: boolean; optionValues: ReturnType<typeof buildOptions>; onDialog: (d: EntityDialogState) => void; onChanged: () => void }) {
+  const [sub, setSub] = useState<AssetsSub>('items');
   const action = useMutation({
     mutationFn: ({ id, path }: { id: string; path: string }) => api(`/asset-security/custody-items/${id}/${path}`, { method: 'POST', json: {} }),
     onSuccess: () => { toast.success('Item atualizado'); onChanged(); },
     onError: (e: any) => toast.error(e?.message ?? 'Falha ao atualizar'),
   });
   return (
+    <div className="space-y-4">
+      <SubTabBar
+        tabs={[{ key: 'items' as AssetsSub, label: 'Chaves e materiais' }, { key: 'correspondence' as AssetsSub, label: 'Correspondências' }]}
+        active={sub}
+        onSelect={setSub}
+      />
+      {sub === 'correspondence' ? (
+        <CorrespondenceSection gates={optionValues.gates} users={optionValues.users} canUpdate={canUpdate} />
+      ) : (
     <div className="grid gap-4 xl:grid-cols-2">
-      <Card>
-        <CardContent className="p-0">
-          <div className="flex items-center justify-between border-b p-3">
-            <TableTitle title="Chaves e crachas" count={custody.length} />
-            {canCreate && <Button size="sm" onClick={() => onDialog(custodyDialog(optionValues))}><Plus className="mr-2 h-4 w-4" />Item</Button>}
-          </div>
+      <SectionCard
+        title={`Chaves e crachás (${custody.length})`}
+        contentClassName="p-0"
+        actions={canCreate && <Button size="sm" onClick={() => onDialog(custodyDialog(optionValues))}><Plus className="mr-2 h-4 w-4" />Item</Button>}
+      >
+        {loading ? (
+          <div className="p-6 text-center text-sm text-muted-foreground">Carregando…</div>
+        ) : custody.length === 0 ? (
+          <EmptyState title="Nenhum item." className="border-0" />
+        ) : (
           <div className="overflow-x-auto">
             <table className="table-modern">
-              <thead><tr><th className="text-left">Codigo</th><th className="text-left">Descricao</th><th className="text-left">Tipo</th><th className="text-left">Status</th><th className="text-right">Acoes</th></tr></thead>
+              <thead><tr><th className="text-left">Código</th><th className="text-left">Descrição</th><th className="text-left">Tipo</th><th className="text-left">Status</th><th className="text-right">Ações</th></tr></thead>
               <tbody>
-                {loading ? <LoadingRow colSpan={5} /> : custody.length === 0 ? <EmptyRow colSpan={5} text="Nenhum item." /> : custody.map((row) => (
+                {custody.map((row) => (
                   <tr key={row.id}>
-                    <td className="font-medium">{row.code}</td><td>{row.description}</td><td>{row.itemType}</td><td><StatusBadge value={row.status} /></td>
+                    <td className="font-medium">{row.code}</td>
+                    <td>{row.description}</td>
+                    <td>{labelFor(row.itemType, CUSTODY_TYPE_LABELS)}</td>
+                    <td><StatusBadge value={row.status} label={labelFor(row.status, CUSTODY_STATUS_LABELS)} tone={statusTone(row.status)} /></td>
                     <td className="text-right">
-                      {row.status === 'AVAILABLE' ? <Button size="sm" variant="outline" onClick={() => onDialog(loanDialog(row.id, optionValues))}>Emprestar</Button> : <Button size="sm" variant="outline" disabled={action.isPending} onClick={() => action.mutate({ id: row.id, path: 'return' })}>Devolver</Button>}
+                      {row.status === 'AVAILABLE'
+                        ? <Button size="sm" variant="outline" onClick={() => onDialog(loanDialog(row.id, optionValues))}>Emprestar</Button>
+                        : <Button size="sm" variant="outline" disabled={action.isPending} onClick={() => action.mutate({ id: row.id, path: 'return' })}>Devolver</Button>}
                     </td>
                   </tr>
                 ))}
               </tbody>
             </table>
           </div>
-        </CardContent>
-      </Card>
-      <Card>
-        <CardContent className="p-0">
-          <div className="flex items-center justify-between border-b p-3">
-            <TableTitle title="Materiais e cargas" count={materials.length} />
-            {canCreate && <Button size="sm" variant="outline" onClick={() => onDialog(materialDialog(optionValues))}>Movimentar</Button>}
-          </div>
-          <SimpleRows rows={materials} primary="description" secondary="fiscalDocument" status="status" empty="Nenhum material movimentado." loading={loading} />
-        </CardContent>
-      </Card>
+        )}
+      </SectionCard>
+      <SectionCard
+        title={`Materiais e cargas (${materials.length})`}
+        contentClassName="p-0"
+        actions={canCreate && <Button size="sm" variant="outline" onClick={() => onDialog(materialDialog(optionValues))}>Movimentar</Button>}
+      >
+        <SimpleRows rows={materials} primary="description" secondary="fiscalDocument" statusKey="status" statusMap={MOVEMENT_STATUS_LABELS} empty="Nenhum material movimentado." loading={loading} />
+      </SectionCard>
+    </div>
+      )}
     </div>
   );
 }
 
-function SettingsTab({ gates, posts, packageConfig, loading, canManage, optionValues, onDialog }: { gates: AnyRecord[]; posts: AnyRecord[]; packageConfig?: AnyRecord; loading: boolean; canManage: boolean; optionValues: ReturnType<typeof buildOptions>; onDialog: (d: EntityDialogState) => void }) {
+/* ------------------------------ Configurações ----------------------------- */
+
+type SettingsSub = 'general' | 'documents' | 'blocklist' | 'audit' | 'offline';
+
+function SettingsTab({ gates, posts, packageConfig, summary, loading, canManage, canBlock, canOffline, optionValues, onDialog }: { gates: AnyRecord[]; posts: AnyRecord[]; packageConfig?: AnyRecord; summary?: SecuritySummary; loading: boolean; canManage: boolean; canBlock: boolean; canOffline: boolean; optionValues: ReturnType<typeof buildOptions>; onDialog: (d: EntityDialogState) => void }) {
+  const [sub, setSub] = useState<SettingsSub>('general');
+  const subTabs: Array<{ key: SettingsSub; label: string }> = [
+    { key: 'general', label: 'Geral' },
+    { key: 'documents', label: 'Exigência documental' },
+    { key: 'blocklist', label: 'Lista de bloqueio' },
+    ...(canManage ? [{ key: 'audit' as SettingsSub, label: 'Auditoria' }] : []),
+    ...(canOffline ? [{ key: 'offline' as SettingsSub, label: 'Offline' }] : []),
+  ];
   return (
     <div className="space-y-4">
-      <Card>
-        <CardContent className="p-4">
-          <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
-            <div>
-              <h2 className="text-base font-semibold">Pacote comercial</h2>
-              <p className="text-sm text-muted-foreground">Status operacional: <span className="font-medium text-foreground">{packageConfig?.status ?? 'ENABLED'}</span>. Recursos ativos: {(packageConfig?.enabledFeatures ?? []).join(', ') || 'todos'}.</p>
-            </div>
-            {canManage && <Button variant="outline" onClick={() => onDialog(packageDialog(optionValues, packageConfig))}>Configurar pacote</Button>}
+      <SubTabBar tabs={subTabs} active={sub} onSelect={setSub} />
+
+      {sub === 'general' && (
+        <div className="space-y-4">
+          <Card>
+            <CardContent className="p-4">
+              <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+                <div>
+                  <h2 className="text-base font-semibold">Pacote comercial</h2>
+                  <p className="text-sm text-muted-foreground">
+                    Status: <span className="font-medium text-foreground">{labelFor(packageConfig?.status ?? 'ENABLED', PACKAGE_STATUS_LABELS)}</span>. Recursos ativos: {(packageConfig?.enabledFeatures ?? []).join(', ') || 'todos'}.
+                  </p>
+                  <p className="mt-1 text-xs text-muted-foreground">Fila de sincronização offline: {formatNumber(summary?.offlinePending ?? 0)} pendência(s).</p>
+                </div>
+                {canManage && <Button variant="outline" onClick={() => onDialog(packageDialog(optionValues, packageConfig))}>Configurar pacote</Button>}
+              </div>
+            </CardContent>
+          </Card>
+          <div className="grid gap-4 xl:grid-cols-2">
+            <SectionCard
+              title={`Portarias (${gates.length})`}
+              contentClassName="p-0"
+              actions={canManage && <Button size="sm" onClick={() => onDialog(gateDialog(optionValues))}><Plus className="mr-2 h-4 w-4" />Portaria</Button>}
+            >
+              <SimpleRows rows={gates} primary="name" secondary="type" statusKey="status" statusMap={RECORD_STATUS_LABELS} empty="Nenhuma portaria." loading={loading} />
+            </SectionCard>
+            <SectionCard
+              title={`Postos de vigilância (${posts.length})`}
+              contentClassName="p-0"
+              actions={canManage && <Button size="sm" variant="outline" onClick={() => onDialog(postDialog(optionValues))}>Posto</Button>}
+            >
+              <SimpleRows rows={posts} primary="name" secondary="location" statusKey="criticality" empty="Nenhum posto." loading={loading} />
+            </SectionCard>
           </div>
-        </CardContent>
-      </Card>
-      <div className="grid gap-4 xl:grid-cols-2">
-        <Card>
-          <CardContent className="p-0">
-            <div className="flex items-center justify-between border-b p-3">
-              <TableTitle title="Portarias" count={gates.length} />
-              {canManage && <Button size="sm" onClick={() => onDialog(gateDialog(optionValues))}><Plus className="mr-2 h-4 w-4" />Portaria</Button>}
-            </div>
-            <SimpleRows rows={gates} primary="name" secondary="type" status="status" empty="Nenhuma portaria." loading={loading} />
-          </CardContent>
-        </Card>
-        <Card>
-          <CardContent className="p-0">
-            <div className="flex items-center justify-between border-b p-3">
-              <TableTitle title="Postos de vigilancia" count={posts.length} />
-              {canManage && <Button size="sm" variant="outline" onClick={() => onDialog(postDialog(optionValues))}>Posto</Button>}
-            </div>
-            <SimpleRows rows={posts} primary="name" secondary="location" status="criticality" empty="Nenhum posto." loading={loading} />
-          </CardContent>
-        </Card>
-      </div>
+        </div>
+      )}
+
+      {sub === 'documents' && <DocumentRequirementsSection canManage={canManage} />}
+      {sub === 'blocklist' && <BlocklistSection people={optionValues.people} vehicles={optionValues.vehicles} canBlock={canBlock} />}
+      {sub === 'audit' && canManage && <AuditLogSection users={optionValues.users} />}
+      {sub === 'offline' && canOffline && <OfflineSyncSection />}
     </div>
   );
 }
+
+/* --------------------------------- Shared --------------------------------- */
+
+function SimpleRows({ rows, primary, secondary, statusKey, statusMap, empty, loading }: { rows: AnyRecord[]; primary: string; secondary?: string; statusKey?: string; statusMap?: Record<string, string>; empty: string; loading?: boolean }) {
+  if (loading) return <div className="p-6 text-center text-sm text-muted-foreground">Carregando…</div>;
+  if (!rows.length) return <EmptyState title={empty} className="border-0" />;
+  return (
+    <div className="divide-y">
+      {rows.map((row) => {
+        const statusValue = statusKey ? row[statusKey] : null;
+        return (
+          <div key={row.id} className="flex items-start justify-between gap-3 p-3">
+            <div className="min-w-0">
+              <div className="truncate text-sm font-medium">{row[primary] ?? '—'}</div>
+              {secondary && <div className="mt-0.5 truncate text-xs text-muted-foreground">{row[secondary] ?? ''}</div>}
+            </div>
+            {statusValue && <StatusBadge value={String(statusValue)} label={labelFor(String(statusValue), statusMap)} tone={statusTone(String(statusValue))} />}
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
+function ActionButton({ icon: Icon, title, text, disabled, onClick }: { icon: LucideIcon; title: string; text: string; disabled?: boolean; onClick: () => void }) {
+  return (
+    <button type="button" disabled={disabled} onClick={onClick} className="rounded-md border bg-card p-4 text-left transition-colors hover:bg-muted/50 disabled:cursor-not-allowed disabled:opacity-50">
+      <Icon className="mb-3 h-6 w-6 text-primary" />
+      <div className="text-sm font-semibold">{title}</div>
+      <div className="mt-1 text-xs text-muted-foreground">{text}</div>
+    </button>
+  );
+}
+
+/* ----------------------------- Validar QR Code ---------------------------- */
+
+function QrValidateDialog({ onClose }: { onClose: () => void }) {
+  const [token, setToken] = useState('');
+  const [result, setResult] = useState<AnyRecord | null>(null);
+  const validate = useMutation({
+    mutationFn: (value: string) => api<AnyRecord>(`/asset-security/qrcodes/validate/${encodeURIComponent(value)}`),
+    onSuccess: (data) => setResult(data),
+    onError: (e: any) => { setResult(null); toast.error(e?.message ?? 'QR Code não encontrado'); },
+  });
+  return (
+    <Dialog open onOpenChange={(v) => !v && onClose()}>
+      <DialogContent className="max-w-md">
+        <DialogHeader><DialogTitle>Validar QR Code</DialogTitle></DialogHeader>
+        <div className="space-y-3">
+          <div>
+            <Label>Token do QR Code</Label>
+            <Input value={token} placeholder="Cole ou digite o token lido" onChange={(e) => { setToken(e.target.value); setResult(null); }} />
+          </div>
+          {result && (
+            <div className={cn('rounded-md border p-3 text-sm', result.valid ? 'border-status-green/40 bg-status-green/5' : 'border-status-red/40 bg-status-red/5')}>
+              <div className="flex items-center gap-2 font-medium">
+                {result.valid ? <CheckCircle2 className="h-4 w-4 text-status-green" /> : <AlertTriangle className="h-4 w-4 text-status-red" />}
+                {result.valid ? 'QR Code válido' : `Inválido${result.reason ? ` — ${labelFor(String(result.reason))}` : ''}`}
+              </div>
+              {result.qr && (
+                <div className="mt-2 text-xs text-muted-foreground">
+                  <div>Entidade: {result.qr.entityType} · {result.qr.entityId}</div>
+                  <div>Finalidade: {result.qr.purpose}</div>
+                  {result.qr.expiresAt && <div>Expira em: {formatDateTime(result.qr.expiresAt)}</div>}
+                </div>
+              )}
+            </div>
+          )}
+        </div>
+        <DialogFooter>
+          <Button variant="ghost" onClick={onClose}>Fechar</Button>
+          <Button disabled={!token.trim() || validate.isPending} onClick={() => validate.mutate(token.trim())}>{validate.isPending ? 'Validando…' : 'Validar'}</Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+/* ------------------------------ Generic dialog ---------------------------- */
 
 function EntityDialog({ state, onClose, onSaved }: { state: EntityDialogState; onClose: () => void; onSaved: () => void }) {
   const [form, setForm] = useState<AnyRecord>(() => state.defaults ?? {});
@@ -583,7 +938,7 @@ function EntityDialog({ state, onClose, onSaved }: { state: EntityDialogState; o
         </div>
         <DialogFooter>
           <Button variant="ghost" onClick={onClose}>Fechar</Button>
-          <Button disabled={save.isPending || state.fields.some((f) => f.required && !String(form[f.name] ?? '').trim())} onClick={() => save.mutate()}>{save.isPending ? 'Salvando...' : 'Salvar'}</Button>
+          <Button disabled={save.isPending || state.fields.some((f) => f.required && !String(form[f.name] ?? '').trim())} onClick={() => save.mutate()}>{save.isPending ? 'Salvando…' : 'Salvar'}</Button>
         </DialogFooter>
       </DialogContent>
     </Dialog>
@@ -593,105 +948,14 @@ function EntityDialog({ state, onClose, onSaved }: { state: EntityDialogState; o
 function FieldInput({ field, value, onChange }: { field: DialogField; value: unknown; onChange: (value: unknown) => void }) {
   const label = <Label className={field.required ? 'field-required' : ''}>{field.label}</Label>;
   if (field.type === 'textarea') return <div className="md:col-span-2">{label}<Textarea rows={3} value={String(value ?? '')} placeholder={field.placeholder} onChange={(e) => onChange(e.target.value)} /></div>;
-  if (field.type === 'select') return <div>{label}<NativeSelect value={String(value ?? '')} onChange={(e) => onChange(e.target.value)}><option value="">-</option>{(field.options ?? []).map((opt) => <option key={opt.value} value={opt.value}>{opt.label}</option>)}</NativeSelect></div>;
+  if (field.type === 'select') return <div>{label}<NativeSelect value={String(value ?? '')} onChange={(e) => onChange(e.target.value)}><option value="">—</option>{(field.options ?? []).map((opt) => <option key={opt.value} value={opt.value}>{opt.label}</option>)}</NativeSelect></div>;
   if (field.type === 'checkbox') return <label className="flex items-center gap-2 pt-7 text-sm"><input type="checkbox" checked={Boolean(value)} onChange={(e) => onChange(e.target.checked)} />{field.label}</label>;
   return <div>{label}<Input type={field.type === 'datetime' ? 'datetime-local' : field.type === 'number' ? 'number' : 'text'} value={String(value ?? '')} placeholder={field.placeholder} onChange={(e) => onChange(e.target.value)} /></div>;
 }
 
-function ActionButton({ icon: Icon, title, text, disabled, onClick }: { icon: LucideIcon; title: string; text: string; disabled?: boolean; onClick: () => void }) {
-  return (
-    <button type="button" disabled={disabled} onClick={onClick} className="rounded-md border bg-card p-4 text-left transition-colors hover:bg-muted/50 disabled:cursor-not-allowed disabled:opacity-50">
-      <Icon className="mb-3 h-6 w-6 text-primary" />
-      <div className="text-sm font-semibold">{title}</div>
-      <div className="mt-1 text-xs text-muted-foreground">{text}</div>
-    </button>
-  );
-}
+/* ------------------------------ Option builder ---------------------------- */
 
-function MovementTable({ rows, loading, empty }: { rows: AnyRecord[]; loading: boolean; empty: string }) {
-  return (
-    <div className="overflow-x-auto">
-      <table className="table-modern">
-        <thead><tr><th className="text-left">Codigo</th><th className="text-left">Pessoa/placa</th><th className="text-left">Portaria</th><th className="text-left">Entrada</th><th className="text-left">Prev. saida</th><th className="text-left">Status</th></tr></thead>
-        <tbody>
-          {loading ? <LoadingRow colSpan={6} /> : rows.length === 0 ? <EmptyRow colSpan={6} text={empty} /> : rows.map((row) => (
-            <tr key={row.id}>
-              <td className="font-medium">{row.code ?? '-'}</td>
-              <td>{row.person?.name ?? row.plate ?? row.vehicle?.plate ?? '-'}<div className="text-xs text-muted-foreground">{row.contractorCompany?.tradeName ?? row.originCompanyName ?? ''}</div></td>
-              <td>{row.gate?.name ?? '-'}</td>
-              <td className="text-xs">{formatDate(row.entryAt)}</td>
-              <td className="text-xs">{formatDate(row.expectedExitAt)}</td>
-              <td><StatusBadge value={row.overdue ? 'OVERDUE' : row.status} /></td>
-            </tr>
-          ))}
-        </tbody>
-      </table>
-    </div>
-  );
-}
-
-function PeopleTable({ rows, loading }: { rows: AnyRecord[]; loading: boolean }) {
-  return (
-    <div className="overflow-x-auto">
-      <table className="table-modern">
-        <thead><tr><th className="text-left">Nome</th><th className="text-left">Tipo</th><th className="text-left">Documento</th><th className="text-left">Docs</th><th className="text-left">Status</th></tr></thead>
-        <tbody>{loading ? <LoadingRow colSpan={5} /> : rows.length === 0 ? <EmptyRow colSpan={5} text="Nenhuma pessoa cadastrada." /> : rows.map((row) => <tr key={row.id}><td className="font-medium">{row.name}</td><td>{row.type}</td><td>{row.documentMasked ?? '-'}</td><td><StatusBadge value={row.documentStatus} /></td><td><StatusBadge value={row.status} /></td></tr>)}</tbody>
-      </table>
-    </div>
-  );
-}
-
-function VehicleTable({ rows, loading }: { rows: AnyRecord[]; loading: boolean }) {
-  return (
-    <div className="overflow-x-auto">
-      <table className="table-modern">
-        <thead><tr><th className="text-left">Placa</th><th className="text-left">Tipo</th><th className="text-left">Modelo</th><th className="text-left">Docs</th><th className="text-left">Status</th></tr></thead>
-        <tbody>{loading ? <LoadingRow colSpan={5} /> : rows.length === 0 ? <EmptyRow colSpan={5} text="Nenhum veiculo cadastrado." /> : rows.map((row) => <tr key={row.id}><td className="font-medium">{row.plate}</td><td>{row.type}</td><td>{row.model ?? '-'}</td><td><StatusBadge value={row.documentStatus} /></td><td><StatusBadge value={row.status} /></td></tr>)}</tbody>
-      </table>
-    </div>
-  );
-}
-
-function SimpleRows({ rows, primary, secondary, status, empty, loading }: { rows: AnyRecord[]; primary: string; secondary?: string; status?: string; empty: string; loading?: boolean }) {
-  if (loading) return <div className="p-6 text-center text-sm text-muted-foreground">Carregando...</div>;
-  if (!rows.length) return <div className="p-6 text-center text-sm text-muted-foreground">{empty}</div>;
-  return (
-    <div className="divide-y">
-      {rows.map((row) => (
-        <div key={row.id} className="flex items-start justify-between gap-3 p-3">
-          <div className="min-w-0">
-            <div className="truncate text-sm font-medium">{row[primary] ?? '-'}</div>
-            {secondary && <div className="mt-0.5 truncate text-xs text-muted-foreground">{row[secondary] ?? ''}</div>}
-          </div>
-          {status && <StatusBadge value={String(row[status] ?? '-')} />}
-        </div>
-      ))}
-    </div>
-  );
-}
-
-function TableHeader({ title, count }: { title: string; count: number }) {
-  return <div className="border-b p-3"><TableTitle title={title} count={count} /></div>;
-}
-
-function TableTitle({ title, count }: { title: string; count: number }) {
-  return <div className="text-sm font-semibold">{title} <span className="text-xs font-normal text-muted-foreground">({count})</span></div>;
-}
-
-function StatusBadge({ value }: { value?: string | null }) {
-  const text = value || '-';
-  return <span className={cn('inline-flex rounded px-2 py-0.5 text-xs font-medium', STATUS_CLASS[text] ?? 'bg-muted text-muted-foreground')}>{text}</span>;
-}
-
-function LoadingRow({ colSpan }: { colSpan: number }) {
-  return <tr><td colSpan={colSpan} className="p-6 text-center text-sm text-muted-foreground">Carregando...</td></tr>;
-}
-
-function EmptyRow({ colSpan, text }: { colSpan: number; text: string }) {
-  return <tr><td colSpan={colSpan} className="p-6 text-center text-sm text-muted-foreground">{text}</td></tr>;
-}
-
-function buildOptions(data?: Options) {
+function buildOptions(data?: SecurityOptions) {
   const map = (rows: AnyRecord[] | undefined, labelKey = 'name') => (rows ?? []).map((row) => ({ value: row.id, label: row[labelKey] ?? row.name ?? row.code ?? row.id }));
   return {
     gates: map(data?.gates),
@@ -702,199 +966,199 @@ function buildOptions(data?: Options) {
     users: map(data?.users),
     orgNodes: map(data?.orgNodes),
     branches: map(data?.branches),
-    formTemplates: (data?.formTemplates ?? []).map((row) => ({ value: row.id, label: row.title ?? row.code })),
     gateTypes: (data?.gateTypes ?? []).map((value) => ({ value, label: value })),
     vehicleTypes: (data?.vehicleTypes ?? []).map((value) => ({ value, label: value })),
-    personTypes: (data?.personTypes ?? []).map((value) => ({ value, label: value })),
-    documentStatuses: (data?.documentStatuses ?? []).map((value) => ({ value, label: value })),
-    recordStatuses: (data?.recordStatuses ?? []).map((value) => ({ value, label: value })),
-    authorizationStatuses: (data?.authorizationStatuses ?? []).map((value) => ({ value, label: value })),
-    incidentSeverities: (data?.incidentSeverities ?? []).map((value) => ({ value, label: value })),
-    custodyTypes: (data?.custodyTypes ?? []).map((value) => ({ value, label: value })),
-    custodyStatuses: (data?.custodyStatuses ?? []).map((value) => ({ value, label: value })),
-    packageFeatures: (data?.packageFeatures ?? []).map((value) => ({ value, label: value })),
+    personTypes: toOptions(data?.personTypes, PERSON_TYPE_LABELS),
+    documentStatuses: toOptions(data?.documentStatuses, DOCUMENT_STATUS_LABELS),
+    recordStatuses: toOptions(data?.recordStatuses, RECORD_STATUS_LABELS),
+    incidentSeverities: toOptions(data?.incidentSeverities, INCIDENT_SEVERITY_LABELS),
+    custodyTypes: toOptions(data?.custodyTypes, CUSTODY_TYPE_LABELS),
+    custodyStatuses: toOptions(data?.custodyStatuses, CUSTODY_STATUS_LABELS),
+    packageStatuses: toOptions(data?.packageStatuses, PACKAGE_STATUS_LABELS),
+    movementTypes: toOptions(data?.movementTypes, MOVEMENT_TYPE_LABELS),
   };
 }
 
-function entryDialog(options: ReturnType<typeof buildOptions>): EntityDialogState {
+type Options = ReturnType<typeof buildOptions>;
+
+function entryDialog(options: Options): EntityDialogState {
   return { title: 'Registrar entrada', path: '/asset-security/movements/entry', success: 'Entrada registrada', fields: [
     { name: 'gateId', label: 'Portaria', type: 'select', options: options.gates, required: true },
     { name: 'postId', label: 'Posto', type: 'select', options: options.posts },
     { name: 'personId', label: 'Pessoa', type: 'select', options: options.people },
-    { name: 'vehicleId', label: 'Veiculo', type: 'select', options: options.vehicles },
-    { name: 'authorizationId', label: 'Autorizacao', type: 'text', placeholder: 'ID/codigo aprovado' },
+    { name: 'vehicleId', label: 'Veículo', type: 'select', options: options.vehicles },
+    { name: 'authorizationId', label: 'Autorização', type: 'text', placeholder: 'ID/código aprovado' },
     { name: 'reason', label: 'Motivo' },
-    { name: 'destinationAreaId', label: 'Area de destino', type: 'select', options: options.orgNodes },
-    { name: 'expectedExitAt', label: 'Previsao de saida', type: 'datetime' },
-    { name: 'exceptionJustification', label: 'Justificativa de excecao', type: 'textarea' },
-    { name: 'notes', label: 'Observacoes', type: 'textarea' },
+    { name: 'destinationAreaId', label: 'Área de destino', type: 'select', options: options.orgNodes },
+    { name: 'expectedExitAt', label: 'Previsão de saída', type: 'datetime' },
+    { name: 'exceptionJustification', label: 'Justificativa de exceção', type: 'textarea' },
+    { name: 'notes', label: 'Observações', type: 'textarea' },
   ] };
 }
 
-function exitDialog(options: ReturnType<typeof buildOptions>): EntityDialogState {
-  return { title: 'Registrar saida', path: '/asset-security/movements/exit', success: 'Saida registrada', fields: [
-    { name: 'id', label: 'ID da entrada aberta' },
+function exitDialog(options: Options): EntityDialogState {
+  return { title: 'Registrar saída', path: '/asset-security/movements/exit', success: 'Saída registrada', fields: [
+    { name: 'id', label: 'ID da entrada em aberto' },
     { name: 'personId', label: 'Pessoa', type: 'select', options: options.people },
-    { name: 'vehicleId', label: 'Veiculo', type: 'select', options: options.vehicles },
+    { name: 'vehicleId', label: 'Veículo', type: 'select', options: options.vehicles },
     { name: 'plate', label: 'Placa' },
-    { name: 'code', label: 'Codigo da movimentacao' },
-    { name: 'notes', label: 'Observacoes', type: 'textarea' },
+    { name: 'code', label: 'Código da movimentação' },
+    { name: 'notes', label: 'Observações', type: 'textarea' },
   ] };
 }
 
-function validateQrDialog(): EntityDialogState {
-  return { title: 'Validar QR Code', path: '/asset-security/qrcodes', success: 'QR Code registrado/validado', fields: [
-    { name: 'entityType', label: 'Entidade', required: true, placeholder: 'SecurityAuthorization' },
-    { name: 'entityId', label: 'ID da entidade', required: true },
-    { name: 'purpose', label: 'Finalidade', required: true, placeholder: 'AUTHORIZATION' },
-    { name: 'expiresAt', label: 'Expira em', type: 'datetime' },
-  ] };
+function personDialog(options: Options, current?: AnyRecord): EntityDialogState {
+  const editing = Boolean(current?.id);
+  return {
+    title: editing ? 'Editar pessoa' : 'Cadastrar pessoa',
+    path: editing ? `/asset-security/people/${current!.id}` : '/asset-security/people',
+    method: editing ? 'PATCH' : 'POST',
+    success: editing ? 'Pessoa atualizada' : 'Pessoa cadastrada',
+    fields: [
+      { name: 'name', label: 'Nome', required: true },
+      { name: 'type', label: 'Tipo', type: 'select', options: options.personTypes, required: true },
+      { name: 'documentType', label: 'Tipo de documento' },
+      { name: 'documentNumber', label: 'Documento' },
+      { name: 'contractorCompanyId', label: 'Empresa prestadora', type: 'select', options: options.contractorCompanies },
+      { name: 'originCompanyName', label: 'Empresa/origem' },
+      { name: 'phone', label: 'Telefone' },
+      { name: 'email', label: 'E-mail' },
+      { name: 'documentStatus', label: 'Situação documental', type: 'select', options: options.documentStatuses },
+      { name: 'notes', label: 'Observações', type: 'textarea' },
+    ],
+    defaults: editing
+      ? { name: current!.name, type: current!.type, documentType: current!.documentType, documentNumber: current!.documentNumber, contractorCompanyId: current!.contractorCompanyId, originCompanyName: current!.originCompanyName, phone: current!.phone, email: current!.email, documentStatus: current!.documentStatus, notes: current!.notes }
+      : { type: 'VISITOR', documentStatus: 'NOT_REQUIRED' },
+  };
 }
 
-function personDialog(options: ReturnType<typeof buildOptions>): EntityDialogState {
-  return { title: 'Cadastrar pessoa', path: '/asset-security/people', success: 'Pessoa cadastrada', fields: [
-    { name: 'name', label: 'Nome', required: true },
-    { name: 'type', label: 'Tipo', type: 'select', options: options.personTypes, required: true },
-    { name: 'documentType', label: 'Tipo de documento' },
-    { name: 'documentNumber', label: 'Documento' },
-    { name: 'contractorCompanyId', label: 'Empresa prestadora', type: 'select', options: options.contractorCompanies },
-    { name: 'originCompanyName', label: 'Empresa/origem' },
-    { name: 'phone', label: 'Telefone' },
-    { name: 'email', label: 'E-mail' },
-    { name: 'documentStatus', label: 'Status documental', type: 'select', options: options.documentStatuses },
-    { name: 'notes', label: 'Observacoes', type: 'textarea' },
-  ], defaults: { type: 'VISITOR', documentStatus: 'NOT_REQUIRED' } };
+function vehicleDialog(options: Options, current?: AnyRecord): EntityDialogState {
+  const editing = Boolean(current?.id);
+  return {
+    title: editing ? 'Editar veículo' : 'Cadastrar veículo',
+    path: editing ? `/asset-security/vehicles/${current!.id}` : '/asset-security/vehicles',
+    method: editing ? 'PATCH' : 'POST',
+    success: editing ? 'Veículo atualizado' : 'Veículo cadastrado',
+    fields: [
+      { name: 'plate', label: 'Placa', required: true },
+      { name: 'type', label: 'Tipo', type: 'select', options: options.vehicleTypes, required: true },
+      { name: 'model', label: 'Modelo' },
+      { name: 'brand', label: 'Marca' },
+      { name: 'color', label: 'Cor' },
+      { name: 'ownerName', label: 'Proprietário' },
+      { name: 'companyName', label: 'Empresa' },
+      { name: 'documentStatus', label: 'Situação documental', type: 'select', options: options.documentStatuses },
+    ],
+    defaults: editing
+      ? { plate: current!.plate, type: current!.type, model: current!.model, brand: current!.brand, color: current!.color, ownerName: current!.ownerName, companyName: current!.companyName, documentStatus: current!.documentStatus }
+      : { type: 'Carro', documentStatus: 'NOT_REQUIRED' },
+  };
 }
 
-function vehicleDialog(options: ReturnType<typeof buildOptions>): EntityDialogState {
-  return { title: 'Cadastrar veiculo', path: '/asset-security/vehicles', success: 'Veiculo cadastrado', fields: [
-    { name: 'plate', label: 'Placa', required: true },
-    { name: 'type', label: 'Tipo', type: 'select', options: options.vehicleTypes, required: true },
-    { name: 'model', label: 'Modelo' },
-    { name: 'brand', label: 'Marca' },
-    { name: 'color', label: 'Cor' },
-    { name: 'ownerName', label: 'Proprietario' },
-    { name: 'companyName', label: 'Empresa' },
-    { name: 'documentStatus', label: 'Status documental', type: 'select', options: options.documentStatuses },
-  ], defaults: { type: 'Carro', documentStatus: 'NOT_REQUIRED' } };
-}
-
-function contractorDialog(_options: ReturnType<typeof buildOptions>): EntityDialogState {
+function contractorDialog(): EntityDialogState {
   return { title: 'Cadastrar empresa prestadora', path: '/asset-security/contractor-companies', success: 'Empresa cadastrada', fields: [
-    { name: 'legalName', label: 'Razao social', required: true },
+    { name: 'legalName', label: 'Razão social', required: true },
     { name: 'tradeName', label: 'Nome fantasia' },
     { name: 'cnpj', label: 'CNPJ' },
     { name: 'contractCode', label: 'Contrato' },
-    { name: 'serviceTypes', label: 'Servicos (separados por virgula)' },
-    { name: 'documentStatus', label: 'Status documental', type: 'select', options: ['VALID', 'EXPIRING', 'EXPIRED', 'MISSING', 'IN_REVIEW', 'REJECTED', 'BLOCKED'].map((value) => ({ value, label: value })) },
-    { name: 'notes', label: 'Observacoes', type: 'textarea' },
+    { name: 'serviceTypes', label: 'Serviços (separados por vírgula)' },
+    { name: 'documentStatus', label: 'Situação documental', type: 'select', options: toOptions(['VALID', 'EXPIRING', 'EXPIRED', 'MISSING', 'IN_REVIEW', 'REJECTED', 'BLOCKED'], DOCUMENT_STATUS_LABELS) },
+    { name: 'notes', label: 'Observações', type: 'textarea' },
   ], defaults: { documentStatus: 'MISSING' } };
 }
 
-function authorizationDialog(options: ReturnType<typeof buildOptions>): EntityDialogState {
-  return { title: 'Nova autorizacao', path: '/asset-security/authorizations', success: 'Autorizacao criada', fields: [
+function authorizationDialog(options: Options): EntityDialogState {
+  return { title: 'Nova autorização', path: '/asset-security/authorizations', success: 'Autorização criada', fields: [
     { name: 'personId', label: 'Pessoa', type: 'select', options: options.people },
-    { name: 'vehicleId', label: 'Veiculo', type: 'select', options: options.vehicles },
+    { name: 'vehicleId', label: 'Veículo', type: 'select', options: options.vehicles },
     { name: 'contractorCompanyId', label: 'Empresa prestadora', type: 'select', options: options.contractorCompanies },
     { name: 'gateId', label: 'Portaria', type: 'select', options: options.gates },
-    { name: 'destinationAreaId', label: 'Area de destino', type: 'select', options: options.orgNodes },
-    { name: 'internalResponsibleId', label: 'Responsavel interno', type: 'select', options: options.users },
-    { name: 'scheduledStartAt', label: 'Inicio previsto', type: 'datetime' },
+    { name: 'destinationAreaId', label: 'Área de destino', type: 'select', options: options.orgNodes },
+    { name: 'internalResponsibleId', label: 'Responsável interno', type: 'select', options: options.users },
+    { name: 'scheduledStartAt', label: 'Início previsto', type: 'datetime' },
     { name: 'scheduledEndAt', label: 'Fim previsto', type: 'datetime' },
     { name: 'reason', label: 'Motivo', type: 'textarea' },
   ] };
 }
 
-function incidentDialog(options: ReturnType<typeof buildOptions>): EntityDialogState {
-  return { title: 'Registrar ocorrencia', path: '/asset-security/incidents', success: 'Ocorrencia registrada', fields: [
-    { name: 'title', label: 'Titulo', required: true },
+function incidentDialog(options: Options): EntityDialogState {
+  return { title: 'Registrar ocorrência', path: '/asset-security/incidents', success: 'Ocorrência registrada', fields: [
+    { name: 'title', label: 'Título', required: true },
     { name: 'type', label: 'Tipo' },
     { name: 'severity', label: 'Criticidade', type: 'select', options: options.incidentSeverities, required: true },
     { name: 'gateId', label: 'Portaria', type: 'select', options: options.gates },
     { name: 'postId', label: 'Posto', type: 'select', options: options.posts },
-    { name: 'responsibleUserId', label: 'Responsavel', type: 'select', options: options.users },
+    { name: 'responsibleUserId', label: 'Responsável', type: 'select', options: options.users },
     { name: 'dueAt', label: 'Prazo', type: 'datetime' },
-    { name: 'description', label: 'Descricao', type: 'textarea' },
-    { name: 'immediateAction', label: 'Acao imediata', type: 'textarea' },
+    { name: 'description', label: 'Descrição', type: 'textarea' },
+    { name: 'immediateAction', label: 'Ação imediata', type: 'textarea' },
   ], defaults: { severity: 'MEDIUM' } };
 }
 
-function roundRouteDialog(options: ReturnType<typeof buildOptions>): EntityDialogState {
-  return { title: 'Nova rota de ronda', path: '/asset-security/round-routes', success: 'Rota criada', fields: [
-    { name: 'name', label: 'Nome', required: true },
-    { name: 'code', label: 'Codigo' },
-    { name: 'gateId', label: 'Portaria', type: 'select', options: options.gates },
-    { name: 'responsibleUserId', label: 'Responsavel', type: 'select', options: options.users },
-    { name: 'frequencyMinutes', label: 'Frequencia (min)', type: 'number' },
-    { name: 'toleranceMinutes', label: 'Tolerancia (min)', type: 'number' },
-    { name: 'instructions', label: 'Instrucoes', type: 'textarea' },
-  ] };
-}
-
-function custodyDialog(options: ReturnType<typeof buildOptions>): EntityDialogState {
-  return { title: 'Cadastrar chave ou cracha', path: '/asset-security/custody-items', success: 'Item cadastrado', fields: [
-    { name: 'code', label: 'Codigo', required: true },
-    { name: 'description', label: 'Descricao', required: true },
+function custodyDialog(options: Options): EntityDialogState {
+  return { title: 'Cadastrar chave ou crachá', path: '/asset-security/custody-items', success: 'Item cadastrado', fields: [
+    { name: 'code', label: 'Código', required: true },
+    { name: 'description', label: 'Descrição', required: true },
     { name: 'itemType', label: 'Tipo', type: 'select', options: options.custodyTypes, required: true },
     { name: 'gateId', label: 'Portaria', type: 'select', options: options.gates },
-    { name: 'location', label: 'Localizacao' },
+    { name: 'location', label: 'Localização' },
     { name: 'status', label: 'Status', type: 'select', options: options.custodyStatuses },
   ], defaults: { itemType: 'KEY', status: 'AVAILABLE' } };
 }
 
-function loanDialog(id: string, options: ReturnType<typeof buildOptions>): EntityDialogState {
+function loanDialog(id: string, options: Options): EntityDialogState {
   return { title: 'Emprestar item', path: `/asset-security/custody-items/${id}/loan`, success: 'Item emprestado', fields: [
     { name: 'holderPersonId', label: 'Pessoa', type: 'select', options: options.people, required: true },
-    { name: 'expectedReturnAt', label: 'Previsao de devolucao', type: 'datetime' },
+    { name: 'expectedReturnAt', label: 'Previsão de devolução', type: 'datetime' },
     { name: 'purpose', label: 'Finalidade' },
-    { name: 'notes', label: 'Observacoes', type: 'textarea' },
+    { name: 'notes', label: 'Observações', type: 'textarea' },
   ] };
 }
 
-function materialDialog(options: ReturnType<typeof buildOptions>): EntityDialogState {
-  return { title: 'Movimentar material/carga', path: '/asset-security/materials', success: 'Movimentacao registrada', fields: [
-    { name: 'description', label: 'Descricao', required: true },
-    { name: 'type', label: 'Tipo', type: 'select', options: ['MATERIAL_ENTRY', 'MATERIAL_EXIT', 'EQUIPMENT_ENTRY', 'EQUIPMENT_EXIT', 'CARGO', 'UNLOADING'].map((value) => ({ value, label: value })) },
+function materialDialog(options: Options): EntityDialogState {
+  return { title: 'Movimentar material/carga', path: '/asset-security/materials', success: 'Movimentação registrada', fields: [
+    { name: 'description', label: 'Descrição', required: true },
+    { name: 'type', label: 'Tipo', type: 'select', options: toOptions(['MATERIAL_ENTRY', 'MATERIAL_EXIT', 'EQUIPMENT_ENTRY', 'EQUIPMENT_EXIT', 'CARGO', 'UNLOADING'], MOVEMENT_TYPE_LABELS) },
     { name: 'quantity', label: 'Quantidade', type: 'number' },
     { name: 'unit', label: 'Unidade' },
-    { name: 'vehicleId', label: 'Veiculo', type: 'select', options: options.vehicles },
+    { name: 'vehicleId', label: 'Veículo', type: 'select', options: options.vehicles },
     { name: 'fiscalDocument', label: 'Nota/documento' },
     { name: 'alertCode', label: 'Alerta' },
-    { name: 'notes', label: 'Observacoes', type: 'textarea' },
+    { name: 'notes', label: 'Observações', type: 'textarea' },
   ], defaults: { type: 'MATERIAL_ENTRY' } };
 }
 
-function gateDialog(options: ReturnType<typeof buildOptions>): EntityDialogState {
+function gateDialog(options: Options): EntityDialogState {
   return { title: 'Cadastrar portaria', path: '/asset-security/gates', success: 'Portaria cadastrada', fields: [
     { name: 'name', label: 'Nome', required: true },
-    { name: 'code', label: 'Codigo' },
+    { name: 'code', label: 'Código' },
     { name: 'type', label: 'Tipo', type: 'select', options: options.gateTypes, required: true },
     { name: 'branchId', label: 'Filial', type: 'select', options: options.branches },
     { name: 'unitId', label: 'Unidade', type: 'select', options: options.orgNodes },
-    { name: 'address', label: 'Endereco' },
-    { name: 'location', label: 'Localizacao' },
-    { name: 'notes', label: 'Observacoes', type: 'textarea' },
+    { name: 'address', label: 'Endereço' },
+    { name: 'location', label: 'Localização' },
+    { name: 'notes', label: 'Observações', type: 'textarea' },
   ], defaults: { type: 'Portaria Principal' } };
 }
 
-function postDialog(options: ReturnType<typeof buildOptions>): EntityDialogState {
+function postDialog(options: Options): EntityDialogState {
   return { title: 'Cadastrar posto', path: '/asset-security/posts', success: 'Posto cadastrado', fields: [
     { name: 'name', label: 'Nome', required: true },
-    { name: 'code', label: 'Codigo' },
+    { name: 'code', label: 'Código' },
     { name: 'gateId', label: 'Portaria', type: 'select', options: options.gates },
     { name: 'unitId', label: 'Unidade', type: 'select', options: options.orgNodes },
-    { name: 'criticality', label: 'Criticidade', type: 'select', options: ['LOW', 'MEDIUM', 'HIGH', 'CRITICAL'].map((value) => ({ value, label: value })) },
-    { name: 'responsibleUserId', label: 'Responsavel', type: 'select', options: options.users },
-    { name: 'location', label: 'Localizacao' },
-    { name: 'instructions', label: 'Instrucoes', type: 'textarea' },
+    { name: 'criticality', label: 'Criticidade', type: 'select', options: toOptions(['LOW', 'MEDIUM', 'HIGH', 'CRITICAL']) },
+    { name: 'responsibleUserId', label: 'Responsável', type: 'select', options: options.users },
+    { name: 'location', label: 'Localização' },
+    { name: 'instructions', label: 'Instruções', type: 'textarea' },
   ], defaults: { criticality: 'MEDIUM' } };
 }
 
-function packageDialog(options: ReturnType<typeof buildOptions>, current?: AnyRecord): EntityDialogState {
+function packageDialog(options: Options, current?: AnyRecord): EntityDialogState {
   return { title: 'Configurar pacote comercial', path: '/asset-security/package', method: 'PATCH', success: 'Pacote configurado', defaults: { status: current?.status ?? 'ENABLED', enabledFeatures: (current?.enabledFeatures ?? []).join(',') }, fields: [
-    { name: 'status', label: 'Status', type: 'select', options: ['ENABLED', 'DISABLED', 'TRIAL', 'READ_ONLY', 'BLOCKED', 'EXPIRED'].map((value) => ({ value, label: value })) },
+    { name: 'status', label: 'Status', type: 'select', options: options.packageStatuses },
     { name: 'unitId', label: 'Unidade', type: 'select', options: options.orgNodes },
-    { name: 'enabledFeatures', label: 'Recursos ativos (separados por virgula)', placeholder: 'GATES,VISITORS,QR_CODE,OFFLINE_APP' },
+    { name: 'enabledFeatures', label: 'Recursos ativos (separados por vírgula)', placeholder: 'GATES,VISITORS,QR_CODE,OFFLINE_APP' },
     { name: 'commercialPlanCode', label: 'Plano comercial' },
     { name: 'trialEndsAt', label: 'Fim do teste', type: 'datetime' },
     { name: 'blockReason', label: 'Motivo de bloqueio', type: 'textarea' },

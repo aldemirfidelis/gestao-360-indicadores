@@ -449,6 +449,12 @@ export class AssetSecurityController {
     return this.service.assistantInsights(me, query);
   }
 
+  @Get('audit-logs')
+  @RequirePermissions('asset-security:manage')
+  auditLogs(@CurrentUser() me: AuthPayload, @Query() query: Record<string, string | undefined>) {
+    return this.service.listAuditLogs(me, query);
+  }
+
   @Get('export')
   @RequirePermissions('asset-security:export')
   exportData(@CurrentUser() me: AuthPayload, @Query('dataset') dataset?: string, @Query() query?: Record<string, string | undefined>) {

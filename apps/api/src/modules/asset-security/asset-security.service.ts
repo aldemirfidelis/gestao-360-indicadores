@@ -1160,6 +1160,19 @@ export class AssetSecurityService {
     return this.csv('asset-security-movimentacoes.csv', ['codigo', 'tipo', 'categoria', 'pessoa', 'placa', 'entrada', 'saida', 'status'], rows.map((r: any) => [r.code, r.movementType, r.category, r.person?.name, r.plate || r.vehicle?.plate, r.entryAt, r.exitAt, r.status]));
   }
 
+  async listAuditLogs(me: AuthPayload, q: Query = {}) {
+    return this.db.securityAuditLog.findMany({
+      where: {
+        companyId: me.companyId,
+        ...(q.entity ? { entity: q.entity } : {}),
+        ...(q.entityId ? { entityId: q.entityId } : {}),
+        ...(q.action ? { action: q.action } : {}),
+      },
+      orderBy: { createdAt: 'desc' },
+      take: this.take(q.take, 200),
+    });
+  }
+
   private gateData(me: AuthPayload, body: JsonMap, unitId: string | null) {
     return {
       companyId: me.companyId,
