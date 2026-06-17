@@ -14,6 +14,8 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/u
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { api, ApiError } from '@/lib/api';
 import { useAuth } from '@/components/auth/auth-provider';
+import { CatalogActualsSection } from '@/components/gestao-premio/catalog-actuals-section';
+import { RuleAliasesSection } from '@/components/gestao-premio/rule-aliases-section';
 
 interface CompetenceRef { id: string; label: string; program: { code: string; name: string } }
 interface Run { id: string; version: number; status: string; totalEmployees: number; totalGross: string | null; totalReductions: string | null; totalFinal: string | null; engineVersion: string; finishedAt: string | null }
@@ -39,6 +41,8 @@ export default function PrizeApuracaoPage() {
   const { hasPermission } = useAuth();
   const canRun = hasPermission(['prize:calc:run']);
   const canApprove = hasPermission(['prize:calc:approve']);
+  const canActuals = hasPermission(['prize:actuals:manage']);
+  const canAdmin = hasPermission(['prize:admin']);
 
   const [competenceId, setCompetenceId] = useState('');
   const [memoryFor, setMemoryFor] = useState<string | null>(null);
@@ -149,6 +153,13 @@ export default function PrizeApuracaoPage() {
           </div>
         )}
       </div>
+
+      {competenceId && (
+        <div className="mb-4 space-y-3">
+          <CatalogActualsSection competenceId={competenceId} canManage={canActuals} />
+          <RuleAliasesSection canAdmin={canAdmin} />
+        </div>
+      )}
 
       {!competenceId ? (
         <Card><CardContent className="flex flex-col items-center gap-3 py-12 text-center">

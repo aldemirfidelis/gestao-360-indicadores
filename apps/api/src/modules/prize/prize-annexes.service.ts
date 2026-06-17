@@ -172,16 +172,83 @@ export class PrizeAnnexesService {
     return updated;
   }
 
-  /** DRAFT/IN_ELABORATION -> IN_VALIDATION (envia para validacao). */
-  async submit(me: AuthPayload, versionId: string) {
+  /** DRAFT/IN_ELABORATION -> IN_VALIDATION (envia para validacao).
+   * Quando informados, registra os destinatarios (gestores da area) como
+   * etapas de aprovacao pendentes — assim o anexo "vai" para pessoas
+   * especificas (gestor imediato ... superintendente), nao para um limbo. */
+  async submit(me: AuthPayload, versionId: string, approverUserIds: string[] = []) {
     const version = await this.getVersion(me.companyId, versionId);
     if (!EDITABLE.includes(version.status)) throw new ConflictException('Versão já está em fluxo de aprovação ou vigente');
-    const updated = await this.prisma.prizeAnnexVersion.update({
-      where: { id: versionId },
-      data: { status: 'IN_VALIDATION', submittedAt: new Date() },
+    const recipients = Array.from(new Set(approverUserIds.filter(Boolean)));
+    const updated = await this.prisma.$transaction(async (tx) => {
+      if (recipients.length) {
+        await tx.prizeAnnexApproval.deleteMany({ where: { annexVersionId: versionId, status: 'PENDING' } });
+        await tx.prizeAnnexApproval.createMany({
+          data: recipients.map((userId, idx) => ({ annexVersionId: versionId, stepOrder: idx + 1, approverUserId: userId, status: 'PENDING' as const })),
+        });
+      }
+      return tx.prizeAnnexVersion.update({ where: { id: versionId }, data: { status: 'IN_VALIDATION', submittedAt: new Date() } });
     });
-    await this.audit.log(me, { action: 'SUBMIT', entityType: 'ANNEX_VERSION', entityId: versionId, before: { status: version.status }, after: { status: 'IN_VALIDATION' } });
+    await this.audit.log(me, { action: 'SUBMIT', entityType: 'ANNEX_VERSION', entityId: versionId, before: { status: version.status }, after: { status: 'IN_VALIDATION', recipients } });
     return updated;
+  }
+
+  /**
+   * Cadeia de gestores aptos a validar/aprovar o anexo: parte da area do anexo
+   * (orgNodeId) e das areas das combinacoes da versao mais recente, subindo a
+   * hierarquia (OrgNode.parentId) e coletando o responsavel de cada nivel ate o
+   * topo (superintendente / gestores maiores). Sem duplicados; ordenado do
+   * gestor imediato ao mais alto.
+   */
+  async listApprovers(companyId: string, annexId: string) {
+    const annex = await this.prisma.prizeAnnex.findFirst({ where: { id: annexId, companyId, deletedAt: null } });
+    if (!annex) throw new NotFoundException('Anexo não encontrado');
+
+    const groups = await this.prisma.prizeRuleGroup.findMany({
+      where: { companyId, deletedAt: null, annexVersion: { annexId } },
+      select: { areaRefs: true },
+    });
+    const areaNames = new Set<string>();
+    for (const g of groups) for (const a of g.areaRefs) areaNames.add(a.trim().toLowerCase());
+
+    const nodes = await this.prisma.orgNode.findMany({
+      where: { companyId, deletedAt: null },
+      select: { id: true, name: true, parentId: true, responsibleUserId: true },
+    });
+    const byId = new Map(nodes.map((n) => [n.id, n]));
+
+    // Nos de partida: a area do anexo + as areas das combinacoes (por nome).
+    const seeds = new Set<string>();
+    if (annex.orgNodeId && byId.has(annex.orgNodeId)) seeds.add(annex.orgNodeId);
+    for (const n of nodes) if (areaNames.has(n.name.trim().toLowerCase())) seeds.add(n.id);
+
+    // Sobe a cadeia coletando o nivel (distancia) mais curto de cada responsavel.
+    const levelByUser = new Map<string, { level: number; orgNodeName: string }>();
+    for (const seedId of seeds) {
+      let cur: string | null = seedId;
+      let level = 0;
+      const guard = new Set<string>();
+      while (cur && !guard.has(cur)) {
+        guard.add(cur);
+        const node = byId.get(cur);
+        if (!node) break;
+        if (node.responsibleUserId) {
+          const prev = levelByUser.get(node.responsibleUserId);
+          if (!prev || level < prev.level) levelByUser.set(node.responsibleUserId, { level, orgNodeName: node.name });
+        }
+        cur = node.parentId;
+        level += 1;
+      }
+    }
+
+    if (levelByUser.size === 0) return [];
+    const users = await this.prisma.user.findMany({
+      where: { id: { in: Array.from(levelByUser.keys()) }, companyId, deletedAt: null, active: true },
+      select: { id: true, name: true, email: true, role: true },
+    });
+    return users
+      .map((u) => ({ userId: u.id, name: u.name, email: u.email, role: u.role, ...levelByUser.get(u.id)! }))
+      .sort((a, b) => a.level - b.level || a.name.localeCompare(b.name));
   }
 
   /** IN_VALIDATION -> IN_APPROVAL, criando etapa de aprovacao pendente. */

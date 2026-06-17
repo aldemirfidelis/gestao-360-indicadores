@@ -16,6 +16,8 @@ import { Textarea } from '@/components/ui/textarea';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { api, ApiError } from '@/lib/api';
 import { useAuth } from '@/components/auth/auth-provider';
+import { CombinationsSection } from '@/components/gestao-premio/combinations-section';
+import { SubmitValidationDialog } from '@/components/gestao-premio/submit-validation-dialog';
 
 interface AnnexVersion {
   id: string; version: number; status: string; effectiveFrom: string | null; effectiveTo: string | null;
@@ -45,6 +47,7 @@ export default function PrizeAnnexesPage() {
   const qc = useQueryClient();
   const { hasPermission } = useAuth();
   const canManage = hasPermission(['prize:annex:manage']);
+  const canManageIndicators = hasPermission(['prize:indicators:manage']);
   const canSubmit = hasPermission(['prize:annex:submit']);
   const canApprove = hasPermission(['prize:annex:approve']);
 
@@ -52,6 +55,7 @@ export default function PrizeAnnexesPage() {
   const [createOpen, setCreateOpen] = useState(false);
   const [selected, setSelected] = useState<string | null>(null);
   const [editVersion, setEditVersion] = useState<AnnexVersion | null>(null);
+  const [submitTarget, setSubmitTarget] = useState<{ annexId: string; versionId: string } | null>(null);
   const [annexForm, setAnnexForm] = useState({ programId: '', code: '', name: '', orgNodeId: '', positionRef: '', costCenterRef: '', notes: '' });
   const [vForm, setVForm] = useState({ salaryPercent: '', gainPotential: '', gainChance: '', effectiveFrom: '', effectiveTo: '', changeReason: '' });
 
@@ -186,7 +190,7 @@ export default function PrizeAnnexesPage() {
                           </div>
                           <div className="mt-2 flex flex-wrap gap-2">
                             {canManage && EDITABLE.includes(v.status) && <Button size="sm" variant="outline" onClick={() => openEditVersion(v)}>Editar</Button>}
-                            {canSubmit && EDITABLE.includes(v.status) && <Button size="sm" variant="ghost" onClick={() => act.mutate({ path: `/prize/annexes/versions/${v.id}/submit` })}><Send className="mr-1 h-3.5 w-3.5" />Enviar p/ validação</Button>}
+                            {canSubmit && EDITABLE.includes(v.status) && <Button size="sm" variant="ghost" onClick={() => setSubmitTarget({ annexId: a.id, versionId: v.id })}><Send className="mr-1 h-3.5 w-3.5" />Enviar p/ validação</Button>}
                             {canSubmit && v.status === 'IN_VALIDATION' && <Button size="sm" variant="ghost" onClick={() => act.mutate({ path: `/prize/annexes/versions/${v.id}/send-approval` })}>Enviar p/ aprovação</Button>}
                             {canApprove && (v.status === 'IN_APPROVAL' || v.status === 'IN_VALIDATION') && (
                               <>
@@ -202,6 +206,13 @@ export default function PrizeAnnexesPage() {
                               {v.approvals.map((ap) => <div key={ap.id}>Aprovação: {ap.status}{ap.comment ? ` — "${ap.comment}"` : ''}</div>)}
                             </div>
                           )}
+                          <CombinationsSection
+                            annexVersionId={v.id}
+                            annexTitle={`${a.code} — ${a.name}`}
+                            canEdit={EDITABLE.includes(v.status)}
+                            canManageGroups={canManage}
+                            canManageIndicators={canManageIndicators}
+                          />
                         </div>
                       ))}
                     </div>
@@ -263,6 +274,16 @@ export default function PrizeAnnexesPage() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {submitTarget && (
+        <SubmitValidationDialog
+          open={!!submitTarget}
+          onOpenChange={(o) => !o && setSubmitTarget(null)}
+          annexId={submitTarget.annexId}
+          versionId={submitTarget.versionId}
+          onDone={invalidate}
+        />
+      )}
     </div>
   );
 }

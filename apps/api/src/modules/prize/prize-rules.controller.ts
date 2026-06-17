@@ -47,19 +47,19 @@ export class PrizeRulesController {
   }
 
   @Post('groups')
-  @RequirePermissions('prize:annexes:manage')
+  @RequirePermissions('prize:annex:manage')
   createGroup(@CurrentUser() me: AuthPayload, @Body() dto: UpsertRuleGroupDto) {
     return this.service.createGroup(me, dto);
   }
 
   @Patch('groups/:id')
-  @RequirePermissions('prize:annexes:manage')
+  @RequirePermissions('prize:annex:manage')
   updateGroup(@CurrentUser() me: AuthPayload, @Param('id') id: string, @Body() dto: UpsertRuleGroupDto) {
     return this.service.updateGroup(me, id, dto);
   }
 
   @Delete('groups/:id')
-  @RequirePermissions('prize:annexes:manage')
+  @RequirePermissions('prize:annex:manage')
   removeGroup(@CurrentUser() me: AuthPayload, @Param('id') id: string) {
     return this.service.removeGroup(me, id);
   }

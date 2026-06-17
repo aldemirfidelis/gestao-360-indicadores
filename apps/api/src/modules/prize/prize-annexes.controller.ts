@@ -26,6 +26,12 @@ export class PrizeAnnexesController {
     return this.service.get(me.companyId, id);
   }
 
+  @Get(':id/approvers')
+  @RequirePermissions('prize:view')
+  approvers(@CurrentUser() me: AuthPayload, @Param('id') id: string) {
+    return this.service.listApprovers(me.companyId, id);
+  }
+
   @Post()
   @RequirePermissions('prize:annex:manage')
   create(@CurrentUser() me: AuthPayload, @Body() dto: CreateAnnexDto) {
@@ -46,8 +52,8 @@ export class PrizeAnnexesController {
 
   @Post('versions/:versionId/submit')
   @RequirePermissions('prize:annex:submit')
-  submit(@CurrentUser() me: AuthPayload, @Param('versionId') versionId: string) {
-    return this.service.submit(me, versionId);
+  submit(@CurrentUser() me: AuthPayload, @Param('versionId') versionId: string, @Body() body?: { approverUserIds?: string[] }) {
+    return this.service.submit(me, versionId, body?.approverUserIds ?? []);
   }
 
   @Post('versions/:versionId/send-approval')
