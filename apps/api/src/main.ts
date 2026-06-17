@@ -1,11 +1,12 @@
 import { NestFactory } from '@nestjs/core';
 import { ValidationPipe } from '@nestjs/common';
 import helmet from 'helmet';
+import { json, urlencoded } from 'express';
 import { AppModule } from './app.module';
 import { HttpExceptionFilter } from './common/filters/http-exception.filter';
 
 async function bootstrap() {
-  const app = await NestFactory.create(AppModule, { cors: false });
+  const app = await NestFactory.create(AppModule, { cors: false, bodyParser: false });
 
   // PORT (padrão DigitalOcean/Heroku/Render) > API_PORT > 3333
   const port = parseInt(process.env.PORT ?? process.env.API_PORT ?? '3333', 10);
@@ -18,6 +19,10 @@ async function bootstrap() {
   // Atras de proxy (DO App Platform / Render / Vercel)
   // permite req.ip resolver corretamente
   expressApp.set?.('trust proxy', 1);
+
+  const bodyLimit = process.env.API_BODY_LIMIT ?? '10mb';
+  app.use(json({ limit: bodyLimit }));
+  app.use(urlencoded({ limit: bodyLimit, extended: true }));
 
   app.use(helmet({ crossOriginResourcePolicy: false }));
   // O middleware global de CORS responde OPTIONS com 204 antes dos controllers.
