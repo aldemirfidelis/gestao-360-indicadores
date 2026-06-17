@@ -38,6 +38,16 @@ export interface TableSummary {
   comment: string | null;
   kind: 'system' | 'business';
   protected: boolean;
+  catalog: TableCatalogEntry;
+}
+
+export interface TableCatalogEntry {
+  module: string;
+  moduleKey: string;
+  label: string;
+  origin: string;
+  purpose: string;
+  impact: string;
 }
 
 export interface ColumnInfo {
@@ -72,6 +82,7 @@ export interface IndexInfo {
 
 export interface TableSchema {
   table: string;
+  catalog: TableCatalogEntry;
   columns: ColumnInfo[];
   constraints: ConstraintInfo[];
   indexes: IndexInfo[];

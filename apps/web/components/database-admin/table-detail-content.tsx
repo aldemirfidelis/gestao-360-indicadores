@@ -83,6 +83,19 @@ export function TableDetailContent({ table, onBack }: { table: string; onBack?: 
 
       {data && (
         <>
+          <SectionCard title="Identificacao da tabela" description="Catalogo funcional usado pelo Portal Administrativo Global.">
+            <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+              <CatalogInfo label="Modulo" value={data.catalog.module} />
+              <CatalogInfo label="Rotulo amigavel" value={data.catalog.label} />
+              <CatalogInfo label="Origem" value={data.catalog.origin} />
+              <CatalogInfo label="Impacto" value={data.catalog.impact} />
+            </div>
+            <div className="mt-4 rounded-md border bg-muted/20 p-3 text-sm">
+              <div className="font-medium">O que faz</div>
+              <p className="mt-1 text-muted-foreground">{data.catalog.purpose}</p>
+            </div>
+          </SectionCard>
+
           <SectionCard title="Colunas" description={`${data.columns.length} coluna(s).`} contentClassName="p-0">
             <div className="overflow-x-auto">
               <table className="table-modern">
@@ -181,6 +194,15 @@ export function TableDetailContent({ table, onBack }: { table: string; onBack?: 
           </SectionCard>
         </>
       )}
+    </div>
+  );
+}
+
+function CatalogInfo({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="min-w-0">
+      <div className="text-xs font-medium uppercase tracking-wide text-muted-foreground">{label}</div>
+      <div className="mt-1 text-sm">{value}</div>
     </div>
   );
 }

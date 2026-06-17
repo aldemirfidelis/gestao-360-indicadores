@@ -2,6 +2,7 @@ import { Injectable } from '@nestjs/common';
 import { PostgreSQLAdapter } from '../adapters/postgresql.adapter';
 import { quoteQualified } from '../util/identifier.util';
 import { ALLOWED_SCHEMAS, isProtectedTable } from '../database-admin.constants';
+import { getTableCatalogEntry, type TableCatalogEntry } from '../table-catalog';
 
 export interface ColumnInfo {
   name: string;
@@ -45,6 +46,7 @@ export interface TableSummary {
   comment: string | null;
   kind: 'system' | 'business';
   protected: boolean;
+  catalog: TableCatalogEntry;
 }
 
 export interface RelationshipInfo {
@@ -111,6 +113,7 @@ export class SchemaInspectionService {
         comment: r.comment ? String(r.comment) : null,
         kind: systemTable ? 'system' : 'business',
         protected: isProtectedTable(name),
+        catalog: getTableCatalogEntry(name),
       };
     });
   }

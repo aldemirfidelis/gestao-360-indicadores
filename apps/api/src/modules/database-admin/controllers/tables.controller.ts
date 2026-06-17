@@ -3,6 +3,7 @@ import { SuperAdminDbGuard } from '../guards/super-admin-db.guard';
 import { DbAdminSubmenuTag } from '../decorators/db-admin-submenu.decorator';
 import { SchemaInspectionService } from '../services/schema-inspection.service';
 import { assertInAllowlist } from '../util/identifier.util';
+import { getTableCatalogEntry } from '../table-catalog';
 
 @Controller('admin/database/tables')
 @UseGuards(SuperAdminDbGuard)
@@ -24,6 +25,6 @@ export class TablesController {
       this.schema.getConstraints(table),
       this.schema.getIndexes(table),
     ]);
-    return { table, columns, constraints, indexes };
+    return { table, catalog: getTableCatalogEntry(table), columns, constraints, indexes };
   }
 }
