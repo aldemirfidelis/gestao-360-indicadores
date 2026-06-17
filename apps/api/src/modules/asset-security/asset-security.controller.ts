@@ -77,6 +77,12 @@ export class AssetSecurityController {
     return this.service.listPeople(me, query);
   }
 
+  @Get('people/lookup')
+  @RequirePermissions('asset-security:view')
+  lookupPerson(@CurrentUser() me: AuthPayload, @Query() query: Record<string, string | undefined>) {
+    return this.service.lookupPerson(me, query);
+  }
+
   @Post('people')
   @RequirePermissions('asset-security:create')
   createPerson(@CurrentUser() me: AuthPayload, @Body() body: Record<string, unknown>) {

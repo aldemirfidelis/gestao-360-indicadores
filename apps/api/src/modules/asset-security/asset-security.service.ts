@@ -290,6 +290,33 @@ export class AssetSecurityService {
     });
   }
 
+  async lookupPerson(me: AuthPayload, q: Query = {}) {
+    const term = this.text(q.search);
+    if (term.length < 2) return { person: null, vehicles: [] };
+
+    const person = await this.findPersonForEntry(me.companyId, term, q.kind ?? q.type);
+    if (!person) return { person: null, vehicles: [] };
+
+    const vehicleIds = Array.isArray(person.vehicleIds) ? person.vehicleIds.filter(Boolean) : [];
+    const vehicles = await this.db.securityVehicle.findMany({
+      where: {
+        companyId: me.companyId,
+        deletedAt: null,
+        OR: [
+          { defaultDriverPersonId: person.id },
+          ...(vehicleIds.length ? [{ id: { in: vehicleIds } }] : []),
+        ],
+      },
+      orderBy: { plate: 'asc' },
+      take: 20,
+    });
+
+    return {
+      person: this.maskPersonForEntryLookup(person),
+      vehicles,
+    };
+  }
+
   async createPerson(me: AuthPayload, body: JsonMap) {
     await this.assertPackageWrite(me);
     const saved = await this.db.securityPerson.create({ data: this.personData(me, body) });
@@ -632,8 +659,8 @@ export class AssetSecurityService {
     const gateId = await this.validateGate(me.companyId, this.id(body.gateId));
     const postId = await this.validatePost(me.companyId, this.id(body.postId));
     const person = await this.resolveEntryPerson(me, body);
-    const vehicle = await this.validateVehicle(me.companyId, this.id(body.vehicleId));
     const contractor = await this.validateContractorCompany(me.companyId, this.id(body.contractorCompanyId));
+    const vehicle = await this.resolveEntryVehicle(me, body, person, contractor);
     const authorization = await this.validateAuthorization(me.companyId, this.id(body.authorizationId));
     await this.validateEntryRules(me, { person, vehicle, contractor, authorization, body });
 
@@ -1894,19 +1921,7 @@ export class AssetSecurityService {
     const term = this.text(body.personSearch ?? body.personName ?? body.personCode);
     if (!term) throw new BadRequestException('Informe a pessoa da entrada por cadastro, CPF ou nome.');
     const digits = this.onlyDigits(term);
-    const found = await this.db.securityPerson.findFirst({
-      where: {
-        companyId: me.companyId,
-        deletedAt: null,
-        OR: [
-          { code: term },
-          ...(digits ? [{ documentNumber: digits }] : []),
-          { name: { contains: term, mode: 'insensitive' } },
-          { socialName: { contains: term, mode: 'insensitive' } },
-        ],
-      },
-      orderBy: { name: 'asc' },
-    });
+    const found = await this.findPersonForEntry(me.companyId, term, body.personKind ?? body.kind ?? body.type);
     if (found) return found;
     if (digits && !/[a-zA-ZÀ-ÿ]/.test(term)) {
       throw new NotFoundException('Pessoa nao encontrada. Importe o cadastro ou digite o nome completo.');
@@ -1914,7 +1929,7 @@ export class AssetSecurityService {
     const saved = await this.db.securityPerson.create({
       data: {
         companyId: me.companyId,
-        type: 'VISITOR',
+        type: this.primaryPersonTypeForEntryKind(body.personKind ?? body.kind ?? body.type),
         name: term,
         documentStatus: 'NOT_REQUIRED',
         status: 'ACTIVE',
@@ -1924,6 +1939,80 @@ export class AssetSecurityService {
     });
     await this.audit(me, 'CREATE_FROM_ENTRY', 'SecurityPerson', saved.id, saved.name, null, this.maskPersonForAudit(saved));
     return saved;
+  }
+
+  private async resolveEntryVehicle(me: AuthPayload, body: JsonMap, person: any | null, contractor: any | null) {
+    const selected = this.id(body.vehicleId)
+      ? await this.validateVehicle(me.companyId, this.id(body.vehicleId))
+      : null;
+    const plate = this.normalizePlate(this.text(body.plate));
+    if (!plate) return selected;
+    if (selected?.plate === plate) return selected;
+
+    const existing = await this.db.securityVehicle.findFirst({
+      where: { companyId: me.companyId, deletedAt: null, plate },
+    });
+    if (existing) {
+      if (person?.id && !existing.defaultDriverPersonId) {
+        return this.db.securityVehicle.update({
+          where: { id: existing.id },
+          data: { defaultDriverPersonId: person.id, updatedById: me.sub },
+        });
+      }
+      return existing;
+    }
+
+    const autoCreate = body.autoCreateVehicle !== false && body.autoCreateVehicle !== 'false';
+    if (!autoCreate) return selected;
+
+    const saved = await this.db.securityVehicle.create({
+      data: {
+        companyId: me.companyId,
+        type: this.text(body.vehicleType) || 'Carro',
+        plate,
+        companyName: contractor?.tradeName ?? contractor?.legalName ?? person?.originCompanyName ?? null,
+        ownerName: person?.name ?? null,
+        defaultDriverPersonId: person?.id ?? null,
+        documentStatus: 'NOT_REQUIRED',
+        status: 'ACTIVE',
+        createdById: me.sub,
+        updatedById: me.sub,
+      },
+    });
+    await this.audit(me, 'CREATE_FROM_ENTRY', 'SecurityVehicle', saved.id, saved.plate, null, saved);
+    return saved;
+  }
+
+  private async findPersonForEntry(companyId: string, term: string, kind?: unknown) {
+    const digits = this.onlyDigits(term);
+    const types = this.personTypesForEntryKind(kind);
+    return this.db.securityPerson.findFirst({
+      where: {
+        companyId,
+        deletedAt: null,
+        ...(types.length ? { type: { in: types } } : {}),
+        OR: [
+          { code: term },
+          ...(digits ? [{ documentNumber: digits }] : []),
+          { name: { contains: term, mode: 'insensitive' } },
+          { socialName: { contains: term, mode: 'insensitive' } },
+        ],
+      },
+      orderBy: { name: 'asc' },
+    });
+  }
+
+  private personTypesForEntryKind(kind?: unknown) {
+    const value = this.sheetKey(this.text(kind));
+    if (['employee', 'funcionario', 'colaborador'].includes(value)) return ['EMPLOYEE'];
+    if (['thirdparty', 'terceiro', 'contractor', 'prestador'].includes(value)) return ['THIRD_PARTY', 'CONTRACTOR', 'SUPPLIER', 'DRIVER', 'REPRESENTATIVE'];
+    if (['visitor', 'visitante'].includes(value)) return ['VISITOR', 'GUEST'];
+    return [];
+  }
+
+  private primaryPersonTypeForEntryKind(kind?: unknown) {
+    const [first] = this.personTypesForEntryKind(kind);
+    return first ?? 'VISITOR';
   }
 
   private sheetValue(row: JsonMap, candidates: string[]) {
@@ -2297,6 +2386,24 @@ export class AssetSecurityService {
   private maskPersonForView(person: any) {
     if (!person) return null;
     return { id: person.id, name: person.name, type: person.type, documentMasked: person.documentMasked ?? this.maskDocument(person.documentNumber), documentStatus: person.documentStatus, status: person.status, originCompanyName: person.originCompanyName };
+  }
+
+  private maskPersonForEntryLookup(person: any) {
+    if (!person) return null;
+    return {
+      id: person.id,
+      code: person.code,
+      name: person.name,
+      type: person.type,
+      documentType: person.documentType,
+      documentMasked: person.documentMasked ?? this.maskDocument(person.documentNumber),
+      contractorCompanyId: person.contractorCompanyId,
+      originCompanyName: person.originCompanyName,
+      jobTitle: person.jobTitle,
+      status: person.status,
+      documentStatus: person.documentStatus,
+      vehicleIds: person.vehicleIds ?? [],
+    };
   }
 
   private isMovementOverdue(row: any) {
