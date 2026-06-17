@@ -83,6 +83,12 @@ export class AssetSecurityController {
     return this.service.createPerson(me, body);
   }
 
+  @Post('people/import')
+  @RequirePermissions('asset-security:create')
+  importPeople(@CurrentUser() me: AuthPayload, @Body() body: { rows?: Record<string, unknown>[] }) {
+    return this.service.importPeople(me, body?.rows ?? []);
+  }
+
   @Patch('people/:id')
   @RequirePermissions('asset-security:update')
   updatePerson(@CurrentUser() me: AuthPayload, @Param('id') id: string, @Body() body: Record<string, unknown>) {
@@ -195,12 +201,6 @@ export class AssetSecurityController {
   @RequirePermissions('asset-security:view')
   pendingExits(@CurrentUser() me: AuthPayload, @Query() query: Record<string, string | undefined>) {
     return this.service.pendingExits(me, query);
-  }
-
-  @Get('emergency-report')
-  @RequirePermissions('asset-security:emergency')
-  emergencyReport(@CurrentUser() me: AuthPayload, @Query() query: Record<string, string | undefined>) {
-    return this.service.emergencyReport(me, query);
   }
 
   @Post('movements/entry')

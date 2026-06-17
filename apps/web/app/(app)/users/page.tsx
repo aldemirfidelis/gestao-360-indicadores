@@ -138,6 +138,7 @@ export default function UsersPage() {
     });
     return Array.from(map.entries());
   }, [permissions.data]);
+  const allPermissionKeys = useMemo(() => (permissions.data ?? []).map((permission) => permission.key), [permissions.data]);
 
   const save = useMutation({
     mutationFn: async () => {
@@ -193,6 +194,8 @@ export default function UsersPage() {
 
   const active = users.data?.filter((u) => u.active).length ?? 0;
   const admins = users.data?.filter((u) => ['SUPER_ADMIN', 'COMPANY_ADMIN'].includes(u.role)).length ?? 0;
+  const allPermissionsSelected =
+    allPermissionKeys.length > 0 && allPermissionKeys.every((key) => form.permissionKeys.includes(key));
   const filteredUsers = useMemo(() => {
     const q = search.toLowerCase();
     return (users.data ?? []).filter((u) =>
@@ -412,7 +415,23 @@ export default function UsersPage() {
                     <div className="text-sm font-semibold">Permissões</div>
                     <div className="text-xs text-muted-foreground">Marque os acessos liberados para este usuário.</div>
                   </div>
-                  <Badge variant="secondary">{form.permissionKeys.length}</Badge>
+                  <div className="flex items-center gap-3">
+                    <label className="flex cursor-pointer items-center gap-2 text-xs font-medium text-muted-foreground">
+                      <input
+                        type="checkbox"
+                        checked={allPermissionsSelected}
+                        disabled={allPermissionKeys.length === 0}
+                        onChange={(e) =>
+                          setForm((prev) => ({
+                            ...prev,
+                            permissionKeys: e.target.checked ? allPermissionKeys : [],
+                          }))
+                        }
+                      />
+                      Selecionar todos
+                    </label>
+                    <Badge variant="secondary">{form.permissionKeys.length}</Badge>
+                  </div>
                 </div>
                 <div className="max-h-[460px] space-y-4 overflow-y-auto pr-1">
                   {byModule.map(([module, items]) => (

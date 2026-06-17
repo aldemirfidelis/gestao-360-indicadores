@@ -8,6 +8,7 @@ import { HelpModule } from '../help/help.module';
 import { IntegrationsModule } from '../integrations/integrations.module';
 import { OrgNodesModule } from '../orgnodes/orgnodes.module';
 import { PortalAdminModule } from '../portal-admin/portal-admin.module';
+import { UsersModule } from '../users/users.module';
 import { PlatformAdminController } from './platform-admin.controller';
 import {
   PlatformAdminLegacyAccessController,
@@ -36,6 +37,7 @@ import { PlatformAdminBootstrapService } from './services/platform-admin-bootstr
     IntegrationsModule,
     OrgNodesModule,
     PortalAdminModule,
+    UsersModule,
   ],
   controllers: [
     PlatformAdminController,

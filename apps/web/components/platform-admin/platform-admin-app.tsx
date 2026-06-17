@@ -52,6 +52,9 @@ import ExternalIntegrationsPage from '@/app/(app)/settings/integracoes/page';
 import VisibilitySettingsPage from '@/app/(app)/settings/visibilidade/page';
 import PortalAdminPage from '@/app/(app)/settings/portal/page';
 import OrgPage from '@/app/(app)/org/page';
+import UsersPage from '@/app/(app)/users/page';
+import { Vision360Provider } from '@/components/ui/vision360-context';
+import { Vision360Sidebar } from '@/components/ui/vision360-sidebar';
 import DatabaseOverviewPage from '@/app/(app)/settings/database/page';
 import DatabaseTablesPage from '@/app/(app)/settings/database/tables/page';
 import { TableDetailContent } from '@/components/database-admin/table-detail-content';
@@ -253,7 +256,7 @@ const COMPANY_CORE_MODULE_CODES = new Set(['users']);
 const PLATFORM_COMPANY_CONTEXT_KEY = 'g360.platformAdmin.companyId';
 const PORTAL_ADMIN_TAB_KEY = 'g360.platformAdmin.portalTab';
 const PORTAL_ADMIN_TAB_EVENT = 'platform-admin:portal-tab';
-const LEGACY_COMPANY_SECTIONS = new Set<SectionKey>(['generalSettings', 'visibilityAdmin', 'externalIntegrations', 'orgStructure', 'companyAudit']);
+const LEGACY_COMPANY_SECTIONS = new Set<SectionKey>(['generalSettings', 'visibilityAdmin', 'externalIntegrations', 'orgStructure', 'users', 'companyAudit']);
 const DATABASE_ADMIN_TABS = new Set<DatabaseAdminTab>([
   'overview',
   'tables',
@@ -676,7 +679,7 @@ export function PlatformAdminApp() {
           {section === 'modules' && <ModulesSection />}
           {section === 'plans' && <PlansSection />}
           {section === 'seoPresence' && <SeoPresenceSection />}
-          {section === 'users' && <UsersSection />}
+          {section === 'users' && <UsersManagementSection />}
           {section === 'security' && <SecuritySection />}
           {section === 'technical' && <TechnicalSection />}
           {section === 'audit' && <AuditSection />}
@@ -803,9 +806,12 @@ function ExternalIntegrationsSection() {
 
 function OrgStructureSection() {
   return (
-    <div className="rounded-sm border bg-white p-4">
-      <OrgPage />
-    </div>
+    <Vision360Provider>
+      <div className="rounded-sm border bg-white p-4">
+        <OrgPage />
+      </div>
+      <Vision360Sidebar />
+    </Vision360Provider>
   );
 }
 
@@ -1779,6 +1785,14 @@ function PlansSection() {
           <Button className="w-full" variant="ghost" onClick={() => setForm(EMPTY_PLAN_FORM)}>Limpar formulário</Button>
         </div>
       </Panel>
+    </div>
+  );
+}
+
+function UsersManagementSection() {
+  return (
+    <div className="rounded-sm border bg-white p-4">
+      <UsersPage />
     </div>
   );
 }

@@ -1,9 +1,10 @@
 'use client';
 
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useState, type ChangeEvent } from 'react';
 import { useSearchParams } from 'next/navigation';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
+import * as XLSX from 'xlsx';
 import {
   AlertTriangle,
   CarFront,
@@ -13,12 +14,14 @@ import {
   FileWarning,
   KeyRound,
   LayoutDashboard,
+  Maximize2,
+  Minimize2,
   PackageCheck,
   Plus,
   QrCode,
   RadioTower,
   Search,
-  ShieldAlert,
+  Upload,
   Users,
 } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
@@ -56,7 +59,6 @@ import { dwellMinutes, formatDateTime, formatDuration } from '@/lib/asset-securi
 import { averageDwellMinutes, documentCompliance, roundsCompliance } from '@/lib/asset-security/analytics';
 import { MovementFlowChart } from '@/components/asset-security/movement-flow-chart';
 import { IncidentBreakdownChart } from '@/components/asset-security/incident-breakdown-chart';
-import { EmergencyPanel } from '@/components/asset-security/emergency-panel';
 import { MovementDetailDialog } from '@/components/asset-security/movement-detail-dialog';
 import { AuthorizationDetailDialog } from '@/components/asset-security/authorization-detail-dialog';
 import { IncidentsSection } from '@/components/asset-security/incidents-section';
@@ -123,7 +125,8 @@ export default function SegurancaPatrimonialPage() {
   const [tab, setTab] = useState<TabKey>(initialTab);
   const [dialog, setDialog] = useState<EntityDialogState | null>(null);
   const [search, setSearch] = useState('');
-  const [emergencyOpen, setEmergencyOpen] = useState(false);
+  const [entryOpen, setEntryOpen] = useState(false);
+  const [exitOpen, setExitOpen] = useState(false);
   const [qrOpen, setQrOpen] = useState(false);
   const [detail, setDetail] = useState<SecurityMovement | null>(null);
 
@@ -169,18 +172,9 @@ export default function SegurancaPatrimonialPage() {
       <PageHeader
         eyebrow="Corporativo"
         tone="admin"
-        title="Segurança Patrimonial e Portarias"
+        title="Segurança Patrimonial"
         description="Controle de portarias, acessos, visitantes, prestadores, veículos, rondas, ocorrências, chaves, crachás, código QR e operação sem conexão."
         breadcrumbs={[{ label: 'Início', href: '/' }, { label: 'Segurança Patrimonial' }]}
-        actions={
-          <div className="flex flex-wrap gap-2">
-            {canOperate && <Button onClick={() => setDialog(entryDialog(optionValues))}><DoorOpen className="mr-2 h-4 w-4" />Registrar entrada</Button>}
-            {canOperate && <Button variant="outline" onClick={() => setDialog(exitDialog(optionValues))}><CheckCircle2 className="mr-2 h-4 w-4" />Registrar saída</Button>}
-            <Button variant="outline" className="border-status-red/40 text-status-red hover:bg-status-red/5" onClick={() => setEmergencyOpen(true)}>
-              <ShieldAlert className="mr-2 h-4 w-4" />Emergência
-            </Button>
-          </div>
-        }
       />
 
       <div className="mb-4 flex flex-wrap gap-1 border-b">
@@ -210,7 +204,6 @@ export default function SegurancaPatrimonialPage() {
           totalRecords={(options.data?.people?.length ?? 0) + (options.data?.vehicles?.length ?? 0) + (options.data?.contractorCompanies?.length ?? 0)}
           loading={summary.isPending}
           onTab={selectTab}
-          onEmergency={() => setEmergencyOpen(true)}
         />
       )}
 
@@ -222,6 +215,8 @@ export default function SegurancaPatrimonialPage() {
           loading={present.isPending || pending.isPending}
           canOperate={canOperate}
           optionValues={optionValues}
+          onEntry={() => setEntryOpen(true)}
+          onExit={() => setExitOpen(true)}
           onDialog={setDialog}
           onDetail={setDetail}
           onQr={() => setQrOpen(true)}
@@ -239,6 +234,7 @@ export default function SegurancaPatrimonialPage() {
           canCreate={canCreate}
           optionValues={optionValues}
           onDialog={setDialog}
+          onChanged={invalidate}
         />
       )}
 
@@ -294,7 +290,8 @@ export default function SegurancaPatrimonialPage() {
       )}
 
       {dialog && <EntityDialog state={dialog} onClose={() => setDialog(null)} onSaved={() => { setDialog(null); invalidate(); }} />}
-      <EmergencyPanel open={emergencyOpen} onClose={() => setEmergencyOpen(false)} />
+      {entryOpen && <EntryDialog optionValues={optionValues} onClose={() => setEntryOpen(false)} onSaved={() => { setEntryOpen(false); invalidate(); }} />}
+      {exitOpen && <ExitDialog openMovements={present.data ?? []} onClose={() => setExitOpen(false)} onSaved={() => { setExitOpen(false); invalidate(); }} />}
       {qrOpen && <QrValidateDialog onClose={() => setQrOpen(false)} />}
       <MovementDetailDialog movement={detail} onClose={() => setDetail(null)} />
     </div>
@@ -312,7 +309,6 @@ function OverviewTab({
   totalRecords,
   loading,
   onTab,
-  onEmergency,
 }: {
   summary?: SecuritySummary;
   insights?: AssistantInsightsResponse;
@@ -322,7 +318,6 @@ function OverviewTab({
   totalRecords: number;
   loading: boolean;
   onTab: (tab: TabKey) => void;
-  onEmergency: () => void;
 }) {
   const s = summary;
   const docs = documentCompliance(s?.expiredOrInvalidDocuments ?? 0, totalRecords);
@@ -395,21 +390,6 @@ function OverviewTab({
           );
         })}
       </div>
-
-      <Card className="border-status-red/30">
-        <CardContent className="flex flex-col items-start justify-between gap-3 p-4 sm:flex-row sm:items-center">
-          <div className="flex items-center gap-3">
-            <ShieldAlert className="h-6 w-6 text-status-red" />
-            <div>
-              <div className="text-sm font-semibold">Plano de emergência e evacuação</div>
-              <p className="text-xs text-muted-foreground">Chamada ao vivo dos presentes para conferência de evacuação, com exportação de ata.</p>
-            </div>
-          </div>
-          <Button variant="outline" className="border-status-red/40 text-status-red hover:bg-status-red/5" onClick={onEmergency}>
-            Abrir chamada de emergência
-          </Button>
-        </CardContent>
-      </Card>
     </div>
   );
 }
@@ -438,6 +418,8 @@ function OperationTab({
   loading,
   canOperate,
   optionValues,
+  onEntry,
+  onExit,
   onDialog,
   onDetail,
   onQr,
@@ -448,20 +430,34 @@ function OperationTab({
   loading: boolean;
   canOperate: boolean;
   optionValues: ReturnType<typeof buildOptions>;
+  onEntry: () => void;
+  onExit: () => void;
   onDialog: (d: EntityDialogState) => void;
   onDetail: (m: SecurityMovement) => void;
   onQr: () => void;
 }) {
   const [gateId, setGateId] = useState('');
+  const [focusMode, setFocusMode] = useState(false);
   const filterByGate = (rows: SecurityMovement[]) => (gateId ? rows.filter((r) => r.gate?.id === gateId) : rows);
   const presentRows = filterByGate(present);
   const pendingRows = filterByGate(pending);
+  const Root = focusMode ? 'section' : 'div';
 
   return (
-    <div className="space-y-4">
+    <Root className={cn('space-y-4', focusMode && 'fixed inset-0 z-40 overflow-y-auto bg-background p-4 lg:p-6')}>
+      <div className="flex flex-col gap-3 border-b pb-3 sm:flex-row sm:items-center sm:justify-between">
+        <div>
+          <h2 className="text-lg font-semibold">Operação de Portaria</h2>
+          <p className="text-sm text-muted-foreground">Visão focal de entradas, saídas e pendências abertas.</p>
+        </div>
+        <Button variant="outline" size="sm" onClick={() => setFocusMode((current) => !current)}>
+          {focusMode ? <Minimize2 className="mr-2 h-4 w-4" /> : <Maximize2 className="mr-2 h-4 w-4" />}
+          {focusMode ? 'Sair da tela cheia' : 'Tela cheia'}
+        </Button>
+      </div>
       <div className="grid gap-3 md:grid-cols-4">
-        <ActionButton disabled={!canOperate} icon={DoorOpen} title="Registrar entrada" text="Pessoa, veículo, material ou carga" onClick={() => onDialog(entryDialog(optionValues))} />
-        <ActionButton disabled={!canOperate} icon={CheckCircle2} title="Registrar saída" text="Baixa por código, pessoa ou placa" onClick={() => onDialog(exitDialog(optionValues))} />
+        <ActionButton disabled={!canOperate} icon={DoorOpen} title="Registrar entrada" text="Pessoa, veículo, material ou carga" onClick={onEntry} />
+        <ActionButton disabled={!canOperate} icon={CheckCircle2} title="Registrar saída" text="Baixa por entrada em aberto" onClick={onExit} />
         <ActionButton disabled={!canOperate} icon={QrCode} title="Validar código QR" text="Conferir convite ou autorização" onClick={onQr} />
         <ActionButton disabled={!canOperate} icon={FileWarning} title="Ocorrência" text="Registrar fato relevante" onClick={() => onDialog(incidentDialog(optionValues))} />
       </div>
@@ -484,7 +480,7 @@ function OperationTab({
           <MovementTable rows={pendingRows} loading={loading} empty="Sem pendências de saída." onDetail={onDetail} />
         </SectionCard>
       </div>
-    </div>
+    </Root>
   );
 }
 
@@ -529,7 +525,7 @@ function MovementTable({ rows, loading, empty, onDetail }: { rows: SecurityMovem
 
 /* ---------------------------- Pessoas e Veículos -------------------------- */
 
-function PeopleTab({ people, vehicles, contractorCompanies, loading, search, setSearch, canCreate, optionValues, onDialog }: { people: AnyRecord[]; vehicles: AnyRecord[]; contractorCompanies: AnyRecord[]; loading: boolean; search: string; setSearch: (v: string) => void; canCreate: boolean; optionValues: ReturnType<typeof buildOptions>; onDialog: (d: EntityDialogState) => void }) {
+function PeopleTab({ people, vehicles, contractorCompanies, loading, search, setSearch, canCreate, optionValues, onDialog, onChanged }: { people: AnyRecord[]; vehicles: AnyRecord[]; contractorCompanies: AnyRecord[]; loading: boolean; search: string; setSearch: (v: string) => void; canCreate: boolean; optionValues: ReturnType<typeof buildOptions>; onDialog: (d: EntityDialogState) => void; onChanged: () => void }) {
   return (
     <div className="space-y-4">
       <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
@@ -539,6 +535,7 @@ function PeopleTab({ people, vehicles, contractorCompanies, loading, search, set
         </div>
         {canCreate && (
           <div className="flex flex-wrap gap-2">
+            <ImportPeopleButton onImported={onChanged} />
             <Button onClick={() => onDialog(personDialog(optionValues))}><Plus className="mr-2 h-4 w-4" />Pessoa</Button>
             <Button variant="outline" onClick={() => onDialog(vehicleDialog(optionValues))}><CarFront className="mr-2 h-4 w-4" />Veículo</Button>
             <Button variant="outline" onClick={() => onDialog(contractorDialog())}>Empresa prestadora</Button>
@@ -559,6 +556,46 @@ function PeopleTab({ people, vehicles, contractorCompanies, loading, search, set
         </div>
       </div>
     </div>
+  );
+}
+
+function ImportPeopleButton({ onImported }: { onImported: () => void }) {
+  const importPeople = useMutation({
+    mutationFn: (rows: AnyRecord[]) => api<{ created: number; updated: number; skipped: number }>('/asset-security/people/import', { method: 'POST', json: { rows } }),
+    onSuccess: (result) => {
+      toast.success(`Importação concluída: ${result.created} criado(s), ${result.updated} atualizado(s), ${result.skipped} ignorado(s).`);
+      onImported();
+    },
+    onError: (e: any) => toast.error(e?.message ?? 'Falha ao importar pessoas'),
+  });
+
+  async function handleFile(event: ChangeEvent<HTMLInputElement>) {
+    const file = event.target.files?.[0];
+    event.target.value = '';
+    if (!file) return;
+    try {
+      const buffer = await file.arrayBuffer();
+      const workbook = XLSX.read(buffer, { type: 'array' });
+      const sheet = workbook.Sheets[workbook.SheetNames[0]];
+      const rows = XLSX.utils.sheet_to_json<AnyRecord>(sheet, { defval: '' });
+      if (rows.length === 0) {
+        toast.error('A planilha não possui linhas para importar.');
+        return;
+      }
+      importPeople.mutate(rows);
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : 'Falha ao ler planilha');
+    }
+  }
+
+  return (
+    <Button variant="outline" asChild disabled={importPeople.isPending}>
+      <label className="cursor-pointer">
+        <Upload className="mr-2 h-4 w-4" />
+        {importPeople.isPending ? 'Importando...' : 'Importar pessoas'}
+        <input className="sr-only" type="file" accept=".xlsx,.xls,.csv" onChange={handleFile} />
+      </label>
+    </Button>
   );
 }
 
@@ -916,6 +953,170 @@ function QrValidateDialog({ onClose }: { onClose: () => void }) {
       </DialogContent>
     </Dialog>
   );
+}
+
+function EntryDialog({ optionValues, onClose, onSaved }: { optionValues: Options; onClose: () => void; onSaved: () => void }) {
+  const [form, setForm] = useState({
+    gateId: '',
+    postId: '',
+    personSearch: '',
+    vehicleId: '',
+    plate: '',
+    reason: '',
+    destinationAreaId: '',
+    expectedExitAt: '',
+    notes: '',
+  });
+  const save = useMutation({
+    mutationFn: () =>
+      api('/asset-security/movements/entry', {
+        method: 'POST',
+        json: normalizePayload(form, [
+          { name: 'gateId', label: 'Portaria' },
+          { name: 'postId', label: 'Posto' },
+          { name: 'personSearch', label: 'Pessoa' },
+          { name: 'vehicleId', label: 'Veículo' },
+          { name: 'plate', label: 'Placa' },
+          { name: 'reason', label: 'Motivo' },
+          { name: 'destinationAreaId', label: 'Área de destino' },
+          { name: 'expectedExitAt', label: 'Previsão de saída', type: 'datetime' },
+          { name: 'notes', label: 'Observações' },
+        ]),
+      }),
+    onSuccess: () => {
+      toast.success('Entrada registrada');
+      onSaved();
+    },
+    onError: (e: any) => toast.error(e?.message ?? 'Falha ao registrar entrada'),
+  });
+
+  return (
+    <Dialog open onOpenChange={(open) => !open && onClose()}>
+      <DialogContent className="max-h-[88vh] max-w-2xl overflow-y-auto">
+        <DialogHeader><DialogTitle>Registrar entrada</DialogTitle></DialogHeader>
+        <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
+          <div>
+            <Label className="field-required">Portaria</Label>
+            <NativeSelect value={form.gateId} onChange={(e) => setForm((current) => ({ ...current, gateId: e.target.value }))}>
+              <option value="">Selecione</option>
+              {optionValues.gates.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}
+            </NativeSelect>
+          </div>
+          <div>
+            <Label>Posto</Label>
+            <NativeSelect value={form.postId} onChange={(e) => setForm((current) => ({ ...current, postId: e.target.value }))}>
+              <option value="">Selecione</option>
+              {optionValues.posts.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}
+            </NativeSelect>
+          </div>
+          <div className="md:col-span-2">
+            <Label className="field-required">Pessoa</Label>
+            <Input
+              value={form.personSearch}
+              placeholder="Digite cadastro, CPF ou nome da pessoa"
+              onChange={(e) => setForm((current) => ({ ...current, personSearch: e.target.value }))}
+            />
+          </div>
+          <div>
+            <Label>Veículo cadastrado</Label>
+            <NativeSelect value={form.vehicleId} onChange={(e) => setForm((current) => ({ ...current, vehicleId: e.target.value }))}>
+              <option value="">Sem veículo cadastrado</option>
+              {optionValues.vehicles.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}
+            </NativeSelect>
+          </div>
+          <div>
+            <Label>Placa avulsa</Label>
+            <Input value={form.plate} placeholder="ABC1D23" onChange={(e) => setForm((current) => ({ ...current, plate: e.target.value }))} />
+          </div>
+          <div>
+            <Label>Área de destino</Label>
+            <NativeSelect value={form.destinationAreaId} onChange={(e) => setForm((current) => ({ ...current, destinationAreaId: e.target.value }))}>
+              <option value="">Sem área</option>
+              {optionValues.orgNodes.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}
+            </NativeSelect>
+          </div>
+          <div>
+            <Label>Previsão de saída</Label>
+            <Input type="datetime-local" value={form.expectedExitAt} onChange={(e) => setForm((current) => ({ ...current, expectedExitAt: e.target.value }))} />
+          </div>
+          <div className="md:col-span-2">
+            <Label>Motivo</Label>
+            <Input value={form.reason} onChange={(e) => setForm((current) => ({ ...current, reason: e.target.value }))} />
+          </div>
+          <div className="md:col-span-2">
+            <Label>Observações</Label>
+            <Textarea rows={3} value={form.notes} onChange={(e) => setForm((current) => ({ ...current, notes: e.target.value }))} />
+          </div>
+        </div>
+        <DialogFooter>
+          <Button variant="ghost" onClick={onClose}>Fechar</Button>
+          <Button disabled={save.isPending || !form.gateId || !form.personSearch.trim()} onClick={() => save.mutate()}>
+            {save.isPending ? 'Registrando...' : 'Registrar entrada'}
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+function ExitDialog({ openMovements, onClose, onSaved }: { openMovements: SecurityMovement[]; onClose: () => void; onSaved: () => void }) {
+  const [movementId, setMovementId] = useState('');
+  const [notes, setNotes] = useState('');
+  const selected = openMovements.find((movement) => movement.id === movementId) ?? null;
+  const save = useMutation({
+    mutationFn: () => api('/asset-security/movements/exit', { method: 'POST', json: { id: movementId, notes } }),
+    onSuccess: () => {
+      toast.success('Saída registrada');
+      onSaved();
+    },
+    onError: (e: any) => toast.error(e?.message ?? 'Falha ao registrar saída'),
+  });
+
+  return (
+    <Dialog open onOpenChange={(open) => !open && onClose()}>
+      <DialogContent className="max-w-2xl">
+        <DialogHeader><DialogTitle>Registrar saída</DialogTitle></DialogHeader>
+        <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
+          <div className="md:col-span-2">
+            <Label className="field-required">ID da entrada em aberto</Label>
+            <NativeSelect value={movementId} onChange={(e) => setMovementId(e.target.value)}>
+              <option value="">Selecione uma entrada aberta</option>
+              {openMovements.map((movement) => (
+                <option key={movement.id} value={movement.id}>{movement.code ?? movement.id} - {movementLabel(movement)}</option>
+              ))}
+            </NativeSelect>
+          </div>
+          <ReadOnlyField label="Pessoa" value={selected?.person?.name ?? '—'} />
+          <ReadOnlyField label="Veículo" value={selected?.vehicle?.model ?? selected?.vehicle?.type ?? '—'} />
+          <ReadOnlyField label="Placa" value={selected?.plate ?? selected?.vehicle?.plate ?? '—'} />
+          <ReadOnlyField label="Portaria" value={selected?.gate?.name ?? '—'} />
+          <div className="md:col-span-2">
+            <Label>Observações</Label>
+            <Textarea rows={3} value={notes} onChange={(e) => setNotes(e.target.value)} />
+          </div>
+        </div>
+        <DialogFooter>
+          <Button variant="ghost" onClick={onClose}>Fechar</Button>
+          <Button disabled={save.isPending || !movementId} onClick={() => save.mutate()}>
+            {save.isPending ? 'Registrando...' : 'Registrar saída'}
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+function ReadOnlyField({ label, value }: { label: string; value: string }) {
+  return (
+    <div>
+      <Label>{label}</Label>
+      <div className="min-h-10 rounded-md border bg-muted/30 px-3 py-2 text-sm">{value || '—'}</div>
+    </div>
+  );
+}
+
+function movementLabel(movement: SecurityMovement) {
+  return movement.person?.name ?? movement.plate ?? movement.vehicle?.plate ?? 'Sem identificação';
 }
 
 /* ------------------------------ Generic dialog ---------------------------- */

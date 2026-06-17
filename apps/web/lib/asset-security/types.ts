@@ -86,16 +86,6 @@ export interface SecurityMovement {
   contractorCompany?: AnyRecord | null;
 }
 
-/** Relatório de emergência/evacuação (`GET /asset-security/emergency-report`). */
-export interface EmergencyReport {
-  generatedAt: string;
-  lastOfflineSyncAt: string | null;
-  totalPeople: number;
-  totalVehicles: number;
-  people: SecurityMovement[];
-  evacuation: { enabled: boolean; fields: string[] };
-}
-
 export interface AssistantInsight {
   severity: string;
   title: string;

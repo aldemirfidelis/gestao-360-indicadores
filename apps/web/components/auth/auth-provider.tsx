@@ -35,6 +35,7 @@ const Ctx = createContext<AuthCtx | null>(null);
 
 const PUBLIC_PATHS = ['/', '/login'];
 const PUBLIC_PREFIXES = ['/platform-admin', '/portal-seguranca'];
+const PLATFORM_ACCESS_KEY = 'g360.platformAdmin.accessToken';
 
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<AuthUser | null>(null);
@@ -125,6 +126,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const hasPermission = (permissions?: string | string[]) => {
     if (!permissions || (Array.isArray(permissions) && permissions.length === 0)) return true;
+    if (
+      pathname.startsWith('/platform-admin') &&
+      typeof window !== 'undefined' &&
+      window.localStorage.getItem(PLATFORM_ACCESS_KEY)
+    ) {
+      return true;
+    }
     if (!user) return false;
     if (user.role === 'SUPER_ADMIN') return true;
     const required = Array.isArray(permissions) ? permissions : [permissions];

@@ -1,9 +1,11 @@
-import { Body, Controller, Get, Param, Patch, Post, Query, Req } from '@nestjs/common';
+import { BadRequestException, Body, Controller, Delete, Get, Param, Patch, Post, Query, Req } from '@nestjs/common';
 import { Throttle } from '@nestjs/throttler';
 import { Request } from 'express';
 import { z } from 'zod';
+import { userCreateSchema } from '@g360/shared';
 import { Public } from '../auth/public.decorator';
 import { ZodValidationPipe } from '../../common/pipes/zod-validation.pipe';
+import { UsersService } from '../users/users.service';
 import { PlatformAdminAuthService } from './services/platform-admin-auth.service';
 import { PlatformAdminService } from './services/platform-admin.service';
 import { PlatformAdminAuditService } from './services/platform-admin-audit.service';
@@ -15,6 +17,12 @@ function platformCompanyHeader(req?: Request) {
   const raw = req?.headers['x-platform-company-id'];
   if (Array.isArray(raw)) return raw[0];
   return raw ? String(raw) : undefined;
+}
+
+function requirePlatformCompanyHeader(req?: Request) {
+  const companyId = platformCompanyHeader(req);
+  if (!companyId) throw new BadRequestException('Selecione uma empresa para gerenciar usuarios.');
+  return companyId;
 }
 
 const loginDto = z.object({
@@ -33,6 +41,7 @@ export class PlatformAdminController {
     private readonly auth: PlatformAdminAuthService,
     private readonly service: PlatformAdminService,
     private readonly audit: PlatformAdminAuditService,
+    private readonly usersService: UsersService,
   ) {}
 
   @Throttle({ default: { limit: 5, ttl: 60_000 } })
@@ -186,7 +195,45 @@ export class PlatformAdminController {
   @Get('users')
   @PlatformAdminRequired('platform.users.view')
   users(@Req() req: Request, @Query('q') q?: string, @Query('companyId') companyId?: string, @Query('status') status?: string) {
-    return this.service.listUsers({ q, companyId: companyId ?? platformCompanyHeader(req), status });
+    const scopedCompanyId = companyId ?? platformCompanyHeader(req);
+    if (scopedCompanyId) return this.usersService.list(scopedCompanyId);
+    return this.service.listUsers({ q, status });
+  }
+
+  @Get('users/permissions')
+  @PlatformAdminRequired('platform.users.manage')
+  userPermissions() {
+    return this.usersService.listPermissions();
+  }
+
+  @Get('users/:id')
+  @PlatformAdminRequired('platform.users.view')
+  userById(@Req() req: Request, @Param('id') id: string) {
+    return this.usersService.getById(id, requirePlatformCompanyHeader(req), true);
+  }
+
+  @Post('users')
+  @PlatformAdminRequired('platform.users.manage')
+  createUser(@Req() req: Request, @Body(new ZodValidationPipe(userCreateSchema)) body: any) {
+    return this.usersService.create({ ...body, companyId: requirePlatformCompanyHeader(req) }, true);
+  }
+
+  @Patch('users/:id')
+  @PlatformAdminRequired('platform.users.manage')
+  updateUser(@Req() req: Request, @Param('id') id: string, @Body() body: any) {
+    return this.usersService.update(id, requirePlatformCompanyHeader(req), true, body);
+  }
+
+  @Patch('users/:id/permissions')
+  @PlatformAdminRequired('platform.users.manage')
+  setUserPermissions(@Req() req: Request, @Param('id') id: string, @Body() body: { permissionKeys: string[] }) {
+    return this.usersService.setPermissions(id, requirePlatformCompanyHeader(req), true, body.permissionKeys ?? []);
+  }
+
+  @Patch('users/:id/active')
+  @PlatformAdminRequired('platform.users.manage')
+  setUserActive(@Req() req: Request, @Param('id') id: string, @Body() body: { active: boolean }) {
+    return this.usersService.setActive(id, requirePlatformCompanyHeader(req), true, Boolean(body.active));
   }
 
   @Patch('users/:id/status')
@@ -203,6 +250,12 @@ export class PlatformAdminController {
   @PlatformAdminRequired('platform.users.manage')
   revokeUserSessions(@CurrentPlatformAdmin() user: PlatformAdminIdentity, @Param('id') id: string) {
     return this.service.revokeUserSessions(user, id);
+  }
+
+  @Delete('users/:id')
+  @PlatformAdminRequired('platform.users.manage')
+  removeUser(@Req() req: Request, @Param('id') id: string) {
+    return this.usersService.remove(id, requirePlatformCompanyHeader(req), true);
   }
 
   @Get('sessions')

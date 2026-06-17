@@ -127,7 +127,7 @@ export class AssetSecurityService {
       status: 'ENABLED',
       enabledFeatures: [...PACKAGE_FEATURES],
       limits: { dailyMovements: null, gates: null, offlineDevices: null },
-      settings: { documentAlertDays: 30, maxStayMinutes: 480, emergencyReportOffline: true },
+      settings: { documentAlertDays: 30, maxStayMinutes: 480 },
       virtual: true,
     };
   }
@@ -295,6 +295,70 @@ export class AssetSecurityService {
     const saved = await this.db.securityPerson.create({ data: this.personData(me, body) });
     await this.audit(me, 'CREATE', 'SecurityPerson', saved.id, saved.name, null, this.maskPersonForAudit(saved));
     return saved;
+  }
+
+  async importPeople(me: AuthPayload, rows: JsonMap[]) {
+    await this.assertPackageWrite(me);
+    if (!Array.isArray(rows) || rows.length === 0) throw new BadRequestException('Informe as linhas da planilha para importar.');
+    let created = 0;
+    let updated = 0;
+    let skipped = 0;
+    const samples: Array<{ row: number; reason: string }> = [];
+
+    for (let index = 0; index < rows.length; index += 1) {
+      const row = rows[index] ?? {};
+      const code = this.nullableText(this.sheetValue(row, ['Cadastro']));
+      const name = this.text(this.sheetValue(row, ['Nome Colaborador', 'Nome', 'Colaborador']));
+      const documentNumber = this.onlyDigits(this.text(this.sheetValue(row, ['CPF', 'Documento'])));
+      const local = this.nullableText(this.sheetValue(row, ['Local']));
+      const jobTitle = this.nullableText(this.sheetValue(row, ['Cargo']));
+      const area = this.nullableText(this.sheetValue(row, ['Area de Atuacao', 'Área de Atuação', 'Area de Atuação', 'Área de Atuacao']));
+
+      if (!name) {
+        skipped += 1;
+        if (samples.length < 10) samples.push({ row: index + 2, reason: 'Nome Colaborador vazio' });
+        continue;
+      }
+
+      const lookup = [
+        ...(code ? [{ code }] : []),
+        ...(documentNumber ? [{ documentNumber }] : []),
+      ];
+      const existing = lookup.length > 0
+        ? await this.db.securityPerson.findFirst({
+            where: {
+              companyId: me.companyId,
+              deletedAt: null,
+              OR: lookup,
+            },
+          })
+        : null;
+      const data = {
+        type: 'EMPLOYEE',
+        code,
+        name,
+        documentType: documentNumber ? 'CPF' : null,
+        documentNumber: documentNumber || null,
+        documentMasked: this.maskDocument(documentNumber),
+        originCompanyName: local,
+        jobTitle,
+        notes: area ? `Area de Atuacao: ${area}` : null,
+        documentStatus: 'NOT_REQUIRED',
+        status: 'ACTIVE',
+        updatedById: me.sub,
+      };
+
+      if (existing) {
+        await this.db.securityPerson.update({ where: { id: existing.id }, data });
+        updated += 1;
+      } else {
+        await this.db.securityPerson.create({ data: { ...data, companyId: me.companyId, createdById: me.sub } });
+        created += 1;
+      }
+    }
+
+    await this.audit(me, 'IMPORT_PEOPLE', 'SecurityPerson', null, 'Importacao de pessoas', null, { created, updated, skipped, samples });
+    return { total: rows.length, created, updated, skipped, samples };
   }
 
   async updatePerson(me: AuthPayload, id: string, body: JsonMap) {
@@ -562,27 +626,12 @@ export class AssetSecurityService {
     return this.decorateMovements(me, rows);
   }
 
-  async emergencyReport(me: AuthPayload, q: Query = {}) {
-    const [present, latestSync] = await Promise.all([
-      this.present(me, q),
-      this.db.securityOfflineSync.findFirst({ where: { companyId: me.companyId, status: 'SYNCED' }, orderBy: { syncedAt: 'desc' } }),
-    ]);
-    return {
-      generatedAt: new Date().toISOString(),
-      lastOfflineSyncAt: latestSync?.syncedAt ?? null,
-      totalPeople: present.filter((r: any) => r.personId).length,
-      totalVehicles: present.filter((r: any) => r.vehicleId || r.plate).length,
-      people: present,
-      evacuation: { enabled: true, fields: ['meetingPoint', 'located', 'locatedAt', 'notes'] },
-    };
-  }
-
   async registerEntry(me: AuthPayload, body: JsonMap) {
     await this.assertPackageWrite(me);
     const unitId = await this.validateOrgNode(me.companyId, this.id(body.unitId));
     const gateId = await this.validateGate(me.companyId, this.id(body.gateId));
     const postId = await this.validatePost(me.companyId, this.id(body.postId));
-    const person = await this.validatePerson(me.companyId, this.id(body.personId));
+    const person = await this.resolveEntryPerson(me, body);
     const vehicle = await this.validateVehicle(me.companyId, this.id(body.vehicleId));
     const contractor = await this.validateContractorCompany(me.companyId, this.id(body.contractorCompanyId));
     const authorization = await this.validateAuthorization(me.companyId, this.id(body.authorizationId));
@@ -1836,6 +1885,65 @@ export class AssetSecurityService {
       if (row.status === 'BLOCKED' && !hasException) throw new ForbiddenException('Cadastro bloqueado para acesso.');
       if (row.status === 'INACTIVE' && !hasException) throw new ForbiddenException('Cadastro inativo para acesso.');
     }
+  }
+
+  private async resolveEntryPerson(me: AuthPayload, body: JsonMap) {
+    const personId = this.id(body.personId);
+    if (personId) return this.validatePerson(me.companyId, personId);
+
+    const term = this.text(body.personSearch ?? body.personName ?? body.personCode);
+    if (!term) throw new BadRequestException('Informe a pessoa da entrada por cadastro, CPF ou nome.');
+    const digits = this.onlyDigits(term);
+    const found = await this.db.securityPerson.findFirst({
+      where: {
+        companyId: me.companyId,
+        deletedAt: null,
+        OR: [
+          { code: term },
+          ...(digits ? [{ documentNumber: digits }] : []),
+          { name: { contains: term, mode: 'insensitive' } },
+          { socialName: { contains: term, mode: 'insensitive' } },
+        ],
+      },
+      orderBy: { name: 'asc' },
+    });
+    if (found) return found;
+    if (digits && !/[a-zA-ZÀ-ÿ]/.test(term)) {
+      throw new NotFoundException('Pessoa nao encontrada. Importe o cadastro ou digite o nome completo.');
+    }
+    const saved = await this.db.securityPerson.create({
+      data: {
+        companyId: me.companyId,
+        type: 'VISITOR',
+        name: term,
+        documentStatus: 'NOT_REQUIRED',
+        status: 'ACTIVE',
+        createdById: me.sub,
+        updatedById: me.sub,
+      },
+    });
+    await this.audit(me, 'CREATE_FROM_ENTRY', 'SecurityPerson', saved.id, saved.name, null, this.maskPersonForAudit(saved));
+    return saved;
+  }
+
+  private sheetValue(row: JsonMap, candidates: string[]) {
+    const normalized = new Map<string, unknown>();
+    for (const [key, value] of Object.entries(row)) {
+      normalized.set(this.sheetKey(key), value);
+    }
+    for (const candidate of candidates) {
+      const value = normalized.get(this.sheetKey(candidate));
+      if (value !== undefined && value !== null && String(value).trim() !== '') return value;
+    }
+    return '';
+  }
+
+  private sheetKey(value: string) {
+    return String(value ?? '')
+      .normalize('NFD')
+      .replace(/[\u0300-\u036f]/g, '')
+      .toLowerCase()
+      .replace(/[^a-z0-9]/g, '');
   }
 
   private async findOpenMovementForExit(me: AuthPayload, body: JsonMap) {
