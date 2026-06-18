@@ -76,7 +76,13 @@ export default function PrizeApuracaoPage() {
     mutationFn: () => api<any>(`/prize/calc/competence/${competenceId}/run-v2`, { method: 'POST' }),
     onSuccess: (r) => {
       if (r.blockedReason) toast.warning(`V2 bloqueada: ${r.blockedReason}`);
-      else toast.success(`Setor apurado na v2: ${r.totalEmployees} colaborador(es)`);
+      else {
+        const apurados = r.apurados ?? r.totalEmployees ?? 0;
+        const fora = r.outOfScope ?? 0;
+        toast.success(fora > 0
+          ? `Setor apurado na v2: ${apurados} apurado(s); ${fora} fora do escopo (sem regra) — veja "Não casados".`
+          : `Setor apurado na v2: ${apurados} colaborador(es)`);
+      }
       qc.invalidateQueries({ queryKey: ['prize-calc-results'] });
       qc.invalidateQueries({ queryKey: ['prize-v2-cells'] });
       qc.invalidateQueries({ queryKey: ['prize-v2-unmatched'] });
@@ -138,7 +144,7 @@ export default function PrizeApuracaoPage() {
             <Button onClick={() => autopilot.mutate()} disabled={autopilot.isPending} title="Sincroniza o realizado da plataforma, valida a lista de verificação e apura automaticamente">
               <Zap className="mr-1 h-4 w-4" />{autopilot.isPending ? 'Executando…' : 'Autopilot'}
             </Button>
-            <Button onClick={() => runV2.mutate()} disabled={runV2.isPending} title="Apura a competência inteira pela matriz área-cargo">
+            <Button onClick={() => runV2.mutate()} disabled={runV2.isPending} title="Apura pela matriz área×cargo quem tem combinação cadastrada; quem não tem regra fica listado em 'Não casados' (fora do escopo). Bloqueia só se houver ambiguidade (2+ combinações para a mesma pessoa).">
               <PlayCircle className="mr-1 h-4 w-4" />{runV2.isPending ? 'Apurando setor...' : 'Rodar setor v2'}
             </Button>
             {!runData ? (

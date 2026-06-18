@@ -359,6 +359,7 @@ export class PrizeCalcService {
     }
 
     const unmatchedRows: Prisma.PrizeUnmatchedEmployeeCreateManyInput[] = [];
+    let ambiguousCount = 0;
     const employeeMatch = new Map<string, { groupId: string; possibleSalaryPercent: number; achievedSalaryPercent: number; groupName: string }>();
     for (const emp of snapshot) {
       if (emp.blocked || !emp.eligible) continue;
@@ -389,7 +390,11 @@ export class PrizeCalcService {
         }
       }
       const matches = [...matchedByGroup.values()];
-      if (matches.length !== 1) {
+      if (matches.length === 1) {
+        employeeMatch.set(emp.registration, matches[0]);
+      } else {
+        const ambiguous = matches.length > 1;
+        if (ambiguous) ambiguousCount++;
         unmatchedRows.push({
           companyId: me.companyId,
           runId: run.id,
@@ -400,22 +405,28 @@ export class PrizeCalcService {
           positionRef: emp.positionRef,
           normalizedAreaKey: areaCandidates[0] ?? normalizeRuleKey(emp.areaRef),
           normalizedPositionKey: normalizedPositionKey || normalizeRuleKey(emp.positionRef),
-          reason: matches.length > 1 ? 'Mais de uma combinacao area-cargo aplicavel' : 'Sem combinacao area-cargo aplicavel',
+          reason: ambiguous ? 'Mais de uma combinacao area-cargo aplicavel' : 'Sem combinacao area-cargo aplicavel (fora do escopo da regua)',
         });
-      } else {
-        employeeMatch.set(emp.registration, matches[0]);
       }
     }
 
+    // Persiste os nao-casados como worklist (aba "Nao casados"). Os "fora do
+    // escopo" (0 combinacoes) sao informativos: a apuracao por setor roda so
+    // para quem tem regra e os demais ficam listados para configuracao futura.
     if (unmatchedRows.length > 0) {
       await this.prisma.prizeUnmatchedEmployee.createMany({ data: unmatchedRows });
+    }
+    // Bloqueio APENAS por ambiguidade (config errada: 2+ combinacoes para a
+    // mesma pessoa). "Fora do escopo" nao bloqueia — apura quem tem regra.
+    if (ambiguousCount > 0) {
       const finished = await this.prisma.prizeCalculationRun.update({
         where: { id: run.id },
-        data: { status: 'ERROR', totalEmployees: snapshot.length, errorsCount: unmatchedRows.length, finishedAt: new Date() },
+        data: { status: 'ERROR', totalEmployees: snapshot.length, errorsCount: ambiguousCount, finishedAt: new Date() },
       });
-      await this.audit.log(me, { action: 'CALC_RUN_V2_BLOCKED', entityType: 'CALC_RUN', entityId: run.id, competenceId, after: { unmatched: unmatchedRows.length } });
-      return { ...finished, unmatched: unmatchedRows.length, blockedReason: 'Existem colaboradores sem regra area-cargo deterministica' };
+      await this.audit.log(me, { action: 'CALC_RUN_V2_BLOCKED', entityType: 'CALC_RUN', entityId: run.id, competenceId, after: { ambiguous: ambiguousCount, unmatched: unmatchedRows.length } });
+      return { ...finished, ambiguous: ambiguousCount, unmatched: unmatchedRows.length, blockedReason: `${ambiguousCount} colaborador(es) com mais de uma combinacao aplicavel (ambiguidade). Ajuste as combinacoes para que cada colaborador caia em apenas uma.` };
     }
+    const outOfScope = unmatchedRows.length; // 0 combinacoes — fora do escopo desta regua
 
     const roundingRule = program?.roundingRule ?? 'HALF_UP_2';
     const eventsByReg = new Map<string, typeof events>();
@@ -425,8 +436,9 @@ export class PrizeCalcService {
 
     let totalGross = 0, totalRed = 0, totalFinal = 0, errors = 0;
     for (const emp of snapshot) {
+      const match = employeeMatch.get(emp.registration);
+      if (!match) continue; // apura so quem casou em exatamente uma combinacao
       try {
-        const match = employeeMatch.get(emp.registration);
         const empEvents = (eventsByReg.get(emp.registration) ?? []).map((e) => ({
           type: e.type,
           days: e.days ?? null,
@@ -436,18 +448,15 @@ export class PrizeCalcService {
           commercialDaysFromAdmission(emp.admissionDate, competence.year, competence.month),
           empEvents,
         );
-        const blockedReason = emp.blocked || !emp.eligible
-          ? 'Colaborador bloqueado/nao elegivel'
-          : !match
-            ? 'Sem combinacao area-cargo aplicavel'
-            : null;
+        // match garante elegivel e nao bloqueado (os demais caem no continue acima).
+        const blockedReason = emp.blocked || !emp.eligible ? 'Colaborador bloqueado/nao elegivel' : null;
 
         const out = computeV2Individual({
           registration: emp.registration,
           name: emp.name,
           baseSalary: num(emp.baseSalary),
-          possibleSalaryPercent: match?.possibleSalaryPercent ?? 0,
-          achievedSalaryPercent: match?.achievedSalaryPercent ?? 0,
+          possibleSalaryPercent: match.possibleSalaryPercent,
+          achievedSalaryPercent: match.achievedSalaryPercent,
           entitledDays,
           events: empEvents,
           moderatorRules: moderatorRules.map((r) => ({ name: r.name, eventType: r.eventType, criterion: r.criterion, reductionPercent: num(r.reductionPercent), reductionValue: num(r.reductionValue), cap: num(r.cap), cumulative: r.cumulative, priority: r.priority })),
@@ -490,12 +499,13 @@ export class PrizeCalcService {
       }
     }
 
+    const apurados = employeeMatch.size;
     const finished = await this.prisma.prizeCalculationRun.update({
       where: { id: run.id },
-      data: { status: errors > 0 ? 'PARTIAL' : 'SUCCESS', totalEmployees: snapshot.length, totalGross, totalReductions: totalRed, totalFinal, errorsCount: errors, finishedAt: new Date() },
+      data: { status: errors > 0 ? 'PARTIAL' : 'SUCCESS', totalEmployees: apurados, totalGross, totalReductions: totalRed, totalFinal, errorsCount: errors, finishedAt: new Date() },
     });
-    await this.audit.log(me, { action: 'CALC_RUN_V2', entityType: 'CALC_RUN', entityId: run.id, competenceId, after: { version, totalFinal, employees: snapshot.length, cells: cellRows.length } });
-    return finished;
+    await this.audit.log(me, { action: 'CALC_RUN_V2', entityType: 'CALC_RUN', entityId: run.id, competenceId, after: { version, totalFinal, apurados, outOfScope, cells: cellRows.length } });
+    return { ...finished, apurados, outOfScope };
   }
 
   async reprocess(me: AuthPayload, competenceId: string, reason: string) {
