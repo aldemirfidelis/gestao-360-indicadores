@@ -98,33 +98,37 @@ export class PrizeEligibleService {
     });
 
     try {
+      // Insercao em LOTE (createMany) em vez de 1 create por linha: com ~2700
+      // colaboradores, o loop por linha estourava o timeout de 5s da transacao
+      // interativa do Prisma ("Transaction already closed"). createMany faz um
+      // unico round-trip e o timeout ampliado cobre lotes grandes.
       await this.prisma.$transaction(async (tx) => {
         await tx.prizeEmployeeSnapshot.updateMany({ where: { competenceId, current: true }, data: { current: false } });
-        for (const r of rows) {
-          await tx.prizeEmployeeSnapshot.create({
-            data: {
-              companyId: me.companyId, competenceId, batchId: job.id, lotVersion, current: true,
-              registration: r.registration, name: r.name, cpfMasked: maskCpf(r.cpf), bond: r.bond ?? null,
-              branchRef: r.branchRef ?? null, unitRef: r.unitRef ?? null, positionRef: r.positionRef ?? null,
-              functionRef: r.functionRef ?? null, areaRef: r.areaRef ?? null, sectorRef: r.sectorRef ?? null,
-              costCenterRef: r.costCenterRef ?? null, baseSalary: r.baseSalary ?? null,
-              admissionDate: r.admissionDate ? new Date(r.admissionDate) : null,
-              terminationDate: r.terminationDate ? new Date(r.terminationDate) : null,
-              situation: r.situation ?? 'ACTIVE', workedDays: r.workedDays ?? null, source,
-            },
-          });
-        }
-        for (const ev of dto.events ?? []) {
-          const snap = await tx.prizeEmployeeSnapshot.findFirst({ where: { competenceId, registration: ev.registration, lotVersion } });
-          await tx.prizeEmployeeEvent.create({
-            data: {
-              companyId: me.companyId, competenceId, snapshotId: snap?.id ?? null, registration: ev.registration,
+        await tx.prizeEmployeeSnapshot.createMany({
+          data: rows.map((r) => ({
+            companyId: me.companyId, competenceId, batchId: job.id, lotVersion, current: true,
+            registration: r.registration, name: r.name, cpfMasked: maskCpf(r.cpf), bond: r.bond ?? null,
+            branchRef: r.branchRef ?? null, unitRef: r.unitRef ?? null, positionRef: r.positionRef ?? null,
+            functionRef: r.functionRef ?? null, areaRef: r.areaRef ?? null, sectorRef: r.sectorRef ?? null,
+            costCenterRef: r.costCenterRef ?? null, baseSalary: r.baseSalary ?? null,
+            admissionDate: r.admissionDate ? new Date(r.admissionDate) : null,
+            terminationDate: r.terminationDate ? new Date(r.terminationDate) : null,
+            situation: r.situation ?? 'ACTIVE', workedDays: r.workedDays ?? null, source,
+          })),
+        });
+        const events = dto.events ?? [];
+        if (events.length) {
+          const snaps = await tx.prizeEmployeeSnapshot.findMany({ where: { competenceId, lotVersion }, select: { id: true, registration: true } });
+          const idByReg = new Map(snaps.map((s) => [s.registration, s.id]));
+          await tx.prizeEmployeeEvent.createMany({
+            data: events.map((ev) => ({
+              companyId: me.companyId, competenceId, snapshotId: idByReg.get(ev.registration) ?? null, registration: ev.registration,
               type: ev.type, date: ev.date ? new Date(ev.date) : null, days: ev.days ?? null, value: ev.value ?? null,
               description: ev.description ?? null, source, batchId: job.id,
-            },
+            })),
           });
         }
-      });
+      }, { timeout: 120_000, maxWait: 20_000 });
 
       const updatedJob = await this.prisma.prizeIntegrationJob.update({
         where: { id: job.id },
