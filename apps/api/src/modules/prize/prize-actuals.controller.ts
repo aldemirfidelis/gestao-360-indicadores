@@ -21,6 +21,13 @@ export class PrizeActualsController {
     return this.sync.syncActuals(me, competenceId);
   }
 
+  /** Sincroniza o realizado da regua V2 (catalogo) a partir dos indicadores nativos vinculados. */
+  @Post('competence/:competenceId/sync-catalog')
+  @RequirePermissions('prize:actuals:manage')
+  syncCatalogFromPlatform(@CurrentUser() me: AuthPayload, @Param('competenceId') competenceId: string) {
+    return this.sync.syncCatalogActuals(me, competenceId);
+  }
+
   @Get('competence/:competenceId')
   @RequirePermissions('prize:view')
   list(@CurrentUser() me: AuthPayload, @Param('competenceId') competenceId: string) {
