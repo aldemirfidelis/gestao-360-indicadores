@@ -2,7 +2,7 @@
 # =====================================================
 # Dockerfile da API NestJS (Gestão 360)
 # - Multi-stage com node:20-alpine
-# - Compativel com pnpm workspaces e Prisma (Neon)
+# - Compativel com pnpm workspaces e Prisma (Postgres local da droplet em prod)
 # - Roda migrate deploy + start no entrypoint
 # =====================================================
 
@@ -12,7 +12,7 @@ FROM node:${NODE_VERSION} AS base
 ENV PNPM_HOME="/pnpm" \
     PATH="/pnpm:$PATH" \
     NODE_OPTIONS="--max-old-space-size=1536 --enable-source-maps"
-# openssl: necessario para Prisma + Neon (SSL obrigatorio)
+# openssl: necessario para Prisma (TLS quando o banco exige SSL)
 # libc6-compat: compatibilidade glibc para alguns binarios nativos
 RUN apk add --no-cache libc6-compat openssl ca-certificates \
     && corepack enable \

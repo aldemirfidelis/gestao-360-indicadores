@@ -14,7 +14,8 @@ datasource db {
   provider  = "postgresql"
   url       = env("DATABASE_URL")
   // directUrl e usado por prisma migrate e introspeccao, para evitar pgbouncer
-  // quando DATABASE_URL aponta para o pooler do Neon
+  // quando DATABASE_URL aponta para um pooler. Em prod o banco e o Postgres
+  // local da droplet (sem pooler); o dev ainda usa o Neon legado.
   directUrl = env("DIRECT_URL")
 }
 
@@ -6102,7 +6103,7 @@ model CompensationSimulation {
 
 // =====================================================
 // Anexos e comentarios de resultados lancados
-// Armazenados no proprio banco (Neon) - limite de 5 MB por arquivo aplicado na API.
+// Armazenados no proprio banco (Postgres) - limite de 5 MB por arquivo aplicado na API.
 // Chaveados por (indicatorId, periodRef) para nao depender do id do resultado.
 // =====================================================
 

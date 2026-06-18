@@ -1,5 +1,9 @@
 # Deploy em DigitalOcean App Platform + Neon Postgres
 
+> ⚠️ **OBSOLETO.** Este guia (App Platform + Neon) **não é mais o setup de produção**.
+> A produção roda numa **Droplet** com **Postgres local** — veja `DEPLOY-DROPLET.md`,
+> `docker-compose.droplet.yml` e `scripts/deploy.sh` (`make deploy`). Mantido só por referência.
+
 Este guia leva a aplicacao de zero a producao em ~20 min, **sem servidor para gerenciar**:
 
 - **Banco**: Neon (Postgres serverless, free tier generoso)

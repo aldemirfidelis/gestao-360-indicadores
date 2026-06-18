@@ -1,6 +1,12 @@
-# Deploy em Droplet DigitalOcean + Neon Postgres
+# Deploy em Droplet DigitalOcean (Postgres local + Caddy)
 
-Guia para subir a aplicacao em uma **Droplet** (VM Linux gerenciada por voce) com **banco no Neon** e **Caddy** como proxy reverso com SSL automatico.
+> ⚠️ **Atual:** o banco de produção roda **LOCAL na droplet** (container `g360-postgres`),
+> não no Neon. O setup vigente é `docker-compose.droplet.yml` + `scripts/deploy.sh`
+> (`make deploy`). O Neon foi a origem migrada uma única vez (`scripts/migrate-neon-to-droplet.sh`)
+> e permanece apenas como banco de desenvolvimento. Trechos abaixo que citam "banco no Neon"
+> são históricos.
+
+Guia para subir a aplicacao em uma **Droplet** (VM Linux gerenciada por voce) com **Postgres local** e **Caddy** como proxy reverso com SSL automatico.
 
 ## Por que Droplet em vez do App Platform?
 
