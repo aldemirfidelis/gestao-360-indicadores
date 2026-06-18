@@ -12,7 +12,7 @@ import { PrismaService } from '../../prisma/prisma.service';
 import { AuthPayload } from '../auth/auth.types';
 import { PrizeAuditService } from './prize-audit.service';
 import { suggestRanges } from './prize-ranges.util';
-import { normalizeRuleKey, uniqueNormalized } from './prize-rule-matrix.util';
+import { matchInherited, normalizeRuleKey, uniqueNormalized } from './prize-rule-matrix.util';
 
 export interface UpsertCatalogDto {
   code?: string;
@@ -152,7 +152,7 @@ export class PrizeRulesService {
   }
 
   async listGroups(companyId: string, query: { annexVersionId?: string; programId?: string } = {}) {
-    return this.prisma.prizeRuleGroup.findMany({
+    const groups = await this.prisma.prizeRuleGroup.findMany({
       where: {
         companyId,
         deletedAt: null,
@@ -169,6 +169,54 @@ export class PrizeRulesService {
       },
       orderBy: [{ updatedAt: 'desc' }],
     });
+    return this.attachInheritedDefaults(companyId, groups);
+  }
+
+  /**
+   * Anexa a cada indicador da combinacao os parametros/faixas HERDADOS do
+   * indicador v1 (PrizeIndicator, tela "Indicadores e faixas"), casados por
+   * platformIndicatorId/BSC/nome. Modelo hibrido: o default vem do indicador;
+   * o que estiver em PrizeRuleParameter (v2) sobrescreve por combinacao.
+   */
+  private async attachInheritedDefaults<T extends { indicators: any[] }>(companyId: string, groups: T[]): Promise<T[]> {
+    const catalogs = new Map<string, { platformIndicatorId: string | null; bscNumber: string | null; name: string }>();
+    for (const g of groups) for (const ri of g.indicators) {
+      if (ri.catalog) catalogs.set(ri.catalogId, { platformIndicatorId: ri.catalog.platformIndicatorId, bscNumber: ri.catalog.bscNumber, name: ri.catalog.name });
+    }
+    if (catalogs.size === 0) return groups;
+    const cats = [...catalogs.values()];
+    const platformIds = cats.map((c) => c.platformIndicatorId).filter((v): v is string => !!v);
+    const bscNumbers = cats.map((c) => c.bscNumber).filter((v): v is string => !!v);
+    const names = cats.map((c) => c.name).filter(Boolean);
+
+    const v1 = await this.prisma.prizeIndicator.findMany({
+      where: {
+        companyId,
+        deletedAt: null,
+        OR: [
+          ...(platformIds.length ? [{ platformIndicatorId: { in: platformIds } }] : []),
+          ...(bscNumbers.length ? [{ bscNumber: { in: bscNumbers } }] : []),
+          ...(names.length ? [{ name: { in: names } }] : []),
+        ],
+      },
+      include: { parameters: true, ranges: { orderBy: { orderIndex: 'asc' } } },
+    });
+    if (v1.length === 0) return groups;
+
+    for (const g of groups) {
+      for (const ri of g.indicators) {
+        if (!ri.catalog) { ri.inherited = null; continue; }
+        const match = matchInherited({ platformIndicatorId: ri.catalog.platformIndicatorId, bscNumber: ri.catalog.bscNumber, name: ri.catalog.name }, v1);
+        ri.inherited = match
+          ? {
+              sourceId: match.id,
+              params: match.parameters.map((p) => ({ year: p.year, month: p.month, zero: p.zero, target: p.target })),
+              ranges: match.ranges.map((r) => ({ orderIndex: r.orderIndex, minLimit: r.minLimit, maxLimit: r.maxLimit, achievementPercent: r.achievementPercent, gainPercent: r.gainPercent })),
+            }
+          : null;
+      }
+    }
+    return groups;
   }
 
   async createGroup(me: AuthPayload, dto: UpsertRuleGroupDto) {

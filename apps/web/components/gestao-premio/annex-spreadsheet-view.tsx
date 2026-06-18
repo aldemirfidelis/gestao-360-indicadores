@@ -3,7 +3,8 @@
 import { useMemo, useState } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { NativeSelect } from '@/components/ui/select';
-import type { RuleGroup, RuleIndicator, RuleParameter } from './types';
+import type { RuleBand, RuleGroup, RuleIndicator, RuleParameter } from './types';
+import { pickInherited } from './types';
 
 interface Props {
   open: boolean;
@@ -106,14 +107,19 @@ function SheetBlock({ annexTitle, group, year }: { annexTitle: string; group: Ru
         <tbody>
           {indicators.map((ri) => {
             const byMonth = monthMap(ri, year);
+            const fixed = ri.type === 'FIXED';
             return (
               <tr key={ri.id}>
                 <td className="sticky left-0 z-[1] border border-emerald-800/20 bg-white px-2 py-1 font-medium">{ri.catalog.name}</td>
                 {MONTHS_FULL.map((_, i) => {
-                  const p = byMonth.get(i + 1);
+                  const month = i + 1;
+                  const p = byMonth.get(month);
+                  const inhP = p ? null : pickInherited(ri.inherited, year, month, fixed);
+                  const inh = !p && inhP != null;
+                  const cls = `border border-emerald-800/20 px-2 py-1 text-center${inh ? ' italic text-slate-400' : ''}`;
                   return [
-                    <td key={`z${i}`} className="border border-emerald-800/20 px-2 py-1 text-center">{fmt(p?.zero)}</td>,
-                    <td key={`t${i}`} className="border border-emerald-800/20 px-2 py-1 text-center">{fmt(p?.target)}</td>,
+                    <td key={`z${i}`} className={cls}>{fmt(p?.zero ?? inhP?.zero ?? null)}</td>,
+                    <td key={`t${i}`} className={cls}>{fmt(p?.target ?? inhP?.target ?? null)}</td>,
                   ];
                 })}
               </tr>
@@ -131,7 +137,14 @@ function SheetBlock({ annexTitle, group, year }: { annexTitle: string; group: Ru
 
 function BandsTable({ ri, year }: { ri: RuleIndicator; year: number }) {
   const byMonth = monthMap(ri, year);
-  const maxBands = Math.max(0, ...Array.from(byMonth.values()).map((p) => p.bands.length));
+  const fixed = ri.type === 'FIXED';
+  const bandsForMonth = (month: number): RuleBand[] => {
+    const p = byMonth.get(month);
+    if (p) return p.bands;
+    const inhP = pickInherited(ri.inherited, year, month, fixed);
+    return inhP ? (ri.inherited?.ranges ?? []) : [];
+  };
+  const maxBands = Math.max(0, ...MONTHS_FULL.map((_, i) => bandsForMonth(i + 1).length));
   if (maxBands === 0) {
     return <div className="border-t border-emerald-800/20 px-3 py-1 text-muted-foreground"><span className="font-medium text-slate-700">{ri.catalog.name}:</span> sem faixas geradas.</div>;
   }
@@ -158,7 +171,7 @@ function BandsTable({ ri, year }: { ri: RuleIndicator; year: number }) {
             <tr key={order}>
               <td className="sticky left-0 z-[1] border border-emerald-800/20 bg-white px-2 py-1 text-center font-medium">{order}</td>
               {MONTHS_FULL.map((_, i) => {
-                const band = byMonth.get(i + 1)?.bands.find((b) => b.orderIndex === order);
+                const band = bandsForMonth(i + 1).find((b) => b.orderIndex === order);
                 return [
                   <td key={`mn${i}`} className="border border-emerald-800/20 px-2 py-1 text-center">{fmt(band?.minLimit)}</td>,
                   <td key={`mx${i}`} className="border border-emerald-800/20 px-2 py-1 text-center">{band?.maxLimit == null ? '∞' : fmt(band.maxLimit)}</td>,

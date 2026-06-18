@@ -12,8 +12,8 @@ import { api, ApiError } from '@/lib/api';
 import { CombinationDialog } from './combination-dialog';
 import { LinkIndicatorDialog } from './link-indicator-dialog';
 import { AnnexSpreadsheetView } from './annex-spreadsheet-view';
-import type { CatalogIndicator, RuleGroup, RuleIndicator, RuleParameter } from './types';
-import { MONTHS_PT, RULE_TYPE, VALIDITY_KIND } from './types';
+import type { CatalogIndicator, InheritedDefaults, RuleGroup, RuleIndicator, RuleParameter } from './types';
+import { MONTHS_PT, RULE_TYPE, VALIDITY_KIND, pickInherited } from './types';
 
 interface Props {
   annexVersionId: string;
@@ -207,7 +207,7 @@ function IndicatorRow({ ri, canEdit, sources, onChanged }: { ri: RuleIndicator; 
               </NativeSelect>
             )}
           </div>
-          <MonthGrid ruleIndicatorId={ri.id} year={year} params={paramsOfYear} direction={ri.catalog.direction} canEdit={canEdit} onChanged={onChanged} />
+          <MonthGrid ruleIndicatorId={ri.id} year={year} params={paramsOfYear} direction={ri.catalog.direction} inherited={ri.inherited} fixed={ri.type === 'FIXED'} canEdit={canEdit} onChanged={onChanged} />
         </div>
       )}
     </div>
@@ -215,8 +215,8 @@ function IndicatorRow({ ri, canEdit, sources, onChanged }: { ri: RuleIndicator; 
 }
 
 // ---- Grade de 12 meses: zero/meta + gerador de faixas ----
-function MonthGrid({ ruleIndicatorId, year, params, direction, canEdit, onChanged }: {
-  ruleIndicatorId: string; year: number; params: RuleParameter[]; direction: string; canEdit: boolean; onChanged: () => void;
+function MonthGrid({ ruleIndicatorId, year, params, direction, inherited, fixed, canEdit, onChanged }: {
+  ruleIndicatorId: string; year: number; params: RuleParameter[]; direction: string; inherited?: InheritedDefaults | null; fixed: boolean; canEdit: boolean; onChanged: () => void;
 }) {
   const byMonth = useMemo(() => {
     const m = new Map<number, RuleParameter>();
@@ -271,17 +271,30 @@ function MonthGrid({ ruleIndicatorId, year, params, direction, canEdit, onChange
           {MONTHS_PT.map((label, idx) => {
             const month = idx + 1;
             const param = byMonth.get(month);
+            const inhP = pickInherited(inherited, year, month, fixed);
+            const inhBands = !param ? (inherited?.ranges.length ?? 0) : 0;
+            const zeroEff = param?.zero ?? inhP?.zero ?? null;
+            const targetEff = param?.target ?? inhP?.target ?? null;
+            const usingInherited = !param && (inhP != null || inhBands > 0);
             return (
               <tr key={month} className="border-t border-border/40">
-                <td className="px-1 py-1">{label}</td>
+                <td className="px-1 py-1">{label}{usingInherited && <span className="ml-1 text-[9px] text-muted-foreground" title="Herdado do indicador (Indicadores e faixas)">herdado</span>}</td>
                 <td className="px-1 py-1">
-                  {canEdit ? <Input className="h-6 w-20" type="number" value={valueOf(month, 'zero')} onChange={(e) => setVal(month, 'zero', e.target.value)} /> : (param?.zero ?? '—')}
+                  {canEdit
+                    ? <Input className="h-6 w-20" type="number" value={valueOf(month, 'zero')} placeholder={inhP?.zero ?? ''} onChange={(e) => setVal(month, 'zero', e.target.value)} />
+                    : <span className={usingInherited ? 'italic text-muted-foreground' : ''}>{zeroEff ?? '—'}</span>}
                 </td>
                 <td className="px-1 py-1">
-                  {canEdit ? <Input className="h-6 w-20" type="number" value={valueOf(month, 'target')} onChange={(e) => setVal(month, 'target', e.target.value)} /> : (param?.target ?? '—')}
+                  {canEdit
+                    ? <Input className="h-6 w-20" type="number" value={valueOf(month, 'target')} placeholder={inhP?.target ?? ''} onChange={(e) => setVal(month, 'target', e.target.value)} />
+                    : <span className={usingInherited ? 'italic text-muted-foreground' : ''}>{targetEff ?? '—'}</span>}
                 </td>
                 <td className="px-1 py-1">
-                  {param?.bands.length ? <span title={param.bands.map((b) => `${b.orderIndex}: [${b.minLimit ?? '−∞'} a ${b.maxLimit ?? '+∞'}] ${b.gainPercent}%`).join('\n')}>{param.bands.length} faixa(s)</span> : <span className="text-muted-foreground">—</span>}
+                  {param?.bands.length
+                    ? <span title={param.bands.map((b) => `${b.orderIndex}: [${b.minLimit ?? '−∞'} a ${b.maxLimit ?? '+∞'}] ${b.gainPercent}%`).join('\n')}>{param.bands.length} faixa(s)</span>
+                    : inhBands > 0
+                      ? <span className="italic text-muted-foreground" title={(inherited?.ranges ?? []).map((b) => `${b.orderIndex}: [${b.minLimit ?? '−∞'} a ${b.maxLimit ?? '+∞'}] ${b.gainPercent}%`).join('\n')}>{inhBands} herdada(s)</span>
+                      : <span className="text-muted-foreground">—</span>}
                 </td>
                 {canEdit && (
                   <td className="px-1 py-1">
@@ -296,6 +309,9 @@ function MonthGrid({ ruleIndicatorId, year, params, direction, canEdit, onChange
           })}
         </tbody>
       </table>
+      {inherited && inherited.params.length > 0 && (
+        <p className="mt-1 text-[11px] text-muted-foreground">Valores em itálico (“herdado”) vêm do indicador em <span className="font-medium">Indicadores e faixas</span>{canEdit ? '; preencha um mês e Salve para sobrescrever só nesta combinação.' : '.'}</p>
+      )}
       {canEdit && (
         <div className="mt-2 flex items-center gap-2 text-xs text-muted-foreground">
           <Wand2 className="h-3.5 w-3.5" />

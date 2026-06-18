@@ -34,6 +34,19 @@ export interface RuleParameter {
   bands: RuleBand[];
 }
 
+export interface InheritedParam {
+  year: number | null;
+  month: number | null;
+  zero: string | null;
+  target: string | null;
+}
+
+export interface InheritedDefaults {
+  sourceId: string;
+  params: InheritedParam[];
+  ranges: RuleBand[];
+}
+
 export interface RuleIndicator {
   id: string;
   catalogId: string;
@@ -47,6 +60,18 @@ export interface RuleIndicator {
   active: boolean;
   catalog: CatalogIndicator;
   parameters: RuleParameter[];
+  inherited?: InheritedDefaults | null;
+}
+
+/** Escolhe o parâmetro v1 herdado para um mês (Fixo usa o único; Variável casa o mês). */
+export function pickInherited(inherited: InheritedDefaults | null | undefined, year: number, month: number, fixed: boolean): InheritedParam | null {
+  if (!inherited) return null;
+  const yearParams = inherited.params.filter((p) => p.year === year || p.year == null);
+  const exact = yearParams.find((p) => p.month === month);
+  if (exact) return exact;
+  if (fixed && yearParams.length) return yearParams[0];
+  if (yearParams.length === 1) return yearParams[0];
+  return null;
 }
 
 export interface RuleGroup {

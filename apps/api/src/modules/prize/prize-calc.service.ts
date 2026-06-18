@@ -6,7 +6,7 @@ import { PrizeAuditService } from './prize-audit.service';
 import { commercialDaysFromAdmission, computePrize, deriveEntitledDays, EngineIndicator, EngineInput, PRIZE_ENGINE_VERSION } from './prize-calc-engine';
 import { selectRangesForParameter } from './prize-evaluation';
 import { computeV2Individual, evaluateV2Cell } from './prize-v2-engine';
-import { normalizeRuleKey } from './prize-rule-matrix.util';
+import { matchInherited, normalizeRuleKey, pickInheritedParam } from './prize-rule-matrix.util';
 
 function num(v: any): number | null {
   if (v === null || v === undefined) return null;
@@ -212,6 +212,35 @@ export class PrizeCalcService {
       throw new BadRequestException('Cadastre regras v2 em matriz para pelo menos um anexo vigente antes de rodar a apuracao do setor');
     }
 
+    // Fallback hibrido: quando a combinacao nao tem parametro v2 para o mes,
+    // herda zero/meta/faixas do indicador v1 (PrizeIndicator) casado por
+    // platformIndicatorId/BSC/nome.
+    const ruleCatalogs = new Map<string, { platformIndicatorId: string | null; bscNumber: string | null; name: string }>();
+    for (const g of groups) for (const ri of g.indicators) if (ri.catalog) ruleCatalogs.set(ri.catalogId, { platformIndicatorId: ri.catalog.platformIndicatorId, bscNumber: ri.catalog.bscNumber, name: ri.catalog.name });
+    const cats = [...ruleCatalogs.values()];
+    const v1PlatformIds = cats.map((c) => c.platformIndicatorId).filter((v): v is string => !!v);
+    const v1Bsc = cats.map((c) => c.bscNumber).filter((v): v is string => !!v);
+    const v1Names = cats.map((c) => c.name).filter(Boolean);
+    const v1Indicators = ruleCatalogs.size
+      ? await this.prisma.prizeIndicator.findMany({
+          where: {
+            companyId: me.companyId,
+            deletedAt: null,
+            OR: [
+              ...(v1PlatformIds.length ? [{ platformIndicatorId: { in: v1PlatformIds } }] : []),
+              ...(v1Bsc.length ? [{ bscNumber: { in: v1Bsc } }] : []),
+              ...(v1Names.length ? [{ name: { in: v1Names } }] : []),
+            ],
+          },
+          include: { parameters: true, ranges: { orderBy: { orderIndex: 'asc' } } },
+        })
+      : [];
+    const inheritedByCatalog = new Map<string, (typeof v1Indicators)[number]>();
+    for (const [catalogId, cat] of ruleCatalogs) {
+      const m = matchInherited(cat, v1Indicators);
+      if (m) inheritedByCatalog.set(catalogId, m);
+    }
+
     const lastRun = await this.prisma.prizeCalculationRun.aggregate({ where: { competenceId }, _max: { version: true } });
     const version = (lastRun._max.version ?? 0) + 1;
     await this.prisma.prizeCalculationRun.updateMany({
@@ -246,21 +275,21 @@ export class PrizeCalcService {
         indicators: group.indicators.map((indicator) => {
           const parameter = indicator.parameters[0] ?? null;
           const actual = actualByCatalog.get(indicator.catalogId);
+          // Sem parametro v2 na combinacao -> herda do indicador v1.
+          const inherited = parameter ? null : inheritedByCatalog.get(indicator.catalogId);
+          const inhParam = inherited ? pickInheritedParam(inherited.parameters, competence.year, competence.month, indicator.type === 'FIXED') : null;
+          const bands = parameter
+            ? (parameter.bands ?? []).map((band) => ({ orderIndex: band.orderIndex, minLimit: num(band.minLimit), maxLimit: num(band.maxLimit), achievementPercent: num(band.achievementPercent), gainPercent: num(band.gainPercent) }))
+            : (inherited?.ranges ?? []).map((r) => ({ orderIndex: r.orderIndex, minLimit: num(r.minLimit), maxLimit: num(r.maxLimit), achievementPercent: num(r.achievementPercent), gainPercent: num(r.gainPercent) }));
           return {
             code: indicator.catalog.code,
             name: indicator.catalog.name,
             direction: indicator.catalog.direction as any,
             weight: num(indicator.weight) ?? 0,
             realized: actual ? num(actual.realized) : null,
-            zero: parameter ? num(parameter.zero) : null,
-            target: parameter ? num(parameter.target) : null,
-            bands: (parameter?.bands ?? []).map((band) => ({
-              orderIndex: band.orderIndex,
-              minLimit: num(band.minLimit),
-              maxLimit: num(band.maxLimit),
-              achievementPercent: num(band.achievementPercent),
-              gainPercent: num(band.gainPercent),
-            })),
+            zero: parameter ? num(parameter.zero) : (inhParam ? num(inhParam.zero) : null),
+            target: parameter ? num(parameter.target) : (inhParam ? num(inhParam.target) : null),
+            bands,
           };
         }),
       });
