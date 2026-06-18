@@ -177,6 +177,29 @@ describe('parseAtestadoRows', () => {
     });
     expect(out.events[0].description).toContain('F41.1');
   });
+
+  it('ignora atestado de contratado fora da base elegivel sem bloquear importacao', () => {
+    const out = parseAtestadoRows([
+      {
+        'Id Contratado': '900415',
+        'Data Início na Situação': '01/04/2026',
+        'Data Fim da Situação': '01/04/2026',
+        'Quantidade de Dias': 1,
+      },
+      {
+        'Id Contratado': '947115',
+        'Data Início na Situação': '02/04/2026',
+        'Data Fim da Situação': '02/04/2026',
+        'Quantidade de Dias': 1,
+      },
+    ], new Set(['900415']));
+
+    expect(out.errors).toHaveLength(0);
+    expect(out.warnings).toHaveLength(1);
+    expect(out.warnings[0].message).toContain('ignorado');
+    expect(out.events).toHaveLength(1);
+    expect(out.events[0].registration).toBe('900415');
+  });
 });
 
 describe('parseEventRows', () => {

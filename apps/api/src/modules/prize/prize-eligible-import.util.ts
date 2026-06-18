@@ -412,7 +412,7 @@ export function parseAtestadoRows(
       return;
     }
     if (knownRegistrations && !knownRegistrations.has(registration)) {
-      errors.push({ row: rowNum, column: 'id_contratado', message: `Id Contratado ${registration} não existe na base elegível desta competência` });
+      warnings.push({ row: rowNum, column: 'id_contratado', message: `Id Contratado ${registration} ignorado: não existe na base elegível desta competência` });
       return;
     }
 
