@@ -259,13 +259,31 @@ describe('dias de direito (mês comercial de 30 dias — regra da planilha)', ()
     expect(commercialDaysFromAdmission(null, 2026, 3)).toBe(30);
   });
 
-  it('ausências reduzem os dias; atestado NÃO reduz (ele modera)', () => {
+  it('ausências reduzem os dias; atestado também reduz (regra oficial Goiasa)', () => {
     const events = [
       { type: 'FERIAS', days: 10 },
       { type: 'FALTA', days: 2 },
-      { type: 'ATESTADO', days: 5 }, // não entra
+      { type: 'ATESTADO', days: 5 }, // entra: atestado reduz dias de direito E modera o 2o+
     ];
-    expect(deriveEntitledDays(30, events)).toBe(18); // 30 − 10 − 2
+    expect(deriveEntitledDays(30, events)).toBe(13); // 30 − 10 − 2 − 5
     expect(deriveEntitledDays(5, [{ type: 'AFASTAMENTO', days: 12 }])).toBe(0); // clamp
+  });
+
+  it('atestado tem duplo efeito (dias de direito + moderador 2o+) — caso Goiasa/Armando', () => {
+    // 4 dias de atestado em 2 ocorrencias (1a com 2 dias = abonada do moderador).
+    const events = [
+      { type: 'ATESTADO', days: 2, date: '2026-04-02' }, // 1a ocorrencia (mais antiga): abonada
+      { type: 'ATESTADO', days: 2, date: '2026-04-15' }, // 2a: 2 dias × 20%
+    ];
+    const entitled = deriveEntitledDays(30, events);
+    expect(entitled).toBe(26); // 30 − 4 (todos os dias de atestado reduzem proporcionalidade)
+    const r = computePrize(input({
+      baseSalary: 7732.27, salaryPercent: 4.165, gainPotential: null,
+      workedDays: entitled, events,
+      moderatorRules: [{ name: 'Atestado', eventType: 'ATESTADO', criterion: 'PER_DAY_AFTER_FIRST', reductionPercent: 20, reductionValue: null, cap: null, cumulative: true, priority: 0 }],
+    }));
+    expect(r.grossValue).toBe(279.11); // 7732,27 × 4,165% × 26/30
+    expect(r.totalReductions).toBe(111.64); // 2 dias × 20% = 40% de 279,11
+    expect(r.finalValue).toBe(167.47); // moderador deixa 60%
   });
 });

@@ -38,6 +38,18 @@ interface ImportPreview {
   canCommit: boolean;
 }
 
+interface AtestadoPreview {
+  fileName: string | null;
+  total: number;
+  ok: number;
+  employeesAffected: number;
+  errors: Issue[];
+  warnings: Issue[];
+  unknownColumns: string[];
+  perEmployee: { registration: string; occurrences: number; totalDays: number }[];
+  canCommit: boolean;
+}
+
 // Payload enviado p/ preview e commit (o servidor SEMPRE revalida no commit).
 interface FilePayload { fileName: string; rawRows?: Record<string, unknown>[]; rawEvents?: Record<string, unknown>[]; xlsxBase64?: string }
 
@@ -89,6 +101,10 @@ export default function PrizeEligiblePage() {
   const [preview, setPreview] = useState<ImportPreview | null>(null);
   const mainFileRef = useRef<HTMLInputElement>(null);
   const eventsFileRef = useRef<HTMLInputElement>(null);
+  const [atestadosOpen, setAtestadosOpen] = useState(false);
+  const [atePayload, setAtePayload] = useState<FilePayload | null>(null);
+  const [atePreview, setAtePreview] = useState<AtestadoPreview | null>(null);
+  const ateFileRef = useRef<HTMLInputElement>(null);
 
   const { data: competences = [] } = useQuery({ queryKey: ['prize-competences-ref'], queryFn: () => api<CompetenceRef[]>('/prize/competences') });
   const { data: snapshot, isLoading } = useQuery({
@@ -143,6 +159,45 @@ export default function PrizeEligiblePage() {
     setPreview(null);
     if (mainFileRef.current) mainFileRef.current.value = '';
     if (eventsFileRef.current) eventsFileRef.current.value = '';
+  }
+
+  const atePreviewMut = useMutation({
+    mutationFn: (p: FilePayload) => api<AtestadoPreview>(`/prize/eligible/competence/${competenceId}/atestados/preview`, { method: 'POST', json: p }),
+    onSuccess: (out) => {
+      setAtePreview(out);
+      if (out.canCommit) toast.success(`Prévia ok: ${out.ok} atestado(s) em ${out.employeesAffected} colaborador(es)`);
+      else toast.error(`Arquivo com ${out.errors.length} erro(s) — corrija e reenvie`);
+    },
+    onError: (e: ApiError) => { setAtePreview(null); toast.error(e.message); },
+  });
+  const ateCommitMut = useMutation({
+    mutationFn: () => api<{ created: number; deleted: number; employeesAffected: number }>(`/prize/eligible/competence/${competenceId}/atestados/file`, { method: 'POST', json: atePayload }),
+    onSuccess: (r) => {
+      toast.success(`${r.created} atestado(s) importados em ${r.employeesAffected} colaborador(es)${r.deleted ? ` (substituiu ${r.deleted} anterior(es))` : ''}`);
+      invalidateAll();
+      closeAtestados();
+    },
+    onError: (e: ApiError) => toast.error(e.message),
+  });
+
+  function closeAtestados() {
+    setAtestadosOpen(false);
+    setAtePayload(null);
+    setAtePreview(null);
+    if (ateFileRef.current) ateFileRef.current.value = '';
+  }
+
+  async function handleAtestadoFile(file: File) {
+    setAtePreview(null);
+    try {
+      const p: FilePayload = /\.xlsx$/i.test(file.name)
+        ? { fileName: file.name, xlsxBase64: await fileToBase64(file) }
+        : { fileName: file.name, rawRows: await parseCsvFile(file) };
+      setAtePayload(p);
+      atePreviewMut.mutate(p);
+    } catch (err: any) {
+      toast.error(`Falha ao ler arquivo: ${err.message}`);
+    }
   }
 
   async function handleMainFile(file: File) {
@@ -213,6 +268,9 @@ export default function PrizeEligiblePage() {
             </Button>
             <Button onClick={() => setImportOpen(true)}>
               <Upload className="mr-1 h-4 w-4" />Importar arquivo
+            </Button>
+            <Button variant="outline" onClick={() => setAtestadosOpen(true)} title="Importa a planilha DatasAtestados (espelho de ponto) para a competência selecionada">
+              <Upload className="mr-1 h-4 w-4" />Importar atestados
             </Button>
             <Button variant="ghost" onClick={() => importMock.mutate()} disabled={importMock.isPending}>
               <Download className="mr-1 h-4 w-4" />{importMock.isPending ? 'Importando…' : 'Base fictícia (homolog.)'}
@@ -374,6 +432,76 @@ export default function PrizeEligiblePage() {
               disabled={!preview?.canCommit || commitMut.isPending || previewMut.isPending}
             >
               {commitMut.isPending ? 'Importando…' : preview?.mode === 'EVENTS_APPEND' ? 'Registrar eventos' : 'Confirmar importação'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Importação de atestados (planilha DatasAtestados — espelho de ponto) */}
+      <Dialog open={atestadosOpen} onOpenChange={(o) => !o && closeAtestados()}>
+        <DialogContent className="max-w-2xl">
+          <DialogHeader><DialogTitle>Importar atestados (DatasAtestados)</DialogTitle></DialogHeader>
+          <div className="space-y-3">
+            <p className="text-xs text-muted-foreground">
+              Contingência enquanto o Apdata não está ligado. Suba a planilha <strong>DatasAtestados</strong> (XLSX ou CSV) com as colunas
+              <em> Id Contratado, Data Início, Data Fim, Quantidade</em>. Os atestados reduzem os <strong>Dias de Direito</strong> e,
+              a partir do <strong>2º atestado</strong>, reduzem 20%/dia do prêmio (1º atestado abonado). Reimportar <strong>substitui</strong> os atestados desta competência.
+            </p>
+            <div>
+              <Label>Arquivo DatasAtestados (CSV ou XLSX) *</Label>
+              <input
+                ref={ateFileRef}
+                type="file"
+                accept=".csv,.xlsx,text/csv,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+                onChange={(e) => { const f = e.target.files?.[0]; if (f) void handleAtestadoFile(f); }}
+                className="h-10 w-full rounded-md border border-input bg-background px-3 text-sm file:mr-3 file:rounded file:border-0 file:bg-secondary file:px-3 file:py-1 file:text-secondary-foreground"
+              />
+            </div>
+
+            {atePreviewMut.isPending && <p className="text-sm text-muted-foreground">Validando arquivo…</p>}
+
+            {atePreview && (
+              <div className="space-y-2">
+                <div className="flex flex-wrap items-center gap-2 text-xs">
+                  {atePreview.canCommit
+                    ? <Badge className="bg-emerald-600"><CheckCircle2 className="mr-1 h-3 w-3" />Arquivo válido</Badge>
+                    : <Badge variant="destructive"><AlertTriangle className="mr-1 h-3 w-3" />Arquivo com erros</Badge>}
+                  <Badge variant="secondary">{atePreview.ok}/{atePreview.total} atestado(s)</Badge>
+                  <Badge variant="secondary">{atePreview.employeesAffected} colaborador(es)</Badge>
+                </div>
+
+                <IssueList title="Erros" issues={atePreview.errors} tone="error" />
+                <IssueList title="Avisos" issues={atePreview.warnings} tone="warn" />
+                {atePreview.unknownColumns.length > 0 && (
+                  <p className="text-xs text-amber-700">Colunas ignoradas (verifique digitação): {atePreview.unknownColumns.join(', ')}</p>
+                )}
+
+                {atePreview.perEmployee.length > 0 && (
+                  <div className="rounded border border-border/60 p-2">
+                    <p className="mb-1 text-xs font-medium">Resumo por colaborador (top {atePreview.perEmployee.length} por dias)</p>
+                    <div className="max-h-44 overflow-y-auto">
+                      <table className="w-full text-xs">
+                        <thead className="text-muted-foreground"><tr><th className="text-left">Matrícula</th><th className="text-right">Atestados</th><th className="text-right">Dias</th></tr></thead>
+                        <tbody>
+                          {atePreview.perEmployee.map((p) => (
+                            <tr key={p.registration} className="border-t border-border/40">
+                              <td className="py-0.5 font-mono">{p.registration}</td>
+                              <td className="py-0.5 text-right">{p.occurrences}</td>
+                              <td className="py-0.5 text-right">{p.totalDays}</td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={closeAtestados}>Cancelar</Button>
+            <Button onClick={() => ateCommitMut.mutate()} disabled={!atePreview?.canCommit || ateCommitMut.isPending || atePreviewMut.isPending}>
+              {ateCommitMut.isPending ? 'Importando…' : 'Confirmar atestados'}
             </Button>
           </DialogFooter>
         </DialogContent>

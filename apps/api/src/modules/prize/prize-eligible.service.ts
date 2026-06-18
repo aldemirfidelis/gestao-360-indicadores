@@ -11,6 +11,7 @@ import {
   ELIGIBLE_TEMPLATE_HEADERS,
   EVENT_TEMPLATE_HEADERS,
   KNOWN_EVENT_TYPES,
+  parseAtestadoRows,
   parseEligibleRows,
   parseEventRows,
 } from './prize-eligible-import.util';
@@ -354,6 +355,85 @@ export class PrizeEligibleService {
     }
     await this.audit.log(me, { action: 'APPEND_EVENTS', entityType: 'ELIGIBLE_BATCH', entityId: competenceId, competenceId, after: { created, source } });
     return { created };
+  }
+
+  // ---- importacao da planilha DatasAtestados (Espelho de Ponto) ----
+
+  /** Extrai as linhas de atestado: aba "DatasAtestados"/"atestado" do XLSX ou CSV pre-parseado. */
+  private async extractAtestadoRaw(payload: FileImportPayload): Promise<Array<Record<string, unknown>>> {
+    if (payload.xlsxBase64) {
+      let wb: Workbook;
+      try {
+        wb = new Workbook();
+        await wb.xlsx.load(Buffer.from(payload.xlsxBase64, 'base64') as unknown as ArrayBuffer);
+      } catch {
+        throw new BadRequestException('Arquivo XLSX inválido ou corrompido');
+      }
+      const sheet =
+        wb.worksheets.find((w) => w.name.toLowerCase().includes('atestado')) ??
+        wb.worksheets.find((w) => w.name.toLowerCase().startsWith('datas')) ??
+        wb.worksheets[0];
+      return sheet ? this.sheetToRecords(sheet) : [];
+    }
+    return payload.rawRows ?? [];
+  }
+
+  /** Valida a planilha de atestados (dry-run): ok/erros + resumo por colaborador. */
+  async previewAtestados(me: AuthPayload, competenceId: string, payload: FileImportPayload) {
+    await this.getCompetence(me.companyId, competenceId);
+    const raw = await this.extractAtestadoRaw(payload);
+    if (!raw.length) throw new BadRequestException('Arquivo vazio: nenhuma linha de atestado encontrada (aba "DatasAtestados")');
+    const current = await this.prisma.prizeEmployeeSnapshot.findMany({ where: { competenceId, current: true }, select: { registration: true } });
+    const knownRegs = new Set(current.map((c) => c.registration));
+    const parsed = parseAtestadoRows(raw, knownRegs);
+
+    const byReg = new Map<string, { registration: string; occurrences: number; totalDays: number }>();
+    for (const e of parsed.events) {
+      const agg = byReg.get(e.registration) ?? { registration: e.registration, occurrences: 0, totalDays: 0 };
+      agg.occurrences++;
+      agg.totalDays += e.days ?? 0;
+      byReg.set(e.registration, agg);
+    }
+    return {
+      fileName: payload.fileName ?? null,
+      total: raw.length,
+      ok: parsed.events.length,
+      employeesAffected: byReg.size,
+      errors: parsed.errors,
+      warnings: parsed.warnings,
+      unknownColumns: parsed.unknownColumns,
+      perEmployee: [...byReg.values()].sort((a, b) => b.totalDays - a.totalDays).slice(0, 50),
+      canCommit: parsed.errors.length === 0 && parsed.events.length > 0,
+    };
+  }
+
+  /** Importa (commit) os atestados — REVALIDA e SUBSTITUI os atestados da competencia (idempotente). */
+  async importAtestados(me: AuthPayload, competenceId: string, payload: FileImportPayload) {
+    const preview = await this.previewAtestados(me, competenceId, payload);
+    if (!preview.canCommit) {
+      throw new BadRequestException({ message: `Arquivo rejeitado: ${preview.errors.length} erro(s) de validação. Corrija e reenvie.`, errors: preview.errors });
+    }
+    const raw = await this.extractAtestadoRaw(payload);
+    const current = await this.prisma.prizeEmployeeSnapshot.findMany({ where: { competenceId, current: true }, select: { id: true, registration: true } });
+    const idByReg = new Map(current.map((c) => [c.registration, c.id]));
+    const parsed = parseAtestadoRows(raw, new Set(idByReg.keys()));
+    const source: PrizeConnectorType = payload.xlsxBase64 ? 'FILE_XLSX' : 'FILE_CSV';
+
+    const result = await this.prisma.$transaction(async (tx) => {
+      // Idempotente: re-importar substitui os atestados da competencia (nao duplica).
+      const del = await tx.prizeEmployeeEvent.deleteMany({ where: { companyId: me.companyId, competenceId, type: 'ATESTADO' } });
+      await tx.prizeEmployeeEvent.createMany({
+        data: parsed.events.map((ev) => ({
+          companyId: me.companyId, competenceId, snapshotId: idByReg.get(ev.registration) ?? null, registration: ev.registration,
+          type: 'ATESTADO', date: ev.date ? new Date(ev.date) : null, days: ev.days ?? null, value: null,
+          description: ev.description ?? null, source,
+        })),
+      });
+      return { deleted: del.count, created: parsed.events.length };
+    }, { timeout: 120_000, maxWait: 20_000 });
+
+    await this.audit.log(me, { action: 'IMPORT_ATESTADOS', entityType: 'ELIGIBLE_BATCH', entityId: competenceId, competenceId, after: { ...result, employeesAffected: preview.employeesAffected } });
+    return { ...result, employeesAffected: preview.employeesAffected };
   }
 
   async listSnapshot(me: AuthPayload, competenceId: string) {

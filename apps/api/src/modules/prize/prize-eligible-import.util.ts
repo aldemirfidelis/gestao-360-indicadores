@@ -345,6 +345,103 @@ const EVENT_TYPE_ALIASES: Record<string, string> = {
   AUXILIO_DOENCA: 'AUXILIO_DOENCA', AUX_DOENCA: 'AUXILIO_DOENCA', DIAS_EM_AUX_DOENCA: 'AUXILIO_DOENCA',
 };
 
+// ---- parse da planilha DatasAtestados (Espelho de Ponto) ----
+// Cada linha = UMA ocorrencia de atestado (Data Inicio/Fim + Quantidade de
+// dias). O motor usa as ocorrencias para o criterio PER_DAY_AFTER_FIRST
+// (1o atestado abonado; do 2o em diante reduz 20%/dia) e a soma dos dias
+// reduz os Dias de Direito (proporcionalidade).
+const ATESTADO_HEADER_MAP: Record<string, string[]> = {
+  registration: ['id_contratado', 'id_contrato', 'contratado', 'matricula', 'cadastro', 'registro'],
+  name: ['nome', 'colaborador'],
+  date: ['data_inicio', 'data_de_inicio', 'inicio', 'data_inicio_afastamento', 'data'],
+  endDate: ['data_fim', 'data_de_fim', 'fim', 'termino', 'data_termino'],
+  days: ['quantidade', 'qtde', 'qtd', 'dias', 'quantidade_dias', 'qtde_dias'],
+  cid: ['doenca_cid', 'cid', 'codigo_oficial', 'codigo', 'doenca', 'cid_doenca'],
+  kind: ['tipo_de_atestado', 'tipo_atestado', 'tipo'],
+};
+
+export const ATESTADO_TEMPLATE_HEADERS = ['id_contratado', 'nome', 'data_inicio', 'data_fim', 'quantidade', 'doenca_cid'] as const;
+
+/** Dias entre duas datas ISO (inclusive). null se invalido. */
+function daysInclusive(startIso: string, endIso: string): number | null {
+  const a = Date.parse(startIso);
+  const b = Date.parse(endIso);
+  if (Number.isNaN(a) || Number.isNaN(b) || b < a) return null;
+  return Math.round((b - a) / 86400000) + 1;
+}
+
+export function parseAtestadoRows(
+  rawRows: Array<Record<string, unknown>>,
+  knownRegistrations?: Set<string>,
+): ParsedEvents {
+  const events: ImportEventRow[] = [];
+  const errors: RowIssue[] = [];
+  const warnings: RowIssue[] = [];
+  const unknownColumns = new Set<string>();
+
+  rawRows.forEach((raw, i) => {
+    const rowNum = i + 2;
+    const { mapped, unknown } = mapRow(raw, ATESTADO_HEADER_MAP);
+    unknown.forEach((u) => unknownColumns.add(u));
+
+    const registration = str(mapped.registration);
+    if (!registration) {
+      errors.push({ row: rowNum, column: 'id_contratado', message: 'Id Contratado (matrícula) é obrigatório' });
+      return;
+    }
+    if (knownRegistrations && !knownRegistrations.has(registration)) {
+      errors.push({ row: rowNum, column: 'id_contratado', message: `Id Contratado ${registration} não existe na base elegível desta competência` });
+      return;
+    }
+
+    const date = parseFlexDate(mapped.date);
+    if (date === 'INVALID') {
+      errors.push({ row: rowNum, column: 'data_inicio', message: `Data de início inválida: "${mapped.date}" (use dd/mm/aaaa)` });
+      return;
+    }
+    if (!date) {
+      warnings.push({ row: rowNum, column: 'data_inicio', message: 'Data de início ausente — a regra "1º atestado abonado" ordena por data; sem ela a ordem pode ficar incorreta' });
+    }
+    const endDate = parseFlexDate(mapped.endDate);
+    if (endDate === 'INVALID') {
+      errors.push({ row: rowNum, column: 'data_fim', message: `Data fim inválida: "${mapped.endDate}" (use dd/mm/aaaa)` });
+      return;
+    }
+
+    // Dias: usa a Quantidade; se ausente, deriva do intervalo Inicio..Fim.
+    let days = parsePtNumber(mapped.days);
+    if (Number.isNaN(days)) {
+      errors.push({ row: rowNum, column: 'quantidade', message: `Quantidade inválida: "${mapped.days}"` });
+      return;
+    }
+    if ((days === null || days === 0) && date && endDate) {
+      const derived = daysInclusive(date, endDate);
+      if (derived) days = derived;
+    }
+    if (days === null) {
+      errors.push({ row: rowNum, column: 'quantidade', message: 'Quantidade de dias ausente (e sem Data Início/Fim para derivar)' });
+      return;
+    }
+    if (!Number.isInteger(days) || days < 1 || days > 31) {
+      errors.push({ row: rowNum, column: 'quantidade', message: 'Quantidade deve ser inteiro entre 1 e 31' });
+      return;
+    }
+
+    const cid = str(mapped.cid);
+    const descParts = [endDate ? `até ${endDate}` : null, cid ? `CID ${cid}` : null].filter(Boolean);
+    events.push({
+      registration,
+      type: 'ATESTADO',
+      date: date ?? null,
+      days,
+      value: null,
+      description: descParts.length ? descParts.join(' · ') : null,
+    });
+  });
+
+  return { events, errors, warnings, unknownColumns: [...unknownColumns] };
+}
+
 export function parseEventRows(
   rawRows: Array<Record<string, unknown>>,
   knownRegistrations?: Set<string>,

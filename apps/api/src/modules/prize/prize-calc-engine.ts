@@ -116,8 +116,15 @@ function weightedGainOf(indicators: EngineIndicator[]): {
   return { gain: sumWG / 100, weightSum: sumW, perIndicator: per };
 }
 
-/** Tipos de evento que reduzem os DIAS DE DIREITO (planilha: coluna AD). Atestado NAO reduz dias — ele modera. */
-export const ABSENCE_EVENT_TYPES = ['FALTA', 'SUSPENSAO', 'FERIAS', 'LICENCA', 'AFASTAMENTO', 'AUXILIO_DOENCA'];
+/**
+ * Tipos de evento que reduzem os DIAS DE DIREITO (proporcionalidade — planilha
+ * coluna AD). Regra oficial GOIASA: os dias de ATESTADO reduzem proporcionalmente
+ * os dias de direito ("os dias do primeiro atestado — ou fora da competencia —
+ * serao descontados proporcionalmente") E, a partir do 2o atestado, ainda
+ * moderam o premio (20%/dia via criterio PER_DAY_AFTER_FIRST na regra de
+ * moderador). Ou seja: atestado tem duplo efeito (dias + moderador 2o+).
+ */
+export const ABSENCE_EVENT_TYPES = ['FALTA', 'ATESTADO', 'SUSPENSAO', 'FERIAS', 'LICENCA', 'AFASTAMENTO', 'AUXILIO_DOENCA'];
 
 /**
  * Dias-base do mes comercial (30) conforme a data de admissao — regra
@@ -324,4 +331,6 @@ export function computePrize(input: EngineInput): EngineOutput {
 // 1.1.0: calibracao pelas planilhas oficiais (Bases_calculo): pesos como % do
 // potencial (sem normalizacao), extrapolacao de faixa por sentido, moderadores
 // agregados por tipo + criterio PER_DAY_AFTER_FIRST, dias de direito base 30.
-export const PRIZE_ENGINE_VERSION = '1.1.0';
+// 1.2.0: regra oficial de atestado — dias de atestado reduzem os dias de direito
+// (proporcionalidade) e ainda moderam 20%/dia a partir do 2o atestado.
+export const PRIZE_ENGINE_VERSION = '1.2.0';

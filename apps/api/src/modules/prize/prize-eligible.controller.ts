@@ -54,6 +54,20 @@ export class PrizeEligibleController {
     return this.service.importFromFile(me, competenceId, payload);
   }
 
+  /** Atestados (DatasAtestados) — valida e simula (dry-run): nada e gravado. */
+  @Post('competence/:competenceId/atestados/preview')
+  @RequirePermissions('prize:eligible:manage')
+  atestadosPreview(@CurrentUser() me: AuthPayload, @Param('competenceId') competenceId: string, @Body() payload: FileImportPayload) {
+    return this.service.previewAtestados(me, competenceId, payload);
+  }
+
+  /** Atestados (DatasAtestados) — commit: revalida e SUBSTITUI os atestados da competencia. */
+  @Post('competence/:competenceId/atestados/file')
+  @RequirePermissions('prize:eligible:manage')
+  atestadosFile(@CurrentUser() me: AuthPayload, @Param('competenceId') competenceId: string, @Body() payload: FileImportPayload) {
+    return this.service.importAtestados(me, competenceId, payload);
+  }
+
   /** Modelo XLSX (abas Colaboradores + Eventos + Instrucoes). */
   @Get('template')
   @RequirePermissions('prize:eligible:manage')
