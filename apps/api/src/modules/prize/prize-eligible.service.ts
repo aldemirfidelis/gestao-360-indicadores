@@ -4,6 +4,8 @@ import { Workbook, Worksheet } from 'exceljs';
 import { PrismaService } from '../../prisma/prisma.service';
 import { AuthPayload } from '../auth/auth.types';
 import { PrizeAuditService } from './prize-audit.service';
+import { PrizeCatalogService } from './prize-catalog.service';
+import { normalizeRuleKey } from './prize-rule-matrix.util';
 import { EligibleRow, generateMockEligible, maskCpf, reconcile, SnapshotLike } from './prize-eligible.util';
 import {
   ELIGIBLE_TEMPLATE_HEADERS,
@@ -39,6 +41,7 @@ export class PrizeEligibleService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly audit: PrizeAuditService,
+    private readonly catalog: PrizeCatalogService,
   ) {}
 
   async canSeeSalary(me: AuthPayload): Promise<boolean> {
@@ -97,6 +100,14 @@ export class PrizeEligibleService {
       },
     });
 
+    // Catalogo de Areas/Cargos por ID (linkagem deterministica): resolve/cria
+    // os refs do catalogo a partir dos nomes do Apdata e grava os IDs no snapshot.
+    const orgMap = await this.catalog.ensureOrgRefs(me.companyId, [
+      ...rows.map((r) => ({ name: r.areaRef ?? '', kind: 'AREA' as const })),
+      ...rows.map((r) => ({ name: r.sectorRef ?? '', kind: 'SECTOR' as const })),
+    ], me.sub);
+    const cargoMap = await this.catalog.ensureCargoRefs(me.companyId, rows.map((r) => r.positionRef), me.sub);
+
     try {
       // Insercao em LOTE (createMany) em vez de 1 create por linha: com ~2700
       // colaboradores, o loop por linha estourava o timeout de 5s da transacao
@@ -111,6 +122,9 @@ export class PrizeEligibleService {
             branchRef: r.branchRef ?? null, unitRef: r.unitRef ?? null, positionRef: r.positionRef ?? null,
             functionRef: r.functionRef ?? null, areaRef: r.areaRef ?? null, sectorRef: r.sectorRef ?? null,
             costCenterRef: r.costCenterRef ?? null, baseSalary: r.baseSalary ?? null,
+            areaRefId: orgMap.get(normalizeRuleKey(r.areaRef)) ?? null,
+            sectorRefId: orgMap.get(normalizeRuleKey(r.sectorRef)) ?? null,
+            cargoRefId: cargoMap.get(normalizeRuleKey(r.positionRef)) ?? null,
             admissionDate: r.admissionDate ? new Date(r.admissionDate) : null,
             terminationDate: r.terminationDate ? new Date(r.terminationDate) : null,
             situation: r.situation ?? 'ACTIVE', workedDays: r.workedDays ?? null, source,

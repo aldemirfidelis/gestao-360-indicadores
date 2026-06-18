@@ -14,6 +14,7 @@ import { NativeSelect } from '@/components/ui/select';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { api, ApiError, getAccessToken } from '@/lib/api';
 import { useAuth } from '@/components/auth/auth-provider';
+import { CatalogManager } from '@/components/gestao-premio/catalog-manager';
 
 interface CompetenceRef { id: string; label: string; program: { code: string; name: string } }
 interface Employee {
@@ -219,6 +220,8 @@ export default function PrizeEligiblePage() {
           </div>
         )}
       </div>
+
+      <CatalogManager canManage={canManage} />
 
       {!competenceId ? (
         <Card><CardContent className="flex flex-col items-center gap-3 py-12 text-center">

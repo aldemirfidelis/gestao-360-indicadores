@@ -12,6 +12,7 @@ import { PrizePayrollController } from './prize-payroll.controller';
 import { PrizePayslipController } from './prize-payslip.controller';
 import { PrizeReportsController } from './prize-reports.controller';
 import { PrizeRulesController } from './prize-rules.controller';
+import { PrizeCatalogController } from './prize-catalog.controller';
 import { PrizeAuditService } from './prize-audit.service';
 import { PrizeOverviewService } from './prize-overview.service';
 import { PrizeProgramsService } from './prize-programs.service';
@@ -30,6 +31,7 @@ import { PrizeReportsService } from './prize-reports.service';
 import { PrizeAiService } from './prize-ai.service';
 import { PrizeSyncService } from './prize-sync.service';
 import { PrizeRulesService } from './prize-rules.service';
+import { PrizeCatalogService } from './prize-catalog.service';
 
 /**
  * Gestao de Premio (Remuneracao Variavel).
@@ -50,6 +52,7 @@ import { PrizeRulesService } from './prize-rules.service';
     PrizePayslipController,
     PrizeReportsController,
     PrizeRulesController,
+    PrizeCatalogController,
   ],
   providers: [
     PrizeAuditService,
@@ -70,6 +73,7 @@ import { PrizeRulesService } from './prize-rules.service';
     PrizeAiService,
     PrizeSyncService,
     PrizeRulesService,
+    PrizeCatalogService,
   ],
   exports: [PrizeAuditService, PrizeAnnexesService, PrizeCompetencesService, PrizeActualsService, PrizeCalcService, PrizePayrollService, PrizeEligibleService, PrizeSyncService, PrizeRulesService],
 })

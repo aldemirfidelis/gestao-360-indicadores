@@ -9138,6 +9138,10 @@ model PrizeRuleGroup {
   positionRefs           String[]          @default([])
   normalizedAreaKeys     String[]          @default([])
   normalizedPositionKeys String[]          @default([])
+  // IDs do catalogo (PrizeOrgRef / PrizeCargoRef). Quando preenchidos, o
+  // matching da apuracao usa ID (deterministico) em vez do nome normalizado.
+  areaRefIds             String[]          @default([])
+  cargoRefIds            String[]          @default([])
   salaryPercent          Decimal           @db.Decimal(9, 4)
   notes                  String?
   active                 Boolean           @default(true)
@@ -9237,6 +9241,55 @@ model PrizeRuleAlias {
   @@unique([companyId, kind, normalizedKey])
   @@index([companyId])
   @@index([companyId, kind, active])
+}
+
+enum PrizeOrgRefKind {
+  AREA
+  SECTOR
+}
+
+/// Catalogo canonico de areas/setores (departamentos) com ID estavel (`code`).
+/// Auto-derivado do import de elegiveis e/ou importado. Combinacoes e snapshots
+/// referenciam o `id`, tornando o matching da apuracao deterministico.
+model PrizeOrgRef {
+  id            String          @id @default(uuid())
+  companyId     String
+  code          Int
+  name          String
+  normalizedKey String
+  kind          PrizeOrgRefKind @default(AREA)
+  source        String          @default("IMPORT")
+  active        Boolean         @default(true)
+  createdById   String?
+  createdAt     DateTime        @default(now())
+  updatedAt     DateTime        @updatedAt
+  deletedAt     DateTime?
+
+  @@unique([companyId, normalizedKey])
+  @@unique([companyId, code])
+  @@index([companyId])
+  @@index([companyId, active])
+}
+
+/// Catalogo canonico de cargos com ID estavel (`code`). Mesma logica do
+/// PrizeOrgRef, para o eixo de cargo das combinacoes.
+model PrizeCargoRef {
+  id            String   @id @default(uuid())
+  companyId     String
+  code          Int
+  name          String
+  normalizedKey String
+  source        String   @default("IMPORT")
+  active        Boolean  @default(true)
+  createdById   String?
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+  deletedAt     DateTime?
+
+  @@unique([companyId, normalizedKey])
+  @@unique([companyId, code])
+  @@index([companyId])
+  @@index([companyId, active])
 }
 
 model PrizeCatalogActualResult {
@@ -9408,6 +9461,11 @@ model PrizeEmployeeSnapshot {
   areaRef         String?
   sectorRef       String?
   costCenterRef   String?
+  // Linkagem deterministica ao catalogo (resolvidos no import a partir dos nomes
+  // acima). O matching da apuracao prefere os IDs e cai p/ nome quando ausentes.
+  areaRefId       String?
+  sectorRefId     String?
+  cargoRefId      String?
   baseSalary      Decimal?           @db.Decimal(14, 2)
   admissionDate   DateTime?
   terminationDate DateTime?
@@ -9426,6 +9484,8 @@ model PrizeEmployeeSnapshot {
   @@index([companyId])
   @@index([competenceId])
   @@index([competenceId, current])
+  @@index([companyId, cargoRefId])
+  @@index([companyId, areaRefId])
 }
 
 model PrizeEmployeeEvent {

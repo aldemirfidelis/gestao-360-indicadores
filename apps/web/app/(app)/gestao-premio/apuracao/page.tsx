@@ -144,7 +144,9 @@ export default function PrizeApuracaoPage() {
               <PlayCircle className="mr-1 h-4 w-4" />{runV2.isPending ? 'Apurando setor...' : 'Rodar setor v2'}
             </Button>
             {!runData ? (
-              <Button variant="outline" onClick={() => run.mutate()} disabled={run.isPending}><PlayCircle className="mr-1 h-4 w-4" />{run.isPending ? 'Apurando…' : 'Rodar apuração'}</Button>
+              <Button variant="outline" onClick={() => run.mutate()} disabled={run.isPending} title="Modelo LEGADO (plano): aplica todos os indicadores do programa, sem casar por área×cargo. Prefira 'Rodar setor v2', que usa as combinações.">
+                <PlayCircle className="mr-1 h-4 w-4" />{run.isPending ? 'Apurando…' : 'Rodar apuração (legado v1)'}
+              </Button>
             ) : (
               <Button variant="outline" onClick={() => { const r = window.prompt('Justificativa para reprocessar (obrigatória):'); if (r?.trim()) reprocess.mutate(r); }} disabled={reprocess.isPending}>
                 <RotateCcw className="mr-1 h-4 w-4" />Reprocessar

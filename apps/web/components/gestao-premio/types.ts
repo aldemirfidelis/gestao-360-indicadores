@@ -82,10 +82,21 @@ export interface RuleGroup {
   positionRefs: string[];
   normalizedAreaKeys: string[];
   normalizedPositionKeys: string[];
+  areaRefIds: string[];
+  cargoRefIds: string[];
   salaryPercent: string;
   notes: string | null;
   active: boolean;
   indicators: RuleIndicator[];
+}
+
+export interface CatalogRef {
+  id: string;
+  code: number;
+  name: string;
+  normalizedKey: string;
+  kind?: string;
+  active: boolean;
 }
 
 export interface PlatformIndicatorRef {

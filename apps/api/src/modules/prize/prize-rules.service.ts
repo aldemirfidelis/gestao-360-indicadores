@@ -13,6 +13,7 @@ import { AuthPayload } from '../auth/auth.types';
 import { PrizeAuditService } from './prize-audit.service';
 import { suggestRanges } from './prize-ranges.util';
 import { matchInherited, normalizeRuleKey, uniqueNormalized } from './prize-rule-matrix.util';
+import { PrizeCatalogService } from './prize-catalog.service';
 
 export interface UpsertCatalogDto {
   code?: string;
@@ -31,6 +32,11 @@ export interface UpsertRuleGroupDto {
   name?: string;
   areaRefs?: string[];
   positionRefs?: string[];
+  // IDs do catalogo (PrizeOrgRef/PrizeCargoRef) escolhidos no picker. Quando
+  // informados, os nomes (areaRefs/positionRefs) sao derivados do catalogo e o
+  // matching da apuracao passa a ser por ID.
+  areaRefIds?: string[];
+  cargoRefIds?: string[];
   salaryPercent?: number;
   notes?: string | null;
   active?: boolean;
@@ -88,6 +94,7 @@ export class PrizeRulesService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly audit: PrizeAuditService,
+    private readonly catalog: PrizeCatalogService,
   ) {}
 
   async listCatalog(companyId: string, query: { q?: string; active?: string } = {}) {
@@ -219,15 +226,36 @@ export class PrizeRulesService {
     return groups;
   }
 
+  /** Resolve nomes/IDs da combinacao: se vierem IDs do catalogo, deriva os nomes
+   *  do PrizeOrgRef/PrizeCargoRef; senao, usa os nomes do dto (back-compat). */
+  private async resolveGroupRefs(companyId: string, dto: UpsertRuleGroupDto, userId?: string | null) {
+    const areaIds = new Set((dto.areaRefIds ?? []).filter(Boolean));
+    const cargoIds = new Set((dto.cargoRefIds ?? []).filter(Boolean));
+    // Nomes livres digitados (sem ID) sao garantidos no catalogo (cria se novo),
+    // entao a combinacao sempre acaba referenciando IDs.
+    const areaNames = this.cleanRefs(dto.areaRefs ?? []);
+    const cargoNames = this.cleanRefs(dto.positionRefs ?? []);
+    if (areaNames.length) {
+      const map = await this.catalog.ensureOrgRefs(companyId, areaNames.map((name) => ({ name, kind: 'AREA' as const })), userId);
+      for (const id of map.values()) areaIds.add(id);
+    }
+    if (cargoNames.length) {
+      const map = await this.catalog.ensureCargoRefs(companyId, cargoNames, userId);
+      for (const id of map.values()) cargoIds.add(id);
+    }
+    const orgs = areaIds.size ? await this.prisma.prizeOrgRef.findMany({ where: { companyId, id: { in: [...areaIds] }, deletedAt: null }, select: { id: true, name: true } }) : [];
+    const cargos = cargoIds.size ? await this.prisma.prizeCargoRef.findMany({ where: { companyId, id: { in: [...cargoIds] }, deletedAt: null }, select: { id: true, name: true } }) : [];
+    return { areaRefs: orgs.map((o) => o.name), positionRefs: cargos.map((c) => c.name), areaRefIds: orgs.map((o) => o.id), cargoRefIds: cargos.map((c) => c.id) };
+  }
+
   async createGroup(me: AuthPayload, dto: UpsertRuleGroupDto) {
     if (!dto.annexVersionId) throw new BadRequestException('Versao do anexo e obrigatoria');
     if (!dto.name?.trim()) throw new BadRequestException('Nome da combinacao e obrigatorio');
     if (dto.salaryPercent === undefined || dto.salaryPercent === null) throw new BadRequestException('Salario possivel % e obrigatorio');
-    if (!this.cleanRefs(dto.areaRefs ?? []).length) throw new BadRequestException('Informe pelo menos uma area para a combinacao');
-    if (!this.cleanRefs(dto.positionRefs ?? []).length) throw new BadRequestException('Informe pelo menos um cargo para a combinacao');
     await this.assertAnnexVersion(me.companyId, dto.annexVersionId);
-    const areaRefs = this.cleanRefs(dto.areaRefs ?? []);
-    const positionRefs = this.cleanRefs(dto.positionRefs ?? []);
+    const { areaRefs, positionRefs, areaRefIds, cargoRefIds } = await this.resolveGroupRefs(me.companyId, dto, me.sub);
+    if (!areaRefs.length) throw new BadRequestException('Informe pelo menos uma area para a combinacao');
+    if (!positionRefs.length) throw new BadRequestException('Informe pelo menos um cargo para a combinacao');
     const group = await this.prisma.prizeRuleGroup.create({
       data: {
         companyId: me.companyId,
@@ -237,6 +265,8 @@ export class PrizeRulesService {
         positionRefs,
         normalizedAreaKeys: uniqueNormalized(areaRefs),
         normalizedPositionKeys: uniqueNormalized(positionRefs),
+        areaRefIds,
+        cargoRefIds,
         salaryPercent: dto.salaryPercent,
         notes: dto.notes ?? null,
         active: dto.active ?? true,
@@ -249,18 +279,22 @@ export class PrizeRulesService {
 
   async updateGroup(me: AuthPayload, id: string, dto: UpsertRuleGroupDto) {
     const current = await this.getGroup(me.companyId, id);
-    const areaRefs = dto.areaRefs === undefined ? undefined : this.cleanRefs(dto.areaRefs);
-    const positionRefs = dto.positionRefs === undefined ? undefined : this.cleanRefs(dto.positionRefs);
-    if (areaRefs !== undefined && areaRefs.length === 0) throw new BadRequestException('Informe pelo menos uma area para a combinacao');
-    if (positionRefs !== undefined && positionRefs.length === 0) throw new BadRequestException('Informe pelo menos um cargo para a combinacao');
+    const refsProvided = dto.areaRefs !== undefined || dto.positionRefs !== undefined || dto.areaRefIds !== undefined || dto.cargoRefIds !== undefined;
+    const resolved = refsProvided ? await this.resolveGroupRefs(me.companyId, dto, me.sub) : null;
+    if (resolved) {
+      if (resolved.areaRefs.length === 0) throw new BadRequestException('Informe pelo menos uma area para a combinacao');
+      if (resolved.positionRefs.length === 0) throw new BadRequestException('Informe pelo menos um cargo para a combinacao');
+    }
     const updated = await this.prisma.prizeRuleGroup.update({
       where: { id },
       data: {
         name: dto.name?.trim() ?? undefined,
-        areaRefs,
-        positionRefs,
-        normalizedAreaKeys: areaRefs ? uniqueNormalized(areaRefs) : undefined,
-        normalizedPositionKeys: positionRefs ? uniqueNormalized(positionRefs) : undefined,
+        areaRefs: resolved ? resolved.areaRefs : undefined,
+        positionRefs: resolved ? resolved.positionRefs : undefined,
+        normalizedAreaKeys: resolved ? uniqueNormalized(resolved.areaRefs) : undefined,
+        normalizedPositionKeys: resolved ? uniqueNormalized(resolved.positionRefs) : undefined,
+        areaRefIds: resolved ? resolved.areaRefIds : undefined,
+        cargoRefIds: resolved ? resolved.cargoRefIds : undefined,
         salaryPercent: dto.salaryPercent ?? undefined,
         notes: dto.notes ?? undefined,
         active: dto.active ?? undefined,

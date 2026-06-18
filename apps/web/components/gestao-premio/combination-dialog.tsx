@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useQuery, useMutation } from '@tanstack/react-query';
 import { toast } from 'sonner';
 import { Plus, X } from 'lucide-react';
@@ -12,7 +12,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { Badge } from '@/components/ui/badge';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { api, ApiError } from '@/lib/api';
-import type { OrgNodeRef, RuleGroup } from './types';
+import type { CatalogRef, RuleGroup } from './types';
 
 interface Props {
   open: boolean;
@@ -22,75 +22,61 @@ interface Props {
   onSaved: () => void;
 }
 
-const empty = { name: '', areaRefs: [] as string[], positionRefs: [] as string[], salaryPercent: '', notes: '' };
+const empty = { name: '', salaryPercent: '', notes: '' };
 
 export function CombinationDialog({ open, onOpenChange, annexVersionId, group, onSaved }: Props) {
   const [form, setForm] = useState(empty);
-  const [cargoInput, setCargoInput] = useState('');
+  const [areaIds, setAreaIds] = useState<string[]>([]);
+  const [cargoIds, setCargoIds] = useState<string[]>([]);
+  const [newAreas, setNewAreas] = useState<string[]>([]);
+  const [newCargos, setNewCargos] = useState<string[]>([]);
   const [areaPick, setAreaPick] = useState('');
+  const [cargoPick, setCargoPick] = useState('');
+  const [newAreaInput, setNewAreaInput] = useState('');
+  const [newCargoInput, setNewCargoInput] = useState('');
+
+  const { data: areas = [] } = useQuery({ queryKey: ['prize-catalog-areas'], queryFn: () => api<CatalogRef[]>('/prize/catalog/areas'), enabled: open, staleTime: 30_000 });
+  const { data: cargos = [] } = useQuery({ queryKey: ['prize-catalog-cargos'], queryFn: () => api<CatalogRef[]>('/prize/catalog/cargos'), enabled: open, staleTime: 30_000 });
 
   useEffect(() => {
     if (!open) return;
-    if (group) {
-      setForm({
-        name: group.name,
-        areaRefs: [...group.areaRefs],
-        positionRefs: [...group.positionRefs],
-        salaryPercent: group.salaryPercent ?? '',
-        notes: group.notes ?? '',
-      });
-    } else {
-      setForm(empty);
-    }
-    setCargoInput('');
-    setAreaPick('');
+    setForm(group ? { name: group.name, salaryPercent: group.salaryPercent ?? '', notes: group.notes ?? '' } : empty);
+    setAreaIds(group ? [...group.areaRefIds] : []);
+    setCargoIds(group ? [...group.cargoRefIds] : []);
+    setNewAreas([]); setNewCargos([]); setAreaPick(''); setCargoPick(''); setNewAreaInput(''); setNewCargoInput('');
   }, [open, group]);
 
-  const { data: orgNodes = [] } = useQuery({
-    queryKey: ['orgnodes'],
-    queryFn: () => api<OrgNodeRef[]>('/orgnodes'),
-    enabled: open,
-    staleTime: 60_000,
-  });
+  const areaById = useMemo(() => new Map(areas.map((a) => [a.id, a])), [areas]);
+  const cargoById = useMemo(() => new Map(cargos.map((c) => [c.id, c])), [cargos]);
 
   const save = useMutation({
     mutationFn: () => {
       const payload = {
         annexVersionId,
         name: form.name.trim(),
-        areaRefs: form.areaRefs,
-        positionRefs: form.positionRefs,
         salaryPercent: Number(form.salaryPercent),
         notes: form.notes.trim() || null,
+        areaRefIds: areaIds,
+        cargoRefIds: cargoIds,
+        areaRefs: newAreas,       // nomes novos -> criados no catalogo pelo backend
+        positionRefs: newCargos,
       };
       return group
         ? api(`/prize/rules/groups/${group.id}`, { method: 'PATCH', json: payload })
         : api('/prize/rules/groups', { method: 'POST', json: payload });
     },
-    onSuccess: () => {
-      toast.success(group ? 'Combinação atualizada' : 'Combinação criada');
-      onSaved();
-      onOpenChange(false);
-    },
+    onSuccess: () => { toast.success(group ? 'Combinação atualizada' : 'Combinação criada'); onSaved(); onOpenChange(false); },
     onError: (e: ApiError) => toast.error(e.message),
   });
 
-  function addArea() {
-    const name = areaPick.trim();
-    if (!name) return;
-    if (!form.areaRefs.includes(name)) setForm((f) => ({ ...f, areaRefs: [...f.areaRefs, name] }));
-    setAreaPick('');
-  }
-  function addCargo() {
-    const name = cargoInput.trim();
-    if (!name) return;
-    if (!form.positionRefs.includes(name)) setForm((f) => ({ ...f, positionRefs: [...f.positionRefs, name] }));
-    setCargoInput('');
-  }
-  const removeArea = (name: string) => setForm((f) => ({ ...f, areaRefs: f.areaRefs.filter((a) => a !== name) }));
-  const removeCargo = (name: string) => setForm((f) => ({ ...f, positionRefs: f.positionRefs.filter((c) => c !== name) }));
+  const addAreaId = () => { if (areaPick && !areaIds.includes(areaPick)) setAreaIds((v) => [...v, areaPick]); setAreaPick(''); };
+  const addCargoId = () => { if (cargoPick && !cargoIds.includes(cargoPick)) setCargoIds((v) => [...v, cargoPick]); setCargoPick(''); };
+  const addNewArea = () => { const n = newAreaInput.trim(); if (n && !newAreas.includes(n)) setNewAreas((v) => [...v, n]); setNewAreaInput(''); };
+  const addNewCargo = () => { const n = newCargoInput.trim(); if (n && !newCargos.includes(n)) setNewCargos((v) => [...v, n]); setNewCargoInput(''); };
 
-  const valid = form.name.trim() && form.areaRefs.length > 0 && form.positionRefs.length > 0 && form.salaryPercent !== '' && !Number.isNaN(Number(form.salaryPercent));
+  const totalAreas = areaIds.length + newAreas.length;
+  const totalCargos = cargoIds.length + newCargos.length;
+  const valid = form.name.trim() && totalAreas > 0 && totalCargos > 0 && form.salaryPercent !== '' && !Number.isNaN(Number(form.salaryPercent));
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -110,45 +96,47 @@ export function CombinationDialog({ open, onOpenChange, annexVersionId, group, o
             </div>
           </div>
 
-          {/* Áreas */}
+          {/* Áreas — do catálogo (por ID) ou nova */}
           <div>
-            <Label>Áreas *</Label>
+            <Label>Áreas/Setores * (do catálogo)</Label>
             <div className="flex gap-2">
               <NativeSelect value={areaPick} onChange={(e) => setAreaPick(e.target.value)} className="flex-1">
-                <option value="">Selecione uma área…</option>
-                {orgNodes.map((o) => <option key={o.id} value={o.name}>{o.name}{o.type ? ` (${o.type})` : ''}</option>)}
+                <option value="">Selecione do catálogo…</option>
+                {areas.filter((a) => a.active && !areaIds.includes(a.id)).map((a) => <option key={a.id} value={a.id}>{a.name} · #{a.code}{a.kind === 'SECTOR' ? ' (setor)' : ''}</option>)}
               </NativeSelect>
-              <Button type="button" variant="outline" size="sm" onClick={addArea} disabled={!areaPick}><Plus className="h-4 w-4" /></Button>
+              <Button type="button" variant="outline" size="sm" onClick={addAreaId} disabled={!areaPick}><Plus className="h-4 w-4" /></Button>
+            </div>
+            <div className="mt-1 flex gap-2">
+              <Input value={newAreaInput} onChange={(e) => setNewAreaInput(e.target.value)} onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); addNewArea(); } }} placeholder="…ou digite uma área nova (cria no catálogo)" className="h-8 text-sm" />
+              <Button type="button" variant="ghost" size="sm" onClick={addNewArea} disabled={!newAreaInput.trim()}><Plus className="h-4 w-4" /></Button>
             </div>
             <div className="mt-2 flex flex-wrap gap-1">
-              {form.areaRefs.length === 0 && <span className="text-xs text-muted-foreground">Nenhuma área. Adicione ao menos uma.</span>}
-              {form.areaRefs.map((a) => (
-                <Badge key={a} variant="secondary" className="gap-1">{a}<button type="button" onClick={() => removeArea(a)} className="hover:text-destructive"><X className="h-3 w-3" /></button></Badge>
-              ))}
+              {totalAreas === 0 && <span className="text-xs text-muted-foreground">Nenhuma área. Adicione ao menos uma.</span>}
+              {areaIds.map((id) => <Badge key={id} variant="secondary" className="gap-1">{areaById.get(id)?.name ?? id}{areaById.get(id) ? ` · #${areaById.get(id)!.code}` : ''}<button type="button" onClick={() => setAreaIds((v) => v.filter((x) => x !== id))} className="hover:text-destructive"><X className="h-3 w-3" /></button></Badge>)}
+              {newAreas.map((n) => <Badge key={n} variant="outline" className="gap-1">{n} (nova)<button type="button" onClick={() => setNewAreas((v) => v.filter((x) => x !== n))} className="hover:text-destructive"><X className="h-3 w-3" /></button></Badge>)}
             </div>
           </div>
 
           {/* Cargos */}
           <div>
-            <Label>Cargos * (a mesma combinação pode ter vários cargos)</Label>
+            <Label>Cargos * (do catálogo)</Label>
             <div className="flex gap-2">
-              <Input
-                value={cargoInput}
-                onChange={(e) => setCargoInput(e.target.value)}
-                onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); addCargo(); } }}
-                placeholder="Ex.: Coordenador de Área"
-              />
-              <Button type="button" variant="outline" size="sm" onClick={addCargo} disabled={!cargoInput.trim()}><Plus className="h-4 w-4" /></Button>
+              <NativeSelect value={cargoPick} onChange={(e) => setCargoPick(e.target.value)} className="flex-1">
+                <option value="">Selecione do catálogo…</option>
+                {cargos.filter((c) => c.active && !cargoIds.includes(c.id)).map((c) => <option key={c.id} value={c.id}>{c.name} · #{c.code}</option>)}
+              </NativeSelect>
+              <Button type="button" variant="outline" size="sm" onClick={addCargoId} disabled={!cargoPick}><Plus className="h-4 w-4" /></Button>
+            </div>
+            <div className="mt-1 flex gap-2">
+              <Input value={newCargoInput} onChange={(e) => setNewCargoInput(e.target.value)} onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); addNewCargo(); } }} placeholder="…ou digite um cargo novo (cria no catálogo)" className="h-8 text-sm" />
+              <Button type="button" variant="ghost" size="sm" onClick={addNewCargo} disabled={!newCargoInput.trim()}><Plus className="h-4 w-4" /></Button>
             </div>
             <div className="mt-2 flex flex-wrap gap-1">
-              {form.positionRefs.length === 0 && <span className="text-xs text-muted-foreground">Nenhum cargo. Adicione ao menos um.</span>}
-              {form.positionRefs.map((c) => (
-                <Badge key={c} variant="outline" className="gap-1">{c}<button type="button" onClick={() => removeCargo(c)} className="hover:text-destructive"><X className="h-3 w-3" /></button></Badge>
-              ))}
+              {totalCargos === 0 && <span className="text-xs text-muted-foreground">Nenhum cargo. Adicione ao menos um.</span>}
+              {cargoIds.map((id) => <Badge key={id} variant="secondary" className="gap-1">{cargoById.get(id)?.name ?? id}{cargoById.get(id) ? ` · #${cargoById.get(id)!.code}` : ''}<button type="button" onClick={() => setCargoIds((v) => v.filter((x) => x !== id))} className="hover:text-destructive"><X className="h-3 w-3" /></button></Badge>)}
+              {newCargos.map((n) => <Badge key={n} variant="outline" className="gap-1">{n} (novo)<button type="button" onClick={() => setNewCargos((v) => v.filter((x) => x !== n))} className="hover:text-destructive"><X className="h-3 w-3" /></button></Badge>)}
             </div>
-            <p className="mt-1 text-xs text-muted-foreground">
-              Cada cargo vira uma chave de elegibilidade (área × cargo) usada para casar o colaborador na apuração.
-            </p>
+            <p className="mt-1 text-xs text-muted-foreground">O cargo/área (por ID) é a chave de elegibilidade: o colaborador casa com a combinação pelo mesmo ID do catálogo.</p>
           </div>
 
           <div>

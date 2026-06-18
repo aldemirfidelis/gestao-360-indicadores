@@ -263,7 +263,10 @@ export class PrizeCalcService {
 
     const actualByCatalog = new Map(catalogActuals.map((actual) => [actual.catalogId, actual]));
     const cellRows: Prisma.PrizeCellResultCreateManyInput[] = [];
-    const cellIndex = new Map<string, Array<{ possibleSalaryPercent: number; achievedSalaryPercent: number; groupName: string }>>();
+    type CellEntry = { groupId: string; possibleSalaryPercent: number; achievedSalaryPercent: number; groupName: string };
+    const cellIndex = new Map<string, Array<CellEntry>>();
+    // Indice por ID do catalogo (areaRefId::cargoRefId) — casamento deterministico.
+    const cellIndexById = new Map<string, Array<CellEntry>>();
     let pendingCells = 0;
 
     for (const group of groups) {
@@ -301,6 +304,7 @@ export class PrizeCalcService {
           const key = this.cellKey(normalizedAreaKey, normalizedPositionKey);
           const indexed = cellIndex.get(key) ?? [];
           indexed.push({
+            groupId: group.id,
             possibleSalaryPercent: output.possibleSalaryPercent,
             achievedSalaryPercent: output.achievedSalaryPercent,
             groupName: group.name,
@@ -324,6 +328,16 @@ export class PrizeCalcService {
           });
         }
       }
+      // Indexa a celula por ID do catalogo (todas as combinacoes area×cargo de IDs do grupo).
+      const idEntry: CellEntry = { groupId: group.id, possibleSalaryPercent: output.possibleSalaryPercent, achievedSalaryPercent: output.achievedSalaryPercent, groupName: group.name };
+      for (const aid of group.areaRefIds) {
+        for (const cid of group.cargoRefIds) {
+          const k = `${aid}::${cid}`;
+          const arr = cellIndexById.get(k) ?? [];
+          arr.push(idEntry);
+          cellIndexById.set(k, arr);
+        }
+      }
     }
 
     if (cellRows.length === 0) {
@@ -345,12 +359,36 @@ export class PrizeCalcService {
     }
 
     const unmatchedRows: Prisma.PrizeUnmatchedEmployeeCreateManyInput[] = [];
-    const employeeMatch = new Map<string, { possibleSalaryPercent: number; achievedSalaryPercent: number; groupName: string }>();
+    const employeeMatch = new Map<string, { groupId: string; possibleSalaryPercent: number; achievedSalaryPercent: number; groupName: string }>();
     for (const emp of snapshot) {
       if (emp.blocked || !emp.eligible) continue;
-      const normalizedAreaKey = this.resolveRuleKey(emp.areaRef, 'AREA', aliases);
-      const normalizedPositionKey = this.resolveRuleKey(emp.positionRef, 'POSITION', aliases);
-      const matches = cellIndex.get(this.cellKey(normalizedAreaKey, normalizedPositionKey)) ?? [];
+      const matchedByGroup = new Map<string, CellEntry>();
+      // 1) PREFERE casamento por ID do catalogo (deterministico): a "area" da
+      //    combinacao casa com a area OU o setor do colaborador (mesmo ID), + cargo.
+      if (emp.cargoRefId) {
+        for (const aid of [emp.areaRefId, emp.sectorRefId]) {
+          if (!aid) continue;
+          for (const cell of cellIndexById.get(`${aid}::${emp.cargoRefId}`) ?? []) matchedByGroup.set(cell.groupId, cell);
+        }
+      }
+      // 2) Fallback por NOME (area/setor/centro de custo + de-para) quando nao ha ID
+      //    no colaborador ou na combinacao. Ex.: base antiga sem catalogo linkado.
+      let areaCandidates: string[] = [];
+      let normalizedPositionKey = '';
+      if (matchedByGroup.size === 0) {
+        normalizedPositionKey = this.resolveRuleKey(emp.positionRef, 'POSITION', aliases);
+        areaCandidates = Array.from(new Set(
+          [
+            this.resolveRuleKey(emp.areaRef, 'AREA', aliases),
+            this.resolveRuleKey(emp.sectorRef, 'AREA', aliases),
+            this.resolveRuleKey(emp.costCenterRef, 'AREA', aliases),
+          ].filter(Boolean),
+        ));
+        for (const ak of areaCandidates) {
+          for (const cell of cellIndex.get(this.cellKey(ak, normalizedPositionKey)) ?? []) matchedByGroup.set(cell.groupId, cell);
+        }
+      }
+      const matches = [...matchedByGroup.values()];
       if (matches.length !== 1) {
         unmatchedRows.push({
           companyId: me.companyId,
@@ -360,8 +398,8 @@ export class PrizeCalcService {
           name: emp.name,
           areaRef: emp.areaRef,
           positionRef: emp.positionRef,
-          normalizedAreaKey,
-          normalizedPositionKey,
+          normalizedAreaKey: areaCandidates[0] ?? normalizeRuleKey(emp.areaRef),
+          normalizedPositionKey: normalizedPositionKey || normalizeRuleKey(emp.positionRef),
           reason: matches.length > 1 ? 'Mais de uma combinacao area-cargo aplicavel' : 'Sem combinacao area-cargo aplicavel',
         });
       } else {
