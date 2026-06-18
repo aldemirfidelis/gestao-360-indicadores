@@ -18,6 +18,7 @@ import { ImportService, ImportFormat, ImportStrategy } from '../database-admin/s
 import { DbAdminAuditService } from '../database-admin/services/db-admin-audit.service';
 import { DbAdminSettingsService } from '../database-admin/services/db-admin-settings.service';
 import { PostgreSQLAdapter } from '../database-admin/adapters/postgresql.adapter';
+import { getTableCatalogEntry } from '../database-admin/table-catalog';
 import { assertInAllowlist, quoteIdent } from '../database-admin/util/identifier.util';
 import { DB_ADMIN_LIMITS } from '../database-admin/database-admin.constants';
 import type { FilterCondition } from '../database-admin/util/where-builder';
@@ -545,7 +546,7 @@ export class PlatformAdminLegacyDatabaseController {
       this.schema.getConstraints(table),
       this.schema.getIndexes(table),
     ]);
-    return { table, columns, constraints, indexes };
+    return { table, catalog: getTableCatalogEntry(table), columns, constraints, indexes };
   }
 
   @Get('schema')

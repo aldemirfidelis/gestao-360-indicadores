@@ -25,6 +25,7 @@ export function TableDetailContent({ table, onBack }: { table: string; onBack?: 
   });
 
   const data = schema.data;
+  const catalog = data?.catalog ?? fallbackTableCatalog(table);
 
   return (
     <div className="space-y-6">
@@ -85,14 +86,14 @@ export function TableDetailContent({ table, onBack }: { table: string; onBack?: 
         <>
           <SectionCard title="Identificacao da tabela" description="Catalogo funcional usado pelo Portal Administrativo Global.">
             <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-              <CatalogInfo label="Modulo" value={data.catalog.module} />
-              <CatalogInfo label="Rotulo amigavel" value={data.catalog.label} />
-              <CatalogInfo label="Origem" value={data.catalog.origin} />
-              <CatalogInfo label="Impacto" value={data.catalog.impact} />
+              <CatalogInfo label="Modulo" value={catalog.module} />
+              <CatalogInfo label="Rotulo amigavel" value={catalog.label} />
+              <CatalogInfo label="Origem" value={catalog.origin} />
+              <CatalogInfo label="Impacto" value={catalog.impact} />
             </div>
             <div className="mt-4 rounded-md border bg-muted/20 p-3 text-sm">
               <div className="font-medium">O que faz</div>
-              <p className="mt-1 text-muted-foreground">{data.catalog.purpose}</p>
+              <p className="mt-1 text-muted-foreground">{catalog.purpose}</p>
             </div>
           </SectionCard>
 
@@ -205,4 +206,23 @@ function CatalogInfo({ label, value }: { label: string; value: string }) {
       <div className="mt-1 text-sm">{value}</div>
     </div>
   );
+}
+
+function fallbackTableCatalog(table: string): TableSchema['catalog'] {
+  return {
+    module: 'Outras tabelas',
+    moduleKey: 'other',
+    label: humanizeTableName(table),
+    origin: 'Schema public',
+    purpose: 'Tabela fisica do banco sem classificacao especifica no catalogo retornado pela API.',
+    impact: 'Pode impactar telas, relatorios, integracoes ou rotinas que dependam diretamente desses dados.',
+  };
+}
+
+function humanizeTableName(table: string) {
+  if (table.startsWith('_')) return table;
+  return table
+    .replace(/([a-z0-9])([A-Z])/g, '$1 $2')
+    .replace(/_/g, ' ')
+    .trim();
 }
