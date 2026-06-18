@@ -35,9 +35,12 @@ export function SubmitValidationDialog({ open, onOpenChange, annexId, versionId,
     enabled: open,
   });
 
+  // Chave estável: o array default `[]` do useQuery muda de referência a cada
+  // render enquanto carrega; depender dele direto causaria loop de re-render.
+  const approverKey = approvers.map((a) => a.userId).join(',');
   useEffect(() => {
-    if (open) setSelected(new Set(approvers.map((a) => a.userId)));
-  }, [open, approvers]);
+    if (open) setSelected(new Set(approverKey ? approverKey.split(',') : []));
+  }, [open, approverKey]);
 
   const submit = useMutation({
     mutationFn: () => api(`/prize/annexes/versions/${versionId}/submit`, { method: 'POST', json: { approverUserIds: Array.from(selected) } }),
