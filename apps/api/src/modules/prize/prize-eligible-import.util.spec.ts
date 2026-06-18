@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import {
   isValidCpf,
   normalizeHeader,
+  parseAtestadoRows,
   parseEligibleRows,
   parseEventRows,
   parseFlexDate,
@@ -147,6 +148,34 @@ describe('parseEligibleRows', () => {
     const out = parseEligibleRows([{ ...validRow, salariooo: 123 }]);
     expect(out.unknownColumns).toContain('salariooo');
     expect(out.rows).toHaveLength(1);
+  });
+});
+
+describe('parseAtestadoRows', () => {
+  it('aceita cabecalhos nativos do Apdata DatasAtestados', () => {
+    const out = parseAtestadoRows([
+      {
+        'Id Contratado': '900415',
+        Nome: 'Armando Donizetti Miranda',
+        'Data Início na Situação': new Date(Date.UTC(2026, 3, 2)),
+        'Data Fim da Situação': new Date(Date.UTC(2026, 3, 2)),
+        'Quantidade de Dias': 1,
+        'Código Oficial CID': 'F41.1',
+        'Doença CID': 'Ansiedade generalizada',
+        'Tipo de atestado': 'Atestado Médico Normal',
+      },
+    ], new Set(['900415']));
+
+    expect(out.errors).toHaveLength(0);
+    expect(out.warnings).toHaveLength(0);
+    expect(out.unknownColumns).toHaveLength(0);
+    expect(out.events[0]).toMatchObject({
+      registration: '900415',
+      type: 'ATESTADO',
+      date: '2026-04-02',
+      days: 1,
+    });
+    expect(out.events[0].description).toContain('F41.1');
   });
 });
 

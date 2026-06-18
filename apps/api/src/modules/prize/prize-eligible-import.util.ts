@@ -205,6 +205,14 @@ function str(v: unknown): string | null {
   return s === '' ? null : s;
 }
 
+function meaningfulStr(v: unknown): string | null {
+  const s = str(v);
+  if (!s) return null;
+  const norm = normalizeHeader(s);
+  if (!norm || ['nenhuma', 'nenhum', 'nao_informado', 'sem_cid'].includes(norm)) return null;
+  return s;
+}
+
 // ---- parse da base elegivel ----
 
 export function parseEligibleRows(rawRows: Array<Record<string, unknown>>): ParsedEligible {
@@ -353,11 +361,25 @@ const EVENT_TYPE_ALIASES: Record<string, string> = {
 const ATESTADO_HEADER_MAP: Record<string, string[]> = {
   registration: ['id_contratado', 'id_contrato', 'contratado', 'matricula', 'cadastro', 'registro'],
   name: ['nome', 'colaborador'],
-  date: ['data_inicio', 'data_de_inicio', 'inicio', 'data_inicio_afastamento', 'data'],
-  endDate: ['data_fim', 'data_de_fim', 'fim', 'termino', 'data_termino'],
-  days: ['quantidade', 'qtde', 'qtd', 'dias', 'quantidade_dias', 'qtde_dias'],
-  cid: ['doenca_cid', 'cid', 'codigo_oficial', 'codigo', 'doenca', 'cid_doenca'],
+  date: ['data_inicio', 'data_de_inicio', 'inicio', 'data_inicio_afastamento', 'data_inicio_na_situacao', 'data_inicio_da_situacao', 'data'],
+  endDate: ['data_fim', 'data_de_fim', 'fim', 'termino', 'data_termino', 'data_fim_da_situacao', 'data_fim_na_situacao'],
+  days: ['quantidade', 'qtde', 'qtd', 'dias', 'quantidade_dias', 'quantidade_de_dias', 'qtde_dias'],
+  cid: ['codigo_oficial_cid', 'cid', 'codigo_oficial', 'codigo', 'cid_doenca'],
+  diagnosis: ['doenca_cid', 'doenca'],
   kind: ['tipo_de_atestado', 'tipo_atestado', 'tipo'],
+  ignored: [
+    'situacao',
+    'cid_cosdoencacidoficial_1',
+    'cid_d1sdoencacid_1',
+    'cid_cosdoencacidoficial_2',
+    'cid_d1sdoencacid_2',
+    'log_transacao',
+    'data_hora_inicio_da_transacao',
+    'id_usuario',
+    'login_usuario',
+    'id_contratado_usuario',
+    'nome_do_usuario',
+  ],
 };
 
 export const ATESTADO_TEMPLATE_HEADERS = ['id_contratado', 'nome', 'data_inicio', 'data_fim', 'quantidade', 'doenca_cid'] as const;
@@ -427,8 +449,9 @@ export function parseAtestadoRows(
       return;
     }
 
-    const cid = str(mapped.cid);
-    const descParts = [endDate ? `até ${endDate}` : null, cid ? `CID ${cid}` : null].filter(Boolean);
+    const cid = meaningfulStr(mapped.cid);
+    const diagnosis = meaningfulStr(mapped.diagnosis);
+    const descParts = [endDate ? `até ${endDate}` : null, cid ? `CID ${cid}` : null, diagnosis].filter(Boolean);
     events.push({
       registration,
       type: 'ATESTADO',
