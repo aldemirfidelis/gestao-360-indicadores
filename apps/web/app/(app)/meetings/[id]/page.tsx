@@ -3,7 +3,7 @@
 import Link from 'next/link';
 import { useParams } from 'next/navigation';
 import type { ReactNode } from 'react';
-import { useEffect, useMemo, useState } from 'react';
+import { useMemo, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
 import {
@@ -12,7 +12,6 @@ import {
   Copy,
   Mail,
   Plus,
-  Save,
   Send,
   Sparkles,
   Users,
@@ -26,6 +25,7 @@ import { Label } from '@/components/ui/label';
 import { NativeSelect } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
 import { useAuth } from '@/components/auth/auth-provider';
+import { AnalysisWorkspace, type AnalysisPayload } from '@/components/platform/analysis-workspace';
 import { api } from '@/lib/api';
 import { formatDate, formatNumber } from '@/lib/utils';
 
@@ -133,16 +133,13 @@ const statusLabels: Record<string, string> = {
   LOW: 'Baixa',
 };
 
-const analysisMethods = ['FIVE_WHYS', 'ISHIKAWA', 'PARETO', 'PDCA', 'MASP', 'DMAIC', 'FCA', 'CAPA', 'SIMPLE'];
-
 export default function MeetingDetailPage() {
   const { id } = useParams<{ id: string }>();
   const qc = useQueryClient();
   const { hasPermission } = useAuth();
   const [agendaTopic, setAgendaTopic] = useState('');
   const [guest, setGuest] = useState({ name: '', email: '', jobTitle: '', area: '', role: 'PARTICIPANT', notes: '' });
-  const [taskForm, setTaskForm] = useState({ description: '', responsibleUserId: '', startDate: '', endDate: '' });
-  const [analysisForm, setAnalysisForm] = useState({ method: 'FIVE_WHYS', problem: '', rootCause: '' });
+  const [w2h, setW2h] = useState({ what: '', why: '', who: '', when: '', where: '', how: '', howMuch: '' });
   const [minutesDraft, setMinutesDraft] = useState<AiMinutesDraft | null>(null);
   const canGenerateMinutes = hasPermission(['meetings:update']);
 
@@ -153,6 +150,13 @@ export default function MeetingDetailPage() {
 
   const m = query.data;
   const linkedAction = m?.actions?.[0] ?? null;
+
+  // Detalhe completo do plano vinculado p/ alimentar a ferramenta de análise (mesmo molde do plano).
+  const actionQuery = useQuery<any>({
+    queryKey: ['action', linkedAction?.id],
+    queryFn: () => api(`/actions/${linkedAction!.id}`),
+    enabled: !!linkedAction?.id,
+  });
 
   const target = useMemo(() => {
     if (!m?.indicator || !m.treatment) return null;
@@ -165,16 +169,6 @@ export default function MeetingDetailPage() {
     if (linkedAction?.responsibleUser) map.set(linkedAction.responsibleUser.id, linkedAction.responsibleUser);
     return Array.from(map.values()).sort((a, b) => a.name.localeCompare(b.name));
   }, [m, linkedAction]);
-
-  useEffect(() => {
-    if (!m) return;
-    const latestSession = linkedAction?.analysisSessions?.[0];
-    setAnalysisForm({
-      method: linkedAction?.analysisTool ?? latestSession?.method ?? m.analysis?.method ?? 'FIVE_WHYS',
-      problem: linkedAction?.problemDescription ?? latestSession?.problem ?? m.deviation?.title ?? m.objective ?? '',
-      rootCause: linkedAction?.rootCause ?? latestSession?.rootCause ?? m.analysis?.content ?? '',
-    });
-  }, [m?.id, linkedAction?.id, linkedAction?.analysisTool, linkedAction?.problemDescription, linkedAction?.rootCause]);
 
   const addAgenda = useMutation({
     mutationFn: () => api(`/meetings/${id}/agenda`, { method: 'POST', json: { topic: agendaTopic } }),
@@ -195,22 +189,29 @@ export default function MeetingDetailPage() {
   });
 
   const generateTask = useMutation({
-    mutationFn: () =>
-      api(`/meetings/${id}/actions`, {
+    mutationFn: () => {
+      const detail = [
+        w2h.why ? `Por quê: ${w2h.why}` : null,
+        w2h.where ? `Onde: ${w2h.where}` : null,
+        w2h.how ? `Como: ${w2h.how}` : null,
+        w2h.howMuch ? `Quanto: ${w2h.howMuch}` : null,
+      ].filter(Boolean).join('\n');
+      return api(`/meetings/${id}/actions`, {
         method: 'POST',
         json: {
           actionPlanId: linkedAction?.id,
-          title: taskForm.description,
-          description: taskForm.description,
-          responsibleUserId: taskForm.responsibleUserId || undefined,
-          startDate: taskForm.startDate || undefined,
-          endDate: taskForm.endDate || undefined,
-          dueDate: taskForm.endDate || undefined,
+          title: w2h.what,
+          description: detail || w2h.what,
+          responsibleUserId: w2h.who || undefined,
+          startDate: w2h.when || undefined,
+          endDate: w2h.when || undefined,
+          dueDate: w2h.when || undefined,
         },
-      }),
+      });
+    },
     onSuccess: () => {
-      toast.success('Tarefa criada para o plano de ação');
-      setTaskForm({ description: '', responsibleUserId: '', startDate: '', endDate: '' });
+      toast.success('Tarefa (5W2H) adicionada ao plano de ação');
+      setW2h({ what: '', why: '', who: '', when: '', where: '', how: '', howMuch: '' });
       qc.invalidateQueries({ queryKey: ['meeting', id] });
       if (linkedAction?.id) qc.invalidateQueries({ queryKey: ['action', linkedAction.id] });
       qc.invalidateQueries({ queryKey: ['actions'] });
@@ -219,16 +220,9 @@ export default function MeetingDetailPage() {
   });
 
   const saveAnalysis = useMutation({
-    mutationFn: () => {
+    mutationFn: (payload: AnalysisPayload) => {
       if (!linkedAction?.id) return Promise.reject(new Error('Nenhum plano de ação vinculado'));
-      return api(`/actions/${linkedAction.id}/analysis`, {
-        method: 'POST',
-        json: {
-          method: analysisForm.method,
-          problem: analysisForm.problem,
-          rootCause: analysisForm.rootCause,
-        },
-      });
+      return api(`/actions/${linkedAction.id}/analysis`, { method: 'POST', json: payload });
     },
     onSuccess: () => {
       toast.success('Análise de causa sincronizada com o plano');
@@ -265,8 +259,10 @@ export default function MeetingDetailPage() {
   const completeMeeting = useMutation({
     mutationFn: () => api(`/meetings/${id}/complete`, { method: 'POST' }),
     onSuccess: () => {
-      toast.success('Reunião concluída');
+      toast.success('Reunião concluída — análises enviadas ao plano e execução iniciada');
       qc.invalidateQueries({ queryKey: ['meeting', id] });
+      if (linkedAction?.id) qc.invalidateQueries({ queryKey: ['action', linkedAction.id] });
+      qc.invalidateQueries({ queryKey: ['actions'] });
     },
   });
 
@@ -334,38 +330,23 @@ export default function MeetingDetailPage() {
             )}
           </SectionCard>
 
-          <SectionCard
-            title="Análise de causa"
-            description="O método e a causa raiz salvos aqui ficam sincronizados com a análise do plano de ação."
-          >
-            <div className="space-y-3">
-              <div>
-                <Label>Método</Label>
-                <NativeSelect value={analysisForm.method} onChange={(e) => setAnalysisForm({ ...analysisForm, method: e.target.value })}>
-                  {analysisMethods.map((method) => (
-                    <option key={method} value={method}>{methodLabel(method)}</option>
-                  ))}
-                </NativeSelect>
-              </div>
-              <div>
-                <Label>Problema tratado</Label>
-                <Textarea rows={3} value={analysisForm.problem} onChange={(e) => setAnalysisForm({ ...analysisForm, problem: e.target.value })} />
-              </div>
-              <div>
-                <Label>Causa raiz</Label>
-                <Textarea rows={4} value={analysisForm.rootCause} onChange={(e) => setAnalysisForm({ ...analysisForm, rootCause: e.target.value })} />
-              </div>
-              <div className="flex flex-wrap items-center justify-between gap-2">
-                <span className="text-xs text-muted-foreground">
-                  {linkedAction ? `Sincronizando com: ${linkedAction.title}` : 'Vincule um plano de ação para salvar a análise.'}
-                </span>
-                <Button onClick={() => saveAnalysis.mutate()} disabled={!linkedAction || saveAnalysis.isPending}>
-                  <Save className="mr-2 h-4 w-4" />
-                  {saveAnalysis.isPending ? 'Salvando...' : 'Salvar análise'}
-                </Button>
-              </div>
-            </div>
-          </SectionCard>
+          {!linkedAction ? (
+            <SectionCard title="Análise de causa" description="Vincule um plano de ação para registrar a análise de causa.">
+              <p className="text-sm text-muted-foreground">Esta reunião ainda não está vinculada a um plano de ação.</p>
+            </SectionCard>
+          ) : !actionQuery.data ? (
+            <SectionCard title="Análise de causa" description="Carregando a ferramenta de análise...">
+              <p className="text-sm text-muted-foreground">Carregando...</p>
+            </SectionCard>
+          ) : (
+            <AnalysisWorkspace
+              action={actionQuery.data}
+              onSave={(payload) => saveAnalysis.mutate(payload)}
+              saving={saveAnalysis.isPending}
+              title="Análise de causa"
+              description={`Escolha o método (5 Porquês, Ishikawa, PDCA...) e preencha a ferramenta. Problema e causa raiz ficam expostos e sincronizados com: ${linkedAction.title}`}
+            />
+          )}
 
           <SectionCard title="Participantes" description="Participantes internos, externos e presenças.">
             <div className="space-y-3">
@@ -513,7 +494,7 @@ export default function MeetingDetailPage() {
             </SectionCard>
           )}
 
-          <SectionCard title="Tarefas para plano de ação" description="As tarefas criadas aqui entram direto na execução do plano vinculado.">
+          <SectionCard title="Resolver o problema (5W2H)" description="Defina as ações no formato 5W2H. Cada item vira uma tarefa na execução do plano vinculado.">
             {!linkedAction ? (
               <p className="text-sm text-muted-foreground">Esta reunião ainda não está vinculada a um plano de ação.</p>
             ) : (
@@ -548,19 +529,22 @@ export default function MeetingDetailPage() {
                 </div>
 
                 <div className="space-y-3 rounded-lg border bg-muted/30 p-3">
-                  <div>
-                    <Label>Descrição da tarefa</Label>
-                    <Textarea
-                      rows={3}
-                      value={taskForm.description}
-                      onChange={(e) => setTaskForm({ ...taskForm, description: e.target.value })}
-                      placeholder="Descreva a tarefa definida na reunião..."
-                    />
-                  </div>
-                  <div className="grid gap-2 md:grid-cols-3">
+                  <div className="grid gap-2 md:grid-cols-2">
+                    <div className="md:col-span-2">
+                      <Label>O quê (ação) *</Label>
+                      <Input
+                        value={w2h.what}
+                        onChange={(e) => setW2h({ ...w2h, what: e.target.value })}
+                        placeholder="O que será feito para resolver o problema..."
+                      />
+                    </div>
+                    <div className="md:col-span-2">
+                      <Label>Por quê</Label>
+                      <Textarea rows={2} value={w2h.why} onChange={(e) => setW2h({ ...w2h, why: e.target.value })} placeholder="Por que essa ação é necessária..." />
+                    </div>
                     <div>
-                      <Label>Responsável</Label>
-                      <NativeSelect value={taskForm.responsibleUserId} onChange={(e) => setTaskForm({ ...taskForm, responsibleUserId: e.target.value })}>
+                      <Label>Quem</Label>
+                      <NativeSelect value={w2h.who} onChange={(e) => setW2h({ ...w2h, who: e.target.value })}>
                         <option value="">Sem responsável</option>
                         {participantUsers.map((u) => (
                           <option key={u.id} value={u.id}>{u.name}</option>
@@ -568,17 +552,25 @@ export default function MeetingDetailPage() {
                       </NativeSelect>
                     </div>
                     <div>
-                      <Label>Data de início</Label>
-                      <Input type="date" value={taskForm.startDate} onChange={(e) => setTaskForm({ ...taskForm, startDate: e.target.value })} />
+                      <Label>Quando</Label>
+                      <Input type="date" value={w2h.when} onChange={(e) => setW2h({ ...w2h, when: e.target.value })} />
                     </div>
                     <div>
-                      <Label>Data final</Label>
-                      <Input type="date" value={taskForm.endDate} onChange={(e) => setTaskForm({ ...taskForm, endDate: e.target.value })} />
+                      <Label>Onde</Label>
+                      <Input value={w2h.where} onChange={(e) => setW2h({ ...w2h, where: e.target.value })} placeholder="Local / setor / equipamento" />
+                    </div>
+                    <div>
+                      <Label>Quanto (custo)</Label>
+                      <Input value={w2h.howMuch} onChange={(e) => setW2h({ ...w2h, howMuch: e.target.value })} placeholder="Custo estimado" />
+                    </div>
+                    <div className="md:col-span-2">
+                      <Label>Como</Label>
+                      <Textarea rows={2} value={w2h.how} onChange={(e) => setW2h({ ...w2h, how: e.target.value })} placeholder="Como a ação será executada..." />
                     </div>
                   </div>
-                  <Button onClick={() => generateTask.mutate()} disabled={!taskForm.description.trim() || generateTask.isPending}>
+                  <Button onClick={() => generateTask.mutate()} disabled={!w2h.what.trim() || generateTask.isPending}>
                     <Plus className="mr-2 h-4 w-4" />
-                    {generateTask.isPending ? 'Criando...' : 'Adicionar tarefa'}
+                    {generateTask.isPending ? 'Adicionando...' : 'Adicionar tarefa'}
                   </Button>
                 </div>
               </div>
@@ -608,21 +600,6 @@ function formatDateTime(value: string | null | undefined) {
     hour: '2-digit',
     minute: '2-digit',
   }).format(new Date(value));
-}
-
-function methodLabel(value: string) {
-  const labels: Record<string, string> = {
-    FIVE_WHYS: '5 Porquês',
-    ISHIKAWA: 'Ishikawa',
-    PARETO: 'Pareto',
-    PDCA: 'PDCA',
-    MASP: 'MASP',
-    DMAIC: 'DMAIC',
-    FCA: 'FCA',
-    CAPA: 'CAPA',
-    SIMPLE: 'Análise simples',
-  };
-  return labels[value] ?? value;
 }
 
 function roleLabel(value: string) {

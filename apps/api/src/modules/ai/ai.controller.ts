@@ -15,7 +15,7 @@ export class AiController {
   @Get('status')
   @RequirePermissions('ai:status')
   status() {
-    return { provider: 'gemini', enabled: this.gemini.isEnabled };
+    return { provider: this.gemini.provider, model: this.gemini.modelName, enabled: this.gemini.isEnabled };
   }
 
   @Get('indicators/:id/context')

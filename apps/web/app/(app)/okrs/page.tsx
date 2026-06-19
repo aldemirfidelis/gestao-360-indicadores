@@ -1,12 +1,11 @@
 'use client';
 
 import Link from 'next/link';
-import { useMemo, useState } from 'react';
+import { useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
-import { ChevronRight, GitBranch, List, MessageSquare, Plus, Save, Target } from 'lucide-react';
+import { ChevronRight, GitBranch, List, MessageSquare, Plus, RefreshCw, Save } from 'lucide-react';
 import { PageHeader } from '@/components/shell/page-header';
-import { MetricCard } from '@/components/platform/metric-card';
 import { SectionCard } from '@/components/platform/section-card';
 import { StatusBadge } from '@/components/platform/status-badge';
 import { Button } from '@/components/ui/button';
@@ -25,7 +24,7 @@ import {
 } from '@/components/ui/dialog';
 import { api } from '@/lib/api';
 import { useAuth } from '@/components/auth/auth-provider';
-import { cn, formatDate, formatNumber, formatPercent } from '@/lib/utils';
+import { formatPercent } from '@/lib/utils';
 import { OkrFlowchart } from './okr-flowchart';
 
 interface Cycle {
@@ -47,6 +46,33 @@ interface KR {
   direction: string;
   weight: number;
   progress: number;
+  indicatorId?: string | null;
+  indicator?: { id: string; name: string; code: string | null; unit?: string } | null;
+  linkedValue?: number | null;
+}
+
+interface AreaOption {
+  id: string;
+  name: string;
+  code?: string | null;
+  type: string;
+  parentId: string | null;
+}
+
+interface UserOption {
+  id: string;
+  name: string;
+  email?: string;
+  avatarUrl?: string | null;
+  jobTitle?: string | null;
+}
+
+interface IndicatorOption {
+  id: string;
+  name: string;
+  code: string | null;
+  unit: string;
+  ownerNode?: { id: string; name: string } | null;
 }
 
 interface StrategicIndicator {
@@ -82,10 +108,21 @@ interface Objective {
   strategicObj: StrategicObjectiveRef | null;
   checkins?: { weekRef: string; progress: number; confidence: number; createdAt: string }[];
   _count?: { checkins: number };
+  ownerNode?: { id: string; name: string; type?: string } | null;
+  ownerUser?: { id: string; name: string; email?: string; avatarUrl?: string | null; jobTitle?: string | null } | null;
+  area?: { id: string; name: string; type?: string } | null;
+  expectedProgress?: number | null;
+  pace?: number | null;
+  paceLabel?: 'AHEAD' | 'ON_TRACK' | 'BEHIND' | 'AT_RISK' | null;
+  lastCheckinWeek?: string | null;
+  needsCheckin?: boolean;
 }
 
 interface OkrOptions {
   strategicObjectives: StrategicObjectiveRef[];
+  areas: AreaOption[];
+  users: UserOption[];
+  indicators: IndicatorOption[];
 }
 
 const STATUS_LABEL: Record<string, string> = {
@@ -98,8 +135,15 @@ const STATUS_LABEL: Record<string, string> = {
 };
 
 const emptyCycle = { name: '', startsAt: new Date().toISOString().slice(0, 10), endsAt: `${new Date().getFullYear()}-12-31` };
-const emptyObjective = { name: '', description: '', ownerName: '', team: '', weight: 1, parentId: '', strategicObjId: '' };
-const emptyKr = { objectiveId: '', metric: '', unit: 'PERCENT', startValue: 0, currentValue: 0, targetValue: 100, direction: 'HIGHER_BETTER', weight: 1, responsible: '' };
+const emptyObjective = { name: '', description: '', ownerName: '', team: '', weight: 1, parentId: '', strategicObjId: '', ownerNodeId: '', ownerUserId: '' };
+const emptyKr = { objectiveId: '', metric: '', unit: 'PERCENT', startValue: 0, currentValue: 0, targetValue: 100, direction: 'HIGHER_BETTER', weight: 1, responsible: '', indicatorId: '' };
+
+const PACE_LABEL: Record<string, { label: string; tone: string }> = {
+  AHEAD: { label: 'Adiantado', tone: 'text-status-blue' },
+  ON_TRACK: { label: 'No ritmo', tone: 'text-status-green' },
+  BEHIND: { label: 'Atrasado', tone: 'text-status-yellow' },
+  AT_RISK: { label: 'Em risco', tone: 'text-status-red' },
+};
 
 export default function OkrsPage() {
   const qc = useQueryClient();
@@ -108,7 +152,8 @@ export default function OkrsPage() {
   const canUpdate = hasPermission(['okrs:update']);
   const canCheckin = hasPermission(['okrs:checkin', 'okrs:update']);
   const [activeCycleId, setActiveCycleId] = useState<string | null>(null);
-  const [view, setView] = useState<'list' | 'flow'>('list');
+  const [view, setView] = useState<'list' | 'flow'>('flow');
+  const [areaFilterId, setAreaFilterId] = useState<string>('');
   const [cycleOpen, setCycleOpen] = useState(false);
   const [objectiveOpen, setObjectiveOpen] = useState(false);
   const [krOpen, setKrOpen] = useState(false);
@@ -123,7 +168,6 @@ export default function OkrsPage() {
     queryFn: () => api<Cycle[]>('/okrs/cycles'),
   });
   const cycleId = activeCycleId ?? cycles.data?.[0]?.id ?? null;
-  const activeCycle = cycles.data?.find((c) => c.id === cycleId);
 
   const objectives = useQuery<Objective[]>({
     queryKey: ['okrs', 'objectives', cycleId],
@@ -155,6 +199,8 @@ export default function OkrsPage() {
           ...objectiveForm,
           parentId: objectiveForm.parentId || null,
           strategicObjId: objectiveForm.strategicObjId || null,
+          ownerNodeId: objectiveForm.ownerNodeId || null,
+          ownerUserId: objectiveForm.ownerUserId || null,
         },
       }),
     onSuccess: () => {
@@ -166,7 +212,7 @@ export default function OkrsPage() {
   });
 
   const createKr = useMutation({
-    mutationFn: () => api(`/okrs/objectives/${krForm.objectiveId}/krs`, { method: 'POST', json: krForm }),
+    mutationFn: () => api(`/okrs/objectives/${krForm.objectiveId}/krs`, { method: 'POST', json: { ...krForm, indicatorId: krForm.indicatorId || null } }),
     onSuccess: () => {
       toast.success('KR criado');
       setKrOpen(false);
@@ -199,13 +245,11 @@ export default function OkrsPage() {
     onSuccess: () => qc.invalidateQueries({ queryKey: ['okrs', 'objectives'] }),
   });
 
-  const stats = useMemo(() => {
-    const list = objectives.data ?? [];
-    const krs = list.reduce((acc, obj) => acc + obj.keyResults.length, 0);
-    const progress = list.length ? list.reduce((acc, obj) => acc + obj.progress, 0) / list.length : 0;
-    const risk = list.filter((obj) => ['AT_RISK', 'OFF_TRACK'].includes(obj.status)).length;
-    return { objectives: list.length, krs, progress, risk };
-  }, [objectives.data]);
+  const allObjectives = objectives.data ?? [];
+  const areaOptions = options.data?.areas ?? [];
+  const filteredObjectives = areaFilterId
+    ? allObjectives.filter((o) => o.area?.id === areaFilterId || o.ownerNode?.id === areaFilterId)
+    : allObjectives;
 
   return (
     <div>
@@ -238,32 +282,44 @@ export default function OkrsPage() {
             <Badge variant="secondary" className="ml-2">{c._count.objectives}</Badge>
           </Button>
         ))}
-        <div className="ml-auto inline-flex items-center rounded-md border p-0.5">
-          <Button size="sm" variant={view === 'list' ? 'default' : 'ghost'} onClick={() => setView('list')}>
-            <List className="mr-1.5 h-3.5 w-3.5" /> Lista
-          </Button>
-          <Button size="sm" variant={view === 'flow' ? 'default' : 'ghost'} onClick={() => setView('flow')}>
-            <GitBranch className="mr-1.5 h-3.5 w-3.5" /> Fluxograma
-          </Button>
+        <div className="ml-auto flex items-center gap-2">
+          <NativeSelect
+            className="h-9 w-[200px] text-xs"
+            value={areaFilterId}
+            onChange={(e) => setAreaFilterId(e.target.value)}
+            title="Filtrar por área"
+          >
+            <option value="">Todas as áreas</option>
+            {areaOptions.map((a) => (
+              <option key={a.id} value={a.id}>{a.name}</option>
+            ))}
+          </NativeSelect>
+          <div className="inline-flex items-center rounded-md border p-0.5">
+            <Button size="sm" variant={view === 'list' ? 'default' : 'ghost'} onClick={() => setView('list')}>
+              <List className="mr-1.5 h-3.5 w-3.5" /> Lista
+            </Button>
+            <Button size="sm" variant={view === 'flow' ? 'default' : 'ghost'} onClick={() => setView('flow')}>
+              <GitBranch className="mr-1.5 h-3.5 w-3.5" /> Fluxograma
+            </Button>
+          </div>
         </div>
-      </div>
-
-      <div className="mb-6 grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
-        <MetricCard title="Ciclo ativo" value={activeCycle?.name ?? '-'} description={activeCycle ? `${formatDate(activeCycle.startsAt)} - ${formatDate(activeCycle.endsAt)}` : 'Crie um ciclo'} tone="blue" />
-        <MetricCard title="Objetivos" value={formatNumber(stats.objectives)} description="No ciclo selecionado" icon={<Target className="h-4 w-4" />} tone="purple" />
-        <MetricCard title="Resultado" value={formatNumber(stats.krs)} description="Métrica de resultado" icon={<Target className="h-4 w-4" />} tone="green" />
-        <MetricCard title="Progresso médio" value={formatPercent(stats.progress)} description={`${stats.risk} em risco`} icon={<Target className="h-4 w-4" />} tone="yellow" />
       </div>
 
       {view === 'list' && (
       <div className="grid gap-4">
-        {objectives.data?.map((o) => (
+        {filteredObjectives.map((o) => (
           <SectionCard
             key={o.id}
             title={o.name}
-            description={o.description ?? `${o.ownerName ?? 'Sem owner'}${o.team ? ` - ${o.team}` : ''}`}
+            description={o.description ?? `${o.ownerUser?.name ?? o.ownerName ?? 'Sem responsável'}${o.team ? ` · ${o.team}` : ''}`}
             actions={
-              <div className="flex flex-wrap gap-2">
+              <div className="flex flex-wrap items-center gap-2">
+                {o.area && <Badge variant="outline">{o.area.name}</Badge>}
+                {o.ownerUser && <span className="text-xs text-muted-foreground">{o.ownerUser.name}</span>}
+                {o.paceLabel && PACE_LABEL[o.paceLabel] && (
+                  <span className={`text-xs font-medium ${PACE_LABEL[o.paceLabel].tone}`}>{PACE_LABEL[o.paceLabel].label}</span>
+                )}
+                {o.needsCheckin && <Badge variant="secondary">Check-in pendente</Badge>}
                 <StatusBadge value={o.status} label={STATUS_LABEL[o.status] ?? o.status} />
                 {canUpdate && (
                   <Button
@@ -345,6 +401,11 @@ export default function OkrsPage() {
                   <div>
                     <div className="font-medium">{kr.metric}</div>
                     <div className="text-xs text-muted-foreground">peso {kr.weight} - {kr.direction}</div>
+                    {kr.indicator && (
+                      <Link href={`/indicators/${kr.indicator.id}`} className="mt-1 inline-flex items-center gap-1 rounded-full border bg-muted/40 px-2 py-0.5 text-[10px] text-muted-foreground hover:bg-accent/40">
+                        <RefreshCw className="h-3 w-3" /> {kr.indicator.code ? `${kr.indicator.code} - ` : ''}{kr.indicator.name}
+                      </Link>
+                    )}
                   </div>
                   <div className="text-xs text-muted-foreground">Início <strong className="text-foreground">{kr.startValue}</strong></div>
                   <div className="text-xs text-muted-foreground">Meta <strong className="text-foreground">{kr.targetValue}</strong></div>
@@ -352,11 +413,13 @@ export default function OkrsPage() {
                     <Input
                       type="number"
                       defaultValue={kr.currentValue}
+                      key={`${kr.id}-${kr.currentValue}`}
                       className="h-8 w-24"
                       step="0.01"
-                      disabled={!canUpdate}
+                      disabled={!canUpdate || !!kr.indicator}
+                      title={kr.indicator ? 'Valor atualizado automaticamente pelo indicador vinculado' : undefined}
                       onBlur={(e) => {
-                        if (!canUpdate) return;
+                        if (!canUpdate || kr.indicator) return;
                         const v = Number(e.target.value);
                         if (!Number.isFinite(v) || v === kr.currentValue) return;
                         updateKR.mutate({ krId: kr.id, currentValue: v });
@@ -391,7 +454,7 @@ export default function OkrsPage() {
 
       {view === 'flow' && (
         <OkrFlowchart
-          objectives={objectives.data ?? []}
+          objectives={filteredObjectives}
           onRefresh={() => objectives.refetch()}
           isFetching={objectives.isFetching}
         />
@@ -437,13 +500,27 @@ export default function OkrsPage() {
             </div>
             <div className="grid grid-cols-2 gap-3">
               <div>
-                <Label>Responsável</Label>
-                <Input value={objectiveForm.ownerName} onChange={(e) => setObjectiveForm({ ...objectiveForm, ownerName: e.target.value })} />
+                <Label>Área</Label>
+                <NativeSelect value={objectiveForm.ownerNodeId} onChange={(e) => setObjectiveForm({ ...objectiveForm, ownerNodeId: e.target.value })}>
+                  <option value="">Sem área</option>
+                  {areaOptions.map((a) => (
+                    <option key={a.id} value={a.id}>{a.name}</option>
+                  ))}
+                </NativeSelect>
               </div>
               <div>
-                <Label>Equipe</Label>
-                <Input value={objectiveForm.team} onChange={(e) => setObjectiveForm({ ...objectiveForm, team: e.target.value })} />
+                <Label>Responsável</Label>
+                <NativeSelect value={objectiveForm.ownerUserId} onChange={(e) => setObjectiveForm({ ...objectiveForm, ownerUserId: e.target.value })}>
+                  <option value="">Sem responsável</option>
+                  {(options.data?.users ?? []).map((u) => (
+                    <option key={u.id} value={u.id}>{u.name}</option>
+                  ))}
+                </NativeSelect>
               </div>
+            </div>
+            <div>
+              <Label>Equipe (opcional)</Label>
+              <Input value={objectiveForm.team} onChange={(e) => setObjectiveForm({ ...objectiveForm, team: e.target.value })} />
             </div>
             <div>
               <Label>Objetivo pai (opcional)</Label>
@@ -522,6 +599,30 @@ export default function OkrsPage() {
                 <option value="LOWER_BETTER">Quanto menor, melhor</option>
                 <option value="EQUAL_TARGET">Igual a meta</option>
               </NativeSelect>
+            </div>
+            <div>
+              <Label>Indicador vinculado (opcional)</Label>
+              <NativeSelect
+                value={krForm.indicatorId}
+                onChange={(e) => {
+                  const indicatorId = e.target.value;
+                  const ind = (options.data?.indicators ?? []).find((i) => i.id === indicatorId);
+                  setKrForm({
+                    ...krForm,
+                    indicatorId,
+                    metric: krForm.metric || ind?.name || '',
+                    unit: ind?.unit ?? krForm.unit,
+                  });
+                }}
+              >
+                <option value="">Sem vínculo (valor manual)</option>
+                {(options.data?.indicators ?? []).map((i) => (
+                  <option key={i.id} value={i.id}>{i.code ? `${i.code} - ` : ''}{i.name}</option>
+                ))}
+              </NativeSelect>
+              <p className="mt-1 text-xs text-muted-foreground">
+                Se vinculado, o valor atual do KR é atualizado automaticamente pelo último realizado do indicador.
+              </p>
             </div>
           </div>
           <DialogFooter>

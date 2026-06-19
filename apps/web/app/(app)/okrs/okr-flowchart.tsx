@@ -35,6 +35,10 @@ export interface FlowObjective {
   confidence: number;
   ownerName: string | null;
   team: string | null;
+  ownerUser?: { name: string } | null;
+  ownerNode?: { id: string; name: string } | null;
+  area?: { id: string; name: string } | null;
+  paceLabel?: 'AHEAD' | 'ON_TRACK' | 'BEHIND' | 'AT_RISK' | null;
   strategicObj?: {
     name: string;
     ownerNode?: { name: string } | null;
@@ -77,7 +81,15 @@ interface OkrNodeData {
   strategyLabel?: string | null;
   areaLabel?: string | null;
   indicatorCount?: number;
+  paceLabel?: string | null;
 }
+
+const PACE_LABEL: Record<string, { label: string; color: string }> = {
+  AHEAD: { label: 'Adiantado', color: '#2563eb' },
+  ON_TRACK: { label: 'No ritmo', color: '#16a34a' },
+  BEHIND: { label: 'Atrasado', color: '#f59e0b' },
+  AT_RISK: { label: 'Em risco', color: '#dc2626' },
+};
 
 function OkrNode({ data }: NodeProps<OkrNodeData>) {
   const color = STATUS_COLOR[data.status] ?? '#94a3b8';
@@ -93,11 +105,20 @@ function OkrNode({ data }: NodeProps<OkrNodeData>) {
           <span className="h-2 w-2 shrink-0 rounded-full" style={{ background: color }} />
           <span className="line-clamp-2 text-sm font-semibold leading-tight">{data.name}</span>
         </div>
-        {data.owner && <div className="truncate text-[11px] text-muted-foreground">{data.owner}</div>}
+        <div className="flex items-center justify-between gap-1">
+          {data.owner && <div className="truncate text-[11px] text-muted-foreground">{data.owner}</div>}
+          {data.paceLabel && PACE_LABEL[data.paceLabel] && (
+            <span className="shrink-0 text-[9px] font-semibold" style={{ color: PACE_LABEL[data.paceLabel].color }}>
+              {PACE_LABEL[data.paceLabel].label}
+            </span>
+          )}
+        </div>
+        {data.areaLabel && (
+          <div className="truncate text-[10px] font-medium text-foreground/70">{data.areaLabel}</div>
+        )}
         {data.strategyLabel && (
           <div className="truncate text-[10px] text-muted-foreground">
             {data.strategyLabel}
-            {data.areaLabel ? ` · ${data.areaLabel}` : ''}
             {data.indicatorCount ? ` · ${data.indicatorCount} ind.` : ''}
           </div>
         )}
@@ -179,13 +200,14 @@ function buildGraph(objectives: FlowObjective[], periodRef: string | null): { no
         data: {
           name: o.name,
           status: o.status,
-          owner: o.ownerName ?? o.team ?? null,
+          owner: o.ownerUser?.name ?? o.ownerName ?? o.team ?? null,
           progressNow: o.progress,
           progressAt: progressAtPeriod(o, periodRef),
           hasPeriod: !!periodRef,
           strategyLabel: o.strategicObj?.perspective?.name ?? o.strategicObj?.name ?? null,
-          areaLabel: o.strategicObj?.ownerNode?.name ?? null,
+          areaLabel: o.area?.name ?? o.ownerNode?.name ?? o.strategicObj?.ownerNode?.name ?? null,
           indicatorCount: o.strategicObj?.indicators?.length ?? 0,
+          paceLabel: o.paceLabel ?? null,
         } satisfies OkrNodeData,
       });
     });

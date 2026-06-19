@@ -470,6 +470,17 @@ export class MeetingsService {
       where: { id: meetingId },
       data: { status: MeetingStatus.COMPLETED },
     });
+    // Ao concluir a reuniao, as analises (5 Porques/Ishikawa/PDCA) ja foram sincronizadas
+    // ao plano via /actions/:id/analysis. Aqui iniciamos a execucao dos planos vinculados
+    // que ainda nao sairam das fases de definicao/analise.
+    await this.prisma.actionPlan.updateMany({
+      where: {
+        meetingId,
+        deletedAt: null,
+        status: { in: [ActionStatus.DRAFT, ActionStatus.NOT_STARTED, ActionStatus.UNDER_ANALYSIS] },
+      },
+      data: { status: ActionStatus.IN_PROGRESS },
+    });
     if (meeting.treatmentId) {
       await this.prisma.treatmentCase.update({
         where: { id: meeting.treatmentId },

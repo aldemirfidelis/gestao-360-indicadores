@@ -48,6 +48,37 @@ export class OkrsService {
     };
   }
 
+  /** Include padrao do objetivo OKR (com area, dono, KRs+indicador e check-ins). */
+  private objectiveInclude() {
+    return {
+      keyResults: {
+        include: {
+          indicator: {
+            select: {
+              id: true,
+              name: true,
+              code: true,
+              unit: true,
+              results: {
+                orderBy: { periodDate: 'desc' as const },
+                take: 1,
+                select: { value: true, periodRef: true, periodDate: true },
+              },
+            },
+          },
+        },
+      },
+      ownerNode: { select: { id: true, name: true, type: true } },
+      ownerUser: { select: { id: true, name: true, email: true, avatarUrl: true, jobTitle: true } },
+      strategicObj: { select: this.strategicObjectiveSelect() },
+      checkins: {
+        orderBy: { createdAt: 'asc' as const },
+        select: { weekRef: true, progress: true, confidence: true, createdAt: true, note: true },
+      },
+      _count: { select: { checkins: true } },
+    };
+  }
+
   async listCycles(companyId: string) {
     return this.prisma.oKRCycle.findMany({
       where: { companyId },
@@ -65,32 +96,62 @@ export class OkrsService {
   }
 
   async options(companyId: string) {
-    const strategicObjectives = await this.prisma.strategicObjective.findMany({
-      where: {
-        deletedAt: null,
-        active: true,
-        map: { companyId, deletedAt: null, active: true },
-      },
-      select: this.strategicObjectiveSelect(),
-      orderBy: [
-        { map: { startsAt: 'desc' } },
-        { perspective: { position: 'asc' } },
-        { position: 'asc' },
-        { name: 'asc' },
-      ],
-    });
+    const [strategic, areas, users, indicators] = await Promise.all([
+      this.prisma.strategicObjective.findMany({
+        where: {
+          deletedAt: null,
+          active: true,
+          map: { companyId, deletedAt: null, active: true },
+        },
+        select: this.strategicObjectiveSelect(),
+        orderBy: [
+          { map: { startsAt: 'desc' } },
+          { perspective: { position: 'asc' } },
+          { position: 'asc' },
+          { name: 'asc' },
+        ],
+      }),
+      this.prisma.orgNode.findMany({
+        where: { companyId, deletedAt: null, active: true },
+        select: { id: true, name: true, code: true, type: true, parentId: true },
+        orderBy: [{ position: 'asc' }, { name: 'asc' }],
+      }),
+      this.prisma.user.findMany({
+        where: { companyId, deletedAt: null, active: true },
+        select: { id: true, name: true, email: true, avatarUrl: true, jobTitle: true },
+        orderBy: { name: 'asc' },
+      }),
+      this.prisma.indicator.findMany({
+        where: { companyId, deletedAt: null, status: 'ACTIVE' },
+        select: {
+          id: true,
+          name: true,
+          code: true,
+          unit: true,
+          ownerNode: { select: { id: true, name: true } },
+        },
+        orderBy: { name: 'asc' },
+      }),
+    ]);
     return {
-      strategicObjectives: strategicObjectives.map((obj) => ({
+      strategicObjectives: strategic.map((obj) => ({
         ...obj,
         indicators: obj.indicatorLinks.map((link) => link.indicator),
       })),
+      areas,
+      users,
+      indicators,
     };
   }
 
   /** Garante que o ciclo pertence a empresa da sessao (isolamento multiempresa). */
   private async assertCycle(companyId: string, cycleId: string) {
-    const cycle = await this.prisma.oKRCycle.findFirst({ where: { id: cycleId, companyId }, select: { id: true } });
+    const cycle = await this.prisma.oKRCycle.findFirst({
+      where: { id: cycleId, companyId },
+      select: { id: true, startsAt: true, endsAt: true },
+    });
     if (!cycle) throw new NotFoundException('Ciclo OKR nao encontrado');
+    return cycle;
   }
 
   /** Carrega o objetivo isolado por empresa (via ciclo). */
@@ -109,6 +170,24 @@ export class OkrsService {
       where: { id: strategicObjId, deletedAt: null, map: { companyId, deletedAt: null } },
     });
     if (!ok) throw new NotFoundException('Objetivo estrategico nao encontrado');
+  }
+
+  /** Garante que a area (OrgNode) pertence a empresa. */
+  private async assertOrgNode(companyId: string, nodeId: string) {
+    const ok = await this.prisma.orgNode.count({ where: { id: nodeId, companyId, deletedAt: null } });
+    if (!ok) throw new NotFoundException('Area nao encontrada');
+  }
+
+  /** Garante que o usuario dono pertence a empresa. */
+  private async assertUser(companyId: string, userId: string) {
+    const ok = await this.prisma.user.count({ where: { id: userId, companyId, deletedAt: null } });
+    if (!ok) throw new NotFoundException('Usuario nao encontrado');
+  }
+
+  /** Garante que o indicador vinculado ao KR pertence a empresa. */
+  private async assertIndicator(companyId: string, indicatorId: string) {
+    const ok = await this.prisma.indicator.count({ where: { id: indicatorId, companyId, deletedAt: null } });
+    if (!ok) throw new NotFoundException('Indicador nao encontrado');
   }
 
   /** Garante que o objetivo pai pertence ao mesmo ciclo do OKR. */
@@ -131,43 +210,59 @@ export class OkrsService {
   }
 
   async listObjectives(me: AuthPayload, cycleId: string) {
-    await this.assertCycle(me.companyId, cycleId);
+    const cycle = await this.assertCycle(me.companyId, cycleId);
     const objs = await this.prisma.oKRObjective.findMany({
       where: { cycleId, deletedAt: null },
-      include: {
-        keyResults: true,
-        strategicObj: { select: this.strategicObjectiveSelect() },
-        checkins: {
-          orderBy: { createdAt: 'asc' },
-          select: { weekRef: true, progress: true, confidence: true, createdAt: true },
-        },
-        _count: { select: { checkins: true } },
-      },
+      include: this.objectiveInclude(),
       orderBy: { createdAt: 'asc' },
     });
-    return objs.map((o) => this.enrich(o));
+    return objs.map((o) => this.enrich(o, cycle));
   }
 
   async getObjective(me: AuthPayload, id: string) {
     const obj = await this.prisma.oKRObjective.findFirst({
       where: { id, deletedAt: null, cycle: { companyId: me.companyId } },
-      include: {
-        keyResults: true,
-        checkins: { orderBy: { createdAt: 'desc' }, take: 20 },
-        strategicObj: { select: this.strategicObjectiveSelect() },
-      },
+      include: { ...this.objectiveInclude(), cycle: { select: { startsAt: true, endsAt: true } } },
     });
     if (!obj) throw new NotFoundException('Objetivo OKR nao encontrado');
-    return this.enrich(obj);
+    return this.enrich(obj, (obj as any).cycle);
   }
 
-  enrich(obj: any) {
-    const krs: KRComputed[] = obj.keyResults.map((kr: any) => ({
-      ...kr,
-      progress: this.krProgress(kr),
-    }));
+  enrich(obj: any, cycle?: { startsAt: Date; endsAt: Date } | null) {
+    const krs: (KRComputed & { indicator: any; linkedValue: number | null })[] = obj.keyResults.map((kr: any) => {
+      // KR ligado a indicador: o valor atual reflete o ultimo realizado do indicador.
+      const linkedValue = kr.indicator?.results?.[0]?.value ?? null;
+      const currentValue = kr.indicatorId != null && linkedValue != null ? linkedValue : kr.currentValue;
+      const computed = { ...kr, currentValue };
+      return {
+        ...computed,
+        indicator: kr.indicator ? { id: kr.indicator.id, name: kr.indicator.name, code: kr.indicator.code, unit: kr.indicator.unit } : null,
+        linkedValue,
+        progress: this.krProgress(computed),
+      };
+    });
     const totalWeight = krs.reduce((a, k) => a + (k.weight || 1), 0) || 1;
     const overall = krs.reduce((a, k) => a + (k.progress * (k.weight || 1)) / totalWeight, 0);
+
+    // Saude / ritmo: progresso esperado pela posicao no tempo do ciclo.
+    let expectedProgress: number | null = null;
+    if (cycle?.startsAt && cycle?.endsAt) {
+      const s = new Date(cycle.startsAt).getTime();
+      const e = new Date(cycle.endsAt).getTime();
+      const now = Date.now();
+      expectedProgress = e > s ? Math.max(0, Math.min(1, (now - s) / (e - s))) : null;
+    }
+    const pace = expectedProgress != null ? overall - expectedProgress : null;
+    const paceLabel =
+      pace == null ? null : pace >= 0.05 ? 'AHEAD' : pace >= -0.1 ? 'ON_TRACK' : pace >= -0.25 ? 'BEHIND' : 'AT_RISK';
+
+    // Cadencia de check-in.
+    const weeks = (obj.checkins ?? []).map((c: any) => c.weekRef).filter(Boolean).sort();
+    const lastCheckinWeek = weeks.length ? weeks[weeks.length - 1] : null;
+    const currentWeek = this.weekRef(new Date());
+    const finished = obj.status === ObjectiveStatus.DONE || obj.status === ObjectiveStatus.CANCELLED;
+    const needsCheckin = !finished && lastCheckinWeek !== currentWeek;
+
     return {
       ...obj,
       strategicObj: obj.strategicObj
@@ -176,8 +271,17 @@ export class OkrsService {
             indicators: (obj.strategicObj.indicatorLinks ?? []).map((link: any) => link.indicator),
           }
         : null,
+      ownerNode: obj.ownerNode ?? null,
+      ownerUser: obj.ownerUser ?? null,
+      area: obj.ownerNode ?? obj.strategicObj?.ownerNode ?? null,
       keyResults: krs,
       progress: overall,
+      expectedProgress,
+      pace,
+      paceLabel,
+      lastCheckinWeek,
+      currentWeek,
+      needsCheckin,
     };
   }
 
@@ -204,6 +308,16 @@ export class OkrsService {
     return Math.max(0, 1 - dist / base);
   }
 
+  /** Semana ISO (YYYY-Www), mesmo formato usado nos check-ins. */
+  private weekRef(date: Date): string {
+    const d = new Date(Date.UTC(date.getUTCFullYear(), date.getUTCMonth(), date.getUTCDate()));
+    const dayNum = d.getUTCDay() || 7;
+    d.setUTCDate(d.getUTCDate() + 4 - dayNum);
+    const yearStart = new Date(Date.UTC(d.getUTCFullYear(), 0, 1));
+    const week = Math.ceil(((d.getTime() - yearStart.getTime()) / 86400000 + 1) / 7);
+    return `${d.getUTCFullYear()}-W${String(week).padStart(2, '0')}`;
+  }
+
   async createObjective(
     me: AuthPayload,
     cycleId: string,
@@ -212,6 +326,8 @@ export class OkrsService {
       description?: string;
       ownerName?: string;
       team?: string;
+      ownerNodeId?: string;
+      ownerUserId?: string;
       weight?: number;
       strategicObjId?: string;
       parentId?: string;
@@ -220,6 +336,8 @@ export class OkrsService {
     await this.assertCycle(me.companyId, cycleId);
     if (body.strategicObjId) await this.assertStrategicObjective(me.companyId, body.strategicObjId);
     if (body.parentId) await this.assertParentInCycle(me.companyId, body.parentId, cycleId);
+    if (body.ownerNodeId) await this.assertOrgNode(me.companyId, body.ownerNodeId);
+    if (body.ownerUserId) await this.assertUser(me.companyId, body.ownerUserId);
     return this.prisma.oKRObjective.create({
       data: {
         cycleId,
@@ -227,6 +345,8 @@ export class OkrsService {
         description: body.description ?? null,
         ownerName: body.ownerName ?? null,
         team: body.team ?? null,
+        ownerNodeId: body.ownerNodeId ?? null,
+        ownerUserId: body.ownerUserId ?? null,
         weight: body.weight ?? 1,
         strategicObjId: body.strategicObjId ?? null,
         parentId: body.parentId ?? null,
@@ -236,20 +356,16 @@ export class OkrsService {
 
   async updateObjective(me: AuthPayload, id: string, patch: any) {
     const current = await this.assertObjective(me.companyId, id);
-    // Nao permite remanejar de ciclo/empresa via PATCH nem persistir campos calculados.
-    const {
-      id: _i,
-      cycleId: _c,
-      keyResults: _k,
-      strategicObj: _s,
-      checkins: _ch,
-      progress: _p,
-      _count: _count,
-      ...safe
-    } = patch ?? {};
-    if (safe.strategicObjId) await this.assertStrategicObjective(me.companyId, safe.strategicObjId);
-    if (safe.parentId) await this.assertParentInCycle(me.companyId, safe.parentId, current.cycleId, id);
-    return this.prisma.oKRObjective.update({ where: { id }, data: safe });
+    if (patch?.strategicObjId) await this.assertStrategicObjective(me.companyId, patch.strategicObjId);
+    if (patch?.parentId) await this.assertParentInCycle(me.companyId, patch.parentId, current.cycleId, id);
+    if (patch?.ownerNodeId) await this.assertOrgNode(me.companyId, patch.ownerNodeId);
+    if (patch?.ownerUserId) await this.assertUser(me.companyId, patch.ownerUserId);
+    // Whitelist explicito: evita persistir campos calculados (area, pace, etc.) que voltam do front.
+    const data: Record<string, any> = {};
+    for (const key of ['name', 'description', 'ownerName', 'team', 'ownerNodeId', 'ownerUserId', 'weight', 'status', 'confidence', 'strategicObjId', 'parentId'] as const) {
+      if (key in (patch ?? {})) data[key] = patch[key];
+    }
+    return this.prisma.oKRObjective.update({ where: { id }, data });
   }
 
   async removeObjective(me: AuthPayload, id: string) {
@@ -269,9 +385,11 @@ export class OkrsService {
       direction?: Direction;
       weight?: number;
       responsible?: string;
+      indicatorId?: string;
     },
   ) {
     await this.assertObjective(me.companyId, objectiveId);
+    if (body.indicatorId) await this.assertIndicator(me.companyId, body.indicatorId);
     return this.prisma.keyResult.create({
       data: {
         objectiveId,
@@ -283,14 +401,19 @@ export class OkrsService {
         direction: body.direction ?? Direction.HIGHER_BETTER,
         weight: body.weight ?? 1,
         responsible: body.responsible ?? null,
+        indicatorId: body.indicatorId ?? null,
       },
     });
   }
 
   async updateKeyResult(me: AuthPayload, id: string, patch: any) {
     await this.assertKeyResult(me.companyId, id);
-    const { id: _i, objectiveId: _o, ...safe } = patch ?? {};
-    return this.prisma.keyResult.update({ where: { id }, data: safe });
+    if (patch?.indicatorId) await this.assertIndicator(me.companyId, patch.indicatorId);
+    const data: Record<string, any> = {};
+    for (const key of ['metric', 'unit', 'startValue', 'currentValue', 'targetValue', 'direction', 'weight', 'responsible', 'indicatorId'] as const) {
+      if (key in (patch ?? {})) data[key] = patch[key];
+    }
+    return this.prisma.keyResult.update({ where: { id }, data });
   }
 
   async removeKeyResult(me: AuthPayload, id: string) {

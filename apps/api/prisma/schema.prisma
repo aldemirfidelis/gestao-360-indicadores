@@ -713,6 +713,7 @@ model OrgNode {
   strategicObjectiveLinks StrategicObjectiveOrgNode[]
   orgEmployees            OrgEmployee[]
   activities              OrganizationalUnitActivity[] @relation("OrgNodeActivities")
+  okrObjectives           OKRObjective[]               @relation("OKRObjectiveOwnerNode")
 
   @@unique([companyId, externalSource, externalId])
   @@index([companyId])
@@ -857,6 +858,7 @@ model User {
   objectivesResponsible       StrategicObjective[]              @relation("StrategicObjectiveResponsible")
   objectivesCreated           StrategicObjective[]              @relation("StrategicObjectiveCreatedBy")
   objectivesUpdated           StrategicObjective[]              @relation("StrategicObjectiveUpdatedBy")
+  okrObjectivesOwned          OKRObjective[]                    @relation("OKRObjectiveOwnerUser")
   strategyVersions            StrategicMapVersion[]             @relation("StrategicVersionCreatedBy")
   closedMonthsClosed          ClosedMonth[]                     @relation("ClosedMonthClosedBy")
   closedMonthsReopened        ClosedMonth[]                     @relation("ClosedMonthReopenedBy")
@@ -1168,6 +1170,11 @@ model OKRObjective {
   description    String?
   ownerName      String?
   team           String?
+  // Vinculo real de area (OrgNode) e dono (User) — alem do texto livre legado.
+  ownerNodeId    String?
+  ownerNode      OrgNode?            @relation("OKRObjectiveOwnerNode", fields: [ownerNodeId], references: [id])
+  ownerUserId    String?
+  ownerUser      User?               @relation("OKRObjectiveOwnerUser", fields: [ownerUserId], references: [id])
   weight         Float               @default(1)
   confidence     Float               @default(0.5) // 0..1
   status         ObjectiveStatus     @default(PLANNED)
@@ -1180,6 +1187,8 @@ model OKRObjective {
 
   @@index([cycleId])
   @@index([parentId])
+  @@index([ownerNodeId])
+  @@index([ownerUserId])
 }
 
 model KeyResult {
@@ -1194,10 +1203,14 @@ model KeyResult {
   direction    Direction     @default(HIGHER_BETTER)
   weight       Float         @default(1)
   responsible  String?
+  // KR pode ser alimentado automaticamente por um indicador (puxa o ultimo realizado).
+  indicatorId  String?
+  indicator    Indicator?    @relation("KeyResultIndicator", fields: [indicatorId], references: [id])
   updatedAt    DateTime      @updatedAt
   createdAt    DateTime      @default(now())
 
   @@index([objectiveId])
+  @@index([indicatorId])
 }
 
 model OKRCheckin {
@@ -1275,6 +1288,7 @@ model Indicator {
   processes               Process[]                     @relation("ProcessIndicator")
   formTemplates           FormTemplate[]                @relation("FormTemplateIndicator")
   formSubmissions         FormSubmission[]              @relation("FormSubmissionIndicator")
+  keyResults              KeyResult[]                   @relation("KeyResultIndicator")
 
   @@unique([companyId, code])
   @@unique([companyId, externalSource, externalId])

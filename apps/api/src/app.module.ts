@@ -54,6 +54,7 @@ import { MyDayModule } from './modules/my-day/my-day.module';
 import { WorkItemEventsModule } from './modules/my-day/work-item-event-bus';
 import { PrizeModule } from './modules/prize/prize.module';
 import { CompensationModule } from './modules/compensation/compensation.module';
+import { MonthlyResultsModule } from './modules/monthly-results/monthly-results.module';
 
 @Module({
   imports: [
@@ -109,6 +110,7 @@ import { CompensationModule } from './modules/compensation/compensation.module';
     MyDayModule,
     PrizeModule,
     CompensationModule,
+    MonthlyResultsModule,
   ],
   providers: [
     { provide: APP_GUARD, useClass: ThrottlerGuard },
