@@ -79,7 +79,6 @@ export const navSections: NavSection[] = [
     intent: 'launch',
     icon: Upload,
     items: [
-      { href: '/deviations', label: 'Desvios', description: 'Indicadores fora da meta, causas e tratativas', icon: AlertTriangle, permissions: ['deviations:view'] },
       { href: '/imports', label: 'Importações', description: 'Importação estruturada de dados', icon: Upload, permissions: ['imports:view', 'imports:create'] },
     ],
   },
@@ -92,6 +91,7 @@ export const navSections: NavSection[] = [
       { href: '/cargos-salarios', label: 'Cargos e Salários', description: 'Estrutura, catálogo, tabelas salariais e movimentações', icon: Briefcase, permissions: ['compensation:view', 'org:positions:view'] },
       { href: '/aprovacoes-cargo', label: 'Aprovações', description: 'Cargo, eficácia e aprovações gerais', icon: ShieldCheck, permissions: ['org:positions:approve', 'eficacia:view', 'actions:effectiveness', 'actions:delete', 'actions:approve', 'actions:manage'] },
       { href: '/periods', label: 'Períodos', description: 'Ano de trabalho, abertura e fechamento anual', icon: CalendarDays, permissions: ['settings:manage'] },
+      { href: '/deviations', label: 'Desvios', description: 'Indicadores fora da meta, causas e tratativas', icon: AlertTriangle, permissions: ['deviations:view'] },
       { href: '/actions', label: 'Plano de Ação', description: 'Ações, execução, evidências e eficácia', icon: CheckSquare, permissions: ['actions:view'] },
       { href: '/risks', label: 'Riscos', description: 'Registro de riscos e mitigações', icon: AlertTriangle, permissions: ['risks:view'] },
       { href: '/nonconformities', label: 'Não Conformidades', description: 'NCs, causa raiz, ação corretiva e eficácia', icon: FileWarning, permissions: ['nc:view'] },

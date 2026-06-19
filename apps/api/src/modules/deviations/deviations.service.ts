@@ -2,6 +2,7 @@ import { ForbiddenException, Injectable, NotFoundException } from '@nestjs/commo
 import { PrismaService } from '../../prisma/prisma.service';
 import {
   ActionOrigin,
+  ActionAnalysisTool,
   ActionPriority,
   ActionStatus,
   AnalysisMethod,
@@ -72,6 +73,16 @@ export class DeviationsService {
       include: {
         indicator: { select: { id: true, name: true, code: true, ownerNodeId: true } },
         responsibleUser: { select: { id: true, name: true } },
+        analyses: {
+          orderBy: { createdAt: 'desc' },
+          take: 1,
+          select: { id: true, method: true, content: true, createdAt: true },
+        },
+        actions: {
+          orderBy: { createdAt: 'desc' },
+          take: 3,
+          select: { id: true, title: true, status: true, dueDate: true },
+        },
         _count: { select: { causes: true, actions: true, analyses: true } },
       },
       orderBy: { openedAt: 'desc' },
@@ -257,16 +268,23 @@ export class DeviationsService {
       data: {
         companyId: dev.companyId,
         deviationId: dev.id,
+        indicatorId: dev.indicatorId,
         origin: ActionOrigin.DEVIATION,
         originRefId: dev.id,
         title: body.title,
         description: body.description ?? null,
+        problemDescription: dev.fact ?? dev.title,
+        analysisTool: this.methodToTool(dev.method),
+        rootCause: dev.rootCause ?? null,
         responsibleUserId: body.responsibleUserId ?? dev.responsibleUserId ?? null,
         ownerNodeId: body.ownerNodeId ?? dev.indicator?.ownerNodeId ?? null,
         priority: (body.priority as ActionPriority | undefined) ?? ActionPriority.HIGH,
+        criticality: (body.priority as ActionPriority | undefined) ?? ActionPriority.HIGH,
         status: ActionStatus.NOT_STARTED,
         dueDate: body.dueDate ? new Date(body.dueDate) : dev.dueDate,
         estimatedCost: body.estimatedCost ?? null,
+        expectedResult: dev.impact ?? null,
+        evidenceRequired: true,
         createdById: me.sub,
       },
     });
@@ -334,6 +352,16 @@ export class DeviationsService {
       statusTo: closed.status,
     });
     return closed;
+  }
+
+  private methodToTool(method: AnalysisMethod | string | null | undefined): ActionAnalysisTool | null {
+    if (method === AnalysisMethod.FIVE_WHYS) return ActionAnalysisTool.FIVE_WHYS;
+    if (method === AnalysisMethod.ISHIKAWA) return ActionAnalysisTool.ISHIKAWA;
+    if (method === AnalysisMethod.MASP) return ActionAnalysisTool.MASP;
+    if (method === AnalysisMethod.PDCA) return ActionAnalysisTool.PDCA;
+    if (method === AnalysisMethod.PARETO) return ActionAnalysisTool.PARETO;
+    if (method === AnalysisMethod.FCA) return ActionAnalysisTool.FCA;
+    return ActionAnalysisTool.ROOT_CAUSE;
   }
 }
 

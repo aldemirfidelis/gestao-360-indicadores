@@ -2,6 +2,7 @@
 
 import { useQuery } from '@tanstack/react-query';
 import Link from 'next/link';
+import { useSearchParams } from 'next/navigation';
 import { AlertTriangle } from 'lucide-react';
 import { PageHeader } from '@/components/shell/page-header';
 import { Card, CardContent } from '@/components/ui/card';
@@ -41,9 +42,11 @@ const STATUS_LABEL: Record<string, string> = {
 };
 
 export default function DeviationsPage() {
+  const searchParams = useSearchParams();
+  const indicatorId = searchParams.get('indicatorId') ?? '';
   const query = useQuery<Deviation[]>({
-    queryKey: ['deviations'],
-    queryFn: () => api<Deviation[]>('/deviations'),
+    queryKey: ['deviations', indicatorId],
+    queryFn: () => api<Deviation[]>(`/deviations${indicatorId ? `?indicatorId=${encodeURIComponent(indicatorId)}` : ''}`),
   });
 
   return (
@@ -72,11 +75,15 @@ export default function DeviationsPage() {
                       </span>
                       <Badge variant="secondary">{STATUS_LABEL[d.status] ?? d.status}</Badge>
                     </div>
-                    <Link href={`/indicators/${d.indicator.id}`} className="font-medium hover:underline">
+                    <Link href={`/deviations/${d.id}`} className="font-medium hover:underline">
                       {d.title}
                     </Link>
                     <div className="text-xs text-muted-foreground">
-                      Indicador: {d.indicator.name} - Período: {periodRefLabel(d.periodRef)}
+                      Indicador:{' '}
+                      <Link href={`/indicators/${d.indicator.id}`} className="hover:underline">
+                        {d.indicator.name}
+                      </Link>{' '}
+                      - Período: {periodRefLabel(d.periodRef)}
                     </div>
                   </div>
                 </div>

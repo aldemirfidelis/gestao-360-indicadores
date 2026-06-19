@@ -1,14 +1,15 @@
 'use client';
 
-import { useParams } from 'next/navigation';
-import { useQuery, useMutation } from '@tanstack/react-query';
+import { useParams, useRouter } from 'next/navigation';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useState } from 'react';
 import type { ReactNode } from 'react';
 import { toast } from 'sonner';
 import {
+  Bar,
+  BarChart,
   CartesianGrid,
-  Line,
-  LineChart,
+  Cell,
   ResponsiveContainer,
   Tooltip,
   XAxis,
@@ -106,6 +107,11 @@ interface DeviationSummary {
   status: string;
   severity: string;
   periodRef: string;
+  fact?: string | null;
+  rootCause?: string | null;
+  impact?: string | null;
+  analyses?: { id: string; method: string; content: string; createdAt: string }[];
+  actions?: { id: string; title: string; status: string; dueDate: string | null }[];
   _count?: { causes: number; actions: number; analyses: number };
 }
 
@@ -121,6 +127,8 @@ const STATUS_LABEL = ACTION_STATUS_LABEL;
 export default function IndicatorDetailPage() {
   const params = useParams<{ id: string }>();
   const id = params.id;
+  const router = useRouter();
+  const queryClient = useQueryClient();
   const [auditOpen, setAuditOpen] = useState(false);
   const { open: openVision360 } = useVision360();
 
@@ -168,7 +176,12 @@ export default function IndicatorDetailPage() {
           severity: 'CRITICAL',
         },
       }),
-    onSuccess: (d) => toast.success(`Desvio #${d.number} aberto`),
+    onSuccess: (d) => {
+      toast.success(`Desvio #${d.number} aberto`);
+      queryClient.invalidateQueries({ queryKey: ['indicator', id, 'deviations'] });
+      queryClient.invalidateQueries({ queryKey: ['traceability', 'indicator', id] });
+      router.push(`/deviations/${d.id}`);
+    },
     onError: (e: any) => toast.error(e?.message ?? 'Falha ao abrir desvio'),
   });
 
@@ -180,12 +193,25 @@ export default function IndicatorDetailPage() {
     label: periodRefLabel(p.periodRef),
     target: p.target,
     value: p.value,
+    light: p.light,
   }));
   const deviationRows = deviations.data ?? [];
   const principalDeviation = getPrincipalDeviation(ind);
   const linkedPrincipalDeviation = principalDeviation
     ? deviationRows.find((d) => d.periodRef === principalDeviation.result.periodRef) ?? null
     : deviationRows[0] ?? null;
+  const openOrCreateDeviation = (targetDeviation?: DeviationSummary | null) => {
+    const existing = targetDeviation ?? linkedPrincipalDeviation ?? deviationRows[0] ?? null;
+    if (existing) {
+      router.push(`/deviations/${existing.id}`);
+      return;
+    }
+    if (!last?.periodRef) {
+      toast.error('Registre um resultado do indicador antes de abrir um desvio.');
+      return;
+    }
+    openDeviation.mutate();
+  };
 
   return (
     <div>
@@ -201,10 +227,14 @@ export default function IndicatorDetailPage() {
             <Button variant="outline" className="gap-1.5" onClick={() => openVision360('INDICATOR', ind.id)}>
               <Network className="h-4 w-4 text-primary" /> Visão 360°
             </Button>
-            {last?.light === 'RED' && (
-              <Button variant="destructive" onClick={() => openDeviation.mutate()} disabled={openDeviation.isPending || !last?.id}>
+            {(last || linkedPrincipalDeviation) && (
+              <Button
+                variant={last?.light === 'RED' ? 'destructive' : 'outline'}
+                onClick={() => openOrCreateDeviation(linkedPrincipalDeviation)}
+                disabled={openDeviation.isPending}
+              >
                 <AlertTriangle className="mr-2 h-4 w-4" />
-                {openDeviation.isPending ? 'Abrindo...' : 'Abrir análise de causa'}
+                {openDeviation.isPending ? 'Abrindo...' : linkedPrincipalDeviation ? 'Abrir desvio' : 'Registrar desvio'}
               </Button>
             )}
           </div>
@@ -283,41 +313,35 @@ export default function IndicatorDetailPage() {
           principalDeviation={linkedPrincipalDeviation}
           deviations={deviationRows}
           currentTreatment={currentTreatment.data ?? null}
+          onOpenDeviation={openOrCreateDeviation}
+          openingDeviation={openDeviation.isPending}
+          canCreateDeviation={Boolean(last?.periodRef)}
         />
 
         <Card>
           <CardHeader>
-            <CardTitle>Evolução (12 períodos)</CardTitle>
+            <CardTitle>Evolução em barras (12 períodos)</CardTitle>
           </CardHeader>
           <CardContent className="h-80">
             <ResponsiveContainer width="100%" height="100%">
-              <LineChart data={chartData}>
-                <CartesianGrid strokeDasharray="3 3" className="stroke-border" />
+              <BarChart data={chartData} barGap={6}>
+                <CartesianGrid vertical={false} strokeDasharray="3 3" className="stroke-border" />
                 <XAxis dataKey="label" tick={{ fontSize: 12 }} />
                 <YAxis tick={{ fontSize: 12 }} />
                 <Tooltip
                   contentStyle={{ background: 'hsl(var(--card))', border: '1px solid hsl(var(--border))' }}
+                  formatter={(value, name) => [
+                    typeof value === 'number' ? formatNumber(value, { maximumFractionDigits: 2 }) : value,
+                    name === 'target' || name === 'Meta' ? 'Meta' : 'Realizado',
+                  ]}
                 />
-                <Line type="monotone" dataKey="target" stroke="#1e3a8a" strokeDasharray="5 5" strokeWidth={2.5} dot={false} name="Meta" />
-                <Line
-                  type="monotone"
-                  dataKey="value"
-                  stroke="hsl(var(--status-blue))"
-                  strokeWidth={2.5}
-                  dot={(dotProps: any) => {
-                    const { cx, cy, payload, index } = dotProps;
-                    if (payload.value === null || payload.value === undefined) {
-                      return <circle key={`dot-${index}`} cx={cx} cy={cy} r={0} fill="transparent" />;
-                    }
-                    const isWithin = ind.direction === 'LOWER_BETTER'
-                      ? (payload.value ?? 0) <= (payload.target ?? 0)
-                      : (payload.value ?? 0) >= (payload.target ?? 0);
-                    const color = isWithin ? '#10b981' : '#ef4444';
-                    return <circle key={`dot-${index}`} cx={cx} cy={cy} r={4.5} fill={color} stroke={color} />;
-                  }}
-                  name="Realizado"
-                />
-              </LineChart>
+                <Bar dataKey="target" name="Meta" fill="#1e3a8a" opacity={0.28} radius={[4, 4, 0, 0]} />
+                <Bar dataKey="value" name="Realizado" radius={[4, 4, 0, 0]}>
+                  {chartData.map((point, index) => (
+                    <Cell key={`${point.label}-${index}`} fill={barColor(point.light)} />
+                  ))}
+                </Bar>
+              </BarChart>
             </ResponsiveContainer>
           </CardContent>
         </Card>
@@ -388,20 +412,14 @@ export default function IndicatorDetailPage() {
             <CardTitle className="text-sm">Próximos passos sugeridos</CardTitle>
           </CardHeader>
           <CardContent className="flex flex-wrap gap-2 pt-0">
-            <Button variant="outline" size="sm" asChild>
-              <Link href="/org">
-                <Network className="mr-1.5 h-4 w-4" />
-                Ver na árvore
-              </Link>
-            </Button>
             <Button
               variant={last?.light === 'RED' ? 'destructive' : 'outline'}
               size="sm"
-              onClick={() => openDeviation.mutate()}
-              disabled={!last || last.light !== 'RED' || openDeviation.isPending}
+              onClick={() => openOrCreateDeviation(linkedPrincipalDeviation)}
+              disabled={openDeviation.isPending || (!linkedPrincipalDeviation && !last?.periodRef)}
             >
               <AlertTriangle className="mr-1.5 h-4 w-4" />
-              Abrir análise de causa
+              {openDeviation.isPending ? 'Abrindo...' : 'Abrir Desvio'}
             </Button>
             <Button variant="outline" size="sm" asChild>
               <Link href="/meetings">
@@ -569,22 +587,32 @@ function IndicatorDecisionCards({
   principalDeviation,
   deviations,
   currentTreatment,
+  onOpenDeviation,
+  openingDeviation,
+  canCreateDeviation,
 }: {
   indicator: IndicatorDetail;
   principal: PrincipalDeviation | null;
   principalDeviation: DeviationSummary | null;
   deviations: DeviationSummary[];
   currentTreatment: CurrentTreatment | null;
+  onOpenDeviation: (deviation?: DeviationSummary | null) => void;
+  openingDeviation: boolean;
+  canCreateDeviation: boolean;
 }) {
   const actionRows = indicator.actions ?? [];
   const openActions = actionRows.filter((action) => !['DONE', 'DONE_LATE', 'CANCELLED', 'EFFECTIVE', 'INEFFECTIVE'].includes(action.status));
-  const deviationHref = principalDeviation ? `/deviations/${principalDeviation.id}` : '/deviations';
+  const mainDeviation = principalDeviation ?? deviations[0] ?? null;
+  const deviationHref = mainDeviation ? `/deviations/${mainDeviation.id}` : '/deviations';
   const treatmentHref = currentTreatment ? `/treatments/${currentTreatment.id}` : '/treatments';
+  const latestAnalysis = mainDeviation?.analyses?.[0] ?? null;
+  const linkedActions = uniqueActionRows([...deviations.flatMap((deviation) => deviation.actions ?? []), ...openActions]);
+  const rootCause = mainDeviation?.rootCause?.trim();
 
   return (
     <aside className="grid gap-3">
       <DecisionCard tone="red" title="Desvio principal">
-        <div className="space-y-2 text-sm">
+        <div className="space-y-3 text-sm">
           <p>
             <span className="text-muted-foreground">Desvio da meta: </span>
             <span className="font-semibold text-foreground">{formatDeviationSummary(principal)}</span>
@@ -593,19 +621,39 @@ function IndicatorDecisionCards({
             <span className="text-muted-foreground">Impacto financeiro/operacional estimado: </span>
             <span className="font-medium text-foreground">{formatOperationalImpact(indicator, principal)}</span>
           </p>
-          <DecisionList>
-            <DecisionLink href={deviationHref}>
-              {principalDeviation ? `Abrir desvio #${principalDeviation.number}` : 'Ver desvios do indicador'}
-            </DecisionLink>
-          </DecisionList>
+          {mainDeviation?.impact && (
+            <p className="rounded-md bg-muted/35 p-2 text-xs leading-relaxed text-muted-foreground">
+              Impacto registrado: {truncateText(mainDeviation.impact, 150)}
+            </p>
+          )}
+          <Button
+            variant={mainDeviation ? 'outline' : 'destructive'}
+            size="sm"
+            onClick={() => onOpenDeviation(mainDeviation)}
+            disabled={openingDeviation || (!mainDeviation && !canCreateDeviation)}
+          >
+            <AlertTriangle className="mr-1.5 h-4 w-4" />
+            {openingDeviation ? 'Abrindo...' : mainDeviation ? `Abrir desvio #${mainDeviation.number}` : 'Registrar Desvio'}
+          </Button>
         </div>
       </DecisionCard>
 
       <DecisionCard tone="olive" title="Providências">
+        <p className="mb-3 text-sm leading-relaxed text-muted-foreground">
+          {summarizeProvidence(deviations, openActions, indicator.meetings ?? [], currentTreatment)}
+        </p>
+        <div className="mb-3">
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => onOpenDeviation(mainDeviation)}
+            disabled={openingDeviation || (!mainDeviation && !canCreateDeviation)}
+          >
+            <AlertTriangle className="mr-1.5 h-4 w-4" />
+            {mainDeviation ? 'Abrir desvio para análise' : 'Registrar Desvio'}
+          </Button>
+        </div>
         <DecisionList>
-          <DecisionLink href={deviationHref}>
-            {principalDeviation ? 'Conferir fato e impacto do desvio' : 'Registrar desvio ou análise de causa'}
-          </DecisionLink>
           <DecisionLink href={treatmentHref}>
             {currentTreatment ? 'Abrir tratativa em andamento' : 'Ver fila de tratativas do indicador'}
           </DecisionLink>
@@ -614,6 +662,20 @@ function IndicatorDecisionCards({
       </DecisionCard>
 
       <DecisionCard tone="orange" title="Causa Raiz">
+        <div className="mb-3 space-y-2 text-sm">
+          <p className="leading-relaxed text-foreground">
+            {rootCause
+              ? rootCause
+              : mainDeviation
+                ? `Causa raiz ainda não consolidada. Existem ${mainDeviation._count?.causes ?? 0} causa(s) e ${mainDeviation._count?.analyses ?? 0} análise(s) registradas no desvio.`
+                : 'Nenhum desvio registrado para consolidar causa raiz.'}
+          </p>
+          {latestAnalysis && (
+            <p className="rounded-md bg-muted/35 p-2 text-xs leading-relaxed text-muted-foreground">
+              Última análise: {truncateText(latestAnalysis.content, 170)}
+            </p>
+          )}
+        </div>
         <DecisionList>
           {deviations.slice(0, 2).map((deviation) => (
             <DecisionLink key={deviation.id} href={`/deviations/${deviation.id}`}>
@@ -628,13 +690,20 @@ function IndicatorDecisionCards({
       </DecisionCard>
 
       <DecisionCard tone="green" title="Plano de Ação">
+        <p className="mb-3 text-sm leading-relaxed text-muted-foreground">
+          {summarizeActionPlan(linkedActions, actionRows.length)}
+        </p>
         <DecisionList>
-          {openActions.slice(0, 3).map((action) => (
+          {linkedActions.slice(0, 3).map((action) => (
             <DecisionLink key={action.id} href={`/actions/${action.id}`}>
               {`${action.title} - ${STATUS_LABEL[action.status] ?? action.status}`}
             </DecisionLink>
           ))}
-          {openActions.length === 0 && <DecisionLink href="/actions">Criar ou consultar plano de ação</DecisionLink>}
+          {linkedActions.length === 0 && (
+            <DecisionLink href={deviationHref}>
+              {mainDeviation ? 'Criar plano de ação a partir do desvio' : 'Registrar desvio antes do plano de ação'}
+            </DecisionLink>
+          )}
           <DecisionLink href="/actions">Ver todos os planos vinculados</DecisionLink>
         </DecisionList>
       </DecisionCard>
@@ -671,6 +740,51 @@ function DecisionLink({ href, children }: { href: string; children: ReactNode })
       </Link>
     </li>
   );
+}
+
+function uniqueActionRows(actions: { id: string; title: string; status: string; dueDate: string | null }[]) {
+  const byId = new Map<string, { id: string; title: string; status: string; dueDate: string | null }>();
+  for (const action of actions) byId.set(action.id, action);
+  return Array.from(byId.values());
+}
+
+function summarizeProvidence(
+  deviations: DeviationSummary[],
+  openActions: { id: string; title: string; status: string; dueDate: string | null }[],
+  meetings: { id: string; title: string; status: string; startsAt: string | null }[],
+  treatment: CurrentTreatment | null,
+) {
+  const openDeviationCount = deviations.filter((deviation) => !['CLOSED', 'CLOSED_LATE', 'CANCELLED'].includes(deviation.status)).length;
+  const meetingCount = meetings.length;
+  const parts = [
+    `${openDeviationCount} desvio(s) em acompanhamento`,
+    `${openActions.length} plano(s) em aberto`,
+    `${meetingCount} reunião(ões) vinculada(s)`,
+  ];
+  if (treatment) parts.push('tratativa em andamento');
+  return `Resumo automático: ${parts.join(', ')}.`;
+}
+
+function summarizeActionPlan(actions: { id: string; title: string; status: string; dueDate: string | null }[], totalActions: number) {
+  if (actions.length === 0) return 'Nenhum plano de ação vinculado ao desvio ainda. Crie o plano após consolidar a análise de causa.';
+  const open = actions.filter((action) => !['DONE', 'DONE_LATE', 'CANCELLED', 'EFFECTIVE', 'INEFFECTIVE'].includes(action.status)).length;
+  const done = totalActions - open;
+  return `Resumo automático: ${open} plano(s) em aberto e ${Math.max(done, 0)} concluído(s) ou encerrado(s).`;
+}
+
+function truncateText(value: string, maxLength: number) {
+  const clean = value.trim().replace(/\s+/g, ' ');
+  return clean.length > maxLength ? `${clean.slice(0, maxLength - 1)}…` : clean;
+}
+
+function barColor(light: string) {
+  const colors: Record<string, string> = {
+    GREEN: '#047857',
+    YELLOW: '#d97706',
+    RED: '#b91c1c',
+    GRAY: '#94a3b8',
+  };
+  return colors[light] ?? colors.GRAY;
 }
 
 function getPrincipalDeviation(indicator: IndicatorDetail): PrincipalDeviation | null {

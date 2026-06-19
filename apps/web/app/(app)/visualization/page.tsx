@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { BarChart3, Edit3, MessageSquareText } from 'lucide-react';
+import Link from 'next/link';
 import { PageHeader } from '@/components/shell/page-header';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
@@ -235,10 +236,14 @@ function ExecutiveIndicatorCard({ indicator }: { indicator: IndicatorRow }) {
   const valueText = formatNumber(indicator.last?.value, { maximumFractionDigits: 2 });
   const unitText = displayUnit(indicator.unitLabel || indicator.unit);
   return (
-    <article className="panel relative flex min-h-[178px] min-w-0 flex-col overflow-hidden p-4">
+    <Link
+      href={`/indicators/${indicator.id}`}
+      className="panel panel-hover group relative flex min-h-[178px] min-w-0 flex-col overflow-hidden p-4 outline-none transition-colors focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+      aria-label={`Abrir detalhe do indicador ${indicator.name}`}
+    >
       <div className="flex min-w-0 items-start justify-between gap-3">
         <div className="min-w-0 flex-1">
-          <h2 className="line-clamp-2 break-words text-sm font-semibold leading-snug text-foreground" title={indicator.name}>
+          <h2 className="line-clamp-2 break-words text-sm font-semibold leading-snug text-foreground transition-colors group-hover:text-primary" title={indicator.name}>
             {indicator.name}
           </h2>
           {indicator.code && <div className="mt-1 truncate text-[11px] font-medium uppercase tracking-[0.08em] text-muted-foreground">{indicator.code}</div>}
@@ -262,7 +267,7 @@ function ExecutiveIndicatorCard({ indicator }: { indicator: IndicatorRow }) {
           <span className="truncate">{LIGHT_TEXT[light] ?? LIGHT_TEXT.GRAY}</span>
         </div>
       </div>
-    </article>
+    </Link>
   );
 }
 
