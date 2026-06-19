@@ -116,7 +116,6 @@ export default function VisualizationPage() {
       <PageHeader
         eyebrow="Painel executivo"
         title="Visão executiva por área"
-        description="Resumo objetivo dos indicadores da árvore organizacional para conduzir reuniões, priorizar riscos e decidir próximos passos."
         tone="view"
       />
 
@@ -234,6 +233,7 @@ function ExecutiveIndicatorCard({ indicator }: { indicator: IndicatorRow }) {
   const light = indicator.last?.light ?? 'GRAY';
   const targetText = formatTarget(indicator);
   const valueText = formatNumber(indicator.last?.value, { maximumFractionDigits: 2 });
+  const unitText = displayUnit(indicator.unitLabel || indicator.unit);
   return (
     <article className="panel relative flex min-h-[178px] min-w-0 flex-col overflow-hidden p-4">
       <div className="flex min-w-0 items-start justify-between gap-3">
@@ -250,7 +250,7 @@ function ExecutiveIndicatorCard({ indicator }: { indicator: IndicatorRow }) {
         <div className="truncate text-[30px] font-semibold leading-none tabular-nums tracking-tight text-foreground" title={valueText}>
           {valueText}
         </div>
-        <div className="mt-1 truncate text-xs font-medium text-muted-foreground">{indicator.unitLabel || indicator.unit || 'Resultado'}</div>
+        <div className="mt-1 truncate text-xs font-medium text-muted-foreground">{unitText}</div>
       </div>
 
       <div className="mt-auto min-w-0 pt-4">
@@ -299,22 +299,51 @@ function ExecutiveReadItem({ color, title, text }: { color: string; title: strin
 }
 
 function formatTarget(indicator: IndicatorRow) {
-  const unit = indicator.unitLabel || indicator.unit || '';
+  const unit = unitSuffix(indicator.unitLabel || indicator.unit || '');
   const lower = indicator.currentTarget?.lowerBound;
   const upper = indicator.currentTarget?.upperBound;
   const target = indicator.currentTarget?.target;
 
   if (lower !== null && lower !== undefined && upper !== null && upper !== undefined) {
-    return `${formatNumber(lower)} a ${formatNumber(upper)}${unitSuffix(unit)}`;
+    return `${formatNumber(lower)} a ${formatNumber(upper)}${unit}`;
   }
   if (target === null || target === undefined) return '-';
   const prefix = indicator.direction === 'LOWER_BETTER' ? '<= ' : indicator.direction === 'HIGHER_BETTER' ? '>= ' : '= ';
-  return `${prefix}${formatNumber(target)}${unitSuffix(unit)}`;
+  return `${prefix}${formatNumber(target)}${unit}`;
+}
+
+function displayUnit(unit: string | null | undefined) {
+  const clean = unit?.trim();
+  if (!clean || clean === 'un') return 'Resultado';
+  const labels: Record<string, string> = {
+    PERCENT: 'Percentual',
+    CURRENCY: 'Moeda',
+    QUANTITY: 'Quantidade',
+    HOURS: 'Horas',
+    DAYS: 'Dias',
+    TONS: 'Toneladas',
+    LITERS: 'Litros',
+    INDEX: 'Índice',
+    TEXT: 'Texto',
+    CUSTOM: 'Personalizada',
+  };
+  return labels[clean.toUpperCase()] ?? clean;
 }
 
 function unitSuffix(unit: string) {
-  if (!unit || unit === 'un') return '';
-  return unit === '%' ? '%' : ` ${unit}`;
+  const clean = unit.trim();
+  if (!clean || clean === 'un') return '';
+  const suffixes: Record<string, string> = {
+    PERCENT: '%',
+    CURRENCY: ' R$',
+    QUANTITY: ' quantidade',
+    HOURS: ' horas',
+    DAYS: ' dias',
+    TONS: ' toneladas',
+    LITERS: ' litros',
+    INDEX: ' índice',
+  };
+  return clean === '%' ? '%' : suffixes[clean.toUpperCase()] ?? ` ${clean}`;
 }
 
 function buildIndentedNodes(nodes: OrgNodeOption[]) {
