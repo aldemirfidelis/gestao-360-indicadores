@@ -2,7 +2,10 @@
 
 import { useEffect, useMemo, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { BarChart3, Edit3, MessageSquareText } from 'lucide-react';
+import { PageHeader } from '@/components/shell/page-header';
 import { Button } from '@/components/ui/button';
+import { Card, CardContent } from '@/components/ui/card';
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Label } from '@/components/ui/label';
 import { NativeSelect } from '@/components/ui/select';
@@ -37,7 +40,7 @@ interface IndicatorRow {
 }
 
 const PLACEHOLDER_CARDS = 8;
-const CONCLUSION_PLACEHOLDER = '[Escrever em 2 ou 3 linhas a conclusão executiva: resultado geral, maior risco e decisão necessária.]';
+const CONCLUSION_PLACEHOLDER = 'Nenhuma mensagem-chave registrada para esta área.';
 
 const LIGHT_DOT: Record<string, string> = {
   GREEN: 'bg-emerald-700',
@@ -96,7 +99,6 @@ export default function VisualizationPage() {
   const indicatorRows = indicators.data ?? [];
   const selectedNode = orderedNodes.find((node) => node.id === selectedNodeId);
   const visibleCards = indicatorRows.slice(0, PLACEHOLDER_CARDS);
-  const emptySlots = Math.max(0, PLACEHOLDER_CARDS - visibleCards.length);
   const conclusion = conclusionQuery.data?.conclusion ?? '';
 
   const openConclusionEditor = () => {
@@ -110,72 +112,91 @@ export default function VisualizationPage() {
   };
 
   return (
-    <div className="-m-6 min-h-[calc(100vh-4rem)] bg-white pb-8 text-slate-950">
-      <div className="h-11 bg-gradient-to-r from-[#69b45f] via-[#53ab76] to-[#1f8f7b]" />
+    <div className="space-y-5">
+      <PageHeader
+        eyebrow="Painel executivo"
+        title="Visão executiva por área"
+        description="Resumo objetivo dos indicadores da árvore organizacional para conduzir reuniões, priorizar riscos e decidir próximos passos."
+        tone="view"
+      />
 
-      <main className="px-7 pb-6 pt-3">
-        <div className="mb-5 grid gap-4 lg:grid-cols-[minmax(0,1fr),360px] lg:items-end">
-          <div>
-            <div className="text-sm text-slate-600">Visão de uma página para iniciar a reunião e definir onde aprofundar.</div>
-            <div className="mt-4 max-w-xl">
-              <Label htmlFor="area-select" className="mb-1.5 block text-xs font-semibold uppercase tracking-wide text-slate-600">
-                Área da árvore organizacional
-              </Label>
-              <NativeSelect
-                id="area-select"
-                value={selectedNodeId}
-                onChange={(event) => setSelectedNodeId(event.target.value)}
-                className="h-11 rounded-md border-slate-300 bg-white text-slate-900 shadow-sm"
-              >
-                {orderedNodes.length === 0 && <option value="">Nenhuma área cadastrada</option>}
-                {orderedNodes.map((node) => (
-                  <option key={node.id} value={node.id}>
-                    {`${'\u00A0'.repeat(node.depth * 4)}${node.name}`}
-                  </option>
-                ))}
-              </NativeSelect>
+      <Card className="overflow-hidden">
+        <CardContent className="grid gap-4 p-4 lg:grid-cols-[minmax(0,1fr),minmax(280px,420px)] lg:items-end">
+          <div className="min-w-0">
+            <div className="flex items-center gap-2 text-sm font-semibold text-foreground">
+              <BarChart3 className="h-4 w-4 shrink-0 text-status-green" />
+              <span>Escopo do painel</span>
             </div>
+            <p className="mt-1 max-w-2xl text-sm leading-relaxed text-muted-foreground">
+              Indicadores principais, faróis e mensagem-chave do mês em uma visão compacta para decisão.
+            </p>
           </div>
 
-          <div className="justify-self-start rounded-md bg-red-600 px-5 py-2 text-center text-lg font-semibold leading-tight text-white shadow-lg lg:justify-self-end">
-            Exemplo do painel da área /<br />Definir Indicadores
+          <div className="min-w-0">
+            <Label htmlFor="area-select" className="mb-1.5 block text-xs font-semibold uppercase tracking-[0.08em] text-muted-foreground">
+              Área da árvore organizacional
+            </Label>
+            <NativeSelect
+              id="area-select"
+              value={selectedNodeId}
+              onChange={(event) => setSelectedNodeId(event.target.value)}
+              className="h-10 w-full rounded-md border-border bg-background text-sm text-foreground shadow-sm"
+            >
+              {orderedNodes.length === 0 && <option value="">Nenhuma área cadastrada</option>}
+              {orderedNodes.map((node) => (
+                <option key={node.id} value={node.id}>
+                  {`${'\u00A0'.repeat(node.depth * 4)}${node.name}`}
+                </option>
+              ))}
+            </NativeSelect>
           </div>
+        </CardContent>
+      </Card>
+
+      <section className="grid gap-5">
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
+          {indicators.isLoading ? (
+            Array.from({ length: PLACEHOLDER_CARDS }).map((_, index) => <ExecutiveIndicatorSkeleton key={`loading-${index}`} />)
+          ) : visibleCards.length === 0 ? (
+            <ExecutiveIndicatorEmptyState />
+          ) : (
+            visibleCards.map((indicator) => <ExecutiveIndicatorCard key={indicator.id} indicator={indicator} />)
+          )}
         </div>
 
-        <section className="grid gap-10">
-          <div className="grid grid-cols-1 gap-x-7 gap-y-10 sm:grid-cols-2 xl:grid-cols-4">
-            {visibleCards.map((indicator) => (
-              <ExecutiveIndicatorCard key={indicator.id} indicator={indicator} />
-            ))}
-            {Array.from({ length: emptySlots }).map((_, index) => (
-              <div key={`empty-${index}`} className="h-[140px] rounded-lg border border-slate-200 bg-white shadow-[0_2px_5px_rgba(15,23,42,0.35)]" />
-            ))}
-          </div>
-
-          <div className="grid gap-8 lg:grid-cols-[1fr,0.9fr] lg:items-start">
-            <div className="pl-2">
-              <h2 className="text-lg font-bold text-emerald-950">Leitura executiva</h2>
-              <div className="mt-3 space-y-2 text-base leading-6 text-slate-950">
-                <p>Indicadores verdes: manter rotina e padronizar boas práticas.</p>
-                <p>Indicadores amarelos: checar tendência, risco e contramedidas preventivas.</p>
-                <p>Indicadores vermelhos: exigir análise de causa, plano de ação e decisão do fórum.</p>
+        <div className="grid gap-5 lg:grid-cols-[minmax(0,1fr),minmax(320px,0.82fr)] lg:items-start">
+          <Card>
+            <CardContent className="p-5">
+              <h2 className="text-sm font-semibold uppercase tracking-[0.08em] text-foreground">Leitura executiva</h2>
+              <div className="mt-4 grid gap-3 text-sm leading-relaxed text-muted-foreground sm:grid-cols-3 lg:grid-cols-1 xl:grid-cols-3">
+                <ExecutiveReadItem color="bg-status-green" title="Dentro da meta" text="Manter rotina, registrar aprendizado e padronizar boas práticas." />
+                <ExecutiveReadItem color="bg-status-yellow" title="Atenção" text="Checar tendência, risco de virada e contramedidas preventivas." />
+                <ExecutiveReadItem color="bg-status-red" title="Crítico" text="Exigir causa, responsável, prazo e decisão do fórum executivo." />
               </div>
-            </div>
+            </CardContent>
+          </Card>
 
-            <div>
-              <div className="rounded-lg border border-slate-200 bg-white p-5 shadow-[0_2px_5px_rgba(15,23,42,0.35)] [border-left:8px_solid_#f28b22]">
-                <h2 className="text-lg font-bold text-orange-500">Mensagem-chave do mês</h2>
-                <p className="mt-4 text-sm leading-5 text-slate-950">
-                  {conclusion || CONCLUSION_PLACEHOLDER}
-                </p>
+          <Card className="border-l-4 border-l-status-orange">
+            <CardContent className="p-5">
+              <div className="flex items-start justify-between gap-3">
+                <div className="min-w-0">
+                  <div className="flex items-center gap-2 text-sm font-semibold uppercase tracking-[0.08em] text-foreground">
+                    <MessageSquareText className="h-4 w-4 shrink-0 text-status-orange" />
+                    <span>Mensagem-chave do mês</span>
+                  </div>
+                  <p className="mt-3 whitespace-pre-wrap break-words text-sm leading-relaxed text-foreground">
+                    {conclusion || CONCLUSION_PLACEHOLDER}
+                  </p>
+                </div>
               </div>
-              <Button className="mt-4" type="button" onClick={openConclusionEditor} disabled={!selectedNodeId}>
-                {conclusion ? 'Editar conclusão executiva' : 'Registrar conclusão executiva'}
+              <Button className="mt-4 gap-2" type="button" variant="outline" onClick={openConclusionEditor} disabled={!selectedNodeId}>
+                <Edit3 className="h-4 w-4" />
+                {conclusion ? 'Editar mensagem' : 'Registrar mensagem'}
               </Button>
-            </div>
-          </div>
-        </section>
-      </main>
+            </CardContent>
+          </Card>
+        </div>
+      </section>
 
       <Dialog open={conclusionOpen} onOpenChange={setConclusionOpen}>
         <DialogContent>
@@ -212,16 +233,68 @@ export default function VisualizationPage() {
 function ExecutiveIndicatorCard({ indicator }: { indicator: IndicatorRow }) {
   const light = indicator.last?.light ?? 'GRAY';
   const targetText = formatTarget(indicator);
+  const valueText = formatNumber(indicator.last?.value, { maximumFractionDigits: 2 });
   return (
-    <article className="relative h-[140px] rounded-lg border border-slate-200 bg-white px-6 py-4 shadow-[0_2px_5px_rgba(15,23,42,0.35)]">
-      <div className={cn('absolute right-6 top-4 h-4 w-4 rounded-full shadow-[0_0_7px_rgba(15,23,42,0.45)]', LIGHT_DOT[light] ?? LIGHT_DOT.GRAY)} />
-      <h2 className="max-w-[calc(100%-2rem)] text-sm font-bold leading-4 text-slate-600">{indicator.name}</h2>
-      <div className="mt-4 text-[32px] font-extrabold leading-none tracking-normal text-zinc-900">
-        {formatNumber(indicator.last?.value, { maximumFractionDigits: 2 })}
+    <article className="panel relative flex min-h-[178px] min-w-0 flex-col overflow-hidden p-4">
+      <div className="flex min-w-0 items-start justify-between gap-3">
+        <div className="min-w-0 flex-1">
+          <h2 className="line-clamp-2 break-words text-sm font-semibold leading-snug text-foreground" title={indicator.name}>
+            {indicator.name}
+          </h2>
+          {indicator.code && <div className="mt-1 truncate text-[11px] font-medium uppercase tracking-[0.08em] text-muted-foreground">{indicator.code}</div>}
+        </div>
+        <span className={cn('mt-0.5 h-3 w-3 shrink-0 rounded-full ring-4 ring-background', LIGHT_DOT[light] ?? LIGHT_DOT.GRAY)} />
       </div>
-      <div className="mt-4 text-sm leading-4 text-slate-600">Meta: {targetText}</div>
-      <div className="mt-1 text-xs leading-4 text-slate-800">{LIGHT_TEXT[light] ?? LIGHT_TEXT.GRAY}</div>
+
+      <div className="mt-4 min-w-0">
+        <div className="truncate text-[30px] font-semibold leading-none tabular-nums tracking-tight text-foreground" title={valueText}>
+          {valueText}
+        </div>
+        <div className="mt-1 truncate text-xs font-medium text-muted-foreground">{indicator.unitLabel || indicator.unit || 'Resultado'}</div>
+      </div>
+
+      <div className="mt-auto min-w-0 pt-4">
+        <div className="truncate text-xs text-muted-foreground" title={`Meta: ${targetText}`}>
+          Meta: <span className="font-medium text-foreground">{targetText}</span>
+        </div>
+        <div className="mt-2 inline-flex max-w-full items-center gap-1.5 rounded-full border border-border bg-muted/45 px-2 py-1 text-[11px] font-medium text-foreground">
+          <span className={cn('h-1.5 w-1.5 shrink-0 rounded-full', LIGHT_DOT[light] ?? LIGHT_DOT.GRAY)} />
+          <span className="truncate">{LIGHT_TEXT[light] ?? LIGHT_TEXT.GRAY}</span>
+        </div>
+      </div>
     </article>
+  );
+}
+
+function ExecutiveIndicatorEmptyState() {
+  return (
+    <div className="panel flex min-h-[178px] items-center justify-center border-dashed p-6 text-center text-sm text-muted-foreground sm:col-span-2 xl:col-span-4">
+      Nenhum indicador vinculado à área selecionada.
+    </div>
+  );
+}
+
+function ExecutiveIndicatorSkeleton() {
+  return (
+    <div className="panel min-h-[178px] animate-pulse p-4">
+      <div className="h-4 w-3/4 rounded bg-muted" />
+      <div className="mt-2 h-3 w-1/3 rounded bg-muted" />
+      <div className="mt-7 h-8 w-1/2 rounded bg-muted" />
+      <div className="mt-8 h-3 w-2/3 rounded bg-muted" />
+      <div className="mt-3 h-6 w-24 rounded-full bg-muted" />
+    </div>
+  );
+}
+
+function ExecutiveReadItem({ color, title, text }: { color: string; title: string; text: string }) {
+  return (
+    <div className="min-w-0 rounded-md border border-border/70 bg-muted/25 p-3">
+      <div className="flex items-center gap-2 text-sm font-semibold text-foreground">
+        <span className={cn('h-2.5 w-2.5 shrink-0 rounded-full', color)} />
+        <span className="truncate">{title}</span>
+      </div>
+      <p className="mt-2 break-words text-xs leading-relaxed text-muted-foreground">{text}</p>
+    </div>
   );
 }
 
