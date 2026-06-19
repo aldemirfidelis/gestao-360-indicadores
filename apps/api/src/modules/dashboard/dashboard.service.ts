@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common';
+import { BadRequestException, ForbiddenException, Injectable } from '@nestjs/common';
 import { PrismaService } from '../../prisma/prisma.service';
 import { ActionStatus, DeviationStatus, TrafficLight, TreatmentStatus } from '@prisma/client';
 import { lastNPeriodRefs } from '../indicators/period.util';
@@ -9,6 +9,7 @@ import { AuthPayload } from '../auth/auth.types';
 // O dashboard agrega dados dos indicadores/ações/desvios: para usuários restritos por
 // área, os números refletem apenas as áreas visíveis (não vaza agregado de outras áreas).
 const MODULE = 'dashboard';
+const EXECUTIVE_CONCLUSION_KEY_PREFIX = 'dashboard.executive_conclusion.';
 
 @Injectable()
 export class DashboardService {
@@ -252,6 +253,156 @@ export class DashboardService {
     };
   }
 
+  async areas(me: AuthPayload) {
+    const permitted = await this.access.listAreaFilter(me.sub, MODULE, 'view');
+    return this.prisma.orgNode.findMany({
+      where: {
+        companyId: me.companyId,
+        deletedAt: null,
+        active: true,
+        ...(permitted ? { id: { in: permitted } } : {}),
+      },
+      select: {
+        id: true,
+        parentId: true,
+        name: true,
+        code: true,
+        type: true,
+        _count: { select: { children: true, indicatorsOwned: true } },
+      },
+      orderBy: [{ position: 'asc' }, { name: 'asc' }],
+    });
+  }
+
+  async areaIndicators(me: AuthPayload, ownerNodeId?: string) {
+    const companyId = me.companyId;
+    const permitted = await this.access.listAreaFilter(me.sub, MODULE, 'view');
+    const selectedIds = ownerNodeId ? await this.descendantNodeIds(companyId, ownerNodeId) : null;
+    const ownerNodeIds = this.intersectAreaScopes(selectedIds, permitted);
+    if (ownerNodeIds && ownerNodeIds.length === 0) return [];
+
+    const anchor = await this.periods.currentAnchorDate(companyId);
+    const indicators = await this.prisma.indicator.findMany({
+      where: {
+        companyId,
+        deletedAt: null,
+        status: 'ACTIVE',
+        ...(ownerNodeIds ? { ownerNodeId: { in: ownerNodeIds } } : {}),
+      },
+      select: {
+        id: true,
+        name: true,
+        code: true,
+        unit: true,
+        unitLabel: true,
+        direction: true,
+        periodicity: true,
+        ownerNode: { select: { id: true, name: true, type: true, parentId: true } },
+      },
+      orderBy: [{ name: 'asc' }],
+    });
+    if (indicators.length === 0) return [];
+
+    const ids = indicators.map((indicator) => indicator.id);
+    const currentRefs = new Map<string, string>();
+    for (const indicator of indicators) {
+      const currentRef = lastNPeriodRefs(indicator.periodicity, 1, anchor)[0];
+      if (currentRef) currentRefs.set(indicator.id, currentRef);
+    }
+    const [targets, results] = await Promise.all([
+      this.prisma.indicatorTarget.findMany({
+        where: {
+          indicatorId: { in: ids },
+          periodRef: { in: Array.from(new Set(currentRefs.values())) },
+        },
+        select: { indicatorId: true, periodRef: true, target: true, lowerBound: true, upperBound: true },
+      }),
+      this.prisma.indicatorResult.findMany({
+        where: { indicatorId: { in: ids } },
+        orderBy: { periodDate: 'desc' },
+        distinct: ['indicatorId'],
+        select: { indicatorId: true, value: true, light: true, attainment: true, deviationPct: true },
+      }),
+    ]);
+
+    const targetMap = new Map(targets.map((target) => [`${target.indicatorId}:${target.periodRef}`, target]));
+    const resultMap = new Map(results.map((result) => [result.indicatorId, result]));
+
+    return indicators.map((indicator) => {
+      const currentRef = currentRefs.get(indicator.id);
+      const target = currentRef ? targetMap.get(`${indicator.id}:${currentRef}`) : null;
+      const last = resultMap.get(indicator.id) ?? null;
+      return {
+        id: indicator.id,
+        name: indicator.name,
+        code: indicator.code,
+        unit: indicator.unit,
+        unitLabel: indicator.unitLabel,
+        direction: indicator.direction,
+        ownerNode: indicator.ownerNode,
+        currentTarget: target
+          ? {
+              target: target.target,
+              lowerBound: target.lowerBound,
+              upperBound: target.upperBound,
+            }
+          : null,
+        last: last
+          ? {
+              value: last.value,
+              light: last.light,
+              attainment: last.attainment,
+              deviationPct: last.deviationPct,
+            }
+          : null,
+      };
+    });
+  }
+
+  async areaConclusion(me: AuthPayload, ownerNodeId?: string) {
+    const node = await this.resolveConclusionArea(me, ownerNodeId);
+    const key = `${EXECUTIVE_CONCLUSION_KEY_PREFIX}${node.id}`;
+    const record = await this.prisma.appSetting.findUnique({
+      where: { companyId_key: { companyId: me.companyId, key } },
+      select: { value: true, updatedAt: true },
+    });
+    return {
+      ownerNodeId: node.id,
+      conclusion: record?.value ?? '',
+      updatedAt: record?.updatedAt ?? null,
+    };
+  }
+
+  async saveAreaConclusion(me: AuthPayload, ownerNodeId: string | undefined, body: { conclusion?: string }) {
+    const node = await this.resolveConclusionArea(me, ownerNodeId);
+    const key = `${EXECUTIVE_CONCLUSION_KEY_PREFIX}${node.id}`;
+    const conclusion = String(body?.conclusion ?? '').trim();
+    const saved = await this.prisma.appSetting.upsert({
+      where: { companyId_key: { companyId: me.companyId, key } },
+      create: {
+        companyId: me.companyId,
+        key,
+        value: conclusion,
+        valueType: 'text',
+        group: 'Dashboard',
+        description: `Conclusao executiva mensal da area ${node.name}`,
+      },
+      update: {
+        value: conclusion,
+        valueType: 'text',
+        group: 'Dashboard',
+        description: `Conclusao executiva mensal da area ${node.name}`,
+        active: true,
+      },
+      select: { value: true, updatedAt: true },
+    });
+    return {
+      ownerNodeId: node.id,
+      conclusion: saved.value,
+      updatedAt: saved.updatedAt,
+    };
+  }
+
   /**
    * Ranking de areas por % medio de atingimento (últimos resultados).
    */
@@ -416,5 +567,53 @@ export class DashboardService {
       },
     });
     return { periodRef, total: active, filled, pending: Math.max(0, active - filled) };
+  }
+
+  private async descendantNodeIds(companyId: string, ownerNodeId: string) {
+    const nodes = await this.prisma.orgNode.findMany({
+      where: { companyId, deletedAt: null },
+      select: { id: true, parentId: true },
+    });
+    if (!nodes.some((node) => node.id === ownerNodeId)) return [];
+    const children = new Map<string, string[]>();
+    for (const node of nodes) {
+      if (!node.parentId) continue;
+      const list = children.get(node.parentId) ?? [];
+      list.push(node.id);
+      children.set(node.parentId, list);
+    }
+    const out = new Set<string>([ownerNodeId]);
+    const queue = [ownerNodeId];
+    while (queue.length) {
+      const parentId = queue.shift()!;
+      for (const childId of children.get(parentId) ?? []) {
+        if (out.has(childId)) continue;
+        out.add(childId);
+        queue.push(childId);
+      }
+    }
+    return Array.from(out);
+  }
+
+  private intersectAreaScopes(selectedIds: string[] | null, permittedIds: string[] | null) {
+    if (!selectedIds && !permittedIds) return null;
+    if (!selectedIds) return permittedIds;
+    if (!permittedIds) return selectedIds;
+    const permitted = new Set(permittedIds);
+    return selectedIds.filter((id) => permitted.has(id));
+  }
+
+  private async resolveConclusionArea(me: AuthPayload, ownerNodeId?: string) {
+    if (!ownerNodeId) throw new BadRequestException('Selecione uma area para registrar a conclusao executiva.');
+    const node = await this.prisma.orgNode.findFirst({
+      where: { id: ownerNodeId, companyId: me.companyId, deletedAt: null },
+      select: { id: true, name: true },
+    });
+    if (!node) throw new BadRequestException('Area invalida para esta empresa.');
+    const permitted = await this.access.listAreaFilter(me.sub, MODULE, 'view');
+    if (permitted && !permitted.includes(node.id)) {
+      throw new ForbiddenException('Voce nao tem acesso ao painel executivo desta area.');
+    }
+    return node;
   }
 }

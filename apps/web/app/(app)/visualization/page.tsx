@@ -1,284 +1,270 @@
 'use client';
 
-import Link from 'next/link';
-import { useQuery } from '@tanstack/react-query';
-import {
-  AlertTriangle,
-  BarChart3,
-  CheckCircle2,
-  Clock,
-  Download,
-  FileBarChart,
-  Gauge,
-  LayoutDashboard,
-  ListChecks,
-  Target,
-} from 'lucide-react';
-import {
-  Bar,
-  BarChart,
-  CartesianGrid,
-  Legend,
-  Line,
-  LineChart,
-  ResponsiveContainer,
-  Tooltip,
-  XAxis,
-  YAxis,
-} from 'recharts';
-import { PageHeader } from '@/components/shell/page-header';
-import { MetricCard } from '@/components/platform/metric-card';
-import { SectionCard } from '@/components/platform/section-card';
-import { EmptyState } from '@/components/platform/empty-state';
+import { useEffect, useMemo, useState } from 'react';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Button } from '@/components/ui/button';
-import { StatusLight } from '@/components/ui/status-light';
+import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { Label } from '@/components/ui/label';
+import { NativeSelect } from '@/components/ui/select';
+import { Textarea } from '@/components/ui/textarea';
 import { api } from '@/lib/api';
-import { formatNumber, formatPercent, periodRefLabel } from '@/lib/utils';
+import { cn, formatNumber } from '@/lib/utils';
 
-interface Overview {
-  totalIndicators: number;
-  counts: { GREEN: number; YELLOW: number; RED: number; GRAY: number };
-  generalAttainment: number | null;
-  openActions: number;
-  overdueActions: number;
-  criticalDeviations: number;
+interface OrgNodeOption {
+  id: string;
+  parentId: string | null;
+  name: string;
+  code: string | null;
+  type: string;
+  _count?: { children: number; indicatorsOwned: number };
 }
 
-interface RankingRow {
-  nodeId: string;
-  nodeName: string;
-  attainment: number | null;
-  green: number;
-  yellow: number;
-  red: number;
-  gray: number;
+interface IndicatorRow {
+  id: string;
+  name: string;
+  code: string | null;
+  unit: string;
+  unitLabel: string | null;
+  direction: string;
+  ownerNode: { id: string; name: string; type: string; parentId: string | null };
+  currentTarget: { target: number; lowerBound: number | null; upperBound: number | null } | null;
+  last: {
+    value: number;
+    light: string;
+    attainment: number | null;
+    deviationPct: number | null;
+  } | null;
 }
 
-interface EvolutionRow {
-  periodRef: string;
-  attainment: number | null;
-  greenRate: number | null;
-  total: number;
-}
+const PLACEHOLDER_CARDS = 8;
+const CONCLUSION_PLACEHOLDER = '[Escrever em 2 ou 3 linhas a conclusão executiva: resultado geral, maior risco e decisão necessária.]';
 
-interface WorstRow {
-  indicator: {
-    id: string;
-    name: string;
-    code: string | null;
-    ownerNode: { id: string; name: string };
-  };
-  periodRef: string;
-  value: number;
-  attainment: number | null;
-  deviationPct: number | null;
-  light: string;
-}
+const LIGHT_DOT: Record<string, string> = {
+  GREEN: 'bg-emerald-700',
+  YELLOW: 'bg-amber-500',
+  RED: 'bg-red-700',
+  GRAY: 'bg-slate-400',
+};
+
+const LIGHT_TEXT: Record<string, string> = {
+  GREEN: 'Sem evento crítico',
+  YELLOW: 'Atenção preventiva',
+  RED: 'Fora da rota',
+  GRAY: 'Sem lançamento',
+};
 
 export default function VisualizationPage() {
-  const overview = useQuery<Overview>({
-    queryKey: ['dashboard', 'overview'],
-    queryFn: () => api<Overview>('/dashboard/overview'),
+  const orgNodes = useQuery<OrgNodeOption[]>({
+    queryKey: ['visualization', 'orgnodes'],
+    queryFn: () => api<OrgNodeOption[]>('/dashboard/areas'),
   });
-  const ranking = useQuery<RankingRow[]>({
-    queryKey: ['dashboard', 'ranking'],
-    queryFn: () => api<RankingRow[]>('/dashboard/ranking?limit=8'),
+  const queryClient = useQueryClient();
+  const [selectedNodeId, setSelectedNodeId] = useState('');
+  const [conclusionDraft, setConclusionDraft] = useState('');
+  const [conclusionOpen, setConclusionOpen] = useState(false);
+
+  const orderedNodes = useMemo(() => buildIndentedNodes(orgNodes.data ?? []), [orgNodes.data]);
+
+  useEffect(() => {
+    if (!selectedNodeId && orderedNodes.length) {
+      setSelectedNodeId(orderedNodes[0].id);
+    }
+  }, [orderedNodes, selectedNodeId]);
+
+  const indicators = useQuery<IndicatorRow[]>({
+    queryKey: ['visualization', 'indicators', selectedNodeId],
+    queryFn: () => api<IndicatorRow[]>(`/dashboard/area-indicators?ownerNodeId=${encodeURIComponent(selectedNodeId)}`),
+    enabled: Boolean(selectedNodeId),
   });
-  const evolution = useQuery<EvolutionRow[]>({
-    queryKey: ['dashboard', 'evolution'],
-    queryFn: () => api<EvolutionRow[]>('/dashboard/evolution?months=12'),
+  const conclusionQuery = useQuery<{ ownerNodeId: string; conclusion: string; updatedAt: string | null }>({
+    queryKey: ['visualization', 'conclusion', selectedNodeId],
+    queryFn: () => api<{ ownerNodeId: string; conclusion: string; updatedAt: string | null }>(`/dashboard/area-conclusion?ownerNodeId=${encodeURIComponent(selectedNodeId)}`),
+    enabled: Boolean(selectedNodeId),
   });
-  const worst = useQuery<WorstRow[]>({
-    queryKey: ['dashboard', 'worst'],
-    queryFn: () => api<WorstRow[]>('/dashboard/worst?limit=7'),
+  const saveConclusionMutation = useMutation({
+    mutationFn: (conclusion: string) =>
+      api(`/dashboard/area-conclusion?ownerNodeId=${encodeURIComponent(selectedNodeId)}`, {
+        method: 'PATCH',
+        json: { conclusion },
+      }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['visualization', 'conclusion', selectedNodeId] });
+      setConclusionOpen(false);
+    },
   });
 
-  const ov = overview.data;
-  const evRows = (evolution.data ?? []).map((e) => ({
-    ...e,
-    label: periodRefLabel(e.periodRef),
-    attainmentPct: e.attainment !== null ? Math.round(e.attainment * 1000) / 10 : null,
-    greenPct: e.greenRate !== null ? Math.round(e.greenRate * 1000) / 10 : null,
-  }));
-  const rankRows = (ranking.data ?? []).map((r) => ({
-    ...r,
-    attainmentPct: r.attainment !== null ? Math.round(r.attainment * 1000) / 10 : 0,
-  }));
+  const indicatorRows = indicators.data ?? [];
+  const selectedNode = orderedNodes.find((node) => node.id === selectedNodeId);
+  const visibleCards = indicatorRows.slice(0, PLACEHOLDER_CARDS);
+  const emptySlots = Math.max(0, PLACEHOLDER_CARDS - visibleCards.length);
+  const conclusion = conclusionQuery.data?.conclusion ?? '';
+
+  const openConclusionEditor = () => {
+    setConclusionDraft(conclusion);
+    setConclusionOpen(true);
+  };
+
+  const saveConclusion = () => {
+    const clean = conclusionDraft.trim();
+    saveConclusionMutation.mutate(clean);
+  };
 
   return (
-    <div>
-      <PageHeader
-        eyebrow="Visualização"
-        tone="view"
-        title="Painel Executivo Gestão 360"
-        description="Panorama de desempenho, farois, planos de ação, rankings e alertas para tomada de decisão."
-        actions={
-          <>
-            <Button variant="outline" asChild>
-              <Link href="/reports">
-                <FileBarChart className="mr-2 h-4 w-4" />
-                Relatórios
-              </Link>
-            </Button>
-            <Button asChild>
-              <Link href="/reports">
-                <Download className="mr-2 h-4 w-4" />
-                Exportar
-              </Link>
-            </Button>
-          </>
-        }
-        breadcrumbs={[{ label: 'Início', href: '/' }, { label: 'Visualização' }]}
-      />
+    <div className="-m-6 min-h-[calc(100vh-4rem)] bg-white pb-8 text-slate-950">
+      <div className="h-11 bg-gradient-to-r from-[#69b45f] via-[#53ab76] to-[#1f8f7b]" />
 
-      <div className="mb-5 grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4">
-        <MetricCard
-          compact
-          title="Desempenho geral"
-          value={formatPercent(ov?.generalAttainment)}
-          description="Atingimento médio"
-          icon={<Gauge className="h-4 w-4" />}
-          tone="blue"
-          href="/indicators"
-        />
-        <MetricCard
-          compact
-          title="Dentro da meta"
-          value={formatNumber(ov?.counts.GREEN)}
-          description="Indicadores verdes"
-          icon={<CheckCircle2 className="h-4 w-4" />}
-          tone="green"
-          href="/indicators?light=GREEN"
-        />
-        <MetricCard
-          compact
-          title="Fora da meta"
-          value={formatNumber(ov?.counts.RED)}
-          description="Indicadores vermelhos"
-          icon={<AlertTriangle className="h-4 w-4" />}
-          tone="red"
-          href="/indicators?light=RED"
-        />
-        <MetricCard
-          compact
-          title="Planos em aberto"
-          value={formatNumber(ov?.openActions)}
-          description={`${formatNumber(ov?.overdueActions)} atrasados`}
-          icon={<ListChecks className="h-4 w-4" />}
-          tone="purple"
-          href="/actions"
-        />
-      </div>
-
-      <div className="grid grid-cols-1 gap-6 xl:grid-cols-[1.4fr,0.8fr]">
-        <SectionCard
-          title="Evolução mensal dos indicadores"
-          description="Atingimento médio mensal e percentual de indicadores verdes no período."
-        >
-          <div className="h-80">
-            <ResponsiveContainer width="100%" height="100%">
-              <LineChart data={evRows}>
-                <CartesianGrid strokeDasharray="3 3" className="stroke-border" />
-                <XAxis dataKey="label" tick={{ fontSize: 12 }} />
-                <YAxis tick={{ fontSize: 12 }} unit="%" />
-                <Legend verticalAlign="top" height={32} iconType="circle" wrapperStyle={{ fontSize: 12 }} />
-                <Tooltip
-                  formatter={(v: number) => `${v}%`}
-                  labelFormatter={(label) => `Período ${label}`}
-                  contentStyle={{ background: 'hsl(var(--card))', border: '1px solid hsl(var(--border))' }}
-                />
-                <Line type="monotone" dataKey="attainmentPct" name="Atingimento médio (%)" stroke="hsl(var(--status-blue))" strokeWidth={2.5} dot={{ r: 3 }} />
-                <Line type="monotone" dataKey="greenPct" name="Indicadores verdes (%)" stroke="hsl(var(--status-green))" strokeWidth={2} dot={{ r: 2 }} />
-              </LineChart>
-            </ResponsiveContainer>
+      <main className="px-7 pb-6 pt-3">
+        <div className="mb-5 grid gap-4 lg:grid-cols-[minmax(0,1fr),360px] lg:items-end">
+          <div>
+            <div className="text-sm text-slate-600">Visão de uma página para iniciar a reunião e definir onde aprofundar.</div>
+            <div className="mt-4 max-w-xl">
+              <Label htmlFor="area-select" className="mb-1.5 block text-xs font-semibold uppercase tracking-wide text-slate-600">
+                Área da árvore organizacional
+              </Label>
+              <NativeSelect
+                id="area-select"
+                value={selectedNodeId}
+                onChange={(event) => setSelectedNodeId(event.target.value)}
+                className="h-11 rounded-md border-slate-300 bg-white text-slate-900 shadow-sm"
+              >
+                {orderedNodes.length === 0 && <option value="">Nenhuma área cadastrada</option>}
+                {orderedNodes.map((node) => (
+                  <option key={node.id} value={node.id}>
+                    {`${'\u00A0'.repeat(node.depth * 4)}${node.name}`}
+                  </option>
+                ))}
+              </NativeSelect>
+            </div>
           </div>
-          <div className="mt-3 rounded-md border bg-muted/30 p-3 text-xs leading-relaxed text-muted-foreground">
-            Fórmula: atingimento médio = média dos atingimentos dos indicadores com resultado no mês, limitado entre 0% e 150%.
-            Indicadores verdes = indicadores com farol verde dividido pelo total de indicadores com lançamento no mês.
-          </div>
-        </SectionCard>
 
-        <SectionCard title="Indicadores críticos" description="Itens com maior desvio no período.">
-          {worst.data && worst.data.length === 0 && (
-            <EmptyState title="Nenhum indicador crítico" description="Os alertas de desempenho aparecem nesta lista." className="border-0 bg-transparent" />
-          )}
-          <div className="space-y-3">
-            {worst.data?.map((w) => (
-              <Link key={`${w.indicator.id}-${w.periodRef}`} href={`/indicators/${w.indicator.id}`} className="flex items-start justify-between gap-3 rounded-lg border p-3 transition-colors hover:bg-accent/35">
-                <div className="min-w-0">
-                  <div className="truncate text-sm font-semibold">{w.indicator.name}</div>
-                  <div className="mt-1 flex items-center gap-2 text-xs text-muted-foreground">
-                    <Clock className="h-3.5 w-3.5" />
-                    <span>{w.indicator.ownerNode.name} - {periodRefLabel(w.periodRef)}</span>
-                  </div>
-                </div>
-                <div className="text-right">
-                  <StatusLight light={w.light} />
-                  <div className="mt-1 text-xs text-muted-foreground">
-                    {w.deviationPct !== null ? `${w.deviationPct > 0 ? '+' : ''}${formatNumber(w.deviationPct, { maximumFractionDigits: 1 })}%` : '-'}
-                  </div>
-                </div>
-              </Link>
+          <div className="justify-self-start rounded-md bg-red-600 px-5 py-2 text-center text-lg font-semibold leading-tight text-white shadow-lg lg:justify-self-end">
+            Exemplo do painel da área /<br />Definir Indicadores
+          </div>
+        </div>
+
+        <section className="grid gap-10">
+          <div className="grid grid-cols-1 gap-x-7 gap-y-10 sm:grid-cols-2 xl:grid-cols-4">
+            {visibleCards.map((indicator) => (
+              <ExecutiveIndicatorCard key={indicator.id} indicator={indicator} />
+            ))}
+            {Array.from({ length: emptySlots }).map((_, index) => (
+              <div key={`empty-${index}`} className="h-[140px] rounded-lg border border-slate-200 bg-white shadow-[0_2px_5px_rgba(15,23,42,0.35)]" />
             ))}
           </div>
-        </SectionCard>
-      </div>
 
-      <div className="mt-6 grid grid-cols-1 gap-6 xl:grid-cols-[1fr,360px]">
-        <SectionCard title="Ranking de áreas" description="Atingimento médio por estrutura organizacional.">
-          <div className="h-80">
-            <ResponsiveContainer width="100%" height="100%">
-              <BarChart data={rankRows} layout="vertical" margin={{ top: 8, right: 16, bottom: 0, left: 12 }}>
-                <CartesianGrid strokeDasharray="3 3" className="stroke-border" />
-                <XAxis type="number" tick={{ fontSize: 12 }} unit="%" />
-                <YAxis type="category" dataKey="nodeName" width={150} tick={{ fontSize: 12 }} />
-                <Tooltip
-                  formatter={(v: number) => `${v}%`}
-                  contentStyle={{ background: 'hsl(var(--card))', border: '1px solid hsl(var(--border))' }}
-                />
-                <Bar
-                  dataKey="attainmentPct"
-                  fill="hsl(var(--status-blue))"
-                  radius={[0, 6, 6, 0]}
-                  cursor="pointer"
-                  onClick={(entry: any) => {
-                    const nodeId = entry?.payload?.nodeId ?? entry?.nodeId;
-                    if (nodeId) window.location.href = `/indicators?ownerNodeId=${encodeURIComponent(nodeId)}`;
-                  }}
-                />
-              </BarChart>
-            </ResponsiveContainer>
-          </div>
-          <div className="mt-3 text-xs text-muted-foreground">
-            Clique em uma barra para abrir os indicadores daquela estrutura.
-          </div>
-        </SectionCard>
+          <div className="grid gap-8 lg:grid-cols-[1fr,0.9fr] lg:items-start">
+            <div className="pl-2">
+              <h2 className="text-lg font-bold text-emerald-950">Leitura executiva</h2>
+              <div className="mt-3 space-y-2 text-base leading-6 text-slate-950">
+                <p>Indicadores verdes: manter rotina e padronizar boas práticas.</p>
+                <p>Indicadores amarelos: checar tendência, risco e contramedidas preventivas.</p>
+                <p>Indicadores vermelhos: exigir análise de causa, plano de ação e decisão do fórum.</p>
+              </div>
+            </div>
 
-        <SectionCard title="Farois consolidados" description="Distribuição atual por status.">
-          <div className="space-y-4">
-            {[
-              ['GREEN', 'Dentro da meta', ov?.counts.GREEN ?? 0],
-              ['YELLOW', 'Atenção', ov?.counts.YELLOW ?? 0],
-              ['RED', 'Críticos', ov?.counts.RED ?? 0],
-              ['GRAY', 'Sem lançamento', ov?.counts.GRAY ?? 0],
-            ].map(([light, label, value]) => (
-              <Link key={light} href={`/indicators?light=${light}`} className="flex items-center justify-between rounded-lg border p-3 transition-colors hover:bg-accent/35">
-                <div className="flex items-center gap-3">
-                  <StatusLight light={String(light)} />
-                  <span className="text-sm font-medium">{label}</span>
-                </div>
-                <span className="text-lg font-semibold">{formatNumber(Number(value))}</span>
-              </Link>
-            ))}
+            <div>
+              <div className="rounded-lg border border-slate-200 bg-white p-5 shadow-[0_2px_5px_rgba(15,23,42,0.35)] [border-left:8px_solid_#f28b22]">
+                <h2 className="text-lg font-bold text-orange-500">Mensagem-chave do mês</h2>
+                <p className="mt-4 text-sm leading-5 text-slate-950">
+                  {conclusion || CONCLUSION_PLACEHOLDER}
+                </p>
+              </div>
+              <Button className="mt-4" type="button" onClick={openConclusionEditor} disabled={!selectedNodeId}>
+                {conclusion ? 'Editar conclusão executiva' : 'Registrar conclusão executiva'}
+              </Button>
+            </div>
           </div>
-          <Button className="mt-4 w-full" variant="outline" asChild>
-            <Link href="/indicators">
-              <BarChart3 className="mr-2 h-4 w-4" />
-              Abrir indicadores
-            </Link>
-          </Button>
-        </SectionCard>
-      </div>
+        </section>
+      </main>
+
+      <Dialog open={conclusionOpen} onOpenChange={setConclusionOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Conclusão executiva da área</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-2">
+            <Label htmlFor="executive-conclusion">Mensagem-chave do mês</Label>
+            <Textarea
+              id="executive-conclusion"
+              rows={5}
+              value={conclusionDraft}
+              onChange={(event) => setConclusionDraft(event.target.value)}
+              placeholder="Resultado geral, maior risco e decisão necessária."
+            />
+            <p className="text-xs text-muted-foreground">
+              Área selecionada: {selectedNode?.name ?? 'nenhuma área selecionada'}
+            </p>
+          </div>
+          <DialogFooter>
+            <Button type="button" variant="outline" onClick={() => setConclusionOpen(false)}>
+              Cancelar
+            </Button>
+            <Button type="button" onClick={saveConclusion} disabled={saveConclusionMutation.isPending}>
+              {saveConclusionMutation.isPending ? 'Salvando...' : 'Salvar conclusão'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
+}
+
+function ExecutiveIndicatorCard({ indicator }: { indicator: IndicatorRow }) {
+  const light = indicator.last?.light ?? 'GRAY';
+  const targetText = formatTarget(indicator);
+  return (
+    <article className="relative h-[140px] rounded-lg border border-slate-200 bg-white px-6 py-4 shadow-[0_2px_5px_rgba(15,23,42,0.35)]">
+      <div className={cn('absolute right-6 top-4 h-4 w-4 rounded-full shadow-[0_0_7px_rgba(15,23,42,0.45)]', LIGHT_DOT[light] ?? LIGHT_DOT.GRAY)} />
+      <h2 className="max-w-[calc(100%-2rem)] text-sm font-bold leading-4 text-slate-600">{indicator.name}</h2>
+      <div className="mt-4 text-[32px] font-extrabold leading-none tracking-normal text-zinc-900">
+        {formatNumber(indicator.last?.value, { maximumFractionDigits: 2 })}
+      </div>
+      <div className="mt-4 text-sm leading-4 text-slate-600">Meta: {targetText}</div>
+      <div className="mt-1 text-xs leading-4 text-slate-800">{LIGHT_TEXT[light] ?? LIGHT_TEXT.GRAY}</div>
+    </article>
+  );
+}
+
+function formatTarget(indicator: IndicatorRow) {
+  const unit = indicator.unitLabel || indicator.unit || '';
+  const lower = indicator.currentTarget?.lowerBound;
+  const upper = indicator.currentTarget?.upperBound;
+  const target = indicator.currentTarget?.target;
+
+  if (lower !== null && lower !== undefined && upper !== null && upper !== undefined) {
+    return `${formatNumber(lower)} a ${formatNumber(upper)}${unitSuffix(unit)}`;
+  }
+  if (target === null || target === undefined) return '-';
+  const prefix = indicator.direction === 'LOWER_BETTER' ? '<= ' : indicator.direction === 'HIGHER_BETTER' ? '>= ' : '= ';
+  return `${prefix}${formatNumber(target)}${unitSuffix(unit)}`;
+}
+
+function unitSuffix(unit: string) {
+  if (!unit || unit === 'un') return '';
+  return unit === '%' ? '%' : ` ${unit}`;
+}
+
+function buildIndentedNodes(nodes: OrgNodeOption[]) {
+  const children = new Map<string | null, OrgNodeOption[]>();
+  for (const node of nodes) {
+    const list = children.get(node.parentId) ?? [];
+    list.push(node);
+    children.set(node.parentId, list);
+  }
+  const sortByName = (items: OrgNodeOption[]) => [...items].sort((a, b) => a.name.localeCompare(b.name, 'pt-BR'));
+  const output: Array<OrgNodeOption & { depth: number }> = [];
+
+  const walk = (parentId: string | null, depth: number) => {
+    for (const node of sortByName(children.get(parentId) ?? [])) {
+      output.push({ ...node, depth });
+      walk(node.id, depth + 1);
+    }
+  };
+
+  walk(null, 0);
+  const attached = new Set(output.map((node) => node.id));
+  for (const node of sortByName(nodes.filter((item) => !attached.has(item.id)))) {
+    output.push({ ...node, depth: 0 });
+  }
+  return output;
 }

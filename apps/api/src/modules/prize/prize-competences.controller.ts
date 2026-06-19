@@ -12,7 +12,7 @@ export class PrizeCompetencesController {
     private readonly sync: PrizeSyncService,
   ) {}
 
-  /** Autopilot: sincroniza realizado da plataforma + checklist + (opcional) apuração. */
+  /** Automacao: sincroniza realizado da plataforma + checklist + (opcional) apuracao. */
   @Post(':id/autopilot')
   @RequirePermissions('prize:calc:run')
   autopilot(@CurrentUser() me: AuthPayload, @Param('id') id: string, @Body() body: { runCalc?: boolean }) {

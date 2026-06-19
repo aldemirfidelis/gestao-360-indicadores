@@ -216,7 +216,7 @@ async function main() {
     const pind = await prisma.prizeIndicator.create({
       data: {
         companyId, programId: program.id, annexVersionId: version.id, platformIndicatorId: nativeId,
-        code, name, kind: 'COLLECTIVE', direction: dir as any, unit, weight: 50, bscNumber: code,
+        code, name, kind: 'COLLECTIVE', direction: dir as any, unit, weight: 50,
         source: 'INTERNAL_API', status: 'ACTIVE', createdById: actorId,
       },
     });

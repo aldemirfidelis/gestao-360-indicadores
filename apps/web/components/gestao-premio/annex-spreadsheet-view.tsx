@@ -68,18 +68,17 @@ function SheetBlock({ annexTitle, group, year }: { annexTitle: string; group: Ru
       <table className="w-full border-collapse">
         <thead className="bg-emerald-100 text-emerald-900">
           <tr>
-            {['Natureza', 'Indicador', 'Nº BSC', 'Unid.', 'Peso (%)', 'Tipo', 'Vigência'].map((h) => (
+            {['Natureza', 'Indicador', 'Unid.', 'Peso (%)', 'Tipo', 'Vigência'].map((h) => (
               <th key={h} className="border border-emerald-800/30 px-2 py-1 text-left font-semibold">{h}</th>
             ))}
           </tr>
         </thead>
         <tbody>
-          {indicators.length === 0 && <tr><td colSpan={7} className="border border-emerald-800/20 px-2 py-2 text-center text-muted-foreground">Nenhum indicador vinculado.</td></tr>}
+          {indicators.length === 0 && <tr><td colSpan={6} className="border border-emerald-800/20 px-2 py-2 text-center text-muted-foreground">Nenhum indicador vinculado.</td></tr>}
           {indicators.map((ri) => (
             <tr key={ri.id}>
               <td className="border border-emerald-800/20 px-2 py-1">{natureza(ri.kind)}</td>
               <td className="border border-emerald-800/20 px-2 py-1">{ri.catalog.name} {arrow(ri.catalog.direction)}</td>
-              <td className="border border-emerald-800/20 px-2 py-1">{ri.catalog.bscNumber ?? '—'}</td>
               <td className="border border-emerald-800/20 px-2 py-1">{ri.catalog.unit ?? '—'}</td>
               <td className="border border-emerald-800/20 px-2 py-1">{ri.weight}</td>
               <td className="border border-emerald-800/20 px-2 py-1">{ri.type === 'FIXED' ? 'Fixo' : 'Variável'}</td>

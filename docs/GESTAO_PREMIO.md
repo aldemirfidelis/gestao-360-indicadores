@@ -119,7 +119,7 @@ Espelho?" por colaborador — coberto por elegível/bloqueado no snapshot.
 
 - **Indicadores (reuso real do módulo nativo)**: o caminho PADRÃO de criação
   agora é **selecionar um indicador do catálogo da plataforma** — nome, unidade,
-  sentido, descrição e nº BSC são **herdados no backend** (`create` resolve o
+  sentido e descrição são **herdados no backend** (`create` resolve o
   nativo e preenche; `GET /prize/indicators/platform-options` expõe o catálogo
   sob `prize:view`, sem exigir `indicators:view`). O formulário manual virou
   exceção explícita ("indicador exclusivo do prêmio"). A tela foi reposicionada
@@ -155,7 +155,7 @@ Espelho?" por colaborador — coberto por elegível/bloqueado no snapshot.
   indicador do prêmio ao **indicador nativo** (módulo Indicadores/Lançamentos).
   `PrizeSyncService.syncActuals` puxa `IndicatorResult` do período da competência
   (mesmo `periodRef`), grava via `launch` oficial (respeita travas, parâmetro
-  vigente, trilha) e só atualiza o que mudou. O BSC legado já desemboca nesses
+  vigente, trilha) e só atualiza o que mudou. O legado já desemboca nesses
   indicadores (`externalSource`), e sistemas externos já podem postar resultados
   via `POST /external/v1/results` — ou seja, **uma única fonte alimenta o prêmio**.
   Botão "Sincronizar da plataforma" na tela do Realizado; vínculo configurável
@@ -166,7 +166,7 @@ Espelho?" por colaborador — coberto por elegível/bloqueado no snapshot.
   snapshot imutável por lote + conciliação automática na resposta. CPF mascarado
   ao persistir. `POST /external/v1/prize/events` anexa eventos (faltas/atestados/
   medidas/acidentes) sem novo lote. Identidade sintética "API Externa" na trilha.
-- **Autopilot da competência** (`POST /prize/competences/:id/autopilot`, botão na
+- **Automatização da competência** (`POST /prize/competences/:id/autopilot`, botão na
   Apuração): sincroniza realizado → roda checklist → **apura automaticamente** se
   não houver pendência impeditiva (explica o motivo quando não roda). Nunca fecha
   competência nem publica espelho sozinho — etapas de alçada continuam humanas.
@@ -270,7 +270,7 @@ Espelho?" por colaborador — coberto por elegível/bloqueado no snapshot.
   `PrizeIntegrationConfig`, `PrizeIntegrationJob`, `PrizeEmployeeSnapshot`,
   `PrizeEmployeeEvent`. Migração `20260609190000_prize_eligible`.
 - **Conectores desacoplados** (`/gestao-premio/integracoes`): Apdata (base/eventos),
-  BSC e Folha; tipos API/CSV/XLSX/banco/manual. **Segredos por referência**
+  Folha; tipos API/CSV/XLSX/banco/manual. **Segredos por referência**
   (`secretRef` = nome de env var/cofre) — nunca armazenados em claro; resposta
   redige a referência (`hasSecret`). Teste de conector valida credencial/endpoint
   sem expor valores. Sem conector real → **importação assistida por arquivo/mock**.
@@ -317,7 +317,7 @@ O Gestão 360 passa a ser a **fonte oficial do realizado**.
 ## 1. Relatório executivo
 
 ### Cenário anterior
-A apuração do prêmio dependia de controles paralelos: BSC, planilhas de resultados
+A apuração do prêmio dependia de controles paralelos: planilhas de resultados
 e de apontamentos, SESuite, Helpdesk, Apdata, e-mails e validações manuais
 (transitoriedade, gratificação de treinamento, conferência de indicadores). Isso
 gerava divergências, retrabalho, atraso no fechamento, baixa rastreabilidade e

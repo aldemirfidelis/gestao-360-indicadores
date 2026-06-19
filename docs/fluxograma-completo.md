@@ -69,7 +69,7 @@ flowchart TD
   D -- "Sim" --> E["API gera access token,<br/>refresh token e log de auditoria"]
   E --> F["Dashboard executivo<br/>/"]
   F --> G["Configurar base corporativa<br/>Empresa, filiais, estrutura, usuários"]
-  G --> H["Definir estratégia<br/>Mapa BSC e OKRs"]
+  G --> H["Definir estratégia<br/>Mapa estratégico e OKRs"]
   H --> I["Cadastrar indicadores,<br/>metas e arvore de influência"]
   I --> J["Lançamento manual ou<br/>importação CSV de resultados"]
   J --> K["Cálculo automático<br/>de farol e atingimento"]
@@ -105,7 +105,7 @@ flowchart TD
 4. **Sessão**: o frontend guarda tokens em `localStorage`; em falha de access token, chama `/auth/refresh`.
 5. **Painel executivo**: gestores iniciam no dashboard com total de indicadores, farois, ranking, evolucao e pendências.
 6. **Base corporativa**: empresa, filiais, organograma e usuários sustentam todos os filtros por área/responsável.
-7. **Estratégia**: mapa BSC, objetivos e OKRs conectam metas estratégicas ao acompanhamento operacional.
+7. **Estratégia**: mapa estratégico, objetivos e OKRs conectam metas estratégicas ao acompanhamento operacional.
 8. **Indicadores**: cada KPI tem área dona, responsável, periodicidade, direção de meta, unidade, fonte e peso.
 9. **Metas**: metas sao cadastradas por `periodRef` canonico, como `YYYY-MM`, `YYYY-Q1`, `YYYY`, etc.
 10. **Resultados**: o valor realizado pode ser lancado em lote na tela `/results` ou importado por CSV.
@@ -270,7 +270,7 @@ flowchart TD
 9. O fechamento do desvio e bloqueado se ainda houver ação diferente de `DONE` ou `DONE_LATE`.
 10. Se o desvio for fechado depois do prazo, o status final vira `CLOSED_LATE`.
 
-## 6. Fluxo estratégico: BSC, objetivos e OKRs
+## 6. Fluxo estratégico: objetivos e OKRs
 
 ```mermaid
 flowchart TD
@@ -317,7 +317,7 @@ flowchart TD
 
 | Módulo | Uso gerencial |
 | --- | --- |
-| Mapa BSC | Mostra a estratégia em perspectivas e objetivos, com farol agregado pelos indicadores vinculados. |
+| Mapa estratégico | Mostra a estratégia em perspectivas e objetivos, com farol agregado pelos indicadores vinculados. |
 | Relações causa-efeito | Mostram dependência entre objetivos estratégicos. |
 | OKRs | Traduzem objetivos em ciclos, objetivos mensuraveis, KRs e check-ins. |
 | Check-in | Atualiza confianca e status automaticamente: `DONE`, `ON_TRACK`, `OFF_TRACK` ou `AT_RISK`. |
@@ -592,7 +592,7 @@ flowchart TD
 | Visão | `/` | Dashboard executivo com KPIs, farois, ranking, evolucao, críticos e pendências. |
 | Visão | `/insights` | Heuristicas locais de resumo, tendência, causa e ação. |
 | Estratégia | `/strategy` | Lista de mapas estratégicos. |
-| Estratégia | `/strategy/:id` | Mapa BSC com perspectivas, objetivos, farol agregado e status inline. |
+| Estratégia | `/strategy/:id` | Mapa estratégico com perspectivas, objetivos, farol agregado e status inline. |
 | Estratégia | `/okrs` | Ciclos, objetivos, KRs, check-ins e progresso ponderado. |
 | Performance | `/indicators` | Lista de indicadores com filtros. |
 | Performance | `/indicators/new` | Cadastro de indicador. |
@@ -627,7 +627,7 @@ flowchart TD
 | `deviations` | CRUD, `/causes`, `/analyses`, `/close` | Desvios, causa raiz, análises e fechamento controlado. |
 | `actions` | CRUD, `/status`, `/tasks` | Planos de ação, Kanban, subtarefas e progresso. |
 | `dashboard` | `/overview`, `/ranking`, `/evolution`, `/worst`, `/pending` | Agregacoes executivas. |
-| `strategy` | `/maps`, `/perspectives`, `/objectives`, `/relations`, vínculo de indicadores | Mapa estratégico BSC. |
+| `strategy` | `/maps`, `/perspectives`, `/objectives`, `/relations`, vínculo de indicadores | Mapa estratégico. |
 | `okrs` | `/cycles`, `/objectives`, `/krs`, `/checkin` | Ciclos OKR, KRs, progresso e confianca. |
 | `projects` | CRUD, `/milestones`, `/tasks` | Projetos, Gantt, marcos e dependências. |
 | `meetings` | CRUD, participantes, pauta, decisões, `/actions` | Reuniões e geração de ações. |
@@ -650,7 +650,7 @@ flowchart TD
 | Ação concluida em atraso vira `DONE_LATE` | `ActionsService.changeStatus` | Mantem histórico do prazo. |
 | Subtarefas recalculam progresso | `ActionsService.recalcProgress` | Progresso sempre coerente com tarefas. |
 | Ranking de áreas usa último resultado | `DashboardService.ranking` | Gestão compara áreas pelo atingimento. |
-| Objetivo BSC agrega farol dos indicadores | `StrategyService.getMap` | Vermelho prevalece, depois amarelo, depois verde. |
+| Objetivo agrega farol dos indicadores | `StrategyService.getMap` | Vermelho prevalece, depois amarelo, depois verde. |
 | OKR usa progresso ponderado | `OkrsService.enrich` | KRs com maior peso impactam mais o objetivo. |
 | Check-in define status OKR | `OkrsService.checkin` | `DONE`, `ON_TRACK`, `OFF_TRACK` ou `AT_RISK`. |
 | Importação válida antes de gravar | `ImportsService.preview` | Erros aparecem por linha antes do commit. |
@@ -674,4 +674,3 @@ O sistema implementa um ciclo PDCA/gestão a vista:
 - Os insights sao heuristicas locais, nao chamadas a uma IA externa.
 - O isolamento multiempresa depende de `companyId` nos filtros da aplicação; nao ha RLS no Postgres no estado atual.
 - O catalogo de permissões existe, mas o enforcement detalhado por permissão ainda nao esta espalhado por todos os endpoints.
-

@@ -187,7 +187,7 @@ export class PrizeSyncService {
   }
 
   /**
-   * Autopilot: executa o maximo do ciclo sem intervencao — sincroniza o realizado,
+   * Automatizacao: executa o maximo do ciclo sem intervencao — sincroniza o realizado,
    * roda o checklist e, se nao houver pendencias impeditivas e runCalc=true,
    * dispara a apuracao. Nunca fecha competencia nem publica nada sozinho.
    */
@@ -200,7 +200,7 @@ export class PrizeSyncService {
       if (checklist.blockingPending > 0) {
         calcSkipped = `${checklist.blockingPending} pendência(s) impeditiva(s) no checklist`;
       } else {
-        calcRun = await this.calc.run(me, competenceId, 'Autopilot: apuração automática pós-sincronização');
+        calcRun = await this.calc.run(me, competenceId, 'Automatizacao: apuração automática pós-sincronização');
       }
     }
     return { sync, checklist, calcRun, calcSkipped };

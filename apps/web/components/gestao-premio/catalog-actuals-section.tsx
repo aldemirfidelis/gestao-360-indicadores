@@ -28,6 +28,15 @@ interface SyncSummary {
   unlinked: Array<{ code: string; name: string }>;
 }
 
+const ACTUAL_STATUS_LABEL: Record<string, string> = {
+  IN_FILLING: 'Em preenchimento',
+  PENDING: 'Pendente',
+  IN_VALIDATION: 'Em validacao',
+  PRE_CLOSE: 'Pre-fechamento',
+  CORRECTED: 'Corrigido',
+  CLOSED: 'Fechado',
+};
+
 export function CatalogActualsSection({ competenceId, canManage }: { competenceId: string; canManage: boolean }) {
   const qc = useQueryClient();
   const [open, setOpen] = useState(false);
@@ -101,22 +110,20 @@ export function CatalogActualsSection({ competenceId, canManage }: { competenceI
                 <thead className="bg-muted/40 text-xs text-muted-foreground">
                   <tr>
                     <th className="px-3 py-2 text-left">Indicador</th>
-                    <th className="px-3 py-2 text-left">Nº BSC</th>
                     <th className="px-3 py-2 text-left">Origem</th>
                     <th className="px-3 py-2 text-left">Realizado</th>
-                    <th className="px-3 py-2 text-left">Status</th>
+                    <th className="px-3 py-2 text-left">Situação</th>
                     {canManage && <th className="px-3 py-2 text-right">Ações</th>}
                   </tr>
                 </thead>
                 <tbody>
-                  {active.length === 0 && <tr><td colSpan={6} className="px-3 py-6 text-center text-muted-foreground">Catálogo vazio. Vincule indicadores nas combinações dos anexos.</td></tr>}
+                  {active.length === 0 && <tr><td colSpan={5} className="px-3 py-6 text-center text-muted-foreground">Catálogo vazio. Vincule indicadores nas combinações dos anexos.</td></tr>}
                   {active.map((c) => {
                     const a = byCatalog.get(c.id);
                     const linked = !!c.platformIndicatorId;
                     return (
                       <tr key={c.id} className="border-t border-border/40">
                         <td className="px-3 py-2">{c.name}</td>
-                        <td className="px-3 py-2 text-muted-foreground">{c.bscNumber ?? '—'}</td>
                         <td className="px-3 py-2">
                           {linked
                             ? <Badge variant="secondary" className="gap-1 text-[10px]"><Link2 className="h-3 w-3" />automático (plataforma)</Badge>
@@ -127,7 +134,7 @@ export function CatalogActualsSection({ competenceId, canManage }: { competenceI
                             ? (a?.realized ?? <span className="text-muted-foreground">— sem lançamento no período</span>)
                             : (canManage ? <Input type="number" className="h-7 w-28" value={valueOf(c.id)} onChange={(e) => setDraft((d) => ({ ...d, [c.id]: e.target.value }))} /> : (a?.realized ?? '—'))}
                         </td>
-                        <td className="px-3 py-2">{a ? <Badge variant="outline">{a.status}</Badge> : <span className="text-muted-foreground">não lançado</span>}</td>
+                        <td className="px-3 py-2">{a ? <Badge variant="outline">{ACTUAL_STATUS_LABEL[a.status] ?? a.status}</Badge> : <span className="text-muted-foreground">não lançado</span>}</td>
                         {canManage && (
                           <td className="px-3 py-2 text-right">
                             {linked

@@ -3,6 +3,7 @@
 import { useParams } from 'next/navigation';
 import { useQuery, useMutation } from '@tanstack/react-query';
 import { useState } from 'react';
+import type { ReactNode } from 'react';
 import { toast } from 'sonner';
 import {
   CartesianGrid,
@@ -98,6 +99,23 @@ interface AuditLogEntry {
   user: { id: string; name: string; email: string } | null;
 }
 
+interface DeviationSummary {
+  id: string;
+  number: number;
+  title: string;
+  status: string;
+  severity: string;
+  periodRef: string;
+  _count?: { causes: number; actions: number; analyses: number };
+}
+
+interface CurrentTreatment {
+  id: string;
+  status: string;
+  periodRef: string;
+  title: string;
+}
+
 const STATUS_LABEL = ACTION_STATUS_LABEL;
 
 export default function IndicatorDetailPage() {
@@ -120,6 +138,17 @@ export default function IndicatorDetailPage() {
     queryFn: () => api<TraceabilityTimeline>(`/traceability/indicators/${id}`),
   });
   const lastResult = detail.data?.results[detail.data.results.length - 1];
+  const lastPeriodRef = lastResult?.periodRef;
+
+  const deviations = useQuery<DeviationSummary[]>({
+    queryKey: ['indicator', id, 'deviations'],
+    queryFn: () => api<DeviationSummary[]>(`/deviations?indicatorId=${id}`),
+  });
+
+  const currentTreatment = useQuery<CurrentTreatment | null>({
+    queryKey: ['indicator', id, 'current-treatment', lastPeriodRef],
+    queryFn: () => api<CurrentTreatment | null>(`/treatments/indicators/${id}/current${lastPeriodRef ? `?periodRef=${encodeURIComponent(lastPeriodRef)}` : ''}`),
+  });
 
   const auditLog = useQuery<{ logs: AuditLogEntry[] }>({
     queryKey: ['indicator', id, 'history'],
@@ -152,6 +181,11 @@ export default function IndicatorDetailPage() {
     target: p.target,
     value: p.value,
   }));
+  const deviationRows = deviations.data ?? [];
+  const principalDeviation = getPrincipalDeviation(ind);
+  const linkedPrincipalDeviation = principalDeviation
+    ? deviationRows.find((d) => d.periodRef === principalDeviation.result.periodRef) ?? null
+    : deviationRows[0] ?? null;
 
   return (
     <div>
@@ -242,42 +276,52 @@ export default function IndicatorDetailPage() {
         </Card>
       </div>
 
-      <Card className="mb-6">
-        <CardHeader>
-          <CardTitle>Evolução (12 períodos)</CardTitle>
-        </CardHeader>
-        <CardContent className="h-80">
-          <ResponsiveContainer width="100%" height="100%">
-            <LineChart data={chartData}>
-              <CartesianGrid strokeDasharray="3 3" className="stroke-border" />
-              <XAxis dataKey="label" tick={{ fontSize: 12 }} />
-              <YAxis tick={{ fontSize: 12 }} />
-              <Tooltip
-                contentStyle={{ background: 'hsl(var(--card))', border: '1px solid hsl(var(--border))' }}
-              />
-              <Line type="monotone" dataKey="target" stroke="#1e3a8a" strokeDasharray="5 5" strokeWidth={2.5} dot={false} name="Meta" />
-              <Line
-                type="monotone"
-                dataKey="value"
-                stroke="hsl(var(--status-blue))"
-                strokeWidth={2.5}
-                dot={(dotProps: any) => {
-                  const { cx, cy, payload, index } = dotProps;
-                  if (payload.value === null || payload.value === undefined) {
-                    return <circle key={`dot-${index}`} cx={cx} cy={cy} r={0} fill="transparent" />;
-                  }
-                  const isWithin = ind.direction === 'LOWER_BETTER'
-                    ? (payload.value ?? 0) <= (payload.target ?? 0)
-                    : (payload.value ?? 0) >= (payload.target ?? 0);
-                  const color = isWithin ? '#10b981' : '#ef4444';
-                  return <circle key={`dot-${index}`} cx={cx} cy={cy} r={4.5} fill={color} stroke={color} />;
-                }}
-                name="Realizado"
-              />
-            </LineChart>
-          </ResponsiveContainer>
-        </CardContent>
-      </Card>
+      <div className="mb-6 grid grid-cols-1 gap-6 xl:grid-cols-[390px,1fr]">
+        <IndicatorDecisionCards
+          indicator={ind}
+          principal={principalDeviation}
+          principalDeviation={linkedPrincipalDeviation}
+          deviations={deviationRows}
+          currentTreatment={currentTreatment.data ?? null}
+        />
+
+        <Card>
+          <CardHeader>
+            <CardTitle>Evolução (12 períodos)</CardTitle>
+          </CardHeader>
+          <CardContent className="h-80">
+            <ResponsiveContainer width="100%" height="100%">
+              <LineChart data={chartData}>
+                <CartesianGrid strokeDasharray="3 3" className="stroke-border" />
+                <XAxis dataKey="label" tick={{ fontSize: 12 }} />
+                <YAxis tick={{ fontSize: 12 }} />
+                <Tooltip
+                  contentStyle={{ background: 'hsl(var(--card))', border: '1px solid hsl(var(--border))' }}
+                />
+                <Line type="monotone" dataKey="target" stroke="#1e3a8a" strokeDasharray="5 5" strokeWidth={2.5} dot={false} name="Meta" />
+                <Line
+                  type="monotone"
+                  dataKey="value"
+                  stroke="hsl(var(--status-blue))"
+                  strokeWidth={2.5}
+                  dot={(dotProps: any) => {
+                    const { cx, cy, payload, index } = dotProps;
+                    if (payload.value === null || payload.value === undefined) {
+                      return <circle key={`dot-${index}`} cx={cx} cy={cy} r={0} fill="transparent" />;
+                    }
+                    const isWithin = ind.direction === 'LOWER_BETTER'
+                      ? (payload.value ?? 0) <= (payload.target ?? 0)
+                      : (payload.value ?? 0) >= (payload.target ?? 0);
+                    const color = isWithin ? '#10b981' : '#ef4444';
+                    return <circle key={`dot-${index}`} cx={cx} cy={cy} r={4.5} fill={color} stroke={color} />;
+                  }}
+                  name="Realizado"
+                />
+              </LineChart>
+            </ResponsiveContainer>
+          </CardContent>
+        </Card>
+      </div>
 
       {/* Blocos de Ações e Reuniões Relacionados */}
       <div className="mb-6 grid grid-cols-1 gap-6 md:grid-cols-2">
@@ -511,6 +555,159 @@ export default function IndicatorDetailPage() {
       </Dialog>
     </div>
   );
+}
+
+type PrincipalDeviation = {
+  result: IndicatorDetail['results'][number];
+  target: number | null;
+  deviationAbs: number | null;
+};
+
+function IndicatorDecisionCards({
+  indicator,
+  principal,
+  principalDeviation,
+  deviations,
+  currentTreatment,
+}: {
+  indicator: IndicatorDetail;
+  principal: PrincipalDeviation | null;
+  principalDeviation: DeviationSummary | null;
+  deviations: DeviationSummary[];
+  currentTreatment: CurrentTreatment | null;
+}) {
+  const actionRows = indicator.actions ?? [];
+  const openActions = actionRows.filter((action) => !['DONE', 'DONE_LATE', 'CANCELLED', 'EFFECTIVE', 'INEFFECTIVE'].includes(action.status));
+  const deviationHref = principalDeviation ? `/deviations/${principalDeviation.id}` : '/deviations';
+  const treatmentHref = currentTreatment ? `/treatments/${currentTreatment.id}` : '/treatments';
+
+  return (
+    <aside className="grid gap-3">
+      <DecisionCard tone="red" title="Desvio principal">
+        <div className="space-y-2 text-sm">
+          <p>
+            <span className="text-muted-foreground">Desvio da meta: </span>
+            <span className="font-semibold text-foreground">{formatDeviationSummary(principal)}</span>
+          </p>
+          <p>
+            <span className="text-muted-foreground">Impacto financeiro/operacional estimado: </span>
+            <span className="font-medium text-foreground">{formatOperationalImpact(indicator, principal)}</span>
+          </p>
+          <DecisionList>
+            <DecisionLink href={deviationHref}>
+              {principalDeviation ? `Abrir desvio #${principalDeviation.number}` : 'Ver desvios do indicador'}
+            </DecisionLink>
+          </DecisionList>
+        </div>
+      </DecisionCard>
+
+      <DecisionCard tone="olive" title="Providências">
+        <DecisionList>
+          <DecisionLink href={deviationHref}>
+            {principalDeviation ? 'Conferir fato e impacto do desvio' : 'Registrar desvio ou análise de causa'}
+          </DecisionLink>
+          <DecisionLink href={treatmentHref}>
+            {currentTreatment ? 'Abrir tratativa em andamento' : 'Ver fila de tratativas do indicador'}
+          </DecisionLink>
+          <DecisionLink href="/meetings">Agendar ou consultar reunião de alinhamento</DecisionLink>
+        </DecisionList>
+      </DecisionCard>
+
+      <DecisionCard tone="orange" title="Causa Raiz">
+        <DecisionList>
+          {deviations.slice(0, 2).map((deviation) => (
+            <DecisionLink key={deviation.id} href={`/deviations/${deviation.id}`}>
+              {`#${deviation.number}: ${deviation._count?.causes ?? 0} causa(s), ${deviation._count?.analyses ?? 0} análise(s)`}
+            </DecisionLink>
+          ))}
+          {deviations.length === 0 && <DecisionLink href="/deviations">Abrir painel de desvios</DecisionLink>}
+          <DecisionLink href={treatmentHref}>
+            {currentTreatment ? 'Completar análise da tratativa atual' : 'Criar tratativa para causa raiz'}
+          </DecisionLink>
+        </DecisionList>
+      </DecisionCard>
+
+      <DecisionCard tone="green" title="Plano de Ação">
+        <DecisionList>
+          {openActions.slice(0, 3).map((action) => (
+            <DecisionLink key={action.id} href={`/actions/${action.id}`}>
+              {`${action.title} - ${STATUS_LABEL[action.status] ?? action.status}`}
+            </DecisionLink>
+          ))}
+          {openActions.length === 0 && <DecisionLink href="/actions">Criar ou consultar plano de ação</DecisionLink>}
+          <DecisionLink href="/actions">Ver todos os planos vinculados</DecisionLink>
+        </DecisionList>
+      </DecisionCard>
+    </aside>
+  );
+}
+
+function DecisionCard({ tone, title, children }: { tone: 'red' | 'olive' | 'orange' | 'green'; title: string; children: ReactNode }) {
+  const toneClass = {
+    red: 'border-l-red-700 text-red-700',
+    olive: 'border-l-[#8a8540] text-[#8a8540]',
+    orange: 'border-l-orange-500 text-orange-600',
+    green: 'border-l-emerald-700 text-emerald-800',
+  }[tone];
+  return (
+    <Card className={`rounded-lg border-l-4 shadow-sm ${toneClass}`}>
+      <CardContent className="p-5">
+        <h3 className="mb-4 text-base font-bold">{title}</h3>
+        {children}
+      </CardContent>
+    </Card>
+  );
+}
+
+function DecisionList({ children }: { children: ReactNode }) {
+  return <ul className="list-[square] space-y-2 pl-4 text-sm text-foreground">{children}</ul>;
+}
+
+function DecisionLink({ href, children }: { href: string; children: ReactNode }) {
+  return (
+    <li>
+      <Link href={href} className="underline-offset-2 hover:underline">
+        {children}
+      </Link>
+    </li>
+  );
+}
+
+function getPrincipalDeviation(indicator: IndicatorDetail): PrincipalDeviation | null {
+  const targetByRef = new Map(indicator.targets.map((target) => [target.periodRef, target.target]));
+  const candidates = indicator.results
+    .map((result) => {
+      const target = targetByRef.get(result.periodRef) ?? null;
+      const deviationAbs = target !== null ? Math.abs(result.value - target) : null;
+      const deviationPctAbs = result.deviationPct !== null ? Math.abs(result.deviationPct) : null;
+      const attentionWeight = result.light === 'RED' ? 1000000 : result.light === 'YELLOW' ? 500000 : 0;
+      const score = attentionWeight + (deviationPctAbs ?? 0) * 1000 + (deviationAbs ?? 0);
+      return { result, target, deviationAbs, score };
+    })
+    .filter((item) => item.result.light === 'RED' || item.result.light === 'YELLOW');
+
+  if (candidates.length === 0) return null;
+  candidates.sort((a, b) => b.score - a.score);
+  const { result, target, deviationAbs } = candidates[0];
+  return { result, target, deviationAbs };
+}
+
+function formatDeviationSummary(principal: PrincipalDeviation | null) {
+  if (!principal) return 'sem desvio crítico no último recorte';
+  const pct = principal.result.deviationPct;
+  const period = periodRefLabel(principal.result.periodRef);
+  const pctText = pct !== null ? `${pct > 0 ? '+' : ''}${formatNumber(pct, { maximumFractionDigits: 1 })}%` : 'sem percentual calculado';
+  if (principal.target === null) return `${period}: ${pctText}`;
+  return `${period}: realizado ${formatNumber(principal.result.value)} vs meta ${formatNumber(principal.target)} (${pctText})`;
+}
+
+function formatOperationalImpact(indicator: IndicatorDetail, principal: PrincipalDeviation | null) {
+  if (!principal) return 'sem impacto estimado para decisão imediata';
+  if (principal.deviationAbs === null) return 'impacto pendente de meta lançada';
+  const unit = indicator.unitLabel || indicator.unit || 'índice';
+  if (unit === 'R$' || unit.toUpperCase() === 'CURRENCY') return `R$ ${formatNumber(principal.deviationAbs)}`;
+  if (unit === '%' || unit.toUpperCase() === 'PERCENT') return `${formatNumber(principal.deviationAbs)} p.p.`;
+  return `${formatNumber(principal.deviationAbs)} ${unit}`;
 }
 
 function eventHref(event: TraceEvent) {

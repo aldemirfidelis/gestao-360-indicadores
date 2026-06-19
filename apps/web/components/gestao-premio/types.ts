@@ -5,7 +5,6 @@
 export interface CatalogIndicator {
   id: string;
   code: string;
-  bscNumber: string | null;
   name: string;
   description: string | null;
   unit: string | null;
@@ -105,7 +104,6 @@ export interface PlatformIndicatorRef {
   code: string | null;
   unit: string | null;
   direction: string;
-  bscNumber: string | null;
 }
 
 export interface OrgNodeRef {

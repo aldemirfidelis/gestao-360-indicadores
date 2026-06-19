@@ -31,7 +31,7 @@ CREATE TYPE "PrizeIndicatorKind" AS ENUM ('COLLECTIVE', 'INDIVIDUAL', 'BEHAVIORA
 CREATE TYPE "PrizeIndicatorDirection" AS ENUM ('HIGHER_BETTER', 'LOWER_BETTER', 'TARGET');
 
 -- CreateEnum
-CREATE TYPE "PrizeIndicatorSource" AS ENUM ('MANUAL', 'BSC', 'INTERNAL_API', 'FILE_IMPORT', 'AUTO_CALC');
+CREATE TYPE "PrizeIndicatorSource" AS ENUM ('MANUAL', 'INTERNAL_API', 'FILE_IMPORT', 'AUTO_CALC');
 
 -- CreateTable
 CREATE TABLE "PrizeProgram" (
@@ -180,7 +180,6 @@ CREATE TABLE "PrizeIndicator" (
     "kind" "PrizeIndicatorKind" NOT NULL DEFAULT 'COLLECTIVE',
     "direction" "PrizeIndicatorDirection" NOT NULL DEFAULT 'HIGHER_BETTER',
     "source" "PrizeIndicatorSource" NOT NULL DEFAULT 'MANUAL',
-    "bscNumber" TEXT,
     "weight" DECIMAL(9,4),
     "formula" TEXT,
     "roundingRule" TEXT,

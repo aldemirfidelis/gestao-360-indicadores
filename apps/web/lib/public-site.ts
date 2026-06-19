@@ -95,7 +95,7 @@ export const solutionPages: PublicPage[] = [
     slug: 'planejamento-estrategico',
     path: '/solucoes/planejamento-estrategico',
     title: 'Planejamento estratégico',
-    seoTitle: 'Software para planejamento estratégico, BSC e OKRs | Gestão 360',
+    seoTitle: 'Software para planejamento estratégico e OKRs | Gestão 360',
     description:
       'Conecte diretrizes, pilares, objetivos, OKRs, indicadores e iniciativas para acompanhar estratégia e execução.',
     eyebrow: 'Estratégia e execução',
@@ -105,7 +105,7 @@ export const solutionPages: PublicPage[] = [
       'Planos estratégicos perdem força quando ficam separados dos indicadores, responsáveis, reuniões e iniciativas de execução.',
     benefits: [
       'Relaciona objetivos, indicadores e iniciativas.',
-      'Apoia BSC, OKRs e mapas estratégicos.',
+      'Apoia OKRs, objetivos e mapas estratégicos.',
       'Mostra execução por área e nível organizacional.',
       'Facilita revisões de estratégia com evidências.',
     ],
@@ -113,7 +113,7 @@ export const solutionPages: PublicPage[] = [
     useCases: ['Ciclo anual de planejamento.', 'Revisão trimestral de OKRs.', 'Governança de iniciativas estratégicas.'],
     faq: [
       {
-        question: 'A plataforma trabalha com BSC e OKR?',
+        question: 'A plataforma trabalha com OKRs?',
         answer:
           'Sim. O Gestão 360 organiza perspectivas, objetivos, indicadores e iniciativas, permitindo adaptar o modelo ao processo de gestão da empresa.',
       },

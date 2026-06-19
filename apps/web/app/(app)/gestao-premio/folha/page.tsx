@@ -130,7 +130,7 @@ export default function PrizePayrollPage() {
                 {selected === b.id && detail && (
                   <div className="mt-3 overflow-x-auto border-t border-border/60 pt-3">
                     <table className="w-full text-sm">
-                      <thead className="text-xs text-muted-foreground"><tr><th className="px-2 py-1 text-left">Matrícula</th><th className="px-2 py-1 text-left">Nome</th><th className="px-2 py-1 text-right">Valor</th><th className="px-2 py-1 text-left">Status</th><th className="px-2 py-1 text-left">Retorno</th></tr></thead>
+                      <thead className="text-xs text-muted-foreground"><tr><th className="px-2 py-1 text-left">Matrícula</th><th className="px-2 py-1 text-left">Nome</th><th className="px-2 py-1 text-right">Valor</th><th className="px-2 py-1 text-left">Situação</th><th className="px-2 py-1 text-left">Retorno</th></tr></thead>
                       <tbody>
                         {detail.items.map((it) => (
                           <tr key={it.id} className="border-t border-border/40">

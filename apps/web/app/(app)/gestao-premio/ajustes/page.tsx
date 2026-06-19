@@ -27,6 +27,7 @@ interface Moderator {
 }
 
 const ADJ_STATUS: Record<string, any> = { REQUESTED: 'secondary', APPROVED: 'default', REJECTED: 'destructive', APPLIED: 'default', CANCELLED: 'outline' };
+const ADJ_STATUS_LABEL: Record<string, string> = { REQUESTED: 'Solicitado', APPROVED: 'Aprovado', REJECTED: 'Rejeitado', APPLIED: 'Aplicado', CANCELLED: 'Cancelado' };
 const EXC_TYPE: Record<string, string> = { IMPOSSIBILITY: 'Impossibilidade de apuração', TRAINING: 'Treinamento', TERMINATION: 'Desligamento', OTHER: 'Outra' };
 const MOD_EVENT_TYPES = ['FALTA', 'ATESTADO', 'MEDIDA_DISCIPLINAR', 'SUSPENSAO', 'ACIDENTE'];
 const MOD_EVENT_LABEL: Record<string, string> = { FALTA: 'Falta', ATESTADO: 'Atestado', MEDIDA_DISCIPLINAR: 'Medida disciplinar', SUSPENSAO: 'Suspensão', ACIDENTE: 'Acidente (ato inseguro)' };
@@ -131,14 +132,14 @@ export default function PrizeAdjustmentsPage() {
             <Card><CardContent className="p-0">
               {adjustments.length === 0 ? <p className="py-8 text-center text-sm text-muted-foreground">Nenhum ajuste.</p> : (
                 <table className="w-full text-sm">
-                  <thead className="border-b border-border/60 bg-muted/40 text-xs text-muted-foreground"><tr><th className="px-3 py-2 text-left">Matrícula</th><th className="px-3 py-2 text-left">Campo</th><th className="px-3 py-2 text-right">Valor</th><th className="px-3 py-2 text-left">Motivo</th><th className="px-3 py-2 text-left">Status</th><th className="px-3 py-2"></th></tr></thead>
+                  <thead className="border-b border-border/60 bg-muted/40 text-xs text-muted-foreground"><tr><th className="px-3 py-2 text-left">Matrícula</th><th className="px-3 py-2 text-left">Campo</th><th className="px-3 py-2 text-right">Valor</th><th className="px-3 py-2 text-left">Motivo</th><th className="px-3 py-2 text-left">Situação</th><th className="px-3 py-2"></th></tr></thead>
                   <tbody>{adjustments.map((a) => (
                     <tr key={a.id} className="border-b border-border/40">
                       <td className="px-3 py-2 font-mono text-xs">{a.registration}</td>
                       <td className="px-3 py-2">{a.field}</td>
                       <td className="px-3 py-2 text-right">{a.amount ? Number(a.amount).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' }) : '—'}</td>
                       <td className="px-3 py-2 text-muted-foreground">{a.reason}</td>
-                      <td className="px-3 py-2"><Badge variant={ADJ_STATUS[a.status]}>{a.status}</Badge></td>
+                      <td className="px-3 py-2"><Badge variant={ADJ_STATUS[a.status]}>{ADJ_STATUS_LABEL[a.status] ?? a.status}</Badge></td>
                       <td className="px-3 py-2 text-right">{canApprove && a.status === 'REQUESTED' && <>
                         <Button size="sm" variant="ghost" onClick={() => decideAdj.mutate({ id: a.id, decision: 'APPROVE' })}><CheckCircle2 className="h-3.5 w-3.5 text-emerald-600" /></Button>
                         <Button size="sm" variant="ghost" onClick={() => decideAdj.mutate({ id: a.id, decision: 'REJECT' })}><XCircle className="h-3.5 w-3.5 text-red-600" /></Button>
@@ -156,14 +157,14 @@ export default function PrizeAdjustmentsPage() {
             <Card><CardContent className="p-0">
               {exceptions.length === 0 ? <p className="py-8 text-center text-sm text-muted-foreground">Nenhuma exceção.</p> : (
                 <table className="w-full text-sm">
-                  <thead className="border-b border-border/60 bg-muted/40 text-xs text-muted-foreground"><tr><th className="px-3 py-2 text-left">Tipo</th><th className="px-3 py-2 text-left">Matrícula</th><th className="px-3 py-2 text-left">Parâmetro</th><th className="px-3 py-2 text-left">Motivo</th><th className="px-3 py-2 text-left">Status</th><th className="px-3 py-2"></th></tr></thead>
+                  <thead className="border-b border-border/60 bg-muted/40 text-xs text-muted-foreground"><tr><th className="px-3 py-2 text-left">Tipo</th><th className="px-3 py-2 text-left">Matrícula</th><th className="px-3 py-2 text-left">Parâmetro</th><th className="px-3 py-2 text-left">Motivo</th><th className="px-3 py-2 text-left">Situação</th><th className="px-3 py-2"></th></tr></thead>
                   <tbody>{exceptions.map((x) => (
                     <tr key={x.id} className="border-b border-border/40">
                       <td className="px-3 py-2">{EXC_TYPE[x.type] ?? x.type}</td>
                       <td className="px-3 py-2 font-mono text-xs">{x.registration ?? 'todos'}</td>
                       <td className="px-3 py-2 text-xs text-muted-foreground">{x.type === 'IMPOSSIBILITY' ? `média ${x.avgMonths}m` : x.gratificationValue ? `gratif. R$ ${x.gratificationValue}` : '—'}</td>
                       <td className="px-3 py-2 text-muted-foreground">{x.reason}</td>
-                      <td className="px-3 py-2"><Badge variant={ADJ_STATUS[x.status]}>{x.status}</Badge></td>
+                      <td className="px-3 py-2"><Badge variant={ADJ_STATUS[x.status]}>{ADJ_STATUS_LABEL[x.status] ?? x.status}</Badge></td>
                       <td className="px-3 py-2 text-right">{canApprove && x.status === 'REQUESTED' && <>
                         <Button size="sm" variant="ghost" onClick={() => decideExc.mutate({ id: x.id, decision: 'APPROVE' })}><CheckCircle2 className="h-3.5 w-3.5 text-emerald-600" /></Button>
                         <Button size="sm" variant="ghost" onClick={() => decideExc.mutate({ id: x.id, decision: 'REJECT' })}><XCircle className="h-3.5 w-3.5 text-red-600" /></Button>

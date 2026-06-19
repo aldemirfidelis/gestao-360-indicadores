@@ -683,8 +683,8 @@ model OrgNode {
   position    Int         @default(0)
 
   // Rastreio de origem para integracao/migracao de sistemas legados
-  // externalId  = chave primaria no sistema de origem (ex.: BSC "18448")
-  // externalSource = identificador da origem (ex.: "BSC 1.43")
+  // externalId  = chave primaria no sistema de origem.
+  // externalSource = identificador da origem.
   externalId     String?
   externalSource String?
 
@@ -966,7 +966,7 @@ model RefreshToken {
 }
 
 // =====================================================
-// Mapa estrategico / BSC
+// Mapa estrategico
 // =====================================================
 
 model StrategicMap {
@@ -1249,8 +1249,8 @@ model Indicator {
   yellowToleranceP Float           @default(10)
 
   // Rastreio de origem para integracao/migracao de sistemas legados
-  // externalId  = chave primaria no sistema de origem (ex.: BSC "18915")
-  // externalSource = identificador da origem (ex.: "BSC 1.43")
+  // externalId  = chave primaria no sistema de origem.
+  // externalSource = identificador da origem.
   externalId     String?
   externalSource String?
 
@@ -8729,7 +8729,6 @@ enum PrizeIndicatorDirection {
 
 enum PrizeIndicatorSource {
   MANUAL
-  BSC
   INTERNAL_API
   FILE_IMPORT
   AUTO_CALC
@@ -8933,7 +8932,6 @@ model PrizeIndicator {
   kind                PrizeIndicatorKind      @default(COLLECTIVE)
   direction           PrizeIndicatorDirection @default(HIGHER_BETTER)
   source              PrizeIndicatorSource    @default(MANUAL)
-  bscNumber           String?
   // Vinculo com o indicador NATIVO da plataforma (modulo Indicadores/Lancamentos).
   // Quando preenchido, o realizado do premio e sincronizado automaticamente de
   // IndicatorResult (periodRef = label da competencia), eliminando redigitacao
@@ -9105,7 +9103,6 @@ model PrizeIndicatorCatalog {
   id                  String                  @id @default(uuid())
   companyId           String
   code                String
-  bscNumber           String?
   name                String
   description         String?
   unit                String?
@@ -9122,7 +9119,6 @@ model PrizeIndicatorCatalog {
   actuals        PrizeCatalogActualResult[]
 
   @@unique([companyId, code])
-  @@unique([companyId, bscNumber])
   @@index([companyId])
   @@index([companyId, active])
   @@index([platformIndicatorId])
@@ -9395,7 +9391,7 @@ enum PrizeJobStatus {
 model PrizeIntegrationConfig {
   id             String             @id @default(uuid())
   companyId      String
-  kind           String // APDATA_ELIGIBLE | APDATA_EVENTS | BSC | PAYROLL
+  kind           String // APDATA_ELIGIBLE | APDATA_EVENTS | PAYROLL
   name           String
   type           PrizeConnectorType @default(MANUAL)
   active         Boolean            @default(true)

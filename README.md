@@ -1,6 +1,6 @@
 # Gestao 360 Indicadores
 
-Plataforma SaaS corporativa para gestao estrategica de indicadores, BSC, OKR, KPI, planos de acao, FCA/CAPA, cronogramas, reunioes, importacao de dados, relatorios, insights e dashboards executivos.
+Plataforma SaaS corporativa para gestao estrategica de indicadores, OKR, KPI, planos de acao, FCA/CAPA, cronogramas, reunioes, importacao de dados, relatorios, insights e dashboards executivos.
 
 > **Status:** sistema funcional ponta a ponta com backend NestJS + frontend Next.js, banco PostgreSQL com 40+ entidades modeladas, rastreabilidade pela Arvore Organizacional e Mapa Estrategico, dashboards, regras de negocio implementadas e dados demo realistas.
 
@@ -164,7 +164,7 @@ Plataforma cuida de build/deploy/SSL/escala. Veja **[DEPLOY.md](./DEPLOY.md)**.
 | `/` | **Dashboard executivo**: KPIs, evolucao 12m, ranking de areas, top criticos, pendencias |
 | `/insights` | **Insights** consumindo o backend com cards categorizados (resumo, tendencia, causas, acoes) |
 | `/strategy` | Lista de mapas estrategicos |
-| `/strategy/:id` | **Mapa estrategico BSC** com objetivos por perspectiva, farol agregado, edicao de status inline, criacao de objetivos |
+| `/strategy/:id` | **Mapa estrategico** com objetivos por perspectiva, farol agregado, edicao de status inline, criacao de objetivos |
 | `/okrs` | **OKRs**: ciclos, objetivos, KRs com edicao inline de valor, **check-in semanal** com sliders, calculo automatico de status |
 | `/indicators` | Lista com busca e filtro por farol |
 | `/indicators/new` | **Formulario completo de novo indicador** com 14 campos |
@@ -217,7 +217,7 @@ Plataforma cuida de build/deploy/SSL/escala. Veja **[DEPLOY.md](./DEPLOY.md)**.
 - **Indicador atrasado** = `dueDate < hoje` AND status nao concluido — destacado em vermelho no Kanban.
 - **OKR — status automatico no check-in**: `confidence >= 0.7 && progress >= 0.3` → ON_TRACK; `confidence < 0.4` → OFF_TRACK; demais → AT_RISK; `progress >= 0.95` → DONE.
 - **OKR — progresso ponderado**: progresso de cada KR conforme direcao (HIGHER_BETTER/LOWER_BETTER), e do objetivo conforme peso dos KRs.
-- **Mapa BSC com farol agregado**: cada objetivo recebe um farol baseado nos indicadores vinculados (qualquer vermelho → vermelho, qualquer amarelo → amarelo, todos verdes → verde).
+- **Mapa estrategico com farol agregado**: cada objetivo recebe um farol baseado nos indicadores vinculados (qualquer vermelho → vermelho, qualquer amarelo → amarelo, todos verdes → verde).
 - **Simulacao de impacto** na arvore de indicadores: BFS ate profundidade configuravel com peso acumulado.
 - **Importacao CSV** valida cada linha contra o schema do indicador (verifica codigo existente, area existente, valor numerico).
 - **Notificacoes geradas por regras**: indicador vermelho sem notificacao previa + acao atrasada com responsavel.

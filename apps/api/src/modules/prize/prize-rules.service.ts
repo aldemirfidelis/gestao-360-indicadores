@@ -17,7 +17,6 @@ import { PrizeCatalogService } from './prize-catalog.service';
 
 export interface UpsertCatalogDto {
   code?: string;
-  bscNumber?: string | null;
   name?: string;
   description?: string | null;
   unit?: string | null;
@@ -104,7 +103,7 @@ export class PrizeRulesService {
         deletedAt: null,
         ...(query.active ? { active: query.active === 'true' } : {}),
         ...(query.q
-          ? { OR: [{ name: { contains: query.q, mode: 'insensitive' } }, { code: { contains: query.q, mode: 'insensitive' } }, { bscNumber: { contains: query.q, mode: 'insensitive' } }] }
+          ? { OR: [{ name: { contains: query.q, mode: 'insensitive' } }, { code: { contains: query.q, mode: 'insensitive' } }] }
           : {}),
       },
       orderBy: [{ active: 'desc' }, { name: 'asc' }],
@@ -114,14 +113,12 @@ export class PrizeRulesService {
 
   async createCatalog(me: AuthPayload, dto: UpsertCatalogDto) {
     if (!dto.name?.trim()) throw new BadRequestException('Nome do indicador e obrigatorio');
-    const code = (dto.code ?? '').trim() || (dto.bscNumber ? `BSC-${dto.bscNumber}` : await this.nextCatalogCode(me.companyId));
+    const code = (dto.code ?? '').trim() || (await this.nextCatalogCode(me.companyId));
     await this.assertCatalogCode(me.companyId, code);
-    if (dto.bscNumber) await this.assertBscNumber(me.companyId, dto.bscNumber);
     const catalog = await this.prisma.prizeIndicatorCatalog.create({
       data: {
         companyId: me.companyId,
         code,
-        bscNumber: dto.bscNumber ?? null,
         name: dto.name.trim(),
         description: dto.description ?? null,
         unit: dto.unit ?? null,
@@ -139,12 +136,10 @@ export class PrizeRulesService {
   async updateCatalog(me: AuthPayload, id: string, dto: UpsertCatalogDto) {
     const current = await this.getCatalog(me.companyId, id);
     if (dto.code?.trim() && dto.code.trim() !== current.code) await this.assertCatalogCode(me.companyId, dto.code.trim());
-    if (dto.bscNumber && dto.bscNumber !== current.bscNumber) await this.assertBscNumber(me.companyId, dto.bscNumber);
     const updated = await this.prisma.prizeIndicatorCatalog.update({
       where: { id },
       data: {
         code: dto.code?.trim() ?? undefined,
-        bscNumber: dto.bscNumber !== undefined ? dto.bscNumber : undefined,
         name: dto.name?.trim() ?? undefined,
         description: dto.description ?? undefined,
         unit: dto.unit ?? undefined,
@@ -182,18 +177,17 @@ export class PrizeRulesService {
   /**
    * Anexa a cada indicador da combinacao os parametros/faixas HERDADOS do
    * indicador v1 (PrizeIndicator, tela "Indicadores e faixas"), casados por
-   * platformIndicatorId/BSC/nome. Modelo hibrido: o default vem do indicador;
+   * platformIndicatorId/nome. Modelo hibrido: o default vem do indicador;
    * o que estiver em PrizeRuleParameter (v2) sobrescreve por combinacao.
    */
   private async attachInheritedDefaults<T extends { indicators: any[] }>(companyId: string, groups: T[]): Promise<T[]> {
-    const catalogs = new Map<string, { platformIndicatorId: string | null; bscNumber: string | null; name: string }>();
+    const catalogs = new Map<string, { platformIndicatorId: string | null; name: string }>();
     for (const g of groups) for (const ri of g.indicators) {
-      if (ri.catalog) catalogs.set(ri.catalogId, { platformIndicatorId: ri.catalog.platformIndicatorId, bscNumber: ri.catalog.bscNumber, name: ri.catalog.name });
+      if (ri.catalog) catalogs.set(ri.catalogId, { platformIndicatorId: ri.catalog.platformIndicatorId, name: ri.catalog.name });
     }
     if (catalogs.size === 0) return groups;
     const cats = [...catalogs.values()];
     const platformIds = cats.map((c) => c.platformIndicatorId).filter((v): v is string => !!v);
-    const bscNumbers = cats.map((c) => c.bscNumber).filter((v): v is string => !!v);
     const names = cats.map((c) => c.name).filter(Boolean);
 
     const v1 = await this.prisma.prizeIndicator.findMany({
@@ -202,7 +196,6 @@ export class PrizeRulesService {
         deletedAt: null,
         OR: [
           ...(platformIds.length ? [{ platformIndicatorId: { in: platformIds } }] : []),
-          ...(bscNumbers.length ? [{ bscNumber: { in: bscNumbers } }] : []),
           ...(names.length ? [{ name: { in: names } }] : []),
         ],
       },
@@ -213,7 +206,7 @@ export class PrizeRulesService {
     for (const g of groups) {
       for (const ri of g.indicators) {
         if (!ri.catalog) { ri.inherited = null; continue; }
-        const match = matchInherited({ platformIndicatorId: ri.catalog.platformIndicatorId, bscNumber: ri.catalog.bscNumber, name: ri.catalog.name }, v1);
+        const match = matchInherited({ platformIndicatorId: ri.catalog.platformIndicatorId, name: ri.catalog.name }, v1);
         ri.inherited = match
           ? {
               sourceId: match.id,
@@ -589,10 +582,5 @@ export class PrizeRulesService {
   private async assertCatalogCode(companyId: string, code: string) {
     const existing = await this.prisma.prizeIndicatorCatalog.findFirst({ where: { companyId, code, deletedAt: null } });
     if (existing) throw new ConflictException(`Ja existe indicador de catalogo com o codigo ${code}`);
-  }
-
-  private async assertBscNumber(companyId: string, bscNumber: string) {
-    const existing = await this.prisma.prizeIndicatorCatalog.findFirst({ where: { companyId, bscNumber, deletedAt: null } });
-    if (existing) throw new ConflictException(`Ja existe indicador de catalogo com o numero BSC ${bscNumber}`);
   }
 }

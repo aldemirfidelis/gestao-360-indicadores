@@ -30,21 +30,16 @@ export function roundPercent(value: number): number {
 // O usuario lanca metas/zeros/faixas em "Indicadores e faixas" (PrizeIndicator).
 // A combinacao (RuleGroup) referencia o catalogo v2. Para o modelo hibrido
 // (default no indicador, override na combinacao), casamos catalogo -> indicador
-// v1 por platformIndicatorId, depois nº BSC, depois nome normalizado.
+// v1 por platformIndicatorId, depois nome normalizado.
 
 export interface InheritSourceLite {
   name: string;
-  bscNumber: string | null;
   platformIndicatorId: string | null;
 }
 
 export function matchInherited<T extends InheritSourceLite>(catalog: InheritSourceLite, sources: T[]): T | null {
   if (catalog.platformIndicatorId) {
     const m = sources.find((s) => s.platformIndicatorId && s.platformIndicatorId === catalog.platformIndicatorId);
-    if (m) return m;
-  }
-  if (catalog.bscNumber) {
-    const m = sources.find((s) => s.bscNumber && s.bscNumber === catalog.bscNumber);
     if (m) return m;
   }
   const key = normalizeRuleKey(catalog.name);

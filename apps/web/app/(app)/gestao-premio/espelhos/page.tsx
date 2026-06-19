@@ -143,7 +143,7 @@ export default function PrizePayslipsPage() {
           <CardContent className="overflow-x-auto p-0">
             <table className="w-full text-sm">
               <thead className="border-b border-border/60 bg-muted/40 text-xs text-muted-foreground">
-                <tr><th className="px-3 py-2 text-left">Colaborador</th><th className="px-3 py-2 text-right">Final</th><th className="px-3 py-2 text-left">Versão</th><th className="px-3 py-2 text-left">Status</th><th className="px-3 py-2 text-left">Ciência</th><th className="px-3 py-2"></th></tr>
+                <tr><th className="px-3 py-2 text-left">Colaborador</th><th className="px-3 py-2 text-right">Final</th><th className="px-3 py-2 text-left">Versão</th><th className="px-3 py-2 text-left">Situação</th><th className="px-3 py-2 text-left">Ciência</th><th className="px-3 py-2"></th></tr>
               </thead>
               <tbody>
                 {payslips.map((p) => (

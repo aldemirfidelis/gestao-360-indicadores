@@ -18,18 +18,18 @@ import { useAuth } from '@/components/auth/auth-provider';
 
 interface Indicator {
   id: string; code: string; name: string; unit: string | null; kind: string; direction: string; source: string;
-  weight: string | null; bscNumber: string | null; platformIndicatorId: string | null; _count?: { parameters: number; ranges: number };
+  weight: string | null; platformIndicatorId: string | null; _count?: { parameters: number; ranges: number };
 }
-interface PlatformIndicatorRef { id: string; name: string; code: string | null; unit: string | null; direction: string; bscNumber: string | null }
+interface PlatformIndicatorRef { id: string; name: string; code: string | null; unit: string | null; direction: string }
 interface Parameter { id: string; year: number | null; month: number | null; scopeKey: string | null; target: string | null; zero: string | null; weight: string | null }
 interface Range { id: string; orderIndex: number; minLimit: string | null; maxLimit: string | null; achievementPercent: string | null; gainPercent: string | null }
 interface IndicatorDetail extends Indicator { parameters: Parameter[]; ranges: Range[] }
 
 const KIND: Record<string, string> = { COLLECTIVE: 'Coletivo', INDIVIDUAL: 'Individual', BEHAVIORAL_COLLECTIVE: 'Comportamental (coletivo)', BEHAVIORAL_INDIVIDUAL: 'Comportamental (individual)' };
 const DIRECTION: Record<string, string> = { HIGHER_BETTER: 'Maior melhor', LOWER_BETTER: 'Menor melhor', TARGET: 'Alvo exato' };
-const SOURCE: Record<string, string> = { MANUAL: 'Manual', BSC: 'BSC', INTERNAL_API: 'API interna', FILE_IMPORT: 'Arquivo', AUTO_CALC: 'Cálculo' };
+const SOURCE: Record<string, string> = { MANUAL: 'Manual', INTERNAL_API: 'API interna', FILE_IMPORT: 'Arquivo', AUTO_CALC: 'Cálculo' };
 
-const emptyInd = { programId: '', code: '', name: '', unit: '', kind: 'COLLECTIVE', direction: 'HIGHER_BETTER', source: 'MANUAL', weight: '', bscNumber: '', platformIndicatorId: '', manual: false };
+const emptyInd = { programId: '', code: '', name: '', unit: '', kind: 'COLLECTIVE', direction: 'HIGHER_BETTER', source: 'MANUAL', weight: '', platformIndicatorId: '', manual: false };
 const emptyParam = { year: new Date().getFullYear(), month: new Date().getMonth() + 1, scopeKey: '', target: '', zero: '', weight: '', changeReason: '' };
 const emptyRange = { orderIndex: 0, minLimit: '', maxLimit: '', achievementPercent: '', gainPercent: '' };
 const emptyGen = { zero: '', target: '', count: 6 };
@@ -174,7 +174,7 @@ export default function PrizeIndicatorsPage() {
                           : <Badge variant="outline">Exclusivo do prêmio</Badge>}
                       </div>
                       <p className="text-xs text-muted-foreground">
-                        {DIRECTION[ind.direction]} · {SOURCE[ind.source]}{ind.unit ? ` · ${ind.unit}` : ''}{ind.weight ? ` · peso ${ind.weight}` : ''}{ind.bscNumber ? ` · BSC ${ind.bscNumber}` : ''}{ind.platformIndicatorId ? ' · realizado sincroniza dos Lançamentos' : ' · realizado manual'}
+                        {DIRECTION[ind.direction]} · {SOURCE[ind.source] ?? 'Externo'}{ind.unit ? ` · ${ind.unit}` : ''}{ind.weight ? ` · peso ${ind.weight}` : ''}{ind.platformIndicatorId ? ' · realizado sincroniza dos Lançamentos' : ' · realizado manual'}
                       </p>
                     </div>
                     <div className="flex shrink-0 items-center gap-2">
@@ -292,7 +292,6 @@ export default function PrizeIndicatorsPage() {
                     </NativeSelect>
                   </div>
                 </div>
-                <div><Label>Nº BSC (opcional)</Label><Input value={form.bscNumber} onChange={(e) => setForm({ ...form, bscNumber: e.target.value })} /></div>
               </>
             )}
 

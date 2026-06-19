@@ -26,7 +26,7 @@ export function LinkIndicatorDialog({ open, onOpenChange, groupId, catalog, onSa
   const [manual, setManual] = useState(false);
   const [catalogId, setCatalogId] = useState('');
   const [platformIndicatorId, setPlatformIndicatorId] = useState('');
-  const [newInd, setNewInd] = useState({ name: '', bscNumber: '', unit: '', direction: 'HIGHER_BETTER' });
+  const [newInd, setNewInd] = useState({ name: '', unit: '', direction: 'HIGHER_BETTER' });
   const [link, setLink] = useState({ weight: '', type: 'VARIABLE', validityKind: 'CALENDAR_YEAR', startMonth: 1, monthsCount: 12 });
 
   useEffect(() => {
@@ -35,7 +35,7 @@ export function LinkIndicatorDialog({ open, onOpenChange, groupId, catalog, onSa
     setManual(false);
     setCatalogId('');
     setPlatformIndicatorId('');
-    setNewInd({ name: '', bscNumber: '', unit: '', direction: 'HIGHER_BETTER' });
+    setNewInd({ name: '', unit: '', direction: 'HIGHER_BETTER' });
     setLink({ weight: '', type: 'VARIABLE', validityKind: 'CALENDAR_YEAR', startMonth: 1, monthsCount: 12 });
   }, [open, catalog.length]);
 
@@ -52,11 +52,11 @@ export function LinkIndicatorDialog({ open, onOpenChange, groupId, catalog, onSa
       if (mode === 'new') {
         let body: Record<string, unknown>;
         if (manual) {
-          body = { name: newInd.name.trim(), bscNumber: newInd.bscNumber.trim() || null, unit: newInd.unit.trim() || null, direction: newInd.direction, source: 'MANUAL' };
+          body = { name: newInd.name.trim(), unit: newInd.unit.trim() || null, direction: newInd.direction, source: 'MANUAL' };
         } else {
           const pi = platformOptions.find((p) => p.id === platformIndicatorId);
           if (!pi) throw new Error('Selecione o indicador da plataforma');
-          body = { name: pi.name, bscNumber: pi.bscNumber ?? null, unit: pi.unit ?? null, direction: pi.direction, platformIndicatorId: pi.id, source: 'INTERNAL_API' };
+          body = { name: pi.name, unit: pi.unit ?? null, direction: pi.direction, platformIndicatorId: pi.id, source: 'INTERNAL_API' };
         }
         const created = await api<CatalogIndicator>('/prize/rules/catalog', { method: 'POST', json: body });
         targetCatalogId = created.id;
@@ -99,7 +99,7 @@ export function LinkIndicatorDialog({ open, onOpenChange, groupId, catalog, onSa
               <Label>Indicador do catálogo *</Label>
               <NativeSelect value={catalogId} onChange={(e) => setCatalogId(e.target.value)}>
                 <option value="">Selecione…</option>
-                {availableCatalog.map((c) => <option key={c.id} value={c.id}>{c.code} — {c.name}{c.bscNumber ? ` (BSC ${c.bscNumber})` : ''}</option>)}
+                {availableCatalog.map((c) => <option key={c.id} value={c.id}>{c.code} — {c.name}</option>)}
               </NativeSelect>
               {availableCatalog.length === 0 && <p className="mt-1 text-xs text-muted-foreground">Catálogo vazio. Use “Novo no catálogo”.</p>}
             </div>
@@ -116,7 +116,6 @@ export function LinkIndicatorDialog({ open, onOpenChange, groupId, catalog, onSa
             <div className="space-y-2">
               <div className="grid grid-cols-2 gap-3">
                 <div><Label>Nome *</Label><Input value={newInd.name} onChange={(e) => setNewInd({ ...newInd, name: e.target.value })} /></div>
-                <div><Label>Nº BSC</Label><Input value={newInd.bscNumber} onChange={(e) => setNewInd({ ...newInd, bscNumber: e.target.value })} /></div>
                 <div><Label>Unidade</Label><Input value={newInd.unit} onChange={(e) => setNewInd({ ...newInd, unit: e.target.value })} placeholder="%, ton…" /></div>
                 <div><Label>Sentido</Label>
                   <NativeSelect value={newInd.direction} onChange={(e) => setNewInd({ ...newInd, direction: e.target.value })}>

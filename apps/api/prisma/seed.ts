@@ -419,7 +419,7 @@ async function main() {
     objectivesByName.set(o.name, obj.id);
   }
 
-  // ---------------- Relacoes BSC entre objetivos ----------------
+  // ---------------- Relacoes entre objetivos ----------------
   const relPairs: Array<[string, string]> = [
     ['Desenvolver lideranca', 'Aumentar produtividade industrial'],
     ['Aumentar produtividade industrial', 'Reduzir custo de transformacao'],

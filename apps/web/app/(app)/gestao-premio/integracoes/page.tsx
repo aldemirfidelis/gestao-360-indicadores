@@ -21,9 +21,10 @@ interface Connector {
 }
 interface Job { id: string; kind: string; type: string; status: string; processed: number; lotVersion: number; createdAt: string; competenceId: string | null }
 
-const KIND_LABEL: Record<string, string> = { APDATA_ELIGIBLE: 'Apdata — Base elegível', APDATA_EVENTS: 'Apdata — Eventos', BSC: 'BSC', PAYROLL: 'Folha de Pagamento' };
+const KIND_LABEL: Record<string, string> = { APDATA_ELIGIBLE: 'Apdata — Base elegível', APDATA_EVENTS: 'Apdata — Eventos', PAYROLL: 'Folha de Pagamento' };
 const TYPE_LABEL: Record<string, string> = { API: 'API', FILE_CSV: 'Arquivo CSV', FILE_XLSX: 'Arquivo XLSX', DB_BRIDGE: 'Banco intermediário', MANUAL: 'Manual' };
 const JOB_STATUS: Record<string, any> = { SUCCESS: 'default', RUNNING: 'secondary', ERROR: 'destructive', PARTIAL: 'outline', PENDING: 'secondary' };
+const JOB_STATUS_LABEL: Record<string, string> = { SUCCESS: 'Sucesso', RUNNING: 'Em execução', ERROR: 'Erro', PARTIAL: 'Parcial', PENDING: 'Pendente' };
 
 const emptyForm = { kind: 'APDATA_ELIGIBLE', name: '', type: 'MANUAL', secretRef: '', endpoint: '', active: true };
 
@@ -60,7 +61,7 @@ export default function PrizeConnectorsPage() {
       <PageHeader
         title="Integrações do Prêmio"
         eyebrow="Gestão de Prêmio"
-        description="Conectores desacoplados (Apdata, BSC, Folha). Segredos por referência de ambiente — nunca armazenados em claro."
+        description="Conectores desacoplados (Apdata e Folha). Segredos por referência de ambiente — nunca armazenados em claro."
         tone="view"
         breadcrumbs={[{ label: 'Gestão de Prêmio', href: '/gestao-premio' }, { label: 'Integrações' }]}
         actions={canAdmin ? <Button onClick={() => setOpen(true)}><Plus className="mr-1 h-4 w-4" />Novo conector</Button> : undefined}
@@ -83,7 +84,7 @@ export default function PrizeConnectorsPage() {
                       <span className="font-medium">{c.name}</span>
                       <Badge variant={c.active ? 'default' : 'outline'}>{c.active ? 'Ativo' : 'Inativo'}</Badge>
                     </div>
-                    <p className="text-xs text-muted-foreground">{KIND_LABEL[c.kind] ?? c.kind} · {TYPE_LABEL[c.type] ?? c.type}</p>
+                    <p className="text-xs text-muted-foreground">{KIND_LABEL[c.kind] ?? 'Legado'} · {TYPE_LABEL[c.type] ?? c.type}</p>
                   </div>
                   {c.lastStatus && <Badge variant={c.lastStatus === 'OK' ? 'default' : 'outline'}>{c.lastStatus}</Badge>}
                 </div>
@@ -99,7 +100,7 @@ export default function PrizeConnectorsPage() {
         </div>
 
         <div className="space-y-3">
-          <h2 className="text-sm font-medium text-muted-foreground">Jobs recentes</h2>
+          <h2 className="text-sm font-medium text-muted-foreground">Rotinas recentes</h2>
           <Card>
             <CardContent className="p-0">
               {jobs.length === 0 ? (
@@ -110,10 +111,10 @@ export default function PrizeConnectorsPage() {
                     <li key={j.id} className="flex items-center justify-between gap-2 px-3 py-2 text-sm">
                       <span className="flex items-center gap-2">
                         {j.status === 'SUCCESS' ? <CheckCircle2 className="h-4 w-4 text-emerald-600" /> : j.status === 'ERROR' ? <XCircle className="h-4 w-4 text-red-600" /> : <PlayCircle className="h-4 w-4 text-muted-foreground" />}
-                        <span>{KIND_LABEL[j.kind] ?? j.kind} <span className="text-xs text-muted-foreground">v{j.lotVersion} · {j.processed} reg.</span></span>
+                        <span>{KIND_LABEL[j.kind] ?? 'Legado'} <span className="text-xs text-muted-foreground">v{j.lotVersion} · {j.processed} reg.</span></span>
                       </span>
                       <span className="flex items-center gap-2">
-                        <Badge variant={JOB_STATUS[j.status] ?? 'secondary'}>{j.status}</Badge>
+                        <Badge variant={JOB_STATUS[j.status] ?? 'secondary'}>{JOB_STATUS_LABEL[j.status] ?? j.status}</Badge>
                         <span className="text-xs text-muted-foreground">{new Date(j.createdAt).toLocaleString('pt-BR')}</span>
                       </span>
                     </li>

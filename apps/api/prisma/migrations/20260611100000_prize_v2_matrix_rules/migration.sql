@@ -23,7 +23,6 @@ CREATE TABLE "PrizeIndicatorCatalog" (
     "id" TEXT NOT NULL,
     "companyId" TEXT NOT NULL,
     "code" TEXT NOT NULL,
-    "bscNumber" TEXT,
     "name" TEXT NOT NULL,
     "description" TEXT,
     "unit" TEXT,
@@ -198,9 +197,6 @@ CREATE TABLE "PrizeUnmatchedEmployee" (
 
 -- CreateIndex
 CREATE UNIQUE INDEX "PrizeIndicatorCatalog_companyId_code_key" ON "PrizeIndicatorCatalog"("companyId", "code");
-
--- CreateIndex
-CREATE UNIQUE INDEX "PrizeIndicatorCatalog_companyId_bscNumber_key" ON "PrizeIndicatorCatalog"("companyId", "bscNumber");
 
 -- CreateIndex
 CREATE INDEX "PrizeIndicatorCatalog_companyId_idx" ON "PrizeIndicatorCatalog"("companyId");

@@ -8,7 +8,7 @@ Este documento descreve o estado atual do repositorio `gestao-indicadores-sqlite
 
 O Gestao 360 e uma plataforma SaaS de gestao estrategica e melhoria continua. O sistema combina:
 
-- BSC, mapa estrategico, perspectivas, objetivos e relacoes.
+- Mapa estrategico, perspectivas, objetivos e relacoes.
 - Indicadores/KPIs com metas, resultados, farol, anexos, comentarios e historico.
 - Planos de acao com execucao, tarefas, evidencias, analise de causa, eficacia, aprovacoes e IA.
 - Reunioes conectadas a planos de acao, participantes, agenda, convites e tarefas.
@@ -1497,7 +1497,7 @@ Arquivos de deploy:
 | Desvios | `/deviations` | `deviations`, `treatments` | Desvios, causas, tratativas e planos derivados |
 | Planos | `/actions`, `/actions/[id]` | `actions` | Plano de acao, tarefas, evidencias, eficacia, IA |
 | Reunioes | `/meetings`, `/meetings/[id]` | `meetings` | Agenda, participantes, convites, tarefas e conclusao |
-| Estrategia | `/strategy`, `/strategy/[id]` | `strategy` | BSC, mapas, objetivos, relacoes, versoes |
+| Estrategia | `/strategy`, `/strategy/[id]` | `strategy` | Mapas, objetivos, relacoes, versoes |
 | OKRs | `/okrs` | `okrs` | Ciclos, objetivos, KRs e check-ins |
 | Projetos | `/projects` | `projects` | Cronogramas, marcos e tarefas |
 | Relatorios | `/reports` | `reports` | Exportacoes CSV |

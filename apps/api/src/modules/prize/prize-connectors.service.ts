@@ -5,7 +5,7 @@ import { AuthPayload } from '../auth/auth.types';
 import { PrizeAuditService } from './prize-audit.service';
 
 export interface UpsertConnectorDto {
-  kind?: string; // APDATA_ELIGIBLE | APDATA_EVENTS | BSC | PAYROLL
+  kind?: string; // APDATA_ELIGIBLE | APDATA_EVENTS | PAYROLL
   name?: string;
   type?: PrizeConnectorType;
   active?: boolean;
@@ -15,7 +15,7 @@ export interface UpsertConnectorDto {
   notes?: string | null;
 }
 
-const KINDS = ['APDATA_ELIGIBLE', 'APDATA_EVENTS', 'BSC', 'PAYROLL'];
+const KINDS = ['APDATA_ELIGIBLE', 'APDATA_EVENTS', 'PAYROLL'];
 
 /**
  * Conectores configuraveis por empresa. Segredos NUNCA sao armazenados: guardamos

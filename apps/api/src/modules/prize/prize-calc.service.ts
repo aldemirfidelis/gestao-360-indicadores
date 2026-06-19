@@ -214,12 +214,11 @@ export class PrizeCalcService {
 
     // Fallback hibrido: quando a combinacao nao tem parametro v2 para o mes,
     // herda zero/meta/faixas do indicador v1 (PrizeIndicator) casado por
-    // platformIndicatorId/BSC/nome.
-    const ruleCatalogs = new Map<string, { platformIndicatorId: string | null; bscNumber: string | null; name: string }>();
-    for (const g of groups) for (const ri of g.indicators) if (ri.catalog) ruleCatalogs.set(ri.catalogId, { platformIndicatorId: ri.catalog.platformIndicatorId, bscNumber: ri.catalog.bscNumber, name: ri.catalog.name });
+    // platformIndicatorId/nome.
+    const ruleCatalogs = new Map<string, { platformIndicatorId: string | null; name: string }>();
+    for (const g of groups) for (const ri of g.indicators) if (ri.catalog) ruleCatalogs.set(ri.catalogId, { platformIndicatorId: ri.catalog.platformIndicatorId, name: ri.catalog.name });
     const cats = [...ruleCatalogs.values()];
     const v1PlatformIds = cats.map((c) => c.platformIndicatorId).filter((v): v is string => !!v);
-    const v1Bsc = cats.map((c) => c.bscNumber).filter((v): v is string => !!v);
     const v1Names = cats.map((c) => c.name).filter(Boolean);
     const v1Indicators = ruleCatalogs.size
       ? await this.prisma.prizeIndicator.findMany({
@@ -228,7 +227,6 @@ export class PrizeCalcService {
             deletedAt: null,
             OR: [
               ...(v1PlatformIds.length ? [{ platformIndicatorId: { in: v1PlatformIds } }] : []),
-              ...(v1Bsc.length ? [{ bscNumber: { in: v1Bsc } }] : []),
               ...(v1Names.length ? [{ name: { in: v1Names } }] : []),
             ],
           },

@@ -28,7 +28,6 @@ export interface UpsertIndicatorDto {
   kind?: PrizeIndicatorKind;
   direction?: PrizeIndicatorDirection;
   source?: PrizeIndicatorSource;
-  bscNumber?: string | null;
   platformIndicatorId?: string | null;
   weight?: number | null;
   formula?: string | null;
@@ -92,7 +91,6 @@ export class PrizeIndicatorsService {
       name: i.name,
       unit: i.unitLabel?.trim() || UNIT_LABEL[i.unit],
       direction: DIRECTION_FROM_PLATFORM[i.direction],
-      bscNumber: i.externalSource?.toUpperCase().startsWith('BSC') ? i.externalId : null,
     }));
   }
 
@@ -163,7 +161,6 @@ export class PrizeIndicatorsService {
         kind: dto.kind ?? 'COLLECTIVE',
         direction: dto.direction ?? (native ? DIRECTION_FROM_PLATFORM[native.direction] : 'HIGHER_BETTER'),
         source: dto.source ?? (native ? 'INTERNAL_API' : 'MANUAL'),
-        bscNumber: dto.bscNumber ?? (native?.externalSource?.toUpperCase().startsWith('BSC') ? native.externalId : null),
         platformIndicatorId: native?.id ?? null,
         weight: dto.weight ?? null,
         formula: dto.formula ?? null,
@@ -193,7 +190,6 @@ export class PrizeIndicatorsService {
         kind: dto.kind ?? undefined,
         direction: dto.direction ?? undefined,
         source: dto.source ?? undefined,
-        bscNumber: dto.bscNumber ?? undefined,
         platformIndicatorId: dto.platformIndicatorId !== undefined ? dto.platformIndicatorId : undefined,
         weight: dto.weight ?? undefined,
         formula: dto.formula ?? undefined,

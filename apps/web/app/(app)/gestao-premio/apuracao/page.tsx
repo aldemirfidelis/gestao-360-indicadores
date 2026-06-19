@@ -35,6 +35,12 @@ const money = (v: string | null) => v == null ? '—' : Number(v).toLocaleString
 
 const percent = (v: string | number | null | undefined) => v == null ? '-' : `${Number(v).toLocaleString('pt-BR', { maximumFractionDigits: 4 })}%`;
 
+const CELL_STATUS_LABEL: Record<string, string> = {
+  CALCULATED: 'Calculado',
+  PENDING_INPUT: 'Pendente',
+  BLOCKED: 'Bloqueado',
+};
+
 export default function PrizeApuracaoPage() {
   const qc = useQueryClient();
   const { hasPermission } = useAuth();
@@ -106,8 +112,8 @@ export default function PrizeApuracaoPage() {
     mutationFn: () => api<any>(`/prize/competences/${competenceId}/autopilot`, { method: 'POST', json: { runCalc: true } }),
     onSuccess: (r) => {
       const s = r.sync;
-      if (r.calcRun) toast.success(`Autopilot: ${s.synced} realizado(s) sincronizado(s) · apuração v${r.calcRun.version} concluída (${r.calcRun.totalEmployees} colab.)`);
-      else toast.warning(`Autopilot: ${s.synced} sincronizado(s), apuração não rodou — ${r.calcSkipped ?? 'verifique a lista de verificação'}`);
+      if (r.calcRun) toast.success(`Automatização: ${s.synced} realizado(s) sincronizado(s) · apuração v${r.calcRun.version} concluída (${r.calcRun.totalEmployees} colab.)`);
+      else toast.warning(`Automatização: ${s.synced} sincronizado(s), apuração não rodou — ${r.calcSkipped ?? 'verifique a lista de verificação'}`);
       qc.invalidateQueries({ queryKey: ['prize-calc-results'] });
     },
     onError: (e: ApiError) => toast.error(e.message),
@@ -142,7 +148,7 @@ export default function PrizeApuracaoPage() {
         {canRun && competenceId && (
           <div className="ml-auto flex gap-2">
             <Button onClick={() => autopilot.mutate()} disabled={autopilot.isPending} title="Sincroniza o realizado da plataforma, valida a lista de verificação e apura automaticamente">
-              <Zap className="mr-1 h-4 w-4" />{autopilot.isPending ? 'Executando…' : 'Autopilot'}
+              <Zap className="mr-1 h-4 w-4" />{autopilot.isPending ? 'Executando…' : 'Automatizar'}
             </Button>
             <Button onClick={() => runV2.mutate()} disabled={runV2.isPending} title="Apura pela matriz área×cargo quem tem combinação cadastrada; quem não tem regra fica listado em 'Não casados' (fora do escopo). Bloqueia só se houver ambiguidade (2+ combinações para a mesma pessoa).">
               <PlayCircle className="mr-1 h-4 w-4" />{runV2.isPending ? 'Apurando setor...' : 'Rodar setor v2'}
@@ -194,7 +200,7 @@ export default function PrizeApuracaoPage() {
                         <th className="px-3 py-2 text-right">% possível</th>
                         <th className="px-3 py-2 text-right">% atingido</th>
                         <th className="px-3 py-2 text-right">Ating.</th>
-                        <th className="px-3 py-2 text-left">Status</th>
+                        <th className="px-3 py-2 text-left">Situação</th>
                       </tr>
                     </thead>
                     <tbody>
@@ -206,7 +212,7 @@ export default function PrizeApuracaoPage() {
                           <td className="px-3 py-2 text-right">{percent(cell.possibleSalaryPercent)}</td>
                           <td className="px-3 py-2 text-right font-medium">{percent(cell.achievedSalaryPercent)}</td>
                           <td className="px-3 py-2 text-right">{percent(cell.weightedGainPercent)}</td>
-                          <td className="px-3 py-2"><Badge variant={cell.status === 'CALCULATED' ? 'secondary' : 'outline'}>{cell.status}</Badge></td>
+                          <td className="px-3 py-2"><Badge variant={cell.status === 'CALCULATED' ? 'secondary' : 'outline'}>{CELL_STATUS_LABEL[cell.status] ?? cell.status}</Badge></td>
                         </tr>
                       ))}
                       {(cellData?.cells ?? []).length === 0 && (

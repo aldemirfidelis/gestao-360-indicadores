@@ -25371,8 +25371,8 @@ index 04052f9..77fd5c3 100644
    {
      icon: Map,
 -    title: 'Mapa estratégico',
--    desc: 'Conecte objetivos, perspectivas BSC e relações de causa e efeito em um mapa único.',
-+    title: 'Estrategia e BSC',
+-    desc: 'Conecte objetivos, perspectivas e relações de causa e efeito em um mapa único.',
++    title: 'Estrategia',
 +    desc: 'Mapas estrategicos, perspectivas, objetivos e conexao entre estrategia e rotina operacional.',
    },
    {

@@ -1,6 +1,6 @@
--- Rastreio de origem para integracao/migracao de sistemas legados (ex.: app Windows "BSC 1.43").
+-- Rastreio de origem para integracao/migracao de sistemas legados.
 -- externalId     = chave primaria no sistema de origem (ex.: "18448", "18915")
--- externalSource = identificador da origem (ex.: "BSC 1.43")
+-- externalSource = identificador da origem
 -- Idempotente: pode ter sido aplicado parcialmente via `prisma db push` em dev.
 
 -- 1. OrgNode

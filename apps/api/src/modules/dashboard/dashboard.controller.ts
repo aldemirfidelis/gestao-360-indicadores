@@ -1,4 +1,4 @@
-import { Controller, Get, Query } from '@nestjs/common';
+import { Body, Controller, Get, Patch, Query } from '@nestjs/common';
 import { DashboardService } from './dashboard.service';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import { AuthPayload } from '../auth/auth.types';
@@ -12,6 +12,30 @@ export class DashboardController {
   @Get('overview')
   overview(@CurrentUser() me: AuthPayload) {
     return this.service.overview(me);
+  }
+
+  @Get('areas')
+  areas(@CurrentUser() me: AuthPayload) {
+    return this.service.areas(me);
+  }
+
+  @Get('area-indicators')
+  areaIndicators(@CurrentUser() me: AuthPayload, @Query('ownerNodeId') ownerNodeId?: string) {
+    return this.service.areaIndicators(me, ownerNodeId);
+  }
+
+  @Get('area-conclusion')
+  areaConclusion(@CurrentUser() me: AuthPayload, @Query('ownerNodeId') ownerNodeId?: string) {
+    return this.service.areaConclusion(me, ownerNodeId);
+  }
+
+  @Patch('area-conclusion')
+  saveAreaConclusion(
+    @CurrentUser() me: AuthPayload,
+    @Query('ownerNodeId') ownerNodeId: string | undefined,
+    @Body() body: { conclusion?: string },
+  ) {
+    return this.service.saveAreaConclusion(me, ownerNodeId, body);
   }
 
   @Get('ranking')
