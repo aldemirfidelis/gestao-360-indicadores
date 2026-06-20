@@ -21,6 +21,9 @@ WORKDIR /app
 
 # ----------- Stage: install + build -----------
 FROM base AS build
+# Heap maior apenas para o build (tsc/nest build em Droplet pequena);
+# o runtime mantem o valor menor definido no stage `base`.
+ENV NODE_OPTIONS="--max-old-space-size=2048 --enable-source-maps"
 # Copia manifests primeiro para aproveitar cache de install
 COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
 COPY packages/shared/package.json ./packages/shared/
