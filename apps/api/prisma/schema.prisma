@@ -618,6 +618,7 @@ model Company {
   workItemIndexes              WorkItemIndex[]              @relation("WorkItemCompany")
   userDashboardPreferences     UserDashboardPreference[]    @relation("DashboardPrefCompany")
   organizationalUnitActivities OrganizationalUnitActivity[] @relation("OrgUnitActivityCompany")
+  monthlyMeetings              MonthlyMeeting[]
 }
 
 model WorkPeriod {
@@ -714,6 +715,7 @@ model OrgNode {
   orgEmployees            OrgEmployee[]
   activities              OrganizationalUnitActivity[] @relation("OrgNodeActivities")
   okrObjectives           OKRObjective[]               @relation("OKRObjectiveOwnerNode")
+  monthlyMeetingAreas     MonthlyMeetingArea[]         @relation("MonthlyAreaOrgNode")
 
   @@unique([companyId, externalSource, externalId])
   @@index([companyId])
@@ -1289,6 +1291,7 @@ model Indicator {
   formTemplates           FormTemplate[]                @relation("FormTemplateIndicator")
   formSubmissions         FormSubmission[]              @relation("FormSubmissionIndicator")
   keyResults              KeyResult[]                   @relation("KeyResultIndicator")
+  monthlyMeetingIndicators MonthlyMeetingIndicator[]    @relation("MonthlySnapshotIndicator")
 
   @@unique([companyId, code])
   @@unique([companyId, externalSource, externalId])
@@ -5230,6 +5233,314 @@ model MeetingDecision {
   decision  String
   owner     String?
   dueDate   DateTime?
+}
+
+// =====================================================
+// Reuniao Mensal de Resultados (modulo dedicado)
+// Tabelas proprias da reuniao; acoes reusam ActionPlan,
+// causa raiz reusa Deviation/DeviationAnalysis, ficha reusa Indicator.
+// Referencias a usuarios/desvios/acoes/documentos sao IDs simples
+// resolvidos no service (sem FK) para nao acoplar os modelos grandes.
+// =====================================================
+
+enum MonthlyMeetingStatus {
+  PREPARING
+  READY
+  IN_PROGRESS
+  CLOSED
+  REOPENED
+  CANCELLED
+}
+
+enum MonthlyAreaReadiness {
+  NOT_STARTED
+  IN_PROGRESS
+  WITH_ISSUES
+  READY_FOR_VALIDATION
+  VALIDATED
+  RELEASED
+}
+
+enum MonthlyEntryKind {
+  DECISION
+  RISK
+  ESCALATION
+  PENDING
+}
+
+enum MonthlyItemStatus {
+  OPEN
+  IN_PROGRESS
+  DONE
+  CANCELLED
+}
+
+enum MonthlyFollowUpLevel {
+  DAILY
+  WEEKLY
+  MONTHLY
+  QUARTERLY
+}
+
+enum MonthlyPresentationStatus {
+  PENDING
+  PRESENTING
+  DISCUSSED
+  SKIPPED
+}
+
+enum MonthlyStandardizationType {
+  POP
+  WORK_INSTRUCTION
+  RISK_MATRIX
+  CHECKLIST
+  TRAINING
+  VISUAL_MANAGEMENT
+  AUDIT
+  BEST_PRACTICE
+  LEARNING_BANK
+}
+
+model MonthlyMeeting {
+  id                String               @id @default(uuid())
+  companyId         String
+  company           Company              @relation(fields: [companyId], references: [id])
+  title             String
+  periodRef         String // AAAA-MM
+  cropSeason        String?
+  cycleName         String?
+  status            MonthlyMeetingStatus @default(PREPARING)
+  format            MeetingFormat        @default(HYBRID)
+  startsAt          DateTime
+  endsAt            DateTime?
+  location          String?
+  responsibleUserId String?
+  secretaryUserId   String?
+  followUpUserId    String?
+  objective         String?
+  assumptions       String?
+  criticalRisks     String?
+  boardDirections   String?
+  generalNotes      String?
+  keyMessage        String?
+  nextMonthlyAt     DateTime?
+  nextWeeklyAt      DateTime?
+  closedAt          DateTime?
+  createdById       String?
+  updatedById       String?
+  createdAt         DateTime             @default(now())
+  updatedAt         DateTime             @updatedAt
+  deletedAt         DateTime?
+
+  areas            MonthlyMeetingArea[]
+  agendaItems      MonthlyMeetingAgendaItem[]
+  indicators       MonthlyMeetingIndicator[]
+  decisions        MonthlyMeetingDecision[]
+  followUps        MonthlyMeetingFollowUp[]
+  learnings        MonthlyMeetingLearning[]
+  standardizations MonthlyMeetingStandardization[]
+  participants     MonthlyMeetingParticipant[]
+  checklist        MonthlyMeetingChecklistItem[]
+  attachments      MonthlyMeetingAttachment[]
+
+  @@index([companyId, periodRef])
+  @@index([companyId, status])
+}
+
+model MonthlyMeetingArea {
+  id              String               @id @default(uuid())
+  meetingId       String
+  meeting         MonthlyMeeting       @relation(fields: [meetingId], references: [id], onDelete: Cascade)
+  orgNodeId       String
+  orgNode         OrgNode              @relation("MonthlyAreaOrgNode", fields: [orgNodeId], references: [id])
+  position        Int                  @default(0)
+  readiness       MonthlyAreaReadiness @default(NOT_STARTED)
+  presenterUserId String?
+  areaKeyMessage  String?
+  validatedById   String?
+  validatedAt     DateTime?
+  createdAt       DateTime             @default(now())
+  updatedAt       DateTime             @updatedAt
+
+  indicators MonthlyMeetingIndicator[]
+
+  @@unique([meetingId, orgNodeId])
+  @@index([meetingId])
+  @@index([orgNodeId])
+}
+
+model MonthlyMeetingIndicator {
+  id                 String             @id @default(uuid())
+  meetingId          String
+  meeting            MonthlyMeeting     @relation(fields: [meetingId], references: [id], onDelete: Cascade)
+  meetingAreaId      String
+  meetingArea        MonthlyMeetingArea @relation(fields: [meetingAreaId], references: [id], onDelete: Cascade)
+  indicatorId        String
+  indicator          Indicator          @relation("MonthlySnapshotIndicator", fields: [indicatorId], references: [id])
+  // snapshot congelado no fechamento
+  target             Float?
+  lowerBound         Float?
+  upperBound         Float?
+  current            Float?
+  accumulated        Float?
+  attainment         Float?
+  deviationPct       Float?
+  light              TrafficLight       @default(GRAY)
+  trend              String?
+  // campos editaveis na preparacao/conducao
+  managerComment     String?
+  trendNote          String?
+  executiveStatus    String?
+  showInPresentation Boolean            @default(true)
+  isCritical         Boolean            @default(false)
+  financialImpact    Float?
+  position           Int                @default(0)
+  deviationId        String?
+  actionPlanId       String?
+  createdAt          DateTime           @default(now())
+  updatedAt          DateTime           @updatedAt
+
+  @@unique([meetingAreaId, indicatorId])
+  @@index([meetingId])
+  @@index([indicatorId])
+}
+
+model MonthlyMeetingAgendaItem {
+  id                 String                    @id @default(uuid())
+  meetingId          String
+  meeting            MonthlyMeeting            @relation(fields: [meetingId], references: [id], onDelete: Cascade)
+  orgNodeId          String?
+  topic              String
+  position           Int                       @default(0)
+  plannedMinutes     Int                       @default(0)
+  actualMinutes      Int?
+  presentationStatus MonthlyPresentationStatus @default(PENDING)
+  startedAt          DateTime?
+  endedAt            DateTime?
+  presenterUserId    String?
+  notes              String?
+
+  @@index([meetingId])
+}
+
+model MonthlyMeetingDecision {
+  id                 String            @id @default(uuid())
+  meetingId          String
+  meeting            MonthlyMeeting    @relation(fields: [meetingId], references: [id], onDelete: Cascade)
+  orgNodeId          String?
+  kind               MonthlyEntryKind  @default(DECISION)
+  topic              String?
+  description        String
+  ownerName          String?
+  ownerUserId        String?
+  dueDate            DateTime?
+  impactIfNotDecided String?
+  boardInvolved      String?
+  status             MonthlyItemStatus @default(OPEN)
+  actionPlanId       String?
+  createdById        String?
+  createdAt          DateTime          @default(now())
+  updatedAt          DateTime          @updatedAt
+
+  @@index([meetingId])
+  @@index([meetingId, kind])
+}
+
+model MonthlyMeetingFollowUp {
+  id           String               @id @default(uuid())
+  meetingId    String
+  meeting      MonthlyMeeting       @relation(fields: [meetingId], references: [id], onDelete: Cascade)
+  level        MonthlyFollowUpLevel @default(WEEKLY)
+  title        String
+  dueDate      DateTime?
+  ownerUserId  String?
+  indicatorId  String?
+  actionPlanId String?
+  status       MonthlyItemStatus    @default(OPEN)
+  notes        String?
+  createdAt    DateTime             @default(now())
+  updatedAt    DateTime             @updatedAt
+
+  @@index([meetingId])
+}
+
+model MonthlyMeetingLearning {
+  id                String            @id @default(uuid())
+  meetingId         String
+  meeting           MonthlyMeeting    @relation(fields: [meetingId], references: [id], onDelete: Cascade)
+  orgNodeId         String?
+  indicatorId       String?
+  learning          String
+  treatedCause      String?
+  effectiveAction   String?
+  replicateToNodeId String?
+  ownerUserId       String?
+  dueDate           DateTime?
+  status            MonthlyItemStatus @default(OPEN)
+  createdAt         DateTime          @default(now())
+  updatedAt         DateTime          @updatedAt
+
+  @@index([meetingId])
+}
+
+model MonthlyMeetingStandardization {
+  id           String                     @id @default(uuid())
+  meetingId    String
+  meeting      MonthlyMeeting             @relation(fields: [meetingId], references: [id], onDelete: Cascade)
+  type         MonthlyStandardizationType @default(POP)
+  description  String
+  sourceNodeId String?
+  indicatorId  String?
+  documentId   String?
+  ownerUserId  String?
+  dueDate      DateTime?
+  status       MonthlyItemStatus          @default(OPEN)
+  createdAt    DateTime                   @default(now())
+  updatedAt    DateTime                   @updatedAt
+
+  @@index([meetingId])
+}
+
+model MonthlyMeetingParticipant {
+  id        String                 @id @default(uuid())
+  meetingId String
+  meeting   MonthlyMeeting         @relation(fields: [meetingId], references: [id], onDelete: Cascade)
+  userId    String
+  role      MeetingParticipantRole @default(PARTICIPANT)
+  attended  Boolean                @default(false)
+
+  @@unique([meetingId, userId])
+  @@index([meetingId])
+}
+
+model MonthlyMeetingChecklistItem {
+  id        String         @id @default(uuid())
+  meetingId String
+  meeting   MonthlyMeeting @relation(fields: [meetingId], references: [id], onDelete: Cascade)
+  orgNodeId String?
+  label     String
+  done      Boolean        @default(false)
+  autoRule  String?
+  severity  String?
+  createdAt DateTime       @default(now())
+  updatedAt DateTime       @updatedAt
+
+  @@index([meetingId])
+}
+
+model MonthlyMeetingAttachment {
+  id          String         @id @default(uuid())
+  meetingId   String
+  meeting     MonthlyMeeting @relation(fields: [meetingId], references: [id], onDelete: Cascade)
+  refKind     String?
+  fileName    String
+  fileUrl     String
+  mimeType    String?
+  documentId  String?
+  createdById String?
+  createdAt   DateTime       @default(now())
+
+  @@index([meetingId])
 }
 
 // =====================================================
