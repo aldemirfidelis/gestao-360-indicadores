@@ -278,6 +278,13 @@ export const PERMISSION_CATALOG = [
 
   // Comunicação e Diretório
   ['communication:view', 'Acessar comunicação e mensagens', 'Comunicação', 'view'],
+  ['communication:create', 'Criar comunicados, campanhas e enquetes', 'Comunicação', 'create'],
+  ['communication:update', 'Editar comunicados, campanhas e públicos', 'Comunicação', 'update'],
+  ['communication:approve', 'Aprovar ou reprovar comunicados', 'Comunicação', 'approve'],
+  ['communication:publish', 'Publicar, agendar e arquivar comunicados', 'Comunicação', 'publish'],
+  ['communication:manage', 'Administrar Comunicação Organizacional', 'Comunicação', 'manage'],
+  ['communication:reports', 'Visualizar métricas e relatórios de comunicação', 'Comunicação', 'view'],
+  ['communication:media', 'Gerenciar biblioteca de mídias', 'Comunicação', 'manage'],
   ['directory:view', 'Acessar o diretório global de pessoas', 'Comunicação', 'view'],
   ['communication:attachments', 'Enviar anexos em mensagens', 'Comunicacao', 'create'],
   ['communication:pin', 'Fixar conversas', 'Comunicacao', 'update'],

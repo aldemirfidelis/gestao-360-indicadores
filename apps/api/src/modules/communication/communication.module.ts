@@ -1,6 +1,7 @@
 import { Module } from '@nestjs/common';
 import { JwtModule } from '@nestjs/jwt';
 import { requireSecret } from '../../common/env';
+import { AiModule } from '../ai/ai.module';
 import { NotificationsModule } from '../notifications/notifications.module';
 import { DirectoryController } from './directory/directory.controller';
 import { DirectoryService } from './directory/directory.service';
@@ -13,6 +14,8 @@ import { ConversationService } from './conversations/conversation.service';
 import { MessageService } from './conversations/message.service';
 import { ConversationsController } from './conversations/conversations.controller';
 import { CommunicationGateway } from './communication.gateway';
+import { OrganizationalCommunicationController } from './organizational/organizational-communication.controller';
+import { OrganizationalCommunicationService } from './organizational/organizational-communication.service';
 
 /**
  * Módulo de Comunicação Corporativa.
@@ -22,11 +25,12 @@ import { CommunicationGateway } from './communication.gateway';
 @Module({
   imports: [
     NotificationsModule,
+    AiModule,
     JwtModule.registerAsync({
       useFactory: () => ({ secret: requireSecret('JWT_ACCESS_SECRET') }),
     }),
   ],
-  controllers: [DirectoryController, ProfileController, ConversationsController],
+  controllers: [DirectoryController, ProfileController, ConversationsController, OrganizationalCommunicationController],
   providers: [
     { provide: PRESENCE_STORE, useClass: InMemoryPresenceStore },
     RealtimeEmitter,
@@ -35,6 +39,7 @@ import { CommunicationGateway } from './communication.gateway';
     ProfileService,
     ConversationService,
     MessageService,
+    OrganizationalCommunicationService,
     CommunicationGateway,
   ],
   exports: [PresenceService],

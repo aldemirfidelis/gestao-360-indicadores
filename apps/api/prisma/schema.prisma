@@ -619,6 +619,9 @@ model Company {
   userDashboardPreferences     UserDashboardPreference[]    @relation("DashboardPrefCompany")
   organizationalUnitActivities OrganizationalUnitActivity[] @relation("OrgUnitActivityCompany")
   monthlyMeetings              MonthlyMeeting[]
+  communicationPosts           CommunicationPost[]
+  communicationCampaigns       CommunicationCampaign[]
+  communicationMedia           CommunicationMedia[]
 }
 
 model WorkPeriod {
@@ -5541,6 +5544,226 @@ model MonthlyMeetingAttachment {
   createdAt   DateTime       @default(now())
 
   @@index([meetingId])
+}
+
+// =====================================================
+// Comunicacao Organizacional (comunicados, campanhas, midias)
+// Config (audience/channels/poll/attachments/history) em Json;
+// refs a usuario/area sao IDs simples resolvidos no service (sem FK).
+// =====================================================
+
+enum CommPostType {
+  SIMPLE
+  BANNER
+  VIDEO
+  POLL
+  SURVEY
+  CAMPAIGN
+}
+
+enum CommPostPriority {
+  LOW
+  NORMAL
+  HIGH
+  CRITICAL
+  URGENT
+}
+
+enum CommPostStatus {
+  DRAFT
+  PENDING_APPROVAL
+  APPROVED
+  SCHEDULED
+  PUBLISHED
+  EXPIRED
+  ARCHIVED
+  CANCELLED
+  REJECTED
+}
+
+enum CommReactionType {
+  LIKE
+  UNDERSTOOD
+  IMPORTANT
+  QUESTION
+}
+
+enum CommCampaignStatus {
+  DRAFT
+  ACTIVE
+  FINISHED
+  ARCHIVED
+}
+
+enum CommMediaType {
+  IMAGE
+  BANNER
+  VIDEO
+  PDF
+  DOCUMENT
+  ICON
+  TEMPLATE
+}
+
+enum CommMediaStatus {
+  ACTIVE
+  EXPIRED
+  ARCHIVED
+}
+
+model CommunicationPost {
+  id                       String                @id @default(uuid())
+  companyId                String
+  company                  Company               @relation(fields: [companyId], references: [id])
+  campaignId               String?
+  campaign                 CommunicationCampaign? @relation(fields: [campaignId], references: [id])
+  title                    String
+  subtitle                 String?
+  content                  String
+  type                     CommPostType          @default(SIMPLE)
+  category                 String                @default("Institucional")
+  priority                 CommPostPriority      @default(NORMAL)
+  status                   CommPostStatus        @default(DRAFT)
+  authorId                 String
+  approverId               String?
+  approvalComment          String?
+  audience                 Json
+  channels                 Json
+  poll                     Json?
+  attachments              Json?
+  history                  Json?
+  publishAt                DateTime?
+  expiresAt                DateTime?
+  publishedAt              DateTime?
+  archivedAt               DateTime?
+  coverImageUrl            String?
+  bannerUrl                String?
+  videoUrl                 String?
+  thumbnailUrl             String?
+  actionUrl                String?
+  actionLabel              String?
+  estimatedMinutes         Int?
+  requiresReadConfirmation Boolean               @default(false)
+  requiresPollAnswer       Boolean               @default(false)
+  requiresVideoCompletion  Boolean               @default(false)
+  allowComments            Boolean               @default(true)
+  allowReactions           Boolean               @default(true)
+  isMandatory              Boolean               @default(false)
+  isPinned                 Boolean               @default(false)
+  isFeatured               Boolean               @default(false)
+  publicLinkEnabled        Boolean               @default(false)
+  qrCodeValue              String?
+  linkedModule             String?
+  linkedEntityId           String?
+  version                  Int                   @default(1)
+  createdAt                DateTime              @default(now())
+  updatedAt                DateTime              @updatedAt
+  deletedAt                DateTime?
+
+  reads         CommunicationPostRead[]
+  reactions     CommunicationPostReaction[]
+  comments      CommunicationPostComment[]
+  pollResponses CommunicationPollResponse[]
+
+  @@index([companyId, status])
+  @@index([companyId, publishedAt])
+  @@index([campaignId])
+}
+
+model CommunicationPostRead {
+  id          String            @id @default(uuid())
+  postId      String
+  post        CommunicationPost @relation(fields: [postId], references: [id], onDelete: Cascade)
+  userId      String
+  viewedAt    DateTime          @default(now())
+  confirmedAt DateTime?
+  channel     String?
+  device      String?
+  ip          String?
+  dwellSeconds Int?
+
+  @@unique([postId, userId])
+  @@index([userId])
+}
+
+model CommunicationPostReaction {
+  id        String           @id @default(uuid())
+  postId    String
+  post      CommunicationPost @relation(fields: [postId], references: [id], onDelete: Cascade)
+  userId    String
+  type      CommReactionType @default(LIKE)
+  createdAt DateTime         @default(now())
+
+  @@unique([postId, userId])
+}
+
+model CommunicationPostComment {
+  id        String            @id @default(uuid())
+  postId    String
+  post      CommunicationPost @relation(fields: [postId], references: [id], onDelete: Cascade)
+  userId    String
+  body      String
+  moderated Boolean           @default(false)
+  createdAt DateTime          @default(now())
+
+  @@index([postId])
+}
+
+model CommunicationPollResponse {
+  id        String            @id @default(uuid())
+  postId    String
+  post      CommunicationPost @relation(fields: [postId], references: [id], onDelete: Cascade)
+  userId    String
+  answers   Json
+  text      String?
+  createdAt DateTime          @default(now())
+
+  @@unique([postId, userId])
+}
+
+model CommunicationCampaign {
+  id             String             @id @default(uuid())
+  companyId      String
+  company        Company            @relation(fields: [companyId], references: [id])
+  name           String
+  objective      String?
+  category       String?
+  status         CommCampaignStatus @default(DRAFT)
+  ownerId        String?
+  startsAt       DateTime?
+  endsAt         DateTime?
+  targetAudience Json?
+  indicatorIds   Json?
+  actionIds      Json?
+  createdById    String?
+  createdAt      DateTime           @default(now())
+  updatedAt      DateTime           @updatedAt
+  deletedAt      DateTime?
+
+  posts CommunicationPost[]
+
+  @@index([companyId, status])
+}
+
+model CommunicationMedia {
+  id          String          @id @default(uuid())
+  companyId   String
+  company     Company         @relation(fields: [companyId], references: [id])
+  name        String
+  type        CommMediaType   @default(IMAGE)
+  category    String?
+  tags        Json?
+  url         String?
+  ownerAreaId String?
+  authorId    String?
+  version     Int             @default(1)
+  status      CommMediaStatus @default(ACTIVE)
+  validUntil  DateTime?
+  usageCount  Int             @default(0)
+  createdAt   DateTime        @default(now())
+  deletedAt   DateTime?
+
+  @@index([companyId, status])
 }
 
 // =====================================================
