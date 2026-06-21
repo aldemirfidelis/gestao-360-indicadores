@@ -1,8 +1,6 @@
 'use client';
 
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useState } from 'react';
-import { toast } from 'sonner';
 import { Calculator, PlayCircle, RotateCcw, FileText, Lock, Zap } from 'lucide-react';
 import { PageHeader } from '@/components/shell/page-header';
 import { Card, CardContent } from '@/components/ui/card';
@@ -12,24 +10,10 @@ import { Label } from '@/components/ui/label';
 import { NativeSelect } from '@/components/ui/select';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { api, ApiError } from '@/lib/api';
+import { usePrizeApuracao } from '@/hooks/gestao-premio/use-prize-apuracao';
 import { useAuth } from '@/components/auth/auth-provider';
 import { CatalogActualsSection } from '@/components/gestao-premio/catalog-actuals-section';
 
-interface CompetenceRef { id: string; label: string; program: { code: string; name: string } }
-interface Run { id: string; version: number; status: string; totalEmployees: number; totalGross: string | null; totalReductions: string | null; totalFinal: string | null; engineVersion: string; finishedAt: string | null }
-interface Result {
-  id: string; registration: string; name: string; potential: string | null; weightedGain: string | null;
-  proportionality: string | null; grossValue: string | null; totalReductions: string | null; adjustments: string | null;
-  gratification: string | null; finalValue: string | null; blocked: boolean; blockReason: string | null; exceptionType: string | null; hash: string | null;
-}
-interface MemoryLine { id: string; step: number; code: string; label: string; detail: string | null; value: string | null }
-interface Memory extends Result { lines: MemoryLine[] }
-interface CellResult {
-  id: string; areaRef: string; positionRef: string; possibleSalaryPercent: string; achievedSalaryPercent: string;
-  weightedGainPercent: string | null; status: string; group?: { name: string };
-}
-interface UnmatchedEmployee { id: string; registration: string; name: string; areaRef: string | null; positionRef: string | null; reason: string }
 
 const money = (v: string | null) => v == null ? '—' : Number(v).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
 
@@ -42,7 +26,6 @@ const CELL_STATUS_LABEL: Record<string, string> = {
 };
 
 export default function PrizeApuracaoPage() {
-  const qc = useQueryClient();
   const { hasPermission } = useAuth();
   const canRun = hasPermission(['prize:calc:run']);
   const canApprove = hasPermission(['prize:calc:approve']);
@@ -51,73 +34,9 @@ export default function PrizeApuracaoPage() {
   const [competenceId, setCompetenceId] = useState('');
   const [memoryFor, setMemoryFor] = useState<string | null>(null);
 
-  const { data: competences = [] } = useQuery({ queryKey: ['prize-competences-ref'], queryFn: () => api<CompetenceRef[]>('/prize/competences') });
-  const { data, isLoading } = useQuery({
-    queryKey: ['prize-calc-results', competenceId],
-    queryFn: () => api<{ run: Run | null; results: Result[]; competenceStatus: string | null }>(`/prize/calc/competence/${competenceId}/results`),
-    enabled: !!competenceId,
-  });
-  const { data: cellData } = useQuery({
-    queryKey: ['prize-v2-cells', competenceId],
-    queryFn: () => api<{ run: Run | null; cells: CellResult[] }>(`/prize/rules/competence/${competenceId}/cells`),
-    enabled: !!competenceId,
-  });
-  const { data: unmatchedData } = useQuery({
-    queryKey: ['prize-v2-unmatched', competenceId],
-    queryFn: () => api<{ run: Run | null; unmatched: UnmatchedEmployee[] }>(`/prize/rules/competence/${competenceId}/unmatched`),
-    enabled: !!competenceId,
-  });
-  const { data: memory } = useQuery({
-    queryKey: ['prize-calc-memory', memoryFor],
-    queryFn: () => api<Memory>(`/prize/calc/result/${memoryFor}/memory`),
-    enabled: !!memoryFor,
-  });
+  const { competences, data, isLoading, cellData, unmatchedData, memory, run, runV2, reprocess, conference, autopilot } =
+    usePrizeApuracao(competenceId, memoryFor);
 
-  const run = useMutation({
-    mutationFn: () => api(`/prize/calc/competence/${competenceId}/run`, { method: 'POST' }),
-    onSuccess: (r: any) => { toast.success(`Apuração v${r.version} concluída: ${r.totalEmployees} colaborador(es)`); qc.invalidateQueries({ queryKey: ['prize-calc-results'] }); },
-    onError: (e: ApiError) => toast.error(e.message),
-  });
-  const runV2 = useMutation({
-    mutationFn: () => api<any>(`/prize/calc/competence/${competenceId}/run-v2`, { method: 'POST' }),
-    onSuccess: (r) => {
-      if (r.blockedReason) toast.warning(`V2 bloqueada: ${r.blockedReason}`);
-      else {
-        const apurados = r.apurados ?? r.totalEmployees ?? 0;
-        const fora = r.outOfScope ?? 0;
-        toast.success(fora > 0
-          ? `Setor apurado na v2: ${apurados} apurado(s); ${fora} fora do escopo (sem regra) — veja "Não casados".`
-          : `Setor apurado na v2: ${apurados} colaborador(es)`);
-      }
-      qc.invalidateQueries({ queryKey: ['prize-calc-results'] });
-      qc.invalidateQueries({ queryKey: ['prize-v2-cells'] });
-      qc.invalidateQueries({ queryKey: ['prize-v2-unmatched'] });
-    },
-    onError: (e: ApiError) => toast.error(e.message),
-  });
-  const reprocess = useMutation({
-    mutationFn: (reason: string) => api(`/prize/calc/competence/${competenceId}/reprocess`, { method: 'POST', json: { reason } }),
-    onSuccess: (r: any) => { toast.success(`Reprocessado (v${r.version})`); qc.invalidateQueries({ queryKey: ['prize-calc-results'] }); },
-    onError: (e: ApiError) => toast.error(e.message),
-  });
-
-  const conference = useMutation({
-    mutationFn: ({ action, comment }: { action: string; comment?: string }) =>
-      api(`/prize/calc/competence/${competenceId}/${action}`, { method: 'POST', json: comment ? { comment } : {} }),
-    onSuccess: () => { toast.success('Conferência atualizada'); qc.invalidateQueries({ queryKey: ['prize-calc-results'] }); },
-    onError: (e: ApiError) => toast.error(e.message),
-  });
-
-  const autopilot = useMutation({
-    mutationFn: () => api<any>(`/prize/competences/${competenceId}/autopilot`, { method: 'POST', json: { runCalc: true } }),
-    onSuccess: (r) => {
-      const s = r.sync;
-      if (r.calcRun) toast.success(`Automatização: ${s.synced} realizado(s) sincronizado(s) · apuração v${r.calcRun.version} concluída (${r.calcRun.totalEmployees} colab.)`);
-      else toast.warning(`Automatização: ${s.synced} sincronizado(s), apuração não rodou — ${r.calcSkipped ?? 'verifique a lista de verificação'}`);
-      qc.invalidateQueries({ queryKey: ['prize-calc-results'] });
-    },
-    onError: (e: ApiError) => toast.error(e.message),
-  });
 
   const runData = data?.run;
   const compStatus = data?.competenceStatus ?? null;
