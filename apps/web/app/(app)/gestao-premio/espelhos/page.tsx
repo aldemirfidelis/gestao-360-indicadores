@@ -3,8 +3,6 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useState } from 'react';
 import { toast } from 'sonner';
-import jsPDF from 'jspdf';
-import autoTable from 'jspdf-autotable';
 import { FileText, FileDown, Send, CheckCircle2, Plus } from 'lucide-react';
 import { PageHeader } from '@/components/shell/page-header';
 import { Card, CardContent } from '@/components/ui/card';
@@ -25,7 +23,8 @@ const STATUS: Record<string, { label: string; variant: any }> = {
   SUPERSEDED: { label: 'Substituído', variant: 'outline' }, DRAFT: { label: 'Rascunho', variant: 'secondary' },
 };
 
-function buildPdf(d: any) {
+async function buildPdf(d: any) {
+  const [{ jsPDF }, { default: autoTable }] = await Promise.all([import('jspdf'), import('jspdf-autotable')]);
   const doc = new jsPDF({ orientation: 'portrait', unit: 'pt', format: 'a4' });
   const W = doc.internal.pageSize.getWidth();
   let y = 40;
@@ -100,7 +99,7 @@ export default function PrizePayslipsPage() {
   async function openPdf(id: string, reg: string) {
     try {
       const full = await api<PayslipFull>(`/prize/payslips/${id}`);
-      const doc = buildPdf(full.data);
+      const doc = await buildPdf(full.data);
       doc.save(`espelho-${reg}.pdf`);
     } catch (e: any) { toast.error('Erro ao gerar PDF'); }
   }

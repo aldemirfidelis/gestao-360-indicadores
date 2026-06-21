@@ -4,6 +4,7 @@ import { createContext, useContext, useEffect, useState, ReactNode } from 'react
 import { useRouter, usePathname } from 'next/navigation';
 import { useQueryClient } from '@tanstack/react-query';
 import { api, clearTokens, getAccessToken, setTokens } from '@/lib/api';
+import { SUPER_ADMIN_ONLY_PERMISSION } from '@/components/shell/navigation';
 
 export interface AuthUser {
   id: string;
@@ -136,6 +137,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     if (!user) return false;
     if (user.role === 'SUPER_ADMIN') return true;
     const required = Array.isArray(permissions) ? permissions : [permissions];
+    if (required.includes(SUPER_ADMIN_ONLY_PERMISSION)) return false;
     const granted = new Set(user.permissions ?? []);
     return required.some((permission) => granted.has(permission) || granted.has(`${permission.split(':')[0]}:manage`));
   };

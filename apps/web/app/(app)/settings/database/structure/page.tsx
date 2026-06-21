@@ -16,7 +16,6 @@ import ReactFlow, {
 } from 'reactflow';
 import 'reactflow/dist/style.css';
 import { toPng } from 'html-to-image';
-import { jsPDF } from 'jspdf';
 import { FileDown, Image as ImageIcon, RefreshCcw, Search } from 'lucide-react';
 import { LoadingState } from '@/components/platform/loading-state';
 import { Button } from '@/components/ui/button';
@@ -85,6 +84,7 @@ function StructureFlow() {
     const img = new Image();
     img.src = dataUrl;
     await new Promise((r) => (img.onload = r));
+    const { jsPDF } = await import('jspdf');
     const pdf = new jsPDF({ orientation: img.width > img.height ? 'landscape' : 'portrait', unit: 'px', format: [img.width, img.height] });
     pdf.addImage(dataUrl, 'PNG', 0, 0, img.width, img.height);
     pdf.save('estrutura-banco.pdf');

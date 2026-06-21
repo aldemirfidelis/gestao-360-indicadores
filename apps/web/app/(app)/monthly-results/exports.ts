@@ -1,6 +1,3 @@
-import { jsPDF } from 'jspdf';
-import autoTable from 'jspdf-autotable';
-import * as XLSX from 'xlsx';
 import { periodRefLabel } from '@/lib/utils';
 import {
   ENTRY_KIND_LABEL,
@@ -17,7 +14,9 @@ function fmtDate(value: string | null | undefined) {
   return Number.isNaN(d.getTime()) ? '—' : d.toLocaleDateString('pt-BR');
 }
 
-function header(doc: jsPDF, meeting: MeetingDetail, subtitle: string) {
+type PdfDoc = import('jspdf').jsPDF;
+
+function header(doc: PdfDoc, meeting: MeetingDetail, subtitle: string) {
   doc.setFontSize(14);
   doc.text(meeting.title, 14, 16);
   doc.setFontSize(10);
@@ -26,7 +25,8 @@ function header(doc: jsPDF, meeting: MeetingDetail, subtitle: string) {
   doc.setTextColor(0);
 }
 
-export function exportAtaPdf(meeting: MeetingDetail) {
+export async function exportAtaPdf(meeting: MeetingDetail) {
+  const [{ jsPDF }, { default: autoTable }] = await Promise.all([import('jspdf'), import('jspdf-autotable')]);
   const doc = new jsPDF();
   header(doc, meeting, 'Ata da Reunião Mensal');
   let y = 30;
@@ -99,7 +99,8 @@ export function exportAtaPdf(meeting: MeetingDetail) {
   doc.save(`ata-${meeting.periodRef}.pdf`);
 }
 
-export function exportResumoPdf(meeting: MeetingDetail, aiSummary?: string) {
+export async function exportResumoPdf(meeting: MeetingDetail, aiSummary?: string) {
+  const [{ jsPDF }, { default: autoTable }] = await Promise.all([import('jspdf'), import('jspdf-autotable')]);
   const doc = new jsPDF();
   header(doc, meeting, 'Resumo Executivo');
   let y = 30;
@@ -118,7 +119,8 @@ export function exportResumoPdf(meeting: MeetingDetail, aiSummary?: string) {
   doc.save(`resumo-executivo-${meeting.periodRef}.pdf`);
 }
 
-export function exportFarolXlsx(meeting: MeetingDetail) {
+export async function exportFarolXlsx(meeting: MeetingDetail) {
+  const XLSX = await import('xlsx');
   const rows = meeting.areas.flatMap((a) =>
     a.indicators.map((i) => ({
       Área: a.name,
@@ -139,7 +141,8 @@ export function exportFarolXlsx(meeting: MeetingDetail) {
   XLSX.writeFile(wb, `farol-${meeting.periodRef}.xlsx`);
 }
 
-export function exportAcoesXlsx(meeting: MeetingDetail) {
+export async function exportAcoesXlsx(meeting: MeetingDetail) {
+  const XLSX = await import('xlsx');
   const rows: any[] = [];
   for (const area of meeting.areas) {
     for (const i of area.indicators) {

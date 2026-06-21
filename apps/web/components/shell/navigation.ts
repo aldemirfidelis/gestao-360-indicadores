@@ -56,6 +56,8 @@ export interface NavSection {
   items: NavItem[];
 }
 
+export const SUPER_ADMIN_ONLY_PERMISSION = 'super-admin:only';
+
 export const navSections: NavSection[] = [
   {
     heading: 'Visualizações',
@@ -151,7 +153,7 @@ export const companyUsersNavItem: NavItem = {
 };
 
 export const mobileNavItems: NavItem[] = [
-  { href: '/', label: 'Visão', icon: LayoutDashboard, permissions: ['dashboard:view'], exact: true },
+  { href: '/dashboard', label: 'Visão', icon: LayoutDashboard, permissions: ['dashboard:view'], exact: true },
   { href: '/indicators', label: 'Indicadores', icon: Target, permissions: ['indicators:view'], exact: true },
   { href: '/strategy', label: 'Mapa', icon: Compass, permissions: ['strategy:view'] },
   { href: '/org', label: 'Árvore', icon: Network, permissions: ['org:view', 'org:view_all'] },
@@ -206,8 +208,8 @@ export const ROUTE_PERMISSIONS: Array<{ prefix: string; permissions: string[]; e
   { prefix: '/users', permissions: ['users:view', 'users:manage'] },
   // Rotas antigas de Configurações no app da empresa. O layout de /settings
   // redireciona para /users; o restante foi centralizado no Portal Admin Global.
-  { prefix: '/settings/database', permissions: ['users:view', 'users:manage'] },
-  { prefix: '/settings/portal', permissions: ['users:view', 'users:manage'] },
+  { prefix: '/settings/database', permissions: [SUPER_ADMIN_ONLY_PERMISSION] },
+  { prefix: '/settings/portal', permissions: [SUPER_ADMIN_ONLY_PERMISSION] },
   { prefix: '/settings/empresas', permissions: ['users:view', 'users:manage'] },
   { prefix: '/settings/visibilidade', permissions: ['users:view', 'users:manage'] },
   { prefix: '/settings/integracoes', permissions: ['users:view', 'users:manage'] },
@@ -245,6 +247,7 @@ export function canAccess(user: NavUser | null | undefined, permissions?: string
   if (!permissions || permissions.length === 0) return true;
   if (!user) return false;
   if (user.role === 'SUPER_ADMIN') return true;
+  if (permissions.includes(SUPER_ADMIN_ONLY_PERMISSION)) return false;
   const granted = new Set(user.permissions ?? []);
   return permissions.some((permission) => granted.has(permission) || granted.has(`${permission.split(':')[0]}:manage`));
 }

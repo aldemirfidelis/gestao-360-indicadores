@@ -2,8 +2,6 @@
 
 import { useRef, useState } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
-import Papa from 'papaparse';
-import * as XLSX from 'xlsx';
 import { toast } from 'sonner';
 import { Download, FileUp, Upload } from 'lucide-react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
@@ -72,6 +70,7 @@ export function ImportJobsDialog({ open, onClose }: { open: boolean; onClose: ()
     setFileName(file.name);
     try {
       if (/\.xlsx?$/i.test(file.name)) {
+        const XLSX = await import('xlsx');
         const wb = XLSX.read(await file.arrayBuffer(), { type: 'array' });
         const sheet = wb.Sheets[wb.SheetNames[0]];
         const json = XLSX.utils.sheet_to_json<Record<string, unknown>>(sheet, { defval: '' });
@@ -80,6 +79,7 @@ export function ImportJobsDialog({ open, onClose }: { open: boolean; onClose: ()
         if (parsed.length === 0) toast.error('Nenhuma linha encontrada na planilha');
         return;
       }
+      const Papa = (await import('papaparse')).default;
       Papa.parse<Record<string, unknown>>(file, {
         header: true,
         skipEmptyLines: true,

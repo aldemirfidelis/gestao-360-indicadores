@@ -8,6 +8,7 @@ import { LoadingState } from '@/components/platform/loading-state';
 import { PageHeader } from '@/components/shell/page-header';
 import { SectionCard } from '@/components/platform/section-card';
 import { Button } from '@/components/ui/button';
+import { SUPER_ADMIN_ONLY_PERMISSION } from '@/components/shell/navigation';
 
 interface Props {
   permissions: string | string[];
@@ -18,6 +19,9 @@ interface Props {
 
 export function RoutePermissionGate({ permissions, title, description, children }: Props) {
   const { hasPermission, loading } = useAuth();
+  const requiredLabel = Array.isArray(permissions)
+    ? permissions.map(formatPermission).join(' ou ')
+    : formatPermission(permissions);
 
   if (loading) {
     return <LoadingState label="Verificando permissões..." />;
@@ -46,7 +50,7 @@ export function RoutePermissionGate({ permissions, title, description, children 
             <ShieldAlert className="mx-auto mb-3 h-8 w-8 opacity-60" />
             Permissões exigidas:{' '}
             <span className="font-mono text-foreground">
-              {Array.isArray(permissions) ? permissions.join(' ou ') : permissions}
+              {requiredLabel}
             </span>
           </div>
         </SectionCard>
@@ -55,4 +59,8 @@ export function RoutePermissionGate({ permissions, title, description, children 
   }
 
   return <>{children}</>;
+}
+
+function formatPermission(permission: string) {
+  return permission === SUPER_ADMIN_ONLY_PERMISSION ? 'SUPER_ADMIN' : permission;
 }

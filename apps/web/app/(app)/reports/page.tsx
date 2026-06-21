@@ -3,8 +3,6 @@
 import { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { toast } from 'sonner';
-import jsPDF from 'jspdf';
-import autoTable from 'jspdf-autotable';
 import { Download, FileSpreadsheet, FileText, Printer, Save, SlidersHorizontal } from 'lucide-react';
 import { PageHeader } from '@/components/shell/page-header';
 import { FilterBar } from '@/components/platform/filter-bar';
@@ -75,11 +73,12 @@ export default function ReportsPage() {
     }
   };
 
-  const generateExecutivePdf = () => {
+  const generateExecutivePdf = async () => {
     if (!overview.data || !indicators.data) {
       toast.error('Aguarde os dados carregarem');
       return;
     }
+    const [{ jsPDF }, { default: autoTable }] = await Promise.all([import('jspdf'), import('jspdf-autotable')]);
     const doc = new jsPDF({ orientation: 'portrait', unit: 'pt' });
     const o = overview.data;
     doc.setFontSize(18);

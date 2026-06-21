@@ -1,6 +1,7 @@
 'use client';
 
 import Link from 'next/link';
+import dynamic from 'next/dynamic';
 import { useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
@@ -25,7 +26,14 @@ import {
 import { api } from '@/lib/api';
 import { useAuth } from '@/components/auth/auth-provider';
 import { formatPercent } from '@/lib/utils';
-import { OkrFlowchart } from './okr-flowchart';
+import { LoadingState } from '@/components/platform/loading-state';
+
+// React Flow (+CSS) e pesado e so e necessario na visao de fluxo; carrega sob demanda
+// para nao entrar no bundle inicial da pagina de OKRs.
+const OkrFlowchart = dynamic(() => import('./okr-flowchart').then((m) => m.OkrFlowchart), {
+  ssr: false,
+  loading: () => <LoadingState label="Carregando mapa de OKRs..." />,
+});
 
 interface Cycle {
   id: string;

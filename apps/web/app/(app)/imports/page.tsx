@@ -2,7 +2,6 @@
 
 import { useState, useRef } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import Papa from 'papaparse';
 import { toast } from 'sonner';
 import { Upload, Download, FileText, CheckCircle2, XCircle, Loader2 } from 'lucide-react';
 import { PageHeader } from '@/components/shell/page-header';
@@ -97,9 +96,10 @@ export default function ImportsPage() {
     if (fileInput.current) fileInput.current.value = '';
   };
 
-  const handleFile = (file: File) => {
+  const handleFile = async (file: File) => {
     setFileName(file.name);
     setPreview(null);
+    const Papa = (await import('papaparse')).default;
     Papa.parse<Record<string, unknown>>(file, {
       header: true,
       skipEmptyLines: true,
@@ -117,11 +117,9 @@ export default function ImportsPage() {
   const downloadTemplate = () => {
     const headers = TARGET_HEADERS[target];
     const example = exampleRow(target);
-    const csv = Papa.unparse([example], { columns: headers });
     const blob = new Blob(['﻿' + headers.join(',') + '\n' + Object.values(example).join(',')], {
       type: 'text/csv;charset=utf-8',
     });
-    void csv; // mantido para clareza
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;

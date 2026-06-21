@@ -20,7 +20,6 @@ import {
   Trash2,
   XCircle,
 } from 'lucide-react';
-import jsPDF from 'jspdf';
 import { PageHeader } from '@/components/shell/page-header';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
@@ -241,6 +240,7 @@ function CareerApprovalsContent() {
   const downloadReport = async (rowId: string) => {
     try {
       const detail = await api<ApprovalDetail>(`/strategy/career-approvals/${rowId}`);
+      const { jsPDF } = await import('jspdf');
       const doc = new jsPDF({ unit: 'pt', format: 'a4' });
       const w = doc.internal.pageSize.getWidth();
       const margin = 48;
