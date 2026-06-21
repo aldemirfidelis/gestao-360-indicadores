@@ -1,0 +1,585 @@
+<!doctype html>
+<html lang="pt-BR">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Proposta de Menu — Gestão 360</title>
+    <style>
+      :root {
+        color-scheme: light;
+        --bg: #f8fafc;
+        --panel: #ffffff;
+        --text: #0f172a;
+        --muted: #475569;
+        --line: #cbd5e1;
+        --brand: #2563eb;
+        --brand-dark: #1d4ed8;
+        --accent: #0d9488;
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+
+      body {
+        margin: 0;
+        background: var(--bg);
+        color: var(--text);
+        font-family:
+          Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+        line-height: 1.5;
+      }
+
+      header {
+        position: sticky;
+        top: 0;
+        z-index: 10;
+        border-bottom: 1px solid var(--line);
+        background: rgba(255, 255, 255, 0.92);
+        backdrop-filter: blur(10px);
+      }
+
+      .bar {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 16px;
+        max-width: 1200px;
+        margin: 0 auto;
+        padding: 16px 24px;
+      }
+
+      h1 {
+        font-size: 22px;
+        line-height: 1.2;
+        margin: 0;
+      }
+
+      h2 {
+        font-size: 20px;
+        line-height: 1.2;
+        margin: 0 0 12px;
+      }
+
+      h3 {
+        font-size: 16px;
+        margin: 16px 0 8px;
+      }
+
+      p {
+        margin: 8px 0;
+        color: var(--muted);
+      }
+
+      main {
+        max-width: 1200px;
+        margin: 0 auto;
+        padding: 24px;
+      }
+
+      .actions {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 8px;
+      }
+
+      button,
+      a.button {
+        appearance: none;
+        border: 1px solid var(--brand);
+        border-radius: 8px;
+        background: var(--brand);
+        color: white;
+        cursor: pointer;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        font: inherit;
+        font-weight: 600;
+        min-height: 36px;
+        padding: 8px 12px;
+        text-decoration: none;
+      }
+
+      button.secondary,
+      a.button.secondary {
+        background: white;
+        color: var(--brand-dark);
+      }
+
+      .intro,
+      section {
+        background: var(--panel);
+        border: 1px solid var(--line);
+        border-radius: 8px;
+        margin-bottom: 18px;
+        padding: 18px;
+      }
+
+      .legend {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+        gap: 10px;
+        margin-top: 12px;
+      }
+
+      .legend-item {
+        border: 1px solid #e2e8f0;
+        border-radius: 8px;
+        padding: 10px 12px;
+        font-size: 13px;
+      }
+
+      .legend-item strong {
+        display: block;
+        margin-bottom: 4px;
+        color: var(--text);
+      }
+
+      .diagram-wrap {
+        border: 1px solid #e2e8f0;
+        border-radius: 8px;
+        overflow: auto;
+        padding: 12px;
+        background: #ffffff;
+      }
+
+      .download-row {
+        display: flex;
+        justify-content: flex-end;
+        margin-bottom: 10px;
+        gap: 8px;
+      }
+
+      table {
+        width: 100%;
+        border-collapse: collapse;
+        margin-top: 10px;
+        font-size: 14px;
+      }
+
+      th,
+      td {
+        border: 1px solid #e2e8f0;
+        padding: 8px 10px;
+        text-align: left;
+        vertical-align: top;
+      }
+
+      th {
+        background: #f1f5f9;
+      }
+
+      code {
+        background: #f1f5f9;
+        border-radius: 4px;
+        padding: 1px 4px;
+        font-size: 13px;
+      }
+
+      .badge {
+        display: inline-block;
+        font-size: 11px;
+        font-weight: 600;
+        padding: 2px 8px;
+        border-radius: 999px;
+        background: #e0f2fe;
+        color: #0369a1;
+      }
+
+      .badge.new {
+        background: #d1fae5;
+        color: #047857;
+      }
+
+      .badge.move {
+        background: #fef3c7;
+        color: #b45309;
+      }
+
+      @media print {
+        header,
+        .download-row,
+        .actions {
+          display: none;
+        }
+
+        body {
+          background: white;
+        }
+
+        section,
+        .intro {
+          break-inside: avoid;
+          border-color: #e5e7eb;
+        }
+
+        .diagram-wrap {
+          max-height: none;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <header>
+      <div class="bar">
+        <div>
+          <h1>Proposta de reorganização do menu lateral</h1>
+          <p>Gestão 360 — documentação visual · base: ARQUITETURA_SISTEMA_POR_ABAS.md</p>
+        </div>
+        <div class="actions">
+          <button class="secondary" type="button" onclick="window.print()">Imprimir / Salvar PDF</button>
+          <a class="button secondary" href="./ARQUITETURA_SISTEMA_POR_ABAS_PROPOSTA.md" download>Baixar Markdown</a>
+          <a class="button secondary" href="./ARQUITETURA_SISTEMA_POR_ABAS.md">Menu atual</a>
+        </div>
+      </div>
+    </header>
+
+    <main>
+      <div class="intro">
+        <h2>Como usar</h2>
+        <p>
+          Abra este arquivo no navegador para ver os fluxogramas renderizados. Use
+          <strong>Imprimir / Salvar PDF</strong> para gerar o PDF de distribuição, ou baixe SVG de cada
+          diagrama. A implementação no app altera apenas <code>navigation.ts</code> — rotas existentes
+          são mantidas.
+        </p>
+        <div class="legend">
+          <div class="legend-item">
+            <strong>Hoje</strong>
+            5 grupos: Visualizações (10) · Lançamentos (1) · Gestão (18) · Prêmio (12) · Relatórios (1)
+          </div>
+          <div class="legend-item">
+            <strong>Proposta</strong>
+            12 accordions temáticos + rodapé Administração
+          </div>
+          <div class="legend-item">
+            <strong>FSMS + Patrimonial</strong>
+            Módulos próprios (como Gestão de Prêmio)
+          </div>
+          <div class="legend-item">
+            <strong>Lançamentos + Relatórios</strong>
+            Expandidos com entradas operacionais e auditoria
+          </div>
+        </div>
+      </div>
+
+      <section>
+        <h2>1. Visão geral — menu lateral proposto</h2>
+        <div class="download-row">
+          <button type="button" onclick="downloadSvg('menu-proposto')">Baixar SVG</button>
+        </div>
+        <div class="diagram-wrap">
+          <pre id="menu-proposto" class="mermaid">
+flowchart TB
+  subgraph TOP["Barra superior"]
+    BUSCA["Busca global"]
+    CHAT["Mensagens"]
+    NOTIF["Notificações"]
+    PERFIL["Perfil / Tema"]
+  end
+
+  subgraph MENU["Menu lateral — accordion proposto"]
+    direction TB
+
+    S1["1. Início<br/>Meu Dia · Tarefas"]
+    S2["2. Estratégia e Indicadores<br/>Dashboard · Mapa · KPI · OKR · Cronogramas · Impactos"]
+    S3["3. Melhoria Contínua<br/>Desvios · Ações · Reuniões · Mensal · Aprovações"]
+    S4["4. Qualidade e Compliance<br/>Riscos · NC · Auditorias · Docs · SIPOC · Modelos"]
+    S5["5. Segurança dos Alimentos<br/>FSMS / APPCC"]
+    S6["6. Segurança Patrimonial<br/>Portarias e Operação"]
+    S7["7. Cargos e Salários"]
+    S8["8. Gestão de Prêmio"]
+    S9["9. Comunicação"]
+    S10["10. Entradas e Operação<br/>Resultados · Importações · Preenchimentos"]
+    S11["11. Relatórios e Auditoria<br/>Exportações · Insights · Auditoria"]
+    S12["12. Automações"]
+  end
+
+  subgraph FOOT["Rodapé — Administração"]
+    PER["Períodos · Usuários · Config · Portal · Banco"]
+  end
+
+  TOP --> MENU
+  MENU --> FOOT
+          </pre>
+        </div>
+      </section>
+
+      <section>
+        <h2>2. Comparativo — hoje × proposta</h2>
+        <div class="download-row">
+          <button type="button" onclick="downloadSvg('comparativo')">Baixar SVG</button>
+        </div>
+        <div class="diagram-wrap">
+          <pre id="comparativo" class="mermaid">
+flowchart LR
+  subgraph HOJE["Menu HOJE"]
+    direction TB
+    V1["Visualizações<br/>10 itens"]
+    L1["Lançamentos<br/>só Importações"]
+    G1["Gestão<br/>18 itens incluindo<br/>FSMS e Patrimonial"]
+    P1["Gestão de Prêmio<br/>12 itens"]
+    R1["Relatórios<br/>só Exportações"]
+  end
+
+  subgraph PROPOSTA["Menu PROPOSTO"]
+    direction TB
+    I2["Início · Estratégia"]
+    M2["Melhoria · Qualidade"]
+    SEC2["FSMS · Patrimonial<br/>módulos próprios"]
+    PPL2["Cargos · Prêmio · Comunicação"]
+    OPS2["Entradas · Relatórios<br/>expandidos"]
+    A2["Automações · Admin"]
+  end
+
+  HOJE -->|"reorganizar"| PROPOSTA
+          </pre>
+        </div>
+        <table>
+          <thead>
+            <tr>
+              <th>Grupo hoje</th>
+              <th>Problema</th>
+              <th>Destino na proposta</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td>Visualizações</td>
+              <td>Mistura trabalho do dia com estratégia</td>
+              <td>Início + Estratégia e Indicadores; Insights → Relatórios</td>
+            </tr>
+            <tr>
+              <td>Lançamentos</td>
+              <td>1 item (Importações)</td>
+              <td>Entradas e Operação (+ resultados + preenchimentos)</td>
+            </tr>
+            <tr>
+              <td>Gestão</td>
+              <td>18 itens; FSMS e portaria perdidos</td>
+              <td>Dividido em 6+ grupos temáticos</td>
+            </tr>
+            <tr>
+              <td>Relatórios</td>
+              <td>1 item; /audit fora do menu</td>
+              <td>Relatórios e Auditoria (+ insights + audit)</td>
+            </tr>
+          </tbody>
+        </table>
+      </section>
+
+      <section>
+        <h2>3. Detalhe — Entradas e Operação (ex-Lançamentos)</h2>
+        <div class="download-row">
+          <button type="button" onclick="downloadSvg('entradas')">Baixar SVG</button>
+        </div>
+        <div class="diagram-wrap">
+          <pre id="entradas" class="mermaid">
+flowchart TD
+  subgraph ANTES["Lançamentos HOJE"]
+    IMP1["Importações"]
+  end
+
+  subgraph DEPOIS["Entradas e Operação PROPOSTO"]
+    LAN["Lançamento de Resultados<br/>/lancamentos/indicadores"]
+    IMP2["Importações<br/>/imports"]
+    PRE["Preenchimentos<br/>/forms?tab=preenchimentos"]
+  end
+
+  ANTES --> DEPOIS
+
+  LAN --> KPI["Indicadores · farol · metas"]
+  IMP2 --> KPI
+  PRE --> Q["Qualidade · NC · Auditorias"]
+          </pre>
+        </div>
+      </section>
+
+      <section>
+        <h2>4. Detalhe — Relatórios e Auditoria (expandido)</h2>
+        <div class="download-row">
+          <button type="button" onclick="downloadSvg('relatorios')">Baixar SVG</button>
+        </div>
+        <div class="diagram-wrap">
+          <pre id="relatorios" class="mermaid">
+flowchart TD
+  subgraph ANTES["Relatórios HOJE"]
+    REP1["Relatórios e Exportações"]
+  end
+
+  subgraph DEPOIS["Relatórios e Auditoria PROPOSTO"]
+    REP2["Exportações CSV/PDF<br/>/reports"]
+    INS["Insights<br/>/insights"]
+    AUD["Auditoria do Sistema<br/>/audit"]
+  end
+
+  ANTES --> DEPOIS
+
+  REP2 --> OUT["Saída executiva"]
+  INS --> OUT
+  AUD --> OUT
+
+  subgraph PREMIO["Gestão de Prêmio mantém"]
+    GPR["/gestao-premio/relatorios"]
+  end
+          </pre>
+        </div>
+      </section>
+
+      <section>
+        <h2>5. Módulos dedicados — FSMS e Patrimonial</h2>
+        <div class="download-row">
+          <button type="button" onclick="downloadSvg('modulos')">Baixar SVG</button>
+        </div>
+        <div class="diagram-wrap">
+          <pre id="modulos" class="mermaid">
+flowchart LR
+  subgraph GESTAO_HOJE["Gestão HOJE"]
+    G["18 itens misturados"]
+    FS["FSMS"]
+    PT["Patrimonial"]
+    G --- FS
+    G --- PT
+  end
+
+  subgraph MODULOS["Módulos PROPOSTOS"]
+    direction TB
+    M5["5. Segurança dos Alimentos<br/>/seguranca-alimentos<br/>flag: food-safety"]
+    M6["6. Segurança Patrimonial<br/>/seguranca-patrimonial<br/>flag: asset-security"]
+    REF["Modelo: Gestão de Prêmio<br/>accordion + abas internas"]
+  end
+
+  GESTAO_HOJE -->|"promover"| MODULOS
+  REF -.-> M5
+  REF -.-> M6
+          </pre>
+        </div>
+        <table>
+          <thead>
+            <tr><th>Módulo</th><th>Sub-abas internas</th><th>Permissão</th></tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td>Segurança dos Alimentos</td>
+              <td>Programas, processos, perigos/PCC, normas, fornecedores, fluxograma APPCC</td>
+              <td><code>fsms:view</code></td>
+            </tr>
+            <tr>
+              <td>Segurança Patrimonial</td>
+              <td>Visão Geral, Operação, Pessoas/Veículos, Autorizações, Rondas, Materiais, Config</td>
+              <td><code>asset-security:view</code></td>
+            </tr>
+          </tbody>
+        </table>
+      </section>
+
+      <section>
+        <h2>6. Jornadas por perfil de usuário</h2>
+        <div class="download-row">
+          <button type="button" onclick="downloadSvg('jornadas')">Baixar SVG</button>
+        </div>
+        <div class="diagram-wrap">
+          <pre id="jornadas" class="mermaid">
+flowchart LR
+  subgraph PERFIS["Quem usa o sistema"]
+    P1["Portaria"]
+    P2["Qualidade / FSMS"]
+    P3["Gestor de área"]
+    P4["Diretoria"]
+    P5["RH / Remuneração"]
+  end
+
+  subgraph ROTAS["Accordions principais"]
+    R1["Seg. Patrimonial"]
+    R2["Qualidade + FSMS"]
+    R3["Início + Estratégia + Melhoria"]
+    R4["Painel + Relatórios"]
+    R5["Cargos + Prêmio"]
+  end
+
+  P1 --> R1
+  P2 --> R2
+  P3 --> R3
+  P4 --> R4
+  P5 --> R5
+
+  subgraph CORE["Núcleo transversal"]
+    KPI["Indicadores"]
+    ACT["Plano de Ação"]
+    KPI --> ACT
+  end
+
+  R3 --> CORE
+  R2 --> CORE
+          </pre>
+        </div>
+      </section>
+
+      <section>
+        <h2>7. Mapa completo de accordions e rotas</h2>
+        <table>
+          <thead>
+            <tr>
+              <th>#</th>
+              <th>Accordion</th>
+              <th>Itens principais</th>
+              <th>Flag Portal Admin</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr><td>1</td><td>Início</td><td>Meu Dia, Tarefas</td><td>—</td></tr>
+            <tr><td>2</td><td>Estratégia e Indicadores</td><td>Dashboard, Mapa, Indicadores, OKRs, Cronogramas, Impactos</td><td>dashboard, strategy, indicators…</td></tr>
+            <tr><td>3</td><td>Melhoria Contínua</td><td>Desvios, Ações, Reuniões, Mensal, Aprovações</td><td>deviations, actions, meetings…</td></tr>
+            <tr><td>4</td><td>Qualidade e Compliance</td><td>Riscos, NC, Auditorias, Docs, SIPOC, Modelos</td><td>risks, nc, audits, documents…</td></tr>
+            <tr><td>5</td><td>Segurança dos Alimentos</td><td>/seguranca-alimentos</td><td>food-safety</td></tr>
+            <tr><td>6</td><td>Segurança Patrimonial</td><td>/seguranca-patrimonial</td><td>asset-security</td></tr>
+            <tr><td>7</td><td>Cargos e Salários</td><td>/cargos-salarios + sub-rotas</td><td>compensation</td></tr>
+            <tr><td>8</td><td>Gestão de Prêmio</td><td>12 sub-itens</td><td>prize</td></tr>
+            <tr><td>9</td><td>Comunicação</td><td>/comunicacao</td><td>communication</td></tr>
+            <tr><td>10</td><td>Entradas e Operação</td><td>Resultados, Importações, Preenchimentos</td><td>indicators, imports, forms</td></tr>
+            <tr><td>11</td><td>Relatórios e Auditoria</td><td>Exportações, Insights, Auditoria</td><td>reports, insights, audit</td></tr>
+            <tr><td>12</td><td>Automações</td><td>/central-automacoes</td><td>automations</td></tr>
+            <tr><td>—</td><td>Administração (rodapé)</td><td>Períodos, Usuários, Config, Portal, Banco</td><td>users, settings…</td></tr>
+          </tbody>
+        </table>
+      </section>
+    </main>
+
+    <script type="module">
+      import mermaid from "https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.esm.min.mjs";
+
+      mermaid.initialize({
+        startOnLoad: true,
+        securityLevel: "loose",
+        theme: "base",
+        themeVariables: {
+          primaryColor: "#e0f2fe",
+          primaryBorderColor: "#0284c7",
+          primaryTextColor: "#0f172a",
+          lineColor: "#64748b",
+          fontFamily: "Inter, ui-sans-serif, system-ui, sans-serif"
+        }
+      });
+
+      window.downloadSvg = function downloadSvg(id) {
+        const container = document.getElementById(id)?.parentElement;
+        const svg = container?.querySelector("svg");
+        if (!svg) {
+          alert("Diagrama ainda não renderizado. Aguarde alguns segundos e tente novamente.");
+          return;
+        }
+        const source = new XMLSerializer().serializeToString(svg);
+        const blob = new Blob([source], { type: "image/svg+xml;charset=utf-8" });
+        const url = URL.createObjectURL(blob);
+        const link = document.createElement("a");
+        link.href = url;
+        link.download = `${id}.svg`;
+        document.body.appendChild(link);
+        link.click();
+        link.remove();
+        URL.revokeObjectURL(url);
+      };
+    </script>
+  </body>
+</html>
