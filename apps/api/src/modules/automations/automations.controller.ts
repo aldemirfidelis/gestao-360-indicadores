@@ -367,7 +367,7 @@ export class AutomationsController {
 
     // Re-trigger execution of failed nodes
     for (const failedExec of instance.nodeExecutions) {
-      await this.executionEngine.processNode(id, failedExec.nodeKey, failedExec.attemptNumber);
+      await this.executionEngine.processNode(id, failedExec.nodeKey, failedExec.attemptNumber, me.companyId);
     }
 
     return { status: 'RELAUNCHED' };
@@ -420,11 +420,16 @@ export class AutomationsController {
     );
 
     // Resume execution
-    await this.executionEngine.resumeInstance(result.workflowInstanceId, result.nodeKey, {
-      approved: true,
-      approverId: me.sub,
-      respondedAt: new Date(),
-    });
+    await this.executionEngine.resumeInstance(
+      result.workflowInstanceId,
+      result.nodeKey,
+      {
+        approved: true,
+        approverId: me.sub,
+        respondedAt: new Date(),
+      },
+      me.companyId,
+    );
 
     return result;
   }
@@ -445,11 +450,16 @@ export class AutomationsController {
     );
 
     // Resume execution with negative outcome
-    await this.executionEngine.resumeInstance(result.workflowInstanceId, result.nodeKey, {
-      approved: false,
-      approverId: me.sub,
-      respondedAt: new Date(),
-    });
+    await this.executionEngine.resumeInstance(
+      result.workflowInstanceId,
+      result.nodeKey,
+      {
+        approved: false,
+        approverId: me.sub,
+        respondedAt: new Date(),
+      },
+      me.companyId,
+    );
 
     return result;
   }
@@ -496,11 +506,16 @@ export class AutomationsController {
     });
 
     // Resume execution
-    await this.executionEngine.resumeInstance(task.workflowInstanceId, task.nodeKey, {
-      completed: true,
-      taskCompletedById: me.sub,
-      evidenceNotes: body.evidenceNotes || '',
-    });
+    await this.executionEngine.resumeInstance(
+      task.workflowInstanceId,
+      task.nodeKey,
+      {
+        completed: true,
+        taskCompletedById: me.sub,
+        evidenceNotes: body.evidenceNotes || '',
+      },
+      me.companyId,
+    );
 
     return updatedTask;
   }
@@ -546,10 +561,10 @@ export class AutomationsController {
     });
 
     const nodeExec = await this.prisma.workflowNodeExecution.findFirstOrThrow({
-      where: { id: dl.nodeExecutionId! },
+      where: { id: dl.nodeExecutionId!, workflowInstanceId: dl.workflowInstanceId, companyId: me.companyId },
     });
 
-    await this.executionEngine.processNode(dl.workflowInstanceId, nodeExec.nodeKey, 1);
+    await this.executionEngine.processNode(dl.workflowInstanceId, nodeExec.nodeKey, 1, me.companyId);
 
     return { resolved: true };
   }

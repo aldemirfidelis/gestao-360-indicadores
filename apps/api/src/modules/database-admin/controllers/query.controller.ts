@@ -1,12 +1,15 @@
 import { Body, Controller, Delete, Get, Param, Post, Req, UseGuards } from '@nestjs/common';
+import { UserRoleEnum } from '@prisma/client';
 import { Request } from 'express';
 import { SuperAdminDbGuard } from '../guards/super-admin-db.guard';
 import { DbAdminSubmenuTag } from '../decorators/db-admin-submenu.decorator';
 import { CurrentUser } from '../../../common/decorators/current-user.decorator';
+import { Roles } from '../../../common/decorators/roles.decorator';
 import { AuthPayload } from '../../auth/auth.types';
 import { QueryExecutionService } from '../services/query-execution.service';
 
 @Controller('admin/database/query')
+@Roles(UserRoleEnum.SUPER_ADMIN)
 @UseGuards(SuperAdminDbGuard)
 @DbAdminSubmenuTag('query')
 export class QueryController {

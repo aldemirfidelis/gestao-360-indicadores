@@ -89,14 +89,18 @@ export class WorkflowTaskService {
 
     switch (type) {
       case 'USER':
-        return config.userId || null;
+        if (!config.userId) return null;
+        return (
+          await this.prisma.user.findFirst({
+            where: { id: config.userId, companyId, active: true },
+            select: { id: true },
+          })
+        )?.id ?? null;
 
       case 'CREATOR':
-        return instance.sourceEventId
-          ? (await this.prisma.workflowEvent.findUnique({ where: { id: instance.sourceEventId } }))?.eventPayload
-            ? JSON.parse((await this.prisma.workflowEvent.findUnique({ where: { id: instance.sourceEventId } }))?.eventPayload || '{}').userId || null
-            : null
-          : null;
+        if (!instance.sourceEventId) return null;
+        const creatorEvent = await this.prisma.workflowEvent.findFirst({ where: { id: instance.sourceEventId, companyId } });
+        return creatorEvent?.eventPayload ? JSON.parse(creatorEvent.eventPayload || '{}').userId || null : null;
 
       case 'INDICATOR_RESPONSIBLE':
         if (instance.sourceEntityType === 'INDICATOR' && instance.sourceEntityId) {

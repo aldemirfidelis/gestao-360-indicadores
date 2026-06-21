@@ -1,11 +1,14 @@
 import { Body, Controller, Get, Param, Post, Put, UseGuards } from '@nestjs/common';
+import { UserRoleEnum } from '@prisma/client';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
+import { Roles } from '../../common/decorators/roles.decorator';
 import { AuthPayload } from '../auth/auth.types';
 import { PortalTabTag } from '../portal-admin/decorators/portal-tab.decorator';
 import { SuperAdminPortalGuard } from '../portal-admin/guards/super-admin-portal.guard';
 import { HelpService } from './help.service';
 
 @Controller('admin/help')
+@Roles(UserRoleEnum.SUPER_ADMIN)
 @UseGuards(SuperAdminPortalGuard)
 export class AdminHelpController {
   constructor(private readonly service: HelpService) {}

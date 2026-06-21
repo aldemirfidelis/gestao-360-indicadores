@@ -1,4 +1,5 @@
 import { CanActivate, ExecutionContext, Injectable } from '@nestjs/common';
+import { GUARDS_METADATA } from '@nestjs/common/constants';
 import { Reflector } from '@nestjs/core';
 import { UserRoleEnum } from '@prisma/client';
 import { ROLES_KEY } from '../decorators/roles.decorator';
@@ -35,6 +36,8 @@ export class RolesGuard implements CanActivate {
     const userId = req.user?.sub;
     if (!role || !userId) return false;
 
+    if (this.hasAuditedAdminGuard(context)) return true;
+
     if (required && required.length > 0 && !required.includes(role)) return false;
     if (!permissions || permissions.length === 0) return true;
     if (role === UserRoleEnum.SUPER_ADMIN) return true;
@@ -57,5 +60,20 @@ export class RolesGuard implements CanActivate {
     // Semantica: basta o usuario ter QUALQUER UMA das permissoes exigidas
     // (OR). Aceita tambem o curinga `<modulo>:manage`.
     return permissions.some((key) => keys.has(key) || keys.has(`${key.split(':')[0]}:manage`));
+  }
+
+  private hasAuditedAdminGuard(context: ExecutionContext) {
+    const guards = this.reflector.getAllAndMerge<unknown[]>(GUARDS_METADATA, [
+      context.getHandler(),
+      context.getClass(),
+    ]) ?? [];
+    return guards.some((guard) => {
+      const guardName =
+        typeof guard === 'function'
+          ? guard.name
+          : (guard as { name?: string; constructor?: { name?: string } })?.name ??
+            (guard as { constructor?: { name?: string } })?.constructor?.name;
+      return guardName === 'SuperAdminDbGuard' || guardName === 'SuperAdminPortalGuard';
+    });
   }
 }

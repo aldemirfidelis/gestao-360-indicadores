@@ -658,6 +658,7 @@ export class AssetSecurityService {
     const unitId = await this.validateOrgNode(me.companyId, this.id(body.unitId));
     const gateId = await this.validateGate(me.companyId, this.id(body.gateId));
     const postId = await this.validatePost(me.companyId, this.id(body.postId));
+    await this.assertRawEntryNotBlocked(me, body);
     const person = await this.resolveEntryPerson(me, body);
     const contractor = await this.validateContractorCompany(me.companyId, this.id(body.contractorCompanyId));
     const vehicle = await this.resolveEntryVehicle(me, body, person, contractor);
@@ -1912,6 +1913,28 @@ export class AssetSecurityService {
       if (row.status === 'BLOCKED' && !hasException) throw new ForbiddenException('Cadastro bloqueado para acesso.');
       if (row.status === 'INACTIVE' && !hasException) throw new ForbiddenException('Cadastro inativo para acesso.');
     }
+  }
+
+  private async assertRawEntryNotBlocked(me: AuthPayload, body: JsonMap) {
+    const exceptionJustification = this.nullableText(body.exceptionJustification);
+    const exceptionApprovedById = this.id(body.exceptionApprovedById);
+    if (exceptionJustification && exceptionApprovedById) return;
+
+    const activeBlock = await this.findActiveBlock(me.companyId, {
+      personId: this.id(body.personId),
+      vehicleId: this.id(body.vehicleId),
+      documentNumber: this.onlyDigits(this.text(body.documentNumber)),
+      plate: this.normalizePlate(this.text(body.plate)),
+    });
+    if (!activeBlock) return;
+
+    await this.audit(me, 'BLOCKED_ENTRY_ATTEMPT', 'SecurityBlocklist', activeBlock.id, activeBlock.reason, null, activeBlock, {
+      personId: this.id(body.personId),
+      vehicleId: this.id(body.vehicleId),
+      documentNumber: this.onlyDigits(this.text(body.documentNumber)) || null,
+      plate: this.normalizePlate(this.text(body.plate)) || null,
+    });
+    throw new ForbiddenException(`Acesso bloqueado: ${activeBlock.reason}`);
   }
 
   private async resolveEntryPerson(me: AuthPayload, body: JsonMap) {

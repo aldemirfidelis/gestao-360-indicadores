@@ -913,7 +913,7 @@ async function main() {
   const platformOwner = await prisma.platformAdminUser.create({
     data: {
       email: 'platform@demo.com',
-      passwordHash: hash,
+      passwordHash: await bcrypt.hash('admin123', 10),
       name: 'Gestao 360 Platform Owner',
       jobTitle: 'Platform Owner',
       status: 'ACTIVE',

@@ -1,8 +1,10 @@
 import { Body, Controller, Delete, Get, Param, Post, Put, Query, Req, UseGuards } from '@nestjs/common';
+import { UserRoleEnum } from '@prisma/client';
 import { Request } from 'express';
 import { SuperAdminPortalGuard } from '../guards/super-admin-portal.guard';
 import { PortalTabTag } from '../decorators/portal-tab.decorator';
 import { CurrentUser } from '../../../common/decorators/current-user.decorator';
+import { Roles } from '../../../common/decorators/roles.decorator';
 import { AuthPayload } from '../../auth/auth.types';
 import { PortalOverviewService } from '../services/portal-overview.service';
 import { RegistryService } from '../services/registry.service';
@@ -10,6 +12,7 @@ import { FeatureFlagService } from '../services/feature-flag.service';
 import { PortalAuditService } from '../services/portal-audit.service';
 
 @Controller('admin/portal')
+@Roles(UserRoleEnum.SUPER_ADMIN)
 @UseGuards(SuperAdminPortalGuard)
 export class PortalAdminController {
   constructor(

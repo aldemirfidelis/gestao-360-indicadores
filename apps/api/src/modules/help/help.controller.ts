@@ -1,9 +1,11 @@
 import { Body, Controller, Get, Param, Post, Query } from '@nestjs/common';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
+import { RequirePermissions } from '../../common/decorators/permissions.decorator';
 import { AuthPayload } from '../auth/auth.types';
 import { HelpService } from './help.service';
 
 @Controller('help')
+@RequirePermissions('help:view')
 export class HelpController {
   constructor(private readonly service: HelpService) {}
 

@@ -40,6 +40,9 @@ function makeService(opts?: {
       count: vi.fn().mockResolvedValue(opts?.strategicCount ?? 0),
       findMany: vi.fn().mockResolvedValue(opts?.strategicObjectives ?? []),
     },
+    orgNode: { findMany: vi.fn().mockResolvedValue([]) },
+    user: { findMany: vi.fn().mockResolvedValue([]) },
+    indicator: { findMany: vi.fn().mockResolvedValue([]) },
   } as any;
 
   const service = new OkrsService(prisma);

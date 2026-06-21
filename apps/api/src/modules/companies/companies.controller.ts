@@ -1,6 +1,8 @@
 import { Controller, Get, Param } from '@nestjs/common';
+import { UserRoleEnum } from '@prisma/client';
 import { CompaniesService } from './companies.service';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
+import { Roles } from '../../common/decorators/roles.decorator';
 import { AuthPayload } from '../auth/auth.types';
 
 @Controller('companies')
@@ -18,6 +20,7 @@ export class CompaniesController {
   }
 
   @Get(':id')
+  @Roles(UserRoleEnum.SUPER_ADMIN)
   byId(@Param('id') id: string) {
     return this.service.getById(id);
   }

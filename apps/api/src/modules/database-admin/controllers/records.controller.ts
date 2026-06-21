@@ -1,8 +1,10 @@
 import { Body, Controller, Get, Param, Patch, Post, Query, Req, UseGuards } from '@nestjs/common';
+import { UserRoleEnum } from '@prisma/client';
 import { Request } from 'express';
 import { SuperAdminDbGuard } from '../guards/super-admin-db.guard';
 import { DbAdminSubmenuTag } from '../decorators/db-admin-submenu.decorator';
 import { CurrentUser } from '../../../common/decorators/current-user.decorator';
+import { Roles } from '../../../common/decorators/roles.decorator';
 import { AuthPayload } from '../../auth/auth.types';
 import { RecordManagementService } from '../services/record-management.service';
 import type { FilterCondition } from '../util/where-builder';
@@ -12,6 +14,7 @@ function meta(req: Request) {
 }
 
 @Controller('admin/database/tables/:table/rows')
+@Roles(UserRoleEnum.SUPER_ADMIN)
 @UseGuards(SuperAdminDbGuard)
 @DbAdminSubmenuTag('records')
 export class RecordsController {

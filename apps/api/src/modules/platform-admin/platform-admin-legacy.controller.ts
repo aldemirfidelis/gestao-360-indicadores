@@ -569,11 +569,13 @@ export class PlatformAdminLegacyDatabaseController {
   }
 
   @Get('diagnostics')
+  @PlatformAdminRequired('platform.database.health')
   getDiagnostics() {
     return this.diagnostics.run();
   }
 
   @Post('diagnostics/run')
+  @PlatformAdminRequired('platform.database.health')
   runDiagnostics() {
     return this.diagnostics.run();
   }
@@ -584,6 +586,7 @@ export class PlatformAdminLegacyDatabaseController {
   }
 
   @Put('settings')
+  @PlatformAdminRequired('platform.environments.manage')
   setSettings(@Body() body: { key: string; value: string }, @CurrentPlatformAdmin() user: PlatformAdminIdentity) {
     return this.settings.set(body?.key, body?.value ?? '', asAuthPayload(user));
   }
@@ -610,6 +613,7 @@ export class PlatformAdminLegacyDatabaseController {
   }
 
   @Post('query/execute')
+  @PlatformAdminRequired('platform.database.restore_request')
   executeQuery(@Body() body: { sql: string; mode?: 'safe' | 'advanced'; confirmationPhrase?: string }, @CurrentPlatformAdmin() user: PlatformAdminIdentity, @Req() req: Request) {
     return this.query.execute(body?.sql ?? '', body?.mode === 'advanced' ? 'advanced' : 'safe', body?.confirmationPhrase, asAuthPayload(user), requestMeta(req));
   }
@@ -630,11 +634,13 @@ export class PlatformAdminLegacyDatabaseController {
   }
 
   @Post('query/favorites')
+  @PlatformAdminRequired('platform.database.read')
   saveQueryFavorite(@Body() body: { name: string; sql: string }, @CurrentPlatformAdmin() user: PlatformAdminIdentity) {
     return this.query.saveFavorite(user.sub, body?.name ?? 'Consulta', body?.sql ?? '');
   }
 
   @Delete('query/favorites/:id')
+  @PlatformAdminRequired('platform.database.read')
   deleteQueryFavorite(@Param('id') id: string, @CurrentPlatformAdmin() user: PlatformAdminIdentity) {
     return this.query.deleteFavorite(user.sub, id);
   }
@@ -645,6 +651,7 @@ export class PlatformAdminLegacyDatabaseController {
   }
 
   @Post('structure/execute')
+  @PlatformAdminRequired('platform.database.restore_request')
   executeStructure(@Body() body: { operation: string; params: Record<string, unknown>; confirmationPhrase?: string }, @CurrentPlatformAdmin() user: PlatformAdminIdentity, @Req() req: Request) {
     return this.structure.execute(body?.operation, body?.params ?? {}, body?.confirmationPhrase, asAuthPayload(user), requestMeta(req));
   }
@@ -671,21 +678,25 @@ export class PlatformAdminLegacyDatabaseController {
   }
 
   @Post('tables/:table/rows')
+  @PlatformAdminRequired('platform.database.restore_request')
   createRow(@Param('table') table: string, @Body() body: { values: Record<string, unknown> }, @CurrentPlatformAdmin() user: PlatformAdminIdentity, @Req() req: Request) {
     return this.records.insert(table, body?.values ?? {}, asAuthPayload(user), requestMeta(req));
   }
 
   @Patch('tables/:table/rows')
+  @PlatformAdminRequired('platform.database.restore_request')
   updateRow(@Param('table') table: string, @Body() body: { key: Record<string, unknown>; values: Record<string, unknown> }, @CurrentPlatformAdmin() user: PlatformAdminIdentity, @Req() req: Request) {
     return this.records.update(table, body?.key ?? {}, body?.values ?? {}, asAuthPayload(user), requestMeta(req));
   }
 
   @Post('tables/:table/rows/delete')
+  @PlatformAdminRequired('platform.database.restore_request')
   deleteRows(@Param('table') table: string, @Body() body: { keys: Record<string, unknown>[] }, @CurrentPlatformAdmin() user: PlatformAdminIdentity, @Req() req: Request) {
     return this.records.deleteRows(table, body?.keys ?? [], asAuthPayload(user), requestMeta(req));
   }
 
   @Post('export')
+  @PlatformAdminRequired('platform.database.read')
   exportData(@Body() body: { table?: string; sql?: string; format: ExportFormat }, @CurrentPlatformAdmin() user: PlatformAdminIdentity, @Req() req: Request) {
     if (body?.sql) return this.exporter.exportQuery(body.sql, body.format, asAuthPayload(user), requestMeta(req));
     return this.exporter.exportTable(String(body?.table), body?.format ?? 'csv', asAuthPayload(user), requestMeta(req));
@@ -697,16 +708,19 @@ export class PlatformAdminLegacyDatabaseController {
   }
 
   @Post('import/commit')
+  @PlatformAdminRequired('platform.database.restore_request')
   commitImport(@Body() body: { table: string; format: ImportFormat; content: string; mapping?: Record<string, string>; strategy: ImportStrategy; keyColumns?: string[] }, @CurrentPlatformAdmin() user: PlatformAdminIdentity, @Req() req: Request) {
     return this.importer.commit(body?.table, body?.format ?? 'csv', body?.content ?? '', body?.mapping ?? {}, body?.strategy ?? 'insert', body?.keyColumns ?? [], asAuthPayload(user), requestMeta(req));
   }
 
   @Get('backups')
+  @PlatformAdminRequired('platform.database.backup')
   listBackups() {
     return this.backup.list();
   }
 
   @Post('backups')
+  @PlatformAdminRequired('platform.database.backup')
   async createBackup(@Body() body: { table: string; reason?: string }, @CurrentPlatformAdmin() user: PlatformAdminIdentity) {
     const allow = await this.schema.getAllowlist();
     assertInAllowlist(String(body?.table), allow, 'tabela');
@@ -723,6 +737,7 @@ export class PlatformAdminLegacyDatabaseController {
   }
 
   @Get('backups/:id/download')
+  @PlatformAdminRequired('platform.database.backup')
   async downloadBackup(@Param('id') id: string) {
     const file = await this.backup.getFile(id);
     if (!file) throw new BadRequestException('Backup indisponivel ou arquivo ausente.');
@@ -730,21 +745,25 @@ export class PlatformAdminLegacyDatabaseController {
   }
 
   @Post('backups/:id/verify')
+  @PlatformAdminRequired('platform.database.backup')
   verifyBackup(@Param('id') id: string) {
     return this.backup.verify(id);
   }
 
   @Post('backups/:id/important')
+  @PlatformAdminRequired('platform.database.backup')
   importantBackup(@Param('id') id: string, @Body() body: { important: boolean }) {
     return this.backup.setImportant(id, Boolean(body?.important));
   }
 
   @Delete('backups/:id')
+  @PlatformAdminRequired('platform.database.backup')
   removeBackup(@Param('id') id: string) {
     return this.backup.remove(id);
   }
 
   @Post('backups/:id/restore')
+  @PlatformAdminRequired('platform.database.restore_request')
   async restoreBackup(@Param('id') id: string, @Body() body: { confirmationPhrase?: string }, @CurrentPlatformAdmin() user: PlatformAdminIdentity, @Req() req: Request) {
     if (body?.confirmationPhrase !== 'CONFIRMAR ALTERAÇÃO CRÍTICA') {
       throw new BadRequestException('Restauração exige a frase de confirmação: "CONFIRMAR ALTERAÇÃO CRÍTICA".');

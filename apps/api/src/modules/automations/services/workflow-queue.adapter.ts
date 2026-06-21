@@ -52,19 +52,19 @@ export class WorkflowQueueAdapter {
       if (type === 'process_event') {
         const { WorkflowEventDispatcher } = await import('./workflow-dispatcher.service');
         const dispatcher = this.moduleRef.get(WorkflowEventDispatcher, { strict: false });
-        await dispatcher.processEvent(payload.eventId);
+        await dispatcher.processEvent(payload.eventId, payload.companyId);
       } else if (type === 'execute_node') {
         const { WorkflowExecutionEngine } = await import('./workflow-engine.service');
         const engine = this.moduleRef.get(WorkflowExecutionEngine, { strict: false });
-        await engine.processNode(payload.workflowInstanceId, payload.nodeKey);
+        await engine.processNode(payload.workflowInstanceId, payload.nodeKey, 1, payload.companyId);
       } else if (type === 'retry_node') {
         const { WorkflowExecutionEngine } = await import('./workflow-engine.service');
         const engine = this.moduleRef.get(WorkflowExecutionEngine, { strict: false });
-        await engine.processNode(payload.workflowInstanceId, payload.nodeKey, payload.attemptNumber);
+        await engine.processNode(payload.workflowInstanceId, payload.nodeKey, payload.attemptNumber, payload.companyId);
       } else if (type === 'timer_trigger') {
         const { WorkflowExecutionEngine } = await import('./workflow-engine.service');
         const engine = this.moduleRef.get(WorkflowExecutionEngine, { strict: false });
-        await engine.resumeInstance(payload.workflowInstanceId, payload.nodeKey, { triggeredAt: new Date() });
+        await engine.resumeInstance(payload.workflowInstanceId, payload.nodeKey, { triggeredAt: new Date() }, payload.companyId);
       }
     } catch (error: any) {
       this.logger.error(`Error executing job ${type} with payload ${JSON.stringify(payload)}: ${error.message}`, error.stack);

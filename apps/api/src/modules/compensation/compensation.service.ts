@@ -736,16 +736,22 @@ export class CompensationService {
     const status = monthlyImpact && monthlyImpact.gt(0) && !availableBudget ? 'PENDING_BUDGET' : 'REQUESTED';
     const approvalSteps = buildApprovalSteps(body.approvalSteps);
     const protocol = await this.nextMovementProtocol(me.companyId);
+    const employeeId = await this.assertCompanyRef(this.prisma.orgEmployee, me.companyId, cleanString(body.employeeId), 'Colaborador nao encontrado');
+    const currentPositionId = await this.assertCompanyRef(this.prisma.compensationPosition, me.companyId, cleanString(body.currentPositionId), 'Posicao atual nao encontrada', { deletedAt: null });
+    const targetPositionId = await this.assertCompanyRef(this.prisma.compensationPosition, me.companyId, cleanString(body.targetPositionId), 'Posicao destino nao encontrada', { deletedAt: null });
+    const currentJobId = await this.assertCompanyRef(this.prisma.orgJob, me.companyId, cleanString(body.currentJobId), 'Cargo atual nao encontrado');
+    const targetJobId = await this.assertCompanyRef(this.prisma.orgJob, me.companyId, cleanString(body.targetJobId), 'Cargo destino nao encontrado');
+    const managerUserId = await this.assertCompanyRef(this.prisma.user, me.companyId, cleanString(body.managerUserId), 'Gestor nao encontrado', { deletedAt: null, active: true });
     const created = await this.prisma.compensationMovementRequest.create({
       data: {
         companyId: me.companyId,
         protocol,
         type,
-        employeeId: cleanString(body.employeeId),
-        currentPositionId: cleanString(body.currentPositionId),
-        targetPositionId: cleanString(body.targetPositionId),
-        currentJobId: cleanString(body.currentJobId),
-        targetJobId: cleanString(body.targetJobId),
+        employeeId,
+        currentPositionId,
+        targetPositionId,
+        currentJobId,
+        targetJobId,
         currentBand: cleanString(body.currentBand),
         targetBand: cleanString(body.targetBand),
         currentSalary,
@@ -759,7 +765,7 @@ export class CompensationService {
         costCenter: cleanString(body.costCenter),
         availableBudget,
         requesterId: me.sub,
-        managerUserId: cleanString(body.managerUserId),
+        managerUserId,
         status,
         approvalSteps: approvalSteps as unknown as Prisma.InputJsonValue,
         attachments: jsonValue(body.attachments),
@@ -774,7 +780,7 @@ export class CompensationService {
       const firstStep = approvalSteps[0];
       const approverIds = await this.findApproverUserIds(me.companyId, ['compensation:movements:approve', 'compensation:manage']);
       const recipients = new Set<string>(approverIds);
-      const managerId = cleanString(body.managerUserId);
+      const managerId = managerUserId;
       if (managerId) recipients.add(managerId);
       recipients.delete(me.sub); // nao notifica o proprio solicitante
       for (const userId of recipients) {
@@ -851,14 +857,15 @@ export class CompensationService {
         });
       }
       if (before.targetPositionId) {
-        await tx.compensationPosition.update({
-          where: { id: before.targetPositionId },
+        const position = await tx.compensationPosition.updateMany({
+          where: { id: before.targetPositionId, companyId: me.companyId, deletedAt: null },
           data: {
             currentEmployeeId: before.employeeId ?? undefined,
             status: before.employeeId ? 'OCCUPIED' : undefined,
             updatedById: me.sub,
           },
         });
+        if (position.count === 0) throw new NotFoundException('Posicao destino nao encontrada');
       }
       if (before.employeeId && before.proposedSalary) {
         await tx.compensationSalarySnapshot.create({
@@ -1330,6 +1337,19 @@ export class CompensationService {
     return movement;
   }
 
+  private async assertCompanyRef(
+    delegate: { findFirst: (args: any) => Promise<{ id: string } | null> },
+    companyId: string,
+    id: string | null | undefined,
+    message: string,
+    extraWhere: Record<string, unknown> = {},
+  ) {
+    if (!id) return null;
+    const found = await delegate.findFirst({ where: { id, companyId, ...extraWhere }, select: { id: true } });
+    if (!found) throw new NotFoundException(message);
+    return found.id;
+  }
+
   private jobDataFromBody(body: Record<string, unknown>, defaults: { name?: string; code?: string }) {
     const status = cleanString(body.status);
     if (status && !JOB_STATUSES.includes(status as any)) throw new BadRequestException('Status de cargo inválido');
@@ -1529,8 +1549,8 @@ export class CompensationService {
   }
 
   private async hasAnyPermission(me: AuthPayload, permissions: string[]) {
-    const user = await this.prisma.user.findUnique({
-      where: { id: me.sub },
+    const user = await this.prisma.user.findFirst({
+      where: { id: me.sub, companyId: me.companyId },
       select: {
         role: true,
         permissions: { select: { permission: { select: { key: true } } } },

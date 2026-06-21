@@ -98,7 +98,7 @@ export class PrizeProgramsService {
         createdById: me.sub,
       },
     });
-    await this.snapshot(program.id, me.sub, 'Criação do programa');
+    await this.snapshot(me.companyId, program.id, me.sub, 'Criação do programa');
     await this.audit.log(me, { action: 'CREATE', entityType: 'PROGRAM', entityId: program.id, after: program });
     return program;
   }
@@ -132,7 +132,7 @@ export class PrizeProgramsService {
         notes: dto.notes ?? undefined,
       },
     });
-    await this.snapshot(id, me.sub, 'Atualização da configuração');
+    await this.snapshot(me.companyId, id, me.sub, 'Atualização da configuração');
     await this.audit.log(me, { action: 'UPDATE', entityType: 'PROGRAM', entityId: id, before: current, after: updated });
     return updated;
   }
@@ -163,7 +163,7 @@ export class PrizeProgramsService {
         createdById: me.sub,
       },
     });
-    await this.snapshot(clone.id, me.sub, `Duplicado de ${src.code}`);
+    await this.snapshot(me.companyId, clone.id, me.sub, `Duplicado de ${src.code}`);
     await this.audit.log(me, { action: 'DUPLICATE', entityType: 'PROGRAM', entityId: clone.id, after: clone });
     return clone;
   }
@@ -201,8 +201,8 @@ export class PrizeProgramsService {
     if (exists) throw new ConflictException(`Já existe um programa com o código ${code}`);
   }
 
-  private async snapshot(programId: string, userId: string, note: string) {
-    const program = await this.prisma.prizeProgram.findUnique({ where: { id: programId } });
+  private async snapshot(companyId: string, programId: string, userId: string, note: string) {
+    const program = await this.prisma.prizeProgram.findFirst({ where: { id: programId, companyId } });
     if (!program) return;
     const last = await this.prisma.prizeProgramVersion.findFirst({
       where: { programId },

@@ -14,9 +14,8 @@ export class WorkflowExecutionEngine {
     private readonly moduleRef: ModuleRef
   ) {}
 
-  async processNode(instanceId: string, nodeKey: string, attemptNumber = 1): Promise<void> {
-    const instance = await this.prisma.workflowInstance.findUnique({
-      where: { id: instanceId },
+  async processNode(instanceId: string, nodeKey: string, attemptNumber = 1, companyId?: string): Promise<void> {
+    const instance = await this.loadInstance(instanceId, companyId, {
       include: {
         workflowVersion: {
           include: {
@@ -74,7 +73,7 @@ export class WorkflowExecutionEngine {
     }
 
     // Log the step initiation
-    await this.logExecution(instanceId, nodeExec.id, 'INFO', 'NODE_STARTED', `Iniciando execução do nó: ${node.name}`);
+    await this.logExecution(instanceId, nodeExec.id, 'INFO', 'NODE_STARTED', `Iniciando execução do nó: ${node.name}`, instance.companyId);
 
     const context = JSON.parse(instance.currentState);
     const nodeConfig = JSON.parse(node.configuration);
@@ -91,26 +90,26 @@ export class WorkflowExecutionEngine {
         case 'CONDITION':
           const evaluation = ExpressionEvaluator.evaluate(nodeConfig.condition, context);
           outputData = { result: evaluation };
-          await this.logExecution(instanceId, nodeExec.id, 'INFO', 'CONDITION_EVALUATED', `Condição [${node.name}] avaliada como ${evaluation}`);
+          await this.logExecution(instanceId, nodeExec.id, 'INFO', 'CONDITION_EVALUATED', `Condição [${node.name}] avaliada como ${evaluation}`, instance.companyId);
           break;
 
         case 'LOGIC':
           if (node.blockType === 'logic.if_else') {
             const ifEvaluation = ExpressionEvaluator.evaluate(nodeConfig.condition, context);
             outputData = { result: ifEvaluation };
-            await this.logExecution(instanceId, nodeExec.id, 'INFO', 'IF_ELSE_EVALUATED', `Desvio lógico se/senão avaliado como ${ifEvaluation}`);
+            await this.logExecution(instanceId, nodeExec.id, 'INFO', 'IF_ELSE_EVALUATED', `Desvio lógico se/senão avaliado como ${ifEvaluation}`, instance.companyId);
           } else if (node.blockType === 'logic.end_success') {
             await this.prisma.workflowInstance.update({
               where: { id: instanceId },
               data: { status: 'COMPLETED', completedAt: new Date() },
             });
-            await this.logExecution(instanceId, nodeExec.id, 'INFO', 'INSTANCE_COMPLETED_SUCCESS', 'Workflow finalizado com sucesso.');
+            await this.logExecution(instanceId, nodeExec.id, 'INFO', 'INSTANCE_COMPLETED_SUCCESS', 'Workflow finalizado com sucesso.', instance.companyId);
           } else if (node.blockType === 'logic.end_fail') {
             await this.prisma.workflowInstance.update({
               where: { id: instanceId },
               data: { status: 'FAILED', failedAt: new Date() },
             });
-            await this.logExecution(instanceId, nodeExec.id, 'ERROR', 'INSTANCE_COMPLETED_FAILED', `Workflow encerrado com erro configurado: ${nodeConfig.errorMessage || 'Falha programada'}`);
+            await this.logExecution(instanceId, nodeExec.id, 'ERROR', 'INSTANCE_COMPLETED_FAILED', `Workflow encerrado com erro configurado: ${nodeConfig.errorMessage || 'Falha programada'}`, instance.companyId);
           }
           break;
 
@@ -122,7 +121,7 @@ export class WorkflowExecutionEngine {
             where: { id: nodeExec.id },
             data: { status: 'RUNNING' }, // Halted, waiting for task response
           });
-          await this.logExecution(instanceId, nodeExec.id, 'INFO', 'TASK_CREATED', `Tarefa humana criada: "${task.title}". Execução pausada aguardando conclusão.`);
+          await this.logExecution(instanceId, nodeExec.id, 'INFO', 'TASK_CREATED', `Tarefa humana criada: "${task.title}". Execução pausada aguardando conclusão.`, instance.companyId);
           isHalted = true;
           break;
 
@@ -134,7 +133,7 @@ export class WorkflowExecutionEngine {
             where: { id: nodeExec.id },
             data: { status: 'RUNNING' }, // Halted, waiting for approval response
           });
-          await this.logExecution(instanceId, nodeExec.id, 'INFO', 'APPROVAL_CREATED', `Solicitação de aprovação criada. Tipo: ${approval.approvalType}. Execução pausada.`);
+          await this.logExecution(instanceId, nodeExec.id, 'INFO', 'APPROVAL_CREATED', `Solicitação de aprovação criada. Tipo: ${approval.approvalType}. Execução pausada.`, instance.companyId);
           isHalted = true;
           break;
 
@@ -151,12 +150,12 @@ export class WorkflowExecutionEngine {
           }
 
           if (delayMs > 0) {
-            await this.queueAdapter.enqueue('timer_trigger', { workflowInstanceId: instanceId, nodeKey }, delayMs);
+            await this.queueAdapter.enqueue('timer_trigger', { companyId: instance.companyId, workflowInstanceId: instanceId, nodeKey }, delayMs);
             await this.prisma.workflowNodeExecution.update({
               where: { id: nodeExec.id },
               data: { status: 'RUNNING' }, // Halted, waiting for timer
             });
-            await this.logExecution(instanceId, nodeExec.id, 'INFO', 'TIMER_SCHEDULED', `Timer agendado para rodar em ${new Date(Date.now() + delayMs).toISOString()}. Execução pausada.`);
+            await this.logExecution(instanceId, nodeExec.id, 'INFO', 'TIMER_SCHEDULED', `Timer agendado para rodar em ${new Date(Date.now() + delayMs).toISOString()}. Execução pausada.`, instance.companyId);
             isHalted = true;
           }
           break;
@@ -165,14 +164,14 @@ export class WorkflowExecutionEngine {
           const { WorkflowTemplateService } = await import('./workflow-template.service');
           const templateService = this.moduleRef.get(WorkflowTemplateService, { strict: false });
           outputData = await templateService.executeActionBlock(instance, node.blockType, nodeConfig, context);
-          await this.logExecution(instanceId, nodeExec.id, 'INFO', 'ACTION_EXECUTED', `Ação automática [${node.blockType}] executada com sucesso.`);
+          await this.logExecution(instanceId, nodeExec.id, 'INFO', 'ACTION_EXECUTED', `Ação automática [${node.blockType}] executada com sucesso.`, instance.companyId);
           break;
 
         case 'INTEGRATION':
           const { WorkflowIntegrationService } = await import('./workflow-integration.service');
           const integrationService = this.moduleRef.get(WorkflowIntegrationService, { strict: false });
           outputData = await integrationService.executeIntegrationBlock(instance, node.blockType, nodeConfig, context);
-          await this.logExecution(instanceId, nodeExec.id, 'INFO', 'INTEGRATION_EXECUTED', `Integração externa [${node.blockType}] executada com sucesso.`);
+          await this.logExecution(instanceId, nodeExec.id, 'INFO', 'INTEGRATION_EXECUTED', `Integração externa [${node.blockType}] executada com sucesso.`, instance.companyId);
           break;
       }
 
@@ -195,11 +194,11 @@ export class WorkflowExecutionEngine {
         });
 
         // Trigger next connected nodes
-        await this.triggerNextNodes(instanceId, nodeKey, updatedContext);
+        await this.triggerNextNodes(instanceId, nodeKey, updatedContext, instance.companyId);
       }
     } catch (error: any) {
       this.logger.error(`Error executing node ${nodeKey} for instance ${instanceId}: ${error.message}`, error.stack);
-      await this.logExecution(instanceId, nodeExec.id, 'ERROR', 'NODE_FAILED', `Falha na execução: ${error.message}`);
+      await this.logExecution(instanceId, nodeExec.id, 'ERROR', 'NODE_FAILED', `Falha na execução: ${error.message}`, instance.companyId);
 
       // Handle Retry Policy
       const maxAttempts = Number(nodeConfig.retryPolicy?.maxAttempts ?? 1);
@@ -214,8 +213,8 @@ export class WorkflowExecutionEngine {
             nextRetryAt: new Date(Date.now() + delaySeconds * 1000),
           },
         });
-        await this.logExecution(instanceId, nodeExec.id, 'WARNING', 'RETRY_SCHEDULED', `Re-execução agendada (tentativa ${attemptNumber + 1}/${maxAttempts}) em ${delaySeconds}s.`);
-        await this.queueAdapter.enqueue('retry_node', { workflowInstanceId: instanceId, nodeKey, attemptNumber: attemptNumber + 1 }, delaySeconds * 1000);
+        await this.logExecution(instanceId, nodeExec.id, 'WARNING', 'RETRY_SCHEDULED', `Re-execução agendada (tentativa ${attemptNumber + 1}/${maxAttempts}) em ${delaySeconds}s.`, instance.companyId);
+        await this.queueAdapter.enqueue('retry_node', { companyId: instance.companyId, workflowInstanceId: instanceId, nodeKey, attemptNumber: attemptNumber + 1 }, delaySeconds * 1000);
       } else {
         // Permanent failure
         await this.prisma.workflowNodeExecution.update({
@@ -254,10 +253,8 @@ export class WorkflowExecutionEngine {
     }
   }
 
-  async resumeInstance(instanceId: string, nodeKey: string, outputData: any): Promise<void> {
-    const instance = await this.prisma.workflowInstance.findUnique({
-      where: { id: instanceId },
-    });
+  async resumeInstance(instanceId: string, nodeKey: string, outputData: any, companyId?: string): Promise<void> {
+    const instance = await this.loadInstance(instanceId, companyId);
 
     if (!instance || instance.status !== 'RUNNING') {
       return;
@@ -293,15 +290,14 @@ export class WorkflowExecutionEngine {
       data: { currentState: JSON.stringify(updatedContext) },
     });
 
-    await this.logExecution(instanceId, nodeExec.id, 'INFO', 'NODE_RESUMED', `Nó retomado com sucesso.`);
+    await this.logExecution(instanceId, nodeExec.id, 'INFO', 'NODE_RESUMED', `Nó retomado com sucesso.`, instance.companyId);
 
     // Trigger next nodes
-    await this.triggerNextNodes(instanceId, nodeKey, updatedContext);
+    await this.triggerNextNodes(instanceId, nodeKey, updatedContext, instance.companyId);
   }
 
-  async triggerNextNodes(instanceId: string, nodeKey: string, variables: any): Promise<void> {
-    const instance = await this.prisma.workflowInstance.findUnique({
-      where: { id: instanceId },
+  async triggerNextNodes(instanceId: string, nodeKey: string, variables: any, companyId?: string): Promise<void> {
+    const instance = await this.loadInstance(instanceId, companyId, {
       include: {
         workflowVersion: {
           include: {
@@ -358,9 +354,15 @@ export class WorkflowExecutionEngine {
 
       if (shouldFollow) {
         this.logger.log(`Following edge: ${edge.sourceNodeKey} -> ${edge.targetNodeKey} (Handle: ${edge.sourceHandle})`);
-        await this.queueAdapter.enqueue('execute_node', { workflowInstanceId: instanceId, nodeKey: edge.targetNodeKey });
+        await this.queueAdapter.enqueue('execute_node', { companyId: instance.companyId, workflowInstanceId: instanceId, nodeKey: edge.targetNodeKey });
       }
     }
+  }
+
+  private async loadInstance(instanceId: string, companyId?: string, args: Record<string, unknown> = {}): Promise<any> {
+    return companyId
+      ? this.prisma.workflowInstance.findFirst({ where: { id: instanceId, companyId }, ...args })
+      : this.prisma.workflowInstance.findFirst({ where: { id: instanceId }, ...args });
   }
 
   private async logExecution(
@@ -368,10 +370,11 @@ export class WorkflowExecutionEngine {
     nodeExecutionId: string | null,
     level: 'INFO' | 'WARNING' | 'ERROR',
     eventType: string,
-    message: string
+    message: string,
+    companyId: string,
   ): Promise<void> {
-    const instance = await this.prisma.workflowInstance.findUnique({
-      where: { id: instanceId },
+    const instance = await this.prisma.workflowInstance.findFirst({
+      where: { id: instanceId, companyId },
     });
 
     if (!instance) return;

@@ -1,8 +1,10 @@
 import { Body, Controller, Post, Req, UseGuards } from '@nestjs/common';
+import { UserRoleEnum } from '@prisma/client';
 import { Request } from 'express';
 import { SuperAdminDbGuard } from '../guards/super-admin-db.guard';
 import { DbAdminSubmenuTag } from '../decorators/db-admin-submenu.decorator';
 import { CurrentUser } from '../../../common/decorators/current-user.decorator';
+import { Roles } from '../../../common/decorators/roles.decorator';
 import { AuthPayload } from '../../auth/auth.types';
 import { ExportService, ExportFormat } from '../services/export.service';
 import { ImportService, ImportFormat, ImportStrategy } from '../services/import.service';
@@ -12,6 +14,7 @@ function meta(req: Request) {
 }
 
 @Controller('admin/database')
+@Roles(UserRoleEnum.SUPER_ADMIN)
 @UseGuards(SuperAdminDbGuard)
 @DbAdminSubmenuTag('import-export')
 export class ImportExportController {

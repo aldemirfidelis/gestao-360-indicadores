@@ -64,8 +64,8 @@ export class PrizeActualsService {
     const week = dto.week ?? 0;
     const day = dto.day ?? 0;
 
-    const existing = await this.prisma.prizeActualResult.findUnique({
-      where: { competenceId_indicatorId_scopeKey_week_day: { competenceId, indicatorId: dto.indicatorId, scopeKey, week, day } },
+    const existing = await this.prisma.prizeActualResult.findFirst({
+      where: { companyId: me.companyId, competenceId, indicatorId: dto.indicatorId, scopeKey, week, day },
     });
 
     // Edicao manual de um realizado ja validado/pendente exige justificativa.

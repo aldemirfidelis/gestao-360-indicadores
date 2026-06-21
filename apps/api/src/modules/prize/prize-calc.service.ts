@@ -41,7 +41,7 @@ export class PrizeCalcService {
       this.prisma.prizeException.findMany({ where: { companyId: me.companyId, competenceId, status: 'APPROVED' } }),
       this.prisma.prizeTemporaryAllocation.findMany({ where: { companyId: me.companyId, competenceId } }),
       this.prisma.prizeAnnexVersion.findMany({ where: { status: 'EFFECTIVE', annex: { companyId: me.companyId, programId: competence.programId } }, include: { annex: true } }),
-      this.prisma.prizeProgram.findFirst({ where: { id: competence.programId } }),
+      this.prisma.prizeProgram.findFirst({ where: { id: competence.programId, companyId: me.companyId } }),
     ]);
 
     if (snapshot.length === 0) throw new BadRequestException('Importe a base elegível (Apdata) antes de apurar');
@@ -91,7 +91,9 @@ export class PrizeCalcService {
         for (const ind of engInds) {
           const act = actualByIndicator.get(ind.indicatorId);
           if (act?.parameterId) {
-            const p = await this.prisma.prizeIndicatorParameter.findUnique({ where: { id: act.parameterId } });
+            const p = await this.prisma.prizeIndicatorParameter.findFirst({
+              where: { id: act.parameterId, indicator: { companyId: me.companyId } },
+            });
             ind.target = p ? num(p.target) : null;
             ind.zero = p ? num(p.zero) : null;
           }

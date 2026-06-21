@@ -1,6 +1,8 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { ExpressionEvaluator } from './expression-evaluator';
+import { WorkflowApprovalService } from './workflow-approval.service';
 import { WorkflowExecutionEngine } from './workflow-engine.service';
+import { WorkflowTaskService } from './workflow-task.service';
 
 describe('Workflow - ExpressionEvaluator', () => {
   const context = {
@@ -90,6 +92,17 @@ describe('Workflow - WorkflowExecutionEngine', () => {
             edges: [],
           },
         }),
+        findFirst: vi.fn().mockResolvedValue({
+          id: 'inst-1',
+          companyId: 'company-1',
+          status: 'RUNNING',
+          currentState: JSON.stringify({ value: 85 }),
+          workflowVersion: {
+            id: 'ver-1',
+            nodes,
+            edges: [],
+          },
+        }),
         update: vi.fn().mockResolvedValue({}),
       },
       workflowNodeExecution: {
@@ -127,6 +140,63 @@ describe('Workflow - WorkflowExecutionEngine', () => {
         status: 'COMPLETED',
         outputData: JSON.stringify({ result: true }),
       }),
+    });
+  });
+
+  it('nao processa instancia de outra empresa quando companyId e informado', async () => {
+    const prismaMock: any = {
+      workflowInstance: {
+        findFirst: vi.fn().mockResolvedValue(null),
+        findUnique: vi.fn(),
+        update: vi.fn(),
+      },
+      workflowNodeExecution: {
+        create: vi.fn(),
+        update: vi.fn(),
+      },
+    };
+
+    const engine = new WorkflowExecutionEngine(prismaMock, { enqueue: vi.fn() } as any, { get: vi.fn() } as any);
+    await engine.processNode('inst-cross', 'node-1', 1, 'company-1');
+
+    expect(prismaMock.workflowInstance.findFirst).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: { id: 'inst-cross', companyId: 'company-1' },
+      }),
+    );
+    expect(prismaMock.workflowNodeExecution.create).not.toHaveBeenCalled();
+    expect(prismaMock.workflowInstance.findUnique).not.toHaveBeenCalled();
+  });
+});
+
+describe('Workflow - tenant isolation helpers', () => {
+  it('WorkflowTaskService: usuario explicito precisa pertencer a empresa', async () => {
+    const prismaMock: any = {
+      user: { findFirst: vi.fn().mockResolvedValue(null) },
+    };
+    const service = new WorkflowTaskService(prismaMock, { markDirty: vi.fn() } as any);
+
+    const resolved = await service.resolveResponsible('company-1', { type: 'USER', userId: 'user-other' }, {}, {});
+
+    expect(resolved).toBeNull();
+    expect(prismaMock.user.findFirst).toHaveBeenCalledWith({
+      where: { id: 'user-other', companyId: 'company-1', active: true },
+      select: { id: true },
+    });
+  });
+
+  it('WorkflowApprovalService: aprovador explicito precisa pertencer a empresa', async () => {
+    const prismaMock: any = {
+      user: { findFirst: vi.fn().mockResolvedValue(null) },
+    };
+    const service = new WorkflowApprovalService(prismaMock, { markDirty: vi.fn() } as any);
+
+    const resolved = await service.resolveApprover('company-1', { type: 'USER', userId: 'user-other' }, {}, {});
+
+    expect(resolved).toBeNull();
+    expect(prismaMock.user.findFirst).toHaveBeenCalledWith({
+      where: { id: 'user-other', companyId: 'company-1', active: true },
+      select: { id: true },
     });
   });
 });

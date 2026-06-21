@@ -1,12 +1,15 @@
 import { Body, Controller, Post, Req, UseGuards } from '@nestjs/common';
+import { UserRoleEnum } from '@prisma/client';
 import { Request } from 'express';
 import { SuperAdminDbGuard } from '../guards/super-admin-db.guard';
 import { DbAdminSubmenuTag } from '../decorators/db-admin-submenu.decorator';
 import { CurrentUser } from '../../../common/decorators/current-user.decorator';
+import { Roles } from '../../../common/decorators/roles.decorator';
 import { AuthPayload } from '../../auth/auth.types';
 import { StructureService } from '../services/structure.service';
 
 @Controller('admin/database/structure')
+@Roles(UserRoleEnum.SUPER_ADMIN)
 @UseGuards(SuperAdminDbGuard)
 @DbAdminSubmenuTag('structure')
 export class StructureController {

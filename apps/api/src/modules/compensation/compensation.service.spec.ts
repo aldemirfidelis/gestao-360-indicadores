@@ -1,4 +1,4 @@
-import { ConflictException } from '@nestjs/common';
+import { ConflictException, NotFoundException } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
 import { describe, expect, it, vi } from 'vitest';
 import { CompensationService } from './compensation.service';
@@ -79,6 +79,10 @@ describe('CompensationService', () => {
     const created = { id: 'mov-1', protocol: 'MOV-2026-0001' };
     const prisma: any = {
       compensationMovementRequest: { create: vi.fn().mockResolvedValue(created) },
+      orgEmployee: { findFirst: vi.fn().mockResolvedValue({ id: 'emp-1' }) },
+      compensationPosition: { findFirst: vi.fn().mockResolvedValue(null) },
+      orgJob: { findFirst: vi.fn().mockResolvedValue(null) },
+      user: { findFirst: vi.fn().mockResolvedValue(null) },
       auditLog: { create: vi.fn().mockResolvedValue({ id: 'audit-1' }) },
     };
     const service = new CompensationService(prisma, notificationsStub, documentsStub);
@@ -151,5 +155,89 @@ describe('CompensationService', () => {
     const rejected = await service.decideMovement(me, 'mov-2', 'REJECTED', 'Fora da política');
     expect(rejected.status).toBe('REJECTED');
   });
-});
 
+  it('blocks movement creation with employee from another company', async () => {
+    const prisma: any = {
+      compensationMovementRequest: { create: vi.fn() },
+      orgEmployee: { findFirst: vi.fn().mockResolvedValue(null) },
+      compensationPosition: { findFirst: vi.fn().mockResolvedValue(null) },
+      orgJob: { findFirst: vi.fn().mockResolvedValue(null) },
+      user: { findFirst: vi.fn().mockResolvedValue(null) },
+    };
+    const service = new CompensationService(prisma, notificationsStub, documentsStub);
+    (service as any).nextMovementProtocol = vi.fn().mockResolvedValue('MOV-2026-0002');
+
+    await expect(
+      service.createMovement(me, {
+        type: 'ENQUADRAMENTO',
+        employeeId: 'emp-other',
+        effectiveAt: '2026-07-01',
+        reason: 'Ajuste de faixa',
+        justification: 'Nao deve aceitar colaborador de outra empresa',
+      }),
+    ).rejects.toBeInstanceOf(NotFoundException);
+
+    expect(prisma.orgEmployee.findFirst).toHaveBeenCalledWith({
+      where: { id: 'emp-other', companyId: 'company-1' },
+      select: { id: true },
+    });
+    expect(prisma.compensationMovementRequest.create).not.toHaveBeenCalled();
+  });
+
+  it('applies movement without updating a target position from another company', async () => {
+    const tx: any = {
+      orgEmployee: { updateMany: vi.fn().mockResolvedValue({ count: 1 }) },
+      compensationPosition: { updateMany: vi.fn().mockResolvedValue({ count: 0 }) },
+      compensationSalarySnapshot: { create: vi.fn() },
+      compensationAllocationHistory: { create: vi.fn() },
+      compensationMovementRequest: { update: vi.fn() },
+    };
+    const prisma: any = {
+      $transaction: vi.fn(async (fn: any) => fn(tx)),
+      auditLog: { create: vi.fn() },
+    };
+    const service = new CompensationService(prisma, notificationsStub, documentsStub);
+    (service as any).getMovement = vi.fn().mockResolvedValue({
+      id: 'mov-1',
+      protocol: 'MOV-1',
+      status: 'APPROVED',
+      requesterId: 'req-1',
+      employeeId: 'emp-1',
+      targetPositionId: 'pos-other',
+      targetJobId: null,
+      currentJobId: null,
+      targetBand: null,
+      proposedSalary: null,
+      effectiveAt: new Date('2026-07-01'),
+      reason: 'Ajuste',
+      justification: 'Teste',
+    });
+
+    await expect(service.applyMovement(me, 'mov-1')).rejects.toBeInstanceOf(NotFoundException);
+
+    expect(tx.compensationPosition.updateMany).toHaveBeenCalledWith({
+      where: { id: 'pos-other', companyId: 'company-1', deletedAt: null },
+      data: expect.objectContaining({ currentEmployeeId: 'emp-1' }),
+    });
+    expect(tx.compensationMovementRequest.update).not.toHaveBeenCalled();
+  });
+
+  it('checks movement permissions only on the current company user', async () => {
+    const prisma: any = {
+      user: { findFirst: vi.fn().mockResolvedValue(null) },
+    };
+    const service = new CompensationService(prisma, notificationsStub, documentsStub);
+
+    const allowed = await (service as any).hasAnyPermission(me, ['compensation:movements:approve']);
+
+    expect(allowed).toBe(false);
+    expect(prisma.user.findFirst).toHaveBeenCalledWith({
+      where: { id: 'user-1', companyId: 'company-1' },
+      select: {
+        role: true,
+        permissions: { select: { permission: { select: { key: true } } } },
+        accessProfile: { select: { permissions: { select: { permission: { select: { key: true } } } } } },
+      },
+    });
+  });
+});

@@ -1,9 +1,12 @@
 import { Controller, Get, Query, UseGuards } from '@nestjs/common';
+import { UserRoleEnum } from '@prisma/client';
 import { SuperAdminDbGuard } from '../guards/super-admin-db.guard';
 import { DbAdminSubmenuTag } from '../decorators/db-admin-submenu.decorator';
+import { Roles } from '../../../common/decorators/roles.decorator';
 import { DbAdminAuditService } from '../services/db-admin-audit.service';
 
 @Controller('admin/database/audit')
+@Roles(UserRoleEnum.SUPER_ADMIN)
 @UseGuards(SuperAdminDbGuard)
 @DbAdminSubmenuTag('audit')
 export class DbAuditController {

@@ -1,8 +1,10 @@
 import { BadRequestException, Body, Controller, Delete, Get, Param, Post, Req, UseGuards } from '@nestjs/common';
+import { UserRoleEnum } from '@prisma/client';
 import { Request } from 'express';
 import { SuperAdminDbGuard } from '../guards/super-admin-db.guard';
 import { DbAdminSubmenuTag } from '../decorators/db-admin-submenu.decorator';
 import { CurrentUser } from '../../../common/decorators/current-user.decorator';
+import { Roles } from '../../../common/decorators/roles.decorator';
 import { AuthPayload } from '../../auth/auth.types';
 import { BackupService } from '../services/backup.service';
 import { ImportService } from '../services/import.service';
@@ -12,6 +14,7 @@ import { assertInAllowlist, quoteIdent } from '../util/identifier.util';
 import { DB_ADMIN_LIMITS } from '../database-admin.constants';
 
 @Controller('admin/database/backups')
+@Roles(UserRoleEnum.SUPER_ADMIN)
 @UseGuards(SuperAdminDbGuard)
 @DbAdminSubmenuTag('backup')
 export class BackupController {

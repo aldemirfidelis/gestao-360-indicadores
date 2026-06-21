@@ -47,8 +47,8 @@ export class PrizeEligibleService {
 
   async canSeeSalary(me: AuthPayload): Promise<boolean> {
     if (me.role === 'SUPER_ADMIN' || me.role === 'COMPANY_ADMIN') return true;
-    const user = await this.prisma.user.findUnique({
-      where: { id: me.sub },
+    const user = await this.prisma.user.findFirst({
+      where: { id: me.sub, companyId: me.companyId },
       select: {
         permissions: { select: { permission: { select: { key: true } } } },
         accessProfile: { select: { permissions: { select: { permission: { select: { key: true } } } } } },

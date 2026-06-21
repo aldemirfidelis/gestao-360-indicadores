@@ -607,8 +607,8 @@ export class MonthlyResultsService {
 
   private async onClose(me: AuthPayload, id: string) {
     // Inicia execução das ações vinculadas à reunião
-    const meeting = await this.prisma.monthlyMeeting.findUnique({
-      where: { id },
+    const meeting = await this.prisma.monthlyMeeting.findFirst({
+      where: { id, companyId: me.companyId },
       include: { indicators: { select: { actionPlanId: true } }, decisions: { select: { actionPlanId: true, ownerUserId: true } }, participants: { select: { userId: true } } },
     });
     if (!meeting) return;

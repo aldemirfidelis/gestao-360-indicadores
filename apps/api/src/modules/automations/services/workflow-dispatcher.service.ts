@@ -59,9 +59,9 @@ export class WorkflowEventDispatcher {
     }
   }
 
-  async processEvent(eventId: string): Promise<void> {
-    const event = await this.prisma.workflowEvent.findUnique({
-      where: { id: eventId },
+  async processEvent(eventId: string, companyId?: string): Promise<void> {
+    const event = await this.prisma.workflowEvent.findFirst({
+      where: { id: eventId, ...(companyId ? { companyId } : {}) },
     });
 
     if (!event || event.status !== 'PENDING') {

@@ -1,11 +1,14 @@
 import { Controller, Get, Param, UseGuards } from '@nestjs/common';
+import { UserRoleEnum } from '@prisma/client';
 import { SuperAdminDbGuard } from '../guards/super-admin-db.guard';
 import { DbAdminSubmenuTag } from '../decorators/db-admin-submenu.decorator';
+import { Roles } from '../../../common/decorators/roles.decorator';
 import { SchemaInspectionService } from '../services/schema-inspection.service';
 import { assertInAllowlist } from '../util/identifier.util';
 import { getTableCatalogEntry } from '../table-catalog';
 
 @Controller('admin/database/tables')
+@Roles(UserRoleEnum.SUPER_ADMIN)
 @UseGuards(SuperAdminDbGuard)
 @DbAdminSubmenuTag('tables')
 export class TablesController {

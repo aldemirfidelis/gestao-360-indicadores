@@ -1,6 +1,7 @@
 import { Controller, Get, Query } from '@nestjs/common';
 import { DirectoryService } from './directory.service';
 import { CurrentUser } from '../../../common/decorators/current-user.decorator';
+import { RequirePermissions } from '../../../common/decorators/permissions.decorator';
 import { AuthPayload } from '../../auth/auth.types';
 
 /**
@@ -9,6 +10,7 @@ import { AuthPayload } from '../../auth/auth.types';
  * O Super Admin pode ocultar/colocar em manutenção o módulo via Central do Portal.
  */
 @Controller('communication/directory')
+@RequirePermissions('directory:view')
 export class DirectoryController {
   constructor(private readonly service: DirectoryService) {}
 

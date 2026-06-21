@@ -1,9 +1,12 @@
 import { Controller, Get, Query, UseGuards } from '@nestjs/common';
+import { UserRoleEnum } from '@prisma/client';
 import { SuperAdminDbGuard } from '../guards/super-admin-db.guard';
 import { DbAdminSubmenuTag } from '../decorators/db-admin-submenu.decorator';
+import { Roles } from '../../../common/decorators/roles.decorator';
 import { SchemaInspectionService } from '../services/schema-inspection.service';
 
 @Controller('admin/database')
+@Roles(UserRoleEnum.SUPER_ADMIN)
 @UseGuards(SuperAdminDbGuard)
 export class SchemaController {
   constructor(private readonly schema: SchemaInspectionService) {}
