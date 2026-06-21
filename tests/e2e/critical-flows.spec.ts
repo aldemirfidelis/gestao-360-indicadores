@@ -81,9 +81,11 @@ test('resultado vermelho gera alerta e tratativa automatica na API', async () =>
 test('resultado vermelho aparece na tela do indicador com tratativa', async ({ page }) => {
   await openAsAdmin(page, `/indicators/${redIndicator.id}`);
 
-  await expect(page.getByText('E2E Resultado vermelho')).toBeVisible();
-  await expect(page.getByText('Desvio principal')).toBeVisible();
-  await expect(page.getByText(/Abrir tratativa em andamento|Ver fila de tratativas/)).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'E2E Resultado vermelho' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Desvio principal' })).toBeVisible();
+  await expect(
+    page.getByRole('link', { name: /Abrir tratativa em andamento|Ver fila de tratativas/ }).first(),
+  ).toBeVisible();
 });
 
 test('cria desvio a partir de indicador fora do alvo', async ({ request }) => {

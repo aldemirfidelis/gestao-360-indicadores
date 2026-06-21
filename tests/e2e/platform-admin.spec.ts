@@ -12,9 +12,9 @@ test('Platform Admin faz login, seleciona empresa e lista usuarios', async ({ pa
   await expect(page.getByText('Portal Administrativo Global').first()).toBeVisible();
 
   await page.getByRole('button', { name: 'Usuários' }).click();
-  await expect(page.getByText(/Usu.rios das empresas/)).toBeVisible();
+  await expect(page.getByRole('heading', { name: /Usu.rios da empresa/ })).toBeVisible();
 
-  const companySelect = page.locator('header select');
+  const companySelect = page.locator('select').first();
   await expect(companySelect).toBeVisible();
   const selectedCompany = await companySelect.inputValue();
   expect(selectedCompany).toBeTruthy();
