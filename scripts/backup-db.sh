@@ -56,6 +56,16 @@ ls -1t "$BACKUP_DIR"/g360-*.dump 2>/dev/null | tail -n +"$((KEEP + 1))" | xargs 
 
 echo "[$(date -Is)] Backup OK: $OUT ($(du -h "$OUT" | cut -f1)). Mantidos os $KEEP mais recentes."
 
+# --- Monitoramento de espaco (item 16: volume g360_pgdata e disco do backup) ---
+WARN_PCT="${DISK_WARN_PCT:-85}"
+DISK_USE="$(df -P "$BACKUP_DIR" 2>/dev/null | awk 'NR==2{gsub("%","",$5); print $5}')"
+if [ -n "${DISK_USE:-}" ] && [ "$DISK_USE" -ge "$WARN_PCT" ]; then
+  echo "[$(date -Is)] AVISO: disco do backup em ${DISK_USE}% (limite ${WARN_PCT}%). Libere espaco ou reduza KEEP." >&2
+fi
+PG_SIZE="$(docker compose -f "$COMPOSE_FILE" exec -T postgres \
+  psql -U "$POSTGRES_USER" -d "$POSTGRES_DB" -tAc "SELECT pg_size_pretty(pg_database_size('$POSTGRES_DB'))" 2>/dev/null | tr -d '[:space:]')"
+[ -n "${PG_SIZE:-}" ] && echo "[$(date -Is)] Tamanho do banco $POSTGRES_DB (volume g360_pgdata): $PG_SIZE."
+
 # --- Copia off-site (opcional): DigitalOcean Spaces / S3 ---
 if [ "${OFFSITE_BACKUP:-0}" = "1" ]; then
   if command -v aws >/dev/null 2>&1 && [ -n "${S3_BUCKET:-}" ] && [ -n "${S3_ENDPOINT:-}" ]; then

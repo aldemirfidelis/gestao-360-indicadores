@@ -1,0 +1,145 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  # ---------------------------------------------------------------------------
+  # Gate principal: deterministico, sem banco (testes da API mockam o Prisma).
+  # Espelha o checklist de producao (docs/CHECKLIST_PRODUCAO.md).
+  # ---------------------------------------------------------------------------
+  quality:
+    name: Lint, typecheck, testes e build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 9.7.0
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: pnpm
+
+      - name: Install
+        run: pnpm install --frozen-lockfile
+
+      - name: Build do pacote compartilhado
+        run: pnpm shared:build
+
+      - name: Prisma generate
+        run: pnpm --filter @g360/api exec prisma generate
+
+      - name: Prisma validate
+        run: pnpm --filter @g360/api exec prisma validate
+
+      - name: Typecheck API
+        run: pnpm --filter @g360/api exec tsc --noEmit --pretty false
+
+      - name: Typecheck Web
+        run: pnpm --filter @g360/web exec tsc --noEmit
+
+      - name: Testes unitarios da API
+        run: pnpm --filter @g360/api test
+
+      - name: Build (API + Web)
+        run: pnpm build
+        env:
+          NODE_OPTIONS: --max-old-space-size=4096
+
+  # ---------------------------------------------------------------------------
+  # E2E: sobe Postgres + Redis como service containers, aplica migrations,
+  # roda o seed e executa o Playwright (que sobe API e Web).
+  # ---------------------------------------------------------------------------
+  e2e:
+    name: E2E (Playwright + Postgres)
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: g360
+          POSTGRES_PASSWORD: g360
+          POSTGRES_DB: g360
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U g360 -d g360"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 12
+      redis:
+        image: redis:7-alpine
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 5s
+          --health-timeout 3s
+          --health-retries 12
+    env:
+      DATABASE_URL: postgresql://g360:g360@localhost:5432/g360?schema=public
+      DIRECT_URL: postgresql://g360:g360@localhost:5432/g360?schema=public
+      REDIS_HOST: localhost
+      REDIS_PORT: 6379
+      JWT_ACCESS_SECRET: ci-access-secret-0123456789-abcdef-0123456789
+      JWT_REFRESH_SECRET: ci-refresh-secret-0123456789-abcdef-0123456789
+      API_CORS_ORIGIN: http://localhost:3000
+      NEXT_PUBLIC_API_URL: http://127.0.0.1:3333/api
+      PLATFORM_ADMIN_BOOTSTRAP_EMAIL: platform@demo.com
+      PLATFORM_ADMIN_BOOTSTRAP_PASSWORD: admin123
+      PLATFORM_ADMIN_BOOTSTRAP_NAME: Platform Owner
+      E2E_API_URL: http://127.0.0.1:3333/api
+      E2E_WEB_URL: http://localhost:3000
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 9.7.0
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: pnpm
+
+      - name: Install
+        run: pnpm install --frozen-lockfile
+
+      - name: Build do pacote compartilhado
+        run: pnpm shared:build
+
+      - name: Prisma generate
+        run: pnpm --filter @g360/api exec prisma generate
+
+      - name: Aplicar migrations
+        run: pnpm --filter @g360/api exec prisma migrate deploy
+
+      - name: Seed do banco de teste
+        run: pnpm --filter @g360/api exec tsx prisma/seed.ts
+
+      - name: Instalar Chromium do Playwright
+        run: pnpm exec playwright install --with-deps chromium
+
+      - name: Rodar E2E
+        run: pnpm test:e2e
+
+      - name: Upload do relatorio Playwright (em falha)
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-report
+          path: playwright-report/
+          retention-days: 7
