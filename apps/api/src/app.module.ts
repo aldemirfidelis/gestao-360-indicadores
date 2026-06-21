@@ -55,6 +55,9 @@ import { WorkItemEventsModule } from './modules/my-day/work-item-event-bus';
 import { PrizeModule } from './modules/prize/prize.module';
 import { CompensationModule } from './modules/compensation/compensation.module';
 import { MonthlyResultsModule } from './modules/monthly-results/monthly-results.module';
+import { StorageModule } from './storage/storage.module';
+import { JobsModule } from './jobs/jobs.module';
+import { workersEnabled } from './jobs/jobs.constants';
 
 @Module({
   imports: [
@@ -111,6 +114,9 @@ import { MonthlyResultsModule } from './modules/monthly-results/monthly-results.
     PrizeModule,
     CompensationModule,
     MonthlyResultsModule,
+    StorageModule,
+    // Workers BullMQ: importados apenas quando WORKERS_ENABLED=true (sem Redis no boot padrão).
+    ...(workersEnabled() ? [JobsModule] : []),
   ],
   providers: [
     { provide: APP_GUARD, useClass: ThrottlerGuard },
