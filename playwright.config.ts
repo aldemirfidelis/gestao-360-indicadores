@@ -20,7 +20,7 @@ export default defineConfig({
       command: 'pnpm --filter @g360/api dev',
       url: `${apiBaseURL}/health`,
       reuseExistingServer: !process.env.CI,
-      timeout: 180_000,
+      timeout: Number(process.env.E2E_WEBSERVER_TIMEOUT ?? 420_000),
       env: {
         API_CORS_ORIGIN: webBaseURL,
       },
@@ -29,7 +29,7 @@ export default defineConfig({
       command: 'pnpm --filter @g360/web dev',
       url: webBaseURL,
       reuseExistingServer: !process.env.CI,
-      timeout: 180_000,
+      timeout: Number(process.env.E2E_WEBSERVER_TIMEOUT ?? 420_000),
       env: {
         NEXT_PUBLIC_API_URL: apiBaseURL,
       },

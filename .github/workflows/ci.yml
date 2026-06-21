@@ -124,11 +124,15 @@ jobs:
       - name: Prisma generate
         run: pnpm --filter @g360/api exec prisma generate
 
-      - name: Aplicar migrations
-        run: pnpm --filter @g360/api exec prisma migrate deploy
+      # NOTA: o historico de migrations ainda nao constroi o schema do zero
+      # (falta CREATE TABLE de OrgEmployee/OrgJob — so existem ALTERs). Para o
+      # banco EFEMERO de e2e usamos db push (schema atual). Corrigir as migrations
+      # para um build limpo e item separado.
+      - name: Construir schema do banco de teste (db push)
+        run: pnpm --filter @g360/api exec prisma db push --skip-generate
 
       - name: Seed do banco de teste
-        run: pnpm --filter @g360/api exec tsx prisma/seed.ts
+        run: pnpm --filter @g360/api prisma:seed
 
       - name: Instalar Chromium do Playwright
         run: pnpm exec playwright install --with-deps chromium
