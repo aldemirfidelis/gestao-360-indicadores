@@ -2,6 +2,8 @@ import { Module } from '@nestjs/common';
 import { BullModule } from '@nestjs/bullmq';
 import { PrismaModule } from '../prisma/prisma.module';
 import { NotificationsModule } from '../modules/notifications/notifications.module';
+import { AutomationsModule } from '../modules/automations/automations.module';
+import { PrizeModule } from '../modules/prize/prize.module';
 import {
   AUTOMATIONS_QUEUE,
   NOTIFICATIONS_QUEUE,
@@ -10,6 +12,8 @@ import {
   redisConnection,
 } from './jobs.constants';
 import { NotificationsProcessor } from './notifications.processor';
+import { AutomationsProcessor } from './automations.processor';
+import { PrizeProcessor } from './prize.processor';
 import { JobsScheduler } from './jobs.scheduler';
 
 /**
@@ -32,7 +36,9 @@ import { JobsScheduler } from './jobs.scheduler';
     ),
     PrismaModule,
     NotificationsModule,
+    AutomationsModule,
+    PrizeModule,
   ],
-  providers: [NotificationsProcessor, JobsScheduler],
+  providers: [NotificationsProcessor, AutomationsProcessor, PrizeProcessor, JobsScheduler],
 })
 export class JobsModule {}

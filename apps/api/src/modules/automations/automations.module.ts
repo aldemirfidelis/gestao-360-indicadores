@@ -35,6 +35,7 @@ import { WorkflowIntegrationService } from './services/workflow-integration.serv
     WorkflowEventDispatcher,
     WorkflowTaskService,
     WorkflowApprovalService,
+    WorkflowQueueAdapter,
   ],
 })
 export class AutomationsModule {}
