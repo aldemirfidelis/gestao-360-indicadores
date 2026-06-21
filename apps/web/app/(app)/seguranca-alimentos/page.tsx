@@ -4,15 +4,7 @@ import Link from 'next/link';
 import { useEffect, useMemo, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
-import ReactFlow, {
-  Background,
-  Controls,
-  MiniMap,
-  ReactFlowProvider,
-  useNodesState,
-  type Node,
-} from 'reactflow';
-import 'reactflow/dist/style.css';
+import dynamic from 'next/dynamic';
 import {
   AlertTriangle,
   Brain,
@@ -48,6 +40,14 @@ import { IntelligenceTab } from '@/components/food-safety/intelligence-tab';
 import { SupplyChainTab } from '@/components/food-safety/supply-chain-tab';
 import { api } from '@/lib/api';
 import { cn, formatDate, formatNumber } from '@/lib/utils';
+import { LoadingState } from '@/components/platform/loading-state';
+
+// React Flow (+CSS) e pesado e so e necessario na aba Fluxograma; carrega sob
+// demanda para nao entrar no bundle inicial da pagina de Seguranca de Alimentos.
+const ProcessFlow = dynamic(
+  () => import('@/components/seguranca-alimentos/process-flow').then((m) => m.ProcessFlow),
+  { ssr: false, loading: () => <LoadingState label="Carregando fluxograma..." /> },
+);
 
 // ----------------------------- tipos --------------------------------------
 type ProgramStatus = 'ACTIVE' | 'DRAFT' | 'ARCHIVED';
@@ -454,7 +454,16 @@ export default function SegurancaAlimentosPage() {
           {tab === 'chain' && <SupplyChainTab programId={programId} canManage={canManage} users={options.data?.users ?? []} processes={processes.data ?? []} />}
           {tab === 'intelligence' && <IntelligenceTab programId={programId} canManage={canManage} />}
           {tab === 'flow' && (
-            <FlowTab processes={processes.data ?? []} canManage={canManage} onOpen={(p) => setProcessDialog(p)} onChanged={invalidate} />
+            <ProcessFlow
+              processes={processes.data ?? []}
+              canManage={canManage}
+              onOpenId={(id) => {
+                const p = (processes.data ?? []).find((x) => x.id === id);
+                if (p) setProcessDialog(p);
+              }}
+              onChanged={invalidate}
+              statusLabel={PROCESS_STATUS_LABEL}
+            />
           )}
           {tab === 'matrix' && <MatrixTab processes={processes.data ?? []} hazards={hazards} />}
         </>
@@ -676,108 +685,6 @@ function ProcessesTab({
   );
 }
 
-// ----------------------------- Fluxograma ---------------------------------
-function FlowTab({ processes, canManage, onOpen, onChanged }: { processes: Process[]; canManage: boolean; onOpen: (p: Process) => void; onChanged: () => void }) {
-  return (
-    <ReactFlowProvider>
-      <FlowCanvas processes={processes} canManage={canManage} onOpen={onOpen} onChanged={onChanged} />
-    </ReactFlowProvider>
-  );
-}
-
-function FlowCanvas({ processes, canManage, onOpen, onChanged }: { processes: Process[]; canManage: boolean; onOpen: (p: Process) => void; onChanged: () => void }) {
-  const [nodes, setNodes, onNodesChange] = useNodesState([]);
-
-  const persist = useMutation({
-    mutationFn: ({ id, positionX, positionY }: { id: string; positionX: number; positionY: number }) =>
-      api(`/food-safety/processes/${id}`, { method: 'PATCH', json: { positionX, positionY } }),
-    onError: (e: any) => toast.error(e?.message ?? 'Falha ao salvar posição'),
-    onSuccess: () => onChanged(),
-  });
-
-  useEffect(() => {
-    setNodes(
-      processes.map((p, i) => ({
-        id: p.id,
-        position: { x: p.positionX ?? (i % 4) * 260 + 20, y: p.positionY ?? Math.floor(i / 4) * 150 + 20 },
-        data: { label: p },
-        type: 'default',
-        style: {
-          width: 220,
-          borderRadius: 10,
-          border: '2px solid',
-          borderColor: p.status === 'PUBLISHED' || p.status === 'APPROVED' ? '#16a34a' : p.status === 'OBSOLETE' ? '#dc2626' : '#94a3b8',
-          background: 'white',
-          padding: 0,
-        },
-      })),
-    );
-  }, [processes, setNodes]);
-
-  const nodeContent = useMemo(
-    () =>
-      ({ id }: Node) => {
-        const p = processes.find((x) => x.id === id);
-        return p;
-      },
-    [processes],
-  );
-
-  return (
-    <Card>
-      <CardContent className="p-0">
-        <div className="h-[68vh] rounded-md bg-muted/5">
-          <ReactFlow
-            nodes={nodes.map((n) => {
-              const p = nodeContent(n);
-              return {
-                ...n,
-                data: {
-                  label: p ? (
-                    <div className="px-3 py-2 text-left">
-                      <div className="truncate text-sm font-semibold text-slate-800">{p.code ? `${p.code} · ` : ''}{p.name}</div>
-                      <div className="mt-0.5 text-[11px] text-slate-500">
-                        {PROCESS_STATUS_LABEL[p.status]} · {p.steps.length} etapas
-                        {p.steps.some((s) => s.isControlPoint) ? ` · ${p.steps.filter((s) => s.isControlPoint).length} PC` : ''}
-                      </div>
-                    </div>
-                  ) : (
-                    n.data?.label
-                  ),
-                },
-              };
-            })}
-            onNodesChange={onNodesChange}
-            nodesDraggable={canManage}
-            onNodeDragStop={(_, node) => {
-              if (!canManage) return;
-              persist.mutate({ id: node.id, positionX: Math.round(node.position.x), positionY: Math.round(node.position.y) });
-            }}
-            onNodeClick={(_, node) => {
-              const p = processes.find((x) => x.id === node.id);
-              if (p) onOpen(p);
-            }}
-            fitView
-            minZoom={0.2}
-            maxZoom={2}
-            proOptions={{ hideAttribution: true }}
-          >
-            <Background gap={20} size={1} color="#cbd5e1" className="opacity-45" />
-            <Controls showInteractive={false} />
-            <MiniMap pannable zoomable className="!bg-muted" />
-          </ReactFlow>
-        </div>
-        <div className="border-t p-2 text-center text-xs text-muted-foreground">
-          {processes.length === 0
-            ? 'Cadastre processos na aba Processos para vê-los no fluxograma.'
-            : canManage
-              ? 'Arraste os processos para reorganizar · clique para abrir · zoom e minimapa no canto.'
-              : 'Clique em um processo para ver os detalhes.'}
-        </div>
-      </CardContent>
-    </Card>
-  );
-}
 
 // ----------------------------- Matriz Geral (APPCC) -----------------------
 function MatrixTab({ processes, hazards }: { processes: Process[]; hazards: Hazard[] }) {
