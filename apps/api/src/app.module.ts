@@ -35,6 +35,7 @@ import { TraceabilityModule } from './modules/traceability/traceability.module';
 import { SearchModule } from './modules/search/search.module';
 import { TreatmentsModule } from './modules/treatments/treatments.module';
 import { AuditInterceptor } from './common/interceptors/audit.interceptor';
+import { HttpMetricsInterceptor } from './common/interceptors/http-metrics.interceptor';
 import { AdminModule } from './modules/admin/admin.module';
 import { DatabaseAdminModule } from './modules/database-admin/database-admin.module';
 import { PortalAdminModule } from './modules/portal-admin/portal-admin.module';
@@ -120,6 +121,8 @@ import { workersEnabled } from './jobs/jobs.constants';
   ],
   providers: [
     { provide: APP_GUARD, useClass: ThrottlerGuard },
+    // Métricas (item 20) primeiro = mede o tempo total da request (envolve a auditoria).
+    { provide: APP_INTERCEPTOR, useClass: HttpMetricsInterceptor },
     { provide: APP_INTERCEPTOR, useClass: AuditInterceptor },
   ],
 })
