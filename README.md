@@ -2,7 +2,9 @@
 
 Plataforma SaaS corporativa para gestao estrategica de indicadores, OKR, KPI, planos de acao, FCA/CAPA, cronogramas, reunioes, importacao de dados, relatorios, insights e dashboards executivos.
 
-> **Status:** sistema funcional ponta a ponta com backend NestJS + frontend Next.js, banco PostgreSQL com 40+ entidades modeladas, rastreabilidade pela Arvore Organizacional e Mapa Estrategico, dashboards, regras de negocio implementadas e dados demo realistas.
+> **Status:** sistema funcional ponta a ponta com backend NestJS + frontend Next.js, banco PostgreSQL com ~370 models Prisma, rastreabilidade pela Arvore Organizacional e Mapa Estrategico, dashboards, regras de negocio implementadas e dados demo realistas.
+
+> **Nota operacional:** o nome local `gestao-indicadores-sqlite` e historico. O produto atual usa PostgreSQL; producao roda em Droplet DigitalOcean com Postgres local.
 
 ---
 
@@ -24,7 +26,7 @@ Plataforma SaaS corporativa para gestao estrategica de indicadores, OKR, KPI, pl
 gestao-indicadores-sqlite/
 ├── apps/
 │   ├── api/          # NestJS + Prisma + PostgreSQL + Redis (BullMQ pronto)
-│   └── web/          # Next.js 14 App Router + Tailwind + shadcn-style + Recharts + React Flow
+│   └── web/          # Next.js 15 App Router + Tailwind + shadcn-style + Recharts + React Flow
 ├── packages/
 │   └── shared/       # Enums, schemas Zod, calculo de farol compartilhados
 ├── docker-compose.yml
@@ -35,9 +37,9 @@ gestao-indicadores-sqlite/
 
 | Camada     | Tecnologia |
 | ---------- | ---------- |
-| Frontend   | Next.js 14, React 18, TypeScript, Tailwind, shadcn-style, Recharts, React Flow, TanStack Query, React Hook Form + Zod, next-themes, jsPDF, Papaparse, date-fns |
+| Frontend   | Next.js 15, React 18, TypeScript, Tailwind, shadcn-style, Recharts, React Flow, TanStack Query, React Hook Form + Zod, next-themes, jsPDF, Papaparse, date-fns |
 | Backend    | NestJS 10, Prisma 5, Passport JWT, bcryptjs, Helmet, Throttler, BullMQ (stack pronta) |
-| Banco      | PostgreSQL 16 |
+| Banco      | PostgreSQL 17 em producao no droplet; compose local pode usar versao propria de desenvolvimento |
 | Cache/Fila | Redis 7 |
 | Devops     | Docker Compose, pnpm workspaces |
 
@@ -58,6 +60,10 @@ pnpm dev                      # API e Web em paralelo (ja inclui shared:build)
 ```
 
 Atalho: `pnpm setup` faz tudo de uma vez.
+
+## Documentacao
+
+A fonte de verdade viva para onboarding, stack, producao, gate e documentos essenciais fica em **[docs/README.md](./docs/README.md)**.
 
 ## Documentacao visual
 
@@ -81,7 +87,9 @@ O modulo avancado de Plano de Acao, com origem ponta a ponta, ferramentas de ana
 
 ## Deploy em producao
 
-Dois caminhos suportados, **ambos** usando Neon Postgres como banco:
+Setup vigente de producao: **Droplet DigitalOcean com Postgres local no proprio droplet**.
+O Neon foi usado como origem legada/migracao e nao deve voltar a ser banco de producao
+sem decisao explicita.
 
 ### Opcao A (recomendada) — Droplet DigitalOcean (~$6/mes)
 VM Linux gerenciada por voce, Caddy fazendo proxy reverso com SSL automatico. Veja **[DEPLOY-DROPLET.md](./DEPLOY-DROPLET.md)**.
@@ -91,13 +99,13 @@ VM Linux gerenciada por voce, Caddy fazendo proxy reverso com SSL automatico. Ve
 # 1. Criar Droplet $6 Ubuntu 24.04 + SSH key
 # 2. ssh root@IP
 # 3. curl -fsSL https://raw.githubusercontent.com/aldemirfidelis/gestao-360-indicadores/main/scripts/setup-droplet.sh | bash
-# 4. nano /opt/gestao-360-indicadores/.env  (cole URLs Neon + JWT secrets)
+# 4. nano /opt/gestao-360-indicadores/.env  (configure Postgres local + JWT secrets)
 # 5. cd /opt/gestao-360-indicadores && bash scripts/deploy.sh
 # 6. http://IP
 ```
 
 ### Opcao B — DigitalOcean App Platform (~$10/mes)
-Plataforma cuida de build/deploy/SSL/escala. Veja **[DEPLOY.md](./DEPLOY.md)**.
+Guia mantido apenas como referencia historica. Veja **[DEPLOY.md](./DEPLOY.md)**.
 
 ```bash
 # 1. Editar .do/app.yaml (ja com repo aldemirfidelis/gestao-360-indicadores)
@@ -107,12 +115,12 @@ Plataforma cuida de build/deploy/SSL/escala. Veja **[DEPLOY.md](./DEPLOY.md)**.
 
 ### Stack de deploy ja pronta:
 - `Dockerfile` multi-stage para API e Web (Alpine, ~80MB Web standalone)
-- `docker-compose.droplet.yml` (API + Web + Caddy) e `.do/app.yaml` (App Platform)
+- `docker-compose.droplet.yml` (Postgres local + API + Web + Caddy) e `.do/app.yaml` (legado App Platform)
 - `Caddyfile` (proxy reverso, SSL Let's Encrypt automatico quando voce tiver dominio)
 - `scripts/setup-droplet.sh` (provisiona Droplet zerada em 3 min)
 - `scripts/deploy.sh` + `Makefile` (deploy / logs / restart / migrate / seed)
 - `.env.droplet.example` e `.env.production.example` (templates)
-- Prisma com `directUrl` (pgbouncer-safe) e `binaryTargets` Alpine
+- Prisma com `directUrl` e `binaryTargets` Alpine
 
 **Credenciais demo:**
 - `demo@demo.com` / `123456` (gestor da Empresa Demonstração)
@@ -193,9 +201,9 @@ Plataforma cuida de build/deploy/SSL/escala. Veja **[DEPLOY.md](./DEPLOY.md)**.
 
 ---
 
-## Modelagem (Prisma) - 40+ entidades
+## Modelagem (Prisma) - ~370 models
 
-`Company`, `Branch`, `OrgNode`, `User`, `Permission`, `UserPermission`, `RefreshToken`, `StrategicMap`, `Perspective`, `StrategicObjective`, `ObjectiveRelation`, `OKRCycle`, `OKRObjective`, `KeyResult`, `OKRCheckin`, `Indicator`, `IndicatorTarget`, `IndicatorResult`, `IndicatorTreeRelation`, `Deviation`, `DeviationCause`, `DeviationAnalysis`, `ActionPlan`, `ActionTask`, `Project`, `ProjectMilestone`, `ProjectTask`, `Meeting`, `MeetingParticipant`, `MeetingAgendaItem`, `MeetingDecision`, `Attachment`, `Comment`, `Notification`, `ImportJob`, `ImportError`, `AuditLog`, `AppSetting`.
+O schema Prisma tem ~370 models e ~167 enums (371 models / 167 enums em 2026-06-20, num `schema.prisma` de ~11k linhas) e cobre multiempresa, estrutura organizacional, usuarios/permissoes, estrategia, OKRs, indicadores, resultados, desvios, planos de acao, reunioes, documentos, auditorias, processos, formularios, Portal Admin, Platform Admin, mensageria, workflows, integracoes e modulos corporativos adicionais.
 
 **Padroes:** `createdAt`, `updatedAt`, `deletedAt` em todas entidades de negocio (soft delete). `companyId` em todas (multi-tenant). Indices em campos quentes. Enums em Prisma + espelhados em `packages/shared/src/enums.ts`.
 
@@ -203,11 +211,11 @@ Plataforma cuida de build/deploy/SSL/escala. Veja **[DEPLOY.md](./DEPLOY.md)**.
 
 ## Regras de negocio implementadas
 
-- **Tratativa automatica de indicador fora da meta**: ao salvar resultado vermelho, o backend cria/atualiza uma `TreatmentCase`, registra historico e a tela de lancamentos oferece abrir o fluxo guiado.
-- **Fluxo guiado de tratativa**: `/treatments/:id` conduz analise de causa, reuniao, participantes, envio de convite, plano de acao e reavaliacao.
+- **Tratativa automatica de indicador fora da meta**: ao salvar resultado vermelho, o backend cria/atualiza uma `TreatmentCase`, registra historico e direciona a operacao para Plano de Acao.
+- **Tratativa incorporada em Plano de Acao**: `/treatments` e detalhes de tratativa redirecionam para `/actions`; analise, reuniao, evidencias, responsaveis e reavaliacao vivem na experiencia de acoes.
 - **Convites de reuniao com ICS**: `POST /meetings/:id/invitations/send` gera iCalendar e registra `EmailLog`; se SMTP nao estiver configurado, o envio fica como `PENDING` sem perder auditoria.
 - **Status automatico da tratativa**: acoes vinculadas atualizam a tratativa para em andamento, atrasada ou aguardando reavaliacao; novo resultado verde resolve o caso.
-- **Mapa de relacoes integrado**: o mapa inclui blocos de `TreatmentCase`, ligados ao indicador, desvio, reuniao e planos de acao.
+- **Mapa de relacoes dentro de estrategia**: relacoes entre objetivo, indicador, desvio, reuniao e acao pertencem ao contexto de `strategy`/Mapa Estrategico, nao a um modulo de produto separado.
 - **Calculo de farol automatico** (`packages/shared/src/status.ts`): direcao maior-melhor / menor-melhor / igual / faixa, retorna verde/amarelo/vermelho/cinza + atingimento + desvio. Mesmo codigo no front (badges) e backend (gravacao).
 - **Sugestao de desvio**: `POST /results/batch` retorna `shouldOpenDeviation: true` quando o lancamento ficou vermelho; a UI exibe toast.
 - **Abertura de desvio com numero sequencial** por empresa.
@@ -226,12 +234,12 @@ Plataforma cuida de build/deploy/SSL/escala. Veja **[DEPLOY.md](./DEPLOY.md)**.
 ## Fluxo de indicador fora da meta
 
 1. Lance um resultado em `/results`.
-2. Se o farol calculado for vermelho, a tela mostra "Indicador fora da meta detectado" e abre a tratativa.
-3. Em `/treatments/:id`, registre problema, causa provavel, causa raiz e metodo de analise: 5 Porques, Ishikawa, Pareto, PDCA, MASP, DMAIC, FCA, CAPA ou simples.
+2. Se o farol calculado for vermelho, a tela mostra "Indicador fora da meta detectado" e oferece seguir para Plano de Acao.
+3. Em `/actions`, registre problema, causa provavel, causa raiz e metodo de analise: 5 Porques, Ishikawa, Pareto, PDCA, MASP, DMAIC, FCA, CAPA ou simples.
 4. Agende a "Reuniao de Tratativa do Indicador"; a pauta e o titulo sao sugeridos a partir do indicador, meta, resultado e desvio.
 5. Adicione participantes internos ou externos com nome, e-mail, area, cargo e papel.
 6. Envie convites pela reuniao. O sistema gera ICS e registra `EmailLog` por participante. Para envio real, configure `SMTP_HOST`, `SMTP_PORT`, `SMTP_USER`, `SMTP_PASS`, `SMTP_FROM`.
-7. Crie acoes pela aba de plano de acao da reuniao ou pelo fluxo guiado. As acoes ficam vinculadas ao indicador, analise, reuniao e tratativa.
+7. Crie acoes pela aba de plano de acao da reuniao ou diretamente em `/actions`. As acoes ficam vinculadas ao indicador, analise, reuniao e tratativa tecnica.
 8. Ao concluir as acoes, lance novo resultado e use "Reavaliar indicador". Resultado verde resolve a tratativa; resultado vermelho marca como nao resolvida.
 
 Tabelas novas/alteradas neste fluxo: `TreatmentCase`, `MeetingGuest`, `EmailLog`, `CalendarInvite`, novos campos em `Meeting`, `MeetingParticipant` e `ActionPlan`, e novos eventos em `TraceabilityEvent`.

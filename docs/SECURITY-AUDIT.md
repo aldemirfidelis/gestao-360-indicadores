@@ -1,148 +1,151 @@
-# Auditoria de Segurança — Gestão 360
+# Auditoria de Seguranca - Gestao 360
 
-**Data:** 2026-05-30
-**Escopo:** Monorepo completo (`apps/api` NestJS, `apps/web` Next.js, `packages/shared`),
-conexões (Neon Postgres, Gemini), arquivos versionados no GitHub, configuração de
-deploy no Droplet DigitalOcean e gestão de segredos.
-
----
+**Data original:** 2026-05-30
+**Atualizacao operacional:** 2026-06-20
+**Escopo:** monorepo completo (`apps/api`, `apps/web`, `packages/shared`), Postgres local no droplet, Neon legado, Gemini, Docker/Caddy e gestao de segredos.
 
 ## Resumo executivo
 
 | Severidade | Achados | Status |
 |-----------|---------|--------|
-| 🔴 Alta | 2 | ✅ Corrigido em código |
-| 🟠 Média | 6 | ✅ Corrigido em código |
-| 🟡 Baixa / Operacional | 4 | ⚠️ Ações manuais necessárias (abaixo) |
+| Alta | 2 | Corrigido em codigo |
+| Media | 6 | Corrigido em codigo |
+| Baixa / operacional | 5 | Requer verificacao manual recorrente |
 
-**Boas notícias confirmadas:**
-- ✅ `.env`, `.env.droplet-ready` e demais segredos **nunca** foram commitados no Git (verificado em todo o histórico). Só vão para o GitHub os arquivos `*.example`.
-- ✅ `.gitignore` e `.dockerignore` excluem corretamente `.env*` — segredos **não** entram na imagem Docker.
-- ✅ Sem SQL bruto (`$queryRaw`/`$executeRaw`): todo acesso via Prisma (sem SQL Injection).
-- ✅ Sem `eval`/`child_process`/`exec` no código.
-- ✅ Isolamento multi-tenant consistente: queries escopadas por `companyId` derivado do token JWT (não do body/params).
-- ✅ Guards globais (`JwtAuthGuard` + `RolesGuard`) → tudo autenticado por padrão; apenas `login`, `refresh` e `health` são `@Public()`.
-- ✅ Conexão com Neon usa `sslmode=require` + `channel_binding=require` (SCRAM).
-- ✅ Senhas com bcrypt; refresh tokens armazenados como hash SHA-256.
-- ✅ No Droplet só o Caddy expõe portas (80/443); API e Web ficam internas à rede Docker.
+Boas noticias confirmadas:
 
----
+- `.env`, `.env.droplet-ready` e demais segredos reais continuam ignorados por Git e Docker.
+- `.gitignore` e `.dockerignore` excluem `.env*`, preservando apenas `*.example`.
+- Sem SQL bruto amplo no caminho operacional; o acesso principal usa Prisma.
+- Guards globais protegem rotas por padrao; `login`, `refresh` e `health` sao publicos.
+- Senhas usam bcrypt e refresh tokens sao armazenados como hash SHA-256.
+- No droplet, somente o Caddy deve expor portas publicas; API, Web e Postgres ficam na rede Docker.
+- Producao atual usa Postgres local no droplet (`postgres:5432`). Neon e legado/desenvolvimento, salvo decisao explicita.
 
-## 🔴 ALTA — corrigido
+## Alta - corrigido em codigo
 
-### A1. Fallback de segredo JWT (`'change-me'`) permitia tokens forjáveis
-**Onde:** `jwt.strategy.ts`, `auth.module.ts`, `auth.service.ts`.
-O segredo de verificação/assinatura usava `process.env.JWT_ACCESS_SECRET ?? 'change-me'`.
-Se a variável faltasse em produção, a API subia silenciosamente com o segredo público
-`change-me` — qualquer pessoa poderia **forjar JWTs válidos** e se autenticar como
-qualquer usuário (inclusive SUPER_ADMIN).
+### A1. Fallback de segredo JWT permitia tokens forjaveis
 
-**Correção:** novo helper `common/env.ts` (`requireSecret`) faz *fail-fast* — a API
-não inicia se `JWT_ACCESS_SECRET` estiver ausente ou, em produção, for fraco/valor de
-exemplo (<32 chars ou padrões conhecidos). `JwtModule` migrado para `registerAsync`
-para resolver o segredo após o carregamento do `.env`.
+Antes, JWT podia cair em valor de exemplo. A API agora usa `requireSecret` e falha no boot quando `JWT_ACCESS_SECRET` esta ausente ou fraco em producao.
 
-### A2. Escalonamento de privilégio: COMPANY_ADMIN → SUPER_ADMIN
-**Onde:** `users.service.ts` (`create`/`update`), `users.controller.ts`.
-O endpoint de update aceitava `@Body() input: any` sem validação e repassava `input.role`
-direto ao Prisma. Um COMPANY_ADMIN (com `users:manage`) podia promover a si mesmo ou a
-outro usuário a **SUPER_ADMIN** — papel que ignora o escopo de `companyId` e dá acesso a
-**todas as empresas** (quebra de isolamento multi-tenant).
+Arquivos envolvidos:
 
-**Correção:** `create` e `update` agora lançam `ForbiddenException` se um ator que não é
-SUPER_ADMIN tentar atribuir/gerenciar o papel SUPER_ADMIN.
+- `apps/api/src/common/env.ts`
+- `apps/api/src/modules/auth/jwt.strategy.ts`
+- `apps/api/src/modules/auth/auth.module.ts`
+- `apps/api/src/modules/auth/auth.service.ts`
 
----
+### A2. Escalonamento COMPANY_ADMIN -> SUPER_ADMIN
 
-## 🟠 MÉDIA — corrigido
+`users.service.ts` agora bloqueia atores que nao sao `SUPER_ADMIN` ao tentar criar/alterar usuarios com papel `SUPER_ADMIN`.
 
-### M1. CORS coringa (`*`) combinado com `credentials: true`
-**Onde:** `main.ts` + `.env.droplet-ready` (`API_CORS_ORIGIN=*`).
-Com origem `*`, o NestJS refletia qualquer origem **com credenciais habilitadas** —
-qualquer site poderia fazer requisições credenciadas à API.
-**Correção:** quando a origem é coringa, `credentials` agora é desativado e um aviso é
-logado em produção. **Ação manual:** definir `API_CORS_ORIGIN=https://gestao360.org` no Droplet (ver abaixo).
+## Media - corrigido em codigo
 
-### M2. Sem limite anti brute-force no login
-**Onde:** `auth.controller.ts`. O throttle global era 200 req/min — permitia ~200 tentativas
-de senha por minuto/IP.
-**Correção:** `@Throttle` específico → **5 tentativas/min** no `login` e 20/min no `refresh`.
+### M1. CORS coringa com credenciais
 
-### M3. Vazamento de detalhes internos em erros 500
-**Onde:** `http-exception.filter.ts`. Erros não-HTTP retornavam `exception.message` cru ao
-cliente (podendo vazar SQL, caminhos, internals).
-**Correção:** em produção retorna `"Internal server error"`; detalhe vai só para o log.
+Quando `API_CORS_ORIGIN=*`, a API desabilita `credentials`. Em producao, a configuracao recomendada e:
 
-### M4. IDOR nos erros de importação
-**Onde:** `imports.service.ts`/`imports.controller.ts`. `GET /imports/jobs/:id/errors`
-não checava `companyId` — um usuário podia ler payloads de importação de **outra empresa**
-enumerando `jobId`.
-**Correção:** `jobErrors` agora valida que o job pertence à empresa do usuário.
+```text
+API_CORS_ORIGIN=https://gestao360.org
+```
 
-### M5. Container da API rodando como root
-**Onde:** `apps/api/Dockerfile`. A imagem de runtime não trocava de usuário (o Web já fazia).
-**Correção:** adicionado `USER node` (não-root) no estágio de runtime.
+### M2. Brute force no login
 
-### M6. Faltavam cabeçalhos de segurança no frontend
-**Onde:** `apps/web/next.config.mjs`. O Next não enviava `X-Frame-Options`, `X-Content-Type-Options`,
-`Referrer-Policy`, `Permissions-Policy`, `HSTS`, e expunha `X-Powered-By`.
-**Correção:** `headers()` + `poweredByHeader: false` adicionados.
+`auth.controller.ts` usa throttle especifico para login e refresh.
 
----
+### M3. Vazamento de erro 500
 
-## 🟡 BAIXA / OPERACIONAL — requer ação manual
+`http-exception.filter.ts` retorna mensagem generica em producao e deixa detalhe apenas em log.
 
-### O1. ⚠️ Segredos reais em arquivos locais — avaliar rotação
-`.env` e `.env.droplet-ready` contêm credenciais **reais** de produção (senha do Neon,
-segredos JWT de prod, `GEMINI_API_KEY`). Eles **não** estão no Git, então não vazaram pelo
-GitHub. Porém, **se** esses arquivos já foram compartilhados (chat, backup, e-mail), faça a
-rotação:
-- **Neon:** rotacionar a senha do role `neondb_owner` no painel Neon e atualizar `DATABASE_URL`/`DIRECT_URL`.
-- **Gemini:** revogar/recriar a `GEMINI_API_KEY` no Google AI Studio.
-- **JWT:** gerar novos `JWT_ACCESS_SECRET`/`JWT_REFRESH_SECRET` (`openssl rand -base64 48`) — invalida sessões ativas.
+### M4. IDOR em erros de importacao
 
-### O2. ⚠️ Definir `API_CORS_ORIGIN` no Droplet
-No `.env` do servidor, troque `API_CORS_ORIGIN=*` por `API_CORS_ORIGIN=https://gestao360.org`.
-(No deploy atual o front chama `/api` na mesma origem via Caddy, então CORS nem é necessário.)
+`imports.service.ts` valida `companyId` antes de retornar erros de jobs de importacao.
 
-### O3. Dependências vulneráveis — parcialmente resolvido nesta auditoria
+### M5. Container da API como root
 
-Evolução do `pnpm audit`:
+`apps/api/Dockerfile` roda runtime com `USER node`.
 
-| Momento | Crítica | Alta | Moderada | Baixa |
-|---------|--------:|-----:|---------:|------:|
-| Antes | 2 | 21 | 27 | 5 |
-| jspdf@4.2.1 + next@14.2.35 | 0 | 13 | 18 | 5 |
-| **Final** (+ next@15.5.18) | **0** | **7** | **11** | **3** |
+### M6. Headers de seguranca no frontend
 
-**Feito (verificado com `tsc --noEmit` + smoke test de geração de PDF):**
-- ✅ **jspdf** `2.5.2 → 4.2.1` + **jspdf-autotable** `3.8.4 → 5.0.8` → elimina as **2 críticas** (HTML/PDF injection, path traversal) e o XSS do dompurify transitivo. API usada (`new jsPDF`, `text`, `autoTable`, `lastAutoTable.finalY`, `save`) validada em runtime.
-- ✅ **next** `14.2.13 → 14.2.35 → 15.5.18` → **zera todas as CVEs do `next`** (DoS Image Optimizer, SSRF WebSocket upgrade, bypass middleware i18n, cache poisoning, XSS CSP nonce). React mantido em 18.3.1 (peer do Next 15 aceita ^18). Migração sem breaking changes de código (app é client-side com Bearer token; sem `cookies()`/`headers()`/`params` async). `next.config`: `outputFileTracingRoot` movido para top-level.
+`apps/web/next.config.mjs` define headers de seguranca e remove `X-Powered-By`.
 
-**Deployado em produção** (gestao360.org) e verificado: api+web `healthy`, `/api/health` 200, headers de segurança ativos, web rodando Next 15.5.18.
+## Baixa / operacional - verificar manualmente
 
-**Pendente (baixo risco — opcional):**
-- ⚠️ Transitivas fora do caminho de exploração do app (7 high restantes): `multer` (não usamos upload), `lodash`/`glob`/`picomatch`/`tmp` (uso interno/build). Podem ser tratadas com `pnpm.overrides` no `package.json` raiz, testando o build a cada override.
-- `esbuild`/`vite`/`webpack` — apenas dev-server; sem impacto no runtime de produção.
+### O1. Segredos e rotacao
 
-> Nota de build: o passo `RUN chown -R node:node /app` no Dockerfile da API adiciona ~3min ao build (chown do node_modules). Otimização futura: usar `COPY --chown` nos estágios em vez de chown recursivo.
+Arquivos reais `.env*` nao devem ser publicados. Foi encontrado um diff historico versionado com URL antiga da Neon; o artefato foi sanitizado nesta rodada, mas a credencial antiga deve ser tratada como exposta se o repo ja foi enviado para fora da maquina.
 
-### O4. ⚠️ Endurecimento operacional do Droplet (recomendado)
-- Firewall (ufw/DO Cloud Firewall): permitir só 22, 80, 443; **bloquear acesso direto** a portas internas.
-- SSH: apenas chave (sem senha), `PermitRootLogin no`, fail2ban.
-- `request_body max_size 50MB` no Caddy é alto para JSON de import — considerar limite menor por rota.
-- Tokens JWT ficam em `localStorage` (exposição a XSS). Mitigado por React (sem `dangerouslySetInnerHTML`) e pelos headers de M6; avaliar cookies httpOnly como reforço futuro.
+Acoes:
 
----
+- Postgres local: trocar `POSTGRES_PASSWORD` em janela controlada se o `.env` foi compartilhado.
+- Neon legado: se ainda existir/for usado, rotacionar senha do role no painel Neon.
+- Gemini: revogar/recriar `GEMINI_API_KEY` se a chave foi compartilhada.
+- JWT: gerar novos `JWT_ACCESS_SECRET` e `JWT_REFRESH_SECRET` se houve compartilhamento de `.env`; isso invalida sessoes ativas.
 
-## Arquivos alterados nesta auditoria
-- `apps/api/src/common/env.ts` *(novo)* — `requireSecret` fail-fast.
-- `apps/api/src/modules/auth/{jwt.strategy,auth.module,auth.service,auth.controller}.ts`
-- `apps/api/src/modules/users/{users.service,users.controller}.ts`
-- `apps/api/src/modules/imports/{imports.service,imports.controller}.ts`
-- `apps/api/src/common/filters/http-exception.filter.ts`
-- `apps/api/src/main.ts`
-- `apps/api/Dockerfile`
-- `apps/web/next.config.mjs`
+### O2. CORS do droplet
 
-Validação: `tsc --noEmit` da API passou sem erros.
+No `.env` do servidor:
+
+```text
+API_CORS_ORIGIN=https://gestao360.org
+```
+
+### O3. Firewall
+
+Expor apenas:
+
+- `22/tcp` para SSH.
+- `80/tcp` e `443/tcp` para Caddy.
+
+Postgres (`5432`), API (`3333`) e Web (`3000`) devem ficar sem porta publica.
+
+### O4. SSH e host hardening
+
+Recomendado:
+
+- SSH apenas por chave.
+- `PasswordAuthentication no`.
+- `PermitRootLogin prohibit-password` ou usuario administrativo sem root direto, conforme politica operacional.
+- fail2ban ativo.
+
+### O5. Tokens no navegador
+
+JWT ainda fica em `localStorage`, o que aumenta impacto de XSS. Mitigacoes atuais: React, sem `dangerouslySetInnerHTML` relevante, headers de seguranca. Evolucao recomendada: migrar access/refresh para cookies `httpOnly` com CSRF protection.
+
+### O6. Dependencias e upgrades
+
+`pnpm audit` deve ser executado de forma recorrente antes de releases maiores e em janelas de manutencao. Resultado local de 2026-06-20:
+
+- Total: 39 vulnerabilidades.
+- Severidade: 1 critica, 13 altas, 19 moderadas, 6 baixas.
+- Principais pacotes reportados: `vitest`, `xlsx`, `multer`, `glob`, `lodash`, `nodemailer`, `vite`, `picomatch`, `dompurify`, `webpack`, `esbuild`.
+
+Plano recomendado:
+
+- Atualizar `vitest` em todos os workspaces e validar a suite local.
+- Substituir ou isolar uso de `xlsx`, pois o advisory reporta ausencia de versao corrigida na linha publicada.
+- Avaliar overrides transitivos para `multer`, `lodash`, `glob`, `picomatch`, `dompurify`, `webpack` e `esbuild` apenas em branch propria, com `pnpm install`, typecheck, testes e build completos.
+- Nao aplicar overrides diretamente em producao sem validar compatibilidade de Nest/Next/Vite.
+- Prisma atual: `@prisma/client`/`prisma` 5.x. Upgrade para Prisma 7 deve ser planejado em etapas: 5 -> 6 -> 7, seguindo os guias oficiais:
+  - https://www.prisma.io/docs/guides/upgrade-prisma-orm/v6
+  - https://www.prisma.io/docs/guides/upgrade-prisma-orm/v7
+
+## Validacoes recomendadas antes de deploy
+
+```bash
+pnpm --filter @g360/api exec prisma validate
+pnpm --filter @g360/api exec tsc --noEmit --pretty false
+pnpm --filter @g360/web exec tsc --noEmit
+pnpm audit
+pnpm --filter @g360/api test
+pnpm test:e2e
+```
+
+No droplet:
+
+```bash
+cd /opt/gestao-360-indicadores
+grep -E '^(DATABASE_URL|DIRECT_URL)=' .env | grep '@postgres:5432'
+docker compose -f docker-compose.droplet.yml exec -T api ./node_modules/.bin/prisma migrate status
+docker compose -f docker-compose.droplet.yml ps
+```

@@ -6,8 +6,8 @@ index 6334c44..2d934b5 100644
  NODE_ENV=production
  
  # -------- Banco Neon Postgres --------
--DATABASE_URL=postgresql://neondb_owner:npg_TN3bO6iURxCZ@ep-soft-dew-acvj28oc-pooler.sa-east-1.aws.neon.tech/neondb?sslmode=require&pgbouncer=true&connect_timeout=15
--DIRECT_URL=postgresql://neondb_owner:npg_TN3bO6iURxCZ@ep-soft-dew-acvj28oc.sa-east-1.aws.neon.tech/neondb?sslmode=require&channel_binding=require
+-DATABASE_URL=postgresql://USER:PASSWORD@ep-xxxxx-pooler.region.aws.neon.tech/DB?sslmode=require&pgbouncer=true&connect_timeout=15
+-DIRECT_URL=postgresql://USER:PASSWORD@ep-xxxxx.region.aws.neon.tech/DB?sslmode=require&channel_binding=require
 +DATABASE_URL=postgresql://USER:PASSWORD@ep-xxxxx-pooler.region.aws.neon.tech/DB?sslmode=require&pgbouncer=true&connect_timeout=15
 +DIRECT_URL=postgresql://USER:PASSWORD@ep-xxxxx.region.aws.neon.tech/DB?sslmode=require&channel_binding=require
  

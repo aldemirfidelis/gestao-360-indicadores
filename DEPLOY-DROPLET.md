@@ -28,7 +28,7 @@ Escolhi Droplet porque **voce ja usa** (BeeYes) e quer controle.
 1. [Pre-requisitos](#1-pre-requisitos)
 2. [Criar Droplet](#2-criar-droplet)
 3. [Setup inicial (script automatico)](#3-setup-inicial)
-4. [Configurar `.env` com Neon + JWT](#4-configurar-env)
+4. [Configurar `.env` com Postgres local + JWT](#4-configurar-env)
 5. [Primeiro deploy](#5-primeiro-deploy)
 6. [Acessar e testar](#6-acessar-e-testar)
 7. [Comandos do dia a dia (Makefile)](#7-comandos-do-dia-a-dia)
@@ -42,7 +42,8 @@ Escolhi Droplet porque **voce ja usa** (BeeYes) e quer controle.
 
 - Conta na **DigitalOcean** com forma de pagamento
 - **SSH key cadastrada** no DigitalOcean (em Account → Security → SSH keys)
-- Banco **Neon** ja provisionado (URLs pooled e direct em maos)
+- O compose do projeto usa **Postgres local** no droplet. A URL da Neon so e necessaria
+  em uma migracao/cutover inicial via `scripts/migrate-neon-to-droplet.sh`.
 - Repo `aldemirfidelis/gestao-360-indicadores` ja no GitHub
 
 ---
@@ -52,7 +53,7 @@ Escolhi Droplet porque **voce ja usa** (BeeYes) e quer controle.
 1. Acesse <https://cloud.digitalocean.com/droplets>
 2. Clique em **Create Droplet**
 3. Configure:
-   - **Region**: NYC3 ou SFO3 (latencia ~150ms ate Neon SA-East, OK)
+   - **Region**: NYC3 ou SFO3
    - **OS**: Ubuntu 24.04 LTS x64
    - **Plan**: Basic → **Regular SSD → $6/mes** (1 GB RAM, 1 vCPU, 25 GB SSD, 1 TB transfer)
    - **Authentication**: SSH Key → selecione a chave que voce ja tem
@@ -99,7 +100,8 @@ cd /opt/gestao-360-indicadores
 nano .env
 ```
 
-Edite os valores marcados com `TROCAR_*`. As URLs do Neon ja estao no template (mesmas que voce usa local), mas troque os JWT secrets:
+Edite os valores marcados com `TROCAR_*`. O template atual ja aponta Prisma para
+o Postgres local (`postgres:5432`). Troque pelo menos a senha do banco e os JWT secrets:
 
 ```bash
 # Gere 2 secrets fortes (rode 2x e copie cada um):
@@ -279,11 +281,15 @@ chmod +x scripts/*.sh
 - Confirme que porta 443 esta aberta: `ufw status`
 - Veja logs: `make logs-caddy`
 
-### API nao conecta no Neon
-- Confirme que `DATABASE_URL` no `.env` esta correta (com `?sslmode=require&pgbouncer=true`)
+### API nao conecta no Postgres local
+- Confirme que `DATABASE_URL` e `DIRECT_URL` no `.env` apontam para `postgres:5432`
+- Confirme que o container `g360-postgres` esta saudavel:
+  ```bash
+  docker compose -f docker-compose.droplet.yml ps postgres
+  ```
 - Teste manualmente:
   ```bash
-  docker run --rm -it postgres:16-alpine psql "$DATABASE_URL"
+  docker compose -f docker-compose.droplet.yml exec -T postgres pg_isready -U "${POSTGRES_USER:-g360}" -d "${POSTGRES_DB:-g360}"
   ```
 
 ### Migration travou
@@ -324,4 +330,4 @@ make seed
 - [ ] Senha do admin trocada apos primeiro acesso
 - [ ] `make logs` nao mostra erros recorrentes
 - [ ] (Opcional) Dominio configurado + SSL ativo
-- [ ] Backup do Neon ativo (PITR padrao 7 dias no free tier)
+- [ ] Backup local agendado (`scripts/backup-db.sh`) e, idealmente, copia off-site ativa
