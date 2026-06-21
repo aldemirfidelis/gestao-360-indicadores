@@ -12,8 +12,6 @@ import type { TabKey, EntityDialogState } from '@/components/seguranca-patrimoni
 import {
   TABS,
   isTab,
-  buildOptions,
-  personDialog,
   OverviewTab,
   OperationTab,
   PeopleTab,
@@ -21,11 +19,14 @@ import {
   RoundsTab,
   AssetsTab,
   SettingsTab,
+} from '@/components/seguranca-patrimonial/tabs';
+import {
   EntityDialog,
   EntryDialog,
   ExitDialog,
   QrValidateDialog,
-} from '@/components/seguranca-patrimonial/views';
+} from '@/components/seguranca-patrimonial/dialogs';
+import { buildOptions, personDialog } from '@/components/seguranca-patrimonial/dialog-configs';
 
 export default function SegurancaPatrimonialPage() {
   const searchParams = useSearchParams();
