@@ -580,15 +580,7 @@ export default function ComunicacaoPage() {
       <Dashboard metrics={data?.metrics} loading={overview.isLoading} />
 
       <Tabs value={tab} onValueChange={(value) => isCommunicationTab(value) && setTab(value)} className="space-y-4">
-        <TabsList className="flex h-auto flex-wrap justify-start gap-1">
-          <TabsTrigger value="mural"><Megaphone className="mr-2 h-4 w-4" />Meu Mural</TabsTrigger>
-          <TabsTrigger value="central"><FileText className="mr-2 h-4 w-4" />Central</TabsTrigger>
-          <TabsTrigger value="criar"><Plus className="mr-2 h-4 w-4" />Criar</TabsTrigger>
-          <TabsTrigger value="campanhas"><Radio className="mr-2 h-4 w-4" />Campanhas</TabsTrigger>
-          <TabsTrigger value="midias"><ImageIcon className="mr-2 h-4 w-4" />Mídias</TabsTrigger>
-          <TabsTrigger value="metricas"><FileBarChart className="mr-2 h-4 w-4" />Métricas</TabsTrigger>
-          <TabsTrigger value="chat"><MessageSquare className="mr-2 h-4 w-4" />Chat</TabsTrigger>
-        </TabsList>
+        {/* abas removidas pois já estão no menu lateral */}
 
         <TabsContent value="mural" className="space-y-4">
           <div className="grid grid-cols-1 gap-4 xl:grid-cols-[0.8fr_1.2fr]">

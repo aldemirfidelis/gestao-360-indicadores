@@ -100,22 +100,7 @@ export default function SegurancaPatrimonialPage() {
         breadcrumbs={[{ label: 'Início', href: '/' }, { label: 'Segurança Patrimonial' }]}
       />
 
-      <div className="mb-4 flex flex-wrap gap-1 border-b">
-        {TABS.map((item) => {
-          const Icon = item.icon;
-          return (
-            <button
-              key={item.key}
-              type="button"
-              onClick={() => selectTab(item.key)}
-              className={cn('flex items-center gap-2 border-b-2 px-3 py-2 text-sm font-medium transition-colors', tab === item.key ? 'border-primary text-foreground' : 'border-transparent text-muted-foreground hover:text-foreground')}
-            >
-              <Icon className="h-4 w-4" />
-              {item.label}
-            </button>
-          );
-        })}
-      </div>
+      {/* abas removidas pois já estão no menu lateral */}
 
       {tab === 'overview' && (
         <OverviewTab

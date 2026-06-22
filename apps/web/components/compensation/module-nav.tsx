@@ -22,24 +22,5 @@ const sections = [
 ] as const;
 
 export function CompensationModuleNav() {
-  const pathname = usePathname();
-  return (
-    <div className="mb-4 flex flex-wrap items-center gap-2 border-b border-border/60 pb-3">
-      {sections.map((section) => {
-        const active = pathname === section.href || (section.href !== '/cargos-salarios' && pathname.startsWith(`${section.href}/`));
-        return (
-          <Link
-            key={section.href}
-            href={section.href}
-            className={cn(
-              'rounded-md border px-3 py-1.5 text-xs font-medium transition-colors',
-              active ? 'border-foreground bg-foreground text-background' : 'border-border bg-background text-muted-foreground hover:text-foreground',
-            )}
-          >
-            {section.label}
-          </Link>
-        );
-      })}
-    </div>
-  );
+  return null;
 }

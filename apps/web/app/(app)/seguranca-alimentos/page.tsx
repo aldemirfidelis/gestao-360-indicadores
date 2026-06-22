@@ -420,26 +420,7 @@ export default function SegurancaAlimentosPage() {
         </Card>
       ) : (
         <>
-          {/* abas */}
-          <div className="mb-4 flex flex-wrap gap-1 border-b">
-            {TABS.map((t) => {
-              const Icon = t.icon;
-              return (
-                <button
-                  key={t.key}
-                  type="button"
-                  onClick={() => selectTab(t.key)}
-                  className={cn(
-                    'flex items-center gap-2 border-b-2 px-3 py-2 text-sm font-medium transition-colors',
-                    tab === t.key ? 'border-primary text-foreground' : 'border-transparent text-muted-foreground hover:text-foreground',
-                  )}
-                >
-                  <Icon className="h-4 w-4" />
-                  {t.label}
-                </button>
-              );
-            })}
-          </div>
+          {/* abas removidas pois já estão no menu lateral */}
 
           {tab === 'overview' && <OverviewTab program={program} summary={summary.data} />}
           {tab === 'processes' && (

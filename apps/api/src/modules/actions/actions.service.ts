@@ -501,11 +501,14 @@ export class ActionsService {
     return { ok: true };
   }
 
-  async saveAnalysis(actionId: string, body: any, userId?: string) {
+  async saveAnalysis(actionId: string, body: any, userId?: string, companyId?: string) {
     const method = body.method as ActionAnalysisTool;
     if (!method) throw new NotFoundException('Ferramenta de análise obrigatoria');
-    const action = await this.prisma.actionPlan.findUnique({ where: { id: actionId } });
+    const action = await this.prisma.actionPlan.findFirst({
+      where: { id: actionId, deletedAt: null, ...(companyId ? { companyId } : {}) },
+    });
     if (!action || action.deletedAt) throw new NotFoundException('Ação nao encontrada');
+    if (userId) await this.access.assertCanWrite(userId, action.ownerNodeId, 'action_plans', 'edit');
 
     const session = await this.prisma.actionAnalysisSession.upsert({
       where: { actionId_method: { actionId, method } },
@@ -735,6 +738,82 @@ export class ActionsService {
     return saved;
   }
 
+  async ishikawaAiSuggestions(actionId: string, body: any, userId?: string, companyId?: string) {
+    const action = await this.getById(actionId, companyId);
+    const session = action.analysisSessions?.find((item: any) => item.method === ActionAnalysisTool.ISHIKAWA);
+    const causes = Array.isArray(body?.causes) ? body.causes : (session?.ishikawaCauses ?? []);
+    const problem = nonEmptyText(body?.problem) ?? session?.problem ?? action.problemDescription ?? action.description ?? action.title;
+    const aiSuggestions = await this.generateIshikawaSuggestionsViaGemini(action, problem, causes);
+    const suggestions = aiSuggestions ?? defaultIshikawaCauseSuggestions(problem, causes);
+    await this.recordHistory(actionId, userId, 'AI_ISHIKAWA_SUGGESTIONS', null, null, problem);
+    await this.audit(action.companyId, userId, 'AI_ISHIKAWA_SUGGESTIONS', 'ActionIshikawaCause', actionId, null, { problem, suggestions, source: aiSuggestions ? 'gemini' : 'rules' });
+    return suggestions;
+  }
+
+  async convertIshikawaCauseToTask(actionId: string, causeId: string, body: any, userId?: string, companyId?: string) {
+    const action = await this.prisma.actionPlan.findFirst({
+      where: { id: actionId, deletedAt: null, ...(companyId ? { companyId } : {}) },
+    });
+    if (!action) throw new NotFoundException('Ação nao encontrada');
+    if (userId) await this.access.assertCanWrite(userId, action.ownerNodeId, 'action_plans', 'edit');
+
+    const cause = await this.prisma.actionIshikawaCause.findFirst({
+      where: { id: causeId, session: { actionId } },
+      include: { session: true },
+    });
+    if (!cause) throw new NotFoundException('Causa nao encontrada');
+
+    if (cause.convertedToTaskId) return this.getById(actionId, companyId);
+
+    const taskTitle = nonEmptyText(body?.title) ?? `Tratar causa Ishikawa: ${cause.title ?? cause.description}`;
+    const count = await this.prisma.actionTask.count({ where: { actionId } });
+    const task = await this.prisma.actionTask.create({
+      data: {
+        actionId,
+        title: taskTitle,
+        dueDate: cause.dueDate ?? action.dueDate ?? null,
+        assignedToId: cause.responsibleUserId ?? action.responsibleUserId ?? null,
+        position: count,
+      },
+    });
+
+    const markRootCause = Boolean(body?.markRootCause ?? cause.likelyRootCause);
+    await this.prisma.actionIshikawaCause.update({
+      where: { id: cause.id },
+      data: {
+        convertedToTaskId: task.id,
+        status: 'CONVERTED_TO_ACTION',
+        likelyRootCause: markRootCause,
+      },
+    });
+    if (markRootCause) {
+      const rootCause = cause.title ?? cause.description;
+      await this.prisma.actionAnalysisSession.update({
+        where: { id: cause.sessionId },
+        data: { rootCause },
+      });
+      await this.prisma.actionPlan.update({ where: { id: actionId }, data: { rootCause } });
+    }
+
+    await this.recalcProgress(actionId);
+    await this.recordHistory(actionId, userId, 'ISHIKAWA_CONVERTED_TO_TASK', null, cause.title ?? cause.description, task.title);
+    await this.audit(action.companyId, userId, 'ISHIKAWA_CONVERTED_TO_TASK', 'ActionIshikawaCause', cause.id, cause, { taskId: task.id });
+    await this.traceability.record({
+      companyId: action.companyId,
+      indicatorId: action.indicatorId,
+      userId,
+      eventType: TraceEventType.TASK_UPDATED,
+      entityType: TraceEntityType.ACTION_TASK,
+      entityId: task.id,
+      relatedType: TraceEntityType.ACTION_PLAN,
+      relatedId: actionId,
+      title: 'Causa Ishikawa convertida em tarefa',
+      description: task.title,
+      metadata: { causeId: cause.id, sessionId: cause.sessionId },
+    });
+    return this.getById(actionId, companyId);
+  }
+
   private async generateSuggestionsViaGemini(action: any, scope?: string) {
     if (!this.gemini.isEnabled) return null;
     const context = {
@@ -800,6 +879,55 @@ ${JSON.stringify(lastResults, null, 2)}`;
       }));
     if (cleaned.length === 0) return null;
     return cleaned;
+  }
+
+  private async generateIshikawaSuggestionsViaGemini(action: any, problem: string, causes: any[]) {
+    if (!this.gemini.isEnabled) return null;
+    const existingCauses = causes
+      .map((cause) => `${ishikawaCategoryLabel(cause.category)}: ${cause.title ?? cause.description ?? ''}`)
+      .filter((line) => !line.endsWith(': '))
+      .join('\n');
+    const lastResults = action.indicator?.results?.slice?.(-6) ?? [];
+    const prompt = `Voce e um facilitador senior de analise de causa Ishikawa 6M para empresas industriais brasileiras.
+Gere sugestoes objetivas de causas possiveis, separadas nas categorias 6M.
+Nao confirme causa raiz. A resposta deve ser apenas JSON valido no schema:
+{
+  "suggestions": [
+    { "category": "METHOD", "title": "...", "justification": "...", "priority": "HIGH" }
+  ]
+}
+
+Categorias permitidas:
+METHOD, MACHINE, MANPOWER, MATERIAL, ENVIRONMENT, MEASUREMENT.
+Prioridades permitidas:
+LOW, MEDIUM, HIGH, CRITICAL.
+
+CONTEXTO DO PLANO:
+- Titulo: ${action.title ?? '-'}
+- Descricao: ${action.description ?? '-'}
+- Problema principal: ${problem ?? '-'}
+- Indicador: ${action.indicator?.name ?? '-'}
+- Meta/resultados recentes: ${JSON.stringify(lastResults, null, 2)}
+- Area/setor: ${action.ownerNode?.name ?? '-'}
+- Causas ja cadastradas:
+${existingCauses || '- nenhuma'}`;
+
+    interface GeminiIshikawaResp {
+      suggestions?: Array<{ category?: string; title?: string; justification?: string; priority?: string }>;
+    }
+    const json = await this.gemini.generateJson<GeminiIshikawaResp>(prompt, {
+      temperature: 0.35,
+      maxOutputTokens: 1800,
+    });
+    const suggestions = json?.suggestions
+      ?.map((item) => ({
+        category: normalizeIshikawaCategory(item.category),
+        title: nonEmptyText(item.title),
+        justification: nonEmptyText(item.justification) ?? 'Sugestao gerada para facilitar a discussao da equipe.',
+        priority: normalizeActionPriority(item.priority),
+      }))
+      .filter((item) => item.title);
+    return suggestions?.length ? suggestions : null;
   }
 
   async decideSuggestion(id: string, status: ActionAiSuggestionStatus, userId?: string) {
@@ -981,7 +1109,7 @@ ${JSON.stringify(lastResults, null, 2)}`;
         orderBy: { updatedAt: 'desc' },
         include: {
           fiveWhys: { orderBy: { position: 'asc' } },
-          ishikawaCauses: { orderBy: [{ category: 'asc' }, { createdAt: 'asc' }] },
+          ishikawaCauses: { orderBy: [{ category: 'asc' }, { orderIndex: 'asc' }, { createdAt: 'asc' }] },
           maspSteps: { orderBy: { step: 'asc' } },
           pdcaSteps: { orderBy: { phase: 'asc' } },
           fiveW2H: true,
@@ -1091,15 +1219,35 @@ ${JSON.stringify(lastResults, null, 2)}`;
     }
     if (method === ActionAnalysisTool.ISHIKAWA) {
       await this.prisma.actionIshikawaCause.deleteMany({ where: { sessionId } });
-      const rows = (body.ishikawaCauses ?? []).filter((item: any) => item.description).map((item: any) => ({
-        sessionId,
-        category: item.category,
-        description: item.description,
-        impact: Number(item.impact ?? 3),
-        probability: Number(item.probability ?? 3),
-        evidence: item.evidence ?? null,
-        likelyRootCause: item.likelyRootCause ?? false,
-      }));
+      const rows = (body.ishikawaCauses ?? [])
+        .map((item: any, index: number) => {
+          const title = nonEmptyText(item.title) ?? nonEmptyText(item.description);
+          if (!title) return null;
+          const description = nonEmptyText(item.description) ?? title;
+          const status = normalizeCauseStatus(item.status, item.isRootCause ?? item.likelyRootCause);
+          return {
+            ...(persistedId(item.id) ? { id: item.id } : {}),
+            sessionId,
+            category: normalizeIshikawaCategory(item.category),
+            title,
+            description,
+            priority: normalizeActionPriority(item.priority),
+            impact: clampScale(item.severity ?? item.impact),
+            probability: clampScale(item.probability),
+            status,
+            evidence: nonEmptyText(item.evidence),
+            responsibleUserId: nonEmptyText(item.responsibleUserId),
+            dueDate: coerceDate(item.dueDate),
+            positionX: numberOrNull(item.positionX),
+            positionY: numberOrNull(item.positionY),
+            orderIndex: Number.isFinite(Number(item.orderIndex)) ? Number(item.orderIndex) : index,
+            tags: normalizeTags(item.tags) as any,
+            isAiSuggested: Boolean(item.isAiSuggested),
+            convertedToTaskId: nonEmptyText(item.convertedToTaskId),
+            likelyRootCause: Boolean(item.isRootCause ?? item.likelyRootCause ?? status === 'ROOT_CAUSE'),
+          };
+        })
+        .filter(Boolean);
       if (rows.length > 0) await this.prisma.actionIshikawaCause.createMany({ data: rows });
     }
     if (method === ActionAnalysisTool.MASP) {
