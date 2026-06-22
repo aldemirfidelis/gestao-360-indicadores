@@ -1,4 +1,4 @@
-import { ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
+import { BadRequestException, ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../../prisma/prisma.service';
 import {
   ActionOrigin,
@@ -29,6 +29,7 @@ export interface OpenDeviationInput {
   dueDate?: Date | null;
   method?: AnalysisMethod;
   fact?: string;
+  immediateAction?: string;
   createdById?: string;
 }
 
@@ -81,7 +82,14 @@ export class DeviationsService {
         actions: {
           orderBy: { createdAt: 'desc' },
           take: 3,
-          select: { id: true, title: true, status: true, dueDate: true },
+          select: {
+            id: true,
+            title: true,
+            status: true,
+            dueDate: true,
+            expectedResult: true,
+            responsibleUser: { select: { id: true, name: true } },
+          },
         },
         _count: { select: { causes: true, actions: true, analyses: true } },
       },
@@ -147,6 +155,7 @@ export class DeviationsService {
           status: DeviationStatus.OPEN,
           method: input.method ?? AnalysisMethod.FCA,
           fact: input.fact,
+          immediateAction: input.immediateAction ?? null,
           responsibleUserId: input.responsibleUserId ?? null,
           dueDate: input.dueDate ?? null,
         },
@@ -258,11 +267,18 @@ export class DeviationsService {
       priority?: 'LOW' | 'MEDIUM' | 'HIGH' | 'CRITICAL';
       dueDate?: string | null;
       estimatedCost?: number | null;
+      expectedResult?: string | null;
     },
   ) {
     const dev = await this.loadScoped(deviationId, me.companyId);
     // Criar uma ação a partir do desvio exige poder atuar na área do desvio.
     await this.access.assertCanWrite(me.sub, dev.indicator?.ownerNodeId ?? null, MODULE, 'edit');
+    const responsibleUserId = body.responsibleUserId ?? dev.responsibleUserId ?? null;
+    const dueDate = body.dueDate ? new Date(body.dueDate) : dev.dueDate;
+    const expectedResult = body.expectedResult ?? dev.impact ?? null;
+    if (!responsibleUserId) throw new BadRequestException('Responsável é obrigatório para criar o plano de ação.');
+    if (!dueDate) throw new BadRequestException('Prazo é obrigatório para criar o plano de ação.');
+    if (!expectedResult) throw new BadRequestException('Resultado esperado é obrigatório para criar o plano de ação.');
 
     const action = await this.prisma.actionPlan.create({
       data: {
@@ -276,14 +292,14 @@ export class DeviationsService {
         problemDescription: dev.fact ?? dev.title,
         analysisTool: this.methodToTool(dev.method),
         rootCause: dev.rootCause ?? null,
-        responsibleUserId: body.responsibleUserId ?? dev.responsibleUserId ?? null,
+        responsibleUserId,
         ownerNodeId: body.ownerNodeId ?? dev.indicator?.ownerNodeId ?? null,
         priority: (body.priority as ActionPriority | undefined) ?? ActionPriority.HIGH,
         criticality: (body.priority as ActionPriority | undefined) ?? ActionPriority.HIGH,
         status: ActionStatus.NOT_STARTED,
-        dueDate: body.dueDate ? new Date(body.dueDate) : dev.dueDate,
+        dueDate,
         estimatedCost: body.estimatedCost ?? null,
-        expectedResult: dev.impact ?? null,
+        expectedResult,
         evidenceRequired: true,
         createdById: me.sub,
       },

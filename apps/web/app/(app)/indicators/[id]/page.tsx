@@ -80,7 +80,7 @@ interface IndicatorDetail {
     updatedAt: string;
     createdBy?: { id: string; name: string } | null;
   }[];
-  actions?: { id: string; title: string; status: string; dueDate: string | null }[] | null;
+  actions?: LinkedAction[] | null;
   meetings?: { id: string; title: string; status: string; startsAt: string | null }[] | null;
 }
 
@@ -131,9 +131,19 @@ interface DeviationSummary {
   fact?: string | null;
   rootCause?: string | null;
   impact?: string | null;
+  immediateAction?: string | null;
   analyses?: { id: string; method: string; content: string; createdAt: string }[];
-  actions?: { id: string; title: string; status: string; dueDate: string | null }[];
+  actions?: LinkedAction[];
   _count?: { causes: number; actions: number; analyses: number };
+}
+
+interface LinkedAction {
+  id: string;
+  title: string;
+  status: string;
+  dueDate: string | null;
+  expectedResult?: string | null;
+  responsibleUser?: { id: string; name: string } | null;
 }
 
 interface CurrentTreatment {
@@ -248,6 +258,7 @@ export default function IndicatorDetailPage() {
   const insights = buildInsights(ind, last ?? null, prev, ppOrUnit);
   const risks = buildRisks(deviationRows, last ?? null);
   const planStats = buildPlanStats(ind.actions ?? [], deviationRows);
+  const indicatorActionsHref = `/actions?indicatorId=${encodeURIComponent(ind.id)}`;
   const upcomingMeetings = (ind.meetings ?? [])
     .slice()
     .sort((a, b) => new Date(a.startsAt ?? 0).getTime() - new Date(b.startsAt ?? 0).getTime());
@@ -387,6 +398,7 @@ export default function IndicatorDetailPage() {
           onOpenDeviation={openOrCreateDeviation}
           openingDeviation={openDeviation.isPending}
           canCreateDeviation={Boolean(last?.periodRef) && canCreateDeviation}
+          actionsHref={indicatorActionsHref}
         />
 
         <Card>
@@ -504,7 +516,7 @@ export default function IndicatorDetailPage() {
               <RailStat label="Aguardando aprovação" value={planStats.waiting} />
               <RailStat label="Planos atrasados" value={planStats.overdue} tone={planStats.overdue > 0 ? 'red' : undefined} />
             </div>
-            <RailLinkTo href="/actions">Ver planos</RailLinkTo>
+            <RailLinkTo href={indicatorActionsHref}>Ver planos</RailLinkTo>
           </RailCard>
 
           <RailCard icon={CalendarClock} iconClass="text-primary" title="Próximas reuniões">
@@ -606,7 +618,7 @@ export default function IndicatorDetailPage() {
               </Button>
               {canCreateAction && (
                 <Button variant="outline" size="sm" asChild>
-                  <Link href={linkedPrincipalDeviation ? `/deviations/${linkedPrincipalDeviation.id}` : '/actions'}>
+                  <Link href={linkedPrincipalDeviation ? `/deviations/${linkedPrincipalDeviation.id}` : indicatorActionsHref}>
                     <ScrollText className="mr-1.5 h-4 w-4" />
                     Criar plano de ação
                   </Link>
@@ -796,6 +808,7 @@ function IndicatorDecisionCards({
   onOpenDeviation,
   openingDeviation,
   canCreateDeviation,
+  actionsHref,
 }: {
   indicator: IndicatorDetail;
   principal: PrincipalDeviation | null;
@@ -805,15 +818,15 @@ function IndicatorDecisionCards({
   onOpenDeviation: (deviation?: DeviationSummary | null) => void;
   openingDeviation: boolean;
   canCreateDeviation: boolean;
+  actionsHref: string;
 }) {
-  const actionRows = indicator.actions ?? [];
-  const openActions = actionRows.filter((action) => !['DONE', 'DONE_LATE', 'CANCELLED', 'EFFECTIVE', 'INEFFECTIVE'].includes(action.status));
   const mainDeviation = principalDeviation ?? deviations[0] ?? null;
   const deviationHref = mainDeviation ? `/deviations/${mainDeviation.id}` : '/deviations';
   const treatmentHref = currentTreatment ? `/treatments/${currentTreatment.id}` : '/treatments';
   const latestAnalysis = mainDeviation?.analyses?.[0] ?? null;
-  const linkedActions = uniqueActionRows([...deviations.flatMap((deviation) => deviation.actions ?? []), ...openActions]);
+  const linkedActions = uniqueActionRows(deviations.flatMap((deviation) => deviation.actions ?? []));
   const rootCause = mainDeviation?.rootCause?.trim();
+  const immediateProvidence = mainDeviation?.immediateAction?.trim();
 
   return (
     <aside className="grid gap-3">
@@ -846,7 +859,7 @@ function IndicatorDecisionCards({
 
       <DecisionCard tone="olive" title="Providências">
         <p className="mb-3 text-sm leading-relaxed text-muted-foreground">
-          {summarizeProvidence(deviations, openActions, indicator.meetings ?? [], currentTreatment)}
+          {immediateProvidence || 'Nenhuma providência imediata registrada no desvio. Registre o que a área fez para conter ou sanar momentaneamente o problema.'}
         </p>
         <div className="mb-3">
           <Button
@@ -873,7 +886,7 @@ function IndicatorDecisionCards({
             {rootCause
               ? rootCause
               : mainDeviation
-                ? `Causa raiz ainda não consolidada. Existem ${mainDeviation._count?.causes ?? 0} causa(s) e ${mainDeviation._count?.analyses ?? 0} análise(s) registradas no desvio.`
+                ? 'Causa raiz ainda não consolidada no desvio.'
                 : 'Nenhum desvio registrado para consolidar causa raiz.'}
           </p>
           {latestAnalysis && (
@@ -882,27 +895,21 @@ function IndicatorDecisionCards({
             </p>
           )}
         </div>
-        <DecisionList>
-          {deviations.slice(0, 2).map((deviation) => (
-            <DecisionLink key={deviation.id} href={`/deviations/${deviation.id}`}>
-              {`#${deviation.number}: ${deviation._count?.causes ?? 0} causa(s), ${deviation._count?.analyses ?? 0} análise(s)`}
-            </DecisionLink>
-          ))}
-          {deviations.length === 0 && <DecisionLink href="/deviations">Abrir painel de desvios</DecisionLink>}
-          <DecisionLink href={treatmentHref}>
-            {currentTreatment ? 'Completar análise da tratativa atual' : 'Criar tratativa para causa raiz'}
-          </DecisionLink>
-        </DecisionList>
+        <div className="text-sm">
+          <Link href={deviationHref} className="underline-offset-2 hover:underline">
+            {mainDeviation ? 'Abrir desvio para consolidar causa raiz' : 'Registrar desvio para análise de causa'}
+          </Link>
+        </div>
       </DecisionCard>
 
       <DecisionCard tone="green" title="Plano de Ação">
         <p className="mb-3 text-sm leading-relaxed text-muted-foreground">
-          {summarizeActionPlan(linkedActions, actionRows.length)}
+          {summarizeActionPlan(linkedActions, linkedActions.length)}
         </p>
         <DecisionList>
           {linkedActions.slice(0, 3).map((action) => (
             <DecisionLink key={action.id} href={`/actions/${action.id}`}>
-              {`${action.title} - ${STATUS_LABEL[action.status] ?? action.status}`}
+              {formatActionSummary(action)}
             </DecisionLink>
           ))}
           {linkedActions.length === 0 && (
@@ -910,7 +917,7 @@ function IndicatorDecisionCards({
               {mainDeviation ? 'Criar plano de ação a partir do desvio' : 'Registrar desvio antes do plano de ação'}
             </DecisionLink>
           )}
-          <DecisionLink href="/actions">Ver todos os planos vinculados</DecisionLink>
+          <DecisionLink href={actionsHref}>Ver todos os planos vinculados</DecisionLink>
         </DecisionList>
       </DecisionCard>
     </aside>
@@ -948,34 +955,28 @@ function DecisionLink({ href, children }: { href: string; children: ReactNode })
   );
 }
 
-function uniqueActionRows(actions: { id: string; title: string; status: string; dueDate: string | null }[]) {
-  const byId = new Map<string, { id: string; title: string; status: string; dueDate: string | null }>();
+function uniqueActionRows(actions: LinkedAction[]) {
+  const byId = new Map<string, LinkedAction>();
   for (const action of actions) byId.set(action.id, action);
   return Array.from(byId.values());
 }
 
-function summarizeProvidence(
-  deviations: DeviationSummary[],
-  openActions: { id: string; title: string; status: string; dueDate: string | null }[],
-  meetings: { id: string; title: string; status: string; startsAt: string | null }[],
-  treatment: CurrentTreatment | null,
-) {
-  const openDeviationCount = deviations.filter((deviation) => !['CLOSED', 'CLOSED_LATE', 'CANCELLED'].includes(deviation.status)).length;
-  const meetingCount = meetings.length;
-  const parts = [
-    `${openDeviationCount} desvio(s) em acompanhamento`,
-    `${openActions.length} plano(s) em aberto`,
-    `${meetingCount} reunião(ões) vinculada(s)`,
-  ];
-  if (treatment) parts.push('tratativa em andamento');
-  return `Resumo automático: ${parts.join(', ')}.`;
-}
-
-function summarizeActionPlan(actions: { id: string; title: string; status: string; dueDate: string | null }[], totalActions: number) {
+function summarizeActionPlan(actions: LinkedAction[], totalActions: number) {
   if (actions.length === 0) return 'Nenhum plano de ação vinculado ao desvio ainda. Crie o plano após consolidar a análise de causa.';
   const open = actions.filter((action) => !['DONE', 'DONE_LATE', 'CANCELLED', 'EFFECTIVE', 'INEFFECTIVE'].includes(action.status)).length;
   const done = totalActions - open;
-  return `Resumo automático: ${open} plano(s) em aberto e ${Math.max(done, 0)} concluído(s) ou encerrado(s).`;
+  const next = actions[0];
+  const owner = next.responsibleUser?.name ?? 'sem dono';
+  const dueDate = next.dueDate ? new Date(next.dueDate).toLocaleDateString('pt-BR') : 'sem prazo';
+  const expected = next.expectedResult ? truncateText(next.expectedResult, 100) : 'sem impacto esperado';
+  return `${open} plano(s) em aberto e ${Math.max(done, 0)} concluído(s). Próxima ação: ${next.title}; dono ${owner}; prazo ${dueDate}; impacto esperado: ${expected}.`;
+}
+
+function formatActionSummary(action: LinkedAction) {
+  const owner = action.responsibleUser?.name ?? 'sem dono';
+  const dueDate = action.dueDate ? new Date(action.dueDate).toLocaleDateString('pt-BR') : 'sem prazo';
+  const expected = action.expectedResult ? `; impacto: ${truncateText(action.expectedResult, 70)}` : '';
+  return `${action.title} - ${owner}; prazo ${dueDate}; ${STATUS_LABEL[action.status] ?? action.status}${expected}`;
 }
 
 function truncateText(value: string, maxLength: number) {
@@ -1133,7 +1134,7 @@ function buildRisks(deviations: DeviationSummary[], last: IndicatorDetail['resul
 
 function buildPlanStats(actions: NonNullable<IndicatorDetail['actions']>, deviations: DeviationSummary[]) {
   const FINAL = ['DONE', 'DONE_LATE', 'CANCELLED', 'EFFECTIVE', 'INEFFECTIVE'];
-  const byId = new Map<string, { id: string; title: string; status: string; dueDate: string | null }>();
+  const byId = new Map<string, LinkedAction>();
   for (const a of actions) byId.set(a.id, a);
   for (const d of deviations) for (const a of d.actions ?? []) byId.set(a.id, a);
   const all = Array.from(byId.values());

@@ -1,6 +1,7 @@
 'use client';
 
 import Link from 'next/link';
+import { useSearchParams } from 'next/navigation';
 import { useMemo, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
@@ -90,6 +91,8 @@ const TOOL_LABEL: Record<string, string> = {
   EFFECTIVENESS_CHECKLIST: 'Lista de verificação de eficácia',
 };
 
+const VISIBLE_ANALYSIS_TOOLS = ['FIVE_WHYS', 'ISHIKAWA', 'PDCA', 'FIVE_W_TWO_H'] as const;
+
 const COLUMNS = ['DRAFT', 'UNDER_ANALYSIS', 'IN_PROGRESS', 'WAITING_VALIDATION', 'EFFECTIVE'];
 type ViewMode = 'kanban' | 'list' | 'timeline';
 
@@ -115,13 +118,20 @@ const emptyForm = {
 
 export default function ActionsPage() {
   const qc = useQueryClient();
+  const searchParams = useSearchParams();
   const { hasPermission } = useAuth();
   const canCreate = hasPermission(['actions:create']);
   const canUpdate = hasPermission(['actions:update']);
   const [view, setView] = useState<ViewMode>('kanban');
   const [open, setOpen] = useState(false);
   const [form, setForm] = useState({ ...emptyForm });
-  const [filters, setFilters] = useState({ search: '', status: '', indicatorId: '', ownerNodeId: '', effectivenessStatus: '' });
+  const [filters, setFilters] = useState({
+    search: searchParams.get('search') ?? '',
+    status: searchParams.get('status') ?? '',
+    indicatorId: searchParams.get('indicatorId') ?? '',
+    ownerNodeId: searchParams.get('ownerNodeId') ?? '',
+    effectivenessStatus: searchParams.get('effectivenessStatus') ?? '',
+  });
 
   const query = useQuery<Action[]>({
     queryKey: ['actions', filters],
@@ -149,6 +159,7 @@ export default function ActionsPage() {
   const withoutOwner = actions.filter((a) => !a.responsibleUser).length;
   const critical = actions.filter((a) => a.criticality === 'CRITICAL' || a.priority === 'CRITICAL').length;
   const pendingEffectiveness = actions.filter((a) => ['PENDING', 'IN_REVIEW', 'REOPENED'].includes(a.effectivenessStatus)).length;
+  const canSubmitForm = Boolean(form.title.trim() && form.responsibleUserId && form.dueDate && form.expectedResult.trim());
 
   const create = useMutation({
     mutationFn: () => api('/actions', { method: 'POST', json: toPayload(form) }),
@@ -318,7 +329,7 @@ export default function ActionsPage() {
           <ActionForm form={form} setForm={setForm} options={options.data} />
           <DialogFooter>
             <Button variant="ghost" onClick={() => setOpen(false)}>Cancelar</Button>
-            <Button disabled={!form.title || create.isPending} onClick={() => create.mutate()}>
+            <Button disabled={!canSubmitForm || create.isPending} onClick={() => create.mutate()}>
               <ClipboardCheck className="mr-2 h-4 w-4" />
               {create.isPending ? 'Salvando...' : 'Salvar e abrir'}
             </Button>
@@ -386,10 +397,12 @@ function ActionForm({ form, setForm, options }: { form: typeof emptyForm; setFor
       <div>
         <Label>Ferramenta de análise</Label>
         <NativeSelect value={form.analysisTool} onChange={(e) => setForm({ ...form, analysisTool: e.target.value })}>
-          {(options?.analysisTools ?? Object.keys(TOOL_LABEL)).map((tool) => <option key={tool} value={tool}>{TOOL_LABEL[tool] ?? tool}</option>)}
+          {(options?.analysisTools ?? Object.keys(TOOL_LABEL))
+            .filter((tool) => VISIBLE_ANALYSIS_TOOLS.includes(tool as typeof VISIBLE_ANALYSIS_TOOLS[number]))
+            .map((tool) => <option key={tool} value={tool}>{TOOL_LABEL[tool] ?? tool}</option>)}
         </NativeSelect>
       </div>
-      <SelectField label="Responsável" value={form.responsibleUserId} onChange={(responsibleUserId) => setForm({ ...form, responsibleUserId })} items={options?.users ?? []} />
+      <SelectField label="Responsável" value={form.responsibleUserId} onChange={(responsibleUserId) => setForm({ ...form, responsibleUserId })} items={options?.users ?? []} required />
       <div>
         <Label>Prioridade</Label>
         <NativeSelect value={form.priority} onChange={(e) => setForm({ ...form, priority: e.target.value })}>
@@ -403,7 +416,7 @@ function ActionForm({ form, setForm, options }: { form: typeof emptyForm; setFor
         </NativeSelect>
       </div>
       <Field label="Início" type="date" value={form.startDate} onChange={(startDate) => setForm({ ...form, startDate })} />
-      <Field label="Prazo final" type="date" value={form.dueDate} onChange={(dueDate) => setForm({ ...form, dueDate })} />
+      <Field label="Prazo final" type="date" value={form.dueDate} onChange={(dueDate) => setForm({ ...form, dueDate })} required />
       <div className="md:col-span-2">
         <Text label="Descrição do problema" value={form.problemDescription} onChange={(problemDescription) => setForm({ ...form, problemDescription })} />
       </div>
@@ -411,7 +424,7 @@ function ActionForm({ form, setForm, options }: { form: typeof emptyForm; setFor
         <Text label="Ação proposta" value={form.description} onChange={(description) => setForm({ ...form, description })} />
       </div>
       <div className="md:col-span-2">
-        <Text label="Resultado esperado / criterio de eficácia" value={form.expectedResult} onChange={(expectedResult) => setForm({ ...form, expectedResult })} />
+        <Text label="Resultado esperado / critério de eficácia" value={form.expectedResult} onChange={(expectedResult) => setForm({ ...form, expectedResult })} required />
       </div>
     </div>
   );
@@ -426,19 +439,19 @@ function Field({ label, value, onChange, type = 'text', required }: { label: str
   );
 }
 
-function Text({ label, value, onChange }: { label: string; value: string; onChange: (value: string) => void }) {
+function Text({ label, value, onChange, required }: { label: string; value: string; onChange: (value: string) => void; required?: boolean }) {
   return (
     <div>
-      <Label>{label}</Label>
+      <Label className={required ? 'field-required' : undefined}>{label}</Label>
       <Textarea rows={3} value={value} onChange={(e) => onChange(e.target.value)} />
     </div>
   );
 }
 
-function SelectField({ label, value, onChange, items }: { label: string; value: string; onChange: (value: string) => void; items: { id: string; name: string }[] }) {
+function SelectField({ label, value, onChange, items, required }: { label: string; value: string; onChange: (value: string) => void; items: { id: string; name: string }[]; required?: boolean }) {
   return (
     <div>
-      <Label>{label}</Label>
+      <Label className={required ? 'field-required' : undefined}>{label}</Label>
       <NativeSelect value={value} onChange={(e) => onChange(e.target.value)}>
         <option value="">Não vinculado</option>
         {items.map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}

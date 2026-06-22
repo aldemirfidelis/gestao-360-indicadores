@@ -98,27 +98,6 @@ const STATUS_LABEL: Record<CauseStatus, string> = {
   CONVERTED_TO_ACTION: 'Convertida em plano de ação',
 };
 
-const EXAMPLE_CAUSES = [
-  ['METHOD', 'Parâmetros operacionais não padronizados', 'HIGH'],
-  ['METHOD', 'Frequência de limpeza inadequada', 'MEDIUM'],
-  ['METHOD', 'Baixa embebição', 'HIGH'],
-  ['MACHINE', 'Desgaste de rolos difusores', 'HIGH'],
-  ['MACHINE', 'Calibração inadequada de instrumentos', 'MEDIUM'],
-  ['MACHINE', 'Falha em sensores de vazão', 'MEDIUM'],
-  ['MANPOWER', 'Procedimento não seguido', 'HIGH'],
-  ['MANPOWER', 'Treinamento insuficiente', 'MEDIUM'],
-  ['MANPOWER', 'Ajustes manuais inconsistentes', 'MEDIUM'],
-  ['MATERIAL', 'Variação da matéria-prima', 'HIGH'],
-  ['MATERIAL', 'Qualidade do bagaço fora do padrão', 'MEDIUM'],
-  ['MATERIAL', 'Contaminação do bagaço', 'LOW'],
-  ['ENVIRONMENT', 'Temperatura ambiente elevada', 'MEDIUM'],
-  ['ENVIRONMENT', 'Umidade relativa fora do ideal', 'LOW'],
-  ['ENVIRONMENT', 'Ventilação inadequada', 'LOW'],
-  ['MEASUREMENT', 'Falha no monitoramento', 'HIGH'],
-  ['MEASUREMENT', 'Amostragem inconsistente', 'MEDIUM'],
-  ['MEASUREMENT', 'Equipamentos de medição descalibrados', 'LOW'],
-] as const;
-
 export function IshikawaVisualAnalysis({
   actionId,
   session,
@@ -793,7 +772,7 @@ function PriorityBadge({ priority }: { priority: Priority }) {
 }
 
 function normalizeCauses(rows: any[] | undefined): IshikawaCause[] {
-  const source = rows?.length ? rows : EXAMPLE_CAUSES.map(([category, title, priority]) => ({ category, title, description: '', priority }));
+  const source = rows?.length ? rows : [];
   return autoLayout(
     source.map((row: any, index: number) =>
       makeCause({
@@ -934,15 +913,6 @@ function newTempId() {
   return `temp-${Date.now()}-${Math.random().toString(16).slice(2)}`;
 }
 
-function defaultSuggestions(causes: IshikawaCause[]): Suggestion[] {
-  const existing = new Set(causes.map((cause) => normalizeKey(cause.title)));
-  return EXAMPLE_CAUSES
-    .filter(([_category, title]) => !existing.has(normalizeKey(title)))
-    .slice(0, 8)
-    .map(([category, title, priority]) => ({
-      category,
-      title,
-      priority,
-      justification: 'Sugestão preliminar para discussão da equipe antes de confirmar causa raiz.',
-    }));
+function defaultSuggestions(_causes: IshikawaCause[]): Suggestion[] {
+  return [];
 }

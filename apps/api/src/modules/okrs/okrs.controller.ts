@@ -23,6 +23,22 @@ export class OkrsController {
     return this.service.createCycle(me.companyId, body.name, new Date(body.startsAt), new Date(body.endsAt));
   }
 
+  @Patch('cycles/:cycleId')
+  @RequirePermissions('okrs:update')
+  updateCycle(
+    @CurrentUser() me: AuthPayload,
+    @Param('cycleId') cycleId: string,
+    @Body() body: { name?: string; startsAt?: string; endsAt?: string; active?: boolean },
+  ) {
+    return this.service.updateCycle(me.companyId, cycleId, body);
+  }
+
+  @Delete('cycles/:cycleId')
+  @RequirePermissions('okrs:delete')
+  removeCycle(@CurrentUser() me: AuthPayload, @Param('cycleId') cycleId: string) {
+    return this.service.removeCycle(me.companyId, cycleId);
+  }
+
   @Get('options')
   @RequirePermissions('okrs:view')
   options(@CurrentUser() me: AuthPayload) {

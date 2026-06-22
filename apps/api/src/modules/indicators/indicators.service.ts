@@ -321,7 +321,16 @@ export class IndicatorsService {
           orderBy: { periodDate: 'asc' },
           include: { createdBy: { select: { id: true, name: true } } },
         },
-        actions: { select: { id: true, title: true, status: true, dueDate: true } },
+        actions: {
+          select: {
+            id: true,
+            title: true,
+            status: true,
+            dueDate: true,
+            expectedResult: true,
+            responsibleUser: { select: { id: true, name: true } },
+          },
+        },
         meetings: { select: { id: true, title: true, status: true, startsAt: true } },
       },
     });

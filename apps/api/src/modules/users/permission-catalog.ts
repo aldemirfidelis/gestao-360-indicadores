@@ -112,12 +112,12 @@ export const PERMISSION_CATALOG = [
   ['audits:followup', 'Gerenciar follow-up e verificacao de eficacia', 'Auditorias', 'update'],
   ['audits:ai', 'Usar IA assistiva em auditorias', 'Auditorias', 'assist'],
 
-  // Processos e SIPOC
-  ['processes:view', 'Visualizar processos e SIPOC', 'Processos', 'view'],
+  // Processos
+  ['processes:view', 'Visualizar processos', 'Processos', 'view'],
   ['processes:create', 'Mapear processos', 'Processos', 'create'],
-  ['processes:update', 'Editar processos, SIPOC e etapas', 'Processos', 'update'],
+  ['processes:update', 'Editar processos e etapas', 'Processos', 'update'],
   ['processes:delete', 'Arquivar/excluir processos', 'Processos', 'delete'],
-  ['processes:manage', 'Gerenciar processos e SIPOC', 'Processos', 'manage'],
+  ['processes:manage', 'Gerenciar processos', 'Processos', 'manage'],
 
   // Seguranca dos Alimentos (FSMS)
   ['fsms:view', 'Visualizar Seguranca dos Alimentos', 'Seguranca dos Alimentos', 'view'],

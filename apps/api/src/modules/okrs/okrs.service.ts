@@ -81,7 +81,7 @@ export class OkrsService {
 
   async listCycles(companyId: string) {
     return this.prisma.oKRCycle.findMany({
-      where: { companyId },
+      where: { companyId, active: true },
       orderBy: { startsAt: 'desc' },
       include: {
         _count: { select: { objectives: true } },
@@ -93,6 +93,21 @@ export class OkrsService {
     return this.prisma.oKRCycle.create({
       data: { companyId, name, startsAt, endsAt },
     });
+  }
+
+  async updateCycle(companyId: string, cycleId: string, body: { name?: string; startsAt?: string; endsAt?: string; active?: boolean }) {
+    await this.assertCycle(companyId, cycleId);
+    const data: Record<string, any> = {};
+    if ('name' in body) data.name = body.name;
+    if ('startsAt' in body && body.startsAt) data.startsAt = new Date(body.startsAt);
+    if ('endsAt' in body && body.endsAt) data.endsAt = new Date(body.endsAt);
+    if ('active' in body) data.active = Boolean(body.active);
+    return this.prisma.oKRCycle.update({ where: { id: cycleId }, data });
+  }
+
+  async removeCycle(companyId: string, cycleId: string) {
+    await this.assertCycle(companyId, cycleId);
+    return this.prisma.oKRCycle.update({ where: { id: cycleId }, data: { active: false } });
   }
 
   async options(companyId: string) {

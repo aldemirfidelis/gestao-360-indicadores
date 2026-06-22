@@ -190,7 +190,7 @@ export function PDCAVisualAnalysis({
   const qc = useQueryClient();
   const canvasRef = useRef<HTMLDivElement | null>(null);
   const scrollRef = useRef<HTMLDivElement | null>(null);
-  const [stages, setStages] = useState<PdcaStage[]>(() => normalizeStages(session?.pdcaSteps ?? initialStages, action, rootCause));
+  const [stages, setStages] = useState<PdcaStage[]>(() => normalizeStages(session?.pdcaSteps ?? initialStages));
   const [selectedPhase, setSelectedPhase] = useState<Phase>('PLAN');
   const [zoom, setZoom] = useState(1);
   const [lastSavedAt, setLastSavedAt] = useState<string | null>(null);
@@ -594,7 +594,7 @@ function PDCAStageDrawer({
           </div>
           {stage.phase === 'PLAN' && (
             <>
-              <TextInput label="Problema principal" value={stage.data.problem ?? action?.problemDescription ?? ''} onChange={(value) => onUpdate({ data: { ...stage.data, problem: value } })} onBlur={onSave} />
+              <TextInput label="Problema principal" value={stage.data.problem ?? ''} onChange={(value) => onUpdate({ data: { ...stage.data, problem: value } })} onBlur={onSave} />
               <TextInput label="Causa raiz" value={stage.data.rootCause ?? ''} onChange={(value) => { onUpdate({ data: { ...stage.data, rootCause: value } }); onRootCauseChange(value); }} onBlur={onSave} />
               <TextInput label="Meta" value={stage.data.target ?? ''} onChange={(value) => onUpdate({ data: { ...stage.data, target: value } })} onBlur={onSave} />
               <TextInput label="Critério de sucesso" value={stage.data.successCriteria ?? ''} onChange={(value) => onUpdate({ data: { ...stage.data, successCriteria: value } })} onBlur={onSave} />
@@ -611,7 +611,7 @@ function PDCAStageDrawer({
           {stage.phase === 'CHECK' && (
             <>
               <TextInput label="Resultado medido" value={stage.data.measuredResult ?? ''} onChange={(value) => onUpdate({ data: { ...stage.data, measuredResult: value } })} onBlur={onSave} />
-              <TextInput label="Indicador monitorado" value={stage.data.indicator ?? action?.indicator?.name ?? ''} onChange={(value) => onUpdate({ data: { ...stage.data, indicator: value } })} onBlur={onSave} />
+              <TextInput label="Indicador monitorado" value={stage.data.indicator ?? ''} onChange={(value) => onUpdate({ data: { ...stage.data, indicator: value } })} onBlur={onSave} />
               <TextInput label="Meta" value={stage.data.target ?? ''} onChange={(value) => onUpdate({ data: { ...stage.data, target: value } })} onBlur={onSave} />
               <TextInput label="Desvio" value={stage.data.deviation ?? ''} onChange={(value) => onUpdate({ data: { ...stage.data, deviation: value } })} onBlur={onSave} />
               <TextInput label="Comentário da verificação" value={stage.data.checkComment ?? ''} onChange={(value) => onUpdate({ data: { ...stage.data, checkComment: value } })} onBlur={onSave} />
@@ -664,7 +664,7 @@ function PDCAStageDrawer({
 
         <div className="grid gap-2">
           <PanelLink icon={Paperclip} label="Evidências vinculadas" value={`${stage.evidence ? 1 : 0} registro`} />
-          <PanelLink icon={Link2} label="Ações vinculadas" value={stage.convertedToTaskId ? '1 tarefa criada' : `${action?.tasks?.length ?? 0} tarefas do plano`} />
+          <PanelLink icon={Link2} label="Ações vinculadas" value={stage.convertedToTaskId ? '1 tarefa criada' : '0 tarefas vinculadas'} />
           <PanelLink icon={ListChecks} label="Checklist da etapa" value={`${stage.checklist.filter((item) => item.done).length}/${stage.checklist.length} concluídos`} />
         </div>
 
@@ -774,15 +774,15 @@ function stageSummary(stage: PdcaStage, responsibleName?: string) {
   ];
 }
 
-function normalizeStages(rows: any[] | undefined, action: any, rootCause: string): PdcaStage[] {
+function normalizeStages(rows: any[] | undefined): PdcaStage[] {
   const byPhase = new Map((rows ?? []).map((row) => [normalizePhase(row.phase), row]));
-  return PHASES.map((phase) => makeStage(byPhase.get(phase), phase, action, rootCause));
+  return PHASES.map((phase) => makeStage(byPhase.get(phase), phase));
 }
 
-function makeStage(row: any, phase: Phase, action: any, rootCause: string): PdcaStage {
+function makeStage(row: any, phase: Phase): PdcaStage {
   const meta = STAGE_META[phase];
   const data = normalizeData(row?.data);
-  const fallback = defaultStageData(phase, action, rootCause);
+  const fallback = defaultStageData(phase);
   return {
     id: row?.id && !String(row.id).startsWith('temp-') ? String(row.id) : newTempId(),
     phase,
@@ -790,9 +790,9 @@ function makeStage(row: any, phase: Phase, action: any, rootCause: string): Pdca
     subtitle: row?.subtitle ?? meta.subtitle,
     description: row?.description ?? fallback.description,
     objective: row?.objective ?? fallback.objective,
-    responsibleUserId: row?.responsibleUserId ?? action?.responsibleUser?.id ?? '',
-    dueDate: row?.dueDate ?? action?.dueDate ?? '',
-    priority: normalizePriority(row?.priority ?? action?.priority),
+    responsibleUserId: row?.responsibleUserId ?? '',
+    dueDate: row?.dueDate ?? '',
+    priority: normalizePriority(row?.priority),
     progress: clampProgress(row?.progress ?? fallback.progress),
     status: normalizeStatus(row?.status ?? fallback.status),
     evidence: row?.evidence ?? '',
@@ -806,45 +806,31 @@ function makeStage(row: any, phase: Phase, action: any, rootCause: string): Pdca
   };
 }
 
-function defaultStageData(phase: Phase, action: any, rootCause: string) {
-  const result = action?.indicator?.results?.[0] ?? action?.indicatorResult ?? null;
+function defaultStageData(phase: Phase) {
   const base = {
     PLAN: {
-      description: 'Definir o problema, identificar a causa raiz e estabelecer metas e ações necessárias para atingir a melhoria desejada.',
-      objective: action?.problemDescription ?? action?.title ?? '',
-      progress: 25,
+      description: '',
+      objective: '',
+      progress: 0,
       status: 'PENDING',
-      data: {
-        problem: action?.problemDescription ?? action?.title ?? '',
-        rootCause: rootCause || action?.rootCause || '',
-        target: action?.expectedResult ?? '',
-        successCriteria: action?.expectedResult ?? '',
-      },
+      data: {},
     },
     DO: {
-      description: 'Executar as ações definidas, registrar responsáveis, impedimentos e evidências.',
-      objective: action?.description ?? '',
-      progress: action?.tasks?.length ? 25 : 0,
-      status: action?.tasks?.length ? 'IN_PROGRESS' : 'PENDING',
-      data: {
-        actionsCount: `${action?.tasks?.length ?? 0} ações ativas`,
-        startedAt: action?.startDate ? formatDate(action.startDate) : '',
-      },
+      description: '',
+      objective: '',
+      progress: 0,
+      status: 'PENDING',
+      data: {},
     },
     CHECK: {
-      description: 'Medir resultados, comparar com a meta e verificar eficácia parcial.',
-      objective: action?.effectivenessSummary ?? '',
-      progress: action?.effectivenessStatus === 'EFFECTIVE' ? 100 : 0,
+      description: '',
+      objective: '',
+      progress: 0,
       status: 'PENDING',
-      data: {
-        measuredResult: result?.value !== undefined && result?.value !== null ? String(result.value) : '',
-        currentResult: result?.value !== undefined && result?.value !== null ? String(result.value) : '',
-        indicator: action?.indicator?.name ?? '',
-        deviation: result?.deviationPct !== undefined && result?.deviationPct !== null ? `${result.deviationPct}%` : '',
-      },
+      data: {},
     },
     ACT: {
-      description: 'Registrar aprendizados, ajustes e padronização para sustentar a melhoria.',
+      description: '',
       objective: '',
       progress: 0,
       status: 'PENDING',

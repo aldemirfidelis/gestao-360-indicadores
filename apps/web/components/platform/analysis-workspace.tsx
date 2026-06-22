@@ -15,6 +15,7 @@ import { FiveWTwoHVisualAnalysis } from '@/components/platform/five-w-two-h-visu
 import { FiveWhysVisualAnalysis } from '@/components/platform/five-whys-visual-analysis';
 
 const TOOL_LABEL = ANALYSIS_METHOD_LABEL;
+const VISIBLE_ANALYSIS_METHODS = ['FIVE_WHYS', 'ISHIKAWA', 'PDCA', 'FIVE_W_TWO_H'] as const;
 
 /**
  * Ferramentas reais de análise de causa (5 Porquês, Ishikawa 6M, MASP, PDCA...).
@@ -60,12 +61,16 @@ export function AnalysisWorkspace({
   title?: string;
   description?: string;
 }) {
-  const session = action.analysisSessions.find((item) => item.method === (action.analysisTool ?? 'FIVE_WHYS')) ?? action.analysisSessions[0];
-  const [method, setMethod] = useState(action.analysisTool ?? session?.method ?? 'FIVE_WHYS');
+  const preferredMethod = action.analysisTool ?? action.analysisSessions[0]?.method ?? 'FIVE_WHYS';
+  const initialMethod = isVisibleAnalysisMethod(preferredMethod) ? preferredMethod : 'FIVE_WHYS';
+  const session =
+    action.analysisSessions.find((item) => item.method === initialMethod) ??
+    action.analysisSessions.find((item) => isVisibleAnalysisMethod(item.method));
+  const [method, setMethod] = useState<string>(initialMethod);
   const [problem, setProblem] = useState(session?.problem ?? action.problemDescription ?? '');
   const [rootCause, setRootCause] = useState(session?.rootCause ?? action.rootCause ?? '');
   const [fiveWhys, setFiveWhys] = useState<any[]>(session?.fiveWhys?.length ? session.fiveWhys : Array.from({ length: 5 }, (_v, i) => ({ position: i + 1, question: `${i + 1}º por quê?`, answer: '', evidence: '' })));
-  const [ishikawa, setIshikawa] = useState<any[]>(session?.ishikawaCauses?.length ? session.ishikawaCauses : ['Método', 'Máquina', 'Mão de obra', 'Material', 'Meio ambiente', 'Medição'].map((category) => ({ category, description: '', impact: 3, probability: 3, evidence: '' })));
+  const [ishikawa, setIshikawa] = useState<any[]>(session?.ishikawaCauses?.length ? session.ishikawaCauses : []);
   const [maspSteps, setMaspSteps] = useState<any[]>(session?.maspSteps?.length ? session.maspSteps : ['Identificação do problema', 'Observação', 'Análise', 'Plano de ação', 'Execução', 'Verificação', 'Padronização', 'Conclusão'].map((title, i) => ({ step: i + 1, title, description: '', status: 'PENDING' })));
   const [pdcaSteps, setPdcaSteps] = useState<any[]>(session?.pdcaSteps?.length ? session.pdcaSteps : ['PLAN', 'DO', 'CHECK', 'ACT'].map((phase) => ({ phase, description: '', status: 'PENDING' })));
   const ishikawaSession = action.analysisSessions.find((item) => item.method === 'ISHIKAWA');
@@ -83,7 +88,7 @@ export function AnalysisWorkspace({
         <div>
           <Label>Ferramenta</Label>
           <NativeSelect value={method} onChange={(e) => setMethod(e.target.value)}>
-            {Object.entries(TOOL_LABEL).map(([key, label]) => <option key={key} value={key}>{label}</option>)}
+            {VISIBLE_ANALYSIS_METHODS.map((key) => <option key={key} value={key}>{TOOL_LABEL[key] ?? key}</option>)}
           </NativeSelect>
         </div>
         <div className="md:col-span-2">
@@ -156,9 +161,9 @@ export function AnalysisWorkspace({
           onSave={(items) => onSave({ method, problem, rootCause, fiveWhys, ishikawaCauses: ishikawa, maspSteps, pdcaSteps, data: { items }, fiveW2H: deriveFiveW2HSummary(items) })}
         />
       )}
-      {!['FIVE_WHYS', 'ISHIKAWA', 'MASP', 'PDCA', 'FIVE_W_TWO_H'].includes(method) && <GenericAnalysis method={method} session={session} />}
+      {!isVisibleAnalysisMethod(method) && <GenericAnalysis method={method} session={session} />}
 
-      {!['FIVE_WHYS', 'ISHIKAWA', 'PDCA', 'FIVE_W_TWO_H'].includes(method) && (
+      {!isVisibleAnalysisMethod(method) && (
         <>
           <div className="mt-4">
             <Label>Causa raiz provável</Label>
@@ -200,6 +205,10 @@ function GenericAnalysis({ method, session }: { method: string; session?: any })
 
 export function updateArray(rows: any[], index: number, value: any) {
   return rows.map((item, itemIndex) => (itemIndex === index ? value : item));
+}
+
+function isVisibleAnalysisMethod(method: string | null | undefined): method is typeof VISIBLE_ANALYSIS_METHODS[number] {
+  return Boolean(method && VISIBLE_ANALYSIS_METHODS.includes(method as typeof VISIBLE_ANALYSIS_METHODS[number]));
 }
 
 /**

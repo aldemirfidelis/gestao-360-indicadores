@@ -5,7 +5,7 @@ import dynamic from 'next/dynamic';
 import { useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
-import { ChevronRight, GitBranch, List, MessageSquare, Plus, RefreshCw, Save } from 'lucide-react';
+import { ChevronRight, GitBranch, List, MessageSquare, Pencil, Plus, RefreshCw, Save, Trash2 } from 'lucide-react';
 import { PageHeader } from '@/components/shell/page-header';
 import { SectionCard } from '@/components/platform/section-card';
 import { StatusBadge } from '@/components/platform/status-badge';
@@ -158,13 +158,16 @@ export default function OkrsPage() {
   const { hasPermission } = useAuth();
   const canCreate = hasPermission(['okrs:create']);
   const canUpdate = hasPermission(['okrs:update']);
+  const canDelete = hasPermission(['okrs:delete']);
   const canCheckin = hasPermission(['okrs:checkin', 'okrs:update']);
   const [activeCycleId, setActiveCycleId] = useState<string | null>(null);
-  const [view, setView] = useState<'list' | 'flow'>('flow');
+  const [view, setView] = useState<'list' | 'flow'>('list');
   const [areaFilterId, setAreaFilterId] = useState<string>('');
   const [cycleOpen, setCycleOpen] = useState(false);
   const [objectiveOpen, setObjectiveOpen] = useState(false);
   const [krOpen, setKrOpen] = useState(false);
+  const [editingCycleId, setEditingCycleId] = useState<string | null>(null);
+  const [editingObjectiveId, setEditingObjectiveId] = useState<string | null>(null);
   const [cycleForm, setCycleForm] = useState(emptyCycle);
   const [objectiveForm, setObjectiveForm] = useState(emptyObjective);
   const [krForm, setKrForm] = useState(emptyKr);
@@ -189,20 +192,33 @@ export default function OkrsPage() {
   });
 
   const createCycle = useMutation({
-    mutationFn: () => api<Cycle>('/okrs/cycles', { method: 'POST', json: cycleForm }),
+    mutationFn: () =>
+      editingCycleId
+        ? api<Cycle>(`/okrs/cycles/${editingCycleId}`, { method: 'PATCH', json: cycleForm })
+        : api<Cycle>('/okrs/cycles', { method: 'POST', json: cycleForm }),
     onSuccess: (created) => {
-      toast.success('Ciclo criado');
+      toast.success(editingCycleId ? 'Ciclo atualizado' : 'Ciclo criado');
       setCycleOpen(false);
       setCycleForm(emptyCycle);
-      setActiveCycleId(created.id);
+      setEditingCycleId(null);
+      if (!editingCycleId) setActiveCycleId(created.id);
       qc.invalidateQueries({ queryKey: ['okrs', 'cycles'] });
+    },
+  });
+
+  const removeCycle = useMutation({
+    mutationFn: (id: string) => api(`/okrs/cycles/${id}`, { method: 'DELETE' }),
+    onSuccess: (_removed, id) => {
+      toast.success('Ciclo removido');
+      if (activeCycleId === id) setActiveCycleId(null);
+      qc.invalidateQueries({ queryKey: ['okrs'] });
     },
   });
 
   const createObjective = useMutation({
     mutationFn: () =>
-      api(`/okrs/cycles/${cycleId}/objectives`, {
-        method: 'POST',
+      api(editingObjectiveId ? `/okrs/objectives/${editingObjectiveId}` : `/okrs/cycles/${cycleId}/objectives`, {
+        method: editingObjectiveId ? 'PATCH' : 'POST',
         json: {
           ...objectiveForm,
           parentId: objectiveForm.parentId || null,
@@ -212,9 +228,18 @@ export default function OkrsPage() {
         },
       }),
     onSuccess: () => {
-      toast.success('Objetivo criado');
+      toast.success(editingObjectiveId ? 'Objetivo atualizado' : 'Objetivo criado');
       setObjectiveOpen(false);
+      setEditingObjectiveId(null);
       setObjectiveForm(emptyObjective);
+      qc.invalidateQueries({ queryKey: ['okrs'] });
+    },
+  });
+
+  const removeObjective = useMutation({
+    mutationFn: (id: string) => api(`/okrs/objectives/${id}`, { method: 'DELETE' }),
+    onSuccess: () => {
+      toast.success('Objetivo removido');
       qc.invalidateQueries({ queryKey: ['okrs'] });
     },
   });
@@ -259,6 +284,40 @@ export default function OkrsPage() {
     ? allObjectives.filter((o) => o.area?.id === areaFilterId || o.ownerNode?.id === areaFilterId)
     : allObjectives;
 
+  const openNewCycle = () => {
+    setEditingCycleId(null);
+    setCycleForm(emptyCycle);
+    setCycleOpen(true);
+  };
+
+  const openEditCycle = (cycle: Cycle) => {
+    setEditingCycleId(cycle.id);
+    setCycleForm({ name: cycle.name, startsAt: toDateInput(cycle.startsAt), endsAt: toDateInput(cycle.endsAt) });
+    setCycleOpen(true);
+  };
+
+  const openNewObjective = () => {
+    setEditingObjectiveId(null);
+    setObjectiveForm(emptyObjective);
+    setObjectiveOpen(true);
+  };
+
+  const openEditObjective = (objective: Objective) => {
+    setEditingObjectiveId(objective.id);
+    setObjectiveForm({
+      name: objective.name,
+      description: objective.description ?? '',
+      ownerName: objective.ownerName ?? '',
+      team: objective.team ?? '',
+      weight: objective.weight ?? 1,
+      parentId: objective.parentId ?? '',
+      strategicObjId: objective.strategicObj?.id ?? '',
+      ownerNodeId: objective.ownerNode?.id ?? objective.area?.id ?? '',
+      ownerUserId: objective.ownerUser?.id ?? '',
+    });
+    setObjectiveOpen(true);
+  };
+
   return (
     <div>
       <PageHeader
@@ -270,11 +329,11 @@ export default function OkrsPage() {
         actions={
           canCreate ? (
             <>
-              <Button variant="outline" onClick={() => setCycleOpen(true)}>
+              <Button variant="outline" onClick={openNewCycle}>
                 <Plus className="mr-2 h-4 w-4" />
                 Novo ciclo
               </Button>
-              <Button onClick={() => setObjectiveOpen(true)} disabled={!cycleId}>
+              <Button onClick={openNewObjective} disabled={!cycleId}>
                 <Plus className="mr-2 h-4 w-4" />
                 Novo objetivo
               </Button>
@@ -285,10 +344,30 @@ export default function OkrsPage() {
 
       <div className="mb-6 flex flex-wrap items-center gap-2">
         {cycles.data?.map((c) => (
-          <Button key={c.id} variant={c.id === cycleId ? 'default' : 'outline'} size="sm" onClick={() => setActiveCycleId(c.id)}>
-            {c.name}
-            <Badge variant="secondary" className="ml-2">{c._count.objectives}</Badge>
-          </Button>
+          <div key={c.id} className="inline-flex items-center rounded-md border bg-card">
+            <Button variant={c.id === cycleId ? 'default' : 'ghost'} size="sm" className="rounded-r-none" onClick={() => setActiveCycleId(c.id)}>
+              {c.name}
+              <Badge variant="secondary" className="ml-2">{c._count.objectives}</Badge>
+            </Button>
+            {canUpdate && (
+              <Button variant="ghost" size="icon" className="h-8 w-8 rounded-none" onClick={() => openEditCycle(c)} title="Editar ciclo">
+                <Pencil className="h-3.5 w-3.5" />
+              </Button>
+            )}
+            {canDelete && (
+              <Button
+                variant="ghost"
+                size="icon"
+                className="h-8 w-8 rounded-l-none text-destructive hover:text-destructive"
+                onClick={() => {
+                  if (window.confirm(`Excluir o ciclo "${c.name}"? Os dados ficam preservados no histórico.`)) removeCycle.mutate(c.id);
+                }}
+                title="Excluir ciclo"
+              >
+                <Trash2 className="h-3.5 w-3.5" />
+              </Button>
+            )}
+          </div>
         ))}
         <div className="ml-auto flex items-center gap-2">
           <NativeSelect
@@ -329,6 +408,25 @@ export default function OkrsPage() {
                 )}
                 {o.needsCheckin && <Badge variant="secondary">Check-in pendente</Badge>}
                 <StatusBadge value={o.status} label={STATUS_LABEL[o.status] ?? o.status} />
+                {canUpdate && (
+                  <Button variant="outline" size="sm" onClick={() => openEditObjective(o)}>
+                    <Pencil className="mr-2 h-4 w-4" />
+                    Editar
+                  </Button>
+                )}
+                {canDelete && (
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="text-destructive hover:text-destructive"
+                    onClick={() => {
+                      if (window.confirm(`Excluir o objetivo "${o.name}"?`)) removeObjective.mutate(o.id);
+                    }}
+                  >
+                    <Trash2 className="mr-2 h-4 w-4" />
+                    Excluir
+                  </Button>
+                )}
                 {canUpdate && (
                   <Button
                     variant="outline"
@@ -470,7 +568,7 @@ export default function OkrsPage() {
 
       <Dialog open={cycleOpen} onOpenChange={setCycleOpen}>
         <DialogContent>
-          <DialogHeader><DialogTitle>Novo ciclo OKR</DialogTitle></DialogHeader>
+          <DialogHeader><DialogTitle>{editingCycleId ? 'Editar ciclo OKR' : 'Novo ciclo OKR'}</DialogTitle></DialogHeader>
           <div className="space-y-3">
             <div>
               <Label>Nome</Label>
@@ -489,14 +587,16 @@ export default function OkrsPage() {
           </div>
           <DialogFooter>
             <Button variant="ghost" onClick={() => setCycleOpen(false)}>Cancelar</Button>
-            <Button onClick={() => createCycle.mutate()} disabled={!cycleForm.name || createCycle.isPending}>Criar ciclo</Button>
+            <Button onClick={() => createCycle.mutate()} disabled={!cycleForm.name || createCycle.isPending}>
+              {editingCycleId ? 'Salvar ciclo' : 'Criar ciclo'}
+            </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
 
       <Dialog open={objectiveOpen} onOpenChange={setObjectiveOpen}>
         <DialogContent>
-          <DialogHeader><DialogTitle>Novo objetivo</DialogTitle></DialogHeader>
+          <DialogHeader><DialogTitle>{editingObjectiveId ? 'Editar objetivo' : 'Novo objetivo'}</DialogTitle></DialogHeader>
           <div className="space-y-3">
             <div>
               <Label>Objetivo</Label>
@@ -534,7 +634,7 @@ export default function OkrsPage() {
               <Label>Objetivo pai (opcional)</Label>
               <NativeSelect value={objectiveForm.parentId} onChange={(e) => setObjectiveForm({ ...objectiveForm, parentId: e.target.value })}>
                 <option value="">Nenhum (objetivo raiz)</option>
-                {objectives.data?.map((o) => (
+                {objectives.data?.filter((o) => o.id !== editingObjectiveId).map((o) => (
                   <option key={o.id} value={o.id}>
                     {o.name}
                   </option>
@@ -570,9 +670,9 @@ export default function OkrsPage() {
           </div>
           <DialogFooter>
             <Button variant="ghost" onClick={() => setObjectiveOpen(false)}>Cancelar</Button>
-            <Button onClick={() => createObjective.mutate()} disabled={!objectiveForm.name || !cycleId || createObjective.isPending}>
+            <Button onClick={() => createObjective.mutate()} disabled={!objectiveForm.name || (!editingObjectiveId && !cycleId) || createObjective.isPending}>
               <Save className="mr-2 h-4 w-4" />
-              Criar objetivo
+              {editingObjectiveId ? 'Salvar objetivo' : 'Criar objetivo'}
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -683,4 +783,9 @@ function weekRef(date: Date): string {
   const yearStart = new Date(Date.UTC(d.getUTCFullYear(), 0, 1));
   const week = Math.ceil(((d.getTime() - yearStart.getTime()) / 86400000 + 1) / 7);
   return `${d.getUTCFullYear()}-W${String(week).padStart(2, '0')}`;
+}
+
+function toDateInput(value: string | Date | null | undefined) {
+  if (!value) return '';
+  return new Date(value).toISOString().slice(0, 10);
 }

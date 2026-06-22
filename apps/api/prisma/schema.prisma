@@ -1397,6 +1397,7 @@ model Deviation {
   fact              String?
   rootCause         String?
   impact            String?
+  immediateAction   String?
   responsibleUserId String?
   responsibleUser   User?             @relation("DeviationResponsible", fields: [responsibleUserId], references: [id])
   dueDate           DateTime?

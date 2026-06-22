@@ -39,6 +39,7 @@ export class DeviationsController {
       dueDate?: string;
       method?: AnalysisMethod;
       fact?: string;
+      immediateAction?: string;
     },
   ) {
     return this.service.open({
@@ -51,6 +52,7 @@ export class DeviationsController {
       dueDate: body.dueDate ? new Date(body.dueDate) : null,
       method: body.method,
       fact: body.fact,
+      immediateAction: body.immediateAction,
       createdById: me.sub,
     });
   }
@@ -101,6 +103,7 @@ export class DeviationsController {
       priority?: 'LOW' | 'MEDIUM' | 'HIGH' | 'CRITICAL';
       dueDate?: string | null;
       estimatedCost?: number | null;
+      expectedResult?: string | null;
     },
   ) {
     return this.service.createAction(me, id, body);

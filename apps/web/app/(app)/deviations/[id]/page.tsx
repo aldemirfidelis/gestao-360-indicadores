@@ -35,6 +35,7 @@ interface Deviation {
   fact: string | null;
   rootCause: string | null;
   impact: string | null;
+  immediateAction: string | null;
   openedAt: string;
   dueDate: string | null;
   closedAt: string | null;
@@ -98,6 +99,7 @@ export default function DeviationDetailPage() {
     dueDate: '',
     responsibleUserId: '',
     estimatedCost: '',
+    expectedResult: '',
   });
 
   const update = useMutation({
@@ -116,6 +118,7 @@ export default function DeviationDetailPage() {
           dueDate: actionForm.dueDate || undefined,
           responsibleUserId: actionForm.responsibleUserId || undefined,
           estimatedCost: actionForm.estimatedCost ? Number(actionForm.estimatedCost) : undefined,
+          expectedResult: actionForm.expectedResult || undefined,
         },
       }),
     onSuccess: (action) => {
@@ -128,6 +131,7 @@ export default function DeviationDetailPage() {
         dueDate: '',
         responsibleUserId: '',
         estimatedCost: '',
+        expectedResult: '',
       });
       qc.invalidateQueries({ queryKey: ['deviation', id] });
       qc.invalidateQueries({ queryKey: ['actions'] });
@@ -162,6 +166,7 @@ export default function DeviationDetailPage() {
       dueDate: d.dueDate ? d.dueDate.slice(0, 10) : '',
       responsibleUserId: d.responsibleUser?.id ?? '',
       estimatedCost: '',
+      expectedResult: d.impact ?? '',
     });
     setActionOpen(true);
   };
@@ -256,6 +261,18 @@ export default function DeviationDetailPage() {
                 }}
               />
             </div>
+            <div>
+              <Label>Providência imediata</Label>
+              <Textarea
+                defaultValue={d.immediateAction ?? ''}
+                placeholder="O que a área fez de imediato para conter ou sanar momentaneamente o problema?"
+                onBlur={(e) => {
+                  if (e.target.value !== (d.immediateAction ?? '')) {
+                    update.mutate({ immediateAction: e.target.value });
+                  }
+                }}
+              />
+            </div>
           </CardContent>
         </Card>
 
@@ -323,6 +340,15 @@ export default function DeviationDetailPage() {
                 placeholder="Contexto da causa, evidência e orientação da ação..."
               />
             </div>
+            <div className="space-y-2">
+              <Label>Resultado esperado *</Label>
+              <Textarea
+                rows={3}
+                value={actionForm.expectedResult}
+                onChange={(e) => setActionForm({ ...actionForm, expectedResult: e.target.value })}
+                placeholder="Impacto esperado da ação corretiva/preventiva..."
+              />
+            </div>
             <div className="grid gap-3 sm:grid-cols-3">
               <div className="space-y-2">
                 <Label>Prioridade</Label>
@@ -336,7 +362,7 @@ export default function DeviationDetailPage() {
                 </NativeSelect>
               </div>
               <div className="space-y-2">
-                <Label>Prazo</Label>
+                <Label>Prazo *</Label>
                 <Input
                   type="date"
                   value={actionForm.dueDate}
@@ -355,7 +381,7 @@ export default function DeviationDetailPage() {
               </div>
             </div>
             <div className="space-y-2">
-              <Label>Responsável</Label>
+              <Label>Responsável *</Label>
               <NativeSelect
                 value={actionForm.responsibleUserId}
                 onChange={(e) => setActionForm({ ...actionForm, responsibleUserId: e.target.value })}
@@ -371,7 +397,7 @@ export default function DeviationDetailPage() {
             <Button variant="outline" onClick={() => setActionOpen(false)}>Cancelar</Button>
             <Button
               onClick={() => createAction.mutate()}
-              disabled={!actionForm.title.trim() || createAction.isPending}
+              disabled={!actionForm.title.trim() || !actionForm.responsibleUserId || !actionForm.dueDate || !actionForm.expectedResult.trim() || createAction.isPending}
             >
               {createAction.isPending ? 'Criando...' : 'Enviar para Planos de Ação'}
             </Button>

@@ -163,7 +163,7 @@ export class ActionsService {
       statuses: Object.values(ActionStatus),
       priorities: Object.values(ActionPriority),
       origins: Object.values(ActionOrigin),
-      analysisTools: Object.values(ActionAnalysisTool),
+      analysisTools: [ActionAnalysisTool.FIVE_WHYS, ActionAnalysisTool.ISHIKAWA, ActionAnalysisTool.PDCA, ActionAnalysisTool.FIVE_W_TWO_H],
       effectivenessStatuses: Object.values(ActionEffectivenessStatus),
     };
   }
@@ -2268,32 +2268,8 @@ function normalizeTags(value: unknown) {
   return text ? text.split(',').map((item) => item.trim()).filter(Boolean) : [];
 }
 
-function defaultIshikawaCauseSuggestions(problem: string, causes: any[]) {
-  const context = problem ? `Relacionada ao problema: ${problem}` : 'Sugestão para discussão da equipe.';
-  const existing = new Set(
-    causes
-      .map((cause) => normalizeKey(cause.title ?? cause.description))
-      .filter(Boolean),
-  );
-  const suggestions = [
-    { category: 'METHOD', title: 'Parâmetros operacionais não padronizados', priority: ActionPriority.HIGH, justification: `${context} Verifique se os critérios de operação estão claros, medidos e seguidos por turno.` },
-    { category: 'METHOD', title: 'Frequência de limpeza inadequada', priority: ActionPriority.MEDIUM, justification: 'Pode indicar rotina preventiva insuficiente para manter estabilidade do processo.' },
-    { category: 'METHOD', title: 'Baixa embebição', priority: ActionPriority.HIGH, justification: 'Hipótese relevante quando há perda ou extração abaixo do esperado no bagaço.' },
-    { category: 'MACHINE', title: 'Desgaste de rolos difusores', priority: ActionPriority.HIGH, justification: 'Falhas mecânicas podem reduzir eficiência e gerar variação operacional.' },
-    { category: 'MACHINE', title: 'Calibração inadequada de instrumentos', priority: ActionPriority.MEDIUM, justification: 'Instrumentos fora de calibração podem mascarar o desvio real.' },
-    { category: 'MACHINE', title: 'Falha em sensores de vazão', priority: ActionPriority.MEDIUM, justification: 'Medições incorretas podem induzir ajustes operacionais equivocados.' },
-    { category: 'MANPOWER', title: 'Procedimento não seguido', priority: ActionPriority.HIGH, justification: 'Avalie aderência ao procedimento padrão e variações entre equipes.' },
-    { category: 'MANPOWER', title: 'Treinamento insuficiente', priority: ActionPriority.MEDIUM, justification: 'Pode explicar decisões manuais inconsistentes e baixa repetibilidade.' },
-    { category: 'MANPOWER', title: 'Ajustes manuais inconsistentes', priority: ActionPriority.MEDIUM, justification: 'Ajustes sem critério padronizado aumentam dispersão do resultado.' },
-    { category: 'MATERIAL', title: 'Variação da matéria-prima', priority: ActionPriority.HIGH, justification: 'Mudanças na qualidade de entrada podem alterar o desempenho do processo.' },
-    { category: 'MATERIAL', title: 'Qualidade do bagaço fora do padrão', priority: ActionPriority.MEDIUM, justification: 'A condição do material pode impactar diretamente a perda medida.' },
-    { category: 'ENVIRONMENT', title: 'Temperatura ambiente elevada', priority: ActionPriority.MEDIUM, justification: 'Condições ambientais extremas podem afetar estabilidade e medições.' },
-    { category: 'ENVIRONMENT', title: 'Ventilação inadequada', priority: ActionPriority.LOW, justification: 'Ambiente operacional inadequado pode contribuir para variações indiretas.' },
-    { category: 'MEASUREMENT', title: 'Falha no monitoramento', priority: ActionPriority.HIGH, justification: 'Sem monitoramento consistente, a equipe pode reagir tarde ao desvio.' },
-    { category: 'MEASUREMENT', title: 'Amostragem inconsistente', priority: ActionPriority.MEDIUM, justification: 'Amostras não representativas comprometem a leitura do indicador.' },
-    { category: 'MEASUREMENT', title: 'Equipamentos de medição descalibrados', priority: ActionPriority.MEDIUM, justification: 'Valide calibração e rastreabilidade antes de confirmar a causa raiz.' },
-  ];
-  return suggestions.filter((item) => !existing.has(normalizeKey(item.title))).slice(0, 12);
+function defaultIshikawaCauseSuggestions(_problem: string, _causes: any[]) {
+  return [];
 }
 
 function stringify(value: unknown) {
