@@ -139,7 +139,6 @@ export default function MeetingDetailPage() {
   const { hasPermission } = useAuth();
   const [agendaTopic, setAgendaTopic] = useState('');
   const [guest, setGuest] = useState({ name: '', email: '', jobTitle: '', area: '', role: 'PARTICIPANT', notes: '' });
-  const [w2h, setW2h] = useState({ what: '', why: '', who: '', when: '', where: '', how: '', howMuch: '' });
   const [minutesDraft, setMinutesDraft] = useState<AiMinutesDraft | null>(null);
   const canGenerateMinutes = hasPermission(['meetings:update']);
 
@@ -163,13 +162,6 @@ export default function MeetingDetailPage() {
     return m.indicator.targets.find((item) => item.periodRef === m.treatment?.periodRef)?.target ?? null;
   }, [m]);
 
-  const participantUsers = useMemo(() => {
-    const map = new Map<string, { id: string; name: string; email: string | null }>();
-    for (const p of m?.participants ?? []) map.set(p.user.id, p.user);
-    if (linkedAction?.responsibleUser) map.set(linkedAction.responsibleUser.id, linkedAction.responsibleUser);
-    return Array.from(map.values()).sort((a, b) => a.name.localeCompare(b.name));
-  }, [m, linkedAction]);
-
   const addAgenda = useMutation({
     mutationFn: () => api(`/meetings/${id}/agenda`, { method: 'POST', json: { topic: agendaTopic } }),
     onSuccess: () => {
@@ -186,37 +178,6 @@ export default function MeetingDetailPage() {
       qc.invalidateQueries({ queryKey: ['meeting', id] });
     },
     onError: (e: any) => toast.error(e?.message ?? 'Não foi possível adicionar participante'),
-  });
-
-  const generateTask = useMutation({
-    mutationFn: () => {
-      const detail = [
-        w2h.why ? `Por quê: ${w2h.why}` : null,
-        w2h.where ? `Onde: ${w2h.where}` : null,
-        w2h.how ? `Como: ${w2h.how}` : null,
-        w2h.howMuch ? `Quanto: ${w2h.howMuch}` : null,
-      ].filter(Boolean).join('\n');
-      return api(`/meetings/${id}/actions`, {
-        method: 'POST',
-        json: {
-          actionPlanId: linkedAction?.id,
-          title: w2h.what,
-          description: detail || w2h.what,
-          responsibleUserId: w2h.who || undefined,
-          startDate: w2h.when || undefined,
-          endDate: w2h.when || undefined,
-          dueDate: w2h.when || undefined,
-        },
-      });
-    },
-    onSuccess: () => {
-      toast.success('Tarefa (5W2H) adicionada ao plano de ação');
-      setW2h({ what: '', why: '', who: '', when: '', where: '', how: '', howMuch: '' });
-      qc.invalidateQueries({ queryKey: ['meeting', id] });
-      if (linkedAction?.id) qc.invalidateQueries({ queryKey: ['action', linkedAction.id] });
-      qc.invalidateQueries({ queryKey: ['actions'] });
-    },
-    onError: (e: any) => toast.error(e?.message ?? 'Não foi possível criar a tarefa'),
   });
 
   const saveAnalysis = useMutation({
@@ -500,7 +461,7 @@ export default function MeetingDetailPage() {
             </SectionCard>
           )}
 
-          <SectionCard title="Resolver o problema (5W2H)" description="Defina as ações no formato 5W2H. Cada item vira uma tarefa na execução do plano vinculado.">
+          <SectionCard title="Tarefas do plano" description="As ações nascem da ferramenta 5W2H (acima). Ao concluir o 5W2H, a tarefa entra automaticamente aqui e na Execução do plano.">
             {!linkedAction ? (
               <p className="text-sm text-muted-foreground">Esta reunião ainda não está vinculada a um plano de ação.</p>
             ) : (
@@ -529,55 +490,9 @@ export default function MeetingDetailPage() {
                   ))}
                   {linkedAction.tasks.length === 0 && (
                     <div className="rounded-md border border-dashed p-4 text-center text-sm text-muted-foreground">
-                      Nenhuma tarefa criada para este plano ainda.
+                      Nenhuma tarefa ainda. Use a ferramenta <span className="font-medium">5W2H</span> na Análise de causa acima para preencher e gerar a tarefa.
                     </div>
                   )}
-                </div>
-
-                <div className="space-y-3 rounded-lg border bg-muted/30 p-3">
-                  <div className="grid gap-2 md:grid-cols-2">
-                    <div className="md:col-span-2">
-                      <Label>O quê (ação) *</Label>
-                      <Input
-                        value={w2h.what}
-                        onChange={(e) => setW2h({ ...w2h, what: e.target.value })}
-                        placeholder="O que será feito para resolver o problema..."
-                      />
-                    </div>
-                    <div className="md:col-span-2">
-                      <Label>Por quê</Label>
-                      <Textarea rows={2} value={w2h.why} onChange={(e) => setW2h({ ...w2h, why: e.target.value })} placeholder="Por que essa ação é necessária..." />
-                    </div>
-                    <div>
-                      <Label>Quem</Label>
-                      <NativeSelect value={w2h.who} onChange={(e) => setW2h({ ...w2h, who: e.target.value })}>
-                        <option value="">Sem responsável</option>
-                        {participantUsers.map((u) => (
-                          <option key={u.id} value={u.id}>{u.name}</option>
-                        ))}
-                      </NativeSelect>
-                    </div>
-                    <div>
-                      <Label>Quando</Label>
-                      <Input type="date" value={w2h.when} onChange={(e) => setW2h({ ...w2h, when: e.target.value })} />
-                    </div>
-                    <div>
-                      <Label>Onde</Label>
-                      <Input value={w2h.where} onChange={(e) => setW2h({ ...w2h, where: e.target.value })} placeholder="Local / setor / equipamento" />
-                    </div>
-                    <div>
-                      <Label>Quanto (custo)</Label>
-                      <Input value={w2h.howMuch} onChange={(e) => setW2h({ ...w2h, howMuch: e.target.value })} placeholder="Custo estimado" />
-                    </div>
-                    <div className="md:col-span-2">
-                      <Label>Como</Label>
-                      <Textarea rows={2} value={w2h.how} onChange={(e) => setW2h({ ...w2h, how: e.target.value })} placeholder="Como a ação será executada..." />
-                    </div>
-                  </div>
-                  <Button onClick={() => generateTask.mutate()} disabled={!w2h.what.trim() || generateTask.isPending}>
-                    <Plus className="mr-2 h-4 w-4" />
-                    {generateTask.isPending ? 'Adicionando...' : 'Adicionar tarefa'}
-                  </Button>
                 </div>
               </div>
             )}

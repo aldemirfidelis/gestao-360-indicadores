@@ -190,7 +190,7 @@ export function PDCAVisualAnalysis({
   const qc = useQueryClient();
   const canvasRef = useRef<HTMLDivElement | null>(null);
   const scrollRef = useRef<HTMLDivElement | null>(null);
-  const [stages, setStages] = useState<PdcaStage[]>(() => normalizeStages(session?.pdcaSteps ?? initialStages));
+  const [stages, setStages] = useState<PdcaStage[]>(() => normalizeStages(session?.pdcaSteps ?? initialStages, action, rootCause));
   const [selectedPhase, setSelectedPhase] = useState<Phase>('PLAN');
   const [zoom, setZoom] = useState(1);
   const [lastSavedAt, setLastSavedAt] = useState<string | null>(null);
@@ -774,15 +774,15 @@ function stageSummary(stage: PdcaStage, responsibleName?: string) {
   ];
 }
 
-function normalizeStages(rows: any[] | undefined): PdcaStage[] {
+function normalizeStages(rows: any[] | undefined, action?: any, rootCause = ''): PdcaStage[] {
   const byPhase = new Map((rows ?? []).map((row) => [normalizePhase(row.phase), row]));
-  return PHASES.map((phase) => makeStage(byPhase.get(phase), phase));
+  return PHASES.map((phase) => makeStage(byPhase.get(phase), phase, action, rootCause));
 }
 
-function makeStage(row: any, phase: Phase): PdcaStage {
+function makeStage(row: any, phase: Phase, action?: any, rootCause = ''): PdcaStage {
   const meta = STAGE_META[phase];
   const data = normalizeData(row?.data);
-  const fallback = defaultStageData(phase);
+  const fallback = defaultStageData(phase, action, rootCause);
   return {
     id: row?.id && !String(row.id).startsWith('temp-') ? String(row.id) : newTempId(),
     phase,
@@ -790,9 +790,9 @@ function makeStage(row: any, phase: Phase): PdcaStage {
     subtitle: row?.subtitle ?? meta.subtitle,
     description: row?.description ?? fallback.description,
     objective: row?.objective ?? fallback.objective,
-    responsibleUserId: row?.responsibleUserId ?? '',
-    dueDate: row?.dueDate ?? '',
-    priority: normalizePriority(row?.priority),
+    responsibleUserId: row?.responsibleUserId ?? action?.responsibleUser?.id ?? '',
+    dueDate: row?.dueDate ?? action?.dueDate ?? '',
+    priority: normalizePriority(row?.priority ?? action?.priority),
     progress: clampProgress(row?.progress ?? fallback.progress),
     status: normalizeStatus(row?.status ?? fallback.status),
     evidence: row?.evidence ?? '',
@@ -806,31 +806,48 @@ function makeStage(row: any, phase: Phase): PdcaStage {
   };
 }
 
-function defaultStageData(phase: Phase) {
+// Auto-preenche (link) o ciclo a partir do plano/indicador para poupar digitação.
+function defaultStageData(phase: Phase, action?: any, rootCause = '') {
+  const result = action?.indicator?.results?.[0] ?? action?.indicatorResult ?? null;
   const base = {
     PLAN: {
-      description: '',
-      objective: '',
-      progress: 0,
+      description: 'Definir o problema, identificar a causa raiz e estabelecer metas e ações para atingir a melhoria desejada.',
+      objective: action?.problemDescription ?? action?.title ?? '',
+      progress: 25,
       status: 'PENDING',
-      data: {},
+      data: {
+        problem: action?.problemDescription ?? action?.title ?? '',
+        rootCause: rootCause || action?.rootCause || '',
+        target: action?.expectedResult ?? '',
+        successCriteria: action?.expectedResult ?? '',
+      },
     },
     DO: {
-      description: '',
-      objective: '',
-      progress: 0,
-      status: 'PENDING',
-      data: {},
+      description: 'Executar as ações definidas, registrar responsáveis, impedimentos e evidências.',
+      objective: action?.description ?? '',
+      progress: action?.tasks?.length ? 25 : 0,
+      status: action?.tasks?.length ? 'IN_PROGRESS' : 'PENDING',
+      data: {
+        actions: action?.tasks?.length ? `${action.tasks.length} ação(ões) no plano` : '',
+        actionsCount: `${action?.tasks?.length ?? 0} ações no plano`,
+        startedAt: action?.startDate ? formatDate(action.startDate) : '',
+      },
     },
     CHECK: {
-      description: '',
-      objective: '',
-      progress: 0,
+      description: 'Medir resultados, comparar com a meta e verificar a eficácia parcial.',
+      objective: action?.effectivenessSummary ?? '',
+      progress: action?.effectivenessStatus === 'EFFECTIVE' ? 100 : 0,
       status: 'PENDING',
-      data: {},
+      data: {
+        measuredResult: result?.value !== undefined && result?.value !== null ? String(result.value) : '',
+        currentResult: result?.value !== undefined && result?.value !== null ? String(result.value) : '',
+        indicator: action?.indicator?.name ?? '',
+        target: action?.expectedResult ?? '',
+        deviation: result?.deviationPct !== undefined && result?.deviationPct !== null ? `${result.deviationPct}%` : '',
+      },
     },
     ACT: {
-      description: '',
+      description: 'Registrar aprendizados, ajustes e padronização para sustentar a melhoria.',
       objective: '',
       progress: 0,
       status: 'PENDING',

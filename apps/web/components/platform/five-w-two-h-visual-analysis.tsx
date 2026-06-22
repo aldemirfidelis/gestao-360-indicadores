@@ -14,8 +14,8 @@ import {
   Download,
   FileText,
   History,
-  Link2,
   ListChecks,
+  Lock,
   MapPin,
   Maximize,
   Paperclip,
@@ -220,6 +220,7 @@ export function FiveWTwoHVisualAnalysis({
   const [newChecklistItem, setNewChecklistItem] = useState('');
   const [addOpen, setAddOpen] = useState(false);
   const [draft, setDraft] = useState<{ itemType: FieldType; text: string }>({ itemType: 'WHAT', text: '' });
+  const [creatingTask, setCreatingTask] = useState(false);
 
   useEffect(() => {
     const next = normalizeItems(session?.data?.items, action);
@@ -281,19 +282,42 @@ export function FiveWTwoHVisualAnalysis({
     setItems((current) => current.map((item) => (item.itemType === type ? { ...item, ...patch } : item)));
   }
 
-  function markDone(item: FiveW2HItem) {
-    const gap = completionGap(item);
-    if (gap) {
-      toast.error(gap);
+  async function createAggregateTask() {
+    if (!actionId) {
+      toast.error('Salve a análise antes de gerar a tarefa.');
       return;
     }
-    const next = items.map((candidate) =>
-      candidate.itemType === item.itemType
-        ? { ...candidate, status: 'DONE' as ItemStatus, progress: 100, completedAt: new Date().toISOString() }
-        : candidate,
-    );
-    setItems(next);
-    handleSave(next);
+    const get = (type: FieldType) => items.find((item) => item.itemType === type);
+    const text = (type: FieldType) => {
+      const item = get(type);
+      return (item?.description?.trim() || (item?.bullets ?? []).filter(Boolean).join('; ') || '').trim();
+    };
+    const whatText = text('WHAT');
+    if (!whatText) {
+      toast.error('Preencha pelo menos o campo "O quê" (What).');
+      return;
+    }
+    const who = get('WHO')?.responsibleUserId || undefined;
+    const whenRaw = get('WHEN')?.dueDate;
+    const when = whenRaw ? whenRaw.slice(0, 10) : undefined;
+    setCreatingTask(true);
+    try {
+      // Mantém o 5W2H salvo (Por quê / Onde / Como / Quanto ficam rastreáveis na análise).
+      handleSave(items);
+      await api(`/actions/${actionId}/tasks`, {
+        method: 'POST',
+        json: { title: whatText, assignedToId: who, dueDate: when, startDate: when, endDate: when },
+      });
+      const next = items.map((item) => ({ ...item, status: 'DONE' as ItemStatus, progress: 100, completedAt: item.completedAt ?? new Date().toISOString() }));
+      setItems(next);
+      handleSave(next);
+      toast.success('5W2H concluído e tarefa criada no plano');
+      qc.invalidateQueries({ queryKey: ['action', actionId] });
+    } catch (error: any) {
+      toast.error(error?.message ?? 'Não foi possível gerar a tarefa');
+    } finally {
+      setCreatingTask(false);
+    }
   }
 
   function addBullet() {
@@ -314,46 +338,11 @@ export function FiveWTwoHVisualAnalysis({
     handleSave(next);
   }
 
-  function removeBullet(type: FieldType, index: number) {
-    const next = items.map((item) =>
-      item.itemType === type ? { ...item, bullets: item.bullets.filter((_b, i) => i !== index) } : item,
-    );
-    setItems(next);
-    handleSave(next);
-  }
-
   function addChecklistItem() {
     const title = newChecklistItem.trim();
     if (!title || !selectedItem) return;
     updateItem(selectedItem.itemType, { checklist: [...selectedItem.checklist, { id: newTempId(), title, done: false }] });
     setNewChecklistItem('');
-  }
-
-  async function convertToAction(item: FiveW2HItem) {
-    if (!actionId) {
-      toast.error('Salve a análise antes de transformar este item em ação.');
-      return;
-    }
-    if (item.convertedToTaskId) return;
-    try {
-      await api(`/actions/${actionId}/analysis/5w2h/items/${item.itemType}/convert-to-action`, {
-        method: 'POST',
-        json: {
-          title: `5W2H ${FIELD_META[item.itemType].title}: ${item.description || item.bullets[0] || action?.title || 'ação vinculada'}`,
-          description: item.description,
-          responsibleUserId: item.responsibleUserId || undefined,
-          dueDate: item.dueDate || undefined,
-          priority: item.priority,
-        },
-      });
-      toast.success('Item transformado em tarefa do plano');
-      // O backend já persistiu a marca de conversão em session.data; apenas refletimos
-      // localmente e deixamos o refetch trazer o convertedToTaskId real (sem re-salvar).
-      setItems((current) => current.map((candidate) => (candidate.itemType === item.itemType ? { ...candidate, convertedToTaskId: 'pending-refresh' } : candidate)));
-      qc.invalidateQueries({ queryKey: ['action', actionId] });
-    } catch (error: any) {
-      toast.error(error?.message ?? 'Não foi possível transformar em ação');
-    }
   }
 
   async function loadAiSuggestions() {
@@ -507,16 +496,16 @@ export function FiveWTwoHVisualAnalysis({
           </div>
         </div>
 
-        <FiveW2HDrawer
-          item={selectedItem}
-          action={action}
+        <FiveW2HGuide
+          items={items}
           users={users}
           canEdit={canEdit}
-          onUpdate={(patch) => selectedItem && updateItem(selectedItem.itemType, patch)}
+          creatingTask={creatingTask}
+          selectedType={selectedType}
+          onSelect={setSelectedType}
+          onUpdate={(type, patch) => updateItem(type, patch)}
           onSave={() => handleSave()}
-          onMarkDone={() => selectedItem && markDone(selectedItem)}
-          onConvert={() => selectedItem && convertToAction(selectedItem)}
-          onRemoveBullet={(index) => selectedItem && removeBullet(selectedItem.itemType, index)}
+          onGenerateTask={createAggregateTask}
           onOpenChecklist={() => setChecklistOpen(true)}
         />
       </div>
@@ -703,171 +692,135 @@ function FiveW2HCard({
   );
 }
 
-function FiveW2HDrawer({
-  item,
-  action,
+const STEP_ORDER: FieldType[] = ['WHAT', 'WHY', 'WHERE', 'WHO', 'WHEN', 'HOW', 'HOW_MUCH'];
+const STEP_CONFIG: Record<FieldType, { label: string; hint: string; kind: 'text' | 'user' | 'date'; placeholder: string }> = {
+  WHAT: { label: 'O quê', hint: 'O que será feito', kind: 'text', placeholder: 'Descreva a ação que será executada...' },
+  WHY: { label: 'Por quê', hint: 'Por que será feito', kind: 'text', placeholder: 'Justifique: por que essa ação resolve o problema...' },
+  WHERE: { label: 'Onde', hint: 'Onde será feito', kind: 'text', placeholder: 'Local / setor / processo / equipamento...' },
+  WHO: { label: 'Quem (dono)', hint: 'Responsável pela execução', kind: 'user', placeholder: '' },
+  WHEN: { label: 'Quando (prazo)', hint: 'Prazo de conclusão', kind: 'date', placeholder: '' },
+  HOW: { label: 'Como', hint: 'Como será executado', kind: 'text', placeholder: 'Método / passo a passo / recursos...' },
+  HOW_MUCH: { label: 'Quanto vai custar (impacto)', hint: 'Custo / impacto estimado', kind: 'text', placeholder: 'Custo estimado, impacto ou retorno esperado...' },
+};
+
+/**
+ * Preenchimento guiado e sequencial do 5W2H: um campo por vez. O próximo só libera
+ * quando o anterior é preenchido; ao concluir "Quanto vai custar", gera a tarefa no plano.
+ */
+function FiveW2HGuide({
+  items,
   users,
   canEdit,
+  creatingTask,
+  selectedType,
+  onSelect,
   onUpdate,
   onSave,
-  onMarkDone,
-  onConvert,
-  onRemoveBullet,
+  onGenerateTask,
   onOpenChecklist,
 }: {
-  item?: FiveW2HItem;
-  action?: any;
+  items: FiveW2HItem[];
   users: UserOption[];
   canEdit: boolean;
-  onUpdate: (patch: Partial<FiveW2HItem>) => void;
+  creatingTask: boolean;
+  selectedType: FieldType;
+  onSelect: (type: FieldType) => void;
+  onUpdate: (type: FieldType, patch: Partial<FiveW2HItem>) => void;
   onSave: () => void;
-  onMarkDone: () => void;
-  onConvert: () => void;
-  onRemoveBullet: (index: number) => void;
+  onGenerateTask: () => void;
   onOpenChecklist: () => void;
 }) {
-  if (!item) {
-    return (
-      <aside className="border-l border-slate-200 bg-white p-4">
-        <div className="text-sm font-semibold text-slate-900">Item selecionado</div>
-        <p className="mt-2 text-sm text-slate-500">Selecione um card do board para editar detalhes, responsáveis, checklist e evidências.</p>
-      </aside>
-    );
+  const byType = (type: FieldType) => items.find((item) => item.itemType === type)!;
+  const isDone = (type: FieldType) => Boolean(String(byType(type).description ?? '').trim());
+  const currentIndex = STEP_ORDER.findIndex((type) => !isDone(type));
+  const allDone = currentIndex === -1;
+  const userName = (id: string) => users.find((user) => user.id === id)?.name ?? '';
+
+  function applyStep(type: FieldType, kind: 'text' | 'user' | 'date', raw: string, save = false) {
+    if (kind === 'user') onUpdate(type, { responsibleUserId: raw, description: userName(raw) });
+    else if (kind === 'date') onUpdate(type, { dueDate: raw, description: raw ? new Date(raw).toLocaleDateString('pt-BR') : '' });
+    else onUpdate(type, { description: raw });
+    if (save) onSave();
   }
-  const meta = FIELD_META[item.itemType];
-  const Icon = meta.icon;
-  const doneChecklist = item.checklist.filter((check) => check.done).length;
+
   return (
     <aside className="border-l border-slate-200 bg-white">
       <div className="border-b border-slate-200 p-3">
-        <div className="text-sm font-semibold text-slate-900">Item selecionado</div>
-        <div className="mt-2 flex items-start gap-2">
-          <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-white" style={{ backgroundColor: meta.color }}>
-            <Icon className="h-4 w-4" />
-          </span>
-          <div className="min-w-0">
-            <div className="text-base font-semibold text-slate-900">{meta.title}</div>
-            <div className="text-xs text-slate-500">{meta.subtitle}</div>
-          </div>
-        </div>
+        <div className="text-sm font-semibold text-slate-900">Preenchimento guiado</div>
+        <p className="mt-0.5 text-xs text-slate-500">Preencha um campo por vez. Ao concluir todos, gere a tarefa no plano.</p>
       </div>
-      <div className="max-h-[520px] space-y-3 overflow-y-auto p-3">
-        <fieldset disabled={!canEdit} className="space-y-3">
-          <div>
-            <Label>Descrição / Objetivo</Label>
-            <Textarea rows={3} value={item.description} onChange={(event) => onUpdate({ description: event.target.value })} onBlur={onSave} />
-          </div>
-
-          <div>
-            <Label>Itens deste campo</Label>
-            <div className="mt-1 space-y-1">
-              {item.bullets.length === 0 && <p className="text-xs text-slate-400">Use “Adicionar item” para detalhar este campo.</p>}
-              {item.bullets.map((bullet, index) => (
-                <div key={index} className="flex items-center gap-2 rounded-md border border-slate-200 bg-slate-50 px-2 py-1 text-xs">
-                  <span className="min-w-0 flex-1 text-slate-700">{bullet}</span>
-                  {canEdit && (
-                    <button type="button" className="text-slate-400 hover:text-red-600" onClick={() => onRemoveBullet(index)} aria-label="Remover item">
-                      <Trash2 className="h-3.5 w-3.5" />
-                    </button>
-                  )}
+      <div className="max-h-[520px] space-y-2 overflow-y-auto p-3">
+        {STEP_ORDER.map((type, idx) => {
+          const meta = FIELD_META[type];
+          const cfg = STEP_CONFIG[type];
+          const item = byType(type);
+          const done = isDone(type);
+          const active = idx === currentIndex;
+          const locked = currentIndex !== -1 && idx > currentIndex;
+          const Icon = meta.icon;
+          const open = (active || done) && !locked;
+          return (
+            <div
+              key={type}
+              className={cn(
+                'rounded-lg border p-3 transition',
+                active ? 'border-blue-300 bg-blue-50/40 ring-1 ring-blue-100' : 'border-slate-200',
+                locked && 'opacity-55',
+                selectedType === type && !active && 'ring-1 ring-slate-200',
+              )}
+              onClick={() => !locked && onSelect(type)}
+            >
+              <div className="flex items-center gap-2">
+                <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-xs font-bold text-white" style={{ backgroundColor: done ? meta.color : locked ? '#cbd5e1' : meta.color }}>
+                  {done ? <CheckCircle2 className="h-4 w-4" /> : meta.number}
+                </span>
+                <div className="min-w-0 flex-1">
+                  <div className="flex items-center gap-1.5 text-sm font-semibold text-slate-800">
+                    <Icon className="h-3.5 w-3.5" style={{ color: meta.color }} />
+                    {idx + 1}. {cfg.label}
+                  </div>
+                  <div className="text-[11px] text-slate-500">{cfg.hint}</div>
                 </div>
-              ))}
-            </div>
-          </div>
-
-          {TYPE_FIELDS[item.itemType].map((field) => (
-            <div key={field.key}>
-              <Label>{field.label}</Label>
-              <Input
-                type={field.type === 'date' ? 'date' : 'text'}
-                value={field.type === 'date' ? String(item.data[field.key] ?? '').slice(0, 10) : item.data[field.key] ?? ''}
-                onChange={(event) => onUpdate({ data: { ...item.data, [field.key]: event.target.value } })}
-                onBlur={onSave}
-              />
-            </div>
-          ))}
-
-          <div className="grid gap-3 sm:grid-cols-2">
-            <div>
-              <Label>Responsável</Label>
-              <NativeSelect value={item.responsibleUserId} onChange={(event) => onUpdate({ responsibleUserId: event.target.value })} onBlur={onSave}>
-                <option value="">Sem responsável</option>
-                {users.map((user) => <option key={user.id} value={user.id}>{user.name}</option>)}
-              </NativeSelect>
-            </div>
-            <div>
-              <Label>Prazo</Label>
-              <Input type="date" value={item.dueDate?.slice(0, 10) ?? ''} onChange={(event) => onUpdate({ dueDate: event.target.value })} onBlur={onSave} />
-            </div>
-          </div>
-          <div className="grid gap-3 sm:grid-cols-2">
-            <div>
-              <Label>Prioridade</Label>
-              <NativeSelect value={item.priority} onChange={(event) => onUpdate({ priority: event.target.value as Priority })} onBlur={onSave}>
-                {Object.entries(PRIORITY_LABEL).map(([key, label]) => <option key={key} value={key}>{label}</option>)}
-              </NativeSelect>
-            </div>
-            <div>
-              <Label>Status</Label>
-              <NativeSelect value={item.status} onChange={(event) => onUpdate({ status: event.target.value as ItemStatus })} onBlur={onSave}>
-                {Object.entries(STATUS_LABEL).map(([key, label]) => <option key={key} value={key}>{label}</option>)}
-              </NativeSelect>
-            </div>
-          </div>
-          <div>
-            <Label>Progresso</Label>
-            <div className="flex items-center gap-3">
-              <Input type="number" min={0} max={100} value={item.progress} onChange={(event) => onUpdate({ progress: clampProgress(event.target.value) })} onBlur={onSave} className="w-24" />
-              <div className="h-1.5 flex-1 overflow-hidden rounded-full bg-slate-100">
-                <div className="h-full rounded-full" style={{ width: `${item.progress}%`, backgroundColor: meta.color }} />
+                {locked && <Lock className="h-3.5 w-3.5 text-slate-400" />}
               </div>
+
+              {open && (
+                <div className="mt-2" onClick={(event) => event.stopPropagation()}>
+                  <fieldset disabled={!canEdit}>
+                    {cfg.kind === 'text' && (
+                      <Textarea rows={2} value={item.description} placeholder={cfg.placeholder} onChange={(event) => applyStep(type, 'text', event.target.value)} onBlur={onSave} />
+                    )}
+                    {cfg.kind === 'user' && (
+                      <NativeSelect value={item.responsibleUserId} onChange={(event) => applyStep(type, 'user', event.target.value, true)}>
+                        <option value="">Selecione o responsável...</option>
+                        {users.map((user) => <option key={user.id} value={user.id}>{user.name}</option>)}
+                      </NativeSelect>
+                    )}
+                    {cfg.kind === 'date' && (
+                      <Input type="date" value={item.dueDate?.slice(0, 10) ?? ''} onChange={(event) => applyStep(type, 'date', event.target.value, true)} />
+                    )}
+                  </fieldset>
+                </div>
+              )}
+              {locked && <p className="mt-1.5 text-[11px] text-slate-400">Conclua o campo anterior para liberar.</p>}
             </div>
-          </div>
-          <div>
-            <Label>Evidências vinculadas</Label>
-            <Textarea rows={2} value={item.evidence} onChange={(event) => onUpdate({ evidence: event.target.value })} onBlur={onSave} placeholder="Arquivos, links, prints ou registros operacionais" />
-          </div>
-        </fieldset>
+          );
+        })}
 
-        <div className="grid gap-2">
-          <PanelLink icon={Paperclip} label="Evidências vinculadas" value={`${item.evidence ? 1 : 0} registro`} />
-          <PanelLink icon={Link2} label="Ações vinculadas" value={item.convertedToTaskId ? '1 tarefa criada' : `${action?.tasks?.length ?? 0} tarefas do plano`} />
-          <button type="button" onClick={onOpenChecklist} className="flex items-center justify-between gap-3 rounded-lg border border-slate-200 bg-white p-3 text-sm transition hover:border-slate-300">
-            <span className="flex items-center gap-2 font-medium text-slate-700"><ListChecks className="h-4 w-4 text-slate-500" />Checklist do item</span>
-            <span className="text-xs text-slate-500">{doneChecklist}/{item.checklist.length} concluídos</span>
-          </button>
-        </div>
+        <button type="button" onClick={onOpenChecklist} className="flex w-full items-center justify-between gap-3 rounded-lg border border-slate-200 bg-white p-2.5 text-sm transition hover:border-slate-300">
+          <span className="flex items-center gap-2 font-medium text-slate-700"><ListChecks className="h-4 w-4 text-slate-500" />Checklist da análise</span>
+          <ChevronRight className="h-4 w-4 text-slate-400" />
+        </button>
 
-        <div className="rounded-lg border border-slate-200 bg-slate-50 p-3">
-          <div className="text-xs font-semibold text-slate-700">Histórico</div>
-          <p className="mt-1 text-xs text-slate-500">As alterações deste item ficam registradas no histórico e na auditoria do plano ao salvar.</p>
-        </div>
-
-        <div className="space-y-2 border-t border-slate-200 pt-4">
-          <Button className="w-full justify-start" onClick={onConvert} disabled={!canEdit || Boolean(item.convertedToTaskId)}>
+        <div className="border-t border-slate-200 pt-3">
+          <Button className="w-full justify-center bg-emerald-600 hover:bg-emerald-700" onClick={onGenerateTask} disabled={!canEdit || creatingTask || !allDone}>
             <Rocket className="mr-2 h-4 w-4" />
-            Transformar em plano de ação
+            {creatingTask ? 'Gerando tarefa...' : 'Concluir 5W2H e gerar tarefa'}
           </Button>
-          <Button variant="outline" className="w-full justify-start text-green-700" onClick={onMarkDone} disabled={!canEdit}>
-            <CheckCircle2 className="mr-2 h-4 w-4" />
-            Marcar concluído
-          </Button>
-          <Button variant="outline" className="w-full justify-start" onClick={onSave} disabled={!canEdit}>
-            <FileText className="mr-2 h-4 w-4" />
-            Editar item
-          </Button>
+          {!allDone && <p className="mt-1.5 text-center text-[11px] text-slate-400">Preencha os 7 campos em ordem para liberar.</p>}
         </div>
       </div>
     </aside>
-  );
-}
-
-function PanelLink({ icon: Icon, label, value }: { icon: LucideIcon; label: string; value: string }) {
-  return (
-    <div className="flex items-center justify-between gap-3 rounded-lg border border-slate-200 bg-white p-3 text-sm">
-      <span className="flex items-center gap-2 font-medium text-slate-700"><Icon className="h-4 w-4 text-slate-500" />{label}</span>
-      <span className="text-xs text-slate-500">{value}</span>
-    </div>
   );
 }
 

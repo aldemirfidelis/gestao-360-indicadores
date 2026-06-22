@@ -15,7 +15,7 @@ import { FiveWTwoHVisualAnalysis } from '@/components/platform/five-w-two-h-visu
 import { FiveWhysVisualAnalysis } from '@/components/platform/five-whys-visual-analysis';
 
 const TOOL_LABEL = ANALYSIS_METHOD_LABEL;
-const VISIBLE_ANALYSIS_METHODS = ['FIVE_WHYS', 'ISHIKAWA', 'PDCA', 'FIVE_W_TWO_H'] as const;
+const VISIBLE_ANALYSIS_METHODS = ['ISHIKAWA', 'FIVE_WHYS', 'FIVE_W_TWO_H', 'PDCA'] as const;
 
 /**
  * Ferramentas reais de análise de causa (5 Porquês, Ishikawa 6M, MASP, PDCA...).
@@ -61,8 +61,8 @@ export function AnalysisWorkspace({
   title?: string;
   description?: string;
 }) {
-  const preferredMethod = action.analysisTool ?? action.analysisSessions[0]?.method ?? 'FIVE_WHYS';
-  const initialMethod = isVisibleAnalysisMethod(preferredMethod) ? preferredMethod : 'FIVE_WHYS';
+  const preferredMethod = action.analysisTool ?? action.analysisSessions[0]?.method ?? 'ISHIKAWA';
+  const initialMethod = isVisibleAnalysisMethod(preferredMethod) ? preferredMethod : 'ISHIKAWA';
   const session =
     action.analysisSessions.find((item) => item.method === initialMethod) ??
     action.analysisSessions.find((item) => isVisibleAnalysisMethod(item.method));
