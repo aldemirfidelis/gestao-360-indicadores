@@ -234,9 +234,12 @@ export function FiveWTwoHVisualAnalysis({
 
   const selectedItem = items.find((item) => item.itemType === selectedType) ?? items[0];
   const responsibleById = useMemo(() => new Map(users.map((user) => [user.id, user.name])), [users]);
-  const completedCount = items.filter((item) => item.status === 'DONE').length;
-  const structuredCount = items.filter((item) => isStructured(item)).length;
-  const overallProgress = Math.round((completedCount / FIELD_ORDER.length) * 100);
+  const doneCount = FIELD_ORDER.filter((type) => stepDone(items.find((i) => i.itemType === type)!)).length;
+  const structuredCount = doneCount;
+  const completedCount = doneCount;
+  const overallProgress = Math.round((doneCount / FIELD_ORDER.length) * 100);
+  const currentIndex = FIELD_ORDER.findIndex((type) => !stepDone(items.find((i) => i.itemType === type)!));
+  const allDone = currentIndex === -1;
 
   const handleSave = useCallback(
     (nextItems = itemsRef.current) => {
@@ -280,6 +283,20 @@ export function FiveWTwoHVisualAnalysis({
 
   function updateItem(type: FieldType, patch: Partial<FiveW2HItem>) {
     setItems((current) => current.map((item) => (item.itemType === type ? { ...item, ...patch } : item)));
+  }
+
+  // Confirma um campo (select/data) já salvando — evita o bug do onChange não disparar em valor pré-selecionado.
+  function commitField(type: FieldType, patch: Partial<FiveW2HItem>) {
+    const next = itemsRef.current.map((item) => (item.itemType === type ? { ...item, ...patch } : item));
+    setItems(next);
+    handleSave(next);
+  }
+
+  function stepDone(item: FiveW2HItem) {
+    const kind = STEP_CONFIG[item.itemType].kind;
+    if (kind === 'user') return Boolean(item.responsibleUserId);
+    if (kind === 'date') return Boolean(item.dueDate);
+    return Boolean((item.description ?? '').trim() || item.bullets.some((bullet) => bullet.trim()));
   }
 
   async function createAggregateTask() {
@@ -411,10 +428,6 @@ export function FiveWTwoHVisualAnalysis({
     <div className="overflow-hidden rounded-lg border border-slate-200 bg-slate-50 shadow-sm">
       <div className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-200 bg-white px-4 py-3">
         <div className="flex flex-wrap items-center gap-2">
-          <Button size="sm" onClick={() => { setDraft({ itemType: selectedType, text: '' }); setAddOpen(true); }} disabled={!canEdit}>
-            <Plus className="mr-2 h-4 w-4" />
-            Adicionar item
-          </Button>
           <Button size="sm" variant="outline" onClick={loadAiSuggestions} disabled={!canEdit || loadingAi}>
             <Sparkles className="mr-2 h-4 w-4" />
             {loadingAi ? 'Gerando...' : 'Sugestão com IA'}
@@ -423,30 +436,8 @@ export function FiveWTwoHVisualAnalysis({
             <ListChecks className="mr-2 h-4 w-4" />
             Checklist
           </Button>
-          <Button size="sm" variant="outline" onClick={() => selectedItem && setSelectedType(selectedItem.itemType)}>
-            <Paperclip className="mr-2 h-4 w-4" />
-            Evidências
-          </Button>
-          <Button size="sm" variant="outline" onClick={() => selectedItem && setSelectedType(selectedItem.itemType)}>
-            <History className="mr-2 h-4 w-4" />
-            Timeline
-          </Button>
         </div>
         <div className="flex flex-wrap items-center gap-2">
-          <Button size="sm" variant="outline" onClick={resetLayout} disabled={!canEdit} title="Reorganizar layout">
-            <Maximize className="mr-2 h-4 w-4" />
-            Layout
-          </Button>
-          <Button size="icon" variant="outline" onClick={() => setZoom((value) => Math.max(0.75, value - 0.1))} title="Reduzir zoom">
-            <ZoomOut className="h-4 w-4" />
-          </Button>
-          <div className="w-12 text-center text-xs font-medium text-slate-600">{Math.round(zoom * 100)}%</div>
-          <Button size="icon" variant="outline" onClick={() => setZoom((value) => Math.min(1.25, value + 0.1))} title="Aumentar zoom">
-            <ZoomIn className="h-4 w-4" />
-          </Button>
-          <Button size="icon" variant="outline" onClick={centerCanvas} title="Centralizar">
-            <Target className="h-4 w-4" />
-          </Button>
           <Button size="sm" variant="outline" onClick={exportImage}>
             <Download className="mr-2 h-4 w-4" />
             Exportar
@@ -464,79 +455,40 @@ export function FiveWTwoHVisualAnalysis({
         </div>
       )}
 
-      <div className="grid grid-cols-1 xl:grid-cols-[minmax(0,1fr)_320px]">
-        <div ref={scrollRef} className="max-h-[560px] overflow-auto bg-slate-50">
-          <div
-            ref={canvasRef}
-            className="relative origin-top-left"
-            style={{ width: CANVAS_WIDTH, height: CANVAS_HEIGHT, transform: `scale(${zoom})`, transformOrigin: 'top left' }}
-          >
-            <FiveW2HConnectors items={items} />
-            <div className="absolute left-1/2 top-3 z-10 -translate-x-1/2 text-center">
-              <div className="text-lg font-bold tracking-tight text-slate-900">5W2H</div>
-              <div className="text-xs font-medium text-slate-500">Plano estruturado de execução</div>
-            </div>
-            {FIELD_ORDER.map((type) => {
-              const item = items.find((candidate) => candidate.itemType === type)!;
-              return (
-                <FiveW2HCard
-                  key={type}
-                  item={item}
-                  selected={selectedType === type}
-                  canEdit={canEdit}
-                  responsibleName={item.responsibleUserId ? responsibleById.get(item.responsibleUserId) : undefined}
-                  onSelect={() => setSelectedType(type)}
-                  onPointerDown={(event) => {
-                    if (!canEdit) return;
-                    dragRef.current = { id: item.id, startX: event.clientX, startY: event.clientY, originX: item.positionX, originY: item.positionY, moved: false };
-                  }}
-                />
-              );
-            })}
-          </div>
+      <div className="bg-slate-50 p-4">
+        <div className="mb-4 text-center">
+          <div className="text-lg font-bold tracking-tight text-slate-900">5W2H</div>
+          <div className="text-xs font-medium text-slate-500">Plano estruturado de execução — preencha um bloco por vez; o próximo libera ao concluir o anterior.</div>
         </div>
-
-        <FiveW2HGuide
-          items={items}
-          users={users}
-          canEdit={canEdit}
-          creatingTask={creatingTask}
-          selectedType={selectedType}
-          onSelect={setSelectedType}
-          onUpdate={(type, patch) => updateItem(type, patch)}
-          onSave={() => handleSave()}
-          onGenerateTask={createAggregateTask}
-          onOpenChecklist={() => setChecklistOpen(true)}
-        />
+        <div ref={canvasRef} className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
+          {FIELD_ORDER.map((type, idx) => {
+            const item = items.find((candidate) => candidate.itemType === type)!;
+            const done = stepDone(item);
+            const active = idx === currentIndex;
+            const locked = currentIndex !== -1 && idx > currentIndex;
+            return (
+              <FiveW2HBlock
+                key={type}
+                item={item}
+                idx={idx}
+                done={done}
+                active={active}
+                locked={locked}
+                allDone={allDone}
+                creatingTask={creatingTask}
+                users={users}
+                canEdit={canEdit}
+                onText={(value) => updateItem(type, { description: value })}
+                onCommit={(patch) => commitField(type, patch)}
+                onBlurSave={() => handleSave()}
+                onGenerateTask={createAggregateTask}
+              />
+            );
+          })}
+        </div>
       </div>
 
       <FiveW2HFooter structuredCount={structuredCount} completedCount={completedCount} progress={overallProgress} saving={saving} lastSavedAt={lastSavedAt} />
-
-      <Dialog open={addOpen} onOpenChange={setAddOpen}>
-        <DialogContent className="max-w-md">
-          <DialogHeader>
-            <DialogTitle>Adicionar item ao 5W2H</DialogTitle>
-          </DialogHeader>
-          <div className="space-y-3">
-            <div>
-              <Label>Campo</Label>
-              <NativeSelect value={draft.itemType} onChange={(event) => setDraft({ ...draft, itemType: event.target.value as FieldType })}>
-                {FIELD_ORDER.map((type) => (
-                  <option key={type} value={type}>{FIELD_META[type].title} — {FIELD_META[type].subtitle}</option>
-                ))}
-              </NativeSelect>
-            </div>
-            <div>
-              <Label>Conteúdo do item</Label>
-              <Input value={draft.text} onChange={(event) => setDraft({ ...draft, text: event.target.value })} autoFocus onKeyDown={(event) => event.key === 'Enter' && addBullet()} />
-            </div>
-          </div>
-          <DialogFooter>
-            <Button variant="ghost" onClick={() => setAddOpen(false)}>Cancelar</Button>
-            <Button onClick={addBullet}>Adicionar</Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
 
       <Dialog open={suggestionsOpen} onOpenChange={setSuggestionsOpen}>
         <DialogContent className="max-w-3xl">
@@ -603,96 +555,109 @@ export function FiveWTwoHVisualAnalysis({
   );
 }
 
-function FiveW2HConnectors({ items }: { items: FiveW2HItem[] }) {
-  const byType = new Map(items.map((item) => [item.itemType, item]));
-  return (
-    <svg className="absolute inset-0 z-0" width={CANVAS_WIDTH} height={CANVAS_HEIGHT} aria-hidden>
-      {CONNECTORS.map(([from, to]) => {
-        const a = byType.get(from);
-        const b = byType.get(to);
-        if (!a || !b) return null;
-        const ax = a.positionX + CARD_WIDTH / 2;
-        const ay = a.positionY + CARD_HEIGHT / 2;
-        const bx = b.positionX + CARD_WIDTH / 2;
-        const by = b.positionY + CARD_HEIGHT / 2;
-        return <line key={`${from}-${to}`} x1={ax} y1={ay} x2={bx} y2={by} stroke="#cbd5e1" strokeWidth={2} strokeDasharray="4 6" strokeLinecap="round" />;
-      })}
-    </svg>
-  );
-}
-
-function FiveW2HCard({
+/**
+ * Bloco do 5W2H com edição inline. O usuário digita direto no card; o próximo só libera
+ * quando o anterior é preenchido (sequência do 5W2H). O bloco final gera a tarefa no plano.
+ */
+function FiveW2HBlock({
   item,
-  selected,
+  done,
+  active,
+  locked,
+  allDone,
+  creatingTask,
+  users,
   canEdit,
-  responsibleName,
-  onSelect,
-  onPointerDown,
+  onText,
+  onCommit,
+  onBlurSave,
+  onGenerateTask,
 }: {
   item: FiveW2HItem;
-  selected: boolean;
+  idx: number;
+  done: boolean;
+  active: boolean;
+  locked: boolean;
+  allDone: boolean;
+  creatingTask: boolean;
+  users: UserOption[];
   canEdit: boolean;
-  responsibleName?: string;
-  onSelect: () => void;
-  onPointerDown: (event: React.PointerEvent<HTMLDivElement>) => void;
+  onText: (value: string) => void;
+  onCommit: (patch: Partial<FiveW2HItem>) => void;
+  onBlurSave: () => void;
+  onGenerateTask: () => void;
 }) {
   const meta = FIELD_META[item.itemType];
+  const cfg = STEP_CONFIG[item.itemType];
   const Icon = meta.icon;
-  const bullets = item.bullets.length ? item.bullets : item.description ? [item.description] : [];
+  const isLast = item.itemType === 'HOW_MUCH';
+  const statusLabel = done ? 'Concluído' : active ? 'Em andamento' : 'Pendente';
+  const statusClass = done
+    ? 'border-green-200 bg-green-50 text-green-700'
+    : active
+      ? 'border-orange-200 bg-orange-50 text-orange-700'
+      : 'border-slate-200 bg-slate-100 text-slate-500';
+  const progress = done ? 100 : active ? 40 : 0;
+  const textValue = item.description?.trim() ? item.description : item.bullets.join('; ');
   return (
     <div
-      role="button"
-      tabIndex={0}
       className={cn(
-        'absolute z-20 rounded-xl border bg-white p-4 text-left shadow-sm transition',
-        canEdit && 'cursor-grab active:cursor-grabbing',
-        selected ? 'border-blue-500 shadow-lg ring-2 ring-blue-100' : 'border-slate-200 hover:border-slate-300 hover:shadow-md',
+        'flex flex-col rounded-xl border bg-white p-3 shadow-sm transition',
+        active ? 'ring-2 ring-blue-200' : '',
+        locked ? 'opacity-60' : '',
       )}
-      style={{ left: item.positionX, top: item.positionY, width: CARD_WIDTH, minHeight: CARD_HEIGHT, borderTopColor: meta.color, borderTopWidth: 3 }}
-      onClick={onSelect}
-      onPointerDown={onPointerDown}
-      onKeyDown={(event) => {
-        if (event.key === 'Enter' || event.key === ' ') onSelect();
-      }}
+      style={{ borderTopColor: meta.color, borderTopWidth: 3 }}
     >
       <div className="flex items-start justify-between gap-2">
         <div className="flex items-center gap-2">
-          <span className="flex h-9 w-9 items-center justify-center rounded-lg text-white shadow-sm" style={{ backgroundColor: meta.color }}>
-            <Icon className="h-4 w-4" />
+          <span className="flex h-8 w-8 items-center justify-center rounded-lg text-white shadow-sm" style={{ backgroundColor: done || active ? meta.color : '#cbd5e1' }}>
+            {done ? <CheckCircle2 className="h-4 w-4" /> : <Icon className="h-4 w-4" />}
           </span>
           <div>
             <div className="text-sm font-bold leading-4" style={{ color: meta.color }}>{meta.number}. {meta.title}</div>
-            <div className="text-[11px] font-medium text-slate-500">{meta.subtitle}</div>
+            <div className="text-[11px] font-medium text-slate-500">{cfg.label} — {meta.subtitle}</div>
           </div>
         </div>
-        <ChevronRight className="h-4 w-4 text-slate-300" />
+        {locked ? <Lock className="h-4 w-4 text-slate-300" /> : <span className={cn('shrink-0 rounded-full border px-2 py-0.5 text-[10px] font-semibold', statusClass)}>{statusLabel}</span>}
       </div>
 
-      <ul className="mt-3 space-y-1">
-        {bullets.slice(0, 5).map((bullet, index) => (
-          <li key={index} className="flex gap-1.5 text-[11px] leading-4 text-slate-700">
-            <span className="mt-1 h-1 w-1 shrink-0 rounded-full" style={{ backgroundColor: meta.color }} />
-            <span className="line-clamp-2">{bullet}</span>
-          </li>
-        ))}
-        {bullets.length === 0 && <li className="text-[11px] italic text-slate-400">Sem itens preenchidos</li>}
-        {bullets.length > 5 && <li className="text-[11px] font-medium text-slate-400">+{bullets.length - 5} item(ns)</li>}
-      </ul>
-
-      <div className="absolute inset-x-4 bottom-3">
-        <div className="mb-2 flex items-center justify-between">
-          <StatusPill item={item} />
-          {item.convertedToTaskId && <Badge variant="outline" className="border-indigo-200 bg-indigo-50 text-indigo-700">Ação criada</Badge>}
-        </div>
-        <div className="h-1.5 overflow-hidden rounded-full bg-slate-100">
-          <div className="h-full rounded-full" style={{ width: `${item.progress}%`, backgroundColor: meta.color }} />
-        </div>
+      <div className="mt-3 min-h-[72px] flex-1">
+        {locked ? (
+          <p className="text-xs text-slate-400">Conclua o campo anterior para liberar.</p>
+        ) : (
+          <fieldset disabled={!canEdit}>
+            {cfg.kind === 'text' && (
+              <Textarea rows={3} value={textValue} placeholder={cfg.placeholder} onChange={(event) => onText(event.target.value)} onBlur={onBlurSave} className="text-sm" />
+            )}
+            {cfg.kind === 'user' && (
+              <NativeSelect value={item.responsibleUserId} onChange={(event) => onCommit({ responsibleUserId: event.target.value })}>
+                <option value="">Selecione o responsável...</option>
+                {users.map((user) => <option key={user.id} value={user.id}>{user.name}</option>)}
+              </NativeSelect>
+            )}
+            {cfg.kind === 'date' && (
+              <Input type="date" value={item.dueDate?.slice(0, 10) ?? ''} onChange={(event) => onCommit({ dueDate: event.target.value })} />
+            )}
+          </fieldset>
+        )}
       </div>
+
+      <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-slate-100">
+        <div className="h-full rounded-full transition-all" style={{ width: `${progress}%`, backgroundColor: meta.color }} />
+      </div>
+
+      {isLast && !locked && (
+        <>
+          <Button className="mt-3 w-full justify-center bg-emerald-600 hover:bg-emerald-700" onClick={onGenerateTask} disabled={!canEdit || creatingTask || !allDone}>
+            <Rocket className="mr-2 h-4 w-4" />
+            {creatingTask ? 'Gerando...' : 'Concluir 5W2H e gerar tarefa'}
+          </Button>
+          {!allDone && <p className="mt-1.5 text-center text-[10px] text-slate-400">Preencha todos os campos para liberar.</p>}
+        </>
+      )}
     </div>
   );
 }
-
-const STEP_ORDER: FieldType[] = ['WHAT', 'WHY', 'WHERE', 'WHO', 'WHEN', 'HOW', 'HOW_MUCH'];
 const STEP_CONFIG: Record<FieldType, { label: string; hint: string; kind: 'text' | 'user' | 'date'; placeholder: string }> = {
   WHAT: { label: 'O quê', hint: 'O que será feito', kind: 'text', placeholder: 'Descreva a ação que será executada...' },
   WHY: { label: 'Por quê', hint: 'Por que será feito', kind: 'text', placeholder: 'Justifique: por que essa ação resolve o problema...' },
@@ -703,126 +668,6 @@ const STEP_CONFIG: Record<FieldType, { label: string; hint: string; kind: 'text'
   HOW_MUCH: { label: 'Quanto vai custar (impacto)', hint: 'Custo / impacto estimado', kind: 'text', placeholder: 'Custo estimado, impacto ou retorno esperado...' },
 };
 
-/**
- * Preenchimento guiado e sequencial do 5W2H: um campo por vez. O próximo só libera
- * quando o anterior é preenchido; ao concluir "Quanto vai custar", gera a tarefa no plano.
- */
-function FiveW2HGuide({
-  items,
-  users,
-  canEdit,
-  creatingTask,
-  selectedType,
-  onSelect,
-  onUpdate,
-  onSave,
-  onGenerateTask,
-  onOpenChecklist,
-}: {
-  items: FiveW2HItem[];
-  users: UserOption[];
-  canEdit: boolean;
-  creatingTask: boolean;
-  selectedType: FieldType;
-  onSelect: (type: FieldType) => void;
-  onUpdate: (type: FieldType, patch: Partial<FiveW2HItem>) => void;
-  onSave: () => void;
-  onGenerateTask: () => void;
-  onOpenChecklist: () => void;
-}) {
-  const byType = (type: FieldType) => items.find((item) => item.itemType === type)!;
-  const isDone = (type: FieldType) => Boolean(String(byType(type).description ?? '').trim());
-  const currentIndex = STEP_ORDER.findIndex((type) => !isDone(type));
-  const allDone = currentIndex === -1;
-  const userName = (id: string) => users.find((user) => user.id === id)?.name ?? '';
-
-  function applyStep(type: FieldType, kind: 'text' | 'user' | 'date', raw: string, save = false) {
-    if (kind === 'user') onUpdate(type, { responsibleUserId: raw, description: userName(raw) });
-    else if (kind === 'date') onUpdate(type, { dueDate: raw, description: raw ? new Date(raw).toLocaleDateString('pt-BR') : '' });
-    else onUpdate(type, { description: raw });
-    if (save) onSave();
-  }
-
-  return (
-    <aside className="border-l border-slate-200 bg-white">
-      <div className="border-b border-slate-200 p-3">
-        <div className="text-sm font-semibold text-slate-900">Preenchimento guiado</div>
-        <p className="mt-0.5 text-xs text-slate-500">Preencha um campo por vez. Ao concluir todos, gere a tarefa no plano.</p>
-      </div>
-      <div className="max-h-[520px] space-y-2 overflow-y-auto p-3">
-        {STEP_ORDER.map((type, idx) => {
-          const meta = FIELD_META[type];
-          const cfg = STEP_CONFIG[type];
-          const item = byType(type);
-          const done = isDone(type);
-          const active = idx === currentIndex;
-          const locked = currentIndex !== -1 && idx > currentIndex;
-          const Icon = meta.icon;
-          const open = (active || done) && !locked;
-          return (
-            <div
-              key={type}
-              className={cn(
-                'rounded-lg border p-3 transition',
-                active ? 'border-blue-300 bg-blue-50/40 ring-1 ring-blue-100' : 'border-slate-200',
-                locked && 'opacity-55',
-                selectedType === type && !active && 'ring-1 ring-slate-200',
-              )}
-              onClick={() => !locked && onSelect(type)}
-            >
-              <div className="flex items-center gap-2">
-                <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-xs font-bold text-white" style={{ backgroundColor: done ? meta.color : locked ? '#cbd5e1' : meta.color }}>
-                  {done ? <CheckCircle2 className="h-4 w-4" /> : meta.number}
-                </span>
-                <div className="min-w-0 flex-1">
-                  <div className="flex items-center gap-1.5 text-sm font-semibold text-slate-800">
-                    <Icon className="h-3.5 w-3.5" style={{ color: meta.color }} />
-                    {idx + 1}. {cfg.label}
-                  </div>
-                  <div className="text-[11px] text-slate-500">{cfg.hint}</div>
-                </div>
-                {locked && <Lock className="h-3.5 w-3.5 text-slate-400" />}
-              </div>
-
-              {open && (
-                <div className="mt-2" onClick={(event) => event.stopPropagation()}>
-                  <fieldset disabled={!canEdit}>
-                    {cfg.kind === 'text' && (
-                      <Textarea rows={2} value={item.description} placeholder={cfg.placeholder} onChange={(event) => applyStep(type, 'text', event.target.value)} onBlur={onSave} />
-                    )}
-                    {cfg.kind === 'user' && (
-                      <NativeSelect value={item.responsibleUserId} onChange={(event) => applyStep(type, 'user', event.target.value, true)}>
-                        <option value="">Selecione o responsável...</option>
-                        {users.map((user) => <option key={user.id} value={user.id}>{user.name}</option>)}
-                      </NativeSelect>
-                    )}
-                    {cfg.kind === 'date' && (
-                      <Input type="date" value={item.dueDate?.slice(0, 10) ?? ''} onChange={(event) => applyStep(type, 'date', event.target.value, true)} />
-                    )}
-                  </fieldset>
-                </div>
-              )}
-              {locked && <p className="mt-1.5 text-[11px] text-slate-400">Conclua o campo anterior para liberar.</p>}
-            </div>
-          );
-        })}
-
-        <button type="button" onClick={onOpenChecklist} className="flex w-full items-center justify-between gap-3 rounded-lg border border-slate-200 bg-white p-2.5 text-sm transition hover:border-slate-300">
-          <span className="flex items-center gap-2 font-medium text-slate-700"><ListChecks className="h-4 w-4 text-slate-500" />Checklist da análise</span>
-          <ChevronRight className="h-4 w-4 text-slate-400" />
-        </button>
-
-        <div className="border-t border-slate-200 pt-3">
-          <Button className="w-full justify-center bg-emerald-600 hover:bg-emerald-700" onClick={onGenerateTask} disabled={!canEdit || creatingTask || !allDone}>
-            <Rocket className="mr-2 h-4 w-4" />
-            {creatingTask ? 'Gerando tarefa...' : 'Concluir 5W2H e gerar tarefa'}
-          </Button>
-          {!allDone && <p className="mt-1.5 text-center text-[11px] text-slate-400">Preencha os 7 campos em ordem para liberar.</p>}
-        </div>
-      </div>
-    </aside>
-  );
-}
 
 function FiveW2HFooter({ structuredCount, completedCount, progress, saving, lastSavedAt }: { structuredCount: number; completedCount: number; progress: number; saving: boolean; lastSavedAt: string | null }) {
   return (
