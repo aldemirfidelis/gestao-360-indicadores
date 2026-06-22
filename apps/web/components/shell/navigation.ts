@@ -65,6 +65,8 @@ export interface NavSection {
   icon: LucideIcon;
   permissions?: string[];
   items: NavItem[];
+  /** Seção de item único renderizada como link direto (sem accordion/sub-menu). */
+  flat?: boolean;
 }
 
 export const SUPER_ADMIN_ONLY_PERMISSION = 'super-admin:only';
@@ -83,6 +85,7 @@ export const navSections: NavSection[] = [
     description: 'Central de trabalho e prioridades do usuário',
     intent: 'view',
     icon: ListTodo,
+    flat: true,
     items: [
       { href: '/meu-dia', label: 'Meu Dia', description: 'Central de trabalho: tudo que exige sua atenção hoje', icon: ListTodo, permissions: [], exact: true },
     ],
@@ -92,6 +95,7 @@ export const navSections: NavSection[] = [
     description: 'Pendências operacionais e documentos liberados para edição',
     intent: 'view',
     icon: ClipboardCheck,
+    flat: true,
     items: [
       { href: '/tarefas', label: 'Tarefas', description: 'Tarefas do usuário, incluindo documentos liberados para edição', icon: ClipboardCheck, permissions: [], exact: true },
     ],

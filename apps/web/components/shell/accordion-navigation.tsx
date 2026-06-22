@@ -107,6 +107,30 @@ export function AccordionNavigation({
             const isOpen = collapsed ? true : open.has(section.heading);
             const sectionActive = currentSection?.heading === section.heading;
 
+            // Seção "flat": item único, renderizado como link direto (sem accordion/sub-menu).
+            if (section.flat) {
+              const item = section.items[0];
+              if (!item) return null;
+              const FlatIcon = item.icon;
+              const flatActive = isActivePath(pathname, item.href, item.exact, currentSearch);
+              return (
+                <Link
+                  key={section.heading}
+                  href={item.href}
+                  onClick={onNavigate}
+                  title={item.description}
+                  className={cn(
+                    'flex w-full items-center gap-2 rounded px-3 py-2 text-[13px] font-semibold uppercase tracking-[0.08em] transition-colors',
+                    collapsed && 'justify-center',
+                    flatActive ? 'bg-foreground/[0.06] text-foreground' : 'text-muted-foreground/80 hover:text-foreground',
+                  )}
+                >
+                  <FlatIcon className="h-4 w-4 shrink-0 opacity-70" />
+                  {!collapsed && <span className="min-w-0 flex-1 leading-tight">{item.label}</span>}
+                </Link>
+              );
+            }
+
             return (
               <div key={section.heading}>
                 {!collapsed && (
