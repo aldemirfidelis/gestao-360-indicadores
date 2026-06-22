@@ -89,6 +89,8 @@ export default function ActionDetailPage() {
   const { hasPermission } = useAuth();
   const canApproveEffectiveness = hasPermission(['actions:effectiveness', 'eficacia:approve']);
   const canRequestDelete = hasPermission(['actions:update', 'actions:delete']);
+  const canEditAnalysis = hasPermission(['actions:analysis', 'actions:update']);
+  const canUseActionAi = hasPermission(['actions:ai']);
   const [tab, setTab] = useState(tabs[0]);
   const [newTask, setNewTask] = useState<{ title: string; startDate: string; endDate: string; assignedToId: string }>({ title: '', startDate: '', endDate: '', assignedToId: '' });
   const [effectiveness, setEffectiveness] = useState({ effective: true, reopen: false, summary: '', evidence: '', achievedResult: '' });
@@ -395,7 +397,16 @@ export default function ActionDetailPage() {
       )}
 
       {tab === 'Origem' && <OriginTrail a={a} />}
-      {tab === 'Análise de causa' && <AnalysisWorkspace action={a} onSave={saveAnalysis.mutate} saving={saveAnalysis.isPending} onAskAi={() => aiAssist.mutate('analysis')} />}
+      {tab === 'Análise de causa' && (
+        <AnalysisWorkspace
+          action={a}
+          users={users}
+          canEdit={canEditAnalysis}
+          onSave={saveAnalysis.mutate}
+          saving={saveAnalysis.isPending}
+          onAskAi={canUseActionAi ? () => aiAssist.mutate('analysis') : undefined}
+        />
+      )}
       {tab === 'Execução' && <ExecutionCard a={a} users={users} newTask={newTask} setNewTask={setNewTask} addTask={addTask.mutate} toggleTask={toggleTask.mutate} updateTask={updateTask.mutate} deleteTask={deleteTask.mutate} addTaskEvidence={(payload) => addTaskEvidence.mutate(payload)} evidenceUploading={addTaskEvidence.isPending} />}
       {tab === 'Eficácia' && (
         <EffectivenessPanel

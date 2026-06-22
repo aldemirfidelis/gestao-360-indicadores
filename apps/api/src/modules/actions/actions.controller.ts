@@ -165,7 +165,41 @@ export class ActionsController {
   @Post(':id/analysis')
   @RequirePermissions('actions:analysis')
   saveAnalysis(@CurrentUser() me: AuthPayload, @Param('id') id: string, @Body() body: any) {
-    return this.service.saveAnalysis(id, body, me.sub);
+    return this.service.saveAnalysis(id, body, me.sub, me.companyId);
+  }
+
+  @Post(':id/analysis/ishikawa/ai-suggestions')
+  @RequirePermissions('actions:ai')
+  ishikawaAiSuggestions(@CurrentUser() me: AuthPayload, @Param('id') id: string, @Body() body: any) {
+    return this.service.ishikawaAiSuggestions(id, body, me.sub, me.companyId);
+  }
+
+  @Post(':id/analysis/ishikawa/causes/:causeId/convert-to-action')
+  @RequirePermissions('actions:update', 'actions:analysis')
+  convertIshikawaCauseToAction(
+    @CurrentUser() me: AuthPayload,
+    @Param('id') id: string,
+    @Param('causeId') causeId: string,
+    @Body() body: any,
+  ) {
+    return this.service.convertIshikawaCauseToTask(id, causeId, body, me.sub, me.companyId);
+  }
+
+  @Post(':id/analysis/pdca/ai-suggestions')
+  @RequirePermissions('actions:ai')
+  pdcaAiSuggestions(@CurrentUser() me: AuthPayload, @Param('id') id: string, @Body() body: any) {
+    return this.service.pdcaAiSuggestions(id, body, me.sub, me.companyId);
+  }
+
+  @Post(':id/analysis/pdca/stages/:stageId/convert-to-action')
+  @RequirePermissions('actions:update', 'actions:analysis')
+  convertPdcaStageToAction(
+    @CurrentUser() me: AuthPayload,
+    @Param('id') id: string,
+    @Param('stageId') stageId: string,
+    @Body() body: any,
+  ) {
+    return this.service.convertPdcaStageToTask(id, stageId, body, me.sub, me.companyId);
   }
 
   @Post(':id/evidences')

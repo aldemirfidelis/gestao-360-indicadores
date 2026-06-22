@@ -814,6 +814,70 @@ export class ActionsService {
     return this.getById(actionId, companyId);
   }
 
+  async pdcaAiSuggestions(actionId: string, body: any, userId?: string, companyId?: string) {
+    const action = await this.getById(actionId, companyId);
+    const session = action.analysisSessions?.find((item: any) => item.method === ActionAnalysisTool.PDCA);
+    const stages = Array.isArray(body?.stages) ? body.stages : (session?.pdcaSteps ?? []);
+    const aiSuggestions = await this.generatePdcaSuggestionsViaGemini(action, stages);
+    const suggestions = aiSuggestions ?? defaultPdcaSuggestions(action, stages);
+    await this.recordHistory(actionId, userId, 'AI_PDCA_SUGGESTIONS', null, null, action.title);
+    await this.audit(action.companyId, userId, 'AI_PDCA_SUGGESTIONS', 'ActionPdcaStep', actionId, null, { suggestions, source: aiSuggestions ? 'gemini' : 'rules' });
+    return suggestions;
+  }
+
+  async convertPdcaStageToTask(actionId: string, stageId: string, body: any, userId?: string, companyId?: string) {
+    const action = await this.prisma.actionPlan.findFirst({
+      where: { id: actionId, deletedAt: null, ...(companyId ? { companyId } : {}) },
+    });
+    if (!action) throw new NotFoundException('Ação nao encontrada');
+    if (userId) await this.access.assertCanWrite(userId, action.ownerNodeId, 'action_plans', 'edit');
+
+    const stage = await this.prisma.actionPdcaStep.findFirst({
+      where: { id: stageId, session: { actionId } },
+      include: { session: true },
+    });
+    if (!stage) throw new NotFoundException('Etapa PDCA nao encontrada');
+    if (stage.convertedToTaskId) return this.getById(actionId, companyId);
+
+    const data = (stage.data && typeof stage.data === 'object' ? stage.data : {}) as Record<string, any>;
+    const title = nonEmptyText(body?.title) ?? `PDCA ${pdcaPhaseLabel(stage.phase)}: ${stage.title ?? data.title ?? action.title}`;
+    const count = await this.prisma.actionTask.count({ where: { actionId } });
+    const task = await this.prisma.actionTask.create({
+      data: {
+        actionId,
+        title,
+        dueDate: stage.dueDate ?? action.dueDate ?? null,
+        assignedToId: stage.responsibleUserId ?? action.responsibleUserId ?? null,
+        position: count,
+      },
+    });
+
+    await this.prisma.actionPdcaStep.update({
+      where: { id: stage.id },
+      data: {
+        convertedToTaskId: task.id,
+        data: { ...data, convertedTaskId: task.id, convertedAt: new Date().toISOString() } as any,
+      },
+    });
+    await this.recalcProgress(actionId);
+    await this.recordHistory(actionId, userId, 'PDCA_CONVERTED_TO_TASK', null, stage.title ?? stage.phase, task.title);
+    await this.audit(action.companyId, userId, 'PDCA_CONVERTED_TO_TASK', 'ActionPdcaStep', stage.id, stage, { taskId: task.id });
+    await this.traceability.record({
+      companyId: action.companyId,
+      indicatorId: action.indicatorId,
+      userId,
+      eventType: TraceEventType.TASK_UPDATED,
+      entityType: TraceEntityType.ACTION_TASK,
+      entityId: task.id,
+      relatedType: TraceEntityType.ACTION_PLAN,
+      relatedId: actionId,
+      title: 'Etapa PDCA convertida em tarefa',
+      description: task.title,
+      metadata: { stageId: stage.id, phase: stage.phase, sessionId: stage.sessionId },
+    });
+    return this.getById(actionId, companyId);
+  }
+
   private async generateSuggestionsViaGemini(action: any, scope?: string) {
     if (!this.gemini.isEnabled) return null;
     const context = {
@@ -927,6 +991,54 @@ ${existingCauses || '- nenhuma'}`;
         priority: normalizeActionPriority(item.priority),
       }))
       .filter((item) => item.title);
+    return suggestions?.length ? suggestions : null;
+  }
+
+  private async generatePdcaSuggestionsViaGemini(action: any, stages: any[]) {
+    if (!this.gemini.isEnabled) return null;
+    const currentStages = stages
+      .map((stage) => `${pdcaPhaseLabel(stage.phase)}: ${stage.description ?? stage.objective ?? ''}`)
+      .filter((line) => !line.endsWith(': '))
+      .join('\n');
+    const lastResults = action.indicator?.results?.slice?.(-6) ?? [];
+    const prompt = `Voce e um facilitador senior de melhoria continua PDCA em empresas brasileiras.
+Gere sugestoes objetivas para preencher um ciclo PDCA dentro de um plano de acao.
+Nao salve nem confirme decisoes. Responda somente JSON valido no schema:
+{
+  "suggestions": [
+    { "phase": "PLAN", "field": "objective", "suggestion": "...", "justification": "..." }
+  ]
+}
+
+Fases permitidas: PLAN, DO, CHECK, ACT.
+Campos sugeridos: objective, description, checklist, risks, evidence, standardization, measurement.
+
+CONTEXTO DO PLANO:
+- Titulo: ${action.title ?? '-'}
+- Descricao: ${action.description ?? '-'}
+- Problema principal: ${action.problemDescription ?? '-'}
+- Causa raiz: ${action.rootCause ?? '-'}
+- Indicador: ${action.indicator?.name ?? '-'}
+- Resultados recentes: ${JSON.stringify(lastResults, null, 2)}
+- Area/setor: ${action.ownerNode?.name ?? '-'}
+- Etapas ja preenchidas:
+${currentStages || '- nenhuma'}`;
+
+    interface GeminiPdcaResp {
+      suggestions?: Array<{ phase?: string; field?: string; suggestion?: string; justification?: string }>;
+    }
+    const json = await this.gemini.generateJson<GeminiPdcaResp>(prompt, {
+      temperature: 0.35,
+      maxOutputTokens: 1800,
+    });
+    const suggestions = json?.suggestions
+      ?.map((item) => ({
+        phase: normalizePdcaPhase(item.phase),
+        field: nonEmptyText(item.field) ?? 'description',
+        suggestion: nonEmptyText(item.suggestion),
+        justification: nonEmptyText(item.justification) ?? 'Sugestão gerada para facilitar a condução do ciclo PDCA.',
+      }))
+      .filter((item) => item.suggestion);
     return suggestions?.length ? suggestions : null;
   }
 
@@ -1219,7 +1331,7 @@ ${existingCauses || '- nenhuma'}`;
     }
     if (method === ActionAnalysisTool.ISHIKAWA) {
       await this.prisma.actionIshikawaCause.deleteMany({ where: { sessionId } });
-      const rows = (body.ishikawaCauses ?? [])
+      const rows: Prisma.ActionIshikawaCauseCreateManyInput[] = (body.ishikawaCauses ?? [])
         .map((item: any, index: number) => {
           const title = nonEmptyText(item.title) ?? nonEmptyText(item.description);
           if (!title) return null;
@@ -1247,7 +1359,7 @@ ${existingCauses || '- nenhuma'}`;
             likelyRootCause: Boolean(item.isRootCause ?? item.likelyRootCause ?? status === 'ROOT_CAUSE'),
           };
         })
-        .filter(Boolean);
+        .filter((item: Prisma.ActionIshikawaCauseCreateManyInput | null): item is Prisma.ActionIshikawaCauseCreateManyInput => Boolean(item));
       if (rows.length > 0) await this.prisma.actionIshikawaCause.createMany({ data: rows });
     }
     if (method === ActionAnalysisTool.MASP) {
@@ -1268,17 +1380,33 @@ ${existingCauses || '- nenhuma'}`;
     }
     if (method === ActionAnalysisTool.PDCA) {
       await this.prisma.actionPdcaStep.deleteMany({ where: { sessionId } });
-      const rows = (body.pdcaSteps ?? defaultPdcaSteps()).map((item: any) => ({
-        sessionId,
-        phase: item.phase,
-        description: item.description ?? null,
-        responsibleUserId: item.responsibleUserId ?? null,
-        dueDate: item.dueDate ? new Date(item.dueDate) : null,
-        evidence: item.evidence ?? null,
-        comments: item.comments ?? null,
-        status: item.status ?? ActionStepStatus.PENDING,
-        validated: item.validated ?? false,
-      }));
+      const rows: Prisma.ActionPdcaStepCreateManyInput[] = (body.pdcaSteps ?? defaultPdcaSteps()).map((item: any, index: number) => {
+        const phase = normalizePdcaPhase(item.phase, index);
+        const status = normalizeActionStepStatus(item.status);
+        const progress = clampProgress(item.progress ?? (status === ActionStepStatus.DONE || status === ActionStepStatus.VALIDATED ? 100 : 0));
+        return {
+          ...(persistedId(item.id) ? { id: item.id } : {}),
+          sessionId,
+          phase,
+          title: nonEmptyText(item.title) ?? pdcaPhaseLabel(phase),
+          subtitle: nonEmptyText(item.subtitle) ?? pdcaPhaseSubtitle(phase),
+          description: nonEmptyText(item.description),
+          objective: nonEmptyText(item.objective),
+          responsibleUserId: nonEmptyText(item.responsibleUserId),
+          dueDate: coerceDate(item.dueDate),
+          priority: normalizeActionPriority(item.priority),
+          progress,
+          evidence: nonEmptyText(item.evidence),
+          comments: nonEmptyText(item.comments),
+          status,
+          validated: Boolean(item.validated ?? status === ActionStepStatus.VALIDATED),
+          checklist: (normalizePdcaChecklist(item.checklist).length ? normalizePdcaChecklist(item.checklist) : defaultPdcaChecklist(phase)) as any,
+          data: normalizePdcaData(item, phase) as any,
+          isAiSuggested: Boolean(item.isAiSuggested),
+          convertedToTaskId: nonEmptyText(item.convertedToTaskId),
+          completedAt: item.completedAt ? coerceDate(item.completedAt) : (status === ActionStepStatus.DONE || status === ActionStepStatus.VALIDATED ? new Date() : null),
+        };
+      });
       await this.prisma.actionPdcaStep.createMany({ data: rows });
     }
     if (method === ActionAnalysisTool.FIVE_W_TWO_H) {
@@ -1484,13 +1612,322 @@ function defaultMaspSteps() {
 }
 
 function defaultPdcaSteps() {
-  return [{ phase: 'PLAN' }, { phase: 'DO' }, { phase: 'CHECK' }, { phase: 'ACT' }];
+  return ['PLAN', 'DO', 'CHECK', 'ACT'].map((phase) => ({
+    phase,
+    title: pdcaPhaseLabel(phase),
+    subtitle: pdcaPhaseSubtitle(phase),
+    status: ActionStepStatus.PENDING,
+    progress: 0,
+    checklist: defaultPdcaChecklist(phase),
+  }));
+}
+
+function normalizePdcaPhase(value: unknown, index = 0) {
+  const key = normalizeKey(value);
+  const map: Record<string, string> = {
+    PLAN: 'PLAN',
+    PLANEJAR: 'PLAN',
+    DO: 'DO',
+    EXECUTAR: 'DO',
+    CHECK: 'CHECK',
+    CHECAR: 'CHECK',
+    VERIFICAR: 'CHECK',
+    ACT: 'ACT',
+    AGIR: 'ACT',
+    PADRONIZAR: 'ACT',
+  };
+  return map[key] ?? ['PLAN', 'DO', 'CHECK', 'ACT'][index] ?? 'PLAN';
+}
+
+function pdcaPhaseLabel(value: unknown) {
+  const phase = normalizePdcaPhase(value);
+  const labels: Record<string, string> = {
+    PLAN: 'Plan',
+    DO: 'Do',
+    CHECK: 'Check',
+    ACT: 'Act',
+  };
+  return labels[phase] ?? phase;
+}
+
+function pdcaPhaseSubtitle(value: unknown) {
+  const phase = normalizePdcaPhase(value);
+  const subtitles: Record<string, string> = {
+    PLAN: 'Planejar causas, metas e ações',
+    DO: 'Executar ações definidas',
+    CHECK: 'Medir resultados e verificar eficácia',
+    ACT: 'Padronizar, corrigir e evoluir',
+  };
+  return subtitles[phase] ?? '';
+}
+
+function normalizeActionStepStatus(value: unknown): ActionStepStatus {
+  const key = normalizeKey(value);
+  const map: Record<string, ActionStepStatus> = {
+    PENDING: ActionStepStatus.PENDING,
+    PENDENTE: ActionStepStatus.PENDING,
+    IN_PROGRESS: ActionStepStatus.IN_PROGRESS,
+    EM_ANDAMENTO: ActionStepStatus.IN_PROGRESS,
+    DONE: ActionStepStatus.DONE,
+    CONCLUIDA: ActionStepStatus.DONE,
+    CONCLUIDO: ActionStepStatus.DONE,
+    BLOCKED: ActionStepStatus.BLOCKED,
+    BLOQUEADA: ActionStepStatus.BLOCKED,
+    BLOQUEADO: ActionStepStatus.BLOCKED,
+    VALIDATED: ActionStepStatus.VALIDATED,
+    VALIDADA: ActionStepStatus.VALIDATED,
+    REOPENED: ActionStepStatus.IN_PROGRESS,
+    REABERTA: ActionStepStatus.IN_PROGRESS,
+    OVERDUE: ActionStepStatus.IN_PROGRESS,
+    ATRASADA: ActionStepStatus.IN_PROGRESS,
+  };
+  return map[key] ?? ActionStepStatus.PENDING;
+}
+
+function clampProgress(value: unknown) {
+  const numeric = Number(value ?? 0);
+  if (!Number.isFinite(numeric)) return 0;
+  return Math.max(0, Math.min(100, Math.round(numeric)));
+}
+
+function defaultPdcaChecklist(value: unknown) {
+  const phase = normalizePdcaPhase(value);
+  const items: Record<string, string[]> = {
+    PLAN: ['Problema definido', 'Causa raiz validada', 'Meta definida', 'Responsável definido', 'Prazo definido'],
+    DO: ['Ações iniciadas', 'Responsáveis acionados', 'Evidências coletadas', 'Impedimentos registrados'],
+    CHECK: ['Indicador medido', 'Resultado comparado com a meta', 'Eficácia avaliada', 'Desvio registrado'],
+    ACT: ['Lições aprendidas registradas', 'Ajustes definidos', 'Padronização criada', 'Próximo ciclo definido'],
+  };
+  return (items[phase] ?? []).map((title, index) => ({ id: `${phase}-${index + 1}`, title, done: false }));
+}
+
+function normalizePdcaChecklist(value: unknown) {
+  if (!Array.isArray(value)) return [];
+  return value
+    .map((item, index) => ({
+      id: nonEmptyText((item as any)?.id) ?? `item-${index + 1}`,
+      title: nonEmptyText((item as any)?.title) ?? nonEmptyText(item) ?? `Item ${index + 1}`,
+      done: Boolean((item as any)?.done),
+    }))
+    .filter((item) => item.title);
+}
+
+function normalizePdcaData(item: any, phase: string) {
+  const reserved = new Set([
+    'id',
+    'sessionId',
+    'phase',
+    'title',
+    'subtitle',
+    'description',
+    'objective',
+    'responsibleUserId',
+    'dueDate',
+    'priority',
+    'progress',
+    'evidence',
+    'comments',
+    'status',
+    'validated',
+    'checklist',
+    'data',
+    'isAiSuggested',
+    'convertedToTaskId',
+    'completedAt',
+    'createdAt',
+    'updatedAt',
+  ]);
+  const data = item.data && typeof item.data === 'object' && !Array.isArray(item.data) ? { ...item.data } : {};
+  for (const [key, value] of Object.entries(item)) {
+    if (!reserved.has(key)) data[key] = value;
+  }
+  return { ...data, phase };
+}
+
+function defaultPdcaSuggestions(action: any, stages: any[]) {
+  const filled = new Set(stages.map((stage) => `${normalizePdcaPhase(stage.phase)}:${normalizeKey(stage.description ?? stage.objective ?? '')}`));
+  const indicatorName = action.indicator?.name ?? 'indicador relacionado';
+  const suggestions = [
+    {
+      phase: 'PLAN',
+      field: 'objective',
+      suggestion: `Definir claramente o problema, a causa raiz e a meta de melhoria para ${action.title}.`,
+      justification: 'A etapa Plan precisa deixar explícitos objetivo, meta, responsável e critério de sucesso antes da execução.',
+    },
+    {
+      phase: 'PLAN',
+      field: 'checklist',
+      suggestion: 'Validar problema, causa raiz, meta, responsável, prazo, riscos e recursos necessários.',
+      justification: 'Checklist reduz risco de avançar para execução sem premissas mínimas.',
+    },
+    {
+      phase: 'DO',
+      field: 'description',
+      suggestion: 'Executar as ações priorizadas, registrar impedimentos e anexar evidências operacionais por etapa.',
+      justification: 'A execução deve gerar rastreabilidade para posterior verificação de eficácia.',
+    },
+    {
+      phase: 'CHECK',
+      field: 'measurement',
+      suggestion: `Comparar o realizado do ${indicatorName} com a meta e registrar desvio, tendência e evidência da medição.`,
+      justification: 'A etapa Check deve confirmar se a melhoria está aparecendo nos dados.',
+    },
+    {
+      phase: 'ACT',
+      field: 'standardization',
+      suggestion: 'Registrar lições aprendidas, padronizar o novo procedimento e definir próxima revisão do ciclo.',
+      justification: 'A etapa Act evita que a melhoria fique apenas como ação pontual.',
+    },
+  ];
+  return suggestions.filter((item) => !filled.has(`${item.phase}:${normalizeKey(item.suggestion)}`));
 }
 
 function fiveW2HScore(item: any) {
   const keys = ['what', 'why', 'where', 'when', 'who', 'how', 'howMuch'];
   const filled = keys.filter((key) => item[key] !== undefined && item[key] !== null && item[key] !== '').length;
   return Math.round((filled / keys.length) * 100);
+}
+
+const ISHIKAWA_CATEGORY_LABELS: Record<string, string> = {
+  METHOD: 'Método',
+  MACHINE: 'Máquina',
+  MANPOWER: 'Mão de obra',
+  MATERIAL: 'Material',
+  ENVIRONMENT: 'Meio ambiente',
+  MEASUREMENT: 'Medição',
+};
+
+function nonEmptyText(value: unknown) {
+  if (typeof value !== 'string') return null;
+  const trimmed = value.trim();
+  return trimmed.length > 0 ? trimmed : null;
+}
+
+function persistedId(value: unknown) {
+  const text = nonEmptyText(value);
+  return text && !text.startsWith('temp-') ? text : null;
+}
+
+function normalizeKey(value: unknown) {
+  return String(value ?? '')
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .trim()
+    .toUpperCase()
+    .replace(/[^A-Z0-9]+/g, '_')
+    .replace(/^_+|_+$/g, '');
+}
+
+function normalizeIshikawaCategory(value: unknown) {
+  const key = normalizeKey(value);
+  const map: Record<string, string> = {
+    METHOD: 'METHOD',
+    METODO: 'METHOD',
+    MACHINE: 'MACHINE',
+    MAQUINA: 'MACHINE',
+    MANPOWER: 'MANPOWER',
+    MAO_DE_OBRA: 'MANPOWER',
+    MAO_OBRA: 'MANPOWER',
+    MATERIAL: 'MATERIAL',
+    ENVIRONMENT: 'ENVIRONMENT',
+    MEIO_AMBIENTE: 'ENVIRONMENT',
+    MEASUREMENT: 'MEASUREMENT',
+    MEDICAO: 'MEASUREMENT',
+  };
+  return map[key] ?? 'METHOD';
+}
+
+function ishikawaCategoryLabel(value: unknown) {
+  const category = normalizeIshikawaCategory(value);
+  return ISHIKAWA_CATEGORY_LABELS[category] ?? category;
+}
+
+function normalizeActionPriority(value: unknown): ActionPriority {
+  const key = normalizeKey(value);
+  const map: Record<string, ActionPriority> = {
+    LOW: ActionPriority.LOW,
+    BAIXA: ActionPriority.LOW,
+    MEDIUM: ActionPriority.MEDIUM,
+    MEDIA: ActionPriority.MEDIUM,
+    HIGH: ActionPriority.HIGH,
+    ALTA: ActionPriority.HIGH,
+    CRITICAL: ActionPriority.CRITICAL,
+    CRITICA: ActionPriority.CRITICAL,
+  };
+  return map[key] ?? ActionPriority.MEDIUM;
+}
+
+function normalizeCauseStatus(value: unknown, rootCause?: unknown) {
+  if (rootCause) return 'ROOT_CAUSE';
+  const key = normalizeKey(value);
+  const map: Record<string, string> = {
+    DRAFT: 'DRAFT',
+    RASCUNHO: 'DRAFT',
+    IN_REVIEW: 'IN_REVIEW',
+    EM_ANALISE: 'IN_REVIEW',
+    LIKELY_CAUSE: 'LIKELY_CAUSE',
+    CAUSA_PROVAVEL: 'LIKELY_CAUSE',
+    ROOT_CAUSE: 'ROOT_CAUSE',
+    CAUSA_RAIZ: 'ROOT_CAUSE',
+    DISCARDED: 'DISCARDED',
+    DESCARTADA: 'DISCARDED',
+    CONVERTED_TO_ACTION: 'CONVERTED_TO_ACTION',
+    CONVERTIDA_EM_PLANO_DE_ACAO: 'CONVERTED_TO_ACTION',
+  };
+  return map[key] ?? 'DRAFT';
+}
+
+function clampScale(value: unknown) {
+  const numeric = Number(value ?? 3);
+  if (!Number.isFinite(numeric)) return 3;
+  return Math.max(1, Math.min(5, Math.round(numeric)));
+}
+
+function numberOrNull(value: unknown) {
+  if (value === null || value === undefined || value === '') return null;
+  const numeric = Number(value);
+  return Number.isFinite(numeric) ? numeric : null;
+}
+
+function coerceDate(value: unknown) {
+  const text = nonEmptyText(value);
+  if (!text) return null;
+  const date = new Date(text);
+  return Number.isNaN(date.getTime()) ? null : date;
+}
+
+function normalizeTags(value: unknown) {
+  if (Array.isArray(value)) return value.map((item) => String(item).trim()).filter(Boolean);
+  const text = nonEmptyText(value);
+  return text ? text.split(',').map((item) => item.trim()).filter(Boolean) : [];
+}
+
+function defaultIshikawaCauseSuggestions(problem: string, causes: any[]) {
+  const context = problem ? `Relacionada ao problema: ${problem}` : 'Sugestão para discussão da equipe.';
+  const existing = new Set(
+    causes
+      .map((cause) => normalizeKey(cause.title ?? cause.description))
+      .filter(Boolean),
+  );
+  const suggestions = [
+    { category: 'METHOD', title: 'Parâmetros operacionais não padronizados', priority: ActionPriority.HIGH, justification: `${context} Verifique se os critérios de operação estão claros, medidos e seguidos por turno.` },
+    { category: 'METHOD', title: 'Frequência de limpeza inadequada', priority: ActionPriority.MEDIUM, justification: 'Pode indicar rotina preventiva insuficiente para manter estabilidade do processo.' },
+    { category: 'METHOD', title: 'Baixa embebição', priority: ActionPriority.HIGH, justification: 'Hipótese relevante quando há perda ou extração abaixo do esperado no bagaço.' },
+    { category: 'MACHINE', title: 'Desgaste de rolos difusores', priority: ActionPriority.HIGH, justification: 'Falhas mecânicas podem reduzir eficiência e gerar variação operacional.' },
+    { category: 'MACHINE', title: 'Calibração inadequada de instrumentos', priority: ActionPriority.MEDIUM, justification: 'Instrumentos fora de calibração podem mascarar o desvio real.' },
+    { category: 'MACHINE', title: 'Falha em sensores de vazão', priority: ActionPriority.MEDIUM, justification: 'Medições incorretas podem induzir ajustes operacionais equivocados.' },
+    { category: 'MANPOWER', title: 'Procedimento não seguido', priority: ActionPriority.HIGH, justification: 'Avalie aderência ao procedimento padrão e variações entre equipes.' },
+    { category: 'MANPOWER', title: 'Treinamento insuficiente', priority: ActionPriority.MEDIUM, justification: 'Pode explicar decisões manuais inconsistentes e baixa repetibilidade.' },
+    { category: 'MANPOWER', title: 'Ajustes manuais inconsistentes', priority: ActionPriority.MEDIUM, justification: 'Ajustes sem critério padronizado aumentam dispersão do resultado.' },
+    { category: 'MATERIAL', title: 'Variação da matéria-prima', priority: ActionPriority.HIGH, justification: 'Mudanças na qualidade de entrada podem alterar o desempenho do processo.' },
+    { category: 'MATERIAL', title: 'Qualidade do bagaço fora do padrão', priority: ActionPriority.MEDIUM, justification: 'A condição do material pode impactar diretamente a perda medida.' },
+    { category: 'ENVIRONMENT', title: 'Temperatura ambiente elevada', priority: ActionPriority.MEDIUM, justification: 'Condições ambientais extremas podem afetar estabilidade e medições.' },
+    { category: 'ENVIRONMENT', title: 'Ventilação inadequada', priority: ActionPriority.LOW, justification: 'Ambiente operacional inadequado pode contribuir para variações indiretas.' },
+    { category: 'MEASUREMENT', title: 'Falha no monitoramento', priority: ActionPriority.HIGH, justification: 'Sem monitoramento consistente, a equipe pode reagir tarde ao desvio.' },
+    { category: 'MEASUREMENT', title: 'Amostragem inconsistente', priority: ActionPriority.MEDIUM, justification: 'Amostras não representativas comprometem a leitura do indicador.' },
+    { category: 'MEASUREMENT', title: 'Equipamentos de medição descalibrados', priority: ActionPriority.MEDIUM, justification: 'Valide calibração e rastreabilidade antes de confirmar a causa raiz.' },
+  ];
+  return suggestions.filter((item) => !existing.has(normalizeKey(item.title))).slice(0, 12);
 }
 
 function stringify(value: unknown) {

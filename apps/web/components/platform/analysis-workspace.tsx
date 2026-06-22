@@ -9,6 +9,8 @@ import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { NativeSelect } from '@/components/ui/select';
 import { ANALYSIS_METHOD_LABEL } from '@/lib/labels';
+import { IshikawaVisualAnalysis } from '@/components/platform/ishikawa-visual-analysis';
+import { PDCAVisualAnalysis } from '@/components/platform/pdca-visual-analysis';
 
 const TOOL_LABEL = ANALYSIS_METHOD_LABEL;
 
@@ -18,6 +20,7 @@ const TOOL_LABEL = ANALYSIS_METHOD_LABEL;
  * a ferramenta correspondente é renderizada e o conteúdo é salvo/linkado no plano.
  */
 export interface AnalysisWorkspaceAction {
+  id?: string;
   analysisTool: string | null;
   problemDescription: string | null;
   rootCause: string | null;
@@ -39,6 +42,8 @@ export function AnalysisWorkspace({
   onSave,
   saving,
   onAskAi,
+  users = [],
+  canEdit = true,
   title = 'Ferramentas reais de análise',
   description = 'Preencha a ferramenta escolhida, salve a análise e use a IA como facilitadora antes de confirmar.',
 }: {
@@ -46,6 +51,8 @@ export function AnalysisWorkspace({
   onSave: (payload: AnalysisPayload) => void;
   saving: boolean;
   onAskAi?: () => void;
+  users?: { id: string; name: string; email?: string }[];
+  canEdit?: boolean;
   title?: string;
   description?: string;
 }) {
@@ -57,6 +64,8 @@ export function AnalysisWorkspace({
   const [ishikawa, setIshikawa] = useState<any[]>(session?.ishikawaCauses?.length ? session.ishikawaCauses : ['Método', 'Máquina', 'Mão de obra', 'Material', 'Meio ambiente', 'Medição'].map((category) => ({ category, description: '', impact: 3, probability: 3, evidence: '' })));
   const [maspSteps, setMaspSteps] = useState<any[]>(session?.maspSteps?.length ? session.maspSteps : ['Identificação do problema', 'Observação', 'Análise', 'Plano de ação', 'Execução', 'Verificação', 'Padronização', 'Conclusão'].map((title, i) => ({ step: i + 1, title, description: '', status: 'PENDING' })));
   const [pdcaSteps, setPdcaSteps] = useState<any[]>(session?.pdcaSteps?.length ? session.pdcaSteps : ['PLAN', 'DO', 'CHECK', 'ACT'].map((phase) => ({ phase, description: '', status: 'PENDING' })));
+  const ishikawaSession = action.analysisSessions.find((item) => item.method === 'ISHIKAWA');
+  const pdcaSession = action.analysisSessions.find((item) => item.method === 'PDCA');
 
   return (
     <SectionCard
@@ -91,34 +100,56 @@ export function AnalysisWorkspace({
       )}
 
       {method === 'ISHIKAWA' && (
-        <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
-          {ishikawa.map((item, index) => (
-            <div key={index} className="rounded-lg border p-3">
-              <div className="mb-2 text-sm font-semibold">{item.category}</div>
-              <Textarea rows={2} value={item.description ?? ''} placeholder="Causa possível" onChange={(e) => setIshikawa(updateArray(ishikawa, index, { ...item, description: e.target.value }))} />
-              <div className="mt-2 grid grid-cols-2 gap-2">
-                <Input type="number" min={1} max={5} value={item.impact ?? 3} onChange={(e) => setIshikawa(updateArray(ishikawa, index, { ...item, impact: Number(e.target.value) }))} />
-                <Input type="number" min={1} max={5} value={item.probability ?? 3} onChange={(e) => setIshikawa(updateArray(ishikawa, index, { ...item, probability: Number(e.target.value) }))} />
-              </div>
-            </div>
-          ))}
-        </div>
+        <IshikawaVisualAnalysis
+          actionId={action.id}
+          session={ishikawaSession}
+          problem={problem}
+          rootCause={rootCause}
+          users={users}
+          saving={saving}
+          canEdit={canEdit}
+          onRootCauseChange={setRootCause}
+          onSave={(causes, nextRootCause = rootCause) => {
+            setIshikawa(causes);
+            onSave({ method, problem, rootCause: nextRootCause, fiveWhys, ishikawaCauses: causes, maspSteps, pdcaSteps });
+          }}
+        />
       )}
 
       {method === 'MASP' && <StepEditor rows={maspSteps} setRows={setMaspSteps} labelKey="title" />}
-      {method === 'PDCA' && <StepEditor rows={pdcaSteps} setRows={setPdcaSteps} labelKey="phase" />}
+      {method === 'PDCA' && (
+        <PDCAVisualAnalysis
+          actionId={action.id}
+          action={action}
+          session={pdcaSession}
+          stages={pdcaSteps}
+          rootCause={rootCause}
+          users={users}
+          saving={saving}
+          canEdit={canEdit}
+          onRootCauseChange={setRootCause}
+          onSave={(stages, nextRootCause = rootCause) => {
+            setPdcaSteps(stages);
+            onSave({ method, problem, rootCause: nextRootCause, fiveWhys, ishikawaCauses: ishikawa, maspSteps, pdcaSteps: stages });
+          }}
+        />
+      )}
       {!['FIVE_WHYS', 'ISHIKAWA', 'MASP', 'PDCA'].includes(method) && <GenericAnalysis method={method} session={session} />}
 
-      <div className="mt-4">
-        <Label>Causa raiz provável</Label>
-        <Textarea rows={3} value={rootCause} onChange={(e) => setRootCause(e.target.value)} />
-      </div>
-      <div className="mt-4 flex justify-end">
-        <Button disabled={saving} onClick={() => onSave({ method, problem, rootCause, fiveWhys, ishikawaCauses: ishikawa, maspSteps, pdcaSteps })}>
-          <Save className="mr-2 h-4 w-4" />
-          {saving ? 'Salvando...' : 'Salvar análise'}
-        </Button>
-      </div>
+      {!['ISHIKAWA', 'PDCA'].includes(method) && (
+        <>
+          <div className="mt-4">
+            <Label>Causa raiz provável</Label>
+            <Textarea rows={3} value={rootCause} onChange={(e) => setRootCause(e.target.value)} />
+          </div>
+          <div className="mt-4 flex justify-end">
+            <Button disabled={saving || !canEdit} onClick={() => onSave({ method, problem, rootCause, fiveWhys, ishikawaCauses: ishikawa, maspSteps, pdcaSteps })}>
+              <Save className="mr-2 h-4 w-4" />
+              {saving ? 'Salvando...' : 'Salvar análise'}
+            </Button>
+          </div>
+        </>
+      )}
     </SectionCard>
   );
 }
