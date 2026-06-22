@@ -43,7 +43,7 @@ export default function SelecionarEmpresaPage() {
 
   // Somente Super Admin escolhe empresa; os demais vão direto à operação.
   useEffect(() => {
-    if (user && user.role !== 'SUPER_ADMIN') router.replace('/dashboard');
+    if (user && user.role !== 'SUPER_ADMIN') router.replace('/meu-dia');
   }, [user, router]);
 
   const companies = useQuery<Company[]>({

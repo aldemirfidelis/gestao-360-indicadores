@@ -123,6 +123,7 @@ export class PortalGateGuard implements CanActivate {
   private inferModule(url: string): string | undefined {
     const map: Array<[string, string]> = [
       ['/api/dashboard', 'dashboard'],
+      ['/api/my-day', 'my-day'],
       ['/api/communication', 'communication'],
       ['/api/integrations', 'integrations'],
       ['/api/help', 'help-center'],
@@ -138,6 +139,7 @@ export class PortalGateGuard implements CanActivate {
       ['/api/periods', 'periods'],
       ['/api/actions', 'actions'],
       ['/api/meetings', 'meetings'],
+      ['/api/monthly-results', 'monthly-results'],
       ['/api/okrs', 'okrs'],
       ['/api/risks', 'risks'],
       ['/api/nonconformities', 'nonconformities'],
@@ -150,6 +152,7 @@ export class PortalGateGuard implements CanActivate {
       ['/api/asset-security', 'asset-security'],
       ['/api/forms', 'forms'],
       ['/api/reports', 'reports'],
+      ['/api/vision360', 'vision360'],
       ['/api/audit', 'audit'],
       ['/api/users', 'users'],
       ['/api/access', 'access-control'],

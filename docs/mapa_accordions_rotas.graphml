@@ -1,1276 +1,1897 @@
 <?xml version="1.0" encoding="UTF-8" standalone="no"?>
-<graphml xmlns="http://graphml.graphdrawing.org/xmlns" 
-         xmlns:df="http://www.yworks.com/xml/yfiles-common/markup/default" 
-         xmlns:y="http://www.yworks.com/xml/graphml" 
-         xmlns:yed="http://www.yworks.com/xml/yed/3" 
-         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" 
-         xsi:schemaLocation="http://graphml.graphdrawing.org/xmlns http://www.yworks.com/xml/schema/graphml/1.1/ygraphml.xsd">
-  <key for="node" id="d6" yfiles.type="nodegraphics"/>
-  <key for="edge" id="d10" yfiles.type="edgegraphics"/>
-  <graph id="G" edgedefault="directed">
-    <node id="n_root">
-      <data key="d6">
+<graphml xmlns="http://graphml.graphdrawing.org/xmlns" xmlns:java="http://www.yworks.com/xml/yfiles-common/1.0/java" xmlns:sys="http://www.yworks.com/xml/yfiles-common/markup/primitives/2.0" xmlns:x="http://www.yworks.com/xml/yfiles-common/markup/2.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:y="http://www.yworks.com/xml/graphml" xmlns:yed="http://www.yworks.com/xml/yed/3" xsi:schemaLocation="http://graphml.graphdrawing.org/xmlns http://www.yworks.com/xml/schema/graphml/1.1/ygraphml.xsd">
+  <!--Created by yEd 3.25.1-->
+  <key for="port" id="d0" yfiles.type="portgraphics"/>
+  <key for="port" id="d1" yfiles.type="portgeometry"/>
+  <key for="port" id="d2" yfiles.type="portuserdata"/>
+  <key attr.name="url" attr.type="string" for="node" id="d3"/>
+  <key attr.name="description" attr.type="string" for="node" id="d4"/>
+  <key for="node" id="d5" yfiles.type="nodegraphics"/>
+  <key for="graphml" id="d6" yfiles.type="resources"/>
+  <key attr.name="url" attr.type="string" for="edge" id="d7"/>
+  <key attr.name="description" attr.type="string" for="edge" id="d8"/>
+  <key for="edge" id="d9" yfiles.type="edgegraphics"/>
+  <graph edgedefault="directed" id="G">
+    <node id="n0">
+      <data key="d4"/>
+      <data key="d5">
         <y:ShapeNode>
-          <y:Geometry height="60.0" width="300.0" x="1050.0" y="30.0"/>
-          <y:Fill color="#1A365D" transparent="false"/>
-          <y:BorderStyle color="#2B6CB0" type="line" width="2.0"/>
-          <y:NodeLabel alignment="center" fontFamily="Arial" fontSize="16" fontStyle="bold" textColor="#FFFFFF" visible="true">MAPA DE ACCORDIONS E ROTAS</y:NodeLabel>
-          <y:Shape type="roundrectangle"/>
-        </y:ShapeNode>
-      </data>
-    </node>
-    <!-- Accordion 1: Início -->
-    <node id="n_acc_1">
-      <data key="d6">
-        <y:ShapeNode>
-          <y:Geometry height="50.0" width="220.0" x="100" y="200.0"/>
+          <y:Geometry height="50.0" width="220.0" x="11.441281138790032" y="-422.5699150274346"/>
           <y:Fill color="#3182CE" transparent="false"/>
-          <y:BorderStyle color="#2B6CB0" type="line" width="1.5"/>
-          <y:NodeLabel alignment="center" fontFamily="Arial" fontSize="12" fontStyle="bold" textColor="#FFFFFF" visible="true">Início</y:NodeLabel>
+          <y:BorderStyle color="#2B6CB0" type="line" width="1.0"/>
+          <y:NodeLabel alignment="center" autoSizePolicy="content" fontFamily="Arial" fontSize="12" fontStyle="bold" hasBackgroundColor="false" hasLineColor="false" height="17.40625" horizontalTextPosition="center" iconTextGap="4" modelName="internal" modelPosition="c" textColor="#FFFFFF" verticalTextPosition="bottom" visible="true" width="50.0078125" x="84.99609375" xml:space="preserve" y="16.296875">Meu Dia</y:NodeLabel>
           <y:Shape type="roundrectangle"/>
         </y:ShapeNode>
       </data>
     </node>
-    <node id="n_item_1_0">
-      <data key="d6">
+    <node id="n1">
+      <data key="d4"/>
+      <data key="d5">
         <y:ShapeNode>
-          <y:Geometry height="35.0" width="180.0" x="120.0" y="280.0"/>
-          <y:Fill color="#EBF8FF" transparent="false"/>
-          <y:BorderStyle color="#90CDF4" type="line" width="1.0"/>
-          <y:NodeLabel alignment="center" fontFamily="Arial" fontSize="11" fontStyle="plain" textColor="#2D3748" visible="true">Meu Dia</y:NodeLabel>
-          <y:Shape type="rectangle"/>
-        </y:ShapeNode>
-      </data>
-    </node>
-    <node id="n_item_1_1">
-      <data key="d6">
-        <y:ShapeNode>
-          <y:Geometry height="35.0" width="180.0" x="120.0" y="325.0"/>
-          <y:Fill color="#EBF8FF" transparent="false"/>
-          <y:BorderStyle color="#90CDF4" type="line" width="1.0"/>
-          <y:NodeLabel alignment="center" fontFamily="Arial" fontSize="11" fontStyle="plain" textColor="#2D3748" visible="true">Tarefas</y:NodeLabel>
-          <y:Shape type="rectangle"/>
-        </y:ShapeNode>
-      </data>
-    </node>
-    <!-- Accordion 2: Estratégia e Indicadores -->
-    <node id="n_acc_2">
-      <data key="d6">
-        <y:ShapeNode>
-          <y:Geometry height="50.0" width="220.0" x="420" y="200.0"/>
+          <y:Geometry height="50.0" width="220.0" x="11.441281138790032" y="-262.5699150274346"/>
           <y:Fill color="#3182CE" transparent="false"/>
-          <y:BorderStyle color="#2B6CB0" type="line" width="1.5"/>
-          <y:NodeLabel alignment="center" fontFamily="Arial" fontSize="12" fontStyle="bold" textColor="#FFFFFF" visible="true">Estratégia e Indicadores</y:NodeLabel>
+          <y:BorderStyle color="#2B6CB0" type="line" width="1.0"/>
+          <y:NodeLabel alignment="center" autoSizePolicy="content" fontFamily="Arial" fontSize="12" fontStyle="bold" hasBackgroundColor="false" hasLineColor="false" height="17.40625" horizontalTextPosition="center" iconTextGap="4" modelName="internal" modelPosition="c" textColor="#FFFFFF" verticalTextPosition="bottom" visible="true" width="62.025390625" x="78.9873046875" xml:space="preserve" y="16.296875">Estratégia</y:NodeLabel>
           <y:Shape type="roundrectangle"/>
         </y:ShapeNode>
       </data>
     </node>
-    <node id="n_item_2_0">
-      <data key="d6">
+    <node id="n2">
+      <data key="d4"/>
+      <data key="d5">
         <y:ShapeNode>
-          <y:Geometry height="35.0" width="180.0" x="440.0" y="280.0"/>
+          <y:Geometry height="35.0" width="180.0" x="31.441281138790032" y="-182.56991502743463"/>
           <y:Fill color="#EBF8FF" transparent="false"/>
           <y:BorderStyle color="#90CDF4" type="line" width="1.0"/>
-          <y:NodeLabel alignment="center" fontFamily="Arial" fontSize="11" fontStyle="plain" textColor="#2D3748" visible="true">Dashboard</y:NodeLabel>
+          <y:NodeLabel alignment="center" autoSizePolicy="content" fontFamily="Arial" fontSize="11" fontStyle="plain" hasBackgroundColor="false" hasLineColor="false" height="16.2890625" horizontalTextPosition="center" iconTextGap="4" modelName="internal" modelPosition="c" textColor="#2D3748" verticalTextPosition="bottom" visible="true" width="85.32373046875" x="47.338134765625" xml:space="preserve" y="9.35546875">Painel Executivo</y:NodeLabel>
           <y:Shape type="rectangle"/>
         </y:ShapeNode>
       </data>
     </node>
-    <node id="n_item_2_1">
-      <data key="d6">
+    <node id="n3">
+      <data key="d4"/>
+      <data key="d5">
         <y:ShapeNode>
-          <y:Geometry height="35.0" width="180.0" x="440.0" y="325.0"/>
+          <y:Geometry height="35.0" width="180.0" x="31.441281138790032" y="-118.21277239795259"/>
           <y:Fill color="#EBF8FF" transparent="false"/>
           <y:BorderStyle color="#90CDF4" type="line" width="1.0"/>
-          <y:NodeLabel alignment="center" fontFamily="Arial" fontSize="11" fontStyle="plain" textColor="#2D3748" visible="true">Mapa</y:NodeLabel>
+          <y:NodeLabel alignment="center" autoSizePolicy="content" fontFamily="Arial" fontSize="11" fontStyle="plain" hasBackgroundColor="false" hasLineColor="false" height="16.2890625" horizontalTextPosition="center" iconTextGap="4" modelName="internal" modelPosition="c" textColor="#2D3748" verticalTextPosition="bottom" visible="true" width="112.8291015625" x="33.58544921875" xml:space="preserve" y="9.35546875">Arvore Organizacional</y:NodeLabel>
           <y:Shape type="rectangle"/>
         </y:ShapeNode>
       </data>
     </node>
-    <node id="n_item_2_2">
-      <data key="d6">
+    <node id="n4">
+      <data key="d4"/>
+      <data key="d5">
         <y:ShapeNode>
-          <y:Geometry height="35.0" width="180.0" x="440.0" y="370.0"/>
+          <y:Geometry height="35.0" width="180.0" x="31.441281138790032" y="16.787227602047437"/>
           <y:Fill color="#EBF8FF" transparent="false"/>
           <y:BorderStyle color="#90CDF4" type="line" width="1.0"/>
-          <y:NodeLabel alignment="center" fontFamily="Arial" fontSize="11" fontStyle="plain" textColor="#2D3748" visible="true">Indicadores</y:NodeLabel>
+          <y:NodeLabel alignment="center" autoSizePolicy="content" fontFamily="Arial" fontSize="11" fontStyle="plain" hasBackgroundColor="false" hasLineColor="false" height="16.2890625" horizontalTextPosition="center" iconTextGap="4" modelName="internal" modelPosition="c" textColor="#2D3748" verticalTextPosition="bottom" visible="true" width="60.869140625" x="59.5654296875" xml:space="preserve" y="9.35546875">Indicadores</y:NodeLabel>
           <y:Shape type="rectangle"/>
         </y:ShapeNode>
       </data>
     </node>
-    <node id="n_item_2_3">
-      <data key="d6">
+    <node id="n5">
+      <data key="d4"/>
+      <data key="d5">
         <y:ShapeNode>
-          <y:Geometry height="35.0" width="180.0" x="440.0" y="415.0"/>
+          <y:Geometry height="35.0" width="180.0" x="31.441281138790032" y="341.78722760204744"/>
           <y:Fill color="#EBF8FF" transparent="false"/>
           <y:BorderStyle color="#90CDF4" type="line" width="1.0"/>
-          <y:NodeLabel alignment="center" fontFamily="Arial" fontSize="11" fontStyle="plain" textColor="#2D3748" visible="true">OKRs</y:NodeLabel>
+          <y:NodeLabel alignment="center" autoSizePolicy="content" fontFamily="Arial" fontSize="11" fontStyle="plain" hasBackgroundColor="false" hasLineColor="false" height="16.2890625" horizontalTextPosition="center" iconTextGap="4" modelName="internal" modelPosition="c" textColor="#2D3748" verticalTextPosition="bottom" visible="true" width="33.3369140625" x="73.33154296875" xml:space="preserve" y="9.35546875">OKRs</y:NodeLabel>
           <y:Shape type="rectangle"/>
         </y:ShapeNode>
       </data>
     </node>
-    <node id="n_item_2_4">
-      <data key="d6">
+    <node id="n6">
+      <data key="d4"/>
+      <data key="d5">
         <y:ShapeNode>
-          <y:Geometry height="35.0" width="180.0" x="440.0" y="460.0"/>
+          <y:Geometry height="35.0" width="180.0" x="31.441281138790146" y="1298.2477120244998"/>
           <y:Fill color="#EBF8FF" transparent="false"/>
           <y:BorderStyle color="#90CDF4" type="line" width="1.0"/>
-          <y:NodeLabel alignment="center" fontFamily="Arial" fontSize="11" fontStyle="plain" textColor="#2D3748" visible="true">Cronogramas</y:NodeLabel>
+          <y:NodeLabel alignment="center" autoSizePolicy="content" fontFamily="Arial" fontSize="11" fontStyle="plain" hasBackgroundColor="false" hasLineColor="false" height="16.2890625" horizontalTextPosition="center" iconTextGap="4" modelName="internal" modelPosition="c" textColor="#2D3748" verticalTextPosition="bottom" visible="true" width="70.63916015625" x="54.680419921875" xml:space="preserve" y="9.35546875">Cronogramas</y:NodeLabel>
           <y:Shape type="rectangle"/>
         </y:ShapeNode>
       </data>
     </node>
-    <node id="n_item_2_5">
-      <data key="d6">
+    <node id="n7">
+      <data key="d4"/>
+      <data key="d5">
         <y:ShapeNode>
-          <y:Geometry height="35.0" width="180.0" x="440.0" y="505.0"/>
+          <y:Geometry height="35.0" width="180.0" x="31.441281138790146" y="1363.2477120244998"/>
           <y:Fill color="#EBF8FF" transparent="false"/>
           <y:BorderStyle color="#90CDF4" type="line" width="1.0"/>
-          <y:NodeLabel alignment="center" fontFamily="Arial" fontSize="11" fontStyle="plain" textColor="#2D3748" visible="true">Impactos</y:NodeLabel>
+          <y:NodeLabel alignment="center" autoSizePolicy="content" fontFamily="Arial" fontSize="11" fontStyle="plain" hasBackgroundColor="false" hasLineColor="false" height="16.2890625" horizontalTextPosition="center" iconTextGap="4" modelName="internal" modelPosition="c" textColor="#2D3748" verticalTextPosition="bottom" visible="true" width="48.62841796875" x="65.685791015625" xml:space="preserve" y="9.35546875">Impactos</y:NodeLabel>
           <y:Shape type="rectangle"/>
         </y:ShapeNode>
       </data>
     </node>
-    <node id="n_flag_2">
-      <data key="d6">
+    <node id="n8">
+      <data key="d4"/>
+      <data key="d5">
         <y:ShapeNode>
-          <y:Geometry height="35.0" width="180.0" x="440.0" y="560.0"/>
+          <y:Geometry height="17.289537366548075" width="174.096512455516" x="127.34476868327397" y="-206.21468371070864"/>
           <y:Fill color="#E6FFFA" transparent="false"/>
           <y:BorderStyle color="#81E6D9" type="dashed" width="1.0"/>
-          <y:NodeLabel alignment="center" fontFamily="Arial" fontSize="10" fontStyle="italic" textColor="#1D4044" visible="true">Flags: dashboard, strategy, indicators</y:NodeLabel>
+          <y:NodeLabel alignment="center" autoSizePolicy="content" fontFamily="Arial" fontSize="10" fontStyle="italic" hasBackgroundColor="false" hasLineColor="false" height="15.171875" horizontalTextPosition="center" iconTextGap="4" modelName="internal" modelPosition="c" textColor="#1D4044" verticalTextPosition="bottom" visible="true" width="170.7529296875" x="1.6717913840080314" xml:space="preserve" y="1.0588311832740374">Flags: dashboard, strategy, indicators</y:NodeLabel>
           <y:Shape type="roundrectangle"/>
         </y:ShapeNode>
       </data>
     </node>
-    <!-- Accordion 3: Melhoria Contínua -->
-    <node id="n_acc_3">
-      <data key="d6">
+    <node id="n9">
+      <data key="d4"/>
+      <data key="d5">
         <y:ShapeNode>
-          <y:Geometry height="50.0" width="220.0" x="740" y="200.0"/>
+          <y:Geometry height="50.0" width="220.0" x="11.441281138790032" y="406.78722760204744"/>
           <y:Fill color="#3182CE" transparent="false"/>
-          <y:BorderStyle color="#2B6CB0" type="line" width="1.5"/>
-          <y:NodeLabel alignment="center" fontFamily="Arial" fontSize="12" fontStyle="bold" textColor="#FFFFFF" visible="true">Melhoria Contínua</y:NodeLabel>
+          <y:BorderStyle color="#2B6CB0" type="line" width="1.0"/>
+          <y:NodeLabel alignment="center" autoSizePolicy="content" fontFamily="Arial" fontSize="12" fontStyle="bold" hasBackgroundColor="false" hasLineColor="false" height="17.40625" horizontalTextPosition="center" iconTextGap="4" modelName="internal" modelPosition="c" textColor="#FFFFFF" verticalTextPosition="bottom" visible="true" width="87.35546875" x="66.322265625" xml:space="preserve" y="16.296875">Administração</y:NodeLabel>
           <y:Shape type="roundrectangle"/>
         </y:ShapeNode>
       </data>
     </node>
-    <node id="n_item_3_0">
-      <data key="d6">
+    <node id="n10">
+      <data key="d4"/>
+      <data key="d5">
         <y:ShapeNode>
-          <y:Geometry height="35.0" width="180.0" x="760.0" y="280.0"/>
+          <y:Geometry height="35.0" width="180.0" x="31.441281138790032" y="211.78722760204744"/>
           <y:Fill color="#EBF8FF" transparent="false"/>
           <y:BorderStyle color="#90CDF4" type="line" width="1.0"/>
-          <y:NodeLabel alignment="center" fontFamily="Arial" fontSize="11" fontStyle="plain" textColor="#2D3748" visible="true">Desvios</y:NodeLabel>
+          <y:NodeLabel alignment="center" autoSizePolicy="content" fontFamily="Arial" fontSize="11" fontStyle="plain" hasBackgroundColor="false" hasLineColor="false" height="16.2890625" horizontalTextPosition="center" iconTextGap="4" modelName="internal" modelPosition="c" textColor="#2D3748" verticalTextPosition="bottom" visible="true" width="50.47607421875" x="64.761962890625" xml:space="preserve" y="9.35546875">Reuniões</y:NodeLabel>
           <y:Shape type="rectangle"/>
         </y:ShapeNode>
       </data>
     </node>
-    <node id="n_item_3_1">
-      <data key="d6">
+    <node id="n11">
+      <data key="d4"/>
+      <data key="d5">
         <y:ShapeNode>
-          <y:Geometry height="35.0" width="180.0" x="760.0" y="325.0"/>
+          <y:Geometry height="35.0" width="180.0" x="31.441281138790032" y="276.78722760204744"/>
           <y:Fill color="#EBF8FF" transparent="false"/>
           <y:BorderStyle color="#90CDF4" type="line" width="1.0"/>
-          <y:NodeLabel alignment="center" fontFamily="Arial" fontSize="11" fontStyle="plain" textColor="#2D3748" visible="true">Ações</y:NodeLabel>
+          <y:NodeLabel alignment="center" autoSizePolicy="content" fontFamily="Arial" fontSize="11" fontStyle="plain" hasBackgroundColor="false" hasLineColor="false" height="16.2890625" horizontalTextPosition="center" iconTextGap="4" modelName="internal" modelPosition="c" textColor="#2D3748" verticalTextPosition="bottom" visible="true" width="83.4921875" x="48.25390625" xml:space="preserve" y="9.35546875">Reunião Mensal</y:NodeLabel>
           <y:Shape type="rectangle"/>
         </y:ShapeNode>
       </data>
     </node>
-    <node id="n_item_3_2">
-      <data key="d6">
+    <node id="n12">
+      <data key="d4"/>
+      <data key="d5">
         <y:ShapeNode>
-          <y:Geometry height="35.0" width="180.0" x="760.0" y="370.0"/>
+          <y:Geometry height="35.0" width="180.0" x="31.441281138790032" y="486.78722760204744"/>
           <y:Fill color="#EBF8FF" transparent="false"/>
           <y:BorderStyle color="#90CDF4" type="line" width="1.0"/>
-          <y:NodeLabel alignment="center" fontFamily="Arial" fontSize="11" fontStyle="plain" textColor="#2D3748" visible="true">Reuniões</y:NodeLabel>
+          <y:NodeLabel alignment="center" autoSizePolicy="content" fontFamily="Arial" fontSize="11" fontStyle="plain" hasBackgroundColor="false" hasLineColor="false" height="16.2890625" horizontalTextPosition="center" iconTextGap="4" modelName="internal" modelPosition="c" textColor="#2D3748" verticalTextPosition="bottom" visible="true" width="62.08837890625" x="58.955810546875" xml:space="preserve" y="9.35546875">Aprovações</y:NodeLabel>
           <y:Shape type="rectangle"/>
         </y:ShapeNode>
       </data>
     </node>
-    <node id="n_item_3_3">
-      <data key="d6">
+    <node id="n13">
+      <data key="d4"/>
+      <data key="d5">
         <y:ShapeNode>
-          <y:Geometry height="35.0" width="180.0" x="760.0" y="415.0"/>
+          <y:Geometry height="50.0" width="220.0" x="11.441281138790146" y="823.8905693950178"/>
+          <y:Fill color="#3182CE" transparent="false"/>
+          <y:BorderStyle color="#2B6CB0" type="line" width="1.0"/>
+          <y:NodeLabel alignment="center" autoSizePolicy="content" fontFamily="Arial" fontSize="12" fontStyle="bold" hasBackgroundColor="false" hasLineColor="false" height="17.40625" horizontalTextPosition="center" iconTextGap="4" modelName="internal" modelPosition="c" textColor="#FFFFFF" verticalTextPosition="bottom" visible="true" width="143.37109375" x="38.314453125" xml:space="preserve" y="16.296875">Qualidade e Compliance</y:NodeLabel>
+          <y:Shape type="roundrectangle"/>
+        </y:ShapeNode>
+      </data>
+    </node>
+    <node id="n14">
+      <data key="d4"/>
+      <data key="d5">
+        <y:ShapeNode>
+          <y:Geometry height="35.0" width="180.0" x="31.441281138790146" y="906.0691407097588"/>
           <y:Fill color="#EBF8FF" transparent="false"/>
           <y:BorderStyle color="#90CDF4" type="line" width="1.0"/>
-          <y:NodeLabel alignment="center" fontFamily="Arial" fontSize="11" fontStyle="plain" textColor="#2D3748" visible="true">Mensal</y:NodeLabel>
+          <y:NodeLabel alignment="center" autoSizePolicy="content" fontFamily="Arial" fontSize="11" fontStyle="plain" hasBackgroundColor="false" hasLineColor="false" height="16.2890625" horizontalTextPosition="center" iconTextGap="4" modelName="internal" modelPosition="c" textColor="#2D3748" verticalTextPosition="bottom" visible="true" width="37.00537109375" x="71.497314453125" xml:space="preserve" y="9.35546875">Riscos</y:NodeLabel>
           <y:Shape type="rectangle"/>
         </y:ShapeNode>
       </data>
     </node>
-    <node id="n_item_3_4">
-      <data key="d6">
+    <node id="n15">
+      <data key="d4"/>
+      <data key="d5">
         <y:ShapeNode>
-          <y:Geometry height="35.0" width="180.0" x="760.0" y="460.0"/>
+          <y:Geometry height="35.0" width="180.0" x="31.441281138790146" y="973.2477120245"/>
           <y:Fill color="#EBF8FF" transparent="false"/>
           <y:BorderStyle color="#90CDF4" type="line" width="1.0"/>
-          <y:NodeLabel alignment="center" fontFamily="Arial" fontSize="11" fontStyle="plain" textColor="#2D3748" visible="true">Aprovações</y:NodeLabel>
+          <y:NodeLabel alignment="center" autoSizePolicy="content" fontFamily="Arial" fontSize="11" fontStyle="plain" hasBackgroundColor="false" hasLineColor="false" height="16.2890625" horizontalTextPosition="center" iconTextGap="4" modelName="internal" modelPosition="c" textColor="#2D3748" verticalTextPosition="bottom" visible="true" width="101.8291015625" x="39.08544921875" xml:space="preserve" y="9.355468750000028">Nao Conformidades</y:NodeLabel>
           <y:Shape type="rectangle"/>
         </y:ShapeNode>
       </data>
     </node>
-    <node id="n_flag_3">
-      <data key="d6">
+    <node id="n16">
+      <data key="d4"/>
+      <data key="d5">
         <y:ShapeNode>
-          <y:Geometry height="35.0" width="180.0" x="760.0" y="515.0"/>
+          <y:Geometry height="35.0" width="180.0" x="31.441281138790146" y="1038.8905693950178"/>
+          <y:Fill color="#EBF8FF" transparent="false"/>
+          <y:BorderStyle color="#90CDF4" type="line" width="1.0"/>
+          <y:NodeLabel alignment="center" autoSizePolicy="content" fontFamily="Arial" fontSize="11" fontStyle="plain" hasBackgroundColor="false" hasLineColor="false" height="16.2890625" horizontalTextPosition="center" iconTextGap="4" modelName="internal" modelPosition="c" textColor="#2D3748" verticalTextPosition="bottom" visible="true" width="52.91455078125" x="63.542724609375" xml:space="preserve" y="9.35546875">Auditorias</y:NodeLabel>
+          <y:Shape type="rectangle"/>
+        </y:ShapeNode>
+      </data>
+    </node>
+    <node id="n17">
+      <data key="d4"/>
+      <data key="d5">
+        <y:ShapeNode>
+          <y:Geometry height="35.0" width="180.0" x="31.441281138790146" y="1103.2477120244998"/>
+          <y:Fill color="#EBF8FF" transparent="false"/>
+          <y:BorderStyle color="#90CDF4" type="line" width="1.0"/>
+          <y:NodeLabel alignment="center" autoSizePolicy="content" fontFamily="Arial" fontSize="11" fontStyle="plain" hasBackgroundColor="false" hasLineColor="false" height="16.2890625" horizontalTextPosition="center" iconTextGap="4" modelName="internal" modelPosition="c" textColor="#2D3748" verticalTextPosition="bottom" visible="true" width="65.75146484375" x="57.124267578125" xml:space="preserve" y="9.35546875">Documentos</y:NodeLabel>
+          <y:Shape type="rectangle"/>
+        </y:ShapeNode>
+      </data>
+    </node>
+    <node id="n18">
+      <data key="d4"/>
+      <data key="d5">
+        <y:ShapeNode>
+          <y:Geometry height="35.0" width="180.0" x="31.441281138790146" y="1168.2477120244998"/>
+          <y:Fill color="#EBF8FF" transparent="false"/>
+          <y:BorderStyle color="#90CDF4" type="line" width="1.0"/>
+          <y:NodeLabel alignment="center" autoSizePolicy="content" fontFamily="Arial" fontSize="11" fontStyle="plain" hasBackgroundColor="false" hasLineColor="false" height="16.2890625" horizontalTextPosition="center" iconTextGap="4" modelName="internal" modelPosition="c" textColor="#2D3748" verticalTextPosition="bottom" visible="true" width="38.22998046875" x="70.885009765625" xml:space="preserve" y="9.35546875">SIPOC</y:NodeLabel>
+          <y:Shape type="rectangle"/>
+        </y:ShapeNode>
+      </data>
+    </node>
+    <node id="n19">
+      <data key="d4"/>
+      <data key="d5">
+        <y:ShapeNode>
+          <y:Geometry height="35.0" width="180.0" x="31.441281138790146" y="1233.2477120244998"/>
+          <y:Fill color="#EBF8FF" transparent="false"/>
+          <y:BorderStyle color="#90CDF4" type="line" width="1.0"/>
+          <y:NodeLabel alignment="center" autoSizePolicy="content" fontFamily="Arial" fontSize="11" fontStyle="plain" hasBackgroundColor="false" hasLineColor="false" height="16.2890625" horizontalTextPosition="center" iconTextGap="4" modelName="internal" modelPosition="c" textColor="#2D3748" verticalTextPosition="bottom" visible="true" width="62.06689453125" x="58.966552734375" xml:space="preserve" y="9.355468750000057">Formularios</y:NodeLabel>
+          <y:Shape type="rectangle"/>
+        </y:ShapeNode>
+      </data>
+    </node>
+    <node id="n20">
+      <data key="d4"/>
+      <data key="d5">
+        <y:ShapeNode>
+          <y:Geometry height="11.971015139442272" width="180.0" x="128.65039145907485" y="882.9050618252967"/>
           <y:Fill color="#E6FFFA" transparent="false"/>
           <y:BorderStyle color="#81E6D9" type="dashed" width="1.0"/>
-          <y:NodeLabel alignment="center" fontFamily="Arial" fontSize="10" fontStyle="italic" textColor="#1D4044" visible="true">Flags: deviations, actions, meetings</y:NodeLabel>
+          <y:NodeLabel alignment="center" autoSizePolicy="content" fontFamily="Arial" fontSize="10" fontStyle="italic" hasBackgroundColor="false" hasLineColor="false" height="15.171875" horizontalTextPosition="center" iconTextGap="4" modelName="internal" modelPosition="c" textColor="#1D4044" verticalTextPosition="bottom" visible="true" width="157.3935546875" x="11.30322265625" xml:space="preserve" y="-1.6004299302788638">Flags: risks, nc, audits, documents</y:NodeLabel>
           <y:Shape type="roundrectangle"/>
         </y:ShapeNode>
       </data>
     </node>
-    <!-- Accordion 4: Qualidade e Compliance -->
-    <node id="n_acc_4">
-      <data key="d6">
+    <node id="n21">
+      <data key="d4"/>
+      <data key="d5">
         <y:ShapeNode>
-          <y:Geometry height="50.0" width="220.0" x="1060" y="200.0"/>
+          <y:Geometry height="50.0" width="220.0" x="11.441281138790146" y="1493.2477120244998"/>
           <y:Fill color="#3182CE" transparent="false"/>
-          <y:BorderStyle color="#2B6CB0" type="line" width="1.5"/>
-          <y:NodeLabel alignment="center" fontFamily="Arial" fontSize="12" fontStyle="bold" textColor="#FFFFFF" visible="true">Qualidade e Compliance</y:NodeLabel>
+          <y:BorderStyle color="#2B6CB0" type="line" width="1.0"/>
+          <y:NodeLabel alignment="center" autoSizePolicy="content" fontFamily="Arial" fontSize="12" fontStyle="bold" hasBackgroundColor="false" hasLineColor="false" height="17.40625" horizontalTextPosition="center" iconTextGap="4" modelName="internal" modelPosition="c" textColor="#FFFFFF" verticalTextPosition="bottom" visible="true" width="151.369140625" x="34.3154296875" xml:space="preserve" y="16.296875">Segurança dos Alimentos</y:NodeLabel>
           <y:Shape type="roundrectangle"/>
         </y:ShapeNode>
       </data>
     </node>
-    <node id="n_item_4_0">
-      <data key="d6">
+    <node id="n22">
+      <data key="d4"/>
+      <data key="d5">
         <y:ShapeNode>
-          <y:Geometry height="35.0" width="180.0" x="1080.0" y="280.0"/>
-          <y:Fill color="#EBF8FF" transparent="false"/>
-          <y:BorderStyle color="#90CDF4" type="line" width="1.0"/>
-          <y:NodeLabel alignment="center" fontFamily="Arial" fontSize="11" fontStyle="plain" textColor="#2D3748" visible="true">Riscos</y:NodeLabel>
-          <y:Shape type="rectangle"/>
-        </y:ShapeNode>
-      </data>
-    </node>
-    <node id="n_item_4_1">
-      <data key="d6">
-        <y:ShapeNode>
-          <y:Geometry height="35.0" width="180.0" x="1080.0" y="325.0"/>
-          <y:Fill color="#EBF8FF" transparent="false"/>
-          <y:BorderStyle color="#90CDF4" type="line" width="1.0"/>
-          <y:NodeLabel alignment="center" fontFamily="Arial" fontSize="11" fontStyle="plain" textColor="#2D3748" visible="true">NC</y:NodeLabel>
-          <y:Shape type="rectangle"/>
-        </y:ShapeNode>
-      </data>
-    </node>
-    <node id="n_item_4_2">
-      <data key="d6">
-        <y:ShapeNode>
-          <y:Geometry height="35.0" width="180.0" x="1080.0" y="370.0"/>
-          <y:Fill color="#EBF8FF" transparent="false"/>
-          <y:BorderStyle color="#90CDF4" type="line" width="1.0"/>
-          <y:NodeLabel alignment="center" fontFamily="Arial" fontSize="11" fontStyle="plain" textColor="#2D3748" visible="true">Auditorias</y:NodeLabel>
-          <y:Shape type="rectangle"/>
-        </y:ShapeNode>
-      </data>
-    </node>
-    <node id="n_item_4_3">
-      <data key="d6">
-        <y:ShapeNode>
-          <y:Geometry height="35.0" width="180.0" x="1080.0" y="415.0"/>
-          <y:Fill color="#EBF8FF" transparent="false"/>
-          <y:BorderStyle color="#90CDF4" type="line" width="1.0"/>
-          <y:NodeLabel alignment="center" fontFamily="Arial" fontSize="11" fontStyle="plain" textColor="#2D3748" visible="true">Docs</y:NodeLabel>
-          <y:Shape type="rectangle"/>
-        </y:ShapeNode>
-      </data>
-    </node>
-    <node id="n_item_4_4">
-      <data key="d6">
-        <y:ShapeNode>
-          <y:Geometry height="35.0" width="180.0" x="1080.0" y="460.0"/>
-          <y:Fill color="#EBF8FF" transparent="false"/>
-          <y:BorderStyle color="#90CDF4" type="line" width="1.0"/>
-          <y:NodeLabel alignment="center" fontFamily="Arial" fontSize="11" fontStyle="plain" textColor="#2D3748" visible="true">SIPOC</y:NodeLabel>
-          <y:Shape type="rectangle"/>
-        </y:ShapeNode>
-      </data>
-    </node>
-    <node id="n_item_4_5">
-      <data key="d6">
-        <y:ShapeNode>
-          <y:Geometry height="35.0" width="180.0" x="1080.0" y="505.0"/>
-          <y:Fill color="#EBF8FF" transparent="false"/>
-          <y:BorderStyle color="#90CDF4" type="line" width="1.0"/>
-          <y:NodeLabel alignment="center" fontFamily="Arial" fontSize="11" fontStyle="plain" textColor="#2D3748" visible="true">Modelos</y:NodeLabel>
-          <y:Shape type="rectangle"/>
-        </y:ShapeNode>
-      </data>
-    </node>
-    <node id="n_flag_4">
-      <data key="d6">
-        <y:ShapeNode>
-          <y:Geometry height="35.0" width="180.0" x="1080.0" y="560.0"/>
+          <y:Geometry height="11.971015139442272" width="99.16356334661373" x="141.44128113879015" y="1552.2622044547786"/>
           <y:Fill color="#E6FFFA" transparent="false"/>
           <y:BorderStyle color="#81E6D9" type="dashed" width="1.0"/>
-          <y:NodeLabel alignment="center" fontFamily="Arial" fontSize="10" fontStyle="italic" textColor="#1D4044" visible="true">Flags: risks, nc, audits, documents</y:NodeLabel>
+          <y:NodeLabel alignment="center" autoSizePolicy="content" fontFamily="Arial" fontSize="10" fontStyle="italic" hasBackgroundColor="false" hasLineColor="false" height="15.171875" horizontalTextPosition="center" iconTextGap="4" modelName="internal" modelPosition="c" textColor="#1D4044" verticalTextPosition="bottom" visible="true" width="83.482421875" x="7.84057073580675" xml:space="preserve" y="-1.6004299302788638">Flags: food-safety</y:NodeLabel>
           <y:Shape type="roundrectangle"/>
         </y:ShapeNode>
       </data>
     </node>
-    <!-- Accordion 5: Segurança dos Alimentos -->
-    <node id="n_acc_5">
-      <data key="d6">
+    <node id="n23">
+      <data key="d4"/>
+      <data key="d5">
         <y:ShapeNode>
-          <y:Geometry height="50.0" width="220.0" x="1380" y="200.0"/>
+          <y:Geometry height="50.0" width="220.0" x="11.441281138790146" y="2162.6048546539823"/>
           <y:Fill color="#3182CE" transparent="false"/>
-          <y:BorderStyle color="#2B6CB0" type="line" width="1.5"/>
-          <y:NodeLabel alignment="center" fontFamily="Arial" fontSize="12" fontStyle="bold" textColor="#FFFFFF" visible="true">Segurança dos Alimentos</y:NodeLabel>
+          <y:BorderStyle color="#2B6CB0" type="line" width="1.0"/>
+          <y:NodeLabel alignment="center" autoSizePolicy="content" fontFamily="Arial" fontSize="12" fontStyle="bold" hasBackgroundColor="false" hasLineColor="false" height="17.40625" horizontalTextPosition="center" iconTextGap="4" modelName="internal" modelPosition="c" textColor="#FFFFFF" verticalTextPosition="bottom" visible="true" width="134.04296875" x="42.978515625" xml:space="preserve" y="16.296875">Segurança Patrimonial</y:NodeLabel>
           <y:Shape type="roundrectangle"/>
         </y:ShapeNode>
       </data>
     </node>
-    <node id="n_item_5_0">
-      <data key="d6">
+    <node id="n24">
+      <data key="d4"/>
+      <data key="d5">
         <y:ShapeNode>
-          <y:Geometry height="35.0" width="180.0" x="1400.0" y="280.0"/>
-          <y:Fill color="#EBF8FF" transparent="false"/>
-          <y:BorderStyle color="#90CDF4" type="line" width="1.0"/>
-          <y:NodeLabel alignment="center" fontFamily="Arial" fontSize="11" fontStyle="plain" textColor="#2D3748" visible="true">/seguranca-alimentos</y:NodeLabel>
-          <y:Shape type="rectangle"/>
-        </y:ShapeNode>
-      </data>
-    </node>
-    <node id="n_flag_5">
-      <data key="d6">
-        <y:ShapeNode>
-          <y:Geometry height="35.0" width="180.0" x="1400.0" y="335.0"/>
+          <y:Geometry height="11.971015139442272" width="99.16356334661373" x="141.44128113879015" y="2221.619347084261"/>
           <y:Fill color="#E6FFFA" transparent="false"/>
           <y:BorderStyle color="#81E6D9" type="dashed" width="1.0"/>
-          <y:NodeLabel alignment="center" fontFamily="Arial" fontSize="10" fontStyle="italic" textColor="#1D4044" visible="true">Flags: food-safety</y:NodeLabel>
+          <y:NodeLabel alignment="center" autoSizePolicy="content" fontFamily="Arial" fontSize="10" fontStyle="italic" hasBackgroundColor="false" hasLineColor="false" height="15.171875" horizontalTextPosition="center" iconTextGap="4" modelName="internal" modelPosition="c" textColor="#1D4044" verticalTextPosition="bottom" visible="true" width="95.6943359375" x="1.7346137045567502" xml:space="preserve" y="-1.6004299302788354">Flags: asset-security</y:NodeLabel>
           <y:Shape type="roundrectangle"/>
         </y:ShapeNode>
       </data>
     </node>
-    <!-- Accordion 6: Segurança Patrimonial -->
-    <node id="n_acc_6">
-      <data key="d6">
+    <node id="n25">
+      <data key="d4"/>
+      <data key="d5">
         <y:ShapeNode>
-          <y:Geometry height="50.0" width="220.0" x="1700" y="200.0"/>
+          <y:Geometry height="50.0" width="220.0" x="11.441281138790146" y="2636.9619972834644"/>
           <y:Fill color="#3182CE" transparent="false"/>
-          <y:BorderStyle color="#2B6CB0" type="line" width="1.5"/>
-          <y:NodeLabel alignment="center" fontFamily="Arial" fontSize="12" fontStyle="bold" textColor="#FFFFFF" visible="true">Segurança Patrimonial</y:NodeLabel>
+          <y:BorderStyle color="#2B6CB0" type="line" width="1.0"/>
+          <y:NodeLabel alignment="center" autoSizePolicy="content" fontFamily="Arial" fontSize="12" fontStyle="bold" hasBackgroundColor="false" hasLineColor="false" height="17.40625" horizontalTextPosition="center" iconTextGap="4" modelName="internal" modelPosition="c" textColor="#FFFFFF" verticalTextPosition="bottom" visible="true" width="105.37890625" x="57.310546875" xml:space="preserve" y="16.296875">Cargos e Salários</y:NodeLabel>
           <y:Shape type="roundrectangle"/>
         </y:ShapeNode>
       </data>
     </node>
-    <node id="n_item_6_0">
-      <data key="d6">
+    <node id="n26">
+      <data key="d4"/>
+      <data key="d5">
         <y:ShapeNode>
-          <y:Geometry height="35.0" width="180.0" x="1720.0" y="280.0"/>
+          <y:Geometry height="35.0" width="180.0" x="31.441281138790146" y="2721.319139912947"/>
           <y:Fill color="#EBF8FF" transparent="false"/>
           <y:BorderStyle color="#90CDF4" type="line" width="1.0"/>
-          <y:NodeLabel alignment="center" fontFamily="Arial" fontSize="11" fontStyle="plain" textColor="#2D3748" visible="true">/seguranca-patrimonial</y:NodeLabel>
+          <y:NodeLabel alignment="center" autoSizePolicy="content" fontFamily="Arial" fontSize="11" fontStyle="plain" hasBackgroundColor="false" hasLineColor="false" height="16.2890625" horizontalTextPosition="center" iconTextGap="4" modelName="internal" modelPosition="c" textColor="#2D3748" verticalTextPosition="bottom" visible="true" width="61.470703125" x="59.2646484375" xml:space="preserve" y="9.35546875">Visão Geral</y:NodeLabel>
           <y:Shape type="rectangle"/>
         </y:ShapeNode>
       </data>
     </node>
-    <node id="n_flag_6">
-      <data key="d6">
+    <node id="n27">
+      <data key="d4"/>
+      <data key="d5">
         <y:ShapeNode>
-          <y:Geometry height="35.0" width="180.0" x="1720.0" y="335.0"/>
+          <y:Geometry height="11.971015139442272" width="99.1635633466135" x="148.4857747316778" y="2695.9764897137434"/>
           <y:Fill color="#E6FFFA" transparent="false"/>
           <y:BorderStyle color="#81E6D9" type="dashed" width="1.0"/>
-          <y:NodeLabel alignment="center" fontFamily="Arial" fontSize="10" fontStyle="italic" textColor="#1D4044" visible="true">Flags: asset-security</y:NodeLabel>
+          <y:NodeLabel alignment="center" autoSizePolicy="content" fontFamily="Arial" fontSize="10" fontStyle="italic" hasBackgroundColor="false" hasLineColor="false" height="15.171875" horizontalTextPosition="center" iconTextGap="4" modelName="internal" modelPosition="c" textColor="#1D4044" verticalTextPosition="bottom" visible="true" width="96.2705078125" x="1.4465277670565229" xml:space="preserve" y="-1.6004299302788354">Flags: compensation</y:NodeLabel>
           <y:Shape type="roundrectangle"/>
         </y:ShapeNode>
       </data>
     </node>
-    <!-- Accordion 7: Cargos e Salários -->
-    <node id="n_acc_7">
-      <data key="d6">
+    <node id="n28">
+      <data key="d4"/>
+      <data key="d5">
         <y:ShapeNode>
-          <y:Geometry height="50.0" width="220.0" x="2020" y="200.0"/>
+          <y:Geometry height="50.0" width="220.0" x="11.441281138790146" y="4166.319139912946"/>
           <y:Fill color="#3182CE" transparent="false"/>
-          <y:BorderStyle color="#2B6CB0" type="line" width="1.5"/>
-          <y:NodeLabel alignment="center" fontFamily="Arial" fontSize="12" fontStyle="bold" textColor="#FFFFFF" visible="true">Cargos e Salários</y:NodeLabel>
+          <y:BorderStyle color="#2B6CB0" type="line" width="1.0"/>
+          <y:NodeLabel alignment="center" autoSizePolicy="content" fontFamily="Arial" fontSize="12" fontStyle="bold" hasBackgroundColor="false" hasLineColor="false" height="17.40625" horizontalTextPosition="center" iconTextGap="4" modelName="internal" modelPosition="c" textColor="#FFFFFF" verticalTextPosition="bottom" visible="true" width="106.03515625" x="56.982421875" xml:space="preserve" y="16.296875">Gestão de Prêmio</y:NodeLabel>
           <y:Shape type="roundrectangle"/>
         </y:ShapeNode>
       </data>
     </node>
-    <node id="n_item_7_0">
-      <data key="d6">
+    <node id="n29">
+      <data key="d4"/>
+      <data key="d5">
         <y:ShapeNode>
-          <y:Geometry height="35.0" width="180.0" x="2040.0" y="280.0"/>
+          <y:Geometry height="35.0" width="180.0" x="31.441281138790146" y="4246.319139912946"/>
           <y:Fill color="#EBF8FF" transparent="false"/>
           <y:BorderStyle color="#90CDF4" type="line" width="1.0"/>
-          <y:NodeLabel alignment="center" fontFamily="Arial" fontSize="11" fontStyle="plain" textColor="#2D3748" visible="true">/cargos-salarios</y:NodeLabel>
+          <y:NodeLabel alignment="center" autoSizePolicy="content" fontFamily="Arial" fontSize="11" fontStyle="plain" hasBackgroundColor="false" hasLineColor="false" height="16.2890625" horizontalTextPosition="center" iconTextGap="4" modelName="internal" modelPosition="c" textColor="#2D3748" verticalTextPosition="bottom" visible="true" width="61.470703125" x="59.2646484375" xml:space="preserve" y="9.35546875">Visão Geral</y:NodeLabel>
           <y:Shape type="rectangle"/>
         </y:ShapeNode>
       </data>
     </node>
-    <node id="n_item_7_1">
-      <data key="d6">
+    <node id="n30">
+      <data key="d4"/>
+      <data key="d5">
         <y:ShapeNode>
-          <y:Geometry height="35.0" width="180.0" x="2040.0" y="325.0"/>
-          <y:Fill color="#EBF8FF" transparent="false"/>
-          <y:BorderStyle color="#90CDF4" type="line" width="1.0"/>
-          <y:NodeLabel alignment="center" fontFamily="Arial" fontSize="11" fontStyle="plain" textColor="#2D3748" visible="true">sub-rotas</y:NodeLabel>
-          <y:Shape type="rectangle"/>
-        </y:ShapeNode>
-      </data>
-    </node>
-    <node id="n_flag_7">
-      <data key="d6">
-        <y:ShapeNode>
-          <y:Geometry height="35.0" width="180.0" x="2040.0" y="380.0"/>
+          <y:Geometry height="14.219723843416432" width="69.1718604982209" x="155.49323274021344" y="4224.209277991238"/>
           <y:Fill color="#E6FFFA" transparent="false"/>
           <y:BorderStyle color="#81E6D9" type="dashed" width="1.0"/>
-          <y:NodeLabel alignment="center" fontFamily="Arial" fontSize="10" fontStyle="italic" textColor="#1D4044" visible="true">Flags: compensation</y:NodeLabel>
+          <y:NodeLabel alignment="center" autoSizePolicy="content" fontFamily="Arial" fontSize="10" fontStyle="italic" hasBackgroundColor="false" hasLineColor="false" height="15.171875" horizontalTextPosition="center" iconTextGap="4" modelName="internal" modelPosition="c" textColor="#1D4044" verticalTextPosition="bottom" visible="true" width="55.6845703125" x="6.743645092860561" xml:space="preserve" y="-0.47607557829178404">Flags: prize</y:NodeLabel>
           <y:Shape type="roundrectangle"/>
         </y:ShapeNode>
       </data>
     </node>
-    <!-- Accordion 8: Gestão de Prêmio -->
-    <node id="n_acc_8">
-      <data key="d6">
+    <node id="n31">
+      <data key="d4"/>
+      <data key="d5">
         <y:ShapeNode>
-          <y:Geometry height="50.0" width="220.0" x="250" y="650.0"/>
+          <y:Geometry height="50.0" width="220.0" x="11.441281138790146" y="3631.3191399129464"/>
           <y:Fill color="#3182CE" transparent="false"/>
-          <y:BorderStyle color="#2B6CB0" type="line" width="1.5"/>
-          <y:NodeLabel alignment="center" fontFamily="Arial" fontSize="12" fontStyle="bold" textColor="#FFFFFF" visible="true">Gestão de Prêmio</y:NodeLabel>
+          <y:BorderStyle color="#2B6CB0" type="line" width="1.0"/>
+          <y:NodeLabel alignment="center" autoSizePolicy="content" fontFamily="Arial" fontSize="12" fontStyle="bold" hasBackgroundColor="false" hasLineColor="false" height="17.40625" horizontalTextPosition="center" iconTextGap="4" modelName="internal" modelPosition="c" textColor="#FFFFFF" verticalTextPosition="bottom" visible="true" width="82.685546875" x="68.6572265625" xml:space="preserve" y="16.296875">Comunicação</y:NodeLabel>
           <y:Shape type="roundrectangle"/>
         </y:ShapeNode>
       </data>
     </node>
-    <node id="n_item_8_0">
-      <data key="d6">
+    <node id="n32">
+      <data key="d4"/>
+      <data key="d5">
         <y:ShapeNode>
-          <y:Geometry height="35.0" width="180.0" x="270.0" y="730.0"/>
+          <y:Geometry height="35.0" width="180.0" x="31.441281138790146" y="3711.3191399129464"/>
           <y:Fill color="#EBF8FF" transparent="false"/>
           <y:BorderStyle color="#90CDF4" type="line" width="1.0"/>
-          <y:NodeLabel alignment="center" fontFamily="Arial" fontSize="11" fontStyle="plain" textColor="#2D3748" visible="true">12 sub-itens</y:NodeLabel>
+          <y:NodeLabel alignment="center" autoSizePolicy="content" fontFamily="Arial" fontSize="11" fontStyle="plain" hasBackgroundColor="false" hasLineColor="false" height="16.2890625" horizontalTextPosition="center" iconTextGap="4" modelName="internal" modelPosition="c" textColor="#2D3748" verticalTextPosition="bottom" visible="true" width="55.9599609375" x="62.02001953125" xml:space="preserve" y="9.35546875">Meu Mural</y:NodeLabel>
           <y:Shape type="rectangle"/>
         </y:ShapeNode>
       </data>
     </node>
-    <node id="n_flag_8">
-      <data key="d6">
+    <node id="n33">
+      <data key="d4"/>
+      <data key="d5">
         <y:ShapeNode>
-          <y:Geometry height="35.0" width="180.0" x="270.0" y="785.0"/>
+          <y:Geometry height="16.30562277580077" width="114.07772241992893" x="128.84882562277562" y="3688.166328525046"/>
           <y:Fill color="#E6FFFA" transparent="false"/>
           <y:BorderStyle color="#81E6D9" type="dashed" width="1.0"/>
-          <y:NodeLabel alignment="center" fontFamily="Arial" fontSize="10" fontStyle="italic" textColor="#1D4044" visible="true">Flags: prize</y:NodeLabel>
+          <y:NodeLabel alignment="center" autoSizePolicy="content" fontFamily="Arial" fontSize="10" fontStyle="italic" hasBackgroundColor="false" hasLineColor="false" height="15.171875" horizontalTextPosition="center" iconTextGap="4" modelName="internal" modelPosition="c" textColor="#1D4044" verticalTextPosition="bottom" visible="true" width="101.2607421875" x="6.408490116214352" xml:space="preserve" y="0.5668738879004422">Flags: communication</y:NodeLabel>
           <y:Shape type="roundrectangle"/>
         </y:ShapeNode>
       </data>
     </node>
-    <!-- Accordion 9: Comunicação -->
-    <node id="n_acc_9">
-      <data key="d6">
+    <node id="n34">
+      <data key="d4"/>
+      <data key="d5">
         <y:ShapeNode>
-          <y:Geometry height="50.0" width="220.0" x="600" y="650.0"/>
+          <y:Geometry height="35.0" width="180.0" x="31.441281138790146" y="2246.9619972834644"/>
+          <y:Fill color="#EBF8FF" transparent="false"/>
+          <y:BorderStyle color="#90CDF4" type="line" width="1.0"/>
+          <y:NodeLabel alignment="center" autoSizePolicy="content" fontFamily="Arial" fontSize="11" fontStyle="plain" hasBackgroundColor="false" hasLineColor="false" height="16.2890625" horizontalTextPosition="center" iconTextGap="4" modelName="internal" modelPosition="c" textColor="#2D3748" verticalTextPosition="bottom" visible="true" width="52.3076171875" x="63.84619140625" xml:space="preserve" y="9.35546875">Operação</y:NodeLabel>
+          <y:Shape type="rectangle"/>
+        </y:ShapeNode>
+      </data>
+    </node>
+    <node id="n35">
+      <data key="d4"/>
+      <data key="d5">
+        <y:ShapeNode>
+          <y:Geometry height="35.0" width="180.0" x="31.441281138790146" y="2311.9619972834644"/>
+          <y:Fill color="#EBF8FF" transparent="false"/>
+          <y:BorderStyle color="#90CDF4" type="line" width="1.0"/>
+          <y:NodeLabel alignment="center" autoSizePolicy="content" fontFamily="Arial" fontSize="11" fontStyle="plain" hasBackgroundColor="false" hasLineColor="false" height="16.2890625" horizontalTextPosition="center" iconTextGap="4" modelName="internal" modelPosition="c" textColor="#2D3748" verticalTextPosition="bottom" visible="true" width="99.99755859375" x="40.001220703125" xml:space="preserve" y="9.35546875">Pessoas e Veiculos</y:NodeLabel>
+          <y:Shape type="rectangle"/>
+        </y:ShapeNode>
+      </data>
+    </node>
+    <node id="n36">
+      <data key="d4"/>
+      <data key="d5">
+        <y:ShapeNode>
+          <y:Geometry height="35.0" width="180.0" x="31.441281138790146" y="2376.9619972834644"/>
+          <y:Fill color="#EBF8FF" transparent="false"/>
+          <y:BorderStyle color="#90CDF4" type="line" width="1.0"/>
+          <y:NodeLabel alignment="center" autoSizePolicy="content" fontFamily="Arial" fontSize="11" fontStyle="plain" hasBackgroundColor="false" hasLineColor="false" height="16.2890625" horizontalTextPosition="center" iconTextGap="4" modelName="internal" modelPosition="c" textColor="#2D3748" verticalTextPosition="bottom" visible="true" width="67.58837890625" x="56.205810546875" xml:space="preserve" y="9.35546875">Autorizações</y:NodeLabel>
+          <y:Shape type="rectangle"/>
+        </y:ShapeNode>
+      </data>
+    </node>
+    <node id="n37">
+      <data key="d4"/>
+      <data key="d5">
+        <y:ShapeNode>
+          <y:Geometry height="35.0" width="180.0" x="31.441281138790146" y="2441.9619972834644"/>
+          <y:Fill color="#EBF8FF" transparent="false"/>
+          <y:BorderStyle color="#90CDF4" type="line" width="1.0"/>
+          <y:NodeLabel alignment="center" autoSizePolicy="content" fontFamily="Arial" fontSize="11" fontStyle="plain" hasBackgroundColor="false" hasLineColor="false" height="16.2890625" horizontalTextPosition="center" iconTextGap="4" modelName="internal" modelPosition="c" textColor="#2D3748" verticalTextPosition="bottom" visible="true" width="113.44140625" x="33.279296875" xml:space="preserve" y="9.35546875">Rondas e Ocorrências</y:NodeLabel>
+          <y:Shape type="rectangle"/>
+        </y:ShapeNode>
+      </data>
+    </node>
+    <node id="n38">
+      <data key="d4"/>
+      <data key="d5">
+        <y:ShapeNode>
+          <y:Geometry height="35.0" width="180.0" x="31.441281138790146" y="2506.9619972834644"/>
+          <y:Fill color="#EBF8FF" transparent="false"/>
+          <y:BorderStyle color="#90CDF4" type="line" width="1.0"/>
+          <y:NodeLabel alignment="center" autoSizePolicy="content" fontFamily="Arial" fontSize="11" fontStyle="plain" hasBackgroundColor="false" hasLineColor="false" height="16.2890625" horizontalTextPosition="center" iconTextGap="4" modelName="internal" modelPosition="c" textColor="#2D3748" verticalTextPosition="bottom" visible="true" width="98.14990234375" x="40.925048828125" xml:space="preserve" y="9.35546875">Materiais e Chaves</y:NodeLabel>
+          <y:Shape type="rectangle"/>
+        </y:ShapeNode>
+      </data>
+    </node>
+    <node id="n39">
+      <data key="d4"/>
+      <data key="d5">
+        <y:ShapeNode>
+          <y:Geometry height="35.0" width="180.0" x="31.441281138790146" y="2571.9619972834644"/>
+          <y:Fill color="#EBF8FF" transparent="false"/>
+          <y:BorderStyle color="#90CDF4" type="line" width="1.0"/>
+          <y:NodeLabel alignment="center" autoSizePolicy="content" fontFamily="Arial" fontSize="11" fontStyle="plain" hasBackgroundColor="false" hasLineColor="false" height="16.2890625" horizontalTextPosition="center" iconTextGap="4" modelName="internal" modelPosition="c" textColor="#2D3748" verticalTextPosition="bottom" visible="true" width="98.14990234375" x="40.925048828125" xml:space="preserve" y="9.35546875">Materiais e Chaves</y:NodeLabel>
+          <y:Shape type="rectangle"/>
+        </y:ShapeNode>
+      </data>
+    </node>
+    <node id="n40">
+      <data key="d4"/>
+      <data key="d5">
+        <y:ShapeNode>
+          <y:Geometry height="35.0" width="180.0" x="31.441281138790146" y="1642.6048546539819"/>
+          <y:Fill color="#EBF8FF" transparent="false"/>
+          <y:BorderStyle color="#90CDF4" type="line" width="1.0"/>
+          <y:NodeLabel alignment="center" autoSizePolicy="content" fontFamily="Arial" fontSize="11" fontStyle="plain" hasBackgroundColor="false" hasLineColor="false" height="16.2890625" horizontalTextPosition="center" iconTextGap="4" modelName="internal" modelPosition="c" textColor="#2D3748" verticalTextPosition="bottom" visible="true" width="61.470703125" x="59.2646484375" xml:space="preserve" y="9.35546875">Visão Geral</y:NodeLabel>
+          <y:Shape type="rectangle"/>
+        </y:ShapeNode>
+      </data>
+    </node>
+    <node id="n41">
+      <data key="d4"/>
+      <data key="d5">
+        <y:ShapeNode>
+          <y:Geometry height="35.0" width="180.0" x="31.441281138790146" y="1707.6048546539819"/>
+          <y:Fill color="#EBF8FF" transparent="false"/>
+          <y:BorderStyle color="#90CDF4" type="line" width="1.0"/>
+          <y:NodeLabel alignment="center" autoSizePolicy="content" fontFamily="Arial" fontSize="11" fontStyle="plain" hasBackgroundColor="false" hasLineColor="false" height="16.2890625" horizontalTextPosition="center" iconTextGap="4" modelName="internal" modelPosition="c" textColor="#2D3748" verticalTextPosition="bottom" visible="true" width="55.35302734375" x="62.323486328125" xml:space="preserve" y="9.35546875">Processos</y:NodeLabel>
+          <y:Shape type="rectangle"/>
+        </y:ShapeNode>
+      </data>
+    </node>
+    <node id="n42">
+      <data key="d4"/>
+      <data key="d5">
+        <y:ShapeNode>
+          <y:Geometry height="35.0" width="180.0" x="31.441281138790146" y="1772.6048546539819"/>
+          <y:Fill color="#EBF8FF" transparent="false"/>
+          <y:BorderStyle color="#90CDF4" type="line" width="1.0"/>
+          <y:NodeLabel alignment="center" autoSizePolicy="content" fontFamily="Arial" fontSize="11" fontStyle="plain" hasBackgroundColor="false" hasLineColor="false" height="16.2890625" horizontalTextPosition="center" iconTextGap="4" modelName="internal" modelPosition="c" textColor="#2D3748" verticalTextPosition="bottom" visible="true" width="88.36376953125" x="45.818115234375" xml:space="preserve" y="9.35546875">Perigos / APPCC</y:NodeLabel>
+          <y:Shape type="rectangle"/>
+        </y:ShapeNode>
+      </data>
+    </node>
+    <node id="n43">
+      <data key="d4"/>
+      <data key="d5">
+        <y:ShapeNode>
+          <y:Geometry height="35.0" width="180.0" x="31.441281138790146" y="1837.6048546539819"/>
+          <y:Fill color="#EBF8FF" transparent="false"/>
+          <y:BorderStyle color="#90CDF4" type="line" width="1.0"/>
+          <y:NodeLabel alignment="center" autoSizePolicy="content" fontFamily="Arial" fontSize="11" fontStyle="plain" hasBackgroundColor="false" hasLineColor="false" height="16.2890625" horizontalTextPosition="center" iconTextGap="4" modelName="internal" modelPosition="c" textColor="#2D3748" verticalTextPosition="bottom" visible="true" width="77.369140625" x="51.3154296875" xml:space="preserve" y="9.35546875">Monitoramento</y:NodeLabel>
+          <y:Shape type="rectangle"/>
+        </y:ShapeNode>
+      </data>
+    </node>
+    <node id="n44">
+      <data key="d4"/>
+      <data key="d5">
+        <y:ShapeNode>
+          <y:Geometry height="35.0" width="180.0" x="31.441281138790146" y="1902.6048546539819"/>
+          <y:Fill color="#EBF8FF" transparent="false"/>
+          <y:BorderStyle color="#90CDF4" type="line" width="1.0"/>
+          <y:NodeLabel alignment="center" autoSizePolicy="content" fontFamily="Arial" fontSize="11" fontStyle="plain" hasBackgroundColor="false" hasLineColor="false" height="16.2890625" horizontalTextPosition="center" iconTextGap="4" modelName="internal" modelPosition="c" textColor="#2D3748" verticalTextPosition="bottom" visible="true" width="62.0830078125" x="58.95849609375" xml:space="preserve" y="9.35546875">Complience</y:NodeLabel>
+          <y:Shape type="rectangle"/>
+        </y:ShapeNode>
+      </data>
+    </node>
+    <node id="n45">
+      <data key="d4"/>
+      <data key="d5">
+        <y:ShapeNode>
+          <y:Geometry height="35.0" width="180.0" x="31.441281138790146" y="1967.6048546539819"/>
+          <y:Fill color="#EBF8FF" transparent="false"/>
+          <y:BorderStyle color="#90CDF4" type="line" width="1.0"/>
+          <y:NodeLabel alignment="center" autoSizePolicy="content" fontFamily="Arial" fontSize="11" fontStyle="plain" hasBackgroundColor="false" hasLineColor="false" height="16.2890625" horizontalTextPosition="center" iconTextGap="4" modelName="internal" modelPosition="c" textColor="#2D3748" verticalTextPosition="bottom" visible="true" width="81.6552734375" x="49.17236328125" xml:space="preserve" y="9.35546875">Cadeia e Recall</y:NodeLabel>
+          <y:Shape type="rectangle"/>
+        </y:ShapeNode>
+      </data>
+    </node>
+    <node id="n46">
+      <data key="d4"/>
+      <data key="d5">
+        <y:ShapeNode>
+          <y:Geometry height="35.0" width="180.0" x="31.441281138790146" y="2032.6048546539819"/>
+          <y:Fill color="#EBF8FF" transparent="false"/>
+          <y:BorderStyle color="#90CDF4" type="line" width="1.0"/>
+          <y:NodeLabel alignment="center" autoSizePolicy="content" fontFamily="Arial" fontSize="11" fontStyle="plain" hasBackgroundColor="false" hasLineColor="false" height="16.2890625" horizontalTextPosition="center" iconTextGap="4" modelName="internal" modelPosition="c" textColor="#2D3748" verticalTextPosition="bottom" visible="true" width="59.64990234375" x="60.175048828125" xml:space="preserve" y="9.35546875">Inteligência</y:NodeLabel>
+          <y:Shape type="rectangle"/>
+        </y:ShapeNode>
+      </data>
+    </node>
+    <node id="n47">
+      <data key="d4"/>
+      <data key="d5">
+        <y:ShapeNode>
+          <y:Geometry height="35.0" width="180.0" x="31.441281138790146" y="1575.4262833392409"/>
+          <y:Fill color="#EBF8FF" transparent="false"/>
+          <y:BorderStyle color="#90CDF4" type="line" width="1.0"/>
+          <y:NodeLabel alignment="center" autoSizePolicy="content" fontFamily="Arial" fontSize="11" fontStyle="plain" hasBackgroundColor="false" hasLineColor="false" height="16.2890625" horizontalTextPosition="center" iconTextGap="4" modelName="internal" modelPosition="c" textColor="#2D3748" verticalTextPosition="bottom" visible="true" width="62.07763671875" x="58.961181640625" xml:space="preserve" y="9.35546875">Fluxograma</y:NodeLabel>
+          <y:Shape type="rectangle"/>
+        </y:ShapeNode>
+      </data>
+    </node>
+    <node id="n48">
+      <data key="d4"/>
+      <data key="d5">
+        <y:ShapeNode>
+          <y:Geometry height="35.0" width="180.0" x="31.441281138790146" y="2097.604854653982"/>
+          <y:Fill color="#EBF8FF" transparent="false"/>
+          <y:BorderStyle color="#90CDF4" type="line" width="1.0"/>
+          <y:NodeLabel alignment="center" autoSizePolicy="content" fontFamily="Arial" fontSize="11" fontStyle="plain" hasBackgroundColor="false" hasLineColor="false" height="16.2890625" horizontalTextPosition="center" iconTextGap="4" modelName="internal" modelPosition="c" textColor="#2D3748" verticalTextPosition="bottom" visible="true" width="63.8984375" x="58.05078125" xml:space="preserve" y="9.35546875">Matriz Geral</y:NodeLabel>
+          <y:Shape type="rectangle"/>
+        </y:ShapeNode>
+      </data>
+    </node>
+    <node id="n49">
+      <data key="d4"/>
+      <data key="d5">
+        <y:ShapeNode>
+          <y:Geometry height="35.0" width="180.0" x="31.441281138790146" y="2786.319139912947"/>
+          <y:Fill color="#EBF8FF" transparent="false"/>
+          <y:BorderStyle color="#90CDF4" type="line" width="1.0"/>
+          <y:NodeLabel alignment="center" autoSizePolicy="content" fontFamily="Arial" fontSize="11" fontStyle="plain" hasBackgroundColor="false" hasLineColor="false" height="16.2890625" horizontalTextPosition="center" iconTextGap="4" modelName="internal" modelPosition="c" textColor="#2D3748" verticalTextPosition="bottom" visible="true" width="97.54833984375" x="41.225830078125" xml:space="preserve" y="9.35546875">Estrutura e Quadro</y:NodeLabel>
+          <y:Shape type="rectangle"/>
+        </y:ShapeNode>
+      </data>
+    </node>
+    <node id="n50">
+      <data key="d4"/>
+      <data key="d5">
+        <y:ShapeNode>
+          <y:Geometry height="35.0" width="180.0" x="31.441281138790146" y="2851.319139912947"/>
+          <y:Fill color="#EBF8FF" transparent="false"/>
+          <y:BorderStyle color="#90CDF4" type="line" width="1.0"/>
+          <y:NodeLabel alignment="center" autoSizePolicy="content" fontFamily="Arial" fontSize="11" fontStyle="plain" hasBackgroundColor="false" hasLineColor="false" height="16.2890625" horizontalTextPosition="center" iconTextGap="4" modelName="internal" modelPosition="c" textColor="#2D3748" verticalTextPosition="bottom" visible="true" width="101.83984375" x="39.080078125" xml:space="preserve" y="9.35546875">Catalogo de Cargos</y:NodeLabel>
+          <y:Shape type="rectangle"/>
+        </y:ShapeNode>
+      </data>
+    </node>
+    <node id="n51">
+      <data key="d4"/>
+      <data key="d5">
+        <y:ShapeNode>
+          <y:Geometry height="35.0" width="180.0" x="31.441281138790146" y="2916.319139912947"/>
+          <y:Fill color="#EBF8FF" transparent="false"/>
+          <y:BorderStyle color="#90CDF4" type="line" width="1.0"/>
+          <y:NodeLabel alignment="center" autoSizePolicy="content" fontFamily="Arial" fontSize="11" fontStyle="plain" hasBackgroundColor="false" hasLineColor="false" height="16.2890625" horizontalTextPosition="center" iconTextGap="4" modelName="internal" modelPosition="c" textColor="#2D3748" verticalTextPosition="bottom" visible="true" width="58.40380859375" x="60.798095703125" xml:space="preserve" y="9.35546875">Descrições</y:NodeLabel>
+          <y:Shape type="rectangle"/>
+        </y:ShapeNode>
+      </data>
+    </node>
+    <node id="n52">
+      <data key="d4"/>
+      <data key="d5">
+        <y:ShapeNode>
+          <y:Geometry height="35.0" width="180.0" x="31.441281138790146" y="2981.319139912947"/>
+          <y:Fill color="#EBF8FF" transparent="false"/>
+          <y:BorderStyle color="#90CDF4" type="line" width="1.0"/>
+          <y:NodeLabel alignment="center" autoSizePolicy="content" fontFamily="Arial" fontSize="11" fontStyle="plain" hasBackgroundColor="false" hasLineColor="false" height="16.2890625" horizontalTextPosition="center" iconTextGap="4" modelName="internal" modelPosition="c" textColor="#2D3748" verticalTextPosition="bottom" visible="true" width="88.37451171875" x="45.812744140625" xml:space="preserve" y="9.35546875">Tabelas Salariais</y:NodeLabel>
+          <y:Shape type="rectangle"/>
+        </y:ShapeNode>
+      </data>
+    </node>
+    <node id="n53">
+      <data key="d4"/>
+      <data key="d5">
+        <y:ShapeNode>
+          <y:Geometry height="35.0" width="180.0" x="31.441281138790146" y="3046.3191399129464"/>
+          <y:Fill color="#EBF8FF" transparent="false"/>
+          <y:BorderStyle color="#90CDF4" type="line" width="1.0"/>
+          <y:NodeLabel alignment="center" autoSizePolicy="content" fontFamily="Arial" fontSize="11" fontStyle="plain" hasBackgroundColor="false" hasLineColor="false" height="16.2890625" horizontalTextPosition="center" iconTextGap="4" modelName="internal" modelPosition="c" textColor="#2D3748" verticalTextPosition="bottom" visible="true" width="82.2783203125" x="48.86083984375" xml:space="preserve" y="9.35546875">Enquadramento</y:NodeLabel>
+          <y:Shape type="rectangle"/>
+        </y:ShapeNode>
+      </data>
+    </node>
+    <node id="n54">
+      <data key="d4"/>
+      <data key="d5">
+        <y:ShapeNode>
+          <y:Geometry height="35.0" width="180.0" x="31.441281138790146" y="3111.3191399129464"/>
+          <y:Fill color="#EBF8FF" transparent="false"/>
+          <y:BorderStyle color="#90CDF4" type="line" width="1.0"/>
+          <y:NodeLabel alignment="center" autoSizePolicy="content" fontFamily="Arial" fontSize="11" fontStyle="plain" hasBackgroundColor="false" hasLineColor="false" height="16.2890625" horizontalTextPosition="center" iconTextGap="4" modelName="internal" modelPosition="c" textColor="#2D3748" verticalTextPosition="bottom" visible="true" width="81.0322265625" x="49.48388671875" xml:space="preserve" y="9.35546875">Movimentações</y:NodeLabel>
+          <y:Shape type="rectangle"/>
+        </y:ShapeNode>
+      </data>
+    </node>
+    <node id="n55">
+      <data key="d4"/>
+      <data key="d5">
+        <y:ShapeNode>
+          <y:Geometry height="35.0" width="180.0" x="31.441281138790146" y="3176.3191399129464"/>
+          <y:Fill color="#EBF8FF" transparent="false"/>
+          <y:BorderStyle color="#90CDF4" type="line" width="1.0"/>
+          <y:NodeLabel alignment="center" autoSizePolicy="content" fontFamily="Arial" fontSize="11" fontStyle="plain" hasBackgroundColor="false" hasLineColor="false" height="16.2890625" horizontalTextPosition="center" iconTextGap="4" modelName="internal" modelPosition="c" textColor="#2D3748" verticalTextPosition="bottom" visible="true" width="82.8583984375" x="48.57080078125" xml:space="preserve" y="9.35546875">Ciclos de Merito</y:NodeLabel>
+          <y:Shape type="rectangle"/>
+        </y:ShapeNode>
+      </data>
+    </node>
+    <node id="n56">
+      <data key="d4"/>
+      <data key="d5">
+        <y:ShapeNode>
+          <y:Geometry height="35.0" width="180.0" x="31.441281138790146" y="3241.3191399129464"/>
+          <y:Fill color="#EBF8FF" transparent="false"/>
+          <y:BorderStyle color="#90CDF4" type="line" width="1.0"/>
+          <y:NodeLabel alignment="center" autoSizePolicy="content" fontFamily="Arial" fontSize="11" fontStyle="plain" hasBackgroundColor="false" hasLineColor="false" height="16.2890625" horizontalTextPosition="center" iconTextGap="4" modelName="internal" modelPosition="c" textColor="#2D3748" verticalTextPosition="bottom" visible="true" width="115.890625" x="32.0546875" xml:space="preserve" y="9.35546875">Orçamento de Pessoal</y:NodeLabel>
+          <y:Shape type="rectangle"/>
+        </y:ShapeNode>
+      </data>
+    </node>
+    <node id="n57">
+      <data key="d4"/>
+      <data key="d5">
+        <y:ShapeNode>
+          <y:Geometry height="35.0" width="180.0" x="31.441281138790146" y="3306.3191399129464"/>
+          <y:Fill color="#EBF8FF" transparent="false"/>
+          <y:BorderStyle color="#90CDF4" type="line" width="1.0"/>
+          <y:NodeLabel alignment="center" autoSizePolicy="content" fontFamily="Arial" fontSize="11" fontStyle="plain" hasBackgroundColor="false" hasLineColor="false" height="16.2890625" horizontalTextPosition="center" iconTextGap="4" modelName="internal" modelPosition="c" textColor="#2D3748" verticalTextPosition="bottom" visible="true" width="99.9921875" x="40.00390625" xml:space="preserve" y="9.35546875">Pesquisas Salariais</y:NodeLabel>
+          <y:Shape type="rectangle"/>
+        </y:ShapeNode>
+      </data>
+    </node>
+    <node id="n58">
+      <data key="d4"/>
+      <data key="d5">
+        <y:ShapeNode>
+          <y:Geometry height="35.0" width="180.0" x="31.441281138790146" y="3371.3191399129464"/>
+          <y:Fill color="#EBF8FF" transparent="false"/>
+          <y:BorderStyle color="#90CDF4" type="line" width="1.0"/>
+          <y:NodeLabel alignment="center" autoSizePolicy="content" fontFamily="Arial" fontSize="11" fontStyle="plain" hasBackgroundColor="false" hasLineColor="false" height="16.2890625" horizontalTextPosition="center" iconTextGap="4" modelName="internal" modelPosition="c" textColor="#2D3748" verticalTextPosition="bottom" visible="true" width="60.8583984375" x="59.57080078125" xml:space="preserve" y="9.35546875">Simulações</y:NodeLabel>
+          <y:Shape type="rectangle"/>
+        </y:ShapeNode>
+      </data>
+    </node>
+    <node id="n59">
+      <data key="d4"/>
+      <data key="d5">
+        <y:ShapeNode>
+          <y:Geometry height="35.0" width="180.0" x="31.441281138790146" y="3436.3191399129464"/>
+          <y:Fill color="#EBF8FF" transparent="false"/>
+          <y:BorderStyle color="#90CDF4" type="line" width="1.0"/>
+          <y:NodeLabel alignment="center" autoSizePolicy="content" fontFamily="Arial" fontSize="11" fontStyle="plain" hasBackgroundColor="false" hasLineColor="false" height="16.2890625" horizontalTextPosition="center" iconTextGap="4" modelName="internal" modelPosition="c" textColor="#2D3748" verticalTextPosition="bottom" visible="true" width="62.08837890625" x="58.955810546875" xml:space="preserve" y="9.35546875">Aprovações</y:NodeLabel>
+          <y:Shape type="rectangle"/>
+        </y:ShapeNode>
+      </data>
+    </node>
+    <node id="n60">
+      <data key="d4"/>
+      <data key="d5">
+        <y:ShapeNode>
+          <y:Geometry height="35.0" width="180.0" x="31.441281138790146" y="3501.3191399129464"/>
+          <y:Fill color="#EBF8FF" transparent="false"/>
+          <y:BorderStyle color="#90CDF4" type="line" width="1.0"/>
+          <y:NodeLabel alignment="center" autoSizePolicy="content" fontFamily="Arial" fontSize="11" fontStyle="plain" hasBackgroundColor="false" hasLineColor="false" height="16.2890625" horizontalTextPosition="center" iconTextGap="4" modelName="internal" modelPosition="c" textColor="#2D3748" verticalTextPosition="bottom" visible="true" width="74.9306640625" x="52.53466796875" xml:space="preserve" y="9.35546875">Configurações</y:NodeLabel>
+          <y:Shape type="rectangle"/>
+        </y:ShapeNode>
+      </data>
+    </node>
+    <node id="n61">
+      <data key="d4"/>
+      <data key="d5">
+        <y:ShapeNode>
+          <y:Geometry height="35.0" width="180.0" x="31.441281138790146" y="3566.3191399129464"/>
+          <y:Fill color="#EBF8FF" transparent="false"/>
+          <y:BorderStyle color="#90CDF4" type="line" width="1.0"/>
+          <y:NodeLabel alignment="center" autoSizePolicy="content" fontFamily="Arial" fontSize="11" fontStyle="plain" hasBackgroundColor="false" hasLineColor="false" height="16.2890625" horizontalTextPosition="center" iconTextGap="4" modelName="internal" modelPosition="c" textColor="#2D3748" verticalTextPosition="bottom" visible="true" width="53.521484375" x="63.2392578125" xml:space="preserve" y="9.35546875">Relatorios</y:NodeLabel>
+          <y:Shape type="rectangle"/>
+        </y:ShapeNode>
+      </data>
+    </node>
+    <node id="n62">
+      <data key="d4"/>
+      <data key="d5">
+        <y:ShapeNode>
+          <y:Geometry height="35.0" width="180.0" x="31.441281138790032" y="-50.71277239795256"/>
+          <y:Fill color="#EBF8FF" transparent="false"/>
+          <y:BorderStyle color="#90CDF4" type="line" width="1.0"/>
+          <y:NodeLabel alignment="center" autoSizePolicy="content" fontFamily="Arial" fontSize="11" fontStyle="plain" hasBackgroundColor="false" hasLineColor="false" height="16.2890625" horizontalTextPosition="center" iconTextGap="4" modelName="internal" modelPosition="c" textColor="#2D3748" verticalTextPosition="bottom" visible="true" width="89.59912109375" x="45.200439453125" xml:space="preserve" y="9.35546875">Mapa Estrategico</y:NodeLabel>
+          <y:Shape type="rectangle"/>
+        </y:ShapeNode>
+      </data>
+    </node>
+    <node id="n63">
+      <data key="d4"/>
+      <data key="d5">
+        <y:ShapeNode>
+          <y:Geometry height="35.0" width="180.0" x="31.441281138790032" y="81.78722760204744"/>
+          <y:Fill color="#EBF8FF" transparent="false"/>
+          <y:BorderStyle color="#90CDF4" type="line" width="1.0"/>
+          <y:NodeLabel alignment="center" autoSizePolicy="content" fontFamily="Arial" fontSize="11" fontStyle="plain" hasBackgroundColor="false" hasLineColor="false" height="16.2890625" horizontalTextPosition="center" iconTextGap="4" modelName="internal" modelPosition="c" textColor="#2D3748" verticalTextPosition="bottom" visible="true" width="43.123046875" x="68.4384765625" xml:space="preserve" y="9.35546875">Desvios</y:NodeLabel>
+          <y:Shape type="rectangle"/>
+        </y:ShapeNode>
+      </data>
+    </node>
+    <node id="n64">
+      <data key="d4"/>
+      <data key="d5">
+        <y:ShapeNode>
+          <y:Geometry height="35.0" width="180.0" x="31.441281138790032" y="146.78722760204744"/>
+          <y:Fill color="#EBF8FF" transparent="false"/>
+          <y:BorderStyle color="#90CDF4" type="line" width="1.0"/>
+          <y:NodeLabel alignment="center" autoSizePolicy="content" fontFamily="Arial" fontSize="11" fontStyle="plain" hasBackgroundColor="false" hasLineColor="false" height="16.2890625" horizontalTextPosition="center" iconTextGap="4" modelName="internal" modelPosition="c" textColor="#2D3748" verticalTextPosition="bottom" visible="true" width="75.5537109375" x="52.22314453125" xml:space="preserve" y="9.35546875">Plano de Ação</y:NodeLabel>
+          <y:Shape type="rectangle"/>
+        </y:ShapeNode>
+      </data>
+    </node>
+    <node id="n65">
+      <data key="d4"/>
+      <data key="d5">
+        <y:ShapeNode>
+          <y:Geometry height="35.0" width="180.0" x="31.441281138790032" y="551.7872276020474"/>
+          <y:Fill color="#EBF8FF" transparent="false"/>
+          <y:BorderStyle color="#90CDF4" type="line" width="1.0"/>
+          <y:NodeLabel alignment="center" autoSizePolicy="content" fontFamily="Arial" fontSize="11" fontStyle="plain" hasBackgroundColor="false" hasLineColor="false" height="16.2890625" horizontalTextPosition="center" iconTextGap="4" modelName="internal" modelPosition="c" textColor="#2D3748" verticalTextPosition="bottom" visible="true" width="47.41455078125" x="66.292724609375" xml:space="preserve" y="9.355468750000028">Periodos</y:NodeLabel>
+          <y:Shape type="rectangle"/>
+        </y:ShapeNode>
+      </data>
+    </node>
+    <node id="n66">
+      <data key="d4"/>
+      <data key="d5">
+        <y:ShapeNode>
+          <y:Geometry height="35.0" width="180.0" x="31.441281138790146" y="1428.2477120244998"/>
+          <y:Fill color="#EBF8FF" transparent="false"/>
+          <y:BorderStyle color="#90CDF4" type="line" width="1.0"/>
+          <y:NodeLabel alignment="center" autoSizePolicy="content" fontFamily="Arial" fontSize="11" fontStyle="plain" hasBackgroundColor="false" hasLineColor="false" height="16.2890625" horizontalTextPosition="center" iconTextGap="4" modelName="internal" modelPosition="c" textColor="#2D3748" verticalTextPosition="bottom" visible="true" width="49.85302734375" x="65.073486328125" xml:space="preserve" y="9.35546875">Processo</y:NodeLabel>
+          <y:Shape type="rectangle"/>
+        </y:ShapeNode>
+      </data>
+    </node>
+    <node id="n67">
+      <data key="d4"/>
+      <data key="d5">
+        <y:ShapeNode>
+          <y:Geometry height="35.0" width="180.0" x="31.441281138790032" y="616.1443702315295"/>
+          <y:Fill color="#EBF8FF" transparent="false"/>
+          <y:BorderStyle color="#90CDF4" type="line" width="1.0"/>
+          <y:NodeLabel alignment="center" autoSizePolicy="content" fontFamily="Arial" fontSize="11" fontStyle="plain" hasBackgroundColor="false" hasLineColor="false" height="16.2890625" horizontalTextPosition="center" iconTextGap="4" modelName="internal" modelPosition="c" textColor="#2D3748" verticalTextPosition="bottom" visible="true" width="118.9521484375" x="30.52392578125" xml:space="preserve" y="9.35546875">Central de Automações</y:NodeLabel>
+          <y:Shape type="rectangle"/>
+        </y:ShapeNode>
+      </data>
+    </node>
+    <node id="n68">
+      <data key="d4"/>
+      <data key="d5">
+        <y:ShapeNode>
+          <y:Geometry height="35.0" width="180.0" x="31.441281138790032" y="681.1443702315295"/>
+          <y:Fill color="#EBF8FF" transparent="false"/>
+          <y:BorderStyle color="#90CDF4" type="line" width="1.0"/>
+          <y:NodeLabel alignment="center" autoSizePolicy="content" fontFamily="Arial" fontSize="11" fontStyle="plain" hasBackgroundColor="false" hasLineColor="false" height="16.2890625" horizontalTextPosition="center" iconTextGap="4" modelName="internal" modelPosition="c" textColor="#2D3748" verticalTextPosition="bottom" visible="true" width="47.40380859375" x="66.298095703125" xml:space="preserve" y="9.35546875">Usuarios</y:NodeLabel>
+          <y:Shape type="rectangle"/>
+        </y:ShapeNode>
+      </data>
+    </node>
+    <node id="n69">
+      <data key="d4"/>
+      <data key="d5">
+        <y:ShapeNode>
+          <y:Geometry height="35.0" width="180.0" x="31.441281138790032" y="751.1443702315295"/>
+          <y:Fill color="#EBF8FF" transparent="false"/>
+          <y:BorderStyle color="#90CDF4" type="line" width="1.0"/>
+          <y:NodeLabel alignment="center" autoSizePolicy="content" fontFamily="Arial" fontSize="11" fontStyle="plain" hasBackgroundColor="false" hasLineColor="false" height="16.2890625" horizontalTextPosition="center" iconTextGap="4" modelName="internal" modelPosition="c" textColor="#2D3748" verticalTextPosition="bottom" visible="true" width="126.89599609375" x="26.552001953125" xml:space="preserve" y="9.35546875">Relatorios e Exportações</y:NodeLabel>
+          <y:Shape type="rectangle"/>
+        </y:ShapeNode>
+      </data>
+    </node>
+    <node id="n70">
+      <data key="d4"/>
+      <data key="d5">
+        <y:ShapeNode>
+          <y:Geometry height="50.0" width="220.0" x="11.441281138790032" y="-342.5699150274346"/>
           <y:Fill color="#3182CE" transparent="false"/>
-          <y:BorderStyle color="#2B6CB0" type="line" width="1.5"/>
-          <y:NodeLabel alignment="center" fontFamily="Arial" fontSize="12" fontStyle="bold" textColor="#FFFFFF" visible="true">Comunicação</y:NodeLabel>
+          <y:BorderStyle color="#2B6CB0" type="line" width="1.0"/>
+          <y:NodeLabel alignment="center" autoSizePolicy="content" fontFamily="Arial" fontSize="12" fontStyle="bold" hasBackgroundColor="false" hasLineColor="false" height="17.40625" horizontalTextPosition="center" iconTextGap="4" modelName="internal" modelPosition="c" textColor="#FFFFFF" verticalTextPosition="bottom" visible="true" width="46.69140625" x="86.654296875" xml:space="preserve" y="16.296875">Tarefas</y:NodeLabel>
           <y:Shape type="roundrectangle"/>
         </y:ShapeNode>
       </data>
     </node>
-    <node id="n_item_9_0">
-      <data key="d6">
+    <node id="n71">
+      <data key="d4"/>
+      <data key="d5">
         <y:ShapeNode>
-          <y:Geometry height="35.0" width="180.0" x="620.0" y="730.0"/>
+          <y:Geometry height="35.0" width="180.0" x="31.441281138790146" y="3776.3191399129464"/>
           <y:Fill color="#EBF8FF" transparent="false"/>
           <y:BorderStyle color="#90CDF4" type="line" width="1.0"/>
-          <y:NodeLabel alignment="center" fontFamily="Arial" fontSize="11" fontStyle="plain" textColor="#2D3748" visible="true">/comunicacao</y:NodeLabel>
+          <y:NodeLabel alignment="center" autoSizePolicy="content" fontFamily="Arial" fontSize="11" fontStyle="plain" hasBackgroundColor="false" hasLineColor="false" height="16.2890625" horizontalTextPosition="center" iconTextGap="4" modelName="internal" modelPosition="c" textColor="#2D3748" verticalTextPosition="bottom" visible="true" width="39.4599609375" x="70.27001953125" xml:space="preserve" y="9.35546875">Central</y:NodeLabel>
           <y:Shape type="rectangle"/>
         </y:ShapeNode>
       </data>
     </node>
-    <node id="n_flag_9">
-      <data key="d6">
+    <node id="n72">
+      <data key="d4"/>
+      <data key="d5">
         <y:ShapeNode>
-          <y:Geometry height="35.0" width="180.0" x="620.0" y="785.0"/>
-          <y:Fill color="#E6FFFA" transparent="false"/>
-          <y:BorderStyle color="#81E6D9" type="dashed" width="1.0"/>
-          <y:NodeLabel alignment="center" fontFamily="Arial" fontSize="10" fontStyle="italic" textColor="#1D4044" visible="true">Flags: communication</y:NodeLabel>
-          <y:Shape type="roundrectangle"/>
+          <y:Geometry height="35.0" width="180.0" x="31.441281138790146" y="3841.3191399129464"/>
+          <y:Fill color="#EBF8FF" transparent="false"/>
+          <y:BorderStyle color="#90CDF4" type="line" width="1.0"/>
+          <y:NodeLabel alignment="center" autoSizePolicy="content" fontFamily="Arial" fontSize="11" fontStyle="plain" hasBackgroundColor="false" hasLineColor="false" height="16.2890625" horizontalTextPosition="center" iconTextGap="4" modelName="internal" modelPosition="c" textColor="#2D3748" verticalTextPosition="bottom" visible="true" width="27.83154296875" x="76.084228515625" xml:space="preserve" y="9.35546875">Criar</y:NodeLabel>
+          <y:Shape type="rectangle"/>
         </y:ShapeNode>
       </data>
     </node>
-    <!-- Accordion 10: Entradas e Operação -->
-    <node id="n_acc_10">
-      <data key="d6">
+    <node id="n73">
+      <data key="d4"/>
+      <data key="d5">
         <y:ShapeNode>
-          <y:Geometry height="50.0" width="220.0" x="950" y="650.0"/>
+          <y:Geometry height="35.0" width="180.0" x="31.441281138790146" y="3906.3191399129464"/>
+          <y:Fill color="#EBF8FF" transparent="false"/>
+          <y:BorderStyle color="#90CDF4" type="line" width="1.0"/>
+          <y:NodeLabel alignment="center" autoSizePolicy="content" fontFamily="Arial" fontSize="11" fontStyle="plain" hasBackgroundColor="false" hasLineColor="false" height="16.2890625" horizontalTextPosition="center" iconTextGap="4" modelName="internal" modelPosition="c" textColor="#2D3748" verticalTextPosition="bottom" visible="true" width="63.31298828125" x="58.343505859375" xml:space="preserve" y="9.35546875">Campanhas</y:NodeLabel>
+          <y:Shape type="rectangle"/>
+        </y:ShapeNode>
+      </data>
+    </node>
+    <node id="n74">
+      <data key="d4"/>
+      <data key="d5">
+        <y:ShapeNode>
+          <y:Geometry height="35.0" width="180.0" x="31.441281138790146" y="3971.3191399129464"/>
+          <y:Fill color="#EBF8FF" transparent="false"/>
+          <y:BorderStyle color="#90CDF4" type="line" width="1.0"/>
+          <y:NodeLabel alignment="center" autoSizePolicy="content" fontFamily="Arial" fontSize="11" fontStyle="plain" hasBackgroundColor="false" hasLineColor="false" height="16.2890625" horizontalTextPosition="center" iconTextGap="4" modelName="internal" modelPosition="c" textColor="#2D3748" verticalTextPosition="bottom" visible="true" width="35.7861328125" x="72.10693359375" xml:space="preserve" y="9.35546875">Midias</y:NodeLabel>
+          <y:Shape type="rectangle"/>
+        </y:ShapeNode>
+      </data>
+    </node>
+    <node id="n75">
+      <data key="d4"/>
+      <data key="d5">
+        <y:ShapeNode>
+          <y:Geometry height="35.0" width="180.0" x="31.441281138790146" y="4036.3191399129464"/>
+          <y:Fill color="#EBF8FF" transparent="false"/>
+          <y:BorderStyle color="#90CDF4" type="line" width="1.0"/>
+          <y:NodeLabel alignment="center" autoSizePolicy="content" fontFamily="Arial" fontSize="11" fontStyle="plain" hasBackgroundColor="false" hasLineColor="false" height="16.2890625" horizontalTextPosition="center" iconTextGap="4" modelName="internal" modelPosition="c" textColor="#2D3748" verticalTextPosition="bottom" visible="true" width="45.5615234375" x="67.21923828125" xml:space="preserve" y="9.35546875">Metricas</y:NodeLabel>
+          <y:Shape type="rectangle"/>
+        </y:ShapeNode>
+      </data>
+    </node>
+    <node id="n76">
+      <data key="d4"/>
+      <data key="d5">
+        <y:ShapeNode>
+          <y:Geometry height="35.0" width="180.0" x="31.441281138790146" y="4101.319139912946"/>
+          <y:Fill color="#EBF8FF" transparent="false"/>
+          <y:BorderStyle color="#90CDF4" type="line" width="1.0"/>
+          <y:NodeLabel alignment="center" autoSizePolicy="content" fontFamily="Arial" fontSize="11" fontStyle="plain" hasBackgroundColor="false" hasLineColor="false" height="16.2890625" horizontalTextPosition="center" iconTextGap="4" modelName="internal" modelPosition="c" textColor="#2D3748" verticalTextPosition="bottom" visible="true" width="27.2353515625" x="76.38232421875" xml:space="preserve" y="9.35546875">Chat</y:NodeLabel>
+          <y:Shape type="rectangle"/>
+        </y:ShapeNode>
+      </data>
+    </node>
+    <node id="n77">
+      <data key="d4"/>
+      <data key="d5">
+        <y:ShapeNode>
+          <y:Geometry height="35.0" width="180.0" x="31.441281138790146" y="4311.319139912946"/>
+          <y:Fill color="#EBF8FF" transparent="false"/>
+          <y:BorderStyle color="#90CDF4" type="line" width="1.0"/>
+          <y:NodeLabel alignment="center" autoSizePolicy="content" fontFamily="Arial" fontSize="11" fontStyle="plain" hasBackgroundColor="false" hasLineColor="false" height="16.2890625" horizontalTextPosition="center" iconTextGap="4" modelName="internal" modelPosition="c" textColor="#2D3748" verticalTextPosition="bottom" visible="true" width="110.98681640625" x="34.506591796875" xml:space="preserve" y="9.35546875">Programas de Prêmio</y:NodeLabel>
+          <y:Shape type="rectangle"/>
+        </y:ShapeNode>
+      </data>
+    </node>
+    <node id="n78">
+      <data key="d4"/>
+      <data key="d5">
+        <y:ShapeNode>
+          <y:Geometry height="35.0" width="180.0" x="31.441281138790146" y="4376.319139912946"/>
+          <y:Fill color="#EBF8FF" transparent="false"/>
+          <y:BorderStyle color="#90CDF4" type="line" width="1.0"/>
+          <y:NodeLabel alignment="center" autoSizePolicy="content" fontFamily="Arial" fontSize="11" fontStyle="plain" hasBackgroundColor="false" hasLineColor="false" height="16.2890625" horizontalTextPosition="center" iconTextGap="4" modelName="internal" modelPosition="c" textColor="#2D3748" verticalTextPosition="bottom" visible="true" width="74.31298828125" x="52.843505859375" xml:space="preserve" y="9.35546875">Competências</y:NodeLabel>
+          <y:Shape type="rectangle"/>
+        </y:ShapeNode>
+      </data>
+    </node>
+    <node id="n79">
+      <data key="d4"/>
+      <data key="d5">
+        <y:ShapeNode>
+          <y:Geometry height="35.0" width="180.0" x="31.441281138790146" y="4441.319139912946"/>
+          <y:Fill color="#EBF8FF" transparent="false"/>
+          <y:BorderStyle color="#90CDF4" type="line" width="1.0"/>
+          <y:NodeLabel alignment="center" autoSizePolicy="content" fontFamily="Arial" fontSize="11" fontStyle="plain" hasBackgroundColor="false" hasLineColor="false" height="16.2890625" horizontalTextPosition="center" iconTextGap="4" modelName="internal" modelPosition="c" textColor="#2D3748" verticalTextPosition="bottom" visible="true" width="88.3798828125" x="45.81005859375" xml:space="preserve" y="9.35546875">Anexos e Regras</y:NodeLabel>
+          <y:Shape type="rectangle"/>
+        </y:ShapeNode>
+      </data>
+    </node>
+    <node id="n80">
+      <data key="d4"/>
+      <data key="d5">
+        <y:ShapeNode>
+          <y:Geometry height="35.0" width="180.0" x="31.441281138790146" y="4506.319139912946"/>
+          <y:Fill color="#EBF8FF" transparent="false"/>
+          <y:BorderStyle color="#90CDF4" type="line" width="1.0"/>
+          <y:NodeLabel alignment="center" autoSizePolicy="content" fontFamily="Arial" fontSize="11" fontStyle="plain" hasBackgroundColor="false" hasLineColor="false" height="16.2890625" horizontalTextPosition="center" iconTextGap="4" modelName="internal" modelPosition="c" textColor="#2D3748" verticalTextPosition="bottom" visible="true" width="52.919921875" x="63.5400390625" xml:space="preserve" y="9.35546875">Realizado</y:NodeLabel>
+          <y:Shape type="rectangle"/>
+        </y:ShapeNode>
+      </data>
+    </node>
+    <node id="n81">
+      <data key="d4"/>
+      <data key="d5">
+        <y:ShapeNode>
+          <y:Geometry height="35.0" width="180.0" x="31.441281138790146" y="4571.319139912946"/>
+          <y:Fill color="#EBF8FF" transparent="false"/>
+          <y:BorderStyle color="#90CDF4" type="line" width="1.0"/>
+          <y:NodeLabel alignment="center" autoSizePolicy="content" fontFamily="Arial" fontSize="11" fontStyle="plain" hasBackgroundColor="false" hasLineColor="false" height="16.2890625" horizontalTextPosition="center" iconTextGap="4" modelName="internal" modelPosition="c" textColor="#2D3748" verticalTextPosition="bottom" visible="true" width="123.23291015625" x="28.383544921875" xml:space="preserve" y="9.35546875">Colaboradores Elegiveis</y:NodeLabel>
+          <y:Shape type="rectangle"/>
+        </y:ShapeNode>
+      </data>
+    </node>
+    <node id="n82">
+      <data key="d4"/>
+      <data key="d5">
+        <y:ShapeNode>
+          <y:Geometry height="35.0" width="180.0" x="31.441281138790146" y="4636.319139912946"/>
+          <y:Fill color="#EBF8FF" transparent="false"/>
+          <y:BorderStyle color="#90CDF4" type="line" width="1.0"/>
+          <y:NodeLabel alignment="center" autoSizePolicy="content" fontFamily="Arial" fontSize="11" fontStyle="plain" hasBackgroundColor="false" hasLineColor="false" height="16.2890625" horizontalTextPosition="center" iconTextGap="4" modelName="internal" modelPosition="c" textColor="#2D3748" verticalTextPosition="bottom" visible="true" width="89.6044921875" x="45.19775390625" xml:space="preserve" y="9.35546875">Apuração Mensal</y:NodeLabel>
+          <y:Shape type="rectangle"/>
+        </y:ShapeNode>
+      </data>
+    </node>
+    <node id="n83">
+      <data key="d4"/>
+      <data key="d5">
+        <y:ShapeNode>
+          <y:Geometry height="35.0" width="180.0" x="31.441281138790146" y="4701.319139912946"/>
+          <y:Fill color="#EBF8FF" transparent="false"/>
+          <y:BorderStyle color="#90CDF4" type="line" width="1.0"/>
+          <y:NodeLabel alignment="center" autoSizePolicy="content" fontFamily="Arial" fontSize="11" fontStyle="plain" hasBackgroundColor="false" hasLineColor="false" height="16.2890625" horizontalTextPosition="center" iconTextGap="4" modelName="internal" modelPosition="c" textColor="#2D3748" verticalTextPosition="bottom" visible="true" width="99.9921875" x="40.00390625" xml:space="preserve" y="9.35546875">Ajustes e Exceções</y:NodeLabel>
+          <y:Shape type="rectangle"/>
+        </y:ShapeNode>
+      </data>
+    </node>
+    <node id="n84">
+      <data key="d4"/>
+      <data key="d5">
+        <y:ShapeNode>
+          <y:Geometry height="35.0" width="180.0" x="31.441281138790146" y="4766.319139912946"/>
+          <y:Fill color="#EBF8FF" transparent="false"/>
+          <y:BorderStyle color="#90CDF4" type="line" width="1.0"/>
+          <y:NodeLabel alignment="center" autoSizePolicy="content" fontFamily="Arial" fontSize="11" fontStyle="plain" hasBackgroundColor="false" hasLineColor="false" height="16.2890625" horizontalTextPosition="center" iconTextGap="4" modelName="internal" modelPosition="c" textColor="#2D3748" verticalTextPosition="bottom" visible="true" width="102.44140625" x="38.779296875" xml:space="preserve" y="9.35546875">Espelhos do Prêmio</y:NodeLabel>
+          <y:Shape type="rectangle"/>
+        </y:ShapeNode>
+      </data>
+    </node>
+    <node id="n85">
+      <data key="d4"/>
+      <data key="d5">
+        <y:ShapeNode>
+          <y:Geometry height="35.0" width="180.0" x="31.441281138790146" y="4831.319139912946"/>
+          <y:Fill color="#EBF8FF" transparent="false"/>
+          <y:BorderStyle color="#90CDF4" type="line" width="1.0"/>
+          <y:NodeLabel alignment="center" autoSizePolicy="content" fontFamily="Arial" fontSize="11" fontStyle="plain" hasBackgroundColor="false" hasLineColor="false" height="16.2890625" horizontalTextPosition="center" iconTextGap="4" modelName="internal" modelPosition="c" textColor="#2D3748" verticalTextPosition="bottom" visible="true" width="103.666015625" x="38.1669921875" xml:space="preserve" y="9.35546875">Relatorio e Auditoria</y:NodeLabel>
+          <y:Shape type="rectangle"/>
+        </y:ShapeNode>
+      </data>
+    </node>
+    <node id="n86">
+      <data key="d4"/>
+      <data key="d5">
+        <y:ShapeNode>
+          <y:Geometry height="35.0" width="180.0" x="31.441281138790146" y="4896.319139912946"/>
+          <y:Fill color="#EBF8FF" transparent="false"/>
+          <y:BorderStyle color="#90CDF4" type="line" width="1.0"/>
+          <y:NodeLabel alignment="center" autoSizePolicy="content" fontFamily="Arial" fontSize="11" fontStyle="plain" hasBackgroundColor="false" hasLineColor="false" height="16.2890625" horizontalTextPosition="center" iconTextGap="4" modelName="internal" modelPosition="c" textColor="#2D3748" verticalTextPosition="bottom" visible="true" width="119.564453125" x="30.2177734375" xml:space="preserve" y="9.35546875">Integração com a Folha</y:NodeLabel>
+          <y:Shape type="rectangle"/>
+        </y:ShapeNode>
+      </data>
+    </node>
+    <node id="n87">
+      <data key="d4"/>
+      <data key="d5">
+        <y:ShapeNode>
+          <y:Geometry height="72.78232028469756" width="180.0" x="31.441281138790146" y="4961.319139912946"/>
+          <y:Fill color="#EBF8FF" transparent="false"/>
+          <y:BorderStyle color="#90CDF4" type="line" width="1.0"/>
+          <y:NodeLabel alignment="center" autoSizePolicy="node_width" configuration="CroppingLabel" fontFamily="Arial" fontSize="11" fontStyle="plain" hasBackgroundColor="false" hasLineColor="false" height="43.94677734375" horizontalTextPosition="center" iconTextGap="4" modelName="internal" modelPosition="c" textColor="#2D3748" verticalTextPosition="bottom" visible="true" width="180.0" x="0.0" xml:space="preserve" y="14.417771470473781">Obs.: Botão Integrações, pode jogar para Painel Administrativo, pois e um painel de adm</y:NodeLabel>
+          <y:Shape type="rectangle"/>
+        </y:ShapeNode>
+      </data>
+    </node>
+    <node id="n88">
+      <data key="d4"/>
+      <data key="d5">
+        <y:ShapeNode>
+          <y:Geometry height="50.0" width="220.0" x="334.41833451957285" y="-304.54572329330335"/>
           <y:Fill color="#3182CE" transparent="false"/>
-          <y:BorderStyle color="#2B6CB0" type="line" width="1.5"/>
-          <y:NodeLabel alignment="center" fontFamily="Arial" fontSize="12" fontStyle="bold" textColor="#FFFFFF" visible="true">Entradas e Operação</y:NodeLabel>
+          <y:BorderStyle color="#2B6CB0" type="line" width="1.0"/>
+          <y:NodeLabel alignment="center" autoSizePolicy="content" fontFamily="Arial" fontSize="12" fontStyle="bold" hasBackgroundColor="false" hasLineColor="false" height="17.40625" horizontalTextPosition="center" iconTextGap="4" modelName="internal" modelPosition="c" textColor="#FFFFFF" verticalTextPosition="bottom" visible="true" width="180.0625" x="19.96875" xml:space="preserve" y="16.296875">Tela Visao Geral pode Eliminar</y:NodeLabel>
           <y:Shape type="roundrectangle"/>
         </y:ShapeNode>
       </data>
     </node>
-    <node id="n_item_10_0">
-      <data key="d6">
-        <y:ShapeNode>
-          <y:Geometry height="35.0" width="180.0" x="970.0" y="730.0"/>
-          <y:Fill color="#EBF8FF" transparent="false"/>
-          <y:BorderStyle color="#90CDF4" type="line" width="1.0"/>
-          <y:NodeLabel alignment="center" fontFamily="Arial" fontSize="11" fontStyle="plain" textColor="#2D3748" visible="true">Resultados</y:NodeLabel>
-          <y:Shape type="rectangle"/>
-        </y:ShapeNode>
+    <node id="n89">
+      <data key="d4"/>
+      <data key="d5">
+        <y:GenericNode configuration="com.yworks.flowchart.process">
+          <y:Geometry height="10.0" width="50.876128113879076" x="96.0032170818505" y="-284.54572329330335"/>
+          <y:Fill color="#E8EEF7" color2="#B7C9E3" transparent="false"/>
+          <y:BorderStyle color="#000000" type="line" width="1.0"/>
+          <y:NodeLabel alignment="center" autoSizePolicy="content" fontFamily="Dialog" fontSize="12" fontStyle="plain" hasBackgroundColor="false" hasLineColor="false" hasText="false" height="4.0" horizontalTextPosition="center" iconTextGap="4" modelName="custom" textColor="#000000" verticalTextPosition="bottom" visible="true" width="4.0" x="23.438064056939538" y="3.0">
+            <y:LabelModel>
+              <y:SmartNodeLabelModel distance="4.0"/>
+            </y:LabelModel>
+            <y:ModelParameter>
+              <y:SmartNodeLabelModelParameter labelRatioX="0.0" labelRatioY="0.0" nodeRatioX="0.0" nodeRatioY="0.0" offsetX="0.0" offsetY="0.0" upX="0.0" upY="-1.0"/>
+            </y:ModelParameter>
+          </y:NodeLabel>
+        </y:GenericNode>
       </data>
     </node>
-    <node id="n_item_10_1">
-      <data key="d6">
-        <y:ShapeNode>
-          <y:Geometry height="35.0" width="180.0" x="970.0" y="775.0"/>
-          <y:Fill color="#EBF8FF" transparent="false"/>
-          <y:BorderStyle color="#90CDF4" type="line" width="1.0"/>
-          <y:NodeLabel alignment="center" fontFamily="Arial" fontSize="11" fontStyle="plain" textColor="#2D3748" visible="true">Importações</y:NodeLabel>
-          <y:Shape type="rectangle"/>
-        </y:ShapeNode>
-      </data>
-    </node>
-    <node id="n_item_10_2">
-      <data key="d6">
-        <y:ShapeNode>
-          <y:Geometry height="35.0" width="180.0" x="970.0" y="820.0"/>
-          <y:Fill color="#EBF8FF" transparent="false"/>
-          <y:BorderStyle color="#90CDF4" type="line" width="1.0"/>
-          <y:NodeLabel alignment="center" fontFamily="Arial" fontSize="11" fontStyle="plain" textColor="#2D3748" visible="true">Preenchimentos</y:NodeLabel>
-          <y:Shape type="rectangle"/>
-        </y:ShapeNode>
-      </data>
-    </node>
-    <node id="n_flag_10">
-      <data key="d6">
-        <y:ShapeNode>
-          <y:Geometry height="35.0" width="180.0" x="970.0" y="875.0"/>
-          <y:Fill color="#E6FFFA" transparent="false"/>
-          <y:BorderStyle color="#81E6D9" type="dashed" width="1.0"/>
-          <y:NodeLabel alignment="center" fontFamily="Arial" fontSize="10" fontStyle="italic" textColor="#1D4044" visible="true">Flags: indicators, imports, forms</y:NodeLabel>
-          <y:Shape type="roundrectangle"/>
-        </y:ShapeNode>
-      </data>
-    </node>
-    <!-- Accordion 11: Relatórios e Auditoria -->
-    <node id="n_acc_11">
-      <data key="d6">
-        <y:ShapeNode>
-          <y:Geometry height="50.0" width="220.0" x="1300" y="650.0"/>
-          <y:Fill color="#3182CE" transparent="false"/>
-          <y:BorderStyle color="#2B6CB0" type="line" width="1.5"/>
-          <y:NodeLabel alignment="center" fontFamily="Arial" fontSize="12" fontStyle="bold" textColor="#FFFFFF" visible="true">Relatórios e Auditoria</y:NodeLabel>
-          <y:Shape type="roundrectangle"/>
-        </y:ShapeNode>
-      </data>
-    </node>
-    <node id="n_item_11_0">
-      <data key="d6">
-        <y:ShapeNode>
-          <y:Geometry height="35.0" width="180.0" x="1320.0" y="730.0"/>
-          <y:Fill color="#EBF8FF" transparent="false"/>
-          <y:BorderStyle color="#90CDF4" type="line" width="1.0"/>
-          <y:NodeLabel alignment="center" fontFamily="Arial" fontSize="11" fontStyle="plain" textColor="#2D3748" visible="true">Exportações</y:NodeLabel>
-          <y:Shape type="rectangle"/>
-        </y:ShapeNode>
-      </data>
-    </node>
-    <node id="n_item_11_1">
-      <data key="d6">
-        <y:ShapeNode>
-          <y:Geometry height="35.0" width="180.0" x="1320.0" y="775.0"/>
-          <y:Fill color="#EBF8FF" transparent="false"/>
-          <y:BorderStyle color="#90CDF4" type="line" width="1.0"/>
-          <y:NodeLabel alignment="center" fontFamily="Arial" fontSize="11" fontStyle="plain" textColor="#2D3748" visible="true">Insights</y:NodeLabel>
-          <y:Shape type="rectangle"/>
-        </y:ShapeNode>
-      </data>
-    </node>
-    <node id="n_item_11_2">
-      <data key="d6">
-        <y:ShapeNode>
-          <y:Geometry height="35.0" width="180.0" x="1320.0" y="820.0"/>
-          <y:Fill color="#EBF8FF" transparent="false"/>
-          <y:BorderStyle color="#90CDF4" type="line" width="1.0"/>
-          <y:NodeLabel alignment="center" fontFamily="Arial" fontSize="11" fontStyle="plain" textColor="#2D3748" visible="true">Auditoria</y:NodeLabel>
-          <y:Shape type="rectangle"/>
-        </y:ShapeNode>
-      </data>
-    </node>
-    <node id="n_flag_11">
-      <data key="d6">
-        <y:ShapeNode>
-          <y:Geometry height="35.0" width="180.0" x="1320.0" y="875.0"/>
-          <y:Fill color="#E6FFFA" transparent="false"/>
-          <y:BorderStyle color="#81E6D9" type="dashed" width="1.0"/>
-          <y:NodeLabel alignment="center" fontFamily="Arial" fontSize="10" fontStyle="italic" textColor="#1D4044" visible="true">Flags: reports, insights, audit</y:NodeLabel>
-          <y:Shape type="roundrectangle"/>
-        </y:ShapeNode>
-      </data>
-    </node>
-    <!-- Accordion 12: Automações -->
-    <node id="n_acc_12">
-      <data key="d6">
-        <y:ShapeNode>
-          <y:Geometry height="50.0" width="220.0" x="1650" y="650.0"/>
-          <y:Fill color="#3182CE" transparent="false"/>
-          <y:BorderStyle color="#2B6CB0" type="line" width="1.5"/>
-          <y:NodeLabel alignment="center" fontFamily="Arial" fontSize="12" fontStyle="bold" textColor="#FFFFFF" visible="true">Automações</y:NodeLabel>
-          <y:Shape type="roundrectangle"/>
-        </y:ShapeNode>
-      </data>
-    </node>
-    <node id="n_item_12_0">
-      <data key="d6">
-        <y:ShapeNode>
-          <y:Geometry height="35.0" width="180.0" x="1670.0" y="730.0"/>
-          <y:Fill color="#EBF8FF" transparent="false"/>
-          <y:BorderStyle color="#90CDF4" type="line" width="1.0"/>
-          <y:NodeLabel alignment="center" fontFamily="Arial" fontSize="11" fontStyle="plain" textColor="#2D3748" visible="true">/central-automacoes</y:NodeLabel>
-          <y:Shape type="rectangle"/>
-        </y:ShapeNode>
-      </data>
-    </node>
-    <node id="n_flag_12">
-      <data key="d6">
-        <y:ShapeNode>
-          <y:Geometry height="35.0" width="180.0" x="1670.0" y="785.0"/>
-          <y:Fill color="#E6FFFA" transparent="false"/>
-          <y:BorderStyle color="#81E6D9" type="dashed" width="1.0"/>
-          <y:NodeLabel alignment="center" fontFamily="Arial" fontSize="10" fontStyle="italic" textColor="#1D4044" visible="true">Flags: automations</y:NodeLabel>
-          <y:Shape type="roundrectangle"/>
-        </y:ShapeNode>
-      </data>
-    </node>
-    <!-- Accordion 13: Administração (rodapé) -->
-    <node id="n_acc_13">
-      <data key="d6">
-        <y:ShapeNode>
-          <y:Geometry height="50.0" width="220.0" x="2000" y="650.0"/>
-          <y:Fill color="#3182CE" transparent="false"/>
-          <y:BorderStyle color="#2B6CB0" type="line" width="1.5"/>
-          <y:NodeLabel alignment="center" fontFamily="Arial" fontSize="12" fontStyle="bold" textColor="#FFFFFF" visible="true">Administração (rodapé)</y:NodeLabel>
-          <y:Shape type="roundrectangle"/>
-        </y:ShapeNode>
-      </data>
-    </node>
-    <node id="n_item_13_0">
-      <data key="d6">
-        <y:ShapeNode>
-          <y:Geometry height="35.0" width="180.0" x="2020.0" y="730.0"/>
-          <y:Fill color="#EBF8FF" transparent="false"/>
-          <y:BorderStyle color="#90CDF4" type="line" width="1.0"/>
-          <y:NodeLabel alignment="center" fontFamily="Arial" fontSize="11" fontStyle="plain" textColor="#2D3748" visible="true">Períodos</y:NodeLabel>
-          <y:Shape type="rectangle"/>
-        </y:ShapeNode>
-      </data>
-    </node>
-    <node id="n_item_13_1">
-      <data key="d6">
-        <y:ShapeNode>
-          <y:Geometry height="35.0" width="180.0" x="2020.0" y="775.0"/>
-          <y:Fill color="#EBF8FF" transparent="false"/>
-          <y:BorderStyle color="#90CDF4" type="line" width="1.0"/>
-          <y:NodeLabel alignment="center" fontFamily="Arial" fontSize="11" fontStyle="plain" textColor="#2D3748" visible="true">Usuários</y:NodeLabel>
-          <y:Shape type="rectangle"/>
-        </y:ShapeNode>
-      </data>
-    </node>
-    <node id="n_item_13_2">
-      <data key="d6">
-        <y:ShapeNode>
-          <y:Geometry height="35.0" width="180.0" x="2020.0" y="820.0"/>
-          <y:Fill color="#EBF8FF" transparent="false"/>
-          <y:BorderStyle color="#90CDF4" type="line" width="1.0"/>
-          <y:NodeLabel alignment="center" fontFamily="Arial" fontSize="11" fontStyle="plain" textColor="#2D3748" visible="true">Config</y:NodeLabel>
-          <y:Shape type="rectangle"/>
-        </y:ShapeNode>
-      </data>
-    </node>
-    <node id="n_item_13_3">
-      <data key="d6">
-        <y:ShapeNode>
-          <y:Geometry height="35.0" width="180.0" x="2020.0" y="865.0"/>
-          <y:Fill color="#EBF8FF" transparent="false"/>
-          <y:BorderStyle color="#90CDF4" type="line" width="1.0"/>
-          <y:NodeLabel alignment="center" fontFamily="Arial" fontSize="11" fontStyle="plain" textColor="#2D3748" visible="true">Portal</y:NodeLabel>
-          <y:Shape type="rectangle"/>
-        </y:ShapeNode>
-      </data>
-    </node>
-    <node id="n_item_13_4">
-      <data key="d6">
-        <y:ShapeNode>
-          <y:Geometry height="35.0" width="180.0" x="2020.0" y="910.0"/>
-          <y:Fill color="#EBF8FF" transparent="false"/>
-          <y:BorderStyle color="#90CDF4" type="line" width="1.0"/>
-          <y:NodeLabel alignment="center" fontFamily="Arial" fontSize="11" fontStyle="plain" textColor="#2D3748" visible="true">Banco</y:NodeLabel>
-          <y:Shape type="rectangle"/>
-        </y:ShapeNode>
-      </data>
-    </node>
-    <node id="n_flag_13">
-      <data key="d6">
-        <y:ShapeNode>
-          <y:Geometry height="35.0" width="180.0" x="2020.0" y="965.0"/>
-          <y:Fill color="#E6FFFA" transparent="false"/>
-          <y:BorderStyle color="#81E6D9" type="dashed" width="1.0"/>
-          <y:NodeLabel alignment="center" fontFamily="Arial" fontSize="10" fontStyle="italic" textColor="#1D4044" visible="true">Flags: users, settings</y:NodeLabel>
-          <y:Shape type="roundrectangle"/>
-        </y:ShapeNode>
-      </data>
-    </node>
-    <edge id="e_root_1" source="n_root" target="n_acc_1">
-      <data key="d10">
-        <y:PolyLineEdge>
-          <y:Path sx="0.0" sy="0.0" tx="0.0" ty="0.0"/>
-          <y:LineStyle color="#A0AEC0" type="line" width="1.5"/>
-          <y:Arrows source="none" target="standard"/>
-        </y:PolyLineEdge>
-      </data>
-    </edge>
-    <edge id="e_acc_item_1_0" source="n_acc_1" target="n_item_1_0">
-      <data key="d10">
+    <edge id="e0" source="n28" target="n29">
+      <data key="d8"/>
+      <data key="d9">
         <y:PolyLineEdge>
           <y:Path sx="0.0" sy="0.0" tx="0.0" ty="0.0"/>
           <y:LineStyle color="#CBD5E0" type="line" width="1.0"/>
           <y:Arrows source="none" target="standard"/>
+          <y:BendStyle smoothed="false"/>
         </y:PolyLineEdge>
       </data>
     </edge>
-    <edge id="e_acc_item_1_1" source="n_acc_1" target="n_item_1_1">
-      <data key="d10">
+    <edge id="e1" source="n34" target="n35">
+      <data key="d8"/>
+      <data key="d9">
         <y:PolyLineEdge>
           <y:Path sx="0.0" sy="0.0" tx="0.0" ty="0.0"/>
-          <y:LineStyle color="#CBD5E0" type="line" width="1.0"/>
+          <y:LineStyle color="#C0C0C0" type="line" width="1.0"/>
           <y:Arrows source="none" target="standard"/>
+          <y:BendStyle smoothed="false"/>
         </y:PolyLineEdge>
       </data>
     </edge>
-    <edge id="e_root_2" source="n_root" target="n_acc_2">
-      <data key="d10">
+    <edge id="e2" source="n35" target="n36">
+      <data key="d8"/>
+      <data key="d9">
         <y:PolyLineEdge>
           <y:Path sx="0.0" sy="0.0" tx="0.0" ty="0.0"/>
-          <y:LineStyle color="#A0AEC0" type="line" width="1.5"/>
+          <y:LineStyle color="#C0C0C0" type="line" width="1.0"/>
           <y:Arrows source="none" target="standard"/>
+          <y:BendStyle smoothed="false"/>
         </y:PolyLineEdge>
       </data>
     </edge>
-    <edge id="e_acc_item_2_0" source="n_acc_2" target="n_item_2_0">
-      <data key="d10">
+    <edge id="e3" source="n36" target="n37">
+      <data key="d8"/>
+      <data key="d9">
         <y:PolyLineEdge>
           <y:Path sx="0.0" sy="0.0" tx="0.0" ty="0.0"/>
-          <y:LineStyle color="#CBD5E0" type="line" width="1.0"/>
+          <y:LineStyle color="#C0C0C0" type="line" width="1.0"/>
           <y:Arrows source="none" target="standard"/>
+          <y:BendStyle smoothed="false"/>
         </y:PolyLineEdge>
       </data>
     </edge>
-    <edge id="e_acc_item_2_1" source="n_acc_2" target="n_item_2_1">
-      <data key="d10">
+    <edge id="e4" source="n37" target="n38">
+      <data key="d8"/>
+      <data key="d9">
         <y:PolyLineEdge>
           <y:Path sx="0.0" sy="0.0" tx="0.0" ty="0.0"/>
-          <y:LineStyle color="#CBD5E0" type="line" width="1.0"/>
+          <y:LineStyle color="#C0C0C0" type="line" width="1.0"/>
           <y:Arrows source="none" target="standard"/>
+          <y:BendStyle smoothed="false"/>
         </y:PolyLineEdge>
       </data>
     </edge>
-    <edge id="e_acc_item_2_2" source="n_acc_2" target="n_item_2_2">
-      <data key="d10">
+    <edge id="e5" source="n38" target="n39">
+      <data key="d8"/>
+      <data key="d9">
         <y:PolyLineEdge>
           <y:Path sx="0.0" sy="0.0" tx="0.0" ty="0.0"/>
-          <y:LineStyle color="#CBD5E0" type="line" width="1.0"/>
+          <y:LineStyle color="#C0C0C0" type="line" width="1.0"/>
           <y:Arrows source="none" target="standard"/>
+          <y:BendStyle smoothed="false"/>
         </y:PolyLineEdge>
       </data>
     </edge>
-    <edge id="e_acc_item_2_3" source="n_acc_2" target="n_item_2_3">
-      <data key="d10">
+    <edge id="e6" source="n40" target="n41">
+      <data key="d8"/>
+      <data key="d9">
         <y:PolyLineEdge>
           <y:Path sx="0.0" sy="0.0" tx="0.0" ty="0.0"/>
-          <y:LineStyle color="#CBD5E0" type="line" width="1.0"/>
+          <y:LineStyle color="#C0C0C0" type="line" width="1.0"/>
           <y:Arrows source="none" target="standard"/>
+          <y:BendStyle smoothed="false"/>
         </y:PolyLineEdge>
       </data>
     </edge>
-    <edge id="e_acc_item_2_4" source="n_acc_2" target="n_item_2_4">
-      <data key="d10">
+    <edge id="e7" source="n41" target="n42">
+      <data key="d8"/>
+      <data key="d9">
         <y:PolyLineEdge>
           <y:Path sx="0.0" sy="0.0" tx="0.0" ty="0.0"/>
-          <y:LineStyle color="#CBD5E0" type="line" width="1.0"/>
+          <y:LineStyle color="#C0C0C0" type="line" width="1.0"/>
           <y:Arrows source="none" target="standard"/>
+          <y:BendStyle smoothed="false"/>
         </y:PolyLineEdge>
       </data>
     </edge>
-    <edge id="e_acc_item_2_5" source="n_acc_2" target="n_item_2_5">
-      <data key="d10">
+    <edge id="e8" source="n42" target="n43">
+      <data key="d8"/>
+      <data key="d9">
         <y:PolyLineEdge>
           <y:Path sx="0.0" sy="0.0" tx="0.0" ty="0.0"/>
-          <y:LineStyle color="#CBD5E0" type="line" width="1.0"/>
+          <y:LineStyle color="#C0C0C0" type="line" width="1.0"/>
           <y:Arrows source="none" target="standard"/>
+          <y:BendStyle smoothed="false"/>
         </y:PolyLineEdge>
       </data>
     </edge>
-    <edge id="e_acc_flag_2" source="n_acc_2" target="n_flag_2">
-      <data key="d10">
+    <edge id="e9" source="n43" target="n44">
+      <data key="d8"/>
+      <data key="d9">
         <y:PolyLineEdge>
           <y:Path sx="0.0" sy="0.0" tx="0.0" ty="0.0"/>
-          <y:LineStyle color="#81E6D9" type="dashed" width="1.0"/>
+          <y:LineStyle color="#C0C0C0" type="line" width="1.0"/>
           <y:Arrows source="none" target="standard"/>
+          <y:BendStyle smoothed="false"/>
         </y:PolyLineEdge>
       </data>
     </edge>
-    <edge id="e_root_3" source="n_root" target="n_acc_3">
-      <data key="d10">
+    <edge id="e10" source="n44" target="n45">
+      <data key="d8"/>
+      <data key="d9">
         <y:PolyLineEdge>
           <y:Path sx="0.0" sy="0.0" tx="0.0" ty="0.0"/>
-          <y:LineStyle color="#A0AEC0" type="line" width="1.5"/>
+          <y:LineStyle color="#C0C0C0" type="line" width="1.0"/>
           <y:Arrows source="none" target="standard"/>
+          <y:BendStyle smoothed="false"/>
         </y:PolyLineEdge>
       </data>
     </edge>
-    <edge id="e_acc_item_3_0" source="n_acc_3" target="n_item_3_0">
-      <data key="d10">
+    <edge id="e11" source="n45" target="n46">
+      <data key="d8"/>
+      <data key="d9">
         <y:PolyLineEdge>
           <y:Path sx="0.0" sy="0.0" tx="0.0" ty="0.0"/>
-          <y:LineStyle color="#CBD5E0" type="line" width="1.0"/>
+          <y:LineStyle color="#C0C0C0" type="line" width="1.0"/>
           <y:Arrows source="none" target="standard"/>
+          <y:BendStyle smoothed="false"/>
         </y:PolyLineEdge>
       </data>
     </edge>
-    <edge id="e_acc_item_3_1" source="n_acc_3" target="n_item_3_1">
-      <data key="d10">
+    <edge id="e12" source="n23" target="n34">
+      <data key="d8"/>
+      <data key="d9">
         <y:PolyLineEdge>
           <y:Path sx="0.0" sy="0.0" tx="0.0" ty="0.0"/>
-          <y:LineStyle color="#CBD5E0" type="line" width="1.0"/>
+          <y:LineStyle color="#C0C0C0" type="line" width="1.0"/>
           <y:Arrows source="none" target="standard"/>
+          <y:BendStyle smoothed="false"/>
         </y:PolyLineEdge>
       </data>
     </edge>
-    <edge id="e_acc_item_3_2" source="n_acc_3" target="n_item_3_2">
-      <data key="d10">
+    <edge id="e13" source="n47" target="n40">
+      <data key="d8"/>
+      <data key="d9">
         <y:PolyLineEdge>
           <y:Path sx="0.0" sy="0.0" tx="0.0" ty="0.0"/>
-          <y:LineStyle color="#CBD5E0" type="line" width="1.0"/>
+          <y:LineStyle color="#C0C0C0" type="line" width="1.0"/>
           <y:Arrows source="none" target="standard"/>
+          <y:BendStyle smoothed="false"/>
         </y:PolyLineEdge>
       </data>
     </edge>
-    <edge id="e_acc_item_3_3" source="n_acc_3" target="n_item_3_3">
-      <data key="d10">
+    <edge id="e14" source="n21" target="n47">
+      <data key="d8"/>
+      <data key="d9">
         <y:PolyLineEdge>
           <y:Path sx="0.0" sy="0.0" tx="0.0" ty="0.0"/>
-          <y:LineStyle color="#CBD5E0" type="line" width="1.0"/>
+          <y:LineStyle color="#C0C0C0" type="line" width="1.0"/>
           <y:Arrows source="none" target="standard"/>
+          <y:BendStyle smoothed="false"/>
         </y:PolyLineEdge>
       </data>
     </edge>
-    <edge id="e_acc_item_3_4" source="n_acc_3" target="n_item_3_4">
-      <data key="d10">
+    <edge id="e15" source="n46" target="n48">
+      <data key="d8"/>
+      <data key="d9">
         <y:PolyLineEdge>
           <y:Path sx="0.0" sy="0.0" tx="0.0" ty="0.0"/>
-          <y:LineStyle color="#CBD5E0" type="line" width="1.0"/>
+          <y:LineStyle color="#C0C0C0" type="line" width="1.0"/>
           <y:Arrows source="none" target="standard"/>
+          <y:BendStyle smoothed="false"/>
         </y:PolyLineEdge>
       </data>
     </edge>
-    <edge id="e_acc_flag_3" source="n_acc_3" target="n_flag_3">
-      <data key="d10">
+    <edge id="e16" source="n25" target="n26">
+      <data key="d8"/>
+      <data key="d9">
         <y:PolyLineEdge>
           <y:Path sx="0.0" sy="0.0" tx="0.0" ty="0.0"/>
-          <y:LineStyle color="#81E6D9" type="dashed" width="1.0"/>
+          <y:LineStyle color="#C0C0C0" type="line" width="1.0"/>
           <y:Arrows source="none" target="standard"/>
+          <y:BendStyle smoothed="false"/>
         </y:PolyLineEdge>
       </data>
     </edge>
-    <edge id="e_root_4" source="n_root" target="n_acc_4">
-      <data key="d10">
+    <edge id="e17" source="n26" target="n49">
+      <data key="d8"/>
+      <data key="d9">
         <y:PolyLineEdge>
           <y:Path sx="0.0" sy="0.0" tx="0.0" ty="0.0"/>
-          <y:LineStyle color="#A0AEC0" type="line" width="1.5"/>
+          <y:LineStyle color="#C0C0C0" type="line" width="1.0"/>
           <y:Arrows source="none" target="standard"/>
+          <y:BendStyle smoothed="false"/>
         </y:PolyLineEdge>
       </data>
     </edge>
-    <edge id="e_acc_item_4_0" source="n_acc_4" target="n_item_4_0">
-      <data key="d10">
+    <edge id="e18" source="n49" target="n50">
+      <data key="d8"/>
+      <data key="d9">
         <y:PolyLineEdge>
           <y:Path sx="0.0" sy="0.0" tx="0.0" ty="0.0"/>
-          <y:LineStyle color="#CBD5E0" type="line" width="1.0"/>
+          <y:LineStyle color="#C0C0C0" type="line" width="1.0"/>
           <y:Arrows source="none" target="standard"/>
+          <y:BendStyle smoothed="false"/>
         </y:PolyLineEdge>
       </data>
     </edge>
-    <edge id="e_acc_item_4_1" source="n_acc_4" target="n_item_4_1">
-      <data key="d10">
+    <edge id="e19" source="n50" target="n51">
+      <data key="d8"/>
+      <data key="d9">
         <y:PolyLineEdge>
           <y:Path sx="0.0" sy="0.0" tx="0.0" ty="0.0"/>
-          <y:LineStyle color="#CBD5E0" type="line" width="1.0"/>
+          <y:LineStyle color="#C0C0C0" type="line" width="1.0"/>
           <y:Arrows source="none" target="standard"/>
+          <y:BendStyle smoothed="false"/>
         </y:PolyLineEdge>
       </data>
     </edge>
-    <edge id="e_acc_item_4_2" source="n_acc_4" target="n_item_4_2">
-      <data key="d10">
+    <edge id="e20" source="n51" target="n52">
+      <data key="d8"/>
+      <data key="d9">
         <y:PolyLineEdge>
           <y:Path sx="0.0" sy="0.0" tx="0.0" ty="0.0"/>
-          <y:LineStyle color="#CBD5E0" type="line" width="1.0"/>
+          <y:LineStyle color="#C0C0C0" type="line" width="1.0"/>
           <y:Arrows source="none" target="standard"/>
+          <y:BendStyle smoothed="false"/>
         </y:PolyLineEdge>
       </data>
     </edge>
-    <edge id="e_acc_item_4_3" source="n_acc_4" target="n_item_4_3">
-      <data key="d10">
+    <edge id="e21" source="n52" target="n53">
+      <data key="d8"/>
+      <data key="d9">
         <y:PolyLineEdge>
           <y:Path sx="0.0" sy="0.0" tx="0.0" ty="0.0"/>
-          <y:LineStyle color="#CBD5E0" type="line" width="1.0"/>
+          <y:LineStyle color="#C0C0C0" type="line" width="1.0"/>
           <y:Arrows source="none" target="standard"/>
+          <y:BendStyle smoothed="false"/>
         </y:PolyLineEdge>
       </data>
     </edge>
-    <edge id="e_acc_item_4_4" source="n_acc_4" target="n_item_4_4">
-      <data key="d10">
+    <edge id="e22" source="n53" target="n54">
+      <data key="d8"/>
+      <data key="d9">
         <y:PolyLineEdge>
           <y:Path sx="0.0" sy="0.0" tx="0.0" ty="0.0"/>
-          <y:LineStyle color="#CBD5E0" type="line" width="1.0"/>
+          <y:LineStyle color="#C0C0C0" type="line" width="1.0"/>
           <y:Arrows source="none" target="standard"/>
+          <y:BendStyle smoothed="false"/>
         </y:PolyLineEdge>
       </data>
     </edge>
-    <edge id="e_acc_item_4_5" source="n_acc_4" target="n_item_4_5">
-      <data key="d10">
+    <edge id="e23" source="n54" target="n55">
+      <data key="d8"/>
+      <data key="d9">
         <y:PolyLineEdge>
           <y:Path sx="0.0" sy="0.0" tx="0.0" ty="0.0"/>
-          <y:LineStyle color="#CBD5E0" type="line" width="1.0"/>
+          <y:LineStyle color="#C0C0C0" type="line" width="1.0"/>
           <y:Arrows source="none" target="standard"/>
+          <y:BendStyle smoothed="false"/>
         </y:PolyLineEdge>
       </data>
     </edge>
-    <edge id="e_acc_flag_4" source="n_acc_4" target="n_flag_4">
-      <data key="d10">
+    <edge id="e24" source="n55" target="n56">
+      <data key="d8"/>
+      <data key="d9">
         <y:PolyLineEdge>
           <y:Path sx="0.0" sy="0.0" tx="0.0" ty="0.0"/>
-          <y:LineStyle color="#81E6D9" type="dashed" width="1.0"/>
+          <y:LineStyle color="#C0C0C0" type="line" width="1.0"/>
           <y:Arrows source="none" target="standard"/>
+          <y:BendStyle smoothed="false"/>
         </y:PolyLineEdge>
       </data>
     </edge>
-    <edge id="e_root_5" source="n_root" target="n_acc_5">
-      <data key="d10">
+    <edge id="e25" source="n56" target="n57">
+      <data key="d8"/>
+      <data key="d9">
         <y:PolyLineEdge>
           <y:Path sx="0.0" sy="0.0" tx="0.0" ty="0.0"/>
-          <y:LineStyle color="#A0AEC0" type="line" width="1.5"/>
+          <y:LineStyle color="#C0C0C0" type="line" width="1.0"/>
           <y:Arrows source="none" target="standard"/>
+          <y:BendStyle smoothed="false"/>
         </y:PolyLineEdge>
       </data>
     </edge>
-    <edge id="e_acc_item_5_0" source="n_acc_5" target="n_item_5_0">
-      <data key="d10">
+    <edge id="e26" source="n57" target="n58">
+      <data key="d8"/>
+      <data key="d9">
         <y:PolyLineEdge>
           <y:Path sx="0.0" sy="0.0" tx="0.0" ty="0.0"/>
-          <y:LineStyle color="#CBD5E0" type="line" width="1.0"/>
+          <y:LineStyle color="#C0C0C0" type="line" width="1.0"/>
           <y:Arrows source="none" target="standard"/>
+          <y:BendStyle smoothed="false"/>
         </y:PolyLineEdge>
       </data>
     </edge>
-    <edge id="e_acc_flag_5" source="n_acc_5" target="n_flag_5">
-      <data key="d10">
+    <edge id="e27" source="n58" target="n59">
+      <data key="d8"/>
+      <data key="d9">
         <y:PolyLineEdge>
           <y:Path sx="0.0" sy="0.0" tx="0.0" ty="0.0"/>
-          <y:LineStyle color="#81E6D9" type="dashed" width="1.0"/>
+          <y:LineStyle color="#C0C0C0" type="line" width="1.0"/>
           <y:Arrows source="none" target="standard"/>
+          <y:BendStyle smoothed="false"/>
         </y:PolyLineEdge>
       </data>
     </edge>
-    <edge id="e_root_6" source="n_root" target="n_acc_6">
-      <data key="d10">
+    <edge id="e28" source="n59" target="n60">
+      <data key="d8"/>
+      <data key="d9">
         <y:PolyLineEdge>
           <y:Path sx="0.0" sy="0.0" tx="0.0" ty="0.0"/>
-          <y:LineStyle color="#A0AEC0" type="line" width="1.5"/>
+          <y:LineStyle color="#C0C0C0" type="line" width="1.0"/>
           <y:Arrows source="none" target="standard"/>
+          <y:BendStyle smoothed="false"/>
         </y:PolyLineEdge>
       </data>
     </edge>
-    <edge id="e_acc_item_6_0" source="n_acc_6" target="n_item_6_0">
-      <data key="d10">
+    <edge id="e29" source="n60" target="n61">
+      <data key="d8"/>
+      <data key="d9">
         <y:PolyLineEdge>
           <y:Path sx="0.0" sy="0.0" tx="0.0" ty="0.0"/>
-          <y:LineStyle color="#CBD5E0" type="line" width="1.0"/>
+          <y:LineStyle color="#C0C0C0" type="line" width="1.0"/>
           <y:Arrows source="none" target="standard"/>
+          <y:BendStyle smoothed="false"/>
         </y:PolyLineEdge>
       </data>
     </edge>
-    <edge id="e_acc_flag_6" source="n_acc_6" target="n_flag_6">
-      <data key="d10">
+    <edge id="e30" source="n13" target="n14">
+      <data key="d8"/>
+      <data key="d9">
         <y:PolyLineEdge>
           <y:Path sx="0.0" sy="0.0" tx="0.0" ty="0.0"/>
-          <y:LineStyle color="#81E6D9" type="dashed" width="1.0"/>
+          <y:LineStyle color="#C0C0C0" type="line" width="1.0"/>
           <y:Arrows source="none" target="standard"/>
+          <y:BendStyle smoothed="false"/>
         </y:PolyLineEdge>
       </data>
     </edge>
-    <edge id="e_root_7" source="n_root" target="n_acc_7">
-      <data key="d10">
+    <edge id="e31" source="n14" target="n15">
+      <data key="d8"/>
+      <data key="d9">
         <y:PolyLineEdge>
           <y:Path sx="0.0" sy="0.0" tx="0.0" ty="0.0"/>
-          <y:LineStyle color="#A0AEC0" type="line" width="1.5"/>
+          <y:LineStyle color="#C0C0C0" type="line" width="1.0"/>
           <y:Arrows source="none" target="standard"/>
+          <y:BendStyle smoothed="false"/>
         </y:PolyLineEdge>
       </data>
     </edge>
-    <edge id="e_acc_item_7_0" source="n_acc_7" target="n_item_7_0">
-      <data key="d10">
+    <edge id="e32" source="n15" target="n16">
+      <data key="d8"/>
+      <data key="d9">
         <y:PolyLineEdge>
           <y:Path sx="0.0" sy="0.0" tx="0.0" ty="0.0"/>
-          <y:LineStyle color="#CBD5E0" type="line" width="1.0"/>
+          <y:LineStyle color="#C0C0C0" type="line" width="1.0"/>
           <y:Arrows source="none" target="standard"/>
+          <y:BendStyle smoothed="false"/>
         </y:PolyLineEdge>
       </data>
     </edge>
-    <edge id="e_acc_item_7_1" source="n_acc_7" target="n_item_7_1">
-      <data key="d10">
+    <edge id="e33" source="n16" target="n17">
+      <data key="d8"/>
+      <data key="d9">
         <y:PolyLineEdge>
           <y:Path sx="0.0" sy="0.0" tx="0.0" ty="0.0"/>
-          <y:LineStyle color="#CBD5E0" type="line" width="1.0"/>
+          <y:LineStyle color="#C0C0C0" type="line" width="1.0"/>
           <y:Arrows source="none" target="standard"/>
+          <y:BendStyle smoothed="false"/>
         </y:PolyLineEdge>
       </data>
     </edge>
-    <edge id="e_acc_flag_7" source="n_acc_7" target="n_flag_7">
-      <data key="d10">
+    <edge id="e34" source="n17" target="n18">
+      <data key="d8"/>
+      <data key="d9">
         <y:PolyLineEdge>
           <y:Path sx="0.0" sy="0.0" tx="0.0" ty="0.0"/>
-          <y:LineStyle color="#81E6D9" type="dashed" width="1.0"/>
+          <y:LineStyle color="#C0C0C0" type="line" width="1.0"/>
           <y:Arrows source="none" target="standard"/>
+          <y:BendStyle smoothed="false"/>
         </y:PolyLineEdge>
       </data>
     </edge>
-    <edge id="e_root_8" source="n_root" target="n_acc_8">
-      <data key="d10">
+    <edge id="e35" source="n18" target="n19">
+      <data key="d8"/>
+      <data key="d9">
         <y:PolyLineEdge>
           <y:Path sx="0.0" sy="0.0" tx="0.0" ty="0.0"/>
-          <y:LineStyle color="#A0AEC0" type="line" width="1.5"/>
+          <y:LineStyle color="#C0C0C0" type="line" width="1.0"/>
           <y:Arrows source="none" target="standard"/>
+          <y:BendStyle smoothed="false"/>
         </y:PolyLineEdge>
       </data>
     </edge>
-    <edge id="e_acc_item_8_0" source="n_acc_8" target="n_item_8_0">
-      <data key="d10">
+    <edge id="e36" source="n1" target="n2">
+      <data key="d8"/>
+      <data key="d9">
         <y:PolyLineEdge>
           <y:Path sx="0.0" sy="0.0" tx="0.0" ty="0.0"/>
-          <y:LineStyle color="#CBD5E0" type="line" width="1.0"/>
+          <y:LineStyle color="#C0C0C0" type="line" width="1.0"/>
           <y:Arrows source="none" target="standard"/>
+          <y:BendStyle smoothed="false"/>
         </y:PolyLineEdge>
       </data>
     </edge>
-    <edge id="e_acc_flag_8" source="n_acc_8" target="n_flag_8">
-      <data key="d10">
+    <edge id="e37" source="n2" target="n3">
+      <data key="d8"/>
+      <data key="d9">
         <y:PolyLineEdge>
           <y:Path sx="0.0" sy="0.0" tx="0.0" ty="0.0"/>
-          <y:LineStyle color="#81E6D9" type="dashed" width="1.0"/>
+          <y:LineStyle color="#C0C0C0" type="line" width="1.0"/>
           <y:Arrows source="none" target="standard"/>
+          <y:BendStyle smoothed="false"/>
         </y:PolyLineEdge>
       </data>
     </edge>
-    <edge id="e_root_9" source="n_root" target="n_acc_9">
-      <data key="d10">
+    <edge id="e38" source="n63" target="n64">
+      <data key="d8"/>
+      <data key="d9">
         <y:PolyLineEdge>
           <y:Path sx="0.0" sy="0.0" tx="0.0" ty="0.0"/>
-          <y:LineStyle color="#A0AEC0" type="line" width="1.5"/>
+          <y:LineStyle color="#C0C0C0" type="line" width="1.0"/>
           <y:Arrows source="none" target="standard"/>
+          <y:BendStyle smoothed="false"/>
         </y:PolyLineEdge>
       </data>
     </edge>
-    <edge id="e_acc_item_9_0" source="n_acc_9" target="n_item_9_0">
-      <data key="d10">
+    <edge id="e39" source="n3" target="n62">
+      <data key="d8"/>
+      <data key="d9">
         <y:PolyLineEdge>
           <y:Path sx="0.0" sy="0.0" tx="0.0" ty="0.0"/>
-          <y:LineStyle color="#CBD5E0" type="line" width="1.0"/>
+          <y:LineStyle color="#C0C0C0" type="line" width="1.0"/>
           <y:Arrows source="none" target="standard"/>
+          <y:BendStyle smoothed="false"/>
         </y:PolyLineEdge>
       </data>
     </edge>
-    <edge id="e_acc_flag_9" source="n_acc_9" target="n_flag_9">
-      <data key="d10">
+    <edge id="e40" source="n62" target="n4">
+      <data key="d8"/>
+      <data key="d9">
         <y:PolyLineEdge>
           <y:Path sx="0.0" sy="0.0" tx="0.0" ty="0.0"/>
-          <y:LineStyle color="#81E6D9" type="dashed" width="1.0"/>
+          <y:LineStyle color="#C0C0C0" type="line" width="1.0"/>
           <y:Arrows source="none" target="standard"/>
+          <y:BendStyle smoothed="false"/>
         </y:PolyLineEdge>
       </data>
     </edge>
-    <edge id="e_root_10" source="n_root" target="n_acc_10">
-      <data key="d10">
+    <edge id="e41" source="n4" target="n63">
+      <data key="d8"/>
+      <data key="d9">
         <y:PolyLineEdge>
           <y:Path sx="0.0" sy="0.0" tx="0.0" ty="0.0"/>
-          <y:LineStyle color="#A0AEC0" type="line" width="1.5"/>
+          <y:LineStyle color="#C0C0C0" type="line" width="1.0"/>
           <y:Arrows source="none" target="standard"/>
+          <y:BendStyle smoothed="false"/>
         </y:PolyLineEdge>
       </data>
     </edge>
-    <edge id="e_acc_item_10_0" source="n_acc_10" target="n_item_10_0">
-      <data key="d10">
+    <edge id="e42" source="n64" target="n10">
+      <data key="d8"/>
+      <data key="d9">
         <y:PolyLineEdge>
           <y:Path sx="0.0" sy="0.0" tx="0.0" ty="0.0"/>
-          <y:LineStyle color="#CBD5E0" type="line" width="1.0"/>
+          <y:LineStyle color="#C0C0C0" type="line" width="1.0"/>
           <y:Arrows source="none" target="standard"/>
+          <y:BendStyle smoothed="false"/>
         </y:PolyLineEdge>
       </data>
     </edge>
-    <edge id="e_acc_item_10_1" source="n_acc_10" target="n_item_10_1">
-      <data key="d10">
+    <edge id="e43" source="n10" target="n11">
+      <data key="d8"/>
+      <data key="d9">
         <y:PolyLineEdge>
           <y:Path sx="0.0" sy="0.0" tx="0.0" ty="0.0"/>
-          <y:LineStyle color="#CBD5E0" type="line" width="1.0"/>
+          <y:LineStyle color="#C0C0C0" type="line" width="1.0"/>
           <y:Arrows source="none" target="standard"/>
+          <y:BendStyle smoothed="false"/>
         </y:PolyLineEdge>
       </data>
     </edge>
-    <edge id="e_acc_item_10_2" source="n_acc_10" target="n_item_10_2">
-      <data key="d10">
+    <edge id="e44" source="n11" target="n5">
+      <data key="d8"/>
+      <data key="d9">
         <y:PolyLineEdge>
           <y:Path sx="0.0" sy="0.0" tx="0.0" ty="0.0"/>
-          <y:LineStyle color="#CBD5E0" type="line" width="1.0"/>
+          <y:LineStyle color="#C0C0C0" type="line" width="1.0"/>
           <y:Arrows source="none" target="standard"/>
+          <y:BendStyle smoothed="false"/>
         </y:PolyLineEdge>
       </data>
     </edge>
-    <edge id="e_acc_flag_10" source="n_acc_10" target="n_flag_10">
-      <data key="d10">
+    <edge id="e45" source="n9" target="n12">
+      <data key="d8"/>
+      <data key="d9">
         <y:PolyLineEdge>
           <y:Path sx="0.0" sy="0.0" tx="0.0" ty="0.0"/>
-          <y:LineStyle color="#81E6D9" type="dashed" width="1.0"/>
+          <y:LineStyle color="#000000" type="line" width="1.0"/>
           <y:Arrows source="none" target="standard"/>
+          <y:BendStyle smoothed="false"/>
         </y:PolyLineEdge>
       </data>
     </edge>
-    <edge id="e_root_11" source="n_root" target="n_acc_11">
-      <data key="d10">
+    <edge id="e46" source="n12" target="n65">
+      <data key="d8"/>
+      <data key="d9">
         <y:PolyLineEdge>
           <y:Path sx="0.0" sy="0.0" tx="0.0" ty="0.0"/>
-          <y:LineStyle color="#A0AEC0" type="line" width="1.5"/>
+          <y:LineStyle color="#000000" type="line" width="1.0"/>
           <y:Arrows source="none" target="standard"/>
+          <y:BendStyle smoothed="false"/>
         </y:PolyLineEdge>
       </data>
     </edge>
-    <edge id="e_acc_item_11_0" source="n_acc_11" target="n_item_11_0">
-      <data key="d10">
+    <edge id="e47" source="n65" target="n67">
+      <data key="d8"/>
+      <data key="d9">
         <y:PolyLineEdge>
           <y:Path sx="0.0" sy="0.0" tx="0.0" ty="0.0"/>
-          <y:LineStyle color="#CBD5E0" type="line" width="1.0"/>
+          <y:LineStyle color="#000000" type="line" width="1.0"/>
           <y:Arrows source="none" target="standard"/>
+          <y:BendStyle smoothed="false"/>
         </y:PolyLineEdge>
       </data>
     </edge>
-    <edge id="e_acc_item_11_1" source="n_acc_11" target="n_item_11_1">
-      <data key="d10">
+    <edge id="e48" source="n67" target="n68">
+      <data key="d8"/>
+      <data key="d9">
         <y:PolyLineEdge>
           <y:Path sx="0.0" sy="0.0" tx="0.0" ty="0.0"/>
-          <y:LineStyle color="#CBD5E0" type="line" width="1.0"/>
+          <y:LineStyle color="#000000" type="line" width="1.0"/>
           <y:Arrows source="none" target="standard"/>
+          <y:BendStyle smoothed="false"/>
         </y:PolyLineEdge>
       </data>
     </edge>
-    <edge id="e_acc_item_11_2" source="n_acc_11" target="n_item_11_2">
-      <data key="d10">
+    <edge id="e49" source="n68" target="n69">
+      <data key="d8"/>
+      <data key="d9">
         <y:PolyLineEdge>
           <y:Path sx="0.0" sy="0.0" tx="0.0" ty="0.0"/>
-          <y:LineStyle color="#CBD5E0" type="line" width="1.0"/>
+          <y:LineStyle color="#000000" type="line" width="1.0"/>
           <y:Arrows source="none" target="standard"/>
+          <y:BendStyle smoothed="false"/>
         </y:PolyLineEdge>
       </data>
     </edge>
-    <edge id="e_acc_flag_11" source="n_acc_11" target="n_flag_11">
-      <data key="d10">
+    <edge id="e50" source="n32" target="n71">
+      <data key="d8"/>
+      <data key="d9">
         <y:PolyLineEdge>
           <y:Path sx="0.0" sy="0.0" tx="0.0" ty="0.0"/>
-          <y:LineStyle color="#81E6D9" type="dashed" width="1.0"/>
+          <y:LineStyle color="#C0C0C0" type="line" width="1.0"/>
           <y:Arrows source="none" target="standard"/>
+          <y:BendStyle smoothed="false"/>
         </y:PolyLineEdge>
       </data>
     </edge>
-    <edge id="e_root_12" source="n_root" target="n_acc_12">
-      <data key="d10">
+    <edge id="e51" source="n71" target="n72">
+      <data key="d8"/>
+      <data key="d9">
         <y:PolyLineEdge>
           <y:Path sx="0.0" sy="0.0" tx="0.0" ty="0.0"/>
-          <y:LineStyle color="#A0AEC0" type="line" width="1.5"/>
+          <y:LineStyle color="#C0C0C0" type="line" width="1.0"/>
           <y:Arrows source="none" target="standard"/>
+          <y:BendStyle smoothed="false"/>
         </y:PolyLineEdge>
       </data>
     </edge>
-    <edge id="e_acc_item_12_0" source="n_acc_12" target="n_item_12_0">
-      <data key="d10">
+    <edge id="e52" source="n72" target="n73">
+      <data key="d8"/>
+      <data key="d9">
         <y:PolyLineEdge>
           <y:Path sx="0.0" sy="0.0" tx="0.0" ty="0.0"/>
-          <y:LineStyle color="#CBD5E0" type="line" width="1.0"/>
+          <y:LineStyle color="#C0C0C0" type="line" width="1.0"/>
           <y:Arrows source="none" target="standard"/>
+          <y:BendStyle smoothed="false"/>
         </y:PolyLineEdge>
       </data>
     </edge>
-    <edge id="e_acc_flag_12" source="n_acc_12" target="n_flag_12">
-      <data key="d10">
+    <edge id="e53" source="n73" target="n74">
+      <data key="d8"/>
+      <data key="d9">
         <y:PolyLineEdge>
           <y:Path sx="0.0" sy="0.0" tx="0.0" ty="0.0"/>
-          <y:LineStyle color="#81E6D9" type="dashed" width="1.0"/>
+          <y:LineStyle color="#C0C0C0" type="line" width="1.0"/>
           <y:Arrows source="none" target="standard"/>
+          <y:BendStyle smoothed="false"/>
         </y:PolyLineEdge>
       </data>
     </edge>
-    <edge id="e_root_13" source="n_root" target="n_acc_13">
-      <data key="d10">
+    <edge id="e54" source="n74" target="n75">
+      <data key="d8"/>
+      <data key="d9">
         <y:PolyLineEdge>
           <y:Path sx="0.0" sy="0.0" tx="0.0" ty="0.0"/>
-          <y:LineStyle color="#A0AEC0" type="line" width="1.5"/>
+          <y:LineStyle color="#C0C0C0" type="line" width="1.0"/>
           <y:Arrows source="none" target="standard"/>
+          <y:BendStyle smoothed="false"/>
         </y:PolyLineEdge>
       </data>
     </edge>
-    <edge id="e_acc_item_13_0" source="n_acc_13" target="n_item_13_0">
-      <data key="d10">
+    <edge id="e55" source="n75" target="n76">
+      <data key="d8"/>
+      <data key="d9">
         <y:PolyLineEdge>
           <y:Path sx="0.0" sy="0.0" tx="0.0" ty="0.0"/>
-          <y:LineStyle color="#CBD5E0" type="line" width="1.0"/>
+          <y:LineStyle color="#C0C0C0" type="line" width="1.0"/>
           <y:Arrows source="none" target="standard"/>
+          <y:BendStyle smoothed="false"/>
         </y:PolyLineEdge>
       </data>
     </edge>
-    <edge id="e_acc_item_13_1" source="n_acc_13" target="n_item_13_1">
-      <data key="d10">
+    <edge id="e56" source="n31" target="n32">
+      <data key="d8"/>
+      <data key="d9">
         <y:PolyLineEdge>
           <y:Path sx="0.0" sy="0.0" tx="0.0" ty="0.0"/>
-          <y:LineStyle color="#CBD5E0" type="line" width="1.0"/>
+          <y:LineStyle color="#C0C0C0" type="line" width="1.0"/>
           <y:Arrows source="none" target="standard"/>
+          <y:BendStyle smoothed="false"/>
         </y:PolyLineEdge>
       </data>
     </edge>
-    <edge id="e_acc_item_13_2" source="n_acc_13" target="n_item_13_2">
-      <data key="d10">
+    <edge id="e57" source="n29" target="n77">
+      <data key="d8"/>
+      <data key="d9">
         <y:PolyLineEdge>
           <y:Path sx="0.0" sy="0.0" tx="0.0" ty="0.0"/>
-          <y:LineStyle color="#CBD5E0" type="line" width="1.0"/>
+          <y:LineStyle color="#C0C0C0" type="line" width="1.0"/>
           <y:Arrows source="none" target="standard"/>
+          <y:BendStyle smoothed="false"/>
         </y:PolyLineEdge>
       </data>
     </edge>
-    <edge id="e_acc_item_13_3" source="n_acc_13" target="n_item_13_3">
-      <data key="d10">
+    <edge id="e58" source="n77" target="n78">
+      <data key="d8"/>
+      <data key="d9">
         <y:PolyLineEdge>
           <y:Path sx="0.0" sy="0.0" tx="0.0" ty="0.0"/>
-          <y:LineStyle color="#CBD5E0" type="line" width="1.0"/>
+          <y:LineStyle color="#C0C0C0" type="line" width="1.0"/>
           <y:Arrows source="none" target="standard"/>
+          <y:BendStyle smoothed="false"/>
         </y:PolyLineEdge>
       </data>
     </edge>
-    <edge id="e_acc_item_13_4" source="n_acc_13" target="n_item_13_4">
-      <data key="d10">
+    <edge id="e59" source="n78" target="n79">
+      <data key="d8"/>
+      <data key="d9">
         <y:PolyLineEdge>
           <y:Path sx="0.0" sy="0.0" tx="0.0" ty="0.0"/>
-          <y:LineStyle color="#CBD5E0" type="line" width="1.0"/>
+          <y:LineStyle color="#C0C0C0" type="line" width="1.0"/>
           <y:Arrows source="none" target="standard"/>
+          <y:BendStyle smoothed="false"/>
         </y:PolyLineEdge>
       </data>
     </edge>
-    <edge id="e_acc_flag_13" source="n_acc_13" target="n_flag_13">
-      <data key="d10">
+    <edge id="e60" source="n79" target="n80">
+      <data key="d8"/>
+      <data key="d9">
         <y:PolyLineEdge>
           <y:Path sx="0.0" sy="0.0" tx="0.0" ty="0.0"/>
-          <y:LineStyle color="#81E6D9" type="dashed" width="1.0"/>
+          <y:LineStyle color="#C0C0C0" type="line" width="1.0"/>
           <y:Arrows source="none" target="standard"/>
+          <y:BendStyle smoothed="false"/>
+        </y:PolyLineEdge>
+      </data>
+    </edge>
+    <edge id="e61" source="n80" target="n81">
+      <data key="d8"/>
+      <data key="d9">
+        <y:PolyLineEdge>
+          <y:Path sx="0.0" sy="0.0" tx="0.0" ty="0.0"/>
+          <y:LineStyle color="#C0C0C0" type="line" width="1.0"/>
+          <y:Arrows source="none" target="standard"/>
+          <y:BendStyle smoothed="false"/>
+        </y:PolyLineEdge>
+      </data>
+    </edge>
+    <edge id="e62" source="n81" target="n82">
+      <data key="d8"/>
+      <data key="d9">
+        <y:PolyLineEdge>
+          <y:Path sx="0.0" sy="0.0" tx="0.0" ty="0.0"/>
+          <y:LineStyle color="#C0C0C0" type="line" width="1.0"/>
+          <y:Arrows source="none" target="standard"/>
+          <y:BendStyle smoothed="false"/>
+        </y:PolyLineEdge>
+      </data>
+    </edge>
+    <edge id="e63" source="n82" target="n83">
+      <data key="d8"/>
+      <data key="d9">
+        <y:PolyLineEdge>
+          <y:Path sx="0.0" sy="0.0" tx="0.0" ty="0.0"/>
+          <y:LineStyle color="#C0C0C0" type="line" width="1.0"/>
+          <y:Arrows source="none" target="standard"/>
+          <y:BendStyle smoothed="false"/>
+        </y:PolyLineEdge>
+      </data>
+    </edge>
+    <edge id="e64" source="n83" target="n84">
+      <data key="d8"/>
+      <data key="d9">
+        <y:PolyLineEdge>
+          <y:Path sx="0.0" sy="0.0" tx="0.0" ty="0.0"/>
+          <y:LineStyle color="#C0C0C0" type="line" width="1.0"/>
+          <y:Arrows source="none" target="standard"/>
+          <y:BendStyle smoothed="false"/>
+        </y:PolyLineEdge>
+      </data>
+    </edge>
+    <edge id="e65" source="n84" target="n85">
+      <data key="d8"/>
+      <data key="d9">
+        <y:PolyLineEdge>
+          <y:Path sx="0.0" sy="0.0" tx="0.0" ty="0.0"/>
+          <y:LineStyle color="#C0C0C0" type="line" width="1.0"/>
+          <y:Arrows source="none" target="standard"/>
+          <y:BendStyle smoothed="false"/>
+        </y:PolyLineEdge>
+      </data>
+    </edge>
+    <edge id="e66" source="n85" target="n86">
+      <data key="d8"/>
+      <data key="d9">
+        <y:PolyLineEdge>
+          <y:Path sx="0.0" sy="0.0" tx="0.0" ty="0.0"/>
+          <y:LineStyle color="#C0C0C0" type="line" width="1.0"/>
+          <y:Arrows source="none" target="standard"/>
+          <y:BendStyle smoothed="false"/>
+        </y:PolyLineEdge>
+      </data>
+    </edge>
+    <edge id="e67" source="n86" target="n87">
+      <data key="d8"/>
+      <data key="d9">
+        <y:PolyLineEdge>
+          <y:Path sx="0.0" sy="0.0" tx="0.0" ty="0.0"/>
+          <y:LineStyle color="#C0C0C0" type="line" width="1.0"/>
+          <y:Arrows source="none" target="standard"/>
+          <y:BendStyle smoothed="false"/>
+        </y:PolyLineEdge>
+      </data>
+    </edge>
+    <edge id="e68" source="n88" target="n89">
+      <data key="d8"/>
+      <data key="d9">
+        <y:PolyLineEdge>
+          <y:Path sx="0.0" sy="0.0" tx="0.0" ty="0.0"/>
+          <y:LineStyle color="#000000" type="line" width="1.0"/>
+          <y:Arrows source="none" target="standard"/>
+          <y:BendStyle smoothed="false"/>
+        </y:PolyLineEdge>
+      </data>
+    </edge>
+    <edge id="e69" source="n19" target="n6">
+      <data key="d8"/>
+      <data key="d9">
+        <y:PolyLineEdge>
+          <y:Path sx="0.0" sy="0.0" tx="0.0" ty="0.0"/>
+          <y:LineStyle color="#000000" type="line" width="1.0"/>
+          <y:Arrows source="none" target="standard"/>
+          <y:BendStyle smoothed="false"/>
+        </y:PolyLineEdge>
+      </data>
+    </edge>
+    <edge id="e70" source="n6" target="n7">
+      <data key="d8"/>
+      <data key="d9">
+        <y:PolyLineEdge>
+          <y:Path sx="0.0" sy="0.0" tx="0.0" ty="0.0"/>
+          <y:LineStyle color="#000000" type="line" width="1.0"/>
+          <y:Arrows source="none" target="standard"/>
+          <y:BendStyle smoothed="false"/>
+        </y:PolyLineEdge>
+      </data>
+    </edge>
+    <edge id="e71" source="n7" target="n66">
+      <data key="d8"/>
+      <data key="d9">
+        <y:PolyLineEdge>
+          <y:Path sx="0.0" sy="0.0" tx="0.0" ty="0.0"/>
+          <y:LineStyle color="#000000" type="line" width="1.0"/>
+          <y:Arrows source="none" target="standard"/>
+          <y:BendStyle smoothed="false"/>
         </y:PolyLineEdge>
       </data>
     </edge>
   </graph>
+  <data key="d6">
+    <y:Resources/>
+  </data>
 </graphml>

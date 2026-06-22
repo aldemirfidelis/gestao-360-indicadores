@@ -1,15 +1,13 @@
 'use client';
 
 import Link from 'next/link';
-import { usePathname } from 'next/navigation';
+import { usePathname, useSearchParams } from 'next/navigation';
 import { useEffect, useMemo, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { ChevronDown, PanelLeftClose, PanelLeftOpen } from 'lucide-react';
 import { useAuth } from '@/components/auth/auth-provider';
 import { usePortalConfig } from '@/components/portal-admin/portal-config-provider';
 import {
-  canAccessCompanyUsers,
-  companyUsersNavItem,
   isActivePath,
   visibleNavSections,
 } from '@/components/shell/navigation';
@@ -30,6 +28,8 @@ export function AccordionNavigation({
   mobile?: boolean;
 }) {
   const pathname = usePathname();
+  const searchParams = useSearchParams();
+  const currentSearch = searchParams.toString();
   const { user } = useAuth();
   const { navHidden, sectionHidden, navLabel } = usePortalConfig();
   const sections = useMemo(() => {
@@ -47,7 +47,7 @@ export function AccordionNavigation({
       .filter((section) => section.items.length > 0);
   }, [user, navHidden, sectionHidden, navLabel]);
   const currentSection = sections.find((section) =>
-    section.items.some((item) => isActivePath(pathname, item.href, item.exact)),
+    section.items.some((item) => isActivePath(pathname, item.href, item.exact, currentSearch)),
   );
   const conversations = useQuery<ConversationSummary[]>({
     queryKey: ['conversations'],
@@ -60,9 +60,6 @@ export function AccordionNavigation({
     const initial = currentSection?.heading ?? sections[0]?.heading;
     return new Set(initial ? [initial] : []);
   });
-  const showCompanyUsers = canAccessCompanyUsers(user);
-  const CompanyUsersIcon = companyUsersNavItem.icon;
-  const companyUsersActive = isActivePath(pathname, companyUsersNavItem.href);
 
   useEffect(() => {
     if (!currentSection) return;
@@ -151,7 +148,7 @@ export function AccordionNavigation({
                         <div className="space-y-0.5">
                           {section.items.map((item, idx) => {
                             const Icon = item.icon;
-                            const active = sectionActive && isActivePath(pathname, item.href, item.exact);
+                            const active = sectionActive && isActivePath(pathname, item.href, item.exact, currentSearch);
                             const isLast = idx === section.items.length - 1;
                             const itemUnread = item.href === '/comunicacao' ? unreadMessages : 0;
                             return (
@@ -199,7 +196,7 @@ export function AccordionNavigation({
                       <div className="space-y-0.5 pb-2">
                         {section.items.map((item) => {
                           const Icon = item.icon;
-                          const active = sectionActive && isActivePath(pathname, item.href, item.exact);
+                          const active = sectionActive && isActivePath(pathname, item.href, item.exact, currentSearch);
                           const itemUnread = item.href === '/comunicacao' ? unreadMessages : 0;
                           return (
                             <Link
@@ -232,26 +229,6 @@ export function AccordionNavigation({
         </div>
       </div>
 
-      {showCompanyUsers && (
-        <div className={cn('border-t border-border/60 p-2', collapsed && !mobile && 'px-1')}>
-          <Link
-            href={companyUsersNavItem.href}
-            onClick={onNavigate}
-            title={collapsed ? companyUsersNavItem.label : companyUsersNavItem.description}
-            className={cn(
-              'relative flex items-center gap-2.5 px-3 py-2 text-sm transition-colors',
-              companyUsersActive
-                ? 'bg-foreground/[0.06] font-medium text-foreground'
-                : 'text-muted-foreground hover:bg-foreground/[0.04] hover:text-foreground',
-              collapsed && !mobile && 'justify-center px-2',
-            )}
-          >
-            {companyUsersActive && <span className="absolute left-0 top-0 h-full w-[2px] bg-foreground" />}
-            <CompanyUsersIcon className={cn('h-4 w-4 shrink-0', companyUsersActive ? 'text-foreground' : 'text-muted-foreground/80')} />
-            {(!collapsed || mobile) && <span className="min-w-0 flex-1 leading-tight line-clamp-2">{companyUsersNavItem.label}</span>}
-          </Link>
-        </div>
-      )}
     </div>
   );
 }

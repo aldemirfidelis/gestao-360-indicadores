@@ -367,6 +367,13 @@ const BOOLEAN_FIELDS: Array<{ key: BooleanFormKey; label: string }> = [
   { key: 'isFeatured', label: 'Destaque' },
 ];
 
+const COMMUNICATION_TABS = ['mural', 'central', 'criar', 'campanhas', 'midias', 'metricas', 'chat'] as const;
+type CommunicationTab = (typeof COMMUNICATION_TABS)[number];
+
+function isCommunicationTab(value: string | null): value is CommunicationTab {
+  return Boolean(value && COMMUNICATION_TABS.includes(value as CommunicationTab));
+}
+
 export default function ComunicacaoPage() {
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -375,8 +382,10 @@ export default function ComunicacaoPage() {
   const requestedConversation = searchParams.get('c');
   const requestedUser = searchParams.get('to');
   const requestedPost = searchParams.get('post');
+  const requestedTab = searchParams.get('tab');
   const startedFor = useRef<string | null>(null);
-  const [tab, setTab] = useState(requestedConversation || requestedUser ? 'chat' : 'mural');
+  const initialTab = requestedConversation || requestedUser ? 'chat' : isCommunicationTab(requestedTab) ? requestedTab : 'mural';
+  const [tab, setTab] = useState<CommunicationTab>(initialTab);
   const [selectedPostId, setSelectedPostId] = useState<string | null>(requestedPost);
   const [form, setForm] = useState(defaultForm);
   const [aiPrompt, setAiPrompt] = useState('');
@@ -423,6 +432,14 @@ export default function ComunicacaoPage() {
       setTab('mural');
     }
   }, [requestedPost]);
+
+  useEffect(() => {
+    if (requestedConversation || requestedUser) {
+      setTab('chat');
+      return;
+    }
+    if (isCommunicationTab(requestedTab)) setTab(requestedTab);
+  }, [requestedConversation, requestedUser, requestedTab]);
 
   const createPost = useMutation({
     mutationFn: () => api('/communication/organizational/posts', { method: 'POST', json: formPayload(form) }),
@@ -562,7 +579,7 @@ export default function ComunicacaoPage() {
 
       <Dashboard metrics={data?.metrics} loading={overview.isLoading} />
 
-      <Tabs value={tab} onValueChange={setTab} className="space-y-4">
+      <Tabs value={tab} onValueChange={(value) => isCommunicationTab(value) && setTab(value)} className="space-y-4">
         <TabsList className="flex h-auto flex-wrap justify-start gap-1">
           <TabsTrigger value="mural"><Megaphone className="mr-2 h-4 w-4" />Meu Mural</TabsTrigger>
           <TabsTrigger value="central"><FileText className="mr-2 h-4 w-4" />Central</TabsTrigger>

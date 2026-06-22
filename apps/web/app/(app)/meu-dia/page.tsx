@@ -855,7 +855,7 @@ function PersonalizeDialog({ initial, cards, saving, onClose, onSave }: {
               <Label>Página inicial</Label>
               <NativeSelect value={landing} onChange={(e) => setLanding(e.target.value)}>
                 <option value="/meu-dia">Meu Dia</option>
-                <option value="/dashboard">Visão Geral</option>
+                <option value="/visualization">Painel Executivo</option>
                 <option value="/visualization">Painel Executivo</option>
                 <option value="/strategy">Mapa Estratégico</option>
                 <option value="/indicators">Indicadores</option>

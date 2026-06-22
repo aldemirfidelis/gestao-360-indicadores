@@ -39,7 +39,7 @@ export function PortalRouteGate({ children }: { children: ReactNode }) {
         description="Esta área foi temporariamente desativada pelo administrador do portal."
         actions={
           <Button asChild variant="outline">
-            <Link href="/dashboard">Voltar ao início</Link>
+            <Link href="/meu-dia">Voltar ao início</Link>
           </Button>
         }
       >

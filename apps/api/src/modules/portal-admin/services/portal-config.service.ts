@@ -3,6 +3,9 @@ import { PrismaService } from '../../../prisma/prisma.service';
 import { AuthPayload } from '../../auth/auth.types';
 import { FeatureFlagService } from './feature-flag.service';
 import { parseArray } from '../util/json';
+import { PLATFORM_PLANS } from '../../platform-admin/platform-admin.catalog';
+
+const COMPANY_CORE_MODULE_CODES = new Set(['auth', 'access-control', 'users', 'my-day', 'tasks']);
 
 /**
  * Monta a configuração EFETIVA do portal para um usuário (overlay resolvido).
@@ -24,7 +27,7 @@ export class PortalConfigService {
     const env = process.env.NODE_ENV ?? 'development';
     const isSuper = user.role === 'SUPER_ADMIN';
 
-    const [flags, modules, pages, navOverrides, maintenanceWindows, announcements, companyModules] = await Promise.all([
+    const [flags, modules, pages, navOverrides, maintenanceWindows, announcements, companyModules, companyProfile, planModules] = await Promise.all([
       this.flags.evaluateAllForUser({ userId: user.sub, role: user.role, environment: env, scopeIds: this.scopeIdsOf(user), now }),
       this.prisma.portalModule.findMany(),
       this.prisma.portalPage.findMany(),
@@ -32,10 +35,16 @@ export class PortalConfigService {
       this.prisma.portalMaintenanceWindow.findMany({ where: { active: true } }),
       this.prisma.portalAnnouncement.findMany({ where: { active: true } }),
       user.companyId ? this.prisma.platformCompanyModule.findMany({ where: { companyId: user.companyId } }).catch(() => []) : Promise.resolve([]),
+      user.companyId ? this.prisma.platformCompanyProfile.findUnique({ where: { companyId: user.companyId }, select: { planCode: true } }).catch(() => null) : Promise.resolve(null),
+      this.prisma.platformPlanModule.findMany({
+        select: { moduleCode: true, included: true, plan: { select: { code: true } } },
+      }).catch(() => []),
     ]);
 
     const activeMaint = maintenanceWindows.filter((w) => withinWindow(w.startsAt, w.endsAt, now));
     const globalMaint = activeMaint.find((w) => w.scope === 'global') ?? null;
+    const planCode = companyProfile?.planCode ?? 'ESSENCIAL';
+    const planEntries = planEntriesByPlan(planModules);
 
     return {
       role: user.role,
@@ -47,13 +56,15 @@ export class PortalConfigService {
       },
       modules: modules.map((m) => {
         const companyModule = companyModules.find((item) => item.moduleCode === m.code);
-        const effectiveStatus = toPortalStatus(companyModule?.status ?? m.status);
+        const fallbackCompanyStatus = user.companyId ? statusFromPlan(planCode, m.code, planEntries) : null;
+        const rawStatus = companyModule?.status ?? fallbackCompanyStatus ?? m.status;
+        const effectiveStatus = toPortalStatus(rawStatus);
         return {
           code: m.code, status: effectiveStatus, route: m.route, category: m.category,
           hidden: effectiveStatus === 'HIDDEN', maintenance: effectiveStatus === 'MAINTENANCE',
           unavailable: ['INACTIVE', 'BLOCKED', 'DISCONTINUED', 'MAINTENANCE'].includes(effectiveStatus),
-          unavailableMessage: companyModule?.note ?? m.unavailableMessage,
-          companyModuleStatus: companyModule?.status ?? null,
+          unavailableMessage: companyModule?.note ?? (rawStatus === 'BLOQUEADO' ? `Modulo fora do plano ${planCode}.` : m.unavailableMessage),
+          companyModuleStatus: companyModule?.status ?? fallbackCompanyStatus,
           companyModuleReadOnly: companyModule?.readOnly ?? false,
           allowedRoles: parseArray(m.allowedRoles),
         };
@@ -100,4 +111,22 @@ function toPortalStatus(status: string): string {
   if (['INATIVO', 'INACTIVE'].includes(normalized)) return 'INACTIVE';
   if (['MANUTENCAO', 'MAINTENANCE'].includes(normalized)) return 'MAINTENANCE';
   return status;
+}
+
+function planEntriesByPlan(rows: Array<{ moduleCode: string; included: boolean; plan: { code: string } }>): Map<string, Map<string, boolean>> {
+  const entries = new Map<string, Map<string, boolean>>();
+  for (const row of rows) {
+    const planEntries = entries.get(row.plan.code) ?? new Map<string, boolean>();
+    planEntries.set(row.moduleCode, row.included);
+    entries.set(row.plan.code, planEntries);
+  }
+  return entries;
+}
+
+function statusFromPlan(planCode: string, moduleCode: string, entries: Map<string, Map<string, boolean>>): string {
+  if (COMPANY_CORE_MODULE_CODES.has(moduleCode)) return 'HERDADO_DO_PLANO';
+  const explicitPlanEntry = entries.get(planCode)?.get(moduleCode);
+  if (explicitPlanEntry !== undefined) return explicitPlanEntry ? 'HERDADO_DO_PLANO' : 'BLOQUEADO';
+  const defaultPlan = PLATFORM_PLANS.find((plan) => plan.code === planCode);
+  return (defaultPlan?.modules as readonly string[] | undefined)?.includes(moduleCode) ? 'HERDADO_DO_PLANO' : 'BLOQUEADO';
 }

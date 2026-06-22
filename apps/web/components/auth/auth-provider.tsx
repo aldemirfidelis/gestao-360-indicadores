@@ -97,7 +97,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     try {
       const pref: any = await api('/my-day/preferences');
       if (pref?.landingPage && typeof pref.landingPage === 'string' && pref.landingPage.startsWith('/')) {
-        landing = pref.landingPage;
+        landing = pref.landingPage === '/dashboard' ? '/meu-dia' : pref.landingPage;
       }
     } catch {
       /* mantem o padrao */
@@ -110,7 +110,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     queryClient.clear();
     // Reload duro: zera o cache do React Query e refaz todas as queries já no
     // escopo da nova empresa efetiva (recomputada no backend a cada requisição).
-    if (typeof window !== 'undefined') window.location.assign('/dashboard');
+    if (typeof window !== 'undefined') window.location.assign('/meu-dia');
   };
 
   const logout = async () => {

@@ -8,6 +8,7 @@ import { HelpModule } from '../help/help.module';
 import { IntegrationsModule } from '../integrations/integrations.module';
 import { OrgNodesModule } from '../orgnodes/orgnodes.module';
 import { PortalAdminModule } from '../portal-admin/portal-admin.module';
+import { PrizeModule } from '../prize/prize.module';
 import { UsersModule } from '../users/users.module';
 import { PlatformAdminController } from './platform-admin.controller';
 import {
@@ -18,6 +19,7 @@ import {
   PlatformAdminLegacyHelpController,
   PlatformAdminLegacyOrgNodesController,
   PlatformAdminLegacyPortalController,
+  PlatformAdminLegacyPrizeEligibleController,
   PlatformAdminLegacySettingsController,
 } from './platform-admin-legacy.controller';
 import { PlatformAdminAuthGuard } from './guards/platform-admin-auth.guard';
@@ -37,6 +39,7 @@ import { PlatformAdminBootstrapService } from './services/platform-admin-bootstr
     IntegrationsModule,
     OrgNodesModule,
     PortalAdminModule,
+    PrizeModule,
     UsersModule,
   ],
   controllers: [
@@ -48,6 +51,7 @@ import { PlatformAdminBootstrapService } from './services/platform-admin-bootstr
     PlatformAdminLegacyExternalIntegrationsController,
     PlatformAdminLegacyHelpController,
     PlatformAdminLegacyOrgNodesController,
+    PlatformAdminLegacyPrizeEligibleController,
     PlatformAdminLegacyCompanyAuditController,
   ],
   providers: [

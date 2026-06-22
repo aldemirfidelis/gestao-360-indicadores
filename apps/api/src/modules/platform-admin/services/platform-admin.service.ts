@@ -7,7 +7,7 @@ import { PLATFORM_MODULES, PLATFORM_PLANS } from '../platform-admin.catalog';
 
 const ACTIVE_MODULE_STATUSES = ['ATIVO', 'ACTIVE', 'HERDADO_DO_PLANO', 'EM_IMPLANTACAO', 'EM_TESTE', 'EXPERIMENTAL'];
 const BLOCKED_MODULE_STATUSES = ['BLOQUEADO', 'SUSPENSO', 'BLOCKED', 'SUSPENDED'];
-const COMPANY_CORE_MODULES = new Set(['auth', 'access-control', 'users']);
+const COMPANY_CORE_MODULES = new Set(['auth', 'access-control', 'users', 'my-day', 'tasks']);
 const SEO_GROUP = 'SEO_PRESENCE';
 const SEO_DEFAULTS: Record<string, string> = {
   defaultTitle: 'Gestao 360 | Plataforma de gestao corporativa integrada',
@@ -439,6 +439,7 @@ export class PlatformAdminService {
   }
 
   async moduleMatrix() {
+    await this.ensureCompanyModuleAssignments();
     const [companies, modules, assignments] = await Promise.all([
       this.prisma.company.findMany({ where: { deletedAt: null }, orderBy: { name: 'asc' }, select: { id: true, name: true, tradeName: true, status: true } }),
       this.listModules(),
@@ -897,6 +898,7 @@ export class PlatformAdminService {
   }
 
   private async companyModules(companyId: string) {
+    await this.ensureCompanyModuleAssignments();
     const [modules, assignments] = await Promise.all([
       this.listModules(),
       this.prisma.platformCompanyModule.findMany({ where: { companyId } }),
@@ -1062,37 +1064,81 @@ export class PlatformAdminService {
   private async syncCatalogData() {
     await this.ensureModuleCatalog();
     await this.ensurePlans();
+    await this.ensureCompanyModuleAssignments();
     await this.ensureEnvironments();
   }
 
   private async ensureModuleCatalog() {
-    const count = await this.prisma.platformModuleCatalog.count();
-    if (count > 0) return;
     for (const module of PLATFORM_MODULES) {
+      const data = {
+        name: module.name,
+        description: module.description,
+        category: module.category,
+        icon: module.icon,
+        route: module.route,
+        version: module.version,
+        dependencies: JSON.stringify(module.dependencies),
+        technicalOwner: module.technicalOwner,
+        experimental: module.experimental,
+        availability: JSON.stringify(['ESSENCIAL', 'PROFISSIONAL', 'CORPORATIVO', 'ENTERPRISE']),
+        documentation: module.route ? `docs:${module.route}` : null,
+      };
       await this.prisma.platformModuleCatalog.upsert({
         where: { code: module.code },
         create: {
           code: module.code,
-          name: module.name,
-          description: module.description,
-          category: module.category,
-          icon: module.icon,
-          route: module.route,
-          version: module.version,
-          dependencies: JSON.stringify(module.dependencies),
-          technicalOwner: module.technicalOwner,
-          experimental: module.experimental,
-          availability: JSON.stringify(['ESSENCIAL', 'PROFISSIONAL', 'CORPORATIVO', 'ENTERPRISE']),
-          documentation: module.route ? `docs:${module.route}` : null,
+          ...data,
         },
-        update: {},
+        update: data,
       });
     }
   }
 
+  private async ensureCompanyModuleAssignments() {
+    await this.ensureModuleCatalog();
+    await this.ensurePlans();
+    const [companies, modules, profiles, planModules, assignments] = await Promise.all([
+      this.prisma.company.findMany({ where: { deletedAt: null }, select: { id: true } }),
+      this.prisma.platformModuleCatalog.findMany({ select: { code: true } }),
+      this.prisma.platformCompanyProfile.findMany({ select: { companyId: true, planCode: true } }),
+      this.prisma.platformPlanModule.findMany({
+        where: { included: true },
+        select: { moduleCode: true, plan: { select: { code: true } } },
+      }),
+      this.prisma.platformCompanyModule.findMany({ select: { companyId: true, moduleCode: true } }),
+    ]);
+    const profileByCompany = new Map(profiles.map((profile) => [profile.companyId, profile]));
+    const includedByPlan = new Map<string, Set<string>>();
+    for (const row of planModules) {
+      const modulesForPlan = includedByPlan.get(row.plan.code) ?? new Set<string>();
+      modulesForPlan.add(row.moduleCode);
+      includedByPlan.set(row.plan.code, modulesForPlan);
+    }
+    const existing = new Set(assignments.map((item) => `${item.companyId}:${item.moduleCode}`));
+    const rows: Prisma.PlatformCompanyModuleCreateManyInput[] = [];
+    for (const company of companies) {
+      const planCode = profileByCompany.get(company.id)?.planCode ?? 'ESSENCIAL';
+      const included = includedByPlan.get(planCode) ?? new Set<string>();
+      for (const module of modules) {
+        const key = `${company.id}:${module.code}`;
+        if (existing.has(key)) continue;
+        const planIncludesModule = included.has(module.code) || COMPANY_CORE_MODULES.has(module.code);
+        rows.push({
+          companyId: company.id,
+          moduleCode: module.code,
+          status: planIncludesModule ? 'HERDADO_DO_PLANO' : 'BLOQUEADO',
+          inheritedFromPlan: true,
+          manuallyOverridden: false,
+          note: planIncludesModule ? null : `Modulo fora do plano ${planCode}.`,
+        });
+      }
+    }
+    if (rows.length > 0) {
+      await this.prisma.platformCompanyModule.createMany({ data: rows, skipDuplicates: true });
+    }
+  }
+
   private async ensurePlans() {
-    const count = await this.prisma.platformPlan.count();
-    if (count > 0) return;
     for (const plan of PLATFORM_PLANS) {
       const created = await this.prisma.platformPlan.upsert({
         where: { code: plan.code },

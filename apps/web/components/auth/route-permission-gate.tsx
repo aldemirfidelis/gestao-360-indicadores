@@ -42,7 +42,7 @@ export function RoutePermissionGate({ permissions, title, description, children 
           description="Esta tela depende de uma permissão que ainda não foi atribuída ao seu perfil."
           actions={
             <Button asChild variant="outline">
-              <Link href="/dashboard">Voltar para Visão Geral</Link>
+              <Link href="/meu-dia">Voltar para Meu Dia</Link>
             </Button>
           }
         >

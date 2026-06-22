@@ -75,14 +75,18 @@ export function PortalConfigProvider({ children }: { children: ReactNode }) {
     return {
       config,
       loading: query.isLoading,
-      navHidden: (href) => hidden.has(href),
+      navHidden: (href) => {
+        const baseHref = href.split('?')[0];
+        return hidden.has(href) || hidden.has(baseHref);
+      },
       sectionHidden: (heading) => sectionHiddenSet.has(heading),
-      navLabel: (href) => labels.get(href) ?? null,
+      navLabel: (href) => labels.get(href) ?? labels.get(href.split('?')[0]) ?? null,
       routeBlock: (href) => {
         if (isSuper) return null; // Super Admin nunca é bloqueado
         if (globalMaint) return { reason: 'global', message: config?.maintenance.global.message };
+        const baseHref = href.split('?')[0];
         const match = blocked
-          .filter((b) => href === b.route || href.startsWith(`${b.route}/`))
+          .filter((b) => baseHref === b.route || baseHref.startsWith(`${b.route}/`))
           .sort((a, b) => b.route.length - a.route.length)[0];
         return match?.block ?? null;
       },

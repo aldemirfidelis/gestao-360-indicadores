@@ -75,6 +75,6 @@ import { PrizeCatalogService } from './prize-catalog.service';
     PrizeRulesService,
     PrizeCatalogService,
   ],
-  exports: [PrizeAuditService, PrizeAnnexesService, PrizeCompetencesService, PrizeActualsService, PrizeCalcService, PrizePayrollService, PrizeEligibleService, PrizeSyncService, PrizeRulesService],
+  exports: [PrizeAuditService, PrizeAnnexesService, PrizeCompetencesService, PrizeActualsService, PrizeCalcService, PrizePayrollService, PrizeEligibleService, PrizeConnectorsService, PrizeSyncService, PrizeRulesService],
 })
 export class PrizeModule {}

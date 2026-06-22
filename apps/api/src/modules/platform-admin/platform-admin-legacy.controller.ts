@@ -38,6 +38,7 @@ import { AnnouncementService } from '../portal-admin/services/announcement.servi
 import { SnapshotService } from '../portal-admin/services/snapshot.service';
 import { PortalDiagnosticsService } from '../portal-admin/services/portal-diagnostics.service';
 import { PermissionViewService } from '../portal-admin/services/permission-view.service';
+import { PrizeConnectorsService, UpsertConnectorDto } from '../prize/prize-connectors.service';
 import { PlatformAdminRequired } from './decorators/platform-permissions.decorator';
 import { CurrentPlatformAdmin } from './decorators/current-platform-admin.decorator';
 import { PlatformAdminIdentity } from './platform-admin.types';
@@ -465,6 +466,46 @@ export class PlatformAdminLegacyExternalIntegrationsController {
   @Get(':id/logs')
   async logs(@Req() req: Request, @Param('id') id: string) {
     return this.integrations.listLogs(await resolveCompanyId(this.prisma, req), id);
+  }
+}
+
+@Public()
+@Controller('platform-admin/prize/eligible')
+@PlatformAdminRequired()
+export class PlatformAdminLegacyPrizeEligibleController {
+  constructor(
+    private readonly connectors: PrizeConnectorsService,
+    private readonly prisma: PrismaService,
+  ) {}
+
+  @Get('connectors')
+  async listConnectors(@Req() req: Request) {
+    return this.connectors.list(await resolveCompanyId(this.prisma, req));
+  }
+
+  @Post('connectors')
+  async createConnector(@CurrentPlatformAdmin() user: PlatformAdminIdentity, @Req() req: Request, @Body() body: UpsertConnectorDto) {
+    return this.connectors.upsert(await asScopedAuth(this.prisma, user, req), null, body);
+  }
+
+  @Patch('connectors/:id')
+  async updateConnector(@CurrentPlatformAdmin() user: PlatformAdminIdentity, @Req() req: Request, @Param('id') id: string, @Body() body: UpsertConnectorDto) {
+    return this.connectors.upsert(await asScopedAuth(this.prisma, user, req), id, body);
+  }
+
+  @Delete('connectors/:id')
+  async removeConnector(@CurrentPlatformAdmin() user: PlatformAdminIdentity, @Req() req: Request, @Param('id') id: string) {
+    return this.connectors.remove(await asScopedAuth(this.prisma, user, req), id);
+  }
+
+  @Post('connectors/:id/test')
+  async testConnector(@CurrentPlatformAdmin() user: PlatformAdminIdentity, @Req() req: Request, @Param('id') id: string) {
+    return this.connectors.test(await asScopedAuth(this.prisma, user, req), id);
+  }
+
+  @Get('jobs')
+  async jobs(@Req() req: Request, @Query('kind') kind?: string, @Query('competenceId') competenceId?: string) {
+    return this.connectors.listJobs(await resolveCompanyId(this.prisma, req), kind, competenceId);
   }
 }
 

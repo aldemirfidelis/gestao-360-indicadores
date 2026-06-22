@@ -40,7 +40,17 @@ export class RegistryService implements OnModuleInit {
     }
     for (const p of CATALOG_PAGES) {
       const exists = await this.prisma.portalPage.findUnique({ where: { code: p.code } });
-      if (!exists) { await this.prisma.portalPage.create({ data: { code: p.code, moduleCode: p.moduleCode, name: p.name, title: p.title, route: p.route } }); created++; }
+      if (!exists) {
+        await this.prisma.portalPage.create({
+          data: { code: p.code, moduleCode: p.moduleCode, name: p.name, title: p.title, route: p.route, menuOrder: p.menuOrder ?? 0 },
+        });
+        created++;
+      } else {
+        await this.prisma.portalPage.update({
+          where: { code: p.code },
+          data: { moduleCode: p.moduleCode, name: p.name, title: p.title, route: p.route, menuOrder: p.menuOrder ?? exists.menuOrder },
+        });
+      }
     }
     for (const f of CATALOG_FEATURES) {
       const exists = await this.prisma.portalFeature.findUnique({ where: { code: f.code } });

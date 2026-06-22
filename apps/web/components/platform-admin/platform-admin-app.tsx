@@ -1,7 +1,7 @@
 'use client';
 
 import { useCallback, useEffect, useMemo, useState, type MouseEvent } from 'react';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
 import {
@@ -53,6 +53,7 @@ import VisibilitySettingsPage from '@/app/(app)/settings/visibilidade/page';
 import PortalAdminPage from '@/app/(app)/settings/portal/page';
 import OrgPage from '@/app/(app)/org/page';
 import UsersPage from '@/app/(app)/users/page';
+import { PrizeConnectorsPanel } from '@/components/gestao-premio/prize-connectors-panel';
 import { Vision360Provider } from '@/components/ui/vision360-context';
 import { Vision360Sidebar } from '@/components/ui/vision360-sidebar';
 import DatabaseOverviewPage from '@/app/(app)/settings/database/page';
@@ -101,6 +102,8 @@ type DatabaseAdminTab =
   | 'audit'
   | 'diagnostics'
   | 'advanced';
+
+type ExternalIntegrationsTab = 'external' | 'prize';
 
 interface SectionItem {
   key: SectionKey;
@@ -235,6 +238,8 @@ const SECTIONS: SectionItem[] = [
   { key: 'audit', label: 'Auditoria', icon: Activity, group: 'Técnico' },
 ];
 
+const SECTION_KEYS = new Set<SectionKey>(SECTIONS.map((section) => section.key));
+
 const MODULE_STATUSES = [
   'ATIVO',
   'BLOQUEADO',
@@ -252,7 +257,7 @@ const MODULE_STATUSES = [
 const COMPANY_STATUSES = ['ACTIVE', 'SUSPENDED', 'INACTIVE'] as const;
 const COMPANY_LIFECYCLE_STATUSES = ['ACTIVE', 'IMPLEMENTATION', 'TRIAL', 'SUSPENDED', 'INACTIVE'] as const;
 const COMPANY_PLAN_CODES = ['ESSENCIAL', 'PROFISSIONAL', 'CORPORATIVO', 'ENTERPRISE', 'PERSONALIZADO'];
-const COMPANY_CORE_MODULE_CODES = new Set(['users']);
+const COMPANY_CORE_MODULE_CODES = new Set(['users', 'my-day', 'tasks']);
 const PLATFORM_COMPANY_CONTEXT_KEY = 'g360.platformAdmin.companyId';
 const PORTAL_ADMIN_TAB_KEY = 'g360.platformAdmin.portalTab';
 const PORTAL_ADMIN_TAB_EVENT = 'platform-admin:portal-tab';
@@ -429,12 +434,17 @@ const COMPANY_SCOPED_QUERY_ROOTS = new Set<string>([
   'ext-keys',
   'ext-logs',
   'platform-admin-company-audit',
+  'prize-connectors',
+  'prize-jobs',
 ]);
 
 export function PlatformAdminApp() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const queryClient = useQueryClient();
-  const [section, setSection] = useState<SectionKey>('dashboard');
+  const requestedSection = searchParams.get('section');
+  const requestedExternalTab = searchParams.get('tab');
+  const [section, setSection] = useState<SectionKey>(() => (isSectionKey(requestedSection) ? requestedSection : 'dashboard'));
   const [databaseTab, setDatabaseTab] = useState<DatabaseAdminTab>('overview');
   const [databaseTable, setDatabaseTable] = useState<string | null>(null);
   const [settingsCompanyId, setSettingsCompanyId] = useState('');
@@ -534,6 +544,17 @@ export function PlatformAdminApp() {
     window.dispatchEvent(new CustomEvent(PORTAL_ADMIN_TAB_EVENT, { detail: tab }));
   }
 
+  function selectSection(next: SectionKey) {
+    setSection(next);
+    if (typeof window === 'undefined') return;
+    const url = next === 'dashboard' ? '/platform-admin' : `/platform-admin?section=${next}`;
+    window.history.replaceState(null, '', url);
+  }
+
+  useEffect(() => {
+    if (isSectionKey(requestedSection)) setSection(requestedSection);
+  }, [requestedSection]);
+
   function handleLegacyNavigation(event: MouseEvent<HTMLDivElement>) {
     const target = event.target as HTMLElement | null;
     const anchor = target?.closest('a[href]') as HTMLAnchorElement | null;
@@ -577,7 +598,7 @@ export function PlatformAdminApp() {
 
     if (!next) return;
     event.preventDefault();
-    setSection(next);
+    selectSection(next);
   }
 
   if (me.isLoading) {
@@ -603,7 +624,7 @@ export function PlatformAdminApp() {
                 )}
                 <button
                   type="button"
-                  onClick={() => setSection(item.key)}
+                  onClick={() => selectSection(item.key)}
                   className={cn(
                     'flex w-full items-center gap-3 px-3 py-2.5 text-left text-sm transition-colors',
                     active ? 'bg-white text-[#101820]' : 'text-white/70 hover:bg-white/10 hover:text-white',
@@ -660,7 +681,7 @@ export function PlatformAdminApp() {
           {section === 'dashboard' && <DashboardSection />}
           {section === 'generalSettings' && <GeneralSettingsSection />}
           {section === 'visibilityAdmin' && <VisibilitySettingsSection />}
-          {section === 'externalIntegrations' && <ExternalIntegrationsSection />}
+          {section === 'externalIntegrations' && <ExternalIntegrationsSection initialTab={requestedExternalTab === 'prize' ? 'prize' : 'external'} />}
           {section === 'orgStructure' && <OrgStructureSection />}
           {section === 'databaseAdmin' && (
             <DatabaseAdminSection
@@ -774,6 +795,10 @@ function isDatabaseAdminTab(value: unknown): value is DatabaseAdminTab {
   return typeof value === 'string' && DATABASE_ADMIN_TABS.has(value as DatabaseAdminTab);
 }
 
+function isSectionKey(value: unknown): value is SectionKey {
+  return typeof value === 'string' && SECTION_KEYS.has(value as SectionKey);
+}
+
 function isDatabaseNavigationDetail(value: unknown): value is { tab: DatabaseAdminTab; table?: string | null } {
   if (!value || typeof value !== 'object') return false;
   const detail = value as { tab?: unknown; table?: unknown };
@@ -796,10 +821,48 @@ function VisibilitySettingsSection() {
   );
 }
 
-function ExternalIntegrationsSection() {
+function ExternalIntegrationsSection({ initialTab }: { initialTab: ExternalIntegrationsTab }) {
+  const [tab, setTab] = useState<ExternalIntegrationsTab>(initialTab);
+
+  useEffect(() => {
+    setTab(initialTab);
+  }, [initialTab]);
+
+  function selectTab(next: ExternalIntegrationsTab) {
+    setTab(next);
+    if (typeof window === 'undefined') return;
+    const url = next === 'prize'
+      ? '/platform-admin?section=externalIntegrations&tab=prize'
+      : '/platform-admin?section=externalIntegrations';
+    window.history.replaceState(null, '', url);
+  }
+
   return (
     <div className="rounded-sm border bg-white p-4">
-      <ExternalIntegrationsPage />
+      <div className="mb-4 flex flex-wrap gap-2 border-b pb-3">
+        <button
+          type="button"
+          onClick={() => selectTab('external')}
+          className={cn(
+            'border px-3 py-1.5 text-xs font-medium transition-colors',
+            tab === 'external' ? 'border-[#101820] bg-[#101820] text-white' : 'border-border bg-white text-muted-foreground hover:text-foreground',
+          )}
+        >
+          APIs Externas
+        </button>
+        <button
+          type="button"
+          onClick={() => selectTab('prize')}
+          className={cn(
+            'border px-3 py-1.5 text-xs font-medium transition-colors',
+            tab === 'prize' ? 'border-[#101820] bg-[#101820] text-white' : 'border-border bg-white text-muted-foreground hover:text-foreground',
+          )}
+        >
+          Integracoes do Premio
+        </button>
+      </div>
+      {tab === 'external' && <ExternalIntegrationsPage />}
+      {tab === 'prize' && <PrizeConnectorsPanel embedded canAdmin />}
     </div>
   );
 }

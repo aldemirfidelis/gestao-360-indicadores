@@ -17,7 +17,7 @@ export function Sidebar() {
       )}
     >
       <Link
-        href="/dashboard"
+        href="/meu-dia"
         className={cn('flex h-14 items-center border-b border-border/60 px-4', collapsed ? 'justify-center px-2' : 'gap-3')}
         title="Gestão 360"
       >

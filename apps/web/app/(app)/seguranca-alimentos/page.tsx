@@ -1,6 +1,7 @@
 'use client';
 
 import Link from 'next/link';
+import { useSearchParams } from 'next/navigation';
 import { useEffect, useMemo, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
@@ -296,6 +297,11 @@ const TABS: Array<{ key: TabKey; label: string; icon: typeof Network }> = [
   { key: 'flow', label: 'Fluxograma', icon: Workflow },
   { key: 'matrix', label: 'Matriz Geral', icon: Layers3 },
 ];
+const TAB_KEYS = new Set<TabKey>(TABS.map((tab) => tab.key));
+
+function isFoodSafetyTab(value: string | null): value is TabKey {
+  return Boolean(value && TAB_KEYS.has(value as TabKey));
+}
 
 // Reuso dos modulos corporativos existentes (integracao da Fase 1).
 const SHORTCUTS: Array<{ href: string; title: string; description: string; icon: typeof Network; tone: string }> = [
@@ -309,9 +315,12 @@ const SHORTCUTS: Array<{ href: string; title: string; description: string; icon:
 // ----------------------------- página -------------------------------------
 export default function SegurancaAlimentosPage() {
   const qc = useQueryClient();
+  const searchParams = useSearchParams();
   const { hasPermission } = useAuth();
   const canManage = hasPermission(['fsms:create', 'fsms:update', 'fsms:manage']);
-  const [tab, setTab] = useState<TabKey>('overview');
+  const requestedTab = searchParams.get('tab');
+  const initialTab = isFoodSafetyTab(requestedTab) ? requestedTab : 'overview';
+  const [tab, setTab] = useState<TabKey>(initialTab);
   const [programId, setProgramId] = useState<string>('');
   const [programDialog, setProgramDialog] = useState<Program | 'new' | null>(null);
   const [processDialog, setProcessDialog] = useState<Process | 'new' | null>(null);
@@ -327,6 +336,12 @@ export default function SegurancaAlimentosPage() {
     const rows = programs.data ?? [];
     if (rows.length && !rows.some((p) => p.id === programId)) setProgramId(rows[0].id);
   }, [programs.data, programId]);
+
+  useEffect(() => {
+    const requested = searchParams.get('tab');
+    const nextTab = isFoodSafetyTab(requested) ? requested : 'overview';
+    setTab(nextTab);
+  }, [searchParams]);
 
   const program = (programs.data ?? []).find((p) => p.id === programId) ?? null;
 
@@ -347,6 +362,13 @@ export default function SegurancaAlimentosPage() {
 
   function invalidate() {
     void qc.invalidateQueries({ queryKey: ['fsms'] });
+  }
+
+  function selectTab(nextTab: TabKey) {
+    setTab(nextTab);
+    if (typeof window === 'undefined') return;
+    const url = nextTab === 'overview' ? '/seguranca-alimentos' : `/seguranca-alimentos?tab=${nextTab}`;
+    window.history.replaceState(null, '', url);
   }
 
   return (
@@ -406,7 +428,7 @@ export default function SegurancaAlimentosPage() {
                 <button
                   key={t.key}
                   type="button"
-                  onClick={() => setTab(t.key)}
+                  onClick={() => selectTab(t.key)}
                   className={cn(
                     'flex items-center gap-2 border-b-2 px-3 py-2 text-sm font-medium transition-colors',
                     tab === t.key ? 'border-primary text-foreground' : 'border-transparent text-muted-foreground hover:text-foreground',
