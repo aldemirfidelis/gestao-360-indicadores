@@ -11,8 +11,8 @@
 import { DEFAULT_PROFILES } from '../src/modules/users/permission-catalog';
 
 const byRole = new Map<string, string[]>();
-for (const p of DEFAULT_PROFILES as Array<{ role: string; permissions: string[] }>) {
-  byRole.set(p.role, p.permissions);
+for (const p of DEFAULT_PROFILES) {
+  byRole.set(p.role, [...p.permissions]);
 }
 const MANAGER = byRole.get('MANAGER') ?? [];
 const roleKeys: Record<string, string[]> = {
