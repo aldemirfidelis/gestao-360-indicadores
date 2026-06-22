@@ -28,6 +28,9 @@ git pull --ff-only
 echo "Commit em deploy: $(git rev-parse --short HEAD) - $(git log -1 --pretty=%s)"
 
 echo ""
+echo "[1.5/5] Liberando memoria: parando Collabora durante o build (evita OOM no droplet; volta no 'up')..."
+docker compose -f "$COMPOSE_FILE" stop collabora 2>/dev/null || true
+
 echo "[2/5] Build das imagens Docker (sequencial para poupar memoria)..."
 docker compose -f "$COMPOSE_FILE" build --pull api
 docker compose -f "$COMPOSE_FILE" build --pull web
