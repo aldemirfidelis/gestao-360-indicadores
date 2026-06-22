@@ -302,6 +302,24 @@ export default function MeetingDetailPage() {
         }
       />
 
+      {linkedAction && (
+        <div className="mb-6">
+          {!actionQuery.data ? (
+            <SectionCard title="Análise de causa" description="Carregando a ferramenta de análise...">
+              <p className="text-sm text-muted-foreground">Carregando...</p>
+            </SectionCard>
+          ) : (
+            <AnalysisWorkspace
+              action={actionQuery.data}
+              onSave={(payload) => saveAnalysis.mutate(payload)}
+              saving={saveAnalysis.isPending}
+              title="Análise de causa"
+              description={`Escolha o método (5 Porquês, Ishikawa, PDCA, 5W2H...) e preencha a ferramenta. Problema e causa raiz ficam sincronizados com o plano: ${linkedAction.title}`}
+            />
+          )}
+        </div>
+      )}
+
       <div className="grid grid-cols-1 gap-6 xl:grid-cols-[0.9fr_1.1fr]">
         <div className="space-y-6">
           <SectionCard
@@ -330,22 +348,10 @@ export default function MeetingDetailPage() {
             )}
           </SectionCard>
 
-          {!linkedAction ? (
+          {!linkedAction && (
             <SectionCard title="Análise de causa" description="Vincule um plano de ação para registrar a análise de causa.">
               <p className="text-sm text-muted-foreground">Esta reunião ainda não está vinculada a um plano de ação.</p>
             </SectionCard>
-          ) : !actionQuery.data ? (
-            <SectionCard title="Análise de causa" description="Carregando a ferramenta de análise...">
-              <p className="text-sm text-muted-foreground">Carregando...</p>
-            </SectionCard>
-          ) : (
-            <AnalysisWorkspace
-              action={actionQuery.data}
-              onSave={(payload) => saveAnalysis.mutate(payload)}
-              saving={saveAnalysis.isPending}
-              title="Análise de causa"
-              description={`Escolha o método (5 Porquês, Ishikawa, PDCA...) e preencha a ferramenta. Problema e causa raiz ficam expostos e sincronizados com: ${linkedAction.title}`}
-            />
           )}
 
           <SectionCard title="Participantes" description="Participantes internos, externos e presenças.">

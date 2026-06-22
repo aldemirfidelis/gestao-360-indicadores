@@ -878,6 +878,253 @@ export class ActionsService {
     return this.getById(actionId, companyId);
   }
 
+  async fiveW2HAiSuggestions(actionId: string, body: any, userId?: string, companyId?: string) {
+    const action = await this.getById(actionId, companyId);
+    const session = action.analysisSessions?.find((item: any) => item.method === ActionAnalysisTool.FIVE_W_TWO_H);
+    const items = Array.isArray(body?.items) ? body.items : ((session?.data as any)?.items ?? []);
+    const aiSuggestions = await this.generateFiveW2HSuggestionsViaGemini(action, items);
+    const suggestions = aiSuggestions ?? defaultFiveW2HSuggestions(action, items);
+    await this.recordHistory(actionId, userId, 'AI_5W2H_SUGGESTIONS', null, null, action.title);
+    await this.audit(action.companyId, userId, 'AI_5W2H_SUGGESTIONS', 'ActionFiveW2H', actionId, null, { suggestions, source: aiSuggestions ? 'gemini' : 'rules' });
+    return suggestions;
+  }
+
+  async convertFiveW2HItemToTask(actionId: string, itemType: string, body: any, userId?: string, companyId?: string) {
+    const action = await this.prisma.actionPlan.findFirst({
+      where: { id: actionId, deletedAt: null, ...(companyId ? { companyId } : {}) },
+    });
+    if (!action) throw new NotFoundException('Ação nao encontrada');
+    if (userId) await this.access.assertCanWrite(userId, action.ownerNodeId, 'action_plans', 'edit');
+
+    const type = normalizeFiveW2HType(itemType);
+    const session = await this.prisma.actionAnalysisSession.findFirst({
+      where: { actionId, method: ActionAnalysisTool.FIVE_W_TWO_H },
+    });
+    const data = (session?.data && typeof session.data === 'object' && !Array.isArray(session.data) ? { ...(session.data as any) } : {}) as Record<string, any>;
+    const items: any[] = Array.isArray(data.items) ? data.items : [];
+    const stored = items.find((item) => normalizeFiveW2HType(item.itemType) === type) ?? {};
+
+    if (stored.convertedToTaskId) return this.getById(actionId, companyId);
+
+    const label = fiveW2HTypeLabel(type);
+    const title =
+      nonEmptyText(body?.title) ??
+      nonEmptyText(stored.description) ??
+      (Array.isArray(stored.bullets) && stored.bullets.length ? `5W2H ${label}: ${stored.bullets[0]}` : `5W2H ${label}: ${action.title}`);
+    const count = await this.prisma.actionTask.count({ where: { actionId } });
+    const task = await this.prisma.actionTask.create({
+      data: {
+        actionId,
+        title,
+        dueDate: coerceDate(body?.dueDate ?? stored.dueDate) ?? action.dueDate ?? null,
+        assignedToId: nonEmptyText(body?.responsibleUserId ?? stored.responsibleUserId) ?? action.responsibleUserId ?? null,
+        position: count,
+      },
+    });
+
+    if (session) {
+      const nextItems = items.some((item) => normalizeFiveW2HType(item.itemType) === type)
+        ? items.map((item) => (normalizeFiveW2HType(item.itemType) === type ? { ...item, convertedToTaskId: task.id } : item))
+        : [...items, { itemType: type, convertedToTaskId: task.id }];
+      await this.prisma.actionAnalysisSession.update({
+        where: { id: session.id },
+        data: { data: { ...data, items: nextItems } as any },
+      });
+    }
+
+    await this.recalcProgress(actionId);
+    await this.recordHistory(actionId, userId, 'FIVE_W_TWO_H_CONVERTED_TO_TASK', null, label, task.title);
+    await this.audit(action.companyId, userId, 'FIVE_W_TWO_H_CONVERTED_TO_TASK', 'ActionFiveW2H', session?.id ?? actionId, null, { taskId: task.id, itemType: type });
+    await this.traceability.record({
+      companyId: action.companyId,
+      indicatorId: action.indicatorId,
+      userId,
+      eventType: TraceEventType.TASK_UPDATED,
+      entityType: TraceEntityType.ACTION_TASK,
+      entityId: task.id,
+      relatedType: TraceEntityType.ACTION_PLAN,
+      relatedId: actionId,
+      title: 'Item 5W2H convertido em tarefa',
+      description: task.title,
+      metadata: { itemType: type, sessionId: session?.id ?? null },
+    });
+    return this.getById(actionId, companyId);
+  }
+
+  private async generateFiveW2HSuggestionsViaGemini(action: any, items: any[]) {
+    if (!this.gemini.isEnabled) return null;
+    const current = items
+      .map((item) => {
+        const bullets = Array.isArray(item.bullets) ? item.bullets.filter(Boolean).join('; ') : '';
+        return `${fiveW2HTypeLabel(normalizeFiveW2HType(item.itemType))}: ${nonEmptyText(item.description) ?? bullets}`;
+      })
+      .filter((line) => !line.endsWith(': '))
+      .join('\n');
+    const lastResults = action.indicator?.results?.slice?.(-6) ?? [];
+    const prompt = `Voce e um facilitador senior de planejamento 5W2H em empresas industriais brasileiras.
+Gere sugestoes objetivas para preencher os sete campos de um 5W2H dentro de um plano de acao.
+Nao salve nem confirme decisoes. Responda somente JSON valido no schema:
+{
+  "suggestions": [
+    { "field": "WHAT", "suggestion": "...", "justification": "..." }
+  ]
+}
+
+Campos permitidos: WHAT, WHY, WHERE, WHEN, WHO, HOW, HOW_MUCH.
+
+CONTEXTO DO PLANO:
+- Titulo: ${action.title ?? '-'}
+- Descricao: ${action.description ?? '-'}
+- Problema principal: ${action.problemDescription ?? '-'}
+- Causa raiz: ${action.rootCause ?? '-'}
+- Indicador: ${action.indicator?.name ?? '-'}
+- Resultados recentes: ${JSON.stringify(lastResults, null, 2)}
+- Area/setor: ${action.ownerNode?.name ?? '-'}
+- Campos ja preenchidos:
+${current || '- nenhum'}`;
+
+    interface GeminiFiveW2HResp {
+      suggestions?: Array<{ field?: string; suggestion?: string; justification?: string }>;
+    }
+    const json = await this.gemini.generateJson<GeminiFiveW2HResp>(prompt, {
+      temperature: 0.35,
+      maxOutputTokens: 1800,
+    });
+    const suggestions = json?.suggestions
+      ?.map((item) => ({
+        field: normalizeFiveW2HType(item.field),
+        suggestion: nonEmptyText(item.suggestion),
+        justification: nonEmptyText(item.justification) ?? 'Sugestão gerada para facilitar o preenchimento do 5W2H.',
+      }))
+      .filter((item) => item.suggestion);
+    return suggestions?.length ? suggestions : null;
+  }
+
+  async fiveWhysAiSuggestions(actionId: string, body: any, userId?: string, companyId?: string) {
+    const action = await this.getById(actionId, companyId);
+    const session = action.analysisSessions?.find((item: any) => item.method === ActionAnalysisTool.FIVE_WHYS);
+    const items = Array.isArray(body?.items) ? body.items : ((session?.data as any)?.items ?? session?.fiveWhys ?? []);
+    const problem = nonEmptyText(body?.problem) ?? session?.problem ?? action.problemDescription ?? action.description ?? action.title;
+    const aiSuggestions = await this.generateFiveWhysSuggestionsViaGemini(action, problem, items);
+    const suggestions = aiSuggestions ?? defaultFiveWhysSuggestions(problem, items);
+    await this.recordHistory(actionId, userId, 'AI_FIVE_WHYS_SUGGESTIONS', null, null, problem);
+    await this.audit(action.companyId, userId, 'AI_FIVE_WHYS_SUGGESTIONS', 'ActionFiveWhy', actionId, null, { suggestions, source: aiSuggestions ? 'gemini' : 'rules' });
+    return suggestions;
+  }
+
+  async convertFiveWhyToTask(actionId: string, level: string, body: any, userId?: string, companyId?: string) {
+    const action = await this.prisma.actionPlan.findFirst({
+      where: { id: actionId, deletedAt: null, ...(companyId ? { companyId } : {}) },
+    });
+    if (!action) throw new NotFoundException('Ação nao encontrada');
+    if (userId) await this.access.assertCanWrite(userId, action.ownerNodeId, 'action_plans', 'edit');
+
+    const lvl = Math.max(1, Math.round(Number(level) || 1));
+    const session = await this.prisma.actionAnalysisSession.findFirst({
+      where: { actionId, method: ActionAnalysisTool.FIVE_WHYS },
+    });
+    const data = (session?.data && typeof session.data === 'object' && !Array.isArray(session.data) ? { ...(session.data as any) } : {}) as Record<string, any>;
+    const items: any[] = Array.isArray(data.items) ? data.items : [];
+    const stored = items.find((item) => Number(item.level) === lvl) ?? {};
+
+    if (stored.convertedToTaskId) return this.getById(actionId, companyId);
+
+    const answer = nonEmptyText(body?.answer) ?? nonEmptyText(stored.answer);
+    const title = nonEmptyText(body?.title) ?? (answer ? `5 Porquês (nível ${lvl}): ${answer}` : `5 Porquês (nível ${lvl}): ${action.title}`);
+    const count = await this.prisma.actionTask.count({ where: { actionId } });
+    const task = await this.prisma.actionTask.create({
+      data: {
+        actionId,
+        title,
+        dueDate: coerceDate(body?.dueDate ?? stored.dueDate) ?? action.dueDate ?? null,
+        assignedToId: nonEmptyText(body?.responsibleUserId ?? stored.responsibleUserId) ?? action.responsibleUserId ?? null,
+        position: count,
+      },
+    });
+
+    const markRoot = Boolean(body?.markRootCause ?? stored.isRootCause);
+    if (session) {
+      const nextItems = items.some((item) => Number(item.level) === lvl)
+        ? items.map((item) => (Number(item.level) === lvl ? { ...item, convertedToTaskId: task.id, status: 'CONVERTED_TO_ACTION' } : item))
+        : [...items, { level: lvl, convertedToTaskId: task.id, status: 'CONVERTED_TO_ACTION' }];
+      await this.prisma.actionAnalysisSession.update({
+        where: { id: session.id },
+        data: { data: { ...data, items: nextItems } as any, ...(markRoot && answer ? { rootCause: answer } : {}) },
+      });
+    }
+    if (markRoot && answer) {
+      await this.prisma.actionPlan.update({ where: { id: actionId }, data: { rootCause: answer } });
+    }
+
+    await this.recalcProgress(actionId);
+    await this.recordHistory(actionId, userId, 'FIVE_WHYS_CONVERTED_TO_TASK', null, `Nível ${lvl}`, task.title);
+    await this.audit(action.companyId, userId, 'FIVE_WHYS_CONVERTED_TO_TASK', 'ActionFiveWhy', session?.id ?? actionId, null, { taskId: task.id, level: lvl });
+    await this.traceability.record({
+      companyId: action.companyId,
+      indicatorId: action.indicatorId,
+      userId,
+      eventType: TraceEventType.TASK_UPDATED,
+      entityType: TraceEntityType.ACTION_TASK,
+      entityId: task.id,
+      relatedType: TraceEntityType.ACTION_PLAN,
+      relatedId: actionId,
+      title: 'Porquê (5 Porquês) convertido em tarefa',
+      description: task.title,
+      metadata: { level: lvl, sessionId: session?.id ?? null },
+    });
+    return this.getById(actionId, companyId);
+  }
+
+  private async generateFiveWhysSuggestionsViaGemini(action: any, problem: string, items: any[]) {
+    if (!this.gemini.isEnabled) return null;
+    const current = (Array.isArray(items) ? items : [])
+      .map((item) => `Nível ${item.level ?? item.position ?? '?'} — P: ${nonEmptyText(item.question) ?? '-'} | R: ${nonEmptyText(item.answer) ?? '-'}`)
+      .join('\n');
+    const lastResults = action.indicator?.results?.slice?.(-6) ?? [];
+    const prompt = `Voce e um facilitador senior de analise de causa raiz pelo metodo dos 5 Porques em empresas industriais brasileiras.
+Gere sugestoes objetivas para aprofundar a investigacao, encadeando cada porque ao anterior ate chegar a uma causa raiz acionavel.
+Nao confirme a causa raiz nem salve decisoes. Responda somente JSON valido no schema:
+{
+  "suggestions": [
+    { "level": 1, "question": "...", "answer": "...", "justification": "...", "confidence": 70 }
+  ]
+}
+
+Regras:
+- level e um inteiro a partir de 1.
+- confidence e um inteiro de 0 a 100.
+- A pergunta de cada nivel deve questionar a resposta do nivel anterior.
+
+CONTEXTO DO PLANO:
+- Titulo: ${action.title ?? '-'}
+- Descricao: ${action.description ?? '-'}
+- Problema principal: ${problem ?? '-'}
+- Causa raiz informada: ${action.rootCause ?? 'nao definida'}
+- Indicador: ${action.indicator?.name ?? '-'}
+- Resultados recentes: ${JSON.stringify(lastResults, null, 2)}
+- Area/setor: ${action.ownerNode?.name ?? '-'}
+- Porques ja preenchidos:
+${current || '- nenhum'}`;
+
+    interface GeminiFiveWhysResp {
+      suggestions?: Array<{ level?: number; question?: string; answer?: string; justification?: string; confidence?: number }>;
+    }
+    const json = await this.gemini.generateJson<GeminiFiveWhysResp>(prompt, {
+      temperature: 0.4,
+      maxOutputTokens: 1800,
+    });
+    const suggestions = json?.suggestions
+      ?.map((item, index) => ({
+        level: Number.isFinite(Number(item.level)) && Number(item.level) > 0 ? Math.round(Number(item.level)) : index + 1,
+        question: nonEmptyText(item.question),
+        answer: nonEmptyText(item.answer) ?? '',
+        justification: nonEmptyText(item.justification) ?? 'Sugestão gerada para facilitar o aprofundamento da análise.',
+        confidence: clampConfidence(item.confidence),
+      }))
+      .filter((item) => item.question);
+    return suggestions?.length ? suggestions : null;
+  }
+
   private async generateSuggestionsViaGemini(action: any, scope?: string) {
     if (!this.gemini.isEnabled) return null;
     const context = {
@@ -1787,6 +2034,124 @@ function fiveW2HScore(item: any) {
   const keys = ['what', 'why', 'where', 'when', 'who', 'how', 'howMuch'];
   const filled = keys.filter((key) => item[key] !== undefined && item[key] !== null && item[key] !== '').length;
   return Math.round((filled / keys.length) * 100);
+}
+
+const FIVE_W_TWO_H_TYPES = ['WHAT', 'WHY', 'WHERE', 'WHEN', 'WHO', 'HOW', 'HOW_MUCH'] as const;
+
+function normalizeFiveW2HType(value: unknown) {
+  const key = normalizeKey(value);
+  const map: Record<string, string> = {
+    WHAT: 'WHAT',
+    O_QUE: 'WHAT',
+    OQUE: 'WHAT',
+    WHY: 'WHY',
+    POR_QUE: 'WHY',
+    PORQUE: 'WHY',
+    WHERE: 'WHERE',
+    ONDE: 'WHERE',
+    WHEN: 'WHEN',
+    QUANDO: 'WHEN',
+    WHO: 'WHO',
+    QUEM: 'WHO',
+    HOW: 'HOW',
+    COMO: 'HOW',
+    HOW_MUCH: 'HOW_MUCH',
+    HOWMUCH: 'HOW_MUCH',
+    QUANTO: 'HOW_MUCH',
+    QUANTO_CUSTA: 'HOW_MUCH',
+    QUANTO_VAI_CUSTAR: 'HOW_MUCH',
+  };
+  return map[key] ?? 'WHAT';
+}
+
+function fiveW2HTypeLabel(value: unknown) {
+  const type = normalizeFiveW2HType(value);
+  const labels: Record<string, string> = {
+    WHAT: 'O que',
+    WHY: 'Por que',
+    WHERE: 'Onde',
+    WHEN: 'Quando',
+    WHO: 'Quem',
+    HOW: 'Como',
+    HOW_MUCH: 'Quanto custa',
+  };
+  return labels[type] ?? type;
+}
+
+function defaultFiveW2HSuggestions(action: any, items: any[]) {
+  const byType = new Map(items.map((item) => [normalizeFiveW2HType(item.itemType), item]));
+  const isEmpty = (type: string) => {
+    const item = byType.get(type);
+    if (!item) return true;
+    const bullets = Array.isArray(item.bullets) ? item.bullets.filter(Boolean) : [];
+    return !nonEmptyText(item.description) && bullets.length === 0;
+  };
+  const indicatorName = action.indicator?.name ?? 'indicador relacionado';
+  const area = action.ownerNode?.name ?? 'a área responsável';
+  const responsible = action.responsibleUser?.name ?? 'o responsável definido';
+  const catalog: Record<string, { suggestion: string; justification: string }> = {
+    WHAT: {
+      suggestion: `Detalhar o que será feito para tratar "${action.problemDescription ?? action.title}", com escopo e resultado esperado.`,
+      justification: 'O campo What precisa deixar claro a entrega, o escopo e o critério de conclusão.',
+    },
+    WHY: {
+      suggestion: `Justificar por que a ação resolve a causa raiz e o impacto esperado sobre ${indicatorName}.`,
+      justification: 'O Why conecta a execução ao problema e ao benefício para o indicador.',
+    },
+    WHERE: {
+      suggestion: `Informar onde será executado: ${area}, setor, processo e equipamentos envolvidos.`,
+      justification: 'O Where evita ambiguidade sobre o local físico e o processo afetado.',
+    },
+    WHEN: {
+      suggestion: 'Definir data de início, prazo final, duração estimada e marcos intermediários.',
+      justification: 'O When estrutura o cronograma e permite acompanhar atrasos.',
+    },
+    WHO: {
+      suggestion: `Definir ${responsible} como responsável principal, equipe de apoio, aprovador e validador.`,
+      justification: 'O Who garante responsabilização clara por execução e validação.',
+    },
+    HOW: {
+      suggestion: 'Descrever o passo a passo, método, recursos necessários e evidências esperadas.',
+      justification: 'O How torna a execução repetível e auditável.',
+    },
+    HOW_MUCH: {
+      suggestion: `Estimar o custo (${action.estimatedCost ? `~R$ ${action.estimatedCost}` : 'a definir'}), tipo de custo, centro de custo e retorno esperado.`,
+      justification: 'O How much sustenta a decisão de investimento e o retorno do plano.',
+    },
+  };
+  return FIVE_W_TWO_H_TYPES.filter((type) => isEmpty(type)).map((type) => ({
+    field: type,
+    suggestion: catalog[type].suggestion,
+    justification: catalog[type].justification,
+  }));
+}
+
+function clampConfidence(value: unknown) {
+  const numeric = Number(value ?? 60);
+  if (!Number.isFinite(numeric)) return 60;
+  return Math.max(0, Math.min(100, Math.round(numeric)));
+}
+
+function defaultFiveWhysSuggestions(problem: string, items: any[]) {
+  const answered = (Array.isArray(items) ? items : [])
+    .slice()
+    .sort((a, b) => Number(a.level ?? a.position ?? 0) - Number(b.level ?? b.position ?? 0));
+  const lastAnswer = [...answered].reverse().find((item) => nonEmptyText(item.answer))?.answer;
+  const answeredCount = answered.filter((item) => nonEmptyText(item.answer)).length;
+  const base = nonEmptyText(lastAnswer) ?? nonEmptyText(problem) ?? 'o problema identificado';
+  const suggestions: Array<{ level: number; question: string; answer: string; justification: string; confidence: number }> = [];
+  const start = Math.max(1, answeredCount + 1);
+  for (let level = start; level <= Math.max(5, start); level += 1) {
+    suggestions.push({
+      level,
+      question: level === 1 ? `Por que "${base}" aconteceu?` : `Por que a causa do nível ${level - 1} ocorre?`,
+      answer: '',
+      justification: 'Encadeie a pergunta à resposta anterior, baseando-se em fatos e evidências, até atingir uma causa acionável.',
+      confidence: 60,
+    });
+    if (suggestions.length >= 5) break;
+  }
+  return suggestions;
 }
 
 const ISHIKAWA_CATEGORY_LABELS: Record<string, string> = {

@@ -365,8 +365,8 @@ export function PDCAVisualAnalysis({
         </div>
       )}
 
-      <div className="grid min-h-[650px] grid-cols-1 xl:grid-cols-[minmax(760px,1fr)_340px]">
-        <div ref={scrollRef} className="overflow-auto bg-slate-50">
+      <div className="grid grid-cols-1 xl:grid-cols-[minmax(0,1fr)_300px]">
+        <div ref={scrollRef} className="max-h-[560px] overflow-auto bg-slate-50">
           <div
             ref={canvasRef}
             className="relative origin-top-left"
@@ -385,7 +385,6 @@ export function PDCAVisualAnalysis({
                 />
               );
             })}
-            <PDCAFooter completedCount={completedCount} progress={pdcaProgress} saving={saving} lastSavedAt={lastSavedAt} />
           </div>
         </div>
 
@@ -401,6 +400,8 @@ export function PDCAVisualAnalysis({
           onRootCauseChange={onRootCauseChange}
         />
       </div>
+
+      <PDCAFooter completedCount={completedCount} progress={pdcaProgress} saving={saving} lastSavedAt={lastSavedAt} />
 
       <Dialog open={suggestionsOpen} onOpenChange={setSuggestionsOpen}>
         <DialogContent className="max-w-3xl">
@@ -571,18 +572,18 @@ function PDCAStageDrawer({
   const meta = STAGE_META[stage.phase];
   return (
     <aside className="border-l border-slate-200 bg-white">
-      <div className="border-b border-slate-200 p-4">
+      <div className="border-b border-slate-200 p-3">
         <div className="text-sm font-semibold text-slate-900">Etapa selecionada</div>
-        <div className="mt-3 flex items-start gap-3">
-          <span className="mt-1 h-2.5 w-2.5 rounded-full" style={{ backgroundColor: meta.color }} />
-          <div>
+        <div className="mt-2 flex items-start gap-2">
+          <span className="mt-1 h-2.5 w-2.5 shrink-0 rounded-full" style={{ backgroundColor: meta.color }} />
+          <div className="min-w-0">
             <div className="text-base font-semibold text-slate-900">{stage.title}</div>
-            <div className="mt-1 text-xs text-slate-500">{stage.subtitle}</div>
+            <div className="mt-0.5 text-xs text-slate-500">{stage.subtitle}</div>
           </div>
         </div>
       </div>
-      <div className="max-h-[590px] space-y-4 overflow-y-auto p-4">
-        <fieldset disabled={!canEdit} className="space-y-4">
+      <div className="max-h-[520px] space-y-3 overflow-y-auto p-3">
+        <fieldset disabled={!canEdit} className="space-y-3">
           <div>
             <Label>Descrição / Objetivo</Label>
             <Textarea rows={4} value={stage.description} onChange={(event) => onUpdate({ description: event.target.value })} onBlur={onSave} />
@@ -706,12 +707,12 @@ function PanelLink({ icon: Icon, label, value }: { icon: LucideIcon; label: stri
 
 function PDCAFooter({ completedCount, progress, saving, lastSavedAt }: { completedCount: number; progress: number; saving: boolean; lastSavedAt: string | null }) {
   return (
-    <div className="absolute bottom-0 left-0 right-0 z-30 flex h-[58px] items-center justify-between border-t border-slate-200 bg-white/95 px-5 text-xs text-slate-600">
+    <div className="flex flex-wrap items-center justify-between gap-3 border-t border-slate-200 bg-white px-4 py-2.5 text-xs text-slate-600">
       <div>
         <div className="font-semibold text-slate-800">Ciclo atual</div>
         <div>{completedCount} de 4 etapas concluídas</div>
       </div>
-      <div className="flex flex-wrap items-center gap-5">
+      <div className="flex flex-wrap items-center gap-4">
         <span className="inline-flex items-center gap-2"><span className="h-2.5 w-2.5 rounded-full bg-slate-400" />Pendente</span>
         <span className="inline-flex items-center gap-2"><span className="h-2.5 w-2.5 rounded-full bg-orange-400" />Em andamento</span>
         <span className="inline-flex items-center gap-2"><span className="h-2.5 w-2.5 rounded-full bg-green-500" />Concluído</span>

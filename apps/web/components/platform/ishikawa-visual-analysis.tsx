@@ -381,8 +381,8 @@ export function IshikawaVisualAnalysis({
         </div>
       )}
 
-      <div className="grid min-h-[650px] grid-cols-1 xl:grid-cols-[minmax(760px,1fr)_340px]">
-        <div ref={scrollRef} className="overflow-auto bg-slate-50">
+      <div className="grid grid-cols-1 xl:grid-cols-[minmax(0,1fr)_300px]">
+        <div ref={scrollRef} className="max-h-[560px] overflow-auto bg-slate-50">
           <div
             ref={canvasRef}
             className="relative m-0 origin-top-left"
@@ -434,8 +434,6 @@ export function IshikawaVisualAnalysis({
                 }}
               />
             ))}
-
-            <Legend lastSavedAt={lastSavedAt} saving={saving} />
           </div>
         </div>
 
@@ -451,6 +449,8 @@ export function IshikawaVisualAnalysis({
           onConvert={() => selectedCause && convertToAction(selectedCause)}
         />
       </div>
+
+      <Legend lastSavedAt={lastSavedAt} saving={saving} />
 
       <Dialog open={addOpen} onOpenChange={setAddOpen}>
         <DialogContent className="max-w-md">
@@ -658,18 +658,18 @@ function CauseDrawer({
   }
   return (
     <aside className="border-l border-slate-200 bg-white">
-      <div className="flex items-start justify-between gap-3 border-b border-slate-200 p-4">
-        <div>
+      <div className="flex items-start justify-between gap-2 border-b border-slate-200 p-3">
+        <div className="min-w-0">
           <div className="text-sm font-semibold text-slate-900">Causa selecionada</div>
-          <div className="mt-2 flex flex-wrap gap-1">
-            <span className="h-2.5 w-2.5 rounded-full bg-blue-600" />
-            <span className="text-sm font-medium text-slate-800">{cause.title}</span>
+          <div className="mt-1.5 flex items-center gap-1.5">
+            <span className="h-2.5 w-2.5 shrink-0 rounded-full bg-blue-600" />
+            <span className="truncate text-sm font-medium text-slate-800">{cause.title}</span>
           </div>
         </div>
         <PriorityBadge priority={cause.priority} />
       </div>
-      <div className="max-h-[590px] space-y-4 overflow-y-auto p-4">
-        <fieldset disabled={!canEdit} className="space-y-4">
+      <div className="max-h-[520px] space-y-3 overflow-y-auto p-3">
+        <fieldset disabled={!canEdit} className="space-y-3">
           <div>
             <Label>Nome da causa</Label>
             <Input value={cause.title} onChange={(event) => onUpdate({ title: event.target.value })} onBlur={onSave} />
@@ -772,13 +772,12 @@ function ScaleControl({ label, value, onChange }: { label: string; value: number
 
 function Legend({ saving, lastSavedAt }: { saving: boolean; lastSavedAt: string | null }) {
   return (
-    <div className="absolute bottom-5 left-24 z-20 flex flex-wrap items-center gap-5 rounded-lg border border-slate-200 bg-white/95 px-4 py-3 text-xs text-slate-600 shadow-sm">
+    <div className="flex flex-wrap items-center gap-x-5 gap-y-2 border-t border-slate-200 bg-white px-4 py-2.5 text-xs text-slate-600">
       <span className="font-semibold text-slate-800">Legenda:</span>
       <span className="inline-flex items-center gap-2"><span className="h-2.5 w-2.5 rounded-full bg-red-500" />Alta prioridade</span>
       <span className="inline-flex items-center gap-2"><span className="h-2.5 w-2.5 rounded-full bg-orange-400" />Média prioridade</span>
       <span className="inline-flex items-center gap-2"><span className="h-2.5 w-2.5 rounded-full bg-green-500" />Baixa prioridade</span>
-      <span className="h-5 w-px bg-slate-200" />
-      <span>{saving ? 'Salvando automaticamente...' : lastSavedAt ? `Salvo às ${lastSavedAt}` : 'Arraste para reposicionar'}</span>
+      <span className="ml-auto text-slate-400">{saving ? 'Salvando automaticamente...' : lastSavedAt ? `Salvo às ${lastSavedAt}` : 'Arraste para reposicionar'}</span>
     </div>
   );
 }

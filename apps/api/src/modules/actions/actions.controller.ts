@@ -202,6 +202,40 @@ export class ActionsController {
     return this.service.convertPdcaStageToTask(id, stageId, body, me.sub, me.companyId);
   }
 
+  @Post(':id/analysis/5w2h/ai-suggestions')
+  @RequirePermissions('actions:ai')
+  fiveW2HAiSuggestions(@CurrentUser() me: AuthPayload, @Param('id') id: string, @Body() body: any) {
+    return this.service.fiveW2HAiSuggestions(id, body, me.sub, me.companyId);
+  }
+
+  @Post(':id/analysis/5w2h/items/:itemType/convert-to-action')
+  @RequirePermissions('actions:update', 'actions:analysis')
+  convertFiveW2HItemToAction(
+    @CurrentUser() me: AuthPayload,
+    @Param('id') id: string,
+    @Param('itemType') itemType: string,
+    @Body() body: any,
+  ) {
+    return this.service.convertFiveW2HItemToTask(id, itemType, body, me.sub, me.companyId);
+  }
+
+  @Post(':id/analysis/five-whys/ai-suggestions')
+  @RequirePermissions('actions:ai')
+  fiveWhysAiSuggestions(@CurrentUser() me: AuthPayload, @Param('id') id: string, @Body() body: any) {
+    return this.service.fiveWhysAiSuggestions(id, body, me.sub, me.companyId);
+  }
+
+  @Post(':id/analysis/five-whys/items/:level/convert-to-action')
+  @RequirePermissions('actions:update', 'actions:analysis')
+  convertFiveWhyToAction(
+    @CurrentUser() me: AuthPayload,
+    @Param('id') id: string,
+    @Param('level') level: string,
+    @Body() body: any,
+  ) {
+    return this.service.convertFiveWhyToTask(id, level, body, me.sub, me.companyId);
+  }
+
   @Post(':id/evidences')
   @RequirePermissions('actions:update')
   addEvidence(@CurrentUser() me: AuthPayload, @Param('id') id: string, @Body() body: any) {

@@ -15,18 +15,39 @@ import {
   XAxis,
   YAxis,
 } from 'recharts';
-import { ArrowLeft, AlertTriangle, Network, ScrollText, Calendar } from 'lucide-react';
+import {
+  ArrowLeft,
+  AlertTriangle,
+  Calendar,
+  CalendarClock,
+  ChevronRight,
+  Download,
+  FileText,
+  Gauge,
+  Lightbulb,
+  Minus,
+  Network,
+  ScrollText,
+  ShieldAlert,
+  Target,
+  TrendingDown,
+  TrendingUp,
+  Users,
+} from 'lucide-react';
 import Link from 'next/link';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { Progress } from '@/components/ui/progress';
+import { NativeSelect } from '@/components/ui/select';
 import { PageHeader } from '@/components/shell/page-header';
 import { StatusLight } from '@/components/ui/status-light';
 import { StatusBadge } from '@/components/platform/status-badge';
 import { api } from '@/lib/api';
-import { formatNumber, formatPercent, periodRefLabel } from '@/lib/utils';
+import { cn, formatNumber, formatPercent, periodRefLabel } from '@/lib/utils';
 import { PERIODICITY_LABEL, DIRECTION_LABEL, ACTION_STATUS_LABEL, MEETING_STATUS_LABEL, TRACE_EVENT_LABEL } from '@/lib/labels';
 import { useVision360 } from '@/components/ui/vision360-context';
+import { useAuth } from '@/components/auth/auth-provider';
 
 interface IndicatorDetail {
   id: string;
@@ -130,7 +151,13 @@ export default function IndicatorDetailPage() {
   const router = useRouter();
   const queryClient = useQueryClient();
   const [auditOpen, setAuditOpen] = useState(false);
+  const [periods, setPeriods] = useState(12);
+  const [chartTab, setChartTab] = useState<'EVOLUCAO' | 'ANALISE' | 'HISTORICO' | 'ACOES'>('EVOLUCAO');
   const { open: openVision360 } = useVision360();
+  const { hasPermission } = useAuth();
+  const canCreateDeviation = hasPermission(['deviations:create', 'deviations:update']);
+  const canCreateAction = hasPermission(['actions:create']);
+  const canScheduleMeeting = hasPermission(['meetings:create', 'meetings:update']);
 
   const detail = useQuery<IndicatorDetail>({
     queryKey: ['indicator', id],
@@ -138,8 +165,8 @@ export default function IndicatorDetailPage() {
   });
 
   const series = useQuery<SeriesPoint[]>({
-    queryKey: ['indicator', id, 'series'],
-    queryFn: () => api<SeriesPoint[]>(`/indicators/${id}/series?points=12`),
+    queryKey: ['indicator', id, 'series', periods],
+    queryFn: () => api<SeriesPoint[]>(`/indicators/${id}/series?points=${periods}`),
   });
   const timeline = useQuery<TraceabilityTimeline>({
     queryKey: ['traceability', 'indicator', id],
@@ -213,30 +240,48 @@ export default function IndicatorDetailPage() {
     openDeviation.mutate();
   };
 
+  const prev = ind.results[ind.results.length - 2] ?? null;
+  const unit = ind.unitLabel || ind.unit || '';
+  const ppOrUnit = unit === '%' || unit.toUpperCase() === 'PERCENT' ? 'p.p.' : unit || 'pontos';
+  const metaValue = ind.targets.find((t) => t.periodRef === last?.periodRef)?.target ?? ind.targets[ind.targets.length - 1]?.target ?? null;
+  const momDelta = last && prev ? last.value - prev.value : null;
+  const insights = buildInsights(ind, last ?? null, prev, ppOrUnit);
+  const risks = buildRisks(deviationRows, last ?? null);
+  const planStats = buildPlanStats(ind.actions ?? [], deviationRows);
+  const upcomingMeetings = (ind.meetings ?? [])
+    .slice()
+    .sort((a, b) => new Date(a.startsAt ?? 0).getTime() - new Date(b.startsAt ?? 0).getTime());
+  const recentSeries = (series.data ?? []).filter((p) => p.value !== null).slice(-4);
+
   return (
     <div>
-      <Link href="/indicators" className="inline-flex items-center text-sm text-muted-foreground hover:text-foreground mb-4">
-        <ArrowLeft className="h-4 w-4 mr-1" /> Voltar para indicadores
-      </Link>
+      <nav className="mb-3 flex items-center gap-1.5 text-xs text-muted-foreground">
+        <Link href="/strategy" className="hover:text-foreground">Estratégia</Link>
+        <ChevronRight className="h-3 w-3" />
+        <Link href="/indicators" className="hover:text-foreground">Indicadores</Link>
+        <ChevronRight className="h-3 w-3" />
+        <span className="font-medium text-foreground">Detalhes do indicador</span>
+      </nav>
 
       <PageHeader
         title={ind.name}
         description={ind.description ?? `${ind.ownerNode?.name ?? '-'} - ${ind.code ?? '-'}`}
         actions={
-          <div className="flex items-center gap-2">
+          <div className="flex flex-wrap items-center gap-2">
             <Button variant="outline" className="gap-1.5" onClick={() => openVision360('INDICATOR', ind.id)}>
               <Network className="h-4 w-4 text-primary" /> Visão 360°
             </Button>
-            {(last || linkedPrincipalDeviation) && (
-              <Button
-                variant={last?.light === 'RED' ? 'destructive' : 'outline'}
-                onClick={() => openOrCreateDeviation(linkedPrincipalDeviation)}
-                disabled={openDeviation.isPending}
-              >
-                <AlertTriangle className="mr-2 h-4 w-4" />
-                {openDeviation.isPending ? 'Abrindo...' : linkedPrincipalDeviation ? 'Abrir desvio' : 'Registrar desvio'}
-              </Button>
-            )}
+            <Button
+              variant={last?.light === 'RED' ? 'destructive' : 'outline'}
+              onClick={() => openOrCreateDeviation(linkedPrincipalDeviation)}
+              disabled={openDeviation.isPending || (!canCreateDeviation && !linkedPrincipalDeviation && deviationRows.length === 0)}
+            >
+              <AlertTriangle className="mr-2 h-4 w-4" />
+              {openDeviation.isPending ? 'Abrindo...' : linkedPrincipalDeviation || deviationRows.length ? 'Abrir desvio' : 'Registrar desvio'}
+            </Button>
+            <Button variant="outline" className="gap-1.5" onClick={() => window.print()}>
+              <Download className="h-4 w-4" /> Exportar
+            </Button>
           </div>
         }
       />
@@ -275,38 +320,64 @@ export default function IndicatorDetailPage() {
         )}
       </div>
 
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
+      <div className="mb-6 grid grid-cols-2 gap-4 md:grid-cols-3 xl:grid-cols-5">
         <Card>
           <CardContent className="p-4">
-            <div className="text-xs uppercase text-muted-foreground">Realizado atual</div>
-            <div className="text-2xl font-semibold mt-1">{last ? formatNumber(last.value) : '-'}</div>
-            <div className="text-xs text-muted-foreground">{last ? periodRefLabel(last.periodRef) : ''}</div>
+            <div className="flex items-center justify-between">
+              <div className="text-xs uppercase text-muted-foreground">Realizado atual</div>
+              <Gauge className="h-4 w-4 text-muted-foreground/60" />
+            </div>
+            <div className="mt-1 text-2xl font-semibold">{last ? formatNumber(last.value) : '-'}</div>
+            <div className="text-xs text-muted-foreground">{last ? periodRefLabel(last.periodRef) : 'Sem lançamento'}</div>
+            {momDelta !== null && (
+              <div className={cn('mt-1.5 inline-flex items-center gap-1 text-xs font-medium', momDelta < 0 ? 'text-status-red' : momDelta > 0 ? 'text-status-green' : 'text-muted-foreground')}>
+                {momDelta < 0 ? <TrendingDown className="h-3.5 w-3.5" /> : momDelta > 0 ? <TrendingUp className="h-3.5 w-3.5" /> : <Minus className="h-3.5 w-3.5" />}
+                {momDelta > 0 ? '+' : ''}{formatNumber(momDelta, { maximumFractionDigits: 2 })} {ppOrUnit} vs período anterior
+              </div>
+            )}
           </CardContent>
         </Card>
         <Card>
           <CardContent className="p-4">
             <div className="text-xs uppercase text-muted-foreground">Atingimento</div>
-            <div className="text-2xl font-semibold mt-1">{formatPercent(last?.attainment ?? null)}</div>
+            <div className="mt-1 text-2xl font-semibold">{formatPercent(last?.attainment ?? null)}</div>
+            <Progress value={last?.attainment ?? 0} className="mt-2" barClassName={attainmentBarColor(last?.light)} />
+            <div className="mt-1.5 text-xs text-muted-foreground">Meta {metaValue !== null ? formatNumber(metaValue) : '-'}</div>
           </CardContent>
         </Card>
         <Card>
           <CardContent className="p-4">
-            <div className="text-xs uppercase text-muted-foreground">Status</div>
-            <div className="mt-2">
-              <StatusLight light={last?.light ?? 'GRAY'} size="md" />
+            <div className="flex items-center justify-between">
+              <div className="text-xs uppercase text-muted-foreground">Status</div>
+              <AlertTriangle className={cn('h-4 w-4', last?.light === 'RED' ? 'text-status-red' : last?.light === 'YELLOW' ? 'text-status-yellow' : 'text-muted-foreground/60')} />
             </div>
+            <div className="mt-2"><StatusLight light={last?.light ?? 'GRAY'} size="md" /></div>
+            <div className="mt-1.5 text-xs text-muted-foreground">{statusHint(last?.light, ind.direction)}</div>
           </CardContent>
         </Card>
         <Card>
           <CardContent className="p-4">
-            <div className="text-xs uppercase text-muted-foreground">Periodicidade</div>
-            <div className="text-2xl font-semibold mt-1">{PERIODICITY_LABEL[ind.periodicity] ?? ind.periodicity}</div>
+            <div className="flex items-center justify-between">
+              <div className="text-xs uppercase text-muted-foreground">Periodicidade</div>
+              <Calendar className="h-4 w-4 text-muted-foreground/60" />
+            </div>
+            <div className="mt-1 text-2xl font-semibold">{PERIODICITY_LABEL[ind.periodicity] ?? ind.periodicity}</div>
             <div className="text-xs text-muted-foreground">Direção: {DIRECTION_LABEL[ind.direction] ?? ind.direction}</div>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardContent className="p-4">
+            <div className="flex items-center justify-between">
+              <div className="text-xs uppercase text-muted-foreground">Meta</div>
+              <Target className="h-4 w-4 text-muted-foreground/60" />
+            </div>
+            <div className="mt-1 text-2xl font-semibold">{metaValue !== null ? formatNumber(metaValue) : '-'}</div>
+            <div className="text-xs text-muted-foreground">{unit ? `Unidade: ${unit}` : 'Meta do período'}</div>
           </CardContent>
         </Card>
       </div>
 
-      <div className="mb-6 grid grid-cols-1 gap-6 xl:grid-cols-[390px,1fr]">
+      <div className="mb-6 grid grid-cols-1 gap-5 xl:grid-cols-[360px_minmax(0,1fr)_320px]">
         <IndicatorDecisionCards
           indicator={ind}
           principal={principalDeviation}
@@ -315,36 +386,146 @@ export default function IndicatorDetailPage() {
           currentTreatment={currentTreatment.data ?? null}
           onOpenDeviation={openOrCreateDeviation}
           openingDeviation={openDeviation.isPending}
-          canCreateDeviation={Boolean(last?.periodRef)}
+          canCreateDeviation={Boolean(last?.periodRef) && canCreateDeviation}
         />
 
         <Card>
-          <CardHeader>
-            <CardTitle>Evolução em barras (12 períodos)</CardTitle>
+          <CardHeader className="pb-2">
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <div className="flex flex-wrap gap-1">
+                {(['EVOLUCAO', 'ANALISE', 'HISTORICO', 'ACOES'] as const).map((tab) => (
+                  <button
+                    key={tab}
+                    type="button"
+                    onClick={() => setChartTab(tab)}
+                    className={cn(
+                      'rounded-md px-3 py-1.5 text-sm font-medium transition-colors',
+                      chartTab === tab ? 'bg-primary text-primary-foreground' : 'text-muted-foreground hover:bg-muted',
+                    )}
+                  >
+                    {CHART_TAB_LABEL[tab]}
+                  </button>
+                ))}
+              </div>
+              <NativeSelect value={String(periods)} onChange={(e) => setPeriods(Number(e.target.value))} className="h-9 w-auto">
+                <option value="6">6 períodos</option>
+                <option value="12">12 períodos</option>
+                <option value="24">24 períodos</option>
+              </NativeSelect>
+            </div>
           </CardHeader>
-          <CardContent className="h-80">
-            <ResponsiveContainer width="100%" height="100%">
-              <BarChart data={chartData} barGap={6}>
-                <CartesianGrid vertical={false} strokeDasharray="3 3" className="stroke-border" />
-                <XAxis dataKey="label" tick={{ fontSize: 12 }} />
-                <YAxis tick={{ fontSize: 12 }} />
-                <Tooltip
-                  contentStyle={{ background: 'hsl(var(--card))', border: '1px solid hsl(var(--border))' }}
-                  formatter={(value, name) => [
-                    typeof value === 'number' ? formatNumber(value, { maximumFractionDigits: 2 }) : value,
-                    name === 'target' || name === 'Meta' ? 'Meta' : 'Realizado',
-                  ]}
-                />
-                <Bar dataKey="target" name="Meta" fill="#1e3a8a" opacity={0.28} radius={[4, 4, 0, 0]} />
-                <Bar dataKey="value" name="Realizado" radius={[4, 4, 0, 0]}>
-                  {chartData.map((point, index) => (
-                    <Cell key={`${point.label}-${index}`} fill={barColor(point.light)} />
-                  ))}
-                </Bar>
-              </BarChart>
-            </ResponsiveContainer>
+          <CardContent>
+            {chartTab === 'EVOLUCAO' && (
+              <>
+                <div className="h-72">
+                  <ResponsiveContainer width="100%" height="100%">
+                    <BarChart data={chartData} barGap={6}>
+                      <CartesianGrid vertical={false} strokeDasharray="3 3" className="stroke-border" />
+                      <XAxis dataKey="label" tick={{ fontSize: 12 }} />
+                      <YAxis tick={{ fontSize: 12 }} />
+                      <Tooltip
+                        contentStyle={{ background: 'hsl(var(--card))', border: '1px solid hsl(var(--border))' }}
+                        formatter={(value, name) => [
+                          typeof value === 'number' ? formatNumber(value, { maximumFractionDigits: 2 }) : value,
+                          name === 'target' || name === 'Meta' ? 'Meta' : 'Realizado',
+                        ]}
+                      />
+                      <Bar dataKey="target" name="Meta" fill="#1e3a8a" opacity={0.28} radius={[4, 4, 0, 0]} />
+                      <Bar dataKey="value" name="Realizado" radius={[4, 4, 0, 0]}>
+                        {chartData.map((point, index) => (
+                          <Cell key={`${point.label}-${index}`} fill={barColor(point.light)} />
+                        ))}
+                      </Bar>
+                    </BarChart>
+                  </ResponsiveContainer>
+                </div>
+                <div className="mt-3 flex items-center gap-2 rounded-lg border bg-muted/30 px-3 py-2 text-xs text-muted-foreground">
+                  <Lightbulb className="h-3.5 w-3.5 text-status-blue" />
+                  Dados atualizados até {last ? periodRefLabel(last.periodRef) : '-'}. Projeção baseada no desempenho atual.
+                </div>
+                {recentSeries.length > 0 && (
+                  <div className="mt-3 grid gap-2 sm:grid-cols-2 lg:grid-cols-4">
+                    {recentSeries.map((p) => (
+                      <div key={p.periodRef} className="rounded-lg border p-2">
+                        <div className="text-xs text-muted-foreground">{periodRefLabel(p.periodRef)}</div>
+                        <div className="mt-0.5 flex items-center justify-between gap-2">
+                          <span className="text-sm font-semibold">{p.value !== null ? formatNumber(p.value) : '-'}</span>
+                          <StatusLight light={p.light} />
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </>
+            )}
+            {chartTab === 'ANALISE' && <AnalysisTab series={series.data ?? []} last={last ?? null} prev={prev} metaValue={metaValue} ppOrUnit={ppOrUnit} />}
+            {chartTab === 'HISTORICO' && <MiniHistory results={ind.results} targets={ind.targets} />}
+            {chartTab === 'ACOES' && <LinkedActionsTab actions={ind.actions ?? []} />}
           </CardContent>
         </Card>
+
+        <div className="space-y-4">
+          <RailCard icon={Lightbulb} iconClass="text-status-blue" title="Insights automáticos">
+            {insights.length === 0 ? (
+              <RailEmpty>Sem insights para o período.</RailEmpty>
+            ) : (
+              <ul className="space-y-2">
+                {insights.map((insight, index) => (
+                  <li key={index} className="flex gap-2 text-xs leading-relaxed text-foreground">
+                    <span className={cn('mt-1 h-1.5 w-1.5 shrink-0 rounded-full', insight.tone === 'red' ? 'bg-status-red' : insight.tone === 'yellow' ? 'bg-status-yellow' : insight.tone === 'green' ? 'bg-status-green' : 'bg-status-blue')} />
+                    <span>{insight.text}</span>
+                  </li>
+                ))}
+              </ul>
+            )}
+            <RailLink onClick={() => openVision360('INDICATOR', ind.id)}>Ver todos os insights</RailLink>
+          </RailCard>
+
+          <RailCard icon={ShieldAlert} iconClass="text-status-yellow" title="Riscos relacionados">
+            {risks.length === 0 ? (
+              <RailEmpty>Nenhum risco vinculado a este indicador.</RailEmpty>
+            ) : (
+              <ul className="space-y-2">
+                {risks.map((risk, index) => (
+                  <li key={index} className="flex gap-2 text-xs leading-relaxed text-foreground">
+                    <span className="mt-1 h-1.5 w-1.5 shrink-0 rounded-full bg-status-yellow" />
+                    <span>{risk}</span>
+                  </li>
+                ))}
+              </ul>
+            )}
+            <RailLinkTo href="/risks">Ver todos os riscos</RailLinkTo>
+          </RailCard>
+
+          <RailCard icon={FileText} iconClass="text-status-blue" title="Planos vinculados">
+            <div className="space-y-1.5 text-xs">
+              <RailStat label="Total de planos" value={planStats.total} />
+              <RailStat label="Planos ativos" value={planStats.active} />
+              <RailStat label="Aguardando aprovação" value={planStats.waiting} />
+              <RailStat label="Planos atrasados" value={planStats.overdue} tone={planStats.overdue > 0 ? 'red' : undefined} />
+            </div>
+            <RailLinkTo href="/actions">Ver planos</RailLinkTo>
+          </RailCard>
+
+          <RailCard icon={CalendarClock} iconClass="text-primary" title="Próximas reuniões">
+            {upcomingMeetings.length === 0 ? (
+              <RailEmpty>Nenhuma reunião vinculada a este indicador.</RailEmpty>
+            ) : (
+              <ul className="space-y-2">
+                {upcomingMeetings.slice(0, 3).map((meeting) => (
+                  <li key={meeting.id} className="text-xs">
+                    <Link href={`/meetings/${meeting.id}`} className="font-medium text-foreground hover:underline">{meeting.title}</Link>
+                    <div className="mt-0.5 flex items-center justify-between gap-2 text-muted-foreground">
+                      <span>{meeting.startsAt ? new Date(meeting.startsAt).toLocaleString('pt-BR') : 'Sem data'}</span>
+                      <StatusBadge value={meeting.status} label={MEETING_STATUS_LABEL[meeting.status] ?? meeting.status} />
+                    </div>
+                  </li>
+                ))}
+              </ul>
+            )}
+            <RailLinkTo href="/meetings">Ver agenda</RailLinkTo>
+          </RailCard>
+        </div>
       </div>
 
       {/* Blocos de Ações e Reuniões Relacionados */}
@@ -411,22 +592,47 @@ export default function IndicatorDetailPage() {
           <CardHeader className="py-3">
             <CardTitle className="text-sm">Próximos passos sugeridos</CardTitle>
           </CardHeader>
-          <CardContent className="flex flex-wrap gap-2 pt-0">
-            <Button
-              variant={last?.light === 'RED' ? 'destructive' : 'outline'}
-              size="sm"
-              onClick={() => openOrCreateDeviation(linkedPrincipalDeviation)}
-              disabled={openDeviation.isPending || (!linkedPrincipalDeviation && !last?.periodRef)}
-            >
-              <AlertTriangle className="mr-1.5 h-4 w-4" />
-              {openDeviation.isPending ? 'Abrindo...' : 'Abrir Desvio'}
-            </Button>
-            <Button variant="outline" size="sm" asChild>
-              <Link href="/meetings">
-                <ScrollText className="mr-1.5 h-4 w-4" />
-                Registrar reunião
-              </Link>
-            </Button>
+          <CardContent className="space-y-3 pt-0">
+            <p className="text-xs text-muted-foreground">{nextStepsHint(last?.light)}</p>
+            <div className="flex flex-wrap gap-2">
+              <Button
+                variant={last?.light === 'RED' ? 'destructive' : 'outline'}
+                size="sm"
+                onClick={() => openOrCreateDeviation(linkedPrincipalDeviation)}
+                disabled={openDeviation.isPending || (!linkedPrincipalDeviation && deviationRows.length === 0 && (!last?.periodRef || !canCreateDeviation))}
+              >
+                <AlertTriangle className="mr-1.5 h-4 w-4" />
+                {openDeviation.isPending ? 'Abrindo...' : 'Abrir desvio'}
+              </Button>
+              {canCreateAction && (
+                <Button variant="outline" size="sm" asChild>
+                  <Link href={linkedPrincipalDeviation ? `/deviations/${linkedPrincipalDeviation.id}` : '/actions'}>
+                    <ScrollText className="mr-1.5 h-4 w-4" />
+                    Criar plano de ação
+                  </Link>
+                </Button>
+              )}
+              {last?.light === 'RED' && (
+                <Button variant="outline" size="sm" asChild>
+                  <Link href={linkedPrincipalDeviation ? `/deviations/${linkedPrincipalDeviation.id}` : '/deviations'}>
+                    <ShieldAlert className="mr-1.5 h-4 w-4" />
+                    Solicitar análise de causa
+                  </Link>
+                </Button>
+              )}
+              {canScheduleMeeting && (
+                <Button variant="outline" size="sm" asChild>
+                  <Link href="/meetings">
+                    <ScrollText className="mr-1.5 h-4 w-4" />
+                    Registrar reunião
+                  </Link>
+                </Button>
+              )}
+              <Button variant="outline" size="sm" onClick={() => openVision360('INDICATOR', ind.id)}>
+                <Network className="mr-1.5 h-4 w-4" />
+                Recomendação com IA
+              </Button>
+            </div>
           </CardContent>
         </Card>
 
@@ -854,4 +1060,204 @@ function auditActionLabel(action: string) {
     PERMISSION_CHANGE: 'Alteração de permissão',
   };
   return labels[action] ?? action;
+}
+
+type InsightItem = { tone: 'red' | 'yellow' | 'green' | 'blue'; text: string };
+
+const CHART_TAB_LABEL: Record<'EVOLUCAO' | 'ANALISE' | 'HISTORICO' | 'ACOES', string> = {
+  EVOLUCAO: 'Evolução',
+  ANALISE: 'Análise',
+  HISTORICO: 'Histórico',
+  ACOES: 'Ações',
+};
+
+function attainmentBarColor(light?: string) {
+  if (light === 'GREEN') return 'bg-status-green';
+  if (light === 'YELLOW') return 'bg-status-yellow';
+  if (light === 'RED') return 'bg-status-red';
+  return 'bg-status-gray';
+}
+
+function statusHint(light: string | undefined, direction: string) {
+  if (light === 'GREEN') return 'Dentro da meta';
+  if (light === 'YELLOW') return 'Próximo do limite';
+  if (light === 'RED') return direction === 'LOWER_BETTER' ? 'Acima da meta' : 'Abaixo da meta';
+  return 'Sem lançamento';
+}
+
+function nextStepsHint(light: string | undefined) {
+  if (light === 'RED') return 'Indicador crítico: abra um desvio, solicite análise de causa e estruture um plano de ação.';
+  if (light === 'YELLOW') return 'Indicador em atenção: agende uma reunião de alinhamento e reforce o monitoramento.';
+  if (light === 'GREEN') return 'Indicador no alvo: registre boas práticas e mantenha o acompanhamento.';
+  return 'Sem lançamento recente: registre o resultado do período para habilitar as tratativas.';
+}
+
+function buildInsights(
+  indicator: IndicatorDetail,
+  last: IndicatorDetail['results'][number] | null,
+  prev: IndicatorDetail['results'][number] | null,
+  ppOrUnit: string,
+): InsightItem[] {
+  const out: InsightItem[] = [];
+  const higherBetter = indicator.direction !== 'LOWER_BETTER';
+  if (last && prev) {
+    const delta = last.value - prev.value;
+    if (Math.abs(delta) >= 0.01) {
+      const improved = higherBetter ? delta > 0 : delta < 0;
+      out.push({
+        tone: improved ? 'green' : 'red',
+        text: `${delta < 0 ? 'Queda' : 'Alta'} de ${formatNumber(Math.abs(delta), { maximumFractionDigits: 2 })} ${ppOrUnit} em relação ao período anterior.`,
+      });
+    }
+  }
+  if (last?.attainment != null) {
+    const gap = 100 - last.attainment;
+    if (gap > 0.05) out.push({ tone: gap > 15 ? 'red' : 'yellow', text: `Atingimento atual abaixo da meta em ${formatNumber(gap, { maximumFractionDigits: 1 })} p.p.` });
+    else if (gap < -0.05) out.push({ tone: 'green', text: `Atingimento atual acima da meta em ${formatNumber(-gap, { maximumFractionDigits: 1 })} p.p.` });
+  }
+  if (!last) out.push({ tone: 'blue', text: 'Sem lançamento no período atual.' });
+  else if (last.light === 'RED') out.push({ tone: 'red', text: 'Indicador em status crítico no período atual.' });
+  else if (last.light === 'YELLOW') out.push({ tone: 'yellow', text: 'Indicador em atenção no período atual.' });
+  else if (last.light === 'GREEN') out.push({ tone: 'green', text: 'Indicador dentro da meta no período atual.' });
+  return out;
+}
+
+function buildRisks(deviations: DeviationSummary[], last: IndicatorDetail['results'][number] | null): string[] {
+  const out: string[] = [];
+  const open = deviations.filter((d) => !['CLOSED', 'CLOSED_LATE', 'CANCELLED'].includes(d.status));
+  for (const d of open.slice(0, 4)) out.push(`#${d.number} ${d.title}`);
+  if (out.length === 0 && last?.light === 'RED') out.push('Resultado fora da meta sem desvio registrado — risco de não tratativa.');
+  if (last?.light === 'YELLOW' && out.length < 4) out.push('Tendência de piora caso não haja acompanhamento.');
+  return out;
+}
+
+function buildPlanStats(actions: NonNullable<IndicatorDetail['actions']>, deviations: DeviationSummary[]) {
+  const FINAL = ['DONE', 'DONE_LATE', 'CANCELLED', 'EFFECTIVE', 'INEFFECTIVE'];
+  const byId = new Map<string, { id: string; title: string; status: string; dueDate: string | null }>();
+  for (const a of actions) byId.set(a.id, a);
+  for (const d of deviations) for (const a of d.actions ?? []) byId.set(a.id, a);
+  const all = Array.from(byId.values());
+  const now = Date.now();
+  return {
+    total: all.length,
+    active: all.filter((a) => !FINAL.includes(a.status)).length,
+    waiting: all.filter((a) => a.status === 'WAITING_VALIDATION').length,
+    overdue: all.filter((a) => a.dueDate && new Date(a.dueDate).getTime() < now && !FINAL.includes(a.status)).length,
+  };
+}
+
+function RailCard({ icon: Icon, iconClass, title, children }: { icon: typeof Lightbulb; iconClass: string; title: string; children: ReactNode }) {
+  return (
+    <Card className="shadow-sm">
+      <CardContent className="p-4">
+        <div className="mb-3 flex items-center gap-2">
+          <Icon className={cn('h-4 w-4', iconClass)} />
+          <h3 className="text-sm font-semibold text-foreground">{title}</h3>
+        </div>
+        {children}
+      </CardContent>
+    </Card>
+  );
+}
+
+function RailEmpty({ children }: { children: ReactNode }) {
+  return <p className="text-xs text-muted-foreground">{children}</p>;
+}
+
+function RailLink({ onClick, children }: { onClick: () => void; children: ReactNode }) {
+  return (
+    <button type="button" onClick={onClick} className="mt-3 flex w-full items-center justify-between rounded-md border bg-muted/30 px-2.5 py-1.5 text-xs font-medium text-foreground hover:bg-muted">
+      {children} <ChevronRight className="h-3.5 w-3.5" />
+    </button>
+  );
+}
+
+function RailLinkTo({ href, children }: { href: string; children: ReactNode }) {
+  return (
+    <Link href={href} className="mt-3 flex items-center justify-between rounded-md border bg-muted/30 px-2.5 py-1.5 text-xs font-medium text-foreground hover:bg-muted">
+      {children} <ChevronRight className="h-3.5 w-3.5" />
+    </Link>
+  );
+}
+
+function RailStat({ label, value, tone }: { label: string; value: number; tone?: 'red' }) {
+  return (
+    <div className="flex items-center justify-between">
+      <span className="text-muted-foreground">{label}</span>
+      <span className={cn('font-semibold', tone === 'red' ? 'text-status-red' : 'text-foreground')}>{value}</span>
+    </div>
+  );
+}
+
+function AnalysisTab({
+  series,
+  last,
+  prev,
+  metaValue,
+  ppOrUnit,
+}: {
+  series: SeriesPoint[];
+  last: IndicatorDetail['results'][number] | null;
+  prev: IndicatorDetail['results'][number] | null;
+  metaValue: number | null;
+  ppOrUnit: string;
+}) {
+  const values = series.map((p) => p.value).filter((v): v is number => v !== null);
+  const avg = values.length ? values.reduce((a, b) => a + b, 0) / values.length : null;
+  const best = values.length ? Math.max(...values) : null;
+  const worst = values.length ? Math.min(...values) : null;
+  const onTarget = series.filter((p) => p.light === 'GREEN').length;
+  const delta = last && prev ? last.value - prev.value : null;
+  return (
+    <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+      <AnalysisStat label="Média do período" value={avg !== null ? formatNumber(avg, { maximumFractionDigits: 2 }) : '-'} />
+      <AnalysisStat label="Meta" value={metaValue !== null ? formatNumber(metaValue) : '-'} />
+      <AnalysisStat label="Períodos no alvo" value={`${onTarget}/${series.length}`} />
+      <AnalysisStat label="Melhor resultado" value={best !== null ? formatNumber(best) : '-'} />
+      <AnalysisStat label="Pior resultado" value={worst !== null ? formatNumber(worst) : '-'} />
+      <AnalysisStat label="Variação último período" value={delta !== null ? `${delta > 0 ? '+' : ''}${formatNumber(delta, { maximumFractionDigits: 2 })} ${ppOrUnit}` : '-'} />
+    </div>
+  );
+}
+
+function AnalysisStat({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="rounded-lg border p-3">
+      <div className="text-xs text-muted-foreground">{label}</div>
+      <div className="mt-0.5 text-lg font-semibold">{value}</div>
+    </div>
+  );
+}
+
+function MiniHistory({ results, targets }: { results: IndicatorDetail['results']; targets: IndicatorDetail['targets'] }) {
+  const rows = results.slice().reverse().slice(0, 8);
+  if (rows.length === 0) return <p className="text-xs text-muted-foreground">Sem lançamentos registrados.</p>;
+  return (
+    <div className="space-y-1.5">
+      {rows.map((r) => {
+        const t = targets.find((x) => x.periodRef === r.periodRef);
+        return (
+          <div key={r.id} className="flex items-center justify-between gap-2 rounded-lg border px-3 py-2 text-xs">
+            <span className="font-medium">{periodRefLabel(r.periodRef)}</span>
+            <span className="text-muted-foreground">Meta {t ? formatNumber(t.target) : '-'} · Real {formatNumber(r.value)}</span>
+            <StatusLight light={r.light} />
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
+function LinkedActionsTab({ actions }: { actions: NonNullable<IndicatorDetail['actions']> }) {
+  if (actions.length === 0) return <p className="text-xs text-muted-foreground">Nenhum plano de ação vinculado a este indicador.</p>;
+  return (
+    <div className="space-y-1.5">
+      {actions.map((a) => (
+        <div key={a.id} className="flex items-center justify-between gap-2 rounded-lg border px-3 py-2 text-xs">
+          <Link href={`/actions/${a.id}`} className="min-w-0 flex-1 truncate font-medium hover:underline">{a.title}</Link>
+          <StatusBadge value={a.status} label={ACTION_STATUS_LABEL[a.status] ?? a.status} />
+        </div>
+      ))}
+    </div>
+  );
 }

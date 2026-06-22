@@ -11,6 +11,8 @@ import { NativeSelect } from '@/components/ui/select';
 import { ANALYSIS_METHOD_LABEL } from '@/lib/labels';
 import { IshikawaVisualAnalysis } from '@/components/platform/ishikawa-visual-analysis';
 import { PDCAVisualAnalysis } from '@/components/platform/pdca-visual-analysis';
+import { FiveWTwoHVisualAnalysis } from '@/components/platform/five-w-two-h-visual-analysis';
+import { FiveWhysVisualAnalysis } from '@/components/platform/five-whys-visual-analysis';
 
 const TOOL_LABEL = ANALYSIS_METHOD_LABEL;
 
@@ -35,6 +37,8 @@ export interface AnalysisPayload {
   ishikawaCauses: any[];
   maspSteps: any[];
   pdcaSteps: any[];
+  data?: any;
+  fiveW2H?: any;
 }
 
 export function AnalysisWorkspace({
@@ -66,6 +70,8 @@ export function AnalysisWorkspace({
   const [pdcaSteps, setPdcaSteps] = useState<any[]>(session?.pdcaSteps?.length ? session.pdcaSteps : ['PLAN', 'DO', 'CHECK', 'ACT'].map((phase) => ({ phase, description: '', status: 'PENDING' })));
   const ishikawaSession = action.analysisSessions.find((item) => item.method === 'ISHIKAWA');
   const pdcaSession = action.analysisSessions.find((item) => item.method === 'PDCA');
+  const fiveW2HSession = action.analysisSessions.find((item) => item.method === 'FIVE_W_TWO_H');
+  const fiveWhysSession = action.analysisSessions.find((item) => item.method === 'FIVE_WHYS');
 
   return (
     <SectionCard
@@ -87,16 +93,21 @@ export function AnalysisWorkspace({
       </div>
 
       {method === 'FIVE_WHYS' && (
-        <div className="space-y-3">
-          {fiveWhys.map((item, index) => (
-            <div key={index} className="grid gap-3 rounded-lg border p-3 md:grid-cols-[120px,1fr,1fr]">
-              <div className="text-sm font-semibold">{index + 1}º por quê?</div>
-              <Input value={item.answer ?? ''} placeholder="Resposta" onChange={(e) => setFiveWhys(updateArray(fiveWhys, index, { ...item, answer: e.target.value }))} />
-              <Input value={item.evidence ?? ''} placeholder="Evidência" onChange={(e) => setFiveWhys(updateArray(fiveWhys, index, { ...item, evidence: e.target.value }))} />
-            </div>
-          ))}
-          <Button variant="outline" onClick={() => setFiveWhys([...fiveWhys, { position: fiveWhys.length + 1, question: `${fiveWhys.length + 1}º por quê?`, answer: '', evidence: '' }])}>Adicionar por quê</Button>
-        </div>
+        <FiveWhysVisualAnalysis
+          actionId={action.id}
+          action={action}
+          session={fiveWhysSession}
+          problem={problem}
+          rootCause={rootCause}
+          users={users}
+          saving={saving}
+          canEdit={canEdit}
+          onRootCauseChange={setRootCause}
+          onSave={(whyItems, nextRootCause = rootCause, extra) => {
+            setFiveWhys(whyItems);
+            onSave({ method, problem, rootCause: nextRootCause, fiveWhys: deriveLegacyWhys(whyItems), ishikawaCauses: ishikawa, maspSteps, pdcaSteps, data: { items: whyItems, ...(extra ?? {}) } });
+          }}
+        />
       )}
 
       {method === 'ISHIKAWA' && (
@@ -134,9 +145,20 @@ export function AnalysisWorkspace({
           }}
         />
       )}
-      {!['FIVE_WHYS', 'ISHIKAWA', 'MASP', 'PDCA'].includes(method) && <GenericAnalysis method={method} session={session} />}
+      {method === 'FIVE_W_TWO_H' && (
+        <FiveWTwoHVisualAnalysis
+          actionId={action.id}
+          action={action}
+          session={fiveW2HSession}
+          users={users}
+          saving={saving}
+          canEdit={canEdit}
+          onSave={(items) => onSave({ method, problem, rootCause, fiveWhys, ishikawaCauses: ishikawa, maspSteps, pdcaSteps, data: { items }, fiveW2H: deriveFiveW2HSummary(items) })}
+        />
+      )}
+      {!['FIVE_WHYS', 'ISHIKAWA', 'MASP', 'PDCA', 'FIVE_W_TWO_H'].includes(method) && <GenericAnalysis method={method} session={session} />}
 
-      {!['ISHIKAWA', 'PDCA'].includes(method) && (
+      {!['FIVE_WHYS', 'ISHIKAWA', 'PDCA', 'FIVE_W_TWO_H'].includes(method) && (
         <>
           <div className="mt-4">
             <Label>Causa raiz provável</Label>
@@ -178,4 +200,52 @@ function GenericAnalysis({ method, session }: { method: string; session?: any })
 
 export function updateArray(rows: any[], index: number, value: any) {
   return rows.map((item, itemIndex) => (itemIndex === index ? value : item));
+}
+
+/**
+ * Resumo textual do 5W2H para manter a tabela simples (ActionFiveW2H) sincronizada.
+ * O board completo (7 cards + detalhes) é persistido em session.data.items.
+ */
+function deriveFiveW2HSummary(items: any[]) {
+  const byType = (type: string) => items.find((item) => item.itemType === type);
+  const text = (type: string) => {
+    const item = byType(type);
+    if (!item) return null;
+    const description = String(item.description ?? '').trim();
+    if (description) return description;
+    const bullets = Array.isArray(item.bullets) ? item.bullets.filter(Boolean) : [];
+    return bullets.length ? bullets.join('; ') : null;
+  };
+  const whenItem = byType('WHEN');
+  const howMuchItem = byType('HOW_MUCH');
+  const rawCost = String(howMuchItem?.data?.cost ?? '').replace(/[^0-9.,-]/g, '').replace(/\.(?=\d{3}(\D|$))/g, '').replace(',', '.');
+  const cost = Number(rawCost);
+  return {
+    what: text('WHAT'),
+    why: text('WHY'),
+    where: text('WHERE'),
+    when: whenItem?.dueDate || whenItem?.data?.endDate || undefined,
+    who: text('WHO'),
+    how: text('HOW'),
+    howMuch: Number.isFinite(cost) && cost > 0 ? cost : undefined,
+    reviewNotes: null,
+  };
+}
+
+/**
+ * Converte o board rico dos 5 Porquês (persistido em session.data.items) para as
+ * linhas da tabela legada ActionFiveWhy (position/question/answer/evidence/isRootCause).
+ */
+function deriveLegacyWhys(items: any[]) {
+  return items.map((item, index) => {
+    const evidences = Array.isArray(item.evidences) ? item.evidences.map((evidence: any) => evidence?.name).filter(Boolean) : [];
+    const evidence = String(item.evidence ?? '').trim() || (evidences.length ? evidences.join('; ') : null);
+    return {
+      position: Number(item.level ?? index + 1),
+      question: String(item.question ?? `${index + 1}º por quê?`).trim() || `${index + 1}º por quê?`,
+      answer: String(item.answer ?? '').trim() || null,
+      evidence,
+      isRootCause: Boolean(item.isRootCause),
+    };
+  });
 }
