@@ -1384,6 +1384,7 @@ ${currentStages || '- nenhuma'}`;
         const phase = normalizePdcaPhase(item.phase, index);
         const status = normalizeActionStepStatus(item.status);
         const progress = clampProgress(item.progress ?? (status === ActionStepStatus.DONE || status === ActionStepStatus.VALIDATED ? 100 : 0));
+        const checklist = normalizePdcaChecklist(item.checklist);
         return {
           ...(persistedId(item.id) ? { id: item.id } : {}),
           sessionId,
@@ -1400,7 +1401,7 @@ ${currentStages || '- nenhuma'}`;
           comments: nonEmptyText(item.comments),
           status,
           validated: Boolean(item.validated ?? status === ActionStepStatus.VALIDATED),
-          checklist: (normalizePdcaChecklist(item.checklist).length ? normalizePdcaChecklist(item.checklist) : defaultPdcaChecklist(phase)) as any,
+          checklist: (checklist.length ? checklist : defaultPdcaChecklist(phase)) as any,
           data: normalizePdcaData(item, phase) as any,
           isAiSuggested: Boolean(item.isAiSuggested),
           convertedToTaskId: nonEmptyText(item.convertedToTaskId),

@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useMemo, useRef, useState } from 'react';
 import { toPng } from 'html-to-image';
 import { useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
@@ -231,12 +231,17 @@ export function PDCAVisualAnalysis({
       return;
     }
     try {
-      await api(`/actions/${actionId}/analysis/pdca/stages/${stage.id}/convert-to-action`, {
+      const updatedAction = await api<any>(`/actions/${actionId}/analysis/pdca/stages/${stage.id}/convert-to-action`, {
         method: 'POST',
         json: { title: `PDCA ${stage.title}: ${stage.objective || stage.description || action?.title || 'ação vinculada'}` },
       });
       toast.success('Etapa transformada em tarefa do plano');
-      updateStage(stage.phase, { convertedToTaskId: 'pending-refresh' });
+      const updatedStage = updatedAction?.analysisSessions
+        ?.find((item: any) => item.method === 'PDCA')
+        ?.pdcaSteps?.find((item: any) => item.id === stage.id);
+      if (updatedStage?.convertedToTaskId) {
+        updateStage(stage.phase, { convertedToTaskId: updatedStage.convertedToTaskId });
+      }
       qc.invalidateQueries({ queryKey: ['action', actionId] });
     } catch (error: any) {
       toast.error(error?.message ?? 'Não foi possível transformar em ação');
@@ -501,7 +506,7 @@ function PDCACycle({ selectedPhase, onSelect }: { selectedPhase: Phase; onSelect
 function PDCAStageCard({ stage, selected, responsibleName, onSelect }: { stage: PdcaStage; selected: boolean; responsibleName?: string; onSelect: () => void }) {
   const meta = STAGE_META[stage.phase];
   const Icon = meta.icon;
-  const summary = stageSummary(stage);
+  const summary = stageSummary(stage, responsibleName);
   return (
     <button
       type="button"
@@ -735,20 +740,20 @@ function StatusPill({ stage }: { stage: PdcaStage }) {
   return <span className={cn('w-fit rounded-full border px-3 py-1 text-[11px] font-semibold', classes)}>{label}</span>;
 }
 
-function stageSummary(stage: PdcaStage) {
+function stageSummary(stage: PdcaStage, responsibleName?: string) {
   if (stage.phase === 'PLAN') {
     return [
       { icon: FileText, label: 'Problema principal', value: stage.data.problem || 'Não informado' },
       { icon: RefreshCw, label: 'Causa raiz', value: stage.data.rootCause || 'Não definida' },
       { icon: BarChart3, label: 'Meta', value: stage.data.target || 'Definir meta' },
-      { icon: UserRound, label: 'Responsável', value: stage.responsibleUserId ? 'Definido' : 'Sem responsável' },
+      { icon: UserRound, label: 'Responsável', value: responsibleName || 'Sem responsável' },
       { icon: CalendarDays, label: 'Prazo', value: formatDate(stage.dueDate) },
     ];
   }
   if (stage.phase === 'DO') {
     return [
       { icon: PlayCircle, label: 'Ações em andamento', value: stage.data.actionsCount ?? stage.data.actions ?? '0 ações' },
-      { icon: UserRound, label: 'Responsáveis', value: stage.responsibleUserId ? '1 responsável envolvido' : 'Não definido' },
+      { icon: UserRound, label: 'Responsáveis', value: responsibleName || 'Não definido' },
       { icon: Paperclip, label: 'Evidências coletadas', value: stage.evidence ? '1 registro' : '0 registros' },
       { icon: CalendarDays, label: 'Início', value: stage.data.startedAt || '-' },
     ];

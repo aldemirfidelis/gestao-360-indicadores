@@ -113,15 +113,16 @@ export default function ActionDetailPage() {
   const users = optionsQuery.data?.users ?? [];
 
   useEffect(() => {
-    if (!a) return;
+    const currentAction = query.data;
+    if (!currentAction) return;
     setEffectiveness({
-      effective: a.effectivenessStatus === 'EFFECTIVE',
-      reopen: a.effectivenessStatus === 'REOPENED',
-      summary: a.effectivenessSummary ?? '',
-      evidence: a.effectivenessEvidence ?? '',
-      achievedResult: a.achievedResult ?? '',
+      effective: currentAction.effectivenessStatus === 'EFFECTIVE',
+      reopen: currentAction.effectivenessStatus === 'REOPENED',
+      summary: currentAction.effectivenessSummary ?? '',
+      evidence: currentAction.effectivenessEvidence ?? '',
+      achievedResult: currentAction.achievedResult ?? '',
     });
-  }, [a?.id, a?.effectivenessStatus]);
+  }, [query.data]);
 
   const update = useMutation({
     mutationFn: (patch: any) => api(`/actions/${id}`, { method: 'PATCH', json: patch }),
