@@ -127,9 +127,14 @@ export class DeviationsService {
     // Indicador precisa pertencer à empresa; sua área define o escopo do desvio.
     const indicator = await this.prisma.indicator.findFirst({
       where: { id: input.indicatorId, companyId: input.companyId, deletedAt: null },
-      select: { name: true, ownerNodeId: true },
+      select: { name: true, ownerNodeId: true, type: true },
     });
     if (!indicator) throw new NotFoundException('Indicador nao encontrado');
+    // Apenas indicadores estratégicos têm tratativa de desvio/causa raiz. Operacionais (e demais
+    // tipos) são apenas para visualização e pagamento de prêmio.
+    if (indicator.type !== 'STRATEGIC') {
+      throw new BadRequestException('Apenas indicadores estratégicos podem abrir desvio. Indicadores operacionais são apenas para visualização e prêmio.');
+    }
     if (input.createdById) {
       await this.access.assertCanWrite(input.createdById, indicator.ownerNodeId, MODULE, 'create');
     }

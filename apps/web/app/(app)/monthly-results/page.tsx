@@ -86,11 +86,13 @@ export default function MonthlyResultsHome() {
             />
             <NativeSelect value={areaFilter} onChange={(event) => setAreaFilter(event.target.value)} className="h-9 w-52">
               <option value="">Todas as áreas</option>
-              {optionsQuery.data?.areaOptions.map((area) => (
-                <option key={area.id} value={area.id}>
-                  {area.name}
-                </option>
-              ))}
+              {(optionsQuery.data?.areaOptions ?? [])
+                .filter((area, _i, all) => area.parentId === null || all.some((other) => other.parentId === area.id))
+                .map((area) => (
+                  <option key={area.id} value={area.id}>
+                    {area.name}
+                  </option>
+                ))}
             </NativeSelect>
             <Button variant="outline" onClick={() => dashboardQuery.refetch()} disabled={dashboardQuery.isFetching}>
               <RefreshCw className={cn('mr-2 h-4 w-4', dashboardQuery.isFetching && 'animate-spin')} />
@@ -412,12 +414,14 @@ function CreateMeetingDialog({
           <div>
             <Label>Áreas participantes</Label>
             <div className="mt-2 grid max-h-60 grid-cols-1 gap-1 overflow-auto rounded-md border p-3 md:grid-cols-2">
-              {options?.areaOptions.map((area) => (
-                <label key={area.id} className="flex min-w-0 items-center gap-2 rounded-md px-2 py-1.5 text-sm hover:bg-muted">
-                  <input type="checkbox" checked={form.areaIds.includes(area.id)} onChange={() => toggleArea(area.id)} className="h-4 w-4 shrink-0" />
-                  <span className="min-w-0 truncate">{area.name}</span>
-                </label>
-              ))}
+              {(options?.areaOptions ?? [])
+                .filter((area, _i, all) => area.parentId === null || all.some((other) => other.parentId === area.id))
+                .map((area) => (
+                  <label key={area.id} className="flex min-w-0 items-center gap-2 rounded-md px-2 py-1.5 text-sm hover:bg-muted">
+                    <input type="checkbox" checked={form.areaIds.includes(area.id)} onChange={() => toggleArea(area.id)} className="h-4 w-4 shrink-0" />
+                    <span className="min-w-0 truncate">{area.name}</span>
+                  </label>
+                ))}
             </div>
             <p className="mt-1 text-xs text-muted-foreground">
               Os indicadores de cada área são copiados como snapshot do mês ao criar a reunião.

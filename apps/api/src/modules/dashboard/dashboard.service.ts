@@ -287,6 +287,8 @@ export class DashboardService {
         companyId,
         deletedAt: null,
         status: 'ACTIVE',
+        // Painel Executivo mostra apenas indicadores estratégicos.
+        type: 'STRATEGIC',
         ...(ownerNodeIds ? { ownerNodeId: { in: ownerNodeIds } } : {}),
       },
       select: {

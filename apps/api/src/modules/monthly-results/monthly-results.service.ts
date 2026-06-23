@@ -136,6 +136,8 @@ export class MonthlyResultsService {
           companyId: me.companyId,
           deletedAt: null,
           status: 'ACTIVE',
+          // Reunião Mensal trata apenas indicadores estratégicos (operacionais ficam só em Indicadores/prêmio).
+          type: 'STRATEGIC',
           ...(areaFilter ? { ownerNodeId: { in: areaFilter } } : {}),
         },
         select: { id: true, name: true, code: true, ownerNodeId: true },
@@ -1339,7 +1341,7 @@ export class MonthlyResultsService {
 
   private async loadIndicatorsForAreas(companyId: string, areaIds: string[] | null, periodRef: string) {
     return this.prisma.indicator.findMany({
-      where: { companyId, deletedAt: null, status: 'ACTIVE', ...(areaIds ? { ownerNodeId: { in: areaIds } } : {}) },
+      where: { companyId, deletedAt: null, status: 'ACTIVE', type: 'STRATEGIC', ...(areaIds ? { ownerNodeId: { in: areaIds } } : {}) },
       select: {
         id: true,
         name: true,

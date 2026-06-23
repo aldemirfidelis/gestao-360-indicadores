@@ -67,7 +67,11 @@ export default function VisualizationPage() {
   const [conclusionDraft, setConclusionDraft] = useState('');
   const [conclusionOpen, setConclusionOpen] = useState(false);
 
-  const orderedNodes = useMemo(() => buildIndentedNodes(orgNodes.data ?? []), [orgNodes.data]);
+  // Combobox mostra apenas as áreas-pai (que têm sub-áreas) — ex.: GOIASA, ADMINISTRAÇÃO, INDÚSTRIA, SSMA...
+  const orderedNodes = useMemo(
+    () => buildIndentedNodes((orgNodes.data ?? []).filter((node) => (node._count?.children ?? 0) > 0 || node.parentId === null)),
+    [orgNodes.data],
+  );
 
   useEffect(() => {
     if (!selectedNodeId && orderedNodes.length) {
