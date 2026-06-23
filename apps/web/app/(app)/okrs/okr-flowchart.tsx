@@ -14,7 +14,7 @@ import ReactFlow, {
 } from 'reactflow';
 import 'reactflow/dist/style.css';
 import { toPng } from 'html-to-image';
-import { Download, RefreshCw, GitBranch } from 'lucide-react';
+import { Download, RefreshCw, GitBranch, X } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { NativeSelect } from '@/components/ui/select';
 import { cn, formatPercent } from '@/lib/utils';
@@ -26,19 +26,42 @@ interface Checkin {
   createdAt: string;
 }
 
+interface FlowKR {
+  id: string;
+  metric: string;
+  progress: number;
+}
+
+interface FlowActionPlan {
+  id: string;
+  title: string;
+  status: string;
+  progress: number;
+  taskCount: number;
+  doneTaskCount: number;
+}
+
 export interface FlowObjective {
   id: string;
   name: string;
+  description?: string | null;
   parentId: string | null;
   status: string;
   progress: number;
   confidence: number;
+  weight?: number;
   ownerName: string | null;
   team: string | null;
   ownerUser?: { name: string } | null;
   ownerNode?: { id: string; name: string } | null;
   area?: { id: string; name: string } | null;
   paceLabel?: 'AHEAD' | 'ON_TRACK' | 'BEHIND' | 'AT_RISK' | null;
+  progressSource?: 'ACTIONS' | 'KEY_RESULTS' | 'CHECKINS' | 'CHILDREN' | 'EMPTY';
+  actionPlanCount?: number;
+  taskCount?: number;
+  doneTaskCount?: number;
+  keyResults?: FlowKR[];
+  actionPlans?: FlowActionPlan[];
   strategicObj?: {
     name: string;
     ownerNode?: { name: string } | null;
@@ -239,7 +262,9 @@ export function OkrFlowchart({
   isFetching?: boolean;
 }) {
   const [period, setPeriod] = useState<string>('');
+  const [selectedId, setSelectedId] = useState<string | null>(null);
   const wrapperRef = useRef<HTMLDivElement>(null);
+  const selected = useMemo(() => objectives.find((o) => o.id === selectedId) ?? null, [objectives, selectedId]);
 
   const periodOptions = useMemo(() => {
     const set = new Set<string>();
@@ -318,7 +343,7 @@ export function OkrFlowchart({
         </div>
       </div>
 
-      <div ref={wrapperRef} className="h-[68vh] overflow-hidden rounded-lg border bg-muted/5">
+      <div ref={wrapperRef} className="relative h-[68vh] overflow-hidden rounded-lg border bg-muted/5">
         <ReactFlow
           key={flowKey}
           nodes={nodes}
@@ -329,10 +354,123 @@ export function OkrFlowchart({
           maxZoom={2}
           nodesConnectable={false}
           proOptions={{ hideAttribution: true }}
+          onNodeClick={(_, node) => setSelectedId(node.id)}
+          onPaneClick={() => setSelectedId(null)}
         >
           <Background gap={20} size={1} color="#cbd5e1" className="opacity-45" />
         </ReactFlow>
+        {selected && <OkrDetailPanel obj={selected} periodRef={period || null} onClose={() => setSelectedId(null)} />}
       </div>
+      <p className="px-1 text-[11px] text-muted-foreground">Clique em um objetivo no fluxograma para ver os detalhes (planos, tarefas e KRs).</p>
+    </div>
+  );
+}
+
+function OkrDetailPanel({ obj, periodRef, onClose }: { obj: FlowObjective; periodRef: string | null; onClose: () => void }) {
+  const color = STATUS_COLOR[obj.status] ?? '#94a3b8';
+  const at = progressAtPeriod(obj, periodRef);
+  const delta = at !== null ? obj.progress - at : null;
+  const pace = obj.paceLabel ? PACE_LABEL[obj.paceLabel] : null;
+  const taskCount = obj.taskCount ?? 0;
+  const doneTaskCount = obj.doneTaskCount ?? 0;
+  const pendingTaskCount = Math.max(0, taskCount - doneTaskCount);
+  return (
+    <aside className="absolute right-3 top-3 bottom-3 z-10 flex w-80 max-w-[calc(100%-24px)] flex-col rounded-lg border bg-card shadow-lg">
+      <div className="flex items-start justify-between gap-2 border-b p-3">
+        <div className="flex min-w-0 items-start gap-2">
+          <span className="mt-1 h-2.5 w-2.5 shrink-0 rounded-full" style={{ background: color }} />
+          <div className="min-w-0">
+            <h3 className="text-sm font-semibold leading-tight">{obj.name}</h3>
+            <div className="mt-0.5 text-[11px] text-muted-foreground">{STATUS_LABEL[obj.status] ?? obj.status}</div>
+          </div>
+        </div>
+        <button onClick={onClose} className="rounded-md p-1 text-muted-foreground hover:bg-muted" aria-label="Fechar">
+          <X className="h-4 w-4" />
+        </button>
+      </div>
+
+      <div className="min-h-0 flex-1 space-y-3 overflow-y-auto p-3 text-sm">
+        {obj.description && <p className="text-xs leading-5 text-muted-foreground">{obj.description}</p>}
+
+        <div className="grid grid-cols-2 gap-2">
+          <Metric label="Progresso" value={formatPercent(obj.progress)} />
+          <Metric label="Confiança" value={formatPercent(obj.confidence)} />
+        </div>
+        <div className="h-1.5 w-full overflow-hidden rounded-full bg-muted">
+          <div className="h-full rounded-full" style={{ width: `${Math.round(obj.progress * 100)}%`, background: color }} />
+        </div>
+        {periodRef && (
+          <div className="text-[11px] text-muted-foreground">
+            Como estava em {periodRef}: {at !== null ? formatPercent(at) : '—'}
+            {delta !== null && delta !== 0 && (
+              <strong className={cn('ml-1', delta > 0 ? 'text-status-green' : 'text-status-red')}>
+                {delta > 0 ? '▲' : '▼'} {formatPercent(Math.abs(delta))}
+              </strong>
+            )}
+          </div>
+        )}
+        {pace && <div className="text-xs font-medium" style={{ color: pace.color }}>Ritmo: {pace.label}</div>}
+
+        <div className="space-y-1 border-t pt-2 text-xs text-muted-foreground">
+          {(obj.ownerUser?.name || obj.ownerName) && <div><span className="text-foreground/70">Responsável:</span> {obj.ownerUser?.name ?? obj.ownerName}</div>}
+          {(obj.area?.name || obj.ownerNode?.name) && <div><span className="text-foreground/70">Área:</span> {obj.area?.name ?? obj.ownerNode?.name}</div>}
+          {obj.team && <div><span className="text-foreground/70">Equipe:</span> {obj.team}</div>}
+        </div>
+
+        <div className="rounded-md border bg-muted/20 p-2.5">
+          <div className="text-[11px] font-semibold uppercase text-muted-foreground">Planos e tarefas</div>
+          <div className="mt-1 text-xs">
+            {obj.actionPlanCount ?? 0} plano(s) · <span className="text-status-green">{doneTaskCount} concluída(s)</span> · <span className="text-status-yellow">{pendingTaskCount} pendente(s)</span> de {taskCount}
+          </div>
+          {(obj.actionPlans ?? []).slice(0, 4).map((plan) => (
+            <div key={plan.id} className="mt-1.5 border-t pt-1.5 text-xs">
+              <div className="flex items-center justify-between gap-2">
+                <span className="truncate">{plan.title}</span>
+                <span className="shrink-0 text-muted-foreground">{plan.progress}%</span>
+              </div>
+              <div className="text-[11px] text-muted-foreground">{plan.doneTaskCount}/{plan.taskCount} tarefa(s) · {STATUS_LABEL[plan.status] ?? plan.status}</div>
+            </div>
+          ))}
+        </div>
+
+        {(obj.keyResults ?? []).length > 0 && (
+          <div className="rounded-md border bg-muted/20 p-2.5">
+            <div className="text-[11px] font-semibold uppercase text-muted-foreground">Key Results</div>
+            {(obj.keyResults ?? []).map((kr) => (
+              <div key={kr.id} className="mt-1.5 text-xs">
+                <div className="flex items-center justify-between gap-2">
+                  <span className="truncate">{kr.metric}</span>
+                  <span className="shrink-0 text-muted-foreground">{formatPercent(kr.progress)}</span>
+                </div>
+                <div className="mt-0.5 h-1.5 w-full overflow-hidden rounded-full bg-muted">
+                  <div className="h-full rounded-full bg-primary" style={{ width: `${Math.round(kr.progress * 100)}%` }} />
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+
+        {obj.strategicObj && (
+          <div className="rounded-md border bg-muted/20 p-2.5 text-xs">
+            <div className="text-[11px] font-semibold uppercase text-muted-foreground">Conexão estratégica</div>
+            <div className="mt-1">{obj.strategicObj.name}</div>
+            {(obj.strategicObj.perspective?.name || obj.strategicObj.ownerNode?.name) && (
+              <div className="mt-0.5 text-muted-foreground">
+                {[obj.strategicObj.perspective?.name, obj.strategicObj.ownerNode?.name].filter(Boolean).join(' · ')}
+              </div>
+            )}
+          </div>
+        )}
+      </div>
+    </aside>
+  );
+}
+
+function Metric({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="rounded-md border bg-background p-2">
+      <div className="text-[10px] uppercase tracking-wide text-muted-foreground">{label}</div>
+      <div className="text-base font-semibold">{value}</div>
     </div>
   );
 }

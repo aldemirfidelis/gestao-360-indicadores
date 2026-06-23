@@ -473,16 +473,22 @@ export default function OkrsPage() {
           <SectionCard
             key={o.id}
             title={o.name}
-            description={o.description ?? `${o.ownerUser?.name ?? o.ownerName ?? 'Sem responsável'}${o.team ? ` · ${o.team}` : ''}`}
+            description={
+              <div className="flex flex-col gap-1.5">
+                <span>{o.description ?? `${o.ownerUser?.name ?? o.ownerName ?? 'Sem responsável'}${o.team ? ` · ${o.team}` : ''}`}</span>
+                <div className="flex flex-wrap items-center gap-2">
+                  {o.area && <Badge variant="outline">{o.area.name}</Badge>}
+                  {o.ownerUser && <span className="text-xs text-muted-foreground">{o.ownerUser.name}</span>}
+                  {o.paceLabel && PACE_LABEL[o.paceLabel] && (
+                    <span className={`text-xs font-medium ${PACE_LABEL[o.paceLabel].tone}`}>{PACE_LABEL[o.paceLabel].label}</span>
+                  )}
+                  {o.needsCheckin && <Badge variant="secondary">Check-in pendente</Badge>}
+                  <StatusBadge value={o.status} label={STATUS_LABEL[o.status] ?? o.status} />
+                </div>
+              </div>
+            }
             actions={
-              <div className="flex flex-wrap items-center gap-2">
-                {o.area && <Badge variant="outline">{o.area.name}</Badge>}
-                {o.ownerUser && <span className="text-xs text-muted-foreground">{o.ownerUser.name}</span>}
-                {o.paceLabel && PACE_LABEL[o.paceLabel] && (
-                  <span className={`text-xs font-medium ${PACE_LABEL[o.paceLabel].tone}`}>{PACE_LABEL[o.paceLabel].label}</span>
-                )}
-                {o.needsCheckin && <Badge variant="secondary">Check-in pendente</Badge>}
-                <StatusBadge value={o.status} label={STATUS_LABEL[o.status] ?? o.status} />
+              <div className="flex flex-wrap items-center gap-2 sm:justify-end">
                 {canUpdate && (
                   <Button variant="outline" size="sm" onClick={() => openEditObjective(o)}>
                     <Pencil className="mr-2 h-4 w-4" />

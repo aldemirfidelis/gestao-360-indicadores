@@ -256,6 +256,8 @@ export class ActionsService {
         analysisTool: action.analysisTool,
       },
     });
+    // Status inicial calculado automaticamente (Rascunho quando ainda não há análise/tarefas).
+    await this.recalcProgress(action.id);
     this.workItemBus.markDirty(action.companyId, [action.responsibleUserId], 'action.created');
     return action;
   }
@@ -439,6 +441,8 @@ export class ActionsService {
       description: task.title,
       metadata: { dueDate: task.dueDate, startDate: task.startDate, endDate: task.endDate },
     });
+    // Criar tarefa avança o status automaticamente para "Em execução".
+    await this.recalcProgress(actionId);
     return task;
   }
 
@@ -556,9 +560,10 @@ export class ActionsService {
         analysisTool: method,
         problemDescription: body.problem ?? action.problemDescription,
         rootCause: body.rootCause ?? action.rootCause,
-        status: finalStatuses.includes(action.status) ? action.status : ActionStatus.UNDER_ANALYSIS,
       },
     });
+    // Status calculado automaticamente (ter análise leva o plano a "Em análise").
+    await this.recalcProgress(actionId);
     await this.recordHistory(actionId, userId, 'ANALYSIS_SAVED', 'analysisTool', action.analysisTool, method);
     await this.audit(action.companyId, userId, 'ANALYSIS_SAVED', 'ActionAnalysisSession', session.id, null, body);
     await this.traceability.record({
@@ -1318,15 +1323,35 @@ ${currentStages || '- nenhuma'}`;
   }
 
   async recalcProgress(actionId: string) {
-    const tasks = await this.prisma.actionTask.findMany({ where: { actionId } });
-    if (tasks.length === 0) {
-      await this.prisma.actionPlan.update({ where: { id: actionId }, data: { progress: 0 } });
-      return;
-    }
-    const done = tasks.filter((t) => t.done).length;
-    const progress = Math.round((done / tasks.length) * 100);
-    const status = progress >= 100 ? ActionStatus.WAITING_VALIDATION : ActionStatus.IN_PROGRESS;
+    const action = await this.prisma.actionPlan.findUnique({ where: { id: actionId }, select: { status: true } });
+    if (!action) return;
+    const tasks = await this.prisma.actionTask.findMany({ where: { actionId }, select: { done: true } });
+    const taskTotal = tasks.length;
+    const taskDone = tasks.filter((t) => t.done).length;
+    const progress = taskTotal ? Math.round((taskDone / taskTotal) * 100) : 0;
+    const status = await this.deriveAutoStatus(actionId, action.status, taskTotal, taskDone);
     await this.prisma.actionPlan.update({ where: { id: actionId }, data: { progress, status } });
+  }
+
+  /**
+   * Status calculado automaticamente pelo ciclo do plano:
+   *   Rascunho → Em análise (tem análise de causa) → Em execução (tem tarefas) → Aguardando validação (tudo concluído).
+   * Só atua sobre os estados "automáticos"; estados definidos manualmente (pausado, aguardando terceiros/evidência,
+   * reaberto, finalizados/eficácia) são respeitados e não são sobrescritos.
+   */
+  private async deriveAutoStatus(actionId: string, current: ActionStatus, taskTotal: number, taskDone: number): Promise<ActionStatus> {
+    const autoManaged: ActionStatus[] = [
+      ActionStatus.DRAFT,
+      ActionStatus.NOT_STARTED,
+      ActionStatus.UNDER_ANALYSIS,
+      ActionStatus.IN_PROGRESS,
+      ActionStatus.WAITING_VALIDATION,
+    ];
+    if (!autoManaged.includes(current)) return current;
+    if (taskTotal > 0) return taskDone >= taskTotal ? ActionStatus.WAITING_VALIDATION : ActionStatus.IN_PROGRESS;
+    const analysisCount = await this.prisma.actionAnalysisSession.count({ where: { actionId } });
+    if (analysisCount > 0) return ActionStatus.UNDER_ANALYSIS;
+    return ActionStatus.DRAFT;
   }
 
   async requestDeletionApproval(actionId: string, companyId: string, userId?: string, reason?: string) {

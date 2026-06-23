@@ -263,25 +263,7 @@ export default function MeetingDetailPage() {
         }
       />
 
-      {linkedAction && (
-        <div className="mb-6">
-          {!actionQuery.data ? (
-            <SectionCard title="Análise de causa" description="Carregando a ferramenta de análise...">
-              <p className="text-sm text-muted-foreground">Carregando...</p>
-            </SectionCard>
-          ) : (
-            <AnalysisWorkspace
-              action={actionQuery.data}
-              onSave={(payload) => saveAnalysis.mutate(payload)}
-              saving={saveAnalysis.isPending}
-              title="Análise de causa"
-              description={`Escolha o método (5 Porquês, Ishikawa, PDCA, 5W2H...) e preencha a ferramenta. Problema e causa raiz ficam sincronizados com o plano: ${linkedAction.title}`}
-            />
-          )}
-        </div>
-      )}
-
-      <div className="grid grid-cols-1 gap-6 xl:grid-cols-[0.9fr_1.1fr]">
+      <div className="grid grid-cols-1 gap-6">
         <div className="space-y-6">
           <SectionCard
             title="Indicador tratado"
@@ -309,11 +291,28 @@ export default function MeetingDetailPage() {
             )}
           </SectionCard>
 
-          {!linkedAction && (
-            <SectionCard title="Análise de causa" description="Vincule um plano de ação para registrar a análise de causa.">
-              <p className="text-sm text-muted-foreground">Esta reunião ainda não está vinculada a um plano de ação.</p>
-            </SectionCard>
-          )}
+          <SectionCard title="Pauta da reunião" description="Itens para conduzir a conversa e registrar os pontos tratados.">
+            <div className="mb-3 flex gap-2">
+              <Input
+                placeholder="Adicionar item de pauta..."
+                value={agendaTopic}
+                onChange={(e) => setAgendaTopic(e.target.value)}
+                onKeyDown={(e) => e.key === 'Enter' && agendaTopic && addAgenda.mutate()}
+              />
+              <Button onClick={() => addAgenda.mutate()} disabled={!agendaTopic || addAgenda.isPending}>
+                <Plus className="h-4 w-4" />
+              </Button>
+            </div>
+            <ol className="space-y-2">
+              {m.agendaItems.map((a, i) => (
+                <li key={a.id} className="flex gap-3 rounded-lg border p-3 text-sm">
+                  <span className="grid h-6 w-6 shrink-0 place-items-center rounded-full bg-muted text-xs text-muted-foreground">{i + 1}</span>
+                  <span>{a.topic}</span>
+                </li>
+              ))}
+            </ol>
+            {m.agendaItems.length === 0 && <p className="py-4 text-center text-sm text-muted-foreground">Sem itens de pauta.</p>}
+          </SectionCard>
 
           <SectionCard title="Participantes" description="Participantes internos, externos e presenças.">
             <div className="space-y-3">
@@ -369,28 +368,25 @@ export default function MeetingDetailPage() {
             </div>
           </SectionCard>
 
-          <SectionCard title="Pauta da reunião" description="Itens para conduzir a conversa e registrar os pontos tratados.">
-            <div className="mb-3 flex gap-2">
-              <Input
-                placeholder="Adicionar item de pauta..."
-                value={agendaTopic}
-                onChange={(e) => setAgendaTopic(e.target.value)}
-                onKeyDown={(e) => e.key === 'Enter' && agendaTopic && addAgenda.mutate()}
+          {linkedAction ? (
+            !actionQuery.data ? (
+              <SectionCard title="Análise de causa" description="Carregando a ferramenta de análise...">
+                <p className="text-sm text-muted-foreground">Carregando...</p>
+              </SectionCard>
+            ) : (
+              <AnalysisWorkspace
+                action={actionQuery.data}
+                onSave={(payload) => saveAnalysis.mutate(payload)}
+                saving={saveAnalysis.isPending}
+                title="Análise de causa (ferramentas)"
+                description={`Escolha o método (Ishikawa, 5 Porquês, 5W2H, PDCA...) e preencha a ferramenta. Problema e causa raiz ficam sincronizados com o plano: ${linkedAction.title}`}
               />
-              <Button onClick={() => addAgenda.mutate()} disabled={!agendaTopic || addAgenda.isPending}>
-                <Plus className="h-4 w-4" />
-              </Button>
-            </div>
-            <ol className="space-y-2">
-              {m.agendaItems.map((a, i) => (
-                <li key={a.id} className="flex gap-3 rounded-lg border p-3 text-sm">
-                  <span className="grid h-6 w-6 shrink-0 place-items-center rounded-full bg-muted text-xs text-muted-foreground">{i + 1}</span>
-                  <span>{a.topic}</span>
-                </li>
-              ))}
-            </ol>
-            {m.agendaItems.length === 0 && <p className="py-4 text-center text-sm text-muted-foreground">Sem itens de pauta.</p>}
-          </SectionCard>
+            )
+          ) : (
+            <SectionCard title="Análise de causa" description="Vincule um plano de ação para registrar a análise de causa.">
+              <p className="text-sm text-muted-foreground">Esta reunião ainda não está vinculada a um plano de ação.</p>
+            </SectionCard>
+          )}
 
           <SectionCard title="Convites e registros de e-mail" description="Cada envio fica registrado para auditoria e reenvio.">
             <div className="space-y-2">

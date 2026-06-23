@@ -19,7 +19,7 @@ export function SectionCard({
 }) {
   return (
     <Card className={className}>
-      <CardHeader className="flex-row items-start justify-between gap-4 space-y-0 border-b border-border/60 px-4 py-3">
+      <CardHeader className="flex flex-col gap-3 space-y-0 border-b border-border/60 px-4 py-3 sm:flex-row sm:items-start sm:justify-between sm:gap-4">
         <div className="min-w-0">
           <CardTitle className="text-[13px] font-semibold uppercase tracking-[0.06em]">{title}</CardTitle>
           {description && <div className="mt-1 text-xs text-muted-foreground">{description}</div>}

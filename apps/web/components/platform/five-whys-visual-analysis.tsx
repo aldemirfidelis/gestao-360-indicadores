@@ -160,6 +160,17 @@ export function FiveWhysVisualAnalysis({
     setItems((current) => current.map((item) => (item.id === id ? { ...item, ...patch } : item)));
   }
 
+  // Resposta de um nível: atualiza a resposta e, em cascata, herda a pergunta do PRÓXIMO nível.
+  function handleAnswer(index: number, value: string) {
+    setItems((current) =>
+      current.map((item, i) => {
+        if (i === index) return { ...item, answer: value, status: item.status === 'PENDING' && value.trim() ? 'IN_REVIEW' : item.status };
+        if (i === index + 1) return { ...item, question: inheritedQuestionFor(value) };
+        return item;
+      }),
+    );
+  }
+
   // Confirma campos de seleção/data já salvando (evita onChange não disparar em valor pré-selecionado).
   function commitItem(id: string, patch: Partial<WhyItem>, nextRootCause = rootCause) {
     const next = itemsRef.current.map((item) => (item.id === id ? { ...item, ...patch } : item));
@@ -170,7 +181,7 @@ export function FiveWhysVisualAnalysis({
   function addWhy() {
     const level = items.length + 1;
     const last = items[items.length - 1];
-    const next = [...items, makeItem({ level, question: last && isAnswered(last) ? `Por que "${last.answer}" ocorre?` : 'Por quê?' }, level, problem)];
+    const next = [...items, makeItem({ level, question: inheritedQuestionFor(last?.answer) }, level, problem)];
     setItems(next);
     handleSave(next);
   }
@@ -351,9 +362,10 @@ export function FiveWhysVisualAnalysis({
                   canEdit={canEdit}
                   converting={converting}
                   users={users}
+                  questionLocked={index >= 1}
                   responsibleName={item.responsibleUserId ? responsibleById.get(item.responsibleUserId) : undefined}
                   onQuestion={(value) => updateItem(item.id, { question: value })}
-                  onAnswer={(value) => updateItem(item.id, { answer: value, status: item.status === 'PENDING' && value.trim() ? 'IN_REVIEW' : item.status })}
+                  onAnswer={(value) => handleAnswer(index, value)}
                   onCommit={(patch) => commitItem(item.id, patch)}
                   onBlurSave={() => handleSave()}
                   onToggleRoot={() => toggleRootCause(item)}
@@ -432,6 +444,7 @@ function WhyBlock({
   canEdit,
   converting,
   users,
+  questionLocked,
   responsibleName,
   onQuestion,
   onAnswer,
@@ -449,6 +462,7 @@ function WhyBlock({
   canEdit: boolean;
   converting: boolean;
   users: UserOption[];
+  questionLocked: boolean;
   responsibleName?: string;
   onQuestion: (value: string) => void;
   onAnswer: (value: string) => void;
@@ -496,8 +510,17 @@ function WhyBlock({
       ) : (
         <fieldset disabled={!canEdit} className="mt-3 space-y-2">
           <div>
-            <Label className="text-[11px] text-slate-500">Pergunta</Label>
-            <Textarea rows={2} value={item.question} placeholder="Por quê?" onChange={(event) => onQuestion(event.target.value)} onBlur={onBlurSave} className="text-sm" />
+            <Label className="text-[11px] text-slate-500">
+              Pergunta{questionLocked && <span className="ml-1 font-normal text-slate-400">(herdada da resposta anterior)</span>}
+            </Label>
+            {questionLocked ? (
+              <div className="flex items-start gap-2 rounded-md border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-700">
+                <Lock className="mt-0.5 h-3.5 w-3.5 shrink-0 text-slate-400" />
+                <span>{item.question || 'Responda o porquê anterior para herdar a pergunta.'}</span>
+              </div>
+            ) : (
+              <Textarea rows={2} value={item.question} placeholder="Por quê?" onChange={(event) => onQuestion(event.target.value)} onBlur={onBlurSave} className="text-sm" />
+            )}
           </div>
           <div>
             <Label className="text-[11px] text-slate-500">Resposta (causa)</Label>
@@ -615,6 +638,17 @@ function isAnswered(item: WhyItem) {
   return Boolean(item.question?.trim()) && Boolean(item.answer?.trim());
 }
 
+/** A pergunta do nível N (N≥2) é herdada da resposta do nível anterior — encadeamento dos 5 Porquês. */
+function inheritedQuestionFor(prevAnswer: string | undefined) {
+  const answer = (prevAnswer ?? '').trim();
+  return answer ? `Por que "${answer}" acontece?` : '';
+}
+
+/** Reescreve as perguntas dos níveis ≥2 a partir da resposta do nível anterior (mantém o nível 1 livre). */
+function syncInheritedQuestions(items: WhyItem[]): WhyItem[] {
+  return items.map((item, index) => (index === 0 ? item : { ...item, question: inheritedQuestionFor(items[index - 1].answer) }));
+}
+
 function normalizeItems(rows: any[] | undefined, problem: string): WhyItem[] {
   const source = Array.isArray(rows) && rows.length ? rows.slice() : [];
   source.sort((a, b) => Number(a.level ?? a.position ?? 0) - Number(b.level ?? b.position ?? 0));
@@ -623,7 +657,7 @@ function normalizeItems(rows: any[] | undefined, problem: string): WhyItem[] {
   for (let level = items.length + 1; level <= 5; level += 1) {
     items.push(makeItem(undefined, level, problem));
   }
-  return items.map((item, index) => ({ ...item, level: index + 1 }));
+  return syncInheritedQuestions(items.map((item, index) => ({ ...item, level: index + 1 })));
 }
 
 function makeItem(row: any, level: number, problem: string): WhyItem {

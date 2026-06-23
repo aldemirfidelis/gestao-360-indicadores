@@ -297,6 +297,7 @@ export default function ActionDetailPage() {
           <NativeSelect value={a.status} onChange={(e) => changeStatus.mutate(e.target.value)} className="mt-1 h-9">
             {Object.entries(STATUS_LABEL).map(([k, v]) => <option key={k} value={k}>{v}</option>)}
           </NativeSelect>
+          <p className="mt-1 text-[10px] leading-tight text-muted-foreground">Calculado automaticamente pelo andamento (análise → execução). Você pode ajustar manualmente.</p>
         </Mini>
         <Mini title="Prazo">
           <div className={cn('mt-1 text-base font-semibold', isOverdue && 'text-status-red')}>{formatDate(a.dueDate)}</div>
