@@ -195,6 +195,7 @@ export function FiveWTwoHVisualAnalysis({
   saving,
   canEdit = true,
   onTaskCreated,
+  onEnsureActionPlan,
   onSave,
 }: {
   actionId?: string;
@@ -204,6 +205,7 @@ export function FiveWTwoHVisualAnalysis({
   saving: boolean;
   canEdit?: boolean;
   onTaskCreated?: () => void;
+  onEnsureActionPlan?: () => Promise<string>;
   onSave: (items: FiveW2HItem[]) => void;
 }) {
   const qc = useQueryClient();
@@ -302,7 +304,7 @@ export function FiveWTwoHVisualAnalysis({
   }
 
   async function createAggregateTask() {
-    if (!actionId) {
+    if (!actionId && !onEnsureActionPlan) {
       toast.error('Salve a análise antes de gerar a tarefa.');
       return;
     }
@@ -321,17 +323,24 @@ export function FiveWTwoHVisualAnalysis({
     const when = whenRaw ? whenRaw.slice(0, 10) : undefined;
     setCreatingTask(true);
     try {
+      // Cria o plano do zero quando ainda não existe (a 1ª tarefa do 5W2H "abre" o plano de ação).
+      const targetActionId = actionId ?? (onEnsureActionPlan ? await onEnsureActionPlan() : undefined);
+      if (!targetActionId) {
+        toast.error('Não foi possível criar o plano de ação.');
+        return;
+      }
       // Mantém o 5W2H salvo (Por quê / Onde / Como / Quanto ficam rastreáveis na análise).
       handleSave(items);
-      await api(`/actions/${actionId}/tasks`, {
+      await api(`/actions/${targetActionId}/tasks`, {
         method: 'POST',
         json: { title: whatText, assignedToId: who, dueDate: when, startDate: when, endDate: when },
       });
       const next = items.map((item) => ({ ...item, status: 'DONE' as ItemStatus, progress: 100, completedAt: item.completedAt ?? new Date().toISOString() }));
       setItems(next);
       handleSave(next);
-      toast.success('5W2H concluído e tarefa criada no plano');
-      qc.invalidateQueries({ queryKey: ['action', actionId] });
+      toast.success(actionId ? '5W2H concluído e tarefa criada no plano' : '5W2H concluído — plano de ação criado e tarefa adicionada');
+      qc.invalidateQueries({ queryKey: ['action', targetActionId] });
+      qc.invalidateQueries({ queryKey: ['actions'] });
       onTaskCreated?.();
     } catch (error: any) {
       toast.error(error?.message ?? 'Não foi possível gerar a tarefa');

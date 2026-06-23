@@ -2,9 +2,11 @@ import { ForbiddenException, Injectable, NotFoundException } from '@nestjs/commo
 import { PrismaService } from '../../prisma/prisma.service';
 import { resolveSmtpConfig, buildTransport, smtpFrom } from '../../common/smtp';
 import {
+  ActionAnalysisTool,
   ActionOrigin,
   ActionPriority,
   ActionStatus,
+  DeviationStatus,
   EmailDeliveryStatus,
   MeetingFormat,
   MeetingKind,
@@ -219,6 +221,74 @@ export class MeetingsService {
       metadata: { kind: meeting.kind, startsAt: meeting.startsAt, location: meeting.location },
     });
     return meeting;
+  }
+
+  /**
+   * Garante um Plano de Ação para a reunião (idempotente). Se a reunião já tem um plano vinculado,
+   * retorna-o; senão cria um novo a partir do contexto (desvio/indicador) — é o "plano do zero" que
+   * nasce da análise feita na reunião (ex.: 1ª tarefa do 5W2H).
+   */
+  async ensureActionPlan(me: AuthPayload, meetingId: string) {
+    const meeting = await this.prisma.meeting.findFirst({
+      where: { id: meetingId, companyId: me.companyId, deletedAt: null },
+      include: {
+        indicator: { select: { id: true, name: true, ownerNodeId: true, responsibleUserId: true } },
+        deviation: { select: { id: true, number: true, title: true, fact: true, rootCause: true, impact: true, responsibleUserId: true, dueDate: true } },
+        actions: { select: { id: true }, take: 1, orderBy: { createdAt: 'asc' } },
+      },
+    });
+    if (!meeting) throw new NotFoundException('Reunião nao encontrada');
+    const area = meeting.indicator?.ownerNodeId ?? null;
+    await this.assertWriteArea(me, area, 'edit');
+
+    if (meeting.actions.length > 0) {
+      return { id: meeting.actions[0].id, created: false };
+    }
+
+    const dev = meeting.deviation;
+    const ind = meeting.indicator;
+    const title = dev ? `Plano do desvio #${dev.number} — ${ind?.name ?? dev.title}` : `Plano de ação — ${ind?.name ?? meeting.title}`;
+    const action = await this.prisma.actionPlan.create({
+      data: {
+        companyId: meeting.companyId,
+        meetingId: meeting.id,
+        deviationId: dev?.id ?? null,
+        indicatorId: ind?.id ?? null,
+        origin: dev ? ActionOrigin.DEVIATION : ActionOrigin.MEETING,
+        originRefId: dev?.id ?? meeting.id,
+        title,
+        problemDescription: dev?.fact ?? dev?.title ?? meeting.objective ?? null,
+        rootCause: dev?.rootCause ?? null,
+        analysisTool: ActionAnalysisTool.ISHIKAWA,
+        responsibleUserId: meeting.responsibleUserId ?? ind?.responsibleUserId ?? null,
+        ownerNodeId: area,
+        priority: ActionPriority.HIGH,
+        criticality: ActionPriority.HIGH,
+        status: ActionStatus.NOT_STARTED,
+        dueDate: dev?.dueDate ?? null,
+        expectedResult: dev?.impact ?? null,
+        evidenceRequired: true,
+        createdById: me.sub,
+      },
+    });
+    if (dev) {
+      await this.prisma.deviation
+        .update({ where: { id: dev.id }, data: { status: DeviationStatus.WAITING_ACTION } })
+        .catch(() => undefined);
+    }
+    await this.traceability.record({
+      companyId: meeting.companyId,
+      indicatorId: ind?.id ?? null,
+      userId: me.sub,
+      eventType: TraceEventType.ACTION_CREATED,
+      entityType: TraceEntityType.ACTION_PLAN,
+      entityId: action.id,
+      relatedType: TraceEntityType.MEETING,
+      relatedId: meeting.id,
+      title: 'Plano de ação criado a partir da reunião',
+      description: action.title,
+    });
+    return { id: action.id, created: true };
   }
 
   async update(me: AuthPayload, id: string, patch: any) {

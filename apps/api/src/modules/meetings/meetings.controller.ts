@@ -132,6 +132,12 @@ export class MeetingsController {
     return this.service.generateAction(me, id, body);
   }
 
+  @Post(':id/action-plan')
+  @RequirePermissions('actions:create')
+  ensureActionPlan(@CurrentUser() me: AuthPayload, @Param('id') id: string) {
+    return this.service.ensureActionPlan(me, id);
+  }
+
   @Post(':id/invitations/send')
   @RequirePermissions('meetings:complete')
   sendInvites(@CurrentUser() me: AuthPayload, @Param('id') id: string) {

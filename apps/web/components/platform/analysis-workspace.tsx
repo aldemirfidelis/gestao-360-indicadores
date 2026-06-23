@@ -29,6 +29,11 @@ export interface AnalysisWorkspaceAction {
   problemDescription: string | null;
   rootCause: string | null;
   analysisSessions: any[];
+  // Campos opcionais de contexto (usados pelo auto-pull do PDCA e quando o plano ainda não existe).
+  indicator?: any;
+  ownerNode?: any;
+  responsibleUser?: any;
+  deviationId?: string;
 }
 
 export interface AnalysisPayload {
@@ -48,6 +53,7 @@ export function AnalysisWorkspace({
   onSave,
   saving,
   onAskAi,
+  onEnsureActionPlan,
   users = [],
   canEdit = true,
   title = 'Ferramentas reais de análise',
@@ -57,6 +63,7 @@ export function AnalysisWorkspace({
   onSave: (payload: AnalysisPayload) => void;
   saving: boolean;
   onAskAi?: () => void;
+  onEnsureActionPlan?: () => Promise<string>;
   users?: { id: string; name: string; email?: string }[];
   canEdit?: boolean;
   title?: string;
@@ -171,6 +178,7 @@ export function AnalysisWorkspace({
           users={users}
           saving={saving}
           canEdit={canEdit}
+          onEnsureActionPlan={onEnsureActionPlan}
           onTaskCreated={() => setMethod('PDCA')}
           onSave={(items) => onSave({ method: 'FIVE_W_TWO_H', problem, rootCause, fiveWhys, ishikawaCauses: ishikawa, maspSteps, pdcaSteps, data: { items }, fiveW2H: deriveFiveW2HSummary(items) })}
         />

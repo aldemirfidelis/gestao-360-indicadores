@@ -180,10 +180,20 @@ export default function MeetingDetailPage() {
     onError: (e: any) => toast.error(e?.message ?? 'Não foi possível adicionar participante'),
   });
 
+  // Garante (cria, se preciso) o Plano de Ação da reunião — usado quando a análise/5W2H começa
+  // sem um plano vinculado (o plano "nasce" da análise feita na reunião).
+  const ensureActionPlan = async (): Promise<string> => {
+    if (linkedAction?.id) return linkedAction.id;
+    const res = await api<{ id: string }>(`/meetings/${id}/action-plan`, { method: 'POST' });
+    await qc.invalidateQueries({ queryKey: ['meeting', id] });
+    await qc.invalidateQueries({ queryKey: ['action', res.id] });
+    return res.id;
+  };
+
   const saveAnalysis = useMutation({
-    mutationFn: (payload: AnalysisPayload) => {
-      if (!linkedAction?.id) return Promise.reject(new Error('Nenhum plano de ação vinculado'));
-      return api(`/actions/${linkedAction.id}/analysis`, { method: 'POST', json: payload });
+    mutationFn: async (payload: AnalysisPayload) => {
+      const actionId = linkedAction?.id ?? (await ensureActionPlan());
+      return api(`/actions/${actionId}/analysis`, { method: 'POST', json: payload });
     },
     onSuccess: () => {
       toast.success('Análise de causa sincronizada com o plano');
@@ -377,14 +387,34 @@ export default function MeetingDetailPage() {
               <AnalysisWorkspace
                 action={actionQuery.data}
                 onSave={(payload) => saveAnalysis.mutate(payload)}
+                onEnsureActionPlan={ensureActionPlan}
                 saving={saveAnalysis.isPending}
                 title="Análise de causa (ferramentas)"
                 description={`Escolha o método (Ishikawa, 5 Porquês, 5W2H, PDCA...) e preencha a ferramenta. Problema e causa raiz ficam sincronizados com o plano: ${linkedAction.title}`}
               />
             )
+          ) : m?.indicator || m?.deviation ? (
+            <AnalysisWorkspace
+              action={{
+                id: undefined,
+                analysisTool: 'ISHIKAWA',
+                problemDescription: m?.deviation?.title ?? m?.indicator?.name ?? m?.title ?? null,
+                rootCause: null,
+                analysisSessions: [],
+                indicator: m?.indicator ?? null,
+                ownerNode: m?.indicator?.ownerNode ?? null,
+                responsibleUser: m?.indicator?.responsibleUser ?? null,
+                deviationId: m?.deviation?.id,
+              }}
+              onSave={(payload) => saveAnalysis.mutate(payload)}
+              onEnsureActionPlan={ensureActionPlan}
+              saving={saveAnalysis.isPending}
+              title="Análise de causa (ferramentas)"
+              description="Conduza Ishikawa → 5 Porquês → 5W2H → PDCA. O plano de ação é criado automaticamente quando a 1ª tarefa do 5W2H é gerada."
+            />
           ) : (
-            <SectionCard title="Análise de causa" description="Vincule um plano de ação para registrar a análise de causa.">
-              <p className="text-sm text-muted-foreground">Esta reunião ainda não está vinculada a um plano de ação.</p>
+            <SectionCard title="Análise de causa" description="Vincule um indicador ou desvio para conduzir a análise de causa.">
+              <p className="text-sm text-muted-foreground">Esta reunião ainda não está vinculada a um indicador ou desvio.</p>
             </SectionCard>
           )}
 
