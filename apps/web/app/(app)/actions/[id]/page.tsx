@@ -5,7 +5,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
 import Link from 'next/link';
-import { ArrowLeft, Bot, CalendarPlus, CheckCircle2, GitBranch, Paperclip, Pencil, Plus, Save, Send, ShieldCheck, Sparkles, Trash2 } from 'lucide-react';
+import { ArrowLeft, Bot, CheckCircle2, GitBranch, Paperclip, Pencil, Plus, Save, Send, ShieldCheck, Sparkles, Trash2 } from 'lucide-react';
 import { PageHeader } from '@/components/shell/page-header';
 import { SectionCard } from '@/components/platform/section-card';
 import { StatusBadge } from '@/components/platform/status-badge';
@@ -96,7 +96,6 @@ export default function ActionDetailPage() {
   const [effectiveness, setEffectiveness] = useState({ effective: true, reopen: false, summary: '', evidence: '', achievedResult: '' });
   const [deletePlanOpen, setDeletePlanOpen] = useState(false);
   const [deleteReason, setDeleteReason] = useState('');
-  const [meetingForm, setMeetingForm] = useState({ startsAt: '', location: '', format: 'ONLINE' });
 
   const query = useQuery<ActionDetail>({
     queryKey: ['action', id],
@@ -181,24 +180,6 @@ export default function ActionDetailPage() {
       qc.invalidateQueries({ queryKey: ['actions', 'general-approvals'] });
     },
     onError: (e: any) => toast.error(e?.message ?? 'Não foi possível enviar para aprovação'),
-  });
-  const createMeeting = useMutation({
-    mutationFn: () =>
-      api(`/actions/${id}/meeting`, {
-        method: 'POST',
-        json: {
-          startsAt: meetingForm.startsAt || undefined,
-          location: meetingForm.location || undefined,
-          format: meetingForm.format,
-        },
-      }),
-    onSuccess: () => {
-      toast.success('Reunião marcada para o plano de ação');
-      setMeetingForm({ startsAt: '', location: '', format: 'ONLINE' });
-      qc.invalidateQueries({ queryKey: ['action', id] });
-      qc.invalidateQueries({ queryKey: ['meetings'] });
-    },
-    onError: (e: any) => toast.error(e?.message ?? 'Não foi possível marcar a reunião'),
   });
   const addTaskEvidence = useMutation({
     mutationFn: async ({ taskId, file }: { taskId: string; file: File }) => {
@@ -347,7 +328,7 @@ export default function ActionDetailPage() {
               <Info label="Ferramenta" value={a.analysisTool ? TOOL_LABEL[a.analysisTool] ?? a.analysisTool : 'Não definida'} />
               <Info label="Criticidade" value={ACTION_CRITICALITY_LABEL[a.criticality] ?? a.criticality} />
             </SectionCard>
-            <SectionCard title="Reunião do plano" description="Use a reunião para analisar causa e criar tarefas para execução.">
+            <SectionCard title="Reunião do plano" description="A reunião conduz a análise de causa e gera as tarefas. A criação da reunião acontece no desvio.">
               {a.meeting ? (
                 <div className="space-y-3">
                   <div className="rounded-md border p-3 text-sm">
@@ -361,29 +342,13 @@ export default function ActionDetailPage() {
                   </Button>
                 </div>
               ) : (
-                <div className="space-y-3">
-                  <div>
-                    <Label>Data e hora</Label>
-                    <Input type="datetime-local" value={meetingForm.startsAt} onChange={(e) => setMeetingForm({ ...meetingForm, startsAt: e.target.value })} />
-                  </div>
-                  <div className="grid gap-2 sm:grid-cols-2">
-                    <div>
-                      <Label>Formato</Label>
-                      <NativeSelect value={meetingForm.format} onChange={(e) => setMeetingForm({ ...meetingForm, format: e.target.value })}>
-                        <option value="ONLINE">Conectado</option>
-                        <option value="PRESENTIAL">Presencial</option>
-                        <option value="HYBRID">Híbrida</option>
-                      </NativeSelect>
-                    </div>
-                    <div>
-                      <Label>Local ou link</Label>
-                      <Input value={meetingForm.location} onChange={(e) => setMeetingForm({ ...meetingForm, location: e.target.value })} />
-                    </div>
-                  </div>
-                  <Button onClick={() => createMeeting.mutate()} disabled={createMeeting.isPending} className="w-full">
-                    <CalendarPlus className="mr-2 h-4 w-4" />
-                    {createMeeting.isPending ? 'Marcando...' : 'Marcar reunião'}
-                  </Button>
+                <div className="space-y-3 rounded-md border border-dashed bg-muted/20 p-4 text-sm text-muted-foreground">
+                  <p>Este plano ainda não tem reunião vinculada. A reunião é criada a partir do <strong>desvio</strong> que originou o plano.</p>
+                  {a.deviation?.id && (
+                    <Button asChild variant="outline" className="w-full">
+                      <Link href={`/deviations/${a.deviation.id}`}>Abrir desvio para criar a reunião</Link>
+                    </Button>
+                  )}
                 </div>
               )}
             </SectionCard>

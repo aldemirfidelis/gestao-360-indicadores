@@ -27,13 +27,11 @@ import {
   ChevronRight,
   Download,
   FileText,
-  Gauge,
   Lightbulb,
   Minus,
   Network,
   ScrollText,
   ShieldAlert,
-  Target,
   TrendingDown,
   TrendingUp,
 } from 'lucide-react';
@@ -41,14 +39,13 @@ import Link from 'next/link';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
-import { Progress } from '@/components/ui/progress';
 import { NativeSelect } from '@/components/ui/select';
 import { PageHeader } from '@/components/shell/page-header';
 import { StatusLight } from '@/components/ui/status-light';
 import { StatusBadge } from '@/components/platform/status-badge';
 import { api } from '@/lib/api';
 import { cn, formatNumber, formatPercent, periodRefLabel } from '@/lib/utils';
-import { PERIODICITY_LABEL, DIRECTION_LABEL, ACTION_STATUS_LABEL, MEETING_STATUS_LABEL, TRACE_EVENT_LABEL, TRAFFIC_LIGHT_LABEL } from '@/lib/labels';
+import { ACTION_STATUS_LABEL, MEETING_STATUS_LABEL, TRACE_EVENT_LABEL, TRAFFIC_LIGHT_LABEL } from '@/lib/labels';
 import { useVision360 } from '@/components/ui/vision360-context';
 import { useAuth } from '@/components/auth/auth-provider';
 
@@ -411,59 +408,38 @@ export default function IndicatorDetailPage() {
         )}
       </div>
 
-      <div className="mb-6 grid grid-cols-2 gap-4 md:grid-cols-3 xl:grid-cols-5">
+      <div className="mb-6 max-w-sm">
         <Card>
           <CardContent className="p-4">
             <div className="flex items-center justify-between">
               <div className="text-xs uppercase text-muted-foreground">Realizado atual</div>
-              <Gauge className="h-4 w-4 text-muted-foreground/60" />
+              <span
+                className={cn(
+                  'h-4 w-4 rounded-full ring-2 ring-offset-1 ring-offset-background',
+                  last?.light === 'RED'
+                    ? 'bg-status-red ring-status-red/30'
+                    : last?.light === 'YELLOW'
+                      ? 'bg-status-yellow ring-status-yellow/30'
+                      : last?.light === 'GREEN'
+                        ? 'bg-status-green ring-status-green/30'
+                        : 'bg-muted-foreground/40 ring-muted-foreground/20',
+                )}
+                title={statusHint(last?.light, ind.direction)}
+                aria-label={`Farol: ${last?.light ?? 'sem dado'}`}
+              />
             </div>
             <div className="mt-1 text-2xl font-semibold">{last ? formatNumber(last.value) : '-'}</div>
-            <div className="text-xs text-muted-foreground">{last ? periodRefLabel(last.periodRef) : 'Sem lançamento'}</div>
+            <div className="text-xs text-muted-foreground">
+              {last ? periodRefLabel(last.periodRef) : 'Sem lançamento'}
+              {metaValue !== null && <> · Meta {formatNumber(metaValue)}</>}
+              {last?.attainment !== null && last?.attainment !== undefined && <> · {formatPercent(last.attainment)}</>}
+            </div>
             {momDelta !== null && (
               <div className={cn('mt-1.5 inline-flex items-center gap-1 text-xs font-medium', momDelta < 0 ? 'text-status-red' : momDelta > 0 ? 'text-status-green' : 'text-muted-foreground')}>
                 {momDelta < 0 ? <TrendingDown className="h-3.5 w-3.5" /> : momDelta > 0 ? <TrendingUp className="h-3.5 w-3.5" /> : <Minus className="h-3.5 w-3.5" />}
                 {momDelta > 0 ? '+' : ''}{formatNumber(momDelta, { maximumFractionDigits: 2 })} {ppOrUnit} vs período anterior
               </div>
             )}
-          </CardContent>
-        </Card>
-        <Card>
-          <CardContent className="p-4">
-            <div className="text-xs uppercase text-muted-foreground">Atingimento</div>
-            <div className="mt-1 text-2xl font-semibold">{formatPercent(last?.attainment ?? null)}</div>
-            <Progress value={last?.attainment ?? 0} className="mt-2" barClassName={attainmentBarColor(last?.light)} />
-            <div className="mt-1.5 text-xs text-muted-foreground">Meta {metaValue !== null ? formatNumber(metaValue) : '-'}</div>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardContent className="p-4">
-            <div className="flex items-center justify-between">
-              <div className="text-xs uppercase text-muted-foreground">Status</div>
-              <AlertTriangle className={cn('h-4 w-4', last?.light === 'RED' ? 'text-status-red' : last?.light === 'YELLOW' ? 'text-status-yellow' : 'text-muted-foreground/60')} />
-            </div>
-            <div className="mt-2"><StatusLight light={last?.light ?? 'GRAY'} size="md" /></div>
-            <div className="mt-1.5 text-xs text-muted-foreground">{statusHint(last?.light, ind.direction)}</div>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardContent className="p-4">
-            <div className="flex items-center justify-between">
-              <div className="text-xs uppercase text-muted-foreground">Periodicidade</div>
-              <Calendar className="h-4 w-4 text-muted-foreground/60" />
-            </div>
-            <div className="mt-1 text-2xl font-semibold">{PERIODICITY_LABEL[ind.periodicity] ?? ind.periodicity}</div>
-            <div className="text-xs text-muted-foreground">Direção: {DIRECTION_LABEL[ind.direction] ?? ind.direction}</div>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardContent className="p-4">
-            <div className="flex items-center justify-between">
-              <div className="text-xs uppercase text-muted-foreground">Meta</div>
-              <Target className="h-4 w-4 text-muted-foreground/60" />
-            </div>
-            <div className="mt-1 text-2xl font-semibold">{metaValue !== null ? formatNumber(metaValue) : '-'}</div>
-            <div className="text-xs text-muted-foreground">{unit ? `Unidade: ${unit}` : 'Meta do período'}</div>
           </CardContent>
         </Card>
       </div>
@@ -1302,13 +1278,6 @@ function DetailChartTooltip({ active, payload, label, viewMode }: any) {
       <div>Status: {LIGHT_LABEL[point?.status ?? 'GRAY'] ?? point?.status ?? 'Sem dados'}</div>
     </div>
   );
-}
-
-function attainmentBarColor(light?: string) {
-  if (light === 'GREEN') return 'bg-status-green';
-  if (light === 'YELLOW') return 'bg-status-yellow';
-  if (light === 'RED') return 'bg-status-red';
-  return 'bg-status-gray';
 }
 
 function statusHint(light: string | undefined, direction: string) {

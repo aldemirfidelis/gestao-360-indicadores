@@ -106,6 +106,7 @@ export class DeviationsService {
         causes: true,
         analyses: true,
         actions: { include: { responsibleUser: { select: { id: true, name: true } } } },
+        meetings: { select: { id: true, title: true, status: true }, orderBy: { createdAt: 'desc' } },
       },
     });
     if (!d) throw new NotFoundException('Desvio nao encontrado');

@@ -1399,6 +1399,7 @@ model Deviation {
   rootCause         String?
   impact            String?
   immediateAction   String?
+  noImmediateAction Boolean           @default(false) // marca "não houve providência imediata" → exige análise
   responsibleUserId String?
   responsibleUser   User?             @relation("DeviationResponsible", fields: [responsibleUserId], references: [id])
   dueDate           DateTime?

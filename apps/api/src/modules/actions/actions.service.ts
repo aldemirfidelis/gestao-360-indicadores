@@ -564,6 +564,13 @@ export class ActionsService {
     });
     // Status calculado automaticamente (ter análise leva o plano a "Em análise").
     await this.recalcProgress(actionId);
+    // Propaga a causa raiz identificada na análise para o desvio de origem (campo bloqueado no desvio).
+    const consolidatedRootCause = nonEmptyText(body.rootCause);
+    if (action.deviationId && consolidatedRootCause) {
+      await this.prisma.deviation
+        .update({ where: { id: action.deviationId }, data: { rootCause: consolidatedRootCause } })
+        .catch(() => undefined);
+    }
     await this.recordHistory(actionId, userId, 'ANALYSIS_SAVED', 'analysisTool', action.analysisTool, method);
     await this.audit(action.companyId, userId, 'ANALYSIS_SAVED', 'ActionAnalysisSession', session.id, null, body);
     await this.traceability.record({
