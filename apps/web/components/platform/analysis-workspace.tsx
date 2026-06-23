@@ -1,7 +1,8 @@
 'use client';
 
 import { useState } from 'react';
-import { Save, Sparkles } from 'lucide-react';
+import { ChevronRight, Save, Sparkles } from 'lucide-react';
+import { cn } from '@/lib/utils';
 import { SectionCard } from '@/components/platform/section-card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -73,6 +74,8 @@ export function AnalysisWorkspace({
   const [ishikawa, setIshikawa] = useState<any[]>(session?.ishikawaCauses?.length ? session.ishikawaCauses : []);
   const [maspSteps, setMaspSteps] = useState<any[]>(session?.maspSteps?.length ? session.maspSteps : ['Identificação do problema', 'Observação', 'Análise', 'Plano de ação', 'Execução', 'Verificação', 'Padronização', 'Conclusão'].map((title, i) => ({ step: i + 1, title, description: '', status: 'PENDING' })));
   const [pdcaSteps, setPdcaSteps] = useState<any[]>(session?.pdcaSteps?.length ? session.pdcaSteps : ['PLAN', 'DO', 'CHECK', 'ACT'].map((phase) => ({ phase, description: '', status: 'PENDING' })));
+  // Encadeamento: causa provável marcada no Ishikawa "semeia" o 1º porquê do 5 Porquês.
+  const [seedWhyAnswer, setSeedWhyAnswer] = useState<string | null>(null);
   const ishikawaSession = action.analysisSessions.find((item) => item.method === 'ISHIKAWA');
   const pdcaSession = action.analysisSessions.find((item) => item.method === 'PDCA');
   const fiveW2HSession = action.analysisSessions.find((item) => item.method === 'FIVE_W_TWO_H');
@@ -97,6 +100,8 @@ export function AnalysisWorkspace({
         </div>
       </div>
 
+      <AnalysisSequenceHint method={method} onSelect={setMethod} />
+
       {method === 'FIVE_WHYS' && (
         <FiveWhysVisualAnalysis
           actionId={action.id}
@@ -107,10 +112,12 @@ export function AnalysisWorkspace({
           users={users}
           saving={saving}
           canEdit={canEdit}
+          seedAnswer={seedWhyAnswer}
+          onSeedConsumed={() => setSeedWhyAnswer(null)}
           onRootCauseChange={setRootCause}
           onSave={(whyItems, nextRootCause = rootCause, extra) => {
             setFiveWhys(whyItems);
-            onSave({ method, problem, rootCause: nextRootCause, fiveWhys: deriveLegacyWhys(whyItems), ishikawaCauses: ishikawa, maspSteps, pdcaSteps, data: { items: whyItems, ...(extra ?? {}) } });
+            onSave({ method: 'FIVE_WHYS', problem, rootCause: nextRootCause, fiveWhys: deriveLegacyWhys(whyItems), ishikawaCauses: ishikawa, maspSteps, pdcaSteps, data: { items: whyItems, ...(extra ?? {}) } });
           }}
         />
       )}
@@ -125,9 +132,15 @@ export function AnalysisWorkspace({
           saving={saving}
           canEdit={canEdit}
           onRootCauseChange={setRootCause}
+          onSendToFiveWhys={(causeText) => {
+            const text = String(causeText ?? '').trim();
+            if (!text) return;
+            setSeedWhyAnswer(text);
+            setMethod('FIVE_WHYS');
+          }}
           onSave={(causes, nextRootCause = rootCause) => {
             setIshikawa(causes);
-            onSave({ method, problem, rootCause: nextRootCause, fiveWhys, ishikawaCauses: causes, maspSteps, pdcaSteps });
+            onSave({ method: 'ISHIKAWA', problem, rootCause: nextRootCause, fiveWhys, ishikawaCauses: causes, maspSteps, pdcaSteps });
           }}
         />
       )}
@@ -158,7 +171,8 @@ export function AnalysisWorkspace({
           users={users}
           saving={saving}
           canEdit={canEdit}
-          onSave={(items) => onSave({ method, problem, rootCause, fiveWhys, ishikawaCauses: ishikawa, maspSteps, pdcaSteps, data: { items }, fiveW2H: deriveFiveW2HSummary(items) })}
+          onTaskCreated={() => setMethod('PDCA')}
+          onSave={(items) => onSave({ method: 'FIVE_W_TWO_H', problem, rootCause, fiveWhys, ishikawaCauses: ishikawa, maspSteps, pdcaSteps, data: { items }, fiveW2H: deriveFiveW2HSummary(items) })}
         />
       )}
       {!isVisibleAnalysisMethod(method) && <GenericAnalysis method={method} session={session} />}
@@ -178,6 +192,33 @@ export function AnalysisWorkspace({
         </>
       )}
     </SectionCard>
+  );
+}
+
+/**
+ * Faixa-guia da sequência de análise: Ishikawa → 5 Porquês → 5W2H → PDCA.
+ * Clicável para navegar; destaca a ferramenta atual.
+ */
+function AnalysisSequenceHint({ method, onSelect }: { method: string; onSelect: (m: string) => void }) {
+  return (
+    <div className="mb-4 flex flex-wrap items-center gap-1.5 rounded-lg border bg-muted/20 px-3 py-2 text-xs">
+      <span className="font-medium text-muted-foreground">Sequência:</span>
+      {VISIBLE_ANALYSIS_METHODS.map((key, index) => (
+        <span key={key} className="flex items-center gap-1.5">
+          <button
+            type="button"
+            onClick={() => onSelect(key)}
+            className={cn(
+              'rounded-full border px-2.5 py-0.5 font-medium transition',
+              method === key ? 'border-primary bg-primary text-primary-foreground' : 'border-border bg-background text-muted-foreground hover:text-foreground',
+            )}
+          >
+            {index + 1}. {TOOL_LABEL[key] ?? key}
+          </button>
+          {index < VISIBLE_ANALYSIS_METHODS.length - 1 && <ChevronRight className="h-3.5 w-3.5 text-muted-foreground/50" />}
+        </span>
+      ))}
+    </div>
   );
 }
 

@@ -194,6 +194,7 @@ export function FiveWTwoHVisualAnalysis({
   users = [],
   saving,
   canEdit = true,
+  onTaskCreated,
   onSave,
 }: {
   actionId?: string;
@@ -202,6 +203,7 @@ export function FiveWTwoHVisualAnalysis({
   users?: UserOption[];
   saving: boolean;
   canEdit?: boolean;
+  onTaskCreated?: () => void;
   onSave: (items: FiveW2HItem[]) => void;
 }) {
   const qc = useQueryClient();
@@ -330,6 +332,7 @@ export function FiveWTwoHVisualAnalysis({
       handleSave(next);
       toast.success('5W2H concluído e tarefa criada no plano');
       qc.invalidateQueries({ queryKey: ['action', actionId] });
+      onTaskCreated?.();
     } catch (error: any) {
       toast.error(error?.message ?? 'Não foi possível gerar a tarefa');
     } finally {

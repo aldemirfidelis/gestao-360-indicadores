@@ -5,6 +5,7 @@ import { toPng } from 'html-to-image';
 import { useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
 import {
+  ArrowRight,
   Download,
   GripVertical,
   LayoutGrid,
@@ -107,6 +108,7 @@ export function IshikawaVisualAnalysis({
   saving,
   canEdit = true,
   onRootCauseChange,
+  onSendToFiveWhys,
   onSave,
 }: {
   actionId?: string;
@@ -117,6 +119,7 @@ export function IshikawaVisualAnalysis({
   saving: boolean;
   canEdit?: boolean;
   onRootCauseChange: (value: string) => void;
+  onSendToFiveWhys?: (text: string) => void;
   onSave: (causes: IshikawaCause[], rootCause?: string) => void;
 }) {
   const qc = useQueryClient();
@@ -426,6 +429,12 @@ export function IshikawaVisualAnalysis({
           onMarkLikely={() => selectedCause && updateCause(selectedCause.id, { status: 'LIKELY_CAUSE' })}
           onMarkRoot={() => selectedCause && markRootCause(selectedCause)}
           onConvert={() => selectedCause && convertToAction(selectedCause)}
+          onSendToFiveWhys={onSendToFiveWhys ? () => {
+            if (!selectedCause) return;
+            updateCause(selectedCause.id, { status: 'LIKELY_CAUSE' });
+            handleSave();
+            onSendToFiveWhys(selectedCause.title);
+          } : undefined}
         />
       </div>
 
@@ -616,6 +625,7 @@ function CauseDrawer({
   onMarkLikely,
   onMarkRoot,
   onConvert,
+  onSendToFiveWhys,
 }: {
   cause: IshikawaCause | null;
   users: UserOption[];
@@ -626,6 +636,7 @@ function CauseDrawer({
   onMarkLikely: () => void;
   onMarkRoot: () => void;
   onConvert: () => void;
+  onSendToFiveWhys?: () => void;
 }) {
   if (!cause) {
     return (
@@ -707,6 +718,12 @@ function CauseDrawer({
         </div>
 
         <div className="space-y-2 border-t border-slate-200 pt-4">
+          {onSendToFiveWhys && (
+            <Button className="w-full justify-start bg-emerald-600 hover:bg-emerald-700" onClick={onSendToFiveWhys} disabled={!canEdit}>
+              <ArrowRight className="mr-2 h-4 w-4" />
+              Investigar nos 5 Porquês
+            </Button>
+          )}
           <Button variant="outline" className="w-full justify-start" onClick={onMarkLikely} disabled={!canEdit}>
             <Target className="mr-2 h-4 w-4" />
             Marcar como causa provável

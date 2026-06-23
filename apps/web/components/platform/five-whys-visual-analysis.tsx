@@ -107,6 +107,8 @@ export function FiveWhysVisualAnalysis({
   users = [],
   saving,
   canEdit = true,
+  seedAnswer,
+  onSeedConsumed,
   onRootCauseChange,
   onSave,
 }: {
@@ -118,6 +120,8 @@ export function FiveWhysVisualAnalysis({
   users?: UserOption[];
   saving: boolean;
   canEdit?: boolean;
+  seedAnswer?: string | null;
+  onSeedConsumed?: () => void;
   onRootCauseChange: (value: string) => void;
   onSave: (items: WhyItem[], rootCause?: string, extra?: Record<string, any>) => void;
 }) {
@@ -139,6 +143,22 @@ export function FiveWhysVisualAnalysis({
   useEffect(() => {
     itemsRef.current = items;
   }, [items]);
+
+  // Semente vinda do Ishikawa: a causa provável vira a resposta do 1º porquê e encadeia o 2º.
+  useEffect(() => {
+    const seed = (seedAnswer ?? '').trim();
+    if (!seed) return;
+    const base = itemsRef.current.length ? itemsRef.current : items;
+    const next = base.map((item, i) => {
+      if (i === 0) return { ...item, answer: seed, status: (item.status === 'PENDING' ? 'IN_REVIEW' : item.status) as WhyStatus };
+      if (i === 1) return { ...item, question: inheritedQuestionFor(seed) };
+      return item;
+    });
+    setItems(next);
+    handleSave(next);
+    onSeedConsumed?.();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [seedAnswer]);
 
   const rootItem = items.find((item) => item.isRootCause) ?? null;
   const answeredCount = items.filter(isAnswered).length;
