@@ -17,6 +17,7 @@ import { TraceabilityService } from '../traceability/traceability.service';
 import { AccessService } from '../access/access.service';
 import type { AreaAction } from '../access/access.logic';
 import { AuthPayload } from '../auth/auth.types';
+import { GeminiService } from '../ai/gemini.service';
 import { FormCodeService } from './form-code.service';
 import { FormStorageService } from './form-storage.service';
 
@@ -72,6 +73,7 @@ export class FormsService {
     private readonly access: AccessService,
     private readonly codes: FormCodeService,
     private readonly storage: FormStorageService,
+    private readonly gemini?: GeminiService,
   ) {}
 
   private templateInclude() {
@@ -1538,7 +1540,7 @@ export class FormsService {
       template = await this.loadTemplate(templateId, me.companyId);
       await this.assertViewArea(me, template);
     }
-    const suggestions = [
+    const fallbackSuggestions = [
       {
         suggestionType: 'QUALITY_REVIEW',
         title: 'Revisar campos obrigatorios e evidencias',
@@ -1555,13 +1557,74 @@ export class FormsService {
         content: 'Use uma versao publicada para preservar o desenho exato usado nos registros operacionais.',
       },
     ];
+    const aiSuggestions = await this.tryGeminiFormSuggestions(template, submission, fallbackSuggestions);
+    const suggestions = aiSuggestions ?? fallbackSuggestions;
     await this.prisma.formAiSuggestion.createMany({
-      data: suggestions.map((item) => ({ companyId: me.companyId, templateId: template?.id ?? null, submissionId: submission?.id ?? null, ...item, context: { generatedBy: me.sub } })),
+      data: suggestions.map((item) => ({
+        companyId: me.companyId,
+        templateId: template?.id ?? null,
+        submissionId: submission?.id ?? null,
+        ...item,
+        context: { generatedBy: me.sub, source: aiSuggestions ? this.gemini?.provider : 'rules', model: aiSuggestions ? this.gemini?.modelName : null },
+      })),
     });
     return this.prisma.formAiSuggestion.findMany({
       where: { companyId: me.companyId, templateId: template?.id ?? undefined, submissionId: submission?.id ?? undefined },
       orderBy: { createdAt: 'desc' },
       take: suggestions.length,
     });
+  }
+
+  private async tryGeminiFormSuggestions(
+    template: any,
+    submission: any,
+    fallbackSuggestions: Array<{ suggestionType: string; title: string; content: string }>,
+  ): Promise<Array<{ suggestionType: string; title: string; content: string }> | null> {
+    if (!this.gemini?.isEnabled) return null;
+    const prompt = `Voce e um especialista senior em formularios corporativos, checklist operacional, qualidade e compliance.
+Gere sugestoes assistivas para melhorar o template ou o preenchimento informado.
+Nao altere dados, nao aprove registros e nao crie pendencias automaticamente.
+
+Responda apenas JSON no schema:
+{
+  "suggestions": [
+    { "suggestionType": "QUALITY_REVIEW|AUTOMATION|VERSIONING|EVIDENCE|COMPLIANCE", "title": "...", "content": "..." }
+  ]
+}
+
+CONTEXTO:
+${JSON.stringify({
+  template: template ? {
+    id: template.id,
+    code: template.code,
+    name: template.name,
+    type: template.type,
+    status: template.status,
+    fields: template.fields,
+    indicator: template.indicator?.name,
+    process: template.process?.name,
+  } : null,
+  submission: submission ? {
+    id: submission.id,
+    status: submission.status,
+    result: submission.result,
+    values: submission.values,
+    score: submission.score,
+  } : null,
+  baseRules: fallbackSuggestions,
+}, null, 2)}`;
+    const json = await this.gemini.generateJson<{ suggestions?: Array<{ suggestionType?: string; title?: string; content?: string }> }>(prompt, {
+      temperature: 0.35,
+      maxOutputTokens: 1400,
+    });
+    const allowed = new Set(['QUALITY_REVIEW', 'AUTOMATION', 'VERSIONING', 'EVIDENCE', 'COMPLIANCE']);
+    const suggestions = json?.suggestions
+      ?.map((item) => ({
+        suggestionType: allowed.has(String(item.suggestionType)) ? String(item.suggestionType) : 'QUALITY_REVIEW',
+        title: String(item.title ?? '').trim(),
+        content: String(item.content ?? '').trim(),
+      }))
+      .filter((item) => item.title && item.content);
+    return suggestions?.length ? suggestions.slice(0, 5) : null;
   }
 }

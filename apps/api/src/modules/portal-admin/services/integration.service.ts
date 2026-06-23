@@ -6,7 +6,7 @@ import { PortalAuditService } from './portal-audit.service';
 export const DEFAULT_INTEGRATIONS = [
   { code: 'email', name: 'Envio de E-mail', type: 'email', env: 'SMTP_HOST' },
   { code: 'ics', name: 'Convites ICS / Calendário', type: 'calendar', env: null },
-  { code: 'ai', name: 'Serviço de IA', type: 'ai', env: 'OPENAI_API_KEY' },
+  { code: 'ai', name: 'Serviço de IA', type: 'ai', env: 'GEMINI_API_KEY' },
   { code: 'database', name: 'Banco de Dados', type: 'database', env: 'DATABASE_URL' },
   { code: 'storage', name: 'Armazenamento', type: 'storage', env: null },
   { code: 'communication', name: 'Comunicacao Interna', type: 'communication', env: null },

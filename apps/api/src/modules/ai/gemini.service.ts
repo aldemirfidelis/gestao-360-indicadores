@@ -45,14 +45,14 @@ export class GeminiService {
   }
 
   get provider(): 'groq' | 'gemini' | 'rules' {
-    if (this.groqApiKey) return 'groq';
     if (this.geminiModel) return 'gemini';
+    if (this.groqApiKey) return 'groq';
     return 'rules';
   }
 
   get modelName(): string | null {
-    if (this.groqApiKey) return this.groqModelName;
     if (this.geminiModel) return this.geminiModelName;
+    if (this.groqApiKey) return this.groqModelName;
     return null;
   }
 
@@ -62,11 +62,14 @@ export class GeminiService {
    */
   async generateText(prompt: string, options?: { temperature?: number; maxOutputTokens?: number }): Promise<string | null> {
     if (!this.isEnabled) return null;
-    if (this.groqApiKey) {
-      const groqText = await this.generateGroqText(prompt, options);
-      if (groqText || !this.geminiModel) return groqText;
+    if (this.geminiModel) {
+      const geminiText = await this.generateGeminiText(prompt, options);
+      if (geminiText || !this.groqApiKey) return geminiText;
     }
-    return this.generateGeminiText(prompt, options);
+    if (this.groqApiKey) {
+      return this.generateGroqText(prompt, options);
+    }
+    return null;
   }
 
   private async generateGroqText(prompt: string, options?: { temperature?: number; maxOutputTokens?: number }): Promise<string | null> {

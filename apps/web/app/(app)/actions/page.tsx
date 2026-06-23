@@ -38,6 +38,7 @@ interface Action extends ActionPlanCardData {
   indicator: { id: string; name: string; code: string | null } | null;
   indicatorResult: { id: string; periodRef: string; value: number; light: string; deviationPct: number | null } | null;
   strategicObjective: { id: string; name: string; perspective: { id: string; name: string } | null } | null;
+  okrObjective: { id: string; name: string; cycle: { id: string; name: string } } | null;
   deviation: { id: string; number: number; title: string; method: string; rootCause: string | null } | null;
   meeting: { id: string; title: string; startsAt: string } | null;
   _count: { tasks: number; evidences: number; comments: number; analysisSessions: number };
@@ -50,6 +51,7 @@ interface Options {
   deviations: { id: string; number: number; title: string; indicatorId: string; method: string; rootCause: string | null }[];
   meetings: { id: string; title: string }[];
   strategicObjectives: { id: string; name: string; perspective: { id: string; name: string } | null }[];
+  okrObjectives: { id: string; name: string; strategicObjId: string | null; ownerNodeId: string | null; ownerUserId: string | null; cycle: { id: string; name: string } }[];
   statuses: string[];
   priorities: string[];
   origins: string[];
@@ -106,6 +108,7 @@ const emptyForm = {
   deviationId: '',
   meetingId: '',
   strategicObjectiveId: '',
+  okrObjectiveId: '',
   ownerNodeId: '',
   responsibleUserId: '',
   priority: 'MEDIUM',
@@ -129,6 +132,7 @@ export default function ActionsPage() {
     search: searchParams.get('search') ?? '',
     status: searchParams.get('status') ?? '',
     indicatorId: searchParams.get('indicatorId') ?? '',
+    okrObjectiveId: searchParams.get('okrObjectiveId') ?? '',
     ownerNodeId: searchParams.get('ownerNodeId') ?? '',
     effectivenessStatus: searchParams.get('effectivenessStatus') ?? '',
   });
@@ -225,7 +229,7 @@ export default function ActionsPage() {
       </div>
 
       <SectionCard title="Filtros avançados" description="Busque por origem, status, indicador, área ou eficácia." className="mb-6">
-        <div className="grid grid-cols-1 gap-3 md:grid-cols-5">
+        <div className="grid grid-cols-1 gap-3 md:grid-cols-6">
           <div className="relative md:col-span-2">
             <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
             <Input className="pl-9" placeholder="Buscar plano, problema ou causa..." value={filters.search} onChange={(e) => setFilters({ ...filters, search: e.target.value })} />
@@ -237,6 +241,10 @@ export default function ActionsPage() {
           <NativeSelect value={filters.indicatorId} onChange={(e) => setFilters({ ...filters, indicatorId: e.target.value })}>
             <option value="">Todos os indicadores</option>
             {(options.data?.indicators ?? []).map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}
+          </NativeSelect>
+          <NativeSelect value={filters.okrObjectiveId} onChange={(e) => setFilters({ ...filters, okrObjectiveId: e.target.value })}>
+            <option value="">Todos os OKRs</option>
+            {(options.data?.okrObjectives ?? []).map((item) => <option key={item.id} value={item.id}>{item.cycle.name} - {item.name}</option>)}
           </NativeSelect>
           <NativeSelect value={filters.effectivenessStatus} onChange={(e) => setFilters({ ...filters, effectivenessStatus: e.target.value })}>
             <option value="">Todas eficácias</option>
@@ -345,10 +353,10 @@ function ActionRow({ action: a }: { action: Action }) {
     <tr>
       <td>
         <Link href={`/actions/${a.id}`} className="font-medium hover:underline">{a.title}</Link>
-        <div className="text-xs text-muted-foreground">{a.strategicObjective?.name ?? a.ownerNode?.name ?? a.origin}</div>
+        <div className="text-xs text-muted-foreground">{a.okrObjective?.name ?? a.strategicObjective?.name ?? a.ownerNode?.name ?? a.origin}</div>
       </td>
       <td>
-        <div className="text-sm">{a.indicator?.name ?? a.deviation?.title ?? a.meeting?.title ?? a.origin}</div>
+        <div className="text-sm">{a.indicator?.name ?? a.deviation?.title ?? a.meeting?.title ?? a.okrObjective?.cycle?.name ?? a.origin}</div>
         {a.indicatorResult && <div className="text-xs text-muted-foreground">{a.indicatorResult.periodRef} - {a.indicatorResult.light}</div>}
       </td>
       <td>{a.responsibleUser?.name ?? 'Sem responsável'}</td>
@@ -377,6 +385,22 @@ function ActionForm({ form, setForm, options }: { form: typeof emptyForm; setFor
         </NativeSelect>
       </div>
       <SelectField label="Objetivo estratégico" value={form.strategicObjectiveId} onChange={(strategicObjectiveId) => setForm({ ...form, strategicObjectiveId })} items={options?.strategicObjectives ?? []} />
+      <SelectField
+        label="Objetivo OKR"
+        value={form.okrObjectiveId}
+        onChange={(okrObjectiveId) => {
+          const objective = options?.okrObjectives.find((item) => item.id === okrObjectiveId);
+          setForm({
+            ...form,
+            okrObjectiveId,
+            origin: okrObjectiveId ? 'OKR' : form.origin,
+            ownerNodeId: objective?.ownerNodeId ?? form.ownerNodeId,
+            responsibleUserId: objective?.ownerUserId ?? form.responsibleUserId,
+            strategicObjectiveId: objective?.strategicObjId ?? form.strategicObjectiveId,
+          });
+        }}
+        items={(options?.okrObjectives ?? []).map((item) => ({ id: item.id, name: `${item.cycle.name} - ${item.name}` }))}
+      />
       <SelectField label="Área ou setor" value={form.ownerNodeId} onChange={(ownerNodeId) => setForm({ ...form, ownerNodeId })} items={options?.orgNodes ?? []} />
       <SelectField label="Indicador vinculado" value={form.indicatorId} onChange={(indicatorId) => {
         const indicator = options?.indicators.find((item) => item.id === indicatorId);
@@ -470,7 +494,7 @@ function toQuery(filters: Record<string, string>) {
 }
 
 function toPayload(form: typeof emptyForm) {
-  const originRefId = form.deviationId || form.meetingId || form.indicatorId || form.strategicObjectiveId || null;
+  const originRefId = form.deviationId || form.meetingId || form.indicatorId || form.okrObjectiveId || form.strategicObjectiveId || null;
   return {
     ...form,
     originRefId,
@@ -479,6 +503,7 @@ function toPayload(form: typeof emptyForm) {
     deviationId: form.deviationId || null,
     meetingId: form.meetingId || null,
     strategicObjectiveId: form.strategicObjectiveId || null,
+    okrObjectiveId: form.okrObjectiveId || null,
     ownerNodeId: form.ownerNodeId || null,
     responsibleUserId: form.responsibleUserId || null,
     startDate: form.startDate || null,

@@ -84,6 +84,7 @@ export const actionCreateSchema = z.object({
   originRefId: z.string().uuid().optional().nullable(),
   branchId: z.string().uuid().optional().nullable(),
   strategicObjectiveId: z.string().uuid().optional().nullable(),
+  okrObjectiveId: z.string().uuid().optional().nullable(),
   indicatorId: z.string().uuid().optional().nullable(),
   indicatorResultId: z.string().uuid().optional().nullable(),
   deviationId: z.string().uuid().optional().nullable(),

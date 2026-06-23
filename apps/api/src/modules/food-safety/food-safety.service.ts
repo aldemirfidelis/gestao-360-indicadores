@@ -28,6 +28,7 @@ import { PrismaService } from '../../prisma/prisma.service';
 import { AccessService } from '../access/access.service';
 import type { AreaAction } from '../access/access.logic';
 import { AuthPayload } from '../auth/auth.types';
+import { GeminiService } from '../ai/gemini.service';
 import { NonConformitiesService } from '../nonconformities/nonconformities.service';
 
 /**
@@ -47,6 +48,7 @@ export class FoodSafetyService {
     private readonly prisma: PrismaService,
     private readonly access: AccessService,
     private readonly nonConformities: NonConformitiesService,
+    private readonly gemini?: GeminiService,
   ) {}
 
   // ----------------------------- helpers ------------------------------------
@@ -1992,7 +1994,53 @@ export class FoodSafetyService {
         area: 'Visao Geral',
       });
     }
-    return { generatedAt: new Date().toISOString(), insights };
+    const aiInsights = await this.tryGeminiFoodSafetyInsights({ dashboard, scorecard, fallbackInsights: insights });
+    return {
+      generatedAt: new Date().toISOString(),
+      provider: aiInsights ? this.gemini?.provider : 'rules',
+      model: aiInsights ? this.gemini?.modelName : null,
+      insights: aiInsights ?? insights,
+    };
+  }
+
+  private async tryGeminiFoodSafetyInsights(context: {
+    dashboard: any;
+    scorecard: any[];
+    fallbackInsights: Array<{ severity: 'LOW' | 'MEDIUM' | 'HIGH' | 'CRITICAL'; title: string; description: string; action: string; area: string }>;
+  }): Promise<Array<{ severity: 'LOW' | 'MEDIUM' | 'HIGH' | 'CRITICAL'; title: string; description: string; action: string; area: string }> | null> {
+    if (!this.gemini?.isEnabled) return null;
+    const prompt = `Voce e um especialista senior em seguranca de alimentos, APPCC, PPR/PPRO/PCC e compliance industrial.
+Gere insights executivos em portugues do Brasil para o modulo Seguranca dos Alimentos.
+Use somente os dados fornecidos. Nao aprove, bloqueie ou encerre nada automaticamente.
+
+Responda apenas JSON no schema:
+{
+  "insights": [
+    { "severity": "LOW|MEDIUM|HIGH|CRITICAL", "title": "...", "description": "...", "action": "...", "area": "..." }
+  ]
+}
+
+CONTEXTO:
+${JSON.stringify({
+  dashboard: context.dashboard,
+  supplierScorecard: context.scorecard.slice(0, 10),
+  baseRules: context.fallbackInsights,
+}, null, 2)}`;
+    const json = await this.gemini.generateJson<{ insights?: Array<{ severity?: string; title?: string; description?: string; action?: string; area?: string }> }>(prompt, {
+      temperature: 0.35,
+      maxOutputTokens: 1600,
+    });
+    const allowed = new Set(['LOW', 'MEDIUM', 'HIGH', 'CRITICAL']);
+    const insights = json?.insights
+      ?.map((item) => ({
+        severity: allowed.has(String(item.severity)) ? String(item.severity) as 'LOW' | 'MEDIUM' | 'HIGH' | 'CRITICAL' : 'MEDIUM',
+        title: String(item.title ?? '').trim(),
+        description: String(item.description ?? '').trim(),
+        action: String(item.action ?? '').trim(),
+        area: String(item.area ?? 'Seguranca dos Alimentos').trim(),
+      }))
+      .filter((item) => item.title && item.description && item.action);
+    return insights?.length ? insights.slice(0, 6) : null;
   }
 
   async exportData(me: AuthPayload, dataset: string, programId?: string) {

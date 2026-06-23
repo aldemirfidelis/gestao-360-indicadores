@@ -31,6 +31,7 @@ interface ActionFilter {
   ownerNodeId?: string;
   indicatorId?: string;
   strategicObjectiveId?: string;
+  okrObjectiveId?: string;
   effectivenessStatus?: ActionEffectivenessStatus;
   overdue?: boolean;
   origin?: string;
@@ -64,6 +65,7 @@ export class ActionsService {
       ...(f.ownerNodeId ? { ownerNodeId: f.ownerNodeId } : {}),
       ...(f.indicatorId ? { indicatorId: f.indicatorId } : {}),
       ...(f.strategicObjectiveId ? { strategicObjectiveId: f.strategicObjectiveId } : {}),
+      ...(f.okrObjectiveId ? { okrObjectiveId: f.okrObjectiveId } : {}),
       ...(f.effectivenessStatus ? { effectivenessStatus: f.effectivenessStatus } : {}),
       ...(f.origin ? { origin: f.origin as ActionOrigin } : {}),
       ...(f.search
@@ -100,7 +102,7 @@ export class ActionsService {
   }
 
   async options(companyId: string) {
-    const [users, orgNodes, branches, indicators, deviations, meetings, strategicObjectives] = await Promise.all([
+    const [users, orgNodes, branches, indicators, deviations, meetings, strategicObjectives, okrObjectives] = await Promise.all([
       this.prisma.user.findMany({
         where: { companyId, deletedAt: null, active: true },
         select: { id: true, name: true, email: true, jobTitle: true, defaultNodeId: true },
@@ -150,6 +152,19 @@ export class ActionsService {
         select: { id: true, name: true, perspective: { select: { id: true, name: true } }, ownerNodeId: true },
         orderBy: [{ perspective: { position: 'asc' } }, { position: 'asc' }, { name: 'asc' }],
       }),
+      this.prisma.oKRObjective.findMany({
+        where: { deletedAt: null, cycle: { companyId, active: true } },
+        select: {
+          id: true,
+          name: true,
+          cycleId: true,
+          strategicObjId: true,
+          ownerNodeId: true,
+          ownerUserId: true,
+          cycle: { select: { id: true, name: true } },
+        },
+        orderBy: [{ cycle: { startsAt: 'desc' } }, { createdAt: 'asc' }],
+      }),
     ]);
 
     return {
@@ -160,6 +175,7 @@ export class ActionsService {
       deviations,
       meetings,
       strategicObjectives,
+      okrObjectives,
       statuses: Object.values(ActionStatus),
       priorities: Object.values(ActionPriority),
       origins: Object.values(ActionOrigin),
@@ -191,6 +207,7 @@ export class ActionsService {
         companyId: input.companyId,
         branchId: input.branchId ?? inferred.branchId ?? null,
         strategicObjectiveId: input.strategicObjectiveId ?? inferred.strategicObjectiveId ?? null,
+        okrObjectiveId: input.okrObjectiveId ?? inferred.okrObjectiveId ?? null,
         indicatorId: input.indicatorId ?? inferred.indicatorId ?? null,
         indicatorResultId: input.indicatorResultId ?? inferred.indicatorResultId ?? null,
         deviationId: input.deviationId ?? inferred.deviationId ?? null,
@@ -1424,6 +1441,7 @@ ${currentStages || '- nenhuma'}`;
       indicator: { select: { id: true, name: true, code: true, ownerNode: { select: { id: true, name: true } } } },
       indicatorResult: { select: { id: true, periodRef: true, value: true, light: true, deviationPct: true } },
       strategicObjective: { select: { id: true, name: true, perspective: { select: { id: true, name: true } } } },
+      okrObjective: { select: { id: true, name: true, cycle: { select: { id: true, name: true } } } },
       deviation: { select: { id: true, number: true, title: true, method: true, rootCause: true, status: true } },
       analysis: { select: { id: true, method: true, content: true } },
       meeting: { select: { id: true, title: true, startsAt: true } },
@@ -1448,6 +1466,7 @@ ${currentStages || '- nenhuma'}`;
       },
       indicatorResult: true,
       strategicObjective: { include: { perspective: true, map: true } },
+      okrObjective: { include: { cycle: true, ownerNode: true, ownerUser: true } },
       deviation: { include: { causes: true, analyses: true } },
       analysis: true,
       meeting: { include: { participants: { include: { user: { select: { id: true, name: true } } } }, decisions: true } },
@@ -1519,6 +1538,27 @@ ${currentStages || '- nenhuma'}`;
     if ((input.origin === ActionOrigin.OBJECTIVE || input.origin === ActionOrigin.STRATEGIC_MAP) && input.originRefId) {
       out.strategicObjectiveId = input.originRefId;
     }
+    const okrObjectiveId = input.okrObjectiveId ?? (input.origin === ActionOrigin.OKR ? input.originRefId : null);
+    if (okrObjectiveId) {
+      const objective = await this.prisma.oKRObjective.findFirst({
+        where: { id: okrObjectiveId, deletedAt: null, cycle: { companyId: input.companyId } },
+        select: {
+          id: true,
+          name: true,
+          description: true,
+          ownerNodeId: true,
+          ownerUserId: true,
+          strategicObjId: true,
+          strategicObj: { select: { ownerNodeId: true } },
+        },
+      });
+      if (!objective) throw new NotFoundException('Objetivo OKR nao encontrado');
+      out.okrObjectiveId = objective.id;
+      out.strategicObjectiveId = objective.strategicObjId;
+      out.ownerNodeId = objective.ownerNodeId ?? objective.strategicObj?.ownerNodeId ?? null;
+      out.responsibleUserId = objective.ownerUserId ?? null;
+      out.problemDescription = objective.description ?? objective.name;
+    }
     return out;
   }
 
@@ -1545,7 +1585,7 @@ ${currentStages || '- nenhuma'}`;
       'cancelReason',
     ];
     for (const key of simple) if (key in patch) (data as any)[key] = patch[key];
-    const nullableRelations = ['branchId', 'ownerNodeId', 'responsibleUserId', 'strategicObjectiveId', 'indicatorId', 'indicatorResultId', 'meetingId', 'analysisId', 'treatmentId', 'deviationId'];
+    const nullableRelations = ['branchId', 'ownerNodeId', 'responsibleUserId', 'strategicObjectiveId', 'okrObjectiveId', 'indicatorId', 'indicatorResultId', 'meetingId', 'analysisId', 'treatmentId', 'deviationId'];
     for (const key of nullableRelations) if (key in patch) (data as any)[key] = patch[key] || null;
     if ('startDate' in patch) data.startDate = patch.startDate ? new Date(patch.startDate) : null;
     if ('dueDate' in patch) data.dueDate = patch.dueDate ? new Date(patch.dueDate) : null;
@@ -1714,6 +1754,7 @@ ${currentStages || '- nenhuma'}`;
 
   private buildOriginTrail(action: any) {
     const trail = [];
+    if (action.okrObjective) trail.push({ type: 'OKR', label: action.okrObjective.name, href: '/okrs' });
     if (action.strategicObjective) trail.push({ type: 'Objetivo estratégico', label: action.strategicObjective.name, href: `/strategy/${action.strategicObjective.mapId ?? action.strategicObjective.map?.id ?? ''}` });
     if (action.ownerNode) trail.push({ type: 'Area/Setor', label: action.ownerNode.name, href: '/org' });
     if (action.indicator) trail.push({ type: 'Indicador', label: action.indicator.name, href: `/indicators/${action.indicator.id}` });

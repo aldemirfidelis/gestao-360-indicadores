@@ -9,6 +9,7 @@ import { UsersService } from '../users/users.service';
 import { PlatformAdminAuthService } from './services/platform-admin-auth.service';
 import { PlatformAdminService } from './services/platform-admin.service';
 import { PlatformAdminAuditService } from './services/platform-admin-audit.service';
+import { PlatformEmailService } from './services/platform-email.service';
 import { PlatformAdminRequired } from './decorators/platform-permissions.decorator';
 import { CurrentPlatformAdmin } from './decorators/current-platform-admin.decorator';
 import { PlatformAdminIdentity } from './platform-admin.types';
@@ -42,6 +43,7 @@ export class PlatformAdminController {
     private readonly service: PlatformAdminService,
     private readonly audit: PlatformAdminAuditService,
     private readonly usersService: UsersService,
+    private readonly email: PlatformEmailService,
   ) {}
 
   @Throttle({ default: { limit: 5, ttl: 60_000 } })
@@ -330,6 +332,56 @@ export class PlatformAdminController {
   @PlatformAdminRequired('platform.integrations.manage')
   integrations() {
     return this.service.integrations();
+  }
+
+  // ---- E-mail (SMTP + remetentes do sistema) ----
+
+  @Get('email/settings')
+  @PlatformAdminRequired('platform.integrations.manage')
+  emailSettings() {
+    return this.email.getSettings();
+  }
+
+  @Put('email/settings')
+  @PlatformAdminRequired('platform.integrations.manage')
+  updateEmailSettings(@CurrentPlatformAdmin() user: PlatformAdminIdentity, @Body() body: Record<string, unknown>) {
+    return this.email.updateSettings(user, body);
+  }
+
+  @Post('email/test')
+  @PlatformAdminRequired('platform.integrations.manage')
+  testEmail(@CurrentPlatformAdmin() user: PlatformAdminIdentity, @Body() body: { to?: string }) {
+    return this.email.sendTest(user, body);
+  }
+
+  @Get('email/mailboxes')
+  @PlatformAdminRequired('platform.integrations.manage')
+  mailboxes() {
+    return this.email.listMailboxes();
+  }
+
+  @Post('email/mailboxes')
+  @PlatformAdminRequired('platform.integrations.manage')
+  createMailbox(@CurrentPlatformAdmin() user: PlatformAdminIdentity, @Body() body: Record<string, unknown>) {
+    return this.email.createMailbox(user, body);
+  }
+
+  @Patch('email/mailboxes/:id')
+  @PlatformAdminRequired('platform.integrations.manage')
+  updateMailbox(@CurrentPlatformAdmin() user: PlatformAdminIdentity, @Param('id') id: string, @Body() body: Record<string, unknown>) {
+    return this.email.updateMailbox(user, id, body);
+  }
+
+  @Post('email/mailboxes/:id/default')
+  @PlatformAdminRequired('platform.integrations.manage')
+  setDefaultMailbox(@CurrentPlatformAdmin() user: PlatformAdminIdentity, @Param('id') id: string) {
+    return this.email.setDefaultMailbox(user, id);
+  }
+
+  @Delete('email/mailboxes/:id')
+  @PlatformAdminRequired('platform.integrations.manage')
+  deleteMailbox(@CurrentPlatformAdmin() user: PlatformAdminIdentity, @Param('id') id: string) {
+    return this.email.deleteMailbox(user, id);
   }
 
   @Get('jobs')

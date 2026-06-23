@@ -18,15 +18,19 @@ import {
   LayoutDashboard,
   ListChecks,
   LogOut,
+  Mail,
   Network,
   PackageCheck,
   Pencil,
   PlayCircle,
   Plus,
   Search,
+  Send,
   ServerCog,
   Save,
   ShieldCheck,
+  Star,
+  Trash2,
   Settings2,
   SlidersHorizontal,
   Users,
@@ -79,6 +83,7 @@ type SectionKey =
   | 'orgStructure'
   | 'databaseAdmin'
   | 'portalAdmin'
+  | 'email'
   | 'seoPresence'
   | 'companyAudit'
   | 'companies'
@@ -234,6 +239,7 @@ const SECTIONS: SectionItem[] = [
   // Ferramentas tecnicas/globais.
   { key: 'databaseAdmin', label: 'Banco de Dados', icon: Database, group: 'Técnico' },
   { key: 'portalAdmin', label: 'Central do Portal', icon: Wrench, group: 'Técnico' },
+  { key: 'email', label: 'E-mail', icon: Mail, group: 'Técnico' },
   { key: 'technical', label: 'Desenvolvimento', icon: ServerCog, group: 'Técnico' },
   { key: 'audit', label: 'Auditoria', icon: Activity, group: 'Técnico' },
 ];
@@ -695,6 +701,7 @@ export function PlatformAdminApp() {
             />
           )}
           {section === 'portalAdmin' && <PortalAdminSection />}
+          {section === 'email' && <EmailSection />}
           {section === 'companyAudit' && <CompanyAuditSection />}
           {section === 'companies' && <CompaniesSection />}
           {section === 'modules' && <ModulesSection />}
@@ -1957,6 +1964,214 @@ function SecuritySection() {
           <Field label="Justificativa" value={support.justification} onChange={(value) => setSupport((prev) => ({ ...prev, justification: value }))} />
           <Field label="Minutos" value={support.minutes} onChange={(value) => setSupport((prev) => ({ ...prev, minutes: value }))} />
           <Button className="w-full" disabled={!support.companyId || !support.justification || start.isPending} onClick={() => start.mutate()}>Iniciar somente leitura</Button>
+        </div>
+      </Panel>
+    </div>
+  );
+}
+
+interface EmailSettings {
+  configured: boolean;
+  source: 'db' | 'env' | 'none';
+  host: string | null;
+  port: number;
+  secure: boolean;
+  username: string | null;
+  hasPassword: boolean;
+  fromName: string | null;
+  fromAddress: string | null;
+  replyTo: string | null;
+  status: string;
+  lastTestAt: string | null;
+  lastTestOk: boolean | null;
+  lastTestError: string | null;
+}
+
+interface Mailbox {
+  id: string;
+  address: string;
+  displayName: string | null;
+  purpose: string | null;
+  isDefault: boolean;
+  active: boolean;
+  notes: string | null;
+}
+
+const PASSWORD_MASK = '••••••';
+
+function EmailSection() {
+  const qc = useQueryClient();
+  const settings = useQuery({ queryKey: ['platform-admin', 'email-settings'], queryFn: () => platformAdminApi<EmailSettings>('/email/settings') });
+  const mailboxes = useQuery({ queryKey: ['platform-admin', 'mailboxes'], queryFn: () => platformAdminApi<Mailbox[]>('/email/mailboxes') });
+
+  const [form, setForm] = useState({ host: '', port: '587', secure: false, username: '', password: '', fromName: '', fromAddress: '', replyTo: '', status: 'active' });
+  const [testTo, setTestTo] = useState('');
+  const [newBox, setNewBox] = useState({ address: '', displayName: '', purpose: '' });
+
+  useEffect(() => {
+    const d = settings.data;
+    if (!d) return;
+    setForm({
+      host: d.host ?? '',
+      port: String(d.port ?? 587),
+      secure: Boolean(d.secure),
+      username: d.username ?? '',
+      password: d.hasPassword ? PASSWORD_MASK : '',
+      fromName: d.fromName ?? '',
+      fromAddress: d.fromAddress ?? '',
+      replyTo: d.replyTo ?? '',
+      status: d.status ?? 'active',
+    });
+  }, [settings.data]);
+
+  const update = (patch: Partial<typeof form>) => setForm((prev) => ({ ...prev, ...patch }));
+
+  const save = useMutation({
+    mutationFn: () => platformAdminApi('/email/settings', { method: 'PUT', json: { ...form, port: Number(form.port) || 587 } }),
+    onSuccess: () => { toast.success('Configuração de e-mail salva'); qc.invalidateQueries({ queryKey: ['platform-admin', 'email-settings'] }); },
+    onError: (err) => toast.error(err instanceof Error ? err.message : 'Falha ao salvar'),
+  });
+  const test = useMutation({
+    mutationFn: () => platformAdminApi<{ ok: boolean; error?: string | null; to: string }>('/email/test', { method: 'POST', json: { to: testTo || undefined } }),
+    onSuccess: (r) => {
+      if (r.ok) toast.success(`E-mail de teste enviado para ${r.to}`);
+      else toast.error(`Falha no envio: ${r.error ?? 'erro desconhecido'}`);
+      qc.invalidateQueries({ queryKey: ['platform-admin', 'email-settings'] });
+    },
+    onError: (err) => toast.error(err instanceof Error ? err.message : 'Falha no teste de envio'),
+  });
+  const addBox = useMutation({
+    mutationFn: () => platformAdminApi('/email/mailboxes', { method: 'POST', json: newBox }),
+    onSuccess: () => { toast.success('Remetente cadastrado'); setNewBox({ address: '', displayName: '', purpose: '' }); qc.invalidateQueries({ queryKey: ['platform-admin', 'mailboxes'] }); },
+    onError: (err) => toast.error(err instanceof Error ? err.message : 'Falha ao cadastrar remetente'),
+  });
+  const setDefault = useMutation({
+    mutationFn: (id: string) => platformAdminApi(`/email/mailboxes/${id}/default`, { method: 'POST' }),
+    onSuccess: () => { toast.success('Remetente padrão atualizado'); qc.invalidateQueries({ queryKey: ['platform-admin', 'mailboxes'] }); },
+    onError: (err) => toast.error(err instanceof Error ? err.message : 'Falha ao definir padrão'),
+  });
+  const toggleBox = useMutation({
+    mutationFn: (box: Mailbox) => platformAdminApi(`/email/mailboxes/${box.id}`, { method: 'PATCH', json: { active: !box.active } }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['platform-admin', 'mailboxes'] }),
+    onError: (err) => toast.error(err instanceof Error ? err.message : 'Falha ao atualizar remetente'),
+  });
+  const delBox = useMutation({
+    mutationFn: (id: string) => platformAdminApi(`/email/mailboxes/${id}`, { method: 'DELETE' }),
+    onSuccess: () => { toast.success('Remetente removido'); qc.invalidateQueries({ queryKey: ['platform-admin', 'mailboxes'] }); },
+    onError: (err) => toast.error(err instanceof Error ? err.message : 'Falha ao remover'),
+  });
+
+  const data = settings.data;
+  const lastTest = data?.lastTestOk === true ? 'SUCCESS' : data?.lastTestOk === false ? 'ERROR' : null;
+
+  return (
+    <div className="grid gap-4 xl:grid-cols-2">
+      <Panel
+        title="Servidor SMTP"
+        icon={Mail}
+        actions={<span className="pill pill-gray whitespace-nowrap">Origem: {data?.source === 'db' ? 'banco' : data?.source === 'env' ? 'ambiente' : 'não configurado'}</span>}
+      >
+        <div className="space-y-3">
+          <div className="grid gap-3 sm:grid-cols-2">
+            <div className="sm:col-span-2">
+              <Label className="text-xs">Host SMTP</Label>
+              <Input value={form.host} onChange={(e) => update({ host: e.target.value })} placeholder="smtp.zoho.com" />
+            </div>
+            <div>
+              <Label className="text-xs">Porta</Label>
+              <Input value={form.port} onChange={(e) => update({ port: e.target.value.replace(/\D/g, '') })} placeholder="587" />
+            </div>
+            <label className="flex items-end gap-2 pb-2 text-sm">
+              <input type="checkbox" checked={form.secure} onChange={(e) => update({ secure: e.target.checked })} />
+              Conexão segura (TLS/SSL na porta 465)
+            </label>
+            <div>
+              <Label className="text-xs">Usuário</Label>
+              <Input value={form.username} onChange={(e) => update({ username: e.target.value })} placeholder="contato@gestao360.org" />
+            </div>
+            <div>
+              <Label className="text-xs">Senha</Label>
+              <Input type="password" value={form.password} onChange={(e) => update({ password: e.target.value })} placeholder={data?.hasPassword ? 'Senha salva (deixe para manter)' : 'Senha do SMTP'} />
+            </div>
+            <div>
+              <Label className="text-xs">Nome de exibição (From)</Label>
+              <Input value={form.fromName} onChange={(e) => update({ fromName: e.target.value })} placeholder="Gestão 360" />
+            </div>
+            <div>
+              <Label className="text-xs">E-mail remetente padrão (From)</Label>
+              <Input value={form.fromAddress} onChange={(e) => update({ fromAddress: e.target.value })} placeholder="contato@gestao360.org" />
+            </div>
+            <div>
+              <Label className="text-xs">Responder para (Reply-To)</Label>
+              <Input value={form.replyTo} onChange={(e) => update({ replyTo: e.target.value })} placeholder="opcional" />
+            </div>
+            <div>
+              <Label className="text-xs">Status</Label>
+              <NativeSelect value={form.status} onChange={(e) => update({ status: e.target.value })}>
+                <option value="active">Ativo</option>
+                <option value="disabled">Desativado</option>
+              </NativeSelect>
+            </div>
+          </div>
+
+          <div className="flex flex-wrap items-center gap-2 border-t pt-3">
+            <Button size="sm" onClick={() => save.mutate()} disabled={save.isPending}>
+              <Save className="mr-2 h-4 w-4" />{save.isPending ? 'Salvando...' : 'Salvar configuração'}
+            </Button>
+            <div className="ml-auto flex items-center gap-2">
+              <Input value={testTo} onChange={(e) => setTestTo(e.target.value)} placeholder="destinatário do teste (opcional)" className="w-56" />
+              <Button size="sm" variant="outline" onClick={() => test.mutate()} disabled={test.isPending}>
+                <Send className="mr-2 h-4 w-4" />{test.isPending ? 'Enviando...' : 'Testar envio'}
+              </Button>
+            </div>
+          </div>
+
+          {lastTest && (
+            <div className="flex items-center justify-between border bg-muted/20 px-3 py-2 text-xs">
+              <span>Último teste: {data?.lastTestAt ? formatDate(data.lastTestAt) : '-'}</span>
+              <span className="flex items-center gap-2"><Status value={lastTest} />{data?.lastTestError && <span className="text-muted-foreground">{data.lastTestError}</span>}</span>
+            </div>
+          )}
+        </div>
+      </Panel>
+
+      <Panel title="Remetentes do sistema" icon={Send}>
+        <p className="mb-3 text-xs text-muted-foreground">
+          Endereços que o sistema usa para enviar e-mails (convites de reunião, notificações). O remetente padrão (★) é usado quando nenhum outro é especificado.
+          Para que <strong>contato@gestao360.org</strong> receba mensagens de verdade é preciso provisionar a caixa no provedor + DNS (veja docs/email-gestao360.md).
+        </p>
+        <div className="space-y-2">
+          {(mailboxes.data ?? []).map((box) => (
+            <div key={box.id} className="flex flex-wrap items-center justify-between gap-2 border px-3 py-2 text-sm">
+              <div className="min-w-0">
+                <div className="flex items-center gap-2 font-medium">
+                  {box.isDefault && <Star className="h-3.5 w-3.5 fill-amber-400 text-amber-500" />}
+                  <span className="truncate">{box.address}</span>
+                  {!box.active && <span className="pill pill-gray">inativo</span>}
+                </div>
+                {(box.displayName || box.purpose) && (
+                  <div className="text-xs text-muted-foreground">{[box.displayName, box.purpose].filter(Boolean).join(' · ')}</div>
+                )}
+              </div>
+              <div className="flex items-center gap-1">
+                {!box.isDefault && <Button size="sm" variant="ghost" onClick={() => setDefault.mutate(box.id)} title="Tornar padrão"><Star className="h-4 w-4" /></Button>}
+                <Button size="sm" variant="ghost" onClick={() => toggleBox.mutate(box)}>{box.active ? 'Desativar' : 'Ativar'}</Button>
+                <Button size="sm" variant="ghost" className="text-red-600" onClick={() => delBox.mutate(box.id)} title="Remover"><Trash2 className="h-4 w-4" /></Button>
+              </div>
+            </div>
+          ))}
+          {(mailboxes.data ?? []).length === 0 && <EmptyState title="Nenhum remetente cadastrado" />}
+        </div>
+
+        <div className="mt-3 space-y-2 border-t pt-3">
+          <div className="grid gap-2 sm:grid-cols-3">
+            <Input value={newBox.address} onChange={(e) => setNewBox((p) => ({ ...p, address: e.target.value }))} placeholder="contato@gestao360.org" />
+            <Input value={newBox.displayName} onChange={(e) => setNewBox((p) => ({ ...p, displayName: e.target.value }))} placeholder="Nome de exibição" />
+            <Input value={newBox.purpose} onChange={(e) => setNewBox((p) => ({ ...p, purpose: e.target.value }))} placeholder="Finalidade (ex.: contato)" />
+          </div>
+          <Button size="sm" onClick={() => addBox.mutate()} disabled={addBox.isPending || !newBox.address.trim()}>
+            <Plus className="mr-2 h-4 w-4" />Adicionar remetente
+          </Button>
         </div>
       </Panel>
     </div>

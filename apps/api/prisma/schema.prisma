@@ -1189,6 +1189,7 @@ model OKRObjective {
 
   keyResults KeyResult[]
   checkins   OKRCheckin[]
+  actionPlans ActionPlan[] @relation("ActionOKRObjective")
 
   @@index([cycleId])
   @@index([parentId])
@@ -1459,6 +1460,8 @@ model ActionPlan {
   createdBy            User?               @relation("ActionCreatedBy", fields: [createdById], references: [id])
   strategicObjectiveId String?
   strategicObjective   StrategicObjective? @relation("ActionStrategicObjective", fields: [strategicObjectiveId], references: [id])
+  okrObjectiveId       String?
+  okrObjective         OKRObjective?       @relation("ActionOKRObjective", fields: [okrObjectiveId], references: [id])
   indicatorId          String?
   indicator            Indicator?          @relation("ActionIndicator", fields: [indicatorId], references: [id])
   indicatorResultId    String?
@@ -1521,6 +1524,7 @@ model ActionPlan {
   @@index([status])
   @@index([dueDate])
   @@index([strategicObjectiveId])
+  @@index([okrObjectiveId])
   @@index([indicatorId])
   @@index([indicatorResultId])
   @@index([meetingId])
@@ -6947,6 +6951,42 @@ model PortalIntegration {
   updatedBy      String?
   createdAt      DateTime  @default(now())
   updatedAt      DateTime  @updatedAt
+}
+
+// Portal Global → E-mail: servidor SMTP do sistema (senha cifrada via common/crypto).
+model PortalEmailSetting {
+  id            String    @id @default(uuid())
+  host          String?
+  port          Int       @default(587)
+  secure        Boolean   @default(false)
+  username      String?
+  passwordEnc   String? // AES-256-GCM (nunca retorna ao frontend)
+  fromName      String?
+  fromAddress   String?
+  replyTo       String?
+  status        String    @default("active") // active|disabled
+  lastTestAt    DateTime?
+  lastTestOk    Boolean?
+  lastTestError String?
+  updatedBy     String?
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+}
+
+// Portal Global → E-mail: endereços remetentes do sistema (ex.: contato@gestao360.org).
+model PortalMailbox {
+  id          String   @id @default(uuid())
+  address     String   @unique
+  displayName String?
+  purpose     String? // contato|no-reply|suporte|...
+  isDefault   Boolean  @default(false)
+  active      Boolean  @default(true)
+  notes       String?
+  createdBy   String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([active])
 }
 
 model PortalAnnouncement {

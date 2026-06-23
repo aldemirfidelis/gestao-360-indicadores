@@ -27,6 +27,7 @@ import { PlatformAdminAuthService } from './services/platform-admin-auth.service
 import { PlatformAdminAuditService } from './services/platform-admin-audit.service';
 import { PlatformAdminService } from './services/platform-admin.service';
 import { PlatformAdminBootstrapService } from './services/platform-admin-bootstrap.service';
+import { PlatformEmailService } from './services/platform-email.service';
 
 @Module({
   imports: [
@@ -60,6 +61,7 @@ import { PlatformAdminBootstrapService } from './services/platform-admin-bootstr
     PlatformAdminAuditService,
     PlatformAdminService,
     PlatformAdminBootstrapService,
+    PlatformEmailService,
   ],
   exports: [PlatformAdminService],
 })

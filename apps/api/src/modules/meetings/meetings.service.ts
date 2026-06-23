@@ -1,6 +1,6 @@
 import { ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
-import nodemailer from 'nodemailer';
 import { PrismaService } from '../../prisma/prisma.service';
+import { resolveSmtpConfig, buildTransport, smtpFrom } from '../../common/smtp';
 import {
   ActionOrigin,
   ActionPriority,
@@ -571,24 +571,18 @@ export class MeetingsService {
   }
 
   private async deliverEmail(to: string, subject: string, body: string, ics: string) {
-    const host = process.env.SMTP_HOST;
-    const from = process.env.SMTP_FROM;
-    if (!host || !from) {
+    // Configuração resolvida do Portal Global (banco) com fallback para SMTP_* do ambiente.
+    const cfg = await resolveSmtpConfig(this.prisma);
+    const from = cfg ? smtpFrom(cfg) : undefined;
+    if (!cfg?.host || !from) {
       return { status: EmailDeliveryStatus.PENDING, error: 'SMTP_NOT_CONFIGURED' };
     }
     try {
-      const port = parseInt(process.env.SMTP_PORT ?? '587', 10);
-      const user = process.env.SMTP_USER;
-      const pass = process.env.SMTP_PASS;
-      const transporter = nodemailer.createTransport({
-        host,
-        port,
-        secure: process.env.SMTP_SECURE === 'true',
-        auth: user && pass ? { user, pass } : undefined,
-      });
+      const transporter = buildTransport(cfg);
       await transporter.sendMail({
         from,
         to,
+        replyTo: cfg.replyTo,
         subject,
         text: body,
         html: body.replace(/\n/g, '<br />'),

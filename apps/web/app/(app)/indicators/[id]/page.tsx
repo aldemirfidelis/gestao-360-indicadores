@@ -10,14 +10,18 @@ import {
   BarChart,
   CartesianGrid,
   Cell,
+  LabelList,
+  Line,
+  LineChart,
   ResponsiveContainer,
   Tooltip,
   XAxis,
   YAxis,
 } from 'recharts';
 import {
-  ArrowLeft,
+  Activity,
   AlertTriangle,
+  BarChart3,
   Calendar,
   CalendarClock,
   ChevronRight,
@@ -32,7 +36,6 @@ import {
   Target,
   TrendingDown,
   TrendingUp,
-  Users,
 } from 'lucide-react';
 import Link from 'next/link';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -45,7 +48,7 @@ import { StatusLight } from '@/components/ui/status-light';
 import { StatusBadge } from '@/components/platform/status-badge';
 import { api } from '@/lib/api';
 import { cn, formatNumber, formatPercent, periodRefLabel } from '@/lib/utils';
-import { PERIODICITY_LABEL, DIRECTION_LABEL, ACTION_STATUS_LABEL, MEETING_STATUS_LABEL, TRACE_EVENT_LABEL } from '@/lib/labels';
+import { PERIODICITY_LABEL, DIRECTION_LABEL, ACTION_STATUS_LABEL, MEETING_STATUS_LABEL, TRACE_EVENT_LABEL, TRAFFIC_LIGHT_LABEL } from '@/lib/labels';
 import { useVision360 } from '@/components/ui/vision360-context';
 import { useAuth } from '@/components/auth/auth-provider';
 
@@ -89,6 +92,37 @@ interface SeriesPoint {
   target: number | null;
   value: number | null;
   light: string;
+  attainment?: number | null;
+}
+
+type IndicatorViewMode = 'monthly' | 'cumulative' | 'weekly' | 'daily';
+type IndicatorChartType = 'bar' | 's-curve';
+
+interface ChartPoint {
+  periodRef: string;
+  month: string;
+  meta: number | null;
+  realizado: number | null;
+  attainment: number | null;
+  status: string;
+  displayMeta: number | null;
+  displayRealizado: number | null;
+}
+
+interface GrainCell {
+  periodRef: string;
+  target: number | null;
+  value: number | null;
+  status: string;
+  light: string;
+  isClosed?: boolean;
+}
+
+interface GrainResponse {
+  indicator: { id: string; name: string };
+  granularity: 'DAILY' | 'WEEKLY' | 'BIWEEKLY' | 'MONTHLY';
+  monthRef: string;
+  cells: GrainCell[];
 }
 
 interface TraceEvent {
@@ -161,8 +195,11 @@ export default function IndicatorDetailPage() {
   const router = useRouter();
   const queryClient = useQueryClient();
   const [auditOpen, setAuditOpen] = useState(false);
-  const [periods, setPeriods] = useState(12);
-  const [chartTab, setChartTab] = useState<'EVOLUCAO' | 'ANALISE' | 'HISTORICO' | 'ACOES'>('EVOLUCAO');
+  const [viewMode, setViewMode] = useState<IndicatorViewMode>('monthly');
+  const [chartType, setChartType] = useState<IndicatorChartType>('bar');
+  const [grainMonth, setGrainMonth] = useState(currentMonthRef());
+  const [selectedIdx, setSelectedIdx] = useState(0);
+  const [detailTab, setDetailTab] = useState<'ANALISE' | 'HISTORICO' | 'ACOES'>('ANALISE');
   const { open: openVision360 } = useVision360();
   const { hasPermission } = useAuth();
   const canCreateDeviation = hasPermission(['deviations:create', 'deviations:update']);
@@ -175,8 +212,15 @@ export default function IndicatorDetailPage() {
   });
 
   const series = useQuery<SeriesPoint[]>({
-    queryKey: ['indicator', id, 'series', periods],
-    queryFn: () => api<SeriesPoint[]>(`/indicators/${id}/series?points=${periods}`),
+    queryKey: ['indicator', id, 'series', 12],
+    queryFn: () => api<SeriesPoint[]>(`/indicators/${id}/series?points=12`),
+  });
+  const isGrainMode = viewMode === 'weekly' || viewMode === 'daily';
+  const grainGranularity = viewMode === 'weekly' ? 'WEEKLY' : 'DAILY';
+  const grainQuery = useQuery<GrainResponse>({
+    queryKey: ['indicator', id, 'grain', grainGranularity, grainMonth],
+    enabled: isGrainMode,
+    queryFn: () => api<GrainResponse>(`/results/grain?indicatorId=${id}&granularity=${grainGranularity}&month=${grainMonth}`),
   });
   const timeline = useQuery<TraceabilityTimeline>({
     queryKey: ['traceability', 'indicator', id],
@@ -226,12 +270,49 @@ export default function IndicatorDetailPage() {
   if (!detail.data) return null;
   const ind = detail.data;
 
-  const chartData = (series.data ?? []).map((p) => ({
-    label: periodRefLabel(p.periodRef),
-    target: p.target,
-    value: p.value,
-    light: p.light,
+  const monthlyHistory = (series.data ?? []).map((p) => ({
+    periodRef: p.periodRef,
+    month: shortMonthLabel(p.periodRef),
+    meta: p.target,
+    realizado: p.value,
+    attainment: p.attainment ?? (p.target !== null && p.value !== null && p.target !== 0 ? p.value / p.target : null),
+    status: p.light,
   }));
+  const chartData: ChartPoint[] = isGrainMode
+    ? (grainQuery.data?.cells ?? []).map((c) => ({
+        periodRef: c.periodRef,
+        month: grainPeriodLabel(c.periodRef),
+        meta: c.target,
+        realizado: c.value,
+        attainment: c.target !== null && c.value !== null && c.target !== 0 ? c.value / c.target : null,
+        status: c.light,
+        displayMeta: c.target,
+        displayRealizado: c.value,
+      }))
+    : viewMode === 'monthly'
+      ? monthlyHistory.map((p) => ({
+          ...p,
+          displayMeta: p.meta,
+          displayRealizado: p.realizado,
+        }))
+      : monthlyHistory.map((p, idx) => {
+          const cumMeta = buildCumulativeAvg(monthlyHistory.map((point) => point.meta));
+          const cumReal = buildCumulativeAvg(monthlyHistory.map((point) => point.realizado));
+          return {
+            ...p,
+            displayMeta: cumMeta[idx],
+            displayRealizado: cumReal[idx],
+          };
+        });
+  const hasChartData = isGrainMode
+    ? (grainQuery.data?.cells ?? []).some((c) => c.target !== null || c.value !== null)
+    : monthlyHistory.some((p) => p.meta !== null || p.realizado !== null);
+  const safeSelectedIdx = Math.min(selectedIdx, Math.max(0, chartData.length - 1));
+  const chartLineColor = realizadoSeriesColor(chartData, ind.direction);
+  const onChartClick = (state: any) => {
+    const idx = state?.activeTooltipIndex;
+    if (typeof idx === 'number' && idx >= 0 && idx < chartData.length) setSelectedIdx(idx);
+  };
   const deviationRows = deviations.data ?? [];
   const principalDeviation = getPrincipalDeviation(ind);
   const linkedPrincipalDeviation = principalDeviation
@@ -255,14 +336,13 @@ export default function IndicatorDetailPage() {
   const ppOrUnit = unit === '%' || unit.toUpperCase() === 'PERCENT' ? 'p.p.' : unit || 'pontos';
   const metaValue = ind.targets.find((t) => t.periodRef === last?.periodRef)?.target ?? ind.targets[ind.targets.length - 1]?.target ?? null;
   const momDelta = last && prev ? last.value - prev.value : null;
+  const indicatorActionsHref = `/actions?indicatorId=${encodeURIComponent(ind.id)}`;
   const insights = buildInsights(ind, last ?? null, prev, ppOrUnit);
   const risks = buildRisks(deviationRows, last ?? null);
   const planStats = buildPlanStats(ind.actions ?? [], deviationRows);
-  const indicatorActionsHref = `/actions?indicatorId=${encodeURIComponent(ind.id)}`;
   const upcomingMeetings = (ind.meetings ?? [])
-    .slice()
+    .filter((meeting) => !meeting.startsAt || new Date(meeting.startsAt).getTime() >= Date.now())
     .sort((a, b) => new Date(a.startsAt ?? 0).getTime() - new Date(b.startsAt ?? 0).getTime());
-  const recentSeries = (series.data ?? []).filter((p) => p.value !== null).slice(-4);
 
   return (
     <div>
@@ -388,7 +468,7 @@ export default function IndicatorDetailPage() {
         </Card>
       </div>
 
-      <div className="mb-6 grid grid-cols-1 gap-5 xl:grid-cols-[360px_minmax(0,1fr)_320px]">
+      <div className="mb-6 grid grid-cols-1 gap-5 xl:grid-cols-[360px_minmax(0,1fr)]">
         <IndicatorDecisionCards
           indicator={ind}
           principal={principalDeviation}
@@ -401,82 +481,167 @@ export default function IndicatorDetailPage() {
           actionsHref={indicatorActionsHref}
         />
 
-        <Card>
+        <Card className="overflow-hidden">
           <CardHeader className="pb-2">
             <div className="flex flex-wrap items-center justify-between gap-2">
-              <div className="flex flex-wrap gap-1">
-                {(['EVOLUCAO', 'ANALISE', 'HISTORICO', 'ACOES'] as const).map((tab) => (
+              <div className="inline-flex rounded-md border bg-card/60 p-0.5">
+                {(['monthly', 'cumulative', 'weekly', 'daily'] as const).map((mode) => (
                   <button
-                    key={tab}
+                    key={mode}
                     type="button"
-                    onClick={() => setChartTab(tab)}
+                    onClick={() => { setViewMode(mode); setSelectedIdx(0); }}
                     className={cn(
-                      'rounded-md px-3 py-1.5 text-sm font-medium transition-colors',
-                      chartTab === tab ? 'bg-primary text-primary-foreground' : 'text-muted-foreground hover:bg-muted',
+                      'rounded px-3 py-1.5 text-xs font-medium transition-colors',
+                      viewMode === mode ? 'bg-primary text-primary-foreground shadow-sm' : 'text-muted-foreground hover:text-foreground',
                     )}
                   >
-                    {CHART_TAB_LABEL[tab]}
+                    {mode === 'monthly' && 'Mensal'}
+                    {mode === 'cumulative' && 'Acumulado'}
+                    {mode === 'weekly' && 'Semanal'}
+                    {mode === 'daily' && 'Diário'}
                   </button>
                 ))}
               </div>
-              <NativeSelect value={String(periods)} onChange={(e) => setPeriods(Number(e.target.value))} className="h-9 w-auto">
+              <div className="flex flex-wrap items-center gap-2">
+                {false && (
+                  <>
                 <option value="6">6 períodos</option>
                 <option value="12">12 períodos</option>
                 <option value="24">24 períodos</option>
-              </NativeSelect>
+                  </>
+                )}
+                {isGrainMode && (
+                  <NativeSelect
+                    value={grainMonth}
+                    onChange={(e) => { setGrainMonth(e.target.value); setSelectedIdx(0); }}
+                    className="h-8 text-xs"
+                  >
+                    {monthOptionsForYear(new Date().getFullYear()).map((opt) => (
+                      <option key={opt.value} value={opt.value}>{opt.label}</option>
+                    ))}
+                  </NativeSelect>
+                )}
+                <div className="inline-flex rounded-md border bg-card/60 p-0.5">
+                  <button
+                    type="button"
+                    onClick={() => setChartType('bar')}
+                    className={cn('inline-flex items-center gap-1.5 rounded px-3 py-1.5 text-xs font-medium transition-colors', chartType === 'bar' ? 'bg-primary text-primary-foreground shadow-sm' : 'text-muted-foreground hover:text-foreground')}
+                  >
+                    <BarChart3 className="h-3.5 w-3.5" />
+                    Barras
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setChartType('s-curve')}
+                    className={cn('inline-flex items-center gap-1.5 rounded px-3 py-1.5 text-xs font-medium transition-colors', chartType === 's-curve' ? 'bg-primary text-primary-foreground shadow-sm' : 'text-muted-foreground hover:text-foreground')}
+                  >
+                    <Activity className="h-3.5 w-3.5" />
+                    Curva S
+                  </button>
+                </div>
+              </div>
             </div>
           </CardHeader>
           <CardContent>
-            {chartTab === 'EVOLUCAO' && (
+            {hasChartData ? (
               <>
-                <div className="h-72">
+                <div className="h-[17rem] border border-border/60 bg-card/60 p-2 sm:h-[23rem]">
                   <ResponsiveContainer width="100%" height="100%">
-                    <BarChart data={chartData} barGap={6}>
-                      <CartesianGrid vertical={false} strokeDasharray="3 3" className="stroke-border" />
-                      <XAxis dataKey="label" tick={{ fontSize: 12 }} />
-                      <YAxis tick={{ fontSize: 12 }} />
-                      <Tooltip
-                        contentStyle={{ background: 'hsl(var(--card))', border: '1px solid hsl(var(--border))' }}
-                        formatter={(value, name) => [
-                          typeof value === 'number' ? formatNumber(value, { maximumFractionDigits: 2 }) : value,
-                          name === 'target' || name === 'Meta' ? 'Meta' : 'Realizado',
-                        ]}
-                      />
-                      <Bar dataKey="target" name="Meta" fill="#1e3a8a" opacity={0.28} radius={[4, 4, 0, 0]} />
-                      <Bar dataKey="value" name="Realizado" radius={[4, 4, 0, 0]}>
-                        {chartData.map((point, index) => (
-                          <Cell key={`${point.label}-${index}`} fill={barColor(point.light)} />
-                        ))}
-                      </Bar>
-                    </BarChart>
+                    {chartType === 'bar' ? (
+                      <BarChart data={chartData} barGap={2} margin={{ top: 24, right: 12, left: 0, bottom: 8 }} onClick={onChartClick} style={{ cursor: 'pointer' }}>
+                        <CartesianGrid vertical={false} strokeDasharray="3 3" className="stroke-border" />
+                        <XAxis
+                          dataKey="month"
+                          tick={({ x, y, payload, index }: any) => (
+                            <text x={x} y={y + 12} textAnchor="middle" fontSize={11} fontWeight={index === safeSelectedIdx ? 700 : 400} fill={index === safeSelectedIdx ? 'hsl(var(--primary))' : 'currentColor'}>
+                              {payload.value}
+                            </text>
+                          )}
+                          axisLine={false}
+                          tickLine={false}
+                          interval={0}
+                        />
+                        <YAxis tick={{ fontSize: 11 }} width={48} />
+                        <Tooltip content={<DetailChartTooltip viewMode={viewMode} />} cursor={{ fill: 'hsl(var(--muted))', opacity: 0.35 }} />
+                        <Bar dataKey="displayMeta" name="Meta" fill="#1e3a8a" radius={[3, 3, 0, 0]}>
+                          <LabelList dataKey="displayMeta" position="top" fontSize={10} fill="#1e3a8a" formatter={(v: any) => (v === null || v === undefined ? '' : formatNumber(v))} />
+                        </Bar>
+                        <Bar dataKey="displayRealizado" name="Realizado" radius={[3, 3, 0, 0]}>
+                          {chartData.map((entry, index) => {
+                            let color = 'hsl(var(--status-gray))';
+                            const r = entry.displayRealizado;
+                            const m = entry.displayMeta;
+                            if (r !== null && r !== undefined) {
+                              const isWithin = ind.direction === 'LOWER_BETTER'
+                                ? (r ?? 0) <= (m ?? 0)
+                                : (r ?? 0) >= (m ?? 0);
+                              color = isWithin ? '#10b981' : '#ef4444';
+                            }
+                            return <Cell key={`cell-${index}`} fill={color} />;
+                          })}
+                          <LabelList dataKey="displayRealizado" position="top" fontSize={10} fill="hsl(var(--foreground))" formatter={(v: any) => (v === null || v === undefined ? '' : formatNumber(v))} />
+                        </Bar>
+                      </BarChart>
+                    ) : (
+                      <LineChart data={chartData} margin={{ top: 24, right: 12, left: 0, bottom: 8 }} onClick={onChartClick} style={{ cursor: 'pointer' }}>
+                        <CartesianGrid vertical={false} strokeDasharray="3 3" className="stroke-border" />
+                        <XAxis
+                          dataKey="month"
+                          tick={({ x, y, payload, index }: any) => (
+                            <text x={x} y={y + 12} textAnchor="middle" fontSize={11} fontWeight={index === safeSelectedIdx ? 700 : 400} fill={index === safeSelectedIdx ? 'hsl(var(--primary))' : 'currentColor'}>
+                              {payload.value}
+                            </text>
+                          )}
+                          axisLine={false}
+                          tickLine={false}
+                          interval={0}
+                        />
+                        <YAxis tick={{ fontSize: 11 }} width={48} />
+                        <Tooltip content={<DetailChartTooltip viewMode={viewMode} />} cursor={{ stroke: 'hsl(var(--muted-foreground))', strokeWidth: 1, strokeDasharray: '3 3' }} />
+                        <Line type="monotone" dataKey="displayMeta" name="Meta" stroke="#1e3a8a" strokeWidth={2.5} strokeDasharray="6 4" dot={{ r: 3, fill: '#1e3a8a' }} activeDot={{ r: 5 }}>
+                          <LabelList dataKey="displayMeta" position="top" fontSize={10} fill="#1e3a8a" formatter={(v: any) => (v === null || v === undefined ? '' : formatNumber(v))} />
+                        </Line>
+                        <Line type="monotone" dataKey="displayRealizado" name="Realizado" stroke={chartLineColor} strokeWidth={2.5} dot={{ r: 3, fill: chartLineColor }} activeDot={{ r: 5 }}>
+                          <LabelList dataKey="displayRealizado" position="top" fontSize={10} fill={chartLineColor} formatter={(v: any) => (v === null || v === undefined ? '' : formatNumber(v))} />
+                        </Line>
+                      </LineChart>
+                    )}
                   </ResponsiveContainer>
                 </div>
                 <div className="mt-3 flex items-center gap-2 rounded-lg border bg-muted/30 px-3 py-2 text-xs text-muted-foreground">
                   <Lightbulb className="h-3.5 w-3.5 text-status-blue" />
                   Dados atualizados até {last ? periodRefLabel(last.periodRef) : '-'}. Projeção baseada no desempenho atual.
                 </div>
-                {recentSeries.length > 0 && (
-                  <div className="mt-3 grid gap-2 sm:grid-cols-2 lg:grid-cols-4">
-                    {recentSeries.map((p) => (
-                      <div key={p.periodRef} className="rounded-lg border p-2">
-                        <div className="text-xs text-muted-foreground">{periodRefLabel(p.periodRef)}</div>
-                        <div className="mt-0.5 flex items-center justify-between gap-2">
-                          <span className="text-sm font-semibold">{p.value !== null ? formatNumber(p.value) : '-'}</span>
-                          <StatusLight light={p.light} />
-                        </div>
-                      </div>
+                <div className="mt-4 border-t pt-4">
+                  <div className="mb-3 flex flex-wrap gap-1">
+                    {(['ANALISE', 'HISTORICO', 'ACOES'] as const).map((tab) => (
+                      <button
+                        key={tab}
+                        type="button"
+                        onClick={() => setDetailTab(tab)}
+                        className={cn(
+                          'rounded-md px-3 py-1.5 text-sm font-medium transition-colors',
+                          detailTab === tab ? 'bg-primary text-primary-foreground' : 'text-muted-foreground hover:bg-muted',
+                        )}
+                      >
+                        {CHART_TAB_LABEL[tab]}
+                      </button>
                     ))}
                   </div>
-                )}
+                  {detailTab === 'ANALISE' && <AnalysisTab series={series.data ?? []} last={last ?? null} prev={prev} metaValue={metaValue} ppOrUnit={ppOrUnit} />}
+                  {detailTab === 'HISTORICO' && <MiniHistory results={ind.results} targets={ind.targets} />}
+                  {detailTab === 'ACOES' && <LinkedActionsTab actions={ind.actions ?? []} />}
+                </div>
               </>
+            ) : (
+              <div className="flex h-[17rem] items-center justify-center border border-border/60 bg-card/60 p-2 text-xs text-muted-foreground sm:h-[23rem]">
+                Sem dados para o período
+              </div>
             )}
-            {chartTab === 'ANALISE' && <AnalysisTab series={series.data ?? []} last={last ?? null} prev={prev} metaValue={metaValue} ppOrUnit={ppOrUnit} />}
-            {chartTab === 'HISTORICO' && <MiniHistory results={ind.results} targets={ind.targets} />}
-            {chartTab === 'ACOES' && <LinkedActionsTab actions={ind.actions ?? []} />}
           </CardContent>
         </Card>
 
-        <div className="space-y-4">
+        <div className="hidden">
           <RailCard icon={Lightbulb} iconClass="text-status-blue" title="Insights automáticos">
             {insights.length === 0 ? (
               <RailEmpty>Sem insights para o período.</RailEmpty>
@@ -984,16 +1149,6 @@ function truncateText(value: string, maxLength: number) {
   return clean.length > maxLength ? `${clean.slice(0, maxLength - 1)}…` : clean;
 }
 
-function barColor(light: string) {
-  const colors: Record<string, string> = {
-    GREEN: '#047857',
-    YELLOW: '#d97706',
-    RED: '#b91c1c',
-    GRAY: '#94a3b8',
-  };
-  return colors[light] ?? colors.GRAY;
-}
-
 function getPrincipalDeviation(indicator: IndicatorDetail): PrincipalDeviation | null {
   const targetByRef = new Map(indicator.targets.map((target) => [target.periodRef, target.target]));
   const candidates = indicator.results
@@ -1071,6 +1226,83 @@ const CHART_TAB_LABEL: Record<'EVOLUCAO' | 'ANALISE' | 'HISTORICO' | 'ACOES', st
   HISTORICO: 'Histórico',
   ACOES: 'Ações',
 };
+
+const LIGHT_LABEL = TRAFFIC_LIGHT_LABEL;
+
+function realizadoSeriesColor(
+  points: Array<{ displayRealizado?: number | null; displayMeta?: number | null }>,
+  direction?: string,
+): string {
+  for (let i = points.length - 1; i >= 0; i -= 1) {
+    const r = points[i]?.displayRealizado;
+    const m = points[i]?.displayMeta;
+    if (r === null || r === undefined) continue;
+    const within = direction === 'LOWER_BETTER' ? (r ?? 0) <= (m ?? 0) : (r ?? 0) >= (m ?? 0);
+    return within ? '#10b981' : '#ef4444';
+  }
+  return '#10b981';
+}
+
+function grainPeriodLabel(periodRef: string): string {
+  if (/^\d{4}-\d{2}-\d{2}$/.test(periodRef)) return periodRef.slice(8, 10);
+  const weekMatch = /^\d{4}-W(\d{2})$/.exec(periodRef);
+  if (weekMatch) return `S${weekMatch[1]}`;
+  const biweekMatch = /^\d{4}-BW(\d+)$/.exec(periodRef);
+  if (biweekMatch) return `Q${biweekMatch[1]}`;
+  return periodRef;
+}
+
+function currentMonthRef(): string {
+  const date = new Date();
+  const pad = (value: number) => String(value).padStart(2, '0');
+  return `${date.getFullYear()}-${pad(date.getMonth() + 1)}`;
+}
+
+function monthOptionsForYear(year: number): { value: string; label: string }[] {
+  const monthNames = ['Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun', 'Jul', 'Ago', 'Set', 'Out', 'Nov', 'Dez'];
+  const pad = (value: number) => String(value).padStart(2, '0');
+  return monthNames.map((label, index) => ({
+    value: `${year}-${pad(index + 1)}`,
+    label: `${label}/${String(year).slice(2)}`,
+  }));
+}
+
+function buildCumulativeAvg(values: Array<number | null | undefined>): Array<number | null> {
+  const out: Array<number | null> = [];
+  let sum = 0;
+  let count = 0;
+  for (const value of values) {
+    if (value !== null && value !== undefined && Number.isFinite(value)) {
+      sum += value;
+      count += 1;
+    }
+    out.push(count === 0 ? null : sum / count);
+  }
+  return out;
+}
+
+function shortMonthLabel(periodRef: string): string {
+  const monthNames = ['Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun', 'Jul', 'Ago', 'Set', 'Out', 'Nov', 'Dez'];
+  const match = /^(\d{4})-(\d{2})/.exec(periodRef);
+  if (!match) return periodRef;
+  const index = Number(match[2]) - 1;
+  return monthNames[index] ?? periodRef;
+}
+
+function DetailChartTooltip({ active, payload, label, viewMode }: any) {
+  if (!active || !payload?.length) return null;
+  const point = payload[0]?.payload as ChartPoint | undefined;
+  const isCum = viewMode === 'cumulative';
+  return (
+    <div className="rounded-md border bg-background p-2 text-xs shadow-sm">
+      <div className="font-semibold">{label}{isCum && ' (acumulado)'}</div>
+      <div>Meta: {formatNumber(point?.displayMeta ?? point?.meta)}</div>
+      <div>Realizado: {formatNumber(point?.displayRealizado ?? point?.realizado)}</div>
+      {!isCum && <div>Atingimento: {formatPercent(point?.attainment)}</div>}
+      <div>Status: {LIGHT_LABEL[point?.status ?? 'GRAY'] ?? point?.status ?? 'Sem dados'}</div>
+    </div>
+  );
+}
 
 function attainmentBarColor(light?: string) {
   if (light === 'GREEN') return 'bg-status-green';

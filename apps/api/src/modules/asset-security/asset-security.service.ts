@@ -3,6 +3,7 @@ import { randomBytes } from 'crypto';
 import { PrismaService } from '../../prisma/prisma.service';
 import { AccessService } from '../access/access.service';
 import { AuthPayload } from '../auth/auth.types';
+import { GeminiService } from '../ai/gemini.service';
 
 const MODULE = 'asset-security';
 
@@ -47,6 +48,7 @@ export class AssetSecurityService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly access: AccessService,
+    private readonly gemini?: GeminiService,
   ) {}
 
   private get db(): any {
@@ -1217,7 +1219,52 @@ export class AssetSecurityService {
     if (insights.length === 0) {
       insights.push({ severity: 'LOW', title: 'Operacao sem sinais criticos', description: 'Os indicadores operacionais nao apontam acumulacao critica neste momento.', recommendation: 'Manter rondas, checklists e conciliacao de saida por turno.', humanDecisionRequired: false });
     }
-    return { generatedAt: new Date().toISOString(), summary, insights, samples: { incidents, pendingExits, lateRounds, invalidDocs } };
+    const samples = { incidents, pendingExits, lateRounds, invalidDocs };
+    const aiInsights = await this.tryGeminiAssetSecurityInsights({ summary, insights, samples });
+    return {
+      generatedAt: new Date().toISOString(),
+      provider: aiInsights ? this.gemini?.provider : 'rules',
+      model: aiInsights ? this.gemini?.modelName : null,
+      summary,
+      insights: aiInsights ?? insights,
+      samples,
+    };
+  }
+
+  private async tryGeminiAssetSecurityInsights(context: {
+    summary: any;
+    insights: Array<{ severity: string; title: string; description: string; recommendation: string; humanDecisionRequired: boolean }>;
+    samples: Record<string, unknown>;
+  }): Promise<Array<{ severity: string; title: string; description: string; recommendation: string; humanDecisionRequired: boolean }> | null> {
+    if (!this.gemini?.isEnabled) return null;
+    const prompt = `Voce e um especialista senior em seguranca patrimonial, portaria, controle de acesso, rondas e tratamento de ocorrencias.
+Gere recomendações executivas em portugues do Brasil para a operacao.
+Use somente os dados fornecidos e mantenha todas as decisoes como recomendacao humana.
+
+Responda apenas JSON no schema:
+{
+  "insights": [
+    { "severity": "LOW|MEDIUM|HIGH|CRITICAL|EMERGENCY", "title": "...", "description": "...", "recommendation": "...", "humanDecisionRequired": true }
+  ]
+}
+
+CONTEXTO:
+${JSON.stringify(context, null, 2)}`;
+    const json = await this.gemini.generateJson<{ insights?: Array<{ severity?: string; title?: string; description?: string; recommendation?: string; humanDecisionRequired?: boolean }> }>(prompt, {
+      temperature: 0.35,
+      maxOutputTokens: 1600,
+    });
+    const allowed = new Set(['LOW', 'MEDIUM', 'HIGH', 'CRITICAL', 'EMERGENCY']);
+    const insights = json?.insights
+      ?.map((item) => ({
+        severity: allowed.has(String(item.severity)) ? String(item.severity) : 'MEDIUM',
+        title: String(item.title ?? '').trim(),
+        description: String(item.description ?? '').trim(),
+        recommendation: String(item.recommendation ?? '').trim(),
+        humanDecisionRequired: item.humanDecisionRequired !== false,
+      }))
+      .filter((item) => item.title && item.description && item.recommendation);
+    return insights?.length ? insights.slice(0, 6) : null;
   }
 
   async exportData(me: AuthPayload, dataset: string, q: Query = {}) {

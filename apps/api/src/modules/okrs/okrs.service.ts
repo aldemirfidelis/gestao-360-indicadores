@@ -71,6 +71,24 @@ export class OkrsService {
       ownerNode: { select: { id: true, name: true, type: true } },
       ownerUser: { select: { id: true, name: true, email: true, avatarUrl: true, jobTitle: true } },
       strategicObj: { select: this.strategicObjectiveSelect() },
+      actionPlans: {
+        where: { deletedAt: null },
+        orderBy: [{ createdAt: 'desc' as const }],
+        select: {
+          id: true,
+          title: true,
+          description: true,
+          status: true,
+          priority: true,
+          origin: true,
+          dueDate: true,
+          progress: true,
+          expectedResult: true,
+          responsibleUser: { select: { id: true, name: true, email: true, avatarUrl: true } },
+          ownerNode: { select: { id: true, name: true, type: true } },
+          tasks: { select: { id: true, done: true } },
+        },
+      },
       checkins: {
         orderBy: { createdAt: 'asc' as const },
         select: { weekRef: true, progress: true, confidence: true, createdAt: true, note: true },
@@ -231,7 +249,7 @@ export class OkrsService {
       include: this.objectiveInclude(),
       orderBy: { createdAt: 'asc' },
     });
-    return objs.map((o) => this.enrich(o, cycle));
+    return this.applyHierarchyProgress(objs.map((o) => this.enrich(o, cycle)));
   }
 
   async getObjective(me: AuthPayload, id: string) {
@@ -257,7 +275,20 @@ export class OkrsService {
       };
     });
     const totalWeight = krs.reduce((a, k) => a + (k.weight || 1), 0) || 1;
-    const overall = krs.reduce((a, k) => a + (k.progress * (k.weight || 1)) / totalWeight, 0);
+    const krProgress = krs.reduce((a, k) => a + (k.progress * (k.weight || 1)) / totalWeight, 0);
+    const actionPlans = (obj.actionPlans ?? []).map((action: any) => {
+      const tasks = action.tasks ?? [];
+      const taskCount = tasks.length;
+      const doneTaskCount = tasks.filter((task: any) => task.done).length;
+      const taskProgress = taskCount ? doneTaskCount / taskCount : Math.max(0, Math.min(1, Number(action.progress ?? 0) / 100));
+      const { tasks: _tasks, ...rest } = action;
+      return { ...rest, taskCount, doneTaskCount, taskProgress };
+    });
+    const actionProgress = actionPlans.length
+      ? actionPlans.reduce((acc: number, action: any) => acc + action.taskProgress, 0) / actionPlans.length
+      : null;
+    const latestCheckinProgress = obj.checkins?.length ? obj.checkins[obj.checkins.length - 1]?.progress : null;
+    const baseProgress = actionProgress ?? (krs.length ? krProgress : latestCheckinProgress ?? 0);
 
     // Saude / ritmo: progresso esperado pela posicao no tempo do ciclo.
     let expectedProgress: number | null = null;
@@ -267,7 +298,7 @@ export class OkrsService {
       const now = Date.now();
       expectedProgress = e > s ? Math.max(0, Math.min(1, (now - s) / (e - s))) : null;
     }
-    const pace = expectedProgress != null ? overall - expectedProgress : null;
+    const pace = expectedProgress != null ? baseProgress - expectedProgress : null;
     const paceLabel =
       pace == null ? null : pace >= 0.05 ? 'AHEAD' : pace >= -0.1 ? 'ON_TRACK' : pace >= -0.25 ? 'BEHIND' : 'AT_RISK';
 
@@ -290,7 +321,15 @@ export class OkrsService {
       ownerUser: obj.ownerUser ?? null,
       area: obj.ownerNode ?? obj.strategicObj?.ownerNode ?? null,
       keyResults: krs,
-      progress: overall,
+      actionPlans,
+      actionPlanCount: actionPlans.length,
+      taskCount: actionPlans.reduce((acc: number, action: any) => acc + action.taskCount, 0),
+      doneTaskCount: actionPlans.reduce((acc: number, action: any) => acc + action.doneTaskCount, 0),
+      krProgress,
+      actionProgress,
+      baseProgress,
+      progress: baseProgress,
+      progressSource: actionPlans.length ? 'ACTIONS' : krs.length ? 'KEY_RESULTS' : latestCheckinProgress != null ? 'CHECKINS' : 'EMPTY',
       expectedProgress,
       pace,
       paceLabel,
@@ -298,6 +337,45 @@ export class OkrsService {
       currentWeek,
       needsCheckin,
     };
+  }
+
+  private applyHierarchyProgress(items: any[]) {
+    const byId = new Map(items.map((item) => [item.id, item]));
+    const childrenByParent = new Map<string, any[]>();
+    for (const item of items) {
+      if (!item.parentId || !byId.has(item.parentId)) continue;
+      const children = childrenByParent.get(item.parentId) ?? [];
+      children.push(item);
+      childrenByParent.set(item.parentId, children);
+    }
+
+    const resolving = new Set<string>();
+    const resolve = (item: any): number => {
+      if (!item || resolving.has(item.id)) return Number(item?.baseProgress ?? item?.progress ?? 0);
+      resolving.add(item.id);
+      const children = childrenByParent.get(item.id) ?? [];
+      if (children.length > 0) {
+        const totalWeight = children.reduce((sum, child) => sum + (Number(child.weight) || 1), 0) || 1;
+        item.progress = children.reduce((sum, child) => sum + (resolve(child) * (Number(child.weight) || 1)) / totalWeight, 0);
+        item.progressSource = 'CHILDREN';
+        this.refreshPace(item);
+      } else {
+        item.progress = Number(item.baseProgress ?? item.progress ?? 0);
+        this.refreshPace(item);
+      }
+      resolving.delete(item.id);
+      return item.progress;
+    };
+
+    for (const item of items) resolve(item);
+    return items;
+  }
+
+  private refreshPace(item: any) {
+    const pace = item.expectedProgress != null ? item.progress - item.expectedProgress : null;
+    item.pace = pace;
+    item.paceLabel =
+      pace == null ? null : pace >= 0.05 ? 'AHEAD' : pace >= -0.1 ? 'ON_TRACK' : pace >= -0.25 ? 'BEHIND' : 'AT_RISK';
   }
 
   krProgress(kr: {

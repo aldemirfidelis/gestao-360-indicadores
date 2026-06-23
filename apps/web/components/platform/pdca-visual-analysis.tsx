@@ -1,35 +1,25 @@
 'use client';
 
-import { useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { toPng } from 'html-to-image';
 import { useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
 import type { LucideIcon } from 'lucide-react';
 import {
   BarChart3,
-  CalendarDays,
   CheckCircle2,
+  ChevronRight,
   ClipboardList,
   Download,
-  FileText,
-  History,
-  Link2,
-  ListChecks,
-  Maximize,
-  Paperclip,
   PlayCircle,
-  Plus,
   RefreshCw,
   Rocket,
   Save,
   Sparkles,
-  UserRound,
-  ZoomIn,
-  ZoomOut,
 } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { NativeSelect } from '@/components/ui/select';
@@ -82,69 +72,19 @@ interface PdcaSuggestion {
   justification: string;
 }
 
-const CANVAS_WIDTH = 1120;
-const CANVAS_HEIGHT = 650;
-
 const STAGE_META: Record<Phase, {
   title: string;
   subtitle: string;
   color: string;
-  bg: string;
-  border: string;
   soft: string;
+  border: string;
   icon: LucideIcon;
   number: string;
-  x: number;
-  y: number;
 }> = {
-  PLAN: {
-    title: 'Plan',
-    subtitle: 'Planejar causas, metas e ações',
-    color: '#2563eb',
-    bg: 'bg-blue-50',
-    border: 'border-blue-300',
-    soft: 'bg-blue-50 text-blue-700 border-blue-200',
-    icon: ClipboardList,
-    number: '01',
-    x: 24,
-    y: 40,
-  },
-  DO: {
-    title: 'Do',
-    subtitle: 'Executar ações definidas',
-    color: '#f97316',
-    bg: 'bg-orange-50',
-    border: 'border-orange-300',
-    soft: 'bg-orange-50 text-orange-700 border-orange-200',
-    icon: PlayCircle,
-    number: '02',
-    x: 710,
-    y: 40,
-  },
-  CHECK: {
-    title: 'Check',
-    subtitle: 'Medir resultados e verificar eficácia',
-    color: '#16a34a',
-    bg: 'bg-green-50',
-    border: 'border-green-300',
-    soft: 'bg-green-50 text-green-700 border-green-200',
-    icon: BarChart3,
-    number: '03',
-    x: 710,
-    y: 372,
-  },
-  ACT: {
-    title: 'Act',
-    subtitle: 'Padronizar, corrigir e evoluir',
-    color: '#7c3aed',
-    bg: 'bg-violet-50',
-    border: 'border-violet-300',
-    soft: 'bg-violet-50 text-violet-700 border-violet-200',
-    icon: RefreshCw,
-    number: '04',
-    x: 24,
-    y: 372,
-  },
+  PLAN: { title: 'Plan', subtitle: 'Planejar causas, metas e ações', color: '#2563eb', soft: 'bg-blue-50 text-blue-700 border-blue-200', border: 'border-blue-200', icon: ClipboardList, number: '01' },
+  DO: { title: 'Do', subtitle: 'Executar as ações definidas', color: '#f97316', soft: 'bg-orange-50 text-orange-700 border-orange-200', border: 'border-orange-200', icon: PlayCircle, number: '02' },
+  CHECK: { title: 'Check', subtitle: 'Medir resultados e verificar eficácia', color: '#16a34a', soft: 'bg-green-50 text-green-700 border-green-200', border: 'border-green-200', icon: BarChart3, number: '03' },
+  ACT: { title: 'Act', subtitle: 'Padronizar, corrigir e evoluir', color: '#7c3aed', soft: 'bg-violet-50 text-violet-700 border-violet-200', border: 'border-violet-200', icon: RefreshCw, number: '04' },
 };
 
 const PHASES: Phase[] = ['PLAN', 'DO', 'CHECK', 'ACT'];
@@ -162,6 +102,31 @@ const STATUS_LABEL: Record<StageStatus, string> = {
   DONE: 'Concluída',
   BLOCKED: 'Bloqueada',
   VALIDATED: 'Validada',
+};
+
+// Campos específicos de cada fase, editados direto no bloco.
+const PHASE_FIELDS: Record<Phase, { key: string; label: string; area?: boolean; rootCause?: boolean }[]> = {
+  PLAN: [
+    { key: 'problem', label: 'Problema principal', area: true },
+    { key: 'rootCause', label: 'Causa raiz', area: true, rootCause: true },
+    { key: 'target', label: 'Meta' },
+    { key: 'successCriteria', label: 'Critério de sucesso' },
+  ],
+  DO: [
+    { key: 'actions', label: 'Ações executadas', area: true },
+    { key: 'blockers', label: 'Impedimentos' },
+  ],
+  CHECK: [
+    { key: 'measuredResult', label: 'Resultado medido' },
+    { key: 'indicator', label: 'Indicador monitorado' },
+    { key: 'target', label: 'Meta' },
+    { key: 'deviation', label: 'Desvio' },
+  ],
+  ACT: [
+    { key: 'lessons', label: 'Lições aprendidas', area: true },
+    { key: 'adjustments', label: 'Ajustes necessários' },
+    { key: 'standardization', label: 'Padronização' },
+  ],
 };
 
 export function PDCAVisualAnalysis({
@@ -189,30 +154,48 @@ export function PDCAVisualAnalysis({
 }) {
   const qc = useQueryClient();
   const canvasRef = useRef<HTMLDivElement | null>(null);
-  const scrollRef = useRef<HTMLDivElement | null>(null);
+  const stagesRef = useRef<PdcaStage[]>([]);
   const [stages, setStages] = useState<PdcaStage[]>(() => normalizeStages(session?.pdcaSteps ?? initialStages, action, rootCause));
-  const [selectedPhase, setSelectedPhase] = useState<Phase>('PLAN');
-  const [zoom, setZoom] = useState(1);
   const [lastSavedAt, setLastSavedAt] = useState<string | null>(null);
   const [suggestionsOpen, setSuggestionsOpen] = useState(false);
   const [suggestions, setSuggestions] = useState<PdcaSuggestion[]>([]);
   const [loadingAi, setLoadingAi] = useState(false);
-  const [checklistOpen, setChecklistOpen] = useState(false);
-  const [newChecklistItem, setNewChecklistItem] = useState('');
+  const [convertingPhase, setConvertingPhase] = useState<Phase | null>(null);
 
-  const selectedStage = stages.find((stage) => stage.phase === selectedPhase) ?? stages[0];
+  useEffect(() => {
+    setStages(normalizeStages(session?.pdcaSteps ?? initialStages, action, rootCause));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [session?.id, session?.updatedAt]);
+
+  useEffect(() => {
+    stagesRef.current = stages;
+  }, [stages]);
+
   const completedCount = stages.filter((stage) => stage.status === 'DONE' || stage.status === 'VALIDATED').length;
   const pdcaProgress = completedCount * 25;
-
+  // Primeira fase ainda não concluída (fase "atual" do ciclo).
+  const currentPhaseIndex = stages.findIndex((stage) => stage.status !== 'DONE' && stage.status !== 'VALIDATED');
   const responsibleById = useMemo(() => new Map(users.map((user) => [user.id, user.name])), [users]);
 
+  function handleSave(nextStages = stagesRef.current, nextRootCause = rootCause) {
+    onSave(nextStages, nextRootCause);
+    setLastSavedAt(new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }));
+  }
+
+  // Edição de texto (descrição/objetivo/campos) — salva no blur.
   function updateStage(phase: Phase, patch: Partial<PdcaStage>) {
     setStages((current) => current.map((stage) => (stage.phase === phase ? { ...stage, ...patch } : stage)));
   }
 
-  function handleSave(nextStages = stages, nextRootCause = rootCause) {
-    onSave(nextStages, nextRootCause);
-    setLastSavedAt(new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }));
+  // Confirma campos de seleção/data já salvando (evita onChange não disparar em valor pré-selecionado).
+  function commitStage(phase: Phase, patch: Partial<PdcaStage>) {
+    const next = stagesRef.current.map((stage) => (stage.phase === phase ? { ...stage, ...patch } : stage));
+    setStages(next);
+    handleSave(next);
+  }
+
+  function updateData(phase: Phase, key: string, value: string) {
+    setStages((current) => current.map((stage) => (stage.phase === phase ? { ...stage, data: { ...stage.data, [key]: value } } : stage)));
   }
 
   function markDone(stage: PdcaStage) {
@@ -230,6 +213,7 @@ export function PDCAVisualAnalysis({
       toast.error('Salve a análise antes de transformar esta etapa em ação.');
       return;
     }
+    setConvertingPhase(stage.phase);
     try {
       const updatedAction = await api<any>(`/actions/${actionId}/analysis/pdca/stages/${stage.id}/convert-to-action`, {
         method: 'POST',
@@ -245,6 +229,8 @@ export function PDCAVisualAnalysis({
       qc.invalidateQueries({ queryKey: ['action', actionId] });
     } catch (error: any) {
       toast.error(error?.message ?? 'Não foi possível transformar em ação');
+    } finally {
+      setConvertingPhase(null);
     }
   }
 
@@ -277,13 +263,11 @@ export function PDCAVisualAnalysis({
     if (!stage) return;
     const patch: Partial<PdcaStage> = { isAiSuggested: true };
     if (item.field === 'objective') patch.objective = item.suggestion;
-    else if (item.field === 'checklist') patch.checklist = appendChecklistText(stage.checklist, item.suggestion, true);
-    else if (item.field === 'measurement') patch.data = { ...stage.data, measurement: item.suggestion };
+    else if (item.field === 'measurement') patch.data = { ...stage.data, measuredResult: item.suggestion };
     else if (item.field === 'standardization') patch.data = { ...stage.data, standardization: item.suggestion };
     else patch.description = [stage.description, item.suggestion].filter(Boolean).join('\n');
     const next = stages.map((candidate) => (candidate.phase === phase ? { ...candidate, ...patch } : candidate));
     setStages(next);
-    setSelectedPhase(phase);
     setSuggestions((current) => current.filter((candidate) => candidate !== item));
     handleSave(next);
     if (editAfter) setSuggestionsOpen(false);
@@ -298,56 +282,16 @@ export function PDCAVisualAnalysis({
     link.click();
   }
 
-  function addChecklistItem() {
-    const title = newChecklistItem.trim();
-    if (!title) return;
-    updateStage(selectedStage.phase, {
-      checklist: [...selectedStage.checklist, { id: newTempId(), title, done: false }],
-    });
-    setNewChecklistItem('');
-  }
-
-  function centerCanvas() {
-    setZoom(1);
-    scrollRef.current?.scrollTo({ left: 0, top: 0, behavior: 'smooth' });
-  }
-
   return (
     <div className="overflow-hidden rounded-lg border border-slate-200 bg-slate-50 shadow-sm">
       <div className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-200 bg-white px-4 py-3">
         <div className="flex flex-wrap items-center gap-2">
-          <Button size="sm" onClick={() => setChecklistOpen(true)} disabled={!canEdit}>
-            <Plus className="mr-2 h-4 w-4" />
-            Adicionar etapa
-          </Button>
           <Button size="sm" variant="outline" onClick={loadAiSuggestions} disabled={!canEdit || loadingAi}>
             <Sparkles className="mr-2 h-4 w-4" />
             {loadingAi ? 'Gerando...' : 'Sugestão com IA'}
           </Button>
-          <Button size="sm" variant="outline" onClick={() => setChecklistOpen(true)}>
-            <ListChecks className="mr-2 h-4 w-4" />
-            Checklist
-          </Button>
-          <Button size="sm" variant="outline" onClick={() => setSelectedPhase(selectedStage.phase)}>
-            <Paperclip className="mr-2 h-4 w-4" />
-            Evidências
-          </Button>
-          <Button size="sm" variant="outline" onClick={() => setSelectedPhase(selectedStage.phase)}>
-            <History className="mr-2 h-4 w-4" />
-            Timeline
-          </Button>
         </div>
         <div className="flex flex-wrap items-center gap-2">
-          <Button size="icon" variant="outline" onClick={() => setZoom((value) => Math.max(0.8, value - 0.1))} title="Reduzir zoom">
-            <ZoomOut className="h-4 w-4" />
-          </Button>
-          <div className="w-12 text-center text-xs font-medium text-slate-600">{Math.round(zoom * 100)}%</div>
-          <Button size="icon" variant="outline" onClick={() => setZoom((value) => Math.min(1.2, value + 0.1))} title="Aumentar zoom">
-            <ZoomIn className="h-4 w-4" />
-          </Button>
-          <Button size="icon" variant="outline" onClick={centerCanvas} title="Centralizar">
-            <Maximize className="h-4 w-4" />
-          </Button>
           <Button size="sm" variant="outline" onClick={exportImage}>
             <Download className="mr-2 h-4 w-4" />
             Exportar
@@ -361,44 +305,41 @@ export function PDCAVisualAnalysis({
 
       {!canEdit && (
         <div className="border-b border-amber-200 bg-amber-50 px-4 py-2 text-xs font-medium text-amber-800">
-          Você está em modo de visualização. Edição, conversão e checklist estão bloqueados.
+          Você está em modo de visualização. Edição e conversão estão bloqueados.
         </div>
       )}
 
-      <div className="grid grid-cols-1 xl:grid-cols-[minmax(0,1fr)_300px]">
-        <div ref={scrollRef} className="max-h-[560px] overflow-auto bg-slate-50">
-          <div
-            ref={canvasRef}
-            className="relative origin-top-left"
-            style={{ width: CANVAS_WIDTH, height: CANVAS_HEIGHT, transform: `scale(${zoom})`, transformOrigin: 'top left' }}
-          >
-            <PDCACycle selectedPhase={selectedPhase} onSelect={setSelectedPhase} />
-            {PHASES.map((phase) => {
-              const stage = stages.find((item) => item.phase === phase)!;
-              return (
-                <PDCAStageCard
-                  key={phase}
-                  stage={stage}
-                  selected={selectedPhase === phase}
-                  responsibleName={stage.responsibleUserId ? responsibleById.get(stage.responsibleUserId) : undefined}
-                  onSelect={() => setSelectedPhase(phase)}
-                />
-              );
-            })}
-          </div>
+      <div className="bg-slate-50 p-4" ref={canvasRef}>
+        <div className="mb-4 text-center">
+          <div className="text-lg font-bold tracking-tight text-slate-900">PDCA — Ciclo de melhoria contínua</div>
+          <div className="text-xs font-medium text-slate-500">Preencha cada etapa direto no bloco. A maioria dos campos já vem puxada do plano e do indicador.</div>
         </div>
 
-        <PDCAStageDrawer
-          stage={selectedStage}
-          action={action}
-          users={users}
-          canEdit={canEdit}
-          onUpdate={(patch) => updateStage(selectedStage.phase, patch)}
-          onSave={() => handleSave()}
-          onMarkDone={() => markDone(selectedStage)}
-          onConvert={() => convertToAction(selectedStage)}
-          onRootCauseChange={onRootCauseChange}
-        />
+        <PDCAStepper stages={stages} currentPhaseIndex={currentPhaseIndex} />
+
+        <div className="mt-4 grid grid-cols-1 gap-3 lg:grid-cols-2">
+          {PHASES.map((phase, index) => {
+            const stage = stages.find((item) => item.phase === phase)!;
+            return (
+              <PDCAStageBlock
+                key={phase}
+                stage={stage}
+                active={index === currentPhaseIndex}
+                canEdit={canEdit}
+                converting={convertingPhase === phase}
+                users={users}
+                responsibleName={stage.responsibleUserId ? responsibleById.get(stage.responsibleUserId) : undefined}
+                onUpdate={(patch) => updateStage(phase, patch)}
+                onCommit={(patch) => commitStage(phase, patch)}
+                onUpdateData={(key, value) => updateData(phase, key, value)}
+                onRootCauseChange={onRootCauseChange}
+                onBlurSave={() => handleSave()}
+                onMarkDone={() => markDone(stage)}
+                onConvert={() => convertToAction(stage)}
+              />
+            );
+          })}
+        </div>
       </div>
 
       <PDCAFooter completedCount={completedCount} progress={pdcaProgress} saving={saving} lastSavedAt={lastSavedAt} />
@@ -421,8 +362,8 @@ export function PDCAVisualAnalysis({
                   <div className="text-sm font-semibold text-slate-900">{item.suggestion}</div>
                   <p className="mt-1 text-xs leading-5 text-slate-600">{item.justification}</p>
                   <div className="mt-3 flex flex-wrap gap-2">
-                    <Button size="sm" onClick={() => acceptSuggestion(item)}>Aceitar</Button>
-                    <Button size="sm" variant="outline" onClick={() => acceptSuggestion(item, true)}>Editar e aceitar</Button>
+                    <Button size="sm" onClick={() => acceptSuggestion(item)} disabled={!canEdit}>Aceitar</Button>
+                    <Button size="sm" variant="outline" onClick={() => acceptSuggestion(item, true)} disabled={!canEdit}>Editar e aceitar</Button>
                     <Button size="sm" variant="ghost" onClick={() => setSuggestions((current) => current.filter((candidate) => candidate !== item))}>Descartar</Button>
                   </div>
                 </div>
@@ -431,276 +372,151 @@ export function PDCAVisualAnalysis({
           </div>
         </DialogContent>
       </Dialog>
-
-      <Dialog open={checklistOpen} onOpenChange={setChecklistOpen}>
-        <DialogContent className="max-w-lg">
-          <DialogHeader>
-            <DialogTitle>Checklist da etapa {selectedStage.title}</DialogTitle>
-          </DialogHeader>
-          <div className="space-y-2">
-            {selectedStage.checklist.map((item) => (
-              <label key={item.id} className="flex items-center gap-3 rounded-lg border p-3 text-sm">
-                <input
-                  type="checkbox"
-                  checked={item.done}
-                  disabled={!canEdit}
-                  onChange={(event) =>
-                    updateStage(selectedStage.phase, {
-                      checklist: selectedStage.checklist.map((candidate) => candidate.id === item.id ? { ...candidate, done: event.target.checked } : candidate),
-                    })
-                  }
-                />
-                <span>{item.title}</span>
-              </label>
-            ))}
-            <div className="flex gap-2 pt-2">
-              <Input value={newChecklistItem} onChange={(event) => setNewChecklistItem(event.target.value)} placeholder="Novo item do checklist" disabled={!canEdit} />
-              <Button onClick={addChecklistItem} disabled={!canEdit}>Adicionar</Button>
-            </div>
-          </div>
-          <DialogFooter>
-            <Button variant="ghost" onClick={() => setChecklistOpen(false)}>Fechar</Button>
-            <Button onClick={() => handleSave()} disabled={!canEdit || saving}>Salvar checklist</Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
     </div>
   );
 }
 
-function PDCACycle({ selectedPhase, onSelect }: { selectedPhase: Phase; onSelect: (phase: Phase) => void }) {
+function PDCAStepper({ stages, currentPhaseIndex }: { stages: PdcaStage[]; currentPhaseIndex: number }) {
   return (
-    <div className="absolute left-[425px] top-[198px] z-10 h-[250px] w-[250px]">
-      <div
-        className="absolute inset-0 rounded-full shadow-lg"
-        style={{ background: 'conic-gradient(#f97316 0deg 90deg, #16a34a 90deg 180deg, #7c3aed 180deg 270deg, #2563eb 270deg 360deg)' }}
-      />
-      <div className="absolute inset-[24px] rounded-full border-[10px] border-white/70 bg-white shadow-inner" />
-      <div className="absolute inset-[73px] flex flex-col items-center justify-center rounded-full bg-white text-center shadow-md">
-        <div className="text-2xl font-bold text-slate-900">PDCA</div>
-        <div className="mt-1 text-xs font-medium text-slate-500">Melhoria<br />Contínua</div>
-      </div>
-      {PHASES.map((phase) => {
+    <div className="mx-auto flex max-w-3xl flex-wrap items-center justify-center gap-1.5">
+      {PHASES.map((phase, index) => {
+        const stage = stages.find((item) => item.phase === phase)!;
         const meta = STAGE_META[phase];
-        const positions: Record<Phase, string> = {
-          PLAN: 'left-[16px] top-[82px]',
-          DO: 'right-[16px] top-[82px]',
-          CHECK: 'right-[16px] bottom-[82px]',
-          ACT: 'left-[16px] bottom-[82px]',
-        };
+        const done = stage.status === 'DONE' || stage.status === 'VALIDATED';
+        const active = index === currentPhaseIndex;
         return (
-          <button
-            key={phase}
-            type="button"
-            className={cn('absolute flex h-10 w-10 items-center justify-center rounded-full border-4 border-white text-xs font-bold text-white shadow-md', positions[phase], selectedPhase === phase && 'ring-4 ring-slate-300')}
-            style={{ backgroundColor: meta.color }}
-            onClick={() => onSelect(phase)}
-          >
-            {meta.number}
-          </button>
+          <div key={phase} className="flex items-center gap-1.5">
+            <span
+              className={cn('inline-flex items-center gap-1.5 rounded-full border px-3 py-1 text-xs font-semibold', active ? 'ring-2 ring-offset-1' : '')}
+              style={{ borderColor: meta.color, color: meta.color, backgroundColor: done ? meta.color : '#fff', ...(done ? { color: '#fff' } : {}) }}
+            >
+              {done ? <CheckCircle2 className="h-3.5 w-3.5" /> : <meta.icon className="h-3.5 w-3.5" />}
+              {meta.number} {meta.title}
+            </span>
+            {index < PHASES.length - 1 && <ChevronRight className="h-4 w-4 text-slate-300" />}
+          </div>
         );
       })}
     </div>
   );
 }
 
-function PDCAStageCard({ stage, selected, responsibleName, onSelect }: { stage: PdcaStage; selected: boolean; responsibleName?: string; onSelect: () => void }) {
-  const meta = STAGE_META[stage.phase];
-  const Icon = meta.icon;
-  const summary = stageSummary(stage, responsibleName);
-  return (
-    <button
-      type="button"
-      className={cn('absolute z-20 w-[386px] rounded-lg border bg-white p-4 text-left shadow-sm transition hover:shadow-md', meta.border, selected && 'shadow-lg ring-2 ring-blue-200')}
-      style={{ left: meta.x, top: meta.y }}
-      onClick={onSelect}
-    >
-      <div className="flex items-start justify-between gap-3">
-        <div className="flex items-start gap-3">
-          <div className={cn('flex h-10 w-10 items-center justify-center rounded-lg border', meta.soft)}>
-            <Icon className="h-5 w-5" />
-          </div>
-          <div>
-            <div className="text-xl font-bold" style={{ color: meta.color }}>{stage.title}</div>
-            <div className="mt-0.5 text-xs font-medium text-slate-500">{stage.subtitle}</div>
-          </div>
-        </div>
-        <span className="text-lg text-slate-500">›</span>
-      </div>
-      <div className="mt-4 grid gap-2">
-        {summary.map((item) => (
-          <div key={item.label} className="grid grid-cols-[18px_112px_1fr] items-start gap-2 text-xs">
-            <item.icon className="mt-0.5 h-3.5 w-3.5" style={{ color: meta.color }} />
-            <span className="font-semibold text-slate-600">{item.label}</span>
-            <span className="min-w-0 text-slate-700">{item.value}</span>
-          </div>
-        ))}
-        <div className="grid grid-cols-[18px_112px_1fr] items-center gap-2 text-xs">
-          <CheckCircle2 className="h-3.5 w-3.5" style={{ color: meta.color }} />
-          <span className="font-semibold text-slate-600">Status</span>
-          <StatusPill stage={stage} />
-        </div>
-      </div>
-      <div className="mt-3 h-1.5 overflow-hidden rounded-full bg-slate-100">
-        <div className="h-full rounded-full" style={{ width: `${stage.progress}%`, backgroundColor: meta.color }} />
-      </div>
-    </button>
-  );
-}
-
-function PDCAStageDrawer({
+/**
+ * Bloco de uma fase do PDCA com edição inline. Os campos já chegam puxados do plano/indicador;
+ * o usuário edita direto no card e pode marcar a fase como concluída ou transformá-la em ação.
+ */
+function PDCAStageBlock({
   stage,
-  action,
-  users,
+  active,
   canEdit,
+  converting,
+  users,
+  responsibleName,
   onUpdate,
-  onSave,
+  onCommit,
+  onUpdateData,
+  onRootCauseChange,
+  onBlurSave,
   onMarkDone,
   onConvert,
-  onRootCauseChange,
 }: {
   stage: PdcaStage;
-  action?: any;
-  users: UserOption[];
+  active: boolean;
   canEdit: boolean;
+  converting: boolean;
+  users: UserOption[];
+  responsibleName?: string;
   onUpdate: (patch: Partial<PdcaStage>) => void;
-  onSave: () => void;
+  onCommit: (patch: Partial<PdcaStage>) => void;
+  onUpdateData: (key: string, value: string) => void;
+  onRootCauseChange: (value: string) => void;
+  onBlurSave: () => void;
   onMarkDone: () => void;
   onConvert: () => void;
-  onRootCauseChange: (value: string) => void;
 }) {
   const meta = STAGE_META[stage.phase];
+  const Icon = meta.icon;
+  const done = stage.status === 'DONE' || stage.status === 'VALIDATED';
+  const fields = PHASE_FIELDS[stage.phase];
   return (
-    <aside className="border-l border-slate-200 bg-white">
-      <div className="border-b border-slate-200 p-3">
-        <div className="text-sm font-semibold text-slate-900">Etapa selecionada</div>
-        <div className="mt-2 flex items-start gap-2">
-          <span className="mt-1 h-2.5 w-2.5 shrink-0 rounded-full" style={{ backgroundColor: meta.color }} />
-          <div className="min-w-0">
-            <div className="text-base font-semibold text-slate-900">{stage.title}</div>
-            <div className="mt-0.5 text-xs text-slate-500">{stage.subtitle}</div>
+    <div
+      className={cn('flex flex-col rounded-xl border bg-white p-4 shadow-sm transition', meta.border, active && 'ring-2 ring-blue-200')}
+      style={{ borderTopColor: meta.color, borderTopWidth: 3 }}
+    >
+      <div className="flex items-start justify-between gap-2">
+        <div className="flex items-center gap-2">
+          <span className="flex h-9 w-9 items-center justify-center rounded-lg text-white shadow-sm" style={{ backgroundColor: meta.color }}>
+            {done ? <CheckCircle2 className="h-5 w-5" /> : <Icon className="h-5 w-5" />}
+          </span>
+          <div>
+            <div className="text-base font-bold leading-4" style={{ color: meta.color }}>{meta.number}. {stage.title}</div>
+            <div className="text-[11px] font-medium text-slate-500">{stage.subtitle}</div>
           </div>
         </div>
+        <StatusPill stage={stage} />
       </div>
-      <div className="max-h-[520px] space-y-3 overflow-y-auto p-3">
-        <fieldset disabled={!canEdit} className="space-y-3">
-          <div>
-            <Label>Descrição / Objetivo</Label>
-            <Textarea rows={4} value={stage.description} onChange={(event) => onUpdate({ description: event.target.value })} onBlur={onSave} />
-          </div>
-          <div>
-            <Label>Objetivo</Label>
-            <Input value={stage.objective} onChange={(event) => onUpdate({ objective: event.target.value })} onBlur={onSave} />
-          </div>
-          {stage.phase === 'PLAN' && (
-            <>
-              <TextInput label="Problema principal" value={stage.data.problem ?? ''} onChange={(value) => onUpdate({ data: { ...stage.data, problem: value } })} onBlur={onSave} />
-              <TextInput label="Causa raiz" value={stage.data.rootCause ?? ''} onChange={(value) => { onUpdate({ data: { ...stage.data, rootCause: value } }); onRootCauseChange(value); }} onBlur={onSave} />
-              <TextInput label="Meta" value={stage.data.target ?? ''} onChange={(value) => onUpdate({ data: { ...stage.data, target: value } })} onBlur={onSave} />
-              <TextInput label="Critério de sucesso" value={stage.data.successCriteria ?? ''} onChange={(value) => onUpdate({ data: { ...stage.data, successCriteria: value } })} onBlur={onSave} />
-              <TextInput label="Riscos previstos" value={stage.data.risks ?? ''} onChange={(value) => onUpdate({ data: { ...stage.data, risks: value } })} onBlur={onSave} />
-            </>
-          )}
-          {stage.phase === 'DO' && (
-            <>
-              <TextInput label="Ações executadas" value={stage.data.actions ?? ''} onChange={(value) => onUpdate({ data: { ...stage.data, actions: value } })} onBlur={onSave} />
-              <TextInput label="Impedimentos" value={stage.data.blockers ?? ''} onChange={(value) => onUpdate({ data: { ...stage.data, blockers: value } })} onBlur={onSave} />
-              <TextInput label="Percentual executado" value={String(stage.progress)} onChange={(value) => onUpdate({ progress: clampProgress(value) })} onBlur={onSave} />
-            </>
-          )}
-          {stage.phase === 'CHECK' && (
-            <>
-              <TextInput label="Resultado medido" value={stage.data.measuredResult ?? ''} onChange={(value) => onUpdate({ data: { ...stage.data, measuredResult: value } })} onBlur={onSave} />
-              <TextInput label="Indicador monitorado" value={stage.data.indicator ?? ''} onChange={(value) => onUpdate({ data: { ...stage.data, indicator: value } })} onBlur={onSave} />
-              <TextInput label="Meta" value={stage.data.target ?? ''} onChange={(value) => onUpdate({ data: { ...stage.data, target: value } })} onBlur={onSave} />
-              <TextInput label="Desvio" value={stage.data.deviation ?? ''} onChange={(value) => onUpdate({ data: { ...stage.data, deviation: value } })} onBlur={onSave} />
-              <TextInput label="Comentário da verificação" value={stage.data.checkComment ?? ''} onChange={(value) => onUpdate({ data: { ...stage.data, checkComment: value } })} onBlur={onSave} />
-            </>
-          )}
-          {stage.phase === 'ACT' && (
-            <>
-              <TextInput label="Lições aprendidas" value={stage.data.lessons ?? ''} onChange={(value) => onUpdate({ data: { ...stage.data, lessons: value } })} onBlur={onSave} />
-              <TextInput label="Ajustes necessários" value={stage.data.adjustments ?? ''} onChange={(value) => onUpdate({ data: { ...stage.data, adjustments: value } })} onBlur={onSave} />
-              <TextInput label="Padronização" value={stage.data.standardization ?? ''} onChange={(value) => onUpdate({ data: { ...stage.data, standardization: value } })} onBlur={onSave} />
-              <TextInput label="Próxima revisão" value={stage.data.nextReview ?? ''} onChange={(value) => onUpdate({ data: { ...stage.data, nextReview: value } })} onBlur={onSave} />
-            </>
-          )}
-          <div className="grid gap-3 sm:grid-cols-2">
-            <div>
-              <Label>Responsável</Label>
-              <NativeSelect value={stage.responsibleUserId} onChange={(event) => onUpdate({ responsibleUserId: event.target.value })} onBlur={onSave}>
-                <option value="">Sem responsável</option>
-                {users.map((user) => <option key={user.id} value={user.id}>{user.name}</option>)}
-              </NativeSelect>
-            </div>
-            <div>
-              <Label>Prazo</Label>
-              <Input type="date" value={stage.dueDate?.slice(0, 10) ?? ''} onChange={(event) => onUpdate({ dueDate: event.target.value })} onBlur={onSave} />
-            </div>
-          </div>
-          <div className="grid gap-3 sm:grid-cols-2">
-            <div>
-              <Label>Prioridade</Label>
-              <NativeSelect value={stage.priority} onChange={(event) => onUpdate({ priority: event.target.value as Priority })} onBlur={onSave}>
-                {Object.entries(PRIORITY_LABEL).map(([key, label]) => <option key={key} value={key}>{label}</option>)}
-              </NativeSelect>
-            </div>
-            <div>
-              <Label>Status</Label>
-              <NativeSelect value={stage.status} onChange={(event) => onUpdate({ status: event.target.value as StageStatus })} onBlur={onSave}>
-                {Object.entries(STATUS_LABEL).map(([key, label]) => <option key={key} value={key}>{label}</option>)}
-              </NativeSelect>
-            </div>
-          </div>
-          <div>
-            <Label>Progresso</Label>
-            <Input type="number" min={0} max={100} value={stage.progress} onChange={(event) => onUpdate({ progress: clampProgress(event.target.value) })} onBlur={onSave} />
-          </div>
-          <div>
-            <Label>Evidências vinculadas</Label>
-            <Textarea rows={3} value={stage.evidence} onChange={(event) => onUpdate({ evidence: event.target.value })} onBlur={onSave} />
-          </div>
-        </fieldset>
 
-        <div className="grid gap-2">
-          <PanelLink icon={Paperclip} label="Evidências vinculadas" value={`${stage.evidence ? 1 : 0} registro`} />
-          <PanelLink icon={Link2} label="Ações vinculadas" value={stage.convertedToTaskId ? '1 tarefa criada' : '0 tarefas vinculadas'} />
-          <PanelLink icon={ListChecks} label="Checklist da etapa" value={`${stage.checklist.filter((item) => item.done).length}/${stage.checklist.length} concluídos`} />
-        </div>
+      <fieldset disabled={!canEdit} className="mt-3 flex-1 space-y-2">
+        {fields.map((field) =>
+          field.area ? (
+            <div key={field.key}>
+              <Label className="text-[11px] text-slate-500">{field.label}</Label>
+              <Textarea
+                rows={2}
+                value={stage.data[field.key] ?? ''}
+                onChange={(event) => {
+                  onUpdateData(field.key, event.target.value);
+                  if (field.rootCause) onRootCauseChange(event.target.value);
+                }}
+                onBlur={onBlurSave}
+                className="text-sm"
+              />
+            </div>
+          ) : (
+            <div key={field.key}>
+              <Label className="text-[11px] text-slate-500">{field.label}</Label>
+              <Input
+                value={stage.data[field.key] ?? ''}
+                onChange={(event) => {
+                  onUpdateData(field.key, event.target.value);
+                  if (field.rootCause) onRootCauseChange(event.target.value);
+                }}
+                onBlur={onBlurSave}
+                className="h-9 text-sm"
+              />
+            </div>
+          ),
+        )}
 
-        <div className="space-y-2 border-t border-slate-200 pt-4">
-          <Button className="w-full justify-start" onClick={onConvert} disabled={!canEdit || Boolean(stage.convertedToTaskId)}>
-            <Rocket className="mr-2 h-4 w-4" />
-            Transformar em plano de ação
-          </Button>
-          <Button variant="outline" className="w-full justify-start text-green-700" onClick={onMarkDone} disabled={!canEdit}>
-            <CheckCircle2 className="mr-2 h-4 w-4" />
-            Marcar concluída
-          </Button>
-          <Button variant="outline" className="w-full justify-start" onClick={onSave} disabled={!canEdit}>
-            <FileText className="mr-2 h-4 w-4" />
-            Editar etapa
-          </Button>
+        <div className="grid gap-2 sm:grid-cols-2">
+          <div>
+            <Label className="text-[11px] text-slate-500">Responsável</Label>
+            <NativeSelect value={stage.responsibleUserId} onChange={(event) => onCommit({ responsibleUserId: event.target.value })} className="h-9 text-sm">
+              <option value="">Sem responsável</option>
+              {users.map((user) => <option key={user.id} value={user.id}>{user.name}</option>)}
+            </NativeSelect>
+          </div>
+          <div>
+            <Label className="text-[11px] text-slate-500">Prazo</Label>
+            <Input type="date" value={stage.dueDate?.slice(0, 10) ?? ''} onChange={(event) => onCommit({ dueDate: event.target.value })} className="h-9 text-sm" />
+          </div>
         </div>
+      </fieldset>
+
+      <div className="mt-3 h-1.5 overflow-hidden rounded-full bg-slate-100">
+        <div className="h-full rounded-full transition-all" style={{ width: `${stage.progress}%`, backgroundColor: meta.color }} />
       </div>
-    </aside>
-  );
-}
 
-function TextInput({ label, value, onChange, onBlur }: { label: string; value: string; onChange: (value: string) => void; onBlur: () => void }) {
-  return (
-    <div>
-      <Label>{label}</Label>
-      <Input value={value ?? ''} onChange={(event) => onChange(event.target.value)} onBlur={onBlur} />
-    </div>
-  );
-}
-
-function PanelLink({ icon: Icon, label, value }: { icon: LucideIcon; label: string; value: string }) {
-  return (
-    <div className="flex items-center justify-between gap-3 rounded-lg border border-slate-200 bg-white p-3 text-sm">
-      <span className="flex items-center gap-2 font-medium text-slate-700"><Icon className="h-4 w-4 text-slate-500" />{label}</span>
-      <span className="text-xs text-slate-500">{value}</span>
+      <div className="mt-3 flex flex-wrap gap-2">
+        <Button size="sm" variant="outline" className="flex-1 text-green-700" onClick={onMarkDone} disabled={!canEdit || done}>
+          <CheckCircle2 className="mr-2 h-4 w-4" />
+          {done ? 'Concluída' : 'Marcar concluída'}
+        </Button>
+        <Button size="sm" className="flex-1 bg-emerald-600 hover:bg-emerald-700" onClick={onConvert} disabled={!canEdit || converting || Boolean(stage.convertedToTaskId)}>
+          <Rocket className="mr-2 h-4 w-4" />
+          {stage.convertedToTaskId ? 'Vinculada' : converting ? 'Gerando...' : 'Gerar tarefa'}
+        </Button>
+      </div>
     </div>
   );
 }
@@ -712,15 +528,14 @@ function PDCAFooter({ completedCount, progress, saving, lastSavedAt }: { complet
         <div className="font-semibold text-slate-800">Ciclo atual</div>
         <div>{completedCount} de 4 etapas concluídas</div>
       </div>
-      <div className="flex flex-wrap items-center gap-4">
+      <div className="hidden flex-wrap items-center gap-4 md:flex">
         <span className="inline-flex items-center gap-2"><span className="h-2.5 w-2.5 rounded-full bg-slate-400" />Pendente</span>
         <span className="inline-flex items-center gap-2"><span className="h-2.5 w-2.5 rounded-full bg-orange-400" />Em andamento</span>
-        <span className="inline-flex items-center gap-2"><span className="h-2.5 w-2.5 rounded-full bg-green-500" />Concluído</span>
-        <span className="inline-flex items-center gap-2"><span className="h-2.5 w-2.5 rounded-full bg-red-500" />Atrasado</span>
+        <span className="inline-flex items-center gap-2"><span className="h-2.5 w-2.5 rounded-full bg-green-500" />Concluída</span>
       </div>
       <div className="text-right">
         <div className="font-semibold text-slate-800">{progress}%</div>
-        <div>{saving ? 'Salvando...' : lastSavedAt ? `Salvo às ${lastSavedAt}` : 'Arraste para reposicionar'}</div>
+        <div>{saving ? 'Salvando...' : lastSavedAt ? `Salvo às ${lastSavedAt}` : 'Não salvo'}</div>
       </div>
     </div>
   );
@@ -738,41 +553,10 @@ function StatusPill({ stage }: { stage: PdcaStage }) {
         : stage.status === 'BLOCKED'
           ? 'border-red-200 bg-red-50 text-red-700'
           : 'border-slate-200 bg-slate-100 text-slate-600';
-  return <span className={cn('w-fit rounded-full border px-3 py-1 text-[11px] font-semibold', classes)}>{label}</span>;
+  return <span className={cn('shrink-0 rounded-full border px-2.5 py-0.5 text-[10px] font-semibold', classes)}>{label}</span>;
 }
 
-function stageSummary(stage: PdcaStage, responsibleName?: string) {
-  if (stage.phase === 'PLAN') {
-    return [
-      { icon: FileText, label: 'Problema principal', value: stage.data.problem || 'Não informado' },
-      { icon: RefreshCw, label: 'Causa raiz', value: stage.data.rootCause || 'Não definida' },
-      { icon: BarChart3, label: 'Meta', value: stage.data.target || 'Definir meta' },
-      { icon: UserRound, label: 'Responsável', value: responsibleName || 'Sem responsável' },
-      { icon: CalendarDays, label: 'Prazo', value: formatDate(stage.dueDate) },
-    ];
-  }
-  if (stage.phase === 'DO') {
-    return [
-      { icon: PlayCircle, label: 'Ações em andamento', value: stage.data.actionsCount ?? stage.data.actions ?? '0 ações' },
-      { icon: UserRound, label: 'Responsáveis', value: responsibleName || 'Não definido' },
-      { icon: Paperclip, label: 'Evidências coletadas', value: stage.evidence ? '1 registro' : '0 registros' },
-      { icon: CalendarDays, label: 'Início', value: stage.data.startedAt || '-' },
-    ];
-  }
-  if (stage.phase === 'CHECK') {
-    return [
-      { icon: BarChart3, label: 'Resultado atual', value: stage.data.measuredResult || stage.data.currentResult || '-' },
-      { icon: FileText, label: 'Indicador', value: stage.data.indicator || '-' },
-      { icon: RefreshCw, label: 'Desvio', value: stage.data.deviation || '-' },
-      { icon: CheckCircle2, label: 'Eficácia parcial', value: `${stage.progress}%` },
-    ];
-  }
-  return [
-    { icon: FileText, label: 'Lições aprendidas', value: stage.data.lessons ? '1 registro' : 'Nenhum registro' },
-    { icon: ListChecks, label: 'Padronização', value: stage.data.standardization || 'Não iniciada' },
-    { icon: RefreshCw, label: 'Próximos ajustes', value: stage.data.adjustments || 'Aguardando verificação' },
-  ];
-}
+// ---------- helpers ----------
 
 function normalizeStages(rows: any[] | undefined, action?: any, rootCause = ''): PdcaStage[] {
   const byPhase = new Map((rows ?? []).map((row) => [normalizePhase(row.phase), row]));
@@ -867,10 +651,6 @@ function defaultChecklist(phase: Phase): ChecklistItem[] {
   return items[phase].map((title, index) => ({ id: `${phase}-${index + 1}`, title, done: false }));
 }
 
-function appendChecklistText(checklist: ChecklistItem[], text: string, done = false) {
-  return [...checklist, { id: newTempId(), title: text, done }];
-}
-
 function defaultSuggestions(action: any): PdcaSuggestion[] {
   return [
     { phase: 'PLAN', field: 'objective', suggestion: `Definir meta, causa raiz e critério de sucesso para ${action?.title ?? 'o plano'}.`, justification: 'A etapa Plan precisa orientar a execução com clareza.' },
@@ -912,7 +692,7 @@ function normalizeData(value: any) {
 function normalizeKey(value: any) {
   return String(value ?? '')
     .normalize('NFD')
-    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/[̀-ͯ]/g, '')
     .trim()
     .toUpperCase()
     .replace(/[^A-Z0-9]+/g, '_')

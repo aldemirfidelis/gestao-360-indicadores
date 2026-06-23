@@ -5,7 +5,7 @@ import dynamic from 'next/dynamic';
 import { useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
-import { ChevronRight, GitBranch, List, MessageSquare, Pencil, Plus, RefreshCw, Save, Trash2 } from 'lucide-react';
+import { ChevronRight, ClipboardList, GitBranch, List, MessageSquare, Pencil, Plus, RefreshCw, Save, Trash2 } from 'lucide-react';
 import { PageHeader } from '@/components/shell/page-header';
 import { SectionCard } from '@/components/platform/section-card';
 import { StatusBadge } from '@/components/platform/status-badge';
@@ -25,7 +25,7 @@ import {
 } from '@/components/ui/dialog';
 import { api } from '@/lib/api';
 import { useAuth } from '@/components/auth/auth-provider';
-import { formatPercent } from '@/lib/utils';
+import { formatDate, formatPercent } from '@/lib/utils';
 import { LoadingState } from '@/components/platform/loading-state';
 
 // React Flow (+CSS) e pesado e so e necessario na visao de fluxo; carrega sob demanda
@@ -101,6 +101,23 @@ interface StrategicObjectiveRef {
   indicators?: StrategicIndicator[];
 }
 
+interface OkrActionPlan {
+  id: string;
+  title: string;
+  description: string | null;
+  status: string;
+  priority: string;
+  origin: string;
+  dueDate: string | null;
+  progress: number;
+  expectedResult: string | null;
+  responsibleUser: { id: string; name: string; email?: string; avatarUrl?: string | null } | null;
+  ownerNode: { id: string; name: string; type?: string } | null;
+  taskCount: number;
+  doneTaskCount: number;
+  taskProgress: number;
+}
+
 interface Objective {
   id: string;
   name: string;
@@ -112,6 +129,13 @@ interface Objective {
   confidence: number;
   status: string;
   progress: number;
+  progressSource?: 'ACTIONS' | 'KEY_RESULTS' | 'CHECKINS' | 'CHILDREN' | 'EMPTY';
+  krProgress?: number;
+  actionProgress?: number | null;
+  actionPlanCount?: number;
+  taskCount?: number;
+  doneTaskCount?: number;
+  actionPlans?: OkrActionPlan[];
   keyResults: KR[];
   strategicObj: StrategicObjectiveRef | null;
   checkins?: { weekRef: string; progress: number; confidence: number; createdAt: string }[];
@@ -145,6 +169,7 @@ const STATUS_LABEL: Record<string, string> = {
 const emptyCycle = { name: '', startsAt: new Date().toISOString().slice(0, 10), endsAt: `${new Date().getFullYear()}-12-31` };
 const emptyObjective = { name: '', description: '', ownerName: '', team: '', weight: 1, parentId: '', strategicObjId: '', ownerNodeId: '', ownerUserId: '' };
 const emptyKr = { objectiveId: '', metric: '', unit: 'PERCENT', startValue: 0, currentValue: 0, targetValue: 100, direction: 'HIGHER_BETTER', weight: 1, responsible: '', indicatorId: '' };
+const emptyAction = { title: '', description: '', responsibleUserId: '', dueDate: '', expectedResult: '', priority: 'MEDIUM' };
 
 const PACE_LABEL: Record<string, { label: string; tone: string }> = {
   AHEAD: { label: 'Adiantado', tone: 'text-status-blue' },
@@ -160,6 +185,7 @@ export default function OkrsPage() {
   const canUpdate = hasPermission(['okrs:update']);
   const canDelete = hasPermission(['okrs:delete']);
   const canCheckin = hasPermission(['okrs:checkin', 'okrs:update']);
+  const canCreateAction = hasPermission(['actions:create']);
   const [activeCycleId, setActiveCycleId] = useState<string | null>(null);
   const [view, setView] = useState<'list' | 'flow'>('list');
   const [areaFilterId, setAreaFilterId] = useState<string>('');
@@ -171,6 +197,8 @@ export default function OkrsPage() {
   const [cycleForm, setCycleForm] = useState(emptyCycle);
   const [objectiveForm, setObjectiveForm] = useState(emptyObjective);
   const [krForm, setKrForm] = useState(emptyKr);
+  const [actionObj, setActionObj] = useState<Objective | null>(null);
+  const [actionForm, setActionForm] = useState(emptyAction);
   const [checkinObj, setCheckinObj] = useState<Objective | null>(null);
   const [checkin, setCheckin] = useState({ confidence: 0.7, progress: 0.5, note: '' });
 
@@ -254,6 +282,41 @@ export default function OkrsPage() {
     },
   });
 
+  const createAction = useMutation({
+    mutationFn: () => {
+      if (!actionObj) throw new Error('Objetivo OKR nao selecionado');
+      return api('/actions', {
+        method: 'POST',
+        json: {
+          title: actionForm.title.trim(),
+          description: actionForm.description.trim() || null,
+          problemDescription: actionObj.description ?? actionObj.name,
+          origin: 'OKR',
+          originRefId: actionObj.id,
+          okrObjectiveId: actionObj.id,
+          strategicObjectiveId: actionObj.strategicObj?.id ?? null,
+          ownerNodeId: actionObj.ownerNode?.id ?? actionObj.area?.id ?? null,
+          responsibleUserId: actionForm.responsibleUserId || actionObj.ownerUser?.id || null,
+          priority: actionForm.priority,
+          criticality: actionForm.priority,
+          status: 'NOT_STARTED',
+          dueDate: actionForm.dueDate || null,
+          expectedResult: actionForm.expectedResult.trim() || null,
+          analysisTool: 'PDCA',
+        },
+      });
+    },
+    onSuccess: (created: any) => {
+      toast.success('Plano de ação criado para o OKR');
+      setActionObj(null);
+      setActionForm(emptyAction);
+      qc.invalidateQueries({ queryKey: ['okrs'] });
+      qc.invalidateQueries({ queryKey: ['actions'] });
+      if (created?.id) window.location.href = `/actions/${created.id}`;
+    },
+    onError: (e: any) => toast.error(e?.message ?? 'Falha ao criar plano de ação'),
+  });
+
   const submitCheckin = useMutation({
     mutationFn: () =>
       api(`/okrs/objectives/${checkinObj?.id}/checkin`, {
@@ -317,6 +380,18 @@ export default function OkrsPage() {
     });
     setObjectiveOpen(true);
   };
+
+  const openNewAction = (objective: Objective) => {
+    setActionObj(objective);
+    setActionForm({
+      ...emptyAction,
+      title: `Plano de ação - ${objective.name}`,
+      responsibleUserId: objective.ownerUser?.id ?? '',
+      expectedResult: `Avançar o objetivo OKR "${objective.name}" dentro do ciclo atual.`,
+    });
+  };
+
+  const canSubmitAction = Boolean(actionObj && actionForm.title.trim() && actionForm.responsibleUserId && actionForm.dueDate && actionForm.expectedResult.trim());
 
   return (
     <div>
@@ -427,6 +502,12 @@ export default function OkrsPage() {
                     Excluir
                   </Button>
                 )}
+                {canCreateAction && (
+                  <Button variant="outline" size="sm" onClick={() => openNewAction(o)}>
+                    <ClipboardList className="mr-2 h-4 w-4" />
+                    Plano
+                  </Button>
+                )}
                 {canUpdate && (
                   <Button
                     variant="outline"
@@ -462,6 +543,55 @@ export default function OkrsPage() {
               </div>
             </div>
             <Progress value={o.progress * 100} className="mb-4" />
+            <div className="mb-4 rounded-lg border bg-muted/20 p-3 text-sm">
+              <div className="flex flex-wrap items-start justify-between gap-3">
+                <div>
+                  <div className="text-xs font-semibold uppercase text-muted-foreground">Planos de ação do OKR</div>
+                  <div className="mt-1 font-medium">
+                    {o.actionPlanCount ?? 0} plano(s) · {o.doneTaskCount ?? 0}/{o.taskCount ?? 0} tarefa(s) concluída(s)
+                  </div>
+                  <div className="mt-1 text-xs text-muted-foreground">
+                    {progressSourceLabel(o.progressSource)}
+                  </div>
+                </div>
+                <div className="flex flex-wrap gap-2">
+                  <Button size="sm" variant="outline" asChild>
+                    <Link href={`/actions?okrObjectiveId=${o.id}`}>Ver planos</Link>
+                  </Button>
+                  {canCreateAction && (
+                    <Button size="sm" onClick={() => openNewAction(o)}>
+                      <Plus className="mr-2 h-4 w-4" />
+                      Novo plano
+                    </Button>
+                  )}
+                </div>
+              </div>
+              {(o.actionPlans ?? []).length > 0 ? (
+                <div className="mt-3 grid gap-2 md:grid-cols-2">
+                  {(o.actionPlans ?? []).slice(0, 4).map((action) => (
+                    <Link key={action.id} href={`/actions/${action.id}`} className="rounded-md border bg-background p-3 transition hover:bg-accent/35">
+                      <div className="flex items-start justify-between gap-2">
+                        <div className="min-w-0">
+                          <div className="truncate font-medium">{action.title}</div>
+                          <div className="mt-1 text-xs text-muted-foreground">
+                            {action.responsibleUser?.name ?? 'Sem responsável'} · {formatDate(action.dueDate)}
+                          </div>
+                        </div>
+                        <Badge variant="outline">{action.progress}%</Badge>
+                      </div>
+                      <Progress value={action.progress} className="mt-2 h-1.5" />
+                      <div className="mt-1 text-xs text-muted-foreground">
+                        {action.doneTaskCount}/{action.taskCount} tarefa(s) · {STATUS_LABEL[action.status] ?? action.status}
+                      </div>
+                    </Link>
+                  ))}
+                </div>
+              ) : (
+                <div className="mt-3 rounded-md border border-dashed bg-background/60 p-3 text-xs text-muted-foreground">
+                  Crie um plano de ação para que as tarefas executadas alimentem automaticamente este objetivo.
+                </div>
+              )}
+            </div>
             {o.strategicObj && (
               <div className="mb-4 rounded-lg border bg-muted/20 p-3 text-sm">
                 <div className="flex flex-wrap items-start justify-between gap-3">
@@ -743,6 +873,65 @@ export default function OkrsPage() {
         </DialogContent>
       </Dialog>
 
+      <Dialog open={!!actionObj} onOpenChange={(open) => {
+        if (!open) {
+          setActionObj(null);
+          setActionForm(emptyAction);
+        }
+      }}>
+        <DialogContent>
+          <DialogHeader><DialogTitle>Novo plano de ação do OKR</DialogTitle></DialogHeader>
+          {actionObj && (
+            <div className="space-y-3">
+              <div className="rounded-md border bg-muted/35 p-3 text-sm font-medium">{actionObj.name}</div>
+              <div>
+                <Label className="field-required">Título</Label>
+                <Input value={actionForm.title} onChange={(e) => setActionForm({ ...actionForm, title: e.target.value })} />
+              </div>
+              <div>
+                <Label>Descrição da ação</Label>
+                <Textarea rows={3} value={actionForm.description} onChange={(e) => setActionForm({ ...actionForm, description: e.target.value })} />
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <Label className="field-required">Responsável</Label>
+                  <NativeSelect value={actionForm.responsibleUserId} onChange={(e) => setActionForm({ ...actionForm, responsibleUserId: e.target.value })}>
+                    <option value="">Selecione</option>
+                    {(options.data?.users ?? []).map((u) => (
+                      <option key={u.id} value={u.id}>{u.name}</option>
+                    ))}
+                  </NativeSelect>
+                </div>
+                <div>
+                  <Label className="field-required">Prazo</Label>
+                  <Input type="date" value={actionForm.dueDate} onChange={(e) => setActionForm({ ...actionForm, dueDate: e.target.value })} />
+                </div>
+              </div>
+              <div>
+                <Label>Prioridade</Label>
+                <NativeSelect value={actionForm.priority} onChange={(e) => setActionForm({ ...actionForm, priority: e.target.value })}>
+                  <option value="LOW">Baixa</option>
+                  <option value="MEDIUM">Média</option>
+                  <option value="HIGH">Alta</option>
+                  <option value="CRITICAL">Crítica</option>
+                </NativeSelect>
+              </div>
+              <div>
+                <Label className="field-required">Resultado esperado / critério de eficácia</Label>
+                <Textarea rows={3} value={actionForm.expectedResult} onChange={(e) => setActionForm({ ...actionForm, expectedResult: e.target.value })} />
+              </div>
+            </div>
+          )}
+          <DialogFooter>
+            <Button variant="ghost" onClick={() => { setActionObj(null); setActionForm(emptyAction); }}>Cancelar</Button>
+            <Button onClick={() => createAction.mutate()} disabled={!canSubmitAction || createAction.isPending}>
+              <ClipboardList className="mr-2 h-4 w-4" />
+              {createAction.isPending ? 'Salvando...' : 'Criar e abrir plano'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
       <Dialog open={!!checkinObj} onOpenChange={(v) => !v && setCheckinObj(null)}>
         <DialogContent>
           <DialogHeader><DialogTitle>Atualização semanal</DialogTitle></DialogHeader>
@@ -783,6 +972,17 @@ function weekRef(date: Date): string {
   const yearStart = new Date(Date.UTC(d.getUTCFullYear(), 0, 1));
   const week = Math.ceil(((d.getTime() - yearStart.getTime()) / 86400000 + 1) / 7);
   return `${d.getUTCFullYear()}-W${String(week).padStart(2, '0')}`;
+}
+
+function progressSourceLabel(source?: Objective['progressSource']) {
+  const map: Record<string, string> = {
+    CHILDREN: 'Progresso consolidado pelos objetivos filhos.',
+    ACTIONS: 'Progresso calculado pelas tarefas dos planos de ação vinculados.',
+    KEY_RESULTS: 'Progresso calculado pelos Key Results.',
+    CHECKINS: 'Progresso vindo do último check-in registrado.',
+    EMPTY: 'Sem planos, KRs ou check-ins para calcular progresso.',
+  };
+  return map[source ?? 'EMPTY'] ?? map.EMPTY;
 }
 
 function toDateInput(value: string | Date | null | undefined) {

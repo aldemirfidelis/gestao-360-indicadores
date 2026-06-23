@@ -31,6 +31,7 @@ import { TraceabilityService } from '../traceability/traceability.service';
 import { AccessService } from '../access/access.service';
 import type { AreaAction } from '../access/access.logic';
 import { AuthPayload } from '../auth/auth.types';
+import { GeminiService } from '../ai/gemini.service';
 import { NonConformitiesService } from '../nonconformities/nonconformities.service';
 import { AuditCodeService } from './audit-code.service';
 import { AuditRiskService } from './audit-risk.service';
@@ -80,6 +81,7 @@ export class AuditsService {
     private readonly codes: AuditCodeService,
     private readonly risk: AuditRiskService,
     private readonly storage: AuditStorageService,
+    private readonly gemini?: GeminiService,
   ) {}
 
   private include() {
@@ -1906,7 +1908,7 @@ export class AuditsService {
   async createAiSuggestions(me: AuthPayload, auditId: string, body: any = {}) {
     const audit = await this.getById(me, auditId) as any;
     await this.assertViewArea(me, audit);
-    const suggestions = [
+    const fallbackSuggestions = [
       {
         suggestionType: 'CHECKLIST',
         title: 'Revisar cobertura do checklist',
@@ -1923,6 +1925,8 @@ export class AuditsService {
         content: audit.criticalFindings > 0 ? 'Sugestao: priorize follow-up para constatacoes criticas antes da emissao do relatorio final.' : 'Sugestao: planeje follow-up apenas para itens com risco, acao ou NC vinculada.',
       },
     ];
+    const aiSuggestions = await this.tryGeminiAuditSuggestions(audit, fallbackSuggestions);
+    const suggestions = aiSuggestions ?? fallbackSuggestions;
     const selected = this.nullableText(body?.type) ? suggestions.filter((item) => item.suggestionType === body.type) : suggestions;
     return this.prisma.$transaction(
       selected.map((item) =>
@@ -1933,11 +1937,67 @@ export class AuditsService {
             suggestionType: item.suggestionType,
             title: item.title,
             content: item.content,
-            context: jsonOrUndefined({ auditId, source: 'deterministic_assistant', generatedBy: me.sub }),
+            context: jsonOrUndefined({ auditId, source: aiSuggestions ? this.gemini?.provider : 'rules', model: aiSuggestions ? this.gemini?.modelName : null, generatedBy: me.sub }),
           },
         }),
       ),
     );
+  }
+
+  private async tryGeminiAuditSuggestions(
+    audit: any,
+    fallbackSuggestions: Array<{ suggestionType: string; title: string; content: string }>,
+  ): Promise<Array<{ suggestionType: string; title: string; content: string }> | null> {
+    if (!this.gemini?.isEnabled) return null;
+    const prompt = `Voce e um auditor lider senior de sistemas de gestao corporativa.
+Gere sugestoes assistivas para a auditoria abaixo, em portugues do Brasil.
+Nao aprove, reprove, encerre ou altere achados. Apenas proponha textos e proximos passos.
+
+Responda apenas JSON no schema:
+{
+  "suggestions": [
+    { "suggestionType": "CHECKLIST|FINDING_TEXT|FOLLOW_UP|RISK|EVIDENCE", "title": "...", "content": "..." }
+  ]
+}
+
+CONTEXTO:
+${JSON.stringify({
+  audit: {
+    id: audit.id,
+    code: audit.code,
+    title: audit.title,
+    type: audit.type,
+    status: audit.status,
+    scope: audit.scope,
+    objective: audit.objective,
+    criteria: audit.criteria,
+    orgNode: audit.orgNode?.name,
+    criticalFindings: audit.criticalFindings,
+    openFindings: audit.openFindings,
+    overdueFindings: audit.overdueFindings,
+    findings: (audit.findings ?? []).slice(0, 10).map((finding: any) => ({
+      type: finding.type,
+      severity: finding.severity,
+      title: finding.title,
+      description: finding.description,
+      status: finding.status,
+    })),
+  },
+  baseRules: fallbackSuggestions,
+}, null, 2)}`;
+    const json = await this.gemini.generateJson<{ suggestions?: Array<{ suggestionType?: string; title?: string; content?: string }> }>(prompt, {
+      temperature: 0.35,
+      maxOutputTokens: 1400,
+    });
+    const allowed = new Set(['CHECKLIST', 'FINDING_TEXT', 'FOLLOW_UP', 'RISK', 'EVIDENCE']);
+    const suggestions = json?.suggestions
+      ?.map((item) => ({
+        suggestionType: allowed.has(String(item.suggestionType)) ? String(item.suggestionType) : 'CHECKLIST',
+        title: String(item.title ?? '').trim(),
+        content: String(item.content ?? '').trim(),
+      }))
+      .filter((item) => item.title && item.content);
+    return suggestions?.length ? suggestions.slice(0, 5) : null;
   }
 
   async decideAiSuggestion(me: AuthPayload, id: string, body: any = {}) {
