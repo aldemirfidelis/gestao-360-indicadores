@@ -329,16 +329,15 @@ export function FiveWTwoHVisualAnalysis({
         toast.error('Não foi possível criar o plano de ação.');
         return;
       }
-      // Mantém o 5W2H salvo (Por quê / Onde / Como / Quanto ficam rastreáveis na análise).
-      handleSave(items);
       await api(`/actions/${targetActionId}/tasks`, {
         method: 'POST',
         json: { title: whatText, assignedToId: who, dueDate: when, startDate: when, endDate: when },
       });
-      const next = items.map((item) => ({ ...item, status: 'DONE' as ItemStatus, progress: 100, completedAt: item.completedAt ?? new Date().toISOString() }));
-      setItems(next);
-      handleSave(next);
-      toast.success(actionId ? '5W2H concluído e tarefa criada no plano' : '5W2H concluído — plano de ação criado e tarefa adicionada');
+      // Limpa o 5W2H para preencher e gerar a PRÓXIMA tarefa (cada 5W2H = uma tarefa do plano).
+      const cleared = FIELD_ORDER.map((type) => makeItem(undefined, type, undefined));
+      setItems(cleared);
+      handleSave(cleared);
+      toast.success(actionId ? 'Tarefa criada no plano — 5W2H limpo para a próxima' : 'Plano de ação criado e tarefa adicionada — 5W2H limpo para a próxima');
       qc.invalidateQueries({ queryKey: ['action', targetActionId] });
       qc.invalidateQueries({ queryKey: ['actions'] });
       onTaskCreated?.();

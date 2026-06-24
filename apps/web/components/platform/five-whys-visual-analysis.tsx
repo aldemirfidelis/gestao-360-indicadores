@@ -7,11 +7,10 @@ import { toast } from 'sonner';
 import {
   AlertTriangle,
   ArrowDown,
-  CheckCircle2,
+  ArrowRight,
   Download,
   Lock,
   Plus,
-  Rocket,
   Save,
   Sparkles,
   Star,
@@ -20,7 +19,6 @@ import {
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
-import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { NativeSelect } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
@@ -110,6 +108,7 @@ export function FiveWhysVisualAnalysis({
   seedAnswer,
   onSeedConsumed,
   onRootCauseChange,
+  onGoToFiveW2H,
   onSave,
 }: {
   actionId?: string;
@@ -122,6 +121,7 @@ export function FiveWhysVisualAnalysis({
   canEdit?: boolean;
   seedAnswer?: string | null;
   onSeedConsumed?: () => void;
+  onGoToFiveW2H?: () => void;
   onRootCauseChange: (value: string) => void;
   onSave: (items: WhyItem[], rootCause?: string, extra?: Record<string, any>) => void;
 }) {
@@ -133,7 +133,6 @@ export function FiveWhysVisualAnalysis({
   const [suggestionsOpen, setSuggestionsOpen] = useState(false);
   const [suggestions, setSuggestions] = useState<WhySuggestion[]>([]);
   const [loadingAi, setLoadingAi] = useState(false);
-  const [converting, setConverting] = useState(false);
 
   useEffect(() => {
     setItems(normalizeItems(session?.data?.items ?? session?.fiveWhys, problem));
@@ -234,35 +233,6 @@ export function FiveWhysVisualAnalysis({
     handleSave(next, nextRootCause);
   }
 
-  async function convertToAction(item: WhyItem) {
-    if (!actionId) {
-      toast.error('Salve a análise antes de transformar a causa raiz em ação.');
-      return;
-    }
-    if (item.convertedToTaskId) return;
-    setConverting(true);
-    try {
-      handleSave(items, item.answer);
-      await api(`/actions/${actionId}/analysis/five-whys/items/${item.level}/convert-to-action`, {
-        method: 'POST',
-        json: {
-          title: `Causa raiz (5 Porquês): ${item.answer || item.question || action?.title || 'ação vinculada'}`,
-          answer: item.answer,
-          responsibleUserId: item.responsibleUserId || undefined,
-          dueDate: item.dueDate || undefined,
-          priority: item.priority,
-          markRootCause: true,
-        },
-      });
-      toast.success('Causa raiz transformada em tarefa do plano');
-      setItems((current) => current.map((candidate) => (candidate.id === item.id ? { ...candidate, convertedToTaskId: 'pending-refresh', status: 'CONVERTED_TO_ACTION' } : candidate)));
-      qc.invalidateQueries({ queryKey: ['action', actionId] });
-    } catch (error: any) {
-      toast.error(error?.message ?? 'Não foi possível transformar em ação');
-    } finally {
-      setConverting(false);
-    }
-  }
 
   async function loadAiSuggestions() {
     if (!actionId) {
@@ -380,7 +350,6 @@ export function FiveWhysVisualAnalysis({
                   locked={locked}
                   isLast={index === items.length - 1}
                   canEdit={canEdit}
-                  converting={converting}
                   users={users}
                   questionLocked={index >= 1}
                   responsibleName={item.responsibleUserId ? responsibleById.get(item.responsibleUserId) : undefined}
@@ -389,7 +358,7 @@ export function FiveWhysVisualAnalysis({
                   onCommit={(patch) => commitItem(item.id, patch)}
                   onBlurSave={() => handleSave()}
                   onToggleRoot={() => toggleRootCause(item)}
-                  onConvert={() => convertToAction(item)}
+                  onGoToFiveW2H={onGoToFiveW2H}
                 />
                 {index < items.length - 1 && (
                   <div className="flex justify-center py-0.5 text-slate-300">
@@ -412,9 +381,8 @@ export function FiveWhysVisualAnalysis({
         rootItem={rootItem}
         answered={answeredCount}
         progress={progress}
-        converting={converting}
         canEdit={canEdit}
-        onConvert={() => rootItem && convertToAction(rootItem)}
+        onGoToFiveW2H={onGoToFiveW2H}
         saving={saving}
         lastSavedAt={lastSavedAt}
       />
@@ -462,7 +430,6 @@ function WhyBlock({
   locked,
   isLast,
   canEdit,
-  converting,
   users,
   questionLocked,
   responsibleName,
@@ -471,7 +438,7 @@ function WhyBlock({
   onCommit,
   onBlurSave,
   onToggleRoot,
-  onConvert,
+  onGoToFiveW2H,
 }: {
   item: WhyItem;
   index: number;
@@ -480,7 +447,6 @@ function WhyBlock({
   locked: boolean;
   isLast: boolean;
   canEdit: boolean;
-  converting: boolean;
   users: UserOption[];
   questionLocked: boolean;
   responsibleName?: string;
@@ -489,7 +455,7 @@ function WhyBlock({
   onCommit: (patch: Partial<WhyItem>) => void;
   onBlurSave: () => void;
   onToggleRoot: () => void;
-  onConvert: () => void;
+  onGoToFiveW2H?: () => void;
 }) {
   const color = levelColor(item.level);
   const isRoot = item.isRootCause;
@@ -573,29 +539,19 @@ function WhyBlock({
           )}
 
           {isRoot && (
-            <div className="mt-2 space-y-2 rounded-lg border border-red-100 bg-red-50/60 p-3">
-              <div className="text-[11px] font-semibold text-red-700">Tratar a causa raiz</div>
-              <div className="grid gap-2 sm:grid-cols-2">
-                <div>
-                  <Label className="text-[11px] text-slate-500">Responsável</Label>
-                  <NativeSelect value={item.responsibleUserId} onChange={(event) => onCommit({ responsibleUserId: event.target.value })} className="h-9 text-sm">
-                    <option value="">Selecione...</option>
-                    {users.map((user) => <option key={user.id} value={user.id}>{user.name}</option>)}
-                  </NativeSelect>
-                </div>
-                <div>
-                  <Label className="text-[11px] text-slate-500">Prazo</Label>
-                  <Input type="date" value={item.dueDate?.slice(0, 10) ?? ''} onChange={(event) => onCommit({ dueDate: event.target.value })} className="h-9 text-sm" />
-                </div>
+            <div className="mt-2 space-y-2 rounded-lg border border-emerald-100 bg-emerald-50/60 p-3">
+              <div className="flex items-center gap-1.5 text-[11px] font-semibold text-emerald-700">
+                <Star className="h-3.5 w-3.5" /> Causa raiz definida — sincronizada com o desvio.
               </div>
-              <Button
-                className="w-full justify-center bg-emerald-600 hover:bg-emerald-700"
-                onClick={onConvert}
-                disabled={!canEdit || converting || Boolean(item.convertedToTaskId)}
-              >
-                <Rocket className="mr-2 h-4 w-4" />
-                {item.convertedToTaskId ? 'Causa raiz já vinculada ao plano' : converting ? 'Gerando...' : 'Transformar causa raiz em ação'}
-              </Button>
+              <p className="text-[11px] leading-4 text-slate-500">
+                Agora vá para o <strong>5W2H</strong> para planejar a execução. A 1ª tarefa criada no 5W2H abre o plano de ação.
+              </p>
+              {onGoToFiveW2H && (
+                <Button className="w-full justify-center bg-blue-600 hover:bg-blue-700" onClick={onGoToFiveW2H} disabled={!canEdit}>
+                  <ArrowRight className="mr-2 h-4 w-4" />
+                  Continuar no 5W2H
+                </Button>
+              )}
             </div>
           )}
         </fieldset>
@@ -612,18 +568,16 @@ function FiveWhysFooter({
   rootItem,
   answered,
   progress,
-  converting,
   canEdit,
-  onConvert,
+  onGoToFiveW2H,
   saving,
   lastSavedAt,
 }: {
   rootItem: WhyItem | null;
   answered: number;
   progress: number;
-  converting: boolean;
   canEdit: boolean;
-  onConvert: () => void;
+  onGoToFiveW2H?: () => void;
   saving: boolean;
   lastSavedAt: string | null;
 }) {
@@ -641,10 +595,10 @@ function FiveWhysFooter({
           <div className="font-semibold text-slate-800">{progress}%</div>
           <div>{answered} respondido(s) · {saving ? 'Salvando...' : lastSavedAt ? `Salvo às ${lastSavedAt}` : 'Não salvo'}</div>
         </div>
-        {rootItem && !rootItem.convertedToTaskId && (
-          <Button size="sm" className="bg-emerald-600 hover:bg-emerald-700" onClick={onConvert} disabled={!canEdit || converting}>
-            <Rocket className="mr-2 h-4 w-4" />
-            {converting ? 'Gerando...' : 'Gerar ação'}
+        {rootItem && onGoToFiveW2H && (
+          <Button size="sm" className="bg-blue-600 hover:bg-blue-700" onClick={onGoToFiveW2H} disabled={!canEdit}>
+            <ArrowRight className="mr-2 h-4 w-4" />
+            Ir para o 5W2H
           </Button>
         )}
       </div>

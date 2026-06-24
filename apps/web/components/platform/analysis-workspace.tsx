@@ -121,6 +121,7 @@ export function AnalysisWorkspace({
           canEdit={canEdit}
           seedAnswer={seedWhyAnswer}
           onSeedConsumed={() => setSeedWhyAnswer(null)}
+          onGoToFiveW2H={() => setMethod('FIVE_W_TWO_H')}
           onRootCauseChange={setRootCause}
           onSave={(whyItems, nextRootCause = rootCause, extra) => {
             setFiveWhys(whyItems);
@@ -179,7 +180,6 @@ export function AnalysisWorkspace({
           saving={saving}
           canEdit={canEdit}
           onEnsureActionPlan={onEnsureActionPlan}
-          onTaskCreated={() => setMethod('PDCA')}
           onSave={(items) => onSave({ method: 'FIVE_W_TWO_H', problem, rootCause, fiveWhys, ishikawaCauses: ishikawa, maspSteps, pdcaSteps, data: { items }, fiveW2H: deriveFiveW2HSummary(items) })}
         />
       )}
