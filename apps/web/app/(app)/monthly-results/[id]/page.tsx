@@ -506,6 +506,7 @@ function ConductTab({ meeting, options, can, run }: { meeting: MeetingDetail; op
   const [areaIdx, setAreaIdx] = useState(0);
   const [decisionOpen, setDecisionOpen] = useState(false);
   const [detailIndicatorId, setDetailIndicatorId] = useState<string | null>(null);
+  const [lightFilter, setLightFilter] = useState<'GREEN' | 'YELLOW' | 'RED' | null>(null);
   // A apresentação segue a ordem do Roteiro da reunião (link com a aba Preparar).
   const agendaPos = new Map(meeting.agendaItems.map((a) => [a.orgNodeId, a.position]));
   const orderedAreas = [...meeting.areas].sort((a, b) => (agendaPos.get(a.orgNodeId) ?? 9999) - (agendaPos.get(b.orgNodeId) ?? 9999));
@@ -514,6 +515,7 @@ function ConductTab({ meeting, options, can, run }: { meeting: MeetingDetail; op
 
   useEffect(() => {
     setDetailIndicatorId(null);
+    setLightFilter(null);
   }, [areaIdx]);
 
   async function toggleFullscreen() {
@@ -524,6 +526,13 @@ function ConductTab({ meeting, options, can, run }: { meeting: MeetingDetail; op
   }
 
   const areaIndicators = area?.indicators ?? [];
+  // Contagens do farol (Dentro da Meta inclui superação/azul) — base dos filtros clicáveis.
+  const greenCount = areaIndicators.filter((i) => i.light === 'GREEN' || i.light === 'BLUE').length;
+  const yellowCount = areaIndicators.filter((i) => i.light === 'YELLOW').length;
+  const redCount = areaIndicators.filter((i) => i.light === 'RED').length;
+  const visibleIndicators = !lightFilter
+    ? areaIndicators
+    : areaIndicators.filter((i) => (lightFilter === 'GREEN' ? i.light === 'GREEN' || i.light === 'BLUE' : i.light === lightFilter));
   const areaPlans = Array.from(
     new Map(areaIndicators.map((i) => i.linkedAction).filter(Boolean).map((a: any) => [a.id, a])).values(),
   ) as any[];
@@ -572,16 +581,23 @@ function ConductTab({ meeting, options, can, run }: { meeting: MeetingDetail; op
               <h2 className="text-2xl font-semibold">{area.name}</h2>
               {area.areaKeyMessage && <p className="mt-1 max-w-3xl text-sm text-muted-foreground">{area.areaKeyMessage}</p>}
             </div>
-            <div className="flex gap-2">
-              <Counter light="GREEN" value={area.green} />
-              <Counter light="YELLOW" value={area.yellow} />
-              <Counter light="RED" value={area.red} />
+            <div className="flex flex-wrap gap-2">
+              <FarolFilter label="Dentro da Meta" light="GREEN" count={greenCount} active={lightFilter === 'GREEN'} onClick={() => setLightFilter((c) => (c === 'GREEN' ? null : 'GREEN'))} />
+              <FarolFilter label="Atenção" light="YELLOW" count={yellowCount} active={lightFilter === 'YELLOW'} onClick={() => setLightFilter((c) => (c === 'YELLOW' ? null : 'YELLOW'))} />
+              <FarolFilter label="Fora da Meta" light="RED" count={redCount} active={lightFilter === 'RED'} onClick={() => setLightFilter((c) => (c === 'RED' ? null : 'RED'))} />
             </div>
           </div>
 
-          <p className="text-xs text-muted-foreground">Clique em um indicador para ver o detalhe completo (Visão 360°) abaixo.</p>
+          <p className="text-xs text-muted-foreground">
+            Clique no farol para filtrar os indicadores; clique em um indicador para ver o detalhe completo (Visão 360°) abaixo.
+            {lightFilter && (
+              <button type="button" className="ml-2 font-medium text-primary hover:underline" onClick={() => setLightFilter(null)}>
+                Limpar filtro
+              </button>
+            )}
+          </p>
           <div className="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-3">
-            {areaIndicators.map((ind) => (
+            {visibleIndicators.map((ind) => (
               <PresentationCard
                 key={ind.id}
                 ind={ind}
@@ -590,6 +606,7 @@ function ConductTab({ meeting, options, can, run }: { meeting: MeetingDetail; op
               />
             ))}
             {areaIndicators.length === 0 && <p className="text-sm text-muted-foreground">Nenhum indicador nesta área.</p>}
+            {areaIndicators.length > 0 && visibleIndicators.length === 0 && <p className="text-sm text-muted-foreground">Nenhum indicador neste farol.</p>}
           </div>
 
           {detailIndicatorId && (
@@ -1396,4 +1413,23 @@ function DecisionDialog({
 
 function Counter({ light, value }: { light: Light; value: number }) {
   return <span className={cn('rounded-full border px-2 py-0.5 text-xs font-medium', LIGHT_STYLES[light])}>{LIGHT_LABEL[light]} {value}</span>;
+}
+
+function FarolFilter({ label, light, count, active, onClick }: { label: string; light: Light; count: number; active: boolean; onClick: () => void }) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      aria-pressed={active}
+      title={active ? 'Clique para limpar o filtro' : `Filtrar: ${label}`}
+      className={cn(
+        'flex items-center gap-1.5 rounded-full border px-3 py-1 text-xs font-medium transition',
+        LIGHT_STYLES[light],
+        active ? 'ring-2 ring-offset-1 ring-current' : 'opacity-80 hover:opacity-100',
+      )}
+    >
+      <span className="h-2 w-2 rounded-full" style={{ background: LIGHT_COLORS[light] }} />
+      {label} {count}
+    </button>
+  );
 }
