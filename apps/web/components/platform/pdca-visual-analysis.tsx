@@ -83,7 +83,7 @@ interface PdcaSuggestion {
 }
 
 const CANVAS_WIDTH = 1120;
-const CANVAS_HEIGHT = 650;
+const CANVAS_HEIGHT = 720;
 
 const STAGE_META: Record<Phase, {
   title: string;
@@ -511,11 +511,11 @@ function PDCAStageCard({ stage, selected, responsibleName, onSelect }: { stage: 
   return (
     <button
       type="button"
-      className={cn('absolute z-20 w-[386px] rounded-lg border bg-white p-4 text-left shadow-sm transition hover:shadow-md', meta.border, selected && 'shadow-lg ring-2 ring-blue-200')}
+      className={cn('absolute z-20 flex h-[300px] w-[386px] flex-col overflow-hidden rounded-lg border bg-white p-4 text-left shadow-sm transition hover:shadow-md', meta.border, selected && 'shadow-lg ring-2 ring-blue-200')}
       style={{ left: meta.x, top: meta.y }}
       onClick={onSelect}
     >
-      <div className="flex items-start justify-between gap-3">
+      <div className="flex shrink-0 items-start justify-between gap-3">
         <div className="flex items-start gap-3">
           <div className={cn('flex h-10 w-10 items-center justify-center rounded-lg border', meta.soft)}>
             <Icon className="h-5 w-5" />
@@ -527,21 +527,21 @@ function PDCAStageCard({ stage, selected, responsibleName, onSelect }: { stage: 
         </div>
         <span className="text-lg text-slate-500">›</span>
       </div>
-      <div className="mt-4 grid gap-2">
+      <div className="mt-3 grid flex-1 content-start gap-1.5 overflow-hidden">
         {summary.map((item) => (
-          <div key={item.label} className="grid grid-cols-[18px_112px_1fr] items-start gap-2 text-xs">
-            <item.icon className="mt-0.5 h-3.5 w-3.5" style={{ color: meta.color }} />
+          <div key={item.label} className="grid grid-cols-[18px_100px_1fr] items-start gap-2 text-xs">
+            <item.icon className="mt-0.5 h-3.5 w-3.5 shrink-0" style={{ color: meta.color }} />
             <span className="font-semibold text-slate-600">{item.label}</span>
-            <span className="min-w-0 text-slate-700">{item.value}</span>
+            <span className="line-clamp-2 min-w-0 text-slate-700">{item.value}</span>
           </div>
         ))}
-        <div className="grid grid-cols-[18px_112px_1fr] items-center gap-2 text-xs">
-          <CheckCircle2 className="h-3.5 w-3.5" style={{ color: meta.color }} />
+        <div className="grid grid-cols-[18px_100px_1fr] items-center gap-2 text-xs">
+          <CheckCircle2 className="h-3.5 w-3.5 shrink-0" style={{ color: meta.color }} />
           <span className="font-semibold text-slate-600">Status</span>
           <StatusPill stage={stage} />
         </div>
       </div>
-      <div className="mt-3 h-1.5 overflow-hidden rounded-full bg-slate-100">
+      <div className="mt-2 h-1.5 shrink-0 overflow-hidden rounded-full bg-slate-100">
         <div className="h-full rounded-full" style={{ width: `${stage.progress}%`, backgroundColor: meta.color }} />
       </div>
     </button>
