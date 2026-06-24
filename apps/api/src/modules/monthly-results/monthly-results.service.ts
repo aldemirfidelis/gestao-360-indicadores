@@ -47,6 +47,8 @@ const CLOSED_DEVIATION_STATUSES: DeviationStatus[] = [
 ];
 
 const VALIDATED_READINESS: MonthlyAreaReadiness[] = [MonthlyAreaReadiness.VALIDATED, MonthlyAreaReadiness.RELEASED];
+// Planos ainda NÃO em execução (não satisfazem a prontidão da área).
+const ACTION_NOT_EXECUTING = new Set(['DRAFT', 'NOT_STARTED', 'UNDER_ANALYSIS', 'CANCELLED']);
 const OPEN_ITEM_STATUSES: MonthlyItemStatus[] = [MonthlyItemStatus.OPEN, MonthlyItemStatus.IN_PROGRESS];
 
 const DEFAULT_AGENDA = [
@@ -1251,19 +1253,21 @@ export class MonthlyResultsService {
     const blockingIssues: string[] = [];
     const validationIssues: string[] = [];
     const hasCause = Boolean(ind.deviationId);
-    const hasAction = Boolean(ind.actionPlanId);
     const hasResponsible = Boolean(ind.indicator?.responsibleUserId);
+    const linkedAction = ind.actionPlanId ? actionMap.get(ind.actionPlanId) ?? null : null;
+    const linkedDeviation = ind.deviationId ? deviationMap.get(ind.deviationId) ?? null : null;
+    // Prontidão: o gestor pode validar quando há um plano de ação EM EXECUÇÃO (análise concluída e
+    // ações em andamento) — não é necessário que as ações estejam concluídas. Causa raiz/responsável
+    // ausentes viram apenas avisos (não bloqueiam a validação).
+    const actionInExecution = Boolean(linkedAction) && !ACTION_NOT_EXECUTING.has(String(linkedAction.status ?? ''));
     if (ind.current === null) validationIssues.push('Sem resultado oficial no mês.');
     if (light === TrafficLight.RED) {
-      if (!hasCause) blockingIssues.push('Vermelho sem causa raiz vinculada.');
-      if (!hasAction) blockingIssues.push('Vermelho sem plano de ação vinculado.');
-      if (!hasResponsible) blockingIssues.push('Crítico sem responsável.');
+      if (!actionInExecution) blockingIssues.push('Vermelho sem plano de ação em execução.');
+      if (!hasCause) validationIssues.push('Vermelho sem causa raiz vinculada.');
+      if (!hasResponsible) validationIssues.push('Crítico sem responsável.');
     }
     if (light === TrafficLight.YELLOW && !ind.managerComment && !ind.trendNote) validationIssues.push('Atenção sem comentário de tendência.');
     validationIssues.push(...blockingIssues);
-
-    const linkedAction = ind.actionPlanId ? actionMap.get(ind.actionPlanId) ?? null : null;
-    const linkedDeviation = ind.deviationId ? deviationMap.get(ind.deviationId) ?? null : null;
     return {
       id: ind.id,
       indicatorId: ind.indicatorId,

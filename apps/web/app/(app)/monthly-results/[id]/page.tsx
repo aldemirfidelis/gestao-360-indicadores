@@ -201,25 +201,10 @@ function StatusActions({ meeting, can, run, pending }: { meeting: MeetingDetail;
 // =====================================================================
 
 function PrepareTab({ meeting, options, can, run, pending }: { meeting: MeetingDetail; options?: MonthlyOptions; can: Can; run: Run; pending: boolean }) {
-  const [selectedAreaId, setSelectedAreaId] = useState(meeting.areas[0]?.id ?? '');
-  const selectedArea = meeting.areas.find((a) => a.id === selectedAreaId) ?? meeting.areas[0] ?? null;
-
   return (
     <div className="space-y-4">
-      <AreaReadinessTable meeting={meeting} can={can} run={run} pending={pending} onSelect={setSelectedAreaId} selectedId={selectedArea?.id ?? ''} />
-      <div className="grid grid-cols-1 gap-4 xl:grid-cols-[1.5fr_0.8fr]">
-        {selectedArea ? (
-          <AreaPreparation meeting={meeting} area={selectedArea} options={options} can={can} run={run} pending={pending} />
-        ) : (
-          <Card>
-            <CardContent className="p-6 text-sm text-muted-foreground">Nenhuma área nesta reunião.</CardContent>
-          </Card>
-        )}
-        <div className="space-y-4">
-          <ChecklistCard meeting={meeting} can={can} run={run} />
-          <AgendaCard meeting={meeting} options={options} can={can} run={run} />
-        </div>
-      </div>
+      <AreaReadinessTable meeting={meeting} can={can} run={run} pending={pending} onSelect={() => {}} selectedId="" />
+      <AgendaCard meeting={meeting} options={options} can={can} run={run} />
     </div>
   );
 }
@@ -544,8 +529,6 @@ function ConductTab({ meeting, options, can, run }: { meeting: MeetingDetail; op
             ))}
             {presentIndicators.length === 0 && <p className="text-sm text-muted-foreground">Nenhum indicador marcado para exibição nesta área.</p>}
           </div>
-
-          <ResultVsTarget indicators={presentIndicators.filter((i) => i.light === 'RED' || i.light === 'YELLOW').slice(0, 6)} />
         </>
       )}
 

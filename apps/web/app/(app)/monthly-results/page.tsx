@@ -20,7 +20,7 @@ import {
   RefreshCw,
   Sparkles,
 } from 'lucide-react';
-import { Bar, BarChart, CartesianGrid, Cell, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts';
+import { Bar, BarChart, CartesianGrid, Cell, LabelList, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts';
 import { PageHeader } from '@/components/shell/page-header';
 import { useAuth } from '@/components/auth/auth-provider';
 import { Badge } from '@/components/ui/badge';
@@ -119,8 +119,6 @@ export default function MonthlyResultsHome() {
         <MeetingsPanel dashboard={dashboard} onOpen={(id) => router.push(`/monthly-results/${id}`)} canCreate={canCreate} onCreate={() => setCreateOpen(true)} />
       </div>
 
-      <CriticalPanel dashboard={dashboard} />
-
       <CreateMeetingDialog
         open={createOpen}
         onOpenChange={setCreateOpen}
@@ -171,10 +169,9 @@ function MetricGrid({ dashboard, loading }: { dashboard?: MonthlyDashboard; load
 function FarolPanel({ dashboard }: { dashboard?: MonthlyDashboard }) {
   const data = dashboard
     ? [
-        { name: 'Verde', value: dashboard.executivePanel.lights.GREEN + dashboard.executivePanel.lights.BLUE, color: LIGHT_COLORS.GREEN },
-        { name: 'Amarelo', value: dashboard.executivePanel.lights.YELLOW, color: LIGHT_COLORS.YELLOW },
-        { name: 'Vermelho', value: dashboard.executivePanel.lights.RED, color: LIGHT_COLORS.RED },
-        { name: 'Cinza', value: dashboard.executivePanel.lights.GRAY, color: LIGHT_COLORS.GRAY },
+        { name: 'Em dia', value: dashboard.executivePanel.lights.GREEN + dashboard.executivePanel.lights.BLUE, color: LIGHT_COLORS.GREEN },
+        { name: 'Atenção', value: dashboard.executivePanel.lights.YELLOW, color: LIGHT_COLORS.YELLOW },
+        { name: 'Fora da meta', value: dashboard.executivePanel.lights.RED, color: LIGHT_COLORS.RED },
       ]
     : [];
   return (
@@ -185,10 +182,10 @@ function FarolPanel({ dashboard }: { dashboard?: MonthlyDashboard }) {
           Farol corporativo do mês
         </CardTitle>
       </CardHeader>
-      <CardContent className="grid grid-cols-1 gap-4 lg:grid-cols-[0.9fr_1fr]">
-        <div className="h-60 min-w-0">
+      <CardContent>
+        <div className="h-64 min-w-0">
           <ResponsiveContainer width="100%" height="100%">
-            <BarChart data={data} margin={{ left: -20, right: 12, top: 12, bottom: 0 }}>
+            <BarChart data={data} margin={{ left: -20, right: 12, top: 24, bottom: 0 }}>
               <CartesianGrid strokeDasharray="3 3" vertical={false} />
               <XAxis dataKey="name" tick={{ fontSize: 12 }} />
               <YAxis allowDecimals={false} tick={{ fontSize: 12 }} />
@@ -197,18 +194,10 @@ function FarolPanel({ dashboard }: { dashboard?: MonthlyDashboard }) {
                 {data.map((entry) => (
                   <Cell key={entry.name} fill={entry.color} />
                 ))}
+                <LabelList dataKey="value" position="top" className="fill-foreground text-xs font-semibold" />
               </Bar>
             </BarChart>
           </ResponsiveContainer>
-        </div>
-        <div className="min-w-0 rounded-md border bg-muted/30 p-4">
-          <div className="flex items-center gap-2 text-sm font-medium">
-            <Sparkles className="h-4 w-4 text-primary" />
-            Mensagem-chave sugerida
-          </div>
-          <p className="mt-3 whitespace-pre-line break-words text-sm leading-6 text-muted-foreground">
-            {dashboard?.executivePanel.keyMessageDraft ?? 'Selecione um período para consolidar a mensagem-chave.'}
-          </p>
         </div>
       </CardContent>
     </Card>
@@ -270,53 +259,6 @@ function MeetingsPanel({
             </div>
           </button>
         ))}
-      </CardContent>
-    </Card>
-  );
-}
-
-function CriticalPanel({ dashboard }: { dashboard?: MonthlyDashboard }) {
-  const indicators = dashboard?.criticalIndicators ?? [];
-  return (
-    <Card>
-      <CardHeader>
-        <CardTitle className="flex items-center gap-2">
-          <AlertTriangle className="h-4 w-4 text-amber-600" />
-          Indicadores críticos para discussão
-        </CardTitle>
-      </CardHeader>
-      <CardContent>
-        {indicators.length === 0 ? (
-          <p className="text-sm text-muted-foreground">Sem indicadores críticos no recorte atual.</p>
-        ) : (
-          <div className="grid grid-cols-1 gap-3 lg:grid-cols-2 xl:grid-cols-3">
-            {indicators.slice(0, 9).map((indicator) => (
-              <Link
-                key={indicator.id}
-                href={indicator.links.indicator}
-                className="block min-w-0 rounded-md border p-3 transition-colors hover:border-primary/50 hover:bg-muted/50"
-              >
-                <div className="flex items-start justify-between gap-3">
-                  <div className="min-w-0">
-                    <p className="break-words text-sm font-semibold">{indicator.name}</p>
-                    <p className="mt-1 text-xs text-muted-foreground">{indicator.area}</p>
-                  </div>
-                  <Badge variant="outline" className={cn('shrink-0', LIGHT_STYLES[indicator.light])}>
-                    {LIGHT_LABEL[indicator.light]}
-                  </Badge>
-                </div>
-                <div className="mt-3 grid grid-cols-3 gap-2 text-xs">
-                  <Fact label="Realizado" value={formatValue(indicator.current, indicator.unitLabel)} />
-                  <Fact label="Meta" value={formatValue(indicator.target, indicator.unitLabel)} />
-                  <Fact label="Ating." value={formatPercent(indicator.attainment)} />
-                </div>
-                <p className="mt-3 line-clamp-2 break-words text-xs text-muted-foreground">
-                  {indicator.rootCause ?? indicator.actionTitle ?? (indicator.validationIssues[0] ?? 'Sem comentário consolidado.')}
-                </p>
-              </Link>
-            ))}
-          </div>
-        )}
       </CardContent>
     </Card>
   );
