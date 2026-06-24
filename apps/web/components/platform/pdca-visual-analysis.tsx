@@ -13,6 +13,7 @@ import {
   Download,
   FileText,
   History,
+  Lightbulb,
   Link2,
   ListChecks,
   Maximize,
@@ -316,25 +317,9 @@ export function PDCAVisualAnalysis({
     <div className="overflow-hidden rounded-lg border border-slate-200 bg-slate-50 shadow-sm">
       <div className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-200 bg-white px-4 py-3">
         <div className="flex flex-wrap items-center gap-2">
-          <Button size="sm" onClick={() => setChecklistOpen(true)} disabled={!canEdit}>
-            <Plus className="mr-2 h-4 w-4" />
-            Adicionar etapa
-          </Button>
-          <Button size="sm" variant="outline" onClick={loadAiSuggestions} disabled={!canEdit || loadingAi}>
-            <Sparkles className="mr-2 h-4 w-4" />
-            {loadingAi ? 'Gerando...' : 'Sugestão com IA'}
-          </Button>
-          <Button size="sm" variant="outline" onClick={() => setChecklistOpen(true)}>
-            <ListChecks className="mr-2 h-4 w-4" />
-            Checklist
-          </Button>
-          <Button size="sm" variant="outline" onClick={() => setSelectedPhase(selectedStage.phase)}>
-            <Paperclip className="mr-2 h-4 w-4" />
-            Evidências
-          </Button>
-          <Button size="sm" variant="outline" onClick={() => setSelectedPhase(selectedStage.phase)}>
-            <History className="mr-2 h-4 w-4" />
-            Timeline
+          <Button size="sm" variant="outline" onClick={loadAiSuggestions} disabled={loadingAi}>
+            <Lightbulb className="mr-2 h-4 w-4" />
+            {loadingAi ? 'Carregando...' : 'Dicas IA'}
           </Button>
         </div>
         <div className="flex flex-wrap items-center gap-2">
@@ -406,29 +391,63 @@ export function PDCAVisualAnalysis({
       <Dialog open={suggestionsOpen} onOpenChange={setSuggestionsOpen}>
         <DialogContent className="max-w-3xl">
           <DialogHeader>
-            <DialogTitle>Sugestões de PDCA com IA</DialogTitle>
+            <DialogTitle>Dicas IA — como funciona o ciclo PDCA</DialogTitle>
           </DialogHeader>
-          <div className="grid max-h-[60vh] gap-3 overflow-y-auto pr-1 md:grid-cols-2">
-            {suggestions.length === 0 && <div className="rounded-lg border border-dashed p-4 text-sm text-muted-foreground">Nenhuma sugestão pendente.</div>}
-            {suggestions.map((item) => {
-              const meta = STAGE_META[normalizePhase(item.phase)];
-              return (
-                <div key={`${item.phase}-${item.field}-${item.suggestion}`} className="rounded-lg border bg-white p-3 shadow-sm">
-                  <div className="mb-2 flex items-center justify-between gap-2">
-                    <Badge variant="outline" className={meta.soft}>{meta.title}</Badge>
-                    <Badge variant="outline">{item.field}</Badge>
+          <div className="max-h-[65vh] space-y-4 overflow-y-auto pr-1">
+            <div className="rounded-lg border border-blue-100 bg-blue-50/60 p-3 text-sm leading-6 text-slate-700">
+              O <strong>PDCA</strong> é o ciclo de melhoria contínua. Rode as 4 etapas em sequência e repita o ciclo:
+              <ol className="mt-2 list-decimal space-y-1 pl-5">
+                <li><strong>Plan (Planejar)</strong>: defina o problema, a causa raiz, a meta e as ações.</li>
+                <li><strong>Do (Fazer)</strong>: execute as ações, registre responsáveis e evidências.</li>
+                <li><strong>Check (Checar)</strong>: meça o resultado e compare com a meta (eficácia).</li>
+                <li><strong>Act (Agir)</strong>: padronize o que funcionou ou corrija e rode o ciclo novamente.</li>
+              </ol>
+            </div>
+
+            <div className="grid gap-2 sm:grid-cols-2">
+              {PHASES.map((phase) => {
+                const meta = STAGE_META[phase];
+                return (
+                  <div key={phase} className="rounded-lg border bg-white p-3">
+                    <div className={cn('mb-1 inline-flex items-center gap-1.5 rounded-full border px-2 py-0.5 text-xs font-semibold', meta.soft)}>
+                      {meta.number} {meta.title}
+                    </div>
+                    <p className="text-xs leading-5 text-slate-600">{meta.subtitle}</p>
                   </div>
-                  <div className="text-sm font-semibold text-slate-900">{item.suggestion}</div>
-                  <p className="mt-1 text-xs leading-5 text-slate-600">{item.justification}</p>
-                  <div className="mt-3 flex flex-wrap gap-2">
-                    <Button size="sm" onClick={() => acceptSuggestion(item)}>Aceitar</Button>
-                    <Button size="sm" variant="outline" onClick={() => acceptSuggestion(item, true)}>Editar e aceitar</Button>
-                    <Button size="sm" variant="ghost" onClick={() => setSuggestions((current) => current.filter((candidate) => candidate !== item))}>Descartar</Button>
-                  </div>
+                );
+              })}
+            </div>
+
+            <div>
+              <div className="mb-2 text-sm font-semibold text-slate-800">Ideias da IA para este ciclo</div>
+              {suggestions.length === 0 && (
+                <div className="rounded-lg border border-dashed p-3 text-sm text-muted-foreground">
+                  {actionId ? 'Sem ideias específicas no momento — use o tutorial acima para conduzir o ciclo.' : 'Salve a análise para a IA sugerir ideias para este ciclo.'}
                 </div>
-              );
-            })}
+              )}
+              <div className="grid gap-2 md:grid-cols-2">
+                {suggestions.map((item) => {
+                  const meta = STAGE_META[normalizePhase(item.phase)];
+                  return (
+                    <div key={`${item.phase}-${item.field}-${item.suggestion}`} className="rounded-lg border bg-white p-3 shadow-sm">
+                      <div className="mb-1 flex items-center justify-between gap-2">
+                        <Badge variant="outline" className={meta.soft}>{meta.title}</Badge>
+                        <Badge variant="outline">{item.field}</Badge>
+                      </div>
+                      <div className="text-sm font-semibold text-slate-900">{item.suggestion}</div>
+                      <p className="mt-1 text-xs leading-5 text-slate-600">{item.justification}</p>
+                      {canEdit && (
+                        <Button size="sm" variant="outline" className="mt-2" onClick={() => acceptSuggestion(item)}>Aplicar dica</Button>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
           </div>
+          <DialogFooter>
+            <Button variant="ghost" onClick={() => setSuggestionsOpen(false)}>Fechar</Button>
+          </DialogFooter>
         </DialogContent>
       </Dialog>
 
