@@ -29,7 +29,32 @@ A tela acima faz o sistema **enviar** como `contato@gestao360.org`. Para a caixa
 **receber** mensagens e permitir login, é preciso uma caixa de e-mail de verdade — isso
 depende de provedor + DNS, **não** de código.
 
-### Opção A — Provedor gerenciado (recomendado)
+> **DNS do domínio:** `gestao360.org` é gerenciado na **DigitalOcean** (ns1/ns2/ns3.digitalocean.com).
+> Os registros abaixo são adicionados em **DigitalOcean → Networking → Domains → gestao360.org**.
+> Estado atual (2026-06-24): **sem MX e sem SPF** — e-mail ainda não provisionado.
+
+### Runbook ESCOLHIDO — Zoho Mail (plano gratuito) + DNS na DigitalOcean
+
+1. **Criar conta** em https://www.zoho.com/mail/ → escolher o **Forever Free Plan** e **adicionar o domínio** `gestao360.org`.
+2. **Verificar a posse**: a Zoho dá um registro **TXT** (ex.: host `zb******` ou `@` com valor `zoho-verification=zb******.zmverify.zoho.com`). Adicione na DigitalOcean (Type TXT) e clique em *Verify* na Zoho.
+3. **Criar a caixa** `contato@gestao360.org` (e, se quiser, `nao-responda@gestao360.org`).
+4. **Publicar os registros DNS** na DigitalOcean:
+   - **MX** (Hostname `@`):
+     - `mx.zoho.com` — prioridade **10**
+     - `mx2.zoho.com` — prioridade **20**
+     - `mx3.zoho.com` — prioridade **50**
+   - **SPF (TXT, host `@`)**: `v=spf1 include:zoho.com ~all`
+   - **DKIM (TXT)**: na Zoho, *Email Configuration → DKIM → Add*, selector `zoho` → ela gera o valor; publique como TXT no host `zoho._domainkey` com o valor fornecido.
+   - **DMARC (TXT, host `_dmarc`)**: `v=DMARC1; p=quarantine; rua=mailto:contato@gestao360.org`
+5. **SMTP no Portal Global → Técnico → E-mail** (para o app ENVIAR como contato@):
+   - Host `smtp.zoho.com` · Porta `465` (TLS marcado) **ou** `587` · Usuário `contato@gestao360.org`
+   - Senha: gere uma **senha de aplicativo** na Zoho (Perfil → Security → App Passwords) — recomendado com 2FA ligado.
+   - From: `Gestão 360 <contato@gestao360.org>` · Remetente padrão = `contato@gestao360.org`.
+   - Clique **Testar envio**.
+   > **Atenção (plano gratuito):** a Zoho às vezes restringe **SMTP/IMAP** ao plano pago **Mail Lite** (~US$1/usuário/mês). Se o "Testar envio" falhar com erro de autenticação/IMAP-POP desativado, ative *IMAP/SMTP Access* nas configurações da caixa ou faça upgrade para o Mail Lite. O recebimento/webmail funciona no gratuito.
+6. **Checklist final**: MX/SPF/DKIM/DMARC propagados (pode levar até algumas horas) → "Testar envio" verde no Portal Global.
+
+### Opção A — Provedor gerenciado (genérico)
 Mais simples e confiável (entregabilidade, antispam, DKIM automático):
 
 - **Zoho Mail** (tem plano gratuito para domínio próprio) ou **Google Workspace** / **Microsoft 365**.
