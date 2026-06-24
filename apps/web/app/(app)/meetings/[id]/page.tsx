@@ -418,6 +418,43 @@ export default function MeetingDetailPage() {
             </SectionCard>
           )}
 
+          <SectionCard title="Tarefas do plano" description="As ações nascem da ferramenta 5W2H (acima). Ao concluir o 5W2H, a tarefa entra automaticamente aqui e na Execução do plano.">
+            {!linkedAction ? (
+              <p className="text-sm text-muted-foreground">As tarefas aparecem aqui assim que você gerar a 1ª tarefa no 5W2H (o plano é criado automaticamente).</p>
+            ) : (
+              <div className="space-y-3">
+                <div className="flex flex-wrap items-center justify-between gap-2 rounded-md border bg-muted/30 p-3 text-sm">
+                  <div>
+                    <div className="font-semibold">{linkedAction.title}</div>
+                    <div className="text-xs text-muted-foreground">{linkedAction.tasks.length} tarefa(s) cadastrada(s)</div>
+                  </div>
+                  <StatusBadge value={linkedAction.status} label={statusLabels[linkedAction.status] ?? linkedAction.status} />
+                </div>
+
+                <div className="space-y-2">
+                  {linkedAction.tasks.map((task) => (
+                    <div key={task.id} className="rounded-lg border p-3 text-sm">
+                      <div className="flex flex-wrap items-start justify-between gap-2">
+                        <div className="min-w-0">
+                          <div className="font-medium">{task.title}</div>
+                          <div className="mt-1 text-xs text-muted-foreground">
+                            {task.assignedTo?.name ?? 'Sem responsável'} · {formatDate(task.startDate)} até {formatDate(task.endDate ?? task.dueDate)}
+                          </div>
+                        </div>
+                        <StatusBadge value={task.done ? 'DONE' : 'NOT_STARTED'} label={task.done ? 'Concluída' : 'Aberta'} />
+                      </div>
+                    </div>
+                  ))}
+                  {linkedAction.tasks.length === 0 && (
+                    <div className="rounded-md border border-dashed p-4 text-center text-sm text-muted-foreground">
+                      Nenhuma tarefa ainda. Use a ferramenta <span className="font-medium">5W2H</span> na Análise de causa acima para preencher e gerar a tarefa.
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
+          </SectionCard>
+
           <SectionCard title="Convites e registros de e-mail" description="Cada envio fica registrado para auditoria e reenvio.">
             <div className="space-y-2">
               {m.emailLogs.map((log) => (
@@ -486,43 +523,6 @@ export default function MeetingDetailPage() {
               )}
             </SectionCard>
           )}
-
-          <SectionCard title="Tarefas do plano" description="As ações nascem da ferramenta 5W2H (acima). Ao concluir o 5W2H, a tarefa entra automaticamente aqui e na Execução do plano.">
-            {!linkedAction ? (
-              <p className="text-sm text-muted-foreground">Esta reunião ainda não está vinculada a um plano de ação.</p>
-            ) : (
-              <div className="space-y-3">
-                <div className="flex flex-wrap items-center justify-between gap-2 rounded-md border bg-muted/30 p-3 text-sm">
-                  <div>
-                    <div className="font-semibold">{linkedAction.title}</div>
-                    <div className="text-xs text-muted-foreground">{linkedAction.tasks.length} tarefa(s) cadastrada(s)</div>
-                  </div>
-                  <StatusBadge value={linkedAction.status} label={statusLabels[linkedAction.status] ?? linkedAction.status} />
-                </div>
-
-                <div className="space-y-2">
-                  {linkedAction.tasks.map((task) => (
-                    <div key={task.id} className="rounded-lg border p-3 text-sm">
-                      <div className="flex flex-wrap items-start justify-between gap-2">
-                        <div className="min-w-0">
-                          <div className="font-medium">{task.title}</div>
-                          <div className="mt-1 text-xs text-muted-foreground">
-                            {task.assignedTo?.name ?? 'Sem responsável'} · {formatDate(task.startDate)} até {formatDate(task.endDate ?? task.dueDate)}
-                          </div>
-                        </div>
-                        <StatusBadge value={task.done ? 'DONE' : 'NOT_STARTED'} label={task.done ? 'Concluída' : 'Aberta'} />
-                      </div>
-                    </div>
-                  ))}
-                  {linkedAction.tasks.length === 0 && (
-                    <div className="rounded-md border border-dashed p-4 text-center text-sm text-muted-foreground">
-                      Nenhuma tarefa ainda. Use a ferramenta <span className="font-medium">5W2H</span> na Análise de causa acima para preencher e gerar a tarefa.
-                    </div>
-                  )}
-                </div>
-              </div>
-            )}
-          </SectionCard>
         </div>
       </div>
     </div>
