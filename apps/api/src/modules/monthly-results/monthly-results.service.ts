@@ -782,6 +782,21 @@ export class MonthlyResultsService {
     return this.meetingDetail(me, item.meeting.id);
   }
 
+  // Reordena o roteiro (drag-and-drop): posição = índice na lista enviada.
+  async reorderAgenda(me: AuthPayload, meetingId: string, orderedIds: string[]) {
+    const meeting = await this.prisma.monthlyMeeting.findFirst({
+      where: { id: meetingId, companyId: me.companyId, deletedAt: null },
+      select: { id: true },
+    });
+    if (!meeting) throw new NotFoundException('Reunião não encontrada.');
+    await this.prisma.$transaction(
+      orderedIds.map((id, index) =>
+        this.prisma.monthlyMeetingAgendaItem.updateMany({ where: { id, meetingId }, data: { position: index + 1 } }),
+      ),
+    );
+    return this.meetingDetail(me, meetingId);
+  }
+
   async agendaTimer(me: AuthPayload, itemId: string, body: { action: 'start' | 'stop' | 'discussed' | 'skip' }) {
     const item = await this.prisma.monthlyMeetingAgendaItem.findFirst({
       where: { id: itemId, meeting: { companyId: me.companyId, deletedAt: null } },

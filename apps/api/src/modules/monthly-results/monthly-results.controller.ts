@@ -78,6 +78,12 @@ export class MonthlyResultsController {
     return this.service.updateAgendaItem(me, id, body);
   }
 
+  @Post('meetings/:id/agenda/reorder')
+  @RequirePermissions('monthly:update')
+  reorderAgenda(@CurrentUser() me: AuthPayload, @Param('id') id: string, @Body() body: { orderedIds?: string[] }) {
+    return this.service.reorderAgenda(me, id, body?.orderedIds ?? []);
+  }
+
   @Post('agenda/:id/timer')
   @RequirePermissions('monthly:present', 'monthly:update')
   agendaTimer(@CurrentUser() me: AuthPayload, @Param('id') id: string, @Body() body: any) {

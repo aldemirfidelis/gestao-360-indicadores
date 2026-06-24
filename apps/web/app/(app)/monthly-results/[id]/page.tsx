@@ -13,6 +13,7 @@ import {
   Clock3,
   FileDown,
   Gauge,
+  GripVertical,
   ListChecks,
   Maximize2,
   Play,
@@ -27,6 +28,7 @@ import {
 import { Bar, BarChart, CartesianGrid, Cell, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts';
 import { PageHeader } from '@/components/shell/page-header';
 import { useAuth } from '@/components/auth/auth-provider';
+import { IndicatorDetailView } from '@/components/platform/indicator-detail-view';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -38,6 +40,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Textarea } from '@/components/ui/textarea';
 import { api } from '@/lib/api';
 import { cn, formatDate, formatPercent, periodRefLabel } from '@/lib/utils';
+import { ACTION_STATUS_LABEL } from '@/lib/labels';
 import {
   ENTRY_KIND_LABEL,
   FOLLOWUP_LEVEL_LABEL,
@@ -416,23 +419,62 @@ function ChecklistCard({ meeting, can, run }: { meeting: MeetingDetail; can: Can
 }
 
 function AgendaCard({ meeting, options, can, run }: { meeting: MeetingDetail; options?: MonthlyOptions; can: Can; run: Run }) {
+  const [order, setOrder] = useState(meeting.agendaItems);
+  const dragIndex = useRef<number | null>(null);
+
+  useEffect(() => {
+    setOrder(meeting.agendaItems);
+  }, [meeting.agendaItems]);
+
+  function handleDrop(targetIdx: number) {
+    const from = dragIndex.current;
+    dragIndex.current = null;
+    if (from === null || from === targetIdx) return;
+    const next = [...order];
+    const [moved] = next.splice(from, 1);
+    next.splice(targetIdx, 0, moved);
+    setOrder(next);
+    run(`/monthly-results/meetings/${meeting.id}/agenda/reorder`, 'POST', { orderedIds: next.map((i) => i.id) }, 'Roteiro reordenado');
+  }
+
   return (
     <Card>
       <CardHeader>
         <CardTitle className="text-base">Roteiro da reunião</CardTitle>
+        {can.update && <p className="text-xs text-muted-foreground">Arraste para reordenar. A ordem define a sequência da apresentação em Conduzir.</p>}
       </CardHeader>
       <CardContent className="space-y-2">
-        {meeting.agendaItems.map((item, index) => (
-          <div key={item.id} className="flex items-center justify-between gap-2 rounded-md border p-2.5">
-            <div className="flex min-w-0 items-center gap-2">
+        {order.map((item, index) => (
+          <div
+            key={item.id}
+            draggable={can.update}
+            onDragStart={() => { dragIndex.current = index; }}
+            onDragOver={(e) => can.update && e.preventDefault()}
+            onDrop={() => handleDrop(index)}
+            className={cn('flex items-center justify-between gap-2 rounded-md border bg-card p-2.5', can.update && 'cursor-move')}
+          >
+            <div className="flex min-w-0 flex-1 items-center gap-2">
+              {can.update && <GripVertical className="h-4 w-4 shrink-0 cursor-grab text-slate-300" />}
               <span className="grid h-6 w-6 shrink-0 place-items-center rounded-full bg-muted text-xs font-semibold">{index + 1}</span>
-              <div className="min-w-0">
-                <p className="min-w-0 break-words text-sm font-medium">{item.topic}</p>
-                {item.presenter && <p className="text-xs text-muted-foreground">{item.presenter.name}</p>}
+              <div className="min-w-0 flex-1">
+                {can.update ? (
+                  <Input
+                    defaultValue={item.topic}
+                    key={`${item.id}-${item.topic}`}
+                    className="h-8"
+                    onBlur={(e) => {
+                      const v = e.target.value.trim();
+                      if (v && v !== item.topic) run(`/monthly-results/agenda/${item.id}`, 'PATCH', { topic: v }, undefined);
+                    }}
+                  />
+                ) : (
+                  <p className="min-w-0 break-words text-sm font-medium">{item.topic}</p>
+                )}
+                {item.presenter && <p className="mt-0.5 text-xs text-muted-foreground">{item.presenter.name}</p>}
               </div>
             </div>
             {can.update ? (
-              <div className="flex items-center gap-1">
+              <div className="flex shrink-0 items-center gap-1">
                 <Input
                   type="number"
                   defaultValue={item.plannedMinutes}
@@ -449,6 +491,7 @@ function AgendaCard({ meeting, options, can, run }: { meeting: MeetingDetail; op
             )}
           </div>
         ))}
+        {order.length === 0 && <p className="text-sm text-muted-foreground">Sem itens no roteiro.</p>}
       </CardContent>
     </Card>
   );
@@ -462,8 +505,16 @@ function ConductTab({ meeting, options, can, run }: { meeting: MeetingDetail; op
   const containerRef = useRef<HTMLDivElement | null>(null);
   const [areaIdx, setAreaIdx] = useState(0);
   const [decisionOpen, setDecisionOpen] = useState(false);
-  const area = meeting.areas[areaIdx] ?? null;
+  const [detailIndicatorId, setDetailIndicatorId] = useState<string | null>(null);
+  // A apresentação segue a ordem do Roteiro da reunião (link com a aba Preparar).
+  const agendaPos = new Map(meeting.agendaItems.map((a) => [a.orgNodeId, a.position]));
+  const orderedAreas = [...meeting.areas].sort((a, b) => (agendaPos.get(a.orgNodeId) ?? 9999) - (agendaPos.get(b.orgNodeId) ?? 9999));
+  const area = orderedAreas[areaIdx] ?? null;
   const agendaForArea = meeting.agendaItems.find((a) => a.orgNodeId === area?.orgNodeId) ?? null;
+
+  useEffect(() => {
+    setDetailIndicatorId(null);
+  }, [areaIdx]);
 
   async function toggleFullscreen() {
     const node = containerRef.current;
@@ -472,7 +523,12 @@ function ConductTab({ meeting, options, can, run }: { meeting: MeetingDetail; op
     else await node.requestFullscreen().catch(() => null);
   }
 
-  const presentIndicators = (area?.indicators ?? []).filter((i) => i.showInPresentation);
+  const areaIndicators = area?.indicators ?? [];
+  const areaPlans = Array.from(
+    new Map(areaIndicators.map((i) => i.linkedAction).filter(Boolean).map((a: any) => [a.id, a])).values(),
+  ) as any[];
+  const plansInProgress = areaPlans.filter((p) => !CLOSED_ACTION_STATUSES.includes(p.status));
+  const plansClosed = areaPlans.filter((p) => CLOSED_ACTION_STATUSES.includes(p.status));
 
   return (
     <div ref={containerRef} className="space-y-4 bg-background p-0 fullscreen:overflow-auto fullscreen:p-6">
@@ -482,13 +538,13 @@ function ConductTab({ meeting, options, can, run }: { meeting: MeetingDetail; op
             Anterior
           </Button>
           <NativeSelect value={String(areaIdx)} onChange={(e) => setAreaIdx(Number(e.target.value))} className="h-9 w-56">
-            {meeting.areas.map((a, idx) => (
+            {orderedAreas.map((a, idx) => (
               <option key={a.id} value={idx}>
                 {a.name}
               </option>
             ))}
           </NativeSelect>
-          <Button variant="outline" size="sm" onClick={() => setAreaIdx((i) => Math.min(meeting.areas.length - 1, i + 1))} disabled={areaIdx >= meeting.areas.length - 1}>
+          <Button variant="outline" size="sm" onClick={() => setAreaIdx((i) => Math.min(orderedAreas.length - 1, i + 1))} disabled={areaIdx >= orderedAreas.length - 1}>
             Próxima
           </Button>
         </div>
@@ -523,16 +579,78 @@ function ConductTab({ meeting, options, can, run }: { meeting: MeetingDetail; op
             </div>
           </div>
 
+          <p className="text-xs text-muted-foreground">Clique em um indicador para ver o detalhe completo (Visão 360°) abaixo.</p>
           <div className="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-3">
-            {presentIndicators.map((ind) => (
-              <PresentationCard key={ind.id} ind={ind} />
+            {areaIndicators.map((ind) => (
+              <PresentationCard
+                key={ind.id}
+                ind={ind}
+                selected={detailIndicatorId === ind.indicatorId}
+                onSelect={() => setDetailIndicatorId((cur) => (cur === ind.indicatorId ? null : ind.indicatorId))}
+              />
             ))}
-            {presentIndicators.length === 0 && <p className="text-sm text-muted-foreground">Nenhum indicador marcado para exibição nesta área.</p>}
+            {areaIndicators.length === 0 && <p className="text-sm text-muted-foreground">Nenhum indicador nesta área.</p>}
           </div>
+
+          {detailIndicatorId && (
+            <Card>
+              <CardHeader className="flex-row items-center justify-between gap-3 space-y-0">
+                <CardTitle className="text-base">Detalhe do indicador</CardTitle>
+                <Button variant="ghost" size="sm" onClick={() => setDetailIndicatorId(null)}>Fechar</Button>
+              </CardHeader>
+              <CardContent>
+                <IndicatorDetailView id={detailIndicatorId} embedded />
+              </CardContent>
+            </Card>
+          )}
+
+          <AreaPlansKanban inProgress={plansInProgress} closed={plansClosed} />
         </>
       )}
 
       {decisionOpen && <DecisionDialog meeting={meeting} options={options} area={area} onClose={() => setDecisionOpen(false)} run={run} />}
+    </div>
+  );
+}
+
+const CLOSED_ACTION_STATUSES = ['DONE', 'DONE_LATE', 'EFFECTIVE', 'INEFFECTIVE', 'CANCELLED'];
+
+function AreaPlansKanban({ inProgress, closed }: { inProgress: any[]; closed: any[] }) {
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle className="text-base">Planos de ação da área</CardTitle>
+        <p className="text-xs text-muted-foreground">Acompanhe os planos vinculados aos indicadores desta área (reuniões anteriores e atual).</p>
+      </CardHeader>
+      <CardContent className="grid grid-cols-1 gap-4 md:grid-cols-2">
+        <PlanColumn title="Em execução" tone="text-status-yellow" plans={inProgress} />
+        <PlanColumn title="Encerrados" tone="text-status-green" plans={closed} />
+      </CardContent>
+    </Card>
+  );
+}
+
+function PlanColumn({ title, tone, plans }: { title: string; tone: string; plans: any[] }) {
+  return (
+    <div className="rounded-lg border bg-muted/20 p-3">
+      <div className={cn('mb-2 flex items-center justify-between text-sm font-semibold', tone)}>
+        <span>{title}</span>
+        <span className="rounded-full bg-background px-2 text-xs">{plans.length}</span>
+      </div>
+      <div className="space-y-2">
+        {plans.length === 0 && <p className="text-xs text-muted-foreground">Nenhum plano.</p>}
+        {plans.map((plan) => (
+          <Link key={plan.id} href={`/actions/${plan.id}`} className="block rounded-md border bg-background p-2.5 text-xs transition hover:border-primary/50">
+            <div className="flex items-start justify-between gap-2">
+              <span className="min-w-0 break-words font-medium">{plan.title}</span>
+              <Badge variant="outline" className="shrink-0">{ACTION_STATUS_LABEL[plan.status] ?? plan.status}</Badge>
+            </div>
+            <div className="mt-1 text-muted-foreground">
+              {plan.responsibleUser?.name ?? 'Sem responsável'}{typeof plan.progress === 'number' ? ` · ${plan.progress}%` : ''}
+            </div>
+          </Link>
+        ))}
+      </div>
     </div>
   );
 }
@@ -567,9 +685,16 @@ function Timer({ item, run }: { item: AgendaItem; run: Run }) {
   );
 }
 
-function PresentationCard({ ind }: { ind: SnapshotIndicator }) {
+function PresentationCard({ ind, selected, onSelect }: { ind: SnapshotIndicator; selected?: boolean; onSelect?: () => void }) {
   return (
-    <div className="min-w-0 rounded-lg border bg-card p-4 shadow-sm">
+    <button
+      type="button"
+      onClick={onSelect}
+      className={cn(
+        'min-w-0 rounded-lg border bg-card p-4 text-left shadow-sm transition hover:border-primary/50 hover:shadow-md',
+        selected && 'border-primary ring-2 ring-primary/20',
+      )}
+    >
       <div className="flex items-start justify-between gap-2">
         <p className="min-w-0 break-words text-base font-semibold">{ind.name}</p>
         <span className={cn('h-3 w-3 shrink-0 rounded-full')} style={{ background: LIGHT_COLORS[ind.light] }} />
@@ -581,7 +706,7 @@ function PresentationCard({ ind }: { ind: SnapshotIndicator }) {
       <p className="mt-1 text-xs text-muted-foreground">{ind.executiveStatus ?? LIGHT_LABEL[ind.light]} · Atingimento {formatPercent(ind.attainment)}</p>
       {(ind.managerComment || ind.rootCause) && <p className="mt-2 line-clamp-3 break-words text-xs text-muted-foreground">{ind.managerComment ?? ind.rootCause}</p>}
       {ind.actionTitle && <p className="mt-2 text-xs"><span className="font-medium">Ação:</span> {ind.actionTitle}</p>}
-    </div>
+    </button>
   );
 }
 
