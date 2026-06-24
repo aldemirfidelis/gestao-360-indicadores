@@ -533,6 +533,7 @@ function ConductTab({ meeting, options, can, run }: { meeting: MeetingDetail; op
   const visibleIndicators = !lightFilter
     ? areaIndicators
     : areaIndicators.filter((i) => (lightFilter === 'GREEN' ? i.light === 'GREEN' || i.light === 'BLUE' : i.light === lightFilter));
+  const selectedIndicator = detailIndicatorId ? areaIndicators.find((i) => i.indicatorId === detailIndicatorId) ?? null : null;
   const areaPlans = Array.from(
     new Map(areaIndicators.map((i) => i.linkedAction).filter(Boolean).map((a: any) => [a.id, a])).values(),
   ) as any[];
@@ -581,47 +582,56 @@ function ConductTab({ meeting, options, can, run }: { meeting: MeetingDetail; op
               <h2 className="text-2xl font-semibold">{area.name}</h2>
               {area.areaKeyMessage && <p className="mt-1 max-w-3xl text-sm text-muted-foreground">{area.areaKeyMessage}</p>}
             </div>
-            <div className="flex flex-wrap gap-2">
-              <FarolFilter label="Dentro da Meta" light="GREEN" count={greenCount} active={lightFilter === 'GREEN'} onClick={() => setLightFilter((c) => (c === 'GREEN' ? null : 'GREEN'))} />
-              <FarolFilter label="Atenção" light="YELLOW" count={yellowCount} active={lightFilter === 'YELLOW'} onClick={() => setLightFilter((c) => (c === 'YELLOW' ? null : 'YELLOW'))} />
-              <FarolFilter label="Fora da Meta" light="RED" count={redCount} active={lightFilter === 'RED'} onClick={() => setLightFilter((c) => (c === 'RED' ? null : 'RED'))} />
-            </div>
-          </div>
-
-          <p className="text-xs text-muted-foreground">
-            Clique no farol para filtrar os indicadores; clique em um indicador para ver o detalhe completo (Visão 360°) abaixo.
-            {lightFilter && (
-              <button type="button" className="ml-2 font-medium text-primary hover:underline" onClick={() => setLightFilter(null)}>
-                Limpar filtro
-              </button>
+            {!detailIndicatorId && (
+              <div className="flex flex-wrap gap-2">
+                <FarolFilter label="Dentro da Meta" light="GREEN" count={greenCount} active={lightFilter === 'GREEN'} onClick={() => setLightFilter((c) => (c === 'GREEN' ? null : 'GREEN'))} />
+                <FarolFilter label="Atenção" light="YELLOW" count={yellowCount} active={lightFilter === 'YELLOW'} onClick={() => setLightFilter((c) => (c === 'YELLOW' ? null : 'YELLOW'))} />
+                <FarolFilter label="Fora da Meta" light="RED" count={redCount} active={lightFilter === 'RED'} onClick={() => setLightFilter((c) => (c === 'RED' ? null : 'RED'))} />
+              </div>
             )}
-          </p>
-          <div className="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-3">
-            {visibleIndicators.map((ind) => (
-              <PresentationCard
-                key={ind.id}
-                ind={ind}
-                selected={detailIndicatorId === ind.indicatorId}
-                onSelect={() => setDetailIndicatorId((cur) => (cur === ind.indicatorId ? null : ind.indicatorId))}
-              />
-            ))}
-            {areaIndicators.length === 0 && <p className="text-sm text-muted-foreground">Nenhum indicador nesta área.</p>}
-            {areaIndicators.length > 0 && visibleIndicators.length === 0 && <p className="text-sm text-muted-foreground">Nenhum indicador neste farol.</p>}
           </div>
 
-          {detailIndicatorId && (
+          {detailIndicatorId ? (
             <Card>
               <CardHeader className="flex-row items-center justify-between gap-3 space-y-0">
-                <CardTitle className="text-base">Detalhe do indicador</CardTitle>
-                <Button variant="ghost" size="sm" onClick={() => setDetailIndicatorId(null)}>Fechar</Button>
+                <div className="flex min-w-0 items-center gap-2">
+                  {selectedIndicator && <span className="h-3 w-3 shrink-0 rounded-full" style={{ background: LIGHT_COLORS[selectedIndicator.light] }} />}
+                  <CardTitle className="truncate text-base">{selectedIndicator?.name ?? 'Detalhe do indicador'}</CardTitle>
+                </div>
+                <Button variant="outline" size="sm" className="shrink-0" onClick={() => setDetailIndicatorId(null)}>
+                  <ArrowLeft className="mr-1.5 h-4 w-4" /> Voltar aos indicadores
+                </Button>
               </CardHeader>
               <CardContent>
                 <IndicatorDetailView id={detailIndicatorId} embedded />
               </CardContent>
             </Card>
-          )}
+          ) : (
+            <>
+              <p className="text-xs text-muted-foreground">
+                Clique no farol para filtrar; clique em um indicador para apresentá-lo (Visão 360°) — os demais recolhem e você volta com “Voltar aos indicadores”.
+                {lightFilter && (
+                  <button type="button" className="ml-2 font-medium text-primary hover:underline" onClick={() => setLightFilter(null)}>
+                    Limpar filtro
+                  </button>
+                )}
+              </p>
+              <div className="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-3">
+                {visibleIndicators.map((ind) => (
+                  <PresentationCard
+                    key={ind.id}
+                    ind={ind}
+                    selected={false}
+                    onSelect={() => setDetailIndicatorId(ind.indicatorId)}
+                  />
+                ))}
+                {areaIndicators.length === 0 && <p className="text-sm text-muted-foreground">Nenhum indicador nesta área.</p>}
+                {areaIndicators.length > 0 && visibleIndicators.length === 0 && <p className="text-sm text-muted-foreground">Nenhum indicador neste farol.</p>}
+              </div>
 
-          <AreaPlansKanban inProgress={plansInProgress} closed={plansClosed} />
+              <AreaPlansKanban inProgress={plansInProgress} closed={plansClosed} />
+            </>
+          )}
         </>
       )}
 
