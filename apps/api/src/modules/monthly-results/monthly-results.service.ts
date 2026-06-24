@@ -726,7 +726,14 @@ export class MonthlyResultsService {
   async updateArea(me: AuthPayload, areaId: string, body: { readiness?: MonthlyAreaReadiness; areaKeyMessage?: string; presenterUserId?: string }) {
     const area = await this.prisma.monthlyMeetingArea.findFirst({
       where: { id: areaId, meeting: { companyId: me.companyId, deletedAt: null } },
-      include: { meeting: { select: { id: true } }, indicators: { include: { indicator: { select: { responsibleUserId: true, name: true } } } } },
+      include: {
+        meeting: { select: { id: true } },
+        // Prontidão por área só considera indicadores estratégicos (regra da Reunião Mensal).
+        indicators: {
+          where: { indicator: { type: 'STRATEGIC' } },
+          include: { indicator: { select: { responsibleUserId: true, name: true, type: true } } },
+        },
+      },
     });
     if (!area) throw new NotFoundException('Área da reunião não encontrada.');
 
