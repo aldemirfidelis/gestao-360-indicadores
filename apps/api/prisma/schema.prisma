@@ -507,6 +507,12 @@ model Company {
   tradeName         String?
   cnpj              String?       @unique
   logoUrl           String?
+  // Subdomínio do tenant (ex.: "goiasa" -> goiasa.gestao360.org). Usado para
+  // branding da tela de login e validação do login por host.
+  slug              String?       @unique
+  // Domínio próprio (white-label, ex.: indicadores.goiasa.com.br). Resolvido
+  // pelo host completo no endpoint público de tenant.
+  customDomain      String?       @unique
   active            Boolean       @default(true)
   status            CompanyStatus @default(ACTIVE)
   email             String?

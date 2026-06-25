@@ -61,6 +61,7 @@ import { PrizeModule } from './modules/prize/prize.module';
 import { CompensationModule } from './modules/compensation/compensation.module';
 import { MonthlyResultsModule } from './modules/monthly-results/monthly-results.module';
 import { StorageModule } from './storage/storage.module';
+import { PublicModule } from './modules/public/public.module';
 import { JobsModule } from './jobs/jobs.module';
 import { workersEnabled } from './jobs/jobs.constants';
 
@@ -121,6 +122,7 @@ import { workersEnabled } from './jobs/jobs.constants';
     CompensationModule,
     MonthlyResultsModule,
     StorageModule,
+    PublicModule,
     // Workers BullMQ: importados apenas quando WORKERS_ENABLED=true (sem Redis no boot padrão).
     ...(workersEnabled() ? [JobsModule] : []),
   ],

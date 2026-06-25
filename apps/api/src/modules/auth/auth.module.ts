@@ -9,9 +9,11 @@ import { JwtStrategy } from './jwt.strategy';
 import { JwtAuthGuard } from './jwt-auth.guard';
 import { RolesGuard } from '../../common/guards/roles.guard';
 import { requireSecret } from '../../common/env';
+import { PublicModule } from '../public/public.module';
 
 @Module({
   imports: [
+    PublicModule,
     PassportModule.register({ defaultStrategy: 'jwt' }),
     // registerAsync: o segredo e resolvido na inicializacao do modulo (apos o
     // ConfigModule carregar o .env), e nao no import-time. Sem fallback

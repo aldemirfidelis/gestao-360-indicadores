@@ -7,15 +7,17 @@ import { AuthPayload } from './auth.types';
 import { requireSecret } from '../../common/env';
 import { effectiveCompanyId } from '../../common/effective-company';
 import { swallow } from '../../common/logging/swallow';
+import { TenantService } from '../public/tenant.service';
 
 @Injectable()
 export class AuthService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly jwt: JwtService,
+    private readonly tenants: TenantService,
   ) {}
 
-  async login(email: string, password: string, ctx?: { ip?: string; userAgent?: string }) {
+  async login(email: string, password: string, ctx?: { ip?: string; userAgent?: string; tenantHost?: string }) {
     const user = await this.prisma.user.findUnique({
       where: { email: email.toLowerCase() },
       include: { company: { select: { status: true, deletedAt: true } } },
@@ -30,6 +32,17 @@ export class AuthService {
     // para não revelar o status da empresa a quem não tem acesso).
     if (!user.company || user.company.deletedAt || user.company.status !== 'ACTIVE') {
       throw new UnauthorizedException('Empresa suspensa ou inativa. Contate o administrador.');
+    }
+
+    // Multi-tenant por host: se o login veio do endereço de uma empresa (subdomínio
+    // ou domínio próprio), o usuário precisa pertencer a ela. SUPER_ADMIN é isento
+    // (opera a plataforma e pode entrar em qualquer endereço). Defesa em profundidade:
+    // não substitui o escopo por companyId, que segue derivado da identidade.
+    if (ctx?.tenantHost && user.role !== 'SUPER_ADMIN') {
+      const tenant = await this.tenants.resolveByHost(ctx.tenantHost);
+      if (tenant && tenant.companyId !== user.companyId) {
+        throw new UnauthorizedException('Este usuário não pertence à empresa deste endereço.');
+      }
     }
 
     const companyId = effectiveCompanyId(user);

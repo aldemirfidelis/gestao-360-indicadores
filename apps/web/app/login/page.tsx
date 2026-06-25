@@ -11,6 +11,7 @@ import { Label } from '@/components/ui/label';
 import { Button } from '@/components/ui/button';
 import { useAuth } from '@/components/auth/auth-provider';
 import { BrandMark } from '@/components/brand/brand-mark';
+import { fetchTenantBranding, type TenantBranding } from '@/lib/tenant';
 
 const schema = z.object({
   email: z.string().email('E-mail inválido.'),
@@ -23,10 +24,16 @@ export default function LoginPage() {
   const { login } = useAuth();
   const [busy, setBusy] = useState(false);
   const [demoMode, setDemoMode] = useState(false);
+  const [tenant, setTenant] = useState<TenantBranding | null>(null);
   const form = useForm<Form>({
     resolver: zodResolver(schema),
     defaultValues: { email: 'demo@demo.com', password: '123456' },
   });
+
+  useEffect(() => {
+    // Branding por tenant: resolve a empresa pelo host (subdomínio/domínio próprio).
+    fetchTenantBranding().then(setTenant).catch(() => setTenant(null));
+  }, []);
 
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
@@ -69,8 +76,13 @@ export default function LoginPage() {
         <div className="absolute inset-0 bg-[radial-gradient(circle_at_20%_20%,rgba(6,182,212,0.32),transparent_34%),radial-gradient(circle_at_80%_0%,rgba(124,58,237,0.22),transparent_30%)]" />
         <div className="absolute inset-x-12 bottom-20 h-px bg-white/20" />
         <div className="flex items-center gap-3">
-          <BrandMark className="h-11 w-11" />
-          <span className="text-lg font-semibold">Gestão 360</span>
+          {tenant?.logoUrl ? (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img src={tenant.logoUrl} alt={tenant.name} className="h-11 w-11 rounded bg-white/90 object-contain p-1" />
+          ) : (
+            <BrandMark className="h-11 w-11" />
+          )}
+          <span className="text-lg font-semibold">{tenant?.name ?? 'Gestão 360'}</span>
         </div>
         <div className="relative max-w-lg space-y-4">
           <h1 className="text-4xl font-semibold leading-tight">
@@ -80,6 +92,11 @@ export default function LoginPage() {
             Metas, planos de ação, reuniões, rastreabilidade e painéis executivos. Tudo conectado para
             transformar dados em decisão.
           </p>
+          {tenant && (
+            <p className="text-sm text-primary-foreground/70">
+              Portal de gestão da <span className="font-semibold">{tenant.name}</span>.
+            </p>
+          )}
         </div>
       </div>
 
@@ -87,8 +104,13 @@ export default function LoginPage() {
         <Card className="w-full max-w-sm">
           <CardHeader>
             <div className="mb-3 flex items-center gap-3 lg:hidden">
-              <BrandMark className="h-10 w-10" />
-              <span className="text-base font-semibold">Gestão 360</span>
+              {tenant?.logoUrl ? (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img src={tenant.logoUrl} alt={tenant.name} className="h-10 w-10 rounded object-contain" />
+              ) : (
+                <BrandMark className="h-10 w-10" />
+              )}
+              <span className="text-base font-semibold">{tenant?.name ?? 'Gestão 360'}</span>
             </div>
             <CardTitle>{demoMode ? 'Acesse a demonstração' : 'Entrar'}</CardTitle>
             <CardDescription>

@@ -79,11 +79,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const login = async (email: string, password: string) => {
     queryClient.clear();
     setUser(null);
+    // Host de origem: permite ao backend validar que o usuário pertence à empresa
+    // do subdomínio/domínio acessado (multi-tenant por host).
+    const host = typeof window !== 'undefined' ? window.location.host : undefined;
     const out = await api<{
       accessToken: string;
       refreshToken: string;
       user: AuthUser;
-    }>('/auth/login', { method: 'POST', json: { email, password } });
+    }>('/auth/login', { method: 'POST', json: { email, password, host } });
     setTokens(out.accessToken, out.refreshToken);
     queryClient.clear();
     const profile = await refreshUser();
