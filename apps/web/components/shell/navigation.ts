@@ -101,7 +101,7 @@ export const navSections: NavSection[] = [
     ],
   },
   {
-    heading: 'Estratégia',
+    heading: 'Gestão à Vista',
     description: 'Painel executivo, estratégia, indicadores e ritos de gestão',
     intent: 'view',
     icon: Compass,
