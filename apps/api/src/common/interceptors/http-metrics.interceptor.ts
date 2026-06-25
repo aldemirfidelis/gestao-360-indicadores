@@ -1,4 +1,5 @@
-import { CallHandler, ExecutionContext, Injectable, Logger, NestInterceptor } from '@nestjs/common';
+import { CallHandler, ExecutionContext, Injectable, NestInterceptor } from '@nestjs/common';
+import { InjectPinoLogger, PinoLogger } from 'nestjs-pino';
 import { Observable, catchError, tap, throwError } from 'rxjs';
 import { Request, Response } from 'express';
 
@@ -6,9 +7,10 @@ const SLOW_MS = Number(process.env.METRICS_SLOW_MS ?? 1000);
 const VERBOSE = process.env.METRICS_VERBOSE === 'true';
 
 /**
- * Métricas de produto via logs (item 20): tempo de resposta, rotas lentas e 5xx
- * por módulo. Sem I/O no banco (zero overhead por request) — agrega-se depois por
- * logs (journald/Caddy) ou um coletor simples.
+ * Métricas de produto via logs estruturados (item 20): tempo de resposta, rotas
+ * lentas e 5xx por módulo. Sem I/O no banco (zero overhead por request) — agrega-se
+ * depois pelos logs JSON (campos: method, path, statusCode, durationMs, module) + o
+ * requestId/userId herdados do contexto do pino.
  *
  * - 5xx: sempre logado como erro (erros por módulo).
  * - lento (>= METRICS_SLOW_MS, default 1000ms): logado como warn (rotas lentas).
@@ -16,7 +18,7 @@ const VERBOSE = process.env.METRICS_VERBOSE === 'true';
  */
 @Injectable()
 export class HttpMetricsInterceptor implements NestInterceptor {
-  private readonly logger = new Logger('HttpMetrics');
+  constructor(@InjectPinoLogger('HttpMetrics') private readonly logger: PinoLogger) {}
 
   intercept(context: ExecutionContext, next: CallHandler): Observable<unknown> {
     if (context.getType() !== 'http') return next.handle();
@@ -28,11 +30,11 @@ export class HttpMetricsInterceptor implements NestInterceptor {
     const module = moduleOf(path);
 
     const record = (status: number) => {
-      const ms = Date.now() - startedAt;
-      const line = `${req.method} ${path} ${status} ${ms}ms [${module}]`;
-      if (status >= 500) this.logger.error(line);
-      else if (ms >= SLOW_MS) this.logger.warn(`SLOW ${line}`);
-      else if (VERBOSE) this.logger.log(line);
+      const durationMs = Date.now() - startedAt;
+      const fields = { method: req.method, path, statusCode: status, durationMs, module };
+      if (status >= 500) this.logger.error(fields, 'request 5xx');
+      else if (durationMs >= SLOW_MS) this.logger.warn(fields, 'slow request');
+      else if (VERBOSE) this.logger.info(fields, 'request');
     };
 
     return next.handle().pipe(
