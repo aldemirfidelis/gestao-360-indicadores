@@ -2,7 +2,7 @@
 
 import Link from 'next/link';
 import { useSearchParams } from 'next/navigation';
-import { useMemo, useState } from 'react';
+import { memo, useMemo, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
 import { AlertTriangle, Bot, CalendarDays, ClipboardCheck, ClipboardList, Columns3, Filter, List, Plus, Search, ShieldCheck, UserRound } from 'lucide-react';
@@ -348,7 +348,7 @@ export default function ActionsPage() {
   );
 }
 
-function ActionRow({ action: a }: { action: Action }) {
+const ActionRow = memo(function ActionRow({ action: a }: { action: Action }) {
   return (
     <tr>
       <td>
@@ -371,7 +371,7 @@ function ActionRow({ action: a }: { action: Action }) {
       </td>
     </tr>
   );
-}
+});
 
 function ActionForm({ form, setForm, options }: { form: typeof emptyForm; setForm: (value: typeof emptyForm) => void; options?: Options }) {
   const selectedIndicator = options?.indicators.find((item) => item.id === form.indicatorId);

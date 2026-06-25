@@ -1,5 +1,6 @@
 'use client';
 
+import { useMemo } from 'react';
 import { Bar, BarChart, CartesianGrid, Cell, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts';
 import { EmptyState } from '@/components/platform/empty-state';
 import { incidentsBySeverity } from '@/lib/asset-security/analytics';
@@ -7,7 +8,7 @@ import type { AnyRecord } from '@/lib/asset-security/types';
 
 /** Ocorrências por severidade (cor proporcional à criticidade). */
 export function IncidentBreakdownChart({ incidents }: { incidents: AnyRecord[] }) {
-  const data = incidentsBySeverity(incidents);
+  const data = useMemo(() => incidentsBySeverity(incidents), [incidents]);
   if (!data.length) {
     return <EmptyState title="Nenhuma ocorrência" description="Sem ocorrências registradas no momento." />;
   }

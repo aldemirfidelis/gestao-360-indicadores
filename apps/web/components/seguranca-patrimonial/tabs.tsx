@@ -127,8 +127,8 @@ export function OverviewTab({
 }) {
   const s = summary;
   const docs = documentCompliance(s?.expiredOrInvalidDocuments ?? 0, totalRecords);
-  const rounds = roundsCompliance(roundExecutions);
-  const avgDwell = averageDwellMinutes(movements);
+  const rounds = useMemo(() => roundsCompliance(roundExecutions), [roundExecutions]);
+  const avgDwell = useMemo(() => averageDwellMinutes(movements), [movements]);
 
   return (
     <div className="space-y-4">
