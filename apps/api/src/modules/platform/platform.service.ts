@@ -4,6 +4,7 @@ import { PrismaService } from '../../prisma/prisma.service';
 import { AccessService } from '../access/access.service';
 import { AuthPayload } from '../auth/auth.types';
 import { swallow } from '../../common/logging/swallow';
+import { prepareTenantFields } from '../../common/tenant-fields';
 import { CreateCompanyDto, UpdateCompanyDto } from './platform.dto';
 
 const OPEN_ACTION_STATUSES = {
@@ -128,6 +129,7 @@ export class PlatformService {
       if (dup) throw new ConflictException('Já existe empresa com este CNPJ.');
     }
     const status = dto.status ?? CompanyStatus.ACTIVE;
+    const tenantFields = await this.prepareTenantFields(dto);
     const created = await this.prisma.company.create({
       data: {
         name: dto.name,
@@ -145,6 +147,7 @@ export class PlatformService {
         status,
         active: status === CompanyStatus.ACTIVE,
         areaAccessEnabled: dto.areaAccessEnabled ?? true,
+        ...tenantFields,
       },
     });
     await this.audit(me, created.id, 'CREATE', null, created);
@@ -158,7 +161,10 @@ export class PlatformService {
       const dup = await this.prisma.company.findFirst({ where: { cnpj: dto.cnpj, deletedAt: null, NOT: { id } } });
       if (dup) throw new ConflictException('Já existe empresa com este CNPJ.');
     }
-    const data: Prisma.CompanyUpdateInput = { ...dto };
+    const tenantFields = await this.prepareTenantFields(dto, id);
+    // slug/customDomain são validados/normalizados em prepareTenantFields; o resto do dto entra direto.
+    const { slug: _slug, customDomain: _customDomain, ...rest } = dto;
+    const data: Prisma.CompanyUpdateInput = { ...rest, ...tenantFields };
     if (dto.status) data.active = dto.status === CompanyStatus.ACTIVE;
     const updated = await this.prisma.company.update({ where: { id }, data });
     await this.audit(me, id, 'UPDATE', before, updated);
@@ -176,12 +182,30 @@ export class PlatformService {
     return this.serialize(updated);
   }
 
+  /** Valida/normaliza slug e customDomain reusando a regra compartilhada. */
+  private prepareTenantFields(dto: { slug?: string; customDomain?: string }, currentId?: string) {
+    return prepareTenantFields(dto, {
+      slugTaken: async (slug) =>
+        !!(await this.prisma.company.findFirst({
+          where: { slug, deletedAt: null, ...(currentId ? { NOT: { id: currentId } } : {}) },
+          select: { id: true },
+        })),
+      customDomainTaken: async (domain) =>
+        !!(await this.prisma.company.findFirst({
+          where: { customDomain: domain, deletedAt: null, ...(currentId ? { NOT: { id: currentId } } : {}) },
+          select: { id: true },
+        })),
+    });
+  }
+
   private serialize(c: Prisma.CompanyGetPayload<object>) {
     return {
       id: c.id,
       name: c.name,
       tradeName: c.tradeName,
       cnpj: c.cnpj,
+      slug: c.slug,
+      customDomain: c.customDomain,
       logoUrl: c.logoUrl,
       email: c.email,
       phone: c.phone,

@@ -21,6 +21,11 @@ const RESERVED_SUBDOMAINS = new Set([
   'mail',
 ]);
 
+/** Indica se um label de subdomínio é reservado (infra/serviço, não empresa). */
+export function isReservedSubdomain(label: string): boolean {
+  return RESERVED_SUBDOMAINS.has(label.toLowerCase());
+}
+
 /** Domínio raiz da plataforma (ex.: gestao360.org). Configurável por ambiente. */
 export function platformRootDomain(): string {
   return (process.env.PLATFORM_ROOT_DOMAIN ?? 'gestao360.org').toLowerCase();

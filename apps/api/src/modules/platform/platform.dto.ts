@@ -19,6 +19,10 @@ export class CreateCompanyDto {
   @IsOptional() @IsString() @MaxLength(2000) notes?: string;
   @IsOptional() @IsEnum(CompanyStatus) status?: CompanyStatus;
   @IsOptional() @IsBoolean() areaAccessEnabled?: boolean;
+  // Subdomínio do tenant (empresa.gestao360.org) e domínio próprio (white-label).
+  // Formato/unicidade/reservados validados no service.
+  @IsOptional() @IsString() @MaxLength(63) slug?: string;
+  @IsOptional() @IsString() @MaxLength(255) customDomain?: string;
 }
 
 export class UpdateCompanyDto {
@@ -36,6 +40,8 @@ export class UpdateCompanyDto {
   @IsOptional() @IsString() @MaxLength(2000) notes?: string;
   @IsOptional() @IsEnum(CompanyStatus) status?: CompanyStatus;
   @IsOptional() @IsBoolean() areaAccessEnabled?: boolean;
+  @IsOptional() @IsString() @MaxLength(63) slug?: string;
+  @IsOptional() @IsString() @MaxLength(255) customDomain?: string;
 }
 
 export class SetCompanyStatusDto {

@@ -4,6 +4,7 @@ import { PrismaService } from '../../../prisma/prisma.service';
 import { PlatformAdminAuditService } from './platform-admin-audit.service';
 import { PlatformAdminIdentity } from '../platform-admin.types';
 import { PLATFORM_MODULES, PLATFORM_PLANS } from '../platform-admin.catalog';
+import { prepareTenantFields } from '../../../common/tenant-fields';
 
 const ACTIVE_MODULE_STATUSES = ['ATIVO', 'ACTIVE', 'HERDADO_DO_PLANO', 'EM_IMPLANTACAO', 'EM_TESTE', 'EXPERIMENTAL'];
 const BLOCKED_MODULE_STATUSES = ['BLOQUEADO', 'SUSPENSO', 'BLOCKED', 'SUSPENDED'];
@@ -42,6 +43,8 @@ interface CompanyInput {
   notes?: string | null;
   status?: string | null;
   areaAccessEnabled?: boolean | null;
+  slug?: string | null;
+  customDomain?: string | null;
   lifecycleStatus?: string;
   planCode?: string | null;
   internalCode?: string | null;
@@ -319,6 +322,7 @@ export class PlatformAdminService {
     }
 
     const companyStatus = parseCompanyStatus(input.status ?? input.lifecycleStatus);
+    const tenantFields = await this.tenantFields(input);
     const company = await this.prisma.company.create({
       data: {
         name: input.name,
@@ -335,6 +339,7 @@ export class PlatformAdminService {
         areaAccessEnabled: input.areaAccessEnabled ?? true,
         status: companyStatus,
         active: companyStatus === CompanyStatus.ACTIVE,
+        ...tenantFields,
       },
     });
     await this.upsertCompanyProfile(company.id, input, user);
@@ -373,6 +378,7 @@ export class PlatformAdminService {
       data.status = companyStatus;
       data.active = companyStatus === CompanyStatus.ACTIVE;
     }
+    Object.assign(data, await this.tenantFields(input, id));
     const company = await this.prisma.company.update({ where: { id }, data });
     const profile = await this.upsertCompanyProfile(id, input, user);
 
@@ -967,12 +973,30 @@ export class PlatformAdminService {
     return `G360-${String(count + 1).padStart(4, '0')}`;
   }
 
+  /** Valida/normaliza slug e customDomain reusando a regra compartilhada. */
+  private tenantFields(input: { slug?: string | null; customDomain?: string | null }, currentId?: string) {
+    return prepareTenantFields(input, {
+      slugTaken: async (slug) =>
+        !!(await this.prisma.company.findFirst({
+          where: { slug, deletedAt: null, ...(currentId ? { NOT: { id: currentId } } : {}) },
+          select: { id: true },
+        })),
+      customDomainTaken: async (domain) =>
+        !!(await this.prisma.company.findFirst({
+          where: { customDomain: domain, deletedAt: null, ...(currentId ? { NOT: { id: currentId } } : {}) },
+          select: { id: true },
+        })),
+    });
+  }
+
   private serializeCompany(company: Prisma.CompanyGetPayload<object>) {
     return {
       id: company.id,
       name: company.name,
       tradeName: company.tradeName,
       cnpj: company.cnpj,
+      slug: company.slug,
+      customDomain: company.customDomain,
       logoUrl: company.logoUrl,
       email: company.email,
       phone: company.phone,

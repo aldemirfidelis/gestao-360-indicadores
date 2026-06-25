@@ -131,6 +131,8 @@ interface CompanyRow {
   name: string;
   tradeName?: string | null;
   cnpj?: string | null;
+  slug?: string | null;
+  customDomain?: string | null;
   email?: string | null;
   phone?: string | null;
   addressLine?: string | null;
@@ -287,6 +289,8 @@ const EMPTY_COMPANY_FORM = {
   name: '',
   tradeName: '',
   cnpj: '',
+  slug: '',
+  customDomain: '',
   email: '',
   phone: '',
   segment: '',
@@ -1429,6 +1433,8 @@ function CompaniesSection() {
                   <Row label="Razão social" value={detail.data.company.name} />
                   <Row label="Nome fantasia" value={detail.data.company.tradeName ?? '-'} />
                   <Row label="CNPJ" value={detail.data.company.cnpj ?? '-'} />
+                  <Row label="Subdomínio" value={detail.data.company.slug ? `${detail.data.company.slug}.gestao360.org` : '-'} />
+                  <Row label="Domínio próprio" value={detail.data.company.customDomain ?? '-'} />
                   <Row label="E-mail" value={detail.data.company.email ?? '-'} />
                   <Row label="Telefone" value={detail.data.company.phone ?? '-'} />
                   <Row label="Segmento" value={detail.data.company.segment ?? '-'} />
@@ -1533,6 +1539,31 @@ function CompanyFormDialog({
           </div>
           <Field label="Cidade" value={form.city} onChange={(value) => update('city', value)} />
           <Field label="UF" value={form.state} onChange={(value) => update('state', value.toUpperCase().slice(0, 2))} />
+          <div className="md:col-span-2 grid gap-4 border bg-muted/10 p-3 md:grid-cols-2">
+            <div className="md:col-span-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+              Endereço de acesso (multi-tenant)
+            </div>
+            <div className="space-y-1.5">
+              <Label className="text-xs">Subdomínio</Label>
+              <Input
+                value={form.slug}
+                placeholder="ex.: goiasa"
+                onChange={(event) => update('slug', event.target.value.toLowerCase().replace(/[^a-z0-9-]/g, ''))}
+              />
+              <p className="text-[11px] text-muted-foreground">
+                {form.slug.trim() ? `${form.slug.trim()}.gestao360.org` : 'Sem subdomínio dedicado (acessa pelo endereço padrão).'}
+              </p>
+            </div>
+            <div className="space-y-1.5">
+              <Label className="text-xs">Domínio próprio (white-label)</Label>
+              <Input
+                value={form.customDomain}
+                placeholder="ex.: indicadores.suaempresa.com.br"
+                onChange={(event) => update('customDomain', event.target.value.toLowerCase())}
+              />
+              <p className="text-[11px] text-muted-foreground">Opcional. Requer CNAME do cliente apontando para o servidor.</p>
+            </div>
+          </div>
           <div className="space-y-1.5">
             <Label className="text-xs">Limite de usuários</Label>
             <Input type="number" min={0} value={form.maxUsers} onChange={(event) => update('maxUsers', event.target.value)} />
@@ -2253,6 +2284,8 @@ function companyToForm(company: CompanyRow, profile: CompanyRow['profile'] = com
     name: company.name ?? '',
     tradeName: company.tradeName ?? '',
     cnpj: company.cnpj ?? '',
+    slug: company.slug ?? '',
+    customDomain: company.customDomain ?? '',
     email: company.email ?? '',
     phone: company.phone ?? '',
     segment: company.segment ?? '',
@@ -2274,6 +2307,8 @@ function companyFormPayload(form: CompanyForm) {
     name: form.name.trim(),
     tradeName: blankToNull(form.tradeName),
     cnpj: blankToNull(form.cnpj),
+    slug: blankToNull(form.slug),
+    customDomain: blankToNull(form.customDomain),
     email: blankToNull(form.email),
     phone: blankToNull(form.phone),
     segment: blankToNull(form.segment),
