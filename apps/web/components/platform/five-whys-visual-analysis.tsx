@@ -1,7 +1,7 @@
 'use client';
 
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { toPng } from 'html-to-image';
+import { exportNodeToPng } from '@/lib/export-image';
 import { useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
 import {
@@ -286,12 +286,7 @@ export function FiveWhysVisualAnalysis({
   }
 
   async function exportImage() {
-    if (!boardRef.current) return;
-    const dataUrl = await toPng(boardRef.current, { backgroundColor: '#f8fafc', pixelRatio: 2 });
-    const link = document.createElement('a');
-    link.download = `5-porques-${actionId ?? 'analise'}.png`;
-    link.href = dataUrl;
-    link.click();
+    await exportNodeToPng(boardRef.current, `5-porques-${actionId ?? 'analise'}`);
   }
 
   const responsibleById = new Map(users.map((user) => [user.id, user.name]));

@@ -1,7 +1,7 @@
 'use client';
 
 import { useMemo, useRef, useState } from 'react';
-import { toPng } from 'html-to-image';
+import { exportNodeToPng } from '@/lib/export-image';
 import { useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
 import type { LucideIcon } from 'lucide-react';
@@ -291,12 +291,7 @@ export function PDCAVisualAnalysis({
   }
 
   async function exportImage() {
-    if (!canvasRef.current) return;
-    const dataUrl = await toPng(canvasRef.current, { backgroundColor: '#f8fafc', pixelRatio: 2 });
-    const link = document.createElement('a');
-    link.download = `pdca-${actionId ?? 'analise'}.png`;
-    link.href = dataUrl;
-    link.click();
+    await exportNodeToPng(canvasRef.current, `pdca-${actionId ?? 'analise'}`);
   }
 
   function addChecklistItem() {

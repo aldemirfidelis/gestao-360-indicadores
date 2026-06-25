@@ -2,6 +2,7 @@ import { CallHandler, ExecutionContext, Injectable, NestInterceptor } from '@nes
 import { InjectPinoLogger, PinoLogger } from 'nestjs-pino';
 import { Observable, catchError, tap, throwError } from 'rxjs';
 import { Request, Response } from 'express';
+import { routeModule } from '../http/request-route';
 
 const SLOW_MS = Number(process.env.METRICS_SLOW_MS ?? 1000);
 const VERBOSE = process.env.METRICS_VERBOSE === 'true';
@@ -27,7 +28,7 @@ export class HttpMetricsInterceptor implements NestInterceptor {
     const res = context.switchToHttp().getResponse<Response>();
     const startedAt = Date.now();
     const path = req.path ?? req.originalUrl ?? '';
-    const module = moduleOf(path);
+    const module = routeModule(path);
 
     const record = (status: number) => {
       const durationMs = Date.now() - startedAt;
@@ -45,9 +46,4 @@ export class HttpMetricsInterceptor implements NestInterceptor {
       }),
     );
   }
-}
-
-function moduleOf(path: string): string {
-  const parts = path.replace(/^\/api\/?/, '').split('/').filter(Boolean);
-  return parts[0] ?? 'root';
 }

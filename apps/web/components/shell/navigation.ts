@@ -328,10 +328,6 @@ export function visibleMobileItems(user: NavUser | null | undefined) {
   return mobileNavItems.filter((item) => canAccess(user, item.permissions));
 }
 
-export function canAccessCompanyUsers(user: NavUser | null | undefined) {
-  return canAccess(user, companyUsersNavItem.permissions);
-}
-
 export function canAccess(user: NavUser | null | undefined, permissions?: string[]) {
   if (!permissions || permissions.length === 0) return true;
   if (!user) return false;

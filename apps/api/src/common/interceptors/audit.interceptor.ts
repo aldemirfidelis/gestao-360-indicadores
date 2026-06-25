@@ -4,6 +4,7 @@ import { Request } from 'express';
 import { PrismaService } from '../../prisma/prisma.service';
 import { AuthPayload } from '../../modules/auth/auth.types';
 import { redactDeep } from '../logging/redact';
+import { routeModule, routeEntity } from '../http/request-route';
 
 const METHOD_ACTION: Record<string, string> = {
   POST: 'CREATE',
@@ -51,9 +52,8 @@ export class AuditInterceptor implements NestInterceptor {
   ) {
     try {
       const path = req.path ?? req.originalUrl ?? '';
-      const parts = path.replace(/^\/api\/?/, '').split('/').filter(Boolean);
-      const module = parts[0] ?? 'system';
-      const entity = parts[0] ? toEntity(parts[0]) : 'System';
+      const module = routeModule(path, 'system');
+      const entity = routeEntity(path);
       const entityId = req.params?.id ?? req.params?.indicatorId ?? req.params?.resultId ?? null;
       const payload = {
         path,
@@ -81,13 +81,6 @@ export class AuditInterceptor implements NestInterceptor {
       // Auditoria nunca deve quebrar a operação principal.
     }
   }
-}
-
-function toEntity(value: string) {
-  return value
-    .split('-')
-    .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
-    .join('');
 }
 
 function safeStringify(value: unknown) {

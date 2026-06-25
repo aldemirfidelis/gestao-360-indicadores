@@ -11,7 +11,3 @@ export function LoadingState({ label = 'Carregando...', className }: { label?: s
     </div>
   );
 }
-
-export function SkeletonBlock({ className }: { className?: string }) {
-  return <div className={cn('animate-pulse bg-muted', className)} />;
-}

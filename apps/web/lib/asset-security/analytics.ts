@@ -3,7 +3,7 @@
  * Funções puras (testáveis) sobre os dados já entregues pelos endpoints
  * existentes — sem qualquer dependência de migração de banco.
  */
-import { INCIDENT_SEVERITY_LABELS, INCIDENT_STATUS_LABELS } from './labels';
+import { INCIDENT_SEVERITY_LABELS } from './labels';
 import type { AnyRecord, SecurityMovement } from './types';
 
 function dayKey(value: string | Date | null | undefined): string | null {
@@ -56,16 +56,6 @@ export function incidentsBySeverity(incidents: AnyRecord[]): Array<{ name: strin
     .map((sev) => ({ name: INCIDENT_SEVERITY_LABELS[sev] ?? sev, value: counts.get(sev) ?? 0, fill: SEVERITY_COLORS[sev] ?? '#64748b' }));
 }
 
-/** Contagem de ocorrências por status. */
-export function incidentsByStatus(incidents: AnyRecord[]): Array<{ name: string; value: number }> {
-  const counts = new Map<string, number>();
-  for (const it of incidents) {
-    const st = String(it.status ?? 'OPEN');
-    counts.set(st, (counts.get(st) ?? 0) + 1);
-  }
-  return Array.from(counts.entries()).map(([st, value]) => ({ name: INCIDENT_STATUS_LABELS[st] ?? st, value }));
-}
-
 /** Tempo médio de permanência (min) das movimentações encerradas. */
 export function averageDwellMinutes(movements: SecurityMovement[]): number | null {
   const closed = movements.filter((m) => m.exitAt && m.entryAt);
@@ -80,18 +70,6 @@ export function averageDwellMinutes(movements: SecurityMovement[]): number | nul
   return Math.round(total / closed.length);
 }
 
-/** Throughput por portaria (entradas registradas). */
-export function throughputByGate(movements: SecurityMovement[], limit = 6): Array<{ name: string; value: number }> {
-  const counts = new Map<string, number>();
-  for (const mv of movements) {
-    const gate = mv.gate?.name ?? 'Sem portaria';
-    counts.set(gate, (counts.get(gate) ?? 0) + 1);
-  }
-  return Array.from(counts.entries())
-    .sort((a, b) => b[1] - a[1])
-    .slice(0, limit)
-    .map(([name, value]) => ({ name, value }));
-}
 
 export interface ComplianceBar {
   label: string;
