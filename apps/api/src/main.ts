@@ -2,11 +2,27 @@ import { NestFactory } from '@nestjs/core';
 import { ValidationPipe } from '@nestjs/common';
 import helmet from 'helmet';
 import { json, urlencoded } from 'express';
+import { Logger } from 'nestjs-pino';
+import pino from 'pino';
 import { AppModule } from './app.module';
-import { HttpExceptionFilter } from './common/filters/http-exception.filter';
+
+// Logger "raiz" (independente do Nest) para eventos de processo e falha de boot,
+// quando o container de DI ainda não existe ou já caiu.
+const rootLogger = pino({ level: process.env.LOG_LEVEL ?? 'info', name: 'g360-api' });
+
+process.on('uncaughtException', (err) => {
+  rootLogger.fatal({ err }, 'uncaughtException — encerrando processo');
+  process.exit(1);
+});
+process.on('unhandledRejection', (reason) => {
+  rootLogger.error({ err: reason }, 'unhandledRejection');
+});
 
 async function bootstrap() {
-  const app = await NestFactory.create(AppModule, { cors: false, bodyParser: false });
+  // bufferLogs: segura os logs iniciais do Nest até o logger pino assumir.
+  const app = await NestFactory.create(AppModule, { cors: false, bodyParser: false, bufferLogs: true });
+  app.useLogger(app.get(Logger));
+  const logger = app.get(Logger);
 
   // PORT (padrão DigitalOcean/Heroku/Render) > API_PORT > 3333
   const port = parseInt(process.env.PORT ?? process.env.API_PORT ?? '3333', 10);
@@ -45,10 +61,8 @@ async function bootstrap() {
   // credentials habilitado.
   const isWildcard = corsOrigin === '*';
   if (isWildcard && process.env.NODE_ENV === 'production') {
-    // eslint-disable-next-line no-console
-    console.warn(
-      '[g360-api] AVISO DE SEGURANCA: API_CORS_ORIGIN="*" em producao. ' +
-        'Defina o dominio explicito (ex.: https://gestao360.org).',
+    logger.warn(
+      'AVISO DE SEGURANCA: API_CORS_ORIGIN="*" em producao. Defina o dominio explicito (ex.: https://gestao360.org).',
     );
   }
   app.enableCors({
@@ -62,11 +76,12 @@ async function bootstrap() {
       forbidNonWhitelisted: false,
     }),
   );
-  app.useGlobalFilters(new HttpExceptionFilter());
 
   await app.listen(port, '0.0.0.0');
-  // eslint-disable-next-line no-console
-  console.log(`[g360-api] listening on http://0.0.0.0:${port}/${prefix}`);
+  logger.log(`g360-api listening on http://0.0.0.0:${port}/${prefix}`);
 }
 
-bootstrap();
+bootstrap().catch((err) => {
+  rootLogger.fatal({ err }, 'bootstrap falhou — processo nao iniciou');
+  process.exit(1);
+});

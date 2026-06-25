@@ -4,6 +4,7 @@ import { getQueueToken } from '@nestjs/bullmq';
 import type { Queue } from 'bullmq';
 import { PrismaService } from '../../../prisma/prisma.service';
 import { AUTOMATIONS_QUEUE, workersEnabled } from '../../../jobs/jobs.constants';
+import { redactDeep } from '../../../common/logging/redact';
 
 export interface QueueJob {
   type: 'process_event' | 'execute_node' | 'retry_node' | 'timer_trigger';
@@ -91,7 +92,7 @@ export class WorkflowQueueAdapter {
         await engine.resumeInstance(payload.workflowInstanceId, payload.nodeKey, { triggeredAt: new Date() }, payload.companyId);
       }
     } catch (error: any) {
-      this.logger.error(`Error executing job ${type} with payload ${JSON.stringify(payload)}: ${error.message}`, error.stack);
+      this.logger.error(`Error executing job ${type} with payload ${JSON.stringify(redactDeep(payload))}: ${error.message}`, error.stack);
       throw error;
     }
   }

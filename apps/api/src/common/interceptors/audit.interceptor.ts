@@ -3,6 +3,7 @@ import { Observable, catchError, tap, throwError } from 'rxjs';
 import { Request } from 'express';
 import { PrismaService } from '../../prisma/prisma.service';
 import { AuthPayload } from '../../modules/auth/auth.types';
+import { redactDeep } from '../logging/redact';
 
 const METHOD_ACTION: Record<string, string> = {
   POST: 'CREATE',
@@ -69,8 +70,8 @@ export class AuditInterceptor implements NestInterceptor {
           module,
           entity,
           entityId,
-          payload: safeStringify(payload),
-          afterValue: result === 'ERROR' ? safeStringify(response) : safeStringify(redact(req.body)),
+          payload: safeStringify(redactDeep(payload)),
+          afterValue: result === 'ERROR' ? safeStringify(redactDeep(response)) : safeStringify(redactDeep(req.body)),
           result,
           ip: req.ip,
           userAgent: req.headers['user-agent'],
@@ -87,15 +88,6 @@ function toEntity(value: string) {
     .split('-')
     .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
     .join('');
-}
-
-function redact(value: unknown): unknown {
-  if (!value || typeof value !== 'object') return value;
-  const copy = { ...(value as Record<string, unknown>) };
-  for (const key of Object.keys(copy)) {
-    if (/password|token|secret/i.test(key)) copy[key] = '[redacted]';
-  }
-  return copy;
 }
 
 function safeStringify(value: unknown) {

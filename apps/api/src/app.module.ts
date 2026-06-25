@@ -1,7 +1,11 @@
 import { Module } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
 import { ThrottlerGuard, ThrottlerModule } from '@nestjs/throttler';
-import { APP_GUARD, APP_INTERCEPTOR } from '@nestjs/core';
+import { APP_FILTER, APP_GUARD, APP_INTERCEPTOR } from '@nestjs/core';
+import { LoggerModule } from 'nestjs-pino';
+import { loggerParams } from './common/logging/logger.config';
+import { LogContextInterceptor } from './common/logging/log-context.interceptor';
+import { HttpExceptionFilter } from './common/filters/http-exception.filter';
 
 import { PrismaModule } from './prisma/prisma.module';
 import { AuthModule } from './modules/auth/auth.module';
@@ -63,6 +67,7 @@ import { workersEnabled } from './jobs/jobs.constants';
 @Module({
   imports: [
     ConfigModule.forRoot({ isGlobal: true }),
+    LoggerModule.forRoot(loggerParams),
     ThrottlerModule.forRoot([{ ttl: 60_000, limit: 200 }]),
     PrismaModule,
     AuthModule,
@@ -120,9 +125,13 @@ import { workersEnabled } from './jobs/jobs.constants';
     ...(workersEnabled() ? [JobsModule] : []),
   ],
   providers: [
+    // Filtro global de exceção via DI (injeta o logger estruturado).
+    { provide: APP_FILTER, useClass: HttpExceptionFilter },
     { provide: APP_GUARD, useClass: ThrottlerGuard },
     // Métricas (item 20) primeiro = mede o tempo total da request (envolve a auditoria).
     { provide: APP_INTERCEPTOR, useClass: HttpMetricsInterceptor },
+    // Anexa userId/companyId ao contexto do logger (após os guards resolverem req.user).
+    { provide: APP_INTERCEPTOR, useClass: LogContextInterceptor },
     { provide: APP_INTERCEPTOR, useClass: AuditInterceptor },
   ],
 })
