@@ -1,4 +1,5 @@
 import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
+import { swallow } from '../../common/logging/swallow';
 import {
   ActionAiSuggestionStatus,
   ActionAnalysisTool,
@@ -569,7 +570,7 @@ export class ActionsService {
     if (action.deviationId && consolidatedRootCause) {
       await this.prisma.deviation
         .update({ where: { id: action.deviationId }, data: { rootCause: consolidatedRootCause } })
-        .catch(() => undefined);
+        .catch(swallow(undefined, `actions.propagateRootCause(deviationId=${action.deviationId})`));
     }
     await this.recordHistory(actionId, userId, 'ANALYSIS_SAVED', 'analysisTool', action.analysisTool, method);
     await this.audit(action.companyId, userId, 'ANALYSIS_SAVED', 'ActionAnalysisSession', session.id, null, body);

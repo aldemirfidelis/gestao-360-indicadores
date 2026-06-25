@@ -10,6 +10,7 @@ import {
 import { Reflector } from '@nestjs/core';
 import { PrismaService } from '../../prisma/prisma.service';
 import { hashApiKey } from '../../common/crypto';
+import { swallow } from '../../common/logging/swallow';
 
 export const SCOPES_KEY = 'apiScopes';
 /** Declara os escopos exigidos por uma rota da API pública (ex.: 'results:write'). */
@@ -45,7 +46,7 @@ export class ApiKeyGuard implements CanActivate {
 
     req.apiKey = { id: key.id, companyId: key.companyId, scopes: key.scopes } as ApiKeyContext;
     // best-effort: marca último uso sem bloquear a requisição.
-    this.prisma.inboundApiKey.update({ where: { id: key.id }, data: { lastUsedAt: new Date() } }).catch(() => undefined);
+    this.prisma.inboundApiKey.update({ where: { id: key.id }, data: { lastUsedAt: new Date() } }).catch(swallow(undefined, 'externalApi.touchKeyLastUsed', 'debug'));
 
     const required = this.reflector.getAllAndOverride<string[]>(SCOPES_KEY, [context.getHandler(), context.getClass()]) ?? [];
     if (required.length && !required.every((s) => key.scopes.includes(s))) {

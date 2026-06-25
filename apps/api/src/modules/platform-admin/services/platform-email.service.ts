@@ -4,6 +4,7 @@ import { encryptJson } from '../../../common/crypto';
 import { resolveSmtpConfig, buildTransport, smtpFrom } from '../../../common/smtp';
 import { PlatformAdminAuditService } from './platform-admin-audit.service';
 import { PlatformAdminIdentity } from '../platform-admin.types';
+import { swallow } from '../../../common/logging/swallow';
 
 const PASSWORD_PLACEHOLDER = '••••••';
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -223,7 +224,7 @@ export class PlatformEmailService {
     if (row) {
       await this.prisma.portalEmailSetting
         .update({ where: { id: row.id }, data: { lastTestAt: new Date(), lastTestOk: ok, lastTestError: error } })
-        .catch(() => undefined);
+        .catch(swallow(undefined, 'platformEmail.persistTestResult', 'debug'));
     }
     await this.audit.record({
       user,

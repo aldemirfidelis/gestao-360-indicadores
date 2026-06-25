@@ -1,4 +1,5 @@
 import { BadRequestException, ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
+import { logSwallowed } from '../../common/logging/swallow';
 import {
   FoodSafetyComplianceResult,
   FoodSafetyControlPlanStatus,
@@ -849,8 +850,9 @@ export class FoodSafetyService {
           immediateAction: plan.correction ?? null,
         })) as { id?: string };
         nonConformityId = nc?.id ?? null;
-      } catch {
-        // Nao bloqueia o registro do monitoramento se a abertura da NC falhar.
+      } catch (err) {
+        // Nao bloqueia o registro do monitoramento se a abertura da NC falhar, mas registra.
+        logSwallowed('foodSafety.monitoring.openNonConformity', err);
       }
     }
 

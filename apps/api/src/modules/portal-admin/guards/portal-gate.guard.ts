@@ -4,6 +4,7 @@ import { PortalConfigService } from '../services/portal-config.service';
 import { PORTAL_GATE_KEY, PortalGateMetadata } from '../decorators/portal-gate.decorator';
 import { IS_PUBLIC_KEY } from '../../auth/jwt-auth.guard';
 import { AuthPayload } from '../../auth/auth.types';
+import { swallow } from '../../../common/logging/swallow';
 import { PrismaService } from '../../../prisma/prisma.service';
 import { canUseCompanyModule } from '../../platform-admin/platform-admin.access';
 
@@ -53,7 +54,7 @@ export class PortalGateGuard implements CanActivate {
     if (moduleCode && user?.companyId) {
       const assignment = await this.prisma.platformCompanyModule
         .findUnique({ where: { companyId_moduleCode: { companyId: user.companyId, moduleCode } } })
-        .catch(() => null);
+        .catch(swallow(null, `portalGate.readCompanyModule(moduleCode=${moduleCode})`));
       if (assignment) {
         const decision = canUseCompanyModule(assignment.status, req.method);
         if (!decision.allowed) {

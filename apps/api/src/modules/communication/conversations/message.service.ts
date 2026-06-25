@@ -1,6 +1,7 @@
 import { BadRequestException, ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
 import { NotificationKind, Prisma, PresenceStatus } from '@prisma/client';
 import { PrismaService } from '../../../prisma/prisma.service';
+import { swallow } from '../../../common/logging/swallow';
 import { ConversationService } from './conversation.service';
 import { PresenceService } from '../presence/presence.service';
 import { RealtimeEmitter } from '../realtime.emitter';
@@ -170,7 +171,7 @@ export class MessageService {
     } else {
       await this.prisma.messageReaction
         .delete({ where: { messageId_userId_emoji: { messageId, userId: meId, emoji } } })
-        .catch(() => undefined);
+        .catch(swallow(undefined, 'message.removeReaction', 'debug'));
     }
     const reactions = await this.prisma.messageReaction.findMany({
       where: { messageId },

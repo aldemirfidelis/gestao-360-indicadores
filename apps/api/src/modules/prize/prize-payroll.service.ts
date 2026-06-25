@@ -3,6 +3,7 @@ import { PrismaService } from '../../prisma/prisma.service';
 import { AuthPayload } from '../auth/auth.types';
 import { PrizeAuditService } from './prize-audit.service';
 import { buildPayrollItems, payrollToCsv, reconcileReturn, ReturnRow } from './prize-payroll.util';
+import { swallow } from '../../common/logging/swallow';
 
 /**
  * Integracao de saida para a folha: gera lote (rubrica/verba) a partir da
@@ -85,7 +86,9 @@ export class PrizePayrollService {
       data: { status: 'SENT', protocol: protocol ?? null, sentAt: new Date() },
     });
     await this.prisma.prizePayrollBatchItem.updateMany({ where: { batchId, status: 'PENDING' }, data: { status: 'SENT' } });
-    await this.prisma.prizeCompetence.update({ where: { id: batch.competenceId }, data: { status: 'SENT_TO_PAYROLL' } }).catch(() => undefined);
+    await this.prisma.prizeCompetence
+      .update({ where: { id: batch.competenceId }, data: { status: 'SENT_TO_PAYROLL' } })
+      .catch(swallow(undefined, `prize.payroll.markCompetenceSent(competenceId=${batch.competenceId})`));
     await this.audit.log(me, { action: 'SENT', entityType: 'PAYROLL_BATCH', entityId: batchId, competenceId: batch.competenceId, after: { protocol } });
     return updated;
   }

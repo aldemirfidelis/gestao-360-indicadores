@@ -6,6 +6,7 @@ import { PrismaService } from '../../prisma/prisma.service';
 import { AuthPayload } from './auth.types';
 import { requireSecret } from '../../common/env';
 import { effectiveCompanyId } from '../../common/effective-company';
+import { swallow } from '../../common/logging/swallow';
 
 @Injectable()
 export class AuthService {
@@ -128,7 +129,7 @@ export class AuthService {
     const tokenHash = createHash('sha256').update(refreshToken).digest('hex');
     await this.prisma.refreshToken
       .update({ where: { tokenHash }, data: { revokedAt: new Date() } })
-      .catch(() => undefined);
+      .catch(swallow(undefined, 'auth.logout(revogar refresh token)'));
     if (ctx?.userId) {
       await this.prisma.auditLog.create({
         data: {
@@ -221,7 +222,7 @@ export class AuthService {
     // Nome da empresa efetiva (para o seletor do topo exibir "Administrando: X").
     const activeCompany = await this.prisma.company
       .findUnique({ where: { id: companyId }, select: { id: true, name: true, tradeName: true } })
-      .catch(() => null);
+      .catch(swallow(null, 'auth.resolveActiveCompany', 'debug'));
 
     return {
       id: user.id,

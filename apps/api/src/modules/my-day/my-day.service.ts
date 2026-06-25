@@ -2,6 +2,7 @@ import { BadRequestException, ForbiddenException, Injectable, NotFoundException,
 import { randomUUID } from 'crypto';
 import { PrismaService } from '../../prisma/prisma.service';
 import { AuthPayload } from '../auth/auth.types';
+import { swallow } from '../../common/logging/swallow';
 import { WorkItemAggregationService } from './work-item-aggregation.service';
 import { WorkflowApprovalService } from '../automations/services/workflow-approval.service';
 import { ActionsService } from '../actions/actions.service';
@@ -279,7 +280,7 @@ export class MyDayService implements OnModuleInit {
   private async isAssistantEnabled(me: AuthPayload) {
     const [pref, setting] = await Promise.all([
       this.getPreferences(me),
-      this.prisma.appSetting.findUnique({ where: { companyId_key: { companyId: me.companyId, key: 'myday.ai.enabled' } } }).catch(() => null),
+      this.prisma.appSetting.findUnique({ where: { companyId_key: { companyId: me.companyId, key: 'myday.ai.enabled' } } }).catch(swallow(null, 'myDay.readAiEnabledSetting', 'debug')),
     ]);
     const companyOff = setting && ['false', '0', 'off', 'disabled'].includes(String(setting.value).toLowerCase());
     return !companyOff && (pref as any).aiEnabled !== false;

@@ -3,6 +3,7 @@ import { Prisma } from '@prisma/client';
 import { PrismaService } from '../../prisma/prisma.service';
 import { AuthPayload } from '../auth/auth.types';
 import { PrizeAuditService } from './prize-audit.service';
+import { swallow } from '../../common/logging/swallow';
 
 function n(v: any): number | null {
   if (v === null || v === undefined) return null;
@@ -114,7 +115,9 @@ export class PrizePayslipService {
     for (const p of latest) {
       if (p.status === 'GENERATED') { await this.publish(me, p.id); published++; }
     }
-    await this.prisma.prizeCompetence.update({ where: { id: competenceId }, data: { status: 'PAYSLIPS_PUBLISHED' } }).catch(() => undefined);
+    await this.prisma.prizeCompetence
+      .update({ where: { id: competenceId }, data: { status: 'PAYSLIPS_PUBLISHED' } })
+      .catch(swallow(undefined, `prize.payslip.markPublished(competenceId=${competenceId})`));
     return { published };
   }
 

@@ -1,6 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { PrismaService } from '../../../prisma/prisma.service';
 import { AuthPayload } from '../../auth/auth.types';
+import { swallow } from '../../../common/logging/swallow';
 import { PortalAuditService } from './portal-audit.service';
 
 export const DEFAULT_INTEGRATIONS = [
@@ -64,7 +65,7 @@ export class IntegrationService {
       data: ok
         ? { lastRunAt: new Date(), lastLatencyMs: latency, lastError: null, recentFailures: 0 }
         : { lastRunAt: new Date(), lastLatencyMs: latency, lastError: note, recentFailures: { increment: 1 } },
-    }).catch(() => undefined);
+    }).catch(swallow(undefined, `portalIntegration.recordTestResult(code=${code})`, 'debug'));
     await this.audit.record({ user, tab: 'integrations', action: 'TEST', targetType: 'integration', targetCode: code, result: ok ? 'SUCCESS' : 'ERROR', message: note });
     return { ok, latencyMs: latency, note };
   }

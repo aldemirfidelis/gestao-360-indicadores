@@ -1,6 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { PrismaService } from '../../../prisma/prisma.service';
 import { AuthPayload } from '../../auth/auth.types';
+import { swallow } from '../../../common/logging/swallow';
 import { FeatureFlagService } from './feature-flag.service';
 import { parseArray } from '../util/json';
 import { PLATFORM_PLANS } from '../../platform-admin/platform-admin.catalog';
@@ -34,11 +35,11 @@ export class PortalConfigService {
       this.prisma.portalNavOverride.findMany(),
       this.prisma.portalMaintenanceWindow.findMany({ where: { active: true } }),
       this.prisma.portalAnnouncement.findMany({ where: { active: true } }),
-      user.companyId ? this.prisma.platformCompanyModule.findMany({ where: { companyId: user.companyId } }).catch(() => []) : Promise.resolve([]),
-      user.companyId ? this.prisma.platformCompanyProfile.findUnique({ where: { companyId: user.companyId }, select: { planCode: true } }).catch(() => null) : Promise.resolve(null),
+      user.companyId ? this.prisma.platformCompanyModule.findMany({ where: { companyId: user.companyId } }).catch(swallow([], 'portalConfig.companyModules', 'debug')) : Promise.resolve([]),
+      user.companyId ? this.prisma.platformCompanyProfile.findUnique({ where: { companyId: user.companyId }, select: { planCode: true } }).catch(swallow(null, 'portalConfig.companyProfile', 'debug')) : Promise.resolve(null),
       this.prisma.platformPlanModule.findMany({
         select: { moduleCode: true, included: true, plan: { select: { code: true } } },
-      }).catch(() => []),
+      }).catch(swallow([], 'portalConfig.planModules', 'debug')),
     ]);
 
     const activeMaint = maintenanceWindows.filter((w) => withinWindow(w.startsAt, w.endsAt, now));

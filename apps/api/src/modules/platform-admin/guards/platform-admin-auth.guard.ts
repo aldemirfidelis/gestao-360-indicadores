@@ -4,6 +4,7 @@ import { JwtService } from '@nestjs/jwt';
 import { Request } from 'express';
 import { PrismaService } from '../../../prisma/prisma.service';
 import { requireSecret } from '../../../common/env';
+import { swallow } from '../../../common/logging/swallow';
 import { PLATFORM_PERMISSIONS_KEY } from '../decorators/platform-permissions.decorator';
 import { hasPlatformPermission } from '../platform-admin.access';
 import { PlatformAdminIdentity, PlatformAdminRequest } from '../platform-admin.types';
@@ -92,7 +93,7 @@ export class PlatformAdminAuthGuard implements CanActivate {
             userAgent: req.headers['user-agent'],
           },
         })
-        .catch(() => undefined);
+        .catch(swallow(undefined, 'platformAdmin.guard.accessLogDenied', 'debug'));
       throw new ForbiddenException('Permissao insuficiente no Portal Admin Global.');
     }
 
@@ -108,7 +109,7 @@ export class PlatformAdminAuthGuard implements CanActivate {
 
     void this.prisma.platformAdminSession
       .update({ where: { id: session.id }, data: { lastSeenAt: new Date() } })
-      .catch(() => undefined);
+      .catch(swallow(undefined, 'platformAdmin.guard.touchLastSeen', 'debug'));
 
     return true;
   }

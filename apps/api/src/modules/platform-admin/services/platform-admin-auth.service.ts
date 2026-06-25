@@ -4,6 +4,7 @@ import * as bcrypt from 'bcryptjs';
 import { createHash, randomBytes } from 'crypto';
 import { PrismaService } from '../../../prisma/prisma.service';
 import { requireSecret } from '../../../common/env';
+import { swallow } from '../../../common/logging/swallow';
 
 @Injectable()
 export class PlatformAdminAuthService {
@@ -109,7 +110,7 @@ export class PlatformAdminAuthService {
     if (refreshToken) {
       await this.prisma.platformAdminSession
         .update({ where: { refreshTokenHash: hashToken(refreshToken) }, data: { revokedAt: new Date() } })
-        .catch(() => undefined);
+        .catch(swallow(undefined, 'platformAdmin.logout(revogar sessao)'));
     }
     await this.accessLog(ctx?.userId ?? null, ctx?.email ?? null, 'LOGOUT', 'SUCCESS', null, ctx);
     return { ok: true };
@@ -185,7 +186,7 @@ export class PlatformAdminAuthService {
           userAgent: ctx?.userAgent,
         },
       })
-      .catch(() => undefined);
+      .catch(swallow(undefined, 'platformAdmin.accessLog', 'debug'));
   }
 }
 

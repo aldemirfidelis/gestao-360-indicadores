@@ -2,6 +2,7 @@ import { ForbiddenException, Injectable } from '@nestjs/common';
 import { UserRoleEnum } from '@prisma/client';
 import { PrismaService } from '../../prisma/prisma.service';
 import { effectiveCompanyId } from '../../common/effective-company';
+import { swallow } from '../../common/logging/swallow';
 import {
   AreaAction,
   AreaScope,
@@ -179,7 +180,7 @@ export class AccessService {
           recordLabel: note ?? `Acesso negado a área ${areaId ?? '-'} (${moduleKey}/${action}).`,
         },
       })
-      .catch(() => undefined);
+      .catch(swallow(undefined, 'access.auditDenied', 'debug'));
   }
 
   /** Nível de visibilidade do usuário sobre uma área (para decidir projeção resumida). */

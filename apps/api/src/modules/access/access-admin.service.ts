@@ -3,6 +3,7 @@ import { AreaAssignmentType, VisibilityEffect } from '@prisma/client';
 import { PrismaService } from '../../prisma/prisma.service';
 import { AuthPayload } from '../auth/auth.types';
 import { AccessService } from './access.service';
+import { swallow } from '../../common/logging/swallow';
 import { ACCESS_MODULES, AddAssignmentDto, CreateExceptionDto, UpsertMatrixRuleDto } from './access-admin.dto';
 import { AreaAction } from './access.logic';
 
@@ -237,6 +238,6 @@ export class AccessAdminService {
           result: 'SUCCESS',
         },
       })
-      .catch(() => undefined);
+      .catch(swallow(undefined, 'accessAdmin.audit', 'debug'));
   }
 }

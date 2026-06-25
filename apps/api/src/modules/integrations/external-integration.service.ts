@@ -4,6 +4,7 @@ import { PrismaService } from '../../prisma/prisma.service';
 import { ResultsService } from '../results/results.service';
 import { AuthPayload } from '../auth/auth.types';
 import { decryptJson, encryptJson, generateApiKey } from '../../common/crypto';
+import { swallow } from '../../common/logging/swallow';
 import { makeConnector, ConnectorContext } from './connectors';
 import { CreateApiKeyDto, CreateExternalIntegrationDto, UpdateExternalIntegrationDto } from './external-integration.dto';
 
@@ -275,7 +276,9 @@ export class ExternalIntegrationService {
         select: { id: true },
       });
       if (!indicator) continue;
-      await this.results.upsertSystem(companyId, { indicatorId: indicator.id, periodRef, value }, actor).catch(() => undefined);
+      await this.results
+        .upsertSystem(companyId, { indicatorId: indicator.id, periodRef, value }, actor)
+        .catch(swallow(undefined, `integrations.upsertSystem(code=${code}, periodRef=${periodRef})`));
     }
   }
 
@@ -320,7 +323,7 @@ export class ExternalIntegrationService {
         where: { id: integrationId },
         data: { lastRunAt: new Date(), lastStatus: ok ? 'SUCCESS' : 'ERROR', lastError: ok ? null : (message?.slice(0, 500) ?? null), lastLatencyMs: latencyMs },
       }),
-    ]).catch(() => undefined);
+    ]).catch(swallow(undefined, 'integrations.recordRun'));
   }
 
   private async audit(me: AuthPayload, action: string, entity: string, entityId: string, after: unknown) {
@@ -337,7 +340,7 @@ export class ExternalIntegrationService {
           result: 'SUCCESS',
         },
       })
-      .catch(() => undefined);
+      .catch(swallow(undefined, 'integrations.audit', 'debug'));
   }
 }
 

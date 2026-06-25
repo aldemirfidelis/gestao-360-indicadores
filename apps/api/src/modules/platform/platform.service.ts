@@ -3,6 +3,7 @@ import { ActionStatus, CompanyStatus, Prisma } from '@prisma/client';
 import { PrismaService } from '../../prisma/prisma.service';
 import { AccessService } from '../access/access.service';
 import { AuthPayload } from '../auth/auth.types';
+import { swallow } from '../../common/logging/swallow';
 import { CreateCompanyDto, UpdateCompanyDto } from './platform.dto';
 
 const OPEN_ACTION_STATUSES = {
@@ -211,6 +212,6 @@ export class PlatformService {
           result: 'SUCCESS',
         },
       })
-      .catch(() => undefined);
+      .catch(swallow(undefined, 'platform.audit', 'debug'));
   }
 }

@@ -2,6 +2,7 @@ import { BadRequestException, ConflictException, Injectable, NotFoundException }
 import { AdminRecordStatus, UserRoleEnum } from '@prisma/client';
 import { PrismaService } from '../../prisma/prisma.service';
 import { DEFAULT_PROFILES, PERMISSION_CATALOG } from '../users/permission-catalog';
+import { swallow } from '../../common/logging/swallow';
 import { AuthPayload } from '../auth/auth.types';
 
 const PARAMETER_CATEGORIES: Array<{ code: string; name: string; module: string; description: string; items?: Array<{ code: string; name: string; description?: string }> }> = [
@@ -460,7 +461,7 @@ export class AdminService {
   async upsertSetting(me: AuthPayload, body: any) {
     if (!body.key) throw new BadRequestException('Chave obrigatoria');
     const companyId = me.companyId;
-    const before = await this.prisma.appSetting.findUnique({ where: { companyId_key: { companyId, key: body.key } } }).catch(() => null);
+    const before = await this.prisma.appSetting.findUnique({ where: { companyId_key: { companyId, key: body.key } } }).catch(swallow(null, 'admin.readAppSettingBefore', 'debug'));
     const saved = await this.prisma.appSetting.upsert({
       where: { companyId_key: { companyId, key: body.key } },
       create: {

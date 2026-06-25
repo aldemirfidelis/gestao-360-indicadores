@@ -1,6 +1,7 @@
 import { ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../../prisma/prisma.service';
 import { resolveSmtpConfig, buildTransport, smtpFrom } from '../../common/smtp';
+import { swallow } from '../../common/logging/swallow';
 import {
   ActionAnalysisTool,
   ActionOrigin,
@@ -274,7 +275,7 @@ export class MeetingsService {
     if (dev) {
       await this.prisma.deviation
         .update({ where: { id: dev.id }, data: { status: DeviationStatus.WAITING_ACTION } })
-        .catch(() => undefined);
+        .catch(swallow(undefined, `meetings.setDeviationWaitingAction(deviationId=${dev.id})`));
     }
     await this.traceability.record({
       companyId: meeting.companyId,

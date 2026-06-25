@@ -1,5 +1,6 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { PrismaService } from '../../prisma/prisma.service';
+import { logSwallowed } from '../../common/logging/swallow';
 import { Prisma, TraceEntityType, TraceEventType } from '@prisma/client';
 import { ModuleRef } from '@nestjs/core';
 
@@ -129,7 +130,8 @@ export class TraceabilityService {
         });
       }
     } catch (err) {
-      // Dispatcher module or service might not be initialized
+      // Dispatcher de workflow pode não estar inicializado — não bloqueia o registro de rastreabilidade.
+      logSwallowed('traceability.dispatchWorkflowEvent', err, 'debug');
     }
 
     return event;

@@ -1,5 +1,6 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../../prisma/prisma.service';
+import { logSwallowed } from '../../common/logging/swallow';
 import { Workbook } from 'exceljs';
 
 export interface EntitySummary {
@@ -337,8 +338,9 @@ export class Vision360Service {
           isMandatory: link.isMandatory,
           originType: 'MANUAL',
         });
-      } catch {
-        // Ignora vínculos manuais órfãos ou inativos temporariamente
+      } catch (err) {
+        // Ignora vínculos manuais órfãos ou inativos temporariamente (apenas registra em debug).
+        logSwallowed('vision360.resolveManualLink', err, 'debug');
       }
     }
 

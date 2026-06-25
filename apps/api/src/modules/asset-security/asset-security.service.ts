@@ -4,6 +4,7 @@ import { PrismaService } from '../../prisma/prisma.service';
 import { AccessService } from '../access/access.service';
 import { AuthPayload } from '../auth/auth.types';
 import { GeminiService } from '../ai/gemini.service';
+import { swallow } from '../../common/logging/swallow';
 
 const MODULE = 'asset-security';
 
@@ -70,7 +71,7 @@ export class AssetSecurityService {
       this.db.securityContractorCompany.findMany({ where: { companyId: me.companyId, deletedAt: null }, orderBy: { tradeName: 'asc' }, select: { id: true, legalName: true, tradeName: true, documentStatus: true, status: true } }),
       this.db.securityVehicle.findMany({ where: { companyId: me.companyId, deletedAt: null }, orderBy: { plate: 'asc' }, take: 500, select: { id: true, plate: true, type: true, model: true, status: true, documentStatus: true } }),
       this.db.securityRoundRoute.findMany({ where: { companyId: me.companyId, deletedAt: null }, orderBy: { name: 'asc' }, select: { id: true, code: true, name: true, status: true } }),
-      this.db.formTemplate.findMany({ where: { companyId: me.companyId, deletedAt: null }, orderBy: { title: 'asc' }, take: 200, select: { id: true, code: true, title: true, status: true, type: true } }).catch(() => []),
+      this.db.formTemplate.findMany({ where: { companyId: me.companyId, deletedAt: null }, orderBy: { title: 'asc' }, take: 200, select: { id: true, code: true, title: true, status: true, type: true } }).catch(swallow([], 'assetSecurity.options.formTemplates', 'debug')),
     ]);
 
     return {
@@ -718,7 +719,7 @@ export class AssetSecurityService {
       },
     });
     if (authorization?.id) {
-      await this.db.securityAuthorization.update({ where: { id: authorization.id }, data: { status: 'USED' } }).catch(() => undefined);
+      await this.db.securityAuthorization.update({ where: { id: authorization.id }, data: { status: 'USED' } }).catch(swallow(undefined, `assetSecurity.markAuthorizationUsed(id=${authorization.id})`));
     }
     await this.audit(me, 'REGISTER_ENTRY', 'SecurityAccessMovement', saved.id, saved.code, null, saved, { gateId, postId, unitId });
     await this.createPresenceWorkItems(me, saved);
@@ -2299,7 +2300,7 @@ ${JSON.stringify(context, null, 2)}`;
   }
 
   private async areaScopedWhere(me: AuthPayload, where: JsonMap) {
-    const permitted = await this.access.listAreaFilter(me.sub, MODULE, 'view').catch(() => null);
+    const permitted = await this.access.listAreaFilter(me.sub, MODULE, 'view').catch(swallow(null, 'assetSecurity.areaScopedWhere', 'debug'));
     if (!permitted) return where;
     const areaFilter = { OR: [{ unitId: null }, { unitId: { in: permitted } }] };
     return { ...where, AND: [...((where.AND as unknown[]) ?? []), areaFilter] };
@@ -2375,7 +2376,7 @@ ${JSON.stringify(context, null, 2)}`;
           offline: extra?.origin === 'OFFLINE',
           syncedAt: this.date(extra?.syncedAt),
         },
-      }).catch(() => undefined),
+      }).catch(swallow(undefined, 'assetSecurity.audit.securityAuditLog', 'debug')),
       this.db.auditLog.create({
         data: {
           companyId: me.companyId,
@@ -2388,12 +2389,12 @@ ${JSON.stringify(context, null, 2)}`;
           payload: JSON.stringify({ before: this.safeJson(before), after: this.safeJson(after), extra: this.safeJson(extra) }),
           result: 'SUCCESS',
         },
-      }).catch(() => undefined),
+      }).catch(swallow(undefined, 'assetSecurity.audit.auditLog', 'debug')),
     ]);
   }
 
   private async auditPublic(companyId: string, action: string, entity: string, entityId: string | null, label?: string | null, before?: unknown, after?: unknown) {
-    await this.db.securityAuditLog.create({ data: { companyId, action, entity, entityId, recordLabel: label ?? null, beforeValue: this.json(before), afterValue: this.json(after), origin: 'PORTAL' } }).catch(() => undefined);
+    await this.db.securityAuditLog.create({ data: { companyId, action, entity, entityId, recordLabel: label ?? null, beforeValue: this.json(before), afterValue: this.json(after), origin: 'PORTAL' } }).catch(swallow(undefined, 'assetSecurity.auditPublic', 'debug'));
   }
 
   private async createWorkItemForAuthorization(me: AuthPayload, authorization: any) {
@@ -2428,14 +2429,14 @@ ${JSON.stringify(context, null, 2)}`;
         contextData: { module: MODULE, entity, entityId },
       },
       update: { title, status: 'OPEN', priority, dueAt: dueAt ? new Date(dueAt) : null, refreshedAt: new Date() },
-    }).catch(() => undefined);
+    }).catch(swallow(undefined, 'assetSecurity.createOperationalWorkItem', 'debug'));
   }
 
   private async closeWorkItem(companyId: string, entity: string, entityId: string) {
     await this.db.workItemIndex.updateMany({
       where: { companyId, sourceModule: MODULE, sourceEntityType: entity, sourceEntityId: entityId, status: { not: 'DONE' } },
       data: { status: 'DONE', completedAt: new Date(), refreshedAt: new Date() },
-    }).catch(() => undefined);
+    }).catch(swallow(undefined, 'assetSecurity.closeWorkItem', 'debug'));
   }
 
   private documentSnapshot(person: any | null, vehicle: any | null, contractor: any | null) {

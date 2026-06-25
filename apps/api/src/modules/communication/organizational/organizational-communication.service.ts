@@ -4,6 +4,7 @@ import { randomUUID } from 'crypto';
 import { PrismaService } from '../../../prisma/prisma.service';
 import { AuthPayload } from '../../auth/auth.types';
 import { GeminiService } from '../../ai/gemini.service';
+import { swallow } from '../../../common/logging/swallow';
 import { NotificationsService } from '../../notifications/notifications.service';
 
 type CommunicationStatus =
@@ -683,7 +684,7 @@ export class OrganizationalCommunicationService {
       audience.map((user) =>
         this.notifications
           .create(companyId, user.id, NotificationKind.MESSAGE, post.title, post.subtitle ?? post.content.slice(0, 140), `/comunicacao?post=${post.id}`)
-          .catch(() => undefined),
+          .catch(swallow(undefined, 'orgCommunication.notifyAudience', 'debug')),
       ),
     );
   }

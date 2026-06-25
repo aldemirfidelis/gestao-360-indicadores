@@ -1,4 +1,5 @@
 import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
+import { swallow } from '../../common/logging/swallow';
 import {
   ActionOrigin,
   ActionPriority,
@@ -636,7 +637,7 @@ export class MonthlyResultsService {
     for (const userId of recipients) {
       await this.notifications
         .create(me.companyId, userId, NotificationKind.MEETING_UPCOMING, `Reunião mensal encerrada: ${meeting.title}`, 'A ata foi gerada e as ações entraram em execução.', link)
-        .catch(() => null);
+        .catch(swallow(null, 'monthlyResults.notifyMeetingClosed', 'debug'));
     }
   }
 
