@@ -1,9 +1,7 @@
 import { BadRequestException, ConflictException, Injectable, NotFoundException } from '@nestjs/common';
 import {
-  AuditChecklistTemplateStatus,
   AuditFindingType,
   AuditModality,
-  AuditRiskLevel,
   AuditType,
   NonConformitySeverity,
   Prisma,

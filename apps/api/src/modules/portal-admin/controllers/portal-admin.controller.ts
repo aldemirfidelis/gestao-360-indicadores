@@ -1,6 +1,5 @@
-import { Body, Controller, Delete, Get, Param, Post, Put, Query, Req, UseGuards } from '@nestjs/common';
+import { Body, Controller, Delete, Get, Param, Post, Put, Query, UseGuards } from '@nestjs/common';
 import { UserRoleEnum } from '@prisma/client';
-import { Request } from 'express';
 import { SuperAdminPortalGuard } from '../guards/super-admin-portal.guard';
 import { PortalTabTag } from '../decorators/portal-tab.decorator';
 import { CurrentUser } from '../../../common/decorators/current-user.decorator';

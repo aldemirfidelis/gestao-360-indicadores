@@ -1,6 +1,6 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { PrismaService } from '../../../prisma/prisma.service';
-import { ActionPriority, ActionStatus, ActionOrigin, AnalysisMethod, DeviationSeverity, DeviationStatus, MeetingFormat, MeetingKind, MeetingStatus } from '@prisma/client';
+import { ActionPriority, AnalysisMethod, DeviationSeverity, MeetingFormat, MeetingKind } from '@prisma/client';
 
 @Injectable()
 export class WorkflowTemplateService {
