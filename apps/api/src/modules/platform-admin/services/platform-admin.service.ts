@@ -4,7 +4,7 @@ import { PrismaService } from '../../../prisma/prisma.service';
 import { PlatformAdminAuditService } from './platform-admin-audit.service';
 import { PlatformAdminIdentity } from '../platform-admin.types';
 import { PLATFORM_MODULES, PLATFORM_PLANS } from '../platform-admin.catalog';
-import { alwaysOnModuleCodes } from '../../portal-admin/business-modules';
+import { alwaysOnModuleCodes, BUSINESS_MODULES, businessModuleMembers } from '../../portal-admin/business-modules';
 import { prepareTenantFields } from '../../../common/tenant-fields';
 
 const ACTIVE_MODULE_STATUSES = ['ATIVO', 'ACTIVE', 'HERDADO_DO_PLANO', 'EM_IMPLANTACAO', 'EM_TESTE', 'EXPERIMENTAL'];
@@ -470,6 +470,42 @@ export class PlatformAdminService {
         }),
       })),
     };
+  }
+
+  /** Catálogo das 10 abas de negócio (com os códigos granulares de cada uma). */
+  listBusinessModules() {
+    return BUSINESS_MODULES.map((m) => ({
+      code: m.code,
+      name: m.name,
+      menuOrder: m.menuOrder,
+      core: Boolean(m.core),
+      members: m.members,
+    }));
+  }
+
+  /**
+   * Liga/desliga uma ABA de negócio inteira para a empresa: aplica o status a
+   * todos os módulos granulares membros (reusa setCompanyModule p/ histórico+auditoria).
+   */
+  async setCompanyBusinessModule(
+    user: PlatformAdminIdentity,
+    companyId: string,
+    businessCode: string,
+    input: { status: string; reason?: string },
+  ) {
+    const members = businessModuleMembers(businessCode);
+    if (members.length === 0) throw new NotFoundException('Módulo de negócio não encontrado.');
+    await this.ensureModuleCatalog();
+    const catalog = new Set((await this.prisma.platformModuleCatalog.findMany({ select: { code: true } })).map((m) => m.code));
+    let changed = 0;
+    for (const moduleCode of members) {
+      if (!catalog.has(moduleCode)) continue;
+      // Núcleo nunca é bloqueado — pula silenciosamente nesse caso (defesa).
+      if (COMPANY_CORE_MODULES.has(moduleCode) && BLOCKED_MODULE_STATUSES.includes(input.status)) continue;
+      await this.setCompanyModule(user, companyId, moduleCode, { status: input.status, reason: input.reason });
+      changed += 1;
+    }
+    return { businessCode, status: input.status, changed };
   }
 
   async setCompanyModule(user: PlatformAdminIdentity, companyId: string, moduleCode: string, input: ModuleUpdateInput) {

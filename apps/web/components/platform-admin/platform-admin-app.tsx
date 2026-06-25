@@ -248,20 +248,6 @@ const SECTIONS: SectionItem[] = [
 
 const SECTION_KEYS = new Set<SectionKey>(SECTIONS.map((section) => section.key));
 
-const MODULE_STATUSES = [
-  'ATIVO',
-  'BLOQUEADO',
-  'SUSPENSO',
-  'SOMENTE_LEITURA',
-  'EM_IMPLANTACAO',
-  'EM_TESTE',
-  'ATIVACAO_PROGRAMADA',
-  'EXPIRACAO_PROGRAMADA',
-  'EXPERIMENTAL',
-  'HERDADO_DO_PLANO',
-  'SOBRESCRITO_MANUALMENTE',
-];
-
 const COMPANY_STATUSES = ['ACTIVE', 'SUSPENDED', 'INACTIVE'] as const;
 const COMPANY_LIFECYCLE_STATUSES = ['ACTIVE', 'IMPLEMENTATION', 'TRIAL', 'SUSPENDED', 'INACTIVE'] as const;
 const COMPANY_PLAN_CODES = ['ESSENCIAL', 'PROFISSIONAL', 'CORPORATIVO', 'ENTERPRISE', 'PERSONALIZADO'];
@@ -1604,6 +1590,30 @@ function CompanyFormDialog({
   );
 }
 
+interface BusinessModuleRow {
+  code: string;
+  name: string;
+  menuOrder: number;
+  core: boolean;
+  members: string[];
+}
+
+// Status que contam como "ativo" ao derivar o estado de uma aba a partir dos membros.
+const ACTIVE_STATUS_SET = new Set(['ATIVO', 'ACTIVE', 'HERDADO_DO_PLANO', 'EM_IMPLANTACAO', 'EM_TESTE', 'EXPERIMENTAL', 'SOMENTE_LEITURA', 'ATIVACAO_PROGRAMADA', 'EXPIRACAO_PROGRAMADA']);
+// Opções que o admin pode aplicar a uma aba inteira.
+const BUSINESS_APPLY_STATUSES = ['HERDADO_DO_PLANO', 'ATIVO', 'BLOQUEADO', 'SOMENTE_LEITURA'] as const;
+
+/** Deriva o status de uma aba (Ativo/Bloqueado/Misto) a partir dos módulos membros. */
+function deriveBusinessStatus(company: MatrixCompany, members: string[]): string {
+  const statuses = members.map((code) => company.modules.find((m) => m.moduleCode === code)?.status ?? 'HERDADO_DO_PLANO');
+  if (statuses.length === 0) return 'HERDADO_DO_PLANO';
+  const allActive = statuses.every((s) => ACTIVE_STATUS_SET.has(s));
+  if (allActive) return 'ATIVO';
+  const allBlocked = statuses.every((s) => !ACTIVE_STATUS_SET.has(s));
+  if (allBlocked) return 'BLOQUEADO';
+  return 'MISTO';
+}
+
 function ModulesSection() {
   const queryClient = useQueryClient();
   const [change, setChange] = useState<Record<string, string>>({});
@@ -1612,13 +1622,17 @@ function ModulesSection() {
     queryKey: ['platform-admin', 'module-matrix'],
     queryFn: () => platformAdminApi<{ modules: ModuleCatalog[]; companies: MatrixCompany[] }>('/module-matrix'),
   });
+  const business = useQuery({
+    queryKey: ['platform-admin', 'business-modules'],
+    queryFn: () => platformAdminApi<BusinessModuleRow[]>('/business-modules'),
+  });
   const plans = useQuery({
     queryKey: ['platform-admin', 'plans', 'module-apply'],
     queryFn: () => platformAdminApi<PlanRow[]>('/plans'),
   });
   const update = useMutation({
-    mutationFn: ({ companyId, moduleCode, status }: { companyId: string; moduleCode: string; status: string }) =>
-      platformAdminApi(`/companies/${companyId}/modules/${moduleCode}`, { method: 'PATCH', json: { status, reason: `Alteração de módulo para ${status}` } }),
+    mutationFn: ({ companyId, businessCode, status }: { companyId: string; businessCode: string; status: string }) =>
+      platformAdminApi(`/companies/${companyId}/business-modules/${businessCode}`, { method: 'PATCH', json: { status, reason: `Aba ${businessCode} → ${status}` } }),
     onSuccess: () => {
       toast.success('Módulo atualizado');
       void queryClient.invalidateQueries({ queryKey: ['platform-admin', 'module-matrix'] });
@@ -1636,9 +1650,9 @@ function ModulesSection() {
     onError: (err) => toast.error(err instanceof Error ? err.message : 'Falha ao aplicar plano'),
   });
 
-  if (matrix.isLoading) return <LoadingGrid />;
-  if (!matrix.data) return <EmptyState title="Matriz indisponível" />;
-  const modules = matrix.data.modules;
+  if (matrix.isLoading || business.isLoading) return <LoadingGrid />;
+  if (!matrix.data || !business.data) return <EmptyState title="Matriz indisponível" />;
+  const businessModules = [...business.data].sort((a, b) => a.menuOrder - b.menuOrder);
 
   return (
     <div className="space-y-4">
@@ -1669,16 +1683,15 @@ function ModulesSection() {
         </div>
       </Panel>
 
-      <Panel title="Catálogo de módulos">
+      <Panel title="Módulos (abas do menu)">
         <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
-          {matrix.data.modules.map((module) => (
-            <div key={module.code} className="border bg-white p-3 text-sm">
+          {businessModules.map((bm) => (
+            <div key={bm.code} className="border bg-white p-3 text-sm">
               <div className="flex items-center justify-between gap-2">
-                <div className="font-medium">{module.name}</div>
-                <Status value={module.globalStatus} />
+                <div className="font-medium">{bm.name}</div>
+                {bm.core && <span className="rounded bg-muted px-1.5 py-0.5 text-[10px] font-medium text-muted-foreground">Padrão</span>}
               </div>
-              <div className="mt-2 text-xs text-muted-foreground">{module.category ?? '-'} · {module.version ?? '1.0.0'}</div>
-              <div className="mt-2 text-xs">Resp.: {module.technicalOwner ?? '-'}</div>
+              <div className="mt-2 text-xs text-muted-foreground">{bm.members.length} {bm.members.length === 1 ? 'recurso' : 'recursos'} internos</div>
             </div>
           ))}
         </div>
@@ -1690,31 +1703,36 @@ function ModulesSection() {
             <thead>
               <tr>
                 <th>Empresa</th>
-                {modules.map((module) => <th key={module.code}>{module.name}</th>)}
+                {businessModules.map((bm) => <th key={bm.code}>{bm.name}</th>)}
               </tr>
             </thead>
             <tbody>
               {matrix.data.companies.map((company) => (
                 <tr key={company.id}>
                   <td className="font-medium">{company.tradeName || company.name}</td>
-                  {modules.map((module) => {
-                    const current = company.modules.find((item) => item.moduleCode === module.code)?.status ?? 'HERDADO_DO_PLANO';
-                    const key = `${company.id}:${module.code}`;
-                    const selected = change[key] ?? current;
-                    const isCore = COMPANY_CORE_MODULE_CODES.has(module.code);
+                  {businessModules.map((bm) => {
+                    const derived = deriveBusinessStatus(company, bm.members);
+                    const key = `${company.id}:${bm.code}`;
+                    const fallback = BUSINESS_APPLY_STATUSES.includes(derived as (typeof BUSINESS_APPLY_STATUSES)[number]) ? derived : 'ATIVO';
+                    const selected = change[key] ?? fallback;
                     return (
-                      <td key={key} className="min-w-[190px]">
+                      <td key={key} className="min-w-[210px]">
                         <div className="flex items-center gap-2">
-                          <select
-                            className="h-8 flex-1 border bg-background px-2 text-xs"
-                            value={selected}
-                            disabled={isCore}
-                            title={isCore ? 'Módulo essencial da empresa' : undefined}
-                            onChange={(event) => setChange((prev) => ({ ...prev, [key]: event.target.value }))}
-                          >
-                            {MODULE_STATUSES.map((status) => <option key={status}>{status}</option>)}
-                          </select>
-                          <Button size="sm" variant="outline" disabled={isCore || selected === current || update.isPending} onClick={() => update.mutate({ companyId: company.id, moduleCode: module.code, status: selected })}>Salvar</Button>
+                          <Status value={derived} />
+                          {bm.core ? (
+                            <span className="text-[10px] text-muted-foreground" title="Aba padrão — sempre ativa">padrão</span>
+                          ) : (
+                            <>
+                              <select
+                                className="h-8 flex-1 border bg-background px-2 text-xs"
+                                value={selected}
+                                onChange={(event) => setChange((prev) => ({ ...prev, [key]: event.target.value }))}
+                              >
+                                {BUSINESS_APPLY_STATUSES.map((status) => <option key={status}>{status}</option>)}
+                              </select>
+                              <Button size="sm" variant="outline" disabled={selected === derived || update.isPending} onClick={() => update.mutate({ companyId: company.id, businessCode: bm.code, status: selected })}>Salvar</Button>
+                            </>
+                          )}
                         </div>
                       </td>
                     );

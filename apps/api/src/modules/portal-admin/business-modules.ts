@@ -109,6 +109,11 @@ export const PLAN_BUSINESS_MODULES: Record<string, string[]> = {
 
 const byCode = new Map(BUSINESS_MODULES.map((m) => [m.code, m]));
 
+/** Membros granulares de uma aba de negócio (vazio se o código não existir). */
+export function businessModuleMembers(code: string): string[] {
+  return byCode.get(code)?.members ?? [];
+}
+
 /** Códigos granulares sempre ativos: módulos de negócio core + sistema. */
 export function alwaysOnModuleCodes(): string[] {
   const core = BUSINESS_MODULES.filter((m) => m.core).flatMap((m) => m.members);

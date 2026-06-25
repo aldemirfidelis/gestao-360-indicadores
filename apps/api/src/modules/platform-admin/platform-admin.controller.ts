@@ -161,6 +161,23 @@ export class PlatformAdminController {
     return this.service.moduleMatrix();
   }
 
+  @Get('business-modules')
+  @PlatformAdminRequired('platform.modules.view')
+  businessModules() {
+    return this.service.listBusinessModules();
+  }
+
+  @Patch('companies/:companyId/business-modules/:businessCode')
+  @PlatformAdminRequired('platform.modules.manage')
+  setCompanyBusinessModule(
+    @CurrentPlatformAdmin() user: PlatformAdminIdentity,
+    @Param('companyId') companyId: string,
+    @Param('businessCode') businessCode: string,
+    @Body() body: { status: string; reason?: string },
+  ) {
+    return this.service.setCompanyBusinessModule(user, companyId, businessCode, body);
+  }
+
   @Patch('companies/:companyId/modules/:moduleCode')
   @PlatformAdminRequired('platform.modules.manage')
   setCompanyModule(
