@@ -1,4 +1,5 @@
 import { CATALOG_MODULES } from '../portal-admin/portal-catalog';
+import { expandPlanModules } from '../portal-admin/business-modules';
 
 export const PLATFORM_PERMISSIONS = [
   ['platform.*', 'Acesso total ao Portal Admin Global', 'Sistema', 'manage'],
@@ -163,7 +164,8 @@ export const PLATFORM_PLANS = [
     supportLevel: 'Padrao',
     sla: 'Proximo dia util',
     trialDays: 14,
-    modules: ['my-day', 'tasks', 'dashboard', 'indicators', 'actions', 'reports', 'meetings', 'monthly-results', 'vision360'],
+    // Padrão (Meu Dia, Tarefas, Administração) + Gestão à Vista.
+    modules: expandPlanModules('ESSENCIAL'),
   },
   {
     code: 'PROFISSIONAL',
@@ -176,23 +178,8 @@ export const PLATFORM_PLANS = [
     supportLevel: 'Prioritario',
     sla: '8 horas uteis',
     trialDays: 21,
-    modules: [
-      'my-day',
-      'tasks',
-      'dashboard',
-      'visualization',
-      'org',
-      'strategy',
-      'indicators',
-      'actions',
-      'documents',
-      'reports',
-      'meetings',
-      'monthly-results',
-      'vision360',
-      'projects',
-      'forms',
-    ],
+    // Padrão + Gestão à Vista + Qualidade e Compliance + Comunicação.
+    modules: expandPlanModules('PROFISSIONAL'),
   },
   {
     code: 'CORPORATIVO',
@@ -205,7 +192,8 @@ export const PLATFORM_PLANS = [
     supportLevel: 'Dedicado',
     sla: '4 horas uteis',
     trialDays: 30,
-    modules: PLATFORM_MODULES.filter((m) => !['database-admin', 'portal-admin'].includes(m.code)).map((m) => m.code),
+    // Padrão + Gestão à Vista + Qualidade e Compliance + Comunicação + Cargos e Salários + Segurança (Alimentos e Patrimonial).
+    modules: expandPlanModules('CORPORATIVO'),
   },
   {
     code: 'ENTERPRISE',
@@ -218,7 +206,8 @@ export const PLATFORM_PLANS = [
     supportLevel: 'SLA customizado',
     sla: 'Contrato especifico',
     trialDays: 30,
-    modules: PLATFORM_MODULES.map((m) => m.code),
+    // Tudo: Padrão + todas as abas de negócio (inclui Gestão de Prêmio).
+    modules: expandPlanModules('ENTERPRISE'),
   },
   {
     code: 'PERSONALIZADO',

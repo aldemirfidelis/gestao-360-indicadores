@@ -4,11 +4,14 @@ import { PrismaService } from '../../../prisma/prisma.service';
 import { PlatformAdminAuditService } from './platform-admin-audit.service';
 import { PlatformAdminIdentity } from '../platform-admin.types';
 import { PLATFORM_MODULES, PLATFORM_PLANS } from '../platform-admin.catalog';
+import { alwaysOnModuleCodes } from '../../portal-admin/business-modules';
 import { prepareTenantFields } from '../../../common/tenant-fields';
 
 const ACTIVE_MODULE_STATUSES = ['ATIVO', 'ACTIVE', 'HERDADO_DO_PLANO', 'EM_IMPLANTACAO', 'EM_TESTE', 'EXPERIMENTAL'];
 const BLOCKED_MODULE_STATUSES = ['BLOQUEADO', 'SUSPENSO', 'BLOCKED', 'SUSPENDED'];
-const COMPANY_CORE_MODULES = new Set(['auth', 'access-control', 'users', 'my-day', 'tasks']);
+// Sempre ativos em qualquer plano: Meu Dia, Tarefas, Administração (usuários,
+// aprovações, períodos, automações, relatórios) + módulos de sistema/Portal Global.
+const COMPANY_CORE_MODULES = new Set<string>(alwaysOnModuleCodes());
 const SEO_GROUP = 'SEO_PRESENCE';
 const SEO_DEFAULTS: Record<string, string> = {
   defaultTitle: 'Gestao 360 | Plataforma de gestao corporativa integrada',
