@@ -20,6 +20,7 @@ type CommunicationStatus =
 
 type CommunicationType = 'SIMPLE' | 'BANNER' | 'VIDEO' | 'POLL' | 'SURVEY' | 'CAMPAIGN';
 type CommunicationPriority = 'LOW' | 'NORMAL' | 'HIGH' | 'CRITICAL' | 'URGENT';
+type CommunicationMediaType = 'IMAGE' | 'BANNER' | 'VIDEO' | 'PDF' | 'DOCUMENT' | 'ICON' | 'TEMPLATE';
 
 interface AudienceRule {
   scope: 'ALL_COMPANY' | 'AREAS' | 'USERS' | 'MANAGERS' | 'DIRECTORS' | 'ACTIVE_USERS';
@@ -147,12 +148,30 @@ interface CommunicationPost {
   updatedAt: string;
 }
 
+interface CommunicationMediaUploadBody {
+  fileName?: string;
+  mimeType?: string;
+  sizeBytes?: number;
+  dataBase64?: string;
+  name?: string;
+  type?: CommunicationMediaType;
+  category?: string;
+  tags?: string[];
+  ownerAreaId?: string;
+  validUntil?: string;
+  adjustments?: Record<string, unknown>;
+}
+
 const POST_INCLUDE = {
   reads: true,
   reactions: true,
   comments: { orderBy: { createdAt: 'asc' as const } },
   pollResponses: true,
 };
+
+const MAX_COMMUNICATION_MEDIA_BYTES = 6 * 1024 * 1024;
+const ALLOWED_COMMUNICATION_VIDEO_MIME_TYPES = new Set(['video/mp4', 'video/webm', 'video/ogg', 'video/quicktime']);
+const COMMUNICATION_UPLOAD_TYPES = new Set<CommunicationMediaType>(['IMAGE', 'BANNER', 'VIDEO']);
 
 @Injectable()
 export class OrganizationalCommunicationService {
@@ -535,6 +554,53 @@ export class OrganizationalCommunicationService {
       },
     });
     return created;
+  }
+
+  async uploadMedia(me: AuthPayload, body: CommunicationMediaUploadBody) {
+    const upload = this.prepareMediaUpload(body);
+    const type = this.mediaTypeFromMime(upload.mimeType, body.type);
+    const baseTags = Array.isArray(body.tags)
+      ? body.tags
+          .map((tag) => this.clean(tag))
+          .filter((tag): tag is string => Boolean(tag))
+          .slice(0, 20)
+      : [];
+    const tags = [
+      ...baseTags,
+      `mime:${upload.mimeType}`,
+      `bytes:${upload.sizeBytes}`,
+      ...(body.adjustments ? ['imagem-ajustada'] : []),
+    ];
+    const created = await this.prisma.communicationMedia.create({
+      data: {
+        companyId: me.companyId,
+        name: this.clean(body.name) ?? upload.fileName,
+        type,
+        category: this.clean(body.category) ?? (type === 'VIDEO' ? 'Videos' : 'Imagens'),
+        tags: tags as unknown as Prisma.InputJsonValue,
+        url: `data:${upload.mimeType};base64,${upload.dataBase64}`,
+        ownerAreaId: this.clean(body.ownerAreaId),
+        authorId: me.sub,
+        version: 1,
+        status: 'ACTIVE',
+        validUntil: this.toDate(body.validUntil),
+      },
+    });
+    return {
+      id: created.id,
+      name: created.name,
+      type: created.type,
+      category: created.category,
+      tags: (created.tags as string[]) ?? [],
+      url: created.url,
+      ownerAreaId: created.ownerAreaId,
+      authorName: me.name ?? 'Usuario',
+      version: created.version,
+      status: created.status,
+      validUntil: this.iso(created.validUntil),
+      usageCount: created.usageCount,
+      createdAt: this.iso(created.createdAt),
+    };
   }
 
   async aiDraft(
@@ -938,6 +1004,54 @@ export class OrganizationalCommunicationService {
       ACTIVE_USERS: 'Usuários ativos da plataforma',
     };
     return labels[scope] ?? 'Público segmentado';
+  }
+
+  private prepareMediaUpload(body: CommunicationMediaUploadBody) {
+    const fileName = this.safeFileName(this.required(body.fileName ?? body.name, 'Informe o arquivo.'));
+    const mimeType = this.required(body.mimeType, 'Informe o tipo do arquivo.').toLowerCase();
+    const isImage = mimeType.startsWith('image/');
+    const isVideo = ALLOWED_COMMUNICATION_VIDEO_MIME_TYPES.has(mimeType);
+    if (!isImage && !isVideo) {
+      throw new BadRequestException('Envie apenas imagens ou videos mp4, webm, ogg e mov.');
+    }
+
+    const declaredSize = Number(body.sizeBytes ?? 0);
+    if (!Number.isFinite(declaredSize) || declaredSize <= 0 || declaredSize > MAX_COMMUNICATION_MEDIA_BYTES) {
+      throw new BadRequestException('Uploads de comunicacao tem limite de 6 MB por arquivo.');
+    }
+
+    const rawBase64 = this.required(body.dataBase64, 'Envie o arquivo em base64.')
+      .replace(/^data:[^;]+;base64,/i, '')
+      .replace(/\s/g, '');
+    if (!/^[A-Za-z0-9+/]+={0,2}$/.test(rawBase64)) {
+      throw new BadRequestException('Arquivo em base64 invalido.');
+    }
+
+    const data = Buffer.from(rawBase64, 'base64');
+    if (!data.length || data.length > MAX_COMMUNICATION_MEDIA_BYTES || data.length !== declaredSize) {
+      throw new BadRequestException('Tamanho do arquivo invalido.');
+    }
+
+    return {
+      fileName,
+      mimeType,
+      sizeBytes: data.length,
+      dataBase64: data.toString('base64'),
+    };
+  }
+
+  private mediaTypeFromMime(mimeType: string, requestedType?: CommunicationMediaType): CommunicationMediaType {
+    const type = String(requestedType ?? '').toUpperCase() as CommunicationMediaType;
+    if (COMMUNICATION_UPLOAD_TYPES.has(type)) return type;
+    return mimeType.startsWith('video/') ? 'VIDEO' : 'IMAGE';
+  }
+
+  private safeFileName(value: string) {
+    return value
+      .trim()
+      .replace(/[^\w.\- ]+/g, '')
+      .replace(/\s+/g, ' ')
+      .slice(0, 120) || `midia-${randomUUID()}`;
   }
 
   private clean(value: unknown) {

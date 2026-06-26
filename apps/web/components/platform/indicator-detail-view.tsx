@@ -419,7 +419,7 @@ export function IndicatorDetailView({ id, embedded = false }: { id: string; embe
                 className={cn(
                   'h-4 w-4 rounded-full ring-2 ring-offset-1 ring-offset-background',
                   last?.light === 'RED'
-                    ? 'bg-status-red ring-status-red/30'
+                    ? 'bg-status-red ring-status-red/30 status-red-pulse'
                     : last?.light === 'YELLOW'
                       ? 'bg-status-yellow ring-status-yellow/30'
                       : last?.light === 'GREEN'

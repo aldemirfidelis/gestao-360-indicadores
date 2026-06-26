@@ -74,6 +74,12 @@ export class OrganizationalCommunicationController {
     return this.service.createMedia(me, body);
   }
 
+  @Post('media/upload')
+  @RequirePermissions('communication:media', 'communication:manage', 'communication:attachments')
+  uploadMedia(@CurrentUser() me: AuthPayload, @Body() body: any) {
+    return this.service.uploadMedia(me, body);
+  }
+
   @Post('ai/draft')
   @RequirePermissions('communication:create', 'communication:manage', 'communication:attachments', 'ai:use')
   aiDraft(@CurrentUser() me: AuthPayload, @Body() body: any) {

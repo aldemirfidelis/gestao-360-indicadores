@@ -13,21 +13,25 @@ import {
   BookOpenCheck,
   CheckCircle2,
   ClipboardCheck,
+  Crop,
   FileBarChart,
   FileText,
+  Film,
   Image as ImageIcon,
+  ImagePlus,
+  Link2,
   Megaphone,
   MessageCircle,
   MessageSquare,
-  MonitorPlay,
   PlaySquare,
   Plus,
   QrCode,
-  Radio,
   Send,
+  SlidersHorizontal,
   Sparkles,
   ThumbsUp,
   Users,
+  Video,
   Vote,
 } from 'lucide-react';
 import {
@@ -51,8 +55,9 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { NativeSelect } from '@/components/ui/select';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Tabs, TabsContent } from '@/components/ui/tabs';
 import { Textarea } from '@/components/ui/textarea';
+import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { useAuth } from '@/components/auth/auth-provider';
 import { api } from '@/lib/api';
 import { cn, formatDate, formatNumber, formatPercent } from '@/lib/utils';
@@ -103,6 +108,7 @@ interface CommunicationPost {
   coverImageUrl?: string | null;
   bannerUrl?: string | null;
   videoUrl?: string | null;
+  thumbnailUrl?: string | null;
   actionUrl?: string | null;
   actionLabel?: string | null;
   requiresReadConfirmation: boolean;
@@ -221,6 +227,24 @@ interface MediaItem {
   createdAt: string;
 }
 
+interface MediaUploadPayload {
+  fileName: string;
+  mimeType: string;
+  sizeBytes: number;
+  dataBase64: string;
+  name?: string;
+  type?: 'IMAGE' | 'BANNER' | 'VIDEO';
+  category?: string;
+  tags?: string[];
+  adjustments?: Record<string, unknown>;
+}
+
+type UploadMediaFn = (payload: MediaUploadPayload) => Promise<MediaItem>;
+type AdjustedImageUpload = Omit<MediaUploadPayload, 'category' | 'tags'> & {
+  type: 'IMAGE' | 'BANNER';
+  adjustments: Record<string, unknown>;
+};
+
 interface TemplateItem {
   id: string;
   name: string;
@@ -300,6 +324,14 @@ const CHANNELS: Array<{ key: keyof ChannelConfig; label: string }> = [
   { key: 'qrCode', label: 'QR Code' },
   { key: 'email', label: 'E-mail' },
   { key: 'push', label: 'Push' },
+];
+
+const MAX_COMMUNICATION_MEDIA_BYTES = 6 * 1024 * 1024;
+const IMAGE_PRESETS = [
+  { id: 'banner', label: 'Banner 16:9', width: 1600, height: 900, type: 'BANNER' as const },
+  { id: 'card', label: 'Card 4:3', width: 1200, height: 900, type: 'IMAGE' as const },
+  { id: 'square', label: 'Quadrado 1:1', width: 1080, height: 1080, type: 'IMAGE' as const },
+  { id: 'story', label: 'Vertical 9:16', width: 1080, height: 1920, type: 'IMAGE' as const },
 ];
 
 const defaultForm = {
@@ -531,7 +563,17 @@ export default function ComunicacaoPage() {
 
   const createMedia = useMutation({
     mutationFn: (payload: any) => api('/communication/organizational/media', { method: 'POST', json: payload }),
+    onSuccess: async () => {
+      toast.success('Mídia adicionada');
+      await overview.refetch();
+    },
+    onError: (e: Error) => toast.error(e.message),
+  });
+
+  const uploadMedia = useMutation<MediaItem, Error, MediaUploadPayload>({
+    mutationFn: (payload) => api<MediaItem>('/communication/organizational/media/upload', { method: 'POST', json: payload }),
     onSuccess: () => overview.refetch(),
+    onError: (e: Error) => toast.error(e.message),
   });
 
   const selectedId = useMemo(() => {
@@ -620,6 +662,8 @@ export default function ComunicacaoPage() {
             setAiPrompt={setAiPrompt}
             generateAi={() => generateAi.mutate()}
             saving={createPost.isPending}
+            uploadMedia={uploadMedia.mutateAsync}
+            uploadingMedia={uploadMedia.isPending}
             onSubmit={() => createPost.mutate()}
           />
         </TabsContent>
@@ -629,7 +673,12 @@ export default function ComunicacaoPage() {
         </TabsContent>
 
         <TabsContent value="midias" className="space-y-4">
-          <MediaPanel media={data?.media ?? []} createMedia={(payload) => createMedia.mutate(payload)} />
+          <MediaPanel
+            media={data?.media ?? []}
+            createMedia={(payload) => createMedia.mutateAsync(payload)}
+            uploadMedia={uploadMedia.mutateAsync}
+            uploadingMedia={uploadMedia.isPending}
+          />
         </TabsContent>
 
         <TabsContent value="metricas" className="space-y-4">
@@ -874,15 +923,20 @@ function PostDetail({
             )}
           </div>
         </div>
+        {post.videoUrl && isPlayableVideoUrl(post.videoUrl) && (
+          <video className="max-h-[420px] w-full rounded-md bg-black" controls preload="metadata" poster={post.thumbnailUrl ?? post.coverImageUrl ?? undefined}>
+            <source src={post.videoUrl} />
+          </video>
+        )}
         {post.videoUrl && (
           <div className="rounded-md border p-4">
             <div className="flex items-center gap-2 text-sm font-medium">
               <PlaySquare className="h-4 w-4" />
               Vídeo vinculado
             </div>
-            <Link href={post.videoUrl} target="_blank" className="mt-2 block break-all text-sm text-primary hover:underline">
+            <a href={post.videoUrl} target="_blank" rel="noreferrer" className="mt-2 block break-all text-sm text-primary hover:underline">
               {post.videoUrl}
-            </Link>
+            </a>
           </div>
         )}
         <div className="prose prose-sm max-w-none whitespace-pre-line break-words text-sm leading-6">{post.content}</div>
@@ -1016,10 +1070,12 @@ interface CreatePostFormProps {
   setAiPrompt: React.Dispatch<React.SetStateAction<string>>;
   generateAi: () => void;
   saving: boolean;
+  uploadMedia: UploadMediaFn;
+  uploadingMedia: boolean;
   onSubmit: () => void;
 }
 
-function CreatePostForm({ form, setForm, overview, aiPrompt, setAiPrompt, generateAi, saving, onSubmit }: CreatePostFormProps) {
+function CreatePostForm({ form, setForm, overview, aiPrompt, setAiPrompt, generateAi, saving, uploadMedia, uploadingMedia, onSubmit }: CreatePostFormProps) {
   const users = overview?.audienceOptions.users ?? [];
   const areas = overview?.audienceOptions.areas ?? [];
   return (
@@ -1055,6 +1111,13 @@ function CreatePostForm({ form, setForm, overview, aiPrompt, setAiPrompt, genera
             <Field label="Conteúdo" className="md:col-span-2">
               <Textarea rows={8} value={form.content} onChange={(event) => setForm({ ...form, content: event.target.value })} />
             </Field>
+            <PostMediaFields
+              form={form}
+              setForm={setForm}
+              media={overview?.media ?? []}
+              uploadMedia={uploadMedia}
+              uploadingMedia={uploadingMedia}
+            />
             <Field label="Imagem / banner">
               <Input value={form.coverImageUrl} onChange={(event) => setForm({ ...form, coverImageUrl: event.target.value })} />
             </Field>
@@ -1159,6 +1222,354 @@ function CreatePostForm({ form, setForm, overview, aiPrompt, setAiPrompt, genera
   );
 }
 
+function PostMediaFields({
+  form,
+  setForm,
+  media,
+  uploadMedia,
+  uploadingMedia,
+}: {
+  form: CommunicationForm;
+  setForm: React.Dispatch<React.SetStateAction<CommunicationForm>>;
+  media: MediaItem[];
+  uploadMedia: UploadMediaFn;
+  uploadingMedia: boolean;
+}) {
+  const images = media.filter(isImageMedia).slice(0, 6);
+  const videos = media.filter(isVideoMedia).slice(0, 4);
+  const applyMedia = (item: MediaItem) => {
+    if (!item.url) return;
+    if (isVideoMedia(item)) {
+      setForm((current) => ({ ...current, videoUrl: item.url ?? current.videoUrl, type: current.type === 'SIMPLE' ? 'VIDEO' : current.type }));
+      return;
+    }
+    setForm((current) => ({ ...current, coverImageUrl: item.url ?? current.coverImageUrl, type: current.type === 'SIMPLE' ? 'BANNER' : current.type }));
+  };
+  return (
+    <div className="md:col-span-2 space-y-3 rounded-md border p-3">
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <div className="min-w-0">
+          <p className="text-sm font-medium">Mídia do comunicado</p>
+          <p className="text-xs text-muted-foreground">Upload de imagem com ajuste e vídeo curto.</p>
+        </div>
+        <MediaAssetUploader
+          uploadMedia={uploadMedia}
+          uploadingMedia={uploadingMedia}
+          imageType="BANNER"
+          category="Comunicados"
+          onUploaded={applyMedia}
+        />
+      </div>
+
+      {(form.coverImageUrl || form.videoUrl) && (
+        <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
+          {form.coverImageUrl && (
+            <div className="overflow-hidden rounded-md border">
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img src={form.coverImageUrl} alt="Imagem do comunicado" className="h-40 w-full object-cover" />
+            </div>
+          )}
+          {form.videoUrl && (
+            <div className="overflow-hidden rounded-md border">
+              {isPlayableVideoUrl(form.videoUrl) ? (
+                <video className="h-40 w-full bg-black object-contain" controls preload="metadata">
+                  <source src={form.videoUrl} />
+                </video>
+              ) : (
+                <div className="flex h-40 items-center gap-2 p-3 text-sm text-muted-foreground">
+                  <Link2 className="h-4 w-4 shrink-0" />
+                  <span className="min-w-0 break-all">{form.videoUrl}</span>
+                </div>
+              )}
+            </div>
+          )}
+        </div>
+      )}
+
+      {(images.length > 0 || videos.length > 0) && (
+        <div className="space-y-2">
+          <p className="text-xs font-medium uppercase text-muted-foreground">Acervo</p>
+          <div className="grid grid-cols-2 gap-2 md:grid-cols-5">
+            {[...images, ...videos].map((item) => (
+              <button
+                key={item.id}
+                type="button"
+                onClick={() => applyMedia(item)}
+                className="min-w-0 overflow-hidden rounded-md border text-left transition hover:border-primary hover:bg-muted"
+              >
+                <MediaPreview item={item} className="h-20 rounded-none border-0" />
+                <span className="block truncate px-2 py-1 text-xs">{item.name}</span>
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function MediaAssetUploader({
+  uploadMedia,
+  uploadingMedia,
+  onUploaded,
+  imageType = 'IMAGE',
+  category = 'Geral',
+}: {
+  uploadMedia: UploadMediaFn;
+  uploadingMedia: boolean;
+  onUploaded?: (item: MediaItem) => void;
+  imageType?: 'IMAGE' | 'BANNER';
+  category?: string;
+}) {
+  const imageInputRef = useRef<HTMLInputElement>(null);
+  const videoInputRef = useRef<HTMLInputElement>(null);
+  const [imageFile, setImageFile] = useState<File | null>(null);
+  const [imageDialogOpen, setImageDialogOpen] = useState(false);
+  const [busy, setBusy] = useState(false);
+  const disabled = uploadingMedia || busy;
+
+  const uploadAdjustedImage = async (payload: AdjustedImageUpload) => {
+    setBusy(true);
+    try {
+      const item = await uploadMedia({ ...payload, category, tags: ['upload', 'imagem'] });
+      onUploaded?.(item);
+      toast.success('Imagem enviada');
+      setImageDialogOpen(false);
+      setImageFile(null);
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const uploadVideoFile = async (file: File) => {
+    if (file.size > MAX_COMMUNICATION_MEDIA_BYTES) {
+      toast.error('O vídeo deve ter até 6 MB.');
+      return;
+    }
+    setBusy(true);
+    try {
+      const dataUrl = await readFileAsDataUrl(file);
+      const item = await uploadMedia({
+        fileName: file.name,
+        name: file.name.replace(/\.[^.]+$/, ''),
+        mimeType: file.type || inferVideoMime(file.name),
+        sizeBytes: file.size,
+        dataBase64: stripDataUrl(dataUrl),
+        type: 'VIDEO',
+        category,
+        tags: ['upload', 'video'],
+      });
+      onUploaded?.(item);
+      toast.success('Vídeo enviado');
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return (
+    <div className="flex flex-wrap gap-2">
+      <Button type="button" variant="outline" size="sm" onClick={() => imageInputRef.current?.click()} disabled={disabled}>
+        <ImagePlus className="mr-2 h-4 w-4" />
+        Imagem
+      </Button>
+      <Button type="button" variant="outline" size="sm" onClick={() => videoInputRef.current?.click()} disabled={disabled}>
+        <Video className="mr-2 h-4 w-4" />
+        Vídeo
+      </Button>
+      <input
+        ref={imageInputRef}
+        type="file"
+        accept="image/*"
+        className="hidden"
+        onChange={(event) => {
+          const file = event.target.files?.[0] ?? null;
+          event.currentTarget.value = '';
+          if (!file) return;
+          setImageFile(file);
+          setImageDialogOpen(true);
+        }}
+      />
+      <input
+        ref={videoInputRef}
+        type="file"
+        accept="video/mp4,video/webm,video/ogg,video/quicktime"
+        className="hidden"
+        onChange={(event) => {
+          const file = event.target.files?.[0] ?? null;
+          event.currentTarget.value = '';
+          if (file) void uploadVideoFile(file);
+        }}
+      />
+      <ImageAdjustDialog
+        file={imageFile}
+        open={imageDialogOpen}
+        imageType={imageType}
+        disabled={disabled}
+        onOpenChange={setImageDialogOpen}
+        onApply={uploadAdjustedImage}
+      />
+    </div>
+  );
+}
+
+function ImageAdjustDialog({
+  file,
+  open,
+  imageType,
+  disabled,
+  onOpenChange,
+  onApply,
+}: {
+  file: File | null;
+  open: boolean;
+  imageType: 'IMAGE' | 'BANNER';
+  disabled: boolean;
+  onOpenChange: (open: boolean) => void;
+  onApply: (payload: AdjustedImageUpload) => Promise<void>;
+}) {
+  const canvasRef = useRef<HTMLCanvasElement>(null);
+  const imageRef = useRef<HTMLImageElement | null>(null);
+  const initialPreset = IMAGE_PRESETS.find((preset) => preset.type === imageType) ?? IMAGE_PRESETS[0]!;
+  const [presetId, setPresetId] = useState(initialPreset.id);
+  const [zoom, setZoom] = useState(1);
+  const [offsetX, setOffsetX] = useState(0);
+  const [offsetY, setOffsetY] = useState(0);
+  const [quality, setQuality] = useState(86);
+  const [ready, setReady] = useState(false);
+  const preset = IMAGE_PRESETS.find((item) => item.id === presetId) ?? initialPreset;
+
+  useEffect(() => {
+    if (!file || !open) return;
+    setReady(false);
+    const url = URL.createObjectURL(file);
+    const image = new window.Image();
+    image.onload = () => {
+      imageRef.current = image;
+      setZoom(1);
+      setOffsetX(0);
+      setOffsetY(0);
+      setReady(true);
+      URL.revokeObjectURL(url);
+    };
+    image.onerror = () => {
+      toast.error('Não foi possível abrir a imagem.');
+      URL.revokeObjectURL(url);
+    };
+    image.src = url;
+  }, [file, open]);
+
+  useEffect(() => {
+    drawAdjustedImage(canvasRef.current, imageRef.current, preset.width, preset.height, zoom, offsetX, offsetY);
+  }, [preset.width, preset.height, zoom, offsetX, offsetY, ready]);
+
+  const apply = async () => {
+    const canvas = canvasRef.current;
+    if (!canvas || !file || !ready) return;
+    drawAdjustedImage(canvas, imageRef.current, preset.width, preset.height, zoom, offsetX, offsetY);
+    const dataUrl = canvas.toDataURL('image/jpeg', quality / 100);
+    const dataBase64 = stripDataUrl(dataUrl);
+    const sizeBytes = base64ByteSize(dataBase64);
+    if (sizeBytes > MAX_COMMUNICATION_MEDIA_BYTES) {
+      toast.error('A imagem ajustada passou de 6 MB.');
+      return;
+    }
+    await onApply({
+      fileName: adjustedImageName(file.name),
+      name: file.name.replace(/\.[^.]+$/, ''),
+      mimeType: 'image/jpeg',
+      sizeBytes,
+      dataBase64,
+      type: preset.type,
+      adjustments: {
+        preset: preset.id,
+        width: preset.width,
+        height: preset.height,
+        zoom,
+        offsetX,
+        offsetY,
+        quality,
+      },
+    });
+  };
+
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="max-w-4xl">
+        <DialogHeader>
+          <DialogTitle className="inline-flex items-center gap-2">
+            <SlidersHorizontal className="h-4 w-4" />
+            Ajustar imagem
+          </DialogTitle>
+        </DialogHeader>
+        <div className="grid grid-cols-1 gap-4 lg:grid-cols-[1fr_280px]">
+          <div className="min-w-0 overflow-hidden rounded-md border bg-muted/30 p-2">
+            <canvas ref={canvasRef} className="max-h-[520px] w-full rounded-md bg-white object-contain" />
+          </div>
+          <div className="space-y-4">
+            <Field label="Formato">
+              <NativeSelect value={presetId} onChange={(event) => setPresetId(event.target.value)}>
+                {IMAGE_PRESETS.map((item) => (
+                  <option key={item.id} value={item.id}>{item.label}</option>
+                ))}
+              </NativeSelect>
+            </Field>
+            <RangeControl label="Zoom" value={zoom} min={1} max={2.5} step={0.05} onChange={setZoom} />
+            <RangeControl label="Horizontal" value={offsetX} min={-50} max={50} step={1} onChange={setOffsetX} />
+            <RangeControl label="Vertical" value={offsetY} min={-50} max={50} step={1} onChange={setOffsetY} />
+            <RangeControl label="Qualidade" value={quality} min={60} max={95} step={1} onChange={setQuality} suffix="%" />
+            <div className="rounded-md border p-3 text-xs text-muted-foreground">
+              {preset.width} x {preset.height}px
+            </div>
+          </div>
+        </div>
+        <DialogFooter>
+          <Button type="button" variant="outline" onClick={() => onOpenChange(false)} disabled={disabled}>Cancelar</Button>
+          <Button type="button" onClick={apply} disabled={disabled || !ready}>
+            <Crop className="mr-2 h-4 w-4" />
+            Aplicar e enviar
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+function RangeControl({
+  label,
+  value,
+  min,
+  max,
+  step,
+  suffix,
+  onChange,
+}: {
+  label: string;
+  value: number;
+  min: number;
+  max: number;
+  step: number;
+  suffix?: string;
+  onChange: (value: number) => void;
+}) {
+  return (
+    <div>
+      <div className="mb-1 flex items-center justify-between gap-3 text-xs">
+        <span className="font-medium">{label}</span>
+        <span className="text-muted-foreground">{Number(value).toFixed(step < 1 ? 2 : 0)}{suffix}</span>
+      </div>
+      <input
+        type="range"
+        min={min}
+        max={max}
+        step={step}
+        value={value}
+        onChange={(event) => onChange(Number(event.target.value))}
+        className="w-full accent-primary"
+      />
+    </div>
+  );
+}
+
 function CampaignsPanel({ campaigns, createCampaign }: { campaigns: Campaign[]; createCampaign: (payload: any) => void }) {
   const [name, setName] = useState('');
   const [category, setCategory] = useState('Campanha corporativa');
@@ -1224,31 +1635,101 @@ function MetricsPanel({ data }: { data?: CommunicationOverview }) {
   );
 }
 
-function MediaPanel({ media, createMedia }: { media: MediaItem[]; createMedia: (payload: any) => void }) {
+function MediaPanel({
+  media,
+  createMedia,
+  uploadMedia,
+  uploadingMedia,
+}: {
+  media: MediaItem[];
+  createMedia: (payload: any) => Promise<unknown>;
+  uploadMedia: UploadMediaFn;
+  uploadingMedia: boolean;
+}) {
   const [name, setName] = useState('');
   const [url, setUrl] = useState('');
+  const [type, setType] = useState<'IMAGE' | 'BANNER' | 'VIDEO' | 'DOCUMENT'>('IMAGE');
+  const [category, setCategory] = useState('Geral');
+  const addExternalMedia = async () => {
+    if (!name.trim()) return;
+    await createMedia({ name, url, type, category });
+    setName('');
+    setUrl('');
+  };
   return (
     <div className="grid grid-cols-1 gap-4 xl:grid-cols-[0.6fr_1fr]">
       <Card>
         <CardHeader><CardTitle>Biblioteca de mídias</CardTitle></CardHeader>
         <CardContent className="space-y-3">
+          <MediaAssetUploader
+            uploadMedia={uploadMedia}
+            uploadingMedia={uploadingMedia}
+            category={category}
+            onUploaded={() => undefined}
+          />
           <Field label="Nome"><Input value={name} onChange={(event) => setName(event.target.value)} /></Field>
           <Field label="URL"><Input value={url} onChange={(event) => setUrl(event.target.value)} /></Field>
-          <Button onClick={() => name && createMedia({ name, url, type: 'IMAGE', category: 'Geral' })}>Adicionar mídia</Button>
+          <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
+            <Field label="Tipo">
+              <NativeSelect value={type} onChange={(event) => setType(event.target.value as typeof type)}>
+                <option value="IMAGE">Imagem</option>
+                <option value="BANNER">Banner</option>
+                <option value="VIDEO">Vídeo</option>
+                <option value="DOCUMENT">Documento</option>
+              </NativeSelect>
+            </Field>
+            <Field label="Categoria"><Input value={category} onChange={(event) => setCategory(event.target.value)} /></Field>
+          </div>
+          <Button onClick={() => void addExternalMedia()} disabled={!name.trim()}>
+            <Link2 className="mr-2 h-4 w-4" />
+            Adicionar link
+          </Button>
         </CardContent>
       </Card>
       <Card>
         <CardHeader><CardTitle>Acervo e modelos</CardTitle></CardHeader>
         <CardContent className="grid grid-cols-1 gap-3 md:grid-cols-2">
           {media.map((item) => (
-            <div key={item.id} className="rounded-md border p-3">
-              <p className="break-words font-medium">{item.name}</p>
-              <p className="text-sm text-muted-foreground">{item.type} · {item.category}</p>
+            <div key={item.id} className="space-y-3 rounded-md border p-3">
+              <MediaPreview item={item} className="h-40" />
+              <div>
+                <p className="break-words font-medium">{item.name}</p>
+                <p className="text-sm text-muted-foreground">{item.type} · {item.category}</p>
+              </div>
+              {item.url && (
+                <Button asChild variant="outline" size="sm">
+                  <a href={item.url} target="_blank" rel="noreferrer">
+                    <Link2 className="mr-2 h-3.5 w-3.5" />
+                    Abrir
+                  </a>
+                </Button>
+              )}
             </div>
           ))}
           {media.length === 0 && <p className="text-sm text-muted-foreground">Nenhuma mídia cadastrada.</p>}
         </CardContent>
       </Card>
+    </div>
+  );
+}
+
+function MediaPreview({ item, className }: { item: MediaItem; className?: string }) {
+  const url = item.url ?? '';
+  if (url && isVideoMedia(item) && isPlayableVideoUrl(url)) {
+    return (
+      <video className={cn('w-full rounded-md border bg-black object-contain', className)} controls preload="metadata">
+        <source src={url} />
+      </video>
+    );
+  }
+  if (url && isImageMedia(item)) {
+    // eslint-disable-next-line @next/next/no-img-element
+    return <img src={url} alt={item.name} className={cn('w-full rounded-md border object-cover', className)} />;
+  }
+  const Icon = isVideoMedia(item) ? Film : isImageMedia(item) ? ImageIcon : FileText;
+  return (
+    <div className={cn('grid w-full place-items-center rounded-md border bg-muted text-muted-foreground', className)}>
+      <Icon className="h-6 w-6" />
     </div>
   );
 }
@@ -1324,6 +1805,75 @@ function toneClass(tone: string) {
     slate: 'bg-slate-100 text-slate-700',
   };
   return tones[tone] ?? tones.slate;
+}
+
+function isImageMedia(item: Pick<MediaItem, 'type' | 'url'>) {
+  return item.type === 'IMAGE' || item.type === 'BANNER' || Boolean(item.url?.startsWith('data:image/'));
+}
+
+function isVideoMedia(item: Pick<MediaItem, 'type' | 'url'>) {
+  return item.type === 'VIDEO' || Boolean(item.url?.startsWith('data:video/'));
+}
+
+function isPlayableVideoUrl(url: string) {
+  return url.startsWith('data:video/') || /\.(mp4|webm|ogg|mov)(\?.*)?$/i.test(url);
+}
+
+function readFileAsDataUrl(file: File) {
+  return new Promise<string>((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(String(reader.result ?? ''));
+    reader.onerror = () => reject(reader.error ?? new Error('Nao foi possivel ler o arquivo.'));
+    reader.readAsDataURL(file);
+  });
+}
+
+function stripDataUrl(dataUrl: string) {
+  return dataUrl.includes(',') ? dataUrl.split(',').pop() ?? '' : dataUrl;
+}
+
+function base64ByteSize(base64: string) {
+  const padding = base64.endsWith('==') ? 2 : base64.endsWith('=') ? 1 : 0;
+  return Math.floor((base64.length * 3) / 4) - padding;
+}
+
+function inferVideoMime(fileName: string) {
+  const extension = fileName.split('.').pop()?.toLowerCase();
+  if (extension === 'webm') return 'video/webm';
+  if (extension === 'ogg' || extension === 'ogv') return 'video/ogg';
+  if (extension === 'mov') return 'video/quicktime';
+  return 'video/mp4';
+}
+
+function adjustedImageName(fileName: string) {
+  return `${fileName.replace(/\.[^.]+$/, '') || 'imagem'}-ajustada.jpg`;
+}
+
+function drawAdjustedImage(
+  canvas: HTMLCanvasElement | null,
+  image: HTMLImageElement | null,
+  width: number,
+  height: number,
+  zoom: number,
+  offsetX: number,
+  offsetY: number,
+) {
+  if (!canvas || !image) return;
+  canvas.width = width;
+  canvas.height = height;
+  const context = canvas.getContext('2d');
+  if (!context) return;
+  context.clearRect(0, 0, width, height);
+  context.fillStyle = '#ffffff';
+  context.fillRect(0, 0, width, height);
+  context.imageSmoothingEnabled = true;
+  context.imageSmoothingQuality = 'high';
+  const scale = Math.max(width / image.naturalWidth, height / image.naturalHeight) * zoom;
+  const drawWidth = image.naturalWidth * scale;
+  const drawHeight = image.naturalHeight * scale;
+  const dx = (width - drawWidth) / 2 + (offsetX / 100) * width;
+  const dy = (height - drawHeight) / 2 + (offsetY / 100) * height;
+  context.drawImage(image, dx, dy, drawWidth, drawHeight);
 }
 
 function formPayload(form: typeof defaultForm) {

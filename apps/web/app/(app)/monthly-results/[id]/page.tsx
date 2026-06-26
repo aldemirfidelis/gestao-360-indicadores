@@ -595,7 +595,9 @@ function ConductTab({ meeting, options, can, run }: { meeting: MeetingDetail; op
             <Card>
               <CardHeader className="flex-row items-center justify-between gap-3 space-y-0">
                 <div className="flex min-w-0 items-center gap-2">
-                  {selectedIndicator && <span className="h-3 w-3 shrink-0 rounded-full" style={{ background: LIGHT_COLORS[selectedIndicator.light] }} />}
+                  {selectedIndicator && (
+                    <span className={cn('h-3 w-3 shrink-0 rounded-full', selectedIndicator.light === 'RED' && 'status-red-pulse')} style={{ background: LIGHT_COLORS[selectedIndicator.light] }} />
+                  )}
                   <CardTitle className="truncate text-base">{selectedIndicator?.name ?? 'Detalhe do indicador'}</CardTitle>
                 </div>
                 <Button variant="outline" size="sm" className="shrink-0" onClick={() => setDetailIndicatorId(null)}>
@@ -724,7 +726,7 @@ function PresentationCard({ ind, selected, onSelect }: { ind: SnapshotIndicator;
     >
       <div className="flex items-start justify-between gap-2">
         <p className="min-w-0 break-words text-base font-semibold">{ind.name}</p>
-        <span className={cn('h-3 w-3 shrink-0 rounded-full')} style={{ background: LIGHT_COLORS[ind.light] }} />
+        <span className={cn('h-3 w-3 shrink-0 rounded-full', ind.light === 'RED' && 'status-red-pulse')} style={{ background: LIGHT_COLORS[ind.light] }} />
       </div>
       <div className="mt-3 flex items-end gap-3">
         <span className="text-3xl font-bold tabular-nums">{formatValue(ind.current, ind.unitLabel)}</span>
@@ -1438,7 +1440,7 @@ function FarolFilter({ label, light, count, active, onClick }: { label: string; 
         active ? 'ring-2 ring-offset-1 ring-current' : 'opacity-80 hover:opacity-100',
       )}
     >
-      <span className="h-2 w-2 rounded-full" style={{ background: LIGHT_COLORS[light] }} />
+      <span className={cn('h-2 w-2 rounded-full', light === 'RED' && 'status-red-pulse')} style={{ background: LIGHT_COLORS[light] }} />
       {label} {count}
     </button>
   );

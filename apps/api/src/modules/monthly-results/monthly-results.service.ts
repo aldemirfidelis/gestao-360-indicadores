@@ -51,6 +51,7 @@ const VALIDATED_READINESS: MonthlyAreaReadiness[] = [MonthlyAreaReadiness.VALIDA
 // Planos ainda NÃO em execução (não satisfazem a prontidão da área).
 const ACTION_NOT_EXECUTING = new Set(['DRAFT', 'NOT_STARTED', 'UNDER_ANALYSIS', 'CANCELLED']);
 const OPEN_ITEM_STATUSES: MonthlyItemStatus[] = [MonthlyItemStatus.OPEN, MonthlyItemStatus.IN_PROGRESS];
+type SnapshotMode = 'period' | 'latest';
 
 const DEFAULT_AGENDA = [
   { topic: 'Abertura', plannedMinutes: 10 },
@@ -468,9 +469,14 @@ export class MonthlyResultsService {
     ]);
     const actionMap = new Map(linkedActions.map((a) => [a.id, a]));
     const deviationMap = new Map(linkedDeviations.map((d) => [d.id, d]));
+    const liveSnapshots = await this.loadLiveSnapshotsForIndicators(
+      me.companyId,
+      meeting.areas.flatMap((area) => area.indicators.map((ind) => ind.indicatorId)),
+      meeting.periodRef,
+    );
 
     const areas = meeting.areas.map((area) => {
-      const indicators = area.indicators.map((ind) => ({ ...this.shapeSnapshot(ind, actionMap, deviationMap), area: area.orgNode.name }));
+      const indicators = area.indicators.map((ind) => ({ ...this.shapeSnapshot(ind, actionMap, deviationMap, liveSnapshots.get(ind.indicatorId)), area: area.orgNode.name }));
       const counts = this.countLights(indicators.map((i) => ({ light: i.light })) as any);
       const validationIssues = indicators.flatMap((i) => i.validationIssues.map((issue) => ({ indicatorId: i.indicatorId, indicator: i.name, issue })));
       const blocking = indicators.flatMap((i) => i.blockingIssues.map((issue) => ({ indicatorId: i.indicatorId, indicator: i.name, issue })));
@@ -681,7 +687,7 @@ export class MonthlyResultsService {
       if (!selectedAreaNode) continue;
       const meetingAreaId = areaIdByNode.get(selectedAreaNode);
       if (!meetingAreaId) continue;
-      const snap = this.computeSnapshot(indicator, periodRef);
+      const snap = this.computeSnapshot(indicator, periodRef, 'latest');
       const isCritical = snap.light === TrafficLight.RED || snap.light === TrafficLight.YELLOW;
       const key = `${meetingAreaId}:${indicator.id}`;
       const prev = existingByKey.get(key);
@@ -728,7 +734,7 @@ export class MonthlyResultsService {
     const area = await this.prisma.monthlyMeetingArea.findFirst({
       where: { id: areaId, meeting: { companyId: me.companyId, deletedAt: null } },
       include: {
-        meeting: { select: { id: true } },
+        meeting: { select: { id: true, periodRef: true } },
         // Prontidão por área só considera indicadores estratégicos (regra da Reunião Mensal).
         indicators: {
           where: { indicator: { type: 'STRATEGIC' } },
@@ -745,7 +751,8 @@ export class MonthlyResultsService {
     if (body.readiness !== undefined) {
       const target = body.readiness;
       if (VALIDATED_READINESS.includes(target)) {
-        const blocking = this.collectBlockingIssues(area.indicators);
+        const liveSnapshots = await this.loadLiveSnapshotsForIndicators(me.companyId, area.indicators.map((ind) => ind.indicatorId), area.meeting.periodRef);
+        const blocking = this.collectBlockingIssues(area.indicators.map((ind) => ({ ...ind, ...liveSnapshots.get(ind.indicatorId) })));
         if (blocking.length) throw new BadRequestException(`Não é possível validar: ${blocking[0]} (e mais ${blocking.length - 1}).`.replace(' (e mais -1).', '.'));
         data.validatedById = me.sub;
         data.validatedAt = new Date();
@@ -1273,8 +1280,9 @@ export class MonthlyResultsService {
     });
   }
 
-  private shapeSnapshot(ind: any, actionMap: Map<string, any>, deviationMap: Map<string, any>) {
-    const light = ind.light as TrafficLight;
+  private shapeSnapshot(ind: any, actionMap: Map<string, any>, deviationMap: Map<string, any>, liveSnapshot?: ReturnType<MonthlyResultsService['computeSnapshot']>) {
+    const snapshot = liveSnapshot ? { ...ind, ...liveSnapshot } : ind;
+    const light = snapshot.light as TrafficLight;
     const blockingIssues: string[] = [];
     const validationIssues: string[] = [];
     const hasCause = Boolean(ind.deviationId);
@@ -1285,7 +1293,7 @@ export class MonthlyResultsService {
     // ações em andamento) — não é necessário que as ações estejam concluídas. Causa raiz/responsável
     // ausentes viram apenas avisos (não bloqueiam a validação).
     const actionInExecution = Boolean(linkedAction) && !ACTION_NOT_EXECUTING.has(String(linkedAction.status ?? ''));
-    if (ind.current === null) validationIssues.push('Sem resultado oficial no mês.');
+    if (snapshot.current === null) validationIssues.push('Sem resultado oficial no mês.');
     if (light === TrafficLight.RED) {
       if (!actionInExecution) blockingIssues.push('Vermelho sem plano de ação em execução.');
       if (!hasCause) validationIssues.push('Vermelho sem causa raiz vinculada.');
@@ -1302,20 +1310,20 @@ export class MonthlyResultsService {
       unitLabel: this.unitLabel(ind.indicator?.unit ?? 'CUSTOM', ind.indicator?.unitLabel),
       source: ind.indicator?.source ?? null,
       area: undefined as string | undefined,
-      target: ind.target,
-      lowerBound: ind.lowerBound,
-      upperBound: ind.upperBound,
-      current: ind.current,
-      accumulated: ind.accumulated,
-      attainment: ind.attainment,
-      deviationPct: ind.deviationPct,
-      light: this.displayLight(light, ind.attainment),
-      trend: ind.trend,
+      target: snapshot.target,
+      lowerBound: snapshot.lowerBound,
+      upperBound: snapshot.upperBound,
+      current: snapshot.current,
+      accumulated: snapshot.accumulated,
+      attainment: snapshot.attainment,
+      deviationPct: snapshot.deviationPct,
+      light: this.displayLight(light, snapshot.attainment),
+      trend: snapshot.trend,
       managerComment: ind.managerComment,
       trendNote: ind.trendNote,
-      executiveStatus: ind.executiveStatus ?? this.executiveStatus(this.displayLight(light, ind.attainment), validationIssues),
+      executiveStatus: ind.executiveStatus ?? this.executiveStatus(this.displayLight(light, snapshot.attainment), validationIssues),
       showInPresentation: ind.showInPresentation,
-      isCritical: ind.isCritical,
+      isCritical: ind.isCritical || light === TrafficLight.RED || light === TrafficLight.YELLOW,
       financialImpact: ind.financialImpact,
       responsibleUserId: ind.indicator?.responsibleUserId ?? null,
       deviationId: ind.deviationId,
@@ -1348,18 +1356,24 @@ export class MonthlyResultsService {
     return issues;
   }
 
-  private computeSnapshot(indicator: any, periodRef: string) {
-    const target = indicator.targets?.[0] ?? null;
+  private computeSnapshot(indicator: any, periodRef: string, mode: SnapshotMode = 'period') {
+    const targets = indicator.targets ?? [];
     const results = [...(indicator.results ?? [])].sort((a: any, b: any) => new Date(b.periodDate).getTime() - new Date(a.periodDate).getTime());
+    const latest = results[0] ?? null;
     const currentResult = results.find((r: any) => r.periodRef === periodRef) ?? null;
-    const current = currentResult ?? results[0] ?? null;
+    const current = mode === 'latest' ? latest : (currentResult ?? latest);
+    const targetForCurrent = current ? targets.find((t: any) => t.periodRef === current.periodRef) ?? null : null;
+    const targetForPeriod = targets.find((t: any) => t.periodRef === periodRef) ?? null;
+    const target = mode === 'latest'
+      ? (targetForCurrent ?? targetForPeriod ?? targets[0] ?? null)
+      : (targetForPeriod ?? targetForCurrent ?? targets[0] ?? null);
     const previous = results.find((r: any) => r.periodRef !== current?.periodRef) ?? null;
     const light = this.displayLight((current?.light as TrafficLight) ?? TrafficLight.GRAY, current?.attainment);
     return {
       target: target?.target ?? null,
       lowerBound: target?.lowerBound ?? null,
       upperBound: target?.upperBound ?? null,
-      current: currentResult?.value ?? null,
+      current: mode === 'latest' ? (current?.value ?? null) : (currentResult?.value ?? null),
       accumulated: current?.value ?? null,
       attainment: current?.attainment ?? null,
       deviationPct: current?.deviationPct ?? null,
@@ -1382,14 +1396,29 @@ export class MonthlyResultsService {
         ownerNode: { select: { id: true, name: true, type: true, parentId: true } },
         responsibleUserId: true,
         responsibleUser: { select: { id: true, name: true } },
-        targets: { where: { periodRef }, select: { target: true, lowerBound: true, upperBound: true }, take: 1 },
+        targets: { orderBy: { periodRef: 'desc' }, select: { periodRef: true, target: true, lowerBound: true, upperBound: true }, take: 24 },
         results: { orderBy: { periodDate: 'desc' }, take: 6, select: { periodRef: true, periodDate: true, value: true, light: true, attainment: true, deviationPct: true, note: true, updatedAt: true } },
       },
       orderBy: { name: 'asc' },
     });
   }
 
-  // Mapeia cada nodeId (área + descendentes) para a área SELECIONADA mais profunda que o contém.
+  // Usa o mesmo farol da ficha do indicador: ultimo resultado disponivel.
+  private async loadLiveSnapshotsForIndicators(companyId: string, indicatorIds: string[], periodRef: string) {
+    const ids = Array.from(new Set(indicatorIds.filter(Boolean)));
+    if (!ids.length) return new Map<string, ReturnType<MonthlyResultsService['computeSnapshot']>>();
+    const indicators = await this.prisma.indicator.findMany({
+      where: { id: { in: ids }, companyId, deletedAt: null, status: 'ACTIVE' },
+      select: {
+        id: true,
+        targets: { orderBy: { periodRef: 'desc' }, select: { periodRef: true, target: true, lowerBound: true, upperBound: true }, take: 24 },
+        results: { orderBy: { periodDate: 'desc' }, take: 6, select: { periodRef: true, periodDate: true, value: true, light: true, attainment: true, deviationPct: true, note: true, updatedAt: true } },
+      },
+    });
+    return new Map(indicators.map((indicator) => [indicator.id, this.computeSnapshot(indicator, periodRef, 'latest')]));
+  }
+
+  // Mapeia cada nodeId (area + descendentes) para a area selecionada mais profunda que o contem.
   private async mapNodesToAreas(companyId: string, selectedAreaIds: string[]) {
     const map = new Map<string, string>();
     for (const areaId of selectedAreaIds) {

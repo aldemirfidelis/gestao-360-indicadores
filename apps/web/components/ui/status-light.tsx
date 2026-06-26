@@ -20,7 +20,7 @@ export function StatusLight({ light, label, size = 'sm', className }: Props) {
   const cfg = map[light] ?? map.GRAY;
   return (
     <span className={cn('pill', cfg.pill, size === 'md' && 'text-sm px-3 py-1', className)}>
-      <span className={cn('inline-block rounded-full', cfg.dot, size === 'md' ? 'h-2.5 w-2.5' : 'h-2 w-2')} />
+      <span className={cn('inline-block rounded-full', cfg.dot, size === 'md' ? 'h-2.5 w-2.5' : 'h-2 w-2', light === 'RED' && 'status-red-pulse')} />
       {label ?? cfg.label}
     </span>
   );

@@ -46,7 +46,7 @@ const CONCLUSION_PLACEHOLDER = 'Nenhuma mensagem-chave registrada para esta áre
 const LIGHT_DOT: Record<string, string> = {
   GREEN: 'bg-emerald-700',
   YELLOW: 'bg-amber-500',
-  RED: 'bg-red-700',
+  RED: 'bg-red-700 status-red-pulse',
   GRAY: 'bg-slate-400',
 };
 
@@ -175,7 +175,7 @@ export default function VisualizationPage() {
               <div className="mt-4 grid gap-3 text-sm leading-relaxed text-muted-foreground sm:grid-cols-3 lg:grid-cols-1 xl:grid-cols-3">
                 <ExecutiveReadItem color="bg-status-green" title="Dentro da meta" text="Manter rotina, registrar aprendizado e padronizar boas práticas." />
                 <ExecutiveReadItem color="bg-status-yellow" title="Atenção" text="Checar tendência, risco de virada e contramedidas preventivas." />
-                <ExecutiveReadItem color="bg-status-red" title="Crítico" text="Exigir causa, responsável, prazo e decisão do fórum executivo." />
+                <ExecutiveReadItem color="bg-status-red status-red-pulse" title="Crítico" text="Exigir causa, responsável, prazo e decisão do fórum executivo." />
               </div>
             </CardContent>
           </Card>
