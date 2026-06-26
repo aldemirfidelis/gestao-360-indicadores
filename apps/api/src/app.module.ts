@@ -50,6 +50,7 @@ import { CommunicationModule } from './modules/communication/communication.modul
 import { PlatformModule } from './modules/platform/platform.module';
 import { AccessModule } from './modules/access/access.module';
 import { HelpModule } from './modules/help/help.module';
+import { SupportTicketsModule } from './modules/support-tickets/support-tickets.module';
 import { IntegrationsModule } from './modules/integrations/integrations.module';
 import { ExternalApiModule } from './modules/external-api/external-api.module';
 import { PlatformAdminGlobalModule } from './modules/platform-admin/platform-admin.module';
@@ -109,6 +110,7 @@ import { workersEnabled } from './jobs/jobs.constants';
     AiModule,
     CommunicationModule,
     HelpModule,
+    SupportTicketsModule,
     IntegrationsModule,
     ExternalApiModule,
     PlatformModule,

@@ -16,11 +16,11 @@ export async function POST(req: NextRequest) {
   const name = String(data.name ?? '').trim();
   const company = String(data.company ?? '').trim();
   const email = String(data.email ?? '').trim().toLowerCase();
-  const segment = String(data.segment ?? '').trim();
+  const requestType = String(data.requestType ?? '').trim();
   const message = String(data.message ?? '').trim();
   const privacy = String(data.privacy ?? '').trim();
 
-  if (!name || !company || !emailRegex.test(email) || !segment || message.length < 10 || privacy !== 'accepted') {
+  if (!name || !company || !emailRegex.test(email) || !requestType || message.length < 10 || privacy !== 'accepted') {
     return NextResponse.json({ ok: false, message: 'Preencha os campos obrigatórios e aceite a política de privacidade.' }, { status: 400 });
   }
 
@@ -29,7 +29,7 @@ export async function POST(req: NextRequest) {
   console.info('public_contact_form_submit', {
     company,
     emailDomain: email.split('@')[1] ?? null,
-    segment,
+    requestType,
     hasPhone: Boolean(String(data.phone ?? '').trim()),
     submittedAt: new Date().toISOString(),
   });

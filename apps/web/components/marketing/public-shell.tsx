@@ -31,7 +31,8 @@ const footerGroups = [
       ['Segurança', '/seguranca'],
       ['Implantação', '/implantacao'],
       ['Suporte', '/suporte'],
-      ['Demonstração', DEMO_PATH],
+      ['SAC', 'mailto:sac@gestao360.org'],
+      ['Contato Comercial', 'mailto:contato@gestao360.org'],
     ],
   },
   {
@@ -103,7 +104,7 @@ export function PublicShell({ children }: { children: ReactNode }) {
           </div>
         </div>
         <div className="border-t border-white/10 px-4 py-4 text-center text-xs text-slate-400">
-          Gestão 360 © 2026 Todos os direitos reservados.
+          © 2026 Gestão 360. Todos os direitos reservados.
         </div>
       </footer>
     </div>

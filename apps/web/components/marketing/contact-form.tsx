@@ -3,7 +3,7 @@
 import { useState } from 'react';
 import { CheckCircle2, Loader2 } from 'lucide-react';
 
-const segments = ['Indústria', 'Agronegócio', 'Alimentos e bebidas', 'Serviços', 'Gestão corporativa', 'Outro'];
+const requestTypes = ['Comercial', 'Suporte', 'SAC', 'Demonstração', 'Parceria', 'Outros'];
 
 export function ContactForm({ compact = false }: { compact?: boolean }) {
   const [status, setStatus] = useState<'idle' | 'loading' | 'success' | 'error'>('idle');
@@ -27,7 +27,7 @@ export function ContactForm({ compact = false }: { compact?: boolean }) {
       (window as any).dataLayer.push({
         event: 'contact_form_submit',
         page: window.location.pathname,
-        segment: payload.segment,
+        requestType: payload.requestType,
         submittedAt: new Date().toISOString(),
       });
     } catch (err) {
@@ -46,10 +46,10 @@ export function ContactForm({ compact = false }: { compact?: boolean }) {
         <Field label="E-mail corporativo" name="email" type="email" required />
         <Field label="Telefone" name="phone" type="tel" />
         <label className="grid gap-1.5 text-sm font-medium text-slate-800">
-          Segmento
-          <select name="segment" required className="h-11 border border-slate-300 bg-white px-3 text-sm outline-none focus:border-slate-950">
+          Tipo de solicitação
+          <select name="requestType" required className="h-11 border border-slate-300 bg-white px-3 text-sm outline-none focus:border-slate-950">
             <option value="">Selecione</option>
-            {segments.map((segment) => <option key={segment} value={segment}>{segment}</option>)}
+            {requestTypes.map((type) => <option key={type} value={type}>{type}</option>)}
           </select>
         </label>
       </div>

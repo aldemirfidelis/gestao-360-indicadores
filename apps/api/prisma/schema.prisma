@@ -558,6 +558,7 @@ model Company {
   fsRequirementAssessments    FoodSafetyRequirementAssessment[] @relation("FsReqAssessmentCompany")
   fsSuppliers                 FoodSafetySupplier[]              @relation("FsSupplierCompany")
   fsMaterials                 FoodSafetyMaterial[]              @relation("FsMaterialCompany")
+  supportTickets              SupportTicket[]
   fsLots                      FoodSafetyLot[]                   @relation("FsLotCompany")
   fsTraceLinks                FoodSafetyTraceLink[]             @relation("FsTraceLinkCompany")
   fsRecalls                   FoodSafetyRecall[]                @relation("FsRecallCompany")
@@ -903,6 +904,10 @@ model User {
   workflowTasksSubstitute     WorkflowTask[]       @relation("WorkflowTaskSubstitute")
   workflowTemplatesCreated    WorkflowTemplate[]   @relation("WorkflowTempCreatedBy")
   workflowDeadLettersResolved WorkflowDeadLetter[] @relation("WorkflowDLResolvedBy")
+  supportTickets              SupportTicket[]      @relation("UserSupportTickets")
+  assignedSupportTickets      SupportTicket[]      @relation("AssignedSupportTickets")
+  ticketMessages              SupportTicketMessage[]
+  ticketAttachments           SupportTicketAttachment[]
 
   @@index([companyId])
   @@index([branchId])
@@ -11357,4 +11362,65 @@ model SecurityAuditLog {
   @@index([entity, entityId])
   @@index([gateId])
   @@index([postId])
+}
+
+model SupportTicket {
+  id               String                    @id @default(uuid())
+  companyId        String
+  company          Company                   @relation(fields: [companyId], references: [id])
+  userId           String
+  user             User                      @relation("UserSupportTickets", fields: [userId], references: [id])
+  requesterName    String
+  requesterEmail   String
+  title            String
+  description      String
+  type             String
+  priority         String
+  status           String                    @default("Aberto")
+  module           String?
+  assignedToUserId String?
+  assignedToUser   User?                     @relation("AssignedSupportTickets", fields: [assignedToUserId], references: [id])
+  createdAt        DateTime                  @default(now())
+  updatedAt        DateTime                  @updatedAt
+  closedAt         DateTime?
+  messages         SupportTicketMessage[]
+  attachments      SupportTicketAttachment[]
+
+  @@index([companyId])
+  @@index([userId])
+  @@index([status])
+}
+
+model SupportTicketMessage {
+  id          String                    @id @default(uuid())
+  ticketId    String
+  ticket      SupportTicket             @relation(fields: [ticketId], references: [id], onDelete: Cascade)
+  userId      String
+  user        User                      @relation(fields: [userId], references: [id])
+  message     String
+  isInternal  Boolean                   @default(false)
+  createdAt   DateTime                  @default(now())
+  attachments SupportTicketAttachment[]
+
+  @@index([ticketId])
+  @@index([userId])
+}
+
+model SupportTicketAttachment {
+  id               String                @id @default(uuid())
+  ticketId         String
+  ticket           SupportTicket         @relation(fields: [ticketId], references: [id], onDelete: Cascade)
+  messageId        String?
+  message          SupportTicketMessage? @relation(fields: [messageId], references: [id])
+  fileName         String
+  fileUrl          String
+  fileType         String
+  fileSize         Int
+  uploadedByUserId String
+  uploadedByUser   User                  @relation(fields: [uploadedByUserId], references: [id])
+  createdAt        DateTime              @default(now())
+
+  @@index([ticketId])
+  @@index([messageId])
+  @@index([uploadedByUserId])
 }

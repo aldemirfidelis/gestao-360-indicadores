@@ -101,6 +101,16 @@ export const navSections: NavSection[] = [
     ],
   },
   {
+    heading: 'Atendimento',
+    description: 'Central de atendimento e chamados de suporte',
+    intent: 'view',
+    icon: MessageSquare,
+    flat: true,
+    items: [
+      { href: '/central-atendimento', label: 'Central de Atendimento', description: 'Abra chamados, tire dúvidas e solicite suporte', icon: MessageSquare, permissions: [], exact: true },
+    ],
+  },
+  {
     heading: 'Gestão à Vista',
     description: 'Painel executivo, estratégia, indicadores e ritos de gestão',
     intent: 'view',
@@ -294,6 +304,7 @@ export const ROUTE_PERMISSIONS: Array<{ prefix: string; permissions: string[]; e
   { prefix: '/perfil', permissions: [] },
   { prefix: '/integracoes', permissions: [] },
   { prefix: '/ajuda', permissions: [] },
+  { prefix: '/central-atendimento', permissions: [] },
   { prefix: '/users', permissions: ['users:view', 'users:manage'] },
   // Rotas antigas de Configuracoes no app da empresa. O layout de /settings
   // redireciona para /users; o restante foi centralizado no Portal Admin Global.

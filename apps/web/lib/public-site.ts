@@ -445,11 +445,11 @@ export const solutionPages: PublicPage[] = [
       'Operações com várias unidades precisam padronizar gestão sem misturar dados, permissões ou responsabilidades.',
     benefits: [
       'Isola dados por empresa.',
-      'Configura módulos e planos por cliente ou unidade.',
+      'Configura módulos e recursos por cliente ou unidade.',
       'Apoia permissões por perfil e área.',
-      'Mantém administração global separada do portal operacional.',
+      'Mantém a gestão corporativa e parametrizações organizacionais de forma segura.',
     ],
-    features: ['Ambientes', 'Filiais', 'Módulos por empresa', 'Permissões', 'Portal Administrativo Global'],
+    features: ['Ambientes', 'Filiais', 'Gestão de acessos', 'Permissões', 'Painel de controle corporativo'],
     useCases: ['Grupo empresarial.', 'Consultoria com clientes distintos.', 'Unidades operacionais com governança central.'],
     faq: [
       {
@@ -458,9 +458,9 @@ export const solutionPages: PublicPage[] = [
           'Não. A plataforma respeita ambiente, autenticação e autorização. Conteúdo privado não é publicado em páginas públicas.',
       },
       {
-        question: 'É possível bloquear módulos por empresa?',
+        question: 'É possível personalizar recursos por empresa?',
         answer:
-          'Sim. O Portal Administrativo Global possui controle de módulos e planos por empresa.',
+          'Sim. A plataforma permite personalizar os módulos e permissões de acesso por empresa e unidade corporativa.',
       },
     ],
     kind: 'solution',
@@ -565,7 +565,7 @@ export const segmentPages: PublicPage[] = [
     problem:
       'Gestores precisam decidir com contexto, mas os dados costumam estar fragmentados entre sistemas, planilhas e reuniões.',
     benefits: ['Unifica contexto de gestão.', 'Conecta estratégia e execução.', 'Apoia governança e auditoria.', 'Respeita permissões e escopo.'],
-    features: ['Estratégia', 'Painéis', 'Riscos', 'Auditoria', 'Portal Administrativo Global'],
+    features: ['Estratégia', 'Painéis', 'Riscos', 'Auditoria', 'Painel de controle corporativo'],
     useCases: ['Comitê executivo.', 'Gestão por metas.', 'Governança multiempresa.'],
     faq: [
       { question: 'O sistema atende vários departamentos?', answer: 'Sim. Ele foi desenhado para áreas, setores, processos e responsáveis.' },
@@ -579,16 +579,16 @@ export const moduleHighlights = [
   'Meu Dia: caixa de entrada corporativa com prioridades, prazos, delegações e recomendações assistidas.',
   'Visão 360 do registro: contexto, vínculos, impactos, histórico e registros relacionados autorizados.',
   'Central de Automações: fluxos de trabalho, tarefas, aprovações, escalonamentos e histórico.',
-  'Portal Administrativo Global: empresas, planos, módulos, usuários, auditoria e saúde técnica.',
+  'Painel de controle corporativo: gestão de empresas, usuários, permissões e auditoria de ações.',
   'GED e documentos: revisões, editor pela web quando configurado, anexos e rastreabilidade.',
   'Segurança dos alimentos: programas, lotes, fornecedores e eventos de rastreabilidade.',
 ];
 
 export const faqPage: FaqItem[] = [
   {
-    question: 'O Gestão 360 é uma plataforma SaaS?',
+    question: 'O Gestão 360 é uma plataforma de gestão empresarial?',
     answer:
-      'Sim. O produto foi estruturado como plataforma SaaS B2B modular, com portal autenticado, isolamento por empresa e módulos ativáveis conforme contrato.',
+      'Sim. O produto foi estruturado como uma plataforma corporativa modular, com portal autenticado, isolamento de dados por empresa e recursos ativáveis conforme a necessidade de cada organização.',
   },
   {
     question: 'Quais páginas são públicas?',
@@ -886,7 +886,7 @@ export function softwareJsonLd() {
     operatingSystem: 'Web',
     url: SITE_URL,
     description:
-      'Plataforma SaaS B2B para gestão corporativa integrada, indicadores, estratégia, planos de ação, documentos, auditorias, riscos e melhoria contínua.',
+      'Plataforma corporativa integrada para gestão empresarial: indicadores, planejamento estratégico, planos de ação, documentos, auditorias, riscos e melhoria contínua.',
     offers: {
       '@type': 'Offer',
       price: '0',

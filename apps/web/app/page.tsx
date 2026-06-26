@@ -21,7 +21,7 @@ import {
 export const metadata: Metadata = publicMetadata({
   title: 'Gestão 360 | Gestão estratégica, indicadores e planos de ação',
   description:
-    'Plataforma SaaS B2B para gestão corporativa integrada: indicadores, planejamento estratégico, planos de ação, documentos, auditorias, riscos e melhoria contínua.',
+    'Plataforma corporativa integrada para gestão empresarial: indicadores, planejamento estratégico, planos de ação, documentos, auditorias, riscos e melhoria contínua.',
   path: '/',
 });
 
@@ -76,7 +76,7 @@ export default function HomePage() {
         </div>
         <div className="relative mx-auto flex min-h-[calc(100svh-5rem)] max-w-7xl items-center px-4 py-14 sm:px-6 lg:min-h-[620px] lg:px-8">
           <div className="max-w-3xl">
-            <p className="text-sm font-semibold uppercase tracking-[0.18em] text-emerald-300">Plataforma SaaS B2B modular</p>
+            <p className="text-sm font-semibold uppercase tracking-[0.18em] text-emerald-300">Plataforma corporativa modular</p>
             <h1 className="mt-5 max-w-4xl text-4xl font-semibold leading-[1.05] sm:text-5xl lg:text-6xl">
               Gestão estratégica, indicadores e planos de ação conectados em uma única plataforma.
             </h1>
@@ -216,6 +216,35 @@ export default function HomePage() {
           </div>
         </div>
       </section>
+
+      <section className="bg-slate-50 py-20 border-t border-slate-200">
+        <div className="mx-auto grid max-w-7xl gap-10 px-4 sm:px-6 lg:grid-cols-[0.9fr,1.1fr] lg:px-8">
+          <div>
+            <SectionIntro eyebrow="Atendimento" title="Precisa falar com a equipe do Gestão 360?" />
+            <p className="mt-5 text-sm leading-6 text-slate-600">
+              Nosso atendimento está disponível para suporte, dúvidas, solicitações comerciais e relacionamento com clientes.
+            </p>
+          </div>
+          <div className="grid gap-4 sm:grid-cols-3">
+            <div className="border border-slate-200 p-5 bg-white">
+              <h3 className="font-semibold text-slate-950 text-sm">Suporte</h3>
+              <p className="mt-2 text-xs text-slate-600">Para suporte técnico ou dúvidas de uso:</p>
+              <a href="mailto:suporte@gestao360.org" className="mt-3 block text-sm font-semibold text-emerald-700 hover:underline break-all">suporte@gestao360.org</a>
+            </div>
+            <div className="border border-slate-200 p-5 bg-white">
+              <h3 className="font-semibold text-slate-950 text-sm">SAC</h3>
+              <p className="mt-2 text-xs text-slate-600">Para atendimento ao cliente:</p>
+              <a href="mailto:sac@gestao360.org" className="mt-3 block text-sm font-semibold text-emerald-700 hover:underline break-all">sac@gestao360.org</a>
+            </div>
+            <div className="border border-slate-200 p-5 bg-white">
+              <h3 className="font-semibold text-slate-950 text-sm">Comercial</h3>
+              <p className="mt-2 text-xs text-slate-600">Para contato comercial ou proposta:</p>
+              <a href="mailto:contato@gestao360.org" className="mt-3 block text-sm font-semibold text-emerald-700 hover:underline break-all">contato@gestao360.org</a>
+            </div>
+          </div>
+        </div>
+      </section>
+
       <WhatsAppButton />
     </PublicShell>
   );
