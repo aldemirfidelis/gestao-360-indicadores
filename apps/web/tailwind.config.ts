@@ -59,11 +59,9 @@ const config: Config = {
         },
       },
       borderRadius: {
-        // Visual minimalista: cantos quadrados em todo o sistema.
-        // Os componentes seguem usando rounded-lg/md/sm — todos viram 0.
-        lg: '0',
-        md: '0',
-        sm: '0',
+        lg: 'var(--radius)',
+        md: 'calc(var(--radius) - 2px)',
+        sm: 'calc(var(--radius) - 4px)',
       },
       fontFamily: {
         sans: ['var(--font-sans)', 'Inter', 'system-ui', '-apple-system', 'Segoe UI', 'sans-serif'],

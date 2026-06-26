@@ -4,7 +4,7 @@ import Link from 'next/link';
 import { usePathname, useSearchParams } from 'next/navigation';
 import { useEffect, useMemo, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { ChevronDown, PanelLeftClose, PanelLeftOpen } from 'lucide-react';
+import { ChevronDown, PanelLeftClose, PanelLeftOpen, Sparkles } from 'lucide-react';
 import { useAuth } from '@/components/auth/auth-provider';
 import { usePortalConfig } from '@/components/portal-admin/portal-config-provider';
 import {
@@ -12,6 +12,7 @@ import {
   visibleNavSections,
 } from '@/components/shell/navigation';
 import { Button } from '@/components/ui/button';
+import { BrandMark } from '@/components/brand/brand-mark';
 import { api } from '@/lib/api';
 import type { ConversationSummary } from '@/lib/communication/types';
 import { cn } from '@/lib/utils';
@@ -77,12 +78,12 @@ export function AccordionNavigation({
   }
 
   return (
-    <div className="flex h-full min-h-0 flex-col">
+    <div className="flex h-full min-h-0 flex-col justify-between">
       <div className={cn('flex-1 overflow-y-auto', mobile ? 'px-2 py-3' : 'px-2 py-3')}>
         {!mobile && (
           <div className={cn('mb-2 flex items-center', collapsed ? 'justify-center' : 'justify-between px-2')}>
             {!collapsed && (
-              <div className="text-[10px] font-medium uppercase tracking-[0.14em] text-muted-foreground/70">
+              <div className="text-[10px] font-medium uppercase tracking-[0.14em] text-slate-500">
                 Navegação
               </div>
             )}
@@ -90,7 +91,7 @@ export function AccordionNavigation({
               <Button
                 variant="ghost"
                 size="icon"
-                className="h-7 w-7"
+                className="h-7 w-7 text-slate-400 hover:text-white hover:bg-white/[0.05]"
                 onClick={() => onCollapsedChange(!collapsed)}
                 aria-label={collapsed ? 'Expandir menu' : 'Recolher menu'}
                 title={collapsed ? 'Expandir menu' : 'Recolher menu'}
@@ -120,12 +121,12 @@ export function AccordionNavigation({
                   onClick={onNavigate}
                   title={item.description}
                   className={cn(
-                    'flex w-full items-center gap-2 rounded px-3 py-2 text-[13px] font-semibold uppercase tracking-[0.08em] transition-colors',
+                    'flex w-full items-center gap-2 rounded-lg px-3 py-2 text-[13px] font-semibold uppercase tracking-[0.08em] transition-colors',
                     collapsed && 'justify-center',
-                    flatActive ? 'bg-foreground/[0.06] text-foreground' : 'text-muted-foreground/80 hover:text-foreground',
+                    flatActive ? 'bg-blue-600 text-white shadow-sm font-medium' : 'text-slate-400 hover:text-white hover:bg-white/[0.04]',
                   )}
                 >
-                  <FlatIcon className="h-4 w-4 shrink-0 opacity-70" />
+                  <FlatIcon className={cn("h-4 w-4 shrink-0", flatActive ? "opacity-100" : "opacity-70")} />
                   {!collapsed && <span className="min-w-0 flex-1 leading-tight">{item.label}</span>}
                 </Link>
               );
@@ -139,7 +140,7 @@ export function AccordionNavigation({
                     onClick={() => toggle(section.heading)}
                     className={cn(
                       'flex w-full items-center gap-2 px-3 py-2 text-left text-[13px] font-semibold uppercase tracking-[0.08em] transition-colors',
-                      sectionActive ? 'text-foreground' : 'text-muted-foreground/80 hover:text-foreground',
+                      sectionActive ? 'text-white font-bold' : 'text-slate-400 hover:text-white hover:bg-white/[0.04]',
                     )}
                     title={section.description}
                   >
@@ -150,7 +151,7 @@ export function AccordionNavigation({
                 )}
 
                 {collapsed && (
-                  <div className="px-1 pb-1 pt-2 text-center text-muted-foreground/50" title={section.heading}>
+                  <div className="px-1 pb-1 pt-2 text-center text-slate-500" title={section.heading}>
                     <SectionIcon className="mx-auto h-3.5 w-3.5" />
                   </div>
                 )}
@@ -167,7 +168,7 @@ export function AccordionNavigation({
                         {/* Linha vertical do pai descendo ate o ultimo filho */}
                         <span
                           aria-hidden="true"
-                          className="pointer-events-none absolute left-0 top-0 h-full w-px bg-border"
+                          className="pointer-events-none absolute left-0 top-0 h-full w-px bg-[#1b2b54]/50"
                         />
                         <div className="space-y-0.5">
                           {section.items.map((item, idx) => {
@@ -182,10 +183,10 @@ export function AccordionNavigation({
                                 onClick={onNavigate}
                                 title={item.description}
                                 className={cn(
-                                  'group relative flex items-center gap-2.5 py-2 pl-5 pr-3 text-sm transition-colors',
+                                  'group relative flex items-center gap-2.5 py-2 pl-5 pr-3 text-[13px] transition-colors rounded-md',
                                   active
-                                    ? 'bg-foreground/[0.06] font-medium text-foreground'
-                                    : 'text-muted-foreground hover:bg-foreground/[0.04] hover:text-foreground',
+                                    ? 'bg-white/[0.08] font-medium text-white shadow-sm'
+                                    : 'text-slate-400 hover:bg-white/[0.04] hover:text-white',
                                 )}
                               >
                                 {/* Conector horizontal pai -> filho (L invertido) */}
@@ -193,18 +194,18 @@ export function AccordionNavigation({
                                   aria-hidden="true"
                                   className={cn(
                                     'pointer-events-none absolute left-0 top-1/2 h-px w-3 -translate-y-1/2',
-                                    active ? 'bg-foreground' : 'bg-border',
+                                    active ? 'bg-blue-500' : 'bg-[#1b2b54]/50',
                                   )}
                                 />
                                 {/* Mascara para encerrar a linha vertical no ultimo filho */}
                                 {isLast && (
                                   <span
                                     aria-hidden="true"
-                                    className="pointer-events-none absolute -left-px top-1/2 h-1/2 w-px bg-card"
+                                    className="pointer-events-none absolute -left-px top-1/2 h-1/2 w-px bg-[#0a1128]"
                                   />
                                 )}
-                                {active && <span className="absolute left-0 top-0 h-full w-[2px] bg-foreground" />}
-                                <Icon className={cn('h-4 w-4 shrink-0', active ? 'text-foreground' : 'text-muted-foreground/80')} />
+                                {active && <span className="absolute left-0 top-0 h-full w-[2px] bg-blue-500" />}
+                                <Icon className={cn('h-4 w-4 shrink-0', active ? 'text-white' : 'text-slate-500 group-hover:text-slate-300')} />
                                 <span className="min-w-0 flex-1 leading-tight line-clamp-2">{item.label}</span>
                                 {itemUnread > 0 && (
                                   <span className="grid h-5 min-w-5 shrink-0 place-items-center rounded-full bg-status-red px-1.5 text-[10px] font-semibold text-white">
@@ -229,14 +230,14 @@ export function AccordionNavigation({
                               onClick={onNavigate}
                               title={item.label}
                               className={cn(
-                                'group relative flex items-center justify-center gap-2.5 py-2 px-2 text-sm transition-colors',
+                                'group relative flex items-center justify-center gap-2.5 py-2 px-2 text-sm transition-colors rounded-md',
                                 active
-                                  ? 'bg-foreground/[0.06] font-medium text-foreground'
-                                  : 'text-muted-foreground hover:bg-foreground/[0.04] hover:text-foreground',
+                                  ? 'bg-white/[0.08] font-medium text-white shadow-sm'
+                                  : 'text-slate-400 hover:bg-white/[0.04] hover:text-white',
                               )}
                             >
-                              {active && <span className="absolute left-0 top-0 h-full w-[2px] bg-foreground" />}
-                              <Icon className={cn('h-4 w-4 shrink-0', active ? 'text-foreground' : 'text-muted-foreground/80')} />
+                              {active && <span className="absolute left-0 top-0 h-full w-[2px] bg-blue-500" />}
+                              <Icon className={cn('h-4 w-4 shrink-0', active ? 'text-white' : 'text-slate-500 group-hover:text-slate-300')} />
                               {itemUnread > 0 && (
                                 <span className="absolute right-2 top-1.5 h-2 w-2 rounded-full bg-status-red" />
                               )}
@@ -253,6 +254,30 @@ export function AccordionNavigation({
         </div>
       </div>
 
+      {/* Card IA e Rodapé */}
+      {!collapsed && (
+        <div className="p-4 border-t border-[#1b2b54]/30 space-y-4">
+          <div className="rounded-xl bg-gradient-to-br from-indigo-950/80 to-blue-900/60 p-4 border border-[#203363] space-y-3 relative overflow-hidden">
+            {/* Ícone de Brilho de IA */}
+            <div className="h-8 w-8 rounded-lg bg-indigo-500/20 text-indigo-300 flex items-center justify-center">
+              <Sparkles className="h-4 w-4" />
+            </div>
+            <div>
+              <h4 className="text-xs font-bold text-white">Novidade: IA Gestão 360</h4>
+              <p className="text-[11px] text-slate-400 mt-1 leading-normal">
+                Insights inteligentes para apoiar suas decisões.
+              </p>
+            </div>
+            <button className="w-full py-1.5 px-3 rounded-lg bg-white/10 hover:bg-white/15 text-white text-xs font-medium transition-colors border border-white/10">
+              Conhecer agora
+            </button>
+          </div>
+          <div className="flex items-center gap-2 text-slate-500 text-[11px] mt-2">
+            <BrandMark className="h-5 w-5 rounded bg-white text-[#0a1128]" />
+            <span>Gestão 360 &copy; 2026</span>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

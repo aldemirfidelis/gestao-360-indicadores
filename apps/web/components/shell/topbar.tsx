@@ -96,26 +96,28 @@ export function Topbar() {
   };
 
   return (
-    <header className="sticky top-0 z-30 flex h-14 items-center gap-3 border-b border-border/60 bg-background/95 px-3 backdrop-blur lg:px-6">
+    <header className="sticky top-0 z-30 flex h-14 items-center gap-3 border-b border-[#1b2b54]/50 bg-[#0a1128] px-3 backdrop-blur lg:px-6">
       <Dialog open={menuOpen} onOpenChange={setMenuOpen}>
         <DialogTrigger asChild>
-          <Button variant="ghost" size="icon" className="lg:hidden" aria-label="Abrir menu">
+          <Button variant="ghost" size="icon" className="lg:hidden text-slate-300 hover:text-white hover:bg-white/[0.05]" aria-label="Abrir menu">
             <Menu className="h-4 w-4" />
           </Button>
         </DialogTrigger>
         <DialogContent className="left-2 top-2 h-[calc(100vh-1rem)] max-w-[300px] translate-x-0 translate-y-0 p-0">
-          <DialogHeader className="border-b border-border/60 px-4 py-3">
-            <DialogTitle className="flex items-center gap-2 text-sm">
-              <BrandMark className="h-7 w-7" />
+          <DialogHeader className="border-b border-[#1b2b54]/50 px-4 py-3 bg-[#0a1128] text-white">
+            <DialogTitle className="flex items-center gap-2 text-sm text-white">
+              <BrandMark className="h-7 w-7 rounded bg-white text-[#0a1128]" />
               <span>Gestão 360</span>
             </DialogTitle>
           </DialogHeader>
-          <AccordionNavigation mobile onNavigate={() => setMenuOpen(false)} />
+          <div className="bg-[#0a1128] h-full">
+            <AccordionNavigation mobile onNavigate={() => setMenuOpen(false)} />
+          </div>
         </DialogContent>
       </Dialog>
 
       <div className="hidden min-w-[140px] lg:block">
-        <div className="text-[10px] font-medium uppercase tracking-[0.14em] text-muted-foreground/70">
+        <div className="text-[10px] font-medium uppercase tracking-[0.14em] text-slate-400">
           {section?.heading ?? 'Início'}
         </div>
       </div>
@@ -123,7 +125,7 @@ export function Topbar() {
       <CompanySwitcher />
 
       <div className="relative min-w-0 flex-1 lg:max-w-xl">
-        <Search className="absolute left-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground/70" />
+        <Search className="absolute left-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-slate-400" />
         <Input
           value={search}
           onChange={(event) => {
@@ -135,19 +137,22 @@ export function Topbar() {
             if (event.key === 'Escape') setSearchOpen(false);
           }}
           placeholder="Buscar indicadores, ações, setores..."
-          className="h-9 border-border/60 bg-muted/40 pl-9 text-sm placeholder:text-muted-foreground/60"
+          className="h-9 border-[#203363] bg-[#121c38] pl-9 pr-8 text-sm text-white placeholder:text-slate-400 focus-visible:ring-1 focus-visible:ring-blue-500 focus-visible:ring-offset-0"
         />
+        <kbd className="pointer-events-none absolute right-2.5 top-1/2 -translate-y-1/2 hidden h-5 select-none items-center gap-1 rounded bg-[#1e293b] px-1.5 font-mono text-[10px] font-medium text-slate-400 opacity-100 sm:flex">
+          <span className="text-[11px]">⌘</span>K
+        </kbd>
         {searchOpen && search.trim().length >= 2 && (
-          <div className="absolute left-0 right-0 top-11 z-50 overflow-hidden border border-border bg-card shadow-lg">
-            <div className="border-b border-border/60 px-3 py-2 text-[10px] font-medium uppercase tracking-[0.12em] text-muted-foreground">
+          <div className="absolute left-0 right-0 top-11 z-50 overflow-hidden border border-[#1b2b54]/80 bg-[#0c1938] shadow-lg rounded-lg text-white">
+            <div className="border-b border-[#1b2b54]/50 px-3 py-2 text-[10px] font-medium uppercase tracking-[0.12em] text-slate-400 bg-[#0a1128]">
               Busca global
             </div>
             <div className="max-h-[420px] overflow-y-auto p-1">
               {globalSearch.isLoading && (
-                <div className="px-3 py-6 text-center text-sm text-muted-foreground">Buscando...</div>
+                <div className="px-3 py-6 text-center text-sm text-slate-400">Buscando...</div>
               )}
               {!globalSearch.isLoading && (globalSearch.data?.length ?? 0) === 0 && (
-                <div className="px-3 py-6 text-center text-sm text-muted-foreground">Nada encontrado.</div>
+                <div className="px-3 py-6 text-center text-sm text-slate-400">Nada encontrado.</div>
               )}
               {globalSearch.data?.map((item) => (
                 <Link
@@ -157,13 +162,13 @@ export function Topbar() {
                     setSearchOpen(false);
                     setSearch('');
                   }}
-                  className="flex items-start justify-between gap-3 px-3 py-2 text-sm transition-colors hover:bg-muted"
+                  className="flex items-start justify-between gap-3 px-3 py-2 text-sm transition-colors hover:bg-white/[0.05] rounded-md"
                 >
                   <span className="min-w-0">
-                    <span className="block truncate font-medium">{item.label}</span>
-                    <span className="block truncate text-xs text-muted-foreground">{item.description}</span>
+                    <span className="block truncate font-medium text-white">{item.label}</span>
+                    <span className="block truncate text-xs text-slate-400">{item.description}</span>
                   </span>
-                  <span className="shrink-0 border border-border/60 bg-background px-1.5 py-0.5 text-[10px] uppercase tracking-wide text-muted-foreground">
+                  <span className="shrink-0 border border-[#1b2b54]/50 bg-[#121c38] px-1.5 py-0.5 text-[10px] uppercase tracking-wide text-slate-300 rounded">
                     {typeLabel(item.type)}
                   </span>
                 </Link>
@@ -173,8 +178,8 @@ export function Topbar() {
         )}
       </div>
 
-      <div className="flex items-center gap-0.5">
-        <Button variant="ghost" size="icon" className="h-9 w-9" aria-label="Ajuda" asChild>
+      <div className="flex items-center gap-0.5 text-slate-300 [&_button]:text-slate-300 [&_button:hover]:text-white [&_button:hover]:bg-white/[0.05]">
+        <Button variant="ghost" size="icon" className="h-9 w-9 text-slate-300 hover:text-white hover:bg-white/[0.05]" aria-label="Ajuda" asChild>
           <Link href="/ajuda" title="Ajuda">
             <LifeBuoy className="h-4 w-4" />
           </Link>
@@ -185,17 +190,17 @@ export function Topbar() {
         <Button
           variant="ghost"
           size="icon"
-          className="h-9 w-9"
+          className="h-9 w-9 text-slate-300 hover:text-white hover:bg-white/[0.05]"
           onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')}
           aria-label="Alternar tema"
         >
           {theme === 'dark' ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
         </Button>
         {user && (
-          <div className="relative ml-1 flex items-center gap-2 border-l border-border/60 pl-3">
+          <div className="relative ml-1 flex items-center gap-2 border-l border-[#1b2b54]/50 pl-3 text-white">
             <div className="hidden text-right leading-tight sm:block">
-              <div className="text-xs font-medium">{user.name}</div>
-              <div className="text-[10px] text-muted-foreground">{profileRole}</div>
+              <div className="text-xs font-medium text-white">{user.name}</div>
+              <div className="text-[10px] text-slate-400">{profileRole}</div>
             </div>
             <button
               type="button"
@@ -206,7 +211,7 @@ export function Topbar() {
             >
               <UserAvatar name={user.name} avatarUrl={user.avatarUrl} size="sm" />
             </button>
-            <Button variant="ghost" size="icon" className="h-9 w-9" onClick={logout} aria-label="Sair">
+            <Button variant="ghost" size="icon" className="h-9 w-9 text-slate-300 hover:text-white hover:bg-white/[0.05]" onClick={logout} aria-label="Sair">
               <LogOut className="h-4 w-4" />
             </Button>
             {profileOpen && (

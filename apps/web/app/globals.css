@@ -39,7 +39,7 @@
     --status-blue: 211 92% 47%;
     --status-purple: 258 60% 55%;
 
-    --radius: 0;
+    --radius: 0.5rem;
   }
 
   .dark {
@@ -82,21 +82,6 @@
     -moz-osx-font-smoothing: grayscale;
   }
   html, body { height: 100%; }
-
-  /* Garante cantos retos em qualquer componente que ainda use rounded-* default */
-  .rounded,
-  .rounded-sm,
-  .rounded-md,
-  .rounded-lg,
-  .rounded-xl,
-  .rounded-2xl,
-  .rounded-3xl {
-    border-radius: 0 !important;
-  }
-  /* Mantemos arredondamento apenas para badges/pills circulares e avatares */
-  .rounded-full {
-    border-radius: 9999px !important;
-  }
 }
 
 @layer components {
