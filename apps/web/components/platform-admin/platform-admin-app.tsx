@@ -1754,24 +1754,36 @@ function PlansSection() {
     queryKey: ['platform-admin', 'plans'],
     queryFn: () => platformAdminApi<PlanRow[]>('/plans'),
   });
-  const modules = useQuery({
-    queryKey: ['platform-admin', 'modules', 'plans'],
-    queryFn: () => platformAdminApi<ModuleCatalog[]>('/modules'),
+  const business = useQuery({
+    queryKey: ['platform-admin', 'business-modules'],
+    queryFn: () => platformAdminApi<BusinessModuleRow[]>('/business-modules'),
   });
   const save = useMutation({
-    mutationFn: () => platformAdminApi('/plans', {
-      method: 'POST',
-      json: {
-        ...form,
-        monthlyPriceCents: Number(form.monthlyPriceCents || 0),
-        setupPriceCents: Number(form.setupPriceCents || 0),
-        defaultUsers: form.defaultUsers ? Number(form.defaultUsers) : null,
-        defaultBranches: form.defaultBranches ? Number(form.defaultBranches) : null,
-        storageLimitMb: form.storageLimitMb ? Number(form.storageLimitMb) : null,
-        trialDays: form.trialDays ? Number(form.trialDays) : null,
-        moduleCodes: Array.from(new Set([...form.moduleCodes, ...Array.from(COMPANY_CORE_MODULE_CODES)])),
-      },
-    }),
+    mutationFn: () => {
+      // Expandir as abas de negócio selecionadas em módulos granulares antes de enviar à API
+      const finalModuleCodes = Array.from(
+        new Set(
+          form.moduleCodes.flatMap((code) => {
+            const bm = (business.data ?? []).find((b) => b.code === code);
+            return bm ? bm.members : [];
+          })
+        )
+      );
+
+      return platformAdminApi('/plans', {
+        method: 'POST',
+        json: {
+          ...form,
+          monthlyPriceCents: Number(form.monthlyPriceCents || 0),
+          setupPriceCents: Number(form.setupPriceCents || 0),
+          defaultUsers: form.defaultUsers ? Number(form.defaultUsers) : null,
+          defaultBranches: form.defaultBranches ? Number(form.defaultBranches) : null,
+          storageLimitMb: form.storageLimitMb ? Number(form.storageLimitMb) : null,
+          trialDays: form.trialDays ? Number(form.trialDays) : null,
+          moduleCodes: finalModuleCodes,
+        },
+      });
+    },
     onSuccess: () => {
       toast.success('Plano salvo');
       setForm(EMPTY_PLAN_FORM);
@@ -1779,19 +1791,23 @@ function PlansSection() {
       void queryClient.invalidateQueries({ queryKey: ['platform-admin', 'module-matrix'] });
     },
   });
-  const moduleByCode = useMemo(() => new Map((modules.data ?? []).map((module) => [module.code, module])), [modules.data]);
-  const modulesByCategory = useMemo(() => {
-    const grouped = new Map<string, ModuleCatalog[]>();
-    (modules.data ?? []).forEach((module) => {
-      const category = module.category ?? 'Outros';
-      if (!grouped.has(category)) grouped.set(category, []);
-      grouped.get(category)!.push(module);
-    });
-    return Array.from(grouped.entries());
-  }, [modules.data]);
+
+  const businessModules = useMemo(() => {
+    return [...(business.data ?? [])].sort((a, b) => a.menuOrder - b.menuOrder);
+  }, [business.data]);
+
   const selectedModules = new Set(form.moduleCodes);
 
   function editPlan(plan: PlanRow) {
+    // Determinar quais abas de negócio têm todos os seus membros incluídos no plano
+    const planModuleCodes = new Set(plan.modules.filter((m) => m.included).map((m) => m.moduleCode));
+    const activeBusinessModules = (business.data ?? [])
+      .filter((bm) => {
+        if (bm.core) return true; // As abas core/padrão sempre estão selecionadas
+        return bm.members.every((memberCode) => planModuleCodes.has(memberCode));
+      })
+      .map((bm) => bm.code);
+
     setForm({
       code: plan.code,
       name: plan.name,
@@ -1803,12 +1819,13 @@ function PlansSection() {
       supportLevel: plan.supportLevel ?? '',
       sla: plan.sla ?? '',
       trialDays: plan.trialDays == null ? '' : String(plan.trialDays),
-      moduleCodes: Array.from(new Set([...plan.modules.filter((module) => module.included).map((module) => module.moduleCode), ...Array.from(COMPANY_CORE_MODULE_CODES)])),
+      moduleCodes: activeBusinessModules,
     });
   }
 
   function toggleModule(code: string) {
-    if (COMPANY_CORE_MODULE_CODES.has(code)) return;
+    const isCore = (business.data ?? []).find((b) => b.code === code)?.core;
+    if (isCore) return;
     setForm((prev) => ({
       ...prev,
       moduleCodes: prev.moduleCodes.includes(code)
@@ -1822,10 +1839,14 @@ function PlansSection() {
       <Panel title="Planos comerciais">
         <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
           {(plans.data ?? []).map((plan) => {
-            const included = plan.modules.filter((module) => module.included);
-            const names = included
-              .map((module) => moduleByCode.get(module.moduleCode)?.name ?? module.moduleCode)
-              .slice(0, 7);
+            const planModuleCodes = new Set(plan.modules.filter((m) => m.included).map((m) => m.moduleCode));
+            // Derivar abas de negócio opcionais/comerciais (não-core) inclusas no plano
+            const activeBusinessModules = (business.data ?? [])
+              .filter((bm) => {
+                if (bm.core) return false;
+                return bm.members.every((memberCode) => planModuleCodes.has(memberCode));
+              });
+            const names = activeBusinessModules.map((bm) => bm.name);
             return (
               <div key={plan.code} className="border bg-white p-4">
                 <div className="flex items-center justify-between gap-3">
@@ -1837,11 +1858,11 @@ function PlansSection() {
                 </div>
                 <div className="mt-3 text-2xl font-semibold">{formatMoney(plan.monthlyPriceCents)}</div>
                 <div className="mt-2 text-sm text-muted-foreground">
-                  {plan.defaultUsers ?? 'Ilimitado'} usuários · {included.length} módulos inclusos
+                  {plan.defaultUsers ?? 'Ilimitado'} usuários · {activeBusinessModules.length} abas opcionais inclusas
                 </div>
                 <div className="mt-3 flex flex-wrap gap-1">
-                  {names.map((name) => <span key={name} className="pill pill-gray">{name}</span>)}
-                  {included.length > names.length && <span className="pill pill-gray">+{included.length - names.length}</span>}
+                  {names.slice(0, 7).map((name) => <span key={name} className="pill pill-gray">{name}</span>)}
+                  {names.length > 7 && <span className="pill pill-gray">+{names.length - 7}</span>}
                 </div>
                 <Button className="mt-4 w-full" size="sm" variant="outline" onClick={() => editPlan(plan)}>Editar plano</Button>
               </div>
@@ -1871,33 +1892,26 @@ function PlansSection() {
               <div className="text-xs text-muted-foreground">{selectedModules.size} selecionados</div>
             </div>
             <div className="max-h-[420px] overflow-y-auto p-3">
-              {modulesByCategory.map(([category, items]) => (
-                <div key={category} className="mb-4 last:mb-0">
-                  <div className="mb-2 text-xs font-semibold text-muted-foreground">{category}</div>
-                  <div className="grid gap-2">
-                    {items.map((module) => {
-                      const core = COMPANY_CORE_MODULE_CODES.has(module.code);
-                      const checked = core || selectedModules.has(module.code);
-                      return (
-                        <label key={module.code} className={cn('flex cursor-pointer items-start gap-2 border px-3 py-2 text-sm', checked && 'border-[#101820] bg-[#f8fafb]', core && 'cursor-not-allowed opacity-80')}>
-                          <input
-                            type="checkbox"
-                            className="mt-1"
-                            checked={checked}
-                            disabled={core}
-                            onChange={() => toggleModule(module.code)}
-                          />
-                          <span className="min-w-0">
-                            <span className="block font-medium">{module.name}</span>
-                            <span className="block text-xs text-muted-foreground">{module.code}{core ? ' · essencial da empresa' : ''}</span>
-                          </span>
-                        </label>
-                      );
-                    })}
-                  </div>
-                </div>
-              ))}
-              {(modules.data ?? []).length === 0 && <EmptyState title="Catálogo de módulos indisponível" />}
+              {businessModules.map((module) => {
+                const core = module.core;
+                const checked = core || selectedModules.has(module.code);
+                return (
+                  <label key={module.code} className={cn('flex cursor-pointer items-start gap-2 border px-3 py-2 text-sm mb-2 last:mb-0', checked && 'border-[#101820] bg-[#f8fafb]', core && 'cursor-not-allowed opacity-80')}>
+                    <input
+                      type="checkbox"
+                      className="mt-1"
+                      checked={checked}
+                      disabled={core}
+                      onChange={() => toggleModule(module.code)}
+                    />
+                    <span className="min-w-0">
+                      <span className="block font-medium">{module.name}</span>
+                      <span className="block text-xs text-muted-foreground">{module.code}{core ? ' · essencial da empresa' : ''}</span>
+                    </span>
+                  </label>
+                );
+              })}
+              {businessModules.length === 0 && <EmptyState title="Catálogo de módulos indisponível" />}
             </div>
           </div>
           <Button className="w-full" disabled={!form.code || !form.name || save.isPending} onClick={() => save.mutate()}>Salvar plano</Button>

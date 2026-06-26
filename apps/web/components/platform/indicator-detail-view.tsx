@@ -186,6 +186,29 @@ interface CurrentTreatment {
 
 const STATUS_LABEL = ACTION_STATUS_LABEL;
 
+const renderCustomBarLabel = (props: any, fill: string) => {
+  const { x, y, width, value } = props;
+  if (value === null || value === undefined || value === '') return null;
+
+  const formatted = formatNumber(value);
+  const cx = x + width / 2;
+  const cy = y - 6;
+
+  return (
+    <text
+      x={cx}
+      y={cy}
+      fill={fill}
+      textAnchor="start"
+      fontSize={9}
+      fontWeight={600}
+      transform={`rotate(-45, ${cx}, ${cy})`}
+    >
+      {formatted}
+    </text>
+  );
+};
+
 export function IndicatorDetailView({ id, embedded = false }: { id: string; embedded?: boolean }) {
   const router = useRouter();
   const queryClient = useQueryClient();
@@ -526,7 +549,7 @@ export function IndicatorDetailView({ id, embedded = false }: { id: string; embe
                 <div className="h-[17rem] border border-border/60 bg-card/60 p-2 sm:h-[23rem]">
                   <ResponsiveContainer width="100%" height="100%">
                     {chartType === 'bar' ? (
-                      <BarChart data={chartData} barGap={2} margin={{ top: 24, right: 12, left: 0, bottom: 8 }} onClick={onChartClick} style={{ cursor: 'pointer' }}>
+                      <BarChart data={chartData} barGap={2} margin={{ top: 40, right: 12, left: 0, bottom: 8 }} onClick={onChartClick} style={{ cursor: 'pointer' }}>
                         <CartesianGrid vertical={false} strokeDasharray="3 3" className="stroke-border" />
                         <XAxis
                           dataKey="month"
@@ -542,7 +565,7 @@ export function IndicatorDetailView({ id, embedded = false }: { id: string; embe
                         <YAxis tick={{ fontSize: 11 }} width={48} />
                         <Tooltip content={<DetailChartTooltip viewMode={viewMode} />} cursor={{ fill: 'hsl(var(--muted))', opacity: 0.35 }} />
                         <Bar dataKey="displayMeta" name="Meta" fill="#1e3a8a" radius={[3, 3, 0, 0]}>
-                          <LabelList dataKey="displayMeta" position="top" fontSize={10} fill="#1e3a8a" formatter={(v: any) => (v === null || v === undefined ? '' : formatNumber(v))} />
+                          <LabelList dataKey="displayMeta" content={(props) => renderCustomBarLabel(props, '#1e3a8a')} />
                         </Bar>
                         <Bar dataKey="displayRealizado" name="Realizado" radius={[3, 3, 0, 0]}>
                           {chartData.map((entry, index) => {
@@ -557,7 +580,7 @@ export function IndicatorDetailView({ id, embedded = false }: { id: string; embe
                             }
                             return <Cell key={`cell-${index}`} fill={color} />;
                           })}
-                          <LabelList dataKey="displayRealizado" position="top" fontSize={10} fill="hsl(var(--foreground))" formatter={(v: any) => (v === null || v === undefined ? '' : formatNumber(v))} />
+                          <LabelList dataKey="displayRealizado" content={(props) => renderCustomBarLabel(props, 'hsl(var(--foreground))')} />
                         </Bar>
                       </BarChart>
                     ) : (

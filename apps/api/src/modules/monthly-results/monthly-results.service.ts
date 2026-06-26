@@ -1321,7 +1321,7 @@ export class MonthlyResultsService {
       trend: snapshot.trend,
       managerComment: ind.managerComment,
       trendNote: ind.trendNote,
-      executiveStatus: ind.executiveStatus ?? this.executiveStatus(this.displayLight(light, snapshot.attainment), validationIssues),
+      executiveStatus: ind.executiveStatus ?? this.executiveStatus(light === TrafficLight.GREEN && snapshot.attainment !== null && snapshot.attainment !== undefined && snapshot.attainment >= 1.1 ? 'BLUE' : light, validationIssues),
       showInPresentation: ind.showInPresentation,
       isCritical: ind.isCritical || light === TrafficLight.RED || light === TrafficLight.YELLOW,
       financialImpact: ind.financialImpact,
@@ -1558,7 +1558,7 @@ export class MonthlyResultsService {
   }
 
   private displayLight(light: TrafficLight, attainment?: number | null): TrafficLight | 'BLUE' {
-    if (light === TrafficLight.GREEN && attainment !== null && attainment !== undefined && attainment >= 1.1) return 'BLUE';
+    // Não retornamos mais 'BLUE' (farol azul) para manter o padrão semafórico clássico (verde/amarelo/vermelho/cinza) conforme solicitação do usuário.
     return light;
   }
 

@@ -303,18 +303,6 @@ export default function MeuDiaPage() {
               <CalendarDays className="h-4 w-4 text-slate-400" />
               <span>{formatTodayDate()}</span>
             </div>
-            <Button
-              className="bg-blue-600 hover:bg-blue-700 text-white rounded-lg flex items-center gap-1.5 px-4 h-9 shadow-sm font-medium"
-              onClick={() => toast.info('Nova tarefa será aberta no módulo de tarefas.')}
-            >
-              <Plus className="h-4 w-4" /> Nova tarefa
-            </Button>
-            <Button
-              variant="outline"
-              className="bg-white hover:bg-slate-50 text-slate-700 border border-slate-200 rounded-lg flex items-center gap-1.5 px-4 h-9 shadow-sm font-medium"
-            >
-              <SlidersHorizontal className="h-4 w-4 text-slate-400" /> Ações rápidas
-            </Button>
           </div>
         </div>
       ) : (

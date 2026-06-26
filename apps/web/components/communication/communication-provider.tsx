@@ -6,12 +6,30 @@ import { toast } from 'sonner';
 import { useAuth } from '@/components/auth/auth-provider';
 import { useRealtime } from '@/components/communication/realtime-provider';
 import { WS } from '@/lib/communication/events';
+import { api } from '@/lib/api';
 import type { ChatMessage } from '@/lib/communication/types';
+
+interface FloatingChatBox {
+  id: string;
+  title: string;
+  avatarUrl: string | null;
+  minimized: boolean;
+  presence?: any;
+  otherUserId?: string;
+  hasUnread?: boolean;
+}
 
 interface CommunicationCtx {
   setActiveConversation: (id: string | null) => void;
   typingNames: (conversationId: string) => string[];
   lastReadOf: (conversationId: string, userId: string) => string | undefined;
+  // Caixas de chat flutuantes
+  openConversations: FloatingChatBox[];
+  openChat: (conversationId: string, otherUser?: { name: string; avatarUrl: string | null; presence?: any; id?: string }) => void;
+  openChatWithUser: (userId: string) => Promise<void>;
+  closeChat: (conversationId: string) => void;
+  toggleMinimizeChat: (conversationId: string) => void;
+  markAsReadLocal: (conversationId: string) => void;
 }
 
 const Ctx = createContext<CommunicationCtx | null>(null);
@@ -26,6 +44,7 @@ export function CommunicationProvider({ children }: { children: ReactNode }) {
   const activeConv = useRef<string | null>(null);
   const [typing, setTyping] = useState<TypingMap>({});
   const [receipts, setReceipts] = useState<ReceiptMap>({});
+  const [openConversations, setOpenConversations] = useState<FloatingChatBox[]>([]);
   const invalidateTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const scheduleConversationsRefresh = useCallback(() => {
@@ -36,6 +55,65 @@ export function CommunicationProvider({ children }: { children: ReactNode }) {
     }, 350);
   }, [qc]);
 
+  const openChat = useCallback((conversationId: string, otherUser?: { name: string; avatarUrl: string | null; presence?: any; id?: string }) => {
+    setOpenConversations((prev) => {
+      const exists = prev.some((c) => c.id === conversationId);
+      if (exists) {
+        return prev.map((c) => c.id === conversationId ? { ...c, minimized: false, hasUnread: false } : c);
+      }
+      return [
+        ...prev,
+        {
+          id: conversationId,
+          title: otherUser?.name ?? 'Conversa',
+          avatarUrl: otherUser?.avatarUrl ?? null,
+          minimized: false,
+          presence: otherUser?.presence ?? 'OFFLINE',
+          otherUserId: otherUser?.id,
+          hasUnread: false,
+        },
+      ];
+    });
+  }, []);
+
+  const openChatWithUser = useCallback(async (userId: string) => {
+    try {
+      const data = await api<{ id: string; title: string; avatarUrl: string | null; presence: any }>(
+        '/communication/conversations/direct',
+        {
+          method: 'POST',
+          json: { userId },
+        }
+      );
+      if (data?.id) {
+        openChat(data.id, {
+          name: data.title,
+          avatarUrl: data.avatarUrl,
+          presence: data.presence,
+          id: userId,
+        });
+      }
+    } catch (err) {
+      toast.error('Erro ao abrir conversa');
+    }
+  }, [openChat]);
+
+  const closeChat = useCallback((conversationId: string) => {
+    setOpenConversations((prev) => prev.filter((c) => c.id !== conversationId));
+  }, []);
+
+  const toggleMinimizeChat = useCallback((conversationId: string) => {
+    setOpenConversations((prev) =>
+      prev.map((c) => (c.id === conversationId ? { ...c, minimized: !c.minimized, hasUnread: c.minimized ? false : c.hasUnread } : c))
+    );
+  }, []);
+
+  const markAsReadLocal = useCallback((conversationId: string) => {
+    setOpenConversations((prev) =>
+      prev.map((c) => (c.id === conversationId ? { ...c, hasUnread: false } : c))
+    );
+  }, []);
+
   useEffect(() => {
     if (!socket || !user?.id) return;
 
@@ -43,6 +121,26 @@ export function CommunicationProvider({ children }: { children: ReactNode }) {
       scheduleConversationsRefresh();
       const fromMe = p.message.senderId === user.id;
       if (!fromMe && activeConv.current !== p.conversationId) {
+        // Se a conversa já estiver na barra, marca como unread para sinalizar ao usuário.
+        // Se não estiver, adiciona ao rodapé de forma minimizada.
+        setOpenConversations((prev) => {
+          const exists = prev.some((c) => c.id === p.conversationId);
+          if (exists) {
+            return prev.map((c) => c.id === p.conversationId ? { ...c, hasUnread: true } : c);
+          }
+          return [
+            ...prev,
+            {
+              id: p.conversationId,
+              title: p.message.sender.name,
+              avatarUrl: p.message.sender.avatarUrl,
+              minimized: true,
+              hasUnread: true,
+              otherUserId: p.message.senderId,
+            },
+          ];
+        });
+
         toast.message(p.message.sender.name, {
           description: p.message.body?.slice(0, 120) || 'Enviou uma mensagem',
         });
@@ -119,7 +217,19 @@ export function CommunicationProvider({ children }: { children: ReactNode }) {
   );
 
   return (
-    <Ctx.Provider value={{ setActiveConversation, typingNames, lastReadOf }}>{children}</Ctx.Provider>
+    <Ctx.Provider value={{
+      setActiveConversation,
+      typingNames,
+      lastReadOf,
+      openConversations,
+      openChat,
+      openChatWithUser,
+      closeChat,
+      toggleMinimizeChat,
+      markAsReadLocal
+    }}>
+      {children}
+    </Ctx.Provider>
   );
 }
 
@@ -130,6 +240,12 @@ export function useCommunication(): CommunicationCtx {
       setActiveConversation: () => undefined,
       typingNames: () => [],
       lastReadOf: () => undefined,
+      openConversations: [],
+      openChat: () => undefined,
+      openChatWithUser: async () => undefined,
+      closeChat: () => undefined,
+      toggleMinimizeChat: () => undefined,
+      markAsReadLocal: () => undefined,
     };
   }
   return ctx;

@@ -20,6 +20,7 @@
 }
 
 www.gestao360.org {
+    tls /data/caddy/certificates/acme-v02.api.letsencrypt.org-directory/www.gestao360.org/www.gestao360.org.crt /data/caddy/certificates/acme-v02.api.letsencrypt.org-directory/www.gestao360.org/www.gestao360.org.key
     redir https://gestao360.org{uri} permanent
 }
 
@@ -114,6 +115,7 @@ gestao360.org {
 # - Habilitado: o profile collabora deve estar no ar:
 #   docker compose -f docker-compose.droplet.yml --profile collabora up -d collabora
 collabora.gestao360.org {
+    tls /data/caddy/certificates/acme-v02.api.letsencrypt.org-directory/collabora.gestao360.org/collabora.gestao360.org.crt /data/caddy/certificates/acme-v02.api.letsencrypt.org-directory/collabora.gestao360.org/collabora.gestao360.org.key
     encode zstd gzip
 
     log {

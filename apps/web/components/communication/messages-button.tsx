@@ -9,10 +9,12 @@ import { Button } from '@/components/ui/button';
 import { api } from '@/lib/api';
 import { shortTime } from '@/lib/communication/format';
 import type { ConversationSummary } from '@/lib/communication/types';
+import { useCommunication } from '@/components/communication/communication-provider';
 
 export function MessagesButton() {
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
+  const { openChat } = useCommunication();
 
   useEffect(() => {
     if (!open) return;
@@ -69,11 +71,13 @@ export function MessagesButton() {
               </div>
             )}
             {latest.map((c) => (
-              <Link
+              <button
                 key={c.id}
-                href={`/comunicacao?c=${c.id}`}
-                onClick={() => setOpen(false)}
-                className="flex items-center gap-2.5 rounded-md px-2 py-2 hover:bg-muted"
+                onClick={() => {
+                  openChat(c.id, { name: c.title, avatarUrl: c.avatarUrl, presence: c.presence });
+                  setOpen(false);
+                }}
+                className="flex w-full items-center gap-2.5 rounded-md px-2 py-2 text-left hover:bg-muted transition-colors"
               >
                 <UserAvatar name={c.title} avatarUrl={c.avatarUrl} status={c.presence} size="sm" />
                 <div className="min-w-0 flex-1">
@@ -90,7 +94,7 @@ export function MessagesButton() {
                     )}
                   </div>
                 </div>
-              </Link>
+              </button>
             ))}
           </div>
         </div>

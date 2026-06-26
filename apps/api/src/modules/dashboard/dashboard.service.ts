@@ -311,29 +311,45 @@ export class DashboardService {
       const currentRef = lastNPeriodRefs(indicator.periodicity, 1, anchor)[0];
       if (currentRef) currentRefs.set(indicator.id, currentRef);
     }
-    const [targets, results] = await Promise.all([
-      this.prisma.indicatorTarget.findMany({
-        where: {
-          indicatorId: { in: ids },
-          periodRef: { in: Array.from(new Set(currentRefs.values())) },
-        },
-        select: { indicatorId: true, periodRef: true, target: true, lowerBound: true, upperBound: true },
-      }),
-      this.prisma.indicatorResult.findMany({
-        where: { indicatorId: { in: ids } },
-        orderBy: { periodDate: 'desc' },
-        distinct: ['indicatorId'],
-        select: { indicatorId: true, value: true, light: true, attainment: true, deviationPct: true },
-      }),
-    ]);
 
-    const targetMap = new Map(targets.map((target) => [`${target.indicatorId}:${target.periodRef}`, target]));
+    const results = await this.prisma.indicatorResult.findMany({
+      where: { indicatorId: { in: ids } },
+      orderBy: { periodDate: 'desc' },
+      distinct: ['indicatorId'],
+      select: { indicatorId: true, periodRef: true, value: true, light: true, attainment: true, deviationPct: true },
+    });
+
     const resultMap = new Map(results.map((result) => [result.indicatorId, result]));
 
+    // Coletar as referências de períodos necessárias para buscar as metas correspondentes ao período do resultado (ou período atual se não houver resultado)
+    const neededRefs = new Set<string>();
+    for (const indicator of indicators) {
+      const last = resultMap.get(indicator.id);
+      const ref = last?.periodRef ?? currentRefs.get(indicator.id);
+      if (ref) {
+        neededRefs.add(`${indicator.id}:${ref}`);
+      }
+    }
+
+    // Buscar as metas apenas para os pares (indicatorId, periodRef) correspondentes
+    const targets = neededRefs.size > 0
+      ? await this.prisma.indicatorTarget.findMany({
+          where: {
+            OR: Array.from(neededRefs).map((key) => {
+              const [indicatorId, periodRef] = key.split(':');
+              return { indicatorId, periodRef };
+            }),
+          },
+          select: { indicatorId: true, periodRef: true, target: true, lowerBound: true, upperBound: true },
+        })
+      : [];
+
+    const targetMap = new Map(targets.map((target) => [`${target.indicatorId}:${target.periodRef}`, target]));
+
     return indicators.map((indicator) => {
-      const currentRef = currentRefs.get(indicator.id);
-      const target = currentRef ? targetMap.get(`${indicator.id}:${currentRef}`) : null;
       const last = resultMap.get(indicator.id) ?? null;
+      const refToUse = last?.periodRef ?? currentRefs.get(indicator.id);
+      const target = refToUse ? targetMap.get(`${indicator.id}:${refToUse}`) : null;
       return {
         id: indicator.id,
         name: indicator.name,
