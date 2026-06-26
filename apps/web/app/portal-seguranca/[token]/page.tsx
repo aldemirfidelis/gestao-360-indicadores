@@ -12,7 +12,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
-import { BrandMark } from '@/components/brand/brand-mark';
+import { BrandLogo } from '@/components/brand/brand-logo';
 import { formatDate } from '@/lib/utils';
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:3333/api';
@@ -117,7 +117,7 @@ export default function SecurityPortalInvitePage() {
       <div className="mx-auto flex min-h-screen w-full max-w-5xl flex-col px-4 py-6 md:px-8">
         <header className="flex items-center justify-between border-b pb-4">
           <div className="flex items-center gap-3">
-            <BrandMark className="h-10 w-10" />
+            <BrandLogo variant="icon" size="sm" theme="light" className="h-10 w-10" animated={true} />
             <div>
               <p className="text-sm font-semibold">Gestão 360</p>
               <p className="text-xs text-muted-foreground">Portal externo de segurança patrimonial</p>

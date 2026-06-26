@@ -25,7 +25,7 @@ import { OnlineUsersButton } from '@/components/communication/online-users-butto
 import { MessagesButton } from '@/components/communication/messages-button';
 import { UserAvatar } from '@/components/communication/user-avatar';
 import { api } from '@/lib/api';
-import { BrandMark } from '@/components/brand/brand-mark';
+import { BrandLogo } from '@/components/brand/brand-logo';
 
 interface SearchResult {
   id: string;
@@ -106,8 +106,7 @@ export function Topbar() {
         <DialogContent className="left-2 top-2 h-[calc(100vh-1rem)] max-w-[300px] translate-x-0 translate-y-0 p-0">
           <DialogHeader className="border-b border-[#1b2b54]/50 px-4 py-3 bg-[#0a1128] text-white">
             <DialogTitle className="flex items-center gap-2 text-sm text-white">
-              <BrandMark className="h-7 w-7 rounded bg-white text-[#0a1128]" />
-              <span>Gestão 360</span>
+              <BrandLogo variant="horizontal" size="sm" theme="dark" animated={true} />
             </DialogTitle>
           </DialogHeader>
           <div className="bg-[#0a1128] h-full">

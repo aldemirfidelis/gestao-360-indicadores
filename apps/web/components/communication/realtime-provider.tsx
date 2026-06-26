@@ -49,6 +49,12 @@ export function RealtimeProvider({ children }: { children: ReactNode }) {
     window.addEventListener('click', markActive);
     window.addEventListener('visibilitychange', markActive);
 
+    const handleUnload = () => {
+      disconnectSocket();
+    };
+    window.addEventListener('beforeunload', handleUnload);
+    window.addEventListener('pagehide', handleUnload);
+
     const isActive = () =>
       typeof document !== 'undefined' &&
       document.visibilityState === 'visible' &&
@@ -83,6 +89,8 @@ export function RealtimeProvider({ children }: { children: ReactNode }) {
       window.removeEventListener('keydown', markActive);
       window.removeEventListener('click', markActive);
       window.removeEventListener('visibilitychange', markActive);
+      window.removeEventListener('beforeunload', handleUnload);
+      window.removeEventListener('pagehide', handleUnload);
       s.off('connect', onConnect);
       s.off('disconnect', onDisconnect);
       s.off(WS.PRESENCE_ONLINE_COUNT, onCount);

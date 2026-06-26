@@ -21,11 +21,14 @@ export const metadata: Metadata = {
   description: 'Plataforma corporativa de gestão estratégica, indicadores, planos de ação e melhoria contínua.',
   alternates: { canonical: absoluteUrl('/') },
   icons: {
-    icon: '/brand/favicon.svg',
-    shortcut: '/brand/favicon.svg',
-    apple: '/brand/apple-touch-icon.svg',
+    icon: [
+      { url: '/icons/favicon-16x16.png', sizes: '16x16', type: 'image/png' },
+      { url: '/icons/favicon-32x32.png', sizes: '32x32', type: 'image/png' },
+    ],
+    shortcut: '/icons/favicon.ico',
+    apple: '/icons/apple-touch-icon.png',
   },
-  manifest: '/brand/site.webmanifest',
+  manifest: '/icons/manifest.json',
   openGraph: {
     type: 'website',
     locale: 'pt_BR',

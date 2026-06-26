@@ -158,3 +158,4 @@ validar VPN/firewall/acesso SSH antes de considerar erro do deploy.
 - Preferir comandos nao destrutivos.
 - Para deploy, garantir que o servidor esta em `main`, limpo e apontando para
   Postgres local antes de rodar o script.
+- **NUNCA realizar commit, push ou deploy de forma automatica.** Sempre apresente o resumo das alteracoes locais e aguarde o "OK" explicito do usuario antes de publicar.

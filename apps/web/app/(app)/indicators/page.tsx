@@ -265,16 +265,17 @@ const renderCustomBarLabel = (props: any, fill: string) => {
   const formatted = formatNumber(value);
   const cx = x + width / 2;
   const cy = y - 6;
+  const isShort = formatted.length <= 3;
 
   return (
     <text
       x={cx}
       y={cy}
       fill={fill}
-      textAnchor="start"
+      textAnchor={isShort ? 'middle' : 'start'}
       fontSize={9}
       fontWeight={600}
-      transform={`rotate(-45, ${cx}, ${cy})`}
+      transform={isShort ? undefined : `rotate(-90, ${cx}, ${cy})`}
     >
       {formatted}
     </text>

@@ -3,7 +3,7 @@
 import Link from 'next/link';
 import { useState } from 'react';
 import { AccordionNavigation } from '@/components/shell/accordion-navigation';
-import { BrandLogo, BrandMark } from '@/components/brand/brand-mark';
+import { BrandLogo } from '@/components/brand/brand-logo';
 import { cn } from '@/lib/utils';
 
 export function Sidebar() {
@@ -21,7 +21,11 @@ export function Sidebar() {
         className={cn('flex h-14 items-center border-b border-[#1b2b54]/50 px-4 text-white', collapsed ? 'justify-center px-2' : 'gap-3')}
         title="Gestão 360"
       >
-        {collapsed ? <BrandMark className="h-7 w-7 rounded bg-white text-[#0a1128]" /> : <BrandLogo className="text-white [&_.text-muted-foreground]:text-slate-400" />}
+        {collapsed ? (
+          <BrandLogo variant="icon" size="sm" theme="dark" className="h-7 w-7" animated={true} />
+        ) : (
+          <BrandLogo variant="horizontal" size="sm" theme="dark" className="text-white" animated={true} />
+        )}
       </Link>
 
       <AccordionNavigation collapsed={collapsed} onCollapsedChange={setCollapsed} />

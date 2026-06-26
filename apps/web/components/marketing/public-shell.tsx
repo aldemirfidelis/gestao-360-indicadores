@@ -1,7 +1,7 @@
 import Link from 'next/link';
 import type { ReactNode } from 'react';
 import { ArrowRight, BarChart3, FileText, Layers3, ShieldCheck } from 'lucide-react';
-import { BrandLogo } from '@/components/brand/brand-mark';
+import { BrandLogo } from '@/components/brand/brand-logo';
 import { DEMO_PATH } from '@/lib/public-site';
 import { DemoLink } from './demo-link';
 
@@ -52,7 +52,7 @@ export function PublicShell({ children }: { children: ReactNode }) {
       <header className="sticky top-0 z-40 border-b border-slate-200 bg-white/95 backdrop-blur">
         <div className="mx-auto flex h-16 max-w-7xl items-center justify-between gap-4 px-4 sm:px-6 lg:px-8">
           <Link href="/" aria-label="Página inicial do Gestão 360" className="shrink-0">
-            <BrandLogo />
+            <BrandLogo variant="horizontal" size="sm" theme="light" animated={true} />
           </Link>
           <nav aria-label="Navegação principal" className="hidden items-center gap-6 lg:flex">
             {nav.map((item) => (
@@ -73,7 +73,7 @@ export function PublicShell({ children }: { children: ReactNode }) {
       <footer className="border-t border-slate-200 bg-slate-950 text-white">
         <div className="mx-auto grid max-w-7xl gap-10 px-4 py-12 sm:px-6 lg:grid-cols-[1.1fr,2fr] lg:px-8">
           <div>
-            <BrandLogo />
+            <BrandLogo variant="horizontal" size="sm" theme="dark" animated={true} />
             <p className="mt-4 max-w-md text-sm leading-6 text-slate-300">
               Plataforma B2B para gestão corporativa integrada, indicadores, estratégia, planos de ação,
               documentos, auditorias, riscos e melhoria contínua.

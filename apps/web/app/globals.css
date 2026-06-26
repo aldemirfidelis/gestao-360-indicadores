@@ -158,3 +158,20 @@
     transform: none;
   }
 }
+
+/* Gestão 360 Logo animations */
+@keyframes spin360 {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+
+.animate-spin-360-once {
+  transform-origin: center;
+  animation: spin360 1.2s ease-in-out forwards;
+}
+
+.animate-spin-360-infinite {
+  transform-origin: center;
+  animation: spin360 1.4s linear infinite;
+}
+

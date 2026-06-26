@@ -12,7 +12,6 @@ import {
   visibleNavSections,
 } from '@/components/shell/navigation';
 import { Button } from '@/components/ui/button';
-import { BrandMark } from '@/components/brand/brand-mark';
 import { api } from '@/lib/api';
 import type { ConversationSummary } from '@/lib/communication/types';
 import { cn } from '@/lib/utils';

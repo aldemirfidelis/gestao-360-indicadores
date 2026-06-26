@@ -42,7 +42,12 @@ type SocketUser = AuthPayload;
 // path '/api/socket.io': mantém o Socket.IO sob o prefixo /api para que o proxy
 // reverso (Caddy) roteie a conexão ao container da API em produção. Em dev o
 // cliente conecta direto no host da API com o mesmo path.
-@WebSocketGateway({ path: '/api/socket.io', cors: wsCors })
+@WebSocketGateway({
+  path: '/api/socket.io',
+  cors: wsCors,
+  pingInterval: 10000,
+  pingTimeout: 5000,
+})
 export class CommunicationGateway
   implements OnGatewayInit, OnGatewayConnection, OnGatewayDisconnect, OnModuleDestroy
 {
