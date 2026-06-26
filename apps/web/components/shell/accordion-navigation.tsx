@@ -12,6 +12,7 @@ import {
   visibleNavSections,
 } from '@/components/shell/navigation';
 import { Button } from '@/components/ui/button';
+import { BrandLogo } from '@/components/brand/brand-logo';
 import { api } from '@/lib/api';
 import type { ConversationSummary } from '@/lib/communication/types';
 import { cn } from '@/lib/utils';
@@ -257,7 +258,7 @@ export function AccordionNavigation({
       {!collapsed && (
         <div className="p-4 border-t border-[#1b2b54]/30">
           <div className="flex items-center gap-2 text-slate-500 text-[11px]">
-            <BrandMark className="h-5 w-5 rounded bg-white text-[#0a1128]" />
+            <BrandLogo variant="icon" size="sm" theme="dark" className="h-5 w-5" />
             <span>Gestão 360 &copy; 2026</span>
           </div>
         </div>
