@@ -1,6 +1,28 @@
+'use client';
+
 import { cn } from '@/lib/utils';
 
+import { useEffect, useState } from 'react';
+
 export function BrandMark({ className }: { className?: string }) {
+  const [rotation, setRotation] = useState(0);
+  const [shouldAnimate, setShouldAnimate] = useState(false);
+
+  useEffect(() => {
+    // Only execute on the client side
+    if (typeof window !== 'undefined') {
+      const hasAnimated = sessionStorage.getItem('gestao360_logo_animated');
+      if (!hasAnimated) {
+        sessionStorage.setItem('gestao360_logo_animated', 'true');
+        setShouldAnimate(true);
+        const timer = setTimeout(() => {
+          setRotation(360);
+        }, 150);
+        return () => clearTimeout(timer);
+      }
+    }
+  }, []);
+
   return (
     <div
       className={cn(
@@ -9,23 +31,43 @@ export function BrandMark({ className }: { className?: string }) {
       )}
       aria-hidden="true"
     >
-      <svg viewBox="0 0 48 48" className="relative h-[70%] w-[70%]" focusable="false">
+      <svg
+        viewBox="0 0 48 48"
+        className="relative h-[70%] w-[70%]"
+        focusable="false"
+        style={{
+          transform: `rotate(${rotation}deg)`,
+          transition: shouldAnimate ? 'transform 1.6s cubic-bezier(0.25, 1.25, 0.5, 1)' : 'none',
+        }}
+      >
+        {/* Main white loop */}
         <path
-          d="M24 7.5a16.5 16.5 0 1 0 13.2 26.4"
+          d="M32 35 A 15 15 0 1 1 24 9"
           fill="none"
           stroke="currentColor"
           strokeLinecap="round"
           strokeWidth="3.5"
         />
+        {/* Cyan loop segment */}
         <path
-          d="M24 7.5a16.5 16.5 0 0 1 15.7 11.4"
+          d="M24 9 A 15 15 0 0 1 35 15"
           fill="none"
-          stroke="currentColor"
+          stroke="#4ED7FA"
           strokeLinecap="round"
           strokeWidth="3.5"
-          opacity="0.5"
         />
-        <circle cx="24" cy="24" r="4" fill="currentColor" />
+        {/* Cyan right-angle arrow tip */}
+        <path
+          d="M35 10 L35 16 L29 16"
+          fill="none"
+          stroke="#4ED7FA"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          strokeWidth="3.5"
+        />
+        {/* Centered avatar (head and rounded shoulders) */}
+        <circle cx="24" cy="20.5" r="3.5" fill="currentColor" />
+        <rect x="15" y="26.5" width="18" height="3.5" rx="1.75" fill="currentColor" />
       </svg>
     </div>
   );
