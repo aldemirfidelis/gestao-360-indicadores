@@ -254,25 +254,10 @@ export function AccordionNavigation({
         </div>
       </div>
 
-      {/* Card IA e Rodapé */}
+      {/* Rodapé */}
       {!collapsed && (
-        <div className="p-4 border-t border-[#1b2b54]/30 space-y-4">
-          <div className="rounded-xl bg-gradient-to-br from-indigo-950/80 to-blue-900/60 p-4 border border-[#203363] space-y-3 relative overflow-hidden">
-            {/* Ícone de Brilho de IA */}
-            <div className="h-8 w-8 rounded-lg bg-indigo-500/20 text-indigo-300 flex items-center justify-center">
-              <Sparkles className="h-4 w-4" />
-            </div>
-            <div>
-              <h4 className="text-xs font-bold text-white">Novidade: IA Gestão 360</h4>
-              <p className="text-[11px] text-slate-400 mt-1 leading-normal">
-                Insights inteligentes para apoiar suas decisões.
-              </p>
-            </div>
-            <button className="w-full py-1.5 px-3 rounded-lg bg-white/10 hover:bg-white/15 text-white text-xs font-medium transition-colors border border-white/10">
-              Conhecer agora
-            </button>
-          </div>
-          <div className="flex items-center gap-2 text-slate-500 text-[11px] mt-2">
+        <div className="p-4 border-t border-[#1b2b54]/30">
+          <div className="flex items-center gap-2 text-slate-500 text-[11px]">
             <BrandMark className="h-5 w-5 rounded bg-white text-[#0a1128]" />
             <span>Gestão 360 &copy; 2026</span>
           </div>
