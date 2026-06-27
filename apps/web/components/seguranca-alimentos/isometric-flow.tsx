@@ -348,8 +348,10 @@ function StepBlock({ step, canManage, onClick, onMove }: StepBlockProps) {
     if (!canManage) return;
     e.stopPropagation();
     
-    // Captura o foco do mouse
-    (e.target as HTMLElement).setPointerCapture(e.pointerId);
+    // Captura o foco do mouse no canvas nativo do DOM
+    if (e.nativeEvent?.target && 'setPointerCapture' in e.nativeEvent.target) {
+      (e.nativeEvent.target as any).setPointerCapture(e.pointerId);
+    }
     setDragging(true);
 
     const intersection = new THREE.Vector3();
@@ -385,7 +387,9 @@ function StepBlock({ step, canManage, onClick, onMove }: StepBlockProps) {
   const handlePointerUp = (e: any) => {
     if (!dragging) return;
     e.stopPropagation();
-    (e.target as HTMLElement).releasePointerCapture(e.pointerId);
+    if (e.nativeEvent?.target && 'releasePointerCapture' in e.nativeEvent.target) {
+      (e.nativeEvent.target as any).releasePointerCapture(e.pointerId);
+    }
     setDragging(false);
 
     if (groupRef.current) {
