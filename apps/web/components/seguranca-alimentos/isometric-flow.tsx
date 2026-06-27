@@ -321,8 +321,10 @@ function StepBlock({ step, canManage, onClick, onMove }: StepBlockProps) {
   const dragOffset = useRef(new THREE.Vector3());
 
   // Coordenadas 3D iniciais: convertemos positionX/positionY salvos na escala React Flow
-  const initialX = step.positionX !== null ? step.positionX / 100 : 0;
-  const initialZ = step.positionY !== null ? step.positionY / 100 : 0;
+  const hasX = typeof step.positionX === 'number' && !isNaN(step.positionX);
+  const hasY = typeof step.positionY === 'number' && !isNaN(step.positionY);
+  const initialX = hasX ? step.positionX / 100 : 0;
+  const initialZ = hasY ? step.positionY / 100 : 0;
 
   useEffect(() => {
     if (groupRef.current && !dragging) {
@@ -454,10 +456,15 @@ interface StepConnectionProps {
 }
 
 function StepConnection({ fromStep, toStep }: StepConnectionProps) {
-  const fromX = fromStep.positionX !== null ? fromStep.positionX / 100 : 0;
-  const fromZ = fromStep.positionY !== null ? fromStep.positionY / 100 : 0;
-  const toX = toStep.positionX !== null ? toStep.positionX / 100 : 0;
-  const toZ = toStep.positionY !== null ? toStep.positionY / 100 : 0;
+  const hasFromX = typeof fromStep.positionX === 'number' && !isNaN(fromStep.positionX);
+  const hasFromY = typeof fromStep.positionY === 'number' && !isNaN(fromStep.positionY);
+  const hasToX = typeof toStep.positionX === 'number' && !isNaN(toStep.positionX);
+  const hasToY = typeof toStep.positionY === 'number' && !isNaN(toStep.positionY);
+
+  const fromX = hasFromX ? fromStep.positionX / 100 : 0;
+  const fromZ = hasFromY ? fromStep.positionY / 100 : 0;
+  const toX = hasToX ? toStep.positionX / 100 : 0;
+  const toZ = hasToY ? toStep.positionY / 100 : 0;
 
   const start = new THREE.Vector3(fromX, 0.1, fromZ);
   const end = new THREE.Vector3(toX, 0.1, toZ);
@@ -503,17 +510,19 @@ export function IsometricFlow({ steps, canManage, onStepClick, onStepMove }: Iso
   const [zoom, setZoom] = useState(42);
   const orbitRef = useRef<any>(null);
 
-  // Ordena as etapas por número
-  const sortedSteps = [...steps].sort((a, b) => a.number - b.number);
+  // Ordena as etapas por número de forma segura
+  const sortedSteps = [...(steps ?? [])].sort((a, b) => (a?.number ?? 0) - (b?.number ?? 0));
 
-  // Distribuição inicial sequencial caso as coordenadas sejam nulas
+  // Distribuição inicial sequencial caso as coordenadas sejam nulas, indefinidas ou NaN
   const positionedSteps = sortedSteps.map((step, idx) => {
-    if (step.positionX === null || step.positionY === null) {
+    const hasPosX = typeof step.positionX === 'number' && !isNaN(step.positionX);
+    const hasPosY = typeof step.positionY === 'number' && !isNaN(step.positionY);
+    if (!hasPosX || !hasPosY) {
       // Auto distribuição em linha no plano
       return {
         ...step,
-        positionX: step.positionX ?? (idx - (sortedSteps.length - 1) / 2) * 250,
-        positionY: step.positionY ?? 0,
+        positionX: hasPosX ? step.positionX : (idx - (sortedSteps.length - 1) / 2) * 250,
+        positionY: hasPosY ? step.positionY : 0,
       };
     }
     return step;
