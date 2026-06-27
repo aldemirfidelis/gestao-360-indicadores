@@ -126,6 +126,7 @@ export const PERMISSION_CATALOG = [
   ['fsms:delete', 'Excluir registros de Seguranca dos Alimentos', 'Seguranca dos Alimentos', 'delete'],
   ['fsms:approve', 'Aprovar/publicar registros de Seguranca dos Alimentos', 'Seguranca dos Alimentos', 'approve'],
   ['fsms:manage', 'Gerenciar o modulo de Seguranca dos Alimentos', 'Seguranca dos Alimentos', 'manage'],
+  ['fsms:export', 'Exportar dados de Seguranca dos Alimentos', 'Seguranca dos Alimentos', 'export'],
 
   // Seguranca Patrimonial e Portarias
   ['asset-security:view', 'Visualizar Seguranca Patrimonial e Portarias', 'Seguranca Patrimonial', 'view'],
@@ -340,6 +341,29 @@ export const PERMISSION_CATALOG = [
 ] as const;
 
 const ALL_KEYS = PERMISSION_CATALOG.map(([key]) => key);
+const SENSITIVE_COMPENSATION_KEYS = new Set(['compensation:salary:individual', 'prize:salary:view']);
+const DIRECTOR_KEYS = PERMISSION_CATALOG
+  .filter(([key, , , action]) => {
+    const prefix = key.split(':')[0];
+    return (
+      ['view', 'export', 'approve'].includes(action) &&
+      !['users', 'settings'].includes(prefix) &&
+      key !== 'asset-security:emergency' &&
+      !SENSITIVE_COMPENSATION_KEYS.has(key)
+    );
+  })
+  .map(([key]) => key);
+const ANALYST_KEYS = PERMISSION_CATALOG
+  .filter(([key, , , action]) => {
+    const prefix = key.split(':')[0];
+    return (
+      ['view', 'create', 'update', 'complete', 'link', 'assist', 'export'].includes(action) &&
+      !['users', 'settings'].includes(prefix) &&
+      key !== 'asset-security:emergency' &&
+      !SENSITIVE_COMPENSATION_KEYS.has(key)
+    );
+  })
+  .map(([key]) => key);
 
 export const DEFAULT_PROFILES = [
   {
@@ -354,7 +378,14 @@ export const DEFAULT_PROFILES = [
     name: 'Admin',
     role: 'COMPANY_ADMIN',
     description: 'Administração da empresa com acesso a usuários, estrutura e parametrização.',
-    permissions: ALL_KEYS.filter((key) => key !== 'audit:export'),
+    permissions: ALL_KEYS.filter((key) => !['audit:export', 'asset-security:emergency'].includes(key)),
+  },
+  {
+    code: 'DIRETORIA',
+    name: 'Diretoria',
+    role: 'DIRECTOR',
+    description: 'Visão ampla para acompanhamento, exportações e alçadas de aprovação, sem administração do ambiente ou acesso salarial individual.',
+    permissions: DIRECTOR_KEYS,
   },
   {
     code: 'GESTOR',
@@ -438,7 +469,6 @@ export const DEFAULT_PROFILES = [
       'asset-security:handover',
       'asset-security:qrcode',
       'asset-security:offline',
-      'asset-security:emergency',
       'asset-security:export',
       'forms:view',
       'forms:create',
@@ -520,6 +550,13 @@ export const DEFAULT_PROFILES = [
     ],
   },
   {
+    code: 'ANALISTA',
+    name: 'Analista',
+    role: 'ANALYST',
+    description: 'Operação técnica para consultar, criar, editar e exportar registros, sem excluir, publicar, aprovar ou administrar usuários.',
+    permissions: ANALYST_KEYS,
+  },
+  {
     code: 'USUARIO',
     name: 'Usuário',
     role: 'COLLABORATOR',
@@ -565,7 +602,6 @@ export const DEFAULT_PROFILES = [
       'asset-security:handover',
       'asset-security:qrcode',
       'asset-security:offline',
-      'asset-security:emergency',
       'forms:view',
       'forms:create',
       'forms:update',
@@ -609,7 +645,6 @@ export const DEFAULT_PROFILES = [
       'audits:view',
       'processes:view',
       'asset-security:view',
-      'asset-security:emergency',
       'asset-security:export',
       'forms:view',
       'forms:dashboard',

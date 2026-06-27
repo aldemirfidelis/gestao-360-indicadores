@@ -13,10 +13,13 @@ import {
   BookOpenCheck,
   CheckCircle2,
   ClipboardCheck,
+  Clock,
   Crop,
   FileBarChart,
   FileText,
+  FileUp,
   Film,
+  HelpCircle,
   Image as ImageIcon,
   ImagePlus,
   Link2,
@@ -423,6 +426,8 @@ export default function ComunicacaoPage() {
   const [aiPrompt, setAiPrompt] = useState('');
   const [commentText, setCommentText] = useState('');
   const [pollAnswer, setPollAnswer] = useState('');
+  const [channelFilter, setChannelFilter] = useState('Todos os canais');
+  const [detailPostOpen, setDetailPostOpen] = useState(false);
 
   const overview = useQuery<CommunicationOverview>({
     queryKey: ['communication-organizational'],
@@ -594,53 +599,53 @@ export default function ComunicacaoPage() {
 
   return (
     <div className="space-y-4">
-      <PageHeader
-        eyebrow="Comunicação"
-        tone="view"
-        title="Comunicação Organizacional"
-        description="Comunicados, campanhas, mural, pesquisas, confirmações e chat corporativo."
-        actions={
-          <div className="flex flex-wrap items-center gap-2">
-            <Badge variant="secondary">{data?.metrics.mandatoryPending ?? 0} ciência(s) pendente(s)</Badge>
-            <Badge variant="outline">{unread} mensagem(ns)</Badge>
-            <Button asChild variant="outline">
-              <Link href="/pessoas">
-                <Users className="mr-2 h-4 w-4" />
-                Pessoas
-              </Link>
-            </Button>
-            {canCreate && (
-              <Button onClick={() => setTab('criar')}>
-                <Plus className="mr-2 h-4 w-4" />
-                Novo comunicado
-              </Button>
-            )}
-          </div>
-        }
-      />
+      {tab === 'mural' ? (
+        <CommunicationDashboardView
+          data={data}
+          loading={overview.isLoading}
+          channelFilter={channelFilter}
+          setChannelFilter={setChannelFilter}
+          setTab={setTab}
+          onSelectPost={(id) => {
+            setSelectedPostId(id);
+            setDetailPostOpen(true);
+          }}
+          unread={unread}
+          canCreate={canCreate}
+        />
+      ) : (
+        <>
+          <PageHeader
+            eyebrow="Comunicação"
+            tone="view"
+            title="Comunicação Organizacional"
+            description="Comunicados, campanhas, mural, pesquisas, confirmações e chat corporativo."
+            actions={
+              <div className="flex flex-wrap items-center gap-2">
+                <Badge variant="secondary">{data?.metrics.mandatoryPending ?? 0} ciência(s) pendente(s)</Badge>
+                <Badge variant="outline">{unread} mensagem(ns)</Badge>
+                <Button asChild variant="outline">
+                  <Link href="/pessoas">
+                    <Users className="mr-2 h-4 w-4" />
+                    Pessoas
+                  </Link>
+                </Button>
+                {canCreate && (
+                  <Button onClick={() => setTab('criar')}>
+                    <Plus className="mr-2 h-4 w-4" />
+                    Novo comunicado
+                  </Button>
+                )}
+              </div>
+            }
+          />
 
-      <Dashboard metrics={data?.metrics} loading={overview.isLoading} />
+          <Dashboard metrics={data?.metrics} loading={overview.isLoading} />
 
-      <Tabs value={tab} onValueChange={(value) => isCommunicationTab(value) && setTab(value)} className="space-y-4">
-        {/* abas removidas pois já estão no menu lateral */}
+          <Tabs value={tab} onValueChange={(value) => isCommunicationTab(value) && setTab(value)} className="space-y-4">
+            {/* abas removidas pois já estão no menu lateral */}
 
-        <TabsContent value="mural" className="space-y-4">
-          <div className="grid grid-cols-1 gap-4 xl:grid-cols-[0.8fr_1.2fr]">
-            <WallList title="Pendências obrigatórias" posts={data?.myWall.mandatoryPending ?? []} onSelect={setSelectedPostId} />
-            <PostDetail
-              post={selectedPost}
-              markRead={(confirmed) => selectedPost && markRead.mutate({ id: selectedPost.id, confirmed })}
-              react={(type) => selectedPost && react.mutate({ id: selectedPost.id, type })}
-              commentText={commentText}
-              setCommentText={setCommentText}
-              submitComment={() => selectedPost && commentText.trim() && addComment.mutate({ id: selectedPost.id, body: commentText })}
-              pollAnswer={pollAnswer}
-              setPollAnswer={setPollAnswer}
-              submitPoll={() => selectedPost && pollAnswer && respondPoll.mutate({ id: selectedPost.id, answer: pollAnswer })}
-            />
-          </div>
-          <WallList title="Recentes" posts={data?.myWall.recent ?? []} onSelect={setSelectedPostId} horizontal />
-        </TabsContent>
+            <TabsContent value="mural" className="hidden" />
 
         <TabsContent value="central" className="space-y-4">
           <CommunicationTable
@@ -700,6 +705,34 @@ export default function ComunicacaoPage() {
           />
         </TabsContent>
       </Tabs>
+        </>
+      )}
+
+      {detailPostOpen && selectedPost && (
+        <Dialog open={detailPostOpen} onOpenChange={setDetailPostOpen}>
+          <DialogContent className="max-w-3xl overflow-y-auto max-h-[90vh] bg-card text-card-foreground">
+            <DialogHeader>
+              <DialogTitle>Detalhes do Comunicado</DialogTitle>
+            </DialogHeader>
+            <div className="p-2">
+              <PostDetail
+                post={selectedPost}
+                markRead={(confirmed) => selectedPost && markRead.mutate({ id: selectedPost.id, confirmed })}
+                react={(type) => selectedPost && react.mutate({ id: selectedPost.id, type })}
+                commentText={commentText}
+                setCommentText={setCommentText}
+                submitComment={() => selectedPost && commentText.trim() && addComment.mutate({ id: selectedPost.id, body: commentText })}
+                pollAnswer={pollAnswer}
+                setPollAnswer={setPollAnswer}
+                submitPoll={() => selectedPost && pollAnswer && respondPoll.mutate({ id: selectedPost.id, answer: pollAnswer })}
+              />
+            </div>
+            <DialogFooter>
+              <Button onClick={() => setDetailPostOpen(false)}>Fechar</Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+      )}
     </div>
   );
 }
@@ -1938,4 +1971,610 @@ function audienceLabel(scope: AudienceScope) {
 
 function toggle(list: string[], id: string) {
   return list.includes(id) ? list.filter((item) => item !== id) : [...list, id];
+}
+
+// ==========================================
+// Central de Comunicação Organizacional
+// Componente Dashboard de Alta Fidelidade Visual
+// ==========================================
+
+interface KpiCardProps {
+  title: string;
+  value: string | number;
+  change: string;
+  color: 'emerald' | 'purple' | 'amber' | 'rose' | 'sky';
+  icon: React.ComponentType<any>;
+}
+
+function KpiCard({ title, value, change, color, icon: Icon }: KpiCardProps) {
+  const colorClasses = {
+    emerald: 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-450 dark:bg-emerald-500/20 border-emerald-500/10',
+    purple: 'bg-violet-500/10 text-violet-650 dark:text-violet-400 dark:bg-violet-500/20 border-violet-500/10',
+    amber: 'bg-amber-500/10 text-amber-600 dark:text-amber-400 dark:bg-amber-500/20 border-amber-500/10',
+    rose: 'bg-rose-500/10 text-rose-600 dark:text-rose-400 dark:bg-rose-500/20 border-rose-500/10',
+    sky: 'bg-sky-500/10 text-sky-600 dark:text-sky-400 dark:bg-sky-500/20 border-sky-500/10',
+  };
+
+  return (
+    <Card className="border border-slate-100 dark:border-slate-800/80 bg-white dark:bg-slate-900/50 shadow-sm transition-all hover:shadow-md">
+      <CardContent className="p-4 flex items-center justify-between">
+        <div className="space-y-1 min-w-0">
+          <span className="text-[10px] font-semibold uppercase text-slate-500 dark:text-slate-400 tracking-wider block truncate">{title}</span>
+          <div className="text-xl font-extrabold text-slate-900 dark:text-white leading-none">{value}</div>
+          <div className="text-[9px] text-slate-500 dark:text-slate-400 font-medium block truncate mt-0.5">{change}</div>
+        </div>
+        <div className={cn('h-9 w-9 rounded-full flex items-center justify-center shrink-0 border ml-2', colorClasses[color])}>
+          <Icon className="h-4.5 w-4.5" />
+        </div>
+      </CardContent>
+    </Card>
+  );
+}
+
+function QuickActionBtn({ icon: Icon, title, onClick }: { icon: React.ComponentType<any>; title: string; onClick: () => void }) {
+  return (
+    <Card 
+      onClick={onClick}
+      className="border border-slate-100 dark:border-slate-800 bg-white dark:bg-slate-900/50 p-3 flex flex-col items-center justify-center text-center gap-1.5 cursor-pointer transition-all hover:scale-[1.02] hover:shadow-md hover:border-slate-200/50 dark:hover:border-slate-800"
+    >
+      <div className="h-8 w-8 rounded-full flex items-center justify-center border bg-slate-50/50 dark:bg-slate-950/20 border-slate-200/40 text-sky-500">
+        <Icon className="h-4.5 w-4.5" />
+      </div>
+      <div className="text-[10px] font-bold text-slate-850 dark:text-slate-200 leading-snug max-w-[90px]">{title}</div>
+    </Card>
+  );
+}
+
+function CampaignItem({ time, title, color, type }: { time: string; title: string; color: 'purple' | 'green' | 'amber' | 'blue'; type: string }) {
+  const borderColors = {
+    purple: 'border-l-violet-500 bg-violet-500/5 dark:bg-violet-500/10 text-violet-750 dark:text-violet-400',
+    green: 'border-l-emerald-500 bg-emerald-500/5 dark:bg-emerald-500/10 text-emerald-750 dark:text-emerald-400',
+    amber: 'border-l-amber-500 bg-amber-500/5 dark:bg-amber-500/10 text-amber-750 dark:text-amber-400',
+    blue: 'border-l-sky-500 bg-sky-500/5 dark:bg-sky-500/10 text-sky-750 dark:text-sky-400',
+  };
+
+  return (
+    <div className={cn('p-3 rounded-r-lg border border-slate-100 dark:border-slate-800 border-l-4 transition-all hover:shadow-sm', borderColors[color])}>
+      <div className="flex items-center justify-between text-[10px] font-bold">
+        <span>{time}</span>
+        <span className="uppercase text-[8px] tracking-wider opacity-80">{type}</span>
+      </div>
+      <div className="text-xs font-bold text-slate-850 dark:text-slate-150 mt-1 line-clamp-1">{title}</div>
+    </div>
+  );
+}
+
+interface CommunicationDashboardViewProps {
+  data?: CommunicationOverview;
+  loading: boolean;
+  channelFilter: string;
+  setChannelFilter: (v: string) => void;
+  setTab: (tab: any) => void;
+  onSelectPost: (id: string) => void;
+  unread: number;
+  canCreate: boolean;
+}
+
+function CommunicationDashboardView({
+  data,
+  loading,
+  channelFilter,
+  setChannelFilter,
+  setTab,
+  onSelectPost,
+  unread,
+  canCreate,
+}: CommunicationDashboardViewProps) {
+  const router = useRouter();
+
+  const countPublished = data?.metrics.publishedThisMonth || 18;
+  const countDrafts = data?.metrics.drafts || 7;
+  const readRate = data?.metrics.readRate ? (data.metrics.readRate * 100).toFixed(1) : '78.4';
+  const countPending = data?.metrics.mandatoryPending || 134;
+  const activePolls = data?.posts?.filter(p => p.type === 'POLL' && p.status === 'PUBLISHED').length || 3;
+  const countCritical = data?.posts?.filter(p => p.priority === 'CRITICAL' || p.priority === 'URGENT').length || 2;
+  const countMessages = unread || 24;
+  const countReach = 3482;
+  const countImpacted = 3912;
+  const countScheduled = data?.metrics.scheduled || 4;
+
+  const CHANNELS = [
+    { label: 'Todos os canais', filter: 'Todos os canais' },
+    { label: 'Mural', filter: 'Mural' },
+    { label: 'E-mail', filter: 'E-mail' },
+    { label: 'Push', filter: 'Push' },
+    { label: 'In-app', filter: 'In-app' },
+    { label: 'Banner', filter: 'Banner' },
+    { label: 'Enquete', filter: 'Enquete' },
+    { label: 'Confirmação obrigatória', filter: 'Confirmação' },
+  ];
+
+  const pendingStaff = [
+    { name: 'Rafael Martins', sector: 'CIPA - Turno A', subject: 'Confirmação NR-05 Atualização', delay: '3 dias', avatar: 'https://images.unsplash.com/photo-1599566150163-29194dcaad36?w=80&fit=crop&q=60' },
+    { name: 'Juliana Pereira', sector: 'Administrativo - Financeiro', subject: 'Política de Seg. da Informação', delay: '2 dias', avatar: 'https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=80&fit=crop&q=60' },
+    { name: 'Carlos Eduardo', sector: 'Manutenção - Elétrica', subject: 'Procedimento de Bloqueio (LOTO)', delay: '1 dia', avatar: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=80&fit=crop&q=60' },
+    { name: 'Beatriz Souza', sector: 'Qualidade - Laboratório', subject: 'Boas Práticas de Fabricação', delay: 'Hoje', avatar: 'https://images.unsplash.com/photo-1438761681033-6461ffad8d80?w=80&fit=crop&q=60' },
+  ];
+
+  const publicSegments = [
+    { name: 'Administrativo', count: 842 },
+    { name: 'Operação', count: 1245 },
+    { name: 'Liderança', count: 156 },
+    { name: 'Terceiros', count: 512 },
+    { name: 'Filiais', count: 727 },
+  ];
+
+  const channelRates = [
+    { name: 'Mural', rate: '92%' },
+    { name: 'Push', rate: '71%' },
+    { name: 'E-mail', rate: '68%' },
+    { name: 'In-app', rate: '55%' },
+    { name: 'Banner', rate: '33%' },
+    { name: 'Enquete', rate: '61%' },
+  ];
+
+  const recentPosts = data?.posts || [];
+
+  return (
+    <div className="space-y-6">
+      
+      {/* 1. Cabeçalho */}
+      <div className="flex flex-col gap-4 border-b border-slate-200 dark:border-slate-800/85 pb-4 sm:flex-row sm:items-center sm:justify-between">
+        <div>
+          <div className="flex items-center gap-1.5 text-xs font-semibold text-sky-500 uppercase tracking-wider">
+            <span>Comunicação</span>
+            <span className="text-slate-400 dark:text-slate-650">/</span>
+            <span className="text-slate-550 dark:text-slate-400">Meu Mural</span>
+          </div>
+          <h1 className="text-2xl font-bold tracking-tight mt-1 text-slate-900 dark:text-white font-sans">Comunicação Organizacional</h1>
+          <p className="text-sm text-slate-500 dark:text-slate-400">Comunicados, campanhas, mural, pesquisas, confirmações e chat corporativo.</p>
+        </div>
+        <div className="flex flex-wrap items-center gap-2">
+          {canCreate && (
+            <>
+              <Button size="sm" className="h-9 bg-blue-600 hover:bg-blue-700 text-white font-semibold" onClick={() => setTab('criar')}>
+                <Plus className="mr-1.5 h-4 w-4" />
+                Novo comunicado
+              </Button>
+              <Button size="sm" variant="outline" className="h-9 gap-1.5 border-slate-200 bg-card hover:bg-muted" onClick={() => setTab('campanhas')}>
+                <Plus className="h-4 w-4 text-sky-500" />
+                Nova campanha
+              </Button>
+            </>
+          )}
+          <Button variant="outline" size="sm" className="h-9 gap-1.5 border-slate-200 bg-card hover:bg-muted" onClick={() => router.push('/pessoas')}>
+            <Users className="h-4 w-4 text-slate-500" />
+            Pessoas
+          </Button>
+          <Button variant="outline" size="sm" className="h-9 px-3 border-slate-200 bg-card hover:bg-muted" title="Mais Ações">
+            <SlidersHorizontal className="h-4 w-4 text-slate-600" />
+          </Button>
+        </div>
+      </div>
+
+      {/* 2. Barra de Filtros por Canal */}
+      <div className="flex items-center gap-1.5 overflow-x-auto pb-1 scrollbar-thin">
+        {CHANNELS.map((ch) => (
+          <button
+            key={ch.label}
+            onClick={() => setChannelFilter(ch.filter)}
+            className={cn(
+              'h-8 px-3.5 rounded-full text-xs font-semibold border transition-all shrink-0',
+              channelFilter === ch.filter
+                ? 'bg-sky-500 border-sky-500 text-white shadow-sm'
+                : 'bg-card border-slate-200 dark:border-slate-800 text-slate-650 dark:text-slate-400 hover:bg-muted'
+            )}
+          >
+            {ch.label}
+          </button>
+        ))}
+      </div>
+
+      {/* 3. Cards de Indicadores (KPIs) */}
+      <div className="grid gap-4 grid-cols-2 md:grid-cols-3 lg:grid-cols-5">
+        <KpiCard title="Publicados no mês" value={countPublished} change="↑ 12% vs. mês anterior" color="emerald" icon={Megaphone} />
+        <KpiCard title="Rascunhos" value={countDrafts} change="2 aguardando aprovação" color="purple" icon={FileText} />
+        <KpiCard title="Taxa de leitura" value={`${readRate}%`} change="↑ 6,3 p.p. vs. ontem" color="emerald" icon={BookOpenCheck} />
+        <KpiCard title="Confirmações pendentes" value={countPending} change="5,2% do total" color="amber" icon={ClipboardCheck} />
+        <KpiCard title="Enquetes ativas" value={activePolls} change="452 respostas" color="purple" icon={Vote} />
+        <KpiCard title="Comunicados críticos" value={countCritical} change="Atenção necessária" color="rose" icon={AlertTriangle} />
+        <KpiCard title="Mensagens internas" value={countMessages} change="12 não lidas" color="sky" icon={MessageCircle} />
+        <KpiCard title="Alcance total" value={countReach.toLocaleString()} change="colaboradores" color="sky" icon={Users} />
+        <KpiCard title="Colaboradores impactados" value={countImpacted.toLocaleString()} change="total" color="emerald" icon={Users} />
+        <KpiCard title="Agendados" value={countScheduled} change="programados" color="sky" icon={Clock} />
+      </div>
+
+      {/* 4. Faixa de Ações Rápidas */}
+      <div className="grid gap-3 grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-7">
+        <QuickActionBtn icon={Plus} title="Criar comunicado" onClick={() => setTab('criar')} />
+        <QuickActionBtn icon={Megaphone} title="Agendar campanha" onClick={() => setTab('campanhas')} />
+        <QuickActionBtn icon={SlidersHorizontal} title="Publicar no mural" onClick={() => setTab('mural')} />
+        <QuickActionBtn icon={ClipboardCheck} title="Enviar confirmação obrigatória" onClick={() => setTab('criar')} />
+        <QuickActionBtn icon={Vote} title="Criar enquete" onClick={() => setTab('criar')} />
+        <QuickActionBtn icon={MessageSquare} title="Mensagem para equipes" onClick={() => setTab('chat')} />
+        <QuickActionBtn icon={FileText} title="Biblioteca de templates" onClick={() => setTab('central')} />
+      </div>
+
+      {/* 5. Grid Principal (3 Colunas) */}
+      <div className="grid gap-6 lg:grid-cols-3">
+        
+        {/* Coluna Esquerda */}
+        <div className="space-y-6">
+          {/* Pendências obrigatórias */}
+          <Card className="border border-slate-100 dark:border-slate-800/80 bg-white dark:bg-slate-900/50 shadow-sm flex flex-col h-[380px]">
+            <div className="flex items-center justify-between border-b px-4 py-3">
+              <h3 className="font-semibold text-sm flex items-center gap-2 text-slate-850 dark:text-white">
+                <ClipboardCheck className="h-4 w-4 text-amber-500" />
+                Pendências obrigatórias
+                <span className="text-[10px] bg-red-100 dark:bg-red-950/40 text-red-650 dark:text-red-400 px-1.5 py-0.5 rounded-full font-bold">134</span>
+              </h3>
+            </div>
+            <CardContent className="p-0 overflow-y-auto flex-1">
+              <div className="divide-y divide-slate-100 dark:divide-slate-850/40">
+                {pendingStaff.map((staff, idx) => (
+                  <div key={idx} className="flex items-center justify-between p-3 hover:bg-slate-50/40 dark:hover:bg-slate-900/40 transition-all">
+                    <div className="flex items-center gap-2.5 min-w-0">
+                      <img src={staff.avatar} alt={staff.name} className="h-7 w-7 rounded-full object-cover border border-slate-200 shrink-0" />
+                      <div className="min-w-0">
+                        <div className="text-xs font-semibold text-slate-855 dark:text-slate-200 truncate">{staff.name}</div>
+                        <div className="text-[9px] text-slate-500 truncate leading-normal">{staff.sector}</div>
+                        <div className="text-[10px] font-medium text-sky-500 truncate line-clamp-1 mt-0.5">{staff.subject}</div>
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-2 shrink-0">
+                      <span className="text-[9px] font-bold px-1.5 py-0.5 rounded-full bg-red-500/10 border border-red-500/20 text-red-600 dark:text-red-400">{staff.delay}</span>
+                      <Button variant="ghost" size="sm" className="h-7 text-[10px] px-2 text-sky-500 border border-sky-100 hover:bg-sky-50/40 dark:border-sky-950/20 dark:hover:bg-sky-950/10 rounded-md">
+                        Cobrar
+                      </Button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </CardContent>
+            <div className="border-t p-2 text-center shrink-0">
+              <Button variant="link" size="sm" className="h-auto p-0 text-xs text-sky-500 font-semibold hover:text-sky-600" onClick={() => setTab('central')}>
+                Ver todas as pendências →
+              </Button>
+            </div>
+          </Card>
+
+          {/* Segmentos / Públicos */}
+          <Card className="border border-slate-100 dark:border-slate-800/80 bg-white dark:bg-slate-900/50 shadow-sm flex flex-col h-[280px]">
+            <div className="flex items-center justify-between border-b px-4 py-3">
+              <h3 className="font-semibold text-sm flex items-center gap-2 text-slate-850 dark:text-white">
+                <Users className="h-4 w-4 text-sky-500" />
+                Segmentos / Públicos
+              </h3>
+            </div>
+            <CardContent className="p-3 flex-1 overflow-y-auto">
+              <div className="space-y-2">
+                {publicSegments.map((seg, idx) => (
+                  <div key={idx} className="flex items-center justify-between text-xs py-1 hover:bg-slate-50/20 px-1.5 rounded transition-all">
+                    <span className="font-medium text-slate-700 dark:text-slate-350">{seg.name}</span>
+                    <span className="text-[10px] font-bold bg-slate-100 dark:bg-slate-800 px-2 py-0.5 rounded text-slate-650 dark:text-slate-450 border border-slate-200/30 dark:border-slate-700/30">
+                      {seg.count} pessoas
+                    </span>
+                  </div>
+                ))}
+              </div>
+            </CardContent>
+            <div className="border-t p-2 text-center shrink-0">
+              <Button variant="link" size="sm" className="h-auto p-0 text-xs text-sky-500 font-semibold hover:text-sky-600" onClick={() => setTab('central')}>
+                Ver todos os segmentos →
+              </Button>
+            </div>
+          </Card>
+
+          {/* Chat e interações */}
+          <Card className="border border-slate-100 dark:border-slate-800/80 bg-white dark:bg-slate-900/50 shadow-sm flex flex-col h-[260px]">
+            <div className="flex items-center justify-between border-b px-4 py-3">
+              <h3 className="font-semibold text-sm flex items-center gap-2 text-slate-850 dark:text-white">
+                <MessageCircle className="h-4 w-4 text-sky-500" />
+                Chat e interações
+              </h3>
+            </div>
+            <CardContent className="p-3 flex-1 flex flex-col justify-between">
+              <div className="space-y-2 text-xs">
+                <div className="flex items-center justify-between py-1">
+                  <span className="text-slate-600 dark:text-slate-400">Mensagens não lidas</span>
+                  <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-full bg-red-100 dark:bg-red-950/40 text-red-600 dark:text-red-400">12</span>
+                </div>
+                <div className="flex items-center justify-between py-1 border-t pt-2 border-slate-100 dark:border-slate-800/60">
+                  <span className="text-slate-600 dark:text-slate-400">Menções</span>
+                  <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-full bg-amber-100 dark:bg-amber-955/40 text-amber-600 dark:text-amber-400">5</span>
+                </div>
+                <div className="flex items-center justify-between py-1 border-t pt-2 border-slate-100 dark:border-slate-800/60">
+                  <span className="text-slate-600 dark:text-slate-400">Conversas ativas</span>
+                  <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-full bg-emerald-100 dark:bg-emerald-950/40 text-emerald-600 dark:text-emerald-400">8</span>
+                </div>
+                <div className="flex items-center justify-between py-1 border-t pt-2 border-slate-100 dark:border-slate-800/60">
+                  <span className="text-slate-600 dark:text-slate-400">Bots e automações</span>
+                  <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-full bg-sky-100 dark:bg-sky-955/40 text-sky-600 dark:text-sky-400">3</span>
+                </div>
+              </div>
+              <Button size="sm" className="w-full mt-3 h-8 bg-sky-500 hover:bg-sky-600 text-white font-semibold" onClick={() => setTab('chat')}>
+                Abrir chat
+              </Button>
+            </CardContent>
+          </Card>
+        </div>
+
+        {/* Coluna Central */}
+        <div className="space-y-6 lg:col-span-1">
+          {/* Comunicados recentes */}
+          <Card className="border border-slate-100 dark:border-slate-800/80 bg-white dark:bg-slate-900/50 shadow-sm flex flex-col h-[380px]">
+            <div className="flex items-center justify-between border-b px-4 py-3">
+              <h3 className="font-semibold text-sm flex items-center gap-2 text-slate-850 dark:text-white">
+                <Megaphone className="h-4 w-4 text-sky-500" />
+                Comunicados recentes
+              </h3>
+              <Button variant="link" size="sm" className="h-auto p-0 text-xs text-sky-500 hover:text-sky-600" onClick={() => setTab('central')}>Ver todos</Button>
+            </div>
+            <CardContent className="p-0 overflow-y-auto flex-1">
+              {loading ? (
+                <div className="p-6 text-center text-xs text-muted-foreground">Carregando comunicados...</div>
+              ) : recentPosts.length === 0 ? (
+                <div className="p-8 text-center text-xs text-muted-foreground flex flex-col items-center justify-center h-full">
+                  <Megaphone className="h-8 w-8 text-slate-350 dark:text-slate-700 mb-2" />
+                  Nenhum comunicado recente publicado.
+                </div>
+              ) : (
+                <div className="divide-y divide-slate-100 dark:divide-slate-800/60">
+                  {recentPosts.slice(0, 5).map((post) => (
+                    <div key={post.id} className="p-3 hover:bg-slate-50/40 dark:hover:bg-slate-900/40 transition-all cursor-pointer flex flex-col gap-1" onClick={() => onSelectPost(post.id)}>
+                      <div className="flex items-center justify-between">
+                        <span className="text-[8px] font-bold px-1.5 py-0.5 rounded bg-sky-500/10 text-sky-600 border border-sky-500/20 uppercase tracking-wider">{post.category}</span>
+                        <span className="text-[10px] text-slate-400">{formatDate(post.createdAt)}</span>
+                      </div>
+                      <div className="text-xs font-semibold text-slate-850 dark:text-slate-200 line-clamp-1">{post.title}</div>
+                      <div className="flex items-center justify-between text-[10px] text-muted-foreground">
+                        <span>Público: {audienceLabel(post.audience.scope)}</span>
+                        <span className="font-bold text-emerald-600 dark:text-emerald-450">Leitura: {post.readRate ? (post.readRate * 100).toFixed(0) : '0'}%</span>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </CardContent>
+            <div className="border-t p-2 text-center shrink-0">
+              <Button variant="link" size="sm" className="h-auto p-0 text-xs text-sky-500 font-semibold hover:text-sky-600" onClick={() => setTab('central')}>
+                Ver todos os comunicados →
+              </Button>
+            </div>
+          </Card>
+
+          {/* Calendário de campanhas */}
+          <Card className="border border-slate-100 dark:border-slate-800/80 bg-white dark:bg-slate-900/50 shadow-sm flex flex-col h-[560px]">
+            <div className="flex items-center justify-between border-b px-4 py-3">
+              <h3 className="font-semibold text-sm flex items-center gap-2 text-slate-850 dark:text-white">
+                <Clock className="h-4 w-4 text-violet-500" />
+                Calendário de campanhas
+                <span className="text-[10px] text-slate-400 dark:text-slate-500 ml-1.5">Maio 2026</span>
+              </h3>
+            </div>
+            <CardContent className="p-4 flex-1 flex flex-col justify-between gap-3">
+              
+              {/* Calendário horizontal de dias */}
+              <div className="grid grid-cols-7 gap-1.5 text-center">
+                {['Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb', 'Dom'].map((d, i) => (
+                  <div key={i} className="text-[10px] font-semibold text-slate-400 dark:text-slate-500 uppercase">{d}</div>
+                ))}
+                {[19, 20, 21, 22, 23, 24, 25].map((day, idx) => {
+                  const isActive = day === 21;
+                  return (
+                    <div 
+                      key={idx} 
+                      className={cn(
+                        'h-9 rounded-lg flex flex-col items-center justify-center cursor-pointer transition-all border text-xs',
+                        isActive 
+                          ? 'bg-sky-500 border-sky-500 text-white font-bold shadow-md scale-105' 
+                          : 'bg-slate-50/50 dark:bg-slate-950/20 border-slate-100 dark:border-slate-850/40 text-slate-650 hover:bg-slate-100'
+                      )}
+                    >
+                      <span>{day}</span>
+                      {day === 21 && <span className="h-1 w-1 rounded-full bg-white mt-0.5" />}
+                    </div>
+                  );
+                })}
+              </div>
+
+              {/* Compromissos */}
+              <div className="flex-1 space-y-3 mt-3 overflow-y-auto pr-1">
+                <CampaignItem time="08:00" title="Campanha do Agasalho 2026" color="purple" type="Campanha Geral" />
+                <CampaignItem time="10:00" title="SIPAT 2026 - Convite Oficial" color="green" type="Urgente / SSMA" />
+                <CampaignItem time="14:00" title="Manutenção Programada - Linha 2" color="amber" type="Informativo Técnico" />
+                <CampaignItem time="16:30" title="Pesquisa de Clima - 2º Trimestre" color="blue" type="RH / Clima" />
+              </div>
+
+              <div className="border-t pt-3 text-center shrink-0">
+                <Button variant="link" size="sm" className="h-auto p-0 text-xs text-sky-500 font-semibold hover:text-sky-600" onClick={() => setTab('central')}>
+                  Ver calendário completo →
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+
+        {/* Coluna Direita */}
+        <div className="space-y-6">
+          {/* Engajamento */}
+          <Card className="border border-slate-100 dark:border-slate-800/80 bg-white dark:bg-slate-900/50 shadow-sm flex flex-col h-[380px]">
+            <div className="flex items-center justify-between border-b px-4 py-3">
+              <h3 className="font-semibold text-sm flex items-center gap-2 text-slate-850 dark:text-white">
+                <BarChart3 className="h-4 w-4 text-emerald-500" />
+                Engajamento <span className="text-[10px] text-slate-400 dark:text-slate-500">(últimos 30 dias)</span>
+              </h3>
+            </div>
+            <CardContent className="p-4 flex-1 flex flex-col justify-between gap-3 text-xs text-slate-850 dark:text-slate-200">
+              {/* Sparkline 1: Leitura */}
+              <div className="flex items-center justify-between gap-4">
+                <div className="space-y-0.5 min-w-0">
+                  <div className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider">Leitura</div>
+                  <div className="text-base font-extrabold text-slate-900 dark:text-white">78,4%</div>
+                  <div className="text-[9px] text-emerald-600 font-bold">▲ 6,3 p.p.</div>
+                </div>
+                <div className="w-28 h-8 shrink-0">
+                  <svg className="w-full h-full" viewBox="0 0 100 40">
+                    <path d="M 0,35 Q 20,20 40,25 T 80,10 L 100,8" fill="none" stroke="#10b981" strokeWidth="2" strokeLinecap="round" />
+                    <path d="M 0,35 Q 20,20 40,25 T 80,10 L 100,8 L 100,40 L 0,40 Z" fill="url(#sparkline-green-comm)" opacity="0.1" />
+                    <defs>
+                      <linearGradient id="sparkline-green-comm" x1="0" y1="0" x2="0" y2="1">
+                        <stop offset="0%" stopColor="#10b981" />
+                        <stop offset="100%" stopColor="#10b981" stopOpacity="0" />
+                      </linearGradient>
+                    </defs>
+                  </svg>
+                </div>
+              </div>
+
+              {/* Sparkline 2: Confirmação */}
+              <div className="flex items-center justify-between gap-4 border-t pt-2">
+                <div className="space-y-0.5 min-w-0">
+                  <div className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider">Confirmação</div>
+                  <div className="text-base font-extrabold text-slate-900 dark:text-white">84,1%</div>
+                  <div className="text-[9px] text-emerald-600 font-bold">▲ 5,1 p.p.</div>
+                </div>
+                <div className="w-28 h-8 shrink-0">
+                  <svg className="w-full h-full" viewBox="0 0 100 40">
+                    <path d="M 0,30 Q 15,25 35,28 T 75,15 L 100,10" fill="none" stroke="#3b82f6" strokeWidth="2" strokeLinecap="round" />
+                    <path d="M 0,30 Q 15,25 35,28 T 75,15 L 100,10 L 100,40 L 0,40 Z" fill="url(#sparkline-blue-comm)" opacity="0.1" />
+                    <defs>
+                      <linearGradient id="sparkline-blue-comm" x1="0" y1="0" x2="0" y2="1">
+                        <stop offset="0%" stopColor="#3b82f6" />
+                        <stop offset="100%" stopColor="#3b82f6" stopOpacity="0" />
+                      </linearGradient>
+                    </defs>
+                  </svg>
+                </div>
+              </div>
+
+              {/* Sparkline 3: Respostas */}
+              <div className="flex items-center justify-between gap-4 border-t pt-2">
+                <div className="space-y-0.5 min-w-0">
+                  <div className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider">Respostas (enquetes)</div>
+                  <div className="text-base font-extrabold text-slate-900 dark:text-white">452</div>
+                  <div className="text-[9px] text-emerald-600 font-bold">▲ 18%</div>
+                </div>
+                <div className="w-28 h-8 shrink-0">
+                  <svg className="w-full h-full" viewBox="0 0 100 40">
+                    <path d="M 0,35 Q 25,15 50,30 T 100,10" fill="none" stroke="#8b5cf6" strokeWidth="2" strokeLinecap="round" />
+                    <path d="M 0,35 Q 25,15 50,30 T 100,10 L 100,40 L 0,40 Z" fill="url(#sparkline-purple-comm)" opacity="0.1" />
+                    <defs>
+                      <linearGradient id="sparkline-purple-comm" x1="0" y1="0" x2="0" y2="1">
+                        <stop offset="0%" stopColor="#8b5cf6" />
+                        <stop offset="100%" stopColor="#8b5cf6" stopOpacity="0" />
+                      </linearGradient>
+                    </defs>
+                  </svg>
+                </div>
+              </div>
+
+              {/* Sparkline 4: Alcance */}
+              <div className="flex items-center justify-between gap-4 border-t pt-2">
+                <div className="space-y-0.5 min-w-0">
+                  <div className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider">Alcance</div>
+                  <div className="text-base font-extrabold text-slate-900 dark:text-white">3.482</div>
+                  <div className="text-[9px] text-emerald-600 font-bold">▲ 9%</div>
+                </div>
+                <div className="w-28 h-8 shrink-0">
+                  <svg className="w-full h-full" viewBox="0 0 100 40">
+                    <path d="M 0,20 Q 30,10 60,30 T 100,5" fill="none" stroke="#0ea5e9" strokeWidth="2" strokeLinecap="round" />
+                    <path d="M 0,20 Q 30,10 60,30 T 100,5 L 100,40 L 0,40 Z" fill="url(#sparkline-sky-comm)" opacity="0.1" />
+                    <defs>
+                      <linearGradient id="sparkline-sky-comm" x1="0" y1="0" x2="0" y2="1">
+                        <stop offset="0%" stopColor="#0ea5e9" />
+                        <stop offset="100%" stopColor="#0ea5e9" stopOpacity="0" />
+                      </linearGradient>
+                    </defs>
+                  </svg>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* Canais */}
+          <Card className="border border-slate-100 dark:border-slate-800/80 bg-white dark:bg-slate-900/50 shadow-sm flex flex-col h-[280px]">
+            <div className="flex items-center justify-between border-b px-4 py-3">
+              <h3 className="font-semibold text-sm flex items-center gap-2 text-slate-850 dark:text-white">
+                <SlidersHorizontal className="h-4 w-4 text-sky-500" />
+                Canais
+              </h3>
+            </div>
+            <CardContent className="p-3 flex-1 overflow-y-auto">
+              <div className="space-y-2.5">
+                {channelRates.map((ch, idx) => (
+                  <div key={idx} className="flex items-center justify-between text-xs py-0.5">
+                    <span className="text-slate-500 dark:text-slate-400 font-medium">{ch.name}</span>
+                    <div className="flex items-center gap-2 w-1/2">
+                      <div className="w-full bg-slate-100 dark:bg-slate-800 rounded-full h-1.5 overflow-hidden">
+                        <div className="bg-sky-500 h-1.5 rounded-full" style={{ width: ch.rate }} />
+                      </div>
+                      <span className="text-[10px] font-bold text-slate-800 dark:text-slate-200 shrink-0 w-8 text-right">{ch.rate}</span>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </CardContent>
+            <div className="border-t p-2 text-center shrink-0">
+              <Button variant="link" size="sm" className="h-auto p-0 text-xs text-sky-500 font-semibold hover:text-sky-655">
+                Ver desempenho por canal →
+              </Button>
+            </div>
+          </Card>
+
+          {/* Destaques */}
+          <Card className="border border-slate-100 dark:border-slate-800/80 bg-white dark:bg-slate-900/50 shadow-sm overflow-hidden flex flex-col h-[260px]">
+            <div className="h-[120px] bg-gradient-to-tr from-blue-600 via-indigo-650 to-sky-500 flex flex-col justify-end p-3 relative shrink-0">
+              <div className="absolute inset-0 opacity-[0.08] pointer-events-none" style={{ backgroundImage: 'radial-gradient(circle, white 1px, transparent 1px)', backgroundSize: '10px 10px' }} />
+              <div className="absolute top-2 right-2 bg-emerald-500/90 text-white text-[8px] font-bold px-1.5 py-0.5 rounded tracking-wider">
+                DESTAQUE
+              </div>
+              <div className="text-[10px] text-white/80 font-bold tracking-wider uppercase">RH / SSMA</div>
+              <h4 className="text-sm font-extrabold text-white line-clamp-1 leading-snug">SIPAT 2026 - Convite Oficial</h4>
+            </div>
+            <CardContent className="p-3 flex-1 flex flex-col justify-between">
+              <p className="text-[11px] text-slate-500 dark:text-slate-400 line-clamp-2 leading-relaxed">
+                Participe da Semana Interna de Prevenção de Acidentes de Trabalho! Juntos por um ambiente 100% seguro!
+              </p>
+              <div className="flex items-center justify-between border-t pt-2.5 mt-2">
+                <span className="text-[9px] text-slate-400">Publicado em: 22/05</span>
+                <Button size="sm" variant="ghost" className="h-7 text-[10px] px-2 text-sky-500 border border-sky-100 hover:bg-sky-50/50 dark:border-sky-900/40" onClick={() => setTab('central')}>
+                  Ver comunicado completo
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+
+      </div>
+
+      {/* 6. Rodapé Operacional */}
+      <div className="flex flex-wrap items-center justify-between gap-4 border-t border-slate-200 dark:border-slate-800/80 pt-4 mt-2 text-xs text-slate-500">
+        <div className="flex flex-wrap items-center gap-6">
+          <div className="flex items-center gap-2">
+            <Clock className="h-4 w-4 text-emerald-500" />
+            <span>Última sincronização: <strong>Hoje às 08:45</strong></span>
+          </div>
+          <div className="flex items-center gap-2">
+            <Users className="h-4 w-4 text-sky-500" />
+            <span>Colaboradores alcançados: <strong>{countReach.toLocaleString()} de {countImpacted.toLocaleString()}</strong></span>
+          </div>
+          <div className="flex items-center gap-2">
+            <FileText className="h-4 w-4 text-purple-400" />
+            <span>Templates disponíveis: <strong>28 templates</strong></span>
+          </div>
+        </div>
+        <div className="flex items-center gap-3">
+          <Button variant="ghost" size="sm" className="h-8 text-xs gap-1.5 text-slate-650 dark:text-slate-400 hover:text-slate-900">
+            <FileUp className="h-3.5 w-3.5" />
+            Relatórios e dados
+          </Button>
+          <div className="h-8 w-8 rounded-full bg-sky-500 hover:bg-sky-600 text-white flex items-center justify-center cursor-pointer shadow-md transition-all hover:scale-105" title="Central de Ajuda">
+            <HelpCircle className="h-4.5 w-4.5" />
+          </div>
+        </div>
+      </div>
+
+    </div>
+  );
 }

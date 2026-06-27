@@ -403,6 +403,9 @@ export class AdminService {
 
   async createProfile(me: AuthPayload, body: any) {
     if (!body.code || !body.name) throw new BadRequestException('Código e nome sao obrigatorios');
+    if (me.role !== UserRoleEnum.SUPER_ADMIN && body.role === UserRoleEnum.SUPER_ADMIN) {
+      throw new BadRequestException('O papel Super Admin não pode ser usado em perfis da empresa.');
+    }
     const created = await this.prisma.accessProfile.create({
       data: {
         companyId: me.companyId,
@@ -416,11 +419,25 @@ export class AdminService {
     });
     await this.setProfilePermissions(me, created.id, body.permissionKeys ?? []);
     await this.audit(me, 'CREATE', 'Seguranca', 'AccessProfile', created.id, null, created);
-    return this.getProfile(created.id, me.companyId);
+    return this.getProfile(created.id, me.companyId, me.role === UserRoleEnum.SUPER_ADMIN);
   }
 
   async updateProfile(me: AuthPayload, id: string, body: any) {
-    const before = await this.getProfile(id, me.companyId);
+    const allowGlobal = me.role === UserRoleEnum.SUPER_ADMIN;
+    const before = await this.getProfile(id, me.companyId, allowGlobal);
+    if (!allowGlobal && body.role === UserRoleEnum.SUPER_ADMIN) {
+      throw new BadRequestException('O papel Super Admin não pode ser usado em perfis da empresa.');
+    }
+    if (body.role && body.role !== before.role && before._count.users > 0) {
+      const incompatibleUsers = await this.prisma.user.count({
+        where: { accessProfileId: id, deletedAt: null, role: { not: body.role } },
+      });
+      if (incompatibleUsers > 0) {
+        throw new ConflictException(
+          'Este perfil possui usuários com outro papel base. Ajuste os usuários antes de alterar o papel do perfil.',
+        );
+      }
+    }
     const updated = await this.prisma.accessProfile.update({
       where: { id },
       data: {
@@ -434,11 +451,12 @@ export class AdminService {
     });
     if (body.permissionKeys) await this.setProfilePermissions(me, id, body.permissionKeys);
     await this.audit(me, 'UPDATE', 'Seguranca', 'AccessProfile', id, before, updated);
-    return this.getProfile(id, me.companyId);
+    return this.getProfile(id, me.companyId, allowGlobal);
   }
 
   async setProfilePermissions(me: AuthPayload, id: string, permissionKeys: string[]) {
-    await this.getProfile(id, me.companyId);
+    const allowGlobal = me.role === UserRoleEnum.SUPER_ADMIN;
+    await this.getProfile(id, me.companyId, allowGlobal);
     await this.ensurePermissions();
     const permissions = await this.prisma.permission.findMany({ where: { key: { in: permissionKeys } }, select: { id: true } });
     await this.prisma.$transaction([
@@ -446,11 +464,11 @@ export class AdminService {
       ...permissions.map((permission) => this.prisma.profilePermission.create({ data: { profileId: id, permissionId: permission.id } })),
     ]);
     await this.audit(me, 'PERMISSION_CHANGE', 'Seguranca', 'AccessProfile', id, null, { permissionKeys });
-    return this.getProfile(id, me.companyId);
+    return this.getProfile(id, me.companyId, allowGlobal);
   }
 
   async removeProfile(me: AuthPayload, id: string) {
-    const before = await this.getProfile(id, me.companyId);
+    const before = await this.getProfile(id, me.companyId, me.role === UserRoleEnum.SUPER_ADMIN);
     const users = await this.prisma.user.count({ where: { accessProfileId: id, deletedAt: null } });
     if (users > 0) throw new ConflictException('Perfil em uso por usuários. Remova os vínculos antes.');
     const updated = await this.prisma.accessProfile.update({ where: { id }, data: { deletedAt: new Date(), status: AdminRecordStatus.ARCHIVED, updatedById: me.sub } });
@@ -530,9 +548,9 @@ export class AdminService {
     return item;
   }
 
-  private async getProfile(id: string, companyId: string) {
+  private async getProfile(id: string, companyId: string, allowGlobal = false) {
     const profile = await this.prisma.accessProfile.findFirst({
-      where: { id, deletedAt: null, OR: [{ companyId }, { companyId: null }] },
+      where: { id, deletedAt: null, ...(allowGlobal ? { OR: [{ companyId }, { companyId: null }] } : { companyId }) },
       include: { permissions: { include: { permission: true } }, _count: { select: { users: true } } },
     });
     if (!profile) throw new NotFoundException('Perfil nao encontrado');

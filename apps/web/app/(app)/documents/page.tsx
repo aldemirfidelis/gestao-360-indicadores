@@ -28,6 +28,7 @@ import {
   Table2,
   Trash2,
   Upload,
+  Users,
   X,
 } from 'lucide-react';
 import { PageHeader } from '@/components/shell/page-header';
@@ -698,62 +699,123 @@ export default function DocumentsPage() {
 
   const selectedType = options?.typeConfigs.find((type) => type.id === form.typeConfigId);
 
+  const pendingReadings = [
+    { name: 'Gabriel Alencar', sector: 'Operação - Envase', docTitle: 'Procedimento Operacional Envase v3', delay: '5 dias', avatar: 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=80&fit=crop&q=60' },
+    { name: 'Mariana Lima', sector: 'Qualidade - Controle Físico', docTitle: 'Manual de Controle de Pragas v2', delay: '2 dias', avatar: 'https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=80&fit=crop&q=60' }
+  ];
+
   return (
-    <div>
+    <div className="space-y-6">
       <PageHeader
         title="Documentos"
-        description="GED corporativo com códigos, revisões, validade, aprovação e publicação controlada."
-        actions={canCreate ? <Button onClick={openCreate}><Plus className="mr-2 h-4 w-4" />Novo documento</Button> : null}
+        description="GED corporativo com controle de revisão, vigência, ciclos de treinamento e conformidade ISO 9500."
+        actions={canCreate ? <Button onClick={openCreate} className="bg-blue-600 hover:bg-blue-700 text-white font-semibold"><Plus className="mr-1.5 h-4 w-4" />Novo documento</Button> : null}
       />
 
-      <div className="mb-6 grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-5">
-        <MetricCard title="Publicados" value={formatNumber(summary?.published)} description={`${formatNumber(summary?.total)} no acervo`} icon={<FileText className="h-4 w-4" />} tone="green" />
-        <MetricCard title="Em elaboração" value={formatNumber(summary?.draft)} description="Rascunho, ajustes ou revisão" icon={<Edit className="h-4 w-4" />} tone="blue" />
-        <MetricCard title="Aguardando aprovação" value={formatNumber(summary?.waitingApproval)} description="Fluxo pendente" icon={<ShieldCheck className="h-4 w-4" />} tone={(summary?.waitingApproval ?? 0) > 0 ? 'purple' : 'green'} />
-        <MetricCard title="Vencidos" value={formatNumber(summary?.expired)} description="Publicados fora da validade" icon={<CalendarClock className="h-4 w-4" />} tone={(summary?.expired ?? 0) > 0 ? 'red' : 'green'} />
-        <MetricCard title="A revisar" value={formatNumber(summary?.needsReview)} description="Vencem no alerta" icon={<RotateCcw className="h-4 w-4" />} tone={(summary?.needsReview ?? 0) > 0 ? 'yellow' : 'green'} />
+      {/* KPIs superiores */}
+      <div className="grid gap-4 grid-cols-2 md:grid-cols-3 lg:grid-cols-5">
+        <KpiCard title="Publicados" value={formatNumber(summary?.published)} change={`${formatNumber(summary?.total)} no acervo`} color="emerald" icon={FileText} />
+        <KpiCard title="Em elaboração" value={formatNumber(summary?.draft)} change="Rascunho ou revisão" color="sky" icon={Edit} />
+        <KpiCard title="Aguardando aprovação" value={formatNumber(summary?.waitingApproval)} change="Pendência de fluxo" color="purple" icon={ShieldCheck} />
+        <KpiCard title="Vencidos" value={formatNumber(summary?.expired)} change="Fora da validade" color="rose" icon={CalendarClock} />
+        <KpiCard title="A revisar" value={formatNumber(summary?.needsReview)} change="Vencem no alerta" color="amber" icon={RotateCcw} />
+      </div>
+
+      {/* Ações Rápidas */}
+      <div className="grid gap-3 grid-cols-2 sm:grid-cols-3 md:grid-cols-5">
+        <QuickActionBtn icon={Plus} title="Criar documento" onClick={openCreate} />
+        <QuickActionBtn icon={Layers} title="Criar categoria" onClick={() => {}} />
+        <QuickActionBtn icon={FileText} title="Novo modelo DOCX" onClick={() => {}} />
+        <QuickActionBtn icon={History} title="Histórico de revisões" onClick={() => {}} />
+        <QuickActionBtn icon={Users} title="Treinamentos de leitura" onClick={() => {}} />
       </div>
 
       <Tabs defaultValue="acervo" className="space-y-4">
-        <TabsList>
-          <TabsTrigger value="acervo"><Layers className="mr-2 h-4 w-4" />Acervo</TabsTrigger>
-          <TabsTrigger value="matriz"><Table2 className="mr-2 h-4 w-4" />Matriz</TabsTrigger>
-          {canManage && <TabsTrigger value="config"><Settings className="mr-2 h-4 w-4" />Configurações</TabsTrigger>}
+        <TabsList className="bg-slate-100 dark:bg-slate-800">
+          <TabsTrigger value="acervo" className="text-xs font-semibold"><Layers className="mr-2 h-4 w-4" />Acervo</TabsTrigger>
+          <TabsTrigger value="matriz" className="text-xs font-semibold"><Table2 className="mr-2 h-4 w-4" />Matriz Geral</TabsTrigger>
+          {canManage && <TabsTrigger value="config" className="text-xs font-semibold"><Settings className="mr-2 h-4 w-4" />Configurações</TabsTrigger>}
         </TabsList>
 
-        <TabsContent value="acervo">
-          <div className="mb-6 grid grid-cols-1 gap-4 xl:grid-cols-[1fr,360px]">
-            <Card>
-              <CardContent className="p-4">
-                <div className="mb-3 flex items-center justify-between gap-2">
-                  <div>
-                    <div className="text-sm font-semibold">Validade / revisão</div>
-                    <div className="text-xs text-muted-foreground">Documentos vencidos ou próximos da revisão.</div>
-                  </div>
-                  <CalendarClock className="h-4 w-4 text-muted-foreground" />
+        <TabsContent value="acervo" className="space-y-6">
+          <div className="grid grid-cols-1 gap-6 xl:grid-cols-[1fr,360px]">
+            <div className="space-y-6">
+              
+              {/* Alerta de validade / revisão */}
+              <Card className="border border-slate-100 dark:border-slate-800/80 bg-white dark:bg-slate-900/50 shadow-sm flex flex-col h-[280px]">
+                <div className="flex items-center justify-between border-b px-4 py-3 shrink-0">
+                  <h3 className="font-semibold text-sm flex items-center gap-2 text-slate-855 dark:text-white">
+                    <CalendarClock className="h-4 w-4 text-rose-500" />
+                    Validade & Revisão Periódica
+                  </h3>
                 </div>
-                <div className="space-y-2">
-                  {(summary?.expiringSoon ?? []).length === 0 && (
-                    <div className="rounded-md border border-dashed p-3 text-sm text-muted-foreground">Nenhum documento a vencer.</div>
+                <CardContent className="p-0 overflow-y-auto flex-1">
+                  {(summary?.expiringSoon ?? []).length === 0 ? (
+                    <div className="p-8 text-center text-xs text-muted-foreground h-full flex items-center justify-center">
+                      <CheckCircle2 className="h-8 w-8 text-emerald-500 mb-2" />
+                      Nenhum documento com prazo crítico.
+                    </div>
+                  ) : (
+                    <div className="divide-y divide-slate-100 dark:divide-slate-850/40">
+                      {(summary?.expiringSoon ?? []).map((doc) => (
+                        <div 
+                          key={doc.id} 
+                          onClick={() => setDetailId(doc.id)} 
+                          className="flex items-center justify-between p-3 hover:bg-slate-50/40 dark:hover:bg-slate-900/40 transition-all cursor-pointer text-xs"
+                        >
+                          <div className="min-w-0">
+                            <div className="font-bold text-slate-850 dark:text-slate-200 truncate">{doc.code ? `${doc.code} - ` : ''}{doc.title}</div>
+                            <div className="text-[10px] text-slate-400 mt-0.5">{TYPE_LABEL[doc.type]} - {doc.owner?.name ?? 'Sem responsável'}</div>
+                          </div>
+                          <div className="flex items-center gap-2 shrink-0">
+                            <span className="text-[10px] text-slate-400 font-semibold">{formatDate(doc.validUntil)}</span>
+                            <Badge variant="outline" className={doc.isExpired ? 'border-status-red/40 text-status-red' : 'border-status-yellow/40 text-status-yellow'}>
+                              {doc.isExpired ? 'Vencido' : `${doc.daysToExpire}d`}
+                            </Badge>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
                   )}
-                  {(summary?.expiringSoon ?? []).map((doc) => (
-                    <button key={doc.id} onClick={() => setDetailId(doc.id)} className="flex w-full items-start justify-between gap-3 rounded-md border p-3 text-left hover:bg-muted/40">
-                      <div className="min-w-0">
-                        <div className="truncate text-sm font-medium">{doc.code ? `${doc.code} - ` : ''}{doc.title}</div>
-                        <div className="mt-1 text-xs text-muted-foreground">{TYPE_LABEL[doc.type]} - {doc.owner?.name ?? 'Sem responsável'} - validade {formatDate(doc.validUntil)}</div>
-                      </div>
-                      <Badge variant="outline" className={doc.isExpired ? 'border-status-red/40 text-status-red' : 'border-status-yellow/40 text-status-yellow'}>
-                        {doc.isExpired ? 'Vencido' : `${doc.daysToExpire}d`}
-                      </Badge>
-                    </button>
-                  ))}
+                </CardContent>
+              </Card>
+
+              {/* Pendências de leitura */}
+              <Card className="border border-slate-100 dark:border-slate-800/80 bg-white dark:bg-slate-900/50 shadow-sm flex flex-col h-[280px]">
+                <div className="flex items-center justify-between border-b px-4 py-3 shrink-0">
+                  <h3 className="font-semibold text-sm flex items-center gap-2 text-slate-850 dark:text-white">
+                    <Users className="h-4 w-4 text-sky-500" />
+                    Pendências de Leitura Obrigatória (ISO 9001)
+                  </h3>
                 </div>
-              </CardContent>
-            </Card>
+                <CardContent className="p-0 overflow-y-auto flex-1">
+                  <div className="divide-y divide-slate-100 dark:divide-slate-850/40">
+                    {pendingReadings.map((read, idx) => (
+                      <div key={idx} className="flex items-center justify-between p-3 hover:bg-slate-50/40 dark:hover:bg-slate-900/40 transition-all text-xs">
+                        <div className="flex items-center gap-2.5 min-w-0">
+                          <img src={read.avatar} alt={read.name} className="h-7 w-7 rounded-full object-cover border border-slate-200 shrink-0" />
+                          <div className="min-w-0">
+                            <div className="font-semibold text-slate-855 dark:text-slate-200 truncate">{read.name}</div>
+                            <div className="text-[9px] text-slate-450 truncate">{read.sector}</div>
+                            <div className="text-[10px] text-sky-500 font-bold truncate line-clamp-1 mt-0.5">{read.docTitle}</div>
+                          </div>
+                        </div>
+                        <div className="flex items-center gap-2 shrink-0">
+                          <span className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-amber-500/10 text-amber-600 border border-amber-500/20">{read.delay}</span>
+                          <Button variant="ghost" size="sm" className="h-7 text-[10px] px-2 text-sky-500 border border-sky-100 hover:bg-sky-50/50 rounded-md">Cobrar</Button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </CardContent>
+              </Card>
+
+            </div>
 
             <FiltersCard filters={filters} setFilters={setFilters} />
           </div>
 
+          {/* Listagem de documentos */}
           <div className="grid grid-cols-1 gap-4 xl:grid-cols-2">
             {items.length === 0 && (
               <Card className="xl:col-span-2">
@@ -769,35 +831,35 @@ export default function DocumentsPage() {
         </TabsContent>
 
         <TabsContent value="matriz">
-          <Card>
+          <Card className="border border-slate-100 dark:border-slate-800/80 bg-white dark:bg-slate-900/50 shadow-sm">
             <CardContent className="overflow-x-auto p-0">
-              <table className="w-full min-w-[980px] text-sm">
-                <thead className="border-b bg-muted/40 text-xs text-muted-foreground">
+              <table className="w-full min-w-[980px] text-xs">
+                <thead className="border-b bg-muted/40 text-slate-500 font-semibold">
                   <tr>
-                    <th className="px-4 py-3 text-left font-medium">Código</th>
-                    <th className="px-4 py-3 text-left font-medium">Título</th>
-                    <th className="px-4 py-3 text-left font-medium">Tipo</th>
-                    <th className="px-4 py-3 text-left font-medium">Status</th>
-                    <th className="px-4 py-3 text-left font-medium">Área</th>
-                    <th className="px-4 py-3 text-left font-medium">Responsável</th>
-                    <th className="px-4 py-3 text-left font-medium">Revisão</th>
-                    <th className="px-4 py-3 text-left font-medium">Validade</th>
-                    <th className="px-4 py-3 text-right font-medium">Ações</th>
+                    <th className="px-4 py-3 text-left">Código</th>
+                    <th className="px-4 py-3 text-left">Título</th>
+                    <th className="px-4 py-3 text-left">Tipo</th>
+                    <th className="px-4 py-3 text-left">Status</th>
+                    <th className="px-4 py-3 text-left">Área</th>
+                    <th className="px-4 py-3 text-left">Responsável</th>
+                    <th className="px-4 py-3 text-left">Revisão</th>
+                    <th className="px-4 py-3 text-left">Validade</th>
+                    <th className="px-4 py-3 text-right">Ações</th>
                   </tr>
                 </thead>
-                <tbody>
+                <tbody className="divide-y divide-slate-100 dark:divide-slate-800/60 text-slate-700 dark:text-slate-350">
                   {items.map((doc) => (
-                    <tr key={doc.id} className="border-b last:border-0">
-                      <td className="px-4 py-3 font-medium">{doc.code ?? `#${doc.number}`}</td>
-                      <td className="px-4 py-3">{doc.title}</td>
+                    <tr key={doc.id} className="hover:bg-slate-50/40 dark:hover:bg-slate-900/40">
+                      <td className="px-4 py-3 font-bold">{doc.code ?? `#${doc.number}`}</td>
+                      <td className="px-4 py-3 font-medium">{doc.title}</td>
                       <td className="px-4 py-3">{TYPE_LABEL[doc.type]}</td>
                       <td className="px-4 py-3"><Badge variant="outline" className={STATUS_CLASS[doc.status]}>{STATUS_LABEL[doc.status]}</Badge></td>
                       <td className="px-4 py-3">{doc.orgNode?.name ?? '-'}</td>
                       <td className="px-4 py-3">{doc.owner?.name ?? '-'}</td>
-                      <td className="px-4 py-3">v{doc.version}</td>
+                      <td className="px-4 py-3 font-bold">v{doc.version}</td>
                       <td className={cn('px-4 py-3', doc.isExpired && 'text-status-red')}>{formatDate(doc.validUntil)}</td>
                       <td className="px-4 py-3 text-right">
-                        <Button variant="ghost" size="sm" onClick={() => setDetailId(doc.id)}><Eye className="mr-2 h-4 w-4" />Abrir</Button>
+                        <Button variant="ghost" size="sm" className="h-7 text-sky-500 hover:bg-sky-50/50" onClick={() => setDetailId(doc.id)}><Eye className="mr-1.5 h-3.5 w-3.5" />Abrir</Button>
                       </td>
                     </tr>
                   ))}
@@ -810,13 +872,13 @@ export default function DocumentsPage() {
         {canManage && (
           <TabsContent value="config">
             <div className="grid grid-cols-1 gap-4 xl:grid-cols-2">
-              <Card>
+              <Card className="border border-slate-100 dark:border-slate-800/80 bg-white dark:bg-slate-900/50 shadow-sm">
                 <CardContent className="space-y-4 p-4">
                   <div className="flex items-center justify-between">
                     <div className="text-sm font-semibold">Tipos e códigos</div>
                     <Badge variant="outline">{formatNumber(options?.typeConfigs.length)} tipos</Badge>
                   </div>
-                  <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                  <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 text-xs">
                     <Input placeholder="Nome" value={typeForm.name} onChange={(e) => setTypeForm((f) => ({ ...f, name: e.target.value }))} />
                     <Input placeholder="Sigla" value={typeForm.sigla} onChange={(e) => setTypeForm((f) => ({ ...f, sigla: e.target.value.toUpperCase(), prefix: e.target.value.toUpperCase() }))} />
                     <Input placeholder="Prefixo" value={typeForm.prefix} onChange={(e) => setTypeForm((f) => ({ ...f, prefix: e.target.value.toUpperCase() }))} />
@@ -826,13 +888,13 @@ export default function DocumentsPage() {
                     <Input type="number" min={1} placeholder="Digitos" value={typeForm.digits} onChange={(e) => setTypeForm((f) => ({ ...f, digits: e.target.value }))} />
                     <Input type="number" min={1} placeholder="Validade padrão" value={typeForm.defaultValidityDays} onChange={(e) => setTypeForm((f) => ({ ...f, defaultValidityDays: e.target.value }))} />
                   </div>
-                  <Button onClick={() => createType.mutate()} disabled={createType.isPending || !typeForm.name.trim()}><Plus className="mr-2 h-4 w-4" />Cadastrar tipo</Button>
+                  <Button size="sm" onClick={() => createType.mutate()} disabled={createType.isPending || !typeForm.name.trim()} className="bg-sky-500 hover:bg-sky-600 text-white font-semibold"><Plus className="mr-1.5 h-4 w-4" />Cadastrar tipo</Button>
                   <div className="space-y-2">
                     {(options?.typeConfigs ?? []).map((type) => (
-                      <div key={type.id} className="flex items-center justify-between rounded-md border p-3">
+                      <div key={type.id} className="flex items-center justify-between rounded-md border p-3 text-xs">
                         <div>
-                          <div className="text-sm font-medium">{type.name}</div>
-                          <div className="text-xs text-muted-foreground">{type.prefix}-001 - próximo {type.nextNumber}</div>
+                          <div className="font-semibold text-slate-800 dark:text-slate-200">{type.name}</div>
+                          <div className="text-[10px] text-muted-foreground">{type.prefix}-001 - próximo {type.nextNumber}</div>
                         </div>
                         <Badge variant={type.active ? 'secondary' : 'outline'}>{TYPE_LABEL[type.category]}</Badge>
                       </div>
@@ -841,22 +903,22 @@ export default function DocumentsPage() {
                 </CardContent>
               </Card>
 
-              <Card>
+              <Card className="border border-slate-100 dark:border-slate-800/80 bg-white dark:bg-slate-900/50 shadow-sm">
                 <CardContent className="space-y-4 p-4">
                   <div className="flex items-center justify-between">
                     <div className="text-sm font-semibold">Modelos DOCX</div>
                     <Badge variant="outline">{formatNumber(options?.templates.length)} modelos</Badge>
                   </div>
-                  <Input placeholder="Nome do modelo" value={templateForm.name} onChange={(e) => setTemplateForm((f) => ({ ...f, name: e.target.value }))} />
-                  <NativeSelect value={templateForm.typeConfigId} onChange={(e) => setTemplateForm((f) => ({ ...f, typeConfigId: e.target.value }))}>
+                  <Input placeholder="Nome do modelo" value={templateForm.name} onChange={(e) => setTemplateForm((f) => ({ ...f, name: e.target.value }))} className="text-xs" />
+                  <NativeSelect value={templateForm.typeConfigId} onChange={(e) => setTemplateForm((f) => ({ ...f, typeConfigId: e.target.value }))} className="text-xs">
                     <option value="">Sem tipo vinculado</option>
                     {(options?.typeConfigs ?? []).map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}
                   </NativeSelect>
-                  <Textarea rows={6} placeholder="{{document_code}} - {{document_title}}" value={templateForm.content} onChange={(e) => setTemplateForm((f) => ({ ...f, content: e.target.value }))} />
-                  <Button onClick={() => createTemplate.mutate()} disabled={createTemplate.isPending || !templateForm.name.trim()}><Upload className="mr-2 h-4 w-4" />Cadastrar modelo</Button>
-                  <div className="rounded-md border p-3 text-sm">
-                    <div className="font-medium">Editor DOCX</div>
-                    <div className="mt-1 text-xs text-muted-foreground">{options?.editor.configured ? `${options.editor.provider} configurado` : 'Modo manual de baixar/envio'}</div>
+                  <Textarea rows={6} placeholder="{{document_code}} - {{document_title}}" value={templateForm.content} onChange={(e) => setTemplateForm((f) => ({ ...f, content: e.target.value }))} className="text-xs" />
+                  <Button size="sm" onClick={() => createTemplate.mutate()} disabled={createTemplate.isPending || !templateForm.name.trim()} className="bg-sky-500 hover:bg-sky-600 text-white font-semibold"><Upload className="mr-1.5 h-4 w-4" />Cadastrar modelo</Button>
+                  <div className="rounded-md border p-3 text-xs">
+                    <div className="font-semibold">Editor DOCX</div>
+                    <div className="mt-1 text-[10px] text-muted-foreground">{options?.editor.configured ? `${options.editor.provider} configurado` : 'Modo manual de baixar/envio'}</div>
                   </div>
                 </CardContent>
               </Card>
@@ -865,19 +927,20 @@ export default function DocumentsPage() {
         )}
       </Tabs>
 
+      {/* Nova RNC Dialog Modal */}
       <Dialog open={open} onOpenChange={(v) => (v ? setOpen(true) : closeDialog())}>
-        <DialogContent className="max-w-4xl">
+        <DialogContent className="max-w-4xl overflow-y-auto max-h-[90vh] bg-card text-card-foreground">
           <DialogHeader>
             <DialogTitle>{editing ? `Editar documento #${editing.number}` : 'Novo documento'}</DialogTitle>
           </DialogHeader>
 
-          <Tabs defaultValue="geral">
-            <TabsList>
+          <Tabs defaultValue="geral" className="p-2">
+            <TabsList className="bg-slate-100 dark:bg-slate-800">
               <TabsTrigger value="geral">Geral</TabsTrigger>
               <TabsTrigger value="vinculos">Vínculos</TabsTrigger>
               <TabsTrigger value="conteudo">Conteúdo</TabsTrigger>
             </TabsList>
-            <TabsContent value="geral" className="grid grid-cols-1 gap-4 md:grid-cols-2">
+            <TabsContent value="geral" className="grid grid-cols-1 gap-4 md:grid-cols-2 pt-3">
               <div className="md:col-span-2">
                 <Label>Título</Label>
                 <Input value={form.title} onChange={(e) => setForm((f) => ({ ...f, title: e.target.value }))} />
@@ -919,7 +982,7 @@ export default function DocumentsPage() {
                 <Textarea rows={2} value={form.description} onChange={(e) => setForm((f) => ({ ...f, description: e.target.value }))} />
               </div>
             </TabsContent>
-            <TabsContent value="vinculos" className="grid grid-cols-1 gap-4 md:grid-cols-2">
+            <TabsContent value="vinculos" className="grid grid-cols-1 gap-4 md:grid-cols-2 pt-3">
               <SelectField label="Área/processo" value={form.orgNodeId} onChange={(value) => setForm((f) => ({ ...f, orgNodeId: value }))} empty="Sem área direta" items={(options?.orgNodes ?? []).map((item) => ({ value: item.id, label: item.name }))} />
               <SelectField label="Indicador relacionado" value={form.indicatorId} onChange={(value) => setForm((f) => ({ ...f, indicatorId: value }))} empty="Sem indicador" items={(options?.indicators ?? []).map((item) => ({ value: item.id, label: `${item.code ? `[${item.code}] ` : ''}${item.name}` }))} />
               <SelectField label="Responsável" value={form.ownerUserId} onChange={(value) => setForm((f) => ({ ...f, ownerUserId: value }))} empty="Sem responsável" items={(options?.users ?? []).map((item) => ({ value: item.id, label: item.name }))} />
@@ -933,7 +996,7 @@ export default function DocumentsPage() {
                 <Input placeholder="https://..." value={form.externalUrl} onChange={(e) => setForm((f) => ({ ...f, externalUrl: e.target.value }))} />
               </div>
             </TabsContent>
-            <TabsContent value="conteudo" className="space-y-4">
+            <TabsContent value="conteudo" className="space-y-4 pt-3">
               <div>
                 <Label>Conteúdo inicial</Label>
                 <Textarea rows={8} value={form.content} onChange={(e) => setForm((f) => ({ ...f, content: e.target.value }))} />
@@ -947,30 +1010,57 @@ export default function DocumentsPage() {
 
           <DialogFooter>
             <Button variant="outline" onClick={closeDialog}>Cancelar</Button>
-            <Button onClick={handleSaveSubmit} disabled={save.isPending || !form.title.trim()}>
+            <Button onClick={handleSaveSubmit} disabled={save.isPending || !form.title.trim()} className="bg-blue-600 hover:bg-blue-700 text-white font-semibold">
               {save.isPending ? 'Salvando...' : 'Salvar documento'}
             </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
 
+      {/* Document Detail Dialog */}
       <Dialog open={Boolean(detailId)} onOpenChange={(v) => !v && setDetailId(null)}>
-        <DialogContent className="max-w-6xl">
+        <DialogContent className="max-w-6xl overflow-y-auto max-h-[92vh] bg-card text-card-foreground">
           <DialogHeader>
             <DialogTitle>{detail ? `${detail.code ?? `#${detail.number}`} - ${detail.title}` : 'Documento'}</DialogTitle>
           </DialogHeader>
+          
+          {/* Visualizador do Ciclo de Vida do Documento */}
+          {detail && (
+            <div className="border border-slate-100 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-900/50 p-4 rounded-xl flex items-center justify-between text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-2">
+              <div className="flex items-center gap-1">
+                <span className={cn('h-2 w-2 rounded-full', detail.status === 'DRAFT' || detail.status === 'IN_DEVELOPMENT' ? 'bg-sky-500 animate-pulse' : 'bg-slate-300')} />
+                <span>Elaboração</span>
+              </div>
+              <span className="text-slate-300">→</span>
+              <div className="flex items-center gap-1">
+                <span className={cn('h-2 w-2 rounded-full', detail.status.includes('REVIEW') || detail.status.includes('REVIS') ? 'bg-violet-500 animate-pulse' : 'bg-slate-300')} />
+                <span>Revisão</span>
+              </div>
+              <span className="text-slate-300">→</span>
+              <div className="flex items-center gap-1">
+                <span className={cn('h-2 w-2 rounded-full', detail.status.includes('APPROV') || detail.status.includes('APROV') ? 'bg-amber-500 animate-pulse' : 'bg-slate-300')} />
+                <span>Aprovação</span>
+              </div>
+              <span className="text-slate-300">→</span>
+              <div className="flex items-center gap-1">
+                <span className={cn('h-2 w-2 rounded-full', detail.status === 'PUBLISHED' ? 'bg-emerald-500' : 'bg-slate-300')} />
+                <span>Publicado (Vigente)</span>
+              </div>
+            </div>
+          )}
+
           {!detail && <div className="p-6 text-sm text-muted-foreground">Carregando documento...</div>}
           {detail && (
             <Tabs defaultValue="visualização">
-              <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
-                <TabsList>
+              <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between py-2">
+                <TabsList className="bg-slate-100 dark:bg-slate-800">
                   <TabsTrigger value="visualização">Visualização</TabsTrigger>
                   <TabsTrigger value="geral">Geral</TabsTrigger>
                   <TabsTrigger value="documento">Edição</TabsTrigger>
                   <TabsTrigger value="revisoes">Revisões</TabsTrigger>
                   <TabsTrigger value="aprovacoes">Aprovações</TabsTrigger>
                   <TabsTrigger value="auditoria">Auditoria</TabsTrigger>
-                  <TabsTrigger value="distribuicao">Distribuicao</TabsTrigger>
+                  <TabsTrigger value="distribuicao">Distribuição</TabsTrigger>
                 </TabsList>
                 <WorkflowActions doc={detail} canUpdate={canUpdate} pending={workflow.isPending} run={(action, body) => workflow.mutate({ id: detail.id, action, body })} />
               </div>
@@ -984,74 +1074,74 @@ export default function DocumentsPage() {
                     )}
                     {!viewerLoading && !viewer && (
                       <div className="h-full min-h-[420px] overflow-auto p-5">
-                        <div className="mb-3 text-xs uppercase text-muted-foreground">Prévia textual controlada</div>
-                        <pre className="whitespace-pre-wrap break-words text-sm leading-6 text-foreground">{detail.content || detail.description || 'Este documento ainda não possui PDF publicado para visualização interna.'}</pre>
+                        <div className="mb-3 text-[10px] uppercase text-muted-foreground font-bold tracking-wider">Prévia textual controlada</div>
+                        <pre className="whitespace-pre-wrap break-words text-xs leading-6 text-foreground font-sans">{detail.content || detail.description || 'Este documento ainda não possui PDF publicado para visualização interna.'}</pre>
                       </div>
                     )}
                   </div>
                   <div className="space-y-3">
-                    <div className="rounded-md border p-3">
-                      <div className="text-sm font-semibold">Ações do documento</div>
-                      <div className="mt-1 text-xs text-muted-foreground">A abertura padrão é somente leitura. A edição exige liberação.</div>
+                    <div className="rounded-md border p-3 text-xs">
+                      <div className="font-semibold text-slate-800 dark:text-slate-200">Ações do documento</div>
+                      <div className="mt-1 text-[10px] text-muted-foreground">A abertura padrão é somente leitura. A edição exige liberação.</div>
                       <div className="mt-3 space-y-2">
                         {latestDocx && (
-                          <Button variant="outline" className="w-full justify-start" onClick={() => downloadControlled(detail.id, latestDocx.id, latestDocx.fileName)}>
-                            <Download className="mr-2 h-4 w-4" />Baixar DOCX
+                          <Button variant="outline" size="sm" className="w-full justify-start text-xs h-8" onClick={() => downloadControlled(detail.id, latestDocx.id, latestDocx.fileName)}>
+                            <Download className="mr-1.5 h-3.5 w-3.5" />Baixar DOCX
                           </Button>
                         )}
                         {!myActiveEditRequest && (
-                          <Button variant="outline" className="w-full justify-start" disabled={requestEdit.isPending} onClick={() => {
+                          <Button variant="outline" size="sm" className="w-full justify-start text-xs h-8" disabled={requestEdit.isPending} onClick={() => {
                             const reason = window.prompt('Descreva o motivo da revisão/edição');
                             if (reason === null) return;
                             requestEdit.mutate({ id: detail.id, reason: reason || undefined });
                           }}>
-                            <Send className="mr-2 h-4 w-4" />Solicitar edição
+                            <Send className="mr-1.5 h-3.5 w-3.5" />Solicitar edição
                           </Button>
                         )}
                         {myActiveEditRequest && (
-                          <Button className="w-full justify-start" disabled={!canEditOnline || openEditor.isPending} onClick={() => openEditor.mutate(detail.id)}>
-                            <Edit className="mr-2 h-4 w-4" />Editar Documento
+                          <Button size="sm" className="w-full justify-start text-xs h-8 bg-sky-500 hover:bg-sky-600 text-white" disabled={!canEditOnline || openEditor.isPending} onClick={() => openEditor.mutate(detail.id)}>
+                            <Edit className="mr-1.5 h-3.5 w-3.5" />Editar Documento
                           </Button>
                         )}
                         {canUpdate && (
-                          <Button className="w-full justify-start" onClick={() => {
+                          <Button size="sm" className="w-full justify-start text-xs h-8 bg-blue-600 hover:bg-blue-700 text-white" onClick={() => {
                             setGrantForm({ requesterUserId: '', reason: '', expiresAt: '' });
                             setGrantOpen(true);
                           }}>
-                            <Edit className="mr-2 h-4 w-4" />Editar Documento
+                            <Edit className="mr-1.5 h-3.5 w-3.5" />Editar Documento
                           </Button>
                         )}
                         {myActiveEditRequest && (
-                          <Button variant="outline" className="w-full justify-start" disabled={decideEdit.isPending} onClick={() => decideEdit.mutate({ requestId: myActiveEditRequest.id, action: 'complete' })}>
-                            <CheckCircle2 className="mr-2 h-4 w-4" />Concluir edição
+                          <Button variant="outline" size="sm" className="w-full justify-start text-xs h-8" disabled={decideEdit.isPending} onClick={() => decideEdit.mutate({ requestId: myActiveEditRequest.id, action: 'complete' })}>
+                            <CheckCircle2 className="mr-1.5 h-3.5 w-3.5" />Concluir edição
                           </Button>
                         )}
                       </div>
                     </div>
 
                     {!detail.editor.configured && (
-                      <div className="rounded-md border border-status-yellow/40 bg-status-yellow/5 p-3 text-sm text-muted-foreground">
+                      <div className="rounded-md border border-status-yellow/40 bg-status-yellow/5 p-3 text-xs text-muted-foreground">
                         <div>{detail.editor.message}</div>
                       </div>
                     )}
 
-                    <div className="rounded-md border p-3">
-                      <div className="mb-2 text-sm font-semibold">Liberações de edição</div>
-                      {detail.editRequests.length === 0 && <div className="text-sm text-muted-foreground">Nenhuma solicitação registrada.</div>}
+                    <div className="rounded-md border p-3 text-xs">
+                      <div className="mb-2 font-semibold text-slate-800 dark:text-slate-200">Liberações de edição</div>
+                      {detail.editRequests.length === 0 && <div className="text-xs text-muted-foreground">Nenhuma solicitação registrada.</div>}
                       <div className="space-y-2">
                         {detail.editRequests.slice(0, 5).map((request) => {
                           const canDecide = request.status === 'REQUESTED' && (request.operatorUserId === user?.id || canUpdate);
                           return (
                             <div key={request.id} className="rounded-md border p-2">
                               <div className="flex items-center justify-between gap-2">
-                                <span className="text-xs font-medium">{request.requester?.name ?? 'Solicitante'}</span>
-                                <Badge variant="outline">{request.status}</Badge>
+                                <span className="text-[10px] font-semibold">{request.requester?.name ?? 'Solicitante'}</span>
+                                <Badge variant="outline" className="text-[9px] scale-90">{request.status}</Badge>
                               </div>
-                              {request.reason && <div className="mt-1 text-xs text-muted-foreground">{request.reason}</div>}
+                              {request.reason && <div className="mt-1 text-[10px] text-muted-foreground">{request.reason}</div>}
                               {canDecide && (
                                 <div className="mt-2 flex gap-2">
-                                  <Button size="sm" disabled={decideEdit.isPending} onClick={() => decideEdit.mutate({ requestId: request.id, action: 'approve' })}>Liberar</Button>
-                                  <Button size="sm" variant="outline" disabled={decideEdit.isPending} onClick={() => {
+                                  <Button size="sm" className="h-6 text-[10px]" disabled={decideEdit.isPending} onClick={() => decideEdit.mutate({ requestId: request.id, action: 'approve' })}>Liberar</Button>
+                                  <Button size="sm" variant="outline" className="h-6 text-[10px]" disabled={decideEdit.isPending} onClick={() => {
                                     const note = window.prompt('Justificativa da rejeicao');
                                     if (note) decideEdit.mutate({ requestId: request.id, action: 'reject', note });
                                   }}>Rejeitar</Button>
@@ -1066,7 +1156,7 @@ export default function DocumentsPage() {
                 </div>
               </TabsContent>
 
-              <TabsContent value="geral">
+              <TabsContent value="geral" className="pt-2">
                 <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
                   <InfoTile label="Status" value={<Badge variant="outline" className={STATUS_CLASS[detail.status]}>{STATUS_LABEL[detail.status]}</Badge>} />
                   <InfoTile label="Tipo" value={TYPE_LABEL[detail.type]} />
@@ -1078,60 +1168,60 @@ export default function DocumentsPage() {
                   <InfoTile label="Validade" value={formatDate(detail.validUntil)} />
                   <InfoTile label="Editor" value={detail.editor.configured ? detail.editor.provider : 'Manual'} />
                 </div>
-                <div className="mt-4 rounded-md border p-4 text-sm text-muted-foreground">{detail.description ?? 'Sem descrição registrada.'}</div>
+                <div className="mt-4 rounded-md border p-4 text-xs text-muted-foreground">{detail.description ?? 'Sem descrição registrada.'}</div>
               </TabsContent>
 
               <TabsContent value="documento">
                 <div className="grid grid-cols-1 gap-4 lg:grid-cols-[1fr,320px]">
                   <div className="space-y-3">
                     {!detail.editor.configured && (
-                      <div className="rounded-md border border-status-yellow/40 bg-status-yellow/5 p-3 text-sm text-muted-foreground">
+                      <div className="rounded-md border border-status-yellow/40 bg-status-yellow/5 p-3 text-xs text-muted-foreground">
                         {detail.editor.message}
                       </div>
                     )}
-                    <Textarea rows={14} value={draftContent} onChange={(e) => setDraftContent(e.target.value)} disabled={!isEditable(detail.status) || !canUpdate} />
+                    <Textarea rows={14} value={draftContent} onChange={(e) => setDraftContent(e.target.value)} disabled={!isEditable(detail.status) || !canUpdate} className="text-xs font-mono" />
                     <div className="flex flex-wrap gap-2">
-                      <Button onClick={() => autosave.mutate({ id: detail.id, content: draftContent })} disabled={!isEditable(detail.status) || autosave.isPending || !canUpdate}>
-                        <Save className="mr-2 h-4 w-4" />Salvar checkpoint
+                      <Button size="sm" onClick={() => autosave.mutate({ id: detail.id, content: draftContent })} disabled={!isEditable(detail.status) || autosave.isPending || !canUpdate}>
+                        <Save className="mr-1.5 h-4 w-4" />Salvar checkpoint
                       </Button>
                       {myActiveEditRequest && (
-                        <Button variant="outline" onClick={() => openEditor.mutate(detail.id)} disabled={openEditor.isPending || !canEditOnline}>
-                          <Edit className="mr-2 h-4 w-4" />Editar Documento
+                        <Button size="sm" variant="outline" onClick={() => openEditor.mutate(detail.id)} disabled={openEditor.isPending || !canEditOnline}>
+                          <Edit className="mr-1.5 h-4 w-4" />Editar Documento
                         </Button>
                       )}
                       {canUpdate && (
-                        <Button variant="outline" onClick={() => {
+                        <Button size="sm" variant="outline" onClick={() => {
                           setGrantForm({ requesterUserId: '', reason: '', expiresAt: '' });
                           setGrantOpen(true);
                         }}>
-                          <Edit className="mr-2 h-4 w-4" />Editar Documento
+                          <Edit className="mr-1.5 h-4 w-4" />Editar Documento
                         </Button>
                       )}
                     </div>
                   </div>
-                  <div className="space-y-3">
-                    <div className="text-sm font-semibold">Arquivos</div>
-                    {detail.files.length === 0 && <div className="rounded-md border border-dashed p-3 text-sm text-muted-foreground">Nenhum arquivo registrado.</div>}
+                  <div className="space-y-3 text-xs">
+                    <div className="font-semibold text-slate-800 dark:text-slate-200">Arquivos</div>
+                    {detail.files.length === 0 && <div className="rounded-md border border-dashed p-3 text-xs text-muted-foreground text-center">Nenhum arquivo registrado.</div>}
                     {detail.files.map((file) => (
                       <div key={file.id} className="rounded-md border p-3">
                         <div className="flex items-center justify-between gap-2">
                           <div className="min-w-0">
-                            <div className="truncate text-sm font-medium">{file.fileName}</div>
-                            <div className="text-xs text-muted-foreground">{file.kind} - {formatBytes(file.sizeBytes)}</div>
+                            <div className="truncate text-xs font-semibold text-slate-800 dark:text-slate-200">{file.fileName}</div>
+                            <div className="text-[10px] text-muted-foreground mt-0.5">{file.kind} - {formatBytes(file.sizeBytes)}</div>
                           </div>
-                          <Button variant="ghost" size="icon" onClick={() => downloadControlled(detail.id, file.id, file.fileName)}>
-                            <Download className="h-4 w-4" />
+                          <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => downloadControlled(detail.id, file.id, file.fileName)}>
+                            <Download className="h-3.5 w-3.5" />
                           </Button>
                         </div>
                       </div>
                     ))}
                     {canUpdate && (
-                      <Button variant="outline" className="w-full" onClick={() => {
+                      <Button variant="outline" size="sm" className="w-full text-xs" onClick={() => {
                         const content = window.prompt('Conteúdo do arquivo');
                         if (!content) return;
                         upload.mutate({ id: detail.id, kind: 'DOCX', fileName: `${detail.code ?? detail.number}.docx`, content });
                       }}>
-                        <Upload className="mr-2 h-4 w-4" />Enviar DOCX
+                        <Upload className="mr-1.5 h-4 w-4" />Enviar DOCX
                       </Button>
                     )}
                   </div>
@@ -1184,10 +1274,10 @@ export default function DocumentsPage() {
               </TabsContent>
 
               <TabsContent value="distribuicao">
-                <div className="rounded-md border p-4 text-sm text-muted-foreground">
-                  Confirmações de leitura ficam registradas por revisão.
-                  <Button className="ml-0 mt-3 sm:ml-3 sm:mt-0" variant="outline" onClick={() => api(`/documents/${detail.id}/read-confirmations`, { method: 'POST', json: {} }).then(() => toast.success('Leitura confirmada')).then(() => invalidate(qc))}>
-                    <CheckCircle2 className="mr-2 h-4 w-4" />Confirmar leitura
+                <div className="rounded-md border p-4 text-xs text-muted-foreground flex items-center justify-between">
+                  <span>Confirmações de leitura ficam registradas por revisão.</span>
+                  <Button variant="outline" size="sm" className="h-8 text-xs bg-sky-500 hover:bg-sky-600 text-white font-semibold" onClick={() => api(`/documents/${detail.id}/read-confirmations`, { method: 'POST', json: {} }).then(() => toast.success('Leitura confirmada')).then(() => invalidate(qc))}>
+                    <CheckCircle2 className="mr-1.5 h-3.5 w-3.5" />Confirmar leitura
                   </Button>
                 </div>
               </TabsContent>
@@ -1493,3 +1583,43 @@ async function fetchControlledBlob(documentId: string, fileId: string) {
 function invalidate(qc: ReturnType<typeof useQueryClient>) {
   qc.invalidateQueries({ queryKey: ['documents'] });
 }
+
+function KpiCard({ title, value, change, color, icon: Icon }: { title: string; value: any; change: string; color: 'emerald' | 'sky' | 'purple' | 'rose' | 'amber'; icon: any }) {
+  const colors = {
+    emerald: 'border-emerald-100 dark:border-emerald-900/30 bg-emerald-50/10 dark:bg-emerald-950/10 text-emerald-600 dark:text-emerald-400',
+    sky: 'border-sky-100 dark:border-sky-900/30 bg-sky-50/10 dark:bg-sky-950/10 text-sky-600 dark:text-sky-400',
+    purple: 'border-purple-100 dark:border-purple-900/30 bg-purple-50/10 dark:bg-purple-950/10 text-purple-600 dark:text-purple-400',
+    rose: 'border-rose-100 dark:border-rose-900/30 bg-rose-50/10 dark:bg-rose-950/10 text-rose-600 dark:text-rose-400',
+    amber: 'border-amber-100 dark:border-amber-900/30 bg-amber-50/10 dark:bg-amber-950/10 text-amber-600 dark:text-amber-400'
+  };
+
+  return (
+    <Card className={cn("border bg-card shadow-sm p-4 relative overflow-hidden transition-all duration-300 hover:shadow-md hover:scale-[1.01] flex items-center justify-between", colors[color])}>
+      <div className="space-y-1">
+        <span className="text-[10px] uppercase font-bold tracking-wider opacity-85 text-slate-550 dark:text-slate-400">{title}</span>
+        <div className="text-2xl font-extrabold text-slate-900 dark:text-white leading-none">{value ?? '0'}</div>
+        <span className="text-[10px] text-slate-400 font-medium">{change}</span>
+      </div>
+      <div className="p-2.5 rounded-xl bg-white dark:bg-slate-900 shadow-sm border border-slate-50 dark:border-slate-800">
+        <Icon className="h-5 w-5" />
+      </div>
+    </Card>
+  );
+}
+
+function QuickActionBtn({ icon: Icon, title, onClick }: { icon: any; title: string; onClick?: () => void }) {
+  return (
+    <Button
+      variant="outline"
+      onClick={onClick}
+      className="flex items-center justify-start gap-3 bg-card border-slate-200 hover:bg-slate-50/50 dark:hover:bg-slate-900/50 text-slate-700 dark:text-slate-200 h-11 w-full rounded-xl transition-all duration-200 text-xs font-semibold shadow-sm hover:scale-[1.01]"
+    >
+      <div className="p-1.5 rounded-lg bg-slate-50 dark:bg-slate-800 text-slate-500 dark:text-slate-400">
+        <Icon className="h-4 w-4" />
+      </div>
+      <span>{title}</span>
+    </Button>
+  );
+}
+
+

@@ -39,6 +39,13 @@ import { Textarea } from '@/components/ui/textarea';
 import { api } from '@/lib/api';
 import { cn, formatDate, formatNumber } from '@/lib/utils';
 import { useAuth } from '@/components/auth/auth-provider';
+import { AccessRoleGuide, PermissionMatrix } from '@/components/access-control/permission-matrix';
+import {
+  ACCESS_ROLE_DEFINITIONS,
+  getRoleDefinition,
+  permissionModuleCount,
+  type PermissionRecord,
+} from '@/lib/access-control';
 
 type ModuleKey = 'users' | 'audit' | 'parameters' | 'security' | 'system';
 type ParamView = 'companies' | 'branches' | 'structure' | 'categories' | 'items';
@@ -88,16 +95,11 @@ interface UserRow {
   lastLoginAt: string | null;
 }
 
-interface Permission {
-  id: string;
-  key: string;
-  description: string;
-  module: string;
-  action: string;
-}
+type Permission = PermissionRecord;
 
 interface AccessProfile {
   id: string;
+  companyId: string | null;
   code: string;
   name: string;
   description: string | null;
@@ -217,9 +219,13 @@ export default function SettingsPage() {
   const [paramView, setParamView] = useState<ParamView>('companies');
   const [search, setSearch] = useState('');
   const [dialog, setDialog] = useState<{ type: string; record?: any } | null>(null);
-  const canOpenSettings = platformAdminContext || hasPermission(['settings:view', 'settings:manage']);
+  const canViewSettings = platformAdminContext || hasPermission(['settings:view', 'settings:manage']);
+  const canViewUsers = platformAdminContext || hasPermission(['users:view', 'users:manage']);
+  const canManageProfiles = platformAdminContext || hasPermission(['users:profiles', 'users:manage']);
+  const canViewAudit = platformAdminContext || hasPermission(['audit:view', 'audit:export']);
+  const canOpenSettings = canViewSettings || canViewUsers || canManageProfiles || canViewAudit;
   const canManageSettings = platformAdminContext || hasPermission(['settings:manage']);
-  const canManageUsers = platformAdminContext || hasPermission(['users:manage']);
+  const canManageUsers = platformAdminContext || hasPermission(['users:permissions', 'users:manage']);
 
   useEffect(() => {
     setPlatformAdminContext(
@@ -227,6 +233,13 @@ export default function SettingsPage() {
       Boolean(window.localStorage.getItem('g360.platformAdmin.accessToken')),
     );
   }, []);
+
+  useEffect(() => {
+    if (canViewSettings) return;
+    if (canManageProfiles) setActive('security');
+    else if (canViewUsers) setActive('users');
+    else if (canViewAudit) setActive('audit');
+  }, [canManageProfiles, canViewAudit, canViewSettings, canViewUsers]);
 
   const query = useQuery<Bootstrap>({
     queryKey: ['admin', 'bootstrap'],
@@ -354,33 +367,45 @@ export default function SettingsPage() {
         contentClassName="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-5"
         className="mb-6"
       >
-        {adminCards.map((card) => {
-          const Icon = card.icon;
-          return (
-            <button
-              key={card.title}
-              type="button"
-              onClick={() => {
-                setActive(card.active);
-                if (card.view) setParamView(card.view);
-              }}
-              className={cn(
-                'h-full rounded-lg border bg-card p-4 text-left shadow-sm transition-colors hover:bg-accent/35',
-                active === card.active && (!card.view || card.view === paramView) && 'border-primary/40 bg-primary/5',
-              )}
-            >
-              <div className={cn('grid h-10 w-10 place-items-center rounded-md', card.tone)}>
-                <Icon className="h-5 w-5" />
-              </div>
-              <div className="mt-4 text-sm font-semibold">{card.title}</div>
-              <p className="mt-1 text-xs leading-relaxed text-muted-foreground">{card.description}</p>
-            </button>
-          );
-        })}
+        {adminCards
+          .filter((card) => {
+            if (platformAdminContext || isSuperAdmin) return true;
+            if (card.active === 'security') return canManageProfiles && card.title === 'Perfis de acesso';
+            if (card.active === 'users') return canViewUsers;
+            if (card.active === 'audit') return canViewAudit;
+            return canViewSettings;
+          })
+          .map((card) => {
+            const Icon = card.icon;
+            const cardTitle = !isSuperAdmin && card.active === 'security' ? 'Perfis e permissões' : card.title;
+            const cardDescription = !isSuperAdmin && card.active === 'security'
+              ? 'Pacotes de acesso organizados e detalhados por módulo.'
+              : card.description;
+            return (
+              <button
+                key={card.title}
+                type="button"
+                onClick={() => {
+                  setActive(card.active);
+                  if (card.view) setParamView(card.view);
+                }}
+                className={cn(
+                  'h-full rounded-lg border bg-card p-4 text-left shadow-sm transition-colors hover:bg-accent/35',
+                  active === card.active && (!card.view || card.view === paramView) && 'border-primary/40 bg-primary/5',
+                )}
+              >
+                <div className={cn('grid h-10 w-10 place-items-center rounded-md', card.tone)}>
+                  <Icon className="h-5 w-5" />
+                </div>
+                <div className="mt-4 text-sm font-semibold">{cardTitle}</div>
+                <p className="mt-1 text-xs leading-relaxed text-muted-foreground">{cardDescription}</p>
+              </button>
+            );
+          })}
       </SectionCard>
 
       {/* No Portal Admin Global, estes atalhos ja existem na barra lateral. */}
-      {!platformAdminContext && (
+      {!platformAdminContext && canViewSettings && (
       <SectionCard
         title="Integrações"
         description="Conectores internos, serviços de apoio e status operacional ficam dentro de Configurações."
@@ -496,7 +521,7 @@ export default function SettingsPage() {
         </SectionCard>
       )}
 
-      {active === 'users' && (
+      {active === 'users' && canViewUsers && (
         <SectionCard
           title="Usuários"
           description="Usuários cadastrados, status, último acesso e atalhos para cadastro completo."
@@ -533,7 +558,7 @@ export default function SettingsPage() {
         </SectionCard>
       )}
 
-      {active === 'audit' && (
+      {active === 'audit' && canViewAudit && (
         <SectionCard
           title="Auditoria"
           description="Registros automáticos de ações, acessos, alterações de permissões e parametrizações."
@@ -557,7 +582,7 @@ export default function SettingsPage() {
         </SectionCard>
       )}
 
-      {active === 'parameters' && (
+      {active === 'parameters' && canViewSettings && (
         <SectionCard
           title="Parâmetros"
           description="Cadastros estruturais usados por empresas, filiais, hierarquia, indicadores e planos de ação."
@@ -675,32 +700,65 @@ export default function SettingsPage() {
         </SectionCard>
       )}
 
-      {active === 'security' && (
+      {active === 'security' && canManageProfiles && (
         <SectionCard
-          title="Seguranca"
-          description="Perfis administraveis e permissões por módulo salvas no banco de dados."
+          title={isSuperAdmin ? 'Seguranca' : 'Perfis e permissões'}
+          description={
+            isSuperAdmin
+              ? 'Perfis administraveis e permissões por módulo salvas no banco de dados.'
+              : 'Crie pacotes reutilizáveis de acesso. O papel base indica a responsabilidade; o perfil define os módulos e ações liberados.'
+          }
           actions={<Button onClick={() => setDialog({ type: 'profile' })}><Plus className="mr-2 h-4 w-4" />Novo perfil</Button>}
           contentClassName="p-0"
         >
-          <DataTable headers={['Perfil', 'Papel base', 'Permissões', 'Usuários', 'Status', 'Ações']} empty="Nenhum perfil cadastrado.">
-            {data?.profiles.map((profile) => (
-              <tr key={profile.id}>
-                <td>
-                  <div className="font-medium">{profile.name}</div>
-                  <div className="text-xs text-muted-foreground">{profile.description ?? profile.code}</div>
-                </td>
-                <td><Badge variant="outline">{profile.role ? roleLabels[profile.role] ?? profile.role : '-'}</Badge></td>
-                <td>{profile.permissions.length}</td>
-                <td>{profile._count?.users ?? 0}</td>
-                <td><StatusPill status={profile.status} /></td>
-                <RowActions onEdit={() => setDialog({ type: 'profile', record: profile })} onDelete={() => confirmDelete('profile', profile.id)} />
-              </tr>
-            ))}
+          {!isSuperAdmin && (
+            <div className="border-b bg-muted/20 p-4">
+              <div className="mb-3">
+                <h3 className="text-sm font-semibold">Para que serve cada papel base?</h3>
+                <p className="mt-1 text-xs leading-5 text-muted-foreground">
+                  O papel organiza a responsabilidade do usuário. As permissões continuam sendo definidas pelo perfil e por eventuais exceções individuais.
+                </p>
+              </div>
+              <AccessRoleGuide />
+            </div>
+          )}
+          <DataTable
+            headers={isSuperAdmin ? ['Perfil', 'Papel base', 'Permissões', 'Usuários', 'Status', 'Ações'] : ['Perfil de acesso', 'Papel base', 'Módulos', 'Permissões', 'Usuários', 'Status', 'Ações']}
+            empty="Nenhum perfil cadastrado."
+          >
+            {data?.profiles
+              .filter((profile) => isSuperAdmin || profile.role !== 'SUPER_ADMIN')
+              .map((profile) => (
+                <tr key={profile.id}>
+                  <td>
+                    <div className="font-medium">{profile.name}</div>
+                    <div className="text-xs text-muted-foreground">{profile.description ?? profile.code}</div>
+                  </td>
+                  <td>
+                    <Badge variant="outline">
+                      {profile.role
+                        ? isSuperAdmin
+                          ? roleLabels[profile.role] ?? profile.role
+                          : getRoleDefinition(profile.role)?.label ?? profile.role
+                        : '-'}
+                    </Badge>
+                  </td>
+                  {!isSuperAdmin && <td>{permissionModuleCount(data.permissions, profile.permissions.map((item) => item.permission.key))}</td>}
+                  <td>{profile.permissions.length}</td>
+                  <td>{profile._count?.users ?? 0}</td>
+                  <td><StatusPill status={profile.status} /></td>
+                  {!isSuperAdmin && profile.companyId === null ? (
+                    <td className="text-right"><Badge variant="outline">Padrão global · somente leitura</Badge></td>
+                  ) : (
+                    <RowActions onEdit={() => setDialog({ type: 'profile', record: profile })} onDelete={() => confirmDelete('profile', profile.id)} />
+                  )}
+                </tr>
+              ))}
           </DataTable>
         </SectionCard>
       )}
 
-      {active === 'system' && (
+      {active === 'system' && canViewSettings && (
         <SectionCard
           title="Sistema"
           description="Regras globais, notificações, aprovações e preferencias da plataforma."
@@ -735,6 +793,7 @@ export default function SettingsPage() {
           dialog={dialog}
           data={data}
           saving={save.isPending}
+          organizedPermissions={!isSuperAdmin}
           onClose={() => setDialog(null)}
           onSave={(payload) => save.mutate({ type: dialog.type, id: dialog.record?.id, payload })}
         />
@@ -857,12 +916,14 @@ function AdminDialog({
   dialog,
   data,
   saving,
+  organizedPermissions,
   onClose,
   onSave,
 }: {
   dialog: { type: string; record?: any };
   data?: Bootstrap;
   saving: boolean;
+  organizedPermissions: boolean;
   onClose: () => void;
   onSave: (payload: any) => void;
 }) {
@@ -899,7 +960,7 @@ function AdminDialog({
 
   return (
     <Dialog open onOpenChange={(open) => !open && onClose()}>
-      <DialogContent className="max-w-3xl">
+      <DialogContent className={dialog.type === 'profile' && organizedPermissions ? 'max-h-[92vh] max-w-6xl overflow-y-auto' : 'max-w-3xl'}>
         <DialogHeader>
           <DialogTitle>{r.id ? 'Editar' : 'Novo'} {titleMap[dialog.type]}</DialogTitle>
         </DialogHeader>
@@ -956,39 +1017,57 @@ function AdminDialog({
               <div>
                 <Label>Papel base</Label>
                 <NativeSelect value={form.role} onChange={(e) => setForm({ ...form, role: e.target.value })}>
-                  {Object.entries(roleLabels).map(([key, label]) => <option key={key} value={key}>{label}</option>)}
+                  {(organizedPermissions
+                    ? ACCESS_ROLE_DEFINITIONS.map((role) => [role.value, role.label] as const)
+                    : Object.entries(roleLabels)
+                  ).map(([key, label]) => <option key={key} value={key}>{label}</option>)}
                 </NativeSelect>
               </div>
               <StatusSelect form={form} setForm={setForm} />
               <div className="md:col-span-2"><TextField label="Descrição" value={form.description} onChange={(description) => setForm({ ...form, description })} /></div>
-              <div className="md:col-span-2 max-h-80 overflow-y-auto rounded-lg border p-3">
-                <div className="mb-3 text-sm font-semibold">Permissões por módulo</div>
-                <div className="grid grid-cols-1 gap-2 md:grid-cols-2">
-                  {data?.permissions.map((permission) => {
-                    const checked = form.permissionKeys.includes(permission.key);
-                    return (
-                      <label key={permission.key} className={cn('flex cursor-pointer gap-2 rounded-md border p-2 text-sm hover:bg-accent/35', checked && 'border-primary/40 bg-primary/5')}>
-                        <input
-                          type="checkbox"
-                          checked={checked}
-                          onChange={(e) =>
-                            setForm({
-                              ...form,
-                              permissionKeys: e.target.checked
-                                ? [...form.permissionKeys, permission.key]
-                                : form.permissionKeys.filter((key: string) => key !== permission.key),
-                            })
-                          }
-                        />
-                        <span>
-                          <span className="block font-medium">{permission.description}</span>
-                          <span className="text-xs text-muted-foreground">{permission.key}</span>
-                        </span>
-                      </label>
-                    );
-                  })}
+              {organizedPermissions ? (
+                <div className="md:col-span-2">
+                  <div className="mb-4 rounded-lg border border-blue-200 bg-blue-50 p-3 text-xs leading-5 text-blue-950 dark:border-blue-900/60 dark:bg-blue-950/30 dark:text-blue-100">
+                    Este perfil será um pacote reutilizável. Use os níveis rápidos por módulo e abra cada módulo somente quando precisar ajustar ações específicas.
+                  </div>
+                  <PermissionMatrix
+                    permissions={data?.permissions ?? []}
+                    selectedKeys={form.permissionKeys}
+                    role={form.role}
+                    onChange={(permissionKeys) => setForm({ ...form, permissionKeys })}
+                    compact
+                  />
                 </div>
-              </div>
+              ) : (
+                <div className="md:col-span-2 max-h-80 overflow-y-auto rounded-lg border p-3">
+                  <div className="mb-3 text-sm font-semibold">Permissões por módulo</div>
+                  <div className="grid grid-cols-1 gap-2 md:grid-cols-2">
+                    {data?.permissions.map((permission) => {
+                      const checked = form.permissionKeys.includes(permission.key);
+                      return (
+                        <label key={permission.key} className={cn('flex cursor-pointer gap-2 rounded-md border p-2 text-sm hover:bg-accent/35', checked && 'border-primary/40 bg-primary/5')}>
+                          <input
+                            type="checkbox"
+                            checked={checked}
+                            onChange={(e) =>
+                              setForm({
+                                ...form,
+                                permissionKeys: e.target.checked
+                                  ? [...form.permissionKeys, permission.key]
+                                  : form.permissionKeys.filter((key: string) => key !== permission.key),
+                              })
+                            }
+                          />
+                          <span>
+                            <span className="block font-medium">{permission.description}</span>
+                            <span className="text-xs text-muted-foreground">{permission.key}</span>
+                          </span>
+                        </label>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
             </>
           )}
 

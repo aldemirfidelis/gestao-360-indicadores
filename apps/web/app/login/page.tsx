@@ -101,47 +101,19 @@ export default function LoginPage() {
         <div className="relative z-10 my-auto max-w-2xl space-y-12">
           <div className="space-y-6">
             <h1 className="text-4xl xl:text-5xl font-extrabold leading-[1.1] text-white tracking-tight">
-              Conecte estratégia, indicadores e execução em um só lugar.
+              Conecte estratégia, indicadores e execução.
             </h1>
-            <p className="text-base text-slate-400 leading-relaxed max-w-xl">
-              Centralize OKRs, KPIs, planos de ação, gestão de riscos e comitês corporativos. A solução completa para governança e melhoria contínua da sua empresa.
-            </p>
           </div>
 
-          {/* Floating UI Widget Mockup */}
-          <div className="relative rounded-2xl border border-slate-800/80 bg-slate-900/30 p-6 backdrop-blur-xl shadow-2xl max-w-md transition-all duration-300 hover:scale-[1.02] hover:border-slate-700/60">
-            <div className="absolute top-0 right-0 w-[150px] h-[150px] rounded-full bg-cyan-500/5 filter blur-[40px]" />
-            <div className="flex items-center justify-between mb-4">
-              <div className="flex items-center gap-2">
-                <BarChart3 className="h-4 w-4 text-cyan-400" />
-                <span className="text-xs font-semibold uppercase tracking-wider text-cyan-400">Meta Global Q2</span>
-              </div>
-              <span className="text-[10px] text-emerald-400 font-bold bg-emerald-500/10 px-2 py-0.5 rounded-full border border-emerald-500/20">+12.4%</span>
-            </div>
-            
-            <div className="text-xl font-bold text-white tracking-tight">Desempenho Geral Corporativo</div>
-            
-            <div className="mt-5 space-y-3">
-              <div className="flex justify-between text-xs">
-                <span className="text-slate-400">Atingimento Acumulado</span>
-                <span className="font-semibold text-white">88.5%</span>
-              </div>
-              <div className="h-2 w-full bg-slate-950 rounded-full overflow-hidden border border-slate-800">
-                <div className="h-full bg-gradient-to-r from-[#00F0FF] to-blue-500 rounded-full" style={{ width: '88.5%' }} />
-              </div>
-            </div>
-
-            <div className="mt-4 pt-4 border-t border-slate-800/60 flex items-center justify-between text-[11px] text-slate-500">
-              <span className="flex items-center gap-1"><Users className="h-3 w-3" /> 24 equipes ativas</span>
-              <span className="flex items-center gap-1"><Zap className="h-3 w-3" /> Atualizado em tempo real</span>
-            </div>
+          {/* Logo do Gestão 360 Expandido Animado (Variante Ícone Gigante) */}
+          <div className="relative flex justify-start pl-2">
+            <BrandLogo 
+              variant="icon" 
+              theme="dark" 
+              animated={true} 
+              className="h-44 w-44 drop-shadow-[0_0_35px_rgba(6,182,212,0.15)] transition-all duration-300 hover:scale-[1.03]" 
+            />
           </div>
-        </div>
-
-        {/* Footer info */}
-        <div className="relative z-10 text-xs text-slate-500 flex items-center gap-2">
-          <ShieldCheck className="h-4 w-4 text-[#00F0FF]" />
-          <span>Conexão criptografada de alta segurança.</span>
         </div>
       </div>
 

@@ -7,7 +7,7 @@ import * as THREE from 'three';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { AlertCircle, RotateCcw, ZoomIn, ZoomOut } from 'lucide-react';
+import { AlertCircle, Plus, RotateCcw, ZoomIn, ZoomOut } from 'lucide-react';
 
 // Tipagem das etapas para o fluxo 3D
 export interface IsometricStep {
@@ -22,9 +22,13 @@ export interface IsometricStep {
 
 interface IsometricFlowProps {
   steps: IsometricStep[];
+  processId: string;
   canManage: boolean;
   onStepClick: (step: IsometricStep) => void;
   onStepMove: (id: string, x: number, y: number) => void;
+  onStepCreate: (name: string) => void;
+  onStepDelete: (id: string) => void;
+  onStepUpdate: (id: string, data: { name?: string; type?: string; isControlPoint?: boolean }) => void;
 }
 
 // ----------------------------------------------------------------------
@@ -499,8 +503,9 @@ function StepConnection({ fromStep, toStep }: StepConnectionProps) {
 // 4. Componente Principal do Editor Canvas
 // ----------------------------------------------------------------------
 
-export function IsometricFlow({ steps, canManage, onStepClick, onStepMove }: IsometricFlowProps) {
+export function IsometricFlow({ steps, processId, canManage, onStepClick, onStepMove, onStepCreate, onStepDelete, onStepUpdate }: IsometricFlowProps) {
   const [zoom, setZoom] = useState(42);
+  const [selectedStepId, setSelectedStepId] = useState<string | null>(null);
   const orbitRef = useRef<any>(null);
 
   // Ordena as etapas por número de forma segura
@@ -529,30 +534,42 @@ export function IsometricFlow({ steps, canManage, onStepClick, onStepMove }: Iso
 
   return (
     <Card className="overflow-hidden border-2">
-      <div className="flex items-center justify-between border-b bg-slate-50 px-4 py-3 dark:bg-slate-900/20">
+      <div className="flex flex-wrap items-center justify-between gap-3 border-b bg-slate-50 px-4 py-3 dark:bg-slate-900/20">
         <div className="flex items-center gap-2">
           <Badge className="bg-sky-500 hover:bg-sky-600">3D Isométrico</Badge>
           <span className="text-xs text-muted-foreground">
             {canManage 
-              ? 'Arraste os modelos para reposicionar no grid · Clique na placa com o nome da etapa para editá-la.' 
-              : 'Clique nas etapas para inspecionar perigos.'}
+              ? 'Arraste os modelos para reposicionar no grid · Clique no bloco ou na placa para editá-lo no painel lateral.' 
+              : 'Inspecione a cadeia tridimensional do processo.'}
           </span>
         </div>
-        <div className="flex items-center gap-1.5">
-          <Button variant="outline" size="icon" className="h-8 w-8" onClick={() => setZoom((z) => Math.min(80, z + 5))} title="Aumentar Zoom">
-            <ZoomIn className="h-4 w-4" />
-          </Button>
-          <Button variant="outline" size="icon" className="h-8 w-8" onClick={() => setZoom((z) => Math.max(15, z - 5))} title="Diminuir Zoom">
-            <ZoomOut className="h-4 w-4" />
-          </Button>
-          <Button variant="outline" size="icon" className="h-8 w-8" onClick={handleResetCamera} title="Resetar Câmera">
-            <RotateCcw className="h-4 w-4" />
-          </Button>
+        <div className="flex items-center gap-2">
+          {canManage && (
+            <Button 
+              size="sm" 
+              className="h-8 gap-1 bg-emerald-600 hover:bg-emerald-700 text-white text-xs px-2.5 font-medium shadow-sm transition-all" 
+              onClick={() => onStepCreate('Nova Etapa')}
+            >
+              <Plus className="h-3.5 w-3.5" />
+              Adicionar Etapa
+            </Button>
+          )}
+          <div className="flex items-center gap-1">
+            <Button variant="outline" size="icon" className="h-8 w-8" onClick={() => setZoom((z) => Math.min(80, z + 5))} title="Aumentar Zoom">
+              <ZoomIn className="h-4 w-4" />
+            </Button>
+            <Button variant="outline" size="icon" className="h-8 w-8" onClick={() => setZoom((z) => Math.max(15, z - 5))} title="Diminuir Zoom">
+              <ZoomOut className="h-4 w-4" />
+            </Button>
+            <Button variant="outline" size="icon" className="h-8 w-8" onClick={handleResetCamera} title="Resetar Câmera">
+              <RotateCcw className="h-4 w-4" />
+            </Button>
+          </div>
         </div>
       </div>
 
-      <CardContent className="relative p-0">
-        <div className="h-[70vh] bg-slate-100 dark:bg-slate-950/30">
+      <CardContent className="relative p-0 flex flex-col md:flex-row">
+        <div className="flex-1 h-[70vh] bg-slate-100 dark:bg-slate-950/30 relative">
           <Canvas shadows dpr={[1, 2]}>
             {/* Câmera Isométrica Ortográfica */}
             <OrthographicCamera 
@@ -606,7 +623,7 @@ export function IsometricFlow({ steps, canManage, onStepClick, onStepMove }: Iso
                 key={step.id}
                 step={step}
                 canManage={canManage}
-                onClick={() => onStepClick(step)}
+                onClick={() => setSelectedStepId(step.id)}
                 onMove={onStepMove}
               />
             ))}
@@ -624,38 +641,139 @@ export function IsometricFlow({ steps, canManage, onStepClick, onStepMove }: Iso
           </Canvas>
         </div>
 
-        {/* Rodapé informativo */}
-        <div className="flex flex-wrap gap-x-6 gap-y-2 border-t bg-slate-50/50 px-4 py-2.5 text-xs text-muted-foreground dark:bg-slate-900/10">
-          <div className="flex items-center gap-1.5">
-            <div className="h-3 w-3 rounded border bg-[#64748b]" />
-            <span>Recepção</span>
-          </div>
-          <div className="flex items-center gap-1.5">
-            <div className="h-3 w-3 rounded border bg-[#94a3b8]" />
-            <span>Armazenamento (Silo)</span>
-          </div>
-          <div className="flex items-center gap-1.5">
-            <div className="h-3 w-3 rounded border bg-[#e2e8f0]" />
-            <span>Processamento</span>
-          </div>
-          <div className="flex items-center gap-1.5">
-            <div className="h-3 w-3 rounded border bg-[#0d9488]" />
-            <span>Embalagem</span>
-          </div>
-          <div className="flex items-center gap-1.5">
-            <div className="h-3 w-3 rounded border bg-[#2563eb]" />
-            <span>Transporte</span>
-          </div>
-          <div className="flex items-center gap-1.5">
-            <div className="h-3 w-3 rounded border bg-[#f8fafc]" />
-            <span>Distribuição (Loja)</span>
-          </div>
-          <div className="flex items-center gap-1.5">
-            <div className="h-3.5 w-3.5 animate-pulse rounded-full bg-red-500" />
-            <span className="font-semibold text-red-600">Ponto Crítico de Controle (PCC)</span>
-          </div>
-        </div>
+        {/* Painel Lateral de Controle (Inspector) */}
+        {selectedStepId && (() => {
+          const selectedStep = steps.find(s => s.id === selectedStepId);
+          if (!selectedStep) return null;
+          return (
+            <div className="w-full md:w-80 border-t md:border-t-0 md:border-l bg-white dark:bg-slate-900 p-4 flex flex-col gap-4 overflow-y-auto h-[70vh] animate-in slide-in-from-right duration-200">
+              <div className="flex items-center justify-between border-b pb-2">
+                <h3 className="font-semibold text-sm">Editar Etapa #{selectedStep.number}</h3>
+                <Button variant="ghost" size="icon" className="h-6 w-6 text-muted-foreground hover:text-foreground" onClick={() => setSelectedStepId(null)}>
+                  <span className="sr-only">Fechar</span>
+                  <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                  </svg>
+                </Button>
+              </div>
+
+              {/* Nome da Etapa */}
+              <div className="space-y-1.5">
+                <label className="text-xs font-semibold text-muted-foreground">Nome da Etapa</label>
+                <input 
+                  type="text"
+                  className="w-full rounded-md border px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-sky-500 bg-transparent text-foreground"
+                  value={selectedStep.name}
+                  onChange={(e) => onStepUpdate(selectedStep.id, { name: e.target.value })}
+                  disabled={!canManage}
+                />
+              </div>
+
+              {/* Tipo de Bloco (Modelo 3D) */}
+              <div className="space-y-1.5">
+                <label className="text-xs font-semibold text-muted-foreground">Tipo de Bloco (Modelo 3D)</label>
+                <select
+                  className="w-full rounded-md border px-2 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-sky-500 bg-transparent text-foreground dark:bg-slate-900"
+                  value={selectedStep.type}
+                  onChange={(e) => onStepUpdate(selectedStep.id, { type: e.target.value })}
+                  disabled={!canManage}
+                >
+                  <option value="RECEIVING">Doca / Recebimento</option>
+                  <option value="STORAGE">Silo / Armazenamento</option>
+                  <option value="PROCESSING">Indústria / Processamento</option>
+                  <option value="PACKAGING">Envase / Embalagem</option>
+                  <option value="TRANSPORT">Caminhão / Transporte</option>
+                  <option value="DISTRIBUTION">Loja / Distribuição</option>
+                  <option value="OTHER">Octaedro / Outros</option>
+                </select>
+              </div>
+
+              {/* Ponto Crítico de Controle (PCC) */}
+              <div className="flex items-center justify-between rounded-lg border p-3 bg-slate-50/50 dark:bg-slate-900/50">
+                <div className="space-y-0.5">
+                  <label className="text-xs font-semibold">Ponto Crítico (PCC)</label>
+                  <p className="text-[10px] text-muted-foreground">Ativa sirene vermelha emissiva</p>
+                </div>
+                <input 
+                  type="checkbox"
+                  className="h-4 w-4 rounded border-slate-300 text-sky-600 focus:ring-sky-500 cursor-pointer"
+                  checked={selectedStep.isControlPoint}
+                  onChange={(e) => onStepUpdate(selectedStep.id, { isControlPoint: e.target.checked })}
+                  disabled={!canManage}
+                />
+              </div>
+
+              {/* Seção de Perigos e Planos */}
+              <div className="space-y-2 pt-2">
+                <label className="text-xs font-semibold text-muted-foreground">Análise do Processo</label>
+                <div className="text-[11px] space-y-1 text-muted-foreground">
+                  <div className="flex justify-between">
+                    <span>Categoria:</span>
+                    <span className="font-medium text-foreground">{selectedStep.type}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span>Estado:</span>
+                    <span className={`font-semibold ${selectedStep.isControlPoint ? 'text-red-500' : 'text-slate-500'}`}>
+                      {selectedStep.isControlPoint ? 'PCC Ativo' : 'Monitorado'}
+                    </span>
+                  </div>
+                </div>
+              </div>
+
+              {/* Botão de Excluir Etapa */}
+              {canManage && (
+                <div className="mt-auto pt-4 border-t">
+                  <Button 
+                    variant="destructive" 
+                    className="w-full text-xs font-medium" 
+                    size="sm"
+                    onClick={() => {
+                      if (confirm(`Tem certeza que deseja excluir a etapa "${selectedStep.name}"?`)) {
+                        onStepDelete(selectedStep.id);
+                        setSelectedStepId(null);
+                      }
+                    }}
+                  >
+                    Excluir Etapa
+                  </Button>
+                </div>
+              )}
+            </div>
+          );
+        })()}
       </CardContent>
+
+      {/* Rodapé informativo */}
+      <div className="flex flex-wrap gap-x-6 gap-y-2 border-t bg-slate-50/50 px-4 py-2.5 text-xs text-muted-foreground dark:bg-slate-900/10">
+        <div className="flex items-center gap-1.5">
+          <div className="h-3 w-3 rounded border bg-[#64748b]" />
+          <span>Recepção</span>
+        </div>
+        <div className="flex items-center gap-1.5">
+          <div className="h-3 w-3 rounded border bg-[#94a3b8]" />
+          <span>Armazenamento (Silo)</span>
+        </div>
+        <div className="flex items-center gap-1.5">
+          <div className="h-3 w-3 rounded border bg-[#e2e8f0]" />
+          <span>Processamento</span>
+        </div>
+        <div className="flex items-center gap-1.5">
+          <div className="h-3 w-3 rounded border bg-[#0d9488]" />
+          <span>Embalagem</span>
+        </div>
+        <div className="flex items-center gap-1.5">
+          <div className="h-3 w-3 rounded border bg-[#2563eb]" />
+          <span>Transporte</span>
+        </div>
+        <div className="flex items-center gap-1.5">
+          <div className="h-3 w-3 rounded border bg-[#f8fafc]" />
+          <span>Distribuição (Loja)</span>
+        </div>
+        <div className="flex items-center gap-1.5">
+          <div className="h-3.5 w-3.5 animate-pulse rounded-full bg-red-500" />
+          <span className="font-semibold text-red-600">Ponto Crítico de Controle (PCC)</span>
+        </div>
+      </div>
     </Card>
   );
 }

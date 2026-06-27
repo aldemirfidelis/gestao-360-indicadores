@@ -1,11 +1,27 @@
 import Image from 'next/image';
 import Link from 'next/link';
 import type { Metadata } from 'next';
-import { ArrowRight, CheckCircle2, ClipboardList, FileSearch, LineChart, Network, ShieldCheck, Workflow } from 'lucide-react';
+import type { LucideIcon } from 'lucide-react';
+import {
+  ArrowRight,
+  BarChart3,
+  BriefcaseBusiness,
+  CheckCircle2,
+  ClipboardCheck,
+  Headphones,
+  ListTodo,
+  Megaphone,
+  ShieldCheck,
+  Trophy,
+  UsersRound,
+  UtensilsCrossed,
+  Warehouse,
+} from 'lucide-react';
 import { PublicShell } from '@/components/marketing/public-shell';
 import { JsonLd } from '@/components/marketing/json-ld';
 import { DemoLink } from '@/components/marketing/demo-link';
 import { WhatsAppButton } from '@/components/marketing/whatsapp-button';
+import { IsometricFoodFlowPreview } from '@/components/marketing/isometric-food-flow-preview';
 import {
   faqJsonLd,
   moduleHighlights,
@@ -13,47 +29,116 @@ import {
   publicMetadata,
   segmentPages,
   softwareJsonLd,
-  solutionPages,
   webPageJsonLd,
   websiteJsonLd,
 } from '@/lib/public-site';
 
 export const metadata: Metadata = publicMetadata({
-  title: 'Gestão 360 | Gestão estratégica, indicadores e planos de ação',
+  title: 'Gestão 360 | Plataforma modular de gestão empresarial',
   description:
-    'Plataforma corporativa integrada para gestão empresarial: indicadores, planejamento estratégico, planos de ação, documentos, auditorias, riscos e melhoria contínua.',
+    'Integre estratégia, execução, qualidade, segurança, pessoas, comunicação, atendimento e remuneração variável em 11 módulos conectados.',
   path: '/',
 });
 
 const challenges = [
-  'Indicadores espalhados em planilhas e sem responsável claro.',
-  'Planos de ação sem evidência, histórico ou verificação de eficácia.',
-  'Auditorias, documentos, riscos e não conformidades tratados em controles isolados.',
-  'Gestores sem visão diária das prioridades e bloqueios da equipe.',
+  'Prioridades, aprovações e tarefas espalhadas entre mensagens e planilhas.',
+  'Estratégia, indicadores, desvios e planos sem uma visão executiva comum.',
+  'Qualidade, segurança e compliance operando em controles isolados.',
+  'Pessoas, comunicação e remuneração sem dados e fluxos conectados.',
 ];
 
 const flow = [
-  ['Estruture', 'Empresas, filiais, áreas, setores, processos e permissões.'],
-  ['Acompanhe', 'Indicadores, metas, painéis, reuniões e desvios.'],
-  ['Trate', 'Análise de causa, planos de ação, evidências e aprovações.'],
-  ['Aprenda', 'Histórico, auditoria, visão 360, riscos e recomendações assistidas.'],
+  ['Organize', 'Empresas, estrutura, pessoas, processos, módulos e permissões.'],
+  ['Enxergue', 'Painéis, prioridades, indicadores, riscos, chamados e pendências.'],
+  ['Execute', 'Tarefas, aprovações, planos, monitoramentos e ritos de gestão.'],
+  ['Evolua', 'Evidências, histórico, auditoria, métricas e inteligência assistida.'],
 ];
+
+const solutionPillars = [
+  {
+    eyebrow: 'Rotina e execução',
+    title: 'Trabalho organizado do início ao fim',
+    summary:
+      'Meu Dia, Tarefas e Central de Atendimento colocam prioridades, pendências e solicitações no fluxo certo, com contexto e acompanhamento.',
+    modules: ['Meu Dia', 'Tarefas', 'Central de Atendimento'],
+    href: '/modulos#meu-dia',
+  },
+  {
+    eyebrow: 'Estratégia e desempenho',
+    title: 'Decisões sustentadas por dados',
+    summary:
+      'Gestão à Vista conecta painel executivo, estratégia, indicadores, desvios, planos de ação, reuniões mensais e OKRs.',
+    modules: ['Gestão à Vista'],
+    href: '/modulos#gestao-a-vista',
+  },
+  {
+    eyebrow: 'Governança e conformidade',
+    title: 'Controle sem perder agilidade',
+    summary:
+      'Administração e Qualidade e Compliance integram permissões, automações, riscos, auditorias, documentos, processos e impactos.',
+    modules: ['Administração', 'Qualidade e Compliance'],
+    href: '/modulos#qualidade-e-compliance',
+  },
+  {
+    eyebrow: 'Operação segura',
+    title: 'Segurança aplicada ao processo real',
+    summary:
+      'Gerencie segurança dos alimentos com APPCC e fluxo 3D, além de portarias, acessos, rondas, ocorrências e ativos patrimoniais.',
+    modules: ['Segurança dos Alimentos', 'Segurança Patrimonial'],
+    href: '/modulos#seguranca-dos-alimentos',
+  },
+  {
+    eyebrow: 'Pessoas e reconhecimento',
+    title: 'Estrutura, remuneração e prêmio',
+    summary:
+      'Cargos e Salários organiza quadro, faixas e orçamento; Gestão de Prêmio conduz regras, apuração, espelhos e integração com a folha.',
+    modules: ['Cargos e Salários', 'Gestão de Prêmio'],
+    href: '/modulos#cargos-e-salarios',
+  },
+  {
+    eyebrow: 'Comunicação e engajamento',
+    title: 'Informação que chega e gera retorno',
+    summary:
+      'Comunicados, campanhas, pesquisas, confirmações, métricas e chat corporativo conectam a empresa em múltiplos canais.',
+    modules: ['Comunicação'],
+    href: '/modulos#comunicacao',
+  },
+];
+
+const moduleIcons: Record<string, LucideIcon> = {
+  'meu-dia': ListTodo,
+  tarefas: ClipboardCheck,
+  'central-de-atendimento': Headphones,
+  'gestao-a-vista': BarChart3,
+  administracao: BriefcaseBusiness,
+  'qualidade-e-compliance': ShieldCheck,
+  'seguranca-dos-alimentos': UtensilsCrossed,
+  'seguranca-patrimonial': Warehouse,
+  'cargos-e-salarios': UsersRound,
+  comunicacao: Megaphone,
+  'gestao-de-premio': Trophy,
+};
 
 const faq = [
   {
-    question: 'O Gestão 360 expõe dados de clientes em páginas públicas?',
+    question: 'Quais módulos fazem parte do Gestão 360?',
     answer:
-      'Não. O conteúdo público é institucional. Painéis, registros, documentos, APIs e áreas administrativas exigem autenticação e autorização.',
+      'A plataforma reúne Meu Dia, Tarefas, Central de Atendimento, Gestão à Vista, Administração, Qualidade e Compliance, Segurança dos Alimentos, Segurança Patrimonial, Cargos e Salários, Comunicação e Gestão de Prêmio.',
   },
   {
-    question: 'A plataforma substitui todos os sistemas da empresa?',
+    question: 'Todos os módulos precisam ser contratados e liberados de uma vez?',
     answer:
-      'Não necessariamente. O Gestão 360 atua como camada integrada de gestão, acompanhamento, evidências e execução. Integrações podem conectar sistemas existentes quando fizer sentido.',
+      'Não. O Gestão 360 é modular: cada empresa pode trabalhar com os módulos adequados à sua operação, mantendo uma base comum de usuários, permissões, histórico e auditoria.',
+  },
+  {
+    question: 'Os dados da empresa ficam disponíveis em páginas públicas?',
+    answer:
+      'Não. O conteúdo público é institucional. Painéis, registros, documentos, chamados, APIs e áreas administrativas exigem autenticação e autorização.',
   },
   {
     question: 'Como funciona a demonstração?',
     answer:
-      'A demonstração permite conhecer a plataforma com dados de exemplo e avaliar quais módulos fazem sentido para a rotina da empresa.',
+      'A demonstração permite navegar por um ambiente com dados de exemplo e conhecer os módulos antes de conversar com a equipe.',
   },
 ];
 
@@ -76,12 +161,12 @@ export default function HomePage() {
         </div>
         <div className="relative mx-auto flex min-h-[calc(100svh-5rem)] max-w-7xl items-center px-4 py-14 sm:px-6 lg:min-h-[620px] lg:px-8">
           <div className="max-w-3xl">
-            <p className="text-sm font-semibold uppercase tracking-[0.18em] text-emerald-300">Plataforma corporativa modular</p>
+            <p className="text-sm font-semibold uppercase tracking-[0.18em] text-emerald-300">11 módulos. Uma gestão conectada.</p>
             <h1 className="mt-5 max-w-4xl text-4xl font-semibold leading-[1.05] sm:text-5xl lg:text-6xl">
-              Gestão estratégica, indicadores e planos de ação conectados em uma única plataforma.
+              Uma plataforma para enxergar, executar e governar toda a operação.
             </h1>
             <p className="mt-6 max-w-2xl text-lg leading-8 text-slate-200">
-              O Gestão 360 integra planejamento, acompanhamento, tratativas, evidências e rastreabilidade para transformar dados corporativos em decisões acompanháveis.
+              O Gestão 360 conecta estratégia, tarefas, qualidade, segurança, pessoas, comunicação, atendimento e remuneração variável em uma rotina rastreável.
             </p>
             <div className="mt-8 flex flex-col gap-3 sm:flex-row">
               <DemoLink source="home_hero" className="inline-flex h-12 items-center justify-center gap-2 bg-emerald-400 px-6 text-sm font-semibold text-slate-950 hover:bg-emerald-300">
@@ -112,15 +197,22 @@ export default function HomePage() {
 
       <section className="bg-slate-50 py-20">
         <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
-          <SectionIntro eyebrow="Soluções" title="Páginas e módulos pensados para a rotina de gestão." />
+          <SectionIntro eyebrow="Soluções" title="Frentes de gestão que trabalham como uma só plataforma." />
           <div className="mt-10 grid gap-4 md:grid-cols-2 xl:grid-cols-3">
-            {solutionPages.slice(0, 9).map((page) => (
-              <Link key={page.slug} href={page.path} className="group border border-slate-200 bg-white p-5 hover:border-slate-950">
-                <div className="text-xs font-semibold uppercase tracking-[0.14em] text-emerald-700">{page.eyebrow}</div>
-                <h2 className="mt-3 text-xl font-semibold text-slate-950">{page.title}</h2>
-                <p className="mt-3 text-sm leading-6 text-slate-600">{page.summary}</p>
-                <span className="mt-5 inline-flex items-center gap-2 text-sm font-semibold text-slate-950">
-                  Ver solução <ArrowRight className="h-4 w-4 transition-transform group-hover:translate-x-1" />
+            {solutionPillars.map((pillar) => (
+              <Link key={pillar.title} href={pillar.href} className="group flex min-h-[286px] flex-col border border-slate-200 bg-white p-6 hover:border-slate-950">
+                <div className="text-xs font-semibold uppercase tracking-[0.14em] text-emerald-700">{pillar.eyebrow}</div>
+                <h2 className="mt-3 text-xl font-semibold text-slate-950">{pillar.title}</h2>
+                <p className="mt-3 text-sm leading-6 text-slate-600">{pillar.summary}</p>
+                <div className="mt-5 flex flex-wrap gap-2">
+                  {pillar.modules.map((module) => (
+                    <span key={module} className="border border-slate-200 bg-slate-50 px-2.5 py-1 text-xs font-medium text-slate-700">
+                      {module}
+                    </span>
+                  ))}
+                </div>
+                <span className="mt-auto inline-flex items-center gap-2 pt-6 text-sm font-semibold text-slate-950">
+                  Conhecer módulos <ArrowRight className="h-4 w-4 transition-transform group-hover:translate-x-1" />
                 </span>
               </Link>
             ))}
@@ -131,9 +223,9 @@ export default function HomePage() {
       <section className="bg-white py-20">
         <div className="mx-auto grid max-w-7xl gap-10 px-4 sm:px-6 lg:grid-cols-[0.9fr,1.1fr] lg:px-8">
           <div>
-            <SectionIntro eyebrow="Fluxo integrado" title="Da estratégia à execução, com trilha de auditoria." />
+            <SectionIntro eyebrow="Fluxo integrado" title="Da estrutura à execução, sem perder contexto." />
             <p className="mt-5 text-base leading-7 text-slate-600">
-              A plataforma não duplica a operação em painéis soltos. Ela conecta registros de origem, responsáveis, prazos, histórico, impactos e evidências.
+              Os módulos compartilham empresas, usuários, permissões, responsáveis, prazos, histórico e evidências. A informação nasce uma vez e segue conectada à decisão.
             </p>
           </div>
           <div className="grid gap-3">
@@ -152,19 +244,69 @@ export default function HomePage() {
 
       <section className="bg-slate-950 py-20 text-white">
         <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
-          <SectionIntro eyebrow="Módulos disponíveis" title="Uma base modular para crescer sem perder governança." inverted />
+          <SectionIntro eyebrow="Módulos disponíveis" title="11 módulos explicados de forma direta." inverted />
           <div className="mt-10 grid gap-4 md:grid-cols-2 xl:grid-cols-3">
-            {moduleHighlights.map((item, index) => {
-              const icons = [LineChart, Network, Workflow, ShieldCheck, FileSearch, ClipboardList];
-              const Icon = icons[index] ?? LineChart;
+            {moduleHighlights.map((item) => {
+              const Icon = moduleIcons[item.slug] ?? BarChart3;
               return (
-                <div key={item} className="border border-white/10 bg-white/[0.03] p-5">
-                  <Icon className="h-5 w-5 text-emerald-300" />
-                  <p className="mt-4 text-sm leading-6 text-slate-200">{item}</p>
-                </div>
+                <Link
+                  key={item.slug}
+                  href={`/modulos#${item.slug}`}
+                  className="group flex min-h-[292px] flex-col border border-white/10 bg-white/[0.03] p-6 transition-colors hover:border-emerald-300/60 hover:bg-white/[0.06]"
+                >
+                  <div className="flex items-start justify-between gap-4">
+                    <div className="grid h-10 w-10 place-items-center border border-emerald-300/20 bg-emerald-300/10">
+                      <Icon className="h-5 w-5 text-emerald-300" />
+                    </div>
+                    <span className="text-[11px] font-semibold uppercase tracking-[0.14em] text-emerald-300">{item.eyebrow}</span>
+                  </div>
+                  <h2 className="mt-5 text-xl font-semibold text-white">{item.title}</h2>
+                  <p className="mt-3 text-sm leading-6 text-slate-300">{item.description}</p>
+                  <div className="mt-auto flex flex-wrap gap-2 pt-5">
+                    {item.capabilities.map((capability) => (
+                      <span key={capability} className="border border-white/10 px-2 py-1 text-[11px] text-slate-300">
+                        {capability}
+                      </span>
+                    ))}
+                  </div>
+                </Link>
               );
             })}
           </div>
+        </div>
+      </section>
+
+      <section className="overflow-hidden bg-[linear-gradient(135deg,#ecfdf5_0%,#f8fafc_48%,#ecfeff_100%)] py-20">
+        <div className="mx-auto grid max-w-7xl items-center gap-12 px-4 sm:px-6 lg:grid-cols-[0.78fr,1.22fr] lg:px-8">
+          <div>
+            <p className="text-sm font-semibold uppercase tracking-[0.18em] text-emerald-700">Destaque do portal</p>
+            <div className="mt-4 inline-flex items-center gap-2 rounded-full bg-emerald-100 px-3 py-1 text-xs font-semibold text-emerald-800">
+              Novo fluxo 3D isométrico
+            </div>
+            <h2 className="mt-5 text-3xl font-semibold tracking-tight text-slate-950 sm:text-4xl">
+              A linha de produção virou um mapa vivo da segurança dos alimentos.
+            </h2>
+            <p className="mt-5 text-base leading-7 text-slate-600">
+              O fluxograma interativo representa cada etapa da operação em 3D, sinaliza pontos críticos de controle e aproxima o APPCC do processo que acontece no chão de fábrica.
+            </p>
+            <ul className="mt-6 grid gap-3 text-sm text-slate-700">
+              {[
+                'Gire, aproxime e reposicione as etapas do processo.',
+                'Destaque visualmente PCCs e pontos que exigem controle.',
+                'Conecte o fluxo a perigos, monitoramentos, cadeia e recall.',
+              ].map((item) => (
+                <li key={item} className="flex items-start gap-3">
+                  <CheckCircle2 className="mt-0.5 h-5 w-5 shrink-0 text-emerald-600" />
+                  <span className="leading-6">{item}</span>
+                </li>
+              ))}
+            </ul>
+            <Link href="/solucoes/seguranca-dos-alimentos" className="mt-8 inline-flex h-11 items-center justify-center gap-2 bg-slate-950 px-5 text-sm font-semibold text-white hover:bg-emerald-700">
+              Conhecer Segurança dos Alimentos
+              <ArrowRight className="h-4 w-4" />
+            </Link>
+          </div>
+          <IsometricFoodFlowPreview />
         </div>
       </section>
 
@@ -185,9 +327,9 @@ export default function HomePage() {
       <section className="bg-slate-50 py-20">
         <div className="mx-auto grid max-w-7xl gap-10 px-4 sm:px-6 lg:grid-cols-[0.9fr,1.1fr] lg:px-8">
           <div>
-            <SectionIntro eyebrow="Demonstração" title="Acesse um ambiente de exemplo e veja a plataforma em uso." />
+            <SectionIntro eyebrow="Demonstração" title="Conheça o portal por dentro, com dados de exemplo." />
             <p className="mt-5 text-sm leading-6 text-slate-600">
-              Use a demonstração para navegar por indicadores, planos, documentos, auditorias e rotinas de acompanhamento com dados fictícios.
+              Navegue pelos módulos disponíveis, veja como as informações se conectam e avalie quais frentes fazem sentido para a operação da sua empresa.
             </p>
           </div>
           <div className="border border-slate-200 bg-white p-6">
@@ -218,28 +360,28 @@ export default function HomePage() {
       </section>
 
       <section className="bg-slate-50 py-20 border-t border-slate-200">
-        <div className="mx-auto grid max-w-7xl gap-10 px-4 sm:px-6 lg:grid-cols-[0.9fr,1.1fr] lg:px-8">
+        <div className="mx-auto grid max-w-7xl gap-10 px-4 sm:px-6 xl:grid-cols-[0.68fr,1.32fr] xl:px-8">
           <div>
             <SectionIntro eyebrow="Atendimento" title="Precisa falar com a equipe do Gestão 360?" />
             <p className="mt-5 text-sm leading-6 text-slate-600">
               Nosso atendimento está disponível para suporte, dúvidas, solicitações comerciais e relacionamento com clientes.
             </p>
           </div>
-          <div className="grid gap-4 sm:grid-cols-3">
-            <div className="border border-slate-200 p-5 bg-white">
+          <div className="grid gap-4 md:grid-cols-3">
+            <div className="flex min-h-[196px] min-w-0 flex-col border border-slate-200 bg-white p-5">
               <h3 className="font-semibold text-slate-950 text-sm">Suporte</h3>
-              <p className="mt-2 text-xs text-slate-600">Para suporte técnico ou dúvidas de uso:</p>
-              <a href="mailto:suporte@gestao360.org" className="mt-3 block text-sm font-semibold text-emerald-700 hover:underline break-all">suporte@gestao360.org</a>
+              <p className="mt-2 text-xs leading-5 text-slate-600">Para suporte técnico ou dúvidas de uso:</p>
+              <a href="mailto:suporte@gestao360.org" className="mt-auto block whitespace-nowrap pt-5 text-[13px] font-semibold tracking-tight text-emerald-700 hover:underline">suporte@gestao360.org</a>
             </div>
-            <div className="border border-slate-200 p-5 bg-white">
+            <div className="flex min-h-[196px] min-w-0 flex-col border border-slate-200 bg-white p-5">
               <h3 className="font-semibold text-slate-950 text-sm">SAC</h3>
-              <p className="mt-2 text-xs text-slate-600">Para atendimento ao cliente:</p>
-              <a href="mailto:sac@gestao360.org" className="mt-3 block text-sm font-semibold text-emerald-700 hover:underline break-all">sac@gestao360.org</a>
+              <p className="mt-2 text-xs leading-5 text-slate-600">Para atendimento ao cliente:</p>
+              <a href="mailto:sac@gestao360.org" className="mt-auto block whitespace-nowrap pt-5 text-[13px] font-semibold tracking-tight text-emerald-700 hover:underline">sac@gestao360.org</a>
             </div>
-            <div className="border border-slate-200 p-5 bg-white">
+            <div className="flex min-h-[196px] min-w-0 flex-col border border-slate-200 bg-white p-5">
               <h3 className="font-semibold text-slate-950 text-sm">Comercial</h3>
-              <p className="mt-2 text-xs text-slate-600">Para contato comercial ou proposta:</p>
-              <a href="mailto:contato@gestao360.org" className="mt-3 block text-sm font-semibold text-emerald-700 hover:underline break-all">contato@gestao360.org</a>
+              <p className="mt-2 text-xs leading-5 text-slate-600">Para contato comercial ou proposta:</p>
+              <a href="mailto:contato@gestao360.org" className="mt-auto block whitespace-nowrap pt-5 text-[13px] font-semibold tracking-tight text-emerald-700 hover:underline">contato@gestao360.org</a>
             </div>
           </div>
         </div>

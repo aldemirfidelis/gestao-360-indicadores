@@ -333,22 +333,22 @@ export const solutionPages: PublicPage[] = [
     slug: 'seguranca-dos-alimentos',
     path: '/solucoes/seguranca-dos-alimentos',
     title: 'Segurança dos alimentos',
-    seoTitle: 'Gestão de segurança dos alimentos e rastreabilidade | Gestão 360',
+    seoTitle: 'Segurança dos alimentos, APPCC e fluxo 3D | Gestão 360',
     description:
-      'Apoie controles de segurança dos alimentos, rastreabilidade, fornecedores, lotes e programas operacionais.',
+      'Gerencie FSMS, APPCC, monitoramentos, cadeia, recall e processos em um fluxo 3D isométrico interativo.',
     eyebrow: 'Módulo especializado',
     summary:
-      'Organize controles específicos de alimentos e bebidas, com rastreabilidade e conexão com qualidade.',
+      'Visualize a linha produtiva em 3D, identifique pontos de controle e conecte perigos, monitoramentos, lotes e evidências.',
     problem:
-      'Controles de segurança dos alimentos exigem evidências consistentes e rastreabilidade entre fornecedores, lotes e ocorrências.',
+      'Controles de segurança dos alimentos exigem visão clara do processo, evidências consistentes e rastreabilidade entre perigos, fornecedores, lotes e ocorrências.',
     benefits: [
-      'Apoia controle de programas e registros.',
-      'Relaciona lotes, materiais e eventos.',
-      'Mantém evidências e histórico.',
-      'Conecta ocorrências a tratativas e ações.',
+      'Mapeia processos e etapas em um fluxo 3D isométrico interativo.',
+      'Identifica perigos, PCCs, PPROs e seus controles no contexto da operação.',
+      'Relaciona fornecedores, materiais, lotes, rastreabilidade e recall.',
+      'Conecta monitoramentos, não conformidades, evidências e planos de ação.',
     ],
-    features: ['Programas', 'Lotes', 'Fornecedores', 'Rastreabilidade', 'Tratativas'],
-    useCases: ['Indústria de alimentos.', 'Bebidas e agroindústria.', 'Controle de rastreabilidade por lote.'],
+    features: ['Fluxo 3D isométrico', 'FSMS e APPCC', 'PCC e PPRO', 'Monitoramentos', 'Cadeia e recall', 'Matriz de perigos'],
+    useCases: ['Mapeamento visual da linha produtiva.', 'Gestão de perigos e pontos críticos.', 'Rastreabilidade e recall por lote.'],
     faq: [
       {
         question: 'Este módulo substitui uma certificação?',
@@ -358,7 +358,12 @@ export const solutionPages: PublicPage[] = [
       {
         question: 'Há rastreabilidade de lotes?',
         answer:
-          'Sim. O módulo inclui estrutura para materiais, lotes e eventos de rastreabilidade.',
+          'Sim. O módulo conecta fornecedores, materiais, lotes, eventos de rastreabilidade e recall.',
+      },
+      {
+        question: 'Como funciona o fluxo 3D?',
+        answer:
+          'As etapas do processo são representadas em um mapa isométrico interativo, com navegação, reposicionamento e sinalização visual dos pontos de controle.',
       },
     ],
     kind: 'solution',
@@ -575,13 +580,103 @@ export const segmentPages: PublicPage[] = [
   },
 ];
 
-export const moduleHighlights = [
-  'Meu Dia: caixa de entrada corporativa com prioridades, prazos, delegações e recomendações assistidas.',
-  'Visão 360 do registro: contexto, vínculos, impactos, histórico e registros relacionados autorizados.',
-  'Central de Automações: fluxos de trabalho, tarefas, aprovações, escalonamentos e histórico.',
-  'Painel de controle corporativo: gestão de empresas, usuários, permissões e auditoria de ações.',
-  'GED e documentos: revisões, editor pela web quando configurado, anexos e rastreabilidade.',
-  'Segurança dos alimentos: programas, lotes, fornecedores e eventos de rastreabilidade.',
+export interface ModuleHighlight {
+  slug: string;
+  title: string;
+  eyebrow: string;
+  description: string;
+  capabilities: string[];
+}
+
+export const moduleHighlights: ModuleHighlight[] = [
+  {
+    slug: 'meu-dia',
+    title: 'Meu Dia',
+    eyebrow: 'Prioridades pessoais',
+    description:
+      'Reúne em uma única central tudo o que exige atenção: aprovações, ações atrasadas, riscos, documentos, reuniões e indicadores fora da meta.',
+    capabilities: ['Prioridades e prazos', 'Delegações e acompanhamento', 'Recomendações assistidas'],
+  },
+  {
+    slug: 'tarefas',
+    title: 'Tarefas',
+    eyebrow: 'Execução diária',
+    description:
+      'Organiza a caixa de trabalho do usuário, incluindo pendências operacionais e documentos liberados para edição, com status e ações disponíveis.',
+    capabilities: ['Fila de trabalho', 'Tarefas de documentos', 'Ações no contexto'],
+  },
+  {
+    slug: 'central-de-atendimento',
+    title: 'Central de Atendimento',
+    eyebrow: 'Suporte rastreável',
+    description:
+      'Permite abrir e acompanhar chamados de suporte, dúvidas e sugestões, mantendo prioridade, histórico e visibilidade para usuário, empresa e equipe de atendimento.',
+    capabilities: ['Abertura de chamados', 'Histórico da solicitação', 'Painel de suporte'],
+  },
+  {
+    slug: 'gestao-a-vista',
+    title: 'Gestão à Vista',
+    eyebrow: 'Estratégia e desempenho',
+    description:
+      'Conecta painel executivo, estrutura organizacional, estratégia, indicadores, desvios, planos de ação, reuniões mensais e OKRs.',
+    capabilities: ['Painel executivo', 'Indicadores e desvios', 'Estratégia, ações e ritos'],
+  },
+  {
+    slug: 'administracao',
+    title: 'Administração',
+    eyebrow: 'Governança da operação',
+    description:
+      'Centraliza aprovações, períodos de trabalho, automações, usuários, permissões, relatórios e exportações com controle por empresa.',
+    capabilities: ['Usuários e permissões', 'Automações e aprovações', 'Relatórios e períodos'],
+  },
+  {
+    slug: 'qualidade-e-compliance',
+    title: 'Qualidade e Compliance',
+    eyebrow: 'Controle e melhoria',
+    description:
+      'Integra riscos, não conformidades, auditorias, documentos, SIPOC, processos, formulários, cronogramas e análises de impacto em uma trilha auditável.',
+    capabilities: ['Riscos, NCs e auditorias', 'Documentos e processos', 'Formulários e impactos 360°'],
+  },
+  {
+    slug: 'seguranca-dos-alimentos',
+    title: 'Segurança dos Alimentos',
+    eyebrow: 'FSMS e APPCC',
+    description:
+      'Gerencia programas, processos, perigos, PCCs, PPROs, monitoramentos, compliance, cadeia, recall e inteligência com fluxo 3D isométrico.',
+    capabilities: ['Fluxo 3D interativo', 'Perigos e controles', 'Cadeia, lotes e recall'],
+  },
+  {
+    slug: 'seguranca-patrimonial',
+    title: 'Segurança Patrimonial',
+    eyebrow: 'Acessos e proteção',
+    description:
+      'Controla portarias, entradas e saídas, pessoas, veículos, autorizações, QR Codes, rondas, ocorrências, materiais, chaves e operação sem conexão.',
+    capabilities: ['Operação de portaria', 'Rondas e ocorrências', 'Autorizações e ativos'],
+  },
+  {
+    slug: 'cargos-e-salarios',
+    title: 'Cargos e Salários',
+    eyebrow: 'Estrutura e remuneração',
+    description:
+      'Administra quadro, catálogo e descrições de cargos, tabelas e faixas salariais, enquadramento, mérito, orçamento, pesquisas, simulações e aprovações.',
+    capabilities: ['Estrutura e quadro', 'Faixas e compa-ratio', 'Orçamento e movimentações'],
+  },
+  {
+    slug: 'comunicacao',
+    title: 'Comunicação',
+    eyebrow: 'Engajamento interno',
+    description:
+      'Entrega comunicados, campanhas e pesquisas por mural e múltiplos canais, com confirmações, mídias, métricas, comentários, reações e chat corporativo.',
+    capabilities: ['Mural e campanhas', 'Métricas e confirmações', 'Chat e múltiplos canais'],
+  },
+  {
+    slug: 'gestao-de-premio',
+    title: 'Gestão de Prêmio',
+    eyebrow: 'Remuneração variável',
+    description:
+      'Conduz programas, competências, regras, indicadores, elegibilidade, apuração, ajustes, espelhos, auditoria e integração do prêmio com a folha.',
+    capabilities: ['Regras e competências', 'Apuração e memória de cálculo', 'Espelhos e folha'],
+  },
 ];
 
 export const faqPage: FaqItem[] = [
@@ -811,11 +906,14 @@ export const privateRoutePrefixes = [
   '/platform-admin',
   '/dashboard',
   '/meu-dia',
+  '/tarefas',
+  '/central-atendimento',
   '/actions',
   '/indicators',
   '/strategy',
   '/okrs',
   '/meetings',
+  '/monthly-results',
   '/documents',
   '/forms',
   '/audits',
@@ -830,9 +928,13 @@ export const privateRoutePrefixes = [
   '/pessoas',
   '/organograma',
   '/org',
+  '/periods',
+  '/aprovacoes-cargo',
   '/central-automacoes',
   '/central-impactos',
   '/comunicacao',
+  '/gestao-premio',
+  '/cargos-salarios',
   '/imports',
   '/integracoes',
   '/insights',
@@ -840,6 +942,7 @@ export const privateRoutePrefixes = [
   '/plataforma',
   '/processes',
   '/seguranca-alimentos',
+  '/seguranca-patrimonial',
   '/visualization',
   '/api',
 ];
@@ -886,7 +989,7 @@ export function softwareJsonLd() {
     operatingSystem: 'Web',
     url: SITE_URL,
     description:
-      'Plataforma corporativa integrada para gestão empresarial: indicadores, planejamento estratégico, planos de ação, documentos, auditorias, riscos e melhoria contínua.',
+      'Plataforma corporativa modular para estratégia, execução, qualidade, segurança, pessoas, comunicação, atendimento e remuneração variável.',
     offers: {
       '@type': 'Offer',
       price: '0',

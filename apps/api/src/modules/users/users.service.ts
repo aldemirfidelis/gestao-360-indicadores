@@ -1,9 +1,9 @@
-import { ConflictException, ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
+import { BadRequestException, ConflictException, ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
 import * as bcrypt from 'bcryptjs';
 import { PrismaService } from '../../prisma/prisma.service';
 import { UserCreateInput } from '@g360/shared';
 import { Prisma, UserAccessStatus, UserRoleEnum } from '@prisma/client';
-import { PERMISSION_CATALOG } from './permission-catalog';
+import { DEFAULT_PROFILES, PERMISSION_CATALOG } from './permission-catalog';
 
 type UserAdminCreateInput = UserCreateInput & {
   branchId?: string | null;
@@ -62,6 +62,38 @@ export class UsersService {
     });
   }
 
+  async accessContext(companyId: string) {
+    await this.ensurePermissionCatalog();
+    await this.ensureCompanyProfiles(companyId);
+    const [branches, profiles] = await Promise.all([
+      this.prisma.branch.findMany({
+        where: { companyId, deletedAt: null },
+        select: { id: true, name: true, code: true },
+        orderBy: { name: 'asc' },
+      }),
+      this.prisma.accessProfile.findMany({
+        where: { OR: [{ companyId }, { companyId: null }], deletedAt: null },
+        select: {
+          id: true,
+          companyId: true,
+          code: true,
+          name: true,
+          description: true,
+          role: true,
+          permissions: {
+            select: {
+              permission: {
+                select: { id: true, key: true, description: true, module: true, action: true },
+              },
+            },
+          },
+        },
+        orderBy: [{ system: 'desc' }, { name: 'asc' }],
+      }),
+    ]);
+    return { branches, profiles };
+  }
+
   async create(input: UserAdminCreateInput, actorIsSuperAdmin = false) {
     // Anti-escalonamento de privilegio: apenas SUPER_ADMIN pode criar SUPER_ADMIN.
     if (input.role === UserRoleEnum.SUPER_ADMIN && !actorIsSuperAdmin) {
@@ -72,7 +104,7 @@ export class UsersService {
     const rounds = parseInt(process.env.BCRYPT_ROUNDS ?? '10', 10);
     const hash = await bcrypt.hash(input.password, rounds);
     const status = input.status ?? UserAccessStatus.ACTIVE;
-    await this.validateUserLinks(input.companyId, input);
+    await this.validateUserLinks(input.companyId, input, input.role, !actorIsSuperAdmin);
     return this.prisma.user.create({
       data: {
         companyId: input.companyId,
@@ -93,8 +125,11 @@ export class UsersService {
   }
 
   async setActive(id: string, companyId: string, isSuperAdmin: boolean, active: boolean) {
-    const user = await this.prisma.user.findFirst({ where: { id, deletedAt: null, companyId }, select: { id: true } });
+    const user = await this.prisma.user.findFirst({ where: { id, deletedAt: null, companyId }, select: { id: true, role: true } });
     if (!user) throw new NotFoundException('Usuário nao encontrado');
+    if (!isSuperAdmin && user.role === UserRoleEnum.SUPER_ADMIN) {
+      throw new ForbiddenException('Somente um Super Admin pode alterar outro Super Admin.');
+    }
     return this.prisma.user.update({
       where: { id },
       data: { active, status: active ? UserAccessStatus.ACTIVE : UserAccessStatus.INACTIVE },
@@ -127,7 +162,7 @@ export class UsersService {
     if (!isSuperAdmin && (input.role === UserRoleEnum.SUPER_ADMIN || user.role === UserRoleEnum.SUPER_ADMIN)) {
       throw new ForbiddenException('Somente um Super Admin pode gerenciar o papel SUPER_ADMIN.');
     }
-    await this.validateUserLinks(user.companyId, input);
+    await this.validateUserLinks(user.companyId, input, input.role ?? user.role, !isSuperAdmin);
 
     if (input.email && input.email.toLowerCase() !== user.email) {
       const exists = await this.prisma.user.findUnique({ where: { email: input.email.toLowerCase() } });
@@ -170,8 +205,11 @@ export class UsersService {
 
   async setPermissions(id: string, companyId: string, isSuperAdmin: boolean, permissionKeys: string[]) {
     await this.ensurePermissionCatalog();
-    const user = await this.prisma.user.findFirst({ where: { id, deletedAt: null, companyId }, select: { id: true } });
+    const user = await this.prisma.user.findFirst({ where: { id, deletedAt: null, companyId }, select: { id: true, role: true } });
     if (!user) throw new NotFoundException('Usuário nao encontrado');
+    if (!isSuperAdmin && user.role === UserRoleEnum.SUPER_ADMIN) {
+      throw new ForbiddenException('Somente um Super Admin pode alterar outro Super Admin.');
+    }
     const permissions = await this.prisma.permission.findMany({
       where: { key: { in: permissionKeys } },
       select: { id: true },
@@ -190,8 +228,11 @@ export class UsersService {
   }
 
   async remove(id: string, companyId: string, isSuperAdmin: boolean) {
-    const user = await this.prisma.user.findFirst({ where: { id, deletedAt: null, companyId }, select: { id: true } });
+    const user = await this.prisma.user.findFirst({ where: { id, deletedAt: null, companyId }, select: { id: true, role: true } });
     if (!user) throw new NotFoundException('Usuário nao encontrado');
+    if (!isSuperAdmin && user.role === UserRoleEnum.SUPER_ADMIN) {
+      throw new ForbiddenException('Somente um Super Admin pode alterar outro Super Admin.');
+    }
     return this.prisma.user.update({
       where: { id },
       data: { deletedAt: new Date(), active: false, status: UserAccessStatus.INACTIVE },
@@ -213,9 +254,55 @@ export class UsersService {
     this.permissionsReady = true;
   }
 
+  private async ensureCompanyProfiles(companyId: string) {
+    const defaults = DEFAULT_PROFILES.filter((profile) => profile.role !== UserRoleEnum.SUPER_ADMIN);
+    const existing = await this.prisma.accessProfile.findMany({
+      where: { companyId, code: { in: defaults.map((profile) => profile.code) }, deletedAt: null },
+      select: { code: true },
+    });
+    const existingCodes = new Set(existing.map((profile) => profile.code));
+    const missing = defaults.filter((profile) => !existingCodes.has(profile.code));
+    if (missing.length === 0) return;
+
+    await this.prisma.accessProfile.createMany({
+      data: missing.map((profile) => ({
+        companyId,
+        code: profile.code,
+        name: profile.name,
+        description: profile.description,
+        role: profile.role as UserRoleEnum,
+        system: true,
+      })),
+      skipDuplicates: true,
+    });
+
+    const [profiles, permissions] = await Promise.all([
+      this.prisma.accessProfile.findMany({
+        where: { companyId, code: { in: missing.map((profile) => profile.code) }, deletedAt: null },
+        select: { id: true, code: true },
+      }),
+      this.prisma.permission.findMany({ select: { id: true, key: true } }),
+    ]);
+    const profileByCode = new Map(profiles.map((profile) => [profile.code, profile.id]));
+    const permissionByKey = new Map(permissions.map((permission) => [permission.key, permission.id]));
+    const entries = missing.flatMap((profile) => {
+      const profileId = profileByCode.get(profile.code);
+      if (!profileId) return [];
+      return profile.permissions.flatMap((key) => {
+        const permissionId = permissionByKey.get(key);
+        return permissionId ? [{ profileId, permissionId }] : [];
+      });
+    });
+    if (entries.length > 0) {
+      await this.prisma.profilePermission.createMany({ data: entries, skipDuplicates: true });
+    }
+  }
+
   private async validateUserLinks(
     companyId: string,
     input: { branchId?: string | null; accessProfileId?: string | null; defaultNodeId?: string | null },
+    role?: UserRoleEnum,
+    enforceProfileRole = false,
   ) {
     if (input.branchId) {
       const branch = await this.prisma.branch.findFirst({ where: { id: input.branchId, companyId, deletedAt: null }, select: { id: true } });
@@ -224,9 +311,12 @@ export class UsersService {
     if (input.accessProfileId) {
       const profile = await this.prisma.accessProfile.findFirst({
         where: { id: input.accessProfileId, OR: [{ companyId }, { companyId: null }], deletedAt: null },
-        select: { id: true },
+        select: { id: true, role: true },
       });
       if (!profile) throw new NotFoundException('Perfil de acesso nao encontrado para a empresa informada');
+      if (enforceProfileRole && profile.role && role && profile.role !== role) {
+        throw new BadRequestException('O papel do usuário deve ser o mesmo papel base definido no perfil de acesso.');
+      }
     }
     if (input.defaultNodeId) {
       const node = await this.prisma.orgNode.findFirst({ where: { id: input.defaultNodeId, companyId, deletedAt: null }, select: { id: true } });

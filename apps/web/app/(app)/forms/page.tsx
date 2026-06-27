@@ -740,53 +740,74 @@ export default function FormsPage() {
   return (
     <div className="space-y-6">
       <PageHeader
-        title="Formulários e Listas de verificação"
-        description="Modelos versionados, execuções, evidências, aprovações e registros operacionais digitais."
+        title="Formulários e Checklists"
+        description="Modelos de listas de verificação, auditorias operacionais, registros digitais e evidências de conformidade."
         actions={
           <div className="flex flex-wrap gap-2">
-            {selected && canExecute ? <Button variant="outline" onClick={() => openExecution(selected)} disabled={!isExecutable(selected)}><Play className="mr-2 h-4 w-4" /> Execução</Button> : null}
-            {canCreate ? <Button onClick={openCreate}><Plus className="mr-2 h-4 w-4" /> Novo modelo</Button> : null}
+            {selected && canExecute ? <Button variant="outline" size="sm" className="h-9 gap-1.5 border-slate-200 bg-card hover:bg-muted" onClick={() => openExecution(selected)} disabled={!isExecutable(selected)}><Play className="h-4 w-4 text-sky-500" /> Executar checklist</Button> : null}
+            {canCreate ? <Button onClick={openCreate} size="sm" className="h-9 bg-blue-600 hover:bg-blue-700 text-white font-semibold"><Plus className="mr-1.5 h-4 w-4" /> Novo modelo</Button> : null}
           </div>
         }
       />
 
       <Tabs value={tab} onValueChange={setTab}>
-        <TabsList>
-          <TabsTrigger value="dashboard">Painel</TabsTrigger>
-          <TabsTrigger value="templates">Modelos</TabsTrigger>
-          <TabsTrigger value="builder">Construtor</TabsTrigger>
-          <TabsTrigger value="executions">Execuções</TabsTrigger>
-          <TabsTrigger value="records">Registros</TabsTrigger>
-          <TabsTrigger value="settings">Configurações</TabsTrigger>
+        <TabsList className="bg-slate-100 dark:bg-slate-800">
+          <TabsTrigger value="dashboard" className="text-xs font-semibold">Painel Geral</TabsTrigger>
+          <TabsTrigger value="templates" className="text-xs font-semibold">Modelos</TabsTrigger>
+          <TabsTrigger value="builder" className="text-xs font-semibold">Construtor</TabsTrigger>
+          <TabsTrigger value="executions" className="text-xs font-semibold">Execuções</TabsTrigger>
+          <TabsTrigger value="records" className="text-xs font-semibold">Registros</TabsTrigger>
+          <TabsTrigger value="settings" className="text-xs font-semibold">Configurações</TabsTrigger>
         </TabsList>
 
-        <TabsContent value="dashboard" className="space-y-4">
-          <div className="grid gap-3 md:grid-cols-4">
-            <MetricCard title="Modelos" value={formatNumber(dashboard?.total)} description={`${formatNumber(dashboard?.active)} ativos/publicados`} icon={<LayoutTemplate className="h-4 w-4" />} tone="blue" />
-            <MetricCard title="Execuções" value={formatNumber(dashboard?.executions)} description={`${formatNumber(dashboard?.overdueExecutions)} atrasadas`} icon={<ListChecks className="h-4 w-4" />} tone="yellow" />
-            <MetricCard title="Registros" value={formatNumber(dashboard?.records)} description={`${formatNumber(dashboard?.submissions)} preenchimentos`} icon={<FileCheck className="h-4 w-4" />} tone="green" />
-            <MetricCard title="Pendências" value={formatNumber(dashboard?.openIssues)} description={`${formatNumber(dashboard?.pendingApprovals)} aprovações pendentes`} icon={<ShieldCheck className="h-4 w-4" />} tone="red" />
+        <TabsContent value="dashboard" className="space-y-6">
+          
+          {/* KPIs de Checklists */}
+          <div className="grid gap-4 grid-cols-2 lg:grid-cols-4">
+            <KpiCard title="Modelos de Formulários" value={formatNumber(dashboard?.total)} change={`${formatNumber(dashboard?.active)} ativos no SGQ`} color="sky" icon={LayoutTemplate} />
+            <KpiCard title="Execuções Programadas" value={formatNumber(dashboard?.executions)} change={`${formatNumber(dashboard?.overdueExecutions)} em atraso`} color="rose" icon={ListChecks} />
+            <KpiCard title="Registros Realizados" value={formatNumber(dashboard?.records)} change={`${formatNumber(dashboard?.submissions)} checklists preenchidos`} color="emerald" icon={FileCheck} />
+            <KpiCard title="Não Conformidades (RNC)" value={formatNumber(dashboard?.openIssues)} change={`${formatNumber(dashboard?.pendingApprovals)} revisões pendentes`} color="purple" icon={ShieldCheck} />
           </div>
-          <div className="grid gap-4 lg:grid-cols-[1fr_1fr]">
-            <Card><CardContent className="space-y-3 p-4">
-              <SectionTitle icon={<Play className="h-4 w-4" />} title="Execuções recentes" />
-              {(dashboard?.recentExecutions ?? []).map((execution) => <ExecutionRow key={execution.id} execution={execution} onResponses={canExecute ? openExecutionResponse : undefined} onComplete={canExecute ? (id) => completeExecution.mutate(id) : undefined} />)}
-              {!dashboard?.recentExecutions?.length ? <EmptyText>Sem execuções recentes.</EmptyText> : null}
-            </CardContent></Card>
-            <Card><CardContent className="space-y-3 p-4">
-              <SectionTitle icon={<Archive className="h-4 w-4" />} title="Registros recentes" />
-              {(dashboard?.recentRecords ?? []).map((record) => (
-                <div key={record.id} className="rounded-md border p-3">
-                  <div className="flex flex-wrap items-center gap-2">
-                    <span className="font-medium">{record.code}</span>
-                    <Badge variant="outline">{record.status}</Badge>
+
+          {/* Gráfico de Aderência e Desvios */}
+          <div className="grid gap-6 lg:grid-cols-2">
+            <Card className="border border-slate-100 dark:border-slate-800/80 bg-white dark:bg-slate-900/50 shadow-sm flex flex-col h-[340px]">
+              <div className="flex items-center justify-between border-b px-4 py-3 shrink-0">
+                <h3 className="font-semibold text-sm flex items-center gap-2 text-slate-855 dark:text-white">
+                  <Play className="h-4 w-4 text-sky-500" />
+                  Execuções Pendentes e Recentes
+                </h3>
+              </div>
+              <CardContent className="p-4 overflow-y-auto flex-1 space-y-3">
+                {(dashboard?.recentExecutions ?? []).slice(0, 4).map((execution) => (
+                  <ExecutionRow key={execution.id} execution={execution} onResponses={canExecute ? openExecutionResponse : undefined} onComplete={canExecute ? (id) => completeExecution.mutate(id) : undefined} />
+                ))}
+                {!dashboard?.recentExecutions?.length ? <EmptyText>Sem execuções recentes no momento.</EmptyText> : null}
+              </CardContent>
+            </Card>
+
+            <Card className="border border-slate-100 dark:border-slate-800/80 bg-white dark:bg-slate-900/50 shadow-sm flex flex-col h-[340px]">
+              <div className="flex items-center justify-between border-b px-4 py-3 shrink-0">
+                <h3 className="font-semibold text-sm flex items-center gap-2 text-slate-855 dark:text-white">
+                  <Archive className="h-4 w-4 text-emerald-500" />
+                  Registros Operacionais Recebidos
+                </h3>
+              </div>
+              <CardContent className="p-4 overflow-y-auto flex-1 space-y-3">
+                {(dashboard?.recentRecords ?? []).slice(0, 3).map((record) => (
+                  <div key={record.id} className="rounded-xl border p-3 bg-slate-50/30 dark:bg-slate-900/30 flex flex-col gap-1 text-xs">
+                    <div className="flex items-center justify-between font-bold">
+                      <span className="text-slate-800 dark:text-slate-200">{record.code}</span>
+                      <Badge variant="outline" className="text-[9px] scale-90">{record.status}</Badge>
+                    </div>
+                    <p className="text-slate-600 dark:text-slate-350">{record.title}</p>
+                    <span className="text-[10px] text-slate-400 mt-1">{formatDate(record.recordDate)}</span>
                   </div>
-                  <p className="mt-1 text-sm text-muted-foreground">{record.title}</p>
-                  <p className="mt-1 text-xs text-muted-foreground">{formatDate(record.recordDate)}</p>
-                </div>
-              ))}
-              {!dashboard?.recentRecords?.length ? <EmptyText>Sem registros recentes.</EmptyText> : null}
-            </CardContent></Card>
+                ))}
+                {!dashboard?.recentRecords?.length ? <EmptyText>Sem registros recebidos.</EmptyText> : null}
+              </CardContent>
+            </Card>
           </div>
         </TabsContent>
 
@@ -1441,4 +1462,27 @@ function toQueryString(filters: Record<string, string>) {
   });
   const qs = params.toString();
   return qs ? `?${qs}` : '';
+}
+
+function KpiCard({ title, value, change, color, icon: Icon }: { title: string; value: any; change: string; color: 'emerald' | 'sky' | 'purple' | 'rose' | 'amber'; icon: any }) {
+  const colors = {
+    emerald: 'border-emerald-100 dark:border-emerald-900/30 bg-emerald-50/10 dark:bg-emerald-950/10 text-emerald-600 dark:text-emerald-400',
+    sky: 'border-sky-100 dark:border-sky-900/30 bg-sky-50/10 dark:bg-sky-950/10 text-sky-600 dark:text-sky-400',
+    purple: 'border-purple-100 dark:border-purple-900/30 bg-purple-50/10 dark:bg-purple-950/10 text-purple-600 dark:text-purple-400',
+    rose: 'border-rose-100 dark:border-rose-900/30 bg-rose-50/10 dark:bg-rose-950/10 text-rose-600 dark:text-rose-400',
+    amber: 'border-amber-100 dark:border-amber-900/30 bg-amber-50/10 dark:bg-amber-950/10 text-amber-600 dark:text-amber-400'
+  };
+
+  return (
+    <Card className={cn("border bg-card shadow-sm p-4 relative overflow-hidden transition-all duration-300 hover:shadow-md hover:scale-[1.01] flex items-center justify-between", colors[color])}>
+      <div className="space-y-1">
+        <span className="text-[10px] uppercase font-bold tracking-wider opacity-85 text-slate-550 dark:text-slate-400">{title}</span>
+        <div className="text-2xl font-extrabold text-slate-900 dark:text-white leading-none">{value ?? '0'}</div>
+        <span className="text-[10px] text-slate-400 font-medium">{change}</span>
+      </div>
+      <div className="p-2.5 rounded-xl bg-white dark:bg-slate-900 shadow-sm border border-slate-50 dark:border-slate-800">
+        <Icon className="h-5 w-5" />
+      </div>
+    </Card>
+  );
 }

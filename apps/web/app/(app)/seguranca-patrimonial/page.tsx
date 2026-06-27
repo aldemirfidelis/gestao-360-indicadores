@@ -120,7 +120,13 @@ export default function SegurancaPatrimonialPage() {
           present={present.data ?? []}
           pending={pending.data ?? []}
           gates={gates.data ?? []}
-          loading={present.isPending || pending.isPending}
+          movements={movements.data ?? []}
+          summary={summary.data}
+          incidents={incidents.data ?? []}
+          roundExecutions={roundExecutions.data ?? []}
+          authorizations={authorizations.data ?? []}
+          insights={insights.data}
+          loading={present.isPending || pending.isPending || summary.isPending}
           canOperate={canOperate}
           optionValues={optionValues}
           onEntry={() => setEntryOpen(true)}

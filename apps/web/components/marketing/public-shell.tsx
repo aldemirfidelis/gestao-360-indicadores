@@ -15,13 +15,14 @@ const nav = [
 
 const footerGroups = [
   {
-    title: 'Soluções',
+    title: 'Módulos',
     links: [
-      ['Indicadores', '/solucoes/gestao-de-indicadores'],
-      ['Planejamento estratégico', '/solucoes/planejamento-estrategico'],
-      ['Planos de ação', '/solucoes/planos-de-acao'],
-      ['Qualidade', '/solucoes/gestao-da-qualidade'],
-      ['Riscos', '/solucoes/gestao-de-riscos'],
+      ['Gestão à Vista', '/modulos#gestao-a-vista'],
+      ['Qualidade e Compliance', '/modulos#qualidade-e-compliance'],
+      ['Segurança dos Alimentos', '/modulos#seguranca-dos-alimentos'],
+      ['Segurança Patrimonial', '/modulos#seguranca-patrimonial'],
+      ['Pessoas e Remuneração', '/modulos#cargos-e-salarios'],
+      ['Todos os módulos', '/modulos'],
     ],
   },
   {
@@ -76,14 +77,14 @@ export function PublicShell({ children }: { children: ReactNode }) {
           <div>
             <BrandLogo variant="horizontal" size="sm" theme="dark" animated={true} />
             <p className="mt-4 max-w-md text-sm leading-6 text-slate-300">
-              Plataforma B2B para gestão corporativa integrada, indicadores, estratégia, planos de ação,
-              documentos, auditorias, riscos e melhoria contínua.
+              Plataforma corporativa com 11 módulos conectados para estratégia, execução, qualidade,
+              segurança, pessoas, comunicação, atendimento e remuneração variável.
             </p>
             <div className="mt-6 grid grid-cols-2 gap-3 text-xs text-slate-300 sm:grid-cols-4">
-              <FooterMetric icon={<BarChart3 className="h-4 w-4" />} label="Indicadores" />
-              <FooterMetric icon={<Layers3 className="h-4 w-4" />} label="Modular" />
+              <FooterMetric icon={<BarChart3 className="h-4 w-4" />} label="Gestão à vista" />
+              <FooterMetric icon={<Layers3 className="h-4 w-4" />} label="11 módulos" />
               <FooterMetric icon={<ShieldCheck className="h-4 w-4" />} label="Permissões" />
-              <FooterMetric icon={<FileText className="h-4 w-4" />} label="Evidências" />
+              <FooterMetric icon={<FileText className="h-4 w-4" />} label="Auditoria" />
             </div>
           </div>
           <div className="grid gap-8 sm:grid-cols-3">

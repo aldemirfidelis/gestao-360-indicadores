@@ -13,13 +13,13 @@ export class AdminController {
   constructor(private readonly service: AdminService) {}
 
   @Get('bootstrap')
-  @RequirePermissions('settings:view')
+  @RequirePermissions('settings:view', 'settings:manage', 'users:view', 'users:profiles', 'users:manage', 'audit:view')
   bootstrap(@CurrentUser() me: AuthPayload) {
     return this.service.bootstrap(me);
   }
 
   @Get('permissions')
-  @RequirePermissions('users:manage')
+  @RequirePermissions('users:permissions', 'users:profiles', 'users:manage')
   permissions() {
     return this.service.listPermissions();
   }
@@ -85,25 +85,25 @@ export class AdminController {
   }
 
   @Post('security/profiles')
-  @RequirePermissions('users:manage')
+  @RequirePermissions('users:profiles', 'users:manage')
   createProfile(@CurrentUser() me: AuthPayload, @Body() body: any) {
     return this.service.createProfile(me, body);
   }
 
   @Patch('security/profiles/:id')
-  @RequirePermissions('users:manage')
+  @RequirePermissions('users:profiles', 'users:manage')
   updateProfile(@CurrentUser() me: AuthPayload, @Param('id') id: string, @Body() body: any) {
     return this.service.updateProfile(me, id, body);
   }
 
   @Patch('security/profiles/:id/permissions')
-  @RequirePermissions('users:manage')
+  @RequirePermissions('users:profiles', 'users:manage')
   setProfilePermissions(@CurrentUser() me: AuthPayload, @Param('id') id: string, @Body() body: { permissionKeys: string[] }) {
     return this.service.setProfilePermissions(me, id, body.permissionKeys ?? []);
   }
 
   @Delete('security/profiles/:id')
-  @RequirePermissions('users:manage')
+  @RequirePermissions('users:profiles', 'users:manage')
   removeProfile(@CurrentUser() me: AuthPayload, @Param('id') id: string) {
     return this.service.removeProfile(me, id);
   }

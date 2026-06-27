@@ -335,7 +335,6 @@ export default function SegurancaAlimentosPage() {
   const [matrixDialog, setMatrixDialog] = useState(false);
   const [planDialog, setPlanDialog] = useState<ControlPlan | 'new' | null>(null);
   const [recordPlan, setRecordPlan] = useState<ControlPlan | null>(null);
-  const [flowMode, setFlowMode] = useState<'2d' | '3d'>('2d');
   const [selectedFlowProcessId, setSelectedFlowProcessId] = useState<string>('');
 
   const programs = useQuery<Program[]>({ queryKey: ['fsms', 'programs'], queryFn: () => api('/food-safety/programs') });
@@ -386,6 +385,39 @@ export default function SegurancaAlimentosPage() {
       api(`/food-safety/steps/${stepId}`, { method: 'PATCH', json: { positionX, positionY } }),
     onSuccess: () => invalidate(),
     onError: (e: any) => toast.error(e?.message ?? 'Falha ao salvar posição da etapa'),
+  });
+
+  // Mutation para criar uma nova etapa
+  const createStepMutation = useMutation({
+    mutationFn: ({ processId, name }: { processId: string; name: string }) =>
+      api(`/food-safety/processes/${processId}/steps`, { method: 'POST', json: { name } }),
+    onSuccess: () => {
+      invalidate();
+      toast.success('Etapa adicionada com sucesso');
+    },
+    onError: (e: any) => toast.error(e?.message ?? 'Falha ao adicionar etapa'),
+  });
+
+  // Mutation para excluir uma etapa
+  const deleteStepMutation = useMutation({
+    mutationFn: (stepId: string) =>
+      api(`/food-safety/steps/${stepId}`, { method: 'DELETE' }),
+    onSuccess: () => {
+      invalidate();
+      toast.success('Etapa removida com sucesso');
+    },
+    onError: (e: any) => toast.error(e?.message ?? 'Falha ao remover etapa'),
+  });
+
+  // Mutation para atualizar campos gerais de uma etapa (Nome, Tipo de modelo, PCC)
+  const updateStepMutation = useMutation({
+    mutationFn: ({ stepId, data }: { stepId: string; data: { name?: string; type?: string; isControlPoint?: boolean } }) =>
+      api(`/food-safety/steps/${stepId}`, { method: 'PATCH', json: data }),
+    onSuccess: () => {
+      invalidate();
+      toast.success('Etapa atualizada com sucesso');
+    },
+    onError: (e: any) => toast.error(e?.message ?? 'Falha ao atualizar etapa'),
   });
 
   function selectTab(nextTab: TabKey) {
@@ -482,31 +514,14 @@ export default function SegurancaAlimentosPage() {
           {tab === 'intelligence' && <IntelligenceTab programId={programId} canManage={canManage} />}
           {tab === 'flow' && (
             <div className="space-y-4">
-              {/* Barra de Acoes do Modo de Fluxo */}
+              {/* Barra de Ações do Modo de Fluxo */}
               <div className="flex flex-wrap items-center justify-between gap-3 rounded-lg border bg-card p-3.5 shadow-sm">
-                <div className="flex items-center gap-3">
-                  <span className="text-sm font-semibold">Visualização do Fluxograma:</span>
-                  <div className="flex rounded-md border p-0.5 bg-muted/30">
-                    <Button 
-                      variant={flowMode === '2d' ? 'default' : 'ghost'} 
-                      size="sm" 
-                      className="h-8 text-xs px-3"
-                      onClick={() => setFlowMode('2d')}
-                    >
-                      Processos (2D)
-                    </Button>
-                    <Button 
-                      variant={flowMode === '3d' ? 'default' : 'ghost'} 
-                      size="sm" 
-                      className="h-8 text-xs px-3"
-                      onClick={() => setFlowMode('3d')}
-                    >
-                      Mapeamento 3D Isométrico
-                    </Button>
-                  </div>
+                <div className="flex items-center gap-2">
+                  <Workflow className="h-4.5 w-4.5 text-sky-500" />
+                  <span className="text-sm font-semibold text-slate-800 dark:text-slate-200">Mapeamento e Fluxograma de Processos 3D</span>
                 </div>
 
-                {flowMode === '3d' && (processes.data ?? []).length > 0 && (
+                {(processes.data ?? []).length > 0 && (
                   <div className="flex items-center gap-2">
                     <span className="text-xs font-medium text-muted-foreground">Selecione o Processo:</span>
                     <NativeSelect 
@@ -524,51 +539,26 @@ export default function SegurancaAlimentosPage() {
                 )}
               </div>
 
-              {flowMode === '2d' ? (
-                <ProcessFlow
-                  processes={processes.data ?? []}
-                  canManage={canManage}
-                  onOpenId={(id) => {
-                    const p = (processes.data ?? []).find((x) => x.id === id);
-                    if (p) setProcessDialog(p);
-                  }}
-                  onChanged={invalidate}
-                  statusLabel={PROCESS_STATUS_LABEL}
-                />
-              ) : (
-                (() => {
-                  const activeProcess = (processes.data ?? []).find((p) => p.id === selectedFlowProcessId);
-                  if (!activeProcess) {
-                    return (
-                      <Card><CardContent className="p-8 text-center text-sm text-muted-foreground">Nenhum processo selecionado para exibição 3D.</CardContent></Card>
-                    );
-                  }
-                  if (activeProcess.steps.length === 0) {
-                    return (
-                      <Card>
-                        <CardContent className="p-10 text-center">
-                          <AlertCircle className="mx-auto mb-3 h-9 w-9 text-amber-500" />
-                          <div className="text-sm font-semibold">Este processo não possui etapas mapeadas</div>
-                          <p className="mx-auto mt-1 max-w-sm text-xs text-muted-foreground">
-                            Para ver o mapeamento 3D isométrico, adicione etapas a este processo editando-o na aba &quot;Processos&quot; ou clicando no botão abaixo.
-                          </p>
-                          <Button size="sm" className="mt-3.5" onClick={() => setProcessDialog(activeProcess)}>
-                            Adicionar Etapas
-                          </Button>
-                        </CardContent>
-                      </Card>
-                    );
-                  }
+              {(() => {
+                const activeProcess = (processes.data ?? []).find((p) => p.id === selectedFlowProcessId);
+                if (!activeProcess) {
                   return (
-                    <IsometricFlow
-                      steps={activeProcess.steps as any[]}
-                      canManage={canManage}
-                      onStepClick={() => setProcessDialog(activeProcess)}
-                      onStepMove={(stepId, x, y) => moveStepMutation.mutate({ stepId, positionX: x, positionY: y })}
-                    />
+                    <Card><CardContent className="p-8 text-center text-sm text-muted-foreground">Nenhum processo selecionado para exibição 3D.</CardContent></Card>
                   );
-                })()
-              )}
+                }
+                return (
+                  <IsometricFlow
+                    steps={activeProcess.steps as any[]}
+                    processId={activeProcess.id}
+                    canManage={canManage}
+                    onStepClick={() => setProcessDialog(activeProcess)}
+                    onStepMove={(stepId, x, y) => moveStepMutation.mutate({ stepId, positionX: x, positionY: y })}
+                    onStepCreate={(name) => createStepMutation.mutate({ processId: activeProcess.id, name })}
+                    onStepDelete={(stepId) => deleteStepMutation.mutate(stepId)}
+                    onStepUpdate={(stepId, data) => updateStepMutation.mutate({ stepId, data })}
+                  />
+                );
+              })()}
             </div>
           )}
           {tab === 'matrix' && <MatrixTab processes={processes.data ?? []} hazards={hazards} />}

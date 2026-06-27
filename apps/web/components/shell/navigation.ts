@@ -76,7 +76,7 @@ export const companyUsersNavItem: NavItem = {
   label: 'Usuários',
   description: 'Criação e manutenção dos usuários da própria empresa',
   icon: Users,
-  permissions: ['users:view', 'users:manage'],
+  permissions: ['users:view', 'users:profiles', 'users:manage'],
 };
 
 export const navSections: NavSection[] = [
@@ -311,9 +311,9 @@ export const ROUTE_PERMISSIONS: Array<{ prefix: string; permissions: string[]; e
   { prefix: '/settings/database', permissions: [SUPER_ADMIN_ONLY_PERMISSION] },
   { prefix: '/settings/portal', permissions: [SUPER_ADMIN_ONLY_PERMISSION] },
   { prefix: '/settings/empresas', permissions: ['users:view', 'users:manage'] },
-  { prefix: '/settings/visibilidade', permissions: ['users:view', 'users:manage'] },
-  { prefix: '/settings/integracoes', permissions: ['users:view', 'users:manage'] },
-  { prefix: '/settings', permissions: ['users:view', 'users:manage'] },
+  { prefix: '/settings/visibilidade', permissions: ['users:permissions', 'users:manage'] },
+  { prefix: '/settings/integracoes', permissions: ['integrations:view', 'integrations:manage', 'settings:manage'] },
+  { prefix: '/settings', permissions: ['settings:view', 'settings:manage', 'users:view', 'users:profiles', 'users:manage', 'audit:view'] },
 ];
 
 export function findRoutePermissions(pathname: string): string[] | null {
