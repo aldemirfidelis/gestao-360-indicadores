@@ -9,7 +9,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { api, ApiError } from '@/lib/api';
 import { cn } from '@/lib/utils';
-import { navSections } from '@/components/shell/navigation';
+import { allNavSections } from '@/components/shell/navigation';
 import { useState } from 'react';
 
 interface NavOverride {
@@ -91,7 +91,7 @@ export function NavigationTab() {
 
       {!overrides.isLoading && (
         <div className="space-y-6">
-          {navSections.map((sect) => {
+          {allNavSections.map((sect) => {
             const sectOverride = overridesMap.get(sect.heading);
             const isSectHidden = sectOverride?.hidden ?? false;
             const sectOrder = sectOverride?.order ?? null;

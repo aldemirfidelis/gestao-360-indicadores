@@ -79,6 +79,32 @@ export const companyUsersNavItem: NavItem = {
   permissions: ['users:view', 'users:profiles', 'users:manage'],
 };
 
+export const portalServiceSections: NavSection[] = [
+  {
+    heading: 'Atendimento',
+    description: 'Central de atendimento e chamados de suporte',
+    intent: 'view',
+    icon: MessageSquare,
+    flat: true,
+    items: [
+      { href: '/central-atendimento', label: 'Central de Atendimento', description: 'Abra chamados, tire dúvidas e solicite suporte', icon: MessageSquare, permissions: [], exact: true },
+    ],
+  },
+  {
+    heading: 'Administração',
+    description: 'Aprovações, períodos, automações, usuários e relatórios',
+    intent: 'management',
+    icon: Briefcase,
+    items: [
+      { href: '/aprovacoes-cargo', label: 'Aprovações', description: 'Cargo, eficácia e aprovações gerais', icon: ClipboardCheck, permissions: ['org:positions:approve', 'eficacia:view', 'actions:effectiveness', 'actions:delete', 'actions:approve', 'actions:manage'] },
+      { href: '/periods', label: 'Períodos', description: 'Ano de trabalho, abertura e fechamento anual', icon: CalendarDays, permissions: ['settings:manage'] },
+      { href: '/central-automacoes', label: 'Central de Automações', description: 'Motor visual de automações e fluxos de trabalho', icon: Sparkles, permissions: ['automations:view'] },
+      companyUsersNavItem,
+      { href: '/reports', label: 'Relatórios e Exportações', description: 'Indicadores, resultados, metas, desvios e áreas', icon: FileBarChart, permissions: ['reports:view', 'reports:export'] },
+    ],
+  },
+];
+
 export const navSections: NavSection[] = [
   {
     heading: 'Meu Dia',
@@ -101,16 +127,6 @@ export const navSections: NavSection[] = [
     ],
   },
   {
-    heading: 'Atendimento',
-    description: 'Central de atendimento e chamados de suporte',
-    intent: 'view',
-    icon: MessageSquare,
-    flat: true,
-    items: [
-      { href: '/central-atendimento', label: 'Central de Atendimento', description: 'Abra chamados, tire dúvidas e solicite suporte', icon: MessageSquare, permissions: [], exact: true },
-    ],
-  },
-  {
     heading: 'Gestão à Vista',
     description: 'Painel executivo, estratégia, indicadores e ritos de gestão',
     intent: 'view',
@@ -125,19 +141,6 @@ export const navSections: NavSection[] = [
       { href: '/meetings', label: 'Reuniões', description: 'Agenda, atas e decisões', icon: CalendarDays, permissions: ['meetings:view'] },
       { href: '/monthly-results', label: 'Reunião Mensal', description: 'Fechamento de resultados, pauta, ata e acompanhamento semanal', icon: CalendarDays, permissions: ['monthly:view'] },
       { href: '/okrs', label: 'OKRs', description: 'Ciclos e resultados-chave', icon: Goal, permissions: ['okrs:view'] },
-    ],
-  },
-  {
-    heading: 'Administração',
-    description: 'Aprovações, períodos, automações, usuários e relatórios',
-    intent: 'management',
-    icon: Briefcase,
-    items: [
-      { href: '/aprovacoes-cargo', label: 'Aprovações', description: 'Cargo, eficácia e aprovações gerais', icon: ClipboardCheck, permissions: ['org:positions:approve', 'eficacia:view', 'actions:effectiveness', 'actions:delete', 'actions:approve', 'actions:manage'] },
-      { href: '/periods', label: 'Períodos', description: 'Ano de trabalho, abertura e fechamento anual', icon: CalendarDays, permissions: ['settings:manage'] },
-      { href: '/central-automacoes', label: 'Central de Automações', description: 'Motor visual de automações e fluxos de trabalho', icon: Sparkles, permissions: ['automations:view'] },
-      companyUsersNavItem,
-      { href: '/reports', label: 'Relatórios e Exportações', description: 'Indicadores, resultados, metas, desvios e áreas', icon: FileBarChart, permissions: ['reports:view', 'reports:export'] },
     ],
   },
   {
@@ -326,13 +329,27 @@ export function findRoutePermissions(pathname: string): string[] | null {
   return null;
 }
 
-export function visibleNavSections(user: NavUser | null | undefined) {
-  return navSections
+export const allNavSections: NavSection[] = [...navSections, ...portalServiceSections];
+
+function visibleSections(sections: NavSection[], user: NavUser | null | undefined) {
+  return sections
     .map((section) => ({
       ...section,
       items: section.items.filter((item) => canAccess(user, item.permissions)),
     }))
     .filter((section) => section.items.length > 0);
+}
+
+export function visibleNavSections(user: NavUser | null | undefined) {
+  return visibleSections(navSections, user);
+}
+
+export function visiblePortalServiceSections(user: NavUser | null | undefined) {
+  return visibleSections(portalServiceSections, user);
+}
+
+export function visibleAllNavSections(user: NavUser | null | undefined) {
+  return visibleSections(allNavSections, user);
 }
 
 export function visibleMobileItems(user: NavUser | null | undefined) {

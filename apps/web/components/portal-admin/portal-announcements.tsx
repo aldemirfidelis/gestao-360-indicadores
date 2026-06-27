@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, type ReactElement } from 'react';
 import { Megaphone, X, AlertTriangle, Info, ShieldAlert, Sparkles } from 'lucide-react';
 import { usePortalConfig } from './portal-config-provider';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
@@ -17,7 +17,7 @@ const ANNOUNCEMENT_BG: Record<string, string> = {
   feature: 'bg-purple-500/10 border-purple-500/30 text-purple-600 dark:text-purple-400',
 };
 
-const ANNOUNCEMENT_ICONS: Record<string, JSX.Element> = {
+const ANNOUNCEMENT_ICONS: Record<string, ReactElement> = {
   urgent: <ShieldAlert className="h-4 w-4 shrink-0" />,
   maintenance: <AlertTriangle className="h-4 w-4 shrink-0" />,
   warning: <AlertTriangle className="h-4 w-4 shrink-0" />,

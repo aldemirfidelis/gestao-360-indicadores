@@ -67,17 +67,17 @@ export function BrandLogo({
   const sharedDefs = (
     <defs>
       <linearGradient id="brand-logo-bg-grad" x1="0" y1="0" x2="100" y2="100" gradientUnits="userSpaceOnUse">
-        <stop offset="0%" stop-color="#0f2042" />
-        <stop offset="100%" stop-color="#081023" />
+        <stop offset="0%" stopColor="#0f2042" />
+        <stop offset="100%" stopColor="#081023" />
       </linearGradient>
       <linearGradient id="brand-logo-ring-grad" x1="20" y1="80" x2="80" y2="20" gradientUnits="userSpaceOnUse">
-        <stop offset="0%" stop-color="#ffffff" />
-        <stop offset="60%" stop-color="#ffffff" />
-        <stop offset="100%" stop-color="#00F0FF" />
+        <stop offset="0%" stopColor="#ffffff" />
+        <stop offset="60%" stopColor="#ffffff" />
+        <stop offset="100%" stopColor="#00F0FF" />
       </linearGradient>
       <linearGradient id="brand-logo-text-360-grad" x1="0" y1="0" x2="1" y2="0">
-        <stop offset="0%" stop-color="#00b4d8" />
-        <stop offset="100%" stop-color="#00F0FF" />
+        <stop offset="0%" stopColor="#00b4d8" />
+        <stop offset="100%" stopColor="#00F0FF" />
       </linearGradient>
     </defs>
   );

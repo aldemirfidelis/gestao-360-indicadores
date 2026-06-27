@@ -98,21 +98,21 @@ export default function LoginPage() {
         </div>
 
         {/* Center Pitch Content & Floating Premium Card */}
-        <div className="relative z-10 my-auto max-w-2xl space-y-12">
-          <div className="space-y-6">
+        <div className="relative z-10 my-auto flex w-full max-w-2xl flex-col items-center justify-center gap-10 text-center">
+          {/* Logo do Gestão 360 Expandido Animado (Variante Ícone Gigante) */}
+          <div className="relative flex justify-center">
+            <BrandLogo
+              variant="icon"
+              theme="dark"
+              animated={true}
+              className="h-44 w-44 drop-shadow-[0_0_35px_rgba(6,182,212,0.15)] transition-all duration-300 hover:scale-[1.03]"
+            />
+          </div>
+
+          <div className="max-w-2xl space-y-6">
             <h1 className="text-4xl xl:text-5xl font-extrabold leading-[1.1] text-white tracking-tight">
               Conecte estratégia, indicadores e execução.
             </h1>
-          </div>
-
-          {/* Logo do Gestão 360 Expandido Animado (Variante Ícone Gigante) */}
-          <div className="relative flex justify-start pl-2">
-            <BrandLogo 
-              variant="icon" 
-              theme="dark" 
-              animated={true} 
-              className="h-44 w-44 drop-shadow-[0_0_35px_rgba(6,182,212,0.15)] transition-all duration-300 hover:scale-[1.03]" 
-            />
           </div>
         </div>
       </div>

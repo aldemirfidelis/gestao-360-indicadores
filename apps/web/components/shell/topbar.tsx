@@ -19,7 +19,7 @@ import {
 } from '@/components/ui/dialog';
 import { useAuth } from '@/components/auth/auth-provider';
 import { AccordionNavigation } from '@/components/shell/accordion-navigation';
-import { isActivePath, visibleNavSections } from '@/components/shell/navigation';
+import { isActivePath, visibleAllNavSections } from '@/components/shell/navigation';
 import { NotificationsBell } from './notifications-bell';
 import { OnlineUsersButton } from '@/components/communication/online-users-button';
 import { MessagesButton } from '@/components/communication/messages-button';
@@ -45,7 +45,7 @@ export function Topbar() {
   const [menuOpen, setMenuOpen] = useState(false);
   const [profileOpen, setProfileOpen] = useState(false);
   const [passwordForm, setPasswordForm] = useState({ currentPassword: '', newPassword: '', confirmPassword: '' });
-  const sections = visibleNavSections(user);
+  const sections = visibleAllNavSections(user);
   const section = sections.find((s) => s.items.some((i) => isActivePath(pathname, i.href, i.exact)));
   const profileRole = user?.accessProfile?.name ?? user?.jobTitle ?? user?.role ?? '-';
 

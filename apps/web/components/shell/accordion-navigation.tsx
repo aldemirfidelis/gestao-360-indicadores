@@ -4,15 +4,15 @@ import Link from 'next/link';
 import { usePathname, useSearchParams } from 'next/navigation';
 import { useEffect, useMemo, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { ChevronDown, PanelLeftClose, PanelLeftOpen, Sparkles } from 'lucide-react';
+import { ChevronDown, PanelLeftClose, PanelLeftOpen } from 'lucide-react';
 import { useAuth } from '@/components/auth/auth-provider';
 import { usePortalConfig } from '@/components/portal-admin/portal-config-provider';
 import {
   isActivePath,
   visibleNavSections,
 } from '@/components/shell/navigation';
+import { PortalServicesMenu } from '@/components/shell/portal-services-menu';
 import { Button } from '@/components/ui/button';
-import { BrandLogo } from '@/components/brand/brand-logo';
 import { api } from '@/lib/api';
 import type { ConversationSummary } from '@/lib/communication/types';
 import { cn } from '@/lib/utils';
@@ -254,15 +254,7 @@ export function AccordionNavigation({
         </div>
       </div>
 
-      {/* Rodapé */}
-      {!collapsed && (
-        <div className="p-4 border-t border-[#1b2b54]/30">
-          <div className="flex items-center gap-2 text-slate-500 text-[11px]">
-            <BrandLogo variant="icon" size="sm" theme="dark" className="h-5 w-5" />
-            <span>Gestão 360 &copy; 2026</span>
-          </div>
-        </div>
-      )}
+      <PortalServicesMenu collapsed={collapsed} mobile={mobile} onNavigate={onNavigate} />
     </div>
   );
 }

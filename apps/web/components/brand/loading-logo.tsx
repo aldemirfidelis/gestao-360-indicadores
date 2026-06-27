@@ -23,9 +23,9 @@ export function LoadingLogo({ className, size = 'md' }: LoadingLogoProps) {
     >
       <defs>
         <linearGradient id="loading-ring-grad" x1="20" y1="80" x2="80" y2="20" gradientUnits="userSpaceOnUse">
-          <stop offset="0%" stop-color="#ffffff" />
-          <stop offset="60%" stop-color="#ffffff" />
-          <stop offset="100%" stop-color="#00F0FF" />
+          <stop offset="0%" stopColor="#ffffff" />
+          <stop offset="60%" stopColor="#ffffff" />
+          <stop offset="100%" stopColor="#00F0FF" />
         </linearGradient>
       </defs>
       {/* Círculo 360 / Seta girando infinitamente */}

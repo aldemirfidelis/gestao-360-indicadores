@@ -1,5 +1,6 @@
 'use client';
 
+import type { ReactElement } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { AlertTriangle, CheckCircle2, Info, RefreshCcw, ShieldAlert } from 'lucide-react';
 import { SectionCard } from '@/components/platform/section-card';
@@ -12,7 +13,7 @@ import { cn, formatDate } from '@/lib/utils';
 interface Finding { id: string; level: string; category: string; title: string; description: string; suggestion?: string }
 interface Report { generatedAt: string; summary: Record<string, number>; findings: Finding[] }
 
-const ICON: Record<string, JSX.Element> = {
+const ICON: Record<string, ReactElement> = {
   critical: <ShieldAlert className="h-4 w-4 text-status-red" />,
   high: <ShieldAlert className="h-4 w-4 text-status-red" />,
   risk: <AlertTriangle className="h-4 w-4 text-status-yellow" />,
