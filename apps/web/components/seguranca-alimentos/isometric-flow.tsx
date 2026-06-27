@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useRef, useState, useEffect } from 'react';
-import { Canvas, useFrame, useThree } from '@react-three/fiber';
+import { Canvas, useFrame } from '@react-three/fiber';
 import { OrthographicCamera, OrbitControls, Html } from '@react-three/drei';
 import * as THREE from 'three';
 import { Card, CardContent } from '@/components/ui/card';
@@ -315,7 +315,6 @@ interface StepBlockProps {
 
 function StepBlock({ step, canManage, onClick, onMove }: StepBlockProps) {
   const groupRef = useRef<THREE.Group>(null);
-  const { camera, raycast } = useThree();
   const [hovered, setHovered] = useState(false);
   const [dragging, setDragging] = useState(false);
   const planeRef = useRef(new THREE.Plane(new THREE.Vector3(0, 1, 0), 0));
