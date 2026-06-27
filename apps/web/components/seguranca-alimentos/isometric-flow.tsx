@@ -321,10 +321,8 @@ function StepBlock({ step, canManage, onClick, onMove }: StepBlockProps) {
   const dragOffset = useRef(new THREE.Vector3());
 
   // Coordenadas 3D iniciais: convertemos positionX/positionY salvos na escala React Flow
-  const hasX = typeof step.positionX === 'number' && !isNaN(step.positionX);
-  const hasY = typeof step.positionY === 'number' && !isNaN(step.positionY);
-  const initialX = hasX ? step.positionX / 100 : 0;
-  const initialZ = hasY ? step.positionY / 100 : 0;
+  const initialX = typeof step.positionX === 'number' && !isNaN(step.positionX) ? step.positionX / 100 : 0;
+  const initialZ = typeof step.positionY === 'number' && !isNaN(step.positionY) ? step.positionY / 100 : 0;
 
   useEffect(() => {
     if (groupRef.current && !dragging) {
@@ -456,15 +454,10 @@ interface StepConnectionProps {
 }
 
 function StepConnection({ fromStep, toStep }: StepConnectionProps) {
-  const hasFromX = typeof fromStep.positionX === 'number' && !isNaN(fromStep.positionX);
-  const hasFromY = typeof fromStep.positionY === 'number' && !isNaN(fromStep.positionY);
-  const hasToX = typeof toStep.positionX === 'number' && !isNaN(toStep.positionX);
-  const hasToY = typeof toStep.positionY === 'number' && !isNaN(toStep.positionY);
-
-  const fromX = hasFromX ? fromStep.positionX / 100 : 0;
-  const fromZ = hasFromY ? fromStep.positionY / 100 : 0;
-  const toX = hasToX ? toStep.positionX / 100 : 0;
-  const toZ = hasToY ? toStep.positionY / 100 : 0;
+  const fromX = typeof fromStep.positionX === 'number' && !isNaN(fromStep.positionX) ? fromStep.positionX / 100 : 0;
+  const fromZ = typeof fromStep.positionY === 'number' && !isNaN(fromStep.positionY) ? fromStep.positionY / 100 : 0;
+  const toX = typeof toStep.positionX === 'number' && !isNaN(toStep.positionX) ? toStep.positionX / 100 : 0;
+  const toZ = typeof toStep.positionY === 'number' && !isNaN(toStep.positionY) ? toStep.positionY / 100 : 0;
 
   const start = new THREE.Vector3(fromX, 0.1, fromZ);
   const end = new THREE.Vector3(toX, 0.1, toZ);
@@ -521,8 +514,8 @@ export function IsometricFlow({ steps, canManage, onStepClick, onStepMove }: Iso
       // Auto distribuição em linha no plano
       return {
         ...step,
-        positionX: hasPosX ? step.positionX : (idx - (sortedSteps.length - 1) / 2) * 250,
-        positionY: hasPosY ? step.positionY : 0,
+        positionX: typeof step.positionX === 'number' && !isNaN(step.positionX) ? step.positionX : (idx - (sortedSteps.length - 1) / 2) * 250,
+        positionY: typeof step.positionY === 'number' && !isNaN(step.positionY) ? step.positionY : 0,
       };
     }
     return step;
