@@ -344,7 +344,7 @@ function StepBlock({ step, canManage, onClick, onMove }: StepBlockProps) {
   };
 
   // Lógica do Drag-and-Drop 3D com Raycasting no plano XZ (y=0)
-  const handlePointerDown = (e: THREE.Event & PointerEvent) => {
+  const handlePointerDown = (e: any) => {
     if (!canManage) return;
     e.stopPropagation();
     
@@ -354,19 +354,19 @@ function StepBlock({ step, canManage, onClick, onMove }: StepBlockProps) {
 
     const intersection = new THREE.Vector3();
     // Interseção do raio da câmera com o plano Y = 0
-    e.ray.intersectPlane(planeRef.current, intersection);
+    e.raycaster.ray.intersectPlane(planeRef.current, intersection);
 
     if (groupRef.current) {
       dragOffset.current.copy(groupRef.current.position).sub(intersection);
     }
   };
 
-  const handlePointerMove = (e: THREE.Event & PointerEvent) => {
+  const handlePointerMove = (e: any) => {
     if (!dragging || !groupRef.current) return;
     e.stopPropagation();
 
     const intersection = new THREE.Vector3();
-    e.ray.intersectPlane(planeRef.current, intersection);
+    e.raycaster.ray.intersectPlane(planeRef.current, intersection);
 
     const newPos = intersection.add(dragOffset.current);
     
@@ -382,7 +382,7 @@ function StepBlock({ step, canManage, onClick, onMove }: StepBlockProps) {
     );
   };
 
-  const handlePointerUp = (e: THREE.Event & PointerEvent) => {
+  const handlePointerUp = (e: any) => {
     if (!dragging) return;
     e.stopPropagation();
     (e.target as HTMLElement).releasePointerCapture(e.pointerId);
