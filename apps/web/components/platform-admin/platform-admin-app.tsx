@@ -2368,7 +2368,8 @@ function InboxSection() {
 
       {tab === 'contacts' ? (
         <div className="grid gap-6 lg:grid-cols-[1.5fr,1fr]">
-          <Panel title="Mensagens de Visitantes" description="Formulários de contato, SAC, comercial e LGPD preenchidos no site.">
+          <Panel title="Mensagens de Visitantes">
+            <p className="text-xs text-muted-foreground mb-4">Formulários de contato, SAC, comercial e LGPD preenchidos no site.</p>
             <div className="mb-4 flex flex-col gap-2 sm:flex-row sm:items-center justify-between">
               <div className="relative flex-1 mr-2">
                 <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
@@ -2428,7 +2429,8 @@ function InboxSection() {
 
           <div>
             {selectedContact ? (
-              <Panel title="Detalhes do Contato" description="Informações completas do remetente e mensagem.">
+              <Panel title="Detalhes do Contato">
+                <p className="text-xs text-muted-foreground mb-4">Informações completas do remetente e mensagem.</p>
                 <div className="space-y-4 text-sm">
                   <div className="grid grid-cols-2 gap-2 border-b pb-3">
                     <div>
@@ -2501,7 +2503,8 @@ function InboxSection() {
         </div>
       ) : (
         <div className="grid gap-6 lg:grid-cols-[1.2fr,1.8fr]">
-          <Panel title="Lista de Chamados" description="Todos os chamados de suporte abertos nas empresas.">
+          <Panel title="Lista de Chamados">
+            <p className="text-xs text-muted-foreground mb-4">Todos os chamados de suporte abertos nas empresas.</p>
             <div className="mb-4 flex flex-col gap-2 sm:flex-row sm:items-center justify-between">
               <div className="relative flex-1 mr-2">
                 <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
@@ -2576,10 +2579,8 @@ function InboxSection() {
 
           <div>
             {selectedTicketId && ticketDetailsQuery.data ? (
-              <Panel
-                title={`Chamado #${ticketDetailsQuery.data.id.substring(0, 8)}`}
-                description={`Aberto por ${ticketDetailsQuery.data.requesterName} (${ticketDetailsQuery.data.company?.name})`}
-              >
+              <Panel title={`Chamado #${ticketDetailsQuery.data.id.substring(0, 8)}`}>
+                <p className="text-xs text-muted-foreground mb-4">Aberto por {ticketDetailsQuery.data.requesterName} ({ticketDetailsQuery.data.company?.name})</p>
                 <div className="space-y-4">
                   <div className="border-b pb-3 space-y-2">
                     <div className="flex flex-wrap items-center gap-2">
