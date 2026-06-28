@@ -894,9 +894,11 @@ export const publicRoutes = [
   '/conteudos/perguntas-frequentes',
   '/sobre',
   '/contato',
+  '/teste-gratis',
   '/seguranca',
   '/implantacao',
   '/suporte',
+  '/lgpd',
   '/politica-de-privacidade',
   '/termos-de-uso',
 ];

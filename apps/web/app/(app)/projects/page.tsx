@@ -2,7 +2,7 @@
 
 import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
 import { AlertTriangle, BarChart3, Clock3, Filter, FolderKanban, Plus, Wallet, X } from 'lucide-react';
@@ -24,6 +24,7 @@ import { NativeSelect } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
 import { api } from '@/lib/api';
 import { useAuth } from '@/components/auth/auth-provider';
+import { downloadCsv } from '@/lib/compensation/format';
 import { cn, formatDate, formatNumber } from '@/lib/utils';
 
 interface Project {
@@ -130,6 +131,10 @@ export default function ProjectsPage() {
   const { hasPermission } = useAuth();
   const canCreate = hasPermission(['projects:create']);
   const [open, setOpen] = useState(false);
+  const [financeOpen, setFinanceOpen] = useState(false);
+  const [milestoneOpen, setMilestoneOpen] = useState(false);
+  const [milestoneProjectId, setMilestoneProjectId] = useState('');
+  const ganttRef = useRef<HTMLDivElement>(null);
   const [filters, setFilters] = useState({
     search: searchParams.get('search') ?? '',
     status: searchParams.get('status') ?? '',
@@ -164,6 +169,7 @@ export default function ProjectsPage() {
 
   const projects = useMemo(() => query.data ?? [], [query.data]);
   const pmo = portfolio.data;
+  const timeline = useMemo(() => buildTimeline(projects), [projects]);
 
   useEffect(() => {
     router.replace(`/projects${toQueryString(filters)}`, { scroll: false });
@@ -201,7 +207,45 @@ export default function ProjectsPage() {
       router.push(`/projects/${project.id}`);
     },
     onError: (e: any) => toast.error(e?.message ?? 'Não foi possível criar o projeto'),
-  });  return (
+  });
+
+  function openMilestone() {
+    if (projects.length === 0) {
+      toast.info('Crie um projeto antes de cadastrar um marco');
+      return;
+    }
+    if (projects.length === 1) {
+      router.push(`/projects/${projects[0].id}#milestones`);
+      return;
+    }
+    setMilestoneProjectId(projects[0].id);
+    setMilestoneOpen(true);
+  }
+
+  function exportPortfolio() {
+    if (projects.length === 0) return;
+    downloadCsv(`portfolio-projetos-${new Date().toISOString().slice(0, 10)}.csv`, [
+      ['Projeto', 'Status', 'Situação PMO', 'Responsável', 'Início', 'Fim', 'Progresso (%)', 'Orçamento', 'Tarefas vencidas', 'Marcos vencidos'],
+      ...projects.map((project) => [
+        project.name,
+        STATUS_LABEL[project.status] ?? project.status,
+        PMO_LABEL[project.pmoStatus],
+        project.responsible ?? '',
+        project.startsAt ?? '',
+        project.endsAt ?? '',
+        project.progressOverall,
+        project.budget ?? '',
+        project.tasksOverdue,
+        project.milestonesOverdue,
+      ]),
+    ]);
+  }
+
+  function scrollToGantt() {
+    ganttRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  }
+
+  return (
     <div className="space-y-6">
       <PageHeader
         title="Projetos e Cronogramas"
@@ -220,55 +264,47 @@ export default function ProjectsPage() {
       {/* Ações Rápidas */}
       <div className="grid gap-3 grid-cols-2 sm:grid-cols-3 md:grid-cols-5">
         <QuickActionBtn icon={Plus} title="Criar projeto" onClick={() => setOpen(true)} />
-        <QuickActionBtn icon={AlertTriangle} title="Novo marco" onClick={() => {}} />
-        <QuickActionBtn icon={Wallet} title="Previsão financeira" onClick={() => {}} />
-        <QuickActionBtn icon={FolderKanban} title="Exportar portfólio" onClick={() => {}} />
-        <QuickActionBtn icon={BarChart3} title="Visão Gantt" onClick={() => {}} />
+        <QuickActionBtn icon={AlertTriangle} title="Novo marco" onClick={openMilestone} />
+        <QuickActionBtn icon={Wallet} title="Previsão financeira" onClick={() => setFinanceOpen(true)} />
+        <QuickActionBtn icon={FolderKanban} title="Exportar portfólio" onClick={exportPortfolio} disabled={projects.length === 0} />
+        <QuickActionBtn icon={BarChart3} title="Visão Gantt" onClick={scrollToGantt} />
       </div>
 
       <div className="grid grid-cols-1 gap-6 xl:grid-cols-[1fr,360px]">
-        
+
         {/* Painel PMO / Gantt Chart SVG */}
-        <Card className="border border-slate-100 dark:border-slate-800/80 bg-white dark:bg-slate-900/50 shadow-sm">
+        <Card ref={ganttRef} className="scroll-mt-20 border border-slate-100 dark:border-slate-800/80 bg-white dark:bg-slate-900/50 shadow-sm">
           <div className="flex items-center justify-between border-b px-4 py-3 shrink-0">
             <h3 className="font-semibold text-sm flex items-center gap-2 text-slate-855 dark:text-white">
               <BarChart3 className="h-4 w-4 text-sky-500" />
-              Cronograma de Auditorias da Qualidade (Gantt)
+              Cronograma do portfólio (Gantt)
             </h3>
           </div>
           <CardContent className="p-4 space-y-4">
-            
-            {/* Gantt Chart SVG */}
-            <div className="border border-slate-100 dark:border-slate-800/85 rounded-xl p-3 bg-slate-50/40 dark:bg-slate-900/40 overflow-x-auto">
-              <svg className="w-full min-w-[500px] h-[130px]" viewBox="0 0 500 130">
-                {/* Linhas de tempo do grid (meses/semanas) */}
-                <line x1="80" y1="10" x2="80" y2="120" stroke="rgba(203,213,225,0.25)" strokeDasharray="3,3" />
-                <line x1="180" y1="10" x2="180" y2="120" stroke="rgba(203,213,225,0.25)" strokeDasharray="3,3" />
-                <line x1="280" y1="10" x2="280" y2="120" stroke="rgba(203,213,225,0.25)" strokeDasharray="3,3" />
-                <line x1="380" y1="10" x2="380" y2="120" stroke="rgba(203,213,225,0.25)" strokeDasharray="3,3" />
-                
-                {/* Rótulos do Grid */}
-                <text x="85" y="20" fill="rgba(148,163,184,0.85)" fontSize="9" fontWeight="bold">JUL</text>
-                <text x="185" y="20" fill="rgba(148,163,184,0.85)" fontSize="9" fontWeight="bold">AGO</text>
-                <text x="285" y="20" fill="rgba(148,163,184,0.85)" fontSize="9" fontWeight="bold">SET</text>
-                <text x="385" y="20" fill="rgba(148,163,184,0.85)" fontSize="9" fontWeight="bold">OUT</text>
 
-                {/* Linhas de Projetos */}
-                {/* 1. Auditoria ISO 9001 */}
-                <text x="10" y="48" fill="currentColor" fontSize="8" fontWeight="bold">ISO 9001</text>
-                <rect x="80" y="38" width="120" height="12" rx="3" fill="#10b981" opacity="0.85" />
-                <text x="85" y="46" fill="#fff" fontSize="7" fontWeight="bold">Fase de Preparação</text>
-
-                {/* 2. Auditoria Ambiental */}
-                <text x="10" y="78" fill="currentColor" fontSize="8" fontWeight="bold">ISO 14001</text>
-                <rect x="180" y="68" width="160" height="12" rx="3" fill="#0ea5e9" opacity="0.85" />
-                <text x="185" y="76" fill="#fff" fontSize="7" fontWeight="bold">Auditoria de Certificação</text>
-
-                {/* 3. Ações Corretivas */}
-                <text x="10" y="108" fill="currentColor" fontSize="8" fontWeight="bold">Planos RNC</text>
-                <rect x="300" y="98" width="140" height="12" rx="3" fill="#f59e0b" opacity="0.85" />
-                <text x="305" y="106" fill="#fff" fontSize="7" fontWeight="bold">Tratamento de Não Conformidades</text>
-              </svg>
+            <div className="overflow-x-auto rounded-xl border border-slate-100 bg-slate-50/40 p-3 dark:border-slate-800/85 dark:bg-slate-900/40">
+              {timeline.rows.length === 0 ? (
+                <div className="p-6 text-center text-xs text-muted-foreground">Informe as datas de início e fim dos projetos para gerar o Gantt.</div>
+              ) : (
+                <div className="min-w-[620px] space-y-2">
+                  <div className="grid grid-cols-[170px,1fr] items-center gap-3 text-[10px] font-semibold text-muted-foreground">
+                    <span>Projeto</span>
+                    <div className="flex justify-between"><span>{formatDate(timeline.start.toISOString())}</span><span>{formatDate(timeline.end.toISOString())}</span></div>
+                  </div>
+                  {timeline.rows.map((row) => (
+                    <Link key={row.project.id} href={`/projects/${row.project.id}`} className="grid grid-cols-[170px,1fr] items-center gap-3 rounded-md px-1 py-1.5 hover:bg-muted/50">
+                      <span className="truncate text-xs font-medium" title={row.project.name}>{row.project.name}</span>
+                      <div className="relative h-6 rounded bg-slate-200/60 dark:bg-slate-800">
+                        <div
+                          className={cn('absolute top-1 h-4 min-w-2 rounded', row.project.pmoStatus === 'CRITICAL' ? 'bg-rose-500' : row.project.pmoStatus === 'AT_RISK' ? 'bg-amber-500' : 'bg-sky-500')}
+                          style={{ left: `${row.left}%`, width: `${row.width}%` }}
+                          title={`${formatDate(row.project.startsAt)} a ${formatDate(row.project.endsAt)}`}
+                        />
+                      </div>
+                    </Link>
+                  ))}
+                </div>
+              )}
             </div>
 
             <div className="space-y-2">
@@ -531,6 +567,55 @@ export default function ProjectsPage() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      <Dialog open={milestoneOpen} onOpenChange={setMilestoneOpen}>
+        <DialogContent className="max-w-md">
+          <DialogHeader><DialogTitle>Selecionar projeto para o novo marco</DialogTitle></DialogHeader>
+          <div className="space-y-2 py-2">
+            <Label>Projeto</Label>
+            <NativeSelect value={milestoneProjectId} onChange={(event) => setMilestoneProjectId(event.target.value)}>
+              {projects.map((project) => <option key={project.id} value={project.id}>{project.name}</option>)}
+            </NativeSelect>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setMilestoneOpen(false)}>Cancelar</Button>
+            <Button
+              disabled={!milestoneProjectId}
+              onClick={() => {
+                setMilestoneOpen(false);
+                router.push(`/projects/${milestoneProjectId}#milestones`);
+              }}
+            >
+              Abrir cadastro de marco
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={financeOpen} onOpenChange={setFinanceOpen}>
+        <DialogContent className="max-w-xl">
+          <DialogHeader><DialogTitle>Previsão financeira do portfólio</DialogTitle></DialogHeader>
+          <div className="grid gap-3 py-2 sm:grid-cols-3">
+            <MetricCard title="Orçamento total" value={formatNumber(pmo?.budgetTotal, { style: 'currency', currency: 'BRL' })} />
+            <MetricCard title="Projetos ativos" value={formatNumber(pmo?.activeBudget, { style: 'currency', currency: 'BRL' })} />
+            <MetricCard title="Sem orçamento" value={formatNumber(projects.filter((project) => project.budget == null).length)} />
+          </div>
+          <div className="max-h-64 divide-y overflow-y-auto rounded-md border">
+            {projects.length === 0 ? (
+              <div className="p-6 text-center text-sm text-muted-foreground">Nenhum projeto no filtro atual.</div>
+            ) : projects.map((project) => (
+              <Link key={project.id} href={`/projects/${project.id}`} onClick={() => setFinanceOpen(false)} className="flex items-center justify-between gap-4 p-3 text-sm hover:bg-muted/50">
+                <div className="min-w-0">
+                  <div className="truncate font-medium">{project.name}</div>
+                  <div className="text-xs text-muted-foreground">{STATUS_LABEL[project.status]} · {project.progressOverall}% concluído</div>
+                </div>
+                <strong className="shrink-0">{project.budget == null ? 'Não informado' : formatNumber(project.budget, { style: 'currency', currency: 'BRL' })}</strong>
+              </Link>
+            ))}
+          </div>
+          <DialogFooter><Button onClick={() => setFinanceOpen(false)}>Fechar</Button></DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
@@ -542,6 +627,25 @@ function toQueryString(filters: { search?: string; status?: string; indicatorId?
   });
   const qs = params.toString();
   return qs ? `?${qs}` : '';
+}
+
+function buildTimeline(projects: Project[]) {
+  const dated = projects.filter((project): project is Project & { startsAt: string; endsAt: string } => Boolean(project.startsAt && project.endsAt));
+  if (dated.length === 0) {
+    const now = new Date();
+    return { start: now, end: now, rows: [] as Array<{ project: Project; left: number; width: number }> };
+  }
+  const start = new Date(Math.min(...dated.map((project) => new Date(project.startsAt).getTime())));
+  const end = new Date(Math.max(...dated.map((project) => new Date(project.endsAt).getTime())));
+  const total = Math.max(1, end.getTime() - start.getTime());
+  const rows = dated.map((project) => {
+    const itemStart = new Date(project.startsAt).getTime();
+    const itemEnd = new Date(project.endsAt).getTime();
+    const left = Math.max(0, ((itemStart - start.getTime()) / total) * 100);
+    const width = Math.max(1, ((Math.max(itemStart, itemEnd) - itemStart) / total) * 100);
+    return { project, left, width: Math.min(100 - left, width) };
+  });
+  return { start, end, rows };
 }
 
 function KpiCard({ title, value, change, color, icon: Icon }: { title: string; value: any; change: string; color: 'emerald' | 'sky' | 'purple' | 'rose' | 'amber'; icon: any }) {
@@ -567,11 +671,12 @@ function KpiCard({ title, value, change, color, icon: Icon }: { title: string; v
   );
 }
 
-function QuickActionBtn({ icon: Icon, title, onClick }: { icon: any; title: string; onClick?: () => void }) {
+function QuickActionBtn({ icon: Icon, title, onClick, disabled = false }: { icon: any; title: string; onClick?: () => void; disabled?: boolean }) {
   return (
     <Button
       variant="outline"
       onClick={onClick}
+      disabled={disabled}
       className="flex items-center justify-start gap-3 bg-card border-slate-200 hover:bg-slate-50/50 dark:hover:bg-slate-900/50 text-slate-700 dark:text-slate-200 h-11 w-full rounded-xl transition-all duration-200 text-xs font-semibold shadow-sm hover:scale-[1.01]"
     >
       <div className="p-1.5 rounded-lg bg-slate-50 dark:bg-slate-800 text-slate-500 dark:text-slate-400">

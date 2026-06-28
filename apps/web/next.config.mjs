@@ -1,12 +1,37 @@
 import bundleAnalyzer from '@next/bundle-analyzer';
+import { execFileSync } from 'node:child_process';
+import { readFileSync } from 'node:fs';
 
 const withBundleAnalyzer = bundleAnalyzer({
   enabled: process.env.ANALYZE === 'true',
 });
 
+const webPackage = JSON.parse(readFileSync(new URL('./package.json', import.meta.url), 'utf8'));
+
+function resolveAppVersion() {
+  if (process.env.NEXT_PUBLIC_APP_VERSION) return process.env.NEXT_PUBLIC_APP_VERSION;
+
+  try {
+    const repositoryRoot = new URL('../../', import.meta.url);
+    const commit = execFileSync('git', ['rev-parse', '--short=8', 'HEAD'], {
+      cwd: repositoryRoot,
+      encoding: 'utf8',
+      stdio: ['ignore', 'pipe', 'ignore'],
+    }).trim();
+    return `${webPackage.version}+${commit}`;
+  } catch {
+    return `${webPackage.version}+dev`;
+  }
+}
+
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   reactStrictMode: true,
+  // Uma versão rastreável é injetada no bundle. Em deploy ela vem do commit;
+  // em desenvolvimento o fallback também consulta o Git local.
+  env: {
+    NEXT_PUBLIC_APP_VERSION: resolveAppVersion(),
+  },
   // Necessário porque @g360/shared e workspace local em TypeScript
   transpilePackages: ['@g360/shared'],
   // Saída self-contained para Docker (gera .next/standalone com server.js)

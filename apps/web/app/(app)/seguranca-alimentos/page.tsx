@@ -387,10 +387,34 @@ export default function SegurancaAlimentosPage() {
     onError: (e: any) => toast.error(e?.message ?? 'Falha ao salvar posição da etapa'),
   });
 
+  const arrangeStepsMutation = useMutation({
+    mutationFn: (positions: Array<{ id: string; positionX: number; positionY: number }>) =>
+      Promise.all(
+        positions.map(({ id, positionX, positionY }) =>
+          api(`/food-safety/steps/${id}`, { method: 'PATCH', json: { positionX, positionY } }),
+        ),
+      ),
+    onSuccess: () => {
+      invalidate();
+      toast.success('Etapas organizadas automaticamente');
+    },
+    onError: (e: any) => toast.error(e?.message ?? 'Falha ao organizar as etapas'),
+  });
+
   // Mutation para criar uma nova etapa
   const createStepMutation = useMutation({
-    mutationFn: ({ processId, name }: { processId: string; name: string }) =>
-      api(`/food-safety/processes/${processId}/steps`, { method: 'POST', json: { name } }),
+    mutationFn: ({
+      processId,
+      name,
+      type,
+      isControlPoint,
+    }: {
+      processId: string;
+      name: string;
+      type: StepType;
+      isControlPoint: boolean;
+    }) =>
+      api(`/food-safety/processes/${processId}/steps`, { method: 'POST', json: { name, type, isControlPoint } }),
     onSuccess: () => {
       invalidate();
       toast.success('Etapa adicionada com sucesso');
@@ -411,7 +435,7 @@ export default function SegurancaAlimentosPage() {
 
   // Mutation para atualizar campos gerais de uma etapa (Nome, Tipo de modelo, PCC)
   const updateStepMutation = useMutation({
-    mutationFn: ({ stepId, data }: { stepId: string; data: { name?: string; type?: string; isControlPoint?: boolean } }) =>
+    mutationFn: ({ stepId, data }: { stepId: string; data: { number?: number; name?: string; type?: string; isControlPoint?: boolean } }) =>
       api(`/food-safety/steps/${stepId}`, { method: 'PATCH', json: data }),
     onSuccess: () => {
       invalidate();
@@ -549,11 +573,10 @@ export default function SegurancaAlimentosPage() {
                 return (
                   <IsometricFlow
                     steps={activeProcess.steps as any[]}
-                    processId={activeProcess.id}
                     canManage={canManage}
-                    onStepClick={() => setProcessDialog(activeProcess)}
                     onStepMove={(stepId, x, y) => moveStepMutation.mutate({ stepId, positionX: x, positionY: y })}
-                    onStepCreate={(name) => createStepMutation.mutate({ processId: activeProcess.id, name })}
+                    onStepsArrange={(positions) => arrangeStepsMutation.mutate(positions)}
+                    onStepCreate={(data) => createStepMutation.mutate({ processId: activeProcess.id, ...data })}
                     onStepDelete={(stepId) => deleteStepMutation.mutate(stepId)}
                     onStepUpdate={(stepId, data) => updateStepMutation.mutate({ stepId, data })}
                   />

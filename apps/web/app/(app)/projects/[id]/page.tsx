@@ -287,7 +287,7 @@ export default function ProjectDetailPage() {
       </Card>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        <Card>
+        <Card id="milestones" className="scroll-mt-20">
           <CardHeader>
             <CardTitle>Marcos ({p.milestones.length})</CardTitle>
           </CardHeader>

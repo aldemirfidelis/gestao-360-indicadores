@@ -12,7 +12,6 @@ import { Button } from '@/components/ui/button';
 import { useAuth } from '@/components/auth/auth-provider';
 import { BrandLogo } from '@/components/brand/brand-logo';
 import { fetchTenantBranding, type TenantBranding } from '@/lib/tenant';
-import { ShieldCheck, BarChart3, Users, Zap } from 'lucide-react';
 
 const schema = z.object({
   email: z.string().email('E-mail inválido.'),
@@ -74,7 +73,7 @@ export default function LoginPage() {
   return (
     <div className="grid min-h-screen lg:grid-cols-[1.1fr_0.9fr] bg-[#030712] overflow-hidden">
       {/* Painel Esquerdo: Marketing Pitch & Visual Premium */}
-      <div className="relative hidden overflow-hidden lg:flex lg:flex-col lg:justify-between lg:p-16 border-r border-slate-900">
+      <div className="relative hidden overflow-hidden lg:flex lg:flex-col lg:justify-center lg:p-16 border-r border-slate-900">
         {/* Glowing gradients & Mesh effect */}
         <div className="absolute inset-0 bg-[#060b18]" />
         <div className="absolute top-[-20%] left-[-20%] w-[70%] h-[70%] rounded-full bg-[radial-gradient(circle,rgba(6,182,212,0.15)_0%,transparent_70%)] filter blur-[100px] animate-pulse duration-5000" />
@@ -84,21 +83,8 @@ export default function LoginPage() {
           style={{ backgroundImage: 'radial-gradient(rgba(255,255,255,0.15) 1px, transparent 1px)', backgroundSize: '24px 24px' }} 
         />
 
-        {/* Top Header Branding */}
-        <div className="relative z-10 flex items-center gap-3">
-          {tenant?.logoUrl ? (
-            <div className="flex items-center gap-3">
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img src={tenant.logoUrl} alt={tenant.name} className="h-11 w-11 rounded-xl bg-white/90 object-contain p-1.5 shadow-lg border border-slate-200/20" />
-              <span className="text-xl font-bold text-white tracking-wide">{tenant.name}</span>
-            </div>
-          ) : (
-            <BrandLogo variant="horizontal" theme="dark" size="md" animated={true} />
-          )}
-        </div>
-
         {/* Center Pitch Content & Floating Premium Card */}
-        <div className="relative z-10 my-auto flex w-full max-w-2xl flex-col items-center justify-center gap-10 text-center">
+        <div className="relative z-10 mx-auto flex w-full max-w-2xl flex-col items-center justify-center gap-10 text-center">
           {/* Logo do Gestão 360 Expandido Animado (Variante Ícone Gigante) */}
           <div className="relative flex justify-center">
             <BrandLogo
@@ -118,82 +104,106 @@ export default function LoginPage() {
       </div>
 
       {/* Painel Direito: Form de Login */}
-      <div className="relative flex items-center justify-center p-6 sm:p-12 md:p-16">
+      <div className="relative flex min-h-screen flex-col px-6 py-6 sm:px-12 md:px-16">
         {/* Soft mobile background glow */}
         <div className="absolute top-[-10%] right-[-10%] w-[300px] h-[300px] rounded-full bg-[radial-gradient(circle,rgba(6,182,212,0.08)_0%,transparent_70%)] filter blur-[50px] lg:hidden" />
-        
-        <div className="w-full max-w-md space-y-8 relative z-10">
-          {/* Mobile logo header */}
-          <div className="flex flex-col items-center text-center lg:hidden gap-2 mb-8">
-            {tenant?.logoUrl ? (
-              <img src={tenant.logoUrl} alt={tenant.name} className="h-12 w-12 rounded-xl bg-white object-contain p-1 shadow-md" />
-            ) : (
-              <BrandLogo variant="icon" size="lg" animated={true} />
-            )}
-            <h2 className="mt-4 text-2xl font-bold text-white">
-              {tenant?.name ?? 'Gestão 360'}
-            </h2>
-            <p className="text-sm text-slate-400 mt-1">Portal de acesso corporativo</p>
-          </div>
+        <div className="relative z-10 flex flex-1 items-center justify-center py-8">
+          <div className="w-full max-w-md space-y-8">
+            {/* Mobile logo header */}
+            <div className="flex flex-col items-center text-center lg:hidden gap-2 mb-8">
+              {tenant?.logoUrl ? (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img src={tenant.logoUrl} alt={tenant.name} className="h-12 w-12 rounded-xl bg-white object-contain p-1 shadow-md" />
+              ) : (
+                <BrandLogo variant="icon" size="lg" animated={true} />
+              )}
+              <h2 className="mt-4 text-2xl font-bold text-white">
+                {tenant?.name ?? 'Gestão 360'}
+              </h2>
+              <p className="text-sm text-slate-400 mt-1">Portal de acesso corporativo</p>
+            </div>
 
-          <Card className="border-slate-800/80 bg-slate-900/40 backdrop-blur-xl shadow-2xl rounded-2xl overflow-hidden p-6 sm:p-8">
-            <CardHeader className="space-y-2 p-0 pb-6 border-b border-slate-800/60">
-              <CardTitle className="text-2xl font-bold text-white tracking-tight">
-                {demoMode ? 'Acessar demonstração' : 'Entrar na plataforma'}
-              </CardTitle>
-              <CardDescription className="text-slate-400 text-sm">
-                {demoMode
-                  ? 'Conheça o Gestão 360 com dados pré-preenchidos e simulados.'
-                  : 'Insira seu e-mail e senha cadastrados para acessar o portal.'}
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="p-0 pt-6">
-              <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-5">
-                <div className="space-y-2">
-                  <Label htmlFor="email" className="text-slate-300 text-xs font-semibold uppercase tracking-wider">E-mail</Label>
-                  <Input 
-                    id="email" 
-                    type="email" 
-                    autoComplete="email" 
-                    {...form.register('email')}
-                    className="h-11 bg-slate-950/60 border-slate-800 text-white placeholder:text-slate-600 focus-visible:ring-cyan-500/20 focus-visible:border-cyan-500 rounded-xl"
-                    placeholder="nome@empresa.com"
-                  />
-                  {form.formState.errors.email && (
-                    <p className="text-xs text-red-400 mt-1">{form.formState.errors.email.message}</p>
-                  )}
-                </div>
-                <div className="space-y-2">
-                  <div className="flex items-center justify-between">
-                    <Label htmlFor="password" className="text-slate-300 text-xs font-semibold uppercase tracking-wider">Senha</Label>
+            <Card className="border-slate-800/80 bg-slate-900/40 backdrop-blur-xl shadow-2xl rounded-2xl overflow-hidden p-6 sm:p-8">
+              <CardHeader className="space-y-2 p-0 pb-6 border-b border-slate-800/60">
+                <CardTitle className="text-2xl font-bold text-white tracking-tight">
+                  {demoMode ? 'Acessar demonstração' : 'Entrar na plataforma'}
+                </CardTitle>
+                <CardDescription className="text-slate-400 text-sm">
+                  {demoMode
+                    ? 'Conheça o Gestão 360 com dados pré-preenchidos e simulados.'
+                    : 'Insira seu e-mail e senha cadastrados para acessar o portal.'}
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="p-0 pt-6">
+                <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-5">
+                  <div className="space-y-2">
+                    <Label htmlFor="email" className="text-slate-300 text-xs font-semibold uppercase tracking-wider">E-mail</Label>
+                    <Input
+                      id="email"
+                      type="email"
+                      autoComplete="email"
+                      {...form.register('email')}
+                      className="h-11 bg-slate-950/60 border-slate-800 text-white placeholder:text-slate-600 focus-visible:ring-cyan-500/20 focus-visible:border-cyan-500 rounded-xl"
+                      placeholder="nome@empresa.com"
+                    />
+                    {form.formState.errors.email && (
+                      <p className="text-xs text-red-400 mt-1">{form.formState.errors.email.message}</p>
+                    )}
                   </div>
-                  <Input 
-                    id="password" 
-                    type="password" 
-                    autoComplete="current-password" 
-                    {...form.register('password')}
-                    className="h-11 bg-slate-950/60 border-slate-800 text-white placeholder:text-slate-600 focus-visible:ring-cyan-500/20 focus-visible:border-cyan-500 rounded-xl"
-                    placeholder="••••••••"
-                  />
-                  {form.formState.errors.password && (
-                    <p className="text-xs text-red-400 mt-1">{form.formState.errors.password.message}</p>
-                  )}
-                </div>
-                <Button 
-                  type="submit" 
-                  disabled={busy} 
-                  className="w-full h-11 bg-gradient-to-r from-cyan-500 to-blue-600 hover:from-cyan-400 hover:to-blue-500 text-white font-bold tracking-wide rounded-xl shadow-[0_4px_20px_rgba(6,182,212,0.2)] transition-all duration-200 disabled:opacity-50"
-                >
-                  {busy ? 'Entrando...' : demoMode ? 'Acessar demonstração' : 'Entrar no sistema'}
-                </Button>
-              </form>
-            </CardContent>
-          </Card>
-          
-          <div className="text-center text-xs text-slate-500">
-            Dúvidas sobre o acesso? <a href="/suporte" className="text-cyan-400 hover:underline">Fale com o suporte</a>.
+                  <div className="space-y-2">
+                    <div className="flex items-center justify-between">
+                      <Label htmlFor="password" className="text-slate-300 text-xs font-semibold uppercase tracking-wider">Senha</Label>
+                    </div>
+                    <Input
+                      id="password"
+                      type="password"
+                      autoComplete="current-password"
+                      {...form.register('password')}
+                      className="h-11 bg-slate-950/60 border-slate-800 text-white placeholder:text-slate-600 focus-visible:ring-cyan-500/20 focus-visible:border-cyan-500 rounded-xl"
+                      placeholder="••••••••"
+                    />
+                    {form.formState.errors.password && (
+                      <p className="text-xs text-red-400 mt-1">{form.formState.errors.password.message}</p>
+                    )}
+                  </div>
+                  <Button
+                    type="submit"
+                    disabled={busy}
+                    className="w-full h-11 bg-gradient-to-r from-cyan-500 to-blue-600 hover:from-cyan-400 hover:to-blue-500 text-white font-bold tracking-wide rounded-xl shadow-[0_4px_20px_rgba(6,182,212,0.2)] transition-all duration-200 disabled:opacity-50"
+                  >
+                    {busy ? 'Entrando...' : demoMode ? 'Acessar demonstração' : 'Entrar no sistema'}
+                  </Button>
+                </form>
+              </CardContent>
+            </Card>
+
+            <div className="text-center text-xs text-slate-500">
+              Dúvidas sobre o acesso? <a href="/suporte#formulario" className="text-cyan-400 hover:underline">Fale com o suporte</a>.
+            </div>
           </div>
         </div>
+
+        <footer className="relative z-10 grid w-full items-center gap-4 border-t border-slate-800/70 pt-5 text-center sm:grid-cols-3 sm:text-left">
+          <div className="flex justify-center sm:justify-start">
+            {tenant?.logoUrl ? (
+              <div className="flex items-center gap-2">
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img src={tenant.logoUrl} alt="" className="h-8 w-8 rounded-lg bg-white/90 object-contain p-1" />
+                <span className="text-xs font-semibold text-slate-200">{tenant.name}</span>
+              </div>
+            ) : (
+              <BrandLogo variant="horizontal" theme="dark" size="sm" animated={true} />
+            )}
+          </div>
+          <div className="text-xs text-slate-500 sm:text-center" aria-label="Versão da aplicação">
+            Versão {process.env.NEXT_PUBLIC_APP_VERSION ?? '0.1.0+dev'}
+          </div>
+          <nav aria-label="Documentos legais" className="flex flex-wrap justify-center gap-x-3 gap-y-1 text-xs sm:justify-end">
+            <a href="/termos-de-uso" className="text-slate-400 hover:text-cyan-300">Termos</a>
+            <a href="/politica-de-privacidade" className="text-slate-400 hover:text-cyan-300">Privacidade</a>
+            <a href="/lgpd" className="text-slate-400 hover:text-cyan-300">LGPD</a>
+          </nav>
+        </footer>
       </div>
     </div>
   );

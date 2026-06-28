@@ -345,6 +345,8 @@ export default function DocumentsPage() {
   const [open, setOpen] = useState(false);
   const [editing, setEditing] = useState<Doc | null>(null);
   const [detailId, setDetailId] = useState<string | null>(null);
+  const [section, setSection] = useState('acervo');
+  const [historyOpen, setHistoryOpen] = useState(false);
   const [filters, setFilters] = useState({ search: '', status: '', type: '', expiring: '' });
   const [form, setForm] = useState<DocForm>(EMPTY_FORM);
   const [typeForm, setTypeForm] = useState({ name: 'Procedimento', sigla: 'PRO', prefix: 'PRO', category: 'PROCEDURE' as DocType, digits: '3', defaultValidityDays: '365', alertDays: '30' });
@@ -356,6 +358,9 @@ export default function DocumentsPage() {
   const [viewer, setViewer] = useState<{ url: string; fileId: string; fileName: string } | null>(null);
   const [viewerLoading, setViewerLoading] = useState(false);
   const autoOpenEditorRef = useRef<string | null>(null);
+  const typeConfigRef = useRef<HTMLDivElement>(null);
+  const templateConfigRef = useRef<HTMLDivElement>(null);
+  const readingRef = useRef<HTMLDivElement>(null);
   const [impactModalConfig, setImpactModalConfig] = useState<{
     isOpen: boolean;
     entityType: string;
@@ -699,10 +704,24 @@ export default function DocumentsPage() {
 
   const selectedType = options?.typeConfigs.find((type) => type.id === form.typeConfigId);
 
-  const pendingReadings = [
-    { name: 'Gabriel Alencar', sector: 'Operação - Envase', docTitle: 'Procedimento Operacional Envase v3', delay: '5 dias', avatar: 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=80&fit=crop&q=60' },
-    { name: 'Mariana Lima', sector: 'Qualidade - Controle Físico', docTitle: 'Manual de Controle de Pragas v2', delay: '2 dias', avatar: 'https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=80&fit=crop&q=60' }
-  ];
+  const publishedForReading = items.filter((doc) => doc.status === 'PUBLISHED');
+  const revisedDocuments = [...items].filter((doc) => doc.version > 1).sort((a, b) => b.version - a.version);
+
+  function openConfig(target: 'types' | 'templates') {
+    if (!canManage) {
+      toast.error('Você não possui permissão para gerenciar a configuração documental');
+      return;
+    }
+    setSection('config');
+    window.setTimeout(() => {
+      (target === 'types' ? typeConfigRef : templateConfigRef).current?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    }, 50);
+  }
+
+  function openReadings() {
+    setSection('acervo');
+    window.setTimeout(() => readingRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' }), 50);
+  }
 
   return (
     <div className="space-y-6">
@@ -724,13 +743,13 @@ export default function DocumentsPage() {
       {/* Ações Rápidas */}
       <div className="grid gap-3 grid-cols-2 sm:grid-cols-3 md:grid-cols-5">
         <QuickActionBtn icon={Plus} title="Criar documento" onClick={openCreate} />
-        <QuickActionBtn icon={Layers} title="Criar categoria" onClick={() => {}} />
-        <QuickActionBtn icon={FileText} title="Novo modelo DOCX" onClick={() => {}} />
-        <QuickActionBtn icon={History} title="Histórico de revisões" onClick={() => {}} />
-        <QuickActionBtn icon={Users} title="Treinamentos de leitura" onClick={() => {}} />
+        <QuickActionBtn icon={Layers} title="Criar categoria" onClick={() => openConfig('types')} />
+        <QuickActionBtn icon={FileText} title="Novo modelo DOCX" onClick={() => openConfig('templates')} />
+        <QuickActionBtn icon={History} title="Histórico de revisões" onClick={() => setHistoryOpen(true)} />
+        <QuickActionBtn icon={Users} title="Leituras e treinamentos" onClick={openReadings} />
       </div>
 
-      <Tabs defaultValue="acervo" className="space-y-4">
+      <Tabs value={section} onValueChange={setSection} className="space-y-4">
         <TabsList className="bg-slate-100 dark:bg-slate-800">
           <TabsTrigger value="acervo" className="text-xs font-semibold"><Layers className="mr-2 h-4 w-4" />Acervo</TabsTrigger>
           <TabsTrigger value="matriz" className="text-xs font-semibold"><Table2 className="mr-2 h-4 w-4" />Matriz Geral</TabsTrigger>
@@ -780,33 +799,30 @@ export default function DocumentsPage() {
                 </CardContent>
               </Card>
 
-              {/* Pendências de leitura */}
-              <Card className="border border-slate-100 dark:border-slate-800/80 bg-white dark:bg-slate-900/50 shadow-sm flex flex-col h-[280px]">
+              {/* Documentos disponíveis para leitura e confirmação */}
+              <Card ref={readingRef} className="scroll-mt-20 border border-slate-100 dark:border-slate-800/80 bg-white dark:bg-slate-900/50 shadow-sm flex flex-col h-[280px]">
                 <div className="flex items-center justify-between border-b px-4 py-3 shrink-0">
                   <h3 className="font-semibold text-sm flex items-center gap-2 text-slate-850 dark:text-white">
                     <Users className="h-4 w-4 text-sky-500" />
-                    Pendências de Leitura Obrigatória (ISO 9001)
+                    Leituras e treinamentos documentais
                   </h3>
                 </div>
                 <CardContent className="p-0 overflow-y-auto flex-1">
-                  <div className="divide-y divide-slate-100 dark:divide-slate-850/40">
-                    {pendingReadings.map((read, idx) => (
-                      <div key={idx} className="flex items-center justify-between p-3 hover:bg-slate-50/40 dark:hover:bg-slate-900/40 transition-all text-xs">
-                        <div className="flex items-center gap-2.5 min-w-0">
-                          <img src={read.avatar} alt={read.name} className="h-7 w-7 rounded-full object-cover border border-slate-200 shrink-0" />
+                  {publishedForReading.length === 0 ? (
+                    <div className="flex h-full items-center justify-center p-8 text-center text-xs text-muted-foreground">Nenhum documento publicado está disponível para leitura.</div>
+                  ) : (
+                    <div className="divide-y divide-slate-100 dark:divide-slate-850/40">
+                      {publishedForReading.slice(0, 8).map((doc) => (
+                        <button type="button" key={doc.id} onClick={() => setDetailId(doc.id)} className="flex w-full items-center justify-between gap-3 p-3 text-left text-xs transition-all hover:bg-slate-50/40 dark:hover:bg-slate-900/40">
                           <div className="min-w-0">
-                            <div className="font-semibold text-slate-855 dark:text-slate-200 truncate">{read.name}</div>
-                            <div className="text-[9px] text-slate-450 truncate">{read.sector}</div>
-                            <div className="text-[10px] text-sky-500 font-bold truncate line-clamp-1 mt-0.5">{read.docTitle}</div>
+                            <div className="truncate font-semibold text-slate-855 dark:text-slate-200">{doc.code ? `${doc.code} · ` : ''}{doc.title}</div>
+                            <div className="mt-0.5 truncate text-[10px] text-muted-foreground">{doc.orgNode?.name ?? 'Sem área'} · versão {doc.version}</div>
                           </div>
-                        </div>
-                        <div className="flex items-center gap-2 shrink-0">
-                          <span className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-amber-500/10 text-amber-600 border border-amber-500/20">{read.delay}</span>
-                          <Button variant="ghost" size="sm" className="h-7 text-[10px] px-2 text-sky-500 border border-sky-100 hover:bg-sky-50/50 rounded-md">Cobrar</Button>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
+                          <span className="shrink-0 rounded border px-2 py-1 text-[9px] font-semibold text-sky-600">Abrir e confirmar</span>
+                        </button>
+                      ))}
+                    </div>
+                  )}
                 </CardContent>
               </Card>
 
@@ -872,7 +888,7 @@ export default function DocumentsPage() {
         {canManage && (
           <TabsContent value="config">
             <div className="grid grid-cols-1 gap-4 xl:grid-cols-2">
-              <Card className="border border-slate-100 dark:border-slate-800/80 bg-white dark:bg-slate-900/50 shadow-sm">
+              <Card ref={typeConfigRef} className="scroll-mt-20 border border-slate-100 dark:border-slate-800/80 bg-white dark:bg-slate-900/50 shadow-sm">
                 <CardContent className="space-y-4 p-4">
                   <div className="flex items-center justify-between">
                     <div className="text-sm font-semibold">Tipos e códigos</div>
@@ -903,7 +919,7 @@ export default function DocumentsPage() {
                 </CardContent>
               </Card>
 
-              <Card className="border border-slate-100 dark:border-slate-800/80 bg-white dark:bg-slate-900/50 shadow-sm">
+              <Card ref={templateConfigRef} className="scroll-mt-20 border border-slate-100 dark:border-slate-800/80 bg-white dark:bg-slate-900/50 shadow-sm">
                 <CardContent className="space-y-4 p-4">
                   <div className="flex items-center justify-between">
                     <div className="text-sm font-semibold">Modelos DOCX</div>
@@ -926,6 +942,34 @@ export default function DocumentsPage() {
           </TabsContent>
         )}
       </Tabs>
+
+      <Dialog open={historyOpen} onOpenChange={setHistoryOpen}>
+        <DialogContent className="max-w-2xl">
+          <DialogHeader><DialogTitle>Histórico de revisões do acervo</DialogTitle></DialogHeader>
+          <div className="max-h-[60vh] divide-y overflow-y-auto rounded-md border">
+            {revisedDocuments.length === 0 ? (
+              <div className="p-8 text-center text-sm text-muted-foreground">Nenhum documento possui revisão posterior à versão inicial.</div>
+            ) : revisedDocuments.map((doc) => (
+              <button
+                type="button"
+                key={doc.id}
+                onClick={() => {
+                  setHistoryOpen(false);
+                  setDetailId(doc.id);
+                }}
+                className="flex w-full items-center justify-between gap-4 p-3 text-left hover:bg-muted/50"
+              >
+                <div className="min-w-0">
+                  <div className="truncate text-sm font-medium">{doc.code ? `${doc.code} · ` : ''}{doc.title}</div>
+                  <div className="text-xs text-muted-foreground">{doc.owner?.name ?? 'Sem responsável'} · {STATUS_LABEL[doc.status]}</div>
+                </div>
+                <Badge variant="secondary">versão {doc.version}</Badge>
+              </button>
+            ))}
+          </div>
+          <DialogFooter><Button onClick={() => setHistoryOpen(false)}>Fechar</Button></DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       {/* Nova RNC Dialog Modal */}
       <Dialog open={open} onOpenChange={(v) => (v ? setOpen(true) : closeDialog())}>

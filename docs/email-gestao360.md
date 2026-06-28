@@ -91,3 +91,17 @@ Mais trabalhoso e sensível a bloqueios de entregabilidade. Só se houver necess
 - [ ] SMTP do provedor preenchido no Portal Global → E-mail
 - [ ] `contato@gestao360.org` definido como remetente padrão
 - [ ] **Testar envio** retornou sucesso
+
+## 4. Formulários públicos
+
+Os formulários de contato, suporte e trial enviam pela API usando a mesma
+configuração SMTP do Portal Global. Os destinatários não vêm do navegador:
+
+- suporte, acesso, SAC e LGPD → `PUBLIC_SUPPORT_EMAIL` (padrão
+  `suporte@gestao360.org`);
+- comercial, demonstração e trial → `PUBLIC_CONTACT_EMAIL` (padrão
+  `contato@gestao360.org`).
+
+O endpoint público aplica validação, campo-isca antispam e limite de cinco
+submissões por minuto. Se o SMTP não estiver configurado ou falhar, o formulário
+informa que o canal está indisponível e não apresenta uma confirmação falsa.

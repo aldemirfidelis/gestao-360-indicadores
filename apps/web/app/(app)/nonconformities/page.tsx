@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { useSearchParams } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
 import { 
@@ -41,6 +41,7 @@ import { NativeSelect } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
 import { useAuth } from '@/components/auth/auth-provider';
 import { api } from '@/lib/api';
+import { downloadCsv } from '@/lib/compensation/format';
 import { cn, formatDate, formatNumber } from '@/lib/utils';
 
 type NcStatus = 'OPEN' | 'TRIAGE' | 'ANALYSIS' | 'ACTION' | 'VERIFICATION' | 'CLOSED' | 'CANCELLED';
@@ -93,6 +94,18 @@ interface NcOptions {
   statuses: NcStatus[];
   sources: NcSource[];
   severities: NcSeverity[];
+}
+
+interface AuditDashboard {
+  summary: { total: number; completed: number; open: number };
+  calendar: Array<{
+    id: string;
+    code: string | null;
+    title: string;
+    status: string;
+    plannedDate: string;
+    orgNode: { id: string; name: string } | null;
+  }>;
 }
 
 interface NcForm {
@@ -181,6 +194,7 @@ const EMPTY_FORM: NcForm = {
 
 export default function NonConformitiesPage() {
   const qc = useQueryClient();
+  const router = useRouter();
   const searchParams = useSearchParams();
   const { hasPermission } = useAuth();
   const canCreate = hasPermission(['nc:create']);
@@ -191,6 +205,8 @@ export default function NonConformitiesPage() {
   const [selectedNc, setSelectedNc] = useState<NonConformity | null>(null); // Nc selecionada para Ishikawa / 5 Whys
   const [filters, setFilters] = useState({ search: '', status: '', severity: '' });
   const [form, setForm] = useState<NcForm>(EMPTY_FORM);
+  const riskRef = useRef<HTMLDivElement>(null);
+  const ishikawaRef = useRef<HTMLDivElement>(null);
 
   const listQuery = useQuery<NonConformity[]>({
     queryKey: ['nonconformities', filters],
@@ -204,6 +220,10 @@ export default function NonConformitiesPage() {
     queryKey: ['nonconformities', 'options'],
     queryFn: () => api<NcOptions>('/nonconformities/options'),
     staleTime: 60_000,
+  });
+  const auditsQuery = useQuery<AuditDashboard>({
+    queryKey: ['audits', 'dashboard', 'nonconformities'],
+    queryFn: () => api<AuditDashboard>('/audits/dashboard'),
   });
 
   const items = useMemo(() => listQuery.data ?? [], [listQuery.data]);
@@ -308,13 +328,57 @@ export default function NonConformitiesPage() {
     }
   }, [focusId, items]);
 
-  // Contadores dinâmicos adicionais do QMS
-  const countTotal = summary?.total ?? 18;
-  const countOpen = summary?.open ?? 8;
-  const countCritical = summary?.critical ?? 2;
-  const countOverdue = summary?.overdue ?? 1;
-  const countEffective = summary?.effective ?? 10;
-  const avgResolutionDays = 12.4; // MTTR mockado de mercado
+  const countTotal = summary?.total ?? 0;
+  const countOpen = summary?.open ?? 0;
+  const countCritical = summary?.critical ?? 0;
+  const countOverdue = summary?.overdue ?? 0;
+  const countEffective = summary?.effective ?? 0;
+  const countClosed = Math.max(0, countTotal - countOpen);
+  const auditSummary = auditsQuery.data?.summary;
+  const priorityMatrix = (['CRITICAL', 'MAJOR', 'MINOR'] as NcSeverity[]).map((severity) => ({
+    severity,
+    overdue: items.filter((item) => item.severity === severity && item.isOverdue).length,
+    dueSoon: items.filter((item) => {
+      if (item.severity !== severity || item.isOverdue || !item.dueDate) return false;
+      const days = (new Date(item.dueDate).getTime() - Date.now()) / 86_400_000;
+      return days >= 0 && days <= 7;
+    }).length,
+    onTime: items.filter((item) => {
+      if (item.severity !== severity || item.isOverdue) return false;
+      if (!item.dueDate) return true;
+      return (new Date(item.dueDate).getTime() - Date.now()) / 86_400_000 > 7;
+    }).length,
+  }));
+
+  function editSelected(section: 'cause' | 'plan') {
+    if (!selectedNc) {
+      toast.info('Selecione uma RNC antes de iniciar a análise');
+      return;
+    }
+    openEdit(selectedNc);
+    toast.info(section === 'cause' ? 'Preencha a causa raiz da RNC selecionada' : 'Preencha o plano corretivo 5W2H da RNC selecionada');
+  }
+
+  function exportReport() {
+    if (items.length === 0) return;
+    downloadCsv(`rnc-${new Date().toISOString().slice(0, 10)}.csv`, [
+      ['Número', 'Título', 'Origem', 'Severidade', 'Status', 'Responsável', 'Área', 'Prazo', 'Atrasada', 'Causa raiz', 'Plano corretivo', 'Eficácia'],
+      ...items.map((item) => [
+        item.number,
+        item.title,
+        SOURCE_LABEL[item.source],
+        SEVERITY_LABEL[item.severity],
+        STATUS_LABEL[item.status],
+        item.responsibleUser?.name ?? '',
+        item.orgNode?.name ?? '',
+        item.dueDate ?? '',
+        item.isOverdue ? 'Sim' : 'Não',
+        item.rootCause ?? '',
+        item.correctivePlan ?? '',
+        item.effectivenessOk == null ? 'Não avaliada' : item.effectivenessOk ? 'Eficaz' : 'Ineficaz',
+      ]),
+    ]);
+  }
 
   return (
     <div className="space-y-6">
@@ -337,7 +401,7 @@ export default function NonConformitiesPage() {
               Nova RNC
             </Button>
           )}
-          <Button variant="outline" size="sm" className="h-9 gap-1.5 bg-card hover:bg-muted" title="Mais Ações">
+          <Button variant="outline" size="sm" className="h-9 gap-1.5 bg-card hover:bg-muted" title="Abrir auditorias" onClick={() => router.push('/audits')}>
             <Layers className="h-4.5 w-4.5 text-slate-500" />
             Auditorias
           </Button>
@@ -347,21 +411,21 @@ export default function NonConformitiesPage() {
       {/* B. Cards de Indicadores do SGQ (KPIs) */}
       <div className="grid gap-4 grid-cols-2 md:grid-cols-3 lg:grid-cols-6">
         <KpiCard title="NCs em aberto" value={countOpen} change={`${countTotal} total registradas`} color="sky" icon={FileWarning} />
-        <KpiCard title="Tempo de Resolução" value={`${avgResolutionDays} dias`} change="Ideal inferior a 15 dias" color="emerald" icon={Clock} />
-        <KpiCard title="Taxa de Eficácia" value={`${((countEffective / (countTotal || 1)) * 100).toFixed(1)}%`} change="Meta global: 85%" color="emerald" icon={CheckCircle2} />
+        <KpiCard title="NCs encerradas" value={countClosed} change={`${countTotal} registros no total`} color="emerald" icon={Clock} />
+        <KpiCard title="Taxa de Eficácia" value={`${((countEffective / (countClosed || 1)) * 100).toFixed(1)}%`} change={`${countEffective} encerradas como eficazes`} color="emerald" icon={CheckCircle2} />
         <KpiCard title="Desvios Críticos" value={countCritical} change="Severidade extrema" color="rose" icon={AlertTriangle} />
-        <KpiCard title="Auditorias Concluídas" value="94.1%" change="Aderência ao cronograma" color="emerald" icon={ClipboardCheck} />
+        <KpiCard title="Auditorias concluídas" value={auditSummary?.completed ?? 0} change={`${auditSummary?.total ?? 0} auditorias cadastradas`} color="emerald" icon={ClipboardCheck} />
         <KpiCard title="Planos Atrasados" value={countOverdue} change="Exigindo intervenção imediata" color="rose" icon={CalendarClock} />
       </div>
 
       {/* C. Faixa de Ações Rápidas */}
       <div className="grid gap-3 grid-cols-2 sm:grid-cols-3 md:grid-cols-6">
         <QuickActionBtn icon={Plus} title="Registrar RNC" onClick={openCreate} />
-        <QuickActionBtn icon={Network} title="Espinha de Ishikawa" onClick={() => {}} />
-        <QuickActionBtn icon={FileText} title="Novo Plano 5W2H" onClick={() => {}} />
-        <QuickActionBtn icon={Scale} title="Matriz de Riscos 5x5" onClick={() => {}} />
-        <QuickActionBtn icon={ClipboardCheck} title="Cronograma de Auditorias" onClick={() => {}} />
-        <QuickActionBtn icon={FileUp} title="Relatório de Qualidade" onClick={() => {}} />
+        <QuickActionBtn icon={Network} title="Espinha de Ishikawa" onClick={() => ishikawaRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' })} />
+        <QuickActionBtn icon={FileText} title="Novo Plano 5W2H" onClick={() => editSelected('plan')} />
+        <QuickActionBtn icon={Scale} title="Matriz de prioridade" onClick={() => riskRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' })} />
+        <QuickActionBtn icon={ClipboardCheck} title="Cronograma de Auditorias" onClick={() => router.push('/audits')} />
+        <QuickActionBtn icon={FileUp} title="Relatório de Qualidade" onClick={exportReport} />
       </div>
 
       {listQuery.isLoading && <LoadingState />}
@@ -421,65 +485,33 @@ export default function NonConformitiesPage() {
           </Card>
 
           {/* Matriz de Riscos 5x5 Heatmap */}
-          <Card className="border border-slate-100 dark:border-slate-800/80 bg-white dark:bg-slate-900/50 shadow-sm flex flex-col h-[300px]">
+          <Card ref={riskRef} className="scroll-mt-20 border border-slate-100 dark:border-slate-800/80 bg-white dark:bg-slate-900/50 shadow-sm flex flex-col h-[300px]">
             <div className="flex items-center justify-between border-b px-4 py-3">
               <h3 className="font-semibold text-sm flex items-center gap-2 text-slate-850 dark:text-white">
                 <Scale className="h-4 w-4 text-emerald-500" />
-                Matriz de Risco do SGQ (5x5)
+                Matriz de prioridade das RNCs
               </h3>
             </div>
             <CardContent className="p-4 flex-1 flex flex-col justify-between">
               
-              {/* Heatmap Grid */}
-              <div className="grid grid-cols-6 gap-1 text-[9px] font-bold text-center text-slate-650">
-                {/* Labels de impacto à esquerda */}
-                <div>5</div>
-                <div className="bg-amber-100 dark:bg-amber-950/20 text-amber-600 rounded">1</div>
-                <div className="bg-amber-200 dark:bg-amber-950/40 text-amber-700 rounded">2</div>
-                <div className="bg-orange-300 dark:bg-orange-950/20 text-orange-700 rounded font-black">3</div>
-                <div className="bg-red-400 dark:bg-red-950/40 text-red-700 rounded font-black">2</div>
-                <div className="bg-red-500 dark:bg-red-950/60 text-red-100 rounded font-black">1</div>
-
-                <div>4</div>
-                <div className="bg-emerald-200 dark:bg-emerald-950/40 text-emerald-700 rounded">0</div>
-                <div className="bg-amber-100 dark:bg-amber-950/20 text-amber-600 rounded">1</div>
-                <div className="bg-amber-200 dark:bg-amber-950/40 text-amber-700 rounded">1</div>
-                <div className="bg-orange-300 dark:bg-orange-950/20 text-orange-700 rounded font-black font-black">1</div>
-                <div className="bg-red-400 dark:bg-red-950/40 text-red-700 rounded font-black">1</div>
-
-                <div>3</div>
-                <div className="bg-emerald-100 dark:bg-emerald-950/20 text-emerald-600 rounded">2</div>
-                <div className="bg-emerald-250 dark:bg-emerald-950/30 text-emerald-700 rounded">3</div>
-                <div className="bg-amber-100 dark:bg-amber-950/20 text-amber-600 rounded">4</div>
-                <div className="bg-amber-200 dark:bg-amber-950/40 text-amber-700 rounded">2</div>
-                <div className="bg-orange-300 dark:bg-orange-950/20 text-orange-700 rounded font-black">1</div>
-
-                <div>2</div>
-                <div className="bg-emerald-100 dark:bg-emerald-950/20 text-emerald-600 rounded">4</div>
-                <div className="bg-emerald-100 dark:bg-emerald-950/20 text-emerald-600 rounded font-semibold">1</div>
-                <div className="bg-emerald-200 dark:bg-emerald-950/40 text-emerald-700 rounded">0</div>
-                <div className="bg-amber-100 dark:bg-amber-950/20 text-amber-600 rounded">1</div>
-                <div className="bg-amber-200 dark:bg-amber-950/40 text-amber-700 rounded">1</div>
-
-                <div>1</div>
-                <div className="bg-emerald-100 dark:bg-emerald-950/20 text-emerald-600 rounded">2</div>
-                <div className="bg-emerald-100 dark:bg-emerald-950/20 text-emerald-600 rounded">1</div>
-                <div className="bg-emerald-100 dark:bg-emerald-950/20 text-emerald-600 rounded">0</div>
-                <div className="bg-emerald-200 dark:bg-emerald-950/40 text-emerald-700 rounded">1</div>
-                <div className="bg-amber-100 dark:bg-amber-950/20 text-amber-600 rounded">1</div>
-
-                {/* Eixo horizontal: Probabilidade */}
-                <div></div>
-                <div>1</div>
-                <div>2</div>
-                <div>3</div>
-                <div>4</div>
-                <div>5</div>
+              <div className="grid grid-cols-[110px,repeat(3,1fr)] gap-2 text-center text-[10px]">
+                <div />
+                <div className="font-semibold text-muted-foreground">No prazo</div>
+                <div className="font-semibold text-amber-600">Até 7 dias</div>
+                <div className="font-semibold text-rose-600">Atrasada</div>
+                {priorityMatrix.map((row) => (
+                  <div key={row.severity} className="contents">
+                    <div className="flex items-center text-left font-semibold">{SEVERITY_LABEL[row.severity]}</div>
+                    <button type="button" className="rounded-lg bg-emerald-500/10 p-4 text-base font-bold text-emerald-700" onClick={() => setFilters((current) => ({ ...current, severity: row.severity }))}>{row.onTime}</button>
+                    <button type="button" className="rounded-lg bg-amber-500/10 p-4 text-base font-bold text-amber-700" onClick={() => setFilters((current) => ({ ...current, severity: row.severity }))}>{row.dueSoon}</button>
+                    <button type="button" className="rounded-lg bg-rose-500/10 p-4 text-base font-bold text-rose-700" onClick={() => setFilters((current) => ({ ...current, severity: row.severity }))}>{row.overdue}</button>
+                  </div>
+                ))}
               </div>
 
               <div className="flex items-center justify-between text-[9px] text-slate-400 border-t pt-2 mt-2">
-                <span>Eixo Y: Impacto / Eixo X: Probabilidade</span>
-                <span className="font-bold text-red-500">Riscos Críticos: {countCritical}</span>
+                <span>Valores calculados por severidade e prazo dos registros.</span>
+                <span className="font-bold text-red-500">Críticas: {countCritical}</span>
               </div>
             </CardContent>
           </Card>
@@ -574,7 +606,7 @@ export default function NonConformitiesPage() {
           </Card>
 
           {/* Diagrama de Causa Raiz - Ishikawa SVG */}
-          <Card className="border border-slate-100 dark:border-slate-800/80 bg-white dark:bg-slate-900/50 shadow-sm flex flex-col h-[300px]">
+          <Card ref={ishikawaRef} className="scroll-mt-20 border border-slate-100 dark:border-slate-800/80 bg-white dark:bg-slate-900/50 shadow-sm flex flex-col h-[300px]">
             <div className="flex items-center justify-between border-b px-4 py-3 shrink-0">
               <h3 className="font-semibold text-sm flex items-center gap-2 text-slate-850 dark:text-white">
                 <Network className="h-4 w-4 text-violet-500" />
@@ -638,7 +670,7 @@ export default function NonConformitiesPage() {
 
               <div className="flex items-center justify-between text-[10px] text-slate-500 border-t pt-2 mt-2">
                 <span className="truncate max-w-[200px]">Causa mapeada: <strong>{selectedNc?.rootCause || 'Não analisada'}</strong></span>
-                <Button size="sm" variant="ghost" className="h-7 text-[10px] px-2 text-sky-500 border border-sky-100 hover:bg-sky-50/50 dark:border-sky-900/40">
+                <Button size="sm" variant="ghost" className="h-7 text-[10px] px-2 text-sky-500 border border-sky-100 hover:bg-sky-50/50 dark:border-sky-900/40" onClick={() => editSelected('cause')} disabled={!selectedNc || !canUpdate}>
                   Mapear Causas
                 </Button>
               </div>
@@ -653,19 +685,19 @@ export default function NonConformitiesPage() {
             <div className="flex items-center justify-between border-b px-4 py-3 shrink-0">
               <h3 className="font-semibold text-sm flex items-center gap-2 text-slate-850 dark:text-white">
                 <HelpCircle className="h-4 w-4 text-sky-500" />
-                Análise dos 5 Porquês (5 Whys)
+                Análise causal registrada
               </h3>
             </div>
             
             <CardContent className="p-4 flex-1 overflow-y-auto">
-              {selectedNc?.rootCause ? (
+              {selectedNc ? (
                 <div className="relative border-l border-sky-200 dark:border-sky-900 ml-2.5 pl-4 space-y-4 text-xs">
                   {[
-                    { q: 'Por que o desvio ocorreu?', a: selectedNc.title },
-                    { q: 'Por que isso foi gerado?', a: selectedNc.description || 'Falha no processo' },
-                    { q: 'Por que não foi detectado antes?', a: 'Ausência de controle na etapa de recebimento' },
-                    { q: 'Por que a instrução falhou?', a: 'Instrução desatualizada ou sem treinamento adequado' },
-                    { q: 'Qual a causa raiz identificada?', a: selectedNc.rootCause }
+                    { q: 'Problema registrado', a: selectedNc.title },
+                    { q: 'Descrição observada', a: selectedNc.description },
+                    { q: 'Contenção imediata', a: selectedNc.immediateAction },
+                    { q: 'Causa raiz identificada', a: selectedNc.rootCause },
+                    { q: 'Plano corretivo', a: selectedNc.correctivePlan },
                   ].map((why, index) => (
                     <div key={index} className="relative">
                       {/* Marcador circular */}
@@ -673,14 +705,16 @@ export default function NonConformitiesPage() {
                         {index + 1}
                       </span>
                       <div className="font-bold text-slate-500">{why.q}</div>
-                      <div className="text-slate-800 dark:text-slate-200 font-semibold mt-0.5">{why.a}</div>
+                      <div className={cn('mt-0.5 font-semibold', why.a ? 'text-slate-800 dark:text-slate-200' : 'text-amber-600')}>
+                        {why.a || 'Ainda não informado'}
+                      </div>
                     </div>
                   ))}
                 </div>
               ) : (
                 <div className="p-8 text-center text-xs text-muted-foreground h-full flex flex-col items-center justify-center">
                   <HelpCircle className="h-8 w-8 text-slate-350 dark:text-slate-700 mb-2" />
-                  Nenhuma causa raiz cadastrada na RNC selecionada.
+                  Selecione uma RNC para visualizar sua análise causal.
                 </div>
               )}
             </CardContent>
@@ -691,30 +725,25 @@ export default function NonConformitiesPage() {
             <div className="flex items-center justify-between border-b px-4 py-3 shrink-0">
               <h3 className="font-semibold text-sm flex items-center gap-2 text-slate-850 dark:text-white">
                 <CalendarClock className="h-4 w-4 text-purple-500" />
-                Cronograma de Auditorias ISO
+                Próximas auditorias
               </h3>
             </div>
             
             <CardContent className="p-3 flex-1 overflow-y-auto text-xs">
               <div className="space-y-3">
-                {[
-                  { title: 'Auditoria Externa ISO 9001', date: '15/07/2026', body: 'Bureau Veritas - Avaliação anual do SGQ', status: 'Agendada' },
-                  { title: 'Auditoria Interna de Meio Ambiente', date: '22/07/2026', body: 'Conformidade com a ISO 14001', status: 'Planejada' },
-                  { title: 'Auditoria de Processo na Linha 1', date: 'Hoje às 14:00', body: 'Checklist de Boas Práticas', status: 'Em andamento' }
-                ].map((aud, idx) => (
-                  <div key={idx} className="p-2.5 rounded-lg border border-slate-100 dark:border-slate-800/80 hover:bg-slate-50/50 dark:hover:bg-slate-900/40 transition-all flex flex-col gap-1">
+                {auditsQuery.isLoading ? (
+                  <LoadingState />
+                ) : (auditsQuery.data?.calendar ?? []).length === 0 ? (
+                  <EmptyState title="Sem auditorias agendadas" description="O cronograma de auditorias não possui eventos futuros." />
+                ) : (auditsQuery.data?.calendar ?? []).slice(0, 5).map((audit) => (
+                  <button type="button" key={audit.id} onClick={() => router.push('/audits')} className="w-full p-2.5 text-left rounded-lg border border-slate-100 dark:border-slate-800/80 hover:bg-slate-50/50 dark:hover:bg-slate-900/40 transition-all flex flex-col gap-1">
                     <div className="flex items-center justify-between font-bold">
-                      <span className="text-slate-800 dark:text-slate-200">{aud.title}</span>
-                      <span className={cn(
-                        'text-[8px] px-1.5 py-0.5 rounded-full border',
-                        aud.status === 'Em andamento' 
-                          ? 'bg-blue-500/10 border-blue-500/20 text-blue-650 dark:text-blue-400' 
-                          : 'bg-slate-100 border-slate-200 text-slate-550'
-                      )}>{aud.status}</span>
+                      <span className="text-slate-800 dark:text-slate-200">{audit.code ? `${audit.code} · ` : ''}{audit.title}</span>
+                      <span className="text-[8px] px-1.5 py-0.5 rounded-full border bg-slate-100 border-slate-200 text-slate-550">{audit.status}</span>
                     </div>
-                    <div className="text-[10px] text-slate-400">{aud.date}</div>
-                    <div className="text-[10.5px] text-slate-500 line-clamp-1">{aud.body}</div>
-                  </div>
+                    <div className="text-[10px] text-slate-400">{formatDate(audit.plannedDate)}</div>
+                    <div className="text-[10.5px] text-slate-500 line-clamp-1">{audit.orgNode?.name ?? 'Área não definida'}</div>
+                  </button>
                 ))}
               </div>
             </CardContent>
@@ -728,21 +757,21 @@ export default function NonConformitiesPage() {
         <div className="flex flex-wrap items-center gap-6">
           <div className="flex items-center gap-2">
             <Clock className="h-4 w-4 text-emerald-500" />
-            <span>Status do SGQ: <strong className="text-slate-700 dark:text-slate-350">Certificação ISO 9001:2015 Ativa</strong></span>
+            <span>Base do SGQ: <strong className="text-slate-700 dark:text-slate-350">{countTotal} RNCs registradas</strong></span>
           </div>
           <div className="flex items-center gap-2">
             <Users className="h-4 w-4 text-sky-500" />
-            <span>Colaboradores com acesso ao QMS: <strong>{(options?.users ?? []).length || 24} pessoas</strong></span>
+            <span>Colaboradores disponíveis como responsáveis: <strong>{(options?.users ?? []).length} pessoas</strong></span>
           </div>
         </div>
         <div className="flex items-center gap-3">
-          <Button variant="ghost" size="sm" className="h-8 text-xs gap-1.5 text-slate-655 dark:text-slate-450 hover:text-slate-900">
+          <Button variant="ghost" size="sm" className="h-8 text-xs gap-1.5 text-slate-655 dark:text-slate-450 hover:text-slate-900" onClick={exportReport} disabled={items.length === 0}>
             <FileUp className="h-3.5 w-3.5" />
             Exportar Painel de RNCs
           </Button>
-          <div className="h-8 w-8 rounded-full bg-sky-500 hover:bg-sky-600 text-white flex items-center justify-center cursor-pointer shadow-md transition-all hover:scale-105" title="Central de Suporte">
+          <button type="button" onClick={() => router.push('/central-atendimento')} className="h-8 w-8 rounded-full bg-sky-500 hover:bg-sky-600 text-white flex items-center justify-center cursor-pointer shadow-md transition-all hover:scale-105" title="Central de Atendimento">
             <HelpCircle className="h-4.5 w-4.5" />
-          </div>
+          </button>
         </div>
       </div>
 
@@ -893,7 +922,8 @@ function KpiCard({ title, value, change, color, icon: Icon }: KpiCardProps) {
 
 function QuickActionBtn({ icon: Icon, title, onClick }: { icon: React.ComponentType<any>; title: string; onClick: () => void }) {
   return (
-    <Card 
+    <button
+      type="button"
       onClick={onClick}
       className="border border-slate-100 dark:border-slate-800 bg-white dark:bg-slate-900/50 p-3 flex flex-col items-center justify-center text-center gap-1.5 cursor-pointer transition-all hover:scale-[1.02] hover:shadow-md hover:border-slate-200/50 dark:hover:border-slate-800"
     >
@@ -901,7 +931,7 @@ function QuickActionBtn({ icon: Icon, title, onClick }: { icon: React.ComponentT
         <Icon className="h-4.5 w-4.5" />
       </div>
       <div className="text-[10px] font-bold text-slate-850 dark:text-slate-200 leading-snug max-w-[120px]">{title}</div>
-    </Card>
+    </button>
   );
 }
 

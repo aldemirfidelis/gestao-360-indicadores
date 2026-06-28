@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useMemo, useState, type ChangeEvent } from 'react';
-import { useSearchParams } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { useMutation, useQuery } from '@tanstack/react-query';
 import { toast } from 'sonner';
 import {
@@ -253,6 +253,7 @@ export function OperationTab({
   onDialog,
   onDetail,
   onQr,
+  onTab,
 }: {
   present: SecurityMovement[];
   pending: SecurityMovement[];
@@ -271,9 +272,14 @@ export function OperationTab({
   onDialog: (d: EntityDialogState) => void;
   onDetail: (m: SecurityMovement) => void;
   onQr: () => void;
+  onTab: (tab: TabKey) => void;
 }) {
+  const router = useRouter();
   const [gateId, setGateId] = useState('');
   const [focusMode, setFocusMode] = useState(false);
+  const [showAllMovements, setShowAllMovements] = useState(false);
+  const [showAllPending, setShowAllPending] = useState(false);
+  const [showAllIncidents, setShowAllIncidents] = useState(false);
   const filterByGate = (rows: SecurityMovement[]) => (gateId ? rows.filter((r) => r.gate?.id === gateId) : rows);
   
   const presentRows = filterByGate(present);
@@ -282,22 +288,14 @@ export function OperationTab({
 
   const Root = focusMode ? 'section' : 'div';
 
-  // KPIs consolidados com dados reais ou fallbacks representativos
-  const countPresent = presentRows.length || 28;
-  const countPending = pendingRows.length || 3;
-  const countAuth = authorizations?.length || 14;
-  const countIncidents = incidents?.filter(i => i.status !== 'RESOLVED').length || 2;
-  const countRoundsDone = roundExecutions?.filter(r => r.status === 'COMPLETED').length || 6;
-  const countRoundsTotal = roundExecutions?.length || 8;
-
-  // Fallbacks de incidentes caso o banco esteja vazio para manter a UI premium viva
-  const demoIncidents = [
-    { id: '1', title: 'Tentativa de acesso não autorizado', severity: 'HIGH', location: 'Portaria Principal', createdAt: new Date(Date.now() - 3600000), status: 'IN_PROGRESS' },
-    { id: '2', title: 'Material danificado', severity: 'MEDIUM', location: 'Almoxarifado', createdAt: new Date(Date.now() - 7200000), status: 'UNDER_INVESTIGATION' },
-    { id: '3', title: 'Objeto esquecido', severity: 'LOW', location: 'Estacionamento', createdAt: new Date(Date.now() - 14400000), status: 'RESOLVED' },
-    { id: '4', title: 'Visitante sem crachá', severity: 'LOW', location: 'Setor Produção', createdAt: new Date(Date.now() - 28800000), status: 'RESOLVED' }
-  ];
-  const listIncidents = (incidents && incidents.length > 0) ? incidents : demoIncidents;
+  const countPresent = presentRows.length;
+  const countPending = pendingRows.length;
+  const countAuth = summary?.authorizationsPending ?? 0;
+  const countIncidents = summary?.openIncidents ?? incidents?.filter((item) => item.status !== 'RESOLVED').length ?? 0;
+  const countRoundsDone = roundExecutions?.filter((item) => item.status === 'COMPLETED').length ?? 0;
+  const countRoundsTotal = roundExecutions?.length ?? 0;
+  const roundsPercent = countRoundsTotal > 0 ? Math.round((countRoundsDone / countRoundsTotal) * 100) : 0;
+  const listIncidents = incidents ?? [];
 
   return (
     <Root className={cn('space-y-6', focusMode && 'fixed inset-0 z-50 overflow-y-auto bg-[#030712] p-6 lg:p-8 text-slate-100')}>
@@ -345,7 +343,7 @@ export function OperationTab({
               <span className="text-xs font-semibold text-slate-500 dark:text-slate-400">Presentes agora</span>
               <div className="text-2xl font-bold text-slate-900 dark:text-white">{countPresent}</div>
               <div className="flex items-center gap-1 text-[10px] text-emerald-600 font-bold">
-                <span>↑ 12% vs. ontem</span>
+                <span>{summary?.todayEntries ?? 0} entradas registradas hoje</span>
               </div>
             </div>
             <div className="h-10 w-10 rounded-full bg-emerald-500/10 dark:bg-emerald-500/20 flex items-center justify-center">
@@ -361,7 +359,7 @@ export function OperationTab({
               <span className="text-xs font-semibold text-slate-500 dark:text-slate-400">Pendências de saída</span>
               <div className="text-2xl font-bold text-slate-900 dark:text-white">{countPending}</div>
               <div className="flex items-center gap-1 text-[10px] text-sky-600 font-bold">
-                <span>↓ 25% vs. ontem</span>
+                <span>{summary?.overduePresence ?? 0} permanências excedidas</span>
               </div>
             </div>
             <div className="h-10 w-10 rounded-full bg-sky-500/10 dark:bg-sky-500/20 flex items-center justify-center">
@@ -374,10 +372,10 @@ export function OperationTab({
         <Card className="border border-slate-100 dark:border-slate-800/80 bg-white dark:bg-slate-900/50 shadow-sm">
           <CardContent className="p-4 flex items-center justify-between">
             <div className="space-y-1">
-              <span className="text-xs font-semibold text-slate-500 dark:text-slate-400">Autorizações hoje</span>
+              <span className="text-xs font-semibold text-slate-500 dark:text-slate-400">Autorizações pendentes</span>
               <div className="text-2xl font-bold text-slate-900 dark:text-white">{countAuth}</div>
               <div className="flex items-center gap-1 text-[10px] text-emerald-600 font-bold">
-                <span>↑ 8% vs. ontem</span>
+                <span>Fila aguardando decisão</span>
               </div>
             </div>
             <div className="h-10 w-10 rounded-full bg-cyan-500/10 dark:bg-cyan-500/20 flex items-center justify-center">
@@ -393,7 +391,7 @@ export function OperationTab({
               <span className="text-xs font-semibold text-slate-500 dark:text-slate-400">Ocorrências ativas</span>
               <div className="text-2xl font-bold text-slate-900 dark:text-white">{countIncidents}</div>
               <div className="flex items-center gap-1 text-[10px] text-rose-600 font-bold">
-                <span>↑ 100% vs. ontem</span>
+                <span>{summary?.criticalIncidents ?? 0} ocorrências críticas</span>
               </div>
             </div>
             <div className="h-10 w-10 rounded-full bg-rose-500/10 dark:bg-rose-500/20 flex items-center justify-center">
@@ -409,7 +407,7 @@ export function OperationTab({
               <span className="text-xs font-semibold text-slate-500 dark:text-slate-400">Rondas do dia</span>
               <div className="text-2xl font-bold text-slate-900 dark:text-white">{countRoundsDone} / {countRoundsTotal}</div>
               <div className="flex items-center gap-1 text-[10px] text-violet-600 font-bold">
-                <span>75% concluídas</span>
+                <span>{roundsPercent}% concluídas</span>
               </div>
             </div>
             <div className="h-10 w-10 rounded-full bg-violet-500/10 dark:bg-violet-500/20 flex items-center justify-center">
@@ -424,9 +422,9 @@ export function OperationTab({
         <QuickActionButton disabled={!canOperate} icon={UserPlus} title="Registrar entrada" desc="Pessoa, veículo, material ou carga" onClick={onEntry} tone="green" />
         <QuickActionButton disabled={!canOperate} icon={DoorClosed} title="Registrar saída" desc="Baixa por saída em aberto" onClick={onExit} tone="blue" />
         <QuickActionButton disabled={!canOperate} icon={QrCode} title="Validar QR Code" desc="Convites e autorizações" onClick={onQr} tone="cyan" />
-        <QuickActionButton disabled={!canOperate} icon={Compass} title="Iniciar ronda" desc="Ponto de controle" onClick={() => {}} tone="indigo" />
+        <QuickActionButton disabled={!canOperate} icon={Compass} title="Iniciar ronda" desc="Ponto de controle" onClick={() => onTab('rounds')} tone="indigo" />
         <QuickActionButton disabled={!canOperate} icon={AlertTriangle} title="Nova ocorrência" desc="Registro de fato relevante" onClick={() => onDialog(incidentDialog(optionValues))} tone="red" />
-        <QuickActionButton disabled={!canOperate} icon={Key} title="Material / Chave" desc="Empréstimos e devoluções" onClick={() => {}} tone="purple" />
+        <QuickActionButton disabled={!canOperate} icon={Key} title="Material / Chave" desc="Empréstimos e devoluções" onClick={() => onTab('assets')} tone="purple" />
       </div>
 
       {/* D. Grid Principal de Conteúdo */}
@@ -441,7 +439,7 @@ export function OperationTab({
                 <ArrowRightLeft className="h-4 w-4 text-sky-500" />
                 Acessos em tempo real
               </h3>
-              <Button variant="link" size="sm" className="h-auto p-0 text-xs text-sky-500 hover:text-sky-600">Ver todos</Button>
+              <Button variant="link" size="sm" className="h-auto p-0 text-xs text-sky-500 hover:text-sky-600" onClick={() => setShowAllMovements((current) => !current)}>{showAllMovements ? 'Ver recentes' : 'Ver todos'}</Button>
             </div>
             <CardContent className="p-0 overflow-y-auto flex-1">
               {loading ? (
@@ -453,7 +451,7 @@ export function OperationTab({
                 </div>
               ) : (
                 <div className="divide-y divide-slate-100 dark:divide-slate-800/60">
-                  {filteredMovements.slice(0, 5).map((mov) => {
+                  {(showAllMovements ? filteredMovements : filteredMovements.slice(0, 5)).map((mov) => {
                     const isEntry = mov.status === 'ENTRY' || !mov.exitAt;
                     return (
                       <div key={mov.id} className="flex items-center justify-between p-3 hover:bg-slate-50/40 dark:hover:bg-slate-900/40 transition-all cursor-pointer" onClick={() => onDetail(mov)}>
@@ -471,7 +469,7 @@ export function OperationTab({
                               {mov.person?.name ?? mov.plate ?? mov.vehicle?.plate ?? 'Anônimo'}
                             </div>
                             <div className="text-[10px] text-slate-500 truncate">
-                              {mov.contractorCompany?.tradeName ?? mov.originCompanyName ?? 'Colaborador Interno'}
+                              {mov.contractorCompany?.tradeName ?? mov.originCompanyName ?? 'Origem não informada'}
                             </div>
                           </div>
                         </div>
@@ -481,7 +479,7 @@ export function OperationTab({
                               {formatTimeOnly(mov.entryAt ?? undefined)}
                             </div>
                             <div className="text-[9px] text-muted-foreground">
-                              {mov.gate?.name ?? 'Portaria 1'}
+                              {mov.gate?.name ?? 'Portaria não informada'}
                             </div>
                           </div>
                           <span className="h-1.5 w-1.5 rounded-full bg-emerald-500" title="Sincronizado" />
@@ -501,7 +499,7 @@ export function OperationTab({
                 <Clock className="h-4 w-4 text-amber-500" />
                 Saídas pendentes
               </h3>
-              <Button variant="link" size="sm" className="h-auto p-0 text-xs text-sky-500 hover:text-sky-600">Ver todas</Button>
+              <Button variant="link" size="sm" className="h-auto p-0 text-xs text-sky-500 hover:text-sky-600" onClick={() => setShowAllPending((current) => !current)}>{showAllPending ? 'Ver recentes' : 'Ver todas'}</Button>
             </div>
             <CardContent className="p-0 overflow-y-auto flex-1">
               {loading ? (
@@ -513,7 +511,7 @@ export function OperationTab({
                 </div>
               ) : (
                 <div className="divide-y divide-slate-100 dark:divide-slate-800/60">
-                  {pendingRows.slice(0, 4).map((mov) => {
+                  {(showAllPending ? pendingRows : pendingRows.slice(0, 4)).map((mov) => {
                     const minutesPresent = Math.floor((Date.now() - new Date(mov.entryAt || Date.now()).getTime()) / 60000);
                     return (
                       <div key={mov.id} className="flex items-center justify-between p-3 hover:bg-slate-50/40 dark:hover:bg-slate-900/40 transition-all">
@@ -558,58 +556,27 @@ export function OperationTab({
             <div className="flex items-center justify-between border-b px-4 py-3">
               <h3 className="font-semibold text-sm flex items-center gap-2 text-slate-850 dark:text-white">
                 <Compass className="h-4 w-4 text-violet-500" />
-                Mapa de rondas
+                Rondas recentes
               </h3>
-              <Button variant="link" size="sm" className="h-auto p-0 text-xs text-sky-500 hover:text-sky-600">Ver mapa</Button>
+              <Button variant="link" size="sm" className="h-auto p-0 text-xs text-sky-500 hover:text-sky-600" onClick={() => onTab('rounds')}>Abrir operação</Button>
             </div>
             <CardContent className="p-4 flex-1 flex flex-col justify-between">
-              {/* Rota da Ronda via SVG Tracejado Estilizado */}
-              <div className="flex-1 rounded-xl border border-slate-100 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-950/30 flex items-center justify-center p-3 relative min-h-[220px]">
-                <div 
-                  className="absolute inset-0 opacity-[0.03] rounded-xl pointer-events-none" 
-                  style={{ backgroundImage: 'radial-gradient(rgba(0,0,0,0.15) 1px, transparent 1px)', backgroundSize: '16px 16px' }} 
-                />
-                
-                <svg className="w-full h-full max-h-[180px] select-none" viewBox="0 0 320 180" xmlns="http://www.w3.org/2000/svg">
-                  <path 
-                    d="M 50,140 L 110,60 L 180,120 L 220,50 L 270,130" 
-                    fill="none" 
-                    stroke="#38bdf8" 
-                    strokeWidth="2.5" 
-                    strokeDasharray="5,5" 
-                  />
-                  
-                  <g className="cursor-pointer">
-                    <circle cx="50" cy="140" r="8" fill="#10b981" />
-                    <circle cx="50" cy="140" r="14" fill="#10b981" fillOpacity="0.1" />
-                    <path d="M 47,140 L 49.5,142.5 L 53.5,138" fill="none" stroke="#ffffff" strokeWidth="1.5" strokeLinecap="round" />
-                  </g>
-
-                  <g className="cursor-pointer">
-                    <circle cx="110" cy="60" r="8" fill="#10b981" />
-                    <circle cx="110" cy="60" r="14" fill="#10b981" fillOpacity="0.1" />
-                    <path d="M 107,60 L 109.5,62.5 L 113.5,58" fill="none" stroke="#ffffff" strokeWidth="1.5" strokeLinecap="round" />
-                  </g>
-
-                  <g className="cursor-pointer">
-                    <circle cx="180" cy="120" r="8" fill="#f59e0b" />
-                    <circle cx="180" cy="120" r="14" fill="#f59e0b" fillOpacity="0.2" className="animate-ping" style={{ transformOrigin: '180px 120px' }} />
-                  </g>
-
-                  <g className="cursor-pointer">
-                    <circle cx="220" cy="50" r="8" fill="#3b82f6" />
-                  </g>
-
-                  <g className="cursor-pointer">
-                    <circle cx="270" cy="130" r="8" fill="#3b82f6" />
-                  </g>
-
-                  <text x="35" y="160" className="fill-slate-500 dark:fill-slate-400 font-sans font-bold text-[8px]">Ponto 1</text>
-                  <text x="95" y="44" className="fill-slate-500 dark:fill-slate-400 font-sans font-bold text-[8px]">Ponto 2</text>
-                  <text x="165" y="142" className="fill-slate-500 dark:fill-slate-400 font-sans font-bold text-[8px]">Ponto 3</text>
-                  <text x="205" y="34" className="fill-slate-500 dark:fill-slate-400 font-sans font-bold text-[8px]">Ponto 4</text>
-                  <text x="255" y="150" className="fill-slate-500 dark:fill-slate-400 font-sans font-bold text-[8px]">Ponto 5</text>
-                </svg>
+              <div className="flex-1 min-h-[220px] overflow-y-auto rounded-xl border border-slate-100 bg-slate-50/50 dark:border-slate-800 dark:bg-slate-950/30">
+                {(roundExecutions ?? []).length === 0 ? (
+                  <div className="flex h-full min-h-[220px] items-center justify-center p-6 text-center text-xs text-muted-foreground">Nenhuma execução de ronda cadastrada.</div>
+                ) : (
+                  <div className="divide-y">
+                    {(roundExecutions ?? []).slice(0, 8).map((execution) => (
+                      <button type="button" key={execution.id} onClick={() => onTab('rounds')} className="flex w-full items-center justify-between gap-3 p-3 text-left hover:bg-muted/50">
+                        <div className="min-w-0">
+                          <div className="truncate text-xs font-semibold">{execution.route?.name ?? execution.code ?? 'Ronda'}</div>
+                          <div className="mt-0.5 text-[10px] text-muted-foreground">{formatDateTime(execution.startedAt ?? execution.scheduledAt)}</div>
+                        </div>
+                        <StatusBadge value={execution.status} label={String(execution.status)} tone={statusTone(execution.status)} />
+                      </button>
+                    ))}
+                  </div>
+                )}
               </div>
 
               <div className="flex items-center justify-between border-t pt-3 mt-2 text-[10px] text-slate-500">
@@ -627,7 +594,7 @@ export function OperationTab({
                     <span>Pendente</span>
                   </div>
                 </div>
-                <Button size="sm" variant="outline" className="h-7 text-[10px] px-2.5 font-medium border-slate-200 dark:border-slate-800 bg-card">
+                <Button size="sm" variant="outline" className="h-7 text-[10px] px-2.5 font-medium border-slate-200 dark:border-slate-800 bg-card" onClick={() => onTab('rounds')}>
                   Iniciar ronda
                 </Button>
               </div>
@@ -641,70 +608,37 @@ export function OperationTab({
                 <Workflow className="h-4 w-4 text-emerald-500" />
                 Indicadores do dia
               </h3>
-              <Button variant="link" size="sm" className="h-auto p-0 text-xs text-sky-500 hover:text-sky-600">Ver painel completo</Button>
+              <Button variant="link" size="sm" className="h-auto p-0 text-xs text-sky-500 hover:text-sky-600" onClick={() => onTab('overview')}>Ver painel completo</Button>
             </div>
             <CardContent className="p-4 flex-1 flex flex-col justify-between gap-3">
-              {/* Widget 1: Taxa de Ocupação */}
+              {/* Widget 1: fluxo real do dia */}
               <div className="flex items-center justify-between gap-4">
                 <div className="space-y-0.5 min-w-0">
-                  <div className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider">Taxa de ocupação</div>
-                  <div className="text-xl font-extrabold text-slate-900 dark:text-white">68%</div>
-                  <div className="text-[9px] text-emerald-600 font-bold">↑ 6% vs. ontem</div>
+                  <div className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider">Movimentações do dia</div>
+                  <div className="text-xl font-extrabold text-slate-900 dark:text-white">{(summary?.todayEntries ?? 0) + (summary?.todayExits ?? 0)}</div>
+                  <div className="text-[9px] text-emerald-600 font-bold">{summary?.todayEntries ?? 0} entradas · {summary?.todayExits ?? 0} saídas</div>
                 </div>
-                <div className="w-28 h-10 shrink-0">
-                  <svg className="w-full h-full" viewBox="0 0 100 40">
-                    <path d="M 0,35 Q 20,20 40,25 T 80,10 L 100,8" fill="none" stroke="#00f0ff" strokeWidth="2" strokeLinecap="round" />
-                    <path d="M 0,35 Q 20,20 40,25 T 80,10 L 100,8 L 100,40 L 0,40 Z" fill="url(#sparkline-cyan-grad)" opacity="0.1" />
-                    <defs>
-                      <linearGradient id="sparkline-cyan-grad" x1="0" y1="0" x2="0" y2="1">
-                        <stop offset="0%" stopColor="#00f0ff" />
-                        <stop offset="100%" stopColor="#00f0ff" stopOpacity="0" />
-                      </linearGradient>
-                    </defs>
-                  </svg>
-                </div>
+                <ArrowRightLeft className="h-8 w-8 text-emerald-500" />
               </div>
 
               {/* Widget 2: Cumprimento de Rondas */}
               <div className="flex items-center justify-between gap-4 border-t pt-3">
                 <div className="space-y-0.5 min-w-0">
                   <div className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider">Cumprimento de rondas</div>
-                  <div className="text-xl font-extrabold text-slate-900 dark:text-white">75%</div>
-                  <div className="text-[9px] text-sky-600 font-bold">↑ 15% vs. ontem</div>
+                  <div className="text-xl font-extrabold text-slate-900 dark:text-white">{roundsPercent}%</div>
+                  <div className="text-[9px] text-sky-600 font-bold">{countRoundsDone} de {countRoundsTotal} execuções concluídas</div>
                 </div>
-                <div className="w-28 h-10 shrink-0">
-                  <svg className="w-full h-full" viewBox="0 0 100 40">
-                    <path d="M 0,30 Q 15,25 35,28 T 75,15 L 100,10" fill="none" stroke="#2563eb" strokeWidth="2" strokeLinecap="round" />
-                    <path d="M 0,30 Q 15,25 35,28 T 75,15 L 100,10 L 100,40 L 0,40 Z" fill="url(#sparkline-blue-grad)" opacity="0.1" />
-                    <defs>
-                      <linearGradient id="sparkline-blue-grad" x1="0" y1="0" x2="0" y2="1">
-                        <stop offset="0%" stopColor="#2563eb" />
-                        <stop offset="100%" stopColor="#2563eb" stopOpacity="0" />
-                      </linearGradient>
-                    </defs>
-                  </svg>
-                </div>
+                <Compass className="h-8 w-8 text-sky-500" />
               </div>
 
               {/* Widget 3: Tempo Médio */}
               <div className="flex items-center justify-between gap-4 border-t pt-3">
                 <div className="space-y-0.5 min-w-0">
-                  <div className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider">Tempo médio de atendimento</div>
-                  <div className="text-xl font-extrabold text-slate-900 dark:text-white">12 min</div>
-                  <div className="text-[9px] text-violet-600 font-bold">↓ 8% vs. ontem</div>
+                  <div className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider">Permanência média encerrada</div>
+                  <div className="text-xl font-extrabold text-slate-900 dark:text-white">{formatDuration(averageDwellMinutes(filteredMovements))}</div>
+                  <div className="text-[9px] text-violet-600 font-bold">Calculada pelas movimentações carregadas</div>
                 </div>
-                <div className="w-28 h-10 shrink-0">
-                  <svg className="w-full h-full" viewBox="0 0 100 40">
-                    <path d="M 0,10 Q 25,12 50,22 T 80,32 L 100,35" fill="none" stroke="#8b5cf6" strokeWidth="2" strokeLinecap="round" />
-                    <path d="M 0,10 Q 25,12 50,22 T 80,32 L 100,35 L 100,40 L 0,40 Z" fill="url(#sparkline-purple-grad)" opacity="0.1" />
-                    <defs>
-                      <linearGradient id="sparkline-purple-grad" x1="0" y1="0" x2="0" y2="1">
-                        <stop offset="0%" stopColor="#8b5cf6" />
-                        <stop offset="100%" stopColor="#8b5cf6" stopOpacity="0" />
-                      </linearGradient>
-                    </defs>
-                  </svg>
-                </div>
+                <Clock className="h-8 w-8 text-violet-500" />
               </div>
             </CardContent>
           </Card>
@@ -719,7 +653,7 @@ export function OperationTab({
                 <AlertCircle className="h-4 w-4 text-rose-500" />
                 Ocorrências recentes
               </h3>
-              <Button variant="link" size="sm" className="h-auto p-0 text-xs text-sky-500 hover:text-sky-600">Ver todas</Button>
+              <Button variant="link" size="sm" className="h-auto p-0 text-xs text-sky-500 hover:text-sky-600" onClick={() => setShowAllIncidents((current) => !current)}>{showAllIncidents ? 'Ver recentes' : 'Ver todas'}</Button>
             </div>
             <CardContent className="p-0 overflow-y-auto flex-1">
               {loading ? (
@@ -731,7 +665,7 @@ export function OperationTab({
                 </div>
               ) : (
                 <div className="divide-y divide-slate-100 dark:divide-slate-800/60 text-slate-805 dark:text-slate-200">
-                  {listIncidents.slice(0, 4).map((inc) => {
+                  {(showAllIncidents ? listIncidents : listIncidents.slice(0, 4)).map((inc) => {
                     const isHigh = inc.severity === 'CRITICAL' || inc.severity === 'HIGH';
                     const isMedium = inc.severity === 'MEDIUM';
                     return (
@@ -753,7 +687,7 @@ export function OperationTab({
                           {inc.title}
                         </div>
                         <div className="flex items-center justify-between text-[10px] text-muted-foreground mt-0.5">
-                          <span>{inc.location ?? 'Portaria Principal'}</span>
+                          <span>{inc.location ?? 'Local não informado'}</span>
                           <span className="bg-slate-105 dark:bg-slate-800 px-1.5 py-0.5 rounded text-[9px] text-slate-600 dark:text-slate-400 font-semibold border border-slate-200/40 dark:border-slate-800">
                             {inc.status === 'RESOLVED' ? 'Concluída' : inc.status === 'UNDER_INVESTIGATION' ? 'Em análise' : 'Em andamento'}
                           </span>
@@ -773,7 +707,7 @@ export function OperationTab({
                 <FileText className="h-4 w-4 text-sky-500" />
                 Documentos e autorizações
               </h3>
-              <Button variant="link" size="sm" className="h-auto p-0 text-xs text-sky-500 hover:text-sky-600">Ver todas</Button>
+              <Button variant="link" size="sm" className="h-auto p-0 text-xs text-sky-500 hover:text-sky-600" onClick={() => onTab('authorizations')}>Ver todas</Button>
             </div>
             <CardContent className="p-3 flex-1 flex flex-col justify-between gap-2.5">
               <div className="flex items-center justify-between p-2 hover:bg-slate-50/50 dark:hover:bg-slate-900/40 rounded-lg transition-all border border-slate-100/50 dark:border-slate-800/30">
@@ -782,7 +716,7 @@ export function OperationTab({
                   <span className="text-xs font-medium text-slate-700 dark:text-slate-350 truncate">Autorizações vencendo</span>
                 </div>
                 <span className="h-5 min-w-[20px] px-1 rounded-full bg-rose-500/10 border border-rose-500/20 text-rose-600 dark:text-rose-400 text-[10px] font-bold flex items-center justify-center shrink-0">
-                  2
+                  {summary?.authorizationsPending ?? 0}
                 </span>
               </div>
 
@@ -792,17 +726,17 @@ export function OperationTab({
                   <span className="text-xs font-medium text-slate-700 dark:text-slate-350 truncate">Documentos expirados</span>
                 </div>
                 <span className="h-5 min-w-[20px] px-1 rounded-full bg-rose-500/10 border border-rose-500/20 text-rose-600 dark:text-rose-400 text-[10px] font-bold flex items-center justify-center shrink-0">
-                  1
+                  {summary?.expiredOrInvalidDocuments ?? 0}
                 </span>
               </div>
 
               <div className="flex items-center justify-between p-2 hover:bg-slate-50/50 dark:hover:bg-slate-900/40 rounded-lg transition-all border border-slate-100/50 dark:border-slate-800/30">
                 <div className="flex items-center gap-2.5 min-w-0">
                   <CalendarDays className="h-4.5 w-4.5 text-sky-500 shrink-0" />
-                  <span className="text-xs font-medium text-slate-700 dark:text-slate-350 truncate">Visitantes agendados hoje</span>
+                  <span className="text-xs font-medium text-slate-700 dark:text-slate-350 truncate">Custódias pendentes</span>
                 </div>
                 <span className="h-5 min-w-[20px] px-1 rounded-full bg-sky-500/10 border border-sky-500/20 text-sky-600 dark:text-sky-400 text-[10px] font-bold flex items-center justify-center shrink-0">
-                  5
+                  {summary?.custodyPending ?? 0}
                 </span>
               </div>
             </CardContent>
@@ -820,7 +754,7 @@ export function OperationTab({
           </div>
           <div className="flex items-center gap-2">
             <Monitor className="h-4 w-4 text-sky-500" />
-            <span>Dispositivos online: <strong>12 de 15</strong></span>
+            <span>Sincronizações offline pendentes: <strong>{summary?.offlinePending ?? 0}</strong></span>
           </div>
           <div className="flex items-center gap-2 cursor-pointer hover:text-sky-500 transition-colors" onClick={onQr}>
             <QrCode className="h-4 w-4 text-sky-400" />
@@ -832,9 +766,9 @@ export function OperationTab({
             <FileUp className="h-3.5 w-3.5" />
             Relatório do dia
           </Button>
-          <div className="h-8 w-8 rounded-full bg-sky-500 hover:bg-sky-600 text-white flex items-center justify-center cursor-pointer shadow-md transition-all hover:scale-105" title="Suporte e Ajuda">
+          <button type="button" onClick={() => router.push('/central-atendimento')} className="h-8 w-8 rounded-full bg-sky-500 hover:bg-sky-600 text-white flex items-center justify-center cursor-pointer shadow-md transition-all hover:scale-105" title="Central de Atendimento">
             <HelpCircle className="h-4.5 w-4.5" />
-          </div>
+          </button>
         </div>
       </div>
 
@@ -864,8 +798,10 @@ function QuickActionButton({ icon: Icon, title, desc, disabled, onClick, tone }:
   };
 
   return (
-    <Card 
+    <button
+      type="button"
       onClick={disabled ? undefined : onClick}
+      disabled={disabled}
       className={cn(
         'border border-slate-100 dark:border-slate-800 bg-white dark:bg-slate-900/50 p-3 flex flex-col items-center text-center gap-1.5 cursor-pointer transition-all hover:scale-[1.02] hover:shadow-md hover:border-slate-200/50 dark:hover:border-slate-800',
         disabled && 'opacity-50 cursor-not-allowed hover:scale-100 hover:shadow-none'
@@ -878,7 +814,7 @@ function QuickActionButton({ icon: Icon, title, desc, disabled, onClick, tone }:
         <div className="text-xs font-bold text-slate-800 dark:text-slate-200">{title}</div>
         <div className="text-[9px] text-muted-foreground leading-snug max-w-[120px] mx-auto">{desc}</div>
       </div>
-    </Card>
+    </button>
   );
 }
 

@@ -6,6 +6,7 @@ import {
   ArrowRight,
   BarChart3,
   BriefcaseBusiness,
+  CalendarDays,
   CheckCircle2,
   ClipboardCheck,
   Headphones,
@@ -327,20 +328,33 @@ export default function HomePage() {
       <section className="bg-slate-50 py-20">
         <div className="mx-auto grid max-w-7xl gap-10 px-4 sm:px-6 lg:grid-cols-[0.9fr,1.1fr] lg:px-8">
           <div>
-            <SectionIntro eyebrow="Demonstração" title="Conheça o portal por dentro, com dados de exemplo." />
+            <SectionIntro eyebrow="Conheça o portal" title="Escolha como deseja avaliar o Gestão 360." />
             <p className="mt-5 text-sm leading-6 text-slate-600">
-              Navegue pelos módulos disponíveis, veja como as informações se conectam e avalie quais frentes fazem sentido para a operação da sua empresa.
+              Navegue imediatamente com dados de exemplo ou solicite um trial de 30 dias preparado para a realidade da sua empresa.
             </p>
           </div>
-          <div className="border border-slate-200 bg-white p-6">
-            <h2 className="text-2xl font-semibold tracking-tight text-slate-950">Entre direto na demonstração.</h2>
-            <p className="mt-3 text-sm leading-6 text-slate-600">
-              O acesso abre a tela de entrada com a conta de demonstração já preenchida. Assim você pode conhecer o produto antes de conversar com a equipe.
-            </p>
-            <DemoLink source="home_demo_section" className="mt-6 inline-flex h-12 items-center justify-center gap-2 bg-slate-950 px-6 text-sm font-semibold text-white hover:bg-emerald-700">
-              Acesse a Demonstração
-              <ArrowRight className="h-4 w-4" />
-            </DemoLink>
+          <div className="grid gap-4 md:grid-cols-2">
+            <div className="flex flex-col border border-slate-200 bg-white p-6">
+              <h2 className="text-xl font-semibold tracking-tight text-slate-950">Demonstração imediata</h2>
+              <p className="mt-3 text-sm leading-6 text-slate-600">
+                Entre agora no ambiente com dados simulados e conheça os módulos sem configuração inicial.
+              </p>
+              <DemoLink source="home_demo_section" className="mt-auto inline-flex h-12 items-center justify-center gap-2 bg-slate-950 px-5 pt-0 text-sm font-semibold text-white hover:bg-emerald-700">
+                Acessar demonstração
+                <ArrowRight className="h-4 w-4" />
+              </DemoLink>
+            </div>
+            <div className="flex flex-col border border-emerald-300 bg-emerald-50 p-6">
+              <CalendarDays className="h-7 w-7 text-emerald-700" />
+              <h2 className="mt-4 text-xl font-semibold tracking-tight text-slate-950">Trial de 30 dias</h2>
+              <p className="mt-3 text-sm leading-6 text-slate-700">
+                Solicite um ambiente de avaliação e converse com nossa equipe sobre os módulos mais relevantes.
+              </p>
+              <Link href="/teste-gratis" className="mt-6 inline-flex h-12 items-center justify-center gap-2 bg-emerald-600 px-5 text-sm font-semibold text-white hover:bg-emerald-700">
+                Solicitar meu trial
+                <ArrowRight className="h-4 w-4" />
+              </Link>
+            </div>
           </div>
         </div>
       </section>
@@ -371,7 +385,7 @@ export default function HomePage() {
             <div className="flex min-h-[196px] min-w-0 flex-col border border-slate-200 bg-white p-5">
               <h3 className="font-semibold text-slate-950 text-sm">Suporte</h3>
               <p className="mt-2 text-xs leading-5 text-slate-600">Para suporte técnico ou dúvidas de uso:</p>
-              <a href="mailto:suporte@gestao360.org" className="mt-auto block whitespace-nowrap pt-5 text-[13px] font-semibold tracking-tight text-emerald-700 hover:underline">suporte@gestao360.org</a>
+              <Link href="/suporte#formulario" className="mt-auto block pt-5 text-[13px] font-semibold tracking-tight text-emerald-700 hover:underline">Abrir formulário de suporte</Link>
             </div>
             <div className="flex min-h-[196px] min-w-0 flex-col border border-slate-200 bg-white p-5">
               <h3 className="font-semibold text-slate-950 text-sm">SAC</h3>
@@ -381,7 +395,7 @@ export default function HomePage() {
             <div className="flex min-h-[196px] min-w-0 flex-col border border-slate-200 bg-white p-5">
               <h3 className="font-semibold text-slate-950 text-sm">Comercial</h3>
               <p className="mt-2 text-xs leading-5 text-slate-600">Para contato comercial ou proposta:</p>
-              <a href="mailto:contato@gestao360.org" className="mt-auto block whitespace-nowrap pt-5 text-[13px] font-semibold tracking-tight text-emerald-700 hover:underline">contato@gestao360.org</a>
+              <Link href="/contato" className="mt-auto block pt-5 text-[13px] font-semibold tracking-tight text-emerald-700 hover:underline">Abrir formulário comercial</Link>
             </div>
           </div>
         </div>

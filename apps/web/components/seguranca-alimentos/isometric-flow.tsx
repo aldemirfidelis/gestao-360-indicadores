@@ -1,13 +1,29 @@
 'use client';
 
-import React, { useRef, useState, useEffect } from 'react';
-import { Canvas, useFrame } from '@react-three/fiber';
+import React, {
+  forwardRef,
+  useCallback,
+  useEffect,
+  useImperativeHandle,
+  useMemo,
+  useRef,
+  useState,
+} from 'react';
+import { Canvas, useFrame, useThree } from '@react-three/fiber';
 import { OrthographicCamera, OrbitControls, Html } from '@react-three/drei';
 import * as THREE from 'three';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { AlertCircle, Plus, RotateCcw, ZoomIn, ZoomOut } from 'lucide-react';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog';
+import { Focus, Plus, Save, Sparkles, Trash2, X, ZoomIn, ZoomOut } from 'lucide-react';
 
 // Tipagem das etapas para o fluxo 3D
 export interface IsometricStep {
@@ -22,13 +38,71 @@ export interface IsometricStep {
 
 interface IsometricFlowProps {
   steps: IsometricStep[];
-  processId: string;
   canManage: boolean;
-  onStepClick: (step: IsometricStep) => void;
   onStepMove: (id: string, x: number, y: number) => void;
-  onStepCreate: (name: string) => void;
+  onStepsArrange: (positions: Array<{ id: string; positionX: number; positionY: number }>) => void;
+  onStepCreate: (data: { name: string; type: IsometricStep['type']; isControlPoint: boolean }) => void;
   onStepDelete: (id: string) => void;
-  onStepUpdate: (id: string, data: { name?: string; type?: string; isControlPoint?: boolean }) => void;
+  onStepUpdate: (id: string, data: { number?: number; name?: string; type?: string; isControlPoint?: boolean }) => void;
+}
+
+const DEFAULT_ZOOM = 55;
+const MIN_ZOOM = 12;
+const MAX_ZOOM = 90;
+const GRID_LIMIT = 15;
+const API_POSITION_SCALE = 100;
+
+type PositionedStep = IsometricStep & {
+  positionX: number;
+  positionY: number;
+};
+
+function clamp(value: number, min: number, max: number) {
+  return Math.max(min, Math.min(max, value));
+}
+
+function createAutomaticLayout(steps: IsometricStep[]): PositionedStep[] {
+  const sorted = [...steps].sort((a, b) => (a.number ?? 0) - (b.number ?? 0));
+  if (sorted.length === 0) return [];
+
+  const columns = Math.min(4, Math.ceil(Math.sqrt(sorted.length * 1.5)));
+  const rows = Math.ceil(sorted.length / columns);
+  const spacingX = 360;
+  const spacingY = 330;
+
+  return sorted.map((step, index) => {
+    const row = Math.floor(index / columns);
+    const indexInRow = index % columns;
+    const itemsInRow = Math.min(columns, sorted.length - row * columns);
+    const column = row % 2 === 0 ? indexInRow : itemsInRow - 1 - indexInRow;
+
+    return {
+      ...step,
+      positionX: Math.round((column - (itemsInRow - 1) / 2) * spacingX),
+      positionY: Math.round((row - (rows - 1) / 2) * spacingY),
+    };
+  });
+}
+
+function positionSteps(steps: IsometricStep[]): PositionedStep[] {
+  const automatic = createAutomaticLayout(steps);
+  const originalById = new Map(steps.map((step) => [step.id, step]));
+
+  return automatic.map((fallback) => {
+    const original = originalById.get(fallback.id);
+    const positionX = typeof original?.positionX === 'number' && Number.isFinite(original.positionX)
+      ? original.positionX
+      : fallback.positionX;
+    const positionY = typeof original?.positionY === 'number' && Number.isFinite(original.positionY)
+      ? original.positionY
+      : fallback.positionY;
+
+    return {
+      ...fallback,
+      positionX: clamp(positionX, -GRID_LIMIT * API_POSITION_SCALE, GRID_LIMIT * API_POSITION_SCALE),
+      positionY: clamp(positionY, -GRID_LIMIT * API_POSITION_SCALE, GRID_LIMIT * API_POSITION_SCALE),
+    };
+  });
 }
 
 // ----------------------------------------------------------------------
@@ -313,11 +387,12 @@ function ModelOther() {
 interface StepBlockProps {
   step: IsometricStep;
   canManage: boolean;
+  selected: boolean;
   onClick: () => void;
   onMove: (id: string, x: number, z: number) => void;
 }
 
-function StepBlock({ step, canManage, onClick, onMove }: StepBlockProps) {
+function StepBlock({ step, canManage, selected, onClick, onMove }: StepBlockProps) {
   const groupRef = useRef<THREE.Group>(null);
   const [hovered, setHovered] = useState(false);
   const [dragging, setDragging] = useState(false);
@@ -421,21 +496,29 @@ function StepBlock({ step, canManage, onClick, onMove }: StepBlockProps) {
       {/* Farol PCC */}
       <PCCBeacon active={step.isControlPoint} />
 
+      {/* Realce da etapa selecionada */}
+      {selected && (
+        <mesh position={[0, 0.025, 0]} rotation={[-Math.PI / 2, 0, 0]}>
+          <ringGeometry args={[1.02, 1.18, 32]} />
+          <meshBasicMaterial color="#0ea5e9" transparent opacity={0.9} side={THREE.DoubleSide} />
+        </mesh>
+      )}
+
       {/* Placa com nome flutuante */}
-      <Html position={[0, 1.4, 0]} center distanceFactor={7}>
+      <Html position={[0, 1.7, 0]} center>
         <div 
           onClick={(e) => {
             e.stopPropagation();
             if (!dragging) onClick();
           }}
-          className={`flex cursor-pointer select-none items-center gap-1.5 rounded-full border px-2.5 py-0.5 shadow-md transition-all ${
+          className={`flex max-w-48 cursor-pointer select-none items-center gap-1.5 whitespace-nowrap rounded-full border px-2.5 py-1 shadow-md transition-all ${
             step.isControlPoint 
               ? 'border-red-400 bg-red-50 text-red-700 hover:bg-red-100' 
               : 'border-slate-200 bg-white text-slate-700 hover:bg-slate-50'
-          } ${hovered || dragging ? 'scale-105 ring-2 ring-sky-500' : ''}`}
+          } ${hovered || dragging || selected ? 'scale-105 ring-2 ring-sky-500' : ''}`}
         >
           <span className="text-[10px] font-bold opacity-60">#{step.number}</span>
-          <span className="max-w-[8rem] truncate text-[11px] font-semibold">{step.name}</span>
+          <span className="max-w-36 truncate text-[11px] font-semibold">{step.name}</span>
         </div>
       </Html>
 
@@ -499,37 +582,383 @@ function StepConnection({ fromStep, toStep }: StepConnectionProps) {
   );
 }
 
+interface FlowCameraHandle {
+  zoomIn: () => void;
+  zoomOut: () => void;
+  fit: () => void;
+}
+
+interface FlowCameraControlsProps {
+  positions: Array<{ x: number; z: number }>;
+  fitKey: string;
+}
+
+const FlowCameraControls = forwardRef<FlowCameraHandle, FlowCameraControlsProps>(
+  function FlowCameraControls({ positions, fitKey }, ref) {
+    const { camera, size, invalidate } = useThree();
+    const controlsRef = useRef<React.ElementRef<typeof OrbitControls>>(null);
+    const positionsRef = useRef(positions);
+    positionsRef.current = positions;
+
+    const setZoom = useCallback((nextZoom: number) => {
+      const orthographic = camera as THREE.OrthographicCamera;
+      orthographic.zoom = clamp(nextZoom, MIN_ZOOM, MAX_ZOOM);
+      orthographic.updateProjectionMatrix();
+      controlsRef.current?.update();
+      invalidate();
+    }, [camera, invalidate]);
+
+    const fit = useCallback(() => {
+      const orthographic = camera as THREE.OrthographicCamera;
+      const currentPositions = positionsRef.current;
+      const xValues = currentPositions.map((position) => position.x);
+      const zValues = currentPositions.map((position) => position.z);
+      const minX = currentPositions.length ? Math.min(...xValues) - 1.4 : -4;
+      const maxX = currentPositions.length ? Math.max(...xValues) + 1.4 : 4;
+      const minZ = currentPositions.length ? Math.min(...zValues) - 1.4 : -4;
+      const maxZ = currentPositions.length ? Math.max(...zValues) + 1.4 : 4;
+      const center = new THREE.Vector3((minX + maxX) / 2, 0.7, (minZ + maxZ) / 2);
+
+      orthographic.position.copy(center).add(new THREE.Vector3(16, 16, 16));
+      orthographic.up.set(0, 1, 0);
+      controlsRef.current?.target.copy(center);
+      controlsRef.current?.update();
+      orthographic.updateMatrixWorld(true);
+
+      const box = new THREE.Box3(
+        new THREE.Vector3(minX, 0, minZ),
+        new THREE.Vector3(maxX, 2.5, maxZ),
+      );
+      const corners = [
+        new THREE.Vector3(box.min.x, box.min.y, box.min.z),
+        new THREE.Vector3(box.min.x, box.min.y, box.max.z),
+        new THREE.Vector3(box.min.x, box.max.y, box.min.z),
+        new THREE.Vector3(box.min.x, box.max.y, box.max.z),
+        new THREE.Vector3(box.max.x, box.min.y, box.min.z),
+        new THREE.Vector3(box.max.x, box.min.y, box.max.z),
+        new THREE.Vector3(box.max.x, box.max.y, box.min.z),
+        new THREE.Vector3(box.max.x, box.max.y, box.max.z),
+      ].map((corner) => corner.applyMatrix4(orthographic.matrixWorldInverse));
+
+      const viewX = corners.map((corner) => corner.x);
+      const viewY = corners.map((corner) => corner.y);
+      const contentWidth = Math.max(...viewX) - Math.min(...viewX);
+      const contentHeight = Math.max(...viewY) - Math.min(...viewY);
+      const fittedZoom = Math.min(
+        size.width / Math.max(contentWidth * 1.3, 1),
+        size.height / Math.max(contentHeight * 1.35, 1),
+        DEFAULT_ZOOM,
+      );
+
+      setZoom(fittedZoom);
+      controlsRef.current?.saveState();
+    }, [camera, setZoom, size.height, size.width]);
+
+    useImperativeHandle(ref, () => ({
+      zoomIn: () => setZoom((camera as THREE.OrthographicCamera).zoom * 1.2),
+      zoomOut: () => setZoom((camera as THREE.OrthographicCamera).zoom / 1.2),
+      fit,
+    }), [camera, fit, setZoom]);
+
+    useEffect(() => {
+      const frame = window.requestAnimationFrame(fit);
+      return () => window.cancelAnimationFrame(frame);
+    }, [fit, fitKey]);
+
+    return (
+      <OrbitControls
+        ref={controlsRef}
+        makeDefault
+        enableRotate
+        enablePan
+        enableZoom
+        enableDamping
+        dampingFactor={0.08}
+        minZoom={MIN_ZOOM}
+        maxZoom={MAX_ZOOM}
+        zoomSpeed={0.8}
+        zoomToCursor
+        screenSpacePanning
+        minPolarAngle={Math.PI / 6}
+        maxPolarAngle={Math.PI / 2.1}
+        mouseButtons={{
+          LEFT: THREE.MOUSE.PAN,
+          MIDDLE: THREE.MOUSE.DOLLY,
+          RIGHT: THREE.MOUSE.ROTATE,
+        }}
+        touches={{
+          ONE: THREE.TOUCH.PAN,
+          TWO: THREE.TOUCH.DOLLY_ROTATE,
+        }}
+      />
+    );
+  },
+);
+
+const STEP_TYPE_OPTIONS: Array<{ value: IsometricStep['type']; label: string }> = [
+  { value: 'RECEIVING', label: 'Doca / Recebimento' },
+  { value: 'STORAGE', label: 'Silo / Armazenamento' },
+  { value: 'PROCESSING', label: 'Indústria / Processamento' },
+  { value: 'PACKAGING', label: 'Envase / Embalagem' },
+  { value: 'TRANSPORT', label: 'Caminhão / Transporte' },
+  { value: 'DISTRIBUTION', label: 'Loja / Distribuição' },
+  { value: 'OTHER', label: 'Outro processo' },
+];
+
+function StepInspector({
+  step,
+  canManage,
+  onClose,
+  onDelete,
+  onUpdate,
+}: {
+  step: IsometricStep;
+  canManage: boolean;
+  onClose: () => void;
+  onDelete: () => void;
+  onUpdate: (data: { number: number; name: string; type: string; isControlPoint: boolean }) => void;
+}) {
+  const [draft, setDraft] = useState({
+    number: step.number,
+    name: step.name,
+    type: step.type,
+    isControlPoint: step.isControlPoint,
+  });
+
+  useEffect(() => {
+    setDraft({
+      number: step.number,
+      name: step.name,
+      type: step.type,
+      isControlPoint: step.isControlPoint,
+    });
+  }, [step.id, step.isControlPoint, step.name, step.number, step.type]);
+
+  const changed =
+    draft.number !== step.number ||
+    draft.name.trim() !== step.name ||
+    draft.type !== step.type ||
+    draft.isControlPoint !== step.isControlPoint;
+
+  return (
+    <aside className="flex h-[70vh] w-full shrink-0 flex-col gap-4 overflow-y-auto border-t bg-white p-4 animate-in slide-in-from-right duration-200 dark:bg-slate-900 md:w-80 md:border-l md:border-t-0">
+      <div className="flex items-center justify-between border-b pb-2">
+        <div>
+          <h3 className="text-sm font-semibold">Editar etapa</h3>
+          <p className="text-[11px] text-muted-foreground">As alterações são aplicadas ao salvar.</p>
+        </div>
+        <Button variant="ghost" size="icon" className="h-7 w-7" onClick={onClose} aria-label="Fechar edição">
+          <X className="h-4 w-4" />
+        </Button>
+      </div>
+
+      <div className="grid grid-cols-[5rem_1fr] gap-3">
+        <div className="space-y-1.5">
+          <label className="text-xs font-semibold text-muted-foreground">Ordem</label>
+          <input
+            type="number"
+            min={1}
+            className="w-full rounded-md border bg-transparent px-2 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-sky-500"
+            value={draft.number}
+            onChange={(event) => setDraft((current) => ({ ...current, number: Math.max(1, Number(event.target.value) || 1) }))}
+            disabled={!canManage}
+          />
+        </div>
+        <div className="space-y-1.5">
+          <label className="text-xs font-semibold text-muted-foreground">Nome da etapa</label>
+          <input
+            type="text"
+            className="w-full rounded-md border bg-transparent px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-sky-500"
+            value={draft.name}
+            onChange={(event) => setDraft((current) => ({ ...current, name: event.target.value }))}
+            disabled={!canManage}
+          />
+        </div>
+      </div>
+
+      <div className="space-y-1.5">
+        <label className="text-xs font-semibold text-muted-foreground">Modelo visual</label>
+        <select
+          className="w-full rounded-md border bg-transparent px-2 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-sky-500 dark:bg-slate-900"
+          value={draft.type}
+          onChange={(event) => setDraft((current) => ({ ...current, type: event.target.value as IsometricStep['type'] }))}
+          disabled={!canManage}
+        >
+          {STEP_TYPE_OPTIONS.map((option) => (
+            <option key={option.value} value={option.value}>{option.label}</option>
+          ))}
+        </select>
+      </div>
+
+      <label className="flex cursor-pointer items-center justify-between rounded-lg border bg-slate-50/50 p-3 dark:bg-slate-900/50">
+        <span>
+          <span className="block text-xs font-semibold">Ponto Crítico de Controle (PCC)</span>
+          <span className="block text-[10px] text-muted-foreground">Destaca a etapa e ativa o sinalizador vermelho.</span>
+        </span>
+        <input
+          type="checkbox"
+          className="h-4 w-4 rounded border-slate-300 text-sky-600 focus:ring-sky-500"
+          checked={draft.isControlPoint}
+          onChange={(event) => setDraft((current) => ({ ...current, isControlPoint: event.target.checked }))}
+          disabled={!canManage}
+        />
+      </label>
+
+      {canManage && (
+        <div className="mt-auto space-y-2 border-t pt-4">
+          <Button
+            className="w-full"
+            size="sm"
+            disabled={!changed || !draft.name.trim()}
+            onClick={() => onUpdate({ ...draft, name: draft.name.trim() })}
+          >
+            <Save className="mr-2 h-4 w-4" />
+            Salvar alterações
+          </Button>
+          <Button
+            variant="ghost"
+            className="w-full text-destructive hover:bg-destructive/10 hover:text-destructive"
+            size="sm"
+            onClick={() => {
+              if (window.confirm(`Tem certeza que deseja excluir a etapa "${step.name}"?`)) onDelete();
+            }}
+          >
+            <Trash2 className="mr-2 h-4 w-4" />
+            Excluir etapa
+          </Button>
+        </div>
+      )}
+    </aside>
+  );
+}
+
+function CreateStepDialog({
+  onClose,
+  onCreate,
+}: {
+  onClose: () => void;
+  onCreate: (data: { name: string; type: IsometricStep['type']; isControlPoint: boolean }) => void;
+}) {
+  const [draft, setDraft] = useState<{
+    name: string;
+    type: IsometricStep['type'];
+    isControlPoint: boolean;
+  }>({
+    name: '',
+    type: 'PROCESSING',
+    isControlPoint: false,
+  });
+
+  const submit = () => {
+    const name = draft.name.trim();
+    if (!name) return;
+    onCreate({ ...draft, name });
+    onClose();
+  };
+
+  return (
+    <Dialog open onOpenChange={(open) => !open && onClose()}>
+      <DialogContent className="max-w-md">
+        <DialogHeader>
+          <DialogTitle>Adicionar etapa ao fluxo</DialogTitle>
+          <DialogDescription>
+            Informe o nome e escolha o modelo que representa esta etapa do processo.
+          </DialogDescription>
+        </DialogHeader>
+
+        <div className="space-y-4">
+          <div className="space-y-1.5">
+            <label className="text-sm font-medium">Nome da etapa</label>
+            <input
+              autoFocus
+              className="w-full rounded-md border bg-transparent px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-sky-500"
+              value={draft.name}
+              onChange={(event) => setDraft((current) => ({ ...current, name: event.target.value }))}
+              onKeyDown={(event) => {
+                if (event.key === 'Enter') submit();
+              }}
+              placeholder="Ex.: Recebimento da matéria-prima"
+            />
+          </div>
+
+          <div className="space-y-1.5">
+            <label className="text-sm font-medium">Modelo visual</label>
+            <select
+              className="w-full rounded-md border bg-transparent px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-sky-500 dark:bg-slate-900"
+              value={draft.type}
+              onChange={(event) => setDraft((current) => ({ ...current, type: event.target.value as IsometricStep['type'] }))}
+            >
+              {STEP_TYPE_OPTIONS.map((option) => (
+                <option key={option.value} value={option.value}>{option.label}</option>
+              ))}
+            </select>
+          </div>
+
+          <label className="flex cursor-pointer items-center gap-2 rounded-md border p-3 text-sm">
+            <input
+              type="checkbox"
+              className="h-4 w-4 rounded border-slate-300 text-sky-600 focus:ring-sky-500"
+              checked={draft.isControlPoint}
+              onChange={(event) => setDraft((current) => ({ ...current, isControlPoint: event.target.checked }))}
+            />
+            Esta etapa é um Ponto Crítico de Controle (PCC)
+          </label>
+        </div>
+
+        <DialogFooter>
+          <Button variant="ghost" onClick={onClose}>Cancelar</Button>
+          <Button disabled={!draft.name.trim()} onClick={submit}>
+            <Plus className="mr-2 h-4 w-4" />
+            Adicionar etapa
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
 // ----------------------------------------------------------------------
 // 4. Componente Principal do Editor Canvas
 // ----------------------------------------------------------------------
 
-export function IsometricFlow({ steps, processId, canManage, onStepClick, onStepMove, onStepCreate, onStepDelete, onStepUpdate }: IsometricFlowProps) {
-  const [zoom, setZoom] = useState(42);
+export function IsometricFlow({
+  steps,
+  canManage,
+  onStepMove,
+  onStepsArrange,
+  onStepCreate,
+  onStepDelete,
+  onStepUpdate,
+}: IsometricFlowProps) {
   const [selectedStepId, setSelectedStepId] = useState<string | null>(null);
-  const orbitRef = useRef<any>(null);
+  const [creatingStep, setCreatingStep] = useState(false);
+  const cameraRef = useRef<FlowCameraHandle>(null);
+  const sortedSteps = useMemo(
+    () => [...(steps ?? [])].sort((a, b) => (a?.number ?? 0) - (b?.number ?? 0)),
+    [steps],
+  );
+  const positionedSteps = useMemo(() => positionSteps(sortedSteps), [sortedSteps]);
+  const cameraPositions = useMemo(
+    () => positionedSteps.map((step) => ({
+      x: step.positionX / API_POSITION_SCALE,
+      z: step.positionY / API_POSITION_SCALE,
+    })),
+    [positionedSteps],
+  );
+  const fitKey = positionedSteps.map((step) => step.id).join('|');
+  const selectedStep = steps.find((step) => step.id === selectedStepId) ?? null;
 
-  // Ordena as etapas por número de forma segura
-  const sortedSteps = [...(steps ?? [])].sort((a, b) => (a?.number ?? 0) - (b?.number ?? 0));
+  useEffect(() => {
+    if (selectedStepId && !selectedStep) setSelectedStepId(null);
+  }, [selectedStep, selectedStepId]);
 
-  // Distribuição inicial sequencial caso as coordenadas sejam nulas, indefinidas ou NaN
-  const positionedSteps = sortedSteps.map((step, idx) => {
-    const hasPosX = typeof step.positionX === 'number' && !isNaN(step.positionX);
-    const hasPosY = typeof step.positionY === 'number' && !isNaN(step.positionY);
-    if (!hasPosX || !hasPosY) {
-      // Auto distribuição em linha no plano
-      return {
-        ...step,
-        positionX: typeof step.positionX === 'number' && !isNaN(step.positionX) ? step.positionX : (idx - (sortedSteps.length - 1) / 2) * 250,
-        positionY: typeof step.positionY === 'number' && !isNaN(step.positionY) ? step.positionY : 0,
-      };
-    }
-    return step;
-  });
-
-  const handleResetCamera = () => {
-    if (orbitRef.current) {
-      orbitRef.current.reset();
-    }
+  const handleArrange = () => {
+    const layout = createAutomaticLayout(sortedSteps);
+    onStepsArrange(layout.map((step) => ({
+      id: step.id,
+      positionX: step.positionX,
+      positionY: step.positionY,
+    })));
   };
 
   return (
@@ -537,47 +966,68 @@ export function IsometricFlow({ steps, processId, canManage, onStepClick, onStep
       <div className="flex flex-wrap items-center justify-between gap-3 border-b bg-slate-50 px-4 py-3 dark:bg-slate-900/20">
         <div className="flex items-center gap-2">
           <Badge className="bg-sky-500 hover:bg-sky-600">3D Isométrico</Badge>
-          <span className="text-xs text-muted-foreground">
-            {canManage 
-              ? 'Arraste os modelos para reposicionar no grid · Clique no bloco ou na placa para editá-lo no painel lateral.' 
-              : 'Inspecione a cadeia tridimensional do processo.'}
-          </span>
+          <div>
+            <p className="text-xs text-muted-foreground">
+              {canManage
+                ? 'Arraste uma etapa para reposicionar · clique para editar.'
+                : 'Inspecione a cadeia tridimensional do processo.'}
+            </p>
+            <p className="hidden text-[10px] text-muted-foreground/80 lg:block">
+              Arraste o fundo para mover · use a roda do mouse para zoom · botão direito para girar.
+            </p>
+          </div>
         </div>
         <div className="flex items-center gap-2">
           {canManage && (
-            <Button 
-              size="sm" 
-              className="h-8 gap-1 bg-emerald-600 hover:bg-emerald-700 text-white text-xs px-2.5 font-medium shadow-sm transition-all" 
-              onClick={() => onStepCreate('Nova Etapa')}
-            >
-              <Plus className="h-3.5 w-3.5" />
-              Adicionar Etapa
-            </Button>
+            <>
+              <Button
+                variant="outline"
+                size="sm"
+                className="h-8 gap-1 px-2.5 text-xs"
+                onClick={handleArrange}
+                disabled={positionedSteps.length === 0}
+                title="Distribuir as etapas automaticamente"
+              >
+                <Sparkles className="h-3.5 w-3.5" />
+                Organizar
+              </Button>
+              <Button
+                size="sm"
+                className="h-8 gap-1 bg-emerald-600 px-2.5 text-xs font-medium text-white shadow-sm transition-all hover:bg-emerald-700"
+                onClick={() => setCreatingStep(true)}
+              >
+                <Plus className="h-3.5 w-3.5" />
+                Adicionar etapa
+              </Button>
+            </>
           )}
           <div className="flex items-center gap-1">
-            <Button variant="outline" size="icon" className="h-8 w-8" onClick={() => setZoom((z) => Math.min(80, z + 5))} title="Aumentar Zoom">
+            <Button variant="outline" size="icon" className="h-8 w-8" onClick={() => cameraRef.current?.zoomIn()} title="Aumentar zoom" aria-label="Aumentar zoom">
               <ZoomIn className="h-4 w-4" />
             </Button>
-            <Button variant="outline" size="icon" className="h-8 w-8" onClick={() => setZoom((z) => Math.max(15, z - 5))} title="Diminuir Zoom">
+            <Button variant="outline" size="icon" className="h-8 w-8" onClick={() => cameraRef.current?.zoomOut()} title="Diminuir zoom" aria-label="Diminuir zoom">
               <ZoomOut className="h-4 w-4" />
             </Button>
-            <Button variant="outline" size="icon" className="h-8 w-8" onClick={handleResetCamera} title="Resetar Câmera">
-              <RotateCcw className="h-4 w-4" />
+            <Button variant="outline" size="icon" className="h-8 w-8" onClick={() => cameraRef.current?.fit()} title="Enquadrar todo o fluxo" aria-label="Enquadrar todo o fluxo">
+              <Focus className="h-4 w-4" />
             </Button>
           </div>
         </div>
       </div>
 
-      <CardContent className="relative p-0 flex flex-col md:flex-row">
-        <div className="flex-1 h-[70vh] bg-slate-100 dark:bg-slate-950/30 relative">
-          <Canvas shadows dpr={[1, 2]}>
+      <CardContent className="relative flex flex-col overflow-hidden p-0 md:flex-row">
+        <div
+          className="relative h-[70vh] min-h-[32rem] min-w-0 flex-1 bg-slate-100 dark:bg-slate-950/30"
+          onContextMenu={(event) => event.preventDefault()}
+        >
+          <Canvas shadows dpr={[1, 2]} onPointerMissed={() => setSelectedStepId(null)}>
             {/* Câmera Isométrica Ortográfica */}
-            <OrthographicCamera 
-              makeDefault 
-              position={[15, 15, 15]} 
-              zoom={zoom} 
-              near={0.1} 
-              far={1000} 
+            <OrthographicCamera
+              makeDefault
+              position={[16, 16, 16]}
+              zoom={DEFAULT_ZOOM}
+              near={0.1}
+              far={1000}
             />
 
             {/* Iluminação Ambiente Suave */}
@@ -623,124 +1073,53 @@ export function IsometricFlow({ steps, processId, canManage, onStepClick, onStep
                 key={step.id}
                 step={step}
                 canManage={canManage}
+                selected={selectedStepId === step.id}
                 onClick={() => setSelectedStepId(step.id)}
                 onMove={onStepMove}
               />
             ))}
 
             {/* Controles de Câmera */}
-            <OrbitControls 
-              ref={orbitRef}
-              enableRotate={true}
-              enableZoom={false} // Zoom controlado manualmente para manter a escala ortográfica
-              enableDamping={true}
-              dampingFactor={0.05}
-              maxPolarAngle={Math.PI / 2.1} // Evita ir abaixo do chão
-              minPolarAngle={Math.PI / 6}
+            <FlowCameraControls
+              ref={cameraRef}
+              positions={cameraPositions}
+              fitKey={fitKey}
             />
           </Canvas>
+          {positionedSteps.length === 0 && (
+            <div className="pointer-events-none absolute inset-0 z-10 flex items-center justify-center p-6">
+              <div className="max-w-sm rounded-xl border bg-white/95 p-6 text-center shadow-lg backdrop-blur dark:bg-slate-900/95">
+                <div className="mx-auto mb-3 flex h-11 w-11 items-center justify-center rounded-full bg-sky-50 text-sky-600 dark:bg-sky-950/50">
+                  <Plus className="h-5 w-5" />
+                </div>
+                <h3 className="text-sm font-semibold">Este processo ainda não possui etapas</h3>
+                <p className="mt-1 text-xs text-muted-foreground">
+                  Adicione a primeira etapa para iniciar o mapeamento do fluxo.
+                </p>
+                {canManage && (
+                  <Button className="pointer-events-auto mt-4" size="sm" onClick={() => setCreatingStep(true)}>
+                    <Plus className="mr-2 h-4 w-4" />
+                    Adicionar primeira etapa
+                  </Button>
+                )}
+              </div>
+            </div>
+          )}
         </div>
 
         {/* Painel Lateral de Controle (Inspector) */}
-        {selectedStepId && (() => {
-          const selectedStep = steps.find(s => s.id === selectedStepId);
-          if (!selectedStep) return null;
-          return (
-            <div className="w-full md:w-80 border-t md:border-t-0 md:border-l bg-white dark:bg-slate-900 p-4 flex flex-col gap-4 overflow-y-auto h-[70vh] animate-in slide-in-from-right duration-200">
-              <div className="flex items-center justify-between border-b pb-2">
-                <h3 className="font-semibold text-sm">Editar Etapa #{selectedStep.number}</h3>
-                <Button variant="ghost" size="icon" className="h-6 w-6 text-muted-foreground hover:text-foreground" onClick={() => setSelectedStepId(null)}>
-                  <span className="sr-only">Fechar</span>
-                  <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                  </svg>
-                </Button>
-              </div>
-
-              {/* Nome da Etapa */}
-              <div className="space-y-1.5">
-                <label className="text-xs font-semibold text-muted-foreground">Nome da Etapa</label>
-                <input 
-                  type="text"
-                  className="w-full rounded-md border px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-sky-500 bg-transparent text-foreground"
-                  value={selectedStep.name}
-                  onChange={(e) => onStepUpdate(selectedStep.id, { name: e.target.value })}
-                  disabled={!canManage}
-                />
-              </div>
-
-              {/* Tipo de Bloco (Modelo 3D) */}
-              <div className="space-y-1.5">
-                <label className="text-xs font-semibold text-muted-foreground">Tipo de Bloco (Modelo 3D)</label>
-                <select
-                  className="w-full rounded-md border px-2 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-sky-500 bg-transparent text-foreground dark:bg-slate-900"
-                  value={selectedStep.type}
-                  onChange={(e) => onStepUpdate(selectedStep.id, { type: e.target.value })}
-                  disabled={!canManage}
-                >
-                  <option value="RECEIVING">Doca / Recebimento</option>
-                  <option value="STORAGE">Silo / Armazenamento</option>
-                  <option value="PROCESSING">Indústria / Processamento</option>
-                  <option value="PACKAGING">Envase / Embalagem</option>
-                  <option value="TRANSPORT">Caminhão / Transporte</option>
-                  <option value="DISTRIBUTION">Loja / Distribuição</option>
-                  <option value="OTHER">Octaedro / Outros</option>
-                </select>
-              </div>
-
-              {/* Ponto Crítico de Controle (PCC) */}
-              <div className="flex items-center justify-between rounded-lg border p-3 bg-slate-50/50 dark:bg-slate-900/50">
-                <div className="space-y-0.5">
-                  <label className="text-xs font-semibold">Ponto Crítico (PCC)</label>
-                  <p className="text-[10px] text-muted-foreground">Ativa sirene vermelha emissiva</p>
-                </div>
-                <input 
-                  type="checkbox"
-                  className="h-4 w-4 rounded border-slate-300 text-sky-600 focus:ring-sky-500 cursor-pointer"
-                  checked={selectedStep.isControlPoint}
-                  onChange={(e) => onStepUpdate(selectedStep.id, { isControlPoint: e.target.checked })}
-                  disabled={!canManage}
-                />
-              </div>
-
-              {/* Seção de Perigos e Planos */}
-              <div className="space-y-2 pt-2">
-                <label className="text-xs font-semibold text-muted-foreground">Análise do Processo</label>
-                <div className="text-[11px] space-y-1 text-muted-foreground">
-                  <div className="flex justify-between">
-                    <span>Categoria:</span>
-                    <span className="font-medium text-foreground">{selectedStep.type}</span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span>Estado:</span>
-                    <span className={`font-semibold ${selectedStep.isControlPoint ? 'text-red-500' : 'text-slate-500'}`}>
-                      {selectedStep.isControlPoint ? 'PCC Ativo' : 'Monitorado'}
-                    </span>
-                  </div>
-                </div>
-              </div>
-
-              {/* Botão de Excluir Etapa */}
-              {canManage && (
-                <div className="mt-auto pt-4 border-t">
-                  <Button 
-                    variant="destructive" 
-                    className="w-full text-xs font-medium" 
-                    size="sm"
-                    onClick={() => {
-                      if (confirm(`Tem certeza que deseja excluir a etapa "${selectedStep.name}"?`)) {
-                        onStepDelete(selectedStep.id);
-                        setSelectedStepId(null);
-                      }
-                    }}
-                  >
-                    Excluir Etapa
-                  </Button>
-                </div>
-              )}
-            </div>
-          );
-        })()}
+        {selectedStep && (
+          <StepInspector
+            step={selectedStep}
+            canManage={canManage}
+            onClose={() => setSelectedStepId(null)}
+            onDelete={() => {
+              onStepDelete(selectedStep.id);
+              setSelectedStepId(null);
+            }}
+            onUpdate={(data) => onStepUpdate(selectedStep.id, data)}
+          />
+        )}
       </CardContent>
 
       {/* Rodapé informativo */}
@@ -774,6 +1153,12 @@ export function IsometricFlow({ steps, processId, canManage, onStepClick, onStep
           <span className="font-semibold text-red-600">Ponto Crítico de Controle (PCC)</span>
         </div>
       </div>
+      {creatingStep && (
+        <CreateStepDialog
+          onClose={() => setCreatingStep(false)}
+          onCreate={onStepCreate}
+        />
+      )}
     </Card>
   );
 }

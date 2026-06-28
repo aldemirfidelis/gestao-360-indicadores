@@ -32,8 +32,9 @@ const footerGroups = [
       ['Segurança', '/seguranca'],
       ['Implantação', '/implantacao'],
       ['Suporte', '/suporte'],
-      ['SAC', 'mailto:sac@gestao360.org'],
-      ['Contato Comercial', 'mailto:contato@gestao360.org'],
+      ['SAC', '/suporte#formulario'],
+      ['Contato Comercial', '/contato'],
+      ['Trial de 30 dias', '/teste-gratis'],
     ],
   },
   {
@@ -44,6 +45,7 @@ const footerGroups = [
       ['Perguntas frequentes', '/conteudos/perguntas-frequentes'],
       ['Política de privacidade', '/politica-de-privacidade'],
       ['Termos de uso', '/termos-de-uso'],
+      ['LGPD e direitos', '/lgpd'],
     ],
   },
 ];

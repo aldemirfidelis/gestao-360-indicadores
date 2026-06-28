@@ -1,11 +1,28 @@
-import { Controller, Get, NotFoundException, Query } from '@nestjs/common';
+import { Body, Controller, Get, HttpCode, NotFoundException, Post, Query } from '@nestjs/common';
 import { Throttle } from '@nestjs/throttler';
 import { Public } from '../auth/public.decorator';
+import { PublicContactDto } from './public-contact.dto';
+import { PublicContactService } from './public-contact.service';
 import { TenantService } from './tenant.service';
 
 @Controller('public')
 export class PublicController {
-  constructor(private readonly tenants: TenantService) {}
+  constructor(
+    private readonly tenants: TenantService,
+    private readonly contacts: PublicContactService,
+  ) {}
+
+  /**
+   * Recebe formulários institucionais e os encaminha pelo SMTP central.
+   * O destinatário é decidido no backend e nunca aceito da requisição.
+   */
+  @Public()
+  @Post('contact')
+  @HttpCode(200)
+  @Throttle({ default: { limit: 5, ttl: 60_000 } })
+  sendContact(@Body() body: PublicContactDto) {
+    return this.contacts.send(body);
+  }
 
   /**
    * Branding da tela de login a partir do host (subdomínio ou domínio próprio).

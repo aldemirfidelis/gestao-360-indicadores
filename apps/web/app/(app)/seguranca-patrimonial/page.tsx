@@ -134,6 +134,7 @@ export default function SegurancaPatrimonialPage() {
           onDialog={setDialog}
           onDetail={setDetail}
           onQr={() => setQrOpen(true)}
+          onTab={selectTab}
         />
       )}
 

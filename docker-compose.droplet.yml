@@ -90,6 +90,7 @@ services:
         NEXT_PUBLIC_SITE_URL: ${NEXT_PUBLIC_SITE_URL:-https://gestao360.org}
         NEXT_PUBLIC_WHATSAPP_NUMBER: ${NEXT_PUBLIC_WHATSAPP_NUMBER:-5564981009108}
         NEXT_PUBLIC_APP_NAME: "Gestão 360"
+        NEXT_PUBLIC_APP_VERSION: ${APP_VERSION:-0.1.0+local}
     image: g360-web:latest
     container_name: g360-web
     restart: unless-stopped
@@ -97,6 +98,8 @@ services:
       NODE_ENV: production
       PORT: "3000"
       HOSTNAME: "0.0.0.0"
+      INTERNAL_API_URL: http://api:3333/api
+      NEXT_PUBLIC_APP_VERSION: ${APP_VERSION:-0.1.0+local}
       NEXT_PUBLIC_SITE_URL: ${NEXT_PUBLIC_SITE_URL:-https://gestao360.org}
       NEXT_PUBLIC_WHATSAPP_NUMBER: ${NEXT_PUBLIC_WHATSAPP_NUMBER:-5564981009108}
       INDEXNOW_ENABLED: ${INDEXNOW_ENABLED:-0}

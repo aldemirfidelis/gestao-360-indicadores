@@ -606,11 +606,17 @@ export default function ComunicacaoPage() {
           channelFilter={channelFilter}
           setChannelFilter={setChannelFilter}
           setTab={setTab}
+          onCreatePreset={(preset) => {
+            setForm({ ...defaultForm, ...preset, channels: { ...defaultForm.channels, ...(preset.channels ?? {}) } });
+            setTab('criar');
+          }}
           onSelectPost={(id) => {
             setSelectedPostId(id);
             setDetailPostOpen(true);
           }}
           unread={unread}
+          conversationCount={conversations.data?.length ?? 0}
+          onMessageUser={(id) => startDirect.mutate(id)}
           canCreate={canCreate}
         />
       ) : (
@@ -2013,7 +2019,8 @@ function KpiCard({ title, value, change, color, icon: Icon }: KpiCardProps) {
 
 function QuickActionBtn({ icon: Icon, title, onClick }: { icon: React.ComponentType<any>; title: string; onClick: () => void }) {
   return (
-    <Card 
+    <button
+      type="button"
       onClick={onClick}
       className="border border-slate-100 dark:border-slate-800 bg-white dark:bg-slate-900/50 p-3 flex flex-col items-center justify-center text-center gap-1.5 cursor-pointer transition-all hover:scale-[1.02] hover:shadow-md hover:border-slate-200/50 dark:hover:border-slate-800"
     >
@@ -2021,7 +2028,7 @@ function QuickActionBtn({ icon: Icon, title, onClick }: { icon: React.ComponentT
         <Icon className="h-4.5 w-4.5" />
       </div>
       <div className="text-[10px] font-bold text-slate-850 dark:text-slate-200 leading-snug max-w-[90px]">{title}</div>
-    </Card>
+    </button>
   );
 }
 
@@ -2049,9 +2056,12 @@ interface CommunicationDashboardViewProps {
   loading: boolean;
   channelFilter: string;
   setChannelFilter: (v: string) => void;
-  setTab: (tab: any) => void;
+  setTab: (tab: CommunicationTab) => void;
+  onCreatePreset: (preset: Partial<CommunicationForm>) => void;
   onSelectPost: (id: string) => void;
+  onMessageUser: (id: string) => void;
   unread: number;
+  conversationCount: number;
   canCreate: boolean;
 }
 
@@ -2061,22 +2071,26 @@ function CommunicationDashboardView({
   channelFilter,
   setChannelFilter,
   setTab,
+  onCreatePreset,
   onSelectPost,
+  onMessageUser,
   unread,
+  conversationCount,
   canCreate,
 }: CommunicationDashboardViewProps) {
   const router = useRouter();
 
-  const countPublished = data?.metrics.publishedThisMonth || 18;
-  const countDrafts = data?.metrics.drafts || 7;
-  const readRate = data?.metrics.readRate ? (data.metrics.readRate * 100).toFixed(1) : '78.4';
-  const countPending = data?.metrics.mandatoryPending || 134;
-  const activePolls = data?.posts?.filter(p => p.type === 'POLL' && p.status === 'PUBLISHED').length || 3;
-  const countCritical = data?.posts?.filter(p => p.priority === 'CRITICAL' || p.priority === 'URGENT').length || 2;
-  const countMessages = unread || 24;
-  const countReach = 3482;
-  const countImpacted = 3912;
-  const countScheduled = data?.metrics.scheduled || 4;
+  const posts = data?.posts ?? [];
+  const countPublished = data?.metrics.publishedThisMonth ?? 0;
+  const countDrafts = data?.metrics.drafts ?? 0;
+  const readRate = data?.metrics.readRate ?? 0;
+  const countPending = data?.metrics.mandatoryPending ?? 0;
+  const activePolls = posts.filter((post) => ['POLL', 'SURVEY'].includes(post.type) && post.status === 'PUBLISHED').length;
+  const countCritical = data?.metrics.critical ?? 0;
+  const countMessages = unread;
+  const countReach = data?.metrics.totalViews ?? 0;
+  const countImpacted = posts.filter((post) => post.status === 'PUBLISHED').reduce((sum, post) => sum + post.audienceSize, 0);
+  const countScheduled = data?.metrics.scheduled ?? 0;
 
   const CHANNELS = [
     { label: 'Todos os canais', filter: 'Todos os canais' },
@@ -2089,31 +2103,29 @@ function CommunicationDashboardView({
     { label: 'Confirmação obrigatória', filter: 'Confirmação' },
   ];
 
-  const pendingStaff = [
-    { name: 'Rafael Martins', sector: 'CIPA - Turno A', subject: 'Confirmação NR-05 Atualização', delay: '3 dias', avatar: 'https://images.unsplash.com/photo-1599566150163-29194dcaad36?w=80&fit=crop&q=60' },
-    { name: 'Juliana Pereira', sector: 'Administrativo - Financeiro', subject: 'Política de Seg. da Informação', delay: '2 dias', avatar: 'https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=80&fit=crop&q=60' },
-    { name: 'Carlos Eduardo', sector: 'Manutenção - Elétrica', subject: 'Procedimento de Bloqueio (LOTO)', delay: '1 dia', avatar: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=80&fit=crop&q=60' },
-    { name: 'Beatriz Souza', sector: 'Qualidade - Laboratório', subject: 'Boas Práticas de Fabricação', delay: 'Hoje', avatar: 'https://images.unsplash.com/photo-1438761681033-6461ffad8d80?w=80&fit=crop&q=60' },
+  const pendingStaff = data?.team.pendingPeople ?? [];
+  const publicSegments = data?.charts.readByArea ?? [];
+  const channelDefinitions = [
+    { name: 'Mural', matches: (post: CommunicationPost) => Boolean(post.channels.digitalBoard) },
+    { name: 'Push', matches: (post: CommunicationPost) => Boolean(post.channels.push) },
+    { name: 'E-mail', matches: (post: CommunicationPost) => Boolean(post.channels.email) },
+    { name: 'In-app', matches: (post: CommunicationPost) => Boolean(post.channels.platform || post.channels.myDay || post.channels.homeCard) },
+    { name: 'Banner', matches: (post: CommunicationPost) => Boolean(post.channels.topBanner || post.type === 'BANNER') },
+    { name: 'Enquete', matches: (post: CommunicationPost) => ['POLL', 'SURVEY'].includes(post.type) },
   ];
-
-  const publicSegments = [
-    { name: 'Administrativo', count: 842 },
-    { name: 'Operação', count: 1245 },
-    { name: 'Liderança', count: 156 },
-    { name: 'Terceiros', count: 512 },
-    { name: 'Filiais', count: 727 },
-  ];
-
-  const channelRates = [
-    { name: 'Mural', rate: '92%' },
-    { name: 'Push', rate: '71%' },
-    { name: 'E-mail', rate: '68%' },
-    { name: 'In-app', rate: '55%' },
-    { name: 'Banner', rate: '33%' },
-    { name: 'Enquete', rate: '61%' },
-  ];
-
-  const recentPosts = data?.posts || [];
+  const channelRates = channelDefinitions.map((channel) => {
+    const channelPosts = posts.filter(channel.matches);
+    const delivered = channelPosts.reduce((sum, post) => sum + post.audienceSize, 0);
+    const views = channelPosts.reduce((sum, post) => sum + post.receipts.length, 0);
+    return { name: channel.name, rate: delivered > 0 ? views / delivered : 0, posts: channelPosts.length };
+  });
+  const recentPosts = posts.filter((post) => {
+    if (channelFilter === 'Todos os canais') return true;
+    if (channelFilter === 'Confirmação') return post.requiresReadConfirmation;
+    return channelDefinitions.find((channel) => channel.name === channelFilter)?.matches(post) ?? true;
+  });
+  const pollResponses = posts.reduce((sum, post) => sum + post.pollResponses.length, 0);
+  const featuredPost = posts.find((post) => post.isFeatured) ?? data?.charts.mostAccessed[0] ?? null;
 
   return (
     <div className="space-y-6">
@@ -2146,7 +2158,7 @@ function CommunicationDashboardView({
             <Users className="h-4 w-4 text-slate-500" />
             Pessoas
           </Button>
-          <Button variant="outline" size="sm" className="h-9 px-3 border-slate-200 bg-card hover:bg-muted" title="Mais Ações">
+          <Button variant="outline" size="sm" className="h-9 px-3 border-slate-200 bg-card hover:bg-muted" title="Métricas e relatórios" onClick={() => setTab('metricas')}>
             <SlidersHorizontal className="h-4 w-4 text-slate-600" />
           </Button>
         </div>
@@ -2172,27 +2184,27 @@ function CommunicationDashboardView({
 
       {/* 3. Cards de Indicadores (KPIs) */}
       <div className="grid gap-4 grid-cols-2 md:grid-cols-3 lg:grid-cols-5">
-        <KpiCard title="Publicados no mês" value={countPublished} change="↑ 12% vs. mês anterior" color="emerald" icon={Megaphone} />
-        <KpiCard title="Rascunhos" value={countDrafts} change="2 aguardando aprovação" color="purple" icon={FileText} />
-        <KpiCard title="Taxa de leitura" value={`${readRate}%`} change="↑ 6,3 p.p. vs. ontem" color="emerald" icon={BookOpenCheck} />
-        <KpiCard title="Confirmações pendentes" value={countPending} change="5,2% do total" color="amber" icon={ClipboardCheck} />
-        <KpiCard title="Enquetes ativas" value={activePolls} change="452 respostas" color="purple" icon={Vote} />
-        <KpiCard title="Comunicados críticos" value={countCritical} change="Atenção necessária" color="rose" icon={AlertTriangle} />
-        <KpiCard title="Mensagens internas" value={countMessages} change="12 não lidas" color="sky" icon={MessageCircle} />
-        <KpiCard title="Alcance total" value={countReach.toLocaleString()} change="colaboradores" color="sky" icon={Users} />
-        <KpiCard title="Colaboradores impactados" value={countImpacted.toLocaleString()} change="total" color="emerald" icon={Users} />
-        <KpiCard title="Agendados" value={countScheduled} change="programados" color="sky" icon={Clock} />
+        <KpiCard title="Publicados no mês" value={countPublished} change="Publicações registradas no período" color="emerald" icon={Megaphone} />
+        <KpiCard title="Rascunhos" value={countDrafts} change={`${data?.metrics.pendingApproval ?? 0} aguardando aprovação`} color="purple" icon={FileText} />
+        <KpiCard title="Taxa de leitura" value={`${(readRate * 100).toFixed(1)}%`} change={`${countReach} visualizações registradas`} color="emerald" icon={BookOpenCheck} />
+        <KpiCard title="Confirmações pendentes" value={countPending} change="Pendências obrigatórias reais" color="amber" icon={ClipboardCheck} />
+        <KpiCard title="Enquetes ativas" value={activePolls} change={`${pollResponses} respostas registradas`} color="purple" icon={Vote} />
+        <KpiCard title="Comunicados críticos" value={countCritical} change="Publicações em prioridade crítica" color="rose" icon={AlertTriangle} />
+        <KpiCard title="Mensagens internas" value={countMessages} change="Não lidas no chat" color="sky" icon={MessageCircle} />
+        <KpiCard title="Visualizações" value={countReach.toLocaleString('pt-BR')} change="Leituras acumuladas" color="sky" icon={Users} />
+        <KpiCard title="Entregas" value={countImpacted.toLocaleString('pt-BR')} change="Audiências das publicações" color="emerald" icon={Users} />
+        <KpiCard title="Agendados" value={countScheduled} change="Programados para publicação" color="sky" icon={Clock} />
       </div>
 
       {/* 4. Faixa de Ações Rápidas */}
       <div className="grid gap-3 grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-7">
-        <QuickActionBtn icon={Plus} title="Criar comunicado" onClick={() => setTab('criar')} />
+        <QuickActionBtn icon={Plus} title="Criar comunicado" onClick={() => onCreatePreset({})} />
         <QuickActionBtn icon={Megaphone} title="Agendar campanha" onClick={() => setTab('campanhas')} />
-        <QuickActionBtn icon={SlidersHorizontal} title="Publicar no mural" onClick={() => setTab('mural')} />
-        <QuickActionBtn icon={ClipboardCheck} title="Enviar confirmação obrigatória" onClick={() => setTab('criar')} />
-        <QuickActionBtn icon={Vote} title="Criar enquete" onClick={() => setTab('criar')} />
+        <QuickActionBtn icon={SlidersHorizontal} title="Publicar no mural" onClick={() => onCreatePreset({ channels: { ...defaultForm.channels, digitalBoard: true } })} />
+        <QuickActionBtn icon={ClipboardCheck} title="Enviar confirmação obrigatória" onClick={() => onCreatePreset({ isMandatory: true, requiresReadConfirmation: true, channels: { ...defaultForm.channels, mandatoryPopup: true } })} />
+        <QuickActionBtn icon={Vote} title="Criar enquete" onClick={() => onCreatePreset({ type: 'POLL', requiresPollAnswer: true })} />
         <QuickActionBtn icon={MessageSquare} title="Mensagem para equipes" onClick={() => setTab('chat')} />
-        <QuickActionBtn icon={FileText} title="Biblioteca de templates" onClick={() => setTab('central')} />
+        <QuickActionBtn icon={FileText} title="Biblioteca de templates" onClick={() => onCreatePreset({})} />
       </div>
 
       {/* 5. Grid Principal (3 Colunas) */}
@@ -2206,33 +2218,35 @@ function CommunicationDashboardView({
               <h3 className="font-semibold text-sm flex items-center gap-2 text-slate-850 dark:text-white">
                 <ClipboardCheck className="h-4 w-4 text-amber-500" />
                 Pendências obrigatórias
-                <span className="text-[10px] bg-red-100 dark:bg-red-950/40 text-red-650 dark:text-red-400 px-1.5 py-0.5 rounded-full font-bold">134</span>
+                <span className="text-[10px] bg-red-100 dark:bg-red-950/40 text-red-650 dark:text-red-400 px-1.5 py-0.5 rounded-full font-bold">{countPending}</span>
               </h3>
             </div>
             <CardContent className="p-0 overflow-y-auto flex-1">
-              <div className="divide-y divide-slate-100 dark:divide-slate-850/40">
-                {pendingStaff.map((staff, idx) => (
-                  <div key={idx} className="flex items-center justify-between p-3 hover:bg-slate-50/40 dark:hover:bg-slate-900/40 transition-all">
+              {pendingStaff.length === 0 ? (
+                <div className="flex h-full items-center justify-center p-8 text-center text-xs text-muted-foreground">Nenhum colaborador com confirmação obrigatória pendente.</div>
+              ) : (
+                <div className="divide-y divide-slate-100 dark:divide-slate-850/40">
+                {pendingStaff.map((staff) => (
+                  <div key={staff.id} className="flex items-center justify-between p-3 hover:bg-slate-50/40 dark:hover:bg-slate-900/40 transition-all">
                     <div className="flex items-center gap-2.5 min-w-0">
-                      <img src={staff.avatar} alt={staff.name} className="h-7 w-7 rounded-full object-cover border border-slate-200 shrink-0" />
+                      <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full border bg-sky-500/10 text-[10px] font-bold text-sky-600">{staff.name.split(' ').map((part) => part[0]).slice(0, 2).join('')}</span>
                       <div className="min-w-0">
                         <div className="text-xs font-semibold text-slate-855 dark:text-slate-200 truncate">{staff.name}</div>
-                        <div className="text-[9px] text-slate-500 truncate leading-normal">{staff.sector}</div>
-                        <div className="text-[10px] font-medium text-sky-500 truncate line-clamp-1 mt-0.5">{staff.subject}</div>
+                        <div className="text-[10px] font-medium text-sky-500 truncate line-clamp-1 mt-0.5">{staff.pending} confirmação(ões) pendente(s)</div>
                       </div>
                     </div>
                     <div className="flex items-center gap-2 shrink-0">
-                      <span className="text-[9px] font-bold px-1.5 py-0.5 rounded-full bg-red-500/10 border border-red-500/20 text-red-600 dark:text-red-400">{staff.delay}</span>
-                      <Button variant="ghost" size="sm" className="h-7 text-[10px] px-2 text-sky-500 border border-sky-100 hover:bg-sky-50/40 dark:border-sky-950/20 dark:hover:bg-sky-950/10 rounded-md">
+                      <Button variant="ghost" size="sm" className="h-7 text-[10px] px-2 text-sky-500 border border-sky-100 hover:bg-sky-50/40 dark:border-sky-950/20 dark:hover:bg-sky-950/10 rounded-md" onClick={() => onMessageUser(staff.id)}>
                         Cobrar
                       </Button>
                     </div>
                   </div>
                 ))}
-              </div>
+                </div>
+              )}
             </CardContent>
             <div className="border-t p-2 text-center shrink-0">
-              <Button variant="link" size="sm" className="h-auto p-0 text-xs text-sky-500 font-semibold hover:text-sky-600" onClick={() => setTab('central')}>
+              <Button variant="link" size="sm" className="h-auto p-0 text-xs text-sky-500 font-semibold hover:text-sky-600" onClick={() => setTab('metricas')}>
                 Ver todas as pendências →
               </Button>
             </div>
@@ -2248,18 +2262,19 @@ function CommunicationDashboardView({
             </div>
             <CardContent className="p-3 flex-1 overflow-y-auto">
               <div className="space-y-2">
-                {publicSegments.map((seg, idx) => (
-                  <div key={idx} className="flex items-center justify-between text-xs py-1 hover:bg-slate-50/20 px-1.5 rounded transition-all">
-                    <span className="font-medium text-slate-700 dark:text-slate-350">{seg.name}</span>
+                {publicSegments.length === 0 && <div className="p-6 text-center text-xs text-muted-foreground">Sem dados de audiência por área.</div>}
+                {publicSegments.map((segment) => (
+                  <button type="button" key={segment.area} onClick={() => setTab('metricas')} className="flex w-full items-center justify-between text-xs py-1 hover:bg-slate-50/20 px-1.5 rounded transition-all">
+                    <span className="font-medium text-slate-700 dark:text-slate-350">{segment.area}</span>
                     <span className="text-[10px] font-bold bg-slate-100 dark:bg-slate-800 px-2 py-0.5 rounded text-slate-650 dark:text-slate-450 border border-slate-200/30 dark:border-slate-700/30">
-                      {seg.count} pessoas
+                      {segment.read}/{segment.delivered} · {(segment.readRate * 100).toFixed(0)}%
                     </span>
-                  </div>
+                  </button>
                 ))}
               </div>
             </CardContent>
             <div className="border-t p-2 text-center shrink-0">
-              <Button variant="link" size="sm" className="h-auto p-0 text-xs text-sky-500 font-semibold hover:text-sky-600" onClick={() => setTab('central')}>
+              <Button variant="link" size="sm" className="h-auto p-0 text-xs text-sky-500 font-semibold hover:text-sky-600" onClick={() => setTab('metricas')}>
                 Ver todos os segmentos →
               </Button>
             </div>
@@ -2277,19 +2292,19 @@ function CommunicationDashboardView({
               <div className="space-y-2 text-xs">
                 <div className="flex items-center justify-between py-1">
                   <span className="text-slate-600 dark:text-slate-400">Mensagens não lidas</span>
-                  <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-full bg-red-100 dark:bg-red-950/40 text-red-600 dark:text-red-400">12</span>
+                  <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-full bg-red-100 dark:bg-red-950/40 text-red-600 dark:text-red-400">{unread}</span>
                 </div>
                 <div className="flex items-center justify-between py-1 border-t pt-2 border-slate-100 dark:border-slate-800/60">
-                  <span className="text-slate-600 dark:text-slate-400">Menções</span>
-                  <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-full bg-amber-100 dark:bg-amber-955/40 text-amber-600 dark:text-amber-400">5</span>
+                  <span className="text-slate-600 dark:text-slate-400">Confirmações pendentes</span>
+                  <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-full bg-amber-100 dark:bg-amber-955/40 text-amber-600 dark:text-amber-400">{countPending}</span>
                 </div>
                 <div className="flex items-center justify-between py-1 border-t pt-2 border-slate-100 dark:border-slate-800/60">
                   <span className="text-slate-600 dark:text-slate-400">Conversas ativas</span>
-                  <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-full bg-emerald-100 dark:bg-emerald-950/40 text-emerald-600 dark:text-emerald-400">8</span>
+                  <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-full bg-emerald-100 dark:bg-emerald-950/40 text-emerald-600 dark:text-emerald-400">{conversationCount}</span>
                 </div>
                 <div className="flex items-center justify-between py-1 border-t pt-2 border-slate-100 dark:border-slate-800/60">
                   <span className="text-slate-600 dark:text-slate-400">Bots e automações</span>
-                  <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-full bg-sky-100 dark:bg-sky-955/40 text-sky-600 dark:text-sky-400">3</span>
+                  <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-full bg-sky-100 dark:bg-sky-955/40 text-sky-600 dark:text-sky-400">{data?.automations.filter((rule) => rule.active).length ?? 0}</span>
                 </div>
               </div>
               <Button size="sm" className="w-full mt-3 h-8 bg-sky-500 hover:bg-sky-600 text-white font-semibold" onClick={() => setTab('chat')}>
@@ -2349,45 +2364,28 @@ function CommunicationDashboardView({
               <h3 className="font-semibold text-sm flex items-center gap-2 text-slate-850 dark:text-white">
                 <Clock className="h-4 w-4 text-violet-500" />
                 Calendário de campanhas
-                <span className="text-[10px] text-slate-400 dark:text-slate-500 ml-1.5">Maio 2026</span>
+                <span className="text-[10px] text-slate-400 dark:text-slate-500 ml-1.5">{data?.campaigns.length ?? 0} cadastrada(s)</span>
               </h3>
             </div>
             <CardContent className="p-4 flex-1 flex flex-col justify-between gap-3">
               
-              {/* Calendário horizontal de dias */}
-              <div className="grid grid-cols-7 gap-1.5 text-center">
-                {['Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb', 'Dom'].map((d, i) => (
-                  <div key={i} className="text-[10px] font-semibold text-slate-400 dark:text-slate-500 uppercase">{d}</div>
-                ))}
-                {[19, 20, 21, 22, 23, 24, 25].map((day, idx) => {
-                  const isActive = day === 21;
-                  return (
-                    <div 
-                      key={idx} 
-                      className={cn(
-                        'h-9 rounded-lg flex flex-col items-center justify-center cursor-pointer transition-all border text-xs',
-                        isActive 
-                          ? 'bg-sky-500 border-sky-500 text-white font-bold shadow-md scale-105' 
-                          : 'bg-slate-50/50 dark:bg-slate-950/20 border-slate-100 dark:border-slate-850/40 text-slate-650 hover:bg-slate-100'
-                      )}
-                    >
-                      <span>{day}</span>
-                      {day === 21 && <span className="h-1 w-1 rounded-full bg-white mt-0.5" />}
-                    </div>
-                  );
-                })}
-              </div>
-
-              {/* Compromissos */}
               <div className="flex-1 space-y-3 mt-3 overflow-y-auto pr-1">
-                <CampaignItem time="08:00" title="Campanha do Agasalho 2026" color="purple" type="Campanha Geral" />
-                <CampaignItem time="10:00" title="SIPAT 2026 - Convite Oficial" color="green" type="Urgente / SSMA" />
-                <CampaignItem time="14:00" title="Manutenção Programada - Linha 2" color="amber" type="Informativo Técnico" />
-                <CampaignItem time="16:30" title="Pesquisa de Clima - 2º Trimestre" color="blue" type="RH / Clima" />
+                {(data?.campaigns ?? []).length === 0 ? (
+                  <div className="flex h-full items-center justify-center text-center text-xs text-muted-foreground">Nenhuma campanha cadastrada.</div>
+                ) : (data?.campaigns ?? []).map((campaign, index) => (
+                  <button type="button" key={campaign.id} className="block w-full text-left" onClick={() => setTab('campanhas')}>
+                    <CampaignItem
+                      time={campaign.startsAt ? formatDate(campaign.startsAt) : 'Sem início'}
+                      title={campaign.name}
+                      color={(['purple', 'green', 'amber', 'blue'] as const)[index % 4]}
+                      type={`${campaign.category} · ${campaign.status}`}
+                    />
+                  </button>
+                ))}
               </div>
 
               <div className="border-t pt-3 text-center shrink-0">
-                <Button variant="link" size="sm" className="h-auto p-0 text-xs text-sky-500 font-semibold hover:text-sky-600" onClick={() => setTab('central')}>
+                <Button variant="link" size="sm" className="h-auto p-0 text-xs text-sky-500 font-semibold hover:text-sky-600" onClick={() => setTab('campanhas')}>
                   Ver calendário completo →
                 </Button>
               </div>
@@ -2410,8 +2408,8 @@ function CommunicationDashboardView({
               <div className="flex items-center justify-between gap-4">
                 <div className="space-y-0.5 min-w-0">
                   <div className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider">Leitura</div>
-                  <div className="text-base font-extrabold text-slate-900 dark:text-white">78,4%</div>
-                  <div className="text-[9px] text-emerald-600 font-bold">▲ 6,3 p.p.</div>
+                  <div className="text-base font-extrabold text-slate-900 dark:text-white">{((data?.metrics.readRate ?? 0) * 100).toFixed(1)}%</div>
+                  <div className="text-[9px] text-emerald-600 font-bold">Sobre a audiência entregue</div>
                 </div>
                 <div className="w-28 h-8 shrink-0">
                   <svg className="w-full h-full" viewBox="0 0 100 40">
@@ -2431,8 +2429,8 @@ function CommunicationDashboardView({
               <div className="flex items-center justify-between gap-4 border-t pt-2">
                 <div className="space-y-0.5 min-w-0">
                   <div className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider">Confirmação</div>
-                  <div className="text-base font-extrabold text-slate-900 dark:text-white">84,1%</div>
-                  <div className="text-[9px] text-emerald-600 font-bold">▲ 5,1 p.p.</div>
+                  <div className="text-base font-extrabold text-slate-900 dark:text-white">{((data?.metrics.confirmationRate ?? 0) * 100).toFixed(1)}%</div>
+                  <div className="text-[9px] text-emerald-600 font-bold">Ciências obrigatórias confirmadas</div>
                 </div>
                 <div className="w-28 h-8 shrink-0">
                   <svg className="w-full h-full" viewBox="0 0 100 40">
@@ -2452,8 +2450,8 @@ function CommunicationDashboardView({
               <div className="flex items-center justify-between gap-4 border-t pt-2">
                 <div className="space-y-0.5 min-w-0">
                   <div className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider">Respostas (enquetes)</div>
-                  <div className="text-base font-extrabold text-slate-900 dark:text-white">452</div>
-                  <div className="text-[9px] text-emerald-600 font-bold">▲ 18%</div>
+                  <div className="text-base font-extrabold text-slate-900 dark:text-white">{pollResponses}</div>
+                  <div className="text-[9px] text-emerald-600 font-bold">{((data?.metrics.pollResponseRate ?? 0) * 100).toFixed(1)}% da audiência</div>
                 </div>
                 <div className="w-28 h-8 shrink-0">
                   <svg className="w-full h-full" viewBox="0 0 100 40">
@@ -2473,8 +2471,8 @@ function CommunicationDashboardView({
               <div className="flex items-center justify-between gap-4 border-t pt-2">
                 <div className="space-y-0.5 min-w-0">
                   <div className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider">Alcance</div>
-                  <div className="text-base font-extrabold text-slate-900 dark:text-white">3.482</div>
-                  <div className="text-[9px] text-emerald-600 font-bold">▲ 9%</div>
+                  <div className="text-base font-extrabold text-slate-900 dark:text-white">{countReach.toLocaleString('pt-BR')}</div>
+                  <div className="text-[9px] text-emerald-600 font-bold">Visualizações registradas</div>
                 </div>
                 <div className="w-28 h-8 shrink-0">
                   <svg className="w-full h-full" viewBox="0 0 100 40">
@@ -2502,21 +2500,21 @@ function CommunicationDashboardView({
             </div>
             <CardContent className="p-3 flex-1 overflow-y-auto">
               <div className="space-y-2.5">
-                {channelRates.map((ch, idx) => (
-                  <div key={idx} className="flex items-center justify-between text-xs py-0.5">
-                    <span className="text-slate-500 dark:text-slate-400 font-medium">{ch.name}</span>
+                {channelRates.map((channel) => (
+                  <div key={channel.name} className="flex items-center justify-between text-xs py-0.5">
+                    <span className="text-slate-500 dark:text-slate-400 font-medium">{channel.name} <small>({channel.posts})</small></span>
                     <div className="flex items-center gap-2 w-1/2">
                       <div className="w-full bg-slate-100 dark:bg-slate-800 rounded-full h-1.5 overflow-hidden">
-                        <div className="bg-sky-500 h-1.5 rounded-full" style={{ width: ch.rate }} />
+                        <div className="bg-sky-500 h-1.5 rounded-full" style={{ width: `${Math.min(100, channel.rate * 100)}%` }} />
                       </div>
-                      <span className="text-[10px] font-bold text-slate-800 dark:text-slate-200 shrink-0 w-8 text-right">{ch.rate}</span>
+                      <span className="text-[10px] font-bold text-slate-800 dark:text-slate-200 shrink-0 w-8 text-right">{(channel.rate * 100).toFixed(0)}%</span>
                     </div>
                   </div>
                 ))}
               </div>
             </CardContent>
             <div className="border-t p-2 text-center shrink-0">
-              <Button variant="link" size="sm" className="h-auto p-0 text-xs text-sky-500 font-semibold hover:text-sky-655">
+              <Button variant="link" size="sm" className="h-auto p-0 text-xs text-sky-500 font-semibold hover:text-sky-655" onClick={() => setTab('metricas')}>
                 Ver desempenho por canal →
               </Button>
             </div>
@@ -2529,16 +2527,16 @@ function CommunicationDashboardView({
               <div className="absolute top-2 right-2 bg-emerald-500/90 text-white text-[8px] font-bold px-1.5 py-0.5 rounded tracking-wider">
                 DESTAQUE
               </div>
-              <div className="text-[10px] text-white/80 font-bold tracking-wider uppercase">RH / SSMA</div>
-              <h4 className="text-sm font-extrabold text-white line-clamp-1 leading-snug">SIPAT 2026 - Convite Oficial</h4>
+              <div className="text-[10px] text-white/80 font-bold tracking-wider uppercase">{featuredPost?.category ?? 'Comunicação'}</div>
+              <h4 className="text-sm font-extrabold text-white line-clamp-1 leading-snug">{featuredPost?.title ?? 'Nenhum destaque publicado'}</h4>
             </div>
             <CardContent className="p-3 flex-1 flex flex-col justify-between">
               <p className="text-[11px] text-slate-500 dark:text-slate-400 line-clamp-2 leading-relaxed">
-                Participe da Semana Interna de Prevenção de Acidentes de Trabalho! Juntos por um ambiente 100% seguro!
+                {featuredPost ? featuredPost.content.replace(/<[^>]*>/g, ' ') : 'Marque um comunicado como destaque para exibi-lo neste espaço.'}
               </p>
               <div className="flex items-center justify-between border-t pt-2.5 mt-2">
-                <span className="text-[9px] text-slate-400">Publicado em: 22/05</span>
-                <Button size="sm" variant="ghost" className="h-7 text-[10px] px-2 text-sky-500 border border-sky-100 hover:bg-sky-50/50 dark:border-sky-900/40" onClick={() => setTab('central')}>
+                <span className="text-[9px] text-slate-400">{featuredPost ? `Publicado em: ${formatDate(featuredPost.publishedAt ?? featuredPost.createdAt)}` : 'Sem publicação'}</span>
+                <Button size="sm" variant="ghost" className="h-7 text-[10px] px-2 text-sky-500 border border-sky-100 hover:bg-sky-50/50 dark:border-sky-900/40" onClick={() => featuredPost && onSelectPost(featuredPost.id)} disabled={!featuredPost}>
                   Ver comunicado completo
                 </Button>
               </div>
@@ -2553,25 +2551,25 @@ function CommunicationDashboardView({
         <div className="flex flex-wrap items-center gap-6">
           <div className="flex items-center gap-2">
             <Clock className="h-4 w-4 text-emerald-500" />
-            <span>Última sincronização: <strong>Hoje às 08:45</strong></span>
+            <span>Fonte dos dados: <strong>API de comunicação organizacional</strong></span>
           </div>
           <div className="flex items-center gap-2">
             <Users className="h-4 w-4 text-sky-500" />
-            <span>Colaboradores alcançados: <strong>{countReach.toLocaleString()} de {countImpacted.toLocaleString()}</strong></span>
+            <span>Visualizações / entregas: <strong>{countReach.toLocaleString('pt-BR')} de {countImpacted.toLocaleString('pt-BR')}</strong></span>
           </div>
           <div className="flex items-center gap-2">
             <FileText className="h-4 w-4 text-purple-400" />
-            <span>Templates disponíveis: <strong>28 templates</strong></span>
+            <span>Templates disponíveis: <strong>{data?.templates.length ?? 0}</strong></span>
           </div>
         </div>
         <div className="flex items-center gap-3">
-          <Button variant="ghost" size="sm" className="h-8 text-xs gap-1.5 text-slate-650 dark:text-slate-400 hover:text-slate-900">
+          <Button variant="ghost" size="sm" className="h-8 text-xs gap-1.5 text-slate-650 dark:text-slate-400 hover:text-slate-900" onClick={() => setTab('metricas')}>
             <FileUp className="h-3.5 w-3.5" />
             Relatórios e dados
           </Button>
-          <div className="h-8 w-8 rounded-full bg-sky-500 hover:bg-sky-600 text-white flex items-center justify-center cursor-pointer shadow-md transition-all hover:scale-105" title="Central de Ajuda">
+          <button type="button" onClick={() => router.push('/central-atendimento')} className="h-8 w-8 rounded-full bg-sky-500 hover:bg-sky-600 text-white flex items-center justify-center cursor-pointer shadow-md transition-all hover:scale-105" title="Central de Atendimento">
             <HelpCircle className="h-4.5 w-4.5" />
-          </div>
+          </button>
         </div>
       </div>
 

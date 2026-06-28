@@ -1,13 +1,42 @@
 'use client';
 
-import { useState } from 'react';
+import Link from 'next/link';
+import { useRef, useState } from 'react';
 import { CheckCircle2, Loader2 } from 'lucide-react';
 
-const requestTypes = ['Comercial', 'Suporte', 'SAC', 'Demonstração', 'Parceria', 'Outros'];
+const generalRequestTypes = ['Comercial', 'Suporte', 'SAC', 'Demonstração', 'Parceria', 'Outros'];
+const supportRequestTypes = ['Suporte técnico', 'Dúvida de acesso', 'SAC', 'LGPD e privacidade'];
 
-export function ContactForm({ compact = false }: { compact?: boolean }) {
+type ContactFormMode = 'general' | 'support' | 'trial';
+
+interface ContactFormProps {
+  compact?: boolean;
+  mode?: ContactFormMode;
+}
+
+const modeContent: Record<ContactFormMode, { label: string; messageLabel: string; placeholder: string }> = {
+  general: {
+    label: 'Enviar mensagem',
+    messageLabel: 'Mensagem',
+    placeholder: 'Conte brevemente como podemos ajudar sua empresa.',
+  },
+  support: {
+    label: 'Enviar para o suporte',
+    messageLabel: 'Descreva sua dúvida',
+    placeholder: 'Informe o que aconteceu, em qual tela e o resultado esperado. Não inclua senhas.',
+  },
+  trial: {
+    label: 'Solicitar trial de 30 dias',
+    messageLabel: 'Objetivo do trial',
+    placeholder: 'Conte quais módulos deseja avaliar e o principal desafio da sua empresa.',
+  },
+};
+
+export function ContactForm({ compact = false, mode = 'general' }: ContactFormProps) {
   const [status, setStatus] = useState<'idle' | 'loading' | 'success' | 'error'>('idle');
   const [message, setMessage] = useState('');
+  const formRef = useRef<HTMLFormElement>(null);
+  const content = modeContent[mode];
 
   async function submit(formData: FormData) {
     setStatus('loading');
@@ -22,7 +51,12 @@ export function ContactForm({ compact = false }: { compact?: boolean }) {
       const body = await res.json().catch(() => ({}));
       if (!res.ok) throw new Error(body?.message ?? 'Falha ao enviar mensagem.');
       setStatus('success');
-      setMessage('Mensagem recebida. A equipe do Gestão 360 retornará pelo canal informado.');
+      setMessage(
+        mode === 'trial'
+          ? 'Solicitação recebida. Nossa equipe comercial entrará em contato para organizar o trial.'
+          : 'Mensagem enviada. A equipe do Gestão 360 retornará pelo canal informado.',
+      );
+      formRef.current?.reset();
       (window as any).dataLayer = (window as any).dataLayer || [];
       (window as any).dataLayer.push({
         event: 'contact_form_submit',
@@ -37,7 +71,12 @@ export function ContactForm({ compact = false }: { compact?: boolean }) {
   }
 
   return (
-    <form action={submit} className="grid gap-4" aria-label="Formulário comercial do Gestão 360">
+    <form
+      ref={formRef}
+      action={submit}
+      className="grid gap-4"
+      aria-label={mode === 'support' ? 'Formulário de suporte do Gestão 360' : mode === 'trial' ? 'Formulário de solicitação de trial do Gestão 360' : 'Formulário de contato do Gestão 360'}
+    >
       <input type="text" name="website" tabIndex={-1} autoComplete="off" className="hidden" aria-hidden="true" />
       <div className={compact ? 'grid gap-4' : 'grid gap-4 md:grid-cols-2'}>
         <Field label="Nome" name="name" required />
@@ -45,29 +84,37 @@ export function ContactForm({ compact = false }: { compact?: boolean }) {
         <Field label="Cargo" name="role" />
         <Field label="E-mail corporativo" name="email" type="email" required />
         <Field label="Telefone" name="phone" type="tel" />
-        <label className="grid gap-1.5 text-sm font-medium text-slate-800">
-          Tipo de solicitação
-          <select name="requestType" required className="h-11 border border-slate-300 bg-white px-3 text-sm outline-none focus:border-slate-950">
-            <option value="">Selecione</option>
-            {requestTypes.map((type) => <option key={type} value={type}>{type}</option>)}
-          </select>
-        </label>
+        {mode === 'trial' ? (
+          <input type="hidden" name="requestType" value="Trial de 30 dias" />
+        ) : (
+          <label className="grid gap-1.5 text-sm font-medium text-slate-800">
+            Tipo de solicitação
+            <select name="requestType" required className="h-11 border border-slate-300 bg-white px-3 text-sm outline-none focus:border-slate-950">
+              <option value="">Selecione</option>
+              {(mode === 'support' ? supportRequestTypes : generalRequestTypes).map((type) => <option key={type} value={type}>{type}</option>)}
+            </select>
+          </label>
+        )}
       </div>
       <label className="grid gap-1.5 text-sm font-medium text-slate-800">
-        Mensagem
+        {content.messageLabel}
         <textarea
           name="message"
           required
           minLength={10}
           rows={compact ? 4 : 5}
           className="border border-slate-300 bg-white px-3 py-2 text-sm outline-none focus:border-slate-950"
-          placeholder="Conte brevemente o que você deseja melhorar na gestão da empresa."
+          placeholder={content.placeholder}
         />
       </label>
       <label className="flex items-start gap-2 text-xs leading-5 text-slate-600">
         <input name="privacy" value="accepted" type="checkbox" required className="mt-1 h-4 w-4 border-slate-300" />
         <span>
-          Li e aceito a política de privacidade. Os dados serão usados para retorno comercial e não serão vendidos.
+          Li e aceito a{' '}
+          <Link href="/politica-de-privacidade" target="_blank" className="font-semibold text-emerald-700 hover:underline">
+            Política de Privacidade
+          </Link>
+          . Os dados serão usados para atender esta solicitação.
         </span>
       </label>
       <button
@@ -76,7 +123,7 @@ export function ContactForm({ compact = false }: { compact?: boolean }) {
         className="inline-flex h-11 items-center justify-center gap-2 bg-slate-950 px-5 text-sm font-semibold text-white transition-colors hover:bg-emerald-700 disabled:cursor-not-allowed disabled:opacity-70"
       >
         {status === 'loading' ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
-        Enviar mensagem
+        {content.label}
       </button>
       {message && (
         <div
