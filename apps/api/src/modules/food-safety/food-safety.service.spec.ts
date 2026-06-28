@@ -66,6 +66,7 @@ function makeService(opts?: {
     foodSafetyProcessStep: {
       findFirst: vi.fn().mockResolvedValue(opts?.step ?? null),
       create: vi.fn().mockImplementation((args: any) => Promise.resolve({ id: 'st1', ...args.data })),
+      createMany: vi.fn().mockImplementation((args: any) => Promise.resolve({ count: args.data.length })),
       update: vi.fn().mockImplementation((args: any) => Promise.resolve({ id: 'st1', ...args.data })),
     },
     foodSafetyRiskMatrix: {
@@ -235,6 +236,54 @@ describe('FoodSafetyService - Fase 1 (programas/processos/etapas)', () => {
     expect(data.id).toBeUndefined();
     expect(data.companyId).toBeUndefined();
     expect(data.name).toBe('Novo nome');
+  });
+
+  it('addStepsBulk: importa um modelo completo sem apagar etapas existentes', async () => {
+    const { service, prisma } = makeService({
+      process: {
+        id: 'pr1',
+        companyId: 'companyA',
+        orgNodeId: null,
+        steps: [{ id: 'st0', number: 3 }],
+      },
+    });
+
+    const result = await service.addStepsBulk(me, 'pr1', {
+      steps: [
+        { name: 'Lavoura', type: 'OTHER', visualModel: 'FARM_FIELD', description: 'Produção primária' },
+        { name: 'Recebimento', type: 'RECEIVING', visualModel: 'RECEIVING_DOCK', isControlPoint: true },
+      ],
+    });
+
+    const rows = prisma.foodSafetyProcessStep.createMany.mock.calls[0][0].data;
+    expect(rows).toHaveLength(2);
+    expect(rows[0]).toMatchObject({ companyId: 'companyA', processId: 'pr1', number: 4, visualModel: 'FARM_FIELD' });
+    expect(rows[1]).toMatchObject({ number: 5, visualModel: 'RECEIVING_DOCK', isControlPoint: true });
+    expect(result.created).toBe(2);
+  });
+
+  it('updateStep: persiste modelo 3D e detalhes operacionais', async () => {
+    const { service, prisma } = makeService({
+      step: {
+        id: 'st1',
+        companyId: 'companyA',
+        process: { id: 'pr1', orgNodeId: null },
+      },
+    });
+
+    await service.updateStep(me, 'st1', {
+      visualModel: 'PASTEURIZER',
+      description: 'Tratamento térmico validado',
+      inputs: 'Produto cru',
+      outputs: 'Produto pasteurizado',
+    });
+
+    expect(prisma.foodSafetyProcessStep.update.mock.calls[0][0].data).toMatchObject({
+      visualModel: 'PASTEURIZER',
+      description: 'Tratamento térmico validado',
+      inputs: 'Produto cru',
+      outputs: 'Produto pasteurizado',
+    });
   });
 
   it('summary: conta processos por status e pontos de controle', async () => {

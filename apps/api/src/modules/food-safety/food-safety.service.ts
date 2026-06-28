@@ -353,6 +353,7 @@ export class FoodSafetyService {
         name: this.requiredText(body?.name, 'Nome da etapa'),
         description: this.nullableText(body?.description) ?? null,
         type: this.parseStepType(body?.type) ?? FoodSafetyStepType.OTHER,
+        visualModel: this.nullableText(body?.visualModel) ?? null,
         inputs: this.nullableText(body?.inputs) ?? null,
         outputs: this.nullableText(body?.outputs) ?? null,
         positionX: this.optionalFloat(body?.positionX) ?? null,
@@ -360,6 +361,39 @@ export class FoodSafetyService {
         isControlPoint: Boolean(body?.isControlPoint),
       },
     });
+  }
+
+  async addStepsBulk(me: AuthPayload, processId: string, body: any) {
+    const proc = await this.loadProcess(me, processId);
+    await this.assertProcessWriteArea(me, proc.orgNodeId, 'edit');
+    const steps = Array.isArray(body?.steps) ? body.steps : [];
+    if (steps.length === 0) throw new BadRequestException('Informe ao menos uma etapa.');
+    if (steps.length > 40) throw new BadRequestException('O limite por importacao e de 40 etapas.');
+
+    const startNumber = proc.steps.length
+      ? Math.max(...proc.steps.map((step) => step.number)) + 1
+      : 1;
+    const rows = steps.map((step: any, index: number) => ({
+      companyId: me.companyId,
+      processId,
+      number: startNumber + index,
+      code: this.nullableText(step?.code) ?? null,
+      name: this.requiredText(step?.name, `Nome da etapa ${index + 1}`),
+      description: this.nullableText(step?.description) ?? null,
+      type: this.parseStepType(step?.type) ?? FoodSafetyStepType.OTHER,
+      visualModel: this.nullableText(step?.visualModel) ?? null,
+      inputs: this.nullableText(step?.inputs) ?? null,
+      outputs: this.nullableText(step?.outputs) ?? null,
+      positionX: this.optionalFloat(step?.positionX) ?? null,
+      positionY: this.optionalFloat(step?.positionY) ?? null,
+      isControlPoint: Boolean(step?.isControlPoint),
+    }));
+
+    await this.prisma.foodSafetyProcessStep.createMany({ data: rows });
+    return {
+      created: rows.length,
+      process: await this.loadProcess(me, processId),
+    };
   }
 
   async updateStep(me: AuthPayload, stepId: string, patch: any) {
@@ -371,6 +405,7 @@ export class FoodSafetyService {
     if ('name' in (patch ?? {})) data.name = this.requiredText(patch.name, 'Nome da etapa');
     if ('description' in (patch ?? {})) data.description = this.nullableText(patch.description);
     if ('type' in (patch ?? {})) data.type = this.parseStepType(patch.type);
+    if ('visualModel' in (patch ?? {})) data.visualModel = this.nullableText(patch.visualModel);
     if ('inputs' in (patch ?? {})) data.inputs = this.nullableText(patch.inputs);
     if ('outputs' in (patch ?? {})) data.outputs = this.nullableText(patch.outputs);
     if ('positionX' in (patch ?? {})) data.positionX = this.optionalFloat(patch.positionX);

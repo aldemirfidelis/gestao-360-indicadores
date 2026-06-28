@@ -43,6 +43,7 @@ import { SupplyChainTab } from '@/components/food-safety/supply-chain-tab';
 import { api } from '@/lib/api';
 import { cn, formatDate, formatNumber } from '@/lib/utils';
 import { LoadingState } from '@/components/platform/loading-state';
+import type { FlowTemplateStep, VisualModelId } from '@/components/seguranca-alimentos/isometric-library';
 
 // React Flow (+CSS) e pesado e so e necessario na aba Fluxograma; carrega sob
 // demanda para nao entrar no bundle inicial da pagina de Seguranca de Alimentos.
@@ -87,6 +88,7 @@ interface Step {
   name: string;
   description: string | null;
   type: StepType;
+  visualModel: string | null;
   inputs: string | null;
   outputs: string | null;
   positionX: number | null;
@@ -406,20 +408,40 @@ export default function SegurancaAlimentosPage() {
     mutationFn: ({
       processId,
       name,
+      description,
       type,
+      visualModel,
       isControlPoint,
     }: {
       processId: string;
       name: string;
+      description?: string;
       type: StepType;
+      visualModel: VisualModelId;
       isControlPoint: boolean;
     }) =>
-      api(`/food-safety/processes/${processId}/steps`, { method: 'POST', json: { name, type, isControlPoint } }),
+      api(`/food-safety/processes/${processId}/steps`, {
+        method: 'POST',
+        json: { name, description: description || null, type, visualModel, isControlPoint },
+      }),
     onSuccess: () => {
       invalidate();
       toast.success('Etapa adicionada com sucesso');
     },
     onError: (e: any) => toast.error(e?.message ?? 'Falha ao adicionar etapa'),
+  });
+
+  const applyTemplateMutation = useMutation({
+    mutationFn: ({ processId, steps }: { processId: string; steps: FlowTemplateStep[] }) =>
+      api<{ created: number }>(`/food-safety/processes/${processId}/steps/bulk`, {
+        method: 'POST',
+        json: { steps },
+      }),
+    onSuccess: ({ created }) => {
+      invalidate();
+      toast.success(`${created} etapas do modelo adicionadas com sucesso`);
+    },
+    onError: (e: any) => toast.error(e?.message ?? 'Falha ao importar o fluxo completo'),
   });
 
   // Mutation para excluir uma etapa
@@ -435,7 +457,22 @@ export default function SegurancaAlimentosPage() {
 
   // Mutation para atualizar campos gerais de uma etapa (Nome, Tipo de modelo, PCC)
   const updateStepMutation = useMutation({
-    mutationFn: ({ stepId, data }: { stepId: string; data: { number?: number; name?: string; type?: string; isControlPoint?: boolean } }) =>
+    mutationFn: ({
+      stepId,
+      data,
+    }: {
+      stepId: string;
+      data: {
+        number?: number;
+        name?: string;
+        description?: string | null;
+        inputs?: string | null;
+        outputs?: string | null;
+        type?: string;
+        visualModel?: string | null;
+        isControlPoint?: boolean;
+      };
+    }) =>
       api(`/food-safety/steps/${stepId}`, { method: 'PATCH', json: data }),
     onSuccess: () => {
       invalidate();
@@ -572,11 +609,12 @@ export default function SegurancaAlimentosPage() {
                 }
                 return (
                   <IsometricFlow
-                    steps={activeProcess.steps as any[]}
+                    steps={activeProcess.steps}
                     canManage={canManage}
                     onStepMove={(stepId, x, y) => moveStepMutation.mutate({ stepId, positionX: x, positionY: y })}
                     onStepsArrange={(positions) => arrangeStepsMutation.mutate(positions)}
                     onStepCreate={(data) => createStepMutation.mutate({ processId: activeProcess.id, ...data })}
+                    onTemplateApply={(steps) => applyTemplateMutation.mutate({ processId: activeProcess.id, steps })}
                     onStepDelete={(stepId) => deleteStepMutation.mutate(stepId)}
                     onStepUpdate={(stepId, data) => updateStepMutation.mutate({ stepId, data })}
                   />

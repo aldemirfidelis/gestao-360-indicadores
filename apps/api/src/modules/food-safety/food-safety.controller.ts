@@ -95,6 +95,12 @@ export class FoodSafetyController {
     return this.service.addStep(me, id, body);
   }
 
+  @Post('processes/:id/steps/bulk')
+  @RequirePermissions('fsms:update')
+  addStepsBulk(@CurrentUser() me: AuthPayload, @Param('id') id: string, @Body() body: any) {
+    return this.service.addStepsBulk(me, id, body);
+  }
+
   @Patch('steps/:stepId')
   @RequirePermissions('fsms:update')
   updateStep(@CurrentUser() me: AuthPayload, @Param('stepId') stepId: string, @Body() body: any) {

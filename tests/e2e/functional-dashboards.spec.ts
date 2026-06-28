@@ -2,7 +2,7 @@ import { expect, test, type Page } from '@playwright/test';
 import { demoCredentials, loginApi, type Session } from './helpers';
 
 test.describe.configure({ mode: 'serial' });
-test.setTimeout(90_000);
+test.setTimeout(180_000);
 
 let session: Session;
 
@@ -65,11 +65,35 @@ test('segurança patrimonial navega da operação para materiais', async ({ page
   expect(errors).toEqual([]);
 });
 
-test('fluxograma de alimentos carrega sem exceção no cliente', async ({ page }) => {
+test('fluxograma de alimentos carrega e importa um ciclo industrial completo', async ({ page }) => {
   const errors = monitorClientErrors(page);
   await open(page, '/seguranca-alimentos?tab=flow');
-  await expect(page.getByText('3D ISOMÉTRICO')).toBeVisible();
+  await expect(page.getByText('3D ISOMÉTRICO')).toBeVisible({ timeout: 60_000 });
   await expect(page.locator('canvas')).toBeVisible();
+  await expect(page.getByText('8 etapas', { exact: true })).toBeVisible();
+  const stepLabels = page.getByTestId('flow-step-label');
+  await expect(stepLabels).toHaveCount(8);
+  const labelSizes = await stepLabels.evaluateAll((labels) =>
+    labels.map((label) => ({ width: label.getBoundingClientRect().width, height: label.getBoundingClientRect().height })),
+  );
+  expect(labelSizes).toHaveLength(8);
+  expect(labelSizes.every(({ width, height }) => width < 240 && height < 100)).toBe(true);
+  await stepLabels.first().click();
+  await expect(page.getByText('Editar etapa', { exact: true })).toBeVisible();
+  await expect(page.getByText('Modelo 3D detalhado', { exact: true })).toBeVisible();
+  await page.getByRole('button', { name: 'Fechar edição' }).click();
+  let importedSteps: any[] = [];
+  await page.route('**/api/food-safety/processes/process-e2e/steps/bulk', async (route) => {
+    importedSteps = route.request().postDataJSON().steps;
+    await route.fulfill({ json: { created: importedSteps.length } });
+  });
+  await page.getByRole('button', { name: 'Biblioteca de fluxos' }).click();
+  await expect(page.getByRole('heading', { name: 'Biblioteca de fluxos industriais' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Do campo ao varejo' })).toBeVisible();
+  await page.getByRole('button', { name: /Adicionar 15 etapas/ }).click();
+  await expect.poll(() => importedSteps.length).toBe(15);
+  expect(importedSteps[0]).toMatchObject({ name: 'Planejamento da lavoura', visualModel: 'FARM_FIELD' });
+  expect(importedSteps.some((step) => step.isControlPoint)).toBe(true);
   expect(errors).toEqual([]);
 });
 
@@ -185,19 +209,25 @@ async function open(page: Page, path: string) {
           ownerUserId: null,
           orgNode: null,
           owner: null,
-          steps: [{
-            id: 'step-e2e',
-            number: 1,
-            code: 'STEP-E2E',
-            name: 'Recepção',
+          steps: [
+            { id: 'step-1', number: 1, name: 'Lavoura', type: 'OTHER', visualModel: 'FARM_FIELD' },
+            { id: 'step-2', number: 2, name: 'Colheita', type: 'TRANSPORT', visualModel: 'HARVESTER' },
+            { id: 'step-3', number: 3, name: 'Recebimento', type: 'RECEIVING', visualModel: 'RECEIVING_DOCK' },
+            { id: 'step-4', number: 4, name: 'Lavagem', type: 'PROCESSING', visualModel: 'WASHING_LINE' },
+            { id: 'step-5', number: 5, name: 'Pasteurização', type: 'PROCESSING', visualModel: 'PASTEURIZER', isControlPoint: true },
+            { id: 'step-6', number: 6, name: 'Embalagem', type: 'PACKAGING', visualModel: 'PACKAGING_LINE' },
+            { id: 'step-7', number: 7, name: 'Transporte', type: 'TRANSPORT', visualModel: 'TRUCK' },
+            { id: 'step-8', number: 8, name: 'Varejo', type: 'DISTRIBUTION', visualModel: 'RETAIL_STORE' },
+          ].map((step) => ({
+            code: null,
             description: null,
-            type: 'RECEIVING',
             inputs: null,
             outputs: null,
-            positionX: 0,
-            positionY: 0,
+            positionX: null,
+            positionY: null,
             isControlPoint: false,
-          }],
+            ...step,
+          })),
         }],
       }),
     );

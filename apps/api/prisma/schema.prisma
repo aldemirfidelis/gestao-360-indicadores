@@ -8077,6 +8077,7 @@ model FoodSafetyProcessStep {
   name           String
   description    String?
   type           FoodSafetyStepType @default(OTHER)
+  visualModel    String?
   inputs         String?
   outputs        String?
   positionX      Float?
