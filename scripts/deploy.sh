@@ -28,8 +28,12 @@ git pull --ff-only
 echo "Commit em deploy: $(git rev-parse --short HEAD) - $(git log -1 --pretty=%s)"
 
 # Versão exibida no login: SemVer do pacote + commit exato implantado.
-# Como todo deploy parte de um commit, qualquer alteração publicada gera outra versão.
-PACKAGE_VERSION="$(node -p "require('./apps/web/package.json').version")"
+# O host da droplet não precisa ter Node instalado; o build Node roda no Docker.
+PACKAGE_VERSION="$(sed -n 's/^[[:space:]]*"version"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/p' apps/web/package.json | head -n 1)"
+if [ -z "$PACKAGE_VERSION" ]; then
+  echo "Erro: nao foi possivel ler a versao de apps/web/package.json."
+  exit 1
+fi
 export APP_VERSION="${PACKAGE_VERSION}+$(git rev-parse --short=8 HEAD)"
 echo "Versao da aplicacao: ${APP_VERSION}"
 
