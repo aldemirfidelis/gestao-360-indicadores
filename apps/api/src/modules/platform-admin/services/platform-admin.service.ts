@@ -6,6 +6,8 @@ import { PlatformAdminIdentity } from '../platform-admin.types';
 import { PLATFORM_MODULES, PLATFORM_PLANS } from '../platform-admin.catalog';
 import { alwaysOnModuleCodes, BUSINESS_MODULES, businessModuleMembers } from '../../portal-admin/business-modules';
 import { prepareTenantFields } from '../../../common/tenant-fields';
+import { resolveSmtpConfig, buildTransport, smtpFrom } from '../../../common/smtp';
+
 
 const ACTIVE_MODULE_STATUSES = ['ATIVO', 'ACTIVE', 'HERDADO_DO_PLANO', 'EM_IMPLANTACAO', 'EM_TESTE', 'EXPERIMENTAL'];
 const BLOCKED_MODULE_STATUSES = ['BLOQUEADO', 'SUSPENSO', 'BLOCKED', 'SUSPENDED'];
@@ -912,6 +914,217 @@ export class PlatformAdminService {
       justification: stringOrNull(input.message),
     });
     return window;
+  }
+
+  // ---- Caixa de Entrada (Inbox) ----
+
+  async listInboxContacts(filters: { q?: string; read?: boolean }) {
+    const where: Prisma.PublicContactMessageWhereInput = {};
+    if (filters.read !== undefined) {
+      where.read = filters.read;
+    }
+    if (filters.q) {
+      where.OR = [
+        { name: { contains: filters.q, mode: 'insensitive' } },
+        { company: { contains: filters.q, mode: 'insensitive' } },
+        { email: { contains: filters.q, mode: 'insensitive' } },
+        { message: { contains: filters.q, mode: 'insensitive' } },
+      ];
+    }
+    return this.prisma.publicContactMessage.findMany({
+      where,
+      orderBy: { createdAt: 'desc' },
+    });
+  }
+
+  async setInboxContactRead(user: PlatformAdminIdentity, id: string, read: boolean) {
+    const contact = await this.prisma.publicContactMessage.findUnique({ where: { id } });
+    if (!contact) throw new NotFoundException('Contato não encontrado.');
+
+    const updated = await this.prisma.publicContactMessage.update({
+      where: { id },
+      data: { read },
+    });
+
+    await this.audit.record({
+      user,
+      action: read ? 'CONTACT_MARK_READ' : 'CONTACT_MARK_UNREAD',
+      permissionKey: 'platform.dashboard.view',
+      targetType: 'PublicContactMessage',
+      targetId: id,
+      targetLabel: contact.email,
+      afterValue: updated,
+    });
+
+    return updated;
+  }
+
+  async deleteInboxContact(user: PlatformAdminIdentity, id: string) {
+    const contact = await this.prisma.publicContactMessage.findUnique({ where: { id } });
+    if (!contact) throw new NotFoundException('Contato não encontrado.');
+
+    await this.prisma.publicContactMessage.delete({ where: { id } });
+
+    await this.audit.record({
+      user,
+      action: 'CONTACT_DELETE',
+      permissionKey: 'platform.dashboard.view',
+      targetType: 'PublicContactMessage',
+      targetId: id,
+      targetLabel: contact.email,
+    });
+
+    return { ok: true };
+  }
+
+  async listInboxSupportTickets(filters: { q?: string; status?: string; priority?: string; companyId?: string }) {
+    const where: Prisma.SupportTicketWhereInput = {};
+    if (filters.status) {
+      where.status = filters.status;
+    }
+    if (filters.priority) {
+      where.priority = filters.priority;
+    }
+    if (filters.companyId) {
+      where.companyId = filters.companyId;
+    }
+    if (filters.q) {
+      where.OR = [
+        { title: { contains: filters.q, mode: 'insensitive' } },
+        { description: { contains: filters.q, mode: 'insensitive' } },
+        { requesterName: { contains: filters.q, mode: 'insensitive' } },
+        { requesterEmail: { contains: filters.q, mode: 'insensitive' } },
+      ];
+    }
+    return this.prisma.supportTicket.findMany({
+      where,
+      include: {
+        company: { select: { id: true, name: true } },
+        user: { select: { id: true, name: true, email: true, avatarUrl: true } },
+        assignedToUser: { select: { id: true, name: true } },
+      },
+      orderBy: { createdAt: 'desc' },
+    });
+  }
+
+  async getInboxSupportTicketById(id: string) {
+    const ticket = await this.prisma.supportTicket.findUnique({
+      where: { id },
+      include: {
+        company: { select: { id: true, name: true } },
+        user: { select: { id: true, name: true, email: true, avatarUrl: true } },
+        assignedToUser: { select: { id: true, name: true } },
+        attachments: true,
+        messages: {
+          include: {
+            user: { select: { id: true, name: true, email: true, avatarUrl: true } },
+          },
+          orderBy: { createdAt: 'asc' },
+        },
+      },
+    });
+    if (!ticket) throw new NotFoundException('Chamado não encontrado.');
+    return ticket;
+  }
+
+  async addInboxSupportTicketMessage(user: PlatformAdminIdentity, id: string, body: { message: string; isInternal?: boolean }) {
+    const ticket = await this.prisma.supportTicket.findUnique({ where: { id } });
+    if (!ticket) throw new NotFoundException('Chamado não encontrado.');
+
+    const msg = await this.prisma.supportTicketMessage.create({
+      data: {
+        ticketId: id,
+        userId: user.sub,
+        message: body.message,
+        isInternal: body.isInternal ?? false,
+      },
+      include: {
+        user: { select: { id: true, name: true, email: true, avatarUrl: true } },
+      },
+    });
+
+    try {
+      const smtp = await resolveSmtpConfig(this.prisma);
+      if (smtp?.host) {
+        const from = smtpFrom(smtp);
+        const recipient = ticket.requesterEmail;
+        const subject = `[Chamado #${ticket.id.substring(0, 8)}] Nova resposta de suporte`;
+        const portalUrl = process.env.NEXT_PUBLIC_SITE_URL || 'https://gestao360.org';
+        const ticketLink = `${portalUrl}/central-atendimento/detalhes/${ticket.id}`;
+        const emailBody = `
+Olá, ${ticket.requesterName}.
+
+O suporte do Gestão 360 respondeu ao seu chamado:
+
+---------------------------------------------------------
+RESPOSTA:
+${body.message}
+---------------------------------------------------------
+
+Você pode interagir e ver a resposta completa no link abaixo:
+${ticketLink}
+
+Atenciosamente,
+Equipe Gestão 360
+        `.trim();
+
+        const transporter = buildTransport(smtp);
+        await transporter.sendMail({
+          from,
+          to: recipient,
+          subject,
+          text: emailBody,
+          html: emailBody.replace(/\n/g, '<br />'),
+        });
+      }
+    } catch (err: any) {
+      console.error(`Erro ao notificar resposta de chamado para ${ticket.requesterEmail}:`, err?.message);
+    }
+
+    return msg;
+  }
+
+  async updateInboxSupportTicket(user: PlatformAdminIdentity, id: string, body: { status?: string; priority?: string; assignedToUserId?: string }) {
+    const ticket = await this.prisma.supportTicket.findUnique({ where: { id } });
+    if (!ticket) throw new NotFoundException('Chamado não encontrado.');
+
+    const updateData: any = {};
+    if (body.status) {
+      updateData.status = body.status;
+      if (body.status === 'Resolvido' || body.status === 'Encerrado' || body.status === 'Cancelado') {
+        updateData.closedAt = new Date();
+      } else {
+        updateData.closedAt = null;
+      }
+    }
+    if (body.priority) {
+      updateData.priority = body.priority;
+    }
+    if (body.assignedToUserId !== undefined) {
+      updateData.assignedToUserId = body.assignedToUserId;
+    }
+
+    const updated = await this.prisma.supportTicket.update({
+      where: { id },
+      data: updateData,
+      include: {
+        company: { select: { id: true, name: true } },
+        user: { select: { id: true, name: true, email: true, avatarUrl: true } },
+        assignedToUser: { select: { id: true, name: true } },
+      },
+    });
+
+    await this.audit.record({
+      user,
+      action: 'TICKET_UPDATE',
+      permissionKey: 'platform.dashboard.view',
+      targetType: 'SupportTicket',
+      targetId: id,
+      targetLabel: updated.title,
+      afterValue: updated,
+    });
+
+    return updated;
   }
 
   private async decorateCompanies(companies: Array<Prisma.CompanyGetPayload<object>>) {

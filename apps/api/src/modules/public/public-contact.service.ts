@@ -41,19 +41,47 @@ export class PublicContactService {
     // Bots recebem uma resposta neutra, sem disparar e-mail nem revelar a proteção.
     if (clean(input.website)) return { ok: true };
 
-    const smtp = await resolveSmtpConfig(this.prisma);
-    if (!smtp?.host) {
-      this.logger.warn('Formulário público recebido sem SMTP configurado.');
-      throw new ServiceUnavailableException('Canal de e-mail indisponível.');
-    }
-
-    const destination = publicContactDestination(input.requestType);
     const name = clean(input.name);
     const company = clean(input.company);
     const role = clean(input.role);
     const email = clean(input.email).toLowerCase();
     const phone = clean(input.phone);
     const message = clean(input.message);
+
+    // 1. Salvar no banco de dados primeiro
+    try {
+      await this.prisma.publicContactMessage.create({
+        data: {
+          name,
+          company,
+          role: role || null,
+          email,
+          phone: phone || null,
+          requestType: input.requestType,
+          message,
+        },
+      });
+      this.logger.log(`Mensagem de contato de ${email} persistida com sucesso.`);
+    } catch (dbError) {
+      this.logger.error(
+        {
+          event: 'public_contact_db_save_failed',
+          email,
+          error: dbError instanceof Error ? dbError.message : 'unknown',
+        },
+        'Falha ao persistir mensagem de contato no banco de dados.',
+      );
+      throw new ServiceUnavailableException('Não foi possível registrar a mensagem.');
+    }
+
+    // 2. Enviar por e-mail (caso configurado)
+    const smtp = await resolveSmtpConfig(this.prisma);
+    if (!smtp?.host) {
+      this.logger.warn('Formulário público recebido sem SMTP configurado. Mensagem salva apenas em banco.');
+      return { ok: true };
+    }
+
+    const destination = publicContactDestination(input.requestType);
     const subject = `[Gestão 360] ${input.requestType} — ${company}`;
     const details = [
       `Nome: ${name}`,
@@ -94,7 +122,6 @@ export class PublicContactService {
         requestType: input.requestType,
         destination,
       });
-      return { ok: true };
     } catch (error) {
       this.logger.error(
         {
@@ -103,9 +130,10 @@ export class PublicContactService {
           destination,
           error: error instanceof Error ? error.message : 'unknown',
         },
-        'Falha ao enviar formulário público por e-mail.',
+        'Falha ao enviar formulário público por e-mail. A mensagem foi salva no banco.',
       );
-      throw new ServiceUnavailableException('Não foi possível enviar a mensagem.');
     }
+
+    return { ok: true };
   }
 }

@@ -418,4 +418,71 @@ export class PlatformAdminController {
   createMaintenance(@CurrentPlatformAdmin() user: PlatformAdminIdentity, @Body() body: Record<string, unknown>) {
     return this.service.createMaintenance(user, body);
   }
+
+  // ---- Caixa de Entrada (Inbox: Contatos e Suporte) ----
+
+  @Get('inbox/contacts')
+  @PlatformAdminRequired('platform.dashboard.view')
+  getInboxContacts(
+    @Query('q') q?: string,
+    @Query('read') read?: string,
+  ) {
+    return this.service.listInboxContacts({ q, read: read !== undefined ? read === 'true' : undefined });
+  }
+
+  @Patch('inbox/contacts/:id/read')
+  @PlatformAdminRequired('platform.dashboard.view')
+  setInboxContactRead(
+    @CurrentPlatformAdmin() user: PlatformAdminIdentity,
+    @Param('id') id: string,
+    @Body() body: { read: boolean },
+  ) {
+    return this.service.setInboxContactRead(user, id, body.read);
+  }
+
+  @Delete('inbox/contacts/:id')
+  @PlatformAdminRequired('platform.dashboard.view')
+  deleteInboxContact(
+    @CurrentPlatformAdmin() user: PlatformAdminIdentity,
+    @Param('id') id: string,
+  ) {
+    return this.service.deleteInboxContact(user, id);
+  }
+
+  @Get('inbox/support-tickets')
+  @PlatformAdminRequired('platform.dashboard.view')
+  getInboxSupportTickets(
+    @Query('q') q?: string,
+    @Query('status') status?: string,
+    @Query('priority') priority?: string,
+    @Query('companyId') companyId?: string,
+  ) {
+    return this.service.listInboxSupportTickets({ q, status, priority, companyId });
+  }
+
+  @Get('inbox/support-tickets/:id')
+  @PlatformAdminRequired('platform.dashboard.view')
+  getInboxSupportTicketById(@Param('id') id: string) {
+    return this.service.getInboxSupportTicketById(id);
+  }
+
+  @Post('inbox/support-tickets/:id/messages')
+  @PlatformAdminRequired('platform.dashboard.view')
+  addInboxSupportTicketMessage(
+    @CurrentPlatformAdmin() user: PlatformAdminIdentity,
+    @Param('id') id: string,
+    @Body() body: { message: string; isInternal?: boolean },
+  ) {
+    return this.service.addInboxSupportTicketMessage(user, id, body);
+  }
+
+  @Patch('inbox/support-tickets/:id')
+  @PlatformAdminRequired('platform.dashboard.view')
+  updateInboxSupportTicket(
+    @CurrentPlatformAdmin() user: PlatformAdminIdentity,
+    @Param('id') id: string,
+    @Body() body: { status?: string; priority?: string; assignedToUserId?: string },
+  ) {
+    return this.service.updateInboxSupportTicket(user, id, body);
+  }
 }

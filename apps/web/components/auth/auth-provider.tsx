@@ -5,6 +5,8 @@ import { useRouter, usePathname } from 'next/navigation';
 import { useQueryClient } from '@tanstack/react-query';
 import { api, clearTokens, getAccessToken, setTokens } from '@/lib/api';
 import { SUPER_ADMIN_ONLY_PERMISSION } from '@/components/shell/navigation';
+import { publicRoutes } from '@/lib/public-site';
+
 
 export interface AuthUser {
   id: string;
@@ -61,7 +63,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const token = getAccessToken();
     if (!token) {
       setLoading(false);
-      if (!PUBLIC_PATHS.includes(pathname) && !PUBLIC_PREFIXES.some((prefix) => pathname.startsWith(prefix))) {
+      const isPublicPath = publicRoutes.some((route) => {
+        if (route === '/') return pathname === '/';
+        return pathname === route || pathname.startsWith(`${route}/`);
+      });
+      if (!isPublicPath && !PUBLIC_PREFIXES.some((prefix) => pathname.startsWith(prefix))) {
         router.replace('/login');
       }
       return;

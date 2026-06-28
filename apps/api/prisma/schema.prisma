@@ -11425,3 +11425,20 @@ model SupportTicketAttachment {
   @@index([messageId])
   @@index([uploadedByUserId])
 }
+
+model PublicContactMessage {
+  id          String   @id @default(uuid())
+  name        String
+  company     String
+  role        String?
+  email       String
+  phone       String?
+  requestType String
+  message     String
+  read        Boolean  @default(false)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([createdAt])
+  @@index([read])
+}

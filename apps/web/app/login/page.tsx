@@ -22,6 +22,10 @@ type Form = z.infer<typeof schema>;
 
 export default function LoginPage() {
   const { login } = useAuth();
+  const rawVersion = process.env.NEXT_PUBLIC_APP_VERSION ?? '0.1.0+dev';
+  const [semver, commitHash] = rawVersion.split('+');
+  const displayVersion = `v${semver}`;
+  const versionTooltip = commitHash ? `Versão completa: ${semver}+${commitHash}` : `Versão: ${semver}`;
   const [busy, setBusy] = useState(false);
   const [demoMode, setDemoMode] = useState(false);
   const [tenant, setTenant] = useState<TenantBranding | null>(null);
@@ -195,8 +199,8 @@ export default function LoginPage() {
               <BrandLogo variant="horizontal" theme="dark" size="sm" animated={true} />
             )}
           </div>
-          <div className="text-xs text-slate-500 sm:text-center" aria-label="Versão da aplicação">
-            Versão {process.env.NEXT_PUBLIC_APP_VERSION ?? '0.1.0+dev'}
+          <div className="text-xs text-slate-500 sm:text-center select-none cursor-help hover:text-slate-300 transition-colors" title={versionTooltip} aria-label="Versão da aplicação">
+            Versão {displayVersion}
           </div>
           <nav aria-label="Documentos legais" className="flex flex-wrap justify-center gap-x-3 gap-y-1 text-xs sm:justify-end">
             <a href="/termos-de-uso" className="text-slate-400 hover:text-cyan-300">Termos</a>

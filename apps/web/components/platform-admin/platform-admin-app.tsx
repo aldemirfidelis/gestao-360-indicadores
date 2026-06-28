@@ -15,6 +15,7 @@ import {
   Eye,
   Flag,
   Globe2,
+  Inbox,
   LayoutDashboard,
   ListChecks,
   LogOut,
@@ -92,7 +93,8 @@ type SectionKey =
   | 'users'
   | 'security'
   | 'technical'
-  | 'audit';
+  | 'audit'
+  | 'inbox';
 
 type DatabaseAdminTab =
   | 'overview'
@@ -230,6 +232,7 @@ const SECTIONS: SectionItem[] = [
   { key: 'modules', label: 'Matriz de Módulos', icon: PackageCheck, group: 'Plataforma' },
   { key: 'plans', label: 'Planos', icon: ListChecks, group: 'Plataforma' },
   { key: 'seoPresence', label: 'SEO e Presenca Digital', icon: Globe2, group: 'Plataforma' },
+  { key: 'inbox', label: 'Caixa de Entrada', icon: Inbox, group: 'Plataforma' },
   { key: 'users', label: 'Usuários', icon: Users, group: 'Plataforma' },
   { key: 'security', label: 'Seguranca e Suporte', icon: ShieldCheck, group: 'Plataforma' },
   // Operam sobre a empresa selecionada no seletor do topo.
@@ -697,6 +700,7 @@ export function PlatformAdminApp() {
           {section === 'modules' && <ModulesSection />}
           {section === 'plans' && <PlansSection />}
           {section === 'seoPresence' && <SeoPresenceSection />}
+          {section === 'inbox' && <InboxSection />}
           {section === 'users' && <UsersManagementSection />}
           {section === 'security' && <SecuritySection />}
           {section === 'technical' && <TechnicalSection />}
@@ -2237,6 +2241,434 @@ function EmailSection() {
           </Button>
         </div>
       </Panel>
+    </div>
+  );
+}
+
+function InboxSection() {
+  const [tab, setTab] = useState<'contacts' | 'support'>('contacts');
+  const queryClient = useQueryClient();
+
+  // --- Contatos ---
+  const [contactSearch, setContactSearch] = useState('');
+  const [contactFilter, setContactFilter] = useState<'all' | 'unread' | 'read'>('all');
+  const [selectedContact, setSelectedContact] = useState<any | null>(null);
+
+  const contactsQuery = useQuery({
+    queryKey: ['platform-admin', 'inbox', 'contacts', contactSearch, contactFilter],
+    queryFn: () => {
+      let url = `/platform-admin/inbox/contacts?q=${encodeURIComponent(contactSearch)}`;
+      if (contactFilter === 'unread') url += '&read=false';
+      if (contactFilter === 'read') url += '&read=true';
+      return platformAdminApi<any[]>(url);
+    },
+  });
+
+  const markContactRead = useMutation({
+    mutationFn: ({ id, read }: { id: string; read: boolean }) =>
+      platformAdminApi(`/platform-admin/inbox/contacts/${id}/read`, { method: 'PATCH', json: { read } }),
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: ['platform-admin', 'inbox', 'contacts'] });
+      setSelectedContact((prev: any) => prev ? { ...prev, read: !prev.read } : null);
+      toast.success('Status da mensagem atualizado');
+    },
+    onError: (err) => toast.error(err instanceof Error ? err.message : 'Erro ao atualizar contato'),
+  });
+
+  const deleteContact = useMutation({
+    mutationFn: (id: string) =>
+      platformAdminApi(`/platform-admin/inbox/contacts/${id}`, { method: 'DELETE' }),
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: ['platform-admin', 'inbox', 'contacts'] });
+      setSelectedContact(null);
+      toast.success('Mensagem excluída com sucesso');
+    },
+    onError: (err) => toast.error(err instanceof Error ? err.message : 'Erro ao excluir contato'),
+  });
+
+  // --- Suporte ---
+  const [ticketSearch, setTicketSearch] = useState('');
+  const [ticketStatusFilter, setTicketStatusFilter] = useState('all');
+  const [selectedTicketId, setSelectedTicketId] = useState<string | null>(null);
+  const [replyText, setReplyText] = useState('');
+  const [isInternal, setIsInternal] = useState(false);
+
+  const ticketsQuery = useQuery({
+    queryKey: ['platform-admin', 'inbox', 'tickets', ticketSearch, ticketStatusFilter],
+    queryFn: () => {
+      let url = `/platform-admin/inbox/support-tickets?q=${encodeURIComponent(ticketSearch)}`;
+      if (ticketStatusFilter !== 'all') url += `&status=${encodeURIComponent(ticketStatusFilter)}`;
+      return platformAdminApi<any[]>(url);
+    },
+  });
+
+  const ticketDetailsQuery = useQuery({
+    queryKey: ['platform-admin', 'inbox', 'tickets', selectedTicketId],
+    queryFn: () => platformAdminApi<any>(`/platform-admin/inbox/support-tickets/${selectedTicketId}`),
+    enabled: Boolean(selectedTicketId),
+  });
+
+  const sendReply = useMutation({
+    mutationFn: ({ id, message, isInternal }: { id: string; message: string; isInternal: boolean }) =>
+      platformAdminApi(`/platform-admin/inbox/support-tickets/${id}/messages`, {
+        method: 'POST',
+        json: { message, isInternal },
+      }),
+    onSuccess: () => {
+      setReplyText('');
+      void queryClient.invalidateQueries({ queryKey: ['platform-admin', 'inbox', 'tickets', selectedTicketId] });
+      toast.success('Resposta enviada com sucesso');
+    },
+    onError: (err) => toast.error(err instanceof Error ? err.message : 'Erro ao enviar resposta'),
+  });
+
+  const updateTicketStatus = useMutation({
+    mutationFn: ({ id, status }: { id: string; status: string }) =>
+      platformAdminApi(`/platform-admin/inbox/support-tickets/${id}`, {
+        method: 'PATCH',
+        json: { status },
+      }),
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: ['platform-admin', 'inbox', 'tickets'] });
+      void queryClient.invalidateQueries({ queryKey: ['platform-admin', 'inbox', 'tickets', selectedTicketId] });
+      toast.success('Status do chamado atualizado');
+    },
+    onError: (err) => toast.error(err instanceof Error ? err.message : 'Erro ao atualizar status'),
+  });
+
+  return (
+    <div className="space-y-6">
+      <div className="flex flex-col justify-between gap-4 border-b pb-4 sm:flex-row sm:items-center">
+        <div>
+          <h1 className="text-xl font-bold tracking-tight">Caixa de Entrada</h1>
+          <p className="text-sm text-muted-foreground">Gerencie contatos do site institucional e chamados de suporte técnico global.</p>
+        </div>
+
+        <div className="flex gap-1 rounded-lg bg-slate-100 p-1 dark:bg-slate-900">
+          <button
+            onClick={() => setTab('contacts')}
+            className={cn(
+              "px-3 py-1.5 text-xs font-semibold rounded-md transition-all",
+              tab === 'contacts' ? "bg-white text-slate-900 shadow-sm dark:bg-slate-800 dark:text-white" : "text-slate-500 hover:text-slate-900 dark:hover:text-white"
+            )}
+          >
+            Contatos do Site
+          </button>
+          <button
+            onClick={() => setTab('support')}
+            className={cn(
+              "px-3 py-1.5 text-xs font-semibold rounded-md transition-all",
+              tab === 'support' ? "bg-white text-slate-900 shadow-sm dark:bg-slate-800 dark:text-white" : "text-slate-500 hover:text-slate-900 dark:hover:text-white"
+            )}
+          >
+            Suporte Técnico
+          </button>
+        </div>
+      </div>
+
+      {tab === 'contacts' ? (
+        <div className="grid gap-6 lg:grid-cols-[1.5fr,1fr]">
+          <Panel title="Mensagens de Visitantes" description="Formulários de contato, SAC, comercial e LGPD preenchidos no site.">
+            <div className="mb-4 flex flex-col gap-2 sm:flex-row sm:items-center justify-between">
+              <div className="relative flex-1 mr-2">
+                <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
+                <Input
+                  className="pl-8 h-9"
+                  placeholder="Pesquisar mensagens..."
+                  value={contactSearch}
+                  onChange={(e) => setContactSearch(e.target.value)}
+                />
+              </div>
+              <div className="flex items-center gap-2">
+                <NativeSelect
+                  className="h-9 text-xs"
+                  value={contactFilter}
+                  onChange={(e: any) => setContactFilter(e.target.value)}
+                >
+                  <option value="all">Todas as mensagens</option>
+                  <option value="unread">Não lidas</option>
+                  <option value="read">Lidas</option>
+                </NativeSelect>
+              </div>
+            </div>
+
+            <div className="divide-y max-h-[500px] overflow-y-auto pr-1">
+              {contactsQuery.isLoading && <div className="py-6 text-center text-xs text-muted-foreground">Carregando mensagens...</div>}
+              {contactsQuery.data?.map((contact) => (
+                <div
+                  key={contact.id}
+                  onClick={() => {
+                    setSelectedContact(contact);
+                    if (!contact.read) {
+                      markContactRead.mutate({ id: contact.id, read: true });
+                    }
+                  }}
+                  className={cn(
+                    "flex flex-col gap-1 p-3 cursor-pointer hover:bg-slate-50 dark:hover:bg-slate-900 transition-colors border-l-2",
+                    contact.read ? "border-l-transparent opacity-75" : "border-l-cyan-500 bg-cyan-50/10"
+                  )}
+                >
+                  <div className="flex justify-between items-start">
+                    <span className="font-semibold text-sm">{contact.name}</span>
+                    <span className="text-xs text-muted-foreground">{new Date(contact.createdAt).toLocaleDateString('pt-BR')}</span>
+                  </div>
+                  <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                    <span>{contact.company}</span>
+                    <span>•</span>
+                    <span className="bg-slate-100 dark:bg-slate-800 px-1.5 py-0.5 rounded font-mono text-[10px]">{contact.requestType}</span>
+                  </div>
+                  <p className="text-xs line-clamp-2 text-slate-600 dark:text-slate-300 mt-1">{contact.message}</p>
+                </div>
+              ))}
+              {(contactsQuery.data ?? []).length === 0 && !contactsQuery.isLoading && (
+                <EmptyState title="Nenhuma mensagem recebida" />
+              )}
+            </div>
+          </Panel>
+
+          <div>
+            {selectedContact ? (
+              <Panel title="Detalhes do Contato" description="Informações completas do remetente e mensagem.">
+                <div className="space-y-4 text-sm">
+                  <div className="grid grid-cols-2 gap-2 border-b pb-3">
+                    <div>
+                      <Label className="text-xs text-muted-foreground">Remetente</Label>
+                      <div className="font-semibold">{selectedContact.name}</div>
+                      <div className="text-xs text-muted-foreground">{selectedContact.role || 'Sem cargo'}</div>
+                    </div>
+                    <div>
+                      <Label className="text-xs text-muted-foreground">Empresa</Label>
+                      <div className="font-semibold">{selectedContact.company}</div>
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-2 border-b pb-3">
+                    <div>
+                      <Label className="text-xs text-muted-foreground">E-mail</Label>
+                      <div>
+                        <a href={`mailto:${selectedContact.email}`} className="text-cyan-500 hover:underline">{selectedContact.email}</a>
+                      </div>
+                    </div>
+                    <div>
+                      <Label className="text-xs text-muted-foreground">Telefone</Label>
+                      <div>{selectedContact.phone || 'Não informado'}</div>
+                    </div>
+                  </div>
+
+                  <div className="border-b pb-3">
+                    <Label className="text-xs text-muted-foreground">Assunto / Tipo</Label>
+                    <div className="mt-1">
+                      <span className="bg-cyan-500/10 text-cyan-600 dark:text-cyan-400 px-2 py-0.5 rounded font-semibold text-xs">{selectedContact.requestType}</span>
+                    </div>
+                  </div>
+
+                  <div>
+                    <Label className="text-xs text-muted-foreground">Mensagem</Label>
+                    <p className="mt-2 rounded-lg bg-slate-50 p-3 text-xs leading-relaxed dark:bg-slate-900 border border-slate-200/60 dark:border-slate-800 font-sans whitespace-pre-wrap">
+                      {selectedContact.message}
+                    </p>
+                  </div>
+
+                  <div className="flex gap-2 justify-end pt-2">
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      onClick={() => markContactRead.mutate({ id: selectedContact.id, read: !selectedContact.read })}
+                    >
+                      {selectedContact.read ? 'Marcar como não lida' : 'Marcar como lida'}
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      className="text-red-500 hover:text-red-600"
+                      onClick={() => {
+                        if (confirm('Tem certeza que deseja excluir esta mensagem de contato?')) {
+                          deleteContact.mutate(selectedContact.id);
+                        }
+                      }}
+                    >
+                      Excluir
+                    </Button>
+                  </div>
+                </div>
+              </Panel>
+            ) : (
+              <div className="flex h-[200px] items-center justify-center rounded-xl border border-dashed text-sm text-muted-foreground dark:border-slate-850">
+                Selecione uma mensagem para ler os detalhes.
+              </div>
+            )}
+          </div>
+        </div>
+      ) : (
+        <div className="grid gap-6 lg:grid-cols-[1.2fr,1.8fr]">
+          <Panel title="Lista de Chamados" description="Todos os chamados de suporte abertos nas empresas.">
+            <div className="mb-4 flex flex-col gap-2 sm:flex-row sm:items-center justify-between">
+              <div className="relative flex-1 mr-2">
+                <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
+                <Input
+                  className="pl-8 h-9"
+                  placeholder="Pesquisar chamados..."
+                  value={ticketSearch}
+                  onChange={(e) => setTicketSearch(e.target.value)}
+                />
+              </div>
+              <div>
+                <NativeSelect
+                  className="h-9 text-xs"
+                  value={ticketStatusFilter}
+                  onChange={(e: any) => setTicketStatusFilter(e.target.value)}
+                >
+                  <option value="all">Todos os status</option>
+                  <option value="Aberto">Aberto</option>
+                  <option value="Em Atendimento">Em Atendimento</option>
+                  <option value="Resolvido">Resolvido</option>
+                  <option value="Cancelado">Cancelado</option>
+                </NativeSelect>
+              </div>
+            </div>
+
+            <div className="divide-y max-h-[500px] overflow-y-auto pr-1">
+              {ticketsQuery.isLoading && <div className="py-6 text-center text-xs text-muted-foreground">Carregando chamados...</div>}
+              {ticketsQuery.data?.map((ticket) => (
+                <div
+                  key={ticket.id}
+                  onClick={() => setSelectedTicketId(ticket.id)}
+                  className={cn(
+                    "flex flex-col gap-1.5 p-3 cursor-pointer hover:bg-slate-50 dark:hover:bg-slate-900 transition-colors border-l-2",
+                    selectedTicketId === ticket.id ? "border-l-cyan-500 bg-cyan-50/10" : "border-l-transparent"
+                  )}
+                >
+                  <div className="flex justify-between items-start">
+                    <span className="font-semibold text-sm line-clamp-1">{ticket.title}</span>
+                    <span className="text-xs text-muted-foreground shrink-0 ml-2">{new Date(ticket.createdAt).toLocaleDateString('pt-BR')}</span>
+                  </div>
+                  <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-muted-foreground">
+                    <span className="font-semibold text-slate-700 dark:text-slate-300">{ticket.company?.name}</span>
+                    <span>•</span>
+                    <span>{ticket.requesterName}</span>
+                  </div>
+                  <div className="flex items-center gap-2 mt-1">
+                    <span className={cn(
+                      "px-1.5 py-0.5 rounded text-[10px] font-bold uppercase tracking-wide",
+                      ticket.status === 'Aberto' ? "bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-400" :
+                      ticket.status === 'Em Atendimento' ? "bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-400" :
+                      ticket.status === 'Resolvido' ? "bg-emerald-100 text-emerald-800 dark:bg-emerald-900/30 dark:text-emerald-400" :
+                      "bg-slate-100 text-slate-800 dark:bg-slate-900 dark:text-slate-400"
+                    )}>
+                      {ticket.status}
+                    </span>
+                    <span className={cn(
+                      "px-1.5 py-0.5 rounded text-[10px] font-bold uppercase",
+                      ticket.priority === 'Alta' ? "bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-400" :
+                      ticket.priority === 'Média' ? "bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-400" :
+                      "bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-400"
+                    )}>
+                      P: {ticket.priority}
+                    </span>
+                  </div>
+                </div>
+              ))}
+              {(ticketsQuery.data ?? []).length === 0 && !ticketsQuery.isLoading && (
+                <EmptyState title="Nenhum chamado de suporte" />
+              )}
+            </div>
+          </Panel>
+
+          <div>
+            {selectedTicketId && ticketDetailsQuery.data ? (
+              <Panel
+                title={`Chamado #${ticketDetailsQuery.data.id.substring(0, 8)}`}
+                description={`Aberto por ${ticketDetailsQuery.data.requesterName} (${ticketDetailsQuery.data.company?.name})`}
+              >
+                <div className="space-y-4">
+                  <div className="border-b pb-3 space-y-2">
+                    <div className="flex flex-wrap items-center gap-2">
+                      <Label className="text-xs text-muted-foreground shrink-0">Alterar Status:</Label>
+                      <NativeSelect
+                        className="h-8 text-xs py-0.5"
+                        value={ticketDetailsQuery.data.status}
+                        onChange={(e: any) => updateTicketStatus.mutate({ id: ticketDetailsQuery.data.id, status: e.target.value })}
+                      >
+                        <option value="Aberto">Aberto</option>
+                        <option value="Em Atendimento">Em Atendimento</option>
+                        <option value="Resolvido">Resolvido</option>
+                        <option value="Cancelado">Cancelado</option>
+                      </NativeSelect>
+
+                      <span className="text-xs text-muted-foreground ml-auto">Prioridade: <strong>{ticketDetailsQuery.data.priority}</strong></span>
+                    </div>
+
+                    <div>
+                      <h3 className="font-bold text-base">{ticketDetailsQuery.data.title}</h3>
+                      <p className="text-xs text-slate-600 dark:text-slate-400 bg-slate-50 dark:bg-slate-900 p-2.5 rounded-lg border border-slate-100 dark:border-slate-800 mt-1.5 whitespace-pre-wrap">{ticketDetailsQuery.data.description}</p>
+                    </div>
+                  </div>
+
+                  {/* Chat de mensagens */}
+                  <div className="space-y-3 max-h-[300px] overflow-y-auto border rounded-lg p-3 bg-slate-50/50 dark:bg-slate-900/30 dark:border-slate-800">
+                    <div className="text-center text-[10px] text-muted-foreground uppercase tracking-wider font-semibold">Histórico de Mensagens</div>
+                    {ticketDetailsQuery.data.messages?.map((msg: any) => (
+                      <div
+                        key={msg.id}
+                        className={cn(
+                          "p-2.5 rounded-lg text-xs max-w-[85%] space-y-1 shadow-sm border",
+                          msg.user?.email === ticketDetailsQuery.data.requesterEmail
+                            ? "bg-white border-slate-200 dark:bg-slate-800 dark:border-slate-700 mr-auto"
+                            : msg.isInternal
+                              ? "bg-amber-50 border-amber-200 text-amber-900 dark:bg-amber-950/20 dark:border-amber-900 dark:text-amber-200 ml-auto"
+                              : "bg-cyan-50 border-cyan-200 text-cyan-900 dark:bg-cyan-950/20 dark:border-cyan-900 dark:text-cyan-200 ml-auto"
+                        )}
+                      >
+                        <div className="flex justify-between items-center gap-4 font-semibold text-[10px]">
+                          <span>{msg.user?.name} {msg.isInternal && '(Interno)'}</span>
+                          <span className="opacity-60">{new Date(msg.createdAt).toLocaleDateString('pt-BR')} {new Date(msg.createdAt).toLocaleTimeString('pt-BR', {hour: '2-digit', minute:'2-digit'})}</span>
+                        </div>
+                        <p className="whitespace-pre-wrap">{msg.message}</p>
+                      </div>
+                    ))}
+                    {(ticketDetailsQuery.data.messages ?? []).length === 0 && (
+                      <div className="text-center text-xs text-muted-foreground py-4">Nenhuma mensagem adicional.</div>
+                    )}
+                  </div>
+
+                  {/* Form de resposta */}
+                  <div className="space-y-3 pt-2">
+                    <Textarea
+                      className="text-xs h-20"
+                      placeholder="Escreva sua resposta de suporte..."
+                      value={replyText}
+                      onChange={(e) => setReplyText(e.target.value)}
+                    />
+                    <div className="flex items-center justify-between">
+                      <label className="flex items-center gap-2 text-xs cursor-pointer select-none">
+                        <input
+                          type="checkbox"
+                          checked={isInternal}
+                          onChange={(e) => setIsInternal(e.target.checked)}
+                          className="rounded border-slate-300 dark:border-slate-700"
+                        />
+                        <span>Mensagem Interna (Apenas para equipe)</span>
+                      </label>
+
+                      <Button
+                        size="sm"
+                        disabled={sendReply.isPending || !replyText.trim()}
+                        onClick={() => sendReply.mutate({ id: ticketDetailsQuery.data.id, message: replyText, isInternal })}
+                      >
+                        Enviar Resposta
+                      </Button>
+                    </div>
+                  </div>
+                </div>
+              </Panel>
+            ) : (
+              <div className="flex h-[200px] items-center justify-center rounded-xl border border-dashed text-sm text-muted-foreground dark:border-slate-800">
+                Selecione um chamado para visualizar e interagir.
+              </div>
+            )}
+          </div>
+        </div>
+      )}
     </div>
   );
 }
