@@ -459,7 +459,7 @@ export class MeetingsService {
     if (linkedAction) {
       const count = await this.prisma.actionTask.count({ where: { actionId: linkedAction.id } });
       const title = (body.description ?? body.title ?? '').trim();
-      if (!title) throw new NotFoundException('DescriÃ§Ã£o da tarefa obrigatoria');
+      if (!title) throw new NotFoundException('Descrição da tarefa obrigatoria');
       const task = await this.prisma.actionTask.create({
         data: {
           actionId: linkedAction.id,
@@ -481,7 +481,7 @@ export class MeetingsService {
         entityId: task.id,
         relatedType: TraceEntityType.MEETING,
         relatedId: meetingId,
-        title: 'Tarefa criada pela reuniÃ£o',
+        title: 'Tarefa criada pela reunião',
         description: task.title,
         metadata: { actionPlanId: linkedAction.id, startDate: task.startDate, endDate: task.endDate },
       });
@@ -496,7 +496,7 @@ export class MeetingsService {
         analysisId: meeting.analysisId ?? null,
         meetingId,
         treatmentId: meeting.treatmentId ?? null,
-        title: body.title || body.description || `AÃ§Ã£o da reuniÃ£o ${meeting.title}`,
+        title: body.title || body.description || `Ação da reunião ${meeting.title}`,
         description: body.description ?? `Ação gerada na reunião "${meeting.title}"`,
         origin: ActionOrigin.MEETING,
         originRefId: meetingId,

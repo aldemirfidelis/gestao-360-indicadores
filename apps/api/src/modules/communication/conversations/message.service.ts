@@ -79,10 +79,10 @@ export class MessageService {
     await this.conversations.assertMember(conversationId, meId);
     const text = body.trim();
     if (!text && attachments.length === 0) throw new BadRequestException('Informe uma mensagem ou anexe um arquivo.');
-    if (attachments.length > MAX_ATTACHMENTS) throw new BadRequestException(`Envie no mÃ¡ximo ${MAX_ATTACHMENTS} anexos por mensagem.`);
+    if (attachments.length > MAX_ATTACHMENTS) throw new BadRequestException(`Envie no máximo ${MAX_ATTACHMENTS} anexos por mensagem.`);
     if (replyToId) {
       const reply = await this.prisma.message.findFirst({ where: { id: replyToId, conversationId }, select: { id: true } });
-      if (!reply) throw new BadRequestException('Mensagem respondida nÃ£o pertence a esta conversa.');
+      if (!reply) throw new BadRequestException('Mensagem respondida não pertence a esta conversa.');
     }
     const preparedAttachments = attachments.map((attachment) => this.prepareAttachment(attachment, meId));
     const message = await this.prisma.message.create({
@@ -110,7 +110,7 @@ export class MessageService {
       where: { id: attachmentId },
       include: { message: { select: { conversationId: true, deletedAt: true } } },
     });
-    if (!attachment || attachment.deletedAt || attachment.message.deletedAt) throw new NotFoundException('Anexo nÃ£o encontrado.');
+    if (!attachment || attachment.deletedAt || attachment.message.deletedAt) throw new NotFoundException('Anexo não encontrado.');
     await this.conversations.assertMember(attachment.message.conversationId, meId);
     return {
       id: attachment.id,
@@ -225,22 +225,22 @@ export class MessageService {
 
   private prepareAttachment(input: MessageAttachmentInput, meId: string): Prisma.MessageAttachmentCreateWithoutMessageInput {
     const fileName = input.fileName.trim().replace(/[\\/:*?"<>|]+/g, '-').slice(0, 180);
-    if (!fileName) throw new BadRequestException('Nome do anexo invÃ¡lido.');
+    if (!fileName) throw new BadRequestException('Nome do anexo inválido.');
     if (!Number.isFinite(input.sizeBytes) || input.sizeBytes <= 0 || input.sizeBytes > MAX_ATTACHMENT_BYTES) {
-      throw new BadRequestException('Cada anexo deve ter atÃ© 5 MB.');
+      throw new BadRequestException('Cada anexo deve ter até 5 MB.');
     }
     const mimeType = input.mimeType?.trim().toLowerCase() || null;
     if (mimeType && !mimeType.startsWith('image/') && !ALLOWED_MIME_TYPES.has(mimeType)) {
-      throw new BadRequestException('Tipo de arquivo nÃ£o permitido para anexo.');
+      throw new BadRequestException('Tipo de arquivo não permitido para anexo.');
     }
     let data: Buffer;
     try {
       data = Buffer.from(input.dataBase64, 'base64');
     } catch {
-      throw new BadRequestException('Arquivo anexado invÃ¡lido.');
+      throw new BadRequestException('Arquivo anexado inválido.');
     }
     if (!data.length || data.length > MAX_ATTACHMENT_BYTES || data.length !== input.sizeBytes) {
-      throw new BadRequestException('Tamanho do anexo invÃ¡lido.');
+      throw new BadRequestException('Tamanho do anexo inválido.');
     }
     return {
       uploadedBy: { connect: { id: meId } },

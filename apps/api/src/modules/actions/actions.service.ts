@@ -272,7 +272,7 @@ export class ActionsService {
       where: { id: actionId },
       include: { meeting: true },
     });
-    if (!action || action.deletedAt) throw new NotFoundException('AÃ§Ã£o nao encontrada');
+    if (!action || action.deletedAt) throw new NotFoundException('Ação nao encontrada');
     if (action.meetingId && action.meeting) return this.getById(actionId);
 
     const startsAt = body.startsAt ? new Date(body.startsAt) : new Date(Date.now() + 24 * 60 * 60 * 1000);
