@@ -1117,6 +1117,17 @@ interface CreatePostFormProps {
 function CreatePostForm({ form, setForm, overview, aiPrompt, setAiPrompt, generateAi, saving, uploadMedia, uploadingMedia, onSubmit }: CreatePostFormProps) {
   const users = overview?.audienceOptions.users ?? [];
   const areas = overview?.audienceOptions.areas ?? [];
+  const templates = overview?.templates ?? [];
+  const applyTemplate = (template: TemplateItem) => {
+    setForm((current) => ({
+      ...current,
+      type: template.type,
+      category: template.category || current.category,
+      title: current.title || template.titlePattern,
+      content: current.content ? current.content : template.contentPattern,
+    }));
+    toast.success(`Template "${template.name}" aplicado`);
+  };
   return (
     <div className="grid grid-cols-1 gap-4 xl:grid-cols-[1fr_0.8fr]">
       <Card>
@@ -1124,6 +1135,27 @@ function CreatePostForm({ form, setForm, overview, aiPrompt, setAiPrompt, genera
           <CardTitle>Editor visual</CardTitle>
         </CardHeader>
         <CardContent className="space-y-4">
+          {templates.length > 0 && (
+            <div className="space-y-2 rounded-md border bg-muted/30 p-3">
+              <div className="flex items-center gap-2 text-xs font-medium uppercase text-muted-foreground">
+                <FileText className="h-3.5 w-3.5" />
+                Biblioteca de templates
+              </div>
+              <div className="flex flex-wrap gap-2">
+                {templates.map((template) => (
+                  <button
+                    key={template.id}
+                    type="button"
+                    onClick={() => applyTemplate(template)}
+                    title={`${TYPE_LABEL[template.type]} · ${template.tone}`}
+                    className="rounded-full border bg-card px-3 py-1 text-xs font-medium transition hover:border-primary hover:bg-primary/5"
+                  >
+                    {template.name}
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
           <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
             <Field label="Tipo">
               <NativeSelect value={form.type} onChange={(event) => setForm({ ...form, type: event.target.value as PostType })}>
@@ -2364,7 +2396,7 @@ function CommunicationDashboardView({
               <h3 className="font-semibold text-sm flex items-center gap-2 text-slate-850 dark:text-white">
                 <Clock className="h-4 w-4 text-violet-500" />
                 Calendário de campanhas
-                <span className="text-[10px] text-slate-400 dark:text-slate-500 ml-1.5">{data?.campaigns.length ?? 0} cadastrada(s)</span>
+                <span className="text-[10px] text-slate-400 dark:text-slate-500 ml-1.5">{data?.campaigns?.length ?? 0} cadastrada(s)</span>
               </h3>
             </div>
             <CardContent className="p-4 flex-1 flex flex-col justify-between gap-3">
@@ -2559,7 +2591,7 @@ function CommunicationDashboardView({
           </div>
           <div className="flex items-center gap-2">
             <FileText className="h-4 w-4 text-purple-400" />
-            <span>Templates disponíveis: <strong>{data?.templates.length ?? 0}</strong></span>
+            <span>Templates disponíveis: <strong>{data?.templates?.length ?? 0}</strong></span>
           </div>
         </div>
         <div className="flex items-center gap-3">

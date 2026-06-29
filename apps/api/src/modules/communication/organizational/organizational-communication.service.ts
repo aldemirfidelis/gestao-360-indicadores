@@ -173,6 +173,59 @@ const MAX_COMMUNICATION_MEDIA_BYTES = 6 * 1024 * 1024;
 const ALLOWED_COMMUNICATION_VIDEO_MIME_TYPES = new Set(['video/mp4', 'video/webm', 'video/ogg', 'video/quicktime']);
 const COMMUNICATION_UPLOAD_TYPES = new Set<CommunicationMediaType>(['IMAGE', 'BANNER', 'VIDEO']);
 
+// Modelos prontos para acelerar a redação de comunicados (biblioteca de templates).
+const STARTER_TEMPLATES = [
+  {
+    id: 'tpl-comunicado-institucional',
+    name: 'Comunicado institucional',
+    type: 'SIMPLE' as CommunicationType,
+    category: 'Institucional',
+    tone: 'Formal e objetivo',
+    titlePattern: 'Comunicado: {assunto}',
+    contentPattern:
+      'Prezados(as),\n\nInformamos que {mensagem principal}.\n\nEm caso de dúvidas, procure {responsável/área}.\n\nAtenciosamente,\n{remetente}',
+  },
+  {
+    id: 'tpl-aviso-urgente',
+    name: 'Aviso urgente',
+    type: 'SIMPLE' as CommunicationType,
+    category: 'Operacional',
+    tone: 'Direto e enfático',
+    titlePattern: '⚠️ Atenção: {assunto}',
+    contentPattern:
+      'Atenção, equipe!\n\n{mensagem principal}.\n\nAção necessária: {o que fazer}.\nPrazo: {prazo}.',
+  },
+  {
+    id: 'tpl-confirmacao-obrigatoria',
+    name: 'Confirmação obrigatória',
+    type: 'SIMPLE' as CommunicationType,
+    category: 'Conformidade',
+    tone: 'Formal',
+    titlePattern: 'Leitura obrigatória: {assunto}',
+    contentPattern:
+      'Este comunicado exige sua ciência.\n\n{conteúdo da política/procedimento}.\n\nApós a leitura, confirme clicando em "Li e estou ciente".',
+  },
+  {
+    id: 'tpl-enquete-clima',
+    name: 'Enquete de clima',
+    type: 'POLL' as CommunicationType,
+    category: 'Pessoas',
+    tone: 'Acolhedor',
+    titlePattern: 'Sua opinião importa: {tema}',
+    contentPattern: 'Queremos ouvir você sobre {tema}. Responda à enquete abaixo — leva menos de 1 minuto.',
+  },
+  {
+    id: 'tpl-resultados-mes',
+    name: 'Resultados do mês',
+    type: 'BANNER' as CommunicationType,
+    category: 'Resultados',
+    tone: 'Motivacional',
+    titlePattern: 'Resultados de {mês}: {destaque}',
+    contentPattern:
+      'Confira os destaques do mês:\n\n• {indicador 1}\n• {indicador 2}\n• {indicador 3}\n\nParabéns a todos pelo empenho!',
+  },
+];
+
 @Injectable()
 export class OrganizationalCommunicationService {
   constructor(
@@ -288,6 +341,9 @@ export class OrganizationalCommunicationService {
       posts,
       campaigns,
       media,
+      templates: STARTER_TEMPLATES,
+      boards: [],
+      automations: [],
       audienceOptions: {
         users: users.map((user) => ({
           id: user.id,
