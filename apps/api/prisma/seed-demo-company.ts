@@ -1,11 +1,11 @@
 /**
- * Seed da EMPRESA DEMONSTRAÇÃO — clona a ESTRUTURA da Goiasa com dados FICTÍCIOS.
+ * Seed da EMPRESA DEMONSTRAÇÃO — empresa fictícia PRÓPRIA (indústria genérica de manufatura).
  *
- * - Espelha a forma da Goiasa (hierarquia, qtde/tipo de indicadores, esqueleto do mapa
- *   estratégico) mas com rótulos fictícios temáticos (usina sucroenergética) e valores
- *   numéricos aleatórios. Não copia nenhum texto real da Goiasa.
- * - Goiasa é SOMENTE LEITURA (nunca modificada). Toda escrita/deleção é escopada ao
- *   companyId da Empresa Demonstração (com guarda explícita).
+ * - Estrutura, indicadores e mapa estratégico são definidos AQUI, do zero, de forma enxuta e
+ *   coerente (NÃO clona a Goiasa). Tema neutro de indústria/manufatura, aplicável a qualquer
+ *   prospect. Valores numéricos aleatórios, dados todos fictícios.
+ * - Goiasa é SOMENTE LEITURA (nunca modificada) — usada apenas como guarda/asserção de snapshot.
+ *   Toda escrita/deleção é escopada ao companyId da Empresa Demonstração (com guarda explícita).
  * - Idempotente: a cada execução LIMPA os dados da Empresa Demonstração e regenera.
  *
  * Rodar:  pnpm -C apps/api exec tsx prisma/seed-demo-company.ts
@@ -40,81 +40,65 @@ function namer(pool: string[]) {
   };
 }
 
-// ---------- catálogos fictícios (tema: usina de etanol/açúcar) ----------
-const SECTOR_POOL = ['Industrial', 'Administrativo', 'Operações', 'Apoio Técnico'];
-const AREA_POOL = [
-  'Moagem', 'Destilaria', 'Fermentação', 'Caldeiras e Utilidades', 'Laboratório',
-  'Manutenção Industrial', 'Meio Ambiente', 'Qualidade', 'Logística e Expedição',
-  'Agrícola (CCT)', 'Recursos Humanos', 'Segurança do Trabalho', 'Automação', 'Tratamento de Caldo',
-];
-const IND_PERCENT_HIGH = [
-  'Eficiência de Moagem', 'Rendimento de Fermentação', 'OEE da Moenda', 'Disponibilidade de Equipamentos',
-  'Conformidade Ambiental', 'Aproveitamento de ATR', 'Eficiência de Caldeira', 'Conformidade ISSMA',
-  'Atendimento de Vagas no Prazo', 'Satisfação Interna', 'Índice de Treinamento', 'Conformidade de Limpeza',
-];
-const IND_PERCENT_LOW = [
-  'Absenteísmo', 'Turnover', 'Taxa de Retrabalho', 'Índice de Perdas', 'Taxa de Reclamações',
-  'Taxa de Frequência de Acidentes', 'Paradas por Falha',
-];
-const IND_QTY = [
-  'Produção de Etanol', 'Produção de Açúcar', 'Moagem de Cana', 'Geração de Energia', 'Consumo de Vapor',
-  'Paradas Não Programadas', 'Acidentes com Afastamento', 'Ocorrências de Incêndio', 'Horas de Manutenção',
-];
+// ---------- catálogos fictícios (indústria genérica de manufatura) ----------
+// (a árvore organizacional e os indicadores são definidos explicitamente em main();
+//  estes pools alimentam apenas rótulos/títulos dos demais módulos)
+const AREA_POOL = ['Operações', 'Produção', 'Qualidade', 'SSMA', 'Comercial', 'Financeiro', 'Recursos Humanos', 'Suprimentos', 'Logística', 'Manutenção'];
 const OBJECTIVE_POOL = [
-  'Aumentar a eficiência operacional', 'Reduzir o custo de produção', 'Zerar acidentes de trabalho',
+  'Aumentar a rentabilidade', 'Reduzir os custos operacionais', 'Zerar acidentes de trabalho',
   'Elevar a satisfação dos clientes', 'Desenvolver competências da equipe', 'Reduzir o impacto ambiental',
-  'Maximizar o aproveitamento de ATR', 'Aumentar a disponibilidade dos ativos', 'Melhorar a qualidade do produto',
-  'Otimizar a logística de expedição', 'Fortalecer a cultura de segurança', 'Ampliar a produtividade agrícola',
-  'Modernizar o parque industrial', 'Reduzir perdas de processo', 'Aumentar a geração de energia',
+  'Ampliar a participação de mercado', 'Aumentar a disponibilidade dos ativos', 'Melhorar a qualidade dos produtos',
+  'Otimizar a logística de entrega', 'Fortalecer a cultura de segurança', 'Aumentar a produtividade',
+  'Modernizar o parque fabril', 'Reduzir perdas de processo', 'Acelerar o lançamento de produtos',
 ];
 const FIRST_NAMES = ['Ana', 'Bruno', 'Carla', 'Diego', 'Eduarda', 'Felipe', 'Gabriela', 'Henrique', 'Isabela', 'João', 'Karina', 'Lucas', 'Mariana', 'Nelson', 'Otávio', 'Patrícia', 'Rafael', 'Sabrina', 'Thiago', 'Vanessa'];
 const LAST_NAMES = ['Silva', 'Souza', 'Oliveira', 'Santos', 'Pereira', 'Lima', 'Costa', 'Almeida', 'Ferreira', 'Rodrigues', 'Gomes', 'Martins', 'Araújo', 'Barbosa', 'Ribeiro', 'Carvalho'];
 const JOB_POOL = [
-  'Operador de Processo', 'Técnico de Manutenção', 'Analista de Qualidade', 'Supervisor de Produção',
-  'Engenheiro Agrônomo', 'Auxiliar Administrativo', 'Técnico de Segurança', 'Analista de RH',
-  'Coordenador Industrial', 'Operador de Caldeira', 'Técnico de Laboratório', 'Encarregado de Logística',
-  'Eletricista Industrial', 'Mecânico Industrial',
+  'Operador de Produção', 'Técnico de Manutenção', 'Analista de Qualidade', 'Supervisor de Produção',
+  'Analista Comercial', 'Auxiliar Administrativo', 'Técnico de Segurança', 'Analista de RH',
+  'Coordenador Industrial', 'Assistente de Logística', 'Comprador', 'Analista Financeiro',
+  'Eletricista de Manutenção', 'Vendedor',
 ];
-const PROJECT_POOL = ['Modernização da Moenda', 'Automação da Destilaria', 'Eficiência Energética', 'Redução de Perdas de ATR', 'Programa de Segurança Comportamental', 'Expansão da Cogeração'];
+const PROJECT_POOL = ['Modernização da Linha de Produção', 'Automação de Processos', 'Eficiência Energética', 'Redução de Perdas e Refugo', 'Programa de Segurança Comportamental', 'Expansão da Capacidade Produtiva'];
 const MEETING_POOL = ['Reunião de Análise de Indicadores', 'Comitê de Produção', 'Reunião de Segurança', 'Análise Crítica de Desvios', 'Reunião de Resultados Mensais'];
 const ACTION_POOL = ['Plano de redução de perdas', 'Ação corretiva de manutenção', 'Melhoria de eficiência operacional', 'Plano de capacitação da equipe', 'Ação de conformidade ambiental', 'Plano de redução de paradas', 'Ação de melhoria de qualidade', 'Plano de segurança comportamental'];
-const DEVIATION_POOL = ['Desvio de meta de produção', 'Não conformidade ambiental', 'Desvio de eficiência de moagem', 'Parada não programada de equipamento', 'Desvio de meta de segurança', 'Desvio de qualidade do produto'];
+const DEVIATION_POOL = ['Desvio de meta de produção', 'Não conformidade ambiental', 'Desvio de eficiência produtiva', 'Parada não programada de equipamento', 'Desvio de meta de segurança', 'Desvio de qualidade do produto'];
 const SIX_M = ['Método', 'Máquina', 'Mão de obra', 'Material', 'Medida', 'Meio ambiente'];
 
-// ---------- catálogos dos módulos corporativos (FASE 6/7) ----------
+// ---------- catálogos dos módulos corporativos ----------
 const RISK_POOL = [
-  'Falha em equipamento crítico da moenda', 'Parada não programada da caldeira',
+  'Falha em equipamento crítico de produção', 'Parada não programada da linha',
   'Não conformidade ambiental em efluentes', 'Acidente de trabalho com afastamento',
-  'Atraso na colheita por chuvas', 'Variação no preço do açúcar e do etanol',
+  'Atraso na entrega de fornecedores', 'Variação no preço de insumos',
   'Indisponibilidade de mão de obra especializada', 'Falha no fornecimento de insumos',
-  'Vazamento em tanque de armazenamento', 'Perda de eficiência por incrustação',
-  'Risco de incêndio em área industrial', 'Quebra de contrato de fornecimento de cana',
+  'Ruptura de estoque de produto acabado', 'Perda de cliente relevante',
+  'Risco de incêndio em área industrial', 'Falha em sistema de TI crítico',
 ];
 const DOC_POOL = [
-  'Política de Qualidade', 'Procedimento de Operação da Moenda', 'Instrução de Trabalho - Caldeira',
+  'Política de Qualidade', 'Procedimento de Operação da Linha de Produção', 'Instrução de Trabalho - Manutenção',
   'Manual de Segurança Industrial', 'Procedimento de Controle Ambiental', 'Política de Recursos Humanos',
-  'Procedimento de Manutenção Preventiva', 'Instrução de Análise de Laboratório',
+  'Procedimento de Manutenção Preventiva', 'Instrução de Inspeção de Qualidade',
   'Manual de Boas Práticas de Fabricação', 'Procedimento de Expedição', 'Política de Meio Ambiente',
   'Procedimento de Gestão de Não Conformidades',
 ];
 const PROCESS_POOL = [
-  'Moagem de Cana', 'Produção de Etanol', 'Produção de Açúcar', 'Geração de Energia (Cogeração)',
-  'Manutenção Industrial', 'Gestão de Pessoas', 'Controle de Qualidade', 'Gestão Ambiental',
-  'Logística de Expedição', 'Suprimentos e Compras',
+  'Produção / Manufatura', 'Manutenção Industrial', 'Controle de Qualidade', 'Gestão Ambiental',
+  'Vendas e Atendimento', 'Gestão de Pessoas', 'Logística e Expedição', 'Suprimentos e Compras',
+  'Planejamento e Controle da Produção (PCP)', 'Gestão Financeira',
 ];
 const AUDIT_POOL = [
   'Auditoria Interna ISO 9001', 'Auditoria Ambiental ISO 14001', 'Auditoria de Segurança do Trabalho',
-  'Auditoria de Processos Industriais', 'Auditoria de Fornecedores', 'Auditoria de Boas Práticas',
+  'Auditoria de Processos Produtivos', 'Auditoria de Fornecedores', 'Auditoria de Boas Práticas',
 ];
 const FORM_POOL = [
-  'Checklist de Inspeção de Segurança', 'Formulário de Análise Crítica', 'Checklist de Partida da Caldeira',
+  'Checklist de Inspeção de Segurança', 'Formulário de Análise Crítica', 'Checklist de Partida de Linha',
   'Inspeção de EPI', 'Checklist de Limpeza Industrial', 'Formulário de Registro de Ocorrência',
   'Checklist de Manutenção Preventiva', 'Pesquisa de Clima Organizacional',
 ];
-const SUPPLIERS_POOL = ['Área Agrícola (CCT)', 'Fornecedores de cana', 'Almoxarifado', 'Laboratório', 'Manutenção'];
-const INPUTS_POOL = ['Cana-de-açúcar', 'Insumos químicos', 'Energia elétrica', 'Vapor de processo', 'Ordens de serviço'];
-const OUTPUTS_POOL = ['Etanol hidratado', 'Açúcar VHP', 'Energia exportada', 'Relatórios de qualidade', 'Bagaço'];
-const CUSTOMERS_POOL = ['Distribuidoras', 'Mercado interno', 'Exportação', 'Áreas internas', 'Concessionária de energia'];
+const SUPPLIERS_POOL = ['Fornecedores de matéria-prima', 'Almoxarifado', 'Suprimentos', 'Laboratório', 'Manutenção'];
+const INPUTS_POOL = ['Matéria-prima', 'Insumos', 'Energia elétrica', 'Ordens de produção', 'Ordens de serviço'];
+const OUTPUTS_POOL = ['Produto acabado', 'Relatórios de qualidade', 'Pedidos expedidos', 'Registros de processo', 'Subprodutos'];
+const CUSTOMERS_POOL = ['Clientes', 'Distribuidores', 'Mercado interno', 'Exportação', 'Áreas internas'];
 
 function randomName() {
   return `${pick(FIRST_NAMES)} ${pick(LAST_NAMES)}`;
@@ -307,39 +291,41 @@ async function main() {
     select: { id: true },
   });
 
-  // 4) Org tree (espelha tipos/hierarquia da Goiasa)
-  const goNodes = await prisma.orgNode.findMany({
-    where: { companyId: goiasa.id, deletedAt: null },
-    select: { id: true, type: true, parentId: true, position: true },
-    orderBy: { position: 'asc' },
+  // 4) Árvore organizacional — estrutura PRÓPRIA, enxuta e genérica (NÃO clona a Goiasa)
+  const ORG_TREE: { area: string; color: string; sectors: string[] }[] = [
+    { area: 'Operações / Produção', color: '#2563eb', sectors: ['Linha de Produção', 'Manutenção', 'PCP – Planejamento e Controle'] },
+    { area: 'Qualidade & SSMA', color: '#16a34a', sectors: ['Qualidade', 'Saúde, Segurança e Meio Ambiente'] },
+    { area: 'Comercial & Marketing', color: '#d97706', sectors: ['Vendas', 'Marketing'] },
+    { area: 'Administrativo & Financeiro', color: '#7c3aed', sectors: ['Financeiro', 'Recursos Humanos', 'Suprimentos / Compras'] },
+    { area: 'Logística', color: '#0891b2', sectors: ['Expedição', 'Armazém'] },
+  ];
+  const rootNode = await prisma.orgNode.create({
+    data: { companyId, branchId: branch.id, parentId: null, name: 'Unidade Matriz', type: 'BRANCH', position: 0, active: true, color: '#0f172a' },
+    select: { id: true },
   });
-  const sectorName = namer(SECTOR_POOL);
-  const areaName = namer(AREA_POOL);
-  const nodeMap = new Map<string, string>();
-  // cria em 2 passadas para resolver parentId (pais primeiro por ausência de parent)
-  const ordered = [...goNodes].sort((a, b) => Number(!!a.parentId) - Number(!!b.parentId));
-  for (const n of ordered) {
-    const name =
-      n.type === 'BRANCH' ? 'Unidade Demonstração'
-        : n.type === 'SECTOR' ? sectorName()
-        : n.type === 'AREA' ? areaName()
-        : `Estrutura ${n.position || rint(1, 99)}`;
-    const created = await prisma.orgNode.create({
-      data: {
-        companyId,
-        branchId: branch.id,
-        parentId: n.parentId ? nodeMap.get(n.parentId) ?? null : null,
-        name,
-        type: n.type,
-        position: n.position,
-        active: true,
-        color: pick(['#2563eb', '#16a34a', '#d97706', '#7c3aed', '#dc2626', '#0891b2']),
-      },
+  const areaNodeIds: string[] = [];
+  const sectorNodeIds: string[] = [];
+  const areaByName = new Map<string, string>();
+  const sectorByName = new Map<string, string>();
+  let nodePos = 1;
+  for (const a of ORG_TREE) {
+    const areaNode = await prisma.orgNode.create({
+      data: { companyId, branchId: branch.id, parentId: rootNode.id, name: a.area, type: 'AREA', position: nodePos++, active: true, color: a.color },
       select: { id: true },
     });
-    nodeMap.set(n.id, created.id);
+    areaNodeIds.push(areaNode.id);
+    areaByName.set(a.area, areaNode.id);
+    for (const s of a.sectors) {
+      const sectorNode = await prisma.orgNode.create({
+        data: { companyId, branchId: branch.id, parentId: areaNode.id, name: s, type: 'SECTOR', position: nodePos++, active: true, color: a.color },
+        select: { id: true },
+      });
+      sectorNodeIds.push(sectorNode.id);
+      sectorByName.set(s, sectorNode.id);
+    }
   }
-  const areaIds = [...nodeMap.values()];
+  // Nós atribuíveis (áreas primeiro, depois setores) — usado para distribuir donos/ações/etc.
+  const areaIds = [...areaNodeIds, ...sectorNodeIds];
 
   // 5) Usuários demo (upsert por email) + atribuição de área PRIMARY
   const rounds = parseInt(process.env.BCRYPT_ROUNDS ?? '10', 10);
@@ -381,36 +367,68 @@ async function main() {
   }
   const userIds = demoUsers.map((u) => u.id);
 
-  // 6) Indicadores (espelha unit/direction/periodicity da Goiasa; nome temático compatível)
-  const goInds = await prisma.indicator.findMany({
-    where: { companyId: goiasa.id, deletedAt: null },
-    select: { id: true, ownerNodeId: true, type: true, unit: true, direction: true, periodicity: true, weight: true, yellowToleranceP: true },
-  });
-  const pctHigh = namer(IND_PERCENT_HIGH);
-  const pctLow = namer(IND_PERCENT_LOW);
-  const qty = namer(IND_QTY);
-  const indMap = new Map<string, string>();
+  // 6) Indicadores PRÓPRIOS distribuídos pelos setores (sem espelhar a Goiasa)
+  type IndUnit = 'PERCENT' | 'CURRENCY' | 'QUANTITY' | 'HOURS' | 'INDEX';
+  type IndType = 'STRATEGIC' | 'PRODUCTION' | 'MAINTENANCE' | 'QUALITY' | 'SAFETY' | 'COMMERCIAL' | 'FINANCE' | 'HR' | 'PROCUREMENT' | 'PROCESS';
+  type IndDef = { sector: string; name: string; unit: IndUnit; dir: 'HIGHER_BETTER' | 'LOWER_BETTER'; type: IndType };
+  const IND_DEFS: IndDef[] = [
+    // Operações / Produção
+    { sector: 'Linha de Produção', name: 'OEE da Produção', unit: 'PERCENT', dir: 'HIGHER_BETTER', type: 'STRATEGIC' },
+    { sector: 'Linha de Produção', name: 'Volume Produzido', unit: 'QUANTITY', dir: 'HIGHER_BETTER', type: 'PRODUCTION' },
+    { sector: 'Linha de Produção', name: 'Taxa de Refugo', unit: 'PERCENT', dir: 'LOWER_BETTER', type: 'QUALITY' },
+    { sector: 'Manutenção', name: 'Disponibilidade de Equipamentos', unit: 'PERCENT', dir: 'HIGHER_BETTER', type: 'STRATEGIC' },
+    { sector: 'Manutenção', name: 'Paradas Não Programadas', unit: 'HOURS', dir: 'LOWER_BETTER', type: 'MAINTENANCE' },
+    { sector: 'Manutenção', name: 'Cumprimento da Manutenção Preventiva', unit: 'PERCENT', dir: 'HIGHER_BETTER', type: 'MAINTENANCE' },
+    { sector: 'PCP – Planejamento e Controle', name: 'Aderência ao Plano de Produção', unit: 'PERCENT', dir: 'HIGHER_BETTER', type: 'PRODUCTION' },
+    { sector: 'PCP – Planejamento e Controle', name: 'Giro de Estoque', unit: 'INDEX', dir: 'HIGHER_BETTER', type: 'PROCESS' },
+    // Qualidade & SSMA
+    { sector: 'Qualidade', name: 'Conformidade de Qualidade', unit: 'PERCENT', dir: 'HIGHER_BETTER', type: 'STRATEGIC' },
+    { sector: 'Qualidade', name: 'Taxa de Retrabalho', unit: 'PERCENT', dir: 'LOWER_BETTER', type: 'QUALITY' },
+    { sector: 'Qualidade', name: 'Reclamações de Clientes', unit: 'QUANTITY', dir: 'LOWER_BETTER', type: 'QUALITY' },
+    { sector: 'Saúde, Segurança e Meio Ambiente', name: 'Taxa de Frequência de Acidentes', unit: 'INDEX', dir: 'LOWER_BETTER', type: 'STRATEGIC' },
+    { sector: 'Saúde, Segurança e Meio Ambiente', name: 'Acidentes com Afastamento', unit: 'QUANTITY', dir: 'LOWER_BETTER', type: 'SAFETY' },
+    { sector: 'Saúde, Segurança e Meio Ambiente', name: 'Conformidade Ambiental', unit: 'PERCENT', dir: 'HIGHER_BETTER', type: 'QUALITY' },
+    // Comercial & Marketing
+    { sector: 'Vendas', name: 'Faturamento', unit: 'CURRENCY', dir: 'HIGHER_BETTER', type: 'STRATEGIC' },
+    { sector: 'Vendas', name: 'Atingimento da Meta de Vendas', unit: 'PERCENT', dir: 'HIGHER_BETTER', type: 'COMMERCIAL' },
+    { sector: 'Vendas', name: 'Novos Clientes', unit: 'QUANTITY', dir: 'HIGHER_BETTER', type: 'COMMERCIAL' },
+    { sector: 'Marketing', name: 'Leads Gerados', unit: 'QUANTITY', dir: 'HIGHER_BETTER', type: 'COMMERCIAL' },
+    { sector: 'Marketing', name: 'Satisfação do Cliente (NPS)', unit: 'PERCENT', dir: 'HIGHER_BETTER', type: 'STRATEGIC' },
+    // Administrativo & Financeiro
+    { sector: 'Financeiro', name: 'Margem de Contribuição', unit: 'PERCENT', dir: 'HIGHER_BETTER', type: 'STRATEGIC' },
+    { sector: 'Financeiro', name: 'Inadimplência', unit: 'PERCENT', dir: 'LOWER_BETTER', type: 'FINANCE' },
+    { sector: 'Financeiro', name: 'Custo Operacional', unit: 'CURRENCY', dir: 'LOWER_BETTER', type: 'FINANCE' },
+    { sector: 'Recursos Humanos', name: 'Turnover', unit: 'PERCENT', dir: 'LOWER_BETTER', type: 'HR' },
+    { sector: 'Recursos Humanos', name: 'Absenteísmo', unit: 'PERCENT', dir: 'LOWER_BETTER', type: 'HR' },
+    { sector: 'Recursos Humanos', name: 'Índice de Treinamento', unit: 'PERCENT', dir: 'HIGHER_BETTER', type: 'HR' },
+    { sector: 'Recursos Humanos', name: 'Engajamento da Equipe', unit: 'PERCENT', dir: 'HIGHER_BETTER', type: 'STRATEGIC' },
+    { sector: 'Suprimentos / Compras', name: 'Saving em Compras', unit: 'PERCENT', dir: 'HIGHER_BETTER', type: 'PROCUREMENT' },
+    { sector: 'Suprimentos / Compras', name: 'Entregas de Fornecedores no Prazo', unit: 'PERCENT', dir: 'HIGHER_BETTER', type: 'PROCUREMENT' },
+    // Logística
+    { sector: 'Expedição', name: 'OTIF – Entregas no Prazo e Completas', unit: 'PERCENT', dir: 'HIGHER_BETTER', type: 'STRATEGIC' },
+    { sector: 'Expedição', name: 'Custo de Frete', unit: 'CURRENCY', dir: 'LOWER_BETTER', type: 'PROCESS' },
+    { sector: 'Armazém', name: 'Acuracidade de Estoque', unit: 'PERCENT', dir: 'HIGHER_BETTER', type: 'PROCESS' },
+    { sector: 'Armazém', name: 'Nível de Serviço Logístico', unit: 'PERCENT', dir: 'HIGHER_BETTER', type: 'PROCESS' },
+  ];
   const demoIndicators: { id: string; unit: string; direction: string; periodicity: string; yellowToleranceP: number }[] = [];
+  const indByName = new Map<string, string>();
   let indSeq = 0;
-  for (const ind of goInds) {
+  for (const d of IND_DEFS) {
     indSeq += 1;
-    const name =
-      ind.unit === 'PERCENT'
-        ? ind.direction === 'LOWER_BETTER' ? pctLow() : pctHigh()
-        : qty();
-    const ownerNodeId = nodeMap.get(ind.ownerNodeId) ?? pick(areaIds);
+    const ownerNodeId = sectorByName.get(d.sector) ?? pick(areaIds);
+    const yellowToleranceP = 5;
     const created = await prisma.indicator.create({
       data: {
-        companyId, ownerNodeId, name, code: `IND-${String(indSeq).padStart(3, '0')}`,
-        type: ind.type, unit: ind.unit, direction: ind.direction, periodicity: ind.periodicity,
-        weight: ind.weight, yellowToleranceP: ind.yellowToleranceP,
+        companyId, ownerNodeId, name: d.name, code: `IND-${String(indSeq).padStart(3, '0')}`,
+        type: d.type, unit: d.unit, direction: d.dir, periodicity: 'MONTHLY',
+        weight: 1, yellowToleranceP,
         responsibleUserId: pick(userIds), feederUserId: pick(userIds), status: 'ACTIVE',
-        description: `Indicador de demonstração (${name}).`,
+        description: `Indicador de ${d.sector} (demonstração).`,
       },
       select: { id: true },
     });
-    indMap.set(ind.id, created.id);
-    demoIndicators.push({ id: created.id, unit: ind.unit, direction: ind.direction, periodicity: ind.periodicity, yellowToleranceP: ind.yellowToleranceP });
+    indByName.set(d.name, created.id);
+    demoIndicators.push({ id: created.id, unit: d.unit, direction: d.dir, periodicity: 'MONTHLY', yellowToleranceP });
   }
 
   // 7) Metas + Resultados (12 meses)
@@ -441,86 +459,83 @@ async function main() {
     await prisma.indicatorResult.createMany({ data: results, skipDuplicates: true });
   }
 
-  // 8) Mapa estratégico (espelha mapas/perspectivas/objetivos da Goiasa)
-  const goMaps = await prisma.strategicMap.findMany({ where: { companyId: goiasa.id, deletedAt: null }, select: { id: true, startsAt: true, endsAt: true, active: true } });
-  const goPersp = await prisma.perspective.findMany({ where: { map: { companyId: goiasa.id } }, select: { id: true, mapId: true, kind: true, position: true, positionX: true, positionY: true, width: true, height: true } });
-  const goObjs = await prisma.strategicObjective.findMany({ where: { map: { companyId: goiasa.id } }, select: { id: true, mapId: true, perspectiveId: true, ownerNodeId: true, weight: true, status: true, priority: true, position: true, positionX: true, positionY: true, width: true, height: true } });
-  const goObjInd = await prisma.strategicObjectiveIndicator.findMany({ where: { objective: { map: { companyId: goiasa.id } } }, select: { objectiveId: true, indicatorId: true } });
-  const goObjNode = await prisma.strategicObjectiveOrgNode.findMany({ where: { objective: { map: { companyId: goiasa.id } } }, select: { objectiveId: true, orgNodeId: true, kind: true } });
-  const goObjRel = await prisma.objectiveRelation.findMany({ where: { from: { map: { companyId: goiasa.id } } }, select: { fromId: true, toId: true, weight: true, kind: true, label: true } });
-
-  const mapMap = new Map<string, string>();
-  const perspMap = new Map<string, string>();
-  const objMap = new Map<string, string>();
-  const objName = namer(OBJECTIVE_POOL);
-  const PERSP_LABEL: Record<string, string> = {
-    FINANCIAL: 'Financeira', CUSTOMERS: 'Clientes', INTERNAL_PROCESS: 'Processos Internos',
-    LEARNING_GROWTH: 'Aprendizado e Crescimento', SAFETY: 'Segurança', PEOPLE: 'Pessoas',
-    ESG: 'Sustentabilidade (ESG)', QUALITY: 'Qualidade', PRODUCTIVITY: 'Produtividade',
-    COSTS: 'Custos', CUSTOM: 'Perspectiva',
-  };
-
-  let mapSeq = 0;
-  for (const gm of goMaps) {
-    mapSeq += 1;
-    const map = await prisma.strategicMap.create({
+  // 8) Mapa estratégico PRÓPRIO (BSC: 4 perspectivas + 10 objetivos), sem clonar a Goiasa
+  type PerspKind = 'FINANCIAL' | 'CUSTOMERS' | 'INTERNAL_PROCESS' | 'LEARNING_GROWTH';
+  const mapStartsAt = new Date(new Date().getFullYear(), 0, 1);
+  const mapEndsAt = new Date(new Date().getFullYear(), 11, 31);
+  const map = await prisma.strategicMap.create({
+    data: { companyId, name: 'Mapa Estratégico (Demonstração)', description: 'Mapa estratégico próprio da Empresa Demonstração (fictício).', startsAt: mapStartsAt, endsAt: mapEndsAt, active: true },
+    select: { id: true },
+  });
+  const PERSPECTIVES: { kind: PerspKind; name: string }[] = [
+    { kind: 'FINANCIAL', name: 'Financeira' },
+    { kind: 'CUSTOMERS', name: 'Clientes' },
+    { kind: 'INTERNAL_PROCESS', name: 'Processos Internos' },
+    { kind: 'LEARNING_GROWTH', name: 'Aprendizado e Crescimento' },
+  ];
+  const perspByKind = new Map<PerspKind, string>();
+  for (let pi = 0; pi < PERSPECTIVES.length; pi++) {
+    const p = PERSPECTIVES[pi];
+    const created = await prisma.perspective.create({
+      data: { mapId: map.id, kind: p.kind, name: p.name, position: pi, positionX: 0, positionY: pi * 200, width: 1240, height: 180 },
+      select: { id: true },
+    });
+    perspByKind.set(p.kind, created.id);
+  }
+  type ObjDef = { persp: PerspKind; name: string; node: string; inds: string[] };
+  const OBJ_DEFS: ObjDef[] = [
+    { persp: 'FINANCIAL', name: 'Aumentar a rentabilidade', node: 'Administrativo & Financeiro', inds: ['Faturamento', 'Margem de Contribuição'] },
+    { persp: 'FINANCIAL', name: 'Reduzir os custos operacionais', node: 'Administrativo & Financeiro', inds: ['Custo Operacional'] },
+    { persp: 'CUSTOMERS', name: 'Elevar a satisfação dos clientes', node: 'Comercial & Marketing', inds: ['Satisfação do Cliente (NPS)', 'Reclamações de Clientes'] },
+    { persp: 'CUSTOMERS', name: 'Ampliar a participação de mercado', node: 'Comercial & Marketing', inds: ['Novos Clientes', 'Atingimento da Meta de Vendas'] },
+    { persp: 'INTERNAL_PROCESS', name: 'Aumentar a eficiência produtiva', node: 'Operações / Produção', inds: ['OEE da Produção', 'Disponibilidade de Equipamentos'] },
+    { persp: 'INTERNAL_PROCESS', name: 'Garantir a qualidade dos produtos', node: 'Qualidade & SSMA', inds: ['Conformidade de Qualidade', 'Taxa de Retrabalho'] },
+    { persp: 'INTERNAL_PROCESS', name: 'Entregar no prazo (OTIF)', node: 'Logística', inds: ['OTIF – Entregas no Prazo e Completas'] },
+    { persp: 'LEARNING_GROWTH', name: 'Desenvolver competências da equipe', node: 'Administrativo & Financeiro', inds: ['Índice de Treinamento'] },
+    { persp: 'LEARNING_GROWTH', name: 'Fortalecer a cultura de segurança', node: 'Qualidade & SSMA', inds: ['Taxa de Frequência de Acidentes'] },
+    { persp: 'LEARNING_GROWTH', name: 'Engajar e reter talentos', node: 'Administrativo & Financeiro', inds: ['Engajamento da Equipe', 'Turnover'] },
+  ];
+  const OBJ_STATUS = ['ON_TRACK', 'ON_TRACK', 'AT_RISK', 'PLANNED'] as const;
+  const objMap = new Map<string, string>(); // nome do objetivo -> id
+  const perspColCount = new Map<PerspKind, number>();
+  for (const o of OBJ_DEFS) {
+    const col = perspColCount.get(o.persp) ?? 0;
+    perspColCount.set(o.persp, col + 1);
+    const perspIndex = PERSPECTIVES.findIndex((p) => p.kind === o.persp);
+    const ownerNodeId = areaByName.get(o.node) ?? null;
+    const obj = await prisma.strategicObjective.create({
       data: {
-        companyId, name: mapSeq === 1 ? 'Mapa Estratégico (Demonstração)' : `Mapa Estratégico ${mapSeq} (Demonstração)`,
-        description: 'Mapa estratégico fictício para demonstração.',
-        startsAt: gm.startsAt, endsAt: gm.endsAt, active: gm.active,
+        mapId: map.id, perspectiveId: perspByKind.get(o.persp)!, name: o.name,
+        ownerNodeId, responsibleUserId: chance(0.8) ? pick(userIds) : null,
+        weight: 1, status: pick([...OBJ_STATUS]), priority: rint(1, 5),
+        position: col, positionX: 40 + col * 300, positionY: 40 + perspIndex * 200, width: 260, height: 150,
       },
       select: { id: true },
     });
-    mapMap.set(gm.id, map.id);
+    objMap.set(o.name, obj.id);
+    for (const indName of o.inds) {
+      const indicatorId = indByName.get(indName);
+      if (indicatorId) await prisma.strategicObjectiveIndicator.create({ data: { objectiveId: obj.id, indicatorId } }).catch(() => undefined);
+    }
+    if (ownerNodeId) await prisma.strategicObjectiveOrgNode.create({ data: { objectiveId: obj.id, orgNodeId: ownerNodeId, kind: 'responsavel' } }).catch(() => undefined);
   }
-  for (const gp of goPersp) {
-    const newMapId = mapMap.get(gp.mapId);
-    if (!newMapId) continue;
-    const p = await prisma.perspective.create({
-      data: {
-        mapId: newMapId, kind: gp.kind, name: PERSP_LABEL[gp.kind] ?? 'Perspectiva',
-        position: gp.position, positionX: gp.positionX, positionY: gp.positionY, width: gp.width, height: gp.height,
-      },
-      select: { id: true },
-    });
-    perspMap.set(gp.id, p.id);
-  }
-  for (const go of goObjs) {
-    const newMapId = mapMap.get(go.mapId);
-    const newPerspId = perspMap.get(go.perspectiveId);
-    if (!newMapId || !newPerspId) continue;
-    const o = await prisma.strategicObjective.create({
-      data: {
-        mapId: newMapId, perspectiveId: newPerspId, name: objName(),
-        ownerNodeId: go.ownerNodeId ? nodeMap.get(go.ownerNodeId) ?? null : null,
-        responsibleUserId: chance(0.8) ? pick(userIds) : null,
-        weight: go.weight, status: go.status, priority: go.priority,
-        position: go.position, positionX: go.positionX, positionY: go.positionY, width: go.width, height: go.height,
-      },
-      select: { id: true },
-    });
-    objMap.set(go.id, o.id);
-  }
-  // links objetivo<->indicador
-  for (const l of goObjInd) {
-    const objectiveId = objMap.get(l.objectiveId);
-    const indicatorId = indMap.get(l.indicatorId);
-    if (!objectiveId || !indicatorId) continue;
-    await prisma.strategicObjectiveIndicator.create({ data: { objectiveId, indicatorId } }).catch(() => undefined);
-  }
-  // links objetivo<->área
-  for (const l of goObjNode) {
-    const objectiveId = objMap.get(l.objectiveId);
-    const orgNodeId = nodeMap.get(l.orgNodeId);
-    if (!objectiveId || !orgNodeId) continue;
-    await prisma.strategicObjectiveOrgNode.create({ data: { objectiveId, orgNodeId, kind: l.kind } }).catch(() => undefined);
-  }
-  // relações entre objetivos
-  for (const r of goObjRel) {
-    const fromId = objMap.get(r.fromId);
-    const toId = objMap.get(r.toId);
+  // relações de causa-efeito (aprendizado -> processos -> clientes -> financeiro)
+  const OBJ_RELATIONS: [string, string][] = [
+    ['Desenvolver competências da equipe', 'Aumentar a eficiência produtiva'],
+    ['Fortalecer a cultura de segurança', 'Aumentar a eficiência produtiva'],
+    ['Engajar e reter talentos', 'Garantir a qualidade dos produtos'],
+    ['Aumentar a eficiência produtiva', 'Reduzir os custos operacionais'],
+    ['Garantir a qualidade dos produtos', 'Elevar a satisfação dos clientes'],
+    ['Entregar no prazo (OTIF)', 'Elevar a satisfação dos clientes'],
+    ['Elevar a satisfação dos clientes', 'Ampliar a participação de mercado'],
+    ['Ampliar a participação de mercado', 'Aumentar a rentabilidade'],
+    ['Reduzir os custos operacionais', 'Aumentar a rentabilidade'],
+  ];
+  for (const [from, to] of OBJ_RELATIONS) {
+    const fromId = objMap.get(from);
+    const toId = objMap.get(to);
     if (!fromId || !toId || fromId === toId) continue;
-    await prisma.objectiveRelation.create({ data: { fromId, toId, weight: r.weight, kind: r.kind, label: r.label } }).catch(() => undefined);
+    await prisma.objectiveRelation.create({ data: { fromId, toId, weight: 1, kind: 'impacta', label: null } }).catch(() => undefined);
   }
 
   // ---------- atividade (gerada num volume saudável p/ demo) ----------
@@ -621,7 +636,7 @@ async function main() {
     const obj = await prisma.oKRObjective.create({
       data: {
         cycleId: cycle.id, name: okrObjName(), description: 'Objetivo OKR fictício.',
-        ownerName: randomName(), team: pick(['Industrial', 'Agrícola', 'Administrativo']),
+        ownerName: randomName(), team: pick(['Operações', 'Comercial', 'Administrativo']),
         confidence: rfloat(0.4, 0.9), status: pick(['PLANNED', 'ON_TRACK', 'AT_RISK'] as const),
         strategicObjId: allObjIds.length && chance(0.6) ? pick(allObjIds) : null,
       },
@@ -1062,7 +1077,7 @@ async function main() {
   const allChannels = { platform: true, homeCard: true, myDay: true, qrCode: true, topBanner: false, mandatoryPopup: false, digitalBoard: false, corporateTv: false, email: false, push: false };
   const commCampaign = await prisma.communicationCampaign.create({
     data: {
-      companyId, name: 'Campanha Seguranca em Primeiro Lugar', objective: 'Reforcar a cultura de seguranca durante a safra.',
+      companyId, name: 'Campanha Seguranca em Primeiro Lugar', objective: 'Reforcar a cultura de seguranca no dia a dia.',
       category: 'Seguranca', status: 'ACTIVE', ownerId: pick(userIds),
       startsAt: new Date(Date.now() - 20 * 86_400_000), endsAt: new Date(Date.now() + 40 * 86_400_000),
       targetAudience: { scope: 'ALL_COMPANY' }, indicatorIds: allIndIds.slice(0, 2), actionIds: actionIds.slice(0, 2), createdById: pick(userIds),
@@ -1075,11 +1090,11 @@ async function main() {
     mandatory?: boolean; campaign?: boolean; poll?: any; linkedModule?: string; linkedEntityId?: string;
   }> = [
     { title: 'Atualizacao da Politica de Seguranca do Trabalho', subtitle: 'Leitura obrigatoria para todos os colaboradores', content: 'Prezados(as),\n\nInformamos a atualizacao da Politica de Seguranca do Trabalho, com novas diretrizes para uso de EPIs e bloqueio de equipamentos.\n\nApos a leitura, confirme sua ciencia.', type: 'SIMPLE', category: 'Conformidade', priority: 'HIGH', status: 'PUBLISHED', mandatory: true, campaign: true },
-    { title: 'Resultados de Producao do Mes', subtitle: 'Destaques de eficiencia e moagem', content: 'Confira os destaques do mes:\n\n- Eficiencia de moagem acima da meta\n- Reducao de paradas nao programadas\n- Producao de etanol dentro do planejado\n\nParabens a todas as equipes!', type: 'BANNER', category: 'Resultados', priority: 'NORMAL', status: 'PUBLISHED', linkedModule: 'INDICATOR', linkedEntityId: allIndIds[0] },
+    { title: 'Resultados de Producao do Mes', subtitle: 'Destaques de eficiencia e produtividade', content: 'Confira os destaques do mes:\n\n- Eficiencia produtiva acima da meta\n- Reducao de paradas nao programadas\n- Volume produzido dentro do planejado\n\nParabens a todas as equipes!', type: 'BANNER', category: 'Resultados', priority: 'NORMAL', status: 'PUBLISHED', linkedModule: 'INDICATOR', linkedEntityId: allIndIds[0] },
     { title: 'Treinamento: Boas Praticas de Fabricacao', content: 'Assista ao video de treinamento sobre boas praticas de fabricacao e higiene industrial. A conclusao e obrigatoria para as areas industriais.', type: 'VIDEO', category: 'Treinamento', priority: 'NORMAL', status: 'PUBLISHED' },
     { title: 'Enquete: Clima Organizacional', content: 'Sua opiniao importa! Como voce avalia o ambiente de trabalho na sua area?', type: 'POLL', category: 'Pessoas', priority: 'NORMAL', status: 'PUBLISHED', campaign: true, poll: { question: 'Como voce avalia o ambiente de trabalho na sua area?', type: 'SINGLE', options: [{ id: 'otimo', label: 'Otimo' }, { id: 'bom', label: 'Bom' }, { id: 'regular', label: 'Regular' }, { id: 'ruim', label: 'Ruim' }], anonymous: true, allowMultiple: false, showResults: true } },
     { title: 'Pesquisa de Satisfacao com o Refeitorio', content: 'Ajude-nos a melhorar! Responda a pesquisa sobre a qualidade das refeicoes.', type: 'SURVEY', category: 'Pessoas', priority: 'LOW', status: 'PUBLISHED', poll: { question: 'Qual seu nivel de satisfacao com o refeitorio?', type: 'SINGLE', options: [{ id: 'muito_satisfeito', label: 'Muito satisfeito' }, { id: 'satisfeito', label: 'Satisfeito' }, { id: 'insatisfeito', label: 'Insatisfeito' }], anonymous: false, allowMultiple: false, showResults: true } },
-    { title: 'Manutencao Programada da Caldeira', subtitle: 'Parada prevista para o proximo fim de semana', content: 'Comunicamos a parada programada da caldeira para manutencao preventiva. Planejem as atividades das areas dependentes de vapor.', type: 'SIMPLE', category: 'Operacional', priority: 'HIGH', status: 'SCHEDULED' },
+    { title: 'Manutencao Programada da Linha de Producao', subtitle: 'Parada prevista para o proximo fim de semana', content: 'Comunicamos a parada programada da linha de producao para manutencao preventiva. Planejem as atividades das areas dependentes.', type: 'SIMPLE', category: 'Operacional', priority: 'HIGH', status: 'SCHEDULED' },
     { title: 'Rascunho: Programa de Reconhecimento', content: 'Em elaboracao: novo programa de reconhecimento de colaboradores destaque.', type: 'SIMPLE', category: 'Institucional', priority: 'LOW', status: 'DRAFT' },
   ];
   let commSeq = 0;
@@ -1124,7 +1139,7 @@ async function main() {
     }
   }
   const mediaDefs: Array<{ name: string; type: 'IMAGE' | 'BANNER' | 'VIDEO' | 'PDF'; category: string }> = [
-    { name: 'Banner Safra 2026', type: 'BANNER', category: 'Campanhas' },
+    { name: 'Banner Institucional 2026', type: 'BANNER', category: 'Campanhas' },
     { name: 'Foto Linha de Producao', type: 'IMAGE', category: 'Institucional' },
     { name: 'Video Treinamento BPF', type: 'VIDEO', category: 'Treinamento' },
     { name: 'Cartilha de Seguranca (PDF)', type: 'PDF', category: 'Seguranca' },
@@ -1148,7 +1163,7 @@ async function main() {
         select: { id: true },
       });
       await prisma.conversationParticipant.createMany({ data: [{ conversationId: conv.id, userId: a, role: 'MEMBER' as const }, { conversationId: conv.id, userId: b, role: 'MEMBER' as const }], skipDuplicates: true });
-      const chat = ['Oi, conseguiu ver os resultados do mes?', 'Vi sim, a moagem ficou acima da meta.', 'Otimo! Vamos levar isso para a reuniao mensal.', 'Combinado, vamos acompanhar.'];
+      const chat = ['Oi, conseguiu ver os resultados do mes?', 'Vi sim, a producao ficou acima da meta.', 'Otimo! Vamos levar isso para a reuniao mensal.', 'Combinado, vamos acompanhar.'];
       for (let m = 0; m < chat.length; m++) {
         await prisma.message.create({ data: { conversationId: conv.id, senderId: m % 2 === 0 ? a : b, body: chat[m], createdAt: new Date(Date.now() - (chat.length - m) * 3_600_000) } });
       }
@@ -1166,14 +1181,14 @@ async function main() {
   const closedMeeting = await prisma.monthlyMeeting.create({
     data: {
       companyId, title: `Reuniao Mensal de Resultados - ${meetingPeriod.periodRef}`, periodRef: meetingPeriod.periodRef,
-      cropSeason: `Safra ${year}/${year + 1}`, cycleName: 'Ciclo Mensal de Resultados', status: 'CLOSED', format: 'HYBRID',
+      cropSeason: `Exercício ${year}`, cycleName: 'Ciclo Mensal de Resultados', status: 'CLOSED', format: 'HYBRID',
       startsAt: meetingStart, endsAt: new Date(meetingStart.getTime() + 3 * 3_600_000), location: 'Auditorio Central',
       responsibleUserId: demoUsers.find((u) => u.role === UserRoleEnum.DIRECTOR)?.id ?? pick(userIds),
       secretaryUserId: demoUsers.find((u) => u.role === UserRoleEnum.ANALYST)?.id ?? pick(userIds),
       followUpUserId: demoUsers.find((u) => u.role === UserRoleEnum.MANAGER)?.id ?? pick(userIds),
       objective: 'Analisar criticamente os resultados do mes, tratar desvios e alinhar diretrizes com a diretoria.',
-      assumptions: 'Dados consolidados ate o fechamento do periodo. Metas conforme planejamento da safra.',
-      criticalRisks: 'Risco de parada nao programada na caldeira; variacao climatica afetando a colheita.',
+      assumptions: 'Dados consolidados ate o fechamento do periodo. Metas conforme planejamento do exercicio.',
+      criticalRisks: 'Risco de parada nao programada na linha de producao; atraso de fornecedores afetando a producao.',
       boardDirections: 'Priorizar disponibilidade de ativos e seguranca; manter investimento em manutencao preventiva.',
       generalNotes: 'Reuniao conduzida com presenca da diretoria e gestores das areas industriais.',
       keyMessage: 'Mes positivo em producao, com atencao redobrada para paradas nao programadas.',
@@ -1222,8 +1237,8 @@ async function main() {
     });
   }
   const decisionDefs: Array<{ kind: 'DECISION' | 'RISK' | 'ESCALATION' | 'PENDING'; description: string }> = [
-    { kind: 'DECISION', description: 'Aprovar a antecipacao da manutencao preventiva da caldeira para reduzir paradas.' },
-    { kind: 'RISK', description: 'Monitorar risco de variacao climatica que pode atrasar a colheita.' },
+    { kind: 'DECISION', description: 'Aprovar a antecipacao da manutencao preventiva da linha de producao para reduzir paradas.' },
+    { kind: 'RISK', description: 'Monitorar risco de atraso de fornecedores que pode impactar a producao.' },
     { kind: 'ESCALATION', description: 'Escalar para a diretoria a necessidade de contratacao de tecnicos de manutencao.' },
   ];
   for (const d of decisionDefs) {
@@ -1233,17 +1248,17 @@ async function main() {
   }
   for (let f = 0; f < 3; f++) {
     await prisma.monthlyMeetingFollowUp.create({
-      data: { meetingId: closedMeeting.id, level: pick(['WEEKLY', 'MONTHLY'] as const), title: pick(['Acompanhar plano de reducao de paradas', 'Verificar evolucao da eficiencia de moagem', 'Revisar indicadores de seguranca']), dueDate: new Date(meetingStart.getTime() + rint(7, 30) * 86_400_000), ownerUserId: pick(userIds), indicatorId: chance(0.7) ? pick(allIndIds) : null, actionPlanId: chance(0.5) ? pick(actionIds) : null, status: pick(['OPEN', 'IN_PROGRESS'] as const) },
+      data: { meetingId: closedMeeting.id, level: pick(['WEEKLY', 'MONTHLY'] as const), title: pick(['Acompanhar plano de reducao de paradas', 'Verificar evolucao da eficiencia produtiva', 'Revisar indicadores de seguranca']), dueDate: new Date(meetingStart.getTime() + rint(7, 30) * 86_400_000), ownerUserId: pick(userIds), indicatorId: chance(0.7) ? pick(allIndIds) : null, actionPlanId: chance(0.5) ? pick(actionIds) : null, status: pick(['OPEN', 'IN_PROGRESS'] as const) },
     });
   }
   for (let l = 0; l < 2; l++) {
     await prisma.monthlyMeetingLearning.create({
-      data: { meetingId: closedMeeting.id, orgNodeId: pick(meetingAreaIds), indicatorId: chance(0.6) ? pick(allIndIds) : null, learning: pick(['A inspecao preditiva reduziu paradas na moenda.', 'O checklist de partida da caldeira evitou retrabalho.']), treatedCause: 'Falha de manutencao preventiva', effectiveAction: 'Revisao do plano de manutencao com periodicidade ajustada', replicateToNodeId: chance(0.5) ? pick(meetingAreaIds) : null, ownerUserId: pick(userIds), status: 'OPEN' },
+      data: { meetingId: closedMeeting.id, orgNodeId: pick(meetingAreaIds), indicatorId: chance(0.6) ? pick(allIndIds) : null, learning: pick(['A inspecao preditiva reduziu paradas na linha de producao.', 'O checklist de partida da linha evitou retrabalho.']), treatedCause: 'Falha de manutencao preventiva', effectiveAction: 'Revisao do plano de manutencao com periodicidade ajustada', replicateToNodeId: chance(0.5) ? pick(meetingAreaIds) : null, ownerUserId: pick(userIds), status: 'OPEN' },
     });
   }
   const stdDefs: Array<{ type: 'POP' | 'CHECKLIST' | 'TRAINING'; description: string }> = [
-    { type: 'POP', description: 'Padronizar o procedimento de partida da caldeira (POP) com base na licao aprendida.' },
-    { type: 'CHECKLIST', description: 'Criar checklist de inspecao preditiva da moenda para todas as unidades.' },
+    { type: 'POP', description: 'Padronizar o procedimento de partida da linha de producao (POP) com base na licao aprendida.' },
+    { type: 'CHECKLIST', description: 'Criar checklist de inspecao preditiva dos equipamentos para todas as unidades.' },
   ];
   for (const s of stdDefs) {
     await prisma.monthlyMeetingStandardization.create({
@@ -1264,7 +1279,7 @@ async function main() {
   const preparingMeeting = await prisma.monthlyMeeting.create({
     data: {
       companyId, title: `Reuniao Mensal de Resultados - ${currentPeriod.periodRef}`, periodRef: currentPeriod.periodRef,
-      cropSeason: `Safra ${year}/${year + 1}`, cycleName: 'Ciclo Mensal de Resultados', status: 'PREPARING', format: 'HYBRID',
+      cropSeason: `Exercício ${year}`, cycleName: 'Ciclo Mensal de Resultados', status: 'PREPARING', format: 'HYBRID',
       startsAt: new Date(Date.now() + rint(3, 12) * 86_400_000), location: 'Auditorio Central',
       responsibleUserId: pick(userIds), secretaryUserId: pick(userIds),
       objective: 'Preparar a analise critica dos resultados do mes corrente.', createdById: pick(userIds),
@@ -1281,19 +1296,19 @@ async function main() {
 
   // 25) Seguranca do Alimento (APPCC + cadeia + compliance)
   const fsProgram = await prisma.foodSafetyProgram.create({
-    data: { companyId, orgNodeId: pick(areaIds), ownerUserId: pick(userIds), createdById: pick(userIds), code: 'FS-001', name: 'Programa de Seguranca de Alimentos (APPCC)', description: 'Sistema de gestao de seguranca de alimentos da unidade.', scope: 'Producao de acucar e etanol.', status: 'ACTIVE' },
+    data: { companyId, orgNodeId: pick(areaIds), ownerUserId: pick(userIds), createdById: pick(userIds), code: 'FS-001', name: 'Programa de Seguranca de Alimentos (APPCC)', description: 'Sistema de gestao de seguranca de alimentos da unidade.', scope: 'Producao de alimentos processados.', status: 'ACTIVE' },
     select: { id: true },
   });
   await prisma.foodSafetyRiskMatrix.create({ data: { companyId, name: 'Matriz padrao APPCC', severityScale: 5, probabilityScale: 5, active: true } });
   const fsStepTemplate: Array<{ name: string; type: 'RECEIVING' | 'STORAGE' | 'PROCESSING' | 'PACKAGING' | 'TRANSPORT' | 'DISTRIBUTION'; ccp?: boolean }> = [
-    { name: 'Recebimento de cana', type: 'RECEIVING' },
+    { name: 'Recebimento de materia-prima', type: 'RECEIVING' },
     { name: 'Armazenamento e preparo', type: 'STORAGE' },
     { name: 'Processamento e tratamento', type: 'PROCESSING', ccp: true },
     { name: 'Envase e empacotamento', type: 'PACKAGING', ccp: true },
     { name: 'Expedicao e distribuicao', type: 'DISTRIBUTION' },
   ];
   const fsHazardDefs: Array<{ name: string; category: 'BIOLOGICAL' | 'CHEMICAL' | 'PHYSICAL' | 'ALLERGENIC'; control: 'PRP' | 'OPRP' | 'CCP' }> = [
-    { name: 'Contaminacao microbiologica no caldo', category: 'BIOLOGICAL', control: 'CCP' },
+    { name: 'Contaminacao microbiologica no produto', category: 'BIOLOGICAL', control: 'CCP' },
     { name: 'Residuo quimico de limpeza', category: 'CHEMICAL', control: 'OPRP' },
     { name: 'Particula fisica (metal) no produto', category: 'PHYSICAL', control: 'CCP' },
     { name: 'Contaminacao cruzada de alergenicos', category: 'ALLERGENIC', control: 'PRP' },
@@ -1301,7 +1316,7 @@ async function main() {
   let fsProcNum = 0;
   let fsHazardNum = 0;
   const fsCcpHazardIds: string[] = [];
-  for (const prodName of ['Producao de Acucar VHP', 'Producao de Etanol Hidratado']) {
+  for (const prodName of ['Producao de Bebida Pronta', 'Producao de Alimento Processado']) {
     fsProcNum += 1;
     const proc = await prisma.foodSafetyProcess.create({
       data: { companyId, programId: fsProgram.id, orgNodeId: pick(areaIds), ownerUserId: pick(userIds), createdById: pick(userIds), number: fsProcNum, code: `FSP-${String(fsProcNum).padStart(3, '0')}`, name: prodName, objective: 'Garantir a seguranca do alimento ao longo da producao.', productName: prodName, productionLine: pick(['Linha 1', 'Linha 2']), version: '1.0', status: 'APPROVED' },
@@ -1361,7 +1376,7 @@ async function main() {
   const fsSupplierIds: string[] = [];
   for (let i = 0; i < 2; i++) {
     const sup = await prisma.foodSafetySupplier.create({
-      data: { companyId, programId: fsProgram.id, orgNodeId: pick(areaIds), responsibleUserId: pick(userIds), code: `SUP-${String(i + 1).padStart(3, '0')}`, name: pick(['Fornecedor de Cana Vale Verde', 'Insumos Quimicos Industriais Ltda', 'Embalagens Sustentaveis SA']), suppliedCategories: 'Materia-prima e insumos', criticality: pick(['MEDIUM', 'HIGH', 'CRITICAL'] as const), status: pick(['APPROVED', 'CONDITIONAL'] as const), score: round2(rfloat(60, 98)), lastAuditAt: new Date(Date.now() - rint(30, 200) * 86_400_000) },
+      data: { companyId, programId: fsProgram.id, orgNodeId: pick(areaIds), responsibleUserId: pick(userIds), code: `SUP-${String(i + 1).padStart(3, '0')}`, name: pick(['Fornecedor de Materia-prima Vale Verde', 'Insumos Alimenticios Industriais Ltda', 'Embalagens Sustentaveis SA']), suppliedCategories: 'Materia-prima e insumos', criticality: pick(['MEDIUM', 'HIGH', 'CRITICAL'] as const), status: pick(['APPROVED', 'CONDITIONAL'] as const), score: round2(rfloat(60, 98)), lastAuditAt: new Date(Date.now() - rint(30, 200) * 86_400_000) },
       select: { id: true },
     });
     fsSupplierIds.push(sup.id);
@@ -1369,7 +1384,7 @@ async function main() {
   const fsMaterialIds: string[] = [];
   for (let i = 0; i < 3; i++) {
     const mat = await prisma.foodSafetyMaterial.create({
-      data: { companyId, programId: fsProgram.id, supplierId: pick(fsSupplierIds), code: `MAT-${String(i + 1).padStart(3, '0')}`, name: pick(['Cana-de-acucar', 'Acido sulfurico', 'Soda caustica', 'Embalagem PET']), category: pick(['RAW_MATERIAL', 'INGREDIENT', 'PACKAGING'] as const), unit: pick(['t', 'kg', 'L', 'un']), shelfLifeDays: rint(30, 365), status: 'ACTIVE' },
+      data: { companyId, programId: fsProgram.id, supplierId: pick(fsSupplierIds), code: `MAT-${String(i + 1).padStart(3, '0')}`, name: pick(['Materia-prima vegetal', 'Aditivo alimentar', 'Conservante', 'Embalagem PET']), category: pick(['RAW_MATERIAL', 'INGREDIENT', 'PACKAGING'] as const), unit: pick(['t', 'kg', 'L', 'un']), shelfLifeDays: rint(30, 365), status: 'ACTIVE' },
       select: { id: true },
     });
     fsMaterialIds.push(mat.id);
@@ -1391,7 +1406,7 @@ async function main() {
   const secGateIds: string[] = [];
   for (let i = 0; i < 2; i++) {
     const gate = await prisma.securityGate.create({
-      data: { companyId, branchId: branch.id, code: `PORT-${i + 1}`, name: pick(['Portaria Principal', 'Portaria de Cargas', 'Portaria Agricola']), type: pick(['PEDESTRIAN', 'VEHICLE', 'MIXED']), location: pick(['Entrada principal', 'Doca de cargas']), allowedAccessTypes: ['PERSON', 'VEHICLE'], status: 'ACTIVE' },
+      data: { companyId, branchId: branch.id, code: `PORT-${i + 1}`, name: pick(['Portaria Principal', 'Portaria de Cargas', 'Portaria de Visitantes']), type: pick(['PEDESTRIAN', 'VEHICLE', 'MIXED']), location: pick(['Entrada principal', 'Doca de cargas']), allowedAccessTypes: ['PERSON', 'VEHICLE'], status: 'ACTIVE' },
       select: { id: true },
     });
     secGateIds.push(gate.id);
@@ -1407,7 +1422,7 @@ async function main() {
   const contractorIds: string[] = [];
   for (let i = 0; i < 2; i++) {
     const cc = await prisma.securityContractorCompany.create({
-      data: { companyId, legalName: pick(['Manutencao Industrial Beta Ltda', 'Construtora Sucroenergetica SA', 'Transportes Cana Rapida ME']), tradeName: pick(['Beta Manutencao', 'Construsucro', 'Cana Rapida']), cnpj: `${rint(10, 99)}.${rint(100, 999)}.${rint(100, 999)}/000${i + 1}-${rint(10, 99)}`, contractCode: `CTR-${year}-${i + 1}`, serviceTypes: ['Manutencao', 'Transporte'], documentStatus: pick(['VALID', 'EXPIRING'] as const), status: 'ACTIVE' },
+      data: { companyId, legalName: pick(['Manutencao Industrial Beta Ltda', 'Construtora Industrial Alfa SA', 'Transportes Rapidos ME']), tradeName: pick(['Beta Manutencao', 'Construir Alfa', 'Trans Rapido']), cnpj: `${rint(10, 99)}.${rint(100, 999)}.${rint(100, 999)}/000${i + 1}-${rint(10, 99)}`, contractCode: `CTR-${year}-${i + 1}`, serviceTypes: ['Manutencao', 'Transporte'], documentStatus: pick(['VALID', 'EXPIRING'] as const), status: 'ACTIVE' },
       select: { id: true },
     });
     contractorIds.push(cc.id);
@@ -1424,7 +1439,7 @@ async function main() {
   const vehicleIds: string[] = [];
   for (let i = 0; i < 3; i++) {
     const v = await prisma.securityVehicle.create({
-      data: { companyId, type: pick(['CAR', 'TRUCK', 'MOTORCYCLE']), plate: `${pick(['ABC', 'XYZ', 'QRS', 'JKL'])}${rint(1, 9)}${pick(['A', 'B', 'C', 'D'])}${rint(10, 99)}`, model: pick(['Caminhao Truck', 'Utilitario', 'Carro de passeio']), brand: pick(['Scania', 'Volvo', 'Fiat', 'VW']), color: pick(['Branco', 'Prata', 'Vermelho']), companyName: pick(['Beta Manutencao', 'Cana Rapida']), defaultDriverPersonId: pick(personIds), documentStatus: pick(['VALID', 'EXPIRING'] as const), status: 'ACTIVE' },
+      data: { companyId, type: pick(['CAR', 'TRUCK', 'MOTORCYCLE']), plate: `${pick(['ABC', 'XYZ', 'QRS', 'JKL'])}${rint(1, 9)}${pick(['A', 'B', 'C', 'D'])}${rint(10, 99)}`, model: pick(['Caminhao Truck', 'Utilitario', 'Carro de passeio']), brand: pick(['Scania', 'Volvo', 'Fiat', 'VW']), color: pick(['Branco', 'Prata', 'Vermelho']), companyName: pick(['Beta Manutencao', 'Trans Rapido']), defaultDriverPersonId: pick(personIds), documentStatus: pick(['VALID', 'EXPIRING'] as const), status: 'ACTIVE' },
       select: { id: true },
     });
     vehicleIds.push(v.id);
@@ -1437,7 +1452,7 @@ async function main() {
     secAuthSeq += 1;
     const status = pick(['APPROVED', 'WAITING_APPROVAL', 'USED'] as const);
     const auth = await prisma.securityAuthorization.create({
-      data: { companyId, code: `AUT-${year}-${String(secAuthSeq).padStart(4, '0')}`, personId: pick(personIds), contractorCompanyId: pick(contractorIds), gateId: pick(secGateIds), vehicleId: chance(0.5) ? pick(vehicleIds) : null, status, reason: pick(['Manutencao programada', 'Entrega de insumos', 'Visita tecnica', 'Coleta de bagaco']), scheduledStartAt: new Date(Date.now() + rint(-5, 5) * 86_400_000), scheduledEndAt: new Date(Date.now() + rint(6, 12) * 86_400_000), maxStayMinutes: rint(60, 480), approverId: status !== 'WAITING_APPROVAL' ? pick(userIds) : null, approvedAt: status !== 'WAITING_APPROVAL' ? new Date(Date.now() - rint(1, 5) * 86_400_000) : null },
+      data: { companyId, code: `AUT-${year}-${String(secAuthSeq).padStart(4, '0')}`, personId: pick(personIds), contractorCompanyId: pick(contractorIds), gateId: pick(secGateIds), vehicleId: chance(0.5) ? pick(vehicleIds) : null, status, reason: pick(['Manutencao programada', 'Entrega de insumos', 'Visita tecnica', 'Coleta de residuos']), scheduledStartAt: new Date(Date.now() + rint(-5, 5) * 86_400_000), scheduledEndAt: new Date(Date.now() + rint(6, 12) * 86_400_000), maxStayMinutes: rint(60, 480), approverId: status !== 'WAITING_APPROVAL' ? pick(userIds) : null, approvedAt: status !== 'WAITING_APPROVAL' ? new Date(Date.now() - rint(1, 5) * 86_400_000) : null },
       select: { id: true },
     });
     authIds.push(auth.id);
@@ -1463,7 +1478,7 @@ async function main() {
   const route = await prisma.securityRoundRoute.create({ data: { companyId, gateId: pick(secGateIds), code: 'RND-001', name: 'Ronda do Perimetro Industrial', description: 'Ronda noturna pelo perimetro e areas criticas.', frequencyMinutes: 120, toleranceMinutes: 15, responsibleUserId: pick(userIds), status: 'ACTIVE' }, select: { id: true } });
   const checkpointIds: string[] = [];
   for (let i = 0; i < 4; i++) {
-    const cp = await prisma.securityRoundCheckpoint.create({ data: { companyId, routeId: route.id, postId: pick(secPostIds), code: `CHK-${i + 1}`, name: pick(['Portao Norte', 'Tanques de Etanol', 'Subestacao', 'Almoxarifado', 'Doca de Cargas']), position: i, requiredEvidence: chance(0.5), status: 'ACTIVE' }, select: { id: true } });
+    const cp = await prisma.securityRoundCheckpoint.create({ data: { companyId, routeId: route.id, postId: pick(secPostIds), code: `CHK-${i + 1}`, name: pick(['Portao Norte', 'Patio de Tanques', 'Subestacao', 'Almoxarifado', 'Doca de Cargas']), position: i, requiredEvidence: chance(0.5), status: 'ACTIVE' }, select: { id: true } });
     checkpointIds.push(cp.id);
   }
   for (let i = 0; i < 3; i++) {
