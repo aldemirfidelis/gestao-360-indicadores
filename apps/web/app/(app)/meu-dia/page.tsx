@@ -340,7 +340,7 @@ export default function MeuDiaPage() {
       )}
 
       {/* Resumo */}
-      <div className="grid grid-cols-2 gap-4 sm:grid-cols-4 lg:grid-cols-8">
+      <div className="grid grid-cols-2 gap-3 sm:grid-cols-4 xl:grid-cols-8">
         {cards.filter((c) => !hiddenCards.includes(c.key)).map((c) => {
           let IconComp = CheckSquare;
           let iconColor = "text-blue-500 bg-blue-50";
@@ -403,7 +403,7 @@ export default function MeuDiaPage() {
               key={c.key}
               type="button"
               onClick={() => pickCard(c.key as any)}
-              className="rounded-xl border border-border bg-card p-4 text-left shadow-[0_2px_8px_rgba(0,0,0,0.02)] hover:shadow-[0_4px_12px_rgba(0,0,0,0.05)] hover:border-primary/20 transition-all flex flex-col justify-between h-[120px]"
+              className="overflow-hidden rounded-xl border border-border bg-card p-4 text-left shadow-[0_2px_8px_rgba(0,0,0,0.02)] hover:shadow-[0_4px_12px_rgba(0,0,0,0.05)] hover:border-primary/20 transition-all flex flex-col justify-between h-[120px]"
             >
               <div className="flex items-center justify-between w-full">
                 <div className={cn("p-1.5 rounded-lg", iconColor)}>
@@ -414,11 +414,11 @@ export default function MeuDiaPage() {
               
               <div className="mt-2 text-2xl font-bold text-slate-800 leading-none">{c.value}</div>
               
-              <div className="mt-2 flex items-center justify-between w-full border-t border-slate-50 pt-2 shrink-0">
-                <span className={cn("text-[9px] font-bold flex items-center gap-0.5", varColor)}>
+              <div className="mt-2 flex items-center justify-between gap-1 w-full border-t border-slate-50 pt-2 shrink-0 overflow-hidden">
+                <span className={cn("text-[9px] font-bold flex items-center gap-0.5 min-w-0 truncate", varColor)}>
                   {variation}
                 </span>
-                <div className="opacity-80 scale-90 -mr-2">
+                <div className="opacity-80 scale-90 shrink-0">
                   <Sparkline color={sparklineColor} />
                 </div>
               </div>

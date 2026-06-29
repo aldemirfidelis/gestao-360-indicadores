@@ -7,7 +7,6 @@ import { BrandLogo } from '@/components/brand/brand-logo';
 import { enablePushNotifications, notificationPermission, pushSupported } from '@/lib/push';
 
 const DISMISS_KEY = 'g360.pwaPromptDismissedAt';
-const DISMISS_DAYS = 14;
 
 interface BeforeInstallPromptEvent extends Event {
   prompt: () => Promise<void>;
@@ -44,8 +43,8 @@ export function PwaManager() {
 
     if (isStandalone()) return; // ja instalado
 
-    const dismissedAt = Number(window.localStorage.getItem(DISMISS_KEY) || 0);
-    if (dismissedAt && Date.now() - dismissedAt < DISMISS_DAYS * 86_400_000) return;
+    // Usuário já dispensou o convite de instalação — respeitar a decisão e não exibir novamente.
+    if (window.localStorage.getItem(DISMISS_KEY)) return;
 
     const ua = window.navigator.userAgent.toLowerCase();
     const ios = /iphone|ipad|ipod/.test(ua);
