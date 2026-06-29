@@ -561,11 +561,15 @@ function StepBlock({ step, canManage, selected, onClick, onMove }: StepBlockProp
             e.stopPropagation();
             if (!dragging) onClick();
           }}
-          className={`max-w-44 cursor-pointer select-none rounded-md border px-2 py-1 shadow-md backdrop-blur-sm transition-all ${
+          className={`max-w-44 cursor-pointer select-none rounded-md border px-2 py-1 shadow-md backdrop-blur-sm transition-all duration-200 ${
             step.isControlPoint 
               ? 'border-red-400 bg-red-50/95 text-red-700 hover:bg-red-100'
               : 'border-slate-200 bg-white/90 text-slate-700 hover:bg-slate-50'
-          } ${hovered || dragging || selected ? 'scale-105 ring-2 ring-sky-500' : ''}`}
+          } ${
+            hovered || dragging || selected 
+              ? 'scale-105 ring-2 ring-sky-500 opacity-100 pointer-events-auto' 
+              : 'opacity-0 scale-95 pointer-events-none'
+          }`}
         >
           <div className="flex items-center gap-1.5 whitespace-nowrap">
             <span className="text-[9px] font-bold opacity-60">#{step.number}</span>

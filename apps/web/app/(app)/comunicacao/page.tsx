@@ -594,7 +594,7 @@ export default function ComunicacaoPage() {
   const unread = (conversations.data ?? []).reduce((sum, c) => sum + c.unread, 0);
   const data = overview.data;
   const posts = data?.posts ?? [];
-  const selectedPost = posts.find((post) => post.id === selectedPostId) ?? data?.myWall.mandatoryPending[0] ?? data?.myWall.recent[0] ?? null;
+  const selectedPost = posts.find((post) => post.id === selectedPostId) ?? data?.myWall?.mandatoryPending?.[0] ?? data?.myWall?.recent?.[0] ?? null;
   const canCreate = hasPermission(['communication:create', 'communication:manage', 'communication:attachments']);
 
   return (
@@ -628,7 +628,7 @@ export default function ComunicacaoPage() {
             description="Comunicados, campanhas, mural, pesquisas, confirmações e chat corporativo."
             actions={
               <div className="flex flex-wrap items-center gap-2">
-                <Badge variant="secondary">{data?.metrics.mandatoryPending ?? 0} ciência(s) pendente(s)</Badge>
+                <Badge variant="secondary">{data?.metrics?.mandatoryPending ?? 0} ciência(s) pendente(s)</Badge>
                 <Badge variant="outline">{unread} mensagem(ns)</Badge>
                 <Button asChild variant="outline">
                   <Link href="/pessoas">
@@ -698,7 +698,7 @@ export default function ComunicacaoPage() {
             <IntegrationSignals data={data} />
           </div>
           <MetricsPanel data={data} />
-          <PostGrid posts={data?.charts.mostAccessed ?? []} onSelect={(post) => { setSelectedPostId(post.id); setTab('mural'); }} />
+          <PostGrid posts={data?.charts?.mostAccessed ?? []} onSelect={(post) => { setSelectedPostId(post.id); setTab('mural'); }} />
         </TabsContent>
 
         <TabsContent value="chat" className="space-y-4">
@@ -775,8 +775,8 @@ function Dashboard({ metrics, loading }: { metrics?: CommunicationOverview['metr
 }
 
 function EngagementCharts({ data }: { data?: CommunicationOverview }) {
-  const readByArea = data?.charts.readByArea.slice(0, 8) ?? [];
-  const typeData = data?.charts.engagementByType ?? [];
+  const readByArea = data?.charts?.readByArea?.slice(0, 8) ?? [];
+  const typeData = data?.charts?.engagementByType ?? [];
   return (
     <Card>
       <CardHeader>
@@ -1640,7 +1640,7 @@ function CampaignsPanel({ campaigns, createCampaign }: { campaigns: Campaign[]; 
 }
 
 function MetricsPanel({ data }: { data?: CommunicationOverview }) {
-  const evolution = data?.charts.monthlyEvolution ?? [];
+  const evolution = data?.charts?.monthlyEvolution ?? [];
   return (
     <div className="grid grid-cols-1 gap-4 xl:grid-cols-2">
       <Card>
@@ -1662,7 +1662,7 @@ function MetricsPanel({ data }: { data?: CommunicationOverview }) {
       <Card>
         <CardHeader><CardTitle>Pendências por gestor</CardTitle></CardHeader>
         <CardContent className="space-y-2">
-          {(data?.charts.pendingByManager ?? []).slice(0, 10).map((item) => (
+          {(data?.charts?.pendingByManager ?? []).slice(0, 10).map((item) => (
             <div key={`${item.manager}-${item.area}`} className="flex items-center justify-between gap-3 rounded-md border p-3 text-sm">
               <span className="min-w-0 break-words">{item.manager} · {item.area}</span>
               <Badge variant={item.pending > 0 ? 'destructive' : 'secondary'}>{item.pending}</Badge>
@@ -2081,16 +2081,16 @@ function CommunicationDashboardView({
   const router = useRouter();
 
   const posts = data?.posts ?? [];
-  const countPublished = data?.metrics.publishedThisMonth ?? 0;
-  const countDrafts = data?.metrics.drafts ?? 0;
-  const readRate = data?.metrics.readRate ?? 0;
-  const countPending = data?.metrics.mandatoryPending ?? 0;
+  const countPublished = data?.metrics?.publishedThisMonth ?? 0;
+  const countDrafts = data?.metrics?.drafts ?? 0;
+  const readRate = data?.metrics?.readRate ?? 0;
+  const countPending = data?.metrics?.mandatoryPending ?? 0;
   const activePolls = posts.filter((post) => ['POLL', 'SURVEY'].includes(post.type) && post.status === 'PUBLISHED').length;
-  const countCritical = data?.metrics.critical ?? 0;
+  const countCritical = data?.metrics?.critical ?? 0;
   const countMessages = unread;
-  const countReach = data?.metrics.totalViews ?? 0;
+  const countReach = data?.metrics?.totalViews ?? 0;
   const countImpacted = posts.filter((post) => post.status === 'PUBLISHED').reduce((sum, post) => sum + post.audienceSize, 0);
-  const countScheduled = data?.metrics.scheduled ?? 0;
+  const countScheduled = data?.metrics?.scheduled ?? 0;
 
   const CHANNELS = [
     { label: 'Todos os canais', filter: 'Todos os canais' },
@@ -2103,8 +2103,8 @@ function CommunicationDashboardView({
     { label: 'Confirmação obrigatória', filter: 'Confirmação' },
   ];
 
-  const pendingStaff = data?.team.pendingPeople ?? [];
-  const publicSegments = data?.charts.readByArea ?? [];
+  const pendingStaff = data?.team?.pendingPeople ?? [];
+  const publicSegments = data?.charts?.readByArea ?? [];
   const channelDefinitions = [
     { name: 'Mural', matches: (post: CommunicationPost) => Boolean(post.channels.digitalBoard) },
     { name: 'Push', matches: (post: CommunicationPost) => Boolean(post.channels.push) },
@@ -2125,7 +2125,7 @@ function CommunicationDashboardView({
     return channelDefinitions.find((channel) => channel.name === channelFilter)?.matches(post) ?? true;
   });
   const pollResponses = posts.reduce((sum, post) => sum + post.pollResponses.length, 0);
-  const featuredPost = posts.find((post) => post.isFeatured) ?? data?.charts.mostAccessed[0] ?? null;
+  const featuredPost = posts.find((post) => post.isFeatured) ?? data?.charts?.mostAccessed?.[0] ?? null;
 
   return (
     <div className="space-y-6">
@@ -2185,7 +2185,7 @@ function CommunicationDashboardView({
       {/* 3. Cards de Indicadores (KPIs) */}
       <div className="grid gap-4 grid-cols-2 md:grid-cols-3 lg:grid-cols-5">
         <KpiCard title="Publicados no mês" value={countPublished} change="Publicações registradas no período" color="emerald" icon={Megaphone} />
-        <KpiCard title="Rascunhos" value={countDrafts} change={`${data?.metrics.pendingApproval ?? 0} aguardando aprovação`} color="purple" icon={FileText} />
+        <KpiCard title="Rascunhos" value={countDrafts} change={`${data?.metrics?.pendingApproval ?? 0} aguardando aprovação`} color="purple" icon={FileText} />
         <KpiCard title="Taxa de leitura" value={`${(readRate * 100).toFixed(1)}%`} change={`${countReach} visualizações registradas`} color="emerald" icon={BookOpenCheck} />
         <KpiCard title="Confirmações pendentes" value={countPending} change="Pendências obrigatórias reais" color="amber" icon={ClipboardCheck} />
         <KpiCard title="Enquetes ativas" value={activePolls} change={`${pollResponses} respostas registradas`} color="purple" icon={Vote} />
@@ -2408,7 +2408,7 @@ function CommunicationDashboardView({
               <div className="flex items-center justify-between gap-4">
                 <div className="space-y-0.5 min-w-0">
                   <div className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider">Leitura</div>
-                  <div className="text-base font-extrabold text-slate-900 dark:text-white">{((data?.metrics.readRate ?? 0) * 100).toFixed(1)}%</div>
+                  <div className="text-base font-extrabold text-slate-900 dark:text-white">{((data?.metrics?.readRate ?? 0) * 100).toFixed(1)}%</div>
                   <div className="text-[9px] text-emerald-600 font-bold">Sobre a audiência entregue</div>
                 </div>
                 <div className="w-28 h-8 shrink-0">
@@ -2429,7 +2429,7 @@ function CommunicationDashboardView({
               <div className="flex items-center justify-between gap-4 border-t pt-2">
                 <div className="space-y-0.5 min-w-0">
                   <div className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider">Confirmação</div>
-                  <div className="text-base font-extrabold text-slate-900 dark:text-white">{((data?.metrics.confirmationRate ?? 0) * 100).toFixed(1)}%</div>
+                  <div className="text-base font-extrabold text-slate-900 dark:text-white">{((data?.metrics?.confirmationRate ?? 0) * 100).toFixed(1)}%</div>
                   <div className="text-[9px] text-emerald-600 font-bold">Ciências obrigatórias confirmadas</div>
                 </div>
                 <div className="w-28 h-8 shrink-0">
@@ -2451,7 +2451,7 @@ function CommunicationDashboardView({
                 <div className="space-y-0.5 min-w-0">
                   <div className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider">Respostas (enquetes)</div>
                   <div className="text-base font-extrabold text-slate-900 dark:text-white">{pollResponses}</div>
-                  <div className="text-[9px] text-emerald-600 font-bold">{((data?.metrics.pollResponseRate ?? 0) * 100).toFixed(1)}% da audiência</div>
+                  <div className="text-[9px] text-emerald-600 font-bold">{((data?.metrics?.pollResponseRate ?? 0) * 100).toFixed(1)}% da audiência</div>
                 </div>
                 <div className="w-28 h-8 shrink-0">
                   <svg className="w-full h-full" viewBox="0 0 100 40">
