@@ -61,6 +61,9 @@ seed-prize-estradas: ## Popula o exemplo do anexo 0561 (Prêmio Estradas) na emp
 seed-prize-estradas-demo: ## Demonstra apuracao do anexo 0561 (base ficticia + calculo)
 	$(COMPOSE) exec -T api npx tsx prisma/seed-prize-estradas-demo.ts
 
+seed-demo: ## Regenera a Empresa Demonstracao (limpa e recria dados ficticios)
+	$(COMPOSE) exec -T api npx tsx prisma/seed-demo-company.ts
+
 shell-api: ## Shell dentro do container API
 	$(COMPOSE) exec api sh
 
