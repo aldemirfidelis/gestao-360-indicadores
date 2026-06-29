@@ -2304,7 +2304,7 @@ function CommunicationDashboardView({
                 </div>
                 <div className="flex items-center justify-between py-1 border-t pt-2 border-slate-100 dark:border-slate-800/60">
                   <span className="text-slate-600 dark:text-slate-400">Bots e automações</span>
-                  <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-full bg-sky-100 dark:bg-sky-955/40 text-sky-600 dark:text-sky-400">{data?.automations.filter((rule) => rule.active).length ?? 0}</span>
+                  <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-full bg-sky-100 dark:bg-sky-955/40 text-sky-600 dark:text-sky-400">{(data?.automations ?? []).filter((rule) => rule.active).length}</span>
                 </div>
               </div>
               <Button size="sm" className="w-full mt-3 h-8 bg-sky-500 hover:bg-sky-600 text-white font-semibold" onClick={() => setTab('chat')}>
