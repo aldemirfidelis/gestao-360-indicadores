@@ -9,6 +9,7 @@ import { Button } from '@/components/ui/button';
 import { api } from '@/lib/api';
 import { formatDate } from '@/lib/utils';
 import { cn } from '@/lib/utils';
+import { enablePushNotifications, notificationPermission, pushSupported } from '@/lib/push';
 
 interface Notif {
   id: string;
@@ -81,6 +82,32 @@ export function NotificationsBell() {
     },
   });
 
+  const [pushState, setPushState] = useState<'on' | 'off' | 'unsupported'>('off');
+  const [pushBusy, setPushBusy] = useState(false);
+  useEffect(() => {
+    if (!pushSupported()) return setPushState('unsupported');
+    setPushState(notificationPermission() === 'granted' ? 'on' : 'off');
+  }, []);
+
+  const enablePush = async () => {
+    setPushBusy(true);
+    try {
+      const res = await enablePushNotifications();
+      if (res.ok) {
+        setPushState('on');
+        toast.success('Notificações ativadas neste dispositivo.');
+      } else if (res.reason === 'denied') {
+        toast.error('Permissão negada. Habilite as notificações nas configurações do navegador.');
+      } else if (res.reason === 'unsupported') {
+        toast.error('Para receber no iPhone, instale o app na tela inicial primeiro.');
+      } else {
+        toast.error('Não foi possível ativar as notificações.');
+      }
+    } finally {
+      setPushBusy(false);
+    }
+  };
+
   const unread = count.data?.unread ?? 0;
 
   return (
@@ -131,6 +158,17 @@ export function NotificationsBell() {
               </Button>
             )}
           </div>
+
+          {pushState === 'off' && (
+            <button
+              onClick={enablePush}
+              disabled={pushBusy}
+              className="mb-3 flex w-full items-center justify-center gap-2 rounded-lg border border-primary/30 bg-primary/[0.04] px-3 py-2 text-xs font-semibold text-primary transition hover:bg-primary/10 disabled:opacity-50"
+            >
+              <BellRing className="h-3.5 w-3.5" />
+              {pushBusy ? 'Ativando...' : 'Ativar notificações neste dispositivo'}
+            </button>
+          )}
 
           <div className="max-h-[350px] overflow-y-auto space-y-2 pr-1 scrollbar-thin">
             {list.isLoading && (

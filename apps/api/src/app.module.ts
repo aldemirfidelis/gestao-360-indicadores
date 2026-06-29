@@ -31,6 +31,7 @@ import { AssetSecurityModule } from './modules/asset-security/asset-security.mod
 import { FormsModule } from './modules/forms/forms.module';
 import { MeetingsModule } from './modules/meetings/meetings.module';
 import { NotificationsModule } from './modules/notifications/notifications.module';
+import { PushModule } from './modules/push/push.module';
 import { AuditModule } from './modules/audit/audit.module';
 import { ImportsModule } from './modules/imports/imports.module';
 import { ReportsModule } from './modules/reports/reports.module';
@@ -95,6 +96,7 @@ import { workersEnabled } from './jobs/jobs.constants';
     FormsModule,
     MeetingsModule,
     NotificationsModule,
+    PushModule,
     AuditModule,
     ImportsModule,
     ReportsModule,

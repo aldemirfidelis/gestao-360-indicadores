@@ -6,6 +6,7 @@ import { ThemeProvider } from 'next-themes';
 import { Toaster } from 'sonner';
 import { AuthProvider } from '@/components/auth/auth-provider';
 import { PortalConfigProvider } from '@/components/portal-admin/portal-config-provider';
+import { PwaManager } from '@/components/pwa/pwa-manager';
 
 export function Providers({ children }: { children: ReactNode }) {
   const [qc] = useState(
@@ -23,6 +24,7 @@ export function Providers({ children }: { children: ReactNode }) {
           <PortalConfigProvider>
             {children}
             <Toaster position="top-right" richColors />
+            <PwaManager />
           </PortalConfigProvider>
         </AuthProvider>
       </QueryClientProvider>

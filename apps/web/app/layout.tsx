@@ -1,5 +1,5 @@
 import './globals.css';
-import type { Metadata } from 'next';
+import type { Metadata, Viewport } from 'next';
 import { ReactNode } from 'react';
 import { Inter } from 'next/font/google';
 import { Providers } from '@/components/providers';
@@ -29,6 +29,13 @@ export const metadata: Metadata = {
     apple: '/icons/apple-touch-icon.png',
   },
   manifest: '/icons/manifest.json',
+  applicationName: SITE_NAME,
+  appleWebApp: {
+    capable: true,
+    title: SITE_NAME,
+    statusBarStyle: 'black-translucent',
+  },
+  formatDetection: { telephone: false },
   openGraph: {
     type: 'website',
     locale: 'pt_BR',
@@ -44,6 +51,16 @@ export const metadata: Metadata = {
     description: 'Conecte estratégia, indicadores, planos de ação, documentos, auditorias, riscos e melhoria contínua em um único ambiente.',
     images: [absoluteUrl(DEFAULT_OG_IMAGE)],
   },
+};
+
+export const viewport: Viewport = {
+  width: 'device-width',
+  initialScale: 1,
+  viewportFit: 'cover',
+  themeColor: [
+    { media: '(prefers-color-scheme: light)', color: '#0f2042' },
+    { media: '(prefers-color-scheme: dark)', color: '#081023' },
+  ],
 };
 
 export default function RootLayout({ children }: { children: ReactNode }) {

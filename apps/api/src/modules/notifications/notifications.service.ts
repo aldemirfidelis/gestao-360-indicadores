@@ -1,10 +1,14 @@
 import { Injectable } from '@nestjs/common';
 import { PrismaService } from '../../prisma/prisma.service';
 import { ActionStatus, NotificationKind } from '@prisma/client';
+import { PushService } from '../push/push.service';
 
 @Injectable()
 export class NotificationsService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly push: PushService,
+  ) {}
 
   async list(userId: string, unreadOnly = false) {
     return this.prisma.notification.findMany({
@@ -26,9 +30,12 @@ export class NotificationsService {
     body?: string,
     link?: string,
   ) {
-    return this.prisma.notification.create({
+    const notification = await this.prisma.notification.create({
       data: { companyId, userId, kind, title, body: body ?? null, link: link ?? null },
     });
+    // Dispara Web Push para os dispositivos do usuario (inerte se VAPID nao configurado).
+    void this.push.sendToUser(userId, { title, body: body ?? undefined, link: link ?? undefined, tag: kind });
+    return notification;
   }
 
   async markRead(id: string) {

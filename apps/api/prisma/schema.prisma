@@ -5854,6 +5854,23 @@ model Notification {
   @@index([userId, readAt])
 }
 
+// Inscricao Web Push (PWA) de um usuario/dispositivo. Sem FK (companyId/userId
+// como colunas simples), seguindo o padrao das tabelas de seguranca, para nao
+// alterar os models User/Company. Uma inscricao por endpoint do navegador.
+model PushSubscription {
+  id        String   @id @default(uuid())
+  userId    String
+  companyId String?
+  endpoint  String   @unique
+  p256dh    String
+  auth      String
+  userAgent String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([userId])
+}
+
 // =====================================================
 // Rastreabilidade e mapa corporativo
 // =====================================================

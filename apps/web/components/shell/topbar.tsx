@@ -96,7 +96,7 @@ export function Topbar() {
   };
 
   return (
-    <header className="sticky top-0 z-30 flex h-14 items-center gap-3 border-b border-[#1b2b54]/50 bg-[#0a1128] px-3 backdrop-blur lg:px-6">
+    <header className="sticky top-0 z-30 flex h-14 items-center gap-3 border-b border-[#1b2b54]/50 bg-[#0a1128] px-3 pt-[env(safe-area-inset-top)] [height:calc(3.5rem+env(safe-area-inset-top))] backdrop-blur lg:px-6">
       <Dialog open={menuOpen} onOpenChange={setMenuOpen}>
         <DialogTrigger asChild>
           <Button variant="ghost" size="icon" className="lg:hidden text-slate-300 hover:text-white hover:bg-white/[0.05]" aria-label="Abrir menu">

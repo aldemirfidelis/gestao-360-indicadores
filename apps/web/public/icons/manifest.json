@@ -1,9 +1,16 @@
 {
+  "id": "/",
   "name": "Gestão 360",
   "short_name": "Gestão 360",
   "description": "Plataforma SaaS de Gestão Empresarial, OKR, KPI e planos de ação.",
-  "start_url": "/",
+  "start_url": "/?source=pwa",
+  "scope": "/",
   "display": "standalone",
+  "display_override": ["standalone", "minimal-ui"],
+  "orientation": "portrait-primary",
+  "lang": "pt-BR",
+  "dir": "ltr",
+  "categories": ["business", "productivity"],
   "background_color": "#081023",
   "theme_color": "#0f2042",
   "icons": [
@@ -30,6 +37,26 @@
       "sizes": "512x512",
       "type": "image/png",
       "purpose": "maskable"
+    }
+  ],
+  "shortcuts": [
+    {
+      "name": "Meu Dia",
+      "short_name": "Meu Dia",
+      "description": "Sua central de trabalho",
+      "url": "/meu-dia?source=pwa"
+    },
+    {
+      "name": "Indicadores",
+      "short_name": "Indicadores",
+      "description": "Acompanhe seus indicadores",
+      "url": "/indicators?source=pwa"
+    },
+    {
+      "name": "Comunicação",
+      "short_name": "Comunicação",
+      "description": "Mural e comunicados",
+      "url": "/comunicacao?source=pwa"
     }
   ]
 }
