@@ -50,3 +50,8 @@ db-backups/
 
 # Documentos internos com dados reais (LGPD - nunca commitar)
 Gestao_premio/
+
+# Documentos institucionais gerados (case comercial / catalogo de modulos) - nao versionar
+docs/modulos/
+docs/case-institucional/
+scripts/gerar-case-institucional.py

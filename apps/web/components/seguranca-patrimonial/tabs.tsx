@@ -1131,6 +1131,10 @@ type SettingsSub = 'general' | 'documents' | 'blocklist' | 'audit' | 'offline';
 
 export function SettingsTab({ gates, posts, packageConfig, summary, loading, canManage, canBlock, canOffline, optionValues, onDialog }: { gates: AnyRecord[]; posts: AnyRecord[]; packageConfig?: AnyRecord; summary?: SecuritySummary; loading: boolean; canManage: boolean; canBlock: boolean; canOffline: boolean; optionValues: ReturnType<typeof buildOptions>; onDialog: (d: EntityDialogState) => void }) {
   const [sub, setSub] = useState<SettingsSub>('general');
+  const { user } = useAuth();
+  // O "Pacote comercial" (ativação/licenciamento dos recursos do módulo) é controle de
+  // plataforma/comercial — só o Super Admin pode ver/configurar; o usuário final não.
+  const isSuperAdmin = user?.role === 'SUPER_ADMIN';
   const subTabs: Array<{ key: SettingsSub; label: string }> = [
     { key: 'general', label: 'Geral' },
     { key: 'documents', label: 'Exigência documental' },
@@ -1144,6 +1148,7 @@ export function SettingsTab({ gates, posts, packageConfig, summary, loading, can
 
       {sub === 'general' && (
         <div className="space-y-4">
+          {isSuperAdmin && (
           <Card>
             <CardContent className="p-4">
               <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
@@ -1154,10 +1159,11 @@ export function SettingsTab({ gates, posts, packageConfig, summary, loading, can
                   </p>
                   <p className="mt-1 text-xs text-muted-foreground">Fila de sincronização sem conexão: {formatNumber(summary?.offlinePending ?? 0)} pendência(s).</p>
                 </div>
-                {canManage && <Button variant="outline" onClick={() => onDialog(packageDialog(optionValues, packageConfig))}>Configurar pacote</Button>}
+                <Button variant="outline" onClick={() => onDialog(packageDialog(optionValues, packageConfig))}>Configurar pacote</Button>
               </div>
             </CardContent>
           </Card>
+          )}
           <div className="grid gap-4 xl:grid-cols-2">
             <SectionCard
               title={`Portarias (${gates.length})`}
