@@ -127,6 +127,16 @@ export const navSections: NavSection[] = [
     ],
   },
   {
+    heading: 'Escanear QR',
+    description: 'Leitor de QR Code para rondas, formulários e ocorrências (uso em campo)',
+    intent: 'view',
+    icon: QrCode,
+    flat: true,
+    items: [
+      { href: '/scan', label: 'Escanear QR', description: 'Aponte a câmera para o QR do ponto de ronda, formulário ou portaria', icon: QrCode, permissions: [], exact: true },
+    ],
+  },
+  {
     heading: 'Gestão à Vista',
     description: 'Painel executivo, estratégia, indicadores e ritos de gestão',
     intent: 'view',
@@ -282,6 +292,7 @@ export const ROUTE_PERMISSIONS: Array<{ prefix: string; permissions: string[]; e
   { prefix: '/projects', permissions: ['projects:view'] },
   { prefix: '/deviations', permissions: ['deviations:view'] },
   { prefix: '/imports', permissions: ['imports:view', 'imports:create'] },
+  { prefix: '/scan', permissions: [] },
   { prefix: '/eficacia', permissions: ['eficacia:view', 'actions:effectiveness'] },
   { prefix: '/periods', permissions: ['settings:manage'] },
   { prefix: '/actions', permissions: ['actions:view'] },

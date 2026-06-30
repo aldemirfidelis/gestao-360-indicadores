@@ -20,6 +20,7 @@ import { AuthPayload } from '../auth/auth.types';
 import { GeminiService } from '../ai/gemini.service';
 import { FormCodeService } from './form-code.service';
 import { FormStorageService } from './form-storage.service';
+import { randomUUID } from 'node:crypto';
 
 const MODULE = 'forms';
 const EXECUTABLE_TEMPLATE_STATUSES = new Set<FormTemplateStatus>([
@@ -983,6 +984,40 @@ export class FormsService {
       orderBy: { createdAt: 'desc' },
     });
     return submissions.map((submission) => this.enrichSubmission(submission));
+  }
+
+  /** Emite (ou reusa) um QR Code para um formulário. O token vira deep-link /scan?type=form. */
+  async createTemplateQr(me: AuthPayload, templateId: string, body: any) {
+    const template = await this.loadTemplate(templateId, me.companyId);
+    const existing = await this.prisma.formQrCode.findFirst({
+      where: { companyId: me.companyId, templateId, active: true, deletedAt: null },
+      orderBy: { createdAt: 'desc' },
+    });
+    if (existing) return { token: existing.code, templateId, title: template.title };
+    const token = randomUUID().replace(/-/g, '');
+    await this.prisma.formQrCode.create({
+      data: {
+        companyId: me.companyId,
+        templateId,
+        code: token,
+        label: body?.label ? String(body.label).slice(0, 200) : template.title,
+        targetEntityType: 'FORM_TEMPLATE',
+        targetEntityId: templateId,
+        active: true,
+        createdById: me.sub,
+      },
+    });
+    return { token, templateId, title: template.title };
+  }
+
+  /** Resolve um token de QR de formulário para o template correspondente (para abrir a inspeção). */
+  async validateFormQr(me: AuthPayload, token: string) {
+    const qr = await this.prisma.formQrCode.findFirst({
+      where: { companyId: me.companyId, code: token, active: true, deletedAt: null },
+      include: { template: { select: { id: true, title: true, status: true } } },
+    });
+    if (!qr) return { valid: false as const };
+    return { valid: true as const, templateId: qr.templateId, title: qr.template?.title ?? 'Formulário', status: qr.template?.status ?? null };
   }
 
   private answerValue(answer: any) {

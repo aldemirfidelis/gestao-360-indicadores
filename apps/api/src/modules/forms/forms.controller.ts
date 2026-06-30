@@ -148,6 +148,19 @@ export class FormsController {
     return this.service.createSubmission(me, id, body);
   }
 
+  // QR Code do formulário: gerar (gestão de templates) e validar/resolver (para abrir a inspeção).
+  @Get('qrcode/validate/:token')
+  @RequirePermissions('forms:view')
+  validateQr(@CurrentUser() me: AuthPayload, @Param('token') token: string) {
+    return this.service.validateFormQr(me, token);
+  }
+
+  @Post(':id/qrcode')
+  @RequirePermissions('forms:templates')
+  createQr(@CurrentUser() me: AuthPayload, @Param('id') id: string, @Body() body: any) {
+    return this.service.createTemplateQr(me, id, body);
+  }
+
   @Patch('submissions/:submissionId')
   @RequirePermissions('forms:update')
   updateSubmission(@CurrentUser() me: AuthPayload, @Param('submissionId') submissionId: string, @Body() body: any) {

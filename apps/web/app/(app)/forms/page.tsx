@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import type { ReactNode } from 'react';
 import { useSearchParams } from 'next/navigation';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
@@ -47,6 +47,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Textarea } from '@/components/ui/textarea';
 import { useAuth } from '@/components/auth/auth-provider';
 import { api } from '@/lib/api';
+import { QrPrintDialog } from '@/components/qr/qr-print-dialog';
 import { cn, formatDate, formatNumber } from '@/lib/utils';
 
 type TemplateType = string;
@@ -441,6 +442,15 @@ export default function FormsPage() {
   const dashboard = dashboardQuery.data;
   const options = optionsQuery.data;
   const selected = useMemo(() => templates.find((item) => item.id === selectedId) ?? null, [templates, selectedId]);
+
+  // QR Code do formulário: gera (ou reusa) o token e abre o diálogo de impressão.
+  const [qrInfo, setQrInfo] = useState<{ token: string; title: string } | null>(null);
+  const [qrOpen, setQrOpen] = useState(false);
+  const generateQr = useMutation({
+    mutationFn: (templateId: string) => api<{ token: string; title: string }>(`/forms/${templateId}/qrcode`, { method: 'POST', json: {} }),
+    onSuccess: (r) => { setQrInfo(r); setQrOpen(true); },
+    onError: (e: any) => toast.error(e?.message ?? 'Falha ao gerar QR Code'),
+  });
   const builderQuery = useQuery<BuilderPayload>({
     queryKey: ['forms', selectedId, 'builder'],
     queryFn: () => api<BuilderPayload>(`/forms/${selectedId}/builder`),
@@ -709,6 +719,15 @@ export default function FormsPage() {
     setSubmissionOpen(true);
   }
 
+  // Aberto via QR (/scan -> /forms?fill=<templateId>): abre direto o preenchimento da inspeção.
+  const fillHandledRef = useRef(false);
+  useEffect(() => {
+    const fillId = searchParams.get('fill');
+    if (!fillId || fillHandledRef.current) return;
+    const t = templates.find((x) => x.id === fillId);
+    if (t) { fillHandledRef.current = true; openSubmission(t); }
+  }, [searchParams, templates]);
+
   function openExecution(item: FormTemplate) {
     setSelectedId(item.id);
     setExecutionForm({ title: item.title, assignedToId: item.ownerUserId ?? '', dueDate: '', offlineEnabled: false });
@@ -869,6 +888,11 @@ export default function FormsPage() {
               <MiniList title="Versões" items={(selectedBuilder?.template.versions ?? selected?.versions ?? []).map((v) => `${v.versionLabel} - ${label(STATUS_LABEL, v.status)}`)} empty="Sem versões." />
               <MiniList title="Regras" items={(selectedBuilder?.rules ?? []).map((r) => `${r.name} - ${r.event}`)} empty="Sem regras configuradas." />
               <MiniList title="Formulas" items={(selectedBuilder?.formulas ?? []).map((f) => `${f.code}: ${f.expression}`)} empty="Sem formulas configuradas." />
+              {selected && canBuilder ? (
+                <Button size="sm" variant="outline" className="w-full" onClick={() => generateQr.mutate(selected.id)} disabled={generateQr.isPending}>
+                  <QrCode className="mr-2 h-4 w-4" />{generateQr.isPending ? 'Gerando…' : 'Gerar QR do formulário'}
+                </Button>
+              ) : null}
               <MiniList title="QR e externo" items={[...(selectedBuilder?.qrCodes ?? []).map((q) => `QR ${q.code}`), ...(selectedBuilder?.externalLinks ?? []).map((l) => `${l.name} - ${l.status}`)]} empty="Sem acesso externo." />
               <MiniList title="IA" items={(selectedBuilder?.aiSuggestions ?? []).map((s) => s.title)} empty="Sem sugestões." />
             </CardContent></Card>
@@ -940,6 +964,7 @@ export default function FormsPage() {
       />
 
       <SubmissionDialog open={submissionOpen} setOpen={setSubmissionOpen} selected={selected} title={submissionTitle} setTitle={setSubmissionTitle} notes={submissionNotes} setNotes={setSubmissionNotes} answers={answers} setAnswers={setAnswers} submit={() => submitForm.mutate()} saving={submitForm.isPending} />
+      <QrPrintDialog open={qrOpen} onOpenChange={setQrOpen} type="form" token={qrInfo?.token ?? null} title={qrInfo?.title ?? 'Formulário'} subtitle="Escaneie para abrir e preencher a inspeção" />
 
       <ExecutionDialog open={executionOpen} setOpen={setExecutionOpen} selected={selected} options={options} form={executionForm} setForm={setExecutionForm} save={() => createExecution.mutate()} saving={createExecution.isPending} />
 
