@@ -1048,6 +1048,27 @@ export class AssetSecurityService {
     return saved;
   }
 
+  /**
+   * Leitura de QR de um ponto de ronda (campo/mobile): acha a ronda ativa do usuario
+   * para a rota do ponto (ou inicia uma) e registra a passagem. Torna o fluxo de campo
+   * trivial: escanear -> registrado. Idempotente o bastante para replay offline.
+   */
+  async scanCheckpoint(me: AuthPayload, checkpointId: string, body: JsonMap) {
+    await this.assertPackageWrite(me);
+    const checkpoint = await this.db.securityRoundCheckpoint.findFirst({ where: { id: checkpointId, companyId: me.companyId, deletedAt: null } });
+    if (!checkpoint) throw new NotFoundException('Ponto de ronda nao encontrado.');
+    let execution = await this.db.securityRoundExecution.findFirst({
+      where: { companyId: me.companyId, routeId: checkpoint.routeId, deletedAt: null, status: { in: ['PLANNED', 'IN_PROGRESS'] }, assignedUserId: me.sub },
+      orderBy: { createdAt: 'desc' },
+    });
+    if (!execution) {
+      execution = await this.createRoundExecution(me, { routeId: checkpoint.routeId, startNow: true, assignedUserId: me.sub });
+    }
+    const saved = await this.visitRoundCheckpoint(me, execution.id, { checkpointId, evidence: body.evidence ?? true });
+    const visited = ((saved.visitedCheckpointIds ?? []) as string[]);
+    return { roundExecutionId: execution.id, checkpointId, checkpointName: checkpoint.name, visitedCount: visited.length };
+  }
+
   async finishRoundExecution(me: AuthPayload, id: string, body: JsonMap) {
     await this.assertPackageWrite(me);
     const before = await this.loadTenant('securityRoundExecution', me.companyId, id, 'Ronda nao encontrada');

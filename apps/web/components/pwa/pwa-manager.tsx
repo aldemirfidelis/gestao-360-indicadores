@@ -5,6 +5,7 @@ import { toast } from 'sonner';
 import { Bell, Download, Share, SquarePlus, X } from 'lucide-react';
 import { BrandLogo } from '@/components/brand/brand-logo';
 import { enablePushNotifications, notificationPermission, pushSupported } from '@/lib/push';
+import { startOfflineSync } from '@/lib/offline-queue';
 
 const DISMISS_KEY = 'g360.pwaPromptDismissedAt';
 
@@ -29,11 +30,13 @@ export function PwaManager() {
   const [notifGranted, setNotifGranted] = useState(false);
   const [busy, setBusy] = useState(false);
 
-  // Registra o service worker (habilita instalacao e push).
+  // Registra o service worker (habilita instalacao e push) + liga a sincronizacao
+  // da fila offline (rondas/ocorrencias capturadas sem internet sobem ao reconectar).
   useEffect(() => {
     if (typeof navigator !== 'undefined' && 'serviceWorker' in navigator) {
       navigator.serviceWorker.register('/sw.js').catch(() => undefined);
     }
+    startOfflineSync();
   }, []);
 
   useEffect(() => {

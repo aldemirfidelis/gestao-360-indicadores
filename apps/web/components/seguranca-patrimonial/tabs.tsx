@@ -55,6 +55,7 @@ import { Label } from '@/components/ui/label';
 import { NativeSelect } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
 import { useAuth } from '@/components/auth/auth-provider';
+import { SecurityQrGeneratorSection } from '@/components/asset-security/qr-generator-section';
 import { api } from '@/lib/api';
 import { cn, formatNumber } from '@/lib/utils';
 import { useAssetSecurityDashboard } from '@/hooks/asset-security/use-asset-security-dashboard';
@@ -1164,6 +1165,7 @@ export function SettingsTab({ gates, posts, packageConfig, summary, loading, can
             </CardContent>
           </Card>
           )}
+          {canManage && <SecurityQrGeneratorSection />}
           <div className="grid gap-4 xl:grid-cols-2">
             <SectionCard
               title={`Portarias (${gates.length})`}

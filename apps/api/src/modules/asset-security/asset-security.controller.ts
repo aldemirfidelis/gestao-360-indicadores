@@ -389,6 +389,13 @@ export class AssetSecurityController {
     return this.service.finishRoundExecution(me, id, body);
   }
 
+  // Leitura de QR de ponto de ronda (campo): registra a passagem na ronda ativa (ou inicia uma).
+  @Post('round-checkpoints/:checkpointId/scan')
+  @RequirePermissions('asset-security:rounds')
+  scanCheckpoint(@CurrentUser() me: AuthPayload, @Param('checkpointId') checkpointId: string, @Body() body: Record<string, unknown>) {
+    return this.service.scanCheckpoint(me, checkpointId, body);
+  }
+
   @Get('shift-handovers')
   @RequirePermissions('asset-security:view')
   shiftHandovers(@CurrentUser() me: AuthPayload, @Query() query: Record<string, string | undefined>) {
