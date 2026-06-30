@@ -224,6 +224,9 @@ async function main() {
   await prisma.nonConformity.deleteMany({ where: { companyId } });
   await prisma.riskRegister.deleteMany({ where: { companyId } });
   await prisma.document.deleteMany({ where: { companyId } });
+  await prisma.workflowDefinition.deleteMany({ where: { companyId } }); // cascata versions/instances/approvals/tasks
+  await prisma.notification.deleteMany({ where: { companyId } });
+  await prisma.workItemIndex.deleteMany({ where: { companyId } }); // projeção do Meu Dia: reconstrói no próximo acesso
   await prisma.process.deleteMany({ where: { companyId } }); // cascata steps (+ forms já apagados)
   // Modulos novos (comunicacao, reuniao mensal, food safety, seg. patrimonial) -
   // apagados ANTES de indicadores/acoes/orgnodes por causa das FKs.
@@ -365,6 +368,35 @@ async function main() {
     });
     demoUsers.push(u);
   }
+
+  // Usuário-apresentador preservado (demo@demo.com): garante presença na empresa demo, com área/
+  // perfil, e o INCLUI no pool de atribuição (userIds) para receber dados em Meu Dia / Tarefas.
+  // NÃO altera senha/nome de uma conta já existente (só assegura empresa/área/ativo).
+  const presenterAreaId = areaIds[0];
+  let presenterRow = await prisma.user.findFirst({ where: { email: 'demo@demo.com' }, select: { id: true } });
+  if (!presenterRow) {
+    presenterRow = await prisma.user.create({
+      data: {
+        companyId, email: 'demo@demo.com', name: 'Usuário Demonstração', passwordHash, role: UserRoleEnum.COMPANY_ADMIN,
+        status: 'ACTIVE', active: true, branchId: branch.id, defaultNodeId: presenterAreaId,
+        accessProfileId: await profileByRole(UserRoleEnum.COMPANY_ADMIN), jobTitle: 'Gestor de Demonstração',
+      },
+      select: { id: true },
+    });
+  } else {
+    await prisma.user.update({
+      where: { id: presenterRow.id },
+      data: { companyId, status: 'ACTIVE', active: true, branchId: branch.id, defaultNodeId: presenterAreaId, activeCompanyId: null },
+    });
+  }
+  await prisma.userAreaAssignment.upsert({
+    where: { userId_orgNodeId: { userId: presenterRow.id, orgNodeId: presenterAreaId } },
+    create: { userId: presenterRow.id, companyId, orgNodeId: presenterAreaId, assignmentType: 'PRIMARY', isPrimary: true },
+    update: { assignmentType: 'PRIMARY', isPrimary: true, companyId },
+  });
+  demoUsers.push({ id: presenterRow.id, role: UserRoleEnum.COMPANY_ADMIN });
+  const demoMainId = presenterRow.id;
+
   const userIds = demoUsers.map((u) => u.id);
 
   // 6) Indicadores PRÓPRIOS distribuídos pelos setores (sem espelhar a Goiasa)
@@ -1507,6 +1539,134 @@ async function main() {
   console.log(`Food safety: 1 programa, ${fsProcNum} processos, ${fsHazardNum} perigos, ${fsLotIds.length} lotes`);
   console.log(`Seg. patrimonial: ${secGateIds.length} portarias, ${personIds.length} pessoas, ${vehicleIds.length} veiculos, rondas e ocorrencias`);
   console.log(`Analises de causa: ${analysisActions.length} planos com Ishikawa/5 Porques/PDCA`);
+
+  // =====================================================
+  // 20.5) INBOX GARANTIDO DO APRESENTADOR (demo@demo.com)
+  // Garante que Meu Dia e Tarefas fiquem populados para a conta usada nas demos,
+  // cobrindo TODOS os cards: pendentes, vencidos, vencendo hoje, aprovações,
+  // indicadores fora da meta, riscos, documentos e reuniões de hoje.
+  // =====================================================
+  const todayAt = (h: number) => { const d = new Date(); d.setHours(h, 0, 0, 0); return d; };
+  const daysAgo = (n: number) => new Date(Date.now() - n * 86_400_000);
+  const daysAhead = (n: number) => new Date(Date.now() + n * 86_400_000);
+
+  // (a) Planos de ação do apresentador: 1 vencido, 1 vence hoje, 1 futuro
+  const presenterActions: { title: string; status: string; due: Date; progress: number; priority: string }[] = [
+    { title: 'Reduzir refugo na Linha de Produção', status: 'IN_PROGRESS', due: daysAgo(4), progress: 45, priority: 'HIGH' },
+    { title: 'Recuperar OEE abaixo da meta', status: 'IN_PROGRESS', due: todayAt(18), progress: 60, priority: 'CRITICAL' },
+    { title: 'Implantar 5S no Armazém', status: 'WAITING_EVIDENCE', due: daysAhead(6), progress: 80, priority: 'MEDIUM' },
+  ];
+  for (const pa of presenterActions) {
+    const a = await prisma.actionPlan.create({
+      data: {
+        companyId, branchId: branch.id, ownerNodeId: presenterAreaId, responsibleUserId: demoMainId, createdById: demoMainId,
+        indicatorId: pick(allIndIds), title: pa.title, description: 'Plano de ação atribuído ao usuário de demonstração.',
+        origin: 'MANUAL', priority: pa.priority as any, criticality: pa.priority as any,
+        status: pa.status as any, startDate: daysAgo(25), dueDate: pa.due, progress: pa.progress,
+      },
+      select: { id: true },
+    });
+    await prisma.actionTask.create({ data: { actionId: a.id, title: 'Etapa em execução pelo responsável', done: false, assignedToId: demoMainId, position: 0, dueDate: pa.due } });
+  }
+
+  // (b) Três indicadores do apresentador FORA DA META (reatribui + força último resultado RED)
+  const presenterInds = demoIndicators.slice(0, 3);
+  const lastPeriod = months.map((m) => m.periodRef).sort()[months.length - 1];
+  for (const ind of presenterInds) {
+    await prisma.indicator.update({ where: { id: ind.id }, data: { responsibleUserId: demoMainId } });
+    await prisma.indicatorResult.updateMany({ where: { indicatorId: ind.id, periodRef: lastPeriod }, data: { light: 'RED' } });
+  }
+
+  // (c) Dois riscos abertos do apresentador
+  const presenterRisks = [
+    { title: 'Ruptura de fornecimento de matéria-prima crítica', cat: 'OPERATIONAL', st: 'MITIGATING', p: 4, im: 5 },
+    { title: 'Não conformidade ambiental com risco de multa', cat: 'COMPLIANCE', st: 'ANALYZING', p: 3, im: 4 },
+  ];
+  for (const r of presenterRisks) {
+    await prisma.riskRegister.create({
+      data: {
+        companyId, orgNodeId: presenterAreaId, indicatorId: pick(allIndIds), responsibleUserId: demoMainId, createdById: demoMainId,
+        title: r.title, description: 'Risco atribuído ao usuário de demonstração.', category: r.cat as any, status: r.st as any,
+        probability: r.p, impact: r.im, mitigationPlan: 'Plano de mitigação com controles e barreiras de proteção.',
+        dueDate: daysAhead(20), identifiedAt: daysAgo(15),
+      },
+    });
+  }
+
+  // (d) Duas não conformidades abertas do apresentador
+  const presenterNcs = [
+    { number: 900, title: 'Reclamação de cliente sobre lote fora de especificação', sev: 'MAJOR', st: 'ANALYSIS' },
+    { number: 901, title: 'Desvio de procedimento na expedição', sev: 'MINOR', st: 'OPEN' },
+  ];
+  for (const n of presenterNcs) {
+    await prisma.nonConformity.create({
+      data: {
+        companyId, number: n.number, orgNodeId: presenterAreaId, indicatorId: pick(allIndIds), responsibleUserId: demoMainId, createdById: demoMainId,
+        title: n.title, description: 'Não conformidade atribuída ao usuário de demonstração.', source: 'CUSTOMER' as any,
+        severity: n.sev as any, status: n.st as any, immediateAction: 'Contenção imediata aplicada.', dueDate: daysAhead(12), identifiedAt: daysAgo(6),
+      },
+    });
+  }
+
+  // (e) Documentos a revisar/aprovar pelo apresentador
+  await prisma.document.create({
+    data: {
+      companyId, number: 901, code: 'PRO-901', orgNodeId: presenterAreaId, ownerUserId: demoMainId, createdById: demoMainId,
+      title: 'Procedimento de Controle de Qualidade (revisão)', description: 'Documento aguardando revisão do responsável.',
+      type: 'PROCEDURE' as any, status: 'WAITING_REVIEW' as any, version: 2,
+      content: '# Procedimento\n\nConteúdo para revisão.',
+    },
+  });
+  await prisma.document.create({
+    data: {
+      companyId, number: 902, code: 'POL-902', orgNodeId: presenterAreaId, ownerUserId: pick(userIds), approverUserId: demoMainId, createdById: demoMainId,
+      title: 'Política de Segurança da Informação (aprovação)', description: 'Documento aguardando aprovação do responsável.',
+      type: 'POLICY' as any, status: 'WAITING_APPROVAL' as any, version: 1,
+      content: '# Política\n\nConteúdo para aprovação.',
+    },
+  });
+
+  // (f) Reunião de HOJE com o apresentador (card "Reuniões hoje")
+  const presenterMeeting = await prisma.meeting.create({
+    data: {
+      companyId, title: 'Reunião de Acompanhamento de Indicadores', kind: 'INDICATORS' as any, format: 'PRESENTIAL' as any,
+      status: 'SCHEDULED' as any, startsAt: todayAt(15), endsAt: todayAt(16), location: 'Sala de Reuniões 1',
+      responsibleUserId: demoMainId, objective: 'Revisar indicadores fora da meta e planos de ação em andamento.',
+      indicatorId: presenterInds[0]?.id ?? pick(allIndIds),
+    },
+    select: { id: true },
+  });
+  await prisma.meetingParticipant.create({ data: { meetingId: presenterMeeting.id, userId: demoMainId, role: 'PARTICIPANT', attended: false } }).catch(() => undefined);
+
+  // (g) Workflow + aprovações/tarefas pendentes do apresentador (card "Aprovações" + tarefas de fluxo/SLA)
+  const wfDef = await prisma.workflowDefinition.create({
+    data: { companyId, name: 'Aprovação de Plano de Ação Crítico', module: 'ACTIONS', category: 'APPROVAL', status: 'ACTIVE', createdById: demoMainId, updatedById: demoMainId },
+    select: { id: true },
+  });
+  const wfVer = await prisma.workflowVersion.create({
+    data: { companyId, workflowDefinitionId: wfDef.id, versionNumber: 1, status: 'PUBLISHED', canvasData: '{"nodes":[],"edges":[]}', configurationSnapshot: '{}', changeSummary: 'Versão demo', createdById: demoMainId, publishedAt: new Date(), publishedById: demoMainId },
+    select: { id: true },
+  });
+  const wfInst = await prisma.workflowInstance.create({
+    data: { companyId, workflowDefinitionId: wfDef.id, workflowVersionId: wfVer.id, status: 'RUNNING', sourceEntityType: 'ACTION_PLAN', priority: 'HIGH' },
+    select: { id: true },
+  });
+  await prisma.workflowApproval.create({ data: { companyId, workflowInstanceId: wfInst.id, nodeKey: 'approval-1', approvalType: 'SIMPLE', status: 'PENDING', approverId: demoMainId, requesterId: pick(userIds), dueAt: daysAhead(2) } });
+  await prisma.workflowApproval.create({ data: { companyId, workflowInstanceId: wfInst.id, nodeKey: 'approval-2', approvalType: 'SIMPLE', status: 'PENDING', approverId: demoMainId, requesterId: pick(userIds), dueAt: todayAt(17) } });
+  // Tarefas de fluxo: 1 vencida (alimenta Escalonamentos/SLA) + 1 pendente
+  await prisma.workflowTask.create({ data: { companyId, workflowInstanceId: wfInst.id, nodeKey: 'task-1', title: 'Elaborar plano de ação para indicador fora da meta', responsibleId: demoMainId, status: 'PENDING', priority: 'HIGH', dueAt: daysAgo(3), escalationLevel: 1 } });
+  await prisma.workflowTask.create({ data: { companyId, workflowInstanceId: wfInst.id, nodeKey: 'task-2', title: 'Validar evidências do plano de ação concluído', responsibleId: demoMainId, status: 'PENDING', priority: 'MEDIUM', dueAt: daysAhead(1) } });
+
+  // (h) Notificações não lidas do apresentador
+  await prisma.notification.createMany({
+    data: [
+      { companyId, userId: demoMainId, kind: 'INDICATOR_OFF_TARGET', title: 'Indicador OEE da Produção abaixo da meta', body: 'O indicador fechou o mês no vermelho. Avalie um plano de ação.', link: '/indicators', readAt: null },
+      { companyId, userId: demoMainId, kind: 'ACTION_OVERDUE', title: 'Plano de ação vencido', body: 'Você tem um plano de ação com prazo vencido.', link: '/actions', readAt: null },
+      { companyId, userId: demoMainId, kind: 'MESSAGE', title: 'Nova mensagem da equipe de Qualidade', body: 'Há um documento aguardando sua revisão.', link: '/documents', readAt: null },
+    ],
+  });
+
+  console.log('Inbox do apresentador (demo@demo.com) populado: ações (vencida/hoje/futura), 3 indicadores RED, 2 riscos, 2 NCs, 2 documentos, reunião de hoje, 2 aprovações + 2 tarefas de fluxo e 3 notificações.');
 
   // 21) Resumo + verificação de que a Goiasa não mudou
   const after = await snapshot(companyId);
