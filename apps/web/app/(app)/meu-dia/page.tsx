@@ -402,18 +402,18 @@ export default function MeuDiaPage() {
               key={c.key}
               type="button"
               onClick={() => pickCard(c.key as any)}
-              className="overflow-hidden rounded-xl border border-border bg-card p-4 text-left shadow-[0_2px_8px_rgba(0,0,0,0.02)] hover:shadow-[0_4px_12px_rgba(0,0,0,0.05)] hover:border-primary/20 transition-all flex flex-col justify-between h-[112px]"
+              className="rounded-xl border border-border bg-card p-4 text-left shadow-[0_2px_8px_rgba(0,0,0,0.02)] hover:shadow-[0_4px_12px_rgba(0,0,0,0.05)] hover:border-primary/20 transition-all flex flex-col min-h-[120px]"
             >
-              <div className="flex items-center justify-between w-full gap-1">
-                <div className={cn('p-1.5 rounded-lg', meta.iconColor)}>
+              <div className="flex items-start justify-between w-full gap-1.5">
+                <div className={cn('p-1.5 rounded-lg shrink-0', meta.iconColor)}>
                   <IconComp className="h-4 w-4" />
                 </div>
-                <span className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider text-right">{c.label}</span>
+                <span className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider text-right leading-tight">{c.label}</span>
               </div>
 
               <div className="mt-2 text-2xl font-bold text-slate-800 leading-none">{c.value}</div>
 
-              <div className="mt-2 w-full border-t border-slate-50 pt-2 shrink-0">
+              <div className="mt-auto w-full border-t border-slate-50 pt-2">
                 <span className={cn('text-[10px] font-semibold', c.value > 0 ? 'text-slate-500' : 'text-emerald-600')}>
                   {c.value > 0 ? 'Toque para abrir' : 'Tudo em dia'}
                 </span>
