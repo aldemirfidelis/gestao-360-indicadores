@@ -5,7 +5,7 @@ import { usePathname } from 'next/navigation';
 import type { ChangeEvent } from 'react';
 import { useState } from 'react';
 import { useMutation, useQuery } from '@tanstack/react-query';
-import { Building2, Camera, Check, ChevronsUpDown, Home, KeyRound, LifeBuoy, LogOut, Menu, Moon, QrCode, Search, Sun } from 'lucide-react';
+import { Building2, Camera, Check, ChevronsUpDown, Home, KeyRound, LifeBuoy, LogOut, Menu, Moon, Search, Sun } from 'lucide-react';
 import { useTheme } from 'next-themes';
 import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
@@ -183,11 +183,6 @@ export function Topbar() {
       </div>
 
       <div className="flex items-center gap-0.5 text-slate-300 [&_button]:text-slate-300 [&_button:hover]:text-white [&_button:hover]:bg-white/[0.05]">
-        <Button variant="ghost" size="icon" className="h-9 w-9 text-slate-300 hover:text-white hover:bg-white/[0.05]" aria-label="Escanear QR" asChild>
-          <Link href="/scan" title="Escanear QR Code">
-            <QrCode className="h-4 w-4" />
-          </Link>
-        </Button>
         <Button variant="ghost" size="icon" className="h-9 w-9 text-slate-300 hover:text-white hover:bg-white/[0.05]" aria-label="Ajuda" asChild>
           <Link href="/ajuda" title="Ajuda">
             <LifeBuoy className="h-4 w-4" />

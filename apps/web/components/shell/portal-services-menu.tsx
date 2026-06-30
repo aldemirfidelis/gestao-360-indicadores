@@ -4,7 +4,7 @@ import Link from 'next/link';
 import { usePathname, useSearchParams } from 'next/navigation';
 import { useMemo } from 'react';
 import * as DropdownMenu from '@radix-ui/react-dropdown-menu';
-import { Settings } from 'lucide-react';
+import { QrCode, Settings } from 'lucide-react';
 import { useAuth } from '@/components/auth/auth-provider';
 import { usePortalConfig } from '@/components/portal-admin/portal-config-provider';
 import { isActivePath, visiblePortalServiceSections } from '@/components/shell/navigation';
@@ -42,15 +42,27 @@ export function PortalServicesMenu({
     section.items.some((item) => isActivePath(pathname, item.href, item.exact, currentSearch)),
   );
 
-  if (sections.length === 0) return null;
-
   return (
     <div
       className={cn(
-        'flex shrink-0 border-t border-[#1b2b54]/30 p-3',
-        collapsed ? 'justify-center' : 'justify-end',
+        'flex shrink-0 items-center gap-1 border-t border-[#1b2b54]/30 p-3',
+        collapsed ? 'flex-col justify-center' : 'justify-end',
       )}
     >
+      {/* Escanear QR — sempre visível, ao lado da engrenagem (campo: rondas/ocorrências/inspeções). */}
+      <Button
+        asChild
+        variant="ghost"
+        size="icon"
+        className="h-9 w-9 text-slate-400 hover:bg-white/[0.06] hover:text-white"
+        aria-label="Escanear QR"
+        title="Escanear QR Code"
+      >
+        <Link href="/scan" onClick={onNavigate}>
+          <QrCode className="h-5 w-5" />
+        </Link>
+      </Button>
+      {sections.length > 0 && (
       <DropdownMenu.Root>
         <DropdownMenu.Trigger asChild>
           <Button
@@ -132,6 +144,7 @@ export function PortalServicesMenu({
           </DropdownMenu.Content>
         </DropdownMenu.Portal>
       </DropdownMenu.Root>
+      )}
     </div>
   );
 }
