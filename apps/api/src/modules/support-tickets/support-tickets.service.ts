@@ -53,8 +53,12 @@ export class SupportTicketsService {
       }
     });
 
-    // Dispara a notificação de e-mail
-    await this.sendEmailNotification(ticket);
+    // Dispara a notificação de e-mail SEM bloquear a resposta: SMTP lento/indisponível
+    // travava a requisição até o timeout do gateway, retornando 502. O chamado já foi
+    // criado; a notificação é best-effort em background.
+    void this.sendEmailNotification(ticket).catch((err) => {
+      console.error('Falha ao notificar chamado por e-mail:', err?.message ?? err);
+    });
 
     return ticket;
   }

@@ -5,7 +5,7 @@ import { usePathname } from 'next/navigation';
 import type { ChangeEvent } from 'react';
 import { useState } from 'react';
 import { useMutation, useQuery } from '@tanstack/react-query';
-import { Building2, Camera, Check, ChevronsUpDown, Home, KeyRound, LifeBuoy, LogOut, Menu, Moon, Search, Sun } from 'lucide-react';
+import { Building2, Camera, Check, ChevronsUpDown, Home, KeyRound, LifeBuoy, LogOut, Menu, Moon, QrCode, Search, Sun } from 'lucide-react';
 import { useTheme } from 'next-themes';
 import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
@@ -135,6 +135,11 @@ export function Topbar() {
           onKeyDown={(event) => {
             if (event.key === 'Escape') setSearchOpen(false);
           }}
+          type="search"
+          name="topbar-search"
+          autoComplete="off"
+          data-1p-ignore
+          data-lpignore="true"
           placeholder="Buscar indicadores, ações, setores..."
           className="h-9 border-[#203363] bg-[#121c38] pl-9 pr-8 text-sm text-white placeholder:text-slate-400 focus-visible:ring-1 focus-visible:ring-blue-500 focus-visible:ring-offset-0"
         />
@@ -178,6 +183,11 @@ export function Topbar() {
       </div>
 
       <div className="flex items-center gap-0.5 text-slate-300 [&_button]:text-slate-300 [&_button:hover]:text-white [&_button:hover]:bg-white/[0.05]">
+        <Button variant="ghost" size="icon" className="h-9 w-9 text-slate-300 hover:text-white hover:bg-white/[0.05]" aria-label="Escanear QR" asChild>
+          <Link href="/scan" title="Escanear QR Code">
+            <QrCode className="h-4 w-4" />
+          </Link>
+        </Button>
         <Button variant="ghost" size="icon" className="h-9 w-9 text-slate-300 hover:text-white hover:bg-white/[0.05]" aria-label="Ajuda" asChild>
           <Link href="/ajuda" title="Ajuda">
             <LifeBuoy className="h-4 w-4" />
@@ -263,6 +273,7 @@ export function Topbar() {
                     value={passwordForm.currentPassword}
                     onChange={(e) => setPasswordForm((prev) => ({ ...prev, currentPassword: e.target.value }))}
                     placeholder="Senha atual"
+                    autoComplete="current-password"
                     className="h-8 text-xs"
                   />
                   <Input
@@ -270,6 +281,7 @@ export function Topbar() {
                     value={passwordForm.newPassword}
                     onChange={(e) => setPasswordForm((prev) => ({ ...prev, newPassword: e.target.value }))}
                     placeholder="Nova senha"
+                    autoComplete="new-password"
                     className="h-8 text-xs"
                   />
                   <Input
@@ -277,6 +289,7 @@ export function Topbar() {
                     value={passwordForm.confirmPassword}
                     onChange={(e) => setPasswordForm((prev) => ({ ...prev, confirmPassword: e.target.value }))}
                     placeholder="Digite a senha novamente"
+                    autoComplete="new-password"
                     className="h-8 text-xs"
                   />
                   <Button

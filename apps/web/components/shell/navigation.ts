@@ -127,16 +127,6 @@ export const navSections: NavSection[] = [
     ],
   },
   {
-    heading: 'Escanear QR',
-    description: 'Leitor de QR Code para rondas, formulários e ocorrências (uso em campo)',
-    intent: 'view',
-    icon: QrCode,
-    flat: true,
-    items: [
-      { href: '/scan', label: 'Escanear QR', description: 'Aponte a câmera para o QR do ponto de ronda, formulário ou portaria', icon: QrCode, permissions: [], exact: true },
-    ],
-  },
-  {
     heading: 'Gestão à Vista',
     description: 'Painel executivo, estratégia, indicadores e ritos de gestão',
     intent: 'view',

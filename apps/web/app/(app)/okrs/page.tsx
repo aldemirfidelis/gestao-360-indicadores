@@ -187,7 +187,7 @@ export default function OkrsPage() {
   const canCheckin = hasPermission(['okrs:checkin', 'okrs:update']);
   const canCreateAction = hasPermission(['actions:create']);
   const [activeCycleId, setActiveCycleId] = useState<string | null>(null);
-  const [view, setView] = useState<'list' | 'flow'>('list');
+  const [view, setView] = useState<'list' | 'flow'>('flow');
   const [areaFilterId, setAreaFilterId] = useState<string>('');
   const [cycleOpen, setCycleOpen] = useState(false);
   const [objectiveOpen, setObjectiveOpen] = useState(false);
@@ -457,11 +457,11 @@ export default function OkrsPage() {
             ))}
           </NativeSelect>
           <div className="inline-flex items-center rounded-md border p-0.5">
-            <Button size="sm" variant={view === 'list' ? 'default' : 'ghost'} onClick={() => setView('list')}>
-              <List className="mr-1.5 h-3.5 w-3.5" /> Lista
-            </Button>
             <Button size="sm" variant={view === 'flow' ? 'default' : 'ghost'} onClick={() => setView('flow')}>
               <GitBranch className="mr-1.5 h-3.5 w-3.5" /> Fluxograma
+            </Button>
+            <Button size="sm" variant={view === 'list' ? 'default' : 'ghost'} onClick={() => setView('list')}>
+              <List className="mr-1.5 h-3.5 w-3.5" /> Lista
             </Button>
           </div>
         </div>
