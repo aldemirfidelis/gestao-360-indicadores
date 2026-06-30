@@ -630,4 +630,274 @@ export class AutomationsController {
 
     return copy;
   }
+
+  // =====================================================
+  // CHANGE HISTORY (auditoria real de design dos fluxos)
+  // =====================================================
+
+  @Get('history')
+  @RequirePermissions('automations:view')
+  async getHistory(@CurrentUser() me: AuthPayload) {
+    const [definitions, versions] = await Promise.all([
+      this.prisma.workflowDefinition.findMany({
+        where: { companyId: me.companyId },
+        select: {
+          id: true,
+          name: true,
+          createdAt: true,
+          deletedAt: true,
+          updatedAt: true,
+          createdBy: { select: { name: true } },
+          updatedBy: { select: { name: true } },
+        },
+      }),
+      this.prisma.workflowVersion.findMany({
+        where: { companyId: me.companyId },
+        select: {
+          id: true,
+          versionNumber: true,
+          changeSummary: true,
+          createdAt: true,
+          publishedAt: true,
+          archivedAt: true,
+          workflowDefinition: { select: { name: true } },
+          createdBy: { select: { name: true } },
+          publishedBy: { select: { name: true } },
+        },
+      }),
+    ]);
+
+    type HistoryEvent = {
+      id: string;
+      workflowName: string;
+      versionNumber: number | null;
+      action: 'CREATE' | 'UPDATE' | 'PUBLISH' | 'ARCHIVE' | 'DUPLICATE';
+      actorName: string;
+      changeSummary: string;
+      createdAt: Date;
+    };
+    const events: HistoryEvent[] = [];
+
+    for (const d of definitions) {
+      events.push({
+        id: `def-create-${d.id}`,
+        workflowName: d.name,
+        versionNumber: null,
+        action: 'CREATE',
+        actorName: d.createdBy?.name ?? 'Sistema',
+        changeSummary: 'Criação inicial da definição de fluxo.',
+        createdAt: d.createdAt,
+      });
+      if (d.deletedAt) {
+        events.push({
+          id: `def-archive-${d.id}`,
+          workflowName: d.name,
+          versionNumber: null,
+          action: 'ARCHIVE',
+          actorName: d.updatedBy?.name ?? d.createdBy?.name ?? 'Sistema',
+          changeSummary: 'Definição de fluxo arquivada/desativada.',
+          createdAt: d.deletedAt,
+        });
+      }
+    }
+
+    for (const v of versions) {
+      const wfName = v.workflowDefinition?.name ?? '—';
+      events.push({
+        id: `ver-create-${v.id}`,
+        workflowName: wfName,
+        versionNumber: v.versionNumber,
+        action: v.versionNumber > 1 ? 'UPDATE' : 'CREATE',
+        actorName: v.createdBy?.name ?? 'Sistema',
+        changeSummary: v.changeSummary ?? `Versão v${v.versionNumber} criada.`,
+        createdAt: v.createdAt,
+      });
+      if (v.publishedAt) {
+        events.push({
+          id: `ver-publish-${v.id}`,
+          workflowName: wfName,
+          versionNumber: v.versionNumber,
+          action: 'PUBLISH',
+          actorName: v.publishedBy?.name ?? v.createdBy?.name ?? 'Sistema',
+          changeSummary: `Versão v${v.versionNumber} publicada e ativada.`,
+          createdAt: v.publishedAt,
+        });
+      }
+      if (v.archivedAt) {
+        events.push({
+          id: `ver-archive-${v.id}`,
+          workflowName: wfName,
+          versionNumber: v.versionNumber,
+          action: 'ARCHIVE',
+          actorName: v.publishedBy?.name ?? v.createdBy?.name ?? 'Sistema',
+          changeSummary: `Versão v${v.versionNumber} arquivada.`,
+          createdAt: v.archivedAt,
+        });
+      }
+    }
+
+    events.sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime());
+    return events;
+  }
+
+  // =====================================================
+  // SLA POLICIES & ESCALATIONS (prazos reais)
+  // Incidentes derivados das WorkflowTask atrasadas (dado real, sem mock).
+  // =====================================================
+
+  @Get('sla-policies')
+  @RequirePermissions('automations:view')
+  async getSlaPolicies(@CurrentUser() me: AuthPayload) {
+    const [policies, overdue] = await Promise.all([
+      this.prisma.slaPolicy.findMany({ where: { companyId: me.companyId }, orderBy: { createdAt: 'asc' } }),
+      this.getOverdueTasks(me.companyId),
+    ]);
+    const byModule = new Map<string, number>();
+    for (const t of overdue) {
+      const mod = t.workflowInstance?.workflowDefinition?.module ?? 'OUTROS';
+      byModule.set(mod, (byModule.get(mod) ?? 0) + 1);
+    }
+    return policies.map((p) => ({
+      id: p.id,
+      name: p.name,
+      module: p.module,
+      limitLabel: p.limitLabel,
+      active: p.active,
+      escalationSteps: this.parseSteps(p.escalationSteps),
+      activeCount: byModule.get(p.module) ?? 0,
+    }));
+  }
+
+  @Post('sla-policies')
+  @RequirePermissions('automations:manage')
+  async createSlaPolicy(
+    @CurrentUser() me: AuthPayload,
+    @Body() body: { name: string; module: string; limitLabel: string; escalationSteps?: string[]; active?: boolean }
+  ) {
+    if (!body?.name?.trim() || !body?.module?.trim() || !body?.limitLabel?.trim()) {
+      throw new Error('Nome, módulo e prazo são obrigatórios.');
+    }
+    return this.prisma.slaPolicy.create({
+      data: {
+        companyId: me.companyId,
+        name: body.name.trim(),
+        module: body.module.trim(),
+        limitLabel: body.limitLabel.trim(),
+        escalationSteps: JSON.stringify(Array.isArray(body.escalationSteps) ? body.escalationSteps.filter((s) => s?.trim()) : []),
+        active: body.active ?? true,
+        createdById: me.sub,
+      },
+    });
+  }
+
+  @Put('sla-policies/:id')
+  @RequirePermissions('automations:manage')
+  async updateSlaPolicy(
+    @CurrentUser() me: AuthPayload,
+    @Param('id') id: string,
+    @Body() body: { name?: string; module?: string; limitLabel?: string; escalationSteps?: string[]; active?: boolean }
+  ) {
+    const existing = await this.prisma.slaPolicy.findFirst({ where: { id, companyId: me.companyId } });
+    if (!existing) throw new Error('Política de SLA não encontrada.');
+    return this.prisma.slaPolicy.update({
+      where: { id },
+      data: {
+        ...(body.name !== undefined ? { name: body.name.trim() } : {}),
+        ...(body.module !== undefined ? { module: body.module.trim() } : {}),
+        ...(body.limitLabel !== undefined ? { limitLabel: body.limitLabel.trim() } : {}),
+        ...(body.escalationSteps !== undefined ? { escalationSteps: JSON.stringify(body.escalationSteps.filter((s) => s?.trim())) } : {}),
+        ...(body.active !== undefined ? { active: body.active } : {}),
+      },
+    });
+  }
+
+  @Delete('sla-policies/:id')
+  @RequirePermissions('automations:manage')
+  async deleteSlaPolicy(@CurrentUser() me: AuthPayload, @Param('id') id: string) {
+    await this.prisma.slaPolicy.deleteMany({ where: { id, companyId: me.companyId } });
+    return { deleted: true };
+  }
+
+  @Get('escalations')
+  @RequirePermissions('automations:view')
+  async getEscalations(@CurrentUser() me: AuthPayload) {
+    const now = new Date();
+    const [overdue, completed, policiesCount] = await Promise.all([
+      this.getOverdueTasks(me.companyId),
+      this.prisma.workflowTask.findMany({
+        where: { companyId: me.companyId, status: 'DONE', dueAt: { not: null }, completedAt: { not: null } },
+        select: { dueAt: true, completedAt: true },
+      }),
+      this.prisma.slaPolicy.count({ where: { companyId: me.companyId, active: true } }),
+    ]);
+
+    const events = overdue.map((t) => {
+      const due = t.dueAt as Date;
+      const overdueDays = Math.max(0, Math.ceil((now.getTime() - due.getTime()) / 86400000));
+      const level = t.escalationLevel ?? 0;
+      const status: 'PENDING' | 'ESCALATED' = level > 0 ? 'ESCALATED' : 'PENDING';
+      return {
+        id: t.id,
+        workflowName: t.workflowInstance?.workflowDefinition?.name ?? '—',
+        taskTitle: t.title,
+        responsibleName: t.responsible?.name ?? 'Não atribuído',
+        dueAt: due,
+        overdueDays,
+        level,
+        status,
+      };
+    });
+
+    const onTimeCount = completed.filter((t) => t.completedAt && t.dueAt && t.completedAt <= t.dueAt).length;
+    const onTimeRate = completed.length > 0 ? Math.round((onTimeCount / completed.length) * 1000) / 10 : null;
+
+    return {
+      events,
+      metrics: {
+        onTimeRate,
+        activeAlarms: events.length,
+        level2plus: events.filter((e) => e.level >= 2).length,
+        policiesCount,
+      },
+    };
+  }
+
+  @Post('escalations/:taskId/extend')
+  @RequirePermissions('automations:manage')
+  async extendTaskDeadline(
+    @CurrentUser() me: AuthPayload,
+    @Param('taskId') taskId: string,
+    @Body() body: { days?: number }
+  ) {
+    const task = await this.prisma.workflowTask.findFirst({ where: { id: taskId, companyId: me.companyId } });
+    if (!task) throw new Error('Tarefa não encontrada.');
+    const days = Math.max(1, Math.min(60, Number(body?.days) || 3));
+    const base = task.dueAt && task.dueAt > new Date() ? task.dueAt : new Date();
+    const newDue = new Date(base.getTime() + days * 86400000);
+    return this.prisma.workflowTask.update({ where: { id: taskId }, data: { dueAt: newDue } });
+  }
+
+  private async getOverdueTasks(companyId: string) {
+    return this.prisma.workflowTask.findMany({
+      where: {
+        companyId,
+        status: { in: ['PENDING', 'IN_PROGRESS', 'OVERDUE'] },
+        dueAt: { lt: new Date() },
+      },
+      include: {
+        responsible: { select: { name: true } },
+        workflowInstance: { include: { workflowDefinition: { select: { name: true, module: true } } } },
+      },
+      orderBy: { dueAt: 'asc' },
+    });
+  }
+
+  private parseSteps(raw: string): string[] {
+    try {
+      const v = JSON.parse(raw);
+      return Array.isArray(v) ? v.filter((s) => typeof s === 'string') : [];
+    } catch {
+      return [];
+    }
+  }
 }

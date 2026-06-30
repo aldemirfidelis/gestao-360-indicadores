@@ -41,7 +41,7 @@ export default function AutomationsOverview() {
   const { data: stats, isLoading } = useQuery<AutomationStats>({
     queryKey: ['automations', 'overview-stats'],
     queryFn: async () => {
-      // Return mocked structured data if endpoint not fully populated, otherwise query endpoint
+      // Métricas reais agregadas dos endpoints de automação (sem dados fictícios).
       try {
         const workflows = await api<any[]>('/automations/workflows');
         const instances = await api<any[]>('/automations/workflow-instances');
@@ -71,19 +71,11 @@ export default function AutomationsOverview() {
           tasksCreated: tasks.length,
           failedTasks: deadLetters.length,
           instancesByStatus: [
-            { name: 'Concluídos', value: completed || 12, color: '#10b981' },
-            { name: 'Em Andamento', value: running || 4, color: '#3b82f6' },
-            { name: 'Falhas', value: failed || 2, color: '#ef4444' },
+            { name: 'Concluídos', value: completed, color: '#10b981' },
+            { name: 'Em Andamento', value: running, color: '#3b82f6' },
+            { name: 'Falhas', value: failed, color: '#ef4444' },
           ],
-          instancesByModule: Object.keys(modulesCount).length > 0
-            ? Object.keys(modulesCount).map(k => ({ module: k, count: modulesCount[k] }))
-            : [
-                { module: 'INDICADORES', count: 8 },
-                { module: 'DOCUMENTOS', count: 5 },
-                { module: 'AUDITORIAS', count: 3 },
-                { module: 'CHECKLISTS', count: 4 },
-                { module: 'PLANOS', count: 6 },
-              ],
+          instancesByModule: Object.keys(modulesCount).map(k => ({ module: k, count: modulesCount[k] })),
           recentFailures: deadLetters.slice(0, 5).map(dl => ({
             id: dl.workflowInstanceId,
             workflowDefinition: { name: dl.workflowInstance?.workflowDefinition?.name || 'Fluxo Operacional' },
@@ -92,28 +84,23 @@ export default function AutomationsOverview() {
           })),
         };
       } catch (err) {
-        // Fallback mockup stats for initial presentation rendering
+        // Sem dados fictícios: se a API falhar, retorna estado zerado real (a UI mostra vazio honesto).
+        console.error('Falha ao carregar métricas da Central de Automações', err);
         return {
-          activeWorkflows: 8,
-          inactiveWorkflows: 3,
-          runningInstances: 4,
-          completedInstances: 32,
-          failedInstances: 2,
-          pendingApprovals: 3,
-          tasksCreated: 15,
-          failedTasks: 1,
+          activeWorkflows: 0,
+          inactiveWorkflows: 0,
+          runningInstances: 0,
+          completedInstances: 0,
+          failedInstances: 0,
+          pendingApprovals: 0,
+          tasksCreated: 0,
+          failedTasks: 0,
           instancesByStatus: [
-            { name: 'Concluídos', value: 32, color: '#10b981' },
-            { name: 'Em Andamento', value: 4, color: '#3b82f6' },
-            { name: 'Falhas', value: 2, color: '#ef4444' },
+            { name: 'Concluídos', value: 0, color: '#10b981' },
+            { name: 'Em Andamento', value: 0, color: '#3b82f6' },
+            { name: 'Falhas', value: 0, color: '#ef4444' },
           ],
-          instancesByModule: [
-            { module: 'INDICADORES', count: 12 },
-            { module: 'DOCUMENTOS', count: 8 },
-            { module: 'AUDITORIAS', count: 6 },
-            { module: 'CHECKLISTS', count: 9 },
-            { module: 'PLANOS', count: 7 },
-          ],
+          instancesByModule: [],
           recentFailures: [],
         };
       }

@@ -1,9 +1,10 @@
 'use client';
 
 import { useState } from 'react';
+import { useQuery } from '@tanstack/react-query';
+import { api } from '@/lib/api';
 import { PageHeader } from '@/components/shell/page-header';
 import { Button } from '@/components/ui/button';
-import { SectionCard } from '@/components/platform/section-card';
 import {
   History,
   Search,
@@ -27,57 +28,14 @@ interface AuditLog {
   createdAt: string;
 }
 
-const AUDIT_LOGS_MOCK: AuditLog[] = [
-  {
-    id: 'log-1',
-    workflowName: 'Indicador fora da meta por dois meses',
-    versionNumber: 2,
-    action: 'PUBLISH',
-    actorName: 'Aldemir Fidelis (Admin)',
-    changeSummary: 'Publicada e ativada versão v2 do fluxo, adicionando notificação via SMTP.',
-    createdAt: '2026-06-08T15:04:00-03:00',
-  },
-  {
-    id: 'log-2',
-    workflowName: 'Indicador fora da meta por dois meses',
-    versionNumber: 2,
-    action: 'UPDATE',
-    actorName: 'Aldemir Fidelis (Admin)',
-    changeSummary: 'Criou rascunho v2 adicionando bloco de notificação por e-mail no final.',
-    createdAt: '2026-06-08T14:45:00-03:00',
-  },
-  {
-    id: 'log-3',
-    workflowName: 'Documento próximo do vencimento',
-    versionNumber: 1,
-    action: 'PUBLISH',
-    actorName: 'Aldemir Fidelis (Admin)',
-    changeSummary: 'Ativação inicial da versão de rascunho v1.',
-    createdAt: '2026-06-08T11:20:00-03:00',
-  },
-  {
-    id: 'log-4',
-    workflowName: 'Não conformidade crítica em auditoria',
-    versionNumber: null,
-    action: 'CREATE',
-    actorName: 'Aldemir Fidelis (Admin)',
-    changeSummary: 'Criação inicial da definição de fluxo importada de modelo padrão.',
-    createdAt: '2026-06-07T09:12:00-03:00',
-  },
-  {
-    id: 'log-5',
-    workflowName: 'Tarefa atrasada com escalonamento',
-    versionNumber: 1,
-    action: 'ARCHIVE',
-    actorName: 'Aldemir Fidelis (Admin)',
-    changeSummary: 'Desativação e arquivamento manual do fluxo obsoleto.',
-    createdAt: '2026-06-05T17:35:00-03:00',
-  },
-];
-
 export default function AuditHistoryPage() {
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedAction, setSelectedAction] = useState<string>('ALL');
+
+  const { data: logs = [], isLoading } = useQuery<AuditLog[]>({
+    queryKey: ['automations', 'history'],
+    queryFn: () => api('/automations/history'),
+  });
 
   const getActionBadge = (action: AuditLog['action']) => {
     switch (action) {
@@ -94,7 +52,7 @@ export default function AuditHistoryPage() {
     }
   };
 
-  const filteredLogs = AUDIT_LOGS_MOCK.filter((log) => {
+  const filteredLogs = logs.filter((log) => {
     const matchesAction = selectedAction === 'ALL' ? true : log.action === selectedAction;
     const matchesSearch =
       log.workflowName.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -145,7 +103,9 @@ export default function AuditHistoryPage() {
 
         {/* Timeline list */}
         <div className="flex-1 overflow-y-auto p-4 space-y-4">
-          {filteredLogs.length > 0 ? (
+          {isLoading ? (
+            <div className="space-y-4">{[0, 1, 2, 3].map((i) => <div key={i} className="h-20 animate-pulse rounded-xl border bg-muted/30" />)}</div>
+          ) : filteredLogs.length > 0 ? (
             <div className="relative border-l border-muted pl-6 ml-2 space-y-6">
               {filteredLogs.map((log) => {
                 const badge = getActionBadge(log.action);

@@ -9066,6 +9066,24 @@ model WorkflowTemplate {
   @@index([status])
 }
 
+/// Politica de SLA configuravel por empresa (prazos + passos de escalonamento).
+/// Os incidentes de SLA NAO sao armazenados aqui: sao derivados em tempo real das
+/// WorkflowTask atrasadas (dado real), evitando duplicacao/dados ficticios.
+model SlaPolicy {
+  id              String   @id @default(uuid())
+  companyId       String
+  name            String
+  module          String
+  limitLabel      String // rotulo legivel do prazo, ex.: "5 dias uteis"
+  escalationSteps String   @default("[]") // JSON array de passos (strings)
+  active          Boolean  @default(true)
+  createdById     String?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  @@index([companyId])
+}
+
 model WorkflowExecutionLog {
   id                 String                 @id @default(uuid())
   companyId          String

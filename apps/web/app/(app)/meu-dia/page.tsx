@@ -7,7 +7,7 @@ import { toast } from 'sonner';
 import {
   AlertTriangle, AtSign, Bookmark, CalendarDays, CheckCircle2, CheckSquare, Clock3, Columns3, EyeOff, FileText, FileWarning,
   Inbox, LayoutList, MessageSquare, Pin, Plus, RefreshCw, Search, ShieldAlert, SlidersHorizontal, Sparkles, Table2, Target, Stamp, ThumbsDown, ThumbsUp, UserPlus, Users, Workflow,
-  Star, Sun, Play, Pause, BarChart3, Clock,
+  Star, Sun, BarChart3, Clock,
 } from 'lucide-react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -129,26 +129,57 @@ function formatTodayDate() {
   return `${dateStr}  |  ${capitalizedWeekday}`;
 }
 
-const Sparkline = ({ color }: { color: string }) => {
-  return (
-    <svg className="w-16 h-6 stroke-2 fill-none" viewBox="0 0 60 20">
-      <path
-        d={color === 'red' 
-          ? "M 0 5 Q 15 18 30 8 T 60 15" 
-          : color === 'green' 
-          ? "M 0 15 Q 15 5 30 12 T 60 3" 
-          : color === 'orange'
-          ? "M 0 10 Q 15 3 30 15 T 60 8"
-          : color === 'purple'
-          ? "M 0 15 Q 15 15 30 5 T 60 12"
-          : color === 'turquoise'
-          ? "M 0 12 Q 15 5 30 15 T 60 6"
-          : "M 0 10 L 20 10 L 40 10 L 60 10"}
-        stroke={color === 'red' ? '#ef4444' : color === 'green' ? '#22c55e' : color === 'orange' ? '#f97316' : color === 'purple' ? '#a855f7' : color === 'turquoise' ? '#06b6d4' : color === 'blue' ? '#3b82f6' : '#94a3b8'}
-      />
-    </svg>
-  );
+const CARD_META: Record<string, { icon: typeof CheckSquare; iconColor: string }> = {
+  pending: { icon: CheckSquare, iconColor: 'text-blue-500 bg-blue-50' },
+  overdue: { icon: Clock, iconColor: 'text-red-500 bg-red-50' },
+  today: { icon: CalendarDays, iconColor: 'text-orange-500 bg-orange-50' },
+  approvals: { icon: Stamp, iconColor: 'text-purple-500 bg-purple-50' },
+  indicators: { icon: Target, iconColor: 'text-cyan-500 bg-cyan-50' },
+  risksCritical: { icon: AlertTriangle, iconColor: 'text-amber-500 bg-amber-50' },
+  documentsToReview: { icon: FileText, iconColor: 'text-blue-600 bg-blue-50' },
+  meetingsToday: { icon: Users, iconColor: 'text-green-500 bg-green-50' },
 };
+
+function shortDue(it: WorkItem) {
+  if (it.overdueDays > 0) return `Atrasado ${it.overdueDays}d`;
+  if (!it.dueAt) return '';
+  const d = new Date(it.dueAt);
+  const now = new Date();
+  if (d.toDateString() === now.toDateString()) return 'Hoje';
+  const tomorrow = new Date(now);
+  tomorrow.setDate(now.getDate() + 1);
+  if (d.toDateString() === tomorrow.toDateString()) return 'Amanhã';
+  return formatDate(it.dueAt);
+}
+
+function timeLabel(iso: string) {
+  return new Date(iso).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
+}
+
+function ItemRow({ it, onClick }: { it: WorkItem; onClick: () => void }) {
+  const prio = PRIORITY_META[it.priority] ?? PRIORITY_META.MEDIUM;
+  const due = shortDue(it);
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className="flex w-full items-center justify-between gap-3 rounded-xl border border-slate-100 bg-slate-50/10 p-3 text-left transition-all hover:border-slate-200 hover:bg-slate-50"
+    >
+      <div className="min-w-0">
+        <div className="truncate text-xs font-bold text-slate-800">{it.title}</div>
+        {it.summary && <div className="mt-0.5 truncate text-[11px] text-slate-500">{it.summary}</div>}
+      </div>
+      <div className="flex shrink-0 items-center gap-2">
+        <span className={cn('rounded px-1.5 py-0.5 text-[10px] font-bold', prio.cls)}>{prio.label}</span>
+        {due && <span className="whitespace-nowrap text-[10px] font-medium text-slate-500">{due}</span>}
+      </div>
+    </button>
+  );
+}
+
+function PanelEmpty({ children }: { children: string }) {
+  return <div className="py-6 text-center text-xs text-slate-400">{children}</div>;
+}
 
 export default function MeuDiaPage() {
   const { user } = useAuth();
@@ -168,7 +199,7 @@ export default function MeuDiaPage() {
   const [delegationsOpen, setDelegationsOpen] = useState(false);
   const prefsInit = useRef(false);
 
-  const overview = useQuery<{ summary: Summary; isManager: boolean }>({ queryKey: ['my-day', 'overview'], queryFn: () => api('/my-day') });
+  const overview = useQuery<{ summary: Summary; isManager: boolean; items?: WorkItem[] }>({ queryKey: ['my-day', 'overview'], queryFn: () => api('/my-day') });
   const itemsQuery = useQuery<{ rows: WorkItem[]; total: number }>({
     queryKey: ['my-day', 'items', tab, typeFilter, q],
     queryFn: () => api(`/my-day/items?tab=${tab}${typeFilter ? `&itemType=${typeFilter}` : ''}${q.trim() ? `&q=${encodeURIComponent(q.trim())}` : ''}`),
@@ -183,6 +214,15 @@ export default function MeuDiaPage() {
   const savedFilters = useQuery<any[]>({ queryKey: ['my-day', 'saved-filters'], queryFn: () => api('/my-day/saved-filters') });
   const delegations = useQuery<DelegationPayload>({ queryKey: ['my-day', 'delegations'], queryFn: () => api('/my-day/delegations'), enabled: delegationsOpen });
   const assistant = useQuery<AssistantResult>({ queryKey: ['my-day', 'assistant'], queryFn: () => api('/my-day/assistant') });
+
+  // Paineis da Visao geral: reusam o endpoint real /my-day/items (sem dados ficticios).
+  const onOverview = tab === 'overview';
+  const panelApprovals = useQuery<{ rows: WorkItem[] }>({ queryKey: ['my-day', 'panel', 'approvals'], queryFn: () => api('/my-day/items?tab=approvals&pageSize=4'), enabled: onOverview });
+  const panelMeetings = useQuery<{ rows: WorkItem[] }>({ queryKey: ['my-day', 'panel', 'meetings'], queryFn: () => api('/my-day/items?itemType=MEETING&pageSize=4'), enabled: onOverview });
+  const panelRisks = useQuery<{ rows: WorkItem[] }>({ queryKey: ['my-day', 'panel', 'risks'], queryFn: () => api('/my-day/items?itemType=RISK_CRITICAL&pageSize=4'), enabled: onOverview });
+  const panelDocs = useQuery<{ rows: WorkItem[] }>({ queryKey: ['my-day', 'panel', 'docs'], queryFn: () => api('/my-day/items?itemType=DOCUMENTS&pageSize=4'), enabled: onOverview });
+  const panelIndicators = useQuery<{ rows: WorkItem[] }>({ queryKey: ['my-day', 'panel', 'indicators'], queryFn: () => api('/my-day/items?itemType=INDICATOR_OFF_TARGET&pageSize=4'), enabled: onOverview });
+  const panelFollowing = useQuery<{ rows: WorkItem[] }>({ queryKey: ['my-day', 'panel', 'following'], queryFn: () => api('/my-day/items?tab=following&pageSize=4'), enabled: onOverview });
 
   useEffect(() => {
     if (prefsInit.current || !prefs.data) return;
@@ -272,6 +312,19 @@ export default function MeuDiaPage() {
 
   const s = overview.data?.summary;
   const isManager = overview.data?.isManager;
+  const priorities = overview.data?.items ?? [];
+  // Indice "no prazo": % dos itens pendentes que NAO estao vencidos (calculado do resumo real).
+  const dayIndex = s ? (s.pending > 0 ? Math.max(0, Math.min(100, Math.round(((s.pending - s.overdue) / s.pending) * 100))) : 100) : 100;
+  const digestHeadline = !s
+    ? 'Carregando seu dia…'
+    : s.overdue > 0
+      ? `${s.overdue} item(ns) vencido(s) exigem atenção`
+      : s.dueToday > 0
+        ? `${s.dueToday} item(ns) vencendo hoje`
+        : s.pending > 0
+          ? 'Nenhum item vencido — mantenha o ritmo'
+          : 'Tudo em dia! Nenhuma pendência atribuída a você.';
+  const digestMessage = assistant.data?.summary ?? 'Mantenha o foco e a disciplina para seguir gerando resultados.';
   const cards = useMemo(() => ([
     { key: 'pending', label: 'Pendentes', value: s?.pending ?? 0, cls: 'text-slate-700' },
     { key: 'overdue', label: 'Vencidos', value: s?.overdue ?? 0, cls: 'text-rose-600' },
@@ -342,85 +395,28 @@ export default function MeuDiaPage() {
       {/* Resumo */}
       <div className="grid grid-cols-2 gap-3 sm:grid-cols-4 xl:grid-cols-8">
         {cards.filter((c) => !hiddenCards.includes(c.key)).map((c) => {
-          let IconComp = CheckSquare;
-          let iconColor = "text-blue-500 bg-blue-50";
-          let sparklineColor = "blue";
-          let variation = "↑ 8% vs ontem";
-          let varColor = "text-emerald-600";
-          
-          if (c.key === 'pending') {
-            IconComp = CheckSquare;
-            iconColor = "text-blue-500 bg-blue-50";
-            sparklineColor = "blue";
-            variation = "↑ 8% vs ontem";
-            varColor = "text-emerald-600";
-          } else if (c.key === 'overdue') {
-            IconComp = Clock;
-            iconColor = "text-red-500 bg-red-50";
-            sparklineColor = "red";
-            variation = "↓ 25% vs ontem";
-            varColor = "text-rose-600";
-          } else if (c.key === 'today') {
-            IconComp = CalendarDays;
-            iconColor = "text-orange-500 bg-orange-50";
-            sparklineColor = "orange";
-            variation = "↑ 12% vs ontem";
-            varColor = "text-emerald-600";
-          } else if (c.key === 'approvals') {
-            IconComp = Stamp;
-            iconColor = "text-purple-500 bg-purple-50";
-            sparklineColor = "purple";
-            variation = "↑ 33% vs ontem";
-            varColor = "text-emerald-600";
-          } else if (c.key === 'indicators') {
-            IconComp = Target;
-            iconColor = "text-cyan-500 bg-cyan-50";
-            sparklineColor = "turquoise";
-            variation = "↑ 5% vs ontem";
-            varColor = "text-emerald-600";
-          } else if (c.key === 'risksCritical') {
-            IconComp = AlertTriangle;
-            iconColor = "text-amber-500 bg-amber-50";
-            sparklineColor = "slate";
-            variation = "= estável";
-            varColor = "text-slate-500";
-          } else if (c.key === 'documentsToReview') {
-            IconComp = FileText;
-            iconColor = "text-blue-600 bg-blue-50";
-            sparklineColor = "blue";
-            variation = "↑ 10% vs ontem";
-            varColor = "text-emerald-600";
-          } else if (c.key === 'meetingsToday') {
-            IconComp = Users;
-            iconColor = "text-green-500 bg-green-50";
-            sparklineColor = "green";
-            variation = "↓ 14% vs ontem";
-            varColor = "text-rose-600";
-          }
-          
+          const meta = CARD_META[c.key] ?? { icon: CheckSquare, iconColor: 'text-slate-500 bg-slate-50' };
+          const IconComp = meta.icon;
           return (
             <button
               key={c.key}
               type="button"
               onClick={() => pickCard(c.key as any)}
-              className="overflow-hidden rounded-xl border border-border bg-card p-4 text-left shadow-[0_2px_8px_rgba(0,0,0,0.02)] hover:shadow-[0_4px_12px_rgba(0,0,0,0.05)] hover:border-primary/20 transition-all flex flex-col justify-between h-[120px]"
+              className="overflow-hidden rounded-xl border border-border bg-card p-4 text-left shadow-[0_2px_8px_rgba(0,0,0,0.02)] hover:shadow-[0_4px_12px_rgba(0,0,0,0.05)] hover:border-primary/20 transition-all flex flex-col justify-between h-[112px]"
             >
-              <div className="flex items-center justify-between w-full">
-                <div className={cn("p-1.5 rounded-lg", iconColor)}>
+              <div className="flex items-center justify-between w-full gap-1">
+                <div className={cn('p-1.5 rounded-lg', meta.iconColor)}>
                   <IconComp className="h-4 w-4" />
                 </div>
-                <span className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider">{c.label}</span>
+                <span className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider text-right">{c.label}</span>
               </div>
-              
+
               <div className="mt-2 text-2xl font-bold text-slate-800 leading-none">{c.value}</div>
-              
-              <div className="mt-2 flex items-center justify-between gap-1 w-full border-t border-slate-50 pt-2 shrink-0 overflow-hidden">
-                <span className={cn("text-[9px] font-bold flex items-center gap-0.5 min-w-0 truncate", varColor)}>
-                  {variation}
+
+              <div className="mt-2 w-full border-t border-slate-50 pt-2 shrink-0">
+                <span className={cn('text-[10px] font-semibold', c.value > 0 ? 'text-slate-500' : 'text-emerald-600')}>
+                  {c.value > 0 ? 'Toque para abrir' : 'Tudo em dia'}
                 </span>
-                <div className="opacity-80 scale-90 shrink-0">
-                  <Sparkline color={sparklineColor} />
-                </div>
               </div>
             </button>
           );
@@ -480,18 +476,20 @@ export default function MeuDiaPage() {
         </Button>
       </div>
 
-      <AssistantPanel
-        data={assistant.data}
-        loading={assistant.isPending}
-        onRefresh={() => void qc.invalidateQueries({ queryKey: ['my-day', 'assistant'] })}
-        onHide={(key) => hideRecommendation.mutate(key)}
-        onFeedback={(key, helpful) => feedbackRecommendation.mutate({ key, helpful })}
-      />
+      {!onOverview && (
+        <AssistantPanel
+          data={assistant.data}
+          loading={assistant.isPending}
+          onRefresh={() => void qc.invalidateQueries({ queryKey: ['my-day', 'assistant'] })}
+          onHide={(key) => hideRecommendation.mutate(key)}
+          onFeedback={(key, helpful) => feedbackRecommendation.mutate({ key, helpful })}
+        />
+      )}
 
       {/* Lista de itens ou Painel Visão Geral */}
       {tab === 'overview' ? (
         <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
-          {/* TOPO: Resumo do seu dia (col-span-2) */}
+          {/* Resumo do seu dia — indice "no prazo" e contadores reais do resumo */}
           <div className="lg:col-span-2 rounded-2xl bg-gradient-to-br from-[#0c1938] to-[#12224d] p-6 text-white shadow-md border border-[#1b2b54]/40 flex flex-col justify-between min-h-[220px]">
             <div className="flex items-start justify-between w-full gap-4">
               <div className="flex items-start gap-3">
@@ -503,57 +501,45 @@ export default function MeuDiaPage() {
                   <p className="text-xs text-slate-400 mt-0.5">Visão consolidada do que mais importa agora.</p>
                 </div>
               </div>
-              {/* Gráfico circular de Donut */}
               <div className="relative flex items-center justify-center h-20 w-20 shrink-0">
                 <svg className="w-20 h-20 transform -rotate-90">
                   <circle cx="40" cy="40" r="30" className="stroke-slate-800 fill-none" strokeWidth="6" />
-                  <circle cx="40" cy="40" r="30" className="stroke-cyan-400 fill-none" strokeWidth="6"
+                  <circle cx="40" cy="40" r="30" className={cn('fill-none', dayIndex >= 80 ? 'stroke-cyan-400' : dayIndex >= 50 ? 'stroke-amber-400' : 'stroke-rose-400')} strokeWidth="6"
                     strokeDasharray={`${2 * Math.PI * 30}`}
-                    strokeDashoffset={`${2 * Math.PI * 30 * (1 - 0.92)}`}
+                    strokeDashoffset={`${2 * Math.PI * 30 * (1 - dayIndex / 100)}`}
                     strokeLinecap="round"
                   />
                 </svg>
                 <div className="absolute flex flex-col items-center justify-center">
-                  <span className="text-sm font-bold text-white leading-none">92%</span>
-                  <span className="text-[9px] text-cyan-400 font-semibold mt-0.5">Índice</span>
+                  <span className="text-sm font-bold text-white leading-none">{dayIndex}%</span>
+                  <span className="text-[9px] text-cyan-400 font-semibold mt-0.5">No prazo</span>
                 </div>
               </div>
             </div>
 
             <div className="my-4">
-              <h4 className="text-md font-semibold text-white tracking-tight">Sem criticidades relevantes no momento.</h4>
-              <p className="text-xs text-slate-300 mt-1 leading-relaxed">Mantenha o foco e a disciplina para seguir gerando resultados.</p>
+              <h4 className="text-md font-semibold text-white tracking-tight">{digestHeadline}</h4>
+              <p className="text-xs text-slate-300 mt-1 leading-relaxed">{digestMessage}</p>
             </div>
 
             <div className="grid grid-cols-4 gap-2 pt-4 border-t border-white/[0.06] text-center">
-              <div className="flex flex-col items-center">
-                <div className="flex items-center gap-1 text-[11px] text-slate-400 font-medium">
-                  <span className="h-2 w-2 rounded-full bg-emerald-500"></span> Concluídas hoje
+              {[
+                { dot: 'bg-blue-500', label: 'A tratar', value: s?.pending ?? 0 },
+                { dot: 'bg-rose-500', label: 'Vencidos', value: s?.overdue ?? 0 },
+                { dot: 'bg-amber-500', label: 'Vencendo hoje', value: s?.dueToday ?? 0 },
+                { dot: 'bg-purple-500', label: 'Aprovações', value: s?.approvals ?? 0 },
+              ].map((st) => (
+                <div key={st.label} className="flex flex-col items-center">
+                  <div className="flex items-center gap-1 text-[11px] text-slate-400 font-medium">
+                    <span className={cn('h-2 w-2 rounded-full', st.dot)}></span> {st.label}
+                  </div>
+                  <div className="text-lg font-bold text-white mt-1">{st.value}</div>
                 </div>
-                <div className="text-lg font-bold text-white mt-1">7</div>
-              </div>
-              <div className="flex flex-col items-center">
-                <div className="flex items-center gap-1 text-[11px] text-slate-400 font-medium">
-                  <span className="h-2 w-2 rounded-full bg-blue-500"></span> Em andamento
-                </div>
-                <div className="text-lg font-bold text-white mt-1">15</div>
-              </div>
-              <div className="flex flex-col items-center">
-                <div className="flex items-center gap-1 text-[11px] text-slate-400 font-medium">
-                  <span className="h-2 w-2 rounded-full bg-orange-500"></span> Pausadas
-                </div>
-                <div className="text-lg font-bold text-white mt-1">2</div>
-              </div>
-              <div className="flex flex-col items-center">
-                <div className="flex items-center gap-1 text-[11px] text-slate-400 font-medium">
-                  <span className="h-2 w-2 rounded-full bg-slate-500"></span> Planejadas
-                </div>
-                <div className="text-lg font-bold text-white mt-1">6</div>
-              </div>
+              ))}
             </div>
           </div>
 
-          {/* Insights com IA */}
+          {/* Insights com IA — recomendacoes reais do assistente (/my-day/assistant) */}
           <div className="rounded-2xl border border-border bg-card p-5 shadow-sm flex flex-col justify-between min-h-[220px]">
             <div className="flex items-start justify-between w-full">
               <div className="flex items-start gap-3">
@@ -563,82 +549,58 @@ export default function MeuDiaPage() {
                 <div>
                   <div className="flex items-center gap-1.5">
                     <h3 className="font-bold text-slate-800 tracking-tight text-sm">Insights com IA</h3>
-                    <span className="bg-indigo-100 text-indigo-700 text-[9px] font-bold px-1.5 py-0.5 rounded-full">Novo</span>
+                    {assistant.data?.enabled === false && <span className="bg-slate-100 text-slate-500 text-[9px] font-bold px-1.5 py-0.5 rounded-full">Desativado</span>}
                   </div>
                   <p className="text-xs text-muted-foreground mt-0.5">Análises inteligentes para apoiar suas decisões.</p>
                 </div>
               </div>
             </div>
 
-            <div className="bg-[#fcfaff] border border-indigo-50/50 rounded-xl p-4 my-3 flex items-start gap-2.5">
-              <div className="p-1 rounded-full bg-indigo-100 text-indigo-500 shrink-0 mt-0.5">
-                <Sparkles className="h-3 w-3" />
+            {assistant.isPending ? (
+              <div className="h-20 animate-pulse rounded-xl bg-muted/30 my-3" />
+            ) : assistant.data?.recommendations?.[0] ? (
+              <div className="bg-[#fcfaff] border border-indigo-50/50 rounded-xl p-4 my-3 flex items-start gap-2.5">
+                <div className="p-1 rounded-full bg-indigo-100 text-indigo-500 shrink-0 mt-0.5">
+                  <Sparkles className="h-3 w-3" />
+                </div>
+                <div className="text-xs leading-relaxed text-indigo-950 font-medium">
+                  <strong className="text-indigo-900 block font-bold mb-0.5">{assistant.data.recommendations[0].title}</strong>
+                  {assistant.data.recommendations[0].suggestion}
+                </div>
               </div>
-              <div className="text-xs leading-relaxed text-indigo-950 font-medium">
-                <strong className="text-indigo-900 block font-bold mb-0.5">Rotina sob controle</strong>
-                Nenhuma criticidade relevante identificada. Mantenha os acompanhamentos e revise os próximos prazos ao fim do dia.
+            ) : (
+              <div className="bg-emerald-50/40 border border-emerald-100 rounded-xl p-4 my-3 text-xs leading-relaxed text-emerald-900 font-medium">
+                {assistant.data?.summary ?? 'Nenhuma criticidade relevante identificada no momento.'}
               </div>
-            </div>
+            )}
 
-            <div className="text-xs font-semibold text-blue-600 hover:text-blue-700 flex items-center gap-1 cursor-pointer">
+            <button type="button" onClick={() => setTab('priorities')} className="text-xs font-semibold text-blue-600 hover:text-blue-700 flex items-center gap-1">
               Ver mais insights <span className="text-[14px] font-bold">&rarr;</span>
-            </div>
+            </button>
           </div>
 
-          {/* COLUNA 1: Prioridades do dia */}
+          {/* Prioridades do dia — itens reais priorizados (overview.items) */}
           <div className="rounded-2xl border border-border bg-card p-5 shadow-sm space-y-4">
             <div className="flex items-center justify-between border-b pb-3">
               <div className="flex items-center gap-2">
                 <Star className="h-4.5 w-4.5 text-amber-500 fill-amber-500" />
                 <h3 className="font-bold text-slate-800 text-sm tracking-tight">Prioridades do dia</h3>
               </div>
-              <button className="text-slate-400 hover:text-slate-600 text-xs">×</button>
+              <span className="text-xs font-semibold text-blue-600 hover:underline cursor-pointer" onClick={() => setTab('priorities')}>Ver todas</span>
             </div>
-            
+
             <div className="space-y-3">
-              <div className="flex items-center justify-between gap-3 p-2.5 rounded-xl border border-slate-100 bg-slate-50/20 hover:bg-slate-50 transition-colors">
-                <div className="flex items-center gap-3">
-                  <div className="h-4.5 w-4.5 rounded-full border border-slate-300 flex items-center justify-center shrink-0 cursor-pointer"></div>
-                  <span className="text-xs font-semibold text-slate-800 line-clamp-1">Validar indicadores de performance Q2</span>
-                </div>
-                <div className="flex items-center gap-2 shrink-0">
-                  <span className="bg-rose-50 text-rose-600 text-[10px] font-bold px-1.5 py-0.5 rounded">Alta</span>
-                  <span className="text-[10px] text-slate-500 font-medium">Hoje</span>
-                  <div className="h-6 w-6 rounded-full bg-slate-200 overflow-hidden flex items-center justify-center text-[10px] font-bold text-slate-700">UD</div>
-                </div>
-              </div>
-
-              <div className="flex items-center justify-between gap-3 p-2.5 rounded-xl border border-slate-100 bg-slate-50/20 hover:bg-slate-50 transition-colors">
-                <div className="flex items-center gap-3">
-                  <div className="h-4.5 w-4.5 rounded-full border border-slate-300 flex items-center justify-center shrink-0 cursor-pointer"></div>
-                  <span className="text-xs font-semibold text-slate-800 line-clamp-1">Aprovar plano de ação - Auditoria Interna</span>
-                </div>
-                <div className="flex items-center gap-2 shrink-0">
-                  <span className="bg-rose-50 text-rose-600 text-[10px] font-bold px-1.5 py-0.5 rounded">Alta</span>
-                  <span className="text-[10px] text-slate-500 font-medium">Hoje</span>
-                  <div className="h-6 w-6 rounded-full bg-slate-300 overflow-hidden flex items-center justify-center text-[10px] font-bold text-slate-700">UD</div>
-                </div>
-              </div>
-
-              <div className="flex items-center justify-between gap-3 p-2.5 rounded-xl border border-slate-100 bg-slate-50/20 hover:bg-slate-50 transition-colors">
-                <div className="flex items-center gap-3">
-                  <div className="h-4.5 w-4.5 rounded-full border border-slate-300 flex items-center justify-center shrink-0 cursor-pointer"></div>
-                  <span className="text-xs font-semibold text-slate-800 line-clamp-1">Revisar procedimentos - Segurança Patrimonial</span>
-                </div>
-                <div className="flex items-center gap-2 shrink-0">
-                  <span className="bg-amber-50 text-amber-600 text-[10px] font-bold px-1.5 py-0.5 rounded">Média</span>
-                  <span className="text-[10px] text-slate-500 font-medium">Amanhã</span>
-                  <div className="h-6 w-6 rounded-full bg-slate-200 overflow-hidden flex items-center justify-center text-[10px] font-bold text-slate-700">UD</div>
-                </div>
-              </div>
-            </div>
-
-            <div className="text-xs font-semibold text-blue-600 hover:text-blue-700 pt-2 cursor-pointer" onClick={() => setTab('priorities')}>
-              Ver todas as prioridades &rarr;
+              {overview.isPending ? (
+                <div className="h-16 animate-pulse rounded-xl bg-muted/30" />
+              ) : priorities.length === 0 ? (
+                <PanelEmpty>Nenhuma prioridade no momento.</PanelEmpty>
+              ) : (
+                priorities.slice(0, 4).map((it) => <ItemRow key={it.id} it={it} onClick={() => setActOn(it)} />)
+              )}
             </div>
           </div>
 
-          {/* COLUNA 2: Aprovações pendentes */}
+          {/* Aprovações pendentes — itens reais (itemType APPROVAL) */}
           <div className="rounded-2xl border border-border bg-card p-5 shadow-sm space-y-4">
             <div className="flex items-center justify-between border-b pb-3">
               <div className="flex items-center gap-2">
@@ -647,27 +609,18 @@ export default function MeuDiaPage() {
               </div>
               <span className="text-xs font-semibold text-blue-600 hover:underline cursor-pointer" onClick={() => { setTab('priorities'); setTypeFilter('APPROVAL'); }}>Ver todas</span>
             </div>
-
             <div className="space-y-3">
-              <div className="p-3 rounded-xl border border-slate-100 hover:border-slate-200 bg-slate-50/10 hover:bg-slate-50 transition-all flex flex-col gap-2 cursor-pointer" onClick={() => { setTab('priorities'); setTypeFilter('APPROVAL'); }}>
-                <div className="flex items-center justify-between w-full gap-2">
-                  <span className="text-xs font-bold text-slate-800 line-clamp-1">Compra de equipamentos</span>
-                  <span className="bg-orange-50 text-orange-600 text-[9px] font-bold px-1.5 py-0.5 rounded">Alta prioridade</span>
-                </div>
-                <span className="text-[11px] text-slate-500">Solicitante: João Silva</span>
-              </div>
-
-              <div className="p-3 rounded-xl border border-slate-100 hover:border-slate-200 bg-slate-50/10 hover:bg-slate-50 transition-all flex flex-col gap-2 cursor-pointer" onClick={() => { setTab('priorities'); setTypeFilter('APPROVAL'); }}>
-                <div className="flex items-center justify-between w-full gap-2">
-                  <span className="text-xs font-bold text-slate-800 line-clamp-1">Política de Qualidade v2.1</span>
-                  <span className="bg-amber-50 text-amber-600 text-[9px] font-bold px-1.5 py-0.5 rounded">Média prioridade</span>
-                </div>
-                <span className="text-[11px] text-slate-500">Solicitante: Mariana Costa</span>
-              </div>
+              {panelApprovals.isPending ? (
+                <div className="h-16 animate-pulse rounded-xl bg-muted/30" />
+              ) : (panelApprovals.data?.rows ?? []).length === 0 ? (
+                <PanelEmpty>Nenhuma aprovação pendente.</PanelEmpty>
+              ) : (
+                (panelApprovals.data?.rows ?? []).map((it) => <ItemRow key={it.id} it={it} onClick={() => setActOn(it)} />)
+              )}
             </div>
           </div>
 
-          {/* COLUNA 3: Próximas reuniões */}
+          {/* Próximas reuniões — reuniões reais atribuídas (itemType MEETING) */}
           <div className="rounded-2xl border border-border bg-card p-5 shadow-sm space-y-4">
             <div className="flex items-center justify-between border-b pb-3">
               <div className="flex items-center gap-2">
@@ -676,141 +629,110 @@ export default function MeuDiaPage() {
               </div>
               <span className="text-xs font-semibold text-blue-600 hover:underline cursor-pointer" onClick={() => router.push('/meetings')}>Ver agenda</span>
             </div>
-
             <div className="space-y-3">
-              <div className="p-3 rounded-xl border border-slate-100 hover:border-slate-200 bg-slate-50/10 hover:bg-slate-50 transition-all flex items-center justify-between gap-3 cursor-pointer" onClick={() => router.push('/meetings')}>
-                <div className="flex items-start gap-3">
-                  <span className="text-xs font-bold text-slate-800 mt-0.5">09:00</span>
-                  <div>
-                    <h4 className="text-xs font-bold text-slate-900 line-clamp-1">Alinhamento Operacional</h4>
-                    <p className="text-[10px] text-slate-500 mt-0.5">Sala de Reuniões 1</p>
-                  </div>
-                </div>
-                <span className="bg-emerald-50 text-emerald-600 text-[9px] font-bold px-2 py-0.5 rounded-full shrink-0">Em 35 min</span>
-              </div>
-
-              <div className="p-3 rounded-xl border border-slate-100 hover:border-slate-200 bg-slate-50/10 hover:bg-slate-50 transition-all flex items-center justify-between gap-3 cursor-pointer" onClick={() => router.push('/meetings')}>
-                <div className="flex items-start gap-3">
-                  <span className="text-xs font-bold text-slate-800 mt-0.5">14:00</span>
-                  <div>
-                    <h4 className="text-xs font-bold text-slate-900 line-clamp-1">Revisão de Indicadores</h4>
-                    <p className="text-[10px] text-slate-500 mt-0.5">Online - Teams</p>
-                  </div>
-                </div>
-                <span className="bg-amber-50 text-amber-600 text-[9px] font-bold px-2 py-0.5 rounded-full shrink-0">Em 5h 35m</span>
-              </div>
+              {panelMeetings.isPending ? (
+                <div className="h-16 animate-pulse rounded-xl bg-muted/30" />
+              ) : (panelMeetings.data?.rows ?? []).length === 0 ? (
+                <PanelEmpty>Nenhuma reunião atribuída a você.</PanelEmpty>
+              ) : (
+                (panelMeetings.data?.rows ?? []).map((it) => (
+                  <button
+                    key={it.id}
+                    type="button"
+                    onClick={() => { const href = it.availableActions?.find((a) => a.key === 'open')?.href; router.push(href ?? '/meetings'); }}
+                    className="w-full text-left p-3 rounded-xl border border-slate-100 bg-slate-50/10 hover:bg-slate-50 hover:border-slate-200 transition-all flex items-center justify-between gap-3"
+                  >
+                    <div className="flex items-start gap-3 min-w-0">
+                      {it.dueAt && <span className="text-xs font-bold text-slate-800 mt-0.5 shrink-0">{timeLabel(it.dueAt)}</span>}
+                      <div className="min-w-0">
+                        <h4 className="text-xs font-bold text-slate-900 truncate">{it.title}</h4>
+                        {it.summary && <p className="text-[10px] text-slate-500 mt-0.5 truncate">{it.summary}</p>}
+                      </div>
+                    </div>
+                    <span className="bg-slate-100 text-slate-600 text-[9px] font-bold px-2 py-0.5 rounded-full shrink-0">{shortDue(it) || 'Agendada'}</span>
+                  </button>
+                ))
+              )}
             </div>
           </div>
 
-          {/* COLUNA 1 LINHA 3: Riscos críticos */}
+          {/* Riscos críticos — itens reais (itemType RISK_CRITICAL) */}
           <div className="rounded-2xl border border-border bg-card p-5 shadow-sm space-y-4">
             <div className="flex items-center justify-between border-b pb-3">
               <div className="flex items-center gap-2">
                 <AlertTriangle className="h-4.5 w-4.5 text-red-500" />
                 <h3 className="font-bold text-slate-800 text-sm tracking-tight">Riscos críticos</h3>
               </div>
-              <span className="bg-red-100 text-red-700 text-[9px] font-bold h-5 min-w-5 px-1.5 flex items-center justify-center rounded-full">2</span>
+              {(s?.risksCritical ?? 0) > 0 && <span className="bg-red-100 text-red-700 text-[9px] font-bold h-5 min-w-5 px-1.5 flex items-center justify-center rounded-full">{s?.risksCritical}</span>}
             </div>
-
             <div className="space-y-3">
-              <div className="p-3 rounded-xl border border-slate-100 bg-slate-50/10 hover:bg-slate-50 transition-all flex flex-col gap-2 cursor-pointer" onClick={() => router.push('/risks')}>
-                <div className="flex items-center justify-between w-full gap-2">
-                  <span className="text-xs font-bold text-slate-800 line-clamp-1">Fornecedores críticos sem avaliação atualizada</span>
-                  <span className="bg-red-50 text-red-600 text-[9px] font-bold px-1.5 py-0.5 rounded shrink-0">Alta</span>
-                </div>
-                <span className="text-[11px] text-slate-500">Risco operacional</span>
-              </div>
+              {panelRisks.isPending ? (
+                <div className="h-16 animate-pulse rounded-xl bg-muted/30" />
+              ) : (panelRisks.data?.rows ?? []).length === 0 ? (
+                <PanelEmpty>Nenhum risco crítico no momento.</PanelEmpty>
+              ) : (
+                (panelRisks.data?.rows ?? []).map((it) => <ItemRow key={it.id} it={it} onClick={() => openVision(it)} />)
+              )}
             </div>
           </div>
 
-          {/* COLUNA 2 LINHA 3: Documentos recentes */}
+          {/* Documentos a revisar — itens reais (DOCUMENT_REVIEW/EDIT) */}
           <div className="rounded-2xl border border-border bg-card p-5 shadow-sm space-y-4">
             <div className="flex items-center justify-between border-b pb-3">
               <div className="flex items-center gap-2">
                 <FileText className="h-4.5 w-4.5 text-blue-500" />
-                <h3 className="font-bold text-slate-800 text-sm tracking-tight">Documentos recentes</h3>
+                <h3 className="font-bold text-slate-800 text-sm tracking-tight">Documentos a revisar</h3>
               </div>
               <span className="text-xs font-semibold text-blue-600 hover:underline cursor-pointer" onClick={() => router.push('/documents')}>Ver todos</span>
             </div>
-
             <div className="space-y-3">
-              <div className="p-3 rounded-xl border border-slate-100 bg-slate-50/10 hover:bg-slate-50 transition-all flex items-center justify-between gap-3 cursor-pointer" onClick={() => router.push('/documents')}>
-                <div className="min-w-0">
-                  <h4 className="text-xs font-bold text-slate-800 truncate">Relatório de Auditoria Interna - Maio/2026</h4>
-                  <p className="text-[10px] text-slate-500 mt-0.5 truncate">Atualizado há 2h por Mariana Costa</p>
-                </div>
-                <span className="bg-red-50 text-red-600 text-[9px] font-bold px-2 py-0.5 rounded shrink-0">PDF</span>
-              </div>
+              {panelDocs.isPending ? (
+                <div className="h-16 animate-pulse rounded-xl bg-muted/30" />
+              ) : (panelDocs.data?.rows ?? []).length === 0 ? (
+                <PanelEmpty>Nenhum documento pendente de revisão.</PanelEmpty>
+              ) : (
+                (panelDocs.data?.rows ?? []).map((it) => <ItemRow key={it.id} it={it} onClick={() => setActOn(it)} />)
+              )}
             </div>
           </div>
 
-          {/* COLUNA 3 LINHA 2-3: Indicadores em destaque */}
+          {/* Indicadores fora da meta — itens reais (INDICATOR_OFF_TARGET) */}
           <div className="rounded-2xl border border-border bg-card p-5 shadow-sm space-y-4">
             <div className="flex items-center justify-between border-b pb-3">
               <div className="flex items-center gap-2">
                 <BarChart3 className="h-4.5 w-4.5 text-cyan-600" />
-                <h3 className="font-bold text-slate-800 text-sm tracking-tight">Indicadores em destaque</h3>
+                <h3 className="font-bold text-slate-800 text-sm tracking-tight">Indicadores fora da meta</h3>
               </div>
               <span className="text-xs font-semibold text-blue-600 hover:underline cursor-pointer" onClick={() => router.push('/indicators')}>Ver painel</span>
             </div>
-
-            <div className="space-y-3.5">
-              <div className="flex items-center justify-between gap-3 cursor-pointer" onClick={() => router.push('/indicators')}>
-                <div className="min-w-0">
-                  <h4 className="text-xs font-bold text-slate-800 truncate">Produtividade Operacional</h4>
-                  <p className="text-[10px] text-slate-500 mt-0.5">Meta: &ge; 90%</p>
-                </div>
-                <div className="flex items-center gap-3 shrink-0">
-                  <Sparkline color="green" />
-                  <span className="text-xs font-bold text-emerald-600">92,4%</span>
-                </div>
-              </div>
-
-              <div className="flex items-center justify-between gap-3 cursor-pointer" onClick={() => router.push('/indicators')}>
-                <div className="min-w-0">
-                  <h4 className="text-xs font-bold text-slate-800 truncate">Qualidade de Processos</h4>
-                  <p className="text-[10px] text-slate-500 mt-0.5">Meta: &ge; 95%</p>
-                </div>
-                <div className="flex items-center gap-3 shrink-0">
-                  <Sparkline color="green" />
-                  <span className="text-xs font-bold text-emerald-600">96,1%</span>
-                </div>
-              </div>
-
-              <div className="flex items-center justify-between gap-3 cursor-pointer" onClick={() => router.push('/indicators')}>
-                <div className="min-w-0">
-                  <h4 className="text-xs font-bold text-slate-800 truncate">Satisfação do Cliente</h4>
-                  <p className="text-[10px] text-slate-500 mt-0.5">Meta: &ge; 90%</p>
-                </div>
-                <div className="flex items-center gap-3 shrink-0">
-                  <Sparkline color="red" />
-                  <span className="text-xs font-bold text-rose-600">88,7%</span>
-                </div>
-              </div>
+            <div className="space-y-3">
+              {panelIndicators.isPending ? (
+                <div className="h-16 animate-pulse rounded-xl bg-muted/30" />
+              ) : (panelIndicators.data?.rows ?? []).length === 0 ? (
+                <PanelEmpty>Todos os indicadores dentro da meta.</PanelEmpty>
+              ) : (
+                (panelIndicators.data?.rows ?? []).map((it) => <ItemRow key={it.id} it={it} onClick={() => openVision(it)} />)
+              )}
             </div>
           </div>
 
-          {/* COLUNA 3 LINHA 3: Acompanhamentos */}
-          <div className="rounded-2xl border border-border bg-card p-5 shadow-sm space-y-4">
+          {/* Acompanhamentos — itens reais que você segue (tab following) */}
+          <div className="lg:col-span-3 rounded-2xl border border-border bg-card p-5 shadow-sm space-y-4">
             <div className="flex items-center justify-between border-b pb-3">
               <div className="flex items-center gap-2">
-                <Users className="h-4.5 w-4.5 text-emerald-600" />
+                <Bookmark className="h-4.5 w-4.5 text-emerald-600" />
                 <h3 className="font-bold text-slate-800 text-sm tracking-tight">Acompanhamentos</h3>
               </div>
-              <span className="text-xs font-semibold text-blue-600 hover:underline cursor-pointer">Ver todos</span>
+              <span className="text-xs font-semibold text-blue-600 hover:underline cursor-pointer" onClick={() => setTab('following')}>Ver todos</span>
             </div>
-
-            <div className="space-y-3">
-              <div className="p-3.5 rounded-xl border border-slate-100 bg-slate-50/10 hover:bg-slate-50 transition-all flex flex-col gap-2.5">
-                <div className="flex items-center justify-between w-full gap-2">
-                  <span className="text-xs font-bold text-slate-800">Plano de ação - ISO 9001</span>
-                  <span className="text-xs font-bold text-slate-700">75%</span>
-                </div>
-                {/* Barra de progresso */}
-                <div className="w-full bg-slate-100 rounded-full h-2 overflow-hidden">
-                  <div className="bg-emerald-500 h-2 rounded-full transition-all" style={{ width: '75%' }}></div>
-                </div>
-              </div>
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
+              {panelFollowing.isPending ? (
+                <div className="h-16 animate-pulse rounded-xl bg-muted/30 sm:col-span-2 lg:col-span-3" />
+              ) : (panelFollowing.data?.rows ?? []).length === 0 ? (
+                <div className="sm:col-span-2 lg:col-span-3"><PanelEmpty>Você ainda não acompanha nenhum item. Use o marcador nos itens para acompanhá-los aqui.</PanelEmpty></div>
+              ) : (
+                (panelFollowing.data?.rows ?? []).map((it) => <ItemRow key={it.id} it={it} onClick={() => setActOn(it)} />)
+              )}
             </div>
           </div>
         </div>
