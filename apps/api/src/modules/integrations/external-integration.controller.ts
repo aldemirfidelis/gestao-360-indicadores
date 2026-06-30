@@ -13,11 +13,13 @@ import {
 } from './external-integration.dto';
 
 /**
- * Administração de integrações com APIs externas — Admin da Empresa / Super Admin.
- * Escopo SEMPRE = empresa da sessão (companyId efetivo). Credenciais nunca retornam ao cliente.
+ * Administração de integrações com APIs externas — SOMENTE Super Admin (operadores da plataforma).
+ * Telas de SAP/Apdata/SE Suite/REST + chaves de entrada ficam no Portal Admin Global; usuários da
+ * empresa não acessam. Escopo SEMPRE = empresa da sessão (companyId efetivo, empresa selecionada/
+ * impersonada). Credenciais nunca retornam ao cliente.
  */
 @Controller('integrations/external')
-@Roles(UserRoleEnum.COMPANY_ADMIN, UserRoleEnum.SUPER_ADMIN)
+@Roles(UserRoleEnum.SUPER_ADMIN)
 @RequirePermissions('settings:manage')
 export class ExternalIntegrationController {
   constructor(private readonly service: ExternalIntegrationService) {}

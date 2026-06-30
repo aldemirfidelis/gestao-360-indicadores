@@ -305,7 +305,7 @@ export const ROUTE_PERMISSIONS: Array<{ prefix: string; permissions: string[]; e
   { prefix: '/comunicacao', permissions: ['communication:view'] },
   { prefix: '/pessoas', permissions: [] },
   { prefix: '/perfil', permissions: [] },
-  { prefix: '/integracoes', permissions: [] },
+  { prefix: '/integracoes', permissions: [SUPER_ADMIN_ONLY_PERMISSION] },
   { prefix: '/ajuda', permissions: [] },
   { prefix: '/central-atendimento', permissions: [] },
   { prefix: '/users', permissions: ['users:view', 'users:manage'] },
@@ -315,7 +315,7 @@ export const ROUTE_PERMISSIONS: Array<{ prefix: string; permissions: string[]; e
   { prefix: '/settings/portal', permissions: [SUPER_ADMIN_ONLY_PERMISSION] },
   { prefix: '/settings/empresas', permissions: ['users:view', 'users:manage'] },
   { prefix: '/settings/visibilidade', permissions: ['users:permissions', 'users:manage'] },
-  { prefix: '/settings/integracoes', permissions: ['integrations:view', 'integrations:manage', 'settings:manage'] },
+  { prefix: '/settings/integracoes', permissions: [SUPER_ADMIN_ONLY_PERMISSION] },
   { prefix: '/settings', permissions: ['settings:view', 'settings:manage', 'users:view', 'users:profiles', 'users:manage', 'audit:view'] },
 ];
 

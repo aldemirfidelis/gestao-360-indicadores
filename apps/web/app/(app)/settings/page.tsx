@@ -5,7 +5,6 @@ import { useEffect, useMemo, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
 import {
-  ArrowLeftRight,
   Building2,
   CheckCircle2,
   Database,
@@ -15,7 +14,6 @@ import {
   KeyRound,
   Layers3,
   Plus,
-  Plug,
   Save,
   ScrollText,
   Search,
@@ -404,45 +402,31 @@ export default function SettingsPage() {
           })}
       </SectionCard>
 
-      {/* No Portal Admin Global, estes atalhos ja existem na barra lateral. */}
-      {!platformAdminContext && canViewSettings && (
-      <SectionCard
-        title="Integrações"
-        description="Conectores internos, serviços de apoio e status operacional ficam dentro de Configurações."
-        className="mb-6"
-        contentClassName="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-3"
-      >
-        <Link
-          href="/integracoes"
-          className="group flex h-full items-start gap-3 rounded-lg border bg-card p-4 shadow-sm transition-colors hover:bg-accent/35"
+      {/* Integrações de SISTEMA (SAP/Apdata/conectores) foram movidas para o Portal Admin Global (Super Admin).
+          Aqui fica apenas a IMPORTAÇÃO de dados, que é tarefa do usuário-chave/admin da empresa. */}
+      {!platformAdminContext && hasPermission(['imports:view', 'imports:create']) && (
+        <SectionCard
+          title="Dados e Importações"
+          description="Importe indicadores, metas e resultados a partir de planilhas (CSV/XLSX), com prévia validada antes de gravar."
+          className="mb-6"
+          contentClassName="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-3"
         >
-          <div className="grid h-10 w-10 shrink-0 place-items-center rounded-md bg-status-blue/10 text-status-blue">
-            <Plug className="h-5 w-5" />
-          </div>
-          <div className="min-w-0">
-            <div className="text-sm font-semibold">Integrações</div>
-            <p className="mt-1 text-xs leading-relaxed text-muted-foreground">
-              Acompanhe conectores, eventos e rotinas técnicas em um local reservado à administração.
-            </p>
-          </div>
-        </Link>
-        {canManageSettings && (
           <Link
-            href="/settings/integracoes"
+            href="/imports"
             className="group flex h-full items-start gap-3 rounded-lg border bg-card p-4 shadow-sm transition-colors hover:bg-accent/35"
           >
-            <div className="grid h-10 w-10 shrink-0 place-items-center rounded-md bg-status-purple/10 text-status-purple">
-              <ArrowLeftRight className="h-5 w-5" />
+            <div className="grid h-10 w-10 shrink-0 place-items-center rounded-md bg-status-blue/10 text-status-blue">
+              <FileDown className="h-5 w-5" />
             </div>
             <div className="min-w-0">
-              <div className="text-sm font-semibold">APIs Externas</div>
+              <div className="text-sm font-semibold">Importações</div>
               <p className="mt-1 text-xs leading-relaxed text-muted-foreground">
-                Conecte sistemas externos (SAP, Apdata, SE Suite e outros): conectores de saída, chaves de API de entrada e registros.
+                Carregue indicadores, metas e realizados em lote a partir de planilhas. As integrações
+                com sistemas externos (SAP, Apdata e outros) são gerenciadas pela equipe da plataforma.
               </p>
             </div>
           </Link>
-        )}
-      </SectionCard>
+        </SectionCard>
       )}
 
       {!platformAdminContext && canManageUsers && (
