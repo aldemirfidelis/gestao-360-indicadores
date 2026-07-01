@@ -1,13 +1,47 @@
 # =====================================================
 # Docker Compose para Droplet DigitalOcean (producao)
-# - API + Web + Caddy (proxy reverso com SSL automatico) + Collabora
-# - Banco de dados: DigitalOcean Managed PostgreSQL (EXTERNO). O DATABASE_URL
-#   (com sslmode=require) vem do .env. O Postgres LOCAL foi removido em 2026-06-30
-#   (dados migrados para o gerenciado).
+# - Postgres + API + Web + Caddy (proxy reverso com SSL automatico)
+# - Banco roda LOCAL na droplet (mesmo host da API) -> latencia <1ms por query.
+#   Antes era Neon (AWS us-east-2): cada query pagava ~20-90ms de rede.
+#   Migracao de dados (uma vez): scripts/migrate-neon-to-droplet.sh
+#   Backup (substitui o gerenciado do Neon): scripts/backup-db.sh + cron.
 # - Variaveis sensiveis vem do arquivo .env no servidor
 # =====================================================
 
 services:
+  # Postgres local — exposto SOMENTE na rede interna do compose (sem `ports`),
+  # nunca na internet. A API conecta via host `postgres` na rede `g360`.
+  postgres:
+    # PG 17 para casar com a origem (Neon roda PostgreSQL 17.x). O servidor local
+    # precisa ser >= a versao do dump de origem.
+    image: postgres:17-alpine
+    container_name: g360-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-g360}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?defina POSTGRES_PASSWORD no .env}
+      POSTGRES_DB: ${POSTGRES_DB:-g360}
+      PGDATA: /var/lib/postgresql/data/pgdata
+    networks:
+      - g360
+    expose:
+      - "5432"
+    volumes:
+      - g360_pgdata:/var/lib/postgresql/data
+    # Evita "could not resize shared memory" em queries paralelas/joins grandes.
+    shm_size: "256mb"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-g360} -d ${POSTGRES_DB:-g360} -h 127.0.0.1"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 30s
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+
   api:
     build:
       context: .
@@ -25,6 +59,10 @@ services:
       - g360
     expose:
       - "3333"
+    depends_on:
+      # Garante que o `prisma migrate deploy` do boot so rode com o banco pronto.
+      postgres:
+        condition: service_healthy
     volumes:
       # Persiste os arquivos binarios controlados do GED (DOCX/PDF), inclusive
       # os salvos pelo editor online Collabora. Sem isso, um rebuild perde os
@@ -158,3 +196,4 @@ volumes:
   caddy_data:
   caddy_config:
   g360_storage:
+  g360_pgdata:
