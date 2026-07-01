@@ -10,12 +10,17 @@ import { DB_ADMIN_LIMITS } from '../database-admin.constants';
  * em modo transaction não suporta de forma confiável DDL, SET de sessão e
  * transações interativas usadas aqui. Mantê-lo separado do PrismaService
  * principal também isola o blast radius do SQL administrativo.
+ *
+ * Resiliência: se o DIRECT_URL estiver desatualizado (ex.: após migrar o banco
+ * para o Postgres gerenciado, com o DIRECT_URL ainda apontando para um host que
+ * não existe mais), a conexão falha e a tela "Banco de Dados" fica vazia. Por
+ * isso, se o $connect via DIRECT_URL falhar, reconectamos via DATABASE_URL.
  */
 @Injectable()
 export class PostgreSQLAdapter implements DatabaseAdapter, OnModuleInit, OnModuleDestroy {
   readonly dialect: SqlDialect = 'postgresql';
   private readonly logger = new Logger(PostgreSQLAdapter.name);
-  private readonly client: PrismaClient;
+  private client: PrismaClient;
 
   constructor() {
     // DIRECT_URL (sem -pooler) > DATABASE_URL como fallback.
@@ -30,7 +35,22 @@ export class PostgreSQLAdapter implements DatabaseAdapter, OnModuleInit, OnModul
     try {
       await this.client.$connect();
     } catch (err) {
-      this.logger.error(`Falha ao conectar adapter administrativo: ${(err as Error).message}`);
+      this.logger.error(`Falha ao conectar adapter administrativo via DIRECT_URL: ${(err as Error).message}`);
+      // Fallback: DIRECT_URL pode apontar para um banco que não existe mais.
+      // Reconecta via DATABASE_URL (usado pela aplicação principal), assim a tela
+      // administrativa volta a funcionar sem depender do ajuste do DIRECT_URL.
+      const fallbackUrl = process.env.DATABASE_URL;
+      const directUrl = process.env.DIRECT_URL;
+      if (fallbackUrl && fallbackUrl !== directUrl) {
+        try {
+          await this.client.$disconnect().catch(() => undefined);
+          this.client = new PrismaClient({ log: ['error'], datasources: { db: { url: fallbackUrl } } });
+          await this.client.$connect();
+          this.logger.warn('Adapter administrativo reconectado via DATABASE_URL (fallback do DIRECT_URL).');
+        } catch (fallbackErr) {
+          this.logger.error(`Fallback via DATABASE_URL também falhou: ${(fallbackErr as Error).message}`);
+        }
+      }
     }
   }
 

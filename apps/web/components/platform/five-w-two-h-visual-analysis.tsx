@@ -194,6 +194,8 @@ export function FiveWTwoHVisualAnalysis({
   users = [],
   saving,
   canEdit = true,
+  rootCause,
+  problem,
   onTaskCreated,
   onEnsureActionPlan,
   onSave,
@@ -204,6 +206,8 @@ export function FiveWTwoHVisualAnalysis({
   users?: UserOption[];
   saving: boolean;
   canEdit?: boolean;
+  rootCause?: string;
+  problem?: string;
   onTaskCreated?: () => void;
   onEnsureActionPlan?: () => Promise<string>;
   onSave: (items: FiveW2HItem[]) => void;
@@ -244,6 +248,9 @@ export function FiveWTwoHVisualAnalysis({
   const overallProgress = Math.round((doneCount / FIELD_ORDER.length) * 100);
   const currentIndex = FIELD_ORDER.findIndex((type) => !stepDone(items.find((i) => i.itemType === type)!));
   const allDone = currentIndex === -1;
+  // Causa raiz identificada no 5 Porquês (compartilhada pela análise) — orienta o 5W2H.
+  const effectiveRootCause = (rootCause ?? action?.rootCause ?? '').trim();
+  const problemText = (problem ?? action?.problemDescription ?? '').trim();
 
   const handleSave = useCallback(
     (nextItems = itemsRef.current) => {
@@ -462,6 +469,16 @@ export function FiveWTwoHVisualAnalysis({
       )}
 
       <div className="bg-slate-50 p-4">
+        {effectiveRootCause && (
+          <div className="mb-4 rounded-lg border border-red-200 bg-red-50 px-4 py-3">
+            <div className="flex items-center gap-2 text-[11px] font-bold uppercase tracking-wide text-red-700">
+              <Target className="h-4 w-4" /> Causa raiz identificada (5 Porquês)
+            </div>
+            <p className="mt-1 text-sm font-semibold text-red-900">{effectiveRootCause}</p>
+            {problemText && <p className="mt-1 text-xs text-red-700/80">Problema: {problemText}</p>}
+            <p className="mt-1 text-[11px] text-red-600/80">Estruture o 5W2H abaixo para tratar esta causa raiz.</p>
+          </div>
+        )}
         <div className="mb-4 text-center">
           <div className="text-lg font-bold tracking-tight text-slate-900">5W2H</div>
           <div className="text-xs font-medium text-slate-500">Plano estruturado de execução — preencha um bloco por vez; o próximo libera ao concluir o anterior.</div>
@@ -620,8 +637,8 @@ function FiveW2HBlock({
             {done ? <CheckCircle2 className="h-4 w-4" /> : <Icon className="h-4 w-4" />}
           </span>
           <div>
-            <div className="text-sm font-bold leading-4" style={{ color: meta.color }}>{meta.number}. {meta.title}</div>
-            <div className="text-[11px] font-medium text-slate-500">{cfg.label} — {meta.subtitle}</div>
+            <div className="text-sm font-bold leading-4" style={{ color: meta.color }}>{meta.number}. {cfg.label} — {meta.subtitle}</div>
+            <div className="text-[11px] font-medium text-slate-400">{meta.title}</div>
           </div>
         </div>
         {locked ? <Lock className="h-4 w-4 text-slate-300" /> : <span className={cn('shrink-0 rounded-full border px-2 py-0.5 text-[10px] font-semibold', statusClass)}>{statusLabel}</span>}
@@ -636,10 +653,7 @@ function FiveW2HBlock({
               <Textarea rows={3} value={textValue} placeholder={cfg.placeholder} onChange={(event) => onText(event.target.value)} onBlur={onBlurSave} className="text-sm" />
             )}
             {cfg.kind === 'user' && (
-              <NativeSelect value={item.responsibleUserId} onChange={(event) => onCommit({ responsibleUserId: event.target.value })}>
-                <option value="">Selecione o responsável...</option>
-                {users.map((user) => <option key={user.id} value={user.id}>{user.name}</option>)}
-              </NativeSelect>
+              <UserPicker users={users} value={item.responsibleUserId} onChange={(id) => onCommit({ responsibleUserId: id })} disabled={!canEdit} />
             )}
             {cfg.kind === 'date' && (
               <Input type="date" value={item.dueDate?.slice(0, 10) ?? ''} onChange={(event) => onCommit({ dueDate: event.target.value })} />
@@ -664,6 +678,53 @@ function FiveW2HBlock({
     </div>
   );
 }
+/**
+ * Seletor de responsável com busca. Mostra a lista COMPLETA de usuários e filtra
+ * por nome/e-mail conforme o texto digitado (pode ser qualquer pessoa).
+ */
+function UserPicker({ users, value, onChange, disabled }: { users: UserOption[]; value: string; onChange: (id: string) => void; disabled?: boolean }) {
+  const [query, setQuery] = useState('');
+  const [open, setOpen] = useState(false);
+  const selected = users.find((u) => u.id === value) ?? null;
+  const q = query.trim().toLowerCase();
+  const filtered = q
+    ? users.filter((u) => u.name.toLowerCase().includes(q) || (u.email ?? '').toLowerCase().includes(q))
+    : users;
+  return (
+    <div className="relative">
+      <Input
+        value={open ? query : selected?.name ?? ''}
+        placeholder="Buscar responsável..."
+        disabled={disabled}
+        onFocus={() => { setOpen(true); setQuery(''); }}
+        onChange={(event) => { setQuery(event.target.value); setOpen(true); }}
+        onBlur={() => window.setTimeout(() => setOpen(false), 150)}
+      />
+      {open && (
+        <div className="absolute z-30 mt-1 max-h-52 w-full overflow-auto rounded-md border border-slate-200 bg-white shadow-lg">
+          {selected && (
+            <button type="button" className="block w-full px-3 py-1.5 text-left text-xs text-slate-400 hover:bg-slate-50" onMouseDown={(event) => { event.preventDefault(); onChange(''); setOpen(false); }}>
+              Limpar seleção
+            </button>
+          )}
+          {filtered.length === 0 && <div className="px-3 py-2 text-xs text-slate-400">Nenhum usuário encontrado.</div>}
+          {filtered.map((user) => (
+            <button
+              key={user.id}
+              type="button"
+              className={cn('block w-full px-3 py-1.5 text-left text-sm hover:bg-slate-100', user.id === value && 'bg-slate-50 font-medium')}
+              onMouseDown={(event) => { event.preventDefault(); onChange(user.id); setOpen(false); }}
+            >
+              {user.name}
+              {user.email ? <span className="ml-1 text-xs text-slate-400">{user.email}</span> : null}
+            </button>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
 const STEP_CONFIG: Record<FieldType, { label: string; hint: string; kind: 'text' | 'user' | 'date'; placeholder: string }> = {
   WHAT: { label: 'O quê', hint: 'O que será feito', kind: 'text', placeholder: 'Descreva a ação que será executada...' },
   WHY: { label: 'Por quê', hint: 'Por que será feito', kind: 'text', placeholder: 'Justifique: por que essa ação resolve o problema...' },

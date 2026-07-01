@@ -1,6 +1,6 @@
 import { BadRequestException, ForbiddenException, Injectable } from '@nestjs/common';
 import { PrismaService } from '../../prisma/prisma.service';
-import { ActionStatus, DeviationStatus, TrafficLight, TreatmentStatus } from '@prisma/client';
+import { ActionStatus, DeviationStatus, IndicatorType, TrafficLight, TreatmentStatus } from '@prisma/client';
 import { lastNPeriodRefs } from '../indicators/period.util';
 import { PeriodsService } from '../periods/periods.service';
 import { AccessService } from '../access/access.service';
@@ -274,12 +274,16 @@ export class DashboardService {
     });
   }
 
-  async areaIndicators(me: AuthPayload, ownerNodeId?: string) {
+  async areaIndicators(me: AuthPayload, ownerNodeId?: string, types?: string[]) {
     const companyId = me.companyId;
     const permitted = await this.access.listAreaFilter(me.sub, MODULE, 'view');
     const selectedIds = ownerNodeId ? await this.descendantNodeIds(companyId, ownerNodeId) : null;
     const ownerNodeIds = this.intersectAreaScopes(selectedIds, permitted);
     if (ownerNodeIds && ownerNodeIds.length === 0) return [];
+
+    // Filtro por tipo (Operacional/Estratégico) escolhido pelo usuário. Sem trava:
+    // o Painel Executivo passa a exibir também operacionais quando o usuário quiser.
+    const wantedTypes = (types ?? []).filter((t) => t === 'STRATEGIC' || t === 'OPERATIONAL') as IndicatorType[];
 
     const anchor = await this.periods.currentAnchorDate(companyId);
     const indicators = await this.prisma.indicator.findMany({
@@ -287,8 +291,7 @@ export class DashboardService {
         companyId,
         deletedAt: null,
         status: 'ACTIVE',
-        // Painel Executivo mostra apenas indicadores estratégicos.
-        type: 'STRATEGIC',
+        ...(wantedTypes.length ? { type: { in: wantedTypes } } : {}),
         ...(ownerNodeIds ? { ownerNodeId: { in: ownerNodeIds } } : {}),
       },
       select: {

@@ -412,7 +412,8 @@ export class MonthlyResultsService {
           include: {
             orgNode: { select: { id: true, name: true, code: true, type: true, responsibleUserId: true } },
             indicators: {
-              // Reunião Mensal é estratégica: exibe apenas indicadores STRATEGIC (igual ao Painel Executivo).
+              // Reunião Mensal é estratégica: exibe apenas indicadores STRATEGIC.
+              // (Trava mantida aqui de propósito; o Painel Executivo passou a permitir operacionais.)
               where: { indicator: { type: 'STRATEGIC' } },
               orderBy: [{ isCritical: 'desc' }, { position: 'asc' }],
               include: { indicator: { select: { id: true, name: true, code: true, unit: true, unitLabel: true, source: true, responsibleUserId: true, type: true } } },

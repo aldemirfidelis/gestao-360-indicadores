@@ -66,6 +66,11 @@ export default function VisualizationPage() {
   const [selectedNodeId, setSelectedNodeId] = useState('');
   const [conclusionDraft, setConclusionDraft] = useState('');
   const [conclusionOpen, setConclusionOpen] = useState(false);
+  // Filtro Tipo de Indicador (vazio = todos). Sem trava: o usuário decide se vê
+  // operacionais e/ou estratégicos no Painel Executivo.
+  const [types, setTypes] = useState<string[]>([]);
+  const toggleType = (value: string) =>
+    setTypes((current) => (current.includes(value) ? current.filter((t) => t !== value) : [...current, value]));
 
   // Combobox mostra apenas as áreas-pai (que têm sub-áreas) — ex.: GOIASA, ADMINISTRAÇÃO, INDÚSTRIA, SSMA...
   const orderedNodes = useMemo(
@@ -80,8 +85,11 @@ export default function VisualizationPage() {
   }, [orderedNodes, selectedNodeId]);
 
   const indicators = useQuery<IndicatorRow[]>({
-    queryKey: ['visualization', 'indicators', selectedNodeId],
-    queryFn: () => api<IndicatorRow[]>(`/dashboard/area-indicators?ownerNodeId=${encodeURIComponent(selectedNodeId)}`),
+    queryKey: ['visualization', 'indicators', selectedNodeId, types.join(',')],
+    queryFn: () =>
+      api<IndicatorRow[]>(
+        `/dashboard/area-indicators?ownerNodeId=${encodeURIComponent(selectedNodeId)}${types.length ? `&types=${types.join(',')}` : ''}`,
+      ),
     enabled: Boolean(selectedNodeId),
   });
   const conclusionQuery = useQuery<{ ownerNodeId: string; conclusion: string; updatedAt: string | null }>({
@@ -153,6 +161,22 @@ export default function VisualizationPage() {
                 </option>
               ))}
             </NativeSelect>
+
+            <div className="mt-3">
+              <Label className="mb-1.5 block text-xs font-semibold uppercase tracking-[0.08em] text-muted-foreground">
+                Tipo de Indicador
+              </Label>
+              <div className="flex flex-wrap items-center gap-4">
+                <label className="flex cursor-pointer items-center gap-2 text-sm">
+                  <input type="checkbox" checked={types.includes('OPERATIONAL')} onChange={() => toggleType('OPERATIONAL')} />
+                  Operacional
+                </label>
+                <label className="flex cursor-pointer items-center gap-2 text-sm">
+                  <input type="checkbox" checked={types.includes('STRATEGIC')} onChange={() => toggleType('STRATEGIC')} />
+                  Estrat\u00E9gico
+                </label>
+              </div>
+            </div>
           </div>
         </CardContent>
       </Card>

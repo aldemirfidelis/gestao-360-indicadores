@@ -332,6 +332,7 @@ function SnapshotRow({ ind, can, run, pending, onCreateAction }: { ind: Snapshot
           <div className="mt-1 flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
             <span>Real: {formatValue(ind.current, ind.unitLabel)}</span>
             <span>Meta: {formatValue(ind.target, ind.unitLabel)}</span>
+            {ind.accumulated !== null && ind.accumulated !== undefined && <span>Acum.: {formatValue(ind.accumulated, ind.unitLabel)}</span>}
             <span>Ating.: {formatPercent(ind.attainment)}</span>
             {ind.trend && <span>Tend.: {ind.trend}</span>}
           </div>
@@ -728,9 +729,12 @@ function PresentationCard({ ind, selected, onSelect }: { ind: SnapshotIndicator;
         <p className="min-w-0 break-words text-base font-semibold">{ind.name}</p>
         <span className={cn('h-3 w-3 shrink-0 rounded-full', ind.light === 'RED' && 'status-red-pulse')} style={{ background: LIGHT_COLORS[ind.light] }} />
       </div>
-      <div className="mt-3 flex items-end gap-3">
+      <div className="mt-3 flex flex-wrap items-end gap-x-3 gap-y-1">
         <span className="text-3xl font-bold tabular-nums">{formatValue(ind.current, ind.unitLabel)}</span>
         <span className="pb-1 text-sm text-muted-foreground">meta {formatValue(ind.target, ind.unitLabel)}</span>
+        {ind.accumulated !== null && ind.accumulated !== undefined && (
+          <span className="pb-1 text-sm text-muted-foreground">· acum. {formatValue(ind.accumulated, ind.unitLabel)}</span>
+        )}
       </div>
       <p className="mt-1 text-xs text-muted-foreground">{ind.executiveStatus ?? LIGHT_LABEL[ind.light]} · Atingimento {formatPercent(ind.attainment)}</p>
       {(ind.managerComment || ind.rootCause) && <p className="mt-2 line-clamp-3 break-words text-xs text-muted-foreground">{ind.managerComment ?? ind.rootCause}</p>}

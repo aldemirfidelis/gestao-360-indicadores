@@ -584,6 +584,10 @@ function PDCAStageDrawer({
   onRootCauseChange: (value: string) => void;
 }) {
   const meta = STAGE_META[stage.phase];
+  // Responsável travado: puxa do plano de ação / indicador. Só cai no seletor
+  // aberto quando não há responsável de origem (ex.: PDCA avulso).
+  const lockedResponsibleId = action?.responsibleUser?.id ?? action?.indicator?.responsibleUserId ?? '';
+  const lockedResponsibleName = action?.responsibleUser?.name ?? users.find((u) => u.id === lockedResponsibleId)?.name ?? '';
   return (
     <aside className="border-l border-slate-200 bg-white">
       <div className="border-b border-slate-200 p-3">
@@ -610,7 +614,7 @@ function PDCAStageDrawer({
             <>
               <TextInput label="Problema principal" value={stage.data.problem ?? ''} onChange={(value) => onUpdate({ data: { ...stage.data, problem: value } })} onBlur={onSave} />
               <TextInput label="Causa raiz" value={stage.data.rootCause ?? ''} onChange={(value) => { onUpdate({ data: { ...stage.data, rootCause: value } }); onRootCauseChange(value); }} onBlur={onSave} />
-              <TextInput label="Meta" value={stage.data.target ?? ''} onChange={(value) => onUpdate({ data: { ...stage.data, target: value } })} onBlur={onSave} />
+              <TextInput label="Resultado esperado" value={stage.data.target ?? ''} onChange={(value) => onUpdate({ data: { ...stage.data, target: value } })} onBlur={onSave} />
               <TextInput label="Critério de sucesso" value={stage.data.successCriteria ?? ''} onChange={(value) => onUpdate({ data: { ...stage.data, successCriteria: value } })} onBlur={onSave} />
               <TextInput label="Riscos previstos" value={stage.data.risks ?? ''} onChange={(value) => onUpdate({ data: { ...stage.data, risks: value } })} onBlur={onSave} />
             </>
@@ -642,10 +646,17 @@ function PDCAStageDrawer({
           <div className="grid gap-3 sm:grid-cols-2">
             <div>
               <Label>Responsável</Label>
-              <NativeSelect value={stage.responsibleUserId} onChange={(event) => onUpdate({ responsibleUserId: event.target.value })} onBlur={onSave}>
-                <option value="">Sem responsável</option>
-                {users.map((user) => <option key={user.id} value={user.id}>{user.name}</option>)}
-              </NativeSelect>
+              {lockedResponsibleId ? (
+                <>
+                  <Input value={lockedResponsibleName || 'Responsável do plano/indicador'} disabled readOnly />
+                  <p className="mt-1 text-[11px] text-slate-400">Travado ao responsável do indicador e do plano de ação.</p>
+                </>
+              ) : (
+                <NativeSelect value={stage.responsibleUserId} onChange={(event) => onUpdate({ responsibleUserId: event.target.value })} onBlur={onSave} disabled={!canEdit}>
+                  <option value="">Sem responsável</option>
+                  {users.map((user) => <option key={user.id} value={user.id}>{user.name}</option>)}
+                </NativeSelect>
+              )}
             </div>
             <div>
               <Label>Prazo</Label>
@@ -804,7 +815,9 @@ function makeStage(row: any, phase: Phase, action?: any, rootCause = ''): PdcaSt
     subtitle: row?.subtitle ?? meta.subtitle,
     description: row?.description ?? fallback.description,
     objective: row?.objective ?? fallback.objective,
-    responsibleUserId: row?.responsibleUserId ?? action?.responsibleUser?.id ?? '',
+    // Responsável travado ao do indicador/plano de ação (quando houver): tem
+    // precedência sobre o valor salvo por etapa, garantindo consistência.
+    responsibleUserId: action?.responsibleUser?.id ?? action?.indicator?.responsibleUserId ?? row?.responsibleUserId ?? '',
     dueDate: row?.dueDate ?? action?.dueDate ?? '',
     priority: normalizePriority(row?.priority ?? action?.priority),
     progress: clampProgress(row?.progress ?? fallback.progress),

@@ -179,6 +179,8 @@ export function AnalysisWorkspace({
           users={users}
           saving={saving}
           canEdit={canEdit}
+          rootCause={rootCause}
+          problem={problem}
           onEnsureActionPlan={onEnsureActionPlan}
           onSave={(items) => onSave({ method: 'FIVE_W_TWO_H', problem, rootCause, fiveWhys, ishikawaCauses: ishikawa, maspSteps, pdcaSteps, data: { items }, fiveW2H: deriveFiveW2HSummary(items) })}
         />

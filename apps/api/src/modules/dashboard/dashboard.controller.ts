@@ -20,8 +20,14 @@ export class DashboardController {
   }
 
   @Get('area-indicators')
-  areaIndicators(@CurrentUser() me: AuthPayload, @Query('ownerNodeId') ownerNodeId?: string) {
-    return this.service.areaIndicators(me, ownerNodeId);
+  areaIndicators(
+    @CurrentUser() me: AuthPayload,
+    @Query('ownerNodeId') ownerNodeId?: string,
+    @Query('types') types?: string,
+  ) {
+    // types: lista separada por vírgula (ex.: "STRATEGIC,OPERATIONAL"). Vazio = todos.
+    const parsed = types ? types.split(',').map((t) => t.trim()).filter(Boolean) : undefined;
+    return this.service.areaIndicators(me, ownerNodeId, parsed);
   }
 
   @Get('area-conclusion')
