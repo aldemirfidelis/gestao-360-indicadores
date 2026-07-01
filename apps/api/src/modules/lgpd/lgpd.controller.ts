@@ -7,11 +7,12 @@ import { LgpdService } from './lgpd.service';
 import { UpsertDataIncidentDto, UpsertProcessingRecordDto, UpsertSubprocessorDto } from './lgpd.dto';
 
 /**
- * Endpoints de privacidade/LGPD. Restrito a administradores da empresa
- * (COMPANY_ADMIN) e ao SUPER_ADMIN. O isolamento por empresa é feito no service.
+ * Endpoints de privacidade/LGPD. Restrito ao SUPER_ADMIN (portal administrativo
+ * global) — não deve ficar acessível ao usuário final da empresa. O isolamento
+ * por empresa continua sendo feito no service (Super Admin opera na empresa ativa).
  */
 @Controller('lgpd')
-@Roles(UserRoleEnum.COMPANY_ADMIN, UserRoleEnum.SUPER_ADMIN)
+@Roles(UserRoleEnum.SUPER_ADMIN)
 export class LgpdController {
   constructor(private readonly service: LgpdService) {}
 

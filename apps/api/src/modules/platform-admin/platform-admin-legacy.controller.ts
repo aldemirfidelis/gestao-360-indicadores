@@ -39,6 +39,8 @@ import { SnapshotService } from '../portal-admin/services/snapshot.service';
 import { PortalDiagnosticsService } from '../portal-admin/services/portal-diagnostics.service';
 import { PermissionViewService } from '../portal-admin/services/permission-view.service';
 import { PrizeConnectorsService, UpsertConnectorDto } from '../prize/prize-connectors.service';
+import { LgpdService } from '../lgpd/lgpd.service';
+import { UpsertDataIncidentDto, UpsertProcessingRecordDto, UpsertSubprocessorDto } from '../lgpd/lgpd.dto';
 import { PlatformAdminRequired } from './decorators/platform-permissions.decorator';
 import { CurrentPlatformAdmin } from './decorators/current-platform-admin.decorator';
 import { PlatformAdminIdentity } from './platform-admin.types';
@@ -506,6 +508,81 @@ export class PlatformAdminLegacyPrizeEligibleController {
   @Get('jobs')
   async jobs(@Req() req: Request, @Query('kind') kind?: string, @Query('competenceId') competenceId?: string) {
     return this.connectors.listJobs(await resolveCompanyId(this.prisma, req), kind, competenceId);
+  }
+}
+
+@Public()
+@Controller('platform-admin/lgpd')
+@PlatformAdminRequired()
+export class PlatformAdminLegacyLgpdController {
+  constructor(
+    private readonly lgpd: LgpdService,
+    private readonly prisma: PrismaService,
+  ) {}
+
+  @Get('overview')
+  async overview(@CurrentPlatformAdmin() user: PlatformAdminIdentity, @Req() req: Request) {
+    return this.lgpd.overview(await asScopedAuth(this.prisma, user, req));
+  }
+
+  @Get('processing-records')
+  async listRecords(@CurrentPlatformAdmin() user: PlatformAdminIdentity, @Req() req: Request) {
+    return this.lgpd.listProcessingRecords(await asScopedAuth(this.prisma, user, req));
+  }
+
+  @Post('processing-records')
+  async createRecord(@CurrentPlatformAdmin() user: PlatformAdminIdentity, @Req() req: Request, @Body() dto: UpsertProcessingRecordDto) {
+    return this.lgpd.createProcessingRecord(await asScopedAuth(this.prisma, user, req), dto);
+  }
+
+  @Patch('processing-records/:id')
+  async updateRecord(@CurrentPlatformAdmin() user: PlatformAdminIdentity, @Req() req: Request, @Param('id') id: string, @Body() dto: UpsertProcessingRecordDto) {
+    return this.lgpd.updateProcessingRecord(await asScopedAuth(this.prisma, user, req), id, dto);
+  }
+
+  @Delete('processing-records/:id')
+  async removeRecord(@CurrentPlatformAdmin() user: PlatformAdminIdentity, @Req() req: Request, @Param('id') id: string) {
+    return this.lgpd.removeProcessingRecord(await asScopedAuth(this.prisma, user, req), id);
+  }
+
+  @Get('subprocessors')
+  async listSubprocessors(@CurrentPlatformAdmin() user: PlatformAdminIdentity, @Req() req: Request) {
+    return this.lgpd.listSubprocessors(await asScopedAuth(this.prisma, user, req));
+  }
+
+  @Post('subprocessors')
+  async createSubprocessor(@CurrentPlatformAdmin() user: PlatformAdminIdentity, @Req() req: Request, @Body() dto: UpsertSubprocessorDto) {
+    return this.lgpd.createSubprocessor(await asScopedAuth(this.prisma, user, req), dto);
+  }
+
+  @Patch('subprocessors/:id')
+  async updateSubprocessor(@CurrentPlatformAdmin() user: PlatformAdminIdentity, @Req() req: Request, @Param('id') id: string, @Body() dto: UpsertSubprocessorDto) {
+    return this.lgpd.updateSubprocessor(await asScopedAuth(this.prisma, user, req), id, dto);
+  }
+
+  @Delete('subprocessors/:id')
+  async removeSubprocessor(@CurrentPlatformAdmin() user: PlatformAdminIdentity, @Req() req: Request, @Param('id') id: string) {
+    return this.lgpd.removeSubprocessor(await asScopedAuth(this.prisma, user, req), id);
+  }
+
+  @Get('incidents')
+  async listIncidents(@CurrentPlatformAdmin() user: PlatformAdminIdentity, @Req() req: Request) {
+    return this.lgpd.listIncidents(await asScopedAuth(this.prisma, user, req));
+  }
+
+  @Post('incidents')
+  async createIncident(@CurrentPlatformAdmin() user: PlatformAdminIdentity, @Req() req: Request, @Body() dto: UpsertDataIncidentDto) {
+    return this.lgpd.createIncident(await asScopedAuth(this.prisma, user, req), dto);
+  }
+
+  @Patch('incidents/:id')
+  async updateIncident(@CurrentPlatformAdmin() user: PlatformAdminIdentity, @Req() req: Request, @Param('id') id: string, @Body() dto: UpsertDataIncidentDto) {
+    return this.lgpd.updateIncident(await asScopedAuth(this.prisma, user, req), id, dto);
+  }
+
+  @Delete('incidents/:id')
+  async removeIncident(@CurrentPlatformAdmin() user: PlatformAdminIdentity, @Req() req: Request, @Param('id') id: string) {
+    return this.lgpd.removeIncident(await asScopedAuth(this.prisma, user, req), id);
   }
 }
 

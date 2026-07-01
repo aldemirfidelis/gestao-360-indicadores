@@ -9,7 +9,7 @@ const REFRESH_KEY = 'g360.refreshToken';
 const PLATFORM_ACCESS_KEY = 'g360.platformAdmin.accessToken';
 const PLATFORM_REFRESH_KEY = 'g360.platformAdmin.refreshToken';
 const PLATFORM_COMPANY_CONTEXT_KEY = 'g360.platformAdmin.companyId';
-const PLATFORM_BRIDGED_PREFIXES = ['/admin/', '/access/', '/integrations/external', '/orgnodes', '/prize/', '/users'];
+const PLATFORM_BRIDGED_PREFIXES = ['/admin/', '/access/', '/integrations/external', '/orgnodes', '/prize/', '/users', '/lgpd'];
 
 export function getAccessToken(): string | null {
   if (typeof window === 'undefined') return null;

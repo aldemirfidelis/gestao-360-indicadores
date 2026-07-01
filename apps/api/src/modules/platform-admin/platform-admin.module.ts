@@ -6,6 +6,7 @@ import { AccessModule } from '../access/access.module';
 import { DatabaseAdminModule } from '../database-admin/database-admin.module';
 import { HelpModule } from '../help/help.module';
 import { IntegrationsModule } from '../integrations/integrations.module';
+import { LgpdModule } from '../lgpd/lgpd.module';
 import { OrgNodesModule } from '../orgnodes/orgnodes.module';
 import { PortalAdminModule } from '../portal-admin/portal-admin.module';
 import { PrizeModule } from '../prize/prize.module';
@@ -17,6 +18,7 @@ import {
   PlatformAdminLegacyDatabaseController,
   PlatformAdminLegacyExternalIntegrationsController,
   PlatformAdminLegacyHelpController,
+  PlatformAdminLegacyLgpdController,
   PlatformAdminLegacyOrgNodesController,
   PlatformAdminLegacyPortalController,
   PlatformAdminLegacyPrizeEligibleController,
@@ -38,6 +40,7 @@ import { PlatformEmailService } from './services/platform-email.service';
     DatabaseAdminModule,
     HelpModule,
     IntegrationsModule,
+    LgpdModule,
     OrgNodesModule,
     PortalAdminModule,
     PrizeModule,
@@ -52,6 +55,7 @@ import { PlatformEmailService } from './services/platform-email.service';
     PlatformAdminLegacyExternalIntegrationsController,
     PlatformAdminLegacyHelpController,
     PlatformAdminLegacyOrgNodesController,
+    PlatformAdminLegacyLgpdController,
     PlatformAdminLegacyPrizeEligibleController,
     PlatformAdminLegacyCompanyAuditController,
   ],

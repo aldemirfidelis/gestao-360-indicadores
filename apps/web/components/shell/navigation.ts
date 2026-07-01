@@ -158,7 +158,6 @@ export const navSections: NavSection[] = [
       { href: '/projects', label: 'Cronogramas', description: 'Projetos, marcos e tarefas', icon: GanttChartSquare, permissions: ['projects:view'] },
       { href: '/central-impactos', label: 'Impactos', description: 'Análise 360° e simulações de impacto', icon: AlertTriangle, permissions: ['vision360:view'] },
       { href: '/processes?view=processo', label: 'Processo', description: 'Cadastro e análise de processos vinculados ao SIPOC', icon: Workflow, permissions: ['processes:view'] },
-      { href: '/privacidade', label: 'Privacidade e LGPD', description: 'RoPA, suboperadores e incidentes de dados pessoais', icon: ShieldCheck, permissions: ['settings:manage'] },
     ],
   },
   {
@@ -271,7 +270,7 @@ export const ROUTE_PERMISSIONS: Array<{ prefix: string; permissions: string[]; e
   { prefix: '/dashboard', permissions: [] },
   { prefix: '/central-automacoes', permissions: ['automations:view'] },
   { prefix: '/central-impactos', permissions: ['vision360:view'] },
-  { prefix: '/privacidade', permissions: ['settings:manage'] },
+  { prefix: '/privacidade', permissions: [SUPER_ADMIN_ONLY_PERMISSION] },
   { prefix: '/visualization', permissions: ['visualization:view', 'dashboard:view'] },
   { prefix: '/insights', permissions: ['insights:view'] },
   { prefix: '/indicators/new', permissions: ['indicators:create'] },

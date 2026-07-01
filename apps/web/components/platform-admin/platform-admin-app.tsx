@@ -54,6 +54,7 @@ import {
 } from '@/lib/platform-admin-api';
 import GeneralSettingsPage from '@/app/(app)/settings/page';
 import ExternalIntegrationsPage from '@/app/(app)/settings/integracoes/page';
+import PrivacidadePage from '@/app/(app)/privacidade/page';
 import VisibilitySettingsPage from '@/app/(app)/settings/visibilidade/page';
 import PortalAdminPage from '@/app/(app)/settings/portal/page';
 import OrgPage from '@/app/(app)/org/page';
@@ -82,6 +83,7 @@ type SectionKey =
   | 'visibilityAdmin'
   | 'externalIntegrations'
   | 'orgStructure'
+  | 'privacidade'
   | 'databaseAdmin'
   | 'portalAdmin'
   | 'email'
@@ -241,6 +243,7 @@ const SECTIONS: SectionItem[] = [
   { key: 'orgStructure', label: 'Áreas e Setores', icon: Network, group: 'Empresa selecionada' },
   { key: 'externalIntegrations', label: 'APIs Externas', icon: ArrowLeftRight, group: 'Empresa selecionada' },
   { key: 'companyAudit', label: 'Auditoria Empresa', icon: Activity, group: 'Empresa selecionada' },
+  { key: 'privacidade', label: 'Privacidade e LGPD', icon: ShieldCheck, group: 'Empresa selecionada' },
   // Ferramentas tecnicas/globais.
   { key: 'databaseAdmin', label: 'Banco de Dados', icon: Database, group: 'Técnico' },
   { key: 'portalAdmin', label: 'Central do Portal', icon: Wrench, group: 'Técnico' },
@@ -258,7 +261,7 @@ const COMPANY_CORE_MODULE_CODES = new Set(['users', 'my-day', 'tasks']);
 const PLATFORM_COMPANY_CONTEXT_KEY = 'g360.platformAdmin.companyId';
 const PORTAL_ADMIN_TAB_KEY = 'g360.platformAdmin.portalTab';
 const PORTAL_ADMIN_TAB_EVENT = 'platform-admin:portal-tab';
-const LEGACY_COMPANY_SECTIONS = new Set<SectionKey>(['generalSettings', 'visibilityAdmin', 'externalIntegrations', 'orgStructure', 'users', 'companyAudit']);
+const LEGACY_COMPANY_SECTIONS = new Set<SectionKey>(['generalSettings', 'visibilityAdmin', 'externalIntegrations', 'orgStructure', 'users', 'companyAudit', 'privacidade']);
 const DATABASE_ADMIN_TABS = new Set<DatabaseAdminTab>([
   'overview',
   'tables',
@@ -682,6 +685,7 @@ export function PlatformAdminApp() {
           {section === 'visibilityAdmin' && <VisibilitySettingsSection />}
           {section === 'externalIntegrations' && <ExternalIntegrationsSection initialTab={requestedExternalTab === 'prize' ? 'prize' : 'external'} />}
           {section === 'orgStructure' && <OrgStructureSection />}
+          {section === 'privacidade' && <PrivacidadeSection />}
           {section === 'databaseAdmin' && (
             <DatabaseAdminSection
               tab={databaseTab}
@@ -876,6 +880,14 @@ function OrgStructureSection() {
       </div>
       <Vision360Sidebar />
     </Vision360Provider>
+  );
+}
+
+function PrivacidadeSection() {
+  return (
+    <div className="rounded-sm border bg-white p-4">
+      <PrivacidadePage />
+    </div>
   );
 }
 
