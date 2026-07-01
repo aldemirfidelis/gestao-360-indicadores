@@ -48,6 +48,14 @@ const sections: LegalSection[] = [
     ],
   },
   {
+    title: 'Encarregado pelo Tratamento de Dados (DPO)',
+    paragraphs: [
+      'O Encarregado (Data Protection Officer) é o canal de comunicação entre o titular, a controladora dos dados e a Autoridade Nacional de Proteção de Dados (ANPD), nos termos do art. 41 da LGPD.',
+      <>Para contatar o Encarregado, utilize o <Link href="/suporte#formulario" className="font-semibold text-emerald-700 hover:underline">formulário de suporte</Link> selecionando a opção “LGPD e privacidade”. Sua mensagem será direcionada ao responsável pelo atendimento de privacidade.</>,
+      'Em ambientes corporativos, a organização cliente pode ser a controladora e indicar o próprio Encarregado; nesse caso, encaminharemos a solicitação ao responsável competente conforme as instruções contratuais.',
+    ],
+  },
+  {
     title: 'Referências oficiais',
     items: [
       <a key="lei" href="https://www.planalto.gov.br/ccivil_03/_ato2015-2018/2018/lei/l13709compilado.htm" target="_blank" rel="noopener noreferrer" className="font-semibold text-emerald-700 hover:underline">Lei nº 13.709/2018 — Lei Geral de Proteção de Dados Pessoais</a>,
