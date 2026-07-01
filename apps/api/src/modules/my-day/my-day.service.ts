@@ -34,6 +34,12 @@ interface AssistantRecommendation {
 @Injectable()
 export class MyDayService implements OnModuleInit {
   private readonly lastRefresh = new Map<string, number>();
+  // Single-flight: garante um unico rebuild em andamento por usuario. A landing
+  // "Meu Dia" dispara ~9 requests simultaneos (overview + items + assistant + 6
+  // paineis) e todos passam por ensureFresh; sem coalescer, cada request roda um
+  // rebuildForUser completo em paralelo sobre as MESMAS linhas de WorkItemIndex,
+  // causando contencao de lock e N+1 de escrita multiplicado pela latencia do DB.
+  private readonly inflight = new Map<string, Promise<void>>();
   private readonly dirty = new Map<string, { companyId: string; userId: string }>();
   private flushTimer: NodeJS.Timeout | null = null;
 
@@ -78,8 +84,22 @@ export class MyDayService implements OnModuleInit {
     const key = this.refreshKey(me);
     const last = this.lastRefresh.get(key) ?? 0;
     if (!force && Date.now() - last < REFRESH_TTL_MS) return;
-    await this.aggregation.rebuildForUser(me);
-    this.lastRefresh.set(key, Date.now());
+
+    // Coalesce: se ja ha um rebuild em andamento para este usuario, aguarda o
+    // mesmo em vez de disparar outro. Colapsa o "thundering herd" da landing.
+    const existing = this.inflight.get(key);
+    if (existing) return existing;
+
+    const run = (async () => {
+      try {
+        await this.aggregation.rebuildForUser(me);
+        this.lastRefresh.set(key, Date.now());
+      } finally {
+        this.inflight.delete(key);
+      }
+    })();
+    this.inflight.set(key, run);
+    return run;
   }
 
   async getOverview(me: AuthPayload) {
@@ -126,28 +146,34 @@ export class MyDayService implements OnModuleInit {
     ]);
     const hiddenKeys = new Set(hidden.map((h) => h.recommendationKey));
     const recommendations = this.buildRecommendations(summary, priorities.rows, overdue.rows, dueToday.rows).filter((r) => !hiddenKeys.has(r.key));
-    for (const rec of recommendations) {
-      await this.prisma.myDayAssistantLog.upsert({
-        where: { companyId_userId_recommendationKey: { companyId: me.companyId, userId: me.sub, recommendationKey: rec.key } },
-        create: {
-          companyId: me.companyId,
-          userId: me.sub,
-          recommendationKey: rec.key,
-          title: rec.title,
-          severity: rec.severity,
-          suggestion: rec.suggestion,
-          explanation: rec.explanation,
-          contextData: { relatedItemIds: rec.relatedItemIds ?? [], pattern: rec.pattern ?? null },
-        },
-        update: {
-          title: rec.title,
-          severity: rec.severity,
-          suggestion: rec.suggestion,
-          explanation: rec.explanation,
-          contextData: { relatedItemIds: rec.relatedItemIds ?? [], pattern: rec.pattern ?? null },
-          generatedAt: new Date(),
-        },
-      });
+    // Persiste as recomendacoes numa unica transacao (1 round-trip em vez de N
+    // upserts sequenciais). Chamado a cada carga do /my-day/assistant.
+    if (recommendations.length) {
+      await this.prisma.$transaction(
+        recommendations.map((rec) =>
+          this.prisma.myDayAssistantLog.upsert({
+            where: { companyId_userId_recommendationKey: { companyId: me.companyId, userId: me.sub, recommendationKey: rec.key } },
+            create: {
+              companyId: me.companyId,
+              userId: me.sub,
+              recommendationKey: rec.key,
+              title: rec.title,
+              severity: rec.severity,
+              suggestion: rec.suggestion,
+              explanation: rec.explanation,
+              contextData: { relatedItemIds: rec.relatedItemIds ?? [], pattern: rec.pattern ?? null },
+            },
+            update: {
+              title: rec.title,
+              severity: rec.severity,
+              suggestion: rec.suggestion,
+              explanation: rec.explanation,
+              contextData: { relatedItemIds: rec.relatedItemIds ?? [], pattern: rec.pattern ?? null },
+              generatedAt: new Date(),
+            },
+          }),
+        ),
+      );
     }
     return {
       enabled: true,

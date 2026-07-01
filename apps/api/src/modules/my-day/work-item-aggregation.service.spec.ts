@@ -23,6 +23,8 @@ function makePrisma(over: { actions?: unknown[] } = {}) {
       upsert: vi.fn().mockResolvedValue({}),
       deleteMany: vi.fn().mockResolvedValue({ count: 0 }),
     },
+    // rebuildForUser agrupa upserts + deleteMany numa unica transacao.
+    $transaction: vi.fn().mockImplementation((ops: unknown[]) => Promise.all(ops)),
   } as any;
 }
 

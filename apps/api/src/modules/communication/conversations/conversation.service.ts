@@ -139,14 +139,21 @@ export class ConversationService {
     const others = conv.participants.filter((p) => p.userId !== meId);
     const counterpart = conv.kind === 'DIRECT' ? others[0]?.user : null;
 
-    const unread = await this.prisma.message.count({
-      where: {
-        conversationId: conv.id,
-        senderId: { not: meId },
-        deletedAt: null,
-        ...(mine?.lastReadAt ? { createdAt: { gt: mine.lastReadAt } } : {}),
-      },
-    });
+    // Pré-filtro: se a última mensagem da conversa não é mais nova que a última
+    // leitura do usuário, não há como haver não lidas — pula o COUNT por conversa.
+    // listForUser decora até 200 conversas e é consultado em polling a cada 30s,
+    // então evitar o COUNT nas já lidas elimina a maior parte do N+1 de fundo.
+    const maybeUnread = !!conv.lastMessageAt && (!mine?.lastReadAt || conv.lastMessageAt > mine.lastReadAt);
+    const unread = maybeUnread
+      ? await this.prisma.message.count({
+          where: {
+            conversationId: conv.id,
+            senderId: { not: meId },
+            deletedAt: null,
+            ...(mine?.lastReadAt ? { createdAt: { gt: mine.lastReadAt } } : {}),
+          },
+        })
+      : 0;
 
     const liveStatus = counterpart ? this.presence.status(counterpart.id) : PresenceStatus.OFFLINE;
 

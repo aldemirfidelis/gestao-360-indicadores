@@ -1,4 +1,5 @@
 import { Injectable, Logger } from '@nestjs/common';
+import { Prisma } from '@prisma/client';
 import { PrismaService } from '../../prisma/prisma.service';
 import { AuthPayload } from '../auth/auth.types';
 import { WorkItemPriorityService } from './work-item-priority.service';
@@ -91,6 +92,7 @@ export class WorkItemAggregationService {
     }
 
     const seenKeys: string[] = [];
+    const ops: Prisma.PrismaPromise<unknown>[] = [];
     for (const d of drafts) {
       const dedupeKey = `${d.sourceEntityType}:${d.sourceEntityId}:${d.itemType}:${d.assignedUserId}`;
       seenKeys.push(dedupeKey);
@@ -138,17 +140,26 @@ export class WorkItemAggregationService {
         sourceUpdatedAt: d.sourceUpdatedAt ?? null,
         refreshedAt: now,
       };
-      await this.prisma.workItemIndex.upsert({
-        where: { dedupeKey },
-        create: { companyId, dedupeKey, ...data },
-        update: data,
-      });
+      ops.push(
+        this.prisma.workItemIndex.upsert({
+          where: { dedupeKey },
+          create: { companyId, dedupeKey, ...data },
+          update: data,
+        }),
+      );
     }
 
     // Remove itens que não estão mais pendentes para este usuário (resolvidos na origem).
-    await this.prisma.workItemIndex.deleteMany({
-      where: { companyId, assignedUserId: me.sub, dedupeKey: { notIn: seenKeys.length ? seenKeys : ['__none__'] } },
-    });
+    ops.push(
+      this.prisma.workItemIndex.deleteMany({
+        where: { companyId, assignedUserId: me.sub, dedupeKey: { notIn: seenKeys.length ? seenKeys : ['__none__'] } },
+      }),
+    );
+
+    // Uma única transação em vez de N upserts sequenciais: colapsa N+1 round-trips
+    // ao banco em um só lote. Era o principal gargalo do "Meu Dia" — agravado pela
+    // migração para o Postgres gerenciado (maior latência por round-trip).
+    await this.prisma.$transaction(ops);
 
     return drafts.length;
   }

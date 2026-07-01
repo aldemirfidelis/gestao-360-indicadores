@@ -47,6 +47,8 @@ function makeService(over: Record<string, any> = {}) {
       upsert: vi.fn().mockResolvedValue({ id: 'ai1' }),
     },
     notification: { count: vi.fn().mockResolvedValue(0), updateMany: vi.fn().mockResolvedValue({ count: 1 }) },
+    // getAssistantSummary persiste as recomendacoes numa unica transacao.
+    $transaction: vi.fn().mockImplementation((ops: unknown[]) => Promise.all(ops)),
   };
   const svc = new MyDayService(
     prisma,
