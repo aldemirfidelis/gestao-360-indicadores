@@ -49,6 +49,7 @@ import { MetricCard } from '@/components/platform/metric-card';
 import { EmptyState } from '@/components/platform/empty-state';
 import { LoadingState } from '@/components/platform/loading-state';
 import { useVision360 } from '@/components/ui/vision360-context';
+import { useInView } from '@/hooks/use-in-view';
 import { ImpactConfirmationModal } from '@/components/ui/impact-confirmation-modal';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -1084,6 +1085,9 @@ function IndicatorManagementCard({
   const [viewMode, setViewMode] = useState<IndicatorViewMode>('monthly');
   const [chartType, setChartType] = useState<IndicatorChartType>('bar');
   const [grainMonth, setGrainMonth] = useState<string>(currentMonthRef());
+  // Só monta o gráfico (recharts é caro) quando o card entra na viewport —
+  // a lista pode ter dezenas/centenas de indicadores, cada um com um gráfico.
+  const { ref: chartRef, inView: chartInView } = useInView<HTMLDivElement>();
   const monthlyHistory = indicator.monthlyHistory ?? [];
   const isGrainMode = viewMode === 'weekly' || viewMode === 'daily';
   const grainGranularity = viewMode === 'weekly' ? 'WEEKLY' : 'DAILY';
@@ -1249,8 +1253,8 @@ function IndicatorManagementCard({
             </div>
           </div>
 
-          <div className="h-[17rem] border border-border/60 bg-card/60 p-2 sm:h-[23rem]">
-            {hasAnyData ? (
+          <div ref={chartRef} className="h-[17rem] border border-border/60 bg-card/60 p-2 sm:h-[23rem]">
+            {!chartInView ? null : hasAnyData ? (
               <ResponsiveContainer width="100%" height="100%">
                 {chartType === 'bar' ? (
                   <BarChart data={chartData} barGap={2} margin={{ top: 40, right: 12, left: 0, bottom: 8 }} onClick={onChartClick} style={{ cursor: 'pointer' }}>
@@ -1268,10 +1272,10 @@ function IndicatorManagementCard({
                     />
                     <YAxis tick={{ fontSize: 11 }} width={48} />
                     <Tooltip content={<ChartTooltip viewMode={viewMode} />} cursor={{ fill: 'hsl(var(--muted))', opacity: 0.35 }} />
-                    <Bar dataKey="displayMeta" name="Meta" fill="#1e3a8a" radius={[3, 3, 0, 0]}>
+                    <Bar dataKey="displayMeta" name="Meta" fill="#1e3a8a" radius={[3, 3, 0, 0]} isAnimationActive={false}>
                       <LabelList dataKey="displayMeta" content={(props) => renderCustomBarLabel(props, '#1e3a8a')} />
                     </Bar>
-                    <Bar dataKey="displayRealizado" name="Realizado" radius={[3, 3, 0, 0]}>
+                    <Bar dataKey="displayRealizado" name="Realizado" radius={[3, 3, 0, 0]} isAnimationActive={false}>
                       {chartData.map((entry, index) => {
                         let color = 'hsl(var(--status-gray))';
                         const r = entry.displayRealizado;
@@ -1303,10 +1307,10 @@ function IndicatorManagementCard({
                     />
                     <YAxis tick={{ fontSize: 11 }} width={48} />
                     <Tooltip content={<ChartTooltip viewMode={viewMode} />} cursor={{ stroke: 'hsl(var(--muted-foreground))', strokeWidth: 1, strokeDasharray: '3 3' }} />
-                    <Line type="monotone" dataKey="displayMeta" name="Meta" stroke="#1e3a8a" strokeWidth={2.5} strokeDasharray="6 4" dot={{ r: 3, fill: '#1e3a8a' }} activeDot={{ r: 5 }}>
+                    <Line type="monotone" dataKey="displayMeta" name="Meta" stroke="#1e3a8a" strokeWidth={2.5} strokeDasharray="6 4" dot={{ r: 3, fill: '#1e3a8a' }} activeDot={{ r: 5 }} isAnimationActive={false}>
                       <LabelList dataKey="displayMeta" position="top" fontSize={10} fill="#1e3a8a" formatter={(v: any) => (v === null || v === undefined ? '' : formatNumber(v))} />
                     </Line>
-                    <Line type="monotone" dataKey="displayRealizado" name="Realizado" stroke={realizadoSeriesColor(chartData, indicator.direction)} strokeWidth={2.5} dot={{ r: 3, fill: realizadoSeriesColor(chartData, indicator.direction) }} activeDot={{ r: 5 }}>
+                    <Line type="monotone" dataKey="displayRealizado" name="Realizado" stroke={realizadoSeriesColor(chartData, indicator.direction)} strokeWidth={2.5} dot={{ r: 3, fill: realizadoSeriesColor(chartData, indicator.direction) }} activeDot={{ r: 5 }} isAnimationActive={false}>
                       <LabelList dataKey="displayRealizado" position="top" fontSize={10} fill={realizadoSeriesColor(chartData, indicator.direction)} formatter={(v: any) => (v === null || v === undefined ? '' : formatNumber(v))} />
                     </Line>
                   </LineChart>
@@ -1420,6 +1424,8 @@ function MicroIndicatorRow({
   const light = micro.last?.light ?? 'GRAY';
   const monthlyHistory = micro.monthlyHistory ?? [];
   const hasHistory = monthlyHistory.some((point) => point.meta !== null || point.realizado !== null);
+  // Adia a montagem do sparkline até o item entrar na viewport.
+  const { ref: chartRef, inView: chartInView } = useInView<HTMLDivElement>();
 
   return (
     <div className="group relative flex flex-col gap-2 rounded-lg border bg-muted/15 p-3 transition-all hover:border-primary/20 hover:bg-muted/25">
@@ -1465,15 +1471,16 @@ function MicroIndicatorRow({
         <div className="flex items-center gap-3 self-stretch md:self-auto min-w-[155px] justify-between border-t border-muted pt-2.5 md:border-t-0 md:pt-0">
           {hasHistory ? (
             <div className="flex flex-col items-center gap-0.5">
-              <div className="h-9 w-36">
+              <div ref={chartRef} className="h-9 w-36">
+                {chartInView && (
                 <ResponsiveContainer width="100%" height="100%">
                   <BarChart data={monthlyHistory} barGap={1}>
                     <Tooltip
                       content={<ChartTooltip />}
                       cursor={{ fill: 'hsl(var(--muted))', opacity: 0.2 }}
                     />
-                    <Bar dataKey="meta" name="Meta" fill="hsl(var(--muted-foreground)/20)" radius={[1, 1, 0, 0]} />
-                    <Bar dataKey="realizado" name="Realizado" radius={[1, 1, 0, 0]}>
+                    <Bar dataKey="meta" name="Meta" fill="hsl(var(--muted-foreground)/20)" radius={[1, 1, 0, 0]} isAnimationActive={false} />
+                    <Bar dataKey="realizado" name="Realizado" radius={[1, 1, 0, 0]} isAnimationActive={false}>
                       {monthlyHistory.map((entry, index) => {
                         let color = 'hsl(var(--status-gray))';
                         if (entry.realizado !== null && entry.realizado !== undefined) {
@@ -1487,6 +1494,7 @@ function MicroIndicatorRow({
                     </Bar>
                   </BarChart>
                 </ResponsiveContainer>
+                )}
               </div>
               <div className="flex w-36 justify-between px-1 text-[9px] text-muted-foreground/60 select-none">
                 <span>Jan</span>
