@@ -629,6 +629,9 @@ model Company {
   communicationPosts           CommunicationPost[]
   communicationCampaigns       CommunicationCampaign[]
   communicationMedia           CommunicationMedia[]
+  dataProcessingRecords        DataProcessingRecord[]       @relation("DataProcessingRecordCompany")
+  subprocessors                Subprocessor[]               @relation("SubprocessorCompany")
+  dataIncidents                DataIncident[]               @relation("DataIncidentCompany")
 }
 
 model WorkPeriod {
@@ -11476,4 +11479,117 @@ model PublicContactMessage {
 
   @@index([createdAt])
   @@index([read])
+}
+
+// ===========================================================================
+// LGPD / Privacidade
+// ===========================================================================
+
+/// Registro das Operações de Tratamento (RoPA — Art. 37 da LGPD).
+/// Uma linha por operação de tratamento de dados pessoais da empresa.
+model DataProcessingRecord {
+  id                 String    @id @default(uuid())
+  companyId          String
+  company            Company   @relation("DataProcessingRecordCompany", fields: [companyId], references: [id], onDelete: Cascade)
+  /// Nome/identificação da operação de tratamento.
+  name               String
+  /// Área/processo responsável (texto livre).
+  area               String?
+  /// Finalidade do tratamento.
+  purpose            String
+  /// Base legal (Art. 7º/11). Valores sugeridos: LEGAL_OBLIGATION, CONTRACT,
+  /// CONSENT, LEGITIMATE_INTEREST, VITAL_INTEREST, PUBLIC_POLICY, LEGAL_PROCESS.
+  legalBasis         String
+  /// Categorias de titulares (ex.: colaboradores, clientes). Lista livre.
+  dataSubjects       String[]
+  /// Categorias de dados pessoais tratados.
+  dataCategories     String[]
+  /// Indica se há dados sensíveis (Art. 11).
+  hasSensitiveData   Boolean   @default(false)
+  /// Compartilhamentos/destinatários (interno/externo).
+  sharedWith         String[]
+  /// Prazo/critério de retenção.
+  retentionPeriod    String?
+  /// Medidas de segurança aplicadas (texto livre).
+  securityMeasures   String?
+  /// Há transferência internacional nesta operação.
+  internationalTransfer Boolean @default(false)
+  /// Status: ACTIVE, UNDER_REVIEW, DISCONTINUED.
+  status             String    @default("ACTIVE")
+  createdById        String?
+  createdAt          DateTime  @default(now())
+  updatedAt          DateTime  @updatedAt
+  deletedAt          DateTime?
+
+  @@index([companyId])
+  @@index([companyId, status])
+  @@index([companyId, deletedAt])
+}
+
+/// Suboperadores / subprocessadores na cadeia de tratamento (Art. 33/39).
+model Subprocessor {
+  id                    String    @id @default(uuid())
+  companyId             String
+  company               Company   @relation("SubprocessorCompany", fields: [companyId], references: [id], onDelete: Cascade)
+  /// Nome do suboperador (ex.: DigitalOcean).
+  name                  String
+  /// Serviço prestado (ex.: hospedagem, e-mail, IA).
+  service               String
+  /// País/região onde os dados são tratados.
+  country               String?
+  /// Indica transferência internacional (fora do Brasil).
+  internationalTransfer Boolean   @default(false)
+  /// Instrumento/cláusula que ampara a transferência (ex.: DPA, cláusulas-padrão).
+  transferSafeguard     String?
+  /// URL/refência do contrato ou DPA.
+  contractRef           String?
+  /// Status: ACTIVE, SUSPENDED, TERMINATED.
+  status                String    @default("ACTIVE")
+  notes                 String?
+  createdById           String?
+  createdAt             DateTime  @default(now())
+  updatedAt             DateTime  @updatedAt
+  deletedAt             DateTime?
+
+  @@index([companyId])
+  @@index([companyId, status])
+  @@index([companyId, deletedAt])
+}
+
+/// Registro de incidentes de segurança envolvendo dados pessoais (Art. 48).
+model DataIncident {
+  id                   String    @id @default(uuid())
+  companyId            String
+  company              Company   @relation("DataIncidentCompany", fields: [companyId], references: [id], onDelete: Cascade)
+  title                String
+  description          String?
+  /// Severidade: CRITICAL, HIGH, MEDIUM, LOW.
+  severity             String    @default("MEDIUM")
+  /// Status: OPEN, CONTAINED, INVESTIGATING, RESOLVED, CLOSED.
+  status               String    @default("OPEN")
+  /// Categorias de dados afetados.
+  affectedData         String[]
+  /// Quantidade estimada de titulares afetados.
+  affectedSubjects     Int?
+  detectedAt           DateTime  @default(now())
+  containedAt          DateTime?
+  resolvedAt           DateTime?
+  /// Comunicação à ANPD.
+  anpdNotified         Boolean   @default(false)
+  anpdNotifiedAt       DateTime?
+  /// Comunicação aos titulares.
+  subjectsNotified     Boolean   @default(false)
+  subjectsNotifiedAt   DateTime?
+  /// Medidas adotadas (contenção, mitigação, correção).
+  measures             String?
+  responsibleUserId    String?
+  createdById          String?
+  createdAt            DateTime  @default(now())
+  updatedAt            DateTime  @updatedAt
+  deletedAt            DateTime?
+
+  @@index([companyId])
+  @@index([companyId, status])
+  @@index([companyId, severity])
+  @@index([companyId, deletedAt])
 }

@@ -59,6 +59,7 @@ import { Vision360Module } from './modules/vision360/vision360.module';
 import { AutomationsModule } from './modules/automations/automations.module';
 import { MyDayModule } from './modules/my-day/my-day.module';
 import { WorkItemEventsModule } from './modules/my-day/work-item-event-bus';
+import { LgpdModule } from './modules/lgpd/lgpd.module';
 import { PrizeModule } from './modules/prize/prize.module';
 import { CompensationModule } from './modules/compensation/compensation.module';
 import { MonthlyResultsModule } from './modules/monthly-results/monthly-results.module';
@@ -122,6 +123,7 @@ import { workersEnabled } from './jobs/jobs.constants';
     Vision360Module,
     AutomationsModule,
     MyDayModule,
+    LgpdModule,
     PrizeModule,
     CompensationModule,
     MonthlyResultsModule,
