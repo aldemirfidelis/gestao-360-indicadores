@@ -31,6 +31,7 @@ import { TraceabilityService } from '../traceability/traceability.service';
 import { AccessService } from '../access/access.service';
 import type { AreaAction } from '../access/access.logic';
 import { AuthPayload } from '../auth/auth.types';
+import { listTake } from '../../common/http/list-take';
 import { GeminiService } from '../ai/gemini.service';
 import { NonConformitiesService } from '../nonconformities/nonconformities.service';
 import { AuditCodeService } from './audit-code.service';
@@ -306,6 +307,7 @@ export class AuditsService {
       },
       include: this.include(),
       orderBy: [{ status: 'asc' }, { plannedDate: 'asc' }, { number: 'desc' }],
+      take: listTake((filters as { limit?: string }).limit),
     });
 
     return items.map((audit) => this.enrich(audit));

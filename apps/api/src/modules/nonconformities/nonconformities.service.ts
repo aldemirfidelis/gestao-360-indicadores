@@ -5,6 +5,7 @@ import { TraceabilityService } from '../traceability/traceability.service';
 import { AccessService } from '../access/access.service';
 import type { AreaAction } from '../access/access.logic';
 import { AuthPayload } from '../auth/auth.types';
+import { listTake } from '../../common/http/list-take';
 
 // A nao conformidade (NC) estende o fluxo de melhoria: nasce de indicador/desvio/auditoria,
 // recebe contencao, analise de causa, acao corretiva e verificacao de eficacia.
@@ -213,6 +214,7 @@ export class NonConformitiesService {
       },
       include: this.include(),
       orderBy: [{ status: 'asc' }, { dueDate: 'asc' }, { number: 'desc' }],
+      take: listTake((filters as { limit?: string }).limit),
     });
 
     return items.map((nc) => this.enrich(nc));

@@ -34,6 +34,7 @@ import {
 import { buildPdf } from './pdf.util';
 import { TEMPLATE_LIBRARY, findLibraryTemplate } from './template-library';
 import { WorkItemEventBus } from '../my-day/work-item-event-bus';
+import { listTake } from '../../common/http/list-take';
 import { NotificationsService } from '../notifications/notifications.service';
 
 const MODULE = 'documents';
@@ -53,6 +54,7 @@ type DocFilters = {
   ownerUserId?: string;
   approverUserId?: string;
   expiring?: string;
+  limit?: string;
 };
 
 type LinkInput = {
@@ -286,6 +288,7 @@ export class DocumentsService {
       },
       include: this.include(),
       orderBy: [{ status: 'asc' }, { validUntil: 'asc' }, { number: 'desc' }],
+      take: listTake(filters.limit),
     });
 
     return items.map((doc) => this.enrich(doc));

@@ -2,6 +2,8 @@ import { Body, Controller, Delete, Get, Param, Patch, Post, Query } from '@nestj
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import { RequirePermissions } from '../../common/decorators/permissions.decorator';
 import { AuthPayload } from '../auth/auth.types';
+import { titledCreateSchema, titledUpdateSchema } from '@g360/shared';
+import { ZodValidationPipe } from '../../common/pipes/zod-validation.pipe';
 import { RisksService } from './risks.service';
 
 @Controller('risks')
@@ -43,13 +45,13 @@ export class RisksController {
 
   @Post()
   @RequirePermissions('risks:create')
-  create(@CurrentUser() me: AuthPayload, @Body() body: any) {
+  create(@CurrentUser() me: AuthPayload, @Body(new ZodValidationPipe(titledCreateSchema)) body: any) {
     return this.service.create(me, body);
   }
 
   @Patch(':id')
   @RequirePermissions('risks:update')
-  update(@CurrentUser() me: AuthPayload, @Param('id') id: string, @Body() body: any) {
+  update(@CurrentUser() me: AuthPayload, @Param('id') id: string, @Body(new ZodValidationPipe(titledUpdateSchema)) body: any) {
     return this.service.update(me, id, body);
   }
 

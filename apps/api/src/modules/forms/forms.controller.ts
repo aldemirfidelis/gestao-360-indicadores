@@ -2,6 +2,8 @@ import { Body, Controller, Delete, Get, Param, Patch, Post, Query } from '@nestj
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import { RequirePermissions } from '../../common/decorators/permissions.decorator';
 import { AuthPayload } from '../auth/auth.types';
+import { formSubmissionWriteSchema, titledCreateSchema, titledUpdateSchema } from '@g360/shared';
+import { ZodValidationPipe } from '../../common/pipes/zod-validation.pipe';
 import { FormsService } from './forms.service';
 
 @Controller('forms')
@@ -102,7 +104,7 @@ export class FormsController {
 
   @Post()
   @RequirePermissions('forms:create')
-  create(@CurrentUser() me: AuthPayload, @Body() body: any) {
+  create(@CurrentUser() me: AuthPayload, @Body(new ZodValidationPipe(titledCreateSchema)) body: any) {
     return this.service.create(me, body);
   }
 
@@ -126,7 +128,7 @@ export class FormsController {
 
   @Patch(':id')
   @RequirePermissions('forms:update')
-  update(@CurrentUser() me: AuthPayload, @Param('id') id: string, @Body() body: any) {
+  update(@CurrentUser() me: AuthPayload, @Param('id') id: string, @Body(new ZodValidationPipe(titledUpdateSchema)) body: any) {
     return this.service.update(me, id, body);
   }
 
@@ -144,7 +146,7 @@ export class FormsController {
 
   @Post(':id/submissions')
   @RequirePermissions('forms:update')
-  createSubmission(@CurrentUser() me: AuthPayload, @Param('id') id: string, @Body() body: any) {
+  createSubmission(@CurrentUser() me: AuthPayload, @Param('id') id: string, @Body(new ZodValidationPipe(formSubmissionWriteSchema)) body: any) {
     return this.service.createSubmission(me, id, body);
   }
 

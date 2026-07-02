@@ -123,3 +123,27 @@ export const userCreateSchema = z.object({
   defaultNodeId: z.string().uuid().optional().nullable(),
 });
 export type UserCreateInput = z.infer<typeof userCreateSchema>;
+
+// ---------------------------------------------------------------------------
+// Schemas "leves" de escrita (auditoria 2026-07): garantem corpo objeto,
+// campo-chave presente e limite de tamanho, deixando a validação semântica
+// (vínculos, enums, permissões) para o service. `.passthrough()` preserva os
+// payloads atuais do frontend — o objetivo é 400 claro em vez de 500.
+// ---------------------------------------------------------------------------
+
+const requiredTrimmed = (max: number) =>
+  z.preprocess((value) => (typeof value === 'string' ? value.trim() : value), z.string().min(1).max(max));
+
+/** Criação de registros identificados por `title` (documentos, NC, riscos, formulários...). */
+export const titledCreateSchema = z.object({ title: requiredTrimmed(300) }).passthrough();
+/** Atualização parcial: `title`, se presente, não pode ser vazio. */
+export const titledUpdateSchema = z.object({ title: requiredTrimmed(300).optional() }).passthrough();
+
+/** Criação de registros identificados por `name` (indicadores...). */
+export const namedCreateSchema = z.object({ name: requiredTrimmed(200) }).passthrough();
+export const namedUpdateSchema = z.object({ name: requiredTrimmed(200).optional() }).passthrough();
+
+/** Preenchimento de formulário: respostas, quando enviadas, devem ser uma lista. */
+export const formSubmissionWriteSchema = z
+  .object({ answers: z.array(z.any()).optional().nullable() })
+  .passthrough();

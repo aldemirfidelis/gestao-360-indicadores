@@ -5,6 +5,7 @@ import { TraceabilityService } from '../traceability/traceability.service';
 import { AccessService } from '../access/access.service';
 import type { AreaAction } from '../access/access.logic';
 import { AuthPayload } from '../auth/auth.types';
+import { listTake } from '../../common/http/list-take';
 
 const MODULE = 'risks';
 const CLOSED_STATUSES = new Set<RiskStatus>([RiskStatus.CLOSED]);
@@ -238,6 +239,7 @@ export class RisksService {
       },
       include: this.include(),
       orderBy: [{ status: 'asc' }, { dueDate: 'asc' }, { createdAt: 'desc' }],
+      take: listTake((filters as { limit?: string }).limit),
     });
 
     return items.map((risk) => this.enrich(risk));

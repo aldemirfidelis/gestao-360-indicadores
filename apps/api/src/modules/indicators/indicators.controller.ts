@@ -3,7 +3,7 @@ import { IndicatorsService } from './indicators.service';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import { AuthPayload } from '../auth/auth.types';
 import { ZodValidationPipe } from '../../common/pipes/zod-validation.pipe';
-import { indicatorTargetUpsertSchema } from '@g360/shared';
+import { indicatorTargetUpsertSchema, namedCreateSchema, namedUpdateSchema } from '@g360/shared';
 import { TrafficLight } from '@prisma/client';
 import { RequirePermissions } from '../../common/decorators/permissions.decorator';
 
@@ -83,13 +83,13 @@ export class IndicatorsController {
 
   @Post()
   @RequirePermissions('indicators:create')
-  create(@CurrentUser() me: AuthPayload, @Body() input: any) {
+  create(@CurrentUser() me: AuthPayload, @Body(new ZodValidationPipe(namedCreateSchema)) input: any) {
     return this.service.create(me, input);
   }
 
   @Patch(':id')
   @RequirePermissions('indicators:update')
-  update(@CurrentUser() me: AuthPayload, @Param('id') id: string, @Body() input: any) {
+  update(@CurrentUser() me: AuthPayload, @Param('id') id: string, @Body(new ZodValidationPipe(namedUpdateSchema)) input: any) {
     return this.service.update(me, id, input);
   }
 
