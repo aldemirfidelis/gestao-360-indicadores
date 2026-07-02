@@ -443,6 +443,20 @@ function StepBlock({ step, canManage, selected, onClick, onMove }: StepBlockProp
   const planeRef = useRef(new THREE.Plane(new THREE.Vector3(0, 1, 0), 0));
   const dragOffset = useRef(new THREE.Vector3());
   const dragStart = useRef(new THREE.Vector3());
+  // OrbitControls padrão (makeDefault). Durante o arraste do bloco eles
+  // PRECISAM ser desligados: como o botão esquerdo também é PAN da câmera, o
+  // mundo se movia junto com o mouse e o bloco parecia travado — era o bug
+  // relatado de "não consigo arrastar a etapa".
+  const controls = useThree((state) => state.controls) as unknown as { enabled: boolean } | null;
+
+  // Cursor coerente com a interação (agarrar/agarrando).
+  useEffect(() => {
+    if (!canManage) return;
+    document.body.style.cursor = dragging ? 'grabbing' : hovered ? 'grab' : '';
+    return () => {
+      document.body.style.cursor = '';
+    };
+  }, [hovered, dragging, canManage]);
 
   // Coordenadas 3D iniciais: convertemos positionX/positionY salvos na escala React Flow
   const initialX = typeof step.positionX === 'number' && !isNaN(step.positionX) ? step.positionX / 100 : 0;
@@ -472,11 +486,13 @@ function StepBlock({ step, canManage, selected, onClick, onMove }: StepBlockProp
   const handlePointerDown = (e: any) => {
     if (!canManage) return;
     e.stopPropagation();
-    
-    // Captura o foco do mouse no canvas nativo do DOM
-    if (e.nativeEvent?.target && 'setPointerCapture' in e.nativeEvent.target) {
-      (e.nativeEvent.target as any).setPointerCapture(e.pointerId);
-    }
+
+    // Captura no ALVO do R3F (não no canvas do DOM): é o que garante que os
+    // eventos de movimento continuem chegando ao bloco mesmo quando o ponteiro
+    // sai da malha durante um arraste rápido.
+    e.target?.setPointerCapture?.(e.pointerId);
+    // Desliga a câmera enquanto arrasta o bloco (senão o PAN anda junto).
+    if (controls) controls.enabled = false;
     setDragging(true);
 
     const intersection = new THREE.Vector3();
@@ -513,9 +529,8 @@ function StepBlock({ step, canManage, selected, onClick, onMove }: StepBlockProp
   const handlePointerUp = (e: any) => {
     if (!dragging) return;
     e.stopPropagation();
-    if (e.nativeEvent?.target && 'releasePointerCapture' in e.nativeEvent.target) {
-      (e.nativeEvent.target as any).releasePointerCapture(e.pointerId);
-    }
+    e.target?.releasePointerCapture?.(e.pointerId);
+    if (controls) controls.enabled = true;
     setDragging(false);
 
     if (groupRef.current) {
@@ -531,12 +546,22 @@ function StepBlock({ step, canManage, selected, onClick, onMove }: StepBlockProp
     }
   };
 
+  // Rede de segurança: se o navegador cancelar o gesto (perda de captura,
+  // alt-tab, toque interrompido), o arraste termina e a câmera volta a operar.
+  const handlePointerCancel = () => {
+    if (!dragging) return;
+    if (controls) controls.enabled = true;
+    setDragging(false);
+  };
+
   return (
-    <group 
+    <group
       ref={groupRef}
       onPointerDown={handlePointerDown}
       onPointerMove={handlePointerMove}
       onPointerUp={handlePointerUp}
+      onPointerCancel={handlePointerCancel}
+      onLostPointerCapture={handlePointerCancel}
       onPointerOver={(e) => { e.stopPropagation(); setHovered(true); }}
       onPointerOut={(e) => { e.stopPropagation(); setHovered(false); }}
     >
