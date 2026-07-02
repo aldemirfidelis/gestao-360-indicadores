@@ -1,4 +1,5 @@
 import { Module } from '@nestjs/common';
+import { NotificationsModule } from '../notifications/notifications.module';
 import { TraceabilityModule } from '../traceability/traceability.module';
 import { DocumentCodeService } from './document-code.service';
 import { DocumentEditorService } from './document-editor.service';
@@ -9,7 +10,7 @@ import { WebDavController } from './webdav.controller';
 import { WopiController } from './wopi.controller';
 
 @Module({
-  imports: [TraceabilityModule],
+  imports: [TraceabilityModule, NotificationsModule],
   controllers: [DocumentsController, WopiController, WebDavController],
   providers: [DocumentCodeService, DocumentEditorService, DocumentStorageService, DocumentsService],
   exports: [DocumentsService],

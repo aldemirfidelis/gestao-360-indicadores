@@ -10,6 +10,7 @@ import {
   DocumentFileKind,
   DocumentStatus,
   DocumentType,
+  NotificationKind,
   Prisma,
   TraceEntityType,
   TraceEventType,
@@ -33,6 +34,7 @@ import {
 import { buildPdf } from './pdf.util';
 import { TEMPLATE_LIBRARY, findLibraryTemplate } from './template-library';
 import { WorkItemEventBus } from '../my-day/work-item-event-bus';
+import { NotificationsService } from '../notifications/notifications.service';
 
 const MODULE = 'documents';
 const DOCX_MIME = 'application/vnd.openxmlformats-officedocument.wordprocessingml.document';
@@ -119,6 +121,7 @@ export class DocumentsService {
     private readonly editor: DocumentEditorService,
     private readonly storage: DocumentStorageService,
     private readonly workItems: WorkItemEventBus,
+    private readonly notifications: NotificationsService,
   ) {}
 
   private include() {
@@ -1814,11 +1817,23 @@ export class DocumentsService {
   }
 
   async runExpirationJob(me: AuthPayload) {
+    return this.expirationSweep(me.companyId, me.sub);
+  }
+
+  /**
+   * Rotina de vencimento (acionável manualmente ou pelo MaintenanceScheduler):
+   * move PUBLISHED -> NEAR_EXPIRATION -> EXPIRED conforme a validade e
+   * notifica responsável e aprovador a cada transição. `actorUserId` null =
+   * execução automática do sistema (histórico/auditoria ficam sem usuário).
+   */
+  async expirationSweep(companyId: string, actorUserId: string | null = null) {
     const now = new Date();
     const limit30 = addDays(now, 30);
+    // Ator para trilha de status/auditoria; userId é nullable em ambas as tabelas.
+    const actor = { companyId, sub: actorUserId } as unknown as AuthPayload;
     const docs = await this.prisma.document.findMany({
       where: {
-        companyId: me.companyId,
+        companyId,
         deletedAt: null,
         status: { in: [DocumentStatus.PUBLISHED, DocumentStatus.NEAR_EXPIRATION] },
         validUntil: { not: null },
@@ -1833,12 +1848,32 @@ export class DocumentsService {
       if (!to || doc.status === to) continue;
       await this.prisma.$transaction(async (tx) => {
         await tx.document.update({ where: { id: doc.id }, data: { status: to } });
-        await this.recordStatusTx(tx, me, doc.id, doc.status, to, 'Atualização automática de vencimento');
-        await this.auditTx(tx, me, doc.id, 'EXPIRATION_JOB', { status: doc.status }, { status: to }, 'Rotina de vencimento');
+        await this.recordStatusTx(tx, actor, doc.id, doc.status, to, 'Atualização automática de vencimento');
+        await this.auditTx(tx, actor, doc.id, 'EXPIRATION_JOB', { status: doc.status }, { status: to }, 'Rotina de vencimento');
       });
+      await this.notifyExpiration(doc, to, validUntil);
       processed++;
     }
     return { processed, checked: docs.length, startedAt: now, finishedAt: new Date() };
+  }
+
+  /** Avisa responsável e aprovador na transição de vencimento (best-effort). */
+  private async notifyExpiration(doc: any, to: DocumentStatus, validUntil: Date) {
+    const code = doc.code ?? `#${doc.number}`;
+    const date = validUntil.toLocaleDateString('pt-BR');
+    const title = to === DocumentStatus.EXPIRED ? `Documento vencido: ${code}` : `Documento próximo do vencimento: ${code}`;
+    const body =
+      to === DocumentStatus.EXPIRED
+        ? `"${doc.title}" venceu em ${date}. Inicie a revisão periódica ou torne-o obsoleto.`
+        : `"${doc.title}" vence em ${date}. Planeje a revisão periódica.`;
+    const recipients = [...new Set([doc.ownerUserId, doc.approverUserId].filter(Boolean))] as string[];
+    for (const userId of recipients) {
+      try {
+        await this.notifications.create(doc.companyId, userId, NotificationKind.MESSAGE, title, body, `/documents?focus=${doc.id}`);
+      } catch {
+        // Notificação é best-effort: a transição de status não pode falhar por causa dela.
+      }
+    }
   }
 
   async diagnostics(me: AuthPayload) {

@@ -115,9 +115,10 @@ function makeService(opts?: {
     readBinary: vi.fn().mockResolvedValue(Buffer.from('BINARY-DOCX')),
   } as any;
   const workItems = { markDirty: vi.fn() } as any;
+  const notifications = { create: vi.fn().mockResolvedValue({ id: 'n1' }) } as any;
 
-  const service = new DocumentsService(prisma, traceability, access, codes, editor, storage, workItems);
-  return { service, prisma, traceability, access, codes, storage };
+  const service = new DocumentsService(prisma, traceability, access, codes, editor, storage, workItems, notifications);
+  return { service, prisma, traceability, access, codes, storage, notifications };
 }
 
 describe('DocumentsService - gestao documental', () => {
@@ -312,6 +313,37 @@ describe('DocumentsService - gestao documental', () => {
     await service.uploadFile(me, 'd1', { kind: 'DOCX', fileName: 'editado.docx', contentBase64: docx.toString('base64') });
     expect(storage.putBinary).toHaveBeenCalled();
     expect(prisma.documentFile.create.mock.calls[0][0].data.contentText).toBeNull();
+  });
+
+  // ---- Rotina de vencimento ----
+
+  it('expirationSweep: transiciona vencido para EXPIRED e notifica responsavel/aprovador', async () => {
+    const { service, prisma, notifications } = makeService();
+    const yesterday = new Date(Date.now() - 86_400_000);
+    prisma.document.findMany = vi.fn().mockResolvedValue([
+      baseDoc({ id: 'd1', code: 'PRO-001', status: 'PUBLISHED', validUntil: yesterday, ownerUserId: 'u-owner', approverUserId: 'u-approver' }),
+    ]);
+    const result = await service.expirationSweep('companyA');
+    expect(result.processed).toBe(1);
+    expect(prisma.document.update).toHaveBeenCalledWith(expect.objectContaining({ data: { status: 'EXPIRED' } }));
+    // historico/auditoria com ator do sistema (userId null)
+    expect(prisma.documentStatusHistory.create.mock.calls[0][0].data.userId).toBeNull();
+    // notifica responsavel e aprovador (sem duplicar)
+    expect(notifications.create).toHaveBeenCalledTimes(2);
+    expect(notifications.create.mock.calls[0][3]).toContain('Documento vencido');
+    expect(notifications.create.mock.calls[0][5]).toBe('/documents?focus=d1');
+  });
+
+  it('expirationSweep: dentro da janela de alerta -> NEAR_EXPIRATION; falha de notificacao nao interrompe', async () => {
+    const { service, prisma, notifications } = makeService();
+    const in10days = new Date(Date.now() + 10 * 86_400_000);
+    prisma.document.findMany = vi.fn().mockResolvedValue([
+      baseDoc({ id: 'd2', status: 'PUBLISHED', validUntil: in10days, ownerUserId: 'u-owner' }),
+    ]);
+    notifications.create = vi.fn().mockRejectedValue(new Error('smtp down'));
+    const result = await service.expirationSweep('companyA', 'user-1');
+    expect(result.processed).toBe(1);
+    expect(prisma.document.update).toHaveBeenCalledWith(expect.objectContaining({ data: { status: 'NEAR_EXPIRATION' } }));
   });
 
   // ---- Host WOPI (editor online) ----

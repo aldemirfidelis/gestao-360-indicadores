@@ -66,6 +66,7 @@ import { MonthlyResultsModule } from './modules/monthly-results/monthly-results.
 import { StorageModule } from './storage/storage.module';
 import { PublicModule } from './modules/public/public.module';
 import { JobsModule } from './jobs/jobs.module';
+import { MaintenanceModule } from './jobs/maintenance.module';
 import { workersEnabled } from './jobs/jobs.constants';
 
 @Module({
@@ -129,6 +130,9 @@ import { workersEnabled } from './jobs/jobs.constants';
     MonthlyResultsModule,
     StorageModule,
     PublicModule,
+    // Rotinas de manutenção in-process (vencimento de documentos, alertas):
+    // sempre ativas, sem dependência de Redis.
+    MaintenanceModule,
     // Workers BullMQ: importados apenas quando WORKERS_ENABLED=true (sem Redis no boot padrão).
     ...(workersEnabled() ? [JobsModule] : []),
   ],
