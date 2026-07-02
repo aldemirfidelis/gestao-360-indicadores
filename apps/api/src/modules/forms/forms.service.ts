@@ -8,6 +8,7 @@ import {
   FormSubmissionStatus,
   FormTemplateStatus,
   FormTemplateType,
+  NonConformitySeverity,
   Prisma,
   TraceEntityType,
   TraceEventType,
@@ -18,6 +19,8 @@ import { AccessService } from '../access/access.service';
 import type { AreaAction } from '../access/access.logic';
 import { AuthPayload } from '../auth/auth.types';
 import { GeminiService } from '../ai/gemini.service';
+import { NonConformitiesService } from '../nonconformities/nonconformities.service';
+import { logSwallowed } from '../../common/logging/swallow';
 import { FormCodeService } from './form-code.service';
 import { FormStorageService } from './form-storage.service';
 import { randomUUID } from 'node:crypto';
@@ -74,6 +77,7 @@ export class FormsService {
     private readonly access: AccessService,
     private readonly codes: FormCodeService,
     private readonly storage: FormStorageService,
+    private readonly nonconformities?: NonConformitiesService,
     private readonly gemini?: GeminiService,
   ) {}
 
@@ -1061,6 +1065,80 @@ export class FormsService {
     });
   }
 
+  // ----------------- NC automática por checklist reprovado --------------------
+  // Configurado por modelo em template.settings.autoNonconformity:
+  //   { enabled: boolean, onlyCritical?: boolean }
+  // Reprovação = campo CONFORMITY com resposta negativa; YES_NO/BOOLEAN só
+  // reprovam quando o item é crítico (evita falso positivo em perguntas
+  // comuns cuja resposta legítima é "não").
+
+  private autoNonconformityConfig(template: any): { enabled: boolean; onlyCritical: boolean } {
+    const raw = (template?.settings as Record<string, unknown> | null)?.autoNonconformity;
+    if (!raw || typeof raw !== 'object') return { enabled: false, onlyCritical: false };
+    const config = raw as Record<string, unknown>;
+    return { enabled: Boolean(config.enabled), onlyCritical: Boolean(config.onlyCritical) };
+  }
+
+  private failedChecklistAnswers(
+    answers: Array<{ fieldType?: string | null; fieldLabel: string; value?: string | null; critical?: boolean }>,
+    onlyCritical: boolean,
+  ) {
+    const negative = new Set([
+      'nao_conforme', 'não_conforme', 'nao conforme', 'não conforme', 'nc', 'nok',
+      'reprovado', 'nao', 'não', 'no', 'false', '0',
+    ]);
+    return answers.filter((answer) => {
+      const value = String(answer.value ?? '').trim().toLowerCase().replace(/\s+/g, ' ');
+      if (!value || !(negative.has(value) || negative.has(value.replace(/ /g, '_')))) return false;
+      const type = String(answer.fieldType ?? '');
+      const conformityField = type === String(FormFieldType.CONFORMITY);
+      const criticalYesNo = (type === String(FormFieldType.YES_NO) || type === String(FormFieldType.BOOLEAN)) && Boolean(answer.critical);
+      if (!conformityField && !criticalYesNo) return false;
+      if (onlyCritical && !answer.critical) return false;
+      return true;
+    });
+  }
+
+  /** Gera a NC (best-effort: o preenchimento nunca falha por causa do gatilho). */
+  private async maybeCreateNonconformity(me: AuthPayload, template: any, submission: any, answers: any[]) {
+    if (!this.nonconformities) return;
+    try {
+      const config = this.autoNonconformityConfig(template);
+      if (!config.enabled) return;
+      const failed = this.failedChecklistAnswers(answers ?? [], config.onlyCritical);
+      if (!failed.length) return;
+      const severity = failed.some((answer) => answer.critical) ? NonConformitySeverity.CRITICAL : NonConformitySeverity.MAJOR;
+      const itens = failed
+        .slice(0, 10)
+        .map((answer) => `- ${answer.fieldLabel}${answer.value ? ` (resposta: ${answer.value})` : ''}`)
+        .join('\n');
+      const reference = submission.code ?? submission.id;
+      const nc = await this.nonconformities.createFromChecklist(me.companyId, me.sub, {
+        title: `Checklist reprovado: ${template.title}`,
+        description: `Gerada automaticamente pelo preenchimento ${reference} de "${template.title}".\n\nItens reprovados (${failed.length}):\n${itens}`,
+        severity,
+        orgNodeId: submission.orgNodeId ?? template.orgNodeId ?? null,
+        indicatorId: submission.indicatorId ?? null,
+        responsibleUserId: template.ownerUserId ?? null,
+        sourceLabel: `form-submission:${submission.id}`,
+      });
+      await this.prisma.formRecordTimeline.create({
+        data: {
+          companyId: me.companyId,
+          submissionId: submission.id,
+          entityType: 'FORM_SUBMISSION',
+          entityId: submission.id,
+          userId: me.sub,
+          action: 'NC_CREATED',
+          title: `Não conformidade #${nc.number} gerada automaticamente`,
+          description: `${failed.length} item(ns) reprovado(s) geraram a NC #${nc.number}: ${nc.title}`,
+        },
+      });
+    } catch (error) {
+      logSwallowed('forms.autoNonconformity', error);
+    }
+  }
+
   private async createRecordForSubmission(tx: Tx, submission: any, template: any, userId: string) {
     const code = await this.codes.nextRecordCode(tx as any, submission.companyId);
     const status = COMPLETED_SUBMISSION_STATUSES.has(submission.status) ? FormOperationalRecordStatus.COMPLETED : FormOperationalRecordStatus.OPEN;
@@ -1172,6 +1250,11 @@ export class FormsService {
       return tx.formSubmission.findUniqueOrThrow({ where: { id: created.id }, include: this.submissionInclude() });
     });
 
+    if (COMPLETED_SUBMISSION_STATUSES.has(status)) {
+      // Usa as respostas construídas nesta chamada (fonte da verdade na criação).
+      await this.maybeCreateNonconformity(me, template, submission, answers);
+    }
+
     await this.traceability.record({
       companyId: me.companyId,
       indicatorId: submission.indicatorId,
@@ -1246,6 +1329,11 @@ export class FormsService {
       });
       return tx.formSubmission.findUniqueOrThrow({ where: { id: submissionId }, include: this.submissionInclude() });
     });
+
+    // Transição para concluído (primeira vez): avalia o gatilho de NC automática.
+    if (statusChanged && COMPLETED_SUBMISSION_STATUSES.has(updated.status) && !before.completedAt) {
+      await this.maybeCreateNonconformity(me, updated.template, updated, updated.answers ?? []);
+    }
 
     await this.traceability.record({
       companyId: me.companyId,

@@ -97,6 +97,7 @@ interface FormTemplate {
   processId: string | null;
   indicatorId: string | null;
   ownerUserId: string | null;
+  settings?: Record<string, unknown> | null;
   orgNode: { id: string; name: string; type: string } | null;
   process: { id: string; number: number; code: string | null; name: string; orgNodeId: string | null } | null;
   indicator: { id: string; name: string; code: string | null; ownerNodeId: string } | null;
@@ -250,6 +251,10 @@ interface TemplateForm {
   indicatorId: string;
   ownerUserId: string;
   fields: FieldForm[];
+  /** Gatilho: reprovação em campo de conformidade (ou sim/não crítico) gera NC automática. */
+  autoNonconformity: boolean;
+  /** Demais chaves de template.settings preservadas no round-trip. */
+  settingsRaw: Record<string, unknown>;
 }
 
 const TYPE_LABEL: Record<string, string> = {
@@ -393,6 +398,8 @@ const EMPTY_TEMPLATE: TemplateForm = {
   indicatorId: '',
   ownerUserId: '',
   fields: [{ ...EMPTY_FIELD }],
+  autoNonconformity: false,
+  settingsRaw: {},
 };
 
 export default function FormsPage() {
@@ -693,6 +700,8 @@ export default function FormsPage() {
       processId: item.processId ?? '',
       indicatorId: item.indicatorId ?? '',
       ownerUserId: item.ownerUserId ?? '',
+      autoNonconformity: Boolean((item.settings as { autoNonconformity?: { enabled?: boolean } } | null)?.autoNonconformity?.enabled),
+      settingsRaw: (item.settings as Record<string, unknown> | null) ?? {},
       fields: item.fields.length
         ? item.fields.map((field) => ({
             order: String(field.order),
@@ -1230,6 +1239,21 @@ function TemplateDialog({ open, setOpen, editing, form, setForm, options, update
             <Field label="Tags"><Input value={form.tags} onChange={(e) => setForm({ ...form, tags: e.target.value })} placeholder="Crítico, recorrente, externo" /></Field>
             <Field label="Retencao dias"><Input type="number" min={0} value={form.retentionDays} onChange={(e) => setForm({ ...form, retentionDays: e.target.value })} /></Field>
           </div>
+          <label className="flex items-start gap-2 rounded-md border p-3 text-sm">
+            <input
+              type="checkbox"
+              className="mt-0.5"
+              checked={form.autoNonconformity}
+              onChange={(e) => setForm({ ...form, autoNonconformity: e.target.checked })}
+            />
+            <span>
+              <span className="font-medium">Gerar Não Conformidade automática quando reprovado</span>
+              <span className="mt-0.5 block text-xs text-muted-foreground">
+                Ao concluir um preenchimento com item de conformidade reprovado (ou sim/não crítico negativo), o sistema abre uma NC
+                vinculada à área do preenchimento, com os itens reprovados na descrição.
+              </span>
+            </span>
+          </label>
           <div className="space-y-3 rounded-md border p-3">
             <div className="flex items-center justify-between">
               <SectionTitle icon={<ClipboardCheck className="h-4 w-4" />} title="Campos" />
@@ -1448,6 +1472,7 @@ function templatePayload(form: TemplateForm) {
     processId: form.processId || null,
     indicatorId: form.indicatorId || null,
     ownerUserId: form.ownerUserId || null,
+    settings: { ...form.settingsRaw, autoNonconformity: { enabled: form.autoNonconformity } },
     fields: form.fields.filter((field) => field.label.trim()).map((field, index) => ({
       order: field.order ? Number(field.order) : index + 1,
       code: field.code || null,

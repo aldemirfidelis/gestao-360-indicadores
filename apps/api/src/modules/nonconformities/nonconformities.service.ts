@@ -383,6 +383,78 @@ export class NonConformitiesService {
     return this.enrich(nc);
   }
 
+  /**
+   * NC gerada automaticamente por checklist/formulario reprovado (gatilho do
+   * sistema, configurado no modelo do formulario). Nao passa pelo gate de
+   * permissao de area do usuario: quem preenche o checklist nao precisa ter
+   * permissao de criar NC — a decisao foi do gestor ao configurar o modelo.
+   */
+  async createFromChecklist(
+    companyId: string,
+    actorUserId: string | null,
+    payload: {
+      title: string;
+      description?: string | null;
+      severity?: NonConformitySeverity;
+      orgNodeId?: string | null;
+      indicatorId?: string | null;
+      responsibleUserId?: string | null;
+      sourceLabel?: string | null;
+    },
+  ) {
+    const [orgNode, indicator, responsible] = await Promise.all([
+      payload.orgNodeId
+        ? this.prisma.orgNode.findFirst({ where: { id: payload.orgNodeId, companyId, deletedAt: null }, select: { id: true } })
+        : Promise.resolve(null),
+      payload.indicatorId
+        ? this.prisma.indicator.findFirst({ where: { id: payload.indicatorId, companyId, deletedAt: null }, select: { id: true } })
+        : Promise.resolve(null),
+      payload.responsibleUserId
+        ? this.prisma.user.findFirst({ where: { id: payload.responsibleUserId, companyId, deletedAt: null, active: true }, select: { id: true } })
+        : Promise.resolve(null),
+    ]);
+
+    const nc = await this.prisma.$transaction(async (tx) => {
+      const last = await tx.nonConformity.findFirst({
+        where: { companyId },
+        orderBy: { number: 'desc' },
+        select: { number: true },
+      });
+      return tx.nonConformity.create({
+        data: {
+          companyId,
+          number: (last?.number ?? 0) + 1,
+          title: payload.title,
+          description: payload.description ?? null,
+          source: NonConformitySource.CHECKLIST,
+          severity: payload.severity ?? NonConformitySeverity.MAJOR,
+          status: NonConformityStatus.OPEN,
+          identifiedAt: new Date(),
+          createdById: actorUserId,
+          orgNodeId: orgNode?.id ?? null,
+          indicatorId: indicator?.id ?? null,
+          responsibleUserId: responsible?.id ?? null,
+        },
+        include: this.include(),
+      });
+    });
+
+    await this.traceability.record({
+      companyId,
+      indicatorId: nc.indicatorId,
+      userId: actorUserId,
+      eventType: TraceEventType.CREATED,
+      entityType: TraceEntityType.NON_CONFORMITY,
+      entityId: nc.id,
+      title: `Nao conformidade #${nc.number} gerada por checklist`,
+      description: nc.title,
+      statusTo: nc.status,
+      metadata: { source: nc.source, severity: nc.severity, origin: payload.sourceLabel ?? 'checklist' },
+    });
+
+    return this.enrich(nc);
+  }
+
   async update(me: AuthPayload, id: string, patch: any) {
     const before = await this.loadScoped(id, me.companyId);
     await this.assertWriteArea(me, this.areaOf(before), 'edit');

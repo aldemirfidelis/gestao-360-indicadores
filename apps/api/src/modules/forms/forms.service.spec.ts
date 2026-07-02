@@ -99,8 +99,12 @@ function makeService(opts?: {
     assertCanWrite: vi.fn().mockResolvedValue(undefined),
   } as any;
 
-  const service = new FormsService(prisma, traceability, access, new FormCodeService(), new FormStorageService());
-  return { service, prisma, traceability, access };
+  const nonconformities = {
+    createFromChecklist: vi.fn().mockResolvedValue({ id: 'nc-1', number: 7, title: 'Checklist reprovado: Checklist' }),
+  } as any;
+
+  const service = new FormsService(prisma, traceability, access, new FormCodeService(), new FormStorageService(), nonconformities);
+  return { service, prisma, traceability, access, nonconformities };
 }
 
 describe('FormsService - formularios e checklists', () => {
@@ -193,6 +197,80 @@ describe('FormsService - formularios e checklists', () => {
     expect(data.status).toBe('SUBMITTED');
     expect(data.answers.create[0]).toEqual(expect.objectContaining({ fieldId: 'field-1', fieldLabel: 'Extintor OK?', value: 'Sim' }));
     expect(traceability.record).toHaveBeenCalledWith(expect.objectContaining({ entityType: 'FORM_SUBMISSION', relatedType: 'FORM_TEMPLATE' }));
+  });
+
+  // ---- NC automática por checklist reprovado ----
+
+  const conformityTemplate = (settings: unknown) =>
+    baseTemplate({
+      status: 'ACTIVE',
+      title: 'Checklist de Segurança',
+      ownerUserId: 'owner-1',
+      settings,
+      fields: [baseField({ id: 'field-1', label: 'Extintor dentro da validade?', type: 'CONFORMITY', required: false })],
+    });
+
+  it('checklist reprovado com gatilho habilitado -> cria NC e registra na timeline', async () => {
+    const template = conformityTemplate({ autoNonconformity: { enabled: true } });
+    const { service, prisma, nonconformities } = makeService({ template });
+    await service.createSubmission(me, 'f1', { answers: [{ fieldId: 'field-1', value: 'NAO_CONFORME' }] });
+    expect(nonconformities.createFromChecklist).toHaveBeenCalledTimes(1);
+    const [companyId, actorId, payload] = nonconformities.createFromChecklist.mock.calls[0];
+    expect(companyId).toBe('companyA');
+    expect(actorId).toBe('user-1');
+    expect(payload.title).toBe('Checklist reprovado: Checklist de Segurança');
+    expect(payload.severity).toBe('MAJOR');
+    expect(payload.responsibleUserId).toBe('owner-1');
+    expect(payload.description).toContain('Extintor dentro da validade?');
+    const timelineActions = prisma.formRecordTimeline.create.mock.calls.map((call: any) => call[0].data.action);
+    expect(timelineActions).toContain('NC_CREATED');
+  });
+
+  it('checklist reprovado sem gatilho configurado -> nao cria NC', async () => {
+    const template = conformityTemplate(null);
+    const { service, nonconformities } = makeService({ template });
+    await service.createSubmission(me, 'f1', { answers: [{ fieldId: 'field-1', value: 'NAO_CONFORME' }] });
+    expect(nonconformities.createFromChecklist).not.toHaveBeenCalled();
+  });
+
+  it('resposta conforme nao dispara NC mesmo com gatilho habilitado', async () => {
+    const template = conformityTemplate({ autoNonconformity: { enabled: true } });
+    const { service, nonconformities } = makeService({ template });
+    await service.createSubmission(me, 'f1', { answers: [{ fieldId: 'field-1', value: 'CONFORME' }] });
+    expect(nonconformities.createFromChecklist).not.toHaveBeenCalled();
+  });
+
+  it('sim/nao negativo so reprova quando o item e critico (severidade CRITICAL)', async () => {
+    const template = baseTemplate({
+      status: 'ACTIVE',
+      title: 'Ronda',
+      settings: { autoNonconformity: { enabled: true } },
+      fields: [
+        baseField({ id: 'field-1', label: 'Portão fechado?', type: 'YES_NO', required: false }),
+        baseField({ id: 'field-2', label: 'Alarme armado?', type: 'YES_NO', required: false, criticality: 'CRITICAL' }),
+      ],
+    });
+    const { service, nonconformities } = makeService({ template });
+    await service.createSubmission(me, 'f1', {
+      answers: [
+        { fieldId: 'field-1', value: 'NAO' }, // nao critico: resposta legitima, nao reprova
+        { fieldId: 'field-2', value: 'NAO' }, // critico: reprova
+      ],
+    });
+    expect(nonconformities.createFromChecklist).toHaveBeenCalledTimes(1);
+    const payload = nonconformities.createFromChecklist.mock.calls[0][2];
+    expect(payload.severity).toBe('CRITICAL');
+    expect(payload.description).toContain('Alarme armado?');
+    expect(payload.description).not.toContain('Portão fechado?');
+  });
+
+  it('falha ao criar NC nao quebra o preenchimento', async () => {
+    const template = conformityTemplate({ autoNonconformity: { enabled: true } });
+    const { service, prisma, nonconformities } = makeService({ template });
+    nonconformities.createFromChecklist = vi.fn().mockRejectedValue(new Error('indisponivel'));
+    const submission = await service.createSubmission(me, 'f1', { answers: [{ fieldId: 'field-1', value: 'NC' }] });
+    expect(submission).toBeTruthy();
+    expect(prisma.formSubmission.create).toHaveBeenCalled();
   });
 });
 
