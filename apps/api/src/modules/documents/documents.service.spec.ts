@@ -2,6 +2,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { BadRequestException, ConflictException, ForbiddenException, NotFoundException } from '@nestjs/common';
 import { DocumentType, UserRoleEnum } from '@prisma/client';
 import { DocumentsService } from './documents.service';
+import { buildDocx, extractDocxText, isDocxBuffer } from './docx.util';
 import type { AuthPayload } from '../auth/auth.types';
 
 const me: AuthPayload = {
@@ -42,7 +43,14 @@ function makeService(opts?: {
       create: vi.fn().mockResolvedValue({ id: 'dt1', category: DocumentType.PROCEDURE, prefix: 'PRO', defaultValidityDays: 365, alertDays: 30 }),
       update: vi.fn().mockResolvedValue({ id: 'dt1' }),
     },
-    documentTemplate: { findMany: vi.fn().mockResolvedValue([]), create: vi.fn().mockResolvedValue({ id: 'tpl1' }) },
+    documentTemplate: {
+      findMany: vi.fn().mockResolvedValue([]),
+      findFirst: vi.fn().mockResolvedValue(null),
+      create: vi.fn().mockResolvedValue({ id: 'tpl1' }),
+      update: vi.fn().mockResolvedValue({ id: 'tpl1' }),
+      updateMany: vi.fn().mockResolvedValue({ count: 0 }),
+    },
+    company: { findUnique: vi.fn().mockResolvedValue({ name: 'Empresa A' }) },
     documentVersion: {
       findMany: vi.fn().mockResolvedValue([]),
       findFirst: vi.fn().mockResolvedValue(null),
@@ -208,6 +216,102 @@ describe('DocumentsService - gestao documental', () => {
     const { service, prisma } = makeService({ doc: baseDoc({ orgNodeId: null }) });
     await expect(service.update(me, 'd1', { status: 'APPROVED' })).rejects.toBeInstanceOf(BadRequestException);
     expect(prisma.document.update).not.toHaveBeenCalled();
+  });
+
+  // ---- Modelos (templates) ----
+
+  it('importTemplate: arquivo que nao e DOCX -> BadRequest e nao grava', async () => {
+    const { service, prisma, storage } = makeService();
+    const fake = Buffer.from('apenas texto').toString('base64');
+    await expect(service.importTemplate(me, { name: 'Modelo X', fileName: 'x.docx', contentBase64: fake })).rejects.toBeInstanceOf(BadRequestException);
+    expect(storage.putBinary).not.toHaveBeenCalled();
+    expect(prisma.documentTemplate.create).not.toHaveBeenCalled();
+  });
+
+  it('importTemplate: DOCX valido -> extrai texto, detecta placeholders e grava binario', async () => {
+    const { service, prisma, storage } = makeService();
+    const docx = buildDocx('Título: {{document_title}}\nCódigo: {{document_code}}');
+    prisma.documentTemplate.create = vi.fn(async ({ data }: any) => ({ id: 'tpl1', ...data }));
+    const template = await service.importTemplate(me, { name: 'Modelo POP', fileName: 'pop.docx', contentBase64: docx.toString('base64') });
+    expect(storage.putBinary).toHaveBeenCalled();
+    expect(template.companyId).toBe('companyA');
+    expect(template.content).toContain('{{document_title}}');
+    expect(template.placeholders).toEqual(['{{document_title}}', '{{document_code}}']);
+  });
+
+  it('create com templateId: conteudo do modelo com placeholders resolvidos', async () => {
+    const { service, prisma } = makeService();
+    prisma.documentTemplate.findFirst = vi.fn().mockResolvedValue({
+      id: 'tpl1',
+      companyId: 'companyA',
+      typeConfigId: 'dt1',
+      name: 'Modelo',
+      content: 'Documento {{document_code}} - {{document_title}} da {{company_name}}',
+      storageKey: null,
+      active: true,
+    });
+    await service.create(me, { title: 'POP de Limpeza', type: 'PROCEDURE', templateId: 'tpl1' });
+    const data = prisma.document.create.mock.calls[0][0].data;
+    expect(data.content).toBe('Documento PRO-001 - POP de Limpeza da Empresa A');
+  });
+
+  it('create com templateId inexistente -> NotFound e nao grava', async () => {
+    const { service, prisma } = makeService();
+    await expect(service.create(me, { title: 'Doc', templateId: 'tpl-outra' })).rejects.toBeInstanceOf(NotFoundException);
+    expect(prisma.document.create).not.toHaveBeenCalled();
+  });
+
+  it('create com modelo binario: semeia DOCX real com placeholders aplicados', async () => {
+    const { service, prisma, storage } = makeService();
+    prisma.documentTemplate.findFirst = vi.fn().mockResolvedValue({
+      id: 'tpl1',
+      companyId: 'companyA',
+      typeConfigId: 'dt1',
+      name: 'Modelo',
+      content: '{{document_code}}',
+      storageKey: 'templates/k1',
+      active: true,
+    });
+    storage.readBinary = vi.fn().mockResolvedValue(buildDocx('Código: {{document_code}}'));
+    await service.create(me, { title: 'Doc com modelo', templateId: 'tpl1' });
+    expect(storage.putBinary).toHaveBeenCalled();
+    const seeded: Buffer = storage.putBinary.mock.calls[0][3];
+    expect(isDocxBuffer(seeded)).toBe(true);
+    expect(extractDocxText(seeded)).toContain('Código: PRO-001');
+    // arquivo binario nao guarda contentText (WOPI le do storage)
+    expect(prisma.documentFile.create.mock.calls[0][0].data.contentText).toBeNull();
+  });
+
+  it('downloadTemplate: sem binario valido -> gera DOCX do texto', async () => {
+    const { service, prisma, storage } = makeService();
+    prisma.documentTemplate.findFirst = vi.fn().mockResolvedValue({
+      id: 'tpl1',
+      companyId: 'companyA',
+      name: 'Modelo Legado',
+      content: 'Conteúdo legado',
+      storageKey: 'templates/legacy',
+      fileName: 'Modelo-Legado.docx',
+    });
+    storage.readBinary = vi.fn().mockResolvedValue(Buffer.from('texto puro legado'));
+    const result = await service.downloadTemplate(me, 'tpl1');
+    expect(isDocxBuffer(result.content)).toBe(true);
+    expect(result.fileName).toBe('Modelo-Legado.docx');
+  });
+
+  it('uploadFile: DOCX em base64 invalido -> BadRequest e nao grava', async () => {
+    const { service, storage } = makeService({ doc: baseDoc({ status: 'DRAFT' }) });
+    const fake = Buffer.from('nao é um docx').toString('base64');
+    await expect(service.uploadFile(me, 'd1', { kind: 'DOCX', fileName: 'x.docx', contentBase64: fake })).rejects.toBeInstanceOf(BadRequestException);
+    expect(storage.putBinary).not.toHaveBeenCalled();
+  });
+
+  it('uploadFile: DOCX binario valido -> grava binario sem contentText', async () => {
+    const { service, prisma, storage } = makeService({ doc: baseDoc({ status: 'DRAFT' }) });
+    prisma.documentVersion.findFirst = vi.fn().mockResolvedValue({ id: 'v1', revisionNumber: 0 });
+    const docx = buildDocx('conteudo editado no Word');
+    await service.uploadFile(me, 'd1', { kind: 'DOCX', fileName: 'editado.docx', contentBase64: docx.toString('base64') });
+    expect(storage.putBinary).toHaveBeenCalled();
+    expect(prisma.documentFile.create.mock.calls[0][0].data.contentText).toBeNull();
   });
 
   // ---- Host WOPI (editor online) ----

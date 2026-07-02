@@ -88,6 +88,55 @@ export class DocumentsController {
     return this.service.createTemplate(me, body);
   }
 
+  @Get('templates/library')
+  @RequirePermissions('doc:manage')
+  templateLibrary(@CurrentUser() me: AuthPayload) {
+    return this.service.listTemplateLibrary(me);
+  }
+
+  @Post('templates/library/install')
+  @RequirePermissions('doc:manage')
+  installLibraryTemplates(@CurrentUser() me: AuthPayload, @Body() body: any) {
+    return this.service.installLibraryTemplates(me, body);
+  }
+
+  @Post('templates/import')
+  @RequirePermissions('doc:manage')
+  importTemplate(@CurrentUser() me: AuthPayload, @Body() body: any) {
+    return this.service.importTemplate(me, body);
+  }
+
+  @Patch('templates/:templateId')
+  @RequirePermissions('doc:manage')
+  updateTemplate(@CurrentUser() me: AuthPayload, @Param('templateId') templateId: string, @Body() body: any) {
+    return this.service.updateTemplate(me, templateId, body);
+  }
+
+  @Delete('templates/:templateId')
+  @RequirePermissions('doc:manage')
+  deleteTemplate(@CurrentUser() me: AuthPayload, @Param('templateId') templateId: string) {
+    return this.service.deleteTemplate(me, templateId);
+  }
+
+  @Post('templates/:templateId/duplicate')
+  @RequirePermissions('doc:manage')
+  duplicateTemplate(@CurrentUser() me: AuthPayload, @Param('templateId') templateId: string) {
+    return this.service.duplicateTemplate(me, templateId);
+  }
+
+  @Get('templates/:templateId/download')
+  @RequirePermissions('doc:view')
+  async downloadTemplate(
+    @CurrentUser() me: AuthPayload,
+    @Param('templateId') templateId: string,
+    @Res({ passthrough: true }) res: Response,
+  ) {
+    const result = await this.service.downloadTemplate(me, templateId);
+    res.setHeader('content-type', result.mimeType);
+    res.setHeader('content-disposition', `attachment; filename="${result.fileName}"`);
+    return new StreamableFile(result.content);
+  }
+
   @Post('generate-code')
   @RequirePermissions('doc:create')
   generateCode(@CurrentUser() me: AuthPayload, @Body() body: any) {

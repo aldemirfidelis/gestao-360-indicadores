@@ -205,12 +205,36 @@ interface DocSummary {
   expiringSoon: Array<Pick<Doc, 'id' | 'number' | 'code' | 'title' | 'type' | 'status' | 'validUntil' | 'isExpired' | 'daysToExpire' | 'orgNode' | 'owner'>>;
 }
 
+interface DocTemplate {
+  id: string;
+  name: string;
+  description: string | null;
+  typeConfigId: string | null;
+  version: number;
+  isDefault: boolean;
+  active: boolean;
+  fileName: string | null;
+  content: string | null;
+  placeholders: string[] | null;
+  updatedAt?: string;
+}
+
+interface LibraryTemplateEntry {
+  key: string;
+  name: string;
+  description: string;
+  category: DocType;
+  preview: string;
+  installed: boolean;
+}
+
 interface DocOptions {
   orgNodes: Array<{ id: string; name: string; type: string }>;
   indicators: Array<{ id: string; name: string; code: string | null; ownerNodeId: string }>;
   users: Array<{ id: string; name: string; email: string; defaultNodeId: string | null }>;
   typeConfigs: TypeConfig[];
-  templates: Array<{ id: string; name: string; typeConfigId: string | null; isDefault: boolean; active: boolean }>;
+  templates: DocTemplate[];
+  placeholders: string[];
   editor: DocDetail['editor'];
   statuses: DocStatus[];
   types: DocType[];
@@ -236,6 +260,7 @@ interface DocForm {
   description: string;
   type: DocType;
   typeConfigId: string;
+  templateId: string;
   version: string;
   content: string;
   externalUrl: string;
@@ -321,6 +346,7 @@ const EMPTY_FORM: DocForm = {
   description: '',
   type: 'PROCEDURE',
   typeConfigId: '',
+  templateId: '',
   version: '1',
   content: '',
   externalUrl: '',
@@ -350,7 +376,14 @@ export default function DocumentsPage() {
   const [filters, setFilters] = useState({ search: '', status: '', type: '', expiring: '' });
   const [form, setForm] = useState<DocForm>(EMPTY_FORM);
   const [typeForm, setTypeForm] = useState({ name: 'Procedimento', sigla: 'PRO', prefix: 'PRO', category: 'PROCEDURE' as DocType, digits: '3', defaultValidityDays: '365', alertDays: '30' });
-  const [templateForm, setTemplateForm] = useState({ name: '', typeConfigId: '', content: '' });
+  const [templateDialog, setTemplateDialog] = useState<{ mode: 'create' | 'edit'; template: DocTemplate | null } | null>(null);
+  const [templateForm, setTemplateForm] = useState({ name: '', typeConfigId: '', description: '', content: '', isDefault: false });
+  const [importDialog, setImportDialog] = useState<{ fileName: string; base64: string } | null>(null);
+  const [importForm, setImportForm] = useState({ name: '', typeConfigId: '', description: '' });
+  const [galleryOpen, setGalleryOpen] = useState(false);
+  const [gallerySelection, setGallerySelection] = useState<string[]>([]);
+  const templateFileRef = useRef<HTMLInputElement>(null);
+  const docxFileRef = useRef<HTMLInputElement>(null);
   const [grantOpen, setGrantOpen] = useState(false);
   const [grantForm, setGrantForm] = useState({ requesterUserId: '', reason: '', expiresAt: '' });
   const [draftContent, setDraftContent] = useState('');
@@ -452,6 +485,16 @@ export default function DocumentsPage() {
     queryFn: () => api<DocDetail>(`/documents/${detailId}`),
     enabled: Boolean(detailId),
   });
+  const templatesQuery = useQuery<DocTemplate[]>({
+    queryKey: ['documents', 'templates'],
+    queryFn: () => api<DocTemplate[]>('/documents/templates'),
+    enabled: canManage,
+  });
+  const libraryQuery = useQuery<LibraryTemplateEntry[]>({
+    queryKey: ['documents', 'templates', 'library'],
+    queryFn: () => api<LibraryTemplateEntry[]>('/documents/templates/library'),
+    enabled: canManage && galleryOpen,
+  });
 
   const items = useMemo(() => listQuery.data ?? [], [listQuery.data]);
   const summary = summaryQuery.data;
@@ -506,6 +549,7 @@ export default function DocumentsPage() {
         description: form.description || null,
         type: form.type,
         typeConfigId: form.typeConfigId || null,
+        templateId: editing ? undefined : form.templateId || null,
         version: Number(form.version) || 1,
         content: form.content || null,
         externalUrl: form.externalUrl || null,
@@ -615,10 +659,10 @@ export default function DocumentsPage() {
   });
 
   const upload = useMutation({
-    mutationFn: ({ id, kind, fileName, content }: { id: string; kind: FileKind; fileName: string; content: string }) =>
-      api(`/documents/${id}/files`, { method: 'POST', json: { kind, fileName, content } }),
+    mutationFn: ({ id, kind, fileName, contentBase64 }: { id: string; kind: FileKind; fileName: string; contentBase64: string }) =>
+      api(`/documents/${id}/files`, { method: 'POST', json: { kind, fileName, contentBase64 } }),
     onSuccess: () => {
-      toast.success('Arquivo registrado');
+      toast.success('Arquivo enviado');
       invalidate(qc);
     },
     onError: (e: any) => toast.error(e?.message ?? 'Não foi possível registrar o arquivo'),
@@ -642,19 +686,132 @@ export default function DocumentsPage() {
     onError: (e: any) => toast.error(e?.message ?? 'Não foi possível cadastrar o tipo'),
   });
 
-  const createTemplate = useMutation({
+  const invalidateTemplates = () => {
+    qc.invalidateQueries({ queryKey: ['documents', 'options'] });
+    qc.invalidateQueries({ queryKey: ['documents', 'templates'] });
+  };
+
+  const saveTemplate = useMutation({
+    mutationFn: () => {
+      const payload = {
+        name: templateForm.name,
+        typeConfigId: templateForm.typeConfigId || null,
+        description: templateForm.description || null,
+        content: templateForm.content || null,
+        isDefault: templateForm.isDefault,
+      };
+      return templateDialog?.mode === 'edit' && templateDialog.template
+        ? api(`/documents/templates/${templateDialog.template.id}`, { method: 'PATCH', json: payload })
+        : api('/documents/templates', { method: 'POST', json: payload });
+    },
+    onSuccess: () => {
+      toast.success(templateDialog?.mode === 'edit' ? 'Modelo atualizado' : 'Modelo cadastrado');
+      setTemplateDialog(null);
+      invalidateTemplates();
+    },
+    onError: (e: any) => toast.error(e?.message ?? 'Não foi possível salvar o modelo'),
+  });
+
+  const patchTemplate = useMutation({
+    mutationFn: ({ id, json }: { id: string; json: Record<string, unknown> }) =>
+      api(`/documents/templates/${id}`, { method: 'PATCH', json }),
+    onSuccess: () => {
+      toast.success('Modelo atualizado');
+      invalidateTemplates();
+    },
+    onError: (e: any) => toast.error(e?.message ?? 'Não foi possível atualizar o modelo'),
+  });
+
+  const deleteTemplate = useMutation({
+    mutationFn: (id: string) => api(`/documents/templates/${id}`, { method: 'DELETE' }),
+    onSuccess: () => {
+      toast.success('Modelo excluído');
+      invalidateTemplates();
+    },
+    onError: (e: any) => toast.error(e?.message ?? 'Não foi possível excluir o modelo'),
+  });
+
+  const duplicateTemplate = useMutation({
+    mutationFn: (id: string) => api(`/documents/templates/${id}/duplicate`, { method: 'POST', json: {} }),
+    onSuccess: () => {
+      toast.success('Modelo duplicado');
+      invalidateTemplates();
+    },
+    onError: (e: any) => toast.error(e?.message ?? 'Não foi possível duplicar o modelo'),
+  });
+
+  const importTemplate = useMutation({
     mutationFn: () =>
-      api('/documents/templates', {
+      api('/documents/templates/import', {
         method: 'POST',
-        json: { name: templateForm.name, typeConfigId: templateForm.typeConfigId || null, content: templateForm.content || null },
+        json: {
+          name: importForm.name,
+          typeConfigId: importForm.typeConfigId || null,
+          description: importForm.description || null,
+          fileName: importDialog?.fileName,
+          contentBase64: importDialog?.base64,
+        },
       }),
     onSuccess: () => {
-      toast.success('Modelo cadastrado');
-      setTemplateForm({ name: '', typeConfigId: '', content: '' });
-      qc.invalidateQueries({ queryKey: ['documents', 'options'] });
+      toast.success('Modelo importado com sucesso');
+      setImportDialog(null);
+      setImportForm({ name: '', typeConfigId: '', description: '' });
+      invalidateTemplates();
     },
-    onError: (e: any) => toast.error(e?.message ?? 'Não foi possível cadastrar o modelo'),
+    onError: (e: any) => toast.error(e?.message ?? 'Não foi possível importar o modelo'),
   });
+
+  const installTemplates = useMutation({
+    mutationFn: (keys: string[]) => api<{ installed: unknown[]; skipped: string[] }>('/documents/templates/library/install', { method: 'POST', json: { keys } }),
+    onSuccess: (result) => {
+      toast.success(`${result.installed.length} modelo(s) adicionados à empresa`);
+      if (result.skipped.length) toast.message('Alguns modelos já existiam', { description: result.skipped.join(', ') });
+      setGallerySelection([]);
+      setGalleryOpen(false);
+      invalidateTemplates();
+    },
+    onError: (e: any) => toast.error(e?.message ?? 'Não foi possível instalar os modelos'),
+  });
+
+  const openTemplateDialog = (template: DocTemplate | null) => {
+    setTemplateForm({
+      name: template?.name ?? '',
+      typeConfigId: template?.typeConfigId ?? '',
+      description: template?.description ?? '',
+      content: template?.content ?? '',
+      isDefault: template?.isDefault ?? false,
+    });
+    setTemplateDialog({ mode: template ? 'edit' : 'create', template });
+  };
+
+  const handleTemplateFile = async (file: File | null) => {
+    if (!file) return;
+    if (!file.name.toLowerCase().endsWith('.docx')) {
+      toast.error('Selecione um arquivo .docx');
+      return;
+    }
+    try {
+      const base64 = await readFileAsBase64(file);
+      setImportForm({ name: file.name.replace(/\.docx$/i, ''), typeConfigId: '', description: '' });
+      setImportDialog({ fileName: file.name, base64 });
+    } catch {
+      toast.error('Não foi possível ler o arquivo selecionado');
+    }
+  };
+
+  const handleDocxUpload = async (file: File | null) => {
+    if (!file || !detail) return;
+    if (!file.name.toLowerCase().endsWith('.docx')) {
+      toast.error('Selecione um arquivo .docx');
+      return;
+    }
+    try {
+      const base64 = await readFileAsBase64(file);
+      upload.mutate({ id: detail.id, kind: 'DOCX', fileName: file.name, contentBase64: base64 });
+    } catch {
+      toast.error('Não foi possível ler o arquivo selecionado');
+    }
+  };
 
   const openCreate = () => {
     setEditing(null);
@@ -670,6 +827,7 @@ export default function DocumentsPage() {
       description: doc.description ?? '',
       type: doc.type,
       typeConfigId: '',
+      templateId: '',
       version: String(doc.version ?? 1),
       content: doc.content ?? '',
       externalUrl: doc.externalUrl ?? '',
@@ -744,7 +902,7 @@ export default function DocumentsPage() {
       <div className="grid gap-3 grid-cols-2 sm:grid-cols-3 md:grid-cols-5">
         <QuickActionBtn icon={Plus} title="Criar documento" onClick={openCreate} />
         <QuickActionBtn icon={Layers} title="Criar categoria" onClick={() => openConfig('types')} />
-        <QuickActionBtn icon={FileText} title="Novo modelo DOCX" onClick={() => openConfig('templates')} />
+        <QuickActionBtn icon={FileText} title="Modelos de documento" onClick={() => openConfig('templates')} />
         <QuickActionBtn icon={History} title="Histórico de revisões" onClick={() => setHistoryOpen(true)} />
         <QuickActionBtn icon={Users} title="Leituras e treinamentos" onClick={openReadings} />
       </div>
@@ -922,16 +1080,100 @@ export default function DocumentsPage() {
               <Card ref={templateConfigRef} className="scroll-mt-20 border border-slate-100 dark:border-slate-800/80 bg-white dark:bg-slate-900/50 shadow-sm">
                 <CardContent className="space-y-4 p-4">
                   <div className="flex items-center justify-between">
-                    <div className="text-sm font-semibold">Modelos DOCX</div>
-                    <Badge variant="outline">{formatNumber(options?.templates.length)} modelos</Badge>
+                    <div className="text-sm font-semibold">Modelos de documento</div>
+                    <Badge variant="outline">{formatNumber(templatesQuery.data?.length ?? options?.templates.length)} modelos</Badge>
                   </div>
-                  <Input placeholder="Nome do modelo" value={templateForm.name} onChange={(e) => setTemplateForm((f) => ({ ...f, name: e.target.value }))} className="text-xs" />
-                  <NativeSelect value={templateForm.typeConfigId} onChange={(e) => setTemplateForm((f) => ({ ...f, typeConfigId: e.target.value }))} className="text-xs">
-                    <option value="">Sem tipo vinculado</option>
-                    {(options?.typeConfigs ?? []).map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}
-                  </NativeSelect>
-                  <Textarea rows={6} placeholder="{{document_code}} - {{document_title}}" value={templateForm.content} onChange={(e) => setTemplateForm((f) => ({ ...f, content: e.target.value }))} className="text-xs" />
-                  <Button size="sm" onClick={() => createTemplate.mutate()} disabled={createTemplate.isPending || !templateForm.name.trim()} className="bg-sky-500 hover:bg-sky-600 text-white font-semibold"><Upload className="mr-1.5 h-4 w-4" />Cadastrar modelo</Button>
+                  <div className="flex flex-wrap gap-2">
+                    <Button size="sm" onClick={() => openTemplateDialog(null)} className="bg-sky-500 hover:bg-sky-600 text-white font-semibold">
+                      <Plus className="mr-1.5 h-4 w-4" />Novo modelo
+                    </Button>
+                    <Button size="sm" variant="outline" onClick={() => templateFileRef.current?.click()}>
+                      <Upload className="mr-1.5 h-4 w-4" />Importar .docx
+                    </Button>
+                    <Button size="sm" variant="outline" onClick={() => setGalleryOpen(true)}>
+                      <Layers className="mr-1.5 h-4 w-4" />Galeria de modelos
+                    </Button>
+                    <input
+                      ref={templateFileRef}
+                      type="file"
+                      accept=".docx,application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+                      className="hidden"
+                      onChange={(e) => {
+                        void handleTemplateFile(e.target.files?.[0] ?? null);
+                        e.target.value = '';
+                      }}
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    {(templatesQuery.data ?? []).length === 0 && (
+                      <div className="rounded-md border border-dashed p-4 text-center text-xs text-muted-foreground">
+                        Nenhum modelo cadastrado. Crie um do zero, importe um .docx da empresa ou instale um pronto pela galeria.
+                      </div>
+                    )}
+                    {(templatesQuery.data ?? []).map((template) => {
+                      const type = options?.typeConfigs.find((item) => item.id === template.typeConfigId);
+                      return (
+                        <div key={template.id} className={cn('rounded-md border p-3 text-xs', !template.active && 'opacity-60')}>
+                          <div className="flex items-start justify-between gap-2">
+                            <div className="min-w-0">
+                              <div className="flex flex-wrap items-center gap-1.5">
+                                <span className="font-semibold text-slate-800 dark:text-slate-200">{template.name}</span>
+                                {template.isDefault && <Badge className="h-4 px-1.5 text-[9px] bg-sky-500 hover:bg-sky-500">Padrão</Badge>}
+                                {!template.active && <Badge variant="outline" className="h-4 px-1.5 text-[9px]">Inativo</Badge>}
+                              </div>
+                              <div className="mt-0.5 text-[10px] text-muted-foreground">
+                                {type ? `Tipo: ${type.name}` : 'Sem tipo vinculado'} · v{template.version}
+                                {template.description ? ` · ${template.description}` : ''}
+                              </div>
+                            </div>
+                            <div className="flex shrink-0 items-center gap-0.5">
+                              <Button variant="ghost" size="icon" className="h-7 w-7" title="Baixar .docx" onClick={() => downloadTemplateDocx(template)}>
+                                <Download className="h-3.5 w-3.5" />
+                              </Button>
+                              <Button variant="ghost" size="icon" className="h-7 w-7" title="Editar" onClick={() => openTemplateDialog(template)}>
+                                <Edit className="h-3.5 w-3.5" />
+                              </Button>
+                              <Button variant="ghost" size="icon" className="h-7 w-7" title="Duplicar" disabled={duplicateTemplate.isPending} onClick={() => duplicateTemplate.mutate(template.id)}>
+                                <Layers className="h-3.5 w-3.5" />
+                              </Button>
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                className="h-7 w-7"
+                                title={template.isDefault ? 'Remover padrão' : 'Definir como padrão'}
+                                disabled={patchTemplate.isPending}
+                                onClick={() => patchTemplate.mutate({ id: template.id, json: { isDefault: !template.isDefault } })}
+                              >
+                                <ShieldCheck className={cn('h-3.5 w-3.5', template.isDefault && 'text-sky-500')} />
+                              </Button>
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                className="h-7 w-7"
+                                title={template.active ? 'Desativar' : 'Ativar'}
+                                disabled={patchTemplate.isPending}
+                                onClick={() => patchTemplate.mutate({ id: template.id, json: { active: !template.active } })}
+                              >
+                                {template.active ? <Archive className="h-3.5 w-3.5" /> : <RotateCcw className="h-3.5 w-3.5" />}
+                              </Button>
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                className="h-7 w-7 text-status-red"
+                                title="Excluir"
+                                disabled={deleteTemplate.isPending}
+                                onClick={() => {
+                                  if (window.confirm(`Excluir o modelo "${template.name}"?`)) deleteTemplate.mutate(template.id);
+                                }}
+                              >
+                                <Trash2 className="h-3.5 w-3.5" />
+                              </Button>
+                            </div>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
                   <div className="rounded-md border p-3 text-xs">
                     <div className="font-semibold">Editor DOCX</div>
                     <div className="mt-1 text-[10px] text-muted-foreground">{options?.editor.configured ? `${options.editor.provider} configurado` : 'Modo manual de baixar/envio'}</div>
@@ -1041,9 +1283,28 @@ export default function DocumentsPage() {
               </div>
             </TabsContent>
             <TabsContent value="conteudo" className="space-y-4 pt-3">
+              {!editing && (
+                <div>
+                  <Label>Modelo do documento</Label>
+                  <NativeSelect value={form.templateId} onChange={(e) => setForm((f) => ({ ...f, templateId: e.target.value }))}>
+                    <option value="">Sem modelo (ou padrão do tipo, se definido)</option>
+                    {(options?.templates ?? [])
+                      .filter((template) => template.active)
+                      .filter((template) => !form.typeConfigId || !template.typeConfigId || template.typeConfigId === form.typeConfigId)
+                      .map((template) => (
+                        <option key={template.id} value={template.id}>
+                          {template.name}{template.isDefault ? ' (padrão)' : ''}
+                        </option>
+                      ))}
+                  </NativeSelect>
+                  <p className="mt-1 text-[11px] text-muted-foreground">
+                    Com um modelo selecionado e o conteúdo abaixo em branco, o documento e o DOCX inicial são gerados do modelo com código, título, empresa, responsáveis e datas já preenchidos.
+                  </p>
+                </div>
+              )}
               <div>
                 <Label>Conteúdo inicial</Label>
-                <Textarea rows={8} value={form.content} onChange={(e) => setForm((f) => ({ ...f, content: e.target.value }))} />
+                <Textarea rows={8} value={form.content} onChange={(e) => setForm((f) => ({ ...f, content: e.target.value }))} placeholder={form.templateId ? 'Deixe em branco para usar o conteúdo do modelo selecionado' : ''} />
               </div>
               <div>
                 <Label>Nota de alteração</Label>
@@ -1260,13 +1521,24 @@ export default function DocumentsPage() {
                       </div>
                     ))}
                     {canUpdate && (
-                      <Button variant="outline" size="sm" className="w-full text-xs" onClick={() => {
-                        const content = window.prompt('Conteúdo do arquivo');
-                        if (!content) return;
-                        upload.mutate({ id: detail.id, kind: 'DOCX', fileName: `${detail.code ?? detail.number}.docx`, content });
-                      }}>
-                        <Upload className="mr-1.5 h-4 w-4" />Enviar DOCX
-                      </Button>
+                      <>
+                        <input
+                          ref={docxFileRef}
+                          type="file"
+                          accept=".docx,application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+                          className="hidden"
+                          onChange={(e) => {
+                            void handleDocxUpload(e.target.files?.[0] ?? null);
+                            e.target.value = '';
+                          }}
+                        />
+                        <Button variant="outline" size="sm" className="w-full text-xs" disabled={upload.isPending} onClick={() => docxFileRef.current?.click()}>
+                          <Upload className="mr-1.5 h-4 w-4" />{upload.isPending ? 'Enviando...' : 'Enviar DOCX (arquivo)'}
+                        </Button>
+                        <p className="text-[10px] text-muted-foreground">
+                          Envie o .docx baixado/editado no Word. O arquivo é preservado byte a byte e vira a versão editável atual.
+                        </p>
+                      </>
                     )}
                   </div>
                 </div>
@@ -1364,6 +1636,157 @@ export default function DocumentsPage() {
               onClick={() => detail && grantEdit.mutate({ id: detail.id, requesterUserId: grantForm.requesterUserId, reason: grantForm.reason || undefined, expiresAt: grantForm.expiresAt || undefined })}
             >
               {grantEdit.isPending ? 'Enviando...' : 'Enviar para edição'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Criar/editar modelo de documento */}
+      <Dialog open={Boolean(templateDialog)} onOpenChange={(v) => !v && setTemplateDialog(null)}>
+        <DialogContent className="max-w-3xl overflow-y-auto max-h-[90vh]">
+          <DialogHeader>
+            <DialogTitle>{templateDialog?.mode === 'edit' ? `Editar modelo — ${templateDialog.template?.name}` : 'Novo modelo de documento'}</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+              <div>
+                <Label>Nome do modelo</Label>
+                <Input value={templateForm.name} onChange={(e) => setTemplateForm((f) => ({ ...f, name: e.target.value }))} />
+              </div>
+              <div>
+                <Label>Tipo documental vinculado</Label>
+                <NativeSelect value={templateForm.typeConfigId} onChange={(e) => setTemplateForm((f) => ({ ...f, typeConfigId: e.target.value }))}>
+                  <option value="">Sem tipo vinculado (uso geral)</option>
+                  {(options?.typeConfigs ?? []).map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}
+                </NativeSelect>
+              </div>
+            </div>
+            <div>
+              <Label>Descrição</Label>
+              <Input value={templateForm.description} onChange={(e) => setTemplateForm((f) => ({ ...f, description: e.target.value }))} placeholder="Quando usar este modelo" />
+            </div>
+            <div>
+              <div className="flex items-center justify-between">
+                <Label>Conteúdo do modelo</Label>
+                <span className="text-[10px] text-muted-foreground">Suporta títulos (#), tabelas (|), negrito (**) e os campos abaixo</span>
+              </div>
+              {templateDialog?.mode === 'edit' && templateDialog.template?.fileName && (
+                <p className="mb-1 rounded-md border border-amber-200 bg-amber-50 px-2 py-1 text-[10px] text-amber-800 dark:border-amber-900 dark:bg-amber-950/30 dark:text-amber-200">
+                  Alterar o texto regenera o arquivo .docx do modelo. Para manter a formatação de um .docx importado, edite o arquivo no Word e importe novamente.
+                </p>
+              )}
+              <Textarea rows={12} className="font-mono text-xs" value={templateForm.content} onChange={(e) => setTemplateForm((f) => ({ ...f, content: e.target.value }))} placeholder={'# 1. Objetivo\n\n{{document_code}} - {{document_title}}...'} />
+              <div className="mt-2 flex flex-wrap gap-1">
+                {(options?.placeholders ?? []).map((placeholder) => (
+                  <button
+                    key={placeholder}
+                    type="button"
+                    className="rounded border bg-muted/50 px-1.5 py-0.5 text-[10px] font-mono hover:bg-muted"
+                    title="Inserir no conteúdo"
+                    onClick={() => setTemplateForm((f) => ({ ...f, content: `${f.content}${f.content && !f.content.endsWith(' ') && !f.content.endsWith('\n') ? ' ' : ''}${placeholder}` }))}
+                  >
+                    {placeholder}
+                  </button>
+                ))}
+              </div>
+            </div>
+            <label className="flex items-center gap-2 text-sm">
+              <input type="checkbox" checked={templateForm.isDefault} onChange={(e) => setTemplateForm((f) => ({ ...f, isDefault: e.target.checked }))} />
+              Usar como modelo padrão {templateForm.typeConfigId ? 'deste tipo documental' : 'geral'}
+            </label>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setTemplateDialog(null)}>Cancelar</Button>
+            <Button onClick={() => saveTemplate.mutate()} disabled={saveTemplate.isPending || !templateForm.name.trim()} className="bg-sky-500 hover:bg-sky-600 text-white font-semibold">
+              {saveTemplate.isPending ? 'Salvando...' : 'Salvar modelo'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Importar modelo .docx */}
+      <Dialog open={Boolean(importDialog)} onOpenChange={(v) => !v && setImportDialog(null)}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Importar modelo (.docx)</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div className="rounded-md border bg-muted/30 p-3 text-xs text-muted-foreground">
+              Arquivo: <span className="font-semibold text-foreground">{importDialog?.fileName}</span>. O .docx é preservado como está;
+              campos <span className="font-mono">{'{{...}}'}</span> presentes no arquivo são preenchidos automaticamente ao criar documentos.
+            </div>
+            <div>
+              <Label>Nome do modelo</Label>
+              <Input value={importForm.name} onChange={(e) => setImportForm((f) => ({ ...f, name: e.target.value }))} />
+            </div>
+            <div>
+              <Label>Tipo documental vinculado</Label>
+              <NativeSelect value={importForm.typeConfigId} onChange={(e) => setImportForm((f) => ({ ...f, typeConfigId: e.target.value }))}>
+                <option value="">Sem tipo vinculado (uso geral)</option>
+                {(options?.typeConfigs ?? []).map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}
+              </NativeSelect>
+            </div>
+            <div>
+              <Label>Descrição</Label>
+              <Input value={importForm.description} onChange={(e) => setImportForm((f) => ({ ...f, description: e.target.value }))} placeholder="Quando usar este modelo" />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setImportDialog(null)}>Cancelar</Button>
+            <Button onClick={() => importTemplate.mutate()} disabled={importTemplate.isPending || !importForm.name.trim()} className="bg-sky-500 hover:bg-sky-600 text-white font-semibold">
+              <Upload className="mr-1.5 h-4 w-4" />{importTemplate.isPending ? 'Importando...' : 'Importar modelo'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Galeria de modelos prontos */}
+      <Dialog open={galleryOpen} onOpenChange={setGalleryOpen}>
+        <DialogContent className="max-w-4xl overflow-y-auto max-h-[90vh]">
+          <DialogHeader>
+            <DialogTitle>Galeria de modelos prontos</DialogTitle>
+          </DialogHeader>
+          <p className="text-xs text-muted-foreground">
+            Modelos profissionais com estrutura, tabelas e campos automáticos. Ao instalar, viram modelos da empresa e podem ser editados livremente.
+          </p>
+          {libraryQuery.isLoading && <div className="p-6 text-sm text-muted-foreground">Carregando galeria...</div>}
+          <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
+            {(libraryQuery.data ?? []).map((entry) => {
+              const checked = gallerySelection.includes(entry.key);
+              return (
+                <button
+                  key={entry.key}
+                  type="button"
+                  disabled={entry.installed}
+                  onClick={() => setGallerySelection((keys) => (checked ? keys.filter((k) => k !== entry.key) : [...keys, entry.key]))}
+                  className={cn(
+                    'rounded-lg border p-3 text-left transition-all',
+                    entry.installed && 'opacity-50 cursor-not-allowed',
+                    checked && 'border-sky-500 ring-2 ring-sky-500/20',
+                  )}
+                >
+                  <div className="flex items-center justify-between gap-2">
+                    <span className="text-sm font-semibold">{entry.name}</span>
+                    {entry.installed ? (
+                      <Badge variant="secondary" className="text-[9px]">Instalado</Badge>
+                    ) : (
+                      <input type="checkbox" readOnly checked={checked} />
+                    )}
+                  </div>
+                  <div className="mt-1 text-[10px] uppercase tracking-wide text-muted-foreground">{TYPE_LABEL[entry.category] ?? entry.category}</div>
+                  <p className="mt-1 text-xs text-muted-foreground">{entry.description}</p>
+                </button>
+              );
+            })}
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setGalleryOpen(false)}>Fechar</Button>
+            <Button
+              onClick={() => installTemplates.mutate(gallerySelection)}
+              disabled={installTemplates.isPending || gallerySelection.length === 0}
+              className="bg-sky-500 hover:bg-sky-600 text-white font-semibold"
+            >
+              {installTemplates.isPending ? 'Instalando...' : `Adicionar ${gallerySelection.length || ''} modelo(s)`}
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -1622,6 +2045,40 @@ async function fetchControlledBlob(documentId: string, fileId: string) {
   });
   if (!res.ok) throw new Error('Falha ao baixar arquivo');
   return res.blob();
+}
+
+async function downloadTemplateDocx(template: DocTemplate) {
+  try {
+    const token = getAccessToken();
+    const res = await fetch(`${API_URL}/documents/templates/${template.id}/download`, {
+      headers: token ? { authorization: `Bearer ${token}` } : undefined,
+    });
+    if (!res.ok) throw new Error('Falha ao baixar modelo');
+    const blob = await res.blob();
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = template.fileName?.endsWith('.docx') ? template.fileName : `${template.name}.docx`;
+    link.click();
+    URL.revokeObjectURL(url);
+  } catch {
+    toast.error('Não foi possível baixar o modelo');
+  }
+}
+
+/** Lê um arquivo local e retorna apenas o payload base64 (sem prefixo data:). */
+function readFileAsBase64(file: File): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => {
+      const result = String(reader.result ?? '');
+      const base64 = result.includes(',') ? result.slice(result.indexOf(',') + 1) : result;
+      if (!base64) reject(new Error('Arquivo vazio'));
+      else resolve(base64);
+    };
+    reader.onerror = () => reject(reader.error ?? new Error('Falha na leitura'));
+    reader.readAsDataURL(file);
+  });
 }
 
 function invalidate(qc: ReturnType<typeof useQueryClient>) {

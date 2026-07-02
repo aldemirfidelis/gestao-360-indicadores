@@ -22,12 +22,23 @@ import { AuthPayload } from '../auth/auth.types';
 import { DocumentCodeService } from './document-code.service';
 import { DocumentEditorService, WopiTokenPayload } from './document-editor.service';
 import { DocumentStorageService, sha256 } from './document-storage.service';
-import { buildDocx } from './docx.util';
+import {
+  applyDocxPlaceholders,
+  applyTextPlaceholders,
+  buildDocx,
+  detectPlaceholders,
+  extractDocxText,
+  isDocxBuffer,
+} from './docx.util';
+import { buildPdf } from './pdf.util';
+import { TEMPLATE_LIBRARY, findLibraryTemplate } from './template-library';
 import { WorkItemEventBus } from '../my-day/work-item-event-bus';
 
 const MODULE = 'documents';
 const DOCX_MIME = 'application/vnd.openxmlformats-officedocument.wordprocessingml.document';
 const PDF_MIME = 'application/pdf';
+// Uploads chegam em base64 no JSON (limite do body: 10mb); ~8MB decodificados.
+const MAX_FILE_BYTES = 8 * 1024 * 1024;
 
 type Tx = Prisma.TransactionClient;
 
@@ -435,6 +446,7 @@ export class DocumentsService {
       users,
       typeConfigs,
       templates,
+      placeholders: defaultPlaceholders(),
       editor: this.editor.status(),
       statuses: Object.values(DocumentStatus),
       types: Object.values(DocumentType),
@@ -456,33 +468,281 @@ export class DocumentsService {
   async listTemplates(me: AuthPayload) {
     return this.prisma.documentTemplate.findMany({
       where: { companyId: me.companyId, deletedAt: null },
-      orderBy: [{ active: 'desc' }, { name: 'asc' }],
+      orderBy: [{ active: 'desc' }, { isDefault: 'desc' }, { name: 'asc' }],
     });
   }
 
-  async createTemplate(me: AuthPayload, body: any) {
-    const name = this.requiredText(body?.name, 'Nome do template');
-    const content = this.nullableText(body?.content) ?? defaultTemplateContent();
-    const typeConfigId = this.id(body?.typeConfigId);
+  private async loadTemplate(me: AuthPayload, id: string) {
+    const template = await this.prisma.documentTemplate.findFirst({ where: { id, companyId: me.companyId, deletedAt: null } });
+    if (!template) throw new NotFoundException('Modelo não encontrado.');
+    return template;
+  }
+
+  private async validateTemplateType(companyId: string, typeConfigId: string | null) {
+    if (!typeConfigId) return null;
+    const exists = await this.prisma.documentTypeConfig.findFirst({ where: { id: typeConfigId, companyId, deletedAt: null } });
+    if (!exists) throw new NotFoundException('Tipo de documento não encontrado.');
+    return typeConfigId;
+  }
+
+  /** Garante um único modelo padrão por tipo (ou global) e sincroniza o tipo documental. */
+  private async applyDefaultTemplateTx(tx: Tx, companyId: string, templateId: string, typeConfigId: string | null) {
+    await tx.documentTemplate.updateMany({
+      where: { companyId, typeConfigId, deletedAt: null, isDefault: true, id: { not: templateId } },
+      data: { isDefault: false },
+    });
     if (typeConfigId) {
-      const exists = await this.prisma.documentTypeConfig.findFirst({ where: { id: typeConfigId, companyId: me.companyId, deletedAt: null } });
-      if (!exists) throw new NotFoundException('Tipo de documento não encontrado.');
+      await tx.documentTypeConfig.update({ where: { id: typeConfigId }, data: { defaultTemplateId: templateId } });
     }
-    const stored = await this.storage.putText(me.companyId, 'templates', `${name}.docx`, content, DOCX_MIME);
+  }
+
+  async createTemplate(me: AuthPayload, body: any) {
+    const name = this.requiredText(body?.name, 'Nome do modelo');
+    const content = this.nullableText(body?.content) ?? defaultTemplateContent();
+    const typeConfigId = await this.validateTemplateType(me.companyId, this.id(body?.typeConfigId));
+    const stored = await this.storage.putBinary(me.companyId, 'templates', `${name}.docx`, buildDocx(content), DOCX_MIME);
+    const isDefault = Boolean(body?.isDefault);
+    const placeholders = detectPlaceholders(content);
+    return this.prisma.$transaction(async (tx) => {
+      const template = await tx.documentTemplate.create({
+        data: {
+          companyId: me.companyId,
+          typeConfigId,
+          name,
+          description: this.nullableText(body?.description),
+          content,
+          isDefault,
+          active: body?.active ?? true,
+          placeholders: placeholders.length ? placeholders : defaultPlaceholders(),
+          createdById: me.sub,
+          ...stored,
+        },
+      });
+      if (isDefault) await this.applyDefaultTemplateTx(tx, me.companyId, template.id, template.typeConfigId);
+      return template;
+    });
+  }
+
+  async updateTemplate(me: AuthPayload, id: string, patch: any) {
+    const before = await this.loadTemplate(me, id);
+    const data: any = {};
+    if ('name' in (patch ?? {})) data.name = this.requiredText(patch.name, 'Nome do modelo');
+    if ('description' in (patch ?? {})) data.description = this.nullableText(patch.description);
+    if ('typeConfigId' in (patch ?? {})) data.typeConfigId = await this.validateTemplateType(me.companyId, this.id(patch.typeConfigId));
+    if ('active' in (patch ?? {})) data.active = Boolean(patch.active);
+    if ('content' in (patch ?? {})) {
+      const content = this.nullableText(patch.content);
+      if (content && content !== before.content) {
+        // Regera o .docx a partir do texto. Para modelos importados isso
+        // substitui o arquivo original (a UI avisa antes de editar).
+        const stored = await this.storage.putBinary(me.companyId, 'templates', `${data.name ?? before.name}.docx`, buildDocx(content), DOCX_MIME);
+        Object.assign(data, stored, { content, placeholders: detectPlaceholders(content), version: before.version + 1 });
+      }
+    }
+    const isDefault = 'isDefault' in (patch ?? {}) ? Boolean(patch.isDefault) : undefined;
+    return this.prisma.$transaction(async (tx) => {
+      const template = await tx.documentTemplate.update({
+        where: { id },
+        data: { ...data, ...(isDefault !== undefined ? { isDefault } : {}) },
+      });
+      if (isDefault) await this.applyDefaultTemplateTx(tx, me.companyId, id, template.typeConfigId);
+      if (isDefault === false) {
+        await tx.documentTypeConfig.updateMany({ where: { companyId: me.companyId, defaultTemplateId: id }, data: { defaultTemplateId: null } });
+      }
+      return template;
+    });
+  }
+
+  async deleteTemplate(me: AuthPayload, id: string) {
+    await this.loadTemplate(me, id);
+    return this.prisma.$transaction(async (tx) => {
+      await tx.documentTypeConfig.updateMany({ where: { companyId: me.companyId, defaultTemplateId: id }, data: { defaultTemplateId: null } });
+      return tx.documentTemplate.update({ where: { id }, data: { deletedAt: new Date(), isDefault: false, active: false } });
+    });
+  }
+
+  async duplicateTemplate(me: AuthPayload, id: string) {
+    const source = await this.loadTemplate(me, id);
+    const name = `${source.name} (cópia)`;
+    let stored = null as Awaited<ReturnType<DocumentStorageService['putBinary']>> | null;
+    if (source.storageKey) {
+      try {
+        const buffer = await this.storage.readBinary(source.storageKey);
+        stored = await this.storage.putBinary(me.companyId, 'templates', source.fileName ?? `${name}.docx`, buffer, source.mimeType ?? DOCX_MIME);
+      } catch {
+        stored = null; // arquivo fonte ausente: regenera a partir do texto abaixo
+      }
+    }
+    if (!stored) {
+      stored = await this.storage.putBinary(me.companyId, 'templates', `${name}.docx`, buildDocx(source.content ?? defaultTemplateContent()), DOCX_MIME);
+    }
     return this.prisma.documentTemplate.create({
       data: {
         companyId: me.companyId,
-        typeConfigId,
+        typeConfigId: source.typeConfigId,
         name,
-        description: this.nullableText(body?.description),
-        content,
-        isDefault: Boolean(body?.isDefault),
-        active: body?.active ?? true,
-        placeholders: body?.placeholders ?? defaultPlaceholders(),
+        description: source.description,
+        content: source.content,
+        isDefault: false,
+        active: true,
+        placeholders: source.placeholders ?? defaultPlaceholders(),
         createdById: me.sub,
         ...stored,
       },
     });
+  }
+
+  /** Importa um .docx real enviado pela empresa como modelo. */
+  async importTemplate(me: AuthPayload, body: any) {
+    const name = this.requiredText(body?.name, 'Nome do modelo');
+    const fileName = this.nullableText(body?.fileName) ?? `${name}.docx`;
+    const buffer = decodeBase64(this.requiredText(body?.contentBase64, 'Arquivo do modelo'));
+    if (!buffer.length) throw new BadRequestException('Arquivo vazio.');
+    if (buffer.length > MAX_FILE_BYTES) throw new BadRequestException('Arquivo excede o limite de 8 MB.');
+    if (!isDocxBuffer(buffer)) throw new BadRequestException('Arquivo inválido: envie um .docx (Word/LibreOffice) válido.');
+    const typeConfigId = await this.validateTemplateType(me.companyId, this.id(body?.typeConfigId));
+    const extracted = extractDocxText(buffer);
+    const placeholders = detectPlaceholders(extracted);
+    const stored = await this.storage.putBinary(me.companyId, 'templates', fileName, buffer, DOCX_MIME);
+    const isDefault = Boolean(body?.isDefault);
+    return this.prisma.$transaction(async (tx) => {
+      const template = await tx.documentTemplate.create({
+        data: {
+          companyId: me.companyId,
+          typeConfigId,
+          name,
+          description: this.nullableText(body?.description),
+          content: extracted,
+          isDefault,
+          active: true,
+          placeholders: placeholders.length ? placeholders : defaultPlaceholders(),
+          createdById: me.sub,
+          ...stored,
+        },
+      });
+      if (isDefault) await this.applyDefaultTemplateTx(tx, me.companyId, template.id, typeConfigId);
+      return template;
+    });
+  }
+
+  /** Baixa o modelo como .docx real (binario importado ou gerado do texto). */
+  async downloadTemplate(me: AuthPayload, id: string) {
+    const template = await this.loadTemplate(me, id);
+    let buffer: Buffer | null = null;
+    if (template.storageKey) {
+      try {
+        const raw = await this.storage.readBinary(template.storageKey);
+        if (isDocxBuffer(raw)) buffer = raw;
+      } catch {
+        buffer = null; // storage indisponivel/legado: gera do texto abaixo
+      }
+    }
+    if (!buffer) buffer = buildDocx(template.content ?? defaultTemplateContent());
+    const fileName = template.fileName?.toLowerCase().endsWith('.docx') ? template.fileName : `${template.name}.docx`;
+    return { fileName, mimeType: DOCX_MIME, content: buffer };
+  }
+
+  /** Galeria de modelos prontos, com marcacao dos ja instalados na empresa. */
+  async listTemplateLibrary(me: AuthPayload) {
+    const existing = await this.prisma.documentTemplate.findMany({
+      where: { companyId: me.companyId, deletedAt: null },
+      select: { name: true },
+    });
+    const names = new Set(existing.map((template) => template.name.toLowerCase()));
+    return TEMPLATE_LIBRARY.map((entry) => ({
+      key: entry.key,
+      name: entry.name,
+      description: entry.description,
+      category: entry.category,
+      preview: entry.content,
+      installed: names.has(entry.name.toLowerCase()),
+    }));
+  }
+
+  /** Instala modelos da galeria como templates proprios (editaveis) da empresa. */
+  async installLibraryTemplates(me: AuthPayload, body: any) {
+    const keys: string[] = Array.isArray(body?.keys) ? body.keys.map(String) : [];
+    if (!keys.length) throw new BadRequestException('Selecione ao menos um modelo da galeria.');
+    await this.codes.ensureDefaultTypes(me.companyId, me.sub);
+    const types = await this.prisma.documentTypeConfig.findMany({ where: { companyId: me.companyId, deletedAt: null } });
+    const existing = await this.prisma.documentTemplate.findMany({
+      where: { companyId: me.companyId, deletedAt: null },
+      select: { name: true },
+    });
+    const names = new Set(existing.map((template) => template.name.toLowerCase()));
+    const installed: any[] = [];
+    const skipped: string[] = [];
+    for (const key of keys) {
+      const entry = findLibraryTemplate(key);
+      if (!entry || names.has(entry.name.toLowerCase())) {
+        skipped.push(entry?.name ?? key);
+        continue;
+      }
+      const typeConfig = types.find((type) => type.sigla === entry.sigla) ?? types.find((type) => type.category === entry.category) ?? null;
+      const stored = await this.storage.putBinary(me.companyId, 'templates', `${entry.name}.docx`, buildDocx(entry.content), DOCX_MIME);
+      const template = await this.prisma.documentTemplate.create({
+        data: {
+          companyId: me.companyId,
+          typeConfigId: typeConfig?.id ?? null,
+          name: entry.name,
+          description: entry.description,
+          content: entry.content,
+          isDefault: false,
+          active: true,
+          placeholders: detectPlaceholders(entry.content),
+          createdById: me.sub,
+          ...stored,
+        },
+      });
+      names.add(entry.name.toLowerCase());
+      installed.push(template);
+    }
+    return { installed, skipped, total: keys.length };
+  }
+
+  /** Resolve os valores dos placeholders {{...}} para um documento em criação. */
+  private async buildPlaceholderValuesTx(
+    tx: Tx,
+    me: AuthPayload,
+    doc: {
+      code: string | null;
+      title: string;
+      typeName: string;
+      orgNodeId: string | null;
+      ownerUserId: string | null;
+      approverUserId: string | null;
+      validUntil: Date | null;
+    },
+  ): Promise<Record<string, string>> {
+    const [company, orgNode, owner, approver] = await Promise.all([
+      tx.company.findUnique({ where: { id: me.companyId }, select: { name: true } }),
+      doc.orgNodeId ? tx.orgNode.findFirst({ where: { id: doc.orgNodeId }, select: { name: true, type: true } }) : Promise.resolve(null),
+      doc.ownerUserId ? tx.user.findFirst({ where: { id: doc.ownerUserId }, select: { name: true } }) : Promise.resolve(null),
+      doc.approverUserId ? tx.user.findFirst({ where: { id: doc.approverUserId }, select: { name: true } }) : Promise.resolve(null),
+    ]);
+    const formatDate = (value: Date | null) => (value ? value.toLocaleDateString('pt-BR') : '____/____/______');
+    const today = formatDate(new Date());
+    const authorName = me.name ?? '';
+    return {
+      document_code: doc.code ?? '',
+      document_title: doc.title,
+      document_type: doc.typeName,
+      revision: 'Rev. 00',
+      company_name: company?.name ?? '',
+      company_logo: company?.name ?? '',
+      unit_name: orgNode?.type === 'UNIT' ? orgNode.name : '',
+      area_name: orgNode?.name ?? '',
+      process_name: orgNode?.type === 'PROCESS' ? orgNode.name : '',
+      author_name: authorName,
+      responsible_name: owner?.name ?? authorName,
+      approver_name: approver?.name ?? '',
+      publication_date: today,
+      expiration_date: formatDate(doc.validUntil),
+      page_number: '',
+      total_pages: '',
+      qr_code: doc.code ?? '',
+      revision_history: `| Revisão | Data | Descrição | Responsável |\n|---|---|---|---|\n| Rev. 00 | ${today} | Emissão inicial | ${authorName} |`,
+    };
   }
 
   async generateCode(me: AuthPayload, body: any) {
@@ -548,6 +808,45 @@ export class DocumentsService {
       const validUntil =
         this.optionalDate(body?.validUntil, 'Validade') ??
         (codeResult.typeConfig.defaultValidityDays ? addDays(validFrom ?? new Date(), codeResult.typeConfig.defaultValidityDays) : null);
+
+      // Modelo: explicito (templateId) ou o padrao do tipo documental.
+      const explicitContent = this.nullableText(body?.content);
+      const templateId = this.id(body?.templateId);
+      let template: any = null;
+      if (templateId) {
+        template = await tx.documentTemplate.findFirst({ where: { id: templateId, companyId: me.companyId, deletedAt: null, active: true } });
+        if (!template) throw new NotFoundException('Modelo não encontrado.');
+      } else if (!explicitContent) {
+        template = await tx.documentTemplate.findFirst({
+          where: codeResult.typeConfig.defaultTemplateId
+            ? { id: codeResult.typeConfig.defaultTemplateId, companyId: me.companyId, deletedAt: null, active: true }
+            : { companyId: me.companyId, typeConfigId: codeResult.typeConfig.id, isDefault: true, deletedAt: null, active: true },
+        });
+      }
+
+      let content = explicitContent ?? generatedDocumentBody(title, codeResult.code, 'Rev. 00');
+      let templateDocx: Buffer | null = null;
+      if (template) {
+        const values = await this.buildPlaceholderValuesTx(tx, me, {
+          code: codeResult.code,
+          title,
+          typeName: codeResult.typeConfig.name ?? codeResult.typeConfig.category,
+          orgNodeId: links.ids.orgNodeId,
+          ownerUserId: links.ids.ownerUserId,
+          approverUserId: links.ids.approverUserId,
+          validUntil,
+        });
+        if (!explicitContent && template.content) content = applyTextPlaceholders(template.content, values);
+        if (template.storageKey) {
+          try {
+            const raw = await this.storage.readBinary(template.storageKey);
+            if (isDocxBuffer(raw)) templateDocx = applyDocxPlaceholders(raw, values);
+          } catch {
+            templateDocx = null; // arquivo do modelo indisponivel: cai no texto
+          }
+        }
+      }
+
       const last = await tx.document.findFirst({
         where: { companyId: me.companyId },
         orderBy: { number: 'desc' },
@@ -563,7 +862,7 @@ export class DocumentsService {
           type: codeResult.typeConfig.category,
           status: DocumentStatus.DRAFT,
           version: 1,
-          content: this.nullableText(body?.content) ?? generatedDocumentBody(title, codeResult.code, 'Rev. 00'),
+          content,
           externalUrl: this.nullableText(body?.externalUrl) ?? null,
           changeNote: this.nullableText(body?.changeNote) ?? 'Criação inicial',
           validFrom,
@@ -589,8 +888,18 @@ export class DocumentsService {
           createdById: me.sub,
         },
       });
-      const content = renderDocxText(doc, version.versionLabel);
-      const stored = await this.storage.putText(me.companyId, `documents/${doc.id}/rev-00`, `${doc.code ?? doc.number}-rev-00.docx`, content, DOCX_MIME);
+      // Semente do DOCX editavel: binario real do modelo (com placeholders
+      // resolvidos) quando existir; senao, texto que o WOPI converte on-the-fly.
+      let stored: Awaited<ReturnType<DocumentStorageService['putText']>>;
+      let fileContentText: string | null;
+      if (templateDocx) {
+        stored = await this.storage.putBinary(me.companyId, `documents/${doc.id}/rev-00`, `${doc.code ?? doc.number}-rev-00.docx`, templateDocx, DOCX_MIME);
+        fileContentText = null;
+      } else {
+        const text = template ? content : renderDocxText(doc, version.versionLabel);
+        stored = await this.storage.putText(me.companyId, `documents/${doc.id}/rev-00`, `${doc.code ?? doc.number}-rev-00.docx`, text, DOCX_MIME);
+        fileContentText = text;
+      }
       const file = await tx.documentFile.create({
         data: {
           companyId: me.companyId,
@@ -599,13 +908,21 @@ export class DocumentsService {
           kind: DocumentFileKind.DOCX,
           protected: false,
           createdById: me.sub,
-          contentText: content,
+          contentText: fileContentText,
           ...stored,
         },
       });
       await tx.documentVersion.update({ where: { id: version.id }, data: { docxFileId: file.id } });
       await this.recordStatusTx(tx, me, doc.id, null, DocumentStatus.DRAFT, 'Documento criado', { versionId: version.id });
-      await this.auditTx(tx, me, doc.id, 'CREATE', null, { code: doc.code, title: doc.title, type: doc.type }, 'Criação do documento');
+      await this.auditTx(
+        tx,
+        me,
+        doc.id,
+        'CREATE',
+        null,
+        { code: doc.code, title: doc.title, type: doc.type, templateId: template?.id ?? null },
+        'Criação do documento',
+      );
       return doc;
     });
 
@@ -756,7 +1073,14 @@ export class DocumentsService {
     const published = await this.prisma.$transaction(async (tx) => {
       const version = await this.ensureLatestVersionTx(tx, doc, me.sub);
       const pdfContent = renderPdfText(doc, version.versionLabel, this.nullableText(body?.watermark));
-      const stored = await this.storage.putText(me.companyId, `documents/${doc.id}/${version.versionLabel}`, `${doc.code ?? doc.number}-${version.versionLabel}.pdf`, pdfContent, PDF_MIME);
+      // PDF oficial controlado: binario real (abre em qualquer leitor).
+      const stored = await this.storage.putBinary(
+        me.companyId,
+        `documents/${doc.id}/${version.versionLabel}`,
+        `${doc.code ?? doc.number}-${version.versionLabel}.pdf`,
+        buildPdf(pdfContent),
+        PDF_MIME,
+      );
       const pdf = await tx.documentFile.create({
         data: {
           companyId: me.companyId,
@@ -765,7 +1089,7 @@ export class DocumentsService {
           kind: DocumentFileKind.PDF,
           protected: true,
           createdById: me.sub,
-          contentText: pdfContent,
+          contentText: null,
           ...stored,
         },
       });
@@ -1374,11 +1698,30 @@ export class DocumentsService {
     if (kind === DocumentFileKind.DOCX && !EDITABLE_STATUSES.has(doc.status)) {
       throw new ConflictException('DOCX editável só pode ser substituído em rascunho/elaboração/ajustes.');
     }
-    const content = this.requiredText(body?.content, 'Conteúdo do arquivo');
     const fileName = this.requiredText(body?.fileName, 'Nome do arquivo');
     const mimeType = this.nullableText(body?.mimeType) ?? mimeFor(kind);
     const latest = await this.ensureLatestVersion(doc, me.sub);
-    const stored = await this.storage.putText(me.companyId, `documents/${doc.id}/uploads`, fileName, content, mimeType);
+
+    // Upload binario (base64) preserva o arquivo original; o modo texto segue
+    // aceito por retrocompatibilidade.
+    const base64 = this.nullableText(body?.contentBase64);
+    let stored: Awaited<ReturnType<DocumentStorageService['putText']>>;
+    let contentText: string | null = null;
+    if (base64) {
+      const buffer = decodeBase64(base64);
+      if (!buffer.length) throw new BadRequestException('Arquivo vazio.');
+      if (buffer.length > MAX_FILE_BYTES) throw new BadRequestException('Arquivo excede o limite de 8 MB.');
+      if (kind === DocumentFileKind.DOCX && !isDocxBuffer(buffer)) {
+        throw new BadRequestException('Arquivo inválido: envie um .docx (Word/LibreOffice) válido.');
+      }
+      if (kind === DocumentFileKind.PDF && buffer.subarray(0, 5).toString('latin1') !== '%PDF-') {
+        throw new BadRequestException('Arquivo inválido: envie um PDF válido.');
+      }
+      stored = await this.storage.putBinary(me.companyId, `documents/${doc.id}/uploads`, fileName, buffer, mimeType);
+    } else {
+      contentText = this.requiredText(body?.content, 'Conteúdo do arquivo');
+      stored = await this.storage.putText(me.companyId, `documents/${doc.id}/uploads`, fileName, contentText, mimeType);
+    }
     const file = await this.prisma.$transaction(async (tx) => {
       const item = await tx.documentFile.create({
         data: {
@@ -1388,7 +1731,7 @@ export class DocumentsService {
           kind,
           protected: kind === DocumentFileKind.PDF,
           createdById: me.sub,
-          contentText: content,
+          contentText,
           ...stored,
         },
       });
@@ -1406,8 +1749,19 @@ export class DocumentsService {
     const file = await this.prisma.documentFile.findFirst({ where: { id: fileId, documentId: id, companyId: me.companyId, deletedAt: null } });
     if (!file) throw new NotFoundException('Arquivo não encontrado.');
     // Arquivos legados guardam o texto em contentText; arquivos binarios
-    // (ex.: DOCX salvo por editor WOPI) ficam apenas no storage.
-    const content = file.contentText != null ? Buffer.from(file.contentText, 'utf8') : await this.storage.readBinary(file.storageKey);
+    // (ex.: DOCX salvo por editor WOPI) ficam apenas no storage. Para DOCX e
+    // PDF legados, converte o texto em arquivo real para o download abrir
+    // corretamente no Word/leitor de PDF.
+    let content: Buffer;
+    if (file.contentText != null && file.kind === DocumentFileKind.DOCX) {
+      content = buildDocx(file.contentText);
+    } else if (file.contentText != null && file.kind === DocumentFileKind.PDF) {
+      content = buildPdf(file.contentText);
+    } else if (file.contentText != null) {
+      content = Buffer.from(file.contentText, 'utf8');
+    } else {
+      content = await this.storage.readBinary(file.storageKey);
+    }
     await this.prisma.$transaction(async (tx) => {
       await tx.documentDownloadLog.create({
         data: {
@@ -1589,7 +1943,19 @@ export class DocumentsService {
         createdById: me.sub,
       },
     });
-    const stored = await this.storage.putText(me.companyId, `documents/${doc.id}/rev-${nextRevisionNumber}`, `${doc.code ?? doc.number}-${versionLabel}.docx`, content, DOCX_MIME);
+    // Arquivo binario (editado no Word/Collabora): copia o DOCX real para a
+    // nova revisao, preservando a formatacao. Senao, segue o caminho textual.
+    let binarySeed: Buffer | null = null;
+    if (sourceFile && sourceFile.contentText == null && sourceFile.storageKey) {
+      try {
+        binarySeed = await this.storage.readBinary(sourceFile.storageKey);
+      } catch {
+        binarySeed = null;
+      }
+    }
+    const stored = binarySeed
+      ? await this.storage.putBinary(me.companyId, `documents/${doc.id}/rev-${nextRevisionNumber}`, `${doc.code ?? doc.number}-${versionLabel}.docx`, binarySeed, DOCX_MIME)
+      : await this.storage.putText(me.companyId, `documents/${doc.id}/rev-${nextRevisionNumber}`, `${doc.code ?? doc.number}-${versionLabel}.docx`, content, DOCX_MIME);
     const file = await tx.documentFile.create({
       data: {
         companyId: me.companyId,
@@ -1598,7 +1964,7 @@ export class DocumentsService {
         kind: DocumentFileKind.DOCX,
         protected: false,
         createdById: me.sub,
-        contentText: content,
+        contentText: binarySeed ? null : content,
         ...stored,
       },
     });
@@ -1824,20 +2190,22 @@ function generatedDocumentBody(title: string, code: string, revision: string, de
   ].join('\n');
 }
 
+/** Corpo (markdown enxuto) do PDF oficial controlado; vira PDF real via buildPdf. */
 function renderPdfText(doc: any, revision: string, watermark?: string | null) {
+  const validade = doc.validUntil ? new Date(doc.validUntil).toLocaleDateString('pt-BR') : 'não definida';
   return [
-    '%PDF-1.4',
-    `% Gestão 360 - PDF oficial controlado`,
-    `Código: ${doc.code ?? `#${doc.number}`}`,
-    `Titulo: ${doc.title}`,
-    `Revisão: ${revision}`,
-    `Publicado em: ${new Date().toISOString()}`,
-    doc.validUntil ? `Validade: ${new Date(doc.validUntil).toISOString().slice(0, 10)}` : 'Validade: não definida',
-    watermark ? `Marca d'agua: ${watermark}` : '',
+    `# ${doc.code ?? `#${doc.number}`} - ${doc.title}`,
+    '',
+    `**Revisão:** ${revision} | **Publicado em:** ${new Date().toLocaleDateString('pt-BR')} | **Validade:** ${validade}`,
+    watermark ? `Marca d'água: ${watermark}` : null,
+    'Documento controlado - cópia impressa não controlada.',
+    '',
+    '---',
     '',
     doc.content ?? '',
-    '%%EOF',
-  ].filter(Boolean).join('\n');
+  ]
+    .filter((line) => line !== null)
+    .join('\n');
 }
 
 function defaultTemplateContent() {
@@ -1881,6 +2249,15 @@ function mimeFor(kind: DocumentFileKind) {
   if (kind === DocumentFileKind.DOCX || kind === DocumentFileKind.TEMPLATE) return DOCX_MIME;
   if (kind === DocumentFileKind.PDF) return PDF_MIME;
   return 'text/plain';
+}
+
+/** Decodifica base64 (aceita data URL) validando o formato. */
+function decodeBase64(value: string): Buffer {
+  const clean = value.replace(/^data:[^;]+;base64,/, '').replace(/\s+/g, '');
+  if (!clean || !/^[A-Za-z0-9+/]+=*$/.test(clean)) {
+    throw new BadRequestException('Arquivo em base64 inválido.');
+  }
+  return Buffer.from(clean, 'base64');
 }
 
 function jsonOrNull(value: unknown) {
