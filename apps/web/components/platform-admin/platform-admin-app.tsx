@@ -234,7 +234,7 @@ const SECTIONS: SectionItem[] = [
   { key: 'modules', label: 'Matriz de Módulos', icon: PackageCheck, group: 'Plataforma' },
   { key: 'plans', label: 'Planos', icon: ListChecks, group: 'Plataforma' },
   { key: 'seoPresence', label: 'SEO e Presenca Digital', icon: Globe2, group: 'Plataforma' },
-  { key: 'inbox', label: 'Caixa de Entrada', icon: Inbox, group: 'Plataforma' },
+  { key: 'inbox', label: 'HelpDesk e Caixa de Entrada', icon: Inbox, group: 'Plataforma' },
   { key: 'users', label: 'Usuários', icon: Users, group: 'Plataforma' },
   { key: 'security', label: 'Seguranca e Suporte', icon: ShieldCheck, group: 'Plataforma' },
   // Operam sobre a empresa selecionada no seletor do topo.
@@ -2352,8 +2352,8 @@ function InboxSection() {
     <div className="space-y-6">
       <div className="flex flex-col justify-between gap-4 border-b pb-4 sm:flex-row sm:items-center">
         <div>
-          <h1 className="text-xl font-bold tracking-tight">Caixa de Entrada</h1>
-          <p className="text-sm text-muted-foreground">Gerencie contatos do site institucional e chamados de suporte técnico global.</p>
+          <h1 className="text-xl font-bold tracking-tight">HelpDesk e Caixa de Entrada</h1>
+          <p className="text-sm text-muted-foreground">Atenda os chamados abertos pelas empresas na Central de Atendimento e os contatos do site institucional.</p>
         </div>
 
         <div className="flex gap-1 rounded-lg bg-slate-100 p-1 dark:bg-slate-900">
@@ -2633,7 +2633,7 @@ function InboxSection() {
                         )}
                       >
                         <div className="flex justify-between items-center gap-4 font-semibold text-[10px]">
-                          <span>{msg.user?.name} {msg.isInternal && '(Interno)'}</span>
+                          <span>{msg.user?.name ?? msg.authorName ?? 'Solicitante'}{msg.authorRole ? ` · ${msg.authorRole}` : ''} {msg.isInternal && '(Interno)'}</span>
                           <span className="opacity-60">{new Date(msg.createdAt).toLocaleDateString('pt-BR')} {new Date(msg.createdAt).toLocaleTimeString('pt-BR', {hour: '2-digit', minute:'2-digit'})}</span>
                         </div>
                         <p className="whitespace-pre-wrap">{msg.message}</p>

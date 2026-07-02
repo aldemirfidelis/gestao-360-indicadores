@@ -1030,12 +1030,19 @@ export class PlatformAdminService {
   async addInboxSupportTicketMessage(user: PlatformAdminIdentity, id: string, body: { message: string; isInternal?: boolean }) {
     const ticket = await this.prisma.supportTicket.findUnique({ where: { id } });
     if (!ticket) throw new NotFoundException('Chamado não encontrado.');
+    const message = String(body?.message ?? '').trim();
+    if (!message) throw new BadRequestException('Escreva uma resposta.');
 
+    // O autor é um platformAdminUser (modelo separado de User): NÃO gravamos
+    // userId (a FK -> User falharia com 500 — causa de "o chamado não podia ser
+    // atendido"). Registramos o autor da plataforma em authorName/authorRole.
     const msg = await this.prisma.supportTicketMessage.create({
       data: {
         ticketId: id,
-        userId: user.sub,
-        message: body.message,
+        userId: null,
+        authorName: user.name,
+        authorRole: 'Suporte Gestão 360',
+        message,
         isInternal: body.isInternal ?? false,
       },
       include: {
@@ -1043,10 +1050,15 @@ export class PlatformAdminService {
       },
     });
 
+    // Ao responder ao cliente, o chamado sai de "Aberto" para "Em atendimento".
+    if (!msg.isInternal && ticket.status === 'Aberto') {
+      await this.prisma.supportTicket.update({ where: { id }, data: { status: 'Em atendimento' } });
+    }
+
     // Comentários internos nunca podem sair do Portal Global. Para respostas ao
     // cliente, a mensagem persistida é a fonte de verdade e o SMTP é best-effort.
     if (!msg.isInternal) {
-      void this.notifyInboxSupportReply(ticket, body.message).catch((err: any) => {
+      void this.notifyInboxSupportReply(ticket, message).catch((err: any) => {
         console.error(`Erro ao notificar resposta de chamado para ${ticket.requesterEmail}:`, err?.message);
       });
     }
