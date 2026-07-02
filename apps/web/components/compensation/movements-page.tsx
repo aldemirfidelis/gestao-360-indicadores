@@ -5,6 +5,7 @@ import { useMutation } from '@tanstack/react-query';
 import { toast } from 'sonner';
 import { CheckCircle2, Play, Plus, Save, X } from 'lucide-react';
 import { CompensationModuleNav } from '@/components/compensation/module-nav';
+import { ReasonDialog, type ReasonDialogState } from '@/components/platform/reason-dialog';
 import { PageHeader } from '@/components/shell/page-header';
 import { SectionCard } from '@/components/platform/section-card';
 import { LoadingState } from '@/components/platform/loading-state';
@@ -77,6 +78,7 @@ export function MovimentacoesPage() {
   const [showCreate, setShowCreate] = useState(false);
   const [statusFilter, setStatusFilter] = useState('');
   const [typeFilter, setTypeFilter] = useState('');
+  const [reasonDialog, setReasonDialog] = useState<ReasonDialogState | null>(null);
 
   const { optionsQuery, structureQuery, movementsQuery, invalidateMovements } = useCompensationMovements();
 
@@ -121,9 +123,13 @@ export function MovimentacoesPage() {
   const selectedEmployee = structureQuery.data?.employees.find((e) => e.id === form.employeeId);
 
   function reject(id: string) {
-    const note = window.prompt('Motivo da rejeição:') ?? undefined;
-    if (note === undefined) return;
-    act.mutate({ id, action: 'reject', note });
+    setReasonDialog({
+      title: 'Rejeitar movimentação',
+      label: 'Motivo da rejeição',
+      confirmLabel: 'Rejeitar',
+      destructive: true,
+      onConfirm: (note) => act.mutate({ id, action: 'reject', note }),
+    });
   }
 
   return (
@@ -328,6 +334,7 @@ export function MovimentacoesPage() {
           </div>
         )}
       </SectionCard>
+      <ReasonDialog state={reasonDialog} onClose={() => setReasonDialog(null)} />
     </div>
   );
 }

@@ -47,6 +47,7 @@ import { api, getAccessToken } from '@/lib/api';
 import { cn, formatDate, formatNumber } from '@/lib/utils';
 import { useVision360 } from '@/components/ui/vision360-context';
 import { ImpactConfirmationModal } from '@/components/ui/impact-confirmation-modal';
+import { ReasonDialog, type ReasonDialogState } from '@/components/platform/reason-dialog';
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:3333/api';
 
@@ -385,6 +386,7 @@ export default function DocumentsPage() {
   const templateFileRef = useRef<HTMLInputElement>(null);
   const docxFileRef = useRef<HTMLInputElement>(null);
   const [grantOpen, setGrantOpen] = useState(false);
+  const [reasonDialog, setReasonDialog] = useState<ReasonDialogState | null>(null);
   const [grantForm, setGrantForm] = useState({ requesterUserId: '', reason: '', expiresAt: '' });
   const [draftContent, setDraftContent] = useState('');
   const [editorSession, setEditorSession] = useState<EditorSession | null>(null);
@@ -1367,7 +1369,7 @@ export default function DocumentsPage() {
                   <TabsTrigger value="auditoria">Auditoria</TabsTrigger>
                   <TabsTrigger value="distribuicao">Distribuição</TabsTrigger>
                 </TabsList>
-                <WorkflowActions doc={detail} canUpdate={canUpdate} pending={workflow.isPending} run={(action, body) => workflow.mutate({ id: detail.id, action, body })} />
+                <WorkflowActions doc={detail} canUpdate={canUpdate} pending={workflow.isPending} run={(action, body) => workflow.mutate({ id: detail.id, action, body })} ask={setReasonDialog} />
               </div>
 
               <TabsContent value="visualização">
@@ -1395,11 +1397,13 @@ export default function DocumentsPage() {
                           </Button>
                         )}
                         {!myActiveEditRequest && (
-                          <Button variant="outline" size="sm" className="w-full justify-start text-xs h-8" disabled={requestEdit.isPending} onClick={() => {
-                            const reason = window.prompt('Descreva o motivo da revisão/edição');
-                            if (reason === null) return;
-                            requestEdit.mutate({ id: detail.id, reason: reason || undefined });
-                          }}>
+                          <Button variant="outline" size="sm" className="w-full justify-start text-xs h-8" disabled={requestEdit.isPending} onClick={() => setReasonDialog({
+                            title: 'Solicitar edição do documento',
+                            label: 'Motivo da revisão/edição',
+                            required: false,
+                            confirmLabel: 'Enviar solicitação',
+                            onConfirm: (reason) => requestEdit.mutate({ id: detail.id, reason: reason || undefined }),
+                          })}>
                             <Send className="mr-1.5 h-3.5 w-3.5" />Solicitar edição
                           </Button>
                         )}
@@ -1446,10 +1450,13 @@ export default function DocumentsPage() {
                               {canDecide && (
                                 <div className="mt-2 flex gap-2">
                                   <Button size="sm" className="h-6 text-[10px]" disabled={decideEdit.isPending} onClick={() => decideEdit.mutate({ requestId: request.id, action: 'approve' })}>Liberar</Button>
-                                  <Button size="sm" variant="outline" className="h-6 text-[10px]" disabled={decideEdit.isPending} onClick={() => {
-                                    const note = window.prompt('Justificativa da rejeicao');
-                                    if (note) decideEdit.mutate({ requestId: request.id, action: 'reject', note });
-                                  }}>Rejeitar</Button>
+                                  <Button size="sm" variant="outline" className="h-6 text-[10px]" disabled={decideEdit.isPending} onClick={() => setReasonDialog({
+                                    title: 'Rejeitar solicitação de edição',
+                                    label: 'Justificativa da rejeição',
+                                    confirmLabel: 'Rejeitar',
+                                    destructive: true,
+                                    onConfirm: (note) => decideEdit.mutate({ requestId: request.id, action: 'reject', note }),
+                                  })}>Rejeitar</Button>
                                 </div>
                               )}
                             </div>
@@ -1792,6 +1799,8 @@ export default function DocumentsPage() {
         </DialogContent>
       </Dialog>
 
+      <ReasonDialog state={reasonDialog} onClose={() => setReasonDialog(null)} />
+
       <OnlineEditorDialog session={editorSession} onClose={() => { setEditorSession(null); invalidate(qc); }} />
 
       {impactModalConfig && (
@@ -1914,19 +1923,20 @@ function FiltersCard({ filters, setFilters }: { filters: { search: string; statu
   );
 }
 
-function WorkflowActions({ doc, canUpdate, pending, run }: { doc: DocDetail; canUpdate: boolean; pending: boolean; run: (action: string, body?: unknown) => void }) {
+function WorkflowActions({ doc, canUpdate, pending, run, ask }: { doc: DocDetail; canUpdate: boolean; pending: boolean; run: (action: string, body?: unknown) => void; ask: (state: ReasonDialogState) => void }) {
   if (!canUpdate) return null;
-  const comment = (label: string) => window.prompt(label) ?? '';
   return (
     <div className="flex flex-wrap gap-2">
       {isEditable(doc.status) && <Button size="sm" disabled={pending} onClick={() => run('submit-review')}><Send className="mr-2 h-4 w-4" />Enviar revisão</Button>}
       {doc.status === 'WAITING_REVIEW' && <Button size="sm" disabled={pending} onClick={() => run('start-review')}><Eye className="mr-2 h-4 w-4" />Iniciar revisão</Button>}
       {(doc.status === 'IN_REVIEW' || doc.status === 'REVIEW') && (
         <>
-          <Button size="sm" variant="outline" disabled={pending} onClick={() => {
-            const value = comment('Comentário dos ajustes');
-            if (value) run('request-adjustments', { comment: value });
-          }}><AlertTriangle className="mr-2 h-4 w-4" />Ajustes</Button>
+          <Button size="sm" variant="outline" disabled={pending} onClick={() => ask({
+            title: 'Solicitar ajustes',
+            label: 'Comentário dos ajustes',
+            confirmLabel: 'Solicitar ajustes',
+            onConfirm: (value) => run('request-adjustments', { comment: value }),
+          })}><AlertTriangle className="mr-2 h-4 w-4" />Ajustes</Button>
           <Button size="sm" disabled={pending} onClick={() => run('complete-review')}><CheckCircle2 className="mr-2 h-4 w-4" />Revisado</Button>
         </>
       )}
@@ -1935,23 +1945,31 @@ function WorkflowActions({ doc, canUpdate, pending, run }: { doc: DocDetail; can
       {doc.status === 'IN_APPROVAL' && (
         <>
           <Button size="sm" disabled={pending} onClick={() => run('approve')}><CheckCircle2 className="mr-2 h-4 w-4" />Aprovar</Button>
-          <Button size="sm" variant="outline" disabled={pending} onClick={() => {
-            const value = comment('Motivo da reprovação');
-            if (value) run('reject', { comment: value });
-          }}><X className="mr-2 h-4 w-4" />Reprovar</Button>
+          <Button size="sm" variant="outline" disabled={pending} onClick={() => ask({
+            title: 'Reprovar documento',
+            label: 'Motivo da reprovação',
+            confirmLabel: 'Reprovar',
+            destructive: true,
+            onConfirm: (value) => run('reject', { comment: value }),
+          })}><X className="mr-2 h-4 w-4" />Reprovar</Button>
         </>
       )}
       {doc.status === 'APPROVED' && <Button size="sm" disabled={pending} onClick={() => run('publish')}><FileText className="mr-2 h-4 w-4" />Publicar</Button>}
       {doc.status === 'PUBLISHED' && (
         <>
-          <Button size="sm" variant="outline" disabled={pending} onClick={() => {
-            const value = comment('Motivo da nova revisão');
-            if (value) run('new-revision', { reason: value });
-          }}><RotateCcw className="mr-2 h-4 w-4" />Nova revisão</Button>
-          <Button size="sm" variant="outline" disabled={pending} onClick={() => {
-            const value = comment('Motivo da obsolescencia');
-            if (value) run('obsolete', { comment: value });
-          }}><Archive className="mr-2 h-4 w-4" />Obsoleto</Button>
+          <Button size="sm" variant="outline" disabled={pending} onClick={() => ask({
+            title: 'Iniciar nova revisão',
+            label: 'Motivo da nova revisão',
+            confirmLabel: 'Criar revisão',
+            onConfirm: (value) => run('new-revision', { reason: value }),
+          })}><RotateCcw className="mr-2 h-4 w-4" />Nova revisão</Button>
+          <Button size="sm" variant="outline" disabled={pending} onClick={() => ask({
+            title: 'Tornar documento obsoleto',
+            label: 'Motivo da obsolescência',
+            confirmLabel: 'Tornar obsoleto',
+            destructive: true,
+            onConfirm: (value) => run('obsolete', { comment: value }),
+          })}><Archive className="mr-2 h-4 w-4" />Obsoleto</Button>
         </>
       )}
     </div>

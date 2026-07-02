@@ -1,6 +1,8 @@
 'use client';
 
+import { useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { ReasonDialog, type ReasonDialogState } from '@/components/platform/reason-dialog';
 import { toast } from 'sonner';
 import { ArrowRight, CheckCircle2, Play, X } from 'lucide-react';
 import { CompensationModuleNav } from '@/components/compensation/module-nav';
@@ -55,11 +57,16 @@ export default function AprovacoesCargosSalariosPage() {
   });
   const data = approvalsQuery.data;
   const total = data ? data.movements.length + data.descriptions.length + data.salaryTables.length + data.simulations.length : 0;
+  const [reasonDialog, setReasonDialog] = useState<ReasonDialogState | null>(null);
 
   function rejectMovement(id: string) {
-    const note = window.prompt('Motivo da rejeição:') ?? undefined;
-    if (note === undefined) return;
-    runAction.mutate({ url: `/cargos-salarios/movements/${id}/reject`, method: 'PATCH', body: { note } });
+    setReasonDialog({
+      title: 'Rejeitar movimentação',
+      label: 'Motivo da rejeição',
+      confirmLabel: 'Rejeitar',
+      destructive: true,
+      onConfirm: (note) => runAction.mutate({ url: `/cargos-salarios/movements/${id}/reject`, method: 'PATCH', body: { note } }),
+    });
   }
 
   return (
@@ -221,6 +228,7 @@ export default function AprovacoesCargosSalariosPage() {
           </div>
         </>
       )}
+      <ReasonDialog state={reasonDialog} onClose={() => setReasonDialog(null)} />
     </div>
   );
 }

@@ -1,6 +1,7 @@
 'use client';
 
 import { useMemo, useState } from 'react';
+import { ReasonDialog, type ReasonDialogState } from '@/components/platform/reason-dialog';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
 import { useRouter } from 'next/navigation';
@@ -36,6 +37,7 @@ export default function DescricoesPage() {
   const [statusFilter, setStatusFilter] = useState('');
   const [jobFilter, setJobFilter] = useState('');
   const [editor, setEditor] = useState<{ mode: 'new' | 'edit'; record: DescriptionRecord | null } | null>(null);
+  const [reasonDialog, setReasonDialog] = useState<ReasonDialogState | null>(null);
 
   const optionsQuery = useQuery<{ jobs: JobOption[] }>({ queryKey: ['compensation', 'options'], queryFn: () => api('/cargos-salarios/options') });
   const descriptionsQuery = useQuery<DescriptionRecord[]>({
@@ -88,12 +90,16 @@ export default function DescricoesPage() {
   }
 
   function handleTransition(record: DescriptionRecord, target: string) {
-    let reason: string | undefined;
     if (target === 'ADJUSTMENTS_REQUESTED') {
-      reason = window.prompt('Descreva os ajustes solicitados:') ?? undefined;
-      if (reason === undefined) return; // cancelado
+      setReasonDialog({
+        title: 'Solicitar ajustes na descrição',
+        label: 'Descreva os ajustes solicitados',
+        confirmLabel: 'Solicitar ajustes',
+        onConfirm: (reason) => changeStatus.mutate({ id: record.id, status: target, reason }),
+      });
+      return;
     }
-    changeStatus.mutate({ id: record.id, status: target, reason });
+    changeStatus.mutate({ id: record.id, status: target, reason: undefined });
   }
 
   return (
@@ -216,6 +222,7 @@ export default function DescricoesPage() {
         canManage={canManage}
         onClose={() => setEditor(null)}
       />
+      <ReasonDialog state={reasonDialog} onClose={() => setReasonDialog(null)} />
     </div>
   );
 }

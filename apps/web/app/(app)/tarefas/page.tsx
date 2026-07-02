@@ -6,6 +6,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
 import { CheckCircle2, ClipboardList, ExternalLink, FileText, RefreshCw, ShieldCheck } from 'lucide-react';
 import { PageHeader } from '@/components/shell/page-header';
+import { ReasonDialog, type ReasonDialogState } from '@/components/platform/reason-dialog';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -40,6 +41,7 @@ export default function TarefasPage() {
   const router = useRouter();
   const qc = useQueryClient();
   const [section, setSection] = useState<'all' | 'documents'>('all');
+  const [reasonDialog, setReasonDialog] = useState<ReasonDialogState | null>(null);
   const itemType = section === 'documents' ? '&itemType=DOCUMENTS' : '';
   const items = useQuery<{ rows: WorkItem[]; total: number }>({
     queryKey: ['tasks', section],
@@ -76,8 +78,13 @@ export default function TarefasPage() {
   }
 
   function rejectDocument(item: WorkItem) {
-    const justification = window.prompt('Justificativa da rejeicao');
-    if (justification) act.mutate({ id: item.id, action: 'reject', justification });
+    setReasonDialog({
+      title: 'Rejeitar tarefa',
+      label: 'Justificativa da rejeição',
+      confirmLabel: 'Rejeitar',
+      destructive: true,
+      onConfirm: (justification) => act.mutate({ id: item.id, action: 'reject', justification }),
+    });
   }
 
   return (
@@ -127,6 +134,7 @@ export default function TarefasPage() {
           ))}
         </TabsContent>
       </Tabs>
+      <ReasonDialog state={reasonDialog} onClose={() => setReasonDialog(null)} />
     </div>
   );
 }

@@ -32,6 +32,7 @@ import { api } from '@/lib/api';
 import { downloadCsv, formatMoney } from '@/lib/compensation/format';
 import { formatDate, formatNumber } from '@/lib/utils';
 import { cn } from '@/lib/utils';
+import { ReasonDialog, type ReasonDialogState } from '@/components/platform/reason-dialog';
 
 interface Overview {
   periodRef: string;
@@ -86,6 +87,7 @@ export default function CargosSalariosPage() {
   const [jobCatalogId, setJobCatalogId] = useState('');
   const [reajustePct, setReajustePct] = useState(5);
   const [showSimulateModal, setShowSimulateModal] = useState(false);
+  const [reasonDialog, setReasonDialog] = useState<ReasonDialogState | null>(null);
 
   const params = useMemo(() => {
     const search = new URLSearchParams();
@@ -139,9 +141,13 @@ export default function CargosSalariosPage() {
   const generatedImpact = payrollBase == null ? null : payrollBase * (reajustePct / 100);
 
   function rejectMovement(id: string) {
-    const note = window.prompt('Motivo da rejeição:');
-    if (note === null) return;
-    approvalAction.mutate({ id, action: 'reject', note });
+    setReasonDialog({
+      title: 'Rejeitar movimentação',
+      label: 'Motivo da rejeição',
+      confirmLabel: 'Rejeitar',
+      destructive: true,
+      onConfirm: (note) => approvalAction.mutate({ id, action: 'reject', note }),
+    });
   }
 
   function exportSnapshot() {
@@ -322,6 +328,8 @@ export default function CargosSalariosPage() {
           </div>
         </>
       )}
+
+      <ReasonDialog state={reasonDialog} onClose={() => setReasonDialog(null)} />
 
       <Dialog open={showSimulateModal} onOpenChange={setShowSimulateModal}>
         <DialogContent className="max-w-md">
