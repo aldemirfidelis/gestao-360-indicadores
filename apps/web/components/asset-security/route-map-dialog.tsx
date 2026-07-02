@@ -85,7 +85,7 @@ export function RouteMapDialog({ route, canManage, onClose }: { route: AnyRecord
                 <ImagePlus className="h-10 w-10 text-muted-foreground/60" />
                 <div className="text-sm font-semibold">Suba a planta da empresa ou o croqui da área</div>
                 <p className="max-w-sm text-xs text-muted-foreground">
-                  Depois do upload, clique em "Posicionar" em cada ponto de controle e marque o local exato no mapa.
+                  Depois do upload, clique em &quot;Posicionar&quot; em cada ponto de controle e marque o local exato no mapa.
                   A rota fica ligada na ordem da ronda.
                 </p>
                 {canManage && (
@@ -220,7 +220,7 @@ export function RouteMapDialog({ route, canManage, onClose }: { route: AnyRecord
             })}
             {unplaced.length > 0 && route.mapImage && (
               <p className="text-[10px] text-muted-foreground">
-                {unplaced.length} ponto(s) ainda sem posição no mapa — use "Posicionar" e clique no local exato.
+                {unplaced.length} ponto(s) ainda sem posição no mapa — use &quot;Posicionar&quot; e clique no local exato.
               </p>
             )}
           </div>
