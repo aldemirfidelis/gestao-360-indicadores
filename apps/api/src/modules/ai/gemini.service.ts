@@ -5,8 +5,10 @@ import { GoogleGenerativeAI, GenerativeModel } from '@google/generative-ai';
 @Injectable()
 export class GeminiService {
   private readonly logger = new Logger(GeminiService.name);
-  private geminiModel: GenerativeModel | null = null;
-  private readonly geminiModelName: string;
+  private geminiClient: GoogleGenerativeAI | null = null;
+  private readonly geminiModels = new Map<string, GenerativeModel>();
+  private readonly geminiCandidates: string[];
+  private geminiActiveModelName: string;
   private readonly groqApiKey: string | null;
   private readonly groqModelName: string;
   private readonly groqBaseUrl: string;
@@ -17,7 +19,15 @@ export class GeminiService {
     this.groqBaseUrl = this.config.get<string>('GROQ_BASE_URL')?.trim() || 'https://api.groq.com/openai/v1';
 
     const geminiApiKey = this.config.get<string>('GEMINI_API_KEY')?.trim();
-    this.geminiModelName = this.config.get<string>('GEMINI_MODEL') ?? 'gemini-2.0-flash';
+    const primaryModel = this.config.get<string>('GEMINI_MODEL')?.trim() || 'gemini-2.5-flash';
+    // Cotas do Google sao por modelo (o free tier do gemini-2.0-flash foi zerado);
+    // com falha no primario, tentamos os reservas antes de desistir do Gemini.
+    const fallbackModels = (this.config.get<string>('GEMINI_FALLBACK_MODELS') ?? 'gemini-2.5-flash,gemini-2.5-flash-lite')
+      .split(',')
+      .map((m) => m.trim())
+      .filter(Boolean);
+    this.geminiCandidates = [...new Set([primaryModel, ...fallbackModels])];
+    this.geminiActiveModelName = primaryModel;
 
     if (this.groqApiKey) {
       this.logger.log(`Groq inicializado com modelo ${this.groqModelName}.`);
@@ -31,29 +41,38 @@ export class GeminiService {
     }
 
     try {
-      const client = new GoogleGenerativeAI(geminiApiKey);
-      this.geminiModel = client.getGenerativeModel({ model: this.geminiModelName });
-      this.logger.log(`Gemini inicializado com modelo ${this.geminiModelName}.`);
+      this.geminiClient = new GoogleGenerativeAI(geminiApiKey);
+      this.logger.log(`Gemini inicializado com modelo ${primaryModel} (reservas: ${this.geminiCandidates.slice(1).join(', ') || 'nenhuma'}).`);
     } catch (err: any) {
       this.logger.error(`Falha ao inicializar Gemini: ${err?.message ?? err}`);
-      this.geminiModel = null;
+      this.geminiClient = null;
     }
   }
 
   get isEnabled(): boolean {
-    return Boolean(this.groqApiKey) || this.geminiModel !== null;
+    return Boolean(this.groqApiKey) || this.geminiClient !== null;
   }
 
   get provider(): 'groq' | 'gemini' | 'rules' {
-    if (this.geminiModel) return 'gemini';
+    if (this.geminiClient) return 'gemini';
     if (this.groqApiKey) return 'groq';
     return 'rules';
   }
 
   get modelName(): string | null {
-    if (this.geminiModel) return this.geminiModelName;
+    if (this.geminiClient) return this.geminiActiveModelName;
     if (this.groqApiKey) return this.groqModelName;
     return null;
+  }
+
+  private getGeminiModel(name: string): GenerativeModel | null {
+    if (!this.geminiClient) return null;
+    let model = this.geminiModels.get(name);
+    if (!model) {
+      model = this.geminiClient.getGenerativeModel({ model: name });
+      this.geminiModels.set(name, model);
+    }
+    return model;
   }
 
   /**
@@ -62,7 +81,7 @@ export class GeminiService {
    */
   async generateText(prompt: string, options?: { temperature?: number; maxOutputTokens?: number }): Promise<string | null> {
     if (!this.isEnabled) return null;
-    if (this.geminiModel) {
+    if (this.geminiClient) {
       const geminiText = await this.generateGeminiText(prompt, options);
       if (geminiText || !this.groqApiKey) return geminiText;
     }
@@ -104,20 +123,31 @@ export class GeminiService {
   }
 
   private async generateGeminiText(prompt: string, options?: { temperature?: number; maxOutputTokens?: number }): Promise<string | null> {
-    if (!this.geminiModel) return null;
-    try {
-      const result = await this.geminiModel.generateContent({
-        contents: [{ role: 'user', parts: [{ text: prompt }] }],
-        generationConfig: {
-          temperature: options?.temperature ?? 0.5,
-          maxOutputTokens: options?.maxOutputTokens ?? 1024,
-        },
-      });
-      return result.response.text();
-    } catch (err: any) {
-      this.logger.error(`Falha Gemini generateText: ${err?.message ?? err}`);
-      return null;
+    if (!this.geminiClient) return null;
+    // Comeca pelo ultimo modelo que funcionou para nao pagar uma chamada falha por request.
+    const candidates = [...new Set([this.geminiActiveModelName, ...this.geminiCandidates])];
+    for (const name of candidates) {
+      const model = this.getGeminiModel(name);
+      if (!model) return null;
+      try {
+        const result = await model.generateContent({
+          contents: [{ role: 'user', parts: [{ text: prompt }] }],
+          generationConfig: {
+            temperature: options?.temperature ?? 0.5,
+            maxOutputTokens: options?.maxOutputTokens ?? 1024,
+          },
+        });
+        const text = result.response.text();
+        if (name !== this.geminiActiveModelName) {
+          this.logger.warn(`Gemini alternou para o modelo reserva ${name}.`);
+          this.geminiActiveModelName = name;
+        }
+        return text;
+      } catch (err: any) {
+        this.logger.error(`Falha Gemini generateText (${name}): ${err?.message ?? err}`);
+      }
     }
+    return null;
   }
 
   /**
