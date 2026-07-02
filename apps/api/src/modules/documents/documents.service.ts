@@ -22,7 +22,7 @@ import type { AreaAction } from '../access/access.logic';
 import { AuthPayload } from '../auth/auth.types';
 import { DocumentCodeService } from './document-code.service';
 import { DocumentEditorService, WopiTokenPayload } from './document-editor.service';
-import { DocumentStorageService, sha256 } from './document-storage.service';
+import { DocumentStorageService, sha256, type StoredDocumentFile } from './document-storage.service';
 import {
   applyDocxPlaceholders,
   applyTextPlaceholders,
@@ -521,7 +521,7 @@ export class DocumentsService {
           active: body?.active ?? true,
           placeholders: placeholders.length ? placeholders : defaultPlaceholders(),
           createdById: me.sub,
-          ...stored,
+          ...templateStorage(stored),
         },
       });
       if (isDefault) await this.applyDefaultTemplateTx(tx, me.companyId, template.id, template.typeConfigId);
@@ -542,7 +542,7 @@ export class DocumentsService {
         // Regera o .docx a partir do texto. Para modelos importados isso
         // substitui o arquivo original (a UI avisa antes de editar).
         const stored = await this.storage.putBinary(me.companyId, 'templates', `${data.name ?? before.name}.docx`, buildDocx(content), DOCX_MIME);
-        Object.assign(data, stored, { content, placeholders: detectPlaceholders(content), version: before.version + 1 });
+        Object.assign(data, templateStorage(stored), { content, placeholders: detectPlaceholders(content), version: before.version + 1 });
       }
     }
     const isDefault = 'isDefault' in (patch ?? {}) ? Boolean(patch.isDefault) : undefined;
@@ -593,7 +593,7 @@ export class DocumentsService {
         active: true,
         placeholders: source.placeholders ?? defaultPlaceholders(),
         createdById: me.sub,
-        ...stored,
+        ...templateStorage(stored),
       },
     });
   }
@@ -623,7 +623,7 @@ export class DocumentsService {
           active: true,
           placeholders: placeholders.length ? placeholders : defaultPlaceholders(),
           createdById: me.sub,
-          ...stored,
+          ...templateStorage(stored),
         },
       });
       if (isDefault) await this.applyDefaultTemplateTx(tx, me.companyId, template.id, typeConfigId);
@@ -697,7 +697,7 @@ export class DocumentsService {
           active: true,
           placeholders: detectPlaceholders(entry.content),
           createdById: me.sub,
-          ...stored,
+          ...templateStorage(stored),
         },
       });
       names.add(entry.name.toLowerCase());
@@ -2287,6 +2287,21 @@ function mimeFor(kind: DocumentFileKind) {
   if (kind === DocumentFileKind.DOCX || kind === DocumentFileKind.TEMPLATE) return DOCX_MIME;
   if (kind === DocumentFileKind.PDF) return PDF_MIME;
   return 'text/plain';
+}
+
+/**
+ * DocumentTemplate nao tem a coluna storageProvider (so DocumentFile tem);
+ * espalhar o StoredDocumentFile inteiro no create/update do template causava
+ * PrismaClientValidationError (500 visto em producao no import de .docx).
+ */
+function templateStorage(stored: StoredDocumentFile) {
+  return {
+    storageKey: stored.storageKey,
+    fileName: stored.fileName,
+    mimeType: stored.mimeType,
+    sizeBytes: stored.sizeBytes,
+    hashSha256: stored.hashSha256,
+  };
 }
 
 /** Decodifica base64 (aceita data URL) validando o formato. */

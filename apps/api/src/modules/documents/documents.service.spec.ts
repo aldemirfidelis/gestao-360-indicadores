@@ -238,6 +238,23 @@ describe('DocumentsService - gestao documental', () => {
     expect(template.companyId).toBe('companyA');
     expect(template.content).toContain('{{document_title}}');
     expect(template.placeholders).toEqual(['{{document_title}}', '{{document_code}}']);
+    // Regressao (500 em prod): DocumentTemplate nao tem storageProvider — o
+    // spread do StoredDocumentFile inteiro quebrava o create no Prisma real.
+    const data = prisma.documentTemplate.create.mock.calls[0][0].data;
+    expect(data.storageProvider).toBeUndefined();
+    expect(data.storageKey).toBeTruthy();
+    expect(data.hashSha256).toBeTruthy();
+  });
+
+  it('createTemplate/duplicate: dados de storage sem campos fora do modelo', async () => {
+    const { service, prisma } = makeService();
+    prisma.documentTemplate.create = vi.fn(async ({ data }: any) => ({ id: 'tpl1', version: 1, ...data }));
+    await service.createTemplate(me, { name: 'Modelo X', content: 'Conteúdo' });
+    expect(prisma.documentTemplate.create.mock.calls[0][0].data.storageProvider).toBeUndefined();
+
+    prisma.documentTemplate.findFirst = vi.fn().mockResolvedValue({ id: 'tpl1', companyId: 'companyA', name: 'Modelo X', content: 'Conteúdo', storageKey: null, placeholders: null, typeConfigId: null, description: null, version: 1 });
+    await service.duplicateTemplate(me, 'tpl1');
+    expect(prisma.documentTemplate.create.mock.calls[1][0].data.storageProvider).toBeUndefined();
   });
 
   it('create com templateId: conteudo do modelo com placeholders resolvidos', async () => {
