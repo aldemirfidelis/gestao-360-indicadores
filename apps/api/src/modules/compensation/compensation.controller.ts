@@ -156,6 +156,24 @@ export class CompensationController {
     return this.service.salaryFit(me, query);
   }
 
+  @Get('equidade')
+  @RequirePermissions('compensation:salary-fit:view', ...VIEW)
+  payEquity(@CurrentUser() me: AuthPayload, @Query() query: Record<string, string | undefined>) {
+    return this.service.payEquity(me, query);
+  }
+
+  @Patch('employees/:id/profile')
+  @RequirePermissions(...MANAGE)
+  saveEmployeeProfile(@CurrentUser() me: AuthPayload, @Param('id') id: string, @Body() body: Record<string, unknown>) {
+    return this.service.saveEmployeeProfile(me, id, body);
+  }
+
+  @Post('employees/profile-import')
+  @RequirePermissions(...MANAGE)
+  importEmployeeProfiles(@CurrentUser() me: AuthPayload, @Body() body: Record<string, unknown>) {
+    return this.service.importEmployeeProfiles(me, body);
+  }
+
   @Get('movements')
   @RequirePermissions('compensation:movements:view', ...VIEW)
   listMovements(@CurrentUser() me: AuthPayload, @Query() query: Record<string, string | undefined>) {

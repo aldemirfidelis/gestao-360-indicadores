@@ -661,7 +661,7 @@ export class CompensationService {
   async salaryFit(me: AuthPayload, query: Record<string, string | undefined>) {
     await this.ensureBaseline(me);
     const canSeeIndividual = await this.hasAnyPermission(me, ['compensation:salary:individual']);
-    const [employees, snapshots, positions] = await Promise.all([
+    const [employees, snapshots, positions, profiles] = await Promise.all([
       this.prisma.orgEmployee.findMany({
         where: {
           companyId: me.companyId,
@@ -673,6 +673,7 @@ export class CompensationService {
       }),
       this.latestSalarySnapshots(me.companyId),
       this.prisma.compensationPosition.findMany({ where: { companyId: me.companyId, deletedAt: null } }),
+      this.employeeProfiles(me.companyId),
     ]);
     const snapshotByEmployee = latestByEmployee(snapshots);
     const positionByEmployee = new Map(positions.flatMap((position) => (position.currentEmployeeId ? [[position.currentEmployeeId, position]] : [])));
@@ -681,6 +682,7 @@ export class CompensationService {
       const classified = this.classifyEmployeeSalary(employee, snapshot);
       const position = positionByEmployee.get(employee.id);
       const range = snapshot?.salaryRange;
+      const profile = profiles.get(employee.id);
       return {
         employeeId: employee.id,
         registrationId: employee.registrationId,
@@ -700,12 +702,197 @@ export class CompensationService {
         costCenter: position?.costCenter ?? null,
         budgetStatus: position?.budgetStatus ?? null,
         salaryMasked: !canSeeIndividual,
+        gender: profile?.gender ?? null,
+        raceEthnicity: profile?.raceEthnicity ?? null,
+        admissionDate: profile?.admissionDate ?? null,
+        tenureMonths: monthsSince(profile?.admissionDate ?? null),
+        performanceRating: profile?.performanceRating ?? null,
+        performanceCycleRef: profile?.performanceCycleRef ?? null,
       };
     });
     if (canSeeIndividual) {
       await this.audit(me, 'SENSITIVE_VIEW', 'CompensationSalaryFit', null, null, { count: rows.length }, 'Enquadramento salarial');
     }
     return query.situation ? rows.filter((row) => row.situation === query.situation) : rows;
+  }
+
+  // --------------------------- equidade e perfis ----------------------------
+  // Dados demograficos/desempenho ficam em CompensationEmployeeProfile (1:1
+  // com OrgEmployee). A leitura e tolerante a migracao pendente: sem a tabela,
+  // os endpoints existentes seguem funcionando com perfis vazios.
+
+  private async employeeProfiles(companyId: string) {
+    try {
+      const profiles = await this.prisma.compensationEmployeeProfile.findMany({ where: { companyId } });
+      return new Map(profiles.map((profile) => [profile.employeeId, profile]));
+    } catch {
+      return new Map<string, never>();
+    }
+  }
+
+  async saveEmployeeProfile(me: AuthPayload, employeeId: string, body: Record<string, unknown>) {
+    const employee = await this.prisma.orgEmployee.findFirst({ where: { id: employeeId, companyId: me.companyId } });
+    if (!employee) throw new NotFoundException('Colaborador nao encontrado');
+    const data = {
+      gender: normalizeGender(body.gender),
+      raceEthnicity: cleanString(body.raceEthnicity),
+      admissionDate: optionalDate(body.admissionDate),
+      performanceRating: normalizeRating(body.performanceRating),
+      performanceCycleRef: cleanString(body.performanceCycleRef),
+      updatedById: me.sub,
+    };
+    const before = await this.prisma.compensationEmployeeProfile.findUnique({ where: { employeeId } });
+    const profile = await this.prisma.compensationEmployeeProfile.upsert({
+      where: { employeeId },
+      create: { companyId: me.companyId, employeeId, ...data },
+      update: data,
+    });
+    await this.audit(me, before ? 'UPDATE' : 'CREATE', 'CompensationEmployeeProfile', profile.id, before, data, employee.name);
+    return profile;
+  }
+
+  /**
+   * Import em lote de perfis (CSV/XLSX no cliente -> linhas JSON). Casa por
+   * matricula (registrationId) ou por nome exato como fallback.
+   */
+  async importEmployeeProfiles(me: AuthPayload, body: Record<string, unknown>) {
+    const rows = Array.isArray(body?.rows) ? (body.rows as Array<Record<string, unknown>>) : [];
+    if (!rows.length) throw new BadRequestException('Informe linhas para importar.');
+    if (rows.length > 2000) throw new BadRequestException('O limite por importação é de 2000 linhas.');
+    const employees = await this.prisma.orgEmployee.findMany({
+      where: { companyId: me.companyId },
+      select: { id: true, registrationId: true, name: true },
+    });
+    const byRegistration = new Map(employees.flatMap((e) => (e.registrationId ? [[e.registrationId.trim().toLowerCase(), e.id]] : [])));
+    const byName = new Map(employees.map((e) => [e.name.trim().toLowerCase(), e.id]));
+    let updated = 0;
+    const errors: Array<{ row: number; message: string }> = [];
+    for (let i = 0; i < rows.length; i++) {
+      const row = rows[i];
+      try {
+        const registration = cleanString(row.registrationId)?.toLowerCase();
+        const name = cleanString(row.employeeName)?.toLowerCase();
+        const employeeId = (registration && byRegistration.get(registration)) || (name && byName.get(name)) || null;
+        if (!employeeId) throw new BadRequestException('Colaborador não encontrado (matrícula/nome).');
+        const data = {
+          gender: normalizeGender(row.gender),
+          raceEthnicity: cleanString(row.raceEthnicity),
+          admissionDate: optionalDate(row.admissionDate),
+          performanceRating: normalizeRating(row.performanceRating),
+          performanceCycleRef: cleanString(row.performanceCycleRef),
+          updatedById: me.sub,
+        };
+        await this.prisma.compensationEmployeeProfile.upsert({
+          where: { employeeId },
+          create: { companyId: me.companyId, employeeId, ...data },
+          update: data,
+        });
+        updated += 1;
+      } catch (error: any) {
+        errors.push({ row: i + 1, message: error?.message ?? 'Erro ao importar linha' });
+      }
+    }
+    await this.audit(me, 'IMPORT', 'CompensationEmployeeProfile', null, null, { updated, errors: errors.length }, 'Import de perfis');
+    return { updated, errors, total: rows.length };
+  }
+
+  /**
+   * Analise de equidade salarial (base do Relatório de Transparência Salarial,
+   * Lei 14.611/2023): gap de mediana/média mulher x homem, global e por grade,
+   * família e área; representatividade em liderança; cobertura de dados.
+   * Grupos com menos de 3 pessoas de qualquer gênero são suprimidos (LGPD).
+   */
+  async payEquity(me: AuthPayload, query: Record<string, string | undefined>) {
+    await this.ensureBaseline(me);
+    const canSeeValues = await this.hasAnyPermission(me, ['compensation:salary:mass', 'compensation:salary:individual']);
+    const [employees, snapshots, catalogs, profiles] = await Promise.all([
+      this.prisma.orgEmployee.findMany({
+        where: { companyId: me.companyId, ...(query.orgNodeId ? { orgNodeId: query.orgNodeId } : {}) },
+        include: { job: true, orgNode: true },
+      }),
+      this.latestSalarySnapshots(me.companyId),
+      this.prisma.compensationJobCatalog.findMany({ where: { companyId: me.companyId, deletedAt: null } }),
+      this.employeeProfiles(me.companyId),
+    ]);
+    const snapshotByEmployee = latestByEmployee(snapshots);
+    const catalogByOrgJob = new Map(catalogs.flatMap((catalog) => (catalog.orgJobId ? [[catalog.orgJobId, catalog]] : [])));
+
+    type EquityMember = { gender: string; salary: number | null; tenureMonths: number | null; leadership: boolean };
+    const members: Array<EquityMember & { grade: string; family: string; area: string; rating: number | null }> = [];
+    let withGender = 0;
+    let withSalary = 0;
+    let withRating = 0;
+    for (const employee of employees) {
+      const profile = profiles.get(employee.id);
+      const snapshot = snapshotByEmployee.get(employee.id);
+      const salary = moneyOrNull(snapshot?.currentSalary);
+      const catalog = catalogByOrgJob.get(employee.jobId);
+      const gender = profile?.gender ?? null;
+      if (gender && gender !== 'NAO_INFORMADO') withGender += 1;
+      if (salary !== null) withSalary += 1;
+      if (profile?.performanceRating != null) withRating += 1;
+      if (!gender || gender === 'NAO_INFORMADO') continue;
+      members.push({
+        gender,
+        salary,
+        tenureMonths: monthsSince(profile?.admissionDate ?? null),
+        leadership: isLeadershipJob(catalog ?? null),
+        grade: snapshot?.salaryRange?.grade ?? snapshot?.salaryRange?.band ?? employee.band ?? 'Sem grade',
+        family: catalog?.family ?? 'Sem família',
+        area: employee.orgNode?.name ?? 'Sem área',
+        rating: profile?.performanceRating ?? null,
+      });
+    }
+
+    const groupBy = (key: (m: (typeof members)[number]) => string) => {
+      const groups = new Map<string, typeof members>();
+      for (const member of members) {
+        const groupKey = key(member);
+        const list = groups.get(groupKey) ?? [];
+        list.push(member);
+        groups.set(groupKey, list);
+      }
+      return [...groups.entries()]
+        .map(([label, list]) => equityGroupStats(label, list, canSeeValues))
+        .sort((a, b) => a.label.localeCompare(b.label, 'pt-BR'));
+    };
+
+    const distribution = [0, 0, 0, 0];
+    for (const profile of profiles.values()) {
+      const rating = (profile as { performanceRating?: number | null }).performanceRating;
+      if (rating != null && rating >= 1 && rating <= 4) distribution[rating - 1] += 1;
+    }
+
+    const leadership = members.filter((member) => member.leadership);
+    if (canSeeValues) {
+      await this.audit(me, 'SENSITIVE_VIEW', 'CompensationPayEquity', null, null, { employees: employees.length }, 'Equidade salarial');
+    }
+    return {
+      generatedAt: new Date(),
+      masked: !canSeeValues,
+      privacyNote: 'Grupos com menos de 3 pessoas de qualquer gênero têm valores suprimidos (privacidade/LGPD).',
+      coverage: {
+        employees: employees.length,
+        withGender,
+        withSalary,
+        withRating,
+        genderPct: employees.length ? (withGender / employees.length) * 100 : 0,
+        ratingPct: employees.length ? (withRating / employees.length) * 100 : 0,
+      },
+      global: equityGroupStats('Geral', members, canSeeValues),
+      byGrade: groupBy((member) => member.grade),
+      byFamily: groupBy((member) => member.family),
+      byArea: groupBy((member) => member.area),
+      leadership: {
+        ...equityGroupStats('Liderança', leadership, canSeeValues),
+        womenSharePct: leadership.length ? (leadership.filter((m) => m.gender === 'FEMININO').length / leadership.length) * 100 : null,
+        womenShareOverallPct: members.length ? (members.filter((m) => m.gender === 'FEMININO').length / members.length) * 100 : null,
+      },
+      performanceDistribution: {
+        counts: distribution,
+        total: distribution.reduce((a, b) => a + b, 0),
+      },
+    };
   }
 
   async listMovements(me: AuthPayload, query: Record<string, string | undefined>) {
@@ -1771,6 +1958,117 @@ function periodWindow(periodRef: string) {
   const start = new Date(Date.UTC(year, month - 1, 1));
   const end = new Date(Date.UTC(year, month, 1));
   return { gte: start, lt: end };
+}
+
+// ------------------------- helpers de equidade ------------------------------
+
+const GENDER_VALUES = new Set(['FEMININO', 'MASCULINO', 'NAO_BINARIO', 'NAO_INFORMADO']);
+const GENDER_ALIASES: Record<string, string> = {
+  F: 'FEMININO',
+  FEM: 'FEMININO',
+  FEMININO: 'FEMININO',
+  MULHER: 'FEMININO',
+  M: 'MASCULINO',
+  MASC: 'MASCULINO',
+  MASCULINO: 'MASCULINO',
+  HOMEM: 'MASCULINO',
+  'NAO-BINARIO': 'NAO_BINARIO',
+  'NÃO-BINÁRIO': 'NAO_BINARIO',
+  NB: 'NAO_BINARIO',
+};
+
+function normalizeGender(value: unknown): string | null {
+  const raw = cleanString(value);
+  if (!raw) return null;
+  const key = raw
+    .normalize('NFD')
+    .replace(/[̀-ͯ]/g, '')
+    .toUpperCase()
+    .replace(/\s+/g, '_');
+  const normalized = GENDER_ALIASES[key] ?? key;
+  if (!GENDER_VALUES.has(normalized)) throw new BadRequestException(`Gênero inválido: ${raw}`);
+  return normalized;
+}
+
+/** Rating de desempenho 1..4 (espelha PERFORMANCE_LEVELS do frontend). */
+function normalizeRating(value: unknown): number | null {
+  if (value === undefined || value === null || value === '') return null;
+  const number = Number(value);
+  if (!Number.isInteger(number) || number < 1 || number > 4) {
+    throw new BadRequestException('Rating de desempenho deve ser um inteiro de 1 a 4.');
+  }
+  return number;
+}
+
+function monthsSince(date: Date | string | null): number | null {
+  if (!date) return null;
+  const from = new Date(date);
+  if (Number.isNaN(from.getTime())) return null;
+  const months = (Date.now() - from.getTime()) / (30.44 * 86_400_000);
+  return months >= 0 ? Math.floor(months) : null;
+}
+
+function median(values: number[]): number | null {
+  if (!values.length) return null;
+  const sorted = [...values].sort((a, b) => a - b);
+  const mid = Math.floor(sorted.length / 2);
+  return sorted.length % 2 ? sorted[mid] : (sorted[mid - 1] + sorted[mid]) / 2;
+}
+
+function mean(values: number[]): number | null {
+  return values.length ? values.reduce((a, b) => a + b, 0) / values.length : null;
+}
+
+/** Heurística de liderança a partir do catálogo (nível hierárquico/trilha). */
+function isLeadershipJob(catalog: { hierarchyLevel: string | null; careerTrack: string | null } | null): boolean {
+  const text = `${catalog?.hierarchyLevel ?? ''} ${catalog?.careerTrack ?? ''}`
+    .normalize('NFD')
+    .replace(/[̀-ͯ]/g, '')
+    .toLowerCase();
+  return /gest|geren|coorden|diretor|superv|lider|chef|executiv/.test(text);
+}
+
+interface EquityMemberInput {
+  gender: string;
+  salary: number | null;
+  tenureMonths: number | null;
+}
+
+/**
+ * Estatísticas de equidade de um grupo. `gapMedianPct`/`gapMeanPct` = razão
+ * mulher/homem - 1 (negativo = mulheres ganham menos), no padrão do Relatório
+ * de Transparência Salarial. Suprime valores quando qualquer gênero tem menos
+ * de 3 pessoas com salário (privacidade/LGPD) ou quando mascarado.
+ */
+function equityGroupStats(label: string, members: EquityMemberInput[], canSeeValues: boolean) {
+  const women = members.filter((member) => member.gender === 'FEMININO');
+  const men = members.filter((member) => member.gender === 'MASCULINO');
+  const womenSalaries = women.map((member) => member.salary).filter((v): v is number => v !== null);
+  const menSalaries = men.map((member) => member.salary).filter((v): v is number => v !== null);
+  const suppressed = womenSalaries.length < 3 || menSalaries.length < 3;
+  const visible = canSeeValues && !suppressed;
+  const medianWomen = visible ? median(womenSalaries) : null;
+  const medianMen = visible ? median(menSalaries) : null;
+  const meanWomen = visible ? mean(womenSalaries) : null;
+  const meanMen = visible ? mean(menSalaries) : null;
+  const womenTenure = women.map((member) => member.tenureMonths).filter((v): v is number => v !== null);
+  const menTenure = men.map((member) => member.tenureMonths).filter((v): v is number => v !== null);
+  return {
+    label,
+    count: members.length,
+    women: women.length,
+    men: men.length,
+    others: members.length - women.length - men.length,
+    suppressed,
+    medianWomen: medianWomen === null ? null : roundMoney(medianWomen),
+    medianMen: medianMen === null ? null : roundMoney(medianMen),
+    meanWomen: meanWomen === null ? null : roundMoney(meanWomen),
+    meanMen: meanMen === null ? null : roundMoney(meanMen),
+    gapMedianPct: medianWomen !== null && medianMen !== null && medianMen > 0 ? roundRatio((medianWomen / medianMen - 1) * 100) : null,
+    gapMeanPct: meanWomen !== null && meanMen !== null && meanMen > 0 ? roundRatio((meanWomen / meanMen - 1) * 100) : null,
+    avgTenureWomenMonths: womenTenure.length ? Math.round(womenTenure.reduce((a, b) => a + b, 0) / womenTenure.length) : null,
+    avgTenureMenMonths: menTenure.length ? Math.round(menTenure.reduce((a, b) => a + b, 0) / menTenure.length) : null,
+  };
 }
 
 function latestByEmployee<T extends { employeeId: string }>(snapshots: T[]) {

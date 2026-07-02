@@ -3,9 +3,12 @@
 import { useMemo, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { useSearchParams } from 'next/navigation';
-import { Download } from 'lucide-react';
+import { Download, UserCog, Upload } from 'lucide-react';
 import { CompensationModuleNav } from '@/components/compensation/module-nav';
 import { CompaRatioDistributionChart, CompaRatioScatter, PenetrationHistogram } from '@/components/compensation/compa-ratio-chart';
+import { EmployeeProfileDialog } from '@/components/compensation/employee-profile-dialog';
+import { ImportProfilesDialog } from '@/components/compensation/import-profiles-dialog';
+import { useAuth } from '@/components/auth/auth-provider';
 import { PageHeader } from '@/components/shell/page-header';
 import { SectionCard } from '@/components/platform/section-card';
 import { LoadingState } from '@/components/platform/loading-state';
@@ -24,7 +27,7 @@ import {
   marketPositioning,
   type EquityDimension,
 } from '@/lib/compensation/analytics';
-import { SITUATION_LABELS, type FitRow, type JobOption, type SalaryTable, type SalarySurvey } from '@/lib/compensation/types';
+import { RATING_LABELS, SITUATION_LABELS, type FitRow, type JobOption, type SalaryTable, type SalarySurvey } from '@/lib/compensation/types';
 import { formatNumber } from '@/lib/utils';
 
 const situations = Object.keys(SITUATION_LABELS);
@@ -39,9 +42,13 @@ function situationTone(situation: string): 'red' | 'yellow' | 'green' | 'gray' {
 
 export default function EnquadramentoPage() {
   const searchParams = useSearchParams();
+  const { hasPermission } = useAuth();
+  const canManage = hasPermission(['compensation:manage', 'org:positions:manage']);
   const [situation, setSituation] = useState(searchParams.get('situation') ?? '');
   const [orgNodeId, setOrgNodeId] = useState('');
   const [equityDim, setEquityDim] = useState<EquityDimension>('area');
+  const [profileRow, setProfileRow] = useState<FitRow | null>(null);
+  const [importOpen, setImportOpen] = useState(false);
 
   const optionsQuery = useQuery<{ orgNodes: Array<{ id: string; name: string }>; jobs: JobOption[] }>({
     queryKey: ['compensation', 'options'],
@@ -67,7 +74,7 @@ export default function EnquadramentoPage() {
   const market = useMemo(() => marketPositioning(surveysQuery.data ?? [], ranges), [surveysQuery.data, ranges]);
 
   function exportCsv() {
-    const header = ['Matrícula', 'Colaborador', 'Área', 'Cargo', 'Faixa', 'Salário', 'Mínimo', 'Médio', 'Máximo', 'Compa-ratio', 'Penetração %', 'Situação'];
+    const header = ['Matrícula', 'Colaborador', 'Área', 'Cargo', 'Faixa', 'Salário', 'Mínimo', 'Médio', 'Máximo', 'Compa-ratio', 'Penetração %', 'Situação', 'Desempenho', 'Tempo de casa (meses)'];
     const body = rows.map((r) => [
       r.registrationId ?? '',
       r.employeeName,
@@ -81,6 +88,8 @@ export default function EnquadramentoPage() {
       r.compaRatio ?? '',
       r.positioningPercent ?? '',
       SITUATION_LABELS[r.situation] ?? r.situation,
+      r.performanceRating != null ? RATING_LABELS[r.performanceRating] ?? r.performanceRating : '',
+      r.tenureMonths ?? '',
     ]);
     downloadCsv(`enquadramento-${new Date().toISOString().slice(0, 10)}.csv`, [header, ...body]);
   }
@@ -97,9 +106,16 @@ export default function EnquadramentoPage() {
 
       <FilterBar
         actions={
-          <Button size="sm" variant="outline" onClick={exportCsv} disabled={rows.length === 0}>
-            <Download className="mr-1.5 h-4 w-4" /> Exportar CSV
-          </Button>
+          <>
+            {canManage && (
+              <Button size="sm" variant="outline" onClick={() => setImportOpen(true)}>
+                <Upload className="mr-1.5 h-4 w-4" /> Importar perfis
+              </Button>
+            )}
+            <Button size="sm" variant="outline" onClick={exportCsv} disabled={rows.length === 0}>
+              <Download className="mr-1.5 h-4 w-4" /> Exportar CSV
+            </Button>
+          </>
         }
       >
         <div>
@@ -277,6 +293,9 @@ export default function EnquadramentoPage() {
                       <th className="py-2 text-right">Compa</th>
                       <th className="py-2 text-right">Penetr.</th>
                       <th className="py-2 text-left">Situação</th>
+                      <th className="py-2 text-left">Desempenho</th>
+                      <th className="py-2 text-right">Tempo de casa</th>
+                      {canManage && <th className="py-2 text-right">Perfil</th>}
                     </tr>
                   </thead>
                   <tbody>
@@ -298,6 +317,19 @@ export default function EnquadramentoPage() {
                             {SITUATION_LABELS[row.situation] ?? row.situation}
                           </Badge>
                         </td>
+                        <td className="py-2 text-xs">
+                          {row.performanceRating != null ? `${row.performanceRating} — ${RATING_LABELS[row.performanceRating] ?? ''}` : <span className="text-muted-foreground">-</span>}
+                        </td>
+                        <td className="py-2 text-right tabular-nums text-xs">
+                          {row.tenureMonths != null ? (row.tenureMonths >= 12 ? `${Math.floor(row.tenureMonths / 12)}a ${row.tenureMonths % 12}m` : `${row.tenureMonths}m`) : '-'}
+                        </td>
+                        {canManage && (
+                          <td className="py-2 text-right">
+                            <Button variant="ghost" size="icon" className="h-7 w-7" title="Perfil & desempenho" onClick={() => setProfileRow(row)}>
+                              <UserCog className="h-3.5 w-3.5" />
+                            </Button>
+                          </td>
+                        )}
                       </tr>
                     ))}
                   </tbody>
@@ -307,6 +339,9 @@ export default function EnquadramentoPage() {
           </SectionCard>
         </>
       )}
+
+      {profileRow && <EmployeeProfileDialog row={profileRow} onClose={() => setProfileRow(null)} />}
+      <ImportProfilesDialog open={importOpen} onClose={() => setImportOpen(false)} />
     </div>
   );
 }

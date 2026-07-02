@@ -11,6 +11,7 @@ const sections = [
   { label: 'Descrições', href: '/cargos-salarios/descricoes' },
   { label: 'Tabelas Salariais', href: '/cargos-salarios/tabelas-salariais' },
   { label: 'Enquadramento', href: '/cargos-salarios/enquadramento' },
+  { label: 'Equidade Salarial', href: '/cargos-salarios/equidade' },
   { label: 'Movimentações', href: '/cargos-salarios/movimentacoes' },
   { label: 'Ciclos de Mérito', href: '/cargos-salarios/ciclos' },
   { label: 'Orçamento de Pessoal', href: '/cargos-salarios/orcamento' },

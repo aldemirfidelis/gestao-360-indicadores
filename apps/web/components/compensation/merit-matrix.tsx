@@ -6,6 +6,7 @@ import {
   COMPA_BANDS,
   DEFAULT_MERIT_MATRIX,
   PERFORMANCE_LEVELS,
+  ratingDistribution,
   simulateMerit,
 } from '@/lib/compensation/analytics';
 import { formatMoney } from '@/lib/compensation/format';
@@ -17,8 +18,9 @@ const DEFAULT_DISTRIBUTION = [0.1, 0.55, 0.25, 0.1]; // soma 1
 
 /**
  * Matriz de merito editavel (desempenho x faixa de compa-ratio -> % de aumento) com
- * simulador de impacto sobre a populacao do enquadramento. A distribuicao de desempenho
- * e assumida (selecionavel) pois nao ha rating por colaborador na Fase 1.
+ * simulador de impacto sobre a populacao do enquadramento. Quando os colaboradores
+ * possuem rating de desempenho (perfil), a distribuicao REAL e usada por padrao;
+ * sem ratings, cai na distribuicao assumida editavel.
  */
 export function MeritMatrix({
   rows,
@@ -37,9 +39,12 @@ export function MeritMatrix({
 }) {
   const [matrix, setMatrix] = useState<number[][]>(initialMatrix ?? DEFAULT_MERIT_MATRIX.map((r) => [...r]));
   const [distribution, setDistribution] = useState<number[]>(DEFAULT_DISTRIBUTION);
+  const real = useMemo(() => ratingDistribution(rows), [rows]);
+  const [source, setSource] = useState<'real' | 'assumida'>(real.rated > 0 ? 'real' : 'assumida');
 
-  const distributionSum = distribution.reduce((a, b) => a + b, 0);
-  const result = useMemo(() => simulateMerit(rows, matrix, distribution), [rows, matrix, distribution]);
+  const activeDistribution = source === 'real' && real.rated > 0 ? real.distribution : distribution;
+  const distributionSum = activeDistribution.reduce((a, b) => a + b, 0);
+  const result = useMemo(() => simulateMerit(rows, matrix, activeDistribution), [rows, matrix, activeDistribution]);
 
   function updateCell(perfIdx: number, bandIdx: number, value: number) {
     const next = matrix.map((row) => [...row]);
@@ -93,33 +98,72 @@ export function MeritMatrix({
         </table>
       </div>
 
-      {/* Distribuicao de desempenho assumida */}
+      {/* Distribuicao de desempenho: real (ratings do perfil) ou assumida */}
       <div>
-        <div className="mb-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-          Distribuicao de desempenho assumida
-        </div>
-        <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-          {PERFORMANCE_LEVELS.map((perf, idx) => (
-            <div key={perf.key}>
-              <label className="text-xs text-muted-foreground">{perf.label}</label>
-              <div className="flex items-center gap-1">
-                <Input
-                  type="number"
-                  min={0}
-                  max={100}
-                  value={Math.round((distribution[idx] ?? 0) * 100)}
-                  onChange={(event) => updateDistribution(idx, Number(event.target.value))}
-                  className="h-8"
-                />
-                <span className="text-xs text-muted-foreground">%</span>
-              </div>
+        <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
+          <div className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+            Distribuicao de desempenho
+          </div>
+          {real.rated > 0 && (
+            <div className="flex items-center gap-1 rounded-md border p-0.5 text-xs">
+              <button
+                type="button"
+                onClick={() => setSource('real')}
+                className={cn('rounded px-2 py-1', source === 'real' ? 'bg-sky-500 font-semibold text-white' : 'text-muted-foreground hover:bg-muted')}
+              >
+                Real ({formatNumber(real.coveragePct, { maximumFractionDigits: 0 })}% avaliados)
+              </button>
+              <button
+                type="button"
+                onClick={() => setSource('assumida')}
+                className={cn('rounded px-2 py-1', source === 'assumida' ? 'bg-sky-500 font-semibold text-white' : 'text-muted-foreground hover:bg-muted')}
+              >
+                Assumida
+              </button>
             </div>
-          ))}
+          )}
         </div>
-        {Math.abs(distributionSum - 1) > 0.001 && (
-          <p className="mt-2 text-xs text-status-yellow">
-            A distribuicao soma {formatNumber(distributionSum * 100, { maximumFractionDigits: 0 })}% (o ideal e 100%).
-          </p>
+        {source === 'real' && real.rated > 0 ? (
+          <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+            {PERFORMANCE_LEVELS.map((perf, idx) => (
+              <div key={perf.key} className="rounded-md border bg-muted/20 p-2">
+                <div className="text-xs text-muted-foreground">{perf.label}</div>
+                <div className="mt-1 text-lg font-semibold tabular-nums">
+                  {formatNumber((real.distribution[idx] ?? 0) * 100, { maximumFractionDigits: 0 })}%
+                </div>
+              </div>
+            ))}
+            <p className="col-span-2 text-xs text-muted-foreground sm:col-span-4">
+              Calculada a partir dos ratings de desempenho informados no perfil de {real.rated} colaborador(es)
+              — Enquadramento &gt; Perfil &amp; desempenho.
+            </p>
+          </div>
+        ) : (
+          <>
+            <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+              {PERFORMANCE_LEVELS.map((perf, idx) => (
+                <div key={perf.key}>
+                  <label className="text-xs text-muted-foreground">{perf.label}</label>
+                  <div className="flex items-center gap-1">
+                    <Input
+                      type="number"
+                      min={0}
+                      max={100}
+                      value={Math.round((distribution[idx] ?? 0) * 100)}
+                      onChange={(event) => updateDistribution(idx, Number(event.target.value))}
+                      className="h-8"
+                    />
+                    <span className="text-xs text-muted-foreground">%</span>
+                  </div>
+                </div>
+              ))}
+            </div>
+            {Math.abs(distributionSum - 1) > 0.001 && (
+              <p className="mt-2 text-xs text-status-yellow">
+                A distribuicao soma {formatNumber(distributionSum * 100, { maximumFractionDigits: 0 })}% (o ideal e 100%).
+              </p>
+            )}
+          </>
         )}
       </div>
 

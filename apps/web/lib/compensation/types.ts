@@ -79,7 +79,70 @@ export interface FitRow {
   costCenter: string | null;
   budgetStatus: string | null;
   salaryMasked: boolean;
+  // Perfil do colaborador (CompensationEmployeeProfile); null enquanto nao informado.
+  gender: string | null;
+  raceEthnicity: string | null;
+  admissionDate: string | null;
+  tenureMonths: number | null;
+  performanceRating: number | null;
+  performanceCycleRef: string | null;
 }
+
+// ---------------------------------------------------------------------------
+// Equidade salarial (GET /cargos-salarios/equidade)
+// ---------------------------------------------------------------------------
+
+export interface EquityGroup {
+  label: string;
+  count: number;
+  women: number;
+  men: number;
+  others: number;
+  suppressed: boolean;
+  medianWomen: number | null;
+  medianMen: number | null;
+  meanWomen: number | null;
+  meanMen: number | null;
+  gapMedianPct: number | null; // razão mulher/homem - 1, em % (negativo = mulheres ganham menos)
+  gapMeanPct: number | null;
+  avgTenureWomenMonths: number | null;
+  avgTenureMenMonths: number | null;
+}
+
+export interface EquityReport {
+  generatedAt: string;
+  masked: boolean;
+  privacyNote: string;
+  coverage: {
+    employees: number;
+    withGender: number;
+    withSalary: number;
+    withRating: number;
+    genderPct: number;
+    ratingPct: number;
+  };
+  global: EquityGroup;
+  byGrade: EquityGroup[];
+  byFamily: EquityGroup[];
+  byArea: EquityGroup[];
+  leadership: EquityGroup & { womenSharePct: number | null; womenShareOverallPct: number | null };
+  performanceDistribution: { counts: number[]; total: number };
+}
+
+export const GENDER_LABELS: Record<string, string> = {
+  FEMININO: 'Feminino',
+  MASCULINO: 'Masculino',
+  NAO_BINARIO: 'Não binário',
+  NAO_INFORMADO: 'Não informado',
+};
+
+// Espelha PERFORMANCE_LEVELS (analytics.ts): rating 1..4.
+export const RATING_LABELS: Record<number, string> = {
+  1: 'Abaixo do esperado',
+  2: 'Atende',
+  3: 'Supera',
+  4: 'Excepcional',
+};
 
 export interface SalarySurvey {
   id: string;

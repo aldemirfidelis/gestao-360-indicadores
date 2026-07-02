@@ -222,6 +222,125 @@ describe('CompensationService', () => {
     expect(tx.compensationMovementRequest.update).not.toHaveBeenCalled();
   });
 
+  // ---- equidade salarial e perfis (Lei 14.611) ----
+
+  function equityFixture(profiles: any[], employees: any[], snapshots: any[]) {
+    const prisma: any = {
+      orgEmployee: { findMany: vi.fn().mockResolvedValue(employees) },
+      compensationJobCatalog: { findMany: vi.fn().mockResolvedValue([]) },
+      compensationEmployeeProfile: { findMany: vi.fn().mockResolvedValue(profiles) },
+      auditLog: { create: vi.fn().mockResolvedValue({ id: 'a' }) },
+    };
+    const service = new CompensationService(prisma, notificationsStub, documentsStub);
+    (service as any).ensureBaseline = vi.fn();
+    (service as any).hasAnyPermission = vi.fn().mockResolvedValue(true);
+    (service as any).latestSalarySnapshots = vi.fn().mockResolvedValue(snapshots);
+    return { service, prisma };
+  }
+
+  const employee = (id: string, band = 'B') => ({ id, jobId: `job-${id}`, band, orgNode: { name: 'Fábrica' }, job: { id: `job-${id}`, name: 'Operador' } });
+  const snapshot = (employeeId: string, salary: number, grade = 'G1') => ({
+    employeeId,
+    currentSalary: new Prisma.Decimal(salary),
+    effectiveFrom: new Date('2026-01-01'),
+    salaryRange: { grade, band: 'B', minSalary: new Prisma.Decimal(1000), midpointSalary: new Prisma.Decimal(salary), maxSalary: new Prisma.Decimal(99000) },
+  });
+  const profile = (employeeId: string, gender: string) => ({ employeeId, gender, raceEthnicity: null, admissionDate: null, performanceRating: null, performanceCycleRef: null });
+
+  it('payEquity: calcula gap de mediana mulher/homem por grade', async () => {
+    const ids = ['f1', 'f2', 'f3', 'm1', 'm2', 'm3'];
+    const { service } = equityFixture(
+      [profile('f1', 'FEMININO'), profile('f2', 'FEMININO'), profile('f3', 'FEMININO'), profile('m1', 'MASCULINO'), profile('m2', 'MASCULINO'), profile('m3', 'MASCULINO')],
+      ids.map((id) => employee(id)),
+      [snapshot('f1', 4800), snapshot('f2', 5000), snapshot('f3', 5200), snapshot('m1', 5800), snapshot('m2', 6000), snapshot('m3', 6200)],
+    );
+    const report = await service.payEquity(me, {});
+    expect(report.masked).toBe(false);
+    expect(report.global.suppressed).toBe(false);
+    expect(report.global.medianWomen).toBe(5000);
+    expect(report.global.medianMen).toBe(6000);
+    expect(report.global.gapMedianPct).toBeCloseTo(-16.67, 1);
+    expect(report.byGrade[0].label).toBe('G1');
+  });
+
+  it('payEquity: suprime grupos com menos de 3 pessoas de um dos generos (LGPD)', async () => {
+    const { service } = equityFixture(
+      [profile('f1', 'FEMININO'), profile('m1', 'MASCULINO'), profile('m2', 'MASCULINO'), profile('m3', 'MASCULINO')],
+      ['f1', 'm1', 'm2', 'm3'].map((id) => employee(id)),
+      [snapshot('f1', 4000), snapshot('m1', 5800), snapshot('m2', 6000), snapshot('m3', 6200)],
+    );
+    const report = await service.payEquity(me, {});
+    expect(report.global.suppressed).toBe(true);
+    expect(report.global.medianWomen).toBeNull();
+    expect(report.global.gapMedianPct).toBeNull();
+    expect(report.global.women).toBe(1); // contagens seguem visiveis
+  });
+
+  it('payEquity: sem permissao de salario em massa -> mascarado, apenas contagens', async () => {
+    const ids = ['f1', 'f2', 'f3', 'm1', 'm2', 'm3'];
+    const { service, prisma } = equityFixture(
+      ids.map((id, i) => profile(id, i < 3 ? 'FEMININO' : 'MASCULINO')),
+      ids.map((id) => employee(id)),
+      ids.map((id) => snapshot(id, 5000)),
+    );
+    (service as any).hasAnyPermission = vi.fn().mockResolvedValue(false);
+    const report = await service.payEquity(me, {});
+    expect(report.masked).toBe(true);
+    expect(report.global.medianWomen).toBeNull();
+    expect(report.global.women).toBe(3);
+    expect(prisma.auditLog.create).not.toHaveBeenCalled(); // sem SENSITIVE_VIEW quando mascarado
+  });
+
+  it('saveEmployeeProfile: normaliza genero e valida rating 1..4', async () => {
+    const prisma: any = {
+      orgEmployee: { findFirst: vi.fn().mockResolvedValue({ id: 'emp-1', name: 'Ana' }) },
+      compensationEmployeeProfile: {
+        findUnique: vi.fn().mockResolvedValue(null),
+        upsert: vi.fn().mockImplementation(({ create }: any) => ({ id: 'prof-1', ...create })),
+      },
+      auditLog: { create: vi.fn().mockResolvedValue({ id: 'a' }) },
+    };
+    const service = new CompensationService(prisma, notificationsStub, documentsStub);
+    const saved = await service.saveEmployeeProfile(me, 'emp-1', { gender: 'f', performanceRating: 3 });
+    expect(prisma.compensationEmployeeProfile.upsert.mock.calls[0][0].create.gender).toBe('FEMININO');
+    expect(saved.performanceRating).toBe(3);
+
+    await expect(service.saveEmployeeProfile(me, 'emp-1', { performanceRating: 9 })).rejects.toThrow('Rating de desempenho');
+    await expect(service.saveEmployeeProfile(me, 'emp-1', { gender: 'xyz' })).rejects.toThrow('Gênero inválido');
+  });
+
+  it('saveEmployeeProfile: colaborador de outra empresa -> NotFound', async () => {
+    const prisma: any = { orgEmployee: { findFirst: vi.fn().mockResolvedValue(null) } };
+    const service = new CompensationService(prisma, notificationsStub, documentsStub);
+    await expect(service.saveEmployeeProfile(me, 'emp-other', {})).rejects.toBeInstanceOf(NotFoundException);
+    expect(prisma.orgEmployee.findFirst).toHaveBeenCalledWith({ where: { id: 'emp-other', companyId: 'company-1' } });
+  });
+
+  it('importEmployeeProfiles: casa por matricula e reporta erros por linha', async () => {
+    const prisma: any = {
+      orgEmployee: {
+        findMany: vi.fn().mockResolvedValue([
+          { id: 'emp-1', registrationId: '00123', name: 'Maria' },
+          { id: 'emp-2', registrationId: null, name: 'João Souza' },
+        ]),
+      },
+      compensationEmployeeProfile: { upsert: vi.fn().mockResolvedValue({ id: 'p' }) },
+      auditLog: { create: vi.fn().mockResolvedValue({ id: 'a' }) },
+    };
+    const service = new CompensationService(prisma, notificationsStub, documentsStub);
+    const result = await service.importEmployeeProfiles(me, {
+      rows: [
+        { registrationId: '00123', gender: 'FEMININO', performanceRating: '3' },
+        { employeeName: 'João Souza', gender: 'M' },
+        { registrationId: '99999', gender: 'F' },
+      ],
+    });
+    expect(result.updated).toBe(2);
+    expect(result.errors).toHaveLength(1);
+    expect(result.errors[0].row).toBe(3);
+    expect(prisma.compensationEmployeeProfile.upsert).toHaveBeenCalledTimes(2);
+  });
+
   it('checks movement permissions only on the current company user', async () => {
     const prisma: any = {
       user: { findFirst: vi.fn().mockResolvedValue(null) },

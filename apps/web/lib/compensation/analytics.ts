@@ -272,6 +272,28 @@ export const DEFAULT_MERIT_MATRIX: number[][] = [
   [9, 8, 6, 4, 2], // Excepcional
 ];
 
+/**
+ * Distribuicao REAL de desempenho a partir dos ratings dos colaboradores
+ * (rows do enquadramento). Retorna percentuais por nivel (soma 1) e a
+ * cobertura (fracao do quadro com rating informado).
+ */
+export function ratingDistribution(rows: FitRow[]): { distribution: number[]; rated: number; coveragePct: number } {
+  const counts = PERFORMANCE_LEVELS.map(() => 0);
+  let rated = 0;
+  for (const row of rows) {
+    const rating = row.performanceRating;
+    if (rating != null && rating >= 1 && rating <= PERFORMANCE_LEVELS.length) {
+      counts[rating - 1] += 1;
+      rated += 1;
+    }
+  }
+  return {
+    distribution: rated ? counts.map((count) => count / rated) : PERFORMANCE_LEVELS.map(() => 0),
+    rated,
+    coveragePct: rows.length ? (rated / rows.length) * 100 : 0,
+  };
+}
+
 export interface MeritSimulationResult {
   perBand: Array<{ band: string; headcount: number; avgIncreasePct: number; payroll: number | null; cost: number | null }>;
   totalHeadcount: number;
