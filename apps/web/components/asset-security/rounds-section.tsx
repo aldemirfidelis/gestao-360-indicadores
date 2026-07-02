@@ -3,7 +3,7 @@
 import { useMemo, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
-import { CheckCircle2, Circle, MapPin, Play, Plus, Route } from 'lucide-react';
+import { CheckCircle2, Circle, Map, MapPin, Play, Plus, Route } from 'lucide-react';
 import { SectionCard } from '@/components/platform/section-card';
 import { EmptyState } from '@/components/platform/empty-state';
 import { StatusBadge } from '@/components/platform/status-badge';
@@ -18,6 +18,7 @@ import { cn } from '@/lib/utils';
 import { ROUND_STATUS_LABELS, labelFor, statusTone } from '@/lib/asset-security/labels';
 import { formatDateTime } from '@/lib/asset-security/format';
 import type { AnyRecord } from '@/lib/asset-security/types';
+import { RouteMapDialog } from '@/components/asset-security/route-map-dialog';
 
 type Opt = Array<{ value: string; label: string }>;
 
@@ -32,6 +33,7 @@ export function RoundsSection({ gates, users, canRounds }: { gates: Opt; users: 
   const routes = useQuery<AnyRecord[]>({ queryKey: ['asset-security', 'round-routes'], queryFn: () => api('/asset-security/round-routes') });
   const executions = useQuery<AnyRecord[]>({ queryKey: ['asset-security', 'round-executions'], queryFn: () => api('/asset-security/round-executions?take=200') });
   const [routeDialog, setRouteDialog] = useState<AnyRecord | 'new' | null>(null);
+  const [mapRouteId, setMapRouteId] = useState<string | null>(null);
   const [executionId, setExecutionId] = useState<string | null>(null);
 
   const invalidate = () => { void qc.invalidateQueries({ queryKey: ['asset-security', 'round-routes'] }); void qc.invalidateQueries({ queryKey: ['asset-security', 'round-executions'] }); void qc.invalidateQueries({ queryKey: ['asset-security', 'summary'] }); };
@@ -46,6 +48,7 @@ export function RoundsSection({ gates, users, canRounds }: { gates: Opt; users: 
   const execList = executions.data ?? [];
   const openExecution = execList.find((e) => e.id === executionId) ?? null;
   const openExecutionRoute = openExecution ? routeList.find((r) => r.id === openExecution.routeId) ?? null : null;
+  const mapRoute = mapRouteId ? routeList.find((r) => r.id === mapRouteId) ?? null : null;
 
   return (
     <div className="grid gap-4 xl:grid-cols-[1fr_0.9fr]">
@@ -72,12 +75,18 @@ export function RoundsSection({ gates, users, canRounds }: { gates: Opt; users: 
                     {(route.checkpoints ?? []).length} ponto(s){route.frequencyMinutes ? ` · a cada ${route.frequencyMinutes} min` : ''}
                   </div>
                 </div>
-                {canRounds && (
-                  <div className="flex shrink-0 gap-2">
-                    <Button size="sm" variant="ghost" onClick={() => setRouteDialog(route)}>Pontos</Button>
-                    <Button size="sm" variant="outline" disabled={start.isPending} onClick={() => start.mutate(route.id)}><Play className="mr-1 h-3.5 w-3.5" />Iniciar</Button>
-                  </div>
-                )}
+                <div className="flex shrink-0 gap-2">
+                  <Button size="sm" variant="ghost" onClick={() => setMapRouteId(route.id)}>
+                    <Map className="mr-1 h-3.5 w-3.5" />Mapa
+                    {route.mapImage ? null : <span className="ml-1 text-[9px] text-muted-foreground">(configurar)</span>}
+                  </Button>
+                  {canRounds && (
+                    <>
+                      <Button size="sm" variant="ghost" onClick={() => setRouteDialog(route)}>Pontos</Button>
+                      <Button size="sm" variant="outline" disabled={start.isPending} onClick={() => start.mutate(route.id)}><Play className="mr-1 h-3.5 w-3.5" />Iniciar</Button>
+                    </>
+                  )}
+                </div>
               </div>
             ))}
           </div>
@@ -109,6 +118,9 @@ export function RoundsSection({ gates, users, canRounds }: { gates: Opt; users: 
         )}
       </SectionCard>
 
+      {mapRoute && (
+        <RouteMapDialog route={mapRoute} canManage={canRounds} onClose={() => setMapRouteId(null)} />
+      )}
       {routeDialog && (
         <RouteBuilderDialog
           route={routeDialog === 'new' ? null : routeDialog}

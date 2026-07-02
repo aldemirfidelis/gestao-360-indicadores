@@ -11257,6 +11257,9 @@ model SecurityRoundRoute {
   responsibleUserId   String?
   checklistTemplateId String?
   instructions        String?
+  // Planta/mapa da rota (data URL de imagem redimensionada no cliente) para
+  // plotar os pontos de ronda visualmente.
+  mapImage            String?
   status              SecurityRecordStatus @default(ACTIVE)
   createdById         String?
   updatedById         String?
@@ -11283,6 +11286,9 @@ model SecurityRoundCheckpoint {
   qrCodeToken      String?
   requiredEvidence Boolean              @default(false)
   instructions     String?
+  // Posição percentual (0-100) do ponto sobre o mapa da rota.
+  mapX             Float?
+  mapY             Float?
   status           SecurityRecordStatus @default(ACTIVE)
   createdAt        DateTime             @default(now())
   updatedAt        DateTime             @updatedAt

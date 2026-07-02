@@ -359,6 +359,12 @@ export class AssetSecurityController {
     return this.service.createRoundCheckpoint(me, id, body);
   }
 
+  @Patch('round-checkpoints/:checkpointId')
+  @RequirePermissions('asset-security:rounds')
+  updateRoundCheckpoint(@CurrentUser() me: AuthPayload, @Param('checkpointId') checkpointId: string, @Body() body: Record<string, unknown>) {
+    return this.service.updateRoundCheckpoint(me, checkpointId, body);
+  }
+
   @Get('round-executions')
   @RequirePermissions('asset-security:view')
   roundExecutions(@CurrentUser() me: AuthPayload, @Query() query: Record<string, string | undefined>) {

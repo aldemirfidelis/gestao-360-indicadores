@@ -984,6 +984,27 @@ export class AssetSecurityService {
     return saved;
   }
 
+  /** Edita um ponto de ronda (usado principalmente para posicionar no mapa). */
+  async updateRoundCheckpoint(me: AuthPayload, id: string, body: JsonMap) {
+    await this.assertPackageWrite(me);
+    const before = await this.loadTenant('securityRoundCheckpoint', me.companyId, id, 'Ponto de ronda nao encontrado');
+    const saved = await this.db.securityRoundCheckpoint.update({
+      where: { id },
+      data: this.clean({
+        name: 'name' in body ? this.requiredText(body.name, 'Nome do ponto') : undefined,
+        location: 'location' in body ? this.nullableText(body.location) : undefined,
+        position: 'position' in body ? (this.int(body.position) ?? before.position) : undefined,
+        requiredEvidence: 'requiredEvidence' in body ? Boolean(body.requiredEvidence) : undefined,
+        instructions: 'instructions' in body ? this.nullableText(body.instructions) : undefined,
+        mapX: 'mapX' in body ? this.mapCoord(body.mapX) : undefined,
+        mapY: 'mapY' in body ? this.mapCoord(body.mapY) : undefined,
+        status: 'status' in body ? this.enumValue(body.status, RECORD_STATUSES, before.status) : undefined,
+      }),
+    });
+    await this.audit(me, 'UPDATE', 'SecurityRoundCheckpoint', saved.id, saved.name, before, saved);
+    return saved;
+  }
+
   async listRoundExecutions(me: AuthPayload, q: Query = {}) {
     return this.db.securityRoundExecution.findMany({
       where: { companyId: me.companyId, deletedAt: null, ...(q.status ? { status: q.status } : {}), ...(q.routeId ? { routeId: q.routeId } : {}), ...(q.postId ? { postId: q.postId } : {}) },
@@ -1862,6 +1883,7 @@ ${JSON.stringify(context, null, 2)}`;
       responsibleUserId: this.id(body.responsibleUserId),
       checklistTemplateId: this.id(body.checklistTemplateId),
       instructions: this.nullableText(body.instructions),
+      mapImage: this.mapImage(body.mapImage),
       status: this.enumValue(body.status, RECORD_STATUSES, 'ACTIVE'),
       createdById: me.sub,
       updatedById: me.sub,
@@ -1880,9 +1902,27 @@ ${JSON.stringify(context, null, 2)}`;
       responsibleUserId: 'responsibleUserId' in body ? this.id(body.responsibleUserId) : undefined,
       checklistTemplateId: 'checklistTemplateId' in body ? this.id(body.checklistTemplateId) : undefined,
       instructions: 'instructions' in body ? this.nullableText(body.instructions) : undefined,
+      mapImage: 'mapImage' in body ? this.mapImage(body.mapImage) : undefined,
       status: 'status' in body ? this.enumValue(body.status, RECORD_STATUSES, 'ACTIVE') : undefined,
       updatedById: me.sub,
     });
+  }
+
+  /** Planta da rota: data URL de imagem, limitada a ~2MB (redimensionada no cliente). */
+  private mapImage(value: unknown): string | null {
+    const raw = this.nullableText(value);
+    if (!raw) return null;
+    if (!raw.startsWith('data:image/')) throw new BadRequestException('Mapa invalido: envie uma imagem.');
+    if (raw.length > 2_000_000) throw new BadRequestException('Mapa muito grande: reduza a imagem (limite ~2MB).');
+    return raw;
+  }
+
+  /** Coordenada percentual 0-100 sobre o mapa (null limpa a posicao). */
+  private mapCoord(value: unknown): number | null {
+    if (value === null || value === undefined || value === '') return null;
+    const n = Number(value);
+    if (!Number.isFinite(n)) throw new BadRequestException('Posicao no mapa invalida.');
+    return Math.min(100, Math.max(0, n));
   }
 
   private roundCheckpointData(me: AuthPayload, routeId: string, body: JsonMap, fallbackPosition?: number) {
@@ -1897,6 +1937,8 @@ ${JSON.stringify(context, null, 2)}`;
       qrCodeToken: this.nullableText(body.qrCodeToken) ?? this.token('chk'),
       requiredEvidence: Boolean(body.requiredEvidence),
       instructions: this.nullableText(body.instructions),
+      mapX: this.mapCoord(body.mapX),
+      mapY: this.mapCoord(body.mapY),
       status: this.enumValue(body.status, RECORD_STATUSES, 'ACTIVE'),
     };
   }
