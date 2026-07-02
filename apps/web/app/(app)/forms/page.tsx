@@ -9,6 +9,8 @@ import {
   Archive,
   Bot,
   CheckCircle2,
+  ChevronDown,
+  ChevronUp,
   ClipboardCheck,
   Copy,
   Edit,
@@ -762,6 +764,24 @@ export default function FormsPage() {
     setForm((current) => ({ ...current, fields: current.fields.filter((_, i) => i !== index).map((field, i) => ({ ...field, order: String(i + 1) })) }));
   }
 
+  function moveField(index: number, direction: -1 | 1) {
+    setForm((current) => {
+      const target = index + direction;
+      if (target < 0 || target >= current.fields.length) return current;
+      const fields = [...current.fields];
+      [fields[index], fields[target]] = [fields[target], fields[index]];
+      return { ...current, fields: fields.map((field, i) => ({ ...field, order: String(i + 1) })) };
+    });
+  }
+
+  function duplicateField(index: number) {
+    setForm((current) => {
+      const fields = [...current.fields];
+      fields.splice(index + 1, 0, { ...current.fields[index], code: '' });
+      return { ...current, fields: fields.map((field, i) => ({ ...field, order: String(i + 1) })) };
+    });
+  }
+
   const selectedSubmissions = submissionsQuery.data ?? [];
   const selectedBuilder = builderQuery.data;
 
@@ -968,6 +988,8 @@ export default function FormsPage() {
         updateField={updateField}
         addField={addField}
         removeField={removeField}
+        moveField={moveField}
+        duplicateField={duplicateField}
         save={() => saveTemplate.mutate()}
         saving={saveTemplate.isPending}
       />
@@ -1190,7 +1212,7 @@ function SubmissionRecord({ submission, onEvidence, onSign, onApprove, onIssue }
   );
 }
 
-function TemplateDialog({ open, setOpen, editing, form, setForm, options, updateField, addField, removeField, save, saving }: {
+function TemplateDialog({ open, setOpen, editing, form, setForm, options, updateField, addField, removeField, moveField, duplicateField, save, saving }: {
   open: boolean;
   setOpen: (open: boolean) => void;
   editing: FormTemplate | null;
@@ -1200,46 +1222,102 @@ function TemplateDialog({ open, setOpen, editing, form, setForm, options, update
   updateField: (index: number, patch: Partial<FieldForm>) => void;
   addField: () => void;
   removeField: (index: number) => void;
+  moveField: (index: number, direction: -1 | 1) => void;
+  duplicateField: (index: number) => void;
   save: () => void;
   saving: boolean;
 }) {
+  const [showAdvanced, setShowAdvanced] = useState(false);
+  const optionTypes = new Set(['SELECT', 'MULTISELECT', 'RADIO', 'CHECKBOX']);
   return (
     <Dialog open={open} onOpenChange={setOpen}>
-      <DialogContent className="max-h-[92vh] max-w-6xl overflow-y-auto">
-        <DialogHeader><DialogTitle>{editing ? 'Editar formulário' : 'Novo formulário'}</DialogTitle></DialogHeader>
-        <div className="grid gap-4 py-2">
-          <div className="grid gap-3 md:grid-cols-[1fr_160px_160px_170px]">
-            <Field label="Título"><Input value={form.title} onChange={(e) => setForm({ ...form, title: e.target.value })} /></Field>
-            <Field label="Código"><Input value={form.code} onChange={(e) => setForm({ ...form, code: e.target.value })} /></Field>
-            <Field label="Versão"><Input value={form.version} onChange={(e) => setForm({ ...form, version: e.target.value })} /></Field>
-            <Field label="Confidencialidade"><Input value={form.confidentiality} onChange={(e) => setForm({ ...form, confidentiality: e.target.value })} /></Field>
+      <DialogContent className="max-h-[92vh] max-w-5xl overflow-y-auto bg-slate-50 p-0 dark:bg-slate-950">
+        <DialogHeader className="sticky top-0 z-10 border-b bg-white px-6 py-4 dark:bg-slate-900">
+          <DialogTitle>{editing ? 'Editar formulário' : 'Novo formulário'}</DialogTitle>
+        </DialogHeader>
+        <div className="space-y-4 px-6 pb-2 pt-4">
+          {/* Cabeçalho do formulário: título grande + descrição (estilo builder) */}
+          <div className="rounded-xl border border-t-8 border-t-primary bg-white p-5 shadow-sm dark:bg-slate-900">
+            <Input
+              value={form.title}
+              onChange={(e) => setForm({ ...form, title: e.target.value })}
+              placeholder="Título do formulário"
+              className="h-auto rounded-none border-0 border-b px-0 pb-2 text-2xl font-semibold shadow-none focus-visible:border-primary focus-visible:ring-0"
+            />
+            <Textarea
+              value={form.description}
+              onChange={(e) => setForm({ ...form, description: e.target.value })}
+              placeholder="Descrição — explique quando e como este formulário deve ser preenchido"
+              rows={2}
+              className="mt-2 resize-none rounded-none border-0 px-0 text-sm shadow-none focus-visible:ring-0"
+            />
+            <div className="mt-3 grid gap-3 md:grid-cols-3">
+              <Field label="Tipo"><NativeSelect value={form.type} onChange={(e) => setForm({ ...form, type: e.target.value })}>{(options?.types ?? Object.keys(TYPE_LABEL)).map((value) => <option key={value} value={value}>{label(TYPE_LABEL, value)}</option>)}</NativeSelect></Field>
+              <Field label="Área responsável"><NativeSelect value={form.orgNodeId} onChange={(e) => setForm({ ...form, orgNodeId: e.target.value })}><option value="">Geral (toda a empresa)</option>{options?.orgNodes.map((node) => <option key={node.id} value={node.id}>{node.name}</option>)}</NativeSelect></Field>
+              <Field label="Status"><NativeSelect value={form.status} onChange={(e) => setForm({ ...form, status: e.target.value })}>{(options?.statuses ?? Object.keys(STATUS_LABEL)).map((value) => <option key={value} value={value}>{label(STATUS_LABEL, value)}</option>)}</NativeSelect></Field>
+            </div>
           </div>
-          <div className="grid gap-3 md:grid-cols-4">
-            <Field label="Tipo"><NativeSelect value={form.type} onChange={(e) => setForm({ ...form, type: e.target.value })}>{(options?.types ?? Object.keys(TYPE_LABEL)).map((value) => <option key={value} value={value}>{label(TYPE_LABEL, value)}</option>)}</NativeSelect></Field>
-            <Field label="Status"><NativeSelect value={form.status} onChange={(e) => setForm({ ...form, status: e.target.value })}>{(options?.statuses ?? Object.keys(STATUS_LABEL)).map((value) => <option key={value} value={value}>{label(STATUS_LABEL, value)}</option>)}</NativeSelect></Field>
-            <Field label="Tipo configurado"><NativeSelect value={form.typeConfigId} onChange={(e) => setForm({ ...form, typeConfigId: e.target.value })}><option value="">Automático</option>{options?.typeConfigs.map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}</NativeSelect></Field>
-            <Field label="Categoria"><NativeSelect value={form.categoryId} onChange={(e) => setForm({ ...form, categoryId: e.target.value })}><option value="">Sem categoria</option>{options?.categories.map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}</NativeSelect></Field>
+
+          {/* Perguntas: um cartão por campo, com reordenar/duplicar/excluir */}
+          <div className="space-y-3">
+            {form.fields.map((field, index) => (
+              <div key={`${index}-${field.order}`} className="group rounded-xl border border-l-4 border-l-primary/60 bg-white p-4 shadow-sm transition-shadow hover:shadow-md dark:bg-slate-900">
+                <div className="flex items-start gap-3">
+                  <span className="mt-2 grid h-7 w-7 shrink-0 place-items-center rounded-full bg-primary/10 text-xs font-bold text-primary">{index + 1}</span>
+                  <div className="min-w-0 flex-1 space-y-3">
+                    <div className="grid gap-3 md:grid-cols-[1fr_220px]">
+                      <Input
+                        value={field.label}
+                        onChange={(e) => updateField(index, { label: e.target.value })}
+                        placeholder="Escreva a pergunta ou item de verificação"
+                        className="rounded-none border-0 border-b px-0 text-base font-medium shadow-none focus-visible:border-primary focus-visible:ring-0"
+                      />
+                      <NativeSelect value={field.type} onChange={(e) => updateField(index, { type: e.target.value })}>
+                        {(options?.fieldTypes ?? FIELD_TYPES).map((value) => <option key={value} value={value}>{label(FIELD_LABEL, value)}</option>)}
+                      </NativeSelect>
+                    </div>
+                    {optionTypes.has(field.type) && (
+                      <Field label="Opções (uma por linha ou separadas por vírgula)">
+                        <Textarea value={field.options} onChange={(e) => updateField(index, { options: e.target.value })} rows={3} placeholder="Conforme
+Não conforme
+Não se aplica" />
+                      </Field>
+                    )}
+                    <Input
+                      value={field.helpText}
+                      onChange={(e) => updateField(index, { helpText: e.target.value })}
+                      placeholder="Texto de ajuda para quem preenche (opcional)"
+                      className="text-xs"
+                    />
+                    <div className="flex flex-wrap items-center gap-x-5 gap-y-2 border-t pt-3 text-sm">
+                      <label className="flex items-center gap-1.5"><input type="checkbox" checked={field.required} onChange={(e) => updateField(index, { required: e.target.checked })} /> Obrigatório</label>
+                      <label className="flex items-center gap-1.5"><input type="checkbox" checked={field.evidenceRequired} onChange={(e) => updateField(index, { evidenceRequired: e.target.checked })} /> Exige evidência</label>
+                      <label className="flex items-center gap-1.5"><input type="checkbox" checked={field.commentRequired} onChange={(e) => updateField(index, { commentRequired: e.target.checked })} /> Exige comentário</label>
+                      <label className="flex items-center gap-1.5">
+                        Criticidade
+                        <NativeSelect value={field.criticality} onChange={(e) => updateField(index, { criticality: e.target.value })} className="h-8 w-28 text-xs">
+                          <option value="">Normal</option>
+                          <option value="CRITICAL">Crítico</option>
+                        </NativeSelect>
+                      </label>
+                      <div className="ml-auto flex items-center gap-0.5">
+                        <Button type="button" variant="ghost" size="icon" className="h-8 w-8" title="Mover para cima" onClick={() => moveField(index, -1)} disabled={index === 0}><ChevronUp className="h-4 w-4" /></Button>
+                        <Button type="button" variant="ghost" size="icon" className="h-8 w-8" title="Mover para baixo" onClick={() => moveField(index, 1)} disabled={index === form.fields.length - 1}><ChevronDown className="h-4 w-4" /></Button>
+                        <Button type="button" variant="ghost" size="icon" className="h-8 w-8" title="Duplicar pergunta" onClick={() => duplicateField(index)}><Copy className="h-4 w-4" /></Button>
+                        <Button type="button" variant="ghost" size="icon" className="h-8 w-8 text-status-red" title="Excluir pergunta" onClick={() => removeField(index)} disabled={form.fields.length === 1}><Trash2 className="h-4 w-4" /></Button>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            ))}
+            <Button type="button" variant="outline" className="w-full border-dashed" onClick={addField}>
+              <Plus className="mr-2 h-4 w-4" /> Adicionar pergunta
+            </Button>
           </div>
-          <div className="grid gap-3 md:grid-cols-4">
-            <Field label="Pasta"><NativeSelect value={form.folderId} onChange={(e) => setForm({ ...form, folderId: e.target.value })}><option value="">Sem pasta</option>{options?.folders.map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}</NativeSelect></Field>
-            <Field label="Área"><NativeSelect value={form.orgNodeId} onChange={(e) => setForm({ ...form, orgNodeId: e.target.value })}><option value="">Geral</option>{options?.orgNodes.map((node) => <option key={node.id} value={node.id}>{node.name}</option>)}</NativeSelect></Field>
-            <Field label="Dono"><NativeSelect value={form.ownerUserId} onChange={(e) => setForm({ ...form, ownerUserId: e.target.value })}><option value="">Sem dono</option>{options?.users.map((user) => <option key={user.id} value={user.id}>{user.name}</option>)}</NativeSelect></Field>
-            <Field label="Tempo min."><Input type="number" min={0} value={form.estimatedMinutes} onChange={(e) => setForm({ ...form, estimatedMinutes: e.target.value })} /></Field>
-          </div>
-          <div className="grid gap-3 md:grid-cols-2">
-            <Field label="Processo"><NativeSelect value={form.processId} onChange={(e) => setForm({ ...form, processId: e.target.value })}><option value="">Sem processo</option>{options?.processes.map((process) => <option key={process.id} value={process.id}>#{process.number} {process.code ? `${process.code} - ` : ''}{process.name}</option>)}</NativeSelect></Field>
-            <Field label="Indicador"><NativeSelect value={form.indicatorId} onChange={(e) => setForm({ ...form, indicatorId: e.target.value })}><option value="">Sem indicador</option>{options?.indicators.map((indicator) => <option key={indicator.id} value={indicator.id}>{indicator.code ? `${indicator.code} - ` : ''}{indicator.name}</option>)}</NativeSelect></Field>
-          </div>
-          <Field label="Descrição"><Textarea value={form.description} onChange={(e) => setForm({ ...form, description: e.target.value })} rows={2} /></Field>
-          <div className="grid gap-3 md:grid-cols-2">
-            <Field label="Finalidade"><Textarea value={form.purpose} onChange={(e) => setForm({ ...form, purpose: e.target.value })} rows={2} /></Field>
-            <Field label="Instruções"><Textarea value={form.instructions} onChange={(e) => setForm({ ...form, instructions: e.target.value })} rows={2} /></Field>
-          </div>
-          <div className="grid gap-3 md:grid-cols-2">
-            <Field label="Tags"><Input value={form.tags} onChange={(e) => setForm({ ...form, tags: e.target.value })} placeholder="Crítico, recorrente, externo" /></Field>
-            <Field label="Retencao dias"><Input type="number" min={0} value={form.retentionDays} onChange={(e) => setForm({ ...form, retentionDays: e.target.value })} /></Field>
-          </div>
-          <label className="flex items-start gap-2 rounded-md border p-3 text-sm">
+
+          {/* Gatilho de NC automática */}
+          <label className="flex items-start gap-2 rounded-xl border bg-white p-4 text-sm shadow-sm dark:bg-slate-900">
             <input
               type="checkbox"
               className="mt-0.5"
@@ -1254,31 +1332,39 @@ function TemplateDialog({ open, setOpen, editing, form, setForm, options, update
               </span>
             </span>
           </label>
-          <div className="space-y-3 rounded-md border p-3">
-            <div className="flex items-center justify-between">
-              <SectionTitle icon={<ClipboardCheck className="h-4 w-4" />} title="Campos" />
-              <Button type="button" variant="outline" size="sm" onClick={addField}><Plus className="mr-2 h-4 w-4" /> Campo</Button>
-            </div>
-            {form.fields.map((field, index) => (
-              <div key={`${index}-${field.order}`} className="grid gap-3 rounded-md border p-3 md:grid-cols-[70px_100px_1fr_170px_150px_40px]">
-                <Field label="Ordem"><Input type="number" min={1} value={field.order} onChange={(e) => updateField(index, { order: e.target.value })} /></Field>
-                <Field label="Código"><Input value={field.code} onChange={(e) => updateField(index, { code: e.target.value })} /></Field>
-                <Field label="Rótulo"><Input value={field.label} onChange={(e) => updateField(index, { label: e.target.value })} /></Field>
-                <Field label="Tipo"><NativeSelect value={field.type} onChange={(e) => updateField(index, { type: e.target.value })}>{(options?.fieldTypes ?? FIELD_TYPES).map((value) => <option key={value} value={value}>{label(FIELD_LABEL, value)}</option>)}</NativeSelect></Field>
-                <Field label="Criticidade"><Input value={field.criticality} onChange={(e) => updateField(index, { criticality: e.target.value })} /></Field>
-                <Button type="button" variant="outline" size="sm" className="mt-6 text-status-red" onClick={() => removeField(index)} disabled={form.fields.length === 1}><Trash2 className="h-4 w-4" /></Button>
-                <label className="flex items-center gap-2 text-sm"><input type="checkbox" checked={field.required} onChange={(e) => updateField(index, { required: e.target.checked })} /> Obrigatorio</label>
-                <label className="flex items-center gap-2 text-sm"><input type="checkbox" checked={field.evidenceRequired} onChange={(e) => updateField(index, { evidenceRequired: e.target.checked })} /> Evidência</label>
-                <label className="flex items-center gap-2 text-sm"><input type="checkbox" checked={field.commentRequired} onChange={(e) => updateField(index, { commentRequired: e.target.checked })} /> Comentario</label>
-                <div className="md:col-span-2"><Field label="Opções"><Textarea value={field.options} onChange={(e) => updateField(index, { options: e.target.value })} rows={2} /></Field></div>
-                <div className="md:col-span-3"><Field label="Ajuda"><Input value={field.helpText} onChange={(e) => updateField(index, { helpText: e.target.value })} /></Field></div>
+
+          {/* Configurações avançadas (recolhidas por padrão) */}
+          <div className="rounded-xl border bg-white shadow-sm dark:bg-slate-900">
+            <button type="button" className="flex w-full items-center justify-between px-4 py-3 text-sm font-semibold" onClick={() => setShowAdvanced((v) => !v)}>
+              <span>Configurações avançadas</span>
+              {showAdvanced ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
+            </button>
+            {showAdvanced && (
+              <div className="grid gap-3 border-t p-4 md:grid-cols-3">
+                <Field label="Código"><Input value={form.code} onChange={(e) => setForm({ ...form, code: e.target.value })} placeholder="Automático" /></Field>
+                <Field label="Versão"><Input value={form.version} onChange={(e) => setForm({ ...form, version: e.target.value })} /></Field>
+                <Field label="Confidencialidade"><NativeSelect value={form.confidentiality} onChange={(e) => setForm({ ...form, confidentiality: e.target.value })}><option value="PUBLIC">Pública</option><option value="INTERNAL">Interna</option><option value="RESTRICTED">Restrita</option></NativeSelect></Field>
+                <Field label="Tipo configurado"><NativeSelect value={form.typeConfigId} onChange={(e) => setForm({ ...form, typeConfigId: e.target.value })}><option value="">Automático</option>{options?.typeConfigs.map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}</NativeSelect></Field>
+                <Field label="Categoria"><NativeSelect value={form.categoryId} onChange={(e) => setForm({ ...form, categoryId: e.target.value })}><option value="">Sem categoria</option>{options?.categories.map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}</NativeSelect></Field>
+                <Field label="Pasta"><NativeSelect value={form.folderId} onChange={(e) => setForm({ ...form, folderId: e.target.value })}><option value="">Sem pasta</option>{options?.folders.map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}</NativeSelect></Field>
+                <Field label="Dono"><NativeSelect value={form.ownerUserId} onChange={(e) => setForm({ ...form, ownerUserId: e.target.value })}><option value="">Sem dono</option>{options?.users.map((user) => <option key={user.id} value={user.id}>{user.name}</option>)}</NativeSelect></Field>
+                <Field label="Processo"><NativeSelect value={form.processId} onChange={(e) => setForm({ ...form, processId: e.target.value })}><option value="">Sem processo</option>{options?.processes.map((process) => <option key={process.id} value={process.id}>#{process.number} {process.code ? `${process.code} - ` : ''}{process.name}</option>)}</NativeSelect></Field>
+                <Field label="Indicador"><NativeSelect value={form.indicatorId} onChange={(e) => setForm({ ...form, indicatorId: e.target.value })}><option value="">Sem indicador</option>{options?.indicators.map((indicator) => <option key={indicator.id} value={indicator.id}>{indicator.code ? `${indicator.code} - ` : ''}{indicator.name}</option>)}</NativeSelect></Field>
+                <Field label="Tempo estimado (min)"><Input type="number" min={0} value={form.estimatedMinutes} onChange={(e) => setForm({ ...form, estimatedMinutes: e.target.value })} /></Field>
+                <Field label="Retenção (dias)"><Input type="number" min={0} value={form.retentionDays} onChange={(e) => setForm({ ...form, retentionDays: e.target.value })} /></Field>
+                <Field label="Tags"><Input value={form.tags} onChange={(e) => setForm({ ...form, tags: e.target.value })} placeholder="Crítico, recorrente, externo" /></Field>
+                <div className="grid gap-3 md:col-span-3 md:grid-cols-2">
+                  <Field label="Finalidade"><Textarea value={form.purpose} onChange={(e) => setForm({ ...form, purpose: e.target.value })} rows={2} /></Field>
+                  <Field label="Instruções"><Textarea value={form.instructions} onChange={(e) => setForm({ ...form, instructions: e.target.value })} rows={2} /></Field>
+                </div>
               </div>
-            ))}
+            )}
           </div>
         </div>
-        <DialogFooter>
+        <DialogFooter className="sticky bottom-0 border-t bg-white px-6 py-3 dark:bg-slate-900">
+          <span className="mr-auto self-center text-xs text-muted-foreground">{form.fields.length} pergunta(s)</span>
           <Button variant="outline" onClick={() => setOpen(false)}>Cancelar</Button>
-          <Button onClick={save} disabled={!form.title.trim() || saving}><Save className="mr-2 h-4 w-4" /> Salvar</Button>
+          <Button onClick={save} disabled={!form.title.trim() || saving}><Save className="mr-2 h-4 w-4" /> {saving ? 'Salvando...' : 'Salvar formulário'}</Button>
         </DialogFooter>
       </DialogContent>
     </Dialog>
