@@ -104,10 +104,16 @@ export class RisksService {
     const isClosed = CLOSED_STATUSES.has(risk.status);
     const dueDate = risk.dueDate ? new Date(risk.dueDate) : null;
     const isOverdue = Boolean(dueDate && dueDate < new Date() && !isClosed);
+    const hasResidual = risk.residualProbability != null && risk.residualImpact != null;
+    const residualScore = hasResidual ? this.score(risk.residualProbability, risk.residualImpact) : null;
     return {
       ...risk,
       score,
       level: this.level(score),
+      residualScore,
+      residualLevel: residualScore == null ? null : this.level(residualScore),
+      // Redução obtida com a mitigação (% do score inerente eliminado).
+      riskReductionPercent: residualScore != null && score > 0 ? Math.round(((score - residualScore) / score) * 100) : null,
       isOverdue,
       areaId: this.areaOf(risk),
     };
@@ -150,6 +156,15 @@ export class RisksService {
     if (value === undefined || value === null || value === '') return fallback;
     const n = Number(value);
     if (!Number.isFinite(n)) throw new BadRequestException('Probabilidade e impacto devem ser numericos.');
+    return Math.min(5, Math.max(1, Math.round(n)));
+  }
+
+  /** Escala residual 1..5 opcional (null = não avaliado). */
+  private optionalScale(value: unknown): number | null | undefined {
+    if (value === undefined) return undefined;
+    if (value === null || value === '') return null;
+    const n = Number(value);
+    if (!Number.isFinite(n)) throw new BadRequestException('Probabilidade e impacto residuais devem ser numericos.');
     return Math.min(5, Math.max(1, Math.round(n)));
   }
 
@@ -282,16 +297,46 @@ export class RisksService {
         project: risk.project ? { id: risk.project.id, name: risk.project.name } : null,
       }));
 
+    // Matriz de risco 5x5 (heatmap): quantos riscos ABERTOS caem em cada
+    // célula probabilidade x impacto, e a mesma contagem para o residual.
+    const inherentMatrix = this.emptyMatrix();
+    const residualMatrix = this.emptyMatrix();
+    let residualCount = 0;
+    let residualReductionSum = 0;
+    for (const risk of openRisks as any[]) {
+      const p = clampScale(risk.probability);
+      const i = clampScale(risk.impact);
+      if (p && i) inherentMatrix[i - 1][p - 1] += 1;
+      if (risk.residualScore != null) {
+        const rp = clampScale(risk.residualProbability);
+        const ri = clampScale(risk.residualImpact);
+        if (rp && ri) residualMatrix[ri - 1][rp - 1] += 1;
+        residualCount += 1;
+        if (risk.riskReductionPercent != null) residualReductionSum += risk.riskReductionPercent;
+      }
+    }
+
     return {
       totalRisks: risks.length,
       openRisks: openRisks.length,
       criticalRisks: openRisks.filter((risk: any) => risk.level === 'CRITICAL').length,
+      highRisks: openRisks.filter((risk: any) => risk.level === 'HIGH').length,
       overdueMitigations: openRisks.filter((risk: any) => risk.isOverdue).length,
       avgScore,
+      // Cobertura da avaliação residual e redução média obtida com a mitigação.
+      residualAssessedPct: openRisks.length ? Math.round((residualCount / openRisks.length) * 100) : 0,
+      avgRiskReductionPercent: residualCount ? Math.round(residualReductionSum / residualCount) : 0,
+      inherentMatrix,
+      residualMatrix,
       byStatus,
       byCategory,
       topRisks,
     };
+  }
+
+  /** Matriz 5x5 zerada; índice [impacto-1][probabilidade-1]. */
+  private emptyMatrix(): number[][] {
+    return Array.from({ length: 5 }, () => Array.from({ length: 5 }, () => 0));
   }
 
   async getById(me: AuthPayload, id: string) {
@@ -380,6 +425,8 @@ export class RisksService {
         status,
         probability: this.scoreValue(body?.probability, 3),
         impact: this.scoreValue(body?.impact, 3),
+        residualProbability: this.optionalScale(body?.residualProbability) ?? null,
+        residualImpact: this.optionalScale(body?.residualImpact) ?? null,
         mitigationPlan: this.nullableText(body?.mitigationPlan) ?? null,
         contingencyPlan: this.nullableText(body?.contingencyPlan) ?? null,
         dueDate: this.optionalDate(body?.dueDate, 'Data de mitigacao') ?? null,
@@ -433,6 +480,8 @@ export class RisksService {
     }
     if ('probability' in (patch ?? {})) data.probability = this.scoreValue(patch.probability, before.probability);
     if ('impact' in (patch ?? {})) data.impact = this.scoreValue(patch.impact, before.impact);
+    if ('residualProbability' in (patch ?? {})) data.residualProbability = this.optionalScale(patch.residualProbability);
+    if ('residualImpact' in (patch ?? {})) data.residualImpact = this.optionalScale(patch.residualImpact);
     if ('mitigationPlan' in (patch ?? {})) data.mitigationPlan = this.nullableText(patch.mitigationPlan);
     if ('contingencyPlan' in (patch ?? {})) data.contingencyPlan = this.nullableText(patch.contingencyPlan);
     if ('dueDate' in (patch ?? {})) data.dueDate = this.optionalDate(patch.dueDate, 'Data de mitigacao');
@@ -547,4 +596,11 @@ export class RisksService {
 
     return { ids, area: uniqueAreas[0] ?? null };
   }
+}
+
+/** Normaliza um valor de escala para 1..5 (0/null quando fora da faixa). */
+function clampScale(value: unknown): number {
+  const n = Number(value);
+  if (!Number.isInteger(n) || n < 1 || n > 5) return 0;
+  return n;
 }

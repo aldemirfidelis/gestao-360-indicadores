@@ -34,6 +34,11 @@ interface Risk {
   impact: number;
   score: number;
   level: RiskLevel;
+  residualProbability: number | null;
+  residualImpact: number | null;
+  residualScore: number | null;
+  residualLevel: RiskLevel | null;
+  riskReductionPercent: number | null;
   isOverdue: boolean;
   mitigationPlan: string | null;
   contingencyPlan: string | null;
@@ -55,8 +60,13 @@ interface RiskSummary {
   totalRisks: number;
   openRisks: number;
   criticalRisks: number;
+  highRisks: number;
   overdueMitigations: number;
   avgScore: number;
+  residualAssessedPct: number;
+  avgRiskReductionPercent: number;
+  inherentMatrix: number[][];
+  residualMatrix: number[][];
   topRisks: Array<Pick<Risk, 'id' | 'title' | 'status' | 'category' | 'probability' | 'impact' | 'score' | 'level' | 'dueDate' | 'responsibleUser' | 'orgNode' | 'indicator' | 'project'>>;
 }
 
@@ -77,6 +87,8 @@ interface RiskForm {
   status: RiskStatus;
   probability: string;
   impact: string;
+  residualProbability: string;
+  residualImpact: string;
   orgNodeId: string;
   indicatorId: string;
   projectId: string;
@@ -139,6 +151,8 @@ const EMPTY_FORM: RiskForm = {
   status: 'IDENTIFIED',
   probability: '3',
   impact: '3',
+  residualProbability: '',
+  residualImpact: '',
   orgNodeId: '',
   indicatorId: '',
   projectId: '',
@@ -160,6 +174,7 @@ export default function RisksPage() {
   const [editing, setEditing] = useState<Risk | null>(null);
   const [filters, setFilters] = useState({ search: '', status: '', category: '' });
   const [form, setForm] = useState<RiskForm>(EMPTY_FORM);
+  const [cellFilter, setCellFilter] = useState<{ p: number; i: number; residual: boolean } | null>(null);
 
   const risksQuery = useQuery<Risk[]>({
     queryKey: ['risks', filters],
@@ -177,7 +192,15 @@ export default function RisksPage() {
     staleTime: 60_000,
   });
 
-  const risks = useMemo(() => risksQuery.data ?? [], [risksQuery.data]);
+  const allRisks = useMemo(() => risksQuery.data ?? [], [risksQuery.data]);
+  const risks = useMemo(() => {
+    if (!cellFilter) return allRisks;
+    return allRisks.filter((risk) =>
+      cellFilter.residual
+        ? risk.residualProbability === cellFilter.p && risk.residualImpact === cellFilter.i
+        : risk.probability === cellFilter.p && risk.impact === cellFilter.i,
+    );
+  }, [allRisks, cellFilter]);
   const summary = summaryQuery.data;
   const options = optionsQuery.data;
 
@@ -190,6 +213,8 @@ export default function RisksPage() {
         status: form.status,
         probability: Number(form.probability),
         impact: Number(form.impact),
+        residualProbability: form.residualProbability ? Number(form.residualProbability) : null,
+        residualImpact: form.residualImpact ? Number(form.residualImpact) : null,
         orgNodeId: form.orgNodeId || null,
         indicatorId: form.indicatorId || null,
         projectId: form.projectId || null,
@@ -235,6 +260,8 @@ export default function RisksPage() {
       status: risk.status,
       probability: String(risk.probability),
       impact: String(risk.impact),
+      residualProbability: risk.residualProbability != null ? String(risk.residualProbability) : '',
+      residualImpact: risk.residualImpact != null ? String(risk.residualImpact) : '',
       orgNodeId: risk.orgNodeId ?? '',
       indicatorId: risk.indicatorId ?? '',
       projectId: risk.projectId ?? '',
@@ -282,6 +309,33 @@ export default function RisksPage() {
         <MetricCard title="Mitigacoes vencidas" value={formatNumber(summary?.overdueMitigations)} description="Riscos abertos com prazo expirado" icon={<CalendarClock className="h-4 w-4" />} tone={(summary?.overdueMitigations ?? 0) > 0 ? 'yellow' : 'green'} />
         <MetricCard title="Score medio" value={formatNumber(summary?.avgScore, { maximumFractionDigits: 1 })} description="Probabilidade x impacto" icon={<CheckCircle2 className="h-4 w-4" />} tone="purple" />
       </div>
+
+      {/* Matriz de risco (heatmap 5x5): inerente x residual */}
+      {summary && (
+        <Card className="mb-6">
+          <CardContent className="p-4">
+            <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+              <div>
+                <div className="text-sm font-semibold">Matriz de risco (probabilidade × impacto)</div>
+                <div className="text-xs text-muted-foreground">
+                  Distribuição dos riscos abertos. Clique numa célula para filtrar a lista. Residual avaliado em{' '}
+                  {formatNumber(summary.residualAssessedPct)}% dos riscos · redução média {formatNumber(summary.avgRiskReductionPercent)}%.
+                </div>
+              </div>
+            </div>
+            <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
+              <RiskMatrix title="Risco inerente" matrix={summary.inherentMatrix} active={cellFilter} onCell={(p, i) => setCellFilter(cellFilter && cellFilter.p === p && cellFilter.i === i ? null : { p, i, residual: false })} residual={false} />
+              <RiskMatrix title="Risco residual (após mitigação)" matrix={summary.residualMatrix} active={cellFilter} onCell={(p, i) => setCellFilter(cellFilter && cellFilter.p === p && cellFilter.i === i ? null : { p, i, residual: true })} residual />
+            </div>
+            {cellFilter && (
+              <div className="mt-3 flex items-center gap-2 text-xs">
+                <Badge variant="outline">Filtro: {cellFilter.residual ? 'residual' : 'inerente'} P{cellFilter.p} × I{cellFilter.i}</Badge>
+                <button type="button" className="text-muted-foreground underline" onClick={() => setCellFilter(null)}>limpar</button>
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      )}
 
       <div className="mb-6 grid grid-cols-1 gap-4 xl:grid-cols-[1fr,360px]">
         <Card>
@@ -429,17 +483,47 @@ export default function RisksPage() {
               </NativeSelect>
             </div>
             <div>
-              <Label>Probabilidade</Label>
+              <Label>Probabilidade (inerente)</Label>
               <NativeSelect value={form.probability} onChange={(e) => setForm((f) => ({ ...f, probability: e.target.value }))}>
                 {[1, 2, 3, 4, 5].map((n) => <option key={n} value={n}>{n}</option>)}
               </NativeSelect>
             </div>
             <div>
-              <Label>Impacto</Label>
+              <Label>Impacto (inerente)</Label>
               <NativeSelect value={form.impact} onChange={(e) => setForm((f) => ({ ...f, impact: e.target.value }))}>
                 {[1, 2, 3, 4, 5].map((n) => <option key={n} value={n}>{n}</option>)}
               </NativeSelect>
             </div>
+            <div className="sm:col-span-2">
+              <FormLevelPreview
+                label="Nível inerente"
+                probability={Number(form.probability)}
+                impact={Number(form.impact)}
+              />
+            </div>
+            <div>
+              <Label>Probabilidade residual</Label>
+              <NativeSelect value={form.residualProbability} onChange={(e) => setForm((f) => ({ ...f, residualProbability: e.target.value }))}>
+                <option value="">Não avaliado</option>
+                {[1, 2, 3, 4, 5].map((n) => <option key={n} value={n}>{n}</option>)}
+              </NativeSelect>
+            </div>
+            <div>
+              <Label>Impacto residual</Label>
+              <NativeSelect value={form.residualImpact} onChange={(e) => setForm((f) => ({ ...f, residualImpact: e.target.value }))}>
+                <option value="">Não avaliado</option>
+                {[1, 2, 3, 4, 5].map((n) => <option key={n} value={n}>{n}</option>)}
+              </NativeSelect>
+            </div>
+            {form.residualProbability && form.residualImpact && (
+              <div className="sm:col-span-2">
+                <FormLevelPreview
+                  label="Nível residual (após mitigação)"
+                  probability={Number(form.residualProbability)}
+                  impact={Number(form.residualImpact)}
+                />
+              </div>
+            )}
             <div>
               <Label>Área/processo</Label>
               <NativeSelect value={form.orgNodeId} onChange={(e) => setForm((f) => ({ ...f, orgNodeId: e.target.value }))}>
@@ -523,4 +607,123 @@ function toInputDate(value: string | null | undefined) {
 
 function invalidateRisks(qc: ReturnType<typeof useQueryClient>) {
   qc.invalidateQueries({ queryKey: ['risks'] });
+}
+
+/** Score -> nível/rótulo/cor (espelha a classificação do backend). */
+function scoreLevel(score: number): { level: RiskLevel; label: string } {
+  if (score <= 4) return { level: 'LOW', label: 'Baixo' };
+  if (score <= 9) return { level: 'MODERATE', label: 'Moderado' };
+  if (score <= 16) return { level: 'HIGH', label: 'Alto' };
+  return { level: 'CRITICAL', label: 'Crítico' };
+}
+
+// Cor de fundo da célula da matriz por score (verde→amarelo→laranja→vermelho).
+function cellColor(score: number): string {
+  if (score === 0) return 'bg-muted/30 text-muted-foreground';
+  if (score <= 4) return 'bg-emerald-500/80 text-white';
+  if (score <= 9) return 'bg-amber-400/85 text-slate-900';
+  if (score <= 16) return 'bg-orange-500/85 text-white';
+  return 'bg-rose-600/90 text-white';
+}
+
+/**
+ * Matriz de risco 5x5 (heatmap). Linhas = impacto (5 no topo), colunas =
+ * probabilidade (1..5). Cada célula mostra a contagem de riscos e é clicável
+ * para filtrar a lista.
+ */
+function RiskMatrix({
+  title,
+  matrix,
+  active,
+  residual,
+  onCell,
+}: {
+  title: string;
+  matrix: number[][];
+  active: { p: number; i: number; residual: boolean } | null;
+  residual: boolean;
+  onCell: (probability: number, impact: number) => void;
+}) {
+  const rows = [5, 4, 3, 2, 1]; // impacto de cima para baixo
+  const cols = [1, 2, 3, 4, 5]; // probabilidade da esquerda para direita
+  const hasData = matrix.some((row) => row.some((n) => n > 0));
+  return (
+    <div>
+      <div className="mb-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground">{title}</div>
+      <div className="flex">
+        <div className="mr-1 flex items-center">
+          <span className="-rotate-90 whitespace-nowrap text-[10px] font-semibold uppercase text-muted-foreground">Impacto →</span>
+        </div>
+        <div className="flex-1">
+          <div className="grid grid-cols-[auto_repeat(5,1fr)] gap-1">
+            <div />
+            {cols.map((p) => <div key={`h${p}`} className="text-center text-[10px] font-semibold text-muted-foreground">{p}</div>)}
+            {rows.map((impact) => (
+              <RowFragment key={impact} impact={impact} cols={cols} matrix={matrix} active={active} residual={residual} onCell={onCell} />
+            ))}
+          </div>
+          <div className="mt-1 text-center text-[10px] font-semibold uppercase text-muted-foreground">Probabilidade →</div>
+          {!hasData && <div className="mt-2 text-center text-xs text-muted-foreground">{residual ? 'Nenhum risco com residual avaliado.' : 'Nenhum risco aberto plotado.'}</div>}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function RowFragment({
+  impact,
+  cols,
+  matrix,
+  active,
+  residual,
+  onCell,
+}: {
+  impact: number;
+  cols: number[];
+  matrix: number[][];
+  active: { p: number; i: number; residual: boolean } | null;
+  residual: boolean;
+  onCell: (p: number, i: number) => void;
+}) {
+  return (
+    <>
+      <div className="flex items-center justify-center text-[10px] font-semibold text-muted-foreground">{impact}</div>
+      {cols.map((p) => {
+        const count = matrix[impact - 1]?.[p - 1] ?? 0;
+        const score = p * impact;
+        const isActive = active && active.residual === residual && active.p === p && active.i === impact;
+        return (
+          <button
+            key={`${impact}-${p}`}
+            type="button"
+            onClick={() => onCell(p, impact)}
+            title={`Probabilidade ${p} × Impacto ${impact} — score ${score} (${scoreLevel(score).label}) · ${count} risco(s)`}
+            className={cn(
+              'flex aspect-square items-center justify-center rounded text-sm font-bold transition-all',
+              cellColor(score),
+              count === 0 && 'opacity-40',
+              isActive && 'ring-2 ring-slate-900 ring-offset-1 dark:ring-white',
+            )}
+          >
+            {count > 0 ? count : ''}
+          </button>
+        );
+      })}
+    </>
+  );
+}
+
+/** Preview do nível de risco a partir de probabilidade × impacto no formulário. */
+function FormLevelPreview({ label, probability, impact }: { label: string; probability: number; impact: number }) {
+  const score = (probability || 0) * (impact || 0);
+  const { level, label: levelLabel } = scoreLevel(score);
+  return (
+    <div className="flex items-center justify-between rounded-md border p-2 text-xs">
+      <span className="text-muted-foreground">{label}</span>
+      <span className="flex items-center gap-2">
+        <span className="font-mono">{probability || '-'} × {impact || '-'} = {score || '-'}</span>
+        <Badge variant="outline" className={LEVEL_CLASS[level]}>{levelLabel}</Badge>
+      </span>
+    </div>
+  );
 }

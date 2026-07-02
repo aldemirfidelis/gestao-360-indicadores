@@ -1885,6 +1885,10 @@ model RiskRegister {
   status          RiskStatus   @default(IDENTIFIED)
   probability     Int          @default(3)
   impact          Int          @default(3)
+  // Risco residual = probabilidade/impacto estimados APÓS a mitigação. Nulos
+  // enquanto não avaliados (o cliente ainda não fez a análise residual).
+  residualProbability Int?
+  residualImpact      Int?
   mitigationPlan  String?
   contingencyPlan String?
   dueDate         DateTime?
