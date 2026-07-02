@@ -137,6 +137,12 @@ function makeService(opts?: {
       findMany: vi.fn().mockResolvedValue(opts?.traceLinks ?? []),
       create: vi.fn().mockImplementation((args: any) => Promise.resolve({ id: 'tl1', ...args.data })),
     },
+    foodSafetyFlowTemplate: {
+      findMany: vi.fn().mockResolvedValue([]),
+      findFirst: vi.fn().mockResolvedValue(null),
+      create: vi.fn().mockImplementation((args: any) => Promise.resolve({ id: 'ft1', ...args.data })),
+      update: vi.fn().mockImplementation((args: any) => Promise.resolve({ id: 'ft1', ...args.data })),
+    },
     foodSafetyRecall: {
       findMany: vi.fn().mockResolvedValue(opts?.recalls ?? []),
       findFirst: vi.fn().mockResolvedValue(opts?.recall ?? null),
@@ -542,5 +548,87 @@ describe('FoodSafetyService - Fase 1 (programas/processos/etapas)', () => {
     const result = await service.importData(me, { dataset: 'suppliers', programId: 'pg1', rows: [{ name: 'Novo fornecedor' }] });
     expect(result.created).toBe(1);
     expect(prisma.foodSafetySupplier.create).toHaveBeenCalled();
+  });
+
+  // ---- modelos de fluxo da empresa ----
+
+  it('createFlowTemplate: normaliza etapas e grava escopo da empresa', async () => {
+    const { service, prisma } = makeService();
+    await service.createFlowTemplate(me, {
+      name: 'Fluxo de envase',
+      steps: [
+        { name: 'Recebimento', type: 'RECEIVING', isControlPoint: false },
+        { name: 'Envase', type: 'PACKAGING', isControlPoint: true, visualModel: 'FILLING_LINE' },
+      ],
+    });
+    const data = prisma.foodSafetyFlowTemplate.create.mock.calls[0][0].data;
+    expect(data.companyId).toBe('companyA');
+    expect(data.stepCount).toBe(2);
+    expect(data.steps[1].isControlPoint).toBe(true);
+    expect(data.createdById).toBe('user-1');
+  });
+
+  it('createFlowTemplate: sem etapas -> BadRequest', async () => {
+    const { service, prisma } = makeService();
+    await expect(service.createFlowTemplate(me, { name: 'Vazio', steps: [] })).rejects.toThrow('Informe ao menos uma etapa');
+    expect(prisma.foodSafetyFlowTemplate.create).not.toHaveBeenCalled();
+  });
+
+  it('createFlowTemplate: tipo de etapa invalido -> BadRequest', async () => {
+    const { service } = makeService();
+    await expect(
+      service.createFlowTemplate(me, { name: 'X', steps: [{ name: 'Etapa', type: 'HACKED' }] }),
+    ).rejects.toThrow('Tipo de etapa invalido');
+  });
+
+  it('saveProcessAsFlowTemplate: snapshot das etapas do processo', async () => {
+    const { service, prisma } = makeService({
+      process: {
+        id: 'pr1',
+        companyId: 'companyA',
+        orgNodeId: null,
+        name: 'Linha 1',
+        description: 'Processo da linha 1',
+        productionLine: 'Linha 1',
+        steps: [
+          { name: 'Recebimento', type: 'RECEIVING', visualModel: 'RECEIVING_DOCK', description: null, inputs: null, outputs: null, isControlPoint: false },
+        ],
+      },
+    });
+    const result = await service.saveProcessAsFlowTemplate(me, 'pr1', {});
+    const data = prisma.foodSafetyFlowTemplate.create.mock.calls[0][0].data;
+    expect(data.name).toBe('Linha 1 (modelo)');
+    expect(data.sourceProcessId).toBe('pr1');
+    expect(data.stepCount).toBe(1);
+    expect(result.id).toBe('ft1');
+  });
+
+  it('saveProcessAsFlowTemplate: processo sem etapas -> BadRequest', async () => {
+    const { service } = makeService({ process: { id: 'pr1', companyId: 'companyA', orgNodeId: null, name: 'Linha 1', steps: [] } });
+    await expect(service.saveProcessAsFlowTemplate(me, 'pr1', {})).rejects.toThrow('nao possui etapas');
+  });
+
+  it('removeFlowTemplate: modelo de outra empresa -> NotFound', async () => {
+    const { service, prisma } = makeService();
+    await expect(service.removeFlowTemplate(me, 'ft-outra')).rejects.toBeInstanceOf(NotFoundException);
+    expect(prisma.foodSafetyFlowTemplate.findFirst.mock.calls[0][0].where.companyId).toBe('companyA');
+    expect(prisma.foodSafetyFlowTemplate.update).not.toHaveBeenCalled();
+  });
+
+  it('exportFlowTemplate: payload reimportavel', async () => {
+    const { service, prisma } = makeService();
+    prisma.foodSafetyFlowTemplate.findFirst = vi.fn().mockResolvedValue({
+      id: 'ft1',
+      companyId: 'companyA',
+      name: 'Fluxo X',
+      sector: 'Envase',
+      summary: null,
+      color: '#0ea5e9',
+      steps: [{ name: 'Etapa', type: 'OTHER' }],
+    });
+    const payload = await service.exportFlowTemplate(me, 'ft1');
+    expect(payload.format).toBe('g360.food-safety.flow-template');
+    expect(payload.name).toBe('Fluxo X');
+    expect(Array.isArray(payload.steps)).toBe(true);
   });
 });

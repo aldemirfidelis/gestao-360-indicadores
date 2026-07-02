@@ -75,6 +75,19 @@ interface IsometricFlowProps {
     visualModel?: string | null;
     isControlPoint?: boolean;
   }) => void;
+  /** Modelos de fluxo persistidos da empresa (aparecem junto à biblioteca padrão). */
+  companyTemplates?: CompanyFlowTemplate[];
+  /** Salva o fluxo atual do processo como modelo da empresa. */
+  onTemplateSave?: (payload: { name: string }) => void;
+  onTemplateDelete?: (id: string) => void;
+  onTemplateExport?: (template: CompanyFlowTemplate) => void;
+  /** Importa um modelo a partir de JSON exportado. */
+  onTemplateImport?: (payload: { name: string; sector?: string | null; summary?: string | null; color?: string | null; steps: FlowTemplateStep[] }) => void;
+}
+
+export interface CompanyFlowTemplate extends FlowTemplate {
+  /** id persistido no servidor (para excluir/exportar). */
+  persistedId: string;
 }
 
 const DEFAULT_ZOOM = 55;
@@ -1156,19 +1169,86 @@ function TemplateLibraryDialog({
   existingSteps,
   onClose,
   onApply,
+  companyTemplates = [],
+  canManage = false,
+  onTemplateDelete,
+  onTemplateExport,
+  onTemplateImport,
 }: {
   existingSteps: number;
   onClose: () => void;
   onApply: (steps: FlowTemplateStep[]) => void;
+  companyTemplates?: CompanyFlowTemplate[];
+  canManage?: boolean;
+  onTemplateDelete?: (id: string) => void;
+  onTemplateExport?: (template: CompanyFlowTemplate) => void;
+  onTemplateImport?: (payload: { name: string; sector?: string | null; summary?: string | null; color?: string | null; steps: FlowTemplateStep[] }) => void;
 }) {
-  const [selectedId, setSelectedId] = useState(FLOW_TEMPLATES[0]?.id ?? '');
-  const selectedTemplate = FLOW_TEMPLATES.find((template) => template.id === selectedId) ?? FLOW_TEMPLATES[0];
+  const allTemplates = useMemo<FlowTemplate[]>(() => [...companyTemplates, ...FLOW_TEMPLATES], [companyTemplates]);
+  const [selectedId, setSelectedId] = useState(allTemplates[0]?.id ?? '');
+  const importInputRef = useRef<HTMLInputElement>(null);
+  const selectedTemplate = allTemplates.find((template) => template.id === selectedId) ?? allTemplates[0];
+  const selectedCompanyTemplate = companyTemplates.find((template) => template.id === selectedTemplate?.id) ?? null;
 
   if (!selectedTemplate) return null;
 
   const applyTemplate = () => {
     onApply(selectedTemplate.steps);
     onClose();
+  };
+
+  const handleImportFile = async (file: File | null) => {
+    if (!file || !onTemplateImport) return;
+    try {
+      const text = await file.text();
+      const payload = JSON.parse(text);
+      const steps = Array.isArray(payload?.steps) ? payload.steps : [];
+      if (!payload?.name || !steps.length) throw new Error('invalid');
+      onTemplateImport({
+        name: String(payload.name),
+        sector: payload.sector ?? null,
+        summary: payload.summary ?? null,
+        color: payload.color ?? null,
+        steps,
+      });
+    } catch {
+      // JSON invalido: o chamador ja exibe toasts das mutations; aqui basta alertar.
+      window.alert('Arquivo inválido. Selecione um JSON exportado de um modelo de fluxo.');
+    }
+  };
+
+  const renderTemplateButton = (template: FlowTemplate) => {
+    const selected = template.id === selectedTemplate.id;
+    return (
+      <button
+        key={template.id}
+        type="button"
+        onClick={() => setSelectedId(template.id)}
+        className={`w-full rounded-xl border p-3 text-left transition-all ${
+          selected
+            ? 'border-sky-500 bg-white shadow-sm ring-2 ring-sky-500/20 dark:bg-slate-900'
+            : 'border-transparent hover:border-slate-200 hover:bg-white dark:hover:border-slate-800 dark:hover:bg-slate-900'
+        }`}
+      >
+        <div className="flex items-start gap-3">
+          <span
+            className="mt-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-lg text-white shadow-sm"
+            style={{ backgroundColor: template.color }}
+          >
+            <Boxes className="h-4 w-4" />
+          </span>
+          <span className="min-w-0">
+            <span className="block text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
+              {template.sector}
+            </span>
+            <span className="mt-0.5 block text-sm font-semibold">{template.name}</span>
+            <span className="mt-1 block text-xs text-muted-foreground">
+              {template.steps.length} etapas
+            </span>
+          </span>
+        </div>
+      </button>
+    );
   };
 
   return (
@@ -1186,41 +1266,38 @@ function TemplateLibraryDialog({
 
         <div className="grid min-h-0 flex-1 md:grid-cols-[20rem_minmax(0,1fr)]">
           <div className="overflow-y-auto border-r bg-slate-50/70 p-3 dark:bg-slate-950/30">
+            {companyTemplates.length > 0 && (
+              <>
+                <div className="px-1 pb-2 text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
+                  Modelos da empresa
+                </div>
+                <div className="space-y-2">{companyTemplates.map(renderTemplateButton)}</div>
+                <div className="px-1 pb-2 pt-4 text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
+                  Biblioteca padrão
+                </div>
+              </>
+            )}
             <div className="space-y-2">
-              {FLOW_TEMPLATES.map((template) => {
-                const selected = template.id === selectedTemplate.id;
-                return (
-                  <button
-                    key={template.id}
-                    type="button"
-                    onClick={() => setSelectedId(template.id)}
-                    className={`w-full rounded-xl border p-3 text-left transition-all ${
-                      selected
-                        ? 'border-sky-500 bg-white shadow-sm ring-2 ring-sky-500/20 dark:bg-slate-900'
-                        : 'border-transparent hover:border-slate-200 hover:bg-white dark:hover:border-slate-800 dark:hover:bg-slate-900'
-                    }`}
-                  >
-                    <div className="flex items-start gap-3">
-                      <span
-                        className="mt-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-lg text-white shadow-sm"
-                        style={{ backgroundColor: template.color }}
-                      >
-                        <Boxes className="h-4 w-4" />
-                      </span>
-                      <span className="min-w-0">
-                        <span className="block text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
-                          {template.sector}
-                        </span>
-                        <span className="mt-0.5 block text-sm font-semibold">{template.name}</span>
-                        <span className="mt-1 block text-xs text-muted-foreground">
-                          {template.steps.length} etapas
-                        </span>
-                      </span>
-                    </div>
-                  </button>
-                );
-              })}
+              {FLOW_TEMPLATES.map(renderTemplateButton)}
             </div>
+            {canManage && onTemplateImport && (
+              <div className="mt-3 border-t pt-3">
+                <input
+                  ref={importInputRef}
+                  type="file"
+                  accept=".json,application/json"
+                  className="hidden"
+                  onChange={(event) => {
+                    void handleImportFile(event.target.files?.[0] ?? null);
+                    event.target.value = '';
+                  }}
+                />
+                <Button variant="outline" size="sm" className="w-full text-xs" onClick={() => importInputRef.current?.click()}>
+                  <Plus className="mr-1.5 h-3.5 w-3.5" />
+                  Importar modelo (JSON)
+                </Button>
+              </div>
+            )}
           </div>
 
           <div className="min-h-0 overflow-y-auto p-5 md:p-6">
@@ -1233,6 +1310,31 @@ function TemplateLibraryDialog({
                 <p className="mt-1 max-w-2xl text-sm leading-6 text-muted-foreground">
                   {selectedTemplate.summary}
                 </p>
+                {selectedCompanyTemplate && (
+                  <div className="mt-2 flex flex-wrap gap-2">
+                    {onTemplateExport && (
+                      <Button variant="outline" size="sm" className="h-7 text-xs" onClick={() => onTemplateExport(selectedCompanyTemplate)}>
+                        Exportar JSON
+                      </Button>
+                    )}
+                    {canManage && onTemplateDelete && (
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        className="h-7 text-xs text-red-600 hover:text-red-700"
+                        onClick={() => {
+                          if (window.confirm(`Excluir o modelo "${selectedCompanyTemplate.name}"?`)) {
+                            onTemplateDelete(selectedCompanyTemplate.persistedId);
+                            setSelectedId(FLOW_TEMPLATES[0]?.id ?? '');
+                          }
+                        }}
+                      >
+                        <Trash2 className="mr-1 h-3 w-3" />
+                        Excluir modelo
+                      </Button>
+                    )}
+                  </div>
+                )}
               </div>
               <div className="rounded-lg border bg-slate-50 px-3 py-2 text-right dark:bg-slate-900">
                 <div className="text-lg font-bold">{selectedTemplate.steps.length}</div>
@@ -1302,6 +1404,11 @@ export function IsometricFlow({
   onTemplateApply,
   onStepDelete,
   onStepUpdate,
+  companyTemplates,
+  onTemplateSave,
+  onTemplateDelete,
+  onTemplateExport,
+  onTemplateImport,
 }: IsometricFlowProps) {
   const [selectedStepId, setSelectedStepId] = useState<string | null>(null);
   const [creatingStep, setCreatingStep] = useState(false);
@@ -1384,6 +1491,22 @@ export function IsometricFlow({
                 <Sparkles className="h-3.5 w-3.5" />
                 Organizar
               </Button>
+              {onTemplateSave && (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="h-8 gap-1 px-2.5 text-xs"
+                  disabled={positionedSteps.length === 0}
+                  title="Salvar este fluxo como modelo reutilizável da empresa"
+                  onClick={() => {
+                    const name = window.prompt('Nome do modelo de fluxo');
+                    if (name?.trim()) onTemplateSave({ name: name.trim() });
+                  }}
+                >
+                  <Save className="h-3.5 w-3.5 text-emerald-600" />
+                  Salvar como modelo
+                </Button>
+              )}
               <Button
                 size="sm"
                 className="h-8 gap-1 bg-emerald-600 px-2.5 text-xs font-medium text-white shadow-sm transition-all hover:bg-emerald-700"
@@ -1570,6 +1693,11 @@ export function IsometricFlow({
           existingSteps={positionedSteps.length}
           onClose={() => setTemplateLibraryOpen(false)}
           onApply={onTemplateApply}
+          companyTemplates={companyTemplates}
+          canManage={canManage}
+          onTemplateDelete={onTemplateDelete}
+          onTemplateExport={onTemplateExport}
+          onTemplateImport={onTemplateImport}
         />
       )}
     </Card>

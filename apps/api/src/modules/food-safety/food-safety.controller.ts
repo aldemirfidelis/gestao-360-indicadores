@@ -113,6 +113,43 @@ export class FoodSafetyController {
     return this.service.removeStep(me, stepId);
   }
 
+  // ----- modelos de fluxo (empresa) -----
+  @Get('flow-templates')
+  @RequirePermissions('fsms:view')
+  listFlowTemplates(@CurrentUser() me: AuthPayload, @Query('includeInactive') includeInactive?: string) {
+    return this.service.listFlowTemplates(me, { includeInactive });
+  }
+
+  @Post('flow-templates')
+  @RequirePermissions('fsms:update')
+  createFlowTemplate(@CurrentUser() me: AuthPayload, @Body() body: any) {
+    return this.service.createFlowTemplate(me, body);
+  }
+
+  @Patch('flow-templates/:id')
+  @RequirePermissions('fsms:update')
+  updateFlowTemplate(@CurrentUser() me: AuthPayload, @Param('id') id: string, @Body() body: any) {
+    return this.service.updateFlowTemplate(me, id, body);
+  }
+
+  @Delete('flow-templates/:id')
+  @RequirePermissions('fsms:delete')
+  removeFlowTemplate(@CurrentUser() me: AuthPayload, @Param('id') id: string) {
+    return this.service.removeFlowTemplate(me, id);
+  }
+
+  @Get('flow-templates/:id/export')
+  @RequirePermissions('fsms:view')
+  exportFlowTemplate(@CurrentUser() me: AuthPayload, @Param('id') id: string) {
+    return this.service.exportFlowTemplate(me, id);
+  }
+
+  @Post('processes/:id/save-as-template')
+  @RequirePermissions('fsms:update')
+  saveProcessAsTemplate(@CurrentUser() me: AuthPayload, @Param('id') id: string, @Body() body: any) {
+    return this.service.saveProcessAsFlowTemplate(me, id, body);
+  }
+
   // ----- matriz de risco -----
   @Get('risk-matrix')
   @RequirePermissions('fsms:view')

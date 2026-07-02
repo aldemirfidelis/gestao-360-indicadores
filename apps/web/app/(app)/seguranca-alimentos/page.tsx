@@ -44,6 +44,7 @@ import { api } from '@/lib/api';
 import { cn, formatDate, formatNumber } from '@/lib/utils';
 import { LoadingState } from '@/components/platform/loading-state';
 import type { FlowTemplateStep, VisualModelId } from '@/components/seguranca-alimentos/isometric-library';
+import type { CompanyFlowTemplate } from '@/components/seguranca-alimentos/isometric-flow';
 
 // React Flow (+CSS) e pesado e so e necessario na aba Fluxograma; carrega sob
 // demanda para nao entrar no bundle inicial da pagina de Seguranca de Alimentos.
@@ -115,6 +116,17 @@ interface Process {
   orgNode: OrgRef | null;
   owner: UserRef | null;
   steps: Step[];
+}
+
+interface FlowTemplateRow {
+  id: string;
+  name: string;
+  sector: string | null;
+  summary: string | null;
+  color: string | null;
+  steps: FlowTemplateStep[] | null;
+  stepCount: number;
+  active: boolean;
 }
 
 interface Summary {
@@ -444,6 +456,71 @@ export default function SegurancaAlimentosPage() {
     onError: (e: any) => toast.error(e?.message ?? 'Falha ao importar o fluxo completo'),
   });
 
+  // ----- Modelos de fluxo da empresa (persistidos no servidor) -----
+  const flowTemplates = useQuery<FlowTemplateRow[]>({
+    queryKey: ['fsms', 'flow-templates'],
+    queryFn: () => api('/food-safety/flow-templates'),
+    enabled: !!programId,
+  });
+
+  const companyFlowTemplates = useMemo<CompanyFlowTemplate[]>(
+    () =>
+      (flowTemplates.data ?? []).map((template) => ({
+        id: `company-${template.id}`,
+        persistedId: template.id,
+        name: template.name,
+        sector: template.sector ?? 'Modelo da empresa',
+        summary: template.summary ?? `${template.stepCount} etapas salvas pela empresa.`,
+        color: template.color ?? '#0ea5e9',
+        steps: (template.steps ?? []) as FlowTemplateStep[],
+      })),
+    [flowTemplates.data],
+  );
+
+  const saveFlowTemplateMutation = useMutation({
+    mutationFn: ({ processId, name }: { processId: string; name: string }) =>
+      api(`/food-safety/processes/${processId}/save-as-template`, { method: 'POST', json: { name } }),
+    onSuccess: () => {
+      void qc.invalidateQueries({ queryKey: ['fsms', 'flow-templates'] });
+      toast.success('Fluxo salvo como modelo da empresa');
+    },
+    onError: (e: any) => toast.error(e?.message ?? 'Falha ao salvar o modelo'),
+  });
+
+  const importFlowTemplateMutation = useMutation({
+    mutationFn: (payload: { name: string; sector?: string | null; summary?: string | null; color?: string | null; steps: FlowTemplateStep[] }) =>
+      api('/food-safety/flow-templates', { method: 'POST', json: payload }),
+    onSuccess: () => {
+      void qc.invalidateQueries({ queryKey: ['fsms', 'flow-templates'] });
+      toast.success('Modelo de fluxo importado');
+    },
+    onError: (e: any) => toast.error(e?.message ?? 'Falha ao importar o modelo'),
+  });
+
+  const deleteFlowTemplateMutation = useMutation({
+    mutationFn: (id: string) => api(`/food-safety/flow-templates/${id}`, { method: 'DELETE' }),
+    onSuccess: () => {
+      void qc.invalidateQueries({ queryKey: ['fsms', 'flow-templates'] });
+      toast.success('Modelo de fluxo excluído');
+    },
+    onError: (e: any) => toast.error(e?.message ?? 'Falha ao excluir o modelo'),
+  });
+
+  async function exportFlowTemplate(template: CompanyFlowTemplate) {
+    try {
+      const payload = await api<Record<string, unknown>>(`/food-safety/flow-templates/${template.persistedId}/export`);
+      const blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = `${template.name.replace(/[^\w.-]+/g, '-')}.fluxo.json`;
+      link.click();
+      URL.revokeObjectURL(url);
+    } catch (e: any) {
+      toast.error(e?.message ?? 'Falha ao exportar o modelo');
+    }
+  }
+
   // Mutation para excluir uma etapa
   const deleteStepMutation = useMutation({
     mutationFn: (stepId: string) =>
@@ -617,6 +694,11 @@ export default function SegurancaAlimentosPage() {
                     onTemplateApply={(steps) => applyTemplateMutation.mutate({ processId: activeProcess.id, steps })}
                     onStepDelete={(stepId) => deleteStepMutation.mutate(stepId)}
                     onStepUpdate={(stepId, data) => updateStepMutation.mutate({ stepId, data })}
+                    companyTemplates={companyFlowTemplates}
+                    onTemplateSave={canManage ? ({ name }) => saveFlowTemplateMutation.mutate({ processId: activeProcess.id, name }) : undefined}
+                    onTemplateDelete={canManage ? (id) => deleteFlowTemplateMutation.mutate(id) : undefined}
+                    onTemplateExport={(template) => void exportFlowTemplate(template)}
+                    onTemplateImport={canManage ? (payload) => importFlowTemplateMutation.mutate(payload) : undefined}
                   />
                 );
               })()}

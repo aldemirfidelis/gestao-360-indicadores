@@ -396,6 +396,125 @@ export class FoodSafetyService {
     };
   }
 
+  // --------------------------- modelos de fluxo -----------------------------
+  // Modelos reutilizaveis da empresa (equivalentes aos da biblioteca fixa do
+  // frontend): criados do zero, salvos de um processo ou importados via JSON.
+
+  private normalizeFlowTemplateSteps(steps: unknown) {
+    const list = Array.isArray(steps) ? steps : [];
+    if (!list.length) throw new BadRequestException('Informe ao menos uma etapa para o modelo.');
+    if (list.length > 60) throw new BadRequestException('O limite e de 60 etapas por modelo.');
+    return list.map((step: any, index: number) => ({
+      name: this.requiredText(step?.name, `Nome da etapa ${index + 1}`),
+      type: this.parseStepType(step?.type) ?? FoodSafetyStepType.OTHER,
+      visualModel: this.nullableText(step?.visualModel) ?? null,
+      description: this.nullableText(step?.description) ?? null,
+      inputs: this.nullableText(step?.inputs) ?? null,
+      outputs: this.nullableText(step?.outputs) ?? null,
+      isControlPoint: Boolean(step?.isControlPoint),
+    }));
+  }
+
+  private async loadFlowTemplate(me: AuthPayload, id: string) {
+    const template = await this.prisma.foodSafetyFlowTemplate.findFirst({
+      where: { id, companyId: me.companyId, deletedAt: null },
+    });
+    if (!template) throw new NotFoundException('Modelo de fluxo nao encontrado');
+    return template;
+  }
+
+  async listFlowTemplates(me: AuthPayload, filters: { includeInactive?: string } = {}) {
+    return this.prisma.foodSafetyFlowTemplate.findMany({
+      where: {
+        companyId: me.companyId,
+        deletedAt: null,
+        ...(filters.includeInactive === 'true' ? {} : { active: true }),
+      },
+      orderBy: [{ name: 'asc' }],
+    });
+  }
+
+  async createFlowTemplate(me: AuthPayload, body: any) {
+    const name = this.requiredText(body?.name, 'Nome do modelo');
+    const steps = this.normalizeFlowTemplateSteps(body?.steps);
+    return this.prisma.foodSafetyFlowTemplate.create({
+      data: {
+        companyId: me.companyId,
+        name,
+        sector: this.nullableText(body?.sector) ?? null,
+        summary: this.nullableText(body?.summary) ?? null,
+        color: this.nullableText(body?.color) ?? null,
+        steps: steps as unknown as Prisma.InputJsonValue,
+        stepCount: steps.length,
+        sourceProcessId: this.id(body?.sourceProcessId),
+        createdById: me.sub,
+      },
+    });
+  }
+
+  async updateFlowTemplate(me: AuthPayload, id: string, patch: any) {
+    await this.loadFlowTemplate(me, id);
+    const data: any = {};
+    if ('name' in (patch ?? {})) data.name = this.requiredText(patch.name, 'Nome do modelo');
+    if ('sector' in (patch ?? {})) data.sector = this.nullableText(patch.sector);
+    if ('summary' in (patch ?? {})) data.summary = this.nullableText(patch.summary);
+    if ('color' in (patch ?? {})) data.color = this.nullableText(patch.color);
+    if ('active' in (patch ?? {})) data.active = Boolean(patch.active);
+    if ('steps' in (patch ?? {})) {
+      const steps = this.normalizeFlowTemplateSteps(patch.steps);
+      data.steps = steps as unknown as Prisma.InputJsonValue;
+      data.stepCount = steps.length;
+    }
+    return this.prisma.foodSafetyFlowTemplate.update({ where: { id }, data });
+  }
+
+  async removeFlowTemplate(me: AuthPayload, id: string) {
+    await this.loadFlowTemplate(me, id);
+    return this.prisma.foodSafetyFlowTemplate.update({ where: { id }, data: { deletedAt: new Date(), active: false } });
+  }
+
+  /** Salva o fluxo (etapas) de um processo existente como modelo reutilizavel. */
+  async saveProcessAsFlowTemplate(me: AuthPayload, processId: string, body: any) {
+    const proc = await this.getProcess(me, processId);
+    if (!proc.steps.length) throw new BadRequestException('O processo nao possui etapas para salvar como modelo.');
+    const steps = proc.steps.map((step) => ({
+      name: step.name,
+      type: step.type,
+      visualModel: step.visualModel ?? null,
+      description: step.description ?? null,
+      inputs: step.inputs ?? null,
+      outputs: step.outputs ?? null,
+      isControlPoint: step.isControlPoint,
+    }));
+    return this.prisma.foodSafetyFlowTemplate.create({
+      data: {
+        companyId: me.companyId,
+        name: this.nullableText(body?.name) ?? `${proc.name} (modelo)`,
+        sector: this.nullableText(body?.sector) ?? proc.productionLine ?? null,
+        summary: this.nullableText(body?.summary) ?? proc.description ?? null,
+        color: this.nullableText(body?.color) ?? null,
+        steps: steps as unknown as Prisma.InputJsonValue,
+        stepCount: steps.length,
+        sourceProcessId: proc.id,
+        createdById: me.sub,
+      },
+    });
+  }
+
+  /** Payload de exportacao (JSON) reimportavel via POST /flow-templates. */
+  async exportFlowTemplate(me: AuthPayload, id: string) {
+    const template = await this.loadFlowTemplate(me, id);
+    return {
+      format: 'g360.food-safety.flow-template',
+      version: 1,
+      name: template.name,
+      sector: template.sector,
+      summary: template.summary,
+      color: template.color,
+      steps: template.steps,
+    };
+  }
+
   async updateStep(me: AuthPayload, stepId: string, patch: any) {
     const step = await this.loadStep(me, stepId);
     await this.assertProcessWriteArea(me, step.process.orgNodeId, 'edit');

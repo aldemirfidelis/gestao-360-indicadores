@@ -548,6 +548,7 @@ model Company {
   fsPrograms                  FoodSafetyProgram[]               @relation("FsProgramCompany")
   fsProcesses                 FoodSafetyProcess[]               @relation("FsProcessCompany")
   fsProcessSteps              FoodSafetyProcessStep[]           @relation("FsStepCompany")
+  fsFlowTemplates             FoodSafetyFlowTemplate[]          @relation("FsFlowTemplateCompany")
   fsRiskMatrices              FoodSafetyRiskMatrix[]            @relation("FsRiskMatrixCompany")
   fsHazards                   FoodSafetyHazard[]                @relation("FsHazardCompany")
   fsControlPlans              FoodSafetyControlPlan[]           @relation("FsControlPlanCompany")
@@ -594,6 +595,7 @@ model Company {
   compensationCycles          CompensationCycle[]
   compensationSalarySurveys   CompensationSalarySurvey[]
   compensationSimulations     CompensationSimulation[]
+  compensationProfiles        CompensationEmployeeProfile[]
   emailLogs                   EmailLog[]
   calendarInvites             CalendarInvite[]
   workPeriods                 WorkPeriod[]
@@ -6244,11 +6246,36 @@ model OrgEmployee {
   createdAt      DateTime @default(now())
   updatedAt      DateTime @updatedAt
 
-  approvalRequests OrgJobApprovalRequest[]
+  approvalRequests    OrgJobApprovalRequest[]
+  compensationProfile CompensationEmployeeProfile?
 
   @@index([companyId])
   @@index([orgNodeId])
   @@index([jobPretendedId])
+}
+
+// Perfil de remuneracao do colaborador (1:1 com OrgEmployee), em tabela
+// separada por dois motivos: (1) dados demograficos sao dado pessoal sensivel
+// (LGPD) e ficam segregados para minimizacao de acesso; (2) tabela nova nao
+// quebra as queries existentes de OrgEmployee enquanto a migracao nao for
+// aplicada em todos os ambientes.
+model CompensationEmployeeProfile {
+  id                  String      @id @default(uuid())
+  companyId           String
+  company             Company     @relation(fields: [companyId], references: [id])
+  employeeId          String      @unique
+  employee            OrgEmployee @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+  gender              String? // FEMININO | MASCULINO | NAO_BINARIO | NAO_INFORMADO
+  raceEthnicity       String?
+  admissionDate       DateTime?
+  performanceRating   Int? // 1..4 (espelha PERFORMANCE_LEVELS do frontend)
+  performanceCycleRef String? // ex.: "2026" ou "2026-S1"
+  updatedById         String?
+  createdAt           DateTime    @default(now())
+  updatedAt           DateTime    @updatedAt
+
+  @@index([companyId])
+  @@map("compensation_employee_profiles")
 }
 
 model OrgJobApprovalRequest {
@@ -8112,6 +8139,30 @@ model FoodSafetyProcessStep {
 
   @@index([companyId])
   @@index([processId])
+}
+
+// Modelos de fluxo da empresa: sequencias de etapas reutilizaveis, criadas
+// do zero, salvas a partir de um processo existente ou importadas via JSON.
+// `steps` guarda o snapshot [{ name, type, visualModel, description, inputs,
+// outputs, isControlPoint }] no mesmo formato da biblioteca do frontend.
+model FoodSafetyFlowTemplate {
+  id              String    @id @default(uuid())
+  companyId       String
+  company         Company   @relation("FsFlowTemplateCompany", fields: [companyId], references: [id])
+  name            String
+  sector          String?
+  summary         String?
+  color           String?
+  steps           Json
+  stepCount       Int       @default(0)
+  sourceProcessId String?
+  createdById     String?
+  active          Boolean   @default(true)
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+  deletedAt       DateTime?
+
+  @@index([companyId, active])
 }
 
 // ----- Perigos / Analise APPCC (Fase 1, incremento 3) ---------------------
