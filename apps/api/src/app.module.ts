@@ -58,6 +58,7 @@ import { PlatformAdminGlobalModule } from './modules/platform-admin/platform-adm
 import { Vision360Module } from './modules/vision360/vision360.module';
 import { AutomationsModule } from './modules/automations/automations.module';
 import { MyDayModule } from './modules/my-day/my-day.module';
+import { TasksModule } from './modules/tasks/tasks.module';
 import { WorkItemEventsModule } from './modules/my-day/work-item-event-bus';
 import { LgpdModule } from './modules/lgpd/lgpd.module';
 import { PrizeModule } from './modules/prize/prize.module';
@@ -124,6 +125,7 @@ import { workersEnabled } from './jobs/jobs.constants';
     Vision360Module,
     AutomationsModule,
     MyDayModule,
+    TasksModule,
     LgpdModule,
     PrizeModule,
     CompensationModule,

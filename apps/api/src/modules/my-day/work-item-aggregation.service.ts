@@ -168,10 +168,15 @@ export class WorkItemAggregationService {
     return (
       await Promise.all([
         this.collectActions(me).catch((e) => this.warn('actions', e)),
+        this.collectActionTasks(me).catch((e) => this.warn('action-tasks', e)),
+        this.collectProjectTasks(me).catch((e) => this.warn('project-tasks', e)),
         this.collectWorkflowTasks(me).catch((e) => this.warn('workflow-tasks', e)),
         this.collectApprovals(me).catch((e) => this.warn('approvals', e)),
         this.collectMeetingsToday(me).catch((e) => this.warn('meetings', e)),
         this.collectDocuments(me).catch((e) => this.warn('documents', e)),
+        this.collectAudits(me).catch((e) => this.warn('audits', e)),
+        this.collectAuditFindings(me).catch((e) => this.warn('audit-findings', e)),
+        this.collectFormSubmissions(me).catch((e) => this.warn('form-submissions', e)),
         this.collectRisks(me).catch((e) => this.warn('risks', e)),
         this.collectNonConformities(me).catch((e) => this.warn('nonconformities', e)),
         this.collectIndicatorsOffTarget(me).catch((e) => this.warn('indicators', e)),
@@ -244,6 +249,93 @@ export class WorkItemAggregationService {
         sourceUpdatedAt: a.updatedAt,
       };
     });
+  }
+
+  /** Cada etapa real de um plano aparece individualmente na Central de Trabalho. */
+  private async collectActionTasks(me: AuthPayload): Promise<WorkItemDraft[]> {
+    const rows = await this.prisma.actionTask.findMany({
+      where: {
+        assignedToId: me.sub,
+        done: false,
+        action: { companyId: me.companyId, deletedAt: null },
+      },
+      select: {
+        id: true,
+        actionId: true,
+        title: true,
+        dueDate: true,
+        startDate: true,
+        createdAt: true,
+        updatedAt: true,
+        action: {
+          select: {
+            title: true,
+            ownerNodeId: true,
+            priority: true,
+            criticality: true,
+            evidenceRequired: true,
+          },
+        },
+      },
+    });
+    return rows.map((task) => ({
+      sourceModule: 'actions',
+      sourceEntityType: 'ACTION_TASK',
+      sourceEntityId: task.id,
+      itemType: 'TASK',
+      title: task.title,
+      summary: `Tarefa do plano: ${task.action.title}`,
+      status: task.startDate ? 'IN_PROGRESS' : 'OPEN',
+      criticality: String(task.action.criticality ?? task.action.priority ?? 'MEDIUM'),
+      dueAt: task.dueDate,
+      assignedUserId: me.sub,
+      orgNodeId: task.action.ownerNodeId,
+      requiresEvidence: task.action.evidenceRequired,
+      recommendedAction: 'Executar a tarefa e registrar evidências',
+      availableActions: [
+        { key: 'open', label: 'Abrir tarefa no plano', href: `/actions/${task.actionId}` },
+        { key: 'vision360', label: 'Abrir Visão 360°', inline: true },
+      ],
+      context: { actionId: task.actionId, actionTitle: task.action.title },
+      sourceCreatedAt: task.createdAt,
+      sourceUpdatedAt: task.updatedAt,
+    }));
+  }
+
+  /** Projetos legados guardam o responsável por nome; a comparação é exata e case-insensitive. */
+  private async collectProjectTasks(me: AuthPayload): Promise<WorkItemDraft[]> {
+    if (!me.name.trim()) return [];
+    const rows = await this.prisma.projectTask.findMany({
+      where: {
+        progress: { lt: 100 },
+        responsible: { equals: me.name, mode: 'insensitive' },
+        project: { companyId: me.companyId, deletedAt: null },
+      },
+      select: {
+        id: true,
+        projectId: true,
+        name: true,
+        startDate: true,
+        endDate: true,
+        progress: true,
+        project: { select: { name: true } },
+      },
+    });
+    return rows.map((task) => ({
+      sourceModule: 'projects',
+      sourceEntityType: 'PROJECT_TASK',
+      sourceEntityId: task.id,
+      itemType: 'TASK',
+      title: task.name,
+      summary: `Cronograma ${task.project.name} · ${Math.round(task.progress)}% concluído`,
+      status: task.progress > 0 ? 'IN_PROGRESS' : 'OPEN',
+      criticality: 'MEDIUM',
+      dueAt: task.endDate,
+      assignedUserId: me.sub,
+      recommendedAction: 'Atualizar o progresso no cronograma',
+      availableActions: [{ key: 'open', label: 'Abrir cronograma', href: `/projects?id=${task.projectId}` }],
+      context: { projectId: task.projectId, projectName: task.project.name, progress: task.progress, startDate: task.startDate },
+    }));
   }
 
   private async collectWorkflowTasks(me: AuthPayload): Promise<WorkItemDraft[]> {
@@ -454,6 +546,141 @@ export class WorkItemAggregationService {
       };
     });
     return [...documentTasks, ...editTasks];
+  }
+
+  private async collectAudits(me: AuthPayload): Promise<WorkItemDraft[]> {
+    const rows = await this.prisma.audit.findMany({
+      where: {
+        companyId: me.companyId,
+        deletedAt: null,
+        leadAuditorUserId: me.sub,
+        status: { notIn: ['COMPLETED', 'CLOSED', 'CANCELLED'] as any },
+      },
+      select: {
+        id: true,
+        number: true,
+        code: true,
+        title: true,
+        status: true,
+        orgNodeId: true,
+        plannedDate: true,
+        plannedEndAt: true,
+        createdAt: true,
+        updatedAt: true,
+      },
+    });
+    return rows.map((audit) => ({
+      sourceModule: 'audits',
+      sourceEntityType: 'AUDIT',
+      sourceEntityId: audit.id,
+      itemType: 'AUDIT',
+      title: `${audit.code ?? `AUD-${audit.number}`} · ${audit.title}`,
+      summary: `Auditoria · ${audit.status}`,
+      status: audit.status === 'IN_PROGRESS' ? 'IN_PROGRESS' : 'OPEN',
+      criticality: audit.status === 'WAITING_AUDITED_RESPONSE' ? 'HIGH' : 'MEDIUM',
+      dueAt: audit.plannedEndAt ?? audit.plannedDate,
+      assignedUserId: me.sub,
+      orgNodeId: audit.orgNodeId,
+      recommendedAction: 'Dar andamento à auditoria',
+      availableActions: [{ key: 'open', label: 'Abrir auditoria', href: `/audits?id=${audit.id}` }],
+      context: { auditNumber: audit.number, auditStatus: audit.status },
+      sourceCreatedAt: audit.createdAt,
+      sourceUpdatedAt: audit.updatedAt,
+    }));
+  }
+
+  private async collectAuditFindings(me: AuthPayload): Promise<WorkItemDraft[]> {
+    const rows = await this.prisma.auditFinding.findMany({
+      where: {
+        companyId: me.companyId,
+        deletedAt: null,
+        responsibleUserId: me.sub,
+        status: { notIn: ['CLOSED', 'CANCELLED'] as any },
+      },
+      select: {
+        id: true,
+        auditId: true,
+        code: true,
+        description: true,
+        status: true,
+        severity: true,
+        criticality: true,
+        dueDate: true,
+        orgNodeId: true,
+        processId: true,
+        createdAt: true,
+        updatedAt: true,
+        audit: { select: { title: true } },
+      },
+    });
+    return rows.map((finding) => ({
+      sourceModule: 'audits',
+      sourceEntityType: 'AUDIT_FINDING',
+      sourceEntityId: finding.id,
+      itemType: 'AUDIT',
+      title: `Responder constatação ${finding.code ?? ''}`.trim(),
+      summary: `${finding.audit.title} · ${finding.description}`,
+      status: finding.status === 'IN_TREATMENT' || finding.status === 'IN_FOLLOW_UP' ? 'IN_PROGRESS' : 'OPEN',
+      criticality: finding.criticality ?? finding.severity ?? 'HIGH',
+      dueAt: finding.dueDate,
+      assignedUserId: me.sub,
+      orgNodeId: finding.orgNodeId,
+      processId: finding.processId,
+      recommendedAction: 'Responder a constatação e anexar evidências',
+      availableActions: [{ key: 'open', label: 'Abrir auditoria', href: `/audits?id=${finding.auditId}` }],
+      context: { auditId: finding.auditId, findingStatus: finding.status },
+      sourceCreatedAt: finding.createdAt,
+      sourceUpdatedAt: finding.updatedAt,
+    }));
+  }
+
+  private async collectFormSubmissions(me: AuthPayload): Promise<WorkItemDraft[]> {
+    const rows = await this.prisma.formSubmission.findMany({
+      where: {
+        companyId: me.companyId,
+        OR: [
+          { assignedToId: me.sub, status: { in: ['ASSIGNED', 'IN_PROGRESS', 'WAITING_CORRECTION'] as any } },
+          { reviewedById: me.sub, status: { in: ['SUBMITTED', 'WAITING_APPROVAL'] as any } },
+        ],
+      },
+      select: {
+        id: true,
+        code: true,
+        title: true,
+        status: true,
+        assignedToId: true,
+        dueDate: true,
+        orgNodeId: true,
+        processId: true,
+        createdAt: true,
+        updatedAt: true,
+        template: { select: { title: true, type: true } },
+      },
+    });
+    return rows.map((submission) => {
+      const review = submission.assignedToId !== me.sub;
+      const checklist = String(submission.template.type).includes('CHECKLIST');
+      return {
+        sourceModule: 'forms',
+        sourceEntityType: checklist ? 'CHECKLIST' : 'FORM_SUBMISSION',
+        sourceEntityId: submission.id,
+        itemType: checklist ? 'CHECKLIST' : 'FORM',
+        title: submission.title ?? `${review ? 'Revisar' : 'Preencher'} ${submission.template.title}`,
+        summary: `${submission.code ? `${submission.code} · ` : ''}${submission.status}`,
+        status: review ? 'WAITING' : submission.status === 'IN_PROGRESS' ? 'IN_PROGRESS' : 'OPEN',
+        criticality: review || submission.status === 'WAITING_CORRECTION' ? 'HIGH' : 'MEDIUM',
+        dueAt: submission.dueDate,
+        assignedUserId: me.sub,
+        orgNodeId: submission.orgNodeId,
+        processId: submission.processId,
+        requiresDecision: review,
+        recommendedAction: review ? 'Revisar e decidir sobre o envio' : 'Preencher e enviar o formulário',
+        availableActions: [{ key: 'open', label: 'Abrir formulário', href: `/forms?submission=${submission.id}` }],
+        context: { submissionStatus: submission.status, templateType: submission.template.type },
+        sourceCreatedAt: submission.createdAt,
+        sourceUpdatedAt: submission.updatedAt,
+      };
+    });
   }
 
   private async collectRisks(me: AuthPayload): Promise<WorkItemDraft[]> {

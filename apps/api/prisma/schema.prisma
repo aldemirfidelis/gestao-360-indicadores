@@ -818,80 +818,80 @@ model User {
   // FK escalar (sem relation) p/ isolar a mudança; ignorada p/ papéis != SUPER_ADMIN.
   activeCompanyId String?
 
-  responsibleNodes            OrgNode[]                         @relation("OrgNodeResponsible")
-  indicatorsResponsible       Indicator[]                       @relation("IndicatorResponsible")
-  indicatorsFeeder            Indicator[]                       @relation("IndicatorFeeder")
-  resultsCreated              IndicatorResult[]                 @relation("ResultCreatedBy")
-  deviationsResponsible       Deviation[]                       @relation("DeviationResponsible")
-  actionsResponsible          ActionPlan[]                      @relation("ActionResponsible")
-  actionsCreated              ActionPlan[]                      @relation("ActionCreatedBy")
-  risksResponsible            RiskRegister[]                    @relation("RiskResponsible")
-  risksCreated                RiskRegister[]                    @relation("RiskCreatedBy")
-  ncResponsible               NonConformity[]                   @relation("NcResponsible")
-  ncCreated                   NonConformity[]                   @relation("NcCreatedBy")
-  documentsOwned              Document[]                        @relation("DocOwner")
-  documentsApproved           Document[]                        @relation("DocApprover")
-  documentsCreated            Document[]                        @relation("DocCreatedBy")
-  documentEditRequestsMade    DocumentEditRequest[]             @relation("DocumentEditRequester")
-  documentEditRequestsToDecide DocumentEditRequest[]            @relation("DocumentEditOperator")
-  documentEditRequestsDecided DocumentEditRequest[]             @relation("DocumentEditDecider")
-  auditsLed                   Audit[]                           @relation("AuditLead")
-  auditsCreated               Audit[]                           @relation("AuditCreatedBy")
-  processesOwned              Process[]                         @relation("ProcessOwner")
-  processesCreated            Process[]                         @relation("ProcessCreatedBy")
-  fsProgramsOwned             FoodSafetyProgram[]               @relation("FsProgramOwner")
-  fsProgramsCreated           FoodSafetyProgram[]               @relation("FsProgramCreatedBy")
-  fsProcessesOwned            FoodSafetyProcess[]               @relation("FsProcessOwner")
-  fsProcessesCreated          FoodSafetyProcess[]               @relation("FsProcessCreatedBy")
-  fsHazardsResponsible        FoodSafetyHazard[]                @relation("FsHazardResponsible")
-  fsControlPlansResponsible   FoodSafetyControlPlan[]           @relation("FsControlPlanResponsible")
-  fsMonitoringRecorded        FoodSafetyMonitoringRecord[]      @relation("FsMonitoringRecordedBy")
-  fsRequirementsResponsible   FoodSafetyRequirement[]           @relation("FsRequirementResponsible")
-  fsReqAssessmentsResponsible FoodSafetyRequirementAssessment[] @relation("FsReqAssessmentResponsible")
-  fsSuppliersResponsible      FoodSafetySupplier[]              @relation("FsSupplierResponsible")
-  fsRecallsResponsible        FoodSafetyRecall[]                @relation("FsRecallResponsible")
-  formTemplatesOwned          FormTemplate[]                    @relation("FormTemplateOwner")
-  formTemplatesCreated        FormTemplate[]                    @relation("FormTemplateCreatedBy")
-  formSubmissionsSubmitted    FormSubmission[]                  @relation("FormSubmissionSubmittedBy")
-  formSubmissionsReviewed     FormSubmission[]                  @relation("FormSubmissionReviewedBy")
-  actionTasksAssigned         ActionTask[]                      @relation("ActionTaskAssignee")
-  careerApprovalsRequested    OrgJobApprovalRequest[]           @relation("CareerApprovalRequester")
-  careerApprovalsToReview     OrgJobApprovalRequest[]           @relation("CareerApprovalApprover")
-  meetingParticipations       MeetingParticipant[]
-  comments                    Comment[]
-  notifications               Notification[]
-  refreshTokens               RefreshToken[]
-  auditLogs                   AuditLog[]
-  permissions                 UserPermission[]
-  traceabilityEvents          TraceabilityEvent[]               @relation("TraceabilityEventUser")
-  statusHistories             StatusHistory[]                   @relation("StatusHistoryUser")
-  mapLayouts                  MapLayout[]                       @relation("MapLayoutUpdatedBy")
-  treatmentsCreated           TreatmentCase[]                   @relation("TreatmentCreatedBy")
-  meetingsResponsible         Meeting[]                         @relation("MeetingResponsible")
-  strategicMapsCreated        StrategicMap[]                    @relation("StrategicMapCreatedBy")
-  strategicMapsUpdated        StrategicMap[]                    @relation("StrategicMapUpdatedBy")
-  perspectivesCreated         Perspective[]                     @relation("PerspectiveCreatedBy")
-  perspectivesUpdated         Perspective[]                     @relation("PerspectiveUpdatedBy")
-  objectivesResponsible       StrategicObjective[]              @relation("StrategicObjectiveResponsible")
-  objectivesCreated           StrategicObjective[]              @relation("StrategicObjectiveCreatedBy")
-  objectivesUpdated           StrategicObjective[]              @relation("StrategicObjectiveUpdatedBy")
-  okrObjectivesOwned          OKRObjective[]                    @relation("OKRObjectiveOwnerUser")
-  strategyVersions            StrategicMapVersion[]             @relation("StrategicVersionCreatedBy")
-  closedMonthsClosed          ClosedMonth[]                     @relation("ClosedMonthClosedBy")
-  closedMonthsReopened        ClosedMonth[]                     @relation("ClosedMonthReopenedBy")
-  conversationsCreated        Conversation[]                    @relation("ConversationCreatedBy")
-  conversationParticipations  ConversationParticipant[]
-  messagesSent                Message[]                         @relation("MessageSender")
-  messageReactions            MessageReaction[]
-  messageAttachmentsUploaded  MessageAttachment[]               @relation("MessageAttachmentUploadedBy")
-  helpFeedback                HelpFeedback[]
-  integrationPreferences      UserIntegrationPreference[]
-  presence                    UserPresence?
-  notificationPreference      NotificationPreference?
-  delegationsGiven            UserDelegation[]                  @relation("UserDelegationDelegator")
-  delegationsReceived         UserDelegation[]                  @relation("UserDelegationDelegate")
-  workItemFollows             WorkItemFollow[]                  @relation("WorkItemFollowUser")
-  myDayAssistantLogs          MyDayAssistantLog[]               @relation("MyDayAssistantUser")
+  responsibleNodes             OrgNode[]                         @relation("OrgNodeResponsible")
+  indicatorsResponsible        Indicator[]                       @relation("IndicatorResponsible")
+  indicatorsFeeder             Indicator[]                       @relation("IndicatorFeeder")
+  resultsCreated               IndicatorResult[]                 @relation("ResultCreatedBy")
+  deviationsResponsible        Deviation[]                       @relation("DeviationResponsible")
+  actionsResponsible           ActionPlan[]                      @relation("ActionResponsible")
+  actionsCreated               ActionPlan[]                      @relation("ActionCreatedBy")
+  risksResponsible             RiskRegister[]                    @relation("RiskResponsible")
+  risksCreated                 RiskRegister[]                    @relation("RiskCreatedBy")
+  ncResponsible                NonConformity[]                   @relation("NcResponsible")
+  ncCreated                    NonConformity[]                   @relation("NcCreatedBy")
+  documentsOwned               Document[]                        @relation("DocOwner")
+  documentsApproved            Document[]                        @relation("DocApprover")
+  documentsCreated             Document[]                        @relation("DocCreatedBy")
+  documentEditRequestsMade     DocumentEditRequest[]             @relation("DocumentEditRequester")
+  documentEditRequestsToDecide DocumentEditRequest[]             @relation("DocumentEditOperator")
+  documentEditRequestsDecided  DocumentEditRequest[]             @relation("DocumentEditDecider")
+  auditsLed                    Audit[]                           @relation("AuditLead")
+  auditsCreated                Audit[]                           @relation("AuditCreatedBy")
+  processesOwned               Process[]                         @relation("ProcessOwner")
+  processesCreated             Process[]                         @relation("ProcessCreatedBy")
+  fsProgramsOwned              FoodSafetyProgram[]               @relation("FsProgramOwner")
+  fsProgramsCreated            FoodSafetyProgram[]               @relation("FsProgramCreatedBy")
+  fsProcessesOwned             FoodSafetyProcess[]               @relation("FsProcessOwner")
+  fsProcessesCreated           FoodSafetyProcess[]               @relation("FsProcessCreatedBy")
+  fsHazardsResponsible         FoodSafetyHazard[]                @relation("FsHazardResponsible")
+  fsControlPlansResponsible    FoodSafetyControlPlan[]           @relation("FsControlPlanResponsible")
+  fsMonitoringRecorded         FoodSafetyMonitoringRecord[]      @relation("FsMonitoringRecordedBy")
+  fsRequirementsResponsible    FoodSafetyRequirement[]           @relation("FsRequirementResponsible")
+  fsReqAssessmentsResponsible  FoodSafetyRequirementAssessment[] @relation("FsReqAssessmentResponsible")
+  fsSuppliersResponsible       FoodSafetySupplier[]              @relation("FsSupplierResponsible")
+  fsRecallsResponsible         FoodSafetyRecall[]                @relation("FsRecallResponsible")
+  formTemplatesOwned           FormTemplate[]                    @relation("FormTemplateOwner")
+  formTemplatesCreated         FormTemplate[]                    @relation("FormTemplateCreatedBy")
+  formSubmissionsSubmitted     FormSubmission[]                  @relation("FormSubmissionSubmittedBy")
+  formSubmissionsReviewed      FormSubmission[]                  @relation("FormSubmissionReviewedBy")
+  actionTasksAssigned          ActionTask[]                      @relation("ActionTaskAssignee")
+  careerApprovalsRequested     OrgJobApprovalRequest[]           @relation("CareerApprovalRequester")
+  careerApprovalsToReview      OrgJobApprovalRequest[]           @relation("CareerApprovalApprover")
+  meetingParticipations        MeetingParticipant[]
+  comments                     Comment[]
+  notifications                Notification[]
+  refreshTokens                RefreshToken[]
+  auditLogs                    AuditLog[]
+  permissions                  UserPermission[]
+  traceabilityEvents           TraceabilityEvent[]               @relation("TraceabilityEventUser")
+  statusHistories              StatusHistory[]                   @relation("StatusHistoryUser")
+  mapLayouts                   MapLayout[]                       @relation("MapLayoutUpdatedBy")
+  treatmentsCreated            TreatmentCase[]                   @relation("TreatmentCreatedBy")
+  meetingsResponsible          Meeting[]                         @relation("MeetingResponsible")
+  strategicMapsCreated         StrategicMap[]                    @relation("StrategicMapCreatedBy")
+  strategicMapsUpdated         StrategicMap[]                    @relation("StrategicMapUpdatedBy")
+  perspectivesCreated          Perspective[]                     @relation("PerspectiveCreatedBy")
+  perspectivesUpdated          Perspective[]                     @relation("PerspectiveUpdatedBy")
+  objectivesResponsible        StrategicObjective[]              @relation("StrategicObjectiveResponsible")
+  objectivesCreated            StrategicObjective[]              @relation("StrategicObjectiveCreatedBy")
+  objectivesUpdated            StrategicObjective[]              @relation("StrategicObjectiveUpdatedBy")
+  okrObjectivesOwned           OKRObjective[]                    @relation("OKRObjectiveOwnerUser")
+  strategyVersions             StrategicMapVersion[]             @relation("StrategicVersionCreatedBy")
+  closedMonthsClosed           ClosedMonth[]                     @relation("ClosedMonthClosedBy")
+  closedMonthsReopened         ClosedMonth[]                     @relation("ClosedMonthReopenedBy")
+  conversationsCreated         Conversation[]                    @relation("ConversationCreatedBy")
+  conversationParticipations   ConversationParticipant[]
+  messagesSent                 Message[]                         @relation("MessageSender")
+  messageReactions             MessageReaction[]
+  messageAttachmentsUploaded   MessageAttachment[]               @relation("MessageAttachmentUploadedBy")
+  helpFeedback                 HelpFeedback[]
+  integrationPreferences       UserIntegrationPreference[]
+  presence                     UserPresence?
+  notificationPreference       NotificationPreference?
+  delegationsGiven             UserDelegation[]                  @relation("UserDelegationDelegator")
+  delegationsReceived          UserDelegation[]                  @relation("UserDelegationDelegate")
+  workItemFollows              WorkItemFollow[]                  @relation("WorkItemFollowUser")
+  myDayAssistantLogs           MyDayAssistantLog[]               @relation("MyDayAssistantUser")
 
   relationshipLinksCreated RelationshipLink[]     @relation("RelationshipCreatedBy")
   impactAnalysesCreated    ImpactAnalysis[]       @relation("ImpactAnalysisCreatedBy")
@@ -899,18 +899,18 @@ model User {
   impactAnalysisItems      ImpactAnalysisItem[]   @relation("ImpactItemResponsible")
   relationshipAuditLogs    RelationshipAuditLog[] @relation("RelationAuditPerformedBy")
 
-  workflowDefinitionsCreated  WorkflowDefinition[] @relation("WorkflowDefCreatedBy")
-  workflowDefinitionsUpdated  WorkflowDefinition[] @relation("WorkflowDefUpdatedBy")
-  workflowVersionsCreated     WorkflowVersion[]    @relation("WorkflowVerCreatedBy")
-  workflowVersionsPublished   WorkflowVersion[]    @relation("WorkflowVerPublishedBy")
-  workflowApprovalsRequested  WorkflowApproval[]   @relation("WorkflowApprovRequester")
-  workflowApprovalsApproved   WorkflowApproval[]   @relation("WorkflowApprovApprover")
-  workflowTasksResponsible    WorkflowTask[]       @relation("WorkflowTaskResponsible")
-  workflowTasksSubstitute     WorkflowTask[]       @relation("WorkflowTaskSubstitute")
-  workflowTemplatesCreated    WorkflowTemplate[]   @relation("WorkflowTempCreatedBy")
-  workflowDeadLettersResolved WorkflowDeadLetter[] @relation("WorkflowDLResolvedBy")
-  supportTickets              SupportTicket[]      @relation("UserSupportTickets")
-  assignedSupportTickets      SupportTicket[]      @relation("AssignedSupportTickets")
+  workflowDefinitionsCreated  WorkflowDefinition[]      @relation("WorkflowDefCreatedBy")
+  workflowDefinitionsUpdated  WorkflowDefinition[]      @relation("WorkflowDefUpdatedBy")
+  workflowVersionsCreated     WorkflowVersion[]         @relation("WorkflowVerCreatedBy")
+  workflowVersionsPublished   WorkflowVersion[]         @relation("WorkflowVerPublishedBy")
+  workflowApprovalsRequested  WorkflowApproval[]        @relation("WorkflowApprovRequester")
+  workflowApprovalsApproved   WorkflowApproval[]        @relation("WorkflowApprovApprover")
+  workflowTasksResponsible    WorkflowTask[]            @relation("WorkflowTaskResponsible")
+  workflowTasksSubstitute     WorkflowTask[]            @relation("WorkflowTaskSubstitute")
+  workflowTemplatesCreated    WorkflowTemplate[]        @relation("WorkflowTempCreatedBy")
+  workflowDeadLettersResolved WorkflowDeadLetter[]      @relation("WorkflowDLResolvedBy")
+  supportTickets              SupportTicket[]           @relation("UserSupportTickets")
+  assignedSupportTickets      SupportTicket[]           @relation("AssignedSupportTickets")
   ticketMessages              SupportTicketMessage[]
   ticketAttachments           SupportTicketAttachment[]
 
@@ -1203,8 +1203,8 @@ model OKRObjective {
   updatedAt      DateTime            @updatedAt
   deletedAt      DateTime?
 
-  keyResults KeyResult[]
-  checkins   OKRCheckin[]
+  keyResults  KeyResult[]
+  checkins    OKRCheckin[]
   actionPlans ActionPlan[] @relation("ActionOKRObjective")
 
   @@index([cycleId])
@@ -1293,25 +1293,25 @@ model Indicator {
   updatedAt DateTime  @updatedAt
   deletedAt DateTime?
 
-  targets                 IndicatorTarget[]
-  results                 IndicatorResult[]
-  deviations              Deviation[]
-  traceabilityEvents      TraceabilityEvent[]
-  meetings                Meeting[]                     @relation("MeetingIndicator")
-  actions                 ActionPlan[]                  @relation("ActionIndicator")
-  treatmentCases          TreatmentCase[]
-  childRelations          IndicatorTreeRelation[]       @relation("RelChild")
-  parentRelations         IndicatorTreeRelation[]       @relation("RelParent")
-  strategicObjectiveLinks StrategicObjectiveIndicator[]
-  projects                Project[]                     @relation("ProjectIndicator")
-  risks                   RiskRegister[]                @relation("RiskIndicator")
-  nonConformities         NonConformity[]               @relation("NcIndicator")
-  documents               Document[]                    @relation("DocIndicator")
-  processes               Process[]                     @relation("ProcessIndicator")
-  formTemplates           FormTemplate[]                @relation("FormTemplateIndicator")
-  formSubmissions         FormSubmission[]              @relation("FormSubmissionIndicator")
-  keyResults              KeyResult[]                   @relation("KeyResultIndicator")
-  monthlyMeetingIndicators MonthlyMeetingIndicator[]    @relation("MonthlySnapshotIndicator")
+  targets                  IndicatorTarget[]
+  results                  IndicatorResult[]
+  deviations               Deviation[]
+  traceabilityEvents       TraceabilityEvent[]
+  meetings                 Meeting[]                     @relation("MeetingIndicator")
+  actions                  ActionPlan[]                  @relation("ActionIndicator")
+  treatmentCases           TreatmentCase[]
+  childRelations           IndicatorTreeRelation[]       @relation("RelChild")
+  parentRelations          IndicatorTreeRelation[]       @relation("RelParent")
+  strategicObjectiveLinks  StrategicObjectiveIndicator[]
+  projects                 Project[]                     @relation("ProjectIndicator")
+  risks                    RiskRegister[]                @relation("RiskIndicator")
+  nonConformities          NonConformity[]               @relation("NcIndicator")
+  documents                Document[]                    @relation("DocIndicator")
+  processes                Process[]                     @relation("ProcessIndicator")
+  formTemplates            FormTemplate[]                @relation("FormTemplateIndicator")
+  formSubmissions          FormSubmission[]              @relation("FormSubmissionIndicator")
+  keyResults               KeyResult[]                   @relation("KeyResultIndicator")
+  monthlyMeetingIndicators MonthlyMeetingIndicator[]     @relation("MonthlySnapshotIndicator")
 
   @@unique([companyId, code])
   @@unique([companyId, externalSource, externalId])
@@ -1879,24 +1879,24 @@ model RiskRegister {
   createdById        String?
   createdBy          User?       @relation("RiskCreatedBy", fields: [createdById], references: [id])
 
-  title           String
-  description     String?
-  category        RiskCategory @default(OPERATIONAL)
-  status          RiskStatus   @default(IDENTIFIED)
-  probability     Int          @default(3)
-  impact          Int          @default(3)
+  title               String
+  description         String?
+  category            RiskCategory @default(OPERATIONAL)
+  status              RiskStatus   @default(IDENTIFIED)
+  probability         Int          @default(3)
+  impact              Int          @default(3)
   // Risco residual = probabilidade/impacto estimados APÓS a mitigação. Nulos
   // enquanto não avaliados (o cliente ainda não fez a análise residual).
   residualProbability Int?
   residualImpact      Int?
-  mitigationPlan  String?
-  contingencyPlan String?
-  dueDate         DateTime?
-  identifiedAt    DateTime     @default(now())
-  closedAt        DateTime?
-  createdAt       DateTime     @default(now())
-  updatedAt       DateTime     @updatedAt
-  deletedAt       DateTime?
+  mitigationPlan      String?
+  contingencyPlan     String?
+  dueDate             DateTime?
+  identifiedAt        DateTime     @default(now())
+  closedAt            DateTime?
+  createdAt           DateTime     @default(now())
+  updatedAt           DateTime     @updatedAt
+  deletedAt           DateTime?
 
   @@index([companyId])
   @@index([companyId, status])
@@ -2370,27 +2370,27 @@ model DocumentReviewRequest {
 }
 
 model DocumentEditRequest {
-  id              String   @id @default(uuid())
+  id              String    @id @default(uuid())
   companyId       String
-  company         Company  @relation("DocumentEditRequestCompany", fields: [companyId], references: [id])
+  company         Company   @relation("DocumentEditRequestCompany", fields: [companyId], references: [id])
   documentId      String
-  document        Document @relation(fields: [documentId], references: [id], onDelete: Cascade)
+  document        Document  @relation(fields: [documentId], references: [id], onDelete: Cascade)
   versionId       String?
   requesterUserId String
-  requester       User     @relation("DocumentEditRequester", fields: [requesterUserId], references: [id])
+  requester       User      @relation("DocumentEditRequester", fields: [requesterUserId], references: [id])
   operatorUserId  String?
-  operator        User?    @relation("DocumentEditOperator", fields: [operatorUserId], references: [id])
+  operator        User?     @relation("DocumentEditOperator", fields: [operatorUserId], references: [id])
   decidedById     String?
-  decidedBy       User?    @relation("DocumentEditDecider", fields: [decidedById], references: [id])
-  status          String   @default("REQUESTED") // REQUESTED | APPROVED | REJECTED | IN_PROGRESS | COMPLETED | CANCELLED
+  decidedBy       User?     @relation("DocumentEditDecider", fields: [decidedById], references: [id])
+  status          String    @default("REQUESTED") // REQUESTED | APPROVED | REJECTED | IN_PROGRESS | COMPLETED | CANCELLED
   reason          String?
   decisionNote    String?
   approvedAt      DateTime?
   rejectedAt      DateTime?
   completedAt     DateTime?
   expiresAt       DateTime?
-  createdAt       DateTime @default(now())
-  updatedAt       DateTime @updatedAt
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
 
   @@index([companyId, status])
   @@index([documentId, status])
@@ -5663,18 +5663,18 @@ enum CommMediaStatus {
 }
 
 model CommunicationPost {
-  id                       String                @id @default(uuid())
+  id                       String                 @id @default(uuid())
   companyId                String
-  company                  Company               @relation(fields: [companyId], references: [id])
+  company                  Company                @relation(fields: [companyId], references: [id])
   campaignId               String?
   campaign                 CommunicationCampaign? @relation(fields: [campaignId], references: [id])
   title                    String
   subtitle                 String?
   content                  String
-  type                     CommPostType          @default(SIMPLE)
-  category                 String                @default("Institucional")
-  priority                 CommPostPriority      @default(NORMAL)
-  status                   CommPostStatus        @default(DRAFT)
+  type                     CommPostType           @default(SIMPLE)
+  category                 String                 @default("Institucional")
+  priority                 CommPostPriority       @default(NORMAL)
+  status                   CommPostStatus         @default(DRAFT)
   authorId                 String
   approverId               String?
   approvalComment          String?
@@ -5694,21 +5694,21 @@ model CommunicationPost {
   actionUrl                String?
   actionLabel              String?
   estimatedMinutes         Int?
-  requiresReadConfirmation Boolean               @default(false)
-  requiresPollAnswer       Boolean               @default(false)
-  requiresVideoCompletion  Boolean               @default(false)
-  allowComments            Boolean               @default(true)
-  allowReactions           Boolean               @default(true)
-  isMandatory              Boolean               @default(false)
-  isPinned                 Boolean               @default(false)
-  isFeatured               Boolean               @default(false)
-  publicLinkEnabled        Boolean               @default(false)
+  requiresReadConfirmation Boolean                @default(false)
+  requiresPollAnswer       Boolean                @default(false)
+  requiresVideoCompletion  Boolean                @default(false)
+  allowComments            Boolean                @default(true)
+  allowReactions           Boolean                @default(true)
+  isMandatory              Boolean                @default(false)
+  isPinned                 Boolean                @default(false)
+  isFeatured               Boolean                @default(false)
+  publicLinkEnabled        Boolean                @default(false)
   qrCodeValue              String?
   linkedModule             String?
   linkedEntityId           String?
-  version                  Int                   @default(1)
-  createdAt                DateTime              @default(now())
-  updatedAt                DateTime              @updatedAt
+  version                  Int                    @default(1)
+  createdAt                DateTime               @default(now())
+  updatedAt                DateTime               @updatedAt
   deletedAt                DateTime?
 
   reads         CommunicationPostRead[]
@@ -5722,15 +5722,15 @@ model CommunicationPost {
 }
 
 model CommunicationPostRead {
-  id          String            @id @default(uuid())
-  postId      String
-  post        CommunicationPost @relation(fields: [postId], references: [id], onDelete: Cascade)
-  userId      String
-  viewedAt    DateTime          @default(now())
-  confirmedAt DateTime?
-  channel     String?
-  device      String?
-  ip          String?
+  id           String            @id @default(uuid())
+  postId       String
+  post         CommunicationPost @relation(fields: [postId], references: [id], onDelete: Cascade)
+  userId       String
+  viewedAt     DateTime          @default(now())
+  confirmedAt  DateTime?
+  channel      String?
+  device       String?
+  ip           String?
   dwellSeconds Int?
 
   @@unique([postId, userId])
@@ -5738,12 +5738,12 @@ model CommunicationPostRead {
 }
 
 model CommunicationPostReaction {
-  id        String           @id @default(uuid())
+  id        String            @id @default(uuid())
   postId    String
   post      CommunicationPost @relation(fields: [postId], references: [id], onDelete: Cascade)
   userId    String
-  type      CommReactionType @default(LIKE)
-  createdAt DateTime         @default(now())
+  type      CommReactionType  @default(LIKE)
+  createdAt DateTime          @default(now())
 
   @@unique([postId, userId])
 }
@@ -9377,6 +9377,175 @@ model MyDayAssistantLog {
 }
 
 // =====================================================
+// Tarefas — Central de Trabalho Visual
+// Camada operacional persistente. Tarefas automaticas referenciam a fonte
+// oficial por sourceKey/sourceEntityId; nunca substituem o registro de origem.
+// =====================================================
+
+model TaskBoard {
+  id          String   @id @default(uuid())
+  key         String   @unique
+  companyId   String
+  name        String
+  description String?
+  type        String   @default("TEAM")
+  areaId      String?
+  ownerId     String?
+  visibility  String   @default("COMPANY")
+  wikiContent String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  columns TaskBoardColumn[]
+  tasks   WorkspaceTask[]
+
+  @@index([companyId, type])
+  @@index([companyId, areaId])
+}
+
+model TaskBoardColumn {
+  id           String    @id @default(uuid())
+  boardId      String
+  board        TaskBoard @relation(fields: [boardId], references: [id], onDelete: Cascade)
+  name         String
+  statusKey    String
+  position     Int
+  color        String
+  icon         String?
+  isDoneColumn Boolean   @default(false)
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+
+  tasks WorkspaceTask[]
+
+  @@unique([boardId, statusKey])
+  @@index([boardId, position])
+}
+
+model WorkspaceTask {
+  id                String          @id @default(uuid())
+  companyId         String
+  boardId           String
+  board             TaskBoard       @relation(fields: [boardId], references: [id], onDelete: Cascade)
+  columnId          String
+  column            TaskBoardColumn @relation(fields: [columnId], references: [id])
+  title             String
+  description       String?
+  status            String          @default("TODO")
+  priority          String          @default("MEDIUM")
+  dueDate           DateTime?
+  startDate         DateTime?
+  completedAt       DateTime?
+  assigneeId        String?
+  createdById       String?
+  areaId            String?
+  projectId         String?
+  position          Float           @default(0)
+  color             String          @default("yellow")
+  icon              String?
+  tags              Json            @default("[]")
+  dependencies      Json            @default("[]")
+  isArchived        Boolean         @default(false)
+  isAutomatic       Boolean         @default(false)
+  sourceKey         String?         @unique
+  sourceType        String          @default("MANUAL")
+  sourceModule      String?
+  sourceEntityId    String?
+  sourceEntityLabel String?
+  sourceUrl         String?
+  automationRuleId  String?
+  generatedBy       String          @default("USER")
+  generatedAt       DateTime?
+  createdAt         DateTime        @default(now())
+  updatedAt         DateTime        @updatedAt
+
+  comments       TaskComment[]
+  attachments    TaskAttachment[]
+  checklistItems TaskChecklistItem[]
+  activities     TaskActivity[]
+  links          TaskLink[]
+
+  @@index([companyId, boardId, isArchived])
+  @@index([companyId, assigneeId, status])
+  @@index([companyId, areaId, status])
+  @@index([columnId, position])
+  @@index([dueDate])
+  @@index([sourceType, sourceEntityId])
+}
+
+model TaskComment {
+  id        String        @id @default(uuid())
+  taskId    String
+  task      WorkspaceTask @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  userId    String
+  content   String
+  mentions  Json          @default("[]")
+  createdAt DateTime      @default(now())
+  updatedAt DateTime      @updatedAt
+
+  @@index([taskId, createdAt])
+  @@index([userId])
+}
+
+model TaskAttachment {
+  id           String        @id @default(uuid())
+  taskId       String
+  task         WorkspaceTask @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  fileName     String
+  fileUrl      String
+  fileType     String?
+  fileSize     Int?
+  uploadedById String
+  createdAt    DateTime      @default(now())
+
+  @@index([taskId, createdAt])
+}
+
+model TaskChecklistItem {
+  id         String        @id @default(uuid())
+  taskId     String
+  task       WorkspaceTask @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  title      String
+  isDone     Boolean       @default(false)
+  position   Int           @default(0)
+  assigneeId String?
+  createdAt  DateTime      @default(now())
+  updatedAt  DateTime      @updatedAt
+
+  @@index([taskId, position])
+}
+
+model TaskActivity {
+  id        String        @id @default(uuid())
+  taskId    String
+  task      WorkspaceTask @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  userId    String?
+  action    String
+  fromValue String?
+  toValue   String?
+  metadata  Json?
+  createdAt DateTime      @default(now())
+
+  @@index([taskId, createdAt])
+  @@index([userId])
+}
+
+model TaskLink {
+  id          String        @id @default(uuid())
+  taskId      String
+  task        WorkspaceTask @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  entityType  String
+  entityId    String
+  entityLabel String
+  moduleName  String
+  url         String?
+  createdAt   DateTime      @default(now())
+
+  @@unique([taskId, entityType, entityId])
+  @@index([entityType, entityId])
+}
+
+// =====================================================
 // Gestao de Premio (Remuneracao Variavel) - Fase 1
 // Governanca de Anexos, Programas, Competencias e Indicadores.
 // Tenancy por companyId (scalar). FKs externas (User/OrgNode) sao colunas
@@ -9990,16 +10159,16 @@ model PrizeOrgRef {
 /// Catalogo canonico de cargos com ID estavel (`code`). Mesma logica do
 /// PrizeOrgRef, para o eixo de cargo das combinacoes.
 model PrizeCargoRef {
-  id            String   @id @default(uuid())
+  id            String    @id @default(uuid())
   companyId     String
   code          Int
   name          String
   normalizedKey String
-  source        String   @default("IMPORT")
-  active        Boolean  @default(true)
+  source        String    @default("IMPORT")
+  active        Boolean   @default(true)
   createdById   String?
-  createdAt     DateTime @default(now())
-  updatedAt     DateTime @updatedAt
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
   deletedAt     DateTime?
 
   @@unique([companyId, normalizedKey])
@@ -11554,38 +11723,38 @@ model PublicContactMessage {
 /// Registro das Operações de Tratamento (RoPA — Art. 37 da LGPD).
 /// Uma linha por operação de tratamento de dados pessoais da empresa.
 model DataProcessingRecord {
-  id                 String    @id @default(uuid())
-  companyId          String
-  company            Company   @relation("DataProcessingRecordCompany", fields: [companyId], references: [id], onDelete: Cascade)
+  id                    String    @id @default(uuid())
+  companyId             String
+  company               Company   @relation("DataProcessingRecordCompany", fields: [companyId], references: [id], onDelete: Cascade)
   /// Nome/identificação da operação de tratamento.
-  name               String
+  name                  String
   /// Área/processo responsável (texto livre).
-  area               String?
+  area                  String?
   /// Finalidade do tratamento.
-  purpose            String
+  purpose               String
   /// Base legal (Art. 7º/11). Valores sugeridos: LEGAL_OBLIGATION, CONTRACT,
   /// CONSENT, LEGITIMATE_INTEREST, VITAL_INTEREST, PUBLIC_POLICY, LEGAL_PROCESS.
-  legalBasis         String
+  legalBasis            String
   /// Categorias de titulares (ex.: colaboradores, clientes). Lista livre.
-  dataSubjects       String[]
+  dataSubjects          String[]
   /// Categorias de dados pessoais tratados.
-  dataCategories     String[]
+  dataCategories        String[]
   /// Indica se há dados sensíveis (Art. 11).
-  hasSensitiveData   Boolean   @default(false)
+  hasSensitiveData      Boolean   @default(false)
   /// Compartilhamentos/destinatários (interno/externo).
-  sharedWith         String[]
+  sharedWith            String[]
   /// Prazo/critério de retenção.
-  retentionPeriod    String?
+  retentionPeriod       String?
   /// Medidas de segurança aplicadas (texto livre).
-  securityMeasures   String?
+  securityMeasures      String?
   /// Há transferência internacional nesta operação.
-  internationalTransfer Boolean @default(false)
+  internationalTransfer Boolean   @default(false)
   /// Status: ACTIVE, UNDER_REVIEW, DISCONTINUED.
-  status             String    @default("ACTIVE")
-  createdById        String?
-  createdAt          DateTime  @default(now())
-  updatedAt          DateTime  @updatedAt
-  deletedAt          DateTime?
+  status                String    @default("ACTIVE")
+  createdById           String?
+  createdAt             DateTime  @default(now())
+  updatedAt             DateTime  @updatedAt
+  deletedAt             DateTime?
 
   @@index([companyId])
   @@index([companyId, status])
@@ -11624,35 +11793,35 @@ model Subprocessor {
 
 /// Registro de incidentes de segurança envolvendo dados pessoais (Art. 48).
 model DataIncident {
-  id                   String    @id @default(uuid())
-  companyId            String
-  company              Company   @relation("DataIncidentCompany", fields: [companyId], references: [id], onDelete: Cascade)
-  title                String
-  description          String?
+  id                 String    @id @default(uuid())
+  companyId          String
+  company            Company   @relation("DataIncidentCompany", fields: [companyId], references: [id], onDelete: Cascade)
+  title              String
+  description        String?
   /// Severidade: CRITICAL, HIGH, MEDIUM, LOW.
-  severity             String    @default("MEDIUM")
+  severity           String    @default("MEDIUM")
   /// Status: OPEN, CONTAINED, INVESTIGATING, RESOLVED, CLOSED.
-  status               String    @default("OPEN")
+  status             String    @default("OPEN")
   /// Categorias de dados afetados.
-  affectedData         String[]
+  affectedData       String[]
   /// Quantidade estimada de titulares afetados.
-  affectedSubjects     Int?
-  detectedAt           DateTime  @default(now())
-  containedAt          DateTime?
-  resolvedAt           DateTime?
+  affectedSubjects   Int?
+  detectedAt         DateTime  @default(now())
+  containedAt        DateTime?
+  resolvedAt         DateTime?
   /// Comunicação à ANPD.
-  anpdNotified         Boolean   @default(false)
-  anpdNotifiedAt       DateTime?
+  anpdNotified       Boolean   @default(false)
+  anpdNotifiedAt     DateTime?
   /// Comunicação aos titulares.
-  subjectsNotified     Boolean   @default(false)
-  subjectsNotifiedAt   DateTime?
+  subjectsNotified   Boolean   @default(false)
+  subjectsNotifiedAt DateTime?
   /// Medidas adotadas (contenção, mitigação, correção).
-  measures             String?
-  responsibleUserId    String?
-  createdById          String?
-  createdAt            DateTime  @default(now())
-  updatedAt            DateTime  @updatedAt
-  deletedAt            DateTime?
+  measures           String?
+  responsibleUserId  String?
+  createdById        String?
+  createdAt          DateTime  @default(now())
+  updatedAt          DateTime  @updatedAt
+  deletedAt          DateTime?
 
   @@index([companyId])
   @@index([companyId, status])

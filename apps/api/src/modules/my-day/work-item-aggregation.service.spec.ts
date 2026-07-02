@@ -6,14 +6,20 @@ import type { AuthPayload } from '../auth/auth.types';
 
 const me: AuthPayload = { sub: 'u1', email: 'u@x.com', name: 'U', role: UserRoleEnum.ANALYST, companyId: 'c1' };
 
-function makePrisma(over: { actions?: unknown[] } = {}) {
+function makePrisma(over: { actions?: unknown[]; actionTasks?: unknown[] } = {}) {
   const empty = () => ({ findMany: vi.fn().mockResolvedValue([]) });
   return {
     actionPlan: { findMany: vi.fn().mockResolvedValue(over.actions ?? []) },
+    actionTask: { findMany: vi.fn().mockResolvedValue(over.actionTasks ?? []) },
+    projectTask: empty(),
     workflowTask: empty(),
     workflowApproval: empty(),
     meeting: empty(),
     document: empty(),
+    documentEditRequest: empty(),
+    audit: empty(),
+    auditFinding: empty(),
+    formSubmission: empty(),
     riskRegister: empty(),
     nonConformity: empty(),
     indicatorResult: empty(),
@@ -59,6 +65,36 @@ describe('WorkItemAggregationService', () => {
     expect(count).toBe(0);
     expect(prisma.workItemIndex.upsert).not.toHaveBeenCalled();
     expect(prisma.workItemIndex.deleteMany).toHaveBeenCalledTimes(1);
+  });
+
+  it('materializa cada tarefa de plano como item individual vinculado à origem', async () => {
+    const prisma = makePrisma({
+      actionTasks: [{
+        id: 'task-a1',
+        actionId: 'a1',
+        title: 'Validar evidências',
+        dueDate: new Date(Date.now() + 86_400_000),
+        startDate: null,
+        createdAt: new Date(),
+        updatedAt: new Date(),
+        action: {
+          title: 'Plano X',
+          ownerNodeId: 'n1',
+          priority: 'HIGH',
+          criticality: 'HIGH',
+          evidenceRequired: true,
+        },
+      }],
+    });
+    const svc = new WorkItemAggregationService(prisma, new WorkItemPriorityService());
+
+    const count = await svc.rebuildForUser(me);
+
+    expect(count).toBe(1);
+    const arg = prisma.workItemIndex.upsert.mock.calls[0][0];
+    expect(arg.where.dedupeKey).toBe('ACTION_TASK:task-a1:TASK:u1');
+    expect(arg.create.requiresEvidence).toBe(true);
+    expect(arg.create.availableActions[0].href).toBe('/actions/a1');
   });
 
   it('materializa itens delegados para o substituto sem alterar a origem', async () => {
