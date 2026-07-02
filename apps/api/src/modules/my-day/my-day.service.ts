@@ -484,13 +484,31 @@ export class MyDayService implements OnModuleInit {
 
   // ---------- delegacoes ----------
 
+  /**
+   * Candidatos a substituto na delegação. Antes retornava a empresa inteira
+   * (o gestor via todos os usuários). Agora separa a EQUIPE do gestor (mesma
+   * definição de "Meu Dia — Equipe": áreas que ele lidera + descendentes) dos
+   * demais colaboradores, para que a delegação priorize quem é da equipe.
+   * `scope='none'` = usuário não lidera ninguém: só existe a lista geral.
+   */
   async listDelegationUsers(me: AuthPayload) {
-    return this.prisma.user.findMany({
-      where: { companyId: me.companyId, id: { not: me.sub }, deletedAt: null, status: 'ACTIVE', active: true },
-      orderBy: { name: 'asc' },
-      select: { id: true, name: true, email: true, jobTitle: true },
-      take: 200,
-    });
+    const [all, team] = await Promise.all([
+      this.prisma.user.findMany({
+        where: { companyId: me.companyId, id: { not: me.sub }, deletedAt: null, status: 'ACTIVE', active: true },
+        orderBy: { name: 'asc' },
+        select: { id: true, name: true, email: true, jobTitle: true },
+        take: 500,
+      }),
+      this.team.getTeamMembers(me),
+    ]);
+    const teamIds = new Set(team.members.map((m) => m.id));
+    return {
+      scope: team.scope,
+      team: all.filter((user) => teamIds.has(user.id)),
+      others: all.filter((user) => !teamIds.has(user.id)),
+      // Compatibilidade: lista plana para telas que ainda não agrupam.
+      users: all,
+    };
   }
 
   async listDelegations(me: AuthPayload) {

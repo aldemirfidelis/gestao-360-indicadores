@@ -99,10 +99,16 @@ const EXTRA_TABS = [
   { key: 'pinned', label: 'Fixados' },
 ];
 
+interface DelegationUser { id: string; name: string; email: string; jobTitle?: string | null }
 interface DelegationPayload {
   given: Array<{ id: string; status: string; startsAt: string; endsAt?: string | null; reason?: string | null; delegate: { id: string; name: string; email: string } }>;
   received: Array<{ id: string; status: string; startsAt: string; endsAt?: string | null; reason?: string | null; delegator: { id: string; name: string; email: string } }>;
-  users: Array<{ id: string; name: string; email: string; jobTitle?: string | null }>;
+  users: {
+    scope: 'managed' | 'company' | 'none';
+    team: DelegationUser[];
+    others: DelegationUser[];
+    users: DelegationUser[];
+  };
 }
 
 interface AssistantResult {
@@ -441,35 +447,46 @@ export default function MeuDiaPage() {
         )}
       </div>
 
-      {/* Toolbar: visualização + filtros salvos + personalizar */}
+      {/* Toolbar: visualização + filtros salvos + personalizar.
+          O alternador de visualização e o "Salvar filtro" só valem nas abas de
+          lista — na Visão geral (painel consolidado) não há lista para
+          alternar, então antes esses botões pareciam sem função. */}
       <div className="flex flex-wrap items-center justify-between gap-3 bg-slate-50/50 p-2 rounded-xl border border-border/60">
         <div className="flex items-center gap-2 flex-wrap">
-          <div className="inline-flex rounded-lg border bg-white p-0.5 shadow-sm">
-            {([['list', LayoutList, 'Lista'], ['table', Table2, 'Tabela'], ['kanban', Columns3, 'Kanban'], ['calendar', CalendarDays, 'Calendário'], ['timeline', Clock3, 'Linha do tempo']] as const).map(([v, Ic, lbl]) => (
-              <button
-                key={v}
-                type="button"
-                onClick={() => setView(v)}
-                className={cn(
-                  'inline-flex items-center gap-1 rounded-md px-3 py-1.5 text-xs font-semibold transition-all',
-                  view === v 
-                    ? 'bg-blue-600 text-white shadow-sm' 
-                    : 'text-slate-500 hover:text-slate-900 hover:bg-slate-50'
-                )}
-              >
-                <Ic className="h-3.5 w-3.5" />{lbl}
-              </button>
-            ))}
-          </div>
-          {(savedFilters.data ?? []).length > 0 && (
-            <NativeSelect className="h-9 w-44 text-xs font-medium rounded-lg" value="" onChange={(e) => { const f = (savedFilters.data ?? []).find((x) => x.id === e.target.value); if (f) applyFilter(f); }}>
-              <option value="">Filtros salvos…</option>
-              {(savedFilters.data ?? []).map((f) => <option key={f.id} value={f.id}>{f.name}</option>)}
-            </NativeSelect>
+          {onOverview ? (
+            <span className="text-xs font-medium text-slate-500">
+              Painel consolidado — abra <strong>Prioridades</strong> ou <strong>Hoje</strong> para alternar entre Lista, Tabela, Kanban, Calendário e Linha do tempo.
+            </span>
+          ) : (
+            <>
+              <div className="inline-flex rounded-lg border bg-white p-0.5 shadow-sm">
+                {([['list', LayoutList, 'Lista'], ['table', Table2, 'Tabela'], ['kanban', Columns3, 'Kanban'], ['calendar', CalendarDays, 'Calendário'], ['timeline', Clock3, 'Linha do tempo']] as const).map(([v, Ic, lbl]) => (
+                  <button
+                    key={v}
+                    type="button"
+                    onClick={() => setView(v)}
+                    className={cn(
+                      'inline-flex items-center gap-1 rounded-md px-3 py-1.5 text-xs font-semibold transition-all',
+                      view === v
+                        ? 'bg-blue-600 text-white shadow-sm'
+                        : 'text-slate-500 hover:text-slate-900 hover:bg-slate-50'
+                    )}
+                  >
+                    <Ic className="h-3.5 w-3.5" />{lbl}
+                  </button>
+                ))}
+              </div>
+              {(savedFilters.data ?? []).length > 0 && (
+                <NativeSelect className="h-9 w-44 text-xs font-medium rounded-lg" value="" onChange={(e) => { const f = (savedFilters.data ?? []).find((x) => x.id === e.target.value); if (f) applyFilter(f); }}>
+                  <option value="">Filtros salvos…</option>
+                  {(savedFilters.data ?? []).map((f) => <option key={f.id} value={f.id}>{f.name}</option>)}
+                </NativeSelect>
+              )}
+              <Button variant="ghost" size="sm" className="h-9 text-xs font-semibold text-slate-500 hover:text-slate-900 rounded-lg" onClick={() => setSaveOpen(true)}>
+                <Bookmark className="mr-1 h-3.5 w-3.5 text-slate-400" />Salvar filtro
+              </Button>
+            </>
           )}
-          <Button variant="ghost" size="sm" className="h-9 text-xs font-semibold text-slate-500 hover:text-slate-900 rounded-lg" onClick={() => setSaveOpen(true)}>
-            <Bookmark className="mr-1 h-3.5 w-3.5 text-slate-400" />Salvar filtro
-          </Button>
         </div>
         <Button variant="outline" size="sm" className="h-9 text-xs font-semibold bg-white border border-border text-slate-600 hover:text-slate-900 shadow-sm rounded-lg" onClick={() => setPrefsOpen(true)}>
           <SlidersHorizontal className="mr-1.5 h-3.5 w-3.5 text-slate-400" />Personalizar dashboard
@@ -1159,7 +1176,9 @@ function DelegationsDialog({ data, loading, creating, revoking, onClose, onCreat
   const [startsAt, setStartsAt] = useState(() => new Date().toISOString().slice(0, 16));
   const [endsAt, setEndsAt] = useState('');
   const [reason, setReason] = useState('');
-  const users = data?.users ?? [];
+  const team = data?.users?.team ?? [];
+  const others = data?.users?.others ?? [];
+  const scope = data?.users?.scope ?? 'none';
   return (
     <Dialog open onOpenChange={(o) => !o && onClose()}>
       <DialogContent className="max-w-3xl">
@@ -1174,8 +1193,22 @@ function DelegationsDialog({ data, loading, creating, revoking, onClose, onCreat
                 <Label>Substituto</Label>
                 <NativeSelect value={delegateUserId} onChange={(e) => setDelegateUserId(e.target.value)}>
                   <option value="">Selecione...</option>
-                  {users.map((u) => <option key={u.id} value={u.id}>{u.name} - {u.email}</option>)}
+                  {team.length > 0 && (
+                    <optgroup label={scope === 'company' ? 'Colaboradores' : 'Minha equipe'}>
+                      {team.map((u) => <option key={u.id} value={u.id}>{u.name}{u.jobTitle ? ` — ${u.jobTitle}` : ''}</option>)}
+                    </optgroup>
+                  )}
+                  {others.length > 0 && (
+                    <optgroup label={team.length > 0 ? 'Outros colaboradores' : 'Colaboradores'}>
+                      {others.map((u) => <option key={u.id} value={u.id}>{u.name}{u.jobTitle ? ` — ${u.jobTitle}` : ''}</option>)}
+                    </optgroup>
+                  )}
                 </NativeSelect>
+                {scope === 'none' && (
+                  <p className="mt-1 text-[11px] text-muted-foreground">
+                    Você ainda não lidera nenhuma área no organograma — a lista mostra todos os colaboradores. Para ver só a sua equipe, defina-se como responsável pela área e vincule os colaboradores a ela (Organograma).
+                  </p>
+                )}
               </div>
               <div className="grid grid-cols-2 gap-2">
                 <div><Label>Inicio</Label><Input type="datetime-local" value={startsAt} onChange={(e) => setStartsAt(e.target.value)} /></div>

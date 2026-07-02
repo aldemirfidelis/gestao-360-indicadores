@@ -50,6 +50,18 @@ export class MyDayTeamService {
     return n > 0;
   }
 
+  /**
+   * Membros da equipe do usuário (mesma definição de "Meu Dia — Equipe"):
+   * áreas que ele lidera + descendentes. `scope`: 'managed' quando ele lidera
+   * áreas, 'company' para admin, 'none' quando não lidera ninguém.
+   */
+  async getTeamMembers(me: AuthPayload): Promise<{ members: Array<{ id: string; name: string }>; scope: 'managed' | 'company' | 'none' }> {
+    const team = await this.resolveTeam(me);
+    const members = team.members.map((m) => ({ id: m.id, name: m.name }));
+    const scope = team.allCompany ? 'company' : team.memberIds.length ? 'managed' : 'none';
+    return { members, scope };
+  }
+
   private async resolveTeam(me: AuthPayload): Promise<TeamScope> {
     const managed = await this.prisma.orgNode.findMany({
       where: { companyId: me.companyId, responsibleUserId: me.sub, active: true, deletedAt: null },
