@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useMemo, useRef, useState } from 'react';
-import type { Dispatch, ReactNode, SetStateAction } from 'react';
+import type { ReactNode } from 'react';
 import { useSearchParams } from 'next/navigation';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
@@ -14,7 +14,6 @@ import {
   Edit,
   Eye,
   FileText,
-  Filter,
   History,
   Layers,
   MessageSquare,
@@ -203,6 +202,8 @@ interface DocSummary {
   expired: number;
   needsReview: number;
   obsolete: number;
+  byStatus: Record<string, number>;
+  byType: Record<string, number>;
   expiringSoon: Array<Pick<Doc, 'id' | 'number' | 'code' | 'title' | 'type' | 'status' | 'validUntil' | 'isExpired' | 'daysToExpire' | 'orgNode' | 'owner'>>;
 }
 
@@ -365,6 +366,7 @@ export default function DocumentsPage() {
   const qc = useQueryClient();
   const searchParams = useSearchParams();
   const { hasPermission, user } = useAuth();
+  const { open: openVision360 } = useVision360();
   const canCreate = hasPermission(['doc:create']);
   const canUpdate = hasPermission(['doc:update']);
   const canDelete = hasPermission(['doc:delete']);
@@ -916,93 +918,226 @@ export default function DocumentsPage() {
           {canManage && <TabsTrigger value="config" className="text-xs font-semibold"><Settings className="mr-2 h-4 w-4" />Configurações</TabsTrigger>}
         </TabsList>
 
-        <TabsContent value="acervo" className="space-y-6">
-          <div className="grid grid-cols-1 gap-6 xl:grid-cols-[1fr,360px]">
-            <div className="space-y-6">
-              
-              {/* Alerta de validade / revisão */}
-              <Card className="border border-slate-100 dark:border-slate-800/80 bg-white dark:bg-slate-900/50 shadow-sm flex flex-col h-[280px]">
-                <div className="flex items-center justify-between border-b px-4 py-3 shrink-0">
-                  <h3 className="font-semibold text-sm flex items-center gap-2 text-slate-855 dark:text-white">
-                    <CalendarClock className="h-4 w-4 text-rose-500" />
-                    Validade & Revisão Periódica
-                  </h3>
-                </div>
-                <CardContent className="p-0 overflow-y-auto flex-1">
-                  {(summary?.expiringSoon ?? []).length === 0 ? (
-                    <div className="p-8 text-center text-xs text-muted-foreground h-full flex items-center justify-center">
-                      <CheckCircle2 className="h-8 w-8 text-emerald-500 mb-2" />
-                      Nenhum documento com prazo crítico.
+        <TabsContent value="acervo">
+          {/* Explorador GED (padrão ECM): navegação à esquerda, acervo em tabela */}
+          <div className="grid grid-cols-1 gap-4 xl:grid-cols-[250px_1fr]">
+            {/* Rail de navegação */}
+            <div className="space-y-4 xl:sticky xl:top-4 xl:self-start">
+              <Card className="border border-slate-100 bg-white shadow-sm dark:border-slate-800/80 dark:bg-slate-900/50">
+                <CardContent className="space-y-4 p-3">
+                  <Input
+                    placeholder="Buscar no acervo..."
+                    value={filters.search}
+                    onChange={(e) => setFilters((f) => ({ ...f, search: e.target.value }))}
+                    className="h-9 text-xs"
+                  />
+                  <div>
+                    <div className="mb-1.5 px-1 text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Situação</div>
+                    <div className="space-y-0.5">
+                      {[
+                        { label: 'Todos os documentos', status: '', expiring: '', count: summary?.total },
+                        { label: 'Publicados (vigentes)', status: 'PUBLISHED', expiring: '', count: summary?.published },
+                        { label: 'Em elaboração', status: 'DRAFT', expiring: '', count: summary?.byStatus?.DRAFT },
+                        { label: 'Aguardando aprovação', status: 'WAITING_APPROVAL', expiring: '', count: summary?.waitingApproval },
+                        { label: 'A revisar (vencem em breve)', status: '', expiring: 'soon', count: summary?.needsReview },
+                        { label: 'Vencidos', status: '', expiring: 'expired', count: summary?.expired },
+                        { label: 'Obsoletos/arquivados', status: 'OBSOLETE', expiring: '', count: summary?.obsolete },
+                      ].map((item) => {
+                        const active = filters.status === item.status && filters.expiring === item.expiring;
+                        return (
+                          <button
+                            key={item.label}
+                            type="button"
+                            onClick={() => setFilters((f) => ({ ...f, status: item.status, expiring: item.expiring }))}
+                            className={cn(
+                              'flex w-full items-center justify-between rounded-md px-2 py-1.5 text-left text-xs transition-colors',
+                              active ? 'bg-sky-500/10 font-semibold text-sky-600' : 'text-slate-600 hover:bg-muted/60 dark:text-slate-300',
+                            )}
+                          >
+                            <span className="truncate">{item.label}</span>
+                            <span className={cn('ml-2 shrink-0 rounded-full px-1.5 text-[10px] tabular-nums', active ? 'bg-sky-500/15' : 'bg-muted text-muted-foreground')}>
+                              {formatNumber(item.count ?? 0)}
+                            </span>
+                          </button>
+                        );
+                      })}
                     </div>
-                  ) : (
-                    <div className="divide-y divide-slate-100 dark:divide-slate-850/40">
-                      {(summary?.expiringSoon ?? []).map((doc) => (
-                        <div 
-                          key={doc.id} 
-                          onClick={() => setDetailId(doc.id)} 
-                          className="flex items-center justify-between p-3 hover:bg-slate-50/40 dark:hover:bg-slate-900/40 transition-all cursor-pointer text-xs"
-                        >
-                          <div className="min-w-0">
-                            <div className="font-bold text-slate-850 dark:text-slate-200 truncate">{doc.code ? `${doc.code} - ` : ''}{doc.title}</div>
-                            <div className="text-[10px] text-slate-400 mt-0.5">{TYPE_LABEL[doc.type]} - {doc.owner?.name ?? 'Sem responsável'}</div>
-                          </div>
-                          <div className="flex items-center gap-2 shrink-0">
-                            <span className="text-[10px] text-slate-400 font-semibold">{formatDate(doc.validUntil)}</span>
-                            <Badge variant="outline" className={doc.isExpired ? 'border-status-red/40 text-status-red' : 'border-status-yellow/40 text-status-yellow'}>
-                              {doc.isExpired ? 'Vencido' : `${doc.daysToExpire}d`}
-                            </Badge>
-                          </div>
-                        </div>
-                      ))}
+                  </div>
+                  <div>
+                    <div className="mb-1.5 px-1 text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Tipos de documento</div>
+                    <div className="space-y-0.5">
+                      <button
+                        type="button"
+                        onClick={() => setFilters((f) => ({ ...f, type: '' }))}
+                        className={cn('flex w-full items-center justify-between rounded-md px-2 py-1.5 text-left text-xs transition-colors', !filters.type ? 'bg-sky-500/10 font-semibold text-sky-600' : 'text-slate-600 hover:bg-muted/60 dark:text-slate-300')}
+                      >
+                        <span>Todos os tipos</span>
+                      </button>
+                      {Object.entries(summary?.byType ?? {})
+                        .filter(([, count]) => count > 0)
+                        .sort(([, a], [, b]) => b - a)
+                        .map(([type, count]) => {
+                          const active = filters.type === type;
+                          return (
+                            <button
+                              key={type}
+                              type="button"
+                              onClick={() => setFilters((f) => ({ ...f, type: active ? '' : type }))}
+                              className={cn(
+                                'flex w-full items-center justify-between rounded-md px-2 py-1.5 text-left text-xs transition-colors',
+                                active ? 'bg-sky-500/10 font-semibold text-sky-600' : 'text-slate-600 hover:bg-muted/60 dark:text-slate-300',
+                              )}
+                            >
+                              <span className="flex min-w-0 items-center gap-1.5"><FileText className="h-3 w-3 shrink-0 text-muted-foreground" /><span className="truncate">{TYPE_LABEL[type as DocType] ?? type}</span></span>
+                              <span className={cn('ml-2 shrink-0 rounded-full px-1.5 text-[10px] tabular-nums', active ? 'bg-sky-500/15' : 'bg-muted text-muted-foreground')}>{count}</span>
+                            </button>
+                          );
+                        })}
                     </div>
+                  </div>
+                  {(filters.search || filters.status || filters.type || filters.expiring) && (
+                    <Button variant="ghost" size="sm" className="w-full text-xs" onClick={() => setFilters({ search: '', status: '', type: '', expiring: '' })}>
+                      <X className="mr-1.5 h-3.5 w-3.5" />Limpar filtros
+                    </Button>
                   )}
                 </CardContent>
               </Card>
-
-              {/* Documentos disponíveis para leitura e confirmação */}
-              <Card ref={readingRef} className="scroll-mt-20 border border-slate-100 dark:border-slate-800/80 bg-white dark:bg-slate-900/50 shadow-sm flex flex-col h-[280px]">
-                <div className="flex items-center justify-between border-b px-4 py-3 shrink-0">
-                  <h3 className="font-semibold text-sm flex items-center gap-2 text-slate-850 dark:text-white">
-                    <Users className="h-4 w-4 text-sky-500" />
-                    Leituras e treinamentos documentais
-                  </h3>
-                </div>
-                <CardContent className="p-0 overflow-y-auto flex-1">
-                  {publishedForReading.length === 0 ? (
-                    <div className="flex h-full items-center justify-center p-8 text-center text-xs text-muted-foreground">Nenhum documento publicado está disponível para leitura.</div>
-                  ) : (
-                    <div className="divide-y divide-slate-100 dark:divide-slate-850/40">
-                      {publishedForReading.slice(0, 8).map((doc) => (
-                        <button type="button" key={doc.id} onClick={() => setDetailId(doc.id)} className="flex w-full items-center justify-between gap-3 p-3 text-left text-xs transition-all hover:bg-slate-50/40 dark:hover:bg-slate-900/40">
-                          <div className="min-w-0">
-                            <div className="truncate font-semibold text-slate-855 dark:text-slate-200">{doc.code ? `${doc.code} · ` : ''}{doc.title}</div>
-                            <div className="mt-0.5 truncate text-[10px] text-muted-foreground">{doc.orgNode?.name ?? 'Sem área'} · versão {doc.version}</div>
-                          </div>
-                          <span className="shrink-0 rounded border px-2 py-1 text-[9px] font-semibold text-sky-600">Abrir e confirmar</span>
-                        </button>
-                      ))}
-                    </div>
-                  )}
-                </CardContent>
-              </Card>
-
             </div>
 
-            <FiltersCard filters={filters} setFilters={setFilters} />
-          </div>
-
-          {/* Listagem de documentos */}
-          <div className="grid grid-cols-1 gap-4 xl:grid-cols-2">
-            {items.length === 0 && (
-              <Card className="xl:col-span-2">
-                <CardContent className="p-8 text-center text-sm text-muted-foreground">
-                  {listQuery.isLoading ? 'Carregando documentos...' : 'Nenhum documento encontrado para os filtros atuais.'}
+            {/* Acervo em tabela */}
+            <div className="min-w-0 space-y-4">
+              <Card className="border border-slate-100 bg-white shadow-sm dark:border-slate-800/80 dark:bg-slate-900/50">
+                <div className="flex flex-wrap items-center justify-between gap-2 border-b px-4 py-2.5">
+                  <div className="text-xs text-muted-foreground">
+                    <strong className="text-foreground">{formatNumber(items.length)}</strong> documento(s) no escopo atual
+                  </div>
+                  {canCreate && (
+                    <Button size="sm" className="h-8 bg-blue-600 text-xs font-semibold text-white hover:bg-blue-700" onClick={openCreate}>
+                      <Plus className="mr-1.5 h-3.5 w-3.5" />Novo documento
+                    </Button>
+                  )}
+                </div>
+                <CardContent className="overflow-x-auto p-0">
+                  {items.length === 0 ? (
+                    <div className="p-10 text-center text-sm text-muted-foreground">
+                      {listQuery.isLoading ? 'Carregando documentos...' : 'Nenhum documento encontrado para os filtros atuais.'}
+                    </div>
+                  ) : (
+                    <table className="w-full min-w-[880px] text-sm">
+                      <thead className="border-b bg-slate-50/60 text-[10px] uppercase tracking-wider text-muted-foreground dark:bg-slate-900/40">
+                        <tr>
+                          <th className="px-4 py-2.5 text-left">Código</th>
+                          <th className="px-2 py-2.5 text-left">Documento</th>
+                          <th className="px-2 py-2.5 text-left">Tipo</th>
+                          <th className="px-2 py-2.5 text-center">Rev.</th>
+                          <th className="px-2 py-2.5 text-left">Status</th>
+                          <th className="px-2 py-2.5 text-left">Validade</th>
+                          <th className="px-2 py-2.5 text-left">Responsável</th>
+                          <th className="px-4 py-2.5 text-right">Ações</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-slate-100 dark:divide-slate-800/60">
+                        {items.map((doc) => (
+                          <tr
+                            key={doc.id}
+                            className="cursor-pointer transition-colors hover:bg-sky-50/40 dark:hover:bg-slate-900/50"
+                            onClick={() => setDetailId(doc.id)}
+                          >
+                            <td className="px-4 py-2.5 font-mono text-xs font-bold text-slate-700 dark:text-slate-300">{doc.code ?? `#${doc.number}`}</td>
+                            <td className="max-w-[280px] px-2 py-2.5">
+                              <div className="truncate font-medium text-slate-800 dark:text-slate-200">{doc.title}</div>
+                              {doc.description && <div className="truncate text-[11px] text-muted-foreground">{doc.description}</div>}
+                            </td>
+                            <td className="px-2 py-2.5 text-xs">{TYPE_LABEL[doc.type]}</td>
+                            <td className="px-2 py-2.5 text-center text-xs font-semibold tabular-nums">v{doc.version}</td>
+                            <td className="px-2 py-2.5">
+                              <Badge variant="outline" className={cn('text-[10px]', STATUS_CLASS[doc.status])}>{STATUS_LABEL[doc.status]}</Badge>
+                            </td>
+                            <td className={cn('px-2 py-2.5 text-xs tabular-nums', doc.isExpired ? 'font-semibold text-status-red' : doc.needsReview ? 'text-status-yellow' : '')}>
+                              {formatDate(doc.validUntil)}
+                              {doc.isExpired && <span className="ml-1 text-[9px] font-bold uppercase">vencido</span>}
+                            </td>
+                            <td className="max-w-[140px] truncate px-2 py-2.5 text-xs">{doc.owner?.name ?? '—'}</td>
+                            <td className="px-4 py-2.5 text-right" onClick={(e) => e.stopPropagation()}>
+                              <div className="flex justify-end gap-0.5">
+                                <Button variant="ghost" size="icon" className="h-7 w-7" title="Visão 360°" onClick={() => openVision360('DOCUMENT', doc.id)}><Network className="h-3.5 w-3.5 text-primary" /></Button>
+                                <Button variant="ghost" size="icon" className="h-7 w-7" title="Abrir" onClick={() => setDetailId(doc.id)}><Eye className="h-3.5 w-3.5" /></Button>
+                                {canUpdate && <Button variant="ghost" size="icon" className="h-7 w-7" title="Editar metadados" onClick={() => openEdit(doc)}><Edit className="h-3.5 w-3.5" /></Button>}
+                                {canDelete && <Button variant="ghost" size="icon" className="h-7 w-7 text-status-red" title="Excluir" disabled={remove.isPending} onClick={() => handleRemoveTrigger(doc.id, doc.title)}><Trash2 className="h-3.5 w-3.5" /></Button>}
+                              </div>
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  )}
                 </CardContent>
               </Card>
-            )}
-            {items.map((doc) => (
-              <DocumentCard key={doc.id} doc={doc} canUpdate={canUpdate} canDelete={canDelete} onView={() => setDetailId(doc.id)} onEdit={() => openEdit(doc)} onRemove={() => handleRemoveTrigger(doc.id, doc.title)} removing={remove.isPending} />
-            ))}
+
+              {/* Pendências: validade e leituras lado a lado */}
+              <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
+                <Card className="flex h-[260px] flex-col border border-slate-100 bg-white shadow-sm dark:border-slate-800/80 dark:bg-slate-900/50">
+                  <div className="flex shrink-0 items-center justify-between border-b px-4 py-2.5">
+                    <h3 className="flex items-center gap-2 text-sm font-semibold text-slate-800 dark:text-white">
+                      <CalendarClock className="h-4 w-4 text-rose-500" />
+                      Validade & Revisão Periódica
+                    </h3>
+                  </div>
+                  <CardContent className="flex-1 overflow-y-auto p-0">
+                    {(summary?.expiringSoon ?? []).length === 0 ? (
+                      <div className="flex h-full items-center justify-center p-8 text-center text-xs text-muted-foreground">Nenhum documento com prazo crítico.</div>
+                    ) : (
+                      <div className="divide-y divide-slate-100 dark:divide-slate-800/40">
+                        {(summary?.expiringSoon ?? []).map((doc) => (
+                          <div
+                            key={doc.id}
+                            onClick={() => setDetailId(doc.id)}
+                            className="flex cursor-pointer items-center justify-between p-3 text-xs transition-all hover:bg-slate-50/40 dark:hover:bg-slate-900/40"
+                          >
+                            <div className="min-w-0">
+                              <div className="truncate font-bold text-slate-800 dark:text-slate-200">{doc.code ? `${doc.code} - ` : ''}{doc.title}</div>
+                              <div className="mt-0.5 text-[10px] text-slate-400">{TYPE_LABEL[doc.type]} - {doc.owner?.name ?? 'Sem responsável'}</div>
+                            </div>
+                            <div className="flex shrink-0 items-center gap-2">
+                              <span className="text-[10px] font-semibold text-slate-400">{formatDate(doc.validUntil)}</span>
+                              <Badge variant="outline" className={doc.isExpired ? 'border-status-red/40 text-status-red' : 'border-status-yellow/40 text-status-yellow'}>
+                                {doc.isExpired ? 'Vencido' : `${doc.daysToExpire}d`}
+                              </Badge>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </CardContent>
+                </Card>
+
+                <Card ref={readingRef} className="flex h-[260px] scroll-mt-20 flex-col border border-slate-100 bg-white shadow-sm dark:border-slate-800/80 dark:bg-slate-900/50">
+                  <div className="flex shrink-0 items-center justify-between border-b px-4 py-2.5">
+                    <h3 className="flex items-center gap-2 text-sm font-semibold text-slate-800 dark:text-white">
+                      <Users className="h-4 w-4 text-sky-500" />
+                      Leituras e treinamentos documentais
+                    </h3>
+                  </div>
+                  <CardContent className="flex-1 overflow-y-auto p-0">
+                    {publishedForReading.length === 0 ? (
+                      <div className="flex h-full items-center justify-center p-8 text-center text-xs text-muted-foreground">Nenhum documento publicado está disponível para leitura.</div>
+                    ) : (
+                      <div className="divide-y divide-slate-100 dark:divide-slate-800/40">
+                        {publishedForReading.slice(0, 8).map((doc) => (
+                          <button type="button" key={doc.id} onClick={() => setDetailId(doc.id)} className="flex w-full items-center justify-between gap-3 p-3 text-left text-xs transition-all hover:bg-slate-50/40 dark:hover:bg-slate-900/40">
+                            <div className="min-w-0">
+                              <div className="truncate font-semibold text-slate-800 dark:text-slate-200">{doc.code ? `${doc.code} · ` : ''}{doc.title}</div>
+                              <div className="mt-0.5 truncate text-[10px] text-muted-foreground">{doc.orgNode?.name ?? 'Sem área'} · versão {doc.version}</div>
+                            </div>
+                            <span className="shrink-0 rounded border px-2 py-1 text-[9px] font-semibold text-sky-600">Abrir e confirmar</span>
+                          </button>
+                        ))}
+                      </div>
+                    )}
+                  </CardContent>
+                </Card>
+              </div>
+            </div>
           </div>
         </TabsContent>
 
@@ -1851,75 +1986,6 @@ function OnlineEditorDialog({ session, onClose }: { session: EditorSession | nul
         </div>
       </DialogContent>
     </Dialog>
-  );
-}
-
-function DocumentCard({ doc, canUpdate, canDelete, onView, onEdit, onRemove, removing }: { doc: Doc; canUpdate: boolean; canDelete: boolean; onView: () => void; onEdit: () => void; onRemove: () => void; removing: boolean }) {
-  const { open: openVision360 } = useVision360();
-  return (
-    <Card className={cn('overflow-hidden', doc.isExpired && 'border-status-red/40', doc.needsReview && !doc.isExpired && 'border-status-yellow/50')}>
-      <CardContent className="p-4">
-        <div className="flex items-start justify-between gap-3">
-          <div className="min-w-0">
-            <div className="flex flex-wrap items-center gap-2">
-              <Badge variant="outline">{doc.code ? doc.code : `#${doc.number}`}</Badge>
-              <Badge variant="outline" className={STATUS_CLASS[doc.status]}>{STATUS_LABEL[doc.status]}</Badge>
-              <Badge variant="secondary">{TYPE_LABEL[doc.type]}</Badge>
-              <Badge variant="outline">v{doc.version}</Badge>
-            </div>
-            <h2 className="mt-3 truncate text-base font-semibold">{doc.title}</h2>
-            <p className="mt-1 line-clamp-2 text-sm text-muted-foreground">{doc.description || 'Sem descrição registrada.'}</p>
-          </div>
-          <div className="flex shrink-0 items-center gap-1">
-            <Button variant="ghost" size="icon" onClick={() => openVision360('DOCUMENT', doc.id)} title="Visão 360°"><Network className="h-4 w-4 text-primary" /></Button>
-            <Button variant="ghost" size="icon" onClick={onView} title="Abrir documento"><Eye className="h-4 w-4" /></Button>
-            {canUpdate && <Button variant="ghost" size="icon" onClick={onEdit} title="Editar metadados"><Edit className="h-4 w-4" /></Button>}
-            {canDelete && (
-              <Button variant="ghost" size="icon" onClick={onRemove} disabled={removing} title="Excluir documento">
-                <Trash2 className="h-4 w-4" />
-              </Button>
-            )}
-          </div>
-        </div>
-        <div className="mt-4 grid grid-cols-1 gap-2 text-xs text-muted-foreground sm:grid-cols-2">
-          <div>Área/processo: <span className="text-foreground">{doc.orgNode?.name ?? '-'}</span></div>
-          <div>Responsável: <span className="text-foreground">{doc.owner?.name ?? '-'}</span></div>
-          <div>Aprovador: <span className="text-foreground">{doc.approver?.name ?? '-'}</span></div>
-          <div>Validade: <span className={cn('text-foreground', doc.isExpired && 'text-status-red')}>{formatDate(doc.validUntil)}</span></div>
-        </div>
-      </CardContent>
-    </Card>
-  );
-}
-
-function FiltersCard({ filters, setFilters }: { filters: { search: string; status: string; type: string; expiring: string }; setFilters: Dispatch<SetStateAction<{ search: string; status: string; type: string; expiring: string }>> }) {
-  return (
-    <Card>
-      <CardContent className="p-4">
-        <div className="mb-3 flex items-center gap-2 text-sm font-semibold"><Filter className="h-4 w-4" />Filtros</div>
-        <div className="space-y-3">
-          <Input placeholder="Buscar por título, código, conteúdo..." value={filters.search} onChange={(e) => setFilters((f) => ({ ...f, search: e.target.value }))} />
-          <NativeSelect value={filters.status} onChange={(e) => setFilters((f) => ({ ...f, status: e.target.value }))}>
-            <option value="">Todos os status</option>
-            {Object.entries(STATUS_LABEL).map(([value, label]) => <option key={value} value={value}>{label}</option>)}
-          </NativeSelect>
-          <NativeSelect value={filters.type} onChange={(e) => setFilters((f) => ({ ...f, type: e.target.value }))}>
-            <option value="">Todos os tipos</option>
-            {Object.entries(TYPE_LABEL).map(([value, label]) => <option key={value} value={value}>{label}</option>)}
-          </NativeSelect>
-          <NativeSelect value={filters.expiring} onChange={(e) => setFilters((f) => ({ ...f, expiring: e.target.value }))}>
-            <option value="">Qualquer validade</option>
-            <option value="soon">Proximos do vencimento</option>
-            <option value="expired">Vencidos</option>
-          </NativeSelect>
-          {(filters.search || filters.status || filters.type || filters.expiring) && (
-            <Button variant="ghost" size="sm" onClick={() => setFilters({ search: '', status: '', type: '', expiring: '' })}>
-              <X className="mr-2 h-4 w-4" />Limpar filtros
-            </Button>
-          )}
-        </div>
-      </CardContent>
-    </Card>
   );
 }
 
