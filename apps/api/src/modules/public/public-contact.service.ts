@@ -74,11 +74,44 @@ export class PublicContactService {
       throw new ServiceUnavailableException('Não foi possível registrar a mensagem.');
     }
 
-    // 2. Enviar por e-mail (caso configurado)
+    // A gravação no inbox do Portal Global é a confirmação da submissão. O e-mail
+    // é uma notificação best-effort e nunca deve manter o visitante aguardando SMTP.
+    void this.sendEmailNotification({
+      input,
+      name,
+      company,
+      role,
+      email,
+      phone,
+      message,
+    }).catch((error) => {
+      this.logger.error(
+        {
+          event: 'public_contact_email_unexpected_failure',
+          requestType: input.requestType,
+          error: error instanceof Error ? error.message : 'unknown',
+        },
+        'Falha inesperada ao preparar notificação do formulário público.',
+      );
+    });
+
+    return { ok: true };
+  }
+
+  private async sendEmailNotification(data: {
+    input: PublicContactDto;
+    name: string;
+    company: string;
+    role: string;
+    email: string;
+    phone: string;
+    message: string;
+  }): Promise<void> {
+    const { input, name, company, role, email, phone, message } = data;
     const smtp = await resolveSmtpConfig(this.prisma);
     if (!smtp?.host) {
       this.logger.warn('Formulário público recebido sem SMTP configurado. Mensagem salva apenas em banco.');
-      return { ok: true };
+      return;
     }
 
     const destination = publicContactDestination(input.requestType);
@@ -133,7 +166,5 @@ export class PublicContactService {
         'Falha ao enviar formulário público por e-mail. A mensagem foi salva no banco.',
       );
     }
-
-    return { ok: true };
   }
 }

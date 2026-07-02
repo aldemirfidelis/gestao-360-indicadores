@@ -81,11 +81,21 @@ export function smtpFrom(cfg: ResolvedSmtp): string | undefined {
   return cfg.fromName ? `${cfg.fromName} <${cfg.fromAddress}>` : cfg.fromAddress;
 }
 
+function smtpTimeout(name: string, fallback: number): number {
+  const configured = Number(process.env[name]);
+  return Number.isFinite(configured) && configured > 0 ? configured : fallback;
+}
+
 export function buildTransport(cfg: ResolvedSmtp): Transporter {
   return nodemailer.createTransport({
     host: cfg.host,
     port: cfg.port,
     secure: cfg.secure,
     auth: cfg.user ? { user: cfg.user, pass: cfg.pass } : undefined,
+    // Falhas de rede não podem prender formulários e rotinas do portal por vários
+    // minutos. Os limites também valem para testes, convites e notificações.
+    connectionTimeout: smtpTimeout('SMTP_CONNECTION_TIMEOUT_MS', 10_000),
+    greetingTimeout: smtpTimeout('SMTP_GREETING_TIMEOUT_MS', 10_000),
+    socketTimeout: smtpTimeout('SMTP_SOCKET_TIMEOUT_MS', 20_000),
   });
 }

@@ -11,6 +11,10 @@ const smtpMocks = vi.hoisted(() => ({
   smtpFrom: vi.fn(),
 }));
 
+const prismaMocks = vi.hoisted(() => ({
+  createContact: vi.fn(),
+}));
+
 vi.mock('../src/common/smtp', () => ({
   resolveSmtpConfig: smtpMocks.resolveSmtpConfig,
   buildTransport: smtpMocks.buildTransport,
@@ -25,6 +29,7 @@ beforeEach(() => {
   smtpMocks.resolveSmtpConfig.mockReset().mockResolvedValue({ host: 'smtp.example.com' });
   smtpMocks.buildTransport.mockReset().mockReturnValue({ sendMail: smtpMocks.sendMail });
   smtpMocks.smtpFrom.mockReset().mockReturnValue('Gestão 360 <no-reply@example.com>');
+  prismaMocks.createContact.mockReset().mockResolvedValue({ id: 'contact-1' });
 });
 
 afterEach(() => {
@@ -59,7 +64,9 @@ describe('publicContactDestination', () => {
   });
 
   it('envia o formulário ao destinatário calculado com reply-to do solicitante', async () => {
-    const service = new PublicContactService({} as never);
+    const service = new PublicContactService({
+      publicContactMessage: { create: prismaMocks.createContact },
+    } as never);
 
     await service.send({
       name: 'Pessoa Teste',
@@ -70,7 +77,8 @@ describe('publicContactDestination', () => {
       privacy: 'accepted',
     });
 
-    expect(smtpMocks.sendMail).toHaveBeenCalledOnce();
+    expect(prismaMocks.createContact).toHaveBeenCalledOnce();
+    await vi.waitFor(() => expect(smtpMocks.sendMail).toHaveBeenCalledOnce());
     expect(smtpMocks.sendMail).toHaveBeenCalledWith(
       expect.objectContaining({
         to: 'contato@gestao360.org',
@@ -78,5 +86,27 @@ describe('publicContactDestination', () => {
         subject: expect.stringContaining('Trial de 30 dias'),
       }),
     );
+  });
+
+  it('confirma a submissão sem aguardar um SMTP indisponível', async () => {
+    let rejectSend!: (reason: Error) => void;
+    smtpMocks.sendMail.mockReturnValue(new Promise((_, reject) => {
+      rejectSend = reject;
+    }));
+    const service = new PublicContactService({
+      publicContactMessage: { create: prismaMocks.createContact },
+    } as never);
+
+    await expect(service.send({
+      name: 'Pessoa Teste',
+      company: 'Empresa Teste',
+      email: 'pessoa@example.com',
+      requestType: 'Comercial',
+      message: 'Preciso de mais informações sobre o portal.',
+      privacy: 'accepted',
+    })).resolves.toEqual({ ok: true });
+
+    expect(prismaMocks.createContact).toHaveBeenCalledOnce();
+    rejectSend(new Error('Connection timeout'));
   });
 });

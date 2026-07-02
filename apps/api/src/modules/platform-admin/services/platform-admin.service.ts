@@ -1043,6 +1043,22 @@ export class PlatformAdminService {
       },
     });
 
+    // Comentários internos nunca podem sair do Portal Global. Para respostas ao
+    // cliente, a mensagem persistida é a fonte de verdade e o SMTP é best-effort.
+    if (!msg.isInternal) {
+      void this.notifyInboxSupportReply(ticket, body.message).catch((err: any) => {
+        console.error(`Erro ao notificar resposta de chamado para ${ticket.requesterEmail}:`, err?.message);
+      });
+    }
+
+    return msg;
+  }
+
+  private async notifyInboxSupportReply(ticket: {
+    id: string;
+    requesterName: string;
+    requesterEmail: string;
+  }, message: string): Promise<void> {
     try {
       const smtp = await resolveSmtpConfig(this.prisma);
       if (smtp?.host) {
@@ -1058,7 +1074,7 @@ O suporte do Gestão 360 respondeu ao seu chamado:
 
 ---------------------------------------------------------
 RESPOSTA:
-${body.message}
+${message}
 ---------------------------------------------------------
 
 Você pode interagir e ver a resposta completa no link abaixo:
@@ -1080,8 +1096,6 @@ Equipe Gestão 360
     } catch (err: any) {
       console.error(`Erro ao notificar resposta de chamado para ${ticket.requesterEmail}:`, err?.message);
     }
-
-    return msg;
   }
 
   async updateInboxSupportTicket(user: PlatformAdminIdentity, id: string, body: { status?: string; priority?: string; assignedToUserId?: string }) {
