@@ -9,6 +9,7 @@ import { cargosSalarios } from './content/cargos-salarios';
 import { comunicacao } from './content/comunicacao';
 import { gestaoPremio } from './content/gestao-premio';
 import { administracao } from './content/administracao';
+import { guiasPreenchimento } from './content/guias-preenchimento';
 
 export type { HelpCatalogCategory } from './content/types';
 
@@ -31,4 +32,5 @@ export const HELP_CATALOG: HelpCatalogCategory[] = [
   comunicacao,
   gestaoPremio,
   administracao,
+  guiasPreenchimento,
 ];

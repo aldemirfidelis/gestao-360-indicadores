@@ -31,10 +31,12 @@ interface HelpBotChatProps {
 const QUICK_SUGGESTIONS = [
   'Como criar uma tarefa?',
   'Como cadastrar um indicador?',
+  'Como preencher o Ishikawa?',
+  'Como preencher o 5W2H?',
   'Como abrir uma não conformidade?',
   'Como gerar QR Code de formulário?',
   'Como criar um plano de ação?',
-  'Como funciona o módulo de documentos?',
+  'Como tratar um desvio?',
   'Como acompanhar tarefas atrasadas?'
 ];
 
