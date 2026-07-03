@@ -48,19 +48,19 @@ export function MetricCard({
   const body = (
     <Card className={cn('group relative h-full overflow-hidden panel-hover', className)}>
       <span className={cn('absolute left-0 top-0 h-full w-[2px]', toneBar[tone])} />
-      <CardContent className={cn(compact ? 'p-3' : 'p-4')}>
-        <div className="flex items-start justify-between gap-3">
+      <CardContent className={cn(compact ? 'p-2.5' : 'p-4')}>
+        <div className="flex items-start justify-between gap-2">
           <div className="min-w-0 flex-1">
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-1.5">
               {icon && <span className={cn('shrink-0', toneClass[tone])}>{icon}</span>}
-              <p className={cn('font-medium uppercase tracking-[0.1em] text-muted-foreground', compact ? 'text-[10px]' : 'text-[11px]')}>{title}</p>
+              <p className={cn('truncate font-medium uppercase tracking-[0.08em] text-muted-foreground', compact ? 'text-[9px]' : 'text-[11px]')}>{title}</p>
             </div>
-            <div className={cn('font-semibold leading-none tracking-tight tabular-nums', compact ? 'mt-2 text-[22px]' : 'mt-3 text-[26px]')}>{value}</div>
+            <div className={cn('truncate font-semibold leading-none tracking-tight tabular-nums', compact ? 'mt-1.5 text-[18px]' : 'mt-3 text-[26px]')}>{value}</div>
           </div>
           {href && <ArrowUpRight className="h-4 w-4 shrink-0 text-muted-foreground opacity-0 transition-opacity group-hover:opacity-100" />}
         </div>
         {(description || trend) && (
-          <div className={cn('flex items-center justify-between gap-3 text-xs text-muted-foreground', compact ? 'mt-2 min-h-4' : 'mt-3 min-h-5')}>
+          <div className={cn('flex items-center justify-between gap-2 text-muted-foreground', compact ? 'mt-1.5 min-h-4 text-[10px]' : 'mt-3 min-h-5 text-xs')}>
             <span className="truncate">{description}</span>
             {trend && (
               <span className="inline-flex shrink-0 items-center gap-1 font-medium text-foreground">

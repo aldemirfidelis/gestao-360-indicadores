@@ -145,20 +145,20 @@ function MetricGrid({ dashboard, loading }: { dashboard?: MonthlyDashboard; load
     { title: 'Decisões pendentes', value: m?.pendingDecisions ?? 0, detail: `${m?.openEscalations ?? 0} escalonamentos`, icon: MessageSquareText, tone: 'violet' },
   ];
   return (
-    <div className="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-6">
+    <div className="grid grid-cols-2 gap-2.5 md:grid-cols-3 xl:grid-cols-6">
       {items.map((item) => (
         <Card key={item.title} className="min-w-0">
-          <CardContent className="p-4">
-            <div className="flex items-start justify-between gap-3">
-              <div className="min-w-0">
-                <p className="break-words text-xs font-medium uppercase text-muted-foreground">{item.title}</p>
-                <p className="mt-2 text-2xl font-semibold">{loading ? '-' : item.value}</p>
+          <CardContent className="p-2.5">
+            <div className="flex items-start justify-between gap-2">
+              <div className="min-w-0 flex-1">
+                <p className="truncate text-[9px] font-medium uppercase tracking-[0.08em] text-muted-foreground">{item.title}</p>
+                <p className="mt-1.5 truncate text-lg font-semibold leading-none tabular-nums">{loading ? '-' : item.value}</p>
               </div>
-              <div className={cn('grid h-9 w-9 shrink-0 place-items-center rounded-md', toneClass(item.tone))}>
-                <item.icon className="h-4 w-4" />
+              <div className={cn('grid h-6 w-6 shrink-0 place-items-center rounded-md', toneClass(item.tone))}>
+                <item.icon className="h-3.5 w-3.5" />
               </div>
             </div>
-            <p className="mt-2 break-words text-xs text-muted-foreground">{loading ? 'Carregando...' : item.detail}</p>
+            <p className="mt-1.5 truncate text-[10px] text-muted-foreground">{loading ? 'Carregando...' : item.detail}</p>
           </CardContent>
         </Card>
       ))}

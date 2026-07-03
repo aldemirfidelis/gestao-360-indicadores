@@ -546,10 +546,10 @@ export default function OrgPage() {
       />
 
       <div className="mb-6 grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
-        <MetricCard title="Nos da estrutura" value={formatNumber(stats.total)} description="Valores, áreas e pilares" icon={<Network className="h-4 w-4" />} tone="blue" />
-        <MetricCard title="Ativos" value={formatNumber(stats.active)} description="Liberados para uso" icon={<BadgeCheck className="h-4 w-4" />} tone="green" />
-        <MetricCard title="Indicadores vinculados" value={formatNumber(stats.indicators)} description="Distribuidos por pilar" icon={<Target className="h-4 w-4" />} tone="purple" />
-        <MetricCard title="Com responsável" value={formatNumber(stats.responsible)} description="Governança atribuída" icon={<UserRound className="h-4 w-4" />} tone="yellow" />
+        <MetricCard compact title="Nos da estrutura" value={formatNumber(stats.total)} description="Valores, áreas e pilares" icon={<Network className="h-4 w-4" />} tone="blue" />
+        <MetricCard compact title="Ativos" value={formatNumber(stats.active)} description="Liberados para uso" icon={<BadgeCheck className="h-4 w-4" />} tone="green" />
+        <MetricCard compact title="Indicadores vinculados" value={formatNumber(stats.indicators)} description="Distribuidos por pilar" icon={<Target className="h-4 w-4" />} tone="purple" />
+        <MetricCard compact title="Com responsável" value={formatNumber(stats.responsible)} description="Governança atribuída" icon={<UserRound className="h-4 w-4" />} tone="yellow" />
       </div>
 
       <SectionCard title="Estrutura de gestão" description="Dados da estrutura, responsáveis e responsabilidades por setor." contentClassName="p-3">

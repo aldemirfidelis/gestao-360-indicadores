@@ -152,10 +152,10 @@ export default function StrategyPage() {
       />
 
       <div className="mb-6 grid grid-cols-1 gap-4 sm:grid-cols-4">
-        <MetricCard title="Mapas" value={formatNumber(maps.length)} description="Ciclos cadastrados" icon={<Map className="h-4 w-4" />} tone="blue" />
-        <MetricCard title="Ativos" value={formatNumber(active)} description="Em acompanhamento" icon={<Map className="h-4 w-4" />} tone="green" />
-        <MetricCard title="Objetivos" value={formatNumber(objectives)} description="Conectados ao desempenho" icon={<CalendarDays className="h-4 w-4" />} tone="purple" />
-        <MetricCard title="Versões" value={formatNumber(versions)} description="Histórico publicado" icon={<CalendarDays className="h-4 w-4" />} tone="yellow" />
+        <MetricCard compact title="Mapas" value={formatNumber(maps.length)} description="Ciclos cadastrados" icon={<Map className="h-4 w-4" />} tone="blue" />
+        <MetricCard compact title="Ativos" value={formatNumber(active)} description="Em acompanhamento" icon={<Map className="h-4 w-4" />} tone="green" />
+        <MetricCard compact title="Objetivos" value={formatNumber(objectives)} description="Conectados ao desempenho" icon={<CalendarDays className="h-4 w-4" />} tone="purple" />
+        <MetricCard compact title="Versões" value={formatNumber(versions)} description="Histórico publicado" icon={<CalendarDays className="h-4 w-4" />} tone="yellow" />
       </div>
 
       <SectionCard title="Mapas cadastrados" description="Abra um mapa para editar perspectivas, objetivos, ligacoes e vínculos com indicadores." contentClassName="space-y-3">

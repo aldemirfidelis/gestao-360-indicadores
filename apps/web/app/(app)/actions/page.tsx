@@ -95,7 +95,12 @@ const TOOL_LABEL: Record<string, string> = {
 
 const VISIBLE_ANALYSIS_TOOLS = ['FIVE_WHYS', 'ISHIKAWA', 'PDCA', 'FIVE_W_TWO_H'] as const;
 
-const COLUMNS = ['DRAFT', 'UNDER_ANALYSIS', 'IN_PROGRESS', 'WAITING_VALIDATION', 'EFFECTIVE'];
+// Kanban simplificado em 3 etapas; os demais status do fluxo (rascunho, aguardando
+// terceiro/evidência/validação, pausado, reaberto, cancelado, eficácia) são
+// agrupados na etapa mais próxima do seu estágio real de trabalho.
+const COLUMNS = ['UNDER_ANALYSIS', 'IN_PROGRESS', 'DONE'];
+const ANALYSIS_LIKE_STATUS = new Set(['DRAFT', 'NOT_STARTED', 'UNDER_ANALYSIS']);
+const DONE_LIKE_STATUS = new Set(['DONE', 'DONE_LATE', 'CANCELLED', 'EFFECTIVE', 'INEFFECTIVE']);
 type ViewMode = 'kanban' | 'list' | 'timeline';
 
 const emptyForm = {
@@ -151,7 +156,7 @@ export default function ActionsPage() {
     const map = new Map<string, Action[]>();
     COLUMNS.forEach((c) => map.set(c, []));
     actions.forEach((a) => {
-      const key = COLUMNS.includes(a.status) ? a.status : a.status === 'DONE' || a.status === 'DONE_LATE' ? 'WAITING_VALIDATION' : 'IN_PROGRESS';
+      const key = ANALYSIS_LIKE_STATUS.has(a.status) ? 'UNDER_ANALYSIS' : DONE_LIKE_STATUS.has(a.status) ? 'DONE' : 'IN_PROGRESS';
       map.get(key)?.push(a);
     });
     return map;
@@ -259,7 +264,7 @@ export default function ActionsPage() {
       )}
 
       {!query.isLoading && actions.length > 0 && view === 'kanban' && (
-        <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-5">
+        <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
           {COLUMNS.map((col) => {
             const items = byCol.get(col) ?? [];
             return (
@@ -274,7 +279,7 @@ export default function ActionsPage() {
                       <ActionPlanCard action={a} />
                       {canUpdate && (
                         <div className="flex flex-wrap gap-1">
-                          {['UNDER_ANALYSIS', 'IN_PROGRESS', 'WAITING_EVIDENCE', 'WAITING_VALIDATION', 'DONE'].filter((s) => s !== a.status).map((s) => (
+                          {COLUMNS.filter((s) => s !== a.status).map((s) => (
                             <button key={s} onClick={() => changeStatus.mutate({ id: a.id, status: s })} className="rounded border bg-card px-2 py-1 text-[10px] font-medium text-muted-foreground transition-colors hover:bg-accent hover:text-foreground">
                               {STATUS_LABEL[s]}
                             </button>
