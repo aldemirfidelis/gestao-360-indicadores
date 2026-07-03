@@ -1,89 +1,21 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { Injectable, Logger, NotFoundException, OnModuleInit } from '@nestjs/common';
 import { Prisma, UserRoleEnum } from '@prisma/client';
 import { PrismaService } from '../../prisma/prisma.service';
 import { AuthPayload } from '../auth/auth.types';
-
-const DEFAULT_HELP = [
-  {
-    slug: 'primeiros-passos',
-    title: 'Primeiros passos',
-    description: 'Orientacoes para entrar no sistema, navegar e encontrar informacoes.',
-    icon: 'Compass',
-    position: 1,
-    articles: [
-      {
-        slug: 'visao-geral-do-sistema',
-        title: 'Visao geral do sistema',
-        summary: 'Entenda onde ficam indicadores, planos de acao, reunioes e comunicacao.',
-        tags: ['inicio', 'navegacao'],
-        body:
-          'Use o menu lateral para alternar entre visualizacoes, lancamentos, gestao, relatorios e comunicacao. As permissoes do seu perfil definem quais areas aparecem. A busca e os filtros de cada tela ajudam a reduzir a lista antes de abrir um registro.',
-      },
-      {
-        slug: 'como-usar-a-comunicacao',
-        title: 'Como usar Comunicacao e Pessoas',
-        summary: 'Converse com a equipe, veja presenca online e abra perfis corporativos.',
-        tags: ['comunicacao', 'mensagens', 'pessoas'],
-        body:
-          'A tela Comunicacao concentra conversas internas. Em Pessoas voce encontra usuarios da empresa, inicia conversas e consulta perfil, cargo, area e contatos. Conversas podem ser fixadas, silenciadas e receber anexos quando for necessario manter contexto junto da mensagem.',
-      },
-    ],
-  },
-  {
-    slug: 'planos-de-acao',
-    title: 'Planos de acao',
-    description: 'Fluxo de tarefas, evidencias, eficacia e aprovacao.',
-    icon: 'CheckSquare',
-    position: 2,
-    articles: [
-      {
-        slug: 'ciclo-do-plano-de-acao',
-        title: 'Ciclo do Plano de Acao',
-        summary: 'Acompanhe abertura, execucao, eficacia e fechamento.',
-        tags: ['acoes', 'eficacia'],
-        body:
-          'Um plano de acao nasce de um desvio, reuniao ou decisao preventiva. As tarefas ficam na execucao com responsavel, prazo, evidencias e historico. Ao finalizar a execucao, a eficacia deve ser avaliada para decidir se o plano pode ser finalizado ou reaberto.',
-      },
-      {
-        slug: 'evidencias-em-tarefas',
-        title: 'Evidencias em tarefas',
-        summary: 'Anexe arquivos na tarefa para comprovar a acao realizada.',
-        tags: ['tarefas', 'evidencias'],
-        body:
-          'Cada tarefa pode receber evidencia. Use o icone de clipe no card de execucao para anexar o arquivo. Depois do envio, o status de evidencia anexada ajuda a identificar rapidamente quais tarefas ja possuem comprovacao.',
-      },
-    ],
-  },
-  {
-    slug: 'administracao',
-    title: 'Administracao',
-    description: 'Recursos do Super Admin, integracoes e parametros.',
-    icon: 'ShieldCheck',
-    position: 3,
-    articles: [
-      {
-        slug: 'central-do-portal',
-        title: 'Central do Portal',
-        summary: 'Controle modulos, paginas, recursos, manutencao, integracoes e escopos.',
-        tags: ['super-admin', 'portal'],
-        body:
-          'A Central do Portal fica em Configuracoes Avancadas e e restrita ao Super Admin. Ela permite controlar o que aparece para os usuarios, registrar manutencoes, revisar integracoes, consultar diagnosticos e auditar alteracoes administrativas.',
-      },
-      {
-        slug: 'integracoes-suportadas',
-        title: 'Integracoes suportadas',
-        summary: 'Veja quais conectores internos estao ativos no ambiente.',
-        tags: ['integracoes', 'admin'],
-        body:
-          'As integracoes disponiveis neste ambiente priorizam e-mail, banco de dados, armazenamento, comunicacao interna e Central de Ajuda. Conectores Google e Microsoft nao fazem parte desta fase.',
-      },
-    ],
-  },
-];
+import { HELP_CATALOG } from './help-content.data';
 
 @Injectable()
-export class HelpService {
+export class HelpService implements OnModuleInit {
+  private readonly logger = new Logger(HelpService.name);
+  private catalogSynced = false;
+
   constructor(private readonly prisma: PrismaService) {}
+
+  onModuleInit() {
+    // Sincroniza o catálogo em background no boot para o Assistente (RAG)
+    // já ter a base completa mesmo antes do primeiro acesso à Central de Ajuda.
+    void this.ensureDefaults();
+  }
 
   async summary(query?: string) {
     await this.ensureDefaults();
@@ -209,29 +141,85 @@ export class HelpService {
     });
   }
 
+  /**
+   * Sincroniza o catálogo oficial (help-content.data.ts) com o banco.
+   * Idempotente: roda uma vez por boot; upsert por slug preservando
+   * contadores (views/feedback) e sem tocar em conteúdo criado pelo admin
+   * com slugs próprios.
+   */
   private async ensureDefaults() {
-    const count = await this.prisma.helpCategory.count();
-    if (count > 0) return;
-    for (const category of DEFAULT_HELP) {
-      await this.prisma.helpCategory.create({
-        data: {
-          slug: category.slug,
+    if (this.catalogSynced) return;
+    try {
+      const catalogArticleSlugs = new Set<string>();
+      for (const category of HELP_CATALOG) {
+        const categoryData = {
           title: category.title,
           description: category.description,
           icon: category.icon,
           position: category.position,
-          articles: {
-            create: category.articles.map((article) => ({
-              slug: article.slug,
+          published: true,
+        };
+        const savedCategory = await this.prisma.helpCategory.upsert({
+          where: { slug: category.slug },
+          update: categoryData,
+          create: { slug: category.slug, ...categoryData },
+        });
+        for (const article of category.articles) {
+          catalogArticleSlugs.add(article.slug);
+          const tags = JSON.stringify(article.tags);
+          const existing = await this.prisma.helpArticle.findUnique({
+            where: { slug: article.slug },
+            select: { id: true, categoryId: true, title: true, summary: true, body: true, tags: true, status: true },
+          });
+          if (!existing) {
+            await this.prisma.helpArticle.create({
+              data: {
+                categoryId: savedCategory.id,
+                slug: article.slug,
+                title: article.title,
+                summary: article.summary,
+                body: article.body,
+                tags,
+                status: 'PUBLISHED',
+              },
+            });
+            continue;
+          }
+          const unchanged =
+            existing.categoryId === savedCategory.id &&
+            existing.title === article.title &&
+            existing.summary === article.summary &&
+            existing.body === article.body &&
+            existing.tags === tags &&
+            existing.status === 'PUBLISHED';
+          if (unchanged) continue;
+          await this.prisma.helpArticle.update({
+            where: { id: existing.id },
+            data: {
+              categoryId: savedCategory.id,
               title: article.title,
               summary: article.summary,
               body: article.body,
-              tags: JSON.stringify(article.tags),
+              tags,
               status: 'PUBLISHED',
-            })),
-          },
-        },
+              version: { increment: 1 },
+            },
+          });
+        }
+      }
+      // Despublica categorias antigas do catálogo que ficaram vazias
+      // (artigos movidos para outra categoria); não toca nas com conteúdo.
+      const catalogCategorySlugs = HELP_CATALOG.map((category) => category.slug);
+      await this.prisma.helpCategory.updateMany({
+        where: { slug: { notIn: catalogCategorySlugs }, published: true, articles: { none: {} } },
+        data: { published: false },
       });
+      this.catalogSynced = true;
+      this.logger.log(
+        `Catálogo da Central de Ajuda sincronizado (${HELP_CATALOG.length} categorias, ${catalogArticleSlugs.size} artigos).`,
+      );
+    } catch (err: any) {
+      this.logger.error(`Falha ao sincronizar catálogo de ajuda: ${err?.message ?? err}`);
     }
   }
 
