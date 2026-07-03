@@ -16,7 +16,6 @@ import {
   ListChecks,
   ListTodo,
   MessageSquare,
-  MoreHorizontal,
   Paperclip,
   PlayCircle,
   Plus,
@@ -66,8 +65,8 @@ export function TaskKanbanBoard({ board, tasks, moving, onOpen, onMove, onAdd }:
   }
 
   return (
-    <div className="relative overflow-x-auto pb-4">
-      <div className="grid min-w-[1460px] grid-cols-5 gap-4">
+    <div className="pb-2">
+      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 xl:gap-3.5">
         {board.columns.map((column) => (
           <TaskBoardColumn
             key={column.id}
@@ -132,7 +131,7 @@ function TaskBoardColumn({
         onDrop();
       }}
       className={cn(
-        'flex min-h-[590px] flex-col rounded-2xl border bg-muted/25 p-2.5 transition-all',
+        'flex min-h-[460px] flex-col rounded-2xl border bg-muted/25 p-2 transition-all',
         over && 'border-primary/50 bg-primary/[0.04] shadow-md',
         doneTarget && 'border-2 border-dashed border-emerald-500 bg-emerald-50/70 dark:bg-emerald-950/30',
       )}
@@ -147,9 +146,6 @@ function TaskBoardColumn({
             <h2 className="truncate text-sm font-semibold">{column.name}</h2>
             <p className="text-[10px] text-muted-foreground">{tasks.length} {tasks.length === 1 ? 'tarefa' : 'tarefas'}</p>
           </div>
-          <Button size="sm" variant="ghost" className="h-8 w-8 p-0" aria-label={`Opções de ${column.name}`}>
-            <MoreHorizontal className="h-4 w-4" />
-          </Button>
         </div>
       </header>
 
@@ -218,7 +214,7 @@ export function TaskStickyCard({ task, onOpen }: { task: TaskRecord; onOpen?: ()
         if ((event.key === 'Enter' || event.key === ' ') && onOpen) onOpen();
       }}
       className={cn(
-        'group relative cursor-grab overflow-hidden rounded-[14px] border p-3.5 shadow-[0_5px_14px_rgba(15,23,42,.10)] outline-none transition duration-200 hover:-translate-y-1 hover:rotate-0 hover:shadow-[0_12px_26px_rgba(15,23,42,.16)] focus:ring-2 focus:ring-primary active:cursor-grabbing',
+        'group relative cursor-grab overflow-hidden rounded-[14px] border p-3 shadow-[0_5px_14px_rgba(15,23,42,.10)] outline-none transition duration-200 hover:-translate-y-1 hover:rotate-0 hover:shadow-[0_12px_26px_rgba(15,23,42,.16)] focus:ring-2 focus:ring-primary active:cursor-grabbing',
         STICKY_CLASS[task.color] ?? STICKY_CLASS.yellow,
         task.priority === 'CRITICAL' && 'ring-1 ring-rose-400/80',
       )}

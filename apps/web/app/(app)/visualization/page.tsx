@@ -173,7 +173,7 @@ export default function VisualizationPage() {
                 </label>
                 <label className="flex cursor-pointer items-center gap-2 text-sm">
                   <input type="checkbox" checked={types.includes('STRATEGIC')} onChange={() => toggleType('STRATEGIC')} />
-                  Estrat\u00E9gico
+                  Estratégico
                 </label>
               </div>
             </div>

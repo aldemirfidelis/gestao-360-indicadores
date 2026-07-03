@@ -354,7 +354,7 @@ export function IshikawaVisualAnalysis({
           </Button>
         </div>
         <div className="flex flex-wrap items-center gap-2">
-          <Button size="icon" variant="outline" onClick={() => setZoom((value) => Math.max(0.75, value - 0.1))} title="Reduzir zoom">
+          <Button size="icon" variant="outline" onClick={() => setZoom((value) => Math.max(0.5, value - 0.1))} title="Reduzir zoom">
             <ZoomOut className="h-4 w-4" />
           </Button>
           <div className="w-12 text-center text-xs font-medium text-slate-600">{Math.round(zoom * 100)}%</div>

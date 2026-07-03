@@ -36,7 +36,7 @@ import { Label } from '@/components/ui/label';
 import { NativeSelect } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
 import { api } from '@/lib/api';
-import { cn, formatDate } from '@/lib/utils';
+import { cn, formatDate, formatNumber, formatPercent } from '@/lib/utils';
 
 type Priority = 'LOW' | 'MEDIUM' | 'HIGH' | 'CRITICAL';
 type StageStatus = 'PENDING' | 'IN_PROGRESS' | 'DONE' | 'BLOCKED' | 'VALIDATED';
@@ -318,7 +318,7 @@ export function PDCAVisualAnalysis({
           </Button>
         </div>
         <div className="flex flex-wrap items-center gap-2">
-          <Button size="icon" variant="outline" onClick={() => setZoom((value) => Math.max(0.8, value - 0.1))} title="Reduzir zoom">
+          <Button size="icon" variant="outline" onClick={() => setZoom((value) => Math.max(0.5, value - 0.1))} title="Reduzir zoom">
             <ZoomOut className="h-4 w-4" />
           </Button>
           <div className="w-12 text-center text-xs font-medium text-slate-600">{Math.round(zoom * 100)}%</div>
@@ -361,6 +361,7 @@ export function PDCAVisualAnalysis({
                   stage={stage}
                   selected={selectedPhase === phase}
                   responsibleName={stage.responsibleUserId ? responsibleById.get(stage.responsibleUserId) : undefined}
+                  action={action}
                   onSelect={() => setSelectedPhase(phase)}
                 />
               );
@@ -518,10 +519,10 @@ function PDCACycle({ selectedPhase, onSelect }: { selectedPhase: Phase; onSelect
   );
 }
 
-function PDCAStageCard({ stage, selected, responsibleName, onSelect }: { stage: PdcaStage; selected: boolean; responsibleName?: string; onSelect: () => void }) {
+function PDCAStageCard({ stage, selected, responsibleName, action, onSelect }: { stage: PdcaStage; selected: boolean; responsibleName?: string; action?: any; onSelect: () => void }) {
   const meta = STAGE_META[stage.phase];
   const Icon = meta.icon;
-  const summary = stageSummary(stage, responsibleName);
+  const summary = stageSummary(stage, responsibleName, action);
   return (
     <button
       type="button"
@@ -766,7 +767,23 @@ function StatusPill({ stage }: { stage: PdcaStage }) {
   return <span className={cn('w-fit rounded-full border px-3 py-1 text-[11px] font-semibold', classes)}>{label}</span>;
 }
 
-function stageSummary(stage: PdcaStage, responsibleName?: string) {
+// Eficácia parcial = atingimento da meta no mês seguinte ao desvio tratado
+// neste PDCA, com o delta em pontos percentuais frente ao mês do desvio — é
+// isso que mede se as ações do plano surtiram efeito, não o progresso do
+// checklist da etapa.
+function partialEffectivenessLabel(action?: any) {
+  const { reference, nextResult } = getCheckMetrics(action);
+  if (nextResult?.attainment === undefined || nextResult?.attainment === null) {
+    return 'Aguardando resultado do mês seguinte';
+  }
+  const value = formatPercent(nextResult.attainment, 2);
+  if (reference?.attainment === undefined || reference?.attainment === null) return value;
+  const deltaPoints = (nextResult.attainment - reference.attainment) * 100;
+  const sign = deltaPoints >= 0 ? '+' : '';
+  return `${value} (${sign}${formatNumber(deltaPoints, { maximumFractionDigits: 2, minimumFractionDigits: 2 })} p.p. vs mês do desvio)`;
+}
+
+function stageSummary(stage: PdcaStage, responsibleName?: string, action?: any) {
   if (stage.phase === 'PLAN') {
     return [
       { icon: FileText, label: 'Problema principal', value: stage.data.problem || 'Não informado' },
@@ -789,7 +806,7 @@ function stageSummary(stage: PdcaStage, responsibleName?: string) {
       { icon: BarChart3, label: 'Resultado atual', value: stage.data.measuredResult || stage.data.currentResult || '-' },
       { icon: FileText, label: 'Indicador', value: stage.data.indicator || '-' },
       { icon: RefreshCw, label: 'Desvio', value: stage.data.deviation || '-' },
-      { icon: CheckCircle2, label: 'Eficácia parcial', value: `${stage.progress}%` },
+      { icon: CheckCircle2, label: 'Eficácia parcial', value: partialEffectivenessLabel(action) },
     ];
   }
   return [
@@ -833,9 +850,27 @@ function makeStage(row: any, phase: Phase, action?: any, rootCause = ''): PdcaSt
   };
 }
 
+// Localiza o resultado mensal vinculado ao desvio tratado neste PDCA (o mês de
+// referência) e o resultado do mês seguinte a ele, para medir se as ações
+// aplicadas melhoraram o atingimento da meta no período posterior.
+function getCheckMetrics(action?: any) {
+  const results: any[] = Array.isArray(action?.indicator?.results) ? action.indicator.results : [];
+  // O plano de ação guarda o vínculo exato com o mês do desvio (indicatorResultId).
+  // Só cai para o resultado mais recente quando não há esse vínculo (PDCA avulso).
+  const reference = action?.indicatorResult ?? results[0] ?? null;
+  const referenceTime = reference?.periodDate ? new Date(reference.periodDate).getTime() : null;
+  const nextResult =
+    referenceTime !== null
+      ? results
+          .filter((item) => item?.periodDate && new Date(item.periodDate).getTime() > referenceTime)
+          .sort((a, b) => new Date(a.periodDate).getTime() - new Date(b.periodDate).getTime())[0] ?? null
+      : null;
+  return { reference, nextResult };
+}
+
 // Auto-preenche (link) o ciclo a partir do plano/indicador para poupar digitação.
 function defaultStageData(phase: Phase, action?: any, rootCause = '') {
-  const result = action?.indicator?.results?.[0] ?? action?.indicatorResult ?? null;
+  const { reference: result } = getCheckMetrics(action);
   const base = {
     PLAN: {
       description: 'Definir o problema, identificar a causa raiz e estabelecer metas e ações para atingir a melhoria desejada.',
@@ -866,11 +901,14 @@ function defaultStageData(phase: Phase, action?: any, rootCause = '') {
       progress: action?.effectivenessStatus === 'EFFECTIVE' ? 100 : 0,
       status: 'PENDING',
       data: {
-        measuredResult: result?.value !== undefined && result?.value !== null ? String(result.value) : '',
-        currentResult: result?.value !== undefined && result?.value !== null ? String(result.value) : '',
+        measuredResult: result?.value !== undefined && result?.value !== null ? formatNumber(result.value, { maximumFractionDigits: 2 }) : '',
+        currentResult: result?.value !== undefined && result?.value !== null ? formatNumber(result.value, { maximumFractionDigits: 2 }) : '',
         indicator: action?.indicator?.name ?? '',
         target: action?.expectedResult ?? '',
-        deviation: result?.deviationPct !== undefined && result?.deviationPct !== null ? `${result.deviationPct}%` : '',
+        deviation:
+          result?.deviationPct !== undefined && result?.deviationPct !== null
+            ? `${formatNumber(result.deviationPct, { maximumFractionDigits: 2, minimumFractionDigits: 2 })}%`
+            : '',
       },
     },
     ACT: {
