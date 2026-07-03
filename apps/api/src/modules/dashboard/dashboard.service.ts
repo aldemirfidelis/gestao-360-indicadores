@@ -274,7 +274,7 @@ export class DashboardService {
     });
   }
 
-  async areaIndicators(me: AuthPayload, ownerNodeId?: string, types?: string[]) {
+  async areaIndicators(me: AuthPayload, ownerNodeId?: string, types?: string[], periodRef?: string) {
     const companyId = me.companyId;
     const permitted = await this.access.listAreaFilter(me.sub, MODULE, 'view');
     const selectedIds = ownerNodeId ? await this.descendantNodeIds(companyId, ownerNodeId) : null;
@@ -315,20 +315,28 @@ export class DashboardService {
       if (currentRef) currentRefs.set(indicator.id, currentRef);
     }
 
-    const results = await this.prisma.indicatorResult.findMany({
-      where: { indicatorId: { in: ids } },
-      orderBy: { periodDate: 'desc' },
-      distinct: ['indicatorId'],
-      select: { indicatorId: true, periodRef: true, value: true, light: true, attainment: true, deviationPct: true },
-    });
+    // Sem mes escolhido: usa o resultado mais recente de cada indicador (comportamento padrao).
+    // Com mes escolhido: usa exatamente aquele periodo (pode nao existir lancamento ainda).
+    const results = periodRef
+      ? await this.prisma.indicatorResult.findMany({
+          where: { indicatorId: { in: ids }, periodRef },
+          select: { indicatorId: true, periodRef: true, value: true, light: true, attainment: true, deviationPct: true },
+        })
+      : await this.prisma.indicatorResult.findMany({
+          where: { indicatorId: { in: ids } },
+          orderBy: { periodDate: 'desc' },
+          distinct: ['indicatorId'],
+          select: { indicatorId: true, periodRef: true, value: true, light: true, attainment: true, deviationPct: true },
+        });
 
     const resultMap = new Map(results.map((result) => [result.indicatorId, result]));
 
-    // Coletar as referências de períodos necessárias para buscar as metas correspondentes ao período do resultado (ou período atual se não houver resultado)
+    // Coletar as referências de períodos necessárias para buscar as metas correspondentes ao período
+    // escolhido (quando ha mes selecionado), ao período do resultado, ou ao período atual como último recurso.
     const neededRefs = new Set<string>();
     for (const indicator of indicators) {
       const last = resultMap.get(indicator.id);
-      const ref = last?.periodRef ?? currentRefs.get(indicator.id);
+      const ref = periodRef ?? last?.periodRef ?? currentRefs.get(indicator.id);
       if (ref) {
         neededRefs.add(`${indicator.id}:${ref}`);
       }
@@ -351,7 +359,7 @@ export class DashboardService {
 
     return indicators.map((indicator) => {
       const last = resultMap.get(indicator.id) ?? null;
-      const refToUse = last?.periodRef ?? currentRefs.get(indicator.id);
+      const refToUse = periodRef ?? last?.periodRef ?? currentRefs.get(indicator.id);
       const target = refToUse ? targetMap.get(`${indicator.id}:${refToUse}`) : null;
       return {
         id: indicator.id,

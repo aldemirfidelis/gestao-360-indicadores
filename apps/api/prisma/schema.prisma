@@ -1281,7 +1281,7 @@ model Indicator {
   feedKind         FeedKind        @default(MANUAL)
   status           IndicatorStatus @default(ACTIVE)
   weight           Float           @default(1)
-  yellowToleranceP Float           @default(10)
+  yellowToleranceP Float           @default(90)
 
   // Rastreio de origem para integracao/migracao de sistemas legados
   // externalId  = chave primaria no sistema de origem.

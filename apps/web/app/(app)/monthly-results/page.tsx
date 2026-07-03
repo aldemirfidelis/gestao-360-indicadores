@@ -77,13 +77,16 @@ export default function MonthlyResultsHome() {
         title="Reunião Mensal de Resultados"
         description="Fechamento corporativo: meta, desvio, causa, ação, decisão e acompanhamento — tudo conectado aos dados do sistema."
         actions={
-          <div className="flex flex-wrap items-center gap-2">
-            <Input
-              type="month"
-              value={periodRef}
-              onChange={(event) => setPeriodRef(event.target.value)}
-              className="h-9 w-40"
-            />
+          <div className="flex flex-wrap items-end gap-2">
+            <label className="flex flex-col gap-1">
+              <span className="text-[11px] font-semibold uppercase tracking-[0.08em] text-muted-foreground">Mês</span>
+              <Input
+                type="month"
+                value={periodRef}
+                onChange={(event) => setPeriodRef(event.target.value)}
+                className="h-9 w-40"
+              />
+            </label>
             <NativeSelect value={areaFilter} onChange={(event) => setAreaFilter(event.target.value)} className="h-9 w-52">
               <option value="">Todas as áreas</option>
               {(optionsQuery.data?.areaOptions ?? [])

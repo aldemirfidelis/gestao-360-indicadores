@@ -24,10 +24,11 @@ export class DashboardController {
     @CurrentUser() me: AuthPayload,
     @Query('ownerNodeId') ownerNodeId?: string,
     @Query('types') types?: string,
+    @Query('periodRef') periodRef?: string,
   ) {
     // types: lista separada por vírgula (ex.: "STRATEGIC,OPERATIONAL"). Vazio = todos.
     const parsed = types ? types.split(',').map((t) => t.trim()).filter(Boolean) : undefined;
-    return this.service.areaIndicators(me, ownerNodeId, parsed);
+    return this.service.areaIndicators(me, ownerNodeId, parsed, periodRef);
   }
 
   @Get('area-conclusion')

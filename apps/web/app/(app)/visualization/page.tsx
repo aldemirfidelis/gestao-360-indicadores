@@ -41,6 +41,20 @@ interface IndicatorRow {
 }
 
 const PLACEHOLDER_CARDS = 8;
+
+const MONTH_NAMES = ['Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun', 'Jul', 'Ago', 'Set', 'Out', 'Nov', 'Dez'];
+
+// Últimos 12 meses (mais recente primeiro) para o seletor de mês do Painel Executivo.
+function recentMonthOptions(): { value: string; label: string }[] {
+  const now = new Date();
+  const options: { value: string; label: string }[] = [];
+  for (let i = 0; i < 12; i += 1) {
+    const date = new Date(now.getFullYear(), now.getMonth() - i, 1);
+    const value = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`;
+    options.push({ value, label: `${MONTH_NAMES[date.getMonth()]}/${String(date.getFullYear()).slice(2)}` });
+  }
+  return options;
+}
 const CONCLUSION_PLACEHOLDER = 'Nenhuma mensagem-chave registrada para esta área.';
 
 const LIGHT_DOT: Record<string, string> = {
@@ -64,6 +78,8 @@ export default function VisualizationPage() {
   });
   const queryClient = useQueryClient();
   const [selectedNodeId, setSelectedNodeId] = useState('');
+  const [selectedMonth, setSelectedMonth] = useState('');
+  const monthOptions = useMemo(() => recentMonthOptions(), []);
   const [conclusionDraft, setConclusionDraft] = useState('');
   const [conclusionOpen, setConclusionOpen] = useState(false);
   // Filtro Tipo de Indicador (vazio = todos). Sem trava: o usuário decide se vê
@@ -85,10 +101,10 @@ export default function VisualizationPage() {
   }, [orderedNodes, selectedNodeId]);
 
   const indicators = useQuery<IndicatorRow[]>({
-    queryKey: ['visualization', 'indicators', selectedNodeId, types.join(',')],
+    queryKey: ['visualization', 'indicators', selectedNodeId, types.join(','), selectedMonth],
     queryFn: () =>
       api<IndicatorRow[]>(
-        `/dashboard/area-indicators?ownerNodeId=${encodeURIComponent(selectedNodeId)}${types.length ? `&types=${types.join(',')}` : ''}`,
+        `/dashboard/area-indicators?ownerNodeId=${encodeURIComponent(selectedNodeId)}${types.length ? `&types=${types.join(',')}` : ''}${selectedMonth ? `&periodRef=${selectedMonth}` : ''}`,
       ),
     enabled: Boolean(selectedNodeId),
   });
@@ -145,6 +161,8 @@ export default function VisualizationPage() {
           </div>
 
           <div className="min-w-0">
+          <div className="grid grid-cols-[1fr,132px] gap-2">
+          <div className="min-w-0">
             <Label htmlFor="area-select" className="mb-1.5 block text-xs font-semibold uppercase tracking-[0.08em] text-muted-foreground">
               Área da árvore organizacional
             </Label>
@@ -161,6 +179,24 @@ export default function VisualizationPage() {
                 </option>
               ))}
             </NativeSelect>
+          </div>
+          <div className="min-w-0">
+            <Label htmlFor="month-select" className="mb-1.5 block text-xs font-semibold uppercase tracking-[0.08em] text-muted-foreground">
+              Mês
+            </Label>
+            <NativeSelect
+              id="month-select"
+              value={selectedMonth}
+              onChange={(event) => setSelectedMonth(event.target.value)}
+              className="h-10 w-full rounded-md border-border bg-background text-sm text-foreground shadow-sm"
+            >
+              <option value="">Mais recente</option>
+              {monthOptions.map((month) => (
+                <option key={month.value} value={month.value}>{month.label}</option>
+              ))}
+            </NativeSelect>
+          </div>
+          </div>
 
             <div className="mt-3">
               <Label className="mb-1.5 block text-xs font-semibold uppercase tracking-[0.08em] text-muted-foreground">

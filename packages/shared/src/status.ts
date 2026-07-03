@@ -20,10 +20,19 @@ export interface StatusResult {
 /**
  * Calcula farol (verde/amarelo/vermelho/cinza), atingimento e desvios
  * a partir do realizado x meta. Regra estavel para uso no backend e no front.
+ *
+ * O farol e sempre derivado do ATINGIMENTO (normalizado em torno de 1 = meta
+ * cumprida, na direcao correta), nunca do desvio bruto em relacao a meta —
+ * ja que o desvio bruto usa a magnitude da meta como referencia e nao e
+ * comparavel entre indicadores maior-melhor e menor-melhor.
+ *
+ * yellowToleranceP = % MINIMO de atingimento para o farol ficar amarelo (ex.:
+ * 90 = precisa de pelo menos 90% de atingimento para nao ficar vermelho).
+ * Atingimento >= 100% = verde.
  */
 export function calcStatus(input: StatusInput): StatusResult {
   const { value, target, direction, lowerBound, upperBound } = input;
-  const tolP = input.yellowToleranceP ?? 10;
+  const tolP = input.yellowToleranceP ?? 90;
 
   if (value === null || value === undefined || target === null || target === undefined) {
     return { light: TrafficLight.GRAY, attainment: null, deviationAbs: null, deviationPct: null };
@@ -33,14 +42,10 @@ export function calcStatus(input: StatusInput): StatusResult {
   const deviationPct = target !== 0 ? (deviationAbs / Math.abs(target)) * 100 : null;
 
   let attainment: number | null = null;
-  let light: TrafficLight = TrafficLight.GRAY;
 
   switch (direction) {
     case Direction.HIGHER_BETTER: {
       attainment = target !== 0 ? value / target : value >= 0 ? 1 : 0;
-      if (value >= target) light = TrafficLight.GREEN;
-      else if (deviationPct !== null && deviationPct >= -tolP) light = TrafficLight.YELLOW;
-      else light = TrafficLight.RED;
       break;
     }
     case Direction.LOWER_BETTER: {
@@ -50,36 +55,37 @@ export function calcStatus(input: StatusInput): StatusResult {
           : value <= 0
             ? 1
             : 0;
-      if (value <= target) light = TrafficLight.GREEN;
-      else if (deviationPct !== null && deviationPct <= tolP) light = TrafficLight.YELLOW;
-      else light = TrafficLight.RED;
       break;
     }
     case Direction.EQUAL_TARGET: {
       const diffPct =
         target !== 0 ? (Math.abs(value - target) / Math.abs(target)) * 100 : value === 0 ? 0 : 100;
       attainment = 1 - diffPct / 100;
-      if (diffPct <= tolP / 2) light = TrafficLight.GREEN;
-      else if (diffPct <= tolP) light = TrafficLight.YELLOW;
-      else light = TrafficLight.RED;
       break;
     }
     case Direction.RANGE: {
       const lo = lowerBound ?? target;
       const hi = upperBound ?? target;
       if (value >= lo && value <= hi) {
-        light = TrafficLight.GREEN;
         attainment = 1;
       } else {
         const dist = value < lo ? lo - value : value - hi;
         const ref = Math.max(Math.abs(lo), Math.abs(hi), 1);
         const distPct = (dist / ref) * 100;
         attainment = Math.max(0, 1 - distPct / 100);
-        light = distPct <= tolP ? TrafficLight.YELLOW : TrafficLight.RED;
       }
       break;
     }
   }
+
+  const light =
+    attainment === null
+      ? TrafficLight.GRAY
+      : attainment >= 1
+        ? TrafficLight.GREEN
+        : attainment >= tolP / 100
+          ? TrafficLight.YELLOW
+          : TrafficLight.RED;
 
   return { light, attainment, deviationAbs, deviationPct };
 }

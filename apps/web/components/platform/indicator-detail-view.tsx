@@ -1149,23 +1149,16 @@ function truncateText(value: string, maxLength: number) {
   return clean.length > maxLength ? `${clean.slice(0, maxLength - 1)}…` : clean;
 }
 
+// O "desvio principal" precisa se referir ao MESMO periodo do "Realizado
+// atual" (o ultimo resultado lancado) — nao ao pior desvio historico do
+// indicador, que confundia o usuario ao misturar meses diferentes no painel.
 function getPrincipalDeviation(indicator: IndicatorDetail): PrincipalDeviation | null {
+  const last = indicator.results[indicator.results.length - 1];
+  if (!last || (last.light !== 'RED' && last.light !== 'YELLOW')) return null;
   const targetByRef = new Map(indicator.targets.map((target) => [target.periodRef, target.target]));
-  const candidates = indicator.results
-    .map((result) => {
-      const target = targetByRef.get(result.periodRef) ?? null;
-      const deviationAbs = target !== null ? Math.abs(result.value - target) : null;
-      const deviationPctAbs = result.deviationPct !== null ? Math.abs(result.deviationPct) : null;
-      const attentionWeight = result.light === 'RED' ? 1000000 : result.light === 'YELLOW' ? 500000 : 0;
-      const score = attentionWeight + (deviationPctAbs ?? 0) * 1000 + (deviationAbs ?? 0);
-      return { result, target, deviationAbs, score };
-    })
-    .filter((item) => item.result.light === 'RED' || item.result.light === 'YELLOW');
-
-  if (candidates.length === 0) return null;
-  candidates.sort((a, b) => b.score - a.score);
-  const { result, target, deviationAbs } = candidates[0];
-  return { result, target, deviationAbs };
+  const target = targetByRef.get(last.periodRef) ?? null;
+  const deviationAbs = target !== null ? Math.abs(last.value - target) : null;
+  return { result: last, target, deviationAbs };
 }
 
 function formatDeviationSummary(principal: PrincipalDeviation | null) {

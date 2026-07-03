@@ -596,7 +596,7 @@ export class IndicatorsService {
       direction: indicator?.direction as Direction,
       lowerBound: target?.lowerBound ?? null,
       upperBound: target?.upperBound ?? null,
-      yellowToleranceP: indicator?.yellowToleranceP ?? 10,
+      yellowToleranceP: indicator?.yellowToleranceP ?? 90,
     });
     await this.prisma.indicatorResult.update({
       where: { id: result.id },
@@ -818,7 +818,7 @@ export class IndicatorsService {
       feedKind: enumOrDefault(FeedKind, input.feedKind, FeedKind.MANUAL),
       status: enumOrDefault(IndicatorStatus, input.status, IndicatorStatus.ACTIVE),
       weight: optionalNumber(input.weight, 'Peso') ?? 1,
-      yellowToleranceP: optionalNumber(input.yellowToleranceP, 'Tolerância amarela') ?? 10,
+      yellowToleranceP: optionalNumber(input.yellowToleranceP, 'Tolerância amarela') ?? 90,
     };
   }
 
@@ -852,7 +852,7 @@ export class IndicatorsService {
     if (input.feedKind !== undefined) data.feedKind = enumOrDefault(FeedKind, input.feedKind, FeedKind.MANUAL);
     if (input.status !== undefined) data.status = enumOrDefault(IndicatorStatus, input.status, IndicatorStatus.ACTIVE);
     if (input.weight !== undefined) data.weight = optionalNumber(input.weight, 'Peso') ?? 1;
-    if (input.yellowToleranceP !== undefined) data.yellowToleranceP = optionalNumber(input.yellowToleranceP, 'Tolerância amarela') ?? 10;
+    if (input.yellowToleranceP !== undefined) data.yellowToleranceP = optionalNumber(input.yellowToleranceP, 'Tolerância amarela') ?? 90;
     return data;
   }
 
