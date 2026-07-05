@@ -19,7 +19,7 @@ import {
 import { Textarea } from '@/components/ui/textarea';
 import { api } from '@/lib/api';
 import { cn, formatDate, formatNumber, periodRefLabel } from '@/lib/utils';
-import { PERIODICITY_LABEL } from '@/lib/labels';
+import { getIndicatorUnitLabel, PERIODICITY_LABEL } from '@/lib/labels';
 
 interface PendingCell {
   periodRef: string;
@@ -232,7 +232,7 @@ export function IndicatorResultEditor(props: IndicatorMonthlyEditorProps) {
   }
 
   const name = row?.indicator.name ?? fallbackName ?? 'Indicador';
-  const unit = row?.indicator.unitLabel ?? unitLabel ?? row?.indicator.unit ?? '';
+  const unit = getIndicatorUnitLabel(row?.indicator.unit, row?.indicator.unitLabel ?? unitLabel);
   const editingLabel = mode === 'target' ? 'Meta' : 'Realizado';
   const otherLabel = mode === 'target' ? 'Realizado' : 'Meta';
   const isSaving = mode === 'target' ? upsertTargets.isPending : upsertResult.isPending;

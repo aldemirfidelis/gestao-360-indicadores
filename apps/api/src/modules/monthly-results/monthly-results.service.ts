@@ -1,10 +1,12 @@
 import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
+import { calcStatus } from '@g360/shared';
 import { swallow } from '../../common/logging/swallow';
 import {
   ActionOrigin,
   ActionPriority,
   ActionStatus,
   DeviationStatus,
+  Direction,
   MeetingFormat,
   MeetingParticipantRole,
   MonthlyAreaReadiness,
@@ -1362,22 +1364,37 @@ export class MonthlyResultsService {
     const results = [...(indicator.results ?? [])].sort((a: any, b: any) => new Date(b.periodDate).getTime() - new Date(a.periodDate).getTime());
     const latest = results[0] ?? null;
     const currentResult = results.find((r: any) => r.periodRef === periodRef) ?? null;
-    const current = mode === 'latest' ? latest : (currentResult ?? latest);
+    const current = mode === 'latest' ? latest : currentResult;
     const targetForCurrent = current ? targets.find((t: any) => t.periodRef === current.periodRef) ?? null : null;
     const targetForPeriod = targets.find((t: any) => t.periodRef === periodRef) ?? null;
     const target = mode === 'latest'
       ? (targetForCurrent ?? targetForPeriod ?? targets[0] ?? null)
       : (targetForPeriod ?? targetForCurrent ?? targets[0] ?? null);
     const previous = results.find((r: any) => r.periodRef !== current?.periodRef) ?? null;
-    const light = this.displayLight((current?.light as TrafficLight) ?? TrafficLight.GRAY, current?.attainment);
+
+    // Farol/atingimento SEMPRE recalculados pela regra unificada (calcStatus),
+    // nunca lidos do IndicatorResult.light gravado — que pode estar defasado para
+    // períodos antigos (anteriores à correção da lógica do farol) e deixaria o
+    // painel da Reunião Mensal divergente do Painel Executivo.
+    const status = current
+      ? calcStatus({
+          value: current.value != null ? Number(current.value) : null,
+          target: target?.target != null ? Number(target.target) : null,
+          direction: (indicator.direction as Direction) ?? Direction.HIGHER_BETTER,
+          lowerBound: target?.lowerBound != null ? Number(target.lowerBound) : null,
+          upperBound: target?.upperBound != null ? Number(target.upperBound) : null,
+          yellowToleranceP: indicator.yellowToleranceP ?? 90,
+        })
+      : null;
+    const light = this.displayLight((status?.light as TrafficLight) ?? TrafficLight.GRAY, status?.attainment);
     return {
       target: target?.target ?? null,
       lowerBound: target?.lowerBound ?? null,
       upperBound: target?.upperBound ?? null,
-      current: mode === 'latest' ? (current?.value ?? null) : (currentResult?.value ?? null),
+      current: current?.value ?? null,
       accumulated: current?.value ?? null,
-      attainment: current?.attainment ?? null,
-      deviationPct: current?.deviationPct ?? null,
+      attainment: status?.attainment ?? null,
+      deviationPct: status?.deviationPct ?? null,
       light: (light === 'BLUE' ? TrafficLight.GREEN : light) as TrafficLight,
       trend: this.trendLabel(current, previous),
     };
@@ -1393,6 +1410,8 @@ export class MonthlyResultsService {
         unit: true,
         unitLabel: true,
         source: true,
+        direction: true,
+        yellowToleranceP: true,
         ownerNodeId: true,
         ownerNode: { select: { id: true, name: true, type: true, parentId: true } },
         responsibleUserId: true,
@@ -1412,6 +1431,8 @@ export class MonthlyResultsService {
       where: { id: { in: ids }, companyId, deletedAt: null, status: 'ACTIVE' },
       select: {
         id: true,
+        direction: true,
+        yellowToleranceP: true,
         targets: { orderBy: { periodRef: 'desc' }, select: { periodRef: true, target: true, lowerBound: true, upperBound: true }, take: 24 },
         results: { orderBy: { periodDate: 'desc' }, take: 6, select: { periodRef: true, periodDate: true, value: true, light: true, attainment: true, deviationPct: true, note: true, updatedAt: true } },
       },

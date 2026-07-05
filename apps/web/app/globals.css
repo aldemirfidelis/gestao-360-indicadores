@@ -175,3 +175,22 @@
   animation: spin360 1.4s linear infinite;
 }
 
+.indicator-print-report {
+  display: none;
+}
+
+@media print {
+  body.indicator-report-printing > :not(.indicator-print-report-active) {
+    display: none !important;
+  }
+
+  body.indicator-report-printing > .indicator-print-report-active {
+    display: block !important;
+    width: 100%;
+    min-height: 100%;
+    background: white;
+    color: #0f172a;
+    print-color-adjust: exact;
+    -webkit-print-color-adjust: exact;
+  }
+}

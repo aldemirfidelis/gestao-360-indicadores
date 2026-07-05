@@ -6,7 +6,7 @@ export interface StatusInput {
   direction: Direction;
   lowerBound?: number | null;
   upperBound?: number | null;
-  /** tolerancia para amarelo, em pontos percentuais (default 10) */
+  /** atingimento percentual minimo para amarelo (default 90) */
   yellowToleranceP?: number;
 }
 

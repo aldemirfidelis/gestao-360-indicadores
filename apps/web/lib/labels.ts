@@ -52,6 +52,15 @@ export const INDICATOR_UNIT_LABEL: Record<string, string> = {
   CUSTOM: 'Personalizada',
 };
 
+export function getIndicatorUnitLabel(unit?: string | null, customLabel?: string | null) {
+  const custom = customLabel?.trim();
+  if (custom) return INDICATOR_UNIT_LABEL[custom.toUpperCase()] ?? custom;
+
+  const rawUnit = unit?.trim();
+  if (!rawUnit) return '';
+  return INDICATOR_UNIT_LABEL[rawUnit.toUpperCase()] ?? rawUnit;
+}
+
 export const INDICATOR_STATUS_LABEL: Record<string, string> = {
   ACTIVE: 'Ativo',
   INACTIVE: 'Inativo',

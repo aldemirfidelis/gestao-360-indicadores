@@ -19,6 +19,7 @@ import {
   Presentation,
   RefreshCw,
   Sparkles,
+  Trash2,
 } from 'lucide-react';
 import { Bar, BarChart, CartesianGrid, Cell, LabelList, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts';
 import { PageHeader } from '@/components/shell/page-header';
@@ -49,8 +50,9 @@ import {
 export default function MonthlyResultsHome() {
   const qc = useQueryClient();
   const router = useRouter();
-  const { hasPermission } = useAuth();
+  const { hasPermission, user } = useAuth();
   const canCreate = hasPermission(['monthly:create', 'monthly:manage']);
+  const canDelete = user?.role === 'SUPER_ADMIN' || user?.role === 'COMPANY_ADMIN';
   const [periodRef, setPeriodRef] = useState(defaultPeriodRef());
   const [areaFilter, setAreaFilter] = useState('');
   const [createOpen, setCreateOpen] = useState(false);
@@ -119,7 +121,13 @@ export default function MonthlyResultsHome() {
 
       <div className="grid grid-cols-1 gap-4 xl:grid-cols-[1.3fr_0.7fr]">
         <FarolPanel dashboard={dashboard} />
-        <MeetingsPanel dashboard={dashboard} onOpen={(id) => router.push(`/monthly-results/${id}`)} canCreate={canCreate} onCreate={() => setCreateOpen(true)} />
+        <MeetingsPanel
+          dashboard={dashboard}
+          onOpen={(id) => router.push(`/monthly-results/${id}`)}
+          canCreate={canCreate}
+          canDelete={canDelete}
+          onCreate={() => setCreateOpen(true)}
+        />
       </div>
 
       <CreateMeetingDialog
@@ -211,14 +219,29 @@ function MeetingsPanel({
   dashboard,
   onOpen,
   canCreate,
+  canDelete,
   onCreate,
 }: {
   dashboard?: MonthlyDashboard;
   onOpen: (id: string) => void;
   canCreate: boolean;
+  canDelete: boolean;
   onCreate: () => void;
 }) {
+  const qc = useQueryClient();
   const meetings = dashboard?.meetings ?? [];
+  const [deleteTarget, setDeleteTarget] = useState<{ id: string; title: string } | null>(null);
+
+  const deleteMeeting = useMutation({
+    mutationFn: (id: string) => api(`/monthly-results/meetings/${id}`, { method: 'DELETE' }),
+    onSuccess: async () => {
+      toast.success('Reunião excluída');
+      setDeleteTarget(null);
+      await qc.invalidateQueries({ queryKey: ['monthly-dashboard'] });
+    },
+    onError: (error: Error) => toast.error(error.message),
+  });
+
   return (
     <Card>
       <CardHeader>
@@ -236,33 +259,70 @@ function MeetingsPanel({
           </div>
         )}
         {meetings.map((meeting) => (
-          <button
+          <div
             key={meeting.id}
-            onClick={() => onOpen(meeting.id)}
-            className="flex w-full min-w-0 items-center justify-between gap-3 rounded-md border p-3 text-left transition-colors hover:border-primary/50 hover:bg-muted/50"
+            className="flex w-full min-w-0 items-center gap-2 rounded-md border p-3 transition-colors hover:border-primary/50 hover:bg-muted/50"
           >
-            <div className="min-w-0">
-              <p className="truncate text-sm font-semibold">{meeting.title}</p>
-              <p className="text-xs text-muted-foreground">
-                {periodRefLabel(meeting.periodRef)} · {formatDate(meeting.startsAt)}
-              </p>
-              <div className="mt-2 flex flex-wrap items-center gap-2 text-[11px] text-muted-foreground">
-                <span>{meeting.counts.areas} áreas</span>
-                <span>·</span>
-                <span>{meeting.readiness.ready}/{meeting.readiness.total} prontas</span>
-                <span>·</span>
-                <span>{meeting.counts.decisions} decisões</span>
+            <button onClick={() => onOpen(meeting.id)} className="flex min-w-0 flex-1 items-center justify-between gap-3 text-left">
+              <div className="min-w-0">
+                <p className="truncate text-sm font-semibold">{meeting.title}</p>
+                <p className="text-xs text-muted-foreground">
+                  {periodRefLabel(meeting.periodRef)} · {formatDate(meeting.startsAt)}
+                </p>
+                <div className="mt-2 flex flex-wrap items-center gap-2 text-[11px] text-muted-foreground">
+                  <span>{meeting.counts.areas} áreas</span>
+                  <span>·</span>
+                  <span>{meeting.readiness.ready}/{meeting.readiness.total} prontas</span>
+                  <span>·</span>
+                  <span>{meeting.counts.decisions} decisões</span>
+                </div>
               </div>
-            </div>
-            <div className="flex shrink-0 flex-col items-end gap-2">
-              <Badge variant="outline" className={cn(STATUS_STYLES[meeting.status] ?? '')}>
-                {STATUS_LABEL[meeting.status] ?? meeting.status}
-              </Badge>
-              <ArrowRight className="h-4 w-4 text-muted-foreground" />
-            </div>
-          </button>
+              <div className="flex shrink-0 flex-col items-end gap-2">
+                <Badge variant="outline" className={cn(STATUS_STYLES[meeting.status] ?? '')}>
+                  {STATUS_LABEL[meeting.status] ?? meeting.status}
+                </Badge>
+                <ArrowRight className="h-4 w-4 text-muted-foreground" />
+              </div>
+            </button>
+            {canDelete && (
+              <button
+                type="button"
+                onClick={() => setDeleteTarget({ id: meeting.id, title: meeting.title })}
+                title="Excluir reunião"
+                aria-label="Excluir reunião"
+                className="shrink-0 rounded-md p-2 text-muted-foreground transition-colors hover:bg-red-50 hover:text-red-600"
+              >
+                <Trash2 className="h-4 w-4" />
+              </button>
+            )}
+          </div>
         ))}
       </CardContent>
+
+      <Dialog open={!!deleteTarget} onOpenChange={(open) => !open && setDeleteTarget(null)}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>Excluir reunião</DialogTitle>
+          </DialogHeader>
+          <p className="text-sm text-muted-foreground">
+            Tem certeza que deseja excluir <span className="font-medium text-foreground">{deleteTarget?.title}</span>? Esta ação
+            remove a reunião e todo o seu conteúdo do fechamento.
+          </p>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setDeleteTarget(null)} disabled={deleteMeeting.isPending}>
+              Cancelar
+            </Button>
+            <Button
+              variant="destructive"
+              onClick={() => deleteTarget && deleteMeeting.mutate(deleteTarget.id)}
+              disabled={deleteMeeting.isPending}
+            >
+              <Trash2 className="mr-2 h-4 w-4" />
+              Excluir
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </Card>
   );
 }

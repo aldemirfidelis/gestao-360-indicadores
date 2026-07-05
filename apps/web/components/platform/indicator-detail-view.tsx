@@ -45,7 +45,7 @@ import { StatusLight } from '@/components/ui/status-light';
 import { StatusBadge } from '@/components/platform/status-badge';
 import { api } from '@/lib/api';
 import { cn, formatNumber, formatPercent, periodRefLabel } from '@/lib/utils';
-import { ACTION_STATUS_LABEL, MEETING_STATUS_LABEL, TRACE_EVENT_LABEL, TRAFFIC_LIGHT_LABEL } from '@/lib/labels';
+import { ACTION_STATUS_LABEL, getIndicatorUnitLabel, MEETING_STATUS_LABEL, TRAFFIC_LIGHT_LABEL } from '@/lib/labels';
 import { useVision360 } from '@/components/ui/vision360-context';
 import { useAuth } from '@/components/auth/auth-provider';
 
@@ -120,26 +120,6 @@ interface GrainResponse {
   granularity: 'DAILY' | 'WEEKLY' | 'BIWEEKLY' | 'MONTHLY';
   monthRef: string;
   cells: GrainCell[];
-}
-
-interface TraceEvent {
-  id: string;
-  eventType: string;
-  entityType: string;
-  entityId: string;
-  relatedType?: string | null;
-  relatedId?: string | null;
-  title: string;
-  description: string | null;
-  statusFrom?: string | null;
-  statusTo?: string | null;
-  occurredAt: string;
-  user: { id: string; name: string; email?: string } | null;
-  metadata?: unknown;
-}
-
-interface TraceabilityTimeline {
-  events: TraceEvent[];
 }
 
 interface AuditLogEntry {
@@ -220,8 +200,6 @@ export function IndicatorDetailView({ id, embedded = false }: { id: string; embe
   const { open: openVision360 } = useVision360();
   const { hasPermission } = useAuth();
   const canCreateDeviation = hasPermission(['deviations:create', 'deviations:update']);
-  const canCreateAction = hasPermission(['actions:create']);
-  const canScheduleMeeting = hasPermission(['meetings:create', 'meetings:update']);
 
   const detail = useQuery<IndicatorDetail>({
     queryKey: ['indicator', id],
@@ -238,10 +216,6 @@ export function IndicatorDetailView({ id, embedded = false }: { id: string; embe
     queryKey: ['indicator', id, 'grain', grainGranularity, grainMonth],
     enabled: isGrainMode,
     queryFn: () => api<GrainResponse>(`/results/grain?indicatorId=${id}&granularity=${grainGranularity}&month=${grainMonth}`),
-  });
-  const timeline = useQuery<TraceabilityTimeline>({
-    queryKey: ['traceability', 'indicator', id],
-    queryFn: () => api<TraceabilityTimeline>(`/traceability/indicators/${id}`),
   });
   const lastResult = detail.data?.results[detail.data.results.length - 1];
   const lastPeriodRef = lastResult?.periodRef;
@@ -349,8 +323,8 @@ export function IndicatorDetailView({ id, embedded = false }: { id: string; embe
   };
 
   const prev = ind.results[ind.results.length - 2] ?? null;
-  const unit = ind.unitLabel || ind.unit || '';
-  const ppOrUnit = unit === '%' || unit.toUpperCase() === 'PERCENT' ? 'p.p.' : unit || 'pontos';
+  const unit = getIndicatorUnitLabel(ind.unit, ind.unitLabel);
+  const ppOrUnit = unit === '%' ? 'p.p.' : unit || 'pontos';
   const metaValue = ind.targets.find((t) => t.periodRef === last?.periodRef)?.target ?? ind.targets[ind.targets.length - 1]?.target ?? null;
   const momDelta = last && prev ? last.value - prev.value : null;
   const indicatorActionsHref = `/actions?indicatorId=${encodeURIComponent(ind.id)}`;
@@ -360,6 +334,7 @@ export function IndicatorDetailView({ id, embedded = false }: { id: string; embe
   const upcomingMeetings = (ind.meetings ?? [])
     .filter((meeting) => !meeting.startsAt || new Date(meeting.startsAt).getTime() >= Date.now())
     .sort((a, b) => new Date(a.startsAt ?? 0).getTime() - new Date(b.startsAt ?? 0).getTime());
+  const exportReportId = `indicator-export-report-${ind.id}`;
 
   return (
     <div>
@@ -390,7 +365,7 @@ export function IndicatorDetailView({ id, embedded = false }: { id: string; embe
               <AlertTriangle className="mr-2 h-4 w-4" />
               {openDeviation.isPending ? 'Abrindo...' : linkedPrincipalDeviation || deviationRows.length ? 'Abrir desvio' : 'Registrar desvio'}
             </Button>
-            <Button variant="outline" className="gap-1.5" onClick={() => window.print()}>
+            <Button variant="outline" className="gap-1.5" onClick={() => printIndicatorReport(exportReportId, ind.name)}>
               <Download className="h-4 w-4" /> Exportar
             </Button>
           </div>
@@ -764,94 +739,6 @@ export function IndicatorDetailView({ id, embedded = false }: { id: string; embe
         </Card>
       </div>
 
-      <div className="mb-6 grid grid-cols-1 gap-6 xl:grid-cols-[1fr,420px]">
-        <Card>
-          <CardHeader className="py-3">
-            <CardTitle className="text-sm">Próximos passos sugeridos</CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-3 pt-0">
-            <p className="text-xs text-muted-foreground">{nextStepsHint(last?.light)}</p>
-            <div className="flex flex-wrap gap-2">
-              <Button
-                variant={last?.light === 'RED' ? 'destructive' : 'outline'}
-                size="sm"
-                onClick={() => openOrCreateDeviation(linkedPrincipalDeviation)}
-                disabled={openDeviation.isPending || (!linkedPrincipalDeviation && deviationRows.length === 0 && (!last?.periodRef || !canCreateDeviation))}
-              >
-                <AlertTriangle className="mr-1.5 h-4 w-4" />
-                {openDeviation.isPending ? 'Abrindo...' : 'Abrir desvio'}
-              </Button>
-              {canCreateAction && (
-                <Button variant="outline" size="sm" asChild>
-                  <Link href={linkedPrincipalDeviation ? `/deviations/${linkedPrincipalDeviation.id}` : indicatorActionsHref}>
-                    <ScrollText className="mr-1.5 h-4 w-4" />
-                    Criar plano de ação
-                  </Link>
-                </Button>
-              )}
-              {last?.light === 'RED' && (
-                <Button variant="outline" size="sm" asChild>
-                  <Link href={linkedPrincipalDeviation ? `/deviations/${linkedPrincipalDeviation.id}` : '/deviations'}>
-                    <ShieldAlert className="mr-1.5 h-4 w-4" />
-                    Solicitar análise de causa
-                  </Link>
-                </Button>
-              )}
-              {canScheduleMeeting && (
-                <Button variant="outline" size="sm" asChild>
-                  <Link href="/meetings">
-                    <ScrollText className="mr-1.5 h-4 w-4" />
-                    Registrar reunião
-                  </Link>
-                </Button>
-              )}
-              <Button variant="outline" size="sm" onClick={() => openVision360('INDICATOR', ind.id)}>
-                <Network className="mr-1.5 h-4 w-4" />
-                Recomendação com IA
-              </Button>
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 py-3">
-            <CardTitle className="text-sm">Linha de rastreabilidade</CardTitle>
-            <Button variant="ghost" size="sm" onClick={() => setAuditOpen(true)}>
-              <ScrollText className="mr-1.5 h-3.5 w-3.5" />
-              Auditoria completa
-            </Button>
-          </CardHeader>
-          <CardContent className="pt-0">
-            {timeline.isLoading && <p className="text-sm text-muted-foreground">Carregando histórico...</p>}
-            {!timeline.isLoading && (timeline.data?.events.length ?? 0) === 0 && (
-              <p className="text-sm text-muted-foreground">Nenhum evento registrado para este indicador.</p>
-            )}
-            <div className="max-h-[420px] space-y-2 overflow-y-auto pr-1">
-              {timeline.data?.events.map((event) => (
-                <Link
-                  key={event.id}
-                  href={eventHref(event)}
-                  className="block rounded-lg border p-3 transition-colors hover:bg-accent/35"
-                >
-                  <div className="flex items-start justify-between gap-3">
-                    <div className="min-w-0">
-                      <div className="truncate text-sm font-semibold">{event.title}</div>
-                      <div className="mt-1 text-xs text-muted-foreground">
-                        {new Date(event.occurredAt).toLocaleString('pt-BR')} - {event.user?.name ?? 'Sistema'}
-                      </div>
-                    </div>
-                    <StatusBadge value={event.statusTo ?? event.eventType} label={shortEventLabel(event.eventType)} />
-                  </div>
-                  {event.description && (
-                    <p className="mt-2 line-clamp-2 text-xs text-muted-foreground">{event.description}</p>
-                  )}
-                </Link>
-              ))}
-            </div>
-          </CardContent>
-        </Card>
-      </div>
-
       <Card>
         <CardHeader>
           <div className="flex flex-row items-center justify-between">
@@ -913,6 +800,19 @@ export function IndicatorDetailView({ id, embedded = false }: { id: string; embe
           </div>
         </CardContent>
       </Card>
+
+      <IndicatorExportReport
+        id={exportReportId}
+        indicator={ind}
+        last={last ?? null}
+        previous={prev}
+        target={metaValue}
+        unit={unit}
+        principal={principalDeviation}
+        deviation={linkedPrincipalDeviation}
+        deviations={deviationRows}
+        treatment={currentTreatment.data ?? null}
+      />
 
       <Dialog open={auditOpen} onOpenChange={setAuditOpen}>
         <DialogContent className="max-w-3xl">
@@ -1089,6 +989,175 @@ function IndicatorDecisionCards({
   );
 }
 
+function IndicatorExportReport({
+  id,
+  indicator,
+  last,
+  previous,
+  target,
+  unit,
+  principal,
+  deviation,
+  deviations,
+  treatment,
+}: {
+  id: string;
+  indicator: IndicatorDetail;
+  last: IndicatorDetail['results'][number] | null;
+  previous: IndicatorDetail['results'][number] | null;
+  target: number | null;
+  unit: string;
+  principal: PrincipalDeviation | null;
+  deviation: DeviationSummary | null;
+  deviations: DeviationSummary[];
+  treatment: CurrentTreatment | null;
+}) {
+  const variation = last && previous ? last.value - previous.value : null;
+  const linkedActions = uniqueActionRows(deviations.flatMap((item) => item.actions ?? []));
+  const latestAnalysis = deviation?.analyses?.[0] ?? null;
+  const hierarchy = [
+    indicator.company?.name,
+    indicator.areaMacro?.name,
+    indicator.areaMicro?.name,
+    indicator.ownerNode?.type === 'UNIT' ? indicator.ownerNode.name : null,
+    indicator.guidelineNode?.name,
+    indicator.strategicObjective?.name,
+  ].filter(Boolean).join(' → ');
+
+  return (
+    <section id={id} className="indicator-print-report" aria-label={`Relatório do indicador ${indicator.name}`}>
+      <header className="border-b-2 border-slate-800 pb-4">
+        <p className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-500">Relatório do indicador</p>
+        <h1 className="mt-1 text-2xl font-bold text-slate-950">{indicator.name}</h1>
+        {indicator.description && <p className="mt-1 text-sm text-slate-600">{indicator.description}</p>}
+        <div className="mt-3 grid grid-cols-2 gap-x-8 gap-y-1 text-xs text-slate-700">
+          <p><span className="font-semibold">Código:</span> {indicator.code ?? 'Sem código'}</p>
+          <p><span className="font-semibold">Responsável:</span> {indicator.responsibleUser?.name ?? 'Não definido'}</p>
+          <p><span className="font-semibold">Área:</span> {indicator.ownerNode?.name ?? 'Não definida'}</p>
+          <p><span className="font-semibold">Unidade:</span> {unit || 'Não definida'}</p>
+        </div>
+        {hierarchy && <p className="mt-2 text-xs text-slate-500"><span className="font-semibold">Hierarquia:</span> {hierarchy}</p>}
+      </header>
+
+      <div className="mt-5 grid grid-cols-4 gap-3">
+        <ExportMetric label="Período" value={last ? periodRefLabel(last.periodRef) : 'Sem lançamento'} />
+        <ExportMetric label="Realizado" value={last ? formatIndicatorValue(last.value, unit) : '-'} />
+        <ExportMetric label="Meta" value={formatIndicatorValue(target, unit)} />
+        <ExportMetric
+          label="Farol / atingimento"
+          value={`${TRAFFIC_LIGHT_LABEL[last?.light ?? 'GRAY'] ?? 'Sem dados'} · ${formatPercent(last?.attainment)}`}
+        />
+      </div>
+
+      {variation !== null && (
+        <p className="mt-3 rounded border border-slate-200 bg-slate-50 px-3 py-2 text-xs text-slate-700">
+          <span className="font-semibold">Variação contra o período anterior:</span>{' '}
+          {variation > 0 ? '+' : ''}{formatIndicatorValue(variation, unit)}
+        </p>
+      )}
+
+      <h2 className="mt-6 text-sm font-bold uppercase tracking-wide text-slate-800">Detalhes para decisão</h2>
+      <div className="mt-3 grid grid-cols-2 gap-3">
+        <ExportDetailCard title="Desvio principal" tone="red">
+          <p><span className="font-semibold">Desvio da meta:</span> {formatDeviationSummary(principal)}</p>
+          <p><span className="font-semibold">Impacto estimado:</span> {formatOperationalImpact(indicator, principal)}</p>
+          {deviation?.impact && <p><span className="font-semibold">Impacto registrado:</span> {deviation.impact}</p>}
+        </ExportDetailCard>
+
+        <ExportDetailCard title="Providências" tone="olive">
+          <p>{deviation?.immediateAction?.trim() || 'Nenhuma providência imediata registrada.'}</p>
+          <p>
+            <span className="font-semibold">Tratativa:</span>{' '}
+            {treatment ? `${treatment.title} (${STATUS_LABEL[treatment.status] ?? 'Em andamento'})` : 'Nenhuma tratativa em andamento.'}
+          </p>
+        </ExportDetailCard>
+
+        <ExportDetailCard title="Causa raiz" tone="orange">
+          <p>{deviation?.rootCause?.trim() || 'Causa raiz ainda não consolidada.'}</p>
+          {latestAnalysis && <p><span className="font-semibold">Última análise:</span> {latestAnalysis.content}</p>}
+        </ExportDetailCard>
+
+        <ExportDetailCard title="Plano de ação" tone="green">
+          <p>{summarizeActionPlan(linkedActions, linkedActions.length)}</p>
+          {linkedActions.length > 0 && (
+            <ul className="list-square space-y-1 pl-4">
+              {linkedActions.slice(0, 5).map((action) => (
+                <li key={action.id}>{formatActionSummary(action)}</li>
+              ))}
+            </ul>
+          )}
+        </ExportDetailCard>
+      </div>
+
+      <h2 className="mt-6 text-sm font-bold uppercase tracking-wide text-slate-800">Histórico de lançamentos</h2>
+      <table className="mt-3 w-full border-collapse text-left text-xs">
+        <thead>
+          <tr className="border-y border-slate-300 bg-slate-100">
+            <th className="px-2 py-2">Período</th>
+            <th className="px-2 py-2 text-right">Meta</th>
+            <th className="px-2 py-2 text-right">Realizado</th>
+            <th className="px-2 py-2 text-right">Atingimento</th>
+            <th className="px-2 py-2">Farol</th>
+            <th className="px-2 py-2">Observação</th>
+          </tr>
+        </thead>
+        <tbody>
+          {indicator.results.slice().reverse().slice(0, 12).map((result) => {
+            const resultTarget = indicator.targets.find((item) => item.periodRef === result.periodRef)?.target ?? null;
+            return (
+              <tr key={result.id} className="border-b border-slate-200 align-top">
+                <td className="px-2 py-2 font-medium">{periodRefLabel(result.periodRef)}</td>
+                <td className="px-2 py-2 text-right">{formatIndicatorValue(resultTarget, unit)}</td>
+                <td className="px-2 py-2 text-right">{formatIndicatorValue(result.value, unit)}</td>
+                <td className="px-2 py-2 text-right">{formatPercent(result.attainment)}</td>
+                <td className="px-2 py-2">{TRAFFIC_LIGHT_LABEL[result.light] ?? 'Sem dados'}</td>
+                <td className="px-2 py-2">{result.note ?? '-'}</td>
+              </tr>
+            );
+          })}
+        </tbody>
+      </table>
+
+      <footer className="mt-5 border-t border-slate-300 pt-2 text-[10px] text-slate-500">
+        Gerado em <span data-print-generated-at /> · Gestão 360
+      </footer>
+    </section>
+  );
+}
+
+function ExportMetric({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="rounded border border-slate-300 p-3">
+      <p className="text-[10px] font-semibold uppercase tracking-wide text-slate-500">{label}</p>
+      <p className="mt-1 text-sm font-bold text-slate-950">{value}</p>
+    </div>
+  );
+}
+
+function ExportDetailCard({
+  title,
+  tone,
+  children,
+}: {
+  title: string;
+  tone: 'red' | 'olive' | 'orange' | 'green';
+  children: ReactNode;
+}) {
+  const borderColor = {
+    red: 'border-l-red-700',
+    olive: 'border-l-[#8a8540]',
+    orange: 'border-l-orange-500',
+    green: 'border-l-emerald-700',
+  }[tone];
+
+  return (
+    <article className={`break-inside-avoid rounded border border-slate-300 border-l-4 p-3 ${borderColor}`}>
+      <h3 className="text-sm font-bold text-slate-900">{title}</h3>
+      <div className="mt-2 space-y-2 text-xs leading-relaxed text-slate-700">{children}</div>
+    </article>
+  );
+}
+
 function DecisionCard({ tone, title, children }: { tone: 'red' | 'olive' | 'orange' | 'green'; title: string; children: ReactNode }) {
   const toneClass = {
     red: 'border-l-red-700 text-red-700',
@@ -1173,28 +1242,53 @@ function formatDeviationSummary(principal: PrincipalDeviation | null) {
 function formatOperationalImpact(indicator: IndicatorDetail, principal: PrincipalDeviation | null) {
   if (!principal) return 'sem impacto estimado para decisão imediata';
   if (principal.deviationAbs === null) return 'impacto pendente de meta lançada';
-  const unit = indicator.unitLabel || indicator.unit || 'índice';
-  if (unit === 'R$' || unit.toUpperCase() === 'CURRENCY') return `R$ ${formatNumber(principal.deviationAbs)}`;
-  if (unit === '%' || unit.toUpperCase() === 'PERCENT') return `${formatNumber(principal.deviationAbs)} p.p.`;
+  const unit = getIndicatorUnitLabel(indicator.unit, indicator.unitLabel) || 'índice';
+  if (unit === 'R$') return `R$ ${formatNumber(principal.deviationAbs)}`;
+  if (unit === '%') return `${formatNumber(principal.deviationAbs)} p.p.`;
   return `${formatNumber(principal.deviationAbs)} ${unit}`;
 }
 
-function eventHref(event: TraceEvent) {
-  if (event.entityType === 'ACTION_PLAN') return `/actions/${event.entityId}`;
-  if (event.entityType === 'DEVIATION') return `/deviations/${event.entityId}`;
-  if (event.entityType === 'MEETING') return `/meetings/${event.entityId}`;
-  if (event.entityType === 'RISK') return `/risks?focus=${event.entityId}`;
-  if (event.entityType === 'NON_CONFORMITY') return `/nonconformities?focus=${event.entityId}`;
-  if (event.entityType === 'DOCUMENT') return `/documents?focus=${event.entityId}`;
-  if (event.entityType === 'PROCESS') return `/processes?focus=${event.entityId}`;
-  if (event.entityType === 'PROCESS_STEP') return `/processes?focus=${event.relatedId ?? event.entityId}`;
-  if (event.entityType === 'FORM_TEMPLATE') return `/forms?focus=${event.entityId}`;
-  if (event.entityType === 'FORM_SUBMISSION') return `/forms?focus=${event.relatedId ?? event.entityId}`;
-  return '#';
+function formatIndicatorValue(value: number | null | undefined, unit: string) {
+  if (value === null || value === undefined) return '-';
+  const formatted = formatNumber(value);
+  if (unit === 'R$') return `R$ ${formatted}`;
+  if (unit === '%') return `${formatted}%`;
+  return unit ? `${formatted} ${unit}` : formatted;
 }
 
-function shortEventLabel(type: string) {
-  return TRACE_EVENT_LABEL[type] ?? type;
+function printIndicatorReport(reportId: string, indicatorName: string) {
+  const report = document.getElementById(reportId);
+  if (!report) {
+    toast.error('Não foi possível preparar o relatório do indicador.');
+    return;
+  }
+
+  const printableReport = report.cloneNode(true) as HTMLElement;
+  printableReport.removeAttribute('id');
+  printableReport.classList.add('indicator-print-report-active');
+  const generatedAt = printableReport.querySelector<HTMLElement>('[data-print-generated-at]');
+  if (generatedAt) generatedAt.textContent = new Date().toLocaleString('pt-BR');
+  document.body.appendChild(printableReport);
+
+  const originalTitle = document.title;
+  const cleanup = () => {
+    printableReport.remove();
+    document.body.classList.remove('indicator-report-printing');
+    document.title = originalTitle;
+    window.removeEventListener('afterprint', cleanup);
+  };
+
+  document.body.classList.add('indicator-report-printing');
+  document.title = `Indicador - ${indicatorName}`;
+  window.addEventListener('afterprint', cleanup, { once: true });
+
+  window.requestAnimationFrame(() => {
+    try {
+      window.print();
+    } finally {
+      window.setTimeout(cleanup, 0);
+    }
+  });
 }
 
 function auditActionLabel(action: string) {
@@ -1302,13 +1396,6 @@ function statusHint(light: string | undefined, direction: string) {
   if (light === 'YELLOW') return 'Próximo do limite';
   if (light === 'RED') return direction === 'LOWER_BETTER' ? 'Acima da meta' : 'Abaixo da meta';
   return 'Sem lançamento';
-}
-
-function nextStepsHint(light: string | undefined) {
-  if (light === 'RED') return 'Indicador crítico: abra um desvio, solicite análise de causa e estruture um plano de ação.';
-  if (light === 'YELLOW') return 'Indicador em atenção: agende uma reunião de alinhamento e reforce o monitoramento.';
-  if (light === 'GREEN') return 'Indicador no alvo: registre boas práticas e mantenha o acompanhamento.';
-  return 'Sem lançamento recente: registre o resultado do período para habilitar as tratativas.';
 }
 
 function buildInsights(

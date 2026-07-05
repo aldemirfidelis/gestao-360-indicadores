@@ -16,6 +16,7 @@ import { NativeSelect } from '@/components/ui/select';
 import { Gantt } from '@/components/gantt';
 import { api } from '@/lib/api';
 import { formatDate, formatNumber, cn } from '@/lib/utils';
+import { getIndicatorUnitLabel } from '@/lib/labels';
 
 interface Milestone {
   id: string;
@@ -418,7 +419,7 @@ function IndicatorImpactPanel({ indicator }: { indicator: LinkedIndicator }) {
   const previous = indicator.results[1];
   const trendUp = latest && previous ? latest.value > previous.value : null;
   const onTarget = latest?.light === 'GREEN' || latest?.light === 'BLUE';
-  const unitLabel = indicator.unitLabel ?? (indicator.unit === 'PERCENT' ? '%' : '');
+  const unitLabel = getIndicatorUnitLabel(indicator.unit, indicator.unitLabel);
   const valueColor = !latest
     ? 'text-muted-foreground'
     : onTarget
@@ -449,7 +450,7 @@ function IndicatorImpactPanel({ indicator }: { indicator: LinkedIndicator }) {
         <div>
           <div className="text-[10px] uppercase text-muted-foreground">Atual</div>
           <div className={cn('text-xl font-bold', valueColor)}>
-            {latest ? `${formatNumber(latest.value)}${unitLabel}` : '—'}
+            {latest ? formatIndicatorValue(latest.value, unitLabel) : '—'}
           </div>
           {latest && (
             <div className="text-[10px] text-muted-foreground">{latest.periodRef}</div>
@@ -486,4 +487,11 @@ function IndicatorImpactPanel({ indicator }: { indicator: LinkedIndicator }) {
       </div>
     </div>
   );
+}
+
+function formatIndicatorValue(value: number, unitLabel: string) {
+  const formatted = formatNumber(value);
+  if (unitLabel === 'R$') return `R$ ${formatted}`;
+  if (unitLabel === '%') return `${formatted}%`;
+  return unitLabel ? `${formatted} ${unitLabel}` : formatted;
 }
