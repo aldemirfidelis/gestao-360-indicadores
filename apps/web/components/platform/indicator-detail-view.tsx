@@ -2,7 +2,7 @@
 
 import { useRouter } from 'next/navigation';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import type { ReactNode } from 'react';
 import { toast } from 'sonner';
 import {
@@ -201,11 +201,22 @@ const renderCustomBarLabel = (props: any, fill: string) => {
   );
 };
 
-export function IndicatorDetailView({ id, embedded = false }: { id: string; embedded?: boolean }) {
+export function IndicatorDetailView({
+  id,
+  embedded = false,
+  initialPeriodRef,
+  initialView,
+}: {
+  id: string;
+  embedded?: boolean;
+  // Vindos do Painel Executivo: mês e visão para abrir o indicador já focado.
+  initialPeriodRef?: string;
+  initialView?: 'monthly' | 'cumulative';
+}) {
   const router = useRouter();
   const queryClient = useQueryClient();
   const [auditOpen, setAuditOpen] = useState(false);
-  const [viewMode, setViewMode] = useState<IndicatorViewMode>('monthly');
+  const [viewMode, setViewMode] = useState<IndicatorViewMode>(initialView === 'cumulative' ? 'cumulative' : 'monthly');
   const [chartType, setChartType] = useState<IndicatorChartType>('bar');
   const [grainMonth, setGrainMonth] = useState(currentMonthRef());
   const [selectedIdx, setSelectedIdx] = useState(0);
@@ -230,8 +241,16 @@ export function IndicatorDetailView({ id, embedded = false }: { id: string; embe
     enabled: isGrainMode,
     queryFn: () => api<GrainResponse>(`/results/grain?indicatorId=${id}&granularity=${grainGranularity}&month=${grainMonth}`),
   });
-  const lastResult = detail.data?.results[detail.data.results.length - 1];
-  const lastPeriodRef = lastResult?.periodRef;
+  // Período em foco: por padrão o último resultado; quando o Painel Executivo
+  // manda um mês (initialPeriodRef), centra tudo naquele mês (KPIs, desvio,
+  // tratativa), mesmo que o mês vigente já esteja sendo alimentado por automação.
+  const detailResults = detail.data?.results ?? [];
+  const latestResult = detailResults[detailResults.length - 1];
+  const focusResult = initialPeriodRef
+    ? detailResults.find((r) => r.periodRef === initialPeriodRef) ?? latestResult
+    : latestResult;
+  const lastResult = focusResult;
+  const lastPeriodRef = focusResult?.periodRef;
 
   const deviations = useQuery<DeviationSummary[]>({
     queryKey: ['indicator', id, 'deviations'],
@@ -269,6 +288,13 @@ export function IndicatorDetailView({ id, embedded = false }: { id: string; embe
     },
     onError: (e: any) => toast.error(e?.message ?? 'Falha ao abrir desvio'),
   });
+
+  // Destaca no gráfico o mês recebido do Painel Executivo assim que a série carrega.
+  useEffect(() => {
+    if (!initialPeriodRef) return;
+    const idx = (series.data ?? []).findIndex((p) => p.periodRef === initialPeriodRef);
+    if (idx >= 0) setSelectedIdx(idx);
+  }, [initialPeriodRef, series.data]);
 
   if (detail.isLoading) return <p className="text-sm text-muted-foreground">Carregando...</p>;
   if (!detail.data) return null;
@@ -346,7 +372,7 @@ export function IndicatorDetailView({ id, embedded = false }: { id: string; embe
     if (typeof idx === 'number' && idx >= 0 && idx < chartData.length) setSelectedIdx(idx);
   };
   const deviationRows = deviations.data ?? [];
-  const principalDeviation = getPrincipalDeviation(ind);
+  const principalDeviation = getPrincipalDeviation(ind, focusResult ?? undefined);
   const linkedPrincipalDeviation = principalDeviation
     ? deviationRows.find((d) => d.periodRef === principalDeviation.result.periodRef) ?? null
     : deviationRows[0] ?? null;
@@ -363,7 +389,9 @@ export function IndicatorDetailView({ id, embedded = false }: { id: string; embe
     openDeviation.mutate();
   };
 
-  const prev = ind.results[ind.results.length - 2] ?? null;
+  // Período anterior ao foco (para variação vs período anterior).
+  const focusResultIdx = focusResult ? ind.results.findIndex((r) => r.periodRef === focusResult.periodRef) : -1;
+  const prev = focusResultIdx > 0 ? ind.results[focusResultIdx - 1] ?? null : null;
   const unit = getIndicatorUnitLabel(ind.unit, ind.unitLabel);
   const ppOrUnit = unit === '%' ? 'p.p.' : unit || 'pontos';
   const metaValue = ind.targets.find((t) => t.periodRef === last?.periodRef)?.target ?? ind.targets[ind.targets.length - 1]?.target ?? null;
@@ -1270,8 +1298,11 @@ function truncateText(value: string, maxLength: number) {
 // O "desvio principal" precisa se referir ao MESMO periodo do "Realizado
 // atual" (o ultimo resultado lancado) — nao ao pior desvio historico do
 // indicador, que confundia o usuario ao misturar meses diferentes no painel.
-function getPrincipalDeviation(indicator: IndicatorDetail): PrincipalDeviation | null {
-  const last = indicator.results[indicator.results.length - 1];
+function getPrincipalDeviation(
+  indicator: IndicatorDetail,
+  focus?: IndicatorDetail['results'][number],
+): PrincipalDeviation | null {
+  const last = focus ?? indicator.results[indicator.results.length - 1];
   if (!last || (last.light !== 'RED' && last.light !== 'YELLOW')) return null;
   const targetByRef = new Map(indicator.targets.map((target) => [target.periodRef, target.target]));
   const target = targetByRef.get(last.periodRef) ?? null;

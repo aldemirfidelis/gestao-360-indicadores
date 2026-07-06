@@ -351,7 +351,7 @@ export function IndicatorResultEditor(props: IndicatorMonthlyEditorProps) {
             )}
           </div>
           <div className="overflow-x-auto rounded-lg border">
-            <table className="table-modern min-w-[760px]">
+            <table className={cn('table-modern', mode === 'target' ? 'min-w-[1200px]' : 'min-w-[760px]')}>
               <thead>
                 <tr>
                   <th className="text-left">Mês/período</th>
@@ -416,7 +416,7 @@ export function IndicatorResultEditor(props: IndicatorMonthlyEditorProps) {
                               : '-'
                           }
                           className={cn(
-                            'h-9 w-full max-w-[160px] text-sm',
+                            'h-9 w-full min-w-[132px] text-sm',
                             cell.light === 'RED' && 'border-status-red/60',
                             cell.light === 'YELLOW' && 'border-status-yellow/60',
                             cell.light === 'GREEN' && 'border-status-green/60',
@@ -431,7 +431,7 @@ export function IndicatorResultEditor(props: IndicatorMonthlyEditorProps) {
                               value={secondaryEdits[cell.periodRef] ?? (cell.secondaryTarget != null ? String(cell.secondaryTarget) : '')}
                               onChange={(e) => setSecondaryEdits((prev) => ({ ...prev, [cell.periodRef]: e.target.value }))}
                               placeholder="—"
-                              className="h-9 w-full max-w-[140px] text-sm"
+                              className="h-9 w-full min-w-[120px] text-sm"
                             />
                           </td>
                           <td>
@@ -439,7 +439,7 @@ export function IndicatorResultEditor(props: IndicatorMonthlyEditorProps) {
                               value={gainLowerEdits[cell.periodRef] ?? (cell.gainLower != null ? String(cell.gainLower) : '')}
                               onChange={(e) => setGainLowerEdits((prev) => ({ ...prev, [cell.periodRef]: e.target.value }))}
                               placeholder="—"
-                              className="h-9 w-full max-w-[130px] text-sm"
+                              className="h-9 w-full min-w-[120px] text-sm"
                             />
                           </td>
                           <td>
@@ -447,7 +447,7 @@ export function IndicatorResultEditor(props: IndicatorMonthlyEditorProps) {
                               value={gainUpperEdits[cell.periodRef] ?? (cell.gainUpper != null ? String(cell.gainUpper) : '')}
                               onChange={(e) => setGainUpperEdits((prev) => ({ ...prev, [cell.periodRef]: e.target.value }))}
                               placeholder="—"
-                              className="h-9 w-full max-w-[130px] text-sm"
+                              className="h-9 w-full min-w-[120px] text-sm"
                             />
                           </td>
                         </>

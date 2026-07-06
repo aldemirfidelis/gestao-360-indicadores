@@ -1,6 +1,7 @@
 import { BadRequestException, ForbiddenException, Injectable } from '@nestjs/common';
 import { PrismaService } from '../../prisma/prisma.service';
-import { ActionStatus, DeviationStatus, IndicatorType, TrafficLight, TreatmentStatus } from '@prisma/client';
+import { ActionStatus, DeviationStatus, Direction, IndicatorType, TrafficLight, TreatmentStatus } from '@prisma/client';
+import { calcStatus } from '@g360/shared';
 import { lastNPeriodRefs } from '../indicators/period.util';
 import { PeriodsService } from '../periods/periods.service';
 import { AccessService } from '../access/access.service';
@@ -274,7 +275,7 @@ export class DashboardService {
     });
   }
 
-  async areaIndicators(me: AuthPayload, ownerNodeId?: string, types?: string[], periodRef?: string) {
+  async areaIndicators(me: AuthPayload, ownerNodeId?: string, types?: string[], periodRef?: string, mode?: string) {
     const companyId = me.companyId;
     const permitted = await this.access.listAreaFilter(me.sub, MODULE, 'view');
     const selectedIds = ownerNodeId ? await this.descendantNodeIds(companyId, ownerNodeId) : null;
@@ -302,6 +303,7 @@ export class DashboardService {
         unitLabel: true,
         direction: true,
         periodicity: true,
+        yellowToleranceP: true,
         ownerNode: { select: { id: true, name: true, type: true, parentId: true } },
       },
       orderBy: [{ name: 'asc' }],
@@ -357,10 +359,86 @@ export class DashboardService {
 
     const targetMap = new Map(targets.map((target) => [`${target.indicatorId}:${target.periodRef}`, target]));
 
+    // Visão "Acumulado" (YTD): média do ano até o mês em foco, para realizado e
+    // meta separadamente (mesma semântica do detalhe), com o farol recalculado
+    // sobre os acumulados. Só se aplica a períodos mensais (YYYY-MM); indicadores
+    // sem YTD mensal caem no valor do período (comportamento mensal).
+    const cumulative = mode === 'cumulative';
+    const cumMap = new Map<
+      string,
+      { value: number | null; target: number | null; light: TrafficLight; attainment: number | null; lower: number | null; upper: number | null }
+    >();
+    if (cumulative) {
+      const boundaryRef = periodRef ?? (await this.periods.currentMonthlyRef(companyId));
+      const year = Number(boundaryRef.slice(0, 4));
+      const upToMonth = Number(boundaryRef.slice(5, 7));
+      const ytdRefs: string[] = [];
+      if (Number.isFinite(year) && upToMonth >= 1 && upToMonth <= 12) {
+        for (let m = 1; m <= upToMonth; m += 1) ytdRefs.push(`${year}-${String(m).padStart(2, '0')}`);
+      }
+      if (ytdRefs.length) {
+        const [ytdResults, ytdTargets] = await Promise.all([
+          this.prisma.indicatorResult.findMany({
+            where: { indicatorId: { in: ids }, periodRef: { in: ytdRefs } },
+            select: { indicatorId: true, value: true },
+          }),
+          this.prisma.indicatorTarget.findMany({
+            where: { indicatorId: { in: ids }, periodRef: { in: ytdRefs } },
+            select: { indicatorId: true, periodRef: true, target: true, lowerBound: true, upperBound: true },
+          }),
+        ]);
+        const valAgg = new Map<string, { sum: number; n: number }>();
+        for (const r of ytdResults) {
+          if (r.value === null || r.value === undefined) continue;
+          const a = valAgg.get(r.indicatorId) ?? { sum: 0, n: 0 };
+          a.sum += r.value;
+          a.n += 1;
+          valAgg.set(r.indicatorId, a);
+        }
+        const tgtAgg = new Map<string, { sum: number; n: number }>();
+        const boundaryBounds = new Map<string, { lower: number | null; upper: number | null }>();
+        for (const t of ytdTargets) {
+          if (t.target !== null && t.target !== undefined) {
+            const a = tgtAgg.get(t.indicatorId) ?? { sum: 0, n: 0 };
+            a.sum += t.target;
+            a.n += 1;
+            tgtAgg.set(t.indicatorId, a);
+          }
+          if (t.periodRef === boundaryRef) boundaryBounds.set(t.indicatorId, { lower: t.lowerBound, upper: t.upperBound });
+        }
+        for (const indicator of indicators) {
+          const v = valAgg.get(indicator.id);
+          const g = tgtAgg.get(indicator.id);
+          const cumValue = v && v.n > 0 ? v.sum / v.n : null;
+          const cumTarget = g && g.n > 0 ? g.sum / g.n : null;
+          const bounds = boundaryBounds.get(indicator.id) ?? { lower: null, upper: null };
+          const status = calcStatus({
+            value: cumValue,
+            target: cumTarget,
+            direction: indicator.direction as Direction,
+            lowerBound: bounds.lower,
+            upperBound: bounds.upper,
+            yellowToleranceP: indicator.yellowToleranceP,
+          });
+          cumMap.set(indicator.id, {
+            value: cumValue,
+            target: cumTarget,
+            light: status.light as TrafficLight,
+            attainment: status.attainment,
+            lower: bounds.lower,
+            upper: bounds.upper,
+          });
+        }
+      }
+    }
+
     return indicators.map((indicator) => {
       const last = resultMap.get(indicator.id) ?? null;
       const refToUse = periodRef ?? last?.periodRef ?? currentRefs.get(indicator.id);
       const target = refToUse ? targetMap.get(`${indicator.id}:${refToUse}`) : null;
+      // Acumulado só substitui o card quando há de fato dado YTD; senão mantém o mês.
+      const cum = cumulative ? cumMap.get(indicator.id) : null;
+      const useCum = Boolean(cum && cum.value !== null);
       return {
         id: indicator.id,
         name: indicator.name,
@@ -369,14 +447,25 @@ export class DashboardService {
         unitLabel: indicator.unitLabel,
         direction: indicator.direction,
         ownerNode: indicator.ownerNode,
-        currentTarget: target
+        currentTarget: useCum
+          ? cum!.target !== null
+            ? { target: cum!.target, lowerBound: cum!.lower, upperBound: cum!.upper }
+            : null
+          : target
+            ? {
+                target: target.target,
+                lowerBound: target.lowerBound,
+                upperBound: target.upperBound,
+              }
+            : null,
+        last: useCum
           ? {
-              target: target.target,
-              lowerBound: target.lowerBound,
-              upperBound: target.upperBound,
+              value: cum!.value as number,
+              light: cum!.light,
+              attainment: cum!.attainment,
+              deviationPct: null,
             }
-          : null,
-        last: last
+          : last
           ? {
               value: last.value,
               light: last.light,

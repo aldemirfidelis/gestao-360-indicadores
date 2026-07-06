@@ -87,6 +87,9 @@ export default function VisualizationPage() {
   const [types, setTypes] = useState<string[]>([]);
   const toggleType = (value: string) =>
     setTypes((current) => (current.includes(value) ? current.filter((t) => t !== value) : [...current, value]));
+  // Visão Mensal x Acumulado: define como o detalhe do indicador abre ao clicar no
+  // card (valor do mês vs. acumulado YTD). Mutuamente exclusivo (radio via checkbox).
+  const [view, setView] = useState<'monthly' | 'cumulative'>('monthly');
 
   // Combobox mostra apenas as áreas-pai (que têm sub-áreas) — ex.: GOIASA, ADMINISTRAÇÃO, INDÚSTRIA, SSMA...
   const orderedNodes = useMemo(
@@ -101,10 +104,10 @@ export default function VisualizationPage() {
   }, [orderedNodes, selectedNodeId]);
 
   const indicators = useQuery<IndicatorRow[]>({
-    queryKey: ['visualization', 'indicators', selectedNodeId, types.join(','), selectedMonth],
+    queryKey: ['visualization', 'indicators', selectedNodeId, types.join(','), selectedMonth, view],
     queryFn: () =>
       api<IndicatorRow[]>(
-        `/dashboard/area-indicators?ownerNodeId=${encodeURIComponent(selectedNodeId)}${types.length ? `&types=${types.join(',')}` : ''}${selectedMonth ? `&periodRef=${selectedMonth}` : ''}`,
+        `/dashboard/area-indicators?ownerNodeId=${encodeURIComponent(selectedNodeId)}${types.length ? `&types=${types.join(',')}` : ''}${selectedMonth ? `&periodRef=${selectedMonth}` : ''}${view === 'cumulative' ? '&mode=cumulative' : ''}`,
       ),
     enabled: Boolean(selectedNodeId),
   });
@@ -198,19 +201,39 @@ export default function VisualizationPage() {
           </div>
           </div>
 
-            <div className="mt-3">
-              <Label className="mb-1.5 block text-xs font-semibold uppercase tracking-[0.08em] text-muted-foreground">
-                Tipo de Indicador
-              </Label>
-              <div className="flex flex-wrap items-center gap-4">
-                <label className="flex cursor-pointer items-center gap-2 text-sm">
-                  <input type="checkbox" checked={types.includes('OPERATIONAL')} onChange={() => toggleType('OPERATIONAL')} />
-                  Operacional
-                </label>
-                <label className="flex cursor-pointer items-center gap-2 text-sm">
-                  <input type="checkbox" checked={types.includes('STRATEGIC')} onChange={() => toggleType('STRATEGIC')} />
-                  Estratégico
-                </label>
+            <div className="mt-3 flex flex-wrap gap-x-8 gap-y-3">
+              <div>
+                <Label className="mb-1.5 block text-xs font-semibold uppercase tracking-[0.08em] text-muted-foreground">
+                  Tipo de Indicador
+                </Label>
+                <div className="flex flex-wrap items-center gap-4">
+                  <label className="flex cursor-pointer items-center gap-2 text-sm">
+                    <input type="checkbox" checked={types.includes('OPERATIONAL')} onChange={() => toggleType('OPERATIONAL')} />
+                    Operacional
+                  </label>
+                  <label className="flex cursor-pointer items-center gap-2 text-sm">
+                    <input type="checkbox" checked={types.includes('STRATEGIC')} onChange={() => toggleType('STRATEGIC')} />
+                    Estratégico
+                  </label>
+                </div>
+              </div>
+              <div>
+                <Label className="mb-1.5 block text-xs font-semibold uppercase tracking-[0.08em] text-muted-foreground">
+                  Visão
+                </Label>
+                <div className="flex flex-wrap items-center gap-4">
+                  <label className="flex cursor-pointer items-center gap-2 text-sm">
+                    <input type="checkbox" checked={view === 'monthly'} onChange={() => setView('monthly')} />
+                    Mensal
+                  </label>
+                  <label className="flex cursor-pointer items-center gap-2 text-sm">
+                    <input type="checkbox" checked={view === 'cumulative'} onChange={() => setView('cumulative')} />
+                    Acumulado
+                  </label>
+                </div>
+                <p className="mt-1 text-[11px] text-muted-foreground">
+                  {view === 'cumulative' ? 'Cards mostram a média acumulada do ano (YTD).' : 'Cards mostram o valor do mês selecionado.'}
+                </p>
               </div>
             </div>
           </div>
@@ -224,7 +247,9 @@ export default function VisualizationPage() {
           ) : visibleCards.length === 0 ? (
             <ExecutiveIndicatorEmptyState />
           ) : (
-            visibleCards.map((indicator) => <ExecutiveIndicatorCard key={indicator.id} indicator={indicator} />)
+            visibleCards.map((indicator) => (
+              <ExecutiveIndicatorCard key={indicator.id} indicator={indicator} periodRef={selectedMonth} view={view} />
+            ))
           )}
         </div>
 
@@ -294,14 +319,28 @@ export default function VisualizationPage() {
   );
 }
 
-function ExecutiveIndicatorCard({ indicator }: { indicator: IndicatorRow }) {
+function ExecutiveIndicatorCard({
+  indicator,
+  periodRef,
+  view,
+}: {
+  indicator: IndicatorRow;
+  periodRef?: string;
+  view?: 'monthly' | 'cumulative';
+}) {
   const light = indicator.last?.light ?? 'GRAY';
   const targetText = formatTarget(indicator);
   const valueText = formatNumber(indicator.last?.value, { maximumFractionDigits: 2 });
   const unitText = displayUnit(indicator.unitLabel || indicator.unit);
+  // Leva o mês e a visão escolhidos no painel para o detalhe, para tratar os
+  // desvios daquele mês mesmo que o mês vigente já tenha sido alimentado.
+  const params = new URLSearchParams();
+  if (periodRef) params.set('periodRef', periodRef);
+  if (view) params.set('view', view);
+  const href = `/indicators/${indicator.id}${params.toString() ? `?${params.toString()}` : ''}`;
   return (
     <Link
-      href={`/indicators/${indicator.id}`}
+      href={href}
       className="panel panel-hover group relative flex min-h-[178px] min-w-0 flex-col overflow-hidden p-4 outline-none transition-colors focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
       aria-label={`Abrir detalhe do indicador ${indicator.name}`}
     >

@@ -25,10 +25,11 @@ export class DashboardController {
     @Query('ownerNodeId') ownerNodeId?: string,
     @Query('types') types?: string,
     @Query('periodRef') periodRef?: string,
+    @Query('mode') mode?: string,
   ) {
     // types: lista separada por vírgula (ex.: "STRATEGIC,OPERATIONAL"). Vazio = todos.
     const parsed = types ? types.split(',').map((t) => t.trim()).filter(Boolean) : undefined;
-    return this.service.areaIndicators(me, ownerNodeId, parsed, periodRef);
+    return this.service.areaIndicators(me, ownerNodeId, parsed, periodRef, mode);
   }
 
   @Get('area-conclusion')
