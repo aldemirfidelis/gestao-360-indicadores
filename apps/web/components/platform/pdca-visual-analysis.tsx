@@ -119,8 +119,8 @@ const STAGE_META: Record<Phase, {
     soft: 'bg-orange-50 text-orange-700 border-orange-200',
     icon: PlayCircle,
     number: '02',
-    x: 710,
-    y: 40,
+    x: 24,
+    y: 372,
   },
   CHECK: {
     title: 'Check',
@@ -143,8 +143,8 @@ const STAGE_META: Record<Phase, {
     soft: 'bg-violet-50 text-violet-700 border-violet-200',
     icon: RefreshCw,
     number: '04',
-    x: 24,
-    y: 372,
+    x: 710,
+    y: 40,
   },
 };
 
@@ -488,7 +488,7 @@ function PDCACycle({ selectedPhase, onSelect }: { selectedPhase: Phase; onSelect
     <div className="absolute left-[425px] top-[198px] z-10 h-[250px] w-[250px]">
       <div
         className="absolute inset-0 rounded-full shadow-lg"
-        style={{ background: 'conic-gradient(#f97316 0deg 90deg, #16a34a 90deg 180deg, #7c3aed 180deg 270deg, #2563eb 270deg 360deg)' }}
+        style={{ background: 'conic-gradient(#7c3aed 0deg 90deg, #16a34a 90deg 180deg, #f97316 180deg 270deg, #2563eb 270deg 360deg)' }}
       />
       <div className="absolute inset-[24px] rounded-full border-[10px] border-white/70 bg-white shadow-inner" />
       <div className="absolute inset-[73px] flex flex-col items-center justify-center rounded-full bg-white text-center shadow-md">
@@ -499,9 +499,9 @@ function PDCACycle({ selectedPhase, onSelect }: { selectedPhase: Phase; onSelect
         const meta = STAGE_META[phase];
         const positions: Record<Phase, string> = {
           PLAN: 'left-[16px] top-[82px]',
-          DO: 'right-[16px] top-[82px]',
+          DO: 'left-[16px] bottom-[82px]',
           CHECK: 'right-[16px] bottom-[82px]',
-          ACT: 'left-[16px] bottom-[82px]',
+          ACT: 'right-[16px] top-[82px]',
         };
         return (
           <button
