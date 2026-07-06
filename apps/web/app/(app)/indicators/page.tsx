@@ -63,6 +63,7 @@ import { IndicatorResultEditor, ResultNotesDialog } from '@/components/platform/
 import { api } from '@/lib/api';
 import { useAuth } from '@/components/auth/auth-provider';
 import { cn, formatDate, formatNumber, formatPercent, periodRefLabel } from '@/lib/utils';
+import { CHART_COLORS, ChartLegend, computeStubValue, isWithinGain, realizadoBarColor } from '@/lib/indicator-chart';
 import {
   PERIODICITY_LABEL,
   DIRECTION_LABEL,
@@ -122,6 +123,9 @@ interface MonthlyPoint {
   month: string;
   meta: number | null;
   target: number | null;
+  secondaryTarget: number | null;
+  gainLower: number | null;
+  gainUpper: number | null;
   realizado: number | null;
   value: number | null;
   attainment: number | null;
@@ -977,11 +981,18 @@ interface ChartPoint {
   status: string;
   displayMeta: number | null;
   displayRealizado: number | null;
+  displaySecondary: number | null;
+  gainLower: number | null;
+  gainUpper: number | null;
+  noValueStub: number | null;
 }
 
 interface GrainCell {
   periodRef: string;
   target: number | null;
+  secondaryTarget?: number | null;
+  gainLower?: number | null;
+  gainUpper?: number | null;
   value: number | null;
   status: string;
   light: string;
@@ -1108,44 +1119,67 @@ function IndicatorManagementCard({
   const [selectedIdx, setSelectedIdx] = useState<number>(Math.max(0, lastFilledIdx));
 
   const chartData: ChartPoint[] = useMemo(() => {
-    if (isGrainMode) {
-      const cells = grainQuery.data?.cells ?? [];
-      return cells.map((c) => ({
-        periodRef: c.periodRef,
-        month: grainPeriodLabel(c.periodRef),
-        meta: c.target,
-        realizado: c.value,
-        attainment: c.target !== null && c.value !== null && c.target !== 0 ? c.value / c.target : null,
-        status: c.light,
-        displayMeta: c.target,
-        displayRealizado: c.value,
-      }));
-    }
-    if (viewMode === 'monthly') {
-      return monthlyHistory.map((p) => ({
-        periodRef: p.periodRef,
-        month: p.month,
-        meta: p.meta,
-        realizado: p.realizado,
-        attainment: p.attainment,
-        status: p.status,
-        displayMeta: p.meta,
-        displayRealizado: p.realizado,
-      }));
-    }
-    const cumMeta = buildCumulativeAvg(monthlyHistory.map((p) => p.meta));
-    const cumReal = buildCumulativeAvg(monthlyHistory.map((p) => p.realizado));
-    return monthlyHistory.map((p, idx) => ({
-      periodRef: p.periodRef,
-      month: p.month,
-      meta: p.meta,
-      realizado: p.realizado,
-      attainment: p.attainment,
-      status: p.status,
-      displayMeta: cumMeta[idx],
-      displayRealizado: cumReal[idx],
+    const base: ChartPoint[] = isGrainMode
+      ? (grainQuery.data?.cells ?? []).map((c) => ({
+          periodRef: c.periodRef,
+          month: grainPeriodLabel(c.periodRef),
+          meta: c.target,
+          realizado: c.value,
+          attainment: c.target !== null && c.value !== null && c.target !== 0 ? c.value / c.target : null,
+          status: c.light,
+          displayMeta: c.target,
+          displayRealizado: c.value,
+          displaySecondary: c.secondaryTarget ?? null,
+          gainLower: c.gainLower ?? null,
+          gainUpper: c.gainUpper ?? null,
+          noValueStub: null,
+        }))
+      : viewMode === 'monthly'
+        ? monthlyHistory.map((p) => ({
+            periodRef: p.periodRef,
+            month: p.month,
+            meta: p.meta,
+            realizado: p.realizado,
+            attainment: p.attainment,
+            status: p.status,
+            displayMeta: p.meta,
+            displayRealizado: p.realizado,
+            displaySecondary: p.secondaryTarget ?? null,
+            gainLower: p.gainLower ?? null,
+            gainUpper: p.gainUpper ?? null,
+            noValueStub: null,
+          }))
+        : (() => {
+            const cumMeta = buildCumulativeAvg(monthlyHistory.map((p) => p.meta));
+            const cumReal = buildCumulativeAvg(monthlyHistory.map((p) => p.realizado));
+            const cumSecondary = buildCumulativeAvg(monthlyHistory.map((p) => p.secondaryTarget ?? null));
+            return monthlyHistory.map((p, idx) => ({
+              periodRef: p.periodRef,
+              month: p.month,
+              meta: p.meta,
+              realizado: p.realizado,
+              attainment: p.attainment,
+              status: p.status,
+              displayMeta: cumMeta[idx],
+              displayRealizado: cumReal[idx],
+              displaySecondary: cumSecondary[idx],
+              // Faixa de ganho não é acumulável; no modo acumulado o realizado
+              // volta a colorir só por meta (verde/vermelho).
+              gainLower: null,
+              gainUpper: null,
+              noValueStub: null,
+            }));
+          })();
+    const stubValue = computeStubValue(base.flatMap((p) => [p.displayMeta, p.displaySecondary, p.displayRealizado]));
+    return base.map((p) => ({
+      ...p,
+      noValueStub: p.displayRealizado === null || p.displayRealizado === undefined ? stubValue : null,
     }));
   }, [monthlyHistory, viewMode, isGrainMode, grainQuery.data]);
+
+  const hasSecondaryBar = chartData.some((p) => p.displaySecondary !== null && p.displaySecondary !== undefined);
+  const hasGainHit = chartData.some((p) => isWithinGain(p.displayRealizado, p.gainLower, p.gainUpper));
+  const hasNoValueBar = chartData.some((p) => p.noValueStub !== null && p.noValueStub !== undefined);
 
   const safeSelectedIdx = Math.min(selectedIdx, Math.max(0, chartData.length - 1));
   const selectedChart = chartData[safeSelectedIdx] ?? null;
@@ -1272,24 +1306,26 @@ function IndicatorManagementCard({
                     />
                     <YAxis tick={{ fontSize: 11 }} width={48} />
                     <Tooltip content={<ChartTooltip viewMode={viewMode} />} cursor={{ fill: 'hsl(var(--muted))', opacity: 0.35 }} />
-                    <Bar dataKey="displayMeta" name="Meta" fill="#1e3a8a" radius={[3, 3, 0, 0]} isAnimationActive={false}>
-                      <LabelList dataKey="displayMeta" content={(props) => renderCustomBarLabel(props, '#1e3a8a')} />
+                    <Bar dataKey="displayMeta" name="Meta" fill={CHART_COLORS.meta} radius={[3, 3, 0, 0]} isAnimationActive={false}>
+                      <LabelList dataKey="displayMeta" content={(props) => renderCustomBarLabel(props, CHART_COLORS.meta)} />
                     </Bar>
+                    {hasSecondaryBar && (
+                      <Bar dataKey="displaySecondary" name="Meta Secundária" fill={CHART_COLORS.secondary} radius={[3, 3, 0, 0]} isAnimationActive={false}>
+                        <LabelList dataKey="displaySecondary" content={(props) => renderCustomBarLabel(props, CHART_COLORS.secondary)} />
+                      </Bar>
+                    )}
                     <Bar dataKey="displayRealizado" name="Realizado" radius={[3, 3, 0, 0]} isAnimationActive={false}>
-                      {chartData.map((entry, index) => {
-                        let color = 'hsl(var(--status-gray))';
-                        const r = entry.displayRealizado;
-                        const m = entry.displayMeta;
-                        if (r !== null && r !== undefined) {
-                          const isWithin = indicator.direction === 'LOWER_BETTER'
-                            ? (r ?? 0) <= (m ?? 0)
-                            : (r ?? 0) >= (m ?? 0);
-                          color = isWithin ? '#10b981' : '#ef4444';
-                        }
-                        return <Cell key={`cell-${index}`} fill={color} />;
-                      })}
+                      {chartData.map((entry, index) => (
+                        <Cell
+                          key={`cell-${index}`}
+                          fill={realizadoBarColor(entry.displayRealizado, entry.displayMeta, entry.gainLower, entry.gainUpper, indicator.direction)}
+                        />
+                      ))}
                       <LabelList dataKey="displayRealizado" content={(props) => renderCustomBarLabel(props, 'hsl(var(--foreground))')} />
                     </Bar>
+                    {hasNoValueBar && (
+                      <Bar dataKey="noValueStub" name="Realizado sem valor" fill={CHART_COLORS.noValue} radius={[3, 3, 0, 0]} isAnimationActive={false} />
+                    )}
                   </BarChart>
                 ) : (
                   <LineChart data={chartData} margin={{ top: 24, right: 12, left: 0, bottom: 8 }} onClick={onChartClick} style={{ cursor: 'pointer' }}>
@@ -1307,9 +1343,14 @@ function IndicatorManagementCard({
                     />
                     <YAxis tick={{ fontSize: 11 }} width={48} />
                     <Tooltip content={<ChartTooltip viewMode={viewMode} />} cursor={{ stroke: 'hsl(var(--muted-foreground))', strokeWidth: 1, strokeDasharray: '3 3' }} />
-                    <Line type="monotone" dataKey="displayMeta" name="Meta" stroke="#1e3a8a" strokeWidth={2.5} strokeDasharray="6 4" dot={{ r: 3, fill: '#1e3a8a' }} activeDot={{ r: 5 }} isAnimationActive={false}>
-                      <LabelList dataKey="displayMeta" position="top" fontSize={10} fill="#1e3a8a" formatter={(v: any) => (v === null || v === undefined ? '' : formatNumber(v))} />
+                    <Line type="monotone" dataKey="displayMeta" name="Meta" stroke={CHART_COLORS.meta} strokeWidth={2.5} strokeDasharray="6 4" dot={{ r: 3, fill: CHART_COLORS.meta }} activeDot={{ r: 5 }} isAnimationActive={false}>
+                      <LabelList dataKey="displayMeta" position="top" fontSize={10} fill={CHART_COLORS.meta} formatter={(v: any) => (v === null || v === undefined ? '' : formatNumber(v))} />
                     </Line>
+                    {hasSecondaryBar && (
+                      <Line type="monotone" dataKey="displaySecondary" name="Meta Secundária" stroke={CHART_COLORS.secondary} strokeWidth={2} strokeDasharray="2 3" dot={{ r: 2.5, fill: CHART_COLORS.secondary }} activeDot={{ r: 4 }} isAnimationActive={false} connectNulls>
+                        <LabelList dataKey="displaySecondary" position="bottom" fontSize={9} fill={CHART_COLORS.secondary} formatter={(v: any) => (v === null || v === undefined ? '' : formatNumber(v))} />
+                      </Line>
+                    )}
                     <Line type="monotone" dataKey="displayRealizado" name="Realizado" stroke={realizadoSeriesColor(chartData, indicator.direction)} strokeWidth={2.5} dot={{ r: 3, fill: realizadoSeriesColor(chartData, indicator.direction) }} activeDot={{ r: 5 }} isAnimationActive={false}>
                       <LabelList dataKey="displayRealizado" position="top" fontSize={10} fill={realizadoSeriesColor(chartData, indicator.direction)} formatter={(v: any) => (v === null || v === undefined ? '' : formatNumber(v))} />
                     </Line>
@@ -1320,6 +1361,9 @@ function IndicatorManagementCard({
               <div className="flex h-full items-center justify-center text-xs text-muted-foreground">Sem dados para o período</div>
             )}
           </div>
+          {hasAnyData && chartInView && (
+            <ChartLegend hasSecondary={hasSecondaryBar} hasGainHit={hasGainHit} hasNoValue={hasNoValueBar} />
+          )}
           <div className="mt-2 text-[11px] text-muted-foreground">
             {viewMode === 'cumulative' && 'Acumulado calculado como média YTD dos períodos preenchidos. '}
             {viewMode === 'monthly' && 'Valores mensais do indicador no ano corrente. '}
@@ -2111,6 +2155,12 @@ function ChartTooltip({ active, payload, label, viewMode }: any) {
     <div className="rounded-md border bg-background p-2 text-xs shadow-sm">
       <div className="font-semibold">{label}{isCum && ' (acumulado)'}</div>
       <div>Meta: {formatNumber(point?.displayMeta ?? point?.meta)}</div>
+      {point?.displaySecondary !== null && point?.displaySecondary !== undefined && (
+        <div>Meta secundária: {formatNumber(point.displaySecondary)}</div>
+      )}
+      {point?.gainLower !== null && point?.gainLower !== undefined && point?.gainUpper !== null && point?.gainUpper !== undefined && (
+        <div>Faixa de ganho: {formatNumber(point.gainLower)} – {formatNumber(point.gainUpper)}</div>
+      )}
       <div>Realizado: {formatNumber(point?.displayRealizado ?? point?.realizado)}</div>
       {!isCum && <div>Atingimento: {formatPercent(point?.attainment)}</div>}
       <div>Status: {LIGHT_LABEL[point?.status ?? 'GRAY']}</div>

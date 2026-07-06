@@ -24,6 +24,9 @@ import { getIndicatorUnitLabel, PERIODICITY_LABEL } from '@/lib/labels';
 interface PendingCell {
   periodRef: string;
   target: number | null;
+  secondaryTarget: number | null;
+  gainLower: number | null;
+  gainUpper: number | null;
   value: number | null;
   status: string;
   light: string;
@@ -71,7 +74,18 @@ export function IndicatorResultEditor(props: IndicatorMonthlyEditorProps) {
   } = props;
   const qc = useQueryClient();
   const [edits, setEdits] = useState<Record<string, string>>({});
+  // Campos extras lançados só no modo meta: meta secundária + faixa de ganho (mín/máx).
+  const [secondaryEdits, setSecondaryEdits] = useState<Record<string, string>>({});
+  const [gainLowerEdits, setGainLowerEdits] = useState<Record<string, string>>({});
+  const [gainUpperEdits, setGainUpperEdits] = useState<Record<string, string>>({});
   const [notesCell, setNotesCell] = useState<string | null>(null);
+
+  const clearAllEdits = () => {
+    setEdits({});
+    setSecondaryEdits({});
+    setGainLowerEdits({});
+    setGainUpperEdits({});
+  };
 
   const query = useQuery<PendingRow[]>({
     queryKey: ['results', 'pending', 'indicator', indicatorId],
@@ -95,6 +109,11 @@ export function IndicatorResultEditor(props: IndicatorMonthlyEditorProps) {
     const pending = Math.max(0, cells.length - filled);
     return { filled, edited, pending };
   }, [cells, edits, mode]);
+
+  const totalEdited = useMemo(() => {
+    const maps = mode === 'target' ? [edits, secondaryEdits, gainLowerEdits, gainUpperEdits] : [edits];
+    return maps.reduce((acc, m) => acc + Object.values(m).filter((v) => v.trim() !== '').length, 0);
+  }, [edits, secondaryEdits, gainLowerEdits, gainUpperEdits, mode]);
 
   const cumulativeTarget = useMemo(
     () => buildCumulative(cells.map((c) => c.target)),
@@ -125,21 +144,29 @@ export function IndicatorResultEditor(props: IndicatorMonthlyEditorProps) {
     onSuccess: (out) => {
       const reds = out.results.filter((r) => r.shouldOpenDeviation).length;
       toast.success(`${out.count} lançamentos salvos${reds ? ` - ${reds} indicador(es) em vermelho` : ''}`);
-      setEdits({});
+      clearAllEdits();
       invalidateAfterSave();
     },
     onError: (e: any) => toast.error(e?.message ?? 'Falha ao salvar'),
   });
 
   const upsertTargets = useMutation({
-    mutationFn: (items: { periodRef: string; target: number }[]) =>
+    mutationFn: (
+      items: {
+        periodRef: string;
+        target: number;
+        secondaryTarget: number | null;
+        gainLower: number | null;
+        gainUpper: number | null;
+      }[],
+    ) =>
       api<{ count: number }>(`/indicators/${indicatorId}/targets/batch`, {
         method: 'POST',
         json: { items },
       }),
     onSuccess: (out) => {
       toast.success(`${out.count} meta(s) salvas`);
-      setEdits({});
+      clearAllEdits();
       invalidateAfterSave();
     },
     onError: (e: any) => toast.error(e?.message ?? 'Falha ao salvar metas'),
@@ -155,16 +182,48 @@ export function IndicatorResultEditor(props: IndicatorMonthlyEditorProps) {
 
   const handleSave = () => {
     if (mode === 'target') {
-      const items: { periodRef: string; target: number }[] = [];
-      for (const [periodRef, raw] of Object.entries(edits)) {
-        const trimmed = raw.trim().replace(',', '.');
-        if (trimmed === '') continue;
-        const num = Number(trimmed);
-        if (!Number.isFinite(num)) continue;
-        items.push({ periodRef, target: num });
+      // Períodos com qualquer edição (meta, meta secundária ou faixa de ganho).
+      const touchedRefs = new Set(
+        [
+          ...Object.entries(edits),
+          ...Object.entries(secondaryEdits),
+          ...Object.entries(gainLowerEdits),
+          ...Object.entries(gainUpperEdits),
+        ]
+          .filter(([, raw]) => raw.trim() !== '')
+          .map(([periodRef]) => periodRef),
+      );
+      const items: {
+        periodRef: string;
+        target: number;
+        secondaryTarget: number | null;
+        gainLower: number | null;
+        gainUpper: number | null;
+      }[] = [];
+      let missingTarget = 0;
+      for (const periodRef of touchedRefs) {
+        const cell = cells.find((c) => c.periodRef === periodRef);
+        // Meta principal é obrigatória para persistir a linha; cai no valor já salvo
+        // quando o usuário só editou secundária/faixa.
+        const target = resolveEditedNumber(edits[periodRef], cell?.target ?? null);
+        if (target === null) {
+          missingTarget++;
+          continue;
+        }
+        items.push({
+          periodRef,
+          target,
+          secondaryTarget: resolveEditedNumber(secondaryEdits[periodRef], cell?.secondaryTarget ?? null),
+          gainLower: resolveEditedNumber(gainLowerEdits[periodRef], cell?.gainLower ?? null),
+          gainUpper: resolveEditedNumber(gainUpperEdits[periodRef], cell?.gainUpper ?? null),
+        });
       }
       if (items.length === 0) {
-        toast.message('Nada para salvar.');
+        toast.message(
+          missingTarget
+            ? 'Informe a meta principal antes de salvar a meta secundária/faixa de ganho.'
+            : 'Nada para salvar.',
+        );
         return;
       }
       upsertTargets.mutate(items);
@@ -261,7 +320,7 @@ export function IndicatorResultEditor(props: IndicatorMonthlyEditorProps) {
             {formatNumber(stats.pending)} pendentes
           </span>
           <span className="rounded-full bg-status-blue/15 px-2.5 py-1 font-medium text-status-blue">
-            {formatNumber(stats.edited)} edicoes
+            {formatNumber(totalEdited)} edicoes
           </span>
         </div>
       </div>
@@ -297,6 +356,13 @@ export function IndicatorResultEditor(props: IndicatorMonthlyEditorProps) {
                 <tr>
                   <th className="text-left">Mês/período</th>
                   <th className="text-left">{editingLabel}</th>
+                  {mode === 'target' && (
+                    <>
+                      <th className="text-left">Meta secundária</th>
+                      <th className="text-left">Faixa ganho (mín)</th>
+                      <th className="text-left">Faixa ganho (máx)</th>
+                    </>
+                  )}
                   <th className="text-left">
                     {editingLabel} acum.
                     <span className="ml-1 text-[10px] font-normal text-muted-foreground">(média YTD)</span>
@@ -358,6 +424,34 @@ export function IndicatorResultEditor(props: IndicatorMonthlyEditorProps) {
                           )}
                         />
                       </td>
+                      {mode === 'target' && (
+                        <>
+                          <td>
+                            <Input
+                              value={secondaryEdits[cell.periodRef] ?? (cell.secondaryTarget != null ? String(cell.secondaryTarget) : '')}
+                              onChange={(e) => setSecondaryEdits((prev) => ({ ...prev, [cell.periodRef]: e.target.value }))}
+                              placeholder="—"
+                              className="h-9 w-full max-w-[140px] text-sm"
+                            />
+                          </td>
+                          <td>
+                            <Input
+                              value={gainLowerEdits[cell.periodRef] ?? (cell.gainLower != null ? String(cell.gainLower) : '')}
+                              onChange={(e) => setGainLowerEdits((prev) => ({ ...prev, [cell.periodRef]: e.target.value }))}
+                              placeholder="—"
+                              className="h-9 w-full max-w-[130px] text-sm"
+                            />
+                          </td>
+                          <td>
+                            <Input
+                              value={gainUpperEdits[cell.periodRef] ?? (cell.gainUpper != null ? String(cell.gainUpper) : '')}
+                              onChange={(e) => setGainUpperEdits((prev) => ({ ...prev, [cell.periodRef]: e.target.value }))}
+                              placeholder="—"
+                              className="h-9 w-full max-w-[130px] text-sm"
+                            />
+                          </td>
+                        </>
+                      )}
                       <td>
                         <div className="text-sm font-medium">
                           {editingAcum !== null ? formatNumber(editingAcum) : '-'}
@@ -428,13 +522,13 @@ export function IndicatorResultEditor(props: IndicatorMonthlyEditorProps) {
       )}
 
       <div className="flex flex-wrap items-center justify-end gap-2">
-        <Button variant="outline" onClick={() => setEdits({})} disabled={stats.edited === 0}>
+        <Button variant="outline" onClick={clearAllEdits} disabled={totalEdited === 0}>
           <RotateCcw className="mr-2 h-4 w-4" />
           Limpar
         </Button>
-        <Button onClick={handleSave} disabled={isSaving || stats.edited === 0}>
+        <Button onClick={handleSave} disabled={isSaving || totalEdited === 0}>
           <Save className="mr-2 h-4 w-4" />
-          {isSaving ? 'Salvando...' : `Salvar (${stats.edited})`}
+          {isSaving ? 'Salvando...' : `Salvar (${totalEdited})`}
         </Button>
       </div>
 
@@ -449,6 +543,16 @@ export function IndicatorResultEditor(props: IndicatorMonthlyEditorProps) {
 
     </div>
   );
+}
+
+// Resolve o valor a persistir: edição não tocada (undefined) mantém o salvo;
+// campo limpo ('') vira null; texto inválido cai no salvo.
+function resolveEditedNumber(raw: string | undefined, persisted: number | null): number | null {
+  if (raw === undefined) return persisted;
+  const trimmed = raw.trim().replace(',', '.');
+  if (trimmed === '') return null;
+  const num = Number(trimmed);
+  return Number.isFinite(num) ? num : persisted;
 }
 
 function buildCumulative(values: Array<number | null | undefined>): Array<number | null> {

@@ -63,6 +63,10 @@ export const indicatorTargetUpsertSchema = z.object({
   target: z.number(),
   lowerBound: z.number().optional().nullable(),
   upperBound: z.number().optional().nullable(),
+  // Lançados separadamente: meta secundária + faixa de ganho (mín/máx).
+  secondaryTarget: z.number().optional().nullable(),
+  gainLower: z.number().optional().nullable(),
+  gainUpper: z.number().optional().nullable(),
   weight: z.number().min(0).max(100).default(1),
 });
 export type IndicatorTargetUpsertInput = z.infer<typeof indicatorTargetUpsertSchema>;

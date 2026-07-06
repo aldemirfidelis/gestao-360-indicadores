@@ -66,6 +66,9 @@ type TargetWriteInput = {
   target?: number | string | null;
   lowerBound?: number | string | null;
   upperBound?: number | string | null;
+  secondaryTarget?: number | string | null;
+  gainLower?: number | string | null;
+  gainUpper?: number | string | null;
   weight?: number | string | null;
   justification?: string | null;
 };
@@ -205,6 +208,9 @@ export class IndicatorsService {
               target: currentTarget.target,
               lowerBound: currentTarget.lowerBound,
               upperBound: currentTarget.upperBound,
+              secondaryTarget: currentTarget.secondaryTarget,
+              gainLower: currentTarget.gainLower,
+              gainUpper: currentTarget.gainUpper,
             }
           : null,
         last: last
@@ -228,6 +234,9 @@ export class IndicatorsService {
             month: monthLabel(periodRef),
             meta: target?.target ?? null,
             target: target?.target ?? null,
+            secondaryTarget: target?.secondaryTarget ?? null,
+            gainLower: target?.gainLower ?? null,
+            gainUpper: target?.gainUpper ?? null,
             realizado: result?.value ?? null,
             value: result?.value ?? null,
             attainment: result?.attainment ?? null,
@@ -464,12 +473,20 @@ export class IndicatorsService {
         target: input.target,
         lowerBound: input.lowerBound ?? null,
         upperBound: input.upperBound ?? null,
+        // Novos campos só são gravados quando informados, para não zerar
+        // meta secundária/faixa de ganho em fluxos que só editam a meta.
+        ...(input.secondaryTarget !== undefined ? { secondaryTarget: input.secondaryTarget } : {}),
+        ...(input.gainLower !== undefined ? { gainLower: input.gainLower } : {}),
+        ...(input.gainUpper !== undefined ? { gainUpper: input.gainUpper } : {}),
         weight: input.weight ?? 1,
       },
       update: {
         target: input.target,
         lowerBound: input.lowerBound ?? null,
         upperBound: input.upperBound ?? null,
+        ...(input.secondaryTarget !== undefined ? { secondaryTarget: input.secondaryTarget } : {}),
+        ...(input.gainLower !== undefined ? { gainLower: input.gainLower } : {}),
+        ...(input.gainUpper !== undefined ? { gainUpper: input.gainUpper } : {}),
         weight: input.weight ?? 1,
       },
     });
@@ -498,6 +515,9 @@ export class IndicatorsService {
         target,
         lowerBound: optionalNumber(body.lowerBound, 'Limite inferior') ?? null,
         upperBound: optionalNumber(body.upperBound, 'Limite superior') ?? null,
+        secondaryTarget: nullableNumber(body.secondaryTarget, 'Meta secundária'),
+        gainLower: nullableNumber(body.gainLower, 'Faixa de ganho (mínimo)'),
+        gainUpper: nullableNumber(body.gainUpper, 'Faixa de ganho (máximo)'),
         weight: optionalNumber(body.weight, 'Peso') ?? 1,
         justification: cleanString(body.justification),
       },
@@ -525,6 +545,9 @@ export class IndicatorsService {
           target,
           lowerBound: optionalNumber(item.lowerBound, 'Limite inferior') ?? null,
           upperBound: optionalNumber(item.upperBound, 'Limite superior') ?? null,
+          secondaryTarget: nullableNumber(item.secondaryTarget, 'Meta secundária'),
+          gainLower: nullableNumber(item.gainLower, 'Faixa de ganho (mínimo)'),
+          gainUpper: nullableNumber(item.gainUpper, 'Faixa de ganho (máximo)'),
           weight: optionalNumber(item.weight, 'Peso') ?? 1,
           justification,
         },
@@ -738,6 +761,9 @@ export class IndicatorsService {
       periodRef: ref,
       periodDate: periodRefToDate(ref, indicator.periodicity),
       target: tMap.get(ref)?.target ?? null,
+      secondaryTarget: tMap.get(ref)?.secondaryTarget ?? null,
+      gainLower: tMap.get(ref)?.gainLower ?? null,
+      gainUpper: tMap.get(ref)?.gainUpper ?? null,
       value: rMap.get(ref)?.value ?? null,
       light: rMap.get(ref)?.light ?? 'GRAY',
       attainment: rMap.get(ref)?.attainment ?? null,
@@ -1166,6 +1192,16 @@ function requiredNumber(value: unknown, message: string) {
 
 function optionalNumber(value: unknown, field: string) {
   if (value === undefined || value === null || value === '') return undefined;
+  const number = typeof value === 'number' ? value : Number(String(value).replace(',', '.'));
+  if (!Number.isFinite(number)) throw new BadRequestException(`${field} deve ser numerico`);
+  return number;
+}
+
+// Como optionalNumber, mas preserva a distinção entre "não informado" (undefined,
+// mantém o valor atual) e "limpar" (null/''), para meta secundária e faixa de ganho.
+function nullableNumber(value: unknown, field: string): number | null | undefined {
+  if (value === undefined) return undefined;
+  if (value === null || value === '') return null;
   const number = typeof value === 'number' ? value : Number(String(value).replace(',', '.'));
   if (!Number.isFinite(number)) throw new BadRequestException(`${field} deve ser numerico`);
   return number;

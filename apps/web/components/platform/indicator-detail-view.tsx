@@ -46,6 +46,7 @@ import { StatusBadge } from '@/components/platform/status-badge';
 import { api } from '@/lib/api';
 import { cn, formatNumber, formatPercent, periodRefLabel } from '@/lib/utils';
 import { ACTION_STATUS_LABEL, getIndicatorUnitLabel, MEETING_STATUS_LABEL, TRAFFIC_LIGHT_LABEL } from '@/lib/labels';
+import { CHART_COLORS, ChartLegend, computeStubValue, isWithinGain, realizadoBarColor } from '@/lib/indicator-chart';
 import { useVision360 } from '@/components/ui/vision360-context';
 import { useAuth } from '@/components/auth/auth-provider';
 
@@ -87,6 +88,9 @@ interface IndicatorDetail {
 interface SeriesPoint {
   periodRef: string;
   target: number | null;
+  secondaryTarget?: number | null;
+  gainLower?: number | null;
+  gainUpper?: number | null;
   value: number | null;
   light: string;
   attainment?: number | null;
@@ -104,11 +108,20 @@ interface ChartPoint {
   status: string;
   displayMeta: number | null;
   displayRealizado: number | null;
+  displaySecondary: number | null;
+  gainLower: number | null;
+  gainUpper: number | null;
+  // Barra-toco amarela: aparece só quando o período não tem realizado lançado.
+  noValueStub: number | null;
 }
+
 
 interface GrainCell {
   periodRef: string;
   target: number | null;
+  secondaryTarget?: number | null;
+  gainLower?: number | null;
+  gainUpper?: number | null;
   value: number | null;
   status: string;
   light: string;
@@ -266,10 +279,13 @@ export function IndicatorDetailView({ id, embedded = false }: { id: string; embe
     month: shortMonthLabel(p.periodRef),
     meta: p.target,
     realizado: p.value,
+    secondaryTarget: p.secondaryTarget ?? null,
+    gainLower: p.gainLower ?? null,
+    gainUpper: p.gainUpper ?? null,
     attainment: p.attainment ?? (p.target !== null && p.value !== null && p.target !== 0 ? p.value / p.target : null),
     status: p.light,
   }));
-  const chartData: ChartPoint[] = isGrainMode
+  const chartDataBase: ChartPoint[] = isGrainMode
     ? (grainQuery.data?.cells ?? []).map((c) => ({
         periodRef: c.periodRef,
         month: grainPeriodLabel(c.periodRef),
@@ -279,22 +295,47 @@ export function IndicatorDetailView({ id, embedded = false }: { id: string; embe
         status: c.light,
         displayMeta: c.target,
         displayRealizado: c.value,
+        displaySecondary: c.secondaryTarget ?? null,
+        gainLower: c.gainLower ?? null,
+        gainUpper: c.gainUpper ?? null,
+        noValueStub: null,
       }))
     : viewMode === 'monthly'
       ? monthlyHistory.map((p) => ({
           ...p,
           displayMeta: p.meta,
           displayRealizado: p.realizado,
+          displaySecondary: p.secondaryTarget,
+          noValueStub: null,
         }))
       : monthlyHistory.map((p, idx) => {
           const cumMeta = buildCumulativeAvg(monthlyHistory.map((point) => point.meta));
           const cumReal = buildCumulativeAvg(monthlyHistory.map((point) => point.realizado));
+          const cumSecondary = buildCumulativeAvg(monthlyHistory.map((point) => point.secondaryTarget));
           return {
             ...p,
             displayMeta: cumMeta[idx],
             displayRealizado: cumReal[idx],
+            displaySecondary: cumSecondary[idx],
+            // Faixa de ganho não é acumulável de forma significativa; no modo
+            // acumulado o realizado volta a colorir só por meta (verde/vermelho).
+            gainLower: null,
+            gainUpper: null,
+            noValueStub: null,
           };
         });
+  // Mini-barra amarela ("sem valor"): só para o período aparecer quando não há realizado.
+  const stubValue = computeStubValue(
+    chartDataBase.flatMap((p) => [p.displayMeta, p.displaySecondary, p.displayRealizado]),
+  );
+  const chartData: ChartPoint[] = chartDataBase.map((p) => ({
+    ...p,
+    noValueStub: p.displayRealizado === null || p.displayRealizado === undefined ? stubValue : null,
+  }));
+  // Só mostra cada barra/legenda quando ela realmente foi lançada/aplica.
+  const hasSecondaryBar = chartData.some((p) => p.displaySecondary !== null && p.displaySecondary !== undefined);
+  const hasGainHit = chartData.some((p) => isWithinGain(p.displayRealizado, p.gainLower, p.gainUpper));
+  const hasNoValueBar = chartData.some((p) => p.noValueStub !== null && p.noValueStub !== undefined);
   const hasChartData = isGrainMode
     ? (grainQuery.data?.cells ?? []).some((c) => c.target !== null || c.value !== null)
     : monthlyHistory.some((p) => p.meta !== null || p.realizado !== null);
@@ -538,24 +579,26 @@ export function IndicatorDetailView({ id, embedded = false }: { id: string; embe
                         />
                         <YAxis tick={{ fontSize: 11 }} width={48} />
                         <Tooltip content={<DetailChartTooltip viewMode={viewMode} />} cursor={{ fill: 'hsl(var(--muted))', opacity: 0.35 }} />
-                        <Bar dataKey="displayMeta" name="Meta" fill="#1e3a8a" radius={[3, 3, 0, 0]}>
-                          <LabelList dataKey="displayMeta" content={(props) => renderCustomBarLabel(props, '#1e3a8a')} />
+                        <Bar dataKey="displayMeta" name="Meta" fill={CHART_COLORS.meta} radius={[3, 3, 0, 0]}>
+                          <LabelList dataKey="displayMeta" content={(props) => renderCustomBarLabel(props, CHART_COLORS.meta)} />
                         </Bar>
+                        {hasSecondaryBar && (
+                          <Bar dataKey="displaySecondary" name="Meta Secundária" fill={CHART_COLORS.secondary} radius={[3, 3, 0, 0]}>
+                            <LabelList dataKey="displaySecondary" content={(props) => renderCustomBarLabel(props, CHART_COLORS.secondary)} />
+                          </Bar>
+                        )}
                         <Bar dataKey="displayRealizado" name="Realizado" radius={[3, 3, 0, 0]}>
-                          {chartData.map((entry, index) => {
-                            let color = 'hsl(var(--status-gray))';
-                            const r = entry.displayRealizado;
-                            const m = entry.displayMeta;
-                            if (r !== null && r !== undefined) {
-                              const isWithin = ind.direction === 'LOWER_BETTER'
-                                ? (r ?? 0) <= (m ?? 0)
-                                : (r ?? 0) >= (m ?? 0);
-                              color = isWithin ? '#10b981' : '#ef4444';
-                            }
-                            return <Cell key={`cell-${index}`} fill={color} />;
-                          })}
+                          {chartData.map((entry, index) => (
+                            <Cell
+                              key={`cell-${index}`}
+                              fill={realizadoBarColor(entry.displayRealizado, entry.displayMeta, entry.gainLower, entry.gainUpper, ind.direction)}
+                            />
+                          ))}
                           <LabelList dataKey="displayRealizado" content={(props) => renderCustomBarLabel(props, 'hsl(var(--foreground))')} />
                         </Bar>
+                        {hasNoValueBar && (
+                          <Bar dataKey="noValueStub" name="Realizado sem valor" fill={CHART_COLORS.noValue} radius={[3, 3, 0, 0]} />
+                        )}
                       </BarChart>
                     ) : (
                       <LineChart data={chartData} margin={{ top: 24, right: 12, left: 0, bottom: 8 }} onClick={onChartClick} style={{ cursor: 'pointer' }}>
@@ -573,9 +616,14 @@ export function IndicatorDetailView({ id, embedded = false }: { id: string; embe
                         />
                         <YAxis tick={{ fontSize: 11 }} width={48} />
                         <Tooltip content={<DetailChartTooltip viewMode={viewMode} />} cursor={{ stroke: 'hsl(var(--muted-foreground))', strokeWidth: 1, strokeDasharray: '3 3' }} />
-                        <Line type="monotone" dataKey="displayMeta" name="Meta" stroke="#1e3a8a" strokeWidth={2.5} strokeDasharray="6 4" dot={{ r: 3, fill: '#1e3a8a' }} activeDot={{ r: 5 }}>
-                          <LabelList dataKey="displayMeta" position="top" fontSize={10} fill="#1e3a8a" formatter={(v: any) => (v === null || v === undefined ? '' : formatNumber(v))} />
+                        <Line type="monotone" dataKey="displayMeta" name="Meta" stroke={CHART_COLORS.meta} strokeWidth={2.5} strokeDasharray="6 4" dot={{ r: 3, fill: CHART_COLORS.meta }} activeDot={{ r: 5 }}>
+                          <LabelList dataKey="displayMeta" position="top" fontSize={10} fill={CHART_COLORS.meta} formatter={(v: any) => (v === null || v === undefined ? '' : formatNumber(v))} />
                         </Line>
+                        {hasSecondaryBar && (
+                          <Line type="monotone" dataKey="displaySecondary" name="Meta Secundária" stroke={CHART_COLORS.secondary} strokeWidth={2} strokeDasharray="2 3" dot={{ r: 2.5, fill: CHART_COLORS.secondary }} activeDot={{ r: 4 }} connectNulls>
+                            <LabelList dataKey="displaySecondary" position="bottom" fontSize={9} fill={CHART_COLORS.secondary} formatter={(v: any) => (v === null || v === undefined ? '' : formatNumber(v))} />
+                          </Line>
+                        )}
                         <Line type="monotone" dataKey="displayRealizado" name="Realizado" stroke={chartLineColor} strokeWidth={2.5} dot={{ r: 3, fill: chartLineColor }} activeDot={{ r: 5 }}>
                           <LabelList dataKey="displayRealizado" position="top" fontSize={10} fill={chartLineColor} formatter={(v: any) => (v === null || v === undefined ? '' : formatNumber(v))} />
                         </Line>
@@ -583,6 +631,7 @@ export function IndicatorDetailView({ id, embedded = false }: { id: string; embe
                     )}
                   </ResponsiveContainer>
                 </div>
+                <ChartLegend hasSecondary={hasSecondaryBar} hasGainHit={hasGainHit} hasNoValue={hasNoValueBar} />
                 <div className="mt-3 flex items-center gap-2 rounded-lg border bg-muted/30 px-3 py-2 text-xs text-muted-foreground">
                   <Lightbulb className="h-3.5 w-3.5 text-status-blue" />
                   Dados atualizados até {last ? periodRefLabel(last.periodRef) : '-'}. Projeção baseada no desempenho atual.
@@ -1384,6 +1433,12 @@ function DetailChartTooltip({ active, payload, label, viewMode }: any) {
     <div className="rounded-md border bg-background p-2 text-xs shadow-sm">
       <div className="font-semibold">{label}{isCum && ' (acumulado)'}</div>
       <div>Meta: {formatNumber(point?.displayMeta ?? point?.meta)}</div>
+      {point?.displaySecondary !== null && point?.displaySecondary !== undefined && (
+        <div>Meta secundária: {formatNumber(point.displaySecondary)}</div>
+      )}
+      {point?.gainLower !== null && point?.gainLower !== undefined && point?.gainUpper !== null && point?.gainUpper !== undefined && (
+        <div>Faixa de ganho: {formatNumber(point.gainLower)} – {formatNumber(point.gainUpper)}</div>
+      )}
       <div>Realizado: {formatNumber(point?.displayRealizado ?? point?.realizado)}</div>
       {!isCum && <div>Atingimento: {formatPercent(point?.attainment)}</div>}
       <div>Status: {LIGHT_LABEL[point?.status ?? 'GRAY'] ?? point?.status ?? 'Sem dados'}</div>

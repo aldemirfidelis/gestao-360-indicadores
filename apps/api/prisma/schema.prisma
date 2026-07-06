@@ -1331,6 +1331,11 @@ model IndicatorTarget {
   target      Float
   lowerBound  Float?
   upperBound  Float?
+  // Lançados separadamente por período (opcionais):
+  // secondaryTarget = 2ª meta / meta de superação; gainLower/gainUpper = faixa de ganho.
+  secondaryTarget Float?
+  gainLower       Float?
+  gainUpper       Float?
   weight      Float     @default(1)
   createdAt   DateTime  @default(now())
   updatedAt   DateTime  @updatedAt

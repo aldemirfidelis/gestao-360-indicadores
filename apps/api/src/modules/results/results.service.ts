@@ -85,6 +85,9 @@ export class ResultsService {
       cells: Array<{
         periodRef: string;
         target: number | null;
+        secondaryTarget: number | null;
+        gainLower: number | null;
+        gainUpper: number | null;
         value: number | null;
         status: ResultStatus | 'NONE';
         light: TrafficLight;
@@ -119,9 +122,13 @@ export class ResultsService {
         indicator: ind,
         cells: refs.map((ref) => {
           const r = rMap.get(ref);
+          const t = tMap.get(ref);
           return {
             periodRef: ref,
-            target: tMap.get(ref)?.target ?? null,
+            target: t?.target ?? null,
+            secondaryTarget: t?.secondaryTarget ?? null,
+            gainLower: t?.gainLower ?? null,
+            gainUpper: t?.gainUpper ?? null,
             value: r?.value ?? null,
             status: (r?.status ?? 'NONE') as ResultStatus | 'NONE',
             light: (r?.light ?? 'GRAY') as TrafficLight,
@@ -189,9 +196,13 @@ export class ResultsService {
       monthRef,
       cells: refs.map((ref) => {
         const r = rMap.get(ref);
+        const t = tMap.get(ref);
         return {
           periodRef: ref,
-          target: tMap.get(ref)?.target ?? null,
+          target: t?.target ?? null,
+          secondaryTarget: t?.secondaryTarget ?? null,
+          gainLower: t?.gainLower ?? null,
+          gainUpper: t?.gainUpper ?? null,
           value: r?.value ?? null,
           status: (r?.status ?? 'NONE') as ResultStatus | 'NONE',
           light: (r?.light ?? 'GRAY') as TrafficLight,
