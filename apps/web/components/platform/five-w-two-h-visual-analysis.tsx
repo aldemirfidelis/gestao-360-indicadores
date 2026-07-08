@@ -210,14 +210,18 @@ export function FiveWTwoHVisualAnalysis({
   problem?: string;
   onTaskCreated?: () => void;
   onEnsureActionPlan?: () => Promise<string>;
-  onSave: (items: FiveW2HItem[]) => void;
+  /** history = 5W2H arquivados (um por tarefa gerada) — preservado a cada save. */
+  onSave: (items: FiveW2HItem[], history?: any[]) => void;
 }) {
   const qc = useQueryClient();
   const canvasRef = useRef<HTMLDivElement | null>(null);
   const scrollRef = useRef<HTMLDivElement | null>(null);
   const itemsRef = useRef<FiveW2HItem[]>([]);
+  const historyRef = useRef<any[]>([]);
   const dragRef = useRef<{ id: string; startX: number; startY: number; originX: number; originY: number; moved: boolean } | null>(null);
   const [items, setItems] = useState<FiveW2HItem[]>(() => normalizeItems(session?.data?.items, action));
+  // Cada 5W2H que vira tarefa é arquivado aqui (auditoria/ISO: "cadê o 5W2H desta ação?").
+  const [history, setHistory] = useState<any[]>(() => (Array.isArray(session?.data?.history) ? session.data.history : []));
   const [selectedType, setSelectedType] = useState<FieldType>('WHAT');
   const [zoom, setZoom] = useState(1);
   const [lastSavedAt, setLastSavedAt] = useState<string | null>(null);
@@ -233,12 +237,17 @@ export function FiveWTwoHVisualAnalysis({
   useEffect(() => {
     const next = normalizeItems(session?.data?.items, action);
     setItems(next);
+    setHistory(Array.isArray(session?.data?.history) ? session.data.history : []);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [session?.id, session?.updatedAt]);
 
   useEffect(() => {
     itemsRef.current = items;
   }, [items]);
+
+  useEffect(() => {
+    historyRef.current = history;
+  }, [history]);
 
   const selectedItem = items.find((item) => item.itemType === selectedType) ?? items[0];
   const responsibleById = useMemo(() => new Map(users.map((user) => [user.id, user.name])), [users]);
@@ -253,8 +262,8 @@ export function FiveWTwoHVisualAnalysis({
   const problemText = (problem ?? action?.problemDescription ?? '').trim();
 
   const handleSave = useCallback(
-    (nextItems = itemsRef.current) => {
-      onSave(nextItems);
+    (nextItems = itemsRef.current, nextHistory = historyRef.current) => {
+      onSave(nextItems, nextHistory);
       setLastSavedAt(new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }));
     },
     [onSave],
@@ -336,15 +345,26 @@ export function FiveWTwoHVisualAnalysis({
         toast.error('Não foi possível criar o plano de ação.');
         return;
       }
-      await api(`/actions/${targetActionId}/tasks`, {
+      const createdTask = await api<{ id?: string }>(`/actions/${targetActionId}/tasks`, {
         method: 'POST',
         json: { title: whatText, assignedToId: who, dueDate: when, startDate: when, endDate: when },
       });
+      // Arquiva o 5W2H que originou a tarefa ANTES de limpar: sem isso o board
+      // era salvo vazio por cima e a análise que justificou a ação se perdia
+      // (rastreabilidade de auditoria: "qual 5W2H gerou esta tarefa?").
+      const archivedEntry = {
+        at: new Date().toISOString(),
+        taskId: createdTask?.id ?? null,
+        taskTitle: whatText,
+        items: itemsRef.current,
+      };
+      const nextHistory = [...historyRef.current, archivedEntry];
+      setHistory(nextHistory);
       // Limpa o 5W2H para preencher e gerar a PRÓXIMA tarefa (cada 5W2H = uma tarefa do plano).
       const cleared = FIELD_ORDER.map((type) => makeItem(undefined, type, undefined));
       setItems(cleared);
-      handleSave(cleared);
-      toast.success(actionId ? 'Tarefa criada no plano — 5W2H limpo para a próxima' : 'Plano de ação criado e tarefa adicionada — 5W2H limpo para a próxima');
+      handleSave(cleared, nextHistory);
+      toast.success(actionId ? 'Tarefa criada no plano — 5W2H arquivado e limpo para a próxima' : 'Plano de ação criado e tarefa adicionada — 5W2H arquivado e limpo para a próxima');
       qc.invalidateQueries({ queryKey: ['action', targetActionId] });
       qc.invalidateQueries({ queryKey: ['actions'] });
       onTaskCreated?.();

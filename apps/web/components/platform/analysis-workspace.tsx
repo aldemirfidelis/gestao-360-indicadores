@@ -182,7 +182,23 @@ export function AnalysisWorkspace({
           rootCause={rootCause}
           problem={problem}
           onEnsureActionPlan={onEnsureActionPlan}
-          onSave={(items) => onSave({ method: 'FIVE_W_TWO_H', problem, rootCause, fiveWhys, ishikawaCauses: ishikawa, maspSteps, pdcaSteps, data: { items }, fiveW2H: deriveFiveW2HSummary(items) })}
+          // Sequência do método: tarefa criada no plano → acompanhar no PDCA
+          // (voltar ao 5W2H para a próxima tarefa é 1 clique na faixa-guia).
+          onTaskCreated={() => setMethod('PDCA')}
+          onSave={(items, history) =>
+            onSave({
+              method: 'FIVE_W_TWO_H',
+              problem,
+              rootCause,
+              fiveWhys,
+              ishikawaCauses: ishikawa,
+              maspSteps,
+              pdcaSteps,
+              // history preserva cada 5W2H que virou tarefa (rastreabilidade da análise).
+              data: { items, history: history ?? [] },
+              fiveW2H: deriveFiveW2HSummary(items),
+            })
+          }
         />
       )}
       {!isVisibleAnalysisMethod(method) && <GenericAnalysis method={method} session={session} />}
