@@ -1,30 +1,10 @@
 import { formatNumber, formatPercent } from '@/lib/utils';
+import { LIGHT_LABEL, LIGHT_COLORS, LIGHT_STYLES, type UiLight } from '@/lib/farol';
 
-export type Light = 'GREEN' | 'YELLOW' | 'RED' | 'GRAY' | 'BLUE';
-
-export const LIGHT_LABEL: Record<Light, string> = {
-  GREEN: 'Verde',
-  YELLOW: 'Amarelo',
-  RED: 'Vermelho',
-  GRAY: 'Cinza',
-  BLUE: 'Azul',
-};
-
-export const LIGHT_COLORS: Record<Light, string> = {
-  GREEN: '#16a34a',
-  YELLOW: '#d97706',
-  RED: '#dc2626',
-  GRAY: '#94a3b8',
-  BLUE: '#2563eb',
-};
-
-export const LIGHT_STYLES: Record<Light, string> = {
-  GREEN: 'border-emerald-200 bg-emerald-50 text-emerald-700',
-  YELLOW: 'border-amber-200 bg-amber-50 text-amber-700',
-  RED: 'border-red-200 bg-red-50 text-red-700',
-  GRAY: 'border-slate-200 bg-slate-50 text-slate-600',
-  BLUE: 'border-blue-200 bg-blue-50 text-blue-700',
-};
+// Farol: regra de cálculo e tokens de apresentação vivem em lib/farol.ts
+// (fonte única, Épico 2). Aliases mantidos para os consumidores do módulo.
+export type Light = UiLight;
+export { LIGHT_LABEL, LIGHT_COLORS, LIGHT_STYLES };
 
 export type MonthlyStatus = 'PREPARING' | 'READY' | 'IN_PROGRESS' | 'CLOSED' | 'REOPENED' | 'CANCELLED';
 

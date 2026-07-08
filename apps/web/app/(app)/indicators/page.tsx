@@ -64,6 +64,7 @@ import { api } from '@/lib/api';
 import { useAuth } from '@/components/auth/auth-provider';
 import { cn, formatDate, formatNumber, formatPercent, periodRefLabel } from '@/lib/utils';
 import { CHART_COLORS, ChartLegend, computeStubValue, isWithinGain, realizadoBarColor } from '@/lib/indicator-chart';
+import { attainmentFor } from '@/lib/farol';
 import {
   PERIODICITY_LABEL,
   DIRECTION_LABEL,
@@ -1125,7 +1126,7 @@ function IndicatorManagementCard({
           month: grainPeriodLabel(c.periodRef),
           meta: c.target,
           realizado: c.value,
-          attainment: c.target !== null && c.value !== null && c.target !== 0 ? c.value / c.target : null,
+          attainment: attainmentFor(c.value, c.target, indicator.direction),
           status: c.light,
           displayMeta: c.target,
           displayRealizado: c.value,
