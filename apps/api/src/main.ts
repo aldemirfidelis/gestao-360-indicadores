@@ -1,5 +1,6 @@
 import { NestFactory } from '@nestjs/core';
 import { ValidationPipe } from '@nestjs/common';
+import { StructuralHardeningPipe } from './common/pipes/structural-hardening.pipe';
 import helmet from 'helmet';
 import { json, urlencoded } from 'express';
 import { Logger } from 'nestjs-pino';
@@ -70,6 +71,9 @@ async function bootstrap() {
     credentials: !isWildcard,
   });
   app.useGlobalPipes(
+    // Hardening estrutural primeiro (profundidade/nós/prototype pollution)...
+    new StructuralHardeningPipe(),
+    // ...depois a validação de contrato (class-validator/Zod por módulo).
     new ValidationPipe({
       whitelist: true,
       transform: true,

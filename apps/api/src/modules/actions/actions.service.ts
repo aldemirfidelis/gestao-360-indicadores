@@ -23,6 +23,8 @@ import { TraceabilityService } from '../traceability/traceability.service';
 import { WorkItemEventBus } from '../my-day/work-item-event-bus';
 import { GeminiService } from '../ai/gemini.service';
 import { AccessService } from '../access/access.service';
+import { AuditWriterService } from '../../common/audit/audit-writer.service';
+import { listTake } from '../../common/http/list-take';
 
 interface ActionFilter {
   companyId: string;
@@ -55,6 +57,7 @@ export class ActionsService {
     private readonly gemini: GeminiService,
     private readonly access: AccessService,
     private readonly workItemBus: WorkItemEventBus,
+    private readonly auditWriter: AuditWriterService,
   ) {}
 
   async list(f: ActionFilter) {
@@ -99,6 +102,7 @@ export class ActionsService {
       where,
       include: this.listInclude(),
       orderBy: [{ priority: 'desc' }, { criticality: 'desc' }, { dueDate: 'asc' }, { createdAt: 'desc' }],
+      take: listTake(),
     });
   }
 
@@ -1904,19 +1908,10 @@ ${currentStages || '- nenhuma'}`;
   }
 
   private async audit(companyId: string | null | undefined, userId: string | undefined, action: string, entity: string, entityId: string, beforeValue: unknown, afterValue: unknown) {
-    await this.prisma.auditLog.create({
-      data: {
-        companyId: companyId ?? null,
-        userId: userId ?? null,
-        action,
-        module: 'Planos de ação',
-        entity,
-        entityId,
-        beforeValue: stringify(beforeValue),
-        afterValue: stringify(afterValue),
-        result: 'SUCCESS',
-      },
-    });
+    await this.auditWriter.record(
+      { companyId, sub: userId },
+      { action, module: 'Planos de ação', entity, entityId, before: beforeValue, after: afterValue },
+    );
   }
 }
 

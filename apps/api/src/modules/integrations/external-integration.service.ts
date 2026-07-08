@@ -1,6 +1,7 @@
 import { BadRequestException, ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
 import { PrismaService } from '../../prisma/prisma.service';
+import { AuditWriterService } from '../../common/audit/audit-writer.service';
 import { ResultsService } from '../results/results.service';
 import { AuthPayload } from '../auth/auth.types';
 import { decryptJson, encryptJson, generateApiKey } from '../../common/crypto';
@@ -13,6 +14,7 @@ export class ExternalIntegrationService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly results: ResultsService,
+    private readonly auditWriter: AuditWriterService,
   ) {}
 
   // -------------------- Conectores (outbound/inbound config) --------------------
@@ -327,20 +329,7 @@ export class ExternalIntegrationService {
   }
 
   private async audit(me: AuthPayload, action: string, entity: string, entityId: string, after: unknown) {
-    await this.prisma.auditLog
-      .create({
-        data: {
-          companyId: me.companyId,
-          userId: me.sub,
-          action,
-          module: 'integrations',
-          entity,
-          entityId,
-          afterValue: after ? JSON.stringify(after) : null,
-          result: 'SUCCESS',
-        },
-      })
-      .catch(swallow(undefined, 'integrations.audit', 'debug'));
+    await this.auditWriter.record(me, { action, module: 'integrations', entity, entityId, after });
   }
 }
 

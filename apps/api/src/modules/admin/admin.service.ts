@@ -1,6 +1,7 @@
 import { BadRequestException, ConflictException, Injectable, NotFoundException } from '@nestjs/common';
 import { AdminRecordStatus, UserRoleEnum } from '@prisma/client';
 import { PrismaService } from '../../prisma/prisma.service';
+import { AuditWriterService } from '../../common/audit/audit-writer.service';
 import { DEFAULT_PROFILES, PERMISSION_CATALOG } from '../users/permission-catalog';
 import { swallow } from '../../common/logging/swallow';
 import { AuthPayload } from '../auth/auth.types';
@@ -94,7 +95,10 @@ export class AdminService {
   private permissionsReady = false;
   private readonly catalogReadyCompanies = new Set<string>();
 
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly auditWriter: AuditWriterService,
+  ) {}
 
   async bootstrap(me: AuthPayload) {
     await this.ensureCatalog(me.companyId, me.sub);
@@ -589,19 +593,14 @@ export class AdminService {
   }
 
   private async audit(me: AuthPayload, action: string, module: string, entity: string, entityId: string, beforeValue: unknown, afterValue: unknown) {
-    await this.prisma.auditLog.create({
-      data: {
-        companyId: me.companyId,
-        userId: me.sub,
-        action,
-        module,
-        entity,
-        entityId,
-        beforeValue: stringify(beforeValue),
-        afterValue: stringify(afterValue),
-        payload: stringify({ source: 'admin-service' }),
-        result: 'SUCCESS',
-      },
+    await this.auditWriter.record(me, {
+      action,
+      module,
+      entity,
+      entityId,
+      before: beforeValue,
+      after: afterValue,
+      payload: { source: 'admin-service' },
     });
   }
 }

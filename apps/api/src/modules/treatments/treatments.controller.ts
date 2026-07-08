@@ -4,6 +4,13 @@ import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import { AuthPayload } from '../auth/auth.types';
 import { TreatmentsService } from './treatments.service';
 import { RequirePermissions } from '../../common/decorators/permissions.decorator';
+import { ZodValidationPipe } from '../../common/pipes/zod-validation.pipe';
+import {
+  treatmentActionSchema,
+  treatmentAnalysisSchema,
+  treatmentIgnoreSchema,
+  treatmentMeetingSchema,
+} from './treatments.dto';
 
 @Controller('treatments')
 export class TreatmentsController {
@@ -33,7 +40,7 @@ export class TreatmentsController {
 
   @Post(':id/ignore')
   @RequirePermissions('treatments:ignore')
-  ignore(@CurrentUser() me: AuthPayload, @Param('id') id: string, @Body() body: { reason: string }) {
+  ignore(@CurrentUser() me: AuthPayload, @Param('id') id: string, @Body(new ZodValidationPipe(treatmentIgnoreSchema)) body: { reason: string }) {
     return this.service.ignore(me, id, body.reason);
   }
 
@@ -42,7 +49,7 @@ export class TreatmentsController {
   createAnalysis(
     @CurrentUser() me: AuthPayload,
     @Param('id') id: string,
-    @Body()
+    @Body(new ZodValidationPipe(treatmentAnalysisSchema))
     body: {
       problem: string;
       probableCause?: string;
@@ -61,7 +68,7 @@ export class TreatmentsController {
   scheduleMeeting(
     @CurrentUser() me: AuthPayload,
     @Param('id') id: string,
-    @Body()
+    @Body(new ZodValidationPipe(treatmentMeetingSchema))
     body: {
       title?: string;
       startsAt: string;
@@ -89,7 +96,7 @@ export class TreatmentsController {
   createAction(
     @CurrentUser() me: AuthPayload,
     @Param('id') id: string,
-    @Body()
+    @Body(new ZodValidationPipe(treatmentActionSchema))
     body: {
       title: string;
       description?: string;

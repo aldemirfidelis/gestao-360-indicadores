@@ -2,6 +2,7 @@ import { BadRequestException, ConflictException, ForbiddenException, Injectable,
 import { ActionStatus, Prisma, UserRoleEnum } from '@prisma/client';
 import { OrgNodeCreateInput } from '@g360/shared';
 import { PrismaService } from '../../prisma/prisma.service';
+import { AuditWriterService } from '../../common/audit/audit-writer.service';
 import { AuthPayload } from '../auth/auth.types';
 import { AccessService } from '../access/access.service';
 import { filterOrgNodesWithAncestors, type OrgNodeLink } from './orgnodes.visibility';
@@ -56,6 +57,7 @@ export class OrgNodesService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly access: AccessService,
+    private readonly auditWriter: AuditWriterService,
   ) {}
 
   async listFlat(companyId: string) {
@@ -692,20 +694,19 @@ export class OrgNodesService {
     recordLabel?: string | null,
     result = 'SUCCESS',
   ) {
-    await this.prisma.auditLog.create({
-      data: {
-        companyId,
-        userId,
+    await this.auditWriter.record(
+      { companyId, sub: userId },
+      {
         action,
         module: MODULE,
         entity,
         entityId,
-        recordLabel: recordLabel ?? null,
-        beforeValue: beforeValue === null || beforeValue === undefined ? null : JSON.stringify(beforeValue),
-        afterValue: afterValue === null || afterValue === undefined ? null : JSON.stringify(afterValue),
+        message: recordLabel ?? undefined,
+        before: beforeValue,
+        after: afterValue,
         result,
       },
-    });
+    );
   }
 }
 

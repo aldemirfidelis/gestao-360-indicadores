@@ -1,6 +1,7 @@
 import { BadRequestException, ConflictException, Injectable, NotFoundException } from '@nestjs/common';
 import { ObjectiveStatus, PerspectiveKind, Prisma, TrafficLight } from '@prisma/client';
 import { PrismaService } from '../../prisma/prisma.service';
+import { AuditWriterService } from '../../common/audit/audit-writer.service';
 import { AuthPayload } from '../auth/auth.types';
 
 const STRATEGY_MODULE = 'Mapa Estratégico';
@@ -62,7 +63,10 @@ type RelationBody = {
 
 @Injectable()
 export class StrategyService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly auditWriter: AuditWriterService,
+  ) {}
 
   async listMaps(companyId: string, includeInactive = false) {
     return this.prisma.strategicMap.findMany({
@@ -1365,20 +1369,14 @@ export class StrategyService {
   }
 
   private async audit(me: AuthPayload, action: string, entity: string, entityId: string, beforeValue: unknown, afterValue: unknown, recordLabel?: string | null) {
-    await this.prisma.auditLog.create({
-      data: {
-        companyId: me.companyId,
-        userId: me.sub,
-        action,
-        module: STRATEGY_MODULE,
-        entity,
-        entityId,
-        recordLabel: recordLabel ?? null,
-        beforeValue: stringify(beforeValue),
-        afterValue: stringify(afterValue),
-        payload: stringify({ source: 'strategy-service' }),
-        result: 'SUCCESS',
-      },
+    await this.auditWriter.record(me, {
+      action,
+      module: STRATEGY_MODULE,
+      entity,
+      entityId,
+      message: recordLabel ?? undefined,
+      before: beforeValue,
+      after: afterValue,
     });
   }
 }

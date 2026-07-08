@@ -8,6 +8,7 @@ import { LogContextInterceptor } from './common/logging/log-context.interceptor'
 import { HttpExceptionFilter } from './common/filters/http-exception.filter';
 
 import { PrismaModule } from './prisma/prisma.module';
+import { AuditWriterModule } from './common/audit/audit-writer.module';
 import { AuthModule } from './modules/auth/auth.module';
 import { UsersModule } from './modules/users/users.module';
 import { CompaniesModule } from './modules/companies/companies.module';
@@ -76,6 +77,7 @@ import { workersEnabled } from './jobs/jobs.constants';
     LoggerModule.forRoot(loggerParams),
     ThrottlerModule.forRoot([{ ttl: 60_000, limit: 200 }]),
     PrismaModule,
+    AuditWriterModule,
     AuthModule,
     UsersModule,
     CompaniesModule,

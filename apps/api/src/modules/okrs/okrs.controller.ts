@@ -3,6 +3,16 @@ import { OkrsService } from './okrs.service';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import { AuthPayload } from '../auth/auth.types';
 import { RequirePermissions } from '../../common/decorators/permissions.decorator';
+import { ZodValidationPipe } from '../../common/pipes/zod-validation.pipe';
+import {
+  okrCheckinSchema,
+  okrCycleCreateSchema,
+  okrCycleUpdateSchema,
+  okrKeyResultCreateSchema,
+  okrKeyResultUpdateSchema,
+  okrObjectiveCreateSchema,
+  okrObjectiveUpdateSchema,
+} from './okrs.dto';
 
 @Controller('okrs')
 export class OkrsController {
@@ -18,7 +28,7 @@ export class OkrsController {
   @RequirePermissions('okrs:create')
   createCycle(
     @CurrentUser() me: AuthPayload,
-    @Body() body: { name: string; startsAt: string; endsAt: string },
+    @Body(new ZodValidationPipe(okrCycleCreateSchema)) body: { name: string; startsAt: string; endsAt: string },
   ) {
     return this.service.createCycle(me.companyId, body.name, new Date(body.startsAt), new Date(body.endsAt));
   }
@@ -28,7 +38,7 @@ export class OkrsController {
   updateCycle(
     @CurrentUser() me: AuthPayload,
     @Param('cycleId') cycleId: string,
-    @Body() body: { name?: string; startsAt?: string; endsAt?: string; active?: boolean },
+    @Body(new ZodValidationPipe(okrCycleUpdateSchema)) body: { name?: string; startsAt?: string; endsAt?: string; active?: boolean },
   ) {
     return this.service.updateCycle(me.companyId, cycleId, body);
   }
@@ -59,13 +69,13 @@ export class OkrsController {
 
   @Post('cycles/:cycleId/objectives')
   @RequirePermissions('okrs:create')
-  create(@CurrentUser() me: AuthPayload, @Param('cycleId') cycleId: string, @Body() body: any) {
+  create(@CurrentUser() me: AuthPayload, @Param('cycleId') cycleId: string, @Body(new ZodValidationPipe(okrObjectiveCreateSchema)) body: any) {
     return this.service.createObjective(me, cycleId, body);
   }
 
   @Patch('objectives/:id')
   @RequirePermissions('okrs:update')
-  update(@CurrentUser() me: AuthPayload, @Param('id') id: string, @Body() body: any) {
+  update(@CurrentUser() me: AuthPayload, @Param('id') id: string, @Body(new ZodValidationPipe(okrObjectiveUpdateSchema)) body: any) {
     return this.service.updateObjective(me, id, body);
   }
 
@@ -77,13 +87,13 @@ export class OkrsController {
 
   @Post('objectives/:id/krs')
   @RequirePermissions('okrs:update')
-  addKR(@CurrentUser() me: AuthPayload, @Param('id') id: string, @Body() body: any) {
+  addKR(@CurrentUser() me: AuthPayload, @Param('id') id: string, @Body(new ZodValidationPipe(okrKeyResultCreateSchema)) body: any) {
     return this.service.addKeyResult(me, id, body);
   }
 
   @Patch('krs/:krId')
   @RequirePermissions('okrs:update')
-  updateKR(@CurrentUser() me: AuthPayload, @Param('krId') krId: string, @Body() body: any) {
+  updateKR(@CurrentUser() me: AuthPayload, @Param('krId') krId: string, @Body(new ZodValidationPipe(okrKeyResultUpdateSchema)) body: any) {
     return this.service.updateKeyResult(me, krId, body);
   }
 
@@ -98,7 +108,7 @@ export class OkrsController {
   checkin(
     @CurrentUser() me: AuthPayload,
     @Param('id') id: string,
-    @Body() body: { weekRef: string; confidence: number; progress: number; note?: string },
+    @Body(new ZodValidationPipe(okrCheckinSchema)) body: { weekRef: string; confidence: number; progress: number; note?: string },
   ) {
     return this.service.checkin(me, id, body);
   }

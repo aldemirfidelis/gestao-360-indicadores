@@ -4,6 +4,14 @@ import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import { AuthPayload } from '../auth/auth.types';
 import { AnalysisMethod, DeviationSeverity, DeviationStatus } from '@prisma/client';
 import { RequirePermissions } from '../../common/decorators/permissions.decorator';
+import { ZodValidationPipe } from '../../common/pipes/zod-validation.pipe';
+import {
+  deviationActionSchema,
+  deviationAnalysisSchema,
+  deviationCauseSchema,
+  deviationOpenSchema,
+  deviationUpdateSchema,
+} from './deviations.dto';
 
 @Controller('deviations')
 export class DeviationsController {
@@ -29,7 +37,7 @@ export class DeviationsController {
   @RequirePermissions('deviations:create')
   open(
     @CurrentUser() me: AuthPayload,
-    @Body()
+    @Body(new ZodValidationPipe(deviationOpenSchema))
     body: {
       indicatorId: string;
       periodRef: string;
@@ -59,7 +67,7 @@ export class DeviationsController {
 
   @Patch(':id')
   @RequirePermissions('deviations:update')
-  update(@CurrentUser() me: AuthPayload, @Param('id') id: string, @Body() patch: any) {
+  update(@CurrentUser() me: AuthPayload, @Param('id') id: string, @Body(new ZodValidationPipe(deviationUpdateSchema)) patch: any) {
     return this.service.update(me, id, patch);
   }
 
@@ -67,7 +75,7 @@ export class DeviationsController {
   @RequirePermissions('deviations:update')
   addCause(
     @Param('id') id: string,
-    @Body() body: { description: string; category?: string; weight?: number },
+    @Body(new ZodValidationPipe(deviationCauseSchema)) body: { description: string; category?: string; weight?: number },
     @CurrentUser() me: AuthPayload,
   ) {
     return this.service.addCause(me, id, body.description, body.category, body.weight ?? 1);
@@ -84,7 +92,7 @@ export class DeviationsController {
   addAnalysis(
     @CurrentUser() me: AuthPayload,
     @Param('id') id: string,
-    @Body() body: { method: AnalysisMethod; content: string },
+    @Body(new ZodValidationPipe(deviationAnalysisSchema)) body: { method: AnalysisMethod; content: string },
   ) {
     return this.service.addAnalysis(me, id, body.method, body.content);
   }
@@ -94,7 +102,7 @@ export class DeviationsController {
   createAction(
     @CurrentUser() me: AuthPayload,
     @Param('id') id: string,
-    @Body()
+    @Body(new ZodValidationPipe(deviationActionSchema))
     body: {
       title: string;
       description?: string;

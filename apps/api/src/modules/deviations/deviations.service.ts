@@ -14,6 +14,7 @@ import {
 } from '@prisma/client';
 import { TraceabilityService } from '../traceability/traceability.service';
 import { AccessService } from '../access/access.service';
+import { listTake } from '../../common/http/list-take';
 import { AuthPayload } from '../auth/auth.types';
 
 /** Chave de módulo usada nas regras de visibilidade por área (AccessService). */
@@ -94,6 +95,7 @@ export class DeviationsService {
         _count: { select: { causes: true, actions: true, analyses: true } },
       },
       orderBy: { openedAt: 'desc' },
+      take: listTake(),
     });
   }
 

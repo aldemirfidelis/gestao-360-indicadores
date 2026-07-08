@@ -11,7 +11,7 @@ describe('Compensation tenant isolation', () => {
     const prisma: any = {
       compensationJobCatalog: { findFirst: vi.fn().mockResolvedValue(null), update: vi.fn() },
     };
-    const service = new CompensationService(prisma, stub, stub);
+    const service = new CompensationService(prisma, stub, stub, { record: vi.fn().mockResolvedValue(undefined) } as any);
 
     await expect(service.reactivateJob(me, 'job-from-other-company')).rejects.toThrow();
 

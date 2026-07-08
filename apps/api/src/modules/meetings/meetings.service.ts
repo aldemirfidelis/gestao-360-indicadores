@@ -1,5 +1,6 @@
 import { ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../../prisma/prisma.service';
+import { listTake } from '../../common/http/list-take';
 import { resolveSmtpConfig, buildTransport, smtpFrom } from '../../common/smtp';
 import { swallow } from '../../common/logging/swallow';
 import {
@@ -107,6 +108,7 @@ export class MeetingsService {
         _count: { select: { participants: true, agendaItems: true, decisions: true } },
       },
       orderBy: { startsAt: 'desc' },
+      take: listTake(),
     });
   }
 

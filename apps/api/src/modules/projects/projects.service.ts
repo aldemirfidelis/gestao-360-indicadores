@@ -1,5 +1,6 @@
 import { ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../../prisma/prisma.service';
+import { listTake } from '../../common/http/list-take';
 import { ProjectStatus } from '@prisma/client';
 import { AccessService } from '../access/access.service';
 import type { AreaAction } from '../access/access.logic';
@@ -127,6 +128,7 @@ export class ProjectsService {
         },
       },
       orderBy: { createdAt: 'desc' },
+      take: listTake(),
     });
     return items.map((p) => this.enrichProject(p));
   }

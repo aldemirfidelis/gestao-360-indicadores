@@ -1,6 +1,7 @@
 import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
 import { AreaAssignmentType, VisibilityEffect } from '@prisma/client';
 import { PrismaService } from '../../prisma/prisma.service';
+import { AuditWriterService } from '../../common/audit/audit-writer.service';
 import { AuthPayload } from '../auth/auth.types';
 import { AccessService } from './access.service';
 import { swallow } from '../../common/logging/swallow';
@@ -12,6 +13,7 @@ export class AccessAdminService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly access: AccessService,
+    private readonly auditWriter: AuditWriterService,
   ) {}
 
   modules() {
@@ -224,20 +226,6 @@ export class AccessAdminService {
     for (const u of users) this.access.invalidate(u.id);
   }
   private async audit(me: AuthPayload, companyId: string, action: string, entity: string, entityId: string, before: unknown, after: unknown) {
-    await this.prisma.auditLog
-      .create({
-        data: {
-          companyId,
-          userId: me.sub,
-          action,
-          module: 'access',
-          entity,
-          entityId,
-          beforeValue: before ? JSON.stringify(before) : null,
-          afterValue: after ? JSON.stringify(after) : null,
-          result: 'SUCCESS',
-        },
-      })
-      .catch(swallow(undefined, 'accessAdmin.audit', 'debug'));
+    await this.auditWriter.record({ companyId, sub: me.sub }, { action, module: 'access', entity, entityId, before, after });
   }
 }

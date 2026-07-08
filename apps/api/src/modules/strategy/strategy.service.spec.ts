@@ -57,7 +57,7 @@ describe('StrategyService — mapa executivo enriquecido', () => {
       },
     } as any;
 
-    const service = new StrategyService(prisma);
+    const service = new StrategyService(prisma, { record: vi.fn().mockResolvedValue(undefined) } as any);
     const result = await service.getMap('companyA', 'map-1');
     const objective = result.objectives[0] as any;
 

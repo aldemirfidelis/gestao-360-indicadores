@@ -15,6 +15,7 @@ import { AuthPayload } from '../auth/auth.types';
 import { PeriodsService } from '../periods/periods.service';
 import { ResultsService } from '../results/results.service';
 import { AccessService } from '../access/access.service';
+import { AuditWriterService } from '../../common/audit/audit-writer.service';
 import { lastNPeriodRefs, periodRefToDate } from './period.util';
 
 export interface IndicatorFilter {
@@ -87,6 +88,7 @@ export class IndicatorsService {
     private readonly periods: PeriodsService,
     private readonly results: ResultsService,
     private readonly access: AccessService,
+    private readonly auditWriter: AuditWriterService,
   ) {}
 
   async list(f: IndicatorFilter) {
@@ -1001,20 +1003,14 @@ export class IndicatorsService {
     afterValue: unknown,
     message: string,
   ) {
-    await this.prisma.auditLog.create({
-      data: {
-        companyId: me.companyId,
-        userId: me.sub,
-        action,
-        module: 'Indicadores',
-        entity,
-        entityId,
-        recordLabel: message,
-        payload: JSON.stringify({ message }),
-        beforeValue: stringifyAudit(beforeValue),
-        afterValue: stringifyAudit(afterValue),
-        result: 'SUCCESS',
-      },
+    await this.auditWriter.record(me, {
+      action,
+      module: 'Indicadores',
+      entity,
+      entityId,
+      message,
+      before: beforeValue,
+      after: afterValue,
     });
   }
 
@@ -1231,7 +1227,3 @@ function monthLabel(periodRef: string) {
   return months[index] ?? periodRef;
 }
 
-function stringifyAudit(value: unknown) {
-  if (value === undefined || value === null) return null;
-  return JSON.stringify(value, (_key, inner) => (inner instanceof Date ? inner.toISOString() : inner));
-}

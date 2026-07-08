@@ -1,6 +1,7 @@
 import { BadRequestException, ConflictException, Injectable, NotFoundException } from '@nestjs/common';
 import { NotificationKind, Prisma, UserRoleEnum } from '@prisma/client';
 import { PrismaService } from '../../prisma/prisma.service';
+import { AuditWriterService } from '../../common/audit/audit-writer.service';
 import { AuthPayload } from '../auth/auth.types';
 import { NotificationsService } from '../notifications/notifications.service';
 import { buildDocx } from '../documents/docx.util';
@@ -48,6 +49,7 @@ export class CompensationService {
     private readonly prisma: PrismaService,
     private readonly notifications: NotificationsService,
     private readonly documents: DocumentsService,
+    private readonly auditWriter: AuditWriterService,
   ) {}
 
   // Notifica um usuario com tolerancia a falha (notificacao nunca quebra o fluxo principal).
@@ -1762,20 +1764,15 @@ export class CompensationService {
     recordLabel?: string | null,
     reason?: string | null,
   ) {
-    await this.prisma.auditLog.create({
-      data: {
-        companyId: me.companyId,
-        userId: me.sub,
-        action,
-        module: MODULE_NAME,
-        entity,
-        entityId,
-        recordLabel: recordLabel ?? null,
-        payload: stringify({ route: '/cargos-salarios', reason: reason ?? null }),
-        beforeValue: stringify(beforeValue),
-        afterValue: stringify(afterValue),
-        result: 'SUCCESS',
-      },
+    await this.auditWriter.record(me, {
+      action,
+      module: MODULE_NAME,
+      entity,
+      entityId,
+      message: recordLabel ?? undefined,
+      payload: { route: '/cargos-salarios', reason: reason ?? null },
+      before: beforeValue,
+      after: afterValue,
     });
   }
 }

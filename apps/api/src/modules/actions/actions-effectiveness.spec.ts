@@ -24,7 +24,7 @@ function makeService(opts: { actionsOfTreatment: Array<{ status: string; dueDate
     treatmentCase: { update: vi.fn().mockResolvedValue({}) },
   } as any;
   const traceability = { record: vi.fn().mockResolvedValue(undefined) } as any;
-  const service = new ActionsService(prisma, traceability, {} as any, {} as any, { markDirty() {} } as any);
+  const service = new ActionsService(prisma, traceability, {} as any, {} as any, { markDirty() {} } as any, { record: vi.fn().mockResolvedValue(undefined) } as any);
   // Evita a query rica de getById: a ação avaliada pertence à tratativa t1.
   vi.spyOn(service, 'getById').mockResolvedValue({
     id: 'a1',

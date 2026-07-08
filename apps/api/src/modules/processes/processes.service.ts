@@ -1,6 +1,7 @@
 import { BadRequestException, ConflictException, ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
 import { Prisma, ProcessStatus, ProcessType, TraceEntityType, TraceEventType } from '@prisma/client';
 import { PrismaService } from '../../prisma/prisma.service';
+import { listTake } from '../../common/http/list-take';
 import { TraceabilityService } from '../traceability/traceability.service';
 import { AccessService } from '../access/access.service';
 import type { AreaAction } from '../access/access.logic';
@@ -165,6 +166,7 @@ export class ProcessesService {
       },
       include: this.include(),
       orderBy: [{ status: 'asc' }, { type: 'asc' }, { number: 'desc' }],
+      take: listTake((filters as { limit?: string }).limit),
     });
 
     return items.map((proc) => this.enrich(proc));

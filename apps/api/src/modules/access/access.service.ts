@@ -1,6 +1,7 @@
 import { ForbiddenException, Injectable } from '@nestjs/common';
 import { UserRoleEnum } from '@prisma/client';
 import { PrismaService } from '../../prisma/prisma.service';
+import { AuditWriterService } from '../../common/audit/audit-writer.service';
 import { effectiveCompanyId } from '../../common/effective-company';
 import { swallow } from '../../common/logging/swallow';
 import {
@@ -29,7 +30,10 @@ const CONTEXT_TTL_MS = 10_000;
 
 @Injectable()
 export class AccessService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly auditWriter: AuditWriterService,
+  ) {}
 
   private cache = new Map<string, { ctx: AccessContext; expires: number }>();
 
@@ -167,20 +171,17 @@ export class AccessService {
   /** Registra uma tentativa de acesso negada na auditoria (best-effort). */
   private async auditDenied(userId: string, moduleKey: string, action: AreaAction | string, areaId: string | null, note?: string) {
     const ctx = this.cache.get(userId)?.ctx;
-    await this.prisma.auditLog
-      .create({
-        data: {
-          companyId: ctx?.companyId,
-          userId,
-          action: `DENIED_${String(action).toUpperCase()}`,
-          module: moduleKey,
-          entity: 'AreaAccess',
-          entityId: areaId,
-          result: 'DENIED',
-          recordLabel: note ?? `Acesso negado a área ${areaId ?? '-'} (${moduleKey}/${action}).`,
-        },
-      })
-      .catch(swallow(undefined, 'access.auditDenied', 'debug'));
+    await this.auditWriter.record(
+      { companyId: ctx?.companyId, sub: userId },
+      {
+        action: `DENIED_${String(action).toUpperCase()}`,
+        module: moduleKey,
+        entity: 'AreaAccess',
+        entityId: areaId,
+        message: note ?? `Acesso negado a área ${areaId ?? '-'} (${moduleKey}/${action}).`,
+        result: 'DENIED',
+      },
+    );
   }
 
   /** Nível de visibilidade do usuário sobre uma área (para decidir projeção resumida). */
