@@ -120,6 +120,40 @@ export class NotificationsService {
       created.push(r.indicator.id);
     }
 
+    // 3. Não conformidades com prazo vencido (Qualidade) — antes ninguém era
+    // avisado; a NC só era percebida quando alguém abria a tela do módulo.
+    const overdueNcs = await this.prisma.nonConformity.findMany({
+      where: {
+        companyId,
+        deletedAt: null,
+        dueDate: { lt: new Date() },
+        status: { notIn: ['CLOSED', 'CANCELLED'] },
+        responsibleUserId: { not: null },
+      },
+      select: { id: true, number: true, title: true, dueDate: true, responsibleUserId: true },
+      take: 50,
+    });
+    for (const nc of overdueNcs) {
+      const exists = await this.prisma.notification.findFirst({
+        where: {
+          userId: nc.responsibleUserId!,
+          kind: NotificationKind.ACTION_OVERDUE,
+          link: `/nonconformities?focus=${nc.id}`,
+          readAt: null,
+        },
+      });
+      if (exists) continue;
+      await this.create(
+        companyId,
+        nc.responsibleUserId!,
+        NotificationKind.ACTION_OVERDUE,
+        `NC vencida: #${nc.number} ${nc.title}`,
+        `Prazo vencido em ${nc.dueDate?.toLocaleDateString('pt-BR')}. Trate a não conformidade.`,
+        `/nonconformities?focus=${nc.id}`,
+      );
+      created.push(nc.id);
+    }
+
     return { generated: created.length };
   }
 }

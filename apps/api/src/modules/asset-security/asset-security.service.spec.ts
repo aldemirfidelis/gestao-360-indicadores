@@ -64,7 +64,7 @@ function makeService(opts?: {
     assertCanWrite: vi.fn().mockResolvedValue(undefined),
   } as any;
 
-  return { service: new AssetSecurityService(prisma, access), prisma, access };
+  return { service: new AssetSecurityService(prisma, access, { record: vi.fn().mockResolvedValue(undefined) } as any, { create: vi.fn().mockResolvedValue({}) } as any), prisma, access };
 }
 
 describe('AssetSecurityService - portarias e seguranca patrimonial', () => {

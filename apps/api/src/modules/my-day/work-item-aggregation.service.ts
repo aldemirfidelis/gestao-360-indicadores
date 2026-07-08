@@ -4,6 +4,7 @@ import { PrismaService } from '../../prisma/prisma.service';
 import { AuthPayload } from '../auth/auth.types';
 import { WorkItemPriorityService } from './work-item-priority.service';
 import type { WorkItemAction } from '@g360/shared';
+import { matchesAudience, type AudienceRule } from '../communication/organizational/audience.util';
 
 /** Item "rascunho" coletado de um modulo de origem, antes da priorização. */
 interface WorkItemDraft {
@@ -181,6 +182,8 @@ export class WorkItemAggregationService {
         this.collectNonConformities(me).catch((e) => this.warn('nonconformities', e)),
         this.collectIndicatorsOffTarget(me).catch((e) => this.warn('indicators', e)),
         this.collectNotifications(me).catch((e) => this.warn('notifications', e)),
+        this.collectUnreadCommunications(me).catch((e) => this.warn('communications', e)),
+        this.collectSecurityIncidents(me).catch((e) => this.warn('security-incidents', e)),
       ])
     ).flat();
   }
@@ -774,6 +777,11 @@ export class WorkItemAggregationService {
       recommendedAction: 'Registrar análise de causa e/ou criar plano de ação',
       availableActions: [
         { key: 'open', label: 'Abrir indicador', href: `/indicators/${r.indicator.id}` },
+        {
+          key: 'analyze',
+          label: 'Analisar causa',
+          href: `/indicators/${r.indicator.id}?analyze=1&periodRef=${encodeURIComponent(r.periodRef)}`,
+        },
         { key: 'vision360', label: 'Abrir Visão 360°', inline: true },
       ],
       context: { periodRef: r.periodRef, value: r.value, attainment: r.attainment, deviationPct: r.deviationPct },
@@ -819,5 +827,125 @@ export class WorkItemAggregationService {
         sourceCreatedAt: n.createdAt,
       };
     });
+  }
+
+  /**
+   * Comunicados publicados que exigem leitura/confirmação e o usuário ainda
+   * não leu/confirmou. O item permanece no Meu Dia até a leitura na origem
+   * (Comunicação) — pedido do produto: "comunicado importante aparece no Meu
+   * Dia até o usuário ler".
+   */
+  private async collectUnreadCommunications(me: AuthPayload): Promise<WorkItemDraft[]> {
+    const now = new Date();
+    const [user, posts] = await Promise.all([
+      this.prisma.user.findFirst({
+        where: { id: me.sub, companyId: me.companyId },
+        select: { id: true, defaultNodeId: true, role: true },
+      }),
+      this.prisma.communicationPost.findMany({
+        where: {
+          companyId: me.companyId,
+          deletedAt: null,
+          status: 'PUBLISHED',
+          OR: [{ expiresAt: null }, { expiresAt: { gt: now } }],
+          AND: [{ OR: [{ requiresReadConfirmation: true }, { isMandatory: true }] }],
+        },
+        orderBy: { publishedAt: 'desc' },
+        take: 50,
+        select: {
+          id: true,
+          title: true,
+          subtitle: true,
+          category: true,
+          priority: true,
+          audience: true,
+          requiresReadConfirmation: true,
+          publishedAt: true,
+          expiresAt: true,
+          reads: { where: { userId: me.sub }, select: { viewedAt: true, confirmedAt: true } },
+        },
+      }),
+    ]);
+    if (!user) return [];
+
+    const critFor: Record<string, string> = { LOW: 'LOW', NORMAL: 'MEDIUM', HIGH: 'HIGH', CRITICAL: 'HIGH', URGENT: 'HIGH' };
+    return posts
+      .filter((post) => matchesAudience(user, post.audience as unknown as AudienceRule))
+      .filter((post) => {
+        const read = post.reads[0];
+        // Com confirmação exigida, só sai do Meu Dia após CONFIRMAR; sem
+        // confirmação (mandatório), basta ter visualizado.
+        return post.requiresReadConfirmation ? !read?.confirmedAt : !read?.viewedAt;
+      })
+      .map((post) => ({
+        sourceModule: 'communication',
+        sourceEntityType: 'COMMUNICATION_POST',
+        sourceEntityId: post.id,
+        itemType: 'COMMUNICATION_UNREAD',
+        title: post.title,
+        summary: post.subtitle ?? `Comunicado de ${post.category} aguardando sua leitura`,
+        status: 'OPEN',
+        criticality: critFor[post.priority as string] ?? 'MEDIUM',
+        dueAt: post.expiresAt ?? null,
+        assignedUserId: me.sub,
+        requiresDecision: false,
+        recommendedAction: post.requiresReadConfirmation ? 'Ler e confirmar a leitura' : 'Ler o comunicado',
+        availableActions: [{ key: 'open', label: 'Ler comunicado', href: `/comunicacao?post=${post.id}` }],
+        context: { category: post.category, priority: post.priority, requiresReadConfirmation: post.requiresReadConfirmation },
+        sourceCreatedAt: post.publishedAt ?? null,
+      }));
+  }
+
+  /**
+   * Ocorrências patrimoniais abertas sob responsabilidade do usuário (ou
+   * criadas por ele, quando sem responsável). Além do card no Meu Dia, o
+   * board de Tarefas materializa o item como tarefa automática — fechando a
+   * integração ocorrência → tarefa sem duplicar registro de origem.
+   */
+  private async collectSecurityIncidents(me: AuthPayload): Promise<WorkItemDraft[]> {
+    const rows = await this.prisma.securityIncident.findMany({
+      where: {
+        companyId: me.companyId,
+        deletedAt: null,
+        status: { in: ['OPEN', 'IN_PROGRESS', 'WAITING_ACTION'] },
+        OR: [{ responsibleUserId: me.sub }, { responsibleUserId: null, createdById: me.sub }],
+      },
+      orderBy: [{ severity: 'desc' }, { createdAt: 'desc' }],
+      take: 50,
+      select: {
+        id: true,
+        code: true,
+        title: true,
+        type: true,
+        severity: true,
+        status: true,
+        dueAt: true,
+        actionPlanId: true,
+        createdAt: true,
+        updatedAt: true,
+      },
+    });
+    const critFor: Record<string, string> = { LOW: 'LOW', MEDIUM: 'MEDIUM', HIGH: 'HIGH', CRITICAL: 'CRITICAL', EMERGENCY: 'CRITICAL' };
+    return rows.map((r) => ({
+      sourceModule: 'asset-security',
+      sourceEntityType: 'SECURITY_INCIDENT',
+      sourceEntityId: r.id,
+      itemType: 'SECURITY_INCIDENT',
+      title: `${r.code ? r.code + ' · ' : ''}${r.title}`,
+      summary: r.type ? `Ocorrência de segurança (${r.type})` : 'Ocorrência de segurança patrimonial',
+      status: r.status,
+      criticality: critFor[r.severity as string] ?? 'MEDIUM',
+      dueAt: r.dueAt ?? null,
+      assignedUserId: me.sub,
+      isBlocking: r.severity === 'CRITICAL' || r.severity === 'EMERGENCY',
+      recommendedAction: r.actionPlanId ? 'Acompanhar o plano de ação vinculado' : 'Tratar a ocorrência e definir plano de ação',
+      availableActions: [
+        { key: 'open', label: 'Abrir ocorrência', href: '/seguranca-patrimonial?tab=ocorrencias' },
+        ...(r.actionPlanId ? [{ key: 'openPlan', label: 'Abrir plano de ação', href: `/actions/${r.actionPlanId}` }] : []),
+      ],
+      context: { severity: r.severity, type: r.type, actionPlanId: r.actionPlanId },
+      sourceCreatedAt: r.createdAt,
+      sourceUpdatedAt: r.updatedAt,
+    }));
   }
 }

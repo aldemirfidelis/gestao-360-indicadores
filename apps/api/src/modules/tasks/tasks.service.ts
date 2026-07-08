@@ -33,6 +33,7 @@ const SOURCE_LABELS: Record<string, string> = {
   PROCESS: 'Processos',
   PROJECT: 'Cronogramas',
   RISK: 'Riscos',
+  SECURITY_INCIDENT: 'Segurança Patrimonial',
   WORKFLOW_TASK: 'Automações',
 };
 
@@ -515,7 +516,9 @@ export class TasksService {
       where: {
         companyId: me.companyId,
         status: { not: 'ARCHIVED' },
-        sourceEntityType: { not: 'NOTIFICATION' },
+        // Notificações e comunicados não viram tarefa: são "leia-me" do Meu
+        // Dia, não trabalho executável no quadro.
+        sourceEntityType: { notIn: ['NOTIFICATION', 'COMMUNICATION_POST'] },
         ...visibility,
       },
       orderBy: [{ priorityScore: 'desc' }, { dueAt: 'asc' }],

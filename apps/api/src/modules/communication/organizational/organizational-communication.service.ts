@@ -6,6 +6,9 @@ import { AuthPayload } from '../../auth/auth.types';
 import { GeminiService } from '../../ai/gemini.service';
 import { swallow } from '../../../common/logging/swallow';
 import { NotificationsService } from '../../notifications/notifications.service';
+// Regra de audiência: vive em audience.util.ts para reuso fora do módulo
+// (ex.: coletor de comunicados não lidos do Meu Dia).
+import { AudienceRule, matchesAudience } from './audience.util';
 
 type CommunicationStatus =
   | 'DRAFT'
@@ -21,14 +24,6 @@ type CommunicationStatus =
 type CommunicationType = 'SIMPLE' | 'BANNER' | 'VIDEO' | 'POLL' | 'SURVEY' | 'CAMPAIGN';
 type CommunicationPriority = 'LOW' | 'NORMAL' | 'HIGH' | 'CRITICAL' | 'URGENT';
 type CommunicationMediaType = 'IMAGE' | 'BANNER' | 'VIDEO' | 'PDF' | 'DOCUMENT' | 'ICON' | 'TEMPLATE';
-
-interface AudienceRule {
-  scope: 'ALL_COMPANY' | 'AREAS' | 'USERS' | 'MANAGERS' | 'DIRECTORS' | 'ACTIVE_USERS';
-  areaIds?: string[];
-  userIds?: string[];
-  roles?: string[];
-  description?: string;
-}
 
 interface ChannelConfig {
   platform?: boolean;
@@ -799,6 +794,49 @@ export class OrganizationalCommunicationService {
     };
   }
 
+  /**
+   * Varredura de publicação/expiração (chamada pelo MaintenanceScheduler,
+   * que roda sem Redis/BullMQ):
+   *  - SCHEDULED com publishAt vencido → PUBLISHED + notificação da audiência;
+   *  - PUBLISHED com expiresAt vencido → EXPIRED.
+   * Antes, comunicado agendado só era publicado se alguém mudasse o status
+   * manualmente — o agendamento não funcionava de fato.
+   */
+  async publicationSweep(companyId: string): Promise<{ published: number; expired: number }> {
+    const now = new Date();
+    const due = await this.prisma.communicationPost.findMany({
+      where: { companyId, deletedAt: null, status: 'SCHEDULED', publishAt: { not: null, lte: now } },
+      select: { id: true, title: true, subtitle: true, content: true, audience: true, history: true },
+      take: 100,
+    });
+    for (const post of due) {
+      const history = Array.isArray(post.history) ? post.history : [];
+      await this.prisma.communicationPost.update({
+        where: { id: post.id },
+        data: {
+          status: 'PUBLISHED',
+          publishedAt: now,
+          history: [
+            ...history,
+            { at: now.toISOString(), by: 'sistema', action: 'Publicado', note: 'Publicação automática do agendamento' },
+          ] as unknown as Prisma.InputJsonValue,
+        },
+      });
+      await this.notifyAudience(companyId, {
+        id: post.id,
+        title: post.title,
+        subtitle: post.subtitle,
+        content: post.content,
+        audience: post.audience as unknown as AudienceRule,
+      });
+    }
+    const expired = await this.prisma.communicationPost.updateMany({
+      where: { companyId, deletedAt: null, status: 'PUBLISHED', expiresAt: { not: null, lte: now } },
+      data: { status: 'EXPIRED' },
+    });
+    return { published: due.length, expired: expired.count };
+  }
+
   private async notifyAudience(companyId: string, post: { id: string; title: string; subtitle?: string | null; content: string; audience: AudienceRule }) {
     const users = await this.activeUsers(companyId);
     const audience = users.filter((user) => this.matchesAudience(user, post.audience)).slice(0, 250);
@@ -921,12 +959,7 @@ export class OrganizationalCommunicationService {
   }
 
   private matchesAudience(user: any, audience: AudienceRule) {
-    if (audience.scope === 'ALL_COMPANY' || audience.scope === 'ACTIVE_USERS') return true;
-    if (audience.scope === 'USERS') return Boolean(audience.userIds?.includes(user.id));
-    if (audience.scope === 'AREAS') return Boolean(user.defaultNodeId && audience.areaIds?.includes(user.defaultNodeId));
-    if (audience.scope === 'MANAGERS') return user.role === UserRoleEnum.MANAGER;
-    if (audience.scope === 'DIRECTORS') return user.role === UserRoleEnum.DIRECTOR;
-    return true;
+    return matchesAudience(user, audience);
   }
 
   private isTargetUser(audience: AudienceRule, me: AuthPayload, users: any[]) {

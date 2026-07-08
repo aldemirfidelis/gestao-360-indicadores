@@ -1,6 +1,7 @@
 import { Module } from '@nestjs/common';
 import { DocumentsModule } from '../modules/documents/documents.module';
 import { NotificationsModule } from '../modules/notifications/notifications.module';
+import { CommunicationModule } from '../modules/communication/communication.module';
 import { MaintenanceScheduler } from './maintenance.scheduler';
 
 /**
@@ -9,7 +10,7 @@ import { MaintenanceScheduler } from './maintenance.scheduler';
  * alertas automáticos.
  */
 @Module({
-  imports: [DocumentsModule, NotificationsModule],
+  imports: [DocumentsModule, NotificationsModule, CommunicationModule],
   providers: [MaintenanceScheduler],
 })
 export class MaintenanceModule {}

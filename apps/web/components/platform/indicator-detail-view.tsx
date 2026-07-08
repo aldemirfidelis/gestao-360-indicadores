@@ -2,7 +2,7 @@
 
 import { useRouter } from 'next/navigation';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import type { ReactNode } from 'react';
 import { toast } from 'sonner';
 import {
@@ -47,6 +47,7 @@ import { api } from '@/lib/api';
 import { cn, formatNumber, formatPercent, periodRefLabel } from '@/lib/utils';
 import { ACTION_STATUS_LABEL, getIndicatorUnitLabel, MEETING_STATUS_LABEL, TRAFFIC_LIGHT_LABEL } from '@/lib/labels';
 import { CHART_COLORS, ChartLegend, computeStubValue, isWithinGain, realizadoBarColor } from '@/lib/indicator-chart';
+import { attainmentFor } from '@/lib/farol';
 import { useVision360 } from '@/components/ui/vision360-context';
 import { useAuth } from '@/components/auth/auth-provider';
 
@@ -206,12 +207,15 @@ export function IndicatorDetailView({
   embedded = false,
   initialPeriodRef,
   initialView,
+  autoAnalyze = false,
 }: {
   id: string;
   embedded?: boolean;
   // Vindos do Painel Executivo: mês e visão para abrir o indicador já focado.
   initialPeriodRef?: string;
   initialView?: 'monthly' | 'cumulative';
+  /** Vindo do Meu Dia (?analyze=1): entra direto no fluxo de análise de causa (desvio). */
+  autoAnalyze?: boolean;
 }) {
   const router = useRouter();
   const queryClient = useQueryClient();
@@ -296,6 +300,30 @@ export function IndicatorDetailView({
     if (idx >= 0) setSelectedIdx(idx);
   }, [initialPeriodRef, series.data]);
 
+  // CTA "Analisar causa" do Meu Dia: assim que os dados carregam, entra no
+  // fluxo de desvio — abre o desvio existente do período ou cria um novo.
+  const autoAnalyzeFired = useRef(false);
+  useEffect(() => {
+    if (!autoAnalyze || autoAnalyzeFired.current) return;
+    if (!detail.data || deviations.data === undefined) return;
+    autoAnalyzeFired.current = true;
+    const existing = (deviations.data ?? [])[0] ?? null;
+    if (existing) {
+      router.push(`/deviations/${existing.id}`);
+      return;
+    }
+    if (!canCreateDeviation) {
+      toast.error('Você não tem permissão para abrir desvios deste indicador.');
+      return;
+    }
+    if (!lastResult?.periodRef) {
+      toast.error('Registre um resultado do indicador antes de abrir um desvio.');
+      return;
+    }
+    openDeviation.mutate();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [autoAnalyze, detail.data, deviations.data]);
+
   if (detail.isLoading) return <p className="text-sm text-muted-foreground">Carregando...</p>;
   if (!detail.data) return null;
   const ind = detail.data;
@@ -308,7 +336,7 @@ export function IndicatorDetailView({
     secondaryTarget: p.secondaryTarget ?? null,
     gainLower: p.gainLower ?? null,
     gainUpper: p.gainUpper ?? null,
-    attainment: p.attainment ?? (p.target !== null && p.value !== null && p.target !== 0 ? p.value / p.target : null),
+    attainment: p.attainment ?? attainmentFor(p.value, p.target, ind.direction),
     status: p.light,
   }));
   const chartDataBase: ChartPoint[] = isGrainMode
@@ -317,7 +345,7 @@ export function IndicatorDetailView({
         month: grainPeriodLabel(c.periodRef),
         meta: c.target,
         realizado: c.value,
-        attainment: c.target !== null && c.value !== null && c.target !== 0 ? c.value / c.target : null,
+        attainment: attainmentFor(c.value, c.target, ind.direction),
         status: c.light,
         displayMeta: c.target,
         displayRealizado: c.value,

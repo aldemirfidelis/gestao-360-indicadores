@@ -42,6 +42,8 @@ import { OrganizationalCommunicationService } from './organizational/organizatio
     OrganizationalCommunicationService,
     CommunicationGateway,
   ],
-  exports: [PresenceService],
+  // OrganizationalCommunicationService exportado para o MaintenanceScheduler
+  // (publicação/expiração de comunicados agendados).
+  exports: [PresenceService, OrganizationalCommunicationService],
 })
 export class CommunicationModule {}

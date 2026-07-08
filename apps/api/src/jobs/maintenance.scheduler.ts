@@ -2,6 +2,7 @@ import { Injectable, Logger, OnApplicationBootstrap, OnApplicationShutdown } fro
 import { PrismaService } from '../prisma/prisma.service';
 import { DocumentsService } from '../modules/documents/documents.service';
 import { NotificationsService } from '../modules/notifications/notifications.service';
+import { OrganizationalCommunicationService } from '../modules/communication/organizational/organizational-communication.service';
 
 /**
  * Rotinas de manutenção que precisam rodar SEM depender de Redis/BullMQ
@@ -11,7 +12,9 @@ import { NotificationsService } from '../modules/notifications/notifications.ser
  *  - vencimento de documentos (PUBLISHED -> NEAR_EXPIRATION -> EXPIRED, com
  *    notificação ao responsável/aprovador) — antes só rodava por botão;
  *  - alertas de ação atrasada/indicador vermelho (generateAlerts, idempotente)
- *    — antes só rodava quando alguém clicava no sino de notificações.
+ *    — antes só rodava quando alguém clicava no sino de notificações;
+ *  - publicação/expiração de comunicados agendados (publicationSweep) —
+ *    antes o agendamento não publicava sozinho.
  *
  * Controles por env: MAINTENANCE_JOBS_ENABLED=false desliga;
  * MAINTENANCE_INTERVAL_MS ajusta o ciclo (mínimo 5 min).
@@ -27,6 +30,7 @@ export class MaintenanceScheduler implements OnApplicationBootstrap, OnApplicati
     private readonly prisma: PrismaService,
     private readonly documents: DocumentsService,
     private readonly notifications: NotificationsService,
+    private readonly orgCommunication: OrganizationalCommunicationService,
   ) {}
 
   onApplicationBootstrap() {
@@ -54,6 +58,8 @@ export class MaintenanceScheduler implements OnApplicationBootstrap, OnApplicati
     const startedAt = Date.now();
     let documentsProcessed = 0;
     let alertsGenerated = 0;
+    let postsPublished = 0;
+    let postsExpired = 0;
     let failures = 0;
     try {
       const companies = await this.prisma.company.findMany({
@@ -76,11 +82,20 @@ export class MaintenanceScheduler implements OnApplicationBootstrap, OnApplicati
           failures += 1;
           this.logger.error(`Geração de alertas falhou (empresa ${company.id}): ${(error as Error).message}`);
         }
+        try {
+          const sweep = await this.orgCommunication.publicationSweep(company.id);
+          postsPublished += sweep.published;
+          postsExpired += sweep.expired;
+        } catch (error) {
+          failures += 1;
+          this.logger.error(`Publicação de comunicados falhou (empresa ${company.id}): ${(error as Error).message}`);
+        }
       }
-      if (documentsProcessed || alertsGenerated || failures) {
+      if (documentsProcessed || alertsGenerated || postsPublished || postsExpired || failures) {
         this.logger.log(
           `Ciclo de manutenção: ${companies.length} empresas, ${documentsProcessed} documentos transicionados, ` +
-            `${alertsGenerated} alertas gerados, ${failures} falhas, ${Date.now() - startedAt}ms.`,
+            `${alertsGenerated} alertas gerados, ${postsPublished} comunicados publicados, ${postsExpired} expirados, ` +
+            `${failures} falhas, ${Date.now() - startedAt}ms.`,
         );
       }
     } catch (error) {

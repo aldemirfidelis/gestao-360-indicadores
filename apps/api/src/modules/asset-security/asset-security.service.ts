@@ -1,9 +1,11 @@
 import { BadRequestException, ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
 import { randomBytes } from 'crypto';
 import { PrismaService } from '../../prisma/prisma.service';
+import { AuditWriterService } from '../../common/audit/audit-writer.service';
 import { AccessService } from '../access/access.service';
 import { AuthPayload } from '../auth/auth.types';
 import { GeminiService } from '../ai/gemini.service';
+import { NotificationsService } from '../notifications/notifications.service';
 import { swallow } from '../../common/logging/swallow';
 
 const MODULE = 'asset-security';
@@ -49,6 +51,8 @@ export class AssetSecurityService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly access: AccessService,
+    private readonly auditWriter: AuditWriterService,
+    private readonly notifications: NotificationsService,
     private readonly gemini?: GeminiService,
   ) {}
 
@@ -921,9 +925,44 @@ export class AssetSecurityService {
     const saved = await this.db.securityIncident.create({ data: await this.incidentData(me, body) });
     if (['HIGH', 'CRITICAL', 'EMERGENCY'].includes(saved.severity)) {
       await this.createOperationalWorkItem(me, 'SecurityIncident', saved.id, saved.type || 'INCIDENT', saved.title, saved.severity === 'HIGH' ? 'HIGH' : 'CRITICAL', saved.dueAt);
+      // Segurança é tempo-crítico: ocorrência grave notifica o responsável e
+      // os admins na hora (sino/push), não só no próximo rebuild do Meu Dia.
+      await this.notifyIncident(me, saved);
     }
     await this.audit(me, 'CREATE', 'SecurityIncident', saved.id, saved.title, null, saved);
     return saved;
+  }
+
+  /** Notifica responsável + admins da empresa sobre ocorrência grave (best-effort). */
+  private async notifyIncident(me: AuthPayload, incident: { id: string; title: string; severity: string; responsibleUserId?: string | null }) {
+    try {
+      const admins = await this.prisma.user.findMany({
+        where: { companyId: me.companyId, deletedAt: null, active: true, role: { in: ['COMPANY_ADMIN', 'SUPER_ADMIN'] } },
+        select: { id: true },
+        take: 10,
+      });
+      const targets = new Set<string>(admins.map((u) => u.id));
+      if (incident.responsibleUserId) targets.add(incident.responsibleUserId);
+      targets.delete(me.sub); // quem registrou já sabe
+      await Promise.all(
+        [...targets].map((userId) =>
+          this.notifications
+            // DEVIATION_CRITICAL = kind de alerta crítico do sino (rótulo vem do título).
+            .create(
+              me.companyId,
+              userId,
+              'DEVIATION_CRITICAL' as any,
+              `Ocorrência de segurança (${incident.severity}): ${incident.title}`,
+              'Ocorrência patrimonial grave registrada. Verifique e trate imediatamente.',
+              '/seguranca-patrimonial?tab=ocorrencias',
+            )
+            .catch(swallow(undefined, 'assetSecurity.notifyIncident', 'debug')),
+        ),
+      );
+    } catch (error) {
+      // Notificação é best-effort: nunca falha o registro da ocorrência.
+      swallow(undefined, 'assetSecurity.notifyIncident', 'debug')(error);
+    }
   }
 
   async updateIncident(me: AuthPayload, id: string, body: JsonMap) {
@@ -2440,19 +2479,16 @@ ${JSON.stringify(context, null, 2)}`;
           syncedAt: this.date(extra?.syncedAt),
         },
       }).catch(swallow(undefined, 'assetSecurity.audit.securityAuditLog', 'debug')),
-      this.db.auditLog.create({
-        data: {
-          companyId: me.companyId,
-          userId: me.sub,
-          action,
-          module: MODULE,
-          entity,
-          entityId,
-          recordLabel: label ?? null,
-          payload: JSON.stringify({ before: this.safeJson(before), after: this.safeJson(after), extra: this.safeJson(extra) }),
-          result: 'SUCCESS',
-        },
-      }).catch(swallow(undefined, 'assetSecurity.audit.auditLog', 'debug')),
+      this.auditWriter.record(me, {
+        action,
+        module: MODULE,
+        entity,
+        entityId,
+        message: label ?? undefined,
+        before,
+        after,
+        payload: extra ? { extra: this.safeJson(extra) } : undefined,
+      }),
     ]);
   }
 

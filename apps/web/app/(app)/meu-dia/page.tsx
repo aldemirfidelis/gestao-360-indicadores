@@ -6,7 +6,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
 import {
   AlertTriangle, AtSign, Bookmark, CalendarDays, CheckCircle2, CheckSquare, Clock3, Columns3, EyeOff, FileText, FileWarning,
-  Inbox, LayoutList, MessageSquare, Pin, Plus, RefreshCw, Search, ShieldAlert, SlidersHorizontal, Sparkles, Table2, Target, Stamp, ThumbsDown, ThumbsUp, UserPlus, Users, Workflow,
+  Inbox, LayoutList, Megaphone, MessageSquare, Pin, Plus, RefreshCw, Search, ShieldAlert, SlidersHorizontal, Sparkles, Table2, Target, Stamp, ThumbsDown, ThumbsUp, UserPlus, Users, Workflow,
   Star, Sun, BarChart3, Clock,
 } from 'lucide-react';
 import { Card, CardContent } from '@/components/ui/card';
@@ -68,6 +68,8 @@ const TYPE_META: Record<string, { label: string; icon: typeof Inbox }> = {
   MEETING: { label: 'Reunião', icon: CalendarDays },
   NONCONFORMITY: { label: 'Não conformidade', icon: FileWarning },
   INDICATOR_OFF_TARGET: { label: 'Indicador', icon: Target },
+  COMMUNICATION_UNREAD: { label: 'Comunicado', icon: Megaphone },
+  SECURITY_INCIDENT: { label: 'Ocorrência', icon: ShieldAlert },
   ALERT: { label: 'Alerta', icon: AlertTriangle },
   MESSAGE: { label: 'Mensagem', icon: MessageSquare },
   MENTION: { label: 'Menção', icon: AtSign },
