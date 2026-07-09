@@ -14,6 +14,26 @@ export function hasPlatformPermission(granted: Iterable<string>, required: strin
   return false;
 }
 
+/**
+ * Um módulo está efetivamente liberado? "Herdado do plano" (ou sem registro)
+ * segue o plano atual (`inPlan`); os demais status manuais decidem sozinhos.
+ */
+export function isModuleEffectivelyActive(status: string | null | undefined, inPlan: boolean): boolean {
+  const normalized = (status ?? 'HERDADO_DO_PLANO').toUpperCase();
+  if (normalized === 'HERDADO_DO_PLANO') return inPlan;
+  return [
+    'ATIVO',
+    'ACTIVE',
+    'EM_IMPLANTACAO',
+    'EM_TESTE',
+    'EXPERIMENTAL',
+    'SOMENTE_LEITURA',
+    'READ_ONLY',
+    'ATIVACAO_PROGRAMADA',
+    'EXPIRACAO_PROGRAMADA',
+  ].includes(normalized);
+}
+
 export function canUseCompanyModule(status: string | null | undefined, method = 'GET'): {
   allowed: boolean;
   readOnly: boolean;

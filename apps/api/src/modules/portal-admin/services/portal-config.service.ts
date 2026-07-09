@@ -5,8 +5,10 @@ import { swallow } from '../../../common/logging/swallow';
 import { FeatureFlagService } from './feature-flag.service';
 import { parseArray } from '../util/json';
 import { PLATFORM_PLANS } from '../../platform-admin/platform-admin.catalog';
+import { alwaysOnModuleCodes } from '../business-modules';
 
-const COMPANY_CORE_MODULE_CODES = new Set(['auth', 'access-control', 'users', 'my-day', 'tasks']);
+// Núcleo/sistema sempre ativos — mesma fonte usada pelo guard e pelos planos.
+const COMPANY_CORE_MODULE_CODES = new Set(alwaysOnModuleCodes());
 
 /**
  * Monta a configuração EFETIVA do portal para um usuário (overlay resolvido).
@@ -57,15 +59,22 @@ export class PortalConfigService {
       },
       modules: modules.map((m) => {
         const companyModule = companyModules.find((item) => item.moduleCode === m.code);
-        const fallbackCompanyStatus = user.companyId ? statusFromPlan(planCode, m.code, planEntries) : null;
-        const rawStatus = companyModule?.status ?? fallbackCompanyStatus ?? m.status;
+        const planStatus = user.companyId ? statusFromPlan(planCode, m.code, planEntries) : null;
+        // "Herdado do plano" (ou sem registro) resolve pelo plano ATUAL da
+        // empresa — trocar o plano reflete na hora. Só exceções manuais
+        // (ATIVO/BLOQUEADO/etc.) gravadas no registro da empresa divergem.
+        const storedStatus = companyModule?.status;
+        const rawStatus =
+          storedStatus && storedStatus.toUpperCase() !== 'HERDADO_DO_PLANO'
+            ? storedStatus
+            : planStatus ?? storedStatus ?? m.status;
         const effectiveStatus = toPortalStatus(rawStatus);
         return {
           code: m.code, status: effectiveStatus, route: m.route, category: m.category,
           hidden: effectiveStatus === 'HIDDEN', maintenance: effectiveStatus === 'MAINTENANCE',
           unavailable: ['INACTIVE', 'BLOCKED', 'DISCONTINUED', 'MAINTENANCE'].includes(effectiveStatus),
           unavailableMessage: companyModule?.note ?? (rawStatus === 'BLOQUEADO' ? `Modulo fora do plano ${planCode}.` : m.unavailableMessage),
-          companyModuleStatus: companyModule?.status ?? fallbackCompanyStatus,
+          companyModuleStatus: rawStatus,
           companyModuleReadOnly: companyModule?.readOnly ?? false,
           allowedRoles: parseArray(m.allowedRoles),
         };

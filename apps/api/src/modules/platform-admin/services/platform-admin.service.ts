@@ -4,12 +4,12 @@ import { PrismaService } from '../../../prisma/prisma.service';
 import { PlatformAdminAuditService } from './platform-admin-audit.service';
 import { PlatformAdminIdentity } from '../platform-admin.types';
 import { PLATFORM_MODULES, PLATFORM_PLANS } from '../platform-admin.catalog';
-import { alwaysOnModuleCodes, BUSINESS_MODULES, businessModuleMembers } from '../../portal-admin/business-modules';
+import { isModuleEffectivelyActive } from '../platform-admin.access';
+import { alwaysOnModuleCodes, BUSINESS_MODULES, businessModuleMembers, expandPlanModules } from '../../portal-admin/business-modules';
 import { prepareTenantFields } from '../../../common/tenant-fields';
 import { resolveSmtpConfig, buildTransport, smtpFrom } from '../../../common/smtp';
 
 
-const ACTIVE_MODULE_STATUSES = ['ATIVO', 'ACTIVE', 'HERDADO_DO_PLANO', 'EM_IMPLANTACAO', 'EM_TESTE', 'EXPERIMENTAL'];
 const BLOCKED_MODULE_STATUSES = ['BLOQUEADO', 'SUSPENSO', 'BLOCKED', 'SUSPENDED'];
 // Sempre ativos em qualquer plano: Meu Dia, Tarefas, Administração (usuários,
 // aprovações, períodos, automações, relatórios) + módulos de sistema/Portal Global.
@@ -321,6 +321,7 @@ export class PlatformAdminService {
 
   async createCompany(user: PlatformAdminIdentity, input: CompanyInput) {
     if (!input.name) throw new ConflictException('Nome da empresa e obrigatorio.');
+    await this.assertValidPlanCode(input.planCode ?? 'ESSENCIAL');
     if (input.cnpj) {
       const dup = await this.prisma.company.findFirst({ where: { cnpj: input.cnpj, deletedAt: null } });
       if (dup) throw new ConflictException('Ja existe empresa com este CNPJ.');
@@ -366,6 +367,7 @@ export class PlatformAdminService {
   async updateCompany(user: PlatformAdminIdentity, id: string, input: CompanyInput) {
     const before = await this.prisma.company.findFirst({ where: { id, deletedAt: null } });
     if (!before) throw new NotFoundException('Empresa nao encontrada.');
+    if (input.planCode) await this.assertValidPlanCode(input.planCode);
     if (input.cnpj && input.cnpj !== before.cnpj) {
       const dup = await this.prisma.company.findFirst({ where: { cnpj: input.cnpj, deletedAt: null, NOT: { id } } });
       if (dup) throw new ConflictException('Ja existe empresa com este CNPJ.');
@@ -385,7 +387,15 @@ export class PlatformAdminService {
     }
     Object.assign(data, await this.tenantFields(input, id));
     const company = await this.prisma.company.update({ where: { id }, data });
+    const profileBefore = await this.prisma.platformCompanyProfile.findUnique({ where: { companyId: id }, select: { planCode: true } });
     const profile = await this.upsertCompanyProfile(id, input, user);
+    // Trocar o plano realinha os módulos da empresa ao novo plano na hora:
+    // módulos do plano voltam a "herdado", módulos fora do plano são bloqueados
+    // e exceções manuais anteriores são resetadas (ajustes pontuais são refeitos
+    // depois na Matriz de Módulos). Sem isso, o plano vira só um rótulo.
+    if (input.planCode && input.planCode !== profileBefore?.planCode) {
+      await this.applyPlanDefaults(id, input.planCode, user);
+    }
 
     await this.audit.record({
       user,
@@ -451,16 +461,31 @@ export class PlatformAdminService {
 
   async moduleMatrix() {
     await this.ensureCompanyModuleAssignments();
-    const [companies, modules, assignments] = await Promise.all([
+    const [companies, modules, assignments, profiles, plans] = await Promise.all([
       this.prisma.company.findMany({ where: { deletedAt: null }, orderBy: { name: 'asc' }, select: { id: true, name: true, tradeName: true, status: true } }),
       this.listModules(),
       this.prisma.platformCompanyModule.findMany(),
+      this.prisma.platformCompanyProfile.findMany({ select: { companyId: true, planCode: true } }),
+      this.prisma.platformPlan.findMany({ where: { deletedAt: null }, include: { modules: true } }),
     ]);
     const byKey = new Map(assignments.map((item) => [`${item.companyId}:${item.moduleCode}`, item]));
+    const planByCompany = new Map(profiles.map((profile) => [profile.companyId, profile.planCode ?? 'ESSENCIAL']));
+    // Composição de cada plano em ABAS de negócio (aba inclusa = todos os membros inclusos),
+    // para a matriz mostrar "no plano" vs "fora do plano" sem o admin decorar a regra.
+    const planCompositions = plans.map((plan) => {
+      const included = new Set(plan.modules.filter((m) => m.included).map((m) => m.moduleCode));
+      return {
+        code: plan.code,
+        name: plan.name,
+        businessModules: BUSINESS_MODULES.filter((bm) => !bm.core && bm.members.every((member) => included.has(member))).map((bm) => bm.code),
+      };
+    });
     return {
       modules,
+      plans: planCompositions,
       companies: companies.map((company) => ({
         ...company,
+        planCode: planByCompany.get(company.id) ?? 'ESSENCIAL',
         modules: modules.map((module) => {
           const assignment = byKey.get(`${company.id}:${module.code}`);
           return {
@@ -578,36 +603,57 @@ export class PlatformAdminService {
     return updated;
   }
 
+  /**
+   * Realinha a empresa ao plano: grava o plano no perfil e faz TODOS os módulos
+   * voltarem a "seguir o plano" (HERDADO_DO_PLANO), zerando exceções manuais.
+   * O acesso efetivo é resolvido na LEITURA (guard/config) pelo plano atual, então
+   * não é preciso — nem correto — gravar ATIVO/BLOQUEADO módulo a módulo aqui.
+   */
   async applyPlanDefaults(companyId: string, planCode: string, user: PlatformAdminIdentity) {
     await this.ensureModuleCatalog();
-    const [plan, catalogModules] = await Promise.all([
-      this.prisma.platformPlan.findUnique({ where: { code: planCode }, include: { modules: true } }),
-      this.prisma.platformModuleCatalog.findMany({ select: { code: true } }),
-    ]);
-    if (!plan) return;
-    const included = new Set(plan.modules.filter((module) => module.included).map((module) => module.moduleCode));
-    for (const module of catalogModules) {
-      const planIncludesModule = included.has(module.code) || COMPANY_CORE_MODULES.has(module.code);
-      await this.prisma.platformCompanyModule.upsert({
-        where: { companyId_moduleCode: { companyId, moduleCode: module.code } },
-        create: {
+    await this.ensurePlans();
+    const plan = await this.prisma.platformPlan.findUnique({ where: { code: planCode }, select: { id: true } });
+    if (!plan) throw new NotFoundException('Plano nao encontrado.');
+    await this.prisma.platformCompanyProfile.upsert({
+      where: { companyId },
+      create: { companyId, internalCode: await this.nextCompanyCode(), lifecycleStatus: 'ACTIVE', planCode },
+      update: { planCode },
+    });
+    const catalogModules = await this.prisma.platformModuleCatalog.findMany({ select: { code: true } });
+    await this.prisma.$transaction([
+      this.prisma.platformCompanyModule.updateMany({
+        where: { companyId },
+        data: {
+          status: 'HERDADO_DO_PLANO',
+          readOnly: false,
+          inheritedFromPlan: true,
+          manuallyOverridden: false,
+          note: null,
+          updatedBy: user.sub,
+          updatedByEmail: user.email,
+        },
+      }),
+      this.prisma.platformCompanyModule.createMany({
+        data: catalogModules.map((module) => ({
           companyId,
           moduleCode: module.code,
-          status: planIncludesModule ? 'HERDADO_DO_PLANO' : 'BLOQUEADO',
+          status: 'HERDADO_DO_PLANO',
           inheritedFromPlan: true,
           manuallyOverridden: false,
-          updatedBy: user.sub,
-          updatedByEmail: user.email,
-        },
-        update: {
-          status: planIncludesModule ? 'HERDADO_DO_PLANO' : 'BLOQUEADO',
-          inheritedFromPlan: true,
-          manuallyOverridden: false,
-          updatedBy: user.sub,
-          updatedByEmail: user.email,
-        },
-      });
-    }
+        })),
+        skipDuplicates: true,
+      }),
+    ]);
+    await this.audit.record({
+      user,
+      action: 'PLAN_APPLY',
+      permissionKey: 'platform.modules.manage',
+      companyId,
+      targetType: 'PlatformCompanyModule',
+      targetLabel: `Plano ${planCode} aplicado aos modulos da empresa`,
+      afterValue: { planCode, modules: catalogModules.length },
+    });
+    return { planCode, applied: catalogModules.length };
   }
 
   async listPlans() {
@@ -1156,29 +1202,52 @@ Equipe Gestão 360
   private async decorateCompanies(companies: Array<Prisma.CompanyGetPayload<object>>) {
     const ids = companies.map((item) => item.id);
     if (ids.length === 0) return [];
-    const [profiles, users, modules, lastAccess] = await Promise.all([
+    const [profiles, users, assignments, planModules, lastAccess] = await Promise.all([
       this.prisma.platformCompanyProfile.findMany({ where: { companyId: { in: ids } } }),
       this.prisma.user.groupBy({ by: ['companyId'], where: { companyId: { in: ids }, deletedAt: null }, _count: { _all: true } }),
-      this.prisma.platformCompanyModule.groupBy({
-        by: ['companyId'],
-        where: { companyId: { in: ids }, status: { in: ACTIVE_MODULE_STATUSES } },
-        _count: { _all: true },
+      this.prisma.platformCompanyModule.findMany({
+        where: { companyId: { in: ids } },
+        select: { companyId: true, moduleCode: true, status: true },
       }),
+      this.prisma.platformPlanModule.findMany({ where: { included: true }, select: { moduleCode: true, plan: { select: { code: true } } } }),
       this.prisma.user.groupBy({ by: ['companyId'], where: { companyId: { in: ids }, deletedAt: null }, _max: { lastLoginAt: true } }),
     ]);
     const profileMap = new Map(profiles.map((item) => [item.companyId, item]));
     const userMap = new Map(users.map((item) => [item.companyId, item._count._all]));
-    const moduleMap = new Map(modules.map((item) => [item.companyId, item._count._all]));
     const accessMap = new Map(lastAccess.map((item) => [item.companyId, item._max.lastLoginAt ?? null]));
-    return companies.map((company) => ({
-      ...this.serializeCompany(company),
-      profile: profileMap.get(company.id) ?? null,
-      usage: {
-        users: userMap.get(company.id) ?? 0,
-        modules: moduleMap.get(company.id) ?? 0,
-        lastAccessAt: accessMap.get(company.id) ?? null,
-      },
-    }));
+    const includedByPlan = new Map<string, Set<string>>();
+    for (const row of planModules) {
+      const set = includedByPlan.get(row.plan.code) ?? new Set<string>();
+      set.add(row.moduleCode);
+      includedByPlan.set(row.plan.code, set);
+    }
+    const statusByCompany = new Map<string, Map<string, string>>();
+    for (const assignment of assignments) {
+      const map = statusByCompany.get(assignment.companyId) ?? new Map<string, string>();
+      map.set(assignment.moduleCode, assignment.status);
+      statusByCompany.set(assignment.companyId, map);
+    }
+    // "Módulos" = abas de NEGÓCIO efetivamente liberadas (plano + exceções),
+    // a mesma régua da Matriz de Módulos — não a contagem granular crua.
+    const businessTabs = BUSINESS_MODULES.filter((bm) => !bm.core);
+    const enabledTabs = (companyId: string, planCode: string) => {
+      const statuses = statusByCompany.get(companyId);
+      const planSet = includedByPlan.get(planCode);
+      const inPlan = (moduleCode: string) => planSet?.has(moduleCode) ?? expandPlanModules(planCode).includes(moduleCode);
+      return businessTabs.filter((bm) => bm.members.every((member) => isModuleEffectivelyActive(statuses?.get(member), inPlan(member)))).length;
+    };
+    return companies.map((company) => {
+      const profile = profileMap.get(company.id) ?? null;
+      return {
+        ...this.serializeCompany(company),
+        profile,
+        usage: {
+          users: userMap.get(company.id) ?? 0,
+          modules: enabledTabs(company.id, profile?.planCode ?? 'ESSENCIAL'),
+          lastAccessAt: accessMap.get(company.id) ?? null,
+        },
+      };
+    });
   }
 
   private async companyModules(companyId: string) {
@@ -1249,6 +1318,13 @@ Equipe Gestão 360
   private async nextCompanyCode() {
     const count = await this.prisma.platformCompanyProfile.count();
     return `G360-${String(count + 1).padStart(4, '0')}`;
+  }
+
+  /** Falha cedo (antes de qualquer escrita) quando o plano informado não existe. */
+  private async assertValidPlanCode(planCode: string) {
+    await this.ensurePlans();
+    const plan = await this.prisma.platformPlan.findUnique({ where: { code: planCode }, select: { id: true } });
+    if (!plan) throw new BadRequestException(`Plano "${planCode}" nao existe.`);
   }
 
   /** Valida/normaliza slug e customDomain reusando a regra compartilhada. */
@@ -1399,39 +1475,24 @@ Equipe Gestão 360
   private async ensureCompanyModuleAssignments() {
     await this.ensureModuleCatalog();
     await this.ensurePlans();
-    const [companies, modules, profiles, planModules, assignments] = await Promise.all([
+    const [companies, modules, assignments] = await Promise.all([
       this.prisma.company.findMany({ where: { deletedAt: null }, select: { id: true } }),
       this.prisma.platformModuleCatalog.findMany({ select: { code: true } }),
-      this.prisma.platformCompanyProfile.findMany({ select: { companyId: true, planCode: true } }),
-      this.prisma.platformPlanModule.findMany({
-        where: { included: true },
-        select: { moduleCode: true, plan: { select: { code: true } } },
-      }),
       this.prisma.platformCompanyModule.findMany({ select: { companyId: true, moduleCode: true } }),
     ]);
-    const profileByCompany = new Map(profiles.map((profile) => [profile.companyId, profile]));
-    const includedByPlan = new Map<string, Set<string>>();
-    for (const row of planModules) {
-      const modulesForPlan = includedByPlan.get(row.plan.code) ?? new Set<string>();
-      modulesForPlan.add(row.moduleCode);
-      includedByPlan.set(row.plan.code, modulesForPlan);
-    }
     const existing = new Set(assignments.map((item) => `${item.companyId}:${item.moduleCode}`));
     const rows: Prisma.PlatformCompanyModuleCreateManyInput[] = [];
     for (const company of companies) {
-      const planCode = profileByCompany.get(company.id)?.planCode ?? 'ESSENCIAL';
-      const included = includedByPlan.get(planCode) ?? new Set<string>();
       for (const module of modules) {
-        const key = `${company.id}:${module.code}`;
-        if (existing.has(key)) continue;
-        const planIncludesModule = included.has(module.code) || COMPANY_CORE_MODULES.has(module.code);
+        if (existing.has(`${company.id}:${module.code}`)) continue;
+        // Registro novo nasce "seguindo o plano" — o acesso efetivo é resolvido
+        // na leitura pelo plano atual da empresa (guard/config), não aqui.
         rows.push({
           companyId: company.id,
           moduleCode: module.code,
-          status: planIncludesModule ? 'HERDADO_DO_PLANO' : 'BLOQUEADO',
+          status: 'HERDADO_DO_PLANO',
           inheritedFromPlan: true,
           manuallyOverridden: false,
-          note: planIncludesModule ? null : `Modulo fora do plano ${planCode}.`,
         });
       }
     }

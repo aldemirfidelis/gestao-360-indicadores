@@ -7,6 +7,9 @@ import { AuthPayload } from '../../auth/auth.types';
 import { swallow } from '../../../common/logging/swallow';
 import { PrismaService } from '../../../prisma/prisma.service';
 import { canUseCompanyModule } from '../../platform-admin/platform-admin.access';
+import { alwaysOnModuleCodes, expandPlanModules } from '../business-modules';
+
+const ALWAYS_ON_MODULES = new Set(alwaysOnModuleCodes());
 
 /**
  * Enforcement de módulos/páginas/funcionalidades + manutenção, derivado da
@@ -55,11 +58,16 @@ export class PortalGateGuard implements CanActivate {
       const assignment = await this.prisma.platformCompanyModule
         .findUnique({ where: { companyId_moduleCode: { companyId: user.companyId, moduleCode } } })
         .catch(swallow(null, `portalGate.readCompanyModule(moduleCode=${moduleCode})`));
-      if (assignment) {
-        const decision = canUseCompanyModule(assignment.status, req.method);
-        if (!decision.allowed) {
-          throw new ForbiddenException(assignment.note || decision.reason || `O modulo "${moduleCode}" nao esta disponivel para esta empresa.`);
-        }
+      // "Herdado do plano" (ou sem registro) segue o PLANO ATUAL da empresa:
+      // trocar o plano muda o acesso na hora, sem depender de reescrever os
+      // registros por módulo. Só exceções manuais (ATIVO/BLOQUEADO) divergem.
+      const storedStatus = assignment?.status ?? 'HERDADO_DO_PLANO';
+      const effectiveStatus = storedStatus.toUpperCase() === 'HERDADO_DO_PLANO'
+        ? await this.resolvePlanModuleStatus(user.companyId, moduleCode)
+        : storedStatus;
+      const decision = canUseCompanyModule(effectiveStatus, req.method);
+      if (!decision.allowed) {
+        throw new ForbiddenException(assignment?.note || decision.reason || `O modulo "${moduleCode}" nao esta disponivel para esta empresa.`);
       }
     }
 
@@ -118,6 +126,31 @@ export class PortalGateGuard implements CanActivate {
       if (err instanceof ForbiddenException || err instanceof ServiceUnavailableException) throw err;
       this.logger.warn(`PortalGateGuard fail-open: ${(err as Error).message}`);
       return true;
+    }
+  }
+
+  /**
+   * Resolve se um módulo "herdado do plano" está liberado pelo plano ATUAL da
+   * empresa: núcleo/sistema sempre ativo; composição do plano no banco vence;
+   * catálogo estático é o fallback. FAIL-OPEN: erro de leitura libera.
+   */
+  private async resolvePlanModuleStatus(companyId: string, moduleCode: string): Promise<string> {
+    if (ALWAYS_ON_MODULES.has(moduleCode)) return 'HERDADO_DO_PLANO';
+    try {
+      const profile = await this.prisma.platformCompanyProfile.findUnique({
+        where: { companyId },
+        select: { planCode: true },
+      });
+      const planCode = profile?.planCode ?? 'ESSENCIAL';
+      const planEntry = await this.prisma.platformPlanModule.findFirst({
+        where: { moduleCode, plan: { code: planCode } },
+        select: { included: true },
+      });
+      if (planEntry) return planEntry.included ? 'HERDADO_DO_PLANO' : 'BLOQUEADO';
+      return expandPlanModules(planCode).includes(moduleCode) ? 'HERDADO_DO_PLANO' : 'BLOQUEADO';
+    } catch (err) {
+      this.logger.warn(`resolvePlanModuleStatus fail-open: ${(err as Error).message}`);
+      return 'HERDADO_DO_PLANO';
     }
   }
 

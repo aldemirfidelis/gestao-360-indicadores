@@ -39,6 +39,7 @@ import {
   type LucideIcon,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { ConfirmDialog } from '@/components/platform/confirm-dialog';
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -176,7 +177,15 @@ interface MatrixCompany {
   id: string;
   name: string;
   tradeName?: string | null;
+  planCode: string;
   modules: { moduleCode: string; status: string; readOnly: boolean; note?: string | null }[];
+}
+
+interface MatrixPlan {
+  code: string;
+  name: string;
+  /** Abas de negócio (não-core) inclusas neste plano. */
+  businessModules: string[];
 }
 
 interface PlanRow {
@@ -1334,6 +1343,8 @@ function CompaniesSection() {
       setForm(EMPTY_COMPANY_FORM);
       void queryClient.invalidateQueries({ queryKey: ['platform-admin', 'companies'] });
       void queryClient.invalidateQueries({ queryKey: ['platform-admin', 'company'] });
+      // Trocar o plano realinha os módulos no backend — a matriz precisa refletir.
+      void queryClient.invalidateQueries({ queryKey: ['platform-admin', 'module-matrix'] });
     },
     onError: (err) => toast.error(err instanceof Error ? err.message : 'Falha ao salvar empresa'),
   });
@@ -1575,6 +1586,11 @@ function CompanyFormDialog({
             <NativeSelect value={form.planCode} onChange={(event) => update('planCode', event.target.value)}>
               {COMPANY_PLAN_CODES.map((plan) => <option key={plan} value={plan}>{plan}</option>)}
             </NativeSelect>
+            <p className="text-[11px] leading-4 text-muted-foreground">
+              O plano define as abas do menu liberadas para a empresa. Ao salvar com um plano
+              diferente, os módulos realinham na hora (exceções manuais são removidas).
+              Exceções pontuais: Matriz de Módulos.
+            </p>
           </div>
           <div className="space-y-1.5">
             <Label className="text-xs">Status da empresa</Label>
@@ -1614,37 +1630,63 @@ interface BusinessModuleRow {
   members: string[];
 }
 
-// Status que contam como "ativo" ao derivar o estado de uma aba a partir dos membros.
-const ACTIVE_STATUS_SET = new Set(['ATIVO', 'ACTIVE', 'HERDADO_DO_PLANO', 'EM_IMPLANTACAO', 'EM_TESTE', 'EXPERIMENTAL', 'SOMENTE_LEITURA', 'ATIVACAO_PROGRAMADA', 'EXPIRACAO_PROGRAMADA']);
-// Opções que o admin pode aplicar a uma aba inteira.
-const BUSINESS_APPLY_STATUSES = ['HERDADO_DO_PLANO', 'ATIVO', 'BLOQUEADO', 'SOMENTE_LEITURA'] as const;
+/**
+ * Modo de uma aba de negócio para a empresa:
+ * - 'plan'      → segue o plano (o acesso real vem do plano atual da empresa);
+ * - 'liberado'  → exceção manual liberando fora do plano;
+ * - 'leitura'   → exceção manual somente leitura;
+ * - 'bloqueado' → exceção manual bloqueando algo que o plano incluiria;
+ * - 'misto'     → recursos internos da aba com estados divergentes.
+ */
+type TabMode = 'plan' | 'liberado' | 'leitura' | 'bloqueado' | 'misto';
 
-/** Deriva o status de uma aba (Ativo/Bloqueado/Misto) a partir dos módulos membros. */
-function deriveBusinessStatus(company: MatrixCompany, members: string[]): string {
-  const statuses = members.map((code) => company.modules.find((m) => m.moduleCode === code)?.status ?? 'HERDADO_DO_PLANO');
-  if (statuses.length === 0) return 'HERDADO_DO_PLANO';
-  const allActive = statuses.every((s) => ACTIVE_STATUS_SET.has(s));
-  if (allActive) return 'ATIVO';
-  const allBlocked = statuses.every((s) => !ACTIVE_STATUS_SET.has(s));
-  if (allBlocked) return 'BLOQUEADO';
-  return 'MISTO';
+const TAB_MODE_TO_STATUS: Record<Exclude<TabMode, 'misto'>, string> = {
+  plan: 'HERDADO_DO_PLANO',
+  liberado: 'ATIVO',
+  leitura: 'SOMENTE_LEITURA',
+  bloqueado: 'BLOQUEADO',
+};
+
+function tabModeOfStatus(status: string): Exclude<TabMode, 'misto'> {
+  const normalized = status.toUpperCase();
+  if (normalized === 'HERDADO_DO_PLANO') return 'plan';
+  if (['SOMENTE_LEITURA', 'READ_ONLY'].includes(normalized)) return 'leitura';
+  if (['BLOQUEADO', 'SUSPENSO', 'BLOCKED', 'SUSPENDED', 'INATIVO', 'INACTIVE', 'DESCONTINUADO', 'DISCONTINUED'].includes(normalized)) return 'bloqueado';
+  return 'liberado';
+}
+
+/** Deriva o modo da aba a partir dos módulos membros gravados para a empresa. */
+function deriveTabMode(company: MatrixCompany, members: string[]): TabMode {
+  const modes = new Set(
+    members.map((code) => tabModeOfStatus(company.modules.find((m) => m.moduleCode === code)?.status ?? 'HERDADO_DO_PLANO')),
+  );
+  if (modes.size === 0) return 'plan';
+  return modes.size === 1 ? [...modes][0] : 'misto';
+}
+
+/** Pill de estado efetivo da aba: o que o usuário final da empresa realmente vê. */
+function TabStatePill({ mode, inPlan }: { mode: TabMode; inPlan: boolean }) {
+  if (mode === 'plan') {
+    return inPlan
+      ? <span className="pill pill-green whitespace-nowrap">No plano</span>
+      : <span className="pill pill-gray whitespace-nowrap">Fora do plano</span>;
+  }
+  if (mode === 'liberado') return <span className="pill pill-yellow whitespace-nowrap" title="Liberado manualmente, fora da regra do plano">Exceção: liberado</span>;
+  if (mode === 'leitura') return <span className="pill pill-yellow whitespace-nowrap" title="Somente leitura, fora da regra do plano">Exceção: leitura</span>;
+  if (mode === 'bloqueado') return <span className="pill pill-red whitespace-nowrap" title="Bloqueado manualmente, fora da regra do plano">Exceção: bloqueado</span>;
+  return <span className="pill pill-red whitespace-nowrap" title="Recursos internos da aba com estados diferentes — escolha uma opção para unificar">Misto</span>;
 }
 
 function ModulesSection() {
   const queryClient = useQueryClient();
-  const [change, setChange] = useState<Record<string, string>>({});
-  const [applyForm, setApplyForm] = useState({ companyId: '', planCode: 'ESSENCIAL' });
+  const [realignTarget, setRealignTarget] = useState<MatrixCompany | null>(null);
   const matrix = useQuery({
     queryKey: ['platform-admin', 'module-matrix'],
-    queryFn: () => platformAdminApi<{ modules: ModuleCatalog[]; companies: MatrixCompany[] }>('/module-matrix'),
+    queryFn: () => platformAdminApi<{ modules: ModuleCatalog[]; plans: MatrixPlan[]; companies: MatrixCompany[] }>('/module-matrix'),
   });
   const business = useQuery({
     queryKey: ['platform-admin', 'business-modules'],
     queryFn: () => platformAdminApi<BusinessModuleRow[]>('/business-modules'),
-  });
-  const plans = useQuery({
-    queryKey: ['platform-admin', 'plans', 'module-apply'],
-    queryFn: () => platformAdminApi<PlanRow[]>('/plans'),
   });
   const update = useMutation({
     mutationFn: ({ companyId, businessCode, status }: { companyId: string; businessCode: string; status: string }) =>
@@ -1652,64 +1694,40 @@ function ModulesSection() {
     onSuccess: () => {
       toast.success('Módulo atualizado');
       void queryClient.invalidateQueries({ queryKey: ['platform-admin', 'module-matrix'] });
+      void queryClient.invalidateQueries({ queryKey: ['platform-admin', 'companies'] });
     },
     onError: (err) => toast.error(err instanceof Error ? err.message : 'Falha ao atualizar módulo'),
   });
-  const applyPlan = useMutation({
-    mutationFn: () => platformAdminApi(`/companies/${applyForm.companyId}/modules/apply-plan/${applyForm.planCode}`, { method: 'POST' }),
+  const realign = useMutation({
+    mutationFn: (company: MatrixCompany) =>
+      platformAdminApi(`/companies/${company.id}/modules/apply-plan/${company.planCode}`, { method: 'POST' }),
     onSuccess: () => {
-      toast.success('Plano aplicado a empresa');
-      setChange({});
+      toast.success('Empresa realinhada ao plano — exceções manuais removidas');
       void queryClient.invalidateQueries({ queryKey: ['platform-admin', 'module-matrix'] });
       void queryClient.invalidateQueries({ queryKey: ['platform-admin', 'companies'] });
     },
-    onError: (err) => toast.error(err instanceof Error ? err.message : 'Falha ao aplicar plano'),
+    onError: (err) => toast.error(err instanceof Error ? err.message : 'Falha ao realinhar ao plano'),
   });
 
   if (matrix.isLoading || business.isLoading) return <LoadingGrid />;
   if (!matrix.data || !business.data) return <EmptyState title="Matriz indisponível" />;
   const businessModules = [...business.data].sort((a, b) => a.menuOrder - b.menuOrder);
+  const optionalModules = businessModules.filter((bm) => !bm.core);
+  const planByCode = new Map((matrix.data.plans ?? []).map((plan) => [plan.code, plan]));
 
   return (
     <div className="space-y-4">
-      <Panel title="Aplicar plano em uma empresa" icon={ListChecks}>
-        <div className="grid gap-3 lg:grid-cols-[1fr,260px,auto]">
-          <div>
-            <Label className="text-xs">Empresa</Label>
-            <NativeSelect value={applyForm.companyId} onChange={(event) => setApplyForm((prev) => ({ ...prev, companyId: event.target.value }))}>
-              <option value="">Selecione a empresa</option>
-              {matrix.data.companies.map((company) => (
-                <option key={company.id} value={company.id}>{company.tradeName || company.name}</option>
-              ))}
-            </NativeSelect>
-          </div>
-          <div>
-            <Label className="text-xs">Plano</Label>
-            <NativeSelect value={applyForm.planCode} onChange={(event) => setApplyForm((prev) => ({ ...prev, planCode: event.target.value }))}>
-              {(plans.data ?? []).map((plan) => (
-                <option key={plan.code} value={plan.code}>{plan.name} ({plan.code})</option>
-              ))}
-            </NativeSelect>
-          </div>
-          <div className="flex items-end">
-            <Button className="w-full lg:w-auto" disabled={!applyForm.companyId || !applyForm.planCode || applyPlan.isPending} onClick={() => applyPlan.mutate()}>
-              Aplicar e bloquear fora do plano
-            </Button>
-          </div>
-        </div>
-      </Panel>
-
-      <Panel title="Módulos (abas do menu)">
-        <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
-          {businessModules.map((bm) => (
-            <div key={bm.code} className="border bg-white p-3 text-sm">
-              <div className="flex items-center justify-between gap-2">
-                <div className="font-medium">{bm.name}</div>
-                {bm.core && <span className="rounded bg-muted px-1.5 py-0.5 text-[10px] font-medium text-muted-foreground">Padrão</span>}
-              </div>
-              <div className="mt-2 text-xs text-muted-foreground">{bm.members.length} {bm.members.length === 1 ? 'recurso' : 'recursos'} internos</div>
-            </div>
-          ))}
+      <Panel title="Como funciona" icon={ListChecks}>
+        <div className="space-y-1 text-sm text-muted-foreground">
+          <p>
+            <strong className="text-foreground">O plano da empresa define as abas liberadas.</strong>{' '}
+            O plano é escolhido em Empresas &gt; Editar; ao trocá-lo, os módulos realinham automaticamente.
+            Abas padrão (Meu Dia, Tarefas e Administração) ficam sempre ativas em qualquer plano.
+          </p>
+          <p>
+            Aqui você só administra <strong className="text-foreground">exceções</strong>: liberar uma aba fora do plano ou bloquear uma aba que o plano inclui.
+            &ldquo;Voltar ao plano&rdquo; remove todas as exceções da empresa de uma vez.
+          </p>
         </div>
       </Panel>
 
@@ -1719,46 +1737,105 @@ function ModulesSection() {
             <thead>
               <tr>
                 <th>Empresa</th>
-                {businessModules.map((bm) => <th key={bm.code}>{bm.name}</th>)}
+                <th>Plano</th>
+                {optionalModules.map((bm) => <th key={bm.code}>{bm.name}</th>)}
+                <th>Ações</th>
               </tr>
             </thead>
             <tbody>
-              {matrix.data.companies.map((company) => (
-                <tr key={company.id}>
-                  <td className="font-medium">{company.tradeName || company.name}</td>
-                  {businessModules.map((bm) => {
-                    const derived = deriveBusinessStatus(company, bm.members);
-                    const key = `${company.id}:${bm.code}`;
-                    const fallback = BUSINESS_APPLY_STATUSES.includes(derived as (typeof BUSINESS_APPLY_STATUSES)[number]) ? derived : 'ATIVO';
-                    const selected = change[key] ?? fallback;
-                    return (
-                      <td key={key} className="min-w-[210px]">
-                        <div className="flex items-center gap-2">
-                          <Status value={derived} />
-                          {bm.core ? (
-                            <span className="text-[10px] text-muted-foreground" title="Aba padrão — sempre ativa">padrão</span>
-                          ) : (
-                            <>
-                              <select
-                                className="h-8 flex-1 border bg-background px-2 text-xs"
-                                value={selected}
-                                onChange={(event) => setChange((prev) => ({ ...prev, [key]: event.target.value }))}
-                              >
-                                {BUSINESS_APPLY_STATUSES.map((status) => <option key={status}>{status}</option>)}
-                              </select>
-                              <Button size="sm" variant="outline" disabled={selected === derived || update.isPending} onClick={() => update.mutate({ companyId: company.id, businessCode: bm.code, status: selected })}>Salvar</Button>
-                            </>
-                          )}
-                        </div>
-                      </td>
-                    );
-                  })}
+              {matrix.data.companies.map((company) => {
+                const plan = planByCode.get(company.planCode);
+                const hasException = optionalModules.some((bm) => deriveTabMode(company, bm.members) !== 'plan');
+                return (
+                  <tr key={company.id}>
+                    <td className="font-medium">{company.tradeName || company.name}</td>
+                    <td><span className="pill pill-gray whitespace-nowrap" title={plan?.name ?? company.planCode}>{company.planCode}</span></td>
+                    {optionalModules.map((bm) => {
+                      const mode = deriveTabMode(company, bm.members);
+                      const inPlan = plan?.businessModules.includes(bm.code) ?? false;
+                      return (
+                        <td key={`${company.id}:${bm.code}`} className="min-w-[190px]">
+                          <div className="flex flex-col gap-1.5">
+                            <TabStatePill mode={mode} inPlan={inPlan} />
+                            <select
+                              className="h-8 w-full border bg-background px-2 text-xs"
+                              value={mode === 'misto' ? '' : TAB_MODE_TO_STATUS[mode]}
+                              disabled={update.isPending || realign.isPending}
+                              onChange={(event) => {
+                                if (!event.target.value) return;
+                                update.mutate({ companyId: company.id, businessCode: bm.code, status: event.target.value });
+                              }}
+                            >
+                              {mode === 'misto' && <option value="">— Misto: escolha p/ unificar —</option>}
+                              <option value="HERDADO_DO_PLANO">Seguir plano{inPlan ? ' (liberado)' : ' (bloqueado)'}</option>
+                              <option value="ATIVO">Liberar (exceção)</option>
+                              <option value="SOMENTE_LEITURA">Somente leitura (exceção)</option>
+                              <option value="BLOQUEADO">Bloquear (exceção)</option>
+                            </select>
+                          </div>
+                        </td>
+                      );
+                    })}
+                    <td>
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        className="whitespace-nowrap"
+                        disabled={!hasException || realign.isPending}
+                        title={hasException ? 'Remove todas as exceções manuais e volta a seguir o plano' : 'Sem exceções — a empresa já segue o plano'}
+                        onClick={() => setRealignTarget(company)}
+                      >
+                        Voltar ao plano
+                      </Button>
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
+      </Panel>
+
+      <Panel title="Composição dos planos (abas por plano)">
+        <div className="overflow-x-auto">
+          <table className="table-modern">
+            <thead>
+              <tr>
+                <th>Aba do menu</th>
+                {(matrix.data.plans ?? []).map((plan) => <th key={plan.code}>{plan.name}</th>)}
+              </tr>
+            </thead>
+            <tbody>
+              {businessModules.map((bm) => (
+                <tr key={bm.code}>
+                  <td className="font-medium">
+                    {bm.name}
+                    {bm.core && <span className="ml-2 rounded bg-muted px-1.5 py-0.5 text-[10px] font-medium text-muted-foreground">Padrão</span>}
+                  </td>
+                  {(matrix.data.plans ?? []).map((plan) => (
+                    <td key={plan.code}>
+                      {bm.core || plan.businessModules.includes(bm.code)
+                        ? <span className="pill pill-green">Incluso</span>
+                        : <span className="pill pill-gray">—</span>}
+                    </td>
+                  ))}
                 </tr>
               ))}
             </tbody>
           </table>
         </div>
       </Panel>
+
+      <ConfirmDialog
+        open={realignTarget !== null}
+        onOpenChange={(open) => !open && setRealignTarget(null)}
+        title="Voltar ao plano?"
+        description={realignTarget ? `Todas as exceções manuais de "${realignTarget.tradeName || realignTarget.name}" serão removidas e as abas voltarão a seguir exatamente o plano ${realignTarget.planCode}.` : undefined}
+        confirmLabel="Voltar ao plano"
+        onConfirm={() => {
+          if (realignTarget) realign.mutate(realignTarget);
+        }}
+      />
     </div>
   );
 }
