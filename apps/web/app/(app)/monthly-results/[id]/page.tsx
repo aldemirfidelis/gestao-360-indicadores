@@ -16,6 +16,7 @@ import {
   GripVertical,
   ListChecks,
   Maximize2,
+  Minimize2,
   Play,
   Plus,
   Presentation,
@@ -29,6 +30,8 @@ import { Bar, BarChart, CartesianGrid, Cell, ResponsiveContainer, Tooltip, XAxis
 import { PageHeader } from '@/components/shell/page-header';
 import { useAuth } from '@/components/auth/auth-provider';
 import { IndicatorDetailView } from '@/components/platform/indicator-detail-view';
+import { ActionDetailView } from '@/components/platform/action-detail-view';
+import { DeviationDetailView } from '@/components/platform/deviation-detail-view';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -502,22 +505,40 @@ function AgendaCard({ meeting, options, can, run }: { meeting: MeetingDetail; op
 // CONDUZIR (apresentação)
 // =====================================================================
 
+type PresentationScreen =
+  | { type: 'indicator'; id: string }
+  | { type: 'action'; id: string }
+  | { type: 'deviation'; id: string };
+
 function ConductTab({ meeting, options, can, run }: { meeting: MeetingDetail; options?: MonthlyOptions; can: Can; run: Run }) {
   const containerRef = useRef<HTMLDivElement | null>(null);
   const [areaIdx, setAreaIdx] = useState(0);
   const [decisionOpen, setDecisionOpen] = useState(false);
-  const [detailIndicatorId, setDetailIndicatorId] = useState<string | null>(null);
+  // Pilha de telas da apresentação: indicador -> plano de ação / desvio, sempre
+  // com "voltar" para a tela anterior sem sair do modo apresentação.
+  const [screenStack, setScreenStack] = useState<PresentationScreen[]>([]);
   const [lightFilter, setLightFilter] = useState<'GREEN' | 'YELLOW' | 'RED' | null>(null);
+  const [fullscreen, setFullscreen] = useState(false);
   // A apresentação segue a ordem do Roteiro da reunião (link com a aba Preparar).
   const agendaPos = new Map(meeting.agendaItems.map((a) => [a.orgNodeId, a.position]));
   const orderedAreas = [...meeting.areas].sort((a, b) => (agendaPos.get(a.orgNodeId) ?? 9999) - (agendaPos.get(b.orgNodeId) ?? 9999));
   const area = orderedAreas[areaIdx] ?? null;
   const agendaForArea = meeting.agendaItems.find((a) => a.orgNodeId === area?.orgNodeId) ?? null;
+  const topScreen = screenStack[screenStack.length - 1] ?? null;
+  const openAction = (actionId: string) => setScreenStack((s) => [...s, { type: 'action', id: actionId }]);
+  const openDeviationScreen = (deviationId: string) => setScreenStack((s) => [...s, { type: 'deviation', id: deviationId }]);
+  const goBackScreen = () => setScreenStack((s) => s.slice(0, -1));
 
   useEffect(() => {
-    setDetailIndicatorId(null);
+    setScreenStack([]);
     setLightFilter(null);
   }, [areaIdx]);
+
+  useEffect(() => {
+    const onChange = () => setFullscreen(Boolean(document.fullscreenElement));
+    document.addEventListener('fullscreenchange', onChange);
+    return () => document.removeEventListener('fullscreenchange', onChange);
+  }, []);
 
   async function toggleFullscreen() {
     const node = containerRef.current;
@@ -534,7 +555,15 @@ function ConductTab({ meeting, options, can, run }: { meeting: MeetingDetail; op
   const visibleIndicators = !lightFilter
     ? areaIndicators
     : areaIndicators.filter((i) => (lightFilter === 'GREEN' ? i.light === 'GREEN' || i.light === 'BLUE' : i.light === lightFilter));
-  const selectedIndicator = detailIndicatorId ? areaIndicators.find((i) => i.indicatorId === detailIndicatorId) ?? null : null;
+  const selectedIndicator = topScreen?.type === 'indicator' ? areaIndicators.find((i) => i.indicatorId === topScreen.id) ?? null : null;
+  const screenTitle = topScreen?.type === 'indicator'
+    ? selectedIndicator?.name ?? 'Detalhe do indicador'
+    : topScreen?.type === 'action'
+      ? 'Plano de ação'
+      : topScreen?.type === 'deviation'
+        ? 'Desvio'
+        : '';
+  const backLabel = screenStack.length > 1 ? 'Voltar ao indicador' : 'Voltar aos indicadores';
   const areaPlans = Array.from(
     new Map(areaIndicators.map((i) => i.linkedAction).filter(Boolean).map((a: any) => [a.id, a])).values(),
   ) as any[];
@@ -542,7 +571,10 @@ function ConductTab({ meeting, options, can, run }: { meeting: MeetingDetail; op
   const plansClosed = areaPlans.filter((p) => CLOSED_ACTION_STATUSES.includes(p.status));
 
   return (
-    <div ref={containerRef} className="space-y-4 bg-background p-0 fullscreen:overflow-auto fullscreen:p-6">
+    <div
+      ref={containerRef}
+      className={cn('space-y-4 bg-background', fullscreen ? 'h-screen overflow-y-auto p-6' : 'p-0')}
+    >
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div className="flex flex-wrap items-center gap-2">
           <Button variant="outline" size="sm" onClick={() => setAreaIdx((i) => Math.max(0, i - 1))} disabled={areaIdx === 0}>
@@ -567,7 +599,8 @@ function ConductTab({ meeting, options, can, run }: { meeting: MeetingDetail; op
             </Button>
           )}
           <Button variant="outline" size="sm" onClick={toggleFullscreen}>
-            <Maximize2 className="mr-2 h-4 w-4" /> Tela cheia
+            {fullscreen ? <Minimize2 className="mr-2 h-4 w-4" /> : <Maximize2 className="mr-2 h-4 w-4" />}
+            {fullscreen ? 'Sair da tela cheia' : 'Tela cheia'}
           </Button>
         </div>
       </div>
@@ -583,7 +616,7 @@ function ConductTab({ meeting, options, can, run }: { meeting: MeetingDetail; op
               <h2 className="text-2xl font-semibold">{area.name}</h2>
               {area.areaKeyMessage && <p className="mt-1 max-w-3xl text-sm text-muted-foreground">{area.areaKeyMessage}</p>}
             </div>
-            {!detailIndicatorId && (
+            {!topScreen && (
               <div className="flex flex-wrap gap-2">
                 <FarolFilter label="Dentro da Meta" light="GREEN" count={greenCount} active={lightFilter === 'GREEN'} onClick={() => setLightFilter((c) => (c === 'GREEN' ? null : 'GREEN'))} />
                 <FarolFilter label="Atenção" light="YELLOW" count={yellowCount} active={lightFilter === 'YELLOW'} onClick={() => setLightFilter((c) => (c === 'YELLOW' ? null : 'YELLOW'))} />
@@ -592,21 +625,29 @@ function ConductTab({ meeting, options, can, run }: { meeting: MeetingDetail; op
             )}
           </div>
 
-          {detailIndicatorId ? (
+          {topScreen ? (
             <Card>
               <CardHeader className="flex-row items-center justify-between gap-3 space-y-0">
                 <div className="flex min-w-0 items-center gap-2">
                   {selectedIndicator && (
                     <span className={cn('h-3 w-3 shrink-0 rounded-full', selectedIndicator.light === 'RED' && 'status-red-pulse')} style={{ background: LIGHT_COLORS[selectedIndicator.light] }} />
                   )}
-                  <CardTitle className="truncate text-base">{selectedIndicator?.name ?? 'Detalhe do indicador'}</CardTitle>
+                  <CardTitle className="truncate text-base">{screenTitle}</CardTitle>
                 </div>
-                <Button variant="outline" size="sm" className="shrink-0" onClick={() => setDetailIndicatorId(null)}>
-                  <ArrowLeft className="mr-1.5 h-4 w-4" /> Voltar aos indicadores
+                <Button variant="outline" size="sm" className="shrink-0" onClick={goBackScreen}>
+                  <ArrowLeft className="mr-1.5 h-4 w-4" /> {backLabel}
                 </Button>
               </CardHeader>
               <CardContent>
-                <IndicatorDetailView id={detailIndicatorId} embedded />
+                {topScreen.type === 'indicator' && (
+                  <IndicatorDetailView id={topScreen.id} embedded onOpenAction={openAction} onOpenDeviation={openDeviationScreen} />
+                )}
+                {topScreen.type === 'action' && (
+                  <ActionDetailView id={topScreen.id} embedded onOpenDeviation={openDeviationScreen} />
+                )}
+                {topScreen.type === 'deviation' && (
+                  <DeviationDetailView id={topScreen.id} embedded onOpenAction={openAction} />
+                )}
               </CardContent>
             </Card>
           ) : (
@@ -625,7 +666,7 @@ function ConductTab({ meeting, options, can, run }: { meeting: MeetingDetail; op
                     key={ind.id}
                     ind={ind}
                     selected={false}
-                    onSelect={() => setDetailIndicatorId(ind.indicatorId)}
+                    onSelect={() => setScreenStack([{ type: 'indicator', id: ind.indicatorId }])}
                   />
                 ))}
                 {areaIndicators.length === 0 && <p className="text-sm text-muted-foreground">Nenhum indicador nesta área.</p>}

@@ -210,6 +210,8 @@ export function IndicatorDetailView({
   initialPeriodRef,
   initialView,
   autoAnalyze = false,
+  onOpenAction,
+  onOpenDeviation,
 }: {
   id: string;
   embedded?: boolean;
@@ -218,6 +220,9 @@ export function IndicatorDetailView({
   initialView?: 'monthly' | 'cumulative';
   /** Vindo do Meu Dia (?analyze=1): entra direto no fluxo de análise de causa (desvio). */
   autoAnalyze?: boolean;
+  /** Quando embutido na apresentação (Reunião Mensal), mantém a navegação na mesma tela em vez de sair para /actions e /deviations. */
+  onOpenAction?: (actionId: string) => void;
+  onOpenDeviation?: (deviationId: string) => void;
 }) {
   const router = useRouter();
   const queryClient = useQueryClient();
@@ -290,7 +295,8 @@ export function IndicatorDetailView({
       toast.success(`Desvio #${d.number} aberto`);
       queryClient.invalidateQueries({ queryKey: ['indicator', id, 'deviations'] });
       queryClient.invalidateQueries({ queryKey: ['traceability', 'indicator', id] });
-      router.push(`/deviations/${d.id}`);
+      if (onOpenDeviation) onOpenDeviation(d.id);
+      else router.push(`/deviations/${d.id}`);
     },
     onError: (e: any) => toast.error(e?.message ?? 'Falha ao abrir desvio'),
   });
@@ -422,7 +428,8 @@ export function IndicatorDetailView({
   const openOrCreateDeviation = (targetDeviation?: DeviationSummary | null) => {
     const existing = targetDeviation ?? linkedPrincipalDeviation ?? deviationRows[0] ?? null;
     if (existing) {
-      router.push(`/deviations/${existing.id}`);
+      if (onOpenDeviation) onOpenDeviation(existing.id);
+      else router.push(`/deviations/${existing.id}`);
       return;
     }
     if (!last?.periodRef) {
@@ -569,6 +576,7 @@ export function IndicatorDetailView({
           openingDeviation={openDeviation.isPending}
           canCreateDeviation={Boolean(last?.periodRef) && canCreateDeviation}
           actionsHref={indicatorActionsHref}
+          onOpenAction={onOpenAction}
         />
 
         <Card className="overflow-hidden">
@@ -728,7 +736,7 @@ export function IndicatorDetailView({
                   </div>
                   {detailTab === 'ANALISE' && <AnalysisTab series={series.data ?? []} last={last ?? null} prev={prev} metaValue={metaValue} ppOrUnit={ppOrUnit} />}
                   {detailTab === 'HISTORICO' && <MiniHistory results={ind.results} targets={ind.targets} />}
-                  {detailTab === 'ACOES' && <LinkedActionsTab actions={ind.actions ?? []} />}
+                  {detailTab === 'ACOES' && <LinkedActionsTab actions={ind.actions ?? []} onOpenAction={onOpenAction} />}
                 </div>
               </>
             ) : (
@@ -820,9 +828,9 @@ export function IndicatorDetailView({
                 {ind.actions.map((act) => (
                   <div key={act.id} className="py-2.5 flex items-center justify-between text-xs gap-3">
                     <div className="min-w-0">
-                      <Link href={`/actions/${act.id}`} className="font-semibold hover:underline block truncate text-foreground">
+                      <ActionRefLink id={act.id} onOpen={onOpenAction} className="font-semibold hover:underline block truncate text-foreground">
                         {act.title}
-                      </Link>
+                      </ActionRefLink>
                       <span className="text-muted-foreground block mt-0.5">Prazo: {act.dueDate ? new Date(act.dueDate).toLocaleDateString('pt-BR') : 'Sem prazo'}</span>
                     </div>
                     <StatusBadge value={act.status} label={STATUS_LABEL[act.status] ?? act.status} />
@@ -997,6 +1005,7 @@ function IndicatorDecisionCards({
   openingDeviation,
   canCreateDeviation,
   actionsHref,
+  onOpenAction,
 }: {
   indicator: IndicatorDetail;
   principal: PrincipalDeviation | null;
@@ -1007,6 +1016,7 @@ function IndicatorDecisionCards({
   openingDeviation: boolean;
   canCreateDeviation: boolean;
   actionsHref: string;
+  onOpenAction?: (actionId: string) => void;
 }) {
   const mainDeviation = principalDeviation ?? deviations[0] ?? null;
   const deviationHref = mainDeviation ? `/deviations/${mainDeviation.id}` : '/deviations';
@@ -1084,9 +1094,9 @@ function IndicatorDecisionCards({
           )}
         </div>
         <div className="text-sm">
-          <Link href={deviationHref} className="underline-offset-2 hover:underline">
+          <button type="button" onClick={() => onOpenDeviation(mainDeviation)} className="text-left underline-offset-2 hover:underline">
             {mainDeviation ? 'Abrir desvio para consolidar causa raiz' : 'Registrar desvio para análise de causa'}
-          </Link>
+          </button>
         </div>
       </DecisionCard>
 
@@ -1096,12 +1106,12 @@ function IndicatorDecisionCards({
         </p>
         <DecisionList>
           {linkedActions.slice(0, 3).map((action) => (
-            <DecisionLink key={action.id} href={`/actions/${action.id}`}>
+            <DecisionLink key={action.id} href={`/actions/${action.id}`} onClick={onOpenAction ? () => onOpenAction(action.id) : undefined}>
               {formatActionSummary(action)}
             </DecisionLink>
           ))}
           {linkedActions.length === 0 && (
-            <DecisionLink href={deviationHref}>
+            <DecisionLink href={deviationHref} onClick={() => onOpenDeviation(mainDeviation)}>
               {mainDeviation ? 'Criar plano de ação a partir do desvio' : 'Registrar desvio antes do plano de ação'}
             </DecisionLink>
           )}
@@ -1302,13 +1312,34 @@ function DecisionList({ children }: { children: ReactNode }) {
   return <ul className="list-[square] space-y-2 pl-4 text-sm text-foreground">{children}</ul>;
 }
 
-function DecisionLink({ href, children }: { href: string; children: ReactNode }) {
+function DecisionLink({ href, onClick, children }: { href: string; onClick?: () => void; children: ReactNode }) {
   return (
     <li>
-      <Link href={href} className="underline-offset-2 hover:underline">
-        {children}
-      </Link>
+      {onClick ? (
+        <button type="button" onClick={onClick} className="text-left underline-offset-2 hover:underline">
+          {children}
+        </button>
+      ) : (
+        <Link href={href} className="underline-offset-2 hover:underline">
+          {children}
+        </Link>
+      )}
     </li>
+  );
+}
+
+function ActionRefLink({ id, onOpen, className, children }: { id: string; onOpen?: (id: string) => void; className?: string; children: ReactNode }) {
+  if (onOpen) {
+    return (
+      <button type="button" onClick={() => onOpen(id)} className={cn('text-left', className)}>
+        {children}
+      </button>
+    );
+  }
+  return (
+    <Link href={`/actions/${id}`} className={className}>
+      {children}
+    </Link>
   );
 }
 
@@ -1686,13 +1717,13 @@ function MiniHistory({ results, targets }: { results: IndicatorDetail['results']
   );
 }
 
-function LinkedActionsTab({ actions }: { actions: NonNullable<IndicatorDetail['actions']> }) {
+function LinkedActionsTab({ actions, onOpenAction }: { actions: NonNullable<IndicatorDetail['actions']>; onOpenAction?: (actionId: string) => void }) {
   if (actions.length === 0) return <p className="text-xs text-muted-foreground">Nenhum plano de ação vinculado a este indicador.</p>;
   return (
     <div className="space-y-1.5">
       {actions.map((a) => (
         <div key={a.id} className="flex items-center justify-between gap-2 rounded-lg border px-3 py-2 text-xs">
-          <Link href={`/actions/${a.id}`} className="min-w-0 flex-1 truncate font-medium hover:underline">{a.title}</Link>
+          <ActionRefLink id={a.id} onOpen={onOpenAction} className="min-w-0 flex-1 truncate font-medium hover:underline">{a.title}</ActionRefLink>
           <StatusBadge value={a.status} label={ACTION_STATUS_LABEL[a.status] ?? a.status} />
         </div>
       ))}
