@@ -1,11 +1,11 @@
 'use client';
 
 import { useParams } from 'next/navigation';
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
 import Link from 'next/link';
-import { ArrowLeft, Bot, CheckCircle2, GitBranch, Paperclip, Pencil, Plus, Save, Send, ShieldCheck, Sparkles, Trash2 } from 'lucide-react';
+import { ArrowLeft, Bot, CheckCircle2, Download, GitBranch, Paperclip, Pencil, Plus, Save, Send, ShieldCheck, Sparkles, Trash2 } from 'lucide-react';
 import { PageHeader } from '@/components/shell/page-header';
 import { SectionCard } from '@/components/platform/section-card';
 import { StatusBadge } from '@/components/platform/status-badge';
@@ -24,6 +24,7 @@ import { api } from '@/lib/api';
 import { cn, formatDate } from '@/lib/utils';
 import { SUGGESTION_STATUS_LABEL, SUGGESTION_TYPE_LABEL, ACTION_STATUS_LABEL, ACTION_PRIORITY_LABEL, ACTION_ORIGIN_LABEL, ACTION_CRITICALITY_LABEL, EFFECTIVENESS_STATUS_LABEL, TRACE_EVENT_LABEL, TRACE_FIELD_LABEL, ANALYSIS_METHOD_LABEL } from '@/lib/labels';
 import { AnalysisWorkspace } from '@/components/platform/analysis-workspace';
+import { exportNodeToPng } from '@/lib/export-image';
 import { useAuth } from '@/components/auth/auth-provider';
 
 interface ActionDetail {
@@ -586,9 +587,30 @@ function ExecutionCard({
     setDeleteDialog({ open: false, task: null });
   };
 
+  // Exportação em imagem das tarefas do plano (para apresentações) — captura
+  // só a lista, sem o formulário de criação.
+  const tasksExportRef = useRef<HTMLDivElement | null>(null);
+  const [exportingTasks, setExportingTasks] = useState(false);
+  const exportTasks = async () => {
+    setExportingTasks(true);
+    const ok = await exportNodeToPng(tasksExportRef.current, `plano-execucao-${a.id}`, { backgroundColor: '#ffffff' });
+    setExportingTasks(false);
+    if (ok) toast.success('Imagem das tarefas exportada');
+    else toast.error('Não foi possível exportar a imagem');
+  };
+
   return (
     <>
-      <SectionCard title={`Execução (${a.tasks.length})`} description="Ao concluir uma tarefa, registre o que foi feito.">
+      <SectionCard
+        title={`Execução (${a.tasks.length})`}
+        description="Ao concluir uma tarefa, registre o que foi feito."
+        actions={
+          <Button type="button" variant="outline" size="sm" className="gap-1.5" onClick={exportTasks} disabled={exportingTasks || a.tasks.length === 0}>
+            <Download className="h-3.5 w-3.5" />
+            {exportingTasks ? 'Exportando...' : 'Exportar imagem'}
+          </Button>
+        }
+      >
         <div className="mb-3 grid gap-2 rounded-lg border bg-muted/30 p-3">
           <Input
             placeholder="Título da tarefa"
@@ -622,7 +644,7 @@ function ExecutionCard({
             <Plus className="mr-2 h-4 w-4" /> Adicionar tarefa
           </Button>
         </div>
-        <div className="space-y-2">
+        <div ref={tasksExportRef} className="space-y-2 bg-background p-1">
           {a.tasks.map((t) => {
             const overdue = !t.done && t.endDate && new Date(t.endDate) < new Date();
             const hasEvidence = (t._count?.evidences ?? 0) > 0 || a.evidences.some((evidence: any) => evidence.taskId === t.id);

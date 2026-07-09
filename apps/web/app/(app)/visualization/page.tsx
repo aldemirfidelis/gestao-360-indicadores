@@ -1,10 +1,12 @@
 'use client';
 
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { BarChart3, Edit3, MessageSquareText } from 'lucide-react';
+import { toast } from 'sonner';
+import { BarChart3, Download, Edit3, MessageSquareText } from 'lucide-react';
 import Link from 'next/link';
 import { PageHeader } from '@/components/shell/page-header';
+import { exportNodeToPng } from '@/lib/export-image';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
@@ -133,6 +135,20 @@ export default function VisualizationPage() {
   const visibleCards = indicatorRows.slice(0, PLACEHOLDER_CARDS);
   const conclusion = conclusionQuery.data?.conclusion ?? '';
 
+  // Exportação em imagem (para apresentações): cards + leitura executiva + mensagem-chave.
+  const exportRef = useRef<HTMLElement | null>(null);
+  const [exporting, setExporting] = useState(false);
+  const exportPanel = async () => {
+    setExporting(true);
+    const areaSlug = (selectedNode?.name ?? 'area').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/[^a-z0-9]+/g, '-');
+    const ok = await exportNodeToPng(exportRef.current, `painel-executivo-${areaSlug}-${selectedMonth || 'recente'}`, {
+      backgroundColor: '#ffffff',
+    });
+    setExporting(false);
+    if (ok) toast.success('Imagem do painel exportada');
+    else toast.error('Não foi possível exportar a imagem');
+  };
+
   const openConclusionEditor = () => {
     setConclusionDraft(conclusion);
     setConclusionOpen(true);
@@ -149,6 +165,12 @@ export default function VisualizationPage() {
         eyebrow="Painel executivo"
         title="Visão executiva por área"
         tone="view"
+        actions={
+          <Button type="button" variant="outline" className="gap-2" onClick={exportPanel} disabled={exporting || indicators.isLoading || !selectedNodeId}>
+            <Download className="h-4 w-4" />
+            {exporting ? 'Exportando...' : 'Exportar imagem'}
+          </Button>
+        }
       />
 
       <Card className="overflow-hidden">
@@ -240,7 +262,7 @@ export default function VisualizationPage() {
         </CardContent>
       </Card>
 
-      <section className="grid gap-5">
+      <section ref={exportRef} className="grid gap-5 bg-background p-1">
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
           {indicators.isLoading ? (
             Array.from({ length: PLACEHOLDER_CARDS }).map((_, index) => <ExecutiveIndicatorSkeleton key={`loading-${index}`} />)

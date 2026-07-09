@@ -26,6 +26,7 @@ import {
   CalendarClock,
   ChevronRight,
   Download,
+  Printer,
   FileText,
   Lightbulb,
   Minus,
@@ -48,6 +49,7 @@ import { cn, formatNumber, formatPercent, periodRefLabel } from '@/lib/utils';
 import { ACTION_STATUS_LABEL, getIndicatorUnitLabel, MEETING_STATUS_LABEL, TRAFFIC_LIGHT_LABEL } from '@/lib/labels';
 import { CHART_COLORS, ChartLegend, computeStubValue, isWithinGain, realizadoBarColor } from '@/lib/indicator-chart';
 import { attainmentFor } from '@/lib/farol';
+import { exportNodeToPng } from '@/lib/export-image';
 import { useVision360 } from '@/components/ui/vision360-context';
 import { useAuth } from '@/components/auth/auth-provider';
 
@@ -300,6 +302,19 @@ export function IndicatorDetailView({
     if (idx >= 0) setSelectedIdx(idx);
   }, [initialPeriodRef, series.data]);
 
+  // Exportação em imagem da visão de decisão (gráfico + desvio principal +
+  // providências + causa raiz + plano de ação) — para apresentações.
+  const decisionExportRef = useRef<HTMLDivElement | null>(null);
+  const [exportingImage, setExportingImage] = useState(false);
+  const exportDecisionImage = async () => {
+    setExportingImage(true);
+    const slug = (detail.data?.code || detail.data?.name || 'indicador').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/[^a-z0-9]+/g, '-');
+    const ok = await exportNodeToPng(decisionExportRef.current, `indicador-${slug}`, { backgroundColor: '#ffffff' });
+    setExportingImage(false);
+    if (ok) toast.success('Imagem do indicador exportada');
+    else toast.error('Não foi possível exportar a imagem');
+  };
+
   // CTA "Analisar causa" do Meu Dia: assim que os dados carregam, entra no
   // fluxo de desvio — abre o desvio existente do período ou cria um novo.
   const autoAnalyzeFired = useRef(false);
@@ -462,8 +477,11 @@ export function IndicatorDetailView({
               <AlertTriangle className="mr-2 h-4 w-4" />
               {openDeviation.isPending ? 'Abrindo...' : linkedPrincipalDeviation || deviationRows.length ? 'Abrir desvio' : 'Registrar desvio'}
             </Button>
+            <Button variant="outline" className="gap-1.5" onClick={exportDecisionImage} disabled={exportingImage}>
+              <Download className="h-4 w-4" /> {exportingImage ? 'Exportando...' : 'Exportar imagem'}
+            </Button>
             <Button variant="outline" className="gap-1.5" onClick={() => printIndicatorReport(exportReportId, ind.name)}>
-              <Download className="h-4 w-4" /> Exportar
+              <Printer className="h-4 w-4" /> Imprimir relatório
             </Button>
           </div>
         }
@@ -540,7 +558,7 @@ export function IndicatorDetailView({
         </Card>
       </div>
 
-      <div className="mb-6 grid grid-cols-1 gap-5 xl:grid-cols-[360px_minmax(0,1fr)]">
+      <div ref={decisionExportRef} className="mb-6 grid grid-cols-1 gap-5 bg-background p-1 xl:grid-cols-[360px_minmax(0,1fr)]">
         <IndicatorDecisionCards
           indicator={ind}
           principal={principalDeviation}
