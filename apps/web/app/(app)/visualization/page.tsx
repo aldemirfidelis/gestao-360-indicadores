@@ -174,7 +174,7 @@ export default function VisualizationPage() {
       />
 
       <Card className="overflow-hidden">
-        <CardContent className="grid gap-4 p-4 lg:grid-cols-[minmax(0,1fr),minmax(280px,420px)] lg:items-end">
+        <CardContent className="space-y-4 p-4">
           <div className="min-w-0">
             <div className="flex items-center gap-2 text-sm font-semibold text-foreground">
               <BarChart3 className="h-4 w-4 shrink-0 text-status-green" />
@@ -185,9 +185,8 @@ export default function VisualizationPage() {
             </p>
           </div>
 
-          <div className="min-w-0">
-          <div className="grid grid-cols-[1fr,132px] gap-2">
-          <div className="min-w-0">
+          <div className="flex flex-wrap items-end gap-4">
+          <div className="min-w-[220px] flex-1 basis-64">
             <Label htmlFor="area-select" className="mb-1.5 block text-xs font-semibold uppercase tracking-[0.08em] text-muted-foreground">
               Área da árvore organizacional
             </Label>
@@ -205,7 +204,7 @@ export default function VisualizationPage() {
               ))}
             </NativeSelect>
           </div>
-          <div className="min-w-0">
+          <div className="w-[132px] shrink-0">
             <Label htmlFor="month-select" className="mb-1.5 block text-xs font-semibold uppercase tracking-[0.08em] text-muted-foreground">
               Mês
             </Label>
@@ -221,43 +220,41 @@ export default function VisualizationPage() {
               ))}
             </NativeSelect>
           </div>
+
+          <div className="shrink-0">
+            <Label className="mb-1.5 block text-xs font-semibold uppercase tracking-[0.08em] text-muted-foreground">
+              Tipo de Indicador
+            </Label>
+            <div className="flex h-10 flex-wrap items-center gap-4">
+              <label className="flex cursor-pointer items-center gap-2 text-sm">
+                <input type="checkbox" checked={types.includes('OPERATIONAL')} onChange={() => toggleType('OPERATIONAL')} />
+                Operacional
+              </label>
+              <label className="flex cursor-pointer items-center gap-2 text-sm">
+                <input type="checkbox" checked={types.includes('STRATEGIC')} onChange={() => toggleType('STRATEGIC')} />
+                Estratégico
+              </label>
+            </div>
           </div>
 
-            <div className="mt-3 flex flex-wrap gap-x-8 gap-y-3">
-              <div>
-                <Label className="mb-1.5 block text-xs font-semibold uppercase tracking-[0.08em] text-muted-foreground">
-                  Tipo de Indicador
-                </Label>
-                <div className="flex flex-wrap items-center gap-4">
-                  <label className="flex cursor-pointer items-center gap-2 text-sm">
-                    <input type="checkbox" checked={types.includes('OPERATIONAL')} onChange={() => toggleType('OPERATIONAL')} />
-                    Operacional
-                  </label>
-                  <label className="flex cursor-pointer items-center gap-2 text-sm">
-                    <input type="checkbox" checked={types.includes('STRATEGIC')} onChange={() => toggleType('STRATEGIC')} />
-                    Estratégico
-                  </label>
-                </div>
-              </div>
-              <div>
-                <Label className="mb-1.5 block text-xs font-semibold uppercase tracking-[0.08em] text-muted-foreground">
-                  Visão
-                </Label>
-                <div className="flex flex-wrap items-center gap-4">
-                  <label className="flex cursor-pointer items-center gap-2 text-sm">
-                    <input type="checkbox" checked={view === 'monthly'} onChange={() => setView('monthly')} />
-                    Mensal
-                  </label>
-                  <label className="flex cursor-pointer items-center gap-2 text-sm">
-                    <input type="checkbox" checked={view === 'cumulative'} onChange={() => setView('cumulative')} />
-                    Acumulado
-                  </label>
-                </div>
-                <p className="mt-1 text-[11px] text-muted-foreground">
-                  {view === 'cumulative' ? 'Cards mostram a média acumulada do ano (YTD).' : 'Cards mostram o valor do mês selecionado.'}
-                </p>
-              </div>
+          <div className="shrink-0">
+            <Label className="mb-1.5 block text-xs font-semibold uppercase tracking-[0.08em] text-muted-foreground">
+              Visão
+            </Label>
+            <div className="flex h-10 flex-wrap items-center gap-4">
+              <label className="flex cursor-pointer items-center gap-2 text-sm">
+                <input type="checkbox" checked={view === 'monthly'} onChange={() => setView('monthly')} />
+                Mensal
+              </label>
+              <label className="flex cursor-pointer items-center gap-2 text-sm">
+                <input type="checkbox" checked={view === 'cumulative'} onChange={() => setView('cumulative')} />
+                Acumulado
+              </label>
             </div>
+            <p className="mt-1 text-[11px] text-muted-foreground">
+              {view === 'cumulative' ? 'Cards mostram a média acumulada do ano (YTD).' : 'Cards mostram o valor do mês selecionado.'}
+            </p>
+          </div>
           </div>
         </CardContent>
       </Card>
