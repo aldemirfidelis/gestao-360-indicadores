@@ -116,6 +116,8 @@ export function IshikawaVisualAnalysis({
   users = [],
   saving,
   canEdit = true,
+  seedCauses,
+  onSeedConsumed,
   onRootCauseChange,
   onSendToFiveWhys,
   onSave,
@@ -127,6 +129,9 @@ export function IshikawaVisualAnalysis({
   users?: UserOption[];
   saving: boolean;
   canEdit?: boolean;
+  /** causas vindas do Pareto (vitais) — semeadas na espinha da categoria correspondente */
+  seedCauses?: Array<{ title: string; category?: string }> | null;
+  onSeedConsumed?: () => void;
   onRootCauseChange: (value: string) => void;
   onSendToFiveWhys?: (text: string) => void;
   onSave: (causes: IshikawaCause[], rootCause?: string) => void;
@@ -206,6 +211,49 @@ export function IshikawaVisualAnalysis({
       window.removeEventListener('pointerup', onUp);
     };
   }, [handleSave, zoom]);
+
+  // Semeadura vinda do Pareto: adiciona as causas vitais na espinha da
+  // categoria correspondente (dedupe por título; posiciona como o addCause).
+  const seedConsumedRef = useRef(false);
+  useEffect(() => {
+    if (!seedCauses?.length) {
+      // seed consumido/limpo — libera uma próxima rodada vinda do Pareto
+      seedConsumedRef.current = false;
+      return;
+    }
+    if (seedConsumedRef.current || !canEdit) return;
+    seedConsumedRef.current = true;
+    const existingTitles = new Set(causesRef.current.map((cause) => cause.title.trim().toLowerCase()));
+    const additions: IshikawaCause[] = [];
+    for (const seed of seedCauses) {
+      const title = String(seed.title ?? '').trim();
+      if (!title || existingTitles.has(title.toLowerCase())) continue;
+      existingTitles.add(title.toLowerCase());
+      const category = getCategory(seed.category ?? 'METHOD');
+      const countInCategory =
+        causesRef.current.filter((cause) => normalizeCategory(cause.category) === category.key).length +
+        additions.filter((cause) => normalizeCategory(cause.category) === category.key).length;
+      additions.push(
+        makeCause({
+          category: category.key,
+          title,
+          orderIndex: causesRef.current.length + additions.length,
+          positionX: category.cardX + (countInCategory % 2 === 0 ? 0 : 18),
+          positionY: category.cardY + countInCategory * 58,
+        }),
+      );
+    }
+    if (additions.length) {
+      const next = [...causesRef.current, ...additions];
+      setCauses(next);
+      handleSave(next);
+      toast.success(`${additions.length} causa(s) vital(is) do Pareto adicionada(s) ao Ishikawa`);
+    } else {
+      toast.info('As causas vitais do Pareto já estão no Ishikawa.');
+    }
+    onSeedConsumed?.();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [seedCauses, canEdit]);
 
   function updateCause(id: string, patch: Partial<IshikawaCause>) {
     setCauses((current) => current.map((cause) => (cause.id === id ? { ...cause, ...patch } : cause)));
