@@ -3,7 +3,7 @@
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import type { ChangeEvent } from 'react';
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useMutation, useQuery } from '@tanstack/react-query';
 import { Building2, Camera, Check, ChevronsUpDown, Home, KeyRound, LifeBuoy, LogOut, Menu, Moon, Search, Sun } from 'lucide-react';
 import { useTheme } from 'next-themes';
@@ -45,9 +45,30 @@ export function Topbar() {
   const [menuOpen, setMenuOpen] = useState(false);
   const [profileOpen, setProfileOpen] = useState(false);
   const [passwordForm, setPasswordForm] = useState({ currentPassword: '', newPassword: '', confirmPassword: '' });
+  const profileRef = useRef<HTMLDivElement | null>(null);
   const sections = visibleAllNavSections(user);
   const section = sections.find((s) => s.items.some((i) => isActivePath(pathname, i.href, i.exact)));
   const profileRole = user?.accessProfile?.name ?? user?.jobTitle ?? user?.role ?? '-';
+
+  // Esc fecha a busca global e o card de perfil de qualquer lugar da página;
+  // clique fora do card de perfil também fecha (o card fica aberto por padrão
+  // e concentra dados sensíveis + troca de senha).
+  useEffect(() => {
+    function handleKeyDown(event: KeyboardEvent) {
+      if (event.key !== 'Escape') return;
+      setSearchOpen(false);
+      setProfileOpen(false);
+    }
+    function handleClickOutside(event: MouseEvent) {
+      if (profileRef.current && !profileRef.current.contains(event.target as Node)) setProfileOpen(false);
+    }
+    document.addEventListener('keydown', handleKeyDown);
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => {
+      document.removeEventListener('keydown', handleKeyDown);
+      document.removeEventListener('mousedown', handleClickOutside);
+    };
+  }, []);
 
   const globalSearch = useQuery<SearchResult[]>({
     queryKey: ['global-search', search],
@@ -201,7 +222,7 @@ export function Topbar() {
           {theme === 'dark' ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
         </Button>
         {user && (
-          <div className="relative ml-1 flex items-center gap-2 border-l border-[#1b2b54]/50 pl-3 text-white">
+          <div ref={profileRef} className="relative ml-1 flex items-center gap-2 border-l border-[#1b2b54]/50 pl-3 text-white">
             <div className="hidden text-right leading-tight sm:block">
               <div className="text-xs font-medium text-white">{user.name}</div>
               <div className="text-[10px] text-slate-400">{profileRole}</div>
@@ -219,7 +240,7 @@ export function Topbar() {
               <LogOut className="h-4 w-4" />
             </Button>
             {profileOpen && (
-              <div className="absolute right-0 top-11 z-50 w-[330px] border border-border bg-card p-4 shadow-xl">
+              <div className="absolute right-0 top-11 z-50 w-[330px] border border-border bg-card p-4 text-foreground shadow-xl">
                 <div className="flex items-start gap-3 border-b border-border/60 pb-3">
                   <UserAvatar name={user.name} avatarUrl={user.avatarUrl} size="lg" />
                   <div className="min-w-0 flex-1">
@@ -258,11 +279,23 @@ export function Topbar() {
                   </div>
                 </div>
 
-                <div className="mt-4 space-y-2 border-t border-border/60 pt-3">
+                <form
+                  className="mt-4 space-y-2 border-t border-border/60 pt-3"
+                  autoComplete="off"
+                  onSubmit={(e) => {
+                    e.preventDefault();
+                    passwordMutation.mutate();
+                  }}
+                >
                   <div className="flex items-center gap-2 text-[11px] font-semibold uppercase tracking-[0.08em] text-muted-foreground">
                     <KeyRound className="h-3.5 w-3.5" />
                     Alterar senha
                   </div>
+                  {/* Campo de usuário oculto: dá ao Chrome um alvo dedicado para
+                      associar às senhas deste formulário, evitando que ele
+                      preencha automaticamente a busca global (fora do form)
+                      com o e-mail salvo do usuário. */}
+                  <input type="text" name="username" autoComplete="username" value={user.email} readOnly hidden />
                   <Input
                     type="password"
                     value={passwordForm.currentPassword}
@@ -288,15 +321,14 @@ export function Topbar() {
                     className="h-8 text-xs"
                   />
                   <Button
-                    type="button"
+                    type="submit"
                     size="sm"
                     className="h-8 w-full text-xs"
-                    onClick={() => passwordMutation.mutate()}
                     disabled={passwordMutation.isPending || !passwordForm.currentPassword || !passwordForm.newPassword || !passwordForm.confirmPassword}
                   >
                     {passwordMutation.isPending ? 'Aplicando...' : 'Aplicar'}
                   </Button>
-                </div>
+                </form>
               </div>
             )}
           </div>
