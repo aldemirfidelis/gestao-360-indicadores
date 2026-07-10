@@ -8,6 +8,7 @@ import {
   AlarmClockCheck,
   CalendarClock,
   CheckCircle2,
+  Download,
   Fingerprint,
   History,
   ListChecks,
@@ -16,6 +17,7 @@ import {
   MapPin,
   Plus,
   Trash2,
+  Upload,
   Users,
   X,
 } from 'lucide-react';
@@ -30,7 +32,7 @@ import { NativeSelect } from '@/components/ui/select';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Textarea } from '@/components/ui/textarea';
 import { useAuth } from '@/components/auth/auth-provider';
-import { api } from '@/lib/api';
+import { api, getAccessToken } from '@/lib/api';
 import { cn, formatDate } from '@/lib/utils';
 import { ReasonDialog, type ReasonDialogState } from '@/components/platform/reason-dialog';
 
@@ -68,6 +70,7 @@ interface MirrorResponse {
 interface SummaryResponse {
   today: MirrorDay & { nextKind: 'IN' | 'OUT' };
   month: MirrorResponse['totals'];
+  bank: { totalMinutes: number; closedMinutes: number; liveMinutes: number };
   pendingAdjustments: number;
   myPendingAdjustments: number;
   period: { ref: string; status: string };
@@ -181,6 +184,10 @@ export default function TimeClockPage() {
   const [templateDialog, setTemplateDialog] = useState(false);
   const [templateForm, setTemplateForm] = useState(DEFAULT_TEMPLATE_FORM);
   const [assignForm, setAssignForm] = useState<{ templateId: string; userIds: string[] }>({ templateId: '', userIds: [] });
+  const [mirrorMonth, setMirrorMonth] = useState(() => new Date().toISOString().slice(0, 7));
+  const [importDialog, setImportDialog] = useState(false);
+  const [importResult, setImportResult] = useState<{ imported: number; duplicates: number; errors: string[] } | null>(null);
+  const currentMonth = new Date().toISOString().slice(0, 7);
 
   useEffect(() => {
     const timer = setInterval(() => setNow(new Date()), 1000);
@@ -193,8 +200,8 @@ export default function TimeClockPage() {
     refetchInterval: 60_000,
   });
   const mirrorQuery = useQuery<MirrorResponse>({
-    queryKey: ['time-clock', 'mirror'],
-    queryFn: () => api<MirrorResponse>('/personnel/time-clock/me'),
+    queryKey: ['time-clock', 'mirror', mirrorMonth],
+    queryFn: () => api<MirrorResponse>(`/personnel/time-clock/me?from=${mirrorMonth}-01&to=${monthEnd(mirrorMonth)}`),
   });
   const myAdjustmentsQuery = useQuery<AdjustmentRequest[]>({
     queryKey: ['time-clock', 'adjustments', 'mine'],
@@ -325,6 +332,16 @@ export default function TimeClockPage() {
     onError: (e: any) => toast.error(e?.message ?? 'Não foi possível atribuir a escala'),
   });
 
+  const importPunches = useMutation({
+    mutationFn: (content: string) => api<{ imported: number; duplicates: number; errors: string[] }>('/personnel/time-clock/import', { method: 'POST', json: { content } }),
+    onSuccess: (result) => {
+      setImportResult(result);
+      toast.success(`${result.imported} batida(s) importada(s)`);
+      invalidate();
+    },
+    onError: (e: any) => toast.error(e?.message ?? 'Não foi possível importar as batidas'),
+  });
+
   const closePeriod = useMutation({
     mutationFn: (ref: string) => api(`/personnel/time-clock/periods/${ref}/close`, { method: 'POST', json: {} }),
     onSuccess: () => {
@@ -436,6 +453,11 @@ export default function TimeClockPage() {
                     value={`${monthBalance > 0 ? '+' : ''}${minutesLabel(monthBalance)}`}
                     className={monthBalance > 0 ? 'text-status-green' : monthBalance < 0 ? 'text-status-red' : undefined}
                   />
+                  <SummaryLine
+                    label="Banco acumulado"
+                    value={`${(summary?.bank?.totalMinutes ?? 0) > 0 ? '+' : ''}${minutesLabel(summary?.bank?.totalMinutes ?? 0)}`}
+                    className={(summary?.bank?.totalMinutes ?? 0) > 0 ? 'text-status-green' : (summary?.bank?.totalMinutes ?? 0) < 0 ? 'text-status-red' : undefined}
+                  />
                   <SummaryLine label="Dias inconsistentes" value={String(summary?.month?.inconsistentDays ?? 0)} className={summary?.month?.inconsistentDays ? 'text-status-yellow' : undefined} />
                   <SummaryLine label="Faltas" value={String(summary?.month?.absentDays ?? 0)} className={summary?.month?.absentDays ? 'text-status-red' : undefined} />
                 </CardContent>
@@ -465,9 +487,12 @@ export default function TimeClockPage() {
             <Card className="min-w-0 border border-slate-100 bg-white shadow-sm dark:border-slate-800/80 dark:bg-slate-900/50">
               <div className="flex items-center justify-between border-b px-4 py-2.5">
                 <h3 className="flex items-center gap-2 text-sm font-semibold text-slate-800 dark:text-white">
-                  <History className="h-4 w-4 text-sky-500" />Espelho de ponto — {mirror ? formatDayKey(mirror.from).slice(3) : ''}
+                  <History className="h-4 w-4 text-sky-500" />Espelho de ponto — {formatDayKey(`${mirrorMonth}-01`).slice(3)}
                 </h3>
-                <div className="text-[10px] text-muted-foreground">Tolerância aplicada conforme a escala vigente</div>
+                <div className="flex items-center gap-1">
+                  <Button variant="ghost" size="sm" className="h-7 px-2 text-xs" onClick={() => setMirrorMonth((m) => addMonths(m, -1))}>‹ mês anterior</Button>
+                  <Button variant="ghost" size="sm" className="h-7 px-2 text-xs" disabled={mirrorMonth >= currentMonth} onClick={() => setMirrorMonth((m) => addMonths(m, 1))}>próximo ›</Button>
+                </div>
               </div>
               <CardContent className="overflow-x-auto p-0">
                 <table className="w-full min-w-[720px] text-xs">
@@ -735,10 +760,13 @@ export default function TimeClockPage() {
         {canManage && (
           <TabsContent value="fechamento">
             <Card className="border border-slate-100 bg-white shadow-sm dark:border-slate-800/80 dark:bg-slate-900/50">
-              <div className="border-b px-4 py-2.5">
+              <div className="flex flex-wrap items-center justify-between gap-2 border-b px-4 py-2.5">
                 <h3 className="flex items-center gap-2 text-sm font-semibold text-slate-800 dark:text-white">
                   <Lock className="h-4 w-4 text-sky-500" />Fechamento de competência
                 </h3>
+                <Button size="sm" variant="outline" className="h-8 text-xs" onClick={() => { setImportResult(null); setImportDialog(true); }}>
+                  <Upload className="mr-1.5 h-3.5 w-3.5" />Importar batidas (CSV)
+                </Button>
               </div>
               <CardContent className="p-0">
                 <table className="w-full text-xs">
@@ -765,6 +793,9 @@ export default function TimeClockPage() {
                         </td>
                         <td className="px-2 py-2.5 text-right tabular-nums">{period.totals?.entries ?? '—'}</td>
                         <td className="px-4 py-2.5 text-right">
+                          <Button variant="ghost" size="sm" className="h-7 text-[10px]" title="Baixar relatório da competência (CSV)" onClick={() => downloadPeriodReport(period.periodRef)}>
+                            <Download className="mr-1 h-3 w-3" />Relatório
+                          </Button>
                           {period.status === 'OPEN' ? (
                             <Button variant="outline" size="sm" className="h-7 text-[10px]" disabled={closePeriod.isPending} onClick={() => setReasonDialog({
                               title: `Fechar competência ${period.periodRef}`,
@@ -907,9 +938,74 @@ export default function TimeClockPage() {
         </DialogContent>
       </Dialog>
 
+      {/* Dialog: importar batidas CSV */}
+      <Dialog open={importDialog} onOpenChange={setImportDialog}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Importar batidas (relógio/REP)</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4 text-xs">
+            <div className="rounded-md border bg-muted/30 p-3 text-muted-foreground">
+              <div className="font-semibold text-foreground">Formato do CSV (uma batida por linha):</div>
+              <pre className="mt-1 font-mono text-[10px]">email;data;hora{'\n'}ana@empresa.com;2026-07-08;08:01{'\n'}ana@empresa.com;08/07/2026;12:00</pre>
+              Também aceita <span className="font-mono">email;data-hora-ISO</span> e separador vírgula. Duplicadas são ignoradas; competência fechada bloqueia a linha.
+            </div>
+            <Input
+              type="file"
+              accept=".csv,.txt,text/csv,text/plain"
+              className="text-xs"
+              onChange={async (e) => {
+                const file = e.target.files?.[0];
+                e.target.value = '';
+                if (!file) return;
+                const content = await file.text();
+                importPunches.mutate(content);
+              }}
+            />
+            {importPunches.isPending && <div className="text-muted-foreground">Importando batidas...</div>}
+            {importResult && (
+              <div className="space-y-1 rounded-md border p-3">
+                <div className="font-semibold text-status-green">{importResult.imported} batida(s) importada(s)</div>
+                {importResult.duplicates > 0 && <div className="text-muted-foreground">{importResult.duplicates} duplicada(s) ignorada(s)</div>}
+                {importResult.errors.length > 0 && (
+                  <div className="max-h-32 space-y-0.5 overflow-y-auto text-status-red">
+                    {importResult.errors.slice(0, 20).map((error, index) => <div key={index}>{error}</div>)}
+                    {importResult.errors.length > 20 && <div>... e mais {importResult.errors.length - 20} erro(s)</div>}
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setImportDialog(false)}>Fechar</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
       <ReasonDialog state={reasonDialog} onClose={() => setReasonDialog(null)} />
     </div>
   );
+}
+
+/** Baixa o relatório CSV da competência com o token de acesso (download controlado). */
+async function downloadPeriodReport(ref: string) {
+  try {
+    const apiUrl = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:3333/api';
+    const token = getAccessToken();
+    const res = await fetch(`${apiUrl}/personnel/time-clock/periods/${ref}/report.csv`, {
+      headers: token ? { authorization: `Bearer ${token}` } : undefined,
+    });
+    if (!res.ok) throw new Error('Falha ao gerar o relatório');
+    const blob = await res.blob();
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = `ponto-${ref}.csv`;
+    link.click();
+    URL.revokeObjectURL(url);
+  } catch {
+    toast.error('Não foi possível baixar o relatório');
+  }
 }
 
 function SummaryLine({ label, value, className }: { label: string; value: string; className?: string }) {
@@ -938,6 +1034,20 @@ function formatTime(value: string | undefined): string {
 function formatDayKey(dayKey: string): string {
   const [year, month, day] = dayKey.split('-');
   return `${day}/${month}/${year}`;
+}
+
+/** Último dia do mês YYYY-MM (o backend limita ao dia de hoje). */
+function monthEnd(ref: string): string {
+  const [year, month] = ref.split('-').map(Number);
+  const lastDay = new Date(Date.UTC(year, month, 0)).getUTCDate();
+  return `${ref}-${String(lastDay).padStart(2, '0')}`;
+}
+
+/** Soma meses a uma referência YYYY-MM. */
+function addMonths(ref: string, delta: number): string {
+  const [year, month] = ref.split('-').map(Number);
+  const d = new Date(Date.UTC(year, month - 1 + delta, 1));
+  return `${d.getUTCFullYear()}-${String(d.getUTCMonth() + 1).padStart(2, '0')}`;
 }
 
 /** Geolocalização com timeout curto: sem permissão/sinal, a batida segue sem coordenadas. */

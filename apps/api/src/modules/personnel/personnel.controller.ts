@@ -1,5 +1,5 @@
-import { Body, Controller, Get, Param, Patch, Post, Query, Req } from '@nestjs/common';
-import { Request } from 'express';
+import { Body, Controller, Get, Param, Patch, Post, Query, Req, Res, StreamableFile } from '@nestjs/common';
+import { Request, Response } from 'express';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import { RequirePermissions } from '../../common/decorators/permissions.decorator';
 import { AuthPayload } from '../auth/auth.types';
@@ -67,7 +67,34 @@ export class PersonnelController {
     return this.service.decideAdjustment(me, id, 'reject', body);
   }
 
+  // ------------------------------ Importação ------------------------------
+
+  @Post('time-clock/import')
+  @RequirePermissions('ponto:manage')
+  importPunches(@CurrentUser() me: AuthPayload, @Body() body: any) {
+    return this.service.importPunches(me, body);
+  }
+
   // ------------------------------ Fechamento ------------------------------
+
+  @Get('time-clock/periods/:ref/report')
+  @RequirePermissions('ponto:manage')
+  periodReport(@CurrentUser() me: AuthPayload, @Param('ref') ref: string) {
+    return this.service.periodReport(me, ref);
+  }
+
+  @Get('time-clock/periods/:ref/report.csv')
+  @RequirePermissions('ponto:manage')
+  async periodReportCsv(
+    @CurrentUser() me: AuthPayload,
+    @Param('ref') ref: string,
+    @Res({ passthrough: true }) res: Response,
+  ) {
+    const result = await this.service.periodReportCsv(me, ref);
+    res.setHeader('content-type', result.mimeType);
+    res.setHeader('content-disposition', `attachment; filename="${result.fileName}"`);
+    return new StreamableFile(result.content);
+  }
 
   @Get('time-clock/periods')
   @RequirePermissions('ponto:manage')

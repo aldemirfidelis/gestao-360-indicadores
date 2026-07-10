@@ -6,9 +6,12 @@ import {
   enumerateDays,
   evaluateDay,
   isValidDayKey,
+  monthBounds,
   pairPunches,
+  parsePunchCsv,
   periodRefOf,
   plannedMinutesFor,
+  previousMonthRef,
   validateProposedTimes,
   validateWeeklyRules,
   weekdayOf,
@@ -118,6 +121,39 @@ describe('time-clock.logic', () => {
     expect(validateWeeklyRules({ mon: { start: '25:00', end: '17:00' } })).not.toEqual([]);
     expect(validateWeeklyRules({ xyz: { start: '08:00', end: '17:00' } })).not.toEqual([]);
     expect(validateWeeklyRules('nada')).not.toEqual([]);
+  });
+
+  it('previousMonthRef e monthBounds: viradas de ano e fevereiro', () => {
+    expect(previousMonthRef('2026-01')).toBe('2025-12');
+    expect(previousMonthRef('2026-07')).toBe('2026-06');
+    expect(monthBounds('2026-02')).toEqual({ first: '2026-02-01', last: '2026-02-28' });
+    expect(monthBounds('2028-02')).toEqual({ first: '2028-02-01', last: '2028-02-29' }); // bissexto
+    expect(monthBounds('2026-07')).toEqual({ first: '2026-07-01', last: '2026-07-31' });
+  });
+
+  it('parsePunchCsv: aceita data BR/ISO, ignora cabeçalho e acumula erros', () => {
+    const csv = [
+      'email;data;hora',
+      'ana@empresa.com;2026-07-08;08:01',
+      'ana@empresa.com;08/07/2026;12:00',
+      'bruno@empresa.com;2026-07-08T14:30:00.000Z',
+      'sem-email;2026-07-08;08:00',
+      'carla@empresa.com;2026-07-99;08:00',
+    ].join('\n');
+    const { rows, errors } = parsePunchCsv(csv);
+    expect(rows).toHaveLength(3);
+    expect(rows[0].email).toBe('ana@empresa.com');
+    expect(dayKeyFor(rows[0].punchedAt)).toBe('2026-07-08');
+    expect(rows[0].punchedAt.toISOString()).toBe('2026-07-08T11:01:00.000Z'); // 08:01 SP = 11:01 UTC
+    expect(rows[1].punchedAt.toISOString()).toBe('2026-07-08T15:00:00.000Z'); // formato BR
+    expect(rows[2].punchedAt.toISOString()).toBe('2026-07-08T14:30:00.000Z'); // ISO direto
+    expect(errors).toHaveLength(2);
+  });
+
+  it('parsePunchCsv: detecta separador vírgula', () => {
+    const { rows, errors } = parsePunchCsv('ana@empresa.com,2026-07-08,08:00\nana@empresa.com,2026-07-08,17:00\n');
+    expect(rows).toHaveLength(2);
+    expect(errors).toHaveLength(0);
   });
 
   it('validateProposedTimes: exige ordem crescente e HH:MM válidos', () => {

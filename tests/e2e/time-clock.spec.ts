@@ -142,6 +142,48 @@ test('API: competência fechada bloqueia batidas e ajustes; reabrir libera', asy
   expect(reopened.status).toBe('OPEN');
 });
 
+test('API: importação de batidas CSV entra no espelho e ignora duplicadas', async ({ request }) => {
+  const managerToken = managerSession.accessToken;
+  const workerToken = workerSession.accessToken;
+  // Um dia passado do mês corrente, sem conflito com as batidas de hoje
+  const mirror = await apiGet<any>(request, workerToken, '/personnel/time-clock/me');
+  const dayKey = mirror.days.length > 2 ? mirror.days[mirror.days.length - 2].dayKey : mirror.today;
+  const csv = [
+    'email;data;hora',
+    `${workerCredentials.email};${dayKey};06:02`,
+    `${workerCredentials.email};${dayKey};10:30`,
+  ].join('\n');
+
+  const first = await apiPost<any>(request, managerToken, '/personnel/time-clock/import', { content: csv });
+  expect(first.imported).toBe(2);
+
+  const again = await apiPost<any>(request, managerToken, '/personnel/time-clock/import', { content: csv });
+  expect(again.imported).toBe(0);
+  expect(again.duplicates).toBe(2);
+
+  const after = await apiGet<any>(request, workerToken, `/personnel/time-clock/me?from=${dayKey}&to=${dayKey}`);
+  const day = after.days.find((d: any) => d.dayKey === dayKey);
+  const imported = day.entries.filter((e: any) => e.source === 'IMPORT');
+  expect(imported.length).toBeGreaterThanOrEqual(2);
+});
+
+test('API: resumo traz banco acumulado e relatório da competência lista colaboradores', async ({ request }) => {
+  const managerToken = managerSession.accessToken;
+  const summary = await apiGet<any>(request, workerSession.accessToken, '/personnel/time-clock/summary');
+  expect(summary.bank).toHaveProperty('totalMinutes');
+
+  const report = await apiGet<any>(request, managerToken, `/personnel/time-clock/periods/${summary.period.ref}/report`);
+  expect(report.rows.some((row: any) => row.user.id === workerSession.user.id)).toBe(true);
+
+  const apiBase = process.env.E2E_API_URL ?? 'http://127.0.0.1:3333/api';
+  const csv = await request.get(`${apiBase}/personnel/time-clock/periods/${summary.period.ref}/report.csv`, {
+    headers: { authorization: `Bearer ${managerToken}` },
+  });
+  expect(csv.ok()).toBe(true);
+  expect(csv.headers()['content-type']).toContain('text/csv');
+  expect(await csv.text()).toContain('colaborador;email');
+});
+
 test('API: colaborador sem ponto:manage não decide ajustes nem fecha competência', async ({ request }) => {
   const apiBase = process.env.E2E_API_URL ?? 'http://127.0.0.1:3333/api';
   const headers = { authorization: `Bearer ${workerSession.accessToken}` };

@@ -151,6 +151,72 @@ export function enumerateDays(fromKey: string, toKey: string): string[] {
   return days;
 }
 
+/** Competência anterior a uma referência YYYY-MM. */
+export function previousMonthRef(ref: string): string {
+  const [year, month] = ref.split('-').map(Number);
+  const d = new Date(Date.UTC(year, month - 2, 1));
+  return `${d.getUTCFullYear()}-${String(d.getUTCMonth() + 1).padStart(2, '0')}`;
+}
+
+/** Primeiro e último dayKey de uma competência YYYY-MM. */
+export function monthBounds(ref: string): { first: string; last: string } {
+  const [year, month] = ref.split('-').map(Number);
+  const lastDay = new Date(Date.UTC(year, month, 0)).getUTCDate();
+  return { first: `${ref}-01`, last: `${ref}-${String(lastDay).padStart(2, '0')}` };
+}
+
+export interface ParsedPunchRow {
+  line: number;
+  email: string;
+  punchedAt: Date;
+}
+
+/**
+ * Importação de batidas (relógio/REP exportado em CSV). Formatos aceitos por linha:
+ *   email;AAAA-MM-DD;HH:MM   |   email;DD/MM/AAAA;HH:MM   |   email;ISO-datetime
+ * Separador ; ou , (detectado). Cabeçalho é ignorado se a 1ª linha não tiver e-mail válido.
+ */
+export function parsePunchCsv(content: string): { rows: ParsedPunchRow[]; errors: string[] } {
+  const rows: ParsedPunchRow[] = [];
+  const errors: string[] = [];
+  const lines = content.split(/\r?\n/);
+  const separator = (content.match(/;/g)?.length ?? 0) >= (content.match(/,/g)?.length ?? 0) ? ';' : ',';
+
+  lines.forEach((raw, index) => {
+    const line = index + 1;
+    const trimmed = raw.trim();
+    if (!trimmed) return;
+    const cols = trimmed.split(separator).map((col) => col.trim().replace(/^"|"$/g, ''));
+    const email = cols[0]?.toLowerCase() ?? '';
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+      if (index === 0) return; // cabeçalho
+      errors.push(`Linha ${line}: e-mail inválido (${cols[0] ?? 'vazio'}).`);
+      return;
+    }
+
+    let punchedAt: Date | null = null;
+    if (cols.length >= 3 && cols[1] && cols[2]) {
+      const rawDate = cols[1];
+      const time = cols[2].slice(0, 5);
+      const dayKey = /^\d{2}\/\d{2}\/\d{4}$/.test(rawDate)
+        ? `${rawDate.slice(6, 10)}-${rawDate.slice(3, 5)}-${rawDate.slice(0, 2)}`
+        : rawDate;
+      if (isValidDayKey(dayKey) && isValidTime(time)) punchedAt = companyTimeToUtc(dayKey, time);
+    } else if (cols.length >= 2 && cols[1]) {
+      const parsed = new Date(cols[1]);
+      if (!Number.isNaN(parsed.getTime())) punchedAt = parsed;
+    }
+
+    if (!punchedAt) {
+      errors.push(`Linha ${line}: data/hora inválida.`);
+      return;
+    }
+    rows.push({ line, email, punchedAt });
+  });
+
+  return { rows, errors };
+}
+
 /** Horários propostos de um ajuste: HH:MM válidos e estritamente crescentes. */
 export function validateProposedTimes(times: unknown): string | null {
   if (!Array.isArray(times) || times.length === 0) return 'Informe ao menos um horário.';

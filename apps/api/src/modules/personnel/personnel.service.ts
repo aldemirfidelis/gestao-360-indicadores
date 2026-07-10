@@ -11,9 +11,12 @@ import {
   enumerateDays,
   evaluateDay,
   isValidDayKey,
+  monthBounds,
   pairPunches,
+  parsePunchCsv,
   periodRefOf,
   plannedMinutesFor,
+  previousMonthRef,
   validateProposedTimes,
   validateWeeklyRules,
   weekdayOf,
@@ -94,7 +97,9 @@ export class PersonnelService {
 
   async myMirror(me: AuthPayload, from?: string, to?: string) {
     const today = dayKeyFor(new Date());
-    const toKey = from && to && isValidDayKey(to) ? to : today;
+    // Dias futuros não entram no espelho (seriam avaliados como falta).
+    const requestedTo = from && to && isValidDayKey(to) ? to : today;
+    const toKey = requestedTo > today ? today : requestedTo;
     const fromKey = from && isValidDayKey(from) ? from : `${today.slice(0, 7)}-01`;
     if (fromKey > toKey) throw new BadRequestException('Período inválido.');
 
@@ -150,19 +155,179 @@ export class PersonnelService {
   async summary(me: AuthPayload) {
     const today = dayKeyFor(new Date());
     const monthStart = `${today.slice(0, 7)}-01`;
-    const [day, monthDays, pendingAdjustments, myPending] = await Promise.all([
+    const [day, monthDays, pendingAdjustments, myPending, bank] = await Promise.all([
       this.buildMyDay(me, today),
       this.buildMirrorDays(me.companyId, me.sub, monthStart, today),
       this.prisma.timeAdjustmentRequest.count({ where: { companyId: me.companyId, status: 'REQUESTED' } }),
       this.prisma.timeAdjustmentRequest.count({ where: { companyId: me.companyId, userId: me.sub, status: 'REQUESTED' } }),
+      this.bankBalance(me.companyId, me.sub),
     ]);
     return {
       today: day,
       month: sumTotals(monthDays),
+      bank,
       pendingAdjustments,
       myPendingAdjustments: myPending,
       period: { ref: periodRefOf(today), status: await this.periodStatus(me.companyId, periodRefOf(today)) },
     };
+  }
+
+  /**
+   * Banco de horas acumulado: competências FECHADAS usam o consolidado gravado
+   * no fechamento; meses em aberto (atual + 2 anteriores) são calculados ao vivo.
+   */
+  private async bankBalance(companyId: string, userId: string) {
+    const today = dayKeyFor(new Date());
+    const closed = await this.prisma.timesheetPeriod.findMany({
+      where: { companyId, status: 'CLOSED' },
+      select: { periodRef: true, totals: true },
+    });
+    let closedMinutes = 0;
+    const closedRefs = new Set<string>();
+    for (const period of closed) {
+      closedRefs.add(period.periodRef);
+      const users = (period.totals as any)?.users;
+      closedMinutes += Number(users?.[userId]?.balanceMinutes ?? 0);
+    }
+    let liveMinutes = 0;
+    let ref = periodRefOf(today);
+    for (let i = 0; i < 3; i++) {
+      if (!closedRefs.has(ref)) {
+        const { first, last } = monthBounds(ref);
+        const to = last > today ? today : last;
+        if (first <= to) {
+          const days = await this.buildMirrorDays(companyId, userId, first, to);
+          liveMinutes += days.reduce((sum, d) => sum + d.balanceMinutes, 0);
+        }
+      }
+      ref = previousMonthRef(ref);
+    }
+    return { totalMinutes: closedMinutes + liveMinutes, closedMinutes, liveMinutes };
+  }
+
+  // ------------------------------ Importação ------------------------------
+
+  /** Importa batidas de relógio/REP em CSV (email;data;hora ou email;ISO). */
+  async importPunches(me: AuthPayload, body: any = {}) {
+    const base64 = text(body?.contentBase64);
+    const content = base64 ? Buffer.from(base64, 'base64').toString('utf8') : (text(body?.content) ?? '');
+    if (!content.trim()) throw new BadRequestException('Envie o conteúdo CSV das batidas.');
+
+    const parsed = parsePunchCsv(content);
+    const errors = [...parsed.errors];
+    if (!parsed.rows.length) {
+      throw new BadRequestException(errors[0] ?? 'Nenhuma linha válida encontrada no arquivo.');
+    }
+    if (parsed.rows.length > 2000) throw new BadRequestException('Máximo de 2.000 batidas por importação.');
+
+    const emails = [...new Set(parsed.rows.map((row) => row.email))];
+    const users = await this.prisma.user.findMany({
+      where: { companyId: me.companyId, deletedAt: null, active: true },
+      select: { id: true, email: true },
+    });
+    const userByEmail = new Map(users.map((u) => [u.email.toLowerCase(), u.id]));
+    const unknownEmails = emails.filter((email) => !userByEmail.has(email));
+    for (const email of unknownEmails) errors.push(`Colaborador não encontrado: ${email}`);
+
+    const closedRefs = new Set(
+      (
+        await this.prisma.timesheetPeriod.findMany({
+          where: { companyId: me.companyId, status: 'CLOSED' },
+          select: { periodRef: true },
+        })
+      ).map((p) => p.periodRef),
+    );
+
+    // Agrupa por usuário, filtra competência fechada e ordena cronologicamente.
+    const byUser = new Map<string, Date[]>();
+    for (const row of parsed.rows) {
+      const userId = userByEmail.get(row.email);
+      if (!userId) continue;
+      const dayKey = dayKeyFor(row.punchedAt);
+      if (closedRefs.has(periodRefOf(dayKey))) {
+        errors.push(`Linha ${row.line}: competência ${periodRefOf(dayKey)} fechada.`);
+        continue;
+      }
+      const list = byUser.get(userId) ?? [];
+      list.push(row.punchedAt);
+      byUser.set(userId, list);
+    }
+
+    let imported = 0;
+    let duplicates = 0;
+    const affectedUsers: string[] = [];
+
+    for (const [userId, times] of byUser) {
+      const sorted = [...new Set(times.map((t) => t.getTime()))].sort((a, b) => a - b).map((t) => new Date(t));
+      duplicates += times.length - sorted.length;
+      const existing = await this.prisma.timeClockEntry.findMany({
+        where: { companyId: me.companyId, userId, punchedAt: { in: sorted } },
+        select: { punchedAt: true },
+      });
+      const existingSet = new Set(existing.map((e) => e.punchedAt.getTime()));
+      const fresh = sorted.filter((t) => !existingSet.has(t.getTime()));
+      duplicates += sorted.length - fresh.length;
+      if (!fresh.length) continue;
+
+      await this.prisma.$transaction(
+        async (tx) => {
+          const last = await tx.timeClockEntry.findFirst({
+            where: { companyId: me.companyId, userId },
+            orderBy: { createdAt: 'desc' },
+            select: { hash: true },
+          });
+          let prevHash = last?.hash ?? null;
+          const affectedDays = new Set<string>();
+          for (const punchedAt of fresh) {
+            const dayKey = dayKeyFor(punchedAt);
+            affectedDays.add(dayKey);
+            const hash = chainHash(prevHash, `${userId}|${punchedAt.toISOString()}|IMPORT|IMPORT`);
+            await tx.timeClockEntry.create({
+              data: {
+                companyId: me.companyId,
+                userId,
+                punchedAt,
+                dayKey,
+                kind: 'IN', // recalculado por dia logo abaixo
+                source: 'IMPORT',
+                prevHash,
+                hash,
+                createdById: me.sub,
+              },
+            });
+            prevHash = hash;
+            imported += 1;
+          }
+          // Reordena a alternância entrada/saída dos dias afetados.
+          for (const dayKey of affectedDays) {
+            const dayEntries = await tx.timeClockEntry.findMany({
+              where: { companyId: me.companyId, userId, dayKey, status: 'VALID' },
+              orderBy: { punchedAt: 'asc' },
+              select: { id: true, kind: true },
+            });
+            for (let i = 0; i < dayEntries.length; i++) {
+              const kind = i % 2 === 0 ? 'IN' : 'OUT';
+              if (dayEntries[i].kind !== kind) {
+                await tx.timeClockEntry.update({ where: { id: dayEntries[i].id }, data: { kind } });
+              }
+            }
+          }
+        },
+        { timeout: 120_000, maxWait: 15_000 },
+      );
+      affectedUsers.push(userId);
+    }
+
+    await this.audit.record(me, {
+      module: MODULE,
+      entity: 'TimeClockEntry',
+      action: 'IMPORT_PUNCHES',
+      message: `Importação de batidas: ${imported} inseridas, ${duplicates} duplicadas, ${errors.length} erros`,
+      after: { imported, duplicates, errorList: errors.slice(0, 20) },
+    });
+    if (affectedUsers.length) this.workItems.markDirty(me.companyId, affectedUsers, 'time-clock-import');
+
+    return { imported, duplicates, errors };
   }
 
   // ------------------------------ Ajustes ------------------------------
@@ -456,9 +621,9 @@ export class PersonnelService {
     this.assertPeriodRef(ref);
     const currentRef = periodRefOf(dayKeyFor(new Date()));
     if (ref > currentRef) throw new BadRequestException('Não é possível fechar uma competência futura.');
-    const entries = await this.prisma.timeClockEntry.count({
-      where: { companyId: me.companyId, dayKey: { startsWith: ref }, status: 'VALID' },
-    });
+    // Consolida o mês por colaborador: é o que alimenta o banco de horas
+    // acumulado e o relatório para a folha sem recalcular meses fechados.
+    const totals = await this.computeMonthTotals(me.companyId, ref);
     const period = await this.prisma.timesheetPeriod.upsert({
       where: { companyId_periodRef: { companyId: me.companyId, periodRef: ref } },
       create: {
@@ -467,18 +632,107 @@ export class PersonnelService {
         status: 'CLOSED',
         closedById: me.sub,
         closedAt: new Date(),
-        totals: { entries },
+        totals,
       },
-      update: { status: 'CLOSED', closedById: me.sub, closedAt: new Date(), totals: { entries } },
+      update: { status: 'CLOSED', closedById: me.sub, closedAt: new Date(), totals },
     });
     await this.audit.record(me, {
       module: MODULE,
       entity: 'TimesheetPeriod',
       entityId: period.id,
       action: 'PERIOD_CLOSED',
-      message: `Competência ${ref} fechada (${entries} batidas)`,
+      message: `Competência ${ref} fechada (${totals.entries} batidas, ${Object.keys(totals.users).length} colaboradores)`,
     });
     return period;
+  }
+
+  /** Consolidado do mês por colaborador (usado no fechamento e no relatório). */
+  private async computeMonthTotals(companyId: string, ref: string) {
+    const { first, last } = monthBounds(ref);
+    const today = dayKeyFor(new Date());
+    const to = last > today ? today : last;
+    const [entryUsers, assignmentUsers] = await Promise.all([
+      this.prisma.timeClockEntry.findMany({
+        where: { companyId, dayKey: { gte: first, lte: to }, status: 'VALID' },
+        select: { userId: true },
+        distinct: ['userId'],
+      }),
+      this.prisma.workScheduleAssignment.findMany({
+        where: {
+          companyId,
+          startsAt: { lte: companyTimeToUtc(to, '23:59') },
+          OR: [{ endsAt: null }, { endsAt: { gte: companyTimeToUtc(first, '00:00') } }],
+        },
+        select: { userId: true },
+        distinct: ['userId'],
+      }),
+    ]);
+    const userIds = [...new Set([...entryUsers.map((u) => u.userId), ...assignmentUsers.map((u) => u.userId)])];
+    const users: Record<string, { plannedMinutes: number; workedMinutes: number; balanceMinutes: number; absentDays: number; inconsistentDays: number; punches: number }> = {};
+    let entries = 0;
+    for (const userId of userIds) {
+      const days = await this.buildMirrorDays(companyId, userId, first, to);
+      const totals = sumTotals(days);
+      const punches = days.reduce((sum, d) => sum + d.entries.length, 0);
+      entries += punches;
+      users[userId] = {
+        plannedMinutes: totals.plannedMinutes,
+        workedMinutes: totals.workedMinutes,
+        balanceMinutes: totals.balanceMinutes,
+        absentDays: totals.absentDays,
+        inconsistentDays: totals.inconsistentDays,
+        punches,
+      };
+    }
+    return { entries, users };
+  }
+
+  /** Relatório da competência p/ folha: consolidado do fechamento ou cálculo ao vivo. */
+  async periodReport(me: AuthPayload, ref: string) {
+    this.assertPeriodRef(ref);
+    const period = await this.prisma.timesheetPeriod.findUnique({
+      where: { companyId_periodRef: { companyId: me.companyId, periodRef: ref } },
+    });
+    const stored = period?.status === 'CLOSED' ? ((period.totals as any)?.users as Record<string, any> | undefined) : undefined;
+    const usersTotals = stored ?? (await this.computeMonthTotals(me.companyId, ref)).users;
+
+    const ids = Object.keys(usersTotals);
+    const people = ids.length
+      ? await this.prisma.user.findMany({
+          where: { id: { in: ids }, companyId: me.companyId },
+          select: { id: true, name: true, email: true },
+        })
+      : [];
+    const byId = new Map(people.map((p) => [p.id, p]));
+    const rows = ids
+      .map((userId) => ({
+        user: byId.get(userId) ?? { id: userId, name: 'Colaborador removido', email: '' },
+        ...usersTotals[userId],
+      }))
+      .sort((a, b) => a.user.name.localeCompare(b.user.name, 'pt-BR'));
+
+    return { periodRef: ref, status: period?.status ?? 'OPEN', closedAt: period?.closedAt ?? null, rows };
+  }
+
+  /** CSV do relatório da competência (download para conferência/folha). */
+  async periodReportCsv(me: AuthPayload, ref: string) {
+    const report = await this.periodReport(me, ref);
+    const header = 'colaborador;email;horas_previstas;horas_trabalhadas;saldo_minutos;faltas;dias_inconsistentes;batidas';
+    const lines = report.rows.map((row: any) =>
+      [
+        csvSafe(row.user.name),
+        csvSafe(row.user.email),
+        (row.plannedMinutes / 60).toFixed(2).replace('.', ','),
+        (row.workedMinutes / 60).toFixed(2).replace('.', ','),
+        String(row.balanceMinutes),
+        String(row.absentDays),
+        String(row.inconsistentDays),
+        String(row.punches ?? ''),
+      ].join(';'),
+    );
+    // BOM para o Excel abrir com acentuação correta.
+    const content = Buffer.from(`﻿${[header, ...lines].join('\r\n')}\r\n`, 'utf8');
+    return { fileName: `ponto-${ref}.csv`, content, mimeType: 'text/csv; charset=utf-8' };
   }
 
   async reopenPeriod(me: AuthPayload, ref: string) {
@@ -714,6 +968,10 @@ function text(value: unknown): string | null {
 function finiteOrNull(value: unknown): number | null {
   const n = Number(value);
   return Number.isFinite(n) ? n : null;
+}
+
+function csvSafe(value: string): string {
+  return String(value ?? '').replaceAll(';', ',').replaceAll(/\r?\n/g, ' ');
 }
 
 function clampInt(value: unknown, min: number, max: number, fallback: number): number {
