@@ -222,6 +222,13 @@ export const PERMISSION_CATALOG = [
   ['org:positions:manage', 'Gerenciar organograma de cargos', 'Estrutura', 'manage'],
   ['org:positions:approve', 'Aprovar mudanças de cargo', 'Estrutura', 'approve'],
 
+  // Servico Pessoal — Prontuario (DP)
+  ['pessoal:view', 'Visualizar colaboradores e prontuarios', 'Servico Pessoal', 'view'],
+  ['pessoal:create', 'Cadastrar colaboradores', 'Servico Pessoal', 'create'],
+  ['pessoal:update', 'Editar prontuario, dependentes e dossie', 'Servico Pessoal', 'update'],
+  ['pessoal:delete', 'Remover registros do prontuario', 'Servico Pessoal', 'delete'],
+  ['pessoal:manage', 'Administrar o servico pessoal (importacao e configuracoes)', 'Servico Pessoal', 'manage'],
+
   // Servico Pessoal — Controle de Ponto
   ['ponto:view', 'Visualizar o proprio espelho de ponto', 'Servico Pessoal', 'view'],
   ['ponto:clock', 'Registrar ponto (batida)', 'Servico Pessoal', 'create'],

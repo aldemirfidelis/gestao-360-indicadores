@@ -6257,6 +6257,10 @@ model OrgEmployee {
 
   approvalRequests    OrgJobApprovalRequest[]
   compensationProfile CompensationEmployeeProfile?
+  personnelProfile    PersonnelEmployeeProfile?
+  dependents          EmployeeDependent[]
+  employmentEvents    EmploymentEvent[]
+  dossierFiles        EmployeeDossierFile[]
 
   @@index([companyId])
   @@index([orgNodeId])
@@ -11941,4 +11945,117 @@ model TimesheetPeriod {
 
   @@unique([companyId, periodRef])
   @@map("timesheet_periods")
+}
+
+// ============================= Serviço Pessoal — Prontuário (Fase 1) =============================
+
+/// Perfil de departamento pessoal do colaborador (1:1 com OrgEmployee).
+/// Tabela separada pelo padrão LGPD do CompensationEmployeeProfile: dados
+/// pessoais sensíveis segregados para minimização de acesso.
+model PersonnelEmployeeProfile {
+  id         String      @id @default(uuid())
+  companyId  String
+  employeeId String      @unique
+  employee   OrgEmployee @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+  /// Vínculo opcional com o login (autoatendimento/ponto).
+  userId     String?
+
+  cpf            String?
+  rg             String?
+  pisPasep       String?
+  ctpsNumber     String?
+  birthDate      DateTime?
+  phone          String?
+  personalEmail  String?
+  address        String?
+  city           String?
+  state          String?
+  zipCode        String?
+  maritalStatus  String?
+  educationLevel String?
+
+  contractType    String? // CLT | PJ | ESTAGIO | APRENDIZ | TEMPORARIO | AUTONOMO
+  workRegime      String? // PRESENCIAL | HIBRIDO | REMOTO
+  admissionDate   DateTime?
+  terminationDate DateTime?
+
+  emergencyContactName  String?
+  emergencyContactPhone String?
+  notes                 String?
+
+  createdById String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@unique([companyId, cpf])
+  @@index([companyId])
+  @@index([companyId, userId])
+  @@map("personnel_employee_profiles")
+}
+
+/// Dependente do colaborador (IR, salário-família, plano de saúde).
+model EmployeeDependent {
+  id            String      @id @default(uuid())
+  companyId     String
+  employeeId    String
+  employee      OrgEmployee @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+  name          String
+  relationship  String // FILHO | CONJUGE | PAI | MAE | OUTRO
+  birthDate     DateTime?
+  cpf           String?
+  isIrDependent Boolean     @default(false)
+  notes         String?
+  createdById   String?
+  createdAt     DateTime    @default(now())
+  updatedAt     DateTime    @updatedAt
+
+  @@index([companyId, employeeId])
+  @@map("employee_dependents")
+}
+
+/// Linha do tempo do vínculo: admissão, promoção, transferência, desligamento…
+/// Eventos automáticos (mudança de cargo/área/status) e manuais (observações).
+model EmploymentEvent {
+  id            String      @id @default(uuid())
+  companyId     String
+  employeeId    String
+  employee      OrgEmployee @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+  type          String // ADMISSAO | PROMOCAO | TRANSFERENCIA | MUDANCA_STATUS | DESLIGAMENTO | OBSERVACAO | OUTRO
+  title         String
+  description   String?
+  effectiveDate DateTime
+  metadata      Json?
+  createdById   String?
+  createdAt     DateTime    @default(now())
+
+  @@index([companyId, employeeId, effectiveDate])
+  @@map("employment_events")
+}
+
+/// Dossiê digital: arquivos do colaborador (RG, CTPS, contrato, ASO...) com
+/// validade opcional. Binário no storage de documentos; `documentId` permite
+/// vincular um documento formal do GED quando existir.
+model EmployeeDossierFile {
+  id         String      @id @default(uuid())
+  companyId  String
+  employeeId String
+  employee   OrgEmployee @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+  kind       String // CPF | RG | CTPS | COMPROVANTE_RESIDENCIA | CONTRATO | ASO | CERTIFICADO | FOTO | OUTRO
+  name       String
+  fileName   String
+  mimeType   String?
+  sizeBytes  Int?
+  hashSha256 String?
+  storageKey String
+  validUntil DateTime?
+  documentId String?
+  note       String?
+
+  createdById String?
+  createdAt   DateTime  @default(now())
+  deletedAt   DateTime?
+
+  @@index([companyId, employeeId])
+  @@index([companyId, validUntil])
+  @@map("employee_dossier_files")
 }

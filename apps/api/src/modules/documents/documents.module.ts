@@ -13,6 +13,6 @@ import { WopiController } from './wopi.controller';
   imports: [TraceabilityModule, NotificationsModule],
   controllers: [DocumentsController, WopiController, WebDavController],
   providers: [DocumentCodeService, DocumentEditorService, DocumentStorageService, DocumentsService],
-  exports: [DocumentsService],
+  exports: [DocumentsService, DocumentStorageService],
 })
 export class DocumentsModule {}

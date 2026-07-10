@@ -149,6 +149,7 @@ export const CATALOG_PAGES: CatalogPage[] = [
   { code: 'compensation.settings', moduleCode: 'compensation', name: 'Configuracoes', title: 'Configuracoes', route: '/cargos-salarios/configuracoes', menuOrder: 92 },
   { code: 'compensation.reports', moduleCode: 'compensation', name: 'Relatorios', title: 'Relatorios', route: '/cargos-salarios/relatorios', menuOrder: 93 },
 
+  { code: 'personnel.employees', moduleCode: 'personnel', name: 'Colaboradores', title: 'Colaboradores', route: '/servico-pessoal/colaboradores', menuOrder: 94 },
   { code: 'personnel.time-clock', moduleCode: 'personnel', name: 'Controle de Ponto', title: 'Controle de Ponto', route: '/servico-pessoal/ponto', menuOrder: 95 },
 
   { code: 'communication.wall', moduleCode: 'communication', name: 'Meu Mural', title: 'Meu Mural', route: '/comunicacao?tab=mural', menuOrder: 100 },
