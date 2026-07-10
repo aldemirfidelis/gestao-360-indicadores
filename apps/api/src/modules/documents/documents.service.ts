@@ -94,7 +94,7 @@ const TRANSITIONS: Record<DocumentStatus, DocumentStatus[]> = {
   [DocumentStatus.REVIEWED]: [DocumentStatus.WAITING_APPROVAL, DocumentStatus.IN_APPROVAL],
   [DocumentStatus.WAITING_APPROVAL]: [DocumentStatus.IN_APPROVAL, DocumentStatus.REJECTED],
   [DocumentStatus.IN_APPROVAL]: [DocumentStatus.APPROVED, DocumentStatus.REJECTED],
-  [DocumentStatus.REJECTED]: [DocumentStatus.IN_DEVELOPMENT, DocumentStatus.CANCELLED],
+  [DocumentStatus.REJECTED]: [DocumentStatus.IN_DEVELOPMENT, DocumentStatus.WAITING_REVIEW, DocumentStatus.CANCELLED],
   [DocumentStatus.APPROVED]: [DocumentStatus.SCHEDULED_PUBLICATION, DocumentStatus.PUBLISHED],
   [DocumentStatus.SCHEDULED_PUBLICATION]: [DocumentStatus.PUBLISHED, DocumentStatus.CANCELLED],
   [DocumentStatus.PUBLISHED]: [
@@ -381,7 +381,7 @@ export class DocumentsService {
   async getById(me: AuthPayload, id: string) {
     const doc = await this.loadScoped(id, me.companyId);
     await this.assertViewArea(me, doc);
-    const [versions, files, statusHistory, approvals, reviewRequests, editRequests, comments, auditLogs, externalMetadata, tagRelations] =
+    const [versions, files, statusHistory, approvals, reviewRequests, editRequests, comments, auditLogs, externalMetadata, tagRelations, readConfirmations] =
       await Promise.all([
         this.prisma.documentVersion.findMany({ where: { documentId: id, companyId: me.companyId, deletedAt: null }, orderBy: { revisionNumber: 'desc' } }),
         this.prisma.documentFile.findMany({ where: { documentId: id, companyId: me.companyId, deletedAt: null }, orderBy: { createdAt: 'desc' } }),
@@ -402,7 +402,18 @@ export class DocumentsService {
         this.prisma.documentAuditLog.findMany({ where: { documentId: id, companyId: me.companyId }, orderBy: { createdAt: 'desc' }, take: 100 }),
         this.prisma.documentExternalMetadata.findUnique({ where: { documentId: id } }),
         this.prisma.documentTagRelation.findMany({ where: { documentId: id, companyId: me.companyId }, include: { tag: true } }),
+        this.prisma.documentReadConfirmation.findMany({
+          where: { documentId: id, companyId: me.companyId, status: 'CONFIRMED' },
+          orderBy: { confirmedAt: 'desc' },
+          take: 200,
+        }),
       ]);
+    // O modelo de confirmação não tem relação com User; resolve os nomes aqui.
+    const readerIds = [...new Set(readConfirmations.map((item) => item.userId))];
+    const readers = readerIds.length
+      ? await this.prisma.user.findMany({ where: { id: { in: readerIds }, companyId: me.companyId }, select: { id: true, name: true, email: true } })
+      : [];
+    const readerById = new Map(readers.map((reader) => [reader.id, reader]));
     return {
       ...this.enrich(doc),
       editor: this.editor.openPayload(id, files.find((file) => file.kind === DocumentFileKind.DOCX)?.id ?? null),
@@ -416,6 +427,13 @@ export class DocumentsService {
       auditLogs,
       externalMetadata,
       tags: tagRelations.map((relation) => relation.tag),
+      readConfirmations: readConfirmations.map((item) => ({
+        id: item.id,
+        userId: item.userId,
+        versionId: item.versionId,
+        confirmedAt: item.confirmedAt,
+        user: readerById.get(item.userId) ?? null,
+      })),
     };
   }
 
@@ -1806,6 +1824,11 @@ export class DocumentsService {
     const doc = await this.loadScoped(id, me.companyId);
     await this.assertViewArea(me, doc);
     const version = await this.ensureLatestVersion(doc, me.sub);
+    // Idempotente por usuário+revisão: reconfirmar não duplica o registro.
+    const existing = await this.prisma.documentReadConfirmation.findFirst({
+      where: { companyId: me.companyId, documentId: id, versionId: version.id, userId: me.sub, status: 'CONFIRMED' },
+    });
+    if (existing) return existing;
     return this.prisma.documentReadConfirmation.create({
       data: {
         companyId: me.companyId,
@@ -2019,8 +2042,17 @@ export class DocumentsService {
 
   private assertEditableMetadata(doc: any, patch: any) {
     if (EDITABLE_STATUSES.has(doc.status)) return;
+    // Bloqueia apenas mudanças reais: o formulário envia todos os campos e
+    // reenviar o valor atual (ex.: só trocar aprovador/validade) é permitido.
     const restricted = ['title', 'code', 'description', 'type', 'content', 'externalUrl'];
-    if (restricted.some((field) => field in (patch ?? {}))) {
+    const normalize = (value: unknown) => {
+      const text = String(value ?? '').trim();
+      return text || null;
+    };
+    const changed = restricted.some(
+      (field) => field in (patch ?? {}) && normalize(patch[field]) !== normalize(doc[field]),
+    );
+    if (changed) {
       throw new ConflictException('Documento bloqueado. Crie uma nova revisão para alterar conteúdo ou metadados principais.');
     }
   }

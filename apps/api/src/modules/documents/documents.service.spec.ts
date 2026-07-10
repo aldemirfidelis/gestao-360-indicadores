@@ -82,7 +82,11 @@ function makeService(opts?: {
     documentAuditLog: { findMany: vi.fn().mockResolvedValue([]), create: vi.fn().mockResolvedValue({ id: 'al1' }) },
     documentExternalMetadata: { findUnique: vi.fn().mockResolvedValue(null) },
     documentTagRelation: { findMany: vi.fn().mockResolvedValue([]) },
-    documentReadConfirmation: { create: vi.fn().mockResolvedValue({ id: 'rc1' }) },
+    documentReadConfirmation: {
+      create: vi.fn().mockResolvedValue({ id: 'rc1' }),
+      findFirst: vi.fn().mockResolvedValue(null),
+      findMany: vi.fn().mockResolvedValue([]),
+    },
     documentEditorSession: { create: vi.fn().mockResolvedValue({ id: 'es1' }) },
     documentAutosaveCheckpoint: { create: vi.fn().mockResolvedValue({ id: 'cp1' }) },
     orgNode: { findFirst: vi.fn().mockResolvedValue(opts?.orgNode ?? null), findMany: vi.fn().mockResolvedValue([]) },
@@ -213,6 +217,22 @@ describe('DocumentsService - gestao documental', () => {
     expect(data.title).toBe('Rev2');
   });
 
+  it('update: documento publicado aceita reenvio dos mesmos valores (só troca de vínculos)', async () => {
+    const { service, prisma } = makeService({
+      doc: baseDoc({ status: 'PUBLISHED', title: 'Doc', description: null, approvedAt: new Date(), publishedAt: new Date() }),
+      user: { id: 'u2' },
+    });
+    await service.update(me, 'd1', { title: 'Doc', description: '', approverUserId: 'u2' });
+    const data = prisma.document.update.mock.calls[0][0].data;
+    expect(data.approverUserId).toBe('u2');
+  });
+
+  it('update: documento publicado rejeita mudanca real de titulo/conteudo', async () => {
+    const { service, prisma } = makeService({ doc: baseDoc({ status: 'PUBLISHED', title: 'Doc' }) });
+    await expect(service.update(me, 'd1', { title: 'Outro título' })).rejects.toBeInstanceOf(ConflictException);
+    expect(prisma.document.update).not.toHaveBeenCalled();
+  });
+
   it('update: bloqueia alteracao direta de status', async () => {
     const { service, prisma } = makeService({ doc: baseDoc({ orgNodeId: null }) });
     await expect(service.update(me, 'd1', { status: 'APPROVED' })).rejects.toBeInstanceOf(BadRequestException);
@@ -330,6 +350,32 @@ describe('DocumentsService - gestao documental', () => {
     await service.uploadFile(me, 'd1', { kind: 'DOCX', fileName: 'editado.docx', contentBase64: docx.toString('base64') });
     expect(storage.putBinary).toHaveBeenCalled();
     expect(prisma.documentFile.create.mock.calls[0][0].data.contentText).toBeNull();
+  });
+
+  // ---- Fluxo de status e leitura ----
+
+  it('transition: REJECTED pode ser reenviado para WAITING_REVIEW', async () => {
+    const { service, prisma } = makeService({ doc: baseDoc({ status: 'REJECTED' }) });
+    prisma.documentVersion.findFirst = vi.fn().mockResolvedValue({ id: 'v1', revisionNumber: 0, versionLabel: 'Rev. 00' });
+    await service.transition(me, 'd1', 'WAITING_REVIEW' as any, {});
+    expect(prisma.document.update).toHaveBeenCalledWith(
+      expect.objectContaining({ data: expect.objectContaining({ status: 'WAITING_REVIEW' }) }),
+    );
+  });
+
+  it('transition: PUBLISHED nao pode voltar direto para WAITING_REVIEW', async () => {
+    const { service, prisma } = makeService({ doc: baseDoc({ status: 'PUBLISHED' }) });
+    await expect(service.transition(me, 'd1', 'WAITING_REVIEW' as any, {})).rejects.toBeInstanceOf(ConflictException);
+    expect(prisma.document.update).not.toHaveBeenCalled();
+  });
+
+  it('confirmRead: reconfirmar a mesma revisao nao duplica o registro', async () => {
+    const { service, prisma } = makeService({ doc: baseDoc({ status: 'PUBLISHED' }) });
+    prisma.documentVersion.findFirst = vi.fn().mockResolvedValue({ id: 'v1', revisionNumber: 0 });
+    prisma.documentReadConfirmation.findFirst = vi.fn().mockResolvedValue({ id: 'rc-existente', userId: 'user-1', versionId: 'v1' });
+    const result = await service.confirmRead(me, 'd1');
+    expect(result.id).toBe('rc-existente');
+    expect(prisma.documentReadConfirmation.create).not.toHaveBeenCalled();
   });
 
   // ---- Rotina de vencimento ----

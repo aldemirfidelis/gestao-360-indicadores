@@ -178,6 +178,13 @@ interface DocDetail extends Doc {
   comments: Array<{ id: string; body: string; userId: string | null; resolvedAt: string | null; createdAt: string }>;
   auditLogs: Array<{ id: string; action: string; reason: string | null; result: string; createdAt: string }>;
   tags: Array<{ id: string; name: string; color: string | null }>;
+  readConfirmations: Array<{
+    id: string;
+    userId: string;
+    versionId: string | null;
+    confirmedAt: string | null;
+    user: { id: string; name: string; email: string } | null;
+  }>;
 }
 
 interface EditorSession {
@@ -340,6 +347,15 @@ const STATUS_CLASS: Record<DocStatus, string> = {
   OBSOLETE: 'border-border text-muted-foreground line-through',
   ARCHIVED: 'border-border text-muted-foreground',
   CANCELLED: 'border-status-red/40 text-status-red',
+};
+
+const EDIT_REQUEST_STATUS_LABEL: Record<string, string> = {
+  REQUESTED: 'Solicitada',
+  APPROVED: 'Liberada',
+  REJECTED: 'Rejeitada',
+  IN_PROGRESS: 'Em edição',
+  COMPLETED: 'Concluída',
+  CANCELLED: 'Cancelada',
 };
 
 const EMPTY_FORM: DocForm = {
@@ -512,7 +528,17 @@ export default function DocumentsPage() {
       request.requesterUserId === user.id && ['APPROVED', 'IN_PROGRESS'].includes(request.status),
     ) ?? null;
   }, [detail, user?.id]);
-  const canEditOnline = Boolean(myActiveEditRequest);
+  const myPendingEditRequest = useMemo(() => {
+    if (!detail || !user?.id) return null;
+    return detail.editRequests.find((request) => request.requesterUserId === user.id && request.status === 'REQUESTED') ?? null;
+  }, [detail, user?.id]);
+  const myReadConfirmation = useMemo(() => {
+    if (!detail || !user?.id) return null;
+    const currentVersionId = detail.versions[0]?.id ?? null;
+    return detail.readConfirmations?.find(
+      (item) => item.userId === user.id && (!currentVersionId || item.versionId === currentVersionId),
+    ) ?? null;
+  }, [detail, user?.id]);
 
   useEffect(() => {
     if (detail) setDraftContent(detail.content ?? '');
@@ -636,6 +662,30 @@ export default function DocumentsPage() {
       invalidate(qc);
     },
     onError: (e: any) => toast.error(e?.message ?? 'Não foi possível solicitar edição'),
+  });
+
+  // Operador com doc:update: libera a edição para si mesmo (mantendo o
+  // rastro de auditoria da liberação) e abre o editor em um clique só.
+  const selfEdit = useMutation({
+    mutationFn: async (id: string) => {
+      if (!user?.id) throw new Error('Sessão expirada');
+      await api(`/documents/${id}/edit-requests/grant`, {
+        method: 'POST',
+        json: { requesterUserId: user.id, reason: 'Edição direta pelo responsável do documento' },
+      });
+      return api<EditorSession>(`/documents/${id}/editor/open`, { method: 'POST', json: {} });
+    },
+    onSuccess: (session) => {
+      invalidate(qc);
+      if (session.editorUrl && session.accessToken) {
+        setEditorSession(session);
+      } else {
+        toast.message('Edição liberada — editor pela web indisponível', {
+          description: session.message ?? 'Use baixar o DOCX, editar no Word e enviar a nova versão.',
+        });
+      }
+    },
+    onError: (e: any) => toast.error(e?.message ?? 'Não foi possível iniciar a edição'),
   });
 
   const grantEdit = useMutation({
@@ -1524,14 +1574,27 @@ export default function DocumentsPage() {
                   <div className="space-y-3">
                     <div className="rounded-md border p-3 text-xs">
                       <div className="font-semibold text-slate-800 dark:text-slate-200">Ações do documento</div>
-                      <div className="mt-1 text-[10px] text-muted-foreground">A abertura padrão é somente leitura. A edição exige liberação.</div>
+                      <div className="mt-1 text-[10px] text-muted-foreground">A abertura padrão é somente leitura. Toda edição fica registrada; quem não é responsável precisa de liberação.</div>
                       <div className="mt-3 space-y-2">
                         {latestDocx && (
                           <Button variant="outline" size="sm" className="w-full justify-start text-xs h-8" onClick={() => downloadControlled(detail.id, latestDocx.id, latestDocx.fileName)}>
                             <Download className="mr-1.5 h-3.5 w-3.5" />Baixar DOCX
                           </Button>
                         )}
-                        {!myActiveEditRequest && (
+                        {myActiveEditRequest ? (
+                          <Button size="sm" className="w-full justify-start text-xs h-8 bg-sky-500 hover:bg-sky-600 text-white" disabled={openEditor.isPending} onClick={() => openEditor.mutate(detail.id)}>
+                            <Edit className="mr-1.5 h-3.5 w-3.5" />{openEditor.isPending ? 'Abrindo editor...' : 'Editar documento'}
+                          </Button>
+                        ) : canUpdate ? (
+                          <Button size="sm" className="w-full justify-start text-xs h-8 bg-sky-500 hover:bg-sky-600 text-white" disabled={selfEdit.isPending} onClick={() => selfEdit.mutate(detail.id)}>
+                            <Edit className="mr-1.5 h-3.5 w-3.5" />{selfEdit.isPending ? 'Liberando edição...' : 'Editar documento'}
+                          </Button>
+                        ) : myPendingEditRequest ? (
+                          <div className="flex items-center gap-2 rounded-md border border-status-yellow/40 bg-status-yellow/5 px-2 py-1.5 text-[11px] text-muted-foreground">
+                            <Send className="h-3.5 w-3.5 shrink-0 text-status-yellow" />
+                            Solicitação enviada — aguardando liberação do operador.
+                          </div>
+                        ) : (
                           <Button variant="outline" size="sm" className="w-full justify-start text-xs h-8" disabled={requestEdit.isPending} onClick={() => setReasonDialog({
                             title: 'Solicitar edição do documento',
                             label: 'Motivo da revisão/edição',
@@ -1543,21 +1606,16 @@ export default function DocumentsPage() {
                           </Button>
                         )}
                         {myActiveEditRequest && (
-                          <Button size="sm" className="w-full justify-start text-xs h-8 bg-sky-500 hover:bg-sky-600 text-white" disabled={!canEditOnline || openEditor.isPending} onClick={() => openEditor.mutate(detail.id)}>
-                            <Edit className="mr-1.5 h-3.5 w-3.5" />Editar Documento
+                          <Button variant="outline" size="sm" className="w-full justify-start text-xs h-8" disabled={decideEdit.isPending} onClick={() => decideEdit.mutate({ requestId: myActiveEditRequest.id, action: 'complete' })}>
+                            <CheckCircle2 className="mr-1.5 h-3.5 w-3.5" />Concluir edição
                           </Button>
                         )}
                         {canUpdate && (
-                          <Button size="sm" className="w-full justify-start text-xs h-8 bg-blue-600 hover:bg-blue-700 text-white" onClick={() => {
+                          <Button variant="outline" size="sm" className="w-full justify-start text-xs h-8" onClick={() => {
                             setGrantForm({ requesterUserId: '', reason: '', expiresAt: '' });
                             setGrantOpen(true);
                           }}>
-                            <Edit className="mr-1.5 h-3.5 w-3.5" />Editar Documento
-                          </Button>
-                        )}
-                        {myActiveEditRequest && (
-                          <Button variant="outline" size="sm" className="w-full justify-start text-xs h-8" disabled={decideEdit.isPending} onClick={() => decideEdit.mutate({ requestId: myActiveEditRequest.id, action: 'complete' })}>
-                            <CheckCircle2 className="mr-1.5 h-3.5 w-3.5" />Concluir edição
+                            <Users className="mr-1.5 h-3.5 w-3.5" />Atribuir edição a outro usuário
                           </Button>
                         )}
                       </div>
@@ -1579,7 +1637,7 @@ export default function DocumentsPage() {
                             <div key={request.id} className="rounded-md border p-2">
                               <div className="flex items-center justify-between gap-2">
                                 <span className="text-[10px] font-semibold">{request.requester?.name ?? 'Solicitante'}</span>
-                                <Badge variant="outline" className="text-[9px] scale-90">{request.status}</Badge>
+                                <Badge variant="outline" className="text-[9px] scale-90">{EDIT_REQUEST_STATUS_LABEL[request.status] ?? request.status}</Badge>
                               </div>
                               {request.reason && <div className="mt-1 text-[10px] text-muted-foreground">{request.reason}</div>}
                               {canDecide && (
@@ -1631,17 +1689,21 @@ export default function DocumentsPage() {
                       <Button size="sm" onClick={() => autosave.mutate({ id: detail.id, content: draftContent })} disabled={!isEditable(detail.status) || autosave.isPending || !canUpdate}>
                         <Save className="mr-1.5 h-4 w-4" />Salvar checkpoint
                       </Button>
-                      {myActiveEditRequest && (
-                        <Button size="sm" variant="outline" onClick={() => openEditor.mutate(detail.id)} disabled={openEditor.isPending || !canEditOnline}>
-                          <Edit className="mr-1.5 h-4 w-4" />Editar Documento
+                      {myActiveEditRequest ? (
+                        <Button size="sm" variant="outline" onClick={() => openEditor.mutate(detail.id)} disabled={openEditor.isPending}>
+                          <Edit className="mr-1.5 h-4 w-4" />Editar documento
                         </Button>
-                      )}
+                      ) : canUpdate ? (
+                        <Button size="sm" variant="outline" onClick={() => selfEdit.mutate(detail.id)} disabled={selfEdit.isPending}>
+                          <Edit className="mr-1.5 h-4 w-4" />{selfEdit.isPending ? 'Liberando edição...' : 'Editar documento'}
+                        </Button>
+                      ) : null}
                       {canUpdate && (
                         <Button size="sm" variant="outline" onClick={() => {
                           setGrantForm({ requesterUserId: '', reason: '', expiresAt: '' });
                           setGrantOpen(true);
                         }}>
-                          <Edit className="mr-1.5 h-4 w-4" />Editar Documento
+                          <Users className="mr-1.5 h-4 w-4" />Atribuir edição a outro usuário
                         </Button>
                       )}
                     </div>
@@ -1732,11 +1794,40 @@ export default function DocumentsPage() {
               </TabsContent>
 
               <TabsContent value="distribuicao">
-                <div className="rounded-md border p-4 text-xs text-muted-foreground flex items-center justify-between">
-                  <span>Confirmações de leitura ficam registradas por revisão.</span>
-                  <Button variant="outline" size="sm" className="h-8 text-xs bg-sky-500 hover:bg-sky-600 text-white font-semibold" onClick={() => api(`/documents/${detail.id}/read-confirmations`, { method: 'POST', json: {} }).then(() => toast.success('Leitura confirmada')).then(() => invalidate(qc))}>
-                    <CheckCircle2 className="mr-1.5 h-3.5 w-3.5" />Confirmar leitura
-                  </Button>
+                <div className="space-y-3">
+                  <div className="rounded-md border p-4 text-xs text-muted-foreground flex items-center justify-between gap-3">
+                    <span>Confirmações de leitura ficam registradas por revisão.</span>
+                    {myReadConfirmation ? (
+                      <Badge variant="outline" className="border-status-green/40 text-status-green shrink-0">
+                        <CheckCircle2 className="mr-1.5 h-3.5 w-3.5" />Leitura confirmada
+                      </Badge>
+                    ) : (
+                      <Button variant="outline" size="sm" className="h-8 text-xs bg-sky-500 hover:bg-sky-600 text-white font-semibold" onClick={() => api(`/documents/${detail.id}/read-confirmations`, { method: 'POST', json: {} }).then(() => toast.success('Leitura confirmada')).then(() => invalidate(qc)).catch((e: any) => toast.error(e?.message ?? 'Não foi possível confirmar a leitura'))}>
+                        <CheckCircle2 className="mr-1.5 h-3.5 w-3.5" />Confirmar leitura
+                      </Button>
+                    )}
+                  </div>
+                  <div className="rounded-md border">
+                    <div className="flex items-center justify-between border-b px-4 py-2.5">
+                      <span className="text-xs font-semibold text-slate-800 dark:text-slate-200">Leituras confirmadas</span>
+                      <Badge variant="outline" className="text-[10px]">{formatNumber(detail.readConfirmations?.length ?? 0)}</Badge>
+                    </div>
+                    {(detail.readConfirmations ?? []).length === 0 ? (
+                      <div className="p-6 text-center text-xs text-muted-foreground">Nenhuma leitura confirmada nesta revisão ainda.</div>
+                    ) : (
+                      <div className="divide-y divide-slate-100 dark:divide-slate-800/60">
+                        {(detail.readConfirmations ?? []).map((item) => (
+                          <div key={item.id} className="flex items-center justify-between px-4 py-2.5 text-xs">
+                            <div className="min-w-0">
+                              <div className="truncate font-medium text-slate-800 dark:text-slate-200">{item.user?.name ?? 'Usuário removido'}</div>
+                              {item.user?.email && <div className="truncate text-[10px] text-muted-foreground">{item.user.email}</div>}
+                            </div>
+                            <span className="shrink-0 tabular-nums text-muted-foreground">{formatDate(item.confirmedAt)}</span>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
                 </div>
               </TabsContent>
             </Tabs>
@@ -2020,8 +2111,10 @@ function WorkflowActions({ doc, canUpdate, pending, run, ask }: { doc: DocDetail
           })}><X className="mr-2 h-4 w-4" />Reprovar</Button>
         </>
       )}
-      {doc.status === 'APPROVED' && <Button size="sm" disabled={pending} onClick={() => run('publish')}><FileText className="mr-2 h-4 w-4" />Publicar</Button>}
-      {doc.status === 'PUBLISHED' && (
+      {(doc.status === 'APPROVED' || doc.status === 'SCHEDULED_PUBLICATION') && (
+        <Button size="sm" disabled={pending} onClick={() => run('publish')}><FileText className="mr-2 h-4 w-4" />Publicar</Button>
+      )}
+      {['PUBLISHED', 'NEAR_EXPIRATION', 'EXPIRED', 'PERIODIC_REVIEW'].includes(doc.status) && (
         <>
           <Button size="sm" variant="outline" disabled={pending} onClick={() => ask({
             title: 'Iniciar nova revisão',
@@ -2037,6 +2130,15 @@ function WorkflowActions({ doc, canUpdate, pending, run, ask }: { doc: DocDetail
             onConfirm: (value) => run('obsolete', { comment: value }),
           })}><Archive className="mr-2 h-4 w-4" />Obsoleto</Button>
         </>
+      )}
+      {(doc.status === 'OBSOLETE' || doc.status === 'EXPIRED') && (
+        <Button size="sm" variant="outline" disabled={pending} onClick={() => ask({
+          title: 'Arquivar documento',
+          label: 'Motivo do arquivamento',
+          confirmLabel: 'Arquivar',
+          destructive: true,
+          onConfirm: (value) => run('archive', { comment: value }),
+        })}><Archive className="mr-2 h-4 w-4" />Arquivar</Button>
       )}
     </div>
   );
