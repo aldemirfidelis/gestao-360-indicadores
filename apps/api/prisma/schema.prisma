@@ -11833,3 +11833,112 @@ model DataIncident {
   @@index([companyId, severity])
   @@index([companyId, deletedAt])
 }
+
+// ============================= Serviço Pessoal — Controle de Ponto =============================
+// Módulo `personnel` (Fase 2 do plano DP). Referências a usuário/empresa por id
+// (sem @relation) seguindo o padrão de DocumentReadConfirmation: evita tocar nos
+// modelos User/Company e mantém a migração aditiva.
+
+/// Escala/jornada de trabalho. `weeklyRules` = JSON { mon..sun: { start: "08:00",
+/// end: "17:00", breakMinutes: 60 } | null (folga) }.
+model WorkShiftTemplate {
+  id               String    @id @default(uuid())
+  companyId        String
+  name             String
+  description      String?
+  toleranceMinutes Int       @default(10)
+  weeklyRules      Json
+  active           Boolean   @default(true)
+  createdById      String?
+  createdAt        DateTime  @default(now())
+  updatedAt        DateTime  @updatedAt
+  deletedAt        DateTime?
+
+  assignments WorkScheduleAssignment[]
+
+  @@unique([companyId, name])
+  @@index([companyId, active])
+  @@map("work_shift_templates")
+}
+
+/// Vínculo colaborador (User) -> escala, com vigência. Uma vigência ativa por vez
+/// (a anterior é encerrada ao atribuir uma nova).
+model WorkScheduleAssignment {
+  id          String            @id @default(uuid())
+  companyId   String
+  userId      String
+  templateId  String
+  template    WorkShiftTemplate @relation(fields: [templateId], references: [id], onDelete: Cascade)
+  startsAt    DateTime
+  endsAt      DateTime?
+  createdById String?
+  createdAt   DateTime          @default(now())
+
+  @@index([companyId, userId, startsAt])
+  @@map("work_schedule_assignments")
+}
+
+/// Batida de ponto. Imutável (ajustes cancelam e recriam com origem MANUAL);
+/// `hash`/`prevHash` formam cadeia de integridade por usuário (Portaria 671).
+model TimeClockEntry {
+  id                  String   @id @default(uuid())
+  companyId           String
+  userId              String
+  punchedAt           DateTime
+  dayKey              String // YYYY-MM-DD no fuso da empresa (America/Sao_Paulo)
+  kind                String // IN | OUT (alternância derivada na batida)
+  source              String   @default("WEB") // WEB | MOBILE | MANUAL | IMPORT
+  status              String   @default("VALID") // VALID | CANCELLED
+  latitude            Float?
+  longitude           Float?
+  accuracy            Float?
+  ip                  String?
+  userAgent           String?
+  note                String?
+  hash                String
+  prevHash            String?
+  adjustmentRequestId String?
+  createdById         String?
+  createdAt           DateTime @default(now())
+
+  @@index([companyId, userId, dayKey])
+  @@index([companyId, dayKey])
+  @@map("time_clock_entries")
+}
+
+/// Solicitação de ajuste do espelho de um dia: o colaborador propõe a lista
+/// completa de horários (HH:MM) do dia; aprovação recria as batidas como MANUAL.
+model TimeAdjustmentRequest {
+  id            String    @id @default(uuid())
+  companyId     String
+  userId        String
+  dayKey        String
+  proposedTimes Json // ["08:00","12:00","13:00","17:00"]
+  reason        String
+  status        String    @default("REQUESTED") // REQUESTED | APPROVED | REJECTED | CANCELLED
+  decidedById   String?
+  decisionNote  String?
+  decidedAt     DateTime?
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  @@index([companyId, status])
+  @@index([companyId, userId, dayKey])
+  @@map("time_adjustment_requests")
+}
+
+/// Fechamento de competência (YYYY-MM): trava batidas e ajustes no período.
+model TimesheetPeriod {
+  id         String    @id @default(uuid())
+  companyId  String
+  periodRef  String // YYYY-MM
+  status     String    @default("OPEN") // OPEN | CLOSED
+  closedById String?
+  closedAt   DateTime?
+  totals     Json?
+  createdAt  DateTime  @default(now())
+  updatedAt  DateTime  @updatedAt
+
+  @@unique([companyId, periodRef])
+  @@map("timesheet_periods")
+}

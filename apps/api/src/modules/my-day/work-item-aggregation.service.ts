@@ -184,6 +184,7 @@ export class WorkItemAggregationService {
         this.collectNotifications(me).catch((e) => this.warn('notifications', e)),
         this.collectUnreadCommunications(me).catch((e) => this.warn('communications', e)),
         this.collectSecurityIncidents(me).catch((e) => this.warn('security-incidents', e)),
+        this.collectTimeClock(me).catch((e) => this.warn('time-clock', e)),
       ])
     ).flat();
   }
@@ -549,6 +550,55 @@ export class WorkItemAggregationService {
       };
     });
     return [...documentTasks, ...editTasks];
+  }
+
+  /** Ajustes de ponto pendentes: viram decisão para quem gerencia o ponto. */
+  private async collectTimeClock(me: AuthPayload): Promise<WorkItemDraft[]> {
+    let canManage = ['SUPER_ADMIN', 'COMPANY_ADMIN'].includes(String(me.role));
+    if (!canManage) {
+      const grants = await this.prisma.user.findUnique({
+        where: { id: me.sub },
+        select: {
+          permissions: { select: { permission: { select: { key: true } } } },
+          accessProfile: { select: { permissions: { select: { permission: { select: { key: true } } } } } },
+        },
+      });
+      const keys = new Set<string>();
+      grants?.permissions.forEach((item) => keys.add(item.permission.key));
+      grants?.accessProfile?.permissions.forEach((item) => keys.add(item.permission.key));
+      canManage = keys.has('ponto:manage');
+    }
+    if (!canManage) return [];
+
+    const requests = await this.prisma.timeAdjustmentRequest.findMany({
+      where: { companyId: me.companyId, status: 'REQUESTED' },
+      orderBy: { createdAt: 'asc' },
+      take: 50,
+    });
+    if (!requests.length) return [];
+    const userIds = [...new Set(requests.map((r) => r.userId))];
+    const users = await this.prisma.user.findMany({ where: { id: { in: userIds } }, select: { id: true, name: true } });
+    const nameById = new Map(users.map((u) => [u.id, u.name]));
+
+    return requests.map((r) => ({
+      sourceModule: 'personnel',
+      sourceEntityType: 'TIME_ADJUSTMENT_REQUEST',
+      sourceEntityId: r.id,
+      itemType: 'TIME_ADJUSTMENT_APPROVAL',
+      title: `Ajuste de ponto: ${nameById.get(r.userId) ?? 'Colaborador'} — ${r.dayKey}`,
+      summary: r.reason,
+      status: r.status,
+      criticality: 'MEDIUM',
+      dueAt: null,
+      assignedUserId: me.sub,
+      requesterUserId: r.userId,
+      requiresDecision: true,
+      recommendedAction: 'Aprovar ou rejeitar o ajuste do espelho de ponto',
+      availableActions: [{ key: 'open', label: 'Abrir controle de ponto', href: '/servico-pessoal/ponto?tab=ajustes' }],
+      context: { dayKey: r.dayKey, proposedTimes: r.proposedTimes },
+      sourceCreatedAt: r.createdAt,
+      sourceUpdatedAt: r.updatedAt,
+    }));
   }
 
   private async collectAudits(me: AuthPayload): Promise<WorkItemDraft[]> {

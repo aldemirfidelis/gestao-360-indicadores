@@ -65,6 +65,7 @@ export const CATALOG_MODULES: CatalogModule[] = [
   { code: 'food-safety', name: 'Seguranca dos Alimentos', description: 'FSMS, APPCC, processos, perigos, cadeia e inteligencia', category: 'Seguranca dos Alimentos', route: '/seguranca-alimentos', menuOrder: 60, criticality: 'medium' },
   { code: 'asset-security', name: 'Seguranca Patrimonial', category: 'Seguranca Patrimonial', route: '/seguranca-patrimonial', menuOrder: 70, criticality: 'high' },
   { code: 'compensation', name: 'Cargos e Salarios', description: 'Plano de cargos, quadro, tabelas salariais e movimentacoes', category: 'Cargos e Salarios', route: '/cargos-salarios', menuOrder: 80, criticality: 'high' },
+  { code: 'personnel', name: 'Servico Pessoal', description: 'Departamento pessoal: controle de ponto, escalas, ajustes e fechamento de competencia', category: 'Servico Pessoal', route: '/servico-pessoal/ponto', menuOrder: 85, criticality: 'high' },
   { code: 'communication', name: 'Comunicacao', category: 'Comunicacao', route: '/comunicacao', menuOrder: 90, criticality: 'medium' },
   { code: 'prize', name: 'Gestao de Premio', description: 'Remuneracao variavel: anexos, competencias, apuracao, folha e espelho', category: 'Gestao de Premio', route: '/gestao-premio', menuOrder: 100, criticality: 'high' },
 
@@ -147,6 +148,8 @@ export const CATALOG_PAGES: CatalogPage[] = [
   { code: 'compensation.approvals', moduleCode: 'compensation', name: 'Aprovacoes', title: 'Aprovacoes', route: '/cargos-salarios/aprovacoes', menuOrder: 91 },
   { code: 'compensation.settings', moduleCode: 'compensation', name: 'Configuracoes', title: 'Configuracoes', route: '/cargos-salarios/configuracoes', menuOrder: 92 },
   { code: 'compensation.reports', moduleCode: 'compensation', name: 'Relatorios', title: 'Relatorios', route: '/cargos-salarios/relatorios', menuOrder: 93 },
+
+  { code: 'personnel.time-clock', moduleCode: 'personnel', name: 'Controle de Ponto', title: 'Controle de Ponto', route: '/servico-pessoal/ponto', menuOrder: 95 },
 
   { code: 'communication.wall', moduleCode: 'communication', name: 'Meu Mural', title: 'Meu Mural', route: '/comunicacao?tab=mural', menuOrder: 100 },
   { code: 'communication.central', moduleCode: 'communication', name: 'Central', title: 'Central', route: '/comunicacao?tab=central', menuOrder: 101 },

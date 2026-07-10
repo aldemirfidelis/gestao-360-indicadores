@@ -222,6 +222,12 @@ export const PERMISSION_CATALOG = [
   ['org:positions:manage', 'Gerenciar organograma de cargos', 'Estrutura', 'manage'],
   ['org:positions:approve', 'Aprovar mudanças de cargo', 'Estrutura', 'approve'],
 
+  // Servico Pessoal — Controle de Ponto
+  ['ponto:view', 'Visualizar o proprio espelho de ponto', 'Servico Pessoal', 'view'],
+  ['ponto:clock', 'Registrar ponto (batida)', 'Servico Pessoal', 'create'],
+  ['ponto:team', 'Visualizar espelho de ponto da equipe', 'Servico Pessoal', 'view'],
+  ['ponto:manage', 'Gerenciar ponto (ajustes, escalas e fechamento)', 'Servico Pessoal', 'manage'],
+
   // Cargos e Salarios
   ['compensation:view', 'Visualizar modulo de Cargos e Salarios', 'Cargos e Salarios', 'view'],
   ['compensation:manage', 'Administrar modulo de Cargos e Salarios', 'Cargos e Salarios', 'manage'],

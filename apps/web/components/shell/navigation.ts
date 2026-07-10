@@ -9,6 +9,7 @@ import {
   CarFront,
   CheckSquare,
   ClipboardCheck,
+  Clock,
   Compass,
   DoorOpen,
   FileBarChart,
@@ -219,6 +220,16 @@ export const navSections: NavSection[] = [
     ],
   },
   {
+    heading: 'Serviço Pessoal',
+    description: 'Departamento pessoal: ponto, escalas e fechamento',
+    intent: 'management',
+    icon: Clock,
+    permissions: ['ponto:view', 'ponto:manage'],
+    items: [
+      { href: '/servico-pessoal/ponto', label: 'Controle de Ponto', description: 'Bater ponto, espelho, ajustes, escalas e fechamento', icon: Clock, permissions: ['ponto:view', 'ponto:manage'] },
+    ],
+  },
+  {
     heading: 'Comunicação',
     description: 'Mural, central, campanhas, mídias, métricas e chat',
     intent: 'management',
@@ -280,6 +291,7 @@ export const ROUTE_PERMISSIONS: Array<{ prefix: string; permissions: string[]; e
   { prefix: '/strategy', permissions: ['strategy:view'] },
   { prefix: '/org', permissions: ['org:view', 'org:view_all'] },
   { prefix: '/cargos-salarios', permissions: ['compensation:view', 'org:positions:view'] },
+  { prefix: '/servico-pessoal', permissions: ['ponto:view', 'ponto:manage'] },
   { prefix: '/organograma', permissions: ['compensation:view', 'org:positions:view', 'org:view'] },
   { prefix: '/aprovacoes-cargo', permissions: ['org:positions:approve', 'eficacia:view', 'actions:effectiveness', 'actions:delete', 'actions:approve', 'actions:manage'] },
   { prefix: '/projects', permissions: ['projects:view'] },

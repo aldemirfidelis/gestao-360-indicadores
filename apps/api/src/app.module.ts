@@ -64,6 +64,7 @@ import { WorkItemEventsModule } from './modules/my-day/work-item-event-bus';
 import { LgpdModule } from './modules/lgpd/lgpd.module';
 import { PrizeModule } from './modules/prize/prize.module';
 import { CompensationModule } from './modules/compensation/compensation.module';
+import { PersonnelModule } from './modules/personnel/personnel.module';
 import { MonthlyResultsModule } from './modules/monthly-results/monthly-results.module';
 import { StorageModule } from './storage/storage.module';
 import { PublicModule } from './modules/public/public.module';
@@ -131,6 +132,7 @@ import { workersEnabled } from './jobs/jobs.constants';
     LgpdModule,
     PrizeModule,
     CompensationModule,
+    PersonnelModule,
     MonthlyResultsModule,
     StorageModule,
     PublicModule,
