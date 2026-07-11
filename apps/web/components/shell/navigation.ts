@@ -231,6 +231,7 @@ export const navSections: NavSection[] = [
       { href: '/servico-pessoal/ponto', label: 'Controle de Ponto', description: 'Bater ponto, espelho, ajustes, escalas e fechamento', icon: Clock, permissions: ['ponto:view', 'ponto:manage'] },
       { href: '/servico-pessoal/ferias', label: 'Férias e Afastamentos', description: 'Saldos, solicitações com aprovação e atestados/afastamentos', icon: CalendarDays, permissions: [] },
       { href: '/servico-pessoal/admissoes', label: 'Admissão e Desligamento', description: 'Checklists de admissão/desligamento e saúde ocupacional (ASO)', icon: ClipboardCheck, permissions: ['pessoal:view', 'pessoal:manage'] },
+      { href: '/servico-pessoal/relatorios', label: 'Relatórios', description: 'Turnover, absenteísmo, horas extras e exportação para a folha', icon: FileBarChart, permissions: ['pessoal:view', 'pessoal:manage'] },
     ],
   },
   {

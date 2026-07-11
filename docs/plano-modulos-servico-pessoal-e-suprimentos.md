@@ -74,7 +74,7 @@
 | **2 — Ponto** ✅ *MVP entregue em 2026-07-10* | Escalas, batida web/mobile (geoloc), espelho, justificativas via Meu Dia, banco de horas, fechamento de competência. Migração `20260710120000` + módulo `personnel` + tela `/servico-pessoal/ponto`. Pendente da fase: import de batidas (REP), banco de horas acumulado multi-mês, DSR/adicional noturno, relatório p/ folha | G |
 | **3 — Férias & Afastamentos** | Saldos, fluxos de aprovação, calendário, atestados, alertas | M |
 | **4 — Admissão/Desligamento digital + Saúde** | Checklists (forms), coleta de documentos, ASO com alertas | M |
-| **5 — Integrações & Relatórios** | Export p/ folha (Apdata/SAP via conectores), preparação eSocial, relatórios (absenteísmo, turnover, horas extras), insights | M |
+| **5 — Integrações & Relatórios** ✅ *implementada em 2026-07-11* | Relatórios de turnover (admissões/desligamentos/headcount/taxa por mês e área), absenteísmo (afastamentos por tipo/área + faltas de ponto + taxa sobre dias úteis), horas extras (saldo positivo do espelho por colaborador/área) e exportação da folha (CSV/XLSX consolidando ponto + afastamentos). Tudo sobre dados reais reaproveitando `periodReport`. Rotas `/personnel/reports/*` + tela `/servico-pessoal/relatorios`. Sem migração. Preparação eSocial/conectores fica para evolução futura | M |
 
 ---
 
