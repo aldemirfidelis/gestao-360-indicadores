@@ -64,6 +64,7 @@ export const BUSINESS_MODULES: BusinessModule[] = [
   { code: 'seguranca-patrimonial', name: 'Segurança Patrimonial', menuOrder: 70, members: ['asset-security'] },
   { code: 'cargos-salarios', name: 'Cargos e Salários', menuOrder: 80, members: ['compensation'] },
   { code: 'servico-pessoal', name: 'Serviço Pessoal', menuOrder: 85, members: ['personnel'] },
+  { code: 'suprimentos', name: 'Suprimentos', menuOrder: 87, members: ['procurement', 'inventory'] },
   { code: 'comunicacao', name: 'Comunicação', menuOrder: 90, members: ['communication'] },
   { code: 'gestao-premio', name: 'Gestão de Prêmio', menuOrder: 100, members: ['prize'] },
 ];
@@ -102,6 +103,7 @@ export const PLAN_BUSINESS_MODULES: Record<string, string[]> = {
     'comunicacao',
     'cargos-salarios',
     'servico-pessoal',
+    'suprimentos',
     'seguranca-alimentos',
     'seguranca-patrimonial',
     'gestao-premio',

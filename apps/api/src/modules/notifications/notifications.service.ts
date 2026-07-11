@@ -154,6 +154,56 @@ export class NotificationsService {
       created.push(nc.id);
     }
 
+    // 4. Materiais abaixo do estoque mínimo: alerta o responsável do
+    // almoxarifado, sem duplicar enquanto a notificação anterior estiver aberta.
+    const lowStock = await this.prisma.stockBalance.findMany({
+      where: { companyId, item: { kind: 'MATERIAL', active: true, deletedAt: null, minimumStock: { not: null } } },
+      include: {
+        item: { select: { id: true, code: true, name: true, minimumStock: true, unit: true } },
+        warehouse: { select: { id: true, name: true, managerUserId: true } },
+      },
+      take: 200,
+    });
+    for (const balance of lowStock) {
+      if (!balance.item.minimumStock || balance.quantity.gte(balance.item.minimumStock) || !balance.warehouse.managerUserId) continue;
+      const link = `/suprimentos?tab=stock&item=${balance.item.id}&warehouse=${balance.warehouse.id}`;
+      const exists = await this.prisma.notification.findFirst({
+        where: { userId: balance.warehouse.managerUserId, kind: NotificationKind.STOCK_MINIMUM_ALERT, link, readAt: null },
+      });
+      if (exists) continue;
+      await this.create(
+        companyId,
+        balance.warehouse.managerUserId,
+        NotificationKind.STOCK_MINIMUM_ALERT,
+        `Estoque mínimo: ${balance.item.code} · ${balance.item.name}`,
+        `${balance.warehouse.name}: saldo ${balance.quantity.toString()} ${balance.item.unit}, mínimo ${balance.item.minimumStock.toString()}.`,
+        link,
+      );
+      created.push(balance.id);
+    }
+
+    // 5. Pedido enviado com entrega vencida: alerta o comprador responsável.
+    const overdueOrders = await this.prisma.purchaseOrder.findMany({
+      where: { companyId, status: { in: ['SENT', 'PARTIALLY_DELIVERED'] }, expectedDeliveryAt: { lt: new Date() } },
+      select: { id: true, number: true, expectedDeliveryAt: true, createdById: true }, take: 100,
+    });
+    for (const order of overdueOrders) {
+      const link = `/suprimentos?tab=orders&order=${order.id}`;
+      const exists = await this.prisma.notification.findFirst({
+        where: { userId: order.createdById, kind: NotificationKind.PURCHASE_ORDER_OVERDUE, link, readAt: null },
+      });
+      if (exists) continue;
+      await this.create(
+        companyId,
+        order.createdById,
+        NotificationKind.PURCHASE_ORDER_OVERDUE,
+        `Entrega atrasada: ${order.number}`,
+        `Previsão de entrega vencida em ${order.expectedDeliveryAt?.toLocaleDateString('pt-BR')}.`,
+        link,
+      );
+      created.push(order.id);
+    }
+
     return { generated: created.length };
   }
 }

@@ -142,6 +142,12 @@ export const BUSINESS_MODULE_DEFINITIONS: BusinessModuleDefinition[] = [
     prefixes: ['compensation'],
   },
   {
+    slug: 'suprimentos',
+    title: 'Suprimentos',
+    description: 'Compras, alçadas, recebimentos, estoque, kardex e almoxarifados.',
+    prefixes: ['compras', 'estoque'],
+  },
+  {
     slug: 'comunicacao',
     title: 'Comunicação',
     description: 'Mural, comunicados, campanhas, mídias, métricas, diretório e chat.',
@@ -197,6 +203,7 @@ const FEATURE_LABELS: Record<string, string> = {
   OKRs: 'OKRs',
   Estrutura: 'Estrutura organizacional',
   'Cargos e Salarios': 'Cargos e Salários',
+  Suprimentos: 'Suprimentos',
   Importações: 'Importações',
   Relatórios: 'Relatórios',
   Configurações: 'Configurações',

@@ -186,6 +186,8 @@ export class WorkItemAggregationService {
         this.collectSecurityIncidents(me).catch((e) => this.warn('security-incidents', e)),
         this.collectTimeClock(me).catch((e) => this.warn('time-clock', e)),
         this.collectVacations(me).catch((e) => this.warn('vacations', e)),
+        this.collectPersonnelLifecycle(me).catch((e) => this.warn('personnel-lifecycle', e)),
+        this.collectSupplies(me).catch((e) => this.warn('supplies', e)),
       ])
     ).flat();
   }
@@ -644,6 +646,176 @@ export class WorkItemAggregationService {
       sourceCreatedAt: r.createdAt,
       sourceUpdatedAt: r.updatedAt,
     }));
+  }
+
+  /** Fase 4 do DP: admissões/desligamentos em andamento e ASOs vencendo/vencidos. */
+  private async collectPersonnelLifecycle(me: AuthPayload): Promise<WorkItemDraft[]> {
+    let canManage = ['SUPER_ADMIN', 'COMPANY_ADMIN'].includes(String(me.role));
+    if (!canManage) {
+      const grants = await this.prisma.user.findUnique({
+        where: { id: me.sub },
+        select: {
+          permissions: { select: { permission: { select: { key: true } } } },
+          accessProfile: { select: { permissions: { select: { permission: { select: { key: true } } } } } },
+        },
+      });
+      const keys = new Set<string>();
+      grants?.permissions.forEach((item) => keys.add(item.permission.key));
+      grants?.accessProfile?.permissions.forEach((item) => keys.add(item.permission.key));
+      canManage = keys.has('pessoal:update') || keys.has('pessoal:manage');
+    }
+    if (!canManage) return [];
+
+    const soon = new Date(Date.now() + 30 * 86_400_000);
+    const [processes, exams] = await Promise.all([
+      this.prisma.employeeProcess.findMany({
+        where: { companyId: me.companyId, status: 'IN_PROGRESS' },
+        include: {
+          employee: { select: { id: true, name: true } },
+          items: { select: { required: true, doneAt: true } },
+        },
+        orderBy: { createdAt: 'asc' },
+        take: 30,
+      }),
+      this.prisma.medicalExam.findMany({
+        where: { companyId: me.companyId, deletedAt: null, validUntil: { lte: soon }, employee: { status: 'ACTIVE' } },
+        include: { employee: { select: { id: true, name: true } } },
+        orderBy: { validUntil: 'asc' },
+        take: 30,
+      }),
+    ]);
+
+    const processItems: WorkItemDraft[] = processes.map((p) => {
+      const pending = p.items.filter((item) => item.required && !item.doneAt).length;
+      return {
+        sourceModule: 'personnel',
+        sourceEntityType: 'EMPLOYEE_PROCESS',
+        sourceEntityId: p.id,
+        itemType: p.kind === 'ONBOARDING' ? 'EMPLOYEE_ONBOARDING' : 'EMPLOYEE_OFFBOARDING',
+        title: `${p.kind === 'ONBOARDING' ? 'Admissão' : 'Desligamento'}: ${p.employee.name}`,
+        summary: pending > 0 ? `${pending} item(ns) obrigatório(s) pendente(s) no checklist` : 'Checklist completo — pronto para concluir',
+        status: p.status,
+        criticality: p.dueDate && p.dueDate.getTime() < Date.now() ? 'HIGH' : 'MEDIUM',
+        dueAt: p.dueDate,
+        assignedUserId: me.sub,
+        requiresDecision: pending === 0,
+        recommendedAction: pending > 0 ? 'Completar o checklist do processo' : 'Concluir o processo',
+        availableActions: [{ key: 'open', label: 'Abrir admissões e desligamentos', href: '/servico-pessoal/admissoes' }],
+        context: { employeeId: p.employeeId, kind: p.kind, pending },
+        sourceCreatedAt: p.createdAt,
+        sourceUpdatedAt: p.updatedAt,
+      };
+    });
+
+    const examItems: WorkItemDraft[] = exams.map((exam) => {
+      const expired = (exam.validUntil?.getTime() ?? 0) < Date.now();
+      return {
+        sourceModule: 'personnel',
+        sourceEntityType: 'MEDICAL_EXAM',
+        sourceEntityId: exam.id,
+        itemType: 'MEDICAL_EXAM_EXPIRING',
+        title: `ASO ${expired ? 'vencido' : 'vencendo'}: ${exam.employee.name}`,
+        summary: `${exam.type} válido até ${exam.validUntil?.toISOString().slice(0, 10) ?? '—'}`,
+        status: expired ? 'EXPIRED' : 'EXPIRING',
+        criticality: expired ? 'HIGH' : 'MEDIUM',
+        dueAt: exam.validUntil,
+        assignedUserId: me.sub,
+        requiresDecision: false,
+        recommendedAction: 'Agendar novo exame ocupacional',
+        availableActions: [{ key: 'open', label: 'Abrir saúde ocupacional', href: '/servico-pessoal/admissoes?tab=aso' }],
+        context: { employeeId: exam.employeeId, type: exam.type, validUntil: exam.validUntil },
+        sourceCreatedAt: exam.createdAt,
+        sourceUpdatedAt: exam.updatedAt,
+      };
+    });
+
+    return [...processItems, ...examItems];
+  }
+
+  /** Filas operacionais de Suprimentos: comprador, alçada e almoxarifado. */
+  private async collectSupplies(me: AuthPayload): Promise<WorkItemDraft[]> {
+    const grants = await this.prisma.user.findUnique({
+      where: { id: me.sub },
+      select: {
+        permissions: { select: { permission: { select: { key: true } } } },
+        accessProfile: { select: { permissions: { select: { permission: { select: { key: true } } } } } },
+      },
+    });
+    const keys = new Set<string>();
+    grants?.permissions.forEach((item) => keys.add(item.permission.key));
+    grants?.accessProfile?.permissions.forEach((item) => keys.add(item.permission.key));
+    const admin = ['SUPER_ADMIN', 'COMPANY_ADMIN'].includes(String(me.role));
+    const canBuy = admin || keys.has('compras:buy') || keys.has('compras:manage');
+    const canApprove = admin || keys.has('compras:approve') || keys.has('compras:manage');
+    const canOperateStock = admin || keys.has('estoque:operate') || keys.has('estoque:manage');
+
+    const [requisitions, approvals, withdrawals] = await Promise.all([
+      canBuy
+        ? this.prisma.purchaseRequisition.findMany({
+            where: { companyId: me.companyId, OR: [{ status: 'SUBMITTED', buyerId: null }, { buyerId: me.sub, status: { in: ['IN_TRIAGE', 'IN_QUOTATION'] } }] },
+            select: { id: true, number: true, title: true, status: true, urgency: true, requesterId: true, buyerId: true, orgNodeId: true, neededAt: true, createdAt: true, updatedAt: true },
+            take: 100,
+          })
+        : [],
+      canApprove
+        ? this.prisma.purchaseOrderApproval.findMany({
+            where: {
+              companyId: me.companyId, status: 'PENDING', purchaseOrder: { status: 'PENDING_APPROVAL' },
+              OR: [{ approverUserId: me.sub }, { approverUserId: null, approverRole: String(me.role) }, { approverUserId: null, approverRole: null }],
+            },
+            include: { purchaseOrder: { select: { id: true, number: true, totalAmount: true, createdById: true, expectedDeliveryAt: true, createdAt: true, updatedAt: true, approvals: { select: { level: true, status: true } } } } },
+            take: 100,
+          })
+        : [],
+      canOperateStock
+        ? this.prisma.materialWithdrawal.findMany({
+            where: { companyId: me.companyId, status: { in: ['REQUESTED', 'APPROVED', 'PARTIALLY_FULFILLED'] } },
+            include: { warehouse: { select: { name: true, managerUserId: true } }, items: { select: { id: true } } },
+            take: 100,
+          })
+        : [],
+    ]);
+
+    const urgency: Record<string, string> = { LOW: 'LOW', NORMAL: 'MEDIUM', HIGH: 'HIGH', CRITICAL: 'CRITICAL' };
+    const drafts: WorkItemDraft[] = requisitions.map((row) => ({
+      sourceModule: 'procurement', sourceEntityType: 'PURCHASE_REQUISITION', sourceEntityId: row.id,
+      itemType: row.buyerId ? 'PROCUREMENT_TRIAGE' : 'PROCUREMENT_QUEUE',
+      title: `${row.number} · ${row.title}`,
+      summary: row.buyerId ? 'Requisição sob sua responsabilidade' : 'Nova requisição na fila do comprador',
+      status: row.status, criticality: urgency[row.urgency] ?? 'MEDIUM', dueAt: row.neededAt,
+      assignedUserId: me.sub, requesterUserId: row.requesterId, orgNodeId: row.orgNodeId,
+      requiresDecision: !row.buyerId, isBlocking: row.urgency === 'CRITICAL',
+      recommendedAction: row.buyerId ? 'Concluir triagem e gerar pedido' : 'Assumir a requisição',
+      availableActions: [{ key: 'open', label: 'Abrir fila de compras', href: '/suprimentos?tab=requisitions' }],
+      context: { number: row.number, urgency: row.urgency, buyerId: row.buyerId }, sourceCreatedAt: row.createdAt, sourceUpdatedAt: row.updatedAt,
+    }));
+
+    const actionableApprovals = approvals.filter((step) => !step.purchaseOrder.approvals.some((other) => other.status === 'PENDING' && other.level < step.level));
+    drafts.push(...actionableApprovals.map((step) => ({
+      sourceModule: 'procurement', sourceEntityType: 'PURCHASE_ORDER_APPROVAL', sourceEntityId: step.id,
+      itemType: 'PURCHASE_APPROVAL', title: `Aprovar ${step.purchaseOrder.number}`,
+      summary: `Pedido de ${step.purchaseOrder.totalAmount.toString()} · nível ${step.level}`,
+      status: step.status, criticality: 'HIGH', dueAt: step.purchaseOrder.expectedDeliveryAt,
+      assignedUserId: me.sub, requesterUserId: step.purchaseOrder.createdById, requiresDecision: true, isBlocking: true,
+      recommendedAction: 'Aprovar ou rejeitar o pedido de compra',
+      availableActions: [{ key: 'open', label: 'Abrir pedidos', href: '/suprimentos?tab=orders' }],
+      context: { purchaseOrderId: step.purchaseOrderId, number: step.purchaseOrder.number, level: step.level, orderAmount: step.orderAmount.toString() },
+      sourceCreatedAt: step.purchaseOrder.createdAt, sourceUpdatedAt: step.purchaseOrder.updatedAt,
+    })));
+
+    drafts.push(...withdrawals
+      .filter((row) => !row.warehouse.managerUserId || row.warehouse.managerUserId === me.sub || admin || keys.has('estoque:manage'))
+      .map((row) => ({
+        sourceModule: 'inventory', sourceEntityType: 'MATERIAL_WITHDRAWAL', sourceEntityId: row.id,
+        itemType: 'WAREHOUSE_QUEUE', title: `Atender ${row.number}`,
+        summary: `${row.items.length} item(ns) · ${row.warehouse.name}`,
+        status: row.status, criticality: 'MEDIUM', dueAt: row.neededAt, assignedUserId: me.sub,
+        requesterUserId: row.requesterId, orgNodeId: row.orgNodeId, requiresDecision: row.status === 'REQUESTED',
+        recommendedAction: row.status === 'REQUESTED' ? 'Aprovar e separar materiais' : 'Registrar a baixa dos materiais entregues',
+        availableActions: [{ key: 'open', label: 'Abrir almoxarifado', href: '/suprimentos?tab=warehouse' }],
+        context: { warehouseId: row.warehouseId, number: row.number }, sourceCreatedAt: row.createdAt, sourceUpdatedAt: row.updatedAt,
+      })));
+    return drafts;
   }
 
   private async collectAudits(me: AuthPayload): Promise<WorkItemDraft[]> {

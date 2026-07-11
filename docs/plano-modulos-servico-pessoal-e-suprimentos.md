@@ -159,8 +159,8 @@ Solicita retirada ────────────────────�
 
 | Fase | Entrega | Tamanho |
 |---|---|---|
-| **1 — Estoque básico** | Warehouse, StockItem, StockBalance, StockMovement (kardex), retirada direta com baixa, import de catálogo. 1 migração | M |
-| **2 — Requisição → Pedido** | Requisição multi-item c/ almoxarifado destino, fila do comprador (Meu Dia), PO com alçadas, recebimento simples | G |
+| **1 — Estoque básico** ✅ *implementada em 2026-07-11* | Warehouse, StockItem, StockBalance, StockMovement (kardex transacional), retirada parcial/total com baixa idempotente, ajuste, transferência e import XLSX. Migração `20260710140000` | M |
+| **2 — Requisição → Pedido** ✅ *implementada em 2026-07-11* | Requisição multi-item com almoxarifado destino, claim atômico da fila do comprador no Meu Dia, pedido com alçadas congeladas, recebimento parcial/total e entrada automática no estoque. Migração `20260710150000` | G |
 | **3 — Cotações + NF material** | Mapa comparativo, SupplierInvoice com entrada automática no estoque de destino | M |
 | **4 — Serviços** | Medição (BM) com aprovação do fiscal + NF de serviço travada pela medição | M |
 | **5 — Almoxarifado avançado** | Fluxo de retirada com aprovação, transferências, inventário, custo médio, curva ABC, alertas min/máx, QR | M |

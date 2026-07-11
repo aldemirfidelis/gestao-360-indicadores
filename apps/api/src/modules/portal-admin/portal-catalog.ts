@@ -66,6 +66,8 @@ export const CATALOG_MODULES: CatalogModule[] = [
   { code: 'asset-security', name: 'Seguranca Patrimonial', category: 'Seguranca Patrimonial', route: '/seguranca-patrimonial', menuOrder: 70, criticality: 'high' },
   { code: 'compensation', name: 'Cargos e Salarios', description: 'Plano de cargos, quadro, tabelas salariais e movimentacoes', category: 'Cargos e Salarios', route: '/cargos-salarios', menuOrder: 80, criticality: 'high' },
   { code: 'personnel', name: 'Servico Pessoal', description: 'Departamento pessoal: controle de ponto, escalas, ajustes e fechamento de competencia', category: 'Servico Pessoal', route: '/servico-pessoal/ponto', menuOrder: 85, criticality: 'high' },
+  { code: 'procurement', name: 'Compras', description: 'Requisicoes, fila do comprador, pedidos, alcadas e recebimentos', category: 'Suprimentos', route: '/suprimentos?tab=requisitions', menuOrder: 87, criticality: 'high' },
+  { code: 'inventory', name: 'Estoque e Almoxarifado', description: 'Saldos, kardex, retiradas, transferencias e alertas de reposicao', category: 'Suprimentos', route: '/suprimentos?tab=stock', menuOrder: 88, criticality: 'high' },
   { code: 'communication', name: 'Comunicacao', category: 'Comunicacao', route: '/comunicacao', menuOrder: 90, criticality: 'medium' },
   { code: 'prize', name: 'Gestao de Premio', description: 'Remuneracao variavel: anexos, competencias, apuracao, folha e espelho', category: 'Gestao de Premio', route: '/gestao-premio', menuOrder: 100, criticality: 'high' },
 
@@ -152,6 +154,13 @@ export const CATALOG_PAGES: CatalogPage[] = [
   { code: 'personnel.employees', moduleCode: 'personnel', name: 'Colaboradores', title: 'Colaboradores', route: '/servico-pessoal/colaboradores', menuOrder: 94 },
   { code: 'personnel.time-clock', moduleCode: 'personnel', name: 'Controle de Ponto', title: 'Controle de Ponto', route: '/servico-pessoal/ponto', menuOrder: 95 },
   { code: 'personnel.vacations', moduleCode: 'personnel', name: 'Ferias e Afastamentos', title: 'Ferias e Afastamentos', route: '/servico-pessoal/ferias', menuOrder: 95.5 },
+  { code: 'personnel.lifecycle', moduleCode: 'personnel', name: 'Admissao, Desligamento e ASO', title: 'Admissao, Desligamento e ASO', route: '/servico-pessoal/admissoes', menuOrder: 95.7 },
+  { code: 'procurement.dashboard', moduleCode: 'procurement', name: 'Painel de Suprimentos', title: 'Suprimentos', route: '/suprimentos?tab=dashboard', menuOrder: 96 },
+  { code: 'procurement.requisitions', moduleCode: 'procurement', name: 'Requisicoes', title: 'Requisicoes de Compra', route: '/suprimentos?tab=requisitions', menuOrder: 97 },
+  { code: 'procurement.orders', moduleCode: 'procurement', name: 'Pedidos', title: 'Pedidos de Compra', route: '/suprimentos?tab=orders', menuOrder: 98 },
+  { code: 'inventory.stock', moduleCode: 'inventory', name: 'Estoque', title: 'Posicao e Kardex', route: '/suprimentos?tab=stock', menuOrder: 99 },
+  { code: 'inventory.warehouse', moduleCode: 'inventory', name: 'Almoxarifado', title: 'Almoxarifado', route: '/suprimentos?tab=warehouse', menuOrder: 100 },
+  { code: 'procurement.registrations', moduleCode: 'procurement', name: 'Cadastros', title: 'Cadastros de Suprimentos', route: '/suprimentos?tab=registrations', menuOrder: 101 },
 
   { code: 'communication.wall', moduleCode: 'communication', name: 'Meu Mural', title: 'Meu Mural', route: '/comunicacao?tab=mural', menuOrder: 100 },
   { code: 'communication.central', moduleCode: 'communication', name: 'Central', title: 'Central', route: '/comunicacao?tab=central', menuOrder: 101 },

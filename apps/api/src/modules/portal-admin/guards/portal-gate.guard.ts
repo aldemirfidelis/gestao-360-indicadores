@@ -183,6 +183,8 @@ export class PortalGateGuard implements CanActivate {
       ['/api/processes', 'processes'],
       ['/api/cargos-salarios', 'compensation'],
       ['/api/personnel', 'personnel'],
+      ['/api/procurement', 'procurement'],
+      ['/api/inventory', 'inventory'],
       ['/api/food-safety', 'food-safety'],
       ['/api/asset-security', 'asset-security'],
       ['/api/forms', 'forms'],
