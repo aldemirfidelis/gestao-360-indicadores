@@ -6261,6 +6261,8 @@ model OrgEmployee {
   dependents          EmployeeDependent[]
   employmentEvents    EmploymentEvent[]
   dossierFiles        EmployeeDossierFile[]
+  vacationRequests    VacationRequest[]
+  leaveRecords        LeaveRecord[]
 
   @@index([companyId])
   @@index([orgNodeId])
@@ -12059,3 +12061,54 @@ model EmployeeDossierFile {
   @@index([companyId, validUntil])
   @@map("employee_dossier_files")
 }
+
+/// Solicitação de férias (dias corridos, CLT). Os períodos aquisitivos e o
+/// saldo são derivados da data de admissão do perfil — sem tabela de períodos.
+model VacationRequest {
+  id                 String      @id @default(uuid())
+  companyId          String
+  employeeId         String
+  employee           OrgEmployee @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+  startDate          DateTime
+  endDate            DateTime
+  days               Int
+  periodRef          String? // período aquisitivo atribuído (ex.: "2025/2026")
+  status             String      @default("REQUESTED") // REQUESTED | MANAGER_APPROVED | APPROVED | REJECTED | CANCELLED | DONE
+  notes              String?
+  managerDecidedById String?
+  managerDecidedAt   DateTime?
+  finalDecidedById   String?
+  finalDecidedAt     DateTime?
+  decisionNote       String?
+  createdById        String?
+  createdAt          DateTime    @default(now())
+  updatedAt          DateTime    @updatedAt
+
+  @@index([companyId, employeeId, startDate])
+  @@index([companyId, status])
+  @@map("vacation_requests")
+}
+
+/// Afastamento/atestado (tipos alinhados ao eSocial). CID é dado sensível:
+/// exposto apenas no detalhe para quem gerencia o serviço pessoal.
+model LeaveRecord {
+  id            String      @id @default(uuid())
+  companyId     String
+  employeeId    String
+  employee      OrgEmployee @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+  type          String // ATESTADO | ACIDENTE_TRABALHO | MATERNIDADE | PATERNIDADE | LICENCA_NAO_REMUNERADA | FALTA_JUSTIFICADA | OUTRO
+  startDate     DateTime
+  endDate       DateTime? // null = em aberto
+  cid           String?
+  description   String?
+  dossierFileId String?
+  createdById   String?
+  createdAt     DateTime    @default(now())
+  updatedAt     DateTime    @updatedAt
+  deletedAt     DateTime?
+
+  @@index([companyId, employeeId, startDate])
+  @@index([companyId, deletedAt])
+  @@map("leave_records")
+}
+

@@ -228,6 +228,7 @@ export const navSections: NavSection[] = [
     items: [
       { href: '/servico-pessoal/colaboradores', label: 'Colaboradores', description: 'Cadastro, prontuário 360°, dependentes e dossiê digital', icon: UserCheck, permissions: ['pessoal:view', 'pessoal:manage'] },
       { href: '/servico-pessoal/ponto', label: 'Controle de Ponto', description: 'Bater ponto, espelho, ajustes, escalas e fechamento', icon: Clock, permissions: ['ponto:view', 'ponto:manage'] },
+      { href: '/servico-pessoal/ferias', label: 'Férias e Afastamentos', description: 'Saldos, solicitações com aprovação e atestados/afastamentos', icon: CalendarDays, permissions: [] },
     ],
   },
   {
@@ -292,6 +293,7 @@ export const ROUTE_PERMISSIONS: Array<{ prefix: string; permissions: string[]; e
   { prefix: '/strategy', permissions: ['strategy:view'] },
   { prefix: '/org', permissions: ['org:view', 'org:view_all'] },
   { prefix: '/cargos-salarios', permissions: ['compensation:view', 'org:positions:view'] },
+  { prefix: '/servico-pessoal/ferias', permissions: [] },
   { prefix: '/servico-pessoal/colaboradores', permissions: ['pessoal:view', 'pessoal:manage'] },
   { prefix: '/servico-pessoal', permissions: ['ponto:view', 'ponto:manage', 'pessoal:view'] },
   { prefix: '/organograma', permissions: ['compensation:view', 'org:positions:view', 'org:view'] },

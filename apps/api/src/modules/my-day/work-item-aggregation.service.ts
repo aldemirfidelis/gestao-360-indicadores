@@ -185,6 +185,7 @@ export class WorkItemAggregationService {
         this.collectUnreadCommunications(me).catch((e) => this.warn('communications', e)),
         this.collectSecurityIncidents(me).catch((e) => this.warn('security-incidents', e)),
         this.collectTimeClock(me).catch((e) => this.warn('time-clock', e)),
+        this.collectVacations(me).catch((e) => this.warn('vacations', e)),
       ])
     ).flat();
   }
@@ -596,6 +597,50 @@ export class WorkItemAggregationService {
       recommendedAction: 'Aprovar ou rejeitar o ajuste do espelho de ponto',
       availableActions: [{ key: 'open', label: 'Abrir controle de ponto', href: '/servico-pessoal/ponto?tab=ajustes' }],
       context: { dayKey: r.dayKey, proposedTimes: r.proposedTimes },
+      sourceCreatedAt: r.createdAt,
+      sourceUpdatedAt: r.updatedAt,
+    }));
+  }
+
+  /** Férias aguardando aprovação (gestor/DP): decisão para quem tem pessoal:update. */
+  private async collectVacations(me: AuthPayload): Promise<WorkItemDraft[]> {
+    let canDecide = ['SUPER_ADMIN', 'COMPANY_ADMIN'].includes(String(me.role));
+    if (!canDecide) {
+      const grants = await this.prisma.user.findUnique({
+        where: { id: me.sub },
+        select: {
+          permissions: { select: { permission: { select: { key: true } } } },
+          accessProfile: { select: { permissions: { select: { permission: { select: { key: true } } } } } },
+        },
+      });
+      const keys = new Set<string>();
+      grants?.permissions.forEach((item) => keys.add(item.permission.key));
+      grants?.accessProfile?.permissions.forEach((item) => keys.add(item.permission.key));
+      canDecide = keys.has('pessoal:update') || keys.has('pessoal:manage');
+    }
+    if (!canDecide) return [];
+
+    const requests = await this.prisma.vacationRequest.findMany({
+      where: { companyId: me.companyId, status: { in: ['REQUESTED', 'MANAGER_APPROVED'] } },
+      include: { employee: { select: { id: true, name: true } } },
+      orderBy: { startDate: 'asc' },
+      take: 50,
+    });
+    return requests.map((r) => ({
+      sourceModule: 'personnel',
+      sourceEntityType: 'VACATION_REQUEST',
+      sourceEntityId: r.id,
+      itemType: 'VACATION_APPROVAL',
+      title: `Férias: ${r.employee.name} — ${r.days} dia(s)`,
+      summary: r.status === 'REQUESTED' ? 'Aguardando aprovação do gestor' : 'Aguardando aprovação final do DP',
+      status: r.status,
+      criticality: 'MEDIUM',
+      dueAt: r.startDate,
+      assignedUserId: me.sub,
+      requiresDecision: true,
+      recommendedAction: 'Aprovar ou rejeitar a solicitação de férias',
+      availableActions: [{ key: 'open', label: 'Abrir férias e afastamentos', href: '/servico-pessoal/ferias?tab=solicitacoes' }],
+      context: { employeeId: r.employeeId, startDate: r.startDate, endDate: r.endDate, days: r.days },
       sourceCreatedAt: r.createdAt,
       sourceUpdatedAt: r.updatedAt,
     }));

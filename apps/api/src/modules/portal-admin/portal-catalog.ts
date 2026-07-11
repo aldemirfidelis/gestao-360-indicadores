@@ -151,6 +151,7 @@ export const CATALOG_PAGES: CatalogPage[] = [
 
   { code: 'personnel.employees', moduleCode: 'personnel', name: 'Colaboradores', title: 'Colaboradores', route: '/servico-pessoal/colaboradores', menuOrder: 94 },
   { code: 'personnel.time-clock', moduleCode: 'personnel', name: 'Controle de Ponto', title: 'Controle de Ponto', route: '/servico-pessoal/ponto', menuOrder: 95 },
+  { code: 'personnel.vacations', moduleCode: 'personnel', name: 'Ferias e Afastamentos', title: 'Ferias e Afastamentos', route: '/servico-pessoal/ferias', menuOrder: 95.5 },
 
   { code: 'communication.wall', moduleCode: 'communication', name: 'Meu Mural', title: 'Meu Mural', route: '/comunicacao?tab=mural', menuOrder: 100 },
   { code: 'communication.central', moduleCode: 'communication', name: 'Central', title: 'Central', route: '/comunicacao?tab=central', menuOrder: 101 },

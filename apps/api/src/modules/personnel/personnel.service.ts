@@ -4,6 +4,7 @@ import { PrismaService } from '../../prisma/prisma.service';
 import { AuditWriterService } from '../../common/audit/audit-writer.service';
 import { WorkItemEventBus } from '../my-day/work-item-event-bus';
 import { AuthPayload } from '../auth/auth.types';
+import { VacationService, type DayCoverage } from './vacation.service';
 import {
   chainHash,
   companyTimeToUtc,
@@ -36,6 +37,7 @@ export class PersonnelService {
     private readonly prisma: PrismaService,
     private readonly audit: AuditWriterService,
     private readonly workItems: WorkItemEventBus,
+    private readonly vacations: VacationService,
   ) {}
 
   // ------------------------------ Batida ------------------------------
@@ -110,7 +112,7 @@ export class PersonnelService {
 
   async teamMirror(me: AuthPayload, day?: string) {
     const dayKey = day && isValidDayKey(day) ? day : dayKeyFor(new Date());
-    const [users, entries, assignments] = await Promise.all([
+    const [users, entries, assignments, coverageMap] = await Promise.all([
       this.prisma.user.findMany({
         where: { companyId: me.companyId, deletedAt: null, active: true },
         select: { id: true, name: true, email: true, jobTitle: true },
@@ -121,15 +123,17 @@ export class PersonnelService {
         orderBy: { punchedAt: 'asc' },
       }),
       this.assignmentsForRange(me.companyId, null, dayKey, dayKey),
+      this.vacations.coverageForUsers(me.companyId, null, dayKey, dayKey),
     ]);
 
     const entriesByUser = groupBy(entries, (e) => e.userId);
     const isToday = dayKey === dayKeyFor(new Date());
     const rows = users.map((user) => {
       const userEntries = entriesByUser.get(user.id) ?? [];
+      const coverage = coverageMap.get(user.id)?.get(dayKey) ?? null;
       const resolved = this.resolveRule(assignments, user.id, dayKey);
       const { workedMinutes, open } = pairPunches(userEntries.map((e) => e.punchedAt));
-      const plannedMinutes = plannedMinutesFor(dayKey, resolved.rules);
+      const plannedMinutes = coverage ? 0 : plannedMinutesFor(dayKey, resolved.rules);
       const { status, balanceMinutes } = evaluateDay({
         punchCount: userEntries.length,
         workedMinutes,
@@ -137,6 +141,7 @@ export class PersonnelService {
         toleranceMinutes: resolved.toleranceMinutes,
         isToday,
         hasOpenPair: open,
+        coverage,
       });
       return {
         user,
@@ -758,16 +763,18 @@ export class PersonnelService {
   // ------------------------------ Internos ------------------------------
 
   private async buildMyDay(me: AuthPayload, dayKey: string) {
-    const [entries, assignments] = await Promise.all([
+    const [entries, assignments, coverageMap] = await Promise.all([
       this.prisma.timeClockEntry.findMany({
         where: { companyId: me.companyId, userId: me.sub, dayKey, status: 'VALID' },
         orderBy: { punchedAt: 'asc' },
       }),
       this.assignmentsForRange(me.companyId, me.sub, dayKey, dayKey),
+      this.vacations.coverageForUsers(me.companyId, [me.sub], dayKey, dayKey),
     ]);
+    const coverage = coverageMap.get(me.sub)?.get(dayKey) ?? null;
     const resolved = this.resolveRule(assignments, me.sub, dayKey);
     const { workedMinutes, open } = pairPunches(entries.map((e) => e.punchedAt));
-    const plannedMinutes = plannedMinutesFor(dayKey, resolved.rules);
+    const plannedMinutes = coverage ? 0 : plannedMinutesFor(dayKey, resolved.rules);
     const evaluation = evaluateDay({
       punchCount: entries.length,
       workedMinutes,
@@ -775,6 +782,7 @@ export class PersonnelService {
       toleranceMinutes: resolved.toleranceMinutes,
       isToday: dayKey === dayKeyFor(new Date()),
       hasOpenPair: open,
+      coverage,
     });
     return {
       dayKey,
@@ -789,7 +797,7 @@ export class PersonnelService {
   }
 
   private async buildMirrorDays(companyId: string, userId: string, fromKey: string, toKey: string) {
-    const [entries, assignments, adjustments] = await Promise.all([
+    const [entries, assignments, adjustments, coverageMap] = await Promise.all([
       this.prisma.timeClockEntry.findMany({
         where: { companyId, userId, dayKey: { gte: fromKey, lte: toKey }, status: 'VALID' },
         orderBy: { punchedAt: 'asc' },
@@ -799,7 +807,9 @@ export class PersonnelService {
         where: { companyId, userId, dayKey: { gte: fromKey, lte: toKey } },
         orderBy: { createdAt: 'desc' },
       }),
+      this.vacations.coverageForUsers(companyId, [userId], fromKey, toKey),
     ]);
+    const coverageDays = coverageMap.get(userId) ?? new Map<string, DayCoverage>();
     const entriesByDay = groupBy(entries, (e) => e.dayKey);
     const adjustmentByDay = new Map<string, (typeof adjustments)[number]>();
     for (const adjustment of adjustments) {
@@ -809,9 +819,10 @@ export class PersonnelService {
 
     return enumerateDays(fromKey, toKey).map((dayKey) => {
       const dayEntries = entriesByDay.get(dayKey) ?? [];
+      const coverage = coverageDays.get(dayKey) ?? null;
       const resolved = this.resolveRule(assignments, userId, dayKey);
       const { workedMinutes, open } = pairPunches(dayEntries.map((e) => e.punchedAt));
-      const plannedMinutes = plannedMinutesFor(dayKey, resolved.rules);
+      const plannedMinutes = coverage ? 0 : plannedMinutesFor(dayKey, resolved.rules);
       const evaluation = evaluateDay({
         punchCount: dayEntries.length,
         workedMinutes,
@@ -819,6 +830,7 @@ export class PersonnelService {
         toleranceMinutes: resolved.toleranceMinutes,
         isToday: dayKey === today,
         hasOpenPair: open,
+        coverage,
       });
       const adjustment = adjustmentByDay.get(dayKey);
       return {

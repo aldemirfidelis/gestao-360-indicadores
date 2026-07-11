@@ -36,7 +36,7 @@ import { api, getAccessToken } from '@/lib/api';
 import { cn, formatDate } from '@/lib/utils';
 import { ReasonDialog, type ReasonDialogState } from '@/components/platform/reason-dialog';
 
-type DayStatus = 'DAY_OFF' | 'IN_PROGRESS' | 'OK' | 'INCOMPLETE' | 'ABSENT' | 'OVERTIME' | 'UNDERTIME';
+type DayStatus = 'DAY_OFF' | 'IN_PROGRESS' | 'OK' | 'INCOMPLETE' | 'ABSENT' | 'OVERTIME' | 'UNDERTIME' | 'VACATION' | 'LEAVE';
 
 interface PunchEntry {
   id: string;
@@ -125,6 +125,8 @@ const STATUS_LABEL: Record<DayStatus, string> = {
   ABSENT: 'Falta',
   OVERTIME: 'Hora extra',
   UNDERTIME: 'Débito',
+  VACATION: 'Férias',
+  LEAVE: 'Afastamento',
 };
 
 const STATUS_CLASS: Record<DayStatus, string> = {
@@ -135,6 +137,8 @@ const STATUS_CLASS: Record<DayStatus, string> = {
   ABSENT: 'border-status-red/40 text-status-red',
   OVERTIME: 'border-status-purple/40 text-status-purple',
   UNDERTIME: 'border-status-red/40 text-status-red',
+  VACATION: 'border-sky-400/50 text-sky-500',
+  LEAVE: 'border-status-purple/40 text-status-purple',
 };
 
 const ADJUSTMENT_STATUS_LABEL: Record<string, string> = {

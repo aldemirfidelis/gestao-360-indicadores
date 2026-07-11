@@ -21,7 +21,9 @@ export type DayStatus =
   | 'INCOMPLETE' // número ímpar de batidas (inconsistência)
   | 'ABSENT' // jornada prevista sem nenhuma batida
   | 'OVERTIME' // acima da tolerância (crédito)
-  | 'UNDERTIME'; // abaixo da tolerância (débito)
+  | 'UNDERTIME' // abaixo da tolerância (débito)
+  | 'VACATION' // férias aprovadas cobrindo o dia (abonado)
+  | 'LEAVE'; // afastamento/atestado cobrindo o dia (abonado)
 
 /** Brasil não tem horário de verão desde 2019: America/Sao_Paulo = UTC-3 fixo. */
 export const COMPANY_UTC_OFFSET_MINUTES = -180;
@@ -120,9 +122,12 @@ export function evaluateDay(input: {
   toleranceMinutes: number;
   isToday: boolean;
   hasOpenPair: boolean;
+  /** Férias/afastamento cobrindo o dia: abona a jornada (saldo 0). */
+  coverage?: 'VACATION' | 'LEAVE' | null;
 }): DayEvaluation {
-  const { punchCount, workedMinutes, plannedMinutes, toleranceMinutes, isToday, hasOpenPair } = input;
+  const { punchCount, workedMinutes, plannedMinutes, toleranceMinutes, isToday, hasOpenPair, coverage } = input;
 
+  if (coverage) return { status: coverage, balanceMinutes: 0 };
   if (isToday && (punchCount === 0 || hasOpenPair)) return { status: 'IN_PROGRESS', balanceMinutes: 0 };
   if (punchCount === 0) {
     return plannedMinutes > 0 ? { status: 'ABSENT', balanceMinutes: -plannedMinutes } : { status: 'DAY_OFF', balanceMinutes: 0 };
