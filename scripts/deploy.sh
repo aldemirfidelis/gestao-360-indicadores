@@ -38,8 +38,13 @@ export APP_VERSION="${PACKAGE_VERSION}+$(git rev-parse --short=8 HEAD)"
 echo "Versao da aplicacao: ${APP_VERSION}"
 
 echo ""
-echo "[1.5/5] Liberando memoria: parando Collabora durante o build (evita OOM no droplet; volta no 'up')..."
-docker compose -f "$COMPOSE_FILE" stop collabora 2>/dev/null || true
+echo "[1.5/5] Liberando memoria: parando app (web+api) e Collabora durante o build..."
+# Droplet de 1.9GB RAM: manter web+api rodando durante o 'next build' estoura a
+# memoria (OOM -> "connection reset by peer" e deploy morto no meio). Paramos os
+# containers da aplicacao durante o build e subimos tudo de novo no passo [3].
+# Isso troca "zero downtime" (que nao cabe na RAM) por uma janela de ~1-2min de
+# indisponibilidade, porem com build confiavel. Collabora volta no 'up'.
+docker compose -f "$COMPOSE_FILE" stop web api collabora 2>/dev/null || true
 
 echo "[2/5] Build das imagens Docker (sequencial para poupar memoria)..."
 docker compose -f "$COMPOSE_FILE" build --pull api
