@@ -34,6 +34,18 @@ export const WITHDRAWAL_TRANSITIONS: Record<string, readonly string[]> = {
   CANCELLED: [],
 };
 
+export const QUOTATION_TRANSITIONS: Record<string, readonly string[]> = {
+  OPEN: ['AWARDED', 'CANCELLED'],
+  AWARDED: [],
+  CANCELLED: [],
+};
+
+export const INVOICE_TRANSITIONS: Record<string, readonly string[]> = {
+  POSTED: ['VERIFIED', 'RETURNED'],
+  VERIFIED: [],
+  RETURNED: [],
+};
+
 export function assertTransition(machine: Record<string, readonly string[]>, current: string, next: string, label: string): void {
   if (!(machine[current] ?? []).includes(next)) {
     throw new ConflictException(`${label}: transição inválida de ${current} para ${next}.`);
@@ -87,6 +99,43 @@ export function orderStatusFromQuantities(lines: Array<{ ordered: unknown; recei
   if (received <= 0) return 'SENT';
   if (received + 1e-9 < ordered) return 'PARTIALLY_DELIVERED';
   return 'DELIVERED';
+}
+
+export interface QuotationMapQuote {
+  id: string;
+  supplierId: string;
+  status: string;
+  totalAmount: unknown;
+  items: Array<{ requisitionItemId: string; quantity: unknown; unitPrice: unknown; totalPrice: unknown }>;
+}
+
+export interface QuotationMapRow {
+  requisitionItemId: string;
+  cells: Array<{ supplierQuoteId: string; quantity: number; unitPrice: number; totalPrice: number; best: boolean } | null>;
+}
+
+/// Mapa comparativo puro: uma linha por item da requisição, uma coluna por
+/// proposta RECEIVED, com o menor preço unitário de cada linha marcado.
+export function buildQuotationMap(
+  requisitionItemIds: string[],
+  quotes: QuotationMapQuote[],
+): { rows: QuotationMapRow[]; cheapestQuoteId: string | null } {
+  const received = quotes.filter((quote) => quote.status === 'RECEIVED');
+  const rows: QuotationMapRow[] = requisitionItemIds.map((requisitionItemId) => {
+    const cells = received.map((quote) => {
+      const line = quote.items.find((candidate) => candidate.requisitionItemId === requisitionItemId);
+      if (!line) return null;
+      return { supplierQuoteId: quote.id, quantity: Number(line.quantity), unitPrice: Number(line.unitPrice), totalPrice: Number(line.totalPrice), best: false };
+    });
+    const prices = cells.filter((cell): cell is NonNullable<typeof cell> => cell !== null).map((cell) => cell.unitPrice);
+    if (prices.length) {
+      const lowest = Math.min(...prices);
+      for (const cell of cells) if (cell && cell.unitPrice <= lowest + 1e-9) cell.best = true;
+    }
+    return { requisitionItemId, cells };
+  });
+  const cheapest = received.length ? received.reduce((best, quote) => (Number(quote.totalAmount) < Number(best.totalAmount) ? quote : best)) : null;
+  return { rows, cheapestQuoteId: cheapest?.id ?? null };
 }
 
 export function businessNumber(prefix: string, now = new Date(), random = cryptoRandom()): string {

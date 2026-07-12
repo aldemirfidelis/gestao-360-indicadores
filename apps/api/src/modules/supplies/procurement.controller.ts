@@ -17,6 +17,11 @@ import {
   supplierCreateSchema,
   supplierUpdateSchema,
   cancellationSchema,
+  invoiceReturnSchema,
+  materialInvoiceCreateSchema,
+  quotationAwardSchema,
+  quotationCreateSchema,
+  supplierQuoteCreateSchema,
 } from './supplies.dto';
 
 @Controller('procurement')
@@ -122,4 +127,40 @@ export class ProcurementController {
   @Get('receipts')
   @RequirePermissions('compras:view', 'estoque:view')
   receipts(@CurrentUser() me: AuthPayload) { return this.service.listReceipts(me); }
+
+  @Get('quotations')
+  @RequirePermissions('compras:view', 'compras:buy')
+  quotations(@CurrentUser() me: AuthPayload) { return this.service.listQuotations(me); }
+
+  @Post('quotations')
+  @RequirePermissions('compras:buy', 'compras:manage')
+  createQuotation(@CurrentUser() me: AuthPayload, @Body(new ZodValidationPipe(quotationCreateSchema)) body: any) { return this.service.createQuotation(me, body); }
+
+  @Post('quotations/:id/quotes')
+  @RequirePermissions('compras:buy', 'compras:manage')
+  addSupplierQuote(@CurrentUser() me: AuthPayload, @Param('id') id: string, @Body(new ZodValidationPipe(supplierQuoteCreateSchema)) body: any) { return this.service.addSupplierQuote(me, id, body); }
+
+  @Get('quotations/:id/map')
+  @RequirePermissions('compras:view', 'compras:buy')
+  quotationMap(@CurrentUser() me: AuthPayload, @Param('id') id: string) { return this.service.quotationMap(me, id); }
+
+  @Post('quotations/:id/award')
+  @RequirePermissions('compras:buy', 'compras:manage')
+  awardQuotation(@CurrentUser() me: AuthPayload, @Param('id') id: string, @Body(new ZodValidationPipe(quotationAwardSchema)) body: any) { return this.service.awardQuotation(me, id, body); }
+
+  @Get('invoices')
+  @RequirePermissions('compras:view', 'compras:buy', 'estoque:view')
+  invoices(@CurrentUser() me: AuthPayload) { return this.service.listInvoices(me); }
+
+  @Post('invoices/material')
+  @RequirePermissions('compras:buy', 'compras:manage', 'estoque:operate')
+  createMaterialInvoice(@CurrentUser() me: AuthPayload, @Body(new ZodValidationPipe(materialInvoiceCreateSchema)) body: any) { return this.service.createMaterialInvoice(me, body); }
+
+  @Post('invoices/:id/verify')
+  @RequirePermissions('compras:buy', 'compras:manage')
+  verifyInvoice(@CurrentUser() me: AuthPayload, @Param('id') id: string) { return this.service.verifyInvoice(me, id); }
+
+  @Post('invoices/:id/return')
+  @RequirePermissions('compras:buy', 'compras:manage')
+  returnInvoice(@CurrentUser() me: AuthPayload, @Param('id') id: string, @Body(new ZodValidationPipe(invoiceReturnSchema)) body: any) { return this.service.returnInvoice(me, id, body); }
 }

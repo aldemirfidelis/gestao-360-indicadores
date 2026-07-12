@@ -9,6 +9,7 @@ import {
   PURCHASE_ORDER_TRANSITIONS,
   REQUISITION_TRANSITIONS,
   assertTransition,
+  buildQuotationMap,
   businessNumber,
   orderStatusFromQuantities,
   orderTotals,
@@ -27,16 +28,18 @@ export class ProcurementService {
   ) {}
 
   async dashboard(me: AuthPayload) {
-    const [openRequisitions, buyerQueue, pendingApprovals, openOrders, overdueOrders, receiptsThisMonth, spend] = await Promise.all([
+    const [openRequisitions, buyerQueue, pendingApprovals, openOrders, overdueOrders, receiptsThisMonth, openQuotations, invoicesToVerify, spend] = await Promise.all([
       this.prisma.purchaseRequisition.count({ where: { companyId: me.companyId, status: { in: ['SUBMITTED', 'IN_TRIAGE', 'IN_QUOTATION', 'ORDER_CREATED', 'PARTIALLY_FULFILLED'] } } }),
       this.prisma.purchaseRequisition.count({ where: { companyId: me.companyId, buyerId: null, status: 'SUBMITTED' } }),
       this.prisma.purchaseOrderApproval.count({ where: { companyId: me.companyId, status: 'PENDING', purchaseOrder: { status: 'PENDING_APPROVAL' } } }),
       this.prisma.purchaseOrder.count({ where: { companyId: me.companyId, status: { in: ['PENDING_APPROVAL', 'APPROVED', 'SENT', 'PARTIALLY_DELIVERED'] } } }),
       this.prisma.purchaseOrder.count({ where: { companyId: me.companyId, status: { in: ['SENT', 'PARTIALLY_DELIVERED'] }, expectedDeliveryAt: { lt: new Date() } } }),
       this.prisma.purchaseReceipt.count({ where: { companyId: me.companyId, receivedAt: { gte: monthStart() } } }),
+      this.prisma.quotation.count({ where: { companyId: me.companyId, status: 'OPEN' } }),
+      this.prisma.supplierInvoice.count({ where: { companyId: me.companyId, status: 'POSTED' } }),
       this.prisma.purchaseOrder.aggregate({ where: { companyId: me.companyId, status: { notIn: ['DRAFT', 'REJECTED', 'CANCELLED'] }, createdAt: { gte: monthStart() } }, _sum: { totalAmount: true } }),
     ]);
-    return { openRequisitions, buyerQueue, pendingApprovals, openOrders, overdueOrders, receiptsThisMonth, spendThisMonth: spend._sum.totalAmount ?? dec(0) };
+    return { openRequisitions, buyerQueue, pendingApprovals, openOrders, overdueOrders, receiptsThisMonth, openQuotations, invoicesToVerify, spendThisMonth: spend._sum.totalAmount ?? dec(0) };
   }
 
   async options(me: AuthPayload) {
@@ -364,6 +367,103 @@ export class ProcurementService {
 
   async listReceipts(me: AuthPayload) {
     return this.prisma.purchaseReceipt.findMany({ where: { companyId: me.companyId }, include: { warehouse: true, purchaseOrder: { include: { supplier: true } }, items: { include: { item: true, movement: true } } }, orderBy: { receivedAt: 'desc' }, take: 1000 });
+  }
+
+  async listQuotations(me: AuthPayload) {
+    return this.prisma.quotation.findMany({ where: { companyId: me.companyId }, include: { requisition: true, awardedQuote: { include: { supplier: true } }, supplierQuotes: { include: { supplier: true, items: true } } }, orderBy: { createdAt: 'desc' }, take: 1000 });
+  }
+
+  async createQuotation(me: AuthPayload, body: any) {
+    const requisition = await this.requisitionOrThrow(me.companyId, body.requisitionId);
+    if (!['IN_TRIAGE', 'IN_QUOTATION'].includes(requisition.status)) throw new ConflictException('A requisição precisa estar em triagem.');
+    if (requisition.buyerId !== me.sub && !isAdmin(me)) throw new ForbiddenException('Somente o comprador responsável pode abrir a cotação.');
+    const created = await this.prisma.$transaction(async (tx) => {
+      const row = await tx.quotation.create({ data: { companyId: me.companyId, number: businessNumber('CT'), requisitionId: requisition.id, buyerId: me.sub, dueAt: toDate(body.dueAt), notes: clean(body.notes) } });
+      await tx.purchaseRequisition.update({ where: { id: requisition.id }, data: { status: 'IN_QUOTATION' } });
+      return row;
+    });
+    await this.audit.record(me, { module: 'Suprimentos', entity: 'Quotation', entityId: created.id, action: 'CREATE', message: `Cotação ${created.number} aberta`, after: created });
+    return created;
+  }
+
+  async addSupplierQuote(me: AuthPayload, quotationId: string, body: any) {
+    const quotation = await this.quotationOrThrow(me.companyId, quotationId);
+    if (quotation.status !== 'OPEN') throw new ConflictException('A cotação não está aberta.');
+    if (quotation.buyerId !== me.sub && !isAdmin(me)) throw new ForbiddenException('Somente o comprador responsável pode registrar propostas.');
+    await this.supplierOrThrow(me.companyId, body.supplierId);
+    assertNoDuplicates(body.items.map((line: any) => line.requisitionItemId), 'Item repetido na proposta.');
+    const lines = body.items.map((line: any) => {
+      const reqLine = quotation.requisition.items.find((candidate) => candidate.id === line.requisitionItemId);
+      if (!reqLine) throw new NotFoundException('Item da requisição não encontrado.');
+      if (dec(line.quantity).gt(reqLine.requestedQuantity)) throw new ConflictException('Quantidade cotada supera a requisitada.');
+      return { reqLine, ...line };
+    });
+    const totals = orderTotals(lines, body.freightAmount, body.discountAmount);
+    const created = await this.prisma.supplierQuote.create({ data: {
+      companyId: me.companyId, quotationId, supplierId: body.supplierId, paymentTerms: clean(body.paymentTerms), deliveryDays: body.deliveryDays ?? null,
+      freightAmount: dec(totals.freight), discountAmount: dec(totals.discount), subtotal: dec(totals.subtotal), totalAmount: dec(totals.total), validUntil: toDate(body.validUntil), notes: clean(body.notes), createdById: me.sub,
+      items: { create: lines.map(({ reqLine, quantity, unitPrice, note }: any) => ({ companyId: me.companyId, requisitionItemId: reqLine.id, itemId: reqLine.itemId, quantity: dec(quantity), unitPrice: dec(unitPrice), totalPrice: dec(quantity).mul(dec(unitPrice)), note: clean(note) })) },
+    }, include: { supplier: true, items: { include: { item: true } } } }).catch(uniqueConflict('Este fornecedor já possui proposta nesta cotação.'));
+    await this.audit.record(me, { module: 'Suprimentos', entity: 'SupplierQuote', entityId: created.id, action: 'CREATE', message: 'Proposta de fornecedor registrada', after: created });
+    return created;
+  }
+
+  async quotationMap(me: AuthPayload, id: string) {
+    const quotation = await this.quotationOrThrow(me.companyId, id);
+    return { quotation, ...buildQuotationMap(quotation.requisition.items.map((line) => line.id), quotation.supplierQuotes) };
+  }
+
+  async awardQuotation(me: AuthPayload, id: string, body: any) {
+    const quotation = await this.quotationOrThrow(me.companyId, id);
+    if (quotation.status !== 'OPEN') throw new ConflictException('A cotação não está aberta.');
+    if (quotation.buyerId !== me.sub && !isAdmin(me)) throw new ForbiddenException('Somente o comprador responsável pode decidir a cotação.');
+    const winner = quotation.supplierQuotes.find((quote) => quote.id === body.supplierQuoteId && quote.status === 'RECEIVED');
+    if (!winner) throw new NotFoundException('Proposta vencedora não encontrada.');
+    const updated = await this.prisma.quotation.update({ where: { id }, data: { status: 'AWARDED', awardedQuoteId: winner.id, awardJustification: body.justification, awardedById: me.sub, awardedAt: new Date() }, include: { awardedQuote: { include: { supplier: true, items: true } } } });
+    await this.audit.record(me, { module: 'Suprimentos', entity: 'Quotation', entityId: id, action: 'AWARD', message: `Cotação ${quotation.number} adjudicada`, before: quotation, after: updated });
+    return updated;
+  }
+
+  async listInvoices(me: AuthPayload) {
+    return this.prisma.supplierInvoice.findMany({ where: { companyId: me.companyId }, include: { supplier: true, purchaseOrder: true, receipt: true, items: { include: { item: true } } }, orderBy: { createdAt: 'desc' }, take: 1000 });
+  }
+
+  async createMaterialInvoice(me: AuthPayload, body: any) {
+    const order = await this.orderOrThrow(me.companyId, body.purchaseOrderId);
+    const receipt = order.receipts.find((row) => row.id === body.receiptId);
+    if (!receipt) throw new NotFoundException('Recebimento não pertence ao pedido informado.');
+    const existing = await this.prisma.supplierInvoice.findFirst({ where: { companyId: me.companyId, receiptId: receipt.id, status: { not: 'RETURNED' } } });
+    if (existing) throw new ConflictException('Este recebimento já possui NF ativa.');
+    assertNoDuplicates(body.items.map((line: any) => line.purchaseOrderItemId), 'Item repetido na nota fiscal.');
+    const lines = body.items.map((line: any) => {
+      const orderLine = order.items.find((candidate) => candidate.id === line.purchaseOrderItemId && candidate.kindSnapshot === 'MATERIAL');
+      if (!orderLine) throw new NotFoundException('Item material do pedido não encontrado.');
+      return { orderLine, ...line };
+    });
+    const total = lines.reduce((sum: Prisma.Decimal, line: any) => sum.plus(dec(line.quantity).mul(dec(line.unitPrice))), dec(0));
+    const created = await this.prisma.supplierInvoice.create({ data: {
+      companyId: me.companyId, kind: 'MATERIAL', invoiceNumber: body.invoiceNumber, series: clean(body.series), accessKey: clean(body.accessKey), supplierId: order.supplierId,
+      purchaseOrderId: order.id, receiptId: receipt.id, issuedAt: new Date(body.issuedAt), totalAmount: total, attachmentDocumentId: body.attachmentDocumentId ?? null, notes: clean(body.notes), postedById: me.sub,
+      items: { create: lines.map(({ orderLine, quantity, unitPrice }: any) => ({ companyId: me.companyId, purchaseOrderItemId: orderLine.id, itemId: orderLine.itemId, description: orderLine.description, quantity: dec(quantity), unitPrice: dec(unitPrice), totalPrice: dec(quantity).mul(dec(unitPrice)) })) },
+    }, include: { supplier: true, receipt: true, items: true } }).catch(uniqueConflict('NF duplicada para este fornecedor/chave de acesso.'));
+    await this.audit.record(me, { module: 'Suprimentos', entity: 'SupplierInvoice', entityId: created.id, action: 'POST', message: `NF ${created.invoiceNumber} lançada sem duplicar a entrada de estoque`, after: created });
+    return created;
+  }
+
+  async verifyInvoice(me: AuthPayload, id: string) { return this.decideInvoice(me, id, 'VERIFIED'); }
+  async returnInvoice(me: AuthPayload, id: string, body: any) { return this.decideInvoice(me, id, 'RETURNED', body.reason); }
+
+  private async decideInvoice(me: AuthPayload, id: string, status: 'VERIFIED' | 'RETURNED', reason?: string) {
+    const current = await this.prisma.supplierInvoice.findFirst({ where: { id, companyId: me.companyId } });
+    if (!current) throw new NotFoundException('Nota fiscal não encontrada.');
+    if (current.status !== 'POSTED') throw new ConflictException('Somente NFs lançadas podem ser conferidas ou devolvidas.');
+    const updated = await this.prisma.supplierInvoice.update({ where: { id }, data: status === 'VERIFIED' ? { status, verifiedById: me.sub, verifiedAt: new Date() } : { status, returnedReason: reason } });
+    await this.audit.record(me, { module: 'Suprimentos', entity: 'SupplierInvoice', entityId: id, action: status, message: `NF ${current.invoiceNumber}: ${status}`, before: current, after: updated });
+    return updated;
+  }
+
+  private quotationOrThrow(companyId: string, id: string) {
+    return this.prisma.quotation.findFirst({ where: { id, companyId }, include: { requisition: { include: { items: { include: { item: true } } } }, supplierQuotes: { include: { supplier: true, items: true } } } }).then((row) => { if (!row) throw new NotFoundException('Cotação não encontrada.'); return row; });
   }
 
   private async validateRequisitionRefs(companyId: string, body: { warehouseId: string; orgNodeId?: string | null; items: Array<{ itemId: string }> }) {
