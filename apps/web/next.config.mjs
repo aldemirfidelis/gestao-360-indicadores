@@ -56,8 +56,10 @@ const nextConfig = {
           { key: 'X-Content-Type-Options', value: 'nosniff' },
           // Nao vaza URL completa para origens externas
           { key: 'Referrer-Policy', value: 'strict-origin-when-cross-origin' },
-          // Desliga APIs sensiveis do navegador por padrao
-          { key: 'Permissions-Policy', value: 'camera=(), microphone=(), geolocation=()' },
+          // Camera e geolocalizacao liberadas apenas para a propria origem
+          // (ponto facial, leitura de QR e batida com localizacao); iframes de
+          // terceiros continuam bloqueados. Microfone segue desligado.
+          { key: 'Permissions-Policy', value: 'camera=(self), microphone=(), geolocation=(self)' },
           // Forca HTTPS por 2 anos (efetivo apenas sob TLS/dominio)
           { key: 'Strict-Transport-Security', value: 'max-age=63072000; includeSubDomains; preload' },
         ],

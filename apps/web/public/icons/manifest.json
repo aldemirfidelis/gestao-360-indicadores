@@ -6,11 +6,17 @@
   "start_url": "/?source=pwa",
   "scope": "/",
   "display": "standalone",
-  "display_override": ["standalone", "minimal-ui"],
+  "display_override": [
+    "standalone",
+    "minimal-ui"
+  ],
   "orientation": "portrait-primary",
   "lang": "pt-BR",
   "dir": "ltr",
-  "categories": ["business", "productivity"],
+  "categories": [
+    "business",
+    "productivity"
+  ],
   "background_color": "#081023",
   "theme_color": "#0f2042",
   "icons": [
@@ -40,6 +46,18 @@
     }
   ],
   "shortcuts": [
+    {
+      "name": "Registrar ponto facial",
+      "short_name": "Ponto facial",
+      "description": "Abrir o reconhecimento facial para registrar o ponto",
+      "url": "/servico-pessoal/ponto-facial?source=pwa"
+    },
+    {
+      "name": "Meu ponto",
+      "short_name": "Meu ponto",
+      "description": "Espelho e batidas do dia",
+      "url": "/servico-pessoal/ponto?source=pwa"
+    },
     {
       "name": "Meu Dia",
       "short_name": "Meu Dia",
