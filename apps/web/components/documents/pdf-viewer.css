@@ -1,0 +1,59 @@
+/*
+ * Estilos globais do visualizador de PDF (camada de texto do pdf.js).
+ * A camada de texto é gerada pelo pdf.js fora do controle do React, por isso
+ * as classes precisam ser globais (não CSS Modules).
+ */
+
+.pdfv-textlayer {
+  position: absolute;
+  inset: 0;
+  overflow: clip;
+  opacity: 1;
+  line-height: 1;
+  text-align: initial;
+  -webkit-text-size-adjust: none;
+  text-size-adjust: none;
+  forced-color-adjust: none;
+  transform-origin: 0 0;
+  caret-color: CanvasText;
+}
+
+.pdfv-textlayer :is(span, br) {
+  color: transparent;
+  position: absolute;
+  white-space: pre;
+  cursor: text;
+  transform-origin: 0% 0%;
+}
+
+/* Contêineres de conteúdo marcado (tags do PDF) não podem ocupar espaço. */
+.pdfv-textlayer span.markedContent {
+  top: 0;
+  height: 0;
+}
+
+.pdfv-textlayer ::selection {
+  background: rgba(37, 99, 235, 0.35);
+  color: transparent;
+}
+
+.pdfv-textlayer mark.pdfv-mark {
+  color: transparent;
+  background-color: rgba(250, 204, 21, 0.45);
+  border-radius: 2px;
+  padding: 0;
+}
+
+.pdfv-textlayer mark.pdfv-mark--active {
+  background-color: rgba(249, 115, 22, 0.7);
+}
+
+/* Ferramenta mão: arrastar para rolar. */
+.pdfv-pan-tool .pdfv-textlayer :is(span, br) {
+  cursor: grab;
+}
+
+.pdfv-pan-tool.pdfv-panning,
+.pdfv-pan-tool.pdfv-panning .pdfv-textlayer :is(span, br) {
+  cursor: grabbing;
+}

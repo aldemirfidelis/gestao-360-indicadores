@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useRef, useState } from 'react';
 import type { ReactNode } from 'react';
+import dynamic from 'next/dynamic';
 import { useSearchParams } from 'next/navigation';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
@@ -49,6 +50,16 @@ import { ImpactConfirmationModal } from '@/components/ui/impact-confirmation-mod
 import { ReasonDialog, type ReasonDialogState } from '@/components/platform/reason-dialog';
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:3333/api';
+
+// O visualizador usa pdf.js (APIs de canvas/DOM), então só carrega no cliente.
+const PdfViewer = dynamic(() => import('@/components/documents/pdf-viewer'), {
+  ssr: false,
+  loading: () => (
+    <div className="flex h-[68vh] min-h-[420px] items-center justify-center rounded-md border bg-muted/10 text-sm text-muted-foreground">
+      Carregando visualizador...
+    </div>
+  ),
+});
 
 type DocStatus =
   | 'DRAFT'
@@ -1574,13 +1585,22 @@ export default function DocumentsPage() {
 
               <TabsContent value="visualização">
                 <div className="grid grid-cols-1 gap-4 lg:grid-cols-[1fr,320px]">
-                  <div className="min-h-[420px] rounded-md border bg-muted/10">
-                    {viewerLoading && <div className="p-6 text-sm text-muted-foreground">Carregando visualização...</div>}
+                  <div className="min-h-[420px]">
+                    {viewerLoading && (
+                      <div className="flex h-[68vh] min-h-[420px] items-center justify-center rounded-md border bg-muted/10 p-6 text-sm text-muted-foreground">
+                        Carregando visualização...
+                      </div>
+                    )}
                     {!viewerLoading && viewer && (
-                      <iframe title={`Visualização de ${viewer.fileName}`} src={viewer.url} className="h-[64vh] min-h-[420px] w-full rounded-md border-0" />
+                      <PdfViewer
+                        src={viewer.url}
+                        fileName={viewer.fileName}
+                        className="h-[68vh] min-h-[420px]"
+                        onDownload={() => downloadControlled(detail.id, viewer.fileId, viewer.fileName)}
+                      />
                     )}
                     {!viewerLoading && !viewer && (
-                      <div className="h-full min-h-[420px] overflow-auto p-5">
+                      <div className="h-full min-h-[420px] overflow-auto rounded-md border bg-muted/10 p-5">
                         <div className="mb-3 text-[10px] uppercase text-muted-foreground font-bold tracking-wider">Prévia textual controlada</div>
                         <pre className="whitespace-pre-wrap break-words text-xs leading-6 text-foreground font-sans">{detail.content || detail.description || 'Este documento ainda não possui PDF publicado para visualização interna.'}</pre>
                       </div>
