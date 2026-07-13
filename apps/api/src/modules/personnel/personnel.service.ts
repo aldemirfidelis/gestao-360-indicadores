@@ -42,44 +42,37 @@ export class PersonnelService {
 
   // ------------------------------ Batida ------------------------------
 
-  async punch(me: AuthPayload, body: any = {}, ctx?: { ip?: string; userAgent?: string }) {
+  async punch(me: AuthPayload, body: any = {}, ctx?: { ip?: string; userAgent?: string; verifiedBiometricAttemptId?: string }) {
     const now = new Date();
     const dayKey = dayKeyFor(now);
     await this.assertPeriodOpen(me.companyId, periodRefOf(dayKey));
 
-    const lastEntry = await this.prisma.timeClockEntry.findFirst({
-      where: { companyId: me.companyId, userId: me.sub },
-      orderBy: { createdAt: 'desc' },
-      select: { hash: true, punchedAt: true, status: true },
-    });
-    if (lastEntry?.status === 'VALID' && now.getTime() - lastEntry.punchedAt.getTime() < MIN_PUNCH_INTERVAL_MS) {
-      throw new ConflictException('Batida registrada há menos de 1 minuto. Aguarde para registrar novamente.');
-    }
-
-    const todayCount = await this.prisma.timeClockEntry.count({
-      where: { companyId: me.companyId, userId: me.sub, dayKey, status: 'VALID' },
-    });
-    const kind = todayCount % 2 === 0 ? 'IN' : 'OUT';
-    const source = body?.source === 'MOBILE' ? 'MOBILE' : 'WEB';
-
-    const entry = await this.prisma.timeClockEntry.create({
-      data: {
-        companyId: me.companyId,
-        userId: me.sub,
-        punchedAt: now,
-        dayKey,
-        kind,
-        source,
-        latitude: finiteOrNull(body?.latitude),
-        longitude: finiteOrNull(body?.longitude),
-        accuracy: finiteOrNull(body?.accuracy),
-        ip: ctx?.ip ?? null,
-        userAgent: ctx?.userAgent?.slice(0, 500) ?? null,
-        note: text(body?.note),
-        prevHash: lastEntry?.hash ?? null,
-        hash: chainHash(lastEntry?.hash ?? null, `${me.sub}|${now.toISOString()}|${kind}|${source}`),
-        createdById: me.sub,
-      },
+    const source = ctx?.verifiedBiometricAttemptId ? 'FACIAL' : (body?.source === 'MOBILE' ? 'MOBILE' : 'WEB');
+    // Serializa batidas simultâneas do mesmo colaborador no PostgreSQL para
+    // preservar a alternância IN/OUT e a cadeia de integridade.
+    const entry = await this.prisma.$transaction(async (tx) => {
+      await tx.$queryRaw`SELECT pg_advisory_xact_lock(hashtext(${`${me.companyId}:${me.sub}:time-clock`}))`;
+      const lastEntry = await tx.timeClockEntry.findFirst({
+        where: { companyId: me.companyId, userId: me.sub },
+        orderBy: { createdAt: 'desc' },
+        select: { hash: true, punchedAt: true, status: true },
+      });
+      if (lastEntry?.status === 'VALID' && now.getTime() - lastEntry.punchedAt.getTime() < MIN_PUNCH_INTERVAL_MS) {
+        throw new ConflictException('Batida registrada há menos de 1 minuto. Aguarde para registrar novamente.');
+      }
+      const todayCount = await tx.timeClockEntry.count({ where: { companyId: me.companyId, userId: me.sub, dayKey, status: 'VALID' } });
+      const kind = todayCount % 2 === 0 ? 'IN' : 'OUT';
+      return tx.timeClockEntry.create({
+        data: {
+          companyId: me.companyId, userId: me.sub, punchedAt: now, dayKey, kind, source,
+          latitude: finiteOrNull(body?.latitude), longitude: finiteOrNull(body?.longitude), accuracy: finiteOrNull(body?.accuracy),
+          ip: ctx?.ip ?? null, userAgent: ctx?.userAgent?.slice(0, 500) ?? null, note: text(body?.note),
+          biometricAttemptId: ctx?.verifiedBiometricAttemptId ?? null,
+          prevHash: lastEntry?.hash ?? null,
+          hash: chainHash(lastEntry?.hash ?? null, `${me.sub}|${now.toISOString()}|${kind}|${source}`),
+          createdById: me.sub,
+        },
+      });
     });
 
     await this.audit.record(me, {
@@ -87,8 +80,8 @@ export class PersonnelService {
       entity: 'TimeClockEntry',
       entityId: entry.id,
       action: 'PUNCH',
-      message: `Batida ${kind} em ${dayKey}`,
-      after: { dayKey, kind, source },
+      message: `Batida ${entry.kind} em ${dayKey}`,
+      after: { dayKey, kind: entry.kind, source },
     });
     this.workItems.markDirty(me.companyId, [me.sub], 'time-clock-punch');
 

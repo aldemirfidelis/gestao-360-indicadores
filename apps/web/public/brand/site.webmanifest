@@ -1,11 +1,24 @@
 {
   "name": "Gestão 360",
   "short_name": "Gestão 360",
-  "description": "Plataforma corporativa para gestão estratégica, indicadores e planos de ação.",
+  "description": "Plataforma corporativa com gestão estratégica, serviço pessoal e controle de ponto facial.",
   "start_url": "/",
   "display": "standalone",
   "background_color": "#f7f9fb",
   "theme_color": "#14213d",
+  "shortcuts": [
+    {
+      "name": "Registrar ponto facial",
+      "short_name": "Ponto facial",
+      "description": "Abrir o reconhecimento facial para registrar o ponto",
+      "url": "/servico-pessoal/ponto-facial"
+    },
+    {
+      "name": "Meu ponto",
+      "short_name": "Meu ponto",
+      "url": "/servico-pessoal/ponto"
+    }
+  ],
   "icons": [
     {
       "src": "/brand/icon-192.svg",

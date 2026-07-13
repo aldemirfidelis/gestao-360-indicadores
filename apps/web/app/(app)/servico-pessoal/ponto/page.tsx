@@ -2,11 +2,13 @@
 
 import { useEffect, useMemo, useState } from 'react';
 import { useSearchParams } from 'next/navigation';
+import Link from 'next/link';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
 import {
   AlarmClockCheck,
   CalendarClock,
+  Camera,
   CheckCircle2,
   Download,
   Fingerprint,
@@ -420,6 +422,9 @@ export default function TimeClockPage() {
                         ? 'Registrar saída'
                         : 'Registrar entrada'}
                   </Button>
+                  <Button asChild variant="outline" size="lg" className="h-11 w-full border-cyan-500/40 text-cyan-700 hover:bg-cyan-500/5 dark:text-cyan-300">
+                    <Link href="/servico-pessoal/ponto-facial"><Camera className="mr-2 h-5 w-5" />Usar reconhecimento facial</Link>
+                  </Button>
                   <div className="flex items-center justify-center gap-1 text-[10px] text-muted-foreground">
                     <MapPin className="h-3 w-3" />A localização é registrada junto com a batida, quando autorizada.
                   </div>
@@ -438,6 +443,7 @@ export default function TimeClockPage() {
                           <Badge key={entry.id} variant="outline" className={cn('text-[10px] tabular-nums', entry.kind === 'IN' ? 'border-status-green/40 text-status-green' : 'border-status-red/40 text-status-red')}>
                             {entry.kind === 'IN' ? '→' : '←'} {formatTime(entry.punchedAt)}
                             {entry.source === 'MANUAL' && ' (ajuste)'}
+                            {entry.source === 'FACIAL' && ' (facial)'}
                           </Badge>
                         ))}
                       </div>
