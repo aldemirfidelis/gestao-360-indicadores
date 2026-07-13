@@ -7,6 +7,7 @@ import { WorkItemEventBus } from '../my-day/work-item-event-bus';
 import { AccessService } from '../access/access.service';
 import { AuthPayload } from '../auth/auth.types';
 import { VacationService, type DayCoverage } from './vacation.service';
+import { detectDayOccurrences } from './attendance.logic';
 import {
   addDays,
   attributePunches,
@@ -34,6 +35,8 @@ import {
 } from './time-clock.logic';
 
 const MODULE = 'personnel';
+/** Motivos categorizados de ajuste/abono. */
+const ADJUSTMENT_CATEGORIES = ['ESQUECIMENTO', 'ATESTADO', 'TRABALHO_EXTERNO', 'TREINAMENTO', 'VIAGEM', 'OUTRO'];
 /** Intervalo mínimo entre batidas do mesmo usuário (anti clique duplo). */
 const MIN_PUNCH_INTERVAL_MS = 60_000;
 const DEFAULT_TOLERANCE_MINUTES = 10;
@@ -265,9 +268,21 @@ export class PersonnelService {
       this.vacations.coverageForUsers(me.companyId, visible ? [...visible] : null, dayKey, dayKey),
       this.holidayMap(me.companyId, extendedFrom, dayKey),
     ]);
+    const abonos = await this.prisma.timeAdjustmentRequest.findMany({
+      where: {
+        companyId: me.companyId,
+        dayKey,
+        type: 'ABONO_DIA',
+        status: 'APPROVED',
+        ...(visible ? { userId: { in: [...visible] } } : {}),
+      },
+      select: { userId: true, category: true },
+    });
+    const abonoByUser = new Map(abonos.map((abono) => [abono.userId, abono.category ?? 'OUTRO']));
 
     const entriesByUser = groupBy(entries, (e) => e.userId);
     const rows = users.map((user) => {
+      const abonoCategory = abonoByUser.get(user.id);
       const dayRow = this.composeUserDays({
         userId: user.id,
         fromKey: dayKey,
@@ -276,6 +291,7 @@ export class PersonnelService {
         assignments,
         holidays,
         coverageDays: coverageMap.get(user.id) ?? new Map<string, DayCoverage>(),
+        abonoDays: abonoCategory ? new Map([[dayKey, abonoCategory]]) : undefined,
       })[0];
       return {
         user,
@@ -286,6 +302,7 @@ export class PersonnelService {
         balanceMinutes: dayRow.balanceMinutes,
         holiday: dayRow.holiday,
         entries: dayRow.entries,
+        detected: dayRow.detected,
       };
     });
 
@@ -507,8 +524,14 @@ export class PersonnelService {
     if (dayKey > dayKeyFor(new Date())) throw new BadRequestException('Não é possível ajustar um dia futuro.');
     await this.assertPeriodOpen(me.companyId, periodRefOf(dayKey));
 
-    const timesError = validateProposedTimes(body?.proposedTimes);
-    if (timesError) throw new BadRequestException(timesError);
+    // HORARIOS corrige a lista de batidas do dia; ABONO_DIA justifica a falta
+    // sem criar batidas (jornada abonada no espelho após aprovação).
+    const type = body?.type === 'ABONO_DIA' ? 'ABONO_DIA' : 'HORARIOS';
+    const category = ADJUSTMENT_CATEGORIES.includes(String(body?.category)) ? String(body.category) : null;
+    if (type === 'HORARIOS') {
+      const timesError = validateProposedTimes(body?.proposedTimes);
+      if (timesError) throw new BadRequestException(timesError);
+    }
     const reason = text(body?.reason);
     if (!reason) throw new BadRequestException('Motivo do ajuste é obrigatório.');
 
@@ -529,7 +552,9 @@ export class PersonnelService {
           companyId: me.companyId,
           userId: me.sub,
           dayKey,
-          proposedTimes: body.proposedTimes,
+          type,
+          category,
+          proposedTimes: type === 'HORARIOS' ? body.proposedTimes : [],
           reason,
         },
       });
@@ -539,8 +564,8 @@ export class PersonnelService {
       entity: 'TimeAdjustmentRequest',
       entityId: request.id,
       action: 'ADJUSTMENT_REQUESTED',
-      message: `Ajuste de ponto solicitado para ${dayKey}`,
-      after: { dayKey, proposedTimes: body.proposedTimes, reason },
+      message: `${type === 'ABONO_DIA' ? 'Abono do dia' : 'Ajuste de ponto'} solicitado para ${dayKey}`,
+      after: { dayKey, type, category, proposedTimes: type === 'HORARIOS' ? body.proposedTimes : [], reason },
     });
     this.workItems.markDirty(me.companyId, [me.sub], 'time-adjustment-requested');
     return request;
@@ -568,6 +593,13 @@ export class PersonnelService {
     const request = await this.prisma.timeAdjustmentRequest.findFirst({ where: { id, companyId: me.companyId } });
     if (!request) throw new NotFoundException('Solicitação de ajuste não encontrada.');
     if (request.status !== 'REQUESTED') throw new ConflictException('Esta solicitação já foi decidida.');
+    // Governança: ninguém decide o próprio ajuste, e o líder só decide dentro
+    // da própria abrangência (visibilidade por área).
+    if (request.userId === me.sub) throw new ForbiddenException('Você não pode decidir a própria solicitação de ajuste.');
+    const visibleForDecision = await this.visibleUserIdsFor(me);
+    if (visibleForDecision && !visibleForDecision.has(request.userId)) {
+      throw new NotFoundException('Solicitação de ajuste não encontrada.');
+    }
     await this.assertPeriodOpen(me.companyId, periodRefOf(request.dayKey));
 
     const note = text(body?.note ?? body?.justification);
@@ -608,11 +640,22 @@ export class PersonnelService {
       after: { status: decided.status, note },
     });
     this.workItems.markDirty(me.companyId, [request.userId, me.sub], 'time-adjustment-decided');
+    if (action === 'approve') {
+      // Ressincroniza a Central de Ocorrências do colaborador ao redor do dia:
+      // a causa tratada (falta, batida ímpar...) é resolvida automaticamente.
+      try {
+        await this.syncOccurrences(me.companyId, [request.userId], addDays(request.dayKey, -1), addDays(request.dayKey, 1));
+      } catch {
+        // Falha no rescan não pode derrubar a aprovação; o scan diário cobre.
+      }
+    }
     return decided;
   }
 
   /** Aprovação: preserva as batidas brutas, cria tratamentos EXCLUDE e novas entradas MANUAL. */
-  private async applyAdjustmentTx(tx: Tx, me: AuthPayload, request: { id: string; userId: string; dayKey: string; proposedTimes: unknown }) {
+  private async applyAdjustmentTx(tx: Tx, me: AuthPayload, request: { id: string; userId: string; dayKey: string; proposedTimes: unknown; type?: string }) {
+    // Abono do dia não toca nas batidas: a aprovação por si só abona o espelho.
+    if (request.type === 'ABONO_DIA') return;
     await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${`${me.companyId}:${request.userId}:time-clock`}))`;
     const originals = await tx.timeClockEntry.findMany({
       where: {
@@ -1143,7 +1186,169 @@ export class PersonnelService {
   private async buildMyDay(me: AuthPayload, dayKey: string) {
     const days = await this.buildMirrorDays(me.companyId, me.sub, dayKey, dayKey);
     const day = days[0];
-    return { ...day, nextKind: day.entries.length % 2 === 0 ? 'IN' : 'OUT' };
+    // Horários previstos do dia (portal do colaborador: próxima marcação/saída prevista).
+    let expectedStartAt: Date | null = null;
+    let expectedEndAt: Date | null = null;
+    if (day.rule) {
+      expectedStartAt = companyTimeToUtc(dayKey, day.rule.start);
+      expectedEndAt = new Date(
+        companyTimeToUtc(dayKey, day.rule.end).getTime() + (ruleCrossesMidnight(day.rule) ? 86_400_000 : 0),
+      );
+    }
+    return { ...day, nextKind: day.entries.length % 2 === 0 ? 'IN' : 'OUT', expectedStartAt, expectedEndAt };
+  }
+
+  // ------------------------------ Central de Ocorrências ------------------------------
+
+  /**
+   * Sincroniza a Central de Ocorrências no intervalo: upsert idempotente das
+   * detecções da apuração e resolução automática das que deixaram de existir
+   * (ex.: falta abonada, batida corrigida). Tratadas (JUSTIFIED/DISMISSED)
+   * nunca são reabertas.
+   */
+  async syncOccurrences(companyId: string, userIds: string[] | null, fromKey: string, toKey: string) {
+    const users =
+      userIds ??
+      (
+        await this.prisma.user.findMany({
+          where: { companyId, deletedAt: null, active: true },
+          select: { id: true },
+        })
+      ).map((user) => user.id);
+
+    let created = 0;
+    let updated = 0;
+    let resolved = 0;
+    for (const userId of users) {
+      const days = await this.buildMirrorDays(companyId, userId, fromKey, toKey);
+      const detectedKeys = new Set<string>();
+      for (const day of days) {
+        for (const detection of day.detected) {
+          detectedKeys.add(`${day.dayKey}|${detection.type}`);
+          const existing = await this.prisma.attendanceOccurrence.findUnique({
+            where: { companyId_userId_dayKey_type: { companyId, userId, dayKey: day.dayKey, type: detection.type } },
+          });
+          if (!existing) {
+            await this.prisma.attendanceOccurrence.create({
+              data: {
+                companyId,
+                userId,
+                dayKey: day.dayKey,
+                type: detection.type,
+                severity: detection.severity,
+                minutes: detection.minutes ?? null,
+                detail: (detection.detail ?? undefined) as Prisma.InputJsonValue | undefined,
+              },
+            });
+            created += 1;
+          } else {
+            const reopen = existing.status === 'RESOLVED';
+            await this.prisma.attendanceOccurrence.update({
+              where: { id: existing.id },
+              data: {
+                severity: detection.severity,
+                minutes: detection.minutes ?? null,
+                detail: (detection.detail ?? undefined) as Prisma.InputJsonValue | undefined,
+                lastSeenAt: new Date(),
+                ...(reopen ? { status: 'OPEN', resolvedAt: null } : {}),
+              },
+            });
+            updated += 1;
+          }
+        }
+      }
+      const open = await this.prisma.attendanceOccurrence.findMany({
+        where: { companyId, userId, dayKey: { gte: fromKey, lte: toKey }, status: 'OPEN' },
+        select: { id: true, dayKey: true, type: true },
+      });
+      const staleIds = open.filter((item) => !detectedKeys.has(`${item.dayKey}|${item.type}`)).map((item) => item.id);
+      if (staleIds.length) {
+        await this.prisma.attendanceOccurrence.updateMany({
+          where: { id: { in: staleIds } },
+          data: { status: 'RESOLVED', resolvedAt: new Date() },
+        });
+        resolved += staleIds.length;
+      }
+    }
+    return { users: users.length, created, updated, resolved };
+  }
+
+  /** Varredura manual da Central de Ocorrências (gestor/DP, escopo por área). */
+  async scanOccurrences(me: AuthPayload, body: any = {}) {
+    const fromKey = String(body?.from ?? '');
+    const toKey = String(body?.to ?? '');
+    if (!isValidDayKey(fromKey) || !isValidDayKey(toKey) || fromKey > toKey) {
+      throw new BadRequestException('Período inválido (use from/to YYYY-MM-DD).');
+    }
+    if (enumerateDays(fromKey, toKey).length > 62) throw new BadRequestException('Período máximo de 62 dias por varredura.');
+    const visible = await this.visibleUserIdsFor(me);
+    const result = await this.syncOccurrences(me.companyId, visible ? [...visible] : null, fromKey, toKey);
+    await this.audit.record(me, {
+      module: MODULE,
+      entity: 'AttendanceOccurrence',
+      action: 'SCAN',
+      message: `Varredura de ocorrências ${fromKey}..${toKey}: ${result.created} novas, ${result.resolved} resolvidas`,
+      after: result,
+    });
+    return result;
+  }
+
+  async listOccurrences(me: AuthPayload, query: any = {}) {
+    const visible = await this.visibleUserIdsFor(me);
+    const status = ['OPEN', 'JUSTIFIED', 'DISMISSED', 'RESOLVED'].includes(query?.status) ? query.status : undefined;
+    const from = isValidDayKey(String(query?.from ?? '')) ? String(query.from) : undefined;
+    const to = isValidDayKey(String(query?.to ?? '')) ? String(query.to) : undefined;
+    const occurrences = await this.prisma.attendanceOccurrence.findMany({
+      where: {
+        companyId: me.companyId,
+        ...(visible ? { userId: { in: [...visible] } } : {}),
+        ...(status ? { status } : {}),
+        ...(from || to ? { dayKey: { ...(from ? { gte: from } : {}), ...(to ? { lte: to } : {}) } } : {}),
+      },
+      orderBy: [{ dayKey: 'desc' }, { severity: 'asc' }],
+      take: 500,
+    });
+    return this.withUserNames(me.companyId, occurrences);
+  }
+
+  /** Ocorrências do próprio colaborador (portal). */
+  async myOccurrences(me: AuthPayload) {
+    const from = addDays(dayKeyFor(new Date()), -60);
+    return this.prisma.attendanceOccurrence.findMany({
+      where: { companyId: me.companyId, userId: me.sub, dayKey: { gte: from } },
+      orderBy: { dayKey: 'desc' },
+      take: 100,
+    });
+  }
+
+  async treatOccurrence(me: AuthPayload, id: string, action: 'justify' | 'dismiss', body: any = {}) {
+    const occurrence = await this.prisma.attendanceOccurrence.findFirst({ where: { id, companyId: me.companyId } });
+    if (!occurrence) throw new NotFoundException('Ocorrência não encontrada.');
+    const visible = await this.visibleUserIdsFor(me);
+    if (visible && !visible.has(occurrence.userId)) throw new NotFoundException('Ocorrência não encontrada.');
+    if (occurrence.status !== 'OPEN') throw new ConflictException('Esta ocorrência já foi tratada ou resolvida.');
+    const note = text(body?.note ?? body?.justification);
+    if (!note) throw new BadRequestException('Justificativa é obrigatória.');
+
+    const treated = await this.prisma.attendanceOccurrence.update({
+      where: { id },
+      data: {
+        status: action === 'justify' ? 'JUSTIFIED' : 'DISMISSED',
+        justification: note,
+        treatedById: me.sub,
+        treatedAt: new Date(),
+      },
+    });
+    await this.audit.record(me, {
+      module: MODULE,
+      entity: 'AttendanceOccurrence',
+      entityId: id,
+      action: action === 'justify' ? 'OCCURRENCE_JUSTIFIED' : 'OCCURRENCE_DISMISSED',
+      message: `Ocorrência ${occurrence.type} de ${occurrence.dayKey} ${action === 'justify' ? 'justificada' : 'dispensada'}: ${note}`,
+      before: { status: 'OPEN' },
+      after: { status: treated.status },
+    });
+    return treated;
   }
 
   private async buildMirrorDays(companyId: string, userId: string, fromKey: string, toKey: string) {
@@ -1171,8 +1376,12 @@ export class PersonnelService {
       this.holidayMap(companyId, extendedFrom, toKey),
     ]);
     const adjustmentByDay = new Map<string, (typeof adjustments)[number]>();
+    const abonoDays = new Map<string, string>();
     for (const adjustment of adjustments) {
       if (!adjustmentByDay.has(adjustment.dayKey)) adjustmentByDay.set(adjustment.dayKey, adjustment);
+      if ((adjustment as { type?: string }).type === 'ABONO_DIA' && adjustment.status === 'APPROVED') {
+        abonoDays.set(adjustment.dayKey, (adjustment as { category?: string | null }).category ?? 'OUTRO');
+      }
     }
     return this.composeUserDays({
       userId,
@@ -1183,6 +1392,7 @@ export class PersonnelService {
       holidays,
       coverageDays: coverageMap.get(userId) ?? new Map<string, DayCoverage>(),
       adjustmentByDay,
+      abonoDays,
     });
   }
 
@@ -1207,8 +1417,10 @@ export class PersonnelService {
     holidays: Map<string, string>;
     coverageDays: Map<string, DayCoverage>;
     adjustmentByDay?: Map<string, { id: string; status: string; reason: string }>;
+    /** Dias com abono aprovado (falta justificada): dayKey → categoria. */
+    abonoDays?: Map<string, string>;
   }) {
-    const { userId, fromKey, toKey, entries, assignments, holidays, coverageDays, adjustmentByDay } = input;
+    const { userId, fromKey, toKey, entries, assignments, holidays, coverageDays, adjustmentByDay, abonoDays } = input;
     const today = dayKeyFor(new Date());
     const byCivilDay = groupBy(entries, (e) => dayKeyFor(e.punchedAt));
     const ruleCache = new Map<string, ReturnType<PersonnelService['resolveRule']>>();
@@ -1232,11 +1444,19 @@ export class PersonnelService {
       ruleFor: dayRuleAt,
     });
 
+    // Última saída do dia anterior à janela (para o cálculo de interjornada).
+    let previousDayLastOut: Date | null = null;
+    {
+      const before = attributed.get(addDays(fromKey, -1)) ?? [];
+      if (before.length > 0 && before.length % 2 === 0) previousDayLastOut = before[before.length - 1].punchedAt;
+    }
+
     return enumerateDays(fromKey, toKey).map((dayKey) => {
       const dayEntries = attributed.get(dayKey) ?? [];
-      const coverage = coverageDays.get(dayKey) ?? null;
+      const coverage = coverageDays.get(dayKey) ?? (abonoDays?.has(dayKey) ? ('JUSTIFIED' as const) : null);
       const holidayName = holidays.get(dayKey) ?? null;
       const resolved = resolvedFor(dayKey);
+      const rule = dayRuleAt(dayKey);
       // Algumas escalas autorizadas mantêm a jornada prevista em feriados.
       const holidayCounts = Boolean(holidayName) && !resolved.worksHolidays;
       const abonado = Boolean(coverage) || holidayCounts;
@@ -1244,7 +1464,7 @@ export class PersonnelService {
       const { workedMinutes, open, marks } = effectiveWorkedMinutes({
         punches: dayEntries.map((entry) => entry.punchedAt),
         dayKey,
-        rule: abonado ? null : dayRuleAt(dayKey),
+        rule: abonado ? null : rule,
         toleranceMinutes: resolved.toleranceMinutes,
       });
       const evaluation = evaluateDay({
@@ -1256,18 +1476,37 @@ export class PersonnelService {
         coverage,
         isHoliday: holidayCounts,
       });
+      const detected = detectDayOccurrences({
+        dayKey,
+        status: evaluation.status,
+        plannedMinutes,
+        workedMinutes,
+        punchTimes: dayEntries.map((entry) => entry.punchedAt),
+        rule,
+        toleranceMinutes: resolved.toleranceMinutes,
+        hasSchedule: resolved.hasSchedule,
+        isHoliday: Boolean(holidayName),
+        worksHolidays: resolved.worksHolidays,
+        coverage,
+        previousDayLastOut,
+        isToday: dayKey === today,
+      });
+      previousDayLastOut =
+        dayEntries.length > 0 && dayEntries.length % 2 === 0 ? dayEntries[dayEntries.length - 1].punchedAt : null;
       const adjustment = adjustmentByDay?.get(dayKey);
       return {
         dayKey,
         weekday: weekdayOf(dayKey),
         hasSchedule: resolved.hasSchedule,
         holiday: holidayName,
+        rule,
         plannedMinutes,
         workedMinutes,
         ...evaluation,
         adjustment: adjustment ? { id: adjustment.id, status: adjustment.status, reason: adjustment.reason } : null,
         entries: dayEntries.map((entry, index) => publicEntry(entry, index)),
         toleranceMarks: marks,
+        detected,
       };
     });
   }
@@ -1428,6 +1667,10 @@ export class PersonnelService {
     ]);
     if (!user) throw new NotFoundException('Colaborador não encontrado.');
 
+    const abono = await this.prisma.timeAdjustmentRequest.findFirst({
+      where: { companyId: me.companyId, userId: targetUserId, dayKey, type: 'ABONO_DIA', status: 'APPROVED' },
+      select: { category: true },
+    });
     const day = this.composeUserDays({
       userId: targetUserId,
       fromKey: dayKey,
@@ -1436,6 +1679,7 @@ export class PersonnelService {
       assignments,
       holidays,
       coverageDays: coverageMap.get(targetUserId) ?? new Map<string, DayCoverage>(),
+      abonoDays: abono ? new Map([[dayKey, abono.category ?? 'OUTRO']]) : undefined,
     })[0];
 
     const resolved = this.resolveRule(assignments, targetUserId, dayKey);
@@ -1474,6 +1718,7 @@ export class PersonnelService {
     }
     if (day.status === 'VACATION') steps.push('Dia coberto por férias aprovadas: jornada abonada (saldo 0).');
     if (day.status === 'LEAVE') steps.push('Dia coberto por afastamento/atestado: jornada abonada (saldo 0).');
+    if (day.status === 'JUSTIFIED') steps.push('Dia abonado por ajuste aprovado (falta justificada): jornada abonada (saldo 0).');
     if (marks.length) {
       const described = marks.map((mark, index) => {
         const base = `${index + 1}ª ${mark.role === 'ENTRADA' ? 'entrada' : mark.role === 'SAIDA' ? 'saída' : 'marcação'}: ${fmt(mark.original)}`;

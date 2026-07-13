@@ -7,6 +7,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
 import {
   AlarmClockCheck,
+  AlertTriangle,
   Calculator,
   CalendarClock,
   Camera,
@@ -43,7 +44,7 @@ import { api, getAccessToken } from '@/lib/api';
 import { cn, formatDate } from '@/lib/utils';
 import { ReasonDialog, type ReasonDialogState } from '@/components/platform/reason-dialog';
 
-type DayStatus = 'DAY_OFF' | 'IN_PROGRESS' | 'OK' | 'INCOMPLETE' | 'ABSENT' | 'OVERTIME' | 'UNDERTIME' | 'VACATION' | 'LEAVE' | 'HOLIDAY';
+type DayStatus = 'DAY_OFF' | 'IN_PROGRESS' | 'OK' | 'INCOMPLETE' | 'ABSENT' | 'OVERTIME' | 'UNDERTIME' | 'VACATION' | 'LEAVE' | 'JUSTIFIED' | 'HOLIDAY';
 
 interface PunchEntry {
   id: string;
@@ -53,6 +54,23 @@ interface PunchEntry {
   note: string | null;
   hasLocation: boolean;
   nsr: string | null;
+}
+
+interface OccurrenceDetection {
+  type: string;
+  severity: 'LOW' | 'MEDIUM' | 'HIGH' | 'CRITICAL';
+  minutes?: number;
+}
+
+interface OccurrenceRow {
+  id: string;
+  dayKey: string;
+  type: string;
+  severity: OccurrenceDetection['severity'];
+  minutes: number | null;
+  status: 'OPEN' | 'JUSTIFIED' | 'DISMISSED' | 'RESOLVED';
+  justification: string | null;
+  user?: { id: string; name: string; email: string } | null;
 }
 
 interface MirrorDay {
@@ -66,6 +84,7 @@ interface MirrorDay {
   balanceMinutes: number;
   adjustment: { id: string; status: string; reason: string } | null;
   entries: PunchEntry[];
+  detected?: OccurrenceDetection[];
 }
 
 interface HolidayRow {
@@ -84,7 +103,7 @@ interface MirrorResponse {
 }
 
 interface SummaryResponse {
-  today: MirrorDay & { nextKind: 'IN' | 'OUT' };
+  today: MirrorDay & { nextKind: 'IN' | 'OUT'; expectedStartAt: string | null; expectedEndAt: string | null };
   month: MirrorResponse['totals'];
   bank: { totalMinutes: number; closedMinutes: number; liveMinutes: number };
   pendingAdjustments: number;
@@ -100,11 +119,14 @@ interface TeamRow {
   status: DayStatus;
   balanceMinutes: number;
   entries: PunchEntry[];
+  detected?: OccurrenceDetection[];
 }
 
 interface AdjustmentRequest {
   id: string;
   dayKey: string;
+  type?: 'HORARIOS' | 'ABONO_DIA';
+  category?: string | null;
   proposedTimes: string[];
   reason: string;
   status: 'REQUESTED' | 'APPROVED' | 'REJECTED' | 'CANCELLED';
@@ -198,6 +220,7 @@ const STATUS_LABEL: Record<DayStatus, string> = {
   UNDERTIME: 'Débito',
   VACATION: 'Férias',
   LEAVE: 'Afastamento',
+  JUSTIFIED: 'Abonado',
   HOLIDAY: 'Feriado',
 };
 
@@ -211,7 +234,46 @@ const STATUS_CLASS: Record<DayStatus, string> = {
   UNDERTIME: 'border-status-red/40 text-status-red',
   VACATION: 'border-sky-400/50 text-sky-500',
   LEAVE: 'border-status-purple/40 text-status-purple',
+  JUSTIFIED: 'border-teal-400/50 text-teal-600',
   HOLIDAY: 'border-amber-400/50 text-amber-600',
+};
+
+const OCCURRENCE_TYPE_LABEL: Record<string, string> = {
+  ABSENT: 'Falta',
+  MISSING_PUNCH: 'Batida ausente',
+  LATE: 'Atraso',
+  EARLY_LEAVE: 'Saída antecipada',
+  MISSING_BREAK: 'Intervalo não registrado',
+  SHORT_BREAK: 'Intervalo insuficiente',
+  SHORT_REST: 'Interjornada insuficiente',
+  OVERLONG_DAY: 'Excesso de jornada',
+  WORK_ON_VACATION: 'Trabalho em férias',
+  WORK_ON_LEAVE: 'Trabalho em afastamento',
+  WORK_ON_HOLIDAY: 'Feriado trabalhado',
+  NO_SCHEDULE: 'Batida sem escala',
+};
+
+const OCCURRENCE_SEVERITY_META: Record<OccurrenceDetection['severity'], { label: string; className: string }> = {
+  CRITICAL: { label: 'Crítica', className: 'border-status-red/50 bg-status-red/10 text-status-red' },
+  HIGH: { label: 'Alta', className: 'border-status-red/40 text-status-red' },
+  MEDIUM: { label: 'Média', className: 'border-status-yellow/40 text-status-yellow' },
+  LOW: { label: 'Baixa', className: 'border-border text-muted-foreground' },
+};
+
+const OCCURRENCE_STATUS_LABEL: Record<OccurrenceRow['status'], string> = {
+  OPEN: 'Em aberto',
+  JUSTIFIED: 'Justificada',
+  DISMISSED: 'Dispensada',
+  RESOLVED: 'Resolvida',
+};
+
+const ADJUSTMENT_CATEGORY_LABEL: Record<string, string> = {
+  ESQUECIMENTO: 'Esquecimento de marcação',
+  ATESTADO: 'Atestado/consulta',
+  TRABALHO_EXTERNO: 'Trabalho externo',
+  TREINAMENTO: 'Treinamento',
+  VIAGEM: 'Viagem a serviço',
+  OUTRO: 'Outro motivo',
 };
 
 const HOLIDAY_KIND_LABEL: Record<HolidayRow['kind'], string> = {
@@ -282,7 +344,12 @@ export default function TimeClockPage() {
   const [now, setNow] = useState(() => new Date());
   const [teamDay, setTeamDay] = useState('');
   const [reasonDialog, setReasonDialog] = useState<ReasonDialogState | null>(null);
-  const [adjustDialog, setAdjustDialog] = useState<{ dayKey: string; times: string[]; reason: string } | null>(null);
+  const [adjustDialog, setAdjustDialog] = useState<{ dayKey: string; times: string[]; reason: string; type: 'HORARIOS' | 'ABONO_DIA'; category: string } | null>(null);
+  const [occurrenceFilter, setOccurrenceFilter] = useState(() => ({
+    status: 'OPEN',
+    from: `${new Date().toISOString().slice(0, 7)}-01`,
+    to: new Date().toISOString().slice(0, 10),
+  }));
   const [templateDialog, setTemplateDialog] = useState(false);
   const [templateForm, setTemplateForm] = useState(DEFAULT_TEMPLATE_FORM);
   const [assignForm, setAssignForm] = useState<{ templateId: string; userIds: string[]; cycleAnchorDay: string }>({ templateId: '', userIds: [], cycleAnchorDay: '' });
@@ -360,6 +427,18 @@ export default function TimeClockPage() {
     queryFn: () => api<KioskDevice[]>('/personnel/kiosk/devices'),
     enabled: canManage && tab === 'escalas',
   });
+  const occurrencesQuery = useQuery<OccurrenceRow[]>({
+    queryKey: ['time-clock', 'occurrences', occurrenceFilter],
+    queryFn: () =>
+      api<OccurrenceRow[]>(
+        `/personnel/occurrences?status=${occurrenceFilter.status}&from=${occurrenceFilter.from}&to=${occurrenceFilter.to}`,
+      ),
+    enabled: canTeam && tab === 'ocorrencias',
+  });
+  const myOccurrencesQuery = useQuery<OccurrenceRow[]>({
+    queryKey: ['time-clock', 'occurrences', 'mine'],
+    queryFn: () => api<OccurrenceRow[]>('/personnel/occurrences/mine'),
+  });
 
   const summary = summaryQuery.data;
   const mirror = mirrorQuery.data;
@@ -390,14 +469,37 @@ export default function TimeClockPage() {
   });
 
   const requestAdjustment = useMutation({
-    mutationFn: (payload: { dayKey: string; proposedTimes: string[]; reason: string }) =>
+    mutationFn: (payload: { dayKey: string; proposedTimes: string[]; reason: string; type: 'HORARIOS' | 'ABONO_DIA'; category: string }) =>
       api('/personnel/time-clock/adjustments', { method: 'POST', json: payload }),
-    onSuccess: () => {
-      toast.success('Solicitação de ajuste enviada');
+    onSuccess: (_result, variables) => {
+      toast.success(variables.type === 'ABONO_DIA' ? 'Pedido de abono enviado' : 'Solicitação de ajuste enviada');
       setAdjustDialog(null);
       invalidate();
     },
     onError: (e: any) => toast.error(e?.message ?? 'Não foi possível solicitar o ajuste'),
+  });
+
+  const treatOccurrence = useMutation({
+    mutationFn: ({ id, action, note }: { id: string; action: 'justify' | 'dismiss'; note: string }) =>
+      api(`/personnel/occurrences/${id}/${action}`, { method: 'POST', json: { note } }),
+    onSuccess: (_result, variables) => {
+      toast.success(variables.action === 'justify' ? 'Ocorrência justificada' : 'Ocorrência dispensada');
+      void qc.invalidateQueries({ queryKey: ['time-clock', 'occurrences'] });
+    },
+    onError: (e: any) => toast.error(e?.message ?? 'Não foi possível tratar a ocorrência'),
+  });
+
+  const scanOccurrences = useMutation({
+    mutationFn: () =>
+      api<{ created: number; resolved: number; users: number }>('/personnel/occurrences/scan', {
+        method: 'POST',
+        json: { from: occurrenceFilter.from, to: occurrenceFilter.to },
+      }),
+    onSuccess: (result) => {
+      toast.success(`Varredura concluída: ${result.created} nova(s), ${result.resolved} resolvida(s) em ${result.users} colaborador(es)`);
+      void qc.invalidateQueries({ queryKey: ['time-clock', 'occurrences'] });
+    },
+    onError: (e: any) => toast.error(e?.message ?? 'Não foi possível varrer o período'),
   });
 
   const decideAdjustment = useMutation({
@@ -544,7 +646,14 @@ export default function TimeClockPage() {
 
   const openAdjustDialog = (day: MirrorDay) => {
     const times = day.entries.map((entry) => formatTime(entry.punchedAt));
-    setAdjustDialog({ dayKey: day.dayKey, times: times.length ? times : ['08:00', '17:00'], reason: '' });
+    setAdjustDialog({
+      dayKey: day.dayKey,
+      times: times.length ? times : ['08:00', '17:00'],
+      reason: '',
+      // Falta sem batidas sugere abono; demais casos sugerem correção de horários.
+      type: day.status === 'ABSENT' ? 'ABONO_DIA' : 'HORARIOS',
+      category: day.status === 'ABSENT' ? 'ATESTADO' : 'ESQUECIMENTO',
+    });
   };
 
   const downloadReceipt = async (entry: PunchEntry) => {
@@ -573,7 +682,7 @@ export default function TimeClockPage() {
         <TabsList className="bg-slate-100 dark:bg-slate-800">
           <TabsTrigger value="meu-ponto" className="text-xs font-semibold"><Fingerprint className="mr-2 h-4 w-4" />Meu Ponto</TabsTrigger>
           {canTeam && <TabsTrigger value="equipe" className="text-xs font-semibold"><Users className="mr-2 h-4 w-4" />Equipe</TabsTrigger>}
-          {canManage && (
+          {canTeam && (
             <TabsTrigger value="ajustes" className="text-xs font-semibold">
               <ListChecks className="mr-2 h-4 w-4" />Ajustes
               {(summary?.pendingAdjustments ?? 0) > 0 && (
@@ -581,6 +690,7 @@ export default function TimeClockPage() {
               )}
             </TabsTrigger>
           )}
+          {canTeam && <TabsTrigger value="ocorrencias" className="text-xs font-semibold"><AlertTriangle className="mr-2 h-4 w-4" />Ocorrências</TabsTrigger>}
           {canManage && <TabsTrigger value="escalas" className="text-xs font-semibold"><CalendarClock className="mr-2 h-4 w-4" />Escalas</TabsTrigger>}
           {canManage && <TabsTrigger value="fechamento" className="text-xs font-semibold"><Lock className="mr-2 h-4 w-4" />Fechamento</TabsTrigger>}
         </TabsList>
@@ -614,6 +724,16 @@ export default function TimeClockPage() {
                   <Button asChild variant="outline" size="lg" className="h-11 w-full border-cyan-500/40 text-cyan-700 hover:bg-cyan-500/5 dark:text-cyan-300">
                     <Link href="/servico-pessoal/ponto-facial"><Camera className="mr-2 h-5 w-5" />Usar reconhecimento facial</Link>
                   </Button>
+                  {summary?.today?.expectedEndAt && summary?.today?.nextKind === 'OUT' && (
+                    <div className="rounded-md border border-sky-400/30 bg-sky-500/5 p-2 text-[11px] text-sky-700 dark:text-sky-300">
+                      Saída prevista às <span className="font-bold tabular-nums">{formatTime(summary.today.expectedEndAt)}</span>
+                    </div>
+                  )}
+                  {summary?.today?.expectedStartAt && summary?.today?.nextKind === 'IN' && (summary?.today?.entries ?? []).length === 0 && (
+                    <div className="rounded-md border border-sky-400/30 bg-sky-500/5 p-2 text-[11px] text-sky-700 dark:text-sky-300">
+                      Próxima marcação esperada: entrada às <span className="font-bold tabular-nums">{formatTime(summary.today.expectedStartAt)}</span>
+                    </div>
+                  )}
                   <div className="flex items-center justify-center gap-1 text-[10px] text-muted-foreground">
                     <MapPin className="h-3 w-3" />A localização é registrada junto com a batida, quando autorizada.
                   </div>
@@ -694,6 +814,39 @@ export default function TimeClockPage() {
                       </Badge>
                     </div>
                   ))}
+                </CardContent>
+              </Card>
+
+              {/* Minhas ocorrências (últimos 60 dias) */}
+              <Card className="border border-slate-100 bg-white shadow-sm dark:border-slate-800/80 dark:bg-slate-900/50">
+                <CardContent className="space-y-2 p-4 text-xs">
+                  <div className="font-semibold text-slate-800 dark:text-slate-200">Minhas ocorrências</div>
+                  {(myOccurrencesQuery.data ?? []).length === 0 && (
+                    <div className="text-muted-foreground">Nenhuma ocorrência nos últimos 60 dias. 🎉</div>
+                  )}
+                  {(myOccurrencesQuery.data ?? []).slice(0, 6).map((occurrence) => (
+                    <div key={occurrence.id} className="flex items-center justify-between gap-2 rounded-md border p-2">
+                      <div className="min-w-0">
+                        <div className="font-semibold tabular-nums">{formatDayKey(occurrence.dayKey)}</div>
+                        <div className="truncate text-[10px] text-muted-foreground">
+                          {OCCURRENCE_TYPE_LABEL[occurrence.type] ?? occurrence.type}
+                          {occurrence.minutes ? ` · ${minutesLabel(occurrence.minutes)}` : ''}
+                        </div>
+                      </div>
+                      <Badge
+                        variant="outline"
+                        className={cn(
+                          'shrink-0 text-[9px]',
+                          occurrence.status === 'OPEN' ? 'border-status-yellow/40 text-status-yellow' : occurrence.status === 'RESOLVED' ? 'border-status-green/40 text-status-green' : 'border-border text-muted-foreground',
+                        )}
+                      >
+                        {OCCURRENCE_STATUS_LABEL[occurrence.status]}
+                      </Badge>
+                    </div>
+                  ))}
+                  <div className="text-[9px] text-muted-foreground">
+                    Ocorrências em aberto podem ser resolvidas solicitando um ajuste ou abono do dia no espelho.
+                  </div>
                 </CardContent>
               </Card>
             </div>
@@ -860,8 +1013,111 @@ export default function TimeClockPage() {
           </TabsContent>
         )}
 
+        {/* ------------------------------ Central de Ocorrências ------------------------------ */}
+        {canTeam && (
+          <TabsContent value="ocorrencias">
+            <Card className="border border-slate-100 bg-white shadow-sm dark:border-slate-800/80 dark:bg-slate-900/50">
+              <div className="flex flex-wrap items-center justify-between gap-2 border-b px-4 py-2.5">
+                <h3 className="flex items-center gap-2 text-sm font-semibold text-slate-800 dark:text-white">
+                  <AlertTriangle className="h-4 w-4 text-sky-500" />Central de Ocorrências
+                </h3>
+                <div className="flex flex-wrap items-center gap-2 text-xs">
+                  <NativeSelect className="h-8 w-36 text-xs" value={occurrenceFilter.status} onChange={(e) => setOccurrenceFilter((f) => ({ ...f, status: e.target.value }))}>
+                    <option value="OPEN">Em aberto</option>
+                    <option value="JUSTIFIED">Justificadas</option>
+                    <option value="DISMISSED">Dispensadas</option>
+                    <option value="RESOLVED">Resolvidas</option>
+                    <option value="">Todas</option>
+                  </NativeSelect>
+                  <Input type="date" className="h-8 w-36 text-xs" value={occurrenceFilter.from} onChange={(e) => setOccurrenceFilter((f) => ({ ...f, from: e.target.value }))} />
+                  <Input type="date" className="h-8 w-36 text-xs" value={occurrenceFilter.to} onChange={(e) => setOccurrenceFilter((f) => ({ ...f, to: e.target.value }))} />
+                  <Button size="sm" variant="outline" className="h-8 text-xs" disabled={scanOccurrences.isPending} onClick={() => scanOccurrences.mutate()}>
+                    {scanOccurrences.isPending ? 'Varrendo...' : 'Varrer período'}
+                  </Button>
+                </div>
+              </div>
+              <CardContent className="overflow-x-auto p-0">
+                <table className="w-full min-w-[860px] text-xs">
+                  <thead className="border-b bg-slate-50/60 text-[10px] uppercase tracking-wider text-muted-foreground dark:bg-slate-900/40">
+                    <tr>
+                      <th className="px-4 py-2.5 text-left">Dia</th>
+                      <th className="px-2 py-2.5 text-left">Colaborador</th>
+                      <th className="px-2 py-2.5 text-left">Ocorrência</th>
+                      <th className="px-2 py-2.5 text-left">Criticidade</th>
+                      <th className="px-2 py-2.5 text-right">Impacto</th>
+                      <th className="px-2 py-2.5 text-left">Situação</th>
+                      <th className="px-4 py-2.5 text-right">Ações</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-100 dark:divide-slate-800/60">
+                    {(occurrencesQuery.data ?? []).map((occurrence) => (
+                      <tr key={occurrence.id}>
+                        <td className="px-4 py-2 font-semibold tabular-nums">{formatDayKey(occurrence.dayKey)}</td>
+                        <td className="px-2 py-2">
+                          <div className="max-w-[220px] truncate">{occurrence.user?.name ?? '—'}</div>
+                        </td>
+                        <td className="px-2 py-2">{OCCURRENCE_TYPE_LABEL[occurrence.type] ?? occurrence.type}</td>
+                        <td className="px-2 py-2">
+                          <Badge variant="outline" className={cn('text-[9px]', OCCURRENCE_SEVERITY_META[occurrence.severity].className)}>
+                            {OCCURRENCE_SEVERITY_META[occurrence.severity].label}
+                          </Badge>
+                        </td>
+                        <td className="px-2 py-2 text-right tabular-nums">{occurrence.minutes ? minutesLabel(occurrence.minutes) : '—'}</td>
+                        <td className="px-2 py-2">
+                          <Badge variant="outline" className="text-[9px]" title={occurrence.justification ?? undefined}>
+                            {OCCURRENCE_STATUS_LABEL[occurrence.status]}
+                          </Badge>
+                        </td>
+                        <td className="px-4 py-2 text-right">
+                          {occurrence.status === 'OPEN' && (
+                            <>
+                              <Button variant="ghost" size="sm" className="h-6 text-[10px]" onClick={() => setReasonDialog({
+                                title: `Justificar — ${OCCURRENCE_TYPE_LABEL[occurrence.type] ?? occurrence.type} (${formatDayKey(occurrence.dayKey)})`,
+                                label: 'Justificativa',
+                                required: true,
+                                confirmLabel: 'Justificar ocorrência',
+                                onConfirm: (reason) => treatOccurrence.mutate({ id: occurrence.id, action: 'justify', note: reason }),
+                              })}>
+                                Justificar
+                              </Button>
+                              {canManage && (
+                                <Button variant="ghost" size="sm" className="h-6 text-[10px] text-muted-foreground" onClick={() => setReasonDialog({
+                                  title: `Dispensar ocorrência (${formatDayKey(occurrence.dayKey)})`,
+                                  label: 'Motivo da dispensa',
+                                  required: true,
+                                  confirmLabel: 'Dispensar',
+                                  destructive: true,
+                                  onConfirm: (reason) => treatOccurrence.mutate({ id: occurrence.id, action: 'dismiss', note: reason }),
+                                })}>
+                                  Dispensar
+                                </Button>
+                              )}
+                            </>
+                          )}
+                          <Button variant="ghost" size="sm" className="h-6 text-[10px]" onClick={() => occurrence.user && setExplainTarget({ userId: occurrence.user.id, dayKey: occurrence.dayKey })}>
+                            Entenda
+                          </Button>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+                {occurrencesQuery.isLoading && <div className="p-6 text-center text-xs text-muted-foreground">Carregando ocorrências...</div>}
+                {!occurrencesQuery.isLoading && (occurrencesQuery.data ?? []).length === 0 && (
+                  <div className="p-6 text-center text-xs text-muted-foreground">
+                    Nenhuma ocorrência {occurrenceFilter.status === 'OPEN' ? 'em aberto' : ''} no período. A varredura automática roda diariamente; use &quot;Varrer período&quot; para reprocessar agora.
+                  </div>
+                )}
+                <div className="border-t p-3 text-[10px] text-muted-foreground">
+                  Ocorrências são detectadas pela apuração (falta, batida ausente, atraso, intervalo, interjornada, excesso de jornada, trabalho em férias/afastamento/feriado). Justificar registra o tratamento; ajustes/abonos aprovados resolvem automaticamente.
+                </div>
+              </CardContent>
+            </Card>
+          </TabsContent>
+        )}
+
         {/* ------------------------------ Ajustes ------------------------------ */}
-        {canManage && (
+        {canTeam && (
           <TabsContent value="ajustes">
             <Card className="border border-slate-100 bg-white shadow-sm dark:border-slate-800/80 dark:bg-slate-900/50">
               <div className="border-b px-4 py-2.5">
@@ -896,11 +1152,17 @@ export default function TimeClockPage() {
                       </div>
                     </div>
                     <div className="mt-2 flex flex-wrap gap-1.5">
-                      {(request.proposedTimes ?? []).map((time, index) => (
-                        <Badge key={`${request.id}-${index}`} variant="outline" className={cn('text-[10px] tabular-nums', index % 2 === 0 ? 'border-status-green/40 text-status-green' : 'border-status-red/40 text-status-red')}>
-                          {index % 2 === 0 ? '→' : '←'} {time}
+                      {request.type === 'ABONO_DIA' ? (
+                        <Badge variant="outline" className="border-teal-400/50 text-[10px] text-teal-600">
+                          Abono do dia{request.category ? ` · ${ADJUSTMENT_CATEGORY_LABEL[request.category] ?? request.category}` : ''}
                         </Badge>
-                      ))}
+                      ) : (
+                        (request.proposedTimes ?? []).map((time, index) => (
+                          <Badge key={`${request.id}-${index}`} variant="outline" className={cn('text-[10px] tabular-nums', index % 2 === 0 ? 'border-status-green/40 text-status-green' : 'border-status-red/40 text-status-red')}>
+                            {index % 2 === 0 ? '→' : '←'} {time}
+                          </Badge>
+                        ))
+                      )}
                     </div>
                     <div className="mt-2 text-muted-foreground">Motivo: {request.reason}</div>
                   </div>
@@ -1262,33 +1524,56 @@ export default function TimeClockPage() {
           </DialogHeader>
           {adjustDialog && (
             <div className="space-y-4">
-              <div className="rounded-md border bg-muted/30 p-3 text-xs text-muted-foreground">
-                Informe a lista completa de horários do dia (entrada, saída, entrada, saída...). Ao aprovar, os horários corrigidos são lançados separadamente; as marcações originais permanecem preservadas na auditoria.
+              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                <div>
+                  <Label>Tipo de solicitação</Label>
+                  <NativeSelect value={adjustDialog.type} onChange={(e) => setAdjustDialog((d) => d && { ...d, type: e.target.value as 'HORARIOS' | 'ABONO_DIA' })}>
+                    <option value="HORARIOS">Corrigir horários do dia</option>
+                    <option value="ABONO_DIA">Abonar o dia (falta justificada)</option>
+                  </NativeSelect>
+                </div>
+                <div>
+                  <Label>Categoria do motivo</Label>
+                  <NativeSelect value={adjustDialog.category} onChange={(e) => setAdjustDialog((d) => d && { ...d, category: e.target.value })}>
+                    {Object.entries(ADJUSTMENT_CATEGORY_LABEL).map(([value, label]) => <option key={value} value={value}>{label}</option>)}
+                  </NativeSelect>
+                </div>
               </div>
-              <div className="space-y-2">
-                {adjustDialog.times.map((time, index) => (
-                  <div key={index} className="flex items-center gap-2">
-                    <Badge variant="outline" className={cn('w-16 justify-center text-[10px]', index % 2 === 0 ? 'border-status-green/40 text-status-green' : 'border-status-red/40 text-status-red')}>
-                      {index % 2 === 0 ? 'Entrada' : 'Saída'}
-                    </Badge>
-                    <Input
-                      type="time"
-                      className="h-8 w-32 text-xs"
-                      value={time}
-                      onChange={(e) => setAdjustDialog((d) => d && { ...d, times: d.times.map((t, i) => (i === index ? e.target.value : t)) })}
-                    />
-                    <Button variant="ghost" size="icon" className="h-7 w-7 text-status-red" onClick={() => setAdjustDialog((d) => d && { ...d, times: d.times.filter((_, i) => i !== index) })}>
-                      <Trash2 className="h-3.5 w-3.5" />
+              {adjustDialog.type === 'HORARIOS' ? (
+                <>
+                  <div className="rounded-md border bg-muted/30 p-3 text-xs text-muted-foreground">
+                    Informe a lista completa de horários do dia (entrada, saída, entrada, saída...). Ao aprovar, os horários corrigidos são lançados separadamente; as marcações originais permanecem preservadas na auditoria.
+                  </div>
+                  <div className="space-y-2">
+                    {adjustDialog.times.map((time, index) => (
+                      <div key={index} className="flex items-center gap-2">
+                        <Badge variant="outline" className={cn('w-16 justify-center text-[10px]', index % 2 === 0 ? 'border-status-green/40 text-status-green' : 'border-status-red/40 text-status-red')}>
+                          {index % 2 === 0 ? 'Entrada' : 'Saída'}
+                        </Badge>
+                        <Input
+                          type="time"
+                          className="h-8 w-32 text-xs"
+                          value={time}
+                          onChange={(e) => setAdjustDialog((d) => d && { ...d, times: d.times.map((t, i) => (i === index ? e.target.value : t)) })}
+                        />
+                        <Button variant="ghost" size="icon" className="h-7 w-7 text-status-red" onClick={() => setAdjustDialog((d) => d && { ...d, times: d.times.filter((_, i) => i !== index) })}>
+                          <Trash2 className="h-3.5 w-3.5" />
+                        </Button>
+                      </div>
+                    ))}
+                    <Button variant="outline" size="sm" className="h-7 text-xs" onClick={() => setAdjustDialog((d) => d && { ...d, times: [...d.times, ''] })}>
+                      <Plus className="mr-1 h-3 w-3" />Adicionar horário
                     </Button>
                   </div>
-                ))}
-                <Button variant="outline" size="sm" className="h-7 text-xs" onClick={() => setAdjustDialog((d) => d && { ...d, times: [...d.times, ''] })}>
-                  <Plus className="mr-1 h-3 w-3" />Adicionar horário
-                </Button>
-              </div>
+                </>
+              ) : (
+                <div className="rounded-md border border-teal-400/30 bg-teal-500/5 p-3 text-xs text-teal-700 dark:text-teal-300">
+                  O abono justifica a falta do dia sem criar batidas: aprovado, o dia deixa de contar como falta e o saldo fica zerado. Nenhuma marcação é criada ou alterada.
+                </div>
+              )}
               <div>
-                <Label>Motivo do ajuste</Label>
-                <Textarea rows={3} value={adjustDialog.reason} onChange={(e) => setAdjustDialog((d) => d && { ...d, reason: e.target.value })} placeholder="Ex.: esqueci de registrar a saída do almoço." />
+                <Label>{adjustDialog.type === 'ABONO_DIA' ? 'Motivo do abono' : 'Motivo do ajuste'}</Label>
+                <Textarea rows={3} value={adjustDialog.reason} onChange={(e) => setAdjustDialog((d) => d && { ...d, reason: e.target.value })} placeholder={adjustDialog.type === 'ABONO_DIA' ? 'Ex.: consulta médica com atestado entregue ao DP.' : 'Ex.: esqueci de registrar a saída do almoço.'} />
               </div>
             </div>
           )}
@@ -1296,8 +1581,17 @@ export default function TimeClockPage() {
             <Button variant="outline" onClick={() => setAdjustDialog(null)}>Cancelar</Button>
             <Button
               className="bg-sky-500 font-semibold text-white hover:bg-sky-600"
-              disabled={!adjustDialog || !adjustDialog.reason.trim() || adjustDialog.times.some((t) => !t) || requestAdjustment.isPending}
-              onClick={() => adjustDialog && requestAdjustment.mutate({ dayKey: adjustDialog.dayKey, proposedTimes: adjustDialog.times, reason: adjustDialog.reason })}
+              disabled={!adjustDialog || !adjustDialog.reason.trim() || (adjustDialog.type === 'HORARIOS' && adjustDialog.times.some((t) => !t)) || requestAdjustment.isPending}
+              onClick={() =>
+                adjustDialog &&
+                requestAdjustment.mutate({
+                  dayKey: adjustDialog.dayKey,
+                  proposedTimes: adjustDialog.type === 'HORARIOS' ? adjustDialog.times : [],
+                  reason: adjustDialog.reason,
+                  type: adjustDialog.type,
+                  category: adjustDialog.category,
+                })
+              }
             >
               {requestAdjustment.isPending ? 'Enviando...' : 'Enviar solicitação'}
             </Button>

@@ -3,6 +3,8 @@ import { PrismaService } from '../prisma/prisma.service';
 import { DocumentsService } from '../modules/documents/documents.service';
 import { NotificationsService } from '../modules/notifications/notifications.service';
 import { OrganizationalCommunicationService } from '../modules/communication/organizational/organizational-communication.service';
+import { PersonnelService } from '../modules/personnel/personnel.service';
+import { addDays, dayKeyFor } from '../modules/personnel/time-clock.logic';
 
 /**
  * Rotinas de manutenção que precisam rodar SEM depender de Redis/BullMQ
@@ -31,6 +33,7 @@ export class MaintenanceScheduler implements OnApplicationBootstrap, OnApplicati
     private readonly documents: DocumentsService,
     private readonly notifications: NotificationsService,
     private readonly orgCommunication: OrganizationalCommunicationService,
+    private readonly personnel: PersonnelService,
   ) {}
 
   onApplicationBootstrap() {
@@ -60,6 +63,8 @@ export class MaintenanceScheduler implements OnApplicationBootstrap, OnApplicati
     let alertsGenerated = 0;
     let postsPublished = 0;
     let postsExpired = 0;
+    let occurrencesCreated = 0;
+    let occurrencesResolved = 0;
     let failures = 0;
     try {
       const companies = await this.prisma.company.findMany({
@@ -90,11 +95,30 @@ export class MaintenanceScheduler implements OnApplicationBootstrap, OnApplicati
           failures += 1;
           this.logger.error(`Publicação de comunicados falhou (empresa ${company.id}): ${(error as Error).message}`);
         }
+        try {
+          // Central de Ocorrências: varre a véspera uma vez por dia por empresa
+          // (dedup pelo contador; o tick roda de hora em hora).
+          const yesterday = addDays(dayKeyFor(new Date()), -1);
+          const scanKey = `occ-scan:${yesterday}`;
+          const alreadyRan = await this.prisma.personnelCounter.findUnique({
+            where: { companyId_key: { companyId: company.id, key: scanKey } },
+          });
+          if (!alreadyRan) {
+            await this.prisma.personnelCounter.create({ data: { companyId: company.id, key: scanKey, value: 1 } });
+            const result = await this.personnel.syncOccurrences(company.id, null, addDays(yesterday, -1), yesterday);
+            occurrencesCreated += result.created;
+            occurrencesResolved += result.resolved;
+          }
+        } catch (error) {
+          failures += 1;
+          this.logger.error(`Varredura de ocorrências falhou (empresa ${company.id}): ${(error as Error).message}`);
+        }
       }
-      if (documentsProcessed || alertsGenerated || postsPublished || postsExpired || failures) {
+      if (documentsProcessed || alertsGenerated || postsPublished || postsExpired || occurrencesCreated || occurrencesResolved || failures) {
         this.logger.log(
           `Ciclo de manutenção: ${companies.length} empresas, ${documentsProcessed} documentos transicionados, ` +
             `${alertsGenerated} alertas gerados, ${postsPublished} comunicados publicados, ${postsExpired} expirados, ` +
+            `${occurrencesCreated} ocorrências novas, ${occurrencesResolved} resolvidas, ` +
             `${failures} falhas, ${Date.now() - startedAt}ms.`,
         );
       }

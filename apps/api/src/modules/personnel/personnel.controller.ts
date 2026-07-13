@@ -61,22 +61,56 @@ export class PersonnelController {
     return this.service.myAdjustments(me);
   }
 
+  // Líderes (ponto:team) decidem dentro da própria abrangência; o service
+  // aplica o escopo por área e proíbe decidir a própria solicitação.
   @Get('time-clock/adjustments/pending')
-  @RequirePermissions('ponto:manage')
+  @RequirePermissions('ponto:team', 'ponto:manage')
   pendingAdjustments(@CurrentUser() me: AuthPayload) {
     return this.service.pendingAdjustments(me);
   }
 
   @Post('time-clock/adjustments/:id/approve')
-  @RequirePermissions('ponto:manage')
+  @RequirePermissions('ponto:team', 'ponto:manage')
   approveAdjustment(@CurrentUser() me: AuthPayload, @Param('id') id: string, @Body() body: any) {
     return this.service.decideAdjustment(me, id, 'approve', body);
   }
 
   @Post('time-clock/adjustments/:id/reject')
-  @RequirePermissions('ponto:manage')
+  @RequirePermissions('ponto:team', 'ponto:manage')
   rejectAdjustment(@CurrentUser() me: AuthPayload, @Param('id') id: string, @Body() body: any) {
     return this.service.decideAdjustment(me, id, 'reject', body);
+  }
+
+  // ------------------------------ Central de Ocorrências ------------------------------
+
+  @Get('occurrences')
+  @RequirePermissions('ponto:team', 'ponto:manage')
+  listOccurrences(@CurrentUser() me: AuthPayload, @Query() query: any) {
+    return this.service.listOccurrences(me, query);
+  }
+
+  @Get('occurrences/mine')
+  @RequirePermissions('ponto:view')
+  myOccurrences(@CurrentUser() me: AuthPayload) {
+    return this.service.myOccurrences(me);
+  }
+
+  @Post('occurrences/scan')
+  @RequirePermissions('ponto:team', 'ponto:manage')
+  scanOccurrences(@CurrentUser() me: AuthPayload, @Body() body: any) {
+    return this.service.scanOccurrences(me, body);
+  }
+
+  @Post('occurrences/:id/justify')
+  @RequirePermissions('ponto:team', 'ponto:manage')
+  justifyOccurrence(@CurrentUser() me: AuthPayload, @Param('id') id: string, @Body() body: any) {
+    return this.service.treatOccurrence(me, id, 'justify', body);
+  }
+
+  @Post('occurrences/:id/dismiss')
+  @RequirePermissions('ponto:manage')
+  dismissOccurrence(@CurrentUser() me: AuthPayload, @Param('id') id: string, @Body() body: any) {
+    return this.service.treatOccurrence(me, id, 'dismiss', body);
   }
 
   // ------------------------------ Importação ------------------------------

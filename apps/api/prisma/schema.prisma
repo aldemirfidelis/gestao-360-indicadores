@@ -12167,7 +12167,13 @@ model TimeAdjustmentRequest {
   companyId     String
   userId        String
   dayKey        String
-  proposedTimes Json // ["08:00","12:00","13:00","17:00"]
+  /// HORARIOS = corrige a lista de horários do dia; ABONO_DIA = abona a
+  /// jornada do dia (falta justificada, sem recriar batidas).
+  type          String    @default("HORARIOS")
+  /// Motivo categorizado: ESQUECIMENTO | ATESTADO | TRABALHO_EXTERNO |
+  /// TREINAMENTO | VIAGEM | OUTRO.
+  category      String?
+  proposedTimes Json // ["08:00","12:00","13:00","17:00"] (vazio em ABONO_DIA)
   reason        String
   status        String    @default("REQUESTED") // REQUESTED | APPROVED | REJECTED | CANCELLED
   decidedById   String?
@@ -12179,6 +12185,37 @@ model TimeAdjustmentRequest {
   @@index([companyId, status])
   @@index([companyId, userId, dayKey])
   @@map("time_adjustment_requests")
+}
+
+/// Ocorrência de jornada detectada pela apuração (Central de Ocorrências).
+/// Idempotente por (empresa, colaborador, dia, tipo): re-escanear atualiza em
+/// vez de duplicar; quando a causa desaparece (ex.: ajuste aprovado) o registro
+/// vira RESOLVED automaticamente, preservando a trilha de tratamento.
+model AttendanceOccurrence {
+  id                  String    @id @default(uuid())
+  companyId           String
+  userId              String
+  dayKey              String
+  /// ABSENT | MISSING_PUNCH | LATE | EARLY_LEAVE | SHORT_BREAK | MISSING_BREAK |
+  /// SHORT_REST | OVERLONG_DAY | WORK_ON_VACATION | WORK_ON_LEAVE |
+  /// WORK_ON_HOLIDAY | NO_SCHEDULE
+  type                String
+  severity            String // LOW | MEDIUM | HIGH | CRITICAL
+  minutes             Int?
+  detail              Json?
+  status              String    @default("OPEN") // OPEN | JUSTIFIED | DISMISSED | RESOLVED
+  justification       String?
+  treatedById         String?
+  treatedAt           DateTime?
+  adjustmentRequestId String?
+  firstDetectedAt     DateTime  @default(now())
+  lastSeenAt          DateTime  @default(now())
+  resolvedAt          DateTime?
+
+  @@unique([companyId, userId, dayKey, type])
+  @@index([companyId, status, dayKey])
+  @@index([companyId, userId, dayKey])
+  @@map("attendance_occurrences")
 }
 
 /// Fechamento de competência (YYYY-MM): trava batidas e ajustes no período.

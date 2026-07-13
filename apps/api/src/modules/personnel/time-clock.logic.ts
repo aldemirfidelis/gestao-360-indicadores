@@ -48,6 +48,7 @@ export type DayStatus =
   | 'UNDERTIME' // débito no dia
   | 'VACATION' // férias aprovadas cobrindo o dia (abonado)
   | 'LEAVE' // afastamento/atestado cobrindo o dia (abonado)
+  | 'JUSTIFIED' // abono aprovado do dia (falta justificada, saldo 0)
   | 'HOLIDAY'; // feriado sem trabalho (não é falta)
 
 /** Brasil não tem horário de verão desde 2019: America/Sao_Paulo = UTC-3 fixo. */
@@ -146,8 +147,8 @@ export function evaluateDay(input: {
   plannedMinutes: number;
   isToday: boolean;
   hasOpenPair: boolean;
-  /** Férias/afastamento cobrindo o dia: abona a jornada (saldo 0). */
-  coverage?: 'VACATION' | 'LEAVE' | null;
+  /** Férias/afastamento/abono aprovado cobrindo o dia: jornada abonada (saldo 0). */
+  coverage?: 'VACATION' | 'LEAVE' | 'JUSTIFIED' | null;
   /** Feriado: ausência não é falta; trabalho vira crédito (previsto deve vir 0). */
   isHoliday?: boolean;
 }): DayEvaluation {
