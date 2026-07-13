@@ -211,6 +211,12 @@ export class DocumentsController {
     return this.service.openEditor(me, id);
   }
 
+  @Post(':id/viewer/open')
+  @RequirePermissions('doc:view')
+  openViewer(@CurrentUser() me: AuthPayload, @Param('id') id: string) {
+    return this.service.openViewer(me, id);
+  }
+
   @Post(':id/editor/open-word')
   @RequirePermissions('doc:view')
   openWordDesktopEditor(@CurrentUser() me: AuthPayload, @Param('id') id: string) {

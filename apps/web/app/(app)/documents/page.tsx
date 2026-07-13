@@ -198,6 +198,7 @@ interface EditorSession {
   accessToken: string | null;
   accessTokenTtl: number;
   wopiSrc: string | null;
+  readOnly?: boolean;
 }
 
 
@@ -646,6 +647,20 @@ export default function DocumentsPage() {
       }
     },
     onError: (e: any) => toast.error(e?.message ?? 'Não foi possível abrir o editor'),
+  });
+
+  const openViewer = useMutation({
+    mutationFn: (id: string) => api<EditorSession>(`/documents/${id}/viewer/open`, { method: 'POST', json: {} }),
+    onSuccess: (session) => {
+      if (session.editorUrl && session.accessToken) {
+        setEditorSession({ ...session, readOnly: true });
+      } else {
+        toast.message('Visualizador pela web indisponível', {
+          description: session.message ?? 'Use o PDF ou baixe o DOCX.',
+        });
+      }
+    },
+    onError: (e: any) => toast.error(e?.message ?? 'Não foi possível abrir a visualização'),
   });
 
   useEffect(() => {
@@ -1576,6 +1591,11 @@ export default function DocumentsPage() {
                       <div className="font-semibold text-slate-800 dark:text-slate-200">Ações do documento</div>
                       <div className="mt-1 text-[10px] text-muted-foreground">A abertura padrão é somente leitura. Toda edição fica registrada; quem não é responsável precisa de liberação.</div>
                       <div className="mt-3 space-y-2">
+                        {detail.editor.configured && (
+                          <Button variant="outline" size="sm" className="w-full justify-start text-xs h-8" disabled={openViewer.isPending} onClick={() => openViewer.mutate(detail.id)}>
+                            <Eye className="mr-1.5 h-3.5 w-3.5" />{openViewer.isPending ? 'Abrindo visualização...' : 'Visualizar no Collabora'}
+                          </Button>
+                        )}
                         {latestDocx && (
                           <Button variant="outline" size="sm" className="w-full justify-start text-xs h-8" onClick={() => downloadControlled(detail.id, latestDocx.id, latestDocx.fileName)}>
                             <Download className="mr-1.5 h-3.5 w-3.5" />Baixar DOCX
@@ -2061,7 +2081,7 @@ function OnlineEditorDialog({ session, onClose }: { session: EditorSession | nul
     <Dialog open onOpenChange={(o) => { if (!o) onClose(); }}>
       <DialogContent className="flex h-[92vh] w-[96vw] max-w-[96vw] flex-col gap-0 overflow-hidden p-0">
         <DialogHeader className="border-b px-4 py-3">
-          <DialogTitle className="text-sm">Editor DOCX pela web — {session.provider}</DialogTitle>
+          <DialogTitle className="text-sm">{session.readOnly ? 'Visualização do documento' : 'Edição do documento'} — {session.provider}</DialogTitle>
         </DialogHeader>
         <div className="relative min-h-0 flex-1">
           <form ref={formRef} action={session.editorUrl} method="post" target="g360-editor-frame" className="hidden">
@@ -2070,7 +2090,7 @@ function OnlineEditorDialog({ session, onClose }: { session: EditorSession | nul
           </form>
           <iframe
             name="g360-editor-frame"
-            title="Editor de documento"
+            title={session.readOnly ? 'Visualização do documento' : 'Editor de documento'}
             className="h-full w-full border-0"
             allow="clipboard-read; clipboard-write; fullscreen"
           />
@@ -2308,5 +2328,3 @@ function QuickActionBtn({ icon: Icon, title, onClick }: { icon: any; title: stri
     </Button>
   );
 }
-
-

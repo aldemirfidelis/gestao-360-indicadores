@@ -1517,6 +1517,39 @@ export class DocumentsService {
     return session;
   }
 
+  async openViewer(me: AuthPayload, id: string) {
+    const doc = await this.loadScoped(id, me.companyId);
+    await this.assertViewArea(me, doc);
+
+    const latestDocx = await this.prisma.documentFile.findFirst({
+      where: { companyId: me.companyId, documentId: id, kind: DocumentFileKind.DOCX, deletedAt: null },
+      orderBy: { createdAt: 'desc' },
+    });
+    const file = latestDocx ?? await this.ensureEditableDocxFile(me, doc);
+    const session = await this.editor.buildSession({
+      documentId: id,
+      fileId: file.id,
+      fileName: file.fileName,
+      companyId: me.companyId,
+      userId: me.sub,
+      userName: me.name,
+      canWrite: false,
+    });
+
+    await this.prisma.documentEditorSession.create({
+      data: {
+        companyId: me.companyId,
+        documentId: id,
+        versionId: file.versionId ?? null,
+        userId: me.sub,
+        provider: this.editor.provider,
+        status: 'OPEN',
+        metadata: jsonOrNull({ fileId: file.id, mode: session.mode, online: Boolean(session.editorUrl), readOnly: true }),
+      },
+    });
+    return session;
+  }
+
   async openWordDesktopEditor(me: AuthPayload, id: string) {
     const doc = await this.loadScoped(id, me.companyId);
     await this.assertViewArea(me, doc);
