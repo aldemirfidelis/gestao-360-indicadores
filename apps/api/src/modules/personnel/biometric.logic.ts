@@ -26,11 +26,3 @@ export function euclideanDistance(a: number[], b: number[]): number {
   return Math.sqrt(a.reduce((sum, item, index) => sum + (item - b[index]) ** 2, 0));
 }
 
-export function validateLiveness(value: unknown, expectedAction: string): boolean {
-  const proof = value && typeof value === 'object' ? value as Record<string, unknown> : {};
-  return proof.action === expectedAction
-    && proof.passed === true
-    && Number(proof.durationMs) >= 800
-    && Number(proof.durationMs) <= 20_000
-    && Number(proof.frames) >= 4;
-}

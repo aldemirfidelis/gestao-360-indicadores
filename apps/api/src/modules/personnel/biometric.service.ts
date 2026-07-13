@@ -5,13 +5,15 @@ import { AuditWriterService } from '../../common/audit/audit-writer.service';
 import { decryptJson, encryptJson } from '../../common/crypto';
 import { AuthPayload } from '../auth/auth.types';
 import { PersonnelService } from './personnel.service';
-import { DEFAULT_FACE_THRESHOLD, euclideanDistance, meanDescriptor, validateDescriptor, validateLiveness } from './biometric.logic';
+import { DEFAULT_FACE_THRESHOLD, euclideanDistance, meanDescriptor, validateDescriptor } from './biometric.logic';
 
 const NOTICE_VERSION = 'facial-clock-v1-2026-07';
 const CHALLENGE_TTL_MS = 2 * 60_000;
 const LOCK_MS = 15 * 60_000;
 const MAX_FAILURES = 5;
-const ACTIONS = ['BLINK', 'TURN_LEFT', 'TURN_RIGHT'] as const;
+// Fluxo simplificado a pedido do negócio: sem prova de vivacidade (piscar/
+// virar o rosto). O desafio de uso único + expiração continua como antirreplay.
+const LIVENESS_ACTION_NONE = 'NONE';
 
 @Injectable()
 export class BiometricService {
@@ -46,26 +48,24 @@ export class BiometricService {
     if (profile?.lockedUntil && profile.lockedUntil > new Date()) throw new ForbiddenException('Biometria temporariamente bloqueada por tentativas inválidas.');
 
     const nonce = randomBytes(24).toString('base64url');
-    const action = ACTIONS[Math.floor(Math.random() * ACTIONS.length)];
     const item = await this.prisma.personnelBiometricChallenge.create({
       data: {
         companyId: me.companyId,
         userId: me.sub,
         purpose,
         nonceHash: sha256(nonce),
-        livenessAction: action,
+        livenessAction: LIVENESS_ACTION_NONE,
         expiresAt: new Date(Date.now() + CHALLENGE_TTL_MS),
       },
     });
-    return { id: item.id, nonce, purpose, livenessAction: action, expiresAt: item.expiresAt, noticeVersion: NOTICE_VERSION };
+    return { id: item.id, nonce, purpose, expiresAt: item.expiresAt, noticeVersion: NOTICE_VERSION };
   }
 
   async enroll(me: AuthPayload, body: any = {}) {
     if (body?.acceptedPrivacyNotice !== true || body?.noticeVersion !== NOTICE_VERSION) {
       throw new BadRequestException('Leia e aceite o aviso de privacidade específico da biometria facial.');
     }
-    const challenge = await this.consumeChallenge(me, body, 'ENROLL');
-    if (!validateLiveness(body?.liveness, challenge.livenessAction)) throw new BadRequestException('A prova de vivacidade não foi concluída.');
+    await this.consumeChallenge(me, body, 'ENROLL');
 
     let descriptor: number[];
     try { descriptor = meanDescriptor(body?.descriptors); } catch (error: any) { throw new BadRequestException(error.message); }
@@ -101,21 +101,20 @@ export class BiometricService {
     if (!profile || profile.status !== 'ACTIVE') throw new NotFoundException('Biometria facial ativa não encontrada.');
     if (profile.lockedUntil && profile.lockedUntil > new Date()) throw new ForbiddenException('Biometria temporariamente bloqueada.');
 
-    const livenessPassed = validateLiveness(body?.liveness, challenge.livenessAction);
     let distance: number | null = null;
     let matched = false;
     try {
       const probe = validateDescriptor(body?.descriptor);
       const stored = decryptJson<{ descriptor: number[] }>(profile.descriptorEnc).descriptor;
       distance = euclideanDistance(stored, probe);
-      matched = livenessPassed && distance <= profile.threshold;
+      matched = distance <= profile.threshold;
     } catch { matched = false; }
 
     const attempt = await this.prisma.personnelBiometricAttempt.create({
       data: {
         companyId: me.companyId, userId: me.sub, challengeId: challenge.id, purpose: 'VERIFY_PUNCH',
-        status: matched ? 'MATCH' : (livenessPassed ? 'NO_MATCH' : 'LIVENESS_FAILED'), distance,
-        threshold: profile.threshold, livenessAction: challenge.livenessAction, livenessPassed,
+        status: matched ? 'MATCH' : 'NO_MATCH', distance,
+        threshold: profile.threshold, livenessAction: LIVENESS_ACTION_NONE, livenessPassed: matched,
         latitude: finiteOrNull(body?.latitude), longitude: finiteOrNull(body?.longitude), accuracy: finiteOrNull(body?.accuracy),
         ip: ctx.ip ?? null, userAgent: ctx.userAgent?.slice(0, 500) ?? null,
       },

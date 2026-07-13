@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { euclideanDistance, meanDescriptor, validateDescriptor, validateLiveness } from './biometric.logic';
+import { euclideanDistance, meanDescriptor, validateDescriptor } from './biometric.logic';
 
 const sample = (offset = 0) => Array.from({ length: 128 }, (_, index) => ((index % 9) + 1) / 100 + offset);
 
@@ -15,10 +15,10 @@ describe('biometric logic', () => {
     expect(() => validateDescriptor(Array(128).fill(0))).toThrow();
   });
 
-  it('calcula distância e valida prova de vivacidade', () => {
+  it('calcula distância entre descritores', () => {
     const a = validateDescriptor(sample());
     expect(euclideanDistance(a, a)).toBeCloseTo(0);
-    expect(validateLiveness({ action: 'BLINK', passed: true, durationMs: 1200, frames: 8 }, 'BLINK')).toBe(true);
-    expect(validateLiveness({ action: 'TURN_LEFT', passed: true, durationMs: 1200, frames: 8 }, 'BLINK')).toBe(false);
+    expect(euclideanDistance(a, validateDescriptor(sample(0.05)))).toBeGreaterThan(0);
+    expect(euclideanDistance(a, [1, 2])).toBe(Number.POSITIVE_INFINITY);
   });
 });
