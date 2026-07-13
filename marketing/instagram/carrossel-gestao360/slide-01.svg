@@ -1,0 +1,11 @@
+<svg viewBox="0 0 1080 1350" xmlns="http://www.w3.org/2000/svg" font-family="Arial, Helvetica, sans-serif">
+  <rect width="1080" height="1350" fill="#0B1220"/>
+  <rect x="0" y="0" width="10" height="1350" fill="#2DD4BF"/>
+  <text x="80" y="470" font-size="88" font-weight="800" fill="#F8FAFC">SUA EMPRESA</text>
+  <text x="80" y="570" font-size="88" font-weight="800" fill="#F8FAFC">TEM <tspan fill="#2DD4BF">GESTÃO</tspan></text>
+  <text x="80" y="670" font-size="88" font-weight="800" fill="#F8FAFC">OU SÓ APAGA</text>
+  <text x="80" y="770" font-size="88" font-weight="800" fill="#FB7185">INCÊNDIO?</text>
+  <text x="80" y="900" font-size="42" font-weight="600" fill="#94A3B8">6 sinais pra descobrir →</text>
+  <text x="80" y="1270" font-size="34" font-weight="700" fill="#94A3B8" letter-spacing="2">GESTÃO 360</text>
+  <text x="920" y="1270" font-size="34" font-weight="700" fill="#94A3B8">01/10</text>
+</svg>

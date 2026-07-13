@@ -1,0 +1,13 @@
+<svg viewBox="0 0 1080 1350" xmlns="http://www.w3.org/2000/svg" font-family="Arial, Helvetica, sans-serif">
+  <rect width="1080" height="1350" fill="#0B1220"/>
+  <rect x="0" y="0" width="10" height="1350" fill="#F59E0B"/>
+  <text x="80" y="420" font-size="66" font-weight="800" fill="#F8FAFC">SE VOCÊ SE</text>
+  <text x="80" y="510" font-size="66" font-weight="800" fill="#F8FAFC">RECONHECEU EM</text>
+  <text x="80" y="600" font-size="88" font-weight="800" fill="#F59E0B">2 OU MAIS...</text>
+  <text x="80" y="820" font-size="46" font-weight="700" fill="#F8FAFC">
+    <tspan x="80" dy="0">Sua gestão está no</tspan>
+    <tspan x="80" dy="60">modo sobrevivência.</tspan>
+  </text>
+  <text x="80" y="1270" font-size="34" font-weight="700" fill="#94A3B8" letter-spacing="2">GESTÃO 360</text>
+  <text x="920" y="1270" font-size="34" font-weight="700" fill="#94A3B8">08/10</text>
+</svg>

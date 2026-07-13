@@ -1,0 +1,14 @@
+<svg viewBox="0 0 1080 1350" xmlns="http://www.w3.org/2000/svg" font-family="Arial, Helvetica, sans-serif">
+  <rect width="1080" height="1350" fill="#0B1220"/>
+  <rect x="0" y="0" width="10" height="1350" fill="#FB7185"/>
+  <text x="80" y="180" font-size="38" font-weight="700" fill="#FB7185" letter-spacing="3">SINAL 6/6</text>
+  <rect x="80" y="210" width="120" height="6" fill="#FB7185"/>
+  <text x="80" y="450" font-size="80" font-weight="800" fill="#F8FAFC">PLR NUMA</text>
+  <text x="80" y="560" font-size="80" font-weight="800" fill="#F8FAFC">PLANILHA</text>
+  <text x="80" y="800" font-size="42" font-weight="600" fill="#94A3B8">
+    <tspan x="80" dy="0">Que só uma pessoa entende</tspan>
+    <tspan x="80" dy="56">— e ninguém audita.</tspan>
+  </text>
+  <text x="80" y="1270" font-size="34" font-weight="700" fill="#94A3B8" letter-spacing="2">GESTÃO 360</text>
+  <text x="920" y="1270" font-size="34" font-weight="700" fill="#94A3B8">07/10</text>
+</svg>
