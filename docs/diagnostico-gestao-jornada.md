@@ -252,5 +252,12 @@ com expiração, challenge de uso único, geofence opcional, idempotência por s
 não é antifraude; ver §Riscos legais). Endurecimento transversal: redação de dados sensíveis
 nos logs e interceptor de auditoria com corpo sanitizado.
 
-Próxima: **ETAPA 3** (Central de Ocorrências, ajustes granulares por tipo/abono, workflow de
-aprovação multi-nível, portal do colaborador mobile-first).
+**ETAPA 3 — CONCLUÍDA** (commit 1793b21): Central de Ocorrências (12 tipos detectados pela
+apuração; registros idempotentes OPEN→JUSTIFIED/DISMISSED/RESOLVED; varredura diária automática
++ manual; resolução automática quando a causa some), ajustes por tipo com motivo categorizado
+(corrigir horários | abonar o dia — status 'Abonado' com saldo 0), aprovação pelo líder
+(ponto:team com escopo por área, sem auto-aprovação) e portal do colaborador (saída prevista,
+próxima marcação, minhas ocorrências).
+
+Próxima: **ETAPA 4** (banco de horas completo — contas/extrato/validade CLT configurável/limites,
+integração de afastamentos com recálculo preservando histórico, assistente de fechamento em etapas).
