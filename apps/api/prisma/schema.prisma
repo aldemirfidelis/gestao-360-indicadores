@@ -11874,18 +11874,56 @@ model WorkShiftTemplate {
 /// Vínculo colaborador (User) -> escala, com vigência. Uma vigência ativa por vez
 /// (a anterior é encerrada ao atribuir uma nova).
 model WorkScheduleAssignment {
-  id          String            @id @default(uuid())
-  companyId   String
-  userId      String
-  templateId  String
-  template    WorkShiftTemplate @relation(fields: [templateId], references: [id], onDelete: Cascade)
-  startsAt    DateTime
-  endsAt      DateTime?
-  createdById String?
-  createdAt   DateTime          @default(now())
+  id                String            @id @default(uuid())
+  companyId         String
+  userId            String
+  templateId        String
+  template          WorkShiftTemplate @relation(fields: [templateId], references: [id], onDelete: Cascade)
+  startsAt          DateTime
+  endsAt            DateTime?
+  /// Snapshot das regras/tolerância no momento da atribuição: a vigência fica
+  /// congelada e editar o template NÃO reescreve espelhos passados.
+  rulesSnapshot     Json?
+  toleranceSnapshot Int?
+  createdById       String?
+  createdAt         DateTime          @default(now())
 
   @@index([companyId, userId, startsAt])
   @@map("work_schedule_assignments")
+}
+
+/// Feriado da empresa (dayKey YYYY-MM-DD no fuso da empresa). Em feriado a
+/// jornada prevista é zero: ausência não é falta e trabalho vira crédito.
+model CompanyHoliday {
+  id          String   @id @default(uuid())
+  companyId   String
+  dayKey      String
+  name        String
+  kind        String   @default("NATIONAL") // NATIONAL | STATE | MUNICIPAL | COMPANY
+  createdById String?
+  createdAt   DateTime @default(now())
+
+  @@unique([companyId, dayKey])
+  @@map("company_holidays")
+}
+
+/// Histórico de fechamentos: cada fechamento gera uma versão imutável do
+/// consolidado; a reabertura registra quem/quando/por quê na última versão.
+model TimesheetPeriodVersion {
+  id           String    @id @default(uuid())
+  companyId    String
+  periodRef    String
+  version      Int
+  totals       Json
+  closedById   String?
+  closedAt     DateTime  @default(now())
+  reopenedById String?
+  reopenedAt   DateTime?
+  reopenNote   String?
+
+  @@unique([companyId, periodRef, version])
+  @@index([companyId, periodRef])
+  @@map("timesheet_period_versions")
 }
 
 /// Batida de ponto. Imutável (ajustes cancelam e recriam com origem MANUAL);
@@ -11909,6 +11947,12 @@ model TimeClockEntry {
   prevHash            String?
   adjustmentRequestId String?
   biometricAttemptId  String?
+  /// Hora informada pelo dispositivo (auditoria/offline); punchedAt é sempre do servidor.
+  deviceTime          DateTime?
+  deviceId            String?
+  /// Identificador de sincronização (idempotência offline). Único por empresa
+  /// quando presente (índice parcial criado na migração).
+  syncId              String?
   createdById         String?
   createdAt           DateTime @default(now())
 
@@ -12018,6 +12062,8 @@ model TimesheetPeriod {
   closedById String?
   closedAt   DateTime?
   totals     Json?
+  /// Quantos fechamentos esta competência já teve (histórico em TimesheetPeriodVersion).
+  version    Int       @default(0)
   createdAt  DateTime  @default(now())
   updatedAt  DateTime  @updatedAt
 

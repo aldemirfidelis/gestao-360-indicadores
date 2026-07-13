@@ -1,4 +1,4 @@
-import { Body, Controller, Get, Param, Patch, Post, Query, Req, Res, StreamableFile } from '@nestjs/common';
+import { Body, Controller, Delete, Get, Param, Patch, Post, Query, Req, Res, StreamableFile } from '@nestjs/common';
 import { Request, Response } from 'express';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import { RequirePermissions } from '../../common/decorators/permissions.decorator';
@@ -110,8 +110,40 @@ export class PersonnelController {
 
   @Post('time-clock/periods/:ref/reopen')
   @RequirePermissions('ponto:manage')
-  reopenPeriod(@CurrentUser() me: AuthPayload, @Param('ref') ref: string) {
-    return this.service.reopenPeriod(me, ref);
+  reopenPeriod(@CurrentUser() me: AuthPayload, @Param('ref') ref: string, @Body() body: any) {
+    return this.service.reopenPeriod(me, ref, body);
+  }
+
+  @Get('time-clock/periods/:ref/versions')
+  @RequirePermissions('ponto:manage')
+  periodVersions(@CurrentUser() me: AuthPayload, @Param('ref') ref: string) {
+    return this.service.periodVersions(me, ref);
+  }
+
+  // ------------------------------ Feriados ------------------------------
+
+  @Get('holidays')
+  @RequirePermissions('ponto:view')
+  listHolidays(@CurrentUser() me: AuthPayload, @Query('year') year?: string) {
+    return this.service.listHolidays(me, year);
+  }
+
+  @Post('holidays')
+  @RequirePermissions('ponto:manage')
+  createHoliday(@CurrentUser() me: AuthPayload, @Body() body: any) {
+    return this.service.createHoliday(me, body);
+  }
+
+  @Post('holidays/generate')
+  @RequirePermissions('ponto:manage')
+  generateHolidays(@CurrentUser() me: AuthPayload, @Body() body: any) {
+    return this.service.generateHolidays(me, body);
+  }
+
+  @Delete('holidays/:id')
+  @RequirePermissions('ponto:manage')
+  deleteHoliday(@CurrentUser() me: AuthPayload, @Param('id') id: string) {
+    return this.service.deleteHoliday(me, id);
   }
 
   // ------------------------------ Escalas ------------------------------

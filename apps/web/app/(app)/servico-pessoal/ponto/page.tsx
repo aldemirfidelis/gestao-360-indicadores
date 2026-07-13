@@ -38,7 +38,7 @@ import { api, getAccessToken } from '@/lib/api';
 import { cn, formatDate } from '@/lib/utils';
 import { ReasonDialog, type ReasonDialogState } from '@/components/platform/reason-dialog';
 
-type DayStatus = 'DAY_OFF' | 'IN_PROGRESS' | 'OK' | 'INCOMPLETE' | 'ABSENT' | 'OVERTIME' | 'UNDERTIME' | 'VACATION' | 'LEAVE';
+type DayStatus = 'DAY_OFF' | 'IN_PROGRESS' | 'OK' | 'INCOMPLETE' | 'ABSENT' | 'OVERTIME' | 'UNDERTIME' | 'VACATION' | 'LEAVE' | 'HOLIDAY';
 
 interface PunchEntry {
   id: string;
@@ -53,12 +53,20 @@ interface MirrorDay {
   dayKey: string;
   weekday: string;
   hasSchedule: boolean;
+  holiday: string | null;
   plannedMinutes: number;
   workedMinutes: number;
   status: DayStatus;
   balanceMinutes: number;
   adjustment: { id: string; status: string; reason: string } | null;
   entries: PunchEntry[];
+}
+
+interface HolidayRow {
+  id: string;
+  dayKey: string;
+  name: string;
+  kind: 'NATIONAL' | 'STATE' | 'MUNICIPAL' | 'COMPANY';
 }
 
 interface MirrorResponse {
@@ -116,6 +124,7 @@ interface PeriodRow {
   status: 'OPEN' | 'CLOSED';
   closedAt: string | null;
   totals: { entries?: number } | null;
+  version?: number;
   closedByUser?: { id: string; name: string } | null;
 }
 
@@ -129,6 +138,7 @@ const STATUS_LABEL: Record<DayStatus, string> = {
   UNDERTIME: 'Débito',
   VACATION: 'Férias',
   LEAVE: 'Afastamento',
+  HOLIDAY: 'Feriado',
 };
 
 const STATUS_CLASS: Record<DayStatus, string> = {
@@ -141,6 +151,14 @@ const STATUS_CLASS: Record<DayStatus, string> = {
   UNDERTIME: 'border-status-red/40 text-status-red',
   VACATION: 'border-sky-400/50 text-sky-500',
   LEAVE: 'border-status-purple/40 text-status-purple',
+  HOLIDAY: 'border-amber-400/50 text-amber-600',
+};
+
+const HOLIDAY_KIND_LABEL: Record<HolidayRow['kind'], string> = {
+  NATIONAL: 'Nacional',
+  STATE: 'Estadual',
+  MUNICIPAL: 'Municipal',
+  COMPANY: 'Empresa',
 };
 
 const ADJUSTMENT_STATUS_LABEL: Record<string, string> = {
@@ -193,6 +211,8 @@ export default function TimeClockPage() {
   const [mirrorMonth, setMirrorMonth] = useState(() => new Date().toISOString().slice(0, 7));
   const [importDialog, setImportDialog] = useState(false);
   const [importResult, setImportResult] = useState<{ imported: number; duplicates: number; errors: string[] } | null>(null);
+  const [holidayYear, setHolidayYear] = useState(() => String(new Date().getFullYear()));
+  const [holidayForm, setHolidayForm] = useState<{ dayKey: string; name: string; kind: HolidayRow['kind'] }>({ dayKey: '', name: '', kind: 'COMPANY' });
   const currentMonth = new Date().toISOString().slice(0, 7);
 
   useEffect(() => {
@@ -242,6 +262,11 @@ export default function TimeClockPage() {
     queryKey: ['time-clock', 'periods'],
     queryFn: () => api<PeriodRow[]>('/personnel/time-clock/periods'),
     enabled: canManage && tab === 'fechamento',
+  });
+  const holidaysQuery = useQuery<HolidayRow[]>({
+    queryKey: ['time-clock', 'holidays', holidayYear],
+    queryFn: () => api<HolidayRow[]>(`/personnel/holidays?year=${holidayYear}`),
+    enabled: canManage && tab === 'escalas',
   });
 
   const summary = summaryQuery.data;
@@ -358,12 +383,44 @@ export default function TimeClockPage() {
   });
 
   const reopenPeriod = useMutation({
-    mutationFn: (ref: string) => api(`/personnel/time-clock/periods/${ref}/reopen`, { method: 'POST', json: {} }),
+    mutationFn: ({ ref, note }: { ref: string; note: string }) =>
+      api(`/personnel/time-clock/periods/${ref}/reopen`, { method: 'POST', json: { note } }),
     onSuccess: () => {
       toast.success('Competência reaberta');
       invalidate();
     },
     onError: (e: any) => toast.error(e?.message ?? 'Não foi possível reabrir a competência'),
+  });
+
+  const createHoliday = useMutation({
+    mutationFn: () => api('/personnel/holidays', { method: 'POST', json: holidayForm }),
+    onSuccess: () => {
+      toast.success('Feriado cadastrado');
+      setHolidayForm({ dayKey: '', name: '', kind: 'COMPANY' });
+      void qc.invalidateQueries({ queryKey: ['time-clock', 'holidays'] });
+      invalidate();
+    },
+    onError: (e: any) => toast.error(e?.message ?? 'Não foi possível cadastrar o feriado'),
+  });
+
+  const generateHolidays = useMutation({
+    mutationFn: () => api<{ created: number }>('/personnel/holidays/generate', { method: 'POST', json: { year: Number(holidayYear) } }),
+    onSuccess: (result) => {
+      toast.success(`${result.created} feriado(s) nacional(is) carregado(s) para ${holidayYear}`);
+      void qc.invalidateQueries({ queryKey: ['time-clock', 'holidays'] });
+      invalidate();
+    },
+    onError: (e: any) => toast.error(e?.message ?? 'Não foi possível gerar os feriados'),
+  });
+
+  const deleteHoliday = useMutation({
+    mutationFn: (id: string) => api(`/personnel/holidays/${id}`, { method: 'DELETE' }),
+    onSuccess: () => {
+      toast.success('Feriado removido');
+      void qc.invalidateQueries({ queryKey: ['time-clock', 'holidays'] });
+      invalidate();
+    },
+    onError: (e: any) => toast.error(e?.message ?? 'Não foi possível remover o feriado'),
   });
 
   const openAdjustDialog = (day: MirrorDay) => {
@@ -536,7 +593,12 @@ export default function TimeClockPage() {
                           {day.balanceMinutes ? `${day.balanceMinutes > 0 ? '+' : ''}${minutesLabel(day.balanceMinutes)}` : '—'}
                         </td>
                         <td className="px-2 py-2">
-                          <Badge variant="outline" className={cn('text-[10px]', STATUS_CLASS[day.status])}>{STATUS_LABEL[day.status]}</Badge>
+                          <Badge variant="outline" className={cn('text-[10px]', STATUS_CLASS[day.status])} title={day.holiday ?? undefined}>
+                            {STATUS_LABEL[day.status]}
+                          </Badge>
+                          {day.holiday && day.status !== 'HOLIDAY' && (
+                            <Badge variant="outline" className="ml-1 border-amber-400/50 text-[9px] text-amber-600" title={day.holiday}>feriado</Badge>
+                          )}
                           {day.adjustment?.status === 'REQUESTED' && (
                             <Badge variant="outline" className="ml-1 border-status-yellow/40 text-[9px] text-status-yellow">ajuste pendente</Badge>
                           )}
@@ -762,6 +824,72 @@ export default function TimeClockPage() {
                   </div>
                 </CardContent>
               </Card>
+
+              {/* Feriados: em feriado a jornada prevista é zero (ausência não é falta). */}
+              <Card className="border border-slate-100 bg-white shadow-sm dark:border-slate-800/80 dark:bg-slate-900/50 xl:col-span-2">
+                <div className="flex flex-wrap items-center justify-between gap-2 border-b px-4 py-2.5">
+                  <h3 className="text-sm font-semibold text-slate-800 dark:text-white">Feriados</h3>
+                  <div className="flex items-center gap-2">
+                    <NativeSelect className="h-8 w-24 text-xs" value={holidayYear} onChange={(e) => setHolidayYear(e.target.value)}>
+                      {[-1, 0, 1].map((offset) => {
+                        const y = String(new Date().getFullYear() + offset);
+                        return <option key={y} value={y}>{y}</option>;
+                      })}
+                    </NativeSelect>
+                    <Button size="sm" variant="outline" className="h-8 text-xs" disabled={generateHolidays.isPending} onClick={() => generateHolidays.mutate()}>
+                      {generateHolidays.isPending ? 'Gerando...' : `Carregar nacionais de ${holidayYear}`}
+                    </Button>
+                  </div>
+                </div>
+                <CardContent className="space-y-3 p-4 text-xs">
+                  <div className="flex flex-wrap items-end gap-2">
+                    <div>
+                      <Label>Data</Label>
+                      <Input type="date" className="h-8 w-40 text-xs" value={holidayForm.dayKey} onChange={(e) => setHolidayForm((f) => ({ ...f, dayKey: e.target.value }))} />
+                    </div>
+                    <div className="min-w-[220px] flex-1">
+                      <Label>Nome</Label>
+                      <Input className="h-8 text-xs" placeholder="Ex.: Aniversário da cidade" value={holidayForm.name} onChange={(e) => setHolidayForm((f) => ({ ...f, name: e.target.value }))} />
+                    </div>
+                    <div>
+                      <Label>Âmbito</Label>
+                      <NativeSelect className="h-8 w-36 text-xs" value={holidayForm.kind} onChange={(e) => setHolidayForm((f) => ({ ...f, kind: e.target.value as HolidayRow['kind'] }))}>
+                        {Object.entries(HOLIDAY_KIND_LABEL).map(([value, label]) => <option key={value} value={value}>{label}</option>)}
+                      </NativeSelect>
+                    </div>
+                    <Button size="sm" className="h-8 bg-sky-500 text-xs font-semibold text-white hover:bg-sky-600" disabled={!holidayForm.dayKey || !holidayForm.name.trim() || createHoliday.isPending} onClick={() => createHoliday.mutate()}>
+                      <Plus className="mr-1 h-3.5 w-3.5" />Adicionar
+                    </Button>
+                  </div>
+                  {(holidaysQuery.data ?? []).length === 0 ? (
+                    <div className="rounded-md border border-dashed p-4 text-center text-muted-foreground">
+                      Nenhum feriado cadastrado em {holidayYear}. Sem cadastro, um feriado com escala conta como falta no espelho.
+                    </div>
+                  ) : (
+                    <div className="grid grid-cols-1 gap-1.5 sm:grid-cols-2 xl:grid-cols-3">
+                      {(holidaysQuery.data ?? []).map((holiday) => (
+                        <div key={holiday.id} className="flex items-center justify-between gap-2 rounded border px-2.5 py-1.5">
+                          <div className="min-w-0">
+                            <span className="font-semibold tabular-nums">{formatDayKey(holiday.dayKey)}</span>
+                            <span className="ml-2 truncate">{holiday.name}</span>
+                          </div>
+                          <div className="flex shrink-0 items-center gap-1.5">
+                            <Badge variant="outline" className="h-4 px-1.5 text-[9px]">{HOLIDAY_KIND_LABEL[holiday.kind]}</Badge>
+                            <button
+                              type="button"
+                              title="Remover feriado"
+                              className="text-muted-foreground hover:text-status-red"
+                              onClick={() => deleteHoliday.mutate(holiday.id)}
+                            >
+                              <X className="h-3.5 w-3.5" />
+                            </button>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
             </div>
           </TabsContent>
         )}
@@ -818,7 +946,14 @@ export default function TimeClockPage() {
                               <Lock className="mr-1 h-3 w-3" />Fechar
                             </Button>
                           ) : (
-                            <Button variant="ghost" size="sm" className="h-7 text-[10px]" disabled={reopenPeriod.isPending} onClick={() => reopenPeriod.mutate(period.periodRef)}>
+                            <Button variant="ghost" size="sm" className="h-7 text-[10px]" disabled={reopenPeriod.isPending} onClick={() => setReasonDialog({
+                              title: `Reabrir competência ${period.periodRef}`,
+                              label: 'Justificativa da reabertura',
+                              required: true,
+                              confirmLabel: 'Reabrir competência',
+                              destructive: true,
+                              onConfirm: (reason) => reopenPeriod.mutate({ ref: period.periodRef, note: reason }),
+                            })}>
                               <LockOpen className="mr-1 h-3 w-3" />Reabrir
                             </Button>
                           )}

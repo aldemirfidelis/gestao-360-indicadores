@@ -17,13 +17,14 @@ export type WeeklyRules = Partial<Record<Weekday, DayRule | null>>;
 export type DayStatus =
   | 'DAY_OFF' // sem jornada prevista e sem batidas
   | 'IN_PROGRESS' // hoje, jornada em andamento
-  | 'OK' // dentro da tolerância
+  | 'OK' // jornada cumprida (com a tolerância por marcação aplicada)
   | 'INCOMPLETE' // número ímpar de batidas (inconsistência)
   | 'ABSENT' // jornada prevista sem nenhuma batida
-  | 'OVERTIME' // acima da tolerância (crédito)
-  | 'UNDERTIME' // abaixo da tolerância (débito)
+  | 'OVERTIME' // crédito no dia
+  | 'UNDERTIME' // débito no dia
   | 'VACATION' // férias aprovadas cobrindo o dia (abonado)
-  | 'LEAVE'; // afastamento/atestado cobrindo o dia (abonado)
+  | 'LEAVE' // afastamento/atestado cobrindo o dia (abonado)
+  | 'HOLIDAY'; // feriado sem trabalho (não é falta)
 
 /** Brasil não tem horário de verão desde 2019: America/Sao_Paulo = UTC-3 fixo. */
 export const COMPANY_UTC_OFFSET_MINUTES = -180;
@@ -111,32 +112,180 @@ export function pairPunches(times: Date[]): { workedMinutes: number; open: boole
 
 export interface DayEvaluation {
   status: DayStatus;
-  /** Crédito (+) ou débito (−) do dia para o banco de horas; 0 dentro da tolerância. */
+  /** Crédito (+) ou débito (−) do dia para o banco de horas. */
   balanceMinutes: number;
 }
 
+/**
+ * Avalia o dia. A tolerância NÃO entra aqui: ela é aplicada por marcação em
+ * {@link effectiveWorkedMinutes} (janela ±tolerância na entrada e na saída
+ * previstas). Depois disso o saldo do dia é exato.
+ */
 export function evaluateDay(input: {
   punchCount: number;
   workedMinutes: number;
   plannedMinutes: number;
-  toleranceMinutes: number;
   isToday: boolean;
   hasOpenPair: boolean;
   /** Férias/afastamento cobrindo o dia: abona a jornada (saldo 0). */
   coverage?: 'VACATION' | 'LEAVE' | null;
+  /** Feriado: ausência não é falta; trabalho vira crédito (previsto deve vir 0). */
+  isHoliday?: boolean;
 }): DayEvaluation {
-  const { punchCount, workedMinutes, plannedMinutes, toleranceMinutes, isToday, hasOpenPair, coverage } = input;
+  const { punchCount, workedMinutes, plannedMinutes, isToday, hasOpenPair, coverage, isHoliday } = input;
 
   if (coverage) return { status: coverage, balanceMinutes: 0 };
   if (isToday && (punchCount === 0 || hasOpenPair)) return { status: 'IN_PROGRESS', balanceMinutes: 0 };
   if (punchCount === 0) {
+    if (isHoliday) return { status: 'HOLIDAY', balanceMinutes: 0 };
     return plannedMinutes > 0 ? { status: 'ABSENT', balanceMinutes: -plannedMinutes } : { status: 'DAY_OFF', balanceMinutes: 0 };
   }
   if (hasOpenPair) return { status: 'INCOMPLETE', balanceMinutes: 0 };
 
   const diff = workedMinutes - plannedMinutes;
-  if (Math.abs(diff) <= toleranceMinutes) return { status: 'OK', balanceMinutes: 0 };
+  if (diff === 0) return { status: 'OK', balanceMinutes: 0 };
   return { status: diff > 0 ? 'OVERTIME' : 'UNDERTIME', balanceMinutes: diff };
+}
+
+/** Regra do dia (ou null quando folga/sem escala). */
+export function dayRuleFor(dayKey: string, rules: WeeklyRules | null | undefined): DayRule | null {
+  return rules?.[weekdayOf(dayKey)] ?? null;
+}
+
+/** dayKey deslocado em `delta` dias. */
+export function addDays(dayKey: string, delta: number): string {
+  const d = new Date(`${dayKey}T12:00:00Z`);
+  d.setUTCDate(d.getUTCDate() + delta);
+  return d.toISOString().slice(0, 10);
+}
+
+/** true quando a jornada prevista atravessa a meia-noite (fim <= início). */
+export function ruleCrossesMidnight(rule: DayRule): boolean {
+  return timeToMinutes(rule.end) <= timeToMinutes(rule.start);
+}
+
+/** Margem após o fim previsto da jornada noturna para ainda aceitar a saída. */
+const NIGHT_GRACE_MS = 4 * 60 * 60_000;
+
+/**
+ * Atribui itens (batidas) ao **dia de jornada**. Quando a escala de um dia
+ * atravessa a meia-noite, as batidas das primeiras horas do dia civil seguinte
+ * pertencem à jornada do dia anterior — até o fim previsto + 4h de margem,
+ * nunca invadindo o início da jornada do próprio dia seguinte.
+ *
+ * `days` deve estar em ordem crescente e conter todos os dias a emitir;
+ * `byCivilDay` agrupa os itens pelo dia civil do instante (dayKeyFor).
+ */
+export function attributePunches<T>(options: {
+  days: string[];
+  byCivilDay: Map<string, T[]>;
+  timeOf: (item: T) => Date;
+  ruleFor: (dayKey: string) => DayRule | null;
+}): Map<string, T[]> {
+  const { days, byCivilDay, timeOf, ruleFor } = options;
+  const result = new Map<string, T[]>();
+  const claimed = new Set<T>();
+
+  for (const dayKey of days) {
+    const own = (byCivilDay.get(dayKey) ?? []).filter((item) => !claimed.has(item));
+    const mine = [...own];
+    const rule = ruleFor(dayKey);
+
+    if (rule && ruleCrossesMidnight(rule)) {
+      const nextKey = addDays(dayKey, 1);
+      const nextRule = ruleFor(nextKey);
+      const shiftEndUtc = companyTimeToUtc(dayKey, rule.end).getTime() + 86_400_000;
+      let cutoff = shiftEndUtc + NIGHT_GRACE_MS;
+      if (nextRule) {
+        cutoff = Math.min(cutoff, companyTimeToUtc(nextKey, nextRule.start).getTime() - 60_000);
+      }
+      for (const item of byCivilDay.get(nextKey) ?? []) {
+        if (!claimed.has(item) && timeOf(item).getTime() <= cutoff) {
+          claimed.add(item);
+          mine.push(item);
+        }
+      }
+    }
+
+    mine.sort((a, b) => timeOf(a).getTime() - timeOf(b).getTime());
+    result.set(dayKey, mine);
+  }
+  return result;
+}
+
+/**
+ * Minutos trabalhados com a **tolerância por marcação** (decisão de negócio):
+ * bater até `toleranceMinutes` antes/depois do horário previsto de entrada
+ * conta como o horário previsto (não gera extra nem atraso); o mesmo vale para
+ * a saída prevista. Fora da janela, vale o horário real integralmente.
+ * Marcações intermediárias (intervalo) contam pelo horário real.
+ */
+export function effectiveWorkedMinutes(input: {
+  punches: Date[];
+  dayKey: string;
+  rule: DayRule | null;
+  toleranceMinutes: number;
+}): { workedMinutes: number; open: boolean } {
+  const sorted = [...input.punches].sort((a, b) => a.getTime() - b.getTime());
+  if (!input.rule || sorted.length === 0) return pairPunches(sorted);
+
+  const tolMs = Math.max(0, input.toleranceMinutes) * 60_000;
+  const startUtc = companyTimeToUtc(input.dayKey, input.rule.start);
+  const endUtc = new Date(
+    companyTimeToUtc(input.dayKey, input.rule.end).getTime() + (ruleCrossesMidnight(input.rule) ? 86_400_000 : 0),
+  );
+
+  const adjusted = [...sorted];
+  // Primeira batida = entrada prevista, se dentro da janela e sem inverter a ordem.
+  if (Math.abs(adjusted[0].getTime() - startUtc.getTime()) <= tolMs) {
+    if (adjusted.length === 1 || startUtc.getTime() <= adjusted[1].getTime()) adjusted[0] = startUtc;
+  }
+  // Última batida = saída prevista (apenas com pares fechados), mesma proteção.
+  const lastIdx = adjusted.length - 1;
+  if (adjusted.length % 2 === 0 && Math.abs(adjusted[lastIdx].getTime() - endUtc.getTime()) <= tolMs) {
+    if (endUtc.getTime() >= adjusted[lastIdx - 1].getTime()) adjusted[lastIdx] = endUtc;
+  }
+  return pairPunches(adjusted);
+}
+
+// ------------------------------ Feriados ------------------------------
+
+/** Domingo de Páscoa (algoritmo de Meeus/Jones/Butcher). */
+export function easterSunday(year: number): string {
+  const a = year % 19;
+  const b = Math.floor(year / 100);
+  const c = year % 100;
+  const d = Math.floor(b / 4);
+  const e = b % 4;
+  const f = Math.floor((b + 8) / 25);
+  const g = Math.floor((b - f + 1) / 3);
+  const h = (19 * a + b - d - g + 15) % 30;
+  const i = Math.floor(c / 4);
+  const k = c % 4;
+  const l = (32 + 2 * e + 2 * i - h - k) % 7;
+  const m = Math.floor((a + 11 * h + 22 * l) / 451);
+  const month = Math.floor((h + l - 7 * m + 114) / 31);
+  const day = ((h + l - 7 * m + 114) % 31) + 1;
+  return `${year}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+}
+
+const NATIONAL_FIXED: Array<{ md: string; name: string }> = [
+  { md: '01-01', name: 'Confraternização Universal' },
+  { md: '04-21', name: 'Tiradentes' },
+  { md: '05-01', name: 'Dia do Trabalho' },
+  { md: '09-07', name: 'Independência do Brasil' },
+  { md: '10-12', name: 'Nossa Senhora Aparecida' },
+  { md: '11-02', name: 'Finados' },
+  { md: '11-15', name: 'Proclamação da República' },
+  { md: '11-20', name: 'Dia Nacional de Zumbi e da Consciência Negra' },
+  { md: '12-25', name: 'Natal' },
+];
+
+/** Feriados nacionais do ano (fixos + Sexta-feira Santa). */
+export function nationalHolidaysFor(year: number): Array<{ dayKey: string; name: string }> {
+  const list = NATIONAL_FIXED.map(({ md, name }) => ({ dayKey: `${year}-${md}`, name }));
+  list.push({ dayKey: addDays(easterSunday(year), -2), name: 'Sexta-feira Santa' });
+  return list.sort((a, b) => a.dayKey.localeCompare(b.dayKey));
 }
 
 /** Cadeia de integridade das batidas (hash encadeado por usuário). */

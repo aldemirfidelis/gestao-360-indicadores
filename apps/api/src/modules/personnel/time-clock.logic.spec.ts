@@ -1,12 +1,18 @@
 import { describe, expect, it } from 'vitest';
 import {
+  addDays,
+  attributePunches,
   chainHash,
   companyTimeToUtc,
   dayKeyFor,
+  dayRuleFor,
+  easterSunday,
+  effectiveWorkedMinutes,
   enumerateDays,
   evaluateDay,
   isValidDayKey,
   monthBounds,
+  nationalHolidaysFor,
   pairPunches,
   parsePunchCsv,
   periodRefOf,
@@ -81,24 +87,116 @@ describe('time-clock.logic', () => {
     expect(unordered.workedMinutes).toBe(480);
   });
 
-  it('evaluateDay: OK dentro da tolerância, extra/débito fora dela', () => {
-    const base = { plannedMinutes: 480, toleranceMinutes: 10, isToday: false, hasOpenPair: false };
-    expect(evaluateDay({ ...base, punchCount: 4, workedMinutes: 485 })).toEqual({ status: 'OK', balanceMinutes: 0 });
+  it('evaluateDay: saldo exato após a tolerância por marcação', () => {
+    const base = { plannedMinutes: 480, isToday: false, hasOpenPair: false };
+    expect(evaluateDay({ ...base, punchCount: 4, workedMinutes: 480 })).toEqual({ status: 'OK', balanceMinutes: 0 });
     expect(evaluateDay({ ...base, punchCount: 4, workedMinutes: 510 })).toEqual({ status: 'OVERTIME', balanceMinutes: 30 });
     expect(evaluateDay({ ...base, punchCount: 4, workedMinutes: 420 })).toEqual({ status: 'UNDERTIME', balanceMinutes: -60 });
   });
 
-  it('evaluateDay: falta, folga, inconsistência e dia em andamento', () => {
-    expect(evaluateDay({ punchCount: 0, workedMinutes: 0, plannedMinutes: 480, toleranceMinutes: 10, isToday: false, hasOpenPair: false }))
+  it('evaluateDay: falta, folga, feriado, inconsistência e dia em andamento', () => {
+    expect(evaluateDay({ punchCount: 0, workedMinutes: 0, plannedMinutes: 480, isToday: false, hasOpenPair: false }))
       .toEqual({ status: 'ABSENT', balanceMinutes: -480 });
-    expect(evaluateDay({ punchCount: 0, workedMinutes: 0, plannedMinutes: 0, toleranceMinutes: 10, isToday: false, hasOpenPair: false }))
+    expect(evaluateDay({ punchCount: 0, workedMinutes: 0, plannedMinutes: 0, isToday: false, hasOpenPair: false }))
       .toEqual({ status: 'DAY_OFF', balanceMinutes: 0 });
-    expect(evaluateDay({ punchCount: 3, workedMinutes: 240, plannedMinutes: 480, toleranceMinutes: 10, isToday: false, hasOpenPair: true }).status)
+    // Feriado sem batidas: não é falta (mesmo com escala no dia da semana).
+    expect(evaluateDay({ punchCount: 0, workedMinutes: 0, plannedMinutes: 0, isToday: false, hasOpenPair: false, isHoliday: true }))
+      .toEqual({ status: 'HOLIDAY', balanceMinutes: 0 });
+    // Feriado trabalhado: todo o trabalho vira crédito (previsto 0).
+    expect(evaluateDay({ punchCount: 2, workedMinutes: 300, plannedMinutes: 0, isToday: false, hasOpenPair: false, isHoliday: true }))
+      .toEqual({ status: 'OVERTIME', balanceMinutes: 300 });
+    expect(evaluateDay({ punchCount: 3, workedMinutes: 240, plannedMinutes: 480, isToday: false, hasOpenPair: true }).status)
       .toBe('INCOMPLETE');
-    expect(evaluateDay({ punchCount: 1, workedMinutes: 0, plannedMinutes: 480, toleranceMinutes: 10, isToday: true, hasOpenPair: true }).status)
+    expect(evaluateDay({ punchCount: 1, workedMinutes: 0, plannedMinutes: 480, isToday: true, hasOpenPair: true }).status)
       .toBe('IN_PROGRESS');
-    expect(evaluateDay({ punchCount: 0, workedMinutes: 0, plannedMinutes: 480, toleranceMinutes: 10, isToday: true, hasOpenPair: false }).status)
+    expect(evaluateDay({ punchCount: 0, workedMinutes: 0, plannedMinutes: 480, isToday: true, hasOpenPair: false }).status)
       .toBe('IN_PROGRESS');
+  });
+
+  it('effectiveWorkedMinutes: janela de ±tolerância na entrada e na saída previstas', () => {
+    // Regra do dia 2026-07-09 (qui): 07:00-17:00 com 60 de intervalo = 540 previstos.
+    const rule = { start: '07:00', end: '17:00', breakMinutes: 60 };
+    const t = (time: string, day = '2026-07-09') => companyTimeToUtc(day, time);
+    const run = (times: string[]) =>
+      effectiveWorkedMinutes({ punches: times.map((x) => t(x)), dayKey: '2026-07-09', rule, toleranceMinutes: 10 });
+
+    // 06:52 e 17:08 (dentro da janela) contam como 07:00 e 17:00 → jornada exata.
+    expect(run(['06:52', '12:00', '13:00', '17:08']).workedMinutes).toBe(540);
+    // 06:50 e 17:10 (limite da janela) idem.
+    expect(run(['06:50', '12:00', '13:00', '17:10']).workedMinutes).toBe(540);
+    // 06:45 (fora da janela): vale o horário real → 15 minutos de crédito.
+    expect(run(['06:45', '12:00', '13:00', '17:00']).workedMinutes).toBe(555);
+    // 07:15 (fora da janela): atraso real → 15 minutos de débito.
+    expect(run(['07:15', '12:00', '13:00', '17:00']).workedMinutes).toBe(525);
+    // Intervalo maior conta pelo horário real (sem tolerância nas marcações intermediárias).
+    expect(run(['07:00', '12:00', '13:20', '17:00']).workedMinutes).toBe(520);
+    // Sem regra: pareamento puro.
+    expect(effectiveWorkedMinutes({ punches: ['08:00', '12:00'].map((x) => t(x)), dayKey: '2026-07-09', rule: null, toleranceMinutes: 10 }).workedMinutes).toBe(240);
+  });
+
+  it('attributePunches: saída após a meia-noite pertence à jornada noturna do dia anterior', () => {
+    // Segunda 22:00-05:00 (vira o dia); terça sem regra.
+    const rules: WeeklyRules = { mon: { start: '22:00', end: '05:00', breakMinutes: 0 } };
+    const punches = [
+      companyTimeToUtc('2026-07-06', '22:02'), // entrada segunda 22:02
+      companyTimeToUtc('2026-07-07', '05:01'), // saída terça 05:01 → jornada de segunda
+    ];
+    const byCivilDay = new Map<string, Date[]>();
+    for (const punch of punches) {
+      const key = dayKeyFor(punch);
+      byCivilDay.set(key, [...(byCivilDay.get(key) ?? []), punch]);
+    }
+    const attributed = attributePunches({
+      days: ['2026-07-05', '2026-07-06', '2026-07-07'],
+      byCivilDay,
+      timeOf: (d: Date) => d,
+      ruleFor: (dayKey) => dayRuleFor(dayKey, rules),
+    });
+    expect(attributed.get('2026-07-06')).toHaveLength(2);
+    expect(attributed.get('2026-07-07')).toHaveLength(0);
+    // Com a tolerância por marcação a jornada fecha exata (22:02→22:00, 05:01→05:00).
+    const { workedMinutes, open } = effectiveWorkedMinutes({
+      punches: attributed.get('2026-07-06')!,
+      dayKey: '2026-07-06',
+      rule: rules.mon!,
+      toleranceMinutes: 10,
+    });
+    expect(open).toBe(false);
+    expect(workedMinutes).toBe(420);
+  });
+
+  it('attributePunches: não invade o início da jornada do dia seguinte', () => {
+    const rules: WeeklyRules = {
+      mon: { start: '22:00', end: '05:00', breakMinutes: 0 },
+      tue: { start: '06:00', end: '14:00', breakMinutes: 60 },
+    };
+    const early = companyTimeToUtc('2026-07-07', '06:02'); // entrada da jornada de terça
+    const byCivilDay = new Map<string, Date[]>([['2026-07-07', [early]]]);
+    const attributed = attributePunches({
+      days: ['2026-07-06', '2026-07-07'],
+      byCivilDay,
+      timeOf: (d: Date) => d,
+      ruleFor: (dayKey) => dayRuleFor(dayKey, rules),
+    });
+    expect(attributed.get('2026-07-06')).toHaveLength(0);
+    expect(attributed.get('2026-07-07')).toHaveLength(1);
+  });
+
+  it('feriados nacionais: fixos + Sexta-feira Santa (Páscoa correta)', () => {
+    expect(easterSunday(2026)).toBe('2026-04-05');
+    expect(easterSunday(2027)).toBe('2027-03-28');
+    const holidays = nationalHolidaysFor(2026);
+    const days = holidays.map((h) => h.dayKey);
+    expect(days).toContain('2026-01-01');
+    expect(days).toContain('2026-04-03'); // Sexta-feira Santa
+    expect(days).toContain('2026-11-20'); // Consciência Negra
+    expect(days).toContain('2026-12-25');
+    expect(holidays).toHaveLength(10);
+  });
+
+  it('addDays: desloca dayKeys inclusive em viradas de mês/ano', () => {
+    expect(addDays('2026-07-01', -1)).toBe('2026-06-30');
+    expect(addDays('2026-12-31', 1)).toBe('2027-01-01');
   });
 
   it('chainHash: encadeia e muda com qualquer alteração', () => {

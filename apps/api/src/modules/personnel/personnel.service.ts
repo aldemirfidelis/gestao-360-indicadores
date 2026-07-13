@@ -3,21 +3,27 @@ import { Prisma } from '@prisma/client';
 import { PrismaService } from '../../prisma/prisma.service';
 import { AuditWriterService } from '../../common/audit/audit-writer.service';
 import { WorkItemEventBus } from '../my-day/work-item-event-bus';
+import { AccessService } from '../access/access.service';
 import { AuthPayload } from '../auth/auth.types';
 import { VacationService, type DayCoverage } from './vacation.service';
 import {
+  addDays,
+  attributePunches,
   chainHash,
   companyTimeToUtc,
   dayKeyFor,
+  dayRuleFor,
+  effectiveWorkedMinutes,
   enumerateDays,
   evaluateDay,
   isValidDayKey,
   monthBounds,
-  pairPunches,
+  nationalHolidaysFor,
   parsePunchCsv,
   periodRefOf,
   plannedMinutesFor,
   previousMonthRef,
+  ruleCrossesMidnight,
   validateProposedTimes,
   validateWeeklyRules,
   weekdayOf,
@@ -38,16 +44,18 @@ export class PersonnelService {
     private readonly audit: AuditWriterService,
     private readonly workItems: WorkItemEventBus,
     private readonly vacations: VacationService,
+    private readonly access: AccessService,
   ) {}
 
   // ------------------------------ Batida ------------------------------
 
   async punch(me: AuthPayload, body: any = {}, ctx?: { ip?: string; userAgent?: string; verifiedBiometricAttemptId?: string }) {
     const now = new Date();
-    const dayKey = dayKeyFor(now);
+    const dayKey = await this.attributedDayKeyFor(me.companyId, me.sub, now);
     await this.assertPeriodOpen(me.companyId, periodRefOf(dayKey));
 
     const source = ctx?.verifiedBiometricAttemptId ? 'FACIAL' : (body?.source === 'MOBILE' ? 'MOBILE' : 'WEB');
+    const deviceTime = body?.deviceTime ? new Date(body.deviceTime) : null;
     // Serializa batidas simultâneas do mesmo colaborador no PostgreSQL para
     // preservar a alternância IN/OUT e a cadeia de integridade.
     const entry = await this.prisma.$transaction(async (tx) => {
@@ -60,14 +68,16 @@ export class PersonnelService {
       if (lastEntry?.status === 'VALID' && now.getTime() - lastEntry.punchedAt.getTime() < MIN_PUNCH_INTERVAL_MS) {
         throw new ConflictException('Batida registrada há menos de 1 minuto. Aguarde para registrar novamente.');
       }
-      const todayCount = await tx.timeClockEntry.count({ where: { companyId: me.companyId, userId: me.sub, dayKey, status: 'VALID' } });
-      const kind = todayCount % 2 === 0 ? 'IN' : 'OUT';
+      const dayCount = await tx.timeClockEntry.count({ where: { companyId: me.companyId, userId: me.sub, dayKey, status: 'VALID' } });
+      const kind = dayCount % 2 === 0 ? 'IN' : 'OUT';
       return tx.timeClockEntry.create({
         data: {
           companyId: me.companyId, userId: me.sub, punchedAt: now, dayKey, kind, source,
           latitude: finiteOrNull(body?.latitude), longitude: finiteOrNull(body?.longitude), accuracy: finiteOrNull(body?.accuracy),
           ip: ctx?.ip ?? null, userAgent: ctx?.userAgent?.slice(0, 500) ?? null, note: text(body?.note),
           biometricAttemptId: ctx?.verifiedBiometricAttemptId ?? null,
+          deviceTime: deviceTime && !Number.isNaN(deviceTime.getTime()) ? deviceTime : null,
+          deviceId: text(body?.deviceId)?.slice(0, 120) ?? null,
           prevHash: lastEntry?.hash ?? null,
           hash: chainHash(lastEntry?.hash ?? null, `${me.sub}|${now.toISOString()}|${kind}|${source}`),
           createdById: me.sub,
@@ -88,6 +98,30 @@ export class PersonnelService {
     return { entry, day: await this.buildMyDay(me, dayKey) };
   }
 
+  /**
+   * Dia de jornada da batida: se a escala de ONTEM atravessa a meia-noite,
+   * a jornada de ontem está com par aberto e ainda estamos dentro da janela
+   * (fim previsto + 4h, sem invadir a jornada de hoje), a batida pertence a ontem.
+   */
+  private async attributedDayKeyFor(companyId: string, userId: string, now: Date): Promise<string> {
+    const civilKey = dayKeyFor(now);
+    const prevKey = addDays(civilKey, -1);
+    const assignments = await this.assignmentsForRange(companyId, userId, prevKey, civilKey);
+    const prevRule = dayRuleFor(prevKey, this.resolveRule(assignments, userId, prevKey).rules);
+    if (!prevRule || !ruleCrossesMidnight(prevRule)) return civilKey;
+
+    const shiftEnd = companyTimeToUtc(prevKey, prevRule.end).getTime() + 86_400_000;
+    let cutoff = shiftEnd + 4 * 60 * 60_000;
+    const todayRule = dayRuleFor(civilKey, this.resolveRule(assignments, userId, civilKey).rules);
+    if (todayRule) cutoff = Math.min(cutoff, companyTimeToUtc(civilKey, todayRule.start).getTime() - 60_000);
+    if (now.getTime() > cutoff) return civilKey;
+
+    const prevCount = await this.prisma.timeClockEntry.count({
+      where: { companyId, userId, dayKey: prevKey, status: 'VALID' },
+    });
+    return prevCount % 2 === 1 ? prevKey : civilKey;
+  }
+
   // ------------------------------ Espelho ------------------------------
 
   async myMirror(me: AuthPayload, from?: string, to?: string) {
@@ -105,45 +139,49 @@ export class PersonnelService {
 
   async teamMirror(me: AuthPayload, day?: string) {
     const dayKey = day && isValidDayKey(day) ? day : dayKeyFor(new Date());
-    const [users, entries, assignments, coverageMap] = await Promise.all([
+    const extendedFrom = addDays(dayKey, -1);
+    const extendedTo = addDays(dayKey, 1);
+    const visible = await this.visibleUserIdsFor(me);
+    const [users, entries, assignments, coverageMap, holidays] = await Promise.all([
       this.prisma.user.findMany({
-        where: { companyId: me.companyId, deletedAt: null, active: true },
+        where: { companyId: me.companyId, deletedAt: null, active: true, ...(visible ? { id: { in: [...visible] } } : {}) },
         select: { id: true, name: true, email: true, jobTitle: true },
         orderBy: { name: 'asc' },
       }),
       this.prisma.timeClockEntry.findMany({
-        where: { companyId: me.companyId, dayKey, status: 'VALID' },
+        where: {
+          companyId: me.companyId,
+          dayKey: { gte: extendedFrom, lte: extendedTo },
+          status: 'VALID',
+          ...(visible ? { userId: { in: [...visible] } } : {}),
+        },
         orderBy: { punchedAt: 'asc' },
       }),
-      this.assignmentsForRange(me.companyId, null, dayKey, dayKey),
-      this.vacations.coverageForUsers(me.companyId, null, dayKey, dayKey),
+      this.assignmentsForRange(me.companyId, null, extendedFrom, dayKey),
+      this.vacations.coverageForUsers(me.companyId, visible ? [...visible] : null, dayKey, dayKey),
+      this.holidayMap(me.companyId, extendedFrom, dayKey),
     ]);
 
     const entriesByUser = groupBy(entries, (e) => e.userId);
-    const isToday = dayKey === dayKeyFor(new Date());
     const rows = users.map((user) => {
-      const userEntries = entriesByUser.get(user.id) ?? [];
-      const coverage = coverageMap.get(user.id)?.get(dayKey) ?? null;
-      const resolved = this.resolveRule(assignments, user.id, dayKey);
-      const { workedMinutes, open } = pairPunches(userEntries.map((e) => e.punchedAt));
-      const plannedMinutes = coverage ? 0 : plannedMinutesFor(dayKey, resolved.rules);
-      const { status, balanceMinutes } = evaluateDay({
-        punchCount: userEntries.length,
-        workedMinutes,
-        plannedMinutes,
-        toleranceMinutes: resolved.toleranceMinutes,
-        isToday,
-        hasOpenPair: open,
-        coverage,
-      });
+      const dayRow = this.composeUserDays({
+        userId: user.id,
+        fromKey: dayKey,
+        toKey: dayKey,
+        entries: entriesByUser.get(user.id) ?? [],
+        assignments,
+        holidays,
+        coverageDays: coverageMap.get(user.id) ?? new Map<string, DayCoverage>(),
+      })[0];
       return {
         user,
-        hasSchedule: resolved.hasSchedule,
-        plannedMinutes,
-        workedMinutes,
-        status,
-        balanceMinutes,
-        entries: userEntries.map(publicEntry),
+        hasSchedule: dayRow.hasSchedule,
+        plannedMinutes: dayRow.plannedMinutes,
+        workedMinutes: dayRow.workedMinutes,
+        status: dayRow.status,
+        balanceMinutes: dayRow.balanceMinutes,
+        holiday: dayRow.holiday,
+        entries: dayRow.entries,
       };
     });
 
@@ -153,10 +191,13 @@ export class PersonnelService {
   async summary(me: AuthPayload) {
     const today = dayKeyFor(new Date());
     const monthStart = `${today.slice(0, 7)}-01`;
+    const visible = await this.visibleUserIdsFor(me);
     const [day, monthDays, pendingAdjustments, myPending, bank] = await Promise.all([
       this.buildMyDay(me, today),
       this.buildMirrorDays(me.companyId, me.sub, monthStart, today),
-      this.prisma.timeAdjustmentRequest.count({ where: { companyId: me.companyId, status: 'REQUESTED' } }),
+      this.prisma.timeAdjustmentRequest.count({
+        where: { companyId: me.companyId, status: 'REQUESTED', ...(visible ? { userId: { in: [...visible] } } : {}) },
+      }),
       this.prisma.timeAdjustmentRequest.count({ where: { companyId: me.companyId, userId: me.sub, status: 'REQUESTED' } }),
       this.bankBalance(me.companyId, me.sub),
     ]);
@@ -275,18 +316,28 @@ export class PersonnelService {
             select: { hash: true },
           });
           let prevHash = last?.hash ?? null;
-          const affectedDays = new Set<string>();
+          // A batida é imutável: o kind gravado é apenas informativo (a apuração
+          // deriva a alternância pela posição na jornada). Nada é atualizado depois.
+          const freshDays = [...new Set(fresh.map((t) => dayKeyFor(t)))];
+          const existingCounts = await tx.timeClockEntry.groupBy({
+            by: ['dayKey'],
+            where: { companyId: me.companyId, userId, dayKey: { in: freshDays }, status: 'VALID' },
+            _count: { _all: true },
+          });
+          const dayCounts = new Map(existingCounts.map((row) => [row.dayKey, row._count._all]));
           for (const punchedAt of fresh) {
             const dayKey = dayKeyFor(punchedAt);
-            affectedDays.add(dayKey);
-            const hash = chainHash(prevHash, `${userId}|${punchedAt.toISOString()}|IMPORT|IMPORT`);
+            const seq = dayCounts.get(dayKey) ?? 0;
+            dayCounts.set(dayKey, seq + 1);
+            const kind = seq % 2 === 0 ? 'IN' : 'OUT';
+            const hash = chainHash(prevHash, `${userId}|${punchedAt.toISOString()}|${kind}|IMPORT`);
             await tx.timeClockEntry.create({
               data: {
                 companyId: me.companyId,
                 userId,
                 punchedAt,
                 dayKey,
-                kind: 'IN', // recalculado por dia logo abaixo
+                kind,
                 source: 'IMPORT',
                 prevHash,
                 hash,
@@ -295,20 +346,6 @@ export class PersonnelService {
             });
             prevHash = hash;
             imported += 1;
-          }
-          // Reordena a alternância entrada/saída dos dias afetados.
-          for (const dayKey of affectedDays) {
-            const dayEntries = await tx.timeClockEntry.findMany({
-              where: { companyId: me.companyId, userId, dayKey, status: 'VALID' },
-              orderBy: { punchedAt: 'asc' },
-              select: { id: true, kind: true },
-            });
-            for (let i = 0; i < dayEntries.length; i++) {
-              const kind = i % 2 === 0 ? 'IN' : 'OUT';
-              if (dayEntries[i].kind !== kind) {
-                await tx.timeClockEntry.update({ where: { id: dayEntries[i].id }, data: { kind } });
-              }
-            }
           }
         },
         { timeout: 120_000, maxWait: 15_000 },
@@ -376,8 +413,9 @@ export class PersonnelService {
   }
 
   async pendingAdjustments(me: AuthPayload) {
+    const visible = await this.visibleUserIdsFor(me);
     const requests = await this.prisma.timeAdjustmentRequest.findMany({
-      where: { companyId: me.companyId, status: 'REQUESTED' },
+      where: { companyId: me.companyId, status: 'REQUESTED', ...(visible ? { userId: { in: [...visible] } } : {}) },
       orderBy: { createdAt: 'asc' },
       take: 200,
     });
@@ -565,6 +603,9 @@ export class PersonnelService {
           userId,
           templateId,
           startsAt,
+          // Congela a vigência: o cálculo usa este snapshot, não o template vivo.
+          rulesSnapshot: template.weeklyRules as Prisma.InputJsonValue,
+          toleranceSnapshot: template.toleranceMinutes,
           createdById: me.sub,
         })),
       });
@@ -581,8 +622,9 @@ export class PersonnelService {
   }
 
   async listAssignments(me: AuthPayload) {
+    const visible = await this.visibleUserIdsFor(me);
     const assignments = await this.prisma.workScheduleAssignment.findMany({
-      where: { companyId: me.companyId, endsAt: null },
+      where: { companyId: me.companyId, endsAt: null, ...(visible ? { userId: { in: [...visible] } } : {}) },
       include: { template: { select: { id: true, name: true, toleranceMinutes: true } } },
       orderBy: { startsAt: 'desc' },
       take: 500,
@@ -591,12 +633,88 @@ export class PersonnelService {
   }
 
   async options(me: AuthPayload) {
+    const visible = await this.visibleUserIdsFor(me);
     const users = await this.prisma.user.findMany({
-      where: { companyId: me.companyId, deletedAt: null, active: true },
+      where: { companyId: me.companyId, deletedAt: null, active: true, ...(visible ? { id: { in: [...visible] } } : {}) },
       select: { id: true, name: true, email: true, jobTitle: true },
       orderBy: { name: 'asc' },
     });
     return { users };
+  }
+
+  // ------------------------------ Feriados ------------------------------
+
+  async listHolidays(me: AuthPayload, year?: string) {
+    const y = /^\d{4}$/.test(String(year ?? '')) ? String(year) : String(new Date().getUTCFullYear());
+    return this.prisma.companyHoliday.findMany({
+      where: { companyId: me.companyId, dayKey: { gte: `${y}-01-01`, lte: `${y}-12-31` } },
+      orderBy: { dayKey: 'asc' },
+    });
+  }
+
+  async createHoliday(me: AuthPayload, body: any = {}) {
+    const dayKey = String(body?.dayKey ?? '');
+    if (!isValidDayKey(dayKey)) throw new BadRequestException('Data inválida (use YYYY-MM-DD).');
+    const name = text(body?.name);
+    if (!name) throw new BadRequestException('Nome do feriado é obrigatório.');
+    const kind = ['NATIONAL', 'STATE', 'MUNICIPAL', 'COMPANY'].includes(body?.kind) ? body.kind : 'COMPANY';
+    try {
+      const holiday = await this.prisma.companyHoliday.create({
+        data: { companyId: me.companyId, dayKey, name, kind, createdById: me.sub },
+      });
+      await this.audit.record(me, {
+        module: MODULE,
+        entity: 'CompanyHoliday',
+        entityId: holiday.id,
+        action: 'CREATE',
+        message: `Feriado "${name}" em ${dayKey}`,
+        after: { dayKey, name, kind },
+      });
+      return holiday;
+    } catch (error: any) {
+      if (error?.code === 'P2002') throw new ConflictException('Já existe um feriado cadastrado nesta data.');
+      throw error;
+    }
+  }
+
+  async deleteHoliday(me: AuthPayload, id: string) {
+    const holiday = await this.prisma.companyHoliday.findFirst({ where: { id, companyId: me.companyId } });
+    if (!holiday) throw new NotFoundException('Feriado não encontrado.');
+    await this.prisma.companyHoliday.delete({ where: { id } });
+    await this.audit.record(me, {
+      module: MODULE,
+      entity: 'CompanyHoliday',
+      entityId: id,
+      action: 'DELETE',
+      message: `Feriado "${holiday.name}" (${holiday.dayKey}) removido`,
+      before: { dayKey: holiday.dayKey, name: holiday.name },
+    });
+    return { deleted: true };
+  }
+
+  /** Carrega os feriados nacionais do ano (fixos + Sexta-feira Santa), sem duplicar. */
+  async generateHolidays(me: AuthPayload, body: any = {}) {
+    const year = Number(body?.year);
+    if (!Number.isInteger(year) || year < 2000 || year > 2100) throw new BadRequestException('Ano inválido.');
+    const list = nationalHolidaysFor(year);
+    const result = await this.prisma.companyHoliday.createMany({
+      data: list.map((holiday) => ({
+        companyId: me.companyId,
+        dayKey: holiday.dayKey,
+        name: holiday.name,
+        kind: 'NATIONAL',
+        createdById: me.sub,
+      })),
+      skipDuplicates: true,
+    });
+    await this.audit.record(me, {
+      module: MODULE,
+      entity: 'CompanyHoliday',
+      action: 'GENERATE',
+      message: `Feriados nacionais de ${year} carregados (${result.count} novos)`,
+      after: { year, created: result.count },
+    });
+    return { created: result.count, total: list.length };
   }
 
   // ------------------------------ Fechamento ------------------------------
@@ -622,24 +740,39 @@ export class PersonnelService {
     // Consolida o mês por colaborador: é o que alimenta o banco de horas
     // acumulado e o relatório para a folha sem recalcular meses fechados.
     const totals = await this.computeMonthTotals(me.companyId, ref);
-    const period = await this.prisma.timesheetPeriod.upsert({
-      where: { companyId_periodRef: { companyId: me.companyId, periodRef: ref } },
-      create: {
-        companyId: me.companyId,
-        periodRef: ref,
-        status: 'CLOSED',
-        closedById: me.sub,
-        closedAt: new Date(),
-        totals,
-      },
-      update: { status: 'CLOSED', closedById: me.sub, closedAt: new Date(), totals },
+    // Fechamento transacional e versionado: cada fechamento gera uma versão
+    // imutável do consolidado (reabrir + fechar de novo não apaga o anterior).
+    const period = await this.prisma.$transaction(async (tx) => {
+      const existing = await tx.timesheetPeriod.findUnique({
+        where: { companyId_periodRef: { companyId: me.companyId, periodRef: ref } },
+      });
+      if (existing?.status === 'CLOSED') throw new ConflictException('Competência já está fechada.');
+      const version = (existing?.version ?? 0) + 1;
+      const saved = await tx.timesheetPeriod.upsert({
+        where: { companyId_periodRef: { companyId: me.companyId, periodRef: ref } },
+        create: {
+          companyId: me.companyId,
+          periodRef: ref,
+          status: 'CLOSED',
+          closedById: me.sub,
+          closedAt: new Date(),
+          totals,
+          version,
+        },
+        update: { status: 'CLOSED', closedById: me.sub, closedAt: new Date(), totals, version },
+      });
+      await tx.timesheetPeriodVersion.create({
+        data: { companyId: me.companyId, periodRef: ref, version, totals, closedById: me.sub },
+      });
+      return saved;
     });
     await this.audit.record(me, {
       module: MODULE,
       entity: 'TimesheetPeriod',
       entityId: period.id,
       action: 'PERIOD_CLOSED',
-      message: `Competência ${ref} fechada (${totals.entries} batidas, ${Object.keys(totals.users).length} colaboradores)`,
+      message: `Competência ${ref} fechada (versão ${period.version}; ${totals.entries} batidas, ${Object.keys(totals.users).length} colaboradores)`,
+      after: { version: period.version },
     });
     return period;
   }
@@ -694,7 +827,8 @@ export class PersonnelService {
     const stored = period?.status === 'CLOSED' ? ((period.totals as any)?.users as Record<string, any> | undefined) : undefined;
     const usersTotals = stored ?? (await this.computeMonthTotals(me.companyId, ref)).users;
 
-    const ids = Object.keys(usersTotals);
+    const visible = await this.visibleUserIdsFor(me);
+    const ids = Object.keys(usersTotals).filter((id) => !visible || visible.has(id));
     const people = ids.length
       ? await this.prisma.user.findMany({
           where: { id: { in: ids }, companyId: me.companyId },
@@ -733,110 +867,199 @@ export class PersonnelService {
     return { fileName: `ponto-${ref}.csv`, content, mimeType: 'text/csv; charset=utf-8' };
   }
 
-  async reopenPeriod(me: AuthPayload, ref: string) {
+  async reopenPeriod(me: AuthPayload, ref: string, body: any = {}) {
     this.assertPeriodRef(ref);
+    const note = text(body?.note ?? body?.justification);
+    if (!note) throw new BadRequestException('Justificativa é obrigatória para reabrir a competência.');
     const period = await this.prisma.timesheetPeriod.findUnique({
       where: { companyId_periodRef: { companyId: me.companyId, periodRef: ref } },
     });
     if (!period || period.status !== 'CLOSED') throw new ConflictException('Competência não está fechada.');
-    const reopened = await this.prisma.timesheetPeriod.update({
-      where: { id: period.id },
-      data: { status: 'OPEN' },
+    const reopened = await this.prisma.$transaction(async (tx) => {
+      const updated = await tx.timesheetPeriod.update({
+        where: { id: period.id },
+        data: { status: 'OPEN' },
+      });
+      // Registra quem/quando/por quê na versão que estava vigente.
+      await tx.timesheetPeriodVersion.updateMany({
+        where: { companyId: me.companyId, periodRef: ref, version: period.version },
+        data: { reopenedById: me.sub, reopenedAt: new Date(), reopenNote: note },
+      });
+      return updated;
     });
     await this.audit.record(me, {
       module: MODULE,
       entity: 'TimesheetPeriod',
       entityId: period.id,
       action: 'PERIOD_REOPENED',
-      message: `Competência ${ref} reaberta`,
+      message: `Competência ${ref} reaberta (versão ${period.version}): ${note}`,
+      after: { note, version: period.version },
     });
     return reopened;
+  }
+
+  /** Histórico de fechamentos da competência (versões imutáveis). */
+  async periodVersions(me: AuthPayload, ref: string) {
+    this.assertPeriodRef(ref);
+    const versions = await this.prisma.timesheetPeriodVersion.findMany({
+      where: { companyId: me.companyId, periodRef: ref },
+      orderBy: { version: 'desc' },
+    });
+    return this.withUserNames(me.companyId, versions, 'closedById');
   }
 
   // ------------------------------ Internos ------------------------------
 
   private async buildMyDay(me: AuthPayload, dayKey: string) {
-    const [entries, assignments, coverageMap] = await Promise.all([
-      this.prisma.timeClockEntry.findMany({
-        where: { companyId: me.companyId, userId: me.sub, dayKey, status: 'VALID' },
-        orderBy: { punchedAt: 'asc' },
-      }),
-      this.assignmentsForRange(me.companyId, me.sub, dayKey, dayKey),
-      this.vacations.coverageForUsers(me.companyId, [me.sub], dayKey, dayKey),
-    ]);
-    const coverage = coverageMap.get(me.sub)?.get(dayKey) ?? null;
-    const resolved = this.resolveRule(assignments, me.sub, dayKey);
-    const { workedMinutes, open } = pairPunches(entries.map((e) => e.punchedAt));
-    const plannedMinutes = coverage ? 0 : plannedMinutesFor(dayKey, resolved.rules);
-    const evaluation = evaluateDay({
-      punchCount: entries.length,
-      workedMinutes,
-      plannedMinutes,
-      toleranceMinutes: resolved.toleranceMinutes,
-      isToday: dayKey === dayKeyFor(new Date()),
-      hasOpenPair: open,
-      coverage,
-    });
-    return {
-      dayKey,
-      weekday: weekdayOf(dayKey),
-      hasSchedule: resolved.hasSchedule,
-      plannedMinutes,
-      workedMinutes,
-      nextKind: entries.length % 2 === 0 ? 'IN' : 'OUT',
-      ...evaluation,
-      entries: entries.map(publicEntry),
-    };
+    const days = await this.buildMirrorDays(me.companyId, me.sub, dayKey, dayKey);
+    const day = days[0];
+    return { ...day, nextKind: day.entries.length % 2 === 0 ? 'IN' : 'OUT' };
   }
 
   private async buildMirrorDays(companyId: string, userId: string, fromKey: string, toKey: string) {
-    const [entries, assignments, adjustments, coverageMap] = await Promise.all([
+    // Janela estendida em ±1 dia: jornadas noturnas têm a saída no dia civil
+    // seguinte, e o primeiro dia do intervalo pode "doar" batidas para o anterior.
+    const extendedFrom = addDays(fromKey, -1);
+    const extendedTo = addDays(toKey, 1);
+    const [entries, assignments, adjustments, coverageMap, holidays] = await Promise.all([
       this.prisma.timeClockEntry.findMany({
-        where: { companyId, userId, dayKey: { gte: fromKey, lte: toKey }, status: 'VALID' },
+        where: { companyId, userId, dayKey: { gte: extendedFrom, lte: extendedTo }, status: 'VALID' },
         orderBy: { punchedAt: 'asc' },
       }),
-      this.assignmentsForRange(companyId, userId, fromKey, toKey),
+      this.assignmentsForRange(companyId, userId, extendedFrom, toKey),
       this.prisma.timeAdjustmentRequest.findMany({
         where: { companyId, userId, dayKey: { gte: fromKey, lte: toKey } },
         orderBy: { createdAt: 'desc' },
       }),
       this.vacations.coverageForUsers(companyId, [userId], fromKey, toKey),
+      this.holidayMap(companyId, extendedFrom, toKey),
     ]);
-    const coverageDays = coverageMap.get(userId) ?? new Map<string, DayCoverage>();
-    const entriesByDay = groupBy(entries, (e) => e.dayKey);
     const adjustmentByDay = new Map<string, (typeof adjustments)[number]>();
     for (const adjustment of adjustments) {
       if (!adjustmentByDay.has(adjustment.dayKey)) adjustmentByDay.set(adjustment.dayKey, adjustment);
     }
+    return this.composeUserDays({
+      userId,
+      fromKey,
+      toKey,
+      entries,
+      assignments,
+      holidays,
+      coverageDays: coverageMap.get(userId) ?? new Map<string, DayCoverage>(),
+      adjustmentByDay,
+    });
+  }
+
+  /**
+   * Composição do espelho de um colaborador: atribui batidas ao dia de jornada
+   * (jornadas noturnas puxam a saída do dia civil seguinte), aplica feriados,
+   * cobertura de férias/afastamento e a tolerância por marcação, e avalia o dia.
+   */
+  private composeUserDays(input: {
+    userId: string;
+    fromKey: string;
+    toKey: string;
+    entries: Array<{
+      id: string;
+      punchedAt: Date;
+      source: string;
+      note: string | null;
+      latitude: number | null;
+      longitude: number | null;
+    }>;
+    assignments: Array<{ userId: string; startsAt: Date; endsAt: Date | null; rulesSnapshot?: unknown; toleranceSnapshot?: number | null; template: { weeklyRules: unknown; toleranceMinutes: number } }>;
+    holidays: Map<string, string>;
+    coverageDays: Map<string, DayCoverage>;
+    adjustmentByDay?: Map<string, { id: string; status: string; reason: string }>;
+  }) {
+    const { userId, fromKey, toKey, entries, assignments, holidays, coverageDays, adjustmentByDay } = input;
     const today = dayKeyFor(new Date());
+    const byCivilDay = groupBy(entries, (e) => dayKeyFor(e.punchedAt));
+    const ruleCache = new Map<string, ReturnType<PersonnelService['resolveRule']>>();
+    const resolvedFor = (dayKey: string) => {
+      let resolved = ruleCache.get(dayKey);
+      if (!resolved) {
+        resolved = this.resolveRule(assignments, userId, dayKey);
+        ruleCache.set(dayKey, resolved);
+      }
+      return resolved;
+    };
+
+    const attributed = attributePunches({
+      days: enumerateDays(addDays(fromKey, -1), toKey),
+      byCivilDay,
+      timeOf: (entry) => entry.punchedAt,
+      ruleFor: (dayKey) => dayRuleFor(dayKey, resolvedFor(dayKey).rules),
+    });
 
     return enumerateDays(fromKey, toKey).map((dayKey) => {
-      const dayEntries = entriesByDay.get(dayKey) ?? [];
+      const dayEntries = attributed.get(dayKey) ?? [];
       const coverage = coverageDays.get(dayKey) ?? null;
-      const resolved = this.resolveRule(assignments, userId, dayKey);
-      const { workedMinutes, open } = pairPunches(dayEntries.map((e) => e.punchedAt));
-      const plannedMinutes = coverage ? 0 : plannedMinutesFor(dayKey, resolved.rules);
+      const holidayName = holidays.get(dayKey) ?? null;
+      const resolved = resolvedFor(dayKey);
+      const abonado = Boolean(coverage) || Boolean(holidayName);
+      const plannedMinutes = abonado ? 0 : plannedMinutesFor(dayKey, resolved.rules);
+      const { workedMinutes, open } = effectiveWorkedMinutes({
+        punches: dayEntries.map((entry) => entry.punchedAt),
+        dayKey,
+        rule: abonado ? null : dayRuleFor(dayKey, resolved.rules),
+        toleranceMinutes: resolved.toleranceMinutes,
+      });
       const evaluation = evaluateDay({
         punchCount: dayEntries.length,
         workedMinutes,
         plannedMinutes,
-        toleranceMinutes: resolved.toleranceMinutes,
         isToday: dayKey === today,
         hasOpenPair: open,
         coverage,
+        isHoliday: Boolean(holidayName),
       });
-      const adjustment = adjustmentByDay.get(dayKey);
+      const adjustment = adjustmentByDay?.get(dayKey);
       return {
         dayKey,
         weekday: weekdayOf(dayKey),
         hasSchedule: resolved.hasSchedule,
+        holiday: holidayName,
         plannedMinutes,
         workedMinutes,
         ...evaluation,
         adjustment: adjustment ? { id: adjustment.id, status: adjustment.status, reason: adjustment.reason } : null,
-        entries: dayEntries.map(publicEntry),
+        entries: dayEntries.map((entry, index) => publicEntry(entry, index)),
       };
     });
+  }
+
+  /** Feriados da empresa no intervalo, indexados por dayKey. */
+  private async holidayMap(companyId: string, fromKey: string, toKey: string): Promise<Map<string, string>> {
+    const rows = await this.prisma.companyHoliday.findMany({
+      where: { companyId, dayKey: { gte: fromKey, lte: toKey } },
+      select: { dayKey: true, name: true },
+    });
+    return new Map(rows.map((row) => [row.dayKey, row.name]));
+  }
+
+  /**
+   * Abrangência do gestor: conjunto de userIds visíveis pela visibilidade por
+   * área da plataforma (módulo access; null = sem restrição configurada).
+   * O vínculo usuário→área vem do prontuário (PersonnelEmployeeProfile →
+   * OrgEmployee.orgNode). O próprio usuário sempre se enxerga.
+   */
+  private async visibleUserIdsFor(me: AuthPayload): Promise<Set<string> | null> {
+    let filter: string[] | null = null;
+    try {
+      filter = await this.access.listAreaFilter(me.sub, MODULE, 'view');
+    } catch {
+      filter = null;
+    }
+    if (!filter) return null;
+    const profiles = await this.prisma.personnelEmployeeProfile.findMany({
+      where: { companyId: me.companyId, userId: { not: null }, employee: { orgNodeId: { in: filter } } },
+      select: { userId: true },
+    });
+    const ids = new Set<string>();
+    for (const profile of profiles) if (profile.userId) ids.add(profile.userId);
+    ids.add(me.sub);
+    return ids;
   }
 
   /** Vigências que tocam o intervalo; userId null = empresa inteira (visão de equipe). */
@@ -856,7 +1079,7 @@ export class PersonnelService {
   }
 
   private resolveRule(
-    assignments: Array<{ userId: string; startsAt: Date; endsAt: Date | null; template: { weeklyRules: unknown; toleranceMinutes: number } }>,
+    assignments: Array<{ userId: string; startsAt: Date; endsAt: Date | null; rulesSnapshot?: unknown; toleranceSnapshot?: number | null; template: { weeklyRules: unknown; toleranceMinutes: number } }>,
     userId: string,
     dayKey: string,
   ): { rules: WeeklyRules | null; toleranceMinutes: number; hasSchedule: boolean } {
@@ -865,9 +1088,10 @@ export class PersonnelService {
       (a) => a.userId === userId && a.startsAt.getTime() <= dayStart.getTime() + 86_399_000 && (!a.endsAt || a.endsAt.getTime() >= dayStart.getTime()),
     );
     if (!match) return { rules: null, toleranceMinutes: DEFAULT_TOLERANCE_MINUTES, hasSchedule: false };
+    // O snapshot congela a vigência: editar o template não reescreve o passado.
     return {
-      rules: match.template.weeklyRules as WeeklyRules,
-      toleranceMinutes: match.template.toleranceMinutes,
+      rules: (match.rulesSnapshot ?? match.template.weeklyRules) as WeeklyRules,
+      toleranceMinutes: match.toleranceSnapshot ?? match.template.toleranceMinutes,
       hasSchedule: true,
     };
   }
@@ -915,19 +1139,23 @@ export class PersonnelService {
 
 // ------------------------------ Helpers ------------------------------
 
-function publicEntry(entry: {
-  id: string;
-  punchedAt: Date;
-  kind: string;
-  source: string;
-  note: string | null;
-  latitude: number | null;
-  longitude: number | null;
-}) {
+function publicEntry(
+  entry: {
+    id: string;
+    punchedAt: Date;
+    source: string;
+    note: string | null;
+    latitude: number | null;
+    longitude: number | null;
+  },
+  index: number,
+) {
   return {
     id: entry.id,
     punchedAt: entry.punchedAt,
-    kind: entry.kind,
+    // Alternância derivada da posição na jornada atribuída (a batida em si é
+    // imutável; o rótulo IN/OUT é interpretação da apuração).
+    kind: index % 2 === 0 ? 'IN' : 'OUT',
     source: entry.source,
     note: entry.note,
     hasLocation: entry.latitude != null && entry.longitude != null,
