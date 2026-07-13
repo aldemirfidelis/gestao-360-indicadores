@@ -2,7 +2,8 @@ import { createHash } from 'crypto';
 
 /**
  * Lógica pura do controle de ponto (sem banco): cálculo de espelho, jornada
- * planejada, pareamento de batidas e cadeia de integridade (Portaria 671).
+ * planejada, pareamento de batidas e cadeia técnica de integridade. Esta cadeia
+ * não substitui a ARP/AFD exigida de uma solução REP-P certificada.
  */
 
 export interface DayRule {
@@ -13,6 +14,29 @@ export interface DayRule {
 
 export type Weekday = 'mon' | 'tue' | 'wed' | 'thu' | 'fri' | 'sat' | 'sun';
 export type WeeklyRules = Partial<Record<Weekday, DayRule | null>>;
+
+/**
+ * Regras de escala em snapshot/vigência. Dois formatos:
+ * - Semanal: objeto { mon..sun: DayRule|null } (formato original, preservado);
+ * - Ciclo:   { kind:'CYCLE', cycle:(DayRule|null)[], worksHolidays? } — sequência
+ *   repetitiva (ex.: 12x36 = [dia, null]); a fase é dada pela âncora por colaborador.
+ */
+export interface CycleRules {
+  kind: 'CYCLE';
+  cycle: Array<DayRule | null>;
+  worksHolidays?: boolean;
+}
+export type ScheduleRules = WeeklyRules | CycleRules;
+
+export function isCycleRules(rules: ScheduleRules | null | undefined): rules is CycleRules {
+  return Boolean(rules) && (rules as CycleRules).kind === 'CYCLE' && Array.isArray((rules as CycleRules).cycle);
+}
+
+/** Dias corridos entre dois dayKeys (b - a). */
+export function daysBetween(a: string, b: string): number {
+  const ms = new Date(`${b}T12:00:00Z`).getTime() - new Date(`${a}T12:00:00Z`).getTime();
+  return Math.round(ms / 86_400_000);
+}
 
 export type DayStatus =
   | 'DAY_OFF' // sem jornada prevista e sem batidas
@@ -90,12 +114,7 @@ export function validateWeeklyRules(rules: unknown): string[] {
       continue;
     }
     if (rule === null || rule === undefined) continue; // folga
-    const r = rule as Partial<DayRule>;
-    if (!r.start || !isValidTime(r.start)) errors.push(`${day}: início inválido`);
-    if (!r.end || !isValidTime(r.end)) errors.push(`${day}: fim inválido`);
-    if (r.breakMinutes !== undefined && (!Number.isFinite(Number(r.breakMinutes)) || Number(r.breakMinutes) < 0)) {
-      errors.push(`${day}: intervalo inválido`);
-    }
+    errors.push(...validateDayRule(rule, day));
   }
   return errors;
 }
@@ -150,6 +169,84 @@ export function evaluateDay(input: {
 /** Regra do dia (ou null quando folga/sem escala). */
 export function dayRuleFor(dayKey: string, rules: WeeklyRules | null | undefined): DayRule | null {
   return rules?.[weekdayOf(dayKey)] ?? null;
+}
+
+/**
+ * Regra do dia para qualquer formato de escala. Em ciclos, a posição é
+ * `daysBetween(anchor, dia) mod tamanho` (âncora = dia 0 do ciclo do colaborador);
+ * dias anteriores à âncora seguem o mesmo ciclo projetado para trás.
+ */
+export function dayRuleFromSchedule(
+  dayKey: string,
+  rules: ScheduleRules | null | undefined,
+  cycleAnchorDay?: string | null,
+): DayRule | null {
+  if (!rules) return null;
+  if (isCycleRules(rules)) {
+    if (!rules.cycle.length || !cycleAnchorDay) return null;
+    const index = ((daysBetween(cycleAnchorDay, dayKey) % rules.cycle.length) + rules.cycle.length) % rules.cycle.length;
+    return rules.cycle[index] ?? null;
+  }
+  return dayRuleFor(dayKey, rules as WeeklyRules);
+}
+
+/** Minutos previstos do dia para qualquer formato de escala. */
+export function plannedMinutesFromSchedule(
+  dayKey: string,
+  rules: ScheduleRules | null | undefined,
+  cycleAnchorDay?: string | null,
+): number {
+  const rule = dayRuleFromSchedule(dayKey, rules, cycleAnchorDay);
+  if (!rule) return 0;
+  const start = timeToMinutes(rule.start);
+  let end = timeToMinutes(rule.end);
+  if (end <= start) end += 24 * 60;
+  return Math.max(0, end - start - Math.max(0, rule.breakMinutes ?? 0));
+}
+
+/** Valida a sequência de um ciclo (mín. 2 posições, pelo menos 1 dia de trabalho). */
+export function validateCycleRules(cycle: unknown): string[] {
+  const errors: string[] = [];
+  if (!Array.isArray(cycle) || cycle.length < 2 || cycle.length > 60) {
+    return ['Ciclo deve ser uma lista de 2 a 60 posições (dias de trabalho e folgas).'];
+  }
+  let workDays = 0;
+  cycle.forEach((rule, index) => {
+    if (rule === null || rule === undefined) return;
+    workDays += 1;
+    errors.push(...validateDayRule(rule, `Posição ${index + 1}`));
+  });
+  if (workDays === 0) errors.push('O ciclo precisa de ao menos um dia de trabalho.');
+  return errors;
+}
+
+/** Validação estrutural/técnica; regras legais e coletivas são parametrizadas fora daqui. */
+function validateDayRule(rule: unknown, label: string): string[] {
+  const errors: string[] = [];
+  if (rule === null || typeof rule !== 'object' || Array.isArray(rule)) return [`${label}: jornada inválida`];
+  const r = rule as Partial<DayRule>;
+  const validStart = typeof r.start === 'string' && isValidTime(r.start);
+  const validEnd = typeof r.end === 'string' && isValidTime(r.end);
+  if (!validStart) errors.push(`${label}: início inválido`);
+  if (!validEnd) errors.push(`${label}: fim inválido`);
+
+  let duration: number | null = null;
+  if (validStart && validEnd) {
+    const start = timeToMinutes(r.start!);
+    const rawEnd = timeToMinutes(r.end!);
+    if (start === rawEnd) errors.push(`${label}: início e fim não podem ser iguais`);
+    else duration = rawEnd > start ? rawEnd - start : rawEnd + 24 * 60 - start;
+  }
+
+  if (r.breakMinutes !== undefined) {
+    const breakMinutes = Number(r.breakMinutes);
+    if (!Number.isInteger(breakMinutes) || breakMinutes < 0 || breakMinutes > 24 * 60) {
+      errors.push(`${label}: intervalo inválido`);
+    } else if (duration !== null && breakMinutes >= duration) {
+      errors.push(`${label}: intervalo deve ser menor que a duração da jornada`);
+    }
+  }
+  return errors;
 }
 
 /** dayKey deslocado em `delta` dias. */
@@ -220,14 +317,34 @@ export function attributePunches<T>(options: {
  * a saída prevista. Fora da janela, vale o horário real integralmente.
  * Marcações intermediárias (intervalo) contam pelo horário real.
  */
+export interface ToleranceMark {
+  /** Horário real da batida. */
+  original: Date;
+  /** Horário considerado no cálculo (previsto, quando dentro da janela). */
+  effective: Date;
+  /** true quando a tolerância "encaixou" a batida no horário previsto. */
+  clamped: boolean;
+  role: 'ENTRADA' | 'SAIDA' | 'INTERMEDIARIA';
+}
+
 export function effectiveWorkedMinutes(input: {
   punches: Date[];
   dayKey: string;
   rule: DayRule | null;
   toleranceMinutes: number;
-}): { workedMinutes: number; open: boolean } {
+}): { workedMinutes: number; open: boolean; marks: ToleranceMark[] } {
   const sorted = [...input.punches].sort((a, b) => a.getTime() - b.getTime());
-  if (!input.rule || sorted.length === 0) return pairPunches(sorted);
+  const baseMarks = (list: Date[]): ToleranceMark[] =>
+    list.map((original, index) => ({
+      original,
+      effective: original,
+      clamped: false,
+      role: index === 0 ? 'ENTRADA' : index === list.length - 1 && list.length % 2 === 0 ? 'SAIDA' : 'INTERMEDIARIA',
+    }));
+
+  if (!input.rule || sorted.length === 0) {
+    return { ...pairPunches(sorted), marks: baseMarks(sorted) };
+  }
 
   const tolMs = Math.max(0, input.toleranceMinutes) * 60_000;
   const startUtc = companyTimeToUtc(input.dayKey, input.rule.start);
@@ -235,17 +352,21 @@ export function effectiveWorkedMinutes(input: {
     companyTimeToUtc(input.dayKey, input.rule.end).getTime() + (ruleCrossesMidnight(input.rule) ? 86_400_000 : 0),
   );
 
-  const adjusted = [...sorted];
+  const marks = baseMarks(sorted);
   // Primeira batida = entrada prevista, se dentro da janela e sem inverter a ordem.
-  if (Math.abs(adjusted[0].getTime() - startUtc.getTime()) <= tolMs) {
-    if (adjusted.length === 1 || startUtc.getTime() <= adjusted[1].getTime()) adjusted[0] = startUtc;
+  if (Math.abs(sorted[0].getTime() - startUtc.getTime()) <= tolMs) {
+    if (sorted.length === 1 || startUtc.getTime() <= sorted[1].getTime()) {
+      marks[0] = { ...marks[0], effective: startUtc, clamped: sorted[0].getTime() !== startUtc.getTime() };
+    }
   }
   // Última batida = saída prevista (apenas com pares fechados), mesma proteção.
-  const lastIdx = adjusted.length - 1;
-  if (adjusted.length % 2 === 0 && Math.abs(adjusted[lastIdx].getTime() - endUtc.getTime()) <= tolMs) {
-    if (endUtc.getTime() >= adjusted[lastIdx - 1].getTime()) adjusted[lastIdx] = endUtc;
+  const lastIdx = sorted.length - 1;
+  if (sorted.length % 2 === 0 && Math.abs(sorted[lastIdx].getTime() - endUtc.getTime()) <= tolMs) {
+    if (endUtc.getTime() >= sorted[lastIdx - 1].getTime()) {
+      marks[lastIdx] = { ...marks[lastIdx], effective: endUtc, clamped: sorted[lastIdx].getTime() !== endUtc.getTime() };
+    }
   }
-  return pairPunches(adjusted);
+  return { ...pairPunches(marks.map((mark) => mark.effective)), marks };
 }
 
 // ------------------------------ Feriados ------------------------------

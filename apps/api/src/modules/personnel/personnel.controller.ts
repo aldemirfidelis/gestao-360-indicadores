@@ -35,6 +35,18 @@ export class PersonnelController {
     return this.service.teamMirror(me, day);
   }
 
+  @Get('time-clock/entries/:id/receipt')
+  @RequirePermissions('ponto:view')
+  punchReceipt(@CurrentUser() me: AuthPayload, @Param('id') id: string) {
+    return this.service.punchReceipt(me, id);
+  }
+
+  @Get('time-clock/explain/:userId/:dayKey')
+  @RequirePermissions('ponto:view', 'ponto:team')
+  explainDay(@CurrentUser() me: AuthPayload, @Param('userId') userId: string, @Param('dayKey') dayKey: string) {
+    return this.service.explainDay(me, userId, dayKey);
+  }
+
   // ------------------------------ Ajustes ------------------------------
 
   @Post('time-clock/adjustments')

@@ -12,11 +12,13 @@ import { BiometricController } from './biometric.controller';
 import { BiometricService } from './biometric.service';
 import { VacationService } from './vacation.service';
 import { VacationsController } from './vacations.controller';
+import { KioskController } from './kiosk.controller';
+import { KioskService } from './kiosk.service';
 
 @Module({
   imports: [DocumentsModule],
-  controllers: [PersonnelController, EmployeesController, VacationsController, LifecycleController, ReportsController, BiometricController],
-  providers: [PersonnelService, EmployeesService, VacationService, LifecycleService, ReportsService, BiometricService],
+  controllers: [PersonnelController, EmployeesController, VacationsController, LifecycleController, ReportsController, BiometricController, KioskController],
+  providers: [PersonnelService, EmployeesService, VacationService, LifecycleService, ReportsService, BiometricService, KioskService],
   exports: [PersonnelService, EmployeesService, VacationService, LifecycleService, ReportsService],
 })
 export class PersonnelModule {}

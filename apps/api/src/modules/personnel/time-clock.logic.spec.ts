@@ -5,7 +5,9 @@ import {
   chainHash,
   companyTimeToUtc,
   dayKeyFor,
+  dayRuleFromSchedule,
   dayRuleFor,
+  daysBetween,
   easterSunday,
   effectiveWorkedMinutes,
   enumerateDays,
@@ -17,8 +19,10 @@ import {
   parsePunchCsv,
   periodRefOf,
   plannedMinutesFor,
+  plannedMinutesFromSchedule,
   previousMonthRef,
   validateProposedTimes,
+  validateCycleRules,
   validateWeeklyRules,
   weekdayOf,
   type WeeklyRules,
@@ -70,6 +74,30 @@ describe('time-clock.logic', () => {
   it('plannedMinutesFor: jornada noturna que vira o dia', () => {
     const night: WeeklyRules = { mon: { start: '22:00', end: '05:00', breakMinutes: 0 } };
     expect(plannedMinutesFor('2026-07-06', night)).toBe(420); // 7h
+  });
+
+  it('escala cíclica: resolve 12x36 pela âncora inclusive antes dela', () => {
+    const rules = {
+      kind: 'CYCLE' as const,
+      cycle: [{ start: '07:00', end: '19:00', breakMinutes: 60 }, null],
+    };
+    expect(dayRuleFromSchedule('2026-07-13', rules, '2026-07-13')).toEqual(rules.cycle[0]);
+    expect(dayRuleFromSchedule('2026-07-14', rules, '2026-07-13')).toBeNull();
+    expect(dayRuleFromSchedule('2026-07-15', rules, '2026-07-13')).toEqual(rules.cycle[0]);
+    expect(dayRuleFromSchedule('2026-07-12', rules, '2026-07-13')).toBeNull();
+    expect(plannedMinutesFromSchedule('2026-07-15', rules, '2026-07-13')).toBe(660);
+    expect(daysBetween('2026-07-13', '2026-07-15')).toBe(2);
+  });
+
+  it('escala cíclica: suporta 4x2 e valida jornadas/intervalos', () => {
+    const work = { start: '22:00', end: '06:00', breakMinutes: 60 };
+    const cycle = [work, work, work, work, null, null];
+    expect(validateCycleRules(cycle)).toEqual([]);
+    expect(dayRuleFromSchedule('2026-07-16', { kind: 'CYCLE', cycle }, '2026-07-13')).toEqual(work);
+    expect(dayRuleFromSchedule('2026-07-17', { kind: 'CYCLE', cycle }, '2026-07-13')).toBeNull();
+    expect(validateCycleRules([null, null])).not.toEqual([]);
+    expect(validateCycleRules([{ start: '08:00', end: '08:00' }, null])).not.toEqual([]);
+    expect(validateCycleRules([{ start: '08:00', end: '12:00', breakMinutes: 240 }, null])).not.toEqual([]);
   });
 
   it('pairPunches: pares fecham, ímpar fica em aberto', () => {

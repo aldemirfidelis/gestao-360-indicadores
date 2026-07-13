@@ -230,3 +230,27 @@ tarefas para ocorrências críticas; comparação ponto × acessos (Segurança P
 4. REP-P: se a empresa pretende operar o Gestão 360 como REP-P oficial (implica INPI/atestado) ou
    como programa de tratamento recebendo AFD de REPs físicos — muda a prioridade da Etapa 6.
 5. Timezone por estabelecimento (necessário só se houver operação fora de UTC-3).
+
+---
+
+## Status de execução (atualizado em 2026-07-13)
+
+**ETAPA 1 — CONCLUÍDA** (commit `ef4963f`): feriados (CRUD + nacionais gerados + espelho),
+tolerância ±10min por marcação (decisão do negócio), jornada noturna atribuída ao dia da escala,
+vigência de escala congelada (snapshot), importação imutável, abrangência do gestor por área,
+fechamento versionado com reabertura justificada, deviceTime/deviceId/syncId na batida.
+
+**ETAPA 2 — CONCLUÍDA** (em conjunto com sessão paralela): NSR sequencial por empresa (contador
+atômico + backfill) e comprovante de marcação com snapshot persistido; escalas cíclicas
+(12x36/4x2/personalizadas, âncora por colaborador, worksHolidays p/ 12x36); memória de cálculo
+persistida (TimesheetCalculationMemory) + "Entenda este cálculo" na UI; tratamentos de batida
+(TimeClockEntryTreatment, ação EXCLUDE — cancelamento lógico sem alterar o registro bruto);
+modo TOTEM (identificação facial 1:N server-side): dispositivo autorizado com token rotacionável
+com expiração, challenge de uso único, geofence opcional, idempotência por syncId, página
+/ponto-totem fullscreen e gestão de totens na tela do ponto. O totem fica atrás da flag
+`PERSONNEL_KIOSK_ENABLED=true` (piloto controlado — reconhecimento facial sem PAD certificado
+não é antifraude; ver §Riscos legais). Endurecimento transversal: redação de dados sensíveis
+nos logs e interceptor de auditoria com corpo sanitizado.
+
+Próxima: **ETAPA 3** (Central de Ocorrências, ajustes granulares por tipo/abono, workflow de
+aprovação multi-nível, portal do colaborador mobile-first).

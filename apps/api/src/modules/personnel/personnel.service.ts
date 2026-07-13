@@ -1,7 +1,8 @@
-import { BadRequestException, ConflictException, Injectable, NotFoundException } from '@nestjs/common';
-import { Prisma } from '@prisma/client';
+import { BadRequestException, ConflictException, ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
+import { createHash } from 'crypto';
+import { Prisma, type TimeClockEntry } from '@prisma/client';
 import { PrismaService } from '../../prisma/prisma.service';
-import { AuditWriterService } from '../../common/audit/audit-writer.service';
+import { AuditWriterService, type AuditActor } from '../../common/audit/audit-writer.service';
 import { WorkItemEventBus } from '../my-day/work-item-event-bus';
 import { AccessService } from '../access/access.service';
 import { AuthPayload } from '../auth/auth.types';
@@ -12,7 +13,7 @@ import {
   chainHash,
   companyTimeToUtc,
   dayKeyFor,
-  dayRuleFor,
+  dayRuleFromSchedule,
   effectiveWorkedMinutes,
   enumerateDays,
   evaluateDay,
@@ -21,21 +22,33 @@ import {
   nationalHolidaysFor,
   parsePunchCsv,
   periodRefOf,
-  plannedMinutesFor,
+  plannedMinutesFromSchedule,
   previousMonthRef,
   ruleCrossesMidnight,
+  validateCycleRules,
   validateProposedTimes,
   validateWeeklyRules,
   weekdayOf,
-  type WeeklyRules,
+  type ScheduleRules,
+  type ToleranceMark,
 } from './time-clock.logic';
 
 const MODULE = 'personnel';
 /** Intervalo mínimo entre batidas do mesmo usuário (anti clique duplo). */
 const MIN_PUNCH_INTERVAL_MS = 60_000;
 const DEFAULT_TOLERANCE_MINUTES = 10;
+const CALCULATION_ALGORITHM_VERSION = 'journey-v2.1';
+const COMPANY_TIMEZONE = 'America/Sao_Paulo';
 
 type Tx = Prisma.TransactionClient;
+type PunchContext = {
+  ip?: string;
+  userAgent?: string;
+  verifiedBiometricAttemptId?: string;
+  sourceOverride?: 'FACIAL_KIOSK';
+  auditActor?: AuditActor;
+  createdById?: string | null;
+};
 
 @Injectable()
 export class PersonnelService {
@@ -49,17 +62,55 @@ export class PersonnelService {
 
   // ------------------------------ Batida ------------------------------
 
-  async punch(me: AuthPayload, body: any = {}, ctx?: { ip?: string; userAgent?: string; verifiedBiometricAttemptId?: string }) {
+  async punch(me: AuthPayload, body: any = {}, ctx?: PunchContext) {
+    const syncId = normalizeSyncId(body?.syncId);
+
+    // Retry após resposta perdida: devolve a mesma marcação antes de verificar
+    // fechamento da competência ou a janela anti-duplo-clique.
+    if (syncId) {
+      const existing = await this.prisma.timeClockEntry.findFirst({ where: { companyId: me.companyId, syncId } });
+      if (existing) return this.idempotentPunchResult(me, existing);
+    }
+
     const now = new Date();
     const dayKey = await this.attributedDayKeyFor(me.companyId, me.sub, now);
     await this.assertPeriodOpen(me.companyId, periodRefOf(dayKey));
 
-    const source = ctx?.verifiedBiometricAttemptId ? 'FACIAL' : (body?.source === 'MOBILE' ? 'MOBILE' : 'WEB');
+    const [company, user, profile] = await Promise.all([
+      this.prisma.company.findUnique({ where: { id: me.companyId }, select: { name: true, cnpj: true } }),
+      this.prisma.user.findFirst({
+        where: { id: me.sub, companyId: me.companyId, active: true, deletedAt: null },
+        select: { id: true, name: true, branchId: true },
+      }),
+      this.prisma.personnelEmployeeProfile.findFirst({
+        where: { companyId: me.companyId, userId: me.sub },
+        select: { cpf: true },
+        orderBy: { updatedAt: 'desc' },
+      }),
+    ]);
+    if (!user) throw new ForbiddenException('Colaborador inativo ou não encontrado.');
+    if (!company) throw new NotFoundException('Empresa não encontrada.');
+
+    const sequenceScope = user.branchId ?? `company:${me.companyId}`;
+    const source = ctx?.sourceOverride ?? (ctx?.verifiedBiometricAttemptId ? 'FACIAL' : body?.source === 'MOBILE' ? 'MOBILE' : 'WEB');
     const deviceTime = body?.deviceTime ? new Date(body.deviceTime) : null;
+    const deviceId = text(body?.deviceId)?.slice(0, 120) ?? null;
+
     // Serializa batidas simultâneas do mesmo colaborador no PostgreSQL para
-    // preservar a alternância IN/OUT e a cadeia de integridade.
-    const entry = await this.prisma.$transaction(async (tx) => {
-      await tx.$queryRaw`SELECT pg_advisory_xact_lock(hashtext(${`${me.companyId}:${me.sub}:time-clock`}))`;
+    // preservar alternância, idempotência e cadeia técnica de integridade.
+    const result = await this.prisma.$transaction(async (tx) => {
+      await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${`${me.companyId}:period:${periodRefOf(dayKey)}`}))`;
+      const lockedPeriod = await tx.timesheetPeriod.findUnique({
+        where: { companyId_periodRef: { companyId: me.companyId, periodRef: periodRefOf(dayKey) } },
+        select: { status: true },
+      });
+      if (lockedPeriod?.status === 'CLOSED') throw new ConflictException(`Competência ${periodRefOf(dayKey)} está fechada para batidas e ajustes.`);
+      await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${`${me.companyId}:${me.sub}:time-clock`}))`;
+      if (syncId) {
+        const existing = await tx.timeClockEntry.findFirst({ where: { companyId: me.companyId, syncId } });
+        if (existing) return { entry: existing, created: false };
+      }
+
       const lastEntry = await tx.timeClockEntry.findFirst({
         where: { companyId: me.companyId, userId: me.sub },
         orderBy: { createdAt: 'desc' },
@@ -68,34 +119,84 @@ export class PersonnelService {
       if (lastEntry?.status === 'VALID' && now.getTime() - lastEntry.punchedAt.getTime() < MIN_PUNCH_INTERVAL_MS) {
         throw new ConflictException('Batida registrada há menos de 1 minuto. Aguarde para registrar novamente.');
       }
-      const dayCount = await tx.timeClockEntry.count({ where: { companyId: me.companyId, userId: me.sub, dayKey, status: 'VALID' } });
+      const dayCount = await tx.timeClockEntry.count({
+        where: { companyId: me.companyId, userId: me.sub, dayKey, status: 'VALID', treatments: { none: { action: 'EXCLUDE' } } },
+      });
       const kind = dayCount % 2 === 0 ? 'IN' : 'OUT';
-      return tx.timeClockEntry.create({
+      const nsr = await this.nextNsr(tx, me.companyId, sequenceScope);
+      const hash = chainHash(lastEntry?.hash ?? null, `${me.sub}|${now.toISOString()}|${kind}|${source}|${sequenceScope}|${nsr}`);
+      const entry = await tx.timeClockEntry.create({
         data: {
-          companyId: me.companyId, userId: me.sub, punchedAt: now, dayKey, kind, source,
-          latitude: finiteOrNull(body?.latitude), longitude: finiteOrNull(body?.longitude), accuracy: finiteOrNull(body?.accuracy),
-          ip: ctx?.ip ?? null, userAgent: ctx?.userAgent?.slice(0, 500) ?? null, note: text(body?.note),
+          companyId: me.companyId,
+          userId: me.sub,
+          punchedAt: now,
+          dayKey,
+          kind,
+          source,
+          latitude: finiteOrNull(body?.latitude),
+          longitude: finiteOrNull(body?.longitude),
+          accuracy: finiteOrNull(body?.accuracy),
+          ip: ctx?.ip ?? null,
+          userAgent: ctx?.userAgent?.slice(0, 500) ?? null,
+          note: text(body?.note),
           biometricAttemptId: ctx?.verifiedBiometricAttemptId ?? null,
           deviceTime: deviceTime && !Number.isNaN(deviceTime.getTime()) ? deviceTime : null,
-          deviceId: text(body?.deviceId)?.slice(0, 120) ?? null,
+          deviceId,
+          syncId,
+          sequenceScope,
+          nsr,
           prevHash: lastEntry?.hash ?? null,
-          hash: chainHash(lastEntry?.hash ?? null, `${me.sub}|${now.toISOString()}|${kind}|${source}`),
-          createdById: me.sub,
+          hash,
+          createdById: ctx?.createdById === undefined ? me.sub : ctx.createdById,
+          receiptSnapshot: {
+            create: {
+              companyId: me.companyId,
+              companyName: company.name,
+              companyRegistrationMasked: maskRegistration(company.cnpj),
+              employeeName: user.name,
+              employeeRegistrationMasked: maskRegistration(profile?.cpf),
+              timezone: COMPANY_TIMEZONE,
+              snapshotOrigin: 'PUNCH',
+              checksum: sha256(`${me.companyId}|${me.sub}|${now.toISOString()}|${sequenceScope}|${nsr}|${hash}`),
+            },
+          },
         },
       });
+      return { entry, created: true };
     });
 
-    await this.audit.record(me, {
+    if (!result.created) return this.idempotentPunchResult(me, result.entry);
+
+    await this.audit.record(ctx?.auditActor ?? me, {
       module: MODULE,
       entity: 'TimeClockEntry',
-      entityId: entry.id,
+      entityId: result.entry.id,
       action: 'PUNCH',
-      message: `Batida ${entry.kind} em ${dayKey}`,
-      after: { dayKey, kind: entry.kind, source },
+      message: `Batida ${result.entry.kind} em ${dayKey} (registro interno ${result.entry.nsr})`,
+      after: { subjectUserId: me.sub, dayKey, kind: result.entry.kind, source, recordSequence: result.entry.nsr.toString(), deviceId },
     });
     this.workItems.markDirty(me.companyId, [me.sub], 'time-clock-punch');
 
-    return { entry, day: await this.buildMyDay(me, dayKey) };
+    return { entry: serializeEntry(result.entry), day: await this.buildMyDay(me, dayKey), idempotent: false };
+  }
+
+  private async idempotentPunchResult(me: AuthPayload, entry: TimeClockEntry) {
+    if (entry.companyId !== me.companyId || entry.userId !== me.sub) {
+      throw new ConflictException('Identificador de sincronização já utilizado.');
+    }
+    return { entry: serializeEntry(entry), day: await this.buildMyDay(me, entry.dayKey), idempotent: true };
+  }
+
+  /** Próxima sequência interna do escopo, alocada atomicamente na transação. */
+  private async nextNsr(tx: Tx, companyId: string, sequenceScope: string): Promise<bigint> {
+    const key = `time-clock-sequence:${sequenceScope}`;
+    const rows = await tx.$queryRaw<Array<{ value: bigint }>>`
+      INSERT INTO "personnel_counters" ("companyId", "key", "value")
+      VALUES (${companyId}, ${key}, 1)
+      ON CONFLICT ("companyId", "key") DO UPDATE SET "value" = "personnel_counters"."value" + 1
+      RETURNING "value"`;
+    if (!rows[0]) throw new Error('Falha ao alocar sequência interna da marcação.');
+    return rows[0].value;
   }
 
   /**
@@ -107,17 +208,19 @@ export class PersonnelService {
     const civilKey = dayKeyFor(now);
     const prevKey = addDays(civilKey, -1);
     const assignments = await this.assignmentsForRange(companyId, userId, prevKey, civilKey);
-    const prevRule = dayRuleFor(prevKey, this.resolveRule(assignments, userId, prevKey).rules);
+    const prevResolved = this.resolveRule(assignments, userId, prevKey);
+    const prevRule = dayRuleFromSchedule(prevKey, prevResolved.rules, prevResolved.cycleAnchorDay);
     if (!prevRule || !ruleCrossesMidnight(prevRule)) return civilKey;
 
     const shiftEnd = companyTimeToUtc(prevKey, prevRule.end).getTime() + 86_400_000;
     let cutoff = shiftEnd + 4 * 60 * 60_000;
-    const todayRule = dayRuleFor(civilKey, this.resolveRule(assignments, userId, civilKey).rules);
+    const todayResolved = this.resolveRule(assignments, userId, civilKey);
+    const todayRule = dayRuleFromSchedule(civilKey, todayResolved.rules, todayResolved.cycleAnchorDay);
     if (todayRule) cutoff = Math.min(cutoff, companyTimeToUtc(civilKey, todayRule.start).getTime() - 60_000);
     if (now.getTime() > cutoff) return civilKey;
 
     const prevCount = await this.prisma.timeClockEntry.count({
-      where: { companyId, userId, dayKey: prevKey, status: 'VALID' },
+      where: { companyId, userId, dayKey: prevKey, status: 'VALID', treatments: { none: { action: 'EXCLUDE' } } },
     });
     return prevCount % 2 === 1 ? prevKey : civilKey;
   }
@@ -153,11 +256,12 @@ export class PersonnelService {
           companyId: me.companyId,
           dayKey: { gte: extendedFrom, lte: extendedTo },
           status: 'VALID',
+          treatments: { none: { action: 'EXCLUDE' } },
           ...(visible ? { userId: { in: [...visible] } } : {}),
         },
         orderBy: { punchedAt: 'asc' },
       }),
-      this.assignmentsForRange(me.companyId, null, extendedFrom, dayKey),
+      this.assignmentsForRange(me.companyId, null, extendedFrom, extendedTo),
       this.vacations.coverageForUsers(me.companyId, visible ? [...visible] : null, dayKey, dayKey),
       this.holidayMap(me.companyId, extendedFrom, dayKey),
     ]);
@@ -262,9 +366,10 @@ export class PersonnelService {
     const emails = [...new Set(parsed.rows.map((row) => row.email))];
     const users = await this.prisma.user.findMany({
       where: { companyId: me.companyId, deletedAt: null, active: true },
-      select: { id: true, email: true },
+      select: { id: true, email: true, branchId: true },
     });
     const userByEmail = new Map(users.map((u) => [u.email.toLowerCase(), u.id]));
+    const branchByUser = new Map(users.map((u) => [u.id, u.branchId]));
     const unknownEmails = emails.filter((email) => !userByEmail.has(email));
     for (const email of unknownEmails) errors.push(`Colaborador não encontrado: ${email}`);
 
@@ -310,6 +415,16 @@ export class PersonnelService {
 
       await this.prisma.$transaction(
         async (tx) => {
+          const periodRefs = [...new Set(fresh.map((item) => periodRefOf(dayKeyFor(item))))].sort();
+          for (const ref of periodRefs) {
+            await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${`${me.companyId}:period:${ref}`}))`;
+          }
+          const closedDuringImport = await tx.timesheetPeriod.findFirst({
+            where: { companyId: me.companyId, periodRef: { in: periodRefs }, status: 'CLOSED' },
+            select: { periodRef: true },
+          });
+          if (closedDuringImport) throw new ConflictException(`Competência ${closedDuringImport.periodRef} foi fechada durante a importação.`);
+          await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${`${me.companyId}:${userId}:time-clock`}))`;
           const last = await tx.timeClockEntry.findFirst({
             where: { companyId: me.companyId, userId },
             orderBy: { createdAt: 'desc' },
@@ -321,16 +436,32 @@ export class PersonnelService {
           const freshDays = [...new Set(fresh.map((t) => dayKeyFor(t)))];
           const existingCounts = await tx.timeClockEntry.groupBy({
             by: ['dayKey'],
-            where: { companyId: me.companyId, userId, dayKey: { in: freshDays }, status: 'VALID' },
+            where: {
+              companyId: me.companyId,
+              userId,
+              dayKey: { in: freshDays },
+              status: 'VALID',
+              treatments: { none: { action: 'EXCLUDE' } },
+            },
             _count: { _all: true },
           });
           const dayCounts = new Map(existingCounts.map((row) => [row.dayKey, row._count._all]));
+          const sequenceScope = branchByUser.get(userId) ?? `company:${me.companyId}`;
           for (const punchedAt of fresh) {
+            const duplicate = await tx.timeClockEntry.findFirst({
+              where: { companyId: me.companyId, userId, punchedAt },
+              select: { id: true },
+            });
+            if (duplicate) {
+              duplicates += 1;
+              continue;
+            }
             const dayKey = dayKeyFor(punchedAt);
             const seq = dayCounts.get(dayKey) ?? 0;
             dayCounts.set(dayKey, seq + 1);
             const kind = seq % 2 === 0 ? 'IN' : 'OUT';
-            const hash = chainHash(prevHash, `${userId}|${punchedAt.toISOString()}|${kind}|IMPORT`);
+            const nsr = await this.nextNsr(tx, me.companyId, sequenceScope);
+            const hash = chainHash(prevHash, `${userId}|${punchedAt.toISOString()}|${kind}|IMPORT|${sequenceScope}|${nsr}`);
             await tx.timeClockEntry.create({
               data: {
                 companyId: me.companyId,
@@ -339,6 +470,9 @@ export class PersonnelService {
                 dayKey,
                 kind,
                 source: 'IMPORT',
+                syncId: `import:${sha256(`${me.companyId}|${userId}|${punchedAt.toISOString()}`)}`,
+                sequenceScope,
+                nsr,
                 prevHash,
                 hash,
                 createdById: me.sub,
@@ -378,19 +512,27 @@ export class PersonnelService {
     const reason = text(body?.reason);
     if (!reason) throw new BadRequestException('Motivo do ajuste é obrigatório.');
 
-    const existing = await this.prisma.timeAdjustmentRequest.findFirst({
-      where: { companyId: me.companyId, userId: me.sub, dayKey, status: 'REQUESTED' },
-    });
-    if (existing) throw new ConflictException('Já existe uma solicitação pendente para este dia.');
-
-    const request = await this.prisma.timeAdjustmentRequest.create({
-      data: {
-        companyId: me.companyId,
-        userId: me.sub,
-        dayKey,
-        proposedTimes: body.proposedTimes,
-        reason,
-      },
+    const request = await this.prisma.$transaction(async (tx) => {
+      await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${`${me.companyId}:period:${periodRefOf(dayKey)}`}))`;
+      await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${`${me.companyId}:${me.sub}:adjustment:${dayKey}`}))`;
+      const period = await tx.timesheetPeriod.findUnique({
+        where: { companyId_periodRef: { companyId: me.companyId, periodRef: periodRefOf(dayKey) } },
+        select: { status: true },
+      });
+      if (period?.status === 'CLOSED') throw new ConflictException(`Competência ${periodRefOf(dayKey)} está fechada para ajustes.`);
+      const existing = await tx.timeAdjustmentRequest.findFirst({
+        where: { companyId: me.companyId, userId: me.sub, dayKey, status: 'REQUESTED' },
+      });
+      if (existing) throw new ConflictException('Já existe uma solicitação pendente para este dia.');
+      return tx.timeAdjustmentRequest.create({
+        data: {
+          companyId: me.companyId,
+          userId: me.sub,
+          dayKey,
+          proposedTimes: body.proposedTimes,
+          reason,
+        },
+      });
     });
     await this.audit.record(me, {
       module: MODULE,
@@ -432,11 +574,21 @@ export class PersonnelService {
     if (action === 'reject' && !note) throw new BadRequestException('Justificativa é obrigatória para rejeitar.');
 
     const decided = await this.prisma.$transaction(async (tx) => {
+      await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${`${me.companyId}:period:${periodRefOf(request.dayKey)}`}))`;
+      const lockedPeriod = await tx.timesheetPeriod.findUnique({
+        where: { companyId_periodRef: { companyId: me.companyId, periodRef: periodRefOf(request.dayKey) } },
+        select: { status: true },
+      });
+      if (lockedPeriod?.status === 'CLOSED') throw new ConflictException(`Competência ${periodRefOf(request.dayKey)} está fechada para ajustes.`);
+      await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${`${me.companyId}:adjustment:${request.id}`}))`;
+      const current = await tx.timeAdjustmentRequest.findUnique({ where: { id: request.id } });
+      if (!current || current.companyId !== me.companyId) throw new NotFoundException('Solicitação de ajuste não encontrada.');
+      if (current.status !== 'REQUESTED') throw new ConflictException('Esta solicitação já foi decidida.');
       if (action === 'approve') {
-        await this.applyAdjustmentTx(tx, me, request);
+        await this.applyAdjustmentTx(tx, me, current);
       }
       return tx.timeAdjustmentRequest.update({
-        where: { id: request.id },
+        where: { id: current.id },
         data: {
           status: action === 'approve' ? 'APPROVED' : 'REJECTED',
           decidedById: me.sub,
@@ -459,23 +611,50 @@ export class PersonnelService {
     return decided;
   }
 
-  /** Aprovação: cancela as batidas VÁLIDAS do dia e recria como MANUAL, mantendo a cadeia de hash. */
+  /** Aprovação: preserva as batidas brutas, cria tratamentos EXCLUDE e novas entradas MANUAL. */
   private async applyAdjustmentTx(tx: Tx, me: AuthPayload, request: { id: string; userId: string; dayKey: string; proposedTimes: unknown }) {
-    await tx.timeClockEntry.updateMany({
-      where: { companyId: me.companyId, userId: request.userId, dayKey: request.dayKey, status: 'VALID' },
-      data: { status: 'CANCELLED' },
+    await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${`${me.companyId}:${request.userId}:time-clock`}))`;
+    const originals = await tx.timeClockEntry.findMany({
+      where: {
+        companyId: me.companyId,
+        userId: request.userId,
+        dayKey: request.dayKey,
+        status: 'VALID',
+        treatments: { none: { action: 'EXCLUDE' } },
+      },
+      select: { id: true },
     });
+    if (originals.length) {
+      await tx.timeClockEntryTreatment.createMany({
+        data: originals.map((entry) => ({
+          companyId: me.companyId,
+          entryId: entry.id,
+          adjustmentRequestId: request.id,
+          action: 'EXCLUDE',
+          reason: `Substituída na apuração pelo ajuste ${request.id.slice(0, 8)}`,
+          createdById: me.sub,
+        })),
+        skipDuplicates: true,
+      });
+    }
     const last = await tx.timeClockEntry.findFirst({
       where: { companyId: me.companyId, userId: request.userId },
       orderBy: { createdAt: 'desc' },
       select: { hash: true },
     });
+    const user = await tx.user.findFirst({
+      where: { id: request.userId, companyId: me.companyId },
+      select: { branchId: true },
+    });
+    if (!user) throw new NotFoundException('Colaborador não encontrado.');
+    const sequenceScope = user.branchId ?? `company:${me.companyId}`;
     let prevHash = last?.hash ?? null;
     const times = (request.proposedTimes as string[]) ?? [];
     for (let i = 0; i < times.length; i++) {
       const punchedAt = companyTimeToUtc(request.dayKey, times[i]);
       const kind = i % 2 === 0 ? 'IN' : 'OUT';
-      const hash = chainHash(prevHash, `${request.userId}|${punchedAt.toISOString()}|${kind}|MANUAL`);
+      const nsr = await this.nextNsr(tx, me.companyId, sequenceScope);
+      const hash = chainHash(prevHash, `${request.userId}|${punchedAt.toISOString()}|${kind}|MANUAL|${sequenceScope}|${nsr}`);
       await tx.timeClockEntry.create({
         data: {
           companyId: me.companyId,
@@ -485,6 +664,8 @@ export class PersonnelService {
           kind,
           source: 'MANUAL',
           note: `Ajuste aprovado (solicitação ${request.id.slice(0, 8)})`,
+          sequenceScope,
+          nsr,
           prevHash,
           hash,
           adjustmentRequestId: request.id,
@@ -516,8 +697,14 @@ export class PersonnelService {
   async createTemplate(me: AuthPayload, body: any = {}) {
     const name = text(body?.name);
     if (!name) throw new BadRequestException('Nome da escala é obrigatório.');
-    const errors = validateWeeklyRules(body?.weeklyRules);
-    if (errors.length) throw new BadRequestException(`Regras inválidas: ${errors.join('; ')}`);
+    const kind = body?.kind === 'CYCLE' ? 'CYCLE' : 'WEEKLY';
+    if (kind === 'CYCLE') {
+      const errors = validateCycleRules(body?.cycleRules);
+      if (errors.length) throw new BadRequestException(`Ciclo inválido: ${errors.join('; ')}`);
+    } else {
+      const errors = validateWeeklyRules(body?.weeklyRules);
+      if (errors.length) throw new BadRequestException(`Regras inválidas: ${errors.join('; ')}`);
+    }
     const toleranceMinutes = clampInt(body?.toleranceMinutes, 0, 120, DEFAULT_TOLERANCE_MINUTES);
 
     try {
@@ -527,7 +714,10 @@ export class PersonnelService {
           name,
           description: text(body?.description),
           toleranceMinutes,
-          weeklyRules: body.weeklyRules,
+          kind,
+          weeklyRules: kind === 'WEEKLY' ? body.weeklyRules : {},
+          cycleRules: kind === 'CYCLE' ? body.cycleRules : Prisma.DbNull,
+          worksHolidays: booleanValue(body?.worksHolidays, false),
           createdById: me.sub,
         },
       });
@@ -562,7 +752,13 @@ export class PersonnelService {
       if (errors.length) throw new BadRequestException(`Regras inválidas: ${errors.join('; ')}`);
       data.weeklyRules = patch.weeklyRules;
     }
-    if ('active' in patch) data.active = Boolean(patch.active);
+    if ('cycleRules' in patch && before.kind === 'CYCLE') {
+      const errors = validateCycleRules(patch.cycleRules);
+      if (errors.length) throw new BadRequestException(`Ciclo inválido: ${errors.join('; ')}`);
+      data.cycleRules = patch.cycleRules;
+    }
+    if ('worksHolidays' in patch) data.worksHolidays = booleanValue(patch.worksHolidays, before.worksHolidays);
+    if ('active' in patch) data.active = booleanValue(patch.active, before.active);
     const updated = await this.prisma.workShiftTemplate.update({ where: { id }, data });
     await this.audit.record(me, {
       module: MODULE,
@@ -585,11 +781,26 @@ export class PersonnelService {
       where: { id: templateId, companyId: me.companyId, deletedAt: null, active: true },
     });
     if (!template) throw new NotFoundException('Escala não encontrada ou inativa.');
+    const cycleAnchorDay = text(body?.cycleAnchorDay);
+    if (template.kind === 'CYCLE') {
+      if (!cycleAnchorDay || !isValidDayKey(cycleAnchorDay)) {
+        throw new BadRequestException('Informe o primeiro dia de trabalho do ciclo (data âncora) para escalas cíclicas.');
+      }
+    }
     const users = await this.prisma.user.findMany({
       where: { id: { in: userIds }, companyId: me.companyId, deletedAt: null, active: true },
       select: { id: true },
     });
     if (users.length !== userIds.length) throw new NotFoundException('Um ou mais colaboradores não foram encontrados.');
+
+    // Congela a vigência: o cálculo usa este snapshot, não o template vivo.
+    const rulesSnapshot = (
+      template.kind === 'CYCLE'
+        ? { kind: 'CYCLE', cycle: template.cycleRules, worksHolidays: template.worksHolidays }
+        : template.worksHolidays
+          ? { ...(template.weeklyRules as Record<string, unknown>), worksHolidays: true }
+          : template.weeklyRules
+    ) as Prisma.InputJsonValue;
 
     const startsAt = new Date();
     await this.prisma.$transaction(async (tx) => {
@@ -603,9 +814,9 @@ export class PersonnelService {
           userId,
           templateId,
           startsAt,
-          // Congela a vigência: o cálculo usa este snapshot, não o template vivo.
-          rulesSnapshot: template.weeklyRules as Prisma.InputJsonValue,
+          rulesSnapshot,
           toleranceSnapshot: template.toleranceMinutes,
+          cycleAnchorDay: template.kind === 'CYCLE' ? cycleAnchorDay : null,
           createdById: me.sub,
         })),
       });
@@ -616,7 +827,14 @@ export class PersonnelService {
       entityId: templateId,
       action: 'ASSIGN',
       message: `Escala "${template.name}" atribuída a ${userIds.length} colaborador(es)`,
-      after: { templateId, userIds },
+      after: {
+        templateId,
+        templateKind: template.kind,
+        userIds,
+        cycleAnchorDay: template.kind === 'CYCLE' ? cycleAnchorDay : null,
+        toleranceSnapshot: template.toleranceMinutes,
+        rulesSnapshot,
+      },
     });
     return { assigned: userIds.length };
   }
@@ -625,7 +843,11 @@ export class PersonnelService {
     const visible = await this.visibleUserIdsFor(me);
     const assignments = await this.prisma.workScheduleAssignment.findMany({
       where: { companyId: me.companyId, endsAt: null, ...(visible ? { userId: { in: [...visible] } } : {}) },
-      include: { template: { select: { id: true, name: true, toleranceMinutes: true } } },
+      include: {
+        template: {
+          select: { id: true, name: true, kind: true, toleranceMinutes: true, cycleRules: true, worksHolidays: true },
+        },
+      },
       orderBy: { startsAt: 'desc' },
       take: 500,
     });
@@ -737,16 +959,19 @@ export class PersonnelService {
     this.assertPeriodRef(ref);
     const currentRef = periodRefOf(dayKeyFor(new Date()));
     if (ref > currentRef) throw new BadRequestException('Não é possível fechar uma competência futura.');
-    // Consolida o mês por colaborador: é o que alimenta o banco de horas
-    // acumulado e o relatório para a folha sem recalcular meses fechados.
-    const totals = await this.computeMonthTotals(me.companyId, ref);
     // Fechamento transacional e versionado: cada fechamento gera uma versão
     // imutável do consolidado (reabrir + fechar de novo não apaga o anterior).
-    const period = await this.prisma.$transaction(async (tx) => {
+    const { period, totals } = await this.prisma.$transaction(async (tx) => {
+      // O mesmo lock é adquirido por batidas/importações/ajustes. Enquanto o
+      // snapshot é calculado, nenhum writer do módulo entra na competência.
+      await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${`${me.companyId}:period:${ref}`}))`;
       const existing = await tx.timesheetPeriod.findUnique({
         where: { companyId_periodRef: { companyId: me.companyId, periodRef: ref } },
       });
       if (existing?.status === 'CLOSED') throw new ConflictException('Competência já está fechada.');
+      // Consolida o mês por colaborador: alimenta banco de horas e folha sem
+      // recalcular versões fechadas.
+      const totals = await this.computeMonthTotals(me.companyId, ref);
       const version = (existing?.version ?? 0) + 1;
       const saved = await tx.timesheetPeriod.upsert({
         where: { companyId_periodRef: { companyId: me.companyId, periodRef: ref } },
@@ -764,8 +989,8 @@ export class PersonnelService {
       await tx.timesheetPeriodVersion.create({
         data: { companyId: me.companyId, periodRef: ref, version, totals, closedById: me.sub },
       });
-      return saved;
-    });
+      return { period: saved, totals };
+    }, { timeout: 120_000, maxWait: 15_000 });
     await this.audit.record(me, {
       module: MODULE,
       entity: 'TimesheetPeriod',
@@ -784,7 +1009,7 @@ export class PersonnelService {
     const to = last > today ? today : last;
     const [entryUsers, assignmentUsers] = await Promise.all([
       this.prisma.timeClockEntry.findMany({
-        where: { companyId, dayKey: { gte: first, lte: to }, status: 'VALID' },
+        where: { companyId, dayKey: { gte: first, lte: to }, status: 'VALID', treatments: { none: { action: 'EXCLUDE' } } },
         select: { userId: true },
         distinct: ['userId'],
       }),
@@ -876,13 +1101,18 @@ export class PersonnelService {
     });
     if (!period || period.status !== 'CLOSED') throw new ConflictException('Competência não está fechada.');
     const reopened = await this.prisma.$transaction(async (tx) => {
+      await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${`${me.companyId}:period:${ref}`}))`;
+      const current = await tx.timesheetPeriod.findUnique({
+        where: { companyId_periodRef: { companyId: me.companyId, periodRef: ref } },
+      });
+      if (!current || current.status !== 'CLOSED') throw new ConflictException('Competência não está fechada.');
       const updated = await tx.timesheetPeriod.update({
-        where: { id: period.id },
+        where: { id: current.id },
         data: { status: 'OPEN' },
       });
       // Registra quem/quando/por quê na versão que estava vigente.
       await tx.timesheetPeriodVersion.updateMany({
-        where: { companyId: me.companyId, periodRef: ref, version: period.version },
+        where: { companyId: me.companyId, periodRef: ref, version: current.version },
         data: { reopenedById: me.sub, reopenedAt: new Date(), reopenNote: note },
       });
       return updated;
@@ -923,10 +1153,16 @@ export class PersonnelService {
     const extendedTo = addDays(toKey, 1);
     const [entries, assignments, adjustments, coverageMap, holidays] = await Promise.all([
       this.prisma.timeClockEntry.findMany({
-        where: { companyId, userId, dayKey: { gte: extendedFrom, lte: extendedTo }, status: 'VALID' },
+        where: {
+          companyId,
+          userId,
+          dayKey: { gte: extendedFrom, lte: extendedTo },
+          status: 'VALID',
+          treatments: { none: { action: 'EXCLUDE' } },
+        },
         orderBy: { punchedAt: 'asc' },
       }),
-      this.assignmentsForRange(companyId, userId, extendedFrom, toKey),
+      this.assignmentsForRange(companyId, userId, extendedFrom, extendedTo),
       this.prisma.timeAdjustmentRequest.findMany({
         where: { companyId, userId, dayKey: { gte: fromKey, lte: toKey } },
         orderBy: { createdAt: 'desc' },
@@ -984,12 +1220,16 @@ export class PersonnelService {
       }
       return resolved;
     };
+    const dayRuleAt = (dayKey: string) => {
+      const resolved = resolvedFor(dayKey);
+      return dayRuleFromSchedule(dayKey, resolved.rules, resolved.cycleAnchorDay);
+    };
 
     const attributed = attributePunches({
       days: enumerateDays(addDays(fromKey, -1), toKey),
       byCivilDay,
       timeOf: (entry) => entry.punchedAt,
-      ruleFor: (dayKey) => dayRuleFor(dayKey, resolvedFor(dayKey).rules),
+      ruleFor: dayRuleAt,
     });
 
     return enumerateDays(fromKey, toKey).map((dayKey) => {
@@ -997,12 +1237,14 @@ export class PersonnelService {
       const coverage = coverageDays.get(dayKey) ?? null;
       const holidayName = holidays.get(dayKey) ?? null;
       const resolved = resolvedFor(dayKey);
-      const abonado = Boolean(coverage) || Boolean(holidayName);
-      const plannedMinutes = abonado ? 0 : plannedMinutesFor(dayKey, resolved.rules);
-      const { workedMinutes, open } = effectiveWorkedMinutes({
+      // Algumas escalas autorizadas mantêm a jornada prevista em feriados.
+      const holidayCounts = Boolean(holidayName) && !resolved.worksHolidays;
+      const abonado = Boolean(coverage) || holidayCounts;
+      const plannedMinutes = abonado ? 0 : plannedMinutesFromSchedule(dayKey, resolved.rules, resolved.cycleAnchorDay);
+      const { workedMinutes, open, marks } = effectiveWorkedMinutes({
         punches: dayEntries.map((entry) => entry.punchedAt),
         dayKey,
-        rule: abonado ? null : dayRuleFor(dayKey, resolved.rules),
+        rule: abonado ? null : dayRuleAt(dayKey),
         toleranceMinutes: resolved.toleranceMinutes,
       });
       const evaluation = evaluateDay({
@@ -1012,7 +1254,7 @@ export class PersonnelService {
         isToday: dayKey === today,
         hasOpenPair: open,
         coverage,
-        isHoliday: Boolean(holidayName),
+        isHoliday: holidayCounts,
       });
       const adjustment = adjustmentByDay?.get(dayKey);
       return {
@@ -1025,6 +1267,7 @@ export class PersonnelService {
         ...evaluation,
         adjustment: adjustment ? { id: adjustment.id, status: adjustment.status, reason: adjustment.reason } : null,
         entries: dayEntries.map((entry, index) => publicEntry(entry, index)),
+        toleranceMarks: marks,
       };
     });
   }
@@ -1073,27 +1316,317 @@ export class PersonnelService {
         startsAt: { lte: to },
         OR: [{ endsAt: null }, { endsAt: { gte: from } }],
       },
-      include: { template: { select: { weeklyRules: true, toleranceMinutes: true, active: true } } },
+      include: { template: { select: { name: true, kind: true, weeklyRules: true, toleranceMinutes: true, active: true } } },
       orderBy: { startsAt: 'desc' },
     });
   }
 
+  // ------------------------------ Comprovante e memória de cálculo ------------------------------
+
+  /** Dados imutáveis do extrato interno. Não é comprovante REP-P assinado/certificado. */
+  async punchReceipt(me: AuthPayload, entryId: string) {
+    const entry = await this.prisma.timeClockEntry.findFirst({
+      where: { id: entryId, companyId: me.companyId, userId: me.sub },
+      include: { receiptSnapshot: true },
+    });
+    if (!entry) throw new NotFoundException('Batida não encontrada.');
+    let snapshot = entry.receiptSnapshot;
+    if (!snapshot) {
+      const [company, user, profile] = await Promise.all([
+        this.prisma.company.findUnique({ where: { id: me.companyId }, select: { name: true, cnpj: true } }),
+        this.prisma.user.findUnique({ where: { id: me.sub }, select: { name: true } }),
+        this.prisma.personnelEmployeeProfile.findFirst({
+          where: { companyId: me.companyId, userId: me.sub },
+          select: { cpf: true },
+          orderBy: { updatedAt: 'desc' },
+        }),
+      ]);
+      if (!company || !user) throw new NotFoundException('Dados cadastrais da marcação não encontrados.');
+      snapshot = await this.prisma.timeClockReceiptSnapshot.upsert({
+        where: { entryId: entry.id },
+        create: {
+          companyId: me.companyId,
+          entryId: entry.id,
+          companyName: company.name,
+          companyRegistrationMasked: maskRegistration(company.cnpj),
+          employeeName: user.name,
+          employeeRegistrationMasked: maskRegistration(profile?.cpf),
+          timezone: COMPANY_TIMEZONE,
+          snapshotOrigin: 'ON_DEMAND_LEGACY',
+          checksum: sha256(`${entry.id}|${entry.hash}|${entry.punchedAt.toISOString()}|${entry.sequenceScope}|${entry.nsr}`),
+        },
+        update: {},
+      });
+    }
+    await this.audit.record(me, {
+      module: MODULE,
+      entity: 'TimeClockEntry',
+      entityId: entry.id,
+      action: 'INTERNAL_RECORD_EXTRACT',
+      message: `Extrato interno da marcação ${entry.nsr} emitido`,
+    });
+    return {
+      documentType: 'INTERNAL_TIME_RECORD_EXTRACT',
+      legalNotice: 'Extrato interno de marcação. Não substitui comprovante REP-P assinado nem comprova certificação legal do sistema.',
+      company: { name: snapshot.companyName, registrationMasked: snapshot.companyRegistrationMasked },
+      employee: { name: snapshot.employeeName, registrationMasked: snapshot.employeeRegistrationMasked },
+      entry: {
+        id: entry.id,
+        dayKey: entry.dayKey,
+        punchedAt: entry.punchedAt,
+        recordedAt: entry.createdAt,
+        kind: entry.kind,
+        source: entry.source,
+        nsr: entry.nsr.toString(),
+        recordSequence: entry.nsr.toString(),
+      },
+      snapshot: {
+        capturedAt: snapshot.capturedAt,
+        origin: snapshot.snapshotOrigin,
+        timezone: snapshot.timezone,
+        checksum: snapshot.checksum,
+      },
+      generatedAt: new Date(),
+    };
+  }
+
+  /**
+   * "Entenda este cálculo": memória de cálculo do dia, reproduzível a partir
+   * das mesmas funções puras usadas no espelho (batidas consideradas e
+   * desconsideradas, regra/vigência aplicada, tolerâncias, pares e saldo).
+   */
+  async explainDay(me: AuthPayload, targetUserId: string, dayKey: string) {
+    if (!isValidDayKey(dayKey)) throw new BadRequestException('Dia inválido (use YYYY-MM-DD).');
+    await this.assertCanViewTimesheetUser(me, targetUserId);
+    const extendedFrom = addDays(dayKey, -1);
+    const extendedTo = addDays(dayKey, 1);
+    const [entries, cancelled, assignments, coverageMap, holidays, user] = await Promise.all([
+      this.prisma.timeClockEntry.findMany({
+        where: {
+          companyId: me.companyId,
+          userId: targetUserId,
+          dayKey: { gte: extendedFrom, lte: extendedTo },
+          status: 'VALID',
+          treatments: { none: { action: 'EXCLUDE' } },
+        },
+        orderBy: { punchedAt: 'asc' },
+      }),
+      this.prisma.timeClockEntry.findMany({
+        where: {
+          companyId: me.companyId,
+          userId: targetUserId,
+          dayKey,
+          OR: [{ status: 'CANCELLED' }, { treatments: { some: { action: 'EXCLUDE' } } }],
+        },
+        include: { treatments: { where: { action: 'EXCLUDE' }, orderBy: { createdAt: 'desc' }, take: 1 } },
+        orderBy: { punchedAt: 'asc' },
+      }),
+      this.assignmentsForRange(me.companyId, targetUserId, extendedFrom, extendedTo),
+      this.vacations.coverageForUsers(me.companyId, [targetUserId], dayKey, dayKey),
+      this.holidayMap(me.companyId, extendedFrom, dayKey),
+      this.prisma.user.findFirst({ where: { id: targetUserId, companyId: me.companyId }, select: { id: true, name: true } }),
+    ]);
+    if (!user) throw new NotFoundException('Colaborador não encontrado.');
+
+    const day = this.composeUserDays({
+      userId: targetUserId,
+      fromKey: dayKey,
+      toKey: dayKey,
+      entries,
+      assignments,
+      holidays,
+      coverageDays: coverageMap.get(targetUserId) ?? new Map<string, DayCoverage>(),
+    })[0];
+
+    const resolved = this.resolveRule(assignments, targetUserId, dayKey);
+    const rule = dayRuleFromSchedule(dayKey, resolved.rules, resolved.cycleAnchorDay);
+    const dayStart = companyTimeToUtc(dayKey, '00:00');
+    const assignment = assignments.find(
+      (a) => a.userId === targetUserId && a.startsAt.getTime() <= dayStart.getTime() + 86_399_000 && (!a.endsAt || a.endsAt.getTime() >= dayStart.getTime()),
+    );
+
+    const marks = (day as { toleranceMarks?: ToleranceMark[] }).toleranceMarks ?? [];
+    const fmt = (date: Date) => formatCompanyTime(date);
+    const pairs: string[] = [];
+    const effective = marks.map((mark) => mark.effective);
+    for (let i = 0; i + 1 < effective.length; i += 2) {
+      const minutes = Math.round((effective[i + 1].getTime() - effective[i].getTime()) / 60_000);
+      pairs.push(`${fmt(effective[i])} → ${fmt(effective[i + 1])} = ${minutes} min`);
+    }
+
+    const steps: string[] = [];
+    if (assignment) {
+      const kindLabel = assignment.template.kind === 'CYCLE' ? 'ciclo' : 'semanal';
+      steps.push(
+        `Escala vigente: "${assignment.template.name}" (${kindLabel}, vigência desde ${fmt(assignment.startsAt)}` +
+          `${resolved.cycleAnchorDay ? `, âncora do ciclo em ${resolved.cycleAnchorDay}` : ''}). ` +
+          (rule ? `Regra do dia: ${rule.start}–${rule.end}${rule.breakMinutes ? ` com ${rule.breakMinutes} min de intervalo` : ''}, tolerância de ±${resolved.toleranceMinutes} min por marcação.` : 'Dia de folga na escala.'),
+      );
+    } else {
+      steps.push('Sem escala vigente para este dia: não há jornada prevista.');
+    }
+    if (day.holiday) {
+      steps.push(
+        resolved.worksHolidays
+          ? `Feriado "${day.holiday}", mas esta escala trabalha normalmente em feriados (ex.: 12x36) — jornada prevista mantida.`
+          : `Feriado "${day.holiday}": jornada prevista zerada (ausência não é falta; trabalho vira crédito).`,
+      );
+    }
+    if (day.status === 'VACATION') steps.push('Dia coberto por férias aprovadas: jornada abonada (saldo 0).');
+    if (day.status === 'LEAVE') steps.push('Dia coberto por afastamento/atestado: jornada abonada (saldo 0).');
+    if (marks.length) {
+      const described = marks.map((mark, index) => {
+        const base = `${index + 1}ª ${mark.role === 'ENTRADA' ? 'entrada' : mark.role === 'SAIDA' ? 'saída' : 'marcação'}: ${fmt(mark.original)}`;
+        return mark.clamped ? `${base} → considerada ${fmt(mark.effective)} (dentro da janela de tolerância)` : base;
+      });
+      steps.push(`Batidas consideradas (${marks.length}): ${described.join('; ')}.`);
+    } else {
+      steps.push('Nenhuma batida válida no dia.');
+    }
+    if (cancelled.length) {
+      steps.push(
+        `Batidas desconsideradas na apuração (${cancelled.length}, por tratamento de ajuste aprovado): ${cancelled.map((c) => fmt(c.punchedAt)).join(', ')}. O registro bruto original permanece imutável.`,
+      );
+    }
+    if (pairs.length) steps.push(`Pareamento entrada/saída: ${pairs.join(' + ')} ⇒ ${day.workedMinutes} min trabalhados.`);
+    steps.push(
+      `Previsto ${day.plannedMinutes} min · trabalhado ${day.workedMinutes} min ⇒ saldo ${day.balanceMinutes >= 0 ? '+' : ''}${day.balanceMinutes} min (situação: ${day.status}).`,
+    );
+
+    const response = {
+      dayKey,
+      user,
+      schedule: assignment
+        ? { name: assignment.template.name, kind: assignment.template.kind, toleranceMinutes: resolved.toleranceMinutes, cycleAnchorDay: resolved.cycleAnchorDay, rule }
+        : null,
+      holiday: day.holiday,
+      status: day.status,
+      plannedMinutes: day.plannedMinutes,
+      workedMinutes: day.workedMinutes,
+      balanceMinutes: day.balanceMinutes,
+      consideredEntries: (day.entries as Array<Record<string, unknown>>).map((entry, index) => ({
+        ...entry,
+        original: marks[index]?.original ?? null,
+        effective: marks[index]?.effective ?? null,
+        clamped: marks[index]?.clamped ?? false,
+      })),
+      cancelledEntries: cancelled.map((entry, index) => ({
+        ...publicEntry(entry, index),
+        treatmentReason: entry.treatments[0]?.reason ?? (entry.status === 'CANCELLED' ? 'Tratamento legado' : null),
+      })),
+      pairs,
+      steps,
+    };
+
+    const inputHash = sha256(
+      stableJson({
+        algorithmVersion: CALCULATION_ALGORITHM_VERSION,
+        dayKey,
+        entries: entries.map((entry) => ({
+          id: entry.id,
+          punchedAt: entry.punchedAt,
+          hash: entry.hash,
+          status: entry.status,
+          nsr: entry.nsr,
+        })),
+        excluded: cancelled.map((entry) => ({
+          id: entry.id,
+          status: entry.status,
+          treatments: entry.treatments.map((item) => ({ id: item.id, requestId: item.adjustmentRequestId, createdAt: item.createdAt })),
+        })),
+        assignments: assignments.map((item) => ({
+          id: item.id,
+          startsAt: item.startsAt,
+          endsAt: item.endsAt,
+          rulesSnapshot: item.rulesSnapshot,
+          toleranceSnapshot: item.toleranceSnapshot,
+          cycleAnchorDay: item.cycleAnchorDay,
+        })),
+        holiday: day.holiday,
+        status: day.status,
+        plannedMinutes: day.plannedMinutes,
+        workedMinutes: day.workedMinutes,
+        balanceMinutes: day.balanceMinutes,
+      }),
+    );
+    const snapshot = jsonValue(response);
+    const memory = await this.prisma.timesheetCalculationMemory.upsert({
+      where: {
+        companyId_userId_dayKey_algorithmVersion_inputHash: {
+          companyId: me.companyId,
+          userId: targetUserId,
+          dayKey,
+          algorithmVersion: CALCULATION_ALGORITHM_VERSION,
+          inputHash,
+        },
+      },
+      create: {
+        companyId: me.companyId,
+        userId: targetUserId,
+        dayKey,
+        algorithmVersion: CALCULATION_ALGORITHM_VERSION,
+        inputHash,
+        snapshot,
+        calculatedById: me.sub,
+      },
+      update: {},
+      select: { id: true, algorithmVersion: true, inputHash: true, calculatedAt: true },
+    });
+
+    return { ...response, memory };
+  }
+
   private resolveRule(
-    assignments: Array<{ userId: string; startsAt: Date; endsAt: Date | null; rulesSnapshot?: unknown; toleranceSnapshot?: number | null; template: { weeklyRules: unknown; toleranceMinutes: number } }>,
+    assignments: Array<{
+      userId: string;
+      startsAt: Date;
+      endsAt: Date | null;
+      rulesSnapshot?: unknown;
+      toleranceSnapshot?: number | null;
+      cycleAnchorDay?: string | null;
+      template: { weeklyRules: unknown; toleranceMinutes: number };
+    }>,
     userId: string,
     dayKey: string,
-  ): { rules: WeeklyRules | null; toleranceMinutes: number; hasSchedule: boolean } {
+  ): { rules: ScheduleRules | null; toleranceMinutes: number; hasSchedule: boolean; cycleAnchorDay: string | null; worksHolidays: boolean } {
     const dayStart = companyTimeToUtc(dayKey, '00:00');
     const match = assignments.find(
       (a) => a.userId === userId && a.startsAt.getTime() <= dayStart.getTime() + 86_399_000 && (!a.endsAt || a.endsAt.getTime() >= dayStart.getTime()),
     );
-    if (!match) return { rules: null, toleranceMinutes: DEFAULT_TOLERANCE_MINUTES, hasSchedule: false };
+    if (!match) {
+      return { rules: null, toleranceMinutes: DEFAULT_TOLERANCE_MINUTES, hasSchedule: false, cycleAnchorDay: null, worksHolidays: false };
+    }
     // O snapshot congela a vigência: editar o template não reescreve o passado.
+    const rules = (match.rulesSnapshot ?? match.template.weeklyRules) as ScheduleRules;
     return {
-      rules: (match.rulesSnapshot ?? match.template.weeklyRules) as WeeklyRules,
+      rules,
       toleranceMinutes: match.toleranceSnapshot ?? match.template.toleranceMinutes,
       hasSchedule: true,
+      cycleAnchorDay: match.cycleAnchorDay ?? null,
+      worksHolidays: Boolean((rules as { worksHolidays?: boolean })?.worksHolidays),
     };
+  }
+
+  private async assertCanViewTimesheetUser(me: AuthPayload, targetUserId: string) {
+    if (targetUserId === me.sub) return;
+    const isAdmin = ['SUPER_ADMIN', 'COMPANY_ADMIN'].includes(String(me.role));
+    if (!isAdmin) {
+      const actor = await this.prisma.user.findFirst({
+        where: { id: me.sub, companyId: me.companyId, active: true, deletedAt: null },
+        select: {
+          permissions: { select: { permission: { select: { key: true } } } },
+          accessProfile: { select: { permissions: { select: { permission: { select: { key: true } } } } } },
+        },
+      });
+      const keys = new Set<string>();
+      actor?.permissions.forEach((item) => keys.add(item.permission.key));
+      actor?.accessProfile?.permissions.forEach((item) => keys.add(item.permission.key));
+      if (!keys.has('ponto:team') && !keys.has('ponto:manage')) {
+        throw new ForbiddenException('Você não tem permissão para consultar a memória de cálculo de outro colaborador.');
+      }
+    }
+    const visible = await this.visibleUserIdsFor(me);
+    if (visible && !visible.has(targetUserId)) throw new ForbiddenException('Colaborador fora da sua abrangência de acesso.');
   }
 
   private async periodStatus(companyId: string, ref: string): Promise<string> {
@@ -1147,6 +1680,7 @@ function publicEntry(
     note: string | null;
     latitude: number | null;
     longitude: number | null;
+    nsr?: bigint | null;
   },
   index: number,
 ) {
@@ -1159,7 +1693,18 @@ function publicEntry(
     source: entry.source,
     note: entry.note,
     hasLocation: entry.latitude != null && entry.longitude != null,
+    nsr: entry.nsr == null ? null : entry.nsr.toString(),
   };
+}
+
+/** Serializa uma batida para resposta HTTP (BigInt → number). */
+function serializeEntry<T extends { nsr?: bigint | null }>(entry: T) {
+  return { ...entry, nsr: entry.nsr == null ? null : entry.nsr.toString() };
+}
+
+/** HH:MM no fuso da empresa (UTC-3). */
+function formatCompanyTime(date: Date): string {
+  return new Date(date.getTime() - 3 * 60 * 60_000).toISOString().slice(11, 16);
 }
 
 function sumTotals(days: Array<{ plannedMinutes: number; workedMinutes: number; balanceMinutes: number; status: string }>) {
@@ -1196,6 +1741,43 @@ function groupBy<T>(items: T[], key: (item: T) => string): Map<string, T[]> {
 function text(value: unknown): string | null {
   const t = String(value ?? '').trim();
   return t || null;
+}
+
+function normalizeSyncId(value: unknown): string | null {
+  const syncId = text(value);
+  if (!syncId) return null;
+  if (syncId.length < 8 || syncId.length > 120 || !/^[A-Za-z0-9._:-]+$/.test(syncId)) {
+    throw new BadRequestException('Identificador de sincronização inválido.');
+  }
+  return syncId;
+}
+
+function booleanValue(value: unknown, fallback: boolean): boolean {
+  if (value === undefined || value === null || value === '') return fallback;
+  if (value === true || value === 'true' || value === 1 || value === '1') return true;
+  if (value === false || value === 'false' || value === 0 || value === '0') return false;
+  throw new BadRequestException('Valor booleano inválido.');
+}
+
+function maskRegistration(value: string | null | undefined): string | null {
+  const digits = String(value ?? '').replace(/\D/g, '');
+  return digits ? `***${digits.slice(-4)}` : null;
+}
+
+function sha256(value: string): string {
+  return createHash('sha256').update(value).digest('hex');
+}
+
+function stableJson(value: unknown): string {
+  return JSON.stringify(value, (_key, inner) => {
+    if (typeof inner === 'bigint') return inner.toString();
+    if (inner instanceof Date) return inner.toISOString();
+    return inner;
+  });
+}
+
+function jsonValue(value: unknown): Prisma.InputJsonValue {
+  return JSON.parse(stableJson(value)) as Prisma.InputJsonValue;
 }
 
 function finiteOrNull(value: unknown): number | null {

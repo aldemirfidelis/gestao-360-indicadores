@@ -1,22 +1,26 @@
 'use client';
 
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useState, type Dispatch, type SetStateAction } from 'react';
 import { useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
 import {
   AlarmClockCheck,
+  Calculator,
   CalendarClock,
   Camera,
   CheckCircle2,
+  Copy,
   Download,
+  FileDown,
   Fingerprint,
   History,
   ListChecks,
   Lock,
   LockOpen,
   MapPin,
+  MonitorSmartphone,
   Plus,
   Trash2,
   Upload,
@@ -31,6 +35,7 @@ import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { NativeSelect } from '@/components/ui/select';
+import { Sheet, SheetBody, SheetContent, SheetDescription, SheetHeader, SheetTitle } from '@/components/ui/sheet';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Textarea } from '@/components/ui/textarea';
 import { useAuth } from '@/components/auth/auth-provider';
@@ -47,6 +52,7 @@ interface PunchEntry {
   source: string;
   note: string | null;
   hasLocation: boolean;
+  nsr: string | null;
 }
 
 interface MirrorDay {
@@ -113,9 +119,63 @@ interface ShiftTemplate {
   name: string;
   description: string | null;
   toleranceMinutes: number;
+  kind: 'WEEKLY' | 'CYCLE';
   weeklyRules: Record<string, { start: string; end: string; breakMinutes?: number } | null>;
+  cycleRules: Array<{ start: string; end: string; breakMinutes?: number } | null> | null;
+  worksHolidays: boolean;
   active: boolean;
   activeAssignments: number;
+}
+
+interface CalculationExplanation {
+  dayKey: string;
+  processedAt?: string;
+  user: { id: string; name: string; email?: string };
+  schedule: {
+    name: string;
+    kind: 'WEEKLY' | 'CYCLE';
+    toleranceMinutes: number;
+    cycleAnchorDay: string | null;
+    rule: { start: string; end: string; breakMinutes?: number } | null;
+    version?: number | string | null;
+  } | null;
+  holiday: string | null;
+  status: DayStatus;
+  plannedMinutes: number;
+  workedMinutes: number;
+  balanceMinutes: number;
+  consideredEntries: Array<PunchEntry & { original?: string | null; effective?: string | null; clamped?: boolean }>;
+  cancelledEntries: Array<PunchEntry & { status?: string }>;
+  pairs: string[];
+  steps: string[];
+  memory?: { id: string; algorithmVersion: string; inputHash: string; calculatedAt: string };
+}
+
+interface PunchReceipt {
+  documentType: 'INTERNAL_TIME_RECORD_EXTRACT';
+  legalNotice: string;
+  company: { name: string; registrationMasked: string | null };
+  employee: { name: string; registrationMasked: string | null };
+  entry: {
+    id: string;
+    nsr: string | null;
+    recordSequence: string;
+    punchedAt: string;
+    recordedAt: string;
+    dayKey: string;
+    kind: 'IN' | 'OUT';
+    source: string;
+  };
+  snapshot: { capturedAt: string; origin: string; timezone: string; checksum: string };
+  generatedAt: string;
+}
+
+interface KioskDevice {
+  id: string;
+  name: string;
+  active: boolean;
+  lastSeenAt?: string | null;
+  createdAt: string;
 }
 
 interface PeriodRow {
@@ -168,6 +228,15 @@ const ADJUSTMENT_STATUS_LABEL: Record<string, string> = {
   CANCELLED: 'Cancelado',
 };
 
+const PUNCH_SOURCE_LABEL: Record<string, string> = {
+  WEB: 'Navegador/PWA',
+  FACIAL: 'Reconhecimento facial individual',
+  FACIAL_KIOSK: 'Totem facial',
+  MANUAL: 'Ajuste manual auditado',
+  IMPORT: 'Importação',
+  API: 'Integração por API',
+};
+
 const WEEKDAYS: Array<{ key: string; label: string }> = [
   { key: 'mon', label: 'Segunda' },
   { key: 'tue', label: 'Terça' },
@@ -183,15 +252,24 @@ const WEEKDAY_SHORT: Record<string, string> = {
 };
 
 type TemplateDayForm = { enabled: boolean; start: string; end: string; breakMinutes: string };
+type ScheduleKind = 'WEEKLY' | 'CYCLE';
 
 const DEFAULT_TEMPLATE_FORM = () => ({
   name: '',
   description: '',
   toleranceMinutes: '10',
+  kind: 'WEEKLY' as ScheduleKind,
+  worksHolidays: false,
   days: Object.fromEntries(
     WEEKDAYS.map(({ key }) => [key, { enabled: !['sat', 'sun'].includes(key), start: '08:00', end: '17:00', breakMinutes: '60' } satisfies TemplateDayForm]),
   ) as Record<string, TemplateDayForm>,
+  cycleDays: [
+    { enabled: true, start: '07:00', end: '19:00', breakMinutes: '60' },
+    { enabled: false, start: '07:00', end: '19:00', breakMinutes: '60' },
+  ] satisfies TemplateDayForm[],
 });
+
+type TemplateFormState = ReturnType<typeof DEFAULT_TEMPLATE_FORM>;
 
 export default function TimeClockPage() {
   const qc = useQueryClient();
@@ -207,12 +285,16 @@ export default function TimeClockPage() {
   const [adjustDialog, setAdjustDialog] = useState<{ dayKey: string; times: string[]; reason: string } | null>(null);
   const [templateDialog, setTemplateDialog] = useState(false);
   const [templateForm, setTemplateForm] = useState(DEFAULT_TEMPLATE_FORM);
-  const [assignForm, setAssignForm] = useState<{ templateId: string; userIds: string[] }>({ templateId: '', userIds: [] });
+  const [assignForm, setAssignForm] = useState<{ templateId: string; userIds: string[]; cycleAnchorDay: string }>({ templateId: '', userIds: [], cycleAnchorDay: '' });
   const [mirrorMonth, setMirrorMonth] = useState(() => new Date().toISOString().slice(0, 7));
   const [importDialog, setImportDialog] = useState(false);
   const [importResult, setImportResult] = useState<{ imported: number; duplicates: number; errors: string[] } | null>(null);
   const [holidayYear, setHolidayYear] = useState(() => String(new Date().getFullYear()));
   const [holidayForm, setHolidayForm] = useState<{ dayKey: string; name: string; kind: HolidayRow['kind'] }>({ dayKey: '', name: '', kind: 'COMPANY' });
+  const [explainTarget, setExplainTarget] = useState<{ userId: string; dayKey: string } | null>(null);
+  const [receiptEntryId, setReceiptEntryId] = useState<string | null>(null);
+  const [kioskName, setKioskName] = useState('');
+  const [createdKiosk, setCreatedKiosk] = useState<{ device: KioskDevice; token: string } | null>(null);
   const currentMonth = new Date().toISOString().slice(0, 7);
 
   useEffect(() => {
@@ -248,7 +330,7 @@ export default function TimeClockPage() {
     queryFn: () => api<ShiftTemplate[]>('/personnel/schedules'),
     enabled: tab === 'escalas' || tab === 'meu-ponto',
   });
-  const assignmentsQuery = useQuery<Array<{ id: string; startsAt: string; user: { id: string; name: string } | null; template: { id: string; name: string } }>>({
+  const assignmentsQuery = useQuery<Array<{ id: string; startsAt: string; cycleAnchorDay: string | null; user: { id: string; name: string } | null; template: { id: string; name: string; kind?: 'WEEKLY' | 'CYCLE' } }>>({
     queryKey: ['time-clock', 'assignments'],
     queryFn: () => api('/personnel/schedules/assignments'),
     enabled: canManage && tab === 'escalas',
@@ -268,9 +350,21 @@ export default function TimeClockPage() {
     queryFn: () => api<HolidayRow[]>(`/personnel/holidays?year=${holidayYear}`),
     enabled: canManage && tab === 'escalas',
   });
+  const explainQuery = useQuery<CalculationExplanation>({
+    queryKey: ['time-clock', 'explain', explainTarget?.userId, explainTarget?.dayKey],
+    queryFn: () => api<CalculationExplanation>(`/personnel/time-clock/explain/${encodeURIComponent(explainTarget!.userId)}/${explainTarget!.dayKey}`),
+    enabled: Boolean(explainTarget),
+  });
+  const kioskDevicesQuery = useQuery<KioskDevice[]>({
+    queryKey: ['time-clock', 'kiosk-devices'],
+    queryFn: () => api<KioskDevice[]>('/personnel/kiosk/devices'),
+    enabled: canManage && tab === 'escalas',
+  });
 
   const summary = summaryQuery.data;
   const mirror = mirrorQuery.data;
+  const selectedTemplate = (templatesQuery.data ?? []).find((template) => template.id === assignForm.templateId) ?? null;
+  const templateValidation = validateTemplateForm(templateForm);
 
   const invalidate = () => {
     void qc.invalidateQueries({ queryKey: ['time-clock'] });
@@ -324,13 +418,18 @@ export default function TimeClockPage() {
           return [key, day.enabled ? { start: day.start, end: day.end, breakMinutes: Number(day.breakMinutes) || 0 } : null];
         }),
       );
+      const cycleRules = templateForm.cycleDays.map((day) =>
+        day.enabled ? { start: day.start, end: day.end, breakMinutes: Number(day.breakMinutes) || 0 } : null,
+      );
       return api('/personnel/schedules', {
         method: 'POST',
         json: {
           name: templateForm.name,
           description: templateForm.description || null,
-          toleranceMinutes: Number(templateForm.toleranceMinutes) || 10,
-          weeklyRules,
+          toleranceMinutes: Number(templateForm.toleranceMinutes),
+          kind: templateForm.kind,
+          worksHolidays: templateForm.worksHolidays,
+          ...(templateForm.kind === 'CYCLE' ? { cycleRules } : { weeklyRules }),
         },
       });
     },
@@ -357,7 +456,7 @@ export default function TimeClockPage() {
     mutationFn: () => api('/personnel/schedules/assign', { method: 'POST', json: assignForm }),
     onSuccess: (result: any) => {
       toast.success(`Escala atribuída a ${result?.assigned ?? assignForm.userIds.length} colaborador(es)`);
-      setAssignForm({ templateId: '', userIds: [] });
+      setAssignForm({ templateId: '', userIds: [], cycleAnchorDay: '' });
       invalidate();
     },
     onError: (e: any) => toast.error(e?.message ?? 'Não foi possível atribuir a escala'),
@@ -423,9 +522,42 @@ export default function TimeClockPage() {
     onError: (e: any) => toast.error(e?.message ?? 'Não foi possível remover o feriado'),
   });
 
+  const createKiosk = useMutation({
+    mutationFn: () => api<{ device: KioskDevice; token: string }>('/personnel/kiosk/devices', { method: 'POST', json: { name: kioskName } }),
+    onSuccess: (result) => {
+      setCreatedKiosk(result);
+      setKioskName('');
+      toast.success('Totem cadastrado. Guarde o token exibido agora.');
+      void qc.invalidateQueries({ queryKey: ['time-clock', 'kiosk-devices'] });
+    },
+    onError: (e: any) => toast.error(e?.message ?? 'Não foi possível cadastrar o totem'),
+  });
+
+  const toggleKiosk = useMutation({
+    mutationFn: ({ id, active }: { id: string; active: boolean }) => api<KioskDevice>(`/personnel/kiosk/devices/${id}`, { method: 'PATCH', json: { active } }),
+    onSuccess: (_, variables) => {
+      toast.success(variables.active ? 'Totem ativado' : 'Totem desativado');
+      void qc.invalidateQueries({ queryKey: ['time-clock', 'kiosk-devices'] });
+    },
+    onError: (e: any) => toast.error(e?.message ?? 'Não foi possível atualizar o totem'),
+  });
+
   const openAdjustDialog = (day: MirrorDay) => {
     const times = day.entries.map((entry) => formatTime(entry.punchedAt));
     setAdjustDialog({ dayKey: day.dayKey, times: times.length ? times : ['08:00', '17:00'], reason: '' });
+  };
+
+  const downloadReceipt = async (entry: PunchEntry) => {
+    setReceiptEntryId(entry.id);
+    try {
+      const receipt = await api<PunchReceipt>(`/personnel/time-clock/entries/${entry.id}/receipt`);
+      await buildPunchReceiptPdf(receipt);
+      toast.success('Extrato interno da marcação gerado');
+    } catch (error: any) {
+      toast.error(error?.message ?? 'Não foi possível gerar o extrato da marcação');
+    } finally {
+      setReceiptEntryId(null);
+    }
   };
 
   const monthBalance = summary?.month?.balanceMinutes ?? 0;
@@ -434,7 +566,7 @@ export default function TimeClockPage() {
     <div className="space-y-6">
       <PageHeader
         title="Controle de Ponto"
-        description="Batida com geolocalização, espelho de ponto, ajustes com aprovação, escalas e fechamento de competência."
+        description="Batida com geolocalização, espelho explicável, extratos internos, ajustes auditados, escalas semanais ou cíclicas e fechamento de competência."
       />
 
       <Tabs value={tab} onValueChange={setTab} className="space-y-4">
@@ -497,13 +629,29 @@ export default function TimeClockPage() {
                     ) : (
                       <div className="flex flex-wrap justify-center gap-1.5">
                         {(summary?.today?.entries ?? []).map((entry) => (
-                          <Badge key={entry.id} variant="outline" className={cn('text-[10px] tabular-nums', entry.kind === 'IN' ? 'border-status-green/40 text-status-green' : 'border-status-red/40 text-status-red')}>
-                            {entry.kind === 'IN' ? '→' : '←'} {formatTime(entry.punchedAt)}
-                            {entry.source === 'MANUAL' && ' (ajuste)'}
-                            {entry.source === 'FACIAL' && ' (facial)'}
-                          </Badge>
+                          <span key={entry.id} className="inline-flex items-center rounded-md border bg-background">
+                            <Badge variant="outline" className={cn('border-0 text-[10px] tabular-nums', entry.kind === 'IN' ? 'text-status-green' : 'text-status-red')}>
+                              {entry.kind === 'IN' ? '→' : '←'} {formatTime(entry.punchedAt)}
+                              {entry.nsr ? ` · NSR ${entry.nsr}` : ''}
+                              {entry.source === 'MANUAL' && ' (ajuste)'}
+                              {entry.source === 'FACIAL' && ' (facial)'}
+                            </Badge>
+                            <button
+                              type="button"
+                              className="border-l px-1.5 py-1 text-muted-foreground transition hover:text-sky-600 disabled:opacity-50"
+                              disabled={Boolean(receiptEntryId)}
+                              title="Baixar extrato interno — não substitui comprovante REP-P"
+                              aria-label={`Baixar extrato interno da marcação${entry.nsr ? ` NSR ${entry.nsr}` : ''}`}
+                              onClick={() => void downloadReceipt(entry)}
+                            >
+                              <FileDown className="h-3 w-3" />
+                            </button>
+                          </span>
                         ))}
                       </div>
+                    )}
+                    {(summary?.today?.entries ?? []).length > 0 && (
+                      <div className="mt-2 text-[9px] text-muted-foreground">O extrato interno não substitui o comprovante oficial de um REP-P.</div>
                     )}
                   </div>
                 </CardContent>
@@ -562,7 +710,7 @@ export default function TimeClockPage() {
                 </div>
               </div>
               <CardContent className="overflow-x-auto p-0">
-                <table className="w-full min-w-[720px] text-xs">
+                <table className="w-full min-w-[900px] text-xs">
                   <thead className="border-b bg-slate-50/60 text-[10px] uppercase tracking-wider text-muted-foreground dark:bg-slate-900/40">
                     <tr>
                       <th className="px-4 py-2.5 text-left">Dia</th>
@@ -584,7 +732,25 @@ export default function TimeClockPage() {
                           {day.entries.length === 0 ? (
                             <span className="text-muted-foreground">—</span>
                           ) : (
-                            <span className="tabular-nums">{day.entries.map((entry) => formatTime(entry.punchedAt)).join(' · ')}</span>
+                            <span className="flex flex-wrap gap-1">
+                              {day.entries.map((entry) => (
+                                <span key={entry.id} className="inline-flex items-center rounded border bg-background tabular-nums">
+                                  <span className="px-1.5 py-0.5" title={entry.nsr ? `NSR ${entry.nsr}` : undefined}>
+                                    {formatTime(entry.punchedAt)}{entry.nsr ? ` · ${entry.nsr}` : ''}
+                                  </span>
+                                  <button
+                                    type="button"
+                                    className="border-l px-1 py-0.5 text-muted-foreground hover:text-sky-600 disabled:opacity-50"
+                                    disabled={Boolean(receiptEntryId)}
+                                    title="Extrato interno — não substitui comprovante REP-P"
+                                    aria-label={`Baixar extrato interno da marcação${entry.nsr ? ` NSR ${entry.nsr}` : ''}`}
+                                    onClick={() => void downloadReceipt(entry)}
+                                  >
+                                    <FileDown className="h-3 w-3" />
+                                  </button>
+                                </span>
+                              ))}
+                            </span>
                           )}
                         </td>
                         <td className="px-2 py-2 text-right tabular-nums">{day.plannedMinutes ? minutesLabel(day.plannedMinutes) : '—'}</td>
@@ -604,17 +770,28 @@ export default function TimeClockPage() {
                           )}
                         </td>
                         <td className="px-4 py-2 text-right">
-                          {day.dayKey <= (mirror?.today ?? '') && (
+                          <div className="flex flex-wrap justify-end gap-1">
                             <Button
                               variant="ghost"
                               size="sm"
                               className="h-6 text-[10px]"
-                              disabled={day.adjustment?.status === 'REQUESTED'}
-                              onClick={() => openAdjustDialog(day)}
+                              disabled={!user?.id}
+                              onClick={() => user?.id && setExplainTarget({ userId: user.id, dayKey: day.dayKey })}
                             >
-                              Solicitar ajuste
+                              <Calculator className="mr-1 h-3 w-3" />Entenda o cálculo
                             </Button>
-                          )}
+                            {day.dayKey <= (mirror?.today ?? '') && (
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                className="h-6 text-[10px]"
+                                disabled={day.adjustment?.status === 'REQUESTED'}
+                                onClick={() => openAdjustDialog(day)}
+                              >
+                                Solicitar ajuste
+                              </Button>
+                            )}
+                          </div>
                         </td>
                       </tr>
                     ))}
@@ -636,7 +813,7 @@ export default function TimeClockPage() {
                 <Input type="date" className="h-8 w-40 text-xs" value={teamDay} onChange={(e) => setTeamDay(e.target.value)} />
               </div>
               <CardContent className="overflow-x-auto p-0">
-                <table className="w-full min-w-[760px] text-xs">
+                <table className="w-full min-w-[900px] text-xs">
                   <thead className="border-b bg-slate-50/60 text-[10px] uppercase tracking-wider text-muted-foreground dark:bg-slate-900/40">
                     <tr>
                       <th className="px-4 py-2.5 text-left">Colaborador</th>
@@ -644,6 +821,7 @@ export default function TimeClockPage() {
                       <th className="px-2 py-2.5 text-right">Prevista</th>
                       <th className="px-2 py-2.5 text-right">Trabalhada</th>
                       <th className="px-2 py-2.5 text-left">Situação</th>
+                      <th className="px-4 py-2.5 text-right">Ações</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-100 dark:divide-slate-800/60">
@@ -661,6 +839,16 @@ export default function TimeClockPage() {
                         <td className="px-2 py-2">
                           <Badge variant="outline" className={cn('text-[10px]', STATUS_CLASS[row.status])}>{STATUS_LABEL[row.status]}</Badge>
                           {!row.hasSchedule && <span className="ml-1 text-[9px] text-muted-foreground">sem escala</span>}
+                        </td>
+                        <td className="px-4 py-2 text-right">
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            className="h-6 text-[10px]"
+                            onClick={() => setExplainTarget({ userId: row.user.id, dayKey: teamQuery.data?.dayKey ?? teamDay })}
+                          >
+                            <Calculator className="mr-1 h-3 w-3" />Entenda o cálculo
+                          </Button>
                         </td>
                       </tr>
                     ))}
@@ -745,10 +933,14 @@ export default function TimeClockPage() {
                         <div className="min-w-0">
                           <div className="flex items-center gap-1.5">
                             <span className="font-semibold text-slate-800 dark:text-slate-200">{template.name}</span>
+                            <Badge variant="outline" className="h-4 px-1.5 text-[9px]">
+                              {template.kind === 'CYCLE' ? `Ciclo · ${template.cycleRules?.length ?? 0} dias` : 'Semanal'}
+                            </Badge>
                             {!template.active && <Badge variant="outline" className="h-4 px-1.5 text-[9px]">Inativa</Badge>}
                           </div>
                           <div className="mt-0.5 text-[10px] text-muted-foreground">
                             Tolerância {template.toleranceMinutes} min · {template.activeAssignments} colaborador(es)
+                            {template.worksHolidays ? ' · trabalha em feriados' : ''}
                           </div>
                         </div>
                         <Button variant="ghost" size="sm" className="h-7 shrink-0 text-[10px]" disabled={patchTemplate.isPending} onClick={() => patchTemplate.mutate({ id: template.id, json: { active: !template.active } })}>
@@ -756,14 +948,20 @@ export default function TimeClockPage() {
                         </Button>
                       </div>
                       <div className="mt-2 flex flex-wrap gap-1">
-                        {WEEKDAYS.map(({ key }) => {
-                          const rule = template.weeklyRules?.[key];
-                          return (
-                            <span key={key} className={cn('rounded border px-1.5 py-0.5 text-[9px] tabular-nums', rule ? 'text-slate-700 dark:text-slate-300' : 'text-muted-foreground opacity-60')}>
-                              {WEEKDAY_SHORT[key]} {rule ? `${rule.start}–${rule.end}` : 'folga'}
-                            </span>
-                          );
-                        })}
+                        {template.kind === 'CYCLE'
+                          ? (template.cycleRules ?? []).map((rule, index) => (
+                              <span key={index} className={cn('rounded border px-1.5 py-0.5 text-[9px] tabular-nums', rule ? 'text-slate-700 dark:text-slate-300' : 'text-muted-foreground opacity-60')}>
+                                D{index + 1} {rule ? `${rule.start}–${rule.end}` : 'folga'}
+                              </span>
+                            ))
+                          : WEEKDAYS.map(({ key }) => {
+                              const rule = template.weeklyRules?.[key];
+                              return (
+                                <span key={key} className={cn('rounded border px-1.5 py-0.5 text-[9px] tabular-nums', rule ? 'text-slate-700 dark:text-slate-300' : 'text-muted-foreground opacity-60')}>
+                                  {WEEKDAY_SHORT[key]} {rule ? `${rule.start}–${rule.end}` : 'folga'}
+                                </span>
+                              );
+                            })}
                       </div>
                     </div>
                   ))}
@@ -777,11 +975,25 @@ export default function TimeClockPage() {
                 <CardContent className="space-y-3 p-4 text-xs">
                   <div>
                     <Label>Escala</Label>
-                    <NativeSelect value={assignForm.templateId} onChange={(e) => setAssignForm((f) => ({ ...f, templateId: e.target.value }))}>
+                    <NativeSelect value={assignForm.templateId} onChange={(e) => setAssignForm((f) => ({ ...f, templateId: e.target.value, cycleAnchorDay: '' }))}>
                       <option value="">Selecione a escala</option>
                       {(templatesQuery.data ?? []).filter((t) => t.active).map((t) => <option key={t.id} value={t.id}>{t.name}</option>)}
                     </NativeSelect>
                   </div>
+                  {selectedTemplate?.kind === 'CYCLE' && (
+                    <div className="rounded-md border border-sky-200 bg-sky-50/50 p-3 dark:border-sky-900/70 dark:bg-sky-950/20">
+                      <Label>Data âncora do ciclo</Label>
+                      <Input
+                        type="date"
+                        className="mt-1 h-8 w-44 bg-background text-xs"
+                        value={assignForm.cycleAnchorDay}
+                        onChange={(e) => setAssignForm((f) => ({ ...f, cycleAnchorDay: e.target.value }))}
+                      />
+                      <p className="mt-1.5 text-[10px] leading-relaxed text-muted-foreground">
+                        Informe a data correspondente ao dia 1 do ciclo para este grupo. Todos os colaboradores selecionados iniciarão na mesma posição.
+                      </p>
+                    </div>
+                  )}
                   <div>
                     <Label>Colaboradores ({assignForm.userIds.length} selecionado(s))</Label>
                     <div className="mt-1 max-h-64 space-y-0.5 overflow-y-auto rounded-md border p-2">
@@ -806,7 +1018,12 @@ export default function TimeClockPage() {
                       })}
                     </div>
                   </div>
-                  <Button size="sm" className="bg-sky-500 font-semibold text-white hover:bg-sky-600" disabled={!assignForm.templateId || assignForm.userIds.length === 0 || assign.isPending} onClick={() => assign.mutate()}>
+                  <Button
+                    size="sm"
+                    className="bg-sky-500 font-semibold text-white hover:bg-sky-600"
+                    disabled={!assignForm.templateId || assignForm.userIds.length === 0 || (selectedTemplate?.kind === 'CYCLE' && !assignForm.cycleAnchorDay) || assign.isPending}
+                    onClick={() => assign.mutate()}
+                  >
                     {assign.isPending ? 'Atribuindo...' : 'Atribuir escala'}
                   </Button>
 
@@ -817,11 +1034,77 @@ export default function TimeClockPage() {
                       {(assignmentsQuery.data ?? []).map((assignment) => (
                         <div key={assignment.id} className="flex items-center justify-between gap-2 rounded border px-2 py-1.5">
                           <span className="min-w-0 truncate">{assignment.user?.name ?? '—'}</span>
-                          <span className="shrink-0 text-[10px] text-muted-foreground">{assignment.template?.name} · desde {formatDate(assignment.startsAt)}</span>
+                          <span className="shrink-0 text-right text-[10px] text-muted-foreground">
+                            {assignment.template?.name}
+                            {(assignment.template?.kind === 'CYCLE' || assignment.cycleAnchorDay) ? ' · ciclo' : ' · semanal'}
+                            {assignment.cycleAnchorDay ? ` · âncora ${formatDayKey(assignment.cycleAnchorDay)}` : ''}
+                            {' · '}desde {formatDate(assignment.startsAt)}
+                          </span>
                         </div>
                       ))}
                     </div>
                   </div>
+                </CardContent>
+              </Card>
+
+              <Card className="border border-slate-100 bg-white shadow-sm dark:border-slate-800/80 dark:bg-slate-900/50 xl:col-span-2">
+                <div className="flex flex-wrap items-center justify-between gap-2 border-b px-4 py-2.5">
+                  <div>
+                    <h3 className="flex items-center gap-2 text-sm font-semibold text-slate-800 dark:text-white">
+                      <MonitorSmartphone className="h-4 w-4 text-sky-500" />Totens autorizados
+                    </h3>
+                    <p className="mt-0.5 text-[10px] text-muted-foreground">Cadastre os celulares e tablets que poderão operar como terminais compartilhados.</p>
+                  </div>
+                  <div className="flex w-full items-end gap-2 sm:w-auto">
+                    <div className="min-w-0 flex-1 sm:w-64">
+                      <Label>Nome do dispositivo</Label>
+                      <Input className="h-8 text-xs" value={kioskName} onChange={(e) => setKioskName(e.target.value)} placeholder="Ex.: Totem Portaria Principal" />
+                    </div>
+                    <Button
+                      size="sm"
+                      className="h-8 shrink-0 bg-sky-500 text-xs font-semibold text-white hover:bg-sky-600"
+                      disabled={!kioskName.trim() || createKiosk.isPending}
+                      onClick={() => createKiosk.mutate()}
+                    >
+                      <Plus className="mr-1 h-3.5 w-3.5" />Cadastrar
+                    </Button>
+                  </div>
+                </div>
+                <CardContent className="p-0">
+                  {kioskDevicesQuery.isLoading ? (
+                    <div className="p-5 text-center text-xs text-muted-foreground">Carregando totens...</div>
+                  ) : kioskDevicesQuery.isError ? (
+                    <div className="p-5 text-center text-xs text-status-red">Não foi possível carregar os totens cadastrados.</div>
+                  ) : (kioskDevicesQuery.data ?? []).length === 0 ? (
+                    <div className="p-5 text-center text-xs text-muted-foreground">Nenhum totem cadastrado.</div>
+                  ) : (
+                    <div className="divide-y divide-slate-100 dark:divide-slate-800/60">
+                      {(kioskDevicesQuery.data ?? []).map((device) => (
+                        <div key={device.id} className="flex flex-wrap items-center justify-between gap-3 px-4 py-3 text-xs">
+                          <div className="min-w-0">
+                            <div className="flex items-center gap-2">
+                              <span className="truncate font-semibold text-slate-800 dark:text-slate-200">{device.name}</span>
+                              <Badge variant="outline" className={cn('text-[9px]', device.active ? 'border-status-green/40 text-status-green' : 'text-muted-foreground')}>
+                                {device.active ? 'Ativo' : 'Inativo'}
+                              </Badge>
+                            </div>
+                            <div className="mt-0.5 text-[10px] text-muted-foreground">
+                              Cadastrado em {formatDate(device.createdAt)} · último contato {device.lastSeenAt ? formatDateTime(device.lastSeenAt) : 'ainda não realizado'}
+                            </div>
+                          </div>
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            className="h-7 text-[10px]"
+                            disabled={toggleKiosk.isPending}
+                            onClick={() => toggleKiosk.mutate({ id: device.id, active: !device.active })}
+                          >
+                            {device.active ? 'Desativar' : 'Ativar'}
+                          </Button>
+                        </div>
+                      ))}
+                    </div>
+                  )}
                 </CardContent>
               </Card>
 
@@ -980,7 +1263,7 @@ export default function TimeClockPage() {
           {adjustDialog && (
             <div className="space-y-4">
               <div className="rounded-md border bg-muted/30 p-3 text-xs text-muted-foreground">
-                Informe a lista completa de horários do dia (entrada, saída, entrada, saída...). Ao aprovar, o espelho do dia é substituído por estes horários.
+                Informe a lista completa de horários do dia (entrada, saída, entrada, saída...). Ao aprovar, os horários corrigidos são lançados separadamente; as marcações originais permanecem preservadas na auditoria.
               </div>
               <div className="space-y-2">
                 {adjustDialog.times.map((time, index) => (
@@ -1029,10 +1312,20 @@ export default function TimeClockPage() {
             <DialogTitle>Nova escala de trabalho</DialogTitle>
           </DialogHeader>
           <div className="space-y-4">
-            <div className="grid grid-cols-1 gap-3 md:grid-cols-3">
+            <div className="grid grid-cols-1 gap-3 md:grid-cols-4">
               <div className="md:col-span-2">
                 <Label>Nome da escala</Label>
                 <Input value={templateForm.name} onChange={(e) => setTemplateForm((f) => ({ ...f, name: e.target.value }))} placeholder="Ex.: Administrativo 08h–17h" />
+              </div>
+              <div>
+                <Label>Tipo da escala</Label>
+                <NativeSelect
+                  value={templateForm.kind}
+                  onChange={(e) => setTemplateForm((f) => ({ ...f, kind: e.target.value as ScheduleKind }))}
+                >
+                  <option value="WEEKLY">Semanal</option>
+                  <option value="CYCLE">Ciclo contínuo</option>
+                </NativeSelect>
               </div>
               <div>
                 <Label>Tolerância (min)</Label>
@@ -1043,40 +1336,90 @@ export default function TimeClockPage() {
               <Label>Descrição</Label>
               <Input value={templateForm.description} onChange={(e) => setTemplateForm((f) => ({ ...f, description: e.target.value }))} placeholder="Quando usar esta escala" />
             </div>
-            <div className="space-y-1.5">
-              <Label>Jornada semanal</Label>
-              {WEEKDAYS.map(({ key, label }) => {
-                const day = templateForm.days[key];
-                return (
-                  <div key={key} className="flex flex-wrap items-center gap-2 rounded-md border px-2 py-1.5 text-xs">
-                    <label className="flex w-28 items-center gap-2">
-                      <input
-                        type="checkbox"
-                        checked={day.enabled}
-                        onChange={(e) => setTemplateForm((f) => ({ ...f, days: { ...f.days, [key]: { ...day, enabled: e.target.checked } } }))}
-                      />
-                      <span className={cn(!day.enabled && 'text-muted-foreground')}>{label}</span>
-                    </label>
-                    {day.enabled ? (
-                      <>
-                        <Input type="time" className="h-7 w-28 text-xs" value={day.start} onChange={(e) => setTemplateForm((f) => ({ ...f, days: { ...f.days, [key]: { ...day, start: e.target.value } } }))} />
-                        <span className="text-muted-foreground">às</span>
-                        <Input type="time" className="h-7 w-28 text-xs" value={day.end} onChange={(e) => setTemplateForm((f) => ({ ...f, days: { ...f.days, [key]: { ...day, end: e.target.value } } }))} />
-                        <span className="text-muted-foreground">intervalo</span>
-                        <Input type="number" min={0} className="h-7 w-20 text-xs" value={day.breakMinutes} onChange={(e) => setTemplateForm((f) => ({ ...f, days: { ...f.days, [key]: { ...day, breakMinutes: e.target.value } } }))} />
-                        <span className="text-muted-foreground">min</span>
-                      </>
-                    ) : (
-                      <span className="text-muted-foreground">Folga</span>
-                    )}
+            {templateForm.kind === 'WEEKLY' ? (
+              <div className="space-y-1.5">
+                <Label>Jornada semanal</Label>
+                {WEEKDAYS.map(({ key, label }) => {
+                  const day = templateForm.days[key];
+                  return (
+                    <ScheduleDayEditor
+                      key={key}
+                      label={label}
+                      day={day}
+                      onChange={(next) => setTemplateForm((f) => ({ ...f, days: { ...f.days, [key]: next } }))}
+                    />
+                  );
+                })}
+              </div>
+            ) : (
+              <div className="space-y-3">
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <div>
+                    <Label>Ciclo contínuo</Label>
+                    <p className="mt-0.5 text-[10px] text-muted-foreground">A sequência se repete continuamente a partir da data âncora de cada atribuição.</p>
                   </div>
-                );
-              })}
-            </div>
+                  <div className="flex flex-wrap gap-1.5">
+                    <Button type="button" variant="outline" size="sm" className="h-7 text-[10px]" onClick={() => applyCyclePreset(setTemplateForm, '12X36')}>Preset 12x36</Button>
+                    <Button type="button" variant="outline" size="sm" className="h-7 text-[10px]" onClick={() => applyCyclePreset(setTemplateForm, '4X2')}>Preset 4x2</Button>
+                    <Button type="button" variant="outline" size="sm" className="h-7 text-[10px]" onClick={() => applyCyclePreset(setTemplateForm, 'CUSTOM')}>Personalizado</Button>
+                  </div>
+                </div>
+                <div className="max-h-[340px] space-y-1.5 overflow-y-auto pr-1">
+                  {templateForm.cycleDays.map((day, index) => (
+                    <div key={index} className="flex items-center gap-1.5">
+                      <div className="min-w-0 flex-1">
+                        <ScheduleDayEditor
+                          label={`Dia ${index + 1}`}
+                          day={day}
+                          onChange={(next) => setTemplateForm((f) => ({ ...f, cycleDays: f.cycleDays.map((item, itemIndex) => itemIndex === index ? next : item) }))}
+                        />
+                      </div>
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="icon"
+                        className="h-7 w-7 shrink-0 text-status-red"
+                        disabled={templateForm.cycleDays.length <= 2}
+                        title="Remover posição do ciclo"
+                        onClick={() => setTemplateForm((f) => ({ ...f, cycleDays: f.cycleDays.filter((_, itemIndex) => itemIndex !== index) }))}
+                      >
+                        <Trash2 className="h-3.5 w-3.5" />
+                      </Button>
+                    </div>
+                  ))}
+                </div>
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  className="h-7 text-xs"
+                  disabled={templateForm.cycleDays.length >= 60}
+                  onClick={() => setTemplateForm((f) => ({ ...f, cycleDays: [...f.cycleDays, { enabled: false, start: '08:00', end: '17:00', breakMinutes: '60' }] }))}
+                >
+                  <Plus className="mr-1 h-3 w-3" />Adicionar dia ao ciclo
+                </Button>
+                <CyclePreview days={templateForm.cycleDays} />
+              </div>
+            )}
+            <label className="flex items-start gap-2 rounded-md border bg-muted/20 p-3 text-xs">
+              <input
+                type="checkbox"
+                className="mt-0.5"
+                checked={templateForm.worksHolidays}
+                onChange={(e) => setTemplateForm((f) => ({ ...f, worksHolidays: e.target.checked }))}
+              />
+              <span>
+                <span className="font-semibold">Manter a jornada prevista em feriados</span>
+                <span className="mt-0.5 block text-[10px] text-muted-foreground">Use quando a escala, como 12x36, trabalha normalmente em feriados. Caso contrário, o feriado zera a jornada prevista.</span>
+              </span>
+            </label>
+            {!templateValidation.valid && templateForm.name.trim() && (
+              <div className="rounded-md border border-status-red/30 bg-status-red/5 p-2 text-xs text-status-red">{templateValidation.message}</div>
+            )}
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setTemplateDialog(false)}>Cancelar</Button>
-            <Button className="bg-sky-500 font-semibold text-white hover:bg-sky-600" disabled={!templateForm.name.trim() || createTemplate.isPending} onClick={() => createTemplate.mutate()}>
+            <Button className="bg-sky-500 font-semibold text-white hover:bg-sky-600" disabled={!templateValidation.valid || createTemplate.isPending} onClick={() => createTemplate.mutate()}>
               {createTemplate.isPending ? 'Salvando...' : 'Salvar escala'}
             </Button>
           </DialogFooter>
@@ -1127,6 +1470,71 @@ export default function TimeClockPage() {
         </DialogContent>
       </Dialog>
 
+      <Dialog open={Boolean(createdKiosk)} onOpenChange={(open) => !open && setCreatedKiosk(null)}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Token do totem — exibição única</DialogTitle>
+          </DialogHeader>
+          {createdKiosk && (
+            <div className="space-y-4 text-xs">
+              <div className="rounded-md border border-status-yellow/40 bg-status-yellow/5 p-3 leading-relaxed text-status-yellow">
+                Copie este token agora. Por segurança, somente o hash é guardado no servidor e o valor não poderá ser consultado novamente depois que esta janela for fechada.
+              </div>
+              <div>
+                <Label>Dispositivo</Label>
+                <div className="mt-1 font-semibold">{createdKiosk.device.name}</div>
+              </div>
+              <div>
+                <Label>Token de ativação</Label>
+                <div className="mt-1 flex items-center gap-2">
+                  <Input readOnly value={createdKiosk.token} className="font-mono text-xs" onFocus={(event) => event.currentTarget.select()} />
+                  <Button
+                    variant="outline"
+                    size="icon"
+                    className="shrink-0"
+                    title="Copiar token"
+                    onClick={async () => {
+                      try {
+                        await navigator.clipboard.writeText(createdKiosk.token);
+                        toast.success('Token copiado');
+                      } catch {
+                        toast.error('Não foi possível copiar automaticamente. Selecione o token manualmente.');
+                      }
+                    }}
+                  >
+                    <Copy className="h-4 w-4" />
+                  </Button>
+                </div>
+              </div>
+              <p className="text-muted-foreground">Guarde o token em local seguro para ativar o dispositivo quando a tela pública do totem for disponibilizada.</p>
+            </div>
+          )}
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setCreatedKiosk(null)}>Já guardei o token</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Sheet open={Boolean(explainTarget)} onOpenChange={(open) => !open && setExplainTarget(null)}>
+        <SheetContent side="right" size="lg">
+          <SheetHeader>
+            <SheetTitle>Entenda este cálculo</SheetTitle>
+            <SheetDescription>
+              Memória explicativa de {explainTarget ? formatDayKey(explainTarget.dayKey) : ''}. Marcações originais e regras aplicadas permanecem auditáveis.
+            </SheetDescription>
+          </SheetHeader>
+          <SheetBody>
+            {explainQuery.isLoading && <div className="py-10 text-center text-sm text-muted-foreground">Carregando memória de cálculo...</div>}
+            {explainQuery.isError && (
+              <div className="rounded-md border border-status-red/40 bg-status-red/5 p-4 text-sm text-status-red">
+                {(explainQuery.error as Error)?.message ?? 'Não foi possível carregar a memória de cálculo.'}
+              </div>
+            )}
+            {explainQuery.data && <CalculationExplanationView data={explainQuery.data} />}
+          </SheetBody>
+        </SheetContent>
+      </Sheet>
+
       <ReasonDialog state={reasonDialog} onClose={() => setReasonDialog(null)} />
     </div>
   );
@@ -1153,6 +1561,236 @@ async function downloadPeriodReport(ref: string) {
   }
 }
 
+function ScheduleDayEditor({ label, day, onChange }: { label: string; day: TemplateDayForm; onChange: (day: TemplateDayForm) => void }) {
+  return (
+    <div className="flex flex-wrap items-center gap-2 rounded-md border px-2 py-1.5 text-xs">
+      <label className="flex w-28 items-center gap-2">
+        <input type="checkbox" checked={day.enabled} onChange={(event) => onChange({ ...day, enabled: event.target.checked })} />
+        <span className={cn(!day.enabled && 'text-muted-foreground')}>{label}</span>
+      </label>
+      {day.enabled ? (
+        <>
+          <Input type="time" className="h-7 w-28 text-xs" value={day.start} onChange={(event) => onChange({ ...day, start: event.target.value })} />
+          <span className="text-muted-foreground">às</span>
+          <Input type="time" className="h-7 w-28 text-xs" value={day.end} onChange={(event) => onChange({ ...day, end: event.target.value })} />
+          <span className="text-muted-foreground">intervalo</span>
+          <Input type="number" min={0} max={1440} className="h-7 w-20 text-xs" value={day.breakMinutes} onChange={(event) => onChange({ ...day, breakMinutes: event.target.value })} />
+          <span className="text-muted-foreground">min</span>
+        </>
+      ) : (
+        <span className="text-muted-foreground">Folga</span>
+      )}
+    </div>
+  );
+}
+
+function CyclePreview({ days }: { days: TemplateDayForm[] }) {
+  const workDays = days.filter((day) => day.enabled).length;
+  const plannedMinutes = days.reduce((total, day) => total + plannedMinutesForFormDay(day), 0);
+  return (
+    <div className="rounded-md border bg-muted/20 p-3 text-xs">
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <span className="font-semibold">Prévia do ciclo</span>
+        <span className="text-[10px] text-muted-foreground">{days.length} dias · {workDays} trabalhado(s) · {days.length - workDays} folga(s) · {minutesLabel(plannedMinutes)} previstos</span>
+      </div>
+      <div className="mt-2 flex flex-wrap gap-1">
+        {days.map((day, index) => (
+          <span key={index} className={cn('rounded border px-1.5 py-0.5 text-[9px] tabular-nums', day.enabled ? 'border-sky-300 text-sky-700 dark:border-sky-800 dark:text-sky-300' : 'text-muted-foreground')}>
+            D{index + 1} {day.enabled ? `${day.start}–${day.end}` : 'folga'}
+          </span>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function applyCyclePreset(setForm: Dispatch<SetStateAction<TemplateFormState>>, preset: '12X36' | '4X2' | 'CUSTOM') {
+  const work12h: TemplateDayForm = { enabled: true, start: '07:00', end: '19:00', breakMinutes: '60' };
+  const work4x2: TemplateDayForm = { enabled: true, start: '08:00', end: '18:00', breakMinutes: '60' };
+  const off = (base: TemplateDayForm): TemplateDayForm => ({ ...base, enabled: false });
+  if (preset === '12X36') {
+    setForm((form) => ({ ...form, kind: 'CYCLE', worksHolidays: true, cycleDays: [work12h, off(work12h)] }));
+    return;
+  }
+  if (preset === '4X2') {
+    setForm((form) => ({ ...form, kind: 'CYCLE', worksHolidays: true, cycleDays: [
+      { ...work4x2 }, { ...work4x2 }, { ...work4x2 }, { ...work4x2 }, off(work4x2), off(work4x2),
+    ] }));
+    return;
+  }
+  setForm((form) => ({ ...form, kind: 'CYCLE', worksHolidays: false, cycleDays: [
+    { enabled: true, start: '08:00', end: '17:00', breakMinutes: '60' },
+    { enabled: false, start: '08:00', end: '17:00', breakMinutes: '60' },
+  ] }));
+}
+
+function validateTemplateForm(form: TemplateFormState): { valid: boolean; message: string } {
+  if (!form.name.trim()) return { valid: false, message: 'Informe o nome da escala.' };
+  const tolerance = Number(form.toleranceMinutes);
+  if (!Number.isFinite(tolerance) || tolerance < 0 || tolerance > 120) return { valid: false, message: 'A tolerância deve estar entre 0 e 120 minutos.' };
+  const days = form.kind === 'CYCLE' ? form.cycleDays : Object.values(form.days);
+  if (form.kind === 'CYCLE' && (days.length < 2 || days.length > 60)) return { valid: false, message: 'O ciclo deve possuir entre 2 e 60 dias.' };
+  if (!days.some((day) => day.enabled)) return { valid: false, message: 'A escala precisa de ao menos um dia de trabalho.' };
+  for (const day of days) {
+    if (!day.enabled) continue;
+    if (!/^([01]\d|2[0-3]):[0-5]\d$/.test(day.start) || !/^([01]\d|2[0-3]):[0-5]\d$/.test(day.end)) {
+      return { valid: false, message: 'Revise os horários de início e término.' };
+    }
+    const breakMinutes = Number(day.breakMinutes);
+    if (!Number.isFinite(breakMinutes) || breakMinutes < 0 || breakMinutes > 1440) return { valid: false, message: 'Revise os minutos de intervalo.' };
+    const gross = grossMinutes(day.start, day.end);
+    if (breakMinutes >= gross) return { valid: false, message: 'O intervalo precisa ser menor que a duração da jornada.' };
+  }
+  return { valid: true, message: '' };
+}
+
+function plannedMinutesForFormDay(day: TemplateDayForm): number {
+  if (!day.enabled) return 0;
+  return Math.max(0, grossMinutes(day.start, day.end) - (Number(day.breakMinutes) || 0));
+}
+
+function grossMinutes(start: string, end: string): number {
+  const [startHour, startMinute] = start.split(':').map(Number);
+  const [endHour, endMinute] = end.split(':').map(Number);
+  if (![startHour, startMinute, endHour, endMinute].every(Number.isFinite)) return 0;
+  const startTotal = startHour * 60 + startMinute;
+  let endTotal = endHour * 60 + endMinute;
+  if (endTotal <= startTotal) endTotal += 24 * 60;
+  return endTotal - startTotal;
+}
+
+function CalculationExplanationView({ data }: { data: CalculationExplanation }) {
+  return (
+    <div className="space-y-4 text-xs">
+      <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+        <ExplanationMetric label="Previsto" value={minutesLabel(data.plannedMinutes)} />
+        <ExplanationMetric label="Trabalhado" value={minutesLabel(data.workedMinutes)} />
+        <ExplanationMetric label="Saldo" value={`${data.balanceMinutes > 0 ? '+' : ''}${minutesLabel(data.balanceMinutes)}`} tone={data.balanceMinutes > 0 ? 'positive' : data.balanceMinutes < 0 ? 'negative' : undefined} />
+        <ExplanationMetric label="Situação" value={STATUS_LABEL[data.status] ?? data.status} />
+      </div>
+
+      <div className="rounded-md border p-3">
+        <div className="font-semibold">Regra aplicada</div>
+        {data.schedule ? (
+          <div className="mt-1.5 space-y-1 text-muted-foreground">
+            <div>{data.schedule.name} · {data.schedule.kind === 'CYCLE' ? 'ciclo contínuo' : 'semanal'}{data.schedule.version != null ? ` · versão ${data.schedule.version}` : ''}</div>
+            <div>{data.schedule.rule ? `${data.schedule.rule.start}–${data.schedule.rule.end} · intervalo ${data.schedule.rule.breakMinutes ?? 0} min` : 'Folga prevista'} · tolerância ±{data.schedule.toleranceMinutes} min</div>
+            {data.schedule.cycleAnchorDay && <div>Âncora do ciclo: {formatDayKey(data.schedule.cycleAnchorDay)}</div>}
+            {data.holiday && <div>Feriado: {data.holiday}</div>}
+          </div>
+        ) : (
+          <div className="mt-1.5 text-muted-foreground">Nenhuma escala vigente encontrada para o dia.</div>
+        )}
+      </div>
+
+      <div className="rounded-md border p-3">
+        <div className="font-semibold">Marcações consideradas</div>
+        {data.consideredEntries.length === 0 ? (
+          <div className="mt-1.5 text-muted-foreground">Nenhuma marcação válida.</div>
+        ) : (
+          <div className="mt-2 space-y-1.5">
+            {data.consideredEntries.map((entry, index) => (
+              <div key={entry.id} className="flex flex-wrap items-center justify-between gap-2 rounded border px-2 py-1.5">
+                <span>{index + 1}ª marcação · {formatTime(entry.punchedAt)}{entry.nsr ? ` · NSR ${entry.nsr}` : ''}</span>
+                {entry.clamped ? (
+                  <Badge variant="outline" className="border-sky-400/40 text-[9px] text-sky-600">considerada {formatTime(entry.effective ?? undefined)} pela tolerância</Badge>
+                ) : (
+                  <Badge variant="outline" className="text-[9px]">horário real</Badge>
+                )}
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+
+      {data.cancelledEntries.length > 0 && (
+        <div className="rounded-md border border-status-yellow/30 bg-status-yellow/5 p-3">
+          <div className="font-semibold">Marcações desconsideradas, mas preservadas</div>
+          <div className="mt-2 flex flex-wrap gap-1.5">
+            {data.cancelledEntries.map((entry) => <Badge key={entry.id} variant="outline" className="text-[9px]">{formatTime(entry.punchedAt)}{entry.nsr ? ` · NSR ${entry.nsr}` : ''}</Badge>)}
+          </div>
+        </div>
+      )}
+
+      {data.pairs.length > 0 && (
+        <div className="rounded-md border p-3">
+          <div className="font-semibold">Pareamento utilizado</div>
+          <div className="mt-2 space-y-1 font-mono text-[10px] text-muted-foreground">{data.pairs.map((pair, index) => <div key={index}>{pair}</div>)}</div>
+        </div>
+      )}
+
+      <div className="rounded-md border p-3">
+        <div className="font-semibold">Etapas do cálculo</div>
+        <ol className="mt-2 space-y-2 text-muted-foreground">
+          {data.steps.map((step, index) => (
+            <li key={index} className="flex gap-2"><span className="grid h-5 w-5 shrink-0 place-items-center rounded-full bg-sky-500/10 text-[10px] font-bold text-sky-600">{index + 1}</span><span className="leading-5">{step}</span></li>
+          ))}
+        </ol>
+      </div>
+      <div className="rounded-md bg-muted/30 p-2 text-[10px] text-muted-foreground">
+        Processamento: {data.memory?.calculatedAt || data.processedAt ? formatDateTime(data.memory?.calculatedAt ?? data.processedAt) : 'explicação reproduzida sob demanda com a regra vigente registrada'}
+        {data.memory?.algorithmVersion ? ` · motor ${data.memory.algorithmVersion}` : ''}
+        {data.memory?.id ? ` · memória ${data.memory.id.slice(0, 8)}` : ''}
+      </div>
+    </div>
+  );
+}
+
+function ExplanationMetric({ label, value, tone }: { label: string; value: string; tone?: 'positive' | 'negative' }) {
+  return (
+    <div className="rounded-md border p-2.5">
+      <div className="text-[9px] font-bold uppercase tracking-wider text-muted-foreground">{label}</div>
+      <div className={cn('mt-1 font-semibold tabular-nums', tone === 'positive' && 'text-status-green', tone === 'negative' && 'text-status-red')}>{value}</div>
+    </div>
+  );
+}
+
+async function buildPunchReceiptPdf(receipt: PunchReceipt) {
+  const [{ jsPDF }, { default: autoTable }] = await Promise.all([import('jspdf'), import('jspdf-autotable')]);
+  const doc = new jsPDF({ orientation: 'portrait', unit: 'pt', format: 'a4' });
+  const width = doc.internal.pageSize.getWidth();
+  const nsr = receipt.entry.nsr ? String(receipt.entry.nsr) : 'não informado';
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(15);
+  doc.text('Extrato interno de marcação de ponto', width / 2, 42, { align: 'center' });
+  doc.setFontSize(9);
+  doc.setTextColor(180, 45, 45);
+  doc.text('NÃO SUBSTITUI COMPROVANTE REP-P', width / 2, 58, { align: 'center' });
+  doc.setTextColor(40);
+  autoTable(doc, {
+    startY: 78,
+    theme: 'grid',
+    styles: { fontSize: 9, cellPadding: 5 },
+    columnStyles: { 0: { fontStyle: 'bold', cellWidth: 125 } },
+    body: [
+      ['Empregador', receipt.company.name || '—'],
+      ['Inscrição do empregador', receipt.company.registrationMasked || '—'],
+      ['Colaborador', receipt.employee.name || '—'],
+      ['CPF/registro', receipt.employee.registrationMasked || '—'],
+      ['Data e hora da marcação', formatDateTime(receipt.entry.punchedAt, receipt.snapshot.timezone)],
+      ['Recebida pelo servidor em', formatDateTime(receipt.entry.recordedAt, receipt.snapshot.timezone)],
+      ['Tipo interpretado', receipt.entry.kind === 'OUT' ? 'Saída' : 'Entrada'],
+      ['Origem', PUNCH_SOURCE_LABEL[receipt.entry.source] ?? receipt.entry.source ?? '—'],
+      ['NSR', nsr],
+      ['Identificador da marcação', receipt.entry.id],
+    ],
+  });
+  let y = (doc as any).lastAutoTable.finalY + 18;
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(8);
+  doc.text('Checksum do extrato', 40, y);
+  y += 11;
+  doc.setFont('courier', 'normal');
+  doc.setFontSize(7);
+  doc.text(doc.splitTextToSize(receipt.snapshot.checksum, width - 80), 40, y);
+  y += 24;
+  doc.setFont('helvetica', 'normal');
+  doc.setFontSize(8);
+  doc.setTextColor(100);
+  doc.text(doc.splitTextToSize(`${receipt.legalNotice} Gerado em ${formatDateTime(receipt.generatedAt, receipt.snapshot.timezone)}.`, width - 80), 40, y);
+  doc.save(`extrato-interno-ponto-nsr-${nsr.replace(/[^a-zA-Z0-9_-]/g, '-')}.pdf`);
+}
+
 function SummaryLine({ label, value, className }: { label: string; value: string; className?: string }) {
   return (
     <div className="flex items-center justify-between">
@@ -1173,12 +1811,27 @@ function minutesLabel(minutes: number): string {
 
 function formatTime(value: string | undefined): string {
   if (!value) return '--:--';
-  return new Date(value).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
+  return new Date(value).toLocaleTimeString('pt-BR', { timeZone: 'America/Sao_Paulo', hour: '2-digit', minute: '2-digit' });
 }
 
 function formatDayKey(dayKey: string): string {
   const [year, month, day] = dayKey.split('-');
   return `${day}/${month}/${year}`;
+}
+
+function formatDateTime(value: string | null | undefined, timeZone = 'America/Sao_Paulo'): string {
+  if (!value) return '—';
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return '—';
+  return date.toLocaleString('pt-BR', {
+    timeZone,
+    day: '2-digit',
+    month: '2-digit',
+    year: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit',
+    second: '2-digit',
+  });
 }
 
 /** Último dia do mês YYYY-MM (o backend limita ao dia de hoje). */

@@ -24,7 +24,10 @@ test.beforeAll(async ({ request }) => {
   // Saneamento: se uma execução anterior falhou com a competência fechada, reabre.
   const periods = await apiGet<any[]>(request, managerSession.accessToken, '/personnel/time-clock/periods');
   for (const period of periods.filter((p) => p.status === 'CLOSED')) {
-    await apiPost(request, managerSession.accessToken, `/personnel/time-clock/periods/${period.periodRef}/reopen`, {});
+    // Reabertura exige justificativa (Etapa 1 da Gestão de Jornada).
+    await apiPost(request, managerSession.accessToken, `/personnel/time-clock/periods/${period.periodRef}/reopen`, {
+      note: 'Saneamento automático da suíte E2E',
+    });
   }
 });
 
@@ -138,8 +141,22 @@ test('API: competência fechada bloqueia batidas e ajustes; reabrir libera', asy
   });
   expect(blockedPunch.status()).toBe(409);
 
-  const reopened = await apiPost<any>(request, managerToken, `/personnel/time-clock/periods/${ref}/reopen`, {});
+  // Reabrir sem justificativa é rejeitado (regra da Etapa 1).
+  const withoutNote = await request.post(`${apiBase}/personnel/time-clock/periods/${ref}/reopen`, {
+    headers: { authorization: `Bearer ${managerToken}` },
+    data: {},
+  });
+  expect(withoutNote.status()).toBe(400);
+
+  const reopened = await apiPost<any>(request, managerToken, `/personnel/time-clock/periods/${ref}/reopen`, {
+    note: 'Reabertura de teste E2E',
+  });
   expect(reopened.status).toBe('OPEN');
+
+  // O fechamento ficou versionado com a justificativa registrada.
+  const versions = await apiGet<any[]>(request, managerToken, `/personnel/time-clock/periods/${ref}/versions`);
+  expect(versions.length).toBeGreaterThan(0);
+  expect(versions[0].reopenNote).toBe('Reabertura de teste E2E');
 });
 
 test('API: importação de batidas CSV entra no espelho e ignora duplicadas', async ({ request }) => {
@@ -154,8 +171,11 @@ test('API: importação de batidas CSV entra no espelho e ignora duplicadas', as
     `${workerCredentials.email};${dayKey};10:30`,
   ].join('\n');
 
+  // O banco de dev persiste entre execuções: a 1ª chamada pode encontrar as
+  // batidas já importadas por uma execução anterior. O contrato testado é a
+  // idempotência (cada linha vira batida OU duplicata, nunca as duas).
   const first = await apiPost<any>(request, managerToken, '/personnel/time-clock/import', { content: csv });
-  expect(first.imported).toBe(2);
+  expect(first.imported + first.duplicates).toBe(2);
 
   const again = await apiPost<any>(request, managerToken, '/personnel/time-clock/import', { content: csv });
   expect(again.imported).toBe(0);

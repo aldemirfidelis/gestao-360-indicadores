@@ -5,7 +5,7 @@ import { useRouter, usePathname } from 'next/navigation';
 import { useQueryClient } from '@tanstack/react-query';
 import { api, clearTokens, getAccessToken, setTokens } from '@/lib/api';
 import { SUPER_ADMIN_ONLY_PERMISSION } from '@/components/shell/navigation';
-import { publicRoutes } from '@/lib/public-site';
+import { authPublicRoutes } from '@/lib/public-site';
 
 
 export interface AuthUser {
@@ -63,7 +63,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const token = getAccessToken();
     if (!token) {
       setLoading(false);
-      const isPublicPath = publicRoutes.some((route) => {
+      const isPublicPath = authPublicRoutes.some((route) => {
         if (route === '/') return pathname === '/';
         return pathname === route || pathname.startsWith(`${route}/`);
       });

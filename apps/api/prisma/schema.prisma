@@ -11857,7 +11857,14 @@ model WorkShiftTemplate {
   name             String
   description      String?
   toleranceMinutes Int       @default(10)
+  /// WEEKLY = regras por dia da semana; CYCLE = sequência repetitiva (12x36, 4x2...).
+  kind             String    @default("WEEKLY")
   weeklyRules      Json
+  /// Sequência do ciclo quando kind=CYCLE: [{start,end,breakMinutes} | null, ...].
+  /// A fase (dia 0) é definida por colaborador na atribuição (cycleAnchor).
+  cycleRules       Json?
+  /// Mantém jornada prevista em feriados quando a regra interna autorizada assim definir.
+  worksHolidays    Boolean   @default(false)
   active           Boolean   @default(true)
   createdById      String?
   createdAt        DateTime  @default(now())
@@ -11883,13 +11890,70 @@ model WorkScheduleAssignment {
   endsAt            DateTime?
   /// Snapshot das regras/tolerância no momento da atribuição: a vigência fica
   /// congelada e editar o template NÃO reescreve espelhos passados.
+  /// Formato: WeeklyRules (mon..sun) OU { kind:'CYCLE', cycle:[...], worksHolidays }.
   rulesSnapshot     Json?
   toleranceSnapshot Int?
+  /// Dia 0 do ciclo para este colaborador (obrigatório em escalas CYCLE).
+  cycleAnchorDay    String?
   createdById       String?
   createdAt         DateTime          @default(now())
 
   @@index([companyId, userId, startsAt])
   @@map("work_schedule_assignments")
+}
+
+/// Totem/coletor autorizado de ponto (celular na parede, tablet, quiosque).
+/// O token é exibido uma única vez na criação; aqui fica apenas o hash.
+model PersonnelKioskDevice {
+  id             String    @id @default(uuid())
+  companyId      String
+  /// Unidade/estabelecimento ao qual o terminal fica restrito. Quando nulo,
+  /// o terminal fica no escopo geral da empresa (modo legado/piloto).
+  branchId       String?
+  name           String
+  tokenHash      String    @unique
+  tokenExpiresAt DateTime
+  lastRotatedAt  DateTime  @default(now())
+  active         Boolean   @default(true)
+  lastSeenAt     DateTime?
+  /// Geofence opcional do terminal.
+  latitude       Float?
+  longitude      Float?
+  radiusMeters   Int?
+  createdById    String?
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+
+  @@index([companyId, branchId, active])
+  @@map("personnel_kiosk_devices")
+}
+
+/// Desafio curto e de uso único do terminal. Impede que a mesma requisição
+/// capturada na rede seja reapresentada; não representa, por si só, prova de vida.
+model PersonnelKioskChallenge {
+  id        String    @id @default(uuid())
+  companyId String
+  deviceId  String
+  nonceHash String
+  expiresAt DateTime
+  usedAt    DateTime?
+  syncId    String?
+  entryId   String?
+  createdAt DateTime  @default(now())
+
+  @@index([deviceId, expiresAt])
+  @@index([companyId, syncId])
+  @@map("personnel_kiosk_challenges")
+}
+
+/// Contadores atômicos por empresa e escopo (sequência técnica interna).
+model PersonnelCounter {
+  companyId String
+  key       String
+  value     BigInt @default(0)
+
+  @@id([companyId, key])
+  @@map("personnel_counters")
 }
 
 /// Feriado da empresa (dayKey YYYY-MM-DD no fuso da empresa). Em feriado a
@@ -11927,7 +11991,7 @@ model TimesheetPeriodVersion {
 }
 
 /// Batida de ponto. Imutável (ajustes cancelam e recriam com origem MANUAL);
-/// `hash`/`prevHash` formam cadeia de integridade por usuário (Portaria 671).
+/// `hash`/`prevHash` formam cadeia técnica de integridade por usuário; não são AFD/ARP.
 model TimeClockEntry {
   id                  String   @id @default(uuid())
   companyId           String
@@ -11953,12 +12017,76 @@ model TimeClockEntry {
   /// Identificador de sincronização (idempotência offline). Único por empresa
   /// quando presente (índice parcial criado na migração).
   syncId              String?
+  /// Sequência interna por unidade/empresa. O nome legado `nsr` é mantido por
+  /// compatibilidade, mas o campo isolado não constitui NSR de REP-P certificado.
+  sequenceScope       String
+  nsr                 BigInt
   createdById         String?
   createdAt           DateTime @default(now())
 
+  receiptSnapshot TimeClockReceiptSnapshot?
+  treatments      TimeClockEntryTreatment[]
+
   @@index([companyId, userId, dayKey])
   @@index([companyId, dayKey])
+  @@unique([companyId, sequenceScope, nsr])
   @@map("time_clock_entries")
+}
+
+/// Tratamento append-only aplicado sobre a marcação bruta. A marcação original
+/// não é alterada; a apuração ignora entradas com tratamento EXCLUDE.
+model TimeClockEntryTreatment {
+  id                  String         @id @default(uuid())
+  companyId           String
+  entryId             String
+  entry               TimeClockEntry @relation(fields: [entryId], references: [id], onDelete: Restrict)
+  adjustmentRequestId String
+  action              String         @default("EXCLUDE")
+  reason              String
+  createdById         String?
+  createdAt           DateTime       @default(now())
+
+  @@unique([entryId, adjustmentRequestId, action])
+  @@index([companyId, adjustmentRequestId])
+  @@map("time_clock_entry_treatments")
+}
+
+/// Snapshot mínimo e imutável usado no extrato interno da marcação. Os
+/// identificadores são armazenados já mascarados para não duplicar CPF/CNPJ.
+model TimeClockReceiptSnapshot {
+  id                          String         @id @default(uuid())
+  companyId                   String
+  entryId                     String         @unique
+  entry                       TimeClockEntry @relation(fields: [entryId], references: [id], onDelete: Restrict)
+  companyName                 String
+  companyRegistrationMasked  String?
+  employeeName                String
+  employeeRegistrationMasked String?
+  timezone                    String         @default("America/Sao_Paulo")
+  snapshotOrigin              String         @default("PUNCH")
+  checksum                    String
+  capturedAt                  DateTime       @default(now())
+
+  @@index([companyId, capturedAt])
+  @@map("time_clock_receipt_snapshots")
+}
+
+/// Memória versionada de uma execução da apuração diária. O snapshot é criado
+/// ao consultar “Entenda o cálculo” e identificado pelo hash dos insumos.
+model TimesheetCalculationMemory {
+  id               String   @id @default(uuid())
+  companyId        String
+  userId           String
+  dayKey           String
+  algorithmVersion String
+  inputHash         String
+  snapshot         Json
+  calculatedById   String?
+  calculatedAt     DateTime @default(now())
+
+  @@unique([companyId, userId, dayKey, algorithmVersion, inputHash])
+  @@index([companyId, userId, dayKey, calculatedAt])
+  @@map("timesheet_calculation_memories")
 }
 
 /// Template biométrico facial do colaborador. Armazena somente o descritor

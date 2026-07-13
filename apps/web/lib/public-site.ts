@@ -903,9 +903,18 @@ export const publicRoutes = [
   '/termos-de-uso',
 ];
 
+/**
+ * Superfícies operacionais sem sessão individual. São públicas para o guard de
+ * navegação, mas deliberadamente ficam fora de sitemap/llms e recebem noindex.
+ */
+export const operationalPublicRoutes = ['/ponto-totem'];
+
+export const authPublicRoutes = [...publicRoutes, ...operationalPublicRoutes];
+
 export const privateRoutePrefixes = [
   '/login',
   '/platform-admin',
+  ...operationalPublicRoutes,
   '/dashboard',
   '/meu-dia',
   '/tarefas',

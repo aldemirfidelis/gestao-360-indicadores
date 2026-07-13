@@ -3,11 +3,13 @@ import { Request } from 'express';
 import { Throttle } from '@nestjs/throttler';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import { RequirePermissions } from '../../common/decorators/permissions.decorator';
+import { SensitiveBody } from '../../common/decorators/sensitive-body.decorator';
 import { AuthPayload } from '../auth/auth.types';
 import { BiometricService } from './biometric.service';
 
 @Controller('personnel/biometrics')
 @Throttle({ default: { limit: 20, ttl: 60_000 } })
+@SensitiveBody()
 export class BiometricController {
   constructor(private readonly service: BiometricService) {}
 
