@@ -188,6 +188,26 @@ export default function PayrollEsocialPage() {
     onError: (err: any) => toast.error(err.message || 'Erro ao gerar S-1299.'),
   });
 
+  const generateAdmission = useMutation({
+    mutationFn: () => api<{ created: number; skipped: unknown[] }>(`/payroll/runs/${effectiveRun}/esocial/admission`, { method: 'POST', json: { environment: 'PRODUCTION_RESTRICTED' } }),
+    onSuccess: (data) => {
+      toast.success(`${data.created} evento(s) S-2200 gerado(s).`);
+      if (data.skipped.length) toast.info(`${data.skipped.length} colaborador(es) já tinham S-2200 ou sem dados.`);
+      void qc.invalidateQueries({ queryKey: ['payroll-esocial-events', effectiveRun] });
+    },
+    onError: (err: any) => toast.error(err.message || 'Erro ao gerar S-2200.'),
+  });
+
+  const reconcile = useMutation({
+    mutationFn: () => api<{ totalizers: Record<string, number>; workersWithoutEvent: number }>(`/payroll/runs/${effectiveRun}/esocial/reconcile`, { method: 'POST', json: { environment: 'PRODUCTION_RESTRICTED' } }),
+    onSuccess: (data) => {
+      const t = data.totalizers;
+      toast.success(`Totalizadores: INSS ${t.s5001CpValue?.toFixed(2)} · IRRF ${t.s5002IrrfValue?.toFixed(2)} · FGTS ${t.fgtsValue?.toFixed(2)}`);
+      if (data.workersWithoutEvent > 0) toast.warning(`${data.workersWithoutEvent} colaborador(es) sem evento gerado.`);
+    },
+    onError: (err: any) => toast.error(err.message || 'Erro ao conciliar totalizadores.'),
+  });
+
   const createBatch = useMutation({
     mutationFn: () => api<EsocialBatch>('/payroll/esocial/batches', { method: 'POST', json: { eventIds: selectedEvents, certificateId: selectedCertificate || undefined } }),
     onSuccess: () => {
@@ -303,7 +323,7 @@ export default function PayrollEsocialPage() {
       <Card className="border-border/60">
         <CardHeader>
           <CardTitle>Processamento de Origem</CardTitle>
-          <CardDescription>Fluxo periódico do período: tabela de rubricas (S-1010) → remuneração (S-1200) → fechamento (S-1299). Tudo em produção restrita, sem assinatura/transmissão.</CardDescription>
+          <CardDescription>Fluxo do período: S-1010 rubricas → S-1200 remuneração (ou S-2299 se rescisão) → S-1299 fechamento. S-2200 admissão e a prévia dos totalizadores à parte. Tudo em produção restrita, sem assinatura/transmissão.</CardDescription>
         </CardHeader>
         <CardContent className="space-y-3">
           <NativeSelect value={effectiveRun} onChange={(event) => { setSelectedRun(event.target.value); setSelectedEvents([]); }}>
@@ -311,14 +331,20 @@ export default function PayrollEsocialPage() {
             {runs.map((run) => <option key={run.id} value={run.id}>{run.label}</option>)}
           </NativeSelect>
           <div className="flex flex-wrap gap-2">
+            <Button variant="outline" onClick={() => generateAdmission.mutate()} disabled={!effectiveRun || generateAdmission.isPending}>
+              <FileCode2 className="mr-2 h-4 w-4" /> S-2200 Admissão
+            </Button>
             <Button variant="outline" onClick={() => generateRubricTable.mutate()} disabled={!effectiveRun || generateRubricTable.isPending}>
               <Binary className="mr-2 h-4 w-4" /> S-1010 Rubricas
             </Button>
             <Button onClick={() => generateEvents.mutate()} disabled={!effectiveRun || generateEvents.isPending}>
-              <FileCode2 className="mr-2 h-4 w-4" /> S-1200 Remuneração
+              <FileCode2 className="mr-2 h-4 w-4" /> S-1200 / S-2299
             </Button>
             <Button variant="outline" onClick={() => generateClosing.mutate()} disabled={!effectiveRun || generateClosing.isPending}>
               <PackagePlus className="mr-2 h-4 w-4" /> S-1299 Fechamento
+            </Button>
+            <Button variant="outline" onClick={() => reconcile.mutate()} disabled={!effectiveRun || reconcile.isPending}>
+              <ShieldCheck className="mr-2 h-4 w-4" /> Totalizadores
             </Button>
           </div>
         </CardContent>

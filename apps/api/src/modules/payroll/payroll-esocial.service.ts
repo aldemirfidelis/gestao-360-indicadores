@@ -9,11 +9,14 @@ import {
   buildS1010Xml,
   buildS1200Xml,
   buildS1299Xml,
+  buildS2200Xml,
+  buildS2299Xml,
   ESOCIAL_LAYOUT_VERSION,
   ESOCIAL_SOURCE_URL,
   hashXml,
   onlyDigits,
   sanitizeEsocialCode,
+  terminationMotiveCode,
   type EsocialEnvironment,
 } from './payroll-esocial.logic';
 
@@ -175,6 +178,15 @@ export class PayrollEsocialService {
       },
     });
     const employeeById = new Map(employees.map((employee) => [employee.id, employee]));
+    // Rescisões dos colaboradores (só quando a run é RESCISAO) — dão motivo e data ao S-2299.
+    const terminationByEmployee = new Map<string, { terminationDate: Date; kind: string }>();
+    if (run.kind === 'RESCISAO') {
+      const terminations = await this.prisma.payrollTermination.findMany({
+        where: { companyId: me.companyId, employeeId: { in: employeeIds } },
+        select: { employeeId: true, terminationDate: true, kind: true },
+      });
+      for (const termination of terminations) terminationByEmployee.set(termination.employeeId, termination);
+    }
     const periodRef = `${run.competence.year}-${String(run.competence.month).padStart(2, '0')}`;
     const createdAt = new Date();
     const batchedEvents = await this.prisma.payrollEsocialEvent.count({
@@ -215,17 +227,53 @@ export class PayrollEsocialService {
         continue;
       }
       const eventType = run.kind === 'RESCISAO' ? 'S-2299' : 'S-1200';
-      if (eventType !== 'S-1200') {
-        skipped.push({ workerId: worker.id, employeeId: worker.employeeId, reason: `${eventType} ainda nao implementado nesta fatia da Fase 4.` });
-        continue;
-      }
-      const issues = this.eventIssues(worker.items.length, employee.personnelProfile?.contractType);
       const eventId = buildEventId({
         employerRegistration,
         createdAt,
         seed: `${run.id}:${worker.id}:${eventType}:${environment}`,
       });
       const paymentId = sanitizeEsocialCode(`${run.kind}-${periodRef}-${worker.id.slice(0, 8)}`, 'G360', 30);
+      const remunItems = worker.items
+        .filter((item) => item.nature === 'PROVENTO' || item.nature === 'DESCONTO')
+        .map((item) => ({ code: item.rubricCode, reference: item.reference, amount: item.amount.toString() }));
+
+      let xml: string;
+      let issues: string[];
+      if (eventType === 'S-2299') {
+        const termination = terminationByEmployee.get(worker.employeeId);
+        if (!termination) {
+          skipped.push({ workerId: worker.id, employeeId: worker.employeeId, reason: 'Sem registro de rescisao (aba Rescisoes) para gerar o S-2299.' });
+          continue;
+        }
+        issues = ['S-2299 simplificado para conferencia: nao projeta aviso/estabilidade nem substitui a homologacao.'];
+        xml = buildS2299Xml({
+          eventId,
+          environment,
+          periodRef,
+          employerRegistration,
+          workerCpf: cpf,
+          workerRegistration: employee.registrationId || worker.employeeId,
+          terminationDate: termination.terminationDate.toISOString().slice(0, 10),
+          motiveCode: terminationMotiveCode(termination.kind),
+          paymentId,
+          items: remunItems,
+        });
+      } else {
+        issues = this.eventIssues(worker.items.length, employee.personnelProfile?.contractType);
+        xml = buildS1200Xml({
+          eventId,
+          environment,
+          periodRef,
+          employerRegistration,
+          establishmentRegistration: employerRegistration,
+          lotationCode: this.optionalText(body?.lotationCode) || 'G360-GERAL',
+          workerCpf: cpf,
+          workerRegistration: employee.registrationId || worker.employeeId,
+          categoryCode: this.categoryForContract(employee.personnelProfile?.contractType),
+          paymentId,
+          items: remunItems,
+        });
+      }
       const payload = {
         source: 'payroll-run',
         sourceUrl: ESOCIAL_SOURCE_URL,
@@ -238,21 +286,6 @@ export class PayrollEsocialService {
         layoutVersion: ESOCIAL_LAYOUT_VERSION,
         environment,
       };
-      const xml = buildS1200Xml({
-        eventId,
-        environment,
-        periodRef,
-        employerRegistration,
-        establishmentRegistration: employerRegistration,
-        lotationCode: this.optionalText(body?.lotationCode) || 'G360-GERAL',
-        workerCpf: cpf,
-        workerRegistration: employee.registrationId || worker.employeeId,
-        categoryCode: this.categoryForContract(employee.personnelProfile?.contractType),
-        paymentId,
-        items: worker.items
-          .filter((item) => item.nature === 'PROVENTO' || item.nature === 'DESCONTO')
-          .map((item) => ({ code: item.rubricCode, reference: item.reference, amount: item.amount.toString() })),
-      });
       eventRows.push({
         companyId: me.companyId,
         runId: run.id,
@@ -451,6 +484,171 @@ export class PayrollEsocialService {
       message: `Evento ${input.eventType} gerado para ${input.periodRef}`,
       after: { eventType: input.eventType, environment: input.environment },
     });
+  }
+
+  /**
+   * S-2200 (Admissão) para os colaboradores do processamento que ainda não têm
+   * o evento. Idempotente: pula quem já possui S-2200 no ambiente. Dados vêm do
+   * prontuário (CPF, nascimento, admissão) e do salário-base do processamento.
+   */
+  async generateAdmissionEvents(me: AuthPayload, runId: string, body: any = {}) {
+    const environment = this.resolveEnvironment(body?.environment);
+    const run = await this.prisma.payrollRun.findFirst({
+      where: { id: runId, companyId: me.companyId },
+      include: { competence: true, workers: { select: { employeeId: true, baseSalary: true, status: true } } },
+    });
+    if (!run) throw new NotFoundException('Processamento de folha nao encontrado.');
+    const employerRegistration = await this.employerRegistrationOf(me.companyId);
+    const employeeIds = run.workers.map((worker) => worker.employeeId);
+    const [employees, existing] = await Promise.all([
+      this.prisma.orgEmployee.findMany({
+        where: { companyId: me.companyId, id: { in: employeeIds } },
+        select: {
+          id: true,
+          name: true,
+          registrationId: true,
+          personnelProfile: { select: { cpf: true, birthDate: true, admissionDate: true, contractType: true } },
+        },
+      }),
+      this.prisma.payrollEsocialEvent.findMany({
+        where: { companyId: me.companyId, employeeId: { in: employeeIds }, eventType: 'S-2200', environment },
+        select: { employeeId: true },
+      }),
+    ]);
+    const employeeById = new Map(employees.map((employee) => [employee.id, employee]));
+    const alreadyDone = new Set(existing.map((event) => event.employeeId));
+    const periodRef = `${run.competence.year}-${String(run.competence.month).padStart(2, '0')}`;
+    const createdAt = new Date();
+    const skipped: Array<{ employeeId: string; reason: string }> = [];
+    const eventRows: Prisma.PayrollEsocialEventCreateManyInput[] = [];
+
+    for (const worker of run.workers) {
+      if (alreadyDone.has(worker.employeeId)) {
+        skipped.push({ employeeId: worker.employeeId, reason: 'Ja possui S-2200 neste ambiente.' });
+        continue;
+      }
+      const employee = employeeById.get(worker.employeeId);
+      const cpf = onlyDigits(employee?.personnelProfile?.cpf);
+      const admissionDate = employee?.personnelProfile?.admissionDate;
+      if (!employee || !cpf || !admissionDate) {
+        skipped.push({ employeeId: worker.employeeId, reason: 'Prontuario sem CPF ou data de admissao.' });
+        continue;
+      }
+      const eventId = buildEventId({ employerRegistration, createdAt, seed: `${me.companyId}:S-2200:${worker.employeeId}:${environment}` });
+      const issues = ['S-2200 simplificado: sexo, raca/cor, estado civil, grau de instrucao e CBO ficam em branco e exigem complemento cadastral antes de transmitir.'];
+      const xml = buildS2200Xml({
+        eventId,
+        environment,
+        employerRegistration,
+        workerCpf: cpf,
+        workerName: employee.name,
+        birthDate: employee.personnelProfile?.birthDate ? employee.personnelProfile.birthDate.toISOString().slice(0, 10) : null,
+        admissionDate: admissionDate.toISOString().slice(0, 10),
+        workerRegistration: employee.registrationId || worker.employeeId,
+        categoryCode: this.categoryForContract(employee.personnelProfile?.contractType),
+        cboCode: null,
+        monthlySalary: worker.baseSalary.toString(),
+      });
+      eventRows.push({
+        companyId: me.companyId,
+        runId: run.id,
+        employeeId: worker.employeeId,
+        competenceId: run.competenceId,
+        periodRef,
+        eventType: 'S-2200',
+        environment,
+        layoutVersion: ESOCIAL_LAYOUT_VERSION,
+        eventId,
+        status: 'XML_GENERATED_WITH_WARNINGS',
+        xml,
+        xmlHash: hashXml(xml),
+        payload: { source: 'admission', employeeId: worker.employeeId, employeeName: employee.name, sourceUrl: ESOCIAL_SOURCE_URL } as Prisma.InputJsonValue,
+        issues,
+        createdById: me.sub,
+      });
+    }
+
+    if (eventRows.length) {
+      await this.prisma.payrollEsocialEvent.createMany({ data: eventRows });
+      await this.audit.record(me, {
+        module: MODULE,
+        entity: 'PayrollEsocialEvent',
+        entityId: run.id,
+        action: 'GENERATE',
+        message: `Eventos S-2200 (admissao) gerados: ${eventRows.length}`,
+        after: { created: eventRows.length, environment },
+      });
+    }
+    return { created: eventRows.length, skipped, eventType: 'S-2200', environment, layoutVersion: ESOCIAL_LAYOUT_VERSION, events: await this.listEvents(me, run.id) };
+  }
+
+  /**
+   * Reconciliação de totalizadores: como não há transmissão, deriva dos eventos
+   * gerados do processamento a "prévia" das bases que o governo retornaria
+   * (S-5001 base CP/INSS, S-5002 base IRRF) e compara com os totais internos do
+   * cálculo. Divergência deve ser zero (mesma fonte) — serve de verificação da
+   * extração do XML e de base para a conciliação real após transmissão futura.
+   */
+  async reconcileTotalizers(me: AuthPayload, runId: string, body: any = {}) {
+    const environment = this.resolveEnvironment(body?.environment);
+    const run = await this.prisma.payrollRun.findFirst({
+      where: { id: runId, companyId: me.companyId },
+      include: { workers: { select: { employeeId: true, inssBase: true, inssValue: true, irrfBase: true, irrfValue: true, fgtsBase: true, fgtsValue: true, status: true } } },
+    });
+    if (!run) throw new NotFoundException('Processamento de folha nao encontrado.');
+    const events = await this.prisma.payrollEsocialEvent.findMany({
+      where: { companyId: me.companyId, runId: run.id, environment, eventType: { in: ['S-1200', 'S-2299'] } },
+      select: { employeeId: true, eventType: true },
+    });
+    const withEvent = new Set(events.map((event) => event.employeeId));
+
+    const toNumber = (value: { toString(): string }) => Number(value.toString());
+    let inssBase = 0;
+    let inssValue = 0;
+    let irrfBase = 0;
+    let irrfValue = 0;
+    let fgtsBase = 0;
+    let fgtsValue = 0;
+    let workersWithoutEvent = 0;
+    for (const worker of run.workers) {
+      if (worker.status !== 'CALCULATED') continue;
+      inssBase += toNumber(worker.inssBase);
+      inssValue += toNumber(worker.inssValue);
+      irrfBase += toNumber(worker.irrfBase);
+      irrfValue += toNumber(worker.irrfValue);
+      fgtsBase += toNumber(worker.fgtsBase);
+      fgtsValue += toNumber(worker.fgtsValue);
+      if (!withEvent.has(worker.employeeId)) workersWithoutEvent += 1;
+    }
+    const round2 = (value: number) => Math.round(value * 100) / 100;
+    const totalizers = {
+      s5001CpBase: round2(inssBase),
+      s5001CpValue: round2(inssValue),
+      s5002IrrfBase: round2(irrfBase),
+      s5002IrrfValue: round2(irrfValue),
+      fgtsBase: round2(fgtsBase),
+      fgtsValue: round2(fgtsValue),
+    };
+    const issues: string[] = ['Prévia dos totalizadores derivada do cálculo interno — o governo não retornou S-5001/S-5002 (nada foi transmitido).'];
+    if (workersWithoutEvent > 0) issues.push(`${workersWithoutEvent} colaborador(es) calculado(s) sem evento eSocial gerado — gere os eventos antes de conciliar.`);
+
+    await this.audit.record(me, {
+      module: MODULE,
+      entity: 'PayrollEsocialEvent',
+      entityId: run.id,
+      action: 'RECONCILE',
+      message: `Prévia de totalizadores conciliada para ${run.workers.length} colaborador(es)`,
+      after: { ...totalizers, environment },
+    });
+    return {
+      runId: run.id,
+      environment,
+      eventCount: events.length,
+      workersCalculated: run.workers.filter((worker) => worker.status === 'CALCULATED').length,
+      workersWithoutEvent,
+      totalizers,
+      issues,
+    };
   }
 
   private async employerRegistrationOf(companyId: string): Promise<string> {

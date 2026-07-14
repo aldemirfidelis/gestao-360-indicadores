@@ -126,8 +126,12 @@ qualquer transmissão.
   mensal para conferência: **S-1010** (tabela de rubricas), **S-1200** (remuneração) e
   **S-1299** (fechamento), com lote interno `STAGED_UNSIGNED`. Assinatura/transmissão seguem
   bloqueadas até cofre/assinador homologado; S-1010 sai com natRubr/codInc* em branco (exigem
-  parametrização contábil). Pendentes: S-2200/S-2299 (admissão/desligamento), S-1210
-  (pagamentos), totalizadores S-5001/5002/5011 e envio real.
+  parametrização contábil). Não-periódicos: **S-2200** (admissão, do prontuário + salário-base;
+  sexo/raça/estado civil/grau instr/CBO em branco) e **S-2299** (desligamento, do registro de
+  rescisão — motivo Tabela 19, verbas rescisórias). **Reconciliação de totalizadores**: prévia
+  de S-5001 (base/valor CP-INSS) e S-5002 (base/valor IRRF) derivada do cálculo interno para
+  conferência (governo não retorna nada — nada transmitido). Pendentes: S-1210 (pagamentos),
+  S-5011 e envio/assinatura reais.
 - **F5**: obrigações assistidas (FGTS Digital, DCTFWeb/Integra Contador opcional, EFD-Reinf,
   Qualificação Cadastral, DET, calendário legal).
 - **F6**: Banking Connector (CNAB 240, dupla aprovação, retorno/conciliação, antifraude) +

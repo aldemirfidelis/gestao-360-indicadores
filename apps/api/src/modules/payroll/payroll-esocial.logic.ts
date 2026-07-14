@@ -35,7 +35,16 @@ export interface EsocialBatchEvent {
 const NS_REMUN = 'http://www.esocial.gov.br/schema/evt/evtRemun/v_S_01_03_00';
 const NS_TAB_RUBRICA = 'http://www.esocial.gov.br/schema/evt/evtTabRubrica/v_S_01_03_00';
 const NS_FECHA = 'http://www.esocial.gov.br/schema/evt/evtFechaEvPer/v_S_01_03_00';
+const NS_ADMISSAO = 'http://www.esocial.gov.br/schema/evt/evtAdmissao/v_S_01_03_00';
+const NS_DESLIG = 'http://www.esocial.gov.br/schema/evt/evtDeslig/v_S_01_03_00';
 const VERSION_PROC = 'G360-0.1';
+
+/** Motivo de desligamento (Tabela 19 do eSocial) por tipo interno de rescisão. */
+export function terminationMotiveCode(kind: string): string {
+  if (kind === 'PEDIDO') return '07'; // rescisão a pedido do empregado
+  if (kind === 'ACORDO') return '33'; // rescisão por acordo (Lei 13.467)
+  return '02'; // dispensa sem justa causa por iniciativa do empregador
+}
 
 /** Código eSocial tpRubr por natureza interna (1 provento, 2 desconto, 3 informativa, 4 info dedutora). */
 export function rubricTypeCode(nature: string): '1' | '2' | '3' | '4' {
@@ -253,6 +262,149 @@ export function buildS1299Xml(input: EsocialClosingEvent): string {
     '      <evtInfoComplPer>N</evtInfoComplPer>',
     '    </infoFech>',
     '  </evtFechaEvPer>',
+    '</eSocial>',
+  ].join('\n');
+}
+
+export interface EsocialAdmissionEvent {
+  eventId: string;
+  environment: EsocialEnvironment;
+  employerRegistration: string;
+  workerCpf: string;
+  workerName: string;
+  birthDate: string | null; // YYYY-MM-DD
+  admissionDate: string; // YYYY-MM-DD
+  workerRegistration: string;
+  categoryCode: string;
+  cboCode: string | null;
+  monthlySalary: string; // valor decimal "0.00"
+}
+
+/**
+ * S-2200 (Admissão / Cadastramento Inicial do Vínculo) simplificado, para
+ * conferência interna. ⚠️ Campos obrigatórios que o cadastro atual pode não ter
+ * (sexo, raça/cor, estado civil, grau de instrução, CBO, país/município) saem
+ * em branco e são sinalizados como pendência antes de qualquer transmissão.
+ */
+export function buildS2200Xml(input: EsocialAdmissionEvent): string {
+  const employerRoot = onlyDigits(input.employerRegistration).slice(0, 8);
+  return [
+    '<?xml version="1.0" encoding="UTF-8"?>',
+    `<eSocial xmlns="${NS_ADMISSAO}">`,
+    `  <evtAdmissao Id="${xmlEscape(input.eventId)}">`,
+    '    <ideEvento>',
+    `      <tpAmb>${environmentCode(input.environment)}</tpAmb>`,
+    '      <procEmi>1</procEmi>',
+    `      <verProc>${VERSION_PROC}</verProc>`,
+    '    </ideEvento>',
+    '    <ideEmpregador>',
+    '      <tpInsc>1</tpInsc>',
+    `      <nrInsc>${xmlEscape(employerRoot)}</nrInsc>`,
+    '    </ideEmpregador>',
+    '    <trabalhador>',
+    `      <cpfTrab>${xmlEscape(onlyDigits(input.workerCpf))}</cpfTrab>`,
+    `      <nmTrab>${xmlEscape(input.workerName.slice(0, 70))}</nmTrab>`,
+    '      <sexo></sexo>',
+    '      <racaCor></racaCor>',
+    '      <estCiv></estCiv>',
+    '      <grauInstr></grauInstr>',
+    '      <nascimento>',
+    `        <dtNascto>${xmlEscape(input.birthDate ?? '')}</dtNascto>`,
+    '        <paisNascto>105</paisNascto>',
+    '        <paisNac>105</paisNac>',
+    '      </nascimento>',
+    '    </trabalhador>',
+    `    <vinculo matricula="${xmlEscape(sanitizeEsocialCode(input.workerRegistration, 'SEM-MATRICULA', 30))}">`,
+    '      <tpRegTrab>1</tpRegTrab>',
+    '      <tpRegPrev>1</tpRegPrev>',
+    '      <infoContrato>',
+    `        <codCargo>${xmlEscape(input.cboCode ?? '')}</codCargo>`,
+    `        <codCateg>${xmlEscape(input.categoryCode)}</codCateg>`,
+    '        <remuneracao>',
+    `          <vrSalFx>${decimalStringToEsocialMoney(input.monthlySalary)}</vrSalFx>`,
+    '          <undSalFixo>5</undSalFixo>',
+    '        </remuneracao>',
+    '        <duracao>',
+    '          <tpContr>1</tpContr>',
+    '        </duracao>',
+    `        <dtAdm>${xmlEscape(input.admissionDate)}</dtAdm>`,
+    '      </infoContrato>',
+    '    </vinculo>',
+    '  </evtAdmissao>',
+    '</eSocial>',
+  ].join('\n');
+}
+
+export interface EsocialTerminationEvent {
+  eventId: string;
+  environment: EsocialEnvironment;
+  periodRef: string;
+  employerRegistration: string;
+  workerCpf: string;
+  workerRegistration: string;
+  terminationDate: string; // YYYY-MM-DD
+  motiveCode: string;
+  paymentId: string;
+  items: EsocialRemunerationItem[];
+}
+
+/**
+ * S-2299 (Desligamento) simplificado, para conferência interna: motivo, data e
+ * as verbas rescisórias como itensRemun. ⚠️ Não projeta aviso/estabilidade nem
+ * substitui a homologação; incidências detalhadas exigem validação.
+ */
+export function buildS2299Xml(input: EsocialTerminationEvent): string {
+  const employerRoot = onlyDigits(input.employerRegistration).slice(0, 8);
+  const items = input.items
+    .filter((item) => Number(decimalStringToEsocialMoney(item.amount)) > 0)
+    .map((item) =>
+      [
+        '            <itensRemun>',
+        `              <codRubr>${xmlEscape(sanitizeEsocialCode(item.code, 'G360', 30))}</codRubr>`,
+        '              <ideTabRubr>G360</ideTabRubr>',
+        `              <vrRubr>${decimalStringToEsocialMoney(item.amount)}</vrRubr>`,
+        '            </itensRemun>',
+      ].join('\n'),
+    )
+    .join('\n');
+
+  return [
+    '<?xml version="1.0" encoding="UTF-8"?>',
+    `<eSocial xmlns="${NS_DESLIG}">`,
+    `  <evtDeslig Id="${xmlEscape(input.eventId)}">`,
+    '    <ideEvento>',
+    '      <indRetif>1</indRetif>',
+    `      <tpAmb>${environmentCode(input.environment)}</tpAmb>`,
+    '      <procEmi>1</procEmi>',
+    `      <verProc>${VERSION_PROC}</verProc>`,
+    '    </ideEvento>',
+    '    <ideEmpregador>',
+    '      <tpInsc>1</tpInsc>',
+    `      <nrInsc>${xmlEscape(employerRoot)}</nrInsc>`,
+    '    </ideEmpregador>',
+    '    <ideVinculo>',
+    `      <cpfTrab>${xmlEscape(onlyDigits(input.workerCpf))}</cpfTrab>`,
+    `      <matricula>${xmlEscape(sanitizeEsocialCode(input.workerRegistration, 'SEM-MATRICULA', 30))}</matricula>`,
+    '    </ideVinculo>',
+    '    <infoDeslig>',
+    `      <mtvDeslig>${xmlEscape(input.motiveCode)}</mtvDeslig>`,
+    `      <dtDeslig>${xmlEscape(input.terminationDate)}</dtDeslig>`,
+    '      <indPagtoAPI>N</indPagtoAPI>',
+    '      <verbasResc>',
+    `        <dmDev>`,
+    `          <ideDmDev>${xmlEscape(sanitizeEsocialCode(input.paymentId, 'G360', 30))}</ideDmDev>`,
+    '          <infoPerApur>',
+    '            <ideEstabLot>',
+    '              <tpInsc>1</tpInsc>',
+    `              <nrInsc>${xmlEscape(employerRoot)}</nrInsc>`,
+    '              <codLotacao>G360-GERAL</codLotacao>',
+    items,
+    '            </ideEstabLot>',
+    '          </infoPerApur>',
+    '        </dmDev>',
+    '      </verbasResc>',
+    '    </infoDeslig>',
+    '  </evtDeslig>',
     '</eSocial>',
   ].join('\n');
 }

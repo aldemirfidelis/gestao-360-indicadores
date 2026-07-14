@@ -5,11 +5,14 @@ import {
   buildS1010Xml,
   buildS1200Xml,
   buildS1299Xml,
+  buildS2200Xml,
+  buildS2299Xml,
   decimalStringToEsocialMoney,
   environmentCode,
   hashXml,
   rubricTypeCode,
   sanitizeEsocialCode,
+  terminationMotiveCode,
 } from './payroll-esocial.logic';
 
 describe('payroll-esocial.logic', () => {
@@ -119,5 +122,63 @@ describe('payroll-esocial.logic', () => {
     expect(xml).toContain('<cpfResp>11122233344</cpfResp>');
     expect(xml).toContain('<evtRemun>S</evtRemun>');
     expect(xml).toContain('<evtPgtos>N</evtPgtos>');
+  });
+
+  it('mapeia o motivo de desligamento (Tabela 19)', () => {
+    expect(terminationMotiveCode('DISPENSA_SEM_JUSTA_CAUSA')).toBe('02');
+    expect(terminationMotiveCode('PEDIDO')).toBe('07');
+    expect(terminationMotiveCode('ACORDO')).toBe('33');
+  });
+
+  it('monta S-2200 (admissão) com dados cadastrais e contratuais', () => {
+    const xml = buildS2200Xml({
+      eventId: 'ID11234567800019020260714123456ADM01',
+      environment: 'PRODUCTION_RESTRICTED',
+      employerRegistration: '12.345.678/0001-90',
+      workerCpf: '123.456.789-09',
+      workerName: 'Ana Silva',
+      birthDate: '1990-05-20',
+      admissionDate: '2023-02-01',
+      workerRegistration: 'M-001',
+      categoryCode: '101',
+      cboCode: '252105',
+      monthlySalary: '3000.00',
+    });
+
+    expect(xml).toContain('<evtAdmissao Id="ID11234567800019020260714123456ADM01">');
+    expect(xml).toContain('<cpfTrab>12345678909</cpfTrab>');
+    expect(xml).toContain('<nmTrab>Ana Silva</nmTrab>');
+    expect(xml).toContain('<dtNascto>1990-05-20</dtNascto>');
+    expect(xml).toContain('<dtAdm>2023-02-01</dtAdm>');
+    expect(xml).toContain('<vrSalFx>3000.00</vrSalFx>');
+    expect(xml).toContain('<codCargo>252105</codCargo>');
+    expect(xml).toContain('matricula="M-001"');
+  });
+
+  it('monta S-2299 (desligamento) com motivo, data e verbas', () => {
+    const xml = buildS2299Xml({
+      eventId: 'ID11234567800019020260714123456DES01',
+      environment: 'PRODUCTION_RESTRICTED',
+      periodRef: '2026-06',
+      employerRegistration: '12.345.678/0001-90',
+      workerCpf: '123.456.789-09',
+      workerRegistration: 'M-001',
+      terminationDate: '2026-06-20',
+      motiveCode: terminationMotiveCode('DISPENSA_SEM_JUSTA_CAUSA'),
+      paymentId: 'RESC-2026-06',
+      items: [
+        { code: '1000', reference: null, amount: '2000.00' },
+        { code: '1031', reference: null, amount: '1750.00' },
+        { code: '5501', reference: null, amount: '0.00' }, // zerado é filtrado
+      ],
+    });
+
+    expect(xml).toContain('<evtDeslig Id="ID11234567800019020260714123456DES01">');
+    expect(xml).toContain('<mtvDeslig>02</mtvDeslig>');
+    expect(xml).toContain('<dtDeslig>2026-06-20</dtDeslig>');
+    expect(xml).toContain('<vrRubr>2000.00</vrRubr>');
+    expect(xml).toContain('<vrRubr>1750.00</vrRubr>');
+    // rubrica zerada não entra
+    expect(xml).not.toContain('<vrRubr>0.00</vrRubr>');
   });
 });

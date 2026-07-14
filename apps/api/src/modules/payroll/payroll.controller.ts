@@ -233,6 +233,18 @@ export class PayrollController {
     return this.esocial.generateClosingEvent(me, id, body);
   }
 
+  @Post('runs/:id/esocial/admission')
+  @RequirePermissions('folha:esocial')
+  generateEsocialAdmission(@CurrentUser() me: AuthPayload, @Param('id') id: string, @Body() body: any) {
+    return this.esocial.generateAdmissionEvents(me, id, body);
+  }
+
+  @Post('runs/:id/esocial/reconcile')
+  @RequirePermissions('folha:esocial')
+  reconcileEsocialTotalizers(@CurrentUser() me: AuthPayload, @Param('id') id: string, @Body() body: any) {
+    return this.esocial.reconcileTotalizers(me, id, body);
+  }
+
   @Get('esocial/batches')
   @RequirePermissions('folha:esocial')
   listEsocialBatches(@CurrentUser() me: AuthPayload, @Query('runId') runId?: string) {
