@@ -65,6 +65,7 @@ import { LgpdModule } from './modules/lgpd/lgpd.module';
 import { PrizeModule } from './modules/prize/prize.module';
 import { CompensationModule } from './modules/compensation/compensation.module';
 import { PersonnelModule } from './modules/personnel/personnel.module';
+import { PayrollModule } from './modules/payroll/payroll.module';
 import { SuppliesModule } from './modules/supplies/supplies.module';
 import { MonthlyResultsModule } from './modules/monthly-results/monthly-results.module';
 import { StorageModule } from './storage/storage.module';
@@ -134,6 +135,7 @@ import { workersEnabled } from './jobs/jobs.constants';
     PrizeModule,
     CompensationModule,
     PersonnelModule,
+    PayrollModule,
     SuppliesModule,
     MonthlyResultsModule,
     StorageModule,

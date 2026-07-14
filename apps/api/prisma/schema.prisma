@@ -12327,6 +12327,199 @@ model PayrollExport {
   @@map("payroll_exports")
 }
 
+// ===================== Folha de Pagamento (módulo payroll — Fase 1) =====================
+// Ver docs/diagnostico-folha-pagamento.md. Reusa OrgEmployee (colaborador),
+// CompensationSalarySnapshot (salário vigente) e a apuração do ponto; NADA de
+// cadastro paralelo. Dinheiro persiste em Decimal(14,2); o motor calcula em
+// centavos inteiros com arredondamento half-up explícito na memória de cálculo.
+
+/// Parâmetro legal versionado (INSS/IRRF/FGTS/salário mínimo/salário-família).
+/// companyId nulo = tabela nacional; preenchido = override da empresa.
+/// NUNCA editar uma versão usada em cálculo: alteração = nova linha (vigência).
+model PayrollLegalTableVersion {
+  id            String   @id @default(uuid())
+  companyId     String?
+  kind          String // INSS | IRRF | FGTS | SALARIO_MINIMO | SALARIO_FAMILIA
+  /// YYYY-MM-DD; a competência usa a versão vigente no último dia do mês.
+  effectiveFrom String
+  /// Payload da tabela: valores em CENTAVOS, alíquotas em basis points (1% = 100).
+  data          Json
+  /// Fonte oficial (portaria/lei). Seeds são marcados para conferência contábil.
+  source        String?
+  active        Boolean  @default(true)
+  createdById   String?
+  createdAt     DateTime @default(now())
+
+  @@index([kind, effectiveFrom])
+  @@index([companyId, kind])
+  @@map("payroll_legal_table_versions")
+}
+
+/// Rubrica interna da folha. O conteúdo publicado vive em versões imutáveis
+/// (PayrollRubricVersion); o cálculo grava qual versão usou.
+model PayrollRubricDef {
+  id        String                 @id @default(uuid())
+  companyId String
+  code      String
+  name      String
+  nature    String // PROVENTO | DESCONTO | BASE | INFORMATIVA
+  active    Boolean                @default(true)
+  createdAt DateTime               @default(now())
+  updatedAt DateTime               @updatedAt
+  versions  PayrollRubricVersion[]
+
+  @@unique([companyId, code])
+  @@map("payroll_rubric_defs")
+}
+
+model PayrollRubricVersion {
+  id            String           @id @default(uuid())
+  rubricId      String
+  rubric        PayrollRubricDef @relation(fields: [rubricId], references: [id], onDelete: Cascade)
+  version       Int
+  /// Snapshot imutável: fórmula declarativa, incidências e prioridade.
+  spec          Json
+  effectiveFrom String
+  createdById   String?
+  createdAt     DateTime         @default(now())
+
+  @@unique([rubricId, version])
+  @@map("payroll_rubric_versions")
+}
+
+model PayrollCompetence {
+  id          String       @id @default(uuid())
+  companyId   String
+  year        Int
+  month       Int
+  status      String       @default("OPEN") // OPEN | CLOSED
+  notes       String?
+  createdById String?
+  createdAt   DateTime     @default(now())
+  updatedAt   DateTime     @updatedAt
+  runs        PayrollRun[]
+
+  @@unique([companyId, year, month])
+  @@map("payroll_competences")
+}
+
+/// Processamento de folha. Estados (F1): DRAFT → IMPORTING → CALCULATING →
+/// CALCULATED | WITH_ISSUES → AWAITING_APPROVAL → APPROVED → CLOSED, com
+/// REOPENED (justificativa + permissão própria) e CANCELLED. eSocial/banco (F4/F6).
+model PayrollRun {
+  id           String                       @id @default(uuid())
+  companyId    String
+  competenceId String
+  competence   PayrollCompetence            @relation(fields: [competenceId], references: [id], onDelete: Restrict)
+  kind         String                       @default("MENSAL") // MENSAL (F1) | ADIANTAMENTO/FERIAS/13o/RESCISAO... (F3)
+  status       String                       @default("DRAFT")
+  version      Int                          @default(1)
+  /// Congela quais versões de tabelas legais o cálculo usou (kind → versionId).
+  legalRefs    Json?
+  issues       Json?
+  totals       Json?
+  calculatedAt DateTime?
+  calculatedById String?
+  approvedById String?
+  approvedAt   DateTime?
+  closedById   String?
+  closedAt     DateTime?
+  reopenNote   String?
+  createdById  String?
+  createdAt    DateTime                     @default(now())
+  updatedAt    DateTime                     @updatedAt
+  workers      PayrollRunWorker[]
+  snapshots    PayrollTimekeepingSnapshot[]
+
+  @@index([companyId, competenceId])
+  @@map("payroll_runs")
+}
+
+/// Resumo do ponto CONGELADO por colaborador na importação (hash detecta
+/// alteração posterior; mudanças no ponto nunca alteram folha calculada
+/// silenciosamente — exigem nova importação explícita e recálculo).
+model PayrollTimekeepingSnapshot {
+  id         String     @id @default(uuid())
+  companyId  String
+  runId      String
+  run        PayrollRun @relation(fields: [runId], references: [id], onDelete: Cascade)
+  employeeId String
+  userId     String?
+  data       Json
+  hash       String
+  importedAt DateTime   @default(now())
+
+  @@unique([runId, employeeId])
+  @@map("payroll_timekeeping_snapshots")
+}
+
+model PayrollRunWorker {
+  id              String           @id @default(uuid())
+  companyId       String
+  runId           String
+  run             PayrollRun       @relation(fields: [runId], references: [id], onDelete: Cascade)
+  employeeId      String
+  userId          String?
+  status          String           @default("CALCULATED") // CALCULATED | WITH_ISSUES
+  baseSalary      Decimal          @db.Decimal(14, 2)
+  totalEarnings   Decimal          @db.Decimal(14, 2)
+  totalDeductions Decimal          @db.Decimal(14, 2)
+  netPay          Decimal          @db.Decimal(14, 2)
+  inssBase        Decimal          @db.Decimal(14, 2)
+  inssValue       Decimal          @db.Decimal(14, 2)
+  irrfBase        Decimal          @db.Decimal(14, 2)
+  irrfValue       Decimal          @db.Decimal(14, 2)
+  fgtsBase        Decimal          @db.Decimal(14, 2)
+  fgtsValue       Decimal          @db.Decimal(14, 2)
+  /// Memória de cálculo passo a passo (fórmula, variáveis, arredondamentos,
+  /// versão de cada parâmetro legal) — base do "explique este valor".
+  memory          Json
+  issues          Json?
+  createdAt       DateTime         @default(now())
+  items           PayrollRunItem[]
+
+  @@unique([runId, employeeId])
+  @@index([companyId, runId])
+  @@map("payroll_run_workers")
+}
+
+model PayrollRunItem {
+  id              String           @id @default(uuid())
+  companyId       String
+  runWorkerId     String
+  worker          PayrollRunWorker @relation(fields: [runWorkerId], references: [id], onDelete: Cascade)
+  rubricCode      String
+  rubricName      String
+  rubricVersionId String?
+  nature          String // PROVENTO | DESCONTO | BASE | INFORMATIVA
+  /// Referência exibida no holerite ("220h", "10h 50%", "2 dias"...).
+  reference       String?
+  amount          Decimal          @db.Decimal(14, 2)
+  origin          String           @default("MOTOR") // MOTOR | PONTO | CONTRATO | MANUAL
+  sortOrder       Int              @default(0)
+
+  @@index([companyId, runWorkerId])
+  @@map("payroll_run_items")
+}
+
+/// Configuração da folha específica do colaborador (o que não existe nos
+/// cadastros reutilizados). Dependentes de IR vêm de EmployeeDependent
+/// (isIrDependent); override manual só quando documentado.
+model PayrollWorkerSettings {
+  id                   String   @id @default(uuid())
+  companyId            String
+  employeeId           String   @unique
+  salaryType           String   @default("MENSAL") // MENSAL | HORISTA (demais em F3)
+  monthlyHours         Int      @default(220)
+  irDependentsOverride Int?
+  updatedById          String?
+  createdAt            DateTime @default(now())
+  updatedAt            DateTime @updatedAt
+
+  @@index([companyId])
+  @@map("payroll_worker_settings")
+}
+
 /// Fechamento de competência (YYYY-MM): trava batidas e ajustes no período.
 model TimesheetPeriod {
   id         String    @id @default(uuid())

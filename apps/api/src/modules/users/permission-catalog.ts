@@ -235,6 +235,13 @@ export const PERMISSION_CATALOG = [
   ['ponto:team', 'Visualizar espelho de ponto da equipe', 'Servico Pessoal', 'view'],
   ['ponto:manage', 'Gerenciar ponto (ajustes, escalas e fechamento)', 'Servico Pessoal', 'manage'],
 
+  // Servico Pessoal — Folha de Pagamento (segregacao de funcoes)
+  ['folha:view', 'Visualizar competencias e resumos da folha', 'Folha de Pagamento', 'view'],
+  ['folha:operate', 'Operar a folha (importar ponto, calcular, conferir memorias)', 'Folha de Pagamento', 'update'],
+  ['folha:approve', 'Aprovar processamentos calculados da folha', 'Folha de Pagamento', 'approve'],
+  ['folha:close', 'Fechar e reabrir (com justificativa) processamentos da folha', 'Folha de Pagamento', 'manage'],
+  ['folha:params', 'Administrar rubricas e parametros legais versionados', 'Folha de Pagamento', 'manage'],
+
   // Suprimentos — Compras
   ['compras:view', 'Visualizar requisições, pedidos e recebimentos', 'Suprimentos', 'view'],
   ['compras:request', 'Criar e enviar requisições de compra', 'Suprimentos', 'create'],
