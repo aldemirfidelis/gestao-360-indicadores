@@ -4,6 +4,7 @@ import { DocumentsService } from '../modules/documents/documents.service';
 import { NotificationsService } from '../modules/notifications/notifications.service';
 import { OrganizationalCommunicationService } from '../modules/communication/organizational/organizational-communication.service';
 import { PersonnelService } from '../modules/personnel/personnel.service';
+import { TimeBankService } from '../modules/personnel/time-bank.service';
 import { addDays, dayKeyFor } from '../modules/personnel/time-clock.logic';
 
 /**
@@ -34,6 +35,7 @@ export class MaintenanceScheduler implements OnApplicationBootstrap, OnApplicati
     private readonly notifications: NotificationsService,
     private readonly orgCommunication: OrganizationalCommunicationService,
     private readonly personnel: PersonnelService,
+    private readonly timeBank: TimeBankService,
   ) {}
 
   onApplicationBootstrap() {
@@ -65,6 +67,7 @@ export class MaintenanceScheduler implements OnApplicationBootstrap, OnApplicati
     let postsExpired = 0;
     let occurrencesCreated = 0;
     let occurrencesResolved = 0;
+    let bankExpiredMinutes = 0;
     let failures = 0;
     try {
       const companies = await this.prisma.company.findMany({
@@ -113,12 +116,27 @@ export class MaintenanceScheduler implements OnApplicationBootstrap, OnApplicati
           failures += 1;
           this.logger.error(`Varredura de ocorrências falhou (empresa ${company.id}): ${(error as Error).message}`);
         }
+        try {
+          // Vencimento do banco de horas (uma vez por dia por empresa).
+          const bankKey = `bank-exp:${dayKeyFor(new Date())}`;
+          const bankRan = await this.prisma.personnelCounter.findUnique({
+            where: { companyId_key: { companyId: company.id, key: bankKey } },
+          });
+          if (!bankRan) {
+            await this.prisma.personnelCounter.create({ data: { companyId: company.id, key: bankKey, value: 1 } });
+            const exp = await this.timeBank.runExpiration(company.id);
+            bankExpiredMinutes += exp.expiredMinutes + exp.payoutMinutes;
+          }
+        } catch (error) {
+          failures += 1;
+          this.logger.error(`Vencimento de banco de horas falhou (empresa ${company.id}): ${(error as Error).message}`);
+        }
       }
-      if (documentsProcessed || alertsGenerated || postsPublished || postsExpired || occurrencesCreated || occurrencesResolved || failures) {
+      if (documentsProcessed || alertsGenerated || postsPublished || postsExpired || occurrencesCreated || occurrencesResolved || bankExpiredMinutes || failures) {
         this.logger.log(
           `Ciclo de manutenção: ${companies.length} empresas, ${documentsProcessed} documentos transicionados, ` +
             `${alertsGenerated} alertas gerados, ${postsPublished} comunicados publicados, ${postsExpired} expirados, ` +
-            `${occurrencesCreated} ocorrências novas, ${occurrencesResolved} resolvidas, ` +
+            `${occurrencesCreated} ocorrências novas, ${occurrencesResolved} resolvidas, ${bankExpiredMinutes} min de banco vencidos, ` +
             `${failures} falhas, ${Date.now() - startedAt}ms.`,
         );
       }

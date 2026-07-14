@@ -159,6 +159,64 @@ test('API: competência fechada bloqueia batidas e ajustes; reabrir libera', asy
   expect(versions[0].reopenNote).toBe('Reabertura de teste E2E');
 });
 
+test('API: assistente de fechamento e livro-razão do banco de horas', async ({ request }) => {
+  const managerToken = managerSession.accessToken;
+  const workerToken = workerSession.accessToken;
+  const summary = await apiGet<any>(request, workerToken, '/personnel/time-clock/summary');
+  const ref = summary.period.ref;
+
+  // Preflight: checklist com estrutura esperada.
+  const preview = await apiGet<any>(request, managerToken, `/personnel/time-clock/periods/${ref}/preview`);
+  expect(preview.periodRef).toBe(ref);
+  expect(Array.isArray(preview.checklist)).toBe(true);
+  expect(preview.checklist.some((item: any) => item.key === 'open_adjustments')).toBe(true);
+
+  // Extrato do banco do próprio colaborador expõe saldo, política e lançamentos.
+  const bank = await apiGet<any>(request, workerToken, '/personnel/time-bank/me');
+  expect(bank).toHaveProperty('balanceMinutes');
+  expect(bank.policy.validityMonths).toBeGreaterThanOrEqual(1);
+  expect(Array.isArray(bank.entries)).toBe(true);
+
+  // Fechar posta o saldo no razão; reabrir remove o lançamento de fechamento.
+  await apiPost(request, managerToken, `/personnel/time-clock/periods/${ref}/close`, {});
+  const afterClose = await apiGet<any>(request, workerToken, '/personnel/time-bank/me');
+  const closingEntries = afterClose.entries.filter((e: any) => e.source === 'CLOSING' && e.periodRef === ref);
+  await apiPost(request, managerToken, `/personnel/time-clock/periods/${ref}/reopen`, { note: 'Reabertura E2E banco' });
+  const afterReopen = await apiGet<any>(request, workerToken, '/personnel/time-bank/me');
+  const stillClosing = afterReopen.entries.filter((e: any) => e.source === 'CLOSING' && e.periodRef === ref);
+  // Se houve saldo lançado no fechamento, a reabertura o remove do razão.
+  if (closingEntries.length > 0) expect(stillClosing.length).toBe(0);
+});
+
+test('API: eventos para folha computam rubricas e exportam com histórico', async ({ request }) => {
+  const managerToken = managerSession.accessToken;
+  const workerToken = workerSession.accessToken;
+  const summary = await apiGet<any>(request, workerToken, '/personnel/time-clock/summary');
+  const ref = summary.period.ref;
+
+  // Rubricas semeadas com o catálogo padrão.
+  const rubrics = await apiGet<any[]>(request, managerToken, '/personnel/payroll/rubrics');
+  expect(rubrics.some((r) => r.eventKey === 'HORAS_NORMAIS')).toBe(true);
+  expect(rubrics.some((r) => r.eventKey === 'ADICIONAL_NOTURNO')).toBe(true);
+
+  // Eventos por colaborador (estrutura de quantidades por rubrica).
+  const events = await apiGet<any>(request, managerToken, `/personnel/payroll/events/${ref}`);
+  expect(events.periodRef).toBe(ref);
+  expect(Array.isArray(events.rows)).toBe(true);
+  if (events.rows.length > 0) expect(events.rows[0]).toHaveProperty('quantities');
+
+  // Exportação CSV registra no histórico.
+  const apiBase = process.env.E2E_API_URL ?? 'http://127.0.0.1:3333/api';
+  const csv = await request.get(`${apiBase}/personnel/payroll/export/${ref}?format=CSV`, {
+    headers: { authorization: `Bearer ${managerToken}` },
+  });
+  expect(csv.ok()).toBe(true);
+  expect(csv.headers()['content-type']).toContain('text/csv');
+  const exportsList = await apiGet<any[]>(request, managerToken, `/personnel/payroll/exports?ref=${ref}`);
+  expect(exportsList.length).toBeGreaterThan(0);
+  expect(exportsList[0].format).toBe('CSV');
+});
+
 test('API: importação de batidas CSV entra no espelho e ignora duplicadas', async ({ request }) => {
   const managerToken = managerSession.accessToken;
   const workerToken = workerSession.accessToken;

@@ -4,10 +4,16 @@ import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import { RequirePermissions } from '../../common/decorators/permissions.decorator';
 import { AuthPayload } from '../auth/auth.types';
 import { PersonnelService } from './personnel.service';
+import { TimeBankService } from './time-bank.service';
+import { PayrollService } from './payroll.service';
 
 @Controller('personnel')
 export class PersonnelController {
-  constructor(private readonly service: PersonnelService) {}
+  constructor(
+    private readonly service: PersonnelService,
+    private readonly timeBank: TimeBankService,
+    private readonly payroll: PayrollService,
+  ) {}
 
   // ------------------------------ Ponto ------------------------------
 
@@ -113,6 +119,79 @@ export class PersonnelController {
     return this.service.treatOccurrence(me, id, 'dismiss', body);
   }
 
+  // ------------------------------ Banco de horas ------------------------------
+
+  @Get('time-bank/me')
+  @RequirePermissions('ponto:view')
+  myBank(@CurrentUser() me: AuthPayload) {
+    return this.timeBank.statement(me);
+  }
+
+  @Get('time-bank/user/:userId')
+  @RequirePermissions('ponto:team', 'ponto:manage')
+  userBank(@CurrentUser() me: AuthPayload, @Param('userId') userId: string) {
+    return this.timeBank.statement(me, userId);
+  }
+
+  @Post('time-bank/entries')
+  @RequirePermissions('ponto:manage')
+  manualBankEntry(@CurrentUser() me: AuthPayload, @Body() body: any) {
+    return this.timeBank.manualEntry(me, body);
+  }
+
+  @Get('time-bank/policy')
+  @RequirePermissions('ponto:view')
+  bankPolicy(@CurrentUser() me: AuthPayload) {
+    return this.timeBank.getPolicy(me.companyId);
+  }
+
+  @Post('time-bank/policy')
+  @RequirePermissions('ponto:manage')
+  setBankPolicy(@CurrentUser() me: AuthPayload, @Body() body: any) {
+    return this.timeBank.setPolicy(me, body);
+  }
+
+  // ------------------------------ Eventos para folha ------------------------------
+
+  @Get('payroll/rubrics')
+  @RequirePermissions('ponto:manage')
+  payrollRubrics(@CurrentUser() me: AuthPayload) {
+    return this.payroll.listRubrics(me.companyId);
+  }
+
+  @Post('payroll/rubrics')
+  @RequirePermissions('ponto:manage')
+  setPayrollRubric(@CurrentUser() me: AuthPayload, @Body() body: any) {
+    return this.payroll.setRubric(me, body);
+  }
+
+  @Get('payroll/events/:ref')
+  @RequirePermissions('ponto:manage')
+  payrollEvents(@CurrentUser() me: AuthPayload, @Param('ref') ref: string) {
+    return this.payroll.computeEvents(me, ref);
+  }
+
+  @Get('payroll/exports')
+  @RequirePermissions('ponto:manage')
+  payrollExports(@CurrentUser() me: AuthPayload, @Query('ref') ref?: string) {
+    return this.payroll.listExports(me, ref);
+  }
+
+  @Get('payroll/export/:ref')
+  @RequirePermissions('ponto:manage')
+  async payrollExport(
+    @CurrentUser() me: AuthPayload,
+    @Param('ref') ref: string,
+    @Query('format') format: string,
+    @Res({ passthrough: true }) res: Response,
+  ) {
+    const fmt = ['JSON', 'TXT', 'CSV'].includes(String(format).toUpperCase()) ? (String(format).toUpperCase() as 'CSV' | 'JSON' | 'TXT') : 'CSV';
+    const result = await this.payroll.export(me, ref, fmt);
+    res.setHeader('content-type', result.mimeType);
+    res.setHeader('content-disposition', `attachment; filename="${result.fileName}"`);
+    return new StreamableFile(result.content);
+  }
+
   // ------------------------------ Importação ------------------------------
 
   @Post('time-clock/import')
@@ -146,6 +225,12 @@ export class PersonnelController {
   @RequirePermissions('ponto:manage')
   listPeriods(@CurrentUser() me: AuthPayload) {
     return this.service.listPeriods(me);
+  }
+
+  @Get('time-clock/periods/:ref/preview')
+  @RequirePermissions('ponto:manage')
+  closingPreview(@CurrentUser() me: AuthPayload, @Param('ref') ref: string) {
+    return this.service.closingPreview(me, ref);
   }
 
   @Post('time-clock/periods/:ref/close')

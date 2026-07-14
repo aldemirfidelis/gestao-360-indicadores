@@ -259,5 +259,17 @@ apuração; registros idempotentes OPEN→JUSTIFIED/DISMISSED/RESOLVED; varredur
 (ponto:team com escopo por área, sem auto-aprovação) e portal do colaborador (saída prevista,
 próxima marcação, minhas ocorrências).
 
-Próxima: **ETAPA 4** (banco de horas completo — contas/extrato/validade CLT configurável/limites,
-integração de afastamentos com recálculo preservando histórico, assistente de fechamento em etapas).
+**ETAPA 4 — CONCLUÍDA**: banco de horas como livro-razão (TimeBankEntry) com política CLT
+configurável (validade 1..12 meses, tetos, EXPIRE/PAYOUT), vencimento FIFO automático, extrato do
+colaborador e assistente de fechamento (checklist de pendências antes de fechar).
+
+**ETAPA 5 — CONCLUÍDA**: motor de eventos para a folha — deriva rubricas da apuração (horas normais,
+HE 50%/100%, adicional noturno 22h–5h, faltas, banco crédito/débito), mapeamento configurável
+evento→código da folha por empresa, exportação CSV/JSON/TXT posicional com histórico para
+conciliação. ⚠️ Faixas de HE, adicional noturno e DSR seguem parâmetros usuais mas exigem validação
+jurídica por CCT — a UI alerta e nada declara conformidade automática. DSR automático não incluído
+(pendente de definição jurídica).
+
+Próxima: **ETAPA 6** (Central Fiscal / REP-P — AFD, AEJ, Espelho oficial, NSR já pronto, comprovante,
+p7s; itens externos: INPI, atestado técnico, certificado — dependem do usuário) e **ETAPA 7**
+(dashboards, automações e integração completa com Meu Dia/Indicadores/Gestão à Vista).

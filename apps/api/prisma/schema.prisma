@@ -12218,6 +12218,90 @@ model AttendanceOccurrence {
   @@map("attendance_occurrences")
 }
 
+/// Política de banco de horas da empresa. Padrão CLT (validade de 6 meses no
+/// acordo individual) configurável dentro do limite legal (12 meses, CCT).
+model TimeBankPolicy {
+  id                String   @id @default(uuid())
+  companyId         String   @unique
+  enabled           Boolean  @default(true)
+  /// Meses de validade do crédito (1..12). CLT: 6 (acordo individual) a 12 (CCT).
+  validityMonths    Int      @default(6)
+  /// Tetos opcionais de saldo (minutos). Nulo = sem teto.
+  maxPositiveMinutes Int?
+  maxNegativeMinutes Int?
+  /// O que fazer com o crédito vencido: EXPIRE (perde) | PAYOUT (marca p/ pagamento).
+  expirationAction  String   @default("PAYOUT")
+  updatedById       String?
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  @@map("time_bank_policies")
+}
+
+/// Livro-razão do banco de horas. Cada lançamento é imutável; o saldo é a soma
+/// dos minutos (crédito +, débito −). O fechamento posta um CREDIT/DEBIT por
+/// competência (idempotente); o vencimento consome créditos FIFO com EXPIRE/PAYOUT.
+model TimeBankEntry {
+  id          String    @id @default(uuid())
+  companyId   String
+  userId      String
+  /// CREDIT | DEBIT | EXPIRE | PAYOUT | ADJUSTMENT
+  kind        String
+  /// CLOSING | EXPIRATION | MANUAL
+  source      String
+  /// Minutos com sinal (crédito > 0, débito < 0).
+  minutes     Int
+  /// Competência de origem (lançamentos de fechamento).
+  periodRef   String?
+  /// Vencimento do crédito (só CREDIT positivo). Nulo = não vence.
+  expiresAt   DateTime?
+  /// Minutos já consumidos deste crédito por vencimento/pagamento (0..minutes).
+  consumed    Int       @default(0)
+  note        String?
+  createdById String?
+  createdAt   DateTime  @default(now())
+
+  @@unique([companyId, userId, periodRef, source])
+  @@index([companyId, userId, createdAt])
+  @@index([companyId, expiresAt])
+  @@map("time_bank_entries")
+}
+
+/// Mapeamento configurável entre a rubrica interna (eventKey) e o código da
+/// folha de pagamento da empresa. Vigência simples via `active`.
+model PayrollRubricMap {
+  id          String   @id @default(uuid())
+  companyId   String
+  eventKey    String // HORAS_NORMAIS | HE_50 | HE_100 | ADICIONAL_NOTURNO | FALTAS | BANCO_CREDITO | BANCO_DEBITO
+  payrollCode String
+  description String
+  unit        String   @default("HORAS") // HORAS | DIAS | VALOR
+  active      Boolean  @default(true)
+  updatedById String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@unique([companyId, eventKey])
+  @@map("payroll_rubric_maps")
+}
+
+/// Histórico de exportações para a folha (auditoria + conciliação).
+model PayrollExport {
+  id          String   @id @default(uuid())
+  companyId   String
+  periodRef   String
+  format      String // CSV | JSON | TXT
+  employees   Int
+  lineCount   Int
+  totalsJson  Json
+  payloadHash String
+  createdById String?
+  createdAt   DateTime @default(now())
+
+  @@index([companyId, periodRef])
+  @@map("payroll_exports")
+}
+
 /// Fechamento de competência (YYYY-MM): trava batidas e ajustes no período.
 model TimesheetPeriod {
   id         String    @id @default(uuid())

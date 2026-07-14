@@ -8,6 +8,7 @@ import { AccessService } from '../access/access.service';
 import { AuthPayload } from '../auth/auth.types';
 import { VacationService, type DayCoverage } from './vacation.service';
 import { detectDayOccurrences } from './attendance.logic';
+import { TimeBankService } from './time-bank.service';
 import {
   addDays,
   attributePunches,
@@ -61,6 +62,7 @@ export class PersonnelService {
     private readonly workItems: WorkItemEventBus,
     private readonly vacations: VacationService,
     private readonly access: AccessService,
+    private readonly timeBank: TimeBankService,
   ) {}
 
   // ------------------------------ Batida ------------------------------
@@ -333,22 +335,21 @@ export class PersonnelService {
   }
 
   /**
-   * Banco de horas acumulado: competências FECHADAS usam o consolidado gravado
-   * no fechamento; meses em aberto (atual + 2 anteriores) são calculados ao vivo.
+   * Banco de horas acumulado: competências FECHADAS vêm do livro-razão
+   * (TimeBankEntry — inclui créditos vencidos/pagos e ajustes manuais); os
+   * meses em aberto (atual + 2 anteriores) são calculados ao vivo.
    */
   private async bankBalance(companyId: string, userId: string) {
     const today = dayKeyFor(new Date());
-    const closed = await this.prisma.timesheetPeriod.findMany({
-      where: { companyId, status: 'CLOSED' },
-      select: { periodRef: true, totals: true },
-    });
-    let closedMinutes = 0;
-    const closedRefs = new Set<string>();
-    for (const period of closed) {
-      closedRefs.add(period.periodRef);
-      const users = (period.totals as any)?.users;
-      closedMinutes += Number(users?.[userId]?.balanceMinutes ?? 0);
-    }
+    const closedRefs = new Set(
+      (
+        await this.prisma.timesheetPeriod.findMany({
+          where: { companyId, status: 'CLOSED' },
+          select: { periodRef: true },
+        })
+      ).map((period) => period.periodRef),
+    );
+    const closedMinutes = await this.timeBank.ledgerBalance(companyId, userId);
     let liveMinutes = 0;
     let ref = periodRefOf(today);
     for (let i = 0; i < 3; i++) {
@@ -1016,6 +1017,7 @@ export class PersonnelService {
       // recalcular versões fechadas.
       const totals = await this.computeMonthTotals(me.companyId, ref);
       const version = (existing?.version ?? 0) + 1;
+      const closedAt = new Date();
       const saved = await tx.timesheetPeriod.upsert({
         where: { companyId_periodRef: { companyId: me.companyId, periodRef: ref } },
         create: {
@@ -1023,15 +1025,18 @@ export class PersonnelService {
           periodRef: ref,
           status: 'CLOSED',
           closedById: me.sub,
-          closedAt: new Date(),
+          closedAt,
           totals,
           version,
         },
-        update: { status: 'CLOSED', closedById: me.sub, closedAt: new Date(), totals, version },
+        update: { status: 'CLOSED', closedById: me.sub, closedAt, totals, version },
       });
       await tx.timesheetPeriodVersion.create({
         data: { companyId: me.companyId, periodRef: ref, version, totals, closedById: me.sub },
       });
+      // Posta o saldo consolidado no livro-razão do banco de horas (com vencimento).
+      const policy = await this.timeBank.getPolicy(me.companyId);
+      await this.timeBank.postClosingEntries(tx, me.companyId, ref, totals.users, closedAt, me.sub, policy);
       return { period: saved, totals };
     }, { timeout: 120_000, maxWait: 15_000 });
     await this.audit.record(me, {
@@ -1043,6 +1048,92 @@ export class PersonnelService {
       after: { version: period.version },
     });
     return period;
+  }
+
+  /**
+   * Assistente de fechamento: pendências da competência antes de fechar
+   * (colaboradores sem escala, dias inconsistentes, faltas, solicitações
+   * abertas, ocorrências em aberto). Não altera nada.
+   */
+  async closingPreview(me: AuthPayload, ref: string) {
+    this.assertPeriodRef(ref);
+    const { first, last } = monthBounds(ref);
+    const today = dayKeyFor(new Date());
+    const to = last > today ? today : last;
+    const status = await this.periodStatus(me.companyId, ref);
+
+    const totals = await this.computeMonthTotals(me.companyId, ref);
+    const userIds = Object.keys(totals.users);
+    let inconsistentDays = 0;
+    let absentDays = 0;
+    const withoutSchedule: string[] = [];
+    for (const [userId, data] of Object.entries(totals.users)) {
+      inconsistentDays += data.inconsistentDays;
+      absentDays += data.absentDays;
+      // Tem batidas mas nenhuma jornada prevista no mês inteiro = sem escala.
+      if (data.plannedMinutes === 0 && data.punches > 0) withoutSchedule.push(userId);
+    }
+
+    const [openAdjustments, openOccurrences] = await Promise.all([
+      this.prisma.timeAdjustmentRequest.count({
+        where: { companyId: me.companyId, status: 'REQUESTED', dayKey: { gte: first, lte: to } },
+      }),
+      this.prisma.attendanceOccurrence.count({
+        where: { companyId: me.companyId, status: 'OPEN', dayKey: { gte: first, lte: to } },
+      }),
+    ]);
+
+    const namedWithoutSchedule = withoutSchedule.length
+      ? await this.prisma.user.findMany({ where: { id: { in: withoutSchedule }, companyId: me.companyId }, select: { id: true, name: true } })
+      : [];
+
+    const checklist = [
+      { key: 'employees', label: 'Colaboradores apurados', count: userIds.length, blocking: false, ok: true },
+      { key: 'without_schedule', label: 'Colaboradores com batida e sem escala', count: withoutSchedule.length, blocking: false, ok: withoutSchedule.length === 0 },
+      { key: 'inconsistent', label: 'Dias com marcação incompleta', count: inconsistentDays, blocking: false, ok: inconsistentDays === 0 },
+      { key: 'absences', label: 'Faltas não tratadas', count: absentDays, blocking: false, ok: absentDays === 0 },
+      { key: 'open_adjustments', label: 'Solicitações de ajuste em aberto', count: openAdjustments, blocking: true, ok: openAdjustments === 0 },
+      { key: 'open_occurrences', label: 'Ocorrências em aberto', count: openOccurrences, blocking: false, ok: openOccurrences === 0 },
+    ];
+
+    return {
+      periodRef: ref,
+      status,
+      readyToClose: checklist.filter((item) => item.blocking).every((item) => item.ok),
+      checklist,
+      withoutSchedule: namedWithoutSchedule,
+      totals: { employees: userIds.length, inconsistentDays, absentDays, openAdjustments, openOccurrences, entries: totals.entries },
+    };
+  }
+
+  /**
+   * Dias de um colaborador na competência, no formato de entrada do motor de
+   * eventos de folha (pares efetivos pós-tolerância para o cálculo noturno).
+   * Reusa a mesma apuração do espelho (fonte única de verdade).
+   */
+  async payrollDaysForUser(companyId: string, userId: string, ref: string) {
+    this.assertPeriodRef(ref);
+    const { first, last } = monthBounds(ref);
+    const today = dayKeyFor(new Date());
+    const to = last > today ? today : last;
+    if (first > to) return [];
+    const days = await this.buildMirrorDays(companyId, userId, first, to);
+    return days.map((day) => {
+      const marks = (day as { toleranceMarks?: Array<{ effective: Date }> }).toleranceMarks ?? [];
+      const effective = marks.map((mark) => mark.effective);
+      const pairs: Array<{ start: Date; end: Date }> = [];
+      for (let i = 0; i + 1 < effective.length; i += 2) pairs.push({ start: effective[i], end: effective[i + 1] });
+      // "Feriado trabalhado" p/ folha: feriado que não é dia normal de escala.
+      const holidayWorked = Boolean(day.holiday) && day.plannedMinutes === 0 && !['JUSTIFIED', 'VACATION', 'LEAVE', 'HOLIDAY'].includes(day.status);
+      return {
+        dayKey: day.dayKey,
+        status: day.status,
+        plannedMinutes: day.plannedMinutes,
+        workedMinutes: day.workedMinutes,
+        pairs,
+        isHoliday: holidayWorked,
+      };
+    });
   }
 
   /** Consolidado do mês por colaborador (usado no fechamento e no relatório). */
@@ -1158,6 +1249,8 @@ export class PersonnelService {
         where: { companyId: me.companyId, periodRef: ref, version: current.version },
         data: { reopenedById: me.sub, reopenedAt: new Date(), reopenNote: note },
       });
+      // Remove os lançamentos de fechamento do razão; o próximo fechamento os repõe.
+      await this.timeBank.removeClosingEntries(tx, me.companyId, ref);
       return updated;
     });
     await this.audit.record(me, {

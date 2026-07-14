@@ -122,6 +122,41 @@ interface TeamRow {
   detected?: OccurrenceDetection[];
 }
 
+interface BankStatement {
+  balanceMinutes: number;
+  policy: { enabled: boolean; validityMonths: number; maxPositiveMinutes: number | null; maxNegativeMinutes: number | null; expirationAction: string };
+  expiringSoonMinutes: number;
+  alerts: Array<{ type: 'MAX_POSITIVE' | 'MAX_NEGATIVE'; overBy: number }>;
+  entries: Array<{ id: string; kind: string; source: string; minutes: number; periodRef: string | null; expiresAt: string | null; note: string | null; createdAt: string }>;
+}
+
+interface PayrollRubric {
+  id: string;
+  eventKey: string;
+  payrollCode: string;
+  description: string;
+  unit: string;
+  active: boolean;
+}
+
+interface PayrollEventsResponse {
+  periodRef: string;
+  status: string;
+  rows: Array<{
+    user: { id: string; name: string; email: string };
+    quantities: Record<string, number>;
+  }>;
+}
+
+interface ClosingPreview {
+  periodRef: string;
+  status: string;
+  readyToClose: boolean;
+  checklist: Array<{ key: string; label: string; count: number; blocking: boolean; ok: boolean }>;
+  withoutSchedule: Array<{ id: string; name: string }>;
+  totals: { employees: number; inconsistentDays: number; absentDays: number; openAdjustments: number; openOccurrences: number; entries: number };
+}
+
 interface AdjustmentRequest {
   id: string;
   dayKey: string;
@@ -290,6 +325,12 @@ const ADJUSTMENT_STATUS_LABEL: Record<string, string> = {
   CANCELLED: 'Cancelado',
 };
 
+const BANK_SOURCE_LABEL: Record<string, string> = {
+  CLOSING: 'Fechamento de competência',
+  EXPIRATION: 'Vencimento',
+  MANUAL: 'Lançamento manual',
+};
+
 const PUNCH_SOURCE_LABEL: Record<string, string> = {
   WEB: 'Navegador/PWA',
   FACIAL: 'Reconhecimento facial individual',
@@ -350,6 +391,10 @@ export default function TimeClockPage() {
     from: `${new Date().toISOString().slice(0, 7)}-01`,
     to: new Date().toISOString().slice(0, 10),
   }));
+  const [previewRef, setPreviewRef] = useState<string | null>(null);
+  const [bankOpen, setBankOpen] = useState(false);
+  const [payrollRef, setPayrollRef] = useState(() => new Date().toISOString().slice(0, 7));
+  const [rubricsOpen, setRubricsOpen] = useState(false);
   const [templateDialog, setTemplateDialog] = useState(false);
   const [templateForm, setTemplateForm] = useState(DEFAULT_TEMPLATE_FORM);
   const [assignForm, setAssignForm] = useState<{ templateId: string; userIds: string[]; cycleAnchorDay: string }>({ templateId: '', userIds: [], cycleAnchorDay: '' });
@@ -438,6 +483,25 @@ export default function TimeClockPage() {
   const myOccurrencesQuery = useQuery<OccurrenceRow[]>({
     queryKey: ['time-clock', 'occurrences', 'mine'],
     queryFn: () => api<OccurrenceRow[]>('/personnel/occurrences/mine'),
+  });
+  const bankQuery = useQuery<BankStatement>({
+    queryKey: ['time-clock', 'bank', 'me'],
+    queryFn: () => api<BankStatement>('/personnel/time-bank/me'),
+  });
+  const closingPreviewQuery = useQuery<ClosingPreview>({
+    queryKey: ['time-clock', 'closing-preview', previewRef],
+    queryFn: () => api<ClosingPreview>(`/personnel/time-clock/periods/${previewRef}/preview`),
+    enabled: canManage && Boolean(previewRef),
+  });
+  const payrollEventsQuery = useQuery<PayrollEventsResponse>({
+    queryKey: ['time-clock', 'payroll-events', payrollRef],
+    queryFn: () => api<PayrollEventsResponse>(`/personnel/payroll/events/${payrollRef}`),
+    enabled: canManage && tab === 'fechamento' && Boolean(payrollRef),
+  });
+  const payrollRubricsQuery = useQuery<PayrollRubric[]>({
+    queryKey: ['time-clock', 'payroll-rubrics'],
+    queryFn: () => api<PayrollRubric[]>('/personnel/payroll/rubrics'),
+    enabled: canManage && tab === 'fechamento',
   });
 
   const summary = summaryQuery.data;
@@ -578,9 +642,19 @@ export default function TimeClockPage() {
     mutationFn: (ref: string) => api(`/personnel/time-clock/periods/${ref}/close`, { method: 'POST', json: {} }),
     onSuccess: () => {
       toast.success('Competência fechada');
+      setPreviewRef(null);
       invalidate();
     },
     onError: (e: any) => toast.error(e?.message ?? 'Não foi possível fechar a competência'),
+  });
+
+  const setRubric = useMutation({
+    mutationFn: (payload: { eventKey: string; payrollCode: string }) => api('/personnel/payroll/rubrics', { method: 'POST', json: payload }),
+    onSuccess: () => {
+      toast.success('Rubrica atualizada');
+      void qc.invalidateQueries({ queryKey: ['time-clock', 'payroll-rubrics'] });
+    },
+    onError: (e: any) => toast.error(e?.message ?? 'Não foi possível salvar a rubrica'),
   });
 
   const reopenPeriod = useMutation({
@@ -795,6 +869,14 @@ export default function TimeClockPage() {
                   />
                   <SummaryLine label="Dias inconsistentes" value={String(summary?.month?.inconsistentDays ?? 0)} className={summary?.month?.inconsistentDays ? 'text-status-yellow' : undefined} />
                   <SummaryLine label="Faltas" value={String(summary?.month?.absentDays ?? 0)} className={summary?.month?.absentDays ? 'text-status-red' : undefined} />
+                  {(bankQuery.data?.expiringSoonMinutes ?? 0) > 0 && (
+                    <div className="rounded-md border border-amber-400/40 bg-amber-500/5 p-2 text-[11px] text-amber-700 dark:text-amber-300">
+                      {minutesLabel(bankQuery.data!.expiringSoonMinutes)} do seu banco vencem nos próximos 30 dias.
+                    </div>
+                  )}
+                  <Button variant="outline" size="sm" className="mt-1 h-7 w-full text-[11px]" onClick={() => setBankOpen(true)}>
+                    <History className="mr-1.5 h-3.5 w-3.5" />Ver extrato do banco de horas
+                  </Button>
                 </CardContent>
               </Card>
 
@@ -1480,15 +1562,8 @@ export default function TimeClockPage() {
                             <Download className="mr-1 h-3 w-3" />Relatório
                           </Button>
                           {period.status === 'OPEN' ? (
-                            <Button variant="outline" size="sm" className="h-7 text-[10px]" disabled={closePeriod.isPending} onClick={() => setReasonDialog({
-                              title: `Fechar competência ${period.periodRef}`,
-                              label: 'Confirme digitando uma observação (opcional)',
-                              required: false,
-                              confirmLabel: 'Fechar competência',
-                              destructive: true,
-                              onConfirm: () => closePeriod.mutate(period.periodRef),
-                            })}>
-                              <Lock className="mr-1 h-3 w-3" />Fechar
+                            <Button variant="outline" size="sm" className="h-7 text-[10px]" onClick={() => setPreviewRef(period.periodRef)}>
+                              <Lock className="mr-1 h-3 w-3" />Revisar e fechar
                             </Button>
                           ) : (
                             <Button variant="ghost" size="sm" className="h-7 text-[10px]" disabled={reopenPeriod.isPending} onClick={() => setReasonDialog({
@@ -1512,9 +1587,212 @@ export default function TimeClockPage() {
                 </div>
               </CardContent>
             </Card>
+
+            {/* Eventos para folha */}
+            <Card className="mt-4 border border-slate-100 bg-white shadow-sm dark:border-slate-800/80 dark:bg-slate-900/50">
+              <div className="flex flex-wrap items-center justify-between gap-2 border-b px-4 py-2.5">
+                <h3 className="flex items-center gap-2 text-sm font-semibold text-slate-800 dark:text-white">
+                  <FileDown className="h-4 w-4 text-sky-500" />Eventos para a folha
+                </h3>
+                <div className="flex flex-wrap items-center gap-2">
+                  <Input type="month" className="h-8 w-36 text-xs" value={payrollRef} max={currentMonth} onChange={(e) => setPayrollRef(e.target.value)} />
+                  <Button size="sm" variant="outline" className="h-8 text-xs" onClick={() => setRubricsOpen(true)}>Rubricas</Button>
+                  <Button size="sm" variant="outline" className="h-8 text-xs" onClick={() => downloadPayroll(payrollRef, 'CSV')}><Download className="mr-1 h-3 w-3" />CSV</Button>
+                  <Button size="sm" variant="outline" className="h-8 text-xs" onClick={() => downloadPayroll(payrollRef, 'JSON')}><Download className="mr-1 h-3 w-3" />JSON</Button>
+                  <Button size="sm" variant="outline" className="h-8 text-xs" onClick={() => downloadPayroll(payrollRef, 'TXT')}><Download className="mr-1 h-3 w-3" />TXT</Button>
+                </div>
+              </div>
+              <CardContent className="overflow-x-auto p-0">
+                <table className="w-full min-w-[820px] text-xs">
+                  <thead className="border-b bg-slate-50/60 text-[10px] uppercase tracking-wider text-muted-foreground dark:bg-slate-900/40">
+                    <tr>
+                      <th className="px-4 py-2.5 text-left">Colaborador</th>
+                      <th className="px-2 py-2.5 text-right">Normais (h)</th>
+                      <th className="px-2 py-2.5 text-right">HE 50% (h)</th>
+                      <th className="px-2 py-2.5 text-right">HE 100% (h)</th>
+                      <th className="px-2 py-2.5 text-right">Not. (h)</th>
+                      <th className="px-2 py-2.5 text-right">Faltas (d)</th>
+                      <th className="px-4 py-2.5 text-right">Banco (h)</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-100 dark:divide-slate-800/60">
+                    {(payrollEventsQuery.data?.rows ?? []).map((row) => {
+                      const q = row.quantities;
+                      const bank = (q.BANCO_CREDITO ?? 0) - (q.BANCO_DEBITO ?? 0);
+                      return (
+                        <tr key={row.user.id}>
+                          <td className="px-4 py-2 max-w-[240px] truncate">{row.user.name}</td>
+                          <td className="px-2 py-2 text-right tabular-nums">{(q.HORAS_NORMAIS ?? 0).toLocaleString('pt-BR')}</td>
+                          <td className="px-2 py-2 text-right tabular-nums">{(q.HE_50 ?? 0).toLocaleString('pt-BR')}</td>
+                          <td className="px-2 py-2 text-right tabular-nums">{(q.HE_100 ?? 0).toLocaleString('pt-BR')}</td>
+                          <td className="px-2 py-2 text-right tabular-nums">{(q.ADICIONAL_NOTURNO ?? 0).toLocaleString('pt-BR')}</td>
+                          <td className="px-2 py-2 text-right tabular-nums">{q.FALTAS ?? 0}</td>
+                          <td className={cn('px-4 py-2 text-right font-semibold tabular-nums', bank > 0 ? 'text-status-green' : bank < 0 ? 'text-status-red' : 'text-muted-foreground')}>
+                            {bank > 0 ? '+' : ''}{bank.toLocaleString('pt-BR')}
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+                {payrollEventsQuery.isLoading && <div className="p-6 text-center text-xs text-muted-foreground">Calculando eventos...</div>}
+                {!payrollEventsQuery.isLoading && (payrollEventsQuery.data?.rows ?? []).length === 0 && (
+                  <div className="p-6 text-center text-xs text-muted-foreground">Sem eventos para {payrollRef}.</div>
+                )}
+                <div className="border-t p-3 text-[10px] text-muted-foreground">
+                  As rubricas são derivadas da apuração (fonte única). Faixas de HE, adicional noturno e DSR dependem da convenção coletiva — <b>revise com o jurídico/DP</b> antes de importar na folha. Cada exportação fica registrada para conciliação.
+                </div>
+              </CardContent>
+            </Card>
           </TabsContent>
         )}
       </Tabs>
+
+      {/* Dialog: extrato do banco de horas */}
+      <Dialog open={bankOpen} onOpenChange={setBankOpen}>
+        <DialogContent className="max-w-2xl overflow-y-auto max-h-[88vh]">
+          <DialogHeader>
+            <DialogTitle>Banco de horas — extrato</DialogTitle>
+          </DialogHeader>
+          {bankQuery.data && (
+            <div className="space-y-4">
+              <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+                <div className="rounded-md border p-3">
+                  <div className="text-[10px] uppercase tracking-wider text-muted-foreground">Saldo atual</div>
+                  <div className={cn('text-lg font-bold tabular-nums', bankQuery.data.balanceMinutes >= 0 ? 'text-status-green' : 'text-status-red')}>
+                    {bankQuery.data.balanceMinutes > 0 ? '+' : ''}{minutesLabel(bankQuery.data.balanceMinutes)}
+                  </div>
+                </div>
+                <div className="rounded-md border p-3">
+                  <div className="text-[10px] uppercase tracking-wider text-muted-foreground">Vencem em 30 dias</div>
+                  <div className="text-lg font-bold tabular-nums text-amber-600">{minutesLabel(bankQuery.data.expiringSoonMinutes)}</div>
+                </div>
+                <div className="col-span-2 rounded-md border p-3 text-xs text-muted-foreground">
+                  Política: validade de <b>{bankQuery.data.policy.validityMonths} meses</b> · crédito vencido{' '}
+                  {bankQuery.data.policy.expirationAction === 'PAYOUT' ? 'marcado para pagamento' : 'expira'}.
+                  {!bankQuery.data.policy.enabled && ' (Banco de horas desativado nesta empresa.)'}
+                </div>
+              </div>
+              {bankQuery.data.alerts.map((alert) => (
+                <div key={alert.type} className="rounded-md border border-status-yellow/40 bg-status-yellow/5 p-2 text-[11px] text-status-yellow">
+                  {alert.type === 'MAX_POSITIVE'
+                    ? `Saldo positivo ${minutesLabel(alert.overBy)} acima do teto da empresa.`
+                    : `Saldo negativo ${minutesLabel(alert.overBy)} abaixo do limite da empresa.`}
+                </div>
+              ))}
+              <div className="rounded-md border">
+                <div className="border-b bg-muted/30 px-3 py-2 text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Lançamentos</div>
+                <div className="max-h-72 overflow-y-auto divide-y">
+                  {bankQuery.data.entries.length === 0 && <div className="p-4 text-center text-xs text-muted-foreground">Nenhum lançamento no banco de horas ainda. O saldo em aberto vira lançamento ao fechar a competência.</div>}
+                  {bankQuery.data.entries.map((entry) => (
+                    <div key={entry.id} className="flex items-center justify-between gap-2 px-3 py-2 text-xs">
+                      <div className="min-w-0">
+                        <div className="font-semibold">{BANK_SOURCE_LABEL[entry.source] ?? entry.source}{entry.periodRef && !entry.periodRef.startsWith('exp:') ? ` · ${entry.periodRef}` : ''}</div>
+                        <div className="truncate text-[10px] text-muted-foreground">
+                          {formatDate(entry.createdAt)}
+                          {entry.expiresAt ? ` · vence ${formatDate(entry.expiresAt)}` : ''}
+                          {entry.note ? ` · ${entry.note}` : ''}
+                        </div>
+                      </div>
+                      <div className={cn('shrink-0 font-bold tabular-nums', entry.minutes >= 0 ? 'text-status-green' : 'text-status-red')}>
+                        {entry.minutes > 0 ? '+' : ''}{minutesLabel(entry.minutes)}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
+
+      {/* Dialog: mapeamento de rubricas da folha */}
+      <Dialog open={rubricsOpen} onOpenChange={setRubricsOpen}>
+        <DialogContent className="max-w-xl">
+          <DialogHeader>
+            <DialogTitle>Rubricas da folha</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-2">
+            <div className="rounded-md border bg-muted/30 p-3 text-[11px] text-muted-foreground">
+              Vincule cada evento interno ao código correspondente na sua folha de pagamento. O código é usado nas exportações.
+            </div>
+            {(payrollRubricsQuery.data ?? []).map((rubric) => (
+              <div key={rubric.id} className="flex items-center justify-between gap-3 rounded-md border p-2.5 text-xs">
+                <div className="min-w-0">
+                  <div className="font-semibold">{rubric.description}</div>
+                  <div className="text-[10px] text-muted-foreground">{rubric.eventKey} · {rubric.unit === 'DIAS' ? 'dias' : 'horas'}</div>
+                </div>
+                <Input
+                  className="h-8 w-28 text-xs"
+                  defaultValue={rubric.payrollCode}
+                  onBlur={(e) => {
+                    const value = e.target.value.trim();
+                    if (value && value !== rubric.payrollCode) setRubric.mutate({ eventKey: rubric.eventKey, payrollCode: value });
+                  }}
+                />
+              </div>
+            ))}
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setRubricsOpen(false)}>Fechar</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Dialog: assistente de fechamento (checklist) */}
+      <Dialog open={Boolean(previewRef)} onOpenChange={(v) => !v && setPreviewRef(null)}>
+        <DialogContent className="max-w-lg">
+          <DialogHeader>
+            <DialogTitle>Fechar competência {previewRef}</DialogTitle>
+          </DialogHeader>
+          {closingPreviewQuery.isLoading && <div className="p-4 text-center text-xs text-muted-foreground">Verificando pendências...</div>}
+          {closingPreviewQuery.data && (
+            <div className="space-y-4">
+              <div className="space-y-1.5">
+                {closingPreviewQuery.data.checklist.map((item) => (
+                  <div key={item.key} className="flex items-center justify-between gap-2 rounded-md border p-2.5 text-xs">
+                    <div className="flex items-center gap-2">
+                      {item.ok ? (
+                        <CheckCircle2 className="h-4 w-4 shrink-0 text-status-green" />
+                      ) : (
+                        <AlertTriangle className={cn('h-4 w-4 shrink-0', item.blocking ? 'text-status-red' : 'text-status-yellow')} />
+                      )}
+                      <span>{item.label}</span>
+                      {item.blocking && !item.ok && <Badge variant="outline" className="h-4 border-status-red/40 px-1.5 text-[8px] text-status-red">bloqueia</Badge>}
+                    </div>
+                    <span className={cn('font-bold tabular-nums', item.ok ? 'text-muted-foreground' : item.blocking ? 'text-status-red' : 'text-status-yellow')}>{item.count}</span>
+                  </div>
+                ))}
+              </div>
+              {closingPreviewQuery.data.withoutSchedule.length > 0 && (
+                <div className="rounded-md border border-status-yellow/40 bg-status-yellow/5 p-2 text-[11px] text-muted-foreground">
+                  Sem escala: {closingPreviewQuery.data.withoutSchedule.map((u) => u.name).join(', ')}.
+                </div>
+              )}
+              {!closingPreviewQuery.data.readyToClose && (
+                <div className="rounded-md border border-status-red/40 bg-status-red/5 p-2 text-[11px] text-status-red">
+                  Existem solicitações de ajuste em aberto. Trate-as na aba Ajustes antes de fechar (recomendado); o fechamento consolida os saldos atuais.
+                </div>
+              )}
+              <div className="text-[10px] text-muted-foreground">
+                Fechar bloqueia batidas e ajustes do mês, gera a versão do consolidado e lança o saldo de cada colaborador no banco de horas (com vencimento pela política).
+              </div>
+            </div>
+          )}
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setPreviewRef(null)}>Cancelar</Button>
+            <Button
+              className="bg-sky-600 font-semibold text-white hover:bg-sky-700"
+              disabled={closePeriod.isPending || !closingPreviewQuery.data}
+              onClick={() => {
+                if (previewRef) closePeriod.mutate(previewRef);
+              }}
+            >
+              <Lock className="mr-1.5 h-3.5 w-3.5" />{closePeriod.isPending ? 'Fechando...' : 'Fechar competência'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       {/* Dialog: solicitar ajuste */}
       <Dialog open={Boolean(adjustDialog)} onOpenChange={(v) => !v && setAdjustDialog(null)}>
@@ -1835,6 +2113,27 @@ export default function TimeClockPage() {
 }
 
 /** Baixa o relatório CSV da competência com o token de acesso (download controlado). */
+async function downloadPayroll(ref: string, format: 'CSV' | 'JSON' | 'TXT') {
+  try {
+    const apiUrl = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:3333/api';
+    const token = getAccessToken();
+    const res = await fetch(`${apiUrl}/personnel/payroll/export/${ref}?format=${format}`, {
+      headers: token ? { authorization: `Bearer ${token}` } : undefined,
+    });
+    if (!res.ok) throw new Error('Falha ao gerar a exportação');
+    const blob = await res.blob();
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = `folha-${ref}.${format.toLowerCase()}`;
+    link.click();
+    URL.revokeObjectURL(url);
+    toast.success(`Exportação ${format} gerada e registrada`);
+  } catch {
+    toast.error('Não foi possível exportar os eventos para a folha');
+  }
+}
+
 async function downloadPeriodReport(ref: string) {
   try {
     const apiUrl = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:3333/api';
