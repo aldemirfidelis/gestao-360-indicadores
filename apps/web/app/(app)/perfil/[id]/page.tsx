@@ -7,8 +7,10 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { format, formatDistanceToNow } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { toast } from 'sonner';
-import { CalendarPlus, Mail, MessageSquare, Phone, Save } from 'lucide-react';
+import { CalendarPlus, Mail, MessageSquare, Phone, Save, Coins, Eye } from 'lucide-react';
 import { api } from '@/lib/api';
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import PayslipCard from '@/components/payroll/payslip-card';
 import { useAuth } from '@/components/auth/auth-provider';
 import { useRealtime } from '@/components/communication/realtime-provider';
 import { UserAvatar } from '@/components/communication/user-avatar';
@@ -107,24 +109,28 @@ export default function ProfilePage() {
 
       <div className="grid gap-4 lg:grid-cols-2">
         {/* Informações corporativas */}
-        <SectionCard title="Informações" contentClassName="p-0">
-          <dl className="divide-y divide-border/50 text-sm">
-            <Info label="E-mail" value={p.email} icon={<Mail className="h-3.5 w-3.5" />} />
-            <Info label="Telefone" value={p.phone ?? '—'} icon={<Phone className="h-3.5 w-3.5" />} />
-            <Info label="Empresa" value={p.company?.name ?? '—'} />
-            <Info label="Filial" value={p.branch?.name ?? '—'} />
-            <Info label="Área / Setor" value={areaPath || '—'} />
-            <Info
-              label="Último acesso"
-              value={
-                p.lastLoginAt
-                  ? formatDistanceToNow(new Date(p.lastLoginAt), { addSuffix: true, locale: ptBR })
-                  : '—'
-              }
-            />
-            <Info label="Membro desde" value={format(new Date(p.createdAt), 'dd/MM/yyyy', { locale: ptBR })} />
-          </dl>
-        </SectionCard>
+        <div className="space-y-4">
+          <SectionCard title="Informações" contentClassName="p-0">
+            <dl className="divide-y divide-border/50 text-sm">
+              <Info label="E-mail" value={p.email} icon={<Mail className="h-3.5 w-3.5" />} />
+              <Info label="Telefone" value={p.phone ?? '—'} icon={<Phone className="h-3.5 w-3.5" />} />
+              <Info label="Empresa" value={p.company?.name ?? '—'} />
+              <Info label="Filial" value={p.branch?.name ?? '—'} />
+              <Info label="Área / Setor" value={areaPath || '—'} />
+              <Info
+                label="Último acesso"
+                value={
+                  p.lastLoginAt
+                    ? formatDistanceToNow(new Date(p.lastLoginAt), { addSuffix: true, locale: ptBR })
+                    : '—'
+                }
+              />
+              <Info label="Membro desde" value={format(new Date(p.createdAt), 'dd/MM/yyyy', { locale: ptBR })} />
+            </dl>
+          </SectionCard>
+
+          {isMe && <MyFunctionalLifeCard />}
+        </div>
 
         {/* Bio + (se for eu) edição */}
         <div className="space-y-4">
@@ -276,5 +282,74 @@ function Toggle({ label, checked, onChange }: { label: string; checked: boolean;
       <span className="text-muted-foreground">{label}</span>
       <input type="checkbox" checked={checked} onChange={onChange} className="h-4 w-4 accent-foreground" />
     </label>
+  );
+}
+
+function MyFunctionalLifeCard() {
+  const [selectedPayslipId, setSelectedPayslipId] = useState<string | null>(null);
+
+  const payslipsQuery = useQuery<any[]>({
+    queryKey: ['my-payslips'],
+    queryFn: () => api<any[]>('/payroll/my-payslips'),
+  });
+
+  const detailQuery = useQuery<any>({
+    queryKey: ['my-payslip-detail', selectedPayslipId],
+    queryFn: () => api<any>(`/payroll/my-payslips/${selectedPayslipId}`),
+    enabled: !!selectedPayslipId,
+  });
+
+  const formatMonthYear = (year: number, month: number) => {
+    return `${String(month).padStart(2, '0')}/${year}`;
+  };
+
+  return (
+    <SectionCard title="Minha Vida Funcional (Holerites)">
+      <div className="space-y-3 text-xs">
+        {payslipsQuery.isLoading && (
+          <div className="text-center py-4 text-muted-foreground">Carregando contracheques...</div>
+        )}
+        {!payslipsQuery.isLoading && (!payslipsQuery.data || payslipsQuery.data.length === 0) && (
+          <div className="text-center py-4 text-muted-foreground">Nenhum contracheque publicado.</div>
+        )}
+        <div className="space-y-2">
+          {payslipsQuery.data?.map((ps) => (
+            <div key={ps.id} className="flex items-center justify-between p-2.5 border border-border/60 rounded bg-muted/20">
+              <div className="flex items-center gap-2">
+                <Coins className="h-4 w-4 text-sky-500" />
+                <div>
+                  <span className="font-bold text-xs uppercase block">
+                    {ps.run.kind === 'ADIANTAMENTO' ? 'Adiantamento Salarial' : 'Folha Mensal'}
+                  </span>
+                  <span className="text-[10px] text-muted-foreground">
+                    Competência: {formatMonthYear(ps.run.competence.year, ps.run.competence.month)}
+                  </span>
+                </div>
+              </div>
+              <Button size="sm" variant="outline" className="h-7 text-[10px]" onClick={() => setSelectedPayslipId(ps.id)}>
+                <Eye className="mr-1 h-3.5 w-3.5" /> Visualizar
+              </Button>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {/* DIALOG: Visualizar Holerite */}
+      <Dialog open={!!selectedPayslipId} onOpenChange={(open) => !open && setSelectedPayslipId(null)}>
+        <DialogContent className="max-w-[750px] max-h-[85vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>Meu Demonstrativo de Pagamento</DialogTitle>
+          </DialogHeader>
+          {detailQuery.isLoading && (
+            <div className="py-8 text-center text-xs text-muted-foreground">Carregando detalhes do holerite...</div>
+          )}
+          {detailQuery.data && (
+            <div className="py-2">
+              <PayslipCard data={detailQuery.data} />
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
+    </SectionCard>
   );
 }

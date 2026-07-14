@@ -12511,6 +12511,7 @@ model PayrollWorkerSettings {
   employeeId           String   @unique
   salaryType           String   @default("MENSAL") // MENSAL | HORISTA (demais em F3)
   monthlyHours         Int      @default(220)
+  advancePercentage    Int      @default(40)
   irDependentsOverride Int?
   updatedById          String?
   createdAt            DateTime @default(now())
@@ -13424,7 +13425,6 @@ model InventoryCountItem {
   @@index([companyId, itemId])
   @@map("supply_inventory_count_items")
 }
-
 model WithdrawalApprovalPolicy {
   id             String    @id @default(uuid())
   companyId      String
@@ -13441,4 +13441,135 @@ model WithdrawalApprovalPolicy {
 
   @@index([companyId, active, orgNodeId])
   @@map("supply_withdrawal_approval_policies")
+}
+
+// ===================== Rotinas Especiais de Folha (Fase 3) =====================
+
+model PayrollVacationPeriod {
+  id              String                   @id @default(uuid())
+  companyId       String
+  employeeId      String
+  startAquisition DateTime
+  endAquisition   DateTime
+  concessionLimit DateTime
+  totalDays       Int                      @default(30)
+  takenDays       Int                      @default(0)
+  status          String                   @default("ACQUIRING") // ACQUIRING | CONCESSIVE | TAKEN
+  createdAt       DateTime                 @default(now())
+  updatedAt       DateTime                 @updatedAt
+  requests        PayrollVacationRequest[]
+
+  @@index([companyId, employeeId])
+  @@map("payroll_vacation_periods")
+}
+
+model PayrollVacationRequest {
+  id                String                @id @default(uuid())
+  companyId         String
+  vacationPeriodId  String
+  period            PayrollVacationPeriod @relation(fields: [vacationPeriodId], references: [id], onDelete: Cascade)
+  startDate         DateTime
+  endDate           DateTime
+  takenDays         Int
+  sellDays          Int                   @default(0) // abono pecuniário
+  advanceThirteenth Boolean               @default(false)
+  status            String                @default("DRAFT") // DRAFT | APPROVED | CALCULATED | CLOSED
+  calculatedAt      DateTime?
+  approvedAt        DateTime?
+  closedAt          DateTime?
+  createdAt         DateTime              @default(now())
+  updatedAt         DateTime              @updatedAt
+
+  @@index([companyId, vacationPeriodId])
+  @@map("payroll_vacation_requests")
+}
+
+model PayrollTermination {
+  id              String    @id @default(uuid())
+  companyId       String
+  employeeId      String    @unique
+  terminationDate DateTime
+  kind            String // DISPENSA_SEM_JUSTA_CAUSA | PEDIDO | ACORDO
+  noticeType      String // TRABALHADO | INDENIZADO
+  noticeDays      Int       @default(30)
+  status          String    @default("DRAFT") // DRAFT | CALCULATED | APPROVED | CLOSED
+  resultsJson     Json?
+  calculatedById  String?
+  calculatedAt    DateTime?
+  approvedById    String?
+  approvedAt      DateTime?
+  closedById      String?
+  closedAt        DateTime?
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+
+  @@index([companyId])
+  @@map("payroll_terminations")
+}
+
+model PayrollBenefit {
+  id          String                     @id @default(uuid())
+  companyId   String
+  name        String
+  provider    String
+  kind        String // VT | VA | VR | SAUDE | ODONTO
+  type        String                     @default("VALOR_FIXO") // VALOR_FIXO | PERCENTUAL_SALARIO
+  value       Decimal                    @db.Decimal(14, 2)
+  copayRateBp Int                        @default(0) // alíquota de coparticipação (basis points)
+  active      Boolean                    @default(true)
+  createdAt   DateTime                   @default(now())
+  updatedAt   DateTime                   @updatedAt
+  enrollments PayrollBenefitEnrollment[]
+
+  @@unique([companyId, name])
+  @@map("payroll_benefits")
+}
+
+model PayrollBenefitEnrollment {
+  id          String         @id @default(uuid())
+  companyId   String
+  employeeId  String
+  benefitId   String
+  benefit     PayrollBenefit @relation(fields: [benefitId], references: [id], onDelete: Cascade)
+  customValue Decimal?       @db.Decimal(14, 2)
+  active      Boolean        @default(true)
+  createdAt   DateTime       @default(now())
+  updatedAt   DateTime       @updatedAt
+
+  @@unique([employeeId, benefitId])
+  @@index([companyId])
+  @@map("payroll_benefit_enrollments")
+}
+
+model PayrollLoan {
+  id                 String   @id @default(uuid())
+  companyId          String
+  employeeId         String
+  bankName           String
+  contractId         String
+  totalAmount        Decimal  @db.Decimal(14, 2)
+  installmentAmount  Decimal  @db.Decimal(14, 2)
+  totalInstallments  Int
+  paidInstallments   Int      @default(0)
+  status             String   @default("ACTIVE") // ACTIVE | COMPLETED
+  createdAt          DateTime @default(now())
+  updatedAt          DateTime @updatedAt
+
+  @@unique([companyId, employeeId, contractId])
+  @@map("payroll_loans")
+}
+
+model PayrollPension {
+  id          String   @id @default(uuid())
+  companyId   String
+  employeeId  String
+  dependentId String   @unique
+  percentage  Decimal  @db.Decimal(6, 4) // Ex: 15.5000%
+  baseType    String   @default("NET") // GROSS | NET (base de cálculo)
+  active      Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([companyId, employeeId])
+  @@map("payroll_pensions")
 }

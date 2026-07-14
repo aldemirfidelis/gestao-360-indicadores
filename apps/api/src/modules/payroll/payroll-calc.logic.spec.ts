@@ -8,6 +8,8 @@ import {
   decimalToCents,
   hourlyRateCents,
   roundDiv,
+  computeVacationWorker,
+  computeThirteenthWorker,
   type InssTableData,
   type IrrfTableData,
   type LegalTables,
@@ -140,5 +142,136 @@ describe('payroll-calc.logic — folha do mensalista (ouro composto)', () => {
       tables: TABLES,
     });
     expect(result.items.find((item) => item.rubricCode === '9003')?.amountCents).toBe(3036); // 2%
+  });
+
+  it('desconto de adiantamento salarial deduz do líquido', () => {
+    const result = computeMonthlyWorker({
+      salaryCents: 300000,
+      monthlyHours: 220,
+      contractType: 'CLT',
+      irDependents: 0,
+      timekeeping: { normalMinutes: 11880, he50Minutes: 0, he100Minutes: 0, nightMinutes: 0, absentMinutes: 0, workedDays: 22, absentDays: 0 },
+      tables: TABLES,
+      advancePaidCents: 120000,
+    });
+    const advanceDiscount = result.items.find((item) => item.rubricCode === '5020');
+    expect(advanceDiscount?.amountCents).toBe(120000);
+    expect(advanceDiscount?.nature).toBe('DESCONTO');
+    expect(result.totals.inssBaseCents).toBe(300000);
+    expect(result.totals.deductionsCents).toBe(25341 + 120000);
+    expect(result.totals.netCents).toBe(300000 - 25341 - 120000);
+  });
+});
+
+describe('payroll-calc.logic — descontos da folha (Benefícios, Consignados e Pensão)', () => {
+  it('aplica descontos de VT, VA, Consignado e Pensão Alimentícia (dedutível no IRRF)', () => {
+    const result = computeMonthlyWorker({
+      salaryCents: 400000, // 4.000,00
+      monthlyHours: 220,
+      contractType: 'CLT',
+      irDependents: 0,
+      timekeeping: { normalMinutes: 11880, he50Minutes: 0, he100Minutes: 0, nightMinutes: 0, absentMinutes: 0, workedDays: 22, absentDays: 0 },
+      tables: TABLES,
+      benefits: [
+        { name: 'Vale Transporte', kind: 'VT', valueCents: 24000 },
+        { name: 'Vale Alimentação', kind: 'VA', valueCents: 5000 },
+      ],
+      loans: [
+        { bankName: 'Banco Itaú', contractId: 'LOAN-123', amountCents: 30000 },
+      ],
+      pensions: [
+        { dependentId: 'dep-1', percentage: 10, baseType: 'NET' }, // 10% da base líquida (Bruto - INSS)
+      ],
+    });
+
+    const byCode = new Map(result.items.map((i) => [i.rubricCode, i]));
+    expect(byCode.get('5100')?.amountCents).toBe(24000); // VT
+    expect(byCode.get('5110')?.amountCents).toBe(5000);  // VA
+    expect(byCode.get('5050')?.amountCents).toBe(30000); // Consignado
+
+    // Bruto = 4.000,00. INSS para 4.000,00:
+    // Faixa 1: 1518 * 7.5% = 113.85
+    // Faixa 2: (2793.88 - 1518) * 9% = 114.8292
+    // Faixa 3: (4000 - 2793.88) * 12% = 144.7344
+    // Total INSS = 113.85 + 114.8292 + 144.7344 = 373.4136 -> 373.41 (37341)
+    expect(byCode.get('5501')?.amountCents).toBe(37341);
+
+    // Pensão = 10% de (Bruto - INSS) = 10% de (400000 - 37341) = 10% de 362659 = 36266 cents
+    expect(byCode.get('5060')?.amountCents).toBe(36266);
+
+    // IRRF deve descontar INSS e Pensão!
+    // Base tributável: 4000.00 - INSS (373.41) - Pensão (362.66) = 3263.93 (326393 cents)
+    // Tabela IRRF 2025: base 3263.93 está na faixa 15% (dedução 394.16)
+    // IRRF Bruto: 3263.93 * 15% - 394.16 = 489.5895 - 394.16 = 95.4295 -> 95.43 (9543)
+    // Se usasse simplificado: 4000.00 - 607.20 = 3392.80. IRRF: 3392.80 * 15% - 394.16 = 508.92 - 394.16 = 114.76
+    // Logo, deduções legais (INSS + Pensão) são melhores. IRRF esperado = 95.43
+    expect(byCode.get('5502')?.amountCents).toBe(9543);
+  });
+});
+
+describe('payroll-calc.logic — Férias e 13º Salário (Fase 3)', () => {
+  it('calcula férias com 30 dias gozados e 10 dias vendidos (abono pecuniário)', () => {
+    const result = computeVacationWorker({
+      salaryCents: 300000,
+      takenDays: 30,
+      sellDays: 10,
+      contractType: 'CLT',
+      tables: TABLES,
+    });
+
+    const byCode = new Map(result.items.map((i) => [i.rubricCode, i]));
+    expect(byCode.get('1020')?.amountCents).toBe(300000); // 30 dias férias
+    expect(byCode.get('1021')?.amountCents).toBe(100000); // 1/3 férias
+    expect(byCode.get('1022')?.amountCents).toBe(100000); // abono 10 dias
+    expect(byCode.get('1023')?.amountCents).toBe(33333);  // 1/3 s/ abono
+
+    // INSS sobre férias gozadas + 1/3 (3.000 + 1.000 = 4.000,00)
+    // INSS para 4.000,00 é 373,41 (37341)
+    expect(byCode.get('5501')?.amountCents).toBe(37341);
+
+    // IRRF sobre base férias (4.000,00 - INSS 373,41 = 3.626,59)
+    // Faixa 15% com dedução de 394,16 -> 3626.59 * 15% - 394.16 = 543.9885 - 394.16 = 149.8285 -> 149.83 (14983)
+    // Desconto simplificado seria: 4000.00 - 607.20 = 3392.80. IRRF: 3392.80 * 15% - 394.16 = 114.76
+    // Como simplificado é melhor do que deduzir apenas INSS (4000 - 607.20 = 3392.80 vs 4000 - 373.41 = 3626.59),
+    // o IRRF simplificado é aplicado: 114.76 (11476)
+    expect(byCode.get('5502')?.amountCents).toBe(11476);
+  });
+
+  it('calcula 13º Salário — 1ª parcela', () => {
+    const result = computeThirteenthWorker({
+      salaryCents: 300000,
+      avos: 12,
+      parcela: 1,
+      contractType: 'CLT',
+      tables: TABLES,
+    });
+
+    const byCode = new Map(result.items.map((i) => [i.rubricCode, i]));
+    expect(byCode.get('1030')?.amountCents).toBe(150000); // 50% de 3.000
+    expect(result.totals.inssCents).toBe(0);
+    expect(result.totals.irrfCents).toBe(0);
+    expect(result.totals.fgtsCents).toBe(12000); // 8% sobre 1.500
+  });
+
+  it('calcula 13º Salário — 2ª parcela deduzindo adiantamento da 1ª', () => {
+    const result = computeThirteenthWorker({
+      salaryCents: 300000,
+      avos: 12,
+      parcela: 2,
+      advancePaidCents: 150000,
+      contractType: 'CLT',
+      tables: TABLES,
+    });
+
+    const byCode = new Map(result.items.map((i) => [i.rubricCode, i]));
+    expect(byCode.get('1031')?.amountCents).toBe(300000); // valor integral
+    expect(byCode.get('5030')?.amountCents).toBe(150000); // desconto 1ª parcela
+
+    // INSS sobre 3.000,00 é 253,41 (25341)
+    expect(byCode.get('5501')?.amountCents).toBe(25341);
+
+    // IRRF sobre base 13º (3000.00 - INSS 253.41 = 2746.59)
+    // Tabela anual: faixa 7.5% (dedução 182.16) -> 2746.59 * 7.5% - 182.16 = 205.99425 - 182.16 = 23.83425 -> 23.83 (2383)
+    expect(byCode.get('5502')?.amountCents).toBe(2383);
   });
 });

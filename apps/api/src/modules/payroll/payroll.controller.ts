@@ -82,6 +82,18 @@ export class PayrollController {
     return this.runs.workerMemory(me, id);
   }
 
+  // ------------------------------ portal do colaborador ------------------------------
+
+  @Get('my-payslips')
+  listMyPayslips(@CurrentUser() me: AuthPayload) {
+    return this.runs.listMyPayslips(me);
+  }
+
+  @Get('my-payslips/:id')
+  getMyPayslipMemory(@CurrentUser() me: AuthPayload, @Param('id') id: string) {
+    return this.runs.getMyPayslipMemory(me, id);
+  }
+
   // ------------------------------ rubricas e parâmetros legais ------------------------------
 
   @Get('rubrics')
@@ -100,5 +112,77 @@ export class PayrollController {
   @RequirePermissions('folha:params')
   createLegalTable(@CurrentUser() me: AuthPayload, @Body() body: any) {
     return this.legalTables.createVersion(me, body);
+  }
+
+  // ------------------------------ Férias ------------------------------
+
+  @Get('vacations')
+  @RequirePermissions('folha:view')
+  listVacations(@CurrentUser() me: AuthPayload) {
+    return this.runs.listVacations(me);
+  }
+
+  @Post('vacations/request')
+  @RequirePermissions('folha:operate')
+  createVacationRequest(@CurrentUser() me: AuthPayload, @Body() body: any) {
+    return this.runs.createVacationRequest(me, body);
+  }
+
+  // ------------------------------ Rescisões ------------------------------
+
+  @Get('terminations')
+  @RequirePermissions('folha:view')
+  listTerminations(@CurrentUser() me: AuthPayload) {
+    return this.runs.listTerminations(me);
+  }
+
+  @Post('terminations')
+  @RequirePermissions('folha:operate')
+  createTermination(@CurrentUser() me: AuthPayload, @Body() body: any) {
+    return this.runs.createTermination(me, body);
+  }
+
+  // ------------------------------ Benefícios e Descontos ------------------------------
+
+  @Get('benefits')
+  @RequirePermissions('folha:view')
+  listBenefits(@CurrentUser() me: AuthPayload) {
+    return this.runs.listBenefits(me);
+  }
+
+  @Post('benefits')
+  @RequirePermissions('folha:params')
+  createBenefit(@CurrentUser() me: AuthPayload, @Body() body: any) {
+    return this.runs.createBenefit(me, body);
+  }
+
+  @Post('benefits/enroll')
+  @RequirePermissions('folha:operate')
+  enrollBenefit(@CurrentUser() me: AuthPayload, @Body() body: any) {
+    return this.runs.enrollBenefit(me, body);
+  }
+
+  @Get('loans')
+  @RequirePermissions('folha:view')
+  listLoans(@CurrentUser() me: AuthPayload) {
+    return this.runs.listLoans(me);
+  }
+
+  @Post('loans')
+  @RequirePermissions('folha:operate')
+  createLoan(@CurrentUser() me: AuthPayload, @Body() body: any) {
+    return this.runs.createLoan(me, body);
+  }
+
+  @Get('pensions')
+  @RequirePermissions('folha:view')
+  listPensions(@CurrentUser() me: AuthPayload) {
+    return this.runs.listPensions(me);
+  }
+
+  @Post('pensions')
+  @RequirePermissions('folha:operate')
+  createPension(@CurrentUser() me: AuthPayload, @Body() body: any) {
+    return this.runs.createPension(me, body);
   }
 }

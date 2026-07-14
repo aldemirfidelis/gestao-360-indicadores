@@ -116,9 +116,10 @@ export function computeIrrf(input: {
   inssCents: number;
   irDependents: number;
   table: IrrfTableData;
+  pensionCents?: number;
 }): IrrfResult {
-  const { grossTaxableCents, inssCents, irDependents, table } = input;
-  const legalDeductions = inssCents + irDependents * table.dependentDeductionCents;
+  const { grossTaxableCents, inssCents, irDependents, table, pensionCents } = input;
+  const legalDeductions = inssCents + irDependents * table.dependentDeductionCents + (pensionCents ?? 0);
   const usedSimplified = table.simplifiedDiscountCents > legalDeductions;
   const deductionsCents = usedSimplified ? table.simplifiedDiscountCents : legalDeductions;
   const taxableBase = Math.max(0, grossTaxableCents - deductionsCents);
@@ -157,6 +158,10 @@ export interface WorkerCalcInput {
   irDependents: number;
   timekeeping: TimekeepingSummary;
   tables: LegalTables;
+  advancePaidCents?: number;
+  benefits?: Array<{ name: string; kind: string; valueCents: number }>;
+  loans?: Array<{ bankName: string; contractId: string; amountCents: number }>;
+  pensions?: Array<{ dependentId: string; percentage: number; baseType: string }>;
 }
 
 export interface WorkerCalcItem {
@@ -196,7 +201,7 @@ function hoursRef(minutes: number): string {
  * variáveis e médias ficam para F2/F3 (exigem validação jurídica por CCT).
  */
 export function computeMonthlyWorker(input: WorkerCalcInput): WorkerCalcResult {
-  const { salaryCents, monthlyHours, contractType, irDependents, timekeeping, tables } = input;
+  const { salaryCents, monthlyHours, contractType, irDependents, timekeeping, tables, advancePaidCents, benefits, loans, pensions } = input;
   const memory: MemoryStep[] = [];
   const items: WorkerCalcItem[] = [];
 
@@ -257,7 +262,16 @@ export function computeMonthlyWorker(input: WorkerCalcInput): WorkerCalcResult {
       resultCents: absences,
     });
   }
-
+  // 5020 — Desconto de adiantamento salarial
+  if (advancePaidCents && advancePaidCents > 0) {
+    items.push({ rubricCode: '5020', rubricName: 'Desconto de adiantamento', nature: 'DESCONTO', reference: 'Adiantamento', amountCents: advancePaidCents, origin: 'MOTOR' });
+    memory.push({
+      step: 'Desconto de adiantamento',
+      formula: 'Dedução do adiantamento pago na competência',
+      inputs: { adiantamentoPago: centsLabel(advancePaidCents) },
+      resultCents: advancePaidCents,
+    });
+  }
   const earningsBeforeTaxes = items.filter((i) => i.nature === 'PROVENTO').reduce((sum, i) => sum + i.amountCents, 0);
   const grossTaxable = earningsBeforeTaxes - absences; // base de INSS/IRRF/FGTS (remuneração do mês)
 
@@ -276,8 +290,40 @@ export function computeMonthlyWorker(input: WorkerCalcInput): WorkerCalcResult {
     legalVersionId: tables.inss.versionId,
   });
 
+  // PENSÃO ALIMENTÍCIA (desconto e dedutível do IRRF)
+  let totalPensionCents = 0;
+  if (pensions && pensions.length > 0) {
+    for (const p of pensions) {
+      const isNet = p.baseType === 'NET';
+      const baseValue = isNet ? (grossTaxable - inss.valueCents) : grossTaxable;
+      const pensionCents = roundDiv(baseValue * Math.round(p.percentage * 100), 10_000);
+      totalPensionCents += pensionCents;
+
+      items.push({
+        rubricCode: '5060',
+        rubricName: 'Pensão alimentícia',
+        nature: 'DESCONTO',
+        reference: `${p.percentage}% da base ${isNet ? 'Líquida (Bruto - INSS)' : 'Bruta'}`,
+        amountCents: pensionCents,
+        origin: 'MOTOR',
+      });
+      memory.push({
+        step: `Pensão alimentícia (${p.dependentId.slice(0, 5)})`,
+        formula: 'base × percentual judicial (half-up)',
+        inputs: { base: centsLabel(baseValue), percentual: `${p.percentage}%` },
+        resultCents: pensionCents,
+      });
+    }
+  }
+
   // IRRF (deduções legais vs desconto simplificado — usa o mais favorável)
-  const irrf = computeIrrf({ grossTaxableCents: grossTaxable, inssCents: inss.valueCents, irDependents, table: tables.irrf.data });
+  const irrf = computeIrrf({
+    grossTaxableCents: grossTaxable,
+    inssCents: inss.valueCents,
+    irDependents,
+    table: tables.irrf.data,
+    pensionCents: totalPensionCents,
+  });
   if (irrf.valueCents > 0) {
     items.push({ rubricCode: '5502', rubricName: 'IRRF', nature: 'DESCONTO', reference: `base ${centsLabel(irrf.taxableBaseCents)}`, amountCents: irrf.valueCents, origin: 'MOTOR' });
   }
@@ -309,6 +355,50 @@ export function computeMonthlyWorker(input: WorkerCalcInput): WorkerCalcResult {
     resultCents: fgts,
     legalVersionId: tables.fgts.versionId,
   });
+
+  // Benefícios (VT / VA / VR / Saúde)
+  if (benefits && benefits.length > 0) {
+    for (const b of benefits) {
+      let rubricCode = '5120'; // default SAUDE/ODONTO
+      if (b.kind === 'VT') rubricCode = '5100';
+      if (b.kind === 'VA' || b.kind === 'VR') rubricCode = '5110';
+
+      items.push({
+        rubricCode,
+        rubricName: `Desconto ${b.name}`,
+        nature: 'DESCONTO',
+        reference: b.kind,
+        amountCents: b.valueCents,
+        origin: 'MOTOR',
+      });
+      memory.push({
+        step: `Benefício ${b.name}`,
+        formula: 'desconto de benefício contratual / coparticipação',
+        inputs: { tipo: b.kind },
+        resultCents: b.valueCents,
+      });
+    }
+  }
+
+  // Empréstimos Consignados
+  if (loans && loans.length > 0) {
+    for (const l of loans) {
+      items.push({
+        rubricCode: '5050',
+        rubricName: `Consignado ${l.bankName}`,
+        nature: 'DESCONTO',
+        reference: `Contrato ${l.contractId}`,
+        amountCents: l.amountCents,
+        origin: 'MOTOR',
+      });
+      memory.push({
+        step: `Consignado ${l.bankName}`,
+        formula: 'desconto de empréstimo consignado em folha',
+        inputs: { contrato: l.contractId },
+        resultCents: l.amountCents,
+      });
+    }
+  }
 
   const earnings = items.filter((i) => i.nature === 'PROVENTO').reduce((sum, i) => sum + i.amountCents, 0);
   const deductions = items.filter((i) => i.nature === 'DESCONTO').reduce((sum, i) => sum + i.amountCents, 0);
@@ -352,4 +442,265 @@ export function decimalToCents(value: string): number {
   const [integer, fraction = ''] = value.replace('-', '').split('.');
   const cents = parseInt(integer || '0', 10) * 100 + parseInt(fraction.padEnd(2, '0').slice(0, 2) || '0', 10);
   return negative ? -cents : cents;
+}
+
+// ------------------------------ FÉRIAS E 13º (Fase 3) ------------------------------
+
+export interface VacationCalcInput {
+  salaryCents: number;
+  takenDays: number;
+  sellDays: number;
+  contractType: string | null;
+  tables: LegalTables;
+}
+
+export interface ThirteenthCalcInput {
+  salaryCents: number;
+  avos: number;
+  parcela: 1 | 2;
+  advancePaidCents?: number;
+  contractType: string | null;
+  tables: LegalTables;
+}
+
+export function computeVacationWorker(input: VacationCalcInput): WorkerCalcResult {
+  const { salaryCents, takenDays, sellDays, contractType, tables } = input;
+  const memory: MemoryStep[] = [];
+  const items: WorkerCalcItem[] = [];
+
+  const vacationCents = roundDiv(salaryCents * takenDays, 30);
+  if (takenDays > 0) {
+    items.push({ rubricCode: '1020', rubricName: 'Férias gozadas', nature: 'PROVENTO', reference: `${takenDays} dia(s)`, amountCents: vacationCents, origin: 'MOTOR' });
+    memory.push({
+      step: 'Férias gozadas',
+      formula: 'salário × dias gozados ÷ 30 (half-up)',
+      inputs: { salario: centsLabel(salaryCents), dias: takenDays },
+      resultCents: vacationCents,
+    });
+  }
+
+  const constitutionalThirdCents = roundDiv(vacationCents, 3);
+  if (takenDays > 0) {
+    items.push({ rubricCode: '1021', rubricName: '1/3 constitucional de férias', nature: 'PROVENTO', reference: '1/3', amountCents: constitutionalThirdCents, origin: 'MOTOR' });
+    memory.push({
+      step: '1/3 constitucional',
+      formula: 'férias gozadas ÷ 3 (half-up)',
+      inputs: { feriasGozadas: centsLabel(vacationCents) },
+      resultCents: constitutionalThirdCents,
+    });
+  }
+
+  const abonoCents = roundDiv(salaryCents * sellDays, 30);
+  if (sellDays > 0) {
+    items.push({ rubricCode: '1022', rubricName: 'Abono pecuniário', nature: 'PROVENTO', reference: `${sellDays} dia(s) vendidos`, amountCents: abonoCents, origin: 'MOTOR' });
+    memory.push({
+      step: 'Abono pecuniário',
+      formula: 'salário × dias vendidos ÷ 30 (half-up)',
+      inputs: { salario: centsLabel(salaryCents), dias: sellDays },
+      resultCents: abonoCents,
+    });
+  }
+
+  const thirdAbonoCents = roundDiv(abonoCents, 3);
+  if (sellDays > 0) {
+    items.push({ rubricCode: '1023', rubricName: '1/3 constitucional sobre abono', nature: 'PROVENTO', reference: '1/3', amountCents: thirdAbonoCents, origin: 'MOTOR' });
+    memory.push({
+      step: '1/3 sobre abono',
+      formula: 'abono pecuniário ÷ 3 (half-up)',
+      inputs: { abono: centsLabel(abonoCents) },
+      resultCents: thirdAbonoCents,
+    });
+  }
+
+  const taxableBaseCents = vacationCents + constitutionalThirdCents;
+  const inss = computeInss(taxableBaseCents, tables.inss.data);
+  if (taxableBaseCents > 0) {
+    items.push({ rubricCode: '5501', rubricName: 'INSS s/ Férias', nature: 'DESCONTO', reference: `base ${centsLabel(inss.cappedBaseCents)}`, amountCents: inss.valueCents, origin: 'MOTOR' });
+    memory.push({
+      step: 'INSS s/ Férias',
+      formula: 'progressivo por faixas sobre férias gozadas + 1/3 (base limitada ao teto)',
+      inputs: { base: centsLabel(taxableBaseCents) },
+      resultCents: inss.valueCents,
+      legalVersionId: tables.inss.versionId,
+    });
+  }
+
+  const irrf = computeIrrf({
+    grossTaxableCents: taxableBaseCents,
+    inssCents: inss.valueCents,
+    irDependents: 0,
+    table: tables.irrf.data,
+  });
+  if (irrf.valueCents > 0) {
+    items.push({ rubricCode: '5502', rubricName: 'IRRF s/ Férias', nature: 'DESCONTO', reference: `base ${centsLabel(irrf.taxableBaseCents)}`, amountCents: irrf.valueCents, origin: 'MOTOR' });
+    memory.push({
+      step: 'IRRF s/ Férias',
+      formula: 'tabela mensal sobre base de férias após desconto do INSS',
+      inputs: { base: centsLabel(irrf.taxableBaseCents) },
+      resultCents: irrf.valueCents,
+      legalVersionId: tables.irrf.versionId,
+    });
+  }
+
+  const fgtsRate = contractType === 'APRENDIZ' ? tables.fgts.data.apprenticeRateBp : tables.fgts.data.rateBp;
+  const fgts = applyBp(taxableBaseCents, fgtsRate);
+  if (taxableBaseCents > 0) {
+    items.push({ rubricCode: '9003', rubricName: `FGTS s/ Férias ${fgtsRate / 100}%`, nature: 'INFORMATIVA', reference: `base ${centsLabel(taxableBaseCents)}`, amountCents: fgts, origin: 'MOTOR' });
+  }
+
+  const earnings = items.filter((i) => i.nature === 'PROVENTO').reduce((sum, i) => sum + i.amountCents, 0);
+  const deductions = items.filter((i) => i.nature === 'DESCONTO').reduce((sum, i) => sum + i.amountCents, 0);
+  const net = earnings - deductions;
+
+  memory.push({
+    step: 'Líquido',
+    formula: 'total de proventos − total de descontos',
+    inputs: { proventos: centsLabel(earnings), descontos: centsLabel(deductions) },
+    resultCents: net,
+  });
+
+  return {
+    items,
+    totals: {
+      earningsCents: earnings,
+      deductionsCents: deductions,
+      netCents: net,
+      inssBaseCents: inss.cappedBaseCents,
+      inssCents: inss.valueCents,
+      irrfBaseCents: irrf.taxableBaseCents,
+      irrfCents: irrf.valueCents,
+      fgtsBaseCents: taxableBaseCents,
+      fgtsCents: fgts,
+    },
+    memory,
+  };
+}
+
+export function computeThirteenthWorker(input: ThirteenthCalcInput): WorkerCalcResult {
+  const { salaryCents, avos, parcela, advancePaidCents = 0, contractType, tables } = input;
+  const memory: MemoryStep[] = [];
+  const items: WorkerCalcItem[] = [];
+
+  const fullAmountCents = roundDiv(salaryCents * avos, 12);
+
+  if (parcela === 1) {
+    const amountCents = roundDiv(fullAmountCents, 2);
+    items.push({ rubricCode: '1030', rubricName: '13º salário 1ª parcela', nature: 'PROVENTO', reference: `${avos}/12 avos (50%)`, amountCents, origin: 'MOTOR' });
+    
+    const fgtsRate = contractType === 'APRENDIZ' ? tables.fgts.data.apprenticeRateBp : tables.fgts.data.rateBp;
+    const fgts = applyBp(amountCents, fgtsRate);
+    items.push({ rubricCode: '9003', rubricName: `FGTS s/ 13º 1ª Parc. ${fgtsRate / 100}%`, nature: 'INFORMATIVA', reference: `base ${centsLabel(amountCents)}`, amountCents: fgts, origin: 'MOTOR' });
+
+    memory.push({
+      step: '13º 1ª parcela',
+      formula: '(salário base × avos ÷ 12) × 50% (half-up)',
+      inputs: { salario: centsLabel(salaryCents), avos, percentual: '50%' },
+      resultCents: amountCents,
+    });
+    
+    const earnings = amountCents;
+    const deductions = 0;
+    const net = amountCents;
+
+    memory.push({
+      step: 'Líquido',
+      formula: 'total de proventos',
+      inputs: { proventos: centsLabel(earnings) },
+      resultCents: net,
+    });
+
+    return {
+      items,
+      totals: {
+        earningsCents: earnings,
+        deductionsCents: deductions,
+        netCents: net,
+        inssBaseCents: 0,
+        inssCents: 0,
+        irrfBaseCents: 0,
+        irrfCents: 0,
+        fgtsBaseCents: amountCents,
+        fgtsCents: fgts,
+      },
+      memory,
+    };
+  } else {
+    items.push({ rubricCode: '1031', rubricName: '13º salário integral', nature: 'PROVENTO', reference: `${avos}/12 avos`, amountCents: fullAmountCents, origin: 'MOTOR' });
+    memory.push({
+      step: '13º integral',
+      formula: 'salário base × avos de direito ÷ 12 (half-up)',
+      inputs: { salario: centsLabel(salaryCents), avos },
+      resultCents: fullAmountCents,
+    });
+
+    if (advancePaidCents > 0) {
+      items.push({ rubricCode: '5030', rubricName: 'Desconto 1ª parcela de 13º', nature: 'DESCONTO', reference: 'Adiantamento', amountCents: advancePaidCents, origin: 'MOTOR' });
+      memory.push({
+        step: 'Desconto 1ª parcela',
+        formula: 'Dedução do valor antecipado de 13º salário',
+        inputs: { adiantamentoPago: centsLabel(advancePaidCents) },
+        resultCents: advancePaidCents,
+      });
+    }
+
+    const inss = computeInss(fullAmountCents, tables.inss.data);
+    items.push({ rubricCode: '5501', rubricName: 'INSS s/ 13º', nature: 'DESCONTO', reference: `base ${centsLabel(inss.cappedBaseCents)}`, amountCents: inss.valueCents, origin: 'MOTOR' });
+    memory.push({
+      step: 'INSS s/ 13º',
+      formula: 'tabela anual progressiva sobre 13º integral (teto independente)',
+      inputs: { base: centsLabel(fullAmountCents) },
+      resultCents: inss.valueCents,
+      legalVersionId: tables.inss.versionId,
+    });
+
+    const irrfBase = Math.max(0, fullAmountCents - inss.valueCents);
+    let bracket = tables.irrf.data.brackets[0] ?? { upToCents: null, rateBp: 0, deductionCents: 0 };
+    for (const candidate of tables.irrf.data.brackets) {
+      bracket = candidate;
+      if (candidate.upToCents === null || irrfBase <= candidate.upToCents) break;
+    }
+    const irrfValue = Math.max(0, applyBp(irrfBase, bracket.rateBp) - bracket.deductionCents);
+    if (irrfValue > 0) {
+      items.push({ rubricCode: '5502', rubricName: 'IRRF s/ 13º', nature: 'DESCONTO', reference: `base ${centsLabel(irrfBase)}`, amountCents: irrfValue, origin: 'MOTOR' });
+      memory.push({
+        step: 'IRRF s/ 13º',
+        formula: 'tabela anual de IRRF sobre base deduzida de INSS',
+        inputs: { base: centsLabel(irrfBase), aliquota: `${bracket.rateBp / 100}%` },
+        resultCents: irrfValue,
+        legalVersionId: tables.irrf.versionId,
+      });
+    }
+
+    const taxableFgtsBase = Math.max(0, fullAmountCents - advancePaidCents);
+    const fgtsRate = contractType === 'APRENDIZ' ? tables.fgts.data.apprenticeRateBp : tables.fgts.data.rateBp;
+    const fgts = applyBp(taxableFgtsBase, fgtsRate);
+    items.push({ rubricCode: '9003', rubricName: `FGTS s/ 13º 2ª Parc. ${fgtsRate / 100}%`, nature: 'INFORMATIVA', reference: `base ${centsLabel(taxableFgtsBase)}`, amountCents: fgts, origin: 'MOTOR' });
+
+    const earnings = fullAmountCents;
+    const deductions = advancePaidCents + inss.valueCents + irrfValue;
+    const net = earnings - deductions;
+
+    memory.push({
+      step: 'Líquido',
+      formula: 'total de proventos − total de descontos',
+      inputs: { proventos: centsLabel(earnings), descontos: centsLabel(deductions) },
+      resultCents: net,
+    });
+
+    return {
+      items,
+      totals: {
+        earningsCents: earnings,
+        deductionsCents: deductions,
+        netCents: net,
+        inssBaseCents: inss.cappedBaseCents,
+        inssCents: inss.valueCents,
+        irrfBaseCents: irrfBase,
+        irrfCents: irrfValue,
+        fgtsBaseCents: taxableFgtsBase,
+        fgtsCents: fgts,
+      },
+      memory,
+    };
+  }
 }
