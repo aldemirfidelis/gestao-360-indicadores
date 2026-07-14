@@ -3,6 +3,7 @@ import { PrizeCompetenceStatus } from '@prisma/client';
 import { PrismaService } from '../../prisma/prisma.service';
 import { AuthPayload } from '../auth/auth.types';
 import { PrizeAuditService } from './prize-audit.service';
+import { PrizeEligibleService } from './prize-eligible.service';
 
 export interface UpsertCompetenceDto {
   programId?: string;
@@ -51,6 +52,7 @@ export class PrizeCompetencesService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly audit: PrizeAuditService,
+    private readonly eligible: PrizeEligibleService,
   ) {}
 
   async list(companyId: string, query: { programId?: string; status?: string; year?: number } = {}) {
@@ -114,6 +116,14 @@ export class PrizeCompetencesService {
       },
     });
     await this.audit.log(me, { action: 'CREATE', entityType: 'COMPETENCE', entityId: competence.id, competenceId: competence.id, after: competence });
+    // Integração 360: semeia a base elegível a partir da base interna de
+    // colaboradores (Serviço Pessoal). Best-effort — base vazia não impede a
+    // criação, e um import Apdata/arquivo posterior vira o próximo lote.
+    try {
+      await this.eligible.importFromInternal(me, competence.id);
+    } catch {
+      // sem base interna (ou sem permissão de escrita) — segue sem semear
+    }
     return competence;
   }
 

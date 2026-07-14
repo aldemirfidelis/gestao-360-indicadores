@@ -10282,6 +10282,9 @@ enum PrizeConnectorType {
   FILE_XLSX
   DB_BRIDGE
   MANUAL
+  /// Base interna da plataforma (Serviço Pessoal/OrgEmployee) — colaborador
+  /// admitido no DP entra na base elegível sem conector externo.
+  INTERNAL
 }
 
 enum PrizeJobStatus {

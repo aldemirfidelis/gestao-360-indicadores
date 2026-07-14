@@ -3,7 +3,7 @@
 import { useMutation } from '@tanstack/react-query';
 import { useRef, useState } from 'react';
 import { toast } from 'sonner';
-import { UserCheck, Download, AlertTriangle, Lock, Upload, FileSpreadsheet, CheckCircle2 } from 'lucide-react';
+import { UserCheck, Download, AlertTriangle, Lock, Upload, FileSpreadsheet, CheckCircle2, RefreshCw } from 'lucide-react';
 import { PageHeader } from '@/components/shell/page-header';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -102,6 +102,16 @@ export function PrizeEligiblePage() {
     onSuccess: (r: any) => {
       const rc = r.reconciliation;
       toast.success(`Lote ${r.job.lotVersion} importado: ${r.job.processed} colaborador(es) · +${rc.added.length}/-${rc.removed.length}/~${rc.changed.length}`);
+      invalidateEligible();
+    },
+    onError: (e: ApiError) => toast.error(e.message),
+  });
+
+  const importInternal = useMutation({
+    mutationFn: () => api(`/prize/eligible/competence/${competenceId}/import/internal`, { method: 'POST' }),
+    onSuccess: (r: any) => {
+      const rc = r.reconciliation;
+      toast.success(`Base sincronizada do Serviço Pessoal: lote ${r.job.lotVersion} com ${r.job.processed} colaborador(es) · +${rc.added.length}/-${rc.removed.length}/~${rc.changed.length}`);
       invalidateEligible();
     },
     onError: (e: ApiError) => toast.error(e.message),
@@ -224,7 +234,7 @@ export function PrizeEligiblePage() {
       <PageHeader
         title="Colaboradores Elegíveis"
         eyebrow="Gestão de Prêmio"
-        description="Base elegível por competência (Apdata). Retrato imutável por lote, CPF mascarado e conciliação de divergências."
+        description="Base elegível por competência — sincronizada da base da empresa (Serviço Pessoal) ou importada (Apdata/arquivo). Retrato imutável por lote, CPF mascarado e conciliação de divergências."
         tone="view"
         breadcrumbs={[{ label: 'Gestão de Prêmio', href: '/gestao-premio' }, { label: 'Colaboradores Elegíveis' }]}
       />
@@ -242,6 +252,9 @@ export function PrizeEligiblePage() {
             </Button>
             <Button onClick={() => setImportOpen(true)}>
               <Upload className="mr-1 h-4 w-4" />Importar arquivo
+            </Button>
+            <Button variant="outline" onClick={() => importInternal.mutate()} disabled={importInternal.isPending} title="Gera a base elegível a partir dos colaboradores cadastrados na plataforma (Serviço Pessoal)">
+              <RefreshCw className="mr-1 h-4 w-4" />{importInternal.isPending ? 'Sincronizando…' : 'Sincronizar da base da empresa'}
             </Button>
             <Button variant="outline" onClick={() => setAtestadosOpen(true)} title="Importa a planilha DatasAtestados (espelho de ponto) para a competência selecionada">
               <Upload className="mr-1 h-4 w-4" />Importar atestados

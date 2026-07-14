@@ -38,6 +38,13 @@ export class PrizeEligibleController {
     return this.service.import(me, competenceId, dto);
   }
 
+  /** Sincroniza a base elegível da base interna de colaboradores (Serviço Pessoal). */
+  @Post('competence/:competenceId/import/internal')
+  @RequirePermissions('prize:eligible:manage')
+  importInternal(@CurrentUser() me: AuthPayload, @Param('competenceId') competenceId: string) {
+    return this.service.importFromInternal(me, competenceId);
+  }
+
   // ----- importacao manual por arquivo (CSV/XLSX) — contingencia do Apdata -----
 
   /** Valida e simula (dry-run): nada e gravado. */

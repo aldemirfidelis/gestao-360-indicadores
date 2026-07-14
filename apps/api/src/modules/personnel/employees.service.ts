@@ -224,6 +224,11 @@ export class EmployeesService {
           createdById: me.sub,
         },
       });
+      // Base única do colaborador: o perfil de remuneração (Cargos e Salários)
+      // nasce junto com a admissão para manter os módulos conectados.
+      await tx.compensationEmployeeProfile.create({
+        data: { companyId: me.companyId, employeeId: employee.id, admissionDate, updatedById: me.sub },
+      });
       return employee;
     }).catch(this.rethrowCpfConflict);
 
@@ -298,6 +303,16 @@ export class EmployeesService {
         create: { companyId: me.companyId, employeeId: id, createdById: me.sub, ...profileData },
         update: profileData,
       });
+      // Mantém a data de admissão espelhada no perfil de remuneração
+      // (Cargos e Salários) sem tocar nos demais campos do perfil.
+      if (profileData.admissionDate !== undefined) {
+        const admissionDate = profileData.admissionDate as Date | null;
+        await tx.compensationEmployeeProfile.upsert({
+          where: { employeeId: id },
+          create: { companyId: me.companyId, employeeId: id, admissionDate, updatedById: me.sub },
+          update: { admissionDate, updatedById: me.sub },
+        });
+      }
       const events: Array<{ type: string; title: string; description?: string | null }> = [];
       if (jobChanged) events.push({ type: 'MUDANCA_CARGO', title: `Mudança de cargo: ${jobChanged.from} → ${jobChanged.to}` });
       if (nodeChanged) events.push({ type: 'TRANSFERENCIA', title: `Transferência: ${nodeChanged.from} → ${nodeChanged.to}` });
@@ -604,6 +619,14 @@ export class EmployeesService {
                 title: 'Admissão (importação)',
                 effectiveDate: (profile.admissionDate as Date | undefined) ?? new Date(),
                 createdById: me.sub,
+              },
+            });
+            await tx.compensationEmployeeProfile.create({
+              data: {
+                companyId: me.companyId,
+                employeeId: employee.id,
+                admissionDate: (profile.admissionDate as Date | undefined) ?? new Date(),
+                updatedById: me.sub,
               },
             });
             if (cpf) byCpf.set(cpf, employee.id);

@@ -204,6 +204,45 @@ export class NotificationsService {
       created.push(order.id);
     }
 
+    // 6. Jornada: ocorrências críticas abertas (interjornada < 11h, jornada
+    // > 10h) avisam quem gere o ponto — antes só apareciam quando alguém
+    // abria a Central de Ocorrências.
+    const criticalOccurrences = await this.prisma.attendanceOccurrence.count({
+      where: { companyId, status: 'OPEN', type: { in: ['SHORT_REST', 'OVERLONG_DAY'] } },
+    });
+    if (criticalOccurrences > 0) {
+      const link = '/servico-pessoal/ponto?tab=ocorrencias';
+      const managers = await this.prisma.user.findMany({
+        where: {
+          companyId,
+          active: true,
+          deletedAt: null,
+          OR: [
+            { role: 'COMPANY_ADMIN' },
+            { permissions: { some: { permission: { key: 'ponto:manage' } } } },
+            { accessProfile: { permissions: { some: { permission: { key: 'ponto:manage' } } } } },
+          ],
+        },
+        select: { id: true },
+        take: 20,
+      });
+      for (const manager of managers) {
+        const exists = await this.prisma.notification.findFirst({
+          where: { userId: manager.id, kind: NotificationKind.DEVIATION_CRITICAL, link, readAt: null },
+        });
+        if (exists) continue;
+        await this.create(
+          companyId,
+          manager.id,
+          NotificationKind.DEVIATION_CRITICAL,
+          `Jornada: ${criticalOccurrences} ocorrência(s) crítica(s) aberta(s)`,
+          'Interjornada abaixo de 11h ou jornada acima de 10h — trate na Central de Ocorrências.',
+          link,
+        );
+        created.push(`journey-occ:${manager.id}`);
+      }
+    }
+
     return { generated: created.length };
   }
 }

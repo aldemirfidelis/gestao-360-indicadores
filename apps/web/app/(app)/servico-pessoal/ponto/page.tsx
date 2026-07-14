@@ -150,6 +150,19 @@ interface PayrollEventsResponse {
   }>;
 }
 
+interface TeamDashboard {
+  dayKey: string;
+  team: number;
+  workingNow: number;
+  finished: number;
+  noPunch: number;
+  covered: number;
+  openOccurrences: number;
+  criticalOccurrences: number;
+  pendingAdjustments: number;
+  bankExpiringMinutes: number;
+}
+
 interface LegalStatus {
   config: { employerIdType: number; cnoCaepf: string | null; inpiRegistry: string | null; company: { name: string; cnpj: string | null } };
   items: Array<{ key: string; label: string; ok: boolean; external: boolean }>;
@@ -449,6 +462,12 @@ export default function TimeClockPage() {
     queryKey: ['time-clock', 'team', teamDay],
     queryFn: () => api(`/personnel/time-clock/team${teamDay ? `?day=${teamDay}` : ''}`),
     enabled: canTeam && tab === 'equipe',
+  });
+  const teamDashboardQuery = useQuery<TeamDashboard>({
+    queryKey: ['time-clock', 'team-dashboard'],
+    queryFn: () => api<TeamDashboard>('/personnel/time-clock/team/dashboard'),
+    enabled: canTeam && tab === 'equipe',
+    refetchInterval: 60_000, // painel em tempo (quase) real
   });
   const pendingQuery = useQuery<AdjustmentRequest[]>({
     queryKey: ['time-clock', 'adjustments', 'pending'],
@@ -1086,6 +1105,25 @@ export default function TimeClockPage() {
         {/* ------------------------------ Equipe ------------------------------ */}
         {canTeam && (
           <TabsContent value="equipe">
+            {teamDashboardQuery.data && (
+              <div className="mb-4 grid grid-cols-2 gap-2 sm:grid-cols-3 xl:grid-cols-6">
+                {[
+                  { label: 'Em jornada agora', value: String(teamDashboardQuery.data.workingNow), tone: 'text-status-green' },
+                  { label: 'Jornada concluída', value: String(teamDashboardQuery.data.finished), tone: '' },
+                  { label: 'Sem registro hoje', value: String(teamDashboardQuery.data.noPunch), tone: teamDashboardQuery.data.noPunch > 0 ? 'text-status-yellow' : '' },
+                  { label: 'Ocorrências abertas', value: String(teamDashboardQuery.data.openOccurrences), tone: teamDashboardQuery.data.criticalOccurrences > 0 ? 'text-status-red' : teamDashboardQuery.data.openOccurrences > 0 ? 'text-status-yellow' : '' },
+                  { label: 'Ajustes pendentes', value: String(teamDashboardQuery.data.pendingAdjustments), tone: teamDashboardQuery.data.pendingAdjustments > 0 ? 'text-status-yellow' : '' },
+                  { label: 'Banco a vencer (30d)', value: minutesLabel(teamDashboardQuery.data.bankExpiringMinutes), tone: teamDashboardQuery.data.bankExpiringMinutes > 0 ? 'text-status-yellow' : '' },
+                ].map((card) => (
+                  <Card key={card.label} className="border border-slate-100 bg-white shadow-sm dark:border-slate-800/80 dark:bg-slate-900/50">
+                    <CardContent className="p-3">
+                      <div className="text-[10px] uppercase tracking-wider text-muted-foreground">{card.label}</div>
+                      <div className={cn('text-xl font-bold tabular-nums', card.tone || 'text-slate-800 dark:text-white')}>{card.value}</div>
+                    </CardContent>
+                  </Card>
+                ))}
+              </div>
+            )}
             <Card className="border border-slate-100 bg-white shadow-sm dark:border-slate-800/80 dark:bg-slate-900/50">
               <div className="flex flex-wrap items-center justify-between gap-2 border-b px-4 py-2.5">
                 <h3 className="flex items-center gap-2 text-sm font-semibold text-slate-800 dark:text-white">

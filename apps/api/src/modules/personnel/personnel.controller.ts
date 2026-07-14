@@ -43,6 +43,12 @@ export class PersonnelController {
     return this.service.teamMirror(me, day);
   }
 
+  @Get('time-clock/team/dashboard')
+  @RequirePermissions('ponto:team')
+  teamDashboard(@CurrentUser() me: AuthPayload) {
+    return this.service.teamDashboard(me);
+  }
+
   @Get('time-clock/entries/:id/receipt')
   @RequirePermissions('ponto:view')
   punchReceipt(@CurrentUser() me: AuthPayload, @Param('id') id: string) {

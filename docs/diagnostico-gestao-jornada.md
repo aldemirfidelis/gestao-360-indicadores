@@ -281,5 +281,20 @@ registro no INPI, assinatura .p7s (certificado ICP-Brasil), Atestado Técnico/Te
 Responsabilidade e validação no validador oficial + jurídica — o sistema sinaliza e não declara
 conformidade automática.
 
-Próxima: **ETAPA 7** (dashboards, automações e integração completa com Meu Dia/Indicadores/
-Gestão à Vista).
+**ETAPA 7 — PRIMEIRA ENTREGA (2026-07-14)**:
+- *Integração 360 do colaborador* (pedido do usuário): OrgEmployee é a fonte única — a admissão
+  no Serviço Pessoal agora cria também o perfil de remuneração (CompensationEmployeeProfile,
+  Cargos e Salários) e mantém a data de admissão espelhada; a Gestão de Prêmio ganhou a fonte
+  `INTERNAL` (sincroniza a base elegível da competência a partir de OrgEmployee/prontuário —
+  matrícula, CPF mascarado, cargo, área/setor pela árvore, admissão/desligamento com
+  proporcionalidade), com semeadura automática ao criar competência e botão "Sincronizar da
+  base da empresa"; import Apdata/arquivo continua funcionando como próximo lote (conciliação).
+  Desligamento no DP já refletia em toda a base (status INACTIVE + terminationDate + evento).
+- *Painel do gestor em tempo real*: GET time-clock/team/dashboard (em jornada agora, jornada
+  concluída, sem registro, ocorrências abertas/críticas, ajustes pendentes, banco a vencer 30d)
+  com visibilidade por área; cards na aba Equipe com atualização a cada 60s.
+- *Automação*: ocorrências críticas abertas (interjornada < 11h, jornada > 10h) geram alerta
+  (notificação + push) para quem tem ponto:manage, no ciclo horário do MaintenanceScheduler.
+
+Pendências da Etapa 7: publicar indicadores de DP (absenteísmo/HE/banco) no módulo de
+Indicadores/Gestão à Vista e comparação ponto × acessos (Segurança Patrimonial).

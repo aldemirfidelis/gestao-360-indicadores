@@ -157,6 +157,60 @@ export class PrizeEligibleService {
     }
   }
 
+  /**
+   * Sincroniza a base elegivel a partir da base interna de colaboradores da
+   * plataforma (Servico Pessoal/OrgEmployee): colaborador admitido no DP entra
+   * no Premio sem depender de conector externo. Gera um lote fonte INTERNAL e
+   * passa pela MESMA conciliacao/versionamento do import padrao — um import
+   * Apdata/arquivo posterior simplesmente vira o proximo lote corrente.
+   * Inclui ativos e desligados dentro da competencia (proporcionalidade).
+   */
+  async importFromInternal(me: AuthPayload, competenceId: string) {
+    const competence = await this.getCompetence(me.companyId, competenceId);
+    const monthStart = new Date(Date.UTC(competence.year, competence.month - 1, 1));
+    const employees = await this.prisma.orgEmployee.findMany({
+      where: { companyId: me.companyId },
+      select: {
+        id: true,
+        registrationId: true,
+        name: true,
+        status: true,
+        job: { select: { name: true } },
+        orgNode: { select: { name: true, parent: { select: { name: true } } } },
+        personnelProfile: { select: { cpf: true, contractType: true, admissionDate: true, terminationDate: true } },
+      },
+      orderBy: { name: 'asc' },
+    });
+    const seen = new Set<string>();
+    const rows: EligibleRow[] = [];
+    for (const employee of employees) {
+      const terminated = employee.status !== 'ACTIVE';
+      const terminationDate = employee.personnelProfile?.terminationDate ?? null;
+      // Desligados antes da competencia nao entram na base do mes.
+      if (terminated && (!terminationDate || terminationDate < monthStart)) continue;
+      let registration = employee.registrationId?.trim() || employee.id;
+      if (seen.has(registration)) registration = employee.id; // matricula duplicada (ex.: readmissao)
+      seen.add(registration);
+      const node = employee.orgNode;
+      rows.push({
+        registration,
+        name: employee.name,
+        cpf: employee.personnelProfile?.cpf ?? null,
+        bond: employee.personnelProfile?.contractType ?? null,
+        positionRef: employee.job?.name ?? null,
+        areaRef: node?.parent?.name ?? node?.name ?? null,
+        sectorRef: node?.parent ? (node?.name ?? null) : null,
+        admissionDate: employee.personnelProfile?.admissionDate?.toISOString().slice(0, 10) ?? null,
+        terminationDate: terminationDate?.toISOString().slice(0, 10) ?? null,
+        situation: terminated ? 'TERMINATED' : 'ACTIVE',
+      });
+    }
+    if (!rows.length) {
+      throw new BadRequestException('Base interna vazia: cadastre colaboradores em Serviço Pessoal > Colaboradores.');
+    }
+    return this.import(me, competenceId, { source: 'INTERNAL', rows });
+  }
+
   // ---- importacao manual por arquivo (CSV/XLSX) — contingencia do Apdata ----
 
   private sheetToRecords(ws: Worksheet): Array<Record<string, unknown>> {

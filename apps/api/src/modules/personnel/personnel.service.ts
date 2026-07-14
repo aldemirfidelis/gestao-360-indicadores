@@ -311,6 +311,60 @@ export class PersonnelService {
     return { dayKey, weekday: weekdayOf(dayKey), rows };
   }
 
+  /**
+   * Painel da equipe em tempo real (Etapa 7): agregados do dia corrente +
+   * pendências e banco a vencer, com a mesma visibilidade por área do espelho.
+   */
+  async teamDashboard(me: AuthPayload) {
+    const mirror = await this.teamMirror(me);
+    const visible = await this.visibleUserIdsFor(me);
+    const scope = visible ? { userId: { in: [...visible] } } : {};
+    const now = new Date();
+    const in30d = new Date(now.getTime() + 30 * 24 * 60 * 60_000);
+    const [openByType, pendingAdjustments, expiringCredits] = await Promise.all([
+      this.prisma.attendanceOccurrence.groupBy({
+        by: ['type'],
+        where: { companyId: me.companyId, status: 'OPEN', ...scope },
+        _count: { _all: true },
+      }),
+      this.prisma.timeAdjustmentRequest.count({
+        where: { companyId: me.companyId, status: 'REQUESTED', ...scope },
+      }),
+      this.prisma.timeBankEntry.findMany({
+        where: { companyId: me.companyId, kind: 'CREDIT', expiresAt: { gte: now, lte: in30d }, ...scope },
+        select: { minutes: true, consumed: true },
+      }),
+    ]);
+    let workingNow = 0;
+    let finished = 0;
+    let noPunch = 0;
+    let covered = 0;
+    for (const row of mirror.rows) {
+      const punches = row.entries.length;
+      if (punches % 2 === 1) workingNow += 1;
+      else if (punches > 0) finished += 1;
+      else if (['VACATION', 'LEAVE', 'JUSTIFIED', 'HOLIDAY', 'DAY_OFF'].includes(row.status)) covered += 1;
+      else if (row.plannedMinutes > 0) noPunch += 1;
+    }
+    const openOccurrences = openByType.reduce((sum, item) => sum + item._count._all, 0);
+    const criticalOccurrences = openByType
+      .filter((item) => ['SHORT_REST', 'OVERLONG_DAY'].includes(item.type))
+      .reduce((sum, item) => sum + item._count._all, 0);
+    const bankExpiringMinutes = expiringCredits.reduce((sum, entry) => sum + Math.max(0, entry.minutes - entry.consumed), 0);
+    return {
+      dayKey: mirror.dayKey,
+      team: mirror.rows.length,
+      workingNow,
+      finished,
+      noPunch,
+      covered,
+      openOccurrences,
+      criticalOccurrences,
+      pendingAdjustments,
+      bankExpiringMinutes,
+    };
+  }
+
   async summary(me: AuthPayload) {
     const today = dayKeyFor(new Date());
     const monthStart = `${today.slice(0, 7)}-01`;
