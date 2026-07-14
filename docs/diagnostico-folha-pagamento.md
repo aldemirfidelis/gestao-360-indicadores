@@ -1,6 +1,6 @@
 # Diagnóstico Técnico — Folha de Pagamento e Obrigações Trabalhistas
 
-Data: 2026-07-14 · Autor: engenharia (sessão Claude) · Status: Fase 1 iniciada
+Data: 2026-07-14 · Autor: engenharia (sessão Claude/Codex) · Status: Fase 4 iniciada em modo assistido
 
 Este documento atende ao prompt-mestre do módulo de Folha: diagnóstico do que já existe no
 Gestão 360, decisões de arquitetura e plano por fases. Princípio central: **evoluir o que
@@ -121,7 +121,10 @@ qualquer transmissão.
 - **F3**: férias/13º/rescisões calculados, benefícios, consignados, pensões, complementares,
   retroativos, convenções coletivas estruturadas.
 - **F4**: eSocial (cadastro trabalhista completo, XML/assinatura/lotes/recibos/totalizadores,
-  central de certificados com cofre, produção restrita).
+  central de certificados com cofre, produção restrita). Iniciada em 2026-07-14 com
+  central de certificados por referencia externa (sem PFX/senha no banco), geração S-1200
+  para conferencia e lote interno `STAGED_UNSIGNED`; assinatura/transmissão seguem bloqueadas
+  até cofre/assinador homologado.
 - **F5**: obrigações assistidas (FGTS Digital, DCTFWeb/Integra Contador opcional, EFD-Reinf,
   Qualificação Cadastral, DET, calendário legal).
 - **F6**: Banking Connector (CNAB 240, dupla aprovação, retorno/conciliação, antifraude) +

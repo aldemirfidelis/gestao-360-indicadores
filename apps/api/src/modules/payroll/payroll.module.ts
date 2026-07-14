@@ -1,6 +1,7 @@
 import { Module } from '@nestjs/common';
 import { PersonnelModule } from '../personnel/personnel.module';
 import { PayrollController } from './payroll.controller';
+import { PayrollEsocialService } from './payroll-esocial.service';
 import { PayrollLegalTablesService } from './legal-tables.service';
 import { PayrollRunService } from './payroll-run.service';
 
@@ -12,7 +13,7 @@ import { PayrollRunService } from './payroll-run.service';
 @Module({
   imports: [PersonnelModule],
   controllers: [PayrollController],
-  providers: [PayrollLegalTablesService, PayrollRunService],
-  exports: [PayrollRunService, PayrollLegalTablesService],
+  providers: [PayrollLegalTablesService, PayrollRunService, PayrollEsocialService],
+  exports: [PayrollRunService, PayrollLegalTablesService, PayrollEsocialService],
 })
 export class PayrollModule {}

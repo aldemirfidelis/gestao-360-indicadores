@@ -2,6 +2,7 @@ import { Body, Controller, Get, Param, Post, Query } from '@nestjs/common';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import { RequirePermissions } from '../../common/decorators/permissions.decorator';
 import { AuthPayload } from '../auth/auth.types';
+import { PayrollEsocialService } from './payroll-esocial.service';
 import { PayrollLegalTablesService } from './legal-tables.service';
 import { PayrollRunService } from './payroll-run.service';
 
@@ -16,6 +17,7 @@ export class PayrollController {
   constructor(
     private readonly runs: PayrollRunService,
     private readonly legalTables: PayrollLegalTablesService,
+    private readonly esocial: PayrollEsocialService,
   ) {}
 
   // ------------------------------ competências ------------------------------
@@ -185,5 +187,55 @@ export class PayrollController {
   @RequirePermissions('folha:operate')
   createPension(@CurrentUser() me: AuthPayload, @Body() body: any) {
     return this.runs.createPension(me, body);
+  }
+
+  // ------------------------------ Fase 4: eSocial + certificados ------------------------------
+
+  @Get('digital-certificates')
+  @RequirePermissions('folha:esocial')
+  listDigitalCertificates(@CurrentUser() me: AuthPayload) {
+    return this.esocial.listCertificates(me);
+  }
+
+  @Post('digital-certificates')
+  @RequirePermissions('folha:esocial')
+  createDigitalCertificate(@CurrentUser() me: AuthPayload, @Body() body: any) {
+    return this.esocial.createCertificate(me, body);
+  }
+
+  @Post('digital-certificates/:id/test')
+  @RequirePermissions('folha:esocial')
+  testDigitalCertificate(@CurrentUser() me: AuthPayload, @Param('id') id: string) {
+    return this.esocial.testCertificate(me, id);
+  }
+
+  @Get('esocial/events')
+  @RequirePermissions('folha:esocial')
+  listEsocialEvents(@CurrentUser() me: AuthPayload, @Query('runId') runId?: string) {
+    return this.esocial.listEvents(me, runId);
+  }
+
+  @Post('runs/:id/esocial/events')
+  @RequirePermissions('folha:esocial')
+  generateEsocialEvents(@CurrentUser() me: AuthPayload, @Param('id') id: string, @Body() body: any) {
+    return this.esocial.generateRunEvents(me, id, body);
+  }
+
+  @Get('esocial/batches')
+  @RequirePermissions('folha:esocial')
+  listEsocialBatches(@CurrentUser() me: AuthPayload, @Query('runId') runId?: string) {
+    return this.esocial.listBatches(me, runId);
+  }
+
+  @Post('esocial/batches')
+  @RequirePermissions('folha:esocial')
+  createEsocialBatch(@CurrentUser() me: AuthPayload, @Body() body: any) {
+    return this.esocial.createBatch(me, body);
+  }
+
+  @Get('esocial/batches/:id/xml')
+  @RequirePermissions('folha:esocial')
+  esocialBatchXml(@CurrentUser() me: AuthPayload, @Param('id') id: string) {
+    return this.esocial.batchXml(me, id);
   }
 }

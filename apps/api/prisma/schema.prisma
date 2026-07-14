@@ -12522,6 +12522,103 @@ model PayrollWorkerSettings {
 }
 
 /// Fechamento de competência (YYYY-MM): trava batidas e ajustes no período.
+/// Central de certificados digitais da folha/eSocial. O PFX e a senha NAO ficam
+/// no banco: apenas referencias externas (cofre/env/secret manager) sao
+/// persistidas. A assinatura real depende de um adaptador de cofre aprovado.
+model PayrollDigitalCertificate {
+  id                String   @id @default(uuid())
+  companyId         String
+  name              String
+  holderName        String?
+  holderCpfCnpj     String?
+  kind              String   @default("A1") // A1 por enquanto; A3/HSM exigem adaptador dedicado.
+  storageMode       String   @default("EXTERNAL_REF") // EXTERNAL_REF | ENV_REF
+  pfxSecretRef      String?
+  passwordSecretRef String?
+  serialNumber      String?
+  validFrom         DateTime?
+  validUntil        DateTime?
+  status            String   @default("ACTIVE") // ACTIVE | EXPIRED | REVOKED | INACTIVE
+  lastTestedAt      DateTime?
+  lastTestStatus    String?
+  notes             String?
+  createdById       String?
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  batches PayrollEsocialBatch[]
+
+  @@index([companyId, status])
+  @@index([companyId, validUntil])
+  @@map("payroll_digital_certificates")
+}
+
+/// Evento eSocial gerado pela folha. Fase 4 inicial: XML para conferencia e
+/// producao restrita, sem assinatura/transmissao automatica.
+model PayrollEsocialEvent {
+  id             String               @id @default(uuid())
+  companyId      String
+  runId          String?
+  runWorkerId    String?
+  employeeId     String?
+  competenceId   String?
+  periodRef      String
+  eventType      String // S-1200 | S-2299 | ...
+  environment    String               @default("PRODUCTION_RESTRICTED")
+  layoutVersion  String               @default("S-1.3")
+  eventId        String
+  status         String               @default("XML_GENERATED") // XML_GENERATED | BATCHED_UNSIGNED | ACCEPTED | REJECTED
+  xml            String
+  xmlHash        String
+  payload        Json
+  issues         Json?
+  batchId        String?
+  batch          PayrollEsocialBatch? @relation(fields: [batchId], references: [id], onDelete: SetNull)
+  receiptNumber  String?
+  protocolNumber String?
+  createdById    String?
+  createdAt      DateTime             @default(now())
+  updatedAt      DateTime             @updatedAt
+
+  @@unique([companyId, eventId])
+  @@unique([runWorkerId, eventType, environment])
+  @@index([companyId, eventType, status])
+  @@index([companyId, runId])
+  @@index([companyId, periodRef])
+  @@map("payroll_esocial_events")
+}
+
+/// Lote eSocial assistido. Enquanto nao houver cofre/assinador homologado, o
+/// status permanece STAGED_UNSIGNED e nao existe rota de transmissao ao governo.
+model PayrollEsocialBatch {
+  id             String                     @id @default(uuid())
+  companyId      String
+  runId          String?
+  competenceId   String?
+  periodRef      String?
+  certificateId  String?
+  certificate    PayrollDigitalCertificate? @relation(fields: [certificateId], references: [id], onDelete: SetNull)
+  environment    String                     @default("PRODUCTION_RESTRICTED")
+  layoutVersion  String                     @default("S-1.3")
+  status         String                     @default("STAGED_UNSIGNED")
+  eventCount     Int                        @default(0)
+  xml            String?
+  xmlHash        String?
+  protocolNumber String?
+  receiptJson    Json?
+  issues         Json?
+  createdById    String?
+  createdAt      DateTime                   @default(now())
+  updatedAt      DateTime                   @updatedAt
+
+  events PayrollEsocialEvent[]
+
+  @@index([companyId, status])
+  @@index([companyId, runId])
+  @@index([companyId, periodRef])
+  @@map("payroll_esocial_batches")
+}
+
 model TimesheetPeriod {
   id         String    @id @default(uuid())
   companyId  String

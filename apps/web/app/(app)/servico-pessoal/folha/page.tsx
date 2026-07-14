@@ -10,6 +10,7 @@ import {
   ClipboardList,
   Coins,
   FileSpreadsheet,
+  FileCode2,
   FileText,
   FolderPlus,
   Gauge,
@@ -141,6 +142,11 @@ export default function PayrollDashboardPage() {
             <Button asChild variant="outline" size="sm">
               <Link href="/servico-pessoal/folha/parametros">
                 <FileText className="mr-2 h-4 w-4" /> Parâmetros Legais
+              </Link>
+            </Button>
+            <Button asChild variant="outline" size="sm">
+              <Link href="/servico-pessoal/folha/esocial">
+                <FileCode2 className="mr-2 h-4 w-4" /> eSocial
               </Link>
             </Button>
             {canOperate && (
