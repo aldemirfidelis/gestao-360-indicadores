@@ -14,6 +14,7 @@ import {
   CheckCircle2,
   Copy,
   Download,
+  Edit,
   FileDown,
   Fingerprint,
   History,
@@ -23,6 +24,7 @@ import {
   MapPin,
   MonitorSmartphone,
   Plus,
+  ShieldCheck,
   Trash2,
   Upload,
   Users,
@@ -146,6 +148,19 @@ interface PayrollEventsResponse {
     user: { id: string; name: string; email: string };
     quantities: Record<string, number>;
   }>;
+}
+
+interface LegalStatus {
+  config: { employerIdType: number; cnoCaepf: string | null; inpiRegistry: string | null; company: { name: string; cnpj: string | null } };
+  items: Array<{ key: string; label: string; ok: boolean; external: boolean }>;
+  readyForInspection: boolean;
+  note: string;
+}
+
+interface LegalFilePreview {
+  fileName: string;
+  lines: number;
+  warnings: string[];
 }
 
 interface ClosingPreview {
@@ -395,6 +410,9 @@ export default function TimeClockPage() {
   const [bankOpen, setBankOpen] = useState(false);
   const [payrollRef, setPayrollRef] = useState(() => new Date().toISOString().slice(0, 7));
   const [rubricsOpen, setRubricsOpen] = useState(false);
+  const [fiscalRef, setFiscalRef] = useState(() => new Date().toISOString().slice(0, 7));
+  const [legalForm, setLegalForm] = useState<{ employerIdType: number; cnoCaepf: string; inpiRegistry: string } | null>(null);
+  const [mirrorUserId, setMirrorUserId] = useState('');
   const [templateDialog, setTemplateDialog] = useState(false);
   const [templateForm, setTemplateForm] = useState(DEFAULT_TEMPLATE_FORM);
   const [assignForm, setAssignForm] = useState<{ templateId: string; userIds: string[]; cycleAnchorDay: string }>({ templateId: '', userIds: [], cycleAnchorDay: '' });
@@ -450,7 +468,7 @@ export default function TimeClockPage() {
   const optionsQuery = useQuery<{ users: Array<{ id: string; name: string; email: string; jobTitle: string | null }> }>({
     queryKey: ['time-clock', 'options'],
     queryFn: () => api('/personnel/options'),
-    enabled: canManage && tab === 'escalas',
+    enabled: canManage && (tab === 'escalas' || tab === 'fiscal'),
   });
   const periodsQuery = useQuery<PeriodRow[]>({
     queryKey: ['time-clock', 'periods'],
@@ -502,6 +520,21 @@ export default function TimeClockPage() {
     queryKey: ['time-clock', 'payroll-rubrics'],
     queryFn: () => api<PayrollRubric[]>('/personnel/payroll/rubrics'),
     enabled: canManage && tab === 'fechamento',
+  });
+  const legalStatusQuery = useQuery<LegalStatus>({
+    queryKey: ['time-clock', 'legal-status'],
+    queryFn: () => api<LegalStatus>('/personnel/legal/status'),
+    enabled: canManage && tab === 'fiscal',
+  });
+  const afdPreviewQuery = useQuery<LegalFilePreview>({
+    queryKey: ['time-clock', 'afd-preview', fiscalRef],
+    queryFn: () => api<LegalFilePreview>(`/personnel/legal/afd/${fiscalRef}/preview`),
+    enabled: canManage && tab === 'fiscal',
+  });
+  const aejPreviewQuery = useQuery<LegalFilePreview>({
+    queryKey: ['time-clock', 'aej-preview', fiscalRef],
+    queryFn: () => api<LegalFilePreview>(`/personnel/legal/aej/${fiscalRef}/preview`),
+    enabled: canManage && tab === 'fiscal',
   });
 
   const summary = summaryQuery.data;
@@ -657,6 +690,18 @@ export default function TimeClockPage() {
     onError: (e: any) => toast.error(e?.message ?? 'Não foi possível salvar a rubrica'),
   });
 
+  const saveLegalConfig = useMutation({
+    mutationFn: (payload: { employerIdType: number; cnoCaepf: string; inpiRegistry: string }) => api('/personnel/legal/config', { method: 'POST', json: payload }),
+    onSuccess: () => {
+      toast.success('Identificação legal salva');
+      setLegalForm(null);
+      void qc.invalidateQueries({ queryKey: ['time-clock', 'legal-status'] });
+      void qc.invalidateQueries({ queryKey: ['time-clock', 'afd-preview'] });
+      void qc.invalidateQueries({ queryKey: ['time-clock', 'aej-preview'] });
+    },
+    onError: (e: any) => toast.error(e?.message ?? 'Não foi possível salvar a identificação legal'),
+  });
+
   const reopenPeriod = useMutation({
     mutationFn: ({ ref, note }: { ref: string; note: string }) =>
       api(`/personnel/time-clock/periods/${ref}/reopen`, { method: 'POST', json: { note } }),
@@ -767,6 +812,7 @@ export default function TimeClockPage() {
           {canTeam && <TabsTrigger value="ocorrencias" className="text-xs font-semibold"><AlertTriangle className="mr-2 h-4 w-4" />Ocorrências</TabsTrigger>}
           {canManage && <TabsTrigger value="escalas" className="text-xs font-semibold"><CalendarClock className="mr-2 h-4 w-4" />Escalas</TabsTrigger>}
           {canManage && <TabsTrigger value="fechamento" className="text-xs font-semibold"><Lock className="mr-2 h-4 w-4" />Fechamento</TabsTrigger>}
+          {canManage && <TabsTrigger value="fiscal" className="text-xs font-semibold"><ShieldCheck className="mr-2 h-4 w-4" />Fiscal</TabsTrigger>}
         </TabsList>
 
         {/* ------------------------------ Meu Ponto ------------------------------ */}
@@ -1646,6 +1692,128 @@ export default function TimeClockPage() {
             </Card>
           </TabsContent>
         )}
+
+        {/* ------------------------------ Central Fiscal (REP-P) ------------------------------ */}
+        {canManage && (
+          <TabsContent value="fiscal">
+            <div className="grid grid-cols-1 gap-4 xl:grid-cols-2">
+              {/* Identificação legal + conformidade */}
+              <Card className="border border-slate-100 bg-white shadow-sm dark:border-slate-800/80 dark:bg-slate-900/50">
+                <div className="border-b px-4 py-2.5">
+                  <h3 className="flex items-center gap-2 text-sm font-semibold text-slate-800 dark:text-white">
+                    <ShieldCheck className="h-4 w-4 text-sky-500" />Identificação legal do empregador
+                  </h3>
+                </div>
+                <CardContent className="space-y-3 p-4 text-xs">
+                  {legalStatusQuery.data && (
+                    <>
+                      <div className="rounded-md border p-2.5">
+                        <div className="text-[10px] uppercase tracking-wider text-muted-foreground">Empresa</div>
+                        <div className="font-semibold">{legalStatusQuery.data.config.company.name}</div>
+                        <div className="text-muted-foreground">CNPJ: {legalStatusQuery.data.config.company.cnpj ?? '— não cadastrado —'}</div>
+                      </div>
+                      {legalForm ? (
+                        <div className="space-y-2">
+                          <div>
+                            <Label>Registro do programa no INPI (REP-P)</Label>
+                            <Input className="h-8 text-xs" value={legalForm.inpiRegistry} onChange={(e) => setLegalForm((f) => f && { ...f, inpiRegistry: e.target.value })} placeholder="Nº do registro no INPI" />
+                          </div>
+                          <div>
+                            <Label>CNO/CAEPF (se aplicável)</Label>
+                            <Input className="h-8 text-xs" value={legalForm.cnoCaepf} onChange={(e) => setLegalForm((f) => f && { ...f, cnoCaepf: e.target.value })} placeholder="Obra/empregador rural" />
+                          </div>
+                          <div className="flex gap-2">
+                            <Button size="sm" className="h-8 bg-sky-500 text-xs font-semibold text-white hover:bg-sky-600" disabled={saveLegalConfig.isPending} onClick={() => saveLegalConfig.mutate(legalForm)}>Salvar</Button>
+                            <Button size="sm" variant="ghost" className="h-8 text-xs" onClick={() => setLegalForm(null)}>Cancelar</Button>
+                          </div>
+                        </div>
+                      ) : (
+                        <Button size="sm" variant="outline" className="h-8 text-xs" onClick={() => setLegalForm({
+                          employerIdType: legalStatusQuery.data!.config.employerIdType,
+                          cnoCaepf: legalStatusQuery.data!.config.cnoCaepf ?? '',
+                          inpiRegistry: legalStatusQuery.data!.config.inpiRegistry ?? '',
+                        })}>
+                          <Edit className="mr-1.5 h-3.5 w-3.5" />Editar identificação legal
+                        </Button>
+                      )}
+                      <div className="border-t pt-3">
+                        <div className="mb-2 font-semibold text-slate-800 dark:text-slate-200">Conformidade REP-P</div>
+                        {legalStatusQuery.data.items.map((item) => (
+                          <div key={item.key} className="flex items-center gap-2 py-1">
+                            {item.ok ? <CheckCircle2 className="h-4 w-4 shrink-0 text-status-green" /> : <AlertTriangle className="h-4 w-4 shrink-0 text-status-yellow" />}
+                            <span className={cn(item.ok ? 'text-foreground' : 'text-muted-foreground')}>{item.label}</span>
+                            {item.external && <Badge variant="outline" className="h-4 px-1.5 text-[8px]">externo</Badge>}
+                          </div>
+                        ))}
+                        <div className="mt-2 rounded-md border border-amber-400/30 bg-amber-500/5 p-2 text-[10px] text-amber-700 dark:text-amber-300">
+                          {legalStatusQuery.data.note}
+                        </div>
+                      </div>
+                    </>
+                  )}
+                </CardContent>
+              </Card>
+
+              {/* Arquivos fiscais */}
+              <Card className="border border-slate-100 bg-white shadow-sm dark:border-slate-800/80 dark:bg-slate-900/50">
+                <div className="flex flex-wrap items-center justify-between gap-2 border-b px-4 py-2.5">
+                  <h3 className="flex items-center gap-2 text-sm font-semibold text-slate-800 dark:text-white">
+                    <FileDown className="h-4 w-4 text-sky-500" />Arquivos fiscais (Portaria 671)
+                  </h3>
+                  <Input type="month" className="h-8 w-36 text-xs" value={fiscalRef} max={currentMonth} onChange={(e) => setFiscalRef(e.target.value)} />
+                </div>
+                <CardContent className="space-y-3 p-4 text-xs">
+                  {[
+                    { code: 'AFD', label: 'AFD — Arquivo Fonte de Dados', desc: 'Marcações do REP-P (registro tipo 7, CRC-16).', preview: afdPreviewQuery.data },
+                    { code: 'AEJ', label: 'AEJ — Arquivo Eletrônico de Jornada', desc: 'Jornada tratada do programa (marcações e ausências).', preview: aejPreviewQuery.data },
+                  ].map((file) => (
+                    <div key={file.code} className="rounded-md border p-3">
+                      <div className="flex items-center justify-between gap-2">
+                        <div className="min-w-0">
+                          <div className="font-semibold">{file.label}</div>
+                          <div className="text-[10px] text-muted-foreground">{file.desc}</div>
+                        </div>
+                        <Button size="sm" variant="outline" className="h-8 shrink-0 text-xs" onClick={() => downloadLegalFile(`legal/${file.code.toLowerCase()}/${fiscalRef}`, `${file.code}-${fiscalRef}.txt`)}>
+                          <Download className="mr-1 h-3 w-3" />Gerar
+                        </Button>
+                      </div>
+                      {file.preview && (
+                        <div className="mt-2 text-[10px] text-muted-foreground">
+                          {file.preview.lines} linhas.
+                          {file.preview.warnings.length > 0 && (
+                            <ul className="mt-1 space-y-0.5">
+                              {file.preview.warnings.map((warning, i) => (
+                                <li key={i} className="flex items-start gap-1 text-amber-600 dark:text-amber-400"><AlertTriangle className="mt-0.5 h-3 w-3 shrink-0" />{warning}</li>
+                              ))}
+                            </ul>
+                          )}
+                        </div>
+                      )}
+                    </div>
+                  ))}
+                  <div className="rounded-md border p-3">
+                    <div className="font-semibold">Espelho de Ponto Eletrônico</div>
+                    <div className="text-[10px] text-muted-foreground">Documento por colaborador: marcações com NSR/origem, jornada prevista × realizada e totais da competência.</div>
+                    <div className="mt-2 flex items-center gap-2">
+                      <NativeSelect className="h-8 flex-1 text-xs" value={mirrorUserId} onChange={(e) => setMirrorUserId(e.target.value)}>
+                        <option value="">Selecione o colaborador…</option>
+                        {(optionsQuery.data?.users ?? []).map((person) => (
+                          <option key={person.id} value={person.id}>{person.name}</option>
+                        ))}
+                      </NativeSelect>
+                      <Button size="sm" variant="outline" className="h-8 shrink-0 text-xs" disabled={!mirrorUserId} onClick={() => downloadLegalFile(`legal/mirror/${fiscalRef}/${mirrorUserId}`, `ESPELHO-${fiscalRef}.txt`)}>
+                        <Download className="mr-1 h-3 w-3" />Gerar
+                      </Button>
+                    </div>
+                  </div>
+                  <div className="rounded-md border border-amber-400/30 bg-amber-500/5 p-2 text-[10px] text-amber-700 dark:text-amber-300">
+                    Os arquivos seguem a estrutura da Portaria 671 para <b>conferência interna</b>. Antes de uso em fiscalização, valide no validador oficial, assine com certificado ICP-Brasil (.p7s) e conclua o registro no INPI e o Atestado Técnico. Nada aqui declara conformidade automática.
+                  </div>
+                </CardContent>
+              </Card>
+            </div>
+          </TabsContent>
+        )}
       </Tabs>
 
       {/* Dialog: extrato do banco de horas */}
@@ -2113,6 +2281,29 @@ export default function TimeClockPage() {
 }
 
 /** Baixa o relatório CSV da competência com o token de acesso (download controlado). */
+async function downloadLegalFile(path: string, fileName: string) {
+  try {
+    const apiUrl = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:3333/api';
+    const token = getAccessToken();
+    const res = await fetch(`${apiUrl}/personnel/${path}`, {
+      headers: token ? { authorization: `Bearer ${token}` } : undefined,
+    });
+    if (!res.ok) throw new Error('Falha ao gerar o arquivo');
+    const warnings = Number(res.headers.get('x-file-warnings') ?? '0');
+    const blob = await res.blob();
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = fileName;
+    link.click();
+    URL.revokeObjectURL(url);
+    if (warnings > 0) toast.warning(`Arquivo gerado com ${warnings} aviso(s) — revise as pendências antes de usar em fiscalização.`);
+    else toast.success('Arquivo gerado');
+  } catch {
+    toast.error('Não foi possível gerar o arquivo fiscal');
+  }
+}
+
 async function downloadPayroll(ref: string, format: 'CSV' | 'JSON' | 'TXT') {
   try {
     const apiUrl = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:3333/api';

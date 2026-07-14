@@ -6,6 +6,7 @@ import { AuthPayload } from '../auth/auth.types';
 import { PersonnelService } from './personnel.service';
 import { TimeBankService } from './time-bank.service';
 import { PayrollService } from './payroll.service';
+import { LegalFilesService } from './legal-files.service';
 
 @Controller('personnel')
 export class PersonnelController {
@@ -13,6 +14,7 @@ export class PersonnelController {
     private readonly service: PersonnelService,
     private readonly timeBank: TimeBankService,
     private readonly payroll: PayrollService,
+    private readonly legal: LegalFilesService,
   ) {}
 
   // ------------------------------ Ponto ------------------------------
@@ -190,6 +192,75 @@ export class PersonnelController {
     res.setHeader('content-type', result.mimeType);
     res.setHeader('content-disposition', `attachment; filename="${result.fileName}"`);
     return new StreamableFile(result.content);
+  }
+
+  // ------------------------------ Central Fiscal (REP-P) ------------------------------
+
+  @Get('legal/config')
+  @RequirePermissions('ponto:view')
+  legalConfig(@CurrentUser() me: AuthPayload) {
+    return this.legal.getConfig(me.companyId);
+  }
+
+  @Post('legal/config')
+  @RequirePermissions('ponto:manage')
+  setLegalConfig(@CurrentUser() me: AuthPayload, @Body() body: any) {
+    return this.legal.setConfig(me, body);
+  }
+
+  @Get('legal/status')
+  @RequirePermissions('ponto:manage')
+  legalStatus(@CurrentUser() me: AuthPayload) {
+    return this.legal.complianceStatus(me);
+  }
+
+  @Get('legal/afd/:ref')
+  @RequirePermissions('ponto:manage')
+  async afd(@CurrentUser() me: AuthPayload, @Param('ref') ref: string, @Res({ passthrough: true }) res: Response) {
+    const result = await this.legal.buildAfd(me, ref);
+    res.setHeader('content-type', 'text/plain; charset=utf-8');
+    res.setHeader('content-disposition', `attachment; filename="${result.fileName}"`);
+    res.setHeader('x-file-warnings', String(result.warnings.length));
+    return new StreamableFile(Buffer.from(result.content, 'utf8'));
+  }
+
+  @Get('legal/aej/:ref')
+  @RequirePermissions('ponto:manage')
+  async aej(@CurrentUser() me: AuthPayload, @Param('ref') ref: string, @Res({ passthrough: true }) res: Response) {
+    const result = await this.legal.buildAej(me, ref);
+    res.setHeader('content-type', 'text/plain; charset=utf-8');
+    res.setHeader('content-disposition', `attachment; filename="${result.fileName}"`);
+    res.setHeader('x-file-warnings', String(result.warnings.length));
+    return new StreamableFile(Buffer.from(result.content, 'utf8'));
+  }
+
+  @Get('legal/afd/:ref/preview')
+  @RequirePermissions('ponto:manage')
+  async afdPreview(@CurrentUser() me: AuthPayload, @Param('ref') ref: string) {
+    const result = await this.legal.buildAfd(me, ref);
+    return { fileName: result.fileName, lines: result.lines, warnings: result.warnings };
+  }
+
+  @Get('legal/aej/:ref/preview')
+  @RequirePermissions('ponto:manage')
+  async aejPreview(@CurrentUser() me: AuthPayload, @Param('ref') ref: string) {
+    const result = await this.legal.buildAej(me, ref);
+    return { fileName: result.fileName, lines: result.lines, warnings: result.warnings };
+  }
+
+  @Get('legal/mirror/:ref/:userId')
+  @RequirePermissions('ponto:manage')
+  async legalMirror(
+    @CurrentUser() me: AuthPayload,
+    @Param('ref') ref: string,
+    @Param('userId') userId: string,
+    @Res({ passthrough: true }) res: Response,
+  ) {
+    const result = await this.legal.buildMirror(me, ref, userId);
+    res.setHeader('content-type', 'text/plain; charset=utf-8');
+    res.setHeader('content-disposition', `attachment; filename="${result.fileName}"`);
+    res.setHeader('x-file-warnings', String(result.warnings.length));
+    return new StreamableFile(Buffer.from(result.content, 'utf8'));
   }
 
   // ------------------------------ Importação ------------------------------

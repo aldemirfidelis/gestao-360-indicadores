@@ -1136,6 +1136,20 @@ export class PersonnelService {
     });
   }
 
+  /**
+   * Dias completos de um colaborador na competência (espelho oficial da
+   * Central Fiscal). Mesma apuração do espelho interno; valida visibilidade.
+   */
+  async mirrorDaysForUser(me: AuthPayload, userId: string, ref: string) {
+    this.assertPeriodRef(ref);
+    await this.assertCanViewTimesheetUser(me, userId);
+    const { first, last } = monthBounds(ref);
+    const today = dayKeyFor(new Date());
+    const to = last > today ? today : last;
+    if (first > to) return [];
+    return this.buildMirrorDays(me.companyId, userId, first, to);
+  }
+
   /** Consolidado do mês por colaborador (usado no fechamento e no relatório). */
   private async computeMonthTotals(companyId: string, ref: string) {
     const { first, last } = monthBounds(ref);

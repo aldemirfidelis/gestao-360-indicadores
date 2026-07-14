@@ -233,7 +233,7 @@ tarefas para ocorrências críticas; comparação ponto × acessos (Segurança P
 
 ---
 
-## Status de execução (atualizado em 2026-07-13)
+## Status de execução (atualizado em 2026-07-14)
 
 **ETAPA 1 — CONCLUÍDA** (commit `ef4963f`): feriados (CRUD + nacionais gerados + espelho),
 tolerância ±10min por marcação (decisão do negócio), jornada noturna atribuída ao dia da escala,
@@ -270,6 +270,16 @@ conciliação. ⚠️ Faixas de HE, adicional noturno e DSR seguem parâmetros u
 jurídica por CCT — a UI alerta e nada declara conformidade automática. DSR automático não incluído
 (pendente de definição jurídica).
 
-Próxima: **ETAPA 6** (Central Fiscal / REP-P — AFD, AEJ, Espelho oficial, NSR já pronto, comprovante,
-p7s; itens externos: INPI, atestado técnico, certificado — dependem do usuário) e **ETAPA 7**
-(dashboards, automações e integração completa com Meu Dia/Indicadores/Gestão à Vista).
+**ETAPA 6 — CONCLUÍDA** (parte de software): Central Fiscal na aba "Fiscal" do ponto —
+identificação legal do empregador (tipo CNPJ/CPF, CNO/CAEPF, registro INPI) com checklist de
+conformidade REP-P; geração dos arquivos da Portaria 671 para conferência interna: AFD (registro
+tipo 7 com NSR/CPF/hash e CRC-16 por linha), AEJ (vínculos, marcações tratadas E/S e ausências
+FERIAS/AFASTAMENTO/ABONO/FALTA) e Espelho de Ponto Eletrônico por colaborador (marcações com
+NSR/origem, prevista × realizada, totais e campo de assinatura), todos com testes de leiaute e
+avisos de pendência (CPF/INPI/dias inconsistentes). ⚠️ Itens externos permanecem com a empresa:
+registro no INPI, assinatura .p7s (certificado ICP-Brasil), Atestado Técnico/Termo de
+Responsabilidade e validação no validador oficial + jurídica — o sistema sinaliza e não declara
+conformidade automática.
+
+Próxima: **ETAPA 7** (dashboards, automações e integração completa com Meu Dia/Indicadores/
+Gestão à Vista).

@@ -12267,6 +12267,28 @@ model TimeBankEntry {
   @@map("time_bank_entries")
 }
 
+/// Identificação legal do empregador para os arquivos fiscais (AFD/AEJ,
+/// Portaria 671): tipo de identificador, CEI/CNO/CAEPF e registro do programa
+/// no INPI. Preenchido pelo DP; os arquivos saem com pendências sinalizadas
+/// enquanto os campos obrigatórios não existirem.
+model PersonnelLegalConfig {
+  id              String   @id @default(uuid())
+  companyId       String   @unique
+  /// 1 = CNPJ, 2 = CPF (empregador pessoa física).
+  employerIdType  Int      @default(1)
+  /// CEI/CNO/CAEPF quando aplicável (obra/empregador rural etc.).
+  cnoCaepf        String?
+  /// Número do registro do programa de tratamento no INPI (REP-P).
+  inpiRegistry    String?
+  /// Identificação da versão do software gerador (vai nos arquivos).
+  softwareVersion String   @default("gestao360-ponto")
+  updatedById     String?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  @@map("personnel_legal_configs")
+}
+
 /// Mapeamento configurável entre a rubrica interna (eventKey) e o código da
 /// folha de pagamento da empresa. Vigência simples via `active`.
 model PayrollRubricMap {
