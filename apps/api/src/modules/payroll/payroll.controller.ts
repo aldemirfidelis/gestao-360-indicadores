@@ -114,7 +114,7 @@ export class PayrollController {
     return this.legalTables.createVersion(me, body);
   }
 
-  // ------------------------------ Férias ------------------------------
+  // ------------------------------ Férias (fonte: Serviço Pessoal) ------------------------------
 
   @Get('vacations')
   @RequirePermissions('folha:view')
@@ -122,10 +122,11 @@ export class PayrollController {
     return this.runs.listVacations(me);
   }
 
-  @Post('vacations/request')
+  /** Ajusta abono pecuniário / antecipação de 13º de uma férias já aprovada no DP. */
+  @Post('vacations/payroll-inputs')
   @RequirePermissions('folha:operate')
-  createVacationRequest(@CurrentUser() me: AuthPayload, @Body() body: any) {
-    return this.runs.createVacationRequest(me, body);
+  setVacationPayrollInputs(@CurrentUser() me: AuthPayload, @Body() body: any) {
+    return this.runs.setVacationPayrollInputs(me, body);
   }
 
   // ------------------------------ Rescisões ------------------------------

@@ -12662,6 +12662,10 @@ model VacationRequest {
   startDate          DateTime
   endDate            DateTime
   days               Int
+  /// Dias vendidos (abono pecuniário) e antecipação do 13º — insumos da folha,
+  /// mantidos na fonte canônica de férias (consumidos pelo módulo payroll).
+  sellDays           Int         @default(0)
+  advanceThirteenth  Boolean     @default(false)
   periodRef          String? // período aquisitivo atribuído (ex.: "2025/2026")
   status             String      @default("REQUESTED") // REQUESTED | MANAGER_APPROVED | APPROVED | REJECTED | CANCELLED | DONE
   notes              String?
@@ -13444,45 +13448,8 @@ model WithdrawalApprovalPolicy {
 }
 
 // ===================== Rotinas Especiais de Folha (Fase 3) =====================
-
-model PayrollVacationPeriod {
-  id              String                   @id @default(uuid())
-  companyId       String
-  employeeId      String
-  startAquisition DateTime
-  endAquisition   DateTime
-  concessionLimit DateTime
-  totalDays       Int                      @default(30)
-  takenDays       Int                      @default(0)
-  status          String                   @default("ACQUIRING") // ACQUIRING | CONCESSIVE | TAKEN
-  createdAt       DateTime                 @default(now())
-  updatedAt       DateTime                 @updatedAt
-  requests        PayrollVacationRequest[]
-
-  @@index([companyId, employeeId])
-  @@map("payroll_vacation_periods")
-}
-
-model PayrollVacationRequest {
-  id                String                @id @default(uuid())
-  companyId         String
-  vacationPeriodId  String
-  period            PayrollVacationPeriod @relation(fields: [vacationPeriodId], references: [id], onDelete: Cascade)
-  startDate         DateTime
-  endDate           DateTime
-  takenDays         Int
-  sellDays          Int                   @default(0) // abono pecuniário
-  advanceThirteenth Boolean               @default(false)
-  status            String                @default("DRAFT") // DRAFT | APPROVED | CALCULATED | CLOSED
-  calculatedAt      DateTime?
-  approvedAt        DateTime?
-  closedAt          DateTime?
-  createdAt         DateTime              @default(now())
-  updatedAt         DateTime              @updatedAt
-
-  @@index([companyId, vacationPeriodId])
-  @@map("payroll_vacation_requests")
-}
+// Férias NÃO têm modelo próprio aqui: o módulo payroll consome a fonte canônica
+// VacationRequest (Serviço Pessoal), evitando cadastro paralelo de férias.
 
 model PayrollTermination {
   id              String    @id @default(uuid())

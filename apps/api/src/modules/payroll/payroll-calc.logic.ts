@@ -427,6 +427,217 @@ export function computeMonthlyWorker(input: WorkerCalcInput): WorkerCalcResult {
   };
 }
 
+// ------------------------------ RESCISÃO (Fase 3) ------------------------------
+
+/**
+ * Conta "avos" (meses com ao menos 15 dias trabalhados) no intervalo [start,end]
+ * inclusivo, teto 12 — regra da CLT para 13º e férias proporcionais.
+ */
+export function countAvos(start: Date, end: Date): number {
+  if (end < start) return 0;
+  let avos = 0;
+  let year = start.getUTCFullYear();
+  let month = start.getUTCMonth();
+  const endYear = end.getUTCFullYear();
+  const endMonth = end.getUTCMonth();
+  while (year < endYear || (year === endYear && month <= endMonth)) {
+    const monthStart = new Date(Date.UTC(year, month, 1));
+    const monthEnd = new Date(Date.UTC(year, month + 1, 0));
+    const from = start > monthStart ? start : monthStart;
+    const to = end < monthEnd ? end : monthEnd;
+    const daysWorked = Math.floor((to.getTime() - from.getTime()) / 86_400_000) + 1;
+    if (daysWorked >= 15) avos += 1;
+    month += 1;
+    if (month > 11) { month = 0; year += 1; }
+  }
+  return Math.min(12, avos);
+}
+
+/** Anos completos entre duas datas (para o aviso-prévio da Lei 12.506). */
+export function completedYears(start: Date, end: Date): number {
+  let years = end.getUTCFullYear() - start.getUTCFullYear();
+  const beforeAnniversary =
+    end.getUTCMonth() < start.getUTCMonth() ||
+    (end.getUTCMonth() === start.getUTCMonth() && end.getUTCDate() < start.getUTCDate());
+  if (beforeAnniversary) years -= 1;
+  return Math.max(0, years);
+}
+
+export interface TerminationCalcInput {
+  salaryCents: number;
+  admissionDate: Date;
+  terminationDate: Date;
+  /** DISPENSA_SEM_JUSTA_CAUSA | PEDIDO | ACORDO */
+  kind: string;
+  /** TRABALHADO | INDENIZADO */
+  noticeType: string;
+  contractType: string | null;
+  irDependents: number;
+  tables: LegalTables;
+  /** Saldo do FGTS na conta vinculada (centavos), p/ multa rescisória. Opcional. */
+  fgtsBalanceCents?: number;
+  /** Avos de férias vencidas não gozadas de período anterior (0..12). Opcional. */
+  expiredVacationAvos?: number;
+}
+
+/** Percentual (basis points) da multa rescisória do FGTS por tipo de desligamento. */
+function fgtsFineBp(kind: string): number {
+  if (kind === 'DISPENSA_SEM_JUSTA_CAUSA') return 4000; // 40%
+  if (kind === 'ACORDO') return 2000; // 20%
+  return 0; // pedido de demissão / justa causa: sem multa
+}
+
+/**
+ * Rescisão (Fase 3) para o caso mais comum (dispensa sem justa causa / acordo /
+ * pedido): saldo de salário, aviso-prévio (30 + 3/ano, teto 90; indenizado paga
+ * e projeta os avos), 13º proporcional, férias proporcionais + vencidas + 1/3,
+ * com incidências corretas (férias/aviso indenizados NÃO têm INSS/IRRF) e multa
+ * do FGTS quando o saldo é informado.
+ *
+ * ⚠️ Simplificações desta fase (sinalizadas em `issues`): períodos de férias
+ * vencidas dependem de informe manual (não há histórico de gozo confiável);
+ * a multa exige o saldo do FGTS (não rastreado internamente). Resultado é para
+ * conferência interna e validação jurídica antes do TRCT.
+ */
+export function computeTermination(input: TerminationCalcInput): WorkerCalcResult & { informative: { fgtsFineCents: number }; issues: string[] } {
+  const { salaryCents, admissionDate, terminationDate, kind, noticeType, contractType, irDependents, tables, fgtsBalanceCents, expiredVacationAvos = 0 } = input;
+  const memory: MemoryStep[] = [];
+  const items: WorkerCalcItem[] = [];
+  const issues: string[] = [];
+
+  // Aviso-prévio: 30 dias + 3 por ano completo, teto 90 (Lei 12.506/2011).
+  const years = completedYears(admissionDate, terminationDate);
+  const noticeDays = Math.min(90, 30 + 3 * years);
+  const indemnifiedNotice = noticeType === 'INDENIZADO' && kind !== 'PEDIDO';
+  // Data projetada: o aviso indenizado projeta o contrato para os avos.
+  const projectedEnd = indemnifiedNotice
+    ? new Date(terminationDate.getTime() + noticeDays * 86_400_000)
+    : terminationDate;
+
+  // 1) Saldo de salário: dias do mês até o desligamento ÷ 30.
+  const dayOfMonth = terminationDate.getUTCDate();
+  const saldoCents = roundDiv(salaryCents * dayOfMonth, 30);
+  items.push({ rubricCode: '1000', rubricName: 'Saldo de salário', nature: 'PROVENTO', reference: `${dayOfMonth}/30 dias`, amountCents: saldoCents, origin: 'MOTOR' });
+  memory.push({ step: 'Saldo de salário', formula: 'salário × dias trabalhados no mês ÷ 30', inputs: { salario: centsLabel(salaryCents), dias: dayOfMonth }, resultCents: saldoCents });
+
+  // 2) Aviso-prévio indenizado.
+  let noticeCents = 0;
+  if (indemnifiedNotice) {
+    noticeCents = roundDiv(salaryCents * noticeDays, 30);
+    items.push({ rubricCode: '1040', rubricName: 'Aviso-prévio indenizado', nature: 'PROVENTO', reference: `${noticeDays} dias`, amountCents: noticeCents, origin: 'MOTOR' });
+    memory.push({ step: 'Aviso-prévio indenizado', formula: '(30 + 3×anos, teto 90) ÷ 30 × salário', inputs: { anosCompletos: years, dias: noticeDays }, resultCents: noticeCents });
+  }
+
+  // 3) 13º proporcional (avos do ano até a data projetada).
+  const yearStart = new Date(Date.UTC(projectedEnd.getUTCFullYear(), 0, 1));
+  const thirteenthStart = admissionDate > yearStart ? admissionDate : yearStart;
+  const avos13 = countAvos(thirteenthStart, projectedEnd);
+  const thirteenthCents = roundDiv(salaryCents * avos13, 12);
+  if (avos13 > 0) {
+    items.push({ rubricCode: '1031', rubricName: '13º proporcional', nature: 'PROVENTO', reference: `${avos13}/12 avos`, amountCents: thirteenthCents, origin: 'MOTOR' });
+    memory.push({ step: '13º proporcional', formula: 'salário × avos (meses ≥15 dias) ÷ 12', inputs: { avos: avos13 }, resultCents: thirteenthCents });
+  }
+
+  // 4) Férias proporcionais + 1/3 (avos do período aquisitivo corrente).
+  const anniversaryYear = (projectedEnd.getUTCMonth() > admissionDate.getUTCMonth() ||
+    (projectedEnd.getUTCMonth() === admissionDate.getUTCMonth() && projectedEnd.getUTCDate() >= admissionDate.getUTCDate()))
+    ? projectedEnd.getUTCFullYear()
+    : projectedEnd.getUTCFullYear() - 1;
+  const lastAnniversary = new Date(Date.UTC(anniversaryYear, admissionDate.getUTCMonth(), admissionDate.getUTCDate()));
+  const periodStart = admissionDate > lastAnniversary ? admissionDate : lastAnniversary;
+  const avosFerias = countAvos(periodStart, projectedEnd);
+  const vacationPropCents = roundDiv(salaryCents * avosFerias, 12);
+  const vacationPropThird = roundDiv(vacationPropCents, 3);
+  if (avosFerias > 0) {
+    items.push({ rubricCode: '1020', rubricName: 'Férias proporcionais', nature: 'PROVENTO', reference: `${avosFerias}/12 avos`, amountCents: vacationPropCents, origin: 'MOTOR' });
+    items.push({ rubricCode: '1021', rubricName: '1/3 s/ férias proporcionais', nature: 'PROVENTO', reference: '1/3', amountCents: vacationPropThird, origin: 'MOTOR' });
+    memory.push({ step: 'Férias proporcionais + 1/3', formula: 'salário × avos ÷ 12, acrescido de 1/3', inputs: { avos: avosFerias }, resultCents: vacationPropCents + vacationPropThird });
+  }
+
+  // 5) Férias vencidas + 1/3 (informadas manualmente).
+  let expiredVacationCents = 0;
+  let expiredVacationThird = 0;
+  if (expiredVacationAvos > 0) {
+    expiredVacationCents = roundDiv(salaryCents * Math.min(12, expiredVacationAvos), 12);
+    expiredVacationThird = roundDiv(expiredVacationCents, 3);
+    items.push({ rubricCode: '1024', rubricName: 'Férias vencidas', nature: 'PROVENTO', reference: `${expiredVacationAvos}/12 avos`, amountCents: expiredVacationCents, origin: 'MOTOR' });
+    items.push({ rubricCode: '1025', rubricName: '1/3 s/ férias vencidas', nature: 'PROVENTO', reference: '1/3', amountCents: expiredVacationThird, origin: 'MOTOR' });
+  } else {
+    issues.push('Férias vencidas não informadas — confirme se há período aquisitivo completo não gozado.');
+  }
+
+  // ---- Incidências ----
+  // Saldo de salário: INSS + IRRF + FGTS. Aviso indenizado: só FGTS.
+  const inssSaldo = computeInss(saldoCents, tables.inss.data);
+  if (saldoCents > 0) {
+    items.push({ rubricCode: '5501', rubricName: 'INSS s/ saldo', nature: 'DESCONTO', reference: `base ${centsLabel(inssSaldo.cappedBaseCents)}`, amountCents: inssSaldo.valueCents, origin: 'MOTOR' });
+    memory.push({ step: 'INSS s/ saldo de salário', formula: 'progressivo sobre o saldo de salário', inputs: { base: centsLabel(saldoCents) }, resultCents: inssSaldo.valueCents, legalVersionId: tables.inss.versionId });
+  }
+  const irrfSaldo = computeIrrf({ grossTaxableCents: saldoCents, inssCents: inssSaldo.valueCents, irDependents, table: tables.irrf.data });
+  if (irrfSaldo.valueCents > 0) {
+    items.push({ rubricCode: '5502', rubricName: 'IRRF s/ saldo', nature: 'DESCONTO', reference: `base ${centsLabel(irrfSaldo.taxableBaseCents)}`, amountCents: irrfSaldo.valueCents, origin: 'MOTOR' });
+    memory.push({ step: 'IRRF s/ saldo de salário', formula: 'tabela mensal sobre o saldo após INSS', inputs: { base: centsLabel(irrfSaldo.taxableBaseCents) }, resultCents: irrfSaldo.valueCents, legalVersionId: tables.irrf.versionId });
+  }
+
+  // 13º proporcional: INSS + IRRF exclusivos.
+  const inss13 = computeInss(thirteenthCents, tables.inss.data);
+  let irrf13Value = 0;
+  if (thirteenthCents > 0) {
+    items.push({ rubricCode: '5503', rubricName: 'INSS s/ 13º', nature: 'DESCONTO', reference: `base ${centsLabel(inss13.cappedBaseCents)}`, amountCents: inss13.valueCents, origin: 'MOTOR' });
+    const irrf13Base = Math.max(0, thirteenthCents - inss13.valueCents);
+    let bracket = tables.irrf.data.brackets[0] ?? { upToCents: null, rateBp: 0, deductionCents: 0 };
+    for (const candidate of tables.irrf.data.brackets) {
+      bracket = candidate;
+      if (candidate.upToCents === null || irrf13Base <= candidate.upToCents) break;
+    }
+    irrf13Value = Math.max(0, applyBp(irrf13Base, bracket.rateBp) - bracket.deductionCents);
+    if (irrf13Value > 0) items.push({ rubricCode: '5504', rubricName: 'IRRF s/ 13º', nature: 'DESCONTO', reference: `base ${centsLabel(irrf13Base)}`, amountCents: irrf13Value, origin: 'MOTOR' });
+    memory.push({ step: 'INSS/IRRF s/ 13º', formula: 'tributação exclusiva do 13º proporcional', inputs: { base13: centsLabel(thirteenthCents) }, resultCents: inss13.valueCents + irrf13Value, legalVersionId: tables.inss.versionId });
+  }
+
+  // FGTS do mês (informativo): saldo + 13º + aviso indenizado.
+  const fgtsRate = contractType === 'APRENDIZ' ? tables.fgts.data.apprenticeRateBp : tables.fgts.data.rateBp;
+  const fgtsBaseCents = saldoCents + thirteenthCents + noticeCents;
+  const fgtsMonthCents = applyBp(fgtsBaseCents, fgtsRate);
+  items.push({ rubricCode: '9003', rubricName: `FGTS rescisório ${fgtsRate / 100}%`, nature: 'INFORMATIVA', reference: `base ${centsLabel(fgtsBaseCents)}`, amountCents: fgtsMonthCents, origin: 'MOTOR' });
+
+  // Multa rescisória do FGTS (informativa; depende do saldo da conta vinculada).
+  const fineBp = fgtsFineBp(kind);
+  let fgtsFineCents = 0;
+  if (fineBp > 0) {
+    if (fgtsBalanceCents && fgtsBalanceCents > 0) {
+      fgtsFineCents = applyBp(fgtsBalanceCents, fineBp);
+      items.push({ rubricCode: '9010', rubricName: `Multa FGTS ${fineBp / 100}%`, nature: 'INFORMATIVA', reference: `s/ saldo ${centsLabel(fgtsBalanceCents)}`, amountCents: fgtsFineCents, origin: 'MOTOR' });
+      memory.push({ step: 'Multa rescisória FGTS', formula: 'saldo do FGTS × percentual da multa', inputs: { saldoFgts: centsLabel(fgtsBalanceCents), percentual: `${fineBp / 100}%` }, resultCents: fgtsFineCents, legalVersionId: tables.fgts.versionId });
+    } else {
+      issues.push(`Multa de ${fineBp / 100}% do FGTS não calculada — informe o saldo da conta vinculada do FGTS.`);
+    }
+  }
+
+  const earnings = items.filter((i) => i.nature === 'PROVENTO').reduce((sum, i) => sum + i.amountCents, 0);
+  const deductions = items.filter((i) => i.nature === 'DESCONTO').reduce((sum, i) => sum + i.amountCents, 0);
+  const net = earnings - deductions;
+  memory.push({ step: 'Líquido da rescisão', formula: 'proventos − descontos (verbas indenizatórias sem INSS/IRRF)', inputs: { proventos: centsLabel(earnings), descontos: centsLabel(deductions) }, resultCents: net });
+
+  return {
+    items,
+    totals: {
+      earningsCents: earnings,
+      deductionsCents: deductions,
+      netCents: net,
+      inssBaseCents: inssSaldo.cappedBaseCents + inss13.cappedBaseCents,
+      inssCents: inssSaldo.valueCents + inss13.valueCents,
+      irrfBaseCents: irrfSaldo.taxableBaseCents,
+      irrfCents: irrfSaldo.valueCents + irrf13Value,
+      fgtsBaseCents,
+      fgtsCents: fgtsMonthCents,
+    },
+    memory,
+    informative: { fgtsFineCents },
+    issues,
+  };
+}
+
 // ------------------------------ centavos ↔ Decimal(14,2) ------------------------------
 
 /** Centavos inteiros → string decimal "1234.56" para persistir em Decimal(14,2). */

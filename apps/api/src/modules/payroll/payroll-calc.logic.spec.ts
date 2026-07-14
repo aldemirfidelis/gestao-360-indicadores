@@ -10,6 +10,9 @@ import {
   roundDiv,
   computeVacationWorker,
   computeThirteenthWorker,
+  computeTermination,
+  countAvos,
+  completedYears,
   type InssTableData,
   type IrrfTableData,
   type LegalTables,
@@ -273,5 +276,82 @@ describe('payroll-calc.logic — Férias e 13º Salário (Fase 3)', () => {
     // IRRF sobre base 13º (3000.00 - INSS 253.41 = 2746.59)
     // Tabela anual: faixa 7.5% (dedução 182.16) -> 2746.59 * 7.5% - 182.16 = 205.99425 - 182.16 = 23.83425 -> 23.83 (2383)
     expect(byCode.get('5502')?.amountCents).toBe(2383);
+  });
+});
+
+describe('payroll-calc.logic — Rescisão (Fase 3)', () => {
+  it('countAvos: regra dos 15 dias no intervalo', () => {
+    expect(countAvos(new Date('2025-01-01'), new Date('2025-07-26'))).toBe(7);
+    expect(countAvos(new Date('2025-01-20'), new Date('2025-03-10'))).toBe(1); // jan 12d (<15), fev 1, mar 10d (<15) -> só fev
+    expect(countAvos(new Date('2025-01-01'), new Date('2026-12-31'))).toBe(12); // teto
+  });
+
+  it('completedYears: anos completos considerando aniversário', () => {
+    expect(completedYears(new Date('2023-01-10'), new Date('2025-06-20'))).toBe(2);
+    expect(completedYears(new Date('2023-07-10'), new Date('2025-06-20'))).toBe(1); // ainda não fez aniversário em 2025
+  });
+
+  it('dispensa sem justa causa com aviso indenizado: verbas, avos e incidências', () => {
+    const result = computeTermination({
+      salaryCents: 300000,
+      admissionDate: new Date('2023-01-10'),
+      terminationDate: new Date('2025-06-20'),
+      kind: 'DISPENSA_SEM_JUSTA_CAUSA',
+      noticeType: 'INDENIZADO',
+      contractType: 'CLT',
+      irDependents: 0,
+      tables: TABLES,
+    });
+    const byCode = new Map(result.items.map((item) => [item.rubricCode, item]));
+    expect(byCode.get('1000')?.amountCents).toBe(200000); // saldo 20/30 dias
+    expect(byCode.get('1040')?.amountCents).toBe(360000); // aviso 36 dias (30 + 3×2 anos)
+    expect(byCode.get('1031')?.amountCents).toBe(175000); // 13º 7/12 (projetado)
+    expect(byCode.get('1020')?.amountCents).toBe(175000); // férias prop 7/12
+    expect(byCode.get('1021')?.amountCents).toBe(58333); // 1/3
+    expect(byCode.get('5501')?.amountCents).toBe(15723); // INSS s/ saldo
+    expect(byCode.get('5503')?.amountCents).toBe(13473); // INSS s/ 13º
+    expect(byCode.get('5502')).toBeUndefined(); // IRRF s/ saldo isento nessa faixa
+    expect(byCode.get('9003')?.amountCents).toBe(58800); // FGTS 8% s/ (saldo+13+aviso)
+    expect(result.totals.earningsCents).toBe(968333);
+    expect(result.totals.deductionsCents).toBe(29196);
+    expect(result.totals.netCents).toBe(939137);
+    // sem saldo de FGTS informado → multa não calculada, vira pendência
+    expect(result.informative.fgtsFineCents).toBe(0);
+    expect(result.issues.some((i) => i.includes('Multa'))).toBe(true);
+  });
+
+  it('pedido de demissão: sem aviso indenizado e sem multa de FGTS', () => {
+    const result = computeTermination({
+      salaryCents: 300000,
+      admissionDate: new Date('2023-01-10'),
+      terminationDate: new Date('2025-06-20'),
+      kind: 'PEDIDO',
+      noticeType: 'TRABALHADO',
+      contractType: 'CLT',
+      irDependents: 0,
+      tables: TABLES,
+    });
+    const byCode = new Map(result.items.map((item) => [item.rubricCode, item]));
+    expect(byCode.get('1040')).toBeUndefined(); // sem aviso indenizado
+    expect(byCode.get('9010')).toBeUndefined(); // sem multa
+    expect(result.informative.fgtsFineCents).toBe(0);
+    expect(result.issues.some((i) => i.includes('Multa'))).toBe(false); // pedido não gera multa
+  });
+
+  it('acordo com saldo de FGTS informado: multa de 20%', () => {
+    const result = computeTermination({
+      salaryCents: 300000,
+      admissionDate: new Date('2023-01-10'),
+      terminationDate: new Date('2025-06-20'),
+      kind: 'ACORDO',
+      noticeType: 'INDENIZADO',
+      contractType: 'CLT',
+      irDependents: 0,
+      tables: TABLES,
+      fgtsBalanceCents: 1000000, // R$ 10.000 de saldo
+    });
+    const byCode = new Map(result.items.map((item) => [item.rubricCode, item]));
+    expect(byCode.get('9010')?.amountCents).toBe(200000); // 20% de 10.000
+    expect(result.informative.fgtsFineCents).toBe(200000);
   });
 });

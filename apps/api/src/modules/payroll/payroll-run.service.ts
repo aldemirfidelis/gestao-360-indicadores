@@ -14,6 +14,7 @@ import {
   centsLabel,
   computeVacationWorker,
   computeThirteenthWorker,
+  computeTermination,
   type TimekeepingSummary,
   type WorkerCalcResult,
 } from './payroll-calc.logic';
@@ -234,7 +235,7 @@ export class PayrollRunService {
       }),
       this.prisma.personnelEmployeeProfile.findMany({
         where: { companyId: me.companyId, employeeId: { in: employeeIds } },
-        select: { employeeId: true, contractType: true },
+        select: { employeeId: true, contractType: true, admissionDate: true },
       }),
       this.ensureRubricVersions(me.companyId),
       this.prisma.payrollBenefitEnrollment.findMany({
@@ -247,13 +248,14 @@ export class PayrollRunService {
       this.prisma.payrollPension.findMany({
         where: { companyId: me.companyId, employeeId: { in: employeeIds }, active: true },
       }),
-      this.prisma.payrollVacationRequest.findMany({
+      // Fonte canônica de férias: VacationRequest do Serviço Pessoal (sem
+      // cadastro paralelo). A folha só CONSOME o que foi aprovado no DP.
+      this.prisma.vacationRequest.findMany({
         where: {
           companyId: me.companyId,
-          period: { employeeId: { in: employeeIds } },
-          status: { in: ['APPROVED', 'CALCULATED', 'CLOSED'] },
+          employeeId: { in: employeeIds },
+          status: { in: ['APPROVED', 'DONE'] },
         },
-        include: { period: true },
       }),
       run.kind === 'DECIMO_TERCEIRO_2'
         ? this.prisma.payrollRunWorker.findMany({
@@ -273,6 +275,17 @@ export class PayrollRunService {
     const settingsByEmployee = new Map(settings.map((setting) => [setting.employeeId, setting]));
     const dependentsByEmployee = new Map(dependents.map((group) => [group.employeeId, group._count._all]));
     const contractByEmployee = new Map(profiles.map((profile) => [profile.employeeId, profile.contractType]));
+    const admissionByEmployee = new Map(profiles.map((profile) => [profile.employeeId, profile.admissionDate]));
+
+    // Registros de rescisão (só quando a run é RESCISAO): fornecem tipo, aviso e
+    // parâmetros informados (saldo de FGTS, férias vencidas) via resultsJson.
+    const terminationByEmployee = new Map<string, any>();
+    if (run.kind === 'RESCISAO') {
+      const terminations = await this.prisma.payrollTermination.findMany({
+        where: { companyId: me.companyId, employeeId: { in: employeeIds } },
+      });
+      for (const termination of terminations) terminationByEmployee.set(termination.employeeId, termination);
+    }
 
     const benefitsByEmployee = new Map<string, any[]>();
     for (const b of benefitEnrollments) {
@@ -296,13 +309,13 @@ export class PayrollRunService {
       pensionsByEmployee.set(p.employeeId, list);
     }
 
-    const vacationRequestByEmployee = new Map<string, any>();
+    const vacationRequestByEmployee = new Map<string, { takenDays: number; sellDays: number }>();
     for (const req of vacationRequests) {
       const reqStart = new Date(req.startDate);
       const reqMonth = reqStart.getUTCMonth() + 1;
       const reqYear = reqStart.getUTCFullYear();
       if (reqMonth === competence.month && reqYear === competence.year) {
-        vacationRequestByEmployee.set(req.period.employeeId, req);
+        vacationRequestByEmployee.set(req.employeeId, { takenDays: req.days, sellDays: req.sellDays });
       }
     }
 
@@ -426,37 +439,35 @@ export class PayrollRunService {
           tables,
         });
       } else if (run.kind === 'RESCISAO') {
-        const noticeDays = 30;
-        const vacationAvos = 6;
-        const thirteenthAvos = 6;
-
-        const noticeCents = roundDiv(salaryCents * noticeDays, 30);
-        const vacationCents = roundDiv(salaryCents * vacationAvos, 12);
-        const constitutionalThirdCents = roundDiv(vacationCents, 3);
-        const thirteenthCents = roundDiv(salaryCents * thirteenthAvos, 12);
-
-        calc = {
-          items: [
-            { rubricCode: '1000', rubricName: 'Saldo de salário', nature: 'PROVENTO', reference: '30 dias', amountCents: salaryCents, origin: 'MOTOR' },
-            { rubricCode: '1020', rubricName: 'Férias proporcionais indenizadas', nature: 'PROVENTO', reference: `${vacationAvos}/12 avos`, amountCents: vacationCents, origin: 'MOTOR' },
-            { rubricCode: '1021', rubricName: '1/3 constitucional s/ férias indenizadas', nature: 'PROVENTO', reference: '1/3', amountCents: constitutionalThirdCents, origin: 'MOTOR' },
-            { rubricCode: '1031', rubricName: '13º proporcional indenizado', nature: 'PROVENTO', reference: `${thirteenthAvos}/12 avos`, amountCents: thirteenthCents, origin: 'MOTOR' },
-          ],
-          totals: {
-            earningsCents: salaryCents + vacationCents + constitutionalThirdCents + thirteenthCents,
-            deductionsCents: 0,
-            netCents: salaryCents + vacationCents + constitutionalThirdCents + thirteenthCents,
-            inssBaseCents: salaryCents,
-            inssCents: 0,
-            irrfBaseCents: 0,
-            irrfCents: 0,
-            fgtsBaseCents: salaryCents + thirteenthCents,
-            fgtsCents: 0,
-          },
-          memory: [
-            { step: 'Verbas rescisórias', formula: 'soma dos avos e aviso prévio', inputs: { salario: centsLabel(salaryCents) }, resultCents: salaryCents + vacationCents + constitutionalThirdCents + thirteenthCents },
-          ],
-        };
+        const termination = terminationByEmployee.get(snapshot.employeeId);
+        const admissionDate = admissionByEmployee.get(snapshot.employeeId) ?? null;
+        if (!termination) {
+          workerIssues.push('Sem registro de rescisão cadastrado (aba Rescisões) para este colaborador.');
+          results.push({ snapshot, calc: null, workerIssues, salaryCents: 0 });
+          issues.push(...workerIssues);
+          continue;
+        }
+        if (!admissionDate) {
+          workerIssues.push('Colaborador sem data de admissão no prontuário — necessária para os avos da rescisão.');
+          results.push({ snapshot, calc: null, workerIssues, salaryCents: 0 });
+          issues.push(...workerIssues);
+          continue;
+        }
+        const params = (termination.resultsJson ?? {}) as { fgtsBalanceCents?: number; expiredVacationAvos?: number };
+        const term = computeTermination({
+          salaryCents,
+          admissionDate: new Date(admissionDate),
+          terminationDate: new Date(termination.terminationDate),
+          kind: termination.kind,
+          noticeType: termination.noticeType,
+          contractType: contractByEmployee.get(snapshot.employeeId) ?? null,
+          irDependents: setting?.irDependentsOverride ?? dependentsByEmployee.get(snapshot.employeeId) ?? 0,
+          tables,
+          fgtsBalanceCents: params.fgtsBalanceCents,
+          expiredVacationAvos: params.expiredVacationAvos,
+        });
+        calc = { items: term.items, totals: term.totals, memory: term.memory };
+        if (term.issues.length) workerIssues.push(...term.issues);
       } else {
         const advancePaidCents = advancePaidByEmployee.get(snapshot.employeeId) ?? 0;
         const employeeBenefits = benefitsByEmployee.get(snapshot.employeeId) ?? [];
@@ -716,59 +727,58 @@ export class PayrollRunService {
     return map;
   }
 
-  // ============================== Férias (Fase 3) ==============================
+  // ============================== Férias (consome o Serviço Pessoal) ==============================
 
+  /**
+   * Férias aprovadas na fonte canônica (VacationRequest do Serviço Pessoal) que
+   * caem em uma competência de folha, para conferência antes de calcular. NÃO há
+   * cadastro de férias aqui — a solicitação/aprovação vive no módulo de DP.
+   */
   async listVacations(me: AuthPayload) {
-    return this.prisma.payrollVacationPeriod.findMany({
-      where: { companyId: me.companyId },
-      include: {
-        requests: true,
-      },
+    const requests = await this.prisma.vacationRequest.findMany({
+      where: { companyId: me.companyId, status: { in: ['APPROVED', 'DONE'] } },
+      orderBy: { startDate: 'desc' },
+      take: 200,
+      include: { employee: { select: { id: true, name: true, registrationId: true } } },
     });
+    return requests.map((req) => ({
+      id: req.id,
+      employee: req.employee,
+      startDate: req.startDate,
+      endDate: req.endDate,
+      days: req.days,
+      sellDays: req.sellDays,
+      advanceThirteenth: req.advanceThirteenth,
+      periodRef: req.periodRef,
+      status: req.status,
+      competence: `${new Date(req.startDate).getUTCFullYear()}-${String(new Date(req.startDate).getUTCMonth() + 1).padStart(2, '0')}`,
+    }));
   }
 
-  async createVacationRequest(me: AuthPayload, body: any) {
-    const period = await this.prisma.payrollVacationPeriod.findFirst({
-      where: { id: body.vacationPeriodId, companyId: me.companyId },
+  /**
+   * Ajusta os insumos de folha (abono pecuniário / antecipação de 13º) de uma
+   * férias JÁ aprovada no Serviço Pessoal. Não cria férias — isso é feito no
+   * fluxo canônico de DP (com saldo, sobreposição e aprovação em 2 níveis).
+   */
+  async setVacationPayrollInputs(me: AuthPayload, body: any) {
+    const request = await this.prisma.vacationRequest.findFirst({
+      where: { id: String(body?.vacationRequestId ?? ''), companyId: me.companyId },
     });
-    if (!period) throw new NotFoundException('Período aquisitivo não encontrado.');
-
-    const totalTaken = period.takenDays + body.takenDays;
-    if (totalTaken > period.totalDays) {
-      throw new BadRequestException(`Saldo insuficiente. Dias gozados: ${period.takenDays}, tentando gozar: ${body.takenDays}, limite: ${period.totalDays}.`);
-    }
-
-    const req = await this.prisma.payrollVacationRequest.create({
-      data: {
-        companyId: me.companyId,
-        vacationPeriodId: body.vacationPeriodId,
-        startDate: new Date(body.startDate),
-        endDate: new Date(body.endDate),
-        takenDays: body.takenDays,
-        sellDays: body.sellDays ?? 0,
-        advanceThirteenth: !!body.advanceThirteenth,
-        status: 'APPROVED',
-        approvedAt: new Date(),
-      },
+    if (!request) throw new NotFoundException('Férias não encontradas no Serviço Pessoal.');
+    const sellDays = Math.max(0, Math.min(Number(body?.sellDays ?? 0) || 0, 10)); // abono: até 1/3 (10 dias)
+    const updated = await this.prisma.vacationRequest.update({
+      where: { id: request.id },
+      data: { sellDays, advanceThirteenth: !!body?.advanceThirteenth },
     });
-
-    await this.prisma.payrollVacationPeriod.update({
-      where: { id: period.id },
-      data: {
-        takenDays: totalTaken,
-        status: totalTaken >= period.totalDays ? 'TAKEN' : 'CONCESSIVE',
-      },
-    });
-
     await this.audit.record(me, {
       module: MODULE,
-      entity: 'PayrollVacationRequest',
-      entityId: req.id,
-      action: 'CREATE',
-      message: `Programação de férias: ${body.takenDays} dia(s) gozados, ${body.sellDays ?? 0} vendidos`,
-      after: { vacationPeriodId: body.vacationPeriodId, takenDays: body.takenDays },
+      entity: 'VacationRequest',
+      entityId: request.id,
+      action: 'UPDATE',
+      message: `Insumos de folha das férias ajustados: ${sellDays} dia(s) de abono`,
+      after: { sellDays, advanceThirteenth: !!body?.advanceThirteenth },
     });
-    return req;
+    return updated;
   }
 
   // ============================== Rescisões (Fase 3) ==============================
