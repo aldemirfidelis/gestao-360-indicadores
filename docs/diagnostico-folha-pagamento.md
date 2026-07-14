@@ -122,9 +122,12 @@ qualquer transmissão.
   retroativos, convenções coletivas estruturadas.
 - **F4**: eSocial (cadastro trabalhista completo, XML/assinatura/lotes/recibos/totalizadores,
   central de certificados com cofre, produção restrita). Iniciada em 2026-07-14 com
-  central de certificados por referencia externa (sem PFX/senha no banco), geração S-1200
-  para conferencia e lote interno `STAGED_UNSIGNED`; assinatura/transmissão seguem bloqueadas
-  até cofre/assinador homologado.
+  central de certificados por referencia externa (sem PFX/senha no banco); fluxo periódico
+  mensal para conferência: **S-1010** (tabela de rubricas), **S-1200** (remuneração) e
+  **S-1299** (fechamento), com lote interno `STAGED_UNSIGNED`. Assinatura/transmissão seguem
+  bloqueadas até cofre/assinador homologado; S-1010 sai com natRubr/codInc* em branco (exigem
+  parametrização contábil). Pendentes: S-2200/S-2299 (admissão/desligamento), S-1210
+  (pagamentos), totalizadores S-5001/5002/5011 e envio real.
 - **F5**: obrigações assistidas (FGTS Digital, DCTFWeb/Integra Contador opcional, EFD-Reinf,
   Qualificação Cadastral, DET, calendário legal).
 - **F6**: Banking Connector (CNAB 240, dupla aprovação, retorno/conciliação, antifraude) +

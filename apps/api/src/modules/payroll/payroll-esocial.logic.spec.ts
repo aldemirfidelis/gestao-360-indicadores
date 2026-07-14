@@ -2,10 +2,13 @@ import { describe, expect, it } from 'vitest';
 import {
   buildEventId,
   buildInternalBatchXml,
+  buildS1010Xml,
   buildS1200Xml,
+  buildS1299Xml,
   decimalStringToEsocialMoney,
   environmentCode,
   hashXml,
+  rubricTypeCode,
   sanitizeEsocialCode,
 } from './payroll-esocial.logic';
 
@@ -69,5 +72,52 @@ describe('payroll-esocial.logic', () => {
     expect(batch).toContain('<ambiente>2</ambiente>');
     expect(batch).toContain('<totalEventos>1</totalEventos>');
     expect(batch).toContain('<![CDATA[<eSocial>');
+  });
+
+  it('mapeia tpRubr por natureza interna', () => {
+    expect(rubricTypeCode('PROVENTO')).toBe('1');
+    expect(rubricTypeCode('DESCONTO')).toBe('2');
+    expect(rubricTypeCode('BASE')).toBe('4');
+    expect(rubricTypeCode('INFORMATIVA')).toBe('3');
+  });
+
+  it('monta S-1010 (tabela de rubricas) por rubrica', () => {
+    const xml = buildS1010Xml({
+      eventId: 'ID11234567800019020260714123456ABCDE',
+      environment: 'PRODUCTION_RESTRICTED',
+      employerRegistration: '12.345.678/0001-90',
+      rubrics: [
+        { code: '1000', description: 'Salário base', nature: 'PROVENTO', validityRef: '2026-07' },
+        { code: '5501', description: 'INSS', nature: 'DESCONTO', validityRef: '2026-07' },
+      ],
+    });
+
+    expect(xml).toContain('<evtTabRubrica Id="ID11234567800019020260714123456ABCDE">');
+    expect(xml).toContain('<codRubr>1000</codRubr>');
+    expect(xml).toContain('<dscRubr>Salário base</dscRubr>');
+    expect(xml).toContain('<tpRubr>1</tpRubr>');
+    expect(xml).toContain('<tpRubr>2</tpRubr>');
+    expect(xml).toContain('<iniValid>2026-07</iniValid>');
+    // dois blocos de rubrica
+    expect(xml.match(/<infoRubrica>/g)).toHaveLength(2);
+    expect(hashXml(xml)).toHaveLength(64);
+  });
+
+  it('monta S-1299 (fechamento) com responsável e flags de período', () => {
+    const xml = buildS1299Xml({
+      eventId: 'ID11234567800019020260714123456FECHA',
+      environment: 'PRODUCTION_RESTRICTED',
+      periodRef: '2026-07',
+      employerRegistration: '12.345.678/0001-90',
+      responsibleName: 'Maria da Folha',
+      responsibleCpf: '111.222.333-44',
+      hasRemuneration: true,
+    });
+
+    expect(xml).toContain('<evtFechaEvPer Id="ID11234567800019020260714123456FECHA">');
+    expect(xml).toContain('<perApur>2026-07</perApur>');
+    expect(xml).toContain('<cpfResp>11122233344</cpfResp>');
+    expect(xml).toContain('<evtRemun>S</evtRemun>');
+    expect(xml).toContain('<evtPgtos>N</evtPgtos>');
   });
 });

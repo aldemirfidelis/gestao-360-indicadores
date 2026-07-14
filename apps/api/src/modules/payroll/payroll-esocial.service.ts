@@ -6,7 +6,9 @@ import { AuthPayload } from '../auth/auth.types';
 import {
   buildEventId,
   buildInternalBatchXml,
+  buildS1010Xml,
   buildS1200Xml,
+  buildS1299Xml,
   ESOCIAL_LAYOUT_VERSION,
   ESOCIAL_SOURCE_URL,
   hashXml,
@@ -295,6 +297,167 @@ export class PayrollEsocialService {
       layoutVersion: ESOCIAL_LAYOUT_VERSION,
       events: await this.listEvents(me, run.id),
     };
+  }
+
+  /**
+   * S-1010 (Tabela de Rubricas): um evento com todas as rubricas ativas da
+   * empresa, válidas a partir da competência do processamento. Pré-requisito
+   * dos eventos de remuneração; gerado para conferência interna.
+   */
+  async generateRubricTableEvent(me: AuthPayload, runId: string, body: any = {}) {
+    const environment = this.resolveEnvironment(body?.environment);
+    const run = await this.prisma.payrollRun.findFirst({
+      where: { id: runId, companyId: me.companyId },
+      include: { competence: true },
+    });
+    if (!run) throw new NotFoundException('Processamento de folha nao encontrado.');
+    const employerRegistration = await this.employerRegistrationOf(me.companyId);
+    const periodRef = `${run.competence.year}-${String(run.competence.month).padStart(2, '0')}`;
+
+    const rubrics = await this.prisma.payrollRubricDef.findMany({
+      where: { companyId: me.companyId, active: true },
+      orderBy: { code: 'asc' },
+      select: { code: true, name: true, nature: true },
+    });
+    if (!rubrics.length) throw new BadRequestException('Nenhuma rubrica interna cadastrada. Calcule uma folha para semear as rubricas padrao.');
+
+    const createdAt = new Date();
+    const eventId = buildEventId({ employerRegistration, createdAt, seed: `${me.companyId}:S-1010:${periodRef}:${environment}` });
+    const xml = buildS1010Xml({
+      eventId,
+      environment,
+      employerRegistration,
+      rubrics: rubrics.map((rubric) => ({ code: rubric.code, description: rubric.name, nature: rubric.nature, validityRef: periodRef })),
+    });
+    const issues = ['S-1010 simplificado: natRubr e codIncCP/IRRF/FGTS ficam em branco e exigem parametrizacao/validacao contabil antes de qualquer transmissao.'];
+
+    await this.upsertSingletonEvent(me, {
+      runId: run.id,
+      competenceId: run.competenceId,
+      periodRef,
+      eventType: 'S-1010',
+      environment,
+      eventId,
+      xml,
+      payload: { source: 'rubric-table', rubricCount: rubrics.length, periodRef, environment, sourceUrl: ESOCIAL_SOURCE_URL },
+      issues,
+    });
+    return { created: 1, eventType: 'S-1010', rubricCount: rubrics.length, environment, layoutVersion: ESOCIAL_LAYOUT_VERSION, events: await this.listEvents(me, run.id) };
+  }
+
+  /**
+   * S-1299 (Fechamento dos Eventos Periódicos): encerra a apuração do período
+   * para conferência interna. Exige eventos de remuneração já gerados no run.
+   */
+  async generateClosingEvent(me: AuthPayload, runId: string, body: any = {}) {
+    const environment = this.resolveEnvironment(body?.environment);
+    const run = await this.prisma.payrollRun.findFirst({
+      where: { id: runId, companyId: me.companyId },
+      include: { competence: true },
+    });
+    if (!run) throw new NotFoundException('Processamento de folha nao encontrado.');
+    const periodRef = `${run.competence.year}-${String(run.competence.month).padStart(2, '0')}`;
+    const remunCount = await this.prisma.payrollEsocialEvent.count({
+      where: { companyId: me.companyId, runId: run.id, environment, eventType: 'S-1200' },
+    });
+    if (remunCount === 0) throw new ConflictException('Gere os eventos de remuneracao (S-1200) antes de fechar o periodo.');
+
+    const employerRegistration = await this.employerRegistrationOf(me.companyId);
+    const [responsible, responsibleProfile] = await Promise.all([
+      this.prisma.user.findFirst({ where: { id: me.sub, companyId: me.companyId }, select: { name: true } }),
+      // CPF do responsável vem do prontuário vinculado ao login (via OrgEmployee.userId).
+      this.prisma.personnelEmployeeProfile.findFirst({ where: { companyId: me.companyId, userId: me.sub }, select: { cpf: true } }),
+    ]);
+    const responsibleCpf = onlyDigits(responsibleProfile?.cpf ?? body?.responsibleCpf);
+
+    const createdAt = new Date();
+    const eventId = buildEventId({ employerRegistration, createdAt, seed: `${me.companyId}:S-1299:${periodRef}:${environment}` });
+    const xml = buildS1299Xml({
+      eventId,
+      environment,
+      periodRef,
+      employerRegistration,
+      responsibleName: responsible?.name ?? 'Responsavel pela folha',
+      responsibleCpf,
+      hasRemuneration: true,
+    });
+    const issues = ['Fechamento interno (S-1299) para conferencia. Nao substitui o fechamento oficial no ambiente do eSocial.'];
+    if (!responsibleCpf) issues.push('CPF do responsavel ausente (prontuario sem CPF) — informe antes de transmitir.');
+
+    await this.upsertSingletonEvent(me, {
+      runId: run.id,
+      competenceId: run.competenceId,
+      periodRef,
+      eventType: 'S-1299',
+      environment,
+      eventId,
+      xml,
+      payload: { source: 'period-closing', periodRef, environment, remunCount, sourceUrl: ESOCIAL_SOURCE_URL },
+      issues,
+    });
+    return { created: 1, eventType: 'S-1299', environment, layoutVersion: ESOCIAL_LAYOUT_VERSION, events: await this.listEvents(me, run.id) };
+  }
+
+  /**
+   * Upsert idempotente de um evento "singleton" do run (S-1010/S-1299): remove
+   * a versão anterior não empacotada e recria; bloqueia se já está em lote.
+   */
+  private async upsertSingletonEvent(me: AuthPayload, input: {
+    runId: string;
+    competenceId: string;
+    periodRef: string;
+    eventType: string;
+    environment: EsocialEnvironment;
+    eventId: string;
+    xml: string;
+    payload: Record<string, unknown>;
+    issues: string[];
+  }) {
+    const batched = await this.prisma.payrollEsocialEvent.findFirst({
+      where: { companyId: me.companyId, runId: input.runId, eventType: input.eventType, environment: input.environment, batchId: { not: null } },
+      select: { id: true },
+    });
+    if (batched) throw new ConflictException(`Ja existe ${input.eventType} em lote para este processamento. Reabra/cancele antes de regenerar.`);
+
+    await this.prisma.$transaction(async (tx) => {
+      await tx.payrollEsocialEvent.deleteMany({
+        where: { companyId: me.companyId, runId: input.runId, eventType: input.eventType, environment: input.environment, batchId: null },
+      });
+      await tx.payrollEsocialEvent.create({
+        data: {
+          companyId: me.companyId,
+          runId: input.runId,
+          competenceId: input.competenceId,
+          periodRef: input.periodRef,
+          eventType: input.eventType,
+          environment: input.environment,
+          layoutVersion: ESOCIAL_LAYOUT_VERSION,
+          eventId: input.eventId,
+          status: input.issues.length ? 'XML_GENERATED_WITH_WARNINGS' : 'XML_GENERATED',
+          xml: input.xml,
+          xmlHash: hashXml(input.xml),
+          payload: input.payload as Prisma.InputJsonValue,
+          issues: input.issues.length ? input.issues : undefined,
+          createdById: me.sub,
+        },
+      });
+    }, { timeout: 60_000, maxWait: 20_000 });
+
+    await this.audit.record(me, {
+      module: MODULE,
+      entity: 'PayrollEsocialEvent',
+      entityId: input.runId,
+      action: 'GENERATE',
+      message: `Evento ${input.eventType} gerado para ${input.periodRef}`,
+      after: { eventType: input.eventType, environment: input.environment },
+    });
+  }
+
+  private async employerRegistrationOf(companyId: string): Promise<string> {
+    const company = await this.prisma.company.findUnique({ where: { id: companyId }, select: { cnpj: true } });
+    const registration = onlyDigits(company?.cnpj);
+    if (!registration) throw new BadRequestException('CNPJ da empresa ausente. Cadastre antes de gerar eventos eSocial.');
+    return registration;
   }
 
   // ------------------------------ lotes ------------------------------

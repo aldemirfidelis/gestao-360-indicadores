@@ -33,7 +33,17 @@ export interface EsocialBatchEvent {
 }
 
 const NS_REMUN = 'http://www.esocial.gov.br/schema/evt/evtRemun/v_S_01_03_00';
+const NS_TAB_RUBRICA = 'http://www.esocial.gov.br/schema/evt/evtTabRubrica/v_S_01_03_00';
+const NS_FECHA = 'http://www.esocial.gov.br/schema/evt/evtFechaEvPer/v_S_01_03_00';
 const VERSION_PROC = 'G360-0.1';
+
+/** Código eSocial tpRubr por natureza interna (1 provento, 2 desconto, 3 informativa, 4 info dedutora). */
+export function rubricTypeCode(nature: string): '1' | '2' | '3' | '4' {
+  if (nature === 'PROVENTO') return '1';
+  if (nature === 'DESCONTO') return '2';
+  if (nature === 'BASE') return '4';
+  return '3'; // INFORMATIVA
+}
 
 export function onlyDigits(value: string | null | undefined): string {
   return String(value ?? '').replace(/\D/g, '');
@@ -128,6 +138,121 @@ export function buildS1200Xml(input: EsocialRemunerationEvent): string {
     '      </infoPerApur>',
     '    </dmDev>',
     '  </evtRemun>',
+    '</eSocial>',
+  ].join('\n');
+}
+
+export interface EsocialRubricTableItem {
+  code: string;
+  description: string;
+  nature: string;
+  /** Início de validade YYYY-MM (competência a partir da qual a rubrica vale). */
+  validityRef: string;
+}
+
+export interface EsocialRubricTableEvent {
+  eventId: string;
+  environment: EsocialEnvironment;
+  employerRegistration: string;
+  rubrics: EsocialRubricTableItem[];
+}
+
+/**
+ * S-1010 (Tabela de Rubricas) simplificado: espelha as rubricas internas para
+ * conferência antes de qualquer transmissão. ⚠️ natRubr e os códigos oficiais
+ * de incidência (codIncCP/IRRF/FGTS) exigem parametrização por rubrica — aqui
+ * saem em branco e devem ser preenchidos com validação da contabilidade.
+ */
+export function buildS1010Xml(input: EsocialRubricTableEvent): string {
+  const employerRoot = onlyDigits(input.employerRegistration).slice(0, 8);
+  const rubrics = input.rubrics
+    .map((rubric) =>
+      [
+        '    <infoRubrica>',
+        '      <inclusao>',
+        '        <ideRubrica>',
+        `          <codRubr>${xmlEscape(sanitizeEsocialCode(rubric.code, 'G360', 30))}</codRubr>`,
+        '          <ideTabRubr>G360</ideTabRubr>',
+        `          <iniValid>${xmlEscape(rubric.validityRef)}</iniValid>`,
+        '        </ideRubrica>',
+        '        <dadosRubrica>',
+        `          <dscRubr>${xmlEscape(rubric.description.slice(0, 100))}</dscRubr>`,
+        '          <natRubr></natRubr>',
+        `          <tpRubr>${rubricTypeCode(rubric.nature)}</tpRubr>`,
+        '          <codIncCP></codIncCP>',
+        '          <codIncIRRF></codIncIRRF>',
+        '          <codIncFGTS></codIncFGTS>',
+        '        </dadosRubrica>',
+        '      </inclusao>',
+        '    </infoRubrica>',
+      ].join('\n'),
+    )
+    .join('\n');
+
+  return [
+    '<?xml version="1.0" encoding="UTF-8"?>',
+    `<eSocial xmlns="${NS_TAB_RUBRICA}">`,
+    `  <evtTabRubrica Id="${xmlEscape(input.eventId)}">`,
+    '    <ideEvento>',
+    `      <tpAmb>${environmentCode(input.environment)}</tpAmb>`,
+    '      <procEmi>1</procEmi>',
+    `      <verProc>${VERSION_PROC}</verProc>`,
+    '    </ideEvento>',
+    '    <ideEmpregador>',
+    '      <tpInsc>1</tpInsc>',
+    `      <nrInsc>${xmlEscape(employerRoot)}</nrInsc>`,
+    '    </ideEmpregador>',
+    rubrics,
+    '  </evtTabRubrica>',
+    '</eSocial>',
+  ].join('\n');
+}
+
+export interface EsocialClosingEvent {
+  eventId: string;
+  environment: EsocialEnvironment;
+  periodRef: string;
+  employerRegistration: string;
+  responsibleName: string;
+  responsibleCpf: string;
+  /** Houve eventos de remuneração no período? (evtRemun S/N). */
+  hasRemuneration: boolean;
+}
+
+/**
+ * S-1299 (Fechamento dos Eventos Periódicos) simplificado: encerra a apuração
+ * do período para conferência interna. Não solicita totalizadores ao governo.
+ */
+export function buildS1299Xml(input: EsocialClosingEvent): string {
+  const employerRoot = onlyDigits(input.employerRegistration).slice(0, 8);
+  return [
+    '<?xml version="1.0" encoding="UTF-8"?>',
+    `<eSocial xmlns="${NS_FECHA}">`,
+    `  <evtFechaEvPer Id="${xmlEscape(input.eventId)}">`,
+    '    <ideEvento>',
+    '      <indApuracao>1</indApuracao>',
+    `      <perApur>${xmlEscape(input.periodRef)}</perApur>`,
+    `      <tpAmb>${environmentCode(input.environment)}</tpAmb>`,
+    '      <procEmi>1</procEmi>',
+    `      <verProc>${VERSION_PROC}</verProc>`,
+    '    </ideEvento>',
+    '    <ideEmpregador>',
+    '      <tpInsc>1</tpInsc>',
+    `      <nrInsc>${xmlEscape(employerRoot)}</nrInsc>`,
+    '    </ideEmpregador>',
+    '    <ideRespInf>',
+    `      <nmResp>${xmlEscape(input.responsibleName.slice(0, 70))}</nmResp>`,
+    `      <cpfResp>${xmlEscape(onlyDigits(input.responsibleCpf))}</cpfResp>`,
+    '    </ideRespInf>',
+    '    <infoFech>',
+    `      <evtRemun>${input.hasRemuneration ? 'S' : 'N'}</evtRemun>`,
+    '      <evtPgtos>N</evtPgtos>',
+    '      <evtAqProd>N</evtAqProd>',
+    '      <evtComProd>N</evtComProd>',
+    '      <evtContratAvNP>N</evtContratAvNP>',
+    '      <evtInfoComplPer>N</evtInfoComplPer>',
+    '    </infoFech>',
+    '  </evtFechaEvPer>',
     '</eSocial>',
   ].join('\n');
 }

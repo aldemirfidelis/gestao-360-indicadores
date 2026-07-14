@@ -221,6 +221,18 @@ export class PayrollController {
     return this.esocial.generateRunEvents(me, id, body);
   }
 
+  @Post('runs/:id/esocial/rubric-table')
+  @RequirePermissions('folha:esocial')
+  generateEsocialRubricTable(@CurrentUser() me: AuthPayload, @Param('id') id: string, @Body() body: any) {
+    return this.esocial.generateRubricTableEvent(me, id, body);
+  }
+
+  @Post('runs/:id/esocial/closing')
+  @RequirePermissions('folha:esocial')
+  generateEsocialClosing(@CurrentUser() me: AuthPayload, @Param('id') id: string, @Body() body: any) {
+    return this.esocial.generateClosingEvent(me, id, body);
+  }
+
   @Get('esocial/batches')
   @RequirePermissions('folha:esocial')
   listEsocialBatches(@CurrentUser() me: AuthPayload, @Query('runId') runId?: string) {

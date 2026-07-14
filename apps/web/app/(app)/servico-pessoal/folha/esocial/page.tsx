@@ -170,6 +170,24 @@ export default function PayrollEsocialPage() {
     onError: (err: any) => toast.error(err.message || 'Erro ao gerar eventos eSocial.'),
   });
 
+  const generateRubricTable = useMutation({
+    mutationFn: () => api<{ rubricCount: number }>(`/payroll/runs/${effectiveRun}/esocial/rubric-table`, { method: 'POST', json: { environment: 'PRODUCTION_RESTRICTED' } }),
+    onSuccess: (data) => {
+      toast.success(`S-1010 gerado com ${data.rubricCount} rubrica(s).`);
+      void qc.invalidateQueries({ queryKey: ['payroll-esocial-events', effectiveRun] });
+    },
+    onError: (err: any) => toast.error(err.message || 'Erro ao gerar S-1010.'),
+  });
+
+  const generateClosing = useMutation({
+    mutationFn: () => api<{ created: number }>(`/payroll/runs/${effectiveRun}/esocial/closing`, { method: 'POST', json: { environment: 'PRODUCTION_RESTRICTED' } }),
+    onSuccess: () => {
+      toast.success('Fechamento S-1299 gerado.');
+      void qc.invalidateQueries({ queryKey: ['payroll-esocial-events', effectiveRun] });
+    },
+    onError: (err: any) => toast.error(err.message || 'Erro ao gerar S-1299.'),
+  });
+
   const createBatch = useMutation({
     mutationFn: () => api<EsocialBatch>('/payroll/esocial/batches', { method: 'POST', json: { eventIds: selectedEvents, certificateId: selectedCertificate || undefined } }),
     onSuccess: () => {
@@ -277,7 +295,7 @@ export default function PayrollEsocialPage() {
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold">S-1.3</div>
-            <p className="mt-1 text-xs text-muted-foreground">Eventos S-1200</p>
+            <p className="mt-1 text-xs text-muted-foreground">S-1010 / S-1200 / S-1299</p>
           </CardContent>
         </Card>
       </div>
@@ -285,16 +303,24 @@ export default function PayrollEsocialPage() {
       <Card className="border-border/60">
         <CardHeader>
           <CardTitle>Processamento de Origem</CardTitle>
-          <CardDescription>Selecione uma folha calculada para gerar eventos de remuneração</CardDescription>
+          <CardDescription>Fluxo periódico do período: tabela de rubricas (S-1010) → remuneração (S-1200) → fechamento (S-1299). Tudo em produção restrita, sem assinatura/transmissão.</CardDescription>
         </CardHeader>
-        <CardContent className="grid gap-3 md:grid-cols-[1fr_auto]">
+        <CardContent className="space-y-3">
           <NativeSelect value={effectiveRun} onChange={(event) => { setSelectedRun(event.target.value); setSelectedEvents([]); }}>
             {runs.length === 0 && <option value="">Nenhum processamento encontrado</option>}
             {runs.map((run) => <option key={run.id} value={run.id}>{run.label}</option>)}
           </NativeSelect>
-          <Button onClick={() => generateEvents.mutate()} disabled={!effectiveRun || generateEvents.isPending}>
-            <FileCode2 className="mr-2 h-4 w-4" /> Gerar XML
-          </Button>
+          <div className="flex flex-wrap gap-2">
+            <Button variant="outline" onClick={() => generateRubricTable.mutate()} disabled={!effectiveRun || generateRubricTable.isPending}>
+              <Binary className="mr-2 h-4 w-4" /> S-1010 Rubricas
+            </Button>
+            <Button onClick={() => generateEvents.mutate()} disabled={!effectiveRun || generateEvents.isPending}>
+              <FileCode2 className="mr-2 h-4 w-4" /> S-1200 Remuneração
+            </Button>
+            <Button variant="outline" onClick={() => generateClosing.mutate()} disabled={!effectiveRun || generateClosing.isPending}>
+              <PackagePlus className="mr-2 h-4 w-4" /> S-1299 Fechamento
+            </Button>
+          </div>
         </CardContent>
       </Card>
 
