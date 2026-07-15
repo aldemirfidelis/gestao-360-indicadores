@@ -213,6 +213,18 @@ export class PayrollController {
     return this.runs.getMyPayslipMemory(me, id);
   }
 
+  /** Informe de rendimentos anual do próprio colaborador (portal). */
+  @Get('my-income-report')
+  myIncomeReport(@CurrentUser() me: AuthPayload, @Query('year') year?: string) {
+    return this.runs.myIncomeReport(me, Number(year) || new Date().getFullYear() - 1);
+  }
+
+  @Get('employees/:employeeId/income-report')
+  @RequirePermissions('folha:view')
+  incomeReport(@CurrentUser() me: AuthPayload, @Param('employeeId') employeeId: string, @Query('year') year?: string) {
+    return this.runs.incomeReport(me, employeeId, Number(year) || new Date().getFullYear() - 1);
+  }
+
   // ------------------------------ rubricas e parâmetros legais ------------------------------
 
   @Get('rubrics')

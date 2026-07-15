@@ -696,6 +696,69 @@ export class PayrollRunService {
     return { ...worker, employee };
   }
 
+  /**
+   * Informe de rendimentos anual do próprio colaborador: agrega os
+   * processamentos FECHADOS do ano (tributável, IRRF, INSS, 13º), para
+   * conferência. ⚠️ Não substitui o comprovante oficial da Receita.
+   */
+  async myIncomeReport(me: AuthPayload, year: number) {
+    const employee = await this.prisma.orgEmployee.findFirst({
+      where: { companyId: me.companyId, personnelProfile: { userId: me.sub } },
+      select: { id: true, name: true, personnelProfile: { select: { cpf: true } } },
+    });
+    if (!employee) return { year, employee: null, months: [], totals: null };
+    return this.incomeReportFor(me.companyId, employee.id, employee.name, employee.personnelProfile?.cpf ?? null, year);
+  }
+
+  /** Informe de rendimentos de um colaborador (visão do DP/folha). */
+  async incomeReport(me: AuthPayload, employeeId: string, year: number) {
+    const employee = await this.prisma.orgEmployee.findFirst({
+      where: { id: employeeId, companyId: me.companyId },
+      select: { name: true, personnelProfile: { select: { cpf: true } } },
+    });
+    if (!employee) throw new NotFoundException('Colaborador não encontrado.');
+    return this.incomeReportFor(me.companyId, employeeId, employee.name, employee.personnelProfile?.cpf ?? null, year);
+  }
+
+  private async incomeReportFor(companyId: string, employeeId: string, name: string, cpf: string | null, year: number) {
+    const workers = await this.prisma.payrollRunWorker.findMany({
+      where: {
+        companyId,
+        employeeId,
+        status: 'CALCULATED',
+        run: { status: 'CLOSED', competence: { year } },
+      },
+      select: {
+        totalEarnings: true, netPay: true, inssValue: true, irrfValue: true, irrfBase: true, fgtsValue: true,
+        run: { select: { kind: true, competence: { select: { month: true } } } },
+      },
+    });
+    const num = (v: { toString(): string }) => Number(v.toString());
+    const months = workers
+      .map((w) => ({
+        month: w.run.competence.month,
+        kind: w.run.kind,
+        earnings: num(w.totalEarnings),
+        inss: num(w.inssValue),
+        irrf: num(w.irrfValue),
+        irrfBase: num(w.irrfBase),
+        net: num(w.netPay),
+        fgts: num(w.fgtsValue),
+      }))
+      .sort((a, b) => a.month - b.month);
+    const totals = months.reduce(
+      (acc, m) => ({
+        earnings: acc.earnings + m.earnings,
+        inss: acc.inss + m.inss,
+        irrf: acc.irrf + m.irrf,
+        fgts: acc.fgts + m.fgts,
+        taxable: acc.taxable + m.irrfBase,
+      }),
+      { earnings: 0, inss: 0, irrf: 0, fgts: 0, taxable: 0 },
+    );
+    return { year, employee: { id: employeeId, name, cpf }, months, totals };
+  }
+
   // ------------------------------ helpers ------------------------------
 
   /** Semeia as rubricas internas (versão 1) e devolve code → versionId vigente. */
