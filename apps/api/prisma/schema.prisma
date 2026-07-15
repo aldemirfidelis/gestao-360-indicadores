@@ -11998,14 +11998,14 @@ model TimesheetPeriodVersion {
 /// Batida de ponto. Imutável (ajustes cancelam e recriam com origem MANUAL);
 /// `hash`/`prevHash` formam cadeia técnica de integridade por usuário; não são AFD/ARP.
 model TimeClockEntry {
-  id                  String   @id @default(uuid())
+  id                  String    @id @default(uuid())
   companyId           String
   userId              String
   punchedAt           DateTime
   dayKey              String // YYYY-MM-DD no fuso da empresa (America/Sao_Paulo)
   kind                String // IN | OUT (alternância derivada na batida)
-  source              String   @default("WEB") // WEB | MOBILE | MANUAL | IMPORT
-  status              String   @default("VALID") // VALID | CANCELLED
+  source              String    @default("WEB") // WEB | MOBILE | MANUAL | IMPORT
+  status              String    @default("VALID") // VALID | CANCELLED
   latitude            Float?
   longitude           Float?
   accuracy            Float?
@@ -12027,14 +12027,14 @@ model TimeClockEntry {
   sequenceScope       String
   nsr                 BigInt
   createdById         String?
-  createdAt           DateTime @default(now())
+  createdAt           DateTime  @default(now())
 
   receiptSnapshot TimeClockReceiptSnapshot?
   treatments      TimeClockEntryTreatment[]
 
+  @@unique([companyId, sequenceScope, nsr])
   @@index([companyId, userId, dayKey])
   @@index([companyId, dayKey])
-  @@unique([companyId, sequenceScope, nsr])
   @@map("time_clock_entries")
 }
 
@@ -12059,18 +12059,18 @@ model TimeClockEntryTreatment {
 /// Snapshot mínimo e imutável usado no extrato interno da marcação. Os
 /// identificadores são armazenados já mascarados para não duplicar CPF/CNPJ.
 model TimeClockReceiptSnapshot {
-  id                          String         @id @default(uuid())
-  companyId                   String
-  entryId                     String         @unique
-  entry                       TimeClockEntry @relation(fields: [entryId], references: [id], onDelete: Restrict)
-  companyName                 String
+  id                         String         @id @default(uuid())
+  companyId                  String
+  entryId                    String         @unique
+  entry                      TimeClockEntry @relation(fields: [entryId], references: [id], onDelete: Restrict)
+  companyName                String
   companyRegistrationMasked  String?
-  employeeName                String
+  employeeName               String
   employeeRegistrationMasked String?
-  timezone                    String         @default("America/Sao_Paulo")
-  snapshotOrigin              String         @default("PUNCH")
-  checksum                    String
-  capturedAt                  DateTime       @default(now())
+  timezone                   String         @default("America/Sao_Paulo")
+  snapshotOrigin             String         @default("PUNCH")
+  checksum                   String
+  capturedAt                 DateTime       @default(now())
 
   @@index([companyId, capturedAt])
   @@map("time_clock_receipt_snapshots")
@@ -12084,7 +12084,7 @@ model TimesheetCalculationMemory {
   userId           String
   dayKey           String
   algorithmVersion String
-  inputHash         String
+  inputHash        String
   snapshot         Json
   calculatedById   String?
   calculatedAt     DateTime @default(now())
@@ -12226,19 +12226,19 @@ model AttendanceOccurrence {
 /// Política de banco de horas da empresa. Padrão CLT (validade de 6 meses no
 /// acordo individual) configurável dentro do limite legal (12 meses, CCT).
 model TimeBankPolicy {
-  id                String   @id @default(uuid())
-  companyId         String   @unique
-  enabled           Boolean  @default(true)
+  id                 String   @id @default(uuid())
+  companyId          String   @unique
+  enabled            Boolean  @default(true)
   /// Meses de validade do crédito (1..12). CLT: 6 (acordo individual) a 12 (CCT).
-  validityMonths    Int      @default(6)
+  validityMonths     Int      @default(6)
   /// Tetos opcionais de saldo (minutos). Nulo = sem teto.
   maxPositiveMinutes Int?
   maxNegativeMinutes Int?
   /// O que fazer com o crédito vencido: EXPIRE (perde) | PAYOUT (marca p/ pagamento).
-  expirationAction  String   @default("PAYOUT")
-  updatedById       String?
-  createdAt         DateTime @default(now())
-  updatedAt         DateTime @updatedAt
+  expirationAction   String   @default("PAYOUT")
+  updatedById        String?
+  createdAt          DateTime @default(now())
+  updatedAt          DateTime @updatedAt
 
   @@map("time_bank_policies")
 }
@@ -12409,29 +12409,29 @@ model PayrollCompetence {
 /// CALCULATED | WITH_ISSUES → AWAITING_APPROVAL → APPROVED → CLOSED, com
 /// REOPENED (justificativa + permissão própria) e CANCELLED. eSocial/banco (F4/F6).
 model PayrollRun {
-  id           String                       @id @default(uuid())
-  companyId    String
-  competenceId String
-  competence   PayrollCompetence            @relation(fields: [competenceId], references: [id], onDelete: Restrict)
-  kind         String                       @default("MENSAL") // MENSAL (F1) | ADIANTAMENTO/FERIAS/13o/RESCISAO... (F3)
-  status       String                       @default("DRAFT")
-  version      Int                          @default(1)
+  id             String                       @id @default(uuid())
+  companyId      String
+  competenceId   String
+  competence     PayrollCompetence            @relation(fields: [competenceId], references: [id], onDelete: Restrict)
+  kind           String                       @default("MENSAL") // MENSAL (F1) | ADIANTAMENTO/FERIAS/13o/RESCISAO... (F3)
+  status         String                       @default("DRAFT")
+  version        Int                          @default(1)
   /// Congela quais versões de tabelas legais o cálculo usou (kind → versionId).
-  legalRefs    Json?
-  issues       Json?
-  totals       Json?
-  calculatedAt DateTime?
+  legalRefs      Json?
+  issues         Json?
+  totals         Json?
+  calculatedAt   DateTime?
   calculatedById String?
-  approvedById String?
-  approvedAt   DateTime?
-  closedById   String?
-  closedAt     DateTime?
-  reopenNote   String?
-  createdById  String?
-  createdAt    DateTime                     @default(now())
-  updatedAt    DateTime                     @updatedAt
-  workers      PayrollRunWorker[]
-  snapshots    PayrollTimekeepingSnapshot[]
+  approvedById   String?
+  approvedAt     DateTime?
+  closedById     String?
+  closedAt       DateTime?
+  reopenNote     String?
+  createdById    String?
+  createdAt      DateTime                     @default(now())
+  updatedAt      DateTime                     @updatedAt
+  workers        PayrollRunWorker[]
+  snapshots      PayrollTimekeepingSnapshot[]
 
   @@index([companyId, competenceId])
   @@map("payroll_runs")
@@ -12528,15 +12528,15 @@ model PayrollWorkerSettings {
 /// no banco: apenas referencias externas (cofre/env/secret manager) sao
 /// persistidas. A assinatura real depende de um adaptador de cofre aprovado.
 model PayrollDigitalCertificate {
-  id                String   @id @default(uuid())
+  id                String    @id @default(uuid())
   companyId         String
   name              String
   holderName        String?
   holderCpfCnpj     String?
-  kind              String   @default("A1") // A1 por enquanto; A3/HSM exigem adaptador dedicado.
+  kind              String    @default("A1") // A1 por enquanto; A3/HSM exigem adaptador dedicado.
   /// EXTERNAL_REF/ENV_REF = só referência a cofre/env; ENCRYPTED_DB = PFX+senha
   /// cifrados (AES-256-GCM) guardados aqui, decifrados só em memória ao assinar.
-  storageMode       String   @default("EXTERNAL_REF") // EXTERNAL_REF | ENV_REF | ENCRYPTED_DB
+  storageMode       String    @default("EXTERNAL_REF") // EXTERNAL_REF | ENV_REF | ENCRYPTED_DB
   pfxSecretRef      String?
   passwordSecretRef String?
   /// Blob do .pfx cifrado (base64 dentro do envelope AES-GCM) — nunca em texto puro.
@@ -12547,13 +12547,13 @@ model PayrollDigitalCertificate {
   subjectName       String?
   validFrom         DateTime?
   validUntil        DateTime?
-  status            String   @default("ACTIVE") // ACTIVE | EXPIRED | REVOKED | INACTIVE
+  status            String    @default("ACTIVE") // ACTIVE | EXPIRED | REVOKED | INACTIVE
   lastTestedAt      DateTime?
   lastTestStatus    String?
   notes             String?
   createdById       String?
-  createdAt         DateTime @default(now())
-  updatedAt         DateTime @updatedAt
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
 
   batches PayrollEsocialBatch[]
 
@@ -12600,32 +12600,32 @@ model PayrollEsocialEvent {
 /// Lote eSocial assistido. Enquanto nao houver cofre/assinador homologado, o
 /// status permanece STAGED_UNSIGNED e nao existe rota de transmissao ao governo.
 model PayrollEsocialBatch {
-  id             String                     @id @default(uuid())
-  companyId      String
-  runId          String?
-  competenceId   String?
-  periodRef      String?
-  certificateId  String?
-  certificate    PayrollDigitalCertificate? @relation(fields: [certificateId], references: [id], onDelete: SetNull)
-  environment    String                     @default("PRODUCTION_RESTRICTED")
-  layoutVersion  String                     @default("S-1.3")
-  status         String                     @default("STAGED_UNSIGNED")
-  eventCount     Int                        @default(0)
-  xml            String?
-  xmlHash        String?
-  protocolNumber String?
-  receiptJson    Json?
-  issues         Json?
+  id                  String                     @id @default(uuid())
+  companyId           String
+  runId               String?
+  competenceId        String?
+  periodRef           String?
+  certificateId       String?
+  certificate         PayrollDigitalCertificate? @relation(fields: [certificateId], references: [id], onDelete: SetNull)
+  environment         String                     @default("PRODUCTION_RESTRICTED")
+  layoutVersion       String                     @default("S-1.3")
+  status              String                     @default("STAGED_UNSIGNED")
+  eventCount          Int                        @default(0)
+  xml                 String?
+  xmlHash             String?
+  protocolNumber      String?
+  receiptJson         Json?
+  issues              Json?
   /// Transmissão SOAP: STAGED | DRY_RUN | SENT | PROCESSED | REJECTED | ERROR.
-  transmissionStatus String?
-  transmittedAt      DateTime?
+  transmissionStatus  String?
+  transmittedAt       DateTime?
   /// Endpoint efetivamente usado (auditoria) e envelope enviado/resposta crua.
-  transmitEndpoint   String?
-  transmitRequestXml String?
+  transmitEndpoint    String?
+  transmitRequestXml  String?
   transmitResponseXml String?
-  createdById    String?
-  createdAt      DateTime                   @default(now())
-  updatedAt      DateTime                   @updatedAt
+  createdById         String?
+  createdAt           DateTime                   @default(now())
+  updatedAt           DateTime                   @updatedAt
 
   events PayrollEsocialEvent[]
 
@@ -12665,30 +12665,30 @@ model PersonnelEmployeeProfile {
   /// Vínculo opcional com o login (autoatendimento/ponto).
   userId     String?
 
-  cpf            String?
-  rg             String?
-  pisPasep       String?
-  ctpsNumber     String?
-  birthDate      DateTime?
-  phone          String?
-  personalEmail  String?
-  address        String?
-  city           String?
-  state          String?
-  zipCode        String?
-  maritalStatus  String?
-  educationLevel String?
+  cpf              String?
+  rg               String?
+  pisPasep         String?
+  ctpsNumber       String?
+  birthDate        DateTime?
+  phone            String?
+  personalEmail    String?
+  address          String?
+  city             String?
+  state            String?
+  zipCode          String?
+  maritalStatus    String?
+  educationLevel   String?
   /// eSocial: sexo (M/F) e raça/cor (código da Tabela 12) do trabalhador.
-  sex            String?
-  raceColor      String?
+  sex              String?
+  raceColor        String?
   /// Dados bancários para pagamento da folha (CNAB/PIX).
-  bankCode        String?
-  bankAgency      String?
-  bankAccount     String?
+  bankCode         String?
+  bankAgency       String?
+  bankAccount      String?
   bankAccountDigit String?
-  pixKey          String?
+  pixKey           String?
   /// Quando os dados bancários mudaram (antifraude: alteração recente).
-  bankUpdatedAt   DateTime?
+  bankUpdatedAt    DateTime?
 
   contractType    String? // CLT | PJ | ESTAGIO | APRENDIZ | TEMPORARIO | AUTONOMO
   workRegime      String? // PRESENCIAL | HIBRIDO | REMOTO
@@ -13553,6 +13553,7 @@ model InventoryCountItem {
   @@index([companyId, itemId])
   @@map("supply_inventory_count_items")
 }
+
 model WithdrawalApprovalPolicy {
   id             String    @id @default(uuid())
   companyId      String
@@ -13602,15 +13603,15 @@ model PayrollBankConfig {
 /// Lote de pagamento bancário de um processamento de folha (Fase 6). Segregação
 /// de funções: quem cria não aprova; a exportação da remessa exige aprovação.
 model PayrollBankBatch {
-  id             String             @id @default(uuid())
+  id             String            @id @default(uuid())
   companyId      String
   runId          String
   periodRef      String
   paymentDate    DateTime
   /// DRAFT | PENDING_APPROVAL | APPROVED | EXPORTED | RETURNED | RECONCILED | CANCELLED
-  status         String             @default("DRAFT")
-  itemCount      Int                @default(0)
-  totalCents     Int                @default(0)
+  status         String            @default("DRAFT")
+  itemCount      Int               @default(0)
+  totalCents     Int               @default(0)
   antifraud      Json? // alertas antifraude no momento da montagem
   remessaContent String? // CNAB 240 gerado
   remessaHash    String?
@@ -13620,8 +13621,8 @@ model PayrollBankBatch {
   approvedAt     DateTime?
   exportedById   String?
   exportedAt     DateTime?
-  createdAt      DateTime           @default(now())
-  updatedAt      DateTime           @updatedAt
+  createdAt      DateTime          @default(now())
+  updatedAt      DateTime          @updatedAt
   items          PayrollBankItem[]
 
   @@index([companyId, runId])
@@ -13630,22 +13631,22 @@ model PayrollBankBatch {
 }
 
 model PayrollBankItem {
-  id          String           @id @default(uuid())
-  companyId   String
-  batchId     String
-  batch       PayrollBankBatch @relation(fields: [batchId], references: [id], onDelete: Cascade)
-  employeeId  String
-  name        String
-  bankCode    String?
-  agency      String?
-  account     String?
+  id           String           @id @default(uuid())
+  companyId    String
+  batchId      String
+  batch        PayrollBankBatch @relation(fields: [batchId], references: [id], onDelete: Cascade)
+  employeeId   String
+  name         String
+  bankCode     String?
+  agency       String?
+  account      String?
   accountDigit String?
-  pixKey      String?
-  netCents    Int
+  pixKey       String?
+  netCents     Int
   /// PENDING | PAID | REJECTED
-  status      String           @default("PENDING")
-  returnCode  String?
-  createdAt   DateTime         @default(now())
+  status       String           @default("PENDING")
+  returnCode   String?
+  createdAt    DateTime         @default(now())
 
   @@index([companyId, batchId])
   @@map("payroll_bank_items")
@@ -13655,25 +13656,25 @@ model PayrollBankItem {
 /// Qualificação Cadastral, DET. Modo assistido — organiza prazo/checklist/
 /// comprovantes; a transmissão/pagamento é feita pela empresa no portal oficial.
 model PayrollObligation {
-  id           String    @id @default(uuid())
-  companyId    String
-  kind         String // FGTS_DIGITAL | DCTFWEB | EFD_REINF | QUALIF_CADASTRAL | DET | ESOCIAL_FECHAMENTO
-  periodRef    String // YYYY-MM
-  title        String
-  dueDate      DateTime?
+  id            String    @id @default(uuid())
+  companyId     String
+  kind          String // FGTS_DIGITAL | DCTFWEB | EFD_REINF | QUALIF_CADASTRAL | DET | ESOCIAL_FECHAMENTO
+  periodRef     String // YYYY-MM
+  title         String
+  dueDate       DateTime?
   /// PENDING | IN_PROGRESS | SUBMITTED | PAID | DONE | NA
-  status       String    @default("PENDING")
-  amountCents  Int?
-  protocol     String?
-  officialUrl  String?
-  checklist    Json? // [{ label, done }]
-  attachments  Json? // [{ name, note, storageKey?, uploadedAt }]
-  resultJson   Json? // Qualificação Cadastral: divergências etc.
-  notes        String?
+  status        String    @default("PENDING")
+  amountCents   Int?
+  protocol      String?
+  officialUrl   String?
+  checklist     Json? // [{ label, done }]
+  attachments   Json? // [{ name, note, storageKey?, uploadedAt }]
+  resultJson    Json? // Qualificação Cadastral: divergências etc.
+  notes         String?
   responsibleId String?
-  createdById  String?
-  createdAt    DateTime  @default(now())
-  updatedAt    DateTime  @updatedAt
+  createdById   String?
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
 
   @@unique([companyId, kind, periodRef])
   @@index([companyId, periodRef])
@@ -13743,18 +13744,18 @@ model PayrollBenefitEnrollment {
 }
 
 model PayrollLoan {
-  id                 String   @id @default(uuid())
-  companyId          String
-  employeeId         String
-  bankName           String
-  contractId         String
-  totalAmount        Decimal  @db.Decimal(14, 2)
-  installmentAmount  Decimal  @db.Decimal(14, 2)
-  totalInstallments  Int
-  paidInstallments   Int      @default(0)
-  status             String   @default("ACTIVE") // ACTIVE | COMPLETED
-  createdAt          DateTime @default(now())
-  updatedAt          DateTime @updatedAt
+  id                String   @id @default(uuid())
+  companyId         String
+  employeeId        String
+  bankName          String
+  contractId        String
+  totalAmount       Decimal  @db.Decimal(14, 2)
+  installmentAmount Decimal  @db.Decimal(14, 2)
+  totalInstallments Int
+  paidInstallments  Int      @default(0)
+  status            String   @default("ACTIVE") // ACTIVE | COMPLETED
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
 
   @@unique([companyId, employeeId, contractId])
   @@map("payroll_loans")
@@ -13783,53 +13784,53 @@ model PayrollPension {
 /// Requisição de vaga: autorização para recrutar. Aponta para a posição
 /// (CompensationPosition) quando existir; senão a posição é criada no fluxo.
 model RecruitRequisition {
-  id                 String   @id @default(uuid())
-  companyId          String
-  code               String
-  status             String   @default("DRAFT")
-  branchId           String?
-  orgNodeId          String?
-  costCenter         String?
-  positionId         String? // CompensationPosition (opcional no modo flexível)
-  orgJobId           String? // cargo (OrgJob)
-  jobCatalogId       String? // descrição versionada (CompensationJobCatalog)
-  openingsRequested  Int      @default(1)
-  requesterId        String
-  reason             String?
-  vacancyType        String   @default("AUMENTO") // SUBSTITUICAO | AUMENTO | TEMPORARIA | SAZONAL | APRENDIZ | ESTAGIO | TERCEIRIZACAO | CONFIDENCIAL | BANCO_TALENTOS
-  replacedEmployeeId String?
-  desiredAdmissionAt DateTime?
-  priority           String   @default("NORMAL") // BAIXA | NORMAL | ALTA | URGENTE
-  criticality        String?
-  workMode           String? // PRESENCIAL | HIBRIDO | REMOTO
-  city               String?
-  location           String?
-  shift              String?
-  schedule           String?
-  contractType       String? // CLT | TEMPORARIO | APRENDIZ | ESTAGIO | PJ
-  salaryMin          Decimal? @db.Decimal(14, 2)
-  salaryMax          Decimal? @db.Decimal(14, 2)
-  monthlyBudgetCents Int?
-  confidential       Boolean  @default(false)
-  slaDays            Int?
-  recruitmentScope   String   @default("EXTERNAL") // INTERNAL | EXTERNAL | MIXED
-  allowsReferral     Boolean  @default(true)
-  allowsFormerEmployees Boolean @default(true)
-  allowsAgency       Boolean  @default(false)
-  recruiterId        String?
-  pipelineTemplateId String? // F2
+  id                    String    @id @default(uuid())
+  companyId             String
+  code                  String
+  status                String    @default("DRAFT")
+  branchId              String?
+  orgNodeId             String?
+  costCenter            String?
+  positionId            String? // CompensationPosition (opcional no modo flexível)
+  orgJobId              String? // cargo (OrgJob)
+  jobCatalogId          String? // descrição versionada (CompensationJobCatalog)
+  openingsRequested     Int       @default(1)
+  requesterId           String
+  reason                String?
+  vacancyType           String    @default("AUMENTO") // SUBSTITUICAO | AUMENTO | TEMPORARIA | SAZONAL | APRENDIZ | ESTAGIO | TERCEIRIZACAO | CONFIDENCIAL | BANCO_TALENTOS
+  replacedEmployeeId    String?
+  desiredAdmissionAt    DateTime?
+  priority              String    @default("NORMAL") // BAIXA | NORMAL | ALTA | URGENTE
+  criticality           String?
+  workMode              String? // PRESENCIAL | HIBRIDO | REMOTO
+  city                  String?
+  location              String?
+  shift                 String?
+  schedule              String?
+  contractType          String? // CLT | TEMPORARIO | APRENDIZ | ESTAGIO | PJ
+  salaryMin             Decimal?  @db.Decimal(14, 2)
+  salaryMax             Decimal?  @db.Decimal(14, 2)
+  monthlyBudgetCents    Int?
+  confidential          Boolean   @default(false)
+  slaDays               Int?
+  recruitmentScope      String    @default("EXTERNAL") // INTERNAL | EXTERNAL | MIXED
+  allowsReferral        Boolean   @default(true)
+  allowsFormerEmployees Boolean   @default(true)
+  allowsAgency          Boolean   @default(false)
+  recruiterId           String?
+  pipelineTemplateId    String? // F2
   /// Requisitos/benefícios/observações estruturados (obrigatórios/desejáveis/etc).
-  details            Json?
+  details               Json?
   /// Exceções de trava aprovadas: [{ kind: POSITION|HEADCOUNT|BUDGET, approvedById, at, reason }].
-  gateExceptions     Json?
-  reservedHeadcount  Int      @default(0)
-  reservedBudgetCents Int     @default(0)
-  attachments        Json?
-  notes              String?
-  createdById        String?
-  createdAt          DateTime @default(now())
-  updatedAt          DateTime @updatedAt
-  deletedAt          DateTime?
+  gateExceptions        Json?
+  reservedHeadcount     Int       @default(0)
+  reservedBudgetCents   Int       @default(0)
+  attachments           Json?
+  notes                 String?
+  createdById           String?
+  createdAt             DateTime  @default(now())
+  updatedAt             DateTime  @updatedAt
+  deletedAt             DateTime?
 
   openings  RecruitRequisitionOpening[]
   approvals RecruitRequisitionApproval[]
@@ -13844,16 +13845,16 @@ model RecruitRequisition {
 
 /// Abertura/slot: unidade de quadro solicitada. Cada contratação ocupa UMA abertura.
 model RecruitRequisitionOpening {
-  id               String             @id @default(uuid())
-  companyId        String
-  requisitionId    String
-  requisition      RecruitRequisition @relation(fields: [requisitionId], references: [id], onDelete: Cascade)
-  positionId       String?
-  status           String             @default("OPEN") // OPEN | RESERVED | FILLED | CANCELLED
+  id                 String             @id @default(uuid())
+  companyId          String
+  requisitionId      String
+  requisition        RecruitRequisition @relation(fields: [requisitionId], references: [id], onDelete: Cascade)
+  positionId         String?
+  status             String             @default("OPEN") // OPEN | RESERVED | FILLED | CANCELLED
   filledByEmployeeId String?
-  filledAt         DateTime?
-  createdAt        DateTime           @default(now())
-  updatedAt        DateTime           @updatedAt
+  filledAt           DateTime?
+  createdAt          DateTime           @default(now())
+  updatedAt          DateTime           @updatedAt
 
   @@index([companyId, requisitionId])
   @@map("recruit_requisition_openings")
@@ -13899,31 +13900,32 @@ model RecruitRequisitionSnapshot {
 
 /// Modelo de pipeline de seleção (etapas configuráveis por empresa/vaga).
 model RecruitPipelineTemplate {
-  id        String                 @id @default(uuid())
-  companyId String
-  name      String
-  isDefault Boolean                @default(false)
-  active    Boolean                @default(true)
+  id          String                 @id @default(uuid())
+  companyId   String
+  name        String
+  isDefault   Boolean                @default(false)
+  active      Boolean                @default(true)
   createdById String?
-  createdAt DateTime               @default(now())
-  updatedAt DateTime               @updatedAt
-  stages    RecruitPipelineStage[]
-  postings  RecruitJobPosting[]
+  createdAt   DateTime               @default(now())
+  updatedAt   DateTime               @updatedAt
+  stages      RecruitPipelineStage[]
+  postings    RecruitJobPosting[]
 
   @@index([companyId])
   @@map("recruit_pipeline_templates")
 }
 
 model RecruitPipelineStage {
-  id         String                  @id @default(uuid())
-  companyId  String
-  templateId String
-  template   RecruitPipelineTemplate @relation(fields: [templateId], references: [id], onDelete: Cascade)
-  order      Int
-  name       String
+  id           String                  @id @default(uuid())
+  companyId    String
+  templateId   String
+  template     RecruitPipelineTemplate @relation(fields: [templateId], references: [id], onDelete: Cascade)
+  order        Int
+  name         String
   /// STANDARD | ELIMINATORY | INTERVIEW | ASSESSMENT | OFFER | PREHIRE | FINAL
-  type       String                  @default("STANDARD")
-  config     Json?
+  type         String                  @default("STANDARD")
+  config       Json?
+  applications RecruitApplication[]
 
   @@index([companyId, templateId])
   @@map("recruit_pipeline_stages")
@@ -13932,7 +13934,7 @@ model RecruitPipelineStage {
 /// Vaga publicada (anúncio). Criada a partir de uma requisição encaminhada.
 /// Guarda a descrição PÚBLICA (editável) e o snapshot protegido do cargo.
 model RecruitJobPosting {
-  id                 String                   @id @default(uuid())
+  id                 String                      @id @default(uuid())
   companyId          String
   requisitionId      String
   slug               String
@@ -13948,23 +13950,26 @@ model RecruitJobPosting {
   orgNodeId          String?
   areaName           String?
   /// PUBLIC | INTERNAL | BOTH | CONFIDENTIAL
-  visibility         String                   @default("PUBLIC")
-  pcd                Boolean                  @default(false)
-  showSalary         Boolean                  @default(false)
+  visibility         String                      @default("PUBLIC")
+  pcd                Boolean                     @default(false)
+  showSalary         Boolean                     @default(false)
   salaryText         String?
-  status             String                   @default("DRAFT") // DRAFT | PUBLISHED | PAUSED | CLOSED
+  status             String                      @default("DRAFT") // DRAFT | PUBLISHED | PAUSED | CLOSED
   publishedAt        DateTime?
   closesAt           DateTime?
   applicationLimit   Int?
   pipelineTemplateId String?
-  pipelineTemplate   RecruitPipelineTemplate? @relation(fields: [pipelineTemplateId], references: [id])
+  pipelineTemplate   RecruitPipelineTemplate?    @relation(fields: [pipelineTemplateId], references: [id])
   /// Snapshot protegido da descrição técnica/requisitos originais do cargo.
   protectedSnapshot  Json?
   createdById        String?
-  createdAt          DateTime                 @default(now())
-  updatedAt          DateTime                 @updatedAt
+  createdAt          DateTime                    @default(now())
+  updatedAt          DateTime                    @updatedAt
   deletedAt          DateTime?
   channels           RecruitPostingChannel[]
+  applications       RecruitApplication[]
+  screeningQuestions RecruitScreeningQuestion[]
+  scorecardCriteria  RecruitScorecardCriterion[]
 
   @@unique([companyId, slug])
   @@index([companyId, status])
@@ -13984,4 +13989,586 @@ model RecruitPostingChannel {
 
   @@index([companyId, postingId])
   @@map("recruit_posting_channels")
+}
+
+// ===================== F3: Candidato + Candidatura + LGPD =====================
+
+/// Candidato — IDENTIDADE SEPARADA (nunca vira User interno). Escopo por empresa:
+/// a empresa é a controladora LGPD dos dados. Auth por e-mail + OTP (senha opcional).
+model RecruitCandidate {
+  id              String    @id @default(uuid())
+  companyId       String
+  email           String
+  emailNormalized String
+  name            String
+  phone           String?
+  passwordHash    String?
+  // Perfil reutilizável entre candidaturas
+  headline        String?
+  city            String?
+  linkedinUrl     String?
+  portfolioUrl    String?
+  profileData     Json? // experiências/formação/skills estruturados
+  emailVerifiedAt DateTime?
+  status          String    @default("ACTIVE") // ACTIVE | ANONYMIZED | BLOCKED
+  lastLoginAt     DateTime?
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+  deletedAt       DateTime?
+
+  otps         RecruitCandidateOtp[]
+  applications RecruitApplication[]
+  documents    RecruitCandidateDocument[]
+  consents     RecruitConsent[]
+  dataRequests RecruitDataRequest[]
+
+  @@unique([companyId, emailNormalized])
+  @@index([companyId, status])
+  @@map("recruit_candidates")
+}
+
+/// Códigos de uso único (login sem senha, verificação de e-mail, reset). Só o hash é guardado.
+model RecruitCandidateOtp {
+  id          String           @id @default(uuid())
+  companyId   String
+  candidateId String
+  candidate   RecruitCandidate @relation(fields: [candidateId], references: [id], onDelete: Cascade)
+  purpose     String // LOGIN | VERIFY | RESET
+  codeHash    String
+  expiresAt   DateTime
+  consumedAt  DateTime?
+  attempts    Int              @default(0)
+  createdAt   DateTime         @default(now())
+
+  @@index([candidateId, purpose])
+  @@map("recruit_candidate_otps")
+}
+
+/// Candidatura de um candidato a uma vaga. Dedupe por (vaga, candidato).
+model RecruitApplication {
+  id              String                @id @default(uuid())
+  companyId       String
+  postingId       String
+  posting         RecruitJobPosting     @relation(fields: [postingId], references: [id], onDelete: Cascade)
+  candidateId     String
+  candidate       RecruitCandidate      @relation(fields: [candidateId], references: [id], onDelete: Cascade)
+  requisitionId   String?
+  source          String                @default("CARREIRAS")
+  status          String                @default("ACTIVE") // ACTIVE | HIRED | REJECTED | WITHDRAWN | DISQUALIFIED
+  currentStageId  String?
+  stage           RecruitPipelineStage? @relation(fields: [currentStageId], references: [id])
+  coverLetter     String?
+  answers         Json?
+  score           Int?
+  rejectionReason String?
+  appliedAt       DateTime              @default(now())
+  updatedAt       DateTime              @updatedAt
+  withdrawnAt     DateTime?
+  rejectedAt      DateTime?
+
+  events                   RecruitApplicationEvent[]
+  documents                RecruitCandidateDocument[]
+  consents                 RecruitConsent[]
+  screeningAnswers         RecruitScreeningAnswer[]
+  evaluations              RecruitEvaluation[]
+  interviews               RecruitInterview[]
+  assessments              RecruitAssessment[]
+  aiAnalyses               RecruitAiAnalysis[]
+  offers                   RecruitOffer[]
+  preAdmissions            RecruitPreAdmission[]
+  occupationalExamRequests RecruitOccupationalExamRequest[]
+  admission                RecruitAdmission?
+
+  @@unique([postingId, candidateId])
+  @@index([companyId, status])
+  @@index([postingId, currentStageId])
+  @@map("recruit_applications")
+}
+
+/// Linha do tempo/auditoria da candidatura (movimentações, notas, rejeição).
+model RecruitApplicationEvent {
+  id            String             @id @default(uuid())
+  companyId     String
+  applicationId String
+  application   RecruitApplication @relation(fields: [applicationId], references: [id], onDelete: Cascade)
+  type          String // CREATED | STAGE_MOVED | REJECTED | WITHDRAWN | NOTE | DOC_ADDED | STATUS
+  fromStageId   String?
+  toStageId     String?
+  note          String?
+  actorType     String // CANDIDATE | USER | SYSTEM
+  actorId       String?
+  createdAt     DateTime           @default(now())
+
+  @@index([applicationId])
+  @@map("recruit_application_events")
+}
+
+/// Arquivos do candidato (currículo, carta, certificados). Binário no storage; metadados aqui.
+model RecruitCandidateDocument {
+  id               String                        @id @default(uuid())
+  companyId        String
+  candidateId      String
+  candidate        RecruitCandidate              @relation(fields: [candidateId], references: [id], onDelete: Cascade)
+  applicationId    String?
+  application      RecruitApplication?           @relation(fields: [applicationId], references: [id], onDelete: SetNull)
+  kind             String // CV | COVER | CERTIFICATE | PORTFOLIO | OTHER
+  fileName         String
+  mimeType         String
+  sizeBytes        Int
+  hashSha256       String
+  storageProvider  String
+  storageKey       String
+  scanStatus       String                        @default("SKIPPED") // PENDING | CLEAN | INFECTED | SKIPPED
+  createdAt        DateTime                      @default(now())
+  deletedAt        DateTime?
+  preAdmissionDocs RecruitPreAdmissionDocument[]
+
+  @@index([candidateId])
+  @@index([applicationId])
+  @@map("recruit_candidate_documents")
+}
+
+/// Consentimentos versionados (LGPD). Base legal e finalidade explícitas.
+model RecruitConsent {
+  id              String              @id @default(uuid())
+  companyId       String
+  candidateId     String
+  candidate       RecruitCandidate    @relation(fields: [candidateId], references: [id], onDelete: Cascade)
+  applicationId   String?
+  application     RecruitApplication? @relation(fields: [applicationId], references: [id], onDelete: SetNull)
+  purpose         String // RECRUITMENT | TALENT_POOL | SENSITIVE
+  documentVersion String
+  granted         Boolean             @default(true)
+  ip              String?
+  userAgent       String?
+  grantedAt       DateTime            @default(now())
+  revokedAt       DateTime?
+
+  @@index([candidateId])
+  @@map("recruit_consents")
+}
+
+/// Pedidos de direitos do titular (LGPD): acesso, exclusão, retificação, portabilidade.
+model RecruitDataRequest {
+  id           String           @id @default(uuid())
+  companyId    String
+  candidateId  String
+  candidate    RecruitCandidate @relation(fields: [candidateId], references: [id], onDelete: Cascade)
+  type         String // ACCESS | DELETION | RECTIFICATION | PORTABILITY
+  status       String           @default("OPEN") // OPEN | DONE | REJECTED
+  details      String?
+  requestedAt  DateTime         @default(now())
+  resolvedAt   DateTime?
+  resolvedById String?
+
+  @@index([companyId, status])
+  @@map("recruit_data_requests")
+}
+
+// ===================== F4: Screening + scorecard + interviews + AI =====================
+
+model RecruitScreeningQuestion {
+  id            String                   @id @default(uuid())
+  companyId     String
+  postingId     String
+  posting       RecruitJobPosting        @relation(fields: [postingId], references: [id], onDelete: Cascade)
+  order         Int                      @default(0)
+  type          String                   @default("TEXT") // TEXT | YES_NO | SINGLE_CHOICE | MULTI_CHOICE | NUMBER
+  question      String
+  required      Boolean                  @default(false)
+  knockout      Boolean                  @default(false)
+  desiredAnswer Json?
+  options       Json?
+  weight        Int                      @default(0)
+  active        Boolean                  @default(true)
+  createdAt     DateTime                 @default(now())
+  updatedAt     DateTime                 @updatedAt
+  answers       RecruitScreeningAnswer[]
+
+  @@index([companyId, postingId])
+  @@map("recruit_screening_questions")
+}
+
+model RecruitScreeningAnswer {
+  id            String                   @id @default(uuid())
+  companyId     String
+  applicationId String
+  application   RecruitApplication       @relation(fields: [applicationId], references: [id], onDelete: Cascade)
+  questionId    String
+  question      RecruitScreeningQuestion @relation(fields: [questionId], references: [id], onDelete: Cascade)
+  answer        Json?
+  passed        Boolean?
+  createdAt     DateTime                 @default(now())
+  updatedAt     DateTime                 @updatedAt
+
+  @@unique([applicationId, questionId])
+  @@index([companyId, applicationId])
+  @@map("recruit_screening_answers")
+}
+
+model RecruitScorecardCriterion {
+  id          String                    @id @default(uuid())
+  companyId   String
+  postingId   String
+  posting     RecruitJobPosting         @relation(fields: [postingId], references: [id], onDelete: Cascade)
+  order       Int                       @default(0)
+  name        String
+  description String?
+  category    String?
+  weight      Int                       @default(1)
+  scaleMin    Int                       @default(1)
+  scaleMax    Int                       @default(5)
+  required    Boolean                   @default(true)
+  active      Boolean                   @default(true)
+  createdAt   DateTime                  @default(now())
+  updatedAt   DateTime                  @updatedAt
+  ratings     RecruitEvaluationRating[]
+
+  @@index([companyId, postingId])
+  @@map("recruit_scorecard_criteria")
+}
+
+model RecruitEvaluation {
+  id                  String                    @id @default(uuid())
+  companyId           String
+  applicationId       String
+  application         RecruitApplication        @relation(fields: [applicationId], references: [id], onDelete: Cascade)
+  evaluatorId         String
+  status              String                    @default("SUBMITTED") // DRAFT | SUBMITTED
+  recommendation      String? // STRONG_YES | YES | NEUTRAL | NO | STRONG_NO
+  summary             String?
+  blindUntilSubmitted Boolean                   @default(true)
+  submittedAt         DateTime?
+  createdAt           DateTime                  @default(now())
+  updatedAt           DateTime                  @updatedAt
+  ratings             RecruitEvaluationRating[]
+
+  @@unique([applicationId, evaluatorId])
+  @@index([companyId, applicationId])
+  @@map("recruit_evaluations")
+}
+
+model RecruitEvaluationRating {
+  id           String                    @id @default(uuid())
+  evaluationId String
+  evaluation   RecruitEvaluation         @relation(fields: [evaluationId], references: [id], onDelete: Cascade)
+  criterionId  String
+  criterion    RecruitScorecardCriterion @relation(fields: [criterionId], references: [id], onDelete: Cascade)
+  score        Int
+  comment      String?
+  evidence     String?
+
+  @@unique([evaluationId, criterionId])
+  @@map("recruit_evaluation_ratings")
+}
+
+model RecruitInterview {
+  id             String                        @id @default(uuid())
+  companyId      String
+  applicationId  String
+  application    RecruitApplication            @relation(fields: [applicationId], references: [id], onDelete: Cascade)
+  type           String                        @default("RH") // RH | TECHNICAL | MANAGER | PANEL | DYNAMIC | TEST | VISIT
+  status         String                        @default("SCHEDULED") // SCHEDULED | CONFIRMED | RESCHEDULED | DONE | NO_SHOW | CANCELLED
+  startsAt       DateTime
+  endsAt         DateTime?
+  location       String?
+  meetingUrl     String?
+  instructions   String?
+  createdById    String?
+  organizerId    String?
+  candidateName  String?
+  candidateEmail String?
+  createdAt      DateTime                      @default(now())
+  updatedAt      DateTime                      @updatedAt
+  participants   RecruitInterviewParticipant[]
+
+  @@index([companyId, startsAt])
+  @@index([applicationId])
+  @@map("recruit_interviews")
+}
+
+model RecruitInterviewParticipant {
+  id          String           @id @default(uuid())
+  interviewId String
+  interview   RecruitInterview @relation(fields: [interviewId], references: [id], onDelete: Cascade)
+  userId      String
+  role        String           @default("INTERVIEWER") // ORGANIZER | INTERVIEWER | OBSERVER
+  required    Boolean          @default(true)
+
+  @@unique([interviewId, userId])
+  @@index([userId])
+  @@map("recruit_interview_participants")
+}
+
+model RecruitAssessment {
+  id            String             @id @default(uuid())
+  companyId     String
+  applicationId String
+  application   RecruitApplication @relation(fields: [applicationId], references: [id], onDelete: Cascade)
+  kind          String             @default("TECHNICAL_TEST") // TECHNICAL_TEST | CASE | ESSAY | PRACTICAL | LANGUAGE | OTHER
+  title         String
+  instructions  String?
+  dueAt         DateTime?
+  status        String             @default("ASSIGNED") // ASSIGNED | SUBMITTED | REVIEWED | CANCELLED
+  score         Int?
+  resultNotes   String?
+  createdById   String?
+  reviewedById  String?
+  createdAt     DateTime           @default(now())
+  updatedAt     DateTime           @updatedAt
+
+  @@index([companyId, applicationId])
+  @@map("recruit_assessments")
+}
+
+model RecruitAiSetting {
+  id                 String   @id @default(uuid())
+  companyId          String   @unique
+  enabled            Boolean  @default(false)
+  sensitiveFiltering Boolean  @default(true)
+  modelPreference    String?
+  updatedById        String?
+  createdAt          DateTime @default(now())
+  updatedAt          DateTime @updatedAt
+
+  @@map("recruit_ai_settings")
+}
+
+model RecruitAiAnalysis {
+  id                  String             @id @default(uuid())
+  companyId           String
+  applicationId       String
+  application         RecruitApplication @relation(fields: [applicationId], references: [id], onDelete: Cascade)
+  provider            String             @default("rules")
+  model               String?
+  promptVersion       String
+  criteria            Json?
+  evidence            Json?
+  missingRequirements Json?
+  risks               Json?
+  summary             String
+  confidence          Float?
+  humanReviewRequired Boolean            @default(true)
+  reviewedAt          DateTime?
+  reviewedById        String?
+  humanDecision       String?
+  createdById         String?
+  createdAt           DateTime           @default(now())
+
+  @@index([companyId, applicationId])
+  @@map("recruit_ai_analyses")
+}
+
+// ===================== F5: Offer + pre-admission + documents =====================
+
+model RecruitOffer {
+  id                String               @id @default(uuid())
+  companyId         String
+  applicationId     String
+  application       RecruitApplication   @relation(fields: [applicationId], references: [id], onDelete: Cascade)
+  status            String               @default("DRAFT") // DRAFT | PENDING_APPROVAL | APPROVED | SENT | ACCEPTED | DECLINED | CANCELLED | EXPIRED
+  revision          Int                  @default(1)
+  salaryAmountCents Int
+  salaryPeriod      String               @default("MONTHLY")
+  currency          String               @default("BRL")
+  salaryMinCents    Int?
+  salaryMaxCents    Int?
+  withinSalaryBand  Boolean              @default(true)
+  approvalRequired  Boolean              @default(false)
+  approvedById      String?
+  approvedAt        DateTime?
+  sentById          String?
+  sentAt            DateTime?
+  expiresAt         DateTime?
+  acceptedAt        DateTime?
+  declinedAt        DateTime?
+  declineReason     String?
+  startDate         DateTime?
+  workMode          String?
+  contractType      String?
+  location          String?
+  benefits          Json?
+  clauses           Json?
+  justification     String?
+  createdById       String?
+  createdAt         DateTime             @default(now())
+  updatedAt         DateTime             @updatedAt
+  preAdmission      RecruitPreAdmission?
+
+  @@index([companyId, applicationId])
+  @@index([companyId, status])
+  @@map("recruit_offers")
+}
+
+model RecruitPreAdmission {
+  id                       String                           @id @default(uuid())
+  companyId                String
+  applicationId            String
+  application              RecruitApplication               @relation(fields: [applicationId], references: [id], onDelete: Cascade)
+  offerId                  String?                          @unique
+  offer                    RecruitOffer?                    @relation(fields: [offerId], references: [id], onDelete: SetNull)
+  status                   String                           @default("OPEN") // OPEN | IN_DOCUMENTS | READY_FOR_ASO | COMPLETED | CANCELLED
+  admissionTargetDate      DateTime?
+  checklistVersion         String                           @default("default-2026-07-15")
+  createdById              String?
+  completedAt              DateTime?
+  createdAt                DateTime                         @default(now())
+  updatedAt                DateTime                         @updatedAt
+  documents                RecruitPreAdmissionDocument[]
+  occupationalExamRequests RecruitOccupationalExamRequest[]
+  admission                RecruitAdmission?
+
+  @@index([companyId, applicationId])
+  @@index([companyId, status])
+  @@map("recruit_pre_admissions")
+}
+
+model RecruitPreAdmissionDocument {
+  id                  String                    @id @default(uuid())
+  companyId           String
+  preAdmissionId      String
+  preAdmission        RecruitPreAdmission       @relation(fields: [preAdmissionId], references: [id], onDelete: Cascade)
+  kind                String
+  title               String
+  instructions        String?
+  required            Boolean                   @default(true)
+  status              String                    @default("PENDING") // PENDING | SUBMITTED | APPROVED | REJECTED | WAIVED
+  candidateDocumentId String?
+  candidateDocument   RecruitCandidateDocument? @relation(fields: [candidateDocumentId], references: [id], onDelete: SetNull)
+  submittedAt         DateTime?
+  reviewedById        String?
+  reviewedAt          DateTime?
+  reviewNote          String?
+  dueAt               DateTime?
+  createdAt           DateTime                  @default(now())
+  updatedAt           DateTime                  @updatedAt
+
+  @@index([companyId, preAdmissionId])
+  @@index([companyId, status])
+  @@map("recruit_pre_admission_documents")
+}
+
+// ===================== F6: Occupational health + admission ASO =====================
+
+model RecruitOccupationalExamRequest {
+  id                 String                          @id @default(uuid())
+  companyId          String
+  applicationId      String
+  application        RecruitApplication              @relation(fields: [applicationId], references: [id], onDelete: Cascade)
+  preAdmissionId     String?
+  preAdmission       RecruitPreAdmission?            @relation(fields: [preAdmissionId], references: [id], onDelete: SetNull)
+  status             String                          @default("REQUESTED") // REQUESTED | SCHEDULED | COMPLETED | CANCELLED
+  examType           String                          @default("ADMISSIONAL") // ADMISSIONAL | PERIODICO | RETORNO_TRABALHO | MUDANCA_RISCO | DEMISSIONAL
+  dueAt              DateTime?
+  requestedById      String?
+  requestedAt        DateTime                        @default(now())
+  cancelledById      String?
+  cancelledAt        DateTime?
+  cancellationReason String?
+  operationalNotes   String?
+  createdAt          DateTime                        @default(now())
+  updatedAt          DateTime                        @updatedAt
+  appointment        RecruitOccupationalAppointment?
+  asoRecord          RecruitAsoRecord?
+
+  @@index([companyId, applicationId])
+  @@index([companyId, preAdmissionId])
+  @@index([companyId, status])
+  @@map("recruit_occupational_exam_requests")
+}
+
+model RecruitOccupationalAppointment {
+  id                  String                         @id @default(uuid())
+  companyId           String
+  requestId           String                         @unique
+  request             RecruitOccupationalExamRequest @relation(fields: [requestId], references: [id], onDelete: Cascade)
+  status              String                         @default("SCHEDULED") // SCHEDULED | COMPLETED | MISSED | CANCELLED
+  scheduledAt         DateTime
+  location            String?
+  providerName        String?
+  instructions        String?
+  candidateNotifiedAt DateTime?
+  createdById         String?
+  createdAt           DateTime                       @default(now())
+  updatedAt           DateTime                       @updatedAt
+
+  @@index([companyId, scheduledAt])
+  @@index([companyId, status])
+  @@map("recruit_occupational_appointments")
+}
+
+model RecruitAsoRecord {
+  id                String                         @id @default(uuid())
+  companyId         String
+  requestId         String                         @unique
+  request           RecruitOccupationalExamRequest @relation(fields: [requestId], references: [id], onDelete: Cascade)
+  result            String // APTO | APTO_COM_RESTRICAO | INAPTO
+  examDate          DateTime
+  validUntil        DateTime?
+  physicianName     String?
+  physicianRegistry String?
+  clinicalNotes     String?
+  restrictionNotes  String?
+  cidCodes          Json?
+  reportedById      String?
+  reportedAt        DateTime                       @default(now())
+  createdAt         DateTime                       @default(now())
+  updatedAt         DateTime                       @updatedAt
+
+  @@index([companyId, result])
+  @@index([companyId, examDate])
+  @@map("recruit_aso_records")
+}
+
+// ===================== F7: Admission + onboarding + probation =====================
+
+model RecruitAdmission {
+  id                  String                   @id @default(uuid())
+  companyId           String
+  applicationId       String                   @unique
+  application         RecruitApplication       @relation(fields: [applicationId], references: [id], onDelete: Cascade)
+  preAdmissionId      String?                  @unique
+  preAdmission        RecruitPreAdmission?     @relation(fields: [preAdmissionId], references: [id], onDelete: SetNull)
+  offerId             String?
+  status              String                   @default("AUTHORIZED") // AUTHORIZED | EMPLOYEE_CREATED | ONBOARDING_STARTED | ESOCIAL_PENDING | ESOCIAL_GENERATED | COMPLETED | CANCELLED
+  employeeId          String?
+  positionId          String?
+  openingId           String?
+  onboardingProcessId String?
+  esocialEventId      String?
+  esocialStatus       String                   @default("NOT_GENERATED") // NOT_GENERATED | PENDING | GENERATED | SKIPPED | ERROR
+  admissionDate       DateTime
+  authorizedById      String?
+  authorizedAt        DateTime                 @default(now())
+  notes               String?
+  payload             Json?
+  createdAt           DateTime                 @default(now())
+  updatedAt           DateTime                 @updatedAt
+  probationReviews    RecruitProbationReview[]
+
+  @@index([companyId, status])
+  @@index([companyId, employeeId])
+  @@map("recruit_admissions")
+}
+
+model RecruitProbationReview {
+  id             String           @id @default(uuid())
+  companyId      String
+  admissionId    String
+  admission      RecruitAdmission @relation(fields: [admissionId], references: [id], onDelete: Cascade)
+  employeeId     String?
+  cycleDay       Int
+  dueAt          DateTime
+  status         String           @default("PENDING") // PENDING | COMPLETED | WAIVED
+  reviewerId     String?
+  completedAt    DateTime?
+  recommendation String?
+  notes          String?
+  createdAt      DateTime         @default(now())
+  updatedAt      DateTime         @updatedAt
+
+  @@unique([admissionId, cycleDay])
+  @@index([companyId, dueAt])
+  @@index([companyId, status])
+  @@map("recruit_probation_reviews")
 }

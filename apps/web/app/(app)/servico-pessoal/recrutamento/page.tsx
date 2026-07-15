@@ -5,7 +5,7 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
-import { AlertTriangle, Briefcase, CheckCircle2, Megaphone, Plus, Send, ShieldAlert, UserPlus, X } from 'lucide-react';
+import { AlertTriangle, Briefcase, CheckCircle2, Megaphone, Plus, Send, ShieldAlert, ShieldCheck, UserPlus, X } from 'lucide-react';
 import { PageHeader } from '@/components/shell/page-header';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -52,6 +52,7 @@ export default function RecruitmentPage() {
   const canCreate = hasPermission(['recruit:requisition:create']);
   const canApprove = hasPermission(['recruit:requisition:approve']);
   const canManage = hasPermission(['recruit:manage']);
+  const canHandleLgpd = hasPermission(['recruit:lgpd', 'recruit:manage']);
   const [formOpen, setFormOpen] = useState(false);
   const [form, setForm] = useState({ ...EMPTY });
   const [detailId, setDetailId] = useState<string | null>(null);
@@ -95,6 +96,7 @@ export default function RecruitmentPage() {
         actions={
           <div className="flex gap-2">
             <Link href="/servico-pessoal/recrutamento/vagas"><Button variant="outline"><Briefcase className="mr-2 h-4 w-4" /> Vagas</Button></Link>
+            {canHandleLgpd && <Link href="/servico-pessoal/recrutamento/lgpd"><Button variant="outline"><ShieldCheck className="mr-2 h-4 w-4" /> LGPD</Button></Link>}
             {canCreate && <Button onClick={() => setFormOpen(true)}><Plus className="mr-2 h-4 w-4" /> Nova requisição</Button>}
           </div>
         }

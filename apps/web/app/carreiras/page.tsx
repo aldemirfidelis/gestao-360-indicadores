@@ -59,6 +59,7 @@ export default function CareersListPage() {
             <h1 className="text-lg font-bold">{data?.company.name ?? 'Carreiras'}</h1>
             <p className="text-xs text-slate-500">Trabalhe conosco</p>
           </div>
+          <Link href={`/candidato${suffix}`} className="ml-auto text-xs font-medium text-sky-600 hover:underline dark:text-sky-400">Area do candidato</Link>
         </div>
       </header>
 

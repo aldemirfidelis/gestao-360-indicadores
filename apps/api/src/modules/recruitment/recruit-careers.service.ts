@@ -13,8 +13,8 @@ import { isPubliclyVisible, toPublicVacancy } from './recruit-posting.logic';
 export class RecruitCareersService {
   constructor(private readonly prisma: PrismaService) {}
 
-  /** Resolve a empresa por host (subdomínio/domínio próprio) OU slug explícito. */
-  private async resolveCompany(host?: string, slug?: string) {
+  /** Resolve a empresa por host (subdomínio/domínio próprio) OU slug explícito. Público: reusado por candidato/candidatura. */
+  async resolveCompany(host?: string, slug?: string) {
     const normalizedHost = normalizeHost(host);
     if (normalizedHost) {
       const byDomain = await this.prisma.company.findFirst({ where: { customDomain: normalizedHost, deletedAt: null }, select: brandSelect });

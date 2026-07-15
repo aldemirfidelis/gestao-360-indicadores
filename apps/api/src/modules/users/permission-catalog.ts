@@ -248,7 +248,12 @@ export const PERMISSION_CATALOG = [
   ['recruit:view', 'Visualizar requisicoes, vagas e candidatos', 'Recrutamento', 'view'],
   ['recruit:requisition:create', 'Criar e enviar requisicoes de vaga', 'Recrutamento', 'create'],
   ['recruit:requisition:approve', 'Aprovar/reprovar requisicoes e excecoes de quadro/orcamento', 'Recrutamento', 'approve'],
+  ['recruit:offer:approve', 'Aprovar propostas fora da faixa salarial', 'Recrutamento', 'approve'],
+  ['recruit:prehire', 'Validar documentos de pre-admissao', 'Recrutamento', 'update'],
+  ['recruit:admit', 'Autorizar admissao e converter candidato em colaborador', 'Recrutamento', 'approve'],
+  ['recruit:lgpd', 'Atender solicitacoes LGPD de candidatos (acesso/exclusao/retificacao/portabilidade)', 'Recrutamento', 'manage'],
   ['recruit:manage', 'Administrar recrutamento (config, pipelines, canais)', 'Recrutamento', 'manage'],
+  ['saude:occupational', 'Agendar ASO admissional e registrar resultado clinico segregado', 'Saude Ocupacional', 'update'],
   ['folha:esocial', 'Gerar XML e lotes assistidos do eSocial e referenciar certificados', 'Folha de Pagamento', 'manage'],
 
   // Suprimentos — Compras

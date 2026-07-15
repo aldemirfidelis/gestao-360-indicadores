@@ -113,7 +113,7 @@ export class RecruitPostingService {
       where: { companyId: me.companyId, deletedAt: null, ...(status ? { status } : {}) },
       orderBy: { createdAt: 'desc' },
       take: 200,
-      include: { channels: true, pipelineTemplate: { select: { name: true } } },
+      include: { channels: true, pipelineTemplate: { select: { name: true } }, _count: { select: { applications: true } } },
     });
   }
 

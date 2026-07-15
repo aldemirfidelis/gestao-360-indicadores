@@ -784,6 +784,104 @@ export class PayrollEsocialService {
   }
 
   /**
+   * S-2200 unitario para admissao originada fora de uma folha calculada
+   * (ex.: recrutamento). Gera XML para conferencia, sem assinatura/transmissao.
+   */
+  async generateAdmissionEventForEmployee(me: AuthPayload, employeeId: string, body: any = {}) {
+    const environment = this.resolveEnvironment(body?.environment);
+    const existing = await this.prisma.payrollEsocialEvent.findFirst({
+      where: { companyId: me.companyId, employeeId, eventType: 'S-2200', environment },
+      orderBy: { createdAt: 'desc' },
+    });
+    if (existing) {
+      return { created: 0, skipped: [{ employeeId, reason: 'Ja possui S-2200 neste ambiente.' }], eventType: 'S-2200', environment, layoutVersion: ESOCIAL_LAYOUT_VERSION, event: existing };
+    }
+    const employee = await this.prisma.orgEmployee.findFirst({
+      where: { id: employeeId, companyId: me.companyId },
+      select: {
+        id: true,
+        name: true,
+        registrationId: true,
+        job: { select: { cbo: true } },
+        personnelProfile: {
+          select: {
+            cpf: true, birthDate: true, admissionDate: true, contractType: true,
+            sex: true, raceColor: true, maritalStatus: true, educationLevel: true, pisPasep: true, state: true,
+          },
+        },
+      },
+    });
+    const cpf = onlyDigits(employee?.personnelProfile?.cpf);
+    const admissionDate = employee?.personnelProfile?.admissionDate;
+    if (!employee || !cpf || !admissionDate) {
+      return { created: 0, skipped: [{ employeeId, reason: 'Prontuario sem CPF ou data de admissao.' }], eventType: 'S-2200', environment, layoutVersion: ESOCIAL_LAYOUT_VERSION, event: null };
+    }
+    const salary = await this.admissionSalaryOf(me.companyId, employeeId, body);
+    if (!salary) {
+      return { created: 0, skipped: [{ employeeId, reason: 'Sem salario vigente para gerar S-2200.' }], eventType: 'S-2200', environment, layoutVersion: ESOCIAL_LAYOUT_VERSION, event: null };
+    }
+    const employerRegistration = await this.employerRegistrationOf(me.companyId);
+    const createdAt = new Date();
+    const eventId = buildEventId({ employerRegistration, createdAt, seed: `${me.companyId}:S-2200:${employeeId}:${environment}` });
+    const profile = employee.personnelProfile;
+    const cbo = onlyDigits(employee.job?.cbo) || null;
+    const issues: string[] = [];
+    if (!profile?.sex) issues.push('Sexo ausente no prontuario - presumido "M".');
+    if (!profile?.raceColor) issues.push('Raca/cor ausente - enviado "6" (nao informado).');
+    if (!cbo) issues.push('CBO do cargo ausente - obrigatorio no eSocial.');
+    issues.push('Municipio de nascimento (codigo IBGE) nao cadastrado - completar antes de transmitir.');
+    issues.push('Evento gerado pelo recrutamento para conferencia; nada foi transmitido ao governo.');
+    const xml = buildS2200Xml({
+      eventId,
+      environment,
+      employerRegistration,
+      workerCpf: cpf,
+      workerName: employee.name,
+      birthDate: profile?.birthDate ? profile.birthDate.toISOString().slice(0, 10) : null,
+      admissionDate: admissionDate.toISOString().slice(0, 10),
+      workerRegistration: employee.registrationId || employeeId,
+      categoryCode: this.categoryForContract(profile?.contractType),
+      cboCode: cbo,
+      monthlySalary: salary.toString(),
+      sexo: mapSexo(profile?.sex),
+      racaCor: mapRacaCor(profile?.raceColor),
+      estadoCivil: mapEstadoCivil(profile?.maritalStatus),
+      grauInstrucao: mapGrauInstrucao(profile?.educationLevel),
+      pisPasep: profile?.pisPasep ?? null,
+      birthCityCode: null,
+      birthUf: profile?.state ?? null,
+    });
+    const event = await this.prisma.payrollEsocialEvent.create({
+      data: {
+        companyId: me.companyId,
+        runId: null,
+        employeeId,
+        competenceId: null,
+        periodRef: admissionDate.toISOString().slice(0, 7),
+        eventType: 'S-2200',
+        environment,
+        layoutVersion: ESOCIAL_LAYOUT_VERSION,
+        eventId,
+        status: 'XML_GENERATED_WITH_WARNINGS',
+        xml,
+        xmlHash: hashXml(xml),
+        payload: { source: 'recruitment-admission', employeeId, employeeName: employee.name, sourceUrl: ESOCIAL_SOURCE_URL } as Prisma.InputJsonValue,
+        issues,
+        createdById: me.sub,
+      },
+    });
+    await this.audit.record(me, {
+      module: MODULE,
+      entity: 'PayrollEsocialEvent',
+      entityId: event.id,
+      action: 'GENERATE',
+      message: `Evento S-2200 (admissao) gerado para ${employee.name}`,
+      after: { employeeId, environment },
+    });
+    return { created: 1, skipped: [], eventType: 'S-2200', environment, layoutVersion: ESOCIAL_LAYOUT_VERSION, event };
+  }
+
+  /**
    * Reconciliação de totalizadores: como não há transmissão, deriva dos eventos
    * gerados do processamento a "prévia" das bases que o governo retornaria
    * (S-5001 base CP/INSS, S-5002 base IRRF) e compara com os totais internos do
@@ -1262,6 +1360,27 @@ export class PayrollEsocialService {
   private categoryForContract(contractType: string | null | undefined): string {
     if (contractType === 'APRENDIZ') return '103';
     return '101';
+  }
+
+  private async admissionSalaryOf(companyId: string, employeeId: string, body: any): Promise<Prisma.Decimal | null> {
+    if (body?.baseSalaryCents != null) {
+      const cents = Math.round(Number(body.baseSalaryCents));
+      if (Number.isFinite(cents) && cents > 0) return new Prisma.Decimal((cents / 100).toFixed(2));
+    }
+    if (body?.baseSalary != null) {
+      try {
+        const value = new Prisma.Decimal(String(body.baseSalary).replace(',', '.'));
+        if (value.gt(0)) return value;
+      } catch {
+        return null;
+      }
+    }
+    const snapshot = await this.prisma.compensationSalarySnapshot.findFirst({
+      where: { companyId, employeeId, effectiveTo: null },
+      orderBy: { effectiveFrom: 'desc' },
+      select: { currentSalary: true },
+    });
+    return snapshot?.currentSalary ?? null;
   }
 
   private eventIssues(itemCount: number, contractType: string | null | undefined): string[] {
