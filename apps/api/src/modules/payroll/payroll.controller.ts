@@ -246,6 +246,12 @@ export class PayrollController {
     return this.esocial.generateAdmissionEvents(me, id, body);
   }
 
+  @Post('runs/:id/esocial/payments')
+  @RequirePermissions('folha:esocial')
+  generateEsocialPayments(@CurrentUser() me: AuthPayload, @Param('id') id: string, @Body() body: any) {
+    return this.esocial.generatePaymentEvents(me, id, body);
+  }
+
   @Post('runs/:id/esocial/reconcile')
   @RequirePermissions('folha:esocial')
   reconcileEsocialTotalizers(@CurrentUser() me: AuthPayload, @Param('id') id: string, @Body() body: any) {
@@ -268,6 +274,19 @@ export class PayrollController {
   @RequirePermissions('folha:esocial')
   signEsocialBatch(@CurrentUser() me: AuthPayload, @Param('id') id: string) {
     return this.esocial.signBatch(me, id);
+  }
+
+  /** Transmite o lote assinado (dry-run por padrão; envio real atrás de flag + confirm). */
+  @Post('esocial/batches/:id/transmit')
+  @RequirePermissions('folha:esocial')
+  transmitEsocialBatch(@CurrentUser() me: AuthPayload, @Param('id') id: string, @Body() body: any) {
+    return this.esocial.transmitBatch(me, id, body);
+  }
+
+  @Post('esocial/batches/:id/query')
+  @RequirePermissions('folha:esocial')
+  queryEsocialBatch(@CurrentUser() me: AuthPayload, @Param('id') id: string, @Body() body: any) {
+    return this.esocial.queryBatch(me, id, body);
   }
 
   @Get('esocial/batches/:id/xml')

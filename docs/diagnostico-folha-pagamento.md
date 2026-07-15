@@ -136,9 +136,22 @@ qualquer transmissão.
   metadados via node-forge (titular/validade/serial), decifrado só em memória; `SigningService`
   com adaptador (ENCRYPTED_DB agora; ENV_REF/procuração/nuvem plugáveis depois); **assinatura
   XML-DSig real** (enveloped, C14N exclusiva, SHA-256, RSA-SHA256, X509 no KeyInfo, Reference ao
-  Id) via node-forge + xml-crypto; lote vira `SIGNED`. **Assinar NÃO transmite** — a transmissão
-  SOAP (WS-Security/TLS mútuo, protocolo→recibo) é a etapa seguinte. Pendentes: S-1210
-  (pagamentos), S-5011, transmissão real e XML schema-completo (validador oficial).
+  Id) via node-forge + xml-crypto; lote vira `SIGNED`.
+  **S-1210 (pagamentos, 2026-07-15):** evento de caixa (data do pagamento + líquido + IRRF retido)
+  vinculado ao S-1200 — fato gerador do IRRF; um por colaborador com líquido positivo.
+  **Transmissão SOAP (2026-07-15):** envelope `loteEventos` (grupo 1) com eventos assinados +
+  SOAP 1.2; envio por **TLS mútuo** (o próprio A1 autentica a conexão via `https.Agent({pfx})`);
+  `transmitBatch` faz **dry-run por padrão** (monta o envelope e NÃO envia) e só envia de verdade
+  com `PAYROLL_ESOCIAL_TRANSMISSION_ENABLED=true` + endpoint configurado + `confirm:true`
+  (produção real ainda exige `PAYROLL_ESOCIAL_PRODUCTION_ENABLED=true`); `queryBatch` consulta pelo
+  protocolo. Guarda envelope/resposta/protocolo no lote para auditoria.
+  **Env vars de transmissão** (droplet, quando ativar): `PAYROLL_ESOCIAL_TRANSMISSION_ENABLED`,
+  `PAYROLL_ESOCIAL_SEND_URL_RESTRICTED`, `PAYROLL_ESOCIAL_SEND_URL_PRODUCTION`,
+  `PAYROLL_ESOCIAL_QUERY_URL_RESTRICTED`, `PAYROLL_ESOCIAL_QUERY_URL_PRODUCTION`,
+  `PAYROLL_ESOCIAL_PRODUCTION_ENABLED`. ⚠️ Os namespaces/versões do WSDL e as URLs oficiais DEVEM
+  ser confirmados na doc oficial do eSocial antes de transmitir; os XMLs ainda são simplificados
+  (validar no validador oficial). Pendentes: S-5011 e demais totalizadores oficiais (só após
+  transmissão), XML schema-completo, e o encaixe do S-1210 no pagamento bancário (F6).
 - **F5**: obrigações assistidas (FGTS Digital, DCTFWeb/Integra Contador opcional, EFD-Reinf,
   Qualificação Cadastral, DET, calendário legal).
 - **F6**: Banking Connector (CNAB 240, dupla aprovação, retorno/conciliação, antifraude) +

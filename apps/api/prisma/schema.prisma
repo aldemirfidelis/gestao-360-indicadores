@@ -12614,6 +12614,13 @@ model PayrollEsocialBatch {
   protocolNumber String?
   receiptJson    Json?
   issues         Json?
+  /// Transmissão SOAP: STAGED | DRY_RUN | SENT | PROCESSED | REJECTED | ERROR.
+  transmissionStatus String?
+  transmittedAt      DateTime?
+  /// Endpoint efetivamente usado (auditoria) e envelope enviado/resposta crua.
+  transmitEndpoint   String?
+  transmitRequestXml String?
+  transmitResponseXml String?
   createdById    String?
   createdAt      DateTime                   @default(now())
   updatedAt      DateTime                   @updatedAt

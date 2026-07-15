@@ -7,20 +7,26 @@ import { encryptJson, decryptJson } from '../../common/crypto';
 import { parsePkcs12, signEsocialXml } from './payroll-cert.util';
 import {
   buildEventId,
+  buildConsultaLoteXml,
   buildInternalBatchXml,
+  buildLoteEnvelopeXml,
   buildS1010Xml,
   buildS1200Xml,
+  buildS1210Xml,
   buildS1299Xml,
   buildS2200Xml,
   buildS2299Xml,
+  buildSoapEnvelope,
   ESOCIAL_LAYOUT_VERSION,
   ESOCIAL_SOURCE_URL,
+  extractProtocol,
   hashXml,
   onlyDigits,
   sanitizeEsocialCode,
   terminationMotiveCode,
   type EsocialEnvironment,
 } from './payroll-esocial.logic';
+import * as https from 'https';
 
 const MODULE = 'payroll';
 const ALLOWED_CERT_STORAGE = ['EXTERNAL_REF', 'ENV_REF'];
@@ -580,6 +586,82 @@ export class PayrollEsocialService {
   }
 
   /**
+   * S-1210 (Pagamentos): informa o pagamento (regime de caixa) e o IRRF retido,
+   * vinculado à apuração do S-1200. Um evento por colaborador calculado com
+   * líquido positivo. A data de pagamento vem do corpo (ou usa o último dia do
+   * mês seguinte como padrão de conferência).
+   */
+  async generatePaymentEvents(me: AuthPayload, runId: string, body: any = {}) {
+    const environment = this.resolveEnvironment(body?.environment);
+    const run = await this.prisma.payrollRun.findFirst({
+      where: { id: runId, companyId: me.companyId },
+      include: { competence: true, workers: { select: { id: true, employeeId: true, netPay: true, irrfValue: true, status: true } } },
+    });
+    if (!run) throw new NotFoundException('Processamento de folha nao encontrado.');
+    if (!GENERATABLE_RUN_STATUSES.includes(run.status)) throw new ConflictException('Gere os pagamentos apos calcular a folha sem pendencias.');
+    const employerRegistration = await this.employerRegistrationOf(me.companyId);
+    const periodRef = `${run.competence.year}-${String(run.competence.month).padStart(2, '0')}`;
+    const paymentDate = this.resolvePaymentDate(body?.paymentDate, run.competence.year, run.competence.month);
+
+    const employeeIds = run.workers.map((worker) => worker.employeeId);
+    const employees = await this.prisma.orgEmployee.findMany({
+      where: { companyId: me.companyId, id: { in: employeeIds } },
+      select: { id: true, personnelProfile: { select: { cpf: true } } },
+    });
+    const cpfByEmployee = new Map(employees.map((employee) => [employee.id, onlyDigits(employee.personnelProfile?.cpf)]));
+
+    const batched = await this.prisma.payrollEsocialEvent.count({
+      where: { companyId: me.companyId, runId: run.id, environment, eventType: 'S-1210', batchId: { not: null } },
+    });
+    if (batched > 0) throw new ConflictException('Ja existem pagamentos (S-1210) em lote para este processamento.');
+
+    const createdAt = new Date();
+    const skipped: Array<{ employeeId: string; reason: string }> = [];
+    const eventRows: Prisma.PayrollEsocialEventCreateManyInput[] = [];
+    for (const worker of run.workers) {
+      if (worker.status !== 'CALCULATED') { skipped.push({ employeeId: worker.employeeId, reason: 'Colaborador com pendencias.' }); continue; }
+      const cpf = cpfByEmployee.get(worker.employeeId);
+      if (!cpf) { skipped.push({ employeeId: worker.employeeId, reason: 'CPF ausente no prontuario.' }); continue; }
+      if (Number(worker.netPay.toString()) <= 0) { skipped.push({ employeeId: worker.employeeId, reason: 'Liquido zero/negativo.' }); continue; }
+      const eventId = buildEventId({ employerRegistration, createdAt, seed: `${run.id}:${worker.id}:S-1210:${environment}` });
+      const paymentId = sanitizeEsocialCode(`${run.kind}-${periodRef}-${worker.id.slice(0, 8)}`, 'G360', 30);
+      const xml = buildS1210Xml({
+        eventId, environment, periodRef, employerRegistration,
+        workerCpf: cpf, paymentDate, paymentId,
+        netPaid: worker.netPay.toString(), irrf: worker.irrfValue.toString(),
+      });
+      eventRows.push({
+        companyId: me.companyId, runId: run.id, runWorkerId: worker.id, employeeId: worker.employeeId,
+        competenceId: run.competenceId, periodRef, eventType: 'S-1210', environment, layoutVersion: ESOCIAL_LAYOUT_VERSION,
+        eventId, status: 'XML_GENERATED_WITH_WARNINGS', xml, xmlHash: hashXml(xml),
+        payload: { source: 'payment', workerId: worker.id, paymentDate, periodRef, sourceUrl: ESOCIAL_SOURCE_URL } as Prisma.InputJsonValue,
+        issues: ['S-1210 simplificado: detalhamento de rendimentos/deducoes do IRRF resumido; validar antes de transmitir.'],
+        createdById: me.sub,
+      });
+    }
+
+    await this.prisma.$transaction(async (tx) => {
+      await tx.payrollEsocialEvent.deleteMany({ where: { companyId: me.companyId, runId: run.id, environment, eventType: 'S-1210', batchId: null } });
+      if (eventRows.length) await tx.payrollEsocialEvent.createMany({ data: eventRows });
+    }, { timeout: 120_000, maxWait: 20_000 });
+
+    await this.audit.record(me, {
+      module: MODULE, entity: 'PayrollEsocialEvent', entityId: run.id, action: 'GENERATE',
+      message: `Eventos S-1210 (pagamentos) gerados: ${eventRows.length}`,
+      after: { created: eventRows.length, paymentDate, environment },
+    });
+    return { created: eventRows.length, skipped, eventType: 'S-1210', paymentDate, environment, layoutVersion: ESOCIAL_LAYOUT_VERSION, events: await this.listEvents(me, run.id) };
+  }
+
+  private resolvePaymentDate(value: unknown, year: number, month: number): string {
+    const text = this.optionalText(value);
+    if (text && /^\d{4}-\d{2}-\d{2}$/.test(text)) return text;
+    // Padrão de conferência: 5º dia útil ~ dia 5 do mês seguinte à competência.
+    const next = month === 12 ? { y: year + 1, m: 1 } : { y: year, m: month + 1 };
+    return `${next.y}-${String(next.m).padStart(2, '0')}-05`;
+  }
+
+  /**
    * S-2200 (Admissão) para os colaboradores do processamento que ainda não têm
    * o evento. Idempotente: pula quem já possui S-2200 no ambiente. Dados vêm do
    * prontuário (CPF, nascimento, admissão) e do salário-base do processamento.
@@ -903,6 +985,171 @@ export class PayrollEsocialService {
       after: { eventCount: signedEvents.length, certificateId: cert.id, subjectName: cert.subjectName },
     });
     return { signed: signedEvents.length, batchId: batch.id, status: 'SIGNED' };
+  }
+
+  /**
+   * Transmite um lote ASSINADO ao eSocial via SOAP com TLS mútuo (o próprio
+   * certificado A1 autentica a conexão). Ação EXTERNA e sensível:
+   * - dry-run por padrão (monta o envelope e NÃO envia) — seguro para conferência;
+   * - envio real só com PAYROLL_ESOCIAL_TRANSMISSION_ENABLED=true, endpoint
+   *   configurado e confirmação explícita; produção (tpAmb=1) exige ainda
+   *   PAYROLL_ESOCIAL_PRODUCTION_ENABLED=true.
+   */
+  async transmitBatch(me: AuthPayload, batchId: string, body: any = {}) {
+    const batch = await this.prisma.payrollEsocialBatch.findFirst({
+      where: { id: batchId, companyId: me.companyId },
+      include: { events: true, certificate: true },
+    });
+    if (!batch) throw new NotFoundException('Lote eSocial nao encontrado.');
+    if (batch.status !== 'SIGNED') throw new ConflictException('Assine o lote antes de transmitir.');
+    if (!batch.certificate) throw new BadRequestException('Lote sem certificado vinculado.');
+    const environment = batch.environment as EsocialEnvironment;
+
+    const employerRegistration = await this.employerRegistrationOf(me.companyId);
+    const loteXml = buildLoteEnvelopeXml({
+      employerRegistration,
+      signedEvents: batch.events.map((event) => ({ eventId: event.eventId, signedXml: event.xml })),
+    });
+    const soapXml = buildSoapEnvelope(loteXml, 'enviar');
+
+    const transmissionEnabled = process.env.PAYROLL_ESOCIAL_TRANSMISSION_ENABLED === 'true';
+    const endpoint = environment === 'PRODUCTION'
+      ? process.env.PAYROLL_ESOCIAL_SEND_URL_PRODUCTION
+      : process.env.PAYROLL_ESOCIAL_SEND_URL_RESTRICTED;
+    const wantsSend = body?.confirm === true && transmissionEnabled && Boolean(endpoint);
+    // Dry-run: monta tudo e guarda, mas não contata o governo.
+    if (!wantsSend) {
+      const reason = !transmissionEnabled
+        ? 'Transmissao desabilitada (defina PAYROLL_ESOCIAL_TRANSMISSION_ENABLED=true).'
+        : !endpoint
+          ? 'Endpoint do eSocial nao configurado (PAYROLL_ESOCIAL_SEND_URL_*).'
+          : 'Envio nao confirmado (dry-run).';
+      const updated = await this.prisma.payrollEsocialBatch.update({
+        where: { id: batch.id },
+        data: {
+          transmissionStatus: 'DRY_RUN',
+          transmitRequestXml: soapXml.slice(0, 100_000),
+          issues: ['Dry-run: envelope de transmissao gerado, mas NADA foi enviado ao governo.', reason],
+        },
+      });
+      await this.audit.record(me, {
+        module: MODULE, entity: 'PayrollEsocialBatch', entityId: batch.id, action: 'TRANSMIT_DRYRUN',
+        message: `Transmissao em dry-run (${reason})`, after: { environment },
+      });
+      return { transmitted: false, dryRun: true, reason, envelopePreview: soapXml.slice(0, 2000), status: updated.transmissionStatus };
+    }
+
+    if (environment === 'PRODUCTION' && process.env.PAYROLL_ESOCIAL_PRODUCTION_ENABLED !== 'true') {
+      throw new BadRequestException('Producao real bloqueada. Habilite PAYROLL_ESOCIAL_PRODUCTION_ENABLED=true.');
+    }
+
+    // Envio real: TLS mútuo com o próprio certificado (decifrado só aqui).
+    const { pfxBase64, password } = this.decryptPfx(batch.certificate);
+    let responseXml = '';
+    let protocol: string | null = null;
+    let status = 'SENT';
+    try {
+      responseXml = await this.postSoap(endpoint!, soapXml, pfxBase64, password);
+      protocol = extractProtocol(responseXml);
+      if (!protocol) status = 'REJECTED';
+    } catch (error) {
+      status = 'ERROR';
+      responseXml = String((error as Error).message ?? error);
+    }
+    const updated = await this.prisma.payrollEsocialBatch.update({
+      where: { id: batch.id },
+      data: {
+        transmissionStatus: status,
+        transmittedAt: new Date(),
+        transmitEndpoint: endpoint,
+        transmitRequestXml: soapXml.slice(0, 100_000),
+        transmitResponseXml: responseXml.slice(0, 100_000),
+        protocolNumber: protocol ?? batch.protocolNumber,
+      },
+    });
+    await this.audit.record(me, {
+      module: MODULE, entity: 'PayrollEsocialBatch', entityId: batch.id, action: 'TRANSMIT',
+      message: `Lote transmitido ao eSocial (${status}${protocol ? `, protocolo ${protocol}` : ''})`,
+      after: { status, protocol, environment, endpoint },
+    });
+    return { transmitted: status === 'SENT', status, protocol, environment };
+  }
+
+  /** POST SOAP com TLS mútuo usando o PFX (A1) como certificado cliente. */
+  private postSoap(endpoint: string, soapXml: string, pfxBase64: string, password: string): Promise<string> {
+    return new Promise((resolve, reject) => {
+      let url: URL;
+      try { url = new URL(endpoint); } catch { reject(new Error('Endpoint invalido.')); return; }
+      const payload = Buffer.from(soapXml, 'utf8');
+      const request = https.request(
+        {
+          method: 'POST',
+          hostname: url.hostname,
+          port: url.port || 443,
+          path: url.pathname + url.search,
+          pfx: Buffer.from(pfxBase64, 'base64'),
+          passphrase: password,
+          headers: {
+            'Content-Type': 'application/soap+xml; charset=utf-8',
+            'Content-Length': payload.length,
+          },
+          timeout: 60_000,
+        },
+        (response) => {
+          const chunks: Buffer[] = [];
+          response.on('data', (chunk) => chunks.push(chunk as Buffer));
+          response.on('end', () => resolve(Buffer.concat(chunks).toString('utf8')));
+        },
+      );
+      request.on('timeout', () => request.destroy(new Error('Tempo de conexao esgotado com o eSocial.')));
+      request.on('error', (error) => reject(error));
+      request.write(payload);
+      request.end();
+    });
+  }
+
+  private decryptPfx(cert: { storageMode: string; encryptedPfx: string | null; encryptedPassword: string | null; pfxSecretRef: string | null; passwordSecretRef: string | null }): { pfxBase64: string; password: string } {
+    if (cert.storageMode === 'ENCRYPTED_DB') {
+      if (!cert.encryptedPfx || !cert.encryptedPassword) throw new BadRequestException('Certificado sem PFX cifrado.');
+      return { pfxBase64: decryptJson<string>(cert.encryptedPfx), password: decryptJson<string>(cert.encryptedPassword) };
+    }
+    if (cert.storageMode === 'ENV_REF') {
+      const pfx = cert.pfxSecretRef ? process.env[cert.pfxSecretRef] : undefined;
+      const pwd = cert.passwordSecretRef ? process.env[cert.passwordSecretRef] : undefined;
+      if (!pfx || !pwd) throw new BadRequestException('Variaveis de ambiente do certificado ausentes.');
+      return { pfxBase64: pfx.replace(/\s+/g, ''), password: pwd };
+    }
+    throw new BadRequestException('Modo de custodia sem material local para TLS mutuo.');
+  }
+
+  /** Consulta o processamento de um lote transmitido pelo protocolo. */
+  async queryBatch(me: AuthPayload, batchId: string, body: any = {}) {
+    const batch = await this.prisma.payrollEsocialBatch.findFirst({ where: { id: batchId, companyId: me.companyId }, include: { certificate: true } });
+    if (!batch) throw new NotFoundException('Lote eSocial nao encontrado.');
+    if (!batch.protocolNumber) throw new BadRequestException('Lote sem protocolo — transmita antes de consultar.');
+    if (!batch.certificate) throw new BadRequestException('Lote sem certificado vinculado.');
+    const environment = batch.environment as EsocialEnvironment;
+    const endpoint = environment === 'PRODUCTION' ? process.env.PAYROLL_ESOCIAL_QUERY_URL_PRODUCTION : process.env.PAYROLL_ESOCIAL_QUERY_URL_RESTRICTED;
+    const consulta = buildConsultaLoteXml(batch.protocolNumber);
+    const soapXml = buildSoapEnvelope(consulta, 'consultar');
+    if (process.env.PAYROLL_ESOCIAL_TRANSMISSION_ENABLED !== 'true' || !endpoint || body?.confirm !== true) {
+      return { queried: false, dryRun: true, protocol: batch.protocolNumber, envelopePreview: soapXml.slice(0, 2000) };
+    }
+    const { pfxBase64, password } = this.decryptPfx(batch.certificate);
+    let responseXml = '';
+    let status = 'PROCESSED';
+    try {
+      responseXml = await this.postSoap(endpoint, soapXml, pfxBase64, password);
+    } catch (error) {
+      status = 'ERROR';
+      responseXml = String((error as Error).message ?? error);
+    }
+    await this.prisma.payrollEsocialBatch.update({
+      where: { id: batch.id },
+      data: { transmissionStatus: status, transmitResponseXml: responseXml.slice(0, 100_000), receiptJson: { queriedAt: new Date().toISOString() } as Prisma.InputJsonValue },
+    });
+    await this.audit.record(me, { module: MODULE, entity: 'PayrollEsocialBatch', entityId: batch.id, action: 'QUERY', message: `Consulta de lote (${status})`, after: { status, protocol: batch.protocolNumber } });
+    return { queried: status !== 'ERROR', status, protocol: batch.protocolNumber };
   }
 
   async batchXml(me: AuthPayload, batchId: string) {

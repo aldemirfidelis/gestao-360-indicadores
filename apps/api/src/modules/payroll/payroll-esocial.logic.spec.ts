@@ -2,13 +2,17 @@ import { describe, expect, it } from 'vitest';
 import {
   buildEventId,
   buildInternalBatchXml,
+  buildLoteEnvelopeXml,
   buildS1010Xml,
   buildS1200Xml,
+  buildS1210Xml,
   buildS1299Xml,
   buildS2200Xml,
   buildS2299Xml,
+  buildSoapEnvelope,
   decimalStringToEsocialMoney,
   environmentCode,
+  extractProtocol,
   hashXml,
   rubricTypeCode,
   sanitizeEsocialCode,
@@ -180,5 +184,61 @@ describe('payroll-esocial.logic', () => {
     expect(xml).toContain('<vrRubr>1750.00</vrRubr>');
     // rubrica zerada não entra
     expect(xml).not.toContain('<vrRubr>0.00</vrRubr>');
+  });
+
+  it('monta S-1210 (pagamentos) com data, líquido e IRRF', () => {
+    const xml = buildS1210Xml({
+      eventId: 'ID11234567800019020260714123456PGT01',
+      environment: 'PRODUCTION_RESTRICTED',
+      periodRef: '2026-07',
+      employerRegistration: '12.345.678/0001-90',
+      workerCpf: '123.456.789-09',
+      paymentDate: '2026-08-05',
+      paymentId: 'DM-2026-07',
+      netPaid: '2913.98',
+      irrf: '23.83',
+    });
+    expect(xml).toContain('<evtPgtos Id="ID11234567800019020260714123456PGT01">');
+    expect(xml).toContain('<cpfBenef>12345678909</cpfBenef>');
+    expect(xml).toContain('<dtPgto>2026-08-05</dtPgto>');
+    expect(xml).toContain('<perRef>2026-07</perRef>');
+    expect(xml).toContain('<vrLiq>2913.98</vrLiq>');
+    expect(xml).toContain('<vrIRRF>23.83</vrIRRF>');
+  });
+
+  it('S-1210 sem IRRF omite o bloco de detalhamento', () => {
+    const xml = buildS1210Xml({
+      eventId: 'ID1', environment: 'PRODUCTION_RESTRICTED', periodRef: '2026-07',
+      employerRegistration: '12345678000190', workerCpf: '12345678909',
+      paymentDate: '2026-08-05', paymentId: 'DM', netPaid: '1500.00', irrf: '0.00',
+    });
+    expect(xml).not.toContain('<detIR>');
+    expect(xml).toContain('<vrLiq>1500.00</vrLiq>');
+  });
+
+  it('monta envelope de lote com eventos assinados e SOAP de envio', () => {
+    const signedEvent = '<?xml version="1.0" encoding="UTF-8"?>\n<eSocial><evtRemun Id="ID-A"><x/></evtRemun><Signature>abc</Signature></eSocial>';
+    const lote = buildLoteEnvelopeXml({
+      employerRegistration: '12.345.678/0001-90',
+      signedEvents: [{ eventId: 'ID-A', signedXml: signedEvent }],
+    });
+    expect(lote).toContain('lote/eventos/envio');
+    expect(lote).toContain('<envioLoteEventos grupo="1">');
+    expect(lote).toContain('<nrInsc>12345678</nrInsc>'); // raiz do CNPJ no empregador
+    expect(lote).toContain('<evento Id="ID-A">');
+    // o evento embutido perde o próprio prólogo <?xml?>
+    expect(lote).not.toContain('<?xml version="1.0" encoding="UTF-8"?>\n<eSocial><evtRemun');
+    expect(lote).toContain('<Signature>abc</Signature>');
+
+    const soap = buildSoapEnvelope(lote, 'enviar');
+    expect(soap).toContain('soap12:Envelope');
+    expect(soap).toContain('<EnviarLoteEventos');
+    expect(soap).toContain('<loteEventos>');
+  });
+
+  it('extrai protocolo da resposta de envio', () => {
+    expect(extractProtocol('<retorno><dadosRecepcaoLote><protocoloEnvio>1.2.202607.0000001</protocoloEnvio></dadosRecepcaoLote></retorno>')).toBe('1.2.202607.0000001');
+    expect(extractProtocol('<x:nrProtocolo>ABC123</x:nrProtocolo>')).toBe('ABC123');
+    expect(extractProtocol('<sem/>')).toBeNull();
   });
 });

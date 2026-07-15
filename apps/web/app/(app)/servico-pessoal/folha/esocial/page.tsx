@@ -264,6 +264,36 @@ export default function PayrollEsocialPage() {
     onError: (err: any) => toast.error(err.message || 'Erro ao assinar o lote.'),
   });
 
+  const generatePayments = useMutation({
+    mutationFn: () => api<{ created: number; skipped: unknown[] }>(`/payroll/runs/${effectiveRun}/esocial/payments`, { method: 'POST', json: { environment: 'PRODUCTION_RESTRICTED' } }),
+    onSuccess: (data) => {
+      toast.success(`${data.created} evento(s) S-1210 gerado(s).`);
+      void qc.invalidateQueries({ queryKey: ['payroll-esocial-events', effectiveRun] });
+    },
+    onError: (err: any) => toast.error(err.message || 'Erro ao gerar S-1210.'),
+  });
+
+  const transmitBatch = useMutation({
+    mutationFn: (id: string) => api<{ transmitted: boolean; dryRun?: boolean; reason?: string; status?: string; protocol?: string }>(`/payroll/esocial/batches/${id}/transmit`, { method: 'POST', json: { confirm: true } }),
+    onSuccess: (data) => {
+      if (data.dryRun) toast.info(`Dry-run: envelope montado, nada enviado. ${data.reason ?? ''}`);
+      else if (data.transmitted) toast.success(`Transmitido. Protocolo: ${data.protocol ?? '—'}`);
+      else toast.warning(`Transmissão retornou ${data.status ?? 'sem protocolo'}.`);
+      void qc.invalidateQueries({ queryKey: ['payroll-esocial-batches', effectiveRun] });
+    },
+    onError: (err: any) => toast.error(err.message || 'Erro ao transmitir.'),
+  });
+
+  const queryBatch = useMutation({
+    mutationFn: (id: string) => api<{ queried: boolean; dryRun?: boolean; status?: string }>(`/payroll/esocial/batches/${id}/query`, { method: 'POST', json: { confirm: true } }),
+    onSuccess: (data) => {
+      if (data.dryRun) toast.info('Consulta em dry-run (transmissão desabilitada).');
+      else toast.success(`Consulta: ${data.status ?? 'ok'}.`);
+      void qc.invalidateQueries({ queryKey: ['payroll-esocial-batches', effectiveRun] });
+    },
+    onError: (err: any) => toast.error(err.message || 'Erro ao consultar.'),
+  });
+
   const onPickPfx = (file: File | undefined) => {
     if (!file) return;
     const reader = new FileReader();
@@ -378,6 +408,9 @@ export default function PayrollEsocialPage() {
             </Button>
             <Button onClick={() => generateEvents.mutate()} disabled={!effectiveRun || generateEvents.isPending}>
               <FileCode2 className="mr-2 h-4 w-4" /> S-1200 / S-2299
+            </Button>
+            <Button variant="outline" onClick={() => generatePayments.mutate()} disabled={!effectiveRun || generatePayments.isPending}>
+              <FileCode2 className="mr-2 h-4 w-4" /> S-1210 Pagamentos
             </Button>
             <Button variant="outline" onClick={() => generateClosing.mutate()} disabled={!effectiveRun || generateClosing.isPending}>
               <PackagePlus className="mr-2 h-4 w-4" /> S-1299 Fechamento
@@ -500,6 +533,16 @@ export default function PayrollEsocialPage() {
                         <Button variant="outline" size="sm" className="mr-2" onClick={() => signBatch.mutate(batch.id)} disabled={signBatch.isPending}>
                           <KeyRound className="mr-1 h-3.5 w-3.5" /> Assinar
                         </Button>
+                      )}
+                      {batch.status === 'SIGNED' && (
+                        <>
+                          <Button variant="outline" size="sm" className="mr-2" onClick={() => transmitBatch.mutate(batch.id)} disabled={transmitBatch.isPending}>
+                            Transmitir
+                          </Button>
+                          <Button variant="ghost" size="sm" className="mr-2" onClick={() => queryBatch.mutate(batch.id)} disabled={queryBatch.isPending}>
+                            Consultar
+                          </Button>
+                        </>
                       )}
                       <Button variant="ghost" size="sm" onClick={() => setXmlFor(batch.id)}>
                         Ver XML

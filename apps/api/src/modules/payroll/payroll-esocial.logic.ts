@@ -37,6 +37,7 @@ const NS_TAB_RUBRICA = 'http://www.esocial.gov.br/schema/evt/evtTabRubrica/v_S_0
 const NS_FECHA = 'http://www.esocial.gov.br/schema/evt/evtFechaEvPer/v_S_01_03_00';
 const NS_ADMISSAO = 'http://www.esocial.gov.br/schema/evt/evtAdmissao/v_S_01_03_00';
 const NS_DESLIG = 'http://www.esocial.gov.br/schema/evt/evtDeslig/v_S_01_03_00';
+const NS_PGTOS = 'http://www.esocial.gov.br/schema/evt/evtPgtos/v_S_01_03_00';
 const VERSION_PROC = 'G360-0.1';
 
 /** Motivo de desligamento (Tabela 19 do eSocial) por tipo interno de rescisão. */
@@ -409,6 +410,67 @@ export function buildS2299Xml(input: EsocialTerminationEvent): string {
   ].join('\n');
 }
 
+export interface EsocialPaymentEvent {
+  eventId: string;
+  environment: EsocialEnvironment;
+  periodRef: string; // competência de apuração YYYY-MM
+  employerRegistration: string;
+  workerCpf: string;
+  paymentDate: string; // YYYY-MM-DD (regime de caixa — fato gerador do IRRF)
+  paymentId: string; // ideDmDev, deve casar com o S-1200 da mesma competência
+  netPaid: string; // valor líquido pago (decimal "0.00")
+  irrf: string; // IRRF retido no pagamento (decimal "0.00")
+}
+
+/**
+ * S-1210 (Pagamentos de Rendimentos do Trabalho) simplificado, para conferência
+ * interna. Informa o pagamento (regime de caixa) vinculado à apuração do S-1200
+ * e o IRRF retido no ato. ⚠️ O detalhamento de rendimentos/deduções do IRRF é
+ * simplificado (só o total) e exige validação antes de qualquer transmissão.
+ */
+export function buildS1210Xml(input: EsocialPaymentEvent): string {
+  const employerRoot = onlyDigits(input.employerRegistration).slice(0, 8);
+  const irrfValue = decimalStringToEsocialMoney(input.irrf);
+  const irrfBlock = Number(irrfValue) > 0
+    ? [
+        '        <detPgtoFl>',
+        '          <detIR>',
+        `            <vrIRRF>${irrfValue}</vrIRRF>`,
+        '          </detIR>',
+        '        </detPgtoFl>',
+      ].join('\n')
+    : '';
+  return [
+    '<?xml version="1.0" encoding="UTF-8"?>',
+    `<eSocial xmlns="${NS_PGTOS}">`,
+    `  <evtPgtos Id="${xmlEscape(input.eventId)}">`,
+    '    <ideEvento>',
+    '      <indApuracao>1</indApuracao>',
+    `      <perApur>${xmlEscape(input.periodRef)}</perApur>`,
+    `      <tpAmb>${environmentCode(input.environment)}</tpAmb>`,
+    '      <procEmi>1</procEmi>',
+    `      <verProc>${VERSION_PROC}</verProc>`,
+    '    </ideEvento>',
+    '    <ideEmpregador>',
+    '      <tpInsc>1</tpInsc>',
+    `      <nrInsc>${xmlEscape(employerRoot)}</nrInsc>`,
+    '    </ideEmpregador>',
+    '    <ideBenef>',
+    `      <cpfBenef>${xmlEscape(onlyDigits(input.workerCpf))}</cpfBenef>`,
+    '      <infoPgto>',
+    `        <dtPgto>${xmlEscape(input.paymentDate)}</dtPgto>`,
+    '        <tpPgto>1</tpPgto>',
+    `        <perRef>${xmlEscape(input.periodRef)}</perRef>`,
+    `        <ideDmDev>${xmlEscape(sanitizeEsocialCode(input.paymentId, 'G360', 30))}</ideDmDev>`,
+    `        <vrLiq>${decimalStringToEsocialMoney(input.netPaid)}</vrLiq>`,
+    irrfBlock,
+    '      </infoPgto>',
+    '    </ideBenef>',
+    '  </evtPgtos>',
+    '</eSocial>',
+  ].filter((line) => line !== '').join('\n');
+}
+
 export function buildInternalBatchXml(input: {
   batchId: string;
   environment: EsocialEnvironment;
@@ -433,6 +495,103 @@ export function buildInternalBatchXml(input: {
     events,
     '</g360EsocialLote>',
   ].join('\n');
+}
+
+// ------------------------------ transmissão (envelope de lote + SOAP) ------------------------------
+
+// ⚠️ Namespaces/versões do serviço mudam entre versões do eSocial. Estes são os
+// modelos estruturais e DEVEM ser confirmados contra o WSDL oficial vigente
+// antes de transmitir em produção.
+const NS_LOTE_ENVIO = 'http://www.esocial.gov.br/schema/lote/eventos/envio/v1_1_1';
+const NS_WS_ENVIO = 'http://www.esocial.gov.br/servicos/empregador/lote/eventos/envio/v1_1_0';
+const NS_WS_CONSULTA = 'http://www.esocial.gov.br/servicos/empregador/lote/eventos/envio/consulta/retornoProcessamento/v1_0_0';
+const NS_SOAP12 = 'http://www.w3.org/2003/05/soap-envelope';
+
+/** Remove o prólogo <?xml ...?> de um documento (para embutir num envelope). */
+function stripXmlProlog(xml: string): string {
+  return xml.replace(/^\s*<\?xml[^>]*\?>\s*/i, '').trim();
+}
+
+/**
+ * Envelope de envio de lote (grupo 1, até 50 eventos) com os eventos JÁ
+ * ASSINADOS. O empregador é o contribuinte; o transmissor pode ser o próprio
+ * empregador ou um procurador (mesmo CNPJ por padrão).
+ */
+export function buildLoteEnvelopeXml(input: {
+  employerRegistration: string;
+  transmitterRegistration?: string;
+  signedEvents: Array<{ eventId: string; signedXml: string }>;
+}): string {
+  const employerRoot = onlyDigits(input.employerRegistration).slice(0, 8);
+  const transmitter = onlyDigits(input.transmitterRegistration || input.employerRegistration).slice(0, 14);
+  const eventos = input.signedEvents
+    .map((event) => [
+      `    <evento Id="${xmlEscape(event.eventId)}">`,
+      stripXmlProlog(event.signedXml),
+      '    </evento>',
+    ].join('\n'))
+    .join('\n');
+  return [
+    '<?xml version="1.0" encoding="UTF-8"?>',
+    `<eSocial xmlns="${NS_LOTE_ENVIO}">`,
+    '  <envioLoteEventos grupo="1">',
+    '    <ideEmpregador>',
+    '      <tpInsc>1</tpInsc>',
+    `      <nrInsc>${xmlEscape(employerRoot)}</nrInsc>`,
+    '    </ideEmpregador>',
+    '    <ideTransmissor>',
+    '      <tpInsc>1</tpInsc>',
+    `      <nrInsc>${xmlEscape(transmitter)}</nrInsc>`,
+    '    </ideTransmissor>',
+    '    <eventos>',
+    eventos,
+    '    </eventos>',
+    '  </envioLoteEventos>',
+    '</eSocial>',
+  ].join('\n');
+}
+
+/** Payload de consulta do processamento de um lote pelo protocolo de envio. */
+export function buildConsultaLoteXml(protocol: string): string {
+  return [
+    '<?xml version="1.0" encoding="UTF-8"?>',
+    `<eSocial xmlns="${NS_WS_CONSULTA}">`,
+    '  <consultaLoteEventos>',
+    `    <protocoloEnvio>${xmlEscape(protocol)}</protocoloEnvio>`,
+    '  </consultaLoteEventos>',
+    '</eSocial>',
+  ].join('\n');
+}
+
+/** Envelope SOAP 1.2 para a operação EnviarLoteEventos. */
+export function buildSoapEnvelope(loteXml: string, operation: 'enviar' | 'consultar' = 'enviar'): string {
+  const inner = stripXmlProlog(loteXml);
+  if (operation === 'consultar') {
+    return [
+      `<soap12:Envelope xmlns:soap12="${NS_SOAP12}">`,
+      '  <soap12:Body>',
+      `    <ConsultarLoteEventos xmlns="${NS_WS_CONSULTA}">`,
+      `      <consulta>${inner}</consulta>`,
+      '    </ConsultarLoteEventos>',
+      '  </soap12:Body>',
+      '</soap12:Envelope>',
+    ].join('\n');
+  }
+  return [
+    `<soap12:Envelope xmlns:soap12="${NS_SOAP12}">`,
+    '  <soap12:Body>',
+    `    <EnviarLoteEventos xmlns="${NS_WS_ENVIO}">`,
+    `      <loteEventos>${inner}</loteEventos>`,
+    '    </EnviarLoteEventos>',
+    '  </soap12:Body>',
+    '</soap12:Envelope>',
+  ].join('\n');
+}
+
+/** Extrai o número do protocolo de uma resposta de envio (best-effort, tolerante a namespace). */
+export function extractProtocol(responseXml: string): string | null {
+  const match = responseXml.match(/<\s*(?:[\w-]+:)?protocoloEnvio\s*>([^<]+)</i) ?? responseXml.match(/<\s*(?:[\w-]+:)?nrProtocolo\s*>([^<]+)</i);
+  return match ? match[1].trim() : null;
 }
 
 export function xmlEscape(value: string | number | null | undefined): string {
