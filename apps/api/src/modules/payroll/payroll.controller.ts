@@ -10,6 +10,7 @@ import { PayrollRunService } from './payroll-run.service';
 import { PayrollObligationsService } from './payroll-obligations.service';
 import { PayrollBankService } from './payroll-bank.service';
 import { PayrollAccountingService } from './payroll-accounting.service';
+import { PayrollAnalyticsService } from './payroll-analytics.service';
 
 /**
  * Folha de Pagamento (Fase 1 — fundação). Segregação de funções por permissão:
@@ -26,7 +27,22 @@ export class PayrollController {
     private readonly obligations: PayrollObligationsService,
     private readonly bank: PayrollBankService,
     private readonly accounting: PayrollAccountingService,
+    private readonly analytics: PayrollAnalyticsService,
   ) {}
+
+  // ------------------------------ Fase 7: Gestão à Vista + anomalias ------------------------------
+
+  @Get('dashboard')
+  @RequirePermissions('folha:view')
+  payrollDashboard(@CurrentUser() me: AuthPayload) {
+    return this.analytics.dashboard(me);
+  }
+
+  @Get('runs/:id/anomalies')
+  @RequirePermissions('folha:view')
+  runAnomalies(@CurrentUser() me: AuthPayload, @Param('id') id: string, @Query('variationPct') variationPct?: string) {
+    return this.analytics.anomalies(me, id, variationPct ? Number(variationPct) : undefined);
+  }
 
   // ------------------------------ Fase 6b: contabilização ------------------------------
 

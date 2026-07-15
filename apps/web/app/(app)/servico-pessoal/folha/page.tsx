@@ -160,6 +160,11 @@ export default function PayrollDashboardPage() {
                 <Banknote className="mr-2 h-4 w-4" /> Banco
               </Link>
             </Button>
+            <Button asChild variant="outline" size="sm">
+              <Link href="/servico-pessoal/folha/gestao-a-vista">
+                <Gauge className="mr-2 h-4 w-4" /> Gestão à Vista
+              </Link>
+            </Button>
             {canOperate && (
               <Button onClick={() => setNewCompOpen(true)} size="sm">
                 <FolderPlus className="mr-2 h-4 w-4" /> Abrir Competência
