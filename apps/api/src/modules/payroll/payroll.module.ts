@@ -5,6 +5,7 @@ import { PayrollEsocialService } from './payroll-esocial.service';
 import { PayrollLegalTablesService } from './legal-tables.service';
 import { PayrollRunService } from './payroll-run.service';
 import { PayrollObligationsService } from './payroll-obligations.service';
+import { PayrollBankService } from './payroll-bank.service';
 
 /**
  * Folha de Pagamento (docs/diagnostico-folha-pagamento.md). Reusa o colaborador
@@ -14,7 +15,7 @@ import { PayrollObligationsService } from './payroll-obligations.service';
 @Module({
   imports: [PersonnelModule],
   controllers: [PayrollController],
-  providers: [PayrollLegalTablesService, PayrollRunService, PayrollEsocialService, PayrollObligationsService],
-  exports: [PayrollRunService, PayrollLegalTablesService, PayrollEsocialService, PayrollObligationsService],
+  providers: [PayrollLegalTablesService, PayrollRunService, PayrollEsocialService, PayrollObligationsService, PayrollBankService],
+  exports: [PayrollRunService, PayrollLegalTablesService, PayrollEsocialService, PayrollObligationsService, PayrollBankService],
 })
 export class PayrollModule {}

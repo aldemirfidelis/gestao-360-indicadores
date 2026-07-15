@@ -241,6 +241,8 @@ export const PERMISSION_CATALOG = [
   ['folha:approve', 'Aprovar processamentos calculados da folha', 'Folha de Pagamento', 'approve'],
   ['folha:close', 'Fechar e reabrir (com justificativa) processamentos da folha', 'Folha de Pagamento', 'manage'],
   ['folha:params', 'Administrar rubricas e parametros legais versionados', 'Folha de Pagamento', 'manage'],
+  ['folha:bank', 'Operar pagamento bancario da folha (remessa, aprovacao, retorno)', 'Folha de Pagamento', 'approve'],
+  ['folha:accounting', 'Gerar e exportar a contabilizacao da folha', 'Folha de Pagamento', 'manage'],
   ['folha:esocial', 'Gerar XML e lotes assistidos do eSocial e referenciar certificados', 'Folha de Pagamento', 'manage'],
 
   // Suprimentos — Compras

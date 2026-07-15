@@ -34,6 +34,11 @@ const PROFILE_TEXT_FIELDS = [
   'educationLevel',
   'sex',
   'raceColor',
+  'bankCode',
+  'bankAgency',
+  'bankAccount',
+  'bankAccountDigit',
+  'pixKey',
   'emergencyContactName',
   'emergencyContactPhone',
   'notes',
@@ -746,6 +751,10 @@ export class EmployeesService {
       } else {
         data.userId = null;
       }
+    }
+    // Antifraude: marca quando os dados bancários mudaram.
+    if (['bankCode', 'bankAgency', 'bankAccount', 'bankAccountDigit', 'pixKey'].some((f) => f in data)) {
+      data.bankUpdatedAt = new Date();
     }
     return data;
   }

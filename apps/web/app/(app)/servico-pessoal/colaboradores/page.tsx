@@ -115,6 +115,7 @@ const EMPTY_FORM = {
   cpf: '', rg: '', pisPasep: '', ctpsNumber: '', birthDate: '', phone: '', personalEmail: '',
   address: '', city: '', state: '', zipCode: '', maritalStatus: '', educationLevel: '',
   sex: '', raceColor: '', cbo: '',
+  bankCode: '', bankAgency: '', bankAccount: '', bankAccountDigit: '', pixKey: '',
   contractType: '', workRegime: '', admissionDate: '', userId: '',
   emergencyContactName: '', emergencyContactPhone: '', notes: '',
 };
@@ -189,6 +190,11 @@ export default function EmployeesPage() {
           sex: form.sex || null,
           raceColor: form.raceColor || null,
           cbo: form.cbo || null,
+          bankCode: form.bankCode || null,
+          bankAgency: form.bankAgency || null,
+          bankAccount: form.bankAccount || null,
+          bankAccountDigit: form.bankAccountDigit || null,
+          pixKey: form.pixKey || null,
           contractType: form.contractType || null,
           workRegime: form.workRegime || null,
           admissionDate: form.admissionDate || null,
@@ -323,6 +329,11 @@ export default function EmployeesPage() {
       sex: profile.sex ?? '',
       raceColor: profile.raceColor ?? '',
       cbo: employee.job?.cbo ?? '',
+      bankCode: profile.bankCode ?? '',
+      bankAgency: profile.bankAgency ?? '',
+      bankAccount: profile.bankAccount ?? '',
+      bankAccountDigit: profile.bankAccountDigit ?? '',
+      pixKey: profile.pixKey ?? '',
       contractType: profile.contractType ?? '',
       workRegime: profile.workRegime ?? '',
       admissionDate: toInputDate(profile.admissionDate),
@@ -546,6 +557,14 @@ export default function EmployeesPage() {
               <div>
                 <Label>CBO do cargo <span className="text-[10px] text-muted-foreground">(eSocial)</span></Label>
                 <Input value={form.cbo} inputMode="numeric" maxLength={6} placeholder="Ex.: 252105" onChange={(e) => setForm((f) => ({ ...f, cbo: e.target.value.replace(/\D/g, '') }))} />
+              </div>
+              <div className="md:col-span-2 grid grid-cols-2 gap-3 rounded-md border p-3 md:grid-cols-5">
+                <div className="col-span-2 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground md:col-span-5">Dados bancários (pagamento da folha)</div>
+                <div><Label className="text-xs">Banco</Label><Input value={form.bankCode} inputMode="numeric" maxLength={3} placeholder="341" onChange={(e) => setForm((f) => ({ ...f, bankCode: e.target.value.replace(/\D/g, '') }))} /></div>
+                <div><Label className="text-xs">Agência</Label><Input value={form.bankAgency} onChange={(e) => setForm((f) => ({ ...f, bankAgency: e.target.value }))} /></div>
+                <div><Label className="text-xs">Conta</Label><Input value={form.bankAccount} onChange={(e) => setForm((f) => ({ ...f, bankAccount: e.target.value }))} /></div>
+                <div><Label className="text-xs">Dígito</Label><Input value={form.bankAccountDigit} maxLength={2} onChange={(e) => setForm((f) => ({ ...f, bankAccountDigit: e.target.value }))} /></div>
+                <div><Label className="text-xs">PIX</Label><Input value={form.pixKey} onChange={(e) => setForm((f) => ({ ...f, pixKey: e.target.value }))} /></div>
               </div>
               <div>
                 <Label>Tipo de contrato</Label>

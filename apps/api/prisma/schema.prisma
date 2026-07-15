@@ -12681,6 +12681,14 @@ model PersonnelEmployeeProfile {
   /// eSocial: sexo (M/F) e raça/cor (código da Tabela 12) do trabalhador.
   sex            String?
   raceColor      String?
+  /// Dados bancários para pagamento da folha (CNAB/PIX).
+  bankCode        String?
+  bankAgency      String?
+  bankAccount     String?
+  bankAccountDigit String?
+  pixKey          String?
+  /// Quando os dados bancários mudaram (antifraude: alteração recente).
+  bankUpdatedAt   DateTime?
 
   contractType    String? // CLT | PJ | ESTAGIO | APRENDIZ | TEMPORARIO | AUTONOMO
   workRegime      String? // PRESENCIAL | HIBRIDO | REMOTO
@@ -13561,6 +13569,73 @@ model WithdrawalApprovalPolicy {
 
   @@index([companyId, active, orgNodeId])
   @@map("supply_withdrawal_approval_policies")
+}
+
+/// Conta bancária pagadora da empresa (cabeçalho do CNAB). Uma por empresa.
+model PayrollBankConfig {
+  id           String   @id @default(uuid())
+  companyId    String   @unique
+  bankCode     String
+  agency       String
+  account      String
+  accountDigit String?
+  updatedById  String?
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  @@map("payroll_bank_configs")
+}
+
+/// Lote de pagamento bancário de um processamento de folha (Fase 6). Segregação
+/// de funções: quem cria não aprova; a exportação da remessa exige aprovação.
+model PayrollBankBatch {
+  id             String             @id @default(uuid())
+  companyId      String
+  runId          String
+  periodRef      String
+  paymentDate    DateTime
+  /// DRAFT | PENDING_APPROVAL | APPROVED | EXPORTED | RETURNED | RECONCILED | CANCELLED
+  status         String             @default("DRAFT")
+  itemCount      Int                @default(0)
+  totalCents     Int                @default(0)
+  antifraud      Json? // alertas antifraude no momento da montagem
+  remessaContent String? // CNAB 240 gerado
+  remessaHash    String?
+  returnContent  String? // retorno importado
+  createdById    String?
+  approvedById   String?
+  approvedAt     DateTime?
+  exportedById   String?
+  exportedAt     DateTime?
+  createdAt      DateTime           @default(now())
+  updatedAt      DateTime           @updatedAt
+  items          PayrollBankItem[]
+
+  @@index([companyId, runId])
+  @@index([companyId, status])
+  @@map("payroll_bank_batches")
+}
+
+model PayrollBankItem {
+  id          String           @id @default(uuid())
+  companyId   String
+  batchId     String
+  batch       PayrollBankBatch @relation(fields: [batchId], references: [id], onDelete: Cascade)
+  employeeId  String
+  name        String
+  bankCode    String?
+  agency      String?
+  account     String?
+  accountDigit String?
+  pixKey      String?
+  netCents    Int
+  /// PENDING | PAID | REJECTED
+  status      String           @default("PENDING")
+  returnCode  String?
+  createdAt   DateTime         @default(now())
+
+  @@index([companyId, batchId])
+  @@map("payroll_bank_items")
 }
 
 /// Obrigação trabalhista assistida (Fase 5): FGTS Digital, DCTFWeb, EFD-Reinf,

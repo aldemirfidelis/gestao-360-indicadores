@@ -155,6 +155,11 @@ export default function PayrollDashboardPage() {
                 <CalendarClock className="mr-2 h-4 w-4" /> Obrigações
               </Link>
             </Button>
+            <Button asChild variant="outline" size="sm">
+              <Link href="/servico-pessoal/folha/banco">
+                <Banknote className="mr-2 h-4 w-4" /> Banco
+              </Link>
+            </Button>
             {canOperate && (
               <Button onClick={() => setNewCompOpen(true)} size="sm">
                 <FolderPlus className="mr-2 h-4 w-4" /> Abrir Competência

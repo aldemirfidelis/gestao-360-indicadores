@@ -8,6 +8,7 @@ import { PayrollEsocialService } from './payroll-esocial.service';
 import { PayrollLegalTablesService } from './legal-tables.service';
 import { PayrollRunService } from './payroll-run.service';
 import { PayrollObligationsService } from './payroll-obligations.service';
+import { PayrollBankService } from './payroll-bank.service';
 
 /**
  * Folha de Pagamento (Fase 1 — fundação). Segregação de funções por permissão:
@@ -22,7 +23,55 @@ export class PayrollController {
     private readonly legalTables: PayrollLegalTablesService,
     private readonly esocial: PayrollEsocialService,
     private readonly obligations: PayrollObligationsService,
+    private readonly bank: PayrollBankService,
   ) {}
+
+  // ------------------------------ Fase 6: pagamento bancário ------------------------------
+
+  @Get('bank/config')
+  @RequirePermissions('folha:bank')
+  bankConfig(@CurrentUser() me: AuthPayload) {
+    return this.bank.getConfig(me.companyId);
+  }
+
+  @Post('bank/config')
+  @RequirePermissions('folha:bank')
+  setBankConfig(@CurrentUser() me: AuthPayload, @Body() body: any) {
+    return this.bank.setConfig(me, body);
+  }
+
+  @Get('bank/batches')
+  @RequirePermissions('folha:bank')
+  listBankBatches(@CurrentUser() me: AuthPayload, @Query('runId') runId?: string) {
+    return this.bank.listBatches(me, runId);
+  }
+
+  @Post('runs/:id/bank/batch')
+  @RequirePermissions('folha:bank')
+  createBankBatch(@CurrentUser() me: AuthPayload, @Param('id') id: string, @Body() body: any) {
+    return this.bank.createBatch(me, id, body);
+  }
+
+  @Post('bank/batches/:id/approve')
+  @RequirePermissions('folha:bank')
+  approveBankBatch(@CurrentUser() me: AuthPayload, @Param('id') id: string, @Body() body: any) {
+    return this.bank.approveBatch(me, id, body);
+  }
+
+  @Post('bank/batches/:id/export')
+  @RequirePermissions('folha:bank')
+  async exportBankBatch(@CurrentUser() me: AuthPayload, @Param('id') id: string, @Res({ passthrough: true }) res: Response) {
+    const result = await this.bank.exportRemessa(me, id);
+    res.setHeader('content-type', 'text/plain; charset=utf-8');
+    res.setHeader('content-disposition', `attachment; filename="${result.fileName}"`);
+    return result.content;
+  }
+
+  @Post('bank/batches/:id/return')
+  @RequirePermissions('folha:bank')
+  importBankReturn(@CurrentUser() me: AuthPayload, @Param('id') id: string, @Body() body: any) {
+    return this.bank.importReturn(me, id, body);
+  }
 
   // ------------------------------ Fase 5: obrigações assistidas ------------------------------
 
