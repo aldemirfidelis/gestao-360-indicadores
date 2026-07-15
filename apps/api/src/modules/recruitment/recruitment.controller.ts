@@ -3,14 +3,70 @@ import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import { RequirePermissions } from '../../common/decorators/permissions.decorator';
 import { AuthPayload } from '../auth/auth.types';
 import { RecruitRequisitionService } from './recruit-requisition.service';
+import { RecruitPostingService } from './recruit-posting.service';
 
 /**
- * Recrutamento e Seleção (F1). Rotas autenticadas /api/recruitment/*.
- * O portal público de carreiras e o do candidato entram em fases seguintes.
+ * Recrutamento e Seleção (F1-F2). Rotas autenticadas /api/recruitment/*.
+ * O portal público de carreiras é servido pelo CareersController (@Public).
  */
 @Controller('recruitment')
 export class RecruitmentController {
-  constructor(private readonly requisitions: RecruitRequisitionService) {}
+  constructor(
+    private readonly requisitions: RecruitRequisitionService,
+    private readonly postings: RecruitPostingService,
+  ) {}
+
+  // ------------------------------ pipelines ------------------------------
+
+  @Get('pipelines')
+  @RequirePermissions('recruit:view')
+  listPipelines(@CurrentUser() me: AuthPayload) {
+    return this.postings.listPipelines(me);
+  }
+
+  @Post('pipelines')
+  @RequirePermissions('recruit:manage')
+  createPipeline(@CurrentUser() me: AuthPayload, @Body() body: any) {
+    return this.postings.createPipeline(me, body);
+  }
+
+  // ------------------------------ vagas ------------------------------
+
+  @Get('postings')
+  @RequirePermissions('recruit:view')
+  listPostings(@CurrentUser() me: AuthPayload, @Query('status') status?: string) {
+    return this.postings.listPostings(me, status);
+  }
+
+  @Get('postings/:id')
+  @RequirePermissions('recruit:view')
+  getPosting(@CurrentUser() me: AuthPayload, @Param('id') id: string) {
+    return this.postings.getPosting(me, id);
+  }
+
+  @Post('requisitions/:id/posting')
+  @RequirePermissions('recruit:manage')
+  createPosting(@CurrentUser() me: AuthPayload, @Param('id') id: string) {
+    return this.postings.createFromRequisition(me, id);
+  }
+
+  @Post('postings/:id')
+  @RequirePermissions('recruit:manage')
+  updatePosting(@CurrentUser() me: AuthPayload, @Param('id') id: string, @Body() body: any) {
+    return this.postings.updatePosting(me, id, body);
+  }
+
+  @Post('postings/:id/publish')
+  @RequirePermissions('recruit:manage')
+  publishPosting(@CurrentUser() me: AuthPayload, @Param('id') id: string) {
+    return this.postings.publish(me, id);
+  }
+
+  @Post('postings/:id/status')
+  @RequirePermissions('recruit:manage')
+  setPostingStatus(@CurrentUser() me: AuthPayload, @Param('id') id: string, @Body() body: any) {
+    return this.postings.setStatus(me, id, String(body?.status ?? ''));
+  }
 
   @Get('requisitions')
   @RequirePermissions('recruit:view')

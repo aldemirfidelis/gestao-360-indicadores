@@ -1,9 +1,11 @@
 'use client';
 
 import { useState } from 'react';
+import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
-import { AlertTriangle, CheckCircle2, Plus, Send, ShieldAlert, UserPlus, X } from 'lucide-react';
+import { AlertTriangle, Briefcase, CheckCircle2, Megaphone, Plus, Send, ShieldAlert, UserPlus, X } from 'lucide-react';
 import { PageHeader } from '@/components/shell/page-header';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -45,9 +47,11 @@ const EMPTY = { orgJobId: '', orgNodeId: '', openingsRequested: 1, vacancyType: 
 
 export default function RecruitmentPage() {
   const qc = useQueryClient();
+  const router = useRouter();
   const { hasPermission } = useAuth();
   const canCreate = hasPermission(['recruit:requisition:create']);
   const canApprove = hasPermission(['recruit:requisition:approve']);
+  const canManage = hasPermission(['recruit:manage']);
   const [formOpen, setFormOpen] = useState(false);
   const [form, setForm] = useState({ ...EMPTY });
   const [detailId, setDetailId] = useState<string | null>(null);
@@ -69,6 +73,11 @@ export default function RecruitmentPage() {
     onSuccess: () => { toast.success('Feito.'); invalidate(); },
     onError: (e: any) => toast.error(e.message || 'Erro.'),
   });
+  const createPosting = useMutation({
+    mutationFn: (id: string) => api<{ id: string }>(`/recruitment/requisitions/${id}/posting`, { method: 'POST' }),
+    onSuccess: () => { toast.success('Vaga criada como rascunho. Ajuste o texto e publique.'); setDetailId(null); router.push('/servico-pessoal/recrutamento/vagas'); },
+    onError: (e: any) => toast.error(e.message || 'Erro ao criar vaga.'),
+  });
 
   const requisitions = listQuery.data ?? [];
   const options = optionsQuery.data;
@@ -83,7 +92,12 @@ export default function RecruitmentPage() {
       <PageHeader
         title="Recrutamento e Seleção"
         description="Requisições de vaga a partir do organograma/Cargos e Salários, com travas de quadro/orçamento e aprovação."
-        actions={canCreate && <Button onClick={() => setFormOpen(true)}><Plus className="mr-2 h-4 w-4" /> Nova requisição</Button>}
+        actions={
+          <div className="flex gap-2">
+            <Link href="/servico-pessoal/recrutamento/vagas"><Button variant="outline"><Briefcase className="mr-2 h-4 w-4" /> Vagas</Button></Link>
+            {canCreate && <Button onClick={() => setFormOpen(true)}><Plus className="mr-2 h-4 w-4" /> Nova requisição</Button>}
+          </div>
+        }
       />
 
       <Card>
@@ -213,6 +227,7 @@ export default function RecruitmentPage() {
                   </>
                 )}
                 {canApprove && detail.status === 'APPROVED' && <Button size="sm" onClick={() => act.mutate({ id: detail.id, action: 'send-to-recruitment' })}><UserPlus className="mr-1 h-3.5 w-3.5" /> Encaminhar ao recrutamento</Button>}
+                {canManage && ['SENT_TO_RECRUITMENT', 'IN_RECRUITMENT'].includes(detail.status) && <Button size="sm" onClick={() => createPosting.mutate(detail.id)} disabled={createPosting.isPending}><Megaphone className="mr-1 h-3.5 w-3.5" /> Criar vaga</Button>}
                 {canCreate && !['CANCELLED', 'CLOSED', 'FILLED'].includes(detail.status) && <Button size="sm" variant="ghost" className="text-rose-600" onClick={() => { const reason = prompt('Motivo do cancelamento:'); if (reason) act.mutate({ id: detail.id, action: 'cancel', body: { reason } }); }}>Cancelar</Button>}
               </div>
             </div>

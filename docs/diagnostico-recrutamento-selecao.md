@@ -1,6 +1,6 @@
 # Diagnóstico + Mapa de Impacto — Módulo de Recrutamento e Seleção (ATS)
 
-Data: 2026-07-15 · Autor: engenharia (sessão Claude) · Status: análise/planejamento (nenhum código alterado)
+Data: 2026-07-15 · Autor: engenharia (sessão Claude) · Status: F1 e F2 implementadas (F3+ pendentes)
 
 Atende à Seção 1 do prompt-mestre: análise do projeto e mapa de impacto ANTES de implementar.
 Princípio central: **reuso máximo, zero cadastro paralelo** (mesma diretriz de
@@ -72,12 +72,16 @@ Todas com `companyId`, índices, unicidade, `createdAt/updatedAt`, soft-delete s
 
 ## 3. Fases de implementação (o módulo NÃO cabe em um PR)
 
-- **F1 — Fundação + Requisição + travas (quadro/orçamento).** Schema-núcleo; requisição a partir de
-  `CompensationPosition`; snapshot versionado do cargo; workflow de aprovação configurável com
-  segregação; reserva provisória de quadro/orçamento (e liberação no cancelamento). Permissões
-  `recruit:*`. Sem UI pública ainda.
-- **F2 — Vaga + Pipeline + Portal público de carreiras.** `/carreiras/{slug}` (listagem/detalhe,
-  responsivo, sem dados internos), publicação de vaga, canais, pipeline Kanban/lista.
+- **F1 — Fundação + Requisição + travas (quadro/orçamento).** ✅ CONCLUÍDA (commit bc14ccb).
+  Schema-núcleo; requisição a partir de `CompensationPosition`; snapshot versionado do cargo;
+  workflow de aprovação configurável com segregação; reserva provisória de quadro/orçamento (e
+  liberação no cancelamento). Permissões `recruit:*`. Sem UI pública ainda.
+- **F2 — Vaga + Pipeline + Portal público de carreiras.** ✅ CONCLUÍDA. Vaga nasce da requisição
+  encaminhada (snapshot protegido + texto público editável); pipeline padrão de 10 etapas; publicação
+  exige descrição + pipeline; portal `/carreiras` (lista) e `/carreiras/vagas/{slug}` (detalhe),
+  responsivo, resolvido por subdomínio ou `?empresa={slug}`, expondo **apenas** campos públicos
+  (`toPublicVacancy`) — nunca orçamento/CC/aprovadores/salário interno. UI interna em
+  `/servico-pessoal/recrutamento/vagas`. Candidatura ainda é stub (F3).
 - **F3 — Candidato + Candidatura + Portal do candidato + LGPD.** Perfil reutilizável, upload seguro
   (MIME/antivírus/URL assinada), consentimentos versionados, dedup, direitos do titular.
 - **F4 — Triagem/Avaliação/Entrevistas/Testes/Comunicação + IA opcional.** Scorecards, perguntas

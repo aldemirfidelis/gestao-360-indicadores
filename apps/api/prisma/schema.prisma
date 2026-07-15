@@ -13894,3 +13894,94 @@ model RecruitRequisitionSnapshot {
   @@unique([requisitionId, version])
   @@map("recruit_requisition_snapshots")
 }
+
+// ===================== Recrutamento — Fase 2 (vaga + pipeline + canais) =====================
+
+/// Modelo de pipeline de seleção (etapas configuráveis por empresa/vaga).
+model RecruitPipelineTemplate {
+  id        String                 @id @default(uuid())
+  companyId String
+  name      String
+  isDefault Boolean                @default(false)
+  active    Boolean                @default(true)
+  createdById String?
+  createdAt DateTime               @default(now())
+  updatedAt DateTime               @updatedAt
+  stages    RecruitPipelineStage[]
+  postings  RecruitJobPosting[]
+
+  @@index([companyId])
+  @@map("recruit_pipeline_templates")
+}
+
+model RecruitPipelineStage {
+  id         String                  @id @default(uuid())
+  companyId  String
+  templateId String
+  template   RecruitPipelineTemplate @relation(fields: [templateId], references: [id], onDelete: Cascade)
+  order      Int
+  name       String
+  /// STANDARD | ELIMINATORY | INTERVIEW | ASSESSMENT | OFFER | PREHIRE | FINAL
+  type       String                  @default("STANDARD")
+  config     Json?
+
+  @@index([companyId, templateId])
+  @@map("recruit_pipeline_stages")
+}
+
+/// Vaga publicada (anúncio). Criada a partir de uma requisição encaminhada.
+/// Guarda a descrição PÚBLICA (editável) e o snapshot protegido do cargo.
+model RecruitJobPosting {
+  id                 String                   @id @default(uuid())
+  companyId          String
+  requisitionId      String
+  slug               String
+  title              String
+  publicDescription  String? // texto de divulgação (adaptável)
+  publicRequirements String?
+  benefitsText       String?
+  processStepsText   String?
+  location           String?
+  city               String?
+  workMode           String?
+  contractType       String?
+  orgNodeId          String?
+  areaName           String?
+  /// PUBLIC | INTERNAL | BOTH | CONFIDENTIAL
+  visibility         String                   @default("PUBLIC")
+  pcd                Boolean                  @default(false)
+  showSalary         Boolean                  @default(false)
+  salaryText         String?
+  status             String                   @default("DRAFT") // DRAFT | PUBLISHED | PAUSED | CLOSED
+  publishedAt        DateTime?
+  closesAt           DateTime?
+  applicationLimit   Int?
+  pipelineTemplateId String?
+  pipelineTemplate   RecruitPipelineTemplate? @relation(fields: [pipelineTemplateId], references: [id])
+  /// Snapshot protegido da descrição técnica/requisitos originais do cargo.
+  protectedSnapshot  Json?
+  createdById        String?
+  createdAt          DateTime                 @default(now())
+  updatedAt          DateTime                 @updatedAt
+  deletedAt          DateTime?
+  channels           RecruitPostingChannel[]
+
+  @@unique([companyId, slug])
+  @@index([companyId, status])
+  @@index([companyId, requisitionId])
+  @@map("recruit_job_postings")
+}
+
+model RecruitPostingChannel {
+  id          String            @id @default(uuid())
+  companyId   String
+  postingId   String
+  posting     RecruitJobPosting @relation(fields: [postingId], references: [id], onDelete: Cascade)
+  channel     String // CARREIRAS | LINKEDIN | INDEED | INTERNO | INDICACAO | CONSULTORIA
+  externalUrl String?
+  publishedAt DateTime?
+  createdAt   DateTime          @default(now())
+
+  @@index([companyId, postingId])
+  @@map("recruit_posting_channels")
+}
