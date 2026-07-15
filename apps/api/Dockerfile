@@ -22,8 +22,11 @@ WORKDIR /app
 # ----------- Stage: install + build -----------
 FROM base AS build
 # Heap maior apenas para o build (tsc/nest build em Droplet pequena);
-# o runtime mantem o valor menor definido no stage `base`.
-ENV NODE_OPTIONS="--max-old-space-size=2048 --enable-source-maps"
+# o runtime mantem o valor menor definido no stage `base`. Subido de 2048 para
+# 3584 em 2026-07-15: o modulo de Recrutamento (F1-F7) fez o "nest build"
+# estourar 2048MB (heap OOM real, visto em producao); droplet tem 4GB de swap
+# livre para sustentar o pico durante o build.
+ENV NODE_OPTIONS="--max-old-space-size=3584 --enable-source-maps"
 # Copia manifests primeiro para aproveitar cache de install
 COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
 COPY packages/shared/package.json ./packages/shared/
