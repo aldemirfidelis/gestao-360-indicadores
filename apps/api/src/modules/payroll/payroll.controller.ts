@@ -258,6 +258,13 @@ export class PayrollController {
     return this.esocial.reconcileTotalizers(me, id, body);
   }
 
+  /** Valida os eventos do processamento contra os XSDs oficiais (pasta configurada). */
+  @Post('runs/:id/esocial/validate-xsd')
+  @RequirePermissions('folha:esocial')
+  validateEsocialXsd(@CurrentUser() me: AuthPayload, @Param('id') id: string) {
+    return this.esocial.validateRunEventsXsd(me, id);
+  }
+
   @Get('esocial/batches')
   @RequirePermissions('folha:esocial')
   listEsocialBatches(@CurrentUser() me: AuthPayload, @Query('runId') runId?: string) {

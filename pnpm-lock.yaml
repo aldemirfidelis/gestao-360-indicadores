@@ -134,6 +134,9 @@ importers:
       xml-crypto:
         specifier: ^6.1.2
         version: 6.1.2
+      xmllint-wasm:
+        specifier: ^5.2.0
+        version: 5.2.0(@types/node@20.19.41)
       zod:
         specifier: ^3.23.8
         version: 3.25.76
@@ -6622,6 +6625,12 @@ packages:
   xmlhttprequest-ssl@2.1.2:
     resolution: {integrity: sha512-TEU+nJVUUnA4CYJFLvK5X9AOeH4KvDvhIfm0vV1GaQRtchnG0hgK5p8hw/xjv8cunWYCsiPCSDzObPyhEwq3KQ==}
     engines: {node: '>=0.4.0'}
+
+  xmllint-wasm@5.2.0:
+    resolution: {integrity: sha512-GVMuR3ViU8R7sakcVm/4GClMtCV8p7xgjXZlc6GmvPpInIz4V41lmRnjSd4uKhVkf5MZj97wEZkPM4RMAhojuQ==}
+    engines: {node: '>=16'}
+    peerDependencies:
+      '@types/node': '>=16'
 
   xpath@0.0.33:
     resolution: {integrity: sha512-NNXnzrkDrAzalLhIUc01jO2mOzXGXh1JwPgkihcLLzw98c0WgYDmmjSh1Kl3wzaxSVWMuA+fe0WTWOBDWCBmNA==}
@@ -13608,6 +13617,10 @@ snapshots:
   xmlchars@2.2.0: {}
 
   xmlhttprequest-ssl@2.1.2: {}
+
+  xmllint-wasm@5.2.0(@types/node@20.19.41):
+    dependencies:
+      '@types/node': 20.19.41
 
   xpath@0.0.33: {}
 

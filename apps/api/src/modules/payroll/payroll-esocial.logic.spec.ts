@@ -14,6 +14,11 @@ import {
   environmentCode,
   extractProtocol,
   hashXml,
+  mapEstadoCivil,
+  mapGrauInstrucao,
+  mapRacaCor,
+  mapSexo,
+  parseOfficialTotalizers,
   rubricTypeCode,
   sanitizeEsocialCode,
   terminationMotiveCode,
@@ -134,7 +139,7 @@ describe('payroll-esocial.logic', () => {
     expect(terminationMotiveCode('ACORDO')).toBe('33');
   });
 
-  it('monta S-2200 (admissão) com dados cadastrais e contratuais', () => {
+  it('monta S-2200 (admissão) com campos obrigatórios preenchidos', () => {
     const xml = buildS2200Xml({
       eventId: 'ID11234567800019020260714123456ADM01',
       environment: 'PRODUCTION_RESTRICTED',
@@ -147,16 +152,54 @@ describe('payroll-esocial.logic', () => {
       categoryCode: '101',
       cboCode: '252105',
       monthlySalary: '3000.00',
+      sexo: 'F',
+      racaCor: '1',
+      estadoCivil: '2',
+      grauInstrucao: '11',
+      pisPasep: '12065812345',
+      birthCityCode: '3550308',
+      birthUf: 'SP',
     });
 
     expect(xml).toContain('<evtAdmissao Id="ID11234567800019020260714123456ADM01">');
     expect(xml).toContain('<cpfTrab>12345678909</cpfTrab>');
-    expect(xml).toContain('<nmTrab>Ana Silva</nmTrab>');
-    expect(xml).toContain('<dtNascto>1990-05-20</dtNascto>');
-    expect(xml).toContain('<dtAdm>2023-02-01</dtAdm>');
+    expect(xml).toContain('<sexo>F</sexo>');
+    expect(xml).toContain('<racaCor>1</racaCor>');
+    expect(xml).toContain('<estCiv>2</estCiv>');
+    expect(xml).toContain('<grauInstr>11</grauInstr>');
+    expect(xml).toContain('<codMunic>3550308</codMunic>');
+    expect(xml).toContain('<CBOCargo>252105</CBOCargo>');
     expect(xml).toContain('<vrSalFx>3000.00</vrSalFx>');
-    expect(xml).toContain('<codCargo>252105</codCargo>');
     expect(xml).toContain('matricula="M-001"');
+    // regime celetista preenchido quando há PIS
+    expect(xml).toContain('<infoCeletista>');
+  });
+
+  it('mapeia códigos das tabelas do eSocial', () => {
+    expect(mapSexo('FEMININO')).toBe('F');
+    expect(mapSexo('M')).toBe('M');
+    expect(mapRacaCor('PARDA')).toBe('3');
+    expect(mapRacaCor('9')).toBe('6'); // fora da tabela → não informado
+    expect(mapEstadoCivil('CASADO')).toBe('2');
+    expect(mapEstadoCivil('VIUVO')).toBe('5');
+    expect(mapGrauInstrucao('SUPERIOR COMPLETO')).toBe('11');
+    expect(mapGrauInstrucao('MEDIO')).toBe('09');
+  });
+
+  it('extrai totalizadores oficiais de um retorno (S-5001/5011/5013)', () => {
+    const retorno = `
+      <retornoProcessamento>
+        <evtBasesTrab><ideEvento/><infoCpCalc><vrCpSeg>253.41</vrCpSeg></infoCpCalc></evtBasesTrab>
+        <evtCS><infoCS><infoCpConsolid><vrBcCp00>3000.00</vrBcCp00><vrCpSeg>253.41</vrCpSeg></infoCpConsolid></infoCS></evtCS>
+        <evtFGTS><infoFGTS><vrBcFgts>3000.00</vrBcFgts><vrFgts>240.00</vrFgts></infoFGTS></evtFGTS>
+      </retornoProcessamento>`;
+    const t = parseOfficialTotalizers(retorno);
+    expect(t.present).toContain('S-5001');
+    expect(t.present).toContain('S-5011');
+    expect(t.present).toContain('S-5013');
+    expect(t.s5013FgtsCents).toBe(24000); // 240.00
+    expect(t.s5013FgtsBaseCents).toBe(300000); // 3000.00
+    expect(t.s5011CpBaseCents).toBe(300000);
   });
 
   it('monta S-2299 (desligamento) com motivo, data e verbas', () => {

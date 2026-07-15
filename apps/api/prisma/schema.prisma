@@ -6222,6 +6222,8 @@ model OrgJob {
   company     Company  @relation(fields: [companyId], references: [id])
   name        String
   description String?
+  /// Código CBO (Classificação Brasileira de Ocupações) — exigido no eSocial.
+  cbo         String?
   active      Boolean  @default(true)
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
@@ -12676,6 +12678,9 @@ model PersonnelEmployeeProfile {
   zipCode        String?
   maritalStatus  String?
   educationLevel String?
+  /// eSocial: sexo (M/F) e raça/cor (código da Tabela 12) do trabalhador.
+  sex            String?
+  raceColor      String?
 
   contractType    String? // CLT | PJ | ESTAGIO | APRENDIZ | TEMPORARIO | AUTONOMO
   workRegime      String? // PRESENCIAL | HIBRIDO | REMOTO

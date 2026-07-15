@@ -21,11 +21,17 @@ import {
   ESOCIAL_SOURCE_URL,
   extractProtocol,
   hashXml,
+  mapEstadoCivil,
+  mapGrauInstrucao,
+  mapRacaCor,
+  mapSexo,
   onlyDigits,
+  parseOfficialTotalizers,
   sanitizeEsocialCode,
   terminationMotiveCode,
   type EsocialEnvironment,
 } from './payroll-esocial.logic';
+import { validateEsocialXsd, xsdConfigured } from './payroll-xsd.util';
 import * as https from 'https';
 
 const MODULE = 'payroll';
@@ -682,7 +688,13 @@ export class PayrollEsocialService {
           id: true,
           name: true,
           registrationId: true,
-          personnelProfile: { select: { cpf: true, birthDate: true, admissionDate: true, contractType: true } },
+          job: { select: { cbo: true } },
+          personnelProfile: {
+            select: {
+              cpf: true, birthDate: true, admissionDate: true, contractType: true,
+              sex: true, raceColor: true, maritalStatus: true, educationLevel: true, pisPasep: true, state: true,
+            },
+          },
         },
       }),
       this.prisma.payrollEsocialEvent.findMany({
@@ -710,19 +722,33 @@ export class PayrollEsocialService {
         continue;
       }
       const eventId = buildEventId({ employerRegistration, createdAt, seed: `${me.companyId}:S-2200:${worker.employeeId}:${environment}` });
-      const issues = ['S-2200 simplificado: sexo, raca/cor, estado civil, grau de instrucao e CBO ficam em branco e exigem complemento cadastral antes de transmitir.'];
+      const profile = employee.personnelProfile;
+      const cbo = onlyDigits(employee.job?.cbo) || null;
+      // Pendências cadastrais que o XSD oficial exigiria de fato.
+      const issues: string[] = [];
+      if (!profile?.sex) issues.push('Sexo ausente no prontuario — presumido "M".');
+      if (!profile?.raceColor) issues.push('Raca/cor ausente — enviado "6" (nao informado).');
+      if (!cbo) issues.push('CBO do cargo ausente — obrigatorio no eSocial.');
+      issues.push('Municipio de nascimento (codigo IBGE) nao cadastrado — completar antes de transmitir.');
       const xml = buildS2200Xml({
         eventId,
         environment,
         employerRegistration,
         workerCpf: cpf,
         workerName: employee.name,
-        birthDate: employee.personnelProfile?.birthDate ? employee.personnelProfile.birthDate.toISOString().slice(0, 10) : null,
+        birthDate: profile?.birthDate ? profile.birthDate.toISOString().slice(0, 10) : null,
         admissionDate: admissionDate.toISOString().slice(0, 10),
         workerRegistration: employee.registrationId || worker.employeeId,
-        categoryCode: this.categoryForContract(employee.personnelProfile?.contractType),
-        cboCode: null,
+        categoryCode: this.categoryForContract(profile?.contractType),
+        cboCode: cbo,
         monthlySalary: worker.baseSalary.toString(),
+        sexo: mapSexo(profile?.sex),
+        racaCor: mapRacaCor(profile?.raceColor),
+        estadoCivil: mapEstadoCivil(profile?.maritalStatus),
+        grauInstrucao: mapGrauInstrucao(profile?.educationLevel),
+        pisPasep: profile?.pisPasep ?? null,
+        birthCityCode: null, // IBGE não cadastrado ainda
+        birthUf: profile?.state ?? null,
       });
       eventRows.push({
         companyId: me.companyId,
@@ -804,16 +830,42 @@ export class PayrollEsocialService {
       fgtsBase: round2(fgtsBase),
       fgtsValue: round2(fgtsValue),
     };
-    const issues: string[] = ['Prévia dos totalizadores derivada do cálculo interno — o governo não retornou S-5001/S-5002 (nada foi transmitido).'];
+    const issues: string[] = [];
     if (workersWithoutEvent > 0) issues.push(`${workersWithoutEvent} colaborador(es) calculado(s) sem evento eSocial gerado — gere os eventos antes de conciliar.`);
+
+    // Retorno OFICIAL: se algum lote do processamento tem resposta de consulta,
+    // extrai os totalizadores do governo (S-5001/5011/5013) e compara.
+    const responded = await this.prisma.payrollEsocialBatch.findFirst({
+      where: { companyId: me.companyId, runId: run.id, environment, transmitResponseXml: { not: null } },
+      orderBy: { updatedAt: 'desc' },
+      select: { transmitResponseXml: true },
+    });
+    let official: ReturnType<typeof parseOfficialTotalizers> | null = null;
+    let divergences: Array<{ metric: string; internalCents: number; officialCents: number; diffCents: number }> = [];
+    if (responded?.transmitResponseXml) {
+      official = parseOfficialTotalizers(responded.transmitResponseXml);
+      const cents = (value: number) => Math.round(value * 100);
+      const pairs: Array<{ metric: string; internal: number; official: number }> = [
+        { metric: 'INSS segurado (S-5001)', internal: cents(totalizers.s5001CpValue), official: official.s5001CpSegCents },
+        { metric: 'IRRF (S-5002)', internal: cents(totalizers.s5002IrrfValue), official: official.s5002IrrfCents },
+        { metric: 'FGTS (S-5013)', internal: cents(totalizers.fgtsValue), official: official.s5013FgtsCents },
+      ];
+      divergences = pairs
+        .filter((pair) => pair.official > 0 && pair.internal !== pair.official)
+        .map((pair) => ({ metric: pair.metric, internalCents: pair.internal, officialCents: pair.official, diffCents: pair.internal - pair.official }));
+      if (official.present.length) issues.push(`Totalizadores oficiais recebidos: ${official.present.join(', ')}.`);
+      if (divergences.length) issues.push(`${divergences.length} divergência(s) entre cálculo interno e retorno oficial.`);
+    } else {
+      issues.push('Prévia dos totalizadores derivada do cálculo interno — sem retorno oficial (nada transmitido/consultado ainda).');
+    }
 
     await this.audit.record(me, {
       module: MODULE,
       entity: 'PayrollEsocialEvent',
       entityId: run.id,
       action: 'RECONCILE',
-      message: `Prévia de totalizadores conciliada para ${run.workers.length} colaborador(es)`,
-      after: { ...totalizers, environment },
+      message: `Totalizadores conciliados para ${run.workers.length} colaborador(es)${official ? ' (com retorno oficial)' : ' (prévia)'}`,
+      after: { ...totalizers, official: official?.present ?? [], divergences: divergences.length, environment },
     });
     return {
       runId: run.id,
@@ -822,8 +874,43 @@ export class PayrollEsocialService {
       workersCalculated: run.workers.filter((worker) => worker.status === 'CALCULATED').length,
       workersWithoutEvent,
       totalizers,
+      official,
+      divergences,
       issues,
     };
+  }
+
+  /**
+   * Valida os eventos gerados de um processamento contra os XSDs OFICIAIS
+   * (pasta configurada em PAYROLL_ESOCIAL_XSD_DIR). Atualiza as pendências de
+   * cada evento com os erros do schema. Sem XSD configurado, informa e não falha.
+   */
+  async validateRunEventsXsd(me: AuthPayload, runId: string) {
+    const run = await this.prisma.payrollRun.findFirst({ where: { id: runId, companyId: me.companyId }, select: { id: true } });
+    if (!run) throw new NotFoundException('Processamento de folha nao encontrado.');
+    if (!xsdConfigured()) {
+      return { validated: false, reason: 'Pasta de XSD nao configurada (defina PAYROLL_ESOCIAL_XSD_DIR com os XSDs oficiais).', results: [] };
+    }
+    const events = await this.prisma.payrollEsocialEvent.findMany({
+      where: { companyId: me.companyId, runId: run.id },
+      select: { id: true, eventId: true, eventType: true, xml: true, issues: true },
+      take: 500,
+    });
+    const results: Array<{ eventId: string; eventType: string; valid: boolean; errors: string[] }> = [];
+    for (const event of events) {
+      const validation = await validateEsocialXsd(event.xml, event.eventType);
+      results.push({ eventId: event.eventId, eventType: event.eventType, valid: validation.valid, errors: validation.errors.slice(0, 20) });
+      const prior = Array.isArray(event.issues) ? (event.issues as string[]).filter((issue) => !issue.startsWith('[XSD]')) : [];
+      const xsdIssues = validation.valid ? [] : validation.errors.slice(0, 20).map((error) => `[XSD] ${error}`);
+      await this.prisma.payrollEsocialEvent.update({ where: { id: event.id }, data: { issues: [...prior, ...xsdIssues] } });
+    }
+    const invalid = results.filter((result) => !result.valid).length;
+    await this.audit.record(me, {
+      module: MODULE, entity: 'PayrollEsocialEvent', entityId: run.id, action: 'VALIDATE',
+      message: `Validacao XSD: ${results.length - invalid}/${results.length} validos`,
+      after: { total: results.length, invalid },
+    });
+    return { validated: true, total: results.length, invalid, results };
   }
 
   private async employerRegistrationOf(companyId: string): Promise<string> {

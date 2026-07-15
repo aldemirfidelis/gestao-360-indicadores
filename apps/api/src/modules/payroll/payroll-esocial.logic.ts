@@ -279,16 +279,29 @@ export interface EsocialAdmissionEvent {
   categoryCode: string;
   cboCode: string | null;
   monthlySalary: string; // valor decimal "0.00"
+  /** Já mapeados p/ os códigos do eSocial (ver mapSexo/mapRacaCor/...). */
+  sexo: 'M' | 'F';
+  racaCor: string;
+  estadoCivil: string;
+  grauInstrucao: string;
+  pisPasep: string | null;
+  /** Código IBGE do município de nascimento (7 dígitos), se disponível. */
+  birthCityCode: string | null;
+  birthUf: string | null;
 }
 
 /**
- * S-2200 (Admissão / Cadastramento Inicial do Vínculo) simplificado, para
- * conferência interna. ⚠️ Campos obrigatórios que o cadastro atual pode não ter
- * (sexo, raça/cor, estado civil, grau de instrução, CBO, país/município) saem
- * em branco e são sinalizados como pendência antes de qualquer transmissão.
+ * S-2200 (Admissão / Cadastramento Inicial do Vínculo). Preenche os campos
+ * obrigatórios com os dados do prontuário mapeados para as tabelas do eSocial.
+ * ⚠️ O que ainda não existe no cadastro (ex.: município de nascimento por código
+ * IBGE, CBO) é sinalizado como pendência pelo serviço; valide no XSD oficial.
  */
 export function buildS2200Xml(input: EsocialAdmissionEvent): string {
   const employerRoot = onlyDigits(input.employerRegistration).slice(0, 8);
+  const nascimentoLoc = input.birthCityCode
+    ? [`        <codMunic>${xmlEscape(input.birthCityCode)}</codMunic>`, `        <uf>${xmlEscape(input.birthUf ?? '')}</uf>`]
+    : [];
+  const pis = onlyDigits(input.pisPasep ?? '');
   return [
     '<?xml version="1.0" encoding="UTF-8"?>',
     `<eSocial xmlns="${NS_ADMISSAO}">`,
@@ -305,12 +318,13 @@ export function buildS2200Xml(input: EsocialAdmissionEvent): string {
     '    <trabalhador>',
     `      <cpfTrab>${xmlEscape(onlyDigits(input.workerCpf))}</cpfTrab>`,
     `      <nmTrab>${xmlEscape(input.workerName.slice(0, 70))}</nmTrab>`,
-    '      <sexo></sexo>',
-    '      <racaCor></racaCor>',
-    '      <estCiv></estCiv>',
-    '      <grauInstr></grauInstr>',
+    `      <sexo>${input.sexo}</sexo>`,
+    `      <racaCor>${xmlEscape(input.racaCor)}</racaCor>`,
+    `      <estCiv>${xmlEscape(input.estadoCivil)}</estCiv>`,
+    `      <grauInstr>${xmlEscape(input.grauInstrucao)}</grauInstr>`,
     '      <nascimento>',
     `        <dtNascto>${xmlEscape(input.birthDate ?? '')}</dtNascto>`,
+    ...nascimentoLoc,
     '        <paisNascto>105</paisNascto>',
     '        <paisNac>105</paisNac>',
     '      </nascimento>',
@@ -318,8 +332,10 @@ export function buildS2200Xml(input: EsocialAdmissionEvent): string {
     `    <vinculo matricula="${xmlEscape(sanitizeEsocialCode(input.workerRegistration, 'SEM-MATRICULA', 30))}">`,
     '      <tpRegTrab>1</tpRegTrab>',
     '      <tpRegPrev>1</tpRegPrev>',
+    ...(pis ? ['      <infoRegimeTrab>', '        <infoCeletista>', `          <dtAdm>${xmlEscape(input.admissionDate)}</dtAdm>`, '          <tpAdmissao>1</tpAdmissao>', '          <tpRegJor>1</tpRegJor>', '          <natAtividade>1</natAtividade>', '        </infoCeletista>', '      </infoRegimeTrab>'] : []),
     '      <infoContrato>',
-    `        <codCargo>${xmlEscape(input.cboCode ?? '')}</codCargo>`,
+    `        <nmCargo>${xmlEscape('Cargo')}</nmCargo>`,
+    ...(input.cboCode ? [`        <CBOCargo>${xmlEscape(input.cboCode)}</CBOCargo>`] : []),
     `        <codCateg>${xmlEscape(input.categoryCode)}</codCateg>`,
     '        <remuneracao>',
     `          <vrSalFx>${decimalStringToEsocialMoney(input.monthlySalary)}</vrSalFx>`,
@@ -592,6 +608,98 @@ export function buildSoapEnvelope(loteXml: string, operation: 'enviar' | 'consul
 export function extractProtocol(responseXml: string): string | null {
   const match = responseXml.match(/<\s*(?:[\w-]+:)?protocoloEnvio\s*>([^<]+)</i) ?? responseXml.match(/<\s*(?:[\w-]+:)?nrProtocolo\s*>([^<]+)</i);
   return match ? match[1].trim() : null;
+}
+
+// ------------------------------ mapeamentos de código (tabelas eSocial) ------------------------------
+
+/** Sexo eSocial: 'M' | 'F' a partir de código ou rótulo interno. */
+export function mapSexo(value: string | null | undefined): 'M' | 'F' {
+  const v = String(value ?? '').trim().toUpperCase();
+  if (v.startsWith('F')) return 'F';
+  return 'M';
+}
+
+/** Raça/cor (Tabela 12): 1 Branca · 2 Preta · 3 Parda · 4 Amarela · 5 Indígena · 6 Não informado. */
+export function mapRacaCor(value: string | null | undefined): string {
+  const v = String(value ?? '').trim().toUpperCase();
+  if (/^[1-6]$/.test(v)) return v;
+  const byLabel: Record<string, string> = { BRANCA: '1', PRETA: '2', PARDA: '3', AMARELA: '4', INDIGENA: '5', 'INDÍGENA': '5' };
+  return byLabel[v] ?? '6';
+}
+
+/** Estado civil (S-2200): 1 Solteiro · 2 Casado · 3 Divorciado · 4 Separado · 5 Viúvo. */
+export function mapEstadoCivil(value: string | null | undefined): string {
+  const v = String(value ?? '').trim().toUpperCase();
+  if (/^[1-5]$/.test(v)) return v;
+  const byLabel: Record<string, string> = {
+    SOLTEIRO: '1', CASADO: '2', UNIAO_ESTAVEL: '2', 'UNIÃO ESTÁVEL': '2',
+    DIVORCIADO: '3', SEPARADO: '4', VIUVO: '5', 'VIÚVO': '5',
+  };
+  return byLabel[v] ?? '1';
+}
+
+/** Grau de instrução (Tabela 18, subconjunto usual): 01 analf..12 pós/doutorado. */
+export function mapGrauInstrucao(value: string | null | undefined): string {
+  const v = String(value ?? '').trim().toUpperCase();
+  if (/^\d{2}$/.test(v)) return v;
+  if (v.includes('ANALFAB')) return '01';
+  if (v.includes('FUNDAMENTAL') || v.includes('FUNDAMENTAL')) return '07';
+  if (v.includes('MEDIO') || v.includes('MÉDIO') || v.includes('TECNICO') || v.includes('TÉCNICO')) return '09';
+  if (v.includes('POS') || v.includes('PÓS') || v.includes('MESTRADO') || v.includes('DOUTORADO') || v.includes('ESPECIALIZ')) return '12';
+  if (v.includes('SUPERIOR') || v.includes('GRADUAC') || v.includes('GRADUAÇ')) return '11';
+  return '09';
+}
+
+// ------------------------------ totalizadores (retornos S-5001/2/11/13) ------------------------------
+
+/** Soma (em centavos) todas as ocorrências de uma tag monetária, tolerante a prefixo de namespace. */
+export function sumMoneyTag(xml: string, tag: string): number {
+  const re = new RegExp(`<\\s*(?:[\\w-]+:)?${tag}\\s*>([^<]+)<`, 'gi');
+  let total = 0;
+  let match: RegExpExecArray | null;
+  while ((match = re.exec(xml)) !== null) {
+    const cents = Math.round(Number(String(match[1]).trim().replace(',', '.')) * 100);
+    if (Number.isFinite(cents)) total += cents;
+  }
+  return total;
+}
+
+export interface OfficialTotalizers {
+  present: string[]; // eventos totalizadores detectados
+  s5001CpSegCents: number; // INSS do segurado (S-5001)
+  s5002IrrfCents: number; // IRRF (S-5002)
+  s5011CpBaseCents: number; // base CP consolidada (S-5011)
+  s5011CpSegCents: number; // CP do segurado consolidada (S-5011)
+  s5013FgtsBaseCents: number; // base FGTS (S-5013)
+  s5013FgtsCents: number; // FGTS (S-5013)
+}
+
+/**
+ * Extrai os totalizadores oficiais de um retorno do eSocial (best-effort,
+ * tolerante a namespace). Os valores exatos dependem do leiaute vigente e devem
+ * ser conferidos; serve para reconciliar contra o cálculo interno.
+ */
+export function parseOfficialTotalizers(responseXml: string): OfficialTotalizers {
+  const present: string[] = [];
+  for (const [evt, label] of [
+    ['evtBasesTrab', 'S-5001'],
+    ['evtIrrf', 'S-5002'],
+    ['evtIrrfBenef', 'S-5002'],
+    ['evtCS', 'S-5011'],
+    ['evtFGTS', 'S-5013'],
+  ] as const) {
+    if (new RegExp(`<\\s*(?:[\\w-]+:)?${evt}\\b`, 'i').test(responseXml) && !present.includes(label)) present.push(label);
+  }
+  // sumMoneyTag já é case-insensitive — não somar variantes de caixa (duplicaria).
+  return {
+    present,
+    s5001CpSegCents: sumMoneyTag(responseXml, 'vrCpSeg'),
+    s5002IrrfCents: sumMoneyTag(responseXml, 'vrIrrf'),
+    s5011CpBaseCents: sumMoneyTag(responseXml, 'vrBcCp00'),
+    s5011CpSegCents: sumMoneyTag(responseXml, 'vrCpSegTransf'),
+    s5013FgtsBaseCents: sumMoneyTag(responseXml, 'vrBcFgts'),
+    s5013FgtsCents: sumMoneyTag(responseXml, 'vrFgts'),
+  };
 }
 
 export function xmlEscape(value: string | number | null | undefined): string {

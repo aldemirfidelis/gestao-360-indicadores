@@ -149,9 +149,19 @@ qualquer transmissão.
   `PAYROLL_ESOCIAL_SEND_URL_RESTRICTED`, `PAYROLL_ESOCIAL_SEND_URL_PRODUCTION`,
   `PAYROLL_ESOCIAL_QUERY_URL_RESTRICTED`, `PAYROLL_ESOCIAL_QUERY_URL_PRODUCTION`,
   `PAYROLL_ESOCIAL_PRODUCTION_ENABLED`. ⚠️ Os namespaces/versões do WSDL e as URLs oficiais DEVEM
-  ser confirmados na doc oficial do eSocial antes de transmitir; os XMLs ainda são simplificados
-  (validar no validador oficial). Pendentes: S-5011 e demais totalizadores oficiais (só após
-  transmissão), XML schema-completo, e o encaixe do S-1210 no pagamento bancário (F6).
+  ser confirmados na doc oficial do eSocial antes de transmitir.
+  **Schema-completude + validação XSD + totalizadores (2026-07-15):** S-2200 enriquecido com os
+  campos obrigatórios (sexo/raça-cor/estCiv/grauInstr mapeados p/ as tabelas do eSocial, PIS,
+  regime celetista, CBO) — novos campos `sex`/`raceColor` no prontuário e `cbo` no cargo (migração
+  20260715160000); o que ainda falta (código IBGE do município de nascimento, e o preenchimento
+  real de sexo/raça/CBO no cadastro) vira pendência sinalizada. **Validação XSD oficial**: util
+  `payroll-xsd.util` (xmllint-wasm) valida cada evento contra os XSDs OFICIAIS que o operador
+  baixa e aponta em `PAYROLL_ESOCIAL_XSD_DIR` (rota validate-xsd; erros viram pendências do
+  evento; sem a pasta, pula sinalizando). **Totalizadores oficiais**: `parseOfficialTotalizers`
+  extrai S-5001/S-5002/S-5011/S-5013 do retorno da consulta e a reconciliação compara com o
+  cálculo interno, apontando divergências (antes só havia a prévia). Pendentes: UI para capturar
+  sexo/raça/CBO no cadastro, tabela IBGE de municípios, e o encaixe do S-1210 no pagamento
+  bancário (F6). ⚠️ Só a validação contra os XSDs oficiais confirma schema-completude real.
 - **F5**: obrigações assistidas (FGTS Digital, DCTFWeb/Integra Contador opcional, EFD-Reinf,
   Qualificação Cadastral, DET, calendário legal).
 - **F6**: Banking Connector (CNAB 240, dupla aprovação, retorno/conciliação, antifraude) +

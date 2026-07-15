@@ -203,13 +203,25 @@ export default function PayrollEsocialPage() {
   });
 
   const reconcile = useMutation({
-    mutationFn: () => api<{ totalizers: Record<string, number>; workersWithoutEvent: number }>(`/payroll/runs/${effectiveRun}/esocial/reconcile`, { method: 'POST', json: { environment: 'PRODUCTION_RESTRICTED' } }),
+    mutationFn: () => api<{ totalizers: Record<string, number>; workersWithoutEvent: number; official?: { present: string[] } | null; divergences?: unknown[] }>(`/payroll/runs/${effectiveRun}/esocial/reconcile`, { method: 'POST', json: { environment: 'PRODUCTION_RESTRICTED' } }),
     onSuccess: (data) => {
       const t = data.totalizers;
       toast.success(`Totalizadores: INSS ${t.s5001CpValue?.toFixed(2)} · IRRF ${t.s5002IrrfValue?.toFixed(2)} · FGTS ${t.fgtsValue?.toFixed(2)}`);
+      if (data.official?.present?.length) toast.info(`Retorno oficial: ${data.official.present.join(', ')}${data.divergences?.length ? ` · ${data.divergences.length} divergência(s)` : ' · sem divergências'}`);
       if (data.workersWithoutEvent > 0) toast.warning(`${data.workersWithoutEvent} colaborador(es) sem evento gerado.`);
     },
     onError: (err: any) => toast.error(err.message || 'Erro ao conciliar totalizadores.'),
+  });
+
+  const validateXsd = useMutation({
+    mutationFn: () => api<{ validated: boolean; reason?: string; total?: number; invalid?: number }>(`/payroll/runs/${effectiveRun}/esocial/validate-xsd`, { method: 'POST' }),
+    onSuccess: (data) => {
+      if (!data.validated) toast.info(data.reason || 'Validação XSD indisponível.');
+      else if ((data.invalid ?? 0) === 0) toast.success(`XSD: ${data.total} evento(s) válidos.`);
+      else toast.warning(`XSD: ${data.invalid}/${data.total} com erro — ver pendências dos eventos.`);
+      void qc.invalidateQueries({ queryKey: ['payroll-esocial-events', effectiveRun] });
+    },
+    onError: (err: any) => toast.error(err.message || 'Erro ao validar XSD.'),
   });
 
   const createBatch = useMutation({
@@ -414,6 +426,9 @@ export default function PayrollEsocialPage() {
             </Button>
             <Button variant="outline" onClick={() => generateClosing.mutate()} disabled={!effectiveRun || generateClosing.isPending}>
               <PackagePlus className="mr-2 h-4 w-4" /> S-1299 Fechamento
+            </Button>
+            <Button variant="outline" onClick={() => validateXsd.mutate()} disabled={!effectiveRun || validateXsd.isPending}>
+              <BadgeCheck className="mr-2 h-4 w-4" /> Validar XSD
             </Button>
             <Button variant="outline" onClick={() => reconcile.mutate()} disabled={!effectiveRun || reconcile.isPending}>
               <ShieldCheck className="mr-2 h-4 w-4" /> Totalizadores
