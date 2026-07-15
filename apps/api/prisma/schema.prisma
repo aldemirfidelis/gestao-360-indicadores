@@ -13563,6 +13563,36 @@ model WithdrawalApprovalPolicy {
   @@map("supply_withdrawal_approval_policies")
 }
 
+/// Obrigação trabalhista assistida (Fase 5): FGTS Digital, DCTFWeb, EFD-Reinf,
+/// Qualificação Cadastral, DET. Modo assistido — organiza prazo/checklist/
+/// comprovantes; a transmissão/pagamento é feita pela empresa no portal oficial.
+model PayrollObligation {
+  id           String    @id @default(uuid())
+  companyId    String
+  kind         String // FGTS_DIGITAL | DCTFWEB | EFD_REINF | QUALIF_CADASTRAL | DET | ESOCIAL_FECHAMENTO
+  periodRef    String // YYYY-MM
+  title        String
+  dueDate      DateTime?
+  /// PENDING | IN_PROGRESS | SUBMITTED | PAID | DONE | NA
+  status       String    @default("PENDING")
+  amountCents  Int?
+  protocol     String?
+  officialUrl  String?
+  checklist    Json? // [{ label, done }]
+  attachments  Json? // [{ name, note, storageKey?, uploadedAt }]
+  resultJson   Json? // Qualificação Cadastral: divergências etc.
+  notes        String?
+  responsibleId String?
+  createdById  String?
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+
+  @@unique([companyId, kind, periodRef])
+  @@index([companyId, periodRef])
+  @@index([companyId, status])
+  @@map("payroll_obligations")
+}
+
 // ===================== Rotinas Especiais de Folha (Fase 3) =====================
 // Férias NÃO têm modelo próprio aqui: o módulo payroll consome a fonte canônica
 // VacationRequest (Serviço Pessoal), evitando cadastro paralelo de férias.

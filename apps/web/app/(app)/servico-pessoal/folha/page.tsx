@@ -5,6 +5,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
 import {
   Banknote,
+  CalendarClock,
   CalendarDays,
   ChevronRight,
   ClipboardList,
@@ -147,6 +148,11 @@ export default function PayrollDashboardPage() {
             <Button asChild variant="outline" size="sm">
               <Link href="/servico-pessoal/folha/esocial">
                 <FileCode2 className="mr-2 h-4 w-4" /> eSocial
+              </Link>
+            </Button>
+            <Button asChild variant="outline" size="sm">
+              <Link href="/servico-pessoal/folha/obrigacoes">
+                <CalendarClock className="mr-2 h-4 w-4" /> Obrigações
               </Link>
             </Button>
             {canOperate && (

@@ -2,9 +2,12 @@ import { Body, Controller, Get, Param, Post, Query } from '@nestjs/common';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import { RequirePermissions } from '../../common/decorators/permissions.decorator';
 import { AuthPayload } from '../auth/auth.types';
+import { Res } from '@nestjs/common';
+import { Response } from 'express';
 import { PayrollEsocialService } from './payroll-esocial.service';
 import { PayrollLegalTablesService } from './legal-tables.service';
 import { PayrollRunService } from './payroll-run.service';
+import { PayrollObligationsService } from './payroll-obligations.service';
 
 /**
  * Folha de Pagamento (Fase 1 — fundação). Segregação de funções por permissão:
@@ -18,7 +21,50 @@ export class PayrollController {
     private readonly runs: PayrollRunService,
     private readonly legalTables: PayrollLegalTablesService,
     private readonly esocial: PayrollEsocialService,
+    private readonly obligations: PayrollObligationsService,
   ) {}
+
+  // ------------------------------ Fase 5: obrigações assistidas ------------------------------
+
+  @Get('obligations')
+  @RequirePermissions('folha:view')
+  listObligations(@CurrentUser() me: AuthPayload, @Query('periodRef') periodRef?: string) {
+    return this.obligations.list(me, periodRef);
+  }
+
+  @Post('obligations/generate')
+  @RequirePermissions('folha:operate')
+  generateObligations(@CurrentUser() me: AuthPayload, @Body() body: any) {
+    return this.obligations.generateForCompetence(me, String(body?.periodRef ?? ''));
+  }
+
+  @Post('obligations/:id')
+  @RequirePermissions('folha:operate')
+  updateObligation(@CurrentUser() me: AuthPayload, @Param('id') id: string, @Body() body: any) {
+    return this.obligations.update(me, id, body);
+  }
+
+  @Post('obligations/:id/attachment')
+  @RequirePermissions('folha:operate')
+  attachObligation(@CurrentUser() me: AuthPayload, @Param('id') id: string, @Body() body: any) {
+    return this.obligations.addAttachment(me, id, body);
+  }
+
+  @Post('obligations/qualif-cad/:periodRef')
+  @RequirePermissions('folha:operate')
+  async qualifCad(@CurrentUser() me: AuthPayload, @Param('periodRef') periodRef: string, @Res({ passthrough: true }) res: Response) {
+    const result = await this.obligations.generateQualifCad(me, periodRef);
+    res.setHeader('content-type', 'text/csv; charset=utf-8');
+    res.setHeader('content-disposition', `attachment; filename="${result.fileName}"`);
+    res.setHeader('x-rows', String(result.rows));
+    return result.content;
+  }
+
+  @Post('obligations/:id/qualif-cad-return')
+  @RequirePermissions('folha:operate')
+  qualifCadReturn(@CurrentUser() me: AuthPayload, @Param('id') id: string, @Body() body: any) {
+    return this.obligations.importQualifCadReturn(me, id, body);
+  }
 
   // ------------------------------ competências ------------------------------
 
