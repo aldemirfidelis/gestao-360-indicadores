@@ -159,14 +159,26 @@ qualquer transmissão.
   baixa e aponta em `PAYROLL_ESOCIAL_XSD_DIR` (rota validate-xsd; erros viram pendências do
   evento; sem a pasta, pula sinalizando). **Totalizadores oficiais**: `parseOfficialTotalizers`
   extrai S-5001/S-5002/S-5011/S-5013 do retorno da consulta e a reconciliação compara com o
-  cálculo interno, apontando divergências (antes só havia a prévia). Pendentes: UI para capturar
-  sexo/raça/CBO no cadastro, tabela IBGE de municípios, e o encaixe do S-1210 no pagamento
-  bancário (F6). ⚠️ Só a validação contra os XSDs oficiais confirma schema-completude real.
-- **F5**: obrigações assistidas (FGTS Digital, DCTFWeb/Integra Contador opcional, EFD-Reinf,
-  Qualificação Cadastral, DET, calendário legal).
-- **F6**: Banking Connector (CNAB 240, dupla aprovação, retorno/conciliação, antifraude) +
-  contabilização.
-- **F7**: portal completo, Gestão à Vista, indicadores, anomalias, assistente explicativo.
+  cálculo interno, apontando divergências (antes só havia a prévia).
+  **Cadastro completo (2026-07-15):** sexo/raça-cor no prontuário + CBO no cargo (UI + backend),
+  então o S-2200 sai completo quando preenchido. Pendente: tabela IBGE de municípios.
+  ⚠️ Só a validação contra os XSDs oficiais confirma schema-completude real.
+- **F5 — CONCLUÍDA (2026-07-15):** obrigações assistidas (`PayrollObligation`): calendário legal
+  (FGTS Digital, DCTFWeb, EFD-Reinf, DET, fechamento eSocial) com prazos, checklist, comprovantes,
+  status ("pago" exige comprovante); Qualificação Cadastral (gera lote CSV dos ativos + importa
+  retorno com divergências). UI /servico-pessoal/folha/obrigacoes. Modo assistido — não transmite.
+- **F6 — CONCLUÍDA (2026-07-15):** pagamento bancário CNAB 240 (FEBRABAN, segmento A) com
+  antifraude (conta/PIX repetidos, desligado, sem conta, conta alterada, outlier), dupla
+  aprovação (aprovador ≠ quem montou), retorno/conciliação; dados bancários no prontuário + conta
+  pagadora da empresa. Contabilização em partidas dobradas balanceadas (D despesa / C passivos +
+  FGTS) com plano de contas configurável e export CSV. Permissões folha:bank/folha:accounting.
+  ⚠️ CNAB varia por banco — ajustar campos conforme o manual. Nada é enviado ao banco pelo sistema.
+- **F7 — CONCLUÍDA (2026-07-15):** portal "Minha Vida Funcional" (holerite PDF via jsPDF + informe
+  de rendimentos anual, self-scoped); Gestão à Vista (KPIs de custo/encargos, evolução 12 meses,
+  detecção de anomalias entre competências). Rotas dashboard/anomalies/income-report.
+
+**TODAS AS 7 FASES CONCLUÍDAS** (commits locais, sem push/deploy). Tudo "conferência interna" —
+nenhuma transmissão a governo/banco é feita pelo sistema; documentos não substituem os oficiais.
 
 ## 5. Riscos e pendências conhecidas
 - Valores legais do seed precisam de conferência da contabilidade (marcados na origem).
