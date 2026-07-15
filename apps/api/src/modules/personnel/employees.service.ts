@@ -32,6 +32,8 @@ const PROFILE_TEXT_FIELDS = [
   'zipCode',
   'maritalStatus',
   'educationLevel',
+  'sex',
+  'raceColor',
   'emergencyContactName',
   'emergencyContactPhone',
   'notes',
@@ -149,7 +151,7 @@ export class EmployeesService {
       where: { id, companyId: me.companyId },
       include: {
         orgNode: { select: { id: true, name: true } },
-        job: { select: { id: true, name: true } },
+        job: { select: { id: true, name: true, cbo: true } },
         personnelProfile: true,
         dependents: { orderBy: { name: 'asc' } },
         employmentEvents: { orderBy: [{ effectiveDate: 'desc' }, { createdAt: 'desc' }], take: 100 },
@@ -231,6 +233,9 @@ export class EmployeesService {
       });
       return employee;
     }).catch(this.rethrowCpfConflict);
+
+    // CBO é do cargo (OrgJob) — exigido no eSocial. Atualiza o cargo resolvido.
+    await this.applyJobCbo(jobId, body?.cbo);
 
     await this.audit.record(me, {
       module: MODULE,
@@ -332,6 +337,12 @@ export class EmployeesService {
         });
       }
     }).catch(this.rethrowCpfConflict);
+
+    // CBO do cargo atual (eSocial).
+    if ('cbo' in patch) {
+      const currentJobId = (core.job as { connect?: { id: string } } | undefined)?.connect?.id ?? before.jobId;
+      await this.applyJobCbo(currentJobId, patch.cbo);
+    }
 
     await this.audit.record(me, {
       module: MODULE,
@@ -686,6 +697,13 @@ export class EmployeesService {
     if (fallback) return fallback.id;
     const job = await this.prisma.orgJob.create({ data: { companyId, name: 'Cargo não definido' } });
     return job.id;
+  }
+
+  /** Grava o CBO (só dígitos) no cargo (OrgJob) — dado do cargo, exigido no eSocial. */
+  private async applyJobCbo(jobId: string | undefined | null, cbo: unknown): Promise<void> {
+    if (!jobId || cbo === undefined) return;
+    const digits = String(cbo ?? '').replace(/\D/g, '').slice(0, 6);
+    await this.prisma.orgJob.update({ where: { id: jobId }, data: { cbo: digits || null } });
   }
 
   private async validateOrgNode(companyId: string, orgNodeId: string | null): Promise<string | null> {

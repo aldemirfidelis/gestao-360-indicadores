@@ -40,7 +40,7 @@ interface EmployeeRow {
   name: string;
   status: string;
   orgNode: { id: string; name: string } | null;
-  job: { id: string; name: string } | null;
+  job: { id: string; name: string; cbo?: string | null } | null;
   cpfMasked: string | null;
   admissionDate: string | null;
   terminationDate: string | null;
@@ -73,7 +73,7 @@ interface EmployeeDetail {
   orgNodeId: string | null;
   jobId: string;
   orgNode: { id: string; name: string } | null;
-  job: { id: string; name: string } | null;
+  job: { id: string; name: string; cbo?: string | null } | null;
   personnelProfile: Record<string, any> | null;
   linkedUser: { id: string; name: string; email: string; active: boolean } | null;
   dependents: Array<{ id: string; name: string; relationship: string; birthDate: string | null; cpf: string | null; isIrDependent: boolean }>;
@@ -114,6 +114,7 @@ const EMPTY_FORM = {
   name: '', registrationId: '', jobId: '', jobName: '', orgNodeId: '',
   cpf: '', rg: '', pisPasep: '', ctpsNumber: '', birthDate: '', phone: '', personalEmail: '',
   address: '', city: '', state: '', zipCode: '', maritalStatus: '', educationLevel: '',
+  sex: '', raceColor: '', cbo: '',
   contractType: '', workRegime: '', admissionDate: '', userId: '',
   emergencyContactName: '', emergencyContactPhone: '', notes: '',
 };
@@ -185,6 +186,9 @@ export default function EmployeesPage() {
           zipCode: form.zipCode || null,
           maritalStatus: form.maritalStatus || null,
           educationLevel: form.educationLevel || null,
+          sex: form.sex || null,
+          raceColor: form.raceColor || null,
+          cbo: form.cbo || null,
           contractType: form.contractType || null,
           workRegime: form.workRegime || null,
           admissionDate: form.admissionDate || null,
@@ -316,6 +320,9 @@ export default function EmployeesPage() {
       zipCode: profile.zipCode ?? '',
       maritalStatus: profile.maritalStatus ?? '',
       educationLevel: profile.educationLevel ?? '',
+      sex: profile.sex ?? '',
+      raceColor: profile.raceColor ?? '',
+      cbo: employee.job?.cbo ?? '',
       contractType: profile.contractType ?? '',
       workRegime: profile.workRegime ?? '',
       admissionDate: toInputDate(profile.admissionDate),
@@ -498,6 +505,25 @@ export default function EmployeesPage() {
                 <Label>Escolaridade</Label>
                 <Input value={form.educationLevel} onChange={(e) => setForm((f) => ({ ...f, educationLevel: e.target.value }))} />
               </div>
+              <div>
+                <Label>Sexo <span className="text-[10px] text-muted-foreground">(eSocial)</span></Label>
+                <NativeSelect value={form.sex} onChange={(e) => setForm((f) => ({ ...f, sex: e.target.value }))}>
+                  <option value="">Não informado</option>
+                  <option value="M">Masculino</option>
+                  <option value="F">Feminino</option>
+                </NativeSelect>
+              </div>
+              <div>
+                <Label>Raça/cor <span className="text-[10px] text-muted-foreground">(eSocial)</span></Label>
+                <NativeSelect value={form.raceColor} onChange={(e) => setForm((f) => ({ ...f, raceColor: e.target.value }))}>
+                  <option value="">Não informado</option>
+                  <option value="1">Branca</option>
+                  <option value="2">Preta</option>
+                  <option value="3">Parda</option>
+                  <option value="4">Amarela</option>
+                  <option value="5">Indígena</option>
+                </NativeSelect>
+              </div>
             </TabsContent>
             <TabsContent value="contratuais" className="grid grid-cols-1 gap-3 pt-3 md:grid-cols-2">
               <div>
@@ -516,6 +542,10 @@ export default function EmployeesPage() {
                   <option value="">Sem área definida</option>
                   {(options?.orgNodes ?? []).map((node) => <option key={node.id} value={node.id}>{node.name}</option>)}
                 </NativeSelect>
+              </div>
+              <div>
+                <Label>CBO do cargo <span className="text-[10px] text-muted-foreground">(eSocial)</span></Label>
+                <Input value={form.cbo} inputMode="numeric" maxLength={6} placeholder="Ex.: 252105" onChange={(e) => setForm((f) => ({ ...f, cbo: e.target.value.replace(/\D/g, '') }))} />
               </div>
               <div>
                 <Label>Tipo de contrato</Label>
