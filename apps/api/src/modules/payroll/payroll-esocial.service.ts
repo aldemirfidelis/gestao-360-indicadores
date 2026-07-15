@@ -3,6 +3,8 @@ import { Prisma } from '@prisma/client';
 import { PrismaService } from '../../prisma/prisma.service';
 import { AuditWriterService } from '../../common/audit/audit-writer.service';
 import { AuthPayload } from '../auth/auth.types';
+import { encryptJson, decryptJson } from '../../common/crypto';
+import { parsePkcs12, signEsocialXml } from './payroll-cert.util';
 import {
   buildEventId,
   buildInternalBatchXml,
@@ -26,8 +28,10 @@ const GENERATABLE_RUN_STATUSES = ['CALCULATED', 'APPROVED', 'CLOSED'];
 const FORBIDDEN_SECRET_KEYS = ['pfx', 'pfxBase64', 'password', 'senha', 'privateKey', 'certificate', 'certificado', 'file', 'content'];
 
 interface CertificateLike {
-  pfxSecretRef: string | null;
-  passwordSecretRef: string | null;
+  pfxSecretRef?: string | null;
+  passwordSecretRef?: string | null;
+  encryptedPfx?: string | null;
+  encryptedPassword?: string | null;
 }
 
 @Injectable()
@@ -87,10 +91,24 @@ export class PayrollEsocialService {
   async testCertificate(me: AuthPayload, id: string) {
     const cert = await this.certificateOf(me.companyId, id);
     const checks = [
-      { key: 'pfx_ref', ok: Boolean(cert.pfxSecretRef), detail: cert.pfxSecretRef ? 'Referencia do PFX cadastrada' : 'Referencia do PFX ausente' },
-      { key: 'password_ref', ok: Boolean(cert.passwordSecretRef), detail: cert.passwordSecretRef ? 'Referencia da senha cadastrada' : 'Referencia da senha ausente' },
       { key: 'validity', ok: !cert.validUntil || cert.validUntil.getTime() >= Date.now(), detail: cert.validUntil ? `Valido ate ${cert.validUntil.toISOString().slice(0, 10)}` : 'Validade nao informada' },
     ];
+    if (cert.storageMode === 'ENCRYPTED_DB') {
+      // Decifra e parseia de verdade (sem expor nada) para confirmar que assina.
+      let signable = false;
+      let detail = 'PFX cifrado ausente';
+      try {
+        this.resolveSigningMaterial(cert);
+        signable = true;
+        detail = 'PFX cifrado decifra e parseia — pronto para assinar';
+      } catch (error) {
+        detail = `Falha ao abrir o PFX cifrado: ${(error as Error).message}`;
+      }
+      checks.push({ key: 'encrypted_pfx', ok: signable, detail });
+    } else {
+      checks.push({ key: 'pfx_ref', ok: Boolean(cert.pfxSecretRef), detail: cert.pfxSecretRef ? 'Referencia do PFX cadastrada' : 'Referencia do PFX ausente' });
+      checks.push({ key: 'password_ref', ok: Boolean(cert.passwordSecretRef), detail: cert.passwordSecretRef ? 'Referencia da senha cadastrada' : 'Referencia da senha ausente' });
+    }
     if (cert.storageMode === 'ENV_REF') {
       checks.push({
         key: 'env_pfx',
@@ -117,6 +135,81 @@ export class PayrollEsocialService {
       after: { ok, checks: checks.map((check) => ({ ...check, detail: check.detail.replace(/[A-Za-z0-9_:-]{24,}/g, '***') })) },
     });
     return { ok, certificate: this.redactCertificate(updated), checks };
+  }
+
+  /**
+   * Upload do certificado A1 (.pfx) com custódia CIFRADA (modo ENCRYPTED_DB):
+   * valida a senha parseando o PKCS#12, extrai metadados (titular/validade),
+   * cifra PFX+senha (AES-256-GCM) e guarda. O material sensível nunca volta ao
+   * cliente e é decifrado apenas em memória no momento da assinatura.
+   */
+  async uploadCertificate(me: AuthPayload, body: any = {}) {
+    const name = this.requiredText(body?.name, 'Nome do certificado');
+    const pfxBase64 = String(body?.pfxBase64 ?? '').replace(/\s+/g, '');
+    const password = String(body?.password ?? '');
+    if (!pfxBase64) throw new BadRequestException('Envie o arquivo .pfx (base64).');
+    if (!password) throw new BadRequestException('Informe a senha do certificado.');
+
+    const parsed = parsePkcs12(pfxBase64, password); // lança se senha/arquivo inválidos
+    const created = await this.prisma.payrollDigitalCertificate.create({
+      data: {
+        companyId: me.companyId,
+        name,
+        holderName: this.optionalText(body?.holderName) ?? parsed.subjectName,
+        holderCpfCnpj: this.optionalText(body?.holderCpfCnpj),
+        kind: 'A1',
+        storageMode: 'ENCRYPTED_DB',
+        encryptedPfx: encryptJson(pfxBase64),
+        encryptedPassword: encryptJson(password),
+        subjectName: parsed.subjectName,
+        serialNumber: parsed.serialNumber,
+        validFrom: parsed.validFrom,
+        validUntil: parsed.validUntil,
+        status: 'ACTIVE',
+        notes: this.optionalText(body?.notes),
+        createdById: me.sub,
+      },
+    });
+    await this.audit.record(me, {
+      module: MODULE,
+      entity: 'PayrollDigitalCertificate',
+      entityId: created.id,
+      action: 'CREATE',
+      message: `Certificado A1 "${name}" enviado (custódia cifrada)`,
+      after: { subjectName: parsed.subjectName, validUntil: parsed.validUntil, storageMode: 'ENCRYPTED_DB' },
+    });
+    return this.redactCertificate(created);
+  }
+
+  /**
+   * Material de assinatura (chave/cert em PEM) resolvido conforme o modo de
+   * custódia. Só decifra em memória; nada é logado. Adaptador para os modos
+   * futuros (procuração, provedor em nuvem) entra aqui.
+   */
+  private resolveSigningMaterial(cert: {
+    storageMode: string;
+    encryptedPfx: string | null;
+    encryptedPassword: string | null;
+    pfxSecretRef: string | null;
+    passwordSecretRef: string | null;
+  }): { privateKeyPem: string; certPem: string } {
+    let pfxBase64: string;
+    let password: string;
+    if (cert.storageMode === 'ENCRYPTED_DB') {
+      if (!cert.encryptedPfx || !cert.encryptedPassword) throw new BadRequestException('Certificado sem PFX cifrado. Reenvie o arquivo.');
+      pfxBase64 = decryptJson<string>(cert.encryptedPfx);
+      password = decryptJson<string>(cert.encryptedPassword);
+    } else if (cert.storageMode === 'ENV_REF') {
+      const pfxEnv = cert.pfxSecretRef ? process.env[cert.pfxSecretRef] : undefined;
+      const pwdEnv = cert.passwordSecretRef ? process.env[cert.passwordSecretRef] : undefined;
+      if (!pfxEnv || !pwdEnv) throw new BadRequestException('Variáveis de ambiente do certificado ausentes na droplet.');
+      pfxBase64 = pfxEnv.replace(/\s+/g, '');
+      password = pwdEnv;
+    } else {
+      throw new BadRequestException('Modo de custódia sem material local para assinar (use ENCRYPTED_DB ou ENV_REF).');
+    }
+    const parsed = parsePkcs12(pfxBase64, password);
+    return { privateKeyPem: parsed.privateKeyPem, certPem: parsed.certPem };
   }
 
   // ------------------------------ eventos eSocial ------------------------------
@@ -748,6 +841,70 @@ export class PayrollEsocialService {
     return { ...created, certificate: created.certificate ? this.redactCertificate(created.certificate) : null };
   }
 
+  /**
+   * Assina os eventos de um lote com XML-DSig (enveloped, SHA-256/RSA) usando o
+   * certificado A1 em custódia cifrada. Assinar NÃO transmite nem tem efeito
+   * legal — é o passo local que prepara o lote; a transmissão SOAP é etapa
+   * seguinte e permanece não implementada.
+   */
+  async signBatch(me: AuthPayload, batchId: string) {
+    const batch = await this.prisma.payrollEsocialBatch.findFirst({
+      where: { id: batchId, companyId: me.companyId },
+      include: { events: true },
+    });
+    if (!batch) throw new NotFoundException('Lote eSocial nao encontrado.');
+    if (!batch.certificateId) throw new BadRequestException('Vincule um certificado ao lote antes de assinar.');
+    if (batch.status === 'SIGNED') throw new ConflictException('Lote ja assinado.');
+    const cert = await this.certificateOf(me.companyId, batch.certificateId);
+    if (cert.status !== 'ACTIVE') throw new ConflictException('Certificado nao esta ativo.');
+    if (cert.validUntil && cert.validUntil.getTime() < Date.now()) throw new ConflictException('Certificado vencido.');
+    if (!batch.events.length) throw new BadRequestException('Lote sem eventos.');
+
+    // Decifra e parseia UMA vez; a chave privada só existe nesta chamada.
+    const { privateKeyPem, certPem } = this.resolveSigningMaterial(cert);
+
+    const signedEvents: Array<{ eventId: string; eventType: string; xml: string; xmlHash: string }> = [];
+    await this.prisma.$transaction(async (tx) => {
+      for (const event of batch.events) {
+        const signedXml = signEsocialXml(event.xml, privateKeyPem, certPem);
+        const xmlHash = hashXml(signedXml);
+        await tx.payrollEsocialEvent.update({
+          where: { id: event.id },
+          data: { xml: signedXml, xmlHash, status: 'SIGNED' },
+        });
+        signedEvents.push({ eventId: event.eventId, eventType: event.eventType, xml: signedXml, xmlHash });
+      }
+      const batchXml = buildInternalBatchXml({
+        batchId: batch.id,
+        environment: batch.environment as EsocialEnvironment,
+        layoutVersion: ESOCIAL_LAYOUT_VERSION,
+        events: signedEvents,
+      });
+      await tx.payrollEsocialBatch.update({
+        where: { id: batch.id },
+        data: {
+          status: 'SIGNED',
+          xml: batchXml,
+          xmlHash: hashXml(batchXml),
+          issues: [
+            'Lote assinado (XML-DSig) para conferência. NÃO transmitido: a transmissão SOAP ao eSocial é etapa seguinte.',
+            'Valide o XML assinado no validador oficial antes de qualquer envio em produção.',
+          ],
+        },
+      });
+    }, { timeout: 120_000, maxWait: 20_000 });
+
+    await this.audit.record(me, {
+      module: MODULE,
+      entity: 'PayrollEsocialBatch',
+      entityId: batch.id,
+      action: 'SIGN',
+      message: `Lote eSocial assinado (${signedEvents.length} evento(s)) com o certificado ${cert.name}`,
+      after: { eventCount: signedEvents.length, certificateId: cert.id, subjectName: cert.subjectName },
+    });
+    return { signed: signedEvents.length, batchId: batch.id, status: 'SIGNED' };
+  }
+
   async batchXml(me: AuthPayload, batchId: string) {
     const batch = await this.prisma.payrollEsocialBatch.findFirst({
       where: { id: batchId, companyId: me.companyId },
@@ -789,10 +946,14 @@ export class PayrollEsocialService {
   private redactCertificate<T extends CertificateLike>(row: T) {
     return {
       ...row,
+      // Material sensível NUNCA volta ao cliente — só flags de presença.
       pfxSecretRef: undefined,
       passwordSecretRef: undefined,
+      encryptedPfx: undefined,
+      encryptedPassword: undefined,
       hasPfxRef: Boolean(row.pfxSecretRef),
       hasPasswordRef: Boolean(row.passwordSecretRef),
+      hasEncryptedPfx: Boolean(row.encryptedPfx),
     };
   }
 

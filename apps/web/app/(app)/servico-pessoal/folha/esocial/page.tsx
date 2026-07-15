@@ -42,8 +42,10 @@ interface Certificate {
   validUntil: string | null;
   status: string;
   lastTestStatus: string | null;
+  subjectName?: string | null;
   hasPfxRef: boolean;
   hasPasswordRef: boolean;
+  hasEncryptedPfx?: boolean;
 }
 
 interface EsocialEvent {
@@ -108,6 +110,7 @@ export default function PayrollEsocialPage() {
   const [selectedEvents, setSelectedEvents] = useState<string[]>([]);
   const [selectedCertificate, setSelectedCertificate] = useState('');
   const [certOpen, setCertOpen] = useState(false);
+  const [uploadOpen, setUploadOpen] = useState(false);
   const [xmlFor, setXmlFor] = useState<string | null>(null);
   const [certForm, setCertForm] = useState({
     name: '',
@@ -118,6 +121,7 @@ export default function PayrollEsocialPage() {
     validUntil: '',
     notes: '',
   });
+  const [uploadForm, setUploadForm] = useState({ name: '', password: '', pfxBase64: '', fileName: '' });
 
   const competencesQuery = useQuery<Competence[]>({
     queryKey: ['payroll-competences'],
@@ -233,11 +237,43 @@ export default function PayrollEsocialPage() {
   const testCertificate = useMutation({
     mutationFn: (id: string) => api<{ ok: boolean }>(`/payroll/digital-certificates/${id}/test`, { method: 'POST' }),
     onSuccess: (data) => {
-      toast[data.ok ? 'success' : 'warning'](data.ok ? 'Referencia validada.' : 'Referencia com pendencias.');
+      toast[data.ok ? 'success' : 'warning'](data.ok ? 'Certificado validado.' : 'Certificado com pendencias.');
       void qc.invalidateQueries({ queryKey: ['payroll-digital-certificates'] });
     },
     onError: (err: any) => toast.error(err.message || 'Erro ao validar certificado.'),
   });
+
+  const uploadCertificate = useMutation({
+    mutationFn: () => api<Certificate>('/payroll/digital-certificates/upload', { method: 'POST', json: { name: uploadForm.name, password: uploadForm.password, pfxBase64: uploadForm.pfxBase64 } }),
+    onSuccess: () => {
+      toast.success('Certificado enviado com custódia cifrada.');
+      setUploadOpen(false);
+      setUploadForm({ name: '', password: '', pfxBase64: '', fileName: '' });
+      void qc.invalidateQueries({ queryKey: ['payroll-digital-certificates'] });
+    },
+    onError: (err: any) => toast.error(err.message || 'Erro ao enviar certificado (verifique o arquivo e a senha).'),
+  });
+
+  const signBatch = useMutation({
+    mutationFn: (id: string) => api<{ signed: number }>(`/payroll/esocial/batches/${id}/sign`, { method: 'POST' }),
+    onSuccess: (data) => {
+      toast.success(`Lote assinado (${data.signed} evento(s)). Não transmitido.`);
+      void qc.invalidateQueries({ queryKey: ['payroll-esocial-batches', effectiveRun] });
+      void qc.invalidateQueries({ queryKey: ['payroll-esocial-events', effectiveRun] });
+    },
+    onError: (err: any) => toast.error(err.message || 'Erro ao assinar o lote.'),
+  });
+
+  const onPickPfx = (file: File | undefined) => {
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = () => {
+      const result = String(reader.result ?? '');
+      const base64 = result.includes(',') ? result.split(',')[1] : result;
+      setUploadForm((f) => ({ ...f, pfxBase64: base64, fileName: file.name, name: f.name || file.name.replace(/\.(pfx|p12)$/i, '') }));
+    };
+    reader.readAsDataURL(file);
+  };
 
   const events = eventsQuery.data ?? [];
   const freeEvents = events.filter((event) => !event.batchId);
@@ -264,8 +300,11 @@ export default function PayrollEsocialPage() {
             <Badge variant="outline" className="h-9 gap-1 px-3">
               <ShieldCheck className="h-4 w-4" /> Produção restrita
             </Badge>
-            <Button variant="outline" size="sm" onClick={() => setCertOpen(true)}>
-              <KeyRound className="mr-2 h-4 w-4" /> Certificado
+            <Button variant="outline" size="sm" onClick={() => setUploadOpen(true)}>
+              <KeyRound className="mr-2 h-4 w-4" /> Enviar .pfx
+            </Button>
+            <Button variant="ghost" size="sm" onClick={() => setCertOpen(true)}>
+              Referência
             </Button>
             <Button variant="outline" size="icon" onClick={() => {
               void qc.invalidateQueries({ queryKey: ['payroll-esocial-events', effectiveRun] });
@@ -457,6 +496,11 @@ export default function PayrollEsocialPage() {
                     <td className="p-3">{batch.certificate?.name ?? '-'}</td>
                     <td className="p-3 font-mono text-[10px]">{shortHash(batch.xmlHash)}</td>
                     <td className="p-3 text-right">
+                      {batch.certificate && batch.status !== 'SIGNED' && (
+                        <Button variant="outline" size="sm" className="mr-2" onClick={() => signBatch.mutate(batch.id)} disabled={signBatch.isPending}>
+                          <KeyRound className="mr-1 h-3.5 w-3.5" /> Assinar
+                        </Button>
+                      )}
                       <Button variant="ghost" size="sm" onClick={() => setXmlFor(batch.id)}>
                         Ver XML
                       </Button>
@@ -483,17 +527,53 @@ export default function PayrollEsocialPage() {
                 <Badge variant="outline" className={cn('text-[10px]', STATUS_BADGE[cert.status])}>{cert.status}</Badge>
               </div>
               <div className="mt-2 space-y-1 text-xs text-muted-foreground">
-                <div>{cert.holderName || 'Titular não informado'}</div>
+                <div>{cert.subjectName || cert.holderName || 'Titular não informado'}</div>
                 <div>Validade: {cert.validUntil ? new Date(cert.validUntil).toLocaleDateString('pt-BR') : '-'}</div>
-                <div>PFX: {cert.hasPfxRef ? 'referenciado' : 'ausente'} · Senha: {cert.hasPasswordRef ? 'referenciada' : 'ausente'}</div>
+                <div>
+                  {cert.hasEncryptedPfx
+                    ? <Badge variant="outline" className="text-[9px] text-emerald-600 dark:text-emerald-400">Custódia cifrada · pronto p/ assinar</Badge>
+                    : <>PFX: {cert.hasPfxRef ? 'referenciado' : 'ausente'} · Senha: {cert.hasPasswordRef ? 'referenciada' : 'ausente'}</>}
+                </div>
               </div>
               <Button variant="outline" size="sm" className="mt-3 w-full" onClick={() => testCertificate.mutate(cert.id)} disabled={testCertificate.isPending}>
-                <BadgeCheck className="mr-2 h-4 w-4" /> Validar referência
+                <BadgeCheck className="mr-2 h-4 w-4" /> Validar certificado
               </Button>
             </div>
           ))}
         </CardContent>
       </Card>
+
+      <Dialog open={uploadOpen} onOpenChange={setUploadOpen}>
+        <DialogContent className="sm:max-w-[520px]">
+          <DialogHeader>
+            <DialogTitle>Enviar Certificado A1 (.pfx)</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-3">
+            <div className="rounded-md border border-amber-400/30 bg-amber-500/5 p-2.5 text-[11px] text-amber-700 dark:text-amber-300">
+              O arquivo e a senha são cifrados (AES-256-GCM) e guardados assim; nunca voltam ao navegador. A chave privada só é aberta em memória no momento da assinatura. Enviar exige conexão segura (HTTPS).
+            </div>
+            <div>
+              <Label>Nome / identificação</Label>
+              <Input value={uploadForm.name} onChange={(event) => setUploadForm({ ...uploadForm, name: event.target.value })} placeholder="Ex.: e-CNPJ 2026" />
+            </div>
+            <div>
+              <Label>Arquivo .pfx / .p12</Label>
+              <Input type="file" accept=".pfx,.p12" onChange={(event) => onPickPfx(event.target.files?.[0])} />
+              {uploadForm.fileName && <div className="mt-1 text-[11px] text-muted-foreground">{uploadForm.fileName} carregado.</div>}
+            </div>
+            <div>
+              <Label>Senha do certificado</Label>
+              <Input type="password" value={uploadForm.password} onChange={(event) => setUploadForm({ ...uploadForm, password: event.target.value })} autoComplete="off" />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="ghost" onClick={() => setUploadOpen(false)}>Cancelar</Button>
+            <Button onClick={() => uploadCertificate.mutate()} disabled={!uploadForm.name.trim() || !uploadForm.pfxBase64 || !uploadForm.password || uploadCertificate.isPending}>
+              Enviar cifrado
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       <Dialog open={certOpen} onOpenChange={setCertOpen}>
         <DialogContent className="sm:max-w-[560px]">

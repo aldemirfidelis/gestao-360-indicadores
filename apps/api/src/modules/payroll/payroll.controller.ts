@@ -203,6 +203,13 @@ export class PayrollController {
     return this.esocial.createCertificate(me, body);
   }
 
+  /** Upload do .pfx com custódia cifrada (AES-256-GCM). O segredo é enviado via TLS e nunca volta. */
+  @Post('digital-certificates/upload')
+  @RequirePermissions('folha:esocial')
+  uploadDigitalCertificate(@CurrentUser() me: AuthPayload, @Body() body: any) {
+    return this.esocial.uploadCertificate(me, body);
+  }
+
   @Post('digital-certificates/:id/test')
   @RequirePermissions('folha:esocial')
   testDigitalCertificate(@CurrentUser() me: AuthPayload, @Param('id') id: string) {
@@ -255,6 +262,12 @@ export class PayrollController {
   @RequirePermissions('folha:esocial')
   createEsocialBatch(@CurrentUser() me: AuthPayload, @Body() body: any) {
     return this.esocial.createBatch(me, body);
+  }
+
+  @Post('esocial/batches/:id/sign')
+  @RequirePermissions('folha:esocial')
+  signEsocialBatch(@CurrentUser() me: AuthPayload, @Param('id') id: string) {
+    return this.esocial.signBatch(me, id);
   }
 
   @Get('esocial/batches/:id/xml')

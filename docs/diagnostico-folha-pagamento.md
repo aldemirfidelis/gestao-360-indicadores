@@ -130,8 +130,15 @@ qualquer transmissão.
   sexo/raça/estado civil/grau instr/CBO em branco) e **S-2299** (desligamento, do registro de
   rescisão — motivo Tabela 19, verbas rescisórias). **Reconciliação de totalizadores**: prévia
   de S-5001 (base/valor CP-INSS) e S-5002 (base/valor IRRF) derivada do cálculo interno para
-  conferência (governo não retorna nada — nada transmitido). Pendentes: S-1210 (pagamentos),
-  S-5011 e envio/assinatura reais.
+  conferência (governo não retorna nada — nada transmitido).
+  **Assinatura digital (2026-07-15):** custódia cifrada do certificado A1 na plataforma (modo
+  `ENCRYPTED_DB`) — upload do .pfx, cifra AES-256-GCM de arquivo+senha (util `common/crypto.ts`),
+  metadados via node-forge (titular/validade/serial), decifrado só em memória; `SigningService`
+  com adaptador (ENCRYPTED_DB agora; ENV_REF/procuração/nuvem plugáveis depois); **assinatura
+  XML-DSig real** (enveloped, C14N exclusiva, SHA-256, RSA-SHA256, X509 no KeyInfo, Reference ao
+  Id) via node-forge + xml-crypto; lote vira `SIGNED`. **Assinar NÃO transmite** — a transmissão
+  SOAP (WS-Security/TLS mútuo, protocolo→recibo) é a etapa seguinte. Pendentes: S-1210
+  (pagamentos), S-5011, transmissão real e XML schema-completo (validador oficial).
 - **F5**: obrigações assistidas (FGTS Digital, DCTFWeb/Integra Contador opcional, EFD-Reinf,
   Qualificação Cadastral, DET, calendário legal).
 - **F6**: Banking Connector (CNAB 240, dupla aprovação, retorno/conciliação, antifraude) +

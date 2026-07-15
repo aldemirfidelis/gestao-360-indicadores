@@ -12532,10 +12532,17 @@ model PayrollDigitalCertificate {
   holderName        String?
   holderCpfCnpj     String?
   kind              String   @default("A1") // A1 por enquanto; A3/HSM exigem adaptador dedicado.
-  storageMode       String   @default("EXTERNAL_REF") // EXTERNAL_REF | ENV_REF
+  /// EXTERNAL_REF/ENV_REF = só referência a cofre/env; ENCRYPTED_DB = PFX+senha
+  /// cifrados (AES-256-GCM) guardados aqui, decifrados só em memória ao assinar.
+  storageMode       String   @default("EXTERNAL_REF") // EXTERNAL_REF | ENV_REF | ENCRYPTED_DB
   pfxSecretRef      String?
   passwordSecretRef String?
+  /// Blob do .pfx cifrado (base64 dentro do envelope AES-GCM) — nunca em texto puro.
+  encryptedPfx      String?
+  /// Senha do .pfx cifrada no mesmo envelope AES-GCM.
+  encryptedPassword String?
   serialNumber      String?
+  subjectName       String?
   validFrom         DateTime?
   validUntil        DateTime?
   status            String   @default("ACTIVE") // ACTIVE | EXPIRED | REVOKED | INACTIVE
