@@ -243,6 +243,12 @@ export const PERMISSION_CATALOG = [
   ['folha:params', 'Administrar rubricas e parametros legais versionados', 'Folha de Pagamento', 'manage'],
   ['folha:bank', 'Operar pagamento bancario da folha (remessa, aprovacao, retorno)', 'Folha de Pagamento', 'approve'],
   ['folha:accounting', 'Gerar e exportar a contabilizacao da folha', 'Folha de Pagamento', 'manage'],
+
+  // Recrutamento e Selecao
+  ['recruit:view', 'Visualizar requisicoes, vagas e candidatos', 'Recrutamento', 'view'],
+  ['recruit:requisition:create', 'Criar e enviar requisicoes de vaga', 'Recrutamento', 'create'],
+  ['recruit:requisition:approve', 'Aprovar/reprovar requisicoes e excecoes de quadro/orcamento', 'Recrutamento', 'approve'],
+  ['recruit:manage', 'Administrar recrutamento (config, pipelines, canais)', 'Recrutamento', 'manage'],
   ['folha:esocial', 'Gerar XML e lotes assistidos do eSocial e referenciar certificados', 'Folha de Pagamento', 'manage'],
 
   // Suprimentos — Compras

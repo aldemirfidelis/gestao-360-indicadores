@@ -66,6 +66,7 @@ import { PrizeModule } from './modules/prize/prize.module';
 import { CompensationModule } from './modules/compensation/compensation.module';
 import { PersonnelModule } from './modules/personnel/personnel.module';
 import { PayrollModule } from './modules/payroll/payroll.module';
+import { RecruitmentModule } from './modules/recruitment/recruitment.module';
 import { SuppliesModule } from './modules/supplies/supplies.module';
 import { MonthlyResultsModule } from './modules/monthly-results/monthly-results.module';
 import { StorageModule } from './storage/storage.module';
@@ -136,6 +137,7 @@ import { workersEnabled } from './jobs/jobs.constants';
     CompensationModule,
     PersonnelModule,
     PayrollModule,
+    RecruitmentModule,
     SuppliesModule,
     MonthlyResultsModule,
     StorageModule,

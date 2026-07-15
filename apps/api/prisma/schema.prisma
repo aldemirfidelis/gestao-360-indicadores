@@ -13774,3 +13774,123 @@ model PayrollPension {
   @@index([companyId, employeeId])
   @@map("payroll_pensions")
 }
+
+// ===================== Recrutamento e Seleção — Fase 1 (fundação) =====================
+// Ver docs/diagnostico-recrutamento-selecao.md. Reusa CompensationPosition (quadro/
+// orçamento), OrgJob/OrgNode (cargo/organograma) e OrgEmployee — nenhum cadastro
+// paralelo. Travas FLEXÍVEIS (posição opcional; exceção aprovável e auditada).
+
+/// Requisição de vaga: autorização para recrutar. Aponta para a posição
+/// (CompensationPosition) quando existir; senão a posição é criada no fluxo.
+model RecruitRequisition {
+  id                 String   @id @default(uuid())
+  companyId          String
+  code               String
+  status             String   @default("DRAFT")
+  branchId           String?
+  orgNodeId          String?
+  costCenter         String?
+  positionId         String? // CompensationPosition (opcional no modo flexível)
+  orgJobId           String? // cargo (OrgJob)
+  jobCatalogId       String? // descrição versionada (CompensationJobCatalog)
+  openingsRequested  Int      @default(1)
+  requesterId        String
+  reason             String?
+  vacancyType        String   @default("AUMENTO") // SUBSTITUICAO | AUMENTO | TEMPORARIA | SAZONAL | APRENDIZ | ESTAGIO | TERCEIRIZACAO | CONFIDENCIAL | BANCO_TALENTOS
+  replacedEmployeeId String?
+  desiredAdmissionAt DateTime?
+  priority           String   @default("NORMAL") // BAIXA | NORMAL | ALTA | URGENTE
+  criticality        String?
+  workMode           String? // PRESENCIAL | HIBRIDO | REMOTO
+  city               String?
+  location           String?
+  shift              String?
+  schedule           String?
+  contractType       String? // CLT | TEMPORARIO | APRENDIZ | ESTAGIO | PJ
+  salaryMin          Decimal? @db.Decimal(14, 2)
+  salaryMax          Decimal? @db.Decimal(14, 2)
+  monthlyBudgetCents Int?
+  confidential       Boolean  @default(false)
+  slaDays            Int?
+  recruitmentScope   String   @default("EXTERNAL") // INTERNAL | EXTERNAL | MIXED
+  allowsReferral     Boolean  @default(true)
+  allowsFormerEmployees Boolean @default(true)
+  allowsAgency       Boolean  @default(false)
+  recruiterId        String?
+  pipelineTemplateId String? // F2
+  /// Requisitos/benefícios/observações estruturados (obrigatórios/desejáveis/etc).
+  details            Json?
+  /// Exceções de trava aprovadas: [{ kind: POSITION|HEADCOUNT|BUDGET, approvedById, at, reason }].
+  gateExceptions     Json?
+  reservedHeadcount  Int      @default(0)
+  reservedBudgetCents Int     @default(0)
+  attachments        Json?
+  notes              String?
+  createdById        String?
+  createdAt          DateTime @default(now())
+  updatedAt          DateTime @updatedAt
+  deletedAt          DateTime?
+
+  openings  RecruitRequisitionOpening[]
+  approvals RecruitRequisitionApproval[]
+  snapshots RecruitRequisitionSnapshot[]
+
+  @@unique([companyId, code])
+  @@index([companyId, status])
+  @@index([companyId, orgNodeId])
+  @@index([companyId, positionId])
+  @@map("recruit_requisitions")
+}
+
+/// Abertura/slot: unidade de quadro solicitada. Cada contratação ocupa UMA abertura.
+model RecruitRequisitionOpening {
+  id               String             @id @default(uuid())
+  companyId        String
+  requisitionId    String
+  requisition      RecruitRequisition @relation(fields: [requisitionId], references: [id], onDelete: Cascade)
+  positionId       String?
+  status           String             @default("OPEN") // OPEN | RESERVED | FILLED | CANCELLED
+  filledByEmployeeId String?
+  filledAt         DateTime?
+  createdAt        DateTime           @default(now())
+  updatedAt        DateTime           @updatedAt
+
+  @@index([companyId, requisitionId])
+  @@map("recruit_requisition_openings")
+}
+
+/// Passo do workflow de aprovação (configurável por empresa). Guarda before/after.
+model RecruitRequisitionApproval {
+  id            String             @id @default(uuid())
+  companyId     String
+  requisitionId String
+  requisition   RecruitRequisition @relation(fields: [requisitionId], references: [id], onDelete: Cascade)
+  order         Int
+  role          String // GESTOR | RH | COMPENSATION | FINANCE | DIRECTOR | COMPLIANCE
+  approverId    String?
+  decision      String? // APPROVED | REJECTED | RETURNED
+  comment       String?
+  decidedAt     DateTime?
+  beforeJson    Json?
+  afterJson     Json?
+  createdAt     DateTime           @default(now())
+
+  @@index([companyId, requisitionId])
+  @@map("recruit_requisition_approvals")
+}
+
+/// Fotografia versionada da descrição/requisitos do cargo usados na requisição
+/// (preserva o histórico mesmo que o cargo mude depois).
+model RecruitRequisitionSnapshot {
+  id            String             @id @default(uuid())
+  companyId     String
+  requisitionId String
+  requisition   RecruitRequisition @relation(fields: [requisitionId], references: [id], onDelete: Cascade)
+  version       Int
+  jobData       Json
+  createdById   String?
+  createdAt     DateTime           @default(now())
+
+  @@unique([requisitionId, version])
+  @@map("recruit_requisition_snapshots")
+}
