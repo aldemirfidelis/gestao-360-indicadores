@@ -9,6 +9,7 @@ import { PayrollLegalTablesService } from './legal-tables.service';
 import { PayrollRunService } from './payroll-run.service';
 import { PayrollObligationsService } from './payroll-obligations.service';
 import { PayrollBankService } from './payroll-bank.service';
+import { PayrollAccountingService } from './payroll-accounting.service';
 
 /**
  * Folha de Pagamento (Fase 1 — fundação). Segregação de funções por permissão:
@@ -24,7 +25,28 @@ export class PayrollController {
     private readonly esocial: PayrollEsocialService,
     private readonly obligations: PayrollObligationsService,
     private readonly bank: PayrollBankService,
+    private readonly accounting: PayrollAccountingService,
   ) {}
+
+  // ------------------------------ Fase 6b: contabilização ------------------------------
+
+  @Get('accounting/config')
+  @RequirePermissions('folha:accounting')
+  accountingConfig(@CurrentUser() me: AuthPayload) {
+    return this.accounting.getConfig(me);
+  }
+
+  @Post('accounting/config')
+  @RequirePermissions('folha:accounting')
+  setAccountingConfig(@CurrentUser() me: AuthPayload, @Body() body: any) {
+    return this.accounting.setConfig(me, body);
+  }
+
+  @Get('runs/:id/accounting')
+  @RequirePermissions('folha:accounting')
+  runAccounting(@CurrentUser() me: AuthPayload, @Param('id') id: string) {
+    return this.accounting.generateForRun(me, id);
+  }
 
   // ------------------------------ Fase 6: pagamento bancário ------------------------------
 

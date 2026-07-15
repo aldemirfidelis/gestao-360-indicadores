@@ -13571,6 +13571,19 @@ model WithdrawalApprovalPolicy {
   @@map("supply_withdrawal_approval_policies")
 }
 
+/// Plano de contas da contabilização da folha (por categoria). Uma por empresa.
+model PayrollAccountingConfig {
+  id          String   @id @default(uuid())
+  companyId   String   @unique
+  /// { CATEGORIA: { code, name } } — sobrescreve os padrões.
+  accounts    Json
+  updatedById String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@map("payroll_accounting_configs")
+}
+
 /// Conta bancária pagadora da empresa (cabeçalho do CNAB). Uma por empresa.
 model PayrollBankConfig {
   id           String   @id @default(uuid())

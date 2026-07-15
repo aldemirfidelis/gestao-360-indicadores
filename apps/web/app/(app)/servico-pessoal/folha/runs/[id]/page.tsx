@@ -22,6 +22,7 @@ import {
   Lock,
   Play,
   Printer,
+  FileSpreadsheet,
   RefreshCw,
   Search,
   Settings,
@@ -203,6 +204,18 @@ export default function RunDetailPage() {
 
   const editable = ['DRAFT', 'CALCULATED', 'WITH_ISSUES', 'REOPENED'].includes(r.status);
   const isCalculated = ['CALCULATED', 'APPROVED', 'CLOSED'].includes(r.status);
+
+  async function downloadAccounting() {
+    try {
+      const res = await api<{ csv: string; balanced: boolean; fileName: string }>(`/payroll/runs/${id}/accounting`);
+      const blob = new Blob([res.csv], { type: 'text/csv;charset=utf-8' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url; a.download = res.fileName; a.click();
+      URL.revokeObjectURL(url);
+      toast.success(res.balanced ? 'Contabilização gerada (balanceada).' : 'Contabilização gerada — DIVERGENTE, confira.');
+    } catch (e: any) { toast.error(e.message || 'Erro ao gerar contabilização.'); }
+  }
 
   const filteredWorkers = r.workers.filter((w) =>
     (w.employee?.name ?? '').toLowerCase().includes(search.toLowerCase()) ||
@@ -390,6 +403,11 @@ export default function RunDetailPage() {
             {isCalculated && (
               <Button onClick={handlePrintAll} size="sm" variant="outline" className="gap-1">
                 <Printer className="h-4 w-4" /> Imprimir em Lote
+              </Button>
+            )}
+            {isCalculated && (
+              <Button onClick={downloadAccounting} size="sm" variant="outline" className="gap-1">
+                <FileSpreadsheet className="h-4 w-4" /> Contabilização
               </Button>
             )}
           </div>
