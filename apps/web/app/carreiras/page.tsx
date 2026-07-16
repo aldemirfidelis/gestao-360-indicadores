@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useMemo, useState } from 'react';
+import { Suspense, useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
 import { useSearchParams } from 'next/navigation';
 
@@ -24,6 +24,14 @@ function resolveSlug(param: string | null): string | null {
 const MODE_LABEL: Record<string, string> = { PRESENCIAL: 'Presencial', HIBRIDO: 'Híbrido', REMOTO: 'Remoto' };
 
 export default function CareersListPage() {
+  return (
+    <Suspense fallback={<main className="min-h-screen bg-slate-50 px-4 py-8 text-sm text-slate-500 dark:bg-slate-950 dark:text-slate-300">Carregando vagas...</main>}>
+      <CareersListContent />
+    </Suspense>
+  );
+}
+
+function CareersListContent() {
   const params = useSearchParams();
   const slug = useMemo(() => resolveSlug(params.get('empresa')), [params]);
   const [data, setData] = useState<CareersData | null>(null);

@@ -1,6 +1,6 @@
 'use client';
 
-import { ChangeEvent, useEffect, useMemo, useState } from 'react';
+import { ChangeEvent, Suspense, useEffect, useMemo, useState } from 'react';
 import type { ReactNode } from 'react';
 import Link from 'next/link';
 import { useSearchParams } from 'next/navigation';
@@ -91,6 +91,14 @@ const STATUS_LABEL: Record<string, string> = {
 };
 
 export default function CandidatePortalPage() {
+  return (
+    <Suspense fallback={<main className="min-h-screen bg-slate-50 px-4 py-8 text-sm text-slate-500 dark:bg-slate-950 dark:text-slate-300">Carregando area do candidato...</main>}>
+      <CandidatePortalContent />
+    </Suspense>
+  );
+}
+
+function CandidatePortalContent() {
   const searchParams = useSearchParams();
   const empresa = useMemo(() => resolveCareersCompanySlug(searchParams.get('empresa')), [searchParams]);
   const suffix = companyQuery(empresa);

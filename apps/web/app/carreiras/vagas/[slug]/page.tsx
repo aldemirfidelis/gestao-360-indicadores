@@ -1,6 +1,6 @@
 'use client';
 
-import { ChangeEvent, useEffect, useMemo, useState } from 'react';
+import { ChangeEvent, Suspense, useEffect, useMemo, useState } from 'react';
 import type { ReactNode } from 'react';
 import Link from 'next/link';
 import { useParams, useSearchParams } from 'next/navigation';
@@ -28,6 +28,14 @@ const API = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:3333/api';
 const MODE_LABEL: Record<string, string> = { PRESENCIAL: 'Presencial', HIBRIDO: 'Hibrido', REMOTO: 'Remoto' };
 
 export default function VacancyDetailPage() {
+  return (
+    <Suspense fallback={<main className="min-h-screen bg-slate-50 px-4 py-8 text-sm text-slate-500 dark:bg-slate-950 dark:text-slate-300">Carregando vaga...</main>}>
+      <VacancyDetailContent />
+    </Suspense>
+  );
+}
+
+function VacancyDetailContent() {
   const routeParams = useParams();
   const searchParams = useSearchParams();
   const vacancySlug = String(routeParams.slug ?? '');
