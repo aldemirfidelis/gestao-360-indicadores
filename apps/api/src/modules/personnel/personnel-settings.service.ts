@@ -32,6 +32,7 @@ export class PersonnelSettingsService {
 
     if (typeof body.autoGenerateRegistration === 'boolean') data.autoGenerateRegistration = body.autoGenerateRegistration;
     if (typeof body.allowManualRegistration === 'boolean') data.allowManualRegistration = body.allowManualRegistration;
+    if (typeof body.portalPunchDefault === 'boolean') data.portalPunchDefault = body.portalPunchDefault;
     if (fmt.registrationPrefix !== undefined) data.registrationPrefix = fmt.registrationPrefix;
     if (fmt.registrationSuffix !== undefined) data.registrationSuffix = fmt.registrationSuffix;
     if (fmt.registrationWidth !== undefined) data.registrationWidth = fmt.registrationWidth;

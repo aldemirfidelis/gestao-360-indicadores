@@ -833,6 +833,11 @@ export class EmployeesService {
     }
     if (source && 'contractType' in source) data.contractType = this.validateEnum(source.contractType, CONTRACT_TYPES, 'tipo de contrato');
     if (source && 'workRegime' in source) data.workRegime = this.validateEnum(source.workRegime, WORK_REGIMES, 'regime de trabalho');
+    // Override tri-estado do ponto pelo portal: '' / null → herda a empresa.
+    if (source && 'allowPortalPunch' in source) {
+      const raw = source.allowPortalPunch;
+      data.allowPortalPunch = raw === '' || raw === null || raw === undefined ? null : Boolean(raw === true || raw === 'true' || raw === 'SIM');
+    }
     if (source && 'userId' in source) {
       const userId = text(source.userId);
       if (userId) {

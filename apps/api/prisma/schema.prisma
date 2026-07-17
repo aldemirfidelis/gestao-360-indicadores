@@ -12753,6 +12753,11 @@ model PersonnelEmployeeProfile {
   photoMimeType   String?
   photoUpdatedAt  DateTime?
 
+  /// Override do ponto pelo portal p/ este colaborador (null = usa o padrão da
+  /// empresa em PersonnelSettings.portalPunchDefault). Ex.: home office = true;
+  /// operação de chão que só bate no totem = false.
+  allowPortalPunch Boolean?
+
   createdById String?
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
@@ -12782,6 +12787,12 @@ model PersonnelSettings {
   registrationPadChar      String  @default("0")
   /// Próximo número sequencial a atribuir (incrementado atomicamente).
   registrationNextSequence Int     @default(1)
+
+  // --- Ponto ---
+  /// Padrão da empresa: colaboradores podem bater ponto pelo portal (web/mobile)?
+  /// Quando false, só valem as origens presenciais (facial/totem). Override por
+  /// colaborador em PersonnelEmployeeProfile.allowPortalPunch.
+  portalPunchDefault Boolean @default(true)
 
   // --- Template do crachá ---
   badgeAccentColor      String  @default("#0ea5e9")

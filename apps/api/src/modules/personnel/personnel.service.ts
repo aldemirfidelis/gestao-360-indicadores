@@ -89,7 +89,7 @@ export class PersonnelService {
       }),
       this.prisma.personnelEmployeeProfile.findFirst({
         where: { companyId: me.companyId, userId: me.sub },
-        select: { cpf: true },
+        select: { cpf: true, allowPortalPunch: true },
         orderBy: { updatedAt: 'desc' },
       }),
     ]);
@@ -98,6 +98,15 @@ export class PersonnelService {
 
     const sequenceScope = user.branchId ?? `company:${me.companyId}`;
     const source = ctx?.sourceOverride ?? (ctx?.verifiedBiometricAttemptId ? 'FACIAL' : body?.source === 'MOBILE' ? 'MOBILE' : 'WEB');
+
+    // Batida pelo portal (web/mobile) pode ser restrita: override por colaborador,
+    // senão o padrão da empresa. Origens presenciais (facial/totem) sempre valem.
+    if (['WEB', 'MOBILE'].includes(source)) {
+      const allowPortal = profile?.allowPortalPunch ?? (await this.portalPunchDefault(me.companyId));
+      if (!allowPortal) {
+        throw new ForbiddenException('Batida pelo portal desabilitada para este colaborador. Use o reconhecimento facial no totem.');
+      }
+    }
     const deviceTime = body?.deviceTime ? new Date(body.deviceTime) : null;
     const deviceId = text(body?.deviceId)?.slice(0, 120) ?? null;
 
@@ -209,6 +218,15 @@ export class PersonnelService {
    * a jornada de ontem está com par aberto e ainda estamos dentro da janela
    * (fim previsto + 4h, sem invadir a jornada de hoje), a batida pertence a ontem.
    */
+  /** Padrão da empresa para batida pelo portal (default true quando não configurado). */
+  private async portalPunchDefault(companyId: string): Promise<boolean> {
+    const settings = await this.prisma.personnelSettings.findUnique({
+      where: { companyId },
+      select: { portalPunchDefault: true },
+    });
+    return settings?.portalPunchDefault ?? true;
+  }
+
   private async attributedDayKeyFor(companyId: string, userId: string, now: Date): Promise<string> {
     const civilKey = dayKeyFor(now);
     const prevKey = addDays(civilKey, -1);

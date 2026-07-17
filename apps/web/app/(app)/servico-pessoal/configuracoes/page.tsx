@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
-import { BadgeCheck, Hash, IdCard, Save } from 'lucide-react';
+import { BadgeCheck, Clock, Hash, IdCard, Save } from 'lucide-react';
 import { PageHeader } from '@/components/shell/page-header';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -22,6 +22,7 @@ interface Settings {
   registrationWidth: number;
   registrationPadChar: string;
   registrationNextSequence: number;
+  portalPunchDefault: boolean;
   badgeAccentColor: string;
   badgeOrientation: 'PORTRAIT' | 'LANDSCAPE';
   badgeShowPhoto: boolean;
@@ -140,6 +141,25 @@ export default function PersonnelSettingsPage() {
             <span className="text-muted-foreground">Próxima matrícula:</span>
             <span className="font-mono text-base font-bold text-sky-600 dark:text-sky-400">{preview || '—'}</span>
           </div>
+        </CardContent>
+      </Card>
+
+      {/* Ponto */}
+      <Card>
+        <CardContent className="space-y-4 p-5">
+          <div className="flex items-center gap-2">
+            <Clock className="h-4 w-4 text-sky-500" />
+            <h2 className="text-sm font-semibold">Controle de ponto</h2>
+          </div>
+          <p className="text-xs text-muted-foreground">
+            Define se, por padrão, os colaboradores podem bater ponto pelo portal (web/celular) — importante para quem trabalha em home office.
+            O reconhecimento facial nos totens sempre funciona, independente desta opção. Cada colaborador pode ter uma regra própria no cadastro
+            (aba Contratuais), que sobrepõe este padrão.
+          </p>
+          <label className="flex items-center gap-2 text-sm">
+            <input type="checkbox" disabled={!canManage} checked={form.portalPunchDefault} onChange={(e) => set('portalPunchDefault', e.target.checked)} />
+            Permitir bater ponto pelo portal (padrão da empresa)
+          </label>
         </CardContent>
       </Card>
 

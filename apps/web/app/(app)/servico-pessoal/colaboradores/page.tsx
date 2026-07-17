@@ -121,6 +121,7 @@ const EMPTY_FORM = {
   sex: '', raceColor: '', cbo: '',
   bankCode: '', bankAgency: '', bankAccount: '', bankAccountDigit: '', pixKey: '',
   contractType: '', workRegime: '', admissionDate: '', userId: '',
+  allowPortalPunch: '' as '' | 'true' | 'false',
   emergencyContactName: '', emergencyContactPhone: '', notes: '',
 };
 
@@ -204,6 +205,7 @@ export default function EmployeesPage() {
           contractType: form.contractType || null,
           workRegime: form.workRegime || null,
           admissionDate: form.admissionDate || null,
+          allowPortalPunch: form.allowPortalPunch,
           userId: form.userId || null,
           emergencyContactName: form.emergencyContactName || null,
           emergencyContactPhone: form.emergencyContactPhone || null,
@@ -358,6 +360,7 @@ export default function EmployeesPage() {
       contractType: profile.contractType ?? '',
       workRegime: profile.workRegime ?? '',
       admissionDate: toInputDate(profile.admissionDate),
+      allowPortalPunch: profile.allowPortalPunch === true ? 'true' : profile.allowPortalPunch === false ? 'false' : '',
       userId: profile.userId ?? '',
       emergencyContactName: profile.emergencyContactName ?? '',
       emergencyContactPhone: profile.emergencyContactPhone ?? '',
@@ -599,6 +602,14 @@ export default function EmployeesPage() {
                 <NativeSelect value={form.workRegime} onChange={(e) => setForm((f) => ({ ...f, workRegime: e.target.value }))}>
                   <option value="">Não informado</option>
                   {(options?.workRegimes ?? []).map((regime) => <option key={regime} value={regime}>{REGIME_LABEL[regime] ?? regime}</option>)}
+                </NativeSelect>
+              </div>
+              <div>
+                <Label>Bater ponto pelo portal</Label>
+                <NativeSelect value={form.allowPortalPunch} onChange={(e) => setForm((f) => ({ ...f, allowPortalPunch: e.target.value as '' | 'true' | 'false' }))}>
+                  <option value="">Herdar padrão da empresa</option>
+                  <option value="true">Permitido (ex.: home office)</option>
+                  <option value="false">Só facial/totem</option>
                 </NativeSelect>
               </div>
               <div>
