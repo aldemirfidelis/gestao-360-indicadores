@@ -10,7 +10,9 @@ import { AuthPayload } from './auth.types';
 import { ZodValidationPipe } from '../../common/pipes/zod-validation.pipe';
 
 const loginDto = z.object({
-  email: z.string().email(),
+  // Identificador de login: e-mail (chave interna), CPF ou matrícula (aliases).
+  // Mantém a chave "email" por compatibilidade com o front.
+  email: z.string().min(3).max(255),
   password: z.string().min(1),
   // Host de origem (subdomínio/domínio do tenant). Usado para validar que o
   // usuário pertence à empresa daquele endereço. Opcional (apex não envia).

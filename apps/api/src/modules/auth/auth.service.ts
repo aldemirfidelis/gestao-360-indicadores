@@ -17,11 +17,41 @@ export class AuthService {
     private readonly tenants: TenantService,
   ) {}
 
-  async login(email: string, password: string, ctx?: { ip?: string; userAgent?: string; tenantHost?: string }) {
-    const user = await this.prisma.user.findUnique({
-      where: { email: email.toLowerCase() },
-      include: { company: { select: { status: true, deletedAt: true } } },
+  /**
+   * Resolve o identificador de login em um usuário. O e-mail é a CHAVE interna;
+   * CPF e matrícula funcionam como ALIAS (resolvem via o vínculo colaborador→usuário).
+   * Alias ambíguo (mesmo CPF/matrícula ligado a usuários de empresas diferentes) NÃO
+   * autentica — o titular deve usar o e-mail. Não revela qual caminho falhou.
+   */
+  private async resolveLoginUser(identifier: string) {
+    const include = { company: { select: { status: true, deletedAt: true } } } as const;
+    const id = identifier.trim();
+    if (id.includes('@')) {
+      return this.prisma.user.findUnique({ where: { email: id.toLowerCase() }, include });
+    }
+    const digits = id.replace(/\D/g, '');
+    // CPF (11 dígitos) → usuário vinculado ao prontuário com esse CPF.
+    if (digits.length === 11) {
+      const profiles = await this.prisma.personnelEmployeeProfile.findMany({
+        where: { cpf: digits, userId: { not: null } },
+        select: { userId: true },
+      });
+      const userIds = [...new Set(profiles.map((p) => p.userId).filter((v): v is string => Boolean(v)))];
+      if (userIds.length === 1) return this.prisma.user.findFirst({ where: { id: userIds[0] }, include });
+      if (userIds.length > 1) return null; // ambíguo
+    }
+    // Matrícula (registrationId) → usuário vinculado ao colaborador ativo.
+    const employees = await this.prisma.orgEmployee.findMany({
+      where: { registrationId: id, status: 'ACTIVE' },
+      select: { personnelProfile: { select: { userId: true } } },
     });
+    const regUserIds = [...new Set(employees.map((e) => e.personnelProfile?.userId).filter((v): v is string => Boolean(v)))];
+    if (regUserIds.length === 1) return this.prisma.user.findFirst({ where: { id: regUserIds[0] }, include });
+    return null;
+  }
+
+  async login(email: string, password: string, ctx?: { ip?: string; userAgent?: string; tenantHost?: string }) {
+    const user = await this.resolveLoginUser(email);
     if (!user || !user.active || user.status !== 'ACTIVE' || user.deletedAt) {
       throw new UnauthorizedException('Credenciais inválidas');
     }
