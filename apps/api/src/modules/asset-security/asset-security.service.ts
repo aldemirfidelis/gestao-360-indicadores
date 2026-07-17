@@ -165,6 +165,112 @@ export class AssetSecurityService {
     return saved;
   }
 
+  async hardwareAccessRequest(me: AuthPayload, body: JsonMap) {
+    const ipAddress = this.text(body.ipAddress);
+    const macAddress = this.text(body.macAddress);
+    
+    if (!ipAddress && !macAddress) return { granted: false, reason: 'Missing hardware identification' };
+
+    const equipment = await this.db.securityEquipment.findFirst({ 
+      where: { 
+        companyId: me.companyId, 
+        OR: [
+          ...(ipAddress ? [{ ipAddress }] : []),
+          ...(macAddress ? [{ macAddress }] : [])
+        ]
+      } 
+    });
+    
+    if (!equipment) return { granted: false, reason: 'Equipment not registered' };
+
+    let personId: string | null = null;
+    const rfidCardNumber = this.text(body.rfidCardNumber);
+    const pinCode = this.text(body.pinCode);
+    const facialId = this.text(body.facialId);
+
+    if (rfidCardNumber) {
+      const person = await this.db.securityPerson.findFirst({ where: { companyId: me.companyId, rfidCardNumber, status: 'ACTIVE', deletedAt: null } });
+      if (person) personId = person.id;
+    } else if (pinCode) {
+      const person = await this.db.securityPerson.findFirst({ where: { companyId: me.companyId, pinCode, status: 'ACTIVE', deletedAt: null } });
+      if (person) personId = person.id;
+    } else if (facialId) {
+      const person = await this.db.securityPerson.findFirst({ where: { companyId: me.companyId, facialId, status: 'ACTIVE', deletedAt: null } });
+      if (person) personId = person.id;
+    }
+
+    if (!personId) return { granted: false, reason: 'Credential not found or person inactive' };
+
+    const activeBlock = await this.findActiveBlock(me.companyId, { personId });
+    if (activeBlock) return { granted: false, reason: 'Person is blocked' };
+
+    const lastMovement = await this.db.securityAccessMovement.findFirst({
+      where: { companyId: me.companyId, personId, status: 'OPEN' },
+      orderBy: { entryAt: 'desc' }
+    });
+
+    if (lastMovement) {
+      await this.registerExit(me, { id: lastMovement.id, exitAt: new Date(), notes: `Exit via ${equipment.brand || 'Hardware'} (${equipment.name})` });
+    } else {
+      await this.registerEntry(me, { gateId: equipment.gateId, postId: equipment.postId, destinationAreaId: equipment.areaId, origin: equipment.type || 'TOTEM', notes: `Entry via ${equipment.brand || 'Hardware'} (${equipment.name})`, code: 'HW_AUTO' });
+    }
+
+    return { granted: true, personId, equipmentId: equipment.id };
+  }
+
+  async hardwareEventLog(me: AuthPayload, body: JsonMap) {
+    await this.db.securityOfflineSync.create({
+      data: {
+        companyId: me.companyId,
+        origin: 'API',
+        payload: body,
+        syncStatus: 'SYNCED',
+        syncedAt: new Date(),
+        createdById: me.sub,
+        updatedById: me.sub,
+      }
+    });
+    return { success: true };
+  }
+
+  async getRollCall(me: AuthPayload, unitId?: string) {
+    const where = {
+      companyId: me.companyId,
+      deletedAt: null,
+      status: 'OPEN',
+      ...(unitId ? { unitId } : {}),
+    };
+
+    const movements = await this.db.securityAccessMovement.findMany({
+      where,
+      select: {
+        id: true,
+        movementType: true,
+        entryAt: true,
+        currentAreaId: true,
+        personId: true,
+        vehicleId: true,
+        origin: true,
+      },
+      orderBy: { entryAt: 'desc' }
+    });
+
+    const populated = await Promise.all(
+      movements.map(async (m: any) => {
+        const person = m.personId ? await this.db.securityPerson.findUnique({ where: { id: m.personId }, select: { name: true, type: true, documentMasked: true } }) : null;
+        const vehicle = m.vehicleId ? await this.db.securityVehicle.findUnique({ where: { id: m.vehicleId }, select: { plate: true, type: true } }) : null;
+        return { ...m, person, vehicle };
+      })
+    );
+
+    return {
+      total: populated.length,
+      people: populated.filter((m: any) => m.personId),
+      vehicles: populated.filter((m: any) => m.vehicleId && !m.personId),
+      generatedAt: new Date().toISOString(),
+    };
+  }
+
   async summary(me: AuthPayload, filters: Query = {}) {
     const where = this.scopeWhere(me, filters);
     const today = new Date();
@@ -670,7 +776,7 @@ export class AssetSecurityService {
     const contractor = await this.validateContractorCompany(me.companyId, this.id(body.contractorCompanyId));
     const vehicle = await this.resolveEntryVehicle(me, body, person, contractor);
     const authorization = await this.validateAuthorization(me.companyId, this.id(body.authorizationId));
-    await this.validateEntryRules(me, { person, vehicle, contractor, authorization, body });
+    await this.validateEntryRules(me, { unitId, gateId, person, vehicle, contractor, authorization, body });
 
     const entryAt = this.date(body.entryAt) || new Date();
     const maxStayMinutes = this.int(body.maxStayMinutes) ?? authorization?.maxStayMinutes ?? this.int((await this.getPackage(me, unitId ?? undefined)).settings?.maxStayMinutes) ?? 480;
@@ -694,6 +800,7 @@ export class AssetSecurityService {
         reason: this.nullableText(body.reason) ?? authorization?.reason ?? null,
         internalResponsibleId: this.id(body.internalResponsibleId) || (authorization?.internalResponsibleId ?? null),
         destinationAreaId: await this.validateOrgNode(me.companyId, this.id(body.destinationAreaId) || (authorization?.destinationAreaId ?? null)),
+        currentAreaId: (await this.validateOrgNode(me.companyId, this.id(body.destinationAreaId) || (authorization?.destinationAreaId ?? null))) || unitId,
         plate: this.normalizePlate(this.text(body.plate) || vehicle?.plate || ''),
         trailerPlate: this.nullableText(body.trailerPlate),
         driverPersonId: this.id(body.driverPersonId),
@@ -725,6 +832,25 @@ export class AssetSecurityService {
     if (authorization?.id) {
       await this.db.securityAuthorization.update({ where: { id: authorization.id }, data: { status: 'USED' } }).catch(swallow(undefined, `assetSecurity.markAuthorizationUsed(id=${authorization.id})`));
     }
+
+    if (saved.exceptionJustification) {
+      await this.db.securityLogBookEntry.create({
+        data: {
+          companyId: me.companyId,
+          unitId: saved.unitId,
+          gateId: saved.gateId,
+          postId: saved.postId,
+          type: 'INCIDENT',
+          category: 'EXCECAO_PORTARIA',
+          description: `Excecao aprovada para entrada: ${saved.exceptionJustification}. Motivo: ${saved.exceptionReason || 'N/A'}`,
+          occurredAt: saved.entryAt || new Date(),
+          status: 'OPEN',
+          createdById: me.sub,
+          updatedById: me.sub,
+        }
+      });
+    }
+
     await this.audit(me, 'REGISTER_ENTRY', 'SecurityAccessMovement', saved.id, saved.code, null, saved, { gateId, postId, unitId });
     await this.createPresenceWorkItems(me, saved);
     return this.decorateOneMovement(me, saved);
@@ -741,6 +867,7 @@ export class AssetSecurityService {
       data: {
         exitAt,
         durationMinutes,
+        currentAreaId: null,
         status: 'CLOSED',
         exitRegisteredById: me.sub,
         notes: this.nullableText(body.notes) ?? movement.notes,
@@ -1505,6 +1632,11 @@ ${JSON.stringify(context, null, 2)}`;
       documentIds: this.stringArray(body.documentIds),
       documentStatus: this.enumValue(body.documentStatus, DOCUMENT_STATUSES, 'NOT_REQUIRED'),
       documentValidUntil: this.date(body.documentValidUntil),
+      facialId: this.nullableText(body.facialId),
+      biometricRegistered: Boolean(body.biometricRegistered),
+      rfidCardNumber: this.nullableText(body.rfidCardNumber),
+      pinCode: this.nullableText(body.pinCode),
+      integrationSource: this.nullableText(body.integrationSource),
       restrictions: this.json(body.restrictions),
       status: this.enumValue(body.status, RECORD_STATUSES, 'ACTIVE'),
       lgpdConsentAt: this.date(body.lgpdConsentAt),
@@ -1535,6 +1667,11 @@ ${JSON.stringify(context, null, 2)}`;
       documentIds: 'documentIds' in body ? this.stringArray(body.documentIds) : undefined,
       documentStatus: 'documentStatus' in body ? this.enumValue(body.documentStatus, DOCUMENT_STATUSES, 'NOT_REQUIRED') : undefined,
       documentValidUntil: 'documentValidUntil' in body ? this.date(body.documentValidUntil) : undefined,
+      facialId: 'facialId' in body ? this.nullableText(body.facialId) : undefined,
+      biometricRegistered: 'biometricRegistered' in body ? Boolean(body.biometricRegistered) : undefined,
+      rfidCardNumber: 'rfidCardNumber' in body ? this.nullableText(body.rfidCardNumber) : undefined,
+      pinCode: 'pinCode' in body ? this.nullableText(body.pinCode) : undefined,
+      integrationSource: 'integrationSource' in body ? this.nullableText(body.integrationSource) : undefined,
       restrictions: 'restrictions' in body ? this.json(body.restrictions) : undefined,
       status: 'status' in body ? this.enumValue(body.status, RECORD_STATUSES, 'ACTIVE') : undefined,
       lgpdConsentAt: 'lgpdConsentAt' in body ? this.date(body.lgpdConsentAt) : undefined,
@@ -1594,6 +1731,8 @@ ${JSON.stringify(context, null, 2)}`;
       companyName: this.nullableText(body.companyName),
       ownerName: this.nullableText(body.ownerName),
       defaultDriverPersonId: this.id(body.defaultDriverPersonId),
+      lprRegistered: Boolean(body.lprRegistered),
+      rfidTagNumber: this.nullableText(body.rfidTagNumber),
       documentStatus: this.enumValue(body.documentStatus, DOCUMENT_STATUSES, 'NOT_REQUIRED'),
       documentValidUntil: this.date(body.documentValidUntil),
       notes: this.nullableText(body.notes),
@@ -1615,6 +1754,8 @@ ${JSON.stringify(context, null, 2)}`;
       companyName: 'companyName' in body ? this.nullableText(body.companyName) : undefined,
       ownerName: 'ownerName' in body ? this.nullableText(body.ownerName) : undefined,
       defaultDriverPersonId: 'defaultDriverPersonId' in body ? this.id(body.defaultDriverPersonId) : undefined,
+      lprRegistered: 'lprRegistered' in body ? Boolean(body.lprRegistered) : undefined,
+      rfidTagNumber: 'rfidTagNumber' in body ? this.nullableText(body.rfidTagNumber) : undefined,
       documentStatus: 'documentStatus' in body ? this.enumValue(body.documentStatus, DOCUMENT_STATUSES, 'NOT_REQUIRED') : undefined,
       documentValidUntil: 'documentValidUntil' in body ? this.date(body.documentValidUntil) : undefined,
       notes: 'notes' in body ? this.nullableText(body.notes) : undefined,
@@ -1869,6 +2010,7 @@ ${JSON.stringify(context, null, 2)}`;
       postId: await this.validatePost(me.companyId, this.id(body.postId)),
       movementId: this.id(body.movementId),
       roundExecutionId: this.id(body.roundExecutionId),
+      checkpointId: this.id(body.checkpointId),
       actionPlanId: this.id(body.actionPlanId),
       code: this.text(body.code) || (await this.nextCode('securityIncident', me.companyId, 'OCO')),
       title: this.requiredText(body.title, 'Titulo'),
@@ -2037,8 +2179,8 @@ ${JSON.stringify(context, null, 2)}`;
     };
   }
 
-  private async validateEntryRules(me: AuthPayload, input: { person: any | null; vehicle: any | null; contractor: any | null; authorization: any | null; body: JsonMap }) {
-    const { person, vehicle, contractor, authorization, body } = input;
+  private async validateEntryRules(me: AuthPayload, input: { unitId: string | null; gateId: string | null; person: any | null; vehicle: any | null; contractor: any | null; authorization: any | null; body: JsonMap }) {
+    const { unitId, gateId, person, vehicle, contractor, authorization, body } = input;
     const exceptionJustification = this.nullableText(body.exceptionJustification);
     const exceptionApprovedById = this.id(body.exceptionApprovedById);
     const hasException = Boolean(exceptionJustification && exceptionApprovedById);
@@ -2051,6 +2193,34 @@ ${JSON.stringify(context, null, 2)}`;
     if (activeBlock && !hasException) {
       await this.audit(me, 'BLOCKED_ENTRY_ATTEMPT', 'SecurityBlocklist', activeBlock.id, activeBlock.reason, null, activeBlock, { personId: person?.id, vehicleId: vehicle?.id });
       throw new ForbiddenException(`Acesso bloqueado: ${activeBlock.reason}`);
+    }
+
+    if (unitId && !hasException) {
+      const pkg = await this.getPackage(me, unitId);
+      if (pkg?.antiPassback) {
+        if (person) {
+          const openPerson = await this.db.securityAccessMovement.findFirst({ where: { companyId: me.companyId, personId: person.id, status: 'OPEN' } });
+          if (openPerson) throw new ForbiddenException('Anti-passback: Pessoa ja consta como presente no local. Registre a saida anterior ou use uma excecao.');
+        }
+        if (vehicle) {
+          const openVehicle = await this.db.securityAccessMovement.findFirst({ where: { companyId: me.companyId, vehicleId: vehicle.id, status: 'OPEN' } });
+          if (openVehicle) throw new ForbiddenException('Anti-passback: Veiculo ja consta como presente no local. Registre a saida anterior ou use uma excecao.');
+        }
+      }
+    }
+
+    if (gateId && !hasException) {
+      const gate = await this.db.securityGate.findUnique({ where: { id: gateId } });
+      if (gate) {
+        if (gate.vehicleCapacity && vehicle) {
+          const currentVehicles = await this.db.securityAccessMovement.count({ where: { companyId: me.companyId, gateId: gate.id, vehicleId: { not: null }, status: 'OPEN' } });
+          if (currentVehicles >= gate.vehicleCapacity) throw new ForbiddenException(`Capacidade maxima de veiculos (${gate.vehicleCapacity}) atingida para este portao/patio.`);
+        }
+        if (gate.personCapacity && person) {
+          const currentPeople = await this.db.securityAccessMovement.count({ where: { companyId: me.companyId, gateId: gate.id, personId: { not: null }, status: 'OPEN' } });
+          if (currentPeople >= gate.personCapacity) throw new ForbiddenException(`Capacidade maxima de pessoas (${gate.personCapacity}) atingida para este portao/area.`);
+        }
+      }
     }
     if (authorization && !['APPROVED', 'PARTIALLY_USED'].includes(authorization.status) && !hasException) {
       throw new BadRequestException('Autorizacao nao aprovada para entrada.');

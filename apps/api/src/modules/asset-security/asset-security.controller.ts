@@ -11,6 +11,24 @@ import { AssetSecurityService } from './asset-security.service';
 export class AssetSecurityController {
   constructor(private readonly service: AssetSecurityService) {}
 
+  @Post('hardware/access-request')
+  @RequirePermissions('asset-security:edit')
+  hardwareAccessRequest(@CurrentUser() me: AuthPayload, @Body() body: Record<string, any>) {
+    return this.service.hardwareAccessRequest(me, body);
+  }
+
+  @Post('hardware/event-log')
+  @RequirePermissions('asset-security:edit')
+  hardwareEventLog(@CurrentUser() me: AuthPayload, @Body() body: Record<string, any>) {
+    return this.service.hardwareEventLog(me, body);
+  }
+
+  @Get('roll-call')
+  @RequirePermissions('asset-security:view')
+  rollCall(@CurrentUser() me: AuthPayload, @Query('unitId') unitId?: string) {
+    return this.service.getRollCall(me, unitId);
+  }
+
   @Get('summary')
   @RequirePermissions('asset-security:view')
   summary(@CurrentUser() me: AuthPayload, @Query('unitId') unitId?: string, @Query('gateId') gateId?: string) {

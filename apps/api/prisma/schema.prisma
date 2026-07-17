@@ -10898,6 +10898,10 @@ enum SecurityRecordOrigin {
   API
   IMPORT
   OFFLINE
+  LPR
+  TOTEM
+  FACIAL
+  BIOMETRIC
 }
 
 model SecurityPackageActivation {
@@ -10909,6 +10913,7 @@ model SecurityPackageActivation {
   enabledFeatures    String[]              @default([])
   limits             Json?
   settings           Json?
+  antiPassback       Boolean               @default(false)
   trialStartedAt     DateTime?
   trialEndsAt        DateTime?
   activatedAt        DateTime?
@@ -10942,6 +10947,8 @@ model SecurityGate {
   allowedAccessTypes   String[]             @default([])
   flowCapabilities     String[]             @default([])
   authorizedAreaIds    String[]             @default([])
+  vehicleCapacity      Int?
+  personCapacity       Int?
   rules                Json?
   requiredDocumentIds  String[]             @default([])
   checklistTemplateIds String[]             @default([])
@@ -10960,6 +10967,33 @@ model SecurityGate {
   @@index([companyId, status])
   @@index([branchId])
   @@index([unitId])
+}
+
+model SecurityEquipment {
+  id              String               @id @default(uuid())
+  companyId       String
+  gateId          String?
+  postId          String?
+  areaId          String?
+  type            String // TURNSTILE, LPR, TOTEM, BIO_READER
+  brand           String? // CONTROL_ID, HIKVISION, INTELBRAS
+  ipAddress       String?
+  macAddress      String?
+  name            String
+  status          SecurityRecordStatus @default(ACTIVE)
+  lastPingAt      DateTime?
+  hardwareVersion String?
+  firmwareVersion String?
+  settings        Json?
+  createdById     String?
+  updatedById     String?
+  createdAt       DateTime             @default(now())
+  updatedAt       DateTime             @updatedAt
+  deletedAt       DateTime?
+
+  @@index([companyId])
+  @@index([gateId])
+  @@index([postId])
 }
 
 model SecurityPost {
@@ -11026,14 +11060,22 @@ model SecurityPerson {
   documentIds         String[]               @default([])
   documentStatus      SecurityDocumentStatus @default(NOT_REQUIRED)
   documentValidUntil  DateTime?
-  restrictions        Json?
-  status              SecurityRecordStatus   @default(ACTIVE)
-  lgpdConsentAt       DateTime?
-  createdById         String?
-  updatedById         String?
-  createdAt           DateTime               @default(now())
-  updatedAt           DateTime               @updatedAt
-  deletedAt           DateTime?
+
+  // Integrações (Biometria/Facial: Hikvision, Intelbras, Control iD)
+  facialId            String?
+  biometricRegistered Boolean @default(false)
+  rfidCardNumber      String?
+  pinCode             String?
+  integrationSource   String?
+
+  restrictions  Json?
+  status        SecurityRecordStatus @default(ACTIVE)
+  lgpdConsentAt DateTime?
+  createdById   String?
+  updatedById   String?
+  createdAt     DateTime             @default(now())
+  updatedAt     DateTime             @updatedAt
+  deletedAt     DateTime?
 
   @@index([companyId])
   @@index([companyId, type])
@@ -11073,7 +11115,7 @@ model SecurityContractorCompany {
 }
 
 model SecurityVehicle {
-  id                    String                 @id @default(uuid())
+  id                    String  @id @default(uuid())
   companyId             String
   type                  String
   plate                 String
@@ -11084,16 +11126,21 @@ model SecurityVehicle {
   companyName           String?
   ownerName             String?
   defaultDriverPersonId String?
-  documentStatus        SecurityDocumentStatus @default(NOT_REQUIRED)
-  documentValidUntil    DateTime?
-  notes                 String?
-  blockReason           String?
-  status                SecurityRecordStatus   @default(ACTIVE)
-  createdById           String?
-  updatedById           String?
-  createdAt             DateTime               @default(now())
-  updatedAt             DateTime               @updatedAt
-  deletedAt             DateTime?
+
+  // Integrações (LPR)
+  lprRegistered Boolean @default(false)
+  rfidTagNumber String?
+
+  documentStatus     SecurityDocumentStatus @default(NOT_REQUIRED)
+  documentValidUntil DateTime?
+  notes              String?
+  blockReason        String?
+  status             SecurityRecordStatus   @default(ACTIVE)
+  createdById        String?
+  updatedById        String?
+  createdAt          DateTime               @default(now())
+  updatedAt          DateTime               @updatedAt
+  deletedAt          DateTime?
 
   @@unique([companyId, plate])
   @@index([companyId])
@@ -11215,6 +11262,7 @@ model SecurityAccessMovement {
   reason                 String?
   internalResponsibleId  String?
   destinationAreaId      String?
+  currentAreaId          String? // Para Controle de Evacuação (Roll Call)
   plate                  String?
   trailerPlate           String?
   driverPersonId         String?
@@ -11402,6 +11450,7 @@ model SecurityIncident {
   postId              String?
   movementId          String?
   roundExecutionId    String?
+  checkpointId        String?
   actionPlanId        String?
   code                String?
   title               String
