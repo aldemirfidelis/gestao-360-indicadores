@@ -188,6 +188,8 @@ export class WorkItemAggregationService {
         this.collectVacations(me).catch((e) => this.warn('vacations', e)),
         this.collectPersonnelLifecycle(me).catch((e) => this.warn('personnel-lifecycle', e)),
         this.collectSupplies(me).catch((e) => this.warn('supplies', e)),
+        this.collectRecruitment(me).catch((e) => this.warn('recruitment', e)),
+        this.collectCompensation(me).catch((e) => this.warn('compensation', e)),
       ])
     ).flat();
   }
@@ -734,16 +736,7 @@ export class WorkItemAggregationService {
 
   /** Filas operacionais de Suprimentos: comprador, alçada e almoxarifado. */
   private async collectSupplies(me: AuthPayload): Promise<WorkItemDraft[]> {
-    const grants = await this.prisma.user.findUnique({
-      where: { id: me.sub },
-      select: {
-        permissions: { select: { permission: { select: { key: true } } } },
-        accessProfile: { select: { permissions: { select: { permission: { select: { key: true } } } } } },
-      },
-    });
-    const keys = new Set<string>();
-    grants?.permissions.forEach((item) => keys.add(item.permission.key));
-    grants?.accessProfile?.permissions.forEach((item) => keys.add(item.permission.key));
+    const keys = await this.permissionKeys(me.sub);
     const admin = ['SUPER_ADMIN', 'COMPANY_ADMIN'].includes(String(me.role));
     const canBuy = admin || keys.has('compras:buy') || keys.has('compras:manage');
     const canApprove = admin || keys.has('compras:approve') || keys.has('compras:manage');
@@ -816,6 +809,189 @@ export class WorkItemAggregationService {
         context: { warehouseId: row.warehouseId, number: row.number }, sourceCreatedAt: row.createdAt, sourceUpdatedAt: row.updatedAt,
       })));
     return drafts;
+  }
+
+  /** Recrutamento: aprovações de requisição, vaga a criar, propostas fora da faixa, documentos e experiência. */
+  private async collectRecruitment(me: AuthPayload): Promise<WorkItemDraft[]> {
+    const keys = await this.permissionKeys(me.sub);
+    const admin = ['SUPER_ADMIN', 'COMPANY_ADMIN'].includes(String(me.role));
+    const manage = admin || keys.has('recruit:manage');
+    const canApproveRequisition = manage || keys.has('recruit:requisition:approve');
+    const canApproveOffer = manage || keys.has('recruit:offer:approve');
+    const canPrehire = manage || keys.has('recruit:prehire');
+    const canAdmit = manage || keys.has('recruit:admit');
+
+    const [requisitions, toPost, offers, preAdmissions, probations] = await Promise.all([
+      canApproveRequisition
+        ? this.prisma.recruitRequisition.findMany({
+            where: { companyId: me.companyId, status: 'SUBMITTED' },
+            select: {
+              id: true, code: true, priority: true, requesterId: true, orgNodeId: true, openingsRequested: true,
+              createdAt: true, updatedAt: true,
+              approvals: { select: { order: true, role: true, decision: true, approverId: true }, orderBy: { order: 'asc' } },
+            },
+            take: 100,
+          })
+        : [],
+      this.prisma.recruitRequisition.findMany({
+        where: {
+          companyId: me.companyId, status: 'SENT_TO_RECRUITMENT',
+          ...(manage ? {} : { recruiterId: me.sub }),
+        },
+        select: { id: true, code: true, recruiterId: true, requesterId: true, orgNodeId: true, createdAt: true, updatedAt: true },
+        take: 100,
+      }),
+      canApproveOffer
+        ? this.prisma.recruitOffer.findMany({
+            where: { companyId: me.companyId, status: 'PENDING_APPROVAL' },
+            select: {
+              id: true, revision: true, salaryAmountCents: true, expiresAt: true, createdAt: true, updatedAt: true,
+              application: { select: { id: true, candidate: { select: { name: true } }, posting: { select: { id: true, title: true } } } },
+            },
+            take: 100,
+          })
+        : [],
+      canPrehire
+        ? this.prisma.recruitPreAdmission.findMany({
+            where: { companyId: me.companyId, documents: { some: { status: 'SUBMITTED' } } },
+            select: {
+              id: true, status: true, admissionTargetDate: true, createdAt: true, updatedAt: true,
+              documents: { where: { status: 'SUBMITTED' }, select: { id: true } },
+              application: { select: { id: true, candidate: { select: { name: true } }, posting: { select: { id: true, title: true } } } },
+            },
+            take: 100,
+          })
+        : [],
+      canAdmit
+        ? this.prisma.recruitProbationReview.findMany({
+            where: { companyId: me.companyId, status: 'PENDING' },
+            select: {
+              id: true, cycleDay: true, dueAt: true, createdAt: true, updatedAt: true,
+              admission: { select: { application: { select: { id: true, candidate: { select: { name: true } }, posting: { select: { id: true, title: true } } } } } },
+            },
+            take: 100,
+          })
+        : [],
+    ]);
+
+    const hub = '/servico-pessoal/recrutamento';
+    const drafts: WorkItemDraft[] = [];
+
+    // Segregação: o solicitante não decide a própria requisição; passo com aprovador
+    // nomeado só aparece para ele.
+    for (const req of requisitions) {
+      if (req.requesterId === me.sub) continue;
+      const pending = req.approvals.find((step) => step.decision == null);
+      if (pending?.approverId && pending.approverId !== me.sub) continue;
+      drafts.push({
+        sourceModule: 'recruitment', sourceEntityType: 'RECRUIT_REQUISITION', sourceEntityId: req.id,
+        itemType: 'RECRUIT_REQUISITION_APPROVAL', title: `Aprovar requisição de vaga ${req.code}`,
+        summary: pending ? `Passo pendente: ${pending.role} · ${req.openingsRequested} vaga(s)` : `${req.openingsRequested} vaga(s)`,
+        status: 'SUBMITTED', criticality: req.priority === 'URGENTE' ? 'CRITICAL' : req.priority === 'ALTA' ? 'HIGH' : 'MEDIUM',
+        assignedUserId: me.sub, requesterUserId: req.requesterId, orgNodeId: req.orgNodeId,
+        requiresDecision: true, isBlocking: req.priority === 'URGENTE',
+        recommendedAction: 'Aprovar ou reprovar a requisição (travas de quadro/orçamento na tela)',
+        availableActions: [{ key: 'open', label: 'Abrir recrutamento', href: hub }],
+        context: { code: req.code, priority: req.priority }, sourceCreatedAt: req.createdAt, sourceUpdatedAt: req.updatedAt,
+      });
+    }
+
+    drafts.push(...toPost.map((req) => ({
+      sourceModule: 'recruitment', sourceEntityType: 'RECRUIT_REQUISITION', sourceEntityId: req.id,
+      itemType: 'RECRUIT_POSTING_TODO', title: `Criar vaga de divulgação (${req.code})`,
+      summary: req.recruiterId === me.sub ? 'Requisição encaminhada sob sua condução' : 'Requisição aprovada aguardando vaga',
+      status: 'SENT_TO_RECRUITMENT', criticality: 'MEDIUM',
+      assignedUserId: me.sub, requesterUserId: req.requesterId, orgNodeId: req.orgNodeId,
+      requiresDecision: false,
+      recommendedAction: 'Abrir a requisição e criar a vaga de divulgação',
+      availableActions: [{ key: 'open', label: 'Abrir recrutamento', href: hub }],
+      context: { code: req.code }, sourceCreatedAt: req.createdAt, sourceUpdatedAt: req.updatedAt,
+    })));
+
+    drafts.push(...offers.map((offer) => ({
+      sourceModule: 'recruitment', sourceEntityType: 'RECRUIT_OFFER', sourceEntityId: offer.id,
+      itemType: 'RECRUIT_OFFER_APPROVAL', title: `Aprovar proposta fora da faixa — ${offer.application.candidate.name}`,
+      summary: `${offer.application.posting.title} · revisão ${offer.revision}`,
+      status: 'PENDING_APPROVAL', criticality: 'HIGH', dueAt: offer.expiresAt,
+      assignedUserId: me.sub, requiresDecision: true, isBlocking: true,
+      recommendedAction: 'Avaliar a justificativa e aprovar ou cancelar a proposta',
+      availableActions: [{ key: 'open', label: 'Abrir vaga', href: `${hub}/vagas/${offer.application.posting.id}` }],
+      context: { applicationId: offer.application.id, salaryAmountCents: offer.salaryAmountCents },
+      sourceCreatedAt: offer.createdAt, sourceUpdatedAt: offer.updatedAt,
+    })));
+
+    drafts.push(...preAdmissions.map((pre) => ({
+      sourceModule: 'recruitment', sourceEntityType: 'RECRUIT_PRE_ADMISSION', sourceEntityId: pre.id,
+      itemType: 'RECRUIT_PREHIRE_DOCS', title: `Revisar documentos de ${pre.application.candidate.name}`,
+      summary: `${pre.documents.length} documento(s) enviados na pré-admissão · ${pre.application.posting.title}`,
+      status: pre.status, criticality: 'MEDIUM', dueAt: pre.admissionTargetDate,
+      assignedUserId: me.sub, requiresDecision: true,
+      recommendedAction: 'Aprovar ou rejeitar os documentos enviados pelo candidato',
+      availableActions: [{ key: 'open', label: 'Abrir vaga', href: `${hub}/vagas/${pre.application.posting.id}` }],
+      context: { applicationId: pre.application.id, submittedDocs: pre.documents.length },
+      sourceCreatedAt: pre.createdAt, sourceUpdatedAt: pre.updatedAt,
+    })));
+
+    drafts.push(...probations.map((review) => ({
+      sourceModule: 'recruitment', sourceEntityType: 'RECRUIT_PROBATION_REVIEW', sourceEntityId: review.id,
+      itemType: 'RECRUIT_PROBATION_REVIEW', title: `Avaliação de experiência D+${review.cycleDay} — ${review.admission.application.candidate.name}`,
+      summary: review.admission.application.posting.title,
+      status: 'PENDING', criticality: 'MEDIUM', dueAt: review.dueAt,
+      assignedUserId: me.sub, requiresDecision: true,
+      recommendedAction: 'Concluir a avaliação do período de experiência',
+      availableActions: [{ key: 'open', label: 'Abrir vaga', href: `${hub}/vagas/${review.admission.application.posting.id}` }],
+      context: { applicationId: review.admission.application.id, cycleDay: review.cycleDay },
+      sourceCreatedAt: review.createdAt, sourceUpdatedAt: review.updatedAt,
+    })));
+
+    return drafts;
+  }
+
+  /** Cargos e Salários: movimentações salariais aguardando aprovação. */
+  private async collectCompensation(me: AuthPayload): Promise<WorkItemDraft[]> {
+    const keys = await this.permissionKeys(me.sub);
+    const admin = ['SUPER_ADMIN', 'COMPANY_ADMIN'].includes(String(me.role));
+    const canApprove = admin || keys.has('compensation:movements:approve') || keys.has('compensation:manage');
+    if (!canApprove) return [];
+
+    const movements = await this.prisma.compensationMovementRequest.findMany({
+      where: { companyId: me.companyId, status: 'REQUESTED' },
+      select: {
+        id: true, protocol: true, type: true, reason: true, monthlyImpact: true,
+        requesterId: true, effectiveAt: true, createdAt: true, updatedAt: true,
+      },
+      take: 100,
+    });
+
+    return movements
+      .filter((movement) => movement.requesterId !== me.sub)
+      .map((movement) => ({
+        sourceModule: 'compensation', sourceEntityType: 'COMPENSATION_MOVEMENT', sourceEntityId: movement.id,
+        itemType: 'COMPENSATION_MOVEMENT_APPROVAL', title: `Aprovar movimentação ${movement.protocol}`,
+        summary: `${movement.reason}${movement.monthlyImpact != null ? ` · impacto mensal R$ ${Number(movement.monthlyImpact).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}` : ''}`,
+        status: 'REQUESTED', criticality: 'HIGH', dueAt: movement.effectiveAt,
+        assignedUserId: me.sub, requesterUserId: movement.requesterId,
+        requiresDecision: true,
+        recommendedAction: 'Aprovar ou rejeitar a movimentação salarial',
+        availableActions: [{ key: 'open', label: 'Abrir aprovações de C&S', href: '/cargos-salarios/aprovacoes' }],
+        context: { protocol: movement.protocol, type: movement.type },
+        sourceCreatedAt: movement.createdAt, sourceUpdatedAt: movement.updatedAt,
+      }));
+  }
+
+  /** Chaves de permissão efetivas (perfil + grants diretos) do usuário. */
+  private async permissionKeys(userId: string): Promise<Set<string>> {
+    const grants = await this.prisma.user.findUnique({
+      where: { id: userId },
+      select: {
+        permissions: { select: { permission: { select: { key: true } } } },
+        accessProfile: { select: { permissions: { select: { permission: { select: { key: true } } } } } },
+      },
+    });
+    const keys = new Set<string>();
+    grants?.permissions.forEach((item) => keys.add(item.permission.key));
+    grants?.accessProfile?.permissions.forEach((item) => keys.add(item.permission.key));
+    return keys;
   }
 
   private async collectAudits(me: AuthPayload): Promise<WorkItemDraft[]> {

@@ -126,4 +126,95 @@ describe('WorkItemAggregationService', () => {
     expect(arg.create.delegatedFromUserId).toBe('u2');
     expect(arg.create.contextData.delegatedFromName).toBe('Delegante');
   });
+
+  // ---------- Coletores de Recrutamento e C&S ----------
+
+  function withGrants(prisma: any, keys: string[]) {
+    prisma.user = {
+      findUnique: vi.fn().mockResolvedValue({
+        permissions: keys.map((key) => ({ permission: { key } })),
+        accessProfile: null,
+      }),
+    };
+    return prisma;
+  }
+
+  it('recrutamento: aprovador recebe requisições SUBMITTED, exceto as próprias e as com aprovador nomeado alheio', async () => {
+    const prisma = withGrants(makePrisma(), ['recruit:requisition:approve']);
+    const base = { priority: 'NORMAL', orgNodeId: 'n1', openingsRequested: 1, createdAt: new Date(), updatedAt: new Date() };
+    prisma.recruitRequisition = {
+      findMany: vi.fn().mockImplementation(({ where }: any) => {
+        if (where.status === 'SUBMITTED') {
+          return Promise.resolve([
+            { id: 'r1', code: 'RQ-1', requesterId: 'u2', approvals: [{ order: 1, role: 'RH', decision: null, approverId: null }], ...base },
+            { id: 'r2', code: 'RQ-2', requesterId: 'u1', approvals: [{ order: 1, role: 'RH', decision: null, approverId: null }], ...base },
+            { id: 'r3', code: 'RQ-3', requesterId: 'u3', approvals: [{ order: 1, role: 'RH', decision: null, approverId: 'u9' }], ...base },
+          ]);
+        }
+        return Promise.resolve([]);
+      }),
+    };
+    const svc = new WorkItemAggregationService(prisma, new WorkItemPriorityService());
+
+    const count = await svc.rebuildForUser(me);
+
+    expect(count).toBe(1);
+    const arg = prisma.workItemIndex.upsert.mock.calls[0][0];
+    expect(arg.where.dedupeKey).toBe('RECRUIT_REQUISITION:r1:RECRUIT_REQUISITION_APPROVAL:u1');
+    expect(arg.create.requiresDecision).toBe(true);
+    expect(arg.create.availableActions[0].href).toBe('/servico-pessoal/recrutamento');
+  });
+
+  it('recrutamento: proposta fora da faixa pendente vira item de decisão com link da vaga', async () => {
+    const prisma = withGrants(makePrisma(), ['recruit:offer:approve']);
+    prisma.recruitRequisition = { findMany: vi.fn().mockResolvedValue([]) };
+    prisma.recruitOffer = {
+      findMany: vi.fn().mockResolvedValue([{
+        id: 'o1', revision: 2, salaryAmountCents: 700000, expiresAt: null, createdAt: new Date(), updatedAt: new Date(),
+        application: { id: 'app1', candidate: { name: 'Maria' }, posting: { id: 'p1', title: 'Analista' } },
+      }]),
+    };
+    const svc = new WorkItemAggregationService(prisma, new WorkItemPriorityService());
+
+    const count = await svc.rebuildForUser(me);
+
+    expect(count).toBe(1);
+    const arg = prisma.workItemIndex.upsert.mock.calls[0][0];
+    expect(arg.where.dedupeKey).toBe('RECRUIT_OFFER:o1:RECRUIT_OFFER_APPROVAL:u1');
+    expect(arg.create.title).toContain('Maria');
+    expect(arg.create.availableActions[0].href).toBe('/servico-pessoal/recrutamento/vagas/p1');
+  });
+
+  it('C&S: movimentação REQUESTED vira item para o aprovador, mas não para o próprio solicitante', async () => {
+    const prisma = withGrants(makePrisma(), ['compensation:movements:approve']);
+    prisma.compensationMovementRequest = {
+      findMany: vi.fn().mockResolvedValue([
+        { id: 'm1', protocol: 'MOV-1', type: 'MERITO', reason: 'Mérito anual', monthlyImpact: 350.5, requesterId: 'u2', effectiveAt: new Date(), createdAt: new Date(), updatedAt: new Date() },
+        { id: 'm2', protocol: 'MOV-2', type: 'PROMOCAO', reason: 'Promoção', monthlyImpact: null, requesterId: 'u1', effectiveAt: new Date(), createdAt: new Date(), updatedAt: new Date() },
+      ]),
+    };
+    const svc = new WorkItemAggregationService(prisma, new WorkItemPriorityService());
+
+    const count = await svc.rebuildForUser(me);
+
+    expect(count).toBe(1);
+    const arg = prisma.workItemIndex.upsert.mock.calls[0][0];
+    expect(arg.where.dedupeKey).toBe('COMPENSATION_MOVEMENT:m1:COMPENSATION_MOVEMENT_APPROVAL:u1');
+    expect(arg.create.availableActions[0].href).toBe('/cargos-salarios/aprovacoes');
+    expect(arg.create.requesterUserId).toBe('u2');
+  });
+
+  it('sem permissões de recrutamento/C&S: coletores novos não disparam consultas de fila', async () => {
+    const prisma = withGrants(makePrisma(), []);
+    prisma.recruitOffer = { findMany: vi.fn() };
+    prisma.compensationMovementRequest = { findMany: vi.fn() };
+    prisma.recruitRequisition = { findMany: vi.fn().mockResolvedValue([]) };
+    const svc = new WorkItemAggregationService(prisma, new WorkItemPriorityService());
+
+    const count = await svc.rebuildForUser(me);
+
+    expect(count).toBe(0);
+    expect(prisma.recruitOffer.findMany).not.toHaveBeenCalled();
+    expect(prisma.compensationMovementRequest.findMany).not.toHaveBeenCalled();
+  });
 });
