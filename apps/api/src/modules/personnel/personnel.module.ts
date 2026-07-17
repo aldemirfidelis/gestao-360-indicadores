@@ -1,5 +1,6 @@
 import { Module } from '@nestjs/common';
 import { DocumentsModule } from '../documents/documents.module';
+import { UsersModule } from '../users/users.module';
 import { EmployeesController } from './employees.controller';
 import { EmployeesService } from './employees.service';
 import { LifecycleController } from './lifecycle.controller';
@@ -21,7 +22,7 @@ import { PersonnelSettingsController } from './personnel-settings.controller';
 import { PersonnelSettingsService } from './personnel-settings.service';
 
 @Module({
-  imports: [DocumentsModule],
+  imports: [DocumentsModule, UsersModule],
   controllers: [PersonnelController, EmployeesController, VacationsController, LifecycleController, ReportsController, BiometricController, KioskController, PersonnelSettingsController],
   providers: [PersonnelService, EmployeesService, VacationService, LifecycleService, ReportsService, BiometricService, KioskService, TimeBankService, PayrollService, LegalFilesService, PersonnelSettingsService],
   exports: [PersonnelService, EmployeesService, VacationService, LifecycleService, ReportsService, TimeBankService, PersonnelSettingsService],

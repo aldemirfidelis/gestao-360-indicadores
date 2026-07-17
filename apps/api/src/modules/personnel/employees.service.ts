@@ -4,6 +4,9 @@ import { PrismaService } from '../../prisma/prisma.service';
 import { AuditWriterService } from '../../common/audit/audit-writer.service';
 import { DocumentStorageService } from '../documents/document-storage.service';
 import { PersonnelSettingsService } from './personnel-settings.service';
+import { UsersService } from '../users/users.service';
+import { UserRoleEnum } from '@prisma/client';
+import { randomBytes } from 'crypto';
 import { AuthPayload } from '../auth/auth.types';
 import {
   CONTRACT_TYPES,
@@ -55,6 +58,7 @@ export class EmployeesService {
     private readonly audit: AuditWriterService,
     private readonly storage: DocumentStorageService,
     private readonly settings: PersonnelSettingsService,
+    private readonly users: UsersService,
   ) {}
 
   // ------------------------------ Listagem ------------------------------
@@ -124,10 +128,17 @@ export class EmployeesService {
   }
 
   async options(me: AuthPayload) {
-    const [orgNodes, jobs, users] = await Promise.all([
+    const [orgNodes, jobs, users, accessProfiles] = await Promise.all([
       this.prisma.orgNode.findMany({
         where: { companyId: me.companyId, deletedAt: null, active: true },
-        select: { id: true, name: true, type: true },
+        select: {
+          id: true,
+          name: true,
+          type: true,
+          // Superior imediato derivado da área (responsável da estrutura).
+          responsibleUserId: true,
+          responsibleUser: { select: { id: true, name: true } },
+        },
         orderBy: [{ type: 'asc' }, { name: 'asc' }],
       }),
       this.prisma.orgJob.findMany({
@@ -140,11 +151,17 @@ export class EmployeesService {
         select: { id: true, name: true, email: true },
         orderBy: { name: 'asc' },
       }),
+      this.prisma.accessProfile.findMany({
+        where: { companyId: me.companyId, deletedAt: null, role: { not: 'SUPER_ADMIN' } },
+        select: { id: true, name: true, code: true, role: true },
+        orderBy: { name: 'asc' },
+      }),
     ]);
     return {
       orgNodes,
       jobs,
       users,
+      accessProfiles,
       contractTypes: CONTRACT_TYPES,
       workRegimes: WORK_REGIMES,
       dependentRelationships: DEPENDENT_RELATIONSHIPS,
@@ -260,7 +277,76 @@ export class EmployeesService {
       message: `Colaborador "${name}" cadastrado`,
       after: { name, registrationId, jobId, orgNodeId },
     });
+
+    // Cadastrar como usuário do portal no mesmo passo (opcional). Só quando não
+    // veio um vínculo com usuário existente.
+    if (body?.createUser && !text(body?.profile?.userId ?? body?.userId)) {
+      await this.provisionPortalUser(me, {
+        employeeId: created.id,
+        name,
+        cpf: (profileData.cpf as string | null) ?? null,
+        registrationId: registrationId ?? null,
+        input: body.createUser,
+      });
+    }
     return this.getById(me, created.id);
+  }
+
+  /**
+   * Cria o usuário do portal para o colaborador e vincula ao prontuário.
+   * O e-mail é a chave interna do User: no login por CPF/matrícula sintetiza um
+   * e-mail placeholder (mat-…/cpf-… @<slug>.local) e o colaborador entra pelo
+   * alias. Ao precisar de mais acessos depois, o admin edita e coloca o e-mail real.
+   */
+  private async provisionPortalUser(
+    me: AuthPayload,
+    args: { employeeId: string; name: string; cpf: string | null; registrationId: string | null; input: any },
+  ): Promise<void> {
+    const loginType = String(args.input?.loginType ?? 'EMAIL').toUpperCase();
+    const company = await this.prisma.company.findUnique({ where: { id: me.companyId }, select: { slug: true } });
+    const slug = (company?.slug || 'empresa').replace(/[^a-z0-9-]/gi, '').toLowerCase() || 'empresa';
+
+    let email: string;
+    if (loginType === 'CPF') {
+      if (!args.cpf) throw new BadRequestException('Informe o CPF para criar o usuário com login por CPF.');
+      email = `cpf-${args.cpf}@${slug}.local`;
+    } else if (loginType === 'REGISTRATION' || loginType === 'MATRICULA') {
+      if (!args.registrationId) throw new BadRequestException('Colaborador sem matrícula — configure a numeração ou informe uma matrícula.');
+      email = `mat-${args.registrationId}@${slug}.local`;
+    } else {
+      const provided = text(args.input?.email);
+      if (!provided) throw new BadRequestException('Informe o e-mail para criar o usuário com login por e-mail.');
+      email = provided.toLowerCase();
+    }
+
+    const accessProfileId =
+      text(args.input?.accessProfileId) ?? (await this.users.ensureAndGetProfileId(me.companyId, 'COLABORADOR_AUTOATENDIMENTO'));
+    const role = (accessProfileId ? await this.users.getProfileRole(me.companyId, accessProfileId) : null) ?? UserRoleEnum.COLLABORATOR;
+
+    const providedPassword = text(args.input?.password);
+    const password = providedPassword ?? randomBytes(9).toString('base64url');
+
+    const user = await this.users.create(
+      {
+        email,
+        password,
+        name: args.name,
+        role,
+        companyId: me.companyId,
+        accessProfileId: accessProfileId ?? undefined,
+        passwordResetRequired: !providedPassword,
+      } as any,
+      me.role === 'SUPER_ADMIN',
+    );
+
+    await this.prisma.personnelEmployeeProfile.update({ where: { employeeId: args.employeeId }, data: { userId: user.id } });
+    await this.audit.record(me, {
+      module: MODULE,
+      entity: 'OrgEmployee',
+      entityId: args.employeeId,
+      action: 'PORTAL_USER_CREATED',
+      message: `Usuário do portal criado (${loginType === 'EMAIL' ? email : loginType.toLowerCase()}) e vinculado ao colaborador`,
+    });
   }
 
   async update(me: AuthPayload, id: string, patch: any = {}) {

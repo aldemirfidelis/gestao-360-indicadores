@@ -94,6 +94,25 @@ export class UsersService {
     return { branches, profiles };
   }
 
+  /** Garante os perfis de sistema da empresa e devolve o id do perfil pelo código. */
+  async ensureAndGetProfileId(companyId: string, code: string): Promise<string | null> {
+    await this.ensureCompanyProfiles(companyId);
+    const profile = await this.prisma.accessProfile.findFirst({
+      where: { companyId, code, deletedAt: null },
+      select: { id: true },
+    });
+    return profile?.id ?? null;
+  }
+
+  /** Papel base de um perfil de acesso da empresa (ou global). */
+  async getProfileRole(companyId: string, profileId: string): Promise<UserRoleEnum | null> {
+    const profile = await this.prisma.accessProfile.findFirst({
+      where: { id: profileId, OR: [{ companyId }, { companyId: null }], deletedAt: null },
+      select: { role: true },
+    });
+    return (profile?.role as UserRoleEnum) ?? null;
+  }
+
   async create(input: UserAdminCreateInput, actorIsSuperAdmin = false) {
     // Anti-escalonamento de privilegio: apenas SUPER_ADMIN pode criar SUPER_ADMIN.
     if (input.role === UserRoleEnum.SUPER_ADMIN && !actorIsSuperAdmin) {

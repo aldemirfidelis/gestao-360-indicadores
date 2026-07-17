@@ -58,9 +58,10 @@ interface ListResponse {
 }
 
 interface Options {
-  orgNodes: Array<{ id: string; name: string; type: string }>;
+  orgNodes: Array<{ id: string; name: string; type: string; responsibleUserId: string | null; responsibleUser: { id: string; name: string } | null }>;
   jobs: Array<{ id: string; name: string }>;
   users: Array<{ id: string; name: string; email: string }>;
+  accessProfiles: Array<{ id: string; name: string; code: string; role: string }>;
   contractTypes: string[];
   workRegimes: string[];
   dependentRelationships: string[];
@@ -123,6 +124,9 @@ const EMPTY_FORM = {
   contractType: '', workRegime: '', admissionDate: '', userId: '',
   allowPortalPunch: '' as '' | 'true' | 'false',
   emergencyContactName: '', emergencyContactPhone: '', notes: '',
+  createUserEnabled: false,
+  loginType: 'EMAIL' as 'EMAIL' | 'CPF' | 'REGISTRATION',
+  userEmail: '', userPassword: '', userAccessProfileId: '',
 };
 
 export default function EmployeesPage() {
@@ -167,6 +171,7 @@ export default function EmployeesPage() {
   const options = optionsQuery.data;
   const detail = detailQuery.data ?? null;
   const kpis = listQuery.data?.kpis;
+  const autoatendimentoProfileId = (options?.accessProfiles ?? []).find((p) => p.code === 'COLABORADOR_AUTOATENDIMENTO')?.id ?? '';
 
   const invalidate = () => {
     void qc.invalidateQueries({ queryKey: ['personnel-employees'] });
@@ -211,6 +216,16 @@ export default function EmployeesPage() {
           emergencyContactPhone: form.emergencyContactPhone || null,
           notes: form.notes || null,
         },
+        ...(!editingId && form.createUserEnabled && !form.userId
+          ? {
+              createUser: {
+                loginType: form.loginType,
+                email: form.loginType === 'EMAIL' ? form.userEmail : undefined,
+                password: form.userPassword || undefined,
+                accessProfileId: form.userAccessProfileId || undefined,
+              },
+            }
+          : {}),
       };
       return editingId
         ? api<EmployeeDetail>(`/personnel/employees/${editingId}`, { method: 'PATCH', json: payload })
@@ -331,6 +346,7 @@ export default function EmployeesPage() {
     const profile = employee.personnelProfile ?? {};
     setEditingId(employee.id);
     setForm({
+      ...EMPTY_FORM,
       name: employee.name,
       registrationId: employee.registrationId ?? '',
       jobId: employee.jobId ?? '',
@@ -624,12 +640,64 @@ export default function EmployeesPage() {
                 <Label>CTPS</Label>
                 <Input value={form.ctpsNumber} onChange={(e) => setForm((f) => ({ ...f, ctpsNumber: e.target.value }))} />
               </div>
-              <div>
-                <Label>Usuário do sistema (autoatendimento/ponto)</Label>
-                <NativeSelect value={form.userId} onChange={(e) => setForm((f) => ({ ...f, userId: e.target.value }))}>
+              <div className="md:col-span-2">
+                <Label>Usuário do portal (autoatendimento/ponto)</Label>
+                <NativeSelect
+                  value={form.userId}
+                  onChange={(e) => setForm((f) => ({ ...f, userId: e.target.value, createUserEnabled: e.target.value ? false : f.createUserEnabled }))}
+                >
                   <option value="">Sem vínculo</option>
                   {(options?.users ?? []).map((user) => <option key={user.id} value={user.id}>{user.name} — {user.email}</option>)}
                 </NativeSelect>
+                {!editingId && !form.userId && (
+                  <div className="mt-2 rounded-md border border-sky-500/25 bg-sky-500/5 p-3">
+                    <label className="flex items-center gap-2 text-sm font-medium">
+                      <input
+                        type="checkbox"
+                        checked={form.createUserEnabled}
+                        onChange={(e) => setForm((f) => ({
+                          ...f,
+                          createUserEnabled: e.target.checked,
+                          userAccessProfileId: f.userAccessProfileId || autoatendimentoProfileId,
+                        }))}
+                      />
+                      Criar usuário do portal para este colaborador
+                    </label>
+                    {form.createUserEnabled && (
+                      <div className="mt-3 grid gap-3 md:grid-cols-2">
+                        <div>
+                          <Label className="text-xs">Entrar no portal com</Label>
+                          <NativeSelect value={form.loginType} onChange={(e) => setForm((f) => ({ ...f, loginType: e.target.value as typeof f.loginType }))}>
+                            <option value="EMAIL">E-mail</option>
+                            <option value="CPF">CPF (usa o CPF do cadastro)</option>
+                            <option value="REGISTRATION">Matrícula (usa a matrícula gerada)</option>
+                          </NativeSelect>
+                        </div>
+                        {form.loginType === 'EMAIL' && (
+                          <div>
+                            <Label className="text-xs">E-mail de acesso</Label>
+                            <Input type="email" value={form.userEmail} onChange={(e) => setForm((f) => ({ ...f, userEmail: e.target.value }))} placeholder="nome@empresa.com" />
+                          </div>
+                        )}
+                        <div>
+                          <Label className="text-xs">Perfil de acesso</Label>
+                          <NativeSelect value={form.userAccessProfileId} onChange={(e) => setForm((f) => ({ ...f, userAccessProfileId: e.target.value }))}>
+                            <option value="">Colaborador (Autoatendimento)</option>
+                            {(options?.accessProfiles ?? []).map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
+                          </NativeSelect>
+                        </div>
+                        <div>
+                          <Label className="text-xs">Senha inicial (opcional)</Label>
+                          <Input type="text" value={form.userPassword} onChange={(e) => setForm((f) => ({ ...f, userPassword: e.target.value }))} placeholder="em branco = gerada, troca no 1º acesso" />
+                        </div>
+                        <p className="text-[11px] text-muted-foreground md:col-span-2">
+                          Login por CPF/matrícula usa um e-mail interno automático. Se depois o colaborador precisar de acesso a outros módulos,
+                          edite o usuário em Configurações → Usuários e informe o e-mail real.
+                        </p>
+                      </div>
+                    )}
+                  </div>
+                )}
               </div>
             </TabsContent>
             <TabsContent value="contato" className="grid grid-cols-1 gap-3 pt-3 md:grid-cols-2">
