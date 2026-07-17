@@ -5,7 +5,7 @@ export const guiasPreenchimento: HelpCatalogCategory = {
   title: 'Guias de preenchimento',
   description: 'Passo a passo detalhado, campo a campo: Ishikawa, 5 Porquês, 5W2H, PDCA, desvio, indicador, NC, risco e mais.',
   icon: 'ClipboardList',
-  position: 11,
+  position: 12,
   articles: [
     {
       slug: 'como-preencher-ishikawa',

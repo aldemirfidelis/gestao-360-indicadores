@@ -6,6 +6,7 @@ import { qualidadeCompliance } from './content/qualidade-compliance';
 import { segurancaAlimentos } from './content/seguranca-alimentos';
 import { segurancaPatrimonial } from './content/seguranca-patrimonial';
 import { cargosSalarios } from './content/cargos-salarios';
+import { servicoPessoal } from './content/servico-pessoal';
 import { comunicacao } from './content/comunicacao';
 import { gestaoPremio } from './content/gestao-premio';
 import { administracao } from './content/administracao';
@@ -29,6 +30,7 @@ export const HELP_CATALOG: HelpCatalogCategory[] = [
   segurancaAlimentos,
   segurancaPatrimonial,
   cargosSalarios,
+  servicoPessoal,
   comunicacao,
   gestaoPremio,
   administracao,

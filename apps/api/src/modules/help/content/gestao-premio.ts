@@ -5,7 +5,7 @@ export const gestaoPremio: HelpCatalogCategory = {
   title: 'Gestão de Prêmio',
   description: 'Remuneração variável: regras, competências, apuração, espelhos e folha.',
   icon: 'Award',
-  position: 9,
+  position: 10,
   articles: [
     {
       slug: 'gestao-premio-visao-geral',

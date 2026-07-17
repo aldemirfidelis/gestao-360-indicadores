@@ -1,6 +1,7 @@
 'use client';
 
 import { useState } from 'react';
+import Link from 'next/link';
 import { useSearchParams } from 'next/navigation';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
@@ -271,6 +272,16 @@ export default function LifecyclePage() {
         <TabsContent value="desligamentos">{renderProcessList(offboarding, 'OFFBOARDING')}</TabsContent>
 
         <TabsContent value="aso">
+          <div className="mb-3 flex flex-wrap items-center gap-2 rounded-md border border-sky-500/25 bg-sky-500/5 px-3 py-2 text-xs text-muted-foreground">
+            <Stethoscope className="h-3.5 w-3.5 shrink-0 text-sky-500" />
+            <span>
+              Esta aba registra exames de <strong>quem já é colaborador</strong> (periódico, retorno, mudança de risco, demissional).
+              O ASO <strong>admissional de candidatos</strong> é conduzido na pré-admissão do Recrutamento, com acesso clínico segregado.
+            </span>
+            <Link href="/servico-pessoal/recrutamento/vagas" className="font-medium text-sky-600 hover:underline dark:text-sky-400">
+              Ir para o Recrutamento →
+            </Link>
+          </div>
           <Card className="border border-slate-100 bg-white shadow-sm dark:border-slate-800/80 dark:bg-slate-900/50">
             <div className="flex items-center justify-between border-b px-4 py-2.5">
               <h3 className="flex items-center gap-2 text-sm font-semibold text-slate-800 dark:text-white">

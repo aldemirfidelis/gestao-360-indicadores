@@ -5,7 +5,7 @@ export const administracao: HelpCatalogCategory = {
   title: 'Administração',
   description: 'Usuários e permissões, automações, importações, relatórios, períodos e atendimento.',
   icon: 'Settings',
-  position: 10,
+  position: 11,
   articles: [
     {
       slug: 'usuarios-perfis-e-permissoes',

@@ -5,7 +5,7 @@ export const comunicacao: HelpCatalogCategory = {
   title: 'Comunicação',
   description: 'Mural, comunicados com leitura obrigatória, campanhas, enquetes e chat.',
   icon: 'MessageSquare',
-  position: 8,
+  position: 9,
   articles: [
     {
       slug: 'como-usar-a-comunicacao',

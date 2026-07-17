@@ -743,6 +743,9 @@ export function CandidateSheet({
                                 : 'O ASO é liberado depois que os documentos obrigatórios forem aprovados.'}
                             </p>
                           )}
+                          <p className="mt-1 text-[10px] text-muted-foreground/80">
+                            Aqui fica só o ASO admissional do candidato. Exames do quadro ativo (periódico, retorno, demissional) são registrados em Serviço Pessoal → Admissão e Desligamento.
+                          </p>
                           <div className="space-y-2">
                             {(pre.occupationalExamRequests ?? []).map((aso) => (
                               <div key={aso.id} className="rounded-md bg-muted/40 p-2">
