@@ -570,6 +570,18 @@ export const DEFAULT_PROFILES = [
       'compensation:movements:view',
       'compensation:movements:request',
       'compensation:reports:view',
+      // Serviço Pessoal: o gestor é o superior imediato — vê o ponto da equipe,
+      // aprova férias/ajustes, consulta prontuário e folha, e conduz requisições
+      // de vaga da sua área (segregação: aprova requisição, não a própria).
+      'ponto:view',
+      'ponto:clock',
+      'ponto:team',
+      'pessoal:view',
+      'pessoal:update',
+      'folha:view',
+      'recruit:view',
+      'recruit:requisition:create',
+      'recruit:requisition:approve',
       'compras:view',
       'compras:request',
       'compras:buy',
@@ -624,8 +636,12 @@ export const DEFAULT_PROFILES = [
     code: 'USUARIO',
     name: 'Usuário',
     role: 'COLLABORATOR',
-    description: 'Acesso operacional para lançamentos e execução de atividades.',
+    description: 'Acesso operacional para lançamentos e execução de atividades, incluindo bater ponto e a própria vida funcional.',
     permissions: [
+      // Autoatendimento do colaborador: bater ponto, ver o próprio espelho e o holerite.
+      'ponto:view',
+      'ponto:clock',
+      'folha:view',
       'dashboard:view',
       'launches:view',
       'results:launch',
@@ -695,8 +711,12 @@ export const DEFAULT_PROFILES = [
     code: 'VISUALIZADOR',
     name: 'Visualizador',
     role: 'VIEWER',
-    description: 'Acesso somente leitura aos principais painéis e relatórios.',
+    description: 'Acesso somente leitura aos principais painéis e relatórios, com bater ponto e vida funcional próprios.',
     permissions: [
+      // Mesmo em modo leitura, o visualizador é um colaborador: bate ponto e vê o holerite.
+      'ponto:view',
+      'ponto:clock',
+      'folha:view',
       'dashboard:view',
       'visualization:view',
       'insights:view',
@@ -738,6 +758,24 @@ export const DEFAULT_PROFILES = [
       'automations:view',
       'compras:view',
       'estoque:view',
+    ],
+  },
+  {
+    // Perfil enxuto para o colaborador de chão/operação que só usa o portal para
+    // bater ponto e acessar a própria vida funcional (holerite, informe, férias).
+    // Não vê indicadores, documentos nem os demais módulos. Ao mudar de função,
+    // o admin troca o perfil e/ou adiciona o e-mail para liberar mais acessos.
+    code: 'COLABORADOR_AUTOATENDIMENTO',
+    name: 'Colaborador (Autoatendimento)',
+    role: 'VIEWER',
+    description: 'Acesso mínimo ao portal: bater ponto, espelho, holerite, informe de rendimentos e solicitação de férias.',
+    permissions: [
+      'ponto:view',
+      'ponto:clock',
+      'folha:view',
+      'communication:view',
+      'directory:view',
+      'help:view',
     ],
   },
 ] as const;

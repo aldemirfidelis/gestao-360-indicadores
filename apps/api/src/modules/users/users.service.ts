@@ -262,35 +262,41 @@ export class UsersService {
     });
     const existingCodes = new Set(existing.map((profile) => profile.code));
     const missing = defaults.filter((profile) => !existingCodes.has(profile.code));
-    if (missing.length === 0) return;
 
-    await this.prisma.accessProfile.createMany({
-      data: missing.map((profile) => ({
-        companyId,
-        code: profile.code,
-        name: profile.name,
-        description: profile.description,
-        role: profile.role as UserRoleEnum,
-        system: true,
-      })),
-      skipDuplicates: true,
-    });
+    if (missing.length > 0) {
+      await this.prisma.accessProfile.createMany({
+        data: missing.map((profile) => ({
+          companyId,
+          code: profile.code,
+          name: profile.name,
+          description: profile.description,
+          role: profile.role as UserRoleEnum,
+          system: true,
+        })),
+        skipDuplicates: true,
+      });
+    }
 
+    // Reconciliação ADITIVA dos perfis de sistema com o catálogo: garante que
+    // perfis já provisionados (empresas antigas) recebam permissões novas
+    // adicionadas ao DEFAULT_PROFILES. Só insere o que falta (skipDuplicates) e
+    // nunca remove — grants extras que o admin adicionou continuam intactos.
     const [profiles, permissions] = await Promise.all([
       this.prisma.accessProfile.findMany({
-        where: { companyId, code: { in: missing.map((profile) => profile.code) }, deletedAt: null },
-        select: { id: true, code: true },
+        where: { companyId, code: { in: defaults.map((profile) => profile.code) }, system: true, deletedAt: null },
+        select: { id: true, code: true, permissions: { select: { permissionId: true } } },
       }),
       this.prisma.permission.findMany({ select: { id: true, key: true } }),
     ]);
-    const profileByCode = new Map(profiles.map((profile) => [profile.code, profile.id]));
+    const profileByCode = new Map(profiles.map((profile) => [profile.code, profile]));
     const permissionByKey = new Map(permissions.map((permission) => [permission.key, permission.id]));
-    const entries = missing.flatMap((profile) => {
-      const profileId = profileByCode.get(profile.code);
-      if (!profileId) return [];
+    const entries = defaults.flatMap((profile) => {
+      const current = profileByCode.get(profile.code);
+      if (!current) return [];
+      const already = new Set(current.permissions.map((item) => item.permissionId));
       return profile.permissions.flatMap((key) => {
         const permissionId = permissionByKey.get(key);
-        return permissionId ? [{ profileId, permissionId }] : [];
+        return permissionId && !already.has(permissionId) ? [{ profileId: current.id, permissionId }] : [];
       });
     });
     if (entries.length > 0) {
