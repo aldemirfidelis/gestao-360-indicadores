@@ -237,6 +237,7 @@ export const navSections: NavSection[] = [
       { href: '/servico-pessoal/recrutamento', label: 'Recrutamento e Seleção', description: 'Contratação de ponta a ponta: requisição, aprovação, vaga, candidatos, proposta e admissão', icon: UserPlus, permissions: ['recruit:view'] },
       { href: '/servico-pessoal/meu-holerite', label: 'Minha Vida Funcional', description: 'Seus holerites e informe de rendimentos', icon: Wallet, permissions: [] },
       { href: '/servico-pessoal/relatorios', label: 'Relatórios', description: 'Turnover, absenteísmo, horas extras e exportação para a folha', icon: FileBarChart, permissions: ['pessoal:view', 'pessoal:manage'] },
+      { href: '/servico-pessoal/configuracoes', label: 'Configurações', description: 'Numeração da matrícula e modelo do crachá de identificação', icon: Settings, permissions: ['pessoal:settings', 'pessoal:manage'] },
     ],
   },
   {
@@ -319,6 +320,7 @@ export const ROUTE_PERMISSIONS: Array<{ prefix: string; permissions: string[]; e
   { prefix: '/servico-pessoal/folha', permissions: ['folha:view'] },
   { prefix: '/servico-pessoal/ferias', permissions: [] },
   { prefix: '/servico-pessoal/colaboradores', permissions: ['pessoal:view', 'pessoal:manage'] },
+  { prefix: '/servico-pessoal/configuracoes', permissions: ['pessoal:settings', 'pessoal:manage'] },
   // Recrutamento tem família de permissões própria (recruit:*): sem esta entrada,
   // um recrutador sem permissões de DP cairia no prefixo /servico-pessoal e seria
   // bloqueado mesmo vendo o item no menu. saude:occupational cobre quem só agenda/

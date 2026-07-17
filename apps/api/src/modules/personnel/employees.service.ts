@@ -3,6 +3,7 @@ import { Prisma } from '@prisma/client';
 import { PrismaService } from '../../prisma/prisma.service';
 import { AuditWriterService } from '../../common/audit/audit-writer.service';
 import { DocumentStorageService } from '../documents/document-storage.service';
+import { PersonnelSettingsService } from './personnel-settings.service';
 import { AuthPayload } from '../auth/auth.types';
 import {
   CONTRACT_TYPES,
@@ -17,6 +18,7 @@ import {
 
 const MODULE = 'personnel';
 const MAX_DOSSIER_BYTES = 8 * 1024 * 1024;
+const MAX_PHOTO_BYTES = 4 * 1024 * 1024;
 const MAX_IMPORT_ROWS = 1000;
 
 /** Campos do perfil aceitos no create/update/import (texto simples). */
@@ -52,6 +54,7 @@ export class EmployeesService {
     private readonly prisma: PrismaService,
     private readonly audit: AuditWriterService,
     private readonly storage: DocumentStorageService,
+    private readonly settings: PersonnelSettingsService,
   ) {}
 
   // ------------------------------ Listagem ------------------------------
@@ -175,6 +178,8 @@ export class EmployeesService {
     return {
       ...employee,
       linkedUser,
+      photoAvailable: Boolean(employee.personnelProfile?.photoStorageKey),
+      photoUpdatedAt: employee.personnelProfile?.photoUpdatedAt ?? null,
       dossierFiles: employee.dossierFiles.map((file) => ({
         id: file.id,
         kind: file.kind,
@@ -194,13 +199,18 @@ export class EmployeesService {
     if (!name) throw new BadRequestException('Nome do colaborador é obrigatório.');
     const jobId = await this.resolveJobId(me.companyId, body?.jobId, body?.jobName, me.sub);
     const orgNodeId = await this.validateOrgNode(me.companyId, text(body?.orgNodeId));
-    const registrationId = text(body?.registrationId);
+    // Matrícula informada tem prioridade; sem ela, gera pelo formato configurado
+    // (Serviço Pessoal → Configurações). Assim tanto a admissão do recrutamento
+    // quanto o cadastro direto ganham a numeração automática por um único caminho.
+    let registrationId = text(body?.registrationId);
     if (registrationId) {
       const duplicate = await this.prisma.orgEmployee.findFirst({
         where: { companyId: me.companyId, registrationId, status: 'ACTIVE' },
         select: { id: true },
       });
       if (duplicate) throw new ConflictException('Já existe colaborador ativo com esta matrícula.');
+    } else {
+      registrationId = await this.settings.allocateRegistration(me.companyId);
     }
     const profileData = await this.buildProfileData(me, body?.profile ?? body, null);
 
@@ -668,6 +678,87 @@ export class EmployeesService {
   }
 
   // ------------------------------ Internos ------------------------------
+
+  // ------------------------------ Foto / Crachá ------------------------------
+
+  async uploadPhoto(me: AuthPayload, employeeId: string, body: any = {}) {
+    await this.assertEmployee(me, employeeId);
+    const base64 = text(body?.contentBase64);
+    const mimeType = text(body?.mimeType) ?? 'image/jpeg';
+    if (!base64) throw new BadRequestException('Foto (conteúdo) é obrigatória.');
+    if (!mimeType.startsWith('image/')) throw new BadRequestException('A foto deve ser uma imagem.');
+    const buffer = Buffer.from(base64, 'base64');
+    if (!buffer.length) throw new BadRequestException('Foto vazia.');
+    if (buffer.length > MAX_PHOTO_BYTES) throw new BadRequestException('A foto excede o limite de 4 MB.');
+
+    const stored = await this.storage.putBinary(me.companyId, `personnel/${employeeId}/photo`, `foto-${employeeId}.img`, buffer, mimeType);
+    const now = new Date();
+    await this.prisma.personnelEmployeeProfile.upsert({
+      where: { employeeId },
+      create: { companyId: me.companyId, employeeId, createdById: me.sub, photoStorageKey: stored.storageKey, photoMimeType: stored.mimeType, photoUpdatedAt: now },
+      update: { photoStorageKey: stored.storageKey, photoMimeType: stored.mimeType, photoUpdatedAt: now },
+    });
+    await this.audit.record(me, { module: MODULE, entity: 'OrgEmployee', entityId: employeeId, action: 'PHOTO_UPDATE', message: 'Foto do colaborador atualizada' });
+    return { photoUpdatedAt: now, mimeType: stored.mimeType };
+  }
+
+  async getPhoto(me: AuthPayload, employeeId: string) {
+    await this.assertEmployee(me, employeeId);
+    const profile = await this.prisma.personnelEmployeeProfile.findUnique({
+      where: { employeeId },
+      select: { companyId: true, photoStorageKey: true, photoMimeType: true },
+    });
+    if (!profile || profile.companyId !== me.companyId || !profile.photoStorageKey) throw new NotFoundException('Foto não cadastrada.');
+    const content = await this.storage.readBinary(profile.photoStorageKey);
+    return { mimeType: profile.photoMimeType ?? 'image/jpeg', contentBase64: content.toString('base64') };
+  }
+
+  /** Dados consolidados para o gerador de crachá (colaborador + empresa + template). */
+  async getBadgeData(me: AuthPayload, employeeId: string) {
+    const employee = await this.prisma.orgEmployee.findFirst({
+      where: { id: employeeId, companyId: me.companyId },
+      include: {
+        orgNode: { select: { name: true } },
+        job: { select: { name: true } },
+        personnelProfile: { select: { admissionDate: true, photoStorageKey: true, photoMimeType: true } },
+      },
+    });
+    if (!employee) throw new NotFoundException('Colaborador não encontrado.');
+
+    const [company, settings] = await Promise.all([
+      this.prisma.company.findUnique({ where: { id: me.companyId }, select: { name: true, tradeName: true, logoUrl: true } }),
+      this.settings.get(me.companyId),
+    ]);
+
+    let photo: { mimeType: string; contentBase64: string } | null = null;
+    if (settings.badgeShowPhoto && employee.personnelProfile?.photoStorageKey) {
+      const buffer = await this.storage.readBinary(employee.personnelProfile.photoStorageKey).catch(() => null);
+      if (buffer) photo = { mimeType: employee.personnelProfile.photoMimeType ?? 'image/jpeg', contentBase64: buffer.toString('base64') };
+    }
+
+    return {
+      employee: {
+        id: employee.id,
+        name: employee.name,
+        registrationId: employee.registrationId,
+        jobName: employee.job?.name ?? null,
+        areaName: employee.orgNode?.name ?? null,
+        admissionDate: employee.personnelProfile?.admissionDate ?? null,
+      },
+      company: { name: company?.tradeName || company?.name || 'Empresa', logoUrl: company?.logoUrl ?? null },
+      photo,
+      template: {
+        accentColor: settings.badgeAccentColor,
+        orientation: settings.badgeOrientation,
+        showPhoto: settings.badgeShowPhoto,
+        showQr: settings.badgeShowQr,
+        showJob: settings.badgeShowJob,
+        showAdmission: settings.badgeShowAdmission,
+        showRegistration: settings.badgeShowRegistration,
+        footerText: settings.badgeFooterText,
+      },
+    };
+  }
 
   private async assertEmployee(me: AuthPayload, employeeId: string) {
     const exists = await this.prisma.orgEmployee.findFirst({

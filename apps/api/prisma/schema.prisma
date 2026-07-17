@@ -12748,6 +12748,11 @@ model PersonnelEmployeeProfile {
   emergencyContactPhone String?
   notes                 String?
 
+  /// Foto do colaborador (identificação/crachá) — binário via DocumentStorageService.
+  photoStorageKey String?
+  photoMimeType   String?
+  photoUpdatedAt  DateTime?
+
   createdById String?
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
@@ -12756,6 +12761,44 @@ model PersonnelEmployeeProfile {
   @@index([companyId])
   @@index([companyId, userId])
   @@map("personnel_employee_profiles")
+}
+
+/// Parâmetros do módulo Serviço Pessoal por empresa: numeração de matrícula e
+/// template do crachá. Uma linha por empresa (criada sob demanda com defaults).
+model PersonnelSettings {
+  id        String @id @default(uuid())
+  companyId String @unique
+
+  // --- Numeração de matrícula (registro do colaborador) ---
+  /// Gera a matrícula automaticamente na admissão quando não informada.
+  autoGenerateRegistration Boolean @default(true)
+  /// Permite digitar/sobrescrever a matrícula manualmente.
+  allowManualRegistration  Boolean @default(true)
+  /// Prefixo fixo (ex.: "9", "MAT-"). Suporta forma numérica ou alfanumérica.
+  registrationPrefix       String  @default("")
+  registrationSuffix       String  @default("")
+  /// Largura do sequencial (zeros à esquerda).
+  registrationWidth        Int     @default(5)
+  registrationPadChar      String  @default("0")
+  /// Próximo número sequencial a atribuir (incrementado atomicamente).
+  registrationNextSequence Int     @default(1)
+
+  // --- Template do crachá ---
+  badgeAccentColor      String  @default("#0ea5e9")
+  badgeOrientation      String  @default("PORTRAIT") // PORTRAIT | LANDSCAPE
+  badgeShowPhoto        Boolean @default(true)
+  badgeShowQr           Boolean @default(true)
+  badgeShowJob          Boolean @default(true)
+  badgeShowAdmission    Boolean @default(false)
+  badgeShowRegistration Boolean @default(true)
+  /// Texto opcional no rodapé (validade, assinatura, slogan).
+  badgeFooterText       String?
+
+  updatedById String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@map("personnel_settings")
 }
 
 /// Dependente do colaborador (IR, salário-família, plano de saúde).

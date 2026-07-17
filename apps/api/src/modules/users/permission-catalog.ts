@@ -227,6 +227,7 @@ export const PERMISSION_CATALOG = [
   ['pessoal:create', 'Cadastrar colaboradores', 'Servico Pessoal', 'create'],
   ['pessoal:update', 'Editar prontuario, dependentes e dossie', 'Servico Pessoal', 'update'],
   ['pessoal:delete', 'Remover registros do prontuario', 'Servico Pessoal', 'delete'],
+  ['pessoal:settings', 'Configurar numeracao de matricula e template do cracha', 'Servico Pessoal', 'update'],
   ['pessoal:manage', 'Administrar o servico pessoal (importacao e configuracoes)', 'Servico Pessoal', 'manage'],
 
   // Servico Pessoal — Controle de Ponto

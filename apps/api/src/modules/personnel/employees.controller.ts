@@ -93,4 +93,22 @@ export class EmployeesController {
   removeFile(@CurrentUser() me: AuthPayload, @Param('id') id: string, @Param('fileId') fileId: string) {
     return this.service.removeDossierFile(me, id, fileId);
   }
+
+  @Post(':id/photo')
+  @RequirePermissions('pessoal:update')
+  uploadPhoto(@CurrentUser() me: AuthPayload, @Param('id') id: string, @Body() body: any) {
+    return this.service.uploadPhoto(me, id, body);
+  }
+
+  @Get(':id/photo')
+  @RequirePermissions('pessoal:view')
+  getPhoto(@CurrentUser() me: AuthPayload, @Param('id') id: string) {
+    return this.service.getPhoto(me, id);
+  }
+
+  @Get(':id/badge')
+  @RequirePermissions('pessoal:view')
+  badge(@CurrentUser() me: AuthPayload, @Param('id') id: string) {
+    return this.service.getBadgeData(me, id);
+  }
 }

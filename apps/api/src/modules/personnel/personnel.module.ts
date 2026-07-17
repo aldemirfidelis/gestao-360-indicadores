@@ -17,11 +17,13 @@ import { KioskService } from './kiosk.service';
 import { TimeBankService } from './time-bank.service';
 import { PayrollService } from './payroll.service';
 import { LegalFilesService } from './legal-files.service';
+import { PersonnelSettingsController } from './personnel-settings.controller';
+import { PersonnelSettingsService } from './personnel-settings.service';
 
 @Module({
   imports: [DocumentsModule],
-  controllers: [PersonnelController, EmployeesController, VacationsController, LifecycleController, ReportsController, BiometricController, KioskController],
-  providers: [PersonnelService, EmployeesService, VacationService, LifecycleService, ReportsService, BiometricService, KioskService, TimeBankService, PayrollService, LegalFilesService],
-  exports: [PersonnelService, EmployeesService, VacationService, LifecycleService, ReportsService, TimeBankService],
+  controllers: [PersonnelController, EmployeesController, VacationsController, LifecycleController, ReportsController, BiometricController, KioskController, PersonnelSettingsController],
+  providers: [PersonnelService, EmployeesService, VacationService, LifecycleService, ReportsService, BiometricService, KioskService, TimeBankService, PayrollService, LegalFilesService, PersonnelSettingsService],
+  exports: [PersonnelService, EmployeesService, VacationService, LifecycleService, ReportsService, TimeBankService, PersonnelSettingsService],
 })
 export class PersonnelModule {}

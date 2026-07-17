@@ -33,6 +33,8 @@ import { useAuth } from '@/components/auth/auth-provider';
 import { api, getAccessToken } from '@/lib/api';
 import { cn, formatDate } from '@/lib/utils';
 import { ReasonDialog, type ReasonDialogState } from '@/components/platform/reason-dialog';
+import { BadgeDialog } from '@/components/personnel/badge-dialog';
+import { IdCard, Image as ImageIcon } from 'lucide-react';
 
 interface EmployeeRow {
   id: string;
@@ -79,6 +81,8 @@ interface EmployeeDetail {
   dependents: Array<{ id: string; name: string; relationship: string; birthDate: string | null; cpf: string | null; isIrDependent: boolean }>;
   employmentEvents: Array<{ id: string; type: string; title: string; description: string | null; effectiveDate: string; createdAt: string }>;
   dossierFiles: Array<{ id: string; kind: string; name: string; fileName: string; sizeBytes: number | null; validUntil: string | null; note: string | null; createdAt: string }>;
+  photoAvailable?: boolean;
+  photoUpdatedAt?: string | null;
 }
 
 const CONTRACT_LABEL: Record<string, string> = {
@@ -141,6 +145,8 @@ export default function EmployeesPage() {
   const [importResult, setImportResult] = useState<{ created: number; updated: number; errors: string[] } | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const importInputRef = useRef<HTMLInputElement>(null);
+  const photoInputRef = useRef<HTMLInputElement>(null);
+  const [badgeId, setBadgeId] = useState<string | null>(null);
 
   const listQuery = useQuery<ListResponse>({
     queryKey: ['personnel-employees', filters],
@@ -277,6 +283,21 @@ export default function EmployeesPage() {
       invalidate();
     },
     onError: (e: any) => toast.error(e?.message ?? 'Não foi possível anexar o documento'),
+  });
+
+  const uploadPhoto = useMutation({
+    mutationFn: async (file: File) => {
+      const base64 = await readAsBase64(file);
+      return api(`/personnel/employees/${detailId}/photo`, {
+        method: 'POST',
+        json: { mimeType: file.type || 'image/jpeg', contentBase64: base64 },
+      });
+    },
+    onSuccess: () => {
+      toast.success('Foto atualizada.');
+      void qc.invalidateQueries({ queryKey: ['personnel-employees', 'detail', detailId] });
+    },
+    onError: (e: any) => toast.error(e?.message ?? 'Não foi possível enviar a foto.'),
   });
 
   const removeFile = useMutation({
@@ -677,7 +698,13 @@ export default function EmployeesPage() {
                   <TabsTrigger value="historico">Histórico</TabsTrigger>
                 </TabsList>
                 {canUpdate && (
-                  <div className="flex gap-2">
+                  <div className="flex flex-wrap gap-2">
+                    <Button size="sm" variant="outline" className="h-8 text-xs" onClick={() => setBadgeId(detail.id)}>
+                      <IdCard className="mr-1 h-3.5 w-3.5" />Gerar crachá
+                    </Button>
+                    <Button size="sm" variant="outline" className="h-8 text-xs" disabled={uploadPhoto.isPending} onClick={() => photoInputRef.current?.click()}>
+                      <ImageIcon className="mr-1 h-3.5 w-3.5" />{uploadPhoto.isPending ? 'Enviando...' : detail.photoAvailable ? 'Trocar foto' : 'Adicionar foto'}
+                    </Button>
                     <Button size="sm" variant="outline" className="h-8 text-xs" onClick={() => openEdit(detail)}>Editar</Button>
                     {detail.status === 'ACTIVE' ? (
                       <Button size="sm" variant="outline" className="h-8 text-xs text-status-red" onClick={() => setReasonDialog({
@@ -911,6 +938,20 @@ export default function EmployeesPage() {
       </Dialog>
 
       <ReasonDialog state={reasonDialog} onClose={() => setReasonDialog(null)} />
+
+      <input
+        ref={photoInputRef}
+        type="file"
+        accept="image/*"
+        className="hidden"
+        onChange={(e) => {
+          const file = e.target.files?.[0];
+          if (file) uploadPhoto.mutate(file);
+          e.target.value = '';
+        }}
+      />
+
+      <BadgeDialog employeeId={badgeId} open={Boolean(badgeId)} onClose={() => setBadgeId(null)} />
     </div>
   );
 }
