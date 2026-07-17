@@ -101,7 +101,7 @@ export const portalServiceSections: NavSection[] = [
     intent: 'management',
     icon: Briefcase,
     items: [
-      { href: '/aprovacoes-cargo', label: 'Aprovações', description: 'Cargo, eficácia e aprovações gerais', icon: ClipboardCheck, permissions: ['org:positions:approve', 'eficacia:view', 'actions:effectiveness', 'actions:delete', 'actions:approve', 'actions:manage'] },
+      { href: '/aprovacoes-cargo', label: 'Aprovações Gerais', description: 'Posições de cargo no organograma, eficácia e aprovações gerais (movimentações salariais ficam em Cargos e Salários → Aprovações)', icon: ClipboardCheck, permissions: ['org:positions:approve', 'eficacia:view', 'actions:effectiveness', 'actions:delete', 'actions:approve', 'actions:manage'] },
       { href: '/periods', label: 'Períodos', description: 'Ano de trabalho, abertura e fechamento anual', icon: CalendarDays, permissions: ['settings:manage'] },
       { href: '/central-automacoes', label: 'Central de Automações', description: 'Motor visual de automações e fluxos de trabalho', icon: Sparkles, permissions: ['automations:view'] },
       companyUsersNavItem,

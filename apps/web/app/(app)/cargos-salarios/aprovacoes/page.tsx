@@ -1,6 +1,7 @@
 'use client';
 
 import { useState } from 'react';
+import Link from 'next/link';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { ReasonDialog, type ReasonDialogState } from '@/components/platform/reason-dialog';
 import { toast } from 'sonner';
@@ -74,8 +75,13 @@ export default function AprovacoesCargosSalariosPage() {
       <PageHeader
         eyebrow="Cargos e Salários"
         title="Aprovações"
-        description="Fila integrada de movimentações, descrições, tabelas salariais e simulações aguardando decisão."
+        description="Fila integrada de movimentações, descrições, tabelas salariais e simulações aguardando decisão. Aprovações de posição no organograma e de eficácia ficam na central de Aprovações Gerais."
         breadcrumbs={[{ label: 'Início', href: '/' }, { label: 'Cargos e Salários', href: '/cargos-salarios' }, { label: 'Aprovações' }]}
+        actions={
+          <Button asChild variant="outline" size="sm">
+            <Link href="/aprovacoes-cargo">Aprovações Gerais (cargo/eficácia)</Link>
+          </Button>
+        }
       />
       <CompensationModuleNav />
 

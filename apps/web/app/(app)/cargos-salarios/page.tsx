@@ -21,6 +21,7 @@ import {
   Users,
   X,
 } from 'lucide-react';
+import { CompensationModuleNav } from '@/components/compensation/module-nav';
 import { LoadingState } from '@/components/platform/loading-state';
 import { EmptyState } from '@/components/platform/empty-state';
 import { Card, CardContent } from '@/components/ui/card';
@@ -194,6 +195,8 @@ export default function CargosSalariosPage() {
           </Button>
         </div>
       </div>
+
+      <CompensationModuleNav />
 
       {overviewQuery.isLoading && <LoadingState />}
 

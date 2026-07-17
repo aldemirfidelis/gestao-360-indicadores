@@ -145,8 +145,13 @@ export default function AprovacoesPage() {
   return (
     <div>
       <PageHeader
-        title="Aprovações"
-        description="Central de aprovações de cargo, análise de eficácia e solicitações gerais."
+        title="Aprovações Gerais"
+        description="Central de aprovações de cargo (posições do organograma), análise de eficácia e solicitações gerais. Movimentações salariais, descrições e tabelas são decididas nas aprovações de Cargos e Salários."
+        actions={
+          <Button asChild variant="outline" size="sm">
+            <Link href="/cargos-salarios/aprovacoes">Aprovações de Cargos e Salários</Link>
+          </Button>
+        }
       />
 
       <Card>
