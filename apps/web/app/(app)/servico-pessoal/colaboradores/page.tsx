@@ -172,6 +172,7 @@ export default function EmployeesPage() {
   const detail = detailQuery.data ?? null;
   const kpis = listQuery.data?.kpis;
   const autoatendimentoProfileId = (options?.accessProfiles ?? []).find((p) => p.code === 'COLABORADOR_AUTOATENDIMENTO')?.id ?? '';
+  const selectedAreaManager = (options?.orgNodes ?? []).find((n) => n.id === form.orgNodeId)?.responsibleUser?.name ?? '';
 
   const invalidate = () => {
     void qc.invalidateQueries({ queryKey: ['personnel-employees'] });
@@ -593,6 +594,11 @@ export default function EmployeesPage() {
                   <option value="">Sem área definida</option>
                   {(options?.orgNodes ?? []).map((node) => <option key={node.id} value={node.id}>{node.name}</option>)}
                 </NativeSelect>
+                {selectedAreaManager && (
+                  <p className="mt-1 text-[11px] text-muted-foreground">
+                    Superior imediato (responsável da área): <span className="font-medium text-foreground">{selectedAreaManager}</span>
+                  </p>
+                )}
               </div>
               <div>
                 <Label>CBO do cargo <span className="text-[10px] text-muted-foreground">(eSocial)</span></Label>
