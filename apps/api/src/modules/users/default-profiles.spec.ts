@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { DEFAULT_PROFILES, PERMISSION_CATALOG } from './permission-catalog';
 
-const byCode = new Map(DEFAULT_PROFILES.map((p) => [p.code, p]));
+const byCode = new Map<string, { role: string; permissions: readonly string[] }>(DEFAULT_PROFILES.map((p) => [p.code, p]));
 const perms = (code: string) => new Set(byCode.get(code)?.permissions ?? []);
 
 describe('DEFAULT_PROFILES — autoatendimento do colaborador', () => {
