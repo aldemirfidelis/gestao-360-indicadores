@@ -1,49 +1,81 @@
 'use client';
 
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
-import { AlertTriangle, Briefcase, CheckCircle2, Megaphone, Plus, Send, ShieldAlert, ShieldCheck, UserPlus, X } from 'lucide-react';
+import {
+  Briefcase,
+  CheckCircle2,
+  ClipboardCheck,
+  FileSignature,
+  Megaphone,
+  Plus,
+  Search,
+  Send,
+  ShieldAlert,
+  ShieldCheck,
+  UserCheck,
+  UserPlus,
+  Users,
+  X,
+} from 'lucide-react';
 import { PageHeader } from '@/components/shell/page-header';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
+import { Card, CardContent } from '@/components/ui/card';
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { NativeSelect } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
+import { Sheet, SheetBody, SheetContent, SheetHeader, SheetTitle } from '@/components/ui/sheet';
+import { EmptyState } from '@/components/platform/empty-state';
+import { LoadingState } from '@/components/platform/loading-state';
+import { MetricCard } from '@/components/platform/metric-card';
+import { ReasonDialog, type ReasonDialogState } from '@/components/platform/reason-dialog';
+import { StatusBadge } from '@/components/platform/status-badge';
+import { JourneyStepper, NextStepCallout, type JourneyStep } from '@/components/recruitment/journey-stepper';
 import { api } from '@/lib/api';
 import { useAuth } from '@/components/auth/auth-provider';
-import { cn } from '@/lib/utils';
+import {
+  APPROVAL_ROLE,
+  GATE_KIND,
+  PRIORITY,
+  REQUISITION_STATUS,
+  VACANCY_TYPE,
+  formatDateBr,
+  formatMoneyCents,
+  labelOf,
+  metaOf,
+} from '@/lib/recruitment/labels';
 
 interface Requisition {
   id: string; code: string; status: string; vacancyType: string; priority: string;
   openingsRequested: number; orgNodeId: string | null; orgJobId: string | null;
-  recruiterId: string | null; confidential: boolean;
+  recruiterId: string | null; confidential: boolean; createdAt?: string;
   _count?: { openings: number; approvals: number };
 }
 interface RequisitionDetail extends Requisition {
   requesterId: string; reason: string | null; notes: string | null;
+  monthlyBudgetCents: number | string | null;
   gateExceptions: Array<{ kind: string; reason: string; at: string }> | null;
   approvals: Array<{ id: string; order: number; role: string; decision: string | null; comment: string | null }>;
   openings: Array<{ id: string; status: string }>;
-  snapshots: Array<{ version: number; jobData: any }>;
 }
-interface Gate { ready: boolean; blocks: string[]; warnings: string[]; exceptionsRequired: string[]; availability: { headcountAvailable: number | null; budgetAvailableCents: number | null } }
-interface Options { orgNodes: Array<{ id: string; name: string }>; jobs: Array<{ id: string; name: string }>; users: Array<{ id: string; name: string }> }
+interface Gate {
+  ready: boolean; blocks: string[]; warnings: string[]; exceptionsRequired: string[];
+  availability: { headcountAvailable: number | null; budgetAvailableCents: number | null };
+}
+interface Options {
+  orgNodes: Array<{ id: string; name: string }>;
+  jobs: Array<{ id: string; name: string }>;
+  users: Array<{ id: string; name: string }>;
+}
+interface Posting { id: string; status: string; _count?: { applications: number } }
 
-const STATUS_TONE: Record<string, string> = {
-  DRAFT: 'bg-slate-100 text-slate-700', SUBMITTED: 'bg-amber-100 text-amber-800', APPROVED: 'bg-sky-100 text-sky-800',
-  REJECTED: 'bg-rose-100 text-rose-800', RETURNED: 'bg-orange-100 text-orange-800', FROZEN: 'bg-slate-100 text-slate-500',
-  CANCELLED: 'bg-slate-100 text-slate-500', SENT_TO_RECRUITMENT: 'bg-violet-100 text-violet-800', IN_RECRUITMENT: 'bg-indigo-100 text-indigo-800',
-  FILLED: 'bg-emerald-100 text-emerald-800', CLOSED: 'bg-slate-100 text-slate-600',
-};
-const VACANCY_TYPES = ['AUMENTO', 'SUBSTITUICAO', 'TEMPORARIA', 'SAZONAL', 'APRENDIZ', 'ESTAGIO', 'TERCEIRIZACAO', 'CONFIDENCIAL', 'BANCO_TALENTOS'];
-
-const EMPTY = { orgJobId: '', orgNodeId: '', openingsRequested: 1, vacancyType: 'AUMENTO', priority: 'NORMAL', reason: '', recruiterId: '', monthlyBudgetCents: '', confidential: false };
+const EMPTY_FORM = { orgJobId: '', orgNodeId: '', openingsRequested: 1, vacancyType: 'AUMENTO', priority: 'NORMAL', reason: '', recruiterId: '', monthlyBudgetCents: '', confidential: false };
 
 export default function RecruitmentPage() {
   const qc = useQueryClient();
@@ -53,76 +85,205 @@ export default function RecruitmentPage() {
   const canApprove = hasPermission(['recruit:requisition:approve']);
   const canManage = hasPermission(['recruit:manage']);
   const canHandleLgpd = hasPermission(['recruit:lgpd', 'recruit:manage']);
+
   const [formOpen, setFormOpen] = useState(false);
-  const [form, setForm] = useState({ ...EMPTY });
+  const [form, setForm] = useState({ ...EMPTY_FORM });
   const [detailId, setDetailId] = useState<string | null>(null);
+  const [statusFilter, setStatusFilter] = useState('');
+  const [search, setSearch] = useState('');
+  const [reasonDialog, setReasonDialog] = useState<ReasonDialogState | null>(null);
 
   const listQuery = useQuery<Requisition[]>({ queryKey: ['recruit-requisitions'], queryFn: () => api('/recruitment/requisitions') });
+  const postingsQuery = useQuery<Posting[]>({ queryKey: ['recruit-postings'], queryFn: () => api('/recruitment/postings') });
   const optionsQuery = useQuery<Options>({ queryKey: ['personnel-employees', 'options'], queryFn: () => api('/personnel/employees/options'), staleTime: 60_000 });
   const detailQuery = useQuery<RequisitionDetail>({ queryKey: ['recruit-req', detailId], queryFn: () => api(`/recruitment/requisitions/${detailId}`), enabled: Boolean(detailId) });
   const gateQuery = useQuery<Gate>({ queryKey: ['recruit-gate', detailId], queryFn: () => api(`/recruitment/requisitions/${detailId}/gate`), enabled: Boolean(detailId) });
 
-  const invalidate = () => { void qc.invalidateQueries({ queryKey: ['recruit-requisitions'] }); void qc.invalidateQueries({ queryKey: ['recruit-req', detailId] }); void qc.invalidateQueries({ queryKey: ['recruit-gate', detailId] }); };
+  const invalidate = () => {
+    void qc.invalidateQueries({ queryKey: ['recruit-requisitions'] });
+    void qc.invalidateQueries({ queryKey: ['recruit-req', detailId] });
+    void qc.invalidateQueries({ queryKey: ['recruit-gate', detailId] });
+  };
 
   const create = useMutation({
-    mutationFn: () => api<Requisition>('/recruitment/requisitions', { method: 'POST', json: { ...form, monthlyBudgetCents: form.monthlyBudgetCents ? Math.round(Number(form.monthlyBudgetCents) * 100) : null } }),
-    onSuccess: () => { toast.success('Requisição criada.'); setFormOpen(false); setForm({ ...EMPTY }); invalidate(); },
-    onError: (e: any) => toast.error(e.message || 'Erro ao criar.'),
+    mutationFn: () =>
+      api<Requisition>('/recruitment/requisitions', {
+        method: 'POST',
+        json: { ...form, monthlyBudgetCents: form.monthlyBudgetCents ? Math.round(Number(form.monthlyBudgetCents) * 100) : null },
+      }),
+    onSuccess: () => { toast.success('Requisição criada como rascunho. Envie para aprovação quando estiver pronta.'); setFormOpen(false); setForm({ ...EMPTY_FORM }); invalidate(); },
+    onError: (error: any) => toast.error(error?.message ?? 'Não foi possível criar a requisição.'),
   });
   const act = useMutation({
-    mutationFn: ({ id, action, body }: { id: string; action: string; body?: any }) => api(`/recruitment/requisitions/${id}/${action}`, { method: 'POST', json: body ?? {} }),
-    onSuccess: () => { toast.success('Feito.'); invalidate(); },
-    onError: (e: any) => toast.error(e.message || 'Erro.'),
+    mutationFn: ({ id, action, body }: { id: string; action: string; body?: unknown }) => api(`/recruitment/requisitions/${id}/${action}`, { method: 'POST', json: body ?? {} }),
+    onSuccess: (_, variables) => {
+      const messages: Record<string, string> = {
+        submit: 'Requisição enviada para aprovação.',
+        decide: 'Decisão registrada.',
+        'send-to-recruitment': 'Requisição encaminhada ao recrutamento.',
+        'gate-exception': 'Exceção aprovada e registrada na auditoria.',
+        cancel: 'Requisição cancelada.',
+      };
+      toast.success(messages[variables.action] ?? 'Feito.');
+      invalidate();
+    },
+    onError: (error: any) => toast.error(error?.message ?? 'Não foi possível concluir a ação.'),
   });
   const createPosting = useMutation({
     mutationFn: (id: string) => api<{ id: string }>(`/recruitment/requisitions/${id}/posting`, { method: 'POST' }),
-    onSuccess: () => { toast.success('Vaga criada como rascunho. Ajuste o texto e publique.'); setDetailId(null); router.push('/servico-pessoal/recrutamento/vagas'); },
-    onError: (e: any) => toast.error(e.message || 'Erro ao criar vaga.'),
+    onSuccess: (posting) => {
+      toast.success('Vaga criada como rascunho. Ajuste o texto de divulgação e publique.');
+      setDetailId(null);
+      router.push(`/servico-pessoal/recrutamento/vagas/${posting.id}`);
+    },
+    onError: (error: any) => toast.error(error?.message ?? 'Não foi possível criar a vaga.'),
   });
 
-  const requisitions = listQuery.data ?? [];
+  const requisitions = useMemo(() => listQuery.data ?? [], [listQuery.data]);
+  const postings = useMemo(() => postingsQuery.data ?? [], [postingsQuery.data]);
   const options = optionsQuery.data;
-  const jobName = (id: string | null) => options?.jobs.find((j) => j.id === id)?.name ?? '—';
-  const nodeName = (id: string | null) => options?.orgNodes.find((n) => n.id === id)?.name ?? '—';
+  const jobName = (id: string | null) => options?.jobs.find((job) => job.id === id)?.name ?? '—';
+  const nodeName = (id: string | null) => options?.orgNodes.find((node) => node.id === id)?.name ?? '—';
   const detail = detailQuery.data;
   const gate = gateQuery.data;
-  const money = (c: number | null) => (c == null ? '—' : (c / 100).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' }));
+
+  const counts = useMemo(() => {
+    const byStatus = (...statuses: string[]) => requisitions.filter((req) => statuses.includes(req.status)).length;
+    return {
+      draft: byStatus('DRAFT', 'RETURNED'),
+      approval: byStatus('SUBMITTED'),
+      recruitment: byStatus('APPROVED', 'SENT_TO_RECRUITMENT', 'IN_RECRUITMENT'),
+      published: postings.filter((posting) => posting.status === 'PUBLISHED').length,
+      applications: postings.reduce((sum, posting) => sum + (posting._count?.applications ?? 0), 0),
+      filled: byStatus('FILLED'),
+    };
+  }, [requisitions, postings]);
+
+  const filtered = useMemo(() => {
+    return requisitions.filter((req) => {
+      if (statusFilter === 'GROUP:draft') {
+        if (!['DRAFT', 'RETURNED'].includes(req.status)) return false;
+      } else if (statusFilter === 'GROUP:recruitment') {
+        if (!['APPROVED', 'SENT_TO_RECRUITMENT', 'IN_RECRUITMENT'].includes(req.status)) return false;
+      } else if (statusFilter && req.status !== statusFilter) return false;
+      if (search) {
+        const haystack = `${req.code} ${jobName(req.orgJobId)} ${nodeName(req.orgNodeId)}`.toLowerCase();
+        if (!haystack.includes(search.toLowerCase())) return false;
+      }
+      return true;
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [requisitions, statusFilter, search, options]);
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-5">
       <PageHeader
         title="Recrutamento e Seleção"
-        description="Requisições de vaga a partir do organograma/Cargos e Salários, com travas de quadro/orçamento e aprovação."
+        description="Da requisição de vaga à admissão: aprovação com travas de quadro/orçamento, divulgação no portal de carreiras, seleção com scorecard, proposta, pré-admissão com ASO e admissão integrada ao Serviço Pessoal."
         actions={
-          <div className="flex gap-2">
-            <Link href="/servico-pessoal/recrutamento/vagas"><Button variant="outline"><Briefcase className="mr-2 h-4 w-4" /> Vagas</Button></Link>
-            {canHandleLgpd && <Link href="/servico-pessoal/recrutamento/lgpd"><Button variant="outline"><ShieldCheck className="mr-2 h-4 w-4" /> LGPD</Button></Link>}
-            {canCreate && <Button onClick={() => setFormOpen(true)}><Plus className="mr-2 h-4 w-4" /> Nova requisição</Button>}
+          <div className="flex flex-wrap gap-2">
+            <Link href="/servico-pessoal/recrutamento/vagas">
+              <Button variant="outline"><Briefcase className="mr-2 h-4 w-4" /> Vagas e candidatos</Button>
+            </Link>
+            {canHandleLgpd && (
+              <Link href="/servico-pessoal/recrutamento/lgpd">
+                <Button variant="outline"><ShieldCheck className="mr-2 h-4 w-4" /> LGPD</Button>
+              </Link>
+            )}
+            {canCreate && (
+              <Button onClick={() => setFormOpen(true)}><Plus className="mr-2 h-4 w-4" /> Nova requisição</Button>
+            )}
           </div>
         }
       />
 
+      {/* Funil do processo com contagens reais — cada cartão filtra ou navega. */}
+      <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 xl:grid-cols-6">
+        <button type="button" className="text-left" onClick={() => setStatusFilter('GROUP:draft')}>
+          <MetricCard compact title="1 · Rascunhos" value={counts.draft} description="Requisições a enviar" icon={<FileSignature className="h-3.5 w-3.5" />} tone="neutral" />
+        </button>
+        <button type="button" className="text-left" onClick={() => setStatusFilter('SUBMITTED')}>
+          <MetricCard compact title="2 · Em aprovação" value={counts.approval} description="Aguardando decisão" icon={<ClipboardCheck className="h-3.5 w-3.5" />} tone={counts.approval > 0 ? 'yellow' : 'neutral'} />
+        </button>
+        <button type="button" className="text-left" onClick={() => setStatusFilter('GROUP:recruitment')}>
+          <MetricCard compact title="3 · No recrutamento" value={counts.recruitment} description="Aprovadas, criar vaga" icon={<Send className="h-3.5 w-3.5" />} tone={counts.recruitment > 0 ? 'blue' : 'neutral'} />
+        </button>
+        <MetricCard compact title="4 · Vagas no ar" value={counts.published} description="Publicadas em carreiras" icon={<Megaphone className="h-3.5 w-3.5" />} tone={counts.published > 0 ? 'purple' : 'neutral'} href="/servico-pessoal/recrutamento/vagas" />
+        <MetricCard compact title="5 · Candidaturas" value={counts.applications} description="Recebidas nas vagas" icon={<Users className="h-3.5 w-3.5" />} tone={counts.applications > 0 ? 'blue' : 'neutral'} href="/servico-pessoal/recrutamento/vagas" />
+        <button type="button" className="text-left" onClick={() => setStatusFilter('FILLED')}>
+          <MetricCard compact title="6 · Preenchidas" value={counts.filled} description="Admissões concluídas" icon={<UserCheck className="h-3.5 w-3.5" />} tone={counts.filled > 0 ? 'green' : 'neutral'} />
+        </button>
+      </div>
+
       <Card>
         <CardContent className="p-0">
-          {requisitions.length === 0 ? (
-            <div className="py-10 text-center text-sm text-muted-foreground">Nenhuma requisição. Crie a primeira.</div>
+          <div className="flex flex-wrap items-center gap-2 border-b p-3">
+            <h2 className="mr-auto text-sm font-semibold">Requisições de vaga</h2>
+            <div className="relative">
+              <Search className="pointer-events-none absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground" />
+              <Input className="h-8 w-56 pl-8 text-xs" placeholder="Código, cargo ou área..." value={search} onChange={(event) => setSearch(event.target.value)} />
+            </div>
+            <NativeSelect className="h-8 w-48 text-xs" value={statusFilter} onChange={(event) => setStatusFilter(event.target.value)}>
+              <option value="">Todos os status</option>
+              <option value="GROUP:draft">Rascunhos e devolvidas</option>
+              <option value="GROUP:recruitment">Aprovadas / no recrutamento</option>
+              {Object.entries(REQUISITION_STATUS).map(([value, meta]) => <option key={value} value={value}>{meta.label}</option>)}
+            </NativeSelect>
+            {(statusFilter || search) && (
+              <Button variant="ghost" size="sm" className="h-8 text-xs" onClick={() => { setStatusFilter(''); setSearch(''); }}>Limpar</Button>
+            )}
+          </div>
+          {listQuery.isLoading ? (
+            <LoadingState label="Carregando requisições..." />
+          ) : filtered.length === 0 ? (
+            <EmptyState
+              className="m-4"
+              title={requisitions.length === 0 ? 'Nenhuma requisição de vaga' : 'Nada com esse filtro'}
+              description={
+                requisitions.length === 0
+                  ? 'O processo começa aqui: crie a requisição informando cargo, área e motivo. Ela passa pela aprovação e vira vaga de divulgação.'
+                  : 'Ajuste a busca ou o filtro de status.'
+              }
+              action={requisitions.length === 0 && canCreate ? <Button onClick={() => setFormOpen(true)}><Plus className="mr-2 h-4 w-4" /> Criar a primeira</Button> : undefined}
+            />
           ) : (
             <div className="overflow-x-auto">
               <table className="w-full text-left text-sm">
                 <thead className="border-b bg-muted/40 text-[10px] uppercase text-muted-foreground">
-                  <tr><th className="p-3">Código</th><th className="p-3">Cargo / Área</th><th className="p-3">Tipo</th><th className="p-3 text-center">Vagas</th><th className="p-3">Status</th><th className="p-3"></th></tr>
+                  <tr>
+                    <th className="p-3">Código</th>
+                    <th className="p-3">Cargo / Área</th>
+                    <th className="p-3">Tipo</th>
+                    <th className="p-3">Prioridade</th>
+                    <th className="p-3 text-center">Vagas</th>
+                    <th className="p-3">Status</th>
+                    <th className="p-3" />
+                  </tr>
                 </thead>
                 <tbody className="divide-y">
-                  {requisitions.map((r) => (
-                    <tr key={r.id} className="hover:bg-muted/20">
-                      <td className="p-3 font-mono text-xs">{r.code}</td>
-                      <td className="p-3"><div className="font-medium">{jobName(r.orgJobId)}</div><div className="text-[10px] text-muted-foreground">{nodeName(r.orgNodeId)}</div></td>
-                      <td className="p-3 text-xs">{r.vacancyType}{r.confidential && <Badge variant="outline" className="ml-1 text-[8px]">confid.</Badge>}</td>
-                      <td className="p-3 text-center">{r.openingsRequested}</td>
-                      <td className="p-3"><Badge variant="outline" className={cn('text-[10px]', STATUS_TONE[r.status])}>{r.status}</Badge></td>
-                      <td className="p-3 text-right"><Button variant="ghost" size="sm" onClick={() => setDetailId(r.id)}>Abrir</Button></td>
-                    </tr>
-                  ))}
+                  {filtered.map((req) => {
+                    const statusMeta = metaOf(REQUISITION_STATUS, req.status);
+                    const priorityMeta = metaOf(PRIORITY, req.priority);
+                    return (
+                      <tr key={req.id} className="cursor-pointer hover:bg-muted/20" onClick={() => setDetailId(req.id)}>
+                        <td className="p-3 font-mono text-xs">{req.code}</td>
+                        <td className="p-3">
+                          <div className="font-medium">{jobName(req.orgJobId)}</div>
+                          <div className="text-[10px] text-muted-foreground">{nodeName(req.orgNodeId)}</div>
+                        </td>
+                        <td className="p-3 text-xs">
+                          {labelOf(VACANCY_TYPE, req.vacancyType)}
+                          {req.confidential && <Badge variant="outline" className="ml-1 text-[8px]">confidencial</Badge>}
+                        </td>
+                        <td className="p-3"><StatusBadge label={priorityMeta.label} tone={priorityMeta.tone} /></td>
+                        <td className="p-3 text-center tabular-nums">{req.openingsRequested}</td>
+                        <td className="p-3"><StatusBadge label={statusMeta.label} tone={statusMeta.tone} /></td>
+                        <td className="p-3 text-right">
+                          <Button variant="ghost" size="sm" onClick={(event) => { event.stopPropagation(); setDetailId(req.id); }}>Abrir</Button>
+                        </td>
+                      </tr>
+                    );
+                  })}
                 </tbody>
               </table>
             </div>
@@ -130,112 +291,305 @@ export default function RecruitmentPage() {
         </CardContent>
       </Card>
 
-      {/* Dialog: nova requisição */}
+      {/* Nova requisição */}
       <Dialog open={formOpen} onOpenChange={setFormOpen}>
         <DialogContent className="sm:max-w-[560px]">
           <DialogHeader><DialogTitle>Nova requisição de vaga</DialogTitle></DialogHeader>
+          <p className="text-xs text-muted-foreground">
+            A requisição é a origem de toda contratação: define cargo, área e motivo, passa pelas travas de quadro/orçamento e pela aprovação antes de virar vaga.
+          </p>
           <div className="grid grid-cols-2 gap-3">
-            <div className="col-span-2"><Label>Cargo</Label>
-              <NativeSelect value={form.orgJobId} onChange={(e) => setForm((f) => ({ ...f, orgJobId: e.target.value }))}>
+            <div className="col-span-2">
+              <Label>Cargo</Label>
+              <NativeSelect value={form.orgJobId} onChange={(event) => setForm((f) => ({ ...f, orgJobId: event.target.value }))}>
                 <option value="">Selecionar cargo…</option>
-                {(options?.jobs ?? []).map((j) => <option key={j.id} value={j.id}>{j.name}</option>)}
+                {(options?.jobs ?? []).map((job) => <option key={job.id} value={job.id}>{job.name}</option>)}
               </NativeSelect>
             </div>
-            <div className="col-span-2"><Label>Área</Label>
-              <NativeSelect value={form.orgNodeId} onChange={(e) => setForm((f) => ({ ...f, orgNodeId: e.target.value }))}>
+            <div className="col-span-2">
+              <Label>Área</Label>
+              <NativeSelect value={form.orgNodeId} onChange={(event) => setForm((f) => ({ ...f, orgNodeId: event.target.value }))}>
                 <option value="">Selecionar área…</option>
-                {(options?.orgNodes ?? []).map((n) => <option key={n.id} value={n.id}>{n.name}</option>)}
+                {(options?.orgNodes ?? []).map((node) => <option key={node.id} value={node.id}>{node.name}</option>)}
               </NativeSelect>
             </div>
-            <div><Label>Tipo</Label>
-              <NativeSelect value={form.vacancyType} onChange={(e) => setForm((f) => ({ ...f, vacancyType: e.target.value }))}>
-                {VACANCY_TYPES.map((t) => <option key={t} value={t}>{t}</option>)}
+            <div>
+              <Label>Tipo de vaga</Label>
+              <NativeSelect value={form.vacancyType} onChange={(event) => setForm((f) => ({ ...f, vacancyType: event.target.value }))}>
+                {Object.entries(VACANCY_TYPE).map(([value, label]) => <option key={value} value={value}>{label}</option>)}
               </NativeSelect>
             </div>
-            <div><Label>Prioridade</Label>
-              <NativeSelect value={form.priority} onChange={(e) => setForm((f) => ({ ...f, priority: e.target.value }))}>
-                {['BAIXA', 'NORMAL', 'ALTA', 'URGENTE'].map((p) => <option key={p} value={p}>{p}</option>)}
+            <div>
+              <Label>Prioridade</Label>
+              <NativeSelect value={form.priority} onChange={(event) => setForm((f) => ({ ...f, priority: event.target.value }))}>
+                {Object.entries(PRIORITY).map(([value, meta]) => <option key={value} value={value}>{meta.label}</option>)}
               </NativeSelect>
             </div>
-            <div><Label>Quantidade de vagas</Label><Input type="number" min={1} value={form.openingsRequested} onChange={(e) => setForm((f) => ({ ...f, openingsRequested: Number(e.target.value) }))} /></div>
-            <div><Label>Orçamento mensal (R$)</Label><Input type="number" value={form.monthlyBudgetCents} onChange={(e) => setForm((f) => ({ ...f, monthlyBudgetCents: e.target.value }))} /></div>
-            <div className="col-span-2"><Label>Recrutador responsável</Label>
-              <NativeSelect value={form.recruiterId} onChange={(e) => setForm((f) => ({ ...f, recruiterId: e.target.value }))}>
+            <div>
+              <Label>Quantidade de vagas</Label>
+              <Input type="number" min={1} value={form.openingsRequested} onChange={(event) => setForm((f) => ({ ...f, openingsRequested: Number(event.target.value) }))} />
+            </div>
+            <div>
+              <Label>Orçamento mensal (R$)</Label>
+              <Input type="number" placeholder="Ex.: 4500" value={form.monthlyBudgetCents} onChange={(event) => setForm((f) => ({ ...f, monthlyBudgetCents: event.target.value }))} />
+            </div>
+            <div className="col-span-2">
+              <Label>Recrutador responsável</Label>
+              <NativeSelect value={form.recruiterId} onChange={(event) => setForm((f) => ({ ...f, recruiterId: event.target.value }))}>
                 <option value="">Definir depois…</option>
-                {(options?.users ?? []).map((u) => <option key={u.id} value={u.id}>{u.name}</option>)}
+                {(options?.users ?? []).map((user) => <option key={user.id} value={user.id}>{user.name}</option>)}
               </NativeSelect>
+              <p className="mt-1 text-[10px] text-muted-foreground">Se não definido, quem encaminhar a requisição ao recrutamento assume como recrutador.</p>
             </div>
-            <div className="col-span-2"><Label>Motivo / justificativa</Label><Textarea value={form.reason} onChange={(e) => setForm((f) => ({ ...f, reason: e.target.value }))} /></div>
-            <label className="col-span-2 flex items-center gap-2 text-sm"><input type="checkbox" checked={form.confidential} onChange={(e) => setForm((f) => ({ ...f, confidential: e.target.checked }))} /> Vaga confidencial</label>
+            <div className="col-span-2">
+              <Label>Motivo / justificativa</Label>
+              <Textarea value={form.reason} onChange={(event) => setForm((f) => ({ ...f, reason: event.target.value }))} placeholder="Por que esta vaga é necessária?" />
+            </div>
+            <label className="col-span-2 flex items-center gap-2 text-sm">
+              <input type="checkbox" checked={form.confidential} onChange={(event) => setForm((f) => ({ ...f, confidential: event.target.checked }))} />
+              Vaga confidencial (aprovação adicional da diretoria)
+            </label>
           </div>
           <DialogFooter>
             <Button variant="ghost" onClick={() => setFormOpen(false)}>Cancelar</Button>
-            <Button onClick={() => create.mutate()} disabled={!form.orgJobId || create.isPending}>Criar</Button>
+            <Button onClick={() => create.mutate()} disabled={!form.orgJobId || create.isPending}>Criar rascunho</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
 
-      {/* Dialog: detalhe */}
-      <Dialog open={Boolean(detailId)} onOpenChange={(o) => !o && setDetailId(null)}>
-        <DialogContent className="sm:max-w-[640px]">
-          <DialogHeader><DialogTitle>{detail?.code} — {jobName(detail?.orgJobId ?? null)}</DialogTitle></DialogHeader>
+      {/* Detalhe da requisição */}
+      <Sheet open={Boolean(detailId)} onOpenChange={(open) => !open && setDetailId(null)}>
+        <SheetContent size="lg">
+          {detailQuery.isLoading && (
+            <SheetBody><LoadingState label="Carregando requisição..." /></SheetBody>
+          )}
           {detail && (
-            <div className="space-y-3 text-sm">
-              <div className="flex flex-wrap items-center gap-2">
-                <Badge variant="outline" className={cn('text-[10px]', STATUS_TONE[detail.status])}>{detail.status}</Badge>
-                <span className="text-muted-foreground">{detail.vacancyType} · {detail.openingsRequested} vaga(s) · {nodeName(detail.orgNodeId)}</span>
-              </div>
+            <>
+              <SheetHeader className="pr-12">
+                <div className="flex flex-wrap items-center gap-2">
+                  <SheetTitle>{detail.code} — {jobName(detail.orgJobId)}</SheetTitle>
+                  <StatusBadge {...badgeOf(REQUISITION_STATUS, detail.status)} />
+                </div>
+                <div className="text-xs text-muted-foreground">
+                  {labelOf(VACANCY_TYPE, detail.vacancyType)} · {detail.openingsRequested} vaga(s) · {nodeName(detail.orgNodeId)}
+                  {detail.confidential ? ' · confidencial' : ''}
+                </div>
+              </SheetHeader>
+              <SheetBody className="space-y-4">
+                <div className="space-y-2">
+                  <JourneyStepper steps={requisitionJourney(detail.status)} />
+                  {gate && gate.exceptionsRequired.length > 0 && !['CANCELLED', 'CLOSED', 'REJECTED', 'FILLED'].includes(detail.status) ? (
+                    <NextStepCallout
+                      text="há exceções de quadro/orçamento pendentes — aprove-as nas travas abaixo antes de encaminhar ao recrutamento."
+                      tone="yellow"
+                    />
+                  ) : (
+                    <NextStepCallout {...requisitionNextStep(detail.status, { canCreate, canApprove, canManage })} />
+                  )}
+                </div>
 
-              {/* Travas / gate */}
-              {gate && (
-                <div className="rounded-md border p-3 text-xs">
-                  <div className="mb-1 flex items-center gap-2 font-semibold">
-                    {gate.ready ? <CheckCircle2 className="h-4 w-4 text-emerald-500" /> : <AlertTriangle className="h-4 w-4 text-amber-500" />}
-                    Travas de quadro/orçamento
+                {detail.reason && (
+                  <div className="rounded-md bg-muted/40 p-3 text-xs">
+                    <div className="mb-1 text-[10px] font-semibold uppercase text-muted-foreground">Motivo</div>
+                    {detail.reason}
                   </div>
-                  <div className="text-muted-foreground">Saldo de quadro: {gate.availability.headcountAvailable ?? 'não cadastrado'} · Orçamento: {money(gate.availability.budgetAvailableCents)}</div>
-                  {gate.blocks.map((b, i) => <div key={i} className="text-rose-600">• {b}</div>)}
-                  {gate.warnings.map((w, i) => <div key={i} className="text-amber-600">• {w}</div>)}
-                  {gate.exceptionsRequired.length > 0 && (
-                    <div className="mt-2 flex items-center gap-2">
-                      <ShieldAlert className="h-3.5 w-3.5 text-amber-500" />
-                      <span>Exceções pendentes: {gate.exceptionsRequired.join(', ')}</span>
-                      {canApprove && gate.exceptionsRequired.map((k) => (
-                        <Button key={k} size="sm" variant="outline" className="h-6 text-[10px]" onClick={() => { const reason = prompt(`Justificativa da exceção de ${k}:`); if (reason) act.mutate({ id: detail.id, action: 'gate-exception', body: { kind: k, reason } }); }}>Aprovar {k}</Button>
+                )}
+
+                {gate && (
+                  <div className="rounded-md border p-3 text-xs">
+                    <div className="mb-1 flex items-center gap-2 font-semibold">
+                      {gate.ready ? <CheckCircle2 className="h-4 w-4 text-status-green" /> : <ShieldAlert className="h-4 w-4 text-status-yellow" />}
+                      Travas de quadro e orçamento
+                    </div>
+                    <div className="text-muted-foreground">
+                      Saldo de quadro: {gate.availability.headcountAvailable ?? 'não cadastrado'} · Orçamento disponível: {formatMoneyCents(gate.availability.budgetAvailableCents)}
+                    </div>
+                    {gate.blocks.map((block, index) => <div key={index} className="mt-1 text-status-red">• {block}</div>)}
+                    {gate.warnings.map((warning, index) => <div key={index} className="mt-1 text-status-yellow">• {warning}</div>)}
+                    {gate.exceptionsRequired.length > 0 && (
+                      <div className="mt-2 space-y-1">
+                        <div className="flex items-center gap-1 font-medium text-status-yellow">
+                          <ShieldAlert className="h-3.5 w-3.5" /> Exceções pendentes de aprovação:
+                        </div>
+                        {gate.exceptionsRequired.map((kind) => (
+                          <div key={kind} className="flex items-center justify-between gap-2 rounded bg-muted/40 px-2 py-1">
+                            <span>Exceção de {labelOf(GATE_KIND, kind)}</span>
+                            {canApprove && (
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                className="h-6 text-[10px]"
+                                onClick={() =>
+                                  setReasonDialog({
+                                    title: `Aprovar exceção de ${labelOf(GATE_KIND, kind)}`,
+                                    description: 'A exceção fica registrada na auditoria com a sua justificativa.',
+                                    label: 'Justificativa',
+                                    confirmLabel: 'Aprovar exceção',
+                                    onConfirm: (reason) => act.mutate({ id: detail.id, action: 'gate-exception', body: { kind, reason } }),
+                                  })
+                                }
+                              >
+                                Aprovar exceção
+                              </Button>
+                            )}
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                    {(detail.gateExceptions ?? [])?.length > 0 && (
+                      <div className="mt-2 border-t pt-2 text-muted-foreground">
+                        {(detail.gateExceptions ?? []).map((exception, index) => (
+                          <div key={index}>✓ Exceção de {labelOf(GATE_KIND, exception.kind)} aprovada em {formatDateBr(exception.at)}: {exception.reason}</div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                <div className="rounded-md border p-3 text-xs">
+                  <div className="mb-2 font-semibold">Fluxo de aprovação</div>
+                  {detail.approvals.length === 0 ? (
+                    <div className="text-muted-foreground">Definido no envio para aprovação.</div>
+                  ) : (
+                    <div className="space-y-1">
+                      {detail.approvals.map((approval) => (
+                        <div key={approval.id} className="flex items-center justify-between gap-2">
+                          <span>{approval.order}. {labelOf(APPROVAL_ROLE, approval.role)}</span>
+                          <span className="flex items-center gap-2">
+                            {approval.comment && <span className="text-[10px] text-muted-foreground">{approval.comment}</span>}
+                            <StatusBadge
+                              label={approval.decision === 'APPROVED' ? 'Aprovado' : approval.decision === 'REJECTED' ? 'Reprovado' : 'Pendente'}
+                              tone={approval.decision === 'APPROVED' ? 'green' : approval.decision === 'REJECTED' ? 'red' : 'gray'}
+                            />
+                          </span>
+                        </div>
                       ))}
                     </div>
                   )}
                 </div>
-              )}
 
-              {/* Aprovações */}
-              <div className="rounded-md border p-3 text-xs">
-                <div className="mb-1 font-semibold">Workflow de aprovação</div>
-                {detail.approvals.length === 0 ? <div className="text-muted-foreground">Sem passos.</div> : detail.approvals.map((a) => (
-                  <div key={a.id} className="flex items-center justify-between py-0.5">
-                    <span>{a.order}. {a.role}</span>
-                    <Badge variant="outline" className={cn('text-[9px]', a.decision === 'APPROVED' ? 'text-emerald-600' : a.decision === 'REJECTED' ? 'text-rose-600' : 'text-muted-foreground')}>{a.decision ?? 'pendente'}</Badge>
-                  </div>
-                ))}
-              </div>
-
-              {/* Ações */}
-              <div className="flex flex-wrap gap-2">
-                {canCreate && detail.status === 'DRAFT' && <Button size="sm" onClick={() => act.mutate({ id: detail.id, action: 'submit' })}><Send className="mr-1 h-3.5 w-3.5" /> Enviar p/ aprovação</Button>}
-                {canApprove && detail.status === 'SUBMITTED' && (
-                  <>
-                    <Button size="sm" variant="outline" onClick={() => act.mutate({ id: detail.id, action: 'decide', body: { decision: 'APPROVED' } })}><CheckCircle2 className="mr-1 h-3.5 w-3.5" /> Aprovar passo</Button>
-                    <Button size="sm" variant="outline" onClick={() => { const comment = prompt('Motivo da reprovação:'); act.mutate({ id: detail.id, action: 'decide', body: { decision: 'REJECTED', comment } }); }}><X className="mr-1 h-3.5 w-3.5" /> Reprovar</Button>
-                  </>
+                {detail.monthlyBudgetCents != null && (
+                  <div className="text-xs text-muted-foreground">Orçamento mensal solicitado: <strong>{formatMoneyCents(detail.monthlyBudgetCents)}</strong></div>
                 )}
-                {canApprove && detail.status === 'APPROVED' && <Button size="sm" onClick={() => act.mutate({ id: detail.id, action: 'send-to-recruitment' })}><UserPlus className="mr-1 h-3.5 w-3.5" /> Encaminhar ao recrutamento</Button>}
-                {canManage && ['SENT_TO_RECRUITMENT', 'IN_RECRUITMENT'].includes(detail.status) && <Button size="sm" onClick={() => createPosting.mutate(detail.id)} disabled={createPosting.isPending}><Megaphone className="mr-1 h-3.5 w-3.5" /> Criar vaga</Button>}
-                {canCreate && !['CANCELLED', 'CLOSED', 'FILLED'].includes(detail.status) && <Button size="sm" variant="ghost" className="text-rose-600" onClick={() => { const reason = prompt('Motivo do cancelamento:'); if (reason) act.mutate({ id: detail.id, action: 'cancel', body: { reason } }); }}>Cancelar</Button>}
-              </div>
-            </div>
+
+                <div className="flex flex-wrap gap-2 border-t pt-3">
+                  {canCreate && detail.status === 'DRAFT' && (
+                    <Button size="sm" onClick={() => act.mutate({ id: detail.id, action: 'submit' })} disabled={act.isPending}>
+                      <Send className="mr-1 h-3.5 w-3.5" /> Enviar para aprovação
+                    </Button>
+                  )}
+                  {canApprove && detail.status === 'SUBMITTED' && (
+                    <>
+                      <Button size="sm" onClick={() => act.mutate({ id: detail.id, action: 'decide', body: { decision: 'APPROVED' } })} disabled={act.isPending}>
+                        <CheckCircle2 className="mr-1 h-3.5 w-3.5" /> Aprovar este passo
+                      </Button>
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        disabled={act.isPending}
+                        onClick={() =>
+                          setReasonDialog({
+                            title: 'Reprovar requisição',
+                            label: 'Motivo da reprovação',
+                            confirmLabel: 'Reprovar',
+                            destructive: true,
+                            onConfirm: (comment) => act.mutate({ id: detail.id, action: 'decide', body: { decision: 'REJECTED', comment } }),
+                          })
+                        }
+                      >
+                        <X className="mr-1 h-3.5 w-3.5" /> Reprovar
+                      </Button>
+                    </>
+                  )}
+                  {canApprove && detail.status === 'APPROVED' && (
+                    <Button size="sm" onClick={() => act.mutate({ id: detail.id, action: 'send-to-recruitment' })} disabled={act.isPending}>
+                      <UserPlus className="mr-1 h-3.5 w-3.5" /> Encaminhar ao recrutamento
+                    </Button>
+                  )}
+                  {canManage && ['SENT_TO_RECRUITMENT', 'IN_RECRUITMENT'].includes(detail.status) && (
+                    <Button size="sm" onClick={() => createPosting.mutate(detail.id)} disabled={createPosting.isPending}>
+                      <Megaphone className="mr-1 h-3.5 w-3.5" /> Criar vaga de divulgação
+                    </Button>
+                  )}
+                  {canCreate && !['CANCELLED', 'CLOSED', 'FILLED'].includes(detail.status) && (
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      className="text-status-red"
+                      disabled={act.isPending}
+                      onClick={() =>
+                        setReasonDialog({
+                          title: `Cancelar requisição ${detail.code}`,
+                          description: 'A reserva de quadro/orçamento é liberada.',
+                          label: 'Motivo do cancelamento',
+                          confirmLabel: 'Cancelar requisição',
+                          destructive: true,
+                          onConfirm: (reason) => act.mutate({ id: detail.id, action: 'cancel', body: { reason } }),
+                        })
+                      }
+                    >
+                      Cancelar requisição
+                    </Button>
+                  )}
+                </div>
+              </SheetBody>
+            </>
           )}
-        </DialogContent>
-      </Dialog>
+        </SheetContent>
+      </Sheet>
+
+      <ReasonDialog state={reasonDialog} onClose={() => setReasonDialog(null)} />
     </div>
   );
+}
+
+function badgeOf(map: Record<string, { label: string; tone: 'green' | 'yellow' | 'red' | 'gray' | 'blue' | 'purple' }>, value: string) {
+  const meta = metaOf(map, value);
+  return { label: meta.label, tone: meta.tone };
+}
+
+function requisitionJourney(status: string): JourneyStep[] {
+  const order = ['DRAFT', 'SUBMITTED', 'APPROVED', 'SENT_TO_RECRUITMENT', 'IN_RECRUITMENT', 'FILLED'];
+  const position = order.indexOf(status);
+  const stepState = (from: number, to: number): JourneyStep['state'] => {
+    if (status === 'REJECTED') return to <= 1 ? (to === 1 ? 'blocked' : 'done') : 'todo';
+    if (['CANCELLED', 'FROZEN', 'CLOSED', 'RETURNED'].includes(status)) return 'todo';
+    if (position > to) return 'done';
+    if (position >= from && position <= to) return 'current';
+    return 'todo';
+  };
+  return [
+    { key: 'draft', label: 'Requisição', state: status === 'DRAFT' || status === 'RETURNED' ? 'current' : 'done' },
+    { key: 'approval', label: 'Aprovação', state: stepState(1, 1) },
+    { key: 'forward', label: 'Encaminhamento', state: stepState(2, 2) },
+    { key: 'posting', label: 'Vaga e seleção', state: stepState(3, 4) },
+    { key: 'filled', label: 'Preenchida', state: status === 'FILLED' ? 'done' : 'todo' },
+  ];
+}
+
+function requisitionNextStep(status: string, can: { canCreate: boolean; canApprove: boolean; canManage: boolean }): { text: string; tone: 'blue' | 'green' | 'yellow' | 'red' } {
+  switch (status) {
+    case 'DRAFT':
+      return { text: can.canCreate ? 'revise os dados e clique em “Enviar para aprovação”.' : 'aguardando o solicitante enviar para aprovação.', tone: 'blue' };
+    case 'RETURNED':
+      return { text: 'a requisição foi devolvida — ajuste e reenvie para aprovação.', tone: 'yellow' };
+    case 'SUBMITTED':
+      return { text: can.canApprove ? 'decida o passo pendente do fluxo de aprovação abaixo.' : 'em aprovação — os aprovadores decidem na ordem do fluxo.', tone: 'yellow' };
+    case 'APPROVED':
+      return { text: can.canApprove ? 'aprovada — encaminhe ao recrutamento para virar vaga.' : 'aprovada — aguardando encaminhamento ao recrutamento.', tone: 'blue' };
+    case 'SENT_TO_RECRUITMENT':
+      return { text: can.canManage ? 'crie a vaga de divulgação e publique no portal de carreiras.' : 'no recrutamento — o recrutador cria a vaga de divulgação.', tone: 'blue' };
+    case 'IN_RECRUITMENT':
+      return { text: 'vaga em seleção — acompanhe os candidatos em Vagas e candidatos.', tone: 'blue' };
+    case 'FILLED':
+      return { text: 'requisição preenchida — admissão concluída.', tone: 'green' };
+    case 'REJECTED':
+      return { text: 'reprovada na aprovação — veja o motivo no fluxo abaixo.', tone: 'red' };
+    case 'CANCELLED':
+      return { text: 'cancelada — a reserva de quadro/orçamento foi liberada.', tone: 'red' };
+    case 'FROZEN':
+      return { text: 'congelada — retome quando houver liberação.', tone: 'yellow' };
+    default:
+      return { text: 'encerrada.', tone: 'blue' };
+  }
 }

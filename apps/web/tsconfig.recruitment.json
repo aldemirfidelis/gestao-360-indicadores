@@ -1,0 +1,11 @@
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": { "incremental": false, "noEmit": true },
+  "include": [
+    "next-env.d.ts",
+    "app/(app)/servico-pessoal/recrutamento/**/*.tsx",
+    "components/recruitment/**/*.tsx",
+    "lib/recruitment/**/*.ts"
+  ],
+  "exclude": ["node_modules", ".next"]
+}

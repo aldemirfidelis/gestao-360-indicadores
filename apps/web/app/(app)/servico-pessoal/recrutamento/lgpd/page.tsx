@@ -13,6 +13,7 @@ import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '
 import { Label } from '@/components/ui/label';
 import { NativeSelect } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
+import { ConfirmDialog } from '@/components/platform/confirm-dialog';
 import { api } from '@/lib/api';
 import { useAuth } from '@/components/auth/auth-provider';
 import { cn } from '@/lib/utils';
@@ -38,6 +39,11 @@ const STATUS_TONE: Record<string, string> = {
   DONE: 'bg-emerald-100 text-emerald-800',
   REJECTED: 'bg-rose-100 text-rose-800',
 };
+const STATUS_LABEL: Record<string, string> = {
+  OPEN: 'Aberta',
+  DONE: 'Atendida',
+  REJECTED: 'Recusada',
+};
 
 export default function RecruitmentLgpdPage() {
   const qc = useQueryClient();
@@ -46,6 +52,7 @@ export default function RecruitmentLgpdPage() {
   const [statusFilter, setStatusFilter] = useState('OPEN');
   const [selected, setSelected] = useState<DataRequest | null>(null);
   const [note, setNote] = useState('');
+  const [anonymizeConfirm, setAnonymizeConfirm] = useState(false);
 
   const listQuery = useQuery<DataRequest[]>({
     queryKey: ['recruit-data-requests', statusFilter],
@@ -84,10 +91,8 @@ export default function RecruitmentLgpdPage() {
   function confirmResolve(action: 'DONE' | 'REJECTED') {
     if (!selected) return;
     if (action === 'DONE' && selected.type === 'DELETION') {
-      const ok = window.confirm(
-        `Isso vai ANONIMIZAR permanentemente o cadastro de ${selected.candidate.name} (nome, e-mail, telefone, currículos). Não pode ser desfeito. Confirmar?`,
-      );
-      if (!ok) return;
+      setAnonymizeConfirm(true);
+      return;
     }
     resolve.mutate({ id: selected.id, action });
   }
@@ -146,7 +151,7 @@ export default function RecruitmentLgpdPage() {
                       </td>
                       <td className="p-3 text-xs">{TYPE_LABEL[r.type] ?? r.type}</td>
                       <td className="p-3 text-xs">{new Date(r.requestedAt).toLocaleString('pt-BR')}</td>
-                      <td className="p-3"><Badge variant="outline" className={cn('text-[10px]', STATUS_TONE[r.status])}>{r.status}</Badge></td>
+                      <td className="p-3"><Badge variant="outline" className={cn('text-[10px]', STATUS_TONE[r.status])}>{STATUS_LABEL[r.status] ?? r.status}</Badge></td>
                       <td className="p-3 text-right">
                         <Button size="sm" variant="outline" onClick={() => { setSelected(r); setNote(''); }}>Abrir</Button>
                       </td>
@@ -203,13 +208,27 @@ export default function RecruitmentLgpdPage() {
                     </DialogFooter>
                   </>
                 ) : (
-                  <Badge variant="outline" className={cn('text-[10px]', STATUS_TONE[selected.status])}>{selected.status}</Badge>
+                  <Badge variant="outline" className={cn('text-[10px]', STATUS_TONE[selected.status])}>{STATUS_LABEL[selected.status] ?? selected.status}</Badge>
                 )}
               </div>
             </>
           )}
         </DialogContent>
       </Dialog>
+
+      <ConfirmDialog
+        open={anonymizeConfirm}
+        onOpenChange={setAnonymizeConfirm}
+        title="Anonimizar dados do candidato"
+        description={
+          selected
+            ? `Isso anonimiza permanentemente o cadastro de ${selected.candidate.name} (nome, e-mail, telefone e currículos). A ação não pode ser desfeita.`
+            : ''
+        }
+        confirmLabel="Anonimizar permanentemente"
+        destructive
+        onConfirm={() => { if (selected) resolve.mutate({ id: selected.id, action: 'DONE' }); }}
+      />
     </div>
   );
 }

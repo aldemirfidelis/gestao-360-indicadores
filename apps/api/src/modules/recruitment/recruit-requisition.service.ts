@@ -179,7 +179,10 @@ export class RecruitRequisitionService {
     if (!GATE_KINDS.includes(kind)) throw new BadRequestException(`Tipo de exceção inválido (${GATE_KINDS.join(', ')}).`);
     const reason = text(body?.reason);
     if (!reason) throw new BadRequestException('Justificativa da exceção é obrigatória.');
-    const list = [...(Array.isArray(req.gateExceptions) ? (req.gateExceptions as unknown[]) : []), { kind, approvedById: me.sub, at: new Date().toISOString(), reason }];
+    const current = Array.isArray(req.gateExceptions) ? (req.gateExceptions as Array<{ kind?: string }>) : [];
+    // Idempotente: cliques repetidos (ou corrida entre refetches na UI) não duplicam a exceção.
+    if (current.some((e) => e?.kind === kind)) return this.get(me, id);
+    const list = [...current, { kind, approvedById: me.sub, at: new Date().toISOString(), reason }];
     await this.prisma.recruitRequisition.update({ where: { id }, data: { gateExceptions: list as unknown as Prisma.InputJsonValue } });
     await this.audit.record(me, { module: MODULE, entity: 'RecruitRequisition', entityId: id, action: 'EXCEPTION', message: `Exceção de trava ${kind} aprovada: ${reason}`, after: { kind } });
     return this.get(me, id);
@@ -200,8 +203,13 @@ export class RecruitRequisitionService {
       requiredMonthlyCents: req.monthlyBudgetCents ?? 0,
       fullyApproved,
       hasDescription: Boolean(req.orgJobId || (Array.isArray(details.requiredSkills) && details.requiredSkills.length)),
-      hasRecruiter: Boolean(req.recruiterId),
-      hasPipeline: Boolean(req.pipelineTemplateId),
+      // Recrutador e pipeline são responsabilidade da FASE DE VAGA, não da requisição:
+      // sendToRecruitment assume quem encaminha como recrutador quando não definido, e a
+      // vaga nasce com pipeline padrão (ensureDefaultPipeline) + publish exige pipeline.
+      // Sem isso o gate bloqueava para sempre — não existe endpoint que grave
+      // req.pipelineTemplateId, e o recruiterId só era gravável na criação.
+      hasRecruiter: true,
+      hasPipeline: true,
     }, 'FLEXIBLE');
     // Remove das exceções pendentes as que já foram aprovadas.
     const approvedKinds = new Set((Array.isArray(req.gateExceptions) ? (req.gateExceptions as Array<{ kind: string }>) : []).map((e) => e.kind));
@@ -216,7 +224,8 @@ export class RecruitRequisitionService {
     const gate = await this.evaluateGate(me, id);
     if (gate.blocks.length) throw new BadRequestException(`Pendências impedem o encaminhamento: ${gate.blocks.join(' ')}`);
     if (gate.exceptionsRequired.length) throw new BadRequestException(`Exceções pendentes de aprovação: ${gate.exceptionsRequired.join(', ')}.`);
-    await this.prisma.recruitRequisition.update({ where: { id }, data: { status: 'SENT_TO_RECRUITMENT' } });
+    // Sem recrutador definido na criação, quem encaminha assume a condução da seleção.
+    await this.prisma.recruitRequisition.update({ where: { id }, data: { status: 'SENT_TO_RECRUITMENT', recruiterId: req.recruiterId ?? me.sub } });
     await this.audit.record(me, { module: MODULE, entity: 'RecruitRequisition', entityId: id, action: 'SEND', message: `Requisição ${req.code} encaminhada ao recrutamento` });
     return this.get(me, id);
   }
