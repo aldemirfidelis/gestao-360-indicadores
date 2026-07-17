@@ -319,6 +319,27 @@ export const ROUTE_PERMISSIONS: Array<{ prefix: string; permissions: string[]; e
   { prefix: '/servico-pessoal/folha', permissions: ['folha:view'] },
   { prefix: '/servico-pessoal/ferias', permissions: [] },
   { prefix: '/servico-pessoal/colaboradores', permissions: ['pessoal:view', 'pessoal:manage'] },
+  // Recrutamento tem família de permissões própria (recruit:*): sem esta entrada,
+  // um recrutador sem permissões de DP cairia no prefixo /servico-pessoal e seria
+  // bloqueado mesmo vendo o item no menu. saude:occupational cobre quem só agenda/
+  // registra ASO admissional na tela de vagas.
+  {
+    prefix: '/servico-pessoal/recrutamento',
+    permissions: [
+      'recruit:view',
+      'recruit:requisition:create',
+      'recruit:requisition:approve',
+      'recruit:offer:approve',
+      'recruit:prehire',
+      'recruit:admit',
+      'recruit:lgpd',
+      'recruit:manage',
+      'saude:occupational',
+    ],
+  },
+  // Portal do próprio colaborador (holerites/informe): liberado a qualquer usuário
+  // autenticado, como o item de menu correspondente.
+  { prefix: '/servico-pessoal/meu-holerite', permissions: [] },
   { prefix: '/servico-pessoal', permissions: ['ponto:view', 'ponto:manage', 'pessoal:view', 'folha:view'] },
   { prefix: '/suprimentos', permissions: ['compras:view', 'compras:request', 'compras:buy', 'compras:approve', 'compras:manage', 'estoque:view', 'estoque:withdraw', 'estoque:operate', 'estoque:approve', 'estoque:transfer', 'estoque:adjust', 'estoque:manage'] },
   { prefix: '/organograma', permissions: ['compensation:view', 'org:positions:view', 'org:view'] },
