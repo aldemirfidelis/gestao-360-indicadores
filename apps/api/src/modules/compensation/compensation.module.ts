@@ -3,9 +3,10 @@ import { CompensationController } from './compensation.controller';
 import { CompensationService } from './compensation.service';
 import { NotificationsModule } from '../notifications/notifications.module';
 import { DocumentsModule } from '../documents/documents.module';
+import { RecruitmentModule } from '../recruitment/recruitment.module';
 
 @Module({
-  imports: [NotificationsModule, DocumentsModule],
+  imports: [NotificationsModule, DocumentsModule, RecruitmentModule],
   controllers: [CompensationController],
   providers: [CompensationService],
   exports: [CompensationService],

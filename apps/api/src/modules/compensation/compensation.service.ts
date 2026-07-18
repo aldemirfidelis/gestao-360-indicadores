@@ -6,6 +6,8 @@ import { AuthPayload } from '../auth/auth.types';
 import { NotificationsService } from '../notifications/notifications.service';
 import { buildDocx } from '../documents/docx.util';
 import { DocumentsService } from '../documents/documents.service';
+import { RecruitRequisitionService } from '../recruitment/recruit-requisition.service';
+import { resolveResponsibleChain } from '../../common/org-hierarchy';
 
 const MODULE_NAME = 'Cargos e Salários';
 
@@ -50,6 +52,7 @@ export class CompensationService {
     private readonly notifications: NotificationsService,
     private readonly documents: DocumentsService,
     private readonly auditWriter: AuditWriterService,
+    private readonly recruitRequisitions: RecruitRequisitionService,
   ) {}
 
   // Notifica um usuario com tolerancia a falha (notificacao nunca quebra o fluxo principal).
@@ -226,7 +229,7 @@ export class CompensationService {
 
   async structure(me: AuthPayload) {
     await this.ensureBaseline(me);
-    const [jobs, employees, careerPaths, positions] = await Promise.all([
+    const [jobs, employees, careerPaths, positions, requisitions] = await Promise.all([
       this.prisma.orgJob.findMany({ where: { companyId: me.companyId, active: true }, orderBy: { name: 'asc' } }),
       this.prisma.orgEmployee.findMany({
         where: { companyId: me.companyId },
@@ -254,8 +257,88 @@ export class CompensationService {
         include: { jobCatalog: true },
         orderBy: [{ orgNodeId: 'asc' }, { code: 'asc' }],
       }),
+      // Requisições de vaga abertas (Recrutamento), para exibir o status/ação
+      // de "Solicitar vaga" / "Enviar ao recrutamento" direto na árvore.
+      this.prisma.recruitRequisition.findMany({
+        where: {
+          companyId: me.companyId,
+          deletedAt: null,
+          status: { in: ['DRAFT', 'SUBMITTED', 'APPROVED', 'SENT_TO_RECRUITMENT', 'IN_RECRUITMENT'] },
+        },
+        select: {
+          id: true,
+          code: true,
+          status: true,
+          orgNodeId: true,
+          orgJobId: true,
+          openingsRequested: true,
+          priority: true,
+          approvals: { select: { order: true, role: true, decision: true }, orderBy: { order: 'asc' } },
+        },
+        orderBy: { createdAt: 'desc' },
+      }),
     ]);
-    return { jobs, employees, careerPaths, positions };
+    return { jobs, employees, careerPaths, positions, requisitions };
+  }
+
+  /**
+   * Abre uma solicitação de vaga a partir da Estrutura de Pessoas: cria (ou
+   * reaproveita) o cargo, resolve gestor->superintendente da área subindo
+   * OrgNode.parentId e cria a RecruitRequisition já enviada para aprovação
+   * (RecruitRequisitionService, módulo de Recrutamento — sem duplicar o
+   * fluxo de aprovação/travas de quadro, que continua lá).
+   */
+  async solicitarVaga(me: AuthPayload, body: any = {}) {
+    const orgNodeId = cleanString(body?.orgNodeId);
+    if (!orgNodeId) throw new BadRequestException('Área/setor é obrigatório.');
+
+    let orgJobId = cleanString(body?.orgJobId);
+    const newJobName = cleanString(body?.newJobName);
+    if (!orgJobId && newJobName) {
+      const job = await this.prisma.orgJob.create({
+        data: { companyId: me.companyId, name: newJobName, description: cleanString(body?.newJobDescription) },
+      });
+      orgJobId = job.id;
+    }
+    if (!orgJobId) throw new BadRequestException('Informe um cargo existente ou o nome do novo cargo.');
+
+    const nodes = await this.prisma.orgNode.findMany({
+      where: { companyId: me.companyId, deletedAt: null },
+      select: { id: true, name: true, parentId: true, responsibleUserId: true },
+    });
+    const chain = resolveResponsibleChain(nodes, orgNodeId);
+    const approvalSteps: Array<{ order: number; role: string; approverId: string }> = [];
+    if (chain[0]) approvalSteps.push({ order: approvalSteps.length + 1, role: 'GESTOR', approverId: chain[0].userId });
+    if (chain[1]) approvalSteps.push({ order: approvalSteps.length + 1, role: 'SUPERINTENDENTE', approverId: chain[1].userId });
+
+    const created = await this.recruitRequisitions.create(me, {
+      orgNodeId,
+      orgJobId,
+      openingsRequested: body?.openingsRequested,
+      vacancyType: body?.vacancyType,
+      priority: body?.priority,
+      reason: body?.reason,
+      approvalSteps: approvalSteps.length ? approvalSteps : undefined,
+    });
+    const submitted = await this.recruitRequisitions.submit(me, created.id);
+
+    const vacantEmployeeId = cleanString(body?.vacantEmployeeId);
+    if (vacantEmployeeId) {
+      await this.prisma.orgEmployee.deleteMany({
+        where: { id: vacantEmployeeId, companyId: me.companyId, status: 'VACANT' },
+      });
+    }
+
+    await this.audit(
+      me,
+      'CREATE',
+      'RecruitRequisition',
+      submitted.id,
+      null,
+      { orgNodeId, orgJobId, code: submitted.code },
+      `Vaga solicitada via Estrutura de Pessoas (${submitted.code})`,
+    );
+    return submitted;
   }
 
   async listJobs(me: AuthPayload, query: Record<string, string | undefined>) {
@@ -1472,8 +1555,13 @@ export class CompensationService {
 
     const employees = await this.prisma.orgEmployee.findMany({ where: { companyId: me.companyId } });
     for (const employee of employees) {
+      // Vagas (status VACANT) não têm currentEmployeeId — dedup pela combinação
+      // orgNode+cargo, senão cada GET criaria uma posição VACANT duplicada.
       const existing = await this.prisma.compensationPosition.findFirst({
-        where: { companyId: me.companyId, currentEmployeeId: employee.id, deletedAt: null },
+        where:
+          employee.status === 'VACANT'
+            ? { companyId: me.companyId, orgNodeId: employee.orgNodeId, orgJobId: employee.jobId, status: 'VACANT', deletedAt: null }
+            : { companyId: me.companyId, currentEmployeeId: employee.id, deletedAt: null },
         select: { id: true },
       });
       if (existing) continue;

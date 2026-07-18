@@ -31,6 +31,12 @@ export class CompensationController {
     return this.service.structure(me);
   }
 
+  @Post('estrutura-quadro/solicitar-vaga')
+  @RequirePermissions(...MANAGE)
+  solicitarVaga(@CurrentUser() me: AuthPayload, @Body() body: any) {
+    return this.service.solicitarVaga(me, body);
+  }
+
   @Get('jobs')
   @RequirePermissions(...VIEW)
   listJobs(@CurrentUser() me: AuthPayload, @Query() query: Record<string, string | undefined>) {

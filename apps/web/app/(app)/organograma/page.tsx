@@ -1,6 +1,7 @@
 'use client';
 
 import { useMemo, useState, type DragEvent } from 'react';
+import Link from 'next/link';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
 import {
@@ -17,6 +18,7 @@ import {
   Send,
   Trash2,
   User,
+  UserPlus,
   Users,
 } from 'lucide-react';
 import { PageHeader } from '@/components/shell/page-header';
@@ -25,6 +27,7 @@ import { MetricCard } from '@/components/platform/metric-card';
 import { SectionCard } from '@/components/platform/section-card';
 import { EmptyState } from '@/components/platform/empty-state';
 import { LoadingState } from '@/components/platform/loading-state';
+import { StatusBadge } from '@/components/platform/status-badge';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
@@ -40,6 +43,7 @@ import {
 } from '@/components/ui/dialog';
 import { api } from '@/lib/api';
 import { cn, formatNumber } from '@/lib/utils';
+import { REQUISITION_STATUS, VACANCY_TYPE, PRIORITY, metaOf } from '@/lib/recruitment/labels';
 
 interface OrgJob {
   id: string;
@@ -84,10 +88,22 @@ interface OrgEmployee {
   approvalRequests?: PendingApprovalSummary[];
 }
 
+interface RequisitionSummary {
+  id: string;
+  code: string;
+  status: string;
+  orgNodeId: string | null;
+  orgJobId: string | null;
+  openingsRequested: number;
+  priority: string;
+  approvals: Array<{ order: number; role: string; decision: string | null }>;
+}
+
 interface OrganogramaData {
   jobs: OrgJob[];
   employees: OrgEmployee[];
   careerPaths: any[];
+  requisitions: RequisitionSummary[];
 }
 
 interface StrategyOptions {
@@ -135,6 +151,21 @@ export default function OrganogramaPage() {
     status: 'ACTIVE',
   });
   const [approvalForm, setApprovalForm] = useState({ approverId: '', reason: '' });
+  const [vagaDialog, setVagaDialog] = useState<{ open: boolean; vacantEmployeeId: string | null; locked: boolean }>({
+    open: false,
+    vacantEmployeeId: null,
+    locked: false,
+  });
+  const [vagaForm, setVagaForm] = useState({
+    orgNodeId: '',
+    orgJobId: '',
+    newJobName: '',
+    useNewJob: false,
+    reason: '',
+    vacancyType: 'AUMENTO',
+    priority: 'NORMAL',
+    openingsRequested: 1,
+  });
 
   const organogramaQuery = useQuery<OrganogramaData>({
     queryKey: ['compensation', 'estrutura-quadro'],
@@ -202,6 +233,23 @@ export default function OrganogramaPage() {
     },
     onError: (e: any) => toast.error(e?.message ?? 'Falha ao enviar para aprovação'),
   });
+  const solicitarVaga = useMutation({
+    mutationFn: (body: any) => api<RequisitionSummary>('/cargos-salarios/estrutura-quadro/solicitar-vaga', { method: 'POST', json: body }),
+    onSuccess: (req) => {
+      toast.success(`Vaga ${req.code} solicitada — aguardando aprovação`);
+      setVagaDialog({ open: false, vacantEmployeeId: null, locked: false });
+      invalidate();
+    },
+    onError: (e: any) => toast.error(e?.message ?? 'Falha ao solicitar vaga'),
+  });
+  const sendToRecruitment = useMutation({
+    mutationFn: (requisitionId: string) => api(`/recruitment/requisitions/${requisitionId}/send-to-recruitment`, { method: 'POST' }),
+    onSuccess: () => {
+      toast.success('Requisição encaminhada ao recrutamento');
+      invalidate();
+    },
+    onError: (e: any) => toast.error(e?.message ?? 'Falha ao encaminhar ao recrutamento'),
+  });
 
   // Agrupamento Area -> Job -> Empregados
   const grouped = useMemo(() => {
@@ -222,8 +270,30 @@ export default function OrganogramaPage() {
       if (!map.has(key)) map.set(key, entry);
     });
 
+    // Cargo com vaga solicitada mas sem nenhum colaborador (nem placeholder) na
+    // área: precisa aparecer mesmo assim, para mostrar o status/ação da requisição.
+    const jobsById = new Map(data.jobs.map((j) => [j.id, j]));
+    (data.requisitions ?? []).forEach((req) => {
+      if (!req.orgJobId) return;
+      const key = req.orgNodeId ?? UNLINKED_KEY;
+      const entry = map.get(key);
+      const job = jobsById.get(req.orgJobId);
+      if (!entry || !job || entry.jobs.has(req.orgJobId)) return;
+      entry.jobs.set(req.orgJobId, { job, employees: [] });
+    });
+
     return map;
   }, [data, areasAndSectors]);
+
+  const requisitionByKey = useMemo(() => {
+    const map = new Map<string, RequisitionSummary>();
+    for (const req of data?.requisitions ?? []) {
+      if (!req.orgJobId) continue;
+      const key = `${req.orgNodeId ?? UNLINKED_KEY}::${req.orgJobId}`;
+      if (!map.has(key)) map.set(key, req); // já vem ordenado por createdAt desc
+    }
+    return map;
+  }, [data]);
 
   const stats = useMemo(() => {
     if (!data) return { total: 0, active: 0, budgeted: 0, vacant: 0 };
@@ -359,6 +429,42 @@ export default function OrganogramaPage() {
     });
   }
 
+  function openVagaDialog(preset: { orgNodeId?: string; orgJobId?: string; vacantEmployeeId?: string } = {}) {
+    const locked = Boolean(preset.orgNodeId && preset.orgJobId);
+    setVagaForm({
+      orgNodeId: preset.orgNodeId ?? '',
+      orgJobId: preset.orgJobId ?? '',
+      newJobName: '',
+      useNewJob: false,
+      reason: '',
+      vacancyType: 'AUMENTO',
+      priority: 'NORMAL',
+      openingsRequested: 1,
+    });
+    setVagaDialog({ open: true, vacantEmployeeId: preset.vacantEmployeeId ?? null, locked });
+  }
+
+  function submitVagaDialog() {
+    if (!vagaForm.orgNodeId) {
+      toast.error('Selecione a área/setor');
+      return;
+    }
+    if (vagaForm.useNewJob ? !vagaForm.newJobName.trim() : !vagaForm.orgJobId) {
+      toast.error('Selecione um cargo existente ou informe o nome do novo cargo');
+      return;
+    }
+    solicitarVaga.mutate({
+      orgNodeId: vagaForm.orgNodeId,
+      orgJobId: vagaForm.useNewJob ? undefined : vagaForm.orgJobId,
+      newJobName: vagaForm.useNewJob ? vagaForm.newJobName : undefined,
+      reason: vagaForm.reason || undefined,
+      vacancyType: vagaForm.vacancyType,
+      priority: vagaForm.priority,
+      openingsRequested: vagaForm.openingsRequested,
+      vacantEmployeeId: vagaDialog.vacantEmployeeId ?? undefined,
+    });
+  }
+
   const orderedAreas = [
     ...areasAndSectors.map((area) => ({ key: area.id, area })),
     { key: UNLINKED_KEY, area: null as OrgNode | null },
@@ -396,7 +502,11 @@ export default function OrganogramaPage() {
               <Plus className="mr-1.5 h-3.5 w-3.5" />
               Novo cargo
             </Button>
-            <Button size="sm" onClick={() => setEmployeeModalOpen(true)}>
+            <Button size="sm" variant="outline" onClick={() => openVagaDialog()}>
+              <UserPlus className="mr-1.5 h-3.5 w-3.5" />
+              Solicitar vaga
+            </Button>
+            <Button size="sm" variant="ghost" onClick={() => setEmployeeModalOpen(true)} title="Alocação manual — use apenas para correções administrativas">
               <Plus className="mr-1.5 h-3.5 w-3.5" />
               Alocar colaborador
             </Button>
@@ -470,6 +580,7 @@ export default function OrganogramaPage() {
                       const jobKey = `${key}::${job.id}`;
                       const jobOpen = isOpen(`job:${jobKey}`);
                       const isHover = hoverSlot === jobKey;
+                      const requisition = requisitionByKey.get(jobKey);
                       return (
                         <div
                           key={jobKey}
@@ -509,6 +620,13 @@ export default function OrganogramaPage() {
                               </span>
                             </button>
                             <div className="flex items-center gap-2">
+                              {requisition && (
+                                <RequisitionStatusChip
+                                  requisition={requisition}
+                                  onSendToRecruitment={() => sendToRecruitment.mutate(requisition.id)}
+                                  sending={sendToRecruitment.isPending}
+                                />
+                              )}
                               <Badge variant="secondary">{employees.length}</Badge>
                             </div>
                           </div>
@@ -516,7 +634,20 @@ export default function OrganogramaPage() {
                           {/* Filhos: Colaboradores (mesmo padrao /org, com linha tracejada) */}
                           {jobOpen && (
                             <div className="ml-5 border-l border-dashed">
-                              {employees.length === 0 && (
+                              {employees.length === 0 && !requisition && key !== UNLINKED_KEY && (
+                                <div className="flex flex-wrap items-center gap-2 px-3 py-2 text-xs italic text-muted-foreground" style={{ paddingLeft: '2rem' }}>
+                                  Solte um colaborador aqui ou
+                                  <Button
+                                    variant="outline"
+                                    size="sm"
+                                    className="h-6 px-2 text-[11px] not-italic"
+                                    onClick={() => openVagaDialog({ orgNodeId: key, orgJobId: job.id })}
+                                  >
+                                    <UserPlus className="mr-1 h-3 w-3" /> solicite uma vaga para {job.name}
+                                  </Button>
+                                </div>
+                              )}
+                              {employees.length === 0 && (requisition || key === UNLINKED_KEY) && (
                                 <div className="px-3 py-2 text-xs italic text-muted-foreground" style={{ paddingLeft: '2rem' }}>
                                   Solte um colaborador aqui para movê-lo para {job.name}.
                                 </div>
@@ -551,7 +682,25 @@ export default function OrganogramaPage() {
                                           onChange={(e) => updateEmployee.mutate({ id: emp.id, name: e.target.value })}
                                           className="h-8 max-w-[260px] flex-1 text-xs font-medium"
                                         />
-                                        {emp.approvalRequests && emp.approvalRequests.length > 0 ? (
+                                        {emp.status === 'VACANT' ? (
+                                          requisition ? (
+                                            <RequisitionStatusChip
+                                              requisition={requisition}
+                                              onSendToRecruitment={() => sendToRecruitment.mutate(requisition.id)}
+                                              sending={sendToRecruitment.isPending}
+                                            />
+                                          ) : key !== UNLINKED_KEY ? (
+                                            <Button
+                                              variant="outline"
+                                              size="sm"
+                                              onClick={() => openVagaDialog({ orgNodeId: emp.orgNodeId ?? key, orgJobId: emp.jobId, vacantEmployeeId: emp.id })}
+                                              className="h-7 shrink-0 px-2 text-[10px]"
+                                              title="Solicitar vaga para este cargo"
+                                            >
+                                              <UserPlus className="mr-1 h-3 w-3" /> Solicitar vaga
+                                            </Button>
+                                          ) : null
+                                        ) : emp.approvalRequests && emp.approvalRequests.length > 0 ? (
                                           <span className="inline-flex shrink-0 items-center gap-1 border border-status-blue/30 bg-status-blue/10 px-1.5 py-0.5 text-[10px] font-medium text-status-blue">
                                             <Clock className="h-3 w-3" /> Aguardando
                                           </span>
@@ -713,6 +862,102 @@ export default function OrganogramaPage() {
             <Button variant="ghost" onClick={() => setJobModalOpen(false)}>Cancelar</Button>
             <Button onClick={() => createJob.mutate({ name: jobForm.name, description: jobForm.description })} disabled={!jobForm.name.trim() || createJob.isPending}>
               <Save className="mr-2 h-4 w-4" /> Salvar
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Solicitar vaga (abre requisição no Recrutamento) */}
+      <Dialog
+        open={vagaDialog.open}
+        onOpenChange={(open) => setVagaDialog({ open, vacantEmployeeId: open ? vagaDialog.vacantEmployeeId : null, locked: open && vagaDialog.locked })}
+      >
+        <DialogContent className="max-w-lg">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <UserPlus className="h-4 w-4" /> Solicitar vaga
+            </DialogTitle>
+          </DialogHeader>
+          <div className="grid grid-cols-1 gap-3 py-2 sm:grid-cols-2">
+            {vagaDialog.locked ? (
+              <div className="sm:col-span-2 border border-border/60 bg-muted/30 p-3 text-xs">
+                <div className="text-[10px] uppercase text-muted-foreground">Cargo · Área</div>
+                <div className="font-medium">
+                  {data?.jobs.find((j) => j.id === vagaForm.orgJobId)?.name ?? '—'} · {areasAndSectors.find((n) => n.id === vagaForm.orgNodeId)?.name ?? '—'}
+                </div>
+              </div>
+            ) : (
+              <>
+                <div className="sm:col-span-2">
+                  <Label>Área / Setor *</Label>
+                  <NativeSelect value={vagaForm.orgNodeId} onChange={(e) => setVagaForm({ ...vagaForm, orgNodeId: e.target.value })}>
+                    <option value="">Selecione</option>
+                    {areasAndSectors.map((n) => <option key={n.id} value={n.id}>{n.name}</option>)}
+                  </NativeSelect>
+                </div>
+                <label className="sm:col-span-2 flex items-center gap-2 text-sm">
+                  <input
+                    type="checkbox"
+                    checked={vagaForm.useNewJob}
+                    onChange={(e) => setVagaForm({ ...vagaForm, useNewJob: e.target.checked })}
+                    className="h-4 w-4 accent-foreground"
+                  />
+                  Cargo novo (ainda não existe na estrutura)
+                </label>
+                {vagaForm.useNewJob ? (
+                  <div className="sm:col-span-2">
+                    <Label>Nome do novo cargo *</Label>
+                    <Input value={vagaForm.newJobName} onChange={(e) => setVagaForm({ ...vagaForm, newJobName: e.target.value })} />
+                  </div>
+                ) : (
+                  <div className="sm:col-span-2">
+                    <Label>Cargo *</Label>
+                    <NativeSelect value={vagaForm.orgJobId} onChange={(e) => setVagaForm({ ...vagaForm, orgJobId: e.target.value })}>
+                      <option value="">Selecione</option>
+                      {data?.jobs.map((j) => <option key={j.id} value={j.id}>{j.name}</option>)}
+                    </NativeSelect>
+                  </div>
+                )}
+              </>
+            )}
+            <div>
+              <Label>Tipo de vaga</Label>
+              <NativeSelect value={vagaForm.vacancyType} onChange={(e) => setVagaForm({ ...vagaForm, vacancyType: e.target.value })}>
+                {Object.entries(VACANCY_TYPE).map(([value, label]) => <option key={value} value={value}>{label}</option>)}
+              </NativeSelect>
+            </div>
+            <div>
+              <Label>Prioridade</Label>
+              <NativeSelect value={vagaForm.priority} onChange={(e) => setVagaForm({ ...vagaForm, priority: e.target.value })}>
+                {Object.entries(PRIORITY).map(([value, meta]) => <option key={value} value={value}>{meta.label}</option>)}
+              </NativeSelect>
+            </div>
+            <div>
+              <Label>Quantidade</Label>
+              <Input
+                type="number"
+                min={1}
+                value={vagaForm.openingsRequested}
+                onChange={(e) => setVagaForm({ ...vagaForm, openingsRequested: Math.max(1, Number(e.target.value) || 1) })}
+              />
+            </div>
+            <div className="sm:col-span-2">
+              <Label>Motivo</Label>
+              <Textarea
+                rows={3}
+                value={vagaForm.reason}
+                onChange={(e) => setVagaForm({ ...vagaForm, reason: e.target.value })}
+                placeholder="Aumento de quadro, substituição..."
+              />
+            </div>
+          </div>
+          <p className="text-[11px] text-muted-foreground">
+            A solicitação vai para aprovação do gestor da área e, quando existir, do superintendente responsável, antes de seguir ao recrutamento.
+          </p>
+          <DialogFooter>
+            <Button variant="ghost" onClick={() => setVagaDialog({ open: false, vacantEmployeeId: null, locked: false })}>Cancelar</Button>
+            <Button onClick={submitVagaDialog} disabled={solicitarVaga.isPending}>
+              <Send className="mr-2 h-4 w-4" /> Solicitar vaga
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -945,6 +1190,31 @@ export default function OrganogramaPage() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+    </div>
+  );
+}
+
+function RequisitionStatusChip({
+  requisition,
+  onSendToRecruitment,
+  sending,
+}: {
+  requisition: RequisitionSummary;
+  onSendToRecruitment: () => void;
+  sending: boolean;
+}) {
+  const meta = metaOf(REQUISITION_STATUS, requisition.status);
+  return (
+    <div className="flex shrink-0 items-center gap-1.5">
+      <StatusBadge tone={meta.tone} label={`${meta.label} · ${requisition.code}`} />
+      {requisition.status === 'APPROVED' && (
+        <Button size="sm" variant="outline" className="h-6 px-2 text-[10px]" onClick={onSendToRecruitment} disabled={sending}>
+          <Send className="mr-1 h-3 w-3" /> Solicitar ao Recrutamento
+        </Button>
+      )}
+      <Link href="/servico-pessoal/recrutamento" className="text-[10px] text-muted-foreground underline underline-offset-2 hover:text-foreground">
+        Ver
+      </Link>
     </div>
   );
 }

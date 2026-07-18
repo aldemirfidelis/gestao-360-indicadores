@@ -3,6 +3,7 @@ import { Prisma, PrizeAnnexStatus } from '@prisma/client';
 import { PrismaService } from '../../prisma/prisma.service';
 import { AuthPayload } from '../auth/auth.types';
 import { PrizeAuditService } from './prize-audit.service';
+import { resolveResponsibleChain } from '../../common/org-hierarchy';
 
 export interface CreateAnnexDto {
   programId?: string;
@@ -223,23 +224,8 @@ export class PrizeAnnexesService {
     for (const n of nodes) if (areaNames.has(n.name.trim().toLowerCase())) seeds.add(n.id);
 
     // Sobe a cadeia coletando o nivel (distancia) mais curto de cada responsavel.
-    const levelByUser = new Map<string, { level: number; orgNodeName: string }>();
-    for (const seedId of seeds) {
-      let cur: string | null = seedId;
-      let level = 0;
-      const guard = new Set<string>();
-      while (cur && !guard.has(cur)) {
-        guard.add(cur);
-        const node = byId.get(cur);
-        if (!node) break;
-        if (node.responsibleUserId) {
-          const prev = levelByUser.get(node.responsibleUserId);
-          if (!prev || level < prev.level) levelByUser.set(node.responsibleUserId, { level, orgNodeName: node.name });
-        }
-        cur = node.parentId;
-        level += 1;
-      }
-    }
+    const chain = resolveResponsibleChain(nodes, seeds);
+    const levelByUser = new Map(chain.map((c) => [c.userId, { level: c.level, orgNodeName: c.orgNodeName }]));
 
     if (levelByUser.size === 0) return [];
     const users = await this.prisma.user.findMany({

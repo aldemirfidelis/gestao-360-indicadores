@@ -18,6 +18,11 @@ const notificationsStub: any = { create: vi.fn().mockResolvedValue({}) };
 const documentsStub: any = { create: vi.fn().mockResolvedValue({ id: 'doc-1', code: 'DOC-1' }) };
 // Stub do AuditWriterService: auditoria de domínio é best-effort.
 const auditWriterStub: any = { record: vi.fn().mockResolvedValue(undefined) };
+// Stub do RecruitRequisitionService: usado apenas por solicitarVaga (Estrutura de Pessoas -> Recrutamento).
+const recruitRequisitionsStub: any = {
+  create: vi.fn().mockResolvedValue({ id: 'req-1', code: 'RQ-2026-0001' }),
+  submit: vi.fn().mockResolvedValue({ id: 'req-1', code: 'RQ-2026-0001' }),
+};
 
 describe('CompensationService', () => {
   it('masks individual salary when user has no nominal permission', async () => {
@@ -36,7 +41,7 @@ describe('CompensationService', () => {
       },
       compensationPosition: { findMany: vi.fn().mockResolvedValue([]) },
     };
-    const service = new CompensationService(prisma, notificationsStub, documentsStub, auditWriterStub);
+    const service = new CompensationService(prisma, notificationsStub, documentsStub, auditWriterStub, recruitRequisitionsStub);
     (service as any).ensureBaseline = vi.fn();
     (service as any).hasAnyPermission = vi.fn().mockResolvedValue(false);
     (service as any).latestSalarySnapshots = vi.fn().mockResolvedValue([
@@ -62,7 +67,7 @@ describe('CompensationService', () => {
   });
 
   it('blocks movement when proposed impact exceeds available budget', async () => {
-    const service = new CompensationService({} as any, notificationsStub, documentsStub, auditWriterStub);
+    const service = new CompensationService({} as any, notificationsStub, documentsStub, auditWriterStub, recruitRequisitionsStub);
 
     await expect(
       service.createMovement(me, {
@@ -87,7 +92,7 @@ describe('CompensationService', () => {
       user: { findFirst: vi.fn().mockResolvedValue(null) },
       auditLog: { create: vi.fn().mockResolvedValue({ id: 'audit-1' }) },
     };
-    const service = new CompensationService(prisma, notificationsStub, documentsStub, auditWriterStub);
+    const service = new CompensationService(prisma, notificationsStub, documentsStub, auditWriterStub, recruitRequisitionsStub);
     (service as any).nextMovementProtocol = vi.fn().mockResolvedValue('MOV-2026-0001');
 
     const result = await service.createMovement(me, {
@@ -119,7 +124,7 @@ describe('CompensationService', () => {
       compensationMovementRequest: { update: vi.fn().mockImplementation(({ data }: any) => ({ id: 'mov-1', protocol: 'MOV-1', ...data })) },
       auditLog: { create: vi.fn().mockResolvedValue({ id: 'a' }) },
     };
-    const service = new CompensationService(prisma, notificationsStub, documentsStub, auditWriterStub);
+    const service = new CompensationService(prisma, notificationsStub, documentsStub, auditWriterStub, recruitRequisitionsStub);
     (service as any).getMovement = vi.fn().mockResolvedValue({
       id: 'mov-1',
       protocol: 'MOV-1',
@@ -144,7 +149,7 @@ describe('CompensationService', () => {
       compensationMovementRequest: { update: vi.fn().mockImplementation(({ data }: any) => ({ id: 'mov-2', protocol: 'MOV-2', ...data })) },
       auditLog: { create: vi.fn().mockResolvedValue({ id: 'a' }) },
     };
-    const service = new CompensationService(prisma, notificationsStub, documentsStub, auditWriterStub);
+    const service = new CompensationService(prisma, notificationsStub, documentsStub, auditWriterStub, recruitRequisitionsStub);
     (service as any).getMovement = vi.fn().mockResolvedValue({
       id: 'mov-2',
       protocol: 'MOV-2',
@@ -166,7 +171,7 @@ describe('CompensationService', () => {
       orgJob: { findFirst: vi.fn().mockResolvedValue(null) },
       user: { findFirst: vi.fn().mockResolvedValue(null) },
     };
-    const service = new CompensationService(prisma, notificationsStub, documentsStub, auditWriterStub);
+    const service = new CompensationService(prisma, notificationsStub, documentsStub, auditWriterStub, recruitRequisitionsStub);
     (service as any).nextMovementProtocol = vi.fn().mockResolvedValue('MOV-2026-0002');
 
     await expect(
@@ -198,7 +203,7 @@ describe('CompensationService', () => {
       $transaction: vi.fn(async (fn: any) => fn(tx)),
       auditLog: { create: vi.fn() },
     };
-    const service = new CompensationService(prisma, notificationsStub, documentsStub, auditWriterStub);
+    const service = new CompensationService(prisma, notificationsStub, documentsStub, auditWriterStub, recruitRequisitionsStub);
     (service as any).getMovement = vi.fn().mockResolvedValue({
       id: 'mov-1',
       protocol: 'MOV-1',
@@ -233,7 +238,7 @@ describe('CompensationService', () => {
       compensationEmployeeProfile: { findMany: vi.fn().mockResolvedValue(profiles) },
       auditLog: { create: vi.fn().mockResolvedValue({ id: 'a' }) },
     };
-    const service = new CompensationService(prisma, notificationsStub, documentsStub, auditWriterStub);
+    const service = new CompensationService(prisma, notificationsStub, documentsStub, auditWriterStub, recruitRequisitionsStub);
     (service as any).ensureBaseline = vi.fn();
     (service as any).hasAnyPermission = vi.fn().mockResolvedValue(true);
     (service as any).latestSalarySnapshots = vi.fn().mockResolvedValue(snapshots);
@@ -302,7 +307,7 @@ describe('CompensationService', () => {
       },
       auditLog: { create: vi.fn().mockResolvedValue({ id: 'a' }) },
     };
-    const service = new CompensationService(prisma, notificationsStub, documentsStub, auditWriterStub);
+    const service = new CompensationService(prisma, notificationsStub, documentsStub, auditWriterStub, recruitRequisitionsStub);
     const saved = await service.saveEmployeeProfile(me, 'emp-1', { gender: 'f', performanceRating: 3 });
     expect(prisma.compensationEmployeeProfile.upsert.mock.calls[0][0].create.gender).toBe('FEMININO');
     expect(saved.performanceRating).toBe(3);
@@ -313,7 +318,7 @@ describe('CompensationService', () => {
 
   it('saveEmployeeProfile: colaborador de outra empresa -> NotFound', async () => {
     const prisma: any = { orgEmployee: { findFirst: vi.fn().mockResolvedValue(null) } };
-    const service = new CompensationService(prisma, notificationsStub, documentsStub, auditWriterStub);
+    const service = new CompensationService(prisma, notificationsStub, documentsStub, auditWriterStub, recruitRequisitionsStub);
     await expect(service.saveEmployeeProfile(me, 'emp-other', {})).rejects.toBeInstanceOf(NotFoundException);
     expect(prisma.orgEmployee.findFirst).toHaveBeenCalledWith({ where: { id: 'emp-other', companyId: 'company-1' } });
   });
@@ -329,7 +334,7 @@ describe('CompensationService', () => {
       compensationEmployeeProfile: { upsert: vi.fn().mockResolvedValue({ id: 'p' }) },
       auditLog: { create: vi.fn().mockResolvedValue({ id: 'a' }) },
     };
-    const service = new CompensationService(prisma, notificationsStub, documentsStub, auditWriterStub);
+    const service = new CompensationService(prisma, notificationsStub, documentsStub, auditWriterStub, recruitRequisitionsStub);
     const result = await service.importEmployeeProfiles(me, {
       rows: [
         { registrationId: '00123', gender: 'FEMININO', performanceRating: '3' },
@@ -347,7 +352,7 @@ describe('CompensationService', () => {
     const prisma: any = {
       user: { findFirst: vi.fn().mockResolvedValue(null) },
     };
-    const service = new CompensationService(prisma, notificationsStub, documentsStub, auditWriterStub);
+    const service = new CompensationService(prisma, notificationsStub, documentsStub, auditWriterStub, recruitRequisitionsStub);
 
     const allowed = await (service as any).hasAnyPermission(me, ['compensation:movements:approve']);
 

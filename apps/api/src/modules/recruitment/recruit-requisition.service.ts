@@ -151,6 +151,12 @@ export class RecruitRequisitionService {
     const pending = nextPendingApproval(steps);
     if (!pending) throw new ConflictException('Não há passo de aprovação pendente.');
     const stepRow = approvals.find((a) => a.order === pending.order)!;
+    // Quando o passo já nasceu com um aprovador específico (ex.: gestor/superintendente
+    // resolvidos pela hierarquia do organograma), só essa pessoa pode decidir — passos
+    // sem approverId (ex.: RH genérico) seguem abertos a qualquer titular da permissão.
+    if (stepRow.approverId && stepRow.approverId !== me.sub) {
+      throw new ForbiddenException('Apenas o aprovador designado para este passo pode decidir.');
+    }
 
     await this.prisma.recruitRequisitionApproval.update({
       where: { id: stepRow.id },

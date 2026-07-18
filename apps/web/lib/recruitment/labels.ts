@@ -45,6 +45,7 @@ export const PRIORITY: Record<string, EnumMeta> = {
 
 export const APPROVAL_ROLE: Record<string, string> = {
   GESTOR: 'Gestor da área',
+  SUPERINTENDENTE: 'Superintendente',
   RH: 'RH',
   COMPENSATION: 'Cargos e Salários',
   FINANCE: 'Financeiro',
