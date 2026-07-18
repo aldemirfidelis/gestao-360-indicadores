@@ -121,6 +121,60 @@ export class PrizePayslipService {
     return { published };
   }
 
+  // ------------------------------ Autoatendimento do colaborador ------------------------------
+
+  /** Matrícula do usuário logado (via colaborador vinculado), ou null. */
+  private async myRegistration(me: AuthPayload): Promise<string | null> {
+    const employee = await this.prisma.orgEmployee.findFirst({
+      where: { companyId: me.companyId, personnelProfile: { userId: me.sub } },
+      select: { registrationId: true },
+    });
+    return employee?.registrationId ?? null;
+  }
+
+  /** Espelhos de prêmio PUBLICADOS do próprio colaborador (Minha Vida Funcional). */
+  async myPayslips(me: AuthPayload) {
+    const registration = await this.myRegistration(me);
+    if (!registration) return [];
+    const rows = await this.prisma.prizePayslip.findMany({
+      where: { companyId: me.companyId, registration, status: 'PUBLISHED' },
+      orderBy: { publishedAt: 'desc' },
+      select: { id: true, competenceId: true, name: true, version: true, finalValue: true, publishedAt: true, acknowledgedAt: true },
+    });
+    const competenceIds = [...new Set(rows.map((r) => r.competenceId))];
+    const competences = competenceIds.length
+      ? await this.prisma.prizeCompetence.findMany({ where: { id: { in: competenceIds } }, select: { id: true, label: true, year: true, month: true } })
+      : [];
+    const byId = new Map(competences.map((c) => [c.id, c]));
+    return rows.map((r) => ({
+      id: r.id,
+      competence: byId.get(r.competenceId)?.label ?? `${byId.get(r.competenceId)?.month ?? ''}/${byId.get(r.competenceId)?.year ?? ''}`,
+      finalValue: r.finalValue,
+      publishedAt: r.publishedAt,
+      acknowledgedAt: r.acknowledgedAt,
+    }));
+  }
+
+  /** Demonstrativo completo do próprio espelho (escopo por matrícula — privacidade). */
+  async myPayslip(me: AuthPayload, id: string) {
+    const registration = await this.myRegistration(me);
+    if (!registration) throw new NotFoundException('Espelho não encontrado.');
+    const payslip = await this.prisma.prizePayslip.findFirst({
+      where: { id, companyId: me.companyId, registration, status: 'PUBLISHED' },
+    });
+    if (!payslip) throw new NotFoundException('Espelho não encontrado.');
+    return payslip;
+  }
+
+  /** Ciência do próprio colaborador (escopo por matrícula). */
+  async acknowledgeMine(me: AuthPayload, id: string) {
+    const payslip = await this.myPayslip(me, id);
+    if (payslip.acknowledgedAt) return payslip;
+    const updated = await this.prisma.prizePayslip.update({ where: { id: payslip.id }, data: { acknowledgedAt: new Date(), acknowledgedById: me.sub } });
+    await this.audit.log(me, { action: 'ACKNOWLEDGE', entityType: 'PAYSLIP', entityId: id, competenceId: payslip.competenceId });
+    return updated;
+  }
+
   /** Ciencia do colaborador (ou de quem consulta em seu nome). */
   async acknowledge(me: AuthPayload, id: string) {
     const p = await this.get(me.companyId, id);

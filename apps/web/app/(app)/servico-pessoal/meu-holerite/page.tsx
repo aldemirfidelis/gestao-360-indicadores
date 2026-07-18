@@ -1,10 +1,10 @@
 'use client';
 
 import { useState } from 'react';
-import { useQuery } from '@tanstack/react-query';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
 import { jsPDF } from 'jspdf';
-import { Download, FileText, Wallet } from 'lucide-react';
+import { CheckCircle2, Download, FileText, Trophy, Wallet } from 'lucide-react';
 import { PageHeader } from '@/components/shell/page-header';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -25,19 +25,29 @@ interface IncomeReport {
   months: Array<{ month: number; kind: string; earnings: number; inss: number; irrf: number; net: number }>;
   totals: { earnings: number; inss: number; irrf: number; fgts: number; taxable: number } | null;
 }
+interface PrizePayslip { id: string; competence: string; finalValue: string | null; publishedAt: string | null; acknowledgedAt: string | null }
 
 const MONTHS = ['', 'Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun', 'Jul', 'Ago', 'Set', 'Out', 'Nov', 'Dez'];
 const money = (v: number | string) => Number(v).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
 
 export default function MyPayslipPage() {
+  const qc = useQueryClient();
   const currentYear = new Date().getFullYear();
   const [year, setYear] = useState(currentYear - 1);
 
   const payslipsQuery = useQuery<Payslip[]>({ queryKey: ['my-payslips'], queryFn: () => api('/payroll/my-payslips') });
   const incomeQuery = useQuery<IncomeReport>({ queryKey: ['my-income-report', year], queryFn: () => api(`/payroll/my-income-report?year=${year}`) });
+  const prizeQuery = useQuery<PrizePayslip[]>({ queryKey: ['my-prize-payslips'], queryFn: () => api('/prize/payslips/mine') });
 
   const payslips = payslipsQuery.data ?? [];
   const income = incomeQuery.data;
+  const prizePayslips = prizeQuery.data ?? [];
+
+  const acknowledgePrize = useMutation({
+    mutationFn: (id: string) => api(`/prize/payslips/mine/${id}/acknowledge`, { method: 'POST' }),
+    onSuccess: () => { toast.success('Ciência registrada.'); void qc.invalidateQueries({ queryKey: ['my-prize-payslips'] }); },
+    onError: (e: any) => toast.error(e?.message ?? 'Não foi possível registrar a ciência.'),
+  });
 
   async function downloadHolerite(id: string, comp: string) {
     try {
@@ -122,6 +132,37 @@ export default function MyPayslipPage() {
           ) : <div className="py-4 text-muted-foreground">Sem folhas fechadas em {year}.</div>}
         </CardContent>
       </Card>
+
+      {prizePayslips.length > 0 && (
+        <Card>
+          <CardHeader className="pb-2"><CardTitle className="flex items-center gap-2 text-sm"><Trophy className="h-4 w-4 text-amber-500" /> Meu Prêmio / PLR</CardTitle></CardHeader>
+          <CardContent className="p-0">
+            <div className="divide-y">
+              {prizePayslips.map((p) => (
+                <div key={p.id} className="flex flex-wrap items-center justify-between gap-2 px-4 py-3 text-sm">
+                  <div className="flex items-center gap-3">
+                    <Badge variant="outline" className="text-[10px]">{p.competence}</Badge>
+                    {p.acknowledgedAt ? (
+                      <Badge variant="outline" className="border-status-green/40 text-[10px] text-status-green">Ciência dada</Badge>
+                    ) : (
+                      <Badge variant="outline" className="border-status-yellow/40 text-[10px] text-status-yellow">Aguardando ciência</Badge>
+                    )}
+                  </div>
+                  <div className="flex items-center gap-3">
+                    <span className="font-semibold">{p.finalValue != null ? money(p.finalValue) : '—'}</span>
+                    {!p.acknowledgedAt && (
+                      <Button size="sm" variant="outline" disabled={acknowledgePrize.isPending} onClick={() => acknowledgePrize.mutate(p.id)}>
+                        <CheckCircle2 className="mr-1 h-3.5 w-3.5" /> Dar ciência
+                      </Button>
+                    )}
+                  </div>
+                </div>
+              ))}
+            </div>
+            <p className="border-t px-4 py-2 text-[11px] text-muted-foreground">Demonstrativo do prêmio de remuneração variável publicado para você. A ciência confirma que você visualizou o valor.</p>
+          </CardContent>
+        </Card>
+      )}
 
       <Card>
         <CardHeader className="pb-2"><CardTitle className="flex items-center gap-2 text-sm"><Wallet className="h-4 w-4 text-emerald-500" /> Meus Holerites</CardTitle></CardHeader>
