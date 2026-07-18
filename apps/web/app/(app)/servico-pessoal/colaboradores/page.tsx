@@ -62,6 +62,7 @@ interface Options {
   jobs: Array<{ id: string; name: string }>;
   users: Array<{ id: string; name: string; email: string }>;
   accessProfiles: Array<{ id: string; name: string; code: string; role: string }>;
+  scheduleTemplates: Array<{ id: string; name: string; kind: string }>;
   contractTypes: string[];
   workRegimes: string[];
   dependentRelationships: string[];
@@ -84,6 +85,7 @@ interface EmployeeDetail {
   dossierFiles: Array<{ id: string; kind: string; name: string; fileName: string; sizeBytes: number | null; validUntil: string | null; note: string | null; createdAt: string }>;
   photoAvailable?: boolean;
   photoUpdatedAt?: string | null;
+  currentSchedule?: { templateId: string; name: string | null } | null;
 }
 
 const CONTRACT_LABEL: Record<string, string> = {
@@ -127,6 +129,7 @@ const EMPTY_FORM = {
   createUserEnabled: false,
   loginType: 'EMAIL' as 'EMAIL' | 'CPF' | 'REGISTRATION',
   userEmail: '', userPassword: '', userAccessProfileId: '',
+  scheduleTemplateId: '', cycleAnchorDay: '',
 };
 
 export default function EmployeesPage() {
@@ -173,6 +176,7 @@ export default function EmployeesPage() {
   const kpis = listQuery.data?.kpis;
   const autoatendimentoProfileId = (options?.accessProfiles ?? []).find((p) => p.code === 'COLABORADOR_AUTOATENDIMENTO')?.id ?? '';
   const selectedAreaManager = (options?.orgNodes ?? []).find((n) => n.id === form.orgNodeId)?.responsibleUser?.name ?? '';
+  const selectedScheduleIsCycle = (options?.scheduleTemplates ?? []).find((s) => s.id === form.scheduleTemplateId)?.kind === 'CYCLE';
 
   const invalidate = () => {
     void qc.invalidateQueries({ queryKey: ['personnel-employees'] });
@@ -227,6 +231,7 @@ export default function EmployeesPage() {
               },
             }
           : {}),
+        ...(form.scheduleTemplateId ? { scheduleTemplateId: form.scheduleTemplateId, cycleAnchorDay: form.cycleAnchorDay || undefined } : {}),
       };
       return editingId
         ? api<EmployeeDetail>(`/personnel/employees/${editingId}`, { method: 'PATCH', json: payload })
@@ -378,6 +383,7 @@ export default function EmployeesPage() {
       workRegime: profile.workRegime ?? '',
       admissionDate: toInputDate(profile.admissionDate),
       allowPortalPunch: profile.allowPortalPunch === true ? 'true' : profile.allowPortalPunch === false ? 'false' : '',
+      scheduleTemplateId: employee.currentSchedule?.templateId ?? '',
       userId: profile.userId ?? '',
       emergencyContactName: profile.emergencyContactName ?? '',
       emergencyContactPhone: profile.emergencyContactPhone ?? '',
@@ -633,6 +639,22 @@ export default function EmployeesPage() {
                   <option value="true">Permitido (ex.: home office)</option>
                   <option value="false">Só facial/totem</option>
                 </NativeSelect>
+              </div>
+              <div>
+                <Label>Escala de trabalho</Label>
+                <NativeSelect value={form.scheduleTemplateId} onChange={(e) => setForm((f) => ({ ...f, scheduleTemplateId: e.target.value }))}>
+                  <option value="">{editingId && detail?.currentSchedule?.name ? `Manter atual (${detail.currentSchedule.name})` : 'Definir depois (em Ponto → Escalas)'}</option>
+                  {(options?.scheduleTemplates ?? []).map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}
+                </NativeSelect>
+                {selectedScheduleIsCycle && (
+                  <div className="mt-1">
+                    <Label className="text-xs">1º dia de trabalho do ciclo (âncora)</Label>
+                    <Input type="date" value={form.cycleAnchorDay} onChange={(e) => setForm((f) => ({ ...f, cycleAnchorDay: e.target.value }))} />
+                  </div>
+                )}
+                {form.scheduleTemplateId && !form.userId && !form.createUserEnabled && (
+                  <p className="mt-1 text-[11px] text-status-yellow">A escala é atribuída ao usuário do portal — vincule ou crie um usuário para o colaborador.</p>
+                )}
               </div>
               <div>
                 <Label>Data de admissão</Label>

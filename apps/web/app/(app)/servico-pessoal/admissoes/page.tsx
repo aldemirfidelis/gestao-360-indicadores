@@ -268,7 +268,32 @@ export default function LifecyclePage() {
           </TabsTrigger>
         </TabsList>
 
-        <TabsContent value="admissoes">{renderProcessList(onboarding, 'ONBOARDING')}</TabsContent>
+        <TabsContent value="admissoes">
+          <div className="mb-3 rounded-md border border-sky-500/25 bg-sky-500/5 p-3">
+            <div className="mb-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground">Fluxo da contratação</div>
+            <ol className="flex flex-wrap items-center gap-x-1 gap-y-1 text-xs">
+              {[
+                'Admissão (requisição/candidato)',
+                'ASO admissional',
+                'Verificação de documentos',
+                'Conclusão da admissão',
+                'Cadastro do colaborador',
+              ].map((step, i, arr) => (
+                <li key={step} className="flex items-center gap-1">
+                  <span className="grid h-4 w-4 place-items-center rounded-full bg-sky-500 text-[9px] font-bold text-white">{i + 1}</span>
+                  <span className="text-muted-foreground">{step}</span>
+                  {i < arr.length - 1 && <span className="mx-0.5 text-muted-foreground/50">→</span>}
+                </li>
+              ))}
+            </ol>
+            <p className="mt-2 text-[11px] text-muted-foreground">
+              O caminho automatizado começa no <Link href="/servico-pessoal/recrutamento" className="font-medium text-sky-600 hover:underline dark:text-sky-400">Recrutamento</Link> (candidato → proposta → ASO → documentos → autorizar admissão),
+              que cria o colaborador na base única. Depois, no <Link href="/servico-pessoal/colaboradores" className="font-medium text-sky-600 hover:underline dark:text-sky-400">cadastro</Link>, complete os dados dos documentos: a matrícula é gerada automaticamente,
+              e você define área, superior imediato (vem da árvore), escala e o usuário do portal. Os checklists abaixo acompanham o onboarding após a admissão.
+            </p>
+          </div>
+          {renderProcessList(onboarding, 'ONBOARDING')}
+        </TabsContent>
         <TabsContent value="desligamentos">{renderProcessList(offboarding, 'OFFBOARDING')}</TabsContent>
 
         <TabsContent value="aso">

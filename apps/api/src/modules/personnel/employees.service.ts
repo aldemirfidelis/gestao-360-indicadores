@@ -4,6 +4,7 @@ import { PrismaService } from '../../prisma/prisma.service';
 import { AuditWriterService } from '../../common/audit/audit-writer.service';
 import { DocumentStorageService } from '../documents/document-storage.service';
 import { PersonnelSettingsService } from './personnel-settings.service';
+import { PersonnelService } from './personnel.service';
 import { UsersService } from '../users/users.service';
 import { UserRoleEnum } from '@prisma/client';
 import { randomBytes } from 'crypto';
@@ -59,6 +60,7 @@ export class EmployeesService {
     private readonly storage: DocumentStorageService,
     private readonly settings: PersonnelSettingsService,
     private readonly users: UsersService,
+    private readonly personnel: PersonnelService,
   ) {}
 
   // ------------------------------ Listagem ------------------------------
@@ -128,7 +130,7 @@ export class EmployeesService {
   }
 
   async options(me: AuthPayload) {
-    const [orgNodes, jobs, users, accessProfiles] = await Promise.all([
+    const [orgNodes, jobs, users, accessProfiles, scheduleTemplates] = await Promise.all([
       this.prisma.orgNode.findMany({
         where: { companyId: me.companyId, deletedAt: null, active: true },
         select: {
@@ -156,12 +158,18 @@ export class EmployeesService {
         select: { id: true, name: true, code: true, role: true },
         orderBy: { name: 'asc' },
       }),
+      this.prisma.workShiftTemplate.findMany({
+        where: { companyId: me.companyId, deletedAt: null, active: true },
+        select: { id: true, name: true, kind: true },
+        orderBy: { name: 'asc' },
+      }),
     ]);
     return {
       orgNodes,
       jobs,
       users,
       accessProfiles,
+      scheduleTemplates,
       contractTypes: CONTRACT_TYPES,
       workRegimes: WORK_REGIMES,
       dependentRelationships: DEPENDENT_RELATIONSHIPS,
@@ -192,9 +200,19 @@ export class EmployeesService {
         })
       : null;
 
+    // Escala vigente do colaborador (é por usuário) — para exibir/pré-selecionar.
+    const currentSchedule = employee.personnelProfile?.userId
+      ? await this.prisma.workScheduleAssignment.findFirst({
+          where: { companyId: me.companyId, userId: employee.personnelProfile.userId, endsAt: null },
+          orderBy: { startsAt: 'desc' },
+          select: { templateId: true, template: { select: { name: true } } },
+        })
+      : null;
+
     return {
       ...employee,
       linkedUser,
+      currentSchedule: currentSchedule ? { templateId: currentSchedule.templateId, name: currentSchedule.template?.name ?? null } : null,
       photoAvailable: Boolean(employee.personnelProfile?.photoStorageKey),
       photoUpdatedAt: employee.personnelProfile?.photoUpdatedAt ?? null,
       dossierFiles: employee.dossierFiles.map((file) => ({
@@ -280,8 +298,9 @@ export class EmployeesService {
 
     // Cadastrar como usuário do portal no mesmo passo (opcional). Só quando não
     // veio um vínculo com usuário existente.
-    if (body?.createUser && !text(body?.profile?.userId ?? body?.userId)) {
-      await this.provisionPortalUser(me, {
+    let linkedUserId = text(body?.profile?.userId ?? body?.userId);
+    if (body?.createUser && !linkedUserId) {
+      linkedUserId = await this.provisionPortalUser(me, {
         employeeId: created.id,
         name,
         cpf: (profileData.cpf as string | null) ?? null,
@@ -289,6 +308,10 @@ export class EmployeesService {
         input: body.createUser,
       });
     }
+
+    // Escala de trabalho (opcional): precisa de usuário vinculado (é por usuário).
+    await this.assignScheduleIfRequested(me, text(body?.scheduleTemplateId), text(body?.cycleAnchorDay), linkedUserId);
+
     return this.getById(me, created.id);
   }
 
@@ -301,7 +324,7 @@ export class EmployeesService {
   private async provisionPortalUser(
     me: AuthPayload,
     args: { employeeId: string; name: string; cpf: string | null; registrationId: string | null; input: any },
-  ): Promise<void> {
+  ): Promise<string> {
     const loginType = String(args.input?.loginType ?? 'EMAIL').toUpperCase();
     const company = await this.prisma.company.findUnique({ where: { id: me.companyId }, select: { slug: true } });
     const slug = (company?.slug || 'empresa').replace(/[^a-z0-9-]/gi, '').toLowerCase() || 'empresa';
@@ -347,6 +370,17 @@ export class EmployeesService {
       action: 'PORTAL_USER_CREATED',
       message: `Usuário do portal criado (${loginType === 'EMAIL' ? email : loginType.toLowerCase()}) e vinculado ao colaborador`,
     });
+    return user.id;
+  }
+
+  /**
+   * Atribui a escala de trabalho ao colaborador reusando o motor do ponto
+   * (assignSchedule é por USUÁRIO). Silencioso quando não há escala escolhida ou
+   * usuário vinculado — a escala também pode ser definida em Ponto → Escalas.
+   */
+  private async assignScheduleIfRequested(me: AuthPayload, scheduleTemplateId: string | null, cycleAnchorDay: string | null, userId: string | null): Promise<void> {
+    if (!scheduleTemplateId || !userId) return;
+    await this.personnel.assignSchedule(me, { templateId: scheduleTemplateId, userIds: [userId], cycleAnchorDay: cycleAnchorDay ?? undefined });
   }
 
   async update(me: AuthPayload, id: string, patch: any = {}) {
@@ -443,6 +477,12 @@ export class EmployeesService {
     if ('cbo' in patch) {
       const currentJobId = (core.job as { connect?: { id: string } } | undefined)?.connect?.id ?? before.jobId;
       await this.applyJobCbo(currentJobId, patch.cbo);
+    }
+
+    // Escala de trabalho (opcional): atribui ao usuário vinculado, se houver.
+    if (text(patch?.scheduleTemplateId)) {
+      const linkedUserId = (profileData.userId as string | null) ?? before.personnelProfile?.userId ?? null;
+      await this.assignScheduleIfRequested(me, text(patch.scheduleTemplateId), text(patch.cycleAnchorDay), linkedUserId);
     }
 
     await this.audit.record(me, {
