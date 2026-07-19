@@ -12,12 +12,13 @@ import { EmptyState } from '@/components/platform/empty-state';
 import { LoadingState } from '@/components/platform/loading-state';
 import { StatusBadge } from '@/components/platform/status-badge';
 import { api } from '@/lib/api';
-import { POSTING_STATUS, VISIBILITY, WORK_MODE, formatDateBr, labelOf, metaOf } from '@/lib/recruitment/labels';
+import { POSTING_STATUS, VISIBILITY, WORK_MODE, formatDateBr, labelOf, metaOf, publicVacancyPath } from '@/lib/recruitment/labels';
 
 interface Posting {
   id: string; slug: string; title: string; status: string; visibility: string; pcd: boolean;
   city: string | null; workMode: string | null; contractType: string | null; closesAt: string | null;
   pipelineTemplate?: { name: string } | null;
+  company?: { slug: string | null } | null;
   _count?: { applications: number };
 }
 
@@ -91,7 +92,7 @@ export default function VacanciesPage() {
                               <Button variant="ghost" size="sm"><Users className="mr-1 h-3.5 w-3.5" /> Abrir</Button>
                             </Link>
                             {posting.status === 'PUBLISHED' && (
-                              <a href={`/carreiras/vagas/${posting.slug}`} target="_blank" rel="noreferrer" title="Página pública">
+                              <a href={publicVacancyPath(posting.slug, posting.company)} target="_blank" rel="noreferrer" title="Página pública">
                                 <Button variant="ghost" size="sm"><ExternalLink className="h-3.5 w-3.5" /></Button>
                               </a>
                             )}

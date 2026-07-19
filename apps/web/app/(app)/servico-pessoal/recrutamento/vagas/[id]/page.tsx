@@ -23,7 +23,7 @@ import { PipelineBoard, type BoardApplication } from '@/components/recruitment/p
 import { NextStepCallout } from '@/components/recruitment/journey-stepper';
 import { api } from '@/lib/api';
 import { useAuth } from '@/components/auth/auth-provider';
-import { POSTING_STATUS, QUESTION_TYPE, VISIBILITY, WORK_MODE, labelOf, metaOf } from '@/lib/recruitment/labels';
+import { POSTING_STATUS, QUESTION_TYPE, VISIBILITY, WORK_MODE, labelOf, metaOf, publicVacancyPath } from '@/lib/recruitment/labels';
 
 interface PostingDetail {
   id: string; slug: string; title: string; status: string; visibility: string; pcd: boolean;
@@ -32,6 +32,7 @@ interface PostingDetail {
   processStepsText: string | null; showSalary: boolean; salaryText: string | null; closesAt: string | null;
   pipelineTemplateId: string | null;
   pipelineTemplate?: { name: string; stages: PipelineStage[] } | null;
+  company?: { slug: string | null } | null;
 }
 interface Pipeline { id: string; name: string; isDefault: boolean }
 interface ScreeningQuestion { id: string; order: number; type: string; question: string; required: boolean; knockout: boolean }
@@ -172,7 +173,7 @@ export default function VacancyDetailPage() {
               </Button>
             )}
             {posting.status === 'PUBLISHED' && (
-              <a href={`/carreiras/vagas/${posting.slug}`} target="_blank" rel="noreferrer">
+              <a href={publicVacancyPath(posting.slug, posting.company)} target="_blank" rel="noreferrer">
                 <Button size="sm" variant="outline"><ExternalLink className="mr-1 h-3.5 w-3.5" /> Página pública</Button>
               </a>
             )}

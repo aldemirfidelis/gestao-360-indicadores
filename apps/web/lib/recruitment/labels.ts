@@ -273,6 +273,18 @@ export function formatDateTimeBr(value: string | Date | null | undefined): strin
   return date.toLocaleString('pt-BR', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' });
 }
 
+/**
+ * Caminho da página pública da vaga. No apex (gestao360.org) sem subdomínio/domínio
+ * próprio da empresa, o portal público precisa do slug da empresa no querystring
+ * (`?empresa=`) para saber de quem é a vaga — senão retorna "Vaga não encontrada".
+ * Quando a empresa acessar por subdomínio/domínio próprio, o param é inofensivo.
+ */
+export function publicVacancyPath(vacancySlug: string, company?: { slug?: string | null } | null): string {
+  const base = `/carreiras/vagas/${vacancySlug}`;
+  const companySlug = company?.slug?.trim();
+  return companySlug ? `${base}?empresa=${encodeURIComponent(companySlug)}` : base;
+}
+
 export function formatDateBr(value: string | Date | null | undefined): string {
   if (!value) return '—';
   const date = value instanceof Date ? value : new Date(value);

@@ -109,21 +109,30 @@ export class RecruitPostingService {
   }
 
   async listPostings(me: AuthPayload, status?: string) {
-    return this.prisma.recruitJobPosting.findMany({
-      where: { companyId: me.companyId, deletedAt: null, ...(status ? { status } : {}) },
-      orderBy: { createdAt: 'desc' },
-      take: 200,
-      include: { channels: true, pipelineTemplate: { select: { name: true } }, _count: { select: { applications: true } } },
-    });
+    // RecruitJobPosting não tem relação `company` (só o escalar companyId), então o
+    // slug (usado p/ montar o link público ?empresa=) vem numa query à parte.
+    const [postings, company] = await Promise.all([
+      this.prisma.recruitJobPosting.findMany({
+        where: { companyId: me.companyId, deletedAt: null, ...(status ? { status } : {}) },
+        orderBy: { createdAt: 'desc' },
+        take: 200,
+        include: { channels: true, pipelineTemplate: { select: { name: true } }, _count: { select: { applications: true } } },
+      }),
+      this.prisma.company.findUnique({ where: { id: me.companyId }, select: { slug: true } }),
+    ]);
+    return postings.map((p) => ({ ...p, company: { slug: company?.slug ?? null } }));
   }
 
   async getPosting(me: AuthPayload, id: string) {
-    const posting = await this.prisma.recruitJobPosting.findFirst({
-      where: { id, companyId: me.companyId, deletedAt: null },
-      include: { channels: true, pipelineTemplate: { include: { stages: { orderBy: { order: 'asc' } } } } },
-    });
+    const [posting, company] = await Promise.all([
+      this.prisma.recruitJobPosting.findFirst({
+        where: { id, companyId: me.companyId, deletedAt: null },
+        include: { channels: true, pipelineTemplate: { include: { stages: { orderBy: { order: 'asc' } } } } },
+      }),
+      this.prisma.company.findUnique({ where: { id: me.companyId }, select: { slug: true } }),
+    ]);
     if (!posting) throw new NotFoundException('Vaga não encontrada.');
-    return posting;
+    return { ...posting, company: { slug: company?.slug ?? null } };
   }
 
   async updatePosting(me: AuthPayload, id: string, body: any = {}) {
