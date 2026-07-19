@@ -1,5 +1,5 @@
 import { BadRequestException, ConflictException, ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
-import { Prisma } from '@prisma/client';
+import { Prisma, UserRoleEnum } from '@prisma/client';
 import { PrismaService } from '../../prisma/prisma.service';
 import { AuditWriterService } from '../../common/audit/audit-writer.service';
 import { AuthPayload } from '../auth/auth.types';
@@ -52,7 +52,16 @@ export class RecruitRequisitionService {
       },
     });
     if (!req) throw new NotFoundException('Requisição não encontrada.');
-    return req;
+    // Resolve o nome de cada aprovador designado para a tela não mostrar só o papel.
+    const approverIds = [...new Set(req.approvals.map((a) => a.approverId).filter((x): x is string => Boolean(x)))];
+    const approvers = approverIds.length
+      ? await this.prisma.user.findMany({ where: { id: { in: approverIds }, companyId: me.companyId }, select: { id: true, name: true } })
+      : [];
+    const nameById = new Map(approvers.map((u) => [u.id, u.name]));
+    return {
+      ...req,
+      approvals: req.approvals.map((a) => ({ ...a, approverName: a.approverId ? nameById.get(a.approverId) ?? null : null })),
+    };
   }
 
   /** Cria a requisição a partir de uma posição (opcional) ou "aumento de quadro". */
@@ -154,8 +163,11 @@ export class RecruitRequisitionService {
     // Quando o passo já nasceu com um aprovador específico (ex.: gestor/superintendente
     // resolvidos pela hierarquia do organograma), só essa pessoa pode decidir — passos
     // sem approverId (ex.: RH genérico) seguem abertos a qualquer titular da permissão.
-    if (stepRow.approverId && stepRow.approverId !== me.sub) {
-      throw new ForbiddenException('Apenas o aprovador designado para este passo pode decidir.');
+    // Exceção: RH/Admin (recruit:manage, COMPANY_ADMIN ou SUPER_ADMIN) pode decidir em
+    // nome do designado quando ele está indisponível — fica registrado na auditoria.
+    const decidingForOther = Boolean(stepRow.approverId && stepRow.approverId !== me.sub);
+    if (decidingForOther && !(await this.hasApprovalOverride(me))) {
+      throw new ForbiddenException('Apenas o aprovador designado para este passo pode decidir. Um RH/Admin pode aprovar em nome dele ou reatribuir o aprovador.');
     }
 
     await this.prisma.recruitRequisitionApproval.update({
@@ -174,8 +186,46 @@ export class RecruitRequisitionService {
       if (newStatus === 'REJECTED' || newStatus === 'RETURNED') { data.reservedHeadcount = 0; data.reservedBudgetCents = 0; }
       await this.prisma.recruitRequisition.update({ where: { id }, data });
     }
-    await this.audit.record(me, { module: MODULE, entity: 'RecruitRequisition', entityId: id, action: 'APPROVE', message: `Aprovação (${pending.role}): ${decision}`, after: { decision, outcome, newStatus } });
+    const onBehalf = decidingForOther ? ` (em nome de ${stepRow.approverId})` : '';
+    await this.audit.record(me, { module: MODULE, entity: 'RecruitRequisition', entityId: id, action: 'APPROVE', message: `Aprovação (${pending.role}): ${decision}${onBehalf}`, after: { decision, outcome, newStatus, overrodeApprover: decidingForOther ? stepRow.approverId : undefined } });
     return this.get(me, id);
+  }
+
+  /** Reatribui o aprovador designado de um passo pendente (RH/Admin). Vazio = abre a qualquer titular da permissão. */
+  async reassignApprover(me: AuthPayload, id: string, body: any = {}) {
+    const req = await this.requisitionOf(me.companyId, id);
+    if (req.status !== 'SUBMITTED') throw new ConflictException('Só é possível reatribuir aprovadores enquanto a requisição está em aprovação.');
+    const approvals = await this.prisma.recruitRequisitionApproval.findMany({ where: { requisitionId: id }, orderBy: { order: 'asc' } });
+    const stepId = text(body?.stepId);
+    const targetStep = stepId ? approvals.find((a) => a.id === stepId) : approvals.find((a) => a.decision === null);
+    if (!targetStep) throw new NotFoundException('Passo de aprovação não encontrado.');
+    if (targetStep.decision) throw new ConflictException('Este passo já foi decidido — não é possível reatribuir.');
+    const newApproverId = text(body?.approverId);
+    if (newApproverId) {
+      const user = await this.prisma.user.findFirst({ where: { id: newApproverId, companyId: me.companyId, deletedAt: null, active: true }, select: { id: true } });
+      if (!user) throw new NotFoundException('Usuário aprovador não encontrado ou inativo.');
+      if (newApproverId === req.requesterId) throw new BadRequestException('Segregação de funções: o solicitante não pode ser o aprovador da própria requisição.');
+    }
+    const before = targetStep.approverId;
+    await this.prisma.recruitRequisitionApproval.update({ where: { id: targetStep.id }, data: { approverId: newApproverId } });
+    await this.audit.record(me, { module: MODULE, entity: 'RecruitRequisition', entityId: id, action: 'UPDATE', message: `Aprovador do passo ${targetStep.order} (${targetStep.role}) reatribuído`, before: { approverId: before }, after: { approverId: newApproverId } });
+    return this.get(me, id);
+  }
+
+  /** RH/Admin (recruit:manage, COMPANY_ADMIN ou SUPER_ADMIN) pode aprovar em nome do designado. */
+  private async hasApprovalOverride(me: AuthPayload): Promise<boolean> {
+    if (me.role === UserRoleEnum.SUPER_ADMIN || me.role === UserRoleEnum.COMPANY_ADMIN) return true;
+    const user = await this.prisma.user.findUnique({
+      where: { id: me.sub },
+      select: {
+        permissions: { select: { permission: { select: { key: true } } } },
+        accessProfile: { select: { permissions: { select: { permission: { select: { key: true } } } } } },
+      },
+    });
+    const keys = new Set<string>();
+    user?.permissions.forEach((p) => keys.add(p.permission.key));
+    user?.accessProfile?.permissions.forEach((p) => keys.add(p.permission.key));
+    return keys.has('recruit:manage');
   }
 
   /** Registra uma exceção aprovada de trava (posição/quadro/orçamento). */

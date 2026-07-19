@@ -61,7 +61,7 @@ interface RequisitionDetail extends Requisition {
   requesterId: string; reason: string | null; notes: string | null;
   monthlyBudgetCents: number | string | null;
   gateExceptions: Array<{ kind: string; reason: string; at: string }> | null;
-  approvals: Array<{ id: string; order: number; role: string; decision: string | null; comment: string | null }>;
+  approvals: Array<{ id: string; order: number; role: string; decision: string | null; comment: string | null; approverId: string | null; approverName: string | null }>;
   openings: Array<{ id: string; status: string }>;
 }
 interface Gate {
@@ -80,7 +80,7 @@ const EMPTY_FORM = { orgJobId: '', orgNodeId: '', openingsRequested: 1, vacancyT
 export default function RecruitmentPage() {
   const qc = useQueryClient();
   const router = useRouter();
-  const { hasPermission } = useAuth();
+  const { hasPermission, user } = useAuth();
   const canCreate = hasPermission(['recruit:requisition:create']);
   const canApprove = hasPermission(['recruit:requisition:approve']);
   const canManage = hasPermission(['recruit:manage']);
@@ -92,6 +92,7 @@ export default function RecruitmentPage() {
   const [statusFilter, setStatusFilter] = useState('');
   const [search, setSearch] = useState('');
   const [reasonDialog, setReasonDialog] = useState<ReasonDialogState | null>(null);
+  const [reassign, setReassign] = useState<{ stepId: string; role: string; approverId: string } | null>(null);
 
   const listQuery = useQuery<Requisition[]>({ queryKey: ['recruit-requisitions'], queryFn: () => api('/recruitment/requisitions') });
   const postingsQuery = useQuery<Posting[]>({ queryKey: ['recruit-postings'], queryFn: () => api('/recruitment/postings') });
@@ -129,6 +130,12 @@ export default function RecruitmentPage() {
     },
     onError: (error: any) => toast.error(error?.message ?? 'Não foi possível concluir a ação.'),
   });
+  const reassignMut = useMutation({
+    mutationFn: ({ id, stepId, approverId }: { id: string; stepId: string; approverId: string }) =>
+      api(`/recruitment/requisitions/${id}/reassign-approver`, { method: 'POST', json: { stepId, approverId: approverId || null } }),
+    onSuccess: () => { toast.success('Aprovador reatribuído.'); setReassign(null); invalidate(); },
+    onError: (error: any) => toast.error(error?.message ?? 'Não foi possível reatribuir o aprovador.'),
+  });
   const createPosting = useMutation({
     mutationFn: (id: string) => api<{ id: string }>(`/recruitment/requisitions/${id}/posting`, { method: 'POST' }),
     onSuccess: (posting) => {
@@ -146,6 +153,13 @@ export default function RecruitmentPage() {
   const nodeName = (id: string | null) => options?.orgNodes.find((node) => node.id === id)?.name ?? '—';
   const detail = detailQuery.data;
   const gate = gateQuery.data;
+  const userName = (id: string | null) => options?.users.find((u) => u.id === id)?.name ?? null;
+  // Passo pendente e quem pode agir nele: passo aberto (sem designado), o próprio
+  // designado, ou RH/Admin (recruit:manage) aprovando em nome do designado.
+  const pendingApproval = detail?.approvals.find((a) => a.decision === null) ?? null;
+  const pendingApproverId = pendingApproval?.approverId ?? null;
+  const isDesignatedApprover = pendingApproverId != null && pendingApproverId === user?.id;
+  const canActOnPending = canApprove && (!pendingApproverId || isDesignatedApprover || canManage);
 
   const counts = useMemo(() => {
     const byStatus = (...statuses: string[]) => requisitions.filter((req) => statuses.includes(req.status)).length;
@@ -451,11 +465,25 @@ export default function RecruitmentPage() {
                   {detail.approvals.length === 0 ? (
                     <div className="text-muted-foreground">Definido no envio para aprovação.</div>
                   ) : (
-                    <div className="space-y-1">
+                    <div className="space-y-1.5">
                       {detail.approvals.map((approval) => (
                         <div key={approval.id} className="flex items-center justify-between gap-2">
-                          <span>{approval.order}. {labelOf(APPROVAL_ROLE, approval.role)}</span>
-                          <span className="flex items-center gap-2">
+                          <span className="min-w-0">
+                            {approval.order}. {labelOf(APPROVAL_ROLE, approval.role)}
+                            <span className="ml-1 text-muted-foreground">
+                              · {approval.approverName ?? (approval.approverId ? 'aprovador designado' : 'qualquer aprovador com permissão')}
+                            </span>
+                            {approval.decision === null && detail.status === 'SUBMITTED' && canManage && (
+                              <button
+                                type="button"
+                                className="ml-2 text-[11px] font-medium text-primary underline-offset-2 hover:underline"
+                                onClick={() => setReassign({ stepId: approval.id, role: approval.role, approverId: approval.approverId ?? '' })}
+                              >
+                                Reatribuir
+                              </button>
+                            )}
+                          </span>
+                          <span className="flex shrink-0 items-center gap-2">
                             {approval.comment && <span className="text-[10px] text-muted-foreground">{approval.comment}</span>}
                             <StatusBadge
                               label={approval.decision === 'APPROVED' ? 'Aprovado' : approval.decision === 'REJECTED' ? 'Reprovado' : 'Pendente'}
@@ -478,7 +506,7 @@ export default function RecruitmentPage() {
                       <Send className="mr-1 h-3.5 w-3.5" /> Enviar para aprovação
                     </Button>
                   )}
-                  {canApprove && detail.status === 'SUBMITTED' && (
+                  {canActOnPending && detail.status === 'SUBMITTED' && (
                     <>
                       <Button size="sm" onClick={() => act.mutate({ id: detail.id, action: 'decide', body: { decision: 'APPROVED' } })} disabled={act.isPending}>
                         <CheckCircle2 className="mr-1 h-3.5 w-3.5" /> Aprovar este passo
@@ -499,7 +527,17 @@ export default function RecruitmentPage() {
                       >
                         <X className="mr-1 h-3.5 w-3.5" /> Reprovar
                       </Button>
+                      {pendingApproverId && !isDesignatedApprover && canManage && (
+                        <span className="basis-full text-[11px] text-muted-foreground">
+                          Você aprovará em nome de <strong>{userName(pendingApproverId) ?? 'aprovador designado'}</strong> (RH/Admin) — fica registrado na auditoria.
+                        </span>
+                      )}
                     </>
+                  )}
+                  {canApprove && !canActOnPending && detail.status === 'SUBMITTED' && pendingApproval && (
+                    <span className="basis-full text-[11px] text-amber-600">
+                      Aguardando aprovação de <strong>{pendingApproval.approverName ?? 'aprovador designado'}</strong>. Só essa pessoa (ou um RH/Admin) pode decidir este passo.
+                    </span>
                   )}
                   {canApprove && detail.status === 'APPROVED' && (
                     <Button size="sm" onClick={() => act.mutate({ id: detail.id, action: 'send-to-recruitment' })} disabled={act.isPending}>
@@ -539,6 +577,40 @@ export default function RecruitmentPage() {
       </Sheet>
 
       <ReasonDialog state={reasonDialog} onClose={() => setReasonDialog(null)} />
+
+      <Dialog open={reassign != null} onOpenChange={(open) => !open && setReassign(null)}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Reatribuir aprovador — {reassign ? labelOf(APPROVAL_ROLE, reassign.role) : ''}</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-2 py-2">
+            <Label htmlFor="reassign-approver">Aprovador designado para este passo</Label>
+            <NativeSelect
+              id="reassign-approver"
+              value={reassign?.approverId ?? ''}
+              onChange={(e) => setReassign((prev) => (prev ? { ...prev, approverId: e.target.value } : prev))}
+            >
+              <option value="">Qualquer aprovador com permissão</option>
+              {(options?.users ?? []).map((u) => (
+                <option key={u.id} value={u.id}>{u.name}</option>
+              ))}
+            </NativeSelect>
+            <p className="text-[11px] text-muted-foreground">
+              A pessoa escolhida passa a ser a única que pode aprovar/reprovar este passo. Deixe em branco para abrir a qualquer usuário com a permissão de aprovação. O solicitante não pode ser o aprovador.
+            </p>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" size="sm" onClick={() => setReassign(null)}>Cancelar</Button>
+            <Button
+              size="sm"
+              disabled={reassignMut.isPending || !detail || !reassign}
+              onClick={() => { if (detail && reassign) reassignMut.mutate({ id: detail.id, stepId: reassign.stepId, approverId: reassign.approverId }); }}
+            >
+              Salvar aprovador
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

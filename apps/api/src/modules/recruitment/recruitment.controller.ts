@@ -400,6 +400,12 @@ export class RecruitmentController {
     return this.requisitions.addGateException(me, id, body);
   }
 
+  @Post('requisitions/:id/reassign-approver')
+  @RequirePermissions('recruit:manage')
+  reassignApprover(@CurrentUser() me: AuthPayload, @Param('id') id: string, @Body() body: any) {
+    return this.requisitions.reassignApprover(me, id, body);
+  }
+
   @Post('requisitions/:id/send-to-recruitment')
   @RequirePermissions('recruit:requisition:approve')
   sendToRecruitment(@CurrentUser() me: AuthPayload, @Param('id') id: string) {
