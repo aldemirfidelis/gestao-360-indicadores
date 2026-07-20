@@ -341,6 +341,7 @@ enum NotificationKind {
   MESSAGE
   STOCK_MINIMUM_ALERT
   PURCHASE_ORDER_OVERDUE
+  RECRUITMENT_REQUISITION_STALE
 }
 
 enum IndicatorRelationKind {

@@ -3,6 +3,8 @@ import { PrismaService } from '../../prisma/prisma.service';
 import { ActionStatus, NotificationKind } from '@prisma/client';
 import { PushService } from '../push/push.service';
 
+const DEFAULT_REQUISITION_SLA_DAYS = 30;
+
 @Injectable()
 export class NotificationsService {
   constructor(
@@ -241,6 +243,37 @@ export class NotificationsService {
         );
         created.push(`journey-occ:${manager.id}`);
       }
+    }
+
+    // 7. Recrutamento: requisição de vaga aberta além do próprio SLA configurado
+    // (slaDays já existia no schema desde a F1, mas nunca era lido em lugar
+    // nenhum) — avisa quem conduz a vaga (recrutador) ou, sem recrutador
+    // definido ainda, quem solicitou a vaga.
+    const openRequisitions = await this.prisma.recruitRequisition.findMany({
+      where: { companyId, deletedAt: null, status: { in: ['SUBMITTED', 'APPROVED', 'SENT_TO_RECRUITMENT', 'IN_RECRUITMENT'] } },
+      select: { id: true, code: true, createdAt: true, slaDays: true, recruiterId: true, requesterId: true },
+      take: 100,
+    });
+    for (const req of openRequisitions) {
+      const limitDays = req.slaDays ?? DEFAULT_REQUISITION_SLA_DAYS;
+      const daysOpen = Math.floor((Date.now() - req.createdAt.getTime()) / 86_400_000);
+      if (daysOpen <= limitDays) continue;
+      const userId = req.recruiterId ?? req.requesterId;
+      if (!userId) continue;
+      const link = `/recrutamento?focus=${req.id}`;
+      const exists = await this.prisma.notification.findFirst({
+        where: { userId, kind: NotificationKind.RECRUITMENT_REQUISITION_STALE, link, readAt: null },
+      });
+      if (exists) continue;
+      await this.create(
+        companyId,
+        userId,
+        NotificationKind.RECRUITMENT_REQUISITION_STALE,
+        `Vaga parada: ${req.code}`,
+        `Aberta há ${daysOpen} dia(s), acima do SLA de ${limitDays} dia(s).`,
+        link,
+      );
+      created.push(req.id);
     }
 
     return { generated: created.length };

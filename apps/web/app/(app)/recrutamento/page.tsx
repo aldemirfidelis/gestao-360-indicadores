@@ -1,6 +1,6 @@
 'use client';
 
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
@@ -89,6 +89,13 @@ export default function RecruitmentPage() {
   const [search, setSearch] = useState('');
   const [reasonDialog, setReasonDialog] = useState<ReasonDialogState | null>(null);
   const [reassign, setReassign] = useState<{ stepId: string; role: string; approverId: string } | null>(null);
+
+  // Abre a requisição direto quando o link vem de uma notificação (?focus=<id>), ex.: alerta de SLA.
+  useEffect(() => {
+    const focus = new URLSearchParams(window.location.search).get('focus');
+    if (focus) setDetailId(focus);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const listQuery = useQuery<Requisition[]>({ queryKey: ['recruit-requisitions'], queryFn: () => api('/recruitment/requisitions') });
   const postingsQuery = useQuery<Posting[]>({ queryKey: ['recruit-postings'], queryFn: () => api('/recruitment/postings') });
