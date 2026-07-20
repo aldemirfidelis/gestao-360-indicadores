@@ -1,5 +1,6 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { PrismaService } from '../../../prisma/prisma.service';
+import { resolveSmtpConfig, buildTransport, smtpFrom } from '../../../common/smtp';
 
 @Injectable()
 export class WorkflowIntegrationService {
@@ -66,7 +67,30 @@ export class WorkflowIntegrationService {
       const body = this.interpolate(config.body || '', context);
 
       this.logger.log(`Sending automated workflow email to ${to}: ${subject}`);
-      
+
+      // Envio real pelo mesmo caminho central de e-mail (Portal Global → E-mail).
+      // Falha não derruba o workflow: registra status ERROR e segue.
+      let sent = false;
+      let errorMsg: string | null = null;
+      try {
+        if (!to || !/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(to)) throw new Error('Destinatário de e-mail inválido.');
+        const cfg = await resolveSmtpConfig(this.prisma);
+        if (!cfg?.host) throw new Error('E-mail não configurado (Portal Global → E-mail).');
+        const looksHtml = /<[a-z][\s\S]*>/i.test(body);
+        await buildTransport(cfg).sendMail({
+          from: smtpFrom(cfg),
+          to,
+          subject,
+          text: body,
+          ...(looksHtml ? { html: body } : {}),
+          replyTo: cfg.replyTo,
+        });
+        sent = true;
+      } catch (e) {
+        errorMsg = (e as Error).message;
+        this.logger.warn(`Falha ao enviar e-mail do workflow para ${to}: ${errorMsg}`);
+      }
+
       // Save mail logs inside system
       await this.prisma.emailLog.create({
         data: {
@@ -74,11 +98,11 @@ export class WorkflowIntegrationService {
           recipientEmail: to,
           subject,
           body,
-          status: 'SENT',
+          status: sent ? 'SENT' : 'ERROR',
         },
       });
 
-      return { emailSent: true, recipient: to };
+      return { emailSent: sent, recipient: to, ...(errorMsg ? { error: errorMsg } : {}) };
     }
 
     return {};
