@@ -211,6 +211,17 @@ export const QUESTION_TYPE: Record<string, string> = {
   NUMBER: 'Número',
 };
 
+export const STAGE_TYPE: Record<string, string> = {
+  STANDARD: 'Triagem',
+  ELIMINATORY: 'Eliminatória',
+  INTERVIEW: 'Entrevista',
+  ASSESSMENT: 'Teste',
+  OFFER: 'Proposta',
+  PREHIRE: 'Pré-admissão',
+  FINAL: 'Final',
+  SEM_ETAPA: 'Sem etapa',
+};
+
 export const GATE_KIND: Record<string, string> = {
   POSITION: 'posição vinculada',
   HEADCOUNT: 'quadro de pessoal',

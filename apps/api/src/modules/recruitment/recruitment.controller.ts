@@ -11,6 +11,7 @@ import { RecruitOccupationalHealthService } from './recruit-occupational-health.
 import { RecruitAdmissionService } from './recruit-admission.service';
 import { RecruitLgpdService } from './recruit-lgpd.service';
 import { RecruitCommunicationService } from './recruit-communication.service';
+import { RecruitAnalyticsService } from './recruit-analytics.service';
 
 /**
  * Recrutamento e Seleção (F1-F2). Rotas autenticadas /api/recruitment/*.
@@ -28,7 +29,16 @@ export class RecruitmentController {
     private readonly admissions: RecruitAdmissionService,
     private readonly lgpd: RecruitLgpdService,
     private readonly communication: RecruitCommunicationService,
+    private readonly analytics: RecruitAnalyticsService,
   ) {}
+
+  // ------------------------------ analytics ------------------------------
+
+  @Get('analytics/funnel')
+  @RequirePermissions('recruit:view')
+  getAnalyticsFunnel(@CurrentUser() me: AuthPayload, @Query('from') from?: string, @Query('to') to?: string) {
+    return this.analytics.getFunnel(me, { from, to });
+  }
 
   // ------------------------------ comunicação (templates de e-mail) ------------------------------
 
