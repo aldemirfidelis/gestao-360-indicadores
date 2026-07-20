@@ -27,12 +27,17 @@ export function PipelineBoard({
   canManage,
   onOpen,
   onMove,
+  selectedIds,
+  onToggleSelect,
 }: {
   stages: PipelineStage[];
   applications: BoardApplication[];
   canManage: boolean;
   onOpen: (applicationId: string) => void;
   onMove: (applicationId: string, toStageId: string) => void;
+  /** Seleção múltipla para ações em massa (opcional — sem isso, comportamento igual ao anterior). */
+  selectedIds?: Set<string>;
+  onToggleSelect?: (applicationId: string) => void;
 }) {
   const [dragId, setDragId] = useState<string | null>(null);
   const [overStage, setOverStage] = useState<string | null>(null);
@@ -99,10 +104,20 @@ export function PipelineBoard({
                     className={cn(
                       'rounded-md border bg-background p-2.5 text-left shadow-sm transition hover:border-status-blue/50 hover:shadow',
                       dragId === app.id && 'opacity-50',
+                      selectedIds?.has(app.id) && 'border-status-blue bg-status-blue/5',
                       canManage && 'cursor-grab active:cursor-grabbing',
                     )}
                   >
                     <div className="flex items-start gap-1.5">
+                      {onToggleSelect && (
+                        <input
+                          type="checkbox"
+                          checked={selectedIds?.has(app.id) ?? false}
+                          onClick={(e) => e.stopPropagation()}
+                          onChange={() => onToggleSelect(app.id)}
+                          className="mt-0.5 h-3.5 w-3.5 shrink-0"
+                        />
+                      )}
                       {canManage && <GripVertical className="mt-0.5 h-3 w-3 shrink-0 text-muted-foreground/50" />}
                       <div className="min-w-0 flex-1">
                         <div className="truncate text-xs font-semibold">{app.candidate.name}</div>

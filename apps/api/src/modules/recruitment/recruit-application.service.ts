@@ -389,6 +389,32 @@ export class RecruitApplicationService {
     return { ok: true };
   }
 
+  /** Move várias candidaturas de uma vez (kanban: seleção múltipla). Reusa moveStage por item — mesma validação, mesmo e-mail ao candidato. */
+  async bulkMoveStage(me: AuthPayload, ids: string[], toStageId: string) {
+    return this.bulkRun(ids, (id) => this.moveStage(me, id, toStageId));
+  }
+
+  /** Rejeita várias candidaturas de uma vez (kanban: seleção múltipla). Reusa reject por item. */
+  async bulkReject(me: AuthPayload, ids: string[], reason?: string) {
+    return this.bulkRun(ids, (id) => this.reject(me, id, reason));
+  }
+
+  /** Roda uma ação item a item — uma falha (ex.: candidatura já encerrada) não impede as demais. */
+  private async bulkRun(ids: string[], run: (id: string) => Promise<unknown>): Promise<{ ok: number; failed: Array<{ id: string; error: string }> }> {
+    const unique = [...new Set(ids)].slice(0, 200);
+    const failed: Array<{ id: string; error: string }> = [];
+    let ok = 0;
+    for (const id of unique) {
+      try {
+        await run(id);
+        ok += 1;
+      } catch (err) {
+        failed.push({ id, error: (err as Error).message });
+      }
+    }
+    return { ok, failed };
+  }
+
   /** Nota interna do recrutador na timeline. */
   async addNote(me: AuthPayload, id: string, note: string) {
     await this.getOwnedApp(me.companyId, id);

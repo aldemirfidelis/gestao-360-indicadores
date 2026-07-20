@@ -16,6 +16,7 @@ import { NativeSelect } from '@/components/ui/select';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Textarea } from '@/components/ui/textarea';
 import { ConfirmDialog } from '@/components/platform/confirm-dialog';
+import { ReasonDialog, type ReasonDialogState } from '@/components/platform/reason-dialog';
 import { LoadingState } from '@/components/platform/loading-state';
 import { StatusBadge } from '@/components/platform/status-badge';
 import { CandidateSheet, type PipelineStage } from '@/components/recruitment/candidate-sheet';
@@ -53,6 +54,13 @@ export default function VacancyDetailPage() {
   const canManage = hasPermission(['recruit:manage']);
 
   const [tab, setTab] = useState('pipeline');
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const toggleSelect = (id: string) => setSelectedIds((prev) => {
+    const next = new Set(prev);
+    if (next.has(id)) next.delete(id); else next.add(id);
+    return next;
+  });
+  const [bulkReasonDialog, setBulkReasonDialog] = useState<ReasonDialogState | null>(null);
   const [detailId, setDetailId] = useState<string | null>(null);
   const [form, setForm] = useState<Partial<PostingDetail> | null>(null);
   const [closeConfirm, setCloseConfirm] = useState(false);
@@ -99,6 +107,24 @@ export default function VacancyDetailPage() {
     mutationFn: ({ id, toStageId }: { id: string; toStageId: string }) => api(`/recruitment/applications/${id}/move`, { method: 'POST', json: { toStageId } }),
     onSuccess: () => { toast.success('Candidato movido.'); invalidateApplications(); },
     onError: (error: any) => toast.error(error?.message ?? 'Não foi possível mover.'),
+  });
+  const bulkMove = useMutation({
+    mutationFn: ({ ids, toStageId }: { ids: string[]; toStageId: string }) => api<{ ok: number; failed: Array<{ id: string; error: string }> }>('/recruitment/applications/bulk-move', { method: 'POST', json: { ids, toStageId } }),
+    onSuccess: (result) => {
+      toast.success(`${result.ok} candidato(s) movido(s).${result.failed.length ? ` ${result.failed.length} falhou(aram).` : ''}`);
+      setSelectedIds(new Set());
+      invalidateApplications();
+    },
+    onError: (error: any) => toast.error(error?.message ?? 'Não foi possível mover em massa.'),
+  });
+  const bulkReject = useMutation({
+    mutationFn: ({ ids, reason }: { ids: string[]; reason?: string }) => api<{ ok: number; failed: Array<{ id: string; error: string }> }>('/recruitment/applications/bulk-reject', { method: 'POST', json: { ids, reason } }),
+    onSuccess: (result) => {
+      toast.success(`${result.ok} candidatura(s) rejeitada(s).${result.failed.length ? ` ${result.failed.length} falhou(aram).` : ''}`);
+      setSelectedIds(new Set());
+      invalidateApplications();
+    },
+    onError: (error: any) => toast.error(error?.message ?? 'Não foi possível rejeitar em massa.'),
   });
   const saveQuestion = useMutation({
     mutationFn: () => api(`/recruitment/postings/${postingId}/screening-questions`, { method: 'POST', json: questionPayload(questionDraft) }),
@@ -226,16 +252,50 @@ export default function VacancyDetailPage() {
               </CardContent>
             </Card>
           ) : (
-            <PipelineBoard
-              stages={stages}
-              applications={applications}
-              canManage={canManage}
-              onOpen={(id) => setDetailId(id)}
-              onMove={(id, toStageId) => moveApplication.mutate({ id, toStageId })}
-            />
+            <>
+              {canManage && selectedIds.size > 0 && (
+                <div className="mb-3 flex flex-wrap items-center gap-2 rounded-md border border-status-blue/40 bg-status-blue/5 p-2.5">
+                  <span className="text-xs font-semibold">{selectedIds.size} selecionado(s)</span>
+                  <NativeSelect
+                    className="h-8 w-52 text-xs"
+                    value=""
+                    disabled={bulkMove.isPending}
+                    onChange={(e) => { if (e.target.value) bulkMove.mutate({ ids: [...selectedIds], toStageId: e.target.value }); }}
+                  >
+                    <option value="">Mover para etapa...</option>
+                    {stages.map((stage) => <option key={stage.id} value={stage.id}>{stage.order}. {stage.name}</option>)}
+                  </NativeSelect>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    className="text-status-red"
+                    disabled={bulkReject.isPending}
+                    onClick={() => setBulkReasonDialog({
+                      title: `Rejeitar ${selectedIds.size} candidatura(s)`,
+                      label: 'Motivo da rejeição',
+                      confirmLabel: 'Rejeitar todos',
+                      destructive: true,
+                      onConfirm: (reason) => bulkReject.mutate({ ids: [...selectedIds], reason }),
+                    })}
+                  >
+                    Rejeitar selecionados
+                  </Button>
+                  <Button size="sm" variant="ghost" onClick={() => setSelectedIds(new Set())}>Cancelar seleção</Button>
+                </div>
+              )}
+              <PipelineBoard
+                stages={stages}
+                applications={applications}
+                canManage={canManage}
+                onOpen={(id) => setDetailId(id)}
+                onMove={(id, toStageId) => moveApplication.mutate({ id, toStageId })}
+                selectedIds={canManage ? selectedIds : undefined}
+                onToggleSelect={canManage ? toggleSelect : undefined}
+              />
+            </>
           )}
           <p className="mt-2 text-[11px] text-muted-foreground">
-            Arraste o cartão para mudar o candidato de etapa, ou clique para abrir o painel completo (avaliação, entrevistas, proposta, pré-admissão e admissão).
+            Arraste o cartão para mudar o candidato de etapa, marque a caixinha para ações em massa, ou clique para abrir o painel completo (avaliação, entrevistas, proposta, pré-admissão e admissão).
           </p>
         </TabsContent>
 
@@ -456,6 +516,8 @@ export default function VacancyDetailPage() {
         destructive
         onConfirm={() => setStatus.mutate('CLOSED')}
       />
+
+      <ReasonDialog state={bulkReasonDialog} onClose={() => setBulkReasonDialog(null)} />
     </div>
   );
 }

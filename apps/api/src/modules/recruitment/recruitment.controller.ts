@@ -187,6 +187,18 @@ export class RecruitmentController {
     return this.applications.reject(me, id, body?.reason);
   }
 
+  @Post('applications/bulk-move')
+  @RequirePermissions('recruit:manage')
+  bulkMoveApplications(@CurrentUser() me: AuthPayload, @Body() body: any) {
+    return this.applications.bulkMoveStage(me, Array.isArray(body?.ids) ? body.ids.map(String) : [], String(body?.toStageId ?? ''));
+  }
+
+  @Post('applications/bulk-reject')
+  @RequirePermissions('recruit:manage')
+  bulkRejectApplications(@CurrentUser() me: AuthPayload, @Body() body: any) {
+    return this.applications.bulkReject(me, Array.isArray(body?.ids) ? body.ids.map(String) : [], body?.reason);
+  }
+
   @Post('applications/:id/notes')
   @RequirePermissions('recruit:manage')
   addApplicationNote(@CurrentUser() me: AuthPayload, @Param('id') id: string, @Body() body: any) {
