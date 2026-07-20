@@ -242,7 +242,7 @@ export class RecruitApplicationService {
     const app = await this.prisma.recruitApplication.findFirst({
       where: { id, companyId: me.companyId },
       include: {
-        candidate: { select: { id: true, name: true, email: true, phone: true, city: true, headline: true, linkedinUrl: true, portfolioUrl: true, profileData: true } },
+        candidate: { select: { id: true, name: true, email: true, phone: true, city: true, headline: true, linkedinUrl: true, portfolioUrl: true, profileData: true, tags: true } },
         posting: { select: { id: true, title: true, slug: true, pipelineTemplateId: true } },
         stage: { select: { id: true, name: true, order: true } },
         events: { orderBy: { createdAt: 'desc' }, take: 100 },

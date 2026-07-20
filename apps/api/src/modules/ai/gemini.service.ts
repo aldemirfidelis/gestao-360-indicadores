@@ -159,17 +159,64 @@ export class GeminiService {
     const fullPrompt = `${prompt}\n\nResponda APENAS com JSON valido (sem markdown, sem comentarios, sem texto extra).`;
     const text = await this.generateText(fullPrompt, options);
     if (!text) return null;
-    const cleaned = text
-      .trim()
-      .replace(/^```json\s*/i, '')
-      .replace(/^```\s*/, '')
-      .replace(/```\s*$/, '')
-      .trim();
-    try {
-      return JSON.parse(cleaned) as T;
-    } catch (err: any) {
-      this.logger.warn(`Resposta Gemini nao e JSON valido: ${err?.message ?? err}. Trecho: ${cleaned.slice(0, 200)}`);
-      return null;
+    return parseJsonResponse<T>(text, this.logger);
+  }
+
+  /**
+   * Variante multimodal de generateJson: envia um arquivo (PDF/imagem) inline junto do
+   * prompt de texto — usado para o modelo LER o currículo em vez de só o texto digitado
+   * pelo candidato. Só o Gemini suporta isso (Groq é texto-only); sem Gemini configurado
+   * ou em caso de falha, retorna null e o chamador cai no fluxo texto-only já existente.
+   */
+  async generateJsonFromDocument<T = unknown>(
+    prompt: string,
+    document: { mimeType: string; base64: string },
+    options?: { temperature?: number; maxOutputTokens?: number },
+  ): Promise<T | null> {
+    if (!this.geminiClient) return null;
+    const fullPrompt = `${prompt}\n\nResponda APENAS com JSON valido (sem markdown, sem comentarios, sem texto extra).`;
+    const candidates = [...new Set([this.geminiActiveModelName, ...this.geminiCandidates])];
+    for (const name of candidates) {
+      const model = this.getGeminiModel(name);
+      if (!model) return null;
+      try {
+        const result = await model.generateContent({
+          contents: [
+            {
+              role: 'user',
+              parts: [{ text: fullPrompt }, { inlineData: { mimeType: document.mimeType, data: document.base64 } }],
+            },
+          ],
+          generationConfig: {
+            temperature: options?.temperature ?? 0.2,
+            maxOutputTokens: options?.maxOutputTokens ?? 1400,
+          },
+        });
+        const text = result.response.text();
+        if (name !== this.geminiActiveModelName) {
+          this.logger.warn(`Gemini alternou para o modelo reserva ${name}.`);
+          this.geminiActiveModelName = name;
+        }
+        return parseJsonResponse<T>(text, this.logger);
+      } catch (err: any) {
+        this.logger.error(`Falha Gemini generateJsonFromDocument (${name}): ${err?.message ?? err}`);
+      }
     }
+    return null;
+  }
+}
+
+function parseJsonResponse<T>(text: string, logger: Logger): T | null {
+  const cleaned = text
+    .trim()
+    .replace(/^```json\s*/i, '')
+    .replace(/^```\s*/, '')
+    .replace(/```\s*$/, '')
+    .trim();
+  try {
+    return JSON.parse(cleaned) as T;
+  } catch (err: any) {
+    logger.warn(`Resposta Gemini nao e JSON valido: ${err?.message ?? err}. Trecho: ${cleaned.slice(0, 200)}`);
+    return null;
   }
 }

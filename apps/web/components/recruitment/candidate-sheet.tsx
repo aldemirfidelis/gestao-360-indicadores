@@ -90,7 +90,7 @@ interface Admission {
 }
 export interface ApplicationDetail {
   id: string; status: string; appliedAt: string; currentStageId: string | null; coverLetter: string | null; score: number | null;
-  candidate: { id: string; name: string; email: string; phone: string | null; city: string | null; headline: string | null };
+  candidate: { id: string; name: string; email: string; phone: string | null; city: string | null; headline: string | null; tags?: string[] };
   posting: { id: string; title: string; slug: string };
   stage: { id: string; name: string; order: number } | null;
   documents: Array<{ id: string; kind: string; fileName: string; mimeType: string; sizeBytes: number; scanStatus: string; createdAt: string }>;
@@ -101,7 +101,7 @@ export interface ApplicationDetail {
   assessments?: Array<{ id: string; kind: string; title: string; status: string; score: number | null; dueAt: string | null; resultNotes?: string | null }>;
   aiAnalyses?: Array<{
     id: string; provider: string; model: string | null; promptVersion: string; summary: string; confidence: number | null; createdAt: string;
-    criteria?: unknown; evidence?: unknown; missingRequirements?: unknown; risks?: unknown; humanReviewRequired: boolean;
+    criteria?: unknown; evidence?: unknown; missingRequirements?: unknown; risks?: unknown; humanReviewRequired: boolean; resumeConsidered?: boolean;
   }>;
   offers?: Offer[];
   preAdmissions?: PreAdmission[];
@@ -182,6 +182,25 @@ export function CandidateSheet({
     },
     onError: (error: any) => toast.error(error?.message ?? 'Não foi possível concluir a ação.'),
   });
+
+  const [tagInput, setTagInput] = useState('');
+  const setTags = useMutation({
+    mutationFn: (tags: string[]) => api(`/recruitment/candidates/${detail?.candidate.id}/tags`, { method: 'POST', json: { tags } }),
+    onSuccess: refresh,
+    onError: (error: any) => toast.error(error?.message ?? 'Não foi possível salvar as tags.'),
+  });
+  function addTag() {
+    const value = tagInput.trim();
+    if (!value || !detail) return;
+    const current = detail.candidate.tags ?? [];
+    if (current.includes(value)) { setTagInput(''); return; }
+    setTags.mutate([...current, value]);
+    setTagInput('');
+  }
+  function removeTag(tag: string) {
+    if (!detail) return;
+    setTags.mutate((detail.candidate.tags ?? []).filter((t) => t !== tag));
+  }
 
   const moveApplication = useMutation({ mutationFn: (toStageId: string) => call(`/recruitment/applications/${applicationId}/move`, { toStageId }), ...mutate('Candidato movido de etapa.') });
   const rejectApplication = useMutation({ mutationFn: (reason: string) => call(`/recruitment/applications/${applicationId}/reject`, { reason }), ...mutate('Candidatura rejeitada.') });
@@ -352,6 +371,28 @@ export function CandidateSheet({
                 </div>
                 <div className="text-xs text-muted-foreground">
                   {[detail.candidate.email, detail.candidate.phone, detail.candidate.city, detail.candidate.headline].filter(Boolean).join(' · ')}
+                </div>
+                <div className="mt-1.5 flex flex-wrap items-center gap-1.5">
+                  {(detail.candidate.tags ?? []).map((tag) => (
+                    <Badge key={tag} variant="outline" className="gap-1 text-[10px]">
+                      {tag}
+                      {canManage && (
+                        <button type="button" onClick={() => removeTag(tag)} aria-label={`Remover tag ${tag}`} className="text-muted-foreground hover:text-foreground">
+                          <XCircle className="h-3 w-3" />
+                        </button>
+                      )}
+                    </Badge>
+                  ))}
+                  {canManage && (
+                    <Input
+                      value={tagInput}
+                      onChange={(e) => setTagInput(e.target.value)}
+                      onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); addTag(); } }}
+                      onBlur={addTag}
+                      placeholder="+ tag"
+                      className="h-6 w-24 border-dashed px-2 text-[10px]"
+                    />
+                  )}
                 </div>
                 <div className="mt-2 flex flex-wrap items-center gap-2">
                   <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
@@ -549,6 +590,7 @@ export function CandidateSheet({
                       <div key={analysis.id} className="rounded-md bg-muted/40 p-2 text-xs">
                         <div className="flex flex-wrap items-center gap-1">
                           <Badge variant="outline" className="text-[8px]">{analysis.provider}{analysis.model ? `/${analysis.model}` : ''}</Badge>
+                          {analysis.resumeConsidered && <Badge variant="outline" className="text-[8px] text-status-blue">leu o currículo anexado</Badge>}
                           {analysis.humanReviewRequired && <Badge variant="outline" className="text-[8px] text-status-yellow">requer revisão humana</Badge>}
                           {typeof analysis.confidence === 'number' && (
                             <span className="ml-auto text-[10px] text-muted-foreground">confiança {Math.round(analysis.confidence * 100)}%</span>

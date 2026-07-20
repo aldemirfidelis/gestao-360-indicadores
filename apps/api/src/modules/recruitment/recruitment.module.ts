@@ -19,6 +19,7 @@ import { RecruitAdmissionService } from './recruit-admission.service';
 import { RecruitLgpdService } from './recruit-lgpd.service';
 import { RecruitCommunicationService } from './recruit-communication.service';
 import { RecruitAnalyticsService } from './recruit-analytics.service';
+import { RecruitTalentPoolService } from './recruit-talent-pool.service';
 import { CandidateGuard } from './candidate.guard';
 
 /**
@@ -42,6 +43,7 @@ import { CandidateGuard } from './candidate.guard';
     RecruitLgpdService,
     RecruitCommunicationService,
     RecruitAnalyticsService,
+    RecruitTalentPoolService,
     CandidateGuard,
   ],
   exports: [RecruitRequisitionService, RecruitPostingService, RecruitApplicationService, RecruitEvaluationService, RecruitOfferService, RecruitOccupationalHealthService, RecruitAdmissionService, RecruitLgpdService, RecruitCommunicationService],

@@ -14133,6 +14133,10 @@ model RecruitCandidate {
   linkedinUrl     String?
   portfolioUrl    String?
   profileData     Json? // experiências/formação/skills estruturados
+  /// Tags atribuídas por recrutadores (skills, categorização) — buscável no banco de talentos.
+  /// Como o candidato é global, tags de uma empresa ficam visíveis só a quem tem candidatura
+  /// vinculada dele (RecruitTalentPoolService.search escopa por RecruitApplication.companyId).
+  tags            String[]  @default([])
   emailVerifiedAt DateTime?
   status          String    @default("ACTIVE") // ACTIVE | ANONYMIZED | BLOCKED
   lastLoginAt     DateTime?
@@ -14473,6 +14477,8 @@ model RecruitAiAnalysis {
   summary             String
   confidence          Float?
   humanReviewRequired Boolean            @default(true)
+  /// true quando o modelo leu o arquivo do currículo (multimodal), não só texto digitado.
+  resumeConsidered    Boolean            @default(false)
   reviewedAt          DateTime?
   reviewedById        String?
   humanDecision       String?

@@ -2,7 +2,7 @@
 
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { BarChart3, Briefcase, ClipboardCheck, Mail, ShieldCheck, UserPlus, type LucideIcon } from 'lucide-react';
+import { BarChart3, Briefcase, ClipboardCheck, Mail, ShieldCheck, UserPlus, Users, type LucideIcon } from 'lucide-react';
 import { useAuth } from '@/components/auth/auth-provider';
 import { cn } from '@/lib/utils';
 
@@ -27,6 +27,12 @@ const items: ModuleItem[] = [
     href: '/recrutamento/vagas',
     icon: Briefcase,
     permissions: ['recruit:view', 'recruit:offer:approve', 'recruit:prehire', 'recruit:admit', 'recruit:manage', 'saude:occupational'],
+  },
+  {
+    label: 'Banco de talentos',
+    href: '/recrutamento/talentos',
+    icon: Users,
+    permissions: ['recruit:view', 'recruit:manage'],
   },
   {
     label: 'Análises',

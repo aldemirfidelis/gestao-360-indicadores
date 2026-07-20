@@ -1,9 +1,10 @@
-import { BadRequestException, ConflictException, Injectable, NotFoundException } from '@nestjs/common';
+import { BadRequestException, ConflictException, Injectable, Logger, NotFoundException } from '@nestjs/common';
 import { NotificationKind, Prisma } from '@prisma/client';
 import { PrismaService } from '../../prisma/prisma.service';
 import { AuditWriterService } from '../../common/audit/audit-writer.service';
 import { NotificationsService } from '../notifications/notifications.service';
 import { GeminiService } from '../ai/gemini.service';
+import { DocumentStorageService } from '../documents/document-storage.service';
 import { AuthPayload } from '../auth/auth.types';
 import { RecruitCareersService } from './recruit-careers.service';
 import { RecruitCommunicationService, resolveCompanyDisplayName } from './recruit-communication.service';
@@ -18,6 +19,8 @@ const PROMPT_VERSION = 'recruit-triage-v1-2026-07-15';
 
 @Injectable()
 export class RecruitEvaluationService {
+  private readonly logger = new Logger(RecruitEvaluationService.name);
+
   constructor(
     private readonly prisma: PrismaService,
     private readonly audit: AuditWriterService,
@@ -25,6 +28,7 @@ export class RecruitEvaluationService {
     private readonly gemini: GeminiService,
     private readonly careers: RecruitCareersService,
     private readonly communication: RecruitCommunicationService,
+    private readonly storage: DocumentStorageService,
   ) {}
 
   // ------------------------------ public screening ------------------------------
@@ -330,7 +334,9 @@ export class RecruitEvaluationService {
       criteria: criteria.map((c) => ({ name: c.name, description: c.description })),
       screening,
     });
-    const ai = await this.generateAiTriage(app, criteria, questions, answers, screening).catch(() => null);
+    const resume = await this.fetchLatestResume(app.candidateId);
+    const triage = await this.generateAiTriage(app, criteria, questions, answers, screening, resume).catch(() => null);
+    const ai = triage?.result ?? null;
     const result = ai ?? fallback;
     const analysis = await this.prisma.recruitAiAnalysis.create({
       data: {
@@ -346,6 +352,7 @@ export class RecruitEvaluationService {
         summary: result.summary,
         confidence: result.confidence,
         humanReviewRequired: true,
+        resumeConsidered: Boolean(ai && triage?.resumeConsidered),
         createdById: me.sub,
       },
     });
@@ -450,18 +457,34 @@ export class RecruitEvaluationService {
     });
   }
 
-  private async generateAiTriage(app: any, criteria: Array<{ name: string; description: string | null }>, questions: any[], answers: any[], screening: any) {
+  /** Busca o currículo mais recente do candidato, se houver e for um formato que o Gemini lê nativamente (PDF/imagem — DOC/DOCX não). */
+  private async fetchLatestResume(candidateId: string): Promise<{ mimeType: string; base64: string } | null> {
+    const doc = await this.prisma.recruitCandidateDocument.findFirst({
+      where: { candidateId, kind: 'CV', deletedAt: null, mimeType: { in: GEMINI_READABLE_MIME } },
+      orderBy: { createdAt: 'desc' },
+    });
+    if (!doc) return null;
+    try {
+      const buffer = await this.storage.readBinary(doc.storageKey);
+      return { mimeType: doc.mimeType, base64: buffer.toString('base64') };
+    } catch (err: any) {
+      this.logger.warn(`Falha ao ler currículo para triagem por IA (${doc.id}): ${err?.message ?? err}`);
+      return null;
+    }
+  }
+
+  private async generateAiTriage(
+    app: any,
+    criteria: Array<{ name: string; description: string | null }>,
+    questions: any[],
+    answers: any[],
+    screening: any,
+    resume: { mimeType: string; base64: string } | null,
+  ): Promise<{ result: { summary: string; criteria: unknown[]; evidence: unknown[]; missingRequirements: unknown[]; risks: unknown[]; confidence: number }; resumeConsidered: boolean } | null> {
     if (!this.gemini.isEnabled) return null;
-    return this.gemini.generateJson<{
-      summary: string;
-      criteria: unknown[];
-      evidence: unknown[];
-      missingRequirements: unknown[];
-      risks: unknown[];
-      confidence: number;
-    }>(`
-Voce e um assistente de recrutamento. Analise somente requisitos objetivos da vaga e evidencias textuais fornecidas.
-Nao use ou infira idade, raca, genero, religiao, saude, gravidez, orientacao sexual, foto ou qualquer atributo sensivel.
+    const prompt = `
+Voce e um assistente de recrutamento. Analise somente requisitos objetivos da vaga e evidencias textuais fornecidas${resume ? ' e o currículo anexado' : ''}.
+Nao use ou infira idade, raca, genero, religiao, saude, gravidez, orientacao sexual, foto ou qualquer atributo sensivel — mesmo que apareçam no currículo.
 Nao aprove nem rejeite o candidato. A decisao humana e obrigatoria.
 
 Vaga: ${app.posting.title}
@@ -471,11 +494,26 @@ Perguntas: ${JSON.stringify(questions.map((q) => ({ id: q.id, question: q.questi
 Respostas: ${JSON.stringify(answers.map((a) => ({ questionId: a.questionId, answer: a.answer }))).slice(0, 3000)}
 Texto do candidato: ${[app.candidate.headline, app.coverLetter].filter(Boolean).join('\n').slice(0, 3000)}
 Resultado deterministico: ${JSON.stringify(screening)}
+${resume ? '\nO currículo do candidato está anexado a esta mensagem — leia-o e use-o como evidência adicional (experiência, formação, habilidades).' : ''}
 
 Retorne JSON com: summary, criteria (array), evidence (array), missingRequirements (array), risks (array), confidence (0 a 1).
-`, { temperature: 0.2, maxOutputTokens: 1400 });
+`;
+    if (resume) {
+      const withResume = await this.gemini.generateJsonFromDocument<{
+        summary: string; criteria: unknown[]; evidence: unknown[]; missingRequirements: unknown[]; risks: unknown[]; confidence: number;
+      }>(prompt, resume, { temperature: 0.2, maxOutputTokens: 1400 });
+      if (withResume) return { result: withResume, resumeConsidered: true };
+      // Falhou (ex.: modelo sem suporte multimodal no momento) — cai no texto-only abaixo.
+    }
+    const textOnly = await this.gemini.generateJson<{
+      summary: string; criteria: unknown[]; evidence: unknown[]; missingRequirements: unknown[]; risks: unknown[]; confidence: number;
+    }>(prompt, { temperature: 0.2, maxOutputTokens: 1400 });
+    return textOnly ? { result: textOnly, resumeConsidered: false } : null;
   }
 }
+
+/** Mimetypes que o Gemini lê nativamente como entrada multimodal (PDF/imagem). DOC/DOCX caem no texto-only. */
+const GEMINI_READABLE_MIME = ['application/pdf', 'image/png', 'image/jpeg'];
 
 function text(value: unknown): string | null {
   const t = String(value ?? '').trim();

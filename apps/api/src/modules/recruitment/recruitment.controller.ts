@@ -12,6 +12,7 @@ import { RecruitAdmissionService } from './recruit-admission.service';
 import { RecruitLgpdService } from './recruit-lgpd.service';
 import { RecruitCommunicationService } from './recruit-communication.service';
 import { RecruitAnalyticsService } from './recruit-analytics.service';
+import { RecruitTalentPoolService } from './recruit-talent-pool.service';
 
 /**
  * Recrutamento e Seleção (F1-F2). Rotas autenticadas /api/recruitment/*.
@@ -30,6 +31,7 @@ export class RecruitmentController {
     private readonly lgpd: RecruitLgpdService,
     private readonly communication: RecruitCommunicationService,
     private readonly analytics: RecruitAnalyticsService,
+    private readonly talentPool: RecruitTalentPoolService,
   ) {}
 
   // ------------------------------ analytics ------------------------------
@@ -38,6 +40,31 @@ export class RecruitmentController {
   @RequirePermissions('recruit:view')
   getAnalyticsFunnel(@CurrentUser() me: AuthPayload, @Query('from') from?: string, @Query('to') to?: string) {
     return this.analytics.getFunnel(me, { from, to });
+  }
+
+  // ------------------------------ banco de talentos ------------------------------
+
+  @Get('candidates')
+  @RequirePermissions('recruit:view')
+  searchCandidates(
+    @CurrentUser() me: AuthPayload,
+    @Query('q') q?: string,
+    @Query('tag') tag?: string,
+    @Query('onlyAvailable') onlyAvailable?: string,
+  ) {
+    return this.talentPool.search(me, { q, tag, onlyAvailable: onlyAvailable === 'true' });
+  }
+
+  @Get('candidates/tags')
+  @RequirePermissions('recruit:view')
+  listCandidateTags(@CurrentUser() me: AuthPayload) {
+    return this.talentPool.listTags(me);
+  }
+
+  @Post('candidates/:id/tags')
+  @RequirePermissions('recruit:manage')
+  setCandidateTags(@CurrentUser() me: AuthPayload, @Param('id') id: string, @Body() body: any) {
+    return this.talentPool.setTags(me, id, body?.tags);
   }
 
   // ------------------------------ comunicação (templates de e-mail) ------------------------------
