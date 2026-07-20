@@ -88,10 +88,24 @@ interface Admission {
   esocialStatus: string; admissionDate: string; probationReviews?: ProbationReview[];
   employee?: { id: string; name: string; registrationId: string | null } | null;
 }
+interface CandidateProfessionalProfile {
+  about?: string;
+  availableForRelocation?: boolean;
+  availableForTravel?: boolean;
+  desiredSalary?: string;
+  availabilityToStart?: string;
+  skills?: string[];
+  experiences?: Array<{ role?: string; company?: string; period?: string; description?: string }>;
+  education?: Array<{ course?: string; institution?: string; period?: string; status?: string }>;
+  languages?: Array<{ name?: string; level?: string }>;
+}
 export interface ApplicationDetail {
   id: string; status: string; appliedAt: string; currentStageId: string | null; coverLetter: string | null; score: number | null;
   referrerName?: string | null;
-  candidate: { id: string; name: string; email: string; phone: string | null; city: string | null; headline: string | null; tags?: string[] };
+  candidate: {
+    id: string; name: string; email: string; phone: string | null; city: string | null; headline: string | null;
+    linkedinUrl?: string | null; portfolioUrl?: string | null; profileData?: CandidateProfessionalProfile | null; tags?: string[];
+  };
   posting: { id: string; title: string; slug: string };
   stage: { id: string; name: string; order: number } | null;
   documents: Array<{ id: string; kind: string; fileName: string; mimeType: string; sizeBytes: number; scanStatus: string; createdAt: string }>;
@@ -459,6 +473,10 @@ export function CandidateSheet({
                     <p className="whitespace-pre-wrap rounded-md bg-muted/40 p-3 text-xs">{detail.coverLetter}</p>
                   </Section>
                 )}
+
+                <Section icon={UserCheck} title="Perfil profissional">
+                  <CandidateProfessionalProfileView candidate={detail.candidate} />
+                </Section>
 
                 <Section icon={ClipboardList} title="Triagem (respostas da candidatura)">
                   {(detail.screeningAnswers ?? []).length === 0 ? (
@@ -1137,6 +1155,88 @@ export function CandidateSheet({
       </Dialog>
     </>
   );
+}
+
+function CandidateProfessionalProfileView({ candidate }: { candidate: ApplicationDetail['candidate'] }) {
+  const profile = candidate.profileData ?? {};
+  const skills = Array.isArray(profile.skills) ? profile.skills : [];
+  const experiences = Array.isArray(profile.experiences) ? profile.experiences : [];
+  const education = Array.isArray(profile.education) ? profile.education : [];
+  const languages = Array.isArray(profile.languages) ? profile.languages : [];
+  const hasStructuredData = Boolean(
+    profile.about || skills.length || experiences.length || education.length || languages.length || profile.desiredSalary || profile.availabilityToStart
+    || typeof profile.availableForRelocation === 'boolean' || typeof profile.availableForTravel === 'boolean',
+  );
+
+  return (
+    <div className="space-y-3 text-xs">
+      {(candidate.linkedinUrl || candidate.portfolioUrl) && (
+        <div className="flex flex-wrap gap-2">
+          {candidate.linkedinUrl && <SafeProfileLink label="LinkedIn" value={candidate.linkedinUrl} />}
+          {candidate.portfolioUrl && <SafeProfileLink label="Portfólio" value={candidate.portfolioUrl} />}
+        </div>
+      )}
+      {!hasStructuredData && <p className="text-muted-foreground">O candidato ainda não preencheu o perfil profissional estruturado.</p>}
+      {profile.about && <p className="whitespace-pre-wrap rounded-md bg-muted/40 p-3">{profile.about}</p>}
+      {skills.length > 0 && (
+        <div>
+          <div className="mb-1 text-[10px] font-semibold uppercase text-muted-foreground">Habilidades</div>
+          <div className="flex flex-wrap gap-1">{skills.map((skill) => <Badge key={skill} variant="outline" className="text-[10px]">{skill}</Badge>)}</div>
+        </div>
+      )}
+      {(profile.availabilityToStart || profile.desiredSalary || typeof profile.availableForRelocation === 'boolean' || typeof profile.availableForTravel === 'boolean') && (
+        <div className="grid gap-2 rounded-md border p-3 sm:grid-cols-2">
+          {profile.availabilityToStart && <ProfileValue label="Disponibilidade para iniciar" value={profile.availabilityToStart} />}
+          {profile.desiredSalary && <ProfileValue label="Pretensão salarial" value={profile.desiredSalary} />}
+          {typeof profile.availableForRelocation === 'boolean' && <ProfileValue label="Disponibilidade para mudança" value={profile.availableForRelocation ? 'Sim' : 'Não'} />}
+          {typeof profile.availableForTravel === 'boolean' && <ProfileValue label="Disponibilidade para viagens" value={profile.availableForTravel ? 'Sim' : 'Não'} />}
+        </div>
+      )}
+      {experiences.length > 0 && (
+        <ProfileCollection title="Experiência">
+          {experiences.map((item, index) => (
+            <div key={`experience-${index}`} className="rounded-md border p-2.5">
+              <div className="font-medium">{[item.role, item.company].filter(Boolean).join(' · ') || 'Experiência profissional'}</div>
+              {item.period && <div className="text-[10px] text-muted-foreground">{item.period}</div>}
+              {item.description && <p className="mt-1 whitespace-pre-wrap text-muted-foreground">{item.description}</p>}
+            </div>
+          ))}
+        </ProfileCollection>
+      )}
+      {education.length > 0 && (
+        <ProfileCollection title="Formação">
+          {education.map((item, index) => (
+            <div key={`education-${index}`} className="rounded-md border p-2.5">
+              <div className="font-medium">{[item.course, item.institution].filter(Boolean).join(' · ') || 'Formação'}</div>
+              {(item.period || item.status) && <div className="text-[10px] text-muted-foreground">{[item.period, item.status].filter(Boolean).join(' · ')}</div>}
+            </div>
+          ))}
+        </ProfileCollection>
+      )}
+      {languages.length > 0 && (
+        <div>
+          <div className="mb-1 text-[10px] font-semibold uppercase text-muted-foreground">Idiomas</div>
+          <div className="flex flex-wrap gap-1">
+            {languages.map((item, index) => <Badge key={`${item.name}-${index}`} variant="outline" className="text-[10px]">{[item.name, item.level].filter(Boolean).join(' · ')}</Badge>)}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function SafeProfileLink({ label, value }: { label: string; value: string }) {
+  const href = /^https?:\/\//i.test(value) ? value : null;
+  if (!href) return <span className="rounded-md border px-2 py-1 text-muted-foreground">{label}: {value}</span>;
+  return <a href={href} target="_blank" rel="noreferrer" className="rounded-md border px-2 py-1 font-medium text-status-blue hover:underline">{label}</a>;
+}
+
+function ProfileValue({ label, value }: { label: string; value: string }) {
+  return <div><div className="text-[10px] font-semibold uppercase text-muted-foreground">{label}</div><div className="mt-0.5">{value}</div></div>;
+}
+
+function ProfileCollection({ title, children }: { title: string; children: React.ReactNode }) {
+  return <div><div className="mb-1 text-[10px] font-semibold uppercase text-muted-foreground">{title}</div><div className="space-y-1.5">{children}</div></div>;
 }
 
 function Section({ icon: Icon, title, actions, children }: { icon: typeof FileText; title: string; actions?: React.ReactNode; children: React.ReactNode }) {

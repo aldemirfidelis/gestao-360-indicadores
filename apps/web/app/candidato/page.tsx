@@ -24,7 +24,34 @@ interface Profile {
   city: string | null;
   linkedinUrl: string | null;
   portfolioUrl: string | null;
+  profileData: CandidateProfileData | null;
   emailVerifiedAt: string | null;
+}
+
+interface CandidateExperience { role: string; company: string; period: string; description: string }
+interface CandidateEducation { course: string; institution: string; period: string; status: string }
+interface CandidateLanguage { name: string; level: string }
+interface CandidateProfileData {
+  about?: string;
+  availableForRelocation?: boolean;
+  availableForTravel?: boolean;
+  desiredSalary?: string;
+  availabilityToStart?: string;
+  skills?: string[];
+  experiences?: Partial<CandidateExperience>[];
+  education?: Partial<CandidateEducation>[];
+  languages?: Partial<CandidateLanguage>[];
+}
+interface ProfessionalForm {
+  about: string;
+  availableForRelocation: boolean;
+  availableForTravel: boolean;
+  desiredSalary: string;
+  availabilityToStart: string;
+  skills: string;
+  experiences: CandidateExperience[];
+  education: CandidateEducation[];
+  languages: CandidateLanguage[];
 }
 
 interface Application {
@@ -89,6 +116,15 @@ const STATUS_LABEL: Record<string, string> = {
   DISQUALIFIED: 'Desclassificado',
 };
 
+const EMPTY_EXPERIENCE: CandidateExperience = { role: '', company: '', period: '', description: '' };
+const EMPTY_EDUCATION: CandidateEducation = { course: '', institution: '', period: '', status: '' };
+const EMPTY_LANGUAGE: CandidateLanguage = { name: '', level: '' };
+const EMPTY_PROFESSIONAL_FORM: ProfessionalForm = {
+  about: '', availableForRelocation: false, availableForTravel: false, desiredSalary: '', availabilityToStart: '', skills: '',
+  experiences: [], education: [], languages: [],
+};
+const MAX_UPLOAD_BYTES = 8 * 1024 * 1024;
+
 export default function CandidatePortalPage() {
   return (
     <Suspense fallback={<main className="min-h-screen bg-slate-50 px-4 py-8 text-sm text-slate-500 dark:bg-slate-950 dark:text-slate-300">Carregando area do candidato...</main>}>
@@ -109,6 +145,7 @@ function CandidatePortalContent() {
   const [authLoading, setAuthLoading] = useState(false);
   const [profile, setProfile] = useState<Profile | null>(null);
   const [profileForm, setProfileForm] = useState({ name: '', phone: '', headline: '', city: '', linkedinUrl: '', portfolioUrl: '' });
+  const [professionalForm, setProfessionalForm] = useState<ProfessionalForm>({ ...EMPTY_PROFESSIONAL_FORM });
   const [applications, setApplications] = useState<Application[]>([]);
   const [documents, setDocuments] = useState<CandidateDocument[]>([]);
   const [dataRequests, setDataRequests] = useState<DataRequest[]>([]);
@@ -149,6 +186,7 @@ function CandidatePortalContent() {
         linkedinUrl: me.linkedinUrl ?? '',
         portfolioUrl: me.portfolioUrl ?? '',
       });
+      setProfessionalForm(toProfessionalForm(me.profileData));
       setApplications(apps);
       setDocuments(docs);
       setDataRequests(requests);
@@ -236,8 +274,20 @@ function CandidatePortalContent() {
   async function saveProfile() {
     setBusy(true); setError(null);
     try {
-      const updated = await candidateApi<Profile>('/careers/candidate/me', { method: 'PATCH', json: profileForm });
+      const profileData: CandidateProfileData = {
+        about: professionalForm.about,
+        availableForRelocation: professionalForm.availableForRelocation,
+        availableForTravel: professionalForm.availableForTravel,
+        desiredSalary: professionalForm.desiredSalary,
+        availabilityToStart: professionalForm.availabilityToStart,
+        skills: splitSkills(professionalForm.skills),
+        experiences: professionalForm.experiences,
+        education: professionalForm.education,
+        languages: professionalForm.languages,
+      };
+      const updated = await candidateApi<Profile>('/careers/candidate/me', { method: 'PATCH', json: { ...profileForm, profileData } });
       setProfile(updated);
+      setProfessionalForm(toProfessionalForm(updated.profileData));
     } catch (e) {
       setError((e as Error).message);
     } finally {
@@ -269,7 +319,7 @@ function CandidatePortalContent() {
           kind: uploadForm.kind,
           applicationId: uploadForm.applicationId || undefined,
           fileName: file.name,
-          mimeType: file.type || 'application/octet-stream',
+          mimeType: uploadMimeType(file),
           contentBase64,
         },
       });
@@ -347,7 +397,20 @@ function CandidatePortalContent() {
   }
 
   function pickFile(event: ChangeEvent<HTMLInputElement>) {
-    setFile(event.target.files?.[0] ?? null);
+    const selected = event.target.files?.[0] ?? null;
+    if (!selected) {
+      setFile(null);
+      return;
+    }
+    const validationError = validateCandidateFile(selected);
+    if (validationError) {
+      setError(validationError);
+      setFile(null);
+      event.target.value = '';
+      return;
+    }
+    setError(null);
+    setFile(selected);
   }
 
   if (!token) {
@@ -445,7 +508,84 @@ function CandidatePortalContent() {
               <Input label="Cidade" value={profileForm.city} onChange={(value) => setProfileForm((f) => ({ ...f, city: value }))} />
               <Input label="LinkedIn" value={profileForm.linkedinUrl} onChange={(value) => setProfileForm((f) => ({ ...f, linkedinUrl: value }))} />
               <Input label="Portfolio" value={profileForm.portfolioUrl} onChange={(value) => setProfileForm((f) => ({ ...f, portfolioUrl: value }))} />
-              <button onClick={saveProfile} disabled={busy} className="w-full rounded-md bg-sky-600 px-4 py-2 text-sm font-semibold text-white hover:bg-sky-700 disabled:opacity-50">Salvar perfil</button>
+              <button onClick={saveProfile} disabled={busy} className="w-full rounded-md bg-sky-600 px-4 py-2 text-sm font-semibold text-white hover:bg-sky-700 disabled:opacity-50">Salvar todo o perfil</button>
+            </div>
+          </Panel>
+
+          <Panel title="Perfil profissional para triagem">
+            <div className="space-y-4">
+              <p className="rounded-md bg-sky-50 p-3 text-xs text-sky-800 dark:bg-sky-950/30 dark:text-sky-200">
+                Estas informações ajudam a empresa e a IA de apoio a comparar sua experiência com os requisitos da vaga. A decisão final é sempre humana.
+              </p>
+
+              <label className="block text-xs font-medium text-slate-500">
+                Sobre sua trajetória profissional
+                <textarea
+                  rows={4}
+                  maxLength={4000}
+                  value={professionalForm.about}
+                  onChange={(e) => setProfessionalForm((f) => ({ ...f, about: e.target.value }))}
+                  placeholder="Conte brevemente sua experiência, principais resultados e objetivo profissional."
+                  className="mt-1 w-full rounded-md border bg-white px-3 py-2 text-sm text-slate-900 outline-none focus:ring-2 focus:ring-sky-500 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100"
+                />
+              </label>
+              <Input label="Habilidades (separe por vírgulas)" value={professionalForm.skills} onChange={(value) => setProfessionalForm((f) => ({ ...f, skills: value }))} />
+              <div className="grid gap-3 sm:grid-cols-2">
+                <Input label="Disponibilidade para iniciar" value={professionalForm.availabilityToStart} onChange={(value) => setProfessionalForm((f) => ({ ...f, availabilityToStart: value }))} />
+                <Input label="Pretensão salarial (opcional)" value={professionalForm.desiredSalary} onChange={(value) => setProfessionalForm((f) => ({ ...f, desiredSalary: value }))} />
+              </div>
+              <div className="grid gap-2 text-xs sm:grid-cols-2">
+                <label className="flex items-center gap-2 rounded-md border p-3 dark:border-slate-700">
+                  <input type="checkbox" checked={professionalForm.availableForRelocation} onChange={(e) => setProfessionalForm((f) => ({ ...f, availableForRelocation: e.target.checked }))} />
+                  Disponibilidade para mudança
+                </label>
+                <label className="flex items-center gap-2 rounded-md border p-3 dark:border-slate-700">
+                  <input type="checkbox" checked={professionalForm.availableForTravel} onChange={(e) => setProfessionalForm((f) => ({ ...f, availableForTravel: e.target.checked }))} />
+                  Disponibilidade para viagens
+                </label>
+              </div>
+
+              <ProfileListHeader title="Experiências" onAdd={() => setProfessionalForm((f) => ({ ...f, experiences: [...f.experiences, { ...EMPTY_EXPERIENCE }] }))} />
+              {professionalForm.experiences.length === 0 && <EmptyProfileList text="Adicione seus cargos e experiências mais relevantes." />}
+              {professionalForm.experiences.map((item, index) => (
+                <ProfileItem key={`experience-${index}`} onRemove={() => setProfessionalForm((f) => ({ ...f, experiences: f.experiences.filter((_, i) => i !== index) }))}>
+                  <div className="grid gap-2 sm:grid-cols-2">
+                    <Input label="Cargo / função" value={item.role} onChange={(value) => setProfessionalForm((f) => ({ ...f, experiences: updateAt(f.experiences, index, { role: value }) }))} />
+                    <Input label="Empresa" value={item.company} onChange={(value) => setProfessionalForm((f) => ({ ...f, experiences: updateAt(f.experiences, index, { company: value }) }))} />
+                  </div>
+                  <Input label="Período" value={item.period} onChange={(value) => setProfessionalForm((f) => ({ ...f, experiences: updateAt(f.experiences, index, { period: value }) }))} />
+                  <label className="block text-xs font-medium text-slate-500">
+                    Atividades e resultados
+                    <textarea rows={3} maxLength={4000} value={item.description} onChange={(e) => setProfessionalForm((f) => ({ ...f, experiences: updateAt(f.experiences, index, { description: e.target.value }) }))} className="mt-1 w-full rounded-md border bg-white px-3 py-2 text-sm text-slate-900 outline-none focus:ring-2 focus:ring-sky-500 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100" />
+                  </label>
+                </ProfileItem>
+              ))}
+
+              <ProfileListHeader title="Formação" onAdd={() => setProfessionalForm((f) => ({ ...f, education: [...f.education, { ...EMPTY_EDUCATION }] }))} />
+              {professionalForm.education.length === 0 && <EmptyProfileList text="Adicione cursos técnicos, graduação, pós-graduação ou outras formações relevantes." />}
+              {professionalForm.education.map((item, index) => (
+                <ProfileItem key={`education-${index}`} onRemove={() => setProfessionalForm((f) => ({ ...f, education: f.education.filter((_, i) => i !== index) }))}>
+                  <div className="grid gap-2 sm:grid-cols-2">
+                    <Input label="Curso" value={item.course} onChange={(value) => setProfessionalForm((f) => ({ ...f, education: updateAt(f.education, index, { course: value }) }))} />
+                    <Input label="Instituição" value={item.institution} onChange={(value) => setProfessionalForm((f) => ({ ...f, education: updateAt(f.education, index, { institution: value }) }))} />
+                    <Input label="Período" value={item.period} onChange={(value) => setProfessionalForm((f) => ({ ...f, education: updateAt(f.education, index, { period: value }) }))} />
+                    <Input label="Situação" value={item.status} onChange={(value) => setProfessionalForm((f) => ({ ...f, education: updateAt(f.education, index, { status: value }) }))} />
+                  </div>
+                </ProfileItem>
+              ))}
+
+              <ProfileListHeader title="Idiomas" onAdd={() => setProfessionalForm((f) => ({ ...f, languages: [...f.languages, { ...EMPTY_LANGUAGE }] }))} />
+              {professionalForm.languages.length === 0 && <EmptyProfileList text="Informe idiomas e o nível de domínio." />}
+              {professionalForm.languages.map((item, index) => (
+                <ProfileItem key={`language-${index}`} onRemove={() => setProfessionalForm((f) => ({ ...f, languages: f.languages.filter((_, i) => i !== index) }))}>
+                  <div className="grid gap-2 sm:grid-cols-2">
+                    <Input label="Idioma" value={item.name} onChange={(value) => setProfessionalForm((f) => ({ ...f, languages: updateAt(f.languages, index, { name: value }) }))} />
+                    <Input label="Nível" value={item.level} onChange={(value) => setProfessionalForm((f) => ({ ...f, languages: updateAt(f.languages, index, { level: value }) }))} />
+                  </div>
+                </ProfileItem>
+              ))}
+
+              <button onClick={saveProfile} disabled={busy} className="w-full rounded-md bg-sky-600 px-4 py-2 text-sm font-semibold text-white hover:bg-sky-700 disabled:opacity-50">Salvar todo o perfil</button>
             </div>
           </Panel>
 
@@ -479,8 +619,11 @@ function CandidatePortalContent() {
           </Panel>
 
           <div id="docs">
-          <Panel title="Documentos">
+          <Panel title="Currículo e documentos">
             <div className="space-y-3">
+              <p className="rounded-md bg-slate-50 p-3 text-xs text-slate-600 dark:bg-slate-950 dark:text-slate-300">
+                Currículos: PDF, DOC ou DOCX. Outros documentos também podem ser PNG ou JPG. Tamanho máximo: 8 MB por arquivo.
+              </p>
               <select value={uploadForm.kind} onChange={(e) => setUploadForm((f) => ({ ...f, kind: e.target.value }))} className="h-10 w-full rounded-md border bg-white px-3 text-sm dark:border-slate-700 dark:bg-slate-950">
                 <option value="CV">Curriculo</option>
                 <option value="COVER">Carta</option>
@@ -494,7 +637,7 @@ function CandidatePortalContent() {
               </select>
               <label className="flex cursor-pointer items-center gap-2 rounded-md border border-dashed px-3 py-3 text-sm text-slate-600 dark:border-slate-700 dark:text-slate-300">
                 <FileUp className="h-4 w-4" />
-                <span className="min-w-0 flex-1 truncate">{file ? file.name : 'Selecionar arquivo'}</span>
+                <span className="min-w-0 flex-1 truncate">{file ? `${file.name} (${formatBytes(file.size)})` : 'Selecionar arquivo (máx. 8 MB)'}</span>
                 <input type="file" accept=".pdf,.doc,.docx,.png,.jpg,.jpeg" className="hidden" onChange={pickFile} />
               </label>
               <button onClick={uploadDocument} disabled={busy || !file} className="w-full rounded-md border px-4 py-2 text-sm font-semibold hover:bg-slate-50 disabled:opacity-50 dark:border-slate-700 dark:hover:bg-slate-800">Enviar documento</button>
@@ -654,6 +797,32 @@ function Panel({ title, children }: { title: string; children: ReactNode }) {
   );
 }
 
+function ProfileListHeader({ title, onAdd }: { title: string; onAdd: () => void }) {
+  return (
+    <div className="flex items-center justify-between gap-3 border-t pt-4 dark:border-slate-800">
+      <h3 className="text-xs font-bold uppercase text-slate-500">{title}</h3>
+      <button type="button" onClick={onAdd} className="rounded-md border px-2.5 py-1.5 text-xs font-semibold hover:bg-slate-50 dark:border-slate-700 dark:hover:bg-slate-800">+ Adicionar</button>
+    </div>
+  );
+}
+
+function ProfileItem({ children, onRemove }: { children: ReactNode; onRemove: () => void }) {
+  return (
+    <div className="space-y-2 rounded-md border p-3 dark:border-slate-700">
+      <div className="flex justify-end">
+        <button type="button" onClick={onRemove} className="inline-flex items-center gap-1 text-xs font-semibold text-rose-600 hover:underline">
+          <Trash2 className="h-3.5 w-3.5" /> Remover
+        </button>
+      </div>
+      {children}
+    </div>
+  );
+}
+
+function EmptyProfileList({ text }: { text: string }) {
+  return <p className="rounded-md border border-dashed p-3 text-xs text-slate-400 dark:border-slate-700">{text}</p>;
+}
+
 function Input({ label, value, onChange, type = 'text' }: { label: string; value: string; onChange: (value: string) => void; type?: string }) {
   return (
     <label className="block text-xs font-medium text-slate-500">
@@ -666,6 +835,55 @@ function Input({ label, value, onChange, type = 'text' }: { label: string; value
       />
     </label>
   );
+}
+
+function updateAt<T extends object>(items: T[], index: number, patch: Partial<T>): T[] {
+  return items.map((item, itemIndex) => itemIndex === index ? { ...item, ...patch } : item);
+}
+
+function toProfessionalForm(data: CandidateProfileData | null | undefined): ProfessionalForm {
+  const value = data ?? {};
+  return {
+    about: String(value.about ?? ''),
+    availableForRelocation: value.availableForRelocation === true,
+    availableForTravel: value.availableForTravel === true,
+    desiredSalary: String(value.desiredSalary ?? ''),
+    availabilityToStart: String(value.availabilityToStart ?? ''),
+    skills: Array.isArray(value.skills) ? value.skills.join(', ') : '',
+    experiences: Array.isArray(value.experiences) ? value.experiences.map((item) => ({
+      role: String(item.role ?? ''), company: String(item.company ?? ''), period: String(item.period ?? ''), description: String(item.description ?? ''),
+    })) : [],
+    education: Array.isArray(value.education) ? value.education.map((item) => ({
+      course: String(item.course ?? ''), institution: String(item.institution ?? ''), period: String(item.period ?? ''), status: String(item.status ?? ''),
+    })) : [],
+    languages: Array.isArray(value.languages) ? value.languages.map((item) => ({ name: String(item.name ?? ''), level: String(item.level ?? '') })) : [],
+  };
+}
+
+function splitSkills(value: string): string[] {
+  return [...new Set(value.split(/[,;\n]/).map((item) => item.trim()).filter(Boolean))].slice(0, 30);
+}
+
+const UPLOAD_MIME_BY_EXTENSION: Record<string, string> = {
+  pdf: 'application/pdf',
+  doc: 'application/msword',
+  docx: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+  png: 'image/png',
+  jpg: 'image/jpeg',
+  jpeg: 'image/jpeg',
+};
+
+function uploadMimeType(file: File): string {
+  const extension = file.name.split('.').pop()?.toLowerCase() ?? '';
+  return UPLOAD_MIME_BY_EXTENSION[extension] ?? file.type;
+}
+
+function validateCandidateFile(file: File): string | null {
+  const mimeType = uploadMimeType(file);
+  if (!Object.values(UPLOAD_MIME_BY_EXTENSION).includes(mimeType)) return 'Tipo de arquivo não permitido. Envie PDF, DOC, DOCX, PNG ou JPG.';
+  if (file.size <= 0) return 'O arquivo selecionado está vazio.';
+  if (file.size > MAX_UPLOAD_BYTES) return 'O arquivo ultrapassa o limite de 8 MB.';
+  return null;
 }
 
 async function fileToBase64(file: File): Promise<string> {

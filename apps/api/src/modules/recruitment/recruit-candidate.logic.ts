@@ -77,3 +77,92 @@ export function safeFileName(name: string): string {
     .slice(0, 140);
   return base || 'arquivo';
 }
+
+// ------------------------------ perfil estruturado do candidato ------------------------------
+
+/** Perfil estruturado que o candidato preenche no portal — alimenta a triagem por IA e a visão do recrutador. */
+export interface CandidateProfileData {
+  about?: string;
+  availableForRelocation?: boolean;
+  availableForTravel?: boolean;
+  desiredSalary?: string;
+  availabilityToStart?: string;
+  skills?: string[];
+  experiences?: Array<{ role?: string; company?: string; period?: string; description?: string }>;
+  education?: Array<{ course?: string; institution?: string; period?: string; status?: string }>;
+  languages?: Array<{ name?: string; level?: string }>;
+}
+
+const PROFILE_MAX_LIST = 30;
+const PROFILE_MAX_LONG = 4000;
+const PROFILE_MAX_SHORT = 300;
+
+function clampProfileStr(v: unknown, max = PROFILE_MAX_SHORT): string | undefined {
+  if (!['string', 'number'].includes(typeof v)) return undefined;
+  const s = String(v ?? '').trim();
+  return s ? s.slice(0, max) : undefined;
+}
+
+/**
+ * Valida e limita o perfil estruturado vindo do candidato (defesa contra JSON gigante/hostil):
+ * só mantém as chaves conhecidas, corta strings e listas em limites sãos. Devolve `undefined`
+ * quando não há nada útil, para não gravar `{}`.
+ */
+export function normalizeCandidateProfileData(raw: unknown): CandidateProfileData | undefined {
+  if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return undefined;
+  const src = raw as Record<string, unknown>;
+  const out: CandidateProfileData = {};
+
+  const about = clampProfileStr(src.about, PROFILE_MAX_LONG);
+  if (about) out.about = about;
+  if (typeof src.availableForRelocation === 'boolean') out.availableForRelocation = src.availableForRelocation;
+  if (typeof src.availableForTravel === 'boolean') out.availableForTravel = src.availableForTravel;
+  const desiredSalary = clampProfileStr(src.desiredSalary);
+  if (desiredSalary) out.desiredSalary = desiredSalary;
+  const availabilityToStart = clampProfileStr(src.availabilityToStart);
+  if (availabilityToStart) out.availabilityToStart = availabilityToStart;
+
+  if (Array.isArray(src.skills)) {
+    const skills = [...new Set(src.skills.map((s) => clampProfileStr(s, 60)).filter((s): s is string => Boolean(s)))].slice(0, PROFILE_MAX_LIST);
+    if (skills.length) out.skills = skills;
+  }
+  if (Array.isArray(src.experiences)) {
+    const experiences = (src.experiences as any[]).slice(0, PROFILE_MAX_LIST)
+      .map((e) => ({ role: clampProfileStr(e?.role), company: clampProfileStr(e?.company), period: clampProfileStr(e?.period), description: clampProfileStr(e?.description, PROFILE_MAX_LONG) }))
+      .filter((e) => e.role || e.company || e.description);
+    if (experiences.length) out.experiences = experiences;
+  }
+  if (Array.isArray(src.education)) {
+    const education = (src.education as any[]).slice(0, PROFILE_MAX_LIST)
+      .map((e) => ({ course: clampProfileStr(e?.course), institution: clampProfileStr(e?.institution), period: clampProfileStr(e?.period), status: clampProfileStr(e?.status, 60) }))
+      .filter((e) => e.course || e.institution);
+    if (education.length) out.education = education;
+  }
+  if (Array.isArray(src.languages)) {
+    const languages = (src.languages as any[]).slice(0, PROFILE_MAX_LIST)
+      .map((l) => ({ name: clampProfileStr(l?.name, 60), level: clampProfileStr(l?.level, 60) }))
+      .filter((l) => l.name);
+    if (languages.length) out.languages = languages;
+  }
+
+  return Object.keys(out).length ? out : undefined;
+}
+
+/** Resumo em texto do perfil estruturado, para alimentar a triagem por IA e o fallback determinístico. */
+export function profileDataToText(raw: unknown): string {
+  const p = normalizeCandidateProfileData(raw);
+  if (!p) return '';
+  const parts: string[] = [];
+  if (p.about) parts.push(`Sobre: ${p.about}`);
+  if (p.skills?.length) parts.push(`Habilidades: ${p.skills.join(', ')}`);
+  if (p.experiences?.length) parts.push('Experiência: ' + p.experiences.map((e) => [e.role, e.company, e.period, e.description].filter(Boolean).join(' - ')).join(' | '));
+  if (p.education?.length) parts.push('Formação: ' + p.education.map((e) => [e.course, e.institution, e.period, e.status].filter(Boolean).join(' - ')).join(' | '));
+  if (p.languages?.length) parts.push('Idiomas: ' + p.languages.map((l) => [l.name, l.level].filter(Boolean).join(' ')).join(', '));
+  const availability: string[] = [];
+  if (p.availableForRelocation != null) availability.push(`mudança: ${p.availableForRelocation ? 'sim' : 'não'}`);
+  if (p.availableForTravel != null) availability.push(`viagens: ${p.availableForTravel ? 'sim' : 'não'}`);
+  if (p.availabilityToStart) availability.push(`início: ${p.availabilityToStart}`);
+  if (availability.length) parts.push(`Disponibilidade: ${availability.join(', ')}`);
+  if (p.desiredSalary) parts.push(`Pretensão salarial: ${p.desiredSalary}`);
+  return parts.join('\n');
+}

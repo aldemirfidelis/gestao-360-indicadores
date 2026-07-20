@@ -4,8 +4,10 @@ import {
   canWithdraw,
   isValidEmail,
   MAX_UPLOAD_BYTES,
+  normalizeCandidateProfileData,
   normalizeEmail,
   otpFromInt,
+  profileDataToText,
   safeFileName,
   validateUpload,
 } from './recruit-candidate.logic';
@@ -46,5 +48,57 @@ describe('recruit-candidate.logic', () => {
     expect(safeFileName('../../etc/passwd')).toBe('passwd');
     expect(safeFileName('C:\\Users\\a\\cv final.pdf')).toBe('cv-final.pdf');
     expect(safeFileName('')).toBe('arquivo');
+  });
+});
+
+describe('normalizeCandidateProfileData', () => {
+  it('devolve undefined para entrada não-objeto ou vazia', () => {
+    expect(normalizeCandidateProfileData(null)).toBeUndefined();
+    expect(normalizeCandidateProfileData('x')).toBeUndefined();
+    expect(normalizeCandidateProfileData([])).toBeUndefined();
+    expect(normalizeCandidateProfileData({})).toBeUndefined();
+    expect(normalizeCandidateProfileData({ irrelevante: 1 })).toBeUndefined();
+  });
+
+  it('mantém só as chaves conhecidas e filtra itens vazios', () => {
+    const out = normalizeCandidateProfileData({
+      about: '  Dev sênior  ',
+      availableForRelocation: true,
+      availableForTravel: false,
+      desiredSalary: 'R$ 8.000',
+      availabilityToStart: 'imediata',
+      skills: ['React', 'React', ' Node ', ''],
+      experiences: [{ role: 'Dev', company: 'Acme', period: '2020-2024', description: 'API' }, { role: '', company: '', description: '' }],
+      education: [{ course: 'ADS', institution: 'IF', period: '2018', status: 'concluído' }, {}],
+      languages: [{ name: 'Inglês', level: 'Avançado' }, { name: '' }],
+      hackeado: 'ignore-me',
+    });
+    expect(out).toEqual({
+      about: 'Dev sênior',
+      availableForRelocation: true,
+      availableForTravel: false,
+      desiredSalary: 'R$ 8.000',
+      availabilityToStart: 'imediata',
+      skills: ['React', 'Node'],
+      experiences: [{ role: 'Dev', company: 'Acme', period: '2020-2024', description: 'API' }],
+      education: [{ course: 'ADS', institution: 'IF', period: '2018', status: 'concluído' }],
+      languages: [{ name: 'Inglês', level: 'Avançado' }],
+    });
+    expect((out as any).hackeado).toBeUndefined();
+  });
+
+  it('limita o tamanho das listas', () => {
+    const many = Array.from({ length: 100 }, (_, i) => ({ role: `r${i}` }));
+    const out = normalizeCandidateProfileData({ experiences: many });
+    expect(out?.experiences?.length).toBe(30);
+  });
+
+  it('profileDataToText serializa em texto legível para a IA', () => {
+    const text = profileDataToText({ about: 'Dev', skills: ['React'], availableForTravel: true, availabilityToStart: '30 dias' });
+    expect(text).toContain('Sobre: Dev');
+    expect(text).toContain('Habilidades: React');
+    expect(text).toContain('viagens: sim');
+    expect(text).toContain('início: 30 dias');
+    expect(profileDataToText(null)).toBe('');
   });
 });

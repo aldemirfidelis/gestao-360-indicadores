@@ -5,11 +5,13 @@ import * as bcrypt from 'bcryptjs';
 import { PrismaService } from '../../prisma/prisma.service';
 import { buildTransport, resolveSmtpConfig, smtpFrom } from '../../common/smtp';
 import { RecruitCareersService } from './recruit-careers.service';
-import { isValidEmail, normalizeEmail, otpFromInt } from './recruit-candidate.logic';
+import { isValidEmail, normalizeCandidateProfileData, normalizeEmail, otpFromInt } from './recruit-candidate.logic';
 import { candidateJwtSecret, CANDIDATE_TOKEN_TTL, CandidateTokenPayload } from './recruit-candidate.token';
 
 const OTP_TTL_MS = 10 * 60 * 1000; // 10 min
 const OTP_MAX_ATTEMPTS = 5;
+/** Chaves do profileData que o candidato controla pelo formulário (o resto vem da admissão). */
+const CANDIDATE_PROFILE_KEYS = ['about', 'availableForRelocation', 'availableForTravel', 'desiredSalary', 'availabilityToStart', 'skills', 'experiences', 'education', 'languages'] as const;
 const isProd = () => process.env.NODE_ENV === 'production';
 
 /**
@@ -137,7 +139,16 @@ export class RecruitCandidateAuthService {
     for (const f of ['name', 'phone', 'headline', 'city', 'linkedinUrl', 'portfolioUrl'] as const) {
       if (f in body) data[f] = f === 'name' ? String(body[f] ?? '').trim() || undefined : text(body[f]);
     }
-    if ('profileData' in body && body.profileData && typeof body.profileData === 'object') data.profileData = body.profileData;
+    if ('profileData' in body) {
+      // Preserva chaves gravadas na admissão (ex.: cpf/birthDate) que o formulário do candidato
+      // não conhece. Remove as chaves que o candidato controla do objeto existente e sobrepõe o
+      // normalizado — assim limpar um campo do formulário realmente o apaga, sem perder o resto.
+      const current = await this.prisma.recruitCandidate.findUnique({ where: { id: candidateId }, select: { profileData: true } });
+      const existing = (current?.profileData && typeof current.profileData === 'object' && !Array.isArray(current.profileData) ? { ...(current.profileData as Record<string, unknown>) } : {}) as Record<string, unknown>;
+      for (const k of CANDIDATE_PROFILE_KEYS) delete existing[k];
+      const normalized = normalizeCandidateProfileData(body.profileData) ?? {};
+      data.profileData = { ...existing, ...normalized };
+    }
     await this.prisma.recruitCandidate.update({ where: { id: candidateId }, data });
     return this.me(candidateId);
   }
