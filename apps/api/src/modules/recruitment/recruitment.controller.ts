@@ -10,6 +10,7 @@ import { RecruitOfferService } from './recruit-offer.service';
 import { RecruitOccupationalHealthService } from './recruit-occupational-health.service';
 import { RecruitAdmissionService } from './recruit-admission.service';
 import { RecruitLgpdService } from './recruit-lgpd.service';
+import { RecruitCommunicationService } from './recruit-communication.service';
 
 /**
  * Recrutamento e Seleção (F1-F2). Rotas autenticadas /api/recruitment/*.
@@ -26,7 +27,28 @@ export class RecruitmentController {
     private readonly occupationalHealth: RecruitOccupationalHealthService,
     private readonly admissions: RecruitAdmissionService,
     private readonly lgpd: RecruitLgpdService,
+    private readonly communication: RecruitCommunicationService,
   ) {}
+
+  // ------------------------------ comunicação (templates de e-mail) ------------------------------
+
+  @Get('email-templates')
+  @RequirePermissions('recruit:manage')
+  listEmailTemplates(@CurrentUser() me: AuthPayload) {
+    return this.communication.listTemplates(me);
+  }
+
+  @Post('email-templates/:event')
+  @RequirePermissions('recruit:manage')
+  upsertEmailTemplate(@CurrentUser() me: AuthPayload, @Param('event') event: string, @Body() body: any) {
+    return this.communication.upsertTemplate(me, event, body);
+  }
+
+  @Post('email-templates/:event/reset')
+  @RequirePermissions('recruit:manage')
+  resetEmailTemplate(@CurrentUser() me: AuthPayload, @Param('event') event: string) {
+    return this.communication.resetTemplate(me, event);
+  }
 
   // ------------------------------ pipelines ------------------------------
 

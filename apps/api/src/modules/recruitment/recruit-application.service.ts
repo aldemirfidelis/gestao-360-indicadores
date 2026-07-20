@@ -6,6 +6,7 @@ import { DocumentStorageService } from '../documents/document-storage.service';
 import { AuthPayload } from '../auth/auth.types';
 import { CandidateContext } from './candidate.guard';
 import { RecruitCareersService } from './recruit-careers.service';
+import { RecruitCommunicationService, resolveCompanyDisplayName } from './recruit-communication.service';
 import { isPubliclyVisible } from './recruit-posting.logic';
 import { canRecruiterAct, canWithdraw, CONSENT_VERSION, safeFileName, validateUpload } from './recruit-candidate.logic';
 import { evaluateScreening } from './recruit-triage.logic';
@@ -25,6 +26,7 @@ export class RecruitApplicationService {
     private readonly audit: AuditWriterService,
     private readonly storage: DocumentStorageService,
     private readonly careers: RecruitCareersService,
+    private readonly communication: RecruitCommunicationService,
   ) {}
 
   // =============================== CANDIDATO ===============================
@@ -106,6 +108,11 @@ export class RecruitApplicationService {
           },
         },
       },
+    });
+    void this.communication.sendEvent(companyId, 'APPLICATION_RECEIVED', candidate.email, {
+      candidato: candidate.name,
+      vaga: posting.title,
+      empresa: company.tradeName ?? company.name,
     });
     return { id: application.id, status: application.status };
   }
@@ -280,6 +287,13 @@ export class RecruitApplicationService {
     await this.prisma.recruitApplication.update({ where: { id }, data: { currentStageId: toStageId } });
     await this.prisma.recruitApplicationEvent.create({ data: { companyId: me.companyId, applicationId: id, type: 'STAGE_MOVED', fromStageId: from, toStageId, actorType: 'USER', actorId: me.sub } });
     await this.audit.record(me, { module: MODULE, entity: 'RecruitApplication', entityId: id, action: 'STAGE_MOVED', message: `Candidatura movida para "${stage.name}"` });
+    const companyName = await resolveCompanyDisplayName(this.prisma, me.companyId);
+    void this.communication.sendEvent(me.companyId, 'STAGE_CHANGED', app.candidate.email, {
+      candidato: app.candidate.name,
+      vaga: posting.title,
+      empresa: companyName,
+      etapa: stage.name,
+    });
     return { ok: true };
   }
 
@@ -290,6 +304,14 @@ export class RecruitApplicationService {
     await this.prisma.recruitApplication.update({ where: { id }, data: { status: 'REJECTED', rejectedAt: new Date(), rejectionReason: text(reason) } });
     await this.prisma.recruitApplicationEvent.create({ data: { companyId: me.companyId, applicationId: id, type: 'REJECTED', note: text(reason), actorType: 'USER', actorId: me.sub } });
     await this.audit.record(me, { module: MODULE, entity: 'RecruitApplication', entityId: id, action: 'REJECTED', message: `Candidatura rejeitada${reason ? `: ${reason}` : ''}` });
+    const posting = await this.postingOrFail(me.companyId, app.postingId);
+    const companyName = await resolveCompanyDisplayName(this.prisma, me.companyId);
+    void this.communication.sendEvent(me.companyId, 'REJECTED', app.candidate.email, {
+      candidato: app.candidate.name,
+      vaga: posting.title,
+      empresa: companyName,
+      motivo: '',
+    });
     return { ok: true };
   }
 
@@ -323,7 +345,10 @@ export class RecruitApplicationService {
   }
 
   private async getOwnedApp(companyId: string, id: string) {
-    const app = await this.prisma.recruitApplication.findFirst({ where: { id, companyId } });
+    const app = await this.prisma.recruitApplication.findFirst({
+      where: { id, companyId },
+      include: { candidate: { select: { name: true, email: true } } },
+    });
     if (!app) throw new NotFoundException('Candidatura não encontrada.');
     return app;
   }

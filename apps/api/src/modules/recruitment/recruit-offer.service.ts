@@ -2,10 +2,10 @@ import { BadRequestException, ConflictException, Injectable, NotFoundException }
 import { Prisma } from '@prisma/client';
 import { PrismaService } from '../../prisma/prisma.service';
 import { AuditWriterService } from '../../common/audit/audit-writer.service';
-import { buildTransport, resolveSmtpConfig, smtpFrom } from '../../common/smtp';
 import { AuthPayload } from '../auth/auth.types';
 import { CandidateContext } from './candidate.guard';
 import { safeAsoInclude } from './recruit-occupational-health.service';
+import { RecruitCommunicationService, resolveCompanyDisplayName } from './recruit-communication.service';
 import {
   DEFAULT_PRE_ADMISSION_DOCUMENTS,
   canCandidateDecideOffer,
@@ -21,6 +21,7 @@ export class RecruitOfferService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly audit: AuditWriterService,
+    private readonly communication: RecruitCommunicationService,
   ) {}
 
   // ------------------------------ ofertas internas ------------------------------
@@ -113,7 +114,7 @@ export class RecruitOfferService {
       if (offerStageId) await tx.recruitApplication.update({ where: { id: offer.applicationId }, data: { currentStageId: offerStageId } });
       return updated;
     });
-    await this.emailCandidateOffer(offer.application.candidate.email, offer.application.candidate.name, offer.application.posting.title, saved).catch(() => undefined);
+    await this.emailCandidateOffer(me.companyId, offer.application.candidate.email, offer.application.candidate.name, offer.application.posting.title, saved);
     await this.audit.record(me, { module: MODULE, entity: 'RecruitOffer', entityId: id, action: 'SEND', message: 'Proposta enviada ao candidato' });
     return saved;
   }
@@ -336,14 +337,13 @@ export class RecruitOfferService {
     return stage?.id ?? null;
   }
 
-  private async emailCandidateOffer(email: string, name: string, title: string, offer: { salaryAmountCents: number; currency: string; expiresAt: Date | null }) {
-    const cfg = await resolveSmtpConfig(this.prisma);
-    if (!cfg?.host) return;
-    await buildTransport(cfg).sendMail({
-      from: smtpFrom(cfg),
-      to: email,
-      subject: `Proposta enviada: ${title}`,
-      text: `Ola, ${name}.\n\nSua proposta para "${title}" esta disponivel na Area do candidato.\nValor: ${formatMoney(offer.salaryAmountCents, offer.currency)}\nValidade: ${offer.expiresAt ? offer.expiresAt.toLocaleDateString('pt-BR') : 'sem data definida'}\n\nAcesse o portal do candidato para aceitar ou recusar.`,
+  private async emailCandidateOffer(companyId: string, email: string, name: string, title: string, offer: { salaryAmountCents: number; currency: string; expiresAt: Date | null }) {
+    const companyName = await resolveCompanyDisplayName(this.prisma, companyId);
+    void this.communication.sendEvent(companyId, 'OFFER_SENT', email, {
+      candidato: name,
+      vaga: title,
+      empresa: companyName,
+      validade: offer.expiresAt ? offer.expiresAt.toLocaleDateString('pt-BR') : 'sem data definida',
     });
   }
 }
@@ -384,8 +384,4 @@ function moneyToCents(body: any, base: string): number {
 
 function decimalToCents(value: Prisma.Decimal): number {
   return Math.round(Number(value.toString()) * 100);
-}
-
-function formatMoney(cents: number, currency: string) {
-  return new Intl.NumberFormat('pt-BR', { style: 'currency', currency: currency || 'BRL' }).format(cents / 100);
 }

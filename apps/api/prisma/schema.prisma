@@ -14094,6 +14094,25 @@ model RecruitPostingChannel {
   @@map("recruit_posting_channels")
 }
 
+/// Template de e-mail automático por evento do funil (candidatura recebida, mudança de
+/// etapa, rejeição, entrevista agendada, proposta enviada, admissão autorizada). Um por
+/// evento por empresa (singleton, mesmo padrão do PortalEmailSetting); sem linha customizada,
+/// o serviço usa um texto padrão embutido — funciona sem configuração.
+model RecruitEmailTemplate {
+  id          String    @id @default(uuid())
+  companyId   String
+  event       String // APPLICATION_RECEIVED | STAGE_CHANGED | REJECTED | INTERVIEW_SCHEDULED | OFFER_SENT | ADMISSION_AUTHORIZED
+  subject     String
+  bodyText    String
+  active      Boolean   @default(true)
+  updatedById String?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  @@unique([companyId, event])
+  @@map("recruit_email_templates")
+}
+
 // ===================== F3: Candidato + Candidatura + LGPD =====================
 
 /// Candidato — IDENTIDADE SEPARADA (nunca vira User interno). Escopo por empresa:

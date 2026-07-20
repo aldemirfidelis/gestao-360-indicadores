@@ -7,6 +7,7 @@ import { EmployeesService } from '../personnel/employees.service';
 import { LifecycleService } from '../personnel/lifecycle.service';
 import { PayrollEsocialService } from '../payroll/payroll-esocial.service';
 import { evaluateAdmissionReadiness, normalizeCpfRequired, probationReviewDueDates } from './recruit-admission.logic';
+import { RecruitCommunicationService, resolveCompanyDisplayName } from './recruit-communication.service';
 
 const MODULE = 'recruitment';
 
@@ -18,6 +19,7 @@ export class RecruitAdmissionService {
     private readonly employees: EmployeesService,
     private readonly lifecycle: LifecycleService,
     private readonly esocial: PayrollEsocialService,
+    private readonly communication: RecruitCommunicationService,
   ) {}
 
   async getAdmission(me: AuthPayload, applicationId: string) {
@@ -186,6 +188,12 @@ export class RecruitAdmissionService {
       action: 'AUTHORIZE',
       message: `Admissao autorizada para ${ctx.candidate.name}`,
       after: { applicationId, employeeId },
+    });
+    const companyName = await resolveCompanyDisplayName(this.prisma, me.companyId);
+    void this.communication.sendEvent(me.companyId, 'ADMISSION_AUTHORIZED', ctx.candidate.email, {
+      candidato: ctx.candidate.name,
+      vaga: ctx.posting.title,
+      empresa: companyName,
     });
     return this.getAdmission(me, applicationId);
   }

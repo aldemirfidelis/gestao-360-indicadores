@@ -17,6 +17,7 @@ import { RecruitOfferService } from './recruit-offer.service';
 import { RecruitOccupationalHealthService } from './recruit-occupational-health.service';
 import { RecruitAdmissionService } from './recruit-admission.service';
 import { RecruitLgpdService } from './recruit-lgpd.service';
+import { RecruitCommunicationService } from './recruit-communication.service';
 import { CandidateGuard } from './candidate.guard';
 
 /**
@@ -38,8 +39,9 @@ import { CandidateGuard } from './candidate.guard';
     RecruitOccupationalHealthService,
     RecruitAdmissionService,
     RecruitLgpdService,
+    RecruitCommunicationService,
     CandidateGuard,
   ],
-  exports: [RecruitRequisitionService, RecruitPostingService, RecruitApplicationService, RecruitEvaluationService, RecruitOfferService, RecruitOccupationalHealthService, RecruitAdmissionService, RecruitLgpdService],
+  exports: [RecruitRequisitionService, RecruitPostingService, RecruitApplicationService, RecruitEvaluationService, RecruitOfferService, RecruitOccupationalHealthService, RecruitAdmissionService, RecruitLgpdService, RecruitCommunicationService],
 })
 export class RecruitmentModule {}

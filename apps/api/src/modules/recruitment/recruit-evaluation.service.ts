@@ -2,11 +2,11 @@ import { BadRequestException, ConflictException, Injectable, NotFoundException }
 import { NotificationKind, Prisma } from '@prisma/client';
 import { PrismaService } from '../../prisma/prisma.service';
 import { AuditWriterService } from '../../common/audit/audit-writer.service';
-import { buildTransport, resolveSmtpConfig, smtpFrom } from '../../common/smtp';
 import { NotificationsService } from '../notifications/notifications.service';
 import { GeminiService } from '../ai/gemini.service';
 import { AuthPayload } from '../auth/auth.types';
 import { RecruitCareersService } from './recruit-careers.service';
+import { RecruitCommunicationService, resolveCompanyDisplayName } from './recruit-communication.service';
 import { evaluateScreening, fallbackTriage, weightedAverage } from './recruit-triage.logic';
 
 const MODULE = 'recruitment';
@@ -24,6 +24,7 @@ export class RecruitEvaluationService {
     private readonly notifications: NotificationsService,
     private readonly gemini: GeminiService,
     private readonly careers: RecruitCareersService,
+    private readonly communication: RecruitCommunicationService,
   ) {}
 
   // ------------------------------ public screening ------------------------------
@@ -227,7 +228,7 @@ export class RecruitEvaluationService {
     });
     await this.prisma.recruitApplicationEvent.create({ data: { companyId: me.companyId, applicationId, type: 'INTERVIEW_SCHEDULED', note: interview.type, actorType: 'USER', actorId: me.sub } });
     await this.notifyInterviewParticipants(me.companyId, interview.id, app.posting.title, participants, startsAt);
-    if (body?.notifyCandidate !== false) await this.emailCandidateInterview(app.candidate.email, app.candidate.name, app.posting.title, interview).catch(() => undefined);
+    if (body?.notifyCandidate !== false) await this.emailCandidateInterview(me.companyId, app.candidate.email, app.candidate.name, app.posting.title, interview);
     await this.audit.record(me, { module: MODULE, entity: 'RecruitInterview', entityId: interview.id, action: 'SCHEDULE', message: `Entrevista agendada para ${app.candidate.name}` });
     return interview;
   }
@@ -436,15 +437,16 @@ export class RecruitEvaluationService {
     ).catch(() => undefined)));
   }
 
-  private async emailCandidateInterview(email: string, name: string, title: string, interview: { startsAt: Date; endsAt: Date | null; location: string | null; meetingUrl: string | null; instructions: string | null }) {
-    const cfg = await resolveSmtpConfig(this.prisma);
-    if (!cfg?.host) return;
-    const when = interview.startsAt.toLocaleString('pt-BR');
-    await buildTransport(cfg).sendMail({
-      from: smtpFrom(cfg),
-      to: email,
-      subject: `Entrevista agendada: ${title}`,
-      text: `Olá, ${name}.\n\nSua entrevista para "${title}" foi agendada para ${when}.\n${interview.meetingUrl ? `Link: ${interview.meetingUrl}\n` : ''}${interview.location ? `Local: ${interview.location}\n` : ''}${interview.instructions ? `Instruções: ${interview.instructions}\n` : ''}\nCaso precise reagendar, responda este e-mail.`,
+  private async emailCandidateInterview(companyId: string, email: string, name: string, title: string, interview: { startsAt: Date; endsAt: Date | null; location: string | null; meetingUrl: string | null; instructions: string | null }) {
+    const companyName = await resolveCompanyDisplayName(this.prisma, companyId);
+    void this.communication.sendEvent(companyId, 'INTERVIEW_SCHEDULED', email, {
+      candidato: name,
+      vaga: title,
+      empresa: companyName,
+      data_hora: interview.startsAt.toLocaleString('pt-BR'),
+      link: interview.meetingUrl ? `Link: ${interview.meetingUrl}\n` : '',
+      local: interview.location ? `Local: ${interview.location}\n` : '',
+      instrucoes: interview.instructions ? `Instruções: ${interview.instructions}\n` : '',
     });
   }
 
