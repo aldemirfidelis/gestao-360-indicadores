@@ -139,6 +139,40 @@ export class RecruitPostingService {
     return { ...posting, company: { slug: company?.slug ?? null }, allowsReferral: requisition?.allowsReferral ?? true };
   }
 
+  // ------------------------------ mobilidade interna ------------------------------
+
+  /**
+   * Vagas internas (visibility INTERNAL/BOTH) publicadas — acessível a QUALQUER
+   * colaborador logado, sem exigir permissão de recrutamento (mesmo padrão de
+   * "Férias e Afastamentos"/"Minha Vida Funcional": self-service, `permissions: []`
+   * no nav). Antes disso, `visibility: INTERNAL` só existia como filtro que
+   * EXCLUÍA a vaga do portal público — nenhuma tela mostrava essas vagas a
+   * ninguém, nem ao próprio colaborador.
+   */
+  async listInternalPostings(me: AuthPayload) {
+    return this.prisma.recruitJobPosting.findMany({
+      where: { companyId: me.companyId, deletedAt: null, status: 'PUBLISHED', visibility: { in: ['INTERNAL', 'BOTH'] } },
+      orderBy: { publishedAt: 'desc' },
+      select: {
+        id: true, slug: true, title: true, publicDescription: true, publicRequirements: true, benefitsText: true,
+        location: true, city: true, workMode: true, contractType: true, areaName: true, showSalary: true, salaryText: true, publishedAt: true,
+      },
+      take: 100,
+    });
+  }
+
+  async getInternalPosting(me: AuthPayload, id: string) {
+    const posting = await this.prisma.recruitJobPosting.findFirst({
+      where: { id, companyId: me.companyId, deletedAt: null, status: 'PUBLISHED', visibility: { in: ['INTERNAL', 'BOTH'] } },
+      select: {
+        id: true, slug: true, title: true, publicDescription: true, publicRequirements: true, benefitsText: true, processStepsText: true,
+        location: true, city: true, workMode: true, contractType: true, areaName: true, showSalary: true, salaryText: true,
+      },
+    });
+    if (!posting) throw new NotFoundException('Vaga interna não encontrada ou encerrada.');
+    return posting;
+  }
+
   async updatePosting(me: AuthPayload, id: string, body: any = {}) {
     const posting = await this.postingOf(me.companyId, id);
     const data: Prisma.RecruitJobPostingUpdateInput = {};

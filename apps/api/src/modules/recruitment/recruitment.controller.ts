@@ -476,4 +476,26 @@ export class RecruitmentController {
   cancel(@CurrentUser() me: AuthPayload, @Param('id') id: string, @Body() body: any) {
     return this.requisitions.cancel(me, id, body);
   }
+
+  // ------------------------------ mobilidade interna (self-service, qualquer colaborador logado) ------------------------------
+
+  @Get('internal-postings')
+  listInternalPostings(@CurrentUser() me: AuthPayload) {
+    return this.postings.listInternalPostings(me);
+  }
+
+  @Get('internal-postings/my-applications')
+  listMyInternalApplications(@CurrentUser() me: AuthPayload) {
+    return this.applications.listMyInternalApplications(me);
+  }
+
+  @Get('internal-postings/:id')
+  getInternalPosting(@CurrentUser() me: AuthPayload, @Param('id') id: string) {
+    return this.postings.getInternalPosting(me, id);
+  }
+
+  @Post('internal-postings/:id/apply')
+  applyInternal(@CurrentUser() me: AuthPayload, @Param('id') id: string, @Body() body: any) {
+    return this.applications.applyInternal(me, id, body);
+  }
 }

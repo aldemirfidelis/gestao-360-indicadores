@@ -259,6 +259,7 @@ export const navSections: NavSection[] = [
       { href: '/servico-pessoal/admissoes', label: 'Admissão e Desligamento', description: 'Checklists de admissão/desligamento e saúde ocupacional (ASO)', icon: ClipboardCheck, permissions: ['pessoal:view', 'pessoal:manage'] },
       { href: '/servico-pessoal/folha', label: 'Folha de Pagamento', description: 'Cálculo de folha, holerites, competências e adiantamento', icon: Banknote, permissions: ['folha:view'] },
       { href: '/servico-pessoal/meu-holerite', label: 'Minha Vida Funcional', description: 'Seus holerites e informe de rendimentos', icon: Wallet, permissions: [] },
+      { href: '/vagas-internas', label: 'Vagas Internas', description: 'Oportunidades abertas nesta empresa para colaboradores atuais', icon: Briefcase, permissions: [] },
       { href: '/servico-pessoal/relatorios', label: 'Relatórios', description: 'Turnover, absenteísmo, horas extras e exportação para a folha', icon: FileBarChart, permissions: ['pessoal:view', 'pessoal:manage'] },
       { href: '/servico-pessoal/configuracoes', label: 'Configurações', description: 'Numeração da matrícula e modelo do crachá de identificação', icon: Settings, permissions: ['pessoal:settings', 'pessoal:manage'] },
     ],

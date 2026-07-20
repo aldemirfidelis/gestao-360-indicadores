@@ -8,7 +8,7 @@ import { CandidateContext } from './candidate.guard';
 import { RecruitCareersService } from './recruit-careers.service';
 import { RecruitCommunicationService, resolveCompanyDisplayName } from './recruit-communication.service';
 import { isPubliclyVisible } from './recruit-posting.logic';
-import { canRecruiterAct, canWithdraw, CONSENT_VERSION, safeFileName, validateUpload } from './recruit-candidate.logic';
+import { canRecruiterAct, canWithdraw, CONSENT_VERSION, normalizeEmail, safeFileName, validateUpload } from './recruit-candidate.logic';
 import { evaluateScreening } from './recruit-triage.logic';
 import { safeAsoInclude } from './recruit-occupational-health.service';
 
@@ -119,6 +119,73 @@ export class RecruitApplicationService {
       empresa: company.tradeName ?? company.name,
     });
     return { id: application.id, status: application.status };
+  }
+
+  // =============================== MOBILIDADE INTERNA ===============================
+
+  /**
+   * Colaborador interno (usuário logado, não candidato externo) se candidata a uma
+   * vaga INTERNAL/BOTH. Reusa TODO o pipeline de recrutamento (kanban, triagem,
+   * scorecard, entrevista, proposta, admissão) — o recrutador vê o candidato interno
+   * exatamente como um externo, sem tela nova. A identidade do candidato é resolvida
+   * por e-mail (RecruitCandidate é global): se o colaborador já tem conta (ex.: se
+   * candidatou externamente antes de ser contratado), reusa; senão cria uma.
+   */
+  async applyInternal(me: AuthPayload, postingId: string, body: any = {}) {
+    if (body?.consent !== true) throw new BadRequestException('É necessário aceitar o tratamento de dados (LGPD) para se candidatar.');
+    const posting = await this.prisma.recruitJobPosting.findFirst({
+      where: { id: postingId, companyId: me.companyId, deletedAt: null, status: 'PUBLISHED', visibility: { in: ['INTERNAL', 'BOTH'] } },
+      include: { pipelineTemplate: { include: { stages: { orderBy: { order: 'asc' }, take: 1 } } } },
+    });
+    if (!posting) throw new NotFoundException('Vaga interna não encontrada ou encerrada.');
+
+    const email = normalizeEmail(me.email);
+    let candidate = await this.prisma.recruitCandidate.findFirst({ where: { emailNormalized: email, deletedAt: null } });
+    if (!candidate) {
+      candidate = await this.prisma.recruitCandidate.create({
+        data: { email: me.email, emailNormalized: email, name: me.name, status: 'ACTIVE' },
+      });
+    }
+
+    const dup = await this.prisma.recruitApplication.findFirst({ where: { postingId: posting.id, candidateId: candidate.id } });
+    if (dup) throw new ConflictException('Você já se candidatou a esta vaga.');
+
+    const firstStageId = posting.pipelineTemplate?.stages[0]?.id ?? null;
+    const application = await this.prisma.recruitApplication.create({
+      data: {
+        companyId: me.companyId,
+        postingId: posting.id,
+        candidateId: candidate.id,
+        requisitionId: posting.requisitionId,
+        source: 'MOBILIDADE_INTERNA',
+        currentStageId: firstStageId,
+        coverLetter: text(body?.coverLetter),
+        events: { create: { companyId: me.companyId, type: 'CREATED', toStageId: firstStageId, actorType: 'CANDIDATE', actorId: candidate.id, note: 'Candidatura interna' } },
+        consents: {
+          create: {
+            companyId: me.companyId, candidateId: candidate.id, purpose: 'RECRUITMENT', documentVersion: CONSENT_VERSION, granted: true,
+          },
+        },
+      },
+    });
+    const company = await this.prisma.company.findUnique({ where: { id: me.companyId }, select: { name: true, tradeName: true } });
+    void this.communication.sendEvent(me.companyId, 'APPLICATION_RECEIVED', candidate.email, {
+      candidato: candidate.name, vaga: posting.title, empresa: company?.tradeName ?? company?.name ?? 'nossa empresa',
+    });
+    return { id: application.id, status: application.status };
+  }
+
+  /** Candidaturas internas do próprio colaborador logado (por e-mail — mesma identidade global). */
+  async listMyInternalApplications(me: AuthPayload) {
+    const email = normalizeEmail(me.email);
+    const candidate = await this.prisma.recruitCandidate.findFirst({ where: { emailNormalized: email, deletedAt: null } });
+    if (!candidate) return [];
+    const apps = await this.prisma.recruitApplication.findMany({
+      where: { candidateId: candidate.id, companyId: me.companyId, source: 'MOBILIDADE_INTERNA' },
+      orderBy: { appliedAt: 'desc' },
+      include: { posting: { select: { title: true, slug: true } }, stage: { select: { name: true } } },
+    });
+    return apps.map((a) => ({ id: a.id, status: a.status, appliedAt: a.appliedAt, stage: a.stage?.name ?? null, posting: a.posting }));
   }
 
   /** Candidaturas do candidato autenticado. */
