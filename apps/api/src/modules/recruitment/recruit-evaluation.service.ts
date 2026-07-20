@@ -432,7 +432,7 @@ export class RecruitEvaluationService {
       NotificationKind.MEETING_UPCOMING,
       `Entrevista agendada: ${title}`,
       `Início em ${startsAt.toLocaleString('pt-BR')}`,
-      `/servico-pessoal/recrutamento/vagas?interview=${interviewId}`,
+      `/recrutamento/vagas?interview=${interviewId}`,
     ).catch(() => undefined)));
   }
 

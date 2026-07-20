@@ -76,6 +76,18 @@ export interface NavSection {
 
 export const SUPER_ADMIN_ONLY_PERMISSION = 'super-admin:only';
 
+export const RECRUITMENT_ROUTE_PERMISSIONS = [
+  'recruit:view',
+  'recruit:requisition:create',
+  'recruit:requisition:approve',
+  'recruit:offer:approve',
+  'recruit:prehire',
+  'recruit:admit',
+  'recruit:lgpd',
+  'recruit:manage',
+  'saude:occupational',
+];
+
 export const companyUsersNavItem: NavItem = {
   href: '/users',
   label: 'Usuários',
@@ -223,6 +235,18 @@ export const navSections: NavSection[] = [
     ],
   },
   {
+    heading: 'Recrutamento e Seleção',
+    description: 'Contratação de ponta a ponta: requisições, vagas, candidatos, propostas e admissão',
+    intent: 'management',
+    icon: UserPlus,
+    permissions: RECRUITMENT_ROUTE_PERMISSIONS,
+    items: [
+      { href: '/recrutamento', label: 'Requisições e Aprovações', description: 'Solicitação, alçadas e liberação de vagas', icon: ClipboardCheck, permissions: ['recruit:view', 'recruit:requisition:create', 'recruit:requisition:approve', 'recruit:manage'], exact: true },
+      { href: '/recrutamento/vagas', label: 'Vagas e Candidatos', description: 'Divulgação, pipeline, avaliação, proposta e pré-admissão', icon: Briefcase, permissions: ['recruit:view', 'recruit:offer:approve', 'recruit:prehire', 'recruit:admit', 'recruit:manage', 'saude:occupational'] },
+      { href: '/recrutamento/lgpd', label: 'Privacidade e LGPD', description: 'Solicitações de titulares e proteção dos dados de candidatos', icon: ShieldCheck, permissions: ['recruit:lgpd', 'recruit:manage'] },
+    ],
+  },
+  {
     heading: 'Serviço Pessoal',
     description: 'Departamento pessoal: colaboradores, ponto, escalas e fechamento',
     intent: 'management',
@@ -234,7 +258,6 @@ export const navSections: NavSection[] = [
       { href: '/servico-pessoal/ferias', label: 'Férias e Afastamentos', description: 'Saldos, solicitações com aprovação e atestados/afastamentos', icon: CalendarDays, permissions: [] },
       { href: '/servico-pessoal/admissoes', label: 'Admissão e Desligamento', description: 'Checklists de admissão/desligamento e saúde ocupacional (ASO)', icon: ClipboardCheck, permissions: ['pessoal:view', 'pessoal:manage'] },
       { href: '/servico-pessoal/folha', label: 'Folha de Pagamento', description: 'Cálculo de folha, holerites, competências e adiantamento', icon: Banknote, permissions: ['folha:view'] },
-      { href: '/servico-pessoal/recrutamento', label: 'Recrutamento e Seleção', description: 'Contratação de ponta a ponta: requisição, aprovação, vaga, candidatos, proposta e admissão', icon: UserPlus, permissions: ['recruit:view'] },
       { href: '/servico-pessoal/meu-holerite', label: 'Minha Vida Funcional', description: 'Seus holerites e informe de rendimentos', icon: Wallet, permissions: [] },
       { href: '/servico-pessoal/relatorios', label: 'Relatórios', description: 'Turnover, absenteísmo, horas extras e exportação para a folha', icon: FileBarChart, permissions: ['pessoal:view', 'pessoal:manage'] },
       { href: '/servico-pessoal/configuracoes', label: 'Configurações', description: 'Numeração da matrícula e modelo do crachá de identificação', icon: Settings, permissions: ['pessoal:settings', 'pessoal:manage'] },
@@ -321,24 +344,10 @@ export const ROUTE_PERMISSIONS: Array<{ prefix: string; permissions: string[]; e
   { prefix: '/servico-pessoal/ferias', permissions: [] },
   { prefix: '/servico-pessoal/colaboradores', permissions: ['pessoal:view', 'pessoal:manage'] },
   { prefix: '/servico-pessoal/configuracoes', permissions: ['pessoal:settings', 'pessoal:manage'] },
-  // Recrutamento tem família de permissões própria (recruit:*): sem esta entrada,
-  // um recrutador sem permissões de DP cairia no prefixo /servico-pessoal e seria
-  // bloqueado mesmo vendo o item no menu. saude:occupational cobre quem só agenda/
-  // registra ASO admissional na tela de vagas.
-  {
-    prefix: '/servico-pessoal/recrutamento',
-    permissions: [
-      'recruit:view',
-      'recruit:requisition:create',
-      'recruit:requisition:approve',
-      'recruit:offer:approve',
-      'recruit:prehire',
-      'recruit:admit',
-      'recruit:lgpd',
-      'recruit:manage',
-      'saude:occupational',
-    ],
-  },
+  // O módulo usa família própria de permissões. O prefixo legado continua
+  // protegido durante a transição e é redirecionado pelo middleware.
+  { prefix: '/recrutamento', permissions: RECRUITMENT_ROUTE_PERMISSIONS },
+  { prefix: '/servico-pessoal/recrutamento', permissions: RECRUITMENT_ROUTE_PERMISSIONS },
   // Portal do próprio colaborador (holerites/informe): liberado a qualquer usuário
   // autenticado, como o item de menu correspondente.
   { prefix: '/servico-pessoal/meu-holerite', permissions: [] },

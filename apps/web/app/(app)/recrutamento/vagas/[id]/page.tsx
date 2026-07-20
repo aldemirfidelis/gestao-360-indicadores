@@ -134,7 +134,7 @@ export default function VacancyDetailPage() {
   return (
     <div className="space-y-4">
       <div className="flex items-center gap-2 text-sm text-muted-foreground">
-        <Link href="/servico-pessoal/recrutamento/vagas" className="flex items-center gap-1 hover:text-foreground">
+        <Link href="/recrutamento/vagas" className="flex items-center gap-1 hover:text-foreground">
           <ArrowLeft className="h-4 w-4" /> Vagas
         </Link>
       </div>

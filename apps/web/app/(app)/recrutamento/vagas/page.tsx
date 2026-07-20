@@ -3,7 +3,7 @@
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useQuery } from '@tanstack/react-query';
-import { ArrowLeft, ExternalLink, Users } from 'lucide-react';
+import { ExternalLink, Users } from 'lucide-react';
 import { PageHeader } from '@/components/shell/page-header';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -29,11 +29,6 @@ export default function VacanciesPage() {
 
   return (
     <div className="space-y-4">
-      <div className="flex items-center gap-2 text-sm text-muted-foreground">
-        <Link href="/servico-pessoal/recrutamento" className="flex items-center gap-1 hover:text-foreground">
-          <ArrowLeft className="h-4 w-4" /> Recrutamento
-        </Link>
-      </div>
       <PageHeader
         title="Vagas"
         description="Cada vaga nasce de uma requisição aprovada. Clique na vaga para editar a divulgação, configurar a triagem e conduzir os candidatos no pipeline até a admissão."
@@ -45,7 +40,7 @@ export default function VacanciesPage() {
         <EmptyState
           title="Nenhuma vaga criada"
           description="Vagas são criadas a partir de requisições encaminhadas ao recrutamento. Abra a requisição aprovada e use “Criar vaga”."
-          action={<Link href="/servico-pessoal/recrutamento"><Button variant="outline">Ir para requisições</Button></Link>}
+          action={<Link href="/recrutamento"><Button variant="outline">Ir para requisições</Button></Link>}
         />
       ) : (
         <Card>
@@ -70,7 +65,7 @@ export default function VacanciesPage() {
                       <tr
                         key={posting.id}
                         className="cursor-pointer hover:bg-muted/20"
-                        onClick={() => router.push(`/servico-pessoal/recrutamento/vagas/${posting.id}`)}
+                        onClick={() => router.push(`/recrutamento/vagas/${posting.id}`)}
                       >
                         <td className="p-3">
                           <div className="font-medium">{posting.title}</div>
@@ -88,7 +83,7 @@ export default function VacanciesPage() {
                         <td className="p-3 text-xs">{posting.closesAt ? formatDateBr(posting.closesAt) : '—'}</td>
                         <td className="p-3 text-right" onClick={(event) => event.stopPropagation()}>
                           <div className="flex justify-end gap-1">
-                            <Link href={`/servico-pessoal/recrutamento/vagas/${posting.id}`}>
+                            <Link href={`/recrutamento/vagas/${posting.id}`}>
                               <Button variant="ghost" size="sm"><Users className="mr-1 h-3.5 w-3.5" /> Abrir</Button>
                             </Link>
                             {posting.status === 'PUBLISHED' && (

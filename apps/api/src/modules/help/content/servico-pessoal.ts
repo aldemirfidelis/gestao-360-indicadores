@@ -2,8 +2,8 @@ import { HelpCatalogCategory } from './types';
 
 export const servicoPessoal: HelpCatalogCategory = {
   slug: 'servico-pessoal',
-  title: 'Serviço Pessoal e Recrutamento',
-  description: 'Contratação de ponta a ponta (ATS), colaboradores, ponto, férias e folha.',
+  title: 'Recrutamento e Serviço Pessoal',
+  description: 'Recrutamento de ponta a ponta (ATS), colaboradores, ponto, férias e folha.',
   icon: 'UserPlus',
   position: 8,
   articles: [
@@ -12,7 +12,7 @@ export const servicoPessoal: HelpCatalogCategory = {
       title: 'Como contratar: o fluxo completo do Recrutamento',
       summary: 'Da requisição de vaga à admissão, passo a passo, com quem faz o quê.',
       tags: ['recrutamento', 'contratacao', 'ats', 'vaga', 'admissao', 'requisicao', 'como contratar'],
-      body: `O módulo **Recrutamento e Seleção** (Serviço Pessoal → Recrutamento e Seleção) conduz a contratação de ponta a ponta. O funil no topo da tela mostra em que etapa cada processo está:
+      body: `O módulo independente **Recrutamento e Seleção** conduz a contratação de ponta a ponta. O funil no topo da aba **Requisições e aprovações** mostra em que etapa cada processo está:
 
 1. **Requisição** — o gestor/RH cria a requisição informando cargo, área, tipo de vaga e motivo. Ela nasce como *Rascunho*.
 2. **Aprovação** — ao enviar, a requisição passa pelo fluxo de aprovação (RH e, se confidencial/urgente, diretoria). As **travas de quadro e orçamento** avisam se não há saldo — sem saldo, um aprovador registra a **exceção com justificativa** (fica na auditoria). Quem solicita nunca aprova a própria requisição.
@@ -31,7 +31,7 @@ As pendências de cada papel (aprovar requisição, criar vaga, revisar document
       summary: 'Como abrir a requisição, o que bloqueia e como funcionam as exceções.',
       tags: ['requisicao', 'vaga', 'aprovacao', 'quadro', 'orcamento', 'travas', 'excecao'],
       body: `## Abrir a requisição
-Em **Serviço Pessoal → Recrutamento e Seleção → Nova requisição**, informe cargo, área, tipo (aumento de quadro, substituição, temporária…), prioridade, quantidade de vagas, orçamento mensal e o motivo. O recrutador responsável pode ficar para depois — quem encaminhar ao recrutamento assume automaticamente.
+Em **Recrutamento e Seleção → Requisições e aprovações → Nova requisição**, informe cargo, área, tipo (aumento de quadro, substituição, temporária…), prioridade, quantidade de vagas, orçamento mensal e o motivo. O recrutador responsável pode ficar para depois — quem encaminhar ao recrutamento assume automaticamente.
 
 ## Aprovação
 - A requisição *Rascunho* precisa ser **enviada para aprovação**;

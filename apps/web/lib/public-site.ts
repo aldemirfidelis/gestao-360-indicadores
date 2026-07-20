@@ -956,6 +956,7 @@ export const privateRoutePrefixes = [
   '/comunicacao',
   '/gestao-premio',
   '/cargos-salarios',
+  '/recrutamento',
   '/imports',
   '/integracoes',
   '/insights',

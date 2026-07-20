@@ -874,7 +874,7 @@ export class WorkItemAggregationService {
         : [],
     ]);
 
-    const hub = '/servico-pessoal/recrutamento';
+    const hub = '/recrutamento';
     const drafts: WorkItemDraft[] = [];
 
     // Segregação: o solicitante não decide a própria requisição; passo com aprovador

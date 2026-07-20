@@ -287,7 +287,7 @@ export default function LifecyclePage() {
               ))}
             </ol>
             <p className="mt-2 text-[11px] text-muted-foreground">
-              O caminho automatizado começa no <Link href="/servico-pessoal/recrutamento" className="font-medium text-sky-600 hover:underline dark:text-sky-400">Recrutamento</Link> (candidato → proposta → ASO → documentos → autorizar admissão),
+              O caminho automatizado começa no <Link href="/recrutamento" className="font-medium text-sky-600 hover:underline dark:text-sky-400">Recrutamento</Link> (candidato → proposta → ASO → documentos → autorizar admissão),
               que cria o colaborador na base única. Depois, no <Link href="/servico-pessoal/colaboradores" className="font-medium text-sky-600 hover:underline dark:text-sky-400">cadastro</Link>, complete os dados dos documentos: a matrícula é gerada automaticamente,
               e você define área, superior imediato (vem da árvore), escala e o usuário do portal. Os checklists abaixo acompanham o onboarding após a admissão.
             </p>
@@ -303,7 +303,7 @@ export default function LifecyclePage() {
               Esta aba registra exames de <strong>quem já é colaborador</strong> (periódico, retorno, mudança de risco, demissional).
               O ASO <strong>admissional de candidatos</strong> é conduzido na pré-admissão do Recrutamento, com acesso clínico segregado.
             </span>
-            <Link href="/servico-pessoal/recrutamento/vagas" className="font-medium text-sky-600 hover:underline dark:text-sky-400">
+            <Link href="/recrutamento/vagas" className="font-medium text-sky-600 hover:underline dark:text-sky-400">
               Ir para o Recrutamento →
             </Link>
           </div>

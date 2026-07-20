@@ -46,7 +46,7 @@ async function createRequisition(request: Parameters<typeof apiGet>[0], override
 test('hub do recrutamento mostra funil e requisições com status traduzido', async ({ page, request }) => {
   await createRequisition(request);
 
-  await page.goto('/servico-pessoal/recrutamento');
+  await page.goto('/recrutamento');
   await expect(page.getByRole('heading', { name: 'Recrutamento e Seleção' })).toBeVisible();
   // Funil didático com contagens
   await expect(page.getByText('1 · Rascunhos')).toBeVisible();
@@ -74,7 +74,7 @@ test('fluxo completo: requisição → aprovação → encaminhar → criar vaga
     reason: 'Fluxo E2E ponta a ponta na UI nova.',
   });
 
-  await page.goto('/servico-pessoal/recrutamento');
+  await page.goto('/recrutamento');
   await page.getByText(requisition.code).click();
 
   // Sheet com stepper e próximo passo
@@ -104,7 +104,7 @@ test('fluxo completo: requisição → aprovação → encaminhar → criar vaga
 
   await page.getByRole('button', { name: 'Criar vaga de divulgação' }).click();
   // Redireciona direto para a página da vaga
-  await page.waitForURL(/\/servico-pessoal\/recrutamento\/vagas\/[\w-]+$/);
+  await page.waitForURL(/\/recrutamento\/vagas\/[\w-]+$/);
   await expect(page.getByRole('tab', { name: /Pipeline de candidatos/ })).toBeVisible();
   await expect(page.getByRole('tab', { name: 'Divulgação' })).toBeVisible();
   await expect(page.getByRole('tab', { name: 'Triagem e scorecard' })).toBeVisible();
@@ -125,7 +125,7 @@ test('fluxo completo: requisição → aprovação → encaminhar → criar vaga
 });
 
 test('lista de vagas traduzida e navegável', async ({ page }) => {
-  await page.goto('/servico-pessoal/recrutamento/vagas');
+  await page.goto('/recrutamento/vagas');
   await expect(page.getByRole('heading', { name: 'Vagas' })).toBeVisible();
   await expect(page.getByText('PUBLISHED', { exact: true })).toHaveCount(0);
 });

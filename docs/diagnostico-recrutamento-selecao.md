@@ -6,6 +6,20 @@ Atende à Seção 1 do prompt-mestre: análise do projeto e mapa de impacto ANTE
 Princípio central: **reuso máximo, zero cadastro paralelo** (mesma diretriz de
 [[employee_360_integration]] e do módulo de Folha).
 
+## Atualização de navegação — módulo independente
+
+Em 2026-07-20, a interface autenticada foi promovida de funcionalidade interna
+de Serviço Pessoal para um módulo principal, sem alteração de banco ou dos
+contratos `/api/recruitment/*`. As abas são:
+
+- `/recrutamento` — requisições, aprovações e visão do funil;
+- `/recrutamento/vagas` — vagas e candidatos (detalhe em `/vagas/:id`);
+- `/recrutamento/lgpd` — privacidade e solicitações dos titulares.
+
+Links anteriores sob `/servico-pessoal/recrutamento/*` recebem redirecionamento
+HTTP 307 para o caminho equivalente. Isso preserva favoritos e itens antigos do
+Meu Dia durante a transição e permite rollback sem cache permanente no navegador.
+
 ---
 
 ## 1. Inventário do que JÁ EXISTE e será REUSADO (sem duplicar)
@@ -73,7 +87,7 @@ LGPD: `RecruitConsent` (consentimento versionado por `CONSENT_VERSION`) + `Recru
 (direitos do titular: ACCESS/DELETION/RECTIFICATION/PORTABILITY) — substituem o
 `RecruitPrivacyNotice`/`RecruitAcknowledgement`/`RecruitDataSubjectRequest` planejados `[impl]`.
 Candidato abre a solicitação pelo portal; equipe atende em
-`/servico-pessoal/recrutamento/lgpd` (`RecruitLgpdService`): exporta os dados (acesso/
+`/recrutamento/lgpd` (`RecruitLgpdService`): exporta os dados (acesso/
 portabilidade) ou anonimiza o candidato (exclusão — irreversível, preserva só o histórico da
 candidatura sem PII).
 
@@ -103,7 +117,7 @@ Todas com `companyId`, índices, unicidade, `createdAt/updatedAt`, soft-delete s
   exige descrição + pipeline; portal `/carreiras` (lista) e `/carreiras/vagas/{slug}` (detalhe),
   responsivo, resolvido por subdomínio ou `?empresa={slug}`, expondo **apenas** campos públicos
   (`toPublicVacancy`) — nunca orçamento/CC/aprovadores/salário interno. UI interna em
-  `/servico-pessoal/recrutamento/vagas`. Candidatura ainda é stub (F3).
+  `/recrutamento/vagas`. Candidatura ainda é stub (F3).
 - **F3 — Candidato + Candidatura + Portal do candidato + LGPD.** ✅ CONCLUÍDA. `RecruitCandidate`
   com identidade separada (JWT próprio, derivado por scrypt de `JWT_ACCESS_SECRET`, nunca cruza
   com auth interno), login por e-mail+OTP ou senha opcional. `apply()` exige `consent:true`,
@@ -111,7 +125,7 @@ Todas com `companyId`, índices, unicidade, `createdAt/updatedAt`, soft-delete s
   allowlist de MIME + limite de tamanho (`DocumentStorageService`). Portal `/candidato` (perfil,
   candidaturas, documentos, ofertas, pré-admissão, ASO redigido, solicitações LGPD). LGPD tem as
   duas pontas: candidato abre o pedido pelo portal, equipe atende em
-  `/servico-pessoal/recrutamento/lgpd` (exporta dados ou anonimiza — irreversível).
+  `/recrutamento/lgpd` (exporta dados ou anonimiza — irreversível).
 - **F4 — Triagem/Avaliação/Entrevistas/Testes/IA opcional.** ✅ CONCLUÍDA. Perguntas de triagem com
   eliminatórias (`knockout`), scorecard ponderado por vaga, **avaliação cega** (avaliador só vê as
   próprias notas até submeter as dele), entrevistas com notificação interna + e-mail ao candidato,

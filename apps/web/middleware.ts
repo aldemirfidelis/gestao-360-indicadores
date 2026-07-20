@@ -20,6 +20,14 @@ export function middleware(request: NextRequest) {
     return NextResponse.redirect(url, 307);
   }
 
+  // Compatibilidade da extração do Recrutamento de Serviço Pessoal. O 307
+  // preserva query string e torna o redirecionamento reversível em um rollback.
+  const legacyRecruitmentPrefix = '/servico-pessoal/recrutamento';
+  if (url.pathname === legacyRecruitmentPrefix || url.pathname.startsWith(`${legacyRecruitmentPrefix}/`)) {
+    url.pathname = `/recrutamento${url.pathname.slice(legacyRecruitmentPrefix.length)}`;
+    return NextResponse.redirect(url, 307);
+  }
+
   const response = NextResponse.next();
   if (privateRoutePrefixes.some((prefix) => url.pathname === prefix || url.pathname.startsWith(`${prefix}/`))) {
     response.headers.set('x-robots-tag', 'noindex, nofollow');

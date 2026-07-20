@@ -1,10 +1,9 @@
 'use client';
 
 import { useState } from 'react';
-import Link from 'next/link';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
-import { AlertTriangle, ArrowLeft, CheckCircle2, Download, ShieldCheck, XCircle } from 'lucide-react';
+import { AlertTriangle, CheckCircle2, Download, ShieldCheck, XCircle } from 'lucide-react';
 import { PageHeader } from '@/components/shell/page-header';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -114,15 +113,12 @@ export default function RecruitmentLgpdPage() {
         title="Solicitações LGPD"
         description="Direitos do titular abertos pelos candidatos no portal (acesso, exclusão, retificação, portabilidade)."
         actions={
-          <div className="flex items-center gap-2">
-            <Link href="/servico-pessoal/recrutamento"><Button variant="outline"><ArrowLeft className="mr-2 h-4 w-4" /> Recrutamento</Button></Link>
-            <NativeSelect value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)} className="h-9 w-40">
-              <option value="OPEN">Em aberto</option>
-              <option value="DONE">Atendidas</option>
-              <option value="REJECTED">Recusadas</option>
-              <option value="">Todas</option>
-            </NativeSelect>
-          </div>
+          <NativeSelect value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)} className="h-9 w-40">
+            <option value="OPEN">Em aberto</option>
+            <option value="DONE">Atendidas</option>
+            <option value="REJECTED">Recusadas</option>
+            <option value="">Todas</option>
+          </NativeSelect>
         }
       />
 

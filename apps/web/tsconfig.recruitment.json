@@ -3,7 +3,7 @@
   "compilerOptions": { "incremental": false, "noEmit": true },
   "include": [
     "next-env.d.ts",
-    "app/(app)/servico-pessoal/recrutamento/**/*.tsx",
+    "app/(app)/recrutamento/**/*.tsx",
     "components/recruitment/**/*.tsx",
     "lib/recruitment/**/*.ts"
   ],

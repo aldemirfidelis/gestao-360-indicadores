@@ -1,12 +1,10 @@
 'use client';
 
 import { useMemo, useState } from 'react';
-import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
 import {
-  Briefcase,
   CheckCircle2,
   ClipboardCheck,
   FileSignature,
@@ -15,7 +13,6 @@ import {
   Search,
   Send,
   ShieldAlert,
-  ShieldCheck,
   UserCheck,
   UserPlus,
   Users,
@@ -84,7 +81,6 @@ export default function RecruitmentPage() {
   const canCreate = hasPermission(['recruit:requisition:create']);
   const canApprove = hasPermission(['recruit:requisition:approve']);
   const canManage = hasPermission(['recruit:manage']);
-  const canHandleLgpd = hasPermission(['recruit:lgpd', 'recruit:manage']);
 
   const [formOpen, setFormOpen] = useState(false);
   const [form, setForm] = useState({ ...EMPTY_FORM });
@@ -141,7 +137,7 @@ export default function RecruitmentPage() {
     onSuccess: (posting) => {
       toast.success('Vaga criada como rascunho. Ajuste o texto de divulgação e publique.');
       setDetailId(null);
-      router.push(`/servico-pessoal/recrutamento/vagas/${posting.id}`);
+      router.push(`/recrutamento/vagas/${posting.id}`);
     },
     onError: (error: any) => toast.error(error?.message ?? 'Não foi possível criar a vaga.'),
   });
@@ -196,14 +192,6 @@ export default function RecruitmentPage() {
         description="Da requisição de vaga à admissão: aprovação com travas de quadro/orçamento, divulgação no portal de carreiras, seleção com scorecard, proposta, pré-admissão com ASO e admissão integrada ao Serviço Pessoal."
         actions={
           <div className="flex flex-wrap gap-2">
-            <Link href="/servico-pessoal/recrutamento/vagas">
-              <Button variant="outline"><Briefcase className="mr-2 h-4 w-4" /> Vagas e candidatos</Button>
-            </Link>
-            {canHandleLgpd && (
-              <Link href="/servico-pessoal/recrutamento/lgpd">
-                <Button variant="outline"><ShieldCheck className="mr-2 h-4 w-4" /> LGPD</Button>
-              </Link>
-            )}
             {canCreate && (
               <Button onClick={() => setFormOpen(true)}><Plus className="mr-2 h-4 w-4" /> Nova requisição</Button>
             )}
@@ -222,8 +210,8 @@ export default function RecruitmentPage() {
         <button type="button" className="text-left" onClick={() => setStatusFilter('GROUP:recruitment')}>
           <MetricCard compact title="3 · No recrutamento" value={counts.recruitment} description="Aprovadas, criar vaga" icon={<Send className="h-3.5 w-3.5" />} tone={counts.recruitment > 0 ? 'blue' : 'neutral'} />
         </button>
-        <MetricCard compact title="4 · Vagas no ar" value={counts.published} description="Publicadas em carreiras" icon={<Megaphone className="h-3.5 w-3.5" />} tone={counts.published > 0 ? 'purple' : 'neutral'} href="/servico-pessoal/recrutamento/vagas" />
-        <MetricCard compact title="5 · Candidaturas" value={counts.applications} description="Recebidas nas vagas" icon={<Users className="h-3.5 w-3.5" />} tone={counts.applications > 0 ? 'blue' : 'neutral'} href="/servico-pessoal/recrutamento/vagas" />
+        <MetricCard compact title="4 · Vagas no ar" value={counts.published} description="Publicadas em carreiras" icon={<Megaphone className="h-3.5 w-3.5" />} tone={counts.published > 0 ? 'purple' : 'neutral'} href="/recrutamento/vagas" />
+        <MetricCard compact title="5 · Candidaturas" value={counts.applications} description="Recebidas nas vagas" icon={<Users className="h-3.5 w-3.5" />} tone={counts.applications > 0 ? 'blue' : 'neutral'} href="/recrutamento/vagas" />
         <button type="button" className="text-left" onClick={() => setStatusFilter('FILLED')}>
           <MetricCard compact title="6 · Preenchidas" value={counts.filled} description="Admissões concluídas" icon={<UserCheck className="h-3.5 w-3.5" />} tone={counts.filled > 0 ? 'green' : 'neutral'} />
         </button>

@@ -162,7 +162,7 @@ describe('WorkItemAggregationService', () => {
     const arg = prisma.workItemIndex.upsert.mock.calls[0][0];
     expect(arg.where.dedupeKey).toBe('RECRUIT_REQUISITION:r1:RECRUIT_REQUISITION_APPROVAL:u1');
     expect(arg.create.requiresDecision).toBe(true);
-    expect(arg.create.availableActions[0].href).toBe('/servico-pessoal/recrutamento');
+    expect(arg.create.availableActions[0].href).toBe('/recrutamento');
   });
 
   it('recrutamento: proposta fora da faixa pendente vira item de decisão com link da vaga', async () => {
@@ -182,7 +182,7 @@ describe('WorkItemAggregationService', () => {
     const arg = prisma.workItemIndex.upsert.mock.calls[0][0];
     expect(arg.where.dedupeKey).toBe('RECRUIT_OFFER:o1:RECRUIT_OFFER_APPROVAL:u1');
     expect(arg.create.title).toContain('Maria');
-    expect(arg.create.availableActions[0].href).toBe('/servico-pessoal/recrutamento/vagas/p1');
+    expect(arg.create.availableActions[0].href).toBe('/recrutamento/vagas/p1');
   });
 
   it('C&S: movimentação REQUESTED vira item para o aprovador, mas não para o próprio solicitante', async () => {

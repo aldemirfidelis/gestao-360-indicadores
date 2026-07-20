@@ -1212,7 +1212,7 @@ function RequisitionStatusChip({
           <Send className="mr-1 h-3 w-3" /> Solicitar ao Recrutamento
         </Button>
       )}
-      <Link href="/servico-pessoal/recrutamento" className="text-[10px] text-muted-foreground underline underline-offset-2 hover:text-foreground">
+      <Link href="/recrutamento" className="text-[10px] text-muted-foreground underline underline-offset-2 hover:text-foreground">
         Ver
       </Link>
     </div>
