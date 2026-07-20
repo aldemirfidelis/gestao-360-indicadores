@@ -1,4 +1,4 @@
-import { BadRequestException, Injectable, Logger, NotFoundException, UnauthorizedException } from '@nestjs/common';
+import { BadRequestException, ConflictException, Injectable, Logger, NotFoundException, UnauthorizedException } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import { createHmac, randomInt } from 'crypto';
 import * as bcrypt from 'bcryptjs';
@@ -13,9 +13,10 @@ const OTP_MAX_ATTEMPTS = 5;
 const isProd = () => process.env.NODE_ENV === 'production';
 
 /**
- * Autenticação do CANDIDATO (identidade separada). E-mail + OTP como caminho
- * principal; senha opcional. Token assinado com segredo próprio (nunca confundível
- * com o token interno). Em dev sem SMTP, o código é logado e devolvido em `devCode`.
+ * Autenticação do CANDIDATO (identidade separada). Caminho principal: e-mail + senha
+ * (cadastro já autentica, sem código). O fluxo de OTP por e-mail permanece disponível
+ * (endpoints request-code/login por code) para um futuro "esqueci minha senha". Token
+ * assinado com segredo próprio (nunca confundível com o token interno).
  */
 @Injectable()
 export class RecruitCandidateAuthService {
@@ -27,23 +28,22 @@ export class RecruitCandidateAuthService {
     private readonly careers: RecruitCareersService,
   ) {}
 
-  /** Cadastro do candidato (idempotente por e-mail): cria a conta e emite OTP de acesso. */
+  /** Cadastro do candidato: cria a conta por e-mail + senha e já autentica (sem código). */
   async register(host: string | undefined, empresa: string | undefined, body: any = {}) {
     const company = await this.careers.resolveCompany(host, empresa);
     const email = normalizeEmail(body?.email);
     const name = String(body?.name ?? '').trim();
+    const password = String(body?.password ?? '');
     if (!isValidEmail(email)) throw new BadRequestException('E-mail inválido.');
     if (name.length < 2) throw new BadRequestException('Informe seu nome.');
+    if (password.length < 6) throw new BadRequestException('A senha deve ter ao menos 6 caracteres.');
 
     const existing = await this.prisma.recruitCandidate.findFirst({
       where: { companyId: company.id, emailNormalized: email, deletedAt: null },
     });
-    if (existing) {
-      if (existing.status !== 'ACTIVE') throw new BadRequestException('Conta indisponível. Contate a empresa.');
-      // Não vazamos se já existe: seguimos o mesmo fluxo de envio de código.
-      return this.issueOtp(company.id, existing.id, existing.email, 'LOGIN');
-    }
-    const passwordHash = body?.password ? await bcrypt.hash(String(body.password), 10) : null;
+    if (existing) throw new ConflictException('Já existe uma conta com este e-mail. Faça login com sua senha.');
+
+    const passwordHash = await bcrypt.hash(password, 10);
     const candidate = await this.prisma.recruitCandidate.create({
       data: {
         companyId: company.id,
@@ -57,7 +57,8 @@ export class RecruitCandidateAuthService {
         passwordHash,
       },
     });
-    return this.issueOtp(company.id, candidate.id, candidate.email, 'VERIFY');
+    // Login imediato: devolve o token, sem passar por código de e-mail.
+    return this.tokenFor(candidate.id, company.id, candidate.email, candidate.name);
   }
 
   /** Solicita um novo código (login sem senha). Resposta neutra p/ não revelar cadastro. */
@@ -88,7 +89,7 @@ export class RecruitCandidateAuthService {
       const ok = await bcrypt.compare(String(body.password), candidate.passwordHash);
       if (!ok) throw new UnauthorizedException('Credenciais inválidas.');
     } else {
-      throw new BadRequestException('Informe o código enviado por e-mail ou sua senha.');
+      throw new BadRequestException('Informe sua senha.');
     }
 
     await this.prisma.recruitCandidate.update({ where: { id: candidate.id }, data: { lastLoginAt: new Date() } });

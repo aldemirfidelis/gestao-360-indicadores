@@ -21,7 +21,6 @@ interface Vacancy {
 }
 interface Data { company: { name: string; slug: string | null; logoUrl: string | null }; vacancy: Vacancy }
 interface ScreeningQuestion { id: string; order: number; type: string; question: string; required: boolean; options: unknown }
-interface OtpResponse { sent: boolean; email?: string; devCode?: string }
 interface ApplyResponse { id: string; status: string }
 
 const API = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:3333/api';
@@ -83,30 +82,16 @@ function VacancyDetailContent() {
   const v = data?.vacancy;
   const missingRequired = questions.some((q) => q.required && isEmptyAnswer(screeningAnswers[q.id]));
 
-  async function requestCode() {
-    setAuthLoading(true); setAuthMessage(null);
-    try {
-      const result = await candidateApi<OtpResponse>(`/careers/candidates/request-code${suffix}`, {
-        method: 'POST',
-        json: { email: authForm.email },
-      });
-      setAuthMessage(result.devCode ? `Codigo de desenvolvimento: ${result.devCode}` : 'Codigo enviado para seu e-mail.');
-    } catch (e) {
-      setAuthMessage((e as Error).message);
-    } finally {
-      setAuthLoading(false);
-    }
-  }
-
   async function register() {
     setAuthLoading(true); setAuthMessage(null);
     try {
-      const result = await candidateApi<OtpResponse>(`/careers/candidates/register${suffix}`, {
+      const session = await candidateApi<CandidateSession>(`/careers/candidates/register${suffix}`, {
         method: 'POST',
-        json: { name: authForm.name, email: authForm.email, phone: authForm.phone, password: authForm.password || undefined },
+        json: { name: authForm.name, email: authForm.email, phone: authForm.phone, password: authForm.password },
       });
-      setAuthMode('login');
-      setAuthMessage(result.devCode ? `Conta criada. Codigo de desenvolvimento: ${result.devCode}` : 'Conta criada. Confira o codigo enviado por e-mail.');
+      setCandidateToken(session.token);
+      setToken(session.token);
+      setAuthMessage(`Conta criada. Bem-vindo(a), ${session.candidate.name}.`);
     } catch (e) {
       setAuthMessage((e as Error).message);
     } finally {
@@ -119,7 +104,7 @@ function VacancyDetailContent() {
     try {
       const session = await candidateApi<CandidateSession>(`/careers/candidates/login${suffix}`, {
         method: 'POST',
-        json: { email: authForm.email, code: authForm.code || undefined, password: authForm.password || undefined },
+        json: { email: authForm.email, password: authForm.password },
       });
       setCandidateToken(session.token);
       setToken(session.token);
@@ -242,20 +227,15 @@ function VacancyDetailContent() {
                     </>
                   )}
                   <LabeledInput label="E-mail" value={authForm.email} onChange={(value) => setAuthForm((f) => ({ ...f, email: value }))} />
-                  <div className="grid gap-2 sm:grid-cols-[1fr_auto]">
-                    <LabeledInput label="Codigo recebido" value={authForm.code} onChange={(value) => setAuthForm((f) => ({ ...f, code: value }))} />
-                    <button onClick={requestCode} disabled={authLoading || !authForm.email} className="rounded-md border px-3 py-2 text-xs font-semibold hover:bg-slate-50 disabled:opacity-50 dark:border-slate-700 dark:hover:bg-slate-800">
-                      Enviar codigo
-                    </button>
-                  </div>
-                  <LabeledInput label="Senha opcional" type="password" value={authForm.password} onChange={(value) => setAuthForm((f) => ({ ...f, password: value }))} />
+                  <LabeledInput label="Senha" type="password" value={authForm.password} onChange={(value) => setAuthForm((f) => ({ ...f, password: value }))} />
+                  {authMode === 'register' && <p className="text-[11px] text-slate-400">Mínimo de 6 caracteres.</p>}
                   {authMessage && <div className="rounded-md border bg-slate-50 p-3 text-xs text-slate-600 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-300">{authMessage}</div>}
                   <button
                     onClick={authMode === 'register' ? register : login}
-                    disabled={authLoading || !authForm.email || (authMode === 'register' && !authForm.name)}
+                    disabled={authLoading || !authForm.email || !authForm.password || (authMode === 'register' && !authForm.name)}
                     className="flex w-full items-center justify-center gap-2 rounded-md bg-sky-600 px-4 py-3 text-sm font-semibold text-white transition hover:bg-sky-700 disabled:cursor-not-allowed disabled:opacity-50"
                   >
-                    <LogIn className="h-4 w-4" /> {authLoading ? 'Aguarde...' : authMode === 'register' ? 'Criar e receber codigo' : 'Entrar para candidatar-se'}
+                    <LogIn className="h-4 w-4" /> {authLoading ? 'Aguarde...' : authMode === 'register' ? 'Criar conta e candidatar-se' : 'Entrar para candidatar-se'}
                   </button>
                 </div>
               )}
