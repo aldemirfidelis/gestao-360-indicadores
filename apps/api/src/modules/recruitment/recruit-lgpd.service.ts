@@ -36,8 +36,11 @@ export class RecruitLgpdService {
 
   /** Bundle legível dos dados que a empresa guarda do candidato (acesso/portabilidade). */
   async exportCandidateData(me: AuthPayload, candidateId: string) {
-    const candidate = await this.prisma.recruitCandidate.findFirst({ where: { id: candidateId, companyId: me.companyId } });
+    // Candidato é global: autoriza pelo vínculo (candidatura a uma vaga DESTA empresa).
+    const candidate = await this.prisma.recruitCandidate.findFirst({ where: { id: candidateId } });
     if (!candidate) throw new NotFoundException('Candidato não encontrado.');
+    const linked = await this.prisma.recruitApplication.count({ where: { candidateId, companyId: me.companyId } });
+    if (!linked) throw new NotFoundException('Candidato não encontrado.');
 
     const [applications, documents, consents, offers] = await Promise.all([
       this.prisma.recruitApplication.findMany({
@@ -118,8 +121,16 @@ export class RecruitLgpdService {
 
   /** Anonimiza PII do candidato e remove seus documentos; preserva o histórico da candidatura para defesa legal do processo seletivo. */
   private async anonymizeCandidate(me: AuthPayload, candidateId: string) {
-    const candidate = await this.prisma.recruitCandidate.findFirst({ where: { id: candidateId, companyId: me.companyId } });
+    const candidate = await this.prisma.recruitCandidate.findFirst({ where: { id: candidateId } });
     if (!candidate || candidate.status === 'ANONYMIZED') return;
+    // Candidato é GLOBAL: uma empresa não pode apagar a identidade se ele tem candidaturas
+    // em OUTRAS empresas — nesse caso remove só os documentos desta empresa.
+    const otherCompanyApps = await this.prisma.recruitApplication.count({ where: { candidateId, companyId: { not: me.companyId } } });
+    if (otherCompanyApps > 0) {
+      await this.prisma.recruitCandidateDocument.updateMany({ where: { candidateId, companyId: me.companyId, deletedAt: null }, data: { deletedAt: new Date() } });
+      await this.audit.record(me, { module: MODULE, entity: 'RecruitCandidate', entityId: candidateId, action: 'ANONYMIZE', message: 'Dados do candidato nesta empresa removidos (identidade global preservada — há candidaturas em outras empresas)' });
+      return;
+    }
     const placeholder = `anonimizado+${candidate.id}@removido.invalid`;
     await this.prisma.$transaction([
       this.prisma.recruitCandidate.update({

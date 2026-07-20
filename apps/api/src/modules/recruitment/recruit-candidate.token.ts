@@ -18,8 +18,7 @@ export function candidateJwtSecret(): string {
 export const CANDIDATE_TOKEN_TTL = process.env.RECRUIT_CANDIDATE_TTL ?? '2h';
 
 export interface CandidateTokenPayload {
-  sub: string; // candidateId
-  companyId: string;
+  sub: string; // candidateId — identidade GLOBAL do portal (sem empresa)
   email: string;
   kind: 'candidate';
 }

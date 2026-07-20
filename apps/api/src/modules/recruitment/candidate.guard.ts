@@ -5,7 +5,6 @@ import { candidateJwtSecret, CandidateTokenPayload } from './recruit-candidate.t
 
 export interface CandidateContext {
   id: string;
-  companyId: string;
   email: string;
   name: string;
 }
@@ -37,12 +36,12 @@ export class CandidateGuard implements CanActivate {
     if (payload.kind !== 'candidate' || !payload.sub) throw new UnauthorizedException('Token inválido.');
 
     const candidate = await this.prisma.recruitCandidate.findFirst({
-      where: { id: payload.sub, companyId: payload.companyId, deletedAt: null },
-      select: { id: true, companyId: true, email: true, name: true, status: true },
+      where: { id: payload.sub, deletedAt: null },
+      select: { id: true, email: true, name: true, status: true },
     });
     if (!candidate || candidate.status !== 'ACTIVE') throw new UnauthorizedException('Conta indisponível.');
 
-    req.candidate = { id: candidate.id, companyId: candidate.companyId, email: candidate.email, name: candidate.name };
+    req.candidate = { id: candidate.id, email: candidate.email, name: candidate.name };
     return true;
   }
 }

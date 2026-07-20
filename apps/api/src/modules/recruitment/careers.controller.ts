@@ -57,22 +57,35 @@ export class CareersController {
 
   // ------------------------------ candidato ------------------------------
 
+  // Conta GLOBAL do portal de vagas: login/cadastro NÃO dependem de empresa.
   @Public()
   @Post('candidates/register')
-  register(@Headers('host') host: string | undefined, @Query('empresa') empresa: string | undefined, @Body() body: any) {
-    return this.candidateAuth.register(host, empresa, body);
+  register(@Body() body: any) {
+    return this.candidateAuth.register(body);
   }
 
   @Public()
   @Post('candidates/request-code')
-  requestCode(@Headers('host') host: string | undefined, @Query('empresa') empresa: string | undefined, @Body() body: any) {
-    return this.candidateAuth.requestOtp(host, empresa, body);
+  requestCode(@Body() body: any) {
+    return this.candidateAuth.requestOtp(body);
   }
 
   @Public()
   @Post('candidates/login')
-  login(@Headers('host') host: string | undefined, @Query('empresa') empresa: string | undefined, @Body() body: any) {
-    return this.candidateAuth.login(host, empresa, body);
+  login(@Body() body: any) {
+    return this.candidateAuth.login(body);
+  }
+
+  @Public()
+  @Post('candidates/forgot-password')
+  forgotPassword(@Body() body: any) {
+    return this.candidateAuth.requestPasswordReset(body);
+  }
+
+  @Public()
+  @Post('candidates/reset-password')
+  resetPassword(@Body() body: any) {
+    return this.candidateAuth.resetPassword(body);
   }
 
   @Public()
@@ -95,10 +108,12 @@ export class CareersController {
   apply(
     @CurrentCandidate() candidate: CandidateContext,
     @Param('slug') slug: string,
+    @Headers('host') host: string | undefined,
+    @Query('empresa') empresa: string | undefined,
     @Body() body: any,
     @Req() req: { ip?: string; headers: Record<string, string | string[] | undefined> },
   ) {
-    return this.applications.apply(candidate, slug, body, {
+    return this.applications.apply(candidate, slug, empresa, host, body, {
       ip: req.ip,
       userAgent: Array.isArray(req.headers['user-agent']) ? req.headers['user-agent'][0] : req.headers['user-agent'],
     });

@@ -14100,7 +14100,9 @@ model RecruitPostingChannel {
 /// a empresa é a controladora LGPD dos dados. Auth por e-mail + OTP (senha opcional).
 model RecruitCandidate {
   id              String    @id @default(uuid())
-  companyId       String
+  // Identidade GLOBAL do portal de vagas: o candidato não pertence a uma empresa.
+  // (legado/opcional: empresa de origem do cadastro, informativo)
+  companyId       String?
   email           String
   emailNormalized String
   name            String
@@ -14125,7 +14127,7 @@ model RecruitCandidate {
   consents     RecruitConsent[]
   dataRequests RecruitDataRequest[]
 
-  @@unique([companyId, emailNormalized])
+  @@unique([emailNormalized])
   @@index([companyId, status])
   @@map("recruit_candidates")
 }
@@ -14133,7 +14135,7 @@ model RecruitCandidate {
 /// Códigos de uso único (login sem senha, verificação de e-mail, reset). Só o hash é guardado.
 model RecruitCandidateOtp {
   id          String           @id @default(uuid())
-  companyId   String
+  companyId   String?
   candidateId String
   candidate   RecruitCandidate @relation(fields: [candidateId], references: [id], onDelete: Cascade)
   purpose     String // LOGIN | VERIFY | RESET
@@ -14209,7 +14211,7 @@ model RecruitApplicationEvent {
 /// Arquivos do candidato (currículo, carta, certificados). Binário no storage; metadados aqui.
 model RecruitCandidateDocument {
   id               String                        @id @default(uuid())
-  companyId        String
+  companyId        String?
   candidateId      String
   candidate        RecruitCandidate              @relation(fields: [candidateId], references: [id], onDelete: Cascade)
   applicationId    String?
@@ -14254,7 +14256,7 @@ model RecruitConsent {
 /// Pedidos de direitos do titular (LGPD): acesso, exclusão, retificação, portabilidade.
 model RecruitDataRequest {
   id           String           @id @default(uuid())
-  companyId    String
+  companyId    String?
   candidateId  String
   candidate    RecruitCandidate @relation(fields: [candidateId], references: [id], onDelete: Cascade)
   type         String // ACCESS | DELETION | RECTIFICATION | PORTABILITY

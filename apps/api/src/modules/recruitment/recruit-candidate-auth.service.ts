@@ -28,9 +28,8 @@ export class RecruitCandidateAuthService {
     private readonly careers: RecruitCareersService,
   ) {}
 
-  /** Cadastro do candidato: cria a conta por e-mail + senha e já autentica (sem código). */
-  async register(host: string | undefined, empresa: string | undefined, body: any = {}) {
-    const company = await this.careers.resolveCompany(host, empresa);
+  /** Cadastro do candidato: conta GLOBAL do portal (e-mail + senha) e já autentica. Sem empresa. */
+  async register(body: any = {}) {
     const email = normalizeEmail(body?.email);
     const name = String(body?.name ?? '').trim();
     const password = String(body?.password ?? '');
@@ -38,15 +37,12 @@ export class RecruitCandidateAuthService {
     if (name.length < 2) throw new BadRequestException('Informe seu nome.');
     if (password.length < 6) throw new BadRequestException('A senha deve ter ao menos 6 caracteres.');
 
-    const existing = await this.prisma.recruitCandidate.findFirst({
-      where: { companyId: company.id, emailNormalized: email, deletedAt: null },
-    });
+    const existing = await this.prisma.recruitCandidate.findFirst({ where: { emailNormalized: email, deletedAt: null } });
     if (existing) throw new ConflictException('Já existe uma conta com este e-mail. Faça login com sua senha.');
 
     const passwordHash = await bcrypt.hash(password, 10);
     const candidate = await this.prisma.recruitCandidate.create({
       data: {
-        companyId: company.id,
         email,
         emailNormalized: email,
         name,
@@ -58,27 +54,25 @@ export class RecruitCandidateAuthService {
       },
     });
     // Login imediato: devolve o token, sem passar por código de e-mail.
-    return this.tokenFor(candidate.id, company.id, candidate.email, candidate.name);
+    return this.tokenFor(candidate.id, candidate.email, candidate.name);
   }
 
-  /** Solicita um novo código (login sem senha). Resposta neutra p/ não revelar cadastro. */
-  async requestOtp(host: string | undefined, empresa: string | undefined, body: any = {}) {
-    const company = await this.careers.resolveCompany(host, empresa);
+  /** Solicita um código (login sem senha). Resposta neutra p/ não revelar cadastro. Global. */
+  async requestOtp(body: any = {}) {
     const email = normalizeEmail(body?.email);
     if (!isValidEmail(email)) throw new BadRequestException('E-mail inválido.');
     const candidate = await this.prisma.recruitCandidate.findFirst({
-      where: { companyId: company.id, emailNormalized: email, deletedAt: null, status: 'ACTIVE' },
+      where: { emailNormalized: email, deletedAt: null, status: 'ACTIVE' },
     });
     if (!candidate) return { sent: true }; // resposta neutra (não confirma existência)
-    return this.issueOtp(company.id, candidate.id, candidate.email, 'LOGIN');
+    return this.issueOtp(candidate.id, candidate.email, 'LOGIN');
   }
 
-  /** Login por OTP ou por senha. Devolve token de candidato. */
-  async login(host: string | undefined, empresa: string | undefined, body: any = {}) {
-    const company = await this.careers.resolveCompany(host, empresa);
+  /** Login por senha (ou OTP, legado). Global — o candidato não pertence a uma empresa. */
+  async login(body: any = {}) {
     const email = normalizeEmail(body?.email);
     const candidate = await this.prisma.recruitCandidate.findFirst({
-      where: { companyId: company.id, emailNormalized: email, deletedAt: null, status: 'ACTIVE' },
+      where: { emailNormalized: email, deletedAt: null, status: 'ACTIVE' },
     });
     if (!candidate) throw new UnauthorizedException('Credenciais inválidas.');
 
@@ -93,7 +87,38 @@ export class RecruitCandidateAuthService {
     }
 
     await this.prisma.recruitCandidate.update({ where: { id: candidate.id }, data: { lastLoginAt: new Date() } });
-    return this.tokenFor(candidate.id, company.id, candidate.email, candidate.name);
+    return this.tokenFor(candidate.id, candidate.email, candidate.name);
+  }
+
+  /** "Esqueci minha senha": envia um código de redefinição por e-mail (resposta neutra). Global. */
+  async requestPasswordReset(body: any = {}) {
+    const email = normalizeEmail(body?.email);
+    if (!isValidEmail(email)) throw new BadRequestException('E-mail inválido.');
+    const candidate = await this.prisma.recruitCandidate.findFirst({
+      where: { emailNormalized: email, deletedAt: null, status: 'ACTIVE' },
+    });
+    if (!candidate) return { sent: true }; // não revela se o e-mail existe
+    return this.issueOtp(candidate.id, candidate.email, 'RESET');
+  }
+
+  /** Redefine a senha com o código recebido e já autentica. Global. */
+  async resetPassword(body: any = {}) {
+    const email = normalizeEmail(body?.email);
+    const code = String(body?.code ?? '').trim();
+    const password = String(body?.password ?? '');
+    if (!isValidEmail(email)) throw new BadRequestException('E-mail inválido.');
+    if (password.length < 6) throw new BadRequestException('A nova senha deve ter ao menos 6 caracteres.');
+    const candidate = await this.prisma.recruitCandidate.findFirst({
+      where: { emailNormalized: email, deletedAt: null, status: 'ACTIVE' },
+    });
+    if (!candidate) throw new UnauthorizedException('Não foi possível redefinir. Solicite um novo código.');
+    await this.consumeOtp(candidate.id, code);
+    const passwordHash = await bcrypt.hash(password, 10);
+    await this.prisma.recruitCandidate.update({
+      where: { id: candidate.id },
+      data: { passwordHash, emailVerifiedAt: candidate.emailVerifiedAt ?? new Date(), lastLoginAt: new Date() },
+    });
+    return this.tokenFor(candidate.id, candidate.email, candidate.name);
   }
 
   /** Perfil do candidato autenticado. */
@@ -119,12 +144,12 @@ export class RecruitCandidateAuthService {
 
   // ------------------------------ OTP interno ------------------------------
 
-  private async issueOtp(companyId: string, candidateId: string, email: string, purpose: 'LOGIN' | 'VERIFY' | 'RESET') {
+  private async issueOtp(candidateId: string, email: string, purpose: 'LOGIN' | 'VERIFY' | 'RESET') {
     const code = otpFromInt(randomInt(0, 1_000_000));
     await this.prisma.recruitCandidateOtp.create({
-      data: { companyId, candidateId, purpose, codeHash: hashCode(candidateId, code), expiresAt: new Date(Date.now() + OTP_TTL_MS) },
+      data: { candidateId, purpose, codeHash: hashCode(candidateId, code), expiresAt: new Date(Date.now() + OTP_TTL_MS) },
     });
-    const delivered = await this.sendCode(email, code);
+    const delivered = await this.sendCode(email, code, purpose);
     this.logger.log(`OTP ${purpose} p/ candidato ${candidateId} (entregue via ${delivered ? 'e-mail' : 'log'}).`);
     return { sent: true, email: maskEmail(email), ...(isProd() || delivered ? {} : { devCode: code }) };
   }
@@ -143,24 +168,24 @@ export class RecruitCandidateAuthService {
     await this.prisma.recruitCandidateOtp.update({ where: { id: otp.id }, data: { consumedAt: new Date() } });
   }
 
-  private async tokenFor(candidateId: string, companyId: string, email: string, name: string) {
-    const payload: CandidateTokenPayload = { sub: candidateId, companyId, email, kind: 'candidate' };
+  private async tokenFor(candidateId: string, email: string, name: string) {
+    const payload: CandidateTokenPayload = { sub: candidateId, email, kind: 'candidate' };
     const token = await this.jwt.signAsync(payload, { secret: candidateJwtSecret(), expiresIn: CANDIDATE_TOKEN_TTL });
     return { token, candidate: { id: candidateId, email, name } };
   }
 
   /** Envia o código por e-mail se houver SMTP; senão retorna false (cai no log/devCode). */
-  private async sendCode(email: string, code: string): Promise<boolean> {
+  private async sendCode(email: string, code: string, purpose: 'LOGIN' | 'VERIFY' | 'RESET' = 'LOGIN'): Promise<boolean> {
+    const isReset = purpose === 'RESET';
+    const subject = isReset ? `Redefinição de senha — código ${code}` : `Seu código de acesso: ${code}`;
+    const body = isReset
+      ? `Use o código ${code} para redefinir a senha do portal de vagas. Ele expira em 10 minutos. Se não foi você, ignore este e-mail.`
+      : `Use o código ${code} para acessar o portal de vagas. Ele expira em 10 minutos. Se não foi você, ignore este e-mail.`;
     try {
       const cfg = await resolveSmtpConfig(this.prisma);
       if (!cfg?.host) return false;
       const transporter = buildTransport(cfg);
-      await transporter.sendMail({
-        from: smtpFrom(cfg),
-        to: email,
-        subject: `Seu código de acesso: ${code}`,
-        text: `Use o código ${code} para acessar o portal de vagas. Ele expira em 10 minutos. Se não foi você, ignore este e-mail.`,
-      });
+      await transporter.sendMail({ from: smtpFrom(cfg), to: email, subject, text: body });
       return true;
     } catch (err) {
       this.logger.warn(`Falha ao enviar OTP por e-mail: ${(err as Error).message}`);

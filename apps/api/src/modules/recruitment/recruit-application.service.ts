@@ -5,6 +5,7 @@ import { AuditWriterService } from '../../common/audit/audit-writer.service';
 import { DocumentStorageService } from '../documents/document-storage.service';
 import { AuthPayload } from '../auth/auth.types';
 import { CandidateContext } from './candidate.guard';
+import { RecruitCareersService } from './recruit-careers.service';
 import { isPubliclyVisible } from './recruit-posting.logic';
 import { canRecruiterAct, canWithdraw, CONSENT_VERSION, safeFileName, validateUpload } from './recruit-candidate.logic';
 import { evaluateScreening } from './recruit-triage.logic';
@@ -23,15 +24,29 @@ export class RecruitApplicationService {
     private readonly prisma: PrismaService,
     private readonly audit: AuditWriterService,
     private readonly storage: DocumentStorageService,
+    private readonly careers: RecruitCareersService,
   ) {}
 
   // =============================== CANDIDATO ===============================
 
-  /** Candidata-se a uma vaga publicada. Exige consentimento explícito (LGPD). */
-  async apply(candidate: CandidateContext, vacancySlug: string, body: any = {}, ctx: { ip?: string; userAgent?: string } = {}) {
+  /**
+   * Candidata-se a uma vaga publicada. Exige consentimento explícito (LGPD).
+   * A empresa vem da VAGA (resolvida por empresa/host), não do candidato — a conta
+   * do candidato é global e pode se candidatar a vagas de qualquer empresa.
+   */
+  async apply(
+    candidate: CandidateContext,
+    vacancySlug: string,
+    empresa: string | undefined,
+    host: string | undefined,
+    body: any = {},
+    ctx: { ip?: string; userAgent?: string } = {},
+  ) {
     if (body?.consent !== true) throw new BadRequestException('É necessário aceitar o tratamento de dados (LGPD) para se candidatar.');
+    const company = await this.careers.resolveCompany(host, empresa);
+    const companyId = company.id;
     const posting = await this.prisma.recruitJobPosting.findFirst({
-      where: { companyId: candidate.companyId, slug: vacancySlug, deletedAt: null },
+      where: { companyId, slug: vacancySlug, deletedAt: null },
       include: { pipelineTemplate: { include: { stages: { orderBy: { order: 'asc' }, take: 1 } } } },
     });
     if (!posting || !isPubliclyVisible(posting)) throw new NotFoundException('Vaga não encontrada ou encerrada.');
@@ -40,7 +55,7 @@ export class RecruitApplicationService {
     if (dup) throw new ConflictException('Você já se candidatou a esta vaga.');
 
     const screeningQuestions = await this.prisma.recruitScreeningQuestion.findMany({
-      where: { companyId: candidate.companyId, postingId: posting.id, active: true },
+      where: { companyId, postingId: posting.id, active: true },
       orderBy: [{ order: 'asc' }, { createdAt: 'asc' }],
     });
     const screeningAnswers = normalizeScreeningAnswers(body?.answers);
@@ -52,7 +67,7 @@ export class RecruitApplicationService {
     const firstStageId = posting.pipelineTemplate?.stages[0]?.id ?? null;
     const application = await this.prisma.recruitApplication.create({
       data: {
-        companyId: candidate.companyId,
+        companyId,
         postingId: posting.id,
         candidateId: candidate.id,
         requisitionId: posting.requisitionId,
@@ -63,9 +78,9 @@ export class RecruitApplicationService {
         score: screening.score,
         events: {
           create: [
-            { companyId: candidate.companyId, type: 'CREATED', toStageId: firstStageId, actorType: 'CANDIDATE', actorId: candidate.id },
+            { companyId, type: 'CREATED', toStageId: firstStageId, actorType: 'CANDIDATE', actorId: candidate.id },
             ...(screening.knockoutFailed.length
-              ? [{ companyId: candidate.companyId, type: 'SCREENING_FLAG', note: `Falha em ${screening.knockoutFailed.length} pergunta(s) eliminatória(s).`, actorType: 'SYSTEM', actorId: null }]
+              ? [{ companyId, type: 'SCREENING_FLAG', note: `Falha em ${screening.knockoutFailed.length} pergunta(s) eliminatória(s).`, actorType: 'SYSTEM', actorId: null }]
               : []),
           ],
         },
@@ -73,7 +88,7 @@ export class RecruitApplicationService {
           create: screeningAnswers
             .filter((a) => screeningQuestions.some((q) => q.id === a.questionId))
             .map((a) => ({
-              companyId: candidate.companyId,
+              companyId,
               questionId: a.questionId,
               answer: a.answer as Prisma.InputJsonValue,
               passed: screening.passedByQuestion[a.questionId],
@@ -81,7 +96,7 @@ export class RecruitApplicationService {
         },
         consents: {
           create: {
-            companyId: candidate.companyId,
+            companyId,
             candidateId: candidate.id,
             purpose: 'RECRUITMENT',
             documentVersion: CONSENT_VERSION,
@@ -113,7 +128,7 @@ export class RecruitApplicationService {
     const app = await this.mineOrFail(candidate.id, id);
     if (!canWithdraw(app.status)) throw new ConflictException('Esta candidatura não pode mais ser cancelada.');
     await this.prisma.recruitApplication.update({ where: { id }, data: { status: 'WITHDRAWN', withdrawnAt: new Date() } });
-    await this.prisma.recruitApplicationEvent.create({ data: { companyId: candidate.companyId, applicationId: id, type: 'WITHDRAWN', actorType: 'CANDIDATE', actorId: candidate.id } });
+    await this.prisma.recruitApplicationEvent.create({ data: { companyId: app.companyId, applicationId: id, type: 'WITHDRAWN', actorType: 'CANDIDATE', actorId: candidate.id } });
     return { ok: true };
   }
 
@@ -123,25 +138,29 @@ export class RecruitApplicationService {
   async uploadDocument(candidate: CandidateContext, body: any = {}) {
     const check = validateUpload({ mimeType: body?.mimeType, sizeBytes: base64Size(body?.contentBase64) });
     if (!check.ok) throw new BadRequestException(check.error);
+    // Documento tem a empresa da CANDIDATURA (se vinculado); currículo geral do perfil
+    // não tem empresa (candidato é global no portal).
     let applicationId: string | null = null;
+    let companyId: string | null = null;
     if (body?.applicationId) {
       const app = await this.mineOrFail(candidate.id, String(body.applicationId));
       applicationId = app.id;
+      companyId = app.companyId;
     }
     const buffer = Buffer.from(String(body.contentBase64 ?? ''), 'base64');
     const fileName = safeFileName(body?.fileName ?? `curriculo.${check.ext}`);
-    const stored = await this.storage.putBinary(candidate.companyId, `recrutamento/${candidate.id}`, fileName, buffer, String(body.mimeType));
+    const stored = await this.storage.putBinary(companyId ?? 'portal-candidatos', `recrutamento/${candidate.id}`, fileName, buffer, String(body.mimeType));
     const kind = ['CV', 'COVER', 'CERTIFICATE', 'PORTFOLIO', 'OTHER'].includes(String(body?.kind)) ? String(body.kind) : 'CV';
     const doc = await this.prisma.recruitCandidateDocument.create({
       data: {
-        companyId: candidate.companyId, candidateId: candidate.id, applicationId, kind,
+        companyId, candidateId: candidate.id, applicationId, kind,
         fileName: stored.fileName, mimeType: stored.mimeType, sizeBytes: stored.sizeBytes, hashSha256: stored.hashSha256,
         storageProvider: stored.storageProvider, storageKey: stored.storageKey,
         scanStatus: 'SKIPPED', // sem antivírus configurado: marcado explicitamente (não "CLEAN")
       },
     });
-    if (applicationId) {
-      await this.prisma.recruitApplicationEvent.create({ data: { companyId: candidate.companyId, applicationId, type: 'DOC_ADDED', note: doc.fileName, actorType: 'CANDIDATE', actorId: candidate.id } });
+    if (applicationId && companyId) {
+      await this.prisma.recruitApplicationEvent.create({ data: { companyId, applicationId, type: 'DOC_ADDED', note: doc.fileName, actorType: 'CANDIDATE', actorId: candidate.id } });
     }
     return { id: doc.id, fileName: doc.fileName, kind: doc.kind, sizeBytes: doc.sizeBytes };
   }
@@ -171,7 +190,7 @@ export class RecruitApplicationService {
 
   async listMyDataRequests(candidate: CandidateContext) {
     return this.prisma.recruitDataRequest.findMany({
-      where: { candidateId: candidate.id, companyId: candidate.companyId },
+      where: { candidateId: candidate.id },
       orderBy: { requestedAt: 'desc' },
       select: { id: true, type: true, status: true, details: true, requestedAt: true, resolvedAt: true },
     });
@@ -182,9 +201,10 @@ export class RecruitApplicationService {
     if (!['ACCESS', 'DELETION', 'RECTIFICATION', 'PORTABILITY'].includes(type)) {
       throw new BadRequestException('Tipo de solicitação inválido.');
     }
+    // Conta global do candidato: a solicitação nasce sem empresa (o próprio candidato).
     return this.prisma.recruitDataRequest.create({
       data: {
-        companyId: candidate.companyId,
+        companyId: null,
         candidateId: candidate.id,
         type,
         details: text(body?.details),

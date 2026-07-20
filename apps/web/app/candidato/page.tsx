@@ -103,7 +103,7 @@ function CandidatePortalContent() {
   const suffix = companyQuery(empresa);
   const publicSuffix = empresa ? `?empresa=${encodeURIComponent(empresa)}` : '';
   const [token, setToken] = useState<string | null>(null);
-  const [authMode, setAuthMode] = useState<'login' | 'register'>('login');
+  const [authMode, setAuthMode] = useState<'login' | 'register' | 'reset'>('login');
   const [authForm, setAuthForm] = useState({ name: '', email: '', phone: '', code: '', password: '' });
   const [authMessage, setAuthMessage] = useState<string | null>(null);
   const [authLoading, setAuthLoading] = useState(false);
@@ -184,6 +184,34 @@ function CandidatePortalContent() {
       const session = await candidateApi<CandidateSession>(`/careers/candidates/login${suffix}`, {
         method: 'POST',
         json: { email: authForm.email, password: authForm.password },
+      });
+      setCandidateToken(session.token);
+      setToken(session.token);
+    } catch (e) {
+      setAuthMessage((e as Error).message);
+    } finally {
+      setAuthLoading(false);
+    }
+  }
+
+  async function requestReset() {
+    setAuthLoading(true); setAuthMessage(null);
+    try {
+      await candidateApi(`/careers/candidates/forgot-password`, { method: 'POST', json: { email: authForm.email } });
+      setAuthMessage('Se houver uma conta com este e-mail, enviamos um código de redefinição.');
+    } catch (e) {
+      setAuthMessage((e as Error).message);
+    } finally {
+      setAuthLoading(false);
+    }
+  }
+
+  async function doReset() {
+    setAuthLoading(true); setAuthMessage(null);
+    try {
+      const session = await candidateApi<CandidateSession>(`/careers/candidates/reset-password`, {
+        method: 'POST',
+        json: { email: authForm.email, code: authForm.code, password: authForm.password },
       });
       setCandidateToken(session.token);
       setToken(session.token);
@@ -333,29 +361,56 @@ function CandidatePortalContent() {
             </div>
             <UserRound className="h-8 w-8 text-sky-500" />
           </div>
-          <div className="mt-5 grid grid-cols-2 gap-2 rounded-md bg-slate-100 p-1 text-sm dark:bg-slate-800">
-            <button onClick={() => setAuthMode('login')} className={authMode === 'login' ? activeTab : inactiveTab}>Entrar</button>
-            <button onClick={() => setAuthMode('register')} className={authMode === 'register' ? activeTab : inactiveTab}>Criar conta</button>
-          </div>
+          {authMode !== 'reset' && (
+            <div className="mt-5 grid grid-cols-2 gap-2 rounded-md bg-slate-100 p-1 text-sm dark:bg-slate-800">
+              <button onClick={() => setAuthMode('login')} className={authMode === 'login' ? activeTab : inactiveTab}>Entrar</button>
+              <button onClick={() => setAuthMode('register')} className={authMode === 'register' ? activeTab : inactiveTab}>Criar conta</button>
+            </div>
+          )}
           <div className="mt-4 space-y-3">
-            {authMode === 'register' && (
+            {authMode === 'reset' ? (
               <>
-                <Input label="Nome" value={authForm.name} onChange={(value) => setAuthForm((f) => ({ ...f, name: value }))} />
-                <Input label="Telefone" value={authForm.phone} onChange={(value) => setAuthForm((f) => ({ ...f, phone: value }))} />
+                <div className="text-sm font-semibold">Redefinir senha</div>
+                <Input label="E-mail" value={authForm.email} onChange={(value) => setAuthForm((f) => ({ ...f, email: value }))} />
+                <button onClick={requestReset} disabled={authLoading || !authForm.email} className="w-full rounded-md border px-3 py-2 text-xs font-semibold hover:bg-slate-50 disabled:opacity-50 dark:border-slate-700 dark:hover:bg-slate-800">Enviar código de redefinição</button>
+                <Input label="Código recebido" value={authForm.code} onChange={(value) => setAuthForm((f) => ({ ...f, code: value }))} />
+                <Input label="Nova senha" type="password" value={authForm.password} onChange={(value) => setAuthForm((f) => ({ ...f, password: value }))} />
+                <p className="text-[11px] text-slate-400">Mínimo de 6 caracteres.</p>
+                {authMessage && <div className="rounded-md border bg-slate-50 p-3 text-xs text-slate-600 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-300">{authMessage}</div>}
+                <button
+                  onClick={doReset}
+                  disabled={authLoading || !authForm.email || !authForm.code || !authForm.password}
+                  className="flex w-full items-center justify-center gap-2 rounded-md bg-sky-600 px-4 py-3 text-sm font-semibold text-white hover:bg-sky-700 disabled:opacity-50"
+                >
+                  <LogIn className="h-4 w-4" /> {authLoading ? 'Aguarde...' : 'Redefinir e entrar'}
+                </button>
+                <button onClick={() => { setAuthMode('login'); setAuthMessage(null); }} className="w-full text-center text-xs text-slate-500 hover:underline">Voltar ao login</button>
+              </>
+            ) : (
+              <>
+                {authMode === 'register' && (
+                  <>
+                    <Input label="Nome" value={authForm.name} onChange={(value) => setAuthForm((f) => ({ ...f, name: value }))} />
+                    <Input label="Telefone" value={authForm.phone} onChange={(value) => setAuthForm((f) => ({ ...f, phone: value }))} />
+                  </>
+                )}
+                <Input label="E-mail" value={authForm.email} onChange={(value) => setAuthForm((f) => ({ ...f, email: value }))} />
+                <Input label="Senha" type="password" value={authForm.password} onChange={(value) => setAuthForm((f) => ({ ...f, password: value }))} />
+                {authMode === 'register' && <p className="text-[11px] text-slate-400">Mínimo de 6 caracteres.</p>}
+                {authMessage && <div className="rounded-md border bg-slate-50 p-3 text-xs text-slate-600 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-300">{authMessage}</div>}
+                <button
+                  onClick={authMode === 'register' ? register : login}
+                  disabled={authLoading || !authForm.email || !authForm.password || (authMode === 'register' && !authForm.name)}
+                  className="flex w-full items-center justify-center gap-2 rounded-md bg-sky-600 px-4 py-3 text-sm font-semibold text-white hover:bg-sky-700 disabled:opacity-50"
+                >
+                  <LogIn className="h-4 w-4" /> {authLoading ? 'Aguarde...' : authMode === 'register' ? 'Criar conta' : 'Entrar'}
+                </button>
+                {authMode === 'login' && (
+                  <button onClick={() => { setAuthMode('reset'); setAuthMessage(null); }} className="w-full text-center text-xs text-sky-600 hover:underline dark:text-sky-400">Esqueci minha senha</button>
+                )}
+                <Link href={`/carreiras${publicSuffix}`} className="block text-center text-xs text-sky-600 hover:underline dark:text-sky-400">Ver vagas abertas</Link>
               </>
             )}
-            <Input label="E-mail" value={authForm.email} onChange={(value) => setAuthForm((f) => ({ ...f, email: value }))} />
-            <Input label="Senha" type="password" value={authForm.password} onChange={(value) => setAuthForm((f) => ({ ...f, password: value }))} />
-            {authMode === 'register' && <p className="text-[11px] text-slate-400">Mínimo de 6 caracteres.</p>}
-            {authMessage && <div className="rounded-md border bg-slate-50 p-3 text-xs text-slate-600 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-300">{authMessage}</div>}
-            <button
-              onClick={authMode === 'register' ? register : login}
-              disabled={authLoading || !authForm.email || !authForm.password || (authMode === 'register' && !authForm.name)}
-              className="flex w-full items-center justify-center gap-2 rounded-md bg-sky-600 px-4 py-3 text-sm font-semibold text-white hover:bg-sky-700 disabled:opacity-50"
-            >
-              <LogIn className="h-4 w-4" /> {authLoading ? 'Aguarde...' : authMode === 'register' ? 'Criar conta' : 'Entrar'}
-            </button>
-            <Link href={`/carreiras${publicSuffix}`} className="block text-center text-xs text-sky-600 hover:underline dark:text-sky-400">Ver vagas abertas</Link>
           </div>
         </section>
       </main>

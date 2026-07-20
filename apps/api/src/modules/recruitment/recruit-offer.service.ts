@@ -190,8 +190,9 @@ export class RecruitOfferService {
   // ------------------------------ portal do candidato ------------------------------
 
   async listMyOffers(candidate: CandidateContext) {
+    // Candidato global: o escopo é a candidatura (application.candidateId), não a empresa.
     return this.prisma.recruitOffer.findMany({
-      where: { companyId: candidate.companyId, status: { in: ['SENT', 'ACCEPTED', 'DECLINED', 'EXPIRED'] }, application: { candidateId: candidate.id } },
+      where: { status: { in: ['SENT', 'ACCEPTED', 'DECLINED', 'EXPIRED'] }, application: { candidateId: candidate.id } },
       orderBy: { createdAt: 'desc' },
       include: { application: { include: { posting: { select: { title: true, slug: true, city: true, workMode: true } } } }, preAdmission: true },
     });
@@ -201,7 +202,7 @@ export class RecruitOfferService {
     const decision = String(body?.decision ?? '').toUpperCase();
     if (!['ACCEPT', 'DECLINE'].includes(decision)) throw new BadRequestException('Decisao invalida.');
     const offer = await this.prisma.recruitOffer.findFirst({
-      where: { id, companyId: candidate.companyId, application: { candidateId: candidate.id } },
+      where: { id, application: { candidateId: candidate.id } },
       include: { application: { include: { posting: true } } },
     });
     if (!offer) throw new NotFoundException('Proposta nao encontrada.');
@@ -213,14 +214,14 @@ export class RecruitOfferService {
     }
     if (decision === 'DECLINE') {
       const saved = await this.prisma.recruitOffer.update({ where: { id }, data: { status: 'DECLINED', declinedAt: new Date(), declineReason: text(body?.reason) } });
-      await this.prisma.recruitApplicationEvent.create({ data: { companyId: candidate.companyId, applicationId: offer.applicationId, type: 'OFFER_DECLINED', note: text(body?.reason), actorType: 'CANDIDATE', actorId: candidate.id } });
+      await this.prisma.recruitApplicationEvent.create({ data: { companyId: offer.companyId, applicationId: offer.applicationId, type: 'OFFER_DECLINED', note: text(body?.reason), actorType: 'CANDIDATE', actorId: candidate.id } });
       return saved;
     }
     return this.prisma.$transaction(async (tx) => {
       const saved = await tx.recruitOffer.update({ where: { id }, data: { status: 'ACCEPTED', acceptedAt: new Date() } });
-      await tx.recruitApplicationEvent.create({ data: { companyId: candidate.companyId, applicationId: offer.applicationId, type: 'OFFER_ACCEPTED', actorType: 'CANDIDATE', actorId: candidate.id } });
+      await tx.recruitApplicationEvent.create({ data: { companyId: offer.companyId, applicationId: offer.applicationId, type: 'OFFER_ACCEPTED', actorType: 'CANDIDATE', actorId: candidate.id } });
       await this.ensurePreAdmission(tx, {
-        companyId: candidate.companyId,
+        companyId: offer.companyId,
         applicationId: offer.applicationId,
         offerId: offer.id,
         admissionTargetDate: offer.startDate,
@@ -232,7 +233,7 @@ export class RecruitOfferService {
 
   async listMyPreAdmissions(candidate: CandidateContext) {
     return this.prisma.recruitPreAdmission.findMany({
-      where: { companyId: candidate.companyId, application: { candidateId: candidate.id }, status: { not: 'CANCELLED' } },
+      where: { application: { candidateId: candidate.id }, status: { not: 'CANCELLED' } },
       orderBy: { createdAt: 'desc' },
       include: {
         offer: true,
@@ -245,20 +246,20 @@ export class RecruitOfferService {
 
   async submitMyPreAdmissionDocument(candidate: CandidateContext, id: string, body: any = {}) {
     const req = await this.prisma.recruitPreAdmissionDocument.findFirst({
-      where: { id, companyId: candidate.companyId, preAdmission: { application: { candidateId: candidate.id } } },
+      where: { id, preAdmission: { application: { candidateId: candidate.id } } },
       include: { preAdmission: true },
     });
     if (!req) throw new NotFoundException('Documento solicitado nao encontrado.');
     if (!['PENDING', 'REJECTED', 'SUBMITTED'].includes(req.status)) throw new ConflictException('Este documento nao pode ser reenviado.');
     const docId = requiredText(body?.candidateDocumentId, 'Documento enviado e obrigatorio.');
-    const doc = await this.prisma.recruitCandidateDocument.findFirst({ where: { id: docId, companyId: candidate.companyId, candidateId: candidate.id, deletedAt: null } });
+    const doc = await this.prisma.recruitCandidateDocument.findFirst({ where: { id: docId, candidateId: candidate.id, deletedAt: null } });
     if (!doc) throw new NotFoundException('Documento do candidato nao encontrado.');
     const saved = await this.prisma.recruitPreAdmissionDocument.update({
       where: { id },
       data: { candidateDocumentId: doc.id, status: 'SUBMITTED', submittedAt: new Date(), reviewedById: null, reviewedAt: null, reviewNote: null },
     });
     await this.prisma.recruitPreAdmission.update({ where: { id: req.preAdmissionId }, data: { status: 'IN_DOCUMENTS' } });
-    await this.prisma.recruitApplicationEvent.create({ data: { companyId: candidate.companyId, applicationId: req.preAdmission.applicationId, type: 'PREHIRE_DOC_SUBMITTED', note: req.title, actorType: 'CANDIDATE', actorId: candidate.id } });
+    await this.prisma.recruitApplicationEvent.create({ data: { companyId: req.companyId, applicationId: req.preAdmission.applicationId, type: 'PREHIRE_DOC_SUBMITTED', note: req.title, actorType: 'CANDIDATE', actorId: candidate.id } });
     return saved;
   }
 
