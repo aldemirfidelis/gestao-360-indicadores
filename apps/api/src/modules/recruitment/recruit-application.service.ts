@@ -66,6 +66,9 @@ export class RecruitApplicationService {
       throw new BadRequestException('Responda todas as perguntas obrigatórias da vaga.');
     }
 
+    // Indicação: candidato chegou por link ?ref=<userId> de um colaborador desta empresa.
+    const referredByUserId = await this.resolveReferrer(companyId, text(body?.referredBy));
+
     const firstStageId = posting.pipelineTemplate?.stages[0]?.id ?? null;
     const application = await this.prisma.recruitApplication.create({
       data: {
@@ -73,7 +76,8 @@ export class RecruitApplicationService {
         postingId: posting.id,
         candidateId: candidate.id,
         requisitionId: posting.requisitionId,
-        source: 'CARREIRAS',
+        source: referredByUserId ? 'INDICACAO' : 'CARREIRAS',
+        referredByUserId,
         currentStageId: firstStageId,
         coverLetter: text(body?.coverLetter),
         answers: body?.answers && typeof body.answers === 'object' ? body.answers : undefined,
@@ -234,7 +238,8 @@ export class RecruitApplicationService {
         _count: { select: { documents: true } },
       },
     });
-    return apps;
+    const referrerNameById = await this.referrerNames(apps.map((a) => a.referredByUserId));
+    return apps.map((a) => ({ ...a, referrerName: a.referredByUserId ? referrerNameById.get(a.referredByUserId) ?? null : null }));
   }
 
   /** Detalhe de uma candidatura (recrutador): perfil, carta, timeline, documentos. */
@@ -260,8 +265,10 @@ export class RecruitApplicationService {
     });
     if (!app) throw new NotFoundException('Candidatura não encontrada.');
     const ownSubmitted = app.evaluations.some((evaluation) => evaluation.evaluatorId === me.sub && evaluation.status === 'SUBMITTED');
+    const referrerName = app.referredByUserId ? (await this.referrerNames([app.referredByUserId])).get(app.referredByUserId) ?? null : null;
     return {
       ...app,
+      referrerName,
       evaluations: ownSubmitted
         ? app.evaluations.filter((evaluation) => evaluation.status === 'SUBMITTED')
         : app.evaluations.filter((evaluation) => evaluation.evaluatorId === me.sub),
@@ -357,6 +364,21 @@ export class RecruitApplicationService {
     const posting = await this.prisma.recruitJobPosting.findFirst({ where: { id: postingId, companyId, deletedAt: null } });
     if (!posting) throw new NotFoundException('Vaga não encontrada.');
     return posting;
+  }
+
+  /** Valida que o ?ref= do link de indicação é um usuário interno ATIVO desta empresa (nunca de outra). */
+  private async resolveReferrer(companyId: string, userId: string | null): Promise<string | null> {
+    if (!userId) return null;
+    const user = await this.prisma.user.findFirst({ where: { id: userId, companyId, active: true, deletedAt: null }, select: { id: true } });
+    return user?.id ?? null;
+  }
+
+  /** Nome de exibição de indicadores (referredByUserId não tem relação Prisma formal — mesmo padrão de createdById/requesterId no schema). */
+  private async referrerNames(userIds: Array<string | null>): Promise<Map<string, string>> {
+    const ids = [...new Set(userIds.filter((id): id is string => Boolean(id)))];
+    if (!ids.length) return new Map();
+    const users = await this.prisma.user.findMany({ where: { id: { in: ids } }, select: { id: true, name: true } });
+    return new Map(users.map((u) => [u.id, u.name]));
   }
 }
 

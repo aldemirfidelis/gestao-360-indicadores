@@ -14182,6 +14182,8 @@ model RecruitApplication {
   candidate       RecruitCandidate      @relation(fields: [candidateId], references: [id], onDelete: Cascade)
   requisitionId   String?
   source          String                @default("CARREIRAS")
+  /// Usuário interno (colaborador) que indicou o candidato — link ?ref=<userId> na vaga pública.
+  referredByUserId String?
   status          String                @default("ACTIVE") // ACTIVE | HIRED | REJECTED | WITHDRAWN | DISQUALIFIED
   currentStageId  String?
   stage           RecruitPipelineStage? @relation(fields: [currentStageId], references: [id])

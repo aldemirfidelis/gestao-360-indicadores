@@ -132,7 +132,11 @@ export class RecruitPostingService {
       this.prisma.company.findUnique({ where: { id: me.companyId }, select: { slug: true } }),
     ]);
     if (!posting) throw new NotFoundException('Vaga não encontrada.');
-    return { ...posting, company: { slug: company?.slug ?? null } };
+    // allowsReferral vem da requisição de origem (campo já existia, era dado morto até o botão de indicação usá-lo).
+    const requisition = posting.requisitionId
+      ? await this.prisma.recruitRequisition.findFirst({ where: { id: posting.requisitionId, companyId: me.companyId }, select: { allowsReferral: true } })
+      : null;
+    return { ...posting, company: { slug: company?.slug ?? null }, allowsReferral: requisition?.allowsReferral ?? true };
   }
 
   async updatePosting(me: AuthPayload, id: string, body: any = {}) {

@@ -90,6 +90,7 @@ interface Admission {
 }
 export interface ApplicationDetail {
   id: string; status: string; appliedAt: string; currentStageId: string | null; coverLetter: string | null; score: number | null;
+  referrerName?: string | null;
   candidate: { id: string; name: string; email: string; phone: string | null; city: string | null; headline: string | null; tags?: string[] };
   posting: { id: string; title: string; slug: string };
   stage: { id: string; name: string; order: number } | null;
@@ -368,6 +369,7 @@ export function CandidateSheet({
                   <SheetTitle>{detail.candidate.name}</SheetTitle>
                   <StatusBadge {...badge(APPLICATION_STATUS, detail.status)} />
                   {typeof detail.score === 'number' && <Badge variant="outline" className="text-[10px]">triagem {detail.score} pts</Badge>}
+                  {detail.referrerName && <Badge variant="outline" className="gap-1 text-[10px] text-status-blue">indicado por {detail.referrerName}</Badge>}
                 </div>
                 <div className="text-xs text-muted-foreground">
                   {[detail.candidate.email, detail.candidate.phone, detail.candidate.city, detail.candidate.headline].filter(Boolean).join(' · ')}

@@ -39,6 +39,7 @@ function VacancyDetailContent() {
   const searchParams = useSearchParams();
   const vacancySlug = String(routeParams.slug ?? '');
   const empresa = useMemo(() => resolveCareersCompanySlug(searchParams.get('empresa')), [searchParams]);
+  const referredBy = searchParams.get('ref'); // link de indicação de um colaborador (?ref=<userId>)
   const [data, setData] = useState<Data | null>(null);
   const [questions, setQuestions] = useState<ScreeningQuestion[]>([]);
   const [screeningAnswers, setScreeningAnswers] = useState<Record<string, unknown>>({});
@@ -150,7 +151,7 @@ function VacancyDetailContent() {
     try {
       const result = await candidateApi<ApplyResponse>(`/careers/vacancies/${vacancySlug}/apply${suffix}`, {
         method: 'POST',
-        json: { coverLetter: applyForm.coverLetter, consent: applyForm.consent, answers: screeningAnswers },
+        json: { coverLetter: applyForm.coverLetter, consent: applyForm.consent, answers: screeningAnswers, referredBy: referredBy || undefined },
       });
       if (resume) await uploadResume(result.id, resume);
       setAppliedId(result.id);

@@ -5,7 +5,7 @@ import Link from 'next/link';
 import { useParams } from 'next/navigation';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
-import { ArrowLeft, ExternalLink, FileText, Megaphone, Pause, Play, Star, StopCircle, Users } from 'lucide-react';
+import { ArrowLeft, ExternalLink, FileText, Megaphone, Pause, Play, Share2, Star, StopCircle, Users } from 'lucide-react';
 import { PageHeader } from '@/components/shell/page-header';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -33,6 +33,7 @@ interface PostingDetail {
   pipelineTemplateId: string | null;
   pipelineTemplate?: { name: string; stages: PipelineStage[] } | null;
   company?: { slug: string | null } | null;
+  allowsReferral?: boolean;
 }
 interface Pipeline { id: string; name: string; isDefault: boolean }
 interface ScreeningQuestion { id: string; order: number; type: string; question: string; required: boolean; knockout: boolean }
@@ -48,7 +49,7 @@ export default function VacancyDetailPage() {
   const params = useParams<{ id: string }>();
   const postingId = params.id;
   const qc = useQueryClient();
-  const { hasPermission } = useAuth();
+  const { hasPermission, user } = useAuth();
   const canManage = hasPermission(['recruit:manage']);
 
   const [tab, setTab] = useState('pipeline');
@@ -176,6 +177,20 @@ export default function VacancyDetailPage() {
               <a href={publicVacancyPath(posting.slug, posting.company)} target="_blank" rel="noreferrer">
                 <Button size="sm" variant="outline"><ExternalLink className="mr-1 h-3.5 w-3.5" /> Página pública</Button>
               </a>
+            )}
+            {posting.status === 'PUBLISHED' && posting.allowsReferral !== false && user?.id && (
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={() => {
+                  const base = publicVacancyPath(posting.slug, posting.company);
+                  const url = `${window.location.origin}${base}${base.includes('?') ? '&' : '?'}ref=${user.id}`;
+                  navigator.clipboard.writeText(url);
+                  toast.success('Link de indicação copiado! Compartilhe para indicar candidatos.');
+                }}
+              >
+                <Share2 className="mr-1 h-3.5 w-3.5" /> Copiar link de indicação
+              </Button>
             )}
           </div>
         }
