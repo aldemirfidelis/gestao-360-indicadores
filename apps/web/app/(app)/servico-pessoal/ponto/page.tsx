@@ -409,7 +409,9 @@ export default function TimeClockPage() {
   const canTeam = hasPermission(['ponto:team', 'ponto:manage']);
   const canManage = hasPermission(['ponto:manage']);
 
-  const [tab, setTab] = useState(searchParams.get('tab') ?? 'meu-ponto');
+  // O "Meu Ponto" pessoal migrou para Minha Vida Funcional; aqui é a área do Serviço Pessoal.
+  const initialTab = searchParams.get('tab');
+  const [tab, setTab] = useState(initialTab && initialTab !== 'meu-ponto' ? initialTab : 'equipe');
   const [now, setNow] = useState(() => new Date());
   const [teamDay, setTeamDay] = useState('');
   const [reasonDialog, setReasonDialog] = useState<ReasonDialogState | null>(null);
@@ -430,6 +432,9 @@ export default function TimeClockPage() {
   const [templateForm, setTemplateForm] = useState(DEFAULT_TEMPLATE_FORM);
   const [assignForm, setAssignForm] = useState<{ templateId: string; userIds: string[]; cycleAnchorDay: string }>({ templateId: '', userIds: [], cycleAnchorDay: '' });
   const [mirrorMonth, setMirrorMonth] = useState(() => new Date().toISOString().slice(0, 7));
+  const [espelhoUserId, setEspelhoUserId] = useState('');
+  const [espelhoMonth, setEspelhoMonth] = useState(() => new Date().toISOString().slice(0, 7));
+  const [confWeek, setConfWeek] = useState(() => isoWeekStart(new Date()));
   const [importDialog, setImportDialog] = useState(false);
   const [importResult, setImportResult] = useState<{ imported: number; duplicates: number; errors: string[] } | null>(null);
   const [holidayYear, setHolidayYear] = useState(() => String(new Date().getFullYear()));
@@ -487,7 +492,17 @@ export default function TimeClockPage() {
   const optionsQuery = useQuery<{ users: Array<{ id: string; name: string; email: string; jobTitle: string | null }> }>({
     queryKey: ['time-clock', 'options'],
     queryFn: () => api('/personnel/options'),
-    enabled: canManage && (tab === 'escalas' || tab === 'fiscal'),
+    enabled: canManage && (tab === 'escalas' || tab === 'fiscal' || tab === 'espelho' || tab === 'conferencia'),
+  });
+  const userMirrorQuery = useQuery<MirrorResponse & { user: { id: string; name: string; email: string; jobTitle: string | null } }>({
+    queryKey: ['time-clock', 'user-mirror', espelhoUserId, espelhoMonth],
+    queryFn: () => api(`/personnel/time-clock/user/${espelhoUserId}?from=${espelhoMonth}-01&to=${monthEnd(espelhoMonth)}`),
+    enabled: canManage && tab === 'espelho' && Boolean(espelhoUserId),
+  });
+  const confOccurrencesQuery = useQuery<OccurrenceRow[]>({
+    queryKey: ['time-clock', 'conf-occurrences', confWeek],
+    queryFn: () => api<OccurrenceRow[]>(`/personnel/occurrences?status=OPEN&from=${confWeek}&to=${weekEndKey(confWeek)}`),
+    enabled: canManage && tab === 'conferencia',
   });
   const periodsQuery = useQuery<PeriodRow[]>({
     queryKey: ['time-clock', 'periods'],
@@ -813,13 +828,14 @@ export default function TimeClockPage() {
     <div className="space-y-6">
       <PageHeader
         title="Controle de Ponto"
-        description="Batida com geolocalização, espelho explicável, extratos internos, ajustes auditados, escalas semanais ou cíclicas e fechamento de competência."
+        description="Área do Serviço Pessoal: conferência da equipe, ajustes auditados, escalas, fechamento e arquivos fiscais. O ponto pessoal de cada colaborador fica em Minha Vida Funcional."
       />
 
       <Tabs value={tab} onValueChange={setTab} className="space-y-4">
         <TabsList className="bg-slate-100 dark:bg-slate-800">
-          <TabsTrigger value="meu-ponto" className="text-xs font-semibold"><Fingerprint className="mr-2 h-4 w-4" />Meu Ponto</TabsTrigger>
           {canTeam && <TabsTrigger value="equipe" className="text-xs font-semibold"><Users className="mr-2 h-4 w-4" />Equipe</TabsTrigger>}
+          {canManage && <TabsTrigger value="conferencia" className="text-xs font-semibold"><CheckCircle2 className="mr-2 h-4 w-4" />Conferência</TabsTrigger>}
+          {canManage && <TabsTrigger value="espelho" className="text-xs font-semibold"><History className="mr-2 h-4 w-4" />Espelho</TabsTrigger>}
           {canTeam && (
             <TabsTrigger value="ajustes" className="text-xs font-semibold">
               <ListChecks className="mr-2 h-4 w-4" />Ajustes
@@ -834,273 +850,194 @@ export default function TimeClockPage() {
           {canManage && <TabsTrigger value="fiscal" className="text-xs font-semibold"><ShieldCheck className="mr-2 h-4 w-4" />Fiscal</TabsTrigger>}
         </TabsList>
 
-        {/* ------------------------------ Meu Ponto ------------------------------ */}
-        <TabsContent value="meu-ponto">
-          <div className="grid grid-cols-1 gap-4 xl:grid-cols-[360px_1fr]">
-            <div className="space-y-4">
-              {/* Cartão de batida */}
-              <Card className="border border-slate-100 bg-white shadow-sm dark:border-slate-800/80 dark:bg-slate-900/50">
-                <CardContent className="space-y-4 p-5 text-center">
-                  <div className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
-                    {now.toLocaleDateString('pt-BR', { weekday: 'long', day: '2-digit', month: 'long' })}
-                  </div>
-                  <div className="font-mono text-4xl font-extrabold tabular-nums text-slate-900 dark:text-white">
-                    {now.toLocaleTimeString('pt-BR')}
-                  </div>
-                  <Button
-                    size="lg"
-                    className="h-12 w-full bg-sky-500 text-sm font-bold text-white hover:bg-sky-600"
-                    disabled={punch.isPending || summary?.period?.status === 'CLOSED'}
-                    onClick={() => punch.mutate()}
-                  >
-                    <AlarmClockCheck className="mr-2 h-5 w-5" />
-                    {punch.isPending
-                      ? 'Registrando...'
-                      : summary?.today?.nextKind === 'OUT'
-                        ? 'Registrar saída'
-                        : 'Registrar entrada'}
-                  </Button>
-                  <Button asChild variant="outline" size="lg" className="h-11 w-full border-cyan-500/40 text-cyan-700 hover:bg-cyan-500/5 dark:text-cyan-300">
-                    <Link href="/servico-pessoal/ponto-facial"><Camera className="mr-2 h-5 w-5" />Usar reconhecimento facial</Link>
-                  </Button>
-                  {summary?.today?.expectedEndAt && summary?.today?.nextKind === 'OUT' && (
-                    <div className="rounded-md border border-sky-400/30 bg-sky-500/5 p-2 text-[11px] text-sky-700 dark:text-sky-300">
-                      Saída prevista às <span className="font-bold tabular-nums">{formatTime(summary.today.expectedEndAt)}</span>
-                    </div>
-                  )}
-                  {summary?.today?.expectedStartAt && summary?.today?.nextKind === 'IN' && (summary?.today?.entries ?? []).length === 0 && (
-                    <div className="rounded-md border border-sky-400/30 bg-sky-500/5 p-2 text-[11px] text-sky-700 dark:text-sky-300">
-                      Próxima marcação esperada: entrada às <span className="font-bold tabular-nums">{formatTime(summary.today.expectedStartAt)}</span>
-                    </div>
-                  )}
-                  <div className="flex items-center justify-center gap-1 text-[10px] text-muted-foreground">
-                    <MapPin className="h-3 w-3" />A localização é registrada junto com a batida, quando autorizada.
-                  </div>
-                  {summary?.period?.status === 'CLOSED' && (
-                    <div className="rounded-md border border-status-red/40 bg-status-red/5 p-2 text-[11px] text-status-red">
-                      Competência {summary.period.ref} fechada — batidas bloqueadas.
-                    </div>
-                  )}
-                  <div className="border-t pt-3">
-                    <div className="mb-2 text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Batidas de hoje</div>
-                    {(summary?.today?.entries ?? []).length === 0 ? (
-                      <div className="text-xs text-muted-foreground">Nenhuma batida registrada hoje.</div>
-                    ) : (
-                      <div className="flex flex-wrap justify-center gap-1.5">
-                        {(summary?.today?.entries ?? []).map((entry) => (
-                          <span key={entry.id} className="inline-flex items-center rounded-md border bg-background">
-                            <Badge variant="outline" className={cn('border-0 text-[10px] tabular-nums', entry.kind === 'IN' ? 'text-status-green' : 'text-status-red')}>
-                              {entry.kind === 'IN' ? '→' : '←'} {formatTime(entry.punchedAt)}
-                              {entry.nsr ? ` · NSR ${entry.nsr}` : ''}
-                              {entry.source === 'MANUAL' && ' (ajuste)'}
-                              {entry.source === 'FACIAL' && ' (facial)'}
-                            </Badge>
-                            <button
-                              type="button"
-                              className="border-l px-1.5 py-1 text-muted-foreground transition hover:text-sky-600 disabled:opacity-50"
-                              disabled={Boolean(receiptEntryId)}
-                              title="Baixar extrato interno — não substitui comprovante REP-P"
-                              aria-label={`Baixar extrato interno da marcação${entry.nsr ? ` NSR ${entry.nsr}` : ''}`}
-                              onClick={() => void downloadReceipt(entry)}
-                            >
-                              <FileDown className="h-3 w-3" />
-                            </button>
-                          </span>
-                        ))}
+        {/* Meu Ponto pessoal migrou para Minha Vida Funcional. Fallback para quem nao e do Servico Pessoal. */}
+        {!canTeam && !canManage && (
+          <Card>
+            <CardContent className="flex flex-col items-center gap-3 py-12 text-center">
+              <Fingerprint className="h-8 w-8 text-sky-500" />
+              <div className="text-sm font-semibold">Seu ponto agora fica em Minha Vida Funcional</div>
+              <p className="max-w-md text-xs text-muted-foreground">
+                Para bater ponto, ver seu espelho e solicitar ajustes, acesse Minha Vida Funcional. Esta area e do Servico Pessoal.
+              </p>
+              <Button asChild variant="outline" size="sm">
+                <Link href="/servico-pessoal/meu-holerite">Ir para Minha Vida Funcional</Link>
+              </Button>
+            </CardContent>
+          </Card>
+        )}
+
+        {/* ------------------------------ Conferência semanal ------------------------------ */}
+        {canManage && (
+          <TabsContent value="conferencia">
+            {(() => {
+              const users = optionsQuery.data?.users ?? [];
+              const byUser = new Map<string, OccurrenceRow[]>();
+              for (const o of confOccurrencesQuery.data ?? []) {
+                const uid = o.user?.id;
+                if (!uid) continue;
+                const arr = byUser.get(uid) ?? [];
+                arr.push(o);
+                byUser.set(uid, arr);
+              }
+              const rows = users
+                .map((u) => ({ user: u, items: byUser.get(u.id) ?? [] }))
+                .sort((a, b) => b.items.length - a.items.length || a.user.name.localeCompare(b.user.name));
+              const pend = rows.filter((r) => r.items.length > 0);
+              const thisWeek = isoWeekStart(new Date());
+              const abrirEspelho = (userId: string) => {
+                setEspelhoUserId(userId);
+                setEspelhoMonth(confWeek.slice(0, 7));
+                setTab('espelho');
+              };
+              return (
+                <div className="space-y-4">
+                  <Card>
+                    <CardContent className="flex flex-wrap items-center justify-between gap-3 p-4">
+                      <div className="flex items-center gap-1">
+                        <Button variant="ghost" size="sm" className="h-8 px-2 text-xs" onClick={() => setConfWeek((w) => addDaysKey(w, -7))}>‹ semana anterior</Button>
+                        <span className="px-2 text-sm font-semibold tabular-nums">Semana de {weekRangeLabel(confWeek)}</span>
+                        <Button variant="ghost" size="sm" className="h-8 px-2 text-xs" disabled={confWeek >= thisWeek} onClick={() => setConfWeek((w) => addDaysKey(w, 7))}>próxima ›</Button>
                       </div>
-                    )}
-                    {(summary?.today?.entries ?? []).length > 0 && (
-                      <div className="mt-2 text-[9px] text-muted-foreground">O extrato interno não substitui o comprovante oficial de um REP-P.</div>
-                    )}
-                  </div>
-                </CardContent>
-              </Card>
-
-              {/* Resumo do mês */}
-              <Card className="border border-slate-100 bg-white shadow-sm dark:border-slate-800/80 dark:bg-slate-900/50">
-                <CardContent className="space-y-2 p-4 text-xs">
-                  <div className="font-semibold text-slate-800 dark:text-slate-200">Resumo do mês</div>
-                  <SummaryLine label="Horas previstas" value={minutesLabel(summary?.month?.plannedMinutes ?? 0)} />
-                  <SummaryLine label="Horas trabalhadas" value={minutesLabel(summary?.month?.workedMinutes ?? 0)} />
-                  <SummaryLine
-                    label="Banco de horas (mês)"
-                    value={`${monthBalance > 0 ? '+' : ''}${minutesLabel(monthBalance)}`}
-                    className={monthBalance > 0 ? 'text-status-green' : monthBalance < 0 ? 'text-status-red' : undefined}
-                  />
-                  <SummaryLine
-                    label="Banco acumulado"
-                    value={`${(summary?.bank?.totalMinutes ?? 0) > 0 ? '+' : ''}${minutesLabel(summary?.bank?.totalMinutes ?? 0)}`}
-                    className={(summary?.bank?.totalMinutes ?? 0) > 0 ? 'text-status-green' : (summary?.bank?.totalMinutes ?? 0) < 0 ? 'text-status-red' : undefined}
-                  />
-                  <SummaryLine label="Dias inconsistentes" value={String(summary?.month?.inconsistentDays ?? 0)} className={summary?.month?.inconsistentDays ? 'text-status-yellow' : undefined} />
-                  <SummaryLine label="Faltas" value={String(summary?.month?.absentDays ?? 0)} className={summary?.month?.absentDays ? 'text-status-red' : undefined} />
-                  {(bankQuery.data?.expiringSoonMinutes ?? 0) > 0 && (
-                    <div className="rounded-md border border-amber-400/40 bg-amber-500/5 p-2 text-[11px] text-amber-700 dark:text-amber-300">
-                      {minutesLabel(bankQuery.data!.expiringSoonMinutes)} do seu banco vencem nos próximos 30 dias.
-                    </div>
-                  )}
-                  <Button variant="outline" size="sm" className="mt-1 h-7 w-full text-[11px]" onClick={() => setBankOpen(true)}>
-                    <History className="mr-1.5 h-3.5 w-3.5" />Ver extrato do banco de horas
-                  </Button>
-                </CardContent>
-              </Card>
-
-              {/* Minhas solicitações */}
-              <Card className="border border-slate-100 bg-white shadow-sm dark:border-slate-800/80 dark:bg-slate-900/50">
-                <CardContent className="space-y-2 p-4 text-xs">
-                  <div className="font-semibold text-slate-800 dark:text-slate-200">Minhas solicitações de ajuste</div>
-                  {(myAdjustmentsQuery.data ?? []).length === 0 && <div className="text-muted-foreground">Nenhuma solicitação enviada.</div>}
-                  {(myAdjustmentsQuery.data ?? []).slice(0, 6).map((request) => (
-                    <div key={request.id} className="flex items-center justify-between gap-2 rounded-md border p-2">
-                      <div className="min-w-0">
-                        <div className="font-semibold tabular-nums">{formatDayKey(request.dayKey)}</div>
-                        <div className="truncate text-[10px] text-muted-foreground">{request.reason}</div>
+                      <div className="flex items-center gap-4 text-xs">
+                        <span className="flex items-center gap-1.5"><CheckCircle2 className="h-4 w-4 text-status-green" /><b className="tabular-nums">{rows.length - pend.length}</b> sem pendência</span>
+                        <span className="flex items-center gap-1.5"><AlertTriangle className="h-4 w-4 text-status-yellow" /><b className="tabular-nums">{pend.length}</b> com pendência</span>
+                        <span className="text-muted-foreground">de {rows.length} colaborador(es)</span>
                       </div>
-                      <Badge variant="outline" className={cn('shrink-0 text-[9px]', request.status === 'APPROVED' ? 'border-status-green/40 text-status-green' : request.status === 'REJECTED' ? 'border-status-red/40 text-status-red' : 'border-status-yellow/40 text-status-yellow')}>
-                        {ADJUSTMENT_STATUS_LABEL[request.status] ?? request.status}
-                      </Badge>
-                    </div>
-                  ))}
-                </CardContent>
-              </Card>
+                    </CardContent>
+                  </Card>
 
-              {/* Minhas ocorrências (últimos 60 dias) */}
-              <Card className="border border-slate-100 bg-white shadow-sm dark:border-slate-800/80 dark:bg-slate-900/50">
-                <CardContent className="space-y-2 p-4 text-xs">
-                  <div className="font-semibold text-slate-800 dark:text-slate-200">Minhas ocorrências</div>
-                  {(myOccurrencesQuery.data ?? []).length === 0 && (
-                    <div className="text-muted-foreground">Nenhuma ocorrência nos últimos 60 dias. 🎉</div>
-                  )}
-                  {(myOccurrencesQuery.data ?? []).slice(0, 6).map((occurrence) => (
-                    <div key={occurrence.id} className="flex items-center justify-between gap-2 rounded-md border p-2">
-                      <div className="min-w-0">
-                        <div className="font-semibold tabular-nums">{formatDayKey(occurrence.dayKey)}</div>
-                        <div className="truncate text-[10px] text-muted-foreground">
-                          {OCCURRENCE_TYPE_LABEL[occurrence.type] ?? occurrence.type}
-                          {occurrence.minutes ? ` · ${minutesLabel(occurrence.minutes)}` : ''}
+                  <Card>
+                    <CardContent className="p-0">
+                      {confOccurrencesQuery.isLoading ? (
+                        <div className="p-10 text-center text-sm text-muted-foreground">Carregando conferência…</div>
+                      ) : rows.length === 0 ? (
+                        <div className="p-10 text-center text-sm text-muted-foreground">Nenhum colaborador para conferir.</div>
+                      ) : pend.length === 0 ? (
+                        <div className="flex flex-col items-center gap-2 p-10 text-center">
+                          <CheckCircle2 className="h-8 w-8 text-status-green" />
+                          <div className="text-sm font-semibold">Semana sem pendências de ponto. 🎉</div>
+                          <p className="text-xs text-muted-foreground">Todos os {rows.length} colaboradores estão com a marcação em ordem nesta semana.</p>
                         </div>
-                      </div>
-                      <Badge
-                        variant="outline"
-                        className={cn(
-                          'shrink-0 text-[9px]',
-                          occurrence.status === 'OPEN' ? 'border-status-yellow/40 text-status-yellow' : occurrence.status === 'RESOLVED' ? 'border-status-green/40 text-status-green' : 'border-border text-muted-foreground',
-                        )}
-                      >
-                        {OCCURRENCE_STATUS_LABEL[occurrence.status]}
-                      </Badge>
-                    </div>
-                  ))}
-                  <div className="text-[9px] text-muted-foreground">
-                    Ocorrências em aberto podem ser resolvidas solicitando um ajuste ou abono do dia no espelho.
-                  </div>
-                </CardContent>
-              </Card>
-            </div>
+                      ) : (
+                        <div className="divide-y">
+                          {pend.map(({ user, items }) => (
+                            <div key={user.id} className="flex flex-wrap items-start justify-between gap-3 px-4 py-3">
+                              <div className="min-w-0">
+                                <div className="flex items-center gap-2">
+                                  <span className="text-sm font-semibold">{user.name}</span>
+                                  <Badge variant="outline" className="border-status-yellow/40 text-[10px] text-status-yellow">{items.length} pendência(s)</Badge>
+                                </div>
+                                <div className="mt-1 flex flex-wrap gap-1.5">
+                                  {items.slice(0, 8).map((o) => (
+                                    <span key={o.id} className="rounded border px-1.5 py-0.5 text-[10px] text-muted-foreground tabular-nums">
+                                      {formatDayKey(o.dayKey)} · {OCCURRENCE_TYPE_LABEL[o.type] ?? o.type}
+                                    </span>
+                                  ))}
+                                </div>
+                              </div>
+                              <Button variant="outline" size="sm" className="h-8 shrink-0 text-xs" onClick={() => abrirEspelho(user.id)}>
+                                <History className="mr-1 h-3.5 w-3.5" />Ver espelho
+                              </Button>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </CardContent>
+                  </Card>
+                  <p className="text-[11px] text-muted-foreground">
+                    Conferência semanal: colaboradores com ocorrências em aberto (faltas, batidas ausentes, atrasos) na semana. Abra o espelho para conferir e peça o ajuste/abono com evidências ao colaborador — que responde pela Minha Vida Funcional.
+                  </p>
+                </div>
+              );
+            })()}
+          </TabsContent>
+        )}
 
-            {/* Espelho do mês */}
+        {/* ------------------------------ Espelho por colaborador ------------------------------ */}
+        {canManage && (
+          <TabsContent value="espelho">
             <Card className="min-w-0 border border-slate-100 bg-white shadow-sm dark:border-slate-800/80 dark:bg-slate-900/50">
-              <div className="flex items-center justify-between border-b px-4 py-2.5">
-                <h3 className="flex items-center gap-2 text-sm font-semibold text-slate-800 dark:text-white">
-                  <History className="h-4 w-4 text-sky-500" />Espelho de ponto — {formatDayKey(`${mirrorMonth}-01`).slice(3)}
-                </h3>
+              <div className="flex flex-wrap items-center justify-between gap-2 border-b px-4 py-2.5">
+                <div className="flex items-center gap-2">
+                  <History className="h-4 w-4 text-sky-500" />
+                  <NativeSelect className="h-8 min-w-[220px] text-xs" value={espelhoUserId} onChange={(e) => setEspelhoUserId(e.target.value)}>
+                    <option value="">Selecione o colaborador…</option>
+                    {(optionsQuery.data?.users ?? []).map((u) => <option key={u.id} value={u.id}>{u.name}</option>)}
+                  </NativeSelect>
+                </div>
                 <div className="flex items-center gap-1">
-                  <Button variant="ghost" size="sm" className="h-7 px-2 text-xs" onClick={() => setMirrorMonth((m) => addMonths(m, -1))}>‹ mês anterior</Button>
-                  <Button variant="ghost" size="sm" className="h-7 px-2 text-xs" disabled={mirrorMonth >= currentMonth} onClick={() => setMirrorMonth((m) => addMonths(m, 1))}>próximo ›</Button>
+                  <Button variant="ghost" size="sm" className="h-7 px-2 text-xs" onClick={() => setEspelhoMonth((m) => addMonths(m, -1))}>‹ mês anterior</Button>
+                  <span className="px-1 text-xs font-semibold tabular-nums">{formatDayKey(`${espelhoMonth}-01`).slice(3)}</span>
+                  <Button variant="ghost" size="sm" className="h-7 px-2 text-xs" disabled={espelhoMonth >= currentMonth} onClick={() => setEspelhoMonth((m) => addMonths(m, 1))}>próximo ›</Button>
                 </div>
               </div>
               <CardContent className="overflow-x-auto p-0">
-                <table className="w-full min-w-[900px] text-xs">
-                  <thead className="border-b bg-slate-50/60 text-[10px] uppercase tracking-wider text-muted-foreground dark:bg-slate-900/40">
-                    <tr>
-                      <th className="px-4 py-2.5 text-left">Dia</th>
-                      <th className="px-2 py-2.5 text-left">Batidas</th>
-                      <th className="px-2 py-2.5 text-right">Prevista</th>
-                      <th className="px-2 py-2.5 text-right">Trabalhada</th>
-                      <th className="px-2 py-2.5 text-right">Saldo</th>
-                      <th className="px-2 py-2.5 text-left">Situação</th>
-                      <th className="px-4 py-2.5 text-right">Ações</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-slate-100 dark:divide-slate-800/60">
-                    {(mirror?.days ?? []).map((day) => (
-                      <tr key={day.dayKey} className={cn(day.dayKey === mirror?.today && 'bg-sky-50/40 dark:bg-sky-950/20')}>
-                        <td className="px-4 py-2 font-semibold tabular-nums">
-                          {formatDayKey(day.dayKey)} <span className="text-[10px] font-normal text-muted-foreground">{WEEKDAY_SHORT[day.weekday]}</span>
-                        </td>
-                        <td className="px-2 py-2">
-                          {day.entries.length === 0 ? (
-                            <span className="text-muted-foreground">—</span>
-                          ) : (
-                            <span className="flex flex-wrap gap-1">
-                              {day.entries.map((entry) => (
-                                <span key={entry.id} className="inline-flex items-center rounded border bg-background tabular-nums">
-                                  <span className="px-1.5 py-0.5" title={entry.nsr ? `NSR ${entry.nsr}` : undefined}>
+                {!espelhoUserId ? (
+                  <div className="p-10 text-center text-sm text-muted-foreground">Selecione um colaborador para ver o espelho de ponto do mês.</div>
+                ) : userMirrorQuery.isLoading ? (
+                  <div className="p-10 text-center text-sm text-muted-foreground">Carregando espelho…</div>
+                ) : (
+                  <table className="w-full min-w-[820px] text-xs">
+                    <thead className="border-b bg-slate-50/60 text-[10px] uppercase tracking-wider text-muted-foreground dark:bg-slate-900/40">
+                      <tr>
+                        <th className="px-4 py-2.5 text-left">Dia</th>
+                        <th className="px-2 py-2.5 text-left">Batidas</th>
+                        <th className="px-2 py-2.5 text-right">Prevista</th>
+                        <th className="px-2 py-2.5 text-right">Trabalhada</th>
+                        <th className="px-2 py-2.5 text-right">Saldo</th>
+                        <th className="px-2 py-2.5 text-left">Situação</th>
+                        <th className="px-4 py-2.5 text-right">Ações</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-100 dark:divide-slate-800/60">
+                      {(userMirrorQuery.data?.days ?? []).map((day) => (
+                        <tr key={day.dayKey} className={cn(day.dayKey === userMirrorQuery.data?.today && 'bg-sky-50/40 dark:bg-sky-950/20')}>
+                          <td className="px-4 py-2 font-semibold tabular-nums">
+                            {formatDayKey(day.dayKey)} <span className="text-[10px] font-normal text-muted-foreground">{WEEKDAY_SHORT[day.weekday]}</span>
+                          </td>
+                          <td className="px-2 py-2">
+                            {day.entries.length === 0 ? <span className="text-muted-foreground">—</span> : (
+                              <span className="flex flex-wrap gap-1">
+                                {day.entries.map((entry) => (
+                                  <span key={entry.id} className="rounded border bg-background px-1.5 py-0.5 tabular-nums" title={entry.nsr ? `NSR ${entry.nsr}` : undefined}>
                                     {formatTime(entry.punchedAt)}{entry.nsr ? ` · ${entry.nsr}` : ''}
                                   </span>
-                                  <button
-                                    type="button"
-                                    className="border-l px-1 py-0.5 text-muted-foreground hover:text-sky-600 disabled:opacity-50"
-                                    disabled={Boolean(receiptEntryId)}
-                                    title="Extrato interno — não substitui comprovante REP-P"
-                                    aria-label={`Baixar extrato interno da marcação${entry.nsr ? ` NSR ${entry.nsr}` : ''}`}
-                                    onClick={() => void downloadReceipt(entry)}
-                                  >
-                                    <FileDown className="h-3 w-3" />
-                                  </button>
-                                </span>
-                              ))}
-                            </span>
-                          )}
-                        </td>
-                        <td className="px-2 py-2 text-right tabular-nums">{day.plannedMinutes ? minutesLabel(day.plannedMinutes) : '—'}</td>
-                        <td className="px-2 py-2 text-right tabular-nums">{day.workedMinutes ? minutesLabel(day.workedMinutes) : '—'}</td>
-                        <td className={cn('px-2 py-2 text-right font-semibold tabular-nums', day.balanceMinutes > 0 ? 'text-status-green' : day.balanceMinutes < 0 ? 'text-status-red' : 'text-muted-foreground')}>
-                          {day.balanceMinutes ? `${day.balanceMinutes > 0 ? '+' : ''}${minutesLabel(day.balanceMinutes)}` : '—'}
-                        </td>
-                        <td className="px-2 py-2">
-                          <Badge variant="outline" className={cn('text-[10px]', STATUS_CLASS[day.status])} title={day.holiday ?? undefined}>
-                            {STATUS_LABEL[day.status]}
-                          </Badge>
-                          {day.holiday && day.status !== 'HOLIDAY' && (
-                            <Badge variant="outline" className="ml-1 border-amber-400/50 text-[9px] text-amber-600" title={day.holiday}>feriado</Badge>
-                          )}
-                          {day.adjustment?.status === 'REQUESTED' && (
-                            <Badge variant="outline" className="ml-1 border-status-yellow/40 text-[9px] text-status-yellow">ajuste pendente</Badge>
-                          )}
-                        </td>
-                        <td className="px-4 py-2 text-right">
-                          <div className="flex flex-wrap justify-end gap-1">
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              className="h-6 text-[10px]"
-                              disabled={!user?.id}
-                              onClick={() => user?.id && setExplainTarget({ userId: user.id, dayKey: day.dayKey })}
-                            >
+                                ))}
+                              </span>
+                            )}
+                          </td>
+                          <td className="px-2 py-2 text-right tabular-nums">{day.plannedMinutes ? minutesLabel(day.plannedMinutes) : '—'}</td>
+                          <td className="px-2 py-2 text-right tabular-nums">{day.workedMinutes ? minutesLabel(day.workedMinutes) : '—'}</td>
+                          <td className={cn('px-2 py-2 text-right font-semibold tabular-nums', day.balanceMinutes > 0 ? 'text-status-green' : day.balanceMinutes < 0 ? 'text-status-red' : 'text-muted-foreground')}>
+                            {day.balanceMinutes ? `${day.balanceMinutes > 0 ? '+' : ''}${minutesLabel(day.balanceMinutes)}` : '—'}
+                          </td>
+                          <td className="px-2 py-2">
+                            <Badge variant="outline" className={cn('text-[10px]', STATUS_CLASS[day.status])} title={day.holiday ?? undefined}>
+                              {STATUS_LABEL[day.status]}
+                            </Badge>
+                            {day.adjustment?.status === 'REQUESTED' && (
+                              <Badge variant="outline" className="ml-1 border-status-yellow/40 text-[9px] text-status-yellow">ajuste pendente</Badge>
+                            )}
+                          </td>
+                          <td className="px-4 py-2 text-right">
+                            <Button variant="ghost" size="sm" className="h-6 text-[10px]" onClick={() => setExplainTarget({ userId: espelhoUserId, dayKey: day.dayKey })}>
                               <Calculator className="mr-1 h-3 w-3" />Entenda o cálculo
                             </Button>
-                            {day.dayKey <= (mirror?.today ?? '') && (
-                              <Button
-                                variant="ghost"
-                                size="sm"
-                                className="h-6 text-[10px]"
-                                disabled={day.adjustment?.status === 'REQUESTED'}
-                                onClick={() => openAdjustDialog(day)}
-                              >
-                                Solicitar ajuste
-                              </Button>
-                            )}
-                          </div>
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                )}
               </CardContent>
+              {espelhoUserId && (
+                <p className="border-t px-4 py-2 text-[11px] text-muted-foreground">
+                  Pendências de ajuste são aprovadas na aba Ajustes. O colaborador solicita correções/abonos pela Minha Vida Funcional.
+                </p>
+              )}
             </Card>
-          </div>
-        </TabsContent>
+          </TabsContent>
+        )}
 
         {/* ------------------------------ Equipe ------------------------------ */}
         {canTeam && (
@@ -2668,6 +2605,31 @@ function addMonths(ref: string, delta: number): string {
   const [year, month] = ref.split('-').map(Number);
   const d = new Date(Date.UTC(year, month - 1 + delta, 1));
   return `${d.getUTCFullYear()}-${String(d.getUTCMonth() + 1).padStart(2, '0')}`;
+}
+
+/** Soma dias a uma data YYYY-MM-DD. */
+function addDaysKey(key: string, n: number): string {
+  const [y, m, d] = key.split('-').map(Number);
+  return new Date(Date.UTC(y, m - 1, d + n)).toISOString().slice(0, 10);
+}
+
+/** Segunda-feira (início ISO da semana) da data informada, como YYYY-MM-DD. */
+function isoWeekStart(date: Date): string {
+  const d = new Date(Date.UTC(date.getFullYear(), date.getMonth(), date.getDate()));
+  const day = d.getUTCDay(); // 0=Dom..6=Sáb
+  return addDaysKey(d.toISOString().slice(0, 10), day === 0 ? -6 : 1 - day);
+}
+
+/** Domingo (fim da semana) a partir da segunda-feira. */
+function weekEndKey(mondayKey: string): string {
+  return addDaysKey(mondayKey, 6);
+}
+
+/** Rótulo curto "dd/mm a dd/mm" de uma semana começando na segunda. */
+function weekRangeLabel(mondayKey: string): string {
+  const end = weekEndKey(mondayKey);
+  const fmt = (k: string) => `${k.slice(8, 10)}/${k.slice(5, 7)}`;
+  return `${fmt(mondayKey)} a ${fmt(end)}`;
 }
 
 /** Geolocalização com timeout curto: sem permissão/sinal, a batida segue sem coordenadas. */

@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { ChevronRight, Save, Sparkles } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { SectionCard } from '@/components/platform/section-card';
@@ -89,6 +89,16 @@ export function AnalysisWorkspace({
   const [pdcaSteps, setPdcaSteps] = useState<any[]>(session?.pdcaSteps?.length ? session.pdcaSteps : ['PLAN', 'DO', 'CHECK', 'ACT'].map((phase) => ({ phase, description: '', status: 'PENDING' })));
   // Encadeamento: causa provável marcada no Ishikawa "semeia" o 1º porquê do 5 Porquês.
   const [seedWhyAnswer, setSeedWhyAnswer] = useState<string | null>(null);
+  // Causa do Ishikawa que está sendo investigada no 5 Porquês agora — a causa raiz
+  // encontrada será ANCORADA nela (permite múltiplas causas raiz, uma por causa).
+  const [activeIshikawaCauseId, setActiveIshikawaCauseId] = useState<string | null>(null);
+  const ishikawaRef = useRef<any[]>(ishikawa);
+  useEffect(() => { ishikawaRef.current = ishikawa; }, [ishikawa]);
+  // Lista consolidada das causas raiz ancoradas (para o desvio/indicador e o PDCA).
+  const consolidatedRootText = () => consolidateRootCauses(ishikawaRef.current);
+  const anchoredRootCauses: Array<{ cause: string; rootCause: string }> = (ishikawa ?? [])
+    .filter((c: any) => (c?.rootCause ?? '').trim())
+    .map((c: any) => ({ cause: c.title || c.description || 'Causa', rootCause: String(c.rootCause).trim() }));
   // Encadeamento: causas vitais do Pareto semeiam o Ishikawa (opcional).
   const [seedIshikawaCauses, setSeedIshikawaCauses] = useState<Array<{ title: string; category?: string }> | null>(null);
   const ishikawaSession = action.analysisSessions.find((item) => item.method === 'ISHIKAWA');
@@ -129,7 +139,7 @@ export function AnalysisWorkspace({
             setMethod('ISHIKAWA');
           }}
           onSave={(items: ParetoItem[]) =>
-            onSave({ method: 'PARETO', problem, rootCause, fiveWhys, ishikawaCauses: ishikawa, maspSteps, pdcaSteps, data: { items } })
+            onSave({ method: 'PARETO', problem, rootCause: consolidatedRootText() || rootCause, fiveWhys, ishikawaCauses: ishikawa, maspSteps, pdcaSteps, data: { items } })
           }
         />
       )}
@@ -147,10 +157,21 @@ export function AnalysisWorkspace({
           seedAnswer={seedWhyAnswer}
           onSeedConsumed={() => setSeedWhyAnswer(null)}
           onGoToFiveW2H={() => setMethod('FIVE_W_TWO_H')}
-          onRootCauseChange={setRootCause}
+          onRootCauseChange={(text) => {
+            setRootCause(text);
+            // Ancora a causa raiz na causa do Ishikawa que originou este 5 Porquês
+            // e persiste a sessão do Ishikawa (fonte da lista consolidada).
+            if (!activeIshikawaCauseId) return;
+            const nextCauses = ishikawaRef.current.map((c: any) =>
+              c.id === activeIshikawaCauseId ? { ...c, rootCause: (text ?? '').trim() || null } : c,
+            );
+            ishikawaRef.current = nextCauses;
+            setIshikawa(nextCauses);
+            onSave({ method: 'ISHIKAWA', problem, rootCause: consolidateRootCauses(nextCauses), fiveWhys, ishikawaCauses: nextCauses, maspSteps, pdcaSteps });
+          }}
           onSave={(whyItems, nextRootCause = rootCause, extra) => {
             setFiveWhys(whyItems);
-            onSave({ method: 'FIVE_WHYS', problem, rootCause: nextRootCause, fiveWhys: deriveLegacyWhys(whyItems), ishikawaCauses: ishikawa, maspSteps, pdcaSteps, data: { items: whyItems, ...(extra ?? {}) } });
+            onSave({ method: 'FIVE_WHYS', problem, rootCause: consolidatedRootText() || nextRootCause, fiveWhys: deriveLegacyWhys(whyItems), ishikawaCauses: ishikawaRef.current, maspSteps, pdcaSteps, data: { items: whyItems, ...(extra ?? {}) } });
           }}
         />
       )}
@@ -167,15 +188,17 @@ export function AnalysisWorkspace({
           seedCauses={seedIshikawaCauses}
           onSeedConsumed={() => setSeedIshikawaCauses(null)}
           onRootCauseChange={setRootCause}
-          onSendToFiveWhys={(causeText) => {
+          onSendToFiveWhys={(causeText, causeId) => {
             const text = String(causeText ?? '').trim();
             if (!text) return;
             setSeedWhyAnswer(text);
+            setActiveIshikawaCauseId(causeId ?? null);
             setMethod('FIVE_WHYS');
           }}
           onSave={(causes, nextRootCause = rootCause) => {
             setIshikawa(causes);
-            onSave({ method: 'ISHIKAWA', problem, rootCause: nextRootCause, fiveWhys, ishikawaCauses: causes, maspSteps, pdcaSteps });
+            ishikawaRef.current = causes;
+            onSave({ method: 'ISHIKAWA', problem, rootCause: consolidateRootCauses(causes) || nextRootCause, fiveWhys, ishikawaCauses: causes, maspSteps, pdcaSteps });
           }}
         />
       )}
@@ -188,13 +211,14 @@ export function AnalysisWorkspace({
           session={pdcaSession}
           stages={pdcaSteps}
           rootCause={rootCause}
+          rootCauses={anchoredRootCauses}
           users={users}
           saving={saving}
           canEdit={canEdit}
           onRootCauseChange={setRootCause}
           onSave={(stages, nextRootCause = rootCause) => {
             setPdcaSteps(stages);
-            onSave({ method, problem, rootCause: nextRootCause, fiveWhys, ishikawaCauses: ishikawa, maspSteps, pdcaSteps: stages });
+            onSave({ method, problem, rootCause: consolidatedRootText() || nextRootCause, fiveWhys, ishikawaCauses: ishikawa, maspSteps, pdcaSteps: stages });
           }}
         />
       )}
@@ -237,7 +261,7 @@ export function AnalysisWorkspace({
             <Textarea rows={3} value={rootCause} onChange={(e) => setRootCause(e.target.value)} />
           </div>
           <div className="mt-4 flex justify-end">
-            <Button disabled={saving || !canEdit} onClick={() => onSave({ method, problem, rootCause, fiveWhys, ishikawaCauses: ishikawa, maspSteps, pdcaSteps })}>
+            <Button disabled={saving || !canEdit} onClick={() => onSave({ method, problem, rootCause: consolidatedRootText() || rootCause, fiveWhys, ishikawaCauses: ishikawa, maspSteps, pdcaSteps })}>
               <Save className="mr-2 h-4 w-4" />
               {saving ? 'Salvando...' : 'Salvar análise'}
             </Button>
@@ -303,6 +327,19 @@ export function updateArray(rows: any[], index: number, value: any) {
 
 function isVisibleAnalysisMethod(method: string | null | undefined): method is typeof VISIBLE_ANALYSIS_METHODS[number] {
   return Boolean(method && VISIBLE_ANALYSIS_METHODS.includes(method as typeof VISIBLE_ANALYSIS_METHODS[number]));
+}
+
+/**
+ * Consolida as causas raiz ANCORADAS nas causas do Ishikawa numa lista legível
+ * (uma linha por causa raiz encontrada), usada como causa raiz do desvio/indicador.
+ * Permite acompanhar TODAS as causas raiz, não só a última. Sem causa ancorada,
+ * devolve '' e o chamador mantém a causa raiz avulsa que já existia.
+ */
+function consolidateRootCauses(causes: any[] | undefined): string {
+  const list = (causes ?? []).filter((c) => (c?.rootCause ?? '').trim());
+  return list
+    .map((c) => `• ${String(c.rootCause).trim()} (de: ${c.title || c.description || 'causa'})`)
+    .join('\n');
 }
 
 /**

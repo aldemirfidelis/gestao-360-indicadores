@@ -43,6 +43,12 @@ export class PersonnelController {
     return this.service.teamMirror(me, day);
   }
 
+  @Get('time-clock/user/:userId')
+  @RequirePermissions('ponto:team', 'ponto:manage')
+  userMirror(@CurrentUser() me: AuthPayload, @Param('userId') userId: string, @Query('from') from?: string, @Query('to') to?: string) {
+    return this.service.userMirror(me, userId, from, to);
+  }
+
   @Get('time-clock/team/dashboard')
   @RequirePermissions('ponto:team')
   teamDashboard(@CurrentUser() me: AuthPayload) {

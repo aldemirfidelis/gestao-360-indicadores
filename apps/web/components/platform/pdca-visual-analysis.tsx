@@ -171,6 +171,7 @@ export function PDCAVisualAnalysis({
   session,
   stages: initialStages,
   rootCause,
+  rootCauses = [],
   users = [],
   saving,
   canEdit = true,
@@ -182,6 +183,7 @@ export function PDCAVisualAnalysis({
   session?: any;
   stages?: any[];
   rootCause: string;
+  rootCauses?: Array<{ cause: string; rootCause: string }>;
   users?: UserOption[];
   saving: boolean;
   canEdit?: boolean;
@@ -342,6 +344,20 @@ export function PDCAVisualAnalysis({
       {!canEdit && (
         <div className="border-b border-amber-200 bg-amber-50 px-4 py-2 text-xs font-medium text-amber-800">
           Você está em modo de visualização. Edição, conversão e checklist estão bloqueados.
+        </div>
+      )}
+
+      {rootCauses.length > 0 && (
+        <div className="border-b border-teal-200 bg-teal-50 px-4 py-2.5 text-xs text-teal-900">
+          <div className="mb-1 font-semibold">Causas raiz encontradas na análise ({rootCauses.length}) — acompanhe todas:</div>
+          <ul className="space-y-0.5">
+            {rootCauses.map((rc, i) => (
+              <li key={i} className="flex gap-1.5">
+                <span className="text-teal-500">•</span>
+                <span><span className="font-medium">{rc.rootCause}</span> <span className="text-teal-600">(de: {rc.cause})</span></span>
+              </li>
+            ))}
+          </ul>
         </div>
       )}
 

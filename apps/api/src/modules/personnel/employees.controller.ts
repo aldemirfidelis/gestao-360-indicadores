@@ -50,6 +50,12 @@ export class EmployeesController {
     return this.service.update(me, id, body);
   }
 
+  @Post(':id/portal-user')
+  @RequirePermissions('pessoal:update')
+  createPortalUser(@CurrentUser() me: AuthPayload, @Param('id') id: string, @Body() body: any) {
+    return this.service.createPortalUser(me, id, body);
+  }
+
   @Post(':id/dependents')
   @RequirePermissions('pessoal:update')
   addDependent(@CurrentUser() me: AuthPayload, @Param('id') id: string, @Body() body: any) {

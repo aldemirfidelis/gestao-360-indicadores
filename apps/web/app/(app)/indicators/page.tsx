@@ -145,6 +145,7 @@ interface IndicatorRow {
   unitLabel: string | null;
   periodicity: string;
   direction: string;
+  accumulation?: string | null;
   formula: string | null;
   source: string | null;
   status: string;
@@ -209,6 +210,7 @@ type IndicatorForm = {
   unitLabel: string;
   periodicity: string;
   direction: string;
+  accumulation: string;
   formula: string;
   source: string;
   status: string;
@@ -255,6 +257,7 @@ const EMPTY_FORM: IndicatorForm = {
   unitLabel: '',
   periodicity: 'MONTHLY',
   direction: 'HIGHER_BETTER',
+  accumulation: 'AVERAGE',
   formula: '',
   source: '',
   status: 'ACTIVE',
@@ -514,6 +517,7 @@ export default function IndicatorsPage() {
         unitLabel: form.unitLabel || null,
         periodicity: form.periodicity,
         direction: form.direction,
+        accumulation: form.accumulation,
         formula: form.formula || null,
         source: form.source || null,
         status: form.status,
@@ -570,6 +574,7 @@ export default function IndicatorsPage() {
       unitLabel: indicator.unitLabel ?? '',
       periodicity: indicator.periodicity,
       direction: indicator.direction,
+      accumulation: indicator.accumulation ?? 'AVERAGE',
       formula: indicator.formula ?? '',
       source: indicator.source ?? '',
       status: indicator.status,
@@ -1036,16 +1041,19 @@ function monthOptionsForYear(year: number): { value: string; label: string }[] {
   }));
 }
 
-function buildCumulativeAvg(values: Array<number | null | undefined>): Array<number | null> {
+function buildCumulative(values: Array<number | null | undefined>, accumulation?: string | null): Array<number | null> {
   const out: Array<number | null> = [];
   let sum = 0;
   let count = 0;
   for (const v of values) {
-    if (v !== null && v !== undefined && Number.isFinite(v)) {
-      sum += v;
+    const ok = v !== null && v !== undefined && Number.isFinite(v);
+    if (ok) {
+      sum += v as number;
       count += 1;
     }
-    out.push(count === 0 ? null : sum / count);
+    if (accumulation === 'FIXED') out.push(ok ? (v as number) : null);
+    else if (accumulation === 'SUM') out.push(count === 0 ? null : sum);
+    else out.push(count === 0 ? null : sum / count);
   }
   return out;
 }
@@ -1151,9 +1159,9 @@ function IndicatorManagementCard({
             noValueStub: null,
           }))
         : (() => {
-            const cumMeta = buildCumulativeAvg(monthlyHistory.map((p) => p.meta));
-            const cumReal = buildCumulativeAvg(monthlyHistory.map((p) => p.realizado));
-            const cumSecondary = buildCumulativeAvg(monthlyHistory.map((p) => p.secondaryTarget ?? null));
+            const cumMeta = buildCumulative(monthlyHistory.map((p) => p.meta), indicator.accumulation);
+            const cumReal = buildCumulative(monthlyHistory.map((p) => p.realizado), indicator.accumulation);
+            const cumSecondary = buildCumulative(monthlyHistory.map((p) => p.secondaryTarget ?? null), indicator.accumulation);
             return monthlyHistory.map((p, idx) => ({
               periodRef: p.periodRef,
               month: p.month,
@@ -1734,6 +1742,13 @@ function IndicatorFormDialog({
               {options?.directions.map((direction) => (
                 <option key={direction} value={direction}>{DIRECTION_LABEL[direction] ?? direction}</option>
               ))}
+            </NativeSelect>
+          </Field>
+          <Field label="Cálculo do acumulado (YTD)">
+            <NativeSelect value={form.accumulation} onChange={(e) => patchForm(setForm, { accumulation: e.target.value })}>
+              <option value="AVERAGE">Média do ano até o mês (padrão)</option>
+              <option value="SUM">Soma mês a mês (ex.: entrada de cana, volumes)</option>
+              <option value="FIXED">Fixo — não acumula (usa o valor do mês)</option>
             </NativeSelect>
           </Field>
           <Field label="Status">

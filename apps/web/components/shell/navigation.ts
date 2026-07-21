@@ -254,11 +254,11 @@ export const navSections: NavSection[] = [
     permissions: ['ponto:view', 'ponto:manage', 'pessoal:view', 'pessoal:manage', 'folha:view'],
     items: [
       { href: '/servico-pessoal/colaboradores', label: 'Colaboradores', description: 'Cadastro, prontuário 360°, dependentes e dossiê digital', icon: UserCheck, permissions: ['pessoal:view', 'pessoal:manage'] },
-      { href: '/servico-pessoal/ponto', label: 'Controle de Ponto', description: 'Bater ponto, espelho, ajustes, escalas e fechamento', icon: Clock, permissions: ['ponto:view', 'ponto:manage'] },
+      { href: '/servico-pessoal/ponto', label: 'Controle de Ponto', description: 'Conferência da equipe, espelho de todos, ajustes, escalas e fechamento', icon: Clock, permissions: ['ponto:team', 'ponto:manage'] },
       { href: '/servico-pessoal/ferias', label: 'Férias e Afastamentos', description: 'Saldos, solicitações com aprovação e atestados/afastamentos', icon: CalendarDays, permissions: [] },
       { href: '/servico-pessoal/admissoes', label: 'Admissão e Desligamento', description: 'Checklists de admissão/desligamento e saúde ocupacional (ASO)', icon: ClipboardCheck, permissions: ['pessoal:view', 'pessoal:manage'] },
       { href: '/servico-pessoal/folha', label: 'Folha de Pagamento', description: 'Cálculo de folha, holerites, competências e adiantamento', icon: Banknote, permissions: ['folha:view'] },
-      { href: '/servico-pessoal/meu-holerite', label: 'Minha Vida Funcional', description: 'Seus holerites e informe de rendimentos', icon: Wallet, permissions: [] },
+      { href: '/servico-pessoal/meu-holerite', label: 'Minha Vida Funcional', description: 'Seu ponto (bater ponto e espelho), holerites e informe de rendimentos', icon: Wallet, permissions: [] },
       { href: '/vagas-internas', label: 'Vagas Internas', description: 'Oportunidades abertas nesta empresa para colaboradores atuais', icon: Briefcase, permissions: [] },
       { href: '/servico-pessoal/relatorios', label: 'Relatórios', description: 'Turnover, absenteísmo, horas extras e exportação para a folha', icon: FileBarChart, permissions: ['pessoal:view', 'pessoal:manage'] },
       { href: '/servico-pessoal/configuracoes', label: 'Configurações', description: 'Numeração da matrícula e modelo do crachá de identificação', icon: Settings, permissions: ['pessoal:settings', 'pessoal:manage'] },

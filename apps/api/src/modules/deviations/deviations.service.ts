@@ -90,6 +90,16 @@ export class DeviationsService {
             dueDate: true,
             expectedResult: true,
             responsibleUser: { select: { id: true, name: true } },
+            tasks: {
+              orderBy: { position: 'asc' },
+              select: {
+                id: true,
+                title: true,
+                done: true,
+                rootCause: true,
+                assignedTo: { select: { id: true, name: true } },
+              },
+            },
           },
         },
         _count: { select: { causes: true, actions: true, analyses: true } },

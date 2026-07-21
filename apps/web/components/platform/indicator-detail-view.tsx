@@ -63,6 +63,7 @@ interface IndicatorDetail {
   unitLabel: string | null;
   periodicity: string;
   direction: string;
+  accumulation?: string | null;
   status: string;
   company?: { id: string; name: string } | null;
   ownerNode: { id: string; name: string; type: string; parent?: { id: string; name: string; type: string } | null };
@@ -164,6 +165,14 @@ interface DeviationSummary {
   _count?: { causes: number; actions: number; analyses: number };
 }
 
+interface LinkedTask {
+  id: string;
+  title: string;
+  done: boolean;
+  rootCause?: string | null;
+  assignedTo?: { id: string; name: string } | null;
+}
+
 interface LinkedAction {
   id: string;
   title: string;
@@ -171,6 +180,7 @@ interface LinkedAction {
   dueDate: string | null;
   expectedResult?: string | null;
   responsibleUser?: { id: string; name: string } | null;
+  tasks?: LinkedTask[];
 }
 
 interface CurrentTreatment {
@@ -384,9 +394,9 @@ export function IndicatorDetailView({
           noValueStub: null,
         }))
       : monthlyHistory.map((p, idx) => {
-          const cumMeta = buildCumulativeAvg(monthlyHistory.map((point) => point.meta));
-          const cumReal = buildCumulativeAvg(monthlyHistory.map((point) => point.realizado));
-          const cumSecondary = buildCumulativeAvg(monthlyHistory.map((point) => point.secondaryTarget));
+          const cumMeta = buildCumulative(monthlyHistory.map((point) => point.meta), ind.accumulation);
+          const cumReal = buildCumulative(monthlyHistory.map((point) => point.realizado), ind.accumulation);
+          const cumSecondary = buildCumulative(monthlyHistory.map((point) => point.secondaryTarget), ind.accumulation);
           return {
             ...p,
             displayMeta: cumMeta[idx],
@@ -1056,67 +1066,79 @@ function IndicatorDecisionCards({
       </DecisionCard>
 
       <DecisionCard tone="olive" title="Providências">
-        <p className="mb-3 text-sm leading-relaxed text-muted-foreground">
-          {immediateProvidence || 'Nenhuma providência imediata registrada no desvio. Registre o que a área fez para conter ou sanar momentaneamente o problema.'}
+        <p className="text-sm leading-relaxed text-muted-foreground">
+          {immediateProvidence || 'Nenhuma providência imediata registrada no desvio.'}
         </p>
-        <div className="mb-3">
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => onOpenDeviation(mainDeviation)}
-            disabled={openingDeviation || (!mainDeviation && !canCreateDeviation)}
-          >
-            <AlertTriangle className="mr-1.5 h-4 w-4" />
-            {mainDeviation ? 'Abrir desvio para análise' : 'Registrar Desvio'}
-          </Button>
-        </div>
-        <DecisionList>
-          <DecisionLink href={treatmentHref}>
-            {currentTreatment ? 'Abrir tratativa em andamento' : 'Ver fila de tratativas do indicador'}
-          </DecisionLink>
-          <DecisionLink href="/meetings">Agendar ou consultar reunião de alinhamento</DecisionLink>
-        </DecisionList>
       </DecisionCard>
 
       <DecisionCard tone="orange" title="Causa Raiz">
         <div className="mb-3 space-y-2 text-sm">
-          <p className="leading-relaxed text-foreground">
-            {rootCause
-              ? rootCause
-              : mainDeviation
-                ? 'Causa raiz ainda não consolidada no desvio.'
-                : 'Nenhum desvio registrado para consolidar causa raiz.'}
-          </p>
-          {latestAnalysis && (
+          {(() => {
+            const lines = (rootCause ?? '').split('\n').map((l) => l.replace(/^•\s*/, '').trim()).filter(Boolean);
+            if (lines.length > 1) {
+              return (
+                <ul className="space-y-1">
+                  {lines.map((line, i) => (
+                    <li key={i} className="flex gap-1.5 leading-relaxed text-foreground">
+                      <span className="text-orange-500">•</span><span>{line}</span>
+                    </li>
+                  ))}
+                </ul>
+              );
+            }
+            return (
+              <p className={cn('leading-relaxed', rootCause ? 'text-foreground' : 'text-muted-foreground')}>
+                {rootCause
+                  ? lines[0] ?? rootCause
+                  : mainDeviation
+                    ? 'Causa raiz ainda não consolidada no desvio.'
+                    : 'Nenhum desvio registrado para consolidar causa raiz.'}
+              </p>
+            );
+          })()}
+          {(rootCause ?? '').split('\n').filter((l) => l.trim()).length <= 1 && latestAnalysis && (
             <p className="rounded-md bg-muted/35 p-2 text-xs leading-relaxed text-muted-foreground">
               Última análise: {truncateText(latestAnalysis.content, 170)}
             </p>
           )}
         </div>
-        <div className="text-sm">
-          <button type="button" onClick={() => onOpenDeviation(mainDeviation)} className="text-left underline-offset-2 hover:underline">
-            {mainDeviation ? 'Abrir desvio para consolidar causa raiz' : 'Registrar desvio para análise de causa'}
-          </button>
-        </div>
       </DecisionCard>
 
       <DecisionCard tone="green" title="Plano de Ação">
-        <p className="mb-3 text-sm leading-relaxed text-muted-foreground">
-          {summarizeActionPlan(linkedActions, linkedActions.length)}
-        </p>
-        <DecisionList>
-          {linkedActions.slice(0, 3).map((action) => (
-            <DecisionLink key={action.id} href={`/actions/${action.id}`} onClick={onOpenAction ? () => onOpenAction(action.id) : undefined}>
-              {formatActionSummary(action)}
-            </DecisionLink>
-          ))}
-          {linkedActions.length === 0 && (
-            <DecisionLink href={deviationHref} onClick={() => onOpenDeviation(mainDeviation)}>
-              {mainDeviation ? 'Criar plano de ação a partir do desvio' : 'Registrar desvio antes do plano de ação'}
-            </DecisionLink>
-          )}
-          <DecisionLink href={actionsHref}>Ver todos os planos vinculados</DecisionLink>
-        </DecisionList>
+        {mainDeviation ? (
+          <div className="space-y-2 text-sm">
+            <div className="text-xs font-semibold text-foreground">
+              Plano do Desvio #{mainDeviation.number}
+              <span className="font-normal text-muted-foreground"> · {indicator.name}</span>
+            </div>
+            {(() => {
+              const tasks = linkedActions.flatMap((action) => action.tasks ?? []);
+              if (tasks.length === 0) {
+                return <p className="text-xs text-muted-foreground">Nenhuma tarefa vinculada ao plano ainda.</p>;
+              }
+              return (
+                <ul className="space-y-2">
+                  {tasks.map((task) => (
+                    <li key={task.id}>
+                      <div className="flex items-start gap-1.5">
+                        <span className={cn('mt-1 h-3 w-3 shrink-0 rounded-full border', task.done ? 'border-status-green bg-status-green/25' : 'border-muted-foreground/40')} />
+                        <span className={cn('leading-snug', task.done ? 'text-muted-foreground line-through' : 'text-foreground')}>{task.title}</span>
+                      </div>
+                      {(task.rootCause ?? '').trim() && (
+                        <div className="ml-[18px] mt-0.5 flex items-start gap-1 text-[10px] leading-snug text-muted-foreground">
+                          <span className="text-orange-500">↳</span>
+                          <span>Causa raiz: {task.rootCause}</span>
+                        </div>
+                      )}
+                    </li>
+                  ))}
+                </ul>
+              );
+            })()}
+          </div>
+        ) : (
+          <p className="text-sm text-muted-foreground">Registre o desvio para abrir o plano de ação.</p>
+        )}
       </DecisionCard>
     </aside>
   );
@@ -1206,7 +1228,7 @@ function IndicatorExportReport({
         </ExportDetailCard>
 
         <ExportDetailCard title="Causa raiz" tone="orange">
-          <p>{deviation?.rootCause?.trim() || 'Causa raiz ainda não consolidada.'}</p>
+          <p className="whitespace-pre-line">{deviation?.rootCause?.trim() || 'Causa raiz ainda não consolidada.'}</p>
           {latestAnalysis && <p><span className="font-semibold">Última análise:</span> {latestAnalysis.content}</p>}
         </ExportDetailCard>
 
@@ -1511,16 +1533,23 @@ function monthOptionsForYear(year: number): { value: string; label: string }[] {
   }));
 }
 
-function buildCumulativeAvg(values: Array<number | null | undefined>): Array<number | null> {
+/**
+ * Constrói a série "acumulada" (YTD) conforme o tipo do indicador:
+ * SUM = soma mês a mês, FIXED = não acumula (valor do próprio mês), AVERAGE = média (padrão).
+ */
+function buildCumulative(values: Array<number | null | undefined>, accumulation?: string | null): Array<number | null> {
   const out: Array<number | null> = [];
   let sum = 0;
   let count = 0;
   for (const value of values) {
-    if (value !== null && value !== undefined && Number.isFinite(value)) {
-      sum += value;
+    const ok = value !== null && value !== undefined && Number.isFinite(value);
+    if (ok) {
+      sum += value as number;
       count += 1;
     }
-    out.push(count === 0 ? null : sum / count);
+    if (accumulation === 'FIXED') out.push(ok ? (value as number) : null);
+    else if (accumulation === 'SUM') out.push(count === 0 ? null : sum);
+    else out.push(count === 0 ? null : sum / count);
   }
   return out;
 }

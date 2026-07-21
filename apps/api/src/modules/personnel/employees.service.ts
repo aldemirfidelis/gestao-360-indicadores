@@ -374,6 +374,32 @@ export class EmployeesService {
   }
 
   /**
+   * Cria o acesso ao portal (login para bater ponto/autoatendimento) de um colaborador
+   * que JÁ existe — admitido pelo recrutamento, importado ou cadastrado sem usuário.
+   * Login por CPF/matrícula (alias) ou e-mail. Idempotente: recusa se já houver vínculo.
+   */
+  async createPortalUser(me: AuthPayload, employeeId: string, input: any = {}) {
+    const employee = await this.prisma.orgEmployee.findFirst({
+      where: { id: employeeId, companyId: me.companyId },
+      include: { personnelProfile: { select: { userId: true, cpf: true } } },
+    });
+    if (!employee) throw new NotFoundException('Colaborador não encontrado.');
+    if (employee.personnelProfile?.userId) throw new ConflictException('Este colaborador já tem usuário do portal vinculado.');
+    // O prontuário é a âncora do vínculo (userId fica nele) — garante que exista.
+    if (!employee.personnelProfile) {
+      await this.prisma.personnelEmployeeProfile.create({ data: { companyId: me.companyId, employeeId, createdById: me.sub } });
+    }
+    await this.provisionPortalUser(me, {
+      employeeId,
+      name: employee.name,
+      cpf: employee.personnelProfile?.cpf ?? null,
+      registrationId: employee.registrationId,
+      input,
+    });
+    return this.getById(me, employeeId);
+  }
+
+  /**
    * Atribui a escala de trabalho ao colaborador reusando o motor do ponto
    * (assignSchedule é por USUÁRIO). Silencioso quando não há escala escolhida ou
    * usuário vinculado — a escala também pode ser definida em Ponto → Escalas.

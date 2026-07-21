@@ -143,13 +143,14 @@ export function FiveWhysVisualAnalysis({
     itemsRef.current = items;
   }, [items]);
 
-  // Semente vinda do Ishikawa: a causa provável vira a resposta do 1º porquê e encadeia o 2º.
+  // Semente vinda do Ishikawa: inicia uma análise NOVA. Zera o quadro (sem herdar as
+  // respostas/responsáveis de uma análise anterior — isso confundia o usuário) e usa a
+  // causa apenas como resposta do 1º porquê, encadeando a pergunta do 2º.
   useEffect(() => {
     const seed = (seedAnswer ?? '').trim();
     if (!seed) return;
-    const base = itemsRef.current.length ? itemsRef.current : items;
-    const next = base.map((item, i) => {
-      if (i === 0) return { ...item, answer: seed, status: (item.status === 'PENDING' ? 'IN_REVIEW' : item.status) as WhyStatus };
+    const next = normalizeItems(undefined, problem).map((item, i) => {
+      if (i === 0) return { ...item, answer: seed, status: 'IN_REVIEW' as WhyStatus };
       if (i === 1) return { ...item, question: inheritedQuestionFor(seed) };
       return item;
     });

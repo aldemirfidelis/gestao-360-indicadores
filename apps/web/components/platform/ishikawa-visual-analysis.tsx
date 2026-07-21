@@ -53,6 +53,8 @@ interface IshikawaCause {
   isRootCause: boolean;
   likelyRootCause?: boolean;
   convertedToTaskId?: string | null;
+  /** Causa raiz encontrada ao investigar esta causa nos 5 Porquês (ancoragem da análise). */
+  rootCause?: string | null;
 }
 
 interface Suggestion {
@@ -133,7 +135,7 @@ export function IshikawaVisualAnalysis({
   seedCauses?: Array<{ title: string; category?: string }> | null;
   onSeedConsumed?: () => void;
   onRootCauseChange: (value: string) => void;
-  onSendToFiveWhys?: (text: string) => void;
+  onSendToFiveWhys?: (text: string, causeId: string) => void;
   onSave: (causes: IshikawaCause[], rootCause?: string) => void;
 }) {
   const qc = useQueryClient();
@@ -496,7 +498,7 @@ export function IshikawaVisualAnalysis({
             if (!selectedCause) return;
             updateCause(selectedCause.id, { status: 'LIKELY_CAUSE' });
             handleSave();
-            onSendToFiveWhys(selectedCause.title);
+            onSendToFiveWhys(selectedCause.title, selectedCause.id);
           } : undefined}
         />
       </div>
@@ -706,6 +708,7 @@ function CauseCard({
             <PriorityBadge priority={cause.priority} />
             {cause.isAiSuggested && <Badge variant="outline" className="border-blue-200 bg-blue-50 text-blue-700">IA</Badge>}
             {cause.isRootCause && <Badge variant="outline" className="border-emerald-200 bg-emerald-50 text-emerald-700">Causa raiz</Badge>}
+            {(cause.rootCause ?? '').trim() && <Badge variant="outline" className="border-teal-200 bg-teal-50 text-teal-700" title={cause.rootCause ?? undefined}>✔ Causa raiz encontrada</Badge>}
             {cause.convertedToTaskId && <Badge variant="outline" className="border-indigo-200 bg-indigo-50 text-indigo-700">Plano criado</Badge>}
           </div>
         </div>
@@ -786,10 +789,16 @@ function CauseDrawer({
         </fieldset>
 
         <div className="space-y-2 border-t border-slate-200 pt-4">
+          {(cause.rootCause ?? '').trim() && (
+            <div className="rounded-md border border-teal-200 bg-teal-50 p-2.5 text-xs text-teal-800">
+              <div className="font-semibold">✔ Causa raiz encontrada nesta causa</div>
+              <div className="mt-1">{cause.rootCause}</div>
+            </div>
+          )}
           {onSendToFiveWhys && (
             <Button className="w-full justify-start bg-emerald-600 hover:bg-emerald-700" onClick={onSendToFiveWhys} disabled={!canEdit}>
               <ArrowRight className="mr-2 h-4 w-4" />
-              Investigar nos 5 Porquês
+              {(cause.rootCause ?? '').trim() ? 'Reabrir no 5 Porquês' : 'Investigar nos 5 Porquês'}
             </Button>
           )}
           <Button variant="ghost" className="w-full justify-start text-red-600 hover:text-red-700" onClick={onDelete} disabled={!canEdit}>
@@ -867,6 +876,7 @@ function normalizeCauses(rows: any[] | undefined): IshikawaCause[] {
         isAiSuggested: row.isAiSuggested,
         isRootCause: row.isRootCause ?? row.likelyRootCause,
         convertedToTaskId: row.convertedToTaskId,
+        rootCause: row.rootCause,
       }),
     ),
   );
@@ -910,6 +920,7 @@ function makeCause(input: Partial<IshikawaCause>): IshikawaCause {
     isAiSuggested: Boolean(input.isAiSuggested),
     isRootCause: Boolean(input.isRootCause),
     convertedToTaskId: input.convertedToTaskId ?? null,
+    rootCause: input.rootCause ?? null,
   };
 }
 

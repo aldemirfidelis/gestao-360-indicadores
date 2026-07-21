@@ -842,7 +842,10 @@ function defaultItemSeed(type: FieldType, action: any): { description: string; b
     case 'WHEN':
       return { ...empty, dueDate: action.dueDate ?? '', data: { startDate: action.startDate ?? '', endDate: action.dueDate ?? '' } };
     case 'WHO':
-      return { ...empty, responsibleUserId: action.responsibleUser?.id ?? '', bullets: action.responsibleUser?.name ? [action.responsibleUser.name] : [], data: { team: action.responsibleUser?.name ?? '' } };
+      // Não vincula automaticamente ao responsável do desvio/plano (quem abre costuma ser
+      // o apoio do gestor): o Who começa vazio para o usuário escolher livremente entre
+      // TODOS os colaboradores — a ação pode ser de outra área.
+      return empty;
     case 'HOW':
       return empty;
     case 'HOW_MUCH':

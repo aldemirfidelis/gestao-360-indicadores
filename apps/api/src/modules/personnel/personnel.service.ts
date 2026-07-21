@@ -263,6 +263,31 @@ export class PersonnelService {
     return { from: fromKey, to: toKey, today, days: [...days].reverse(), totals };
   }
 
+  /**
+   * Espelho mensal de QUALQUER colaborador, para o Serviço Pessoal conferir/ajustar o
+   * time todo no Controle de Ponto. Respeita a abrangência por área do solicitante
+   * (mesmo escopo do espelho da equipe) — fora dela, 403.
+   */
+  async userMirror(me: AuthPayload, targetUserId: string, from?: string, to?: string) {
+    const target = String(targetUserId ?? '').trim();
+    if (!target) throw new BadRequestException('Informe o colaborador.');
+    const visible = await this.visibleUserIdsFor(me);
+    if (visible && !visible.has(target)) throw new ForbiddenException('Colaborador fora da sua abrangência.');
+    const user = await this.prisma.user.findFirst({
+      where: { id: target, companyId: me.companyId, deletedAt: null },
+      select: { id: true, name: true, email: true, jobTitle: true },
+    });
+    if (!user) throw new NotFoundException('Colaborador não encontrado.');
+    const today = dayKeyFor(new Date());
+    const requestedTo = from && to && isValidDayKey(to) ? to : today;
+    const toKey = requestedTo > today ? today : requestedTo;
+    const fromKey = from && isValidDayKey(from) ? from : `${today.slice(0, 7)}-01`;
+    if (fromKey > toKey) throw new BadRequestException('Período inválido.');
+    const days = await this.buildMirrorDays(me.companyId, target, fromKey, toKey);
+    const totals = sumTotals(days);
+    return { user, from: fromKey, to: toKey, today, days: [...days].reverse(), totals };
+  }
+
   async teamMirror(me: AuthPayload, day?: string) {
     const dayKey = day && isValidDayKey(day) ? day : dayKeyFor(new Date());
     const extendedFrom = addDays(dayKey, -1);

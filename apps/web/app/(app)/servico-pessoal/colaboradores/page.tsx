@@ -155,6 +155,8 @@ export default function EmployeesPage() {
   const importInputRef = useRef<HTMLInputElement>(null);
   const photoInputRef = useRef<HTMLInputElement>(null);
   const [badgeId, setBadgeId] = useState<string | null>(null);
+  const [portalOpen, setPortalOpen] = useState(false);
+  const [portalForm, setPortalForm] = useState({ loginType: 'CPF' as 'EMAIL' | 'CPF' | 'REGISTRATION', email: '', password: '', accessProfileId: '' });
 
   const listQuery = useQuery<ListResponse>({
     queryKey: ['personnel-employees', filters],
@@ -254,6 +256,25 @@ export default function EmployeesPage() {
       invalidate();
     },
     onError: (e: any) => toast.error(e?.message ?? 'Não foi possível alterar o status'),
+  });
+
+  const createPortalUser = useMutation({
+    mutationFn: () => api(`/personnel/employees/${detailId}/portal-user`, {
+      method: 'POST',
+      json: {
+        loginType: portalForm.loginType,
+        email: portalForm.loginType === 'EMAIL' ? portalForm.email : undefined,
+        password: portalForm.password || undefined,
+        accessProfileId: portalForm.accessProfileId || autoatendimentoProfileId || undefined,
+      },
+    }),
+    onSuccess: () => {
+      toast.success('Acesso ao portal criado. O colaborador já pode entrar e bater ponto.');
+      setPortalOpen(false);
+      setPortalForm({ loginType: 'CPF', email: '', password: '', accessProfileId: '' });
+      invalidate();
+    },
+    onError: (e: any) => toast.error(e?.message ?? 'Não foi possível criar o acesso ao portal'),
   });
 
   const addDependent = useMutation({
@@ -847,10 +868,24 @@ export default function EmployeesPage() {
                     value={detail.linkedUser ? `${detail.linkedUser.name}` : 'Sem vínculo'}
                   />
                 </div>
-                {detail.linkedUser && (
+                {detail.linkedUser ? (
                   <Link href="/servico-pessoal/ponto" className="mt-3 inline-flex items-center gap-1.5 text-xs font-semibold text-sky-600 hover:underline">
                     <Clock className="h-3.5 w-3.5" />Ver controle de ponto
                   </Link>
+                ) : (
+                  <div className="mt-3 flex flex-wrap items-center gap-2 rounded-md border border-dashed p-3">
+                    <span className="text-xs text-muted-foreground">Sem acesso ao portal — o colaborador não consegue entrar nem bater ponto.</span>
+                    {canUpdate && (
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        className="h-8 text-xs"
+                        onClick={() => { setPortalForm({ loginType: 'CPF', email: profileFields.personalEmail ?? '', password: '', accessProfileId: autoatendimentoProfileId }); setPortalOpen(true); }}
+                      >
+                        <UserPlus className="mr-1 h-3.5 w-3.5" />Gerar acesso ao portal
+                      </Button>
+                    )}
+                  </div>
                 )}
                 {profileFields.notes && <div className="mt-3 rounded-md border p-3 text-xs text-muted-foreground">{profileFields.notes}</div>}
               </TabsContent>
@@ -1059,6 +1094,50 @@ export default function EmployeesPage() {
       />
 
       <BadgeDialog employeeId={badgeId} open={Boolean(badgeId)} onClose={() => setBadgeId(null)} />
+
+      <Dialog open={portalOpen} onOpenChange={(v) => !v && setPortalOpen(false)}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>Gerar acesso ao portal</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-3 py-1">
+            <p className="text-xs text-muted-foreground">
+              Cria o login do colaborador para entrar no portal e bater ponto. Por CPF ou matrícula não precisa de e-mail — o colaborador entra usando esse número e uma senha provisória.
+            </p>
+            <div className="space-y-1">
+              <Label className="text-xs">Entrar com</Label>
+              <NativeSelect
+                value={portalForm.loginType}
+                onChange={(e) => setPortalForm((f) => ({ ...f, loginType: e.target.value as typeof f.loginType }))}
+              >
+                <option value="CPF">CPF</option>
+                <option value="REGISTRATION">Matrícula</option>
+                <option value="EMAIL">E-mail</option>
+              </NativeSelect>
+            </div>
+            {portalForm.loginType === 'EMAIL' && (
+              <div className="space-y-1">
+                <Label className="text-xs">E-mail de login</Label>
+                <Input type="email" value={portalForm.email} onChange={(e) => setPortalForm((f) => ({ ...f, email: e.target.value }))} placeholder="colaborador@empresa.com" />
+              </div>
+            )}
+            <div className="space-y-1">
+              <Label className="text-xs">Senha provisória (opcional)</Label>
+              <Input type="text" value={portalForm.password} onChange={(e) => setPortalForm((f) => ({ ...f, password: e.target.value }))} placeholder="Em branco = gerada automaticamente (troca no 1º acesso)" />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setPortalOpen(false)}>Cancelar</Button>
+            <Button
+              className="bg-blue-600 font-semibold text-white hover:bg-blue-700"
+              disabled={createPortalUser.isPending || (portalForm.loginType === 'EMAIL' && !portalForm.email.trim())}
+              onClick={() => createPortalUser.mutate()}
+            >
+              Criar acesso
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

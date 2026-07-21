@@ -4,12 +4,14 @@ import { useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
 import { jsPDF } from 'jspdf';
-import { CheckCircle2, Download, FileText, Trophy, Wallet } from 'lucide-react';
+import { CheckCircle2, Download, FileText, Fingerprint, Trophy, Wallet } from 'lucide-react';
 import { PageHeader } from '@/components/shell/page-header';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { NativeSelect } from '@/components/ui/select';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { MeuPontoPanel } from '@/components/personnel/meu-ponto-panel';
 import { api } from '@/lib/api';
 
 interface Payslip { id: string; netPay: string; run: { kind: string; competence: { year: number; month: number } } }
@@ -108,8 +110,19 @@ export default function MyPayslipPage() {
 
   return (
     <div className="space-y-4">
-      <PageHeader title="Minha Vida Funcional" description="Seus holerites e informe de rendimentos." />
+      <PageHeader title="Minha Vida Funcional" description="Seu ponto, holerites e informe de rendimentos." />
 
+      <Tabs defaultValue="ponto" className="space-y-4">
+        <TabsList className="bg-slate-100 dark:bg-slate-800">
+          <TabsTrigger value="ponto" className="text-xs font-semibold"><Fingerprint className="mr-2 h-4 w-4" />Meu Ponto</TabsTrigger>
+          <TabsTrigger value="pagamentos" className="text-xs font-semibold"><Wallet className="mr-2 h-4 w-4" />Holerites e Rendimentos</TabsTrigger>
+        </TabsList>
+
+        <TabsContent value="ponto">
+          <MeuPontoPanel />
+        </TabsContent>
+
+        <TabsContent value="pagamentos" className="space-y-4">
       <Card>
         <CardHeader className="flex flex-row items-center justify-between pb-2">
           <CardTitle className="flex items-center gap-2 text-sm"><FileText className="h-4 w-4 text-sky-500" /> Informe de Rendimentos</CardTitle>
@@ -190,6 +203,8 @@ export default function MyPayslipPage() {
           )}
         </CardContent>
       </Card>
+        </TabsContent>
+      </Tabs>
     </div>
   );
 }

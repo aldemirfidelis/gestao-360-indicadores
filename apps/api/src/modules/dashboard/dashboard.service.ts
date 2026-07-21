@@ -303,6 +303,7 @@ export class DashboardService {
         unitLabel: true,
         direction: true,
         periodicity: true,
+        accumulation: true,
         yellowToleranceP: true,
         ownerNode: { select: { id: true, name: true, type: true, parentId: true } },
       },
@@ -409,8 +410,17 @@ export class DashboardService {
         for (const indicator of indicators) {
           const v = valAgg.get(indicator.id);
           const g = tgtAgg.get(indicator.id);
-          const cumValue = v && v.n > 0 ? v.sum / v.n : null;
-          const cumTarget = g && g.n > 0 ? g.sum / g.n : null;
+          // Como acumular o YTD: SUM (soma mês a mês), FIXED (não acumula — usa o valor do
+          // mês em foco) ou AVERAGE (média do ano até o mês — padrão histórico).
+          const acc = (indicator as any).accumulation ?? 'AVERAGE';
+          const cumValue =
+            acc === 'SUM' ? (v && v.n > 0 ? v.sum : null)
+            : acc === 'FIXED' ? (resultMap.get(indicator.id)?.value ?? null)
+            : (v && v.n > 0 ? v.sum / v.n : null);
+          const cumTarget =
+            acc === 'SUM' ? (g && g.n > 0 ? g.sum : null)
+            : acc === 'FIXED' ? (targetMap.get(`${indicator.id}:${boundaryRef}`)?.target ?? null)
+            : (g && g.n > 0 ? g.sum / g.n : null);
           const bounds = boundaryBounds.get(indicator.id) ?? { lower: null, upper: null };
           const status = calcStatus({
             value: cumValue,

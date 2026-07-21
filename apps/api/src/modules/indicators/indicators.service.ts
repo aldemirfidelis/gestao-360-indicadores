@@ -2,6 +2,7 @@ import { BadRequestException, ConflictException, ForbiddenException, Injectable,
 import {
   Direction,
   FeedKind,
+  IndicatorAccumulation,
   IndicatorStatus,
   IndicatorType,
   IndicatorUnit,
@@ -50,6 +51,7 @@ type IndicatorWriteInput = {
   unitLabel?: string | null;
   periodicity?: string | null;
   direction?: string | null;
+  accumulation?: string | null;
   formula?: string | null;
   source?: string | null;
   feedKind?: string | null;
@@ -841,6 +843,7 @@ export class IndicatorsService {
       unitLabel: cleanString(input.unitLabel) ?? null,
       periodicity: enumOrDefault(Periodicity, input.periodicity, Periodicity.MONTHLY),
       direction: enumOrDefault(Direction, input.direction, Direction.HIGHER_BETTER),
+      accumulation: enumOrDefault(IndicatorAccumulation, input.accumulation, IndicatorAccumulation.AVERAGE),
       formula: cleanString(input.formula) ?? null,
       source: cleanString(input.source) ?? null,
       feedKind: enumOrDefault(FeedKind, input.feedKind, FeedKind.MANUAL),
@@ -875,6 +878,7 @@ export class IndicatorsService {
     if (input.unitLabel !== undefined) data.unitLabel = cleanString(input.unitLabel) ?? null;
     if (input.periodicity !== undefined) data.periodicity = enumOrDefault(Periodicity, input.periodicity, Periodicity.MONTHLY);
     if (input.direction !== undefined) data.direction = enumOrDefault(Direction, input.direction, Direction.HIGHER_BETTER);
+    if (input.accumulation !== undefined) data.accumulation = enumOrDefault(IndicatorAccumulation, input.accumulation, IndicatorAccumulation.AVERAGE);
     if (input.formula !== undefined) data.formula = cleanString(input.formula) ?? null;
     if (input.source !== undefined) data.source = cleanString(input.source) ?? null;
     if (input.feedKind !== undefined) data.feedKind = enumOrDefault(FeedKind, input.feedKind, FeedKind.MANUAL);

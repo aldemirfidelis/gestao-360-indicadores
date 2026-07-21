@@ -805,6 +805,7 @@ export class ActionsService {
       data: {
         actionId,
         title: taskTitle,
+        rootCause: nonEmptyText(cause.rootCause) ?? nonEmptyText(cause.title) ?? nonEmptyText(cause.description),
         dueDate: cause.dueDate ?? action.dueDate ?? null,
         assignedToId: cause.responsibleUserId ?? action.responsibleUserId ?? null,
         position: count,
@@ -880,6 +881,7 @@ export class ActionsService {
       data: {
         actionId,
         title,
+        rootCause: nonEmptyText(action.rootCause),
         dueDate: stage.dueDate ?? action.dueDate ?? null,
         assignedToId: stage.responsibleUserId ?? action.responsibleUserId ?? null,
         position: count,
@@ -945,11 +947,15 @@ export class ActionsService {
       nonEmptyText(body?.title) ??
       nonEmptyText(stored.description) ??
       (Array.isArray(stored.bullets) && stored.bullets.length ? `5W2H ${label}: ${stored.bullets[0]}` : `5W2H ${label}: ${action.title}`);
+    // Causa raiz da tarefa: o "Porquê" (WHY) do 5W2H é a causa raiz do dia; na falta, usa a do plano.
+    const whyItem = items.find((item) => normalizeFiveW2HType(item.itemType) === 'WHY');
+    const taskRootCause = nonEmptyText(whyItem?.description) ?? nonEmptyText(session?.rootCause) ?? nonEmptyText(action.rootCause);
     const count = await this.prisma.actionTask.count({ where: { actionId } });
     const task = await this.prisma.actionTask.create({
       data: {
         actionId,
         title,
+        rootCause: taskRootCause,
         dueDate: coerceDate(body?.dueDate ?? stored.dueDate) ?? action.dueDate ?? null,
         assignedToId: nonEmptyText(body?.responsibleUserId ?? stored.responsibleUserId) ?? action.responsibleUserId ?? null,
         position: count,
@@ -1070,6 +1076,7 @@ ${current || '- nenhum'}`;
       data: {
         actionId,
         title,
+        rootCause: answer ?? nonEmptyText(session?.rootCause) ?? nonEmptyText(action.rootCause),
         dueDate: coerceDate(body?.dueDate ?? stored.dueDate) ?? action.dueDate ?? null,
         assignedToId: nonEmptyText(body?.responsibleUserId ?? stored.responsibleUserId) ?? action.responsibleUserId ?? null,
         position: count,
@@ -1681,6 +1688,7 @@ ${currentStages || '- nenhuma'}`;
             isAiSuggested: Boolean(item.isAiSuggested),
             convertedToTaskId: nonEmptyText(item.convertedToTaskId),
             likelyRootCause: Boolean(item.isRootCause ?? item.likelyRootCause ?? status === 'ROOT_CAUSE'),
+            rootCause: nonEmptyText(item.rootCause),
           };
         })
         .filter((item: Prisma.ActionIshikawaCauseCreateManyInput | null): item is Prisma.ActionIshikawaCauseCreateManyInput => Boolean(item));

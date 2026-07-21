@@ -157,6 +157,15 @@ export default function MeetingDetailPage() {
     enabled: !!linkedAction?.id,
   });
 
+  // Lista COMPLETA de colaboradores para o "Quem (dono)" do 5W2H — a ação pode ser para
+  // alguém de outra área, então precisa de todos, não só participantes da reunião.
+  const analysisOptionsQuery = useQuery<{ users: { id: string; name: string; email?: string }[] }>({
+    queryKey: ['actions', 'options'],
+    queryFn: () => api('/actions/options'),
+    staleTime: 60_000,
+  });
+  const analysisUsers = analysisOptionsQuery.data?.users ?? [];
+
   const target = useMemo(() => {
     if (!m?.indicator || !m.treatment) return null;
     return m.indicator.targets.find((item) => item.periodRef === m.treatment?.periodRef)?.target ?? null;
@@ -175,6 +184,18 @@ export default function MeetingDetailPage() {
     onSuccess: () => {
       toast.success('Participante adicionado');
       setGuest({ name: '', email: '', jobTitle: '', area: '', role: 'PARTICIPANT', notes: '' });
+      qc.invalidateQueries({ queryKey: ['meeting', id] });
+    },
+    onError: (e: any) => toast.error(e?.message ?? 'Não foi possível adicionar participante'),
+  });
+
+  // Adicionar participante INTERNO (usuário cadastrado) via busca.
+  const [participantSearch, setParticipantSearch] = useState('');
+  const addParticipant = useMutation({
+    mutationFn: (userId: string) => api(`/meetings/${id}/participants`, { method: 'POST', json: { userId, role: 'PARTICIPANT' } }),
+    onSuccess: () => {
+      toast.success('Participante adicionado');
+      setParticipantSearch('');
       qc.invalidateQueries({ queryKey: ['meeting', id] });
     },
     onError: (e: any) => toast.error(e?.message ?? 'Não foi possível adicionar participante'),
@@ -355,6 +376,49 @@ export default function MeetingDetailPage() {
               <div className="rounded-lg border bg-muted/30 p-3">
                 <div className="mb-2 flex items-center gap-2 text-sm font-semibold">
                   <Users className="h-4 w-4" />
+                  Adicionar participante cadastrado
+                </div>
+                <Input
+                  placeholder="Buscar por nome ou e-mail..."
+                  value={participantSearch}
+                  onChange={(e) => setParticipantSearch(e.target.value)}
+                />
+                {participantSearch.trim() && (() => {
+                  const already = new Set(m.participants.map((p) => p.userId));
+                  const q = participantSearch.trim().toLowerCase();
+                  const matches = analysisUsers
+                    .filter((u) => !already.has(u.id) && (u.name.toLowerCase().includes(q) || (u.email ?? '').toLowerCase().includes(q)))
+                    .slice(0, 8);
+                  return (
+                    <div className="mt-1 max-h-56 overflow-auto rounded-md border bg-background">
+                      {matches.length === 0 ? (
+                        <div className="p-3 text-xs text-muted-foreground">Nenhum colaborador encontrado.</div>
+                      ) : (
+                        matches.map((u) => (
+                          <button
+                            key={u.id}
+                            type="button"
+                            disabled={addParticipant.isPending}
+                            onClick={() => addParticipant.mutate(u.id)}
+                            className="flex w-full items-center justify-between gap-2 px-3 py-2 text-left text-sm hover:bg-muted/60 disabled:opacity-50"
+                          >
+                            <span className="min-w-0">
+                              <span className="block truncate font-medium">{u.name}</span>
+                              {u.email ? <span className="block truncate text-xs text-muted-foreground">{u.email}</span> : null}
+                            </span>
+                            <Plus className="h-4 w-4 shrink-0 text-sky-600" />
+                          </button>
+                        ))
+                      )}
+                    </div>
+                  );
+                })()}
+                <p className="mt-2 text-[11px] text-muted-foreground">Não é cadastrado? Adicione como participante externo abaixo.</p>
+              </div>
+
+              <div className="rounded-lg border bg-muted/30 p-3">
+                <div className="mb-2 flex items-center gap-2 text-sm font-semibold">
+                  <Users className="h-4 w-4" />
                   Adicionar participante externo
                 </div>
                 <div className="grid gap-2 md:grid-cols-2">
@@ -386,6 +450,7 @@ export default function MeetingDetailPage() {
             ) : (
               <AnalysisWorkspace
                 action={actionQuery.data}
+                users={analysisUsers}
                 onSave={(payload) => saveAnalysis.mutate(payload)}
                 onEnsureActionPlan={ensureActionPlan}
                 saving={saveAnalysis.isPending}
@@ -406,6 +471,7 @@ export default function MeetingDetailPage() {
                 responsibleUser: m?.indicator?.responsibleUser ?? null,
                 deviationId: m?.deviation?.id,
               }}
+              users={analysisUsers}
               onSave={(payload) => saveAnalysis.mutate(payload)}
               onEnsureActionPlan={ensureActionPlan}
               saving={saveAnalysis.isPending}

@@ -1,4 +1,4 @@
-import { BadRequestException, ConflictException, Injectable, NotFoundException } from '@nestjs/common';
+import { BadRequestException, ConflictException, Injectable, Logger, NotFoundException } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
 import { PrismaService } from '../../prisma/prisma.service';
 import { AuditWriterService } from '../../common/audit/audit-writer.service';
@@ -13,6 +13,8 @@ const MODULE = 'recruitment';
 
 @Injectable()
 export class RecruitAdmissionService {
+  private readonly logger = new Logger(RecruitAdmissionService.name);
+
   constructor(
     private readonly prisma: PrismaService,
     private readonly audit: AuditWriterService,
@@ -189,6 +191,13 @@ export class RecruitAdmissionService {
       message: `Admissao autorizada para ${ctx.candidate.name}`,
       after: { applicationId, employeeId },
     });
+    // Cria o acesso ao portal (login por CPF) para o novo colaborador bater ponto/autoatendimento.
+    // Não bloqueia a admissão: se já houver usuário vinculado (ex.: mobilidade interna) ou falhar, apenas registra.
+    try {
+      await this.employees.createPortalUser(me, employeeId, { loginType: 'CPF' });
+    } catch (err) {
+      this.logger.warn(`Acesso ao portal nao criado na admissao de ${employeeId}: ${(err as Error)?.message ?? err}`);
+    }
     const companyName = await resolveCompanyDisplayName(this.prisma, me.companyId);
     void this.communication.sendEvent(me.companyId, 'ADMISSION_AUTHORIZED', ctx.candidate.email, {
       candidato: ctx.candidate.name,

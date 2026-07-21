@@ -122,6 +122,13 @@ enum Direction {
   RANGE
 }
 
+// Como o valor acumulado (YTD) do indicador é calculado a partir dos meses.
+enum IndicatorAccumulation {
+  AVERAGE // média do ano até o mês (padrão histórico)
+  SUM     // soma mês a mês (ex.: entrada de cana, volumes)
+  FIXED   // não acumula: o acumulado é o próprio valor do período
+}
+
 enum FeedKind {
   MANUAL
   IMPORT
@@ -1279,6 +1286,7 @@ model Indicator {
   unitLabel        String?
   periodicity      Periodicity     @default(MONTHLY)
   direction        Direction       @default(HIGHER_BETTER)
+  accumulation     IndicatorAccumulation @default(AVERAGE)
   formula          String?
   source           String?
   feedKind         FeedKind        @default(MANUAL)
@@ -1562,6 +1570,9 @@ model ActionTask {
   actionId       String
   action         ActionPlan       @relation(fields: [actionId], references: [id], onDelete: Cascade)
   title          String
+  // Causa raiz que originou esta tarefa (de qual causa/análise ela veio) — permite
+  // rastrear, quando há várias causas raiz, de onde cada tarefa está vindo.
+  rootCause      String?
   done           Boolean          @default(false)
   completionNote String?
   dueDate        DateTime?
@@ -1726,6 +1737,9 @@ model ActionIshikawaCause {
   isAiSuggested     Boolean               @default(false)
   convertedToTaskId String?
   likelyRootCause   Boolean               @default(false)
+  // Causa raiz encontrada ao investigar esta causa nos 5 Porquês (permite múltiplas
+  // causas raiz por análise, uma ancorada em cada causa do Ishikawa).
+  rootCause         String?
   createdAt         DateTime              @default(now())
   updatedAt         DateTime              @updatedAt
 
