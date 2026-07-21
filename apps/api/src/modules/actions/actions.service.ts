@@ -415,7 +415,7 @@ export class ActionsService {
 
   async addTask(
     actionId: string,
-    body: { title: string; dueDate?: Date; startDate?: Date; endDate?: Date; assignedToId?: string },
+    body: { title: string; description?: string; rootCause?: string; dueDate?: Date; startDate?: Date; endDate?: Date; assignedToId?: string },
     userId?: string,
   ) {
     const count = await this.prisma.actionTask.count({ where: { actionId } });
@@ -423,6 +423,8 @@ export class ActionsService {
       data: {
         actionId,
         title: body.title,
+        description: nonEmptyText(body.description),
+        rootCause: nonEmptyText(body.rootCause),
         dueDate: body.dueDate ?? null,
         startDate: body.startDate ?? null,
         endDate: body.endDate ?? null,
@@ -1689,6 +1691,7 @@ ${currentStages || '- nenhuma'}`;
             convertedToTaskId: nonEmptyText(item.convertedToTaskId),
             likelyRootCause: Boolean(item.isRootCause ?? item.likelyRootCause ?? status === 'ROOT_CAUSE'),
             rootCause: nonEmptyText(item.rootCause),
+            fiveWhysData: (item.fiveWhysData ?? undefined) as Prisma.InputJsonValue | undefined,
           };
         })
         .filter((item: Prisma.ActionIshikawaCauseCreateManyInput | null): item is Prisma.ActionIshikawaCauseCreateManyInput => Boolean(item));

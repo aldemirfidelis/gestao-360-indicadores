@@ -59,6 +59,8 @@ interface ActionDetail {
   tasks: {
     id: string;
     title: string;
+    description: string | null;
+    rootCause: string | null;
     done: boolean;
     completionNote: string | null;
     dueDate: string | null;
@@ -80,7 +82,7 @@ interface ActionDetail {
 const STATUS_LABEL = ACTION_STATUS_LABEL;
 const TOOL_LABEL = ANALYSIS_METHOD_LABEL;
 
-const tabs = ['Visão geral', 'Origem', 'Análise de causa', 'Execução', 'Eficácia', 'IA', 'Histórico'];
+const tabs = ['Visão geral', 'Origem', 'Análise de causa', 'Ações', 'Eficácia', 'IA', 'Histórico'];
 const MAX_ATTACHMENT_BYTES = 5 * 1024 * 1024;
 
 export function ActionDetailView({
@@ -389,7 +391,7 @@ export function ActionDetailView({
           onAskAi={canUseActionAi ? () => aiAssist.mutate('analysis') : undefined}
         />
       )}
-      {tab === 'Execução' && <ExecutionCard a={a} users={users} newTask={newTask} setNewTask={setNewTask} addTask={addTask.mutate} toggleTask={toggleTask.mutate} updateTask={updateTask.mutate} deleteTask={deleteTask.mutate} addTaskEvidence={(payload) => addTaskEvidence.mutate(payload)} evidenceUploading={addTaskEvidence.isPending} />}
+      {tab === 'Ações' && <ExecutionCard a={a} users={users} newTask={newTask} setNewTask={setNewTask} addTask={addTask.mutate} toggleTask={toggleTask.mutate} updateTask={updateTask.mutate} deleteTask={deleteTask.mutate} addTaskEvidence={(payload) => addTaskEvidence.mutate(payload)} evidenceUploading={addTaskEvidence.isPending} />}
       {tab === 'Eficácia' && (
         <EffectivenessPanel
           a={a}
@@ -616,7 +618,7 @@ function ExecutionCard({
   return (
     <>
       <SectionCard
-        title={`Execução (${a.tasks.length})`}
+        title={`Tarefas do plano de ação (${a.tasks.length})`}
         description="Ao concluir uma tarefa, registre o que foi feito."
         actions={
           <Button type="button" variant="outline" size="sm" className="gap-1.5" onClick={exportTasks} disabled={exportingTasks || a.tasks.length === 0}>
@@ -705,6 +707,14 @@ function ExecutionCard({
                         </Button>
                       </div>
                     </div>
+                    {(t.description ?? '').trim() && (
+                      <div className="mt-1 whitespace-pre-line rounded-md bg-muted/40 p-2 text-xs text-muted-foreground">{t.description}</div>
+                    )}
+                    {(t.rootCause ?? '').trim() && (
+                      <div className="mt-1 flex items-start gap-1 text-[11px] text-orange-600">
+                        <span>↳</span><span><span className="font-medium">Causa raiz:</span> {t.rootCause}</span>
+                      </div>
+                    )}
                     {t.completionNote && (
                       <div className="mt-2 rounded-md border border-status-green/25 bg-status-green/10 p-2 text-xs">
                         <div className="mb-1 font-semibold text-status-green">Realizado</div>

@@ -518,6 +518,7 @@ function ConductTab({ meeting, options, can, run }: { meeting: MeetingDetail; op
   // com "voltar" para a tela anterior sem sair do modo apresentação.
   const [screenStack, setScreenStack] = useState<PresentationScreen[]>([]);
   const [lightFilter, setLightFilter] = useState<'GREEN' | 'YELLOW' | 'RED' | null>(null);
+  const [presentMode, setPresentMode] = useState<'monthly' | 'cumulative'>('monthly');
   const [fullscreen, setFullscreen] = useState(false);
   // A apresentação segue a ordem do Roteiro da reunião (link com a aba Preparar).
   const agendaPos = new Map(meeting.agendaItems.map((a) => [a.orgNodeId, a.position]));
@@ -640,7 +641,7 @@ function ConductTab({ meeting, options, can, run }: { meeting: MeetingDetail; op
               </CardHeader>
               <CardContent>
                 {topScreen.type === 'indicator' && (
-                  <IndicatorDetailView id={topScreen.id} embedded onOpenAction={openAction} onOpenDeviation={openDeviationScreen} />
+                  <IndicatorDetailView id={topScreen.id} embedded initialPeriodRef={meeting.periodRef} onOpenAction={openAction} onOpenDeviation={openDeviationScreen} />
                 )}
                 {topScreen.type === 'action' && (
                   <ActionDetailView id={topScreen.id} embedded onOpenDeviation={openDeviationScreen} />
@@ -660,11 +661,24 @@ function ConductTab({ meeting, options, can, run }: { meeting: MeetingDetail; op
                   </button>
                 )}
               </p>
+              <div className="mb-2 inline-flex rounded-md border p-0.5 text-xs">
+                {(['monthly', 'cumulative'] as const).map((m) => (
+                  <button
+                    key={m}
+                    type="button"
+                    onClick={() => setPresentMode(m)}
+                    className={cn('rounded px-3 py-1 font-medium transition', presentMode === m ? 'bg-primary text-primary-foreground' : 'text-muted-foreground hover:text-foreground')}
+                  >
+                    {m === 'monthly' ? 'Mensal' : 'Acumulado'}
+                  </button>
+                ))}
+              </div>
               <div className="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-3">
                 {visibleIndicators.map((ind) => (
                   <PresentationCard
                     key={ind.id}
                     ind={ind}
+                    mode={presentMode}
                     selected={false}
                     onSelect={() => setScreenStack([{ type: 'indicator', id: ind.indicatorId }])}
                   />
@@ -756,7 +770,21 @@ function Timer({ item, run }: { item: AgendaItem; run: Run }) {
   );
 }
 
-function PresentationCard({ ind, selected, onSelect }: { ind: SnapshotIndicator; selected?: boolean; onSelect?: () => void }) {
+/** Pontos percentuais (ganho +, perda -) vs meta, para indicadores em %. */
+function percentagePoints(ind: SnapshotIndicator, value: number | null, target: number | null): number | null {
+  if (ind.unitLabel !== '%' || value == null || target == null) return null;
+  const toPP = (v: number) => (Math.abs(v) <= 1 ? v * 100 : v);
+  const gain = ind.direction === 'LOWER_BETTER' ? toPP(target) - toPP(value) : toPP(value) - toPP(target);
+  return gain;
+}
+
+function PresentationCard({ ind, selected, onSelect, mode = 'monthly' }: { ind: SnapshotIndicator; selected?: boolean; onSelect?: () => void; mode?: 'monthly' | 'cumulative' }) {
+  const isCum = mode === 'cumulative';
+  const value = isCum ? ind.accumulated : ind.current;
+  const target = isCum ? ind.accumulatedTarget : ind.target;
+  const attainment = isCum ? ind.accumulatedAttainment : ind.attainment;
+  const pp = percentagePoints(ind, value, target);
+  const ppLabel = pp == null ? null : `${pp >= 0 ? '+' : ''}${pp.toFixed(1).replace('.', ',')} p.p.`;
   return (
     <button
       type="button"
@@ -771,15 +799,22 @@ function PresentationCard({ ind, selected, onSelect }: { ind: SnapshotIndicator;
         <span className={cn('h-3 w-3 shrink-0 rounded-full', ind.light === 'RED' && 'status-red-pulse')} style={{ background: LIGHT_COLORS[ind.light] }} />
       </div>
       <div className="mt-3 flex flex-wrap items-end gap-x-3 gap-y-1">
-        <span className="text-3xl font-bold tabular-nums">{formatValue(ind.current, ind.unitLabel)}</span>
-        <span className="pb-1 text-sm text-muted-foreground">meta {formatValue(ind.target, ind.unitLabel)}</span>
-        {ind.accumulated !== null && ind.accumulated !== undefined && (
-          <span className="pb-1 text-sm text-muted-foreground">· acum. {formatValue(ind.accumulated, ind.unitLabel)}</span>
-        )}
+        <span className="text-3xl font-bold tabular-nums">{formatValue(value, ind.unitLabel)}</span>
+        <span className="pb-1 text-sm text-muted-foreground">meta {formatValue(target, ind.unitLabel)}</span>
+        {isCum
+          ? ind.current !== null && ind.current !== undefined && (
+              <span className="pb-1 text-sm text-muted-foreground">· mês {formatValue(ind.current, ind.unitLabel)}</span>
+            )
+          : ind.accumulated !== null && ind.accumulated !== undefined && (
+              <span className="pb-1 text-sm text-muted-foreground">· acum. {formatValue(ind.accumulated, ind.unitLabel)}</span>
+            )}
       </div>
-      <p className="mt-1 text-xs text-muted-foreground">{ind.executiveStatus ?? LIGHT_LABEL[ind.light]} · Atingimento {formatPercent(ind.attainment)}</p>
+      <p className="mt-1 text-xs text-muted-foreground">
+        {ind.executiveStatus ?? LIGHT_LABEL[ind.light]} · Atingimento {formatPercent(attainment)}
+        {ppLabel && <span className={cn('font-medium', pp! >= 0 ? 'text-status-green' : 'text-status-red')}> · {ppLabel}</span>}
+        {isCum && ' (acum.)'}
+      </p>
       {(ind.managerComment || ind.rootCause) && <p className="mt-2 line-clamp-3 break-words text-xs text-muted-foreground">{ind.managerComment ?? ind.rootCause}</p>}
-      {ind.actionTitle && <p className="mt-2 text-xs"><span className="font-medium">Ação:</span> {ind.actionTitle}</p>}
     </button>
   );
 }

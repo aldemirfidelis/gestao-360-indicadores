@@ -337,6 +337,19 @@ export function FiveWTwoHVisualAnalysis({
     const who = get('WHO')?.responsibleUserId || undefined;
     const whenRaw = get('WHEN')?.dueDate;
     const when = whenRaw ? whenRaw.slice(0, 10) : undefined;
+    // Detalhamento completo do 5W2H que vai junto com a tarefa (Como/Onde/Quando/Quem/Quanto/Por quê).
+    const whoName = who ? (users.find((u) => u.id === who)?.name ?? '') : '';
+    const fmtDate = (d?: string) => (d ? d.split('-').reverse().join('/') : '');
+    const detailLines = [
+      text('HOW') && `Como: ${text('HOW')}`,
+      text('WHERE') && `Onde: ${text('WHERE')}`,
+      (when || text('WHEN')) && `Quando: ${when ? fmtDate(when) : text('WHEN')}`,
+      whoName && `Quem: ${whoName}`,
+      text('HOW_MUCH') && `Quanto: ${text('HOW_MUCH')}`,
+      text('WHY') && `Por quê: ${text('WHY')}`,
+    ].filter(Boolean) as string[];
+    const description = detailLines.join('\n') || undefined;
+    const taskRootCause = (rootCause ?? '').trim() || text('WHY') || undefined;
     setCreatingTask(true);
     try {
       // Cria o plano do zero quando ainda não existe (a 1ª tarefa do 5W2H "abre" o plano de ação).
@@ -347,7 +360,7 @@ export function FiveWTwoHVisualAnalysis({
       }
       const createdTask = await api<{ id?: string }>(`/actions/${targetActionId}/tasks`, {
         method: 'POST',
-        json: { title: whatText, assignedToId: who, dueDate: when, startDate: when, endDate: when },
+        json: { title: whatText, description, rootCause: taskRootCause, assignedToId: who, dueDate: when, startDate: when, endDate: when },
       });
       // Arquiva o 5W2H que originou a tarefa ANTES de limpar: sem isso o board
       // era salvo vazio por cima e a análise que justificou a ação se perdia

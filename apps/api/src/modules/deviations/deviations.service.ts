@@ -197,6 +197,26 @@ export class DeviationsService {
     return result;
   }
 
+  /** Exclusão (soft delete) do desvio — restrita a admins/perfis superiores (deviations:manage). */
+  async remove(me: AuthPayload, id: string) {
+    const before = await this.loadScoped(id, me.companyId);
+    await this.access.assertCanWrite(me.sub, before.indicator?.ownerNodeId ?? null, MODULE, 'edit');
+    await this.prisma.deviation.update({ where: { id }, data: { deletedAt: new Date() } });
+    await this.traceability.record({
+      companyId: before.companyId,
+      indicatorId: before.indicatorId,
+      userId: me.sub,
+      eventType: TraceEventType.STATUS_CHANGED,
+      entityType: TraceEntityType.DEVIATION,
+      entityId: before.id,
+      title: `Desvio #${before.number} excluído`,
+      description: before.title,
+      statusFrom: before.status,
+      statusTo: 'DELETED',
+    });
+    return { ok: true };
+  }
+
   async update(me: AuthPayload, id: string, patch: Prisma.DeviationUpdateInput) {
     const before = await this.loadScoped(id, me.companyId);
     await this.access.assertCanWrite(me.sub, before.indicator?.ownerNodeId ?? null, MODULE, 'edit');

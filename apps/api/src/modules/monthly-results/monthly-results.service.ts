@@ -690,7 +690,7 @@ export class MonthlyResultsService {
       if (!selectedAreaNode) continue;
       const meetingAreaId = areaIdByNode.get(selectedAreaNode);
       if (!meetingAreaId) continue;
-      const snap = this.computeSnapshot(indicator, periodRef, 'latest');
+      const snap = this.computeSnapshot(indicator, periodRef, 'period');
       const isCritical = snap.light === TrafficLight.RED || snap.light === TrafficLight.YELLOW;
       const key = `${meetingAreaId}:${indicator.id}`;
       const prev = existingByKey.get(key);
@@ -1318,8 +1318,11 @@ export class MonthlyResultsService {
       upperBound: snapshot.upperBound,
       current: snapshot.current,
       accumulated: snapshot.accumulated,
+      accumulatedTarget: snapshot.accumulatedTarget ?? null,
+      accumulatedAttainment: snapshot.accumulatedAttainment ?? null,
       attainment: snapshot.attainment,
       deviationPct: snapshot.deviationPct,
+      direction: snapshot.direction ?? ind.indicator?.direction ?? null,
       light: this.displayLight(light, snapshot.attainment),
       trend: snapshot.trend,
       managerComment: ind.managerComment,
@@ -1387,14 +1390,46 @@ export class MonthlyResultsService {
         })
       : null;
     const light = this.displayLight((status?.light as TrafficLight) ?? TrafficLight.GRAY, status?.attainment);
+
+    // Acumulado (YTD): agrega os meses do ano até o período conforme a REGRA do indicador
+    // (média — padrão / soma / fixo). Mesma semântica do Painel Executivo — nada diferente.
+    const boundaryRef = mode === 'latest' ? (current?.periodRef ?? periodRef) : periodRef;
+    const acc = String(indicator.accumulation ?? 'AVERAGE');
+    const yearPrefix = boundaryRef.slice(0, 4);
+    const ytdResults = results.filter((r: any) => r.periodRef?.slice(0, 4) === yearPrefix && r.periodRef <= boundaryRef && r.value != null);
+    const ytdTargets = targets.filter((t: any) => t.periodRef?.slice(0, 4) === yearPrefix && t.periodRef <= boundaryRef && t.target != null);
+    const sumV = ytdResults.reduce((s: number, r: any) => s + Number(r.value), 0);
+    const sumT = ytdTargets.reduce((s: number, t: any) => s + Number(t.target), 0);
+    const accumulated =
+      acc === 'SUM' ? (ytdResults.length ? sumV : null)
+      : acc === 'FIXED' ? (current?.value ?? null)
+      : (ytdResults.length ? sumV / ytdResults.length : null);
+    const accumulatedTarget =
+      acc === 'SUM' ? (ytdTargets.length ? sumT : null)
+      : acc === 'FIXED' ? (target?.target ?? null)
+      : (ytdTargets.length ? sumT / ytdTargets.length : null);
+    const accStatus = accumulated != null && accumulatedTarget != null
+      ? calcStatus({
+          value: Number(accumulated),
+          target: Number(accumulatedTarget),
+          direction: (indicator.direction as Direction) ?? Direction.HIGHER_BETTER,
+          lowerBound: target?.lowerBound != null ? Number(target.lowerBound) : null,
+          upperBound: target?.upperBound != null ? Number(target.upperBound) : null,
+          yellowToleranceP: indicator.yellowToleranceP ?? 90,
+        })
+      : null;
+
     return {
       target: target?.target ?? null,
       lowerBound: target?.lowerBound ?? null,
       upperBound: target?.upperBound ?? null,
       current: current?.value ?? null,
-      accumulated: current?.value ?? null,
+      accumulated,
+      accumulatedTarget,
+      accumulatedAttainment: accStatus?.attainment ?? null,
       attainment: status?.attainment ?? null,
       deviationPct: status?.deviationPct ?? null,
+      direction: (indicator.direction as Direction) ?? Direction.HIGHER_BETTER,
       light: (light === 'BLUE' ? TrafficLight.GREEN : light) as TrafficLight,
       trend: this.trendLabel(current, previous),
     };
@@ -1411,13 +1446,14 @@ export class MonthlyResultsService {
         unitLabel: true,
         source: true,
         direction: true,
+        accumulation: true,
         yellowToleranceP: true,
         ownerNodeId: true,
         ownerNode: { select: { id: true, name: true, type: true, parentId: true } },
         responsibleUserId: true,
         responsibleUser: { select: { id: true, name: true } },
         targets: { orderBy: { periodRef: 'desc' }, select: { periodRef: true, target: true, lowerBound: true, upperBound: true }, take: 24 },
-        results: { orderBy: { periodDate: 'desc' }, take: 6, select: { periodRef: true, periodDate: true, value: true, light: true, attainment: true, deviationPct: true, note: true, updatedAt: true } },
+        results: { orderBy: { periodDate: 'desc' }, take: 18, select: { periodRef: true, periodDate: true, value: true, light: true, attainment: true, deviationPct: true, note: true, updatedAt: true } },
       },
       orderBy: { name: 'asc' },
     });
@@ -1432,12 +1468,14 @@ export class MonthlyResultsService {
       select: {
         id: true,
         direction: true,
+        accumulation: true,
         yellowToleranceP: true,
         targets: { orderBy: { periodRef: 'desc' }, select: { periodRef: true, target: true, lowerBound: true, upperBound: true }, take: 24 },
-        results: { orderBy: { periodDate: 'desc' }, take: 6, select: { periodRef: true, periodDate: true, value: true, light: true, attainment: true, deviationPct: true, note: true, updatedAt: true } },
+        results: { orderBy: { periodDate: 'desc' }, take: 18, select: { periodRef: true, periodDate: true, value: true, light: true, attainment: true, deviationPct: true, note: true, updatedAt: true } },
       },
     });
-    return new Map(indicators.map((indicator) => [indicator.id, this.computeSnapshot(indicator, periodRef, 'latest')]));
+    // 'period': os cards seguem o MÊS da reunião (não o mês vigente/último lançamento).
+    return new Map(indicators.map((indicator) => [indicator.id, this.computeSnapshot(indicator, periodRef, 'period')]));
   }
 
   // Mapeia cada nodeId (area + descendentes) para a area selecionada mais profunda que o contem.

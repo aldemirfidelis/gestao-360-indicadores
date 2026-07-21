@@ -71,6 +71,13 @@ export class DeviationsController {
     return this.service.update(me, id, patch);
   }
 
+  // Excluir desvio — só administradores/perfis superiores (deviations:manage).
+  @Delete(':id')
+  @RequirePermissions('deviations:manage')
+  remove(@CurrentUser() me: AuthPayload, @Param('id') id: string) {
+    return this.service.remove(me, id);
+  }
+
   @Post(':id/causes')
   @RequirePermissions('deviations:update')
   addCause(

@@ -109,12 +109,14 @@ export class ActionsController {
   addTask(
     @CurrentUser() me: AuthPayload,
     @Param('id') id: string,
-    @Body() body: { title: string; dueDate?: string; startDate?: string; endDate?: string; assignedToId?: string },
+    @Body() body: { title: string; description?: string; rootCause?: string; dueDate?: string; startDate?: string; endDate?: string; assignedToId?: string },
   ) {
     return this.service.addTask(
       id,
       {
         title: body.title,
+        description: body.description || undefined,
+        rootCause: body.rootCause || undefined,
         dueDate: body.dueDate ? new Date(body.dueDate) : undefined,
         startDate: body.startDate ? new Date(body.startDate) : undefined,
         endDate: body.endDate ? new Date(body.endDate) : undefined,

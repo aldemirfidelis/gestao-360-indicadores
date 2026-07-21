@@ -142,8 +142,11 @@ export interface SnapshotIndicator {
   upperBound: number | null;
   current: number | null;
   accumulated: number | null;
+  accumulatedTarget: number | null;
+  accumulatedAttainment: number | null;
   attainment: number | null;
   deviationPct: number | null;
+  direction?: string | null;
   light: Light;
   trend: string | null;
   managerComment: string | null;
@@ -333,10 +336,15 @@ export function defaultPeriodRef() {
   return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
 }
 
+// Rótulos de "quantidade" não são anexados ao valor (poluem o card) — mostra só o número.
+const QUANTITY_LABELS = /^(quantidade|qtd|qtde|un|und|unid|unidade|unidades|nº|numero|número)$/i;
+
 export function formatValue(value: number | null | undefined, unitLabel?: string | null) {
   if (value === null || value === undefined || Number.isNaN(value)) return '—';
   if (unitLabel === '%') return formatPercent(value > 1 ? value / 100 : value);
-  return `${formatNumber(value)}${unitLabel && unitLabel !== 'personalizado' ? ` ${unitLabel}` : ''}`;
+  const label = (unitLabel ?? '').trim();
+  const showLabel = label && label !== 'personalizado' && !QUANTITY_LABELS.test(label);
+  return `${formatNumber(value)}${showLabel ? ` ${label}` : ''}`;
 }
 
 export function normalize(value: string) {

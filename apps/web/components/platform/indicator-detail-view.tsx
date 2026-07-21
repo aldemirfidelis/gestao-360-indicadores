@@ -33,6 +33,7 @@ import {
   Network,
   ScrollText,
   ShieldAlert,
+  Trash2,
   TrendingDown,
   TrendingUp,
 } from 'lucide-react';
@@ -245,6 +246,10 @@ export function IndicatorDetailView({
   const { open: openVision360 } = useVision360();
   const { hasPermission } = useAuth();
   const canCreateDeviation = hasPermission(['deviations:create', 'deviations:update']);
+  const canDeleteDeviation = hasPermission(['deviations:manage']);
+  // Mês em foco para o Desvio/Providências/Causa Raiz/Plano: começa no que veio do
+  // Painel Executivo/Reunião (initialPeriodRef) e pode ser trocado no combobox.
+  const [periodFilter, setPeriodFilter] = useState<string | null>(initialPeriodRef ?? null);
 
   const detail = useQuery<IndicatorDetail>({
     queryKey: ['indicator', id],
@@ -267,8 +272,9 @@ export function IndicatorDetailView({
   // tratativa), mesmo que o mês vigente já esteja sendo alimentado por automação.
   const detailResults = detail.data?.results ?? [];
   const latestResult = detailResults[detailResults.length - 1];
-  const focusResult = initialPeriodRef
-    ? detailResults.find((r) => r.periodRef === initialPeriodRef) ?? latestResult
+  const activePeriodRef = periodFilter ?? latestResult?.periodRef ?? null;
+  const focusResult = activePeriodRef
+    ? detailResults.find((r) => r.periodRef === activePeriodRef) ?? latestResult
     : latestResult;
   const lastResult = focusResult;
   const lastPeriodRef = focusResult?.periodRef;
@@ -309,6 +315,16 @@ export function IndicatorDetailView({
       else router.push(`/deviations/${d.id}`);
     },
     onError: (e: any) => toast.error(e?.message ?? 'Falha ao abrir desvio'),
+  });
+
+  const deleteDeviation = useMutation({
+    mutationFn: (deviationId: string) => api(`/deviations/${deviationId}`, { method: 'DELETE' }),
+    onSuccess: () => {
+      toast.success('Desvio excluído');
+      queryClient.invalidateQueries({ queryKey: ['indicator', id, 'deviations'] });
+      queryClient.invalidateQueries({ queryKey: ['traceability', 'indicator', id] });
+    },
+    onError: (e: any) => toast.error(e?.message ?? 'Não foi possível excluir o desvio'),
   });
 
   // Destaca no gráfico o mês recebido do Painel Executivo assim que a série carrega.
@@ -432,9 +448,12 @@ export function IndicatorDetailView({
   };
   const deviationRows = deviations.data ?? [];
   const principalDeviation = getPrincipalDeviation(ind, focusResult ?? undefined);
-  const linkedPrincipalDeviation = principalDeviation
+  // Desvio do mês em foco. Com filtro explícito, NÃO cai para outro mês (mostra "sem desvio").
+  const monthDeviation = activePeriodRef ? deviationRows.find((d) => d.periodRef === activePeriodRef) ?? null : null;
+  const fallbackDeviation = (principalDeviation
     ? deviationRows.find((d) => d.periodRef === principalDeviation.result.periodRef) ?? null
-    : deviationRows[0] ?? null;
+    : null) ?? deviationRows[0] ?? null;
+  const linkedPrincipalDeviation = monthDeviation ?? (periodFilter ? null : fallbackDeviation);
   const openOrCreateDeviation = (targetDeviation?: DeviationSummary | null) => {
     const existing = targetDeviation ?? linkedPrincipalDeviation ?? deviationRows[0] ?? null;
     if (existing) {
@@ -575,6 +594,31 @@ export function IndicatorDetailView({
         </Card>
       </div>
 
+      {(() => {
+        const MONTHS = ['Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun', 'Jul', 'Ago', 'Set', 'Out', 'Nov', 'Dez'];
+        const years = Array.from(new Set([
+          ...detailResults.map((r) => r.periodRef.slice(0, 4)),
+          ...deviationRows.map((d) => d.periodRef.slice(0, 4)),
+          String(new Date().getFullYear()),
+        ].filter(Boolean))).sort().reverse();
+        const y = (activePeriodRef ?? '').slice(0, 4) || years[0];
+        const m = (activePeriodRef ?? '').slice(5, 7) || String(new Date().getMonth() + 1).padStart(2, '0');
+        return (
+          <div className="mb-3 flex flex-wrap items-center gap-2 text-sm">
+            <span className="font-medium text-muted-foreground">Mês em foco (desvio, providências, causa raiz e plano):</span>
+            <NativeSelect className="h-8 w-24 text-xs" value={m} onChange={(e) => setPeriodFilter(`${y}-${e.target.value}`)}>
+              {MONTHS.map((label, i) => <option key={i} value={String(i + 1).padStart(2, '0')}>{label}</option>)}
+            </NativeSelect>
+            <NativeSelect className="h-8 w-24 text-xs" value={y} onChange={(e) => setPeriodFilter(`${e.target.value}-${m}`)}>
+              {years.map((yr) => <option key={yr} value={yr}>{yr}</option>)}
+            </NativeSelect>
+            {periodFilter && (
+              <button type="button" className="text-xs text-primary hover:underline" onClick={() => setPeriodFilter(null)}>voltar ao mês atual</button>
+            )}
+          </div>
+        );
+      })()}
+
       <div ref={decisionExportRef} className="mb-6 grid grid-cols-1 gap-5 bg-background p-1 xl:grid-cols-[360px_minmax(0,1fr)]">
         <IndicatorDecisionCards
           indicator={ind}
@@ -585,6 +629,11 @@ export function IndicatorDetailView({
           onOpenDeviation={openOrCreateDeviation}
           openingDeviation={openDeviation.isPending}
           canCreateDeviation={Boolean(last?.periodRef) && canCreateDeviation}
+          canDeleteDeviation={canDeleteDeviation}
+          onDeleteDeviation={(deviationId) => {
+            if (window.confirm('Excluir este desvio? Esta ação remove o desvio e sua análise da lista.')) deleteDeviation.mutate(deviationId);
+          }}
+          deletingDeviation={deleteDeviation.isPending}
           actionsHref={indicatorActionsHref}
           onOpenAction={onOpenAction}
         />
@@ -1014,6 +1063,9 @@ function IndicatorDecisionCards({
   onOpenDeviation,
   openingDeviation,
   canCreateDeviation,
+  canDeleteDeviation,
+  onDeleteDeviation,
+  deletingDeviation,
   actionsHref,
   onOpenAction,
 }: {
@@ -1025,16 +1077,33 @@ function IndicatorDecisionCards({
   onOpenDeviation: (deviation?: DeviationSummary | null) => void;
   openingDeviation: boolean;
   canCreateDeviation: boolean;
+  canDeleteDeviation?: boolean;
+  onDeleteDeviation?: (deviationId: string) => void;
+  deletingDeviation?: boolean;
   actionsHref: string;
   onOpenAction?: (actionId: string) => void;
 }) {
-  const mainDeviation = principalDeviation ?? deviations[0] ?? null;
+  // O pai já resolve o desvio do mês em foco (ou null quando há filtro sem desvio no mês).
+  const mainDeviation = principalDeviation ?? null;
   const deviationHref = mainDeviation ? `/deviations/${mainDeviation.id}` : '/deviations';
   const treatmentHref = currentTreatment ? `/treatments/${currentTreatment.id}` : '/treatments';
   const latestAnalysis = mainDeviation?.analyses?.[0] ?? null;
   const linkedActions = uniqueActionRows(deviations.flatMap((deviation) => deviation.actions ?? []));
   const rootCause = mainDeviation?.rootCause?.trim();
   const immediateProvidence = mainDeviation?.immediateAction?.trim();
+
+  // Causas raiz numeradas (①②③) para amarrar cada tarefa à sua causa de forma sutil,
+  // sem repetir o texto embaixo da tarefa (já aparece no card Causa Raiz).
+  const rootCauseLines = (rootCause ?? '').split('\n').map((l) => l.replace(/^•\s*/, '').trim()).filter(Boolean);
+  const rootCauseKeys = rootCauseLines.map((line) => line.split(' (de:')[0].trim().toLowerCase());
+  const rootCauseColor = (i: number) => ['bg-orange-500', 'bg-sky-500', 'bg-emerald-500', 'bg-violet-500', 'bg-rose-500', 'bg-amber-500'][i % 6];
+  const rootCauseIndexOf = (rc?: string | null): number => {
+    const t = (rc ?? '').trim().toLowerCase();
+    if (!t) return -1;
+    const exact = rootCauseKeys.indexOf(t);
+    if (exact >= 0) return exact;
+    return rootCauseKeys.findIndex((k) => k.startsWith(t) || t.startsWith(k));
+  };
 
   return (
     <aside className="grid gap-3">
@@ -1053,15 +1122,29 @@ function IndicatorDecisionCards({
               Impacto registrado: {truncateText(mainDeviation.impact, 150)}
             </p>
           )}
-          <Button
-            variant={mainDeviation ? 'outline' : 'destructive'}
-            size="sm"
-            onClick={() => onOpenDeviation(mainDeviation)}
-            disabled={openingDeviation || (!mainDeviation && !canCreateDeviation)}
-          >
-            <AlertTriangle className="mr-1.5 h-4 w-4" />
-            {openingDeviation ? 'Abrindo...' : mainDeviation ? `Abrir desvio #${mainDeviation.number}` : 'Registrar Desvio'}
-          </Button>
+          <div className="flex flex-wrap items-center gap-2">
+            <Button
+              variant={mainDeviation ? 'outline' : 'destructive'}
+              size="sm"
+              onClick={() => onOpenDeviation(mainDeviation)}
+              disabled={openingDeviation || (!mainDeviation && !canCreateDeviation)}
+            >
+              <AlertTriangle className="mr-1.5 h-4 w-4" />
+              {openingDeviation ? 'Abrindo...' : mainDeviation ? `Abrir desvio #${mainDeviation.number}` : 'Registrar Desvio'}
+            </Button>
+            {mainDeviation && canDeleteDeviation && onDeleteDeviation && (
+              <Button
+                variant="ghost"
+                size="sm"
+                className="text-status-red hover:text-status-red"
+                disabled={deletingDeviation}
+                onClick={() => onDeleteDeviation(mainDeviation.id)}
+                title="Excluir desvio (administradores)"
+              >
+                <Trash2 className="mr-1.5 h-4 w-4" />Excluir
+              </Button>
+            )}
+          </div>
         </div>
       </DecisionCard>
 
@@ -1073,29 +1156,20 @@ function IndicatorDecisionCards({
 
       <DecisionCard tone="orange" title="Causa Raiz">
         <div className="mb-3 space-y-2 text-sm">
-          {(() => {
-            const lines = (rootCause ?? '').split('\n').map((l) => l.replace(/^•\s*/, '').trim()).filter(Boolean);
-            if (lines.length > 1) {
-              return (
-                <ul className="space-y-1">
-                  {lines.map((line, i) => (
-                    <li key={i} className="flex gap-1.5 leading-relaxed text-foreground">
-                      <span className="text-orange-500">•</span><span>{line}</span>
-                    </li>
-                  ))}
-                </ul>
-              );
-            }
-            return (
-              <p className={cn('leading-relaxed', rootCause ? 'text-foreground' : 'text-muted-foreground')}>
-                {rootCause
-                  ? lines[0] ?? rootCause
-                  : mainDeviation
-                    ? 'Causa raiz ainda não consolidada no desvio.'
-                    : 'Nenhum desvio registrado para consolidar causa raiz.'}
-              </p>
-            );
-          })()}
+          {rootCauseLines.length > 0 ? (
+            <ul className="space-y-1.5">
+              {rootCauseLines.map((line, i) => (
+                <li key={i} className="flex items-start gap-2 leading-relaxed text-foreground">
+                  <span className={cn('mt-0.5 inline-flex h-4 w-4 shrink-0 items-center justify-center rounded-full text-[10px] font-bold text-white', rootCauseColor(i))}>{i + 1}</span>
+                  <span>{line}</span>
+                </li>
+              ))}
+            </ul>
+          ) : (
+            <p className="leading-relaxed text-muted-foreground">
+              {mainDeviation ? 'Causa raiz ainda não consolidada no desvio.' : 'Nenhum desvio registrado para consolidar causa raiz.'}
+            </p>
+          )}
           {(rootCause ?? '').split('\n').filter((l) => l.trim()).length <= 1 && latestAnalysis && (
             <p className="rounded-md bg-muted/35 p-2 text-xs leading-relaxed text-muted-foreground">
               Última análise: {truncateText(latestAnalysis.content, 170)}
@@ -1118,20 +1192,23 @@ function IndicatorDecisionCards({
               }
               return (
                 <ul className="space-y-2">
-                  {tasks.map((task) => (
-                    <li key={task.id}>
-                      <div className="flex items-start gap-1.5">
+                  {tasks.map((task) => {
+                    const rcIdx = rootCauseIndexOf(task.rootCause);
+                    return (
+                      <li key={task.id} className="flex items-start gap-1.5">
                         <span className={cn('mt-1 h-3 w-3 shrink-0 rounded-full border', task.done ? 'border-status-green bg-status-green/25' : 'border-muted-foreground/40')} />
-                        <span className={cn('leading-snug', task.done ? 'text-muted-foreground line-through' : 'text-foreground')}>{task.title}</span>
-                      </div>
-                      {(task.rootCause ?? '').trim() && (
-                        <div className="ml-[18px] mt-0.5 flex items-start gap-1 text-[10px] leading-snug text-muted-foreground">
-                          <span className="text-orange-500">↳</span>
-                          <span>Causa raiz: {task.rootCause}</span>
-                        </div>
-                      )}
-                    </li>
-                  ))}
+                        <span className={cn('flex-1 leading-snug', task.done ? 'text-muted-foreground line-through' : 'text-foreground')}>{task.title}</span>
+                        {rcIdx >= 0 && (
+                          <span
+                            className={cn('mt-0.5 inline-flex h-4 w-4 shrink-0 items-center justify-center rounded-full text-[10px] font-bold text-white', rootCauseColor(rcIdx))}
+                            title={`Causa raiz ${rcIdx + 1}: ${rootCauseLines[rcIdx]}`}
+                          >
+                            {rcIdx + 1}
+                          </span>
+                        )}
+                      </li>
+                    );
+                  })}
                 </ul>
               );
             })()}

@@ -107,6 +107,13 @@ export function AnalysisWorkspace({
   const fiveWhysSession = action.analysisSessions.find((item) => item.method === 'FIVE_WHYS');
   const paretoSession = action.analysisSessions.find((item) => item.method === 'PARETO');
 
+  // Quando o 5 Porquês está investigando uma causa do Ishikawa, o quadro é o DAQUELA
+  // causa (persistido nela), não a sessão única — assim cada causa tem sua análise.
+  const activeCause = activeIshikawaCauseId ? (ishikawa ?? []).find((c: any) => c.id === activeIshikawaCauseId) : null;
+  const fiveWhysEffectiveSession = activeIshikawaCauseId
+    ? { id: `cause-${activeIshikawaCauseId}`, data: { items: Array.isArray(activeCause?.fiveWhysData) ? activeCause?.fiveWhysData : null }, updatedAt: activeCause?.updatedAt ?? activeIshikawaCauseId }
+    : fiveWhysSession;
+
   return (
     <SectionCard
       title={title}
@@ -146,9 +153,10 @@ export function AnalysisWorkspace({
 
       {method === 'FIVE_WHYS' && (
         <FiveWhysVisualAnalysis
+          key={activeIshikawaCauseId ?? 'shared'}
           actionId={action.id}
           action={action}
-          session={fiveWhysSession}
+          session={fiveWhysEffectiveSession as any}
           problem={problem}
           rootCause={rootCause}
           users={users}
@@ -171,6 +179,16 @@ export function AnalysisWorkspace({
           }}
           onSave={(whyItems, nextRootCause = rootCause, extra) => {
             setFiveWhys(whyItems);
+            if (activeIshikawaCauseId) {
+              // Guarda o quadro NA causa do Ishikawa (cada causa tem seu 5 Porquês).
+              const nextCauses = ishikawaRef.current.map((c: any) =>
+                c.id === activeIshikawaCauseId ? { ...c, fiveWhysData: whyItems } : c,
+              );
+              ishikawaRef.current = nextCauses;
+              setIshikawa(nextCauses);
+              onSave({ method: 'ISHIKAWA', problem, rootCause: consolidateRootCauses(nextCauses), fiveWhys, ishikawaCauses: nextCauses, maspSteps, pdcaSteps });
+              return;
+            }
             onSave({ method: 'FIVE_WHYS', problem, rootCause: consolidatedRootText() || nextRootCause, fiveWhys: deriveLegacyWhys(whyItems), ishikawaCauses: ishikawaRef.current, maspSteps, pdcaSteps, data: { items: whyItems, ...(extra ?? {}) } });
           }}
         />
@@ -191,8 +209,11 @@ export function AnalysisWorkspace({
           onSendToFiveWhys={(causeText, causeId) => {
             const text = String(causeText ?? '').trim();
             if (!text) return;
-            setSeedWhyAnswer(text);
             setActiveIshikawaCauseId(causeId ?? null);
+            // Se a causa já tem análise, abre preenchida (sem semear); senão semeia a causa no 1º porquê.
+            const cause = ishikawaRef.current.find((c: any) => c.id === causeId);
+            const hasAnalysis = Array.isArray(cause?.fiveWhysData) && cause.fiveWhysData.length > 0;
+            setSeedWhyAnswer(hasAnalysis ? null : text);
             setMethod('FIVE_WHYS');
           }}
           onSave={(causes, nextRootCause = rootCause) => {

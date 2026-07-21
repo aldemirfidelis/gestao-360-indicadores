@@ -55,6 +55,8 @@ interface IshikawaCause {
   convertedToTaskId?: string | null;
   /** Causa raiz encontrada ao investigar esta causa nos 5 Porquês (ancoragem da análise). */
   rootCause?: string | null;
+  /** Quadro dos 5 Porquês desta causa (para reabrir a análise preenchida). */
+  fiveWhysData?: any[] | null;
 }
 
 interface Suggestion {
@@ -877,6 +879,7 @@ function normalizeCauses(rows: any[] | undefined): IshikawaCause[] {
         isRootCause: row.isRootCause ?? row.likelyRootCause,
         convertedToTaskId: row.convertedToTaskId,
         rootCause: row.rootCause,
+        fiveWhysData: row.fiveWhysData,
       }),
     ),
   );
@@ -921,6 +924,7 @@ function makeCause(input: Partial<IshikawaCause>): IshikawaCause {
     isRootCause: Boolean(input.isRootCause),
     convertedToTaskId: input.convertedToTaskId ?? null,
     rootCause: input.rootCause ?? null,
+    fiveWhysData: Array.isArray(input.fiveWhysData) ? input.fiveWhysData : null,
   };
 }
 
