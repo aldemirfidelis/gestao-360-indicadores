@@ -313,6 +313,12 @@ export class RecruitmentController {
     return this.offers.addDocumentRequirement(me, id, body);
   }
 
+  @Post('pre-admissions/:id/notify-documents')
+  @RequirePermissions('recruit:prehire', 'recruit:manage')
+  notifyPreAdmissionDocuments(@CurrentUser() me: AuthPayload, @Param('id') id: string) {
+    return this.offers.notifyDocuments(me, id);
+  }
+
   @Post('pre-admission-documents/:id/review')
   @RequirePermissions('recruit:prehire', 'recruit:manage')
   reviewPreAdmissionDocument(@CurrentUser() me: AuthPayload, @Param('id') id: string, @Body() body: any) {

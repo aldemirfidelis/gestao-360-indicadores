@@ -10,6 +10,7 @@ import {
   Download,
   FileText,
   HeartPulse,
+  Mail,
   MessageSquare,
   Send,
   Star,
@@ -289,8 +290,9 @@ export function CandidateSheet({
   const approveOffer = useMutation({ mutationFn: (id: string) => call(`/recruitment/offers/${id}/approve`), ...mutate('Proposta aprovada.') });
   const sendOffer = useMutation({ mutationFn: (id: string) => call(`/recruitment/offers/${id}/send`), ...mutate('Proposta enviada ao candidato.') });
   const cancelOffer = useMutation({ mutationFn: ({ id, reason }: { id: string; reason?: string }) => call(`/recruitment/offers/${id}/cancel`, { reason }), ...mutate('Proposta cancelada.') });
-  const startPreAdmission = useMutation({ mutationFn: (offerId?: string) => call(`/recruitment/applications/${applicationId}/pre-admissions`, { offerId }), ...mutate('Pré-admissão iniciada. Solicite os documentos ao candidato.') });
+  const startPreAdmission = useMutation({ mutationFn: (offerId?: string) => call(`/recruitment/applications/${applicationId}/pre-admissions`, { offerId }), ...mutate('Pré-admissão iniciada. O candidato foi notificado por e-mail para enviar os documentos.') });
   const addPreAdmissionDocument = useMutation({ mutationFn: ({ preAdmissionId, title }: { preAdmissionId: string; title: string }) => call(`/recruitment/pre-admissions/${preAdmissionId}/documents`, { title, kind: 'OTHER' }), ...mutate('Documento solicitado ao candidato.') });
+  const notifyPreAdmissionDocuments = useMutation({ mutationFn: (preAdmissionId: string) => call(`/recruitment/pre-admissions/${preAdmissionId}/notify-documents`), ...mutate('Candidato notificado por e-mail para enviar os documentos.') });
   const reviewPreAdmissionDocument = useMutation({ mutationFn: ({ id, status, note }: { id: string; status: string; note?: string }) => call(`/recruitment/pre-admission-documents/${id}/review`, { status, note }), ...mutate('Documento revisado.') });
   const requestAso = useMutation({ mutationFn: (preAdmissionId: string) => call(`/recruitment/applications/${applicationId}/occupational-exams`, { preAdmissionId }), ...mutate('ASO admissional solicitado.') });
   const scheduleAso = useMutation({
@@ -726,22 +728,33 @@ export function CandidateSheet({
                       <div key={pre.id} className="rounded-md border p-2.5 text-xs">
                         <div className="flex flex-wrap items-center justify-between gap-2">
                           <StatusBadge {...badge(PRE_ADMISSION_STATUS, pre.status)} />
-                          <Button
-                            size="sm"
-                            variant="ghost"
-                            disabled={!canManage || addPreAdmissionDocument.isPending}
-                            onClick={() =>
-                              setReasonDialog({
-                                title: 'Solicitar documento adicional',
-                                label: 'Nome do documento',
-                                placeholder: 'Ex.: Certificado de reservista',
-                                confirmLabel: 'Solicitar',
-                                onConfirm: (title) => addPreAdmissionDocument.mutate({ preAdmissionId: pre.id, title }),
-                              })
-                            }
-                          >
-                            Solicitar documento
-                          </Button>
+                          <div className="flex flex-wrap items-center gap-1">
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              disabled={!canManage || notifyPreAdmissionDocuments.isPending}
+                              onClick={() => notifyPreAdmissionDocuments.mutate(pre.id)}
+                              title="Envia um e-mail ao candidato com o link do portal e a lista de documentos pendentes"
+                            >
+                              <Mail className="mr-1 h-3.5 w-3.5" /> Notificar candidato
+                            </Button>
+                            <Button
+                              size="sm"
+                              variant="ghost"
+                              disabled={!canManage || addPreAdmissionDocument.isPending}
+                              onClick={() =>
+                                setReasonDialog({
+                                  title: 'Solicitar documento adicional',
+                                  label: 'Nome do documento',
+                                  placeholder: 'Ex.: Certificado de reservista',
+                                  confirmLabel: 'Solicitar',
+                                  onConfirm: (title) => addPreAdmissionDocument.mutate({ preAdmissionId: pre.id, title }),
+                                })
+                              }
+                            >
+                              Solicitar documento
+                            </Button>
+                          </div>
                         </div>
                         <div className="mt-2 divide-y rounded-md border bg-background">
                           {pre.documents.map((doc) => (

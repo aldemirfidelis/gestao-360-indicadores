@@ -151,7 +151,19 @@ export class RecruitOfferService {
       createdById: me.sub,
     }));
     await this.audit.record(me, { module: MODULE, entity: 'RecruitPreAdmission', entityId: created.id, action: 'CREATE', message: 'Pre-admissao iniciada' });
+    // Avisa o candidato por e-mail que o checklist de documentos foi aberto (não bloqueia o fluxo se o e-mail falhar).
+    void this.emailDocumentsFor(me.companyId, created.id);
     return created;
+  }
+
+  /** Reenvia (sob demanda) o e-mail pedindo os documentos da pré-admissão — botão "Notificar candidato" no painel do recrutador. */
+  async notifyDocuments(me: AuthPayload, preAdmissionId: string) {
+    const pre = await this.preAdmissionOrFail(me.companyId, preAdmissionId);
+    const sent = await this.emailDocumentsFor(me.companyId, pre.id);
+    if (!sent) throw new BadRequestException('Candidatura sem e-mail cadastrado — não foi possível notificar.');
+    await this.prisma.recruitApplicationEvent.create({ data: { companyId: me.companyId, applicationId: pre.applicationId, type: 'PREHIRE_DOCS_NOTIFIED', actorType: 'USER', actorId: me.sub } });
+    await this.audit.record(me, { module: MODULE, entity: 'RecruitPreAdmission', entityId: pre.id, action: 'NOTIFY', message: 'Candidato notificado por e-mail para enviar os documentos' });
+    return { ok: true };
   }
 
   async addDocumentRequirement(me: AuthPayload, preAdmissionId: string, body: any = {}) {
@@ -346,6 +358,42 @@ export class RecruitOfferService {
       validade: offer.expiresAt ? offer.expiresAt.toLocaleDateString('pt-BR') : 'sem data definida',
     });
   }
+
+  /**
+   * Dispara o e-mail DOCUMENTS_REQUESTED para o candidato da pré-admissão, listando os documentos
+   * pendentes. Retorna false quando não há e-mail do candidato (para o chamador avisar). Nunca lança
+   * por causa do envio em si — `sendEvent` já engole falhas de SMTP.
+   */
+  private async emailDocumentsFor(companyId: string, preAdmissionId: string): Promise<boolean> {
+    const pre = await this.prisma.recruitPreAdmission.findFirst({
+      where: { id: preAdmissionId, companyId },
+      include: {
+        documents: { orderBy: { createdAt: 'asc' }, select: { title: true, required: true, status: true } },
+        application: { include: { candidate: { select: { name: true, email: true } }, posting: { select: { title: true } } } },
+      },
+    });
+    const email = pre?.application?.candidate?.email;
+    if (!pre || !email) return false;
+    const companyName = await resolveCompanyDisplayName(this.prisma, companyId);
+    const pending = pre.documents.filter((d) => !['APPROVED', 'WAIVED'].includes(d.status));
+    const list = (pending.length ? pending : pre.documents)
+      .map((d) => `- ${d.title}${d.required ? '' : ' (opcional)'}`)
+      .join('\n');
+    void this.communication.sendEvent(companyId, 'DOCUMENTS_REQUESTED', email, {
+      candidato: pre.application.candidate.name,
+      vaga: pre.application.posting.title,
+      empresa: companyName,
+      documentos: list,
+      link: candidatePortalLink(),
+    });
+    return true;
+  }
+}
+
+/** Link absoluto para a Área do candidato quando há URL pública configurada; senão string vazia (o corpo do e-mail continua coerente). */
+function candidatePortalLink(): string {
+  const base = (process.env.PUBLIC_SITE_URL ?? process.env.NEXT_PUBLIC_SITE_URL ?? '').trim().replace(/\/+$/, '');
+  return base ? `\n\nAcesse aqui: ${base}/candidato` : '';
 }
 
 function text(value: unknown): string | null {

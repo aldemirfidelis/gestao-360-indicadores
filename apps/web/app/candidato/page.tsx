@@ -396,6 +396,37 @@ function CandidatePortalContent() {
     }
   }
 
+  /** Envia o arquivo e já o vincula ao item da pré-admissão, em um passo só (o candidato não precisa subir antes na biblioteca). */
+  async function attachPreAdmissionFile(item: PreAdmissionDocument, event: ChangeEvent<HTMLInputElement>) {
+    const selected = event.target.files?.[0] ?? null;
+    event.target.value = '';
+    if (!selected) return;
+    const validationError = validateCandidateFile(selected);
+    if (validationError) {
+      setError(validationError);
+      return;
+    }
+    setBusy(true); setError(null);
+    try {
+      const contentBase64 = await fileToBase64(selected);
+      const created = await candidateApi<{ id: string }>('/careers/candidate/documents', {
+        method: 'POST',
+        json: {
+          kind: ['EDUCATION', 'CERTIFICATE'].includes(item.kind) ? 'CERTIFICATE' : 'OTHER',
+          fileName: selected.name,
+          mimeType: uploadMimeType(selected),
+          contentBase64,
+        },
+      });
+      await candidateApi(`/careers/candidate/pre-admission-documents/${item.id}/submit`, { method: 'POST', json: { candidateDocumentId: created.id } });
+      await loadPortal();
+    } catch (e) {
+      setError((e as Error).message);
+    } finally {
+      setBusy(false);
+    }
+  }
+
   function pickFile(event: ChangeEvent<HTMLInputElement>) {
     const selected = event.target.files?.[0] ?? null;
     if (!selected) {
@@ -710,17 +741,23 @@ function CandidatePortalContent() {
                       {item.candidateDocument && <div className="mt-1 text-slate-500">{item.candidateDocument.fileName}</div>}
                       {item.reviewNote && <div className="mt-1 rounded bg-slate-50 p-2 text-slate-500 dark:bg-slate-950">{item.reviewNote}</div>}
                       {['PENDING', 'REJECTED', 'SUBMITTED'].includes(item.status) && (
-                        <div className="mt-2 grid gap-2 sm:grid-cols-[1fr_auto]">
-                          <select
-                            defaultValue={item.candidateDocumentId ?? ''}
-                            onChange={(e) => submitPreAdmissionDocument(item.id, e.target.value)}
-                            disabled={busy || documents.length === 0}
-                            className="h-9 rounded-md border bg-white px-3 text-xs dark:border-slate-700 dark:bg-slate-950"
-                          >
-                            <option value="">Selecionar documento enviado...</option>
-                            {documents.map((doc) => <option key={doc.id} value={doc.id}>{doc.fileName}</option>)}
-                          </select>
-                          <Link href="#docs" className="rounded-md border px-3 py-2 text-center text-xs font-semibold hover:bg-slate-50 dark:border-slate-700 dark:hover:bg-slate-800">Enviar novo</Link>
+                        <div className="mt-2 space-y-2">
+                          <label className={`flex items-center gap-2 rounded-md border border-dashed px-3 py-2 text-xs text-slate-600 dark:border-slate-700 dark:text-slate-300 ${busy ? 'cursor-not-allowed opacity-60' : 'cursor-pointer hover:bg-slate-50 dark:hover:bg-slate-800'}`}>
+                            <FileUp className="h-4 w-4 shrink-0" />
+                            <span className="min-w-0 flex-1 truncate">{item.status === 'REJECTED' ? 'Reenviar arquivo (PDF, JPG ou PNG, máx. 8 MB)' : 'Enviar arquivo (PDF, JPG ou PNG, máx. 8 MB)'}</span>
+                            <input type="file" accept=".pdf,.png,.jpg,.jpeg" className="hidden" disabled={busy} onChange={(e) => attachPreAdmissionFile(item, e)} />
+                          </label>
+                          {documents.length > 0 && (
+                            <select
+                              defaultValue={item.candidateDocumentId ?? ''}
+                              onChange={(e) => submitPreAdmissionDocument(item.id, e.target.value)}
+                              disabled={busy}
+                              className="h-9 w-full rounded-md border bg-white px-3 text-xs dark:border-slate-700 dark:bg-slate-950"
+                            >
+                              <option value="">Ou usar um arquivo já enviado...</option>
+                              {documents.map((doc) => <option key={doc.id} value={doc.id}>{doc.fileName}</option>)}
+                            </select>
+                          )}
                         </div>
                       )}
                     </div>

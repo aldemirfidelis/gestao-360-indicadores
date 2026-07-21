@@ -244,6 +244,7 @@ export const EVENT_TYPE: Record<string, string> = {
   OFFER_DECLINED: 'Proposta recusada',
   OFFER_CANCELLED: 'Proposta cancelada',
   PREHIRE_STARTED: 'Pré-admissão iniciada',
+  PREHIRE_DOCS_NOTIFIED: 'Candidato notificado (documentos)',
   PREHIRE_DOC_REQUIRED: 'Documento solicitado',
   PREHIRE_DOC_SUBMITTED: 'Documento enviado',
   PREHIRE_DOC_REVIEWED: 'Documento revisado',

@@ -17,7 +17,7 @@ const MODULE = 'recruitment';
  * — este serviço só centraliza o TEXTO (antes hardcoded em 2 lugares, e ausente em outros
  * 4 eventos onde o candidato simplesmente não era avisado).
  */
-export type RecruitEmailEvent = 'APPLICATION_RECEIVED' | 'STAGE_CHANGED' | 'REJECTED' | 'INTERVIEW_SCHEDULED' | 'OFFER_SENT' | 'ADMISSION_AUTHORIZED';
+export type RecruitEmailEvent = 'APPLICATION_RECEIVED' | 'STAGE_CHANGED' | 'REJECTED' | 'INTERVIEW_SCHEDULED' | 'OFFER_SENT' | 'DOCUMENTS_REQUESTED' | 'ADMISSION_AUTHORIZED';
 
 export const RECRUIT_EMAIL_EVENTS: RecruitEmailEvent[] = [
   'APPLICATION_RECEIVED',
@@ -25,6 +25,7 @@ export const RECRUIT_EMAIL_EVENTS: RecruitEmailEvent[] = [
   'REJECTED',
   'INTERVIEW_SCHEDULED',
   'OFFER_SENT',
+  'DOCUMENTS_REQUESTED',
   'ADMISSION_AUTHORIZED',
 ];
 
@@ -34,6 +35,7 @@ const EVENT_LABELS: Record<RecruitEmailEvent, string> = {
   REJECTED: 'Candidatura encerrada',
   INTERVIEW_SCHEDULED: 'Entrevista agendada',
   OFFER_SENT: 'Proposta enviada',
+  DOCUMENTS_REQUESTED: 'Documentos solicitados (pré-admissão)',
   ADMISSION_AUTHORIZED: 'Admissão autorizada',
 };
 
@@ -43,6 +45,7 @@ const EVENT_PLACEHOLDERS: Record<RecruitEmailEvent, string[]> = {
   REJECTED: ['candidato', 'vaga', 'empresa', 'motivo'],
   INTERVIEW_SCHEDULED: ['candidato', 'vaga', 'empresa', 'data_hora', 'link', 'local', 'instrucoes'],
   OFFER_SENT: ['candidato', 'vaga', 'empresa', 'validade'],
+  DOCUMENTS_REQUESTED: ['candidato', 'vaga', 'empresa', 'documentos', 'link'],
   ADMISSION_AUTHORIZED: ['candidato', 'vaga', 'empresa'],
 };
 
@@ -66,6 +69,10 @@ const DEFAULT_TEMPLATES: Record<RecruitEmailEvent, { subject: string; body: stri
   OFFER_SENT: {
     subject: 'Proposta de trabalho — {{vaga}}',
     body: 'Olá, {{candidato}}!\n\nTemos uma proposta para você na vaga de {{vaga}} em {{empresa}}. Acesse a área do candidato para ver os detalhes e responder até {{validade}}.',
+  },
+  DOCUMENTS_REQUESTED: {
+    subject: 'Envie seus documentos de admissão — {{vaga}}',
+    body: 'Olá, {{candidato}}!\n\nPara darmos andamento à sua contratação para a vaga de {{vaga}} em {{empresa}}, precisamos que você envie alguns documentos:\n{{documentos}}\n\nAcesse a Área do candidato, faça login com este mesmo e-mail e envie os arquivos no painel "Pré-admissão".{{link}}\n\nQualquer dúvida, é só responder este e-mail.',
   },
   ADMISSION_AUTHORIZED: {
     subject: 'Parabéns! Sua admissão foi autorizada — {{vaga}}',
