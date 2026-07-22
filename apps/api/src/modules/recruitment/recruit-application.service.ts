@@ -443,8 +443,19 @@ export class RecruitApplicationService {
 
   /** Conteúdo de um documento para o recrutador (base64). */
   async readApplicationDocument(me: AuthPayload, docId: string) {
-    const doc = await this.prisma.recruitCandidateDocument.findFirst({ where: { id: docId, companyId: me.companyId, deletedAt: null } });
+    const doc = await this.prisma.recruitCandidateDocument.findFirst({ where: { id: docId, deletedAt: null } });
     if (!doc) throw new NotFoundException('Documento não encontrado.');
+    // Isolamento multi-tenant: documento com empresa fica restrito a ela; documentos
+    // de perfil global (companyId nulo — enviados pelo candidato na pré-admissão sem
+    // vínculo de empresa) são liberados se o candidato tem candidatura nesta empresa.
+    if (doc.companyId) {
+      if (doc.companyId !== me.companyId) throw new NotFoundException('Documento não encontrado.');
+    } else {
+      const linked = await this.prisma.recruitApplication.count({
+        where: { companyId: me.companyId, candidateId: doc.candidateId },
+      });
+      if (!linked) throw new NotFoundException('Documento não encontrado.');
+    }
     return this.readStored(doc);
   }
 
