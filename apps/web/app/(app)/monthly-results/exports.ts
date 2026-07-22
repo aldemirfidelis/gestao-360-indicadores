@@ -4,6 +4,7 @@ import {
   FOLLOWUP_LEVEL_LABEL,
   ITEM_STATUS_LABEL,
   LIGHT_LABEL,
+  decisionOutputHeader,
   formatValue,
   type MeetingDetail,
 } from './shared';
@@ -74,15 +75,23 @@ export async function exportAtaPdf(meeting: MeetingDetail) {
   }
 
   if (meeting.decisions.length) {
-    doc.setFontSize(11);
-    doc.text('Decisões, riscos e escalonamentos', 14, y);
-    autoTable(doc, {
-      startY: y + 2,
-      styles: { fontSize: 8 },
-      head: [['Tipo', 'Tema', 'Registro', 'Responsável', 'Prazo', 'Status']],
-      body: meeting.decisions.map((d) => [ENTRY_KIND_LABEL[d.kind] ?? d.kind, d.topic ?? '—', d.description, d.owner ?? '—', fmtDate(d.dueDate), ITEM_STATUS_LABEL[d.status] ?? d.status]),
-    });
-    y = (doc as any).lastAutoTable.finalY + 6;
+    const decisionGroups = new Map<string, typeof meeting.decisions>();
+    for (const decision of meeting.decisions) {
+      const groupHeader = decision.boardInvolved?.trim() || decisionOutputHeader(meeting);
+      decisionGroups.set(groupHeader, [...(decisionGroups.get(groupHeader) ?? []), decision]);
+    }
+
+    for (const [groupHeader, decisions] of decisionGroups) {
+      doc.setFontSize(11);
+      doc.text(groupHeader, 14, y);
+      autoTable(doc, {
+        startY: y + 2,
+        styles: { fontSize: 8 },
+        head: [['Tipo', 'Tema', 'Registro', 'Responsável', 'Prazo', 'Status']],
+        body: decisions.map((d) => [ENTRY_KIND_LABEL[d.kind] ?? d.kind, d.topic ?? '—', d.description, d.owner ?? '—', fmtDate(d.dueDate), ITEM_STATUS_LABEL[d.status] ?? d.status]),
+      });
+      y = (doc as any).lastAutoTable.finalY + 6;
+    }
   }
 
   if (meeting.followUps.length) {

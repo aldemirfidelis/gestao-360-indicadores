@@ -12782,6 +12782,14 @@ model PersonnelEmployeeProfile {
   /// operação de chão que só bate no totem = false.
   allowPortalPunch Boolean?
 
+  /// Almoço automático: com só entrada e saída, o sistema desconta o intervalo
+  /// da escala (colaborador não precisa bater o almoço).
+  autoLunch Boolean @default(false)
+  /// Isento de registro de ponto (gerentes/cargos de confiança, CLT art. 62):
+  /// não bate ponto; o espelho considera a jornada da escala cumprida (previsto =
+  /// trabalhado) para fins de cálculo/folha.
+  timeClockExempt Boolean @default(false)
+
   createdById String?
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt

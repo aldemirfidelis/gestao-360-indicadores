@@ -131,10 +131,11 @@ export class ActionsController {
   updateTask(
     @CurrentUser() me: AuthPayload,
     @Param('taskId') taskId: string,
-    @Body() body: { title?: string; done?: boolean; completionNote?: string | null; dueDate?: string | null; startDate?: string | null; endDate?: string | null; assignedToId?: string | null },
+    @Body() body: { title?: string; done?: boolean; rootCause?: string | null; completionNote?: string | null; dueDate?: string | null; startDate?: string | null; endDate?: string | null; assignedToId?: string | null },
   ) {
     const patch: any = {};
     if (body.title !== undefined) patch.title = body.title;
+    if (body.rootCause !== undefined) patch.rootCause = body.rootCause || null;
     if (body.done !== undefined) patch.done = body.done;
     if (body.completionNote !== undefined) patch.completionNote = body.completionNote || null;
     if (body.dueDate !== undefined) patch.dueDate = body.dueDate ? new Date(body.dueDate) : null;

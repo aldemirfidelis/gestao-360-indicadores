@@ -74,7 +74,26 @@ export interface SummaryResponse {
   bank: { totalMinutes: number; closedMinutes: number; liveMinutes: number };
   pendingAdjustments: number;
   myPendingAdjustments: number;
+  autoLunch?: boolean;
+  timeClockExempt?: boolean;
   period: { ref: string; status: string };
+}
+
+/** Rótulo da próxima batida do dia (4 batidas: Entrada/Saída almoço/Retorno/Saída). */
+export function nextPunchLabel(count: number, autoLunch?: boolean): string {
+  if (count === 0) return 'Registrar entrada';
+  if (autoLunch) return count === 1 ? 'Registrar saída' : 'Registrar nova batida';
+  if (count === 1) return 'Registrar saída para o almoço';
+  if (count === 2) return 'Registrar retorno do almoço';
+  if (count === 3) return 'Registrar saída';
+  return 'Registrar nova batida';
+}
+
+/** Papel de uma batida pela posição (0=Entrada, 1=Saída almoço, 2=Retorno, 3=Saída). */
+export function punchRoleLabel(index: number, autoLunch?: boolean): string {
+  if (index === 0) return 'Entrada';
+  if (autoLunch) return index === 1 ? 'Saída' : index % 2 === 0 ? 'Entrada' : 'Saída';
+  return ['Entrada', 'Saída p/ almoço', 'Retorno do almoço', 'Saída'][index] ?? (index % 2 === 0 ? 'Entrada' : 'Saída');
 }
 
 export interface AdjustmentRequest {

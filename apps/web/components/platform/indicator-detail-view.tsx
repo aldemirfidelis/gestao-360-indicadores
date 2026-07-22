@@ -1096,6 +1096,7 @@ function IndicatorDecisionCards({
   // sem repetir o texto embaixo da tarefa (já aparece no card Causa Raiz).
   const rootCauseLines = (rootCause ?? '').split('\n').map((l) => l.replace(/^•\s*/, '').trim()).filter(Boolean);
   const rootCauseKeys = rootCauseLines.map((line) => line.split(' (de:')[0].trim().toLowerCase());
+  const rootCauseTextOf = (i: number) => (rootCauseLines[i] ?? '').split(' (de:')[0].trim();
   const rootCauseColor = (i: number) => ['bg-orange-500', 'bg-sky-500', 'bg-emerald-500', 'bg-violet-500', 'bg-rose-500', 'bg-amber-500'][i % 6];
   const rootCauseIndexOf = (rc?: string | null): number => {
     const t = (rc ?? '').trim().toLowerCase();
@@ -1104,6 +1105,17 @@ function IndicatorDecisionCards({
     if (exact >= 0) return exact;
     return rootCauseKeys.findIndex((k) => k.startsWith(t) || t.startsWith(k));
   };
+  // Vincular manualmente uma tarefa (inclusive as legadas, sem causa raiz gravada) a
+  // uma das causas raiz numeradas do desvio.
+  const assignTaskQc = useQueryClient();
+  const assignTaskRootCause = useMutation({
+    mutationFn: ({ taskId, rootCause: rc }: { taskId: string; rootCause: string }) => api(`/actions/tasks/${taskId}`, { method: 'PATCH', json: { rootCause: rc } }),
+    onSuccess: () => {
+      toast.success('Tarefa vinculada à causa raiz');
+      void assignTaskQc.invalidateQueries({ queryKey: ['indicator', indicator.id, 'deviations'] });
+    },
+    onError: (e: any) => toast.error(e?.message ?? 'Não foi possível vincular a tarefa'),
+  });
 
   return (
     <aside className="grid gap-3">
@@ -1198,14 +1210,28 @@ function IndicatorDecisionCards({
                       <li key={task.id} className="flex items-start gap-1.5">
                         <span className={cn('mt-1 h-3 w-3 shrink-0 rounded-full border', task.done ? 'border-status-green bg-status-green/25' : 'border-muted-foreground/40')} />
                         <span className={cn('flex-1 leading-snug', task.done ? 'text-muted-foreground line-through' : 'text-foreground')}>{task.title}</span>
-                        {rcIdx >= 0 && (
+                        {rcIdx >= 0 ? (
                           <span
                             className={cn('mt-0.5 inline-flex h-4 w-4 shrink-0 items-center justify-center rounded-full text-[10px] font-bold text-white', rootCauseColor(rcIdx))}
                             title={`Causa raiz ${rcIdx + 1}: ${rootCauseLines[rcIdx]}`}
                           >
                             {rcIdx + 1}
                           </span>
-                        )}
+                        ) : rootCauseLines.length > 0 ? (
+                          <select
+                            className="mt-0.5 h-5 shrink-0 rounded border bg-background px-1 text-[10px] text-muted-foreground"
+                            value=""
+                            disabled={assignTaskRootCause.isPending}
+                            title="Vincular esta tarefa a uma causa raiz"
+                            onChange={(e) => {
+                              const i = Number(e.target.value);
+                              if (Number.isFinite(i) && i >= 0) assignTaskRootCause.mutate({ taskId: task.id, rootCause: rootCauseTextOf(i) });
+                            }}
+                          >
+                            <option value="">＋causa</option>
+                            {rootCauseLines.map((_, i) => <option key={i} value={i}>Causa {i + 1}</option>)}
+                          </select>
+                        ) : null}
                       </li>
                     );
                   })}

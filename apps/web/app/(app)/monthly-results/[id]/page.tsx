@@ -54,6 +54,7 @@ import {
   READINESS_STYLES,
   STANDARDIZATION_TYPES,
   STATUS_STYLES,
+  decisionOutputHeader,
   formatValue,
   type AgendaItem,
   type DecisionEntry,
@@ -936,6 +937,7 @@ function DecisionRow({ d, can, run }: { d: DecisionEntry; can: Can; run: Run }) 
             <Badge variant="secondary">{ENTRY_KIND_LABEL[d.kind] ?? d.kind}</Badge>
             {d.topic && <span className="text-xs font-medium">{d.topic}</span>}
           </div>
+          {d.boardInvolved && <p className="mt-1 break-words text-xs font-medium text-muted-foreground">{d.boardInvolved}</p>}
           <p className="mt-1 break-words text-sm">{d.description}</p>
           <div className="mt-1 flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
             {d.owner && <span>{d.owner}</span>}
@@ -1422,16 +1424,23 @@ function DecisionDialog({
   onClose: () => void;
   run: Run;
 }) {
+  const defaultHeader = decisionOutputHeader(meeting);
+  const selectedAreaName = area?.name ?? '';
   const [form, setForm] = useState({
     kind: 'DECISION',
-    topic: '',
+    topic: selectedAreaName,
     description: '',
+    orgNodeId: area?.orgNodeId ?? '',
     ownerUserId: '',
     dueDate: '',
     impactIfNotDecided: '',
-    boardInvolved: '',
+    boardInvolved: defaultHeader,
     createAction: false,
   });
+  const chooseArea = (orgNodeId: string) => {
+    const selected = meeting.areas.find((item) => item.orgNodeId === orgNodeId);
+    setForm({ ...form, orgNodeId, topic: selected?.name ?? '' });
+  };
   return (
     <Dialog open onOpenChange={(open) => !open && onClose()}>
       <DialogContent className="max-w-lg">
@@ -1439,7 +1448,33 @@ function DecisionDialog({
           <DialogTitle>Registrar decisão / risco / escalonamento</DialogTitle>
         </DialogHeader>
         <div className="space-y-3">
-          <div className="grid grid-cols-2 gap-3">
+          <div className="rounded-md border bg-muted/30 p-3">
+            <div>
+              <Label>Tema</Label>
+              {area ? (
+                <Input className="mt-1" value={form.topic} readOnly />
+              ) : (
+                <NativeSelect className="mt-1" value={form.orgNodeId} onChange={(e) => chooseArea(e.target.value)}>
+                  <option value="">Selecione a área</option>
+                  {meeting.areas.map((item) => (
+                    <option key={item.id} value={item.orgNodeId}>
+                      {item.name}
+                    </option>
+                  ))}
+                </NativeSelect>
+              )}
+            </div>
+            <div className="mt-3">
+              <Label>Cabeçalho</Label>
+              <Input
+                className="mt-1"
+                value={form.boardInvolved}
+                placeholder={defaultHeader}
+                onChange={(e) => setForm({ ...form, boardInvolved: e.target.value })}
+              />
+            </div>
+          </div>
+          <div className="grid grid-cols-1 gap-3">
             <div>
               <Label>Tipo</Label>
               <NativeSelect className="mt-1" value={form.kind} onChange={(e) => setForm({ ...form, kind: e.target.value })}>
@@ -1448,10 +1483,6 @@ function DecisionDialog({
                 <option value="ESCALATION">Escalonamento</option>
                 <option value="PENDING">Pendência</option>
               </NativeSelect>
-            </div>
-            <div>
-              <Label>Tema</Label>
-              <Input className="mt-1" value={form.topic} onChange={(e) => setForm({ ...form, topic: e.target.value })} />
             </div>
           </div>
           <div>
@@ -1491,7 +1522,8 @@ function DecisionDialog({
           <Button
             disabled={!form.description.trim()}
             onClick={() => {
-              run(`/monthly-results/meetings/${meeting.id}/decisions`, 'POST', { ...form, orgNodeId: area?.orgNodeId }, 'Registrado na ata');
+              const header = form.boardInvolved.trim() || defaultHeader;
+              run(`/monthly-results/meetings/${meeting.id}/decisions`, 'POST', { ...form, boardInvolved: header }, 'Registrado na ata');
               onClose();
             }}
           >

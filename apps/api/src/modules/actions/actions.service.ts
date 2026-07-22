@@ -455,7 +455,7 @@ export class ActionsService {
 
   async updateTask(
     taskId: string,
-    patch: { title?: string; completionNote?: string | null; dueDate?: Date | null; startDate?: Date | null; endDate?: Date | null; assignedToId?: string | null; done?: boolean },
+    patch: { title?: string; rootCause?: string | null; completionNote?: string | null; dueDate?: Date | null; startDate?: Date | null; endDate?: Date | null; assignedToId?: string | null; done?: boolean },
     userId?: string,
   ) {
     const existing = await this.prisma.actionTask.findUnique({ where: { id: taskId } });
@@ -472,6 +472,7 @@ export class ActionsService {
 
     const data: any = {};
     if (patch.title !== undefined) data.title = patch.title;
+    if (patch.rootCause !== undefined) data.rootCause = patch.rootCause;
     if (patch.completionNote !== undefined) data.completionNote = patch.completionNote;
     if (patch.dueDate !== undefined) data.dueDate = patch.dueDate;
     if (patch.startDate !== undefined) data.startDate = patch.startDate;

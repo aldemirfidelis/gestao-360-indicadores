@@ -1,4 +1,4 @@
-import { formatNumber, formatPercent } from '@/lib/utils';
+import { formatNumber, formatPercent, periodRefLabel } from '@/lib/utils';
 import { LIGHT_LABEL, LIGHT_COLORS, LIGHT_STYLES, type UiLight } from '@/lib/farol';
 
 // Farol: regra de cálculo e tokens de apresentação vivem em lib/farol.ts
@@ -296,6 +296,16 @@ export interface MeetingDetail {
   weeklyRoutine: Array<{ level: string; focus: string[] }>;
   governance: string[];
   ai: { enabled: boolean; provider: string; model: string | null };
+}
+
+export function decisionOutputHeader(meeting: Pick<MeetingDetail, 'periodRef' | 'title'>) {
+  const title = meeting.title.trim();
+  if (!title) return `Saídas e Ações da Reunião Mensal ${periodRefLabel(meeting.periodRef)}`;
+
+  const normalizedTitle = title.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
+  if (normalizedTitle.startsWith('saidas e acoes')) return title;
+  if (normalizedTitle.includes('reuniao')) return `Saídas e Ações da ${title}`;
+  return `Saídas e Ações da Reunião ${title}`;
 }
 
 export const ENTRY_KIND_LABEL: Record<string, string> = {

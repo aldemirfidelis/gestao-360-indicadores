@@ -990,6 +990,9 @@ export class EmployeesService {
       const raw = source.allowPortalPunch;
       data.allowPortalPunch = raw === '' || raw === null || raw === undefined ? null : Boolean(raw === true || raw === 'true' || raw === 'SIM');
     }
+    // Almoço automático e isenção de ponto (cargo de confiança) — booleanos.
+    if (source && 'autoLunch' in source) data.autoLunch = Boolean(source.autoLunch === true || source.autoLunch === 'true' || source.autoLunch === 'SIM');
+    if (source && 'timeClockExempt' in source) data.timeClockExempt = Boolean(source.timeClockExempt === true || source.timeClockExempt === 'true' || source.timeClockExempt === 'SIM');
     if (source && 'userId' in source) {
       const userId = text(source.userId);
       if (userId) {

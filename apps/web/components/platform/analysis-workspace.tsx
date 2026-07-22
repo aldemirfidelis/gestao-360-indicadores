@@ -110,8 +110,13 @@ export function AnalysisWorkspace({
   // Quando o 5 Porquês está investigando uma causa do Ishikawa, o quadro é o DAQUELA
   // causa (persistido nela), não a sessão única — assim cada causa tem sua análise.
   const activeCause = activeIshikawaCauseId ? (ishikawa ?? []).find((c: any) => c.id === activeIshikawaCauseId) : null;
+  const activeCauseHasData = Array.isArray(activeCause?.fiveWhysData) && activeCause!.fiveWhysData.length > 0;
   const fiveWhysEffectiveSession = activeIshikawaCauseId
-    ? { id: `cause-${activeIshikawaCauseId}`, data: { items: Array.isArray(activeCause?.fiveWhysData) ? activeCause?.fiveWhysData : null }, updatedAt: activeCause?.updatedAt ?? activeIshikawaCauseId }
+    ? (activeCauseHasData
+        // Causa já tem seu quadro salvo: abre o dela.
+        ? { id: `cause-${activeIshikawaCauseId}`, data: { items: activeCause?.fiveWhysData }, updatedAt: activeCause?.updatedAt ?? activeIshikawaCauseId }
+        // Legado (sem quadro por causa): mostra a análise existente; ao salvar, migra para a causa.
+        : fiveWhysSession)
     : fiveWhysSession;
 
   return (
@@ -210,10 +215,13 @@ export function AnalysisWorkspace({
             const text = String(causeText ?? '').trim();
             if (!text) return;
             setActiveIshikawaCauseId(causeId ?? null);
-            // Se a causa já tem análise, abre preenchida (sem semear); senão semeia a causa no 1º porquê.
+            // Se a causa já tem análise (ou há uma análise compartilhada legada a mostrar),
+            // abre preenchida sem semear; senão semeia a causa no 1º porquê.
             const cause = ishikawaRef.current.find((c: any) => c.id === causeId);
-            const hasAnalysis = Array.isArray(cause?.fiveWhysData) && cause.fiveWhysData.length > 0;
-            setSeedWhyAnswer(hasAnalysis ? null : text);
+            const causeHasData = Array.isArray(cause?.fiveWhysData) && cause.fiveWhysData.length > 0;
+            const sharedData = (fiveWhysSession as any)?.data?.items ?? (fiveWhysSession as any)?.fiveWhys;
+            const sharedHasData = Array.isArray(sharedData) && sharedData.length > 0;
+            setSeedWhyAnswer(causeHasData || sharedHasData ? null : text);
             setMethod('FIVE_WHYS');
           }}
           onSave={(causes, nextRootCause = rootCause) => {

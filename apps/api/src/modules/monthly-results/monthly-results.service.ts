@@ -107,6 +107,9 @@ const CHECKLIST_RULES = [
 
 @Injectable()
 export class MonthlyResultsService {
+  private indicatorAccumulationAvailable = true;
+  private indicatorAccumulationChecked = false;
+
   constructor(
     private readonly prisma: PrismaService,
     private readonly access: AccessService,
@@ -1435,47 +1438,62 @@ export class MonthlyResultsService {
     };
   }
 
-  private async loadIndicatorsForAreas(companyId: string, areaIds: string[] | null, periodRef: string) {
-    return this.prisma.indicator.findMany({
-      where: { companyId, deletedAt: null, status: 'ACTIVE', type: 'STRATEGIC', ...(areaIds ? { ownerNodeId: { in: areaIds } } : {}) },
-      select: {
-        id: true,
-        name: true,
-        code: true,
-        unit: true,
-        unitLabel: true,
-        source: true,
-        direction: true,
-        accumulation: true,
-        yellowToleranceP: true,
-        ownerNodeId: true,
-        ownerNode: { select: { id: true, name: true, type: true, parentId: true } },
-        responsibleUserId: true,
-        responsibleUser: { select: { id: true, name: true } },
-        targets: { orderBy: { periodRef: 'desc' }, select: { periodRef: true, target: true, lowerBound: true, upperBound: true }, take: 24 },
-        results: { orderBy: { periodDate: 'desc' }, take: 18, select: { periodRef: true, periodDate: true, value: true, light: true, attainment: true, deviationPct: true, note: true, updatedAt: true } },
-      },
-      orderBy: { name: 'asc' },
-    });
+  private async loadIndicatorsForAreas(companyId: string, areaIds: string[] | null, periodRef: string): Promise<any[]> {
+    const includeAccumulation = await this.shouldSelectIndicatorAccumulation();
+    const where: any = { companyId, deletedAt: null, status: 'ACTIVE', type: 'STRATEGIC', ...(areaIds ? { ownerNodeId: { in: areaIds } } : {}) };
+    const select: any = {
+      id: true,
+      name: true,
+      code: true,
+      unit: true,
+      unitLabel: true,
+      source: true,
+      direction: true,
+      ...(includeAccumulation ? { accumulation: true } : {}),
+      yellowToleranceP: true,
+      ownerNodeId: true,
+      ownerNode: { select: { id: true, name: true, type: true, parentId: true } },
+      responsibleUserId: true,
+      responsibleUser: { select: { id: true, name: true } },
+      targets: { orderBy: { periodRef: 'desc' }, select: { periodRef: true, target: true, lowerBound: true, upperBound: true }, take: 24 },
+      results: { orderBy: { periodDate: 'desc' }, take: 18, select: { periodRef: true, periodDate: true, value: true, light: true, attainment: true, deviationPct: true, note: true, updatedAt: true } },
+    };
+    return this.prisma.indicator.findMany({ where, select, orderBy: { name: 'asc' } });
   }
 
   // Usa o mesmo farol da ficha do indicador: ultimo resultado disponivel.
-  private async loadLiveSnapshotsForIndicators(companyId: string, indicatorIds: string[], periodRef: string) {
+  private async loadLiveSnapshotsForIndicators(companyId: string, indicatorIds: string[], periodRef: string): Promise<Map<string, ReturnType<MonthlyResultsService['computeSnapshot']>>> {
     const ids = Array.from(new Set(indicatorIds.filter(Boolean)));
     if (!ids.length) return new Map<string, ReturnType<MonthlyResultsService['computeSnapshot']>>();
-    const indicators = await this.prisma.indicator.findMany({
-      where: { id: { in: ids }, companyId, deletedAt: null, status: 'ACTIVE' },
-      select: {
-        id: true,
-        direction: true,
-        accumulation: true,
-        yellowToleranceP: true,
-        targets: { orderBy: { periodRef: 'desc' }, select: { periodRef: true, target: true, lowerBound: true, upperBound: true }, take: 24 },
-        results: { orderBy: { periodDate: 'desc' }, take: 18, select: { periodRef: true, periodDate: true, value: true, light: true, attainment: true, deviationPct: true, note: true, updatedAt: true } },
-      },
-    });
+    const includeAccumulation = await this.shouldSelectIndicatorAccumulation();
+    const where: any = { id: { in: ids }, companyId, deletedAt: null, status: 'ACTIVE' };
+    const select: any = {
+      id: true,
+      direction: true,
+      ...(includeAccumulation ? { accumulation: true } : {}),
+      yellowToleranceP: true,
+      targets: { orderBy: { periodRef: 'desc' }, select: { periodRef: true, target: true, lowerBound: true, upperBound: true }, take: 24 },
+      results: { orderBy: { periodDate: 'desc' }, take: 18, select: { periodRef: true, periodDate: true, value: true, light: true, attainment: true, deviationPct: true, note: true, updatedAt: true } },
+    };
+    const indicators = (await this.prisma.indicator.findMany({ where, select })) as any[];
     // 'period': os cards seguem o MÊS da reunião (não o mês vigente/último lançamento).
-    return new Map(indicators.map((indicator) => [indicator.id, this.computeSnapshot(indicator, periodRef, 'period')]));
+    return new Map<string, ReturnType<MonthlyResultsService['computeSnapshot']>>(indicators.map((indicator) => [indicator.id, this.computeSnapshot(indicator, periodRef, 'period')]));
+  }
+
+  private async shouldSelectIndicatorAccumulation() {
+    if (this.indicatorAccumulationChecked) return this.indicatorAccumulationAvailable;
+    const rows = await this.prisma.$queryRaw<Array<{ exists: boolean }>>`
+      SELECT EXISTS (
+        SELECT 1
+        FROM information_schema.columns
+        WHERE table_schema = current_schema()
+          AND table_name = 'Indicator'
+          AND column_name = 'accumulation'
+      ) AS "exists"
+    `;
+    this.indicatorAccumulationAvailable = Boolean(rows[0]?.exists);
+    this.indicatorAccumulationChecked = true;
+    return this.indicatorAccumulationAvailable;
   }
 
   // Mapeia cada nodeId (area + descendentes) para a area selecionada mais profunda que o contem.

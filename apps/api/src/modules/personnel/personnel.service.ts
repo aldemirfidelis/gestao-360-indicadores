@@ -412,7 +412,7 @@ export class PersonnelService {
     const today = dayKeyFor(new Date());
     const monthStart = `${today.slice(0, 7)}-01`;
     const visible = await this.visibleUserIdsFor(me);
-    const [day, monthDays, pendingAdjustments, myPending, bank] = await Promise.all([
+    const [day, monthDays, pendingAdjustments, myPending, bank, profile] = await Promise.all([
       this.buildMyDay(me, today),
       this.buildMirrorDays(me.companyId, me.sub, monthStart, today),
       this.prisma.timeAdjustmentRequest.count({
@@ -420,6 +420,7 @@ export class PersonnelService {
       }),
       this.prisma.timeAdjustmentRequest.count({ where: { companyId: me.companyId, userId: me.sub, status: 'REQUESTED' } }),
       this.bankBalance(me.companyId, me.sub),
+      this.prisma.personnelEmployeeProfile.findFirst({ where: { companyId: me.companyId, userId: me.sub }, select: { autoLunch: true, timeClockExempt: true } }),
     ]);
     return {
       today: day,
@@ -427,6 +428,8 @@ export class PersonnelService {
       bank,
       pendingAdjustments,
       myPendingAdjustments: myPending,
+      autoLunch: Boolean(profile?.autoLunch),
+      timeClockExempt: Boolean(profile?.timeClockExempt),
       period: { ref: periodRefOf(today), status: await this.periodStatus(me.companyId, periodRefOf(today)) },
     };
   }
@@ -1560,7 +1563,7 @@ export class PersonnelService {
     // seguinte, e o primeiro dia do intervalo pode "doar" batidas para o anterior.
     const extendedFrom = addDays(fromKey, -1);
     const extendedTo = addDays(toKey, 1);
-    const [entries, assignments, adjustments, coverageMap, holidays] = await Promise.all([
+    const [entries, assignments, adjustments, coverageMap, holidays, profile] = await Promise.all([
       this.prisma.timeClockEntry.findMany({
         where: {
           companyId,
@@ -1578,6 +1581,7 @@ export class PersonnelService {
       }),
       this.vacations.coverageForUsers(companyId, [userId], fromKey, toKey),
       this.holidayMap(companyId, extendedFrom, toKey),
+      this.prisma.personnelEmployeeProfile.findFirst({ where: { companyId, userId }, select: { autoLunch: true, timeClockExempt: true } }),
     ]);
     const adjustmentByDay = new Map<string, (typeof adjustments)[number]>();
     const abonoDays = new Map<string, string>();
@@ -1597,6 +1601,7 @@ export class PersonnelService {
       coverageDays: coverageMap.get(userId) ?? new Map<string, DayCoverage>(),
       adjustmentByDay,
       abonoDays,
+      flags: { autoLunch: Boolean(profile?.autoLunch), timeClockExempt: Boolean(profile?.timeClockExempt) },
     });
   }
 
@@ -1623,8 +1628,10 @@ export class PersonnelService {
     adjustmentByDay?: Map<string, { id: string; status: string; reason: string }>;
     /** Dias com abono aprovado (falta justificada): dayKey → categoria. */
     abonoDays?: Map<string, string>;
+    /** Config de ponto do colaborador: almoço automático e isenção (cargo de confiança). */
+    flags?: { autoLunch: boolean; timeClockExempt: boolean };
   }) {
-    const { userId, fromKey, toKey, entries, assignments, holidays, coverageDays, adjustmentByDay, abonoDays } = input;
+    const { userId, fromKey, toKey, entries, assignments, holidays, coverageDays, adjustmentByDay, abonoDays, flags } = input;
     const today = dayKeyFor(new Date());
     const byCivilDay = groupBy(entries, (e) => dayKeyFor(e.punchedAt));
     const ruleCache = new Map<string, ReturnType<PersonnelService['resolveRule']>>();
@@ -1665,27 +1672,35 @@ export class PersonnelService {
       const holidayCounts = Boolean(holidayName) && !resolved.worksHolidays;
       const abonado = Boolean(coverage) || holidayCounts;
       const plannedMinutes = abonado ? 0 : plannedMinutesFromSchedule(dayKey, resolved.rules, resolved.cycleAnchorDay);
-      const { workedMinutes, open, marks } = effectiveWorkedMinutes({
-        punches: dayEntries.map((entry) => entry.punchedAt),
-        dayKey,
-        rule: abonado ? null : rule,
-        toleranceMinutes: resolved.toleranceMinutes,
-      });
-      const evaluation = evaluateDay({
-        punchCount: dayEntries.length,
-        workedMinutes,
-        plannedMinutes,
-        isToday: dayKey === today,
-        hasOpenPair: open,
-        coverage,
-        isHoliday: holidayCounts,
-      });
-      const detected = detectDayOccurrences({
+      const punchTimes = dayEntries.map((entry) => entry.punchedAt);
+      const base = effectiveWorkedMinutes({ punches: punchTimes, dayKey, rule: abonado ? null : rule, toleranceMinutes: resolved.toleranceMinutes });
+      const marks = base.marks;
+      let open = base.open;
+      let workedMinutes = base.workedMinutes;
+
+      // Almoço automático: com só entrada e saída (sem intervalo registrado), desconta o
+      // intervalo previsto na escala — o colaborador não precisa bater o almoço.
+      const breakMin = Math.max(0, rule?.breakMinutes ?? 0);
+      const autoLunchApplied = Boolean(flags?.autoLunch) && !abonado && !open && dayEntries.length === 2 && breakMin > 0;
+      if (autoLunchApplied) workedMinutes = Math.max(0, workedMinutes - breakMin);
+
+      // Isento de ponto (cargo de confiança, CLT art. 62): não bate ponto; a jornada da
+      // escala é considerada cumprida (previsto = trabalhado) para fins de cálculo/folha.
+      const exemptApplied = Boolean(flags?.timeClockExempt) && !abonado && plannedMinutes > 0;
+      if (exemptApplied) {
+        workedMinutes = plannedMinutes;
+        open = false;
+      }
+
+      const evaluation = exemptApplied
+        ? evaluateDay({ punchCount: 2, workedMinutes: plannedMinutes, plannedMinutes, isToday: dayKey === today, hasOpenPair: false, coverage: null, isHoliday: holidayCounts })
+        : evaluateDay({ punchCount: dayEntries.length, workedMinutes, plannedMinutes, isToday: dayKey === today, hasOpenPair: open, coverage, isHoliday: holidayCounts });
+      let detected = exemptApplied ? [] : detectDayOccurrences({
         dayKey,
         status: evaluation.status,
         plannedMinutes,
         workedMinutes,
-        punchTimes: dayEntries.map((entry) => entry.punchedAt),
+        punchTimes,
         rule,
         toleranceMinutes: resolved.toleranceMinutes,
         hasSchedule: resolved.hasSchedule,
@@ -1695,6 +1710,8 @@ export class PersonnelService {
         previousDayLastOut,
         isToday: dayKey === today,
       });
+      // Com almoço automático, não cobra intervalo não registrado.
+      if (autoLunchApplied) detected = detected.filter((d) => d.type !== 'MISSING_BREAK' && d.type !== 'SHORT_BREAK');
       previousDayLastOut =
         dayEntries.length > 0 && dayEntries.length % 2 === 0 ? dayEntries[dayEntries.length - 1].punchedAt : null;
       const adjustment = adjustmentByDay?.get(dayKey);

@@ -33,6 +33,8 @@ import {
   formatTime,
   minutesLabel,
   monthEnd,
+  nextPunchLabel,
+  punchRoleLabel,
   type AdjustmentRequest,
   type BankStatement,
   type MirrorDay,
@@ -176,7 +178,7 @@ export function MeuPontoPanel() {
               onClick={() => punch.mutate()}
             >
               <AlarmClockCheck className="mr-2 h-5 w-5" />
-              {punch.isPending ? 'Registrando...' : summary?.today?.nextKind === 'OUT' ? 'Registrar saída' : 'Registrar entrada'}
+              {punch.isPending ? 'Registrando...' : nextPunchLabel((summary?.today?.entries ?? []).length, summary?.autoLunch)}
             </Button>
             <Button asChild variant="outline" size="lg" className="h-11 w-full border-cyan-500/40 text-cyan-700 hover:bg-cyan-500/5 dark:text-cyan-300">
               <Link href="/servico-pessoal/ponto-facial"><Camera className="mr-2 h-5 w-5" />Usar reconhecimento facial</Link>
@@ -205,10 +207,11 @@ export function MeuPontoPanel() {
                 <div className="text-xs text-muted-foreground">Nenhuma batida registrada hoje.</div>
               ) : (
                 <div className="flex flex-wrap justify-center gap-1.5">
-                  {(summary?.today?.entries ?? []).map((entry) => (
+                  {(summary?.today?.entries ?? []).map((entry, i) => (
                     <span key={entry.id} className="inline-flex items-center rounded-md border bg-background">
                       <Badge variant="outline" className={cn('border-0 text-[10px] tabular-nums', entry.kind === 'IN' ? 'text-status-green' : 'text-status-red')}>
-                        {entry.kind === 'IN' ? '→' : '←'} {formatTime(entry.punchedAt)}
+                        <span className="mr-1 font-semibold not-italic">{punchRoleLabel(i, summary?.autoLunch)}</span>
+                        {formatTime(entry.punchedAt)}
                         {entry.nsr ? ` · NSR ${entry.nsr}` : ''}
                         {entry.source === 'MANUAL' && ' (ajuste)'}
                         {entry.source === 'FACIAL' && ' (facial)'}

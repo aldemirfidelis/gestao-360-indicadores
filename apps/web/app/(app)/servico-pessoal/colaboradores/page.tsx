@@ -125,6 +125,8 @@ const EMPTY_FORM = {
   bankCode: '', bankAgency: '', bankAccount: '', bankAccountDigit: '', pixKey: '',
   contractType: '', workRegime: '', admissionDate: '', userId: '',
   allowPortalPunch: '' as '' | 'true' | 'false',
+  autoLunch: false,
+  timeClockExempt: false,
   emergencyContactName: '', emergencyContactPhone: '', notes: '',
   createUserEnabled: false,
   loginType: 'EMAIL' as 'EMAIL' | 'CPF' | 'REGISTRATION',
@@ -218,6 +220,8 @@ export default function EmployeesPage() {
           workRegime: form.workRegime || null,
           admissionDate: form.admissionDate || null,
           allowPortalPunch: form.allowPortalPunch,
+          autoLunch: form.autoLunch,
+          timeClockExempt: form.timeClockExempt,
           userId: form.userId || null,
           emergencyContactName: form.emergencyContactName || null,
           emergencyContactPhone: form.emergencyContactPhone || null,
@@ -404,6 +408,8 @@ export default function EmployeesPage() {
       workRegime: profile.workRegime ?? '',
       admissionDate: toInputDate(profile.admissionDate),
       allowPortalPunch: profile.allowPortalPunch === true ? 'true' : profile.allowPortalPunch === false ? 'false' : '',
+      autoLunch: profile.autoLunch === true,
+      timeClockExempt: profile.timeClockExempt === true,
       scheduleTemplateId: employee.currentSchedule?.templateId ?? '',
       userId: profile.userId ?? '',
       emergencyContactName: profile.emergencyContactName ?? '',
@@ -660,6 +666,17 @@ export default function EmployeesPage() {
                   <option value="true">Permitido (ex.: home office)</option>
                   <option value="false">Só facial/totem</option>
                 </NativeSelect>
+              </div>
+              <div className="sm:col-span-2 space-y-2 rounded-md border bg-muted/20 p-3">
+                <Label className="text-xs uppercase text-muted-foreground">Regras de ponto</Label>
+                <label className="flex items-start gap-2 text-sm">
+                  <input type="checkbox" className="mt-0.5" checked={form.autoLunch} onChange={(e) => setForm((f) => ({ ...f, autoLunch: e.target.checked }))} />
+                  <span><span className="font-medium">Almoço automático</span> — bate só entrada e saída; o sistema desconta o intervalo da escala sozinho.</span>
+                </label>
+                <label className="flex items-start gap-2 text-sm">
+                  <input type="checkbox" className="mt-0.5" checked={form.timeClockExempt} onChange={(e) => setForm((f) => ({ ...f, timeClockExempt: e.target.checked }))} />
+                  <span><span className="font-medium">Isento de ponto (cargo de confiança)</span> — não bate ponto; a jornada da escala é considerada cumprida para o cálculo/folha.</span>
+                </label>
               </div>
               <div>
                 <Label>Escala de trabalho</Label>
