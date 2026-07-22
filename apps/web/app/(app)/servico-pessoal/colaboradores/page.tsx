@@ -78,6 +78,9 @@ interface EmployeeDetail {
   jobId: string;
   orgNode: { id: string; name: string } | null;
   job: { id: string; name: string; cbo?: string | null } | null;
+  band?: string | null;
+  currentSalary?: string | null;
+  salaryEffectiveFrom?: string | null;
   personnelProfile: Record<string, any> | null;
   linkedUser: { id: string; name: string; email: string; active: boolean } | null;
   dependents: Array<{ id: string; name: string; relationship: string; birthDate: string | null; cpf: string | null; isIrDependent: boolean }>;
@@ -873,6 +876,14 @@ export default function EmployeesPage() {
               <TabsContent value="dados" className="pt-3">
                 <div className="grid grid-cols-2 gap-3 md:grid-cols-3">
                   <InfoTile label="Cargo" value={detail.job?.name ?? '—'} />
+                  <InfoTile
+                    label="Salário"
+                    value={
+                      detail.currentSalary != null
+                        ? `${Number(detail.currentSalary).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}${detail.band ? ` · Faixa ${detail.band}` : ''}`
+                        : '—'
+                    }
+                  />
                   <InfoTile label="Área" value={detail.orgNode?.name ?? '—'} />
                   <InfoTile label="Tipo de contrato" value={profileFields.contractType ? (CONTRACT_LABEL[profileFields.contractType] ?? profileFields.contractType) : '—'} />
                   <InfoTile label="Admissão" value={formatDate(profileFields.admissionDate)} />

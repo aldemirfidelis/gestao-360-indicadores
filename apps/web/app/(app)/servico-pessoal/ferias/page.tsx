@@ -7,11 +7,9 @@ import { toast } from 'sonner';
 import {
   BedDouble,
   CalendarClock,
-  CalendarDays,
   CheckCircle2,
   Plus,
   Stethoscope,
-  SunMedium,
   Users,
   X,
 } from 'lucide-react';
@@ -54,13 +52,6 @@ interface VacationRequest {
   decisionNote: string | null;
   createdAt: string;
   employee?: { id: string; name: string; registrationId: string | null };
-}
-
-interface MyOverview {
-  linked: boolean;
-  employee: { id: string; name: string; status: string } | null;
-  balance: { periods: PeriodBalance[]; totalBalance: number; nextDeadline: string | null; expiring: boolean; overdue: boolean } | null;
-  requests: VacationRequest[];
 }
 
 interface BalanceRow {
@@ -119,17 +110,13 @@ export default function VacationsPage() {
   const canView = hasPermission(['pessoal:view', 'pessoal:manage']);
   const canDecide = hasPermission(['pessoal:update', 'pessoal:manage']);
 
-  const [tab, setTab] = useState(searchParams.get('tab') ?? 'minhas');
+  const [tab, setTab] = useState(searchParams.get('tab') ?? 'solicitacoes');
   const [reasonDialog, setReasonDialog] = useState<ReasonDialogState | null>(null);
   const [requestDialog, setRequestDialog] = useState<{ employeeId?: string; self: boolean } | null>(null);
   const [requestForm, setRequestForm] = useState({ startDate: '', endDate: '', notes: '' });
   const [leaveDialog, setLeaveDialog] = useState(false);
   const [leaveForm, setLeaveForm] = useState({ employeeId: '', type: 'ATESTADO', startDate: '', endDate: '', cid: '', description: '' });
 
-  const myQuery = useQuery<MyOverview>({
-    queryKey: ['vacations', 'me'],
-    queryFn: () => api<MyOverview>('/personnel/vacations/me'),
-  });
   const requestsQuery = useQuery<VacationRequest[]>({
     queryKey: ['vacations', 'requests'],
     queryFn: () => api<VacationRequest[]>('/personnel/vacations'),
@@ -183,15 +170,6 @@ export default function VacationsPage() {
     onError: (e: any) => toast.error(e?.message ?? 'Não foi possível decidir a solicitação'),
   });
 
-  const cancelMine = useMutation({
-    mutationFn: (id: string) => api(`/personnel/vacations/me/${id}/cancel`, { method: 'POST', json: {} }),
-    onSuccess: () => {
-      toast.success('Solicitação cancelada');
-      invalidate();
-    },
-    onError: (e: any) => toast.error(e?.message ?? 'Não foi possível cancelar'),
-  });
-
   const createLeave = useMutation({
     mutationFn: () =>
       api('/personnel/leaves', {
@@ -223,7 +201,6 @@ export default function VacationsPage() {
     onError: (e: any) => toast.error(e?.message ?? 'Não foi possível encerrar'),
   });
 
-  const my = myQuery.data;
   const pending = (requestsQuery.data ?? []).filter((r) => ['REQUESTED', 'MANAGER_APPROVED'].includes(r.status));
   const decided = (requestsQuery.data ?? []).filter((r) => !['REQUESTED', 'MANAGER_APPROVED'].includes(r.status));
 
@@ -236,7 +213,6 @@ export default function VacationsPage() {
 
       <Tabs value={tab} onValueChange={setTab} className="space-y-4">
         <TabsList className="bg-slate-100 dark:bg-slate-800">
-          <TabsTrigger value="minhas" className="text-xs font-semibold"><SunMedium className="mr-2 h-4 w-4" />Minhas Férias</TabsTrigger>
           {canView && (
             <TabsTrigger value="solicitacoes" className="text-xs font-semibold">
               <CheckCircle2 className="mr-2 h-4 w-4" />Solicitações
@@ -246,99 +222,6 @@ export default function VacationsPage() {
           {canView && <TabsTrigger value="saldos" className="text-xs font-semibold"><Users className="mr-2 h-4 w-4" />Saldos</TabsTrigger>}
           {canView && <TabsTrigger value="afastamentos" className="text-xs font-semibold"><Stethoscope className="mr-2 h-4 w-4" />Afastamentos</TabsTrigger>}
         </TabsList>
-
-        {/* ------------------------------ Minhas Férias ------------------------------ */}
-        <TabsContent value="minhas">
-          {!my?.linked ? (
-            <Card className="border border-slate-100 bg-white shadow-sm dark:border-slate-800/80 dark:bg-slate-900/50">
-              <CardContent className="p-10 text-center text-sm text-muted-foreground">
-                Seu usuário ainda não está vinculado a um colaborador do quadro.
-                <br />Procure o Serviço Pessoal para vincular seu cadastro e visualizar seu saldo de férias.
-              </CardContent>
-            </Card>
-          ) : (
-            <div className="grid grid-cols-1 gap-4 xl:grid-cols-[360px_1fr]">
-              <div className="space-y-4">
-                <Card className="border border-slate-100 bg-white shadow-sm dark:border-slate-800/80 dark:bg-slate-900/50">
-                  <CardContent className="space-y-3 p-5 text-center">
-                    <div className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Saldo disponível</div>
-                    <div className={cn('text-4xl font-extrabold', (my.balance?.totalBalance ?? 0) > 0 ? 'text-status-green' : 'text-slate-500')}>
-                      {my.balance?.totalBalance ?? 0} <span className="text-base font-semibold">dias</span>
-                    </div>
-                    {my.balance?.overdue && (
-                      <div className="rounded-md border border-status-red/40 bg-status-red/5 p-2 text-[11px] text-status-red">
-                        Há período com prazo de gozo vencido (risco de dobra). Procure o DP.
-                      </div>
-                    )}
-                    {!my.balance?.overdue && my.balance?.expiring && (
-                      <div className="rounded-md border border-status-yellow/40 bg-status-yellow/5 p-2 text-[11px] text-status-yellow">
-                        Período com prazo de gozo vencendo em breve — programe suas férias.
-                      </div>
-                    )}
-                    <Button
-                      className="w-full bg-sky-500 font-semibold text-white hover:bg-sky-600"
-                      disabled={(my.balance?.totalBalance ?? 0) <= 0}
-                      onClick={() => setRequestDialog({ self: true })}
-                    >
-                      <Plus className="mr-1.5 h-4 w-4" />Solicitar férias
-                    </Button>
-                  </CardContent>
-                </Card>
-
-                <Card className="border border-slate-100 bg-white shadow-sm dark:border-slate-800/80 dark:bg-slate-900/50">
-                  <CardContent className="space-y-2 p-4 text-xs">
-                    <div className="font-semibold text-slate-800 dark:text-slate-200">Períodos aquisitivos</div>
-                    {(my.balance?.periods ?? []).length === 0 && (
-                      <div className="text-muted-foreground">Nenhum período completo ainda (ou admissão não informada no prontuário).</div>
-                    )}
-                    {(my.balance?.periods ?? []).map((period) => (
-                      <div key={period.ref} className="rounded-md border p-2.5">
-                        <div className="flex items-center justify-between">
-                          <span className="font-semibold tabular-nums">{period.ref}</span>
-                          <Badge variant="outline" className={period.balanceDays > 0 ? 'border-status-green/40 text-status-green' : 'border-border text-muted-foreground'}>
-                            {period.balanceDays} dia(s)
-                          </Badge>
-                        </div>
-                        <div className="mt-1 text-[10px] text-muted-foreground">
-                          Gozar até {formatDate(period.concessiveDeadline)}
-                          {period.overdue && <span className="ml-1 font-bold text-status-red">VENCIDO</span>}
-                          {!period.overdue && period.expiring && <span className="ml-1 font-bold text-status-yellow">vence em breve</span>}
-                        </div>
-                      </div>
-                    ))}
-                  </CardContent>
-                </Card>
-              </div>
-
-              <Card className="min-w-0 border border-slate-100 bg-white shadow-sm dark:border-slate-800/80 dark:bg-slate-900/50">
-                <div className="border-b px-4 py-2.5">
-                  <h3 className="flex items-center gap-2 text-sm font-semibold text-slate-800 dark:text-white">
-                    <CalendarDays className="h-4 w-4 text-sky-500" />Minhas solicitações
-                  </h3>
-                </div>
-                <CardContent className="space-y-2 p-4 text-xs">
-                  {(my.requests ?? []).length === 0 && <div className="rounded-md border border-dashed p-6 text-center text-muted-foreground">Nenhuma solicitação de férias ainda.</div>}
-                  {(my.requests ?? []).map((request) => (
-                    <div key={request.id} className="flex flex-wrap items-center justify-between gap-2 rounded-md border p-3">
-                      <div>
-                        <div className="font-semibold tabular-nums">{formatDate(request.startDate)} a {formatDate(request.endDate)} · {request.days} dia(s)</div>
-                        {request.decisionNote && <div className="mt-0.5 text-[10px] text-muted-foreground">{request.decisionNote}</div>}
-                      </div>
-                      <div className="flex items-center gap-2">
-                        <Badge variant="outline" className={cn('text-[10px]', VACATION_STATUS_CLASS[request.status])}>{VACATION_STATUS_LABEL[request.status] ?? request.status}</Badge>
-                        {['REQUESTED', 'MANAGER_APPROVED', 'APPROVED'].includes(request.status) && new Date(request.startDate) > new Date() && (
-                          <Button variant="ghost" size="sm" className="h-6 text-[10px] text-status-red" disabled={cancelMine.isPending} onClick={() => cancelMine.mutate(request.id)}>
-                            Cancelar
-                          </Button>
-                        )}
-                      </div>
-                    </div>
-                  ))}
-                </CardContent>
-              </Card>
-            </div>
-          )}
-        </TabsContent>
 
         {/* ------------------------------ Solicitações (DP) ------------------------------ */}
         {canView && (

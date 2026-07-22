@@ -315,7 +315,7 @@ export class RecruitApplicationService {
       where: { id, companyId: me.companyId },
       include: {
         candidate: { select: { id: true, name: true, email: true, phone: true, city: true, headline: true, linkedinUrl: true, portfolioUrl: true, profileData: true, tags: true } },
-        posting: { select: { id: true, title: true, slug: true, pipelineTemplateId: true } },
+        posting: { select: { id: true, title: true, slug: true, pipelineTemplateId: true, requisitionId: true } },
         stage: { select: { id: true, name: true, order: true } },
         events: { orderBy: { createdAt: 'desc' }, take: 100 },
         screeningAnswers: { include: { question: true }, orderBy: { question: { order: 'asc' } } },
@@ -333,9 +333,26 @@ export class RecruitApplicationService {
     if (!app) throw new NotFoundException('Candidatura não encontrada.');
     const ownSubmitted = app.evaluations.some((evaluation) => evaluation.evaluatorId === me.sub && evaluation.status === 'SUBMITTED');
     const referrerName = app.referredByUserId ? (await this.referrerNames([app.referredByUserId])).get(app.referredByUserId) ?? null : null;
+
+    // Salário de referência da vaga (vindo de Cargos e Salários → cargo+faixa, gravado
+    // na requisição como salaryMin). Serve para pré-preencher a proposta do recrutador.
+    let referenceSalaryCents: number | null = null;
+    let referenceBand: string | null = null;
+    if (app.posting?.requisitionId) {
+      const req = await this.prisma.recruitRequisition.findFirst({
+        where: { id: app.posting.requisitionId, companyId: me.companyId, deletedAt: null },
+        select: { salaryMin: true, details: true },
+      });
+      if (req?.salaryMin != null) referenceSalaryCents = Math.round(Number(req.salaryMin) * 100);
+      const details = (req?.details ?? null) as { band?: string } | null;
+      referenceBand = details?.band ?? null;
+    }
+
     return {
       ...app,
       referrerName,
+      referenceSalaryCents,
+      referenceBand,
       evaluations: ownSubmitted
         ? app.evaluations.filter((evaluation) => evaluation.status === 'SUBMITTED')
         : app.evaluations.filter((evaluation) => evaluation.evaluatorId === me.sub),

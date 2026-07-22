@@ -72,7 +72,7 @@ interface Offer {
 }
 interface PreAdmissionDocument {
   id: string; kind: string; title: string; required: boolean; status: string; reviewNote: string | null;
-  candidateDocument?: { fileName: string; sizeBytes: number } | null;
+  candidateDocument?: { id: string; fileName: string; sizeBytes: number } | null;
 }
 interface OccupationalExamRequest {
   id: string; status: string; examType: string; dueAt: string | null; requestedAt: string; operationalNotes: string | null;
@@ -103,6 +103,8 @@ interface CandidateProfessionalProfile {
 export interface ApplicationDetail {
   id: string; status: string; appliedAt: string; currentStageId: string | null; coverLetter: string | null; score: number | null;
   referrerName?: string | null;
+  referenceSalaryCents?: number | null;
+  referenceBand?: string | null;
   candidate: {
     id: string; name: string; email: string; phone: string | null; city: string | null; headline: string | null;
     linkedinUrl?: string | null; portfolioUrl?: string | null; profileData?: CandidateProfessionalProfile | null; tags?: string[];
@@ -184,6 +186,14 @@ export function CandidateSheet({
     enabled: Boolean(applicationId),
   });
   const detail = detailQuery.data;
+
+  // Pré-preenche o salário da proposta com o salário de referência da vaga
+  // (Cargos e Salários → cargo+faixa, gravado na requisição). O recrutador ainda pode ajustar.
+  useEffect(() => {
+    if (detail?.referenceSalaryCents != null) {
+      setOfferDraft((f) => (f.salaryAmount ? f : { ...f, salaryAmount: (detail.referenceSalaryCents! / 100).toFixed(2) }));
+    }
+  }, [detail?.referenceSalaryCents]);
 
   const refresh = () => {
     void qc.invalidateQueries({ queryKey: ['recruit-application', applicationId] });
@@ -630,6 +640,14 @@ export function CandidateSheet({
                 <Section icon={Send} title="Proposta">
                   {canManage && (
                     <div className="rounded-md border p-3">
+                      {detail.referenceSalaryCents != null && (
+                        <div className="mb-2 rounded-md border border-sky-500/30 bg-sky-500/5 p-2 text-xs">
+                          <span className="font-semibold text-sky-700 dark:text-sky-400">
+                            Salário da vaga{detail.referenceBand ? ` (Faixa ${detail.referenceBand})` : ''}: {formatMoneyCents(detail.referenceSalaryCents, 'BRL')}
+                          </span>
+                          <span className="text-muted-foreground"> — preenchido automaticamente de Cargos e Salários. Você pode ajustar.</span>
+                        </div>
+                      )}
                       <div className="grid gap-2 sm:grid-cols-2">
                         <div>
                           <Label className="text-xs">Salário mensal (R$)</Label>
@@ -765,7 +783,17 @@ export function CandidateSheet({
                                 {doc.required && <Badge variant="outline" className="text-[8px]">obrigatório</Badge>}
                               </div>
                               {doc.candidateDocument && (
-                                <div className="mt-1 text-muted-foreground">{doc.candidateDocument.fileName} · {formatBytes(doc.candidateDocument.sizeBytes)}</div>
+                                <button
+                                  type="button"
+                                  onClick={() => downloadDocument.mutate(doc.candidateDocument!.id)}
+                                  disabled={downloadDocument.isPending}
+                                  className="mt-1 inline-flex max-w-full items-center gap-1.5 rounded-md border px-2 py-1 text-xs font-medium text-status-blue transition hover:bg-muted disabled:opacity-50"
+                                  title="Baixar documento para conferência"
+                                >
+                                  <Download className="h-3.5 w-3.5 shrink-0" />
+                                  <span className="truncate">{doc.candidateDocument.fileName}</span>
+                                  <span className="shrink-0 text-muted-foreground">· {formatBytes(doc.candidateDocument.sizeBytes)}</span>
+                                </button>
                               )}
                               {doc.reviewNote && <div className="mt-1 text-muted-foreground">{doc.reviewNote}</div>}
                               {['SUBMITTED', 'REJECTED'].includes(doc.status) && canPrehire && (

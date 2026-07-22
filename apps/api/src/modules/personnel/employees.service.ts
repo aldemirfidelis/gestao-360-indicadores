@@ -209,9 +209,18 @@ export class EmployeesService {
         })
       : null;
 
+    // Salário vigente (Cargos e Salários → CompensationSalarySnapshot; é o mesmo que a folha usa).
+    const salarySnapshot = await this.prisma.compensationSalarySnapshot.findFirst({
+      where: { companyId: me.companyId, employeeId: employee.id },
+      orderBy: { effectiveFrom: 'desc' },
+      select: { currentSalary: true, effectiveFrom: true },
+    });
+
     return {
       ...employee,
       linkedUser,
+      currentSalary: salarySnapshot ? salarySnapshot.currentSalary.toString() : null,
+      salaryEffectiveFrom: salarySnapshot?.effectiveFrom ?? null,
       currentSchedule: currentSchedule ? { templateId: currentSchedule.templateId, name: currentSchedule.template?.name ?? null } : null,
       photoAvailable: Boolean(employee.personnelProfile?.photoStorageKey),
       photoUpdatedAt: employee.personnelProfile?.photoUpdatedAt ?? null,

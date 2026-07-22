@@ -1,4 +1,4 @@
-import { Body, Controller, Get, Param, Patch, Post, Query } from '@nestjs/common';
+import { Body, Controller, Delete, Get, Param, Patch, Post, Query } from '@nestjs/common';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import { RequirePermissions } from '../../common/decorators/permissions.decorator';
 import { AuthPayload } from '../auth/auth.types';
@@ -154,6 +154,18 @@ export class CompensationController {
   @RequirePermissions('compensation:salary-table:update', ...MANAGE)
   addSalaryRange(@CurrentUser() me: AuthPayload, @Param('id') id: string, @Body() body: Record<string, unknown>) {
     return this.service.addSalaryRange(me, id, body);
+  }
+
+  @Delete('salary-tables/:id')
+  @RequirePermissions('compensation:salary-table:update', ...MANAGE)
+  deleteSalaryTable(@CurrentUser() me: AuthPayload, @Param('id') id: string) {
+    return this.service.deleteSalaryTable(me, id);
+  }
+
+  @Get('salary-lookup')
+  @RequirePermissions('compensation:salary-table:view', ...VIEW)
+  salaryLookup(@CurrentUser() me: AuthPayload, @Query('orgJobId') orgJobId?: string, @Query('band') band?: string) {
+    return this.service.salaryForJobBand(me, orgJobId, band);
   }
 
   @Post('salary-tables/:id/publish')

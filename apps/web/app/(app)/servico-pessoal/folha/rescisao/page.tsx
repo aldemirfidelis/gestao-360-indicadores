@@ -63,7 +63,11 @@ export default function TerminationsPage() {
 
   const employeesQuery = useQuery<Employee[]>({
     queryKey: ['personnel-employees'],
-    queryFn: () => api<Employee[]>('/personnel/employees'),
+    // /personnel/employees devolve { items, kpis }; item usa admissionDate (não hiringDate).
+    queryFn: async () => {
+      const res = await api<{ items: Array<{ id: string; name: string; registrationId: string; admissionDate: string | null }> }>('/personnel/employees');
+      return (res.items ?? []).map((e) => ({ id: e.id, name: e.name, registrationId: e.registrationId, hiringDate: e.admissionDate ?? '' }));
+    },
   });
 
   const terminationsQuery = useQuery<Termination[]>({

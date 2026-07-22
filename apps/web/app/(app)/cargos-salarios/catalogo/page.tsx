@@ -130,24 +130,12 @@ export default function CatalogoCargosPage() {
       {showCreate && canManage && (
         <SectionCard title="Novo cargo" description="O código é gerado automaticamente quando deixado em branco." className="mb-4">
           <div className="grid grid-cols-1 gap-3 lg:grid-cols-6">
-            <div className="lg:col-span-2">
+            <div className="lg:col-span-3">
               <Label>Nome do cargo</Label>
-              <Input value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} />
+              <Input value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} placeholder="Ex.: Analista Administrativo Júnior" />
             </div>
-            <div>
-              <Label>Família</Label>
-              <Input value={form.family} onChange={(e) => setForm({ ...form, family: e.target.value })} />
-            </div>
-            <div>
-              <Label>Grade</Label>
-              <Input value={form.grade} onChange={(e) => setForm({ ...form, grade: e.target.value })} />
-            </div>
-            <div>
-              <Label>Faixa</Label>
-              <Input value={form.salaryBand} onChange={(e) => setForm({ ...form, salaryBand: e.target.value })} />
-            </div>
-            <div>
-              <Label>Tipo</Label>
+            <div className="lg:col-span-3">
+              <Label>Tipo (categoria funcional)</Label>
               <NativeSelect value={form.jobType} onChange={(e) => setForm({ ...form, jobType: e.target.value })}>
                 <option value="administrativo">Administrativo</option>
                 <option value="operacional">Operacional</option>
@@ -167,6 +155,7 @@ export default function CatalogoCargosPage() {
                 <Plus className="mr-2 h-4 w-4" /> Salvar
               </Button>
             </div>
+            <p className="text-xs text-muted-foreground lg:col-span-6">A faixa (A–F) e o salário do cargo são definidos em <strong>Tabelas Salariais</strong>.</p>
           </div>
         </SectionCard>
       )}
@@ -186,8 +175,7 @@ export default function CatalogoCargosPage() {
                 <tr>
                   <th className="py-2 text-left">Código</th>
                   <th className="py-2 text-left">Cargo</th>
-                  <th className="py-2 text-left">Família</th>
-                  <th className="py-2 text-left">Grade/Faixa</th>
+                  <th className="py-2 text-left">Tipo</th>
                   <th className="py-2 text-left">Vínculos</th>
                   <th className="py-2 text-left">Versão</th>
                   <th className="py-2 text-left">Status</th>
@@ -205,8 +193,7 @@ export default function CatalogoCargosPage() {
                       <div className="font-medium">{job.name}</div>
                       <div className="max-w-md truncate text-xs text-muted-foreground">{job.summary}</div>
                     </td>
-                    <td className="py-2">{job.family ?? '-'}</td>
-                    <td className="py-2">{[job.grade, job.salaryBand].filter(Boolean).join(' / ') || '-'}</td>
+                    <td className="py-2 capitalize">{job.jobType ?? '-'}</td>
                     <td className="py-2">{job.linkedEmployees ?? 0} pessoas · {job._count?.positions ?? 0} posições</td>
                     <td className="py-2">v{job.currentVersion}</td>
                     <td className="py-2">

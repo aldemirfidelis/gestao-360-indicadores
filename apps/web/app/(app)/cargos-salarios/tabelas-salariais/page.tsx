@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
-import { CheckCircle2, GitBranch, Plus, Save } from 'lucide-react';
+import { CheckCircle2, GitBranch, Plus, Save, Trash2 } from 'lucide-react';
 import { CompensationModuleNav } from '@/components/compensation/module-nav';
 import { SalaryStructureChart } from '@/components/compensation/salary-structure-chart';
 import { PageHeader } from '@/components/shell/page-header';
@@ -25,8 +25,9 @@ import { formatDate } from '@/lib/utils';
 const MANAGE_PERMS = ['compensation:salary-table:update', 'compensation:manage', 'org:positions:manage'];
 const APPROVE_PERMS = ['compensation:salary-table:approve', 'compensation:manage'];
 
+const FAIXAS = ['A', 'B', 'C', 'D', 'E', 'F'];
 const emptyTable = () => ({ name: '', effectiveFrom: new Date().toISOString().slice(0, 10) });
-const emptyRange = () => ({ jobCatalogId: '', band: 'B', grade: '', minSalary: '', midpointSalary: '', maxSalary: '' });
+const emptyRange = () => ({ jobCatalogId: '', band: 'A', salary: '' });
 
 export default function TabelasSalariaisPage() {
   const qc = useQueryClient();
@@ -68,18 +69,24 @@ export default function TabelasSalariaisPage() {
         json: {
           jobCatalogId: rangeForm.jobCatalogId || undefined,
           band: rangeForm.band,
-          grade: rangeForm.grade || undefined,
-          minSalary: Number(rangeForm.minSalary),
-          midpointSalary: Number(rangeForm.midpointSalary),
-          maxSalary: Number(rangeForm.maxSalary),
+          salary: Number(rangeForm.salary),
         },
       }),
     onSuccess: () => {
-      toast.success('Faixa adicionada');
+      toast.success('Salário da faixa adicionado');
       setRangeForm(emptyRange());
       invalidate();
     },
     onError: (error: any) => toast.error(error?.message ?? 'Falha ao adicionar faixa'),
+  });
+  const deleteTable = useMutation({
+    mutationFn: (id: string) => api(`/cargos-salarios/salary-tables/${id}`, { method: 'DELETE' }),
+    onSuccess: (_, id) => {
+      toast.success('Tabela excluída');
+      if (selectedId === id) setSelectedId(null);
+      invalidate();
+    },
+    onError: (error: any) => toast.error(error?.message ?? 'Falha ao excluir tabela'),
   });
   const publish = useMutation({
     mutationFn: () => api(`/cargos-salarios/salary-tables/${selectedId}/publish`, { method: 'POST' }),
@@ -99,7 +106,7 @@ export default function TabelasSalariaisPage() {
     onError: (error: any) => toast.error(error?.message ?? 'Falha ao criar revisão'),
   });
 
-  const rangeValid = rangeForm.minSalary && rangeForm.midpointSalary && rangeForm.maxSalary;
+  const rangeValid = rangeForm.jobCatalogId && rangeForm.band && Number(rangeForm.salary) > 0;
   const isPublished = selected?.status === 'PUBLISHED';
 
   return (
@@ -132,11 +139,11 @@ export default function TabelasSalariaisPage() {
           ) : (
             <ul className="space-y-1">
               {tables.map((table) => (
-                <li key={table.id}>
+                <li key={table.id} className={`flex items-stretch gap-1 rounded-md ${selectedId === table.id ? 'bg-muted' : 'hover:bg-muted/50'}`}>
                   <button
                     type="button"
                     onClick={() => setSelectedId(table.id)}
-                    className={`w-full rounded-md px-3 py-2 text-left text-sm transition-colors ${selectedId === table.id ? 'bg-muted' : 'hover:bg-muted/50'}`}
+                    className="min-w-0 flex-1 rounded-md px-3 py-2 text-left text-sm"
                   >
                     <div className="flex items-center justify-between gap-2">
                       <span className="truncate font-medium">{table.name}</span>
@@ -146,6 +153,20 @@ export default function TabelasSalariaisPage() {
                       {table.code} · v{table.version} · {table.ranges.length} faixas
                     </div>
                   </button>
+                  {canManage && (
+                    <button
+                      type="button"
+                      title="Excluir tabela"
+                      aria-label={`Excluir tabela ${table.name}`}
+                      disabled={deleteTable.isPending}
+                      onClick={() => {
+                        if (window.confirm(`Excluir a tabela "${table.name}"? Esta ação não pode ser desfeita.`)) deleteTable.mutate(table.id);
+                      }}
+                      className="flex items-center px-2 text-muted-foreground transition-colors hover:text-status-red disabled:opacity-50"
+                    >
+                      <Trash2 className="h-4 w-4" />
+                    </button>
+                  )}
                 </li>
               ))}
             </ul>
@@ -207,24 +228,20 @@ export default function TabelasSalariaisPage() {
                   <EmptyState title="Sem faixas" description="Adicione faixas para compor a estrutura." />
                 ) : (
                   <div className="overflow-x-auto">
-                    <table className="w-full min-w-[720px] text-sm">
+                    <table className="w-full min-w-[420px] text-sm">
                       <thead className="border-b text-xs uppercase text-muted-foreground">
                         <tr>
-                          <th className="py-2 text-left">Faixa</th>
                           <th className="py-2 text-left">Cargo</th>
-                          <th className="py-2 text-right">Mínimo</th>
-                          <th className="py-2 text-right">Ponto médio</th>
-                          <th className="py-2 text-right">Máximo</th>
+                          <th className="py-2 text-left">Faixa</th>
+                          <th className="py-2 text-right">Salário</th>
                         </tr>
                       </thead>
                       <tbody>
                         {selected.ranges.map((range) => (
                           <tr key={range.id} className="border-b border-border/60">
-                            <td className="py-2 font-medium">{[range.band, range.grade].filter(Boolean).join(' / ')}</td>
-                            <td className="py-2 text-muted-foreground">{range.jobCatalog ? `${range.jobCatalog.code} - ${range.jobCatalog.name}` : 'Geral'}</td>
-                            <td className="py-2 text-right tabular-nums">{formatMoney(range.minSalary, { currency: selected.currency })}</td>
+                            <td className="py-2 font-medium">{range.jobCatalog ? `${range.jobCatalog.code} - ${range.jobCatalog.name}` : 'Geral'}</td>
+                            <td className="py-2">Faixa {range.band}</td>
                             <td className="py-2 text-right tabular-nums">{formatMoney(range.midpointSalary, { currency: selected.currency })}</td>
-                            <td className="py-2 text-right tabular-nums">{formatMoney(range.maxSalary, { currency: selected.currency })}</td>
                           </tr>
                         ))}
                       </tbody>
@@ -233,19 +250,11 @@ export default function TabelasSalariaisPage() {
                 )}
 
                 {canManage && !isPublished && (
-                  <div className="mt-4 grid grid-cols-1 gap-3 border-t pt-4 sm:grid-cols-7">
+                  <div className="mt-4 grid grid-cols-1 gap-3 border-t pt-4 sm:grid-cols-[1fr_auto_auto]">
                     <div>
-                      <Label>Faixa</Label>
-                      <Input value={rangeForm.band} onChange={(e) => setRangeForm({ ...rangeForm, band: e.target.value })} />
-                    </div>
-                    <div>
-                      <Label>Grade</Label>
-                      <Input value={rangeForm.grade} onChange={(e) => setRangeForm({ ...rangeForm, grade: e.target.value })} />
-                    </div>
-                    <div className="sm:col-span-2">
                       <Label>Cargo</Label>
                       <NativeSelect value={rangeForm.jobCatalogId} onChange={(e) => setRangeForm({ ...rangeForm, jobCatalogId: e.target.value })}>
-                        <option value="">Geral</option>
+                        <option value="">Selecione o cargo</option>
                         {(optionsQuery.data?.jobs ?? []).map((job) => (
                           <option key={job.id} value={job.id}>
                             {job.code} - {job.name}
@@ -254,20 +263,20 @@ export default function TabelasSalariaisPage() {
                       </NativeSelect>
                     </div>
                     <div>
-                      <Label>Mínimo</Label>
-                      <Input type="number" value={rangeForm.minSalary} onChange={(e) => setRangeForm({ ...rangeForm, minSalary: e.target.value })} />
+                      <Label>Faixa</Label>
+                      <NativeSelect value={rangeForm.band} onChange={(e) => setRangeForm({ ...rangeForm, band: e.target.value })}>
+                        {FAIXAS.map((f) => (
+                          <option key={f} value={f}>Faixa {f}</option>
+                        ))}
+                      </NativeSelect>
                     </div>
                     <div>
-                      <Label>Médio</Label>
-                      <Input type="number" value={rangeForm.midpointSalary} onChange={(e) => setRangeForm({ ...rangeForm, midpointSalary: e.target.value })} />
+                      <Label>Salário (R$)</Label>
+                      <Input type="number" step="0.01" min="0" className="w-40" value={rangeForm.salary} onChange={(e) => setRangeForm({ ...rangeForm, salary: e.target.value })} />
                     </div>
-                    <div>
-                      <Label>Máximo</Label>
-                      <Input type="number" value={rangeForm.maxSalary} onChange={(e) => setRangeForm({ ...rangeForm, maxSalary: e.target.value })} />
-                    </div>
-                    <div className="flex items-end sm:col-span-7">
+                    <div className="flex items-end sm:col-span-3">
                       <Button size="sm" onClick={() => addRange.mutate()} disabled={!rangeValid || addRange.isPending}>
-                        <Plus className="mr-1.5 h-4 w-4" /> Adicionar faixa
+                        <Plus className="mr-1.5 h-4 w-4" /> Adicionar salário do cargo/faixa
                       </Button>
                     </div>
                   </div>

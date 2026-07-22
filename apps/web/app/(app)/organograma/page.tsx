@@ -161,6 +161,7 @@ export default function OrganogramaPage() {
     orgJobId: '',
     newJobName: '',
     useNewJob: false,
+    band: 'A',
     reason: '',
     vacancyType: 'AUMENTO',
     priority: 'NORMAL',
@@ -241,6 +242,12 @@ export default function OrganogramaPage() {
       invalidate();
     },
     onError: (e: any) => toast.error(e?.message ?? 'Falha ao solicitar vaga'),
+  });
+  // Salário vinculado ao cargo+faixa escolhidos (Cargos e Salários → Tabelas Salariais).
+  const vagaSalary = useQuery<{ salary: string | null; currency: string }>({
+    queryKey: ['salary-lookup', vagaForm.orgJobId, vagaForm.band],
+    queryFn: () => api(`/cargos-salarios/salary-lookup?orgJobId=${encodeURIComponent(vagaForm.orgJobId)}&band=${encodeURIComponent(vagaForm.band)}`),
+    enabled: vagaDialog.open && !vagaForm.useNewJob && Boolean(vagaForm.orgJobId) && Boolean(vagaForm.band),
   });
   const sendToRecruitment = useMutation({
     mutationFn: (requisitionId: string) => api(`/recruitment/requisitions/${requisitionId}/send-to-recruitment`, { method: 'POST' }),
@@ -436,6 +443,7 @@ export default function OrganogramaPage() {
       orgJobId: preset.orgJobId ?? '',
       newJobName: '',
       useNewJob: false,
+      band: 'A',
       reason: '',
       vacancyType: 'AUMENTO',
       priority: 'NORMAL',
@@ -457,6 +465,7 @@ export default function OrganogramaPage() {
       orgNodeId: vagaForm.orgNodeId,
       orgJobId: vagaForm.useNewJob ? undefined : vagaForm.orgJobId,
       newJobName: vagaForm.useNewJob ? vagaForm.newJobName : undefined,
+      band: vagaForm.band,
       reason: vagaForm.reason || undefined,
       vacancyType: vagaForm.vacancyType,
       priority: vagaForm.priority,
@@ -919,6 +928,33 @@ export default function OrganogramaPage() {
                   </div>
                 )}
               </>
+            )}
+            {!vagaForm.useNewJob && (
+              <div className="sm:col-span-2 rounded-md border border-border/60 bg-muted/20 p-3">
+                <div className="flex items-end gap-3">
+                  <div className="w-32">
+                    <Label>Faixa salarial</Label>
+                    <NativeSelect value={vagaForm.band} onChange={(e) => setVagaForm({ ...vagaForm, band: e.target.value })}>
+                      {['A', 'B', 'C', 'D', 'E', 'F'].map((f) => <option key={f} value={f}>Faixa {f}</option>)}
+                    </NativeSelect>
+                  </div>
+                  <div className="min-w-0 flex-1">
+                    <div className="text-[10px] uppercase text-muted-foreground">Salário vinculado (cargo + faixa)</div>
+                    <div className="text-lg font-bold tabular-nums">
+                      {!vagaForm.orgJobId
+                        ? '—'
+                        : vagaSalary.isFetching
+                          ? 'Buscando…'
+                          : vagaSalary.data?.salary != null
+                            ? Number(vagaSalary.data.salary).toLocaleString('pt-BR', { style: 'currency', currency: vagaSalary.data.currency || 'BRL' })
+                            : 'Sem salário cadastrado'}
+                    </div>
+                  </div>
+                </div>
+                {vagaForm.orgJobId && !vagaSalary.isFetching && vagaSalary.data?.salary == null && (
+                  <p className="mt-1 text-[11px] text-status-yellow">Cadastre o salário deste cargo/faixa em Tabelas Salariais para a proposta sair automática.</p>
+                )}
+              </div>
             )}
             <div>
               <Label>Tipo de vaga</Label>

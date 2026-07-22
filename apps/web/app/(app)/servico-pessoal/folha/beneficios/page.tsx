@@ -114,7 +114,8 @@ export default function BenefitsPage() {
   // Queries
   const employeesQuery = useQuery<Employee[]>({
     queryKey: ['personnel-employees'],
-    queryFn: () => api<Employee[]>('/personnel/employees'),
+    // /personnel/employees devolve { items, kpis } (não um array puro): extrair items.
+    queryFn: async () => (await api<{ items: Employee[] }>('/personnel/employees')).items ?? [],
   });
 
   const benefitsQuery = useQuery<Benefit[]>({

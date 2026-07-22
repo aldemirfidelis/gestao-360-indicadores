@@ -311,6 +311,11 @@ export class CompensationService {
     if (chain[0]) approvalSteps.push({ order: approvalSteps.length + 1, role: 'GESTOR', approverId: chain[0].userId });
     if (chain[1]) approvalSteps.push({ order: approvalSteps.length + 1, role: 'SUPERINTENDENTE', approverId: chain[1].userId });
 
+    // Faixa (A–F) e salário vinculado ao cargo+faixa — segue para o recrutamento
+    // como salário de referência da proposta.
+    const band = cleanString(body?.band);
+    const salaryInfo = await this.salaryForJobBand(me, orgJobId, band);
+
     const created = await this.recruitRequisitions.create(me, {
       orgNodeId,
       orgJobId,
@@ -318,6 +323,10 @@ export class CompensationService {
       vacancyType: body?.vacancyType,
       priority: body?.priority,
       reason: body?.reason,
+      contractType: body?.contractType,
+      salaryMin: salaryInfo.salary ?? undefined,
+      salaryMax: salaryInfo.salary ?? undefined,
+      details: band ? { band } : undefined,
       approvalSteps: approvalSteps.length ? approvalSteps : undefined,
     });
     const submitted = await this.recruitRequisitions.submit(me, created.id);
@@ -731,9 +740,52 @@ export class CompensationService {
 
   async addSalaryRange(me: AuthPayload, id: string, body: Record<string, unknown>) {
     await this.getSalaryTable(me, id);
-    const created = await this.createRange(this.prisma, me, id, body);
+    // Liga a faixa ao cargo do quadro (OrgJob) para resolução direta do salário
+    // por cargo+faixa em Solicitar Vaga / Recrutamento / Folha.
+    const payload: Record<string, unknown> = { ...body };
+    if (!cleanString(payload.orgJobId) && cleanString(payload.jobCatalogId)) {
+      const catalog = await this.prisma.compensationJobCatalog.findFirst({
+        where: { id: String(payload.jobCatalogId), companyId: me.companyId },
+        select: { orgJobId: true },
+      });
+      if (catalog?.orgJobId) payload.orgJobId = catalog.orgJobId;
+    }
+    const created = await this.createRange(this.prisma, me, id, payload);
     await this.audit(me, 'CREATE', 'CompensationSalaryRange', created.id, null, created, created.band);
     return created;
+  }
+
+  async deleteSalaryTable(me: AuthPayload, id: string) {
+    const before = await this.getSalaryTable(me, id);
+    await this.prisma.compensationSalaryTable.update({
+      where: { id },
+      data: { deletedAt: new Date(), updatedById: me.sub },
+    });
+    await this.audit(me, 'DELETE', 'CompensationSalaryTable', id, before, null, before.name);
+    return { ok: true };
+  }
+
+  /**
+   * Resolve o salário vinculado a um cargo (OrgJob) + faixa (A–F). Prioriza tabela
+   * PUBLICADA e vigência mais recente; cai para rascunho se não houver publicada.
+   * Usado por Solicitar Vaga, pela proposta do recrutamento e pela folha.
+   */
+  async salaryForJobBand(me: AuthPayload, orgJobId?: string | null, band?: string | null) {
+    const job = cleanString(orgJobId);
+    const faixa = cleanString(band);
+    if (!job || !faixa) return { salary: null as string | null, currency: 'BRL', rangeId: null as string | null };
+    const range = await this.prisma.compensationSalaryRange.findFirst({
+      where: {
+        companyId: me.companyId,
+        band: faixa,
+        salaryTable: { deletedAt: null },
+        OR: [{ orgJobId: job }, { jobCatalog: { orgJobId: job } }],
+      },
+      include: { salaryTable: { select: { status: true, currency: true, effectiveFrom: true } } },
+      orderBy: [{ salaryTable: { effectiveFrom: 'desc' } }, { createdAt: 'desc' }],
+    });
+    if (!range) return { salary: null, currency: 'BRL', rangeId: null };
+    return { salary: range.midpointSalary.toString(), currency: range.salaryTable.currency ?? 'BRL', rangeId: range.id };
   }
 
   async publishSalaryTable(me: AuthPayload, id: string) {
@@ -1748,9 +1800,15 @@ export class CompensationService {
   }
 
   private async createRange(tx: Pick<PrismaService, 'compensationSalaryRange'>, me: AuthPayload, salaryTableId: string, body: Record<string, unknown>) {
-    const minSalary = requiredMoney(body.minSalary, 'Salário mínimo obrigatório');
-    const midpointSalary = requiredMoney(body.midpointSalary, 'Ponto médio obrigatório');
-    const maxSalary = requiredMoney(body.maxSalary, 'Salário máximo obrigatório');
+    // Modelo simplificado: um único salário por cargo+faixa (body.salary). O legado
+    // com mínimo/médio/máximo continua aceito por compatibilidade. Quando vem só o
+    // valor único, gravamos min = médio = máx = valor (as telas de equidade/compa-ratio
+    // continuam funcionando usando o médio).
+    const single = body.salary ?? body.value;
+    const hasSingle = single != null && single !== '';
+    const minSalary = requiredMoney(hasSingle ? single : body.minSalary, 'Salário obrigatório');
+    const midpointSalary = hasSingle ? minSalary : requiredMoney(body.midpointSalary, 'Ponto médio obrigatório');
+    const maxSalary = hasSingle ? minSalary : requiredMoney(body.maxSalary, 'Salário máximo obrigatório');
     if (minSalary.gt(midpointSalary) || midpointSalary.gt(maxSalary)) {
       throw new BadRequestException('Faixa salarial inválida: mínimo <= médio <= máximo');
     }

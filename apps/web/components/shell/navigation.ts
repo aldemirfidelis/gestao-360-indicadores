@@ -255,7 +255,7 @@ export const navSections: NavSection[] = [
     items: [
       { href: '/servico-pessoal/colaboradores', label: 'Colaboradores', description: 'Cadastro, prontuário 360°, dependentes e dossiê digital', icon: UserCheck, permissions: ['pessoal:view', 'pessoal:manage'] },
       { href: '/servico-pessoal/ponto', label: 'Controle de Ponto', description: 'Conferência da equipe, espelho de todos, ajustes, escalas e fechamento', icon: Clock, permissions: ['ponto:team', 'ponto:manage'] },
-      { href: '/servico-pessoal/ferias', label: 'Férias e Afastamentos', description: 'Saldos, solicitações com aprovação e atestados/afastamentos', icon: CalendarDays, permissions: [] },
+      { href: '/servico-pessoal/ferias', label: 'Férias e Afastamentos', description: 'Gestão do DP: saldos, aprovação de solicitações e atestados/afastamentos (o colaborador solicita em Minha Vida Funcional)', icon: CalendarDays, permissions: ['pessoal:view', 'pessoal:manage'] },
       { href: '/servico-pessoal/admissoes', label: 'Admissão e Desligamento', description: 'Checklists de admissão/desligamento e saúde ocupacional (ASO)', icon: ClipboardCheck, permissions: ['pessoal:view', 'pessoal:manage'] },
       { href: '/servico-pessoal/folha', label: 'Folha de Pagamento', description: 'Cálculo de folha, holerites, competências e adiantamento', icon: Banknote, permissions: ['folha:view'] },
       { href: '/servico-pessoal/meu-holerite', label: 'Minha Vida Funcional', description: 'Seu ponto (bater ponto e espelho), holerites e informe de rendimentos', icon: Wallet, permissions: [] },
@@ -342,7 +342,7 @@ export const ROUTE_PERMISSIONS: Array<{ prefix: string; permissions: string[]; e
   { prefix: '/org', permissions: ['org:view', 'org:view_all'] },
   { prefix: '/cargos-salarios', permissions: ['compensation:view', 'org:positions:view'] },
   { prefix: '/servico-pessoal/folha', permissions: ['folha:view'] },
-  { prefix: '/servico-pessoal/ferias', permissions: [] },
+  { prefix: '/servico-pessoal/ferias', permissions: ['pessoal:view', 'pessoal:manage'] },
   { prefix: '/servico-pessoal/colaboradores', permissions: ['pessoal:view', 'pessoal:manage'] },
   { prefix: '/servico-pessoal/configuracoes', permissions: ['pessoal:settings', 'pessoal:manage'] },
   // O módulo usa família própria de permissões. O prefixo legado continua
