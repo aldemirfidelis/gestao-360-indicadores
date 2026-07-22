@@ -392,8 +392,10 @@ export class RecruitOfferService {
 
 /** Link absoluto para a Área do candidato quando há URL pública configurada; senão string vazia (o corpo do e-mail continua coerente). */
 function candidatePortalLink(): string {
-  const base = (process.env.PUBLIC_SITE_URL ?? process.env.NEXT_PUBLIC_SITE_URL ?? '').trim().replace(/\/+$/, '');
-  return base ? `\n\nAcesse aqui: ${base}/candidato` : '';
+  // Sempre inclui o link no corpo (o candidato clica direto). Usa a URL pública
+  // configurada ou o domínio de produção como padrão.
+  const base = (process.env.PUBLIC_SITE_URL ?? process.env.NEXT_PUBLIC_SITE_URL ?? 'https://gestao360.org').trim().replace(/\/+$/, '');
+  return `\n\n👉 Enviar meus documentos: ${base}/candidato`;
 }
 
 function text(value: unknown): string | null {

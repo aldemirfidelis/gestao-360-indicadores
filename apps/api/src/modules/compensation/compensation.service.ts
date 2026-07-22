@@ -341,6 +341,66 @@ export class CompensationService {
     return submitted;
   }
 
+  // ------------------------------ Hierarquia por cargo/pessoa ------------------------------
+
+  /** Todos os colaboradores ativos com seu superior imediato — o frontend monta a árvore. */
+  async hierarchy(me: AuthPayload) {
+    const employees = await this.prisma.orgEmployee.findMany({
+      where: { companyId: me.companyId, status: 'ACTIVE' },
+      select: {
+        id: true,
+        name: true,
+        registrationId: true,
+        superiorEmployeeId: true,
+        job: { select: { id: true, name: true } },
+        orgNode: { select: { id: true, name: true } },
+      },
+      orderBy: { name: 'asc' },
+    });
+    return employees.map((e) => ({
+      id: e.id,
+      name: e.name,
+      registrationId: e.registrationId,
+      superiorEmployeeId: e.superiorEmployeeId,
+      jobName: e.job?.name ?? null,
+      areaName: e.orgNode?.name ?? null,
+    }));
+  }
+
+  /** Define o superior imediato do colaborador, bloqueando auto-referência e ciclos. */
+  async setSuperior(me: AuthPayload, employeeId: string, superiorEmployeeId: string | null) {
+    const employee = await this.prisma.orgEmployee.findFirst({ where: { id: employeeId, companyId: me.companyId }, select: { id: true, name: true } });
+    if (!employee) throw new NotFoundException('Colaborador não encontrado.');
+    const superiorId = (superiorEmployeeId ?? '').trim() || null;
+
+    if (superiorId) {
+      if (superiorId === employeeId) throw new BadRequestException('Um colaborador não pode ser superior de si mesmo.');
+      const superior = await this.prisma.orgEmployee.findFirst({ where: { id: superiorId, companyId: me.companyId }, select: { id: true } });
+      if (!superior) throw new NotFoundException('Superior não encontrado.');
+      // Impede ciclo: o superior escolhido não pode estar na cadeia de subordinados do colaborador.
+      const all = await this.prisma.orgEmployee.findMany({ where: { companyId: me.companyId }, select: { id: true, superiorEmployeeId: true } });
+      const byId = new Map(all.map((e) => [e.id, e.superiorEmployeeId]));
+      let cursor: string | null = superiorId;
+      const guard = new Set<string>();
+      while (cursor) {
+        if (cursor === employeeId) throw new BadRequestException('Esse superior geraria um ciclo na hierarquia.');
+        if (guard.has(cursor)) break;
+        guard.add(cursor);
+        cursor = byId.get(cursor) ?? null;
+      }
+    }
+
+    await this.prisma.orgEmployee.update({ where: { id: employeeId }, data: { superiorEmployeeId: superiorId } });
+    await this.auditWriter.record(me, {
+      module: MODULE_NAME,
+      entity: 'OrgEmployee',
+      entityId: employeeId,
+      action: 'UPDATE',
+      message: `Superior imediato de "${employee.name}" ${superiorId ? 'definido' : 'removido'}`,
+    });
+    return { ok: true };
+  }
+
   async listJobs(me: AuthPayload, query: Record<string, string | undefined>) {
     await this.ensureBaseline(me);
     const jobs = await this.prisma.compensationJobCatalog.findMany({

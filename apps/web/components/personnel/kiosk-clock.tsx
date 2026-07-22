@@ -98,6 +98,8 @@ export function KioskClock() {
   const resetTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const cancelledRef = useRef(false);
   const inFlightRef = useRef(false);
+  // Falhas consecutivas de reconhecimento — após 3, orienta procurar o Serviço Pessoal.
+  const failCountRef = useRef(0);
 
   const [phase, setPhase] = useState<Phase>('INITIALIZING');
   const [deviceToken, setDeviceToken] = useState('');
@@ -192,7 +194,7 @@ export function KioskClock() {
     (message: string, reset = true) => {
       stopCamera();
       setError(message);
-      setInstruction('Não foi possível registrar');
+      setInstruction('PONTO NÃO REGISTRADO');
       setPhase('ERROR');
       if (reset) scheduleReset(ERROR_RESET_MS);
     },
@@ -268,6 +270,7 @@ export function KioskClock() {
         ...(location ?? {}),
       });
 
+      failCountRef.current = 0;
       setResult(punch);
       setInstruction('Ponto registrado');
       setPhase('SUCCESS');
@@ -285,7 +288,12 @@ export function KioskClock() {
         setPhase('SETUP');
         return;
       }
-      fail(normalized.message);
+      failCountRef.current += 1;
+      fail(
+        failCountRef.current >= 3
+          ? 'Não foi possível reconhecer o rosto após 3 tentativas. Procure o Serviço Pessoal da sua empresa.'
+          : normalized.message,
+      );
     } finally {
       inFlightRef.current = false;
     }
@@ -517,9 +525,12 @@ export function KioskClock() {
 
 function ErrorBox({ message }: { message: string }) {
   return (
-    <div role="alert" className="flex items-start gap-2.5 rounded-xl border border-rose-400/25 bg-rose-400/[0.08] p-3 text-sm leading-5 text-rose-100">
-      <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-rose-300" />
-      <span>{message}</span>
+    <div role="alert" className="rounded-xl bg-red-600 p-4 text-white shadow-lg">
+      <div className="flex items-center gap-2.5 text-lg font-black tracking-wide">
+        <AlertTriangle className="h-6 w-6 shrink-0" />
+        PONTO NÃO REGISTRADO
+      </div>
+      <p className="mt-1 text-sm font-medium leading-5 text-red-50">{message}</p>
     </div>
   );
 }

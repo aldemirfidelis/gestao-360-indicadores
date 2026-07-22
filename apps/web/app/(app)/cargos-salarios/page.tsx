@@ -217,6 +217,7 @@ export default function CargosSalariosPage() {
             <QuickActionBtn icon={Briefcase} title="Descrições de cargo" onClick={() => router.push('/cargos-salarios/descricoes')} />
             <QuickActionBtn icon={GitPullRequestArrow} title="Ciclos de mérito" onClick={() => router.push('/cargos-salarios/ciclos')} />
             <QuickActionBtn icon={Network} title="Estrutura e carreira" onClick={() => router.push('/cargos-salarios/estrutura-quadro')} />
+            <QuickActionBtn icon={Users} title="Hierarquia por cargo" onClick={() => router.push('/cargos-salarios/hierarquia')} />
             <QuickActionBtn icon={Scale} title="Equidade salarial (Lei 14.611)" onClick={() => router.push('/cargos-salarios/equidade')} />
           </div>
 

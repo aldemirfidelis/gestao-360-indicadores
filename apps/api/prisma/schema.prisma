@@ -6275,6 +6275,10 @@ model OrgEmployee {
   isBudgeted     Boolean  @default(true)
   status         String   @default("ACTIVE")
   approvalStatus String   @default("PENDENTE")
+  // Superior imediato (hierarquia por cargo/pessoa em Cargos e Salários).
+  superiorEmployeeId String?
+  superior           OrgEmployee?  @relation("EmployeeHierarchy", fields: [superiorEmployeeId], references: [id])
+  subordinates       OrgEmployee[] @relation("EmployeeHierarchy")
   createdAt      DateTime @default(now())
   updatedAt      DateTime @updatedAt
 
@@ -6292,6 +6296,7 @@ model OrgEmployee {
   @@index([companyId])
   @@index([orgNodeId])
   @@index([jobPretendedId])
+  @@index([superiorEmployeeId])
 }
 
 // Perfil de remuneracao do colaborador (1:1 com OrgEmployee), em tabela

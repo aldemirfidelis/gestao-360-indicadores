@@ -37,6 +37,18 @@ export class CompensationController {
     return this.service.solicitarVaga(me, body);
   }
 
+  @Get('hierarquia')
+  @RequirePermissions(...VIEW)
+  hierarchy(@CurrentUser() me: AuthPayload) {
+    return this.service.hierarchy(me);
+  }
+
+  @Patch('hierarquia/:employeeId')
+  @RequirePermissions(...MANAGE)
+  setSuperior(@CurrentUser() me: AuthPayload, @Param('employeeId') employeeId: string, @Body() body: any) {
+    return this.service.setSuperior(me, employeeId, body?.superiorEmployeeId ?? null);
+  }
+
   @Get('jobs')
   @RequirePermissions(...VIEW)
   listJobs(@CurrentUser() me: AuthPayload, @Query() query: Record<string, string | undefined>) {
