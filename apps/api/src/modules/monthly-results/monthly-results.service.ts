@@ -701,7 +701,7 @@ export class MonthlyResultsService {
         await this.prisma.monthlyMeetingIndicator.update({
           where: { id: prev.id },
           data: {
-            ...snap,
+            ...this.persistSnapshotFields(snap),
             isCritical,
             // não sobrescreve vínculos manuais; preenche se ainda vazio
             deviationId: prev.deviationId ?? primaryDeviation.get(indicator.id) ?? null,
@@ -714,7 +714,7 @@ export class MonthlyResultsService {
             meetingId,
             meetingAreaId,
             indicatorId: indicator.id,
-            ...snap,
+            ...this.persistSnapshotFields(snap),
             isCritical,
             deviationId: primaryDeviation.get(indicator.id) ?? null,
             actionPlanId: primaryAction.get(indicator.id) ?? null,
@@ -1435,6 +1435,24 @@ export class MonthlyResultsService {
       direction: (indicator.direction as Direction) ?? Direction.HIGHER_BETTER,
       light: (light === 'BLUE' ? TrafficLight.GREEN : light) as TrafficLight,
       trend: this.trendLabel(current, previous),
+    };
+  }
+
+  // Extrai apenas os campos que EXISTEM como coluna em MonthlyMeetingIndicator.
+  // computeSnapshot devolve campos derivados extras (accumulatedTarget,
+  // accumulatedAttainment, direction) usados só na exibição ao vivo — persistir
+  // o objeto inteiro com `...snap` quebra o Prisma (Unknown argument).
+  private persistSnapshotFields(snap: ReturnType<MonthlyResultsService['computeSnapshot']>) {
+    return {
+      target: snap.target,
+      lowerBound: snap.lowerBound,
+      upperBound: snap.upperBound,
+      current: snap.current,
+      accumulated: snap.accumulated,
+      attainment: snap.attainment,
+      deviationPct: snap.deviationPct,
+      light: snap.light,
+      trend: snap.trend,
     };
   }
 
