@@ -132,7 +132,8 @@ export default function VisualizationPage() {
 
   const indicatorRows = indicators.data ?? [];
   const selectedNode = orderedNodes.find((node) => node.id === selectedNodeId);
-  const visibleCards = indicatorRows.slice(0, PLACEHOLDER_CARDS);
+  // Mostra TODOS os indicadores da área (sem limite); PLACEHOLDER_CARDS serve só ao skeleton de carregamento.
+  const visibleCards = indicatorRows;
   const conclusion = conclusionQuery.data?.conclusion ?? '';
 
   // Exportação em imagem (para apresentações): cards + leitura executiva + mensagem-chave.
