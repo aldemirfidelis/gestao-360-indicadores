@@ -284,6 +284,13 @@ export class PayrollController {
     return this.runs.listTerminations(me);
   }
 
+  /** Prévia da rescisão com o motor real, sem persistir nada. */
+  @Post('terminations/preview')
+  @RequirePermissions('folha:operate')
+  previewTermination(@CurrentUser() me: AuthPayload, @Body() body: any) {
+    return this.runs.previewTermination(me, body);
+  }
+
   @Post('terminations')
   @RequirePermissions('folha:operate')
   createTermination(@CurrentUser() me: AuthPayload, @Body() body: any) {

@@ -210,6 +210,58 @@ describe('payroll-calc.logic — descontos da folha (Benefícios, Consignados e 
     // Logo, deduções legais (INSS + Pensão) são melhores. IRRF esperado = 95.43
     expect(byCode.get('5502')?.amountCents).toBe(9543);
   });
+
+  it('VT com teto de coparticipação: desconta o MENOR entre o custo e 6% do salário', () => {
+    const result = computeMonthlyWorker({
+      salaryCents: 300000, // 3.000,00 → teto 6% = 180,00
+      monthlyHours: 220,
+      contractType: 'CLT',
+      irDependents: 0,
+      timekeeping: { normalMinutes: 11880, he50Minutes: 0, he100Minutes: 0, nightMinutes: 0, absentMinutes: 0, workedDays: 22, absentDays: 0 },
+      tables: TABLES,
+      benefits: [
+        // custo do VT 240,00 > teto 180,00 → desconta 180,00
+        { name: 'Vale Transporte', kind: 'VT', valueCents: 24000, copayRateBp: 600 },
+        // custo da saúde 100,00 < teto 300,00 (10%) → desconta os 100,00 integrais
+        { name: 'Plano Saúde', kind: 'SAUDE', valueCents: 10000, copayRateBp: 1000 },
+      ],
+    });
+    const byCode = new Map(result.items.map((i) => [i.rubricCode, i]));
+    expect(byCode.get('5100')?.amountCents).toBe(18000); // teto 6% × 3.000
+    expect(byCode.get('5100')?.reference).toContain('teto 6%');
+    expect(byCode.get('5120')?.amountCents).toBe(10000); // abaixo do teto: valor cheio
+  });
+
+  it('benefício PERCENTUAL_SALARIO: cobrança = % do salário (rateBp)', () => {
+    const result = computeMonthlyWorker({
+      salaryCents: 250000, // 2.500,00
+      monthlyHours: 220,
+      contractType: 'CLT',
+      irDependents: 0,
+      timekeeping: { normalMinutes: 11880, he50Minutes: 0, he100Minutes: 0, nightMinutes: 0, absentMinutes: 0, workedDays: 22, absentDays: 0 },
+      tables: TABLES,
+      benefits: [
+        // 4% do salário = 100,00 (rateBp derivado do value "4.00" → 400)
+        { name: 'Vale Refeição', kind: 'VR', type: 'PERCENTUAL_SALARIO', valueCents: 400, rateBp: 400 },
+      ],
+    });
+    const byCode = new Map(result.items.map((i) => [i.rubricCode, i]));
+    expect(byCode.get('5110')?.amountCents).toBe(10000); // 4% de 2.500,00
+  });
+
+  it('sem teto (copay 0) mantém o comportamento antigo: desconta o valor cheio', () => {
+    const result = computeMonthlyWorker({
+      salaryCents: 300000,
+      monthlyHours: 220,
+      contractType: 'CLT',
+      irDependents: 0,
+      timekeeping: { normalMinutes: 11880, he50Minutes: 0, he100Minutes: 0, nightMinutes: 0, absentMinutes: 0, workedDays: 22, absentDays: 0 },
+      tables: TABLES,
+      benefits: [{ name: 'Plano Saúde', kind: 'SAUDE', valueCents: 10000, copayRateBp: 0 }],
+    });
+    const byCode = new Map(result.items.map((i) => [i.rubricCode, i]));
+    expect(byCode.get('5120')?.amountCents).toBe(10000);
+  });
 });
 
 describe('payroll-calc.logic — Férias e 13º Salário (Fase 3)', () => {

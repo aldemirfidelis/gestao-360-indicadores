@@ -244,7 +244,7 @@ export default function BenefitsPage() {
                             {b.kind}
                           </Badge>
                           <span className="text-sm font-bold text-sky-600 dark:text-sky-400">
-                            {formatCurrency(b.value)}
+                            {b.type === 'PERCENTUAL_SALARIO' ? `${parseFloat(b.value)}% do salário` : formatCurrency(b.value)}
                           </span>
                         </div>
                         <CardTitle className="text-base font-bold mt-1.5">{b.name}</CardTitle>
@@ -252,7 +252,9 @@ export default function BenefitsPage() {
                       </CardHeader>
                       <CardContent className="pt-2 pb-3">
                         <div className="text-xs text-muted-foreground mb-4">
-                          Coparticipação máxima: {b.copayRateBp / 100}%
+                          {b.copayRateBp > 0
+                            ? `Teto do desconto: ${b.copayRateBp / 100}% do salário`
+                            : 'Sem teto — desconta o valor integral'}
                         </div>
                         {canOperate && (
                           <Button size="sm" variant="outline" className="w-full text-xs" onClick={() => handleOpenEnroll(b.id)}>
@@ -456,23 +458,41 @@ export default function BenefitsPage() {
                 </NativeSelect>
               </div>
               <div className="space-y-1">
-                <Label htmlFor="value">Custo Mensal (R$)</Label>
-                <Input
-                  id="value"
-                  value={benefitForm.value}
-                  onChange={(e) => setBenefitForm({ ...benefitForm, value: e.target.value })}
-                />
+                <Label htmlFor="type">Forma de Cobrança</Label>
+                <NativeSelect
+                  id="type"
+                  value={benefitForm.type}
+                  onChange={(e) => setBenefitForm({ ...benefitForm, type: e.target.value })}
+                >
+                  <option value="VALOR_FIXO">Valor fixo (R$/mês)</option>
+                  <option value="PERCENTUAL_SALARIO">% do salário base</option>
+                </NativeSelect>
               </div>
             </div>
             <div className="space-y-1">
-              <Label htmlFor="copayRateBp">Coparticipação do Funcionário (%)</Label>
+              <Label htmlFor="value">
+                {benefitForm.type === 'PERCENTUAL_SALARIO' ? 'Percentual do Salário (%)' : 'Valor Descontado do Colaborador (R$/mês)'}
+              </Label>
+              <Input
+                id="value"
+                value={benefitForm.value}
+                onChange={(e) => setBenefitForm({ ...benefitForm, value: e.target.value })}
+                placeholder={benefitForm.type === 'PERCENTUAL_SALARIO' ? 'Ex: 4.00 (= 4% do salário)' : 'Ex: 100.00'}
+              />
+            </div>
+            <div className="space-y-1">
+              <Label htmlFor="copayRateBp">Teto do Desconto (% do salário) — 0 = sem teto</Label>
               <Input
                 id="copayRateBp"
                 type="number"
                 value={benefitForm.copayRateBp / 100}
                 onChange={(e) => setBenefitForm({ ...benefitForm, copayRateBp: Math.round(Number(e.target.value) * 100) })}
-                placeholder="Ex: 6 para VT padrão"
+                placeholder="Ex: 6 para VT (limite legal)"
               />
+              <p className="text-[11px] text-muted-foreground">
+                A folha desconta o menor valor entre a cobrança e este teto. Ex.: VT de R$ 240 com teto de 6% e salário
+                de R$ 3.000 desconta R$ 180.
+              </p>
             </div>
             <DialogFooter className="pt-2">
               <Button type="button" variant="outline" onClick={() => setBenefitOpen(false)}>Cancelar</Button>

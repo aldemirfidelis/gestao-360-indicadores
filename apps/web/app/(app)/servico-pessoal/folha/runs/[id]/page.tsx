@@ -418,7 +418,12 @@ export default function RunDetailPage() {
       <Card className="border-border/60 bg-card/60">
         <CardHeader>
           <CardTitle className="text-base font-semibold">Fluxo de Fechamento do Lote</CardTitle>
-          <CardDescription>Siga as etapas sequencialmente para consolidar os cálculos da competência</CardDescription>
+          <CardDescription>
+            Siga as etapas sequencialmente para consolidar os cálculos da competência. O passo{' '}
+            <strong>Calcular</strong> gera a PRÉVIA completa por colaborador (proventos, benefícios, descontos, INSS/IRRF
+            e líquido) — nada é pago nem liberado no portal do colaborador até o passo <strong>Fechar</strong>; até lá é
+            possível recalcular quantas vezes precisar.
+          </CardDescription>
         </CardHeader>
         <CardContent>
           <div className="grid gap-6 md:grid-cols-5 text-xs">

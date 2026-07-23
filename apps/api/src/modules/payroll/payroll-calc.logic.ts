@@ -151,6 +151,33 @@ export interface TimekeepingSummary {
   absentDays: number;
 }
 
+/**
+ * Cobrança de benefício ao colaborador.
+ * - `type=VALOR_FIXO`: desconta `valueCents` (valor cheio ou customizado na adesão).
+ * - `type=PERCENTUAL_SALARIO`: desconta `rateBp` (basis points) sobre o salário base.
+ * - `copayRateBp > 0`: TETO legal do desconto em % do salário (ex.: VT ≤ 6%);
+ *   o colaborador paga o menor entre a cobrança e o teto.
+ */
+export interface BenefitChargeInput {
+  name: string;
+  kind: string;
+  type?: string; // VALOR_FIXO | PERCENTUAL_SALARIO
+  valueCents: number;
+  rateBp?: number;
+  copayRateBp?: number;
+}
+
+/** Resolve o desconto efetivo de um benefício (cobrança × teto) sobre o salário base. */
+export function computeBenefitCharge(benefit: BenefitChargeInput, salaryCents: number): { chargeCents: number; capCents: number | null; deductionCents: number } {
+  const chargeCents =
+    benefit.type === 'PERCENTUAL_SALARIO' && benefit.rateBp && benefit.rateBp > 0
+      ? applyBp(salaryCents, benefit.rateBp)
+      : benefit.valueCents;
+  const capCents = benefit.copayRateBp && benefit.copayRateBp > 0 ? applyBp(salaryCents, benefit.copayRateBp) : null;
+  const deductionCents = capCents !== null ? Math.min(chargeCents, capCents) : chargeCents;
+  return { chargeCents, capCents, deductionCents };
+}
+
 export interface WorkerCalcInput {
   salaryCents: number;
   monthlyHours: number;
@@ -159,7 +186,7 @@ export interface WorkerCalcInput {
   timekeeping: TimekeepingSummary;
   tables: LegalTables;
   advancePaidCents?: number;
-  benefits?: Array<{ name: string; kind: string; valueCents: number }>;
+  benefits?: Array<BenefitChargeInput>;
   loans?: Array<{ bankName: string; contractId: string; amountCents: number }>;
   pensions?: Array<{ dependentId: string; percentage: number; baseType: string }>;
 }
@@ -356,26 +383,38 @@ export function computeMonthlyWorker(input: WorkerCalcInput): WorkerCalcResult {
     legalVersionId: tables.fgts.versionId,
   });
 
-  // Benefícios (VT / VA / VR / Saúde)
+  // Benefícios (VT / VA / VR / Saúde): cobrança fixa ou % do salário, com teto
+  // legal opcional em % do salário (ex.: VT limitado a 6%).
   if (benefits && benefits.length > 0) {
     for (const b of benefits) {
       let rubricCode = '5120'; // default SAUDE/ODONTO
       if (b.kind === 'VT') rubricCode = '5100';
       if (b.kind === 'VA' || b.kind === 'VR') rubricCode = '5110';
 
+      const charge = computeBenefitCharge(b, salaryCents);
+      const capped = charge.capCents !== null && charge.deductionCents < charge.chargeCents;
       items.push({
         rubricCode,
         rubricName: `Desconto ${b.name}`,
         nature: 'DESCONTO',
-        reference: b.kind,
-        amountCents: b.valueCents,
+        reference: capped ? `${b.kind} (teto ${(b.copayRateBp ?? 0) / 100}% do salário)` : b.kind,
+        amountCents: charge.deductionCents,
         origin: 'MOTOR',
       });
       memory.push({
         step: `Benefício ${b.name}`,
-        formula: 'desconto de benefício contratual / coparticipação',
-        inputs: { tipo: b.kind },
-        resultCents: b.valueCents,
+        formula:
+          b.type === 'PERCENTUAL_SALARIO'
+            ? 'cobrança = salário × percentual; desconto = menor entre cobrança e teto (% do salário)'
+            : charge.capCents !== null
+              ? 'desconto = menor entre o valor do benefício e o teto (% do salário)'
+              : 'desconto do valor contratual do benefício',
+        inputs: {
+          tipo: b.kind,
+          cobranca: centsLabel(charge.chargeCents),
+          ...(charge.capCents !== null ? { teto: centsLabel(charge.capCents) } : {}),
+        },
+        resultCents: charge.deductionCents,
       });
     }
   }

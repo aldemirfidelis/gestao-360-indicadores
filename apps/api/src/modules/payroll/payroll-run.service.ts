@@ -1,4 +1,5 @@
 import { BadRequestException, ConflictException, Injectable, NotFoundException } from '@nestjs/common';
+import { Prisma } from '@prisma/client';
 import { createHash } from 'crypto';
 import { PrismaService } from '../../prisma/prisma.service';
 import { AuditWriterService } from '../../common/audit/audit-writer.service';
@@ -290,8 +291,19 @@ export class PayrollRunService {
     const benefitsByEmployee = new Map<string, any[]>();
     for (const b of benefitEnrollments) {
       const list = benefitsByEmployee.get(b.employeeId) || [];
-      const val = b.customValue ? decimalToCents(b.customValue.toString()) : decimalToCents(b.benefit.value.toString());
-      list.push({ name: b.benefit.name, kind: b.benefit.kind, valueCents: val });
+      // customValue na adesão sempre é um valor fixo em R$ e substitui a regra
+      // do benefício; sem ele, vale o tipo do benefício (fixo ou % do salário —
+      // para PERCENTUAL_SALARIO o campo value guarda o percentual, e
+      // decimalToCents("6.00") = 600 já equivale aos basis points).
+      const custom = b.customValue ? decimalToCents(b.customValue.toString()) : null;
+      list.push({
+        name: b.benefit.name,
+        kind: b.benefit.kind,
+        type: custom !== null ? 'VALOR_FIXO' : b.benefit.type,
+        valueCents: custom ?? decimalToCents(b.benefit.value.toString()),
+        rateBp: custom !== null ? undefined : decimalToCents(b.benefit.value.toString()),
+        copayRateBp: b.benefit.copayRateBp ?? 0,
+      });
       benefitsByEmployee.set(b.employeeId, list);
     }
 
@@ -852,8 +864,62 @@ export class PayrollRunService {
     });
   }
 
+  /**
+   * Roda o motor real de rescisão (computeTermination) com os insumos vigentes
+   * do colaborador. Usado tanto na prévia (sem persistir) quanto no registro.
+   */
+  async previewTermination(me: AuthPayload, body: any) {
+    const employeeId = String(body?.employeeId ?? '');
+    await this.assertEmployee(me.companyId, employeeId);
+    const terminationDate = new Date(String(body?.terminationDate ?? ''));
+    if (Number.isNaN(terminationDate.getTime())) throw new BadRequestException('Data de rescisão inválida.');
+    const dateKey = terminationDate.toISOString().slice(0, 10);
+
+    const [tables, salarySnapshot, profile, dependents] = await Promise.all([
+      this.legalTables.tablesFor(me.companyId, dateKey),
+      this.prisma.compensationSalarySnapshot.findFirst({
+        where: { companyId: me.companyId, employeeId, effectiveFrom: { lte: terminationDate } },
+        orderBy: { effectiveFrom: 'desc' },
+        select: { currentSalary: true },
+      }),
+      this.prisma.personnelEmployeeProfile.findFirst({
+        where: { companyId: me.companyId, employeeId },
+        select: { contractType: true, admissionDate: true },
+      }),
+      this.prisma.employeeDependent.count({
+        where: { companyId: me.companyId, employeeId, isIrDependent: true },
+      }),
+    ]);
+    if (!salarySnapshot) {
+      throw new BadRequestException('Sem salário vigente em Cargos e Salários (CompensationSalarySnapshot) — cálculo bloqueado.');
+    }
+    if (!profile?.admissionDate) {
+      throw new BadRequestException('Colaborador sem data de admissão no prontuário do Serviço Pessoal — cálculo bloqueado.');
+    }
+
+    const salaryCents = decimalToCents(salarySnapshot.currentSalary.toString());
+    const fgtsBalanceCents = Math.max(0, Math.round(Number(body?.fgtsBalance ?? 0) * 100)) || undefined;
+    const expiredVacationAvos = Math.max(0, Math.min(12, Number(body?.expiredVacationAvos ?? 0) || 0));
+
+    const calc = computeTermination({
+      salaryCents,
+      admissionDate: profile.admissionDate,
+      terminationDate,
+      kind: String(body?.kind ?? 'DISPENSA_SEM_JUSTA_CAUSA'),
+      noticeType: String(body?.noticeType ?? 'INDENIZADO'),
+      contractType: profile.contractType ?? null,
+      irDependents: dependents,
+      tables,
+      fgtsBalanceCents,
+      expiredVacationAvos,
+    });
+    return { salaryCents, admissionDate: profile.admissionDate, ...calc };
+  }
+
   async createTermination(me: AuthPayload, body: any) {
-    await this.assertEmployee(me.companyId, String(body?.employeeId ?? ''));
+    // O resultado persistido é SEMPRE o do motor real — o frontend não manda
+    // valores calculados (a prévia antiga enviava números simulados fixos).
+    const calc = await this.previewTermination(me, body);
     const created = await this.prisma.payrollTermination.create({
       data: {
         companyId: me.companyId,
@@ -863,7 +929,15 @@ export class PayrollRunService {
         noticeType: body.noticeType,
         noticeDays: body.noticeDays ?? 30,
         status: 'DRAFT',
-        resultsJson: body.resultsJson ?? {},
+        resultsJson: {
+          engine: 'computeTermination',
+          grossValue: calc.totals.earningsCents,
+          deductionsValue: calc.totals.deductionsCents,
+          netValue: calc.totals.netCents,
+          fgtsFineCents: calc.informative.fgtsFineCents,
+          items: calc.items,
+          issues: calc.issues,
+        } as unknown as Prisma.InputJsonValue,
         calculatedById: me.sub,
       },
     });
@@ -873,7 +947,7 @@ export class PayrollRunService {
       entityId: created.id,
       action: 'CREATE',
       message: `Rescisão registrada (${body.kind}) para colaborador`,
-      after: { employeeId: body.employeeId, kind: body.kind, terminationDate: body.terminationDate },
+      after: { employeeId: body.employeeId, kind: body.kind, terminationDate: body.terminationDate, netValueCents: calc.totals.netCents },
     });
     return created;
   }
