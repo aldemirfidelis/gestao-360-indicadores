@@ -13,8 +13,11 @@ import { useAuth } from '@/components/auth/auth-provider';
 import { BrandLogo } from '@/components/brand/brand-logo';
 import { fetchTenantBranding, type TenantBranding } from '@/lib/tenant';
 
+// Login aceita e-mail, CPF (11 dígitos, com ou sem máscara) ou matrícula — o
+// backend resolve o identificador (auth.service.ts). Não usar z.string().email()
+// nem <input type="email">: ambos bloqueiam CPF antes de chegar no servidor.
 const schema = z.object({
-  email: z.string().email('E-mail inválido.'),
+  email: z.string().min(1, 'Informe seu e-mail, CPF ou matrícula.'),
   password: z.string().min(6, 'Mínimo de 6 caracteres.'),
 });
 
@@ -135,20 +138,20 @@ export default function LoginPage() {
                 <CardDescription className="text-slate-400 text-sm">
                   {demoMode
                     ? 'Conheça o Gestão 360 com dados pré-preenchidos e simulados.'
-                    : 'Insira seu e-mail e senha cadastrados para acessar o portal.'}
+                    : 'Insira seu e-mail, CPF ou matrícula e a senha cadastrados para acessar o portal.'}
                 </CardDescription>
               </CardHeader>
               <CardContent className="p-0 pt-6">
                 <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-5">
                   <div className="space-y-2">
-                    <Label htmlFor="email" className="text-slate-300 text-xs font-semibold uppercase tracking-wider">E-mail</Label>
+                    <Label htmlFor="email" className="text-slate-300 text-xs font-semibold uppercase tracking-wider">E-mail, CPF ou matrícula</Label>
                     <Input
                       id="email"
-                      type="email"
-                      autoComplete="email"
+                      type="text"
+                      autoComplete="username"
                       {...form.register('email')}
                       className="h-11 bg-slate-950/60 border-slate-800 text-white placeholder:text-slate-600 focus-visible:ring-cyan-500/20 focus-visible:border-cyan-500 rounded-xl"
-                      placeholder="nome@empresa.com"
+                      placeholder="nome@empresa.com ou CPF"
                     />
                     {form.formState.errors.email && (
                       <p className="text-xs text-red-400 mt-1">{form.formState.errors.email.message}</p>
