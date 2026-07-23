@@ -90,8 +90,22 @@ echo "[5/5] Status:"
 docker compose -f "$COMPOSE_FILE" ps
 
 echo ""
+echo "Tamanho das imagens (acompanhe: se voltar a crescer, algo desnecessario"
+echo "entrou na imagem - ver comentarios em apps/api/Dockerfile):"
+docker images --format '  {{.Repository}}:{{.Tag}}\t{{.Size}}' \
+  | grep -E '^  g360-(api|web):latest' || true
+
+echo ""
 echo "Limpeza de imagens antigas..."
 docker image prune -f > /dev/null
+
+# O cache de build do BuildKit cresce sem limite: medido em 2026-07-23 estava
+# em 20,8 GB (16,3 GB recuperaveis) com o disco em 72%. Sem teto, um dia o
+# deploy falha por disco cheio. 10 GB preserva o cache util (base + install)
+# e descarta o excedente antigo.
+echo "Limitando o cache de build a 10GB..."
+docker builder prune -f --max-used-space 10GB > /dev/null 2>&1 \
+  || echo "  (aviso: esta versao do Docker nao suporta --max-used-space; cache nao limitado)"
 
 echo ""
 echo "=========================================="

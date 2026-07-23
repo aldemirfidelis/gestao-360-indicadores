@@ -24,8 +24,15 @@ COPY packages/shared/package.json ./packages/shared/
 COPY apps/api/package.json ./apps/api/
 COPY apps/web/package.json ./apps/web/
 
+# Install SO do que o web precisa (ele + @g360/shared). Sem o filtro, o pnpm
+# instalava tambem as dependencias da API (engines do Prisma ~168 MB, aws-sdk,
+# exceljs, mammoth, xmllint-wasm...) sem que o web use nenhuma delas. A imagem
+# final nao era afetada — o `output: standalone` do Next so leva o que rastreia
+# — mas o install e o cache de build pagavam a conta em todo deploy.
+# O manifesto da API segue copiado acima porque o --frozen-lockfile valida o
+# workspace inteiro contra o lockfile.
 RUN --mount=type=cache,id=pnpm-store,target=/pnpm/store \
-    pnpm install --frozen-lockfile
+    pnpm install --frozen-lockfile --filter @g360/web... --filter @g360/shared...
 
 COPY packages/shared ./packages/shared
 COPY apps/web ./apps/web
