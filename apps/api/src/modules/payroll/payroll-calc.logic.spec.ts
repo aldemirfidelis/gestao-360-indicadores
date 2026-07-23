@@ -6,6 +6,7 @@ import {
   computeIrrf,
   computeMonthlyWorker,
   decimalToCents,
+  dsrCalendarForMonth,
   hourlyRateCents,
   roundDiv,
   computeVacationWorker,
@@ -261,6 +262,48 @@ describe('payroll-calc.logic — descontos da folha (Benefícios, Consignados e 
     });
     const byCode = new Map(result.items.map((i) => [i.rubricCode, i]));
     expect(byCode.get('5120')?.amountCents).toBe(10000);
+  });
+});
+
+describe('payroll-calc.logic — DSR sobre variáveis (Lei 605/49, opt-in por empresa)', () => {
+  it('dsrCalendarForMonth: julho/2026 tem 4 domingos; feriado em dia útil vira repouso', () => {
+    // Julho/2026: 31 dias, domingos em 05/12/19/26.
+    expect(dsrCalendarForMonth(2026, 7, [])).toEqual({ workingDays: 27, restDays: 4 });
+    // Feriado em dia útil (qui 09/07) conta como repouso; feriado em domingo (05/07) NÃO conta duas vezes.
+    expect(dsrCalendarForMonth(2026, 7, ['2026-07-09', '2026-07-05'])).toEqual({ workingDays: 26, restDays: 5 });
+    // Feriado de outro mês é ignorado.
+    expect(dsrCalendarForMonth(2026, 7, ['2026-08-07'])).toEqual({ workingDays: 27, restDays: 4 });
+  });
+
+  it('DSR = variáveis ÷ dias úteis × dias de repouso, e integra a base de INSS/FGTS', () => {
+    // Salário 2.200,00 / 220h → hora 10,00. HE50 10h = 150,00 de variáveis.
+    // DSR com 25 úteis e 5 repousos = 150 ÷ 25 × 5 = 30,00.
+    const result = computeMonthlyWorker({
+      salaryCents: 220000,
+      monthlyHours: 220,
+      contractType: 'CLT',
+      irDependents: 0,
+      timekeeping: { normalMinutes: 11880, he50Minutes: 600, he100Minutes: 0, nightMinutes: 0, absentMinutes: 0, workedDays: 22, absentDays: 0 },
+      tables: TABLES,
+      dsr: { workingDays: 25, restDays: 5 },
+    });
+    const byCode = new Map(result.items.map((i) => [i.rubricCode, i]));
+    expect(byCode.get('1101')?.amountCents).toBe(15000); // HE50 10h × 10,00 × 1,5
+    expect(byCode.get('1104')?.amountCents).toBe(3000); // DSR 150 ÷ 25 × 5
+    // Base tributável inclui o DSR: 2.200 + 150 + 30 = 2.380,00
+    expect(result.totals.fgtsBaseCents).toBe(238000);
+  });
+
+  it('sem o parâmetro dsr (empresa não ativou), nenhuma rubrica 1104 é gerada', () => {
+    const result = computeMonthlyWorker({
+      salaryCents: 220000,
+      monthlyHours: 220,
+      contractType: 'CLT',
+      irDependents: 0,
+      timekeeping: { normalMinutes: 11880, he50Minutes: 600, he100Minutes: 0, nightMinutes: 0, absentMinutes: 0, workedDays: 22, absentDays: 0 },
+      tables: TABLES,
+    });
+    expect(result.items.some((i) => i.rubricCode === '1104')).toBe(false);
   });
 });
 

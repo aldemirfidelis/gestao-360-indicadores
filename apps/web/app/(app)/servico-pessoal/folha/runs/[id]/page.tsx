@@ -138,6 +138,11 @@ export default function RunDetailPage() {
     enabled: !!id,
   });
 
+  const companySettingsQuery = useQuery<{ legalTablesConfirmedAt: string | null }>({
+    queryKey: ['payroll-company-settings'],
+    queryFn: () => api<{ legalTablesConfirmedAt: string | null }>('/payroll/company-settings'),
+  });
+
   const importTimekeeping = useMutation({
     mutationFn: () => api<{ imported: number }>(`/payroll/runs/${id}/import-timekeeping`, { method: 'POST' }),
     onSuccess: (data) => {
@@ -413,6 +418,21 @@ export default function RunDetailPage() {
           </div>
         }
       />
+
+      {companySettingsQuery.data && !companySettingsQuery.data.legalTablesConfirmedAt && (
+        <div className="flex items-start gap-2 rounded-lg border border-amber-500/50 bg-amber-500/10 p-3 text-xs text-amber-800 dark:text-amber-300">
+          <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
+          <div>
+            As tabelas legais em uso (INSS/IRRF/FGTS) ainda <strong>não foram conferidas pela contabilidade</strong> da
+            sua empresa — o cálculo usa o padrão nacional entregue pela plataforma. Antes do primeiro fechamento
+            oficial, valide-as em{' '}
+            <Link href="/servico-pessoal/folha/parametros" className="font-semibold underline">
+              Parâmetros de Folha
+            </Link>
+            .
+          </div>
+        </div>
+      )}
 
       {/* Operações & Passos (Checklist/Stepper) */}
       <Card className="border-border/60 bg-card/60">

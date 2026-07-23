@@ -11,11 +11,13 @@ import {
   centsToDecimalString,
   computeMonthlyWorker,
   decimalToCents,
+  dsrCalendarForMonth,
   roundDiv,
   centsLabel,
   computeVacationWorker,
   computeThirteenthWorker,
   computeTermination,
+  type DsrCalendar,
   type TimekeepingSummary,
   type WorkerCalcResult,
 } from './payroll-calc.logic';
@@ -38,6 +40,7 @@ const DEFAULT_RUBRIC_DEFS: Array<{ code: string; name: string; nature: string }>
   { code: '1101', name: 'Horas extras 50%', nature: 'PROVENTO' },
   { code: '1102', name: 'Horas extras 100%', nature: 'PROVENTO' },
   { code: '1103', name: 'Adicional noturno 20%', nature: 'PROVENTO' },
+  { code: '1104', name: 'DSR sobre variáveis', nature: 'PROVENTO' },
   { code: '5010', name: 'Faltas e ausências', nature: 'DESCONTO' },
   { code: '5020', name: 'Desconto de adiantamento', nature: 'DESCONTO' },
   { code: '5030', name: 'Desconto 1ª parcela de 13º', nature: 'DESCONTO' },
@@ -221,6 +224,8 @@ export class PayrollRunService {
       pensions,
       vacationRequests,
       thirteenth1stWorkers,
+      companySettings,
+      monthHolidays,
     ] = await Promise.all([
       this.legalTables.tablesFor(me.companyId, endKey),
       this.prisma.compensationSalarySnapshot.findMany({
@@ -268,7 +273,17 @@ export class PayrollRunService {
             select: { employeeId: true, netPay: true },
           })
         : Promise.resolve([]),
+      this.prisma.payrollCompanySettings.findUnique({ where: { companyId: me.companyId } }),
+      this.prisma.companyHoliday.findMany({
+        where: { companyId: me.companyId, dayKey: { startsWith: `${competence.year}-${String(competence.month).padStart(2, '0')}-` } },
+        select: { dayKey: true },
+      }),
     ]);
+    // DSR sobre variáveis: só quando a empresa ativou o parâmetro (contabilidade
+    // valida a regra da CCT antes de ligar). Feriados vêm do calendário do ponto.
+    const dsrCalendar: DsrCalendar | undefined = companySettings?.dsrOnVariables
+      ? dsrCalendarForMonth(competence.year, competence.month, monthHolidays.map((holiday) => holiday.dayKey))
+      : undefined;
     const salaryByEmployee = new Map<string, string>();
     for (const snapshot of salaries) {
       if (!salaryByEmployee.has(snapshot.employeeId)) salaryByEmployee.set(snapshot.employeeId, snapshot.currentSalary.toString());
@@ -494,6 +509,7 @@ export class PayrollRunService {
           timekeeping: events,
           tables,
           advancePaidCents,
+          dsr: dsrCalendar,
           benefits: employeeBenefits,
           loans: employeeLoans,
           pensions: employeePensions,
@@ -854,6 +870,56 @@ export class PayrollRunService {
       after: { sellDays, advanceThirteenth: !!body?.advanceThirteenth },
     });
     return updated;
+  }
+
+  // ============================== Parâmetros por empresa (SaaS) ==============================
+
+  /** Parâmetros da folha desta empresa (defaults quando nunca configurado). */
+  async getCompanySettings(me: AuthPayload) {
+    const settings = await this.prisma.payrollCompanySettings.findUnique({ where: { companyId: me.companyId } });
+    return {
+      dsrOnVariables: settings?.dsrOnVariables ?? false,
+      legalTablesConfirmedAt: settings?.legalTablesConfirmedAt ?? null,
+      legalTablesConfirmedById: settings?.legalTablesConfirmedById ?? null,
+      legalTablesConfirmNote: settings?.legalTablesConfirmNote ?? null,
+    };
+  }
+
+  /**
+   * Atualiza parâmetros por empresa: liga/desliga DSR sobre variáveis e registra
+   * a conferência das tabelas legais pela contabilidade (quem/quando/nota).
+   */
+  async updateCompanySettings(me: AuthPayload, body: any = {}) {
+    const data: Record<string, unknown> = { updatedById: me.sub };
+    const changes: string[] = [];
+    if (body?.dsrOnVariables !== undefined) {
+      data.dsrOnVariables = body.dsrOnVariables === true || body.dsrOnVariables === 'true';
+      changes.push(`DSR sobre variáveis ${data.dsrOnVariables ? 'ATIVADO' : 'desativado'}`);
+    }
+    if (body?.confirmLegalTables === true) {
+      data.legalTablesConfirmedAt = new Date();
+      data.legalTablesConfirmedById = me.sub;
+      data.legalTablesConfirmNote = String(body?.confirmNote ?? '').trim() || null;
+      changes.push('tabelas legais conferidas pela contabilidade');
+    }
+    if (!changes.length) throw new BadRequestException('Nenhum parâmetro informado para atualizar.');
+    const saved = await this.prisma.payrollCompanySettings.upsert({
+      where: { companyId: me.companyId },
+      create: { companyId: me.companyId, ...data },
+      update: data,
+    });
+    await this.audit.record(me, {
+      module: MODULE,
+      entity: 'PayrollCompanySettings',
+      entityId: saved.id,
+      action: 'UPDATE',
+      message: `Parâmetros da folha da empresa: ${changes.join('; ')}`,
+      after: {
+        dsrOnVariables: saved.dsrOnVariables,
+        legalTablesConfirmedAt: saved.legalTablesConfirmedAt,
+      },
+    });
+    return this.getCompanySettings(me);
   }
 
   // ============================== Rescisões (Fase 3) ==============================

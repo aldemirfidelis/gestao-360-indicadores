@@ -12596,6 +12596,26 @@ model PayrollWorkerSettings {
   @@map("payroll_worker_settings")
 }
 
+/// Parâmetros da folha POR EMPRESA (modelo SaaS): a plataforma entrega os
+/// padrões nacionais prontos e cada contabilidade confere/ativa os seus.
+model PayrollCompanySettings {
+  id                       String    @id @default(uuid())
+  companyId                String    @unique
+  /// DSR sobre variáveis (HE + adicional noturno). Desligado por padrão até a
+  /// contabilidade validar a regra aplicável (a fórmula pode variar por CCT).
+  dsrOnVariables           Boolean   @default(false)
+  /// Conferência das tabelas legais vigentes (INSS/IRRF/FGTS) pela
+  /// contabilidade desta empresa. Nulo = usando seed nacional sem conferência.
+  legalTablesConfirmedAt   DateTime?
+  legalTablesConfirmedById String?
+  legalTablesConfirmNote   String?
+  updatedById              String?
+  createdAt                DateTime  @default(now())
+  updatedAt                DateTime  @updatedAt
+
+  @@map("payroll_company_settings")
+}
+
 /// Fechamento de competência (YYYY-MM): trava batidas e ajustes no período.
 /// Central de certificados digitais da folha/eSocial. O PFX e a senha NAO ficam
 /// no banco: apenas referencias externas (cofre/env/secret manager) sao

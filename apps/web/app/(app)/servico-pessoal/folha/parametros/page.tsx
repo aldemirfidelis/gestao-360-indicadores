@@ -55,6 +55,13 @@ interface Rubric {
   }>;
 }
 
+interface CompanySettings {
+  dsrOnVariables: boolean;
+  legalTablesConfirmedAt: string | null;
+  legalTablesConfirmedById: string | null;
+  legalTablesConfirmNote: string | null;
+}
+
 export default function ParametersPage() {
   const qc = useQueryClient();
   const [activeTab, setActiveTab] = useState('legal');
@@ -67,9 +74,26 @@ export default function ParametersPage() {
     dataJson: '{\n  "valueCents": 151800\n}',
   });
 
+  const [confirmNote, setConfirmNote] = useState('');
+
   const legalQuery = useQuery<LegalVersion[]>({
     queryKey: ['payroll-legal-tables'],
     queryFn: () => api<LegalVersion[]>('/payroll/legal-tables'),
+  });
+
+  const settingsQuery = useQuery<CompanySettings>({
+    queryKey: ['payroll-company-settings'],
+    queryFn: () => api<CompanySettings>('/payroll/company-settings'),
+  });
+
+  const updateSettings = useMutation({
+    mutationFn: (json: any) => api<CompanySettings>('/payroll/company-settings', { method: 'PATCH', json }),
+    onSuccess: () => {
+      toast.success('Parâmetros da empresa atualizados.');
+      setConfirmNote('');
+      void qc.invalidateQueries({ queryKey: ['payroll-company-settings'] });
+    },
+    onError: (err: any) => toast.error(err.message || 'Erro ao atualizar parâmetros da empresa.'),
   });
 
   const rubricsQuery = useQuery<Rubric[]>({
@@ -137,6 +161,80 @@ export default function ParametersPage() {
           </div>
         }
       />
+
+      {/* Parâmetros por empresa (SaaS): conferência da contabilidade + DSR */}
+      <div className="grid gap-4 lg:grid-cols-2">
+        <Card className={settingsQuery.data?.legalTablesConfirmedAt ? 'border-emerald-500/40 bg-emerald-500/5' : 'border-amber-500/50 bg-amber-500/5'}>
+          <CardHeader className="pb-2">
+            <CardTitle className="flex items-center gap-2 text-sm">
+              <Scale className="h-4 w-4" />
+              Conferência da Contabilidade
+              {settingsQuery.data?.legalTablesConfirmedAt ? (
+                <Badge className="bg-emerald-600 text-white text-[9px] uppercase">Conferido</Badge>
+              ) : (
+                <Badge variant="outline" className="border-amber-500 text-amber-600 dark:text-amber-400 text-[9px] uppercase">Pendente</Badge>
+              )}
+            </CardTitle>
+            <CardDescription className="text-xs">
+              A plataforma entrega as tabelas legais nacionais (INSS/IRRF/FGTS) prontas. Antes do primeiro fechamento
+              oficial, a contabilidade da sua empresa deve conferi-las (e criar overrides se necessário).
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-2 text-xs">
+            {settingsQuery.data?.legalTablesConfirmedAt ? (
+              <div className="text-emerald-700 dark:text-emerald-400">
+                Conferidas em {new Date(settingsQuery.data.legalTablesConfirmedAt).toLocaleDateString('pt-BR')}
+                {settingsQuery.data.legalTablesConfirmNote ? ` — “${settingsQuery.data.legalTablesConfirmNote}”` : ''}
+                <div className="mt-2">
+                  <Button size="sm" variant="outline" className="h-7 text-[11px]" disabled={updateSettings.isPending} onClick={() => updateSettings.mutate({ confirmLegalTables: true, confirmNote: 'Reconferência após atualização de tabelas' })}>
+                    Registrar nova conferência
+                  </Button>
+                </div>
+              </div>
+            ) : (
+              <div className="space-y-2">
+                <Input
+                  className="h-8 text-xs"
+                  value={confirmNote}
+                  onChange={(e) => setConfirmNote(e.target.value)}
+                  placeholder="Nota da conferência (ex.: conferido pela Contabilidade XYZ) — opcional"
+                />
+                <Button size="sm" className="h-8" disabled={updateSettings.isPending} onClick={() => updateSettings.mutate({ confirmLegalTables: true, confirmNote })}>
+                  Marcar tabelas como conferidas
+                </Button>
+              </div>
+            )}
+          </CardContent>
+        </Card>
+
+        <Card className="border-border/60">
+          <CardHeader className="pb-2">
+            <CardTitle className="flex items-center gap-2 text-sm">
+              <CalendarDays className="h-4 w-4" />
+              DSR sobre variáveis (HE e adicional noturno)
+              <Badge variant={settingsQuery.data?.dsrOnVariables ? 'default' : 'outline'} className="text-[9px] uppercase">
+                {settingsQuery.data?.dsrOnVariables ? 'Ativado' : 'Desativado'}
+              </Badge>
+            </CardTitle>
+            <CardDescription className="text-xs">
+              Reflexo do repouso semanal remunerado sobre horas extras e adicional noturno (Lei 605/49): variáveis ÷
+              dias úteis × domingos/feriados do mês (feriados vêm do calendário do Controle de Ponto). A regra pode
+              variar por CCT — ative somente após validação da contabilidade.
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <Button
+              size="sm"
+              variant={settingsQuery.data?.dsrOnVariables ? 'outline' : 'default'}
+              className="h-8"
+              disabled={updateSettings.isPending || settingsQuery.isLoading}
+              onClick={() => updateSettings.mutate({ dsrOnVariables: !settingsQuery.data?.dsrOnVariables })}
+            >
+              {settingsQuery.data?.dsrOnVariables ? 'Desativar DSR sobre variáveis' : 'Ativar DSR sobre variáveis'}
+            </Button>
+          </CardContent>
+        </Card>
+      </div>
 
       <Tabs defaultValue="legal" onValueChange={setActiveTab} className="space-y-4">
         <TabsList className="bg-muted/40 p-1 border border-border/60">

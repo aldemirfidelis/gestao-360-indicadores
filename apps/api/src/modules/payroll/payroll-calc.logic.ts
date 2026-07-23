@@ -178,6 +178,34 @@ export function computeBenefitCharge(benefit: BenefitChargeInput, salaryCents: n
   return { chargeCents, capCents, deductionCents };
 }
 
+/**
+ * Calendário do DSR na competência. Convenção padrão (Lei 605/49): dias de
+ * repouso = domingos + feriados; dias úteis = demais dias (sábado conta como
+ * útil, salvo CCT). Ative por empresa somente após validação da contabilidade.
+ */
+export interface DsrCalendar {
+  workingDays: number;
+  restDays: number;
+}
+
+/** Deriva o calendário do DSR de um mês a partir dos feriados da empresa (dayKey YYYY-MM-DD). */
+export function dsrCalendarForMonth(year: number, month: number, holidayDayKeys: string[]): DsrCalendar {
+  const daysInMonth = new Date(Date.UTC(year, month, 0)).getUTCDate();
+  const prefix = `${year}-${String(month).padStart(2, '0')}-`;
+  const holidays = new Set(holidayDayKeys.filter((dayKey) => dayKey.startsWith(prefix)));
+  let sundays = 0;
+  let holidaysOnWorkdays = 0;
+  for (let day = 1; day <= daysInMonth; day++) {
+    const date = new Date(Date.UTC(year, month - 1, day));
+    const isSunday = date.getUTCDay() === 0;
+    const dayKey = `${prefix}${String(day).padStart(2, '0')}`;
+    if (isSunday) sundays += 1;
+    else if (holidays.has(dayKey)) holidaysOnWorkdays += 1; // feriado em domingo não conta duas vezes
+  }
+  const restDays = sundays + holidaysOnWorkdays;
+  return { workingDays: daysInMonth - restDays, restDays };
+}
+
 export interface WorkerCalcInput {
   salaryCents: number;
   monthlyHours: number;
@@ -186,6 +214,8 @@ export interface WorkerCalcInput {
   timekeeping: TimekeepingSummary;
   tables: LegalTables;
   advancePaidCents?: number;
+  /** Presente somente quando a empresa ativou DSR sobre variáveis nos parâmetros. */
+  dsr?: DsrCalendar;
   benefits?: Array<BenefitChargeInput>;
   loans?: Array<{ bankName: string; contractId: string; amountCents: number }>;
   pensions?: Array<{ dependentId: string; percentage: number; baseType: string }>;
@@ -228,7 +258,7 @@ function hoursRef(minutes: number): string {
  * variáveis e médias ficam para F2/F3 (exigem validação jurídica por CCT).
  */
 export function computeMonthlyWorker(input: WorkerCalcInput): WorkerCalcResult {
-  const { salaryCents, monthlyHours, contractType, irDependents, timekeeping, tables, advancePaidCents, benefits, loans, pensions } = input;
+  const { salaryCents, monthlyHours, contractType, irDependents, timekeeping, tables, advancePaidCents, dsr, benefits, loans, pensions } = input;
   const memory: MemoryStep[] = [];
   const items: WorkerCalcItem[] = [];
 
@@ -276,6 +306,29 @@ export function computeMonthlyWorker(input: WorkerCalcInput): WorkerCalcResult {
       inputs: { minutos: timekeeping.nightMinutes, hora: centsLabel(hourly) },
       resultCents: night,
     });
+  }
+
+  // 1104 — DSR sobre variáveis (HE + adicional noturno), Lei 605/49: só quando a
+  // empresa ativa o parâmetro (a contabilidade valida a regra da CCT antes).
+  if (dsr && dsr.workingDays > 0 && dsr.restDays > 0) {
+    const variableCents = he50 + he100 + night;
+    if (variableCents > 0) {
+      const dsrCents = roundDiv(variableCents * dsr.restDays, dsr.workingDays);
+      items.push({
+        rubricCode: '1104',
+        rubricName: 'DSR sobre variáveis',
+        nature: 'PROVENTO',
+        reference: `${dsr.restDays} repouso / ${dsr.workingDays} úteis`,
+        amountCents: dsrCents,
+        origin: 'MOTOR',
+      });
+      memory.push({
+        step: 'DSR sobre variáveis',
+        formula: 'variáveis do mês (HE + noturno) ÷ dias úteis × dias de repouso (half-up)',
+        inputs: { variaveis: centsLabel(variableCents), diasUteis: dsr.workingDays, diasRepouso: dsr.restDays },
+        resultCents: dsrCents,
+      });
+    }
   }
 
   // 5010 — Faltas/ausências não justificadas (em horas; DSR perdido fica p/ F2)
