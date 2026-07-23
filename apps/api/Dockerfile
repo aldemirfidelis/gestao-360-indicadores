@@ -33,9 +33,18 @@ COPY packages/shared/package.json ./packages/shared/
 COPY apps/api/package.json ./apps/api/
 COPY apps/web/package.json ./apps/web/
 
-# Install completo (precisa de devDeps para nest build / prisma generate / tsc)
+# Install SO do que a API precisa: ela + @g360/shared, com devDeps (nest build,
+# prisma generate, tsc). O manifesto do web continua sendo copiado acima porque
+# o --frozen-lockfile valida o workspace inteiro contra o lockfile.
+# SEM o filtro, o pnpm instalava tambem as dependencias do apps/web e elas iam
+# parar dentro da imagem da API (medido em 2026-07-23): next + 2 binarios swc
+# = 427 MB, alem de pdfjs-dist, three, lucide-react, jspdf e canvas — ~590 MB
+# de biblioteca de frontend que o backend nunca carrega.
+# Seguro: nao ha .npmrc de hoisting, entao o pnpm usa layout ESTRITO e a API so
+# resolve o que declara no proprio package.json — remover o resto do store nao
+# cria dependencia fantasma.
 RUN --mount=type=cache,id=pnpm-store,target=/pnpm/store \
-    pnpm install --frozen-lockfile
+    pnpm install --frozen-lockfile --filter @g360/api... --filter @g360/shared...
 
 # Copia codigo
 COPY packages/shared ./packages/shared
@@ -70,26 +79,32 @@ ENV NODE_ENV=production \
     PORT=3333 \
     API_PREFIX=api
 
-# Copia node_modules, shared/dist e api/dist
-COPY --from=build /app/node_modules ./node_modules
-COPY --from=build /app/pnpm-workspace.yaml /app/package.json ./
-COPY --from=build /app/packages/shared/package.json ./packages/shared/
-COPY --from=build /app/packages/shared/node_modules ./packages/shared/node_modules
-COPY --from=build /app/packages/shared/dist ./packages/shared/dist
-COPY --from=build /app/apps/api/node_modules ./apps/api/node_modules
-COPY --from=build /app/apps/api/package.json ./apps/api/
-COPY --from=build /app/apps/api/dist ./apps/api/dist
-COPY --from=build /app/apps/api/prisma ./apps/api/prisma
+# Copia node_modules, shared/dist e api/dist ja com o dono correto.
+# ATENCAO: usar `RUN chown -R node:node /app` depois das copias reescreve TODOS
+# os arquivos e faz o Docker gravar uma SEGUNDA copia integral do node_modules
+# numa camada nova — medido em 2026-07-23: 1,73 GB de pura duplicacao numa
+# imagem de 4,51 GB. Com --chown no proprio COPY os arquivos ja nascem do
+# usuario 'node' e essa camada deixa de existir.
+COPY --from=build --chown=node:node /app/node_modules ./node_modules
+COPY --from=build --chown=node:node /app/pnpm-workspace.yaml /app/package.json ./
+COPY --from=build --chown=node:node /app/packages/shared/package.json ./packages/shared/
+COPY --from=build --chown=node:node /app/packages/shared/node_modules ./packages/shared/node_modules
+COPY --from=build --chown=node:node /app/packages/shared/dist ./packages/shared/dist
+COPY --from=build --chown=node:node /app/apps/api/node_modules ./apps/api/node_modules
+COPY --from=build --chown=node:node /app/apps/api/package.json ./apps/api/
+COPY --from=build --chown=node:node /app/apps/api/dist ./apps/api/dist
+COPY --from=build --chown=node:node /app/apps/api/prisma ./apps/api/prisma
 
 WORKDIR /app/apps/api
 
 # Seguranca: roda como usuario nao-root (o usuario 'node' ja existe na imagem
 # oficial node). Evita que um RCE no processo tenha privilegios de root no
-# container. Garante leitura do app pelo usuario node.
-# storage/: arquivos binarios controlados (DOCX/PDF do GED). Criado como node
-# para que o volume nomeado (docker-compose) inicialize com permissao de escrita.
+# container.
+# storage/: arquivos binarios controlados (DOCX/PDF do GED). Precisa pertencer
+# ao 'node' para que o volume nomeado (docker-compose) inicialize com permissao
+# de escrita. O chown aqui cobre SO esse diretorio (poucos KB), nao o /app todo.
 RUN mkdir -p /app/apps/api/storage/documents \
-    && chown -R node:node /app
+    && chown -R node:node /app/apps/api/storage
 USER node
 
 # DigitalOcean injeta PORT automaticamente; default 3333

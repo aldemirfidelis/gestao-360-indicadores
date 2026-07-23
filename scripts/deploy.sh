@@ -46,6 +46,18 @@ echo "[1.5/5] Liberando memoria: parando app (web+api) e Collabora durante o bui
 # indisponibilidade, porem com build confiavel. Collabora volta no 'up'.
 docker compose -f "$COMPOSE_FILE" stop web api collabora 2>/dev/null || true
 
+# Rede de seguranca: a partir daqui o portal esta fora do ar (containers parados
+# acima). Se o build falhar, o 'set -e' abortaria o script e o portal ficaria
+# fora ate alguem intervir manualmente. O trap sobe de volta a versao anterior
+# (as imagens antigas seguem no disco com a tag :latest) antes de abortar.
+restore_on_failure() {
+  echo ""
+  echo "!! FALHA no build/deploy - restaurando os containers da versao anterior..."
+  docker compose -f "$COMPOSE_FILE" up -d || true
+  echo "!! Containers restaurados na versao anterior. Deploy abortado."
+}
+trap restore_on_failure ERR
+
 echo "[2/5] Build das imagens Docker (sequencial para poupar memoria)..."
 docker compose -f "$COMPOSE_FILE" build --pull api
 docker compose -f "$COMPOSE_FILE" build --pull web
@@ -53,6 +65,9 @@ docker compose -f "$COMPOSE_FILE" build --pull web
 echo ""
 echo "[3/5] Subindo containers (zero downtime quando possivel)..."
 docker compose -f "$COMPOSE_FILE" up -d --remove-orphans
+
+# Containers no ar: a partir daqui uma falha nao exige restaurar nada.
+trap - ERR
 
 echo ""
 echo "[4/5] Aplicando migrations do banco..."
