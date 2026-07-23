@@ -1,4 +1,5 @@
-import { BadRequestException, ConflictException, Injectable, NotFoundException } from '@nestjs/common';
+import { BadRequestException, ConflictException, Injectable, Logger, NotFoundException } from '@nestjs/common';
+import { readFileSync } from 'fs';
 import { Prisma } from '@prisma/client';
 import { PrismaService } from '../../prisma/prisma.service';
 import { AuditWriterService } from '../../common/audit/audit-writer.service';
@@ -48,6 +49,8 @@ interface CertificateLike {
 
 @Injectable()
 export class PayrollEsocialService {
+  private readonly logger = new Logger(PayrollEsocialService.name);
+
   constructor(
     private readonly prisma: PrismaService,
     private readonly audit: AuditWriterService,
@@ -1260,12 +1263,33 @@ export class PayrollEsocialService {
     return { transmitted: status === 'SENT', status, protocol, environment };
   }
 
+  /**
+   * Cadeia de certificação do SERVIDOR do eSocial (lado deles). O certificado
+   * do webservice e emitido por AC do SERPRO, que NAO esta no bundle padrao do
+   * Node (Mozilla) — sem isso o handshake falha com UNABLE_TO_VERIFY_LEAF_
+   * SIGNATURE mesmo com o nosso certificado cliente correto. A cadeia oficial
+   * fica em https://certificados.serpro.gov.br/serproacf/certificate-chain e o
+   * operador aponta o arquivo PEM em PAYROLL_ESOCIAL_CA_BUNDLE.
+   * Sem a variavel, mantem o comportamento atual (bundle padrao do Node).
+   */
+  private resolveCaBundle(): Buffer | undefined {
+    const path = process.env.PAYROLL_ESOCIAL_CA_BUNDLE?.trim();
+    if (!path) return undefined;
+    try {
+      return readFileSync(path);
+    } catch (error) {
+      this.logger.warn(`PAYROLL_ESOCIAL_CA_BUNDLE ilegivel (${path}): ${(error as Error).message}. Usando o bundle padrao.`);
+      return undefined;
+    }
+  }
+
   /** POST SOAP com TLS mútuo usando o PFX (A1) como certificado cliente. */
   private postSoap(endpoint: string, soapXml: string, pfxBase64: string, password: string): Promise<string> {
     return new Promise((resolve, reject) => {
       let url: URL;
       try { url = new URL(endpoint); } catch { reject(new Error('Endpoint invalido.')); return; }
       const payload = Buffer.from(soapXml, 'utf8');
+      const ca = this.resolveCaBundle();
       const request = https.request(
         {
           method: 'POST',
@@ -1274,6 +1298,10 @@ export class PayrollEsocialService {
           path: url.pathname + url.search,
           pfx: Buffer.from(pfxBase64, 'base64'),
           passphrase: password,
+          ...(ca ? { ca } : {}),
+          // ICP-Brasil V10/Sectigo (producao desde jun/2026) exige cadeia com
+          // SHA-384; TLS 1.2 e o minimo aceito pelo eSocial.
+          minVersion: 'TLSv1.2',
           headers: {
             'Content-Type': 'application/soap+xml; charset=utf-8',
             'Content-Length': payload.length,
