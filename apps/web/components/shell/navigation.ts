@@ -17,6 +17,7 @@ import {
   FileSpreadsheet,
   FileText,
   FileWarning,
+  Fingerprint,
   GanttChartSquare,
   Gauge,
   Goal,
@@ -141,6 +142,16 @@ export const navSections: NavSection[] = [
     flat: true,
     items: [
       { href: '/tarefas', label: 'Tarefas', description: 'Tarefas do usuário, incluindo documentos liberados para edição', icon: ClipboardCheck, permissions: [], exact: true },
+    ],
+  },
+  {
+    heading: 'Totem',
+    description: 'Terminal de reconhecimento facial para instalar em um totem físico',
+    intent: 'view',
+    icon: Fingerprint,
+    flat: true,
+    items: [
+      { href: '/totem', label: 'Totem', description: 'Tela de reconhecimento facial do ponto', icon: Fingerprint, permissions: ['ponto:kiosk'], exact: true },
     ],
   },
   {

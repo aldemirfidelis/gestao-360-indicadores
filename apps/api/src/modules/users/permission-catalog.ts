@@ -235,6 +235,7 @@ export const PERMISSION_CATALOG = [
   ['ponto:clock', 'Registrar ponto (batida)', 'Servico Pessoal', 'create'],
   ['ponto:team', 'Visualizar espelho de ponto da equipe', 'Servico Pessoal', 'view'],
   ['ponto:manage', 'Gerenciar ponto (ajustes, escalas e fechamento)', 'Servico Pessoal', 'manage'],
+  ['ponto:kiosk', 'Acessar exclusivamente o terminal de totem (ponto facial)', 'Servico Pessoal', 'view'],
 
   // Servico Pessoal — Folha de Pagamento (segregacao de funcoes)
   ['folha:view', 'Visualizar competencias e resumos da folha', 'Folha de Pagamento', 'view'],
@@ -777,5 +778,15 @@ export const DEFAULT_PROFILES = [
       'directory:view',
       'help:view',
     ],
+  },
+  {
+    // Login exclusivo para instalar em um totem físico compartilhado. Não bate
+    // o próprio ponto nem vê nenhum outro módulo — só abre a tela de
+    // reconhecimento facial (ver rota /totem no frontend).
+    code: 'TOTEM',
+    name: 'Totem (Terminal Facial)',
+    role: 'VIEWER',
+    description: 'Acesso restrito só à tela de instalação do terminal de reconhecimento facial do ponto.',
+    permissions: ['ponto:kiosk'],
   },
 ] as const;

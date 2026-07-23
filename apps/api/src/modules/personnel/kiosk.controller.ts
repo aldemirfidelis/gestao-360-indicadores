@@ -1,4 +1,4 @@
-import { Body, Controller, Get, Param, Patch, Post, Req } from '@nestjs/common';
+import { Body, Controller, Delete, Get, Param, Patch, Post, Req } from '@nestjs/common';
 import { Request } from 'express';
 import { Throttle } from '@nestjs/throttler';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
@@ -51,6 +51,12 @@ export class KioskController {
   @RequirePermissions('ponto:manage')
   rotateDeviceToken(@CurrentUser() me: AuthPayload, @Param('id') id: string, @Body() body: any) {
     return this.service.rotateDeviceToken(me, id, body);
+  }
+
+  @Delete('devices/:id')
+  @RequirePermissions('ponto:manage')
+  deleteDevice(@CurrentUser() me: AuthPayload, @Param('id') id: string) {
+    return this.service.deleteDevice(me, id);
   }
 }
 

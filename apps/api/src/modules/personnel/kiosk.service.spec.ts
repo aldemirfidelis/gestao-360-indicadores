@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { ForbiddenException, ServiceUnavailableException } from '@nestjs/common';
+import { ForbiddenException, PreconditionFailedException } from '@nestjs/common';
 import { KioskService } from './kiosk.service';
 
 describe('KioskService security boundary', () => {
@@ -40,7 +40,7 @@ describe('KioskService security boundary', () => {
 
   it('mantém o piloto bloqueado por padrão', async () => {
     process.env.PERSONNEL_KIOSK_ENABLED = 'false';
-    await expect(service.challenge('x'.repeat(43))).rejects.toBeInstanceOf(ServiceUnavailableException);
+    await expect(service.challenge('x'.repeat(43))).rejects.toBeInstanceOf(PreconditionFailedException);
     expect(prisma.personnelKioskDevice.findUnique).not.toHaveBeenCalled();
   });
 

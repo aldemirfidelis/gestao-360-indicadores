@@ -101,6 +101,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       router.replace('/selecionar-empresa');
       return;
     }
+    // Login exclusivo do totem: vai direto para a tela de reconhecimento facial.
+    if (profile?.accessProfile?.code === 'TOTEM') {
+      router.replace('/totem');
+      return;
+    }
     // Pagina inicial padrao = Meu Dia, respeitando a preferencia do usuario.
     let landing = '/meu-dia';
     try {

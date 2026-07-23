@@ -1,9 +1,9 @@
 import {
   BadRequestException,
-  ConflictException,
   ForbiddenException,
   Injectable,
   NotFoundException,
+  PreconditionFailedException,
   ServiceUnavailableException,
 } from '@nestjs/common';
 import { createHash, randomBytes } from 'crypto';
@@ -97,6 +97,18 @@ export class KioskService {
       message: `Totem "${device.name}" ${active ? 'ativado' : 'desativado'}`,
     });
     return updated;
+  }
+
+  async deleteDevice(me: AuthPayload, id: string) {
+    const device = await this.deviceForCompany(me.companyId, id);
+    await this.prisma.personnelKioskDevice.delete({ where: { id } });
+    await this.audit.record(me, {
+      module: MODULE,
+      entity: 'PersonnelKioskDevice',
+      entityId: id,
+      action: 'DELETE',
+      message: `Totem de ponto "${device.name}" excluído`,
+    });
   }
 
   async rotateDeviceToken(me: AuthPayload, id: string, body: any = {}) {
@@ -325,7 +337,10 @@ export class KioskService {
 
   private assertEnabled() {
     if (process.env.PERSONNEL_KIOSK_ENABLED !== 'true') {
-      throw new ServiceUnavailableException('Totem facial indisponível: piloto não habilitado pelo administrador do ambiente.');
+      // 412 (não 5xx): o filtro global mascara mensagens de erro >=500 em produção
+      // para não vazar detalhes de falhas reais. Esta é uma configuração esperada
+      // e precisa continuar visível no totem/log do frontend.
+      throw new PreconditionFailedException('Totem facial indisponível: piloto não habilitado pelo administrador do ambiente.');
     }
   }
 

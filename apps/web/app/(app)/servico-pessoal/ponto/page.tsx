@@ -797,6 +797,15 @@ export default function TimeClockPage() {
     onError: (e: any) => toast.error(e?.message ?? 'Não foi possível atualizar o totem'),
   });
 
+  const deleteKiosk = useMutation({
+    mutationFn: (id: string) => api(`/personnel/kiosk/devices/${id}`, { method: 'DELETE' }),
+    onSuccess: () => {
+      toast.success('Totem excluído');
+      void qc.invalidateQueries({ queryKey: ['time-clock', 'kiosk-devices'] });
+    },
+    onError: (e: any) => toast.error(e?.message ?? 'Não foi possível excluir o totem'),
+  });
+
   const openAdjustDialog = (day: MirrorDay) => {
     const times = day.entries.map((entry) => formatTime(entry.punchedAt));
     setAdjustDialog({
@@ -1457,15 +1466,31 @@ export default function TimeClockPage() {
                               Cadastrado em {formatDate(device.createdAt)} · último contato {device.lastSeenAt ? formatDateTime(device.lastSeenAt) : 'ainda não realizado'}
                             </div>
                           </div>
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            className="h-7 text-[10px]"
-                            disabled={toggleKiosk.isPending}
-                            onClick={() => toggleKiosk.mutate({ id: device.id, active: !device.active })}
-                          >
-                            {device.active ? 'Desativar' : 'Ativar'}
-                          </Button>
+                          <div className="flex shrink-0 items-center gap-1.5">
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              className="h-7 text-[10px]"
+                              disabled={toggleKiosk.isPending}
+                              onClick={() => toggleKiosk.mutate({ id: device.id, active: !device.active })}
+                            >
+                              {device.active ? 'Desativar' : 'Ativar'}
+                            </Button>
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              className="h-7 w-7 text-status-red"
+                              title="Excluir totem"
+                              disabled={deleteKiosk.isPending}
+                              onClick={() => {
+                                if (window.confirm(`Excluir o totem "${device.name}"? O token deixa de funcionar imediatamente e a ação não pode ser desfeita.`)) {
+                                  deleteKiosk.mutate(device.id);
+                                }
+                              }}
+                            >
+                              <Trash2 className="h-3.5 w-3.5" />
+                            </Button>
+                          </div>
                         </div>
                       ))}
                     </div>

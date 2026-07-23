@@ -11,9 +11,6 @@ import {
   LockKeyhole,
   MapPin,
   RefreshCw,
-  ShieldAlert,
-  Trash2,
-  UserRoundCheck,
   UsersRound,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -176,20 +173,6 @@ export function KioskClock() {
     setPhase('READY');
   };
 
-  const removeProvisioning = () => {
-    if (!window.confirm('Remover o token deste aparelho? O terminal deixará de registrar pontos até ser provisionado novamente.')) return;
-    clearResetTimer();
-    cancelledRef.current = true;
-    stopCamera();
-    removeStoredToken();
-    setDeviceToken('');
-    setProvisioningToken('');
-    setError('');
-    setResult(null);
-    setInstruction('Provisionamento necessário');
-    setPhase('SETUP');
-  };
-
   const fail = useCallback(
     (message: string, reset = true) => {
       stopCamera();
@@ -329,20 +312,6 @@ export function KioskClock() {
               <p className="truncate text-[11px] text-slate-400 sm:text-xs">Terminal compartilhado de registro facial</p>
             </div>
           </div>
-          {deviceToken && (
-            <Button
-              type="button"
-              variant="ghost"
-              size="sm"
-              className="shrink-0 text-slate-400 hover:bg-white/10 hover:text-white"
-              onClick={removeProvisioning}
-              disabled={busy}
-            >
-              <Trash2 className="mr-1.5 h-4 w-4" />
-              <span className="hidden sm:inline">Remover terminal</span>
-              <span className="sm:hidden">Remover</span>
-            </Button>
-          )}
         </header>
 
         <div className="grid min-h-0 flex-1 gap-4 lg:grid-cols-[minmax(0,1.35fr)_minmax(340px,.65fr)] lg:gap-6">
@@ -457,14 +426,6 @@ export function KioskClock() {
 
               {phase !== 'INITIALIZING' && phase !== 'SETUP' && (
                 <div className="space-y-5">
-                  <div className="flex items-start gap-3">
-                    <div className="rounded-xl bg-cyan-400/10 p-2.5 text-cyan-300"><UserRoundCheck className="h-7 w-7" /></div>
-                    <div>
-                      <h1 className="text-xl font-black sm:text-2xl">Registrar meu ponto</h1>
-                      <p className="mt-1 text-sm leading-6 text-slate-400">Fique sozinho diante da câmera, toque no botão e mantenha o rosto centralizado.</p>
-                    </div>
-                  </div>
-
                   {phase === 'ERROR' && error && <ErrorBox message={error} />}
 
                   {!busy && phase !== 'SUCCESS' && (
@@ -492,24 +453,6 @@ export function KioskClock() {
                   )}
                 </div>
               )}
-            </section>
-
-            <section className="rounded-[1.5rem] border border-amber-300/20 bg-amber-300/[0.07] p-4 text-sm text-amber-50 sm:p-5">
-              <div className="flex items-start gap-3">
-                <ShieldAlert className="mt-0.5 h-5 w-5 shrink-0 text-amber-300" />
-                <div>
-                  <p className="font-black">Piloto sem prova de vida certificada</p>
-                  <p className="mt-1.5 text-xs leading-5 text-amber-100/70">Este piloto exige uma única face e usa desafio de uso único, mas ainda não possui tecnologia certificada contra apresentação por foto, tela ou vídeo.</p>
-                </div>
-              </div>
-            </section>
-
-            <section className="rounded-[1.5rem] border border-white/10 bg-white/[0.035] p-4 sm:p-5">
-              <p className="text-sm font-bold">Não conseguiu usar o reconhecimento?</p>
-              <p className="mt-1 text-xs leading-5 text-slate-400">Nenhuma marcação fica em fila offline. Em caso de falha de câmera, localização ou internet, use o registro convencional.</p>
-              <Button asChild variant="link" className="mt-2 h-auto p-0 font-bold text-cyan-300 hover:text-cyan-200">
-                <a href="/login">Usar registro convencional</a>
-              </Button>
             </section>
           </aside>
         </div>

@@ -923,6 +923,7 @@ export const authPublicRoutes = [...publicRoutes, ...operationalPublicRoutes, ..
 export const privateRoutePrefixes = [
   '/login',
   '/platform-admin',
+  '/totem',
   ...operationalPublicRoutes,
   ...careersPublicRoutes,
   '/dashboard',
