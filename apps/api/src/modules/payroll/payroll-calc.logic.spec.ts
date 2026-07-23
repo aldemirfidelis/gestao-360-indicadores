@@ -265,6 +265,62 @@ describe('payroll-calc.logic — descontos da folha (Benefícios, Consignados e 
   });
 });
 
+describe('payroll-calc.logic — margem consignável (35% da remuneração disponível)', () => {
+  // Salário 3.000,00: INSS = 253,41 (teste-ouro acima). IRRF pelo desconto
+  // simplificado: base 3.000 − 607,20 = 2.392,80 → abaixo da faixa de isenção
+  // (2.428,80) → IRRF = 0. Disponível = 3.000 − 253,41 = 2.746,59.
+  // Margem 35% = 961,3065 → 961,31 (96131 centavos).
+  const base = {
+    salaryCents: 300000,
+    monthlyHours: 220,
+    contractType: 'CLT',
+    irDependents: 0,
+    timekeeping: { normalMinutes: 11880, he50Minutes: 0, he100Minutes: 0, nightMinutes: 0, absentMinutes: 0, workedDays: 22, absentDays: 0 },
+    tables: TABLES,
+  };
+
+  it('parcela dentro da margem e descontada integralmente e sem pendencia', () => {
+    const result = computeMonthlyWorker({
+      ...base,
+      loans: [{ bankName: 'Banco A', contractId: 'C-1', amountCents: 50000 }],
+    });
+    const loan = result.items.find((i) => i.rubricCode === '5050');
+    expect(loan?.amountCents).toBe(50000);
+    expect(result.issues).toBeUndefined();
+    const margin = result.memory.find((m) => m.step === 'Margem consignável');
+    expect(margin?.resultCents).toBe(96131); // 35% de 2.746,59
+  });
+
+  it('parcela acima da margem e limitada ao teto e gera pendencia', () => {
+    const result = computeMonthlyWorker({
+      ...base,
+      loans: [{ bankName: 'Banco B', contractId: 'C-2', amountCents: 150000 }],
+    });
+    const loan = result.items.find((i) => i.rubricCode === '5050');
+    expect(loan?.amountCents).toBe(96131); // cortado no teto
+    expect(loan?.reference).toContain('limitado pela margem');
+    expect(result.issues).toHaveLength(1);
+    expect(result.issues?.[0]).toContain('excede a margem consignável');
+  });
+
+  it('varios contratos consomem a margem em ordem; o que nao cabe nao vira rubrica zerada', () => {
+    const result = computeMonthlyWorker({
+      ...base,
+      loans: [
+        { bankName: 'Banco A', contractId: 'C-1', amountCents: 90000 },
+        { bankName: 'Banco B', contractId: 'C-2', amountCents: 40000 },
+      ],
+    });
+    const loans = result.items.filter((i) => i.rubricCode === '5050');
+    expect(loans).toHaveLength(2);
+    expect(loans[0].amountCents).toBe(90000);
+    expect(loans[1].amountCents).toBe(6131); // sobra da margem: 96.131 − 90.000
+    expect(result.issues).toHaveLength(1);
+    // total consignado nunca ultrapassa o teto
+    expect(loans.reduce((s, i) => s + i.amountCents, 0)).toBe(96131);
+  });
+});
+
 describe('payroll-calc.logic — DSR sobre variáveis (Lei 605/49, opt-in por empresa)', () => {
   it('dsrCalendarForMonth: julho/2026 tem 4 domingos; feriado em dia útil vira repouso', () => {
     // Julho/2026: 31 dias, domingos em 05/12/19/26.

@@ -515,6 +515,9 @@ export class PayrollRunService {
           pensions: employeePensions,
         });
       }
+      // Pendências vindas do próprio motor (ex.: parcela de consignado cortada
+      // pelo teto da margem) entram na conferência do lote como as demais.
+      if (calc.issues?.length) workerIssues.push(...calc.issues);
       results.push({ snapshot, calc, workerIssues, salaryCents });
       issues.push(...workerIssues);
     }

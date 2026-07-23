@@ -232,6 +232,8 @@ export interface WorkerCalcItem {
 
 export interface WorkerCalcResult {
   items: WorkerCalcItem[];
+  /** Pendências detectadas no cálculo (ex.: parcela cortada pela margem consignável). */
+  issues?: string[];
   totals: {
     earningsCents: number;
     deductionsCents: number;
@@ -472,22 +474,59 @@ export function computeMonthlyWorker(input: WorkerCalcInput): WorkerCalcResult {
     }
   }
 
-  // Empréstimos Consignados
+  // Empréstimos consignados com TETO DE MARGEM (Lei 10.820/2003, redação da Lei
+  // 15.179/2025 + Portaria MTE 435/2025): o desconto total não pode ultrapassar
+  // 35% da REMUNERAÇÃO DISPONÍVEL (bruto − INSS − IRRF). Controlar a margem é
+  // obrigação do EMPREGADOR: o eSocial valida só a existência do contrato e a
+  // identificação da instituição, nunca o valor descontado.
+  // Nota: a lei reparte os 35% em 30% (empréstimo) + 5% (cartão consignado). O
+  // cadastro atual não distingue as duas modalidades, então aplicamos o teto
+  // agregado de 35% e sinalizamos quando ele corta alguma parcela.
+  const marginIssues: string[] = [];
   if (loans && loans.length > 0) {
+    const availableCents = Math.max(0, grossTaxable - inss.valueCents - irrf.valueCents);
+    const marginCapCents = applyBp(availableCents, CONSIGNED_MARGIN_BP);
+    memory.push({
+      step: 'Margem consignável',
+      formula: 'remuneração disponível (bruto − INSS − IRRF) × 35%',
+      inputs: {
+        bruto: centsLabel(grossTaxable),
+        inss: centsLabel(inss.valueCents),
+        irrf: centsLabel(irrf.valueCents),
+        disponivel: centsLabel(availableCents),
+      },
+      resultCents: marginCapCents,
+    });
+
+    let consumedCents = 0;
     for (const l of loans) {
+      const remainingCents = Math.max(0, marginCapCents - consumedCents);
+      const chargedCents = Math.min(l.amountCents, remainingCents);
+      const cut = chargedCents < l.amountCents;
+      if (cut) {
+        marginIssues.push(
+          `Consignado ${l.bankName} (contrato ${l.contractId}): parcela de ${centsLabel(l.amountCents)} excede a margem consignável; ` +
+            `descontado ${centsLabel(chargedCents)}. Trate a diferença com a instituição financeira.`,
+        );
+      }
+      consumedCents += chargedCents;
+      // Parcela integralmente fora da margem não vira rubrica de R$ 0,00.
+      if (chargedCents <= 0) continue;
       items.push({
         rubricCode: '5050',
         rubricName: `Consignado ${l.bankName}`,
         nature: 'DESCONTO',
-        reference: `Contrato ${l.contractId}`,
-        amountCents: l.amountCents,
+        reference: cut ? `Contrato ${l.contractId} (limitado pela margem)` : `Contrato ${l.contractId}`,
+        amountCents: chargedCents,
         origin: 'MOTOR',
       });
       memory.push({
         step: `Consignado ${l.bankName}`,
-        formula: 'desconto de empréstimo consignado em folha',
-        inputs: { contrato: l.contractId },
-        resultCents: l.amountCents,
+        formula: cut
+          ? 'parcela limitada ao saldo da margem consignável (35% da remuneração disponível)'
+          : 'desconto de empréstimo consignado em folha',
+        inputs: { contrato: l.contractId, parcela: centsLabel(l.amountCents), margemRestante: centsLabel(remainingCents) },
+        resultCents: chargedCents,
       });
     }
   }
@@ -504,6 +543,7 @@ export function computeMonthlyWorker(input: WorkerCalcInput): WorkerCalcResult {
 
   return {
     items,
+    ...(marginIssues.length ? { issues: marginIssues } : {}),
     totals: {
       earningsCents: earnings,
       deductionsCents: deductions,
@@ -544,6 +584,14 @@ export function countAvos(start: Date, end: Date): number {
   }
   return Math.min(12, avos);
 }
+
+/**
+ * Teto legal da margem consignável do trabalhador CLT, em basis points.
+ * 35% da remuneração disponível (bruto − INSS − IRRF) — Lei 10.820/2003 com a
+ * redação da Lei 15.179/2025 e Portaria MTE 435/2025. Não confundir com os 40%
+ * dos beneficiários do INSS (MP 1.355/2026), que não se aplicam à folha CLT.
+ */
+export const CONSIGNED_MARGIN_BP = 3500;
 
 /** Anos completos entre duas datas (para o aviso-prévio da Lei 12.506). */
 export function completedYears(start: Date, end: Date): number {
