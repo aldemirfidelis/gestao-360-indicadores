@@ -325,9 +325,258 @@ const PREFIX_CATALOG: Array<{ prefix: string; seed: CatalogSeed }> = [
       impact: 'Impacta comunicacao interna, notificacoes e historico de conversas.',
     },
   },
+  // --- Módulos mais recentes (tabelas físicas em snake_case via @@map) ---
+  {
+    prefix: 'recruit_',
+    seed: {
+      module: 'Recrutamento e Selecao',
+      moduleKey: 'recruitment',
+      origin: 'Modulo Recrutamento e Selecao',
+      purpose: 'Sustenta requisicoes de vaga, vagas, candidatos, etapas, avaliacoes, propostas, pre-admissao e admissao.',
+      impact: 'Impacta o funil de contratacao, aprovacoes de vaga, portal de carreiras e a admissao integrada ao DP.',
+    },
+  },
+  {
+    prefix: 'payroll_',
+    seed: {
+      module: 'Folha de Pagamento',
+      moduleKey: 'payroll',
+      origin: 'Modulo Folha de Pagamento',
+      purpose: 'Guarda competencias, lotes, calculos, rubricas, tabelas legais, beneficios, rescisoes, eSocial, CNAB e contabilizacao.',
+      impact: 'Impacta pagamento dos colaboradores, holerites, encargos, obrigacoes legais e integracoes banco/governo.',
+    },
+  },
+  {
+    prefix: 'personnel_',
+    seed: {
+      module: 'Servico Pessoal',
+      moduleKey: 'personnel',
+      origin: 'Modulo Servico Pessoal (DP)',
+      purpose: 'Mantem prontuarios, perfis LGPD, biometria facial, totens de ponto, contadores e configuracoes do DP.',
+      impact: 'Impacta cadastro do colaborador, ponto facial, matricula, cracha e a vida funcional no portal.',
+    },
+  },
+  {
+    prefix: 'employee_',
+    seed: {
+      module: 'Servico Pessoal',
+      moduleKey: 'personnel',
+      origin: 'Modulo Servico Pessoal (DP)',
+      purpose: 'Guarda dependentes e dados vinculados ao colaborador.',
+      impact: 'Impacta IRRF (dependentes), beneficios, pensoes e o prontuario do colaborador.',
+    },
+  },
+  {
+    prefix: 'employment_',
+    seed: {
+      module: 'Servico Pessoal',
+      moduleKey: 'personnel',
+      origin: 'Modulo Servico Pessoal (DP)',
+      purpose: 'Registra a linha do tempo funcional (admissao, mudancas de cargo, transferencias, desligamento).',
+      impact: 'Impacta historico funcional, avos de rescisao e relatorios de DP.',
+    },
+  },
+  {
+    prefix: 'vacation_',
+    seed: {
+      module: 'Servico Pessoal',
+      moduleKey: 'personnel',
+      origin: 'Ferias e Afastamentos',
+      purpose: 'Controla periodos aquisitivos, solicitacoes e aprovacoes de ferias e afastamentos.',
+      impact: 'Impacta saldo de ferias, espelho de ponto, folha (ferias/abono) e alertas de dobra.',
+    },
+  },
+  {
+    prefix: 'timesheet_',
+    seed: {
+      module: 'Controle de Ponto',
+      moduleKey: 'time-clock',
+      origin: 'Modulo Controle de Ponto',
+      purpose: 'Guarda fechamentos de competencia do ponto e suas versoes imutaveis.',
+      impact: 'Impacta travamento de batidas/ajustes, banco de horas consolidado e a base da folha.',
+    },
+  },
+  {
+    prefix: 'time_',
+    seed: {
+      module: 'Controle de Ponto',
+      moduleKey: 'time-clock',
+      origin: 'Modulo Controle de Ponto',
+      purpose: 'Armazena batidas (com NSR e hash encadeado), ajustes aprovados e banco de horas.',
+      impact: 'Impacta espelho de ponto, jornada, horas extras, AFD/AEJ e o calculo da folha.',
+    },
+  },
+  {
+    prefix: 'work_',
+    seed: {
+      module: 'Controle de Ponto',
+      moduleKey: 'time-clock',
+      origin: 'Escalas de trabalho',
+      purpose: 'Define modelos de escala (semanal/ciclo) e vigencias de atribuicao por colaborador.',
+      impact: 'Impacta jornada prevista, tolerancias, DSR, faltas e o espelho de ponto.',
+    },
+  },
+  {
+    prefix: 'supply_',
+    seed: {
+      module: 'Suprimentos',
+      moduleKey: 'supplies',
+      origin: 'Modulo Suprimentos',
+      purpose: 'Sustenta itens, fornecedores, requisicoes, pedidos, cotacoes, recebimentos, estoque e kardex.',
+      impact: 'Impacta compras, alcadas, almoxarifado, custo medio e rastreabilidade de materiais.',
+    },
+  },
+  {
+    prefix: 'Quotation',
+    seed: {
+      module: 'Suprimentos',
+      moduleKey: 'supplies',
+      origin: 'Modulo Suprimentos',
+      purpose: 'Registra cotacoes de compra e seus itens.',
+      impact: 'Impacta selecao de fornecedores e formacao de preco dos pedidos.',
+    },
+  },
+  {
+    prefix: 'Supplier',
+    seed: {
+      module: 'Suprimentos',
+      moduleKey: 'supplies',
+      origin: 'Modulo Suprimentos',
+      purpose: 'Guarda notas fiscais e documentos de fornecedores.',
+      impact: 'Impacta recebimento, medicao e conciliacao de pedidos.',
+    },
+  },
+  {
+    prefix: 'compensation_',
+    seed: {
+      module: 'Cargos e salarios',
+      moduleKey: 'compensation',
+      origin: 'Modulo Cargos e Salarios',
+      purpose: 'Guarda snapshots salariais, perfis de remuneracao, posicoes, faixas e movimentacoes (tabelas novas).',
+      impact: 'Impacta salario vigente lido pela folha, equidade salarial e aprovacoes de movimentacao.',
+    },
+  },
+  {
+    prefix: 'document_',
+    seed: {
+      module: 'Documentos',
+      moduleKey: 'documents',
+      origin: 'Modulo Documentos (GED)',
+      purpose: 'Sustenta o GED: versoes, revisoes, modelos, leituras, publicacoes e arquivos.',
+      impact: 'Impacta gestao documental, aprovacao, distribuicao e evidencias de leitura.',
+    },
+  },
+  {
+    prefix: 'Communication',
+    seed: {
+      module: 'Comunicacao',
+      moduleKey: 'communication',
+      origin: 'Comunicacao organizacional',
+      purpose: 'Guarda comunicados, campanhas, midias, confirmacoes de leitura e metricas.',
+      impact: 'Impacta mural, comunicados obrigatorios, campanhas e indicadores de comunicacao.',
+    },
+  },
+  {
+    prefix: 'organizational_',
+    seed: {
+      module: 'Comunicacao',
+      moduleKey: 'communication',
+      origin: 'Comunicacao organizacional',
+      purpose: 'Tabelas da central de comunicacao organizacional.',
+      impact: 'Impacta publicacao e acompanhamento de comunicados.',
+    },
+  },
+  {
+    prefix: 'Conversation',
+    seed: {
+      module: 'Comunicacao',
+      moduleKey: 'communication',
+      origin: 'Chat corporativo',
+      purpose: 'Armazena conversas e participantes do chat.',
+      impact: 'Impacta o chat interno e o historico de conversas.',
+    },
+  },
+  {
+    prefix: 'Monthly',
+    seed: {
+      module: 'Reuniao Mensal',
+      moduleKey: 'monthly-results',
+      origin: 'Modulo Reuniao Mensal de Resultados',
+      purpose: 'Sustenta reunioes mensais, snapshots de indicadores, pautas, atas e acompanhamentos.',
+      impact: 'Impacta o rito mensal de resultados, decisoes e planos derivados.',
+    },
+  },
+  {
+    prefix: 'Task',
+    seed: {
+      module: 'Tarefas',
+      moduleKey: 'tasks',
+      origin: 'Central de Tarefas',
+      purpose: 'Guarda tarefas do usuario e vinculos com os modulos de origem.',
+      impact: 'Impacta a caixa de tarefas, prazos e pendencias pessoais.',
+    },
+  },
+  {
+    prefix: 'Help',
+    seed: {
+      module: 'Central de Ajuda',
+      moduleKey: 'help-center',
+      origin: 'Central de Ajuda e assistente',
+      purpose: 'Armazena artigos, guias e feedbacks da ajuda.',
+      impact: 'Impacta a base de conhecimento e o assistente do portal.',
+    },
+  },
+  {
+    prefix: 'Support',
+    seed: {
+      module: 'Central de Atendimento',
+      moduleKey: 'service-desk',
+      origin: 'Central de Atendimento',
+      purpose: 'Guarda chamados de suporte, mensagens e status.',
+      impact: 'Impacta abertura e acompanhamento de chamados dos usuarios.',
+    },
+  },
+  {
+    prefix: 'External',
+    seed: {
+      module: 'Integracoes externas',
+      moduleKey: 'integrations',
+      origin: 'Integracoes com sistemas externos',
+      purpose: 'Guarda conectores, chaves de API publica e execucoes de integracao.',
+      impact: 'Impacta SAP/Apdata/SE Suite, API publica e sincronizacoes.',
+    },
+  },
+  {
+    prefix: 'Inbound',
+    seed: {
+      module: 'Integracoes externas',
+      moduleKey: 'integrations',
+      origin: 'Integracoes com sistemas externos',
+      purpose: 'Registra recebimentos de dados de sistemas externos.',
+      impact: 'Impacta cargas de dados e reconciliacao de integracoes.',
+    },
+  },
+  {
+    prefix: 'Sla',
+    seed: {
+      module: 'Automacoes',
+      moduleKey: 'automations',
+      origin: 'Central de Automacoes',
+      purpose: 'Define politicas de SLA e escalonamento de tarefas de workflow.',
+      impact: 'Impacta prazos, alertas e escalonamentos automaticos.',
+    },
+  },
 ];
 
 const EXACT_FALLBACKS: Record<string, CatalogSeed> = {
+  company_holidays: {
+    module: 'Controle de Ponto',
+    moduleKey: 'time-clock',
+    label: 'Feriados da empresa',
+    origin: 'Calendario do ponto',
+    purpose: 'Feriados usados na jornada prevista e no DSR.',
+    impact: 'Impacta espelho de ponto, faltas, DSR sobre variaveis e calculo da folha.',
+  },
   _prisma_migrations: {
     module: 'Sistema',
     moduleKey: 'system',

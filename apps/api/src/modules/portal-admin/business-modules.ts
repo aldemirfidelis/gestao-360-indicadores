@@ -24,6 +24,7 @@ export const BUSINESS_MODULES: BusinessModule[] = [
   // --- Padrão: sempre ativos em todos os planos ---
   { code: 'meu-dia', name: 'Meu Dia', menuOrder: 10, core: true, members: ['my-day'] },
   { code: 'tarefas', name: 'Tarefas', menuOrder: 20, core: true, members: ['tasks'] },
+  { code: 'atendimento', name: 'Central de Atendimento', menuOrder: 25, core: true, members: ['service-desk'] },
   {
     code: 'administracao',
     name: 'Administração',
@@ -63,7 +64,10 @@ export const BUSINESS_MODULES: BusinessModule[] = [
   { code: 'seguranca-alimentos', name: 'Segurança dos Alimentos', menuOrder: 60, members: ['food-safety'] },
   { code: 'seguranca-patrimonial', name: 'Segurança Patrimonial', menuOrder: 70, members: ['asset-security'] },
   { code: 'cargos-salarios', name: 'Cargos e Salários', menuOrder: 80, members: ['compensation'] },
-  { code: 'servico-pessoal', name: 'Serviço Pessoal', menuOrder: 85, members: ['personnel'] },
+  // Recrutamento é aba própria do menu (requisições→vagas→admissão) e a Folha
+  // faz parte do Serviço Pessoal (aba do menu que a contém).
+  { code: 'recrutamento', name: 'Recrutamento e Seleção', menuOrder: 83, members: ['recruitment'] },
+  { code: 'servico-pessoal', name: 'Serviço Pessoal', menuOrder: 85, members: ['personnel', 'payroll'] },
   { code: 'suprimentos', name: 'Suprimentos', menuOrder: 87, members: ['procurement', 'inventory'] },
   { code: 'comunicacao', name: 'Comunicação', menuOrder: 90, members: ['communication'] },
   { code: 'gestao-premio', name: 'Gestão de Prêmio', menuOrder: 100, members: ['prize'] },
@@ -102,6 +106,7 @@ export const PLAN_BUSINESS_MODULES: Record<string, string[]> = {
     'qualidade-compliance',
     'comunicacao',
     'cargos-salarios',
+    'recrutamento',
     'servico-pessoal',
     'suprimentos',
     'seguranca-alimentos',
