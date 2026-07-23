@@ -145,7 +145,7 @@ export class EmployeesService {
       }),
       this.prisma.orgJob.findMany({
         where: { companyId: me.companyId, active: true },
-        select: { id: true, name: true },
+        select: { id: true, name: true, cbo: true },
         orderBy: { name: 'asc' },
       }),
       this.prisma.user.findMany({
@@ -294,7 +294,8 @@ export class EmployeesService {
     }).catch(this.rethrowCpfConflict);
 
     // CBO é do cargo (OrgJob) — exigido no eSocial. Atualiza o cargo resolvido.
-    await this.applyJobCbo(jobId, body?.cbo);
+    // O formulário envia o CBO dentro de profile; a raiz segue aceita.
+    await this.applyJobCbo(jobId, body?.cbo ?? body?.profile?.cbo);
 
     await this.audit.record(me, {
       module: MODULE,
@@ -508,10 +509,12 @@ export class EmployeesService {
       }
     }).catch(this.rethrowCpfConflict);
 
-    // CBO do cargo atual (eSocial).
-    if ('cbo' in patch) {
+    // CBO do cargo atual (eSocial). O formulário envia dentro de profile; a
+    // raiz segue aceita por compatibilidade.
+    const cboPatch = 'cbo' in patch ? patch.cbo : patch?.profile && 'cbo' in patch.profile ? patch.profile.cbo : undefined;
+    if (cboPatch !== undefined) {
       const currentJobId = (core.job as { connect?: { id: string } } | undefined)?.connect?.id ?? before.jobId;
-      await this.applyJobCbo(currentJobId, patch.cbo);
+      await this.applyJobCbo(currentJobId, cboPatch);
     }
 
     // Escala de trabalho (opcional): atribui ao usuário vinculado, se houver.

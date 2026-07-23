@@ -24,6 +24,7 @@ import {
 } from '@/components/ui/dialog';
 import { api } from '@/lib/api';
 import { cn, formatDate, formatNumber } from '@/lib/utils';
+import { displayLogin, parseLoginAlias } from '@/lib/login-alias';
 import { useAuth } from '@/components/auth/auth-provider';
 import { PermissionMatrix } from '@/components/access-control/permission-matrix';
 import {
@@ -116,6 +117,9 @@ export default function UsersPage() {
   const [open, setOpen] = useState(false);
   const [search, setSearch] = useState('');
   const [form, setForm] = useState<UserForm>(emptyForm);
+  // E-mail sintético original (cpf-/mat-@*.local) do usuário em edição — permite
+  // alternar entre "acesso por CPF/matrícula" e "acesso por e-mail real".
+  const [aliasEmail, setAliasEmail] = useState<string | null>(null);
   const searchParams = useSearchParams();
 
   // Deep-link "/users?new=1" (ex.: vindo da Central de Administração) abre o cadastro direto.
@@ -238,6 +242,7 @@ export default function UsersPage() {
     admin.data?.profiles.find((profile) => profile.role === role && profile.companyId === null);
 
   const openUser = (user?: UserRow) => {
+    setAliasEmail(user && parseLoginAlias(user.email) ? user.email : null);
     if (!user) {
       const recommendedProfile = organizedAccess
         ? recommendedProfileFor(emptyForm.role)
@@ -363,7 +368,7 @@ export default function UsersPage() {
                 <tr key={u.id}>
                   <td>
                     <div className="font-medium">{u.name}</div>
-                    <div className="text-xs text-muted-foreground">{u.email}</div>
+                    <div className="text-xs text-muted-foreground">{displayLogin(u.email)}</div>
                   </td>
                   <td>{u.jobTitle ?? '-'}</td>
                   <td>{u.branch?.name ?? '-'}</td>
@@ -442,10 +447,44 @@ export default function UsersPage() {
                 <Label>Nome</Label>
                 <Input value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} />
               </div>
-              <div>
-                <Label>Email</Label>
-                <Input type="email" value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} />
-              </div>
+              {form.id && aliasEmail ? (
+                <div>
+                  <Label>Forma de acesso</Label>
+                  <NativeSelect
+                    value={form.email === aliasEmail ? 'ALIAS' : 'EMAIL'}
+                    onChange={(e) => setForm({ ...form, email: e.target.value === 'ALIAS' ? aliasEmail : '' })}
+                  >
+                    <option value="ALIAS">
+                      {parseLoginAlias(aliasEmail)?.kind === 'CPF' ? 'CPF — autoatendimento (ponto, espelho, holerite)' : 'Matrícula — autoatendimento (ponto, espelho, holerite)'}
+                    </option>
+                    <option value="EMAIL">E-mail — acesso completo à plataforma</option>
+                  </NativeSelect>
+                  {form.email === aliasEmail ? (
+                    <div className="mt-2 rounded-md border bg-muted/30 p-2.5 text-xs leading-5 text-muted-foreground">
+                      Login atual: <span className="font-semibold text-foreground">{displayLogin(aliasEmail)}</span>. O colaborador
+                      entra no portal digitando somente o {parseLoginAlias(aliasEmail)?.kind === 'CPF' ? 'CPF (números)' : 'número da matrícula'} e a senha.
+                    </div>
+                  ) : (
+                    <div className="mt-2">
+                      <Label>E-mail de acesso</Label>
+                      <Input
+                        type="email"
+                        value={form.email}
+                        onChange={(e) => setForm({ ...form, email: e.target.value })}
+                        placeholder="colaborador@empresa.com"
+                      />
+                      <p className="mt-1 text-[11px] leading-4 text-muted-foreground">
+                        O e-mail vira o login principal. O acesso pelo CPF continua funcionando como atalho (vínculo do prontuário).
+                      </p>
+                    </div>
+                  )}
+                </div>
+              ) : (
+                <div>
+                  <Label>Email</Label>
+                  <Input type="email" value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} />
+                </div>
+              )}
               <div>
                 <Label>{form.id ? 'Nova senha (opcional)' : 'Senha inicial'}</Label>
                 <Input type="password" value={form.password} onChange={(e) => setForm({ ...form, password: e.target.value })} />

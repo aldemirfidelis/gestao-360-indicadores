@@ -142,6 +142,18 @@ export const BUSINESS_MODULE_DEFINITIONS: BusinessModuleDefinition[] = [
     prefixes: ['compensation'],
   },
   {
+    slug: 'recrutamento',
+    title: 'Recrutamento e Seleção',
+    description: 'Requisições de vaga, divulgação, candidatos, propostas, pré-admissão e admissão.',
+    prefixes: ['recruit'],
+  },
+  {
+    slug: 'servico-pessoal',
+    title: 'Serviço Pessoal',
+    description: 'Colaboradores e prontuário, controle de ponto (inclusive totem), férias, folha de pagamento e saúde ocupacional.',
+    prefixes: ['pessoal', 'ponto', 'folha', 'saude'],
+  },
+  {
     slug: 'suprimentos',
     title: 'Suprimentos',
     description: 'Compras, alçadas, recebimentos, estoque, kardex e almoxarifados.',
@@ -218,6 +230,10 @@ const FEATURE_LABELS: Record<string, string> = {
   Automações: 'Central de Automações',
   'Meu Dia': 'Meu Dia',
   'Gestão de Prêmio': 'Gestão de Prêmio',
+  'Servico Pessoal': 'Serviço Pessoal e Ponto',
+  'Folha de Pagamento': 'Folha de Pagamento',
+  Recrutamento: 'Recrutamento e Seleção',
+  'Saude Ocupacional': 'Saúde Ocupacional',
 };
 
 export const ACCESS_LEVELS = [

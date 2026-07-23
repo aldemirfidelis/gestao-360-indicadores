@@ -32,6 +32,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { useAuth } from '@/components/auth/auth-provider';
 import { api, getAccessToken } from '@/lib/api';
 import { cn, formatDate } from '@/lib/utils';
+import { displayLogin } from '@/lib/login-alias';
 import { ReasonDialog, type ReasonDialogState } from '@/components/platform/reason-dialog';
 import { BadgeDialog } from '@/components/personnel/badge-dialog';
 import { IdCard, Image as ImageIcon } from 'lucide-react';
@@ -59,7 +60,7 @@ interface ListResponse {
 
 interface Options {
   orgNodes: Array<{ id: string; name: string; type: string; responsibleUserId: string | null; responsibleUser: { id: string; name: string } | null }>;
-  jobs: Array<{ id: string; name: string }>;
+  jobs: Array<{ id: string; name: string; cbo?: string | null }>;
   users: Array<{ id: string; name: string; email: string }>;
   accessProfiles: Array<{ id: string; name: string; code: string; role: string }>;
   scheduleTemplates: Array<{ id: string; name: string; kind: string }>;
@@ -616,7 +617,16 @@ export default function EmployeesPage() {
             <TabsContent value="contratuais" className="grid grid-cols-1 gap-3 pt-3 md:grid-cols-2">
               <div>
                 <Label>Cargo</Label>
-                <NativeSelect value={form.jobId} onChange={(e) => setForm((f) => ({ ...f, jobId: e.target.value }))}>
+                <NativeSelect
+                  value={form.jobId}
+                  onChange={(e) => {
+                    const jobId = e.target.value;
+                    // O CBO é dado do cargo: ao escolher um cargo, puxa o CBO
+                    // cadastrado nele automaticamente.
+                    const jobCbo = (options?.jobs ?? []).find((job) => job.id === jobId)?.cbo ?? '';
+                    setForm((f) => ({ ...f, jobId, cbo: jobId ? (jobCbo ?? '') : f.cbo }));
+                  }}
+                >
                   <option value="">Selecionar do catálogo...</option>
                   {(options?.jobs ?? []).map((job) => <option key={job.id} value={job.id}>{job.name}</option>)}
                 </NativeSelect>
@@ -639,6 +649,9 @@ export default function EmployeesPage() {
               <div>
                 <Label>CBO do cargo <span className="text-[10px] text-muted-foreground">(eSocial)</span></Label>
                 <Input value={form.cbo} inputMode="numeric" maxLength={6} placeholder="Ex.: 252105" onChange={(e) => setForm((f) => ({ ...f, cbo: e.target.value.replace(/\D/g, '') }))} />
+                <p className="mt-1 text-[11px] text-muted-foreground">
+                  Preenchido automaticamente pelo cargo selecionado. Alterar aqui atualiza o CBO do cargo (vale para todos os colaboradores nele).
+                </p>
               </div>
               <div className="md:col-span-2 grid grid-cols-2 gap-3 rounded-md border p-3 md:grid-cols-5">
                 <div className="col-span-2 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground md:col-span-5">Dados bancários (pagamento da folha)</div>
@@ -716,7 +729,7 @@ export default function EmployeesPage() {
                   onChange={(e) => setForm((f) => ({ ...f, userId: e.target.value, createUserEnabled: e.target.value ? false : f.createUserEnabled }))}
                 >
                   <option value="">Sem vínculo</option>
-                  {(options?.users ?? []).map((user) => <option key={user.id} value={user.id}>{user.name} — {user.email}</option>)}
+                  {(options?.users ?? []).map((user) => <option key={user.id} value={user.id}>{user.name} — {displayLogin(user.email)}</option>)}
                 </NativeSelect>
                 {!editingId && !form.userId && (
                   <div className="mt-2 rounded-md border border-sky-500/25 bg-sky-500/5 p-3">
@@ -893,7 +906,7 @@ export default function EmployeesPage() {
                   <InfoTile label="Regime" value={profileFields.workRegime ? (REGIME_LABEL[profileFields.workRegime] ?? profileFields.workRegime) : '—'} />
                   <InfoTile
                     label="Usuário vinculado"
-                    value={detail.linkedUser ? `${detail.linkedUser.name}` : 'Sem vínculo'}
+                    value={detail.linkedUser ? `${detail.linkedUser.name} · ${displayLogin(detail.linkedUser.email)}` : 'Sem vínculo'}
                   />
                 </div>
                 {detail.linkedUser ? (

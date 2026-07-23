@@ -25,7 +25,7 @@ import { jobArchitecture } from '@/lib/compensation/analytics';
 import { JOB_STATUS_LABELS, type JobCatalog } from '@/lib/compensation/types';
 import { cn } from '@/lib/utils';
 
-const initial = { name: '', summary: '', family: '', grade: '', salaryBand: '', jobType: 'administrativo' };
+const initial = { name: '', summary: '', family: '', grade: '', salaryBand: '', jobType: 'administrativo', cbo: '' };
 const MANAGE_PERMS = ['compensation:jobs:create', 'compensation:manage', 'org:positions:manage'];
 
 export default function CatalogoCargosPage() {
@@ -134,7 +134,7 @@ export default function CatalogoCargosPage() {
               <Label>Nome do cargo</Label>
               <Input value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} placeholder="Ex.: Analista Administrativo Júnior" />
             </div>
-            <div className="lg:col-span-3">
+            <div className="lg:col-span-2">
               <Label>Tipo (categoria funcional)</Label>
               <NativeSelect value={form.jobType} onChange={(e) => setForm({ ...form, jobType: e.target.value })}>
                 <option value="administrativo">Administrativo</option>
@@ -145,6 +145,17 @@ export default function CatalogoCargosPage() {
                 <option value="gestao">Gestão</option>
                 <option value="executivo">Executivo</option>
               </NativeSelect>
+            </div>
+            <div>
+              <Label>CBO <span className="text-[10px] text-muted-foreground">(eSocial)</span></Label>
+              <Input
+                value={form.cbo}
+                inputMode="numeric"
+                maxLength={6}
+                placeholder="252105"
+                onChange={(e) => setForm({ ...form, cbo: e.target.value.replace(/\D/g, '') })}
+              />
+              <p className="mt-1 text-[10px] leading-4 text-muted-foreground">Preenche sozinho o prontuário de quem assumir este cargo.</p>
             </div>
             <div className="lg:col-span-5">
               <Label>Descrição resumida</Label>

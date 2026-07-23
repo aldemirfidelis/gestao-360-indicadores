@@ -464,6 +464,9 @@ export class CompensationService {
       const job = await tx.compensationJobCatalog.create({
         data: { ...data, companyId: me.companyId, orgJobId, code, name, createdById: me.sub, updatedById: me.sub },
       });
+      // CBO acompanha o cargo operacional (OrgJob): é de lá que o prontuário e o
+      // eSocial (S-2200) leem — cadastrar no catálogo já propaga sozinho.
+      if (body.cbo !== undefined) await this.syncOrgJobCbo(tx, orgJobId, data.cbo);
       await this.createJobVersion(tx, me, job, 'Criação do cargo');
       return job;
     });
@@ -494,6 +497,11 @@ export class CompensationService {
             description: body.summary !== undefined ? cleanString(body.summary) : undefined,
           },
         });
+      }
+      // Propaga o CBO ao cargo operacional somente quando o campo veio no corpo
+      // (uma edição sem o campo não pode apagar o CBO já registrado no OrgJob).
+      if (before.orgJobId && body.cbo !== undefined) {
+        await this.syncOrgJobCbo(tx, before.orgJobId, cleanString(body.cbo));
       }
       return job;
     });
@@ -1885,6 +1893,12 @@ export class CompensationService {
   private async createOrgJob(tx: Pick<PrismaService, 'orgJob'>, me: AuthPayload, name: string, description?: string | null) {
     const orgJob = await tx.orgJob.create({ data: { companyId: me.companyId, name, description: description ?? null } });
     return orgJob.id;
+  }
+
+  /** Espelha o CBO do catálogo no cargo operacional (OrgJob) — fonte lida pelo prontuário/eSocial. */
+  private async syncOrgJobCbo(tx: Pick<PrismaService, 'orgJob'>, orgJobId: string, cbo: string | null | undefined) {
+    const digits = String(cbo ?? '').replace(/\D/g, '').slice(0, 6);
+    await tx.orgJob.update({ where: { id: orgJobId }, data: { cbo: digits || null } });
   }
 
   private async createJobVersion(tx: Pick<PrismaService, 'compensationJobCatalogVersion'>, me: AuthPayload, job: any, reason: string) {
