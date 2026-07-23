@@ -265,6 +265,59 @@ describe('payroll-calc.logic — descontos da folha (Benefícios, Consignados e 
   });
 });
 
+describe('payroll-calc.logic — consignado na rescisão (Portaria MTE 1.115/2026)', () => {
+  const baseTermination = {
+    salaryCents: 300000,
+    admissionDate: new Date(Date.UTC(2024, 0, 15)),
+    terminationDate: new Date(Date.UTC(2026, 6, 20)),
+    kind: 'DISPENSA_SEM_JUSTA_CAUSA',
+    noticeType: 'INDENIZADO',
+    contractType: 'CLT',
+    irDependents: 0,
+    tables: TABLES,
+  };
+
+  it('sem consignado ativo: nenhuma rubrica 5050 e nenhuma pendencia sobre consignado', () => {
+    const r = computeTermination(baseTermination);
+    expect(r.items.some((i) => i.rubricCode === '5050')).toBe(false);
+    expect(r.issues.some((i) => i.includes('consignado'))).toBe(false);
+  });
+
+  it('consignado ativo sem valor informado: nao desconta e exige consulta ao Emprega Brasil', () => {
+    const r = computeTermination({ ...baseTermination, hasActiveConsigned: true });
+    expect(r.items.some((i) => i.rubricCode === '5050')).toBe(false);
+    expect(r.issues.some((i) => i.includes('Emprega Brasil'))).toBe(true);
+  });
+
+  it('valor informado dentro do teto e descontado integralmente', () => {
+    const r = computeTermination({ ...baseTermination, hasActiveConsigned: true, consignedRetentionCents: 10000 });
+    const loan = r.items.find((i) => i.rubricCode === '5050');
+    expect(loan?.amountCents).toBe(10000);
+  });
+
+  it('valor acima do teto e limitado a 35% da base legal (ferias + 1/3 + aviso), sem saldo de salario nem 13o', () => {
+    const r = computeTermination({ ...baseTermination, hasActiveConsigned: true, consignedRetentionCents: 99_999_00 });
+    const loan = r.items.find((i) => i.rubricCode === '5050');
+    const byCode = new Map(r.items.map((i) => [i.rubricCode, i.amountCents]));
+    // Base legal = ferias prop + 1/3 + ferias vencidas + 1/3 + aviso indenizado
+    const baseLegal =
+      (byCode.get('1020') ?? 0) + (byCode.get('1021') ?? 0) +
+      (byCode.get('1024') ?? 0) + (byCode.get('1025') ?? 0) +
+      (byCode.get('1040') ?? 0);
+    expect(loan?.amountCents).toBe(Math.round((baseLegal * 3500) / 10_000));
+
+    // Prova de que saldo de salario (1000) e 13o (1031) FICAM FORA da base:
+    // ambos existem e sao > 0, e o teto aplicado e estritamente menor do que
+    // seria se a base fosse o total dos proventos.
+    expect(byCode.get('1000')).toBeGreaterThan(0);
+    expect(byCode.get('1031')).toBeGreaterThan(0);
+    const totalProventos = r.items.filter((i) => i.nature === 'PROVENTO').reduce((s, i) => s + i.amountCents, 0);
+    expect(baseLegal).toBeLessThan(totalProventos);
+    expect(loan!.amountCents).toBeLessThan(Math.round((totalProventos * 3500) / 10_000));
+    expect(r.issues.some((i) => i.includes('excede o teto'))).toBe(true);
+  });
+});
+
 describe('payroll-calc.logic — margem consignável (35% da remuneração disponível)', () => {
   // Salário 3.000,00: INSS = 253,41 (teste-ouro acima). IRRF pelo desconto
   // simplificado: base 3.000 − 607,20 = 2.392,80 → abaixo da faixa de isenção

@@ -618,6 +618,15 @@ export interface TerminationCalcInput {
   fgtsBalanceCents?: number;
   /** Avos de férias vencidas não gozadas de período anterior (0..12). Opcional. */
   expiredVacationAvos?: number;
+  /**
+   * Valor a reter para quitação de consignado, obtido pelo empregador no Portal
+   * Emprega Brasil (percentual de garantia do contrato). NÃO é estimado aqui: o
+   * saldo devedor real vem da instituição financeira via portal. O motor apenas
+   * aplica o TETO legal sobre o que for informado.
+   */
+  consignedRetentionCents?: number;
+  /** Há contrato de consignado ativo? Sem o valor do portal, vira pendência. */
+  hasActiveConsigned?: boolean;
 }
 
 /** Percentual (basis points) da multa rescisória do FGTS por tipo de desligamento. */
@@ -640,7 +649,10 @@ function fgtsFineBp(kind: string): number {
  * conferência interna e validação jurídica antes do TRCT.
  */
 export function computeTermination(input: TerminationCalcInput): WorkerCalcResult & { informative: { fgtsFineCents: number }; issues: string[] } {
-  const { salaryCents, admissionDate, terminationDate, kind, noticeType, contractType, irDependents, tables, fgtsBalanceCents, expiredVacationAvos = 0 } = input;
+  const {
+    salaryCents, admissionDate, terminationDate, kind, noticeType, contractType, irDependents, tables,
+    fgtsBalanceCents, expiredVacationAvos = 0, consignedRetentionCents = 0, hasActiveConsigned = false,
+  } = input;
   const memory: MemoryStep[] = [];
   const items: WorkerCalcItem[] = [];
   const issues: string[] = [];
@@ -752,6 +764,49 @@ export function computeTermination(input: TerminationCalcInput): WorkerCalcResul
     } else {
       issues.push(`Multa de ${fineBp / 100}% do FGTS não calculada — informe o saldo da conta vinculada do FGTS.`);
     }
+  }
+
+  // Consignado na rescisão — Portaria MTE 435/2025 com a redação da Portaria
+  // MTE 1.115, de 25/06/2026: pode-se descontar até 35% das VERBAS RESCISÓRIAS
+  // para quitar consignado ativo. A base legal é restrita a férias
+  // (proporcionais, vencidas, em dobro e indenizadas), 1/3 constitucional e
+  // aviso prévio — saldo de salário e 13º ficam FORA dessa base.
+  // O saldo devedor NÃO é estimado aqui: o empregador consulta o percentual de
+  // garantia no Portal Emprega Brasil e informa o valor. Aqui só aplicamos o teto.
+  const consignedBaseCents =
+    vacationPropCents + vacationPropThird + expiredVacationCents + expiredVacationThird + noticeCents;
+  const consignedCapCents = applyBp(consignedBaseCents, CONSIGNED_MARGIN_BP);
+  if (consignedRetentionCents > 0) {
+    const chargedCents = Math.min(consignedRetentionCents, consignedCapCents);
+    items.push({
+      rubricCode: '5050',
+      rubricName: 'Consignado — quitação na rescisão',
+      nature: 'DESCONTO',
+      reference: `teto 35% das verbas rescisórias (${centsLabel(consignedCapCents)})`,
+      amountCents: chargedCents,
+      origin: 'MOTOR',
+    });
+    memory.push({
+      step: 'Consignado na rescisão',
+      formula: 'menor entre o valor informado pelo Emprega Brasil e 35% das férias + 1/3 + aviso prévio',
+      inputs: {
+        informado: centsLabel(consignedRetentionCents),
+        baseLegal: centsLabel(consignedBaseCents),
+        teto: centsLabel(consignedCapCents),
+      },
+      resultCents: chargedCents,
+    });
+    if (chargedCents < consignedRetentionCents) {
+      issues.push(
+        `Consignado: retenção informada de ${centsLabel(consignedRetentionCents)} excede o teto de 35% das verbas ` +
+          `rescisórias (${centsLabel(consignedCapCents)}). Descontado o teto; trate o saldo com a instituição financeira.`,
+      );
+    }
+  } else if (hasActiveConsigned) {
+    issues.push(
+      'Colaborador com consignado ativo e sem valor de quitação informado. Consulte o percentual de garantia no ' +
+        'Portal Emprega Brasil (Portaria MTE 435/2025, red. Portaria MTE 1.115/2026) e informe o valor a reter.',
+    );
   }
 
   const earnings = items.filter((i) => i.nature === 'PROVENTO').reduce((sum, i) => sum + i.amountCents, 0);

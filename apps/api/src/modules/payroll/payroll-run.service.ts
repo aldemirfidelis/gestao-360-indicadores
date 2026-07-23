@@ -969,6 +969,12 @@ export class PayrollRunService {
     const salaryCents = decimalToCents(salarySnapshot.currentSalary.toString());
     const fgtsBalanceCents = Math.max(0, Math.round(Number(body?.fgtsBalance ?? 0) * 100)) || undefined;
     const expiredVacationAvos = Math.max(0, Math.min(12, Number(body?.expiredVacationAvos ?? 0) || 0));
+    // Consignado na rescisão: o valor a quitar vem do Portal Emprega Brasil
+    // (não é estimado). Sem ele, havendo contrato ativo, o motor sinaliza.
+    const consignedRetentionCents = Math.max(0, Math.round(Number(body?.consignedRetention ?? 0) * 100));
+    const activeLoans = await this.prisma.payrollLoan.count({
+      where: { companyId: me.companyId, employeeId, status: 'ACTIVE' },
+    });
 
     const calc = computeTermination({
       salaryCents,
@@ -981,6 +987,8 @@ export class PayrollRunService {
       tables,
       fgtsBalanceCents,
       expiredVacationAvos,
+      consignedRetentionCents,
+      hasActiveConsigned: activeLoans > 0,
     });
     return { salaryCents, admissionDate: profile.admissionDate, ...calc };
   }
