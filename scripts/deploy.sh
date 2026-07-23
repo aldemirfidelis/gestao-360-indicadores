@@ -92,8 +92,8 @@ docker compose -f "$COMPOSE_FILE" ps
 echo ""
 echo "Tamanho das imagens (acompanhe: se voltar a crescer, algo desnecessario"
 echo "entrou na imagem - ver comentarios em apps/api/Dockerfile):"
-docker images --format '  {{.Repository}}:{{.Tag}}\t{{.Size}}' \
-  | grep -E '^  g360-(api|web):latest' || true
+docker images --format '{{.Repository}}:{{.Tag}}\t{{.Size}}' \
+  | grep -E '^g360-(api|web):latest' | sed 's/^/  /' || true
 
 echo ""
 echo "Limpeza de imagens antigas..."
