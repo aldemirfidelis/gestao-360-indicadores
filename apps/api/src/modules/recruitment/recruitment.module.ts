@@ -8,6 +8,7 @@ import { PersonnelModule } from '../personnel/personnel.module';
 import { RecruitmentController } from './recruitment.controller';
 import { CareersController } from './careers.controller';
 import { RecruitRequisitionService } from './recruit-requisition.service';
+import { RecruitRecruiterService } from './recruit-recruiter.service';
 import { RecruitPostingService } from './recruit-posting.service';
 import { RecruitCareersService } from './recruit-careers.service';
 import { RecruitCandidateAuthService } from './recruit-candidate-auth.service';
@@ -32,6 +33,7 @@ import { CandidateGuard } from './candidate.guard';
   controllers: [RecruitmentController, CareersController],
   providers: [
     RecruitRequisitionService,
+    RecruitRecruiterService,
     RecruitPostingService,
     RecruitCareersService,
     RecruitCandidateAuthService,

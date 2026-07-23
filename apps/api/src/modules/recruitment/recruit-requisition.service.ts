@@ -3,6 +3,7 @@ import { Prisma, UserRoleEnum } from '@prisma/client';
 import { PrismaService } from '../../prisma/prisma.service';
 import { AuditWriterService } from '../../common/audit/audit-writer.service';
 import { AuthPayload } from '../auth/auth.types';
+import { RecruitRecruiterService } from './recruit-recruiter.service';
 import {
   approvalOutcome,
   canTransition,
@@ -26,6 +27,7 @@ export class RecruitRequisitionService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly audit: AuditWriterService,
+    private readonly recruiters: RecruitRecruiterService,
   ) {}
 
   async list(me: AuthPayload, filters: { status?: string; orgNodeId?: string } = {}) {
@@ -52,15 +54,24 @@ export class RecruitRequisitionService {
       },
     });
     if (!req) throw new NotFoundException('Requisição não encontrada.');
-    // Resolve o nome de cada aprovador designado para a tela não mostrar só o papel.
-    const approverIds = [...new Set(req.approvals.map((a) => a.approverId).filter((x): x is string => Boolean(x)))];
-    const approvers = approverIds.length
-      ? await this.prisma.user.findMany({ where: { id: { in: approverIds }, companyId: me.companyId }, select: { id: true, name: true } })
+    // Resolve o nome de cada pessoa envolvida (aprovadores + condução da seleção)
+    // para a tela não mostrar só IDs/papéis.
+    const userIds = [...new Set([
+      ...req.approvals.map((a) => a.approverId),
+      req.recruiterId,
+      req.recruiterLeadId,
+      req.requesterId,
+    ].filter((x): x is string => Boolean(x)))];
+    const users = userIds.length
+      ? await this.prisma.user.findMany({ where: { id: { in: userIds }, companyId: me.companyId }, select: { id: true, name: true } })
       : [];
-    const nameById = new Map(approvers.map((u) => [u.id, u.name]));
+    const nameById = new Map(users.map((u) => [u.id, u.name]));
     return {
       ...req,
       approvals: req.approvals.map((a) => ({ ...a, approverName: a.approverId ? nameById.get(a.approverId) ?? null : null })),
+      recruiterName: req.recruiterId ? nameById.get(req.recruiterId) ?? null : null,
+      recruiterLeadName: req.recruiterLeadId ? nameById.get(req.recruiterLeadId) ?? null : null,
+      requesterName: req.requesterId ? nameById.get(req.requesterId) ?? null : null,
     };
   }
 
@@ -273,16 +284,43 @@ export class RecruitRequisitionService {
     return { ...gate, exceptionsRequired: outstanding, availability, approvedExceptions: [...approvedKinds] };
   }
 
-  /** Encaminha ao recrutamento (cria a vaga é F2). Exige gate ok e exceções resolvidas. */
-  async sendToRecruitment(me: AuthPayload, id: string) {
+  /**
+   * Encaminha ao recrutamento (cria a vaga é F2). Exige gate ok e exceções
+   * resolvidas. Aqui se define QUEM CONDUZ (recrutador cadastrado) e QUEM
+   * ACOMPANHA: o líder do recrutador (autopreenchido do cadastro se não vier) e
+   * o gestor solicitante da vaga (requesterId, já registrado na criação).
+   */
+  async sendToRecruitment(me: AuthPayload, id: string, body: any = {}) {
     const req = await this.requisitionOf(me.companyId, id);
     this.assertTransition(req.status as RequisitionStatus, 'SENT_TO_RECRUITMENT');
     const gate = await this.evaluateGate(me, id);
     if (gate.blocks.length) throw new BadRequestException(`Pendências impedem o encaminhamento: ${gate.blocks.join(' ')}`);
     if (gate.exceptionsRequired.length) throw new BadRequestException(`Exceções pendentes de aprovação: ${gate.exceptionsRequired.join(', ')}.`);
-    // Sem recrutador definido na criação, quem encaminha assume a condução da seleção.
-    await this.prisma.recruitRequisition.update({ where: { id }, data: { status: 'SENT_TO_RECRUITMENT', recruiterId: req.recruiterId ?? me.sub } });
-    await this.audit.record(me, { module: MODULE, entity: 'RecruitRequisition', entityId: id, action: 'SEND', message: `Requisição ${req.code} encaminhada ao recrutamento` });
+
+    // Recrutador que conduz: precisa estar cadastrado e ativo. Retrocompat: se
+    // nada for informado e a requisição já tinha um recrutador cadastrado, usa-o.
+    const recruiterId = text(body?.recruiterId) ?? req.recruiterId;
+    if (!recruiterId) {
+      throw new BadRequestException('Defina o recrutador que vai conduzir a seleção. Cadastre recrutadores em Recrutamento → Recrutadores.');
+    }
+    if (!(await this.recruiters.isActiveRecruiter(me.companyId, recruiterId))) {
+      throw new BadRequestException('O responsável escolhido não é um recrutador ativo cadastrado. Cadastre-o em Recrutamento → Recrutadores.');
+    }
+    // Líder que acompanha: usa o informado ou, na falta, o líder do cadastro do recrutador.
+    const recruiterLeadId = text(body?.recruiterLeadId) ?? (await this.recruiters.leadOf(me.companyId, recruiterId));
+
+    await this.prisma.recruitRequisition.update({
+      where: { id },
+      data: { status: 'SENT_TO_RECRUITMENT', recruiterId, recruiterLeadId },
+    });
+    await this.audit.record(me, {
+      module: MODULE,
+      entity: 'RecruitRequisition',
+      entityId: id,
+      action: 'SEND',
+      message: `Requisição ${req.code} encaminhada ao recrutamento`,
+      after: { recruiterId, recruiterLeadId, requesterId: req.requesterId },
+    });
     return this.get(me, id);
   }
 

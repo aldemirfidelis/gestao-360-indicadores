@@ -13972,7 +13972,8 @@ model RecruitRequisition {
   allowsReferral        Boolean   @default(true)
   allowsFormerEmployees Boolean   @default(true)
   allowsAgency          Boolean   @default(false)
-  recruiterId           String?
+  recruiterId           String? // recrutador que CONDUZ a seleção (RecruitRecruiter.userId)
+  recruiterLeadId       String? // líder do recrutador que ACOMPANHA (gestor solicitante = requesterId)
   pipelineTemplateId    String? // F2
   /// Requisitos/benefícios/observações estruturados (obrigatórios/desejáveis/etc).
   details               Json?
@@ -14049,6 +14050,25 @@ model RecruitRequisitionSnapshot {
 
   @@unique([requisitionId, version])
   @@map("recruit_requisition_snapshots")
+}
+
+/// Recrutador cadastrado (vem da área de Recursos Humanos). Quem CONDUZ as
+/// seleções. Cada recrutador tem um líder opcional que acompanha as vagas
+/// conduzidas por ele. O vínculo é com User; sem @relation (padrão do módulo,
+/// escopo por companyId manual).
+model RecruitRecruiter {
+  id          String    @id @default(uuid())
+  companyId   String
+  userId      String // o recrutador (User)
+  leadUserId  String? // líder do recrutador (acompanha as seleções conduzidas)
+  active      Boolean   @default(true)
+  createdById String?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  @@unique([companyId, userId])
+  @@index([companyId, active])
+  @@map("recruit_recruiters")
 }
 
 // ===================== Recrutamento — Fase 2 (vaga + pipeline + canais) =====================

@@ -1,8 +1,9 @@
-import { Body, Controller, Get, Param, Post, Query } from '@nestjs/common';
+import { Body, Controller, Delete, Get, Param, Patch, Post, Query } from '@nestjs/common';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import { RequirePermissions } from '../../common/decorators/permissions.decorator';
 import { AuthPayload } from '../auth/auth.types';
 import { RecruitRequisitionService } from './recruit-requisition.service';
+import { RecruitRecruiterService } from './recruit-recruiter.service';
 import { RecruitPostingService } from './recruit-posting.service';
 import { RecruitApplicationService } from './recruit-application.service';
 import { RecruitEvaluationService } from './recruit-evaluation.service';
@@ -22,6 +23,7 @@ import { RecruitTalentPoolService } from './recruit-talent-pool.service';
 export class RecruitmentController {
   constructor(
     private readonly requisitions: RecruitRequisitionService,
+    private readonly recruiters: RecruitRecruiterService,
     private readonly postings: RecruitPostingService,
     private readonly applications: RecruitApplicationService,
     private readonly evaluations: RecruitEvaluationService,
@@ -435,6 +437,38 @@ export class RecruitmentController {
     return this.postings.setStatus(me, id, String(body?.status ?? ''));
   }
 
+  // ------------------------------ recrutadores (cadastro, vêm de RH) ------------------------------
+
+  @Get('recruiters')
+  @RequirePermissions('recruit:view')
+  listRecruiters(@CurrentUser() me: AuthPayload) {
+    return this.recruiters.list(me);
+  }
+
+  @Get('recruiters/candidates')
+  @RequirePermissions('recruit:manage')
+  recruiterCandidates(@CurrentUser() me: AuthPayload) {
+    return this.recruiters.candidates(me);
+  }
+
+  @Post('recruiters')
+  @RequirePermissions('recruit:manage')
+  createRecruiter(@CurrentUser() me: AuthPayload, @Body() body: any) {
+    return this.recruiters.create(me, body);
+  }
+
+  @Patch('recruiters/:id')
+  @RequirePermissions('recruit:manage')
+  updateRecruiter(@CurrentUser() me: AuthPayload, @Param('id') id: string, @Body() body: any) {
+    return this.recruiters.update(me, id, body);
+  }
+
+  @Delete('recruiters/:id')
+  @RequirePermissions('recruit:manage')
+  removeRecruiter(@CurrentUser() me: AuthPayload, @Param('id') id: string) {
+    return this.recruiters.remove(me, id);
+  }
+
   @Get('requisitions')
   @RequirePermissions('recruit:view')
   list(@CurrentUser() me: AuthPayload, @Query('status') status?: string, @Query('orgNodeId') orgNodeId?: string) {
@@ -485,8 +519,8 @@ export class RecruitmentController {
 
   @Post('requisitions/:id/send-to-recruitment')
   @RequirePermissions('recruit:requisition:approve')
-  sendToRecruitment(@CurrentUser() me: AuthPayload, @Param('id') id: string) {
-    return this.requisitions.sendToRecruitment(me, id);
+  sendToRecruitment(@CurrentUser() me: AuthPayload, @Param('id') id: string, @Body() body: any) {
+    return this.requisitions.sendToRecruitment(me, id, body);
   }
 
   @Post('requisitions/:id/cancel')

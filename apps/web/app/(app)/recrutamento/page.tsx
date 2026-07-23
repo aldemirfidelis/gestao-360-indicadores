@@ -34,6 +34,7 @@ import { MetricCard } from '@/components/platform/metric-card';
 import { ReasonDialog, type ReasonDialogState } from '@/components/platform/reason-dialog';
 import { StatusBadge } from '@/components/platform/status-badge';
 import { JourneyStepper, NextStepCallout, type JourneyStep } from '@/components/recruitment/journey-stepper';
+import { RecruitersDialog } from '@/components/recruitment/recruiters-dialog';
 import { api } from '@/lib/api';
 import { useAuth } from '@/components/auth/auth-provider';
 import {
@@ -57,9 +58,15 @@ interface Requisition {
 interface RequisitionDetail extends Requisition {
   requesterId: string; reason: string | null; notes: string | null;
   monthlyBudgetCents: number | string | null;
+  recruiterLeadId: string | null;
+  recruiterName: string | null; recruiterLeadName: string | null; requesterName: string | null;
   gateExceptions: Array<{ kind: string; reason: string; at: string }> | null;
   approvals: Array<{ id: string; order: number; role: string; decision: string | null; comment: string | null; approverId: string | null; approverName: string | null }>;
   openings: Array<{ id: string; status: string }>;
+}
+interface Recruiter {
+  id: string; userId: string; userName: string | null; areaName: string | null;
+  leadUserId: string | null; leadUserName: string | null; active: boolean;
 }
 interface Gate {
   ready: boolean; blocks: string[]; warnings: string[]; exceptionsRequired: string[];
@@ -89,6 +96,10 @@ export default function RecruitmentPage() {
   const [search, setSearch] = useState('');
   const [reasonDialog, setReasonDialog] = useState<ReasonDialogState | null>(null);
   const [reassign, setReassign] = useState<{ stepId: string; role: string; approverId: string } | null>(null);
+  const [recruitersOpen, setRecruitersOpen] = useState(false);
+  // Encaminhamento: escolhe quem CONDUZ (recrutador) e quem ACOMPANHA (líder).
+  const [forwardId, setForwardId] = useState<string | null>(null);
+  const [forwardForm, setForwardForm] = useState({ recruiterId: '', recruiterLeadId: '' });
 
   // Abre a requisição direto quando o link vem de uma notificação (?focus=<id>), ex.: alerta de SLA.
   useEffect(() => {
@@ -101,6 +112,7 @@ export default function RecruitmentPage() {
   const postingsQuery = useQuery<Posting[]>({ queryKey: ['recruit-postings'], queryFn: () => api('/recruitment/postings') });
   const optionsQuery = useQuery<Options>({ queryKey: ['personnel-employees', 'options'], queryFn: () => api('/personnel/employees/options'), staleTime: 60_000 });
   const detailQuery = useQuery<RequisitionDetail>({ queryKey: ['recruit-req', detailId], queryFn: () => api(`/recruitment/requisitions/${detailId}`), enabled: Boolean(detailId) });
+  const recruitersQuery = useQuery<Recruiter[]>({ queryKey: ['recruit-recruiters'], queryFn: () => api('/recruitment/recruiters') });
   const gateQuery = useQuery<Gate>({ queryKey: ['recruit-gate', detailId], queryFn: () => api(`/recruitment/requisitions/${detailId}/gate`), enabled: Boolean(detailId) });
 
   const invalidate = () => {
@@ -108,6 +120,22 @@ export default function RecruitmentPage() {
     void qc.invalidateQueries({ queryKey: ['recruit-req', detailId] });
     void qc.invalidateQueries({ queryKey: ['recruit-gate', detailId] });
   };
+
+  const activeRecruiters = useMemo(() => (recruitersQuery.data ?? []).filter((r) => r.active), [recruitersQuery.data]);
+
+  // Abre o diálogo de encaminhamento com o recrutador atual (se houver) e o
+  // líder autopreenchido do cadastro do recrutador escolhido.
+  const openForward = (req: RequisitionDetail) => {
+    const recruiterId = req.recruiterId ?? '';
+    const lead = activeRecruiters.find((r) => r.userId === recruiterId)?.leadUserId ?? '';
+    setForwardForm({ recruiterId, recruiterLeadId: req.recruiterLeadId ?? lead });
+    setForwardId(req.id);
+  };
+  const forward = useMutation({
+    mutationFn: () => api(`/recruitment/requisitions/${forwardId}/send-to-recruitment`, { method: 'POST', json: forwardForm }),
+    onSuccess: () => { toast.success('Requisição encaminhada ao recrutamento.'); setForwardId(null); invalidate(); },
+    onError: (error: any) => toast.error(error?.message ?? 'Não foi possível encaminhar.'),
+  });
 
   const create = useMutation({
     mutationFn: () =>
@@ -199,6 +227,9 @@ export default function RecruitmentPage() {
         description="Da requisição de vaga à admissão: aprovação com travas de quadro/orçamento, divulgação no portal de carreiras, seleção com scorecard, proposta, pré-admissão com ASO e admissão integrada ao Serviço Pessoal."
         actions={
           <div className="flex flex-wrap gap-2">
+            {canManage && (
+              <Button variant="outline" onClick={() => setRecruitersOpen(true)}><Users className="mr-2 h-4 w-4" /> Recrutadores</Button>
+            )}
             {canCreate && (
               <Button onClick={() => setFormOpen(true)}><Plus className="mr-2 h-4 w-4" /> Nova requisição</Button>
             )}
@@ -404,6 +435,26 @@ export default function RecruitmentPage() {
                   </div>
                 )}
 
+                {detail.recruiterId && (
+                  <div className="rounded-md border border-status-blue/30 bg-status-blue/5 p-3 text-xs">
+                    <div className="mb-1.5 flex items-center gap-1.5 font-semibold"><UserCheck className="h-3.5 w-3.5 text-status-blue" /> Condução da seleção</div>
+                    <div className="grid grid-cols-1 gap-1 sm:grid-cols-3">
+                      <div>
+                        <div className="text-[10px] uppercase text-muted-foreground">Recrutador (conduz)</div>
+                        <div className="font-medium">{detail.recruiterName ?? userName(detail.recruiterId) ?? '—'}</div>
+                      </div>
+                      <div>
+                        <div className="text-[10px] uppercase text-muted-foreground">Líder (acompanha)</div>
+                        <div className="font-medium">{detail.recruiterLeadName ?? (detail.recruiterLeadId ? userName(detail.recruiterLeadId) : null) ?? '—'}</div>
+                      </div>
+                      <div>
+                        <div className="text-[10px] uppercase text-muted-foreground">Gestor solicitante</div>
+                        <div className="font-medium">{detail.requesterName ?? userName(detail.requesterId) ?? '—'}</div>
+                      </div>
+                    </div>
+                  </div>
+                )}
+
                 {gate && (
                   <div className="rounded-md border p-3 text-xs">
                     <div className="mb-1 flex items-center gap-2 font-semibold">
@@ -535,7 +586,7 @@ export default function RecruitmentPage() {
                     </span>
                   )}
                   {canApprove && detail.status === 'APPROVED' && (
-                    <Button size="sm" onClick={() => act.mutate({ id: detail.id, action: 'send-to-recruitment' })} disabled={act.isPending}>
+                    <Button size="sm" onClick={() => openForward(detail)} disabled={act.isPending}>
                       <UserPlus className="mr-1 h-3.5 w-3.5" /> Encaminhar ao recrutamento
                     </Button>
                   )}
@@ -606,6 +657,54 @@ export default function RecruitmentPage() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* Encaminhamento: define quem conduz e quem acompanha */}
+      <Dialog open={forwardId != null} onOpenChange={(open) => !open && setForwardId(null)}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Encaminhar ao recrutamento</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-3 py-2">
+            <div>
+              <Label htmlFor="fwd-recruiter">Recrutador responsável (conduz a seleção)</Label>
+              <NativeSelect
+                id="fwd-recruiter"
+                value={forwardForm.recruiterId}
+                onChange={(e) => {
+                  const recruiterId = e.target.value;
+                  const lead = activeRecruiters.find((r) => r.userId === recruiterId)?.leadUserId ?? '';
+                  setForwardForm({ recruiterId, recruiterLeadId: lead });
+                }}
+              >
+                <option value="">Selecione um recrutador…</option>
+                {activeRecruiters.map((r) => <option key={r.id} value={r.userId}>{r.userName}{r.areaName ? ` — ${r.areaName}` : ''}</option>)}
+              </NativeSelect>
+              {activeRecruiters.length === 0 && (
+                <p className="mt-1 text-[11px] text-status-yellow">
+                  Nenhum recrutador cadastrado.{' '}
+                  <button type="button" className="underline" onClick={() => { setForwardId(null); setRecruitersOpen(true); }}>Cadastre um recrutador</button> antes de encaminhar.
+                </p>
+              )}
+            </div>
+            <div>
+              <Label htmlFor="fwd-lead">Líder do recrutador (acompanha)</Label>
+              <NativeSelect id="fwd-lead" value={forwardForm.recruiterLeadId} onChange={(e) => setForwardForm((f) => ({ ...f, recruiterLeadId: e.target.value }))}>
+                <option value="">Sem líder acompanhante</option>
+                {(options?.users ?? []).map((u) => <option key={u.id} value={u.id}>{u.name}</option>)}
+              </NativeSelect>
+              <p className="mt-1 text-[11px] text-muted-foreground">Preenchido automaticamente pelo líder do recrutador cadastrado. O gestor solicitante ({detail?.requesterName ?? (detail ? userName(detail.requesterId) : null) ?? '—'}) já acompanha por padrão.</p>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" size="sm" onClick={() => setForwardId(null)}>Cancelar</Button>
+            <Button size="sm" disabled={forward.isPending || !forwardForm.recruiterId} onClick={() => forward.mutate()}>
+              <UserPlus className="mr-1.5 h-3.5 w-3.5" /> Encaminhar
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <RecruitersDialog open={recruitersOpen} onOpenChange={setRecruitersOpen} />
     </div>
   );
 }
