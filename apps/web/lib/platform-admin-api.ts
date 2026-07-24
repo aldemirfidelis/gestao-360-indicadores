@@ -30,6 +30,15 @@ export function clearPlatformAdminTokens() {
   window.localStorage.removeItem(REFRESH_KEY);
 }
 
+export function normalizePlatformAdminPath(path: string): string {
+  const withLeadingSlash = path.startsWith('/') ? path : `/${path}`;
+  if (withLeadingSlash === '/platform-admin') return '';
+  if (withLeadingSlash.startsWith('/platform-admin/')) {
+    return withLeadingSlash.slice('/platform-admin'.length);
+  }
+  return withLeadingSlash;
+}
+
 async function refreshAccess() {
   const refreshToken = getPlatformAdminRefreshToken();
   if (!refreshToken) return false;
@@ -63,13 +72,14 @@ export async function platformAdminApi<T>(path: string, opts: PlatformAdminApiOp
     headers,
     body: opts.json !== undefined ? JSON.stringify(opts.json) : opts.body,
   };
-  let res = await fetch(`${API_URL}/platform-admin${path}`, init);
+  const normalizedPath = normalizePlatformAdminPath(path);
+  let res = await fetch(`${API_URL}/platform-admin${normalizedPath}`, init);
 
   if (res.status === 401 && (await refreshAccess())) {
     const retryHeaders = new Headers(headers);
     const nextToken = getPlatformAdminAccessToken();
     if (nextToken) retryHeaders.set('authorization', `Bearer ${nextToken}`);
-    res = await fetch(`${API_URL}/platform-admin${path}`, { ...init, headers: retryHeaders });
+    res = await fetch(`${API_URL}/platform-admin${normalizedPath}`, { ...init, headers: retryHeaders });
   }
 
   const text = await res.text();

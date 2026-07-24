@@ -254,7 +254,7 @@ export const PERMISSION_CATALOG = [
   ['recruit:prehire', 'Validar documentos de pre-admissao', 'Recrutamento', 'update'],
   ['recruit:admit', 'Autorizar admissao e converter candidato em colaborador', 'Recrutamento', 'approve'],
   ['recruit:lgpd', 'Atender solicitacoes LGPD de candidatos (acesso/exclusao/retificacao/portabilidade)', 'Recrutamento', 'manage'],
-  ['recruit:manage', 'Administrar recrutamento (config, pipelines, canais)', 'Recrutamento', 'manage'],
+  ['recruit:manage', 'Administrar recrutamento (pagina de carreiras, configuracoes, pipelines e canais)', 'Recrutamento', 'manage'],
   ['saude:occupational', 'Agendar ASO admissional e registrar resultado clinico segregado', 'Saude Ocupacional', 'update'],
   ['folha:esocial', 'Gerar XML e lotes assistidos do eSocial e referenciar certificados', 'Folha de Pagamento', 'manage'],
 

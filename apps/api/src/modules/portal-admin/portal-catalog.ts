@@ -179,6 +179,7 @@ export const CATALOG_PAGES: CatalogPage[] = [
 
   { code: 'recruitment.requisitions', moduleCode: 'recruitment', name: 'Requisicoes e Aprovacoes', title: 'Requisicoes e Aprovacoes', route: '/recrutamento', menuOrder: 93.6 },
   { code: 'recruitment.jobs', moduleCode: 'recruitment', name: 'Vagas e Candidatos', title: 'Vagas e Candidatos', route: '/recrutamento/vagas', menuOrder: 93.7 },
+  { code: 'recruitment.career-page', moduleCode: 'recruitment', name: 'Pagina de Carreiras', title: 'Pagina de Carreiras', route: '/recrutamento/carreiras', menuOrder: 93.705 },
   { code: 'recruitment.job-detail', moduleCode: 'recruitment', name: 'Detalhe da Vaga', title: 'Vaga e Pipeline', route: '/recrutamento/vagas/[id]', menuOrder: 93.71 },
   { code: 'recruitment.talent-pool', moduleCode: 'recruitment', name: 'Banco de Talentos', title: 'Banco de Talentos', route: '/recrutamento/talentos', menuOrder: 93.72 },
   { code: 'recruitment.analytics', moduleCode: 'recruitment', name: 'Analises de Recrutamento', title: 'Analises de Recrutamento', route: '/recrutamento/analises', menuOrder: 93.73 },
@@ -328,6 +329,7 @@ export const CATALOG_FEATURES: CatalogFeature[] = [
   { code: 'compensation.export', moduleCode: 'compensation', name: 'Exportar dados de cargos e salarios', criticality: 'high' },
   { code: 'recruitment.requisitions', moduleCode: 'recruitment', name: 'Criar e aprovar requisicoes de vaga', criticality: 'high' },
   { code: 'recruitment.jobs', moduleCode: 'recruitment', name: 'Publicar vagas e administrar candidatos', criticality: 'high' },
+  { code: 'recruitment.career-page', moduleCode: 'recruitment', name: 'Personalizar e publicar pagina de carreiras', criticality: 'medium' },
   { code: 'recruitment.offers', moduleCode: 'recruitment', name: 'Aprovar propostas de contratacao', criticality: 'critical' },
   { code: 'recruitment.admission', moduleCode: 'recruitment', name: 'Converter pre-admissao em admissao', criticality: 'critical' },
   { code: 'recruitment.lgpd', moduleCode: 'recruitment', name: 'Administrar privacidade de candidatos', criticality: 'high' },

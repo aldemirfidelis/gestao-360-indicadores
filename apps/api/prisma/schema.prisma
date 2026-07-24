@@ -570,6 +570,7 @@ model Company {
   fsSuppliers                 FoodSafetySupplier[]              @relation("FsSupplierCompany")
   fsMaterials                 FoodSafetyMaterial[]              @relation("FsMaterialCompany")
   supportTickets              SupportTicket[]
+  recruitCareerPage           RecruitCareerPage?
   fsLots                      FoodSafetyLot[]                   @relation("FsLotCompany")
   fsTraceLinks                FoodSafetyTraceLink[]             @relation("FsTraceLinkCompany")
   fsRecalls                   FoodSafetyRecall[]                @relation("FsRecallCompany")
@@ -14104,6 +14105,48 @@ model RecruitPipelineStage {
 
   @@index([companyId, templateId])
   @@map("recruit_pipeline_stages")
+}
+
+/// Página pública de carreiras da empresa. O cadastro é separado da identidade
+/// geral do tenant para permitir uma comunicação própria de marca empregadora.
+model RecruitCareerPage {
+  id                 String   @id @default(uuid())
+  companyId          String   @unique
+  company            Company  @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  published          Boolean  @default(true)
+  showInGlobalPortal Boolean  @default(true)
+  template           String   @default("MODERN") // MODERN | CORPORATE | MINIMAL
+  heroAlignment      String   @default("LEFT") // LEFT | CENTER
+  headline           String?
+  subheadline        String?
+  bannerUrl          String?
+  bannerStorageKey   String?
+  bannerMimeType     String?
+  logoUrl            String?
+  logoStorageKey     String?
+  logoMimeType       String?
+  primaryColor       String   @default("#0f172a")
+  secondaryColor     String   @default("#0284c7")
+  accentColor        String   @default("#10b981")
+  backgroundColor    String   @default("#f8fafc")
+  aboutTitle         String?
+  aboutText          String?
+  cultureTitle       String?
+  cultureText        String?
+  benefitsTitle      String?
+  benefitsText       String?
+  contactEmail       String?
+  websiteUrl         String?
+  linkedinUrl        String?
+  seoTitle           String?
+  seoDescription     String?
+  showAbout          Boolean  @default(true)
+  showCulture        Boolean  @default(true)
+  showBenefits       Boolean  @default(true)
+  createdAt          DateTime @default(now())
+  updatedAt          DateTime @updatedAt
+
+  @@map("recruit_career_pages")
 }
 
 /// Vaga publicada (anúncio). Criada a partir de uma requisição encaminhada.

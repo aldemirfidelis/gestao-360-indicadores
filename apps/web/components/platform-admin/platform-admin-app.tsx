@@ -2452,7 +2452,7 @@ function InboxSection() {
   const contactsQuery = useQuery({
     queryKey: ['platform-admin', 'inbox', 'contacts', contactSearch, contactFilter],
     queryFn: () => {
-      let url = `/platform-admin/inbox/contacts?q=${encodeURIComponent(contactSearch)}`;
+      let url = `/inbox/contacts?q=${encodeURIComponent(contactSearch)}`;
       if (contactFilter === 'unread') url += '&read=false';
       if (contactFilter === 'read') url += '&read=true';
       return platformAdminApi<any[]>(url);
@@ -2461,7 +2461,7 @@ function InboxSection() {
 
   const markContactRead = useMutation({
     mutationFn: ({ id, read }: { id: string; read: boolean }) =>
-      platformAdminApi(`/platform-admin/inbox/contacts/${id}/read`, { method: 'PATCH', json: { read } }),
+      platformAdminApi(`/inbox/contacts/${id}/read`, { method: 'PATCH', json: { read } }),
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: ['platform-admin', 'inbox', 'contacts'] });
       setSelectedContact((prev: any) => prev ? { ...prev, read: !prev.read } : null);
@@ -2472,7 +2472,7 @@ function InboxSection() {
 
   const deleteContact = useMutation({
     mutationFn: (id: string) =>
-      platformAdminApi(`/platform-admin/inbox/contacts/${id}`, { method: 'DELETE' }),
+      platformAdminApi(`/inbox/contacts/${id}`, { method: 'DELETE' }),
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: ['platform-admin', 'inbox', 'contacts'] });
       setSelectedContact(null);
@@ -2491,7 +2491,7 @@ function InboxSection() {
   const ticketsQuery = useQuery({
     queryKey: ['platform-admin', 'inbox', 'tickets', ticketSearch, ticketStatusFilter],
     queryFn: () => {
-      let url = `/platform-admin/inbox/support-tickets?q=${encodeURIComponent(ticketSearch)}`;
+      let url = `/inbox/support-tickets?q=${encodeURIComponent(ticketSearch)}`;
       if (ticketStatusFilter !== 'all') url += `&status=${encodeURIComponent(ticketStatusFilter)}`;
       return platformAdminApi<any[]>(url);
     },
@@ -2499,13 +2499,13 @@ function InboxSection() {
 
   const ticketDetailsQuery = useQuery({
     queryKey: ['platform-admin', 'inbox', 'tickets', selectedTicketId],
-    queryFn: () => platformAdminApi<any>(`/platform-admin/inbox/support-tickets/${selectedTicketId}`),
+    queryFn: () => platformAdminApi<any>(`/inbox/support-tickets/${selectedTicketId}`),
     enabled: Boolean(selectedTicketId),
   });
 
   const sendReply = useMutation({
     mutationFn: ({ id, message, isInternal }: { id: string; message: string; isInternal: boolean }) =>
-      platformAdminApi(`/platform-admin/inbox/support-tickets/${id}/messages`, {
+      platformAdminApi(`/inbox/support-tickets/${id}/messages`, {
         method: 'POST',
         json: { message, isInternal },
       }),
@@ -2519,7 +2519,7 @@ function InboxSection() {
 
   const updateTicketStatus = useMutation({
     mutationFn: ({ id, status }: { id: string; status: string }) =>
-      platformAdminApi(`/platform-admin/inbox/support-tickets/${id}`, {
+      platformAdminApi(`/inbox/support-tickets/${id}`, {
         method: 'PATCH',
         json: { status },
       }),
@@ -2590,6 +2590,11 @@ function InboxSection() {
 
             <div className="divide-y max-h-[500px] overflow-y-auto pr-1">
               {contactsQuery.isLoading && <div className="py-6 text-center text-xs text-muted-foreground">Carregando mensagens...</div>}
+              {contactsQuery.isError && (
+                <div className="rounded-lg border border-red-200 bg-red-50 p-3 text-xs text-red-700 dark:border-red-900/50 dark:bg-red-950/30 dark:text-red-300">
+                  Não foi possível carregar as mensagens: {contactsQuery.error instanceof Error ? contactsQuery.error.message : 'erro desconhecido'}.
+                </div>
+              )}
               {contactsQuery.data?.map((contact) => (
                 <div
                   key={contact.id}
@@ -2616,7 +2621,7 @@ function InboxSection() {
                   <p className="text-xs line-clamp-2 text-slate-600 dark:text-slate-300 mt-1">{contact.message}</p>
                 </div>
               ))}
-              {(contactsQuery.data ?? []).length === 0 && !contactsQuery.isLoading && (
+              {(contactsQuery.data ?? []).length === 0 && !contactsQuery.isLoading && !contactsQuery.isError && (
                 <EmptyState title="Nenhuma mensagem recebida" />
               )}
             </div>
@@ -2718,7 +2723,9 @@ function InboxSection() {
                 >
                   <option value="all">Todos os status</option>
                   <option value="Aberto">Aberto</option>
-                  <option value="Em Atendimento">Em Atendimento</option>
+                  <option value="Em atendimento">Em atendimento</option>
+                  <option value="Em análise">Em análise</option>
+                  <option value="Aguardando retorno do solicitante">Aguardando retorno</option>
                   <option value="Resolvido">Resolvido</option>
                   <option value="Cancelado">Cancelado</option>
                 </NativeSelect>
@@ -2727,6 +2734,11 @@ function InboxSection() {
 
             <div className="divide-y max-h-[500px] overflow-y-auto pr-1">
               {ticketsQuery.isLoading && <div className="py-6 text-center text-xs text-muted-foreground">Carregando chamados...</div>}
+              {ticketsQuery.isError && (
+                <div className="rounded-lg border border-red-200 bg-red-50 p-3 text-xs text-red-700 dark:border-red-900/50 dark:bg-red-950/30 dark:text-red-300">
+                  Não foi possível carregar os chamados: {ticketsQuery.error instanceof Error ? ticketsQuery.error.message : 'erro desconhecido'}.
+                </div>
+              )}
               {ticketsQuery.data?.map((ticket) => (
                 <div
                   key={ticket.id}
@@ -2749,7 +2761,7 @@ function InboxSection() {
                     <span className={cn(
                       "px-1.5 py-0.5 rounded text-[10px] font-bold uppercase tracking-wide",
                       ticket.status === 'Aberto' ? "bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-400" :
-                      ticket.status === 'Em Atendimento' ? "bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-400" :
+                      ticket.status === 'Em atendimento' || ticket.status === 'Em análise' ? "bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-400" :
                       ticket.status === 'Resolvido' ? "bg-emerald-100 text-emerald-800 dark:bg-emerald-900/30 dark:text-emerald-400" :
                       "bg-slate-100 text-slate-800 dark:bg-slate-900 dark:text-slate-400"
                     )}>
@@ -2766,13 +2778,18 @@ function InboxSection() {
                   </div>
                 </div>
               ))}
-              {(ticketsQuery.data ?? []).length === 0 && !ticketsQuery.isLoading && (
+              {(ticketsQuery.data ?? []).length === 0 && !ticketsQuery.isLoading && !ticketsQuery.isError && (
                 <EmptyState title="Nenhum chamado de suporte" />
               )}
             </div>
           </Panel>
 
           <div>
+            {selectedTicketId && ticketDetailsQuery.isError && (
+              <div className="rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-700 dark:border-red-900/50 dark:bg-red-950/30 dark:text-red-300">
+                Não foi possível abrir o chamado: {ticketDetailsQuery.error instanceof Error ? ticketDetailsQuery.error.message : 'erro desconhecido'}.
+              </div>
+            )}
             {selectedTicketId && ticketDetailsQuery.data ? (
               <Panel title={`Chamado #${ticketDetailsQuery.data.id.substring(0, 8)}`}>
                 <p className="text-xs text-muted-foreground mb-4">Aberto por {ticketDetailsQuery.data.requesterName} ({ticketDetailsQuery.data.company?.name})</p>
@@ -2786,7 +2803,9 @@ function InboxSection() {
                         onChange={(e: any) => updateTicketStatus.mutate({ id: ticketDetailsQuery.data.id, status: e.target.value })}
                       >
                         <option value="Aberto">Aberto</option>
-                        <option value="Em Atendimento">Em Atendimento</option>
+                        <option value="Em atendimento">Em atendimento</option>
+                        <option value="Em análise">Em análise</option>
+                        <option value="Aguardando retorno do solicitante">Aguardando retorno do solicitante</option>
                         <option value="Resolvido">Resolvido</option>
                         <option value="Cancelado">Cancelado</option>
                       </NativeSelect>

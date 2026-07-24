@@ -908,6 +908,7 @@ export const publicRoutes = [
   '/solucoes',
   ...solutionPages.map((page) => page.path),
   '/modulos',
+  '/carreiras',
   '/segmentos',
   ...segmentPages.map((page) => page.path),
   '/recursos',
@@ -937,8 +938,9 @@ export const operationalPublicRoutes = ['/ponto-totem'];
  * Portal público de carreiras e área do candidato. O candidato externo não tem
  * sessão interna, então o guard de navegação (AuthProvider) precisa tratá-las como
  * públicas — senão qualquer visitante não logado é redirecionado para /login e o
- * portal fica inacessível para o público que ele atende. Ficam noindex e fora do
- * sitemap (as vagas são multi-tenant via ?empresa=, divulgadas por link direto).
+ * portal fica inacessível para o público que ele atende. A página global
+ * /carreiras também está em publicRoutes para sitemap; páginas de empresa,
+ * detalhes e candidato continuam fora da lista estática.
  */
 export const careersPublicRoutes = ['/carreiras', '/candidato'];
 

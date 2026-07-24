@@ -1,4 +1,4 @@
-import { Body, Controller, Delete, Get, Headers, Param, Patch, Post, Query, Req, UseGuards } from '@nestjs/common';
+import { Body, Controller, Delete, Get, Headers, Param, Patch, Post, Query, Req, StreamableFile, UseGuards } from '@nestjs/common';
 import { Public } from '../auth/public.decorator';
 import { RecruitCareersService } from './recruit-careers.service';
 import { RecruitCandidateAuthService } from './recruit-candidate-auth.service';
@@ -32,6 +32,32 @@ export class CareersController {
   }
 
   @Public()
+  @Get('global')
+  globalVacancies(
+    @Query('q') q?: string,
+    @Query('city') city?: string,
+    @Query('workMode') workMode?: string,
+    @Query('contractType') contractType?: string,
+    @Query('company') company?: string,
+  ) {
+    return this.careers.listGlobalVacancies({ q, city, workMode, contractType, company });
+  }
+
+  @Public()
+  @Get('assets/:kind')
+  async careerAsset(
+    @Param('kind') kind: string,
+    @Headers('host') host?: string,
+    @Query('empresa') empresa?: string,
+  ) {
+    const asset = await this.careers.readPublicAsset(kind, host, empresa);
+    return new StreamableFile(asset.buffer, {
+      type: asset.mimeType,
+      disposition: 'inline',
+    });
+  }
+
+  @Public()
   @Get('vacancies')
   vacancies(
     @Headers('host') host?: string,
@@ -39,8 +65,9 @@ export class CareersController {
     @Query('q') q?: string,
     @Query('city') city?: string,
     @Query('workMode') workMode?: string,
+    @Query('contractType') contractType?: string,
   ) {
-    return this.careers.listVacancies(host, empresa, { q, city, workMode });
+    return this.careers.listVacancies(host, empresa, { q, city, workMode, contractType });
   }
 
   @Public()

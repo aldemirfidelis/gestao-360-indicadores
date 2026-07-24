@@ -13,13 +13,14 @@ import {
   resolveCareersCompanySlug,
   setCandidateToken,
 } from '@/lib/candidate-api';
+import { type CareerPageConfig, type CareersCompany, careersImageUrl } from '@/lib/careers';
 
 interface Vacancy {
   slug: string; title: string; description: string | null; requirements: string | null; benefits: string | null;
   processSteps: string | null; area: string | null; city: string | null; location: string | null;
   workMode: string | null; contractType: string | null; pcd: boolean; salary: string | null; closesAt: string | null; closed: boolean;
 }
-interface Data { company: { name: string; slug: string | null; logoUrl: string | null }; vacancy: Vacancy }
+interface Data { company: CareersCompany; careerPage: CareerPageConfig; vacancy: Vacancy }
 interface ScreeningQuestion { id: string; order: number; type: string; question: string; required: boolean; options: unknown }
 interface ApplyResponse { id: string; status: string }
 
@@ -80,6 +81,8 @@ function VacancyDetailContent() {
 
   const suffix = companyQuery(empresa);
   const listSuffix = empresa ? `?empresa=${encodeURIComponent(empresa)}` : '';
+  const listPath = data?.company.careersPath ?? `/carreiras${listSuffix}`;
+  const logoUrl = careersImageUrl(data?.company.logoUrl);
   const v = data?.vacancy;
   const missingRequired = questions.some((q) => q.required && isEmptyAnswer(screeningAnswers[q.id]));
 
@@ -168,20 +171,23 @@ function VacancyDetailContent() {
 
   return (
     <main className="min-h-screen bg-slate-50 text-slate-900 dark:bg-slate-950 dark:text-slate-100">
-      <header className="border-b bg-white dark:border-slate-800 dark:bg-slate-900">
+      <header className="border-b text-white" style={{ backgroundColor: data?.careerPage.primaryColor ?? '#0f172a' }}>
         <div className="mx-auto flex max-w-3xl items-center gap-3 px-4 py-5">
-          {data?.company.logoUrl && <img src={data.company.logoUrl} alt="" className="h-9 w-auto" />}
-          <Link href={`/carreiras${listSuffix}`} className="text-sm font-semibold hover:underline">{data?.company.name ?? 'Carreiras'}</Link>
-          <Link href={`/candidato${listSuffix}`} className="ml-auto text-xs font-medium text-sky-600 hover:underline dark:text-sky-400">Area do candidato</Link>
+          {logoUrl && (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img src={logoUrl} alt="" className="h-9 max-w-40 bg-white object-contain p-1" />
+          )}
+          <Link href={listPath} className="text-sm font-semibold hover:underline">{data?.company.name ?? 'Carreiras'}</Link>
+          <Link href={`/candidato${listSuffix}`} className="ml-auto text-xs font-semibold hover:underline">Área do candidato</Link>
         </div>
       </header>
 
       <article className="mx-auto max-w-3xl px-4 py-8">
         {loading && <div className="py-12 text-center text-slate-400">Carregando...</div>}
-        {error && <div className="rounded-md border border-amber-300 bg-amber-50 p-4 text-sm text-amber-800 dark:border-amber-800/40 dark:bg-amber-950/20 dark:text-amber-300">{error} <Link href={`/carreiras${listSuffix}`} className="underline">Ver outras vagas</Link></div>}
+        {error && <div className="rounded-md border border-amber-300 bg-amber-50 p-4 text-sm text-amber-800 dark:border-amber-800/40 dark:bg-amber-950/20 dark:text-amber-300">{error} <Link href={listPath} className="underline">Ver outras vagas</Link></div>}
         {v && (
           <>
-            <Link href={`/carreiras${listSuffix}`} className="text-xs text-slate-400 hover:underline">Voltar para vagas</Link>
+            <Link href={listPath} className="text-xs text-slate-400 hover:underline">Voltar para vagas</Link>
             <h1 className="mt-2 text-2xl font-bold tracking-tight">{v.title}</h1>
             <p className="mt-1 text-sm text-slate-500">{[v.area, v.city || v.location, v.workMode ? MODE_LABEL[v.workMode] ?? v.workMode : null, v.contractType].filter(Boolean).join(' | ')}</p>
             {v.pcd && <span className="mt-2 inline-block rounded-full bg-sky-100 px-2 py-0.5 text-[10px] font-medium text-sky-700 dark:bg-sky-900/30 dark:text-sky-300">Vaga afirmativa PcD</span>}

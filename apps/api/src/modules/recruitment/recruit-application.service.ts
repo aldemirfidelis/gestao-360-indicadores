@@ -195,9 +195,26 @@ export class RecruitApplicationService {
       orderBy: { appliedAt: 'desc' },
       include: { posting: { select: { title: true, slug: true, city: true, workMode: true } }, stage: { select: { name: true } } },
     });
+    const companyIds = [...new Set(apps.map((application) => application.companyId))];
+    const companies = companyIds.length
+      ? await this.prisma.company.findMany({
+          where: { id: { in: companyIds }, deletedAt: null },
+          select: { id: true, name: true, tradeName: true, slug: true },
+        })
+      : [];
+    const companyById = new Map(companies.map((company) => [company.id, company]));
     return apps.map((a) => ({
       id: a.id, status: a.status, appliedAt: a.appliedAt, stage: a.stage?.name ?? null,
-      posting: a.posting, rejectionReason: a.status === 'REJECTED' ? a.rejectionReason : null,
+      posting: {
+        ...a.posting,
+        company: companyById.has(a.companyId)
+          ? {
+              name: companyById.get(a.companyId)!.tradeName ?? companyById.get(a.companyId)!.name,
+              slug: companyById.get(a.companyId)!.slug,
+            }
+          : null,
+      },
+      rejectionReason: a.status === 'REJECTED' ? a.rejectionReason : null,
     }));
   }
 

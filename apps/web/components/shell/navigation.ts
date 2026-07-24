@@ -21,6 +21,7 @@ import {
   GanttChartSquare,
   Gauge,
   Goal,
+  Globe2,
   Image as ImageIcon,
   KeyRound,
   Layers3,
@@ -262,6 +263,7 @@ export const navSections: NavSection[] = [
     items: [
       { href: '/recrutamento', label: 'Requisições e Aprovações', description: 'Solicitação, alçadas e liberação de vagas', icon: ClipboardCheck, permissions: ['recruit:view', 'recruit:requisition:create', 'recruit:requisition:approve', 'recruit:manage'], exact: true },
       { href: '/recrutamento/vagas', label: 'Vagas e Candidatos', description: 'Divulgação, pipeline, avaliação, proposta e pré-admissão', icon: Briefcase, permissions: ['recruit:view', 'recruit:offer:approve', 'recruit:prehire', 'recruit:admit', 'recruit:manage', 'saude:occupational'] },
+      { href: '/recrutamento/carreiras', label: 'Página de Carreiras', description: 'Banner, logo, cores e marca empregadora', icon: Globe2, permissions: ['recruit:view', 'recruit:manage'] },
       { href: '/recrutamento/lgpd', label: 'Privacidade e LGPD', description: 'Solicitações de titulares e proteção dos dados de candidatos', icon: ShieldCheck, permissions: ['recruit:lgpd', 'recruit:manage'] },
     ],
   },

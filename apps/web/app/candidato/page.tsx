@@ -59,7 +59,13 @@ interface Application {
   status: string;
   appliedAt: string;
   stage: string | null;
-  posting: { title: string; slug: string; city: string | null; workMode: string | null };
+  posting: {
+    title: string;
+    slug: string;
+    city: string | null;
+    workMode: string | null;
+    company: { name: string; slug: string | null } | null;
+  };
   rejectionReason: string | null;
 }
 
@@ -805,6 +811,7 @@ function CandidatePortalContent() {
               <div key={app.id} className="rounded-md border p-4 dark:border-slate-800">
                 <div className="flex items-start justify-between gap-3">
                   <div>
+                    {app.posting.company?.name && <p className="text-[10px] font-bold uppercase tracking-wide text-sky-600 dark:text-sky-400">{app.posting.company.name}</p>}
                     <h3 className="font-semibold">{app.posting.title}</h3>
                     <p className="text-xs text-slate-500">{[app.posting.city, app.posting.workMode, app.stage].filter(Boolean).join(' | ')}</p>
                   </div>
@@ -812,7 +819,12 @@ function CandidatePortalContent() {
                 </div>
                 {app.rejectionReason && <p className="mt-3 rounded-md bg-slate-50 p-3 text-xs text-slate-500 dark:bg-slate-950">{app.rejectionReason}</p>}
                 <div className="mt-4 flex flex-wrap gap-2">
-                  <Link href={`/carreiras/vagas/${app.posting.slug}${publicSuffix}`} className="rounded-md border px-3 py-2 text-xs font-semibold hover:bg-slate-50 dark:border-slate-700 dark:hover:bg-slate-800">Ver vaga</Link>
+                  <Link
+                    href={`/carreiras/vagas/${app.posting.slug}${app.posting.company?.slug ? `?empresa=${encodeURIComponent(app.posting.company.slug)}` : publicSuffix}`}
+                    className="rounded-md border px-3 py-2 text-xs font-semibold hover:bg-slate-50 dark:border-slate-700 dark:hover:bg-slate-800"
+                  >
+                    Ver vaga
+                  </Link>
                   {app.status === 'ACTIVE' && <button onClick={() => withdraw(app.id)} disabled={busy} className="inline-flex items-center gap-1 rounded-md border px-3 py-2 text-xs font-semibold text-rose-600 hover:bg-rose-50 disabled:opacity-50 dark:border-slate-700 dark:hover:bg-rose-950/20"><XCircle className="h-3.5 w-3.5" /> Desistir</button>}
                 </div>
               </div>

@@ -14,6 +14,7 @@ import { RecruitLgpdService } from './recruit-lgpd.service';
 import { RecruitCommunicationService } from './recruit-communication.service';
 import { RecruitAnalyticsService } from './recruit-analytics.service';
 import { RecruitTalentPoolService } from './recruit-talent-pool.service';
+import { RecruitCareersService } from './recruit-careers.service';
 
 /**
  * Recrutamento e Seleção (F1-F2). Rotas autenticadas /api/recruitment/*.
@@ -34,6 +35,7 @@ export class RecruitmentController {
     private readonly communication: RecruitCommunicationService,
     private readonly analytics: RecruitAnalyticsService,
     private readonly talentPool: RecruitTalentPoolService,
+    private readonly careers: RecruitCareersService,
   ) {}
 
   // ------------------------------ analytics ------------------------------
@@ -42,6 +44,36 @@ export class RecruitmentController {
   @RequirePermissions('recruit:view')
   getAnalyticsFunnel(@CurrentUser() me: AuthPayload, @Query('from') from?: string, @Query('to') to?: string) {
     return this.analytics.getFunnel(me, { from, to });
+  }
+
+  // ------------------------------ página pública de carreiras ------------------------------
+
+  @Get('career-page')
+  @RequirePermissions('recruit:view')
+  getCareerPage(@CurrentUser() me: AuthPayload) {
+    return this.careers.getCareerPageConfig(me);
+  }
+
+  @Patch('career-page')
+  @RequirePermissions('recruit:manage')
+  updateCareerPage(@CurrentUser() me: AuthPayload, @Body() body: Record<string, unknown>) {
+    return this.careers.updateCareerPage(me, body);
+  }
+
+  @Post('career-page/assets/:kind')
+  @RequirePermissions('recruit:manage')
+  uploadCareerAsset(
+    @CurrentUser() me: AuthPayload,
+    @Param('kind') kind: string,
+    @Body() body: Record<string, unknown>,
+  ) {
+    return this.careers.uploadCareerAsset(me, kind, body);
+  }
+
+  @Delete('career-page/assets/:kind')
+  @RequirePermissions('recruit:manage')
+  removeCareerAsset(@CurrentUser() me: AuthPayload, @Param('kind') kind: string) {
+    return this.careers.removeCareerAsset(me, kind);
   }
 
   // ------------------------------ banco de talentos ------------------------------

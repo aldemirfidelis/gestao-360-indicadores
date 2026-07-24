@@ -1,6 +1,6 @@
 import Link from 'next/link';
 import type { ReactNode } from 'react';
-import { ArrowRight, BarChart3, FileText, Layers3, ShieldCheck } from 'lucide-react';
+import { ArrowRight, BarChart3, BriefcaseBusiness, FileText, Layers3, ShieldCheck, UserRound } from 'lucide-react';
 import { BrandLogo } from '@/components/brand/brand-logo';
 import { DEMO_PATH } from '@/lib/public-site';
 import { DemoLink } from './demo-link';
@@ -8,6 +8,7 @@ import { DemoLink } from './demo-link';
 const nav = [
   { href: '/solucoes', label: 'Soluções' },
   { href: '/modulos', label: 'Módulos' },
+  { href: '/carreiras', label: 'Vagas' },
   { href: '/segmentos', label: 'Segmentos' },
   { href: '/recursos', label: 'Recursos' },
   { href: '/conteudos', label: 'Conteúdos' },
@@ -37,6 +38,8 @@ const footerGroups = [
       ['Suporte', '/suporte'],
       ['SAC', '/suporte#formulario'],
       ['Contato Comercial', '/contato'],
+      ['Vagas abertas', '/carreiras'],
+      ['Área do candidato', '/candidato'],
       ['Trial de 30 dias', '/teste-gratis'],
     ],
   },
@@ -61,7 +64,7 @@ export function PublicShell({ children }: { children: ReactNode }) {
           <Link href="/" aria-label="Página inicial do Gestão 360" className="shrink-0">
             <BrandLogo variant="horizontal" size="sm" theme="light" animated={true} />
           </Link>
-          <nav aria-label="Navegação principal" className="hidden items-center gap-6 lg:flex">
+          <nav aria-label="Navegação principal" className="hidden items-center gap-6 2xl:flex">
             {nav.map((item) => (
               <Link key={item.href} href={item.href} className="text-sm font-semibold text-slate-600 hover:text-slate-950">
                 {item.label}
@@ -69,8 +72,27 @@ export function PublicShell({ children }: { children: ReactNode }) {
             ))}
           </nav>
           <div className="flex items-center gap-2">
+            <Link
+              href="/candidato"
+              className="hidden items-center gap-2 border border-slate-300 px-3 py-2 text-sm font-semibold text-slate-700 hover:border-sky-500 hover:text-sky-700 sm:inline-flex"
+              aria-label="Acessar a Área do candidato"
+            >
+              <UserRound className="h-4 w-4" />
+              <span className="hidden xl:inline">Área do candidato</span>
+              <span className="xl:hidden">Candidato</span>
+            </Link>
+            <Link
+              href="/carreiras"
+              className="inline-flex items-center gap-2 bg-emerald-600 px-3 py-2 text-sm font-semibold text-white hover:bg-emerald-500"
+              aria-label="Encontre sua próxima vaga no portal global de carreiras"
+            >
+              <BriefcaseBusiness className="h-4 w-4" />
+              <span className="hidden xl:inline">Encontre sua próxima vaga</span>
+              <span className="xl:hidden">Vagas</span>
+            </Link>
             <DemoLink source="public_header" className="inline-flex items-center gap-2 bg-slate-950 px-3 py-2 text-sm font-semibold text-white hover:bg-emerald-700">
-              Acesse a Demonstração
+              <span className="hidden sm:inline">Acesse a Demonstração</span>
+              <span className="sm:hidden">Demo</span>
               <ArrowRight className="h-4 w-4" />
             </DemoLink>
           </div>

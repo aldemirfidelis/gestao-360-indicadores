@@ -12,6 +12,7 @@ import { Button } from '@/components/ui/button';
 import { useAuth } from '@/components/auth/auth-provider';
 import { BrandLogo } from '@/components/brand/brand-logo';
 import { fetchTenantBranding, type TenantBranding } from '@/lib/tenant';
+import Link from 'next/link';
 
 // Login aceita e-mail, CPF (11 dígitos, com ou sem máscara) ou matrícula — o
 // backend resolve o identificador (auth.service.ts). Não usar z.string().email()
@@ -184,8 +185,17 @@ export default function LoginPage() {
               </CardContent>
             </Card>
 
-            <div className="text-center text-xs text-slate-500">
-              Dúvidas sobre o acesso? <a href="/suporte#formulario" className="text-cyan-400 hover:underline">Fale com o suporte</a>.
+            <div className="space-y-2 text-center text-xs text-slate-500">
+              <p>
+                É candidato?{' '}
+                <Link href="/candidato" className="font-semibold text-cyan-400 hover:underline">
+                  Acesse a Área do candidato
+                </Link>
+                .
+              </p>
+              <p>
+                Dúvidas sobre o acesso? <a href="/suporte#formulario" className="text-cyan-400 hover:underline">Fale com o suporte</a>.
+              </p>
             </div>
           </div>
         </div>
