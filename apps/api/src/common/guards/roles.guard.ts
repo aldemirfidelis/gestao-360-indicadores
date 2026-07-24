@@ -56,7 +56,6 @@ export class RolesGuard implements CanActivate {
     const keys = new Set<string>();
     user?.permissions.forEach((item) => keys.add(item.permission.key));
     user?.accessProfile?.permissions.forEach((item) => keys.add(item.permission.key));
-    if (role === UserRoleEnum.COMPANY_ADMIN && keys.size === 0) return true;
     // Semantica: basta o usuario ter QUALQUER UMA das permissoes exigidas
     // (OR). Aceita tambem o curinga `<modulo>:manage`.
     return permissions.some((key) => keys.has(key) || keys.has(`${key.split(':')[0]}:manage`));

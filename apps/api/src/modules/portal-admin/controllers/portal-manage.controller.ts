@@ -76,5 +76,7 @@ export class PortalManageController {
   @Post('diagnostics/run') @PortalTabTag('diagnostics') diagRun(@CurrentUser() u: AuthPayload) { return this.diagnostics.run(u); }
 
   // ---- Perfis e Permissões (surface do RBAC) ----
-  @Get('permissions') @PortalTabTag('permissions') perms() { return this.permissions.overview(); }
+  @Get('permissions') @PortalTabTag('permissions') perms(@CurrentUser() user: AuthPayload) {
+    return this.permissions.overview(user.companyId);
+  }
 }

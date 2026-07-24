@@ -8,6 +8,7 @@ import { AuthController } from './auth.controller';
 import { JwtStrategy } from './jwt.strategy';
 import { JwtAuthGuard } from './jwt-auth.guard';
 import { RolesGuard } from '../../common/guards/roles.guard';
+import { ExclusiveAccessProfileGuard } from '../../common/guards/exclusive-access-profile.guard';
 import { requireSecret } from '../../common/env';
 import { PublicModule } from '../public/public.module';
 
@@ -30,6 +31,7 @@ import { PublicModule } from '../public/public.module';
     AuthService,
     JwtStrategy,
     { provide: APP_GUARD, useClass: JwtAuthGuard },
+    { provide: APP_GUARD, useClass: ExclusiveAccessProfileGuard },
     { provide: APP_GUARD, useClass: RolesGuard },
   ],
   exports: [AuthService],

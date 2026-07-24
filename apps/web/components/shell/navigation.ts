@@ -89,6 +89,14 @@ export const RECRUITMENT_ROUTE_PERMISSIONS = [
   'saude:occupational',
 ];
 
+export const EMPLOYEE_SELF_SERVICE_PERMISSIONS = [
+  'ponto:view',
+  'ponto:clock',
+  'folha:view',
+  'pessoal:view',
+  'pessoal:manage',
+];
+
 export const companyUsersNavItem: NavItem = {
   href: '/users',
   label: 'Usuários',
@@ -105,7 +113,7 @@ export const portalServiceSections: NavSection[] = [
     icon: MessageSquare,
     flat: true,
     items: [
-      { href: '/central-atendimento', label: 'Central de Atendimento', description: 'Abra chamados, tire dúvidas e solicite suporte', icon: MessageSquare, permissions: [], exact: true },
+      { href: '/central-atendimento', label: 'Central de Atendimento', description: 'Abra chamados, tire dúvidas e solicite suporte', icon: MessageSquare, permissions: ['help:view'], exact: true },
     ],
   },
   {
@@ -131,7 +139,7 @@ export const navSections: NavSection[] = [
     icon: ListTodo,
     flat: true,
     items: [
-      { href: '/meu-dia', label: 'Meu Dia', description: 'Central de trabalho: tudo que exige sua atenção hoje', icon: ListTodo, permissions: [], exact: true },
+      { href: '/meu-dia', label: 'Meu Dia', description: 'Central de trabalho: tudo que exige sua atenção hoje', icon: ListTodo, permissions: ['myday:view'], exact: true },
     ],
   },
   {
@@ -141,7 +149,7 @@ export const navSections: NavSection[] = [
     icon: ClipboardCheck,
     flat: true,
     items: [
-      { href: '/tarefas', label: 'Tarefas', description: 'Tarefas do usuário, incluindo documentos liberados para edição', icon: ClipboardCheck, permissions: [], exact: true },
+      { href: '/tarefas', label: 'Tarefas', description: 'Tarefas do usuário, incluindo documentos liberados para edição', icon: ClipboardCheck, permissions: ['myday:view'], exact: true },
     ],
   },
   {
@@ -269,7 +277,7 @@ export const navSections: NavSection[] = [
       { href: '/servico-pessoal/ferias', label: 'Férias e Afastamentos', description: 'Gestão do DP: saldos, aprovação de solicitações e atestados/afastamentos (o colaborador solicita em Minha Vida Funcional)', icon: CalendarDays, permissions: ['pessoal:view', 'pessoal:manage'] },
       { href: '/servico-pessoal/admissoes', label: 'Admissão e Desligamento', description: 'Checklists de admissão/desligamento e saúde ocupacional (ASO)', icon: ClipboardCheck, permissions: ['pessoal:view', 'pessoal:manage'] },
       { href: '/servico-pessoal/folha', label: 'Folha de Pagamento', description: 'Cálculo de folha, holerites, competências e adiantamento', icon: Banknote, permissions: ['folha:view'] },
-      { href: '/servico-pessoal/meu-holerite', label: 'Minha Vida Funcional', description: 'Seu ponto (bater ponto e espelho), férias, vagas internas, holerites e informe de rendimentos', icon: Wallet, permissions: [] },
+      { href: '/servico-pessoal/meu-holerite', label: 'Minha Vida Funcional', description: 'Seu ponto (bater ponto e espelho), férias, vagas internas, holerites e informe de rendimentos', icon: Wallet, permissions: EMPLOYEE_SELF_SERVICE_PERMISSIONS },
       { href: '/servico-pessoal/relatorios', label: 'Relatórios', description: 'Turnover, absenteísmo, horas extras e exportação para a folha', icon: FileBarChart, permissions: ['pessoal:view', 'pessoal:manage'] },
       { href: '/servico-pessoal/configuracoes', label: 'Configurações', description: 'Numeração da matrícula e modelo do crachá de identificação', icon: Settings, permissions: ['pessoal:settings', 'pessoal:manage'] },
     ],
@@ -328,8 +336,8 @@ export const navSections: NavSection[] = [
 ];
 
 export const mobileNavItems: NavItem[] = [
-  { href: '/meu-dia', label: 'Meu Dia', icon: ListTodo, permissions: [], exact: true },
-  { href: '/tarefas', label: 'Tarefas', icon: ClipboardCheck, permissions: [], exact: true },
+  { href: '/meu-dia', label: 'Meu Dia', icon: ListTodo, permissions: ['myday:view'], exact: true },
+  { href: '/tarefas', label: 'Tarefas', icon: ClipboardCheck, permissions: ['myday:view'], exact: true },
   { href: '/indicators', label: 'Indicadores', icon: Target, permissions: ['indicators:view'], exact: true },
   { href: '/visualization', label: 'Painel', icon: BarChart3, permissions: ['visualization:view', 'dashboard:view'] },
   companyUsersNavItem,
@@ -338,9 +346,9 @@ export const mobileNavItems: NavItem[] = [
 // Mapeamento centralizado URL -> permissoes necessarias.
 // Usado pelo RouteGuard para bloquear acesso direto via URL.
 export const ROUTE_PERMISSIONS: Array<{ prefix: string; permissions: string[]; exact?: boolean }> = [
-  { prefix: '/meu-dia', permissions: [] },
-  { prefix: '/tarefas', permissions: [] },
-  { prefix: '/dashboard', permissions: [] },
+  { prefix: '/meu-dia', permissions: ['myday:view'] },
+  { prefix: '/tarefas', permissions: ['myday:view'] },
+  { prefix: '/dashboard', permissions: ['myday:view'] },
   { prefix: '/central-automacoes', permissions: ['automations:view'] },
   { prefix: '/central-impactos', permissions: ['vision360:view'] },
   { prefix: '/privacidade', permissions: [SUPER_ADMIN_ONLY_PERMISSION] },
@@ -359,9 +367,10 @@ export const ROUTE_PERMISSIONS: Array<{ prefix: string; permissions: string[]; e
   // protegido durante a transição e é redirecionado pelo middleware.
   { prefix: '/recrutamento', permissions: RECRUITMENT_ROUTE_PERMISSIONS },
   { prefix: '/servico-pessoal/recrutamento', permissions: RECRUITMENT_ROUTE_PERMISSIONS },
-  // Portal do próprio colaborador (holerites/informe): liberado a qualquer usuário
-  // autenticado, como o item de menu correspondente.
-  { prefix: '/servico-pessoal/meu-holerite', permissions: [] },
+  // Portal do próprio colaborador (holerites/informe): exige ao menos uma
+  // permissão de autoatendimento. Assim um perfil de módulo único não recebe
+  // Serviço Pessoal implicitamente.
+  { prefix: '/servico-pessoal/meu-holerite', permissions: EMPLOYEE_SELF_SERVICE_PERMISSIONS },
   { prefix: '/servico-pessoal', permissions: ['ponto:view', 'ponto:manage', 'pessoal:view', 'folha:view'] },
   { prefix: '/suprimentos', permissions: ['compras:view', 'compras:request', 'compras:buy', 'compras:approve', 'compras:manage', 'estoque:view', 'estoque:withdraw', 'estoque:operate', 'estoque:approve', 'estoque:transfer', 'estoque:adjust', 'estoque:manage'] },
   { prefix: '/organograma', permissions: ['compensation:view', 'org:positions:view', 'org:view'] },
@@ -369,7 +378,7 @@ export const ROUTE_PERMISSIONS: Array<{ prefix: string; permissions: string[]; e
   { prefix: '/projects', permissions: ['projects:view'] },
   { prefix: '/deviations', permissions: ['deviations:view'] },
   { prefix: '/imports', permissions: ['imports:view', 'imports:create'] },
-  { prefix: '/scan', permissions: [] },
+  { prefix: '/scan', permissions: ['forms:view', 'asset-security:view'] },
   { prefix: '/eficacia', permissions: ['eficacia:view', 'actions:effectiveness'] },
   { prefix: '/periods', permissions: ['settings:manage'] },
   { prefix: '/actions', permissions: ['actions:view'] },
@@ -384,18 +393,18 @@ export const ROUTE_PERMISSIONS: Array<{ prefix: string; permissions: string[]; e
   { prefix: '/monthly-results', permissions: ['monthly:view'] },
   { prefix: '/meetings', permissions: ['meetings:view'] },
   { prefix: '/okrs', permissions: ['okrs:view'] },
-  { prefix: '/gestao-premio/integracoes', permissions: [] },
+  { prefix: '/gestao-premio/integracoes', permissions: [SUPER_ADMIN_ONLY_PERMISSION] },
   { prefix: '/gestao-premio', permissions: ['prize:view'] },
   { prefix: '/plataforma', permissions: ['platform:admin'] },
   { prefix: '/selecionar-empresa', permissions: ['platform:admin'] },
   { prefix: '/reports', permissions: ['reports:view', 'reports:export'] },
   { prefix: '/audit', permissions: ['users:view', 'users:manage'] },
   { prefix: '/comunicacao', permissions: ['communication:view'] },
-  { prefix: '/pessoas', permissions: [] },
+  { prefix: '/pessoas', permissions: ['directory:view'] },
   { prefix: '/perfil', permissions: [] },
   { prefix: '/integracoes', permissions: [SUPER_ADMIN_ONLY_PERMISSION] },
-  { prefix: '/ajuda', permissions: [] },
-  { prefix: '/central-atendimento', permissions: [] },
+  { prefix: '/ajuda', permissions: ['help:view'] },
+  { prefix: '/central-atendimento', permissions: ['help:view'] },
   { prefix: '/users', permissions: ['users:view', 'users:manage'] },
   // Rotas antigas de Configuracoes no app da empresa. O layout de /settings
   // redireciona para /users; o restante foi centralizado no Portal Admin Global.
@@ -408,6 +417,7 @@ export const ROUTE_PERMISSIONS: Array<{ prefix: string; permissions: string[]; e
 ];
 
 export function findRoutePermissions(pathname: string): string[] | null {
+  if (pathname.startsWith('/perfil/')) return ['directory:view'];
   const ordered = [...ROUTE_PERMISSIONS].sort((a, b) => b.prefix.length - a.prefix.length);
   for (const route of ordered) {
     if (pathname === route.prefix || pathname.startsWith(`${route.prefix}/`)) {
@@ -442,6 +452,27 @@ export function visibleAllNavSections(user: NavUser | null | undefined) {
 
 export function visibleMobileItems(user: NavUser | null | undefined) {
   return mobileNavItems.filter((item) => canAccess(user, item.permissions));
+}
+
+export function defaultLandingFor(user: NavUser | null | undefined, preferred?: string | null) {
+  const normalizedPreferred = preferred === '/dashboard' ? '/meu-dia' : preferred;
+  if (
+    normalizedPreferred &&
+    normalizedPreferred.startsWith('/') &&
+    canAccessRoute(user, normalizedPreferred)
+  ) {
+    return normalizedPreferred;
+  }
+
+  const firstVisible = visibleAllNavSections(user)
+    .flatMap((section) => section.items)
+    .find((item) => item.href !== '/totem');
+  return firstVisible?.href ?? '/perfil';
+}
+
+export function canAccessRoute(user: NavUser | null | undefined, pathname: string) {
+  const required = findRoutePermissions(pathname.split('?')[0]);
+  return required === null || canAccess(user, required);
 }
 
 export function canAccess(user: NavUser | null | undefined, permissions?: string[]) {

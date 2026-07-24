@@ -9,15 +9,35 @@ import { PrismaService } from '../../../prisma/prisma.service';
 export class PermissionViewService {
   constructor(private readonly prisma: PrismaService) {}
 
-  async overview() {
+  async overview(companyId?: string) {
     const [profiles, permissions, roleCounts] = await Promise.all([
       this.prisma.accessProfile.findMany({
-        where: { deletedAt: null },
-        select: { id: true, code: true, name: true, role: true, status: true, system: true, _count: { select: { users: true, permissions: true } } },
+        where: {
+          deletedAt: null,
+          ...(companyId ? { OR: [{ companyId: null }, { companyId }] } : {}),
+        },
+        select: {
+          id: true,
+          code: true,
+          name: true,
+          role: true,
+          status: true,
+          system: true,
+          _count: {
+            select: {
+              users: companyId ? { where: { companyId, deletedAt: null } } : true,
+              permissions: true,
+            },
+          },
+        },
         orderBy: { name: 'asc' },
       }),
       this.prisma.permission.findMany({ orderBy: [{ module: 'asc' }, { action: 'asc' }] }),
-      this.prisma.user.groupBy({ by: ['role'], where: { deletedAt: null }, _count: { _all: true } }),
+      this.prisma.user.groupBy({
+        by: ['role'],
+        where: { deletedAt: null, ...(companyId ? { companyId } : {}) },
+        _count: { _all: true },
+      }),
     ]);
     const byModule = new Map<string, number>();
     for (const p of permissions) byModule.set(p.module, (byModule.get(p.module) ?? 0) + 1);
@@ -26,7 +46,9 @@ export class PermissionViewService {
       permissionModules: Array.from(byModule.entries()).map(([module, count]) => ({ module, count })),
       totalPermissions: permissions.length,
       usersByRole: roleCounts.map((r) => ({ role: r.role, count: r._count._all })),
-      note: 'A edição de perfis/permissões é feita em Configurações > Segurança (RBAC existente).',
+      note: companyId
+        ? 'Visão limitada à empresa selecionada. A edição é feita em Usuários e Permissões.'
+        : 'Visão global da plataforma. Selecione uma empresa para administrar seus perfis e usuários.',
     };
   }
 }

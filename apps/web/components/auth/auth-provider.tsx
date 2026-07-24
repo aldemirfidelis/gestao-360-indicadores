@@ -4,7 +4,11 @@ import { createContext, useContext, useEffect, useState, ReactNode } from 'react
 import { useRouter, usePathname } from 'next/navigation';
 import { useQueryClient } from '@tanstack/react-query';
 import { api, clearTokens, getAccessToken, setTokens } from '@/lib/api';
-import { SUPER_ADMIN_ONLY_PERMISSION } from '@/components/shell/navigation';
+import {
+  SUPER_ADMIN_ONLY_PERMISSION,
+  canAccess,
+  defaultLandingFor,
+} from '@/components/shell/navigation';
 import { authPublicRoutes } from '@/lib/public-site';
 
 
@@ -106,17 +110,21 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       router.replace('/totem');
       return;
     }
-    // Pagina inicial padrao = Meu Dia, respeitando a preferencia do usuario.
-    let landing = '/meu-dia';
-    try {
-      const pref: any = await api('/my-day/preferences');
-      if (pref?.landingPage && typeof pref.landingPage === 'string' && pref.landingPage.startsWith('/')) {
-        landing = pref.landingPage === '/dashboard' ? '/meu-dia' : pref.landingPage;
+    // Só consulta preferências do Meu Dia quando o perfil realmente possui o
+    // módulo. Perfis de módulo único entram diretamente na primeira rota que
+    // suas permissões permitem.
+    let preferredLanding: string | null = null;
+    if (canAccess(profile, ['myday:view'])) {
+      try {
+        const pref: any = await api('/my-day/preferences');
+        if (pref?.landingPage && typeof pref.landingPage === 'string' && pref.landingPage.startsWith('/')) {
+          preferredLanding = pref.landingPage;
+        }
+      } catch {
+        /* usa a primeira rota acessível */
       }
-    } catch {
-      /* mantem o padrao */
     }
-    router.replace(landing);
+    router.replace(defaultLandingFor(profile, preferredLanding));
   };
 
   const switchCompany = async (companyId: string | null) => {

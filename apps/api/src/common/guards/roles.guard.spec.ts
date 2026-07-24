@@ -88,4 +88,33 @@ describe('RolesGuard', () => {
       ),
     ).resolves.toBe(false);
   });
+
+  it('does not grant every permission to a company admin with an empty profile', async () => {
+    const reflector = {
+      getAllAndOverride: vi.fn((key: string) => {
+        if (key === PERMISSIONS_KEY) return ['users:manage'];
+        return undefined;
+      }),
+      getAllAndMerge: vi.fn().mockReturnValue([]),
+    };
+    const prisma = {
+      user: {
+        findUnique: vi.fn().mockResolvedValue({
+          permissions: [],
+          accessProfile: { permissions: [] },
+        }),
+      },
+    };
+    const guard = new RolesGuard(reflector as any, prisma as any);
+
+    await expect(
+      guard.canActivate(
+        context({
+          sub: 'admin-1',
+          role: UserRoleEnum.COMPANY_ADMIN,
+          companyId: 'company-1',
+        }),
+      ),
+    ).resolves.toBe(false);
+  });
 });

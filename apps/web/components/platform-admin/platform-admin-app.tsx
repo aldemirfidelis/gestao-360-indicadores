@@ -79,6 +79,7 @@ import DatabaseAdvancedPage from '@/app/(app)/settings/database/advanced/page';
 
 type SectionKey =
   | 'dashboard'
+  | 'governance'
   | 'settings'
   | 'generalSettings'
   | 'visibilityAdmin'
@@ -238,15 +239,16 @@ interface CompanyAuditEntry {
 // cards) foi removida por duplicar a propria barra — cada destino segue aqui.
 const SECTIONS: SectionItem[] = [
   { key: 'dashboard', label: 'Painel', icon: LayoutDashboard, group: 'Geral' },
+  { key: 'governance', label: 'Governança e Escopos', icon: ShieldCheck, group: 'Geral' },
   // Gestao dos clientes da plataforma (global, independe da empresa selecionada).
   { key: 'companies', label: 'Empresas', icon: Building2, group: 'Plataforma' },
   { key: 'modules', label: 'Matriz de Módulos', icon: PackageCheck, group: 'Plataforma' },
   { key: 'plans', label: 'Planos', icon: ListChecks, group: 'Plataforma' },
   { key: 'seoPresence', label: 'SEO e Presenca Digital', icon: Globe2, group: 'Plataforma' },
   { key: 'inbox', label: 'HelpDesk e Caixa de Entrada', icon: Inbox, group: 'Plataforma' },
-  { key: 'users', label: 'Usuários', icon: Users, group: 'Plataforma' },
   { key: 'security', label: 'Seguranca e Suporte', icon: ShieldCheck, group: 'Plataforma' },
   // Operam sobre a empresa selecionada no seletor do topo.
+  { key: 'users', label: 'Usuários e Permissões', icon: Users, group: 'Empresa selecionada' },
   { key: 'generalSettings', label: 'Config. Gerais', icon: Settings2, group: 'Empresa selecionada' },
   { key: 'visibilityAdmin', label: 'Visibilidade', icon: Eye, group: 'Empresa selecionada' },
   { key: 'orgStructure', label: 'Áreas e Setores', icon: Network, group: 'Empresa selecionada' },
@@ -270,6 +272,7 @@ const COMPANY_CORE_MODULE_CODES = new Set(['users', 'my-day', 'tasks']);
 const PLATFORM_COMPANY_CONTEXT_KEY = 'g360.platformAdmin.companyId';
 const PORTAL_ADMIN_TAB_KEY = 'g360.platformAdmin.portalTab';
 const PORTAL_ADMIN_TAB_EVENT = 'platform-admin:portal-tab';
+const PLATFORM_NEW_USER_REQUEST_KEY = 'g360.platformAdmin.newUserRequest';
 const LEGACY_COMPANY_SECTIONS = new Set<SectionKey>(['generalSettings', 'visibilityAdmin', 'externalIntegrations', 'orgStructure', 'users', 'companyAudit', 'privacidade']);
 const DATABASE_ADMIN_TABS = new Set<DatabaseAdminTab>([
   'overview',
@@ -601,6 +604,9 @@ export function PlatformAdminApp() {
       next = 'orgStructure';
     } else if (path.startsWith('/users')) {
       next = 'users';
+      if (url.searchParams.get('new') === '1') {
+        window.localStorage.setItem(PLATFORM_NEW_USER_REQUEST_KEY, '1');
+      }
     } else if (path.startsWith('/audit')) {
       next = 'companyAudit';
     } else if (path === '/settings') {
@@ -690,6 +696,7 @@ export function PlatformAdminApp() {
 
         <div className="min-h-0 flex-1 overflow-y-auto p-4 lg:p-6" onClickCapture={handleLegacyNavigation}>
           {section === 'dashboard' && <DashboardSection />}
+          {section === 'governance' && <GovernanceSection onNavigate={selectSection} />}
           {section === 'generalSettings' && <GeneralSettingsSection />}
           {section === 'visibilityAdmin' && <VisibilitySettingsSection />}
           {section === 'externalIntegrations' && <ExternalIntegrationsSection initialTab={requestedExternalTab === 'prize' ? 'prize' : 'external'} />}
@@ -817,6 +824,103 @@ function isDatabaseNavigationDetail(value: unknown): value is { tab: DatabaseAdm
   if (!value || typeof value !== 'object') return false;
   const detail = value as { tab?: unknown; table?: unknown };
   return isDatabaseAdminTab(detail.tab) && (detail.table === undefined || detail.table === null || typeof detail.table === 'string');
+}
+
+function GovernanceSection({ onNavigate }: { onNavigate: (section: SectionKey) => void }) {
+  const scopes = [
+    {
+      title: 'Governança global da plataforma',
+      description: 'Controla o que existe e o que cada empresa contratou, sem alterar dados operacionais do cliente.',
+      items: [
+        'Empresas, contratos, planos, limites e ciclo de vida',
+        'Catálogo de módulos, páginas, funcionalidades e menus',
+        'Disponibilidade, manutenção, flags, infraestrutura, SMTP e banco',
+        'Credenciais provedoras da plataforma e auditoria técnica',
+      ],
+      actions: [
+        { label: 'Matriz de módulos', section: 'modules' as SectionKey },
+        { label: 'Central do Portal', section: 'portalAdmin' as SectionKey },
+      ],
+    },
+    {
+      title: 'Governança da empresa selecionada',
+      description: 'O Portal Global administra estes dados sempre no escopo da empresa escolhida no topo.',
+      items: [
+        'Usuários, perfis, permissões individuais e perfil exclusivo Totem',
+        'Áreas, setores, filiais, vínculos e matriz de visibilidade',
+        'Parâmetros da empresa, integrações externas e conectores do prêmio',
+        'Auditoria empresarial, privacidade e registros de LGPD',
+      ],
+      actions: [
+        { label: 'Usuários e permissões', section: 'users' as SectionKey },
+        { label: 'Configurações da empresa', section: 'generalSettings' as SectionKey },
+      ],
+    },
+    {
+      title: 'Configuração operacional no Gestão 360',
+      description: 'Permanece no tenant porque depende de RH, DP, gestores e responsáveis legais da própria empresa.',
+      items: [
+        'Jornadas, escalas, fechamento do ponto, férias e admissões',
+        'Cargos, salários, vagas, candidatos e fluxos de aprovação',
+        'Folha, eSocial, Dataprev, benefícios e arquivos para a contabilidade',
+        'Compras, estoque, qualidade, segurança, comunicação e premiações',
+      ],
+      actions: [
+        { label: 'Controlar quem acessa', section: 'users' as SectionKey },
+        { label: 'Controlar disponibilidade', section: 'modules' as SectionKey },
+      ],
+    },
+  ];
+
+  return (
+    <div className="space-y-4">
+      <Panel title="Modelo de governança do Gestão 360" icon={ShieldCheck}>
+        <p className="max-w-4xl text-sm leading-6 text-muted-foreground">
+          O Portal Administrativo Global controla disponibilidade, contratação, acesso, segurança e suporte.
+          A operação diária continua dentro do Gestão 360 da empresa, com permissões granulares. Isso evita
+          que uma configuração global sobrescreva regras trabalhistas, salariais ou operacionais de outro cliente.
+        </p>
+      </Panel>
+      <div className="grid gap-4 xl:grid-cols-3">
+        {scopes.map((scope) => (
+          <Panel key={scope.title} title={scope.title}>
+            <p className="mb-4 text-sm leading-5 text-muted-foreground">{scope.description}</p>
+            <ul className="mb-5 space-y-2 text-sm">
+              {scope.items.map((item) => (
+                <li key={item} className="flex gap-2">
+                  <ShieldCheck className="mt-0.5 h-4 w-4 shrink-0 text-[#2a6f68]" />
+                  <span>{item}</span>
+                </li>
+              ))}
+            </ul>
+            <div className="flex flex-wrap gap-2">
+              {scope.actions.map((action) => (
+                <Button key={action.label} size="sm" variant="outline" onClick={() => onNavigate(action.section)}>
+                  {action.label}
+                </Button>
+              ))}
+            </div>
+          </Panel>
+        ))}
+      </div>
+      <Panel title="Regra de acesso granular">
+        <div className="grid gap-3 text-sm md:grid-cols-3">
+          <div className="border bg-muted/20 p-3">
+            <div className="font-semibold">Plano da empresa</div>
+            <p className="mt-1 text-muted-foreground">Define quais módulos podem ser utilizados pelo cliente.</p>
+          </div>
+          <div className="border bg-muted/20 p-3">
+            <div className="font-semibold">Perfil e permissões do usuário</div>
+            <p className="mt-1 text-muted-foreground">Define exatamente quais menus, páginas e ações cada pessoa acessa.</p>
+          </div>
+          <div className="border bg-muted/20 p-3">
+            <div className="font-semibold">Escopo organizacional</div>
+            <p className="mt-1 text-muted-foreground">Limita os dados às áreas, filiais e equipes autorizadas.</p>
+          </div>
+        </div>
+      </Panel>
+    </div>
+  );
 }
 
 function GeneralSettingsSection() {
@@ -1999,7 +2103,9 @@ function PlansSection() {
                     />
                     <span className="min-w-0">
                       <span className="block font-medium">{module.name}</span>
-                      <span className="block text-xs text-muted-foreground">{module.code}{core ? ' · essencial da empresa' : ''}</span>
+                      <span className="block text-xs text-muted-foreground">
+                        {module.code}{core ? ' · disponível no plano; acesso individual depende de permissão' : ''}
+                      </span>
                     </span>
                   </label>
                 );

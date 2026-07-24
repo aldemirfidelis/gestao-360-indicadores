@@ -8,7 +8,7 @@ import { LoadingState } from '@/components/platform/loading-state';
 import { PageHeader } from '@/components/shell/page-header';
 import { SectionCard } from '@/components/platform/section-card';
 import { Button } from '@/components/ui/button';
-import { SUPER_ADMIN_ONLY_PERMISSION } from '@/components/shell/navigation';
+import { SUPER_ADMIN_ONLY_PERMISSION, defaultLandingFor } from '@/components/shell/navigation';
 
 interface Props {
   permissions: string | string[];
@@ -18,7 +18,8 @@ interface Props {
 }
 
 export function RoutePermissionGate({ permissions, title, description, children }: Props) {
-  const { hasPermission, loading } = useAuth();
+  const { hasPermission, loading, user } = useAuth();
+  const landing = defaultLandingFor(user);
   const requiredLabel = Array.isArray(permissions)
     ? permissions.map(formatPermission).join(' ou ')
     : formatPermission(permissions);
@@ -42,7 +43,7 @@ export function RoutePermissionGate({ permissions, title, description, children 
           description="Esta tela depende de uma permissão que ainda não foi atribuída ao seu perfil."
           actions={
             <Button asChild variant="outline">
-              <Link href="/meu-dia">Voltar para Meu Dia</Link>
+              <Link href={landing}>Ir para uma área permitida</Link>
             </Button>
           }
         >

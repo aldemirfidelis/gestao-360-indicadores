@@ -18,7 +18,7 @@ export const metadata: Metadata = {
     default: `${SITE_NAME} | Plataforma de gestão corporativa integrada`,
     template: `%s | ${SITE_NAME}`,
   },
-  description: 'Plataforma corporativa de gestão estratégica, indicadores, planos de ação e melhoria contínua.',
+  description: 'Plataforma corporativa integrada para estratégia, qualidade, segurança, suprimentos e toda a jornada de pessoas, do cargo ao ponto e à folha.',
   alternates: { canonical: absoluteUrl('/') },
   icons: {
     icon: [
@@ -41,14 +41,14 @@ export const metadata: Metadata = {
     locale: 'pt_BR',
     siteName: SITE_NAME,
     title: `${SITE_NAME} | Plataforma de gestão corporativa integrada`,
-    description: 'Conecte estratégia, indicadores, planos de ação, documentos, auditorias, riscos e melhoria contínua em um único ambiente.',
+    description: 'Conecte estratégia, indicadores, qualidade, segurança, suprimentos, cargos, recrutamento, ponto, folha e vida funcional em um único ambiente.',
     url: absoluteUrl('/'),
     images: [{ url: absoluteUrl(DEFAULT_OG_IMAGE), width: 1200, height: 630, alt: `${SITE_NAME} - plataforma de gestão corporativa` }],
   },
   twitter: {
     card: 'summary_large_image',
     title: `${SITE_NAME} | Plataforma de gestão corporativa integrada`,
-    description: 'Conecte estratégia, indicadores, planos de ação, documentos, auditorias, riscos e melhoria contínua em um único ambiente.',
+    description: 'Conecte estratégia, indicadores, qualidade, segurança, suprimentos, cargos, recrutamento, ponto, folha e vida funcional em um único ambiente.',
     images: [absoluteUrl(DEFAULT_OG_IMAGE)],
   },
 };

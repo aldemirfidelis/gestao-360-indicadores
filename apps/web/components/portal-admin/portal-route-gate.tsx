@@ -8,6 +8,8 @@ import { PageHeader } from '@/components/shell/page-header';
 import { SectionCard } from '@/components/platform/section-card';
 import { Button } from '@/components/ui/button';
 import { usePortalConfig } from '@/components/portal-admin/portal-config-provider';
+import { useAuth } from '@/components/auth/auth-provider';
+import { defaultLandingFor } from '@/components/shell/navigation';
 
 const DEFAULT_MSG = 'Esta funcionalidade está temporariamente indisponível para manutenção. Tente novamente mais tarde.';
 
@@ -18,6 +20,8 @@ const DEFAULT_MSG = 'Esta funcionalidade está temporariamente indisponível par
 export function PortalRouteGate({ children }: { children: ReactNode }) {
   const pathname = usePathname();
   const { routeBlock } = usePortalConfig();
+  const { user } = useAuth();
+  const landing = defaultLandingFor(user);
   const block = routeBlock(pathname ?? '');
 
   if (!block) return <>{children}</>;
@@ -39,7 +43,7 @@ export function PortalRouteGate({ children }: { children: ReactNode }) {
         description="Esta área foi temporariamente desativada pelo administrador do portal."
         actions={
           <Button asChild variant="outline">
-            <Link href="/meu-dia">Voltar ao início</Link>
+            <Link href={landing}>Voltar ao início permitido</Link>
           </Button>
         }
       >

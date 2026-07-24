@@ -1,7 +1,7 @@
 'use client';
 
-import { ReactNode } from 'react';
-import { usePathname } from 'next/navigation';
+import { ReactNode, useEffect } from 'react';
+import { usePathname, useRouter } from 'next/navigation';
 import { Sidebar } from '@/components/shell/sidebar';
 import { Topbar } from '@/components/shell/topbar';
 import { MobileNav } from '@/components/shell/mobile-nav';
@@ -20,6 +20,13 @@ import { HelpBotFloatingButton } from '@/components/help-bot/help-bot-floating-b
 export function AppShell({ children }: { children: ReactNode }) {
   const { user, loading } = useAuth();
   const pathname = usePathname();
+  const router = useRouter();
+  const exclusiveTotem = user?.accessProfile?.code === 'TOTEM';
+
+  useEffect(() => {
+    if (!loading && exclusiveTotem) router.replace('/totem');
+  }, [exclusiveTotem, loading, router]);
+
   if (loading) {
     return (
       <div className="enterprise-shell grid min-h-screen place-items-center text-sm text-muted-foreground">
@@ -28,6 +35,13 @@ export function AppShell({ children }: { children: ReactNode }) {
     );
   }
   if (!user) return null;
+  if (exclusiveTotem) {
+    return (
+      <div className="enterprise-shell grid min-h-screen place-items-center text-sm text-muted-foreground">
+        <div className="border border-border/60 bg-card px-5 py-4">Abrindo terminal de ponto...</div>
+      </div>
+    );
+  }
   const routePerms = findRoutePermissions(pathname ?? '');
   return (
     <RealtimeProvider>

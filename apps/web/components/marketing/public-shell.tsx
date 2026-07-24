@@ -21,7 +21,10 @@ const footerGroups = [
       ['Qualidade e Compliance', '/modulos#qualidade-e-compliance'],
       ['Segurança dos Alimentos', '/modulos#seguranca-dos-alimentos'],
       ['Segurança Patrimonial', '/modulos#seguranca-patrimonial'],
-      ['Pessoas e Remuneração', '/modulos#cargos-e-salarios'],
+      ['Cargos e Salários', '/modulos#cargos-e-salarios'],
+      ['Recrutamento e Seleção', '/modulos#recrutamento'],
+      ['Serviço Pessoal e Ponto', '/modulos#servico-pessoal'],
+      ['Suprimentos', '/modulos#suprimentos'],
       ['Todos os módulos', '/modulos'],
     ],
   },
@@ -79,12 +82,12 @@ export function PublicShell({ children }: { children: ReactNode }) {
           <div>
             <BrandLogo variant="horizontal" size="sm" theme="dark" animated={true} />
             <p className="mt-4 max-w-md text-sm leading-6 text-slate-300">
-              Plataforma corporativa com 11 módulos conectados para estratégia, execução, qualidade,
-              segurança, pessoas, comunicação, atendimento e remuneração variável.
+              Plataforma corporativa com 14 módulos conectados para estratégia, execução, qualidade,
+              segurança, suprimentos e toda a jornada de pessoas, do cargo à vida funcional.
             </p>
             <div className="mt-6 grid grid-cols-2 gap-3 text-xs text-slate-300 sm:grid-cols-4">
               <FooterMetric icon={<BarChart3 className="h-4 w-4" />} label="Gestão à vista" />
-              <FooterMetric icon={<Layers3 className="h-4 w-4" />} label="11 módulos" />
+              <FooterMetric icon={<Layers3 className="h-4 w-4" />} label="14 módulos" />
               <FooterMetric icon={<ShieldCheck className="h-4 w-4" />} label="Permissões" />
               <FooterMetric icon={<FileText className="h-4 w-4" />} label="Auditoria" />
             </div>

@@ -105,6 +105,8 @@ const emptyForm = {
 
 type UserForm = typeof emptyForm;
 
+const PLATFORM_NEW_USER_REQUEST_KEY = 'g360.platformAdmin.newUserRequest';
+
 export default function UsersPage() {
   const qc = useQueryClient();
   const { user: me, hasPermission } = useAuth();
@@ -124,7 +126,12 @@ export default function UsersPage() {
 
   // Deep-link "/users?new=1" (ex.: vindo da Central de Administração) abre o cadastro direto.
   useEffect(() => {
-    if (searchParams.get('new') === '1' && canCreate) {
+    const platformRequested =
+      window.localStorage.getItem(PLATFORM_NEW_USER_REQUEST_KEY) === '1';
+    if (platformRequested) {
+      window.localStorage.removeItem(PLATFORM_NEW_USER_REQUEST_KEY);
+    }
+    if ((searchParams.get('new') === '1' || platformRequested) && canCreate) {
       setForm(emptyForm);
       setOpen(true);
     }

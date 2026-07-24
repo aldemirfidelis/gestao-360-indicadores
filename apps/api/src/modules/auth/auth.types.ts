@@ -11,4 +11,6 @@ export interface AuthPayload {
   homeCompanyId?: string;
   /** true quando o Super Admin está administrando uma empresa diferente da sua origem. */
   impersonating?: boolean;
+  /** Código do perfil de acesso efetivo, usado por guards de sessão exclusiva. */
+  accessProfileCode?: string | null;
 }

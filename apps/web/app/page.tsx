@@ -12,8 +12,11 @@ import {
   Headphones,
   ListTodo,
   Megaphone,
+  PackageCheck,
   ShieldCheck,
+  ScanFace,
   Trophy,
+  UserPlus,
   UsersRound,
   UtensilsCrossed,
   Warehouse,
@@ -37,7 +40,7 @@ import {
 export const metadata: Metadata = publicMetadata({
   title: 'Gestão 360 | Plataforma modular de gestão empresarial',
   description:
-    'Integre estratégia, execução, qualidade, segurança, pessoas, comunicação, atendimento e remuneração variável em 11 módulos conectados.',
+    'Integre estratégia, execução, qualidade, segurança, suprimentos e toda a jornada de pessoas — do cargo e da vaga ao ponto, folha e vida funcional — em 14 módulos conectados.',
   path: '/',
 });
 
@@ -45,14 +48,57 @@ const challenges = [
   'Prioridades, aprovações e tarefas espalhadas entre mensagens e planilhas.',
   'Estratégia, indicadores, desvios e planos sem uma visão executiva comum.',
   'Qualidade, segurança e compliance operando em controles isolados.',
-  'Pessoas, comunicação e remuneração sem dados e fluxos conectados.',
+  'Cargo, orçamento, vaga, admissão, ponto, folha e desenvolvimento sem uma jornada única.',
 ];
 
 const flow = [
-  ['Organize', 'Empresas, estrutura, pessoas, processos, módulos e permissões.'],
-  ['Enxergue', 'Painéis, prioridades, indicadores, riscos, chamados e pendências.'],
-  ['Execute', 'Tarefas, aprovações, planos, monitoramentos e ritos de gestão.'],
-  ['Evolua', 'Evidências, histórico, auditoria, métricas e inteligência assistida.'],
+  ['Organize', 'Empresas, estrutura, cargos, pessoas, processos, materiais, módulos e permissões.'],
+  ['Enxergue', 'Painéis, orçamento, vagas, jornada, indicadores, riscos, chamados e pendências.'],
+  ['Execute', 'Aprovações, recrutamento, admissão, ponto, compras, tarefas, planos e monitoramentos.'],
+  ['Evolua', 'Folha, desempenho, evidências, histórico, auditoria, métricas e inteligência assistida.'],
+];
+
+const peopleJourney = [
+  {
+    step: '01',
+    title: 'Estrutura, cargo e orçamento',
+    text: 'Organograma, posições, CBO, descrições, faixas salariais, compa-ratio, equidade, mérito e orçamento definem a necessidade com base real.',
+  },
+  {
+    step: '02',
+    title: 'Requisição e aprovação da vaga',
+    text: 'A solicitação nasce vinculada ao cargo, à posição e à faixa salarial, passa pelas alçadas e segue para o recrutamento sem redigitação.',
+  },
+  {
+    step: '03',
+    title: 'Divulgação e atração',
+    text: 'Vaga publicada no portal de carreiras, mobilidade interna, indicação por link, banco de talentos e comunicação automática com candidatos.',
+  },
+  {
+    step: '04',
+    title: 'Seleção e proposta',
+    text: 'Kanban do funil, triagem, currículo assistido por IA, entrevistas, avaliações, analytics, proposta e aprovações conectadas à faixa do cargo.',
+  },
+  {
+    step: '05',
+    title: 'Pré-admissão e saúde ocupacional',
+    text: 'Documentos digitais, acompanhamento do candidato, privacidade LGPD e ASO admissional com acesso segregado preparam a contratação.',
+  },
+  {
+    step: '06',
+    title: 'Admissão e vida funcional',
+    text: 'A admissão cria o colaborador, ocupa a posição, gera matrícula e prontuário, inicia o onboarding e prepara os eventos trabalhistas aplicáveis.',
+  },
+  {
+    step: '07',
+    title: 'Jornada e ponto inteligente',
+    text: 'Escalas, batida web/mobile, geolocalização, PWA, totem e reconhecimento facial, além de espelho, ocorrências, ajustes, banco de horas e fechamento.',
+  },
+  {
+    step: '08',
+    title: 'Folha, obrigações e reconhecimento',
+    text: 'Eventos do ponto alimentam folha, férias, 13º, rescisão, benefícios, holerites, exportações contábeis e eSocial; os dados também apoiam prêmio e gestão.',
+  },
 ];
 
 const solutionPillars = [
@@ -90,11 +136,19 @@ const solutionPillars = [
   },
   {
     eyebrow: 'Pessoas e reconhecimento',
-    title: 'Estrutura, remuneração e prêmio',
+    title: 'Da estrutura do cargo à vida funcional',
     summary:
-      'Cargos e Salários organiza quadro, faixas e orçamento; Gestão de Prêmio conduz regras, apuração, espelhos e integração com a folha.',
-    modules: ['Cargos e Salários', 'Gestão de Prêmio'],
+      'Cargos e Salários, Recrutamento e Seleção, Serviço Pessoal e Gestão de Prêmio conectam posição, vaga, admissão, ponto, folha e reconhecimento.',
+    modules: ['Cargos e Salários', 'Recrutamento e Seleção', 'Serviço Pessoal', 'Gestão de Prêmio'],
     href: '/modulos#cargos-e-salarios',
+  },
+  {
+    eyebrow: 'Compras e estoque',
+    title: 'Suprimentos com rastreabilidade',
+    summary:
+      'Requisições, alçadas, pedidos, recebimentos, fornecedores, estoque, custo médio, kardex e almoxarifados compartilham uma única trilha operacional.',
+    modules: ['Suprimentos', 'Meu Dia', 'Administração'],
+    href: '/modulos#suprimentos',
   },
   {
     eyebrow: 'Comunicação e engajamento',
@@ -116,6 +170,9 @@ const moduleIcons: Record<string, LucideIcon> = {
   'seguranca-dos-alimentos': UtensilsCrossed,
   'seguranca-patrimonial': Warehouse,
   'cargos-e-salarios': UsersRound,
+  recrutamento: UserPlus,
+  'servico-pessoal': ScanFace,
+  suprimentos: PackageCheck,
   comunicacao: Megaphone,
   'gestao-de-premio': Trophy,
 };
@@ -124,12 +181,17 @@ const faq = [
   {
     question: 'Quais módulos fazem parte do Gestão 360?',
     answer:
-      'A plataforma reúne Meu Dia, Tarefas, Central de Atendimento, Gestão à Vista, Administração, Qualidade e Compliance, Segurança dos Alimentos, Segurança Patrimonial, Cargos e Salários, Comunicação e Gestão de Prêmio.',
+      'A plataforma reúne Meu Dia, Tarefas, Central de Atendimento, Gestão à Vista, Administração, Qualidade e Compliance, Segurança dos Alimentos, Segurança Patrimonial, Cargos e Salários, Recrutamento e Seleção, Serviço Pessoal, Suprimentos, Comunicação e Gestão de Prêmio.',
   },
   {
     question: 'Todos os módulos precisam ser contratados e liberados de uma vez?',
     answer:
       'Não. O Gestão 360 é modular: cada empresa pode trabalhar com os módulos adequados à sua operação, mantendo uma base comum de usuários, permissões, histórico e auditoria.',
+  },
+  {
+    question: 'É possível usar somente o controle de ponto e enviar os dados para uma contabilidade externa?',
+    answer:
+      'Sim. A empresa pode usar o Serviço Pessoal de forma modular e exportar competências, espelhos e eventos do ponto em formatos como CSV, XLSX, JSON e TXT. Layouts específicos de sistemas contábeis podem exigir parametrização ou adaptação.',
   },
   {
     question: 'Os dados da empresa ficam disponíveis em páginas públicas?',
@@ -162,12 +224,12 @@ export default function HomePage() {
         </div>
         <div className="relative mx-auto flex min-h-[calc(100svh-5rem)] max-w-7xl items-center px-4 py-14 sm:px-6 lg:min-h-[620px] lg:px-8">
           <div className="max-w-3xl">
-            <p className="text-sm font-semibold uppercase tracking-[0.18em] text-emerald-300">11 módulos. Uma gestão conectada.</p>
+            <p className="text-sm font-semibold uppercase tracking-[0.18em] text-emerald-300">14 módulos. Uma gestão conectada.</p>
             <h1 className="mt-5 max-w-4xl text-4xl font-semibold leading-[1.05] sm:text-5xl lg:text-6xl">
               Uma plataforma para enxergar, executar e governar toda a operação.
             </h1>
             <p className="mt-6 max-w-2xl text-lg leading-8 text-slate-200">
-              O Gestão 360 conecta estratégia, tarefas, qualidade, segurança, pessoas, comunicação, atendimento e remuneração variável em uma rotina rastreável.
+              O Gestão 360 conecta estratégia, tarefas, qualidade, segurança, suprimentos e toda a jornada de pessoas — do cargo e da vaga ao ponto, folha e reconhecimento.
             </p>
             <div className="mt-8 flex flex-col gap-3 sm:flex-row">
               <DemoLink source="home_hero" className="inline-flex h-12 items-center justify-center gap-2 bg-emerald-400 px-6 text-sm font-semibold text-slate-950 hover:bg-emerald-300">
@@ -221,12 +283,47 @@ export default function HomePage() {
         </div>
       </section>
 
+      <section className="border-y border-slate-200 bg-white py-20">
+        <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
+          <div className="grid gap-8 lg:grid-cols-[0.82fr,1.18fr]">
+            <div>
+              <SectionIntro eyebrow="Jornada de pessoas integrada" title="Do planejamento do cargo ao dia a dia do colaborador." />
+              <p className="mt-5 text-base leading-7 text-slate-600">
+                Cada etapa aproveita o dado criado na anterior. A posição aprovada orienta a vaga; a contratação ocupa o quadro; a escala alimenta o ponto; o fechamento gera eventos para a folha; e a vida funcional permanece conectada à gestão, à comunicação e ao reconhecimento.
+              </p>
+              <div className="mt-6 flex flex-wrap gap-2">
+                {['Cargos e Salários', 'Recrutamento', 'Serviço Pessoal', 'Controle de Ponto', 'Folha', 'Gestão de Prêmio'].map((item) => (
+                  <span key={item} className="border border-emerald-200 bg-emerald-50 px-3 py-1.5 text-xs font-semibold text-emerald-800">
+                    {item}
+                  </span>
+                ))}
+              </div>
+              <Link href="/modulos#cargos-e-salarios" className="mt-8 inline-flex h-11 items-center justify-center gap-2 bg-slate-950 px-5 text-sm font-semibold text-white hover:bg-emerald-700">
+                Ver a jornada completa
+                <ArrowRight className="h-4 w-4" />
+              </Link>
+            </div>
+            <div className="grid gap-3 sm:grid-cols-2">
+              {peopleJourney.map((item) => (
+                <div key={item.step} className="border border-slate-200 bg-slate-50 p-4">
+                  <div className="flex items-center gap-3">
+                    <span className="grid h-9 w-9 shrink-0 place-items-center bg-slate-950 text-xs font-semibold text-white">{item.step}</span>
+                    <h2 className="font-semibold text-slate-950">{item.title}</h2>
+                  </div>
+                  <p className="mt-3 text-sm leading-6 text-slate-600">{item.text}</p>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+      </section>
+
       <section className="bg-white py-20">
         <div className="mx-auto grid max-w-7xl gap-10 px-4 sm:px-6 lg:grid-cols-[0.9fr,1.1fr] lg:px-8">
           <div>
             <SectionIntro eyebrow="Fluxo integrado" title="Da estrutura à execução, sem perder contexto." />
             <p className="mt-5 text-base leading-7 text-slate-600">
-              Os módulos compartilham empresas, usuários, permissões, responsáveis, prazos, histórico e evidências. A informação nasce uma vez e segue conectada à decisão.
+              Os módulos compartilham empresas, estrutura, cargos, pessoas, usuários, permissões, responsáveis, prazos, histórico e evidências. A informação nasce uma vez e segue conectada à decisão, da operação ao resultado.
             </p>
           </div>
           <div className="grid gap-3">
@@ -245,7 +342,7 @@ export default function HomePage() {
 
       <section className="bg-slate-950 py-20 text-white">
         <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
-          <SectionIntro eyebrow="Módulos disponíveis" title="11 módulos explicados de forma direta." inverted />
+          <SectionIntro eyebrow="Módulos disponíveis" title="14 módulos explicados de forma direta." inverted />
           <div className="mt-10 grid gap-4 md:grid-cols-2 xl:grid-cols-3">
             {moduleHighlights.map((item) => {
               const Icon = moduleIcons[item.slug] ?? BarChart3;

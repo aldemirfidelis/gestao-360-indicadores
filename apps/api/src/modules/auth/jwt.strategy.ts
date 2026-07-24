@@ -29,6 +29,7 @@ export class JwtStrategy extends PassportStrategy(Strategy, 'jwt') {
         role: true,
         companyId: true,
         activeCompanyId: true,
+        accessProfile: { select: { code: true } },
         company: { select: { status: true, deletedAt: true } },
       },
     });
@@ -50,6 +51,7 @@ export class JwtStrategy extends PassportStrategy(Strategy, 'jwt') {
       companyId,
       homeCompanyId: user.companyId,
       impersonating: companyId !== user.companyId,
+      accessProfileCode: user.accessProfile?.code ?? null,
     };
   }
 }

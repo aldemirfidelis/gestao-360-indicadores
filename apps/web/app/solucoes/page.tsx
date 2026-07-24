@@ -8,7 +8,7 @@ import { breadcrumbJsonLd, moduleHighlights, publicMetadata, solutionPages, webP
 
 export const metadata: Metadata = publicMetadata({
   title: 'Soluções de gestão corporativa integrada',
-  description: 'Conheça as soluções e os 11 módulos do Gestão 360 para estratégia, execução, qualidade, segurança, pessoas, comunicação, atendimento e prêmio.',
+  description: 'Conheça as soluções e os 14 módulos do Gestão 360 para estratégia, execução, qualidade, segurança, suprimentos e toda a jornada de pessoas.',
   path: '/solucoes',
 });
 
@@ -20,7 +20,7 @@ export default function SolucoesPage() {
       <section className="bg-white py-16">
         <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
           <p className="text-sm font-semibold uppercase tracking-[0.16em] text-emerald-700">Plataforma atual</p>
-          <h2 className="mt-3 text-3xl font-semibold tracking-tight text-slate-950">11 módulos sobre uma base comum</h2>
+          <h2 className="mt-3 text-3xl font-semibold tracking-tight text-slate-950">14 módulos sobre uma base comum</h2>
           <div className="mt-8 grid gap-3 md:grid-cols-2 xl:grid-cols-3">
             {moduleHighlights.map((module) => (
               <Link key={module.slug} href={`/modulos#${module.slug}`} className="group flex min-h-[192px] flex-col border border-slate-200 bg-slate-50 p-5 hover:border-slate-950">

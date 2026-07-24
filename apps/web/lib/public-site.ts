@@ -4,7 +4,7 @@ export const SITE_NAME = 'Gestão 360';
 export const PRODUCT_NAME = 'Gestão 360';
 export const DEFAULT_SITE_URL = 'https://gestão360.org';
 export const SITE_URL = (process.env.NEXT_PUBLIC_SITE_URL ?? DEFAULT_SITE_URL).replace(/\/$/, '');
-export const DEFAULT_OG_IMAGE = '/brand/social-preview.svg';
+export const DEFAULT_OG_IMAGE = '/brand/social-preview-14-modulos.png';
 export const DEMO_PATH = '/login?demo=1';
 export const WHATSAPP_NUMBER = process.env.NEXT_PUBLIC_WHATSAPP_NUMBER ?? '5564981009108';
 export const WHATSAPP_MESSAGE =
@@ -658,8 +658,32 @@ export const moduleHighlights: ModuleHighlight[] = [
     title: 'Cargos e Salários',
     eyebrow: 'Estrutura e remuneração',
     description:
-      'Administra quadro, catálogo e descrições de cargos, tabelas e faixas salariais, enquadramento, mérito, orçamento, pesquisas, simulações e aprovações.',
-    capabilities: ['Estrutura e quadro', 'Faixas e compa-ratio', 'Orçamento e movimentações'],
+      'Administra estrutura e quadro, catálogo, CBO e descrições de cargos, tabelas e faixas salariais, enquadramento, equidade, mérito, orçamento, pesquisas, simulações e aprovações.',
+    capabilities: ['Estrutura, posições e quadro', 'Faixas, equidade e compa-ratio', 'Orçamento, mérito e movimentações'],
+  },
+  {
+    slug: 'recrutamento',
+    title: 'Recrutamento e Seleção',
+    eyebrow: 'Contratação de ponta a ponta',
+    description:
+      'Conecta requisição e aprovação da vaga ao portal de carreiras, candidatos, triagem, entrevistas, proposta, documentos, ASO, pré-admissão e admissão no Serviço Pessoal.',
+    capabilities: ['Vagas, carreira e mobilidade interna', 'ATS, talentos, IA e analytics', 'Proposta, pré-admissão e admissão'],
+  },
+  {
+    slug: 'servico-pessoal',
+    title: 'Serviço Pessoal',
+    eyebrow: 'Jornada e vida funcional',
+    description:
+      'Centraliza colaboradores, prontuário, admissão, desligamento, férias, afastamentos, saúde ocupacional, controle de ponto, folha, obrigações e autoatendimento.',
+    capabilities: ['Ponto web, mobile, totem e facial', 'Escalas, banco de horas e fechamento', 'Folha, holerites, eSocial e exportações'],
+  },
+  {
+    slug: 'suprimentos',
+    title: 'Suprimentos',
+    eyebrow: 'Compras e estoque',
+    description:
+      'Integra requisições, fila do comprador, alçadas, pedidos, recebimentos, fornecedores, estoque, custo médio, kardex, transferências e almoxarifados.',
+    capabilities: ['Requisição, aprovação e pedido', 'Recebimento e fornecedores', 'Estoque, kardex e almoxarifado'],
   },
   {
     slug: 'comunicacao',
@@ -1012,7 +1036,7 @@ export function softwareJsonLd() {
     operatingSystem: 'Web',
     url: SITE_URL,
     description:
-      'Plataforma corporativa modular para estratégia, execução, qualidade, segurança, pessoas, comunicação, atendimento e remuneração variável.',
+      'Plataforma corporativa modular para estratégia, execução, qualidade, segurança, suprimentos, pessoas, recrutamento, serviço pessoal, comunicação, atendimento e remuneração.',
     offers: {
       '@type': 'Offer',
       price: '0',
