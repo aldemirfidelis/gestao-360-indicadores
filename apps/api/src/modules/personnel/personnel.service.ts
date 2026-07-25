@@ -482,8 +482,9 @@ export class PersonnelService {
     if (parsed.rows.length > 2000) throw new BadRequestException('Máximo de 2.000 batidas por importação.');
 
     const emails = [...new Set(parsed.rows.map((row) => row.email))];
+    const eligible = await this.employeeUserIds(me.companyId, null);
     const users = await this.prisma.user.findMany({
-      where: { companyId: me.companyId, deletedAt: null, active: true },
+      where: { companyId: me.companyId, deletedAt: null, active: true, id: { in: [...eligible] } },
       select: { id: true, email: true, branchId: true },
     });
     const userByEmail = new Map(users.map((u) => [u.email.toLowerCase(), u.id]));
@@ -931,11 +932,14 @@ export class PersonnelService {
         throw new BadRequestException('Informe o primeiro dia de trabalho do ciclo (data âncora) para escalas cíclicas.');
       }
     }
+    const eligible = await this.employeeUserIds(me.companyId, null);
     const users = await this.prisma.user.findMany({
       where: { id: { in: userIds }, companyId: me.companyId, deletedAt: null, active: true },
       select: { id: true },
     });
-    if (users.length !== userIds.length) throw new NotFoundException('Um ou mais colaboradores não foram encontrados.');
+    if (users.length !== userIds.length || userIds.some((id) => !eligible.has(id))) {
+      throw new NotFoundException('Um ou mais colaboradores não foram encontrados.');
+    }
 
     // Congela a vigência: o cálculo usa este snapshot, não o template vivo.
     const rulesSnapshot = (
@@ -1414,14 +1418,7 @@ export class PersonnelService {
    * nunca são reabertas.
    */
   async syncOccurrences(companyId: string, userIds: string[] | null, fromKey: string, toKey: string) {
-    const users =
-      userIds ??
-      (
-        await this.prisma.user.findMany({
-          where: { companyId, deletedAt: null, active: true },
-          select: { id: true },
-        })
-      ).map((user) => user.id);
+    const users = userIds ?? [...(await this.employeeUserIds(companyId, null))];
 
     let created = 0;
     let updated = 0;
@@ -1754,14 +1751,28 @@ export class PersonnelService {
     } catch {
       filter = null;
     }
-    if (!filter) return null;
+    return this.employeeUserIds(me.companyId, filter);
+  }
+
+  /**
+   * Universo do ponto: apenas logins com cadastro de colaborador vinculado.
+   * Quem existe só como conta de acesso (admin do portal, consultor) não bate
+   * ponto e por isso não aparece em nenhuma visão do módulo — o cadastro
+   * funcional é a fonte, nunca a lista de usuários.
+   */
+  private async employeeUserIds(companyId: string, orgNodeFilter: string[] | null): Promise<Set<string>> {
     const profiles = await this.prisma.personnelEmployeeProfile.findMany({
-      where: { companyId: me.companyId, userId: { not: null }, employee: { orgNodeId: { in: filter } } },
+      where: {
+        companyId,
+        userId: { not: null },
+        // Desligado continua no universo: o histórico de ponto e o fechamento
+        // de meses anteriores precisam dele.
+        ...(orgNodeFilter ? { employee: { is: { orgNodeId: { in: orgNodeFilter } } } } : {}),
+      },
       select: { userId: true },
     });
     const ids = new Set<string>();
     for (const profile of profiles) if (profile.userId) ids.add(profile.userId);
-    ids.add(me.sub);
     return ids;
   }
 
