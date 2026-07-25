@@ -1,4 +1,4 @@
-import { Body, Controller, Get, Post, Req } from '@nestjs/common';
+import { Body, Controller, Get, Param, Post, Query, Req } from '@nestjs/common';
 import { Request } from 'express';
 import { Throttle } from '@nestjs/throttler';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
@@ -16,6 +16,35 @@ export class BiometricController {
   @Get('me')
   @RequirePermissions('ponto:view')
   status(@CurrentUser() me: AuthPayload) { return this.service.status(me); }
+
+  @Get('employees')
+  @RequirePermissions('ponto:manage')
+  employeeProfiles(
+    @CurrentUser() me: AuthPayload,
+    @Query('search') search?: string,
+    @Query('biometricStatus') biometricStatus?: string,
+  ) {
+    return this.service.listEmployeeProfiles(me, { search, biometricStatus });
+  }
+
+  @Post('employees/:employeeId/challenge')
+  @RequirePermissions('ponto:manage')
+  employeeEnrollmentChallenge(@CurrentUser() me: AuthPayload, @Param('employeeId') employeeId: string) {
+    return this.service.employeeEnrollmentChallenge(me, employeeId);
+  }
+
+  @Post('employees/:employeeId/enroll')
+  @Throttle({ default: { limit: 10, ttl: 60_000 } })
+  @RequirePermissions('ponto:manage')
+  enrollEmployee(@CurrentUser() me: AuthPayload, @Param('employeeId') employeeId: string, @Body() body: any) {
+    return this.service.enrollEmployee(me, employeeId, body);
+  }
+
+  @Post('employees/:employeeId/revoke')
+  @RequirePermissions('ponto:manage')
+  revokeEmployee(@CurrentUser() me: AuthPayload, @Param('employeeId') employeeId: string, @Body() body: any) {
+    return this.service.revokeEmployee(me, employeeId, body);
+  }
 
   @Post('challenge/enroll')
   @RequirePermissions('ponto:view')

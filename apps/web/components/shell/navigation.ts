@@ -276,6 +276,7 @@ export const navSections: NavSection[] = [
     items: [
       { href: '/servico-pessoal/colaboradores', label: 'Colaboradores', description: 'Cadastro, prontuário 360°, dependentes e dossiê digital', icon: UserCheck, permissions: ['pessoal:view', 'pessoal:manage'] },
       { href: '/servico-pessoal/ponto', label: 'Controle de Ponto', description: 'Conferência da equipe, espelho de todos, ajustes, escalas e fechamento', icon: Clock, permissions: ['ponto:team', 'ponto:manage'] },
+      { href: '/servico-pessoal/biometrias', label: 'Cadastros Faciais', description: 'Biometria por matrícula para reconhecimento nos totens', icon: Fingerprint, permissions: ['ponto:manage'] },
       { href: '/servico-pessoal/ferias', label: 'Férias e Afastamentos', description: 'Gestão do DP: saldos, aprovação de solicitações e atestados/afastamentos (o colaborador solicita em Minha Vida Funcional)', icon: CalendarDays, permissions: ['pessoal:view', 'pessoal:manage'] },
       { href: '/servico-pessoal/admissoes', label: 'Admissão e Desligamento', description: 'Checklists de admissão/desligamento e saúde ocupacional (ASO)', icon: ClipboardCheck, permissions: ['pessoal:view', 'pessoal:manage'] },
       { href: '/servico-pessoal/folha', label: 'Folha de Pagamento', description: 'Cálculo de folha, holerites, competências e adiantamento', icon: Banknote, permissions: ['folha:view'] },

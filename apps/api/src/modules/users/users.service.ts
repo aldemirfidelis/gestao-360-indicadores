@@ -21,7 +21,7 @@ export class UsersService {
 
   async list(companyId: string) {
     return this.prisma.user.findMany({
-      where: { companyId, deletedAt: null },
+      where: { companyId, deletedAt: null, serviceAccount: false },
       orderBy: { name: 'asc' },
       select: {
         id: true,
@@ -220,6 +220,45 @@ export class UsersService {
     }
 
     return this.prisma.user.update({ where: { id }, data });
+  }
+
+  /**
+   * Converte uma identidade técnica de jornada em uma conta normal do portal.
+   * A identidade conserva o mesmo id para não romper escalas, batidas e hashes.
+   */
+  async promoteServiceAccount(
+    id: string,
+    companyId: string,
+    isSuperAdmin: boolean,
+    input: {
+      email: string;
+      name: string;
+      role: UserRoleEnum;
+      password: string;
+      accessProfileId?: string | null;
+      passwordResetRequired?: boolean;
+    },
+  ) {
+    const serviceUser = await this.prisma.user.findFirst({
+      where: { id, companyId, serviceAccount: true, deletedAt: null },
+      select: { id: true },
+    });
+    if (!serviceUser) throw new ConflictException('A identidade vinculada não é uma conta técnica promovível.');
+
+    await this.update(id, companyId, isSuperAdmin, {
+      email: input.email,
+      name: input.name,
+      role: input.role,
+      password: input.password,
+      accessProfileId: input.accessProfileId,
+      passwordResetRequired: input.passwordResetRequired,
+      status: UserAccessStatus.ACTIVE,
+      active: true,
+    });
+    return this.prisma.user.update({
+      where: { id },
+      data: { serviceAccount: false },
+    });
   }
 
   async setPermissions(id: string, companyId: string, isSuperAdmin: boolean, permissionKeys: string[]) {

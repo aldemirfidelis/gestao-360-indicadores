@@ -812,6 +812,9 @@ model User {
   active                Boolean          @default(true)
   lastLoginAt           DateTime?
   passwordResetRequired Boolean          @default(false)
+  /// Identidade interna usada por motores legados (ex.: jornada) sem permitir
+  /// login no portal. Não aparece na administração normal de usuários.
+  serviceAccount        Boolean          @default(false)
   invitedAt             DateTime?
   blockedAt             DateTime?
   createdAt             DateTime         @default(now())
@@ -6286,6 +6289,7 @@ model OrgEmployee {
   approvalRequests    OrgJobApprovalRequest[]
   compensationProfile CompensationEmployeeProfile?
   personnelProfile    PersonnelEmployeeProfile?
+  biometricProfile    PersonnelBiometricProfile?
   dependents          EmployeeDependent[]
   employmentEvents    EmploymentEvent[]
   dossierFiles        EmployeeDossierFile[]
@@ -12173,6 +12177,12 @@ model TimesheetCalculationMemory {
 model PersonnelBiometricProfile {
   id                String    @id @default(uuid())
   companyId         String
+  /// Vínculo de negócio principal. Pode ser nulo apenas em registros legados
+  /// ainda não associados ao cadastro funcional.
+  employeeId        String?   @unique
+  employee          OrgEmployee? @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+  /// Compatibilidade temporária com o motor de jornada, historicamente baseado
+  /// em User. Novos cadastros administrativos sempre informam employeeId.
   userId            String
   status            String    @default("ACTIVE") // ACTIVE | REVOKED | LOCKED
   descriptorEnc     String
@@ -12203,7 +12213,8 @@ model PersonnelBiometricChallenge {
   id             String    @id @default(uuid())
   companyId      String
   userId         String
-  purpose        String // ENROLL | VERIFY_PUNCH
+  employeeId     String?
+  purpose        String // ENROLL | ADMIN_ENROLL | VERIFY_PUNCH
   nonceHash      String
   livenessAction String // BLINK | TURN_LEFT | TURN_RIGHT
   expiresAt      DateTime
@@ -12212,6 +12223,7 @@ model PersonnelBiometricChallenge {
   createdAt      DateTime  @default(now())
 
   @@index([companyId, userId, purpose, expiresAt])
+  @@index([companyId, employeeId, purpose, expiresAt])
   @@map("personnel_biometric_challenges")
 }
 
@@ -12220,6 +12232,7 @@ model PersonnelBiometricAttempt {
   id             String   @id @default(uuid())
   companyId      String
   userId         String
+  employeeId     String?
   challengeId    String
   purpose        String
   status         String // MATCH | NO_MATCH | LIVENESS_FAILED | BLOCKED | ERROR
@@ -12235,6 +12248,7 @@ model PersonnelBiometricAttempt {
   createdAt      DateTime @default(now())
 
   @@index([companyId, userId, createdAt])
+  @@index([companyId, employeeId, createdAt])
   @@index([challengeId])
   @@map("personnel_biometric_attempts")
 }

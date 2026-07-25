@@ -103,6 +103,16 @@ export class EmployeesService {
     const admittedThisMonth = await this.prisma.personnelEmployeeProfile.count({
       where: { companyId: me.companyId, admissionDate: { gte: monthStart } },
     });
+    const linkedIds = items
+      .map((employee) => employee.personnelProfile?.userId)
+      .filter((value): value is string => Boolean(value));
+    const portalUsers = linkedIds.length
+      ? await this.prisma.user.findMany({
+          where: { id: { in: linkedIds }, companyId: me.companyId, serviceAccount: false, deletedAt: null },
+          select: { id: true },
+        })
+      : [];
+    const portalUserIds = new Set(portalUsers.map((user) => user.id));
 
     return {
       items: items.map((employee) => ({
@@ -117,7 +127,7 @@ export class EmployeesService {
         terminationDate: employee.personnelProfile?.terminationDate ?? null,
         contractType: employee.personnelProfile?.contractType ?? null,
         phone: employee.personnelProfile?.phone ?? null,
-        hasUserLink: Boolean(employee.personnelProfile?.userId),
+        hasUserLink: Boolean(employee.personnelProfile?.userId && portalUserIds.has(employee.personnelProfile.userId)),
         profileComplete: Boolean(employee.personnelProfile?.cpf && employee.personnelProfile?.admissionDate),
       })),
       kpis: {
@@ -149,7 +159,7 @@ export class EmployeesService {
         orderBy: { name: 'asc' },
       }),
       this.prisma.user.findMany({
-        where: { companyId: me.companyId, deletedAt: null, active: true },
+        where: { companyId: me.companyId, deletedAt: null, active: true, serviceAccount: false },
         select: { id: true, name: true, email: true },
         orderBy: { name: 'asc' },
       }),
@@ -195,7 +205,7 @@ export class EmployeesService {
 
     const linkedUser = employee.personnelProfile?.userId
       ? await this.prisma.user.findFirst({
-          where: { id: employee.personnelProfile.userId, companyId: me.companyId },
+          where: { id: employee.personnelProfile.userId, companyId: me.companyId, serviceAccount: false },
           select: { id: true, name: true, email: true, active: true },
         })
       : null;
@@ -359,18 +369,38 @@ export class EmployeesService {
     const providedPassword = text(args.input?.password);
     const password = providedPassword ?? randomBytes(9).toString('base64url');
 
-    const user = await this.users.create(
-      {
-        email,
-        password,
-        name: args.name,
-        role,
-        companyId: me.companyId,
-        accessProfileId: accessProfileId ?? undefined,
-        passwordResetRequired: !providedPassword,
-      } as any,
-      me.role === 'SUPER_ADMIN',
-    );
+    const employeeProfile = await this.prisma.personnelEmployeeProfile.findUnique({
+      where: { employeeId: args.employeeId },
+      select: { userId: true },
+    });
+    const linkedUser = employeeProfile?.userId
+      ? await this.prisma.user.findFirst({
+          where: { id: employeeProfile.userId, companyId: me.companyId, deletedAt: null },
+          select: { id: true, serviceAccount: true },
+        })
+      : null;
+
+    const user = linkedUser?.serviceAccount
+      ? await this.users.promoteServiceAccount(linkedUser.id, me.companyId, me.role === 'SUPER_ADMIN', {
+          email,
+          password,
+          name: args.name,
+          role,
+          accessProfileId,
+          passwordResetRequired: !providedPassword,
+        })
+      : await this.users.create(
+          {
+            email,
+            password,
+            name: args.name,
+            role,
+            companyId: me.companyId,
+            accessProfileId: accessProfileId ?? undefined,
+            passwordResetRequired: !providedPassword,
+          } as any,
+          me.role === 'SUPER_ADMIN',
+        );
 
     await this.prisma.personnelEmployeeProfile.update({ where: { employeeId: args.employeeId }, data: { userId: user.id } });
     await this.audit.record(me, {
@@ -378,7 +408,7 @@ export class EmployeesService {
       entity: 'OrgEmployee',
       entityId: args.employeeId,
       action: 'PORTAL_USER_CREATED',
-      message: `Usuário do portal criado (${loginType === 'EMAIL' ? email : loginType.toLowerCase()}) e vinculado ao colaborador`,
+      message: `${linkedUser?.serviceAccount ? 'Identidade técnica promovida a usuário' : 'Usuário do portal criado'} (${loginType === 'EMAIL' ? email : loginType.toLowerCase()}) e vinculado ao colaborador`,
     });
     return user.id;
   }
@@ -394,7 +424,13 @@ export class EmployeesService {
       include: { personnelProfile: { select: { userId: true, cpf: true } } },
     });
     if (!employee) throw new NotFoundException('Colaborador não encontrado.');
-    if (employee.personnelProfile?.userId) throw new ConflictException('Este colaborador já tem usuário do portal vinculado.');
+    if (employee.personnelProfile?.userId) {
+      const linked = await this.prisma.user.findFirst({
+        where: { id: employee.personnelProfile.userId, companyId: me.companyId, deletedAt: null },
+        select: { serviceAccount: true },
+      });
+      if (!linked?.serviceAccount) throw new ConflictException('Este colaborador já tem usuário do portal vinculado.');
+    }
     // O prontuário é a âncora do vínculo (userId fica nele) — garante que exista.
     if (!employee.personnelProfile) {
       await this.prisma.personnelEmployeeProfile.create({ data: { companyId: me.companyId, employeeId, createdById: me.sub } });

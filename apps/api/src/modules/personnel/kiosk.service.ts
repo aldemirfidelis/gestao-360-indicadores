@@ -206,7 +206,6 @@ export class KioskService {
         companyId: device.companyId,
         active: true,
         deletedAt: null,
-        ...(device.branchId ? { branchId: device.branchId } : {}),
       },
       select: { id: true, name: true, email: true, role: true },
       take: MAX_ACTIVE_PROFILES + 1,
@@ -219,13 +218,23 @@ export class KioskService {
         userId: { in: users.map((user) => user.id) },
         status: 'ACTIVE',
         descriptorVersion: MODEL_VERSION,
-        OR: [{ lockedUntil: null }, { lockedUntil: { lte: new Date() } }],
+        AND: [
+          { OR: [{ lockedUntil: null }, { lockedUntil: { lte: new Date() } }] },
+          { OR: [{ employeeId: null }, { employee: { is: { status: 'ACTIVE' } } }] },
+        ],
       },
-      select: { id: true, userId: true, descriptorEnc: true, threshold: true },
+      select: {
+        id: true,
+        userId: true,
+        employeeId: true,
+        employee: { select: { name: true } },
+        descriptorEnc: true,
+        threshold: true,
+      },
     });
     if (!profiles.length) throw new NotFoundException('Nenhum colaborador elegível com biometria ativa neste terminal.');
 
-    let best: { profileId: string; userId: string; distance: number; threshold: number } | null = null;
+    let best: { profileId: string; userId: string; employeeId: string | null; employeeName: string | null; distance: number; threshold: number } | null = null;
     let secondDistance = Number.POSITIVE_INFINITY;
     for (const profile of profiles) {
       try {
@@ -234,7 +243,14 @@ export class KioskService {
         const threshold = Math.min(profile.threshold, kioskThreshold());
         if (!best || distance < best.distance) {
           secondDistance = best?.distance ?? Number.POSITIVE_INFINITY;
-          best = { profileId: profile.id, userId: profile.userId, distance, threshold };
+          best = {
+            profileId: profile.id,
+            userId: profile.userId,
+            employeeId: profile.employeeId,
+            employeeName: profile.employee?.name ?? null,
+            distance,
+            threshold,
+          };
         } else if (distance < secondDistance) {
           secondDistance = distance;
         }
@@ -249,6 +265,7 @@ export class KioskService {
       data: {
         companyId: device.companyId,
         userId: best?.userId ?? `kiosk:${device.id}`,
+        employeeId: best?.employeeId ?? null,
         challengeId,
         purpose: 'KIOSK_PUNCH',
         status: matched ? 'MATCH' : unambiguous ? 'NO_MATCH' : 'AMBIGUOUS',
@@ -319,7 +336,7 @@ export class KioskService {
         this.prisma.personnelKioskDevice.update({ where: { id: device.id }, data: { lastSeenAt: new Date() } }),
       ]);
       return {
-        user: { name: displayName(user.name) },
+        user: { name: displayName(best.employeeName ?? user.name) },
         entry: {
           id: result.entry.id,
           punchedAt: result.entry.punchedAt,
@@ -473,5 +490,5 @@ function distanceMeters(lat1: number, lon1: number, lat2: number, lon2: number) 
 }
 
 function displayName(name: string) {
-  return name.trim().split(/\s+/)[0] || 'Colaborador';
+  return name.trim().replace(/\s+/g, ' ').slice(0, 120) || 'Colaborador';
 }
