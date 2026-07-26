@@ -135,12 +135,18 @@ export class ExternalIntegrationService {
       scopes: k.scopes,
       status: k.status,
       lastUsedAt: k.lastUsedAt,
+      lastUsedIp: k.lastUsedIp,
       expiresAt: k.expiresAt,
+      allowedIps: k.allowedIps,
+      rateLimitPerMinute: k.rateLimitPerMinute,
+      revokedAt: k.revokedAt,
       createdAt: k.createdAt,
     }));
   }
 
   async createApiKey(me: AuthPayload, dto: CreateApiKeyDto) {
+    const scopes = dedupeScopes(dto.scopes);
+    if (scopes.length === 0) throw new BadRequestException('Selecione ao menos um escopo valido.');
     const { token, hash, prefix } = generateApiKey();
     const created = await this.prisma.inboundApiKey.create({
       data: {
@@ -148,20 +154,30 @@ export class ExternalIntegrationService {
         name: dto.name,
         keyHash: hash,
         keyPrefix: prefix,
-        scopes: dedupeScopes(dto.scopes),
+        scopes,
         expiresAt: dto.expiresAt ? new Date(dto.expiresAt) : null,
+        allowedIps: [...new Set(dto.allowedIps ?? [])],
+        rateLimitPerMinute: dto.rateLimitPerMinute ?? null,
         createdById: me.sub,
       },
     });
-    await this.audit(me, 'CREATE', 'InboundApiKey', created.id, { name: dto.name, scopes: dto.scopes });
+    await this.audit(me, 'CREATE', 'InboundApiKey', created.id, {
+      name: dto.name,
+      scopes: dto.scopes,
+      allowedIps: dto.allowedIps ?? [],
+      rateLimitPerMinute: dto.rateLimitPerMinute ?? null,
+    });
     // token mostrado UMA única vez.
-    return { id: created.id, name: created.name, scopes: created.scopes, keyPrefix: prefix, token };
+    return {
+      id: created.id, name: created.name, scopes: created.scopes, keyPrefix: prefix, token,
+      allowedIps: created.allowedIps, rateLimitPerMinute: created.rateLimitPerMinute,
+    };
   }
 
   async revokeApiKey(me: AuthPayload, id: string) {
     const key = await this.prisma.inboundApiKey.findFirst({ where: { id, companyId: me.companyId } });
     if (!key) throw new NotFoundException('Chave não encontrada.');
-    await this.prisma.inboundApiKey.update({ where: { id }, data: { status: 'revoked' } });
+    await this.prisma.inboundApiKey.update({ where: { id }, data: { status: 'revoked', revokedAt: new Date() } });
     await this.audit(me, 'REVOKE', 'InboundApiKey', id, null);
     return { ok: true };
   }

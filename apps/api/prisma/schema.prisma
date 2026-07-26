@@ -8046,7 +8046,11 @@ model InboundApiKey {
   scopes      String[] // ex.: ["indicators:read","results:write"]
   status      String    @default("active") // active | revoked
   lastUsedAt  DateTime?
+  lastUsedIp  String?
   expiresAt   DateTime?
+  allowedIps  String[]  @default([])
+  rateLimitPerMinute Int?
+  revokedAt   DateTime?
   createdById String?
   createdAt   DateTime  @default(now())
   updatedAt   DateTime  @updatedAt

@@ -14,6 +14,7 @@ import { NativeSelect } from '@/components/ui/select';
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { api } from '@/lib/api';
 import { cn, formatDate } from '@/lib/utils';
+import { useAuth } from '@/components/auth/auth-provider';
 
 type Tab = 'connectors' | 'keys';
 
@@ -67,6 +68,10 @@ interface ApiKey {
   status: string;
   lastUsedAt: string | null;
   expiresAt: string | null;
+  allowedIps: string[];
+  rateLimitPerMinute: number | null;
+  lastUsedIp: string | null;
+  revokedAt: string | null;
   createdAt: string;
 }
 interface LogRow {
@@ -118,6 +123,8 @@ export default function IntegracoesExternasPage() {
 
 function ConnectorsTab() {
   const qc = useQueryClient();
+  const { hasPermission } = useAuth();
+  const canManage = hasPermission('integrations:manage');
   const [editing, setEditing] = useState<Connector | null>(null);
   const [creating, setCreating] = useState(false);
   const [logsFor, setLogsFor] = useState<Connector | null>(null);
@@ -145,7 +152,7 @@ function ConnectorsTab() {
     <SectionCard
       title="Conectores"
       description="Sistemas externos integrados a esta empresa. A sincronização de saída é manual (sob demanda)."
-      actions={<Button onClick={() => setCreating(true)}><Plus className="mr-2 h-4 w-4" />Novo conector</Button>}
+      actions={canManage ? <Button onClick={() => setCreating(true)}><Plus className="mr-2 h-4 w-4" />Novo conector</Button> : undefined}
       contentClassName="p-0"
     >
       <div className="overflow-x-auto">
@@ -182,10 +189,10 @@ function ConnectorsTab() {
                 </td>
                 <td>
                   <div className="flex flex-wrap justify-end gap-1">
-                    <Button size="sm" variant="outline" className="h-8" title="Testar conexão" onClick={() => test.mutate(c.id)} disabled={test.isPending}>
+                    {canManage && <Button size="sm" variant="outline" className="h-8" title="Testar conexão" onClick={() => test.mutate(c.id)} disabled={test.isPending}>
                       <TestTube2 className="h-3.5 w-3.5" />
-                    </Button>
-                    {c.direction !== 'INBOUND' && (
+                    </Button>}
+                    {canManage && c.direction !== 'INBOUND' && (
                       <select
                         className="h-8 rounded-md border border-border/60 bg-background px-1.5 text-xs"
                         value=""
@@ -202,8 +209,8 @@ function ConnectorsTab() {
                       </select>
                     )}
                     <Button size="sm" variant="ghost" className="h-8" title="Registros" onClick={() => setLogsFor(c)}><ScrollText className="h-3.5 w-3.5" /></Button>
-                    <Button size="sm" variant="ghost" className="h-8" title="Editar" onClick={() => setEditing(c)}><Pencil className="h-3.5 w-3.5" /></Button>
-                    <Button size="sm" variant="ghost" className="h-8 text-destructive" title="Remover" onClick={() => { if (window.confirm('Remover este conector?')) remove.mutate(c.id); }}><Trash2 className="h-3.5 w-3.5" /></Button>
+                    {canManage && <Button size="sm" variant="ghost" className="h-8" title="Editar" onClick={() => setEditing(c)}><Pencil className="h-3.5 w-3.5" /></Button>}
+                    {canManage && <Button size="sm" variant="ghost" className="h-8 text-destructive" title="Remover" onClick={() => { if (window.confirm('Remover este conector?')) remove.mutate(c.id); }}><Trash2 className="h-3.5 w-3.5" /></Button>}
                   </div>
                 </td>
               </tr>
@@ -347,6 +354,8 @@ function LogsDialog({ connector, onClose }: { connector: Connector; onClose: () 
 
 function ApiKeysTab() {
   const qc = useQueryClient();
+  const { hasPermission } = useAuth();
+  const canManage = hasPermission('integrations:manage');
   const [creating, setCreating] = useState(false);
   const [newToken, setNewToken] = useState<{ name: string; token: string } | null>(null);
 
@@ -363,7 +372,7 @@ function ApiKeysTab() {
     <SectionCard
       title="Chaves de API (entrada)"
       description="Sistemas externos usam estas chaves no header X-Api-Key para enviar/ler dados desta empresa. A chave é exibida apenas uma vez."
-      actions={<Button onClick={() => setCreating(true)}><Plus className="mr-2 h-4 w-4" />Nova chave</Button>}
+      actions={canManage ? <Button onClick={() => setCreating(true)}><Plus className="mr-2 h-4 w-4" />Nova chave</Button> : undefined}
       contentClassName="p-0"
     >
       <div className="overflow-x-auto">
@@ -375,11 +384,12 @@ function ApiKeysTab() {
               <th className="text-left">Escopos</th>
               <th className="text-left">Status</th>
               <th className="text-left">Último uso</th>
+              <th className="text-left">Proteções</th>
               <th className="text-right">Ações</th>
             </tr>
           </thead>
           <tbody>
-            {query.isLoading && <tr><td colSpan={6} className="py-8 text-center text-sm text-muted-foreground">Carregando...</td></tr>}
+            {query.isLoading && <tr><td colSpan={7} className="py-8 text-center text-sm text-muted-foreground">Carregando...</td></tr>}
             {rows.map((k) => (
               <tr key={k.id}>
                 <td className="font-medium">{k.name}</td>
@@ -387,8 +397,13 @@ function ApiKeysTab() {
                 <td className="text-xs">{k.scopes.join(', ')}</td>
                 <td><Badge className={cn('text-[10px]', k.status === 'active' ? 'bg-emerald-500/10 text-emerald-600 border-transparent' : 'bg-muted text-muted-foreground border-transparent')}>{k.status === 'active' ? 'Ativa' : 'Revogada'}</Badge></td>
                 <td className="text-xs text-muted-foreground">{k.lastUsedAt ? formatDate(k.lastUsedAt) : '—'}</td>
+                <td className="text-xs text-muted-foreground">
+                  <div>{k.allowedIps.length ? `${k.allowedIps.length} IP(s)` : 'Qualquer IP'}</div>
+                  <div>{k.rateLimitPerMinute ? `${k.rateLimitPerMinute}/min` : 'Limite global'}</div>
+                  {k.lastUsedIp && <div className="font-mono">último: {k.lastUsedIp}</div>}
+                </td>
                 <td className="text-right">
-                  {k.status === 'active' && (
+                  {canManage && k.status === 'active' && (
                     <Button size="sm" variant="ghost" className="h-8 text-destructive" title="Revogar" onClick={() => { if (window.confirm('Revogar esta chave? Sistemas que a usam perderão o acesso.')) revoke.mutate(k.id); }}>
                       <Ban className="h-3.5 w-3.5" />
                     </Button>
@@ -396,7 +411,7 @@ function ApiKeysTab() {
                 </td>
               </tr>
             ))}
-            {!query.isLoading && rows.length === 0 && <tr><td colSpan={6} className="py-8 text-center text-sm text-muted-foreground">Nenhuma chave criada.</td></tr>}
+            {!query.isLoading && rows.length === 0 && <tr><td colSpan={7} className="py-8 text-center text-sm text-muted-foreground">Nenhuma chave criada.</td></tr>}
           </tbody>
         </table>
       </div>
@@ -410,8 +425,20 @@ function ApiKeysTab() {
 function ApiKeyDialog({ onClose, onCreated }: { onClose: () => void; onCreated: (name: string, token: string) => void }) {
   const [name, setName] = useState('');
   const [scopes, setScopes] = useState<string[]>(['results:write']);
+  const [expiresAt, setExpiresAt] = useState('');
+  const [allowedIps, setAllowedIps] = useState('');
+  const [rateLimitPerMinute, setRateLimitPerMinute] = useState('');
   const create = useMutation({
-    mutationFn: () => api<{ token: string; name: string }>('/integrations/external/keys', { method: 'POST', json: { name: name.trim(), scopes } }),
+    mutationFn: () => api<{ token: string; name: string }>('/integrations/external/keys', {
+      method: 'POST',
+      json: {
+        name: name.trim(),
+        scopes,
+        expiresAt: expiresAt ? new Date(`${expiresAt}T23:59:59`).toISOString() : undefined,
+        allowedIps: allowedIps.split(/[\n,;]/).map((value) => value.trim()).filter(Boolean),
+        rateLimitPerMinute: rateLimitPerMinute ? Number(rateLimitPerMinute) : undefined,
+      },
+    }),
     onSuccess: (r) => onCreated(r.name, r.token),
     onError: (e: any) => toast.error(e?.message ?? 'Falha ao criar chave'),
   });
@@ -421,6 +448,11 @@ function ApiKeyDialog({ onClose, onCreated }: { onClose: () => void; onCreated: 
         <DialogHeader><DialogTitle>Nova chave de API</DialogTitle></DialogHeader>
         <div className="space-y-3">
           <Field label="Nome *"><Input value={name} onChange={(e) => setName(e.target.value)} placeholder="Ex.: Integração SAP - Produção" /></Field>
+          <div className="grid grid-cols-2 gap-3">
+            <Field label="Expira em"><Input type="date" value={expiresAt} onChange={(e) => setExpiresAt(e.target.value)} /></Field>
+            <Field label="Limite por minuto"><Input type="number" min={1} max={5000} value={rateLimitPerMinute} onChange={(e) => setRateLimitPerMinute(e.target.value)} placeholder="Ex.: 120" /></Field>
+          </div>
+          <Field label="IPs permitidos (opcional, separados por vírgula)"><Input value={allowedIps} onChange={(e) => setAllowedIps(e.target.value)} placeholder="Ex.: 203.0.113.10, 2001:db8::1" /></Field>
           <div>
             <Label>Escopos</Label>
             <div className="mt-1 space-y-1.5">

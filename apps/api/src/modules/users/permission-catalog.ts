@@ -344,6 +344,8 @@ export const PERMISSION_CATALOG = [
   ['communication:mute', 'Silenciar conversas', 'Comunicacao', 'update'],
   ['integrations:view', 'Visualizar integracoes disponiveis', 'Integracoes', 'view'],
   ['integrations:manage', 'Gerenciar integracoes do sistema', 'Integracoes', 'manage'],
+  ['company-data:view', 'Consultar dados operacionais da propria empresa', 'Dados da Empresa', 'view'],
+  ['company-data:export', 'Exportar dados operacionais da propria empresa', 'Dados da Empresa', 'export'],
   ['help:view', 'Acessar Central de Ajuda', 'Ajuda', 'view'],
   ['help:manage', 'Administrar artigos da Central de Ajuda', 'Ajuda', 'manage'],
 
@@ -399,7 +401,7 @@ const DIRECTOR_KEYS = PERMISSION_CATALOG
     const prefix = key.split(':')[0];
     return (
       ['view', 'export', 'approve'].includes(action) &&
-      !['users', 'settings'].includes(prefix) &&
+      !['users', 'settings', 'company-data'].includes(prefix) &&
       key !== 'asset-security:emergency' &&
       !SENSITIVE_COMPENSATION_KEYS.has(key)
     );
@@ -410,7 +412,7 @@ const ANALYST_KEYS = PERMISSION_CATALOG
     const prefix = key.split(':')[0];
     return (
       ['view', 'create', 'update', 'complete', 'link', 'assist', 'export'].includes(action) &&
-      !['users', 'settings'].includes(prefix) &&
+      !['users', 'settings', 'company-data'].includes(prefix) &&
       key !== 'asset-security:emergency' &&
       !SENSITIVE_COMPENSATION_KEYS.has(key)
     );
@@ -778,6 +780,13 @@ export const DEFAULT_PROFILES = [
       'directory:view',
       'help:view',
     ],
+  },
+  {
+    code: 'OPERADOR_DADOS',
+    name: 'Operador de Dados',
+    role: 'ANALYST',
+    description: 'Consulta e exporta visoes seguras dos dados da propria empresa, sem acesso ao banco fisico ou a dados de outros clientes.',
+    permissions: ['company-data:view', 'company-data:export', 'integrations:view', 'audit:view'],
   },
   {
     // Login exclusivo para instalar em um totem físico compartilhado. Não bate

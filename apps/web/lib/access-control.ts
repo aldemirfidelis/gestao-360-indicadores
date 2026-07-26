@@ -115,7 +115,7 @@ export const BUSINESS_MODULE_DEFINITIONS: BusinessModuleDefinition[] = [
     slug: 'administracao',
     title: 'Administração',
     description: 'Usuários, perfis, parâmetros, auditoria, importações, relatórios, automações e integrações.',
-    prefixes: ['settings', 'users', 'audit', 'imports', 'reports', 'automations', 'integrations', 'help', 'ai'],
+    prefixes: ['settings', 'users', 'audit', 'imports', 'reports', 'automations', 'integrations', 'company-data', 'help', 'ai'],
   },
   {
     slug: 'qualidade-compliance',

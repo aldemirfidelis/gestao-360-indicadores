@@ -1,4 +1,5 @@
-import { IsArray, IsBoolean, IsEnum, IsIn, IsObject, IsOptional, IsString, MaxLength } from 'class-validator';
+import { Type } from 'class-transformer';
+import { ArrayMaxSize, IsArray, IsBoolean, IsEnum, IsIn, IsInt, IsIP, IsISO8601, IsObject, IsOptional, IsString, Max, MaxLength, Min } from 'class-validator';
 import { IntegrationAuthType, IntegrationDirection, IntegrationProvider } from '@prisma/client';
 
 export class CreateExternalIntegrationDto {
@@ -30,6 +31,9 @@ export class RunIntegrationDto {
 
 export class CreateApiKeyDto {
   @IsString() @MaxLength(120) name!: string;
-  @IsArray() @IsString({ each: true }) scopes!: string[];
-  @IsOptional() @IsString() expiresAt?: string;
+  @IsArray() @ArrayMaxSize(20) @IsString({ each: true }) scopes!: string[];
+  @IsOptional() @IsISO8601() expiresAt?: string;
+  /** Lista vazia = qualquer IP. Aceita IPv4 e IPv6 exatos. */
+  @IsOptional() @IsArray() @ArrayMaxSize(50) @IsIP(undefined, { each: true }) allowedIps?: string[];
+  @IsOptional() @Type(() => Number) @IsInt() @Min(1) @Max(5000) rateLimitPerMinute?: number;
 }

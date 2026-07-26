@@ -74,6 +74,7 @@ import { PublicModule } from './modules/public/public.module';
 import { JobsModule } from './jobs/jobs.module';
 import { MaintenanceModule } from './jobs/maintenance.module';
 import { workersEnabled } from './jobs/jobs.constants';
+import { CompanyAdminModule } from './modules/company-admin/company-admin.module';
 
 @Module({
   imports: [
@@ -142,6 +143,7 @@ import { workersEnabled } from './jobs/jobs.constants';
     MonthlyResultsModule,
     StorageModule,
     PublicModule,
+    CompanyAdminModule,
     // Rotinas de manutenção in-process (vencimento de documentos, alertas):
     // sempre ativas, sem dependência de Redis.
     MaintenanceModule,

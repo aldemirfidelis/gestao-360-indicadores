@@ -40,4 +40,11 @@ describe('DEFAULT_PROFILES — autoatendimento do colaborador', () => {
       }
     }
   });
+
+  it('dados administrativos ficam no perfil dedicado e nao sao liberados ao analista generico', () => {
+    expect(perms('OPERADOR_DADOS').has('company-data:view')).toBe(true);
+    expect(perms('OPERADOR_DADOS').has('company-data:export')).toBe(true);
+    expect(perms('ANALISTA').has('company-data:view')).toBe(false);
+    expect(perms('DIRETORIA').has('company-data:export')).toBe(false);
+  });
 });

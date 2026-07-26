@@ -1,6 +1,4 @@
 import { Body, Controller, Delete, Get, Param, Patch, Post } from '@nestjs/common';
-import { UserRoleEnum } from '@prisma/client';
-import { Roles } from '../../common/decorators/roles.decorator';
 import { RequirePermissions } from '../../common/decorators/permissions.decorator';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import { AuthPayload } from '../auth/auth.types';
@@ -13,14 +11,12 @@ import {
 } from './external-integration.dto';
 
 /**
- * Administração de integrações com APIs externas — SOMENTE Super Admin (operadores da plataforma).
- * Telas de SAP/Apdata/SE Suite/REST + chaves de entrada ficam no Portal Admin Global; usuários da
- * empresa não acessam. Escopo SEMPRE = empresa da sessão (companyId efetivo, empresa selecionada/
- * impersonada). Credenciais nunca retornam ao cliente.
+ * Administracao de integracoes da empresa. O escopo SEMPRE vem da empresa da
+ * sessao; credenciais nunca retornam ao cliente. O Super Admin continua com
+ * acesso global por impersonacao, sem criar uma segunda implementacao.
  */
 @Controller('integrations/external')
-@Roles(UserRoleEnum.SUPER_ADMIN)
-@RequirePermissions('settings:manage')
+@RequirePermissions('integrations:view', 'integrations:manage')
 export class ExternalIntegrationController {
   constructor(private readonly service: ExternalIntegrationService) {}
 
@@ -31,11 +27,13 @@ export class ExternalIntegrationController {
   }
 
   @Post('keys')
+  @RequirePermissions('integrations:manage')
   createApiKey(@CurrentUser() me: AuthPayload, @Body() dto: CreateApiKeyDto) {
     return this.service.createApiKey(me, dto);
   }
 
   @Delete('keys/:id')
+  @RequirePermissions('integrations:manage')
   revokeApiKey(@CurrentUser() me: AuthPayload, @Param('id') id: string) {
     return this.service.revokeApiKey(me, id);
   }
@@ -47,6 +45,7 @@ export class ExternalIntegrationController {
   }
 
   @Post()
+  @RequirePermissions('integrations:manage')
   create(@CurrentUser() me: AuthPayload, @Body() dto: CreateExternalIntegrationDto) {
     return this.service.createConnector(me, dto);
   }
@@ -57,21 +56,25 @@ export class ExternalIntegrationController {
   }
 
   @Patch(':id')
+  @RequirePermissions('integrations:manage')
   update(@CurrentUser() me: AuthPayload, @Param('id') id: string, @Body() dto: UpdateExternalIntegrationDto) {
     return this.service.updateConnector(me, id, dto);
   }
 
   @Delete(':id')
+  @RequirePermissions('integrations:manage')
   remove(@CurrentUser() me: AuthPayload, @Param('id') id: string) {
     return this.service.removeConnector(me, id);
   }
 
   @Post(':id/test')
+  @RequirePermissions('integrations:manage')
   test(@CurrentUser() me: AuthPayload, @Param('id') id: string) {
     return this.service.testConnector(me, id);
   }
 
   @Post(':id/run')
+  @RequirePermissions('integrations:manage')
   run(@CurrentUser() me: AuthPayload, @Param('id') id: string, @Body() dto: RunIntegrationDto) {
     return this.service.runConnector(me, id, dto.operation);
   }

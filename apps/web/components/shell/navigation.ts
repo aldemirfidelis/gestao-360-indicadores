@@ -12,6 +12,7 @@ import {
   Clock,
   Compass,
   DoorOpen,
+  Database,
   Download,
   FileBarChart,
   FileSpreadsheet,
@@ -34,6 +35,7 @@ import {
   QrCode,
   Radio,
   RadioTower,
+  ScrollText,
   Scale,
   Settings,
   ShieldCheck,
@@ -119,10 +121,14 @@ export const portalServiceSections: NavSection[] = [
   },
   {
     heading: 'Administração',
-    description: 'Aprovações, períodos, automações, usuários e relatórios',
+    description: 'Gestão da empresa, acessos, dados, integrações e auditoria',
     intent: 'management',
     icon: Briefcase,
     items: [
+      { href: '/settings', label: 'Central Administrativa', description: 'Empresa, usuários, perfis, parâmetros e segurança', icon: Settings, permissions: ['settings:view', 'settings:manage', 'users:view', 'users:manage', 'integrations:view', 'company-data:view', 'audit:view'], exact: true },
+      { href: '/settings/dados', label: 'Dados da Empresa', description: 'Consultas e exportações seguras, sempre limitadas à empresa', icon: Database, permissions: ['company-data:view', 'company-data:export'], exact: true },
+      { href: '/settings/integracoes', label: 'APIs e Integrações', description: 'Conectores, chaves, escopos e histórico de execução', icon: KeyRound, permissions: ['integrations:view', 'integrations:manage'], exact: true },
+      { href: '/audit', label: 'Auditoria', description: 'Trilha de alterações e acessos da empresa', icon: ScrollText, permissions: ['audit:view', 'audit:export'], exact: true },
       { href: '/aprovacoes-cargo', label: 'Aprovações Gerais', description: 'Posições de cargo no organograma, eficácia e aprovações gerais (movimentações salariais ficam em Cargos e Salários → Aprovações)', icon: ClipboardCheck, permissions: ['org:positions:approve', 'eficacia:view', 'actions:effectiveness', 'actions:delete', 'actions:approve', 'actions:manage'] },
       { href: '/periods', label: 'Períodos', description: 'Ano de trabalho, abertura e fechamento anual', icon: CalendarDays, permissions: ['settings:manage'] },
       { href: '/central-automacoes', label: 'Central de Automações', description: 'Motor visual de automações e fluxos de trabalho', icon: Sparkles, permissions: ['automations:view'] },
@@ -409,14 +415,13 @@ export const ROUTE_PERMISSIONS: Array<{ prefix: string; permissions: string[]; e
   { prefix: '/ajuda', permissions: ['help:view'] },
   { prefix: '/central-atendimento', permissions: ['help:view'] },
   { prefix: '/users', permissions: ['users:view', 'users:manage'] },
-  // Rotas antigas de Configuracoes no app da empresa. O layout de /settings
-  // redireciona para /users; o restante foi centralizado no Portal Admin Global.
   { prefix: '/settings/database', permissions: [SUPER_ADMIN_ONLY_PERMISSION] },
   { prefix: '/settings/portal', permissions: [SUPER_ADMIN_ONLY_PERMISSION] },
   { prefix: '/settings/empresas', permissions: ['users:view', 'users:manage'] },
   { prefix: '/settings/visibilidade', permissions: ['users:permissions', 'users:manage'] },
-  { prefix: '/settings/integracoes', permissions: [SUPER_ADMIN_ONLY_PERMISSION] },
-  { prefix: '/settings', permissions: ['settings:view', 'settings:manage', 'users:view', 'users:profiles', 'users:manage', 'audit:view'] },
+  { prefix: '/settings/dados', permissions: ['company-data:view', 'company-data:export'] },
+  { prefix: '/settings/integracoes', permissions: ['integrations:view', 'integrations:manage'] },
+  { prefix: '/settings', permissions: ['settings:view', 'settings:manage', 'users:view', 'users:profiles', 'users:manage', 'audit:view', 'integrations:view', 'company-data:view'] },
 ];
 
 export function findRoutePermissions(pathname: string): string[] | null {

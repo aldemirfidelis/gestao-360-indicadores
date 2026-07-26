@@ -156,6 +156,11 @@ interface Bootstrap {
   auditCount: number;
 }
 
+interface CompanyAdminOverview {
+  company: { id: string; name: string; tradeName: string | null; status: string; active: boolean; maxUsers: number | null };
+  counts: { users: number; profiles: number; branches: number; areas: number; indicators: number; connectors: number; apiKeys: number; auditEvents: number };
+}
+
 const EMPTY_BOOTSTRAP: Bootstrap = {
   companies: [],
   branches: [],
@@ -221,7 +226,10 @@ export default function SettingsPage() {
   const canViewUsers = platformAdminContext || hasPermission(['users:view', 'users:manage']);
   const canManageProfiles = platformAdminContext || hasPermission(['users:profiles', 'users:manage']);
   const canViewAudit = platformAdminContext || hasPermission(['audit:view', 'audit:export']);
-  const canOpenSettings = canViewSettings || canViewUsers || canManageProfiles || canViewAudit;
+  const canViewIntegrations = platformAdminContext || hasPermission(['integrations:view', 'integrations:manage']);
+  const canViewCompanyData = platformAdminContext || hasPermission(['company-data:view', 'company-data:export']);
+  const canLoadBootstrap = canViewSettings || canViewUsers || canManageProfiles || canViewAudit;
+  const canOpenSettings = canLoadBootstrap || canViewIntegrations || canViewCompanyData;
   const canManageSettings = platformAdminContext || hasPermission(['settings:manage']);
   const canManageUsers = platformAdminContext || hasPermission(['users:permissions', 'users:manage']);
 
@@ -242,7 +250,13 @@ export default function SettingsPage() {
   const query = useQuery<Bootstrap>({
     queryKey: ['admin', 'bootstrap'],
     queryFn: () => withTimeout(api<Bootstrap>('/admin/bootstrap'), 15000, 'Tempo excedido ao carregar configurações.'),
-    enabled: canOpenSettings,
+    enabled: canLoadBootstrap,
+    retry: 1,
+  });
+  const overview = useQuery<CompanyAdminOverview>({
+    queryKey: ['company-admin', 'overview'],
+    queryFn: () => api('/company-admin/overview'),
+    enabled: canOpenSettings && !platformAdminContext,
     retry: 1,
   });
 
@@ -300,7 +314,7 @@ export default function SettingsPage() {
     onError: (e: any) => toast.error(e?.message ?? 'Não foi possível excluir'),
   });
 
-  if ((!platformAdminContext && authLoading) || (canOpenSettings && query.isPending && query.fetchStatus !== 'idle')) {
+  if ((!platformAdminContext && authLoading) || (canLoadBootstrap && query.isPending && query.fetchStatus !== 'idle')) {
     return <LoadingState label="Carregando configurações..." />;
   }
 
@@ -332,17 +346,42 @@ export default function SettingsPage() {
         title="Configurações"
         description="Central administrativa para usuários, auditoria, parâmetros, segurança e regras do sistema."
         breadcrumbs={[{ label: 'Início', href: '/' }, { label: 'Configurações' }]}
-        actions={
+        actions={canViewAudit ? (
           <Button asChild variant="outline">
             <Link href="/audit">
               <ScrollText className="mr-2 h-4 w-4" />
               Auditoria completa
             </Link>
           </Button>
-        }
+        ) : undefined}
       />
 
-      {query.isError && (
+      {!platformAdminContext && overview.data && (
+        <SectionCard
+          title={overview.data.company.tradeName || overview.data.company.name}
+          description={`Visão consolidada do ambiente da empresa · status ${overview.data.company.status}`}
+          className="mb-6"
+          contentClassName="grid grid-cols-2 gap-3 md:grid-cols-4 xl:grid-cols-8"
+        >
+          {([
+            ['Usuários', overview.data.counts.users],
+            ['Perfis', overview.data.counts.profiles],
+            ['Filiais', overview.data.counts.branches],
+            ['Áreas', overview.data.counts.areas],
+            ['Indicadores', overview.data.counts.indicators],
+            ['Conectores', overview.data.counts.connectors],
+            ['Chaves API', overview.data.counts.apiKeys],
+            ['Eventos auditados', overview.data.counts.auditEvents],
+          ] as const).map(([label, value]) => (
+            <div key={label} className="rounded-lg border bg-muted/20 p-3">
+              <div className="text-lg font-semibold tabular-nums">{formatNumber(value)}</div>
+              <div className="mt-1 text-[11px] leading-4 text-muted-foreground">{label}</div>
+            </div>
+          ))}
+        </SectionCard>
+      )}
+
+      {canLoadBootstrap && query.isError && (
         <SectionCard
           title="Configurações em modo seguro"
           description="Não foi possível carregar os dados administrativos agora. A tela continua disponível com listas vazias para evitar carregamento infinito."
@@ -359,7 +398,35 @@ export default function SettingsPage() {
         </SectionCard>
       )}
 
-      <SectionCard
+      {!platformAdminContext && (canViewCompanyData || canViewIntegrations || canViewAudit) && (
+        <SectionCard
+          title="Portal administrativo da empresa"
+          description="Cada recurso abaixo opera somente no tenant da empresa ativa. Banco físico, SQL, backups e dados de outros clientes permanecem fora deste portal."
+          className="mb-6"
+          contentClassName="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-3"
+        >
+          {canViewCompanyData && (
+            <Link href="/settings/dados" className="group flex h-full items-start gap-3 rounded-lg border bg-card p-4 shadow-sm transition-colors hover:bg-accent/35">
+              <div className="grid h-10 w-10 shrink-0 place-items-center rounded-md bg-status-blue/10 text-status-blue"><Database className="h-5 w-5" /></div>
+              <div><div className="text-sm font-semibold">Dados da Empresa</div><p className="mt-1 text-xs leading-relaxed text-muted-foreground">Consulte e exporte visões autorizadas, sem SQL e sem acesso entre empresas.</p></div>
+            </Link>
+          )}
+          {canViewIntegrations && (
+            <Link href="/settings/integracoes" className="group flex h-full items-start gap-3 rounded-lg border bg-card p-4 shadow-sm transition-colors hover:bg-accent/35">
+              <div className="grid h-10 w-10 shrink-0 place-items-center rounded-md bg-status-purple/10 text-status-purple"><KeyRound className="h-5 w-5" /></div>
+              <div><div className="text-sm font-semibold">APIs e Integrações</div><p className="mt-1 text-xs leading-relaxed text-muted-foreground">Conectores, chaves por escopo, IP permitido, limites e logs de execução.</p></div>
+            </Link>
+          )}
+          {canViewAudit && (
+            <Link href="/audit" className="group flex h-full items-start gap-3 rounded-lg border bg-card p-4 shadow-sm transition-colors hover:bg-accent/35">
+              <div className="grid h-10 w-10 shrink-0 place-items-center rounded-md bg-status-green/10 text-status-green"><ScrollText className="h-5 w-5" /></div>
+              <div><div className="text-sm font-semibold">Auditoria</div><p className="mt-1 text-xs leading-relaxed text-muted-foreground">Acompanhe alterações, autores, módulos, resultados e datas.</p></div>
+            </Link>
+          )}
+        </SectionCard>
+      )}
+
+      {canLoadBootstrap && <SectionCard
         title="Central de Configurações"
         description="Acesso separado da operação diária para usuários, permissões, auditoria, parâmetros e regras globais."
         contentClassName="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-5"
@@ -400,10 +467,8 @@ export default function SettingsPage() {
               </button>
             );
           })}
-      </SectionCard>
+      </SectionCard>}
 
-      {/* Integrações de SISTEMA (SAP/Apdata/conectores) foram movidas para o Portal Admin Global (Super Admin).
-          Aqui fica apenas a IMPORTAÇÃO de dados, que é tarefa do usuário-chave/admin da empresa. */}
       {!platformAdminContext && hasPermission(['imports:view', 'imports:create']) && (
         <SectionCard
           title="Dados e Importações"
@@ -421,8 +486,8 @@ export default function SettingsPage() {
             <div className="min-w-0">
               <div className="text-sm font-semibold">Importações</div>
               <p className="mt-1 text-xs leading-relaxed text-muted-foreground">
-                Carregue indicadores, metas e realizados em lote a partir de planilhas. As integrações
-                com sistemas externos (SAP, Apdata e outros) são gerenciadas pela equipe da plataforma.
+                Carregue indicadores, metas e realizados em lote a partir de planilhas. Conectores com
+                sistemas externos ficam disponíveis em APIs e Integrações conforme o seu perfil.
               </p>
             </div>
           </Link>
