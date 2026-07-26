@@ -1,4 +1,4 @@
-import { BadRequestException, HttpException, Injectable } from '@nestjs/common';
+import { BadRequestException, ForbiddenException, HttpException, Injectable } from '@nestjs/common';
 import { PrismaService } from '../../../prisma/prisma.service';
 import { AuthPayload } from '../../auth/auth.types';
 import { PostgreSQLAdapter } from '../adapters/postgresql.adapter';
@@ -44,6 +44,7 @@ export class QueryExecutionService {
     user: AuthPayload,
     meta: ReqMeta,
   ): Promise<ExecuteResult> {
+    blockFreeSql();
     const analysis = this.validation.assertExecutable(sql, mode, confirmationPhrase);
     const started = Date.now();
     const cleaned = sql.trim().replace(/;\s*$/, '');
@@ -114,6 +115,7 @@ export class QueryExecutionService {
   }
 
   async explain(sql: string): Promise<Record<string, unknown>[]> {
+    blockFreeSql();
     const cleaned = sql.trim().replace(/;\s*$/, '');
     return this.pg.explain(cleaned);
   }
@@ -143,4 +145,8 @@ export class QueryExecutionService {
   deleteFavorite(userId: string, id: string) {
     return this.prisma.dbAdminSavedQuery.deleteMany({ where: { id, userId } });
   }
+}
+
+function blockFreeSql(): void {
+  throw new ForbiddenException('Editor SQL livre desativado para garantir o escopo por empresa.');
 }

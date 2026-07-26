@@ -6833,6 +6833,7 @@ model IndicatorResultComment {
 
 model DbAdminAuditLog {
   id             String   @id @default(uuid())
+  companyId      String?
   userId         String?
   userEmail      String?
   userRole       String?
@@ -6855,6 +6856,7 @@ model DbAdminAuditLog {
   createdAt      DateTime @default(now())
 
   @@index([createdAt])
+  @@index([companyId, createdAt])
   @@index([userId, createdAt])
   @@index([submenu, action])
   @@index([targetTable])
@@ -6863,6 +6865,7 @@ model DbAdminAuditLog {
 
 model DbAdminBackup {
   id                String   @id @default(uuid())
+  companyId         String?
   userId            String?
   userEmail         String?
   type              String // PRE_OP | TABLE_EXPORT | MANUAL_LOGICAL
@@ -6880,6 +6883,7 @@ model DbAdminBackup {
   createdAt         DateTime @default(now())
 
   @@index([createdAt])
+  @@index([companyId, createdAt])
   @@index([type])
   @@index([status])
 }

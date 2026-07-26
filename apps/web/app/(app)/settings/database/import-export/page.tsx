@@ -35,7 +35,7 @@ export default function ImportExportPage() {
     <div className="space-y-6">
       <div>
         <h2 className="text-lg font-semibold">Importar e Exportar</h2>
-        <p className="text-sm text-muted-foreground">Exporte tabelas/consultas (CSV, Excel, JSON, SQL) e importe dados (CSV/JSON) com prévia e estratégias.</p>
+        <p className="text-sm text-muted-foreground">Operações limitadas às tabelas e aos registros da empresa selecionada.</p>
       </div>
       <ExportCard tables={tables.data ?? []} />
       <ImportCard tables={tables.data ?? []} />
@@ -44,39 +44,26 @@ export default function ImportExportPage() {
 }
 
 function ExportCard({ tables }: { tables: TableSummary[] }) {
-  const [mode, setMode] = useState<'table' | 'query'>('table');
   const [table, setTable] = useState('');
-  const [sql, setSql] = useState('SELECT * FROM "Indicator" LIMIT 100');
   const [format, setFormat] = useState<'csv' | 'json' | 'sql' | 'xlsx'>('csv');
 
   const exportMut = useMutation({
-    mutationFn: () => api<ExportPayload>('/admin/database/export', { method: 'POST', json: mode === 'table' ? { table, format } : { sql, format } }),
+    mutationFn: () => api<ExportPayload>('/admin/database/export', { method: 'POST', json: { table, format } }),
     onSuccess: (p) => { downloadPayload(p); toast.success(`Exportado: ${p.rowCount} linha(s).`); },
     onError: (e: ApiError) => toast.error(e.message),
   });
 
   return (
-    <SectionCard title="Exportar" description="Tabela completa ou resultado de uma consulta SELECT.">
+    <SectionCard title="Exportar" description="Somente registros da empresa selecionada.">
       <div className="space-y-3">
-        <div className="flex gap-2">
-          <Button variant={mode === 'table' ? 'default' : 'outline'} size="sm" onClick={() => setMode('table')}>Tabela</Button>
-          <Button variant={mode === 'query' ? 'default' : 'outline'} size="sm" onClick={() => setMode('query')}>Consulta SELECT</Button>
-        </div>
         <div className="grid grid-cols-1 gap-3 md:grid-cols-[1fr,200px]">
-          {mode === 'table' ? (
-            <div>
-              <Label>Tabela</Label>
-              <NativeSelect value={table} onChange={(e) => setTable(e.target.value)}>
-                <option value="">Selecione...</option>
-                {tables.map((t) => <option key={t.name} value={t.name}>{t.name}</option>)}
-              </NativeSelect>
-            </div>
-          ) : (
-            <div>
-              <Label>SQL (somente SELECT)</Label>
-              <Textarea rows={3} value={sql} onChange={(e) => setSql(e.target.value)} className="font-mono text-xs" />
-            </div>
-          )}
+          <div>
+            <Label>Tabela</Label>
+            <NativeSelect value={table} onChange={(e) => setTable(e.target.value)}>
+              <option value="">Selecione...</option>
+              {tables.map((t) => <option key={t.name} value={t.name}>{t.name}</option>)}
+            </NativeSelect>
+          </div>
           <div>
             <Label>Formato</Label>
             <NativeSelect value={format} onChange={(e) => setFormat(e.target.value as typeof format)}>
@@ -87,7 +74,7 @@ function ExportCard({ tables }: { tables: TableSummary[] }) {
             </NativeSelect>
           </div>
         </div>
-        <Button onClick={() => exportMut.mutate()} disabled={exportMut.isPending || (mode === 'table' && !table)}>
+        <Button onClick={() => exportMut.mutate()} disabled={exportMut.isPending || !table}>
           <Download className="mr-2 h-4 w-4" /> {exportMut.isPending ? 'Exportando...' : 'Exportar'}
         </Button>
       </div>
@@ -101,8 +88,7 @@ function ImportCard({ tables }: { tables: TableSummary[] }) {
   const [content, setContent] = useState('');
   const [preview, setPreview] = useState<ImportPreview | null>(null);
   const [mapping, setMapping] = useState<Record<string, string>>({});
-  const [strategy, setStrategy] = useState<'insert' | 'ignoreDuplicates' | 'upsert' | 'replace' | 'onlyValid'>('insert');
-  const [keyColumns, setKeyColumns] = useState<string[]>([]);
+  const [strategy, setStrategy] = useState<'insert' | 'ignoreDuplicates' | 'onlyValid'>('insert');
   const [report, setReport] = useState<ImportReport | null>(null);
 
   const previewMut = useMutation({
@@ -111,7 +97,7 @@ function ImportCard({ tables }: { tables: TableSummary[] }) {
     onError: (e: ApiError) => toast.error(e.message),
   });
   const commitMut = useMutation({
-    mutationFn: () => api<ImportReport>('/admin/database/import/commit', { method: 'POST', json: { table, format, content, mapping, strategy, keyColumns } }),
+    mutationFn: () => api<ImportReport>('/admin/database/import/commit', { method: 'POST', json: { table, format, content, mapping, strategy } }),
     onSuccess: (r) => { setReport(r); toast.success(`Importação concluída: +${r.inserted} inserido(s).`); },
     onError: (e: ApiError) => toast.error(e.message),
   });
@@ -127,7 +113,7 @@ function ImportCard({ tables }: { tables: TableSummary[] }) {
   }
 
   return (
-    <SectionCard title="Importar" description="CSV ou JSON. Pré-visualize, mapeie colunas, escolha a estratégia. Tudo roda em transação com retrato.">
+    <SectionCard title="Importar" description="CSV ou JSON. O companyId é definido pela empresa selecionada e não pode ser enviado pelo arquivo.">
       <div className="space-y-3">
         <div className="grid grid-cols-1 gap-3 md:grid-cols-3">
           <div>
@@ -180,24 +166,9 @@ function ImportCard({ tables }: { tables: TableSummary[] }) {
                 <NativeSelect value={strategy} onChange={(e) => setStrategy(e.target.value as typeof strategy)}>
                   <option value="insert">Inserir novos</option>
                   <option value="ignoreDuplicates">Ignorar duplicados</option>
-                  <option value="upsert">Atualizar/Inserir (upsert)</option>
                   <option value="onlyValid">Somente válidos (relatar inválidos)</option>
-                  <option value="replace">Substituir tudo (TRUNCATE + inserir)</option>
                 </NativeSelect>
               </div>
-              {strategy === 'upsert' && (
-                <div>
-                  <Label>Colunas-chave</Label>
-                  <div className="flex flex-wrap gap-1">
-                    {preview.tableColumns.map((tc) => {
-                      const on = keyColumns.includes(tc.name);
-                      return (
-                        <button key={tc.name} type="button" onClick={() => setKeyColumns((k) => on ? k.filter((x) => x !== tc.name) : [...k, tc.name])} className={`rounded px-2 py-0.5 text-xs ${on ? 'bg-primary text-primary-foreground' : 'bg-muted text-muted-foreground'}`}>{tc.name}</button>
-                      );
-                    })}
-                  </div>
-                </div>
-              )}
               <Button onClick={() => commitMut.mutate()} disabled={commitMut.isPending}>
                 <Upload className="mr-2 h-4 w-4" /> {commitMut.isPending ? 'Importando...' : 'Importar'}
               </Button>

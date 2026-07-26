@@ -426,49 +426,6 @@ export default function SettingsPage() {
         </SectionCard>
       )}
 
-      {canLoadBootstrap && <SectionCard
-        title="Central de Configurações"
-        description="Acesso separado da operação diária para usuários, permissões, auditoria, parâmetros e regras globais."
-        contentClassName="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-5"
-        className="mb-6"
-      >
-        {adminCards
-          .filter((card) => {
-            if (platformAdminContext || isSuperAdmin) return true;
-            if (card.active === 'security') return canManageProfiles && card.title === 'Perfis de acesso';
-            if (card.active === 'users') return canViewUsers;
-            if (card.active === 'audit') return canViewAudit;
-            return canViewSettings;
-          })
-          .map((card) => {
-            const Icon = card.icon;
-            const cardTitle = !isSuperAdmin && card.active === 'security' ? 'Perfis e permissões' : card.title;
-            const cardDescription = !isSuperAdmin && card.active === 'security'
-              ? 'Pacotes de acesso organizados e detalhados por módulo.'
-              : card.description;
-            return (
-              <button
-                key={card.title}
-                type="button"
-                onClick={() => {
-                  setActive(card.active);
-                  if (card.view) setParamView(card.view);
-                }}
-                className={cn(
-                  'h-full rounded-lg border bg-card p-4 text-left shadow-sm transition-colors hover:bg-accent/35',
-                  active === card.active && (!card.view || card.view === paramView) && 'border-primary/40 bg-primary/5',
-                )}
-              >
-                <div className={cn('grid h-10 w-10 place-items-center rounded-md', card.tone)}>
-                  <Icon className="h-5 w-5" />
-                </div>
-                <div className="mt-4 text-sm font-semibold">{cardTitle}</div>
-                <p className="mt-1 text-xs leading-relaxed text-muted-foreground">{cardDescription}</p>
-              </button>
-            );
-          })}
-      </SectionCard>}
-
       {!platformAdminContext && hasPermission(['imports:view', 'imports:create']) && (
         <SectionCard
           title="Dados e Importações"
@@ -569,6 +526,49 @@ export default function SettingsPage() {
           </Link>
         </SectionCard>
       )}
+
+      {canLoadBootstrap && <SectionCard
+        title="Central de Configurações"
+        description="Acesso separado da operação diária para usuários, permissões, auditoria, parâmetros e regras globais."
+        contentClassName="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-5"
+        className="mb-6"
+      >
+        {adminCards
+          .filter((card) => {
+            if (platformAdminContext || isSuperAdmin) return true;
+            if (card.active === 'security') return canManageProfiles && card.title === 'Perfis de acesso';
+            if (card.active === 'users') return canViewUsers;
+            if (card.active === 'audit') return canViewAudit;
+            return canViewSettings;
+          })
+          .map((card) => {
+            const Icon = card.icon;
+            const cardTitle = !isSuperAdmin && card.active === 'security' ? 'Perfis e permissões' : card.title;
+            const cardDescription = !isSuperAdmin && card.active === 'security'
+              ? 'Pacotes de acesso organizados e detalhados por módulo.'
+              : card.description;
+            return (
+              <button
+                key={card.title}
+                type="button"
+                onClick={() => {
+                  setActive(card.active);
+                  if (card.view) setParamView(card.view);
+                }}
+                className={cn(
+                  'h-full rounded-lg border bg-card p-4 text-left shadow-sm transition-colors hover:bg-accent/35',
+                  active === card.active && (!card.view || card.view === paramView) && 'border-primary/40 bg-primary/5',
+                )}
+              >
+                <div className={cn('grid h-10 w-10 place-items-center rounded-md', card.tone)}>
+                  <Icon className="h-5 w-5" />
+                </div>
+                <div className="mt-4 text-sm font-semibold">{cardTitle}</div>
+                <p className="mt-1 text-xs leading-relaxed text-muted-foreground">{cardDescription}</p>
+              </button>
+            );
+          })}
+      </SectionCard>}
 
       {active === 'users' && canViewUsers && (
         <SectionCard

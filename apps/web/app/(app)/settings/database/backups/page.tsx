@@ -82,7 +82,7 @@ export default function BackupsPage() {
 
       <div className="flex items-center gap-2 rounded-lg border border-status-blue/30 bg-status-blue/10 p-3 text-sm">
         <ShieldCheck className="h-4 w-4 text-status-blue" />
-        <span>Recuperação de <strong>banco inteiro</strong> não é feita aqui — use as <strong>ramificações e a recuperação em ponto no tempo da Neon</strong>. Esta tela faz backups <strong>lógicos</strong> (por tabela).</span>
+        <span>Os retratos desta tela incluem somente os registros da <strong>empresa selecionada</strong>. A recuperação integral da plataforma permanece sob responsabilidade do banco PostgreSQL gerenciado.</span>
       </div>
 
       <SectionCard title="Criar backup lógico" description="Retrato manual de uma tabela.">

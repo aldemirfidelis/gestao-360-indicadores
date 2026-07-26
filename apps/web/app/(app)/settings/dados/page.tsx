@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { Database, Download, Search, ShieldCheck } from 'lucide-react';
+import { Download, Search } from 'lucide-react';
 import { toast } from 'sonner';
 import { PageHeader } from '@/components/shell/page-header';
 import { SectionCard } from '@/components/platform/section-card';
@@ -81,17 +81,6 @@ export default function CompanyDataPage() {
         description="Visões de consulta e exportação isoladas pelo tenant. Esta área não fornece SQL, estrutura física, backups nem credenciais."
         breadcrumbs={[{ label: 'Início', href: '/' }, { label: 'Configurações', href: '/settings' }, { label: 'Dados da Empresa' }]}
       />
-
-      <div className="grid gap-3 md:grid-cols-[1fr_1fr]">
-        <div className="rounded-lg border border-emerald-500/25 bg-emerald-500/5 p-4">
-          <div className="flex items-center gap-2 text-sm font-semibold"><ShieldCheck className="h-4 w-4 text-emerald-600" /> Isolamento multiempresa obrigatório</div>
-          <p className="mt-1 text-xs leading-5 text-muted-foreground">A empresa é obtida da sessão autenticada e nunca aceita como parâmetro da tela ou da API.</p>
-        </div>
-        <div className="rounded-lg border border-blue-500/25 bg-blue-500/5 p-4">
-          <div className="flex items-center gap-2 text-sm font-semibold"><Database className="h-4 w-4 text-blue-600" /> Dados minimizados</div>
-          <p className="mt-1 text-xs leading-5 text-muted-foreground">Senhas, biometria, salários, conteúdo de documentos, payloads e dados de rede não aparecem nestas visões.</p>
-        </div>
-      </div>
 
       <SectionCard
         title={definition?.label ?? 'Conjuntos de dados'}

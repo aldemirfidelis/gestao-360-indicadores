@@ -1,6 +1,6 @@
-import { Injectable } from '@nestjs/common';
+import { ForbiddenException, Injectable } from '@nestjs/common';
 import { PostgreSQLAdapter } from '../adapters/postgresql.adapter';
-import { quoteQualified } from '../util/identifier.util';
+import { quoteIdent, quoteQualified } from '../util/identifier.util';
 import { ALLOWED_SCHEMAS, isProtectedTable } from '../database-admin.constants';
 import { getTableCatalogEntry, type TableCatalogEntry } from '../table-catalog';
 
@@ -62,6 +62,7 @@ const SCHEMA = ALLOWED_SCHEMAS[0];
 @Injectable()
 export class SchemaInspectionService {
   private allowlistCache: { at: number; set: Set<string> } | null = null;
+  private companyScopedAllowlistCache: { at: number; set: Set<string> } | null = null;
 
   constructor(private readonly pg: PostgreSQLAdapter) {}
 
@@ -116,6 +117,68 @@ export class SchemaInspectionService {
         catalog: getTableCatalogEntry(name),
       };
     });
+  }
+
+  /**
+   * Somente tabelas com companyId direto podem ser administradas neste modulo.
+   * Tabelas globais ou cujo tenant dependa de JOIN ficam fora por seguranca.
+   */
+  async getCompanyScopedAllowlist(): Promise<Set<string>> {
+    if (this.companyScopedAllowlistCache && Date.now() - this.companyScopedAllowlistCache.at < 30_000) {
+      return this.companyScopedAllowlistCache.set;
+    }
+    const { rows } = await this.pg.runReadOnly(
+      `SELECT table_name AS name
+         FROM information_schema.columns
+        WHERE table_schema = $1 AND column_name = 'companyId'
+        ORDER BY table_name`,
+      { params: [SCHEMA] },
+    );
+    const set = new Set(rows.map((row) => String(row.name)));
+    this.companyScopedAllowlistCache = { at: Date.now(), set };
+    return set;
+  }
+
+  async assertCompanyScopedTable(table: string): Promise<void> {
+    const allow = await this.getCompanyScopedAllowlist();
+    if (!allow.has(table)) {
+      throw new ForbiddenException('Tabela indisponivel: o escopo por empresa nao pode ser garantido.');
+    }
+  }
+
+  async listCompanyScopedTables(companyId: string): Promise<TableSummary[]> {
+    if (!companyId) throw new ForbiddenException('Selecione uma empresa para acessar os dados.');
+    const [tables, allow] = await Promise.all([this.listTables(), this.getCompanyScopedAllowlist()]);
+    const scoped = tables.filter((table) => allow.has(table.name));
+    if (scoped.length === 0) return [];
+
+    const countSql = scoped
+      .map((table, index) =>
+        `SELECT $${index + 2}::text AS name, count(*)::bigint AS total FROM ${quoteIdent(table.name, 'tabela')} WHERE "companyId" = $1`,
+      )
+      .join(' UNION ALL ');
+    const counts = await this.pg.runReadOnly(countSql, { params: [companyId, ...scoped.map((table) => table.name)] });
+    const countByTable = new Map(counts.rows.map((row) => [String(row.name), Number(row.total ?? 0)]));
+
+    return scoped.map((table) => ({
+      ...table,
+      estimatedRows: countByTable.get(table.name) ?? 0,
+      sizeBytes: 0,
+      sizePretty: 'escopo compartilhado',
+    }));
+  }
+
+  async getCompanyScopedRelationships(): Promise<RelationshipInfo[]> {
+    const allow = await this.getCompanyScopedAllowlist();
+    const relationships = await this.getRelationships();
+    return relationships.filter((item) => allow.has(item.sourceTable) && allow.has(item.targetTable));
+  }
+
+  async getCompanyScopedIndexes(table?: string): Promise<IndexInfo[]> {
+    const allow = await this.getCompanyScopedAllowlist();
+    if (table) await this.assertCompanyScopedTable(table);
+    const indexes = await this.getIndexes(table);
+    return indexes.filter((item) => allow.has(item.table));
   }
 
   private async primaryKeysByTable(): Promise<Map<string, string[]>> {

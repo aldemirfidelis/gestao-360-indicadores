@@ -1,4 +1,4 @@
-import { Body, Controller, Delete, Get, Param, Post, Req, UseGuards } from '@nestjs/common';
+import { Body, Controller, Delete, ForbiddenException, Get, Param, Post, Req, UseGuards } from '@nestjs/common';
 import { UserRoleEnum } from '@prisma/client';
 import { Request } from 'express';
 import { SuperAdminDbGuard } from '../guards/super-admin-db.guard';
@@ -26,37 +26,41 @@ export class QueryController {
     @CurrentUser() user: AuthPayload,
     @Req() req: Request,
   ) {
-    return this.query.execute(
-      body?.sql ?? '',
-      body?.mode === 'advanced' ? 'advanced' : 'safe',
-      body?.confirmationPhrase,
-      user,
-      { ip: req.ip ?? null, userAgent: req.headers['user-agent'] ?? null },
-    );
+    void body;
+    void user;
+    void req;
+    throw new ForbiddenException('Editor SQL livre desativado para garantir o escopo por empresa.');
   }
 
   @Post('explain')
   explain(@Body() body: { sql: string }) {
-    return this.query.explain(body?.sql ?? '');
+    void body;
+    throw new ForbiddenException('Editor SQL livre desativado para garantir o escopo por empresa.');
   }
 
   @Get('history')
   history(@CurrentUser() user: AuthPayload) {
-    return this.query.listHistory(user.sub);
+    void user;
+    throw new ForbiddenException('Historico SQL indisponivel no escopo empresarial.');
   }
 
   @Get('favorites')
   favorites(@CurrentUser() user: AuthPayload) {
-    return this.query.listFavorites(user.sub);
+    void user;
+    throw new ForbiddenException('Consultas SQL indisponiveis no escopo empresarial.');
   }
 
   @Post('favorites')
   saveFavorite(@Body() body: { name: string; sql: string }, @CurrentUser() user: AuthPayload) {
-    return this.query.saveFavorite(user.sub, body?.name ?? 'Consulta', body?.sql ?? '');
+    void body;
+    void user;
+    throw new ForbiddenException('Consultas SQL indisponiveis no escopo empresarial.');
   }
 
   @Delete('favorites/:id')
   deleteFavorite(@Param('id') id: string, @CurrentUser() user: AuthPayload) {
-    return this.query.deleteFavorite(user.sub, id);
+    void id;
+    void user;
+    throw new ForbiddenException('Consultas SQL indisponiveis no escopo empresarial.');
   }
 }

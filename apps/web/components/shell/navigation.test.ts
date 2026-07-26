@@ -3,6 +3,7 @@ import {
   canAccessRoute,
   defaultLandingFor,
   visibleAllNavSections,
+  visiblePortalServiceSections,
 } from './navigation';
 
 describe('granular navigation', () => {
@@ -41,5 +42,24 @@ describe('granular navigation', () => {
     expect(canAccessRoute(user, '/scan')).toBe(false);
     expect(canAccessRoute(user, '/perfil/another-user')).toBe(false);
     expect(canAccessRoute(user, '/gestao-premio/integracoes')).toBe(false);
+  });
+
+  it('keeps duplicated administrative shortcuts out of the portal services menu', () => {
+    const user = {
+      role: 'ADMIN',
+      permissions: [
+        'help:view',
+        'settings:manage',
+        'users:manage',
+        'company-data:view',
+        'integrations:view',
+        'audit:view',
+      ],
+    };
+    const hrefs = visiblePortalServiceSections(user).flatMap((section) =>
+      section.items.map((item) => item.href),
+    );
+
+    expect(hrefs).toEqual(['/central-atendimento', '/settings']);
   });
 });

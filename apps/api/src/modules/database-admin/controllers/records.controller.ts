@@ -23,6 +23,7 @@ export class RecordsController {
   @Get()
   list(
     @Param('table') table: string,
+    @CurrentUser() user: AuthPayload,
     @Query('page') page?: string,
     @Query('pageSize') pageSize?: string,
     @Query('sort') sort?: string,
@@ -46,7 +47,7 @@ export class RecordsController {
       dir: dir === 'desc' ? 'desc' : 'asc',
       search,
       filters: parsedFilters,
-    });
+    }, user.companyId);
   }
 
   @Post()

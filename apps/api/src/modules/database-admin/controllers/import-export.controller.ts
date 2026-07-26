@@ -34,8 +34,8 @@ export class ImportExportController {
   }
 
   @Post('import/preview')
-  preview(@Body() body: { table: string; format: ImportFormat; content: string }) {
-    return this.importer.preview(body?.table, body?.format ?? 'csv', body?.content ?? '');
+  preview(@Body() body: { table: string; format: ImportFormat; content: string }, @CurrentUser() user: AuthPayload) {
+    return this.importer.preview(body?.table, body?.format ?? 'csv', body?.content ?? '', user.companyId);
   }
 
   @Post('import/commit')

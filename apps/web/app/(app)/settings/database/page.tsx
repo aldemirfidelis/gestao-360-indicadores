@@ -11,7 +11,6 @@ import {
   KeyRound,
   RefreshCcw,
   ShieldCheck,
-  Stethoscope,
   Table2,
 } from 'lucide-react';
 import { MetricCard } from '@/components/platform/metric-card';
@@ -36,18 +35,12 @@ export default function DatabaseOverviewPage() {
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
           <h2 className="text-lg font-semibold">Visão Geral</h2>
-          <p className="text-sm text-muted-foreground">Painel técnico do banco de dados em uso.</p>
+          <p className="text-sm text-muted-foreground">Dados limitados à empresa selecionada.</p>
         </div>
         <div className="flex flex-wrap gap-2">
           <Button variant="outline" onClick={() => overview.refetch()} disabled={overview.isFetching}>
             <RefreshCcw className={cn('mr-2 h-4 w-4', overview.isFetching && 'animate-spin')} />
             Atualizar informações
-          </Button>
-          <Button asChild variant="outline">
-            <Link href="/settings/database/diagnostics">
-              <Stethoscope className="mr-2 h-4 w-4" />
-              Executar diagnóstico
-            </Link>
           </Button>
           <Button asChild>
             <Link href="/settings/database/backups">
@@ -86,9 +79,9 @@ export default function DatabaseOverviewPage() {
               tone={data.connection.ok ? 'green' : 'red'}
             />
             <MetricCard
-              title="Tamanho estimado"
-              value={data.database.sizePretty}
-              description={`${formatNumber(data.counts.totalEstimatedRows)} registros estimados`}
+              title="Registros"
+              value={formatNumber(data.counts.totalEstimatedRows)}
+              description="Somente da empresa selecionada"
               icon={<HardDrive className="h-4 w-4" />}
               tone="purple"
             />
@@ -129,14 +122,13 @@ export default function DatabaseOverviewPage() {
           )}
 
           <div className="grid grid-cols-1 gap-6 xl:grid-cols-2">
-            <SectionCard title="Tabelas com maior volume" description="Top tabelas por tamanho em disco." contentClassName="p-0">
+            <SectionCard title="Tabelas com maior volume" description="Top tabelas pela quantidade de registros da empresa." contentClassName="p-0">
               <div className="overflow-x-auto">
                 <table className="table-modern">
                   <thead>
                     <tr>
                       <th className="text-left">Tabela</th>
                       <th className="text-left">Registros (est.)</th>
-                      <th className="text-left">Tamanho</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -148,7 +140,6 @@ export default function DatabaseOverviewPage() {
                           </Link>
                         </td>
                         <td>{formatNumber(t.estimatedRows)}</td>
-                        <td>{t.sizePretty}</td>
                       </tr>
                     ))}
                   </tbody>
@@ -190,10 +181,7 @@ export default function DatabaseOverviewPage() {
             </SectionCard>
           </div>
 
-          <p className="text-xs text-muted-foreground">
-            Backup/restore de banco inteiro: este projeto usa PostgreSQL gerenciado (Neon). Para recuperação completa use o
-            ramificações e recuperação em ponto no tempo da Neon. Retratos lógicos por operação ficam em Backup e Restauração.
-          </p>
+          <p className="text-xs text-muted-foreground">Tabelas sem companyId direto não são exibidas, pois seu isolamento não pode ser garantido pelo editor genérico.</p>
         </>
       )}
     </div>

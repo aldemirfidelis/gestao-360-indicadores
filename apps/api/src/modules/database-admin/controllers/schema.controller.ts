@@ -4,6 +4,8 @@ import { SuperAdminDbGuard } from '../guards/super-admin-db.guard';
 import { DbAdminSubmenuTag } from '../decorators/db-admin-submenu.decorator';
 import { Roles } from '../../../common/decorators/roles.decorator';
 import { SchemaInspectionService } from '../services/schema-inspection.service';
+import { CurrentUser } from '../../../common/decorators/current-user.decorator';
+import { AuthPayload } from '../../auth/auth.types';
 
 @Controller('admin/database')
 @Roles(UserRoleEnum.SUPER_ADMIN)
@@ -14,10 +16,10 @@ export class SchemaController {
   /** Estrutura completa para o diagrama ER (tabelas + colunas-chave + relacionamentos). */
   @Get('schema')
   @DbAdminSubmenuTag('structure')
-  async getSchema() {
+  async getSchema(@CurrentUser() user: AuthPayload) {
     const [tables, relationships] = await Promise.all([
-      this.schema.listTables(),
-      this.schema.getRelationships(),
+      this.schema.listCompanyScopedTables(user.companyId),
+      this.schema.getCompanyScopedRelationships(),
     ]);
     return { tables, relationships };
   }
@@ -25,12 +27,12 @@ export class SchemaController {
   @Get('relationships')
   @DbAdminSubmenuTag('structure')
   getRelationships() {
-    return this.schema.getRelationships();
+    return this.schema.getCompanyScopedRelationships();
   }
 
   @Get('indexes')
   @DbAdminSubmenuTag('indexes')
   getIndexes(@Query('table') table?: string) {
-    return this.schema.getIndexes(table || undefined);
+    return this.schema.getCompanyScopedIndexes(table || undefined);
   }
 }

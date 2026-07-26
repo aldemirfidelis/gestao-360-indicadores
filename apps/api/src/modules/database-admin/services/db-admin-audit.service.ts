@@ -37,6 +37,7 @@ export class DbAdminAuditService {
     try {
       const created = await this.prisma.dbAdminAuditLog.create({
         data: {
+          companyId: entry.user?.companyId ?? null,
           userId: entry.user?.sub ?? null,
           userEmail: entry.user?.email ?? null,
           userRole: entry.user?.role ?? null,
@@ -70,6 +71,7 @@ export class DbAdminAuditService {
   }
 
   async list(params: {
+    companyId: string;
     from?: string;
     to?: string;
     userId?: string;
@@ -81,7 +83,7 @@ export class DbAdminAuditService {
     skip?: number;
     take?: number;
   }) {
-    const where: Record<string, unknown> = {};
+    const where: Record<string, unknown> = { companyId: params.companyId };
     if (params.userId) where.userId = params.userId;
     if (params.submenu) where.submenu = params.submenu;
     if (params.action) where.action = params.action;

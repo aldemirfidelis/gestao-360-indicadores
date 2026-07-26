@@ -10,7 +10,7 @@ import { BackupService } from '../services/backup.service';
 import { ImportService } from '../services/import.service';
 import { PostgreSQLAdapter } from '../adapters/postgresql.adapter';
 import { SchemaInspectionService } from '../services/schema-inspection.service';
-import { assertInAllowlist, quoteIdent } from '../util/identifier.util';
+import { quoteIdent } from '../util/identifier.util';
 import { DB_ADMIN_LIMITS } from '../database-admin.constants';
 
 @Controller('admin/database/backups')
@@ -26,42 +26,45 @@ export class BackupController {
   ) {}
 
   @Get()
-  list() {
-    return this.backup.list();
+  list(@CurrentUser() user: AuthPayload) {
+    return this.backup.list(user.companyId);
   }
 
   /** Backup lógico manual de uma tabela. */
   @Post()
   async create(@Body() body: { table: string; reason?: string }, @CurrentUser() user: AuthPayload) {
-    const allow = await this.schema.getAllowlist();
-    assertInAllowlist(String(body?.table), allow, 'tabela');
-    const res = await this.pg.runReadOnly(`SELECT * FROM ${quoteIdent(body.table, 'tabela')} LIMIT ${DB_ADMIN_LIMITS.maxSnapshotRows}`);
+    await this.schema.assertCompanyScopedTable(String(body?.table));
+    const res = await this.pg.runReadOnly(
+      `SELECT * FROM ${quoteIdent(body.table, 'tabela')} WHERE "companyId" = $1 LIMIT ${DB_ADMIN_LIMITS.maxSnapshotRows}`,
+      { params: [user.companyId] },
+    );
     return this.backup.snapshot({
+      companyId: user.companyId,
       table: body.table, rows: res.rows, type: 'MANUAL_LOGICAL', reason: body?.reason ?? 'Backup manual',
       userId: user.sub, userEmail: user.email, important: true,
     });
   }
 
   @Get(':id/download')
-  async download(@Param('id') id: string) {
-    const file = await this.backup.getFile(id);
+  async download(@Param('id') id: string, @CurrentUser() user: AuthPayload) {
+    const file = await this.backup.getFile(id, user.companyId);
     if (!file) throw new BadRequestException('Backup indisponível ou arquivo ausente.');
     return file; // { name, content } — frontend gera o download
   }
 
   @Post(':id/verify')
-  verify(@Param('id') id: string) {
-    return this.backup.verify(id);
+  verify(@Param('id') id: string, @CurrentUser() user: AuthPayload) {
+    return this.backup.verify(id, user.companyId);
   }
 
   @Post(':id/important')
-  important(@Param('id') id: string, @Body() body: { important: boolean }) {
-    return this.backup.setImportant(id, Boolean(body?.important));
+  important(@Param('id') id: string, @Body() body: { important: boolean }, @CurrentUser() user: AuthPayload) {
+    return this.backup.setImportant(id, user.companyId, Boolean(body?.important));
   }
 
   @Delete(':id')
-  remove(@Param('id') id: string) {
-    return this.backup.remove(id);
+  remove(@Param('id') id: string, @CurrentUser() user: AuthPayload) {
+    return this.backup.remove(id, user.companyId);
   }
 
   /**
@@ -78,7 +81,7 @@ export class BackupController {
     if (body?.confirmationPhrase !== 'CONFIRMAR ALTERAÇÃO CRÍTICA') {
       throw new BadRequestException('Restauração exige a frase de confirmação: "CONFIRMAR ALTERAÇÃO CRÍTICA".');
     }
-    const file = await this.backup.getFile(id);
+    const file = await this.backup.getFile(id, user.companyId);
     if (!file) throw new BadRequestException('Backup indisponível.');
     const payload = JSON.parse(file.content) as { table: string; rows: Record<string, unknown>[] };
     if (!payload?.table || !Array.isArray(payload.rows)) throw new BadRequestException('Snapshot inválido.');

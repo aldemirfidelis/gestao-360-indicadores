@@ -4,8 +4,9 @@ import { SuperAdminDbGuard } from '../guards/super-admin-db.guard';
 import { DbAdminSubmenuTag } from '../decorators/db-admin-submenu.decorator';
 import { Roles } from '../../../common/decorators/roles.decorator';
 import { SchemaInspectionService } from '../services/schema-inspection.service';
-import { assertInAllowlist } from '../util/identifier.util';
 import { getTableCatalogEntry } from '../table-catalog';
+import { CurrentUser } from '../../../common/decorators/current-user.decorator';
+import { AuthPayload } from '../../auth/auth.types';
 
 @Controller('admin/database/tables')
 @Roles(UserRoleEnum.SUPER_ADMIN)
@@ -15,14 +16,13 @@ export class TablesController {
   constructor(private readonly schema: SchemaInspectionService) {}
 
   @Get()
-  list() {
-    return this.schema.listTables();
+  list(@CurrentUser() user: AuthPayload) {
+    return this.schema.listCompanyScopedTables(user.companyId);
   }
 
   @Get(':table/schema')
   async getSchema(@Param('table') table: string) {
-    const allow = await this.schema.getAllowlist();
-    assertInAllowlist(table, allow, 'tabela');
+    await this.schema.assertCompanyScopedTable(table);
     const [columns, constraints, indexes] = await Promise.all([
       this.schema.getColumns(table),
       this.schema.getConstraints(table),

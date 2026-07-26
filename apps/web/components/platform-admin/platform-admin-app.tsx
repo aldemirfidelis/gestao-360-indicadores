@@ -273,7 +273,7 @@ const PLATFORM_COMPANY_CONTEXT_KEY = 'g360.platformAdmin.companyId';
 const PORTAL_ADMIN_TAB_KEY = 'g360.platformAdmin.portalTab';
 const PORTAL_ADMIN_TAB_EVENT = 'platform-admin:portal-tab';
 const PLATFORM_NEW_USER_REQUEST_KEY = 'g360.platformAdmin.newUserRequest';
-const LEGACY_COMPANY_SECTIONS = new Set<SectionKey>(['generalSettings', 'visibilityAdmin', 'externalIntegrations', 'orgStructure', 'users', 'companyAudit', 'privacidade']);
+const LEGACY_COMPANY_SECTIONS = new Set<SectionKey>(['generalSettings', 'visibilityAdmin', 'externalIntegrations', 'orgStructure', 'users', 'companyAudit', 'privacidade', 'databaseAdmin']);
 const DATABASE_ADMIN_TABS = new Set<DatabaseAdminTab>([
   'overview',
   'tables',
@@ -448,6 +448,7 @@ const COMPANY_SCOPED_QUERY_ROOTS = new Set<string>([
   'ext-keys',
   'ext-logs',
   'platform-admin-company-audit',
+  'db-admin',
   'prize-connectors',
   'prize-jobs',
 ]);
@@ -484,9 +485,8 @@ export function PlatformAdminApp() {
     // carregada continuaria exibindo os dados da empresa anterior durante o
     // refetch — um vazamento visual de uma empresa/area para outra. Com
     // removeQueries o dado obsoleto e descartado: consultas ativas recarregam
-    // imediatamente e as inativas montam em estado de carregamento. As demais
-    // (db-admin e os metadados do proprio Portal Admin Global) sao globais e
-    // permanecem em cache para evitar refetches caros e desnecessarios.
+    // imediatamente e as inativas montam em estado de carregamento. Metadados
+    // do proprio Portal Admin Global permanecem em cache.
     void queryClient.removeQueries({
       predicate: (query) => COMPANY_SCOPED_QUERY_ROOTS.has(String(query.queryKey[0] ?? '')),
     });

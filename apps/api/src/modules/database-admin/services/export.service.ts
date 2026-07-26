@@ -1,11 +1,10 @@
-import { BadRequestException, Injectable } from '@nestjs/common';
+import { BadRequestException, ForbiddenException, Injectable } from '@nestjs/common';
 import { Workbook } from 'exceljs';
 import { AuthPayload } from '../../auth/auth.types';
 import { PostgreSQLAdapter } from '../adapters/postgresql.adapter';
 import { SchemaInspectionService } from './schema-inspection.service';
-import { QueryValidationService } from './query-validation.service';
 import { DbAdminAuditService } from './db-admin-audit.service';
-import { assertInAllowlist, quoteIdent } from '../util/identifier.util';
+import { quoteIdent } from '../util/identifier.util';
 import { toCsv } from '../util/csv';
 import { ReqMeta } from './record-management.service';
 
@@ -26,14 +25,16 @@ export class ExportService {
   constructor(
     private readonly pg: PostgreSQLAdapter,
     private readonly schema: SchemaInspectionService,
-    private readonly validation: QueryValidationService,
     private readonly audit: DbAdminAuditService,
   ) {}
 
   async exportTable(table: string, format: ExportFormat, user: AuthPayload, meta: ReqMeta): Promise<ExportPayload> {
-    const allow = await this.schema.getAllowlist();
-    assertInAllowlist(table, allow, 'tabela');
-    const res = await this.pg.runReadOnly(`SELECT * FROM ${quoteIdent(table, 'tabela')} LIMIT ${EXPORT_ROW_CAP + 1}`);
+    if (!user.companyId) throw new ForbiddenException('Selecione uma empresa para exportar dados.');
+    await this.schema.assertCompanyScopedTable(table);
+    const res = await this.pg.runReadOnly(
+      `SELECT * FROM ${quoteIdent(table, 'tabela')} WHERE "companyId" = $1 LIMIT ${EXPORT_ROW_CAP + 1}`,
+      { params: [user.companyId] },
+    );
     const rows = res.rows.slice(0, EXPORT_ROW_CAP);
     const columns = rows.length > 0 ? Object.keys(rows[0]) : (await this.schema.getColumns(table)).map((c) => c.name);
     const payload = await this.build(table, columns, rows, format);
@@ -42,15 +43,11 @@ export class ExportService {
   }
 
   async exportQuery(sql: string, format: ExportFormat, user: AuthPayload, meta: ReqMeta): Promise<ExportPayload> {
-    const v = this.validation.analyze(sql);
-    if (!v.isReadOnly) throw new BadRequestException('Apenas consultas de leitura (SELECT) podem ser exportadas.');
-    const cleaned = sql.trim().replace(/;\s*$/, '');
-    const res = await this.pg.runReadOnly(`SELECT * FROM (${cleaned}) AS _q LIMIT ${EXPORT_ROW_CAP + 1}`);
-    const rows = res.rows.slice(0, EXPORT_ROW_CAP);
-    const columns = rows.length > 0 ? Object.keys(rows[0]) : [];
-    const payload = await this.build('consulta', columns, rows, format);
-    await this.audit.record({ user, submenu: 'import-export', action: 'EXPORT', sqlText: sql.slice(0, 2000), rowsAffected: rows.length, result: 'SUCCESS', message: `Export consulta ${format}`, ip: meta.ip, userAgent: meta.userAgent });
-    return payload;
+    void sql;
+    void format;
+    void user;
+    void meta;
+    throw new ForbiddenException('Exportacao por SQL livre foi desativada para garantir o escopo por empresa.');
   }
 
   private async build(name: string, columns: string[], rows: Record<string, unknown>[], format: ExportFormat): Promise<ExportPayload> {

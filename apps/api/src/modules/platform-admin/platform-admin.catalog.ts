@@ -81,6 +81,7 @@ export const PLATFORM_ROLES = [
     description: 'Acompanha integridade, backups, migracoes e consultas controladas.',
     permissions: [
       'platform.dashboard.view',
+      'platform.companies.view',
       'platform.database.read',
       'platform.database.health',
       'platform.database.backup',

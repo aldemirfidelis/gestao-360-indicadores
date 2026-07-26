@@ -15,12 +15,12 @@ export class OverviewService {
     private readonly schema: SchemaInspectionService,
   ) {}
 
-  async getOverview() {
-    const tables = await this.schema.listTables();
-    const [views, relationships, indexes] = await Promise.all([
-      this.schema.listViews(),
-      this.schema.getRelationships(),
-      this.schema.getIndexes(),
+  async getOverview(companyId: string) {
+    const tables = await this.schema.listCompanyScopedTables(companyId);
+    const [company, relationships, indexes] = await Promise.all([
+      this.prisma.company.findFirst({ where: { id: companyId, deletedAt: null }, select: { name: true, tradeName: true } }),
+      this.schema.getCompanyScopedRelationships(),
+      this.schema.getCompanyScopedIndexes(),
     ]);
 
     let connection: { ok: boolean; latencyMs: number; engine: string; version: string } = {
@@ -29,37 +29,30 @@ export class OverviewService {
       engine: 'PostgreSQL',
       version: 'desconhecida',
     };
-    let dbName = 'desconhecido';
-    let sizeBytes = 0;
-    let sizePretty = '0 bytes';
+    const dbName = company?.tradeName || company?.name || 'Empresa selecionada';
+    const sizeBytes = 0;
+    const sizePretty = 'escopo empresarial';
     try {
       const ping = await this.pg.ping();
       connection = { ok: ping.ok, latencyMs: ping.latencyMs, engine: 'PostgreSQL', version: shortVersion(ping.version) };
-      const meta = await this.pg.runReadOnly(
-        `SELECT current_database() AS name, pg_database_size(current_database()) AS size,
-                pg_size_pretty(pg_database_size(current_database())) AS size_pretty`,
-      );
-      dbName = String(meta.rows[0]?.name ?? 'desconhecido');
-      sizeBytes = Number(meta.rows[0]?.size ?? 0);
-      sizePretty = String(meta.rows[0]?.size_pretty ?? '0 bytes');
     } catch {
       /* mantém connection.ok = false */
     }
 
     const totalEstimatedRows = tables.reduce((sum, t) => sum + t.estimatedRows, 0);
-    const biggestTables = [...tables].sort((a, b) => b.sizeBytes - a.sizeBytes).slice(0, 8);
+    const biggestTables = [...tables].sort((a, b) => b.estimatedRows - a.estimatedRows).slice(0, 8);
 
     const [lastBackup, recentErrors, recentChanges, migrationCount] = await Promise.all([
-      this.prisma.dbAdminBackup.findFirst({ where: { status: 'AVAILABLE' }, orderBy: { createdAt: 'desc' } }),
+      this.prisma.dbAdminBackup.findFirst({ where: { companyId, status: 'AVAILABLE' }, orderBy: { createdAt: 'desc' } }),
       this.prisma.dbAdminAuditLog.count({
-        where: { result: 'ERROR', createdAt: { gte: new Date(Date.now() - 7 * 24 * 3600 * 1000) } },
+        where: { companyId, result: 'ERROR', createdAt: { gte: new Date(Date.now() - 7 * 24 * 3600 * 1000) } },
       }),
       this.prisma.dbAdminAuditLog.findMany({
-        where: { action: { in: ['INSERT', 'UPDATE', 'DELETE', 'DDL', 'TRUNCATE', 'IMPORT', 'RESTORE'] } },
+        where: { companyId, action: { in: ['INSERT', 'UPDATE', 'DELETE', 'IMPORT', 'RESTORE'] } },
         orderBy: { createdAt: 'desc' },
         take: 10,
       }),
-      this.migrationCount(),
+      Promise.resolve(0),
     ]);
 
     const alerts = this.buildAlerts({ tables, relationships, recentErrors, lastBackupAt: lastBackup?.createdAt ?? null });
@@ -69,7 +62,7 @@ export class OverviewService {
       connection,
       counts: {
         tables: tables.length,
-        views: views.length,
+        views: 0,
         indexes: indexes.length,
         relationships: relationships.length,
         totalEstimatedRows,

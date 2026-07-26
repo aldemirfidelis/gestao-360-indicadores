@@ -1,4 +1,4 @@
-import { BadRequestException, Body, Controller, Delete, Get, Header, Param, Patch, Post, Put, Query, Req } from '@nestjs/common';
+import { BadRequestException, Body, Controller, Delete, ForbiddenException, Get, Header, Param, Patch, Post, Put, Query, Req } from '@nestjs/common';
 import { Request } from 'express';
 import { Prisma, UserRoleEnum } from '@prisma/client';
 import { PrismaService } from '../../prisma/prisma.service';
@@ -8,7 +8,6 @@ import { AdminService } from '../admin/admin.service';
 import { AccessAdminService } from '../access/access-admin.service';
 import { OverviewService } from '../database-admin/services/overview.service';
 import { SchemaInspectionService } from '../database-admin/services/schema-inspection.service';
-import { DiagnosticsService } from '../database-admin/services/diagnostics.service';
 import { BackupService } from '../database-admin/services/backup.service';
 import { RecordManagementService } from '../database-admin/services/record-management.service';
 import { QueryExecutionService } from '../database-admin/services/query-execution.service';
@@ -16,10 +15,9 @@ import { StructureService } from '../database-admin/services/structure.service';
 import { ExportService, ExportFormat } from '../database-admin/services/export.service';
 import { ImportService, ImportFormat, ImportStrategy } from '../database-admin/services/import.service';
 import { DbAdminAuditService } from '../database-admin/services/db-admin-audit.service';
-import { DbAdminSettingsService } from '../database-admin/services/db-admin-settings.service';
 import { PostgreSQLAdapter } from '../database-admin/adapters/postgresql.adapter';
 import { getTableCatalogEntry } from '../database-admin/table-catalog';
-import { assertInAllowlist, quoteIdent } from '../database-admin/util/identifier.util';
+import { quoteIdent } from '../database-admin/util/identifier.util';
 import { DB_ADMIN_LIMITS } from '../database-admin/database-admin.constants';
 import type { FilterCondition } from '../database-admin/util/where-builder';
 import { HelpService } from '../help/help.service';
@@ -78,6 +76,14 @@ async function resolveCompanyId(prisma: PrismaService, req?: Request, preferredC
 
 async function asScopedAuth(prisma: PrismaService, user: PlatformAdminIdentity, req?: Request, preferredCompanyId?: string | null) {
   return asAuthPayload(user, await resolveCompanyId(prisma, req, preferredCompanyId));
+}
+
+async function asRequiredDatabaseAuth(prisma: PrismaService, user: PlatformAdminIdentity, req: Request) {
+  const companyId = requestedCompanyId(req);
+  if (!companyId) throw new BadRequestException('Selecione uma empresa antes de acessar o banco de dados.');
+  const company = await prisma.company.findFirst({ where: { id: companyId, deletedAt: null }, select: { id: true } });
+  if (!company) throw new BadRequestException('Empresa selecionada nao encontrada.');
+  return asAuthPayload(user, company.id);
 }
 
 function companyAuditWhere(
@@ -631,9 +637,9 @@ export class PlatformAdminLegacyHelpController {
 @PlatformAdminRequired('platform.database.read')
 export class PlatformAdminLegacyDatabaseController {
   constructor(
+    private readonly prisma: PrismaService,
     private readonly overview: OverviewService,
     private readonly schema: SchemaInspectionService,
-    private readonly diagnostics: DiagnosticsService,
     private readonly backup: BackupService,
     private readonly records: RecordManagementService,
     private readonly query: QueryExecutionService,
@@ -641,24 +647,25 @@ export class PlatformAdminLegacyDatabaseController {
     private readonly exporter: ExportService,
     private readonly importer: ImportService,
     private readonly audit: DbAdminAuditService,
-    private readonly settings: DbAdminSettingsService,
     private readonly pg: PostgreSQLAdapter,
   ) {}
 
   @Get('overview')
-  getOverview() {
-    return this.overview.getOverview();
+  async getOverview(@CurrentPlatformAdmin() user: PlatformAdminIdentity, @Req() req: Request) {
+    const auth = await asRequiredDatabaseAuth(this.prisma, user, req);
+    return this.overview.getOverview(auth.companyId);
   }
 
   @Get('tables')
-  listTables() {
-    return this.schema.listTables();
+  async listTables(@CurrentPlatformAdmin() user: PlatformAdminIdentity, @Req() req: Request) {
+    const auth = await asRequiredDatabaseAuth(this.prisma, user, req);
+    return this.schema.listCompanyScopedTables(auth.companyId);
   }
 
   @Get('tables/:table/schema')
-  async getTableSchema(@Param('table') table: string) {
-    const allow = await this.schema.getAllowlist();
-    assertInAllowlist(table, allow, 'tabela');
+  async getTableSchema(@Param('table') table: string, @CurrentPlatformAdmin() user: PlatformAdminIdentity, @Req() req: Request) {
+    await asRequiredDatabaseAuth(this.prisma, user, req);
+    await this.schema.assertCompanyScopedTable(table);
     const [columns, constraints, indexes] = await Promise.all([
       this.schema.getColumns(table),
       this.schema.getConstraints(table),
@@ -668,49 +675,56 @@ export class PlatformAdminLegacyDatabaseController {
   }
 
   @Get('schema')
-  async getSchema() {
+  async getSchema(@CurrentPlatformAdmin() user: PlatformAdminIdentity, @Req() req: Request) {
+    const auth = await asRequiredDatabaseAuth(this.prisma, user, req);
     const [tables, relationships] = await Promise.all([
-      this.schema.listTables(),
-      this.schema.getRelationships(),
+      this.schema.listCompanyScopedTables(auth.companyId),
+      this.schema.getCompanyScopedRelationships(),
     ]);
     return { tables, relationships };
   }
 
   @Get('relationships')
-  getRelationships() {
-    return this.schema.getRelationships();
+  async getRelationships(@CurrentPlatformAdmin() user: PlatformAdminIdentity, @Req() req: Request) {
+    await asRequiredDatabaseAuth(this.prisma, user, req);
+    return this.schema.getCompanyScopedRelationships();
   }
 
   @Get('indexes')
-  getIndexes(@Query('table') table?: string) {
-    return this.schema.getIndexes(table || undefined);
+  async getIndexes(@CurrentPlatformAdmin() user: PlatformAdminIdentity, @Req() req: Request, @Query('table') table?: string) {
+    await asRequiredDatabaseAuth(this.prisma, user, req);
+    return this.schema.getCompanyScopedIndexes(table || undefined);
   }
 
   @Get('diagnostics')
   @PlatformAdminRequired('platform.database.health')
   getDiagnostics() {
-    return this.diagnostics.run();
+    throw new ForbiddenException('Diagnostico global indisponivel no escopo empresarial.');
   }
 
   @Post('diagnostics/run')
   @PlatformAdminRequired('platform.database.health')
   runDiagnostics() {
-    return this.diagnostics.run();
+    throw new ForbiddenException('Diagnostico global indisponivel no escopo empresarial.');
   }
 
   @Get('settings')
   getSettings() {
-    return this.settings.get();
+    throw new ForbiddenException('Configuracoes globais indisponiveis no escopo empresarial.');
   }
 
   @Put('settings')
   @PlatformAdminRequired('platform.environments.manage')
   setSettings(@Body() body: { key: string; value: string }, @CurrentPlatformAdmin() user: PlatformAdminIdentity) {
-    return this.settings.set(body?.key, body?.value ?? '', asAuthPayload(user));
+    void body;
+    void user;
+    throw new ForbiddenException('Configuracoes globais indisponiveis no escopo empresarial.');
   }
 
   @Get('audit')
-  listAudit(
+  async listAudit(
+    @CurrentPlatformAdmin() user: PlatformAdminIdentity,
+    @Req() req: Request,
     @Query('from') from?: string,
     @Query('to') to?: string,
     @Query('userId') userId?: string,
@@ -722,7 +736,8 @@ export class PlatformAdminLegacyDatabaseController {
     @Query('skip') skip?: string,
     @Query('take') take?: string,
   ) {
-    return this.audit.list({ from, to, userId, submenu, action, result, targetTable, q, skip: skip ? parseInt(skip, 10) : undefined, take: take ? parseInt(take, 10) : undefined });
+    const auth = await asRequiredDatabaseAuth(this.prisma, user, req);
+    return this.audit.list({ companyId: auth.companyId, from, to, userId, submenu, action, result, targetTable, q, skip: skip ? parseInt(skip, 10) : undefined, take: take ? parseInt(take, 10) : undefined });
   }
 
   @Post('query/validate')
@@ -733,34 +748,44 @@ export class PlatformAdminLegacyDatabaseController {
   @Post('query/execute')
   @PlatformAdminRequired('platform.database.restore_request')
   executeQuery(@Body() body: { sql: string; mode?: 'safe' | 'advanced'; confirmationPhrase?: string }, @CurrentPlatformAdmin() user: PlatformAdminIdentity, @Req() req: Request) {
-    return this.query.execute(body?.sql ?? '', body?.mode === 'advanced' ? 'advanced' : 'safe', body?.confirmationPhrase, asAuthPayload(user), requestMeta(req));
+    void body;
+    void user;
+    void req;
+    throw new ForbiddenException('Editor SQL livre desativado para garantir o escopo por empresa.');
   }
 
   @Post('query/explain')
   explainQuery(@Body() body: { sql: string }) {
-    return this.query.explain(body?.sql ?? '');
+    void body;
+    throw new ForbiddenException('Editor SQL livre desativado para garantir o escopo por empresa.');
   }
 
   @Get('query/history')
   queryHistory(@CurrentPlatformAdmin() user: PlatformAdminIdentity) {
-    return this.query.listHistory(user.sub);
+    void user;
+    throw new ForbiddenException('Historico SQL indisponivel no escopo empresarial.');
   }
 
   @Get('query/favorites')
   queryFavorites(@CurrentPlatformAdmin() user: PlatformAdminIdentity) {
-    return this.query.listFavorites(user.sub);
+    void user;
+    throw new ForbiddenException('Consultas SQL indisponiveis no escopo empresarial.');
   }
 
   @Post('query/favorites')
   @PlatformAdminRequired('platform.database.read')
   saveQueryFavorite(@Body() body: { name: string; sql: string }, @CurrentPlatformAdmin() user: PlatformAdminIdentity) {
-    return this.query.saveFavorite(user.sub, body?.name ?? 'Consulta', body?.sql ?? '');
+    void body;
+    void user;
+    throw new ForbiddenException('Consultas SQL indisponiveis no escopo empresarial.');
   }
 
   @Delete('query/favorites/:id')
   @PlatformAdminRequired('platform.database.read')
   deleteQueryFavorite(@Param('id') id: string, @CurrentPlatformAdmin() user: PlatformAdminIdentity) {
-    return this.query.deleteFavorite(user.sub, id);
+    void id;
+    void user;
+    throw new ForbiddenException('Consultas SQL indisponiveis no escopo empresarial.');
   }
 
   @Post('structure/preview')
@@ -771,11 +796,14 @@ export class PlatformAdminLegacyDatabaseController {
   @Post('structure/execute')
   @PlatformAdminRequired('platform.database.restore_request')
   executeStructure(@Body() body: { operation: string; params: Record<string, unknown>; confirmationPhrase?: string }, @CurrentPlatformAdmin() user: PlatformAdminIdentity, @Req() req: Request) {
-    return this.structure.execute(body?.operation, body?.params ?? {}, body?.confirmationPhrase, asAuthPayload(user), requestMeta(req));
+    void body;
+    void user;
+    void req;
+    throw new ForbiddenException('Alteracoes estruturais desativadas no escopo empresarial.');
   }
 
   @Get('tables/:table/rows')
-  listRows(@Param('table') table: string, @Query('page') page?: string, @Query('pageSize') pageSize?: string, @Query('sort') sort?: string, @Query('dir') dir?: string, @Query('search') search?: string, @Query('filters') filters?: string) {
+  async listRows(@Param('table') table: string, @CurrentPlatformAdmin() user: PlatformAdminIdentity, @Req() req: Request, @Query('page') page?: string, @Query('pageSize') pageSize?: string, @Query('sort') sort?: string, @Query('dir') dir?: string, @Query('search') search?: string, @Query('filters') filters?: string) {
     let parsedFilters: FilterCondition[] = [];
     if (filters) {
       try {
@@ -785,6 +813,7 @@ export class PlatformAdminLegacyDatabaseController {
         parsedFilters = [];
       }
     }
+    const auth = await asRequiredDatabaseAuth(this.prisma, user, req);
     return this.records.getRows(table, {
       page: page ? parseInt(page, 10) : undefined,
       pageSize: pageSize ? parseInt(pageSize, 10) : undefined,
@@ -792,58 +821,65 @@ export class PlatformAdminLegacyDatabaseController {
       dir: dir === 'desc' ? 'desc' : 'asc',
       search,
       filters: parsedFilters,
-    });
+    }, auth.companyId);
   }
 
   @Post('tables/:table/rows')
   @PlatformAdminRequired('platform.database.restore_request')
-  createRow(@Param('table') table: string, @Body() body: { values: Record<string, unknown> }, @CurrentPlatformAdmin() user: PlatformAdminIdentity, @Req() req: Request) {
-    return this.records.insert(table, body?.values ?? {}, asAuthPayload(user), requestMeta(req));
+  async createRow(@Param('table') table: string, @Body() body: { values: Record<string, unknown> }, @CurrentPlatformAdmin() user: PlatformAdminIdentity, @Req() req: Request) {
+    return this.records.insert(table, body?.values ?? {}, await asRequiredDatabaseAuth(this.prisma, user, req), requestMeta(req));
   }
 
   @Patch('tables/:table/rows')
   @PlatformAdminRequired('platform.database.restore_request')
-  updateRow(@Param('table') table: string, @Body() body: { key: Record<string, unknown>; values: Record<string, unknown> }, @CurrentPlatformAdmin() user: PlatformAdminIdentity, @Req() req: Request) {
-    return this.records.update(table, body?.key ?? {}, body?.values ?? {}, asAuthPayload(user), requestMeta(req));
+  async updateRow(@Param('table') table: string, @Body() body: { key: Record<string, unknown>; values: Record<string, unknown> }, @CurrentPlatformAdmin() user: PlatformAdminIdentity, @Req() req: Request) {
+    return this.records.update(table, body?.key ?? {}, body?.values ?? {}, await asRequiredDatabaseAuth(this.prisma, user, req), requestMeta(req));
   }
 
   @Post('tables/:table/rows/delete')
   @PlatformAdminRequired('platform.database.restore_request')
-  deleteRows(@Param('table') table: string, @Body() body: { keys: Record<string, unknown>[] }, @CurrentPlatformAdmin() user: PlatformAdminIdentity, @Req() req: Request) {
-    return this.records.deleteRows(table, body?.keys ?? [], asAuthPayload(user), requestMeta(req));
+  async deleteRows(@Param('table') table: string, @Body() body: { keys: Record<string, unknown>[] }, @CurrentPlatformAdmin() user: PlatformAdminIdentity, @Req() req: Request) {
+    return this.records.deleteRows(table, body?.keys ?? [], await asRequiredDatabaseAuth(this.prisma, user, req), requestMeta(req));
   }
 
   @Post('export')
   @PlatformAdminRequired('platform.database.read')
-  exportData(@Body() body: { table?: string; sql?: string; format: ExportFormat }, @CurrentPlatformAdmin() user: PlatformAdminIdentity, @Req() req: Request) {
-    if (body?.sql) return this.exporter.exportQuery(body.sql, body.format, asAuthPayload(user), requestMeta(req));
-    return this.exporter.exportTable(String(body?.table), body?.format ?? 'csv', asAuthPayload(user), requestMeta(req));
+  async exportData(@Body() body: { table?: string; sql?: string; format: ExportFormat }, @CurrentPlatformAdmin() user: PlatformAdminIdentity, @Req() req: Request) {
+    const auth = await asRequiredDatabaseAuth(this.prisma, user, req);
+    if (body?.sql) return this.exporter.exportQuery(body.sql, body.format, auth, requestMeta(req));
+    return this.exporter.exportTable(String(body?.table), body?.format ?? 'csv', auth, requestMeta(req));
   }
 
   @Post('import/preview')
-  previewImport(@Body() body: { table: string; format: ImportFormat; content: string }) {
-    return this.importer.preview(body?.table, body?.format ?? 'csv', body?.content ?? '');
+  async previewImport(@Body() body: { table: string; format: ImportFormat; content: string }, @CurrentPlatformAdmin() user: PlatformAdminIdentity, @Req() req: Request) {
+    const auth = await asRequiredDatabaseAuth(this.prisma, user, req);
+    return this.importer.preview(body?.table, body?.format ?? 'csv', body?.content ?? '', auth.companyId);
   }
 
   @Post('import/commit')
   @PlatformAdminRequired('platform.database.restore_request')
-  commitImport(@Body() body: { table: string; format: ImportFormat; content: string; mapping?: Record<string, string>; strategy: ImportStrategy; keyColumns?: string[] }, @CurrentPlatformAdmin() user: PlatformAdminIdentity, @Req() req: Request) {
-    return this.importer.commit(body?.table, body?.format ?? 'csv', body?.content ?? '', body?.mapping ?? {}, body?.strategy ?? 'insert', body?.keyColumns ?? [], asAuthPayload(user), requestMeta(req));
+  async commitImport(@Body() body: { table: string; format: ImportFormat; content: string; mapping?: Record<string, string>; strategy: ImportStrategy; keyColumns?: string[] }, @CurrentPlatformAdmin() user: PlatformAdminIdentity, @Req() req: Request) {
+    return this.importer.commit(body?.table, body?.format ?? 'csv', body?.content ?? '', body?.mapping ?? {}, body?.strategy ?? 'insert', body?.keyColumns ?? [], await asRequiredDatabaseAuth(this.prisma, user, req), requestMeta(req));
   }
 
   @Get('backups')
   @PlatformAdminRequired('platform.database.backup')
-  listBackups() {
-    return this.backup.list();
+  async listBackups(@CurrentPlatformAdmin() user: PlatformAdminIdentity, @Req() req: Request) {
+    const auth = await asRequiredDatabaseAuth(this.prisma, user, req);
+    return this.backup.list(auth.companyId);
   }
 
   @Post('backups')
   @PlatformAdminRequired('platform.database.backup')
-  async createBackup(@Body() body: { table: string; reason?: string }, @CurrentPlatformAdmin() user: PlatformAdminIdentity) {
-    const allow = await this.schema.getAllowlist();
-    assertInAllowlist(String(body?.table), allow, 'tabela');
-    const res = await this.pg.runReadOnly(`SELECT * FROM ${quoteIdent(body.table, 'tabela')} LIMIT ${DB_ADMIN_LIMITS.maxSnapshotRows}`);
+  async createBackup(@Body() body: { table: string; reason?: string }, @CurrentPlatformAdmin() user: PlatformAdminIdentity, @Req() req: Request) {
+    const auth = await asRequiredDatabaseAuth(this.prisma, user, req);
+    await this.schema.assertCompanyScopedTable(String(body?.table));
+    const res = await this.pg.runReadOnly(
+      `SELECT * FROM ${quoteIdent(body.table, 'tabela')} WHERE "companyId" = $1 LIMIT ${DB_ADMIN_LIMITS.maxSnapshotRows}`,
+      { params: [auth.companyId] },
+    );
     return this.backup.snapshot({
+      companyId: auth.companyId,
       table: body.table,
       rows: res.rows,
       type: 'MANUAL_LOGICAL',
@@ -856,28 +892,32 @@ export class PlatformAdminLegacyDatabaseController {
 
   @Get('backups/:id/download')
   @PlatformAdminRequired('platform.database.backup')
-  async downloadBackup(@Param('id') id: string) {
-    const file = await this.backup.getFile(id);
+  async downloadBackup(@Param('id') id: string, @CurrentPlatformAdmin() user: PlatformAdminIdentity, @Req() req: Request) {
+    const auth = await asRequiredDatabaseAuth(this.prisma, user, req);
+    const file = await this.backup.getFile(id, auth.companyId);
     if (!file) throw new BadRequestException('Backup indisponivel ou arquivo ausente.');
     return file;
   }
 
   @Post('backups/:id/verify')
   @PlatformAdminRequired('platform.database.backup')
-  verifyBackup(@Param('id') id: string) {
-    return this.backup.verify(id);
+  async verifyBackup(@Param('id') id: string, @CurrentPlatformAdmin() user: PlatformAdminIdentity, @Req() req: Request) {
+    const auth = await asRequiredDatabaseAuth(this.prisma, user, req);
+    return this.backup.verify(id, auth.companyId);
   }
 
   @Post('backups/:id/important')
   @PlatformAdminRequired('platform.database.backup')
-  importantBackup(@Param('id') id: string, @Body() body: { important: boolean }) {
-    return this.backup.setImportant(id, Boolean(body?.important));
+  async importantBackup(@Param('id') id: string, @Body() body: { important: boolean }, @CurrentPlatformAdmin() user: PlatformAdminIdentity, @Req() req: Request) {
+    const auth = await asRequiredDatabaseAuth(this.prisma, user, req);
+    return this.backup.setImportant(id, auth.companyId, Boolean(body?.important));
   }
 
   @Delete('backups/:id')
   @PlatformAdminRequired('platform.database.backup')
-  removeBackup(@Param('id') id: string) {
-    return this.backup.remove(id);
+  async removeBackup(@Param('id') id: string, @CurrentPlatformAdmin() user: PlatformAdminIdentity, @Req() req: Request) {
+    const auth = await asRequiredDatabaseAuth(this.prisma, user, req);
+    return this.backup.remove(id, auth.companyId);
   }
 
   @Post('backups/:id/restore')
@@ -886,11 +926,12 @@ export class PlatformAdminLegacyDatabaseController {
     if (body?.confirmationPhrase !== 'CONFIRMAR ALTERAÇÃO CRÍTICA') {
       throw new BadRequestException('Restauração exige a frase de confirmação: "CONFIRMAR ALTERAÇÃO CRÍTICA".');
     }
-    const file = await this.backup.getFile(id);
+    const auth = await asRequiredDatabaseAuth(this.prisma, user, req);
+    const file = await this.backup.getFile(id, auth.companyId);
     if (!file) throw new BadRequestException('Backup indisponivel.');
     const payload = JSON.parse(file.content) as { table: string; rows: Record<string, unknown>[] };
     if (!payload?.table || !Array.isArray(payload.rows)) throw new BadRequestException('Snapshot invalido.');
-    const report = await this.importer.commit(payload.table, 'json', JSON.stringify(payload.rows), {}, 'ignoreDuplicates', [], asAuthPayload(user), requestMeta(req));
+    const report = await this.importer.commit(payload.table, 'json', JSON.stringify(payload.rows), {}, 'ignoreDuplicates', [], auth, requestMeta(req));
     return { restoredInto: payload.table, ...report };
   }
 }

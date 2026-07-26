@@ -167,6 +167,7 @@ export class StructureService {
   }
 
   async execute(operation: string, params: Record<string, unknown>, confirmationPhrase: string | undefined, user: AuthPayload, meta: ReqMeta) {
+    blockStructuralChanges();
     const plan = await this.plan(operation, params);
     if (plan.requiresConfirmationPhrase && confirmationPhrase !== plan.confirmationPhrase) {
       throw new BadRequestException(`Operação de alto risco. Para confirmar, digite exatamente: "${plan.confirmationPhrase}".`);
@@ -178,6 +179,7 @@ export class StructureService {
       try {
         const rows = await this.pg.runReadOnly(`SELECT * FROM ${quoteIdent(plan.snapshotTable, 'tabela')} LIMIT ${DB_ADMIN_LIMITS.maxSnapshotRows}`);
         const snap = await this.backup.snapshot({
+          companyId: user.companyId,
           table: plan.snapshotTable, rows: rows.rows, type: 'PRE_OP', reason: `DDL: ${operation}`, relatedOperation: `structure.${operation}`,
           userId: user.sub, userEmail: user.email,
         });
@@ -219,4 +221,8 @@ export class StructureService {
     if (SAFE_DEFAULT.test(value.trim())) return value.trim();
     return `'${value.replace(/'/g, "''")}'`;
   }
+}
+
+function blockStructuralChanges(): void {
+  throw new ForbiddenException('Alteracoes estruturais desativadas no escopo empresarial.');
 }

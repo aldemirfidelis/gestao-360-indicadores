@@ -32,6 +32,7 @@ export class BackupService {
 
   /** Cria um snapshot lógico de linhas (pré-operação ou export). */
   async snapshot(params: {
+    companyId: string;
     table: string;
     rows: Record<string, unknown>[];
     type?: 'PRE_OP' | 'TABLE_EXPORT' | 'MANUAL_LOGICAL';
@@ -44,9 +45,11 @@ export class BackupService {
     const dir = this.dir();
     if (!existsSync(dir)) await mkdir(dir, { recursive: true });
     const ts = new Date().toISOString().replace(/[:.]/g, '-');
-    const fileName = `${params.table}__${params.type ?? 'PRE_OP'}__${ts}.json`;
+    const safeCompany = params.companyId.replace(/[^A-Za-z0-9_-]/g, '_');
+    const fileName = `${safeCompany}__${params.table}__${params.type ?? 'PRE_OP'}__${ts}.json`;
     const filePath = join(dir, fileName);
     const payload = {
+      companyId: params.companyId,
       table: params.table,
       type: params.type ?? 'PRE_OP',
       reason: params.reason ?? null,
@@ -64,6 +67,7 @@ export class BackupService {
     try {
       const created = await this.prisma.dbAdminBackup.create({
         data: {
+          companyId: params.companyId,
           userId: params.userId ?? null,
           userEmail: params.userEmail ?? null,
           type: params.type ?? 'PRE_OP',
@@ -88,19 +92,19 @@ export class BackupService {
     return { backupId, filePath, checksum, rowCount: params.rows.length, sizeBytes };
   }
 
-  async list() {
-    return this.prisma.dbAdminBackup.findMany({ orderBy: { createdAt: 'desc' }, take: 200 });
+  async list(companyId: string) {
+    return this.prisma.dbAdminBackup.findMany({ where: { companyId }, orderBy: { createdAt: 'desc' }, take: 200 });
   }
 
-  async getFile(id: string): Promise<{ name: string; content: string } | null> {
-    const b = await this.prisma.dbAdminBackup.findUnique({ where: { id } });
+  async getFile(id: string, companyId: string): Promise<{ name: string; content: string } | null> {
+    const b = await this.prisma.dbAdminBackup.findFirst({ where: { id, companyId } });
     if (!b || !existsSync(b.filePath)) return null;
     const content = await readFile(b.filePath, 'utf8');
     return { name: b.filePath.split(/[\\/]/).pop() ?? `backup-${id}.json`, content };
   }
 
-  async verify(id: string): Promise<{ ok: boolean; reason?: string }> {
-    const b = await this.prisma.dbAdminBackup.findUnique({ where: { id } });
+  async verify(id: string, companyId: string): Promise<{ ok: boolean; reason?: string }> {
+    const b = await this.prisma.dbAdminBackup.findFirst({ where: { id, companyId } });
     if (!b) return { ok: false, reason: 'Backup não encontrado' };
     if (!existsSync(b.filePath)) return { ok: false, reason: 'Arquivo ausente' };
     const content = await readFile(b.filePath, 'utf8');
@@ -110,12 +114,12 @@ export class BackupService {
     return ok ? { ok } : { ok, reason: 'Checksum divergente' };
   }
 
-  async setImportant(id: string, important: boolean) {
-    return this.prisma.dbAdminBackup.update({ where: { id }, data: { important } });
+  async setImportant(id: string, companyId: string, important: boolean) {
+    return this.prisma.dbAdminBackup.updateMany({ where: { id, companyId }, data: { important } });
   }
 
-  async remove(id: string) {
-    const b = await this.prisma.dbAdminBackup.findUnique({ where: { id } });
+  async remove(id: string, companyId: string) {
+    const b = await this.prisma.dbAdminBackup.findFirst({ where: { id, companyId } });
     if (b && existsSync(b.filePath)) {
       try {
         await unlink(b.filePath);
@@ -123,12 +127,12 @@ export class BackupService {
         /* arquivo pode já não existir */
       }
     }
-    await this.prisma.dbAdminBackup.update({ where: { id }, data: { status: 'DELETED' } });
+    if (b) await this.prisma.dbAdminBackup.update({ where: { id }, data: { status: 'DELETED' } });
     return { ok: true };
   }
 
-  async fileMeta(id: string): Promise<{ exists: boolean; sizeBytes: number }> {
-    const b = await this.prisma.dbAdminBackup.findUnique({ where: { id } });
+  async fileMeta(id: string, companyId: string): Promise<{ exists: boolean; sizeBytes: number }> {
+    const b = await this.prisma.dbAdminBackup.findFirst({ where: { id, companyId } });
     if (!b || !existsSync(b.filePath)) return { exists: false, sizeBytes: 0 };
     const s = await stat(b.filePath);
     return { exists: true, sizeBytes: s.size };
