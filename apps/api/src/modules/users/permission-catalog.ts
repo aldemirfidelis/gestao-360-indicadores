@@ -786,6 +786,23 @@ export const DEFAULT_PROFILES = [
     ],
   },
   {
+    // Mesmo acesso do Colaborador (Autoatendimento), porém SEM `ponto:clock`:
+    // quem bate ponto no totem não vê o relógio nem os botões de marcação em
+    // Minha Vida Funcional — só consulta o espelho, o banco e as solicitações.
+    code: 'COLABORADOR_PONTO_TOTEM',
+    name: 'Colaborador (Ponto no Totem)',
+    role: 'VIEWER',
+    description:
+      'Mesmo acesso do autoatendimento, mas sem registrar ponto pelo portal: a marcação acontece no totem de reconhecimento facial.',
+    permissions: [
+      'ponto:view',
+      'folha:view',
+      'communication:view',
+      'directory:view',
+      'help:view',
+    ],
+  },
+  {
     code: 'OPERADOR_DADOS',
     name: 'Operador de Dados',
     role: 'ANALYST',

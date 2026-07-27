@@ -19,8 +19,10 @@ export class PersonnelController {
 
   // ------------------------------ Ponto ------------------------------
 
+  // Só `ponto:clock`: o guard é OR, então listar `ponto:view` junto liberaria a
+  // batida para quem só consulta o espelho (perfil que bate ponto no totem).
   @Post('time-clock/punch')
-  @RequirePermissions('ponto:clock', 'ponto:view')
+  @RequirePermissions('ponto:clock')
   punch(@CurrentUser() me: AuthPayload, @Body() body: any, @Req() req: Request) {
     return this.service.punch(me, body, { ip: req.ip, userAgent: req.headers['user-agent'] });
   }

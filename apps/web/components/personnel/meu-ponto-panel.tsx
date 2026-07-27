@@ -14,6 +14,7 @@ import { Label } from '@/components/ui/label';
 import { NativeSelect } from '@/components/ui/select';
 import { Sheet, SheetBody, SheetContent, SheetDescription, SheetHeader, SheetTitle } from '@/components/ui/sheet';
 import { Textarea } from '@/components/ui/textarea';
+import { useAuth } from '@/components/auth/auth-provider';
 import { api } from '@/lib/api';
 import { cn } from '@/lib/utils';
 import {
@@ -63,6 +64,9 @@ type AdjustDialogState = { dayKey: string; times: string[]; reason: string; type
  */
 export function MeuPontoPanel() {
   const qc = useQueryClient();
+  const { hasPermission } = useAuth();
+  /** Sem `ponto:clock` o colaborador só consulta: bate ponto no totem. */
+  const canPunch = hasPermission('ponto:clock');
   const [now, setNow] = useState(() => new Date());
   const [mirrorMonth, setMirrorMonth] = useState(() => new Date().toISOString().slice(0, 7));
   const [bankOpen, setBankOpen] = useState(false);
@@ -162,7 +166,10 @@ export function MeuPontoPanel() {
   return (
     <div className="grid grid-cols-1 gap-4 xl:grid-cols-[360px_1fr]">
       <div className="space-y-4">
-        {/* Cartão de batida */}
+        {/* Cartão de batida — some para quem bate ponto só no totem (sem
+            `ponto:clock`). O restante do painel (espelho, banco, ajustes)
+            continua disponível. */}
+        {canPunch ? (
         <Card className="border border-slate-100 bg-white shadow-sm dark:border-slate-800/80 dark:bg-slate-900/50">
           <CardContent className="space-y-4 p-5 text-center">
             <div className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
@@ -236,6 +243,23 @@ export function MeuPontoPanel() {
             </div>
           </CardContent>
         </Card>
+        ) : (
+          <Card className="border border-slate-100 bg-white shadow-sm dark:border-slate-800/80 dark:bg-slate-900/50">
+            <CardContent className="space-y-2 p-5 text-center">
+              <div className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
+                {now.toLocaleDateString('pt-BR', { weekday: 'long', day: '2-digit', month: 'long' })}
+              </div>
+              <div className="flex items-center justify-center gap-2 text-sm font-semibold text-slate-800 dark:text-slate-200">
+                <MapPin className="h-4 w-4 text-sky-500" />
+                Seu ponto é registrado no totem
+              </div>
+              <p className="text-xs text-muted-foreground">
+                Use o terminal de reconhecimento facial da sua unidade. As marcações aparecem no espelho ao lado assim que
+                são registradas.
+              </p>
+            </CardContent>
+          </Card>
+        )}
 
         {/* Resumo do mês */}
         <Card className="border border-slate-100 bg-white shadow-sm dark:border-slate-800/80 dark:bg-slate-900/50">

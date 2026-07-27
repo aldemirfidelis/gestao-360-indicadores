@@ -50,8 +50,9 @@ export class BiometricController {
   @RequirePermissions('ponto:view')
   enrollmentChallenge(@CurrentUser() me: AuthPayload) { return this.service.challenge(me, 'ENROLL'); }
 
+  // Batida facial pelo portal exige `ponto:clock` (guard é OR — ver punch).
   @Post('challenge/punch')
-  @RequirePermissions('ponto:clock', 'ponto:view')
+  @RequirePermissions('ponto:clock')
   punchChallenge(@CurrentUser() me: AuthPayload) { return this.service.challenge(me, 'VERIFY_PUNCH'); }
 
   @Post('enroll')
@@ -60,7 +61,7 @@ export class BiometricController {
   enroll(@CurrentUser() me: AuthPayload, @Body() body: any) { return this.service.enroll(me, body); }
 
   @Post('verify-and-punch')
-  @RequirePermissions('ponto:clock', 'ponto:view')
+  @RequirePermissions('ponto:clock')
   verifyAndPunch(@CurrentUser() me: AuthPayload, @Body() body: any, @Req() req: Request) {
     return this.service.verifyAndPunch(me, body, { ip: req.ip, userAgent: req.headers['user-agent'] });
   }

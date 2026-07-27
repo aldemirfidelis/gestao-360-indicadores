@@ -371,6 +371,9 @@ export const ROUTE_PERMISSIONS: Array<{ prefix: string; permissions: string[]; e
   // permissão de autoatendimento. Assim um perfil de módulo único não recebe
   // Serviço Pessoal implicitamente.
   { prefix: '/servico-pessoal/meu-holerite', permissions: EMPLOYEE_SELF_SERVICE_PERMISSIONS },
+  // Batida facial pelo portal exige a permissão de bater ponto: quem marca no
+  // totem não deve nem abrir a tela (o backend também recusa a batida).
+  { prefix: '/servico-pessoal/ponto-facial', permissions: ['ponto:clock'] },
   { prefix: '/servico-pessoal', permissions: ['ponto:view', 'ponto:manage', 'pessoal:view', 'folha:view'] },
   { prefix: '/suprimentos', permissions: ['compras:view', 'compras:request', 'compras:buy', 'compras:approve', 'compras:manage', 'estoque:view', 'estoque:withdraw', 'estoque:operate', 'estoque:approve', 'estoque:transfer', 'estoque:adjust', 'estoque:manage'] },
   { prefix: '/organograma', permissions: ['compensation:view', 'org:positions:view', 'org:view'] },

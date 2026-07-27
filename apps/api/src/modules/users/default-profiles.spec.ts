@@ -14,6 +14,18 @@ describe('DEFAULT_PROFILES — autoatendimento do colaborador', () => {
     }
   });
 
+  it('Colaborador (Ponto no Totem) vê a vida funcional mas NÃO bate ponto pelo portal', () => {
+    const p = perms('COLABORADOR_PONTO_TOTEM');
+    expect(byCode.get('COLABORADOR_PONTO_TOTEM')?.role).toBe('VIEWER');
+    // Continua consultando espelho, holerite e comunicação interna...
+    expect(p.has('ponto:view')).toBe(true);
+    expect(p.has('folha:view')).toBe(true);
+    expect(p.has('communication:view')).toBe(true);
+    // ...mas a marcação só acontece no totem.
+    expect(p.has('ponto:clock')).toBe(false);
+    expect(p.has('ponto:kiosk')).toBe(false);
+  });
+
   it('existe o perfil enxuto Colaborador (Autoatendimento) sem acesso a indicadores/documentos', () => {
     const p = perms('COLABORADOR_AUTOATENDIMENTO');
     expect(byCode.get('COLABORADOR_AUTOATENDIMENTO')?.role).toBe('VIEWER');
