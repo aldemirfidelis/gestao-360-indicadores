@@ -15187,6 +15187,8 @@ model Training {
   documentId      String?
   document        Document? @relation("TrainingDocument", fields: [documentId], references: [id])
   documentVersion Int?
+  /// O que fazer com quem ja foi treinado quando o documento e revisado.
+  revisionAction  TrainingRevisionAction @default(ACKNOWLEDGE)
 
   requiresAssessment    Boolean  @default(false)
   minimumScore          Decimal? @db.Decimal(5, 2)

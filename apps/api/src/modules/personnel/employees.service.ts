@@ -1,10 +1,11 @@
-import { BadRequestException, ConflictException, Injectable, NotFoundException } from '@nestjs/common';
+import { BadRequestException, ConflictException, Injectable, Logger, NotFoundException } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
 import { PrismaService } from '../../prisma/prisma.service';
 import { AuditWriterService } from '../../common/audit/audit-writer.service';
 import { DocumentStorageService } from '../documents/document-storage.service';
 import { PersonnelSettingsService } from './personnel-settings.service';
 import { PersonnelService } from './personnel.service';
+import { TrainingMatrixService } from '../training/training-matrix.service';
 import { UsersService } from '../users/users.service';
 import { UserRoleEnum } from '@prisma/client';
 import { randomBytes } from 'crypto';
@@ -54,6 +55,8 @@ type Tx = Prisma.TransactionClient;
 
 @Injectable()
 export class EmployeesService {
+  private readonly logger = new Logger(EmployeesService.name);
+
   constructor(
     private readonly prisma: PrismaService,
     private readonly audit: AuditWriterService,
@@ -61,6 +64,7 @@ export class EmployeesService {
     private readonly settings: PersonnelSettingsService,
     private readonly users: UsersService,
     private readonly personnel: PersonnelService,
+    private readonly trainingMatrix: TrainingMatrixService,
   ) {}
 
   // ------------------------------ Listagem ------------------------------
@@ -316,6 +320,13 @@ export class EmployeesService {
       after: { name, registrationId, jobId, orgNodeId },
     });
 
+    // Evento 1 do T&D: admissão consulta a matriz do cargo/área e gera as
+    // pendências obrigatórias com os prazos de admissão. Nunca derruba o
+    // cadastro — a admissão é o fato, o treinamento é consequência.
+    await this.trainingMatrix
+      .recomputeEmployee(me.companyId, created.id, { reason: 'ADMISSION', actorUserId: me.sub })
+      .catch((error) => this.logger.warn(`Matriz de treinamento não gerada na admissão: ${(error as Error).message}`));
+
     // Cadastrar como usuário do portal no mesmo passo (opcional). Só quando não
     // veio um vínculo com usuário existente.
     let linkedUserId = text(body?.profile?.userId ?? body?.userId);
@@ -568,6 +579,18 @@ export class EmployeesService {
       before: { jobId: before.jobId, orgNodeId: before.orgNodeId, status: before.status },
       after: { jobChanged, nodeChanged, statusChanged },
     });
+
+    // Eventos 2 e do desligamento: mudança de cargo, área ou status recalcula a
+    // matriz — aproveita o que já é válido, gera só as novas exigências e
+    // encerra (sem apagar) o que deixou de ser aplicável.
+    if (jobChanged || nodeChanged || statusChanged) {
+      await this.trainingMatrix
+        .recomputeEmployee(me.companyId, id, {
+          reason: statusChanged?.to === 'INACTIVE' ? 'TERMINATION' : 'JOB_CHANGED',
+          actorUserId: me.sub,
+        })
+        .catch((error) => this.logger.warn(`Matriz de treinamento não recalculada: ${(error as Error).message}`));
+    }
     return this.getById(me, id);
   }
 

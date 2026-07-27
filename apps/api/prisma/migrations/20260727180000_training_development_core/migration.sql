@@ -320,3 +320,6 @@ CREATE INDEX "training_history_entries_companyId_employeeId_createdAt_idx" ON "t
 CREATE INDEX "training_history_entries_assignmentId_idx" ON "training_history_entries"("assignmentId");
 ALTER TABLE "training_history_entries" ADD CONSTRAINT "training_history_entries_employeeId_fkey" FOREIGN KEY ("employeeId") REFERENCES "OrgEmployee"("id") ON DELETE CASCADE ON UPDATE CASCADE;
 ALTER TABLE "training_history_entries" ADD CONSTRAINT "training_history_entries_assignmentId_fkey" FOREIGN KEY ("assignmentId") REFERENCES "training_assignments"("id") ON DELETE SET NULL ON UPDATE CASCADE;
+
+-- Acao padrao aplicada a quem ja foi treinado quando o documento e revisado.
+ALTER TABLE "trainings" ADD COLUMN "revisionAction" "TrainingRevisionAction" NOT NULL DEFAULT 'ACKNOWLEDGE';

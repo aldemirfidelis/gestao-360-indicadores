@@ -3,6 +3,7 @@ import { DocumentsModule } from '../modules/documents/documents.module';
 import { NotificationsModule } from '../modules/notifications/notifications.module';
 import { CommunicationModule } from '../modules/communication/communication.module';
 import { PersonnelModule } from '../modules/personnel/personnel.module';
+import { TrainingModule } from '../modules/training/training.module';
 import { MaintenanceScheduler } from './maintenance.scheduler';
 
 /**
@@ -11,7 +12,7 @@ import { MaintenanceScheduler } from './maintenance.scheduler';
  * alertas automáticos.
  */
 @Module({
-  imports: [DocumentsModule, NotificationsModule, CommunicationModule, PersonnelModule],
+  imports: [DocumentsModule, NotificationsModule, CommunicationModule, PersonnelModule, TrainingModule],
   providers: [MaintenanceScheduler],
 })
 export class MaintenanceModule {}

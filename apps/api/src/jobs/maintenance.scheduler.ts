@@ -3,6 +3,7 @@ import { PrismaService } from '../prisma/prisma.service';
 import { DocumentsService } from '../modules/documents/documents.service';
 import { NotificationsService } from '../modules/notifications/notifications.service';
 import { PublicationsService } from '../modules/communication/publications/publications.service';
+import { TrainingMatrixService } from '../modules/training/training-matrix.service';
 import { PersonnelService } from '../modules/personnel/personnel.service';
 import { TimeBankService } from '../modules/personnel/time-bank.service';
 import { addDays, dayKeyFor } from '../modules/personnel/time-clock.logic';
@@ -34,6 +35,7 @@ export class MaintenanceScheduler implements OnApplicationBootstrap, OnApplicati
     private readonly documents: DocumentsService,
     private readonly notifications: NotificationsService,
     private readonly publications: PublicationsService,
+    private readonly trainingMatrix: TrainingMatrixService,
     private readonly personnel: PersonnelService,
     private readonly timeBank: TimeBankService,
   ) {}
@@ -65,6 +67,7 @@ export class MaintenanceScheduler implements OnApplicationBootstrap, OnApplicati
     let alertsGenerated = 0;
     let postsPublished = 0;
     let postsExpired = 0;
+    let trainingRefreshed = 0;
     let occurrencesCreated = 0;
     let occurrencesResolved = 0;
     let bankExpiredMinutes = 0;
@@ -97,6 +100,15 @@ export class MaintenanceScheduler implements OnApplicationBootstrap, OnApplicati
         } catch (error) {
           failures += 1;
           this.logger.error(`Publicação de comunicados falhou (empresa ${company.id}): ${(error as Error).message}`);
+        }
+        try {
+          // T&D (Eventos 4 e 5): reclassifica a matriz por data — válido vira
+          // "próximo do vencimento" e depois "vencido", alimentando as
+          // pendências e os alertas sem ninguém precisar rodar nada.
+          trainingRefreshed += await this.trainingMatrix.refreshValidityStatuses(company.id);
+        } catch (error) {
+          failures += 1;
+          this.logger.error(`Varredura de vencimentos do T&D falhou (empresa ${company.id}): ${(error as Error).message}`);
         }
         try {
           // Central de Ocorrências: varre a véspera uma vez por dia por empresa
@@ -132,10 +144,11 @@ export class MaintenanceScheduler implements OnApplicationBootstrap, OnApplicati
           this.logger.error(`Vencimento de banco de horas falhou (empresa ${company.id}): ${(error as Error).message}`);
         }
       }
-      if (documentsProcessed || alertsGenerated || postsPublished || postsExpired || occurrencesCreated || occurrencesResolved || bankExpiredMinutes || failures) {
+      if (documentsProcessed || alertsGenerated || postsPublished || postsExpired || trainingRefreshed || occurrencesCreated || occurrencesResolved || bankExpiredMinutes || failures) {
         this.logger.log(
           `Ciclo de manutenção: ${companies.length} empresas, ${documentsProcessed} documentos transicionados, ` +
             `${alertsGenerated} alertas gerados, ${postsPublished} comunicados publicados, ${postsExpired} expirados, ` +
+            `${trainingRefreshed} treinamentos reclassificados, ` +
             `${occurrencesCreated} ocorrências novas, ${occurrencesResolved} resolvidas, ${bankExpiredMinutes} min de banco vencidos, ` +
             `${failures} falhas, ${Date.now() - startedAt}ms.`,
         );

@@ -3,6 +3,7 @@ import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import { RequirePermissions } from '../../common/decorators/permissions.decorator';
 import { AuthPayload } from '../auth/auth.types';
 import { TrainingCatalogService } from './training-catalog.service';
+import { TrainingDocumentService } from './training-document.service';
 import { TrainingCertificatesService } from './training-certificates.service';
 import { TrainingClassesService } from './training-classes.service';
 import { TrainingEmployeeService } from './training-employee.service';
@@ -256,5 +257,41 @@ export class TrainingEmployeeController {
   @RequirePermissions('training:self')
   justify(@CurrentUser() me: AuthPayload, @Param('participantId') participantId: string, @Body() body: any) {
     return this.employee.justifyAbsence(me, participantId, String(body?.reason ?? ''));
+  }
+}
+
+/**
+ * Integração com o GED: o que a revisão de um documento exige de quem já foi
+ * treinado, e quem ainda não está na versão atual.
+ */
+@Controller('training/documents')
+export class TrainingDocumentController {
+  constructor(private readonly documents: TrainingDocumentService) {}
+
+  @Get(':documentId')
+  @RequirePermissions('training:view', 'doc:view')
+  linked(@CurrentUser() me: AuthPayload, @Param('documentId') documentId: string) {
+    return this.documents.trainingsForDocument(me.companyId, documentId);
+  }
+
+  /** Quem ainda não foi treinado na revisão atual do documento. */
+  @Get(':documentId/outdated')
+  @RequirePermissions('training:view')
+  outdated(@CurrentUser() me: AuthPayload, @Param('documentId') documentId: string) {
+    return this.documents.outdatedForDocument(me.companyId, documentId);
+  }
+
+  /** O responsável decide o que a revisão exige (sobrepõe a ação padrão). */
+  @Post(':documentId/revision')
+  @RequirePermissions('training:requirements', 'training:manage')
+  decide(@CurrentUser() me: AuthPayload, @Param('documentId') documentId: string, @Body() body: any) {
+    return this.documents.decideRevision(me, documentId, body ?? {});
+  }
+
+  /** Ação padrão do treinamento para futuras revisões do documento. */
+  @Patch('trainings/:trainingId/revision-action')
+  @RequirePermissions('training:update', 'training:manage')
+  setAction(@CurrentUser() me: AuthPayload, @Param('trainingId') trainingId: string, @Body() body: any) {
+    return this.documents.setRevisionAction(me, trainingId, body?.action);
   }
 }

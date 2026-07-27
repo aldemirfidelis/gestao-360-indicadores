@@ -5,9 +5,11 @@ import {
   TrainingCertificatesController,
   TrainingClassesController,
   TrainingController,
+  TrainingDocumentController,
   TrainingEmployeeController,
 } from './training.controller';
 import { TrainingCatalogService } from './training-catalog.service';
+import { TrainingDocumentService } from './training-document.service';
 import { TrainingCertificatesService } from './training-certificates.service';
 import { TrainingClassesService } from './training-classes.service';
 import { TrainingEmployeeService } from './training-employee.service';
@@ -32,15 +34,17 @@ import { TrainingQueryService } from './training-query.service';
     TrainingClassesController,
     TrainingCertificatesController,
     TrainingEmployeeController,
+    TrainingDocumentController,
   ],
   providers: [
     TrainingMatrixService,
     TrainingCatalogService,
+    TrainingDocumentService,
     TrainingClassesService,
     TrainingCertificatesService,
     TrainingQueryService,
     TrainingEmployeeService,
   ],
-  exports: [TrainingMatrixService],
+  exports: [TrainingMatrixService, TrainingDocumentService],
 })
 export class TrainingModule {}

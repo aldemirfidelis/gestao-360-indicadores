@@ -3,6 +3,7 @@ import {
   ConflictException,
   ForbiddenException,
   Injectable,
+  Logger,
   NotFoundException,
 } from '@nestjs/common';
 import {
@@ -36,6 +37,7 @@ import { TEMPLATE_LIBRARY, findLibraryTemplate } from './template-library';
 import { WorkItemEventBus } from '../my-day/work-item-event-bus';
 import { listTake } from '../../common/http/list-take';
 import { NotificationsService } from '../notifications/notifications.service';
+import { TrainingDocumentService } from '../training/training-document.service';
 
 const MODULE = 'documents';
 const DOCX_MIME = 'application/vnd.openxmlformats-officedocument.wordprocessingml.document';
@@ -115,6 +117,8 @@ const TRANSITIONS: Record<DocumentStatus, DocumentStatus[]> = {
 
 @Injectable()
 export class DocumentsService {
+  private readonly logger = new Logger(DocumentsService.name);
+
   constructor(
     private readonly prisma: PrismaService,
     private readonly traceability: TraceabilityService,
@@ -124,6 +128,7 @@ export class DocumentsService {
     private readonly storage: DocumentStorageService,
     private readonly workItems: WorkItemEventBus,
     private readonly notifications: NotificationsService,
+    private readonly trainingDocuments: TrainingDocumentService,
   ) {}
 
   private include() {
@@ -1141,6 +1146,20 @@ export class DocumentsService {
       await this.auditTx(tx, me, doc.id, 'PUBLISH', { status: doc.status }, { status: DocumentStatus.PUBLISHED, pdfFileId: pdf.id }, this.nullableText(body?.comment) ?? 'Publicação oficial');
       return item;
     });
+
+    // Nova revisão publicada: reabre os treinamentos vinculados conforme a ação
+    // configurada em cada um (ciência, reciclagem ou novo treinamento). Nunca
+    // derruba a publicação — o T&D é consequência, não pré-requisito.
+    try {
+      const outcomes = await this.trainingDocuments.applyRevision(me.companyId, doc.id, { actorUserId: me.sub });
+      const reopened = outcomes.reduce((sum, item) => sum + item.reopened, 0);
+      if (reopened > 0) {
+        this.logger.log(`Revisão do documento ${doc.id}: ${reopened} treinamento(s) reaberto(s) para nova capacitação.`);
+      }
+    } catch (error) {
+      this.logger.warn(`Falha ao propagar a revisão do documento ${doc.id} para o T&D: ${(error as Error).message}`);
+    }
+
     return this.getById(me, published.id);
   }
 

@@ -120,8 +120,10 @@ function makeService(opts?: {
   } as any;
   const workItems = { markDirty: vi.fn() } as any;
   const notifications = { create: vi.fn().mockResolvedValue({ id: 'n1' }) } as any;
+  // Publicação propaga a revisão para o T&D; aqui só precisamos do contrato.
+  const trainingDocuments = { applyRevision: vi.fn().mockResolvedValue([]) } as any;
 
-  const service = new DocumentsService(prisma, traceability, access, codes, editor, storage, workItems, notifications);
+  const service = new DocumentsService(prisma, traceability, access, codes, editor, storage, workItems, notifications, trainingDocuments);
   return { service, prisma, traceability, access, codes, storage, notifications };
 }
 

@@ -183,6 +183,7 @@ export class WorkItemAggregationService {
         this.collectIndicatorsOffTarget(me).catch((e) => this.warn('indicators', e)),
         this.collectNotifications(me).catch((e) => this.warn('notifications', e)),
         this.collectUnreadCommunications(me).catch((e) => this.warn('communications', e)),
+        this.collectTrainings(me).catch((e) => this.warn('trainings', e)),
         this.collectSecurityIncidents(me).catch((e) => this.warn('security-incidents', e)),
         this.collectTimeClock(me).catch((e) => this.warn('time-clock', e)),
         this.collectVacations(me).catch((e) => this.warn('vacations', e)),
@@ -1327,6 +1328,65 @@ export class WorkItemAggregationService {
         context: { category: post.category, priority: post.priority, requiresReadConfirmation: true },
         sourceCreatedAt: post.publishedAt ?? null,
       }));
+  }
+
+  /**
+   * Treinamentos obrigatórios pendentes ou vencidos do próprio colaborador.
+   * Sai do Meu Dia quando a pendência é resolvida na origem (turma concluída,
+   * certificado validado ou dispensa).
+   */
+  private async collectTrainings(me: AuthPayload): Promise<WorkItemDraft[]> {
+    const profile = await this.prisma.personnelEmployeeProfile.findFirst({
+      where: { companyId: me.companyId, userId: me.sub },
+      select: { employeeId: true },
+    });
+    if (!profile) return [];
+
+    const rows = await this.prisma.trainingAssignment.findMany({
+      where: {
+        companyId: me.companyId,
+        employeeId: profile.employeeId,
+        deletedAt: null,
+        mandatory: true,
+        status: { in: ['PENDING', 'NOT_STARTED', 'EXPIRED', 'DUE_SOON', 'FAILED', 'ABSENT'] },
+      },
+      orderBy: [{ dueAt: 'asc' }],
+      take: 50,
+      select: {
+        id: true,
+        status: true,
+        dueAt: true,
+        validUntil: true,
+        training: { select: { id: true, name: true, code: true } },
+        requirement: { select: { blocksOperation: true } },
+      },
+    });
+
+    return rows.map((row) => ({
+      sourceModule: 'training',
+      sourceEntityType: 'TRAINING_ASSIGNMENT',
+      sourceEntityId: row.id,
+      itemType: 'TRAINING_PENDING',
+      title: row.training.name,
+      summary:
+        row.status === 'EXPIRED'
+          ? 'Treinamento obrigatório vencido — exige reciclagem'
+          : row.status === 'DUE_SOON'
+            ? 'Treinamento próximo do vencimento'
+            : 'Treinamento obrigatório pendente',
+      status: 'OPEN',
+      // Vencido ou que bloqueia a atividade sobe a criticidade.
+      criticality: row.status === 'EXPIRED' || row.requirement?.blocksOperation ? 'HIGH' : 'MEDIUM',
+      dueAt: row.validUntil ?? row.dueAt ?? null,
+      assignedUserId: me.sub,
+      requiresDecision: false,
+      recommendedAction: row.status === 'EXPIRED' ? 'Regularizar o treinamento vencido' : 'Realizar o treinamento',
+      availableActions: [
+        { key: 'open', label: 'Ver meus treinamentos', href: '/servico-pessoal/meu-holerite?tab=treinamentos' },
+      ],
+      context: { code: row.training.code, status: row.status, blocksOperation: row.requirement?.blocksOperation ?? false },
+      sourceCreatedAt: null,
+    }));
   }
 
   /**

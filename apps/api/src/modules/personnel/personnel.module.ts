@@ -1,4 +1,5 @@
 import { Module } from '@nestjs/common';
+import { TrainingModule } from '../training/training.module';
 import { DocumentsModule } from '../documents/documents.module';
 import { UsersModule } from '../users/users.module';
 import { EmployeesController } from './employees.controller';
@@ -22,7 +23,8 @@ import { PersonnelSettingsController } from './personnel-settings.controller';
 import { PersonnelSettingsService } from './personnel-settings.service';
 
 @Module({
-  imports: [DocumentsModule, UsersModule],
+  // TrainingModule: admissao e movimentacao recalculam a matriz de treinamento.
+  imports: [DocumentsModule, UsersModule, TrainingModule],
   controllers: [PersonnelController, EmployeesController, VacationsController, LifecycleController, ReportsController, BiometricController, KioskController, PersonnelSettingsController],
   providers: [PersonnelService, EmployeesService, VacationService, LifecycleService, ReportsService, BiometricService, KioskService, TimeBankService, PayrollService, LegalFilesService, PersonnelSettingsService],
   exports: [PersonnelService, EmployeesService, VacationService, LifecycleService, ReportsService, TimeBankService, PersonnelSettingsService],
