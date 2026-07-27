@@ -5,7 +5,8 @@ export const PRODUCT_NAME = 'Gestão 360';
 export const DEFAULT_SITE_URL = 'https://gestão360.org';
 export const SITE_URL = (process.env.NEXT_PUBLIC_SITE_URL ?? DEFAULT_SITE_URL).replace(/\/$/, '');
 export const DEFAULT_OG_IMAGE = '/brand/social-preview-14-modulos.png';
-export const DEMO_PATH = '/login?demo=1';
+/** A demonstração deixou de ter acesso aberto: agora é solicitada por formulário. */
+export const DEMO_PATH = '/demonstracao';
 export const WHATSAPP_NUMBER = process.env.NEXT_PUBLIC_WHATSAPP_NUMBER ?? '5564981009108';
 export const WHATSAPP_MESSAGE =
   process.env.NEXT_PUBLIC_WHATSAPP_MESSAGE ??
@@ -722,7 +723,7 @@ export const faqPage: FaqItem[] = [
   {
     question: 'Como acessar a demonstração?',
     answer:
-      'Use o botão "Acesse a Demonstração" para entrar no ambiente de exemplo. Se fizer sentido, o WhatsApp fica disponível para proposta ou solução sob medida.',
+      'Use o botão "Agendar Demonstração" e preencha o formulário. Nossa equipe entra em contato pelo e-mail informado para enviar a demonstração e agendar uma apresentação. Se preferir, o WhatsApp fica disponível para proposta ou solução sob medida.',
   },
 ];
 
@@ -919,6 +920,7 @@ export const publicRoutes = [
   '/conteudos/perguntas-frequentes',
   '/sobre',
   '/contato',
+  '/demonstracao',
   '/teste-gratis',
   '/seguranca',
   '/implantacao',

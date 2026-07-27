@@ -7,7 +7,7 @@ import { CheckCircle2, Loader2 } from 'lucide-react';
 const generalRequestTypes = ['Comercial', 'Suporte', 'SAC', 'Demonstração', 'Parceria', 'Outros'];
 const supportRequestTypes = ['Suporte técnico', 'Dúvida de acesso', 'SAC', 'LGPD e privacidade'];
 
-type ContactFormMode = 'general' | 'support' | 'trial';
+type ContactFormMode = 'general' | 'support' | 'trial' | 'demo';
 
 interface ContactFormProps {
   compact?: boolean;
@@ -30,6 +30,17 @@ const modeContent: Record<ContactFormMode, { label: string; messageLabel: string
     messageLabel: 'Objetivo do trial',
     placeholder: 'Conte quais módulos deseja avaliar e o principal desafio da sua empresa.',
   },
+  demo: {
+    label: 'Agendar demonstração',
+    messageLabel: 'O que você gostaria de ver na demonstração?',
+    placeholder: 'Conte quais módulos e desafios interessam à sua empresa para prepararmos a demonstração.',
+  },
+};
+
+/** Tipo de solicitação fixo (não escolhido pelo usuário) por modo. */
+const fixedRequestType: Partial<Record<ContactFormMode, string>> = {
+  trial: 'Trial de 30 dias',
+  demo: 'Demonstração',
 };
 
 export function ContactForm({ compact = false, mode = 'general' }: ContactFormProps) {
@@ -54,7 +65,9 @@ export function ContactForm({ compact = false, mode = 'general' }: ContactFormPr
       setMessage(
         mode === 'trial'
           ? 'Solicitação recebida. Nossa equipe comercial entrará em contato para organizar o trial.'
-          : 'Mensagem enviada. A equipe do Gestão 360 retornará pelo canal informado.',
+          : mode === 'demo'
+            ? 'Solicitação recebida. Nossa equipe entrará em contato pelo e-mail informado para enviar a demonstração.'
+            : 'Mensagem enviada. A equipe do Gestão 360 retornará pelo canal informado.',
       );
       formRef.current?.reset();
       (window as any).dataLayer = (window as any).dataLayer || [];
@@ -75,7 +88,15 @@ export function ContactForm({ compact = false, mode = 'general' }: ContactFormPr
       ref={formRef}
       action={submit}
       className="grid gap-4"
-      aria-label={mode === 'support' ? 'Formulário de suporte do Gestão 360' : mode === 'trial' ? 'Formulário de solicitação de trial do Gestão 360' : 'Formulário de contato do Gestão 360'}
+      aria-label={
+        mode === 'support'
+          ? 'Formulário de suporte do Gestão 360'
+          : mode === 'trial'
+            ? 'Formulário de solicitação de trial do Gestão 360'
+            : mode === 'demo'
+              ? 'Formulário de solicitação de demonstração do Gestão 360'
+              : 'Formulário de contato do Gestão 360'
+      }
     >
       <input type="text" name="website" tabIndex={-1} autoComplete="off" className="hidden" aria-hidden="true" />
       <div className={compact ? 'grid gap-4' : 'grid gap-4 md:grid-cols-2'}>
@@ -84,8 +105,8 @@ export function ContactForm({ compact = false, mode = 'general' }: ContactFormPr
         <Field label="Cargo" name="role" />
         <Field label="E-mail corporativo" name="email" type="email" required />
         <Field label="Telefone" name="phone" type="tel" />
-        {mode === 'trial' ? (
-          <input type="hidden" name="requestType" value="Trial de 30 dias" />
+        {fixedRequestType[mode] ? (
+          <input type="hidden" name="requestType" value={fixedRequestType[mode]} />
         ) : (
           <label className="grid gap-1.5 text-sm font-medium text-slate-800">
             Tipo de solicitação

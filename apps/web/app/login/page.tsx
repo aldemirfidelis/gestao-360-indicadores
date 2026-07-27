@@ -31,11 +31,12 @@ export default function LoginPage() {
   const displayVersion = `v${semver}`;
   const versionTooltip = commitHash ? `Versão completa: ${semver}+${commitHash}` : `Versão: ${semver}`;
   const [busy, setBusy] = useState(false);
-  const [demoMode, setDemoMode] = useState(false);
   const [tenant, setTenant] = useState<TenantBranding | null>(null);
+  // Sem credenciais pré-preenchidas: a demonstração não tem mais acesso aberto,
+  // é liberada por solicitação em /demonstracao.
   const form = useForm<Form>({
     resolver: zodResolver(schema),
-    defaultValues: { email: 'demo@demo.com', password: '123456' },
+    defaultValues: { email: '', password: '' },
   });
 
   useEffect(() => {
@@ -43,34 +44,11 @@ export default function LoginPage() {
     fetchTenantBranding().then(setTenant).catch(() => setTenant(null));
   }, []);
 
-  useEffect(() => {
-    const params = new URLSearchParams(window.location.search);
-    let cameFromDemoButton = params.get('demo') === '1';
-
-    try {
-      cameFromDemoButton = cameFromDemoButton || window.sessionStorage.getItem('g360.demoEntry') !== null;
-    } catch {
-      cameFromDemoButton = cameFromDemoButton || params.get('demo') === '1';
-    }
-
-    if (cameFromDemoButton) {
-      setDemoMode(true);
-      try {
-        window.sessionStorage.setItem(
-          'g360.demoAccessIntent',
-          JSON.stringify({ page: window.location.pathname, detectedAt: new Date().toISOString() }),
-        );
-      } catch {
-        /* Storage pode estar bloqueado; a demonstração continua acessível. */
-      }
-    }
-  }, []);
-
   const onSubmit = async (data: Form) => {
     setBusy(true);
     try {
       await login(data.email, data.password);
-      toast.success(demoMode ? 'Demonstração acessada.' : 'Bem-vindo de volta!');
+      toast.success('Bem-vindo de volta!');
     } catch (err) {
       toast.error('Credenciais inválidas.');
     } finally {
@@ -133,13 +111,9 @@ export default function LoginPage() {
 
             <Card className="border-slate-800/80 bg-slate-900/40 backdrop-blur-xl shadow-2xl rounded-2xl overflow-hidden p-6 sm:p-8">
               <CardHeader className="space-y-2 p-0 pb-6 border-b border-slate-800/60">
-                <CardTitle className="text-2xl font-bold text-white tracking-tight">
-                  {demoMode ? 'Acessar demonstração' : 'Entrar na plataforma'}
-                </CardTitle>
+                <CardTitle className="text-2xl font-bold text-white tracking-tight">Entrar na plataforma</CardTitle>
                 <CardDescription className="text-slate-400 text-sm">
-                  {demoMode
-                    ? 'Conheça o Gestão 360 com dados pré-preenchidos e simulados.'
-                    : 'Insira seu e-mail, CPF ou matrícula e a senha cadastrados para acessar o portal.'}
+                  Insira seu e-mail, CPF ou matrícula e a senha cadastrados para acessar o portal.
                 </CardDescription>
               </CardHeader>
               <CardContent className="p-0 pt-6">
@@ -179,7 +153,7 @@ export default function LoginPage() {
                     disabled={busy}
                     className="w-full h-11 bg-gradient-to-r from-cyan-500 to-blue-600 hover:from-cyan-400 hover:to-blue-500 text-white font-bold tracking-wide rounded-xl shadow-[0_4px_20px_rgba(6,182,212,0.2)] transition-all duration-200 disabled:opacity-50"
                   >
-                    {busy ? 'Entrando...' : demoMode ? 'Acessar demonstração' : 'Entrar no sistema'}
+                    {busy ? 'Entrando...' : 'Entrar no sistema'}
                   </Button>
                 </form>
               </CardContent>

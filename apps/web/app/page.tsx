@@ -233,7 +233,7 @@ export default function HomePage() {
             </p>
             <div className="mt-8 flex flex-col gap-3 sm:flex-row">
               <DemoLink source="home_hero" className="inline-flex h-12 items-center justify-center gap-2 bg-emerald-400 px-6 text-sm font-semibold text-slate-950 hover:bg-emerald-300">
-                Acesse a Demonstração
+                Agendar Demonstração
                 <ArrowRight className="h-4 w-4" />
               </DemoLink>
               <Link href="/modulos" className="inline-flex h-12 items-center justify-center border border-white/30 px-6 text-sm font-semibold text-white hover:bg-white hover:text-slate-950">
@@ -427,17 +427,18 @@ export default function HomePage() {
           <div>
             <SectionIntro eyebrow="Conheça o portal" title="Escolha como deseja avaliar o Gestão 360." />
             <p className="mt-5 text-sm leading-6 text-slate-600">
-              Navegue imediatamente com dados de exemplo ou solicite um trial de 30 dias preparado para a realidade da sua empresa.
+              Agende uma demonstração guiada ou solicite um trial de 30 dias preparado para a realidade da sua empresa.
             </p>
           </div>
           <div className="grid gap-4 md:grid-cols-2">
             <div className="flex flex-col border border-slate-200 bg-white p-6">
-              <h2 className="text-xl font-semibold tracking-tight text-slate-950">Demonstração imediata</h2>
+              <h2 className="text-xl font-semibold tracking-tight text-slate-950">Demonstração guiada</h2>
               <p className="mt-3 text-sm leading-6 text-slate-600">
-                Entre agora no ambiente com dados simulados e conheça os módulos sem configuração inicial.
+                Solicite pelo formulário: enviamos a demonstração por e-mail e agendamos uma apresentação dos módulos que
+                interessam à sua operação.
               </p>
               <DemoLink source="home_demo_section" className="mt-auto inline-flex h-12 items-center justify-center gap-2 bg-slate-950 px-5 pt-0 text-sm font-semibold text-white hover:bg-emerald-700">
-                Acessar demonstração
+                Agendar demonstração
                 <ArrowRight className="h-4 w-4" />
               </DemoLink>
             </div>

@@ -12,7 +12,7 @@ export function PageHero({ eyebrow, title, description }: { eyebrow: string; tit
         <p className="mt-5 max-w-3xl text-lg leading-8 text-slate-200">{description}</p>
         <div className="mt-8 flex flex-col gap-3 sm:flex-row">
           <DemoLink source="public_page_hero" className="inline-flex h-11 items-center justify-center gap-2 bg-emerald-400 px-5 text-sm font-semibold text-slate-950 hover:bg-emerald-300">
-            Acesse a Demonstração <ArrowRight className="h-4 w-4" />
+            Agendar Demonstração <ArrowRight className="h-4 w-4" />
           </DemoLink>
         </div>
       </div>
