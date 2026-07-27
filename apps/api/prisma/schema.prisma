@@ -14436,6 +14436,7 @@ model RecruitCandidate {
   deletedAt       DateTime?
 
   otps         RecruitCandidateOtp[]
+  identities   RecruitCandidateIdentity[]
   applications RecruitApplication[]
   documents    RecruitCandidateDocument[]
   consents     RecruitConsent[]
@@ -14461,6 +14462,25 @@ model RecruitCandidateOtp {
 
   @@index([candidateId, purpose])
   @@map("recruit_candidate_otps")
+}
+
+/// Conta social (Google/LinkedIn) ligada ao candidato.
+///
+/// O vínculo é pelo ID do provedor, não pelo e-mail: e-mail pode ser trocado na
+/// conta de origem, o `sub`/`id` não. Guardamos o e-mail só para diagnóstico.
+model RecruitCandidateIdentity {
+  id                String           @id @default(uuid())
+  candidateId       String
+  candidate         RecruitCandidate @relation(fields: [candidateId], references: [id], onDelete: Cascade)
+  provider          String // GOOGLE | LINKEDIN
+  providerAccountId String
+  email             String?
+  createdAt         DateTime         @default(now())
+  lastLoginAt       DateTime?
+
+  @@unique([provider, providerAccountId])
+  @@index([candidateId])
+  @@map("recruit_candidate_identities")
 }
 
 /// Candidatura de um candidato a uma vaga. Dedupe por (vaga, candidato).

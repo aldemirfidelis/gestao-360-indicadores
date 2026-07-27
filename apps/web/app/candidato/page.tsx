@@ -1,10 +1,9 @@
 'use client';
 
-import { ChangeEvent, Suspense, useEffect, useMemo, useState } from 'react';
-import type { ReactNode } from 'react';
+import { ChangeEvent, Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import Link from 'next/link';
 import { useSearchParams } from 'next/navigation';
-import { Briefcase, Download, FileUp, HeartPulse, LogIn, LogOut, RefreshCw, ShieldCheck, Trash2, UserRound, XCircle } from 'lucide-react';
+import { BriefcaseBusiness, Loader2, LogOut, RefreshCw } from 'lucide-react';
 import {
   type CandidateSession,
   candidateApi,
@@ -14,188 +13,42 @@ import {
   resolveCareersCompanySlug,
   setCandidateToken,
 } from '@/lib/candidate-api';
-import { ASO_RESULT, ASO_STATUS, DOC_KIND, labelOf, metaOf } from '@/lib/recruitment/labels';
+import { portalCounters } from '@/lib/candidate/progress';
+import {
+  type Application,
+  type CandidateDocument,
+  type CandidateProfileData,
+  type DataRequest,
+  type Offer,
+  type PortalData,
+  type PreAdmission,
+  type PreAdmissionDocument,
+  type ProfessionalForm,
+  type Profile,
+  type ProfileForm,
+  type StoredContent,
+  EMPTY_PROFESSIONAL_FORM,
+} from '@/lib/candidate/types';
+import { AuthScreen, type AuthFormState, type AuthMode } from '@/components/candidate/auth-screen';
+import { ApplicationsSection } from '@/components/candidate/applications-section';
+import { DocumentsSection } from '@/components/candidate/documents-section';
+import { OverviewSection } from '@/components/candidate/overview-section';
+import { PrivacySection } from '@/components/candidate/privacy-section';
+import { ProfileSection } from '@/components/candidate/profile-section';
+import { PORTAL_TABS, type PortalTab } from '@/components/candidate/tabs';
+import { Button, initials } from '@/components/candidate/ui';
 
-interface Profile {
-  id: string;
-  email: string;
-  name: string;
-  phone: string | null;
-  headline: string | null;
-  city: string | null;
-  linkedinUrl: string | null;
-  portfolioUrl: string | null;
-  profileData: CandidateProfileData | null;
-  emailVerifiedAt: string | null;
-}
-
-interface CandidateExperience { role: string; company: string; period: string; description: string }
-interface CandidateEducation { course: string; institution: string; period: string; status: string }
-interface CandidateLanguage { name: string; level: string }
-interface CandidateProfileData {
-  about?: string;
-  availableForRelocation?: boolean;
-  availableForTravel?: boolean;
-  desiredSalary?: string;
-  availabilityToStart?: string;
-  skills?: string[];
-  experiences?: Partial<CandidateExperience>[];
-  education?: Partial<CandidateEducation>[];
-  languages?: Partial<CandidateLanguage>[];
-}
-interface ProfessionalForm {
-  about: string;
-  availableForRelocation: boolean;
-  availableForTravel: boolean;
-  desiredSalary: string;
-  availabilityToStart: string;
-  skills: string;
-  experiences: CandidateExperience[];
-  education: CandidateEducation[];
-  languages: CandidateLanguage[];
-}
-
-interface Application {
-  id: string;
-  status: string;
-  appliedAt: string;
-  stage: string | null;
-  posting: {
-    title: string;
-    slug: string;
-    city: string | null;
-    workMode: string | null;
-    company: { name: string; slug: string | null } | null;
-  };
-  rejectionReason: string | null;
-}
-
-interface CandidateDocument {
-  id: string;
-  kind: string;
-  fileName: string;
-  mimeType: string;
-  sizeBytes: number;
-  applicationId: string | null;
-  createdAt: string;
-}
-
-interface DataRequest {
-  id: string;
-  type: string;
-  status: string;
-  details: string | null;
-  requestedAt: string;
-  resolvedAt: string | null;
-}
-
-interface StoredContent { fileName: string; mimeType: string; contentBase64: string }
-interface Offer {
-  id: string; status: string; revision: number; salaryAmountCents: number; currency: string; startDate: string | null; expiresAt: string | null; acceptedAt: string | null; declinedAt: string | null;
-  application: { posting: { title: string; slug: string; city: string | null; workMode: string | null } };
-}
-interface PreAdmissionDocument {
-  id: string; kind: string; title: string; required: boolean; status: string; reviewNote: string | null; candidateDocumentId: string | null;
-  candidateDocument?: { fileName: string; sizeBytes: number } | null;
-}
-interface OccupationalAppointment {
-  id: string; status: string; scheduledAt: string; location: string | null; providerName: string | null; instructions: string | null;
-}
-interface AsoRecord {
-  id: string; result: string; examDate: string; validUntil: string | null;
-}
-interface OccupationalExamRequest {
-  id: string; status: string; examType: string; dueAt: string | null; requestedAt: string;
-  appointment?: OccupationalAppointment | null; asoRecord?: AsoRecord | null;
-}
-interface PreAdmission {
-  id: string; status: string; admissionTargetDate: string | null;
-  application: { posting: { title: string; slug: string } };
-  documents: PreAdmissionDocument[];
-  occupationalExamRequests?: OccupationalExamRequest[];
-}
-
-const STATUS_LABEL: Record<string, string> = {
-  ACTIVE: 'Em andamento',
-  HIRED: 'Contratado',
-  REJECTED: 'Não selecionado',
-  WITHDRAWN: 'Desistiu',
-  DISQUALIFIED: 'Desclassificado',
-};
-
-// Nada no portal do candidato pode aparecer no código do banco. ASO, resultado
-// e tipo de documento reaproveitam os mapas de `lib/recruitment/labels`; os de
-// baixo existem à parte porque o texto muda de perspectiva — o recrutador lê
-// "Enviada ao candidato", o candidato precisa ler "Aguardando sua resposta".
-const OFFER_STATUS_LABEL: Record<string, string> = {
-  DRAFT: 'Em elaboração',
-  PENDING_APPROVAL: 'Aguardando aprovação',
-  APPROVED: 'Aprovada',
-  SENT: 'Aguardando sua resposta',
-  ACCEPTED: 'Aceita por você',
-  DECLINED: 'Recusada por você',
-  CANCELLED: 'Cancelada',
-  EXPIRED: 'Expirada',
-};
-
-const PRE_ADMISSION_STATUS_LABEL: Record<string, string> = {
-  OPEN: 'Aberta',
-  IN_DOCUMENTS: 'Envio de documentos',
-  READY_FOR_ASO: 'Pronta para o exame admissional',
-  COMPLETED: 'Concluída',
-  CANCELLED: 'Cancelada',
-};
-
-const DOCUMENT_STATUS_LABEL: Record<string, string> = {
-  PENDING: 'Pendente',
-  SUBMITTED: 'Enviado, em análise',
-  APPROVED: 'Aprovado',
-  REJECTED: 'Reprovado, reenviar',
-  WAIVED: 'Dispensado',
-};
-
-
-const EXAM_TYPE_LABEL: Record<string, string> = {
-  ADMISSIONAL: 'Admissional',
-  PERIODICO: 'Periódico',
-  RETORNO_TRABALHO: 'Retorno ao trabalho',
-  MUDANCA_RISCO: 'Mudança de risco',
-  DEMISSIONAL: 'Demissional',
-};
-
-
-const DATA_REQUEST_TYPE_LABEL: Record<string, string> = {
-  ACCESS: 'Acesso aos dados',
-  RECTIFICATION: 'Retificação',
-  PORTABILITY: 'Portabilidade',
-  DELETION: 'Exclusão/anonimização',
-};
-
-const DATA_REQUEST_STATUS_LABEL: Record<string, string> = {
-  OPEN: 'Em aberto',
-  DONE: 'Atendida',
-  REJECTED: 'Recusada',
-};
-
-
-/** Traduz o código; se aparecer um valor novo, mostra algo legível em vez do código cru. */
-function label(map: Record<string, string>, value?: string | null): string {
-  if (!value) return '—';
-  return map[value] ?? value.replace(/_/g, ' ').toLowerCase();
-}
-
-const EMPTY_EXPERIENCE: CandidateExperience = { role: '', company: '', period: '', description: '' };
-const EMPTY_EDUCATION: CandidateEducation = { course: '', institution: '', period: '', status: '' };
-const EMPTY_LANGUAGE: CandidateLanguage = { name: '', level: '' };
-const EMPTY_PROFESSIONAL_FORM: ProfessionalForm = {
-  about: '', availableForRelocation: false, availableForTravel: false, desiredSalary: '', availabilityToStart: '', skills: '',
-  experiences: [], education: [], languages: [],
-};
 const MAX_UPLOAD_BYTES = 8 * 1024 * 1024;
 
 export default function CandidatePortalPage() {
   return (
-    <Suspense fallback={<main className="min-h-screen bg-slate-50 px-4 py-8 text-sm text-slate-500 dark:bg-slate-950 dark:text-slate-300">Carregando área do candidato...</main>}>
+    <Suspense
+      fallback={
+        <main className="flex min-h-screen items-center justify-center bg-slate-50 text-sm text-slate-500 dark:bg-slate-950 dark:text-slate-300">
+          <Loader2 className="mr-2 h-4 w-4 animate-spin" /> Carregando área do candidato…
+        </main>
+      }
+    >
       <CandidatePortalContent />
     </Suspense>
   );
@@ -206,13 +59,18 @@ function CandidatePortalContent() {
   const empresa = useMemo(() => resolveCareersCompanySlug(searchParams.get('empresa')), [searchParams]);
   const suffix = companyQuery(empresa);
   const publicSuffix = empresa ? `?empresa=${encodeURIComponent(empresa)}` : '';
+  const vacanciesHref = `/carreiras${publicSuffix}`;
+
   const [token, setToken] = useState<string | null>(null);
-  const [authMode, setAuthMode] = useState<'login' | 'register' | 'reset'>('login');
-  const [authForm, setAuthForm] = useState({ name: '', email: '', phone: '', code: '', password: '' });
+  const [tab, setTab] = useState<PortalTab>('inicio');
+  const [authMode, setAuthMode] = useState<AuthMode>('login');
+  const [authForm, setAuthForm] = useState<AuthFormState>({ name: '', email: '', phone: '', code: '', password: '' });
   const [authMessage, setAuthMessage] = useState<string | null>(null);
+  const [authError, setAuthError] = useState<string | null>(null);
   const [authLoading, setAuthLoading] = useState(false);
+
   const [profile, setProfile] = useState<Profile | null>(null);
-  const [profileForm, setProfileForm] = useState({ name: '', phone: '', headline: '', city: '', linkedinUrl: '', portfolioUrl: '' });
+  const [profileForm, setProfileForm] = useState<ProfileForm>({ name: '', phone: '', headline: '', city: '', linkedinUrl: '', portfolioUrl: '' });
   const [professionalForm, setProfessionalForm] = useState<ProfessionalForm>({ ...EMPTY_PROFESSIONAL_FORM });
   const [applications, setApplications] = useState<Application[]>([]);
   const [documents, setDocuments] = useState<CandidateDocument[]>([]);
@@ -224,18 +82,40 @@ function CandidatePortalContent() {
   const [uploadForm, setUploadForm] = useState({ kind: 'CV', applicationId: '' });
   const [loading, setLoading] = useState(false);
   const [busy, setBusy] = useState(false);
+  const [savedAt, setSavedAt] = useState(0);
   const [error, setError] = useState<string | null>(null);
+  const savedTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  useEffect(() => setToken(getCandidateToken()), []);
-
+  /**
+   * Sessão inicial. O login social devolve o token no FRAGMENTO da URL
+   * (`#token=…`), que não vai ao servidor nem entra em log; consumimos e
+   * limpamos da barra de endereços para não ficar em histórico.
+   */
   useEffect(() => {
-    if (!token) return;
-    void loadPortal();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [token]);
+    const hash = typeof window === 'undefined' ? '' : window.location.hash;
+    const fromHash = hash.startsWith('#token=') ? decodeURIComponent(hash.slice('#token='.length)) : null;
+    if (fromHash) {
+      setCandidateToken(fromHash);
+      window.history.replaceState(null, '', window.location.pathname + window.location.search);
+      setToken(fromHash);
+      return;
+    }
+    setToken(getCandidateToken());
+  }, []);
 
-  async function loadPortal() {
-    setLoading(true); setError(null);
+  /** Erro devolvido pelo callback do provedor social. */
+  useEffect(() => {
+    const reason = searchParams.get('erroLogin');
+    if (reason) setAuthError(reason);
+  }, [searchParams]);
+
+  useEffect(() => () => {
+    if (savedTimer.current) clearTimeout(savedTimer.current);
+  }, []);
+
+  const loadPortal = useCallback(async () => {
+    setLoading(true);
+    setError(null);
     try {
       const [me, apps, docs, requests, myOffers, myPreAdmissions] = await Promise.all([
         candidateApi<Profile>('/careers/candidate/me'),
@@ -266,63 +146,45 @@ function CandidatePortalContent() {
     } finally {
       setLoading(false);
     }
-  }
+  }, []);
 
-  async function register() {
-    setAuthLoading(true); setAuthMessage(null);
+  useEffect(() => {
+    if (!token) return;
+    void loadPortal();
+  }, [token, loadPortal]);
+
+  async function submitAuth() {
+    setAuthLoading(true);
+    setAuthError(null);
+    setAuthMessage(null);
     try {
-      const session = await candidateApi<CandidateSession>(`/careers/candidates/register${suffix}`, {
+      const session = await candidateApi<CandidateSession>(authEndpoint(authMode, suffix), {
         method: 'POST',
-        json: { name: authForm.name, email: authForm.email, phone: authForm.phone, password: authForm.password },
+        json:
+          authMode === 'register'
+            ? { name: authForm.name, email: authForm.email, phone: authForm.phone, password: authForm.password }
+            : authMode === 'reset'
+              ? { email: authForm.email, code: authForm.code, password: authForm.password }
+              : { email: authForm.email, password: authForm.password },
       });
       setCandidateToken(session.token);
       setToken(session.token);
     } catch (e) {
-      setAuthMessage((e as Error).message);
-    } finally {
-      setAuthLoading(false);
-    }
-  }
-
-  async function login() {
-    setAuthLoading(true); setAuthMessage(null);
-    try {
-      const session = await candidateApi<CandidateSession>(`/careers/candidates/login${suffix}`, {
-        method: 'POST',
-        json: { email: authForm.email, password: authForm.password },
-      });
-      setCandidateToken(session.token);
-      setToken(session.token);
-    } catch (e) {
-      setAuthMessage((e as Error).message);
+      setAuthError((e as Error).message);
     } finally {
       setAuthLoading(false);
     }
   }
 
   async function requestReset() {
-    setAuthLoading(true); setAuthMessage(null);
+    setAuthLoading(true);
+    setAuthError(null);
+    setAuthMessage(null);
     try {
-      await candidateApi(`/careers/candidates/forgot-password`, { method: 'POST', json: { email: authForm.email } });
+      await candidateApi('/careers/candidates/forgot-password', { method: 'POST', json: { email: authForm.email } });
       setAuthMessage('Se houver uma conta com este e-mail, enviamos um código de redefinição.');
     } catch (e) {
-      setAuthMessage((e as Error).message);
-    } finally {
-      setAuthLoading(false);
-    }
-  }
-
-  async function doReset() {
-    setAuthLoading(true); setAuthMessage(null);
-    try {
-      const session = await candidateApi<CandidateSession>(`/careers/candidates/reset-password`, {
-        method: 'POST',
-        json: { email: authForm.email, code: authForm.code, password: authForm.password },
-      });
-      setCandidateToken(session.token);
-      setToken(session.token);
-    } catch (e) {
-      setAuthMessage((e as Error).message);
+      setAuthError((e as Error).message);
     } finally {
       setAuthLoading(false);
     }
@@ -337,10 +199,26 @@ function CandidatePortalContent() {
     setDataRequests([]);
     setOffers([]);
     setPreAdmissions([]);
+    setTab('inicio');
+  }
+
+  /** Toda mutação recarrega o portal: os painéis se influenciam (enviar documento muda a pré-admissão). */
+  async function mutate(action: () => Promise<void>) {
+    setBusy(true);
+    setError(null);
+    try {
+      await action();
+      await loadPortal();
+    } catch (e) {
+      setError((e as Error).message);
+    } finally {
+      setBusy(false);
+    }
   }
 
   async function saveProfile() {
-    setBusy(true); setError(null);
+    setBusy(true);
+    setError(null);
     try {
       const profileData: CandidateProfileData = {
         about: professionalForm.about,
@@ -356,6 +234,9 @@ function CandidatePortalContent() {
       const updated = await candidateApi<Profile>('/careers/candidate/me', { method: 'PATCH', json: { ...profileForm, profileData } });
       setProfile(updated);
       setProfessionalForm(toProfessionalForm(updated.profileData));
+      setSavedAt(Date.now());
+      if (savedTimer.current) clearTimeout(savedTimer.current);
+      savedTimer.current = setTimeout(() => setSavedAt(0), 4000);
     } catch (e) {
       setError((e as Error).message);
     } finally {
@@ -363,23 +244,16 @@ function CandidatePortalContent() {
     }
   }
 
-  async function withdraw(id: string) {
-    if (!window.confirm('Deseja desistir desta candidatura?')) return;
-    setBusy(true); setError(null);
-    try {
+  function withdraw(id: string) {
+    if (!window.confirm('Deseja desistir desta candidatura? A empresa é avisada e a ação não pode ser desfeita.')) return;
+    void mutate(async () => {
       await candidateApi(`/careers/candidate/applications/${id}/withdraw`, { method: 'POST' });
-      await loadPortal();
-    } catch (e) {
-      setError((e as Error).message);
-    } finally {
-      setBusy(false);
-    }
+    });
   }
 
-  async function uploadDocument() {
+  function uploadDocument() {
     if (!file) return;
-    setBusy(true); setError(null);
-    try {
+    void mutate(async () => {
       const contentBase64 = await fileToBase64(file);
       await candidateApi('/careers/candidate/documents', {
         method: 'POST',
@@ -392,19 +266,14 @@ function CandidatePortalContent() {
         },
       });
       setFile(null);
-      await loadPortal();
-    } catch (e) {
-      setError((e as Error).message);
-    } finally {
-      setBusy(false);
-    }
+    });
   }
 
   async function downloadDocument(id: string) {
-    setBusy(true); setError(null);
+    setBusy(true);
+    setError(null);
     try {
-      const doc = await candidateApi<StoredContent>(`/careers/candidate/documents/${id}`);
-      downloadBase64(doc);
+      downloadBase64(await candidateApi<StoredContent>(`/careers/candidate/documents/${id}`));
     } catch (e) {
       setError((e as Error).message);
     } finally {
@@ -412,60 +281,36 @@ function CandidatePortalContent() {
     }
   }
 
-  async function deleteDocument(id: string) {
+  function deleteDocument(id: string) {
     if (!window.confirm('Remover este documento do seu perfil?')) return;
-    setBusy(true); setError(null);
-    try {
+    void mutate(async () => {
       await candidateApi(`/careers/candidate/documents/${id}`, { method: 'DELETE' });
-      await loadPortal();
-    } catch (e) {
-      setError((e as Error).message);
-    } finally {
-      setBusy(false);
-    }
+    });
   }
 
-  async function createDataRequest() {
-    setBusy(true); setError(null);
-    try {
+  function createDataRequest() {
+    void mutate(async () => {
       await candidateApi('/careers/candidate/data-requests', { method: 'POST', json: dataRequestForm });
       setDataRequestForm({ type: 'ACCESS', details: '' });
-      await loadPortal();
-    } catch (e) {
-      setError((e as Error).message);
-    } finally {
-      setBusy(false);
-    }
+    });
   }
 
-  async function decideOffer(id: string, decision: 'ACCEPT' | 'DECLINE') {
-    const reason = decision === 'DECLINE' ? window.prompt('Motivo opcional da recusa:') ?? undefined : undefined;
-    setBusy(true); setError(null);
-    try {
+  function decideOffer(id: string, decision: 'ACCEPT' | 'DECLINE') {
+    const reason = decision === 'DECLINE' ? window.prompt('Motivo da recusa (opcional):') ?? undefined : undefined;
+    void mutate(async () => {
       await candidateApi(`/careers/candidate/offers/${id}/decision`, { method: 'POST', json: { decision, reason } });
-      await loadPortal();
-    } catch (e) {
-      setError((e as Error).message);
-    } finally {
-      setBusy(false);
-    }
+    });
   }
 
-  async function submitPreAdmissionDocument(requirementId: string, candidateDocumentId: string) {
+  function submitPreAdmissionDocument(requirementId: string, candidateDocumentId: string) {
     if (!candidateDocumentId) return;
-    setBusy(true); setError(null);
-    try {
+    void mutate(async () => {
       await candidateApi(`/careers/candidate/pre-admission-documents/${requirementId}/submit`, { method: 'POST', json: { candidateDocumentId } });
-      await loadPortal();
-    } catch (e) {
-      setError((e as Error).message);
-    } finally {
-      setBusy(false);
-    }
+    });
   }
 
-  /** Envia o arquivo e já o vincula ao item da pré-admissão, em um passo só (o candidato não precisa subir antes na biblioteca). */
-  async function attachPreAdmissionFile(item: PreAdmissionDocument, event: ChangeEvent<HTMLInputElement>) {
+  /** Envia o arquivo e já o vincula ao item da pré-admissão, em um passo só. */
+  function attachPreAdmissionFile(item: PreAdmissionDocument, event: ChangeEvent<HTMLInputElement>) {
     const selected = event.target.files?.[0] ?? null;
     event.target.value = '';
     if (!selected) return;
@@ -474,8 +319,7 @@ function CandidatePortalContent() {
       setError(validationError);
       return;
     }
-    setBusy(true); setError(null);
-    try {
+    void mutate(async () => {
       const contentBase64 = await fileToBase64(selected);
       const created = await candidateApi<{ id: string }>('/careers/candidate/documents', {
         method: 'POST',
@@ -487,12 +331,7 @@ function CandidatePortalContent() {
         },
       });
       await candidateApi(`/careers/candidate/pre-admission-documents/${item.id}/submit`, { method: 'POST', json: { candidateDocumentId: created.id } });
-      await loadPortal();
-    } catch (e) {
-      setError((e as Error).message);
-    } finally {
-      setBusy(false);
-    }
+    });
   }
 
   function pickFile(event: ChangeEvent<HTMLInputElement>) {
@@ -514,442 +353,161 @@ function CandidatePortalContent() {
 
   if (!token) {
     return (
-      <main className="min-h-screen bg-slate-50 px-4 py-8 text-slate-900 dark:bg-slate-950 dark:text-slate-100">
-        <section className="mx-auto max-w-md rounded-lg border bg-white p-5 shadow-sm dark:border-slate-800 dark:bg-slate-900">
-          <div className="flex items-center justify-between gap-3">
-            <div>
-              <h1 className="text-xl font-bold">Area do candidato</h1>
-              <p className="text-sm text-slate-500">Acompanhe candidaturas e curriculos enviados.</p>
-            </div>
-            <UserRound className="h-8 w-8 text-sky-500" />
-          </div>
-          {authMode !== 'reset' && (
-            <div className="mt-5 grid grid-cols-2 gap-2 rounded-md bg-slate-100 p-1 text-sm dark:bg-slate-800">
-              <button onClick={() => setAuthMode('login')} className={authMode === 'login' ? activeTab : inactiveTab}>Entrar</button>
-              <button onClick={() => setAuthMode('register')} className={authMode === 'register' ? activeTab : inactiveTab}>Criar conta</button>
-            </div>
-          )}
-          <div className="mt-4 space-y-3">
-            {authMode === 'reset' ? (
-              <>
-                <div className="text-sm font-semibold">Redefinir senha</div>
-                <Input label="E-mail" value={authForm.email} onChange={(value) => setAuthForm((f) => ({ ...f, email: value }))} />
-                <button onClick={requestReset} disabled={authLoading || !authForm.email} className="w-full rounded-md border px-3 py-2 text-xs font-semibold hover:bg-slate-50 disabled:opacity-50 dark:border-slate-700 dark:hover:bg-slate-800">Enviar código de redefinição</button>
-                <Input label="Código recebido" value={authForm.code} onChange={(value) => setAuthForm((f) => ({ ...f, code: value }))} />
-                <Input label="Nova senha" type="password" value={authForm.password} onChange={(value) => setAuthForm((f) => ({ ...f, password: value }))} />
-                <p className="text-[11px] text-slate-400">Mínimo de 6 caracteres.</p>
-                {authMessage && <div className="rounded-md border bg-slate-50 p-3 text-xs text-slate-600 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-300">{authMessage}</div>}
-                <button
-                  onClick={doReset}
-                  disabled={authLoading || !authForm.email || !authForm.code || !authForm.password}
-                  className="flex w-full items-center justify-center gap-2 rounded-md bg-sky-600 px-4 py-3 text-sm font-semibold text-white hover:bg-sky-700 disabled:opacity-50"
-                >
-                  <LogIn className="h-4 w-4" /> {authLoading ? 'Aguarde...' : 'Redefinir e entrar'}
-                </button>
-                <button onClick={() => { setAuthMode('login'); setAuthMessage(null); }} className="w-full text-center text-xs text-slate-500 hover:underline">Voltar ao login</button>
-              </>
-            ) : (
-              <>
-                {authMode === 'register' && (
-                  <>
-                    <Input label="Nome" value={authForm.name} onChange={(value) => setAuthForm((f) => ({ ...f, name: value }))} />
-                    <Input label="Telefone" value={authForm.phone} onChange={(value) => setAuthForm((f) => ({ ...f, phone: value }))} />
-                  </>
-                )}
-                <Input label="E-mail" value={authForm.email} onChange={(value) => setAuthForm((f) => ({ ...f, email: value }))} />
-                <Input label="Senha" type="password" value={authForm.password} onChange={(value) => setAuthForm((f) => ({ ...f, password: value }))} />
-                {authMode === 'register' && <p className="text-[11px] text-slate-400">Mínimo de 6 caracteres.</p>}
-                {authMessage && <div className="rounded-md border bg-slate-50 p-3 text-xs text-slate-600 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-300">{authMessage}</div>}
-                <button
-                  onClick={authMode === 'register' ? register : login}
-                  disabled={authLoading || !authForm.email || !authForm.password || (authMode === 'register' && !authForm.name)}
-                  className="flex w-full items-center justify-center gap-2 rounded-md bg-sky-600 px-4 py-3 text-sm font-semibold text-white hover:bg-sky-700 disabled:opacity-50"
-                >
-                  <LogIn className="h-4 w-4" /> {authLoading ? 'Aguarde...' : authMode === 'register' ? 'Criar conta' : 'Entrar'}
-                </button>
-                {authMode === 'login' && (
-                  <button onClick={() => { setAuthMode('reset'); setAuthMessage(null); }} className="w-full text-center text-xs text-sky-600 hover:underline dark:text-sky-400">Esqueci minha senha</button>
-                )}
-                <Link href={`/carreiras${publicSuffix}`} className="block text-center text-xs text-sky-600 hover:underline dark:text-sky-400">Ver vagas abertas</Link>
-              </>
-            )}
-          </div>
-        </section>
-      </main>
+      <AuthScreen
+        mode={authMode}
+        onModeChange={(mode) => {
+          setAuthMode(mode);
+          setAuthMessage(null);
+          setAuthError(null);
+        }}
+        form={authForm}
+        onFormChange={(patch) => setAuthForm((current) => ({ ...current, ...patch }))}
+        onSubmit={submitAuth}
+        onRequestReset={requestReset}
+        loading={authLoading}
+        message={authMessage}
+        errorMessage={authError}
+        vacanciesHref={vacanciesHref}
+        returnTo={`/candidato${publicSuffix}`}
+      />
     );
   }
 
+  const data: PortalData = { profile, applications, documents, dataRequests, offers, preAdmissions };
+  const counters = portalCounters(data);
+  const badgeFor: Partial<Record<PortalTab, number>> = {
+    candidaturas: counters.applicationsBadge,
+    documentos: 0,
+    privacidade: counters.openDataRequests,
+  };
+
   return (
-    <main className="min-h-screen bg-slate-50 text-slate-900 dark:bg-slate-950 dark:text-slate-100">
-      <header className="border-b bg-white dark:border-slate-800 dark:bg-slate-900">
-        <div className="mx-auto flex max-w-5xl items-center gap-3 px-4 py-5">
-          <div>
-            <h1 className="text-lg font-bold">Area do candidato</h1>
-            <p className="text-xs text-slate-500">{profile?.email ?? 'Carregando perfil...'}</p>
+    <main className="min-h-screen bg-slate-50 dark:bg-slate-950">
+      <header className="sticky top-0 z-30 border-b border-slate-200 bg-white/90 backdrop-blur dark:border-slate-800 dark:bg-slate-900/90">
+        <div className="mx-auto flex max-w-5xl items-center gap-3 px-4 py-3.5 sm:px-6">
+          <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-sky-600 text-sm font-bold text-white">
+            {initials(profile?.name)}
+          </span>
+          <div className="min-w-0 flex-1">
+            <p className="truncate text-sm font-semibold text-slate-900 dark:text-slate-50">{profile?.name ?? 'Área do candidato'}</p>
+            <p className="truncate text-xs text-slate-500 dark:text-slate-400">{profile?.email ?? 'Carregando…'}</p>
           </div>
-          <div className="ml-auto flex gap-2">
-            <Link href={`/carreiras${publicSuffix}`} className="rounded-md border px-3 py-2 text-xs font-semibold hover:bg-slate-50 dark:border-slate-700 dark:hover:bg-slate-800">Vagas</Link>
-            <button onClick={logout} className="inline-flex items-center gap-1 rounded-md border px-3 py-2 text-xs font-semibold hover:bg-slate-50 dark:border-slate-700 dark:hover:bg-slate-800"><LogOut className="h-3.5 w-3.5" /> Sair</button>
-          </div>
+          <Link href={vacanciesHref} className="hidden sm:block">
+            <Button variant="secondary" size="sm">
+              <BriefcaseBusiness className="h-3.5 w-3.5" /> Vagas
+            </Button>
+          </Link>
+          <Button variant="secondary" size="sm" onClick={logout}>
+            <LogOut className="h-3.5 w-3.5" /> <span className="hidden sm:inline">Sair</span>
+          </Button>
         </div>
+
+        <nav className="mx-auto max-w-5xl overflow-x-auto px-4 sm:px-6">
+          <ul className="flex min-w-max gap-1 pb-px">
+            {PORTAL_TABS.map((item) => {
+              const active = tab === item.id;
+              const badge = badgeFor[item.id] ?? 0;
+              return (
+                <li key={item.id}>
+                  <button
+                    onClick={() => setTab(item.id)}
+                    aria-current={active ? 'page' : undefined}
+                    className={`inline-flex items-center gap-2 border-b-2 px-3 py-2.5 text-sm font-medium transition ${
+                      active
+                        ? 'border-sky-600 text-sky-700 dark:border-sky-400 dark:text-sky-300'
+                        : 'border-transparent text-slate-500 hover:text-slate-900 dark:hover:text-slate-100'
+                    }`}
+                  >
+                    <item.icon className="h-4 w-4" />
+                    {item.label}
+                    {badge > 0 && (
+                      <span className="rounded-full bg-amber-500 px-1.5 py-0.5 text-[10px] font-bold leading-none text-white">{badge}</span>
+                    )}
+                  </button>
+                </li>
+              );
+            })}
+          </ul>
+        </nav>
       </header>
 
-      <section className="mx-auto grid max-w-5xl gap-4 px-4 py-6 lg:grid-cols-[0.85fr_1.15fr]">
-        {error && <div className="lg:col-span-2 rounded-md border border-rose-200 bg-rose-50 p-3 text-sm text-rose-700 dark:border-rose-900/40 dark:bg-rose-950/20 dark:text-rose-300">{error}</div>}
-        {loading && <div className="lg:col-span-2 flex items-center gap-2 text-sm text-slate-500"><RefreshCw className="h-4 w-4 animate-spin" /> Carregando...</div>}
-
-        <div className="space-y-4">
-          <Panel title="Perfil">
-            <div className="space-y-3">
-              <Input label="Nome" value={profileForm.name} onChange={(value) => setProfileForm((f) => ({ ...f, name: value }))} />
-              <Input label="Telefone" value={profileForm.phone} onChange={(value) => setProfileForm((f) => ({ ...f, phone: value }))} />
-              <Input label="Resumo profissional" value={profileForm.headline} onChange={(value) => setProfileForm((f) => ({ ...f, headline: value }))} />
-              <Input label="Cidade" value={profileForm.city} onChange={(value) => setProfileForm((f) => ({ ...f, city: value }))} />
-              <Input label="LinkedIn" value={profileForm.linkedinUrl} onChange={(value) => setProfileForm((f) => ({ ...f, linkedinUrl: value }))} />
-              <Input label="Portfolio" value={profileForm.portfolioUrl} onChange={(value) => setProfileForm((f) => ({ ...f, portfolioUrl: value }))} />
-              <button onClick={saveProfile} disabled={busy} className="w-full rounded-md bg-sky-600 px-4 py-2 text-sm font-semibold text-white hover:bg-sky-700 disabled:opacity-50">Salvar todo o perfil</button>
-            </div>
-          </Panel>
-
-          <Panel title="Perfil profissional para triagem">
-            <div className="space-y-4">
-              <p className="rounded-md bg-sky-50 p-3 text-xs text-sky-800 dark:bg-sky-950/30 dark:text-sky-200">
-                Estas informações ajudam a empresa e a IA de apoio a comparar sua experiência com os requisitos da vaga. A decisão final é sempre humana.
-              </p>
-
-              <label className="block text-xs font-medium text-slate-500">
-                Sobre sua trajetória profissional
-                <textarea
-                  rows={4}
-                  maxLength={4000}
-                  value={professionalForm.about}
-                  onChange={(e) => setProfessionalForm((f) => ({ ...f, about: e.target.value }))}
-                  placeholder="Conte brevemente sua experiência, principais resultados e objetivo profissional."
-                  className="mt-1 w-full rounded-md border bg-white px-3 py-2 text-sm text-slate-900 outline-none focus:ring-2 focus:ring-sky-500 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100"
-                />
-              </label>
-              <Input label="Habilidades (separe por vírgulas)" value={professionalForm.skills} onChange={(value) => setProfessionalForm((f) => ({ ...f, skills: value }))} />
-              <div className="grid gap-3 sm:grid-cols-2">
-                <Input label="Disponibilidade para iniciar" value={professionalForm.availabilityToStart} onChange={(value) => setProfessionalForm((f) => ({ ...f, availabilityToStart: value }))} />
-                <Input label="Pretensão salarial (opcional)" value={professionalForm.desiredSalary} onChange={(value) => setProfessionalForm((f) => ({ ...f, desiredSalary: value }))} />
-              </div>
-              <div className="grid gap-2 text-xs sm:grid-cols-2">
-                <label className="flex items-center gap-2 rounded-md border p-3 dark:border-slate-700">
-                  <input type="checkbox" checked={professionalForm.availableForRelocation} onChange={(e) => setProfessionalForm((f) => ({ ...f, availableForRelocation: e.target.checked }))} />
-                  Disponibilidade para mudança
-                </label>
-                <label className="flex items-center gap-2 rounded-md border p-3 dark:border-slate-700">
-                  <input type="checkbox" checked={professionalForm.availableForTravel} onChange={(e) => setProfessionalForm((f) => ({ ...f, availableForTravel: e.target.checked }))} />
-                  Disponibilidade para viagens
-                </label>
-              </div>
-
-              <ProfileListHeader title="Experiências" onAdd={() => setProfessionalForm((f) => ({ ...f, experiences: [...f.experiences, { ...EMPTY_EXPERIENCE }] }))} />
-              {professionalForm.experiences.length === 0 && <EmptyProfileList text="Adicione seus cargos e experiências mais relevantes." />}
-              {professionalForm.experiences.map((item, index) => (
-                <ProfileItem key={`experience-${index}`} onRemove={() => setProfessionalForm((f) => ({ ...f, experiences: f.experiences.filter((_, i) => i !== index) }))}>
-                  <div className="grid gap-2 sm:grid-cols-2">
-                    <Input label="Cargo / função" value={item.role} onChange={(value) => setProfessionalForm((f) => ({ ...f, experiences: updateAt(f.experiences, index, { role: value }) }))} />
-                    <Input label="Empresa" value={item.company} onChange={(value) => setProfessionalForm((f) => ({ ...f, experiences: updateAt(f.experiences, index, { company: value }) }))} />
-                  </div>
-                  <Input label="Período" value={item.period} onChange={(value) => setProfessionalForm((f) => ({ ...f, experiences: updateAt(f.experiences, index, { period: value }) }))} />
-                  <label className="block text-xs font-medium text-slate-500">
-                    Atividades e resultados
-                    <textarea rows={3} maxLength={4000} value={item.description} onChange={(e) => setProfessionalForm((f) => ({ ...f, experiences: updateAt(f.experiences, index, { description: e.target.value }) }))} className="mt-1 w-full rounded-md border bg-white px-3 py-2 text-sm text-slate-900 outline-none focus:ring-2 focus:ring-sky-500 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100" />
-                  </label>
-                </ProfileItem>
-              ))}
-
-              <ProfileListHeader title="Formação" onAdd={() => setProfessionalForm((f) => ({ ...f, education: [...f.education, { ...EMPTY_EDUCATION }] }))} />
-              {professionalForm.education.length === 0 && <EmptyProfileList text="Adicione cursos técnicos, graduação, pós-graduação ou outras formações relevantes." />}
-              {professionalForm.education.map((item, index) => (
-                <ProfileItem key={`education-${index}`} onRemove={() => setProfessionalForm((f) => ({ ...f, education: f.education.filter((_, i) => i !== index) }))}>
-                  <div className="grid gap-2 sm:grid-cols-2">
-                    <Input label="Curso" value={item.course} onChange={(value) => setProfessionalForm((f) => ({ ...f, education: updateAt(f.education, index, { course: value }) }))} />
-                    <Input label="Instituição" value={item.institution} onChange={(value) => setProfessionalForm((f) => ({ ...f, education: updateAt(f.education, index, { institution: value }) }))} />
-                    <Input label="Período" value={item.period} onChange={(value) => setProfessionalForm((f) => ({ ...f, education: updateAt(f.education, index, { period: value }) }))} />
-                    <Input label="Situação" value={item.status} onChange={(value) => setProfessionalForm((f) => ({ ...f, education: updateAt(f.education, index, { status: value }) }))} />
-                  </div>
-                </ProfileItem>
-              ))}
-
-              <ProfileListHeader title="Idiomas" onAdd={() => setProfessionalForm((f) => ({ ...f, languages: [...f.languages, { ...EMPTY_LANGUAGE }] }))} />
-              {professionalForm.languages.length === 0 && <EmptyProfileList text="Informe idiomas e o nível de domínio." />}
-              {professionalForm.languages.map((item, index) => (
-                <ProfileItem key={`language-${index}`} onRemove={() => setProfessionalForm((f) => ({ ...f, languages: f.languages.filter((_, i) => i !== index) }))}>
-                  <div className="grid gap-2 sm:grid-cols-2">
-                    <Input label="Idioma" value={item.name} onChange={(value) => setProfessionalForm((f) => ({ ...f, languages: updateAt(f.languages, index, { name: value }) }))} />
-                    <Input label="Nível" value={item.level} onChange={(value) => setProfessionalForm((f) => ({ ...f, languages: updateAt(f.languages, index, { level: value }) }))} />
-                  </div>
-                </ProfileItem>
-              ))}
-
-              <button onClick={saveProfile} disabled={busy} className="w-full rounded-md bg-sky-600 px-4 py-2 text-sm font-semibold text-white hover:bg-sky-700 disabled:opacity-50">Salvar todo o perfil</button>
-            </div>
-          </Panel>
-
-          <Panel title="Privacidade e LGPD">
-            <div className="space-y-3">
-              <div className="flex items-center gap-2 rounded-md bg-slate-50 p-3 text-xs text-slate-500 dark:bg-slate-950">
-                <ShieldCheck className="h-4 w-4 text-sky-500" />
-                Seus pedidos ficam registrados para atendimento pela empresa controladora dos dados.
-              </div>
-              <select value={dataRequestForm.type} onChange={(e) => setDataRequestForm((f) => ({ ...f, type: e.target.value }))} className="h-10 w-full rounded-md border bg-white px-3 text-sm dark:border-slate-700 dark:bg-slate-950">
-                <option value="ACCESS">Acesso aos dados</option>
-                <option value="RECTIFICATION">Retificação</option>
-                <option value="PORTABILITY">Portabilidade</option>
-                <option value="DELETION">Exclusão/anonimização</option>
-              </select>
-              <textarea value={dataRequestForm.details} onChange={(e) => setDataRequestForm((f) => ({ ...f, details: e.target.value }))} rows={3} placeholder="Detalhes opcionais" className="w-full rounded-md border bg-white px-3 py-2 text-sm dark:border-slate-700 dark:bg-slate-950" />
-              <button onClick={createDataRequest} disabled={busy} className="w-full rounded-md border px-4 py-2 text-sm font-semibold hover:bg-slate-50 disabled:opacity-50 dark:border-slate-700 dark:hover:bg-slate-800">Abrir solicitação</button>
-              <div className="divide-y rounded-md border dark:divide-slate-800 dark:border-slate-800">
-                {dataRequests.length === 0 && <div className="p-3 text-sm text-slate-400">Nenhuma solicitação aberta.</div>}
-                {dataRequests.map((item) => (
-                  <div key={item.id} className="p-3 text-xs">
-                    <div className="flex items-center justify-between gap-2">
-                      <span className="font-semibold">{label(DATA_REQUEST_TYPE_LABEL, item.type)}</span>
-                      <span className="rounded-full bg-slate-100 px-2 py-0.5 text-[10px] dark:bg-slate-800">{label(DATA_REQUEST_STATUS_LABEL, item.status)}</span>
-                    </div>
-                    {item.details && <div className="mt-1 text-slate-500">{item.details}</div>}
-                  </div>
-                ))}
-              </div>
-            </div>
-          </Panel>
-
-          <div id="docs">
-          <Panel title="Currículo e documentos">
-            <div className="space-y-3">
-              <p className="rounded-md bg-slate-50 p-3 text-xs text-slate-600 dark:bg-slate-950 dark:text-slate-300">
-                Currículos: PDF, DOC ou DOCX. Outros documentos também podem ser PNG ou JPG. Tamanho máximo: 8 MB por arquivo.
-              </p>
-              <select value={uploadForm.kind} onChange={(e) => setUploadForm((f) => ({ ...f, kind: e.target.value }))} className="h-10 w-full rounded-md border bg-white px-3 text-sm dark:border-slate-700 dark:bg-slate-950">
-                <option value="CV">Currículo</option>
-                <option value="COVER">Carta de apresentação</option>
-                <option value="CERTIFICATE">Certificado</option>
-                <option value="PORTFOLIO">Portfólio</option>
-                <option value="OTHER">Outro</option>
-              </select>
-              <select value={uploadForm.applicationId} onChange={(e) => setUploadForm((f) => ({ ...f, applicationId: e.target.value }))} className="h-10 w-full rounded-md border bg-white px-3 text-sm dark:border-slate-700 dark:bg-slate-950">
-                <option value="">Perfil geral</option>
-                {applications.map((app) => <option key={app.id} value={app.id}>{app.posting.title}</option>)}
-              </select>
-              <label className="flex cursor-pointer items-center gap-2 rounded-md border border-dashed px-3 py-3 text-sm text-slate-600 dark:border-slate-700 dark:text-slate-300">
-                <FileUp className="h-4 w-4" />
-                <span className="min-w-0 flex-1 truncate">{file ? `${file.name} (${formatBytes(file.size)})` : 'Selecionar arquivo (máx. 8 MB)'}</span>
-                <input type="file" accept=".pdf,.doc,.docx,.png,.jpg,.jpeg" className="hidden" onChange={pickFile} />
-              </label>
-              <button onClick={uploadDocument} disabled={busy || !file} className="w-full rounded-md border px-4 py-2 text-sm font-semibold hover:bg-slate-50 disabled:opacity-50 dark:border-slate-700 dark:hover:bg-slate-800">Enviar documento</button>
-              <div className="divide-y rounded-md border dark:divide-slate-800 dark:border-slate-800">
-                {documents.length === 0 && <div className="p-3 text-sm text-slate-400">Nenhum documento enviado.</div>}
-                {documents.map((doc) => (
-                  <div key={doc.id} className="flex items-center gap-2 p-3 text-sm">
-                    <div className="min-w-0 flex-1">
-                      <div className="truncate font-medium">{doc.fileName}</div>
-                      <div className="text-[11px] text-slate-500">{labelOf(DOC_KIND, doc.kind)} · {formatBytes(doc.sizeBytes)}</div>
-                    </div>
-                    <button onClick={() => downloadDocument(doc.id)} title="Baixar" className="rounded p-2 hover:bg-slate-100 dark:hover:bg-slate-800"><Download className="h-4 w-4" /></button>
-                    <button onClick={() => deleteDocument(doc.id)} title="Remover" className="rounded p-2 text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-950/20"><Trash2 className="h-4 w-4" /></button>
-                  </div>
-                ))}
-              </div>
-            </div>
-          </Panel>
+      <div className="mx-auto max-w-5xl px-4 py-6 sm:px-6">
+        {error && (
+          <div className="mb-4 flex items-start justify-between gap-3 rounded-xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700 dark:border-rose-900/50 dark:bg-rose-950/30 dark:text-rose-300">
+            <span>{error}</span>
+            <button onClick={() => setError(null)} className="shrink-0 font-semibold hover:underline">Fechar</button>
           </div>
-        </div>
-
-        <div className="space-y-4">
-        <Panel title="Propostas">
-          <div className="space-y-3">
-            {offers.length === 0 && <div className="rounded-md border border-dashed p-6 text-center text-sm text-slate-400 dark:border-slate-800">Nenhuma proposta enviada.</div>}
-            {offers.map((offer) => (
-              <div key={offer.id} className="rounded-md border p-4 text-sm dark:border-slate-800">
-                <div className="flex items-start justify-between gap-3">
-                  <div>
-                    <h3 className="font-semibold">{offer.application.posting.title}</h3>
-                    <p className="text-xs text-slate-500">{[offer.application.posting.city, offer.application.posting.workMode].filter(Boolean).join(' | ')}</p>
-                  </div>
-                  <span className="rounded-full bg-slate-100 px-2 py-1 text-[10px] font-semibold text-slate-700 dark:bg-slate-800 dark:text-slate-200">{label(OFFER_STATUS_LABEL, offer.status)}</span>
-                </div>
-                <div className="mt-3 rounded-md bg-slate-50 p-3 text-xs text-slate-600 dark:bg-slate-950 dark:text-slate-300">
-                  <div className="font-semibold">{formatMoney(offer.salaryAmountCents, offer.currency)}</div>
-                  <div>Início previsto: {formatDate(offer.startDate)} | Validade: {formatDate(offer.expiresAt)}</div>
-                </div>
-                {offer.status === 'SENT' && (
-                  <div className="mt-3 flex flex-wrap gap-2">
-                    <button onClick={() => decideOffer(offer.id, 'ACCEPT')} disabled={busy} className="rounded-md bg-emerald-600 px-3 py-2 text-xs font-semibold text-white hover:bg-emerald-700 disabled:opacity-50">Aceitar proposta</button>
-                    <button onClick={() => decideOffer(offer.id, 'DECLINE')} disabled={busy} className="rounded-md border px-3 py-2 text-xs font-semibold text-rose-600 hover:bg-rose-50 disabled:opacity-50 dark:border-slate-700 dark:hover:bg-rose-950/20">Recusar</button>
-                  </div>
-                )}
-              </div>
-            ))}
+        )}
+        {loading && (
+          <div className="mb-4 flex items-center gap-2 text-sm text-slate-500 dark:text-slate-400">
+            <RefreshCw className="h-4 w-4 animate-spin" /> Carregando seus dados…
           </div>
-        </Panel>
+        )}
 
-        <Panel title="Pré-admissão">
-          <div className="space-y-3">
-            {preAdmissions.length === 0 && <div className="rounded-md border border-dashed p-6 text-center text-sm text-slate-400 dark:border-slate-800">Nenhum checklist aberto.</div>}
-            {preAdmissions.map((pre) => (
-              <div key={pre.id} className="rounded-md border p-4 text-sm dark:border-slate-800">
-                <div className="flex items-start justify-between gap-3">
-                  <div>
-                    <h3 className="font-semibold">{pre.application.posting.title}</h3>
-                    <p className="text-xs text-slate-500">Data alvo: {formatDate(pre.admissionTargetDate)}</p>
-                  </div>
-                  <span className="rounded-full bg-slate-100 px-2 py-1 text-[10px] font-semibold text-slate-700 dark:bg-slate-800 dark:text-slate-200">{label(PRE_ADMISSION_STATUS_LABEL, pre.status)}</span>
-                </div>
-                <div className="mt-3 divide-y rounded-md border dark:divide-slate-800 dark:border-slate-800">
-                  {pre.documents.map((item) => (
-                    <div key={item.id} className="p-3 text-xs">
-                      <div className="flex flex-wrap items-center gap-2">
-                        <span className="font-semibold">{item.title}</span>
-                        <span className="rounded-full bg-slate-100 px-2 py-0.5 text-[10px] dark:bg-slate-800">{label(DOCUMENT_STATUS_LABEL, item.status)}</span>
-                        {item.required && <span className="text-rose-500">*</span>}
-                      </div>
-                      {item.candidateDocument && <div className="mt-1 text-slate-500">{item.candidateDocument.fileName}</div>}
-                      {item.reviewNote && <div className="mt-1 rounded bg-slate-50 p-2 text-slate-500 dark:bg-slate-950">{item.reviewNote}</div>}
-                      {['PENDING', 'REJECTED', 'SUBMITTED'].includes(item.status) && (
-                        <div className="mt-2 space-y-2">
-                          <label className={`flex items-center gap-2 rounded-md border border-dashed px-3 py-2 text-xs text-slate-600 dark:border-slate-700 dark:text-slate-300 ${busy ? 'cursor-not-allowed opacity-60' : 'cursor-pointer hover:bg-slate-50 dark:hover:bg-slate-800'}`}>
-                            <FileUp className="h-4 w-4 shrink-0" />
-                            <span className="min-w-0 flex-1 truncate">{item.status === 'REJECTED' ? 'Reenviar arquivo (PDF, JPG ou PNG, máx. 8 MB)' : 'Enviar arquivo (PDF, JPG ou PNG, máx. 8 MB)'}</span>
-                            <input type="file" accept=".pdf,.png,.jpg,.jpeg" className="hidden" disabled={busy} onChange={(e) => attachPreAdmissionFile(item, e)} />
-                          </label>
-                          {documents.length > 0 && (
-                            <select
-                              defaultValue={item.candidateDocumentId ?? ''}
-                              onChange={(e) => submitPreAdmissionDocument(item.id, e.target.value)}
-                              disabled={busy}
-                              className="h-9 w-full rounded-md border bg-white px-3 text-xs dark:border-slate-700 dark:bg-slate-950"
-                            >
-                              <option value="">Ou usar um arquivo já enviado...</option>
-                              {documents.map((doc) => <option key={doc.id} value={doc.id}>{doc.fileName}</option>)}
-                            </select>
-                          )}
-                        </div>
-                      )}
-                    </div>
-                  ))}
-                </div>
-                {(pre.occupationalExamRequests ?? []).length > 0 && (
-                  <div className="mt-3 rounded-md border p-3 text-xs dark:border-slate-800">
-                    <div className="mb-2 flex items-center gap-2 font-semibold text-slate-600 dark:text-slate-300"><HeartPulse className="h-4 w-4 text-sky-500" /> ASO admissional</div>
-                    <div className="space-y-2">
-                      {(pre.occupationalExamRequests ?? []).map((aso) => (
-                        <div key={aso.id} className="rounded-md bg-slate-50 p-2 dark:bg-slate-950">
-                          <div className="flex flex-wrap items-center gap-2">
-                            <span className="font-semibold">{label(EXAM_TYPE_LABEL, aso.examType)}</span>
-                            <span className="rounded-full bg-slate-100 px-2 py-0.5 text-[10px] dark:bg-slate-800">{metaOf(ASO_STATUS, aso.status).label}</span>
-                            {aso.asoRecord?.result && <span className="rounded-full bg-slate-100 px-2 py-0.5 text-[10px] dark:bg-slate-800">{metaOf(ASO_RESULT, aso.asoRecord.result).label}</span>}
-                          </div>
-                          {aso.appointment && (
-                            <div className="mt-1 text-slate-500">
-                              Agendado: {formatDateTime(aso.appointment.scheduledAt)}
-                              {aso.appointment.location ? ` | ${aso.appointment.location}` : ''}
-                              {aso.appointment.providerName ? ` | ${aso.appointment.providerName}` : ''}
-                            </div>
-                          )}
-                          {aso.appointment?.instructions && <div className="mt-1 text-slate-500">{aso.appointment.instructions}</div>}
-                          {aso.asoRecord && <div className="mt-1 text-slate-500">Exame: {formatDate(aso.asoRecord.examDate)}{aso.asoRecord.validUntil ? ` | validade ${formatDate(aso.asoRecord.validUntil)}` : ''}</div>}
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                )}
-              </div>
-            ))}
-          </div>
-        </Panel>
+        {tab === 'inicio' && <OverviewSection data={data} onNavigate={setTab} vacanciesHref={vacanciesHref} />}
 
-        <Panel title="Minhas candidaturas">
-          <div className="space-y-3">
-            {applications.length === 0 && (
-              <div className="rounded-md border border-dashed p-8 text-center text-sm text-slate-400 dark:border-slate-800">
-                <Briefcase className="mx-auto mb-2 h-6 w-6" />
-                Nenhuma candidatura ainda.
-              </div>
-            )}
-            {applications.map((app) => (
-              <div key={app.id} className="rounded-md border p-4 dark:border-slate-800">
-                <div className="flex items-start justify-between gap-3">
-                  <div>
-                    {app.posting.company?.name && <p className="text-[10px] font-bold uppercase tracking-wide text-sky-600 dark:text-sky-400">{app.posting.company.name}</p>}
-                    <h3 className="font-semibold">{app.posting.title}</h3>
-                    <p className="text-xs text-slate-500">{[app.posting.city, app.posting.workMode, app.stage].filter(Boolean).join(' | ')}</p>
-                  </div>
-                  <span className="rounded-full bg-slate-100 px-2 py-1 text-[10px] font-semibold text-slate-700 dark:bg-slate-800 dark:text-slate-200">{STATUS_LABEL[app.status] ?? app.status}</span>
-                </div>
-                {app.rejectionReason && <p className="mt-3 rounded-md bg-slate-50 p-3 text-xs text-slate-500 dark:bg-slate-950">{app.rejectionReason}</p>}
-                <div className="mt-4 flex flex-wrap gap-2">
-                  <Link
-                    href={`/carreiras/vagas/${app.posting.slug}${app.posting.company?.slug ? `?empresa=${encodeURIComponent(app.posting.company.slug)}` : publicSuffix}`}
-                    className="rounded-md border px-3 py-2 text-xs font-semibold hover:bg-slate-50 dark:border-slate-700 dark:hover:bg-slate-800"
-                  >
-                    Ver vaga
-                  </Link>
-                  {app.status === 'ACTIVE' && <button onClick={() => withdraw(app.id)} disabled={busy} className="inline-flex items-center gap-1 rounded-md border px-3 py-2 text-xs font-semibold text-rose-600 hover:bg-rose-50 disabled:opacity-50 dark:border-slate-700 dark:hover:bg-rose-950/20"><XCircle className="h-3.5 w-3.5" /> Desistir</button>}
-                </div>
-              </div>
-            ))}
-          </div>
-        </Panel>
-        </div>
-      </section>
+        {tab === 'candidaturas' && (
+          <ApplicationsSection
+            applications={applications}
+            offers={offers}
+            preAdmissions={preAdmissions}
+            documents={documents}
+            busy={busy}
+            vacanciesHref={vacanciesHref}
+            publicSuffix={publicSuffix}
+            onWithdraw={withdraw}
+            onDecideOffer={decideOffer}
+            onAttachPreAdmissionFile={attachPreAdmissionFile}
+            onSelectExistingDocument={submitPreAdmissionDocument}
+          />
+        )}
+
+        {tab === 'perfil' && (
+          <ProfileSection
+            profile={profile}
+            profileForm={profileForm}
+            professionalForm={professionalForm}
+            onProfileChange={(patch) => setProfileForm((current) => ({ ...current, ...patch }))}
+            onProfessionalChange={(patch) => setProfessionalForm((current) => ({ ...current, ...patch }))}
+            onSave={saveProfile}
+            busy={busy}
+            saved={savedAt > 0}
+          />
+        )}
+
+        {tab === 'documentos' && (
+          <DocumentsSection
+            documents={documents}
+            applications={applications}
+            file={file}
+            uploadForm={uploadForm}
+            busy={busy}
+            onPickFile={pickFile}
+            onUploadFormChange={(patch) => setUploadForm((current) => ({ ...current, ...patch }))}
+            onUpload={uploadDocument}
+            onDownload={downloadDocument}
+            onDelete={deleteDocument}
+          />
+        )}
+
+        {tab === 'privacidade' && (
+          <PrivacySection
+            dataRequests={dataRequests}
+            form={dataRequestForm}
+            busy={busy}
+            onFormChange={(patch) => setDataRequestForm((current) => ({ ...current, ...patch }))}
+            onSubmit={createDataRequest}
+          />
+        )}
+      </div>
     </main>
   );
 }
 
-function Panel({ title, children }: { title: string; children: ReactNode }) {
-  return (
-    <section className="rounded-lg border bg-white p-4 shadow-sm dark:border-slate-800 dark:bg-slate-900">
-      <h2 className="mb-3 text-sm font-bold uppercase text-slate-500">{title}</h2>
-      {children}
-    </section>
-  );
-}
-
-function ProfileListHeader({ title, onAdd }: { title: string; onAdd: () => void }) {
-  return (
-    <div className="flex items-center justify-between gap-3 border-t pt-4 dark:border-slate-800">
-      <h3 className="text-xs font-bold uppercase text-slate-500">{title}</h3>
-      <button type="button" onClick={onAdd} className="rounded-md border px-2.5 py-1.5 text-xs font-semibold hover:bg-slate-50 dark:border-slate-700 dark:hover:bg-slate-800">+ Adicionar</button>
-    </div>
-  );
-}
-
-function ProfileItem({ children, onRemove }: { children: ReactNode; onRemove: () => void }) {
-  return (
-    <div className="space-y-2 rounded-md border p-3 dark:border-slate-700">
-      <div className="flex justify-end">
-        <button type="button" onClick={onRemove} className="inline-flex items-center gap-1 text-xs font-semibold text-rose-600 hover:underline">
-          <Trash2 className="h-3.5 w-3.5" /> Remover
-        </button>
-      </div>
-      {children}
-    </div>
-  );
-}
-
-function EmptyProfileList({ text }: { text: string }) {
-  return <p className="rounded-md border border-dashed p-3 text-xs text-slate-400 dark:border-slate-700">{text}</p>;
-}
-
-function Input({ label, value, onChange, type = 'text' }: { label: string; value: string; onChange: (value: string) => void; type?: string }) {
-  return (
-    <label className="block text-xs font-medium text-slate-500">
-      {label}
-      <input
-        type={type}
-        value={value}
-        onChange={(e) => onChange(e.target.value)}
-        className="mt-1 h-10 w-full rounded-md border bg-white px-3 text-sm text-slate-900 outline-none focus:ring-2 focus:ring-sky-500 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100"
-      />
-    </label>
-  );
-}
-
-function updateAt<T extends object>(items: T[], index: number, patch: Partial<T>): T[] {
-  return items.map((item, itemIndex) => itemIndex === index ? { ...item, ...patch } : item);
+function authEndpoint(mode: AuthMode, suffix: string): string {
+  if (mode === 'register') return `/careers/candidates/register${suffix}`;
+  if (mode === 'reset') return '/careers/candidates/reset-password';
+  return `/careers/candidates/login${suffix}`;
 }
 
 function toProfessionalForm(data: CandidateProfileData | null | undefined): ProfessionalForm {
@@ -961,12 +519,22 @@ function toProfessionalForm(data: CandidateProfileData | null | undefined): Prof
     desiredSalary: String(value.desiredSalary ?? ''),
     availabilityToStart: String(value.availabilityToStart ?? ''),
     skills: Array.isArray(value.skills) ? value.skills.join(', ') : '',
-    experiences: Array.isArray(value.experiences) ? value.experiences.map((item) => ({
-      role: String(item.role ?? ''), company: String(item.company ?? ''), period: String(item.period ?? ''), description: String(item.description ?? ''),
-    })) : [],
-    education: Array.isArray(value.education) ? value.education.map((item) => ({
-      course: String(item.course ?? ''), institution: String(item.institution ?? ''), period: String(item.period ?? ''), status: String(item.status ?? ''),
-    })) : [],
+    experiences: Array.isArray(value.experiences)
+      ? value.experiences.map((item) => ({
+          role: String(item.role ?? ''),
+          company: String(item.company ?? ''),
+          period: String(item.period ?? ''),
+          description: String(item.description ?? ''),
+        }))
+      : [],
+    education: Array.isArray(value.education)
+      ? value.education.map((item) => ({
+          course: String(item.course ?? ''),
+          institution: String(item.institution ?? ''),
+          period: String(item.period ?? ''),
+          status: String(item.status ?? ''),
+        }))
+      : [],
     languages: Array.isArray(value.languages) ? value.languages.map((item) => ({ name: String(item.name ?? ''), level: String(item.level ?? '') })) : [],
   };
 }
@@ -1018,30 +586,3 @@ function downloadBase64(doc: StoredContent) {
   a.click();
   URL.revokeObjectURL(url);
 }
-
-function formatBytes(value: number) {
-  if (value < 1024) return `${value} B`;
-  if (value < 1024 * 1024) return `${(value / 1024).toFixed(1)} KB`;
-  return `${(value / 1024 / 1024).toFixed(1)} MB`;
-}
-
-function formatMoney(cents: number, currency = 'BRL') {
-  return new Intl.NumberFormat('pt-BR', { style: 'currency', currency: currency || 'BRL' }).format(cents / 100);
-}
-
-function formatDate(value: string | null | undefined) {
-  if (!value) return '-';
-  const date = new Date(value);
-  if (!Number.isFinite(date.getTime())) return value;
-  return date.toLocaleDateString('pt-BR');
-}
-
-function formatDateTime(value: string | null | undefined) {
-  if (!value) return '-';
-  const date = new Date(value);
-  if (!Number.isFinite(date.getTime())) return value;
-  return date.toLocaleString('pt-BR');
-}
-
-const activeTab = 'rounded bg-white px-3 py-2 font-semibold shadow-sm dark:bg-slate-950';
-const inactiveTab = 'rounded px-3 py-2 text-slate-500 hover:text-slate-900 dark:hover:text-slate-100';

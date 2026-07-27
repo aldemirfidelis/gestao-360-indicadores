@@ -1,7 +1,10 @@
-import { Body, Controller, Delete, Get, Headers, Param, Patch, Post, Query, Req, StreamableFile, UseGuards } from '@nestjs/common';
+import { BadRequestException, Body, Controller, Delete, Get, Headers, Param, Patch, Post, Query, Req, Res, StreamableFile, UseGuards } from '@nestjs/common';
+import type { Response } from 'express';
 import { Public } from '../auth/public.decorator';
 import { RecruitCareersService } from './recruit-careers.service';
 import { RecruitCandidateAuthService } from './recruit-candidate-auth.service';
+import { RecruitCandidateOauthService } from './recruit-candidate-oauth.service';
+import { parseProvider } from './recruit-candidate-oauth.logic';
 import { RecruitApplicationService } from './recruit-application.service';
 import { RecruitEvaluationService } from './recruit-evaluation.service';
 import { RecruitOfferService } from './recruit-offer.service';
@@ -20,6 +23,7 @@ export class CareersController {
   constructor(
     private readonly careers: RecruitCareersService,
     private readonly candidateAuth: RecruitCandidateAuthService,
+    private readonly candidateOauth: RecruitCandidateOauthService,
     private readonly applications: RecruitApplicationService,
     private readonly evaluations: RecruitEvaluationService,
     private readonly offers: RecruitOfferService,
@@ -113,6 +117,36 @@ export class CareersController {
   @Post('candidates/reset-password')
   resetPassword(@Body() body: any) {
     return this.candidateAuth.resetPassword(body);
+  }
+
+  // ---------------------------- login social ----------------------------
+
+  /** Quais provedores estão configurados — a tela só mostra botão que funciona. */
+  @Public()
+  @Get('candidates/oauth/providers')
+  oauthProviders() {
+    return this.candidateOauth.listProviders();
+  }
+
+  @Public()
+  @Get('candidates/oauth/:provider/start')
+  async oauthStart(@Param('provider') provider: string, @Query('returnTo') returnTo: string | undefined, @Res() res: Response) {
+    const parsed = parseProvider(provider);
+    if (!parsed) throw new BadRequestException('Provedor inválido.');
+    res.redirect(await this.candidateOauth.startUrl(parsed, returnTo));
+  }
+
+  /** O provedor devolve o candidato aqui; sempre respondemos com redirect. */
+  @Public()
+  @Get('candidates/oauth/:provider/callback')
+  async oauthCallback(
+    @Param('provider') provider: string,
+    @Query() query: { code?: string; state?: string; error?: string },
+    @Res() res: Response,
+  ) {
+    const parsed = parseProvider(provider);
+    if (!parsed) throw new BadRequestException('Provedor inválido.');
+    res.redirect(await this.candidateOauth.handleCallback(parsed, query));
   }
 
   @Public()

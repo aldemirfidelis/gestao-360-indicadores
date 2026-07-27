@@ -1,5 +1,7 @@
 import { describe, expect, it, vi, beforeEach } from 'vitest';
-import { candidateAreaUrl } from './recruit-communication.service';
+// `vi.mock` é içado acima dos imports pelo transform do vitest, então o import
+// estático abaixo já recebe o SMTP mockado — sem precisar de `await import`.
+import { candidateAreaUrl, RecruitCommunicationService } from './recruit-communication.service';
 
 // O transporte é mockado no nível do módulo de SMTP: o teste verifica o que o
 // serviço MANDA enviar, não a entrega em si.
@@ -16,8 +18,6 @@ vi.mock('../../common/smtp', () => ({
   buildTransport: () => ({ sendMail }),
   smtpFrom: (cfg: any) => `${cfg.fromName} <${cfg.fromAddress}>`,
 }));
-
-const { RecruitCommunicationService } = await import('./recruit-communication.service');
 
 function service(company: any) {
   const prisma = {

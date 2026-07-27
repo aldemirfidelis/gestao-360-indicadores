@@ -12,6 +12,7 @@ import { RecruitRecruiterService } from './recruit-recruiter.service';
 import { RecruitPostingService } from './recruit-posting.service';
 import { RecruitCareersService } from './recruit-careers.service';
 import { RecruitCandidateAuthService } from './recruit-candidate-auth.service';
+import { RecruitCandidateOauthService } from './recruit-candidate-oauth.service';
 import { RecruitApplicationService } from './recruit-application.service';
 import { RecruitEvaluationService } from './recruit-evaluation.service';
 import { RecruitOfferService } from './recruit-offer.service';
@@ -37,6 +38,7 @@ import { CandidateGuard } from './candidate.guard';
     RecruitPostingService,
     RecruitCareersService,
     RecruitCandidateAuthService,
+    RecruitCandidateOauthService,
     RecruitApplicationService,
     RecruitEvaluationService,
     RecruitOfferService,
