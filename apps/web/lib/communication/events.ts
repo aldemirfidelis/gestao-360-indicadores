@@ -26,6 +26,7 @@ export const WS = {
   MESSAGE_TYPING: 'message:typing',
   REACTION_UPDATED: 'reaction:updated',
   NOTIFICATION_CREATED: 'notification:created',
+  COMPANY_CONTEXT_CHANGED: 'session:company-context-changed',
   ERROR: 'comm:error',
 } as const;
 

@@ -12,9 +12,13 @@ export class ProfileService {
   ) {}
 
   /** Perfil corporativo de um usuário (visível dentro da mesma empresa). */
-  async getProfile(viewerCompanyId: string, isSuperAdmin: boolean, userId: string) {
+  async getProfile(viewerCompanyId: string, viewerUserId: string, userId: string) {
     const user = await this.prisma.user.findFirst({
-      where: { id: userId, deletedAt: null, ...(isSuperAdmin ? {} : { companyId: viewerCompanyId }) },
+      where: {
+        id: userId,
+        deletedAt: null,
+        ...(userId === viewerUserId ? {} : { companyId: viewerCompanyId }),
+      },
       select: {
         id: true,
         name: true,
@@ -67,8 +71,8 @@ export class ProfileService {
   }
 
   /** Define o status de presença manual e propaga via WebSocket. */
-  async setMyStatus(userId: string, status: PresenceStatus) {
-    await this.presence.setManualStatus(userId, status === PresenceStatus.OFFLINE ? null : status);
+  async setMyStatus(userId: string, companyId: string, status: PresenceStatus) {
+    await this.presence.setManualStatus(userId, status === PresenceStatus.OFFLINE ? null : status, companyId);
     return { status: this.presence.status(userId) };
   }
 

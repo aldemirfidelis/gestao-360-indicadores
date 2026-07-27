@@ -245,7 +245,10 @@ export class MyDayService implements OnModuleInit {
     }
 
     if (action === 'markread' && item.sourceEntityType === 'NOTIFICATION') {
-      await this.prisma.notification.updateMany({ where: { id: item.sourceEntityId, userId: me.sub }, data: { readAt: new Date() } });
+      await this.prisma.notification.updateMany({
+        where: { id: item.sourceEntityId, companyId: me.companyId, userId: me.sub },
+        data: { readAt: new Date() },
+      });
       await this.ensureFresh(me, true);
       return { ok: true, message: 'Marcada como lida.' };
     }

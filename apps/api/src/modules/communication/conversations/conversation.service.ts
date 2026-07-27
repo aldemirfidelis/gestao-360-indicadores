@@ -20,11 +20,16 @@ export class ConversationService {
   ) {}
 
   /** Garante membership; lança ForbiddenException caso contrário. Retorna o participante. */
-  async assertMember(conversationId: string, userId: string) {
-    const part = await this.prisma.conversationParticipant.findUnique({
-      where: { conversationId_userId: { conversationId, userId } },
+  async assertMember(conversationId: string, userId: string, companyId: string) {
+    const part = await this.prisma.conversationParticipant.findFirst({
+      where: {
+        conversationId,
+        userId,
+        leftAt: null,
+        conversation: { companyId },
+      },
     });
-    if (!part || part.leftAt) throw new ForbiddenException('Você não participa desta conversa.');
+    if (!part) throw new ForbiddenException('Você não participa desta conversa nesta empresa.');
     return part;
   }
 
@@ -41,8 +46,8 @@ export class ConversationService {
     if (!other) throw new NotFoundException('Usuário não encontrado.');
 
     const dmKey = directKey(meId, otherId);
-    const existing = await this.prisma.conversation.findUnique({ where: { dmKey } });
-    if (existing) return this.summaryById(existing.id, meId);
+    const existing = await this.prisma.conversation.findFirst({ where: { dmKey, companyId } });
+    if (existing) return this.summaryById(existing.id, meId, companyId);
 
     try {
       const created = await this.prisma.conversation.create({
@@ -59,21 +64,21 @@ export class ConversationService {
           },
         },
       });
-      return this.summaryById(created.id, meId);
+      return this.summaryById(created.id, meId, companyId);
     } catch (err) {
       // Corrida: outra requisição criou a mesma DM — reaproveita.
       if (err instanceof Prisma.PrismaClientKnownRequestError && err.code === 'P2002') {
-        const again = await this.prisma.conversation.findUnique({ where: { dmKey } });
-        if (again) return this.summaryById(again.id, meId);
+        const again = await this.prisma.conversation.findFirst({ where: { dmKey, companyId } });
+        if (again) return this.summaryById(again.id, meId, companyId);
       }
       throw err;
     }
   }
 
   /** Lista as conversas do usuário, ordenadas pela atividade mais recente. */
-  async listForUser(meId: string) {
+  async listForUser(meId: string, companyId: string) {
     const convs = await this.prisma.conversation.findMany({
-      where: { participants: { some: { userId: meId, leftAt: null } } },
+      where: { companyId, participants: { some: { userId: meId, leftAt: null } } },
       include: { participants: { include: { user: PARTICIPANT_USER } } },
       orderBy: [{ lastMessageAt: { sort: 'desc', nulls: 'last' } }, { updatedAt: 'desc' }],
       take: 200,
@@ -83,9 +88,9 @@ export class ConversationService {
     return summaries;
   }
 
-  async summaryById(conversationId: string, meId: string) {
-    const conv = await this.prisma.conversation.findUnique({
-      where: { id: conversationId },
+  async summaryById(conversationId: string, meId: string, companyId: string) {
+    const conv = await this.prisma.conversation.findFirst({
+      where: { id: conversationId, companyId },
       include: { participants: { include: { user: PARTICIPANT_USER } } },
     });
     if (!conv) throw new NotFoundException('Conversa não encontrada.');
@@ -95,8 +100,8 @@ export class ConversationService {
     return this.decorate(conv, meId);
   }
 
-  async markRead(conversationId: string, meId: string) {
-    await this.assertMember(conversationId, meId);
+  async markRead(conversationId: string, meId: string, companyId: string) {
+    await this.assertMember(conversationId, meId, companyId);
     await this.prisma.conversationParticipant.update({
       where: { conversationId_userId: { conversationId, userId: meId } },
       data: { lastReadAt: new Date() },
@@ -104,8 +109,8 @@ export class ConversationService {
     return { ok: true };
   }
 
-  async setMuted(conversationId: string, meId: string, muted: boolean) {
-    await this.assertMember(conversationId, meId);
+  async setMuted(conversationId: string, meId: string, companyId: string, muted: boolean) {
+    await this.assertMember(conversationId, meId, companyId);
     await this.prisma.conversationParticipant.update({
       where: { conversationId_userId: { conversationId, userId: meId } },
       data: { muted },
@@ -113,8 +118,8 @@ export class ConversationService {
     return { ok: true, muted };
   }
 
-  async setPinned(conversationId: string, meId: string, pinned: boolean) {
-    await this.assertMember(conversationId, meId);
+  async setPinned(conversationId: string, meId: string, companyId: string, pinned: boolean) {
+    await this.assertMember(conversationId, meId, companyId);
     await this.prisma.conversationParticipant.update({
       where: { conversationId_userId: { conversationId, userId: meId } },
       data: { pinnedAt: pinned ? new Date() : null },
@@ -123,9 +128,9 @@ export class ConversationService {
   }
 
   /** userIds de todos os participantes ativos (usado para broadcast/notificações). */
-  async participantIds(conversationId: string): Promise<string[]> {
+  async participantIds(conversationId: string, companyId: string): Promise<string[]> {
     const parts = await this.prisma.conversationParticipant.findMany({
-      where: { conversationId, leftAt: null },
+      where: { conversationId, leftAt: null, conversation: { companyId } },
       select: { userId: true },
     });
     return parts.map((p) => p.userId);

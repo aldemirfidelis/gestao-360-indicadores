@@ -29,10 +29,15 @@ export const WS = {
   MESSAGE_TYPING: 'message:typing',
   REACTION_UPDATED: 'reaction:updated',
   NOTIFICATION_CREATED: 'notification:created',
+  COMPANY_CONTEXT_CHANGED: 'session:company-context-changed',
   ERROR: 'comm:error',
 } as const;
 
 /** Sala de uma conversa (todos os participantes conectados entram nela). */
 export const conversationRoom = (conversationId: string) => `conv:${conversationId}`;
-/** Sala pessoal do usuário (todas as abas/dispositivos dele). */
-export const userRoom = (userId: string) => `user:${userId}`;
+/** Sala técnica da conta, usada apenas para invalidar sessões ao trocar de tenant. */
+export const accountRoom = (userId: string) => `account:${userId}`;
+/** Sala de eventos visíveis apenas no tenant efetivo. */
+export const companyRoom = (companyId: string) => `company:${companyId}`;
+/** Sala pessoal do usuário dentro de uma empresa efetiva. */
+export const userRoom = (companyId: string, userId: string) => `company:${companyId}:user:${userId}`;

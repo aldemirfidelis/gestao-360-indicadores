@@ -66,7 +66,7 @@ export function ChatPanel({ conversation }: { conversation: ConversationSummary 
   const canSend = !!draft.trim() || pendingAttachments.length > 0;
 
   const messages = useInfiniteQuery({
-    queryKey: ['messages', conversationId],
+    queryKey: ['messages', user?.companyId, conversationId],
     queryFn: ({ pageParam }) =>
       api<MessagesPage>(
         `/communication/conversations/${conversationId}/messages?limit=40${pageParam ? `&cursor=${pageParam}` : ''}`,
@@ -99,7 +99,7 @@ export function ChatPanel({ conversation }: { conversation: ConversationSummary 
   useEffect(() => {
     if (!socket || !conversationId) return;
     const upsert = (message: ChatMessage) => {
-      qc.setQueryData<MessagesInfiniteData>(['messages', conversationId], (old) => {
+      qc.setQueryData<MessagesInfiniteData>(['messages', user?.companyId, conversationId], (old) => {
         if (!old?.pages?.length) return old;
         const exists = old.pages.some((page: MessagesPage) => page.items.some((item) => item.id === message.id));
         if (exists) {
@@ -126,7 +126,7 @@ export function ChatPanel({ conversation }: { conversation: ConversationSummary 
     };
     const onDeleted = (p: { conversationId: string; messageId: string }) => {
       if (p.conversationId !== conversationId) return;
-      qc.setQueryData<MessagesInfiniteData>(['messages', conversationId], (old) => {
+      qc.setQueryData<MessagesInfiniteData>(['messages', user?.companyId, conversationId], (old) => {
         if (!old?.pages?.length) return old;
         return {
           ...old,
@@ -140,7 +140,7 @@ export function ChatPanel({ conversation }: { conversation: ConversationSummary 
     };
     const onReaction = (p: { conversationId: string; messageId: string; reactions: ChatMessage['reactions'] }) => {
       if (p.conversationId !== conversationId) return;
-      qc.setQueryData<MessagesInfiniteData>(['messages', conversationId], (old) => {
+      qc.setQueryData<MessagesInfiniteData>(['messages', user?.companyId, conversationId], (old) => {
         if (!old?.pages?.length) return old;
         return {
           ...old,
@@ -161,7 +161,7 @@ export function ChatPanel({ conversation }: { conversation: ConversationSummary 
       socket.off(WS.MESSAGE_DELETED, onDeleted);
       socket.off(WS.REACTION_UPDATED, onReaction);
     };
-  }, [socket, conversationId, qc, user?.id]);
+  }, [socket, conversationId, qc, user?.id, user?.companyId]);
 
   // Rola para o fim quando troca de conversa ou quando chega/envia a mensagem
   // MAIS RECENTE — mas NÃO quando carregamos mensagens antigas (que entram no topo),
@@ -191,7 +191,7 @@ export function ChatPanel({ conversation }: { conversation: ConversationSummary 
       setPendingAttachments([]);
       setReplyTo(null);
       socket?.emit(WS.MESSAGE_TYPING_STOP, { conversationId });
-      qc.setQueryData<MessagesInfiniteData>(['messages', conversationId], (old) => {
+      qc.setQueryData<MessagesInfiniteData>(['messages', user?.companyId, conversationId], (old) => {
         if (!old?.pages?.length) return old;
         if (old.pages.some((page: MessagesPage) => page.items.some((item) => item.id === message.id))) return old;
         const pages = [...old.pages];
@@ -231,7 +231,7 @@ export function ChatPanel({ conversation }: { conversation: ConversationSummary 
       }),
     onSuccess: () => {
       setEditing(null);
-      qc.invalidateQueries({ queryKey: ['messages', conversationId] });
+      qc.invalidateQueries({ queryKey: ['messages', user?.companyId, conversationId] });
       qc.invalidateQueries({ queryKey: ['conversations'] });
     },
     onError: (e: any) => toast.error(e?.message ?? 'Não foi possível editar a mensagem'),
@@ -240,7 +240,7 @@ export function ChatPanel({ conversation }: { conversation: ConversationSummary 
   const deleteMessage = useMutation({
     mutationFn: (id: string) => api(`/communication/messages/${id}`, { method: 'DELETE' }),
     onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ['messages', conversationId] });
+      qc.invalidateQueries({ queryKey: ['messages', user?.companyId, conversationId] });
       qc.invalidateQueries({ queryKey: ['conversations'] });
     },
     onError: (e: any) => toast.error(e?.message ?? 'Não foi possível excluir a mensagem'),

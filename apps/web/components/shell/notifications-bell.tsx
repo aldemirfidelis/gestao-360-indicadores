@@ -10,6 +10,7 @@ import { api } from '@/lib/api';
 import { formatDate } from '@/lib/utils';
 import { cn } from '@/lib/utils';
 import { enablePushNotifications, notificationPermission, pushSupported } from '@/lib/push';
+import { useAuth } from '@/components/auth/auth-provider';
 
 interface Notif {
   id: string;
@@ -35,6 +36,7 @@ const KIND_STYLES: Record<string, string> = {
 
 export function NotificationsBell() {
   const qc = useQueryClient();
+  const { user } = useAuth();
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
 
@@ -48,13 +50,13 @@ export function NotificationsBell() {
   }, [open]);
 
   const count = useQuery<{ unread: number }>({
-    queryKey: ['notifications', 'count'],
+    queryKey: ['notifications', user?.companyId, 'count'],
     queryFn: () => api<{ unread: number }>('/notifications/count'),
     refetchInterval: 60_000,
   });
 
   const list = useQuery<Notif[]>({
-    queryKey: ['notifications', 'list'],
+    queryKey: ['notifications', user?.companyId, 'list'],
     queryFn: () => api<Notif[]>('/notifications'),
     enabled: open,
   });

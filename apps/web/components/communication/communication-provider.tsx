@@ -47,6 +47,13 @@ export function CommunicationProvider({ children }: { children: ReactNode }) {
   const [openConversations, setOpenConversations] = useState<FloatingChatBox[]>([]);
   const invalidateTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
+  useEffect(() => {
+    activeConv.current = null;
+    setTyping({});
+    setReceipts({});
+    setOpenConversations([]);
+  }, [user?.id, user?.companyId]);
+
   const scheduleConversationsRefresh = useCallback(() => {
     if (invalidateTimer.current) return;
     invalidateTimer.current = setTimeout(() => {

@@ -18,13 +18,13 @@ export class PushController {
   }
 
   @Post('unsubscribe')
-  unsubscribe(@Body() body: { endpoint?: string }) {
-    return this.service.unsubscribe(body?.endpoint ?? '');
+  unsubscribe(@CurrentUser() me: AuthPayload, @Body() body: { endpoint?: string }) {
+    return this.service.unsubscribe(me.sub, me.companyId, body?.endpoint ?? '');
   }
 
   @Post('test')
   async test(@CurrentUser() me: AuthPayload) {
-    await this.service.sendToUser(me.sub, {
+    await this.service.sendToUser(me.companyId, me.sub, {
       title: 'Gestão 360',
       body: 'Notificação de teste recebida com sucesso ✓',
       link: '/',

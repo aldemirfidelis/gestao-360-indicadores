@@ -7,6 +7,7 @@ import { AuthPayload } from '../auth/auth.types';
 import { swallow } from '../../common/logging/swallow';
 import { prepareTenantFields } from '../../common/tenant-fields';
 import { CreateCompanyDto, UpdateCompanyDto } from './platform.dto';
+import { RealtimeEmitter } from '../communication/realtime.emitter';
 
 const OPEN_ACTION_STATUSES = {
   notIn: [ActionStatus.DONE, ActionStatus.DONE_LATE, ActionStatus.CANCELLED],
@@ -18,6 +19,7 @@ export class PlatformService {
     private readonly prisma: PrismaService,
     private readonly access: AccessService,
     private readonly auditWriter: AuditWriterService,
+    private readonly realtime: RealtimeEmitter,
   ) {}
 
   /**
@@ -41,9 +43,19 @@ export class PlatformService {
       target = null;
     }
 
-    await this.prisma.user.update({ where: { id: me.sub }, data: { activeCompanyId: target } });
+    await this.prisma.$transaction([
+      this.prisma.user.update({ where: { id: me.sub }, data: { activeCompanyId: target } }),
+      // A inscrição push do navegador também representa um contexto de tenant.
+      // Ao trocar de empresa, nenhum dispositivo pode continuar recebendo alertas
+      // do contexto anterior.
+      this.prisma.pushSubscription.updateMany({
+        where: { userId: me.sub },
+        data: { companyId: target ?? home },
+      }),
+    ]);
     this.access.invalidate(me.sub);
     await this.audit(me, target ?? home, 'SWITCH_COMPANY', { activeCompanyId: me.companyId }, { activeCompanyId: target });
+    this.realtime.changeCompanyContext(me.sub, target ?? home);
 
     return {
       company: company ? this.serialize(company) : null,

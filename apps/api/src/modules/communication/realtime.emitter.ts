@@ -1,6 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import type { Server } from 'socket.io';
-import { conversationRoom, userRoom } from './communication.events';
+import { WS, accountRoom, companyRoom, conversationRoom, userRoom } from './communication.events';
 
 /**
  * Detentor único do servidor Socket.IO (ligado pelo gateway em afterInit).
@@ -23,15 +23,25 @@ export class RealtimeEmitter {
     this.server?.emit(event, payload);
   }
 
+  toCompany(companyId: string, event: string, payload: unknown) {
+    this.server?.to(companyRoom(companyId)).emit(event, payload);
+  }
+
   toConversation(conversationId: string, event: string, payload: unknown) {
     this.server?.to(conversationRoom(conversationId)).emit(event, payload);
   }
 
-  toUser(userId: string, event: string, payload: unknown) {
-    this.server?.to(userRoom(userId)).emit(event, payload);
+  toUser(companyId: string, userId: string, event: string, payload: unknown) {
+    this.server?.to(userRoom(companyId, userId)).emit(event, payload);
   }
 
-  toUsers(userIds: string[], event: string, payload: unknown) {
-    for (const id of userIds) this.toUser(id, event, payload);
+  toUsers(companyId: string, userIds: string[], event: string, payload: unknown) {
+    for (const id of userIds) this.toUser(companyId, id, event, payload);
+  }
+
+  changeCompanyContext(userId: string, companyId: string) {
+    const room = accountRoom(userId);
+    this.server?.to(room).emit(WS.COMPANY_CONTEXT_CHANGED, { companyId });
+    this.server?.in(room).disconnectSockets(true);
   }
 }

@@ -9,22 +9,22 @@ export class NotificationsController {
 
   @Get()
   list(@CurrentUser() me: AuthPayload, @Query('unread') unread?: string) {
-    return this.service.list(me.sub, unread === 'true');
+    return this.service.list(me.companyId, me.sub, unread === 'true');
   }
 
   @Get('count')
   count(@CurrentUser() me: AuthPayload) {
-    return this.service.unreadCount(me.sub).then((unread) => ({ unread }));
+    return this.service.unreadCount(me.companyId, me.sub).then((unread) => ({ unread }));
   }
 
   @Patch(':id/read')
-  markRead(@Param('id') id: string) {
-    return this.service.markRead(id);
+  markRead(@CurrentUser() me: AuthPayload, @Param('id') id: string) {
+    return this.service.markRead(me.companyId, me.sub, id);
   }
 
   @Post('read-all')
   markAll(@CurrentUser() me: AuthPayload) {
-    return this.service.markAllRead(me.sub);
+    return this.service.markAllRead(me.companyId, me.sub);
   }
 
   @Post('generate')

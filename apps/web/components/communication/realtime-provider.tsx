@@ -38,6 +38,9 @@ export function RealtimeProvider({ children }: { children: ReactNode }) {
       return;
     }
 
+    // A empresa efetiva faz parte da identidade do socket. Uma troca de tenant
+    // precisa criar um handshake novo para não reutilizar salas da sessão anterior.
+    disconnectSocket();
     const s = getSocket();
     setSocket(s);
 
@@ -72,11 +75,13 @@ export function RealtimeProvider({ children }: { children: ReactNode }) {
       setPresence((prev) => ({ ...prev, [p.userId]: p.status }));
       if (p.userId === user.id) setMyStatus(p.status);
     };
+    const onCompanyContextChanged = () => window.location.assign('/meu-dia');
 
     s.on('connect', onConnect);
     s.on('disconnect', onDisconnect);
     s.on(WS.PRESENCE_ONLINE_COUNT, onCount);
     s.on(WS.PRESENCE_UPDATED, onPresence);
+    s.on(WS.COMPANY_CONTEXT_CHANGED, onCompanyContextChanged);
     s.connect();
 
     const beat = setInterval(() => {
@@ -95,8 +100,10 @@ export function RealtimeProvider({ children }: { children: ReactNode }) {
       s.off('disconnect', onDisconnect);
       s.off(WS.PRESENCE_ONLINE_COUNT, onCount);
       s.off(WS.PRESENCE_UPDATED, onPresence);
+      s.off(WS.COMPANY_CONTEXT_CHANGED, onCompanyContextChanged);
+      disconnectSocket();
     };
-  }, [user?.id]);
+  }, [user?.id, user?.companyId]);
 
   const presenceOf = useCallback(
     (userId: string, fallback: PresenceStatus = 'OFFLINE') => presence[userId] ?? fallback,

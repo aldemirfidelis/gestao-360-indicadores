@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../../prisma/prisma.service';
 import { ActionStatus, NotificationKind } from '@prisma/client';
 import { PushService } from '../push/push.service';
@@ -12,16 +12,16 @@ export class NotificationsService {
     private readonly push: PushService,
   ) {}
 
-  async list(userId: string, unreadOnly = false) {
+  async list(companyId: string, userId: string, unreadOnly = false) {
     return this.prisma.notification.findMany({
-      where: { userId, ...(unreadOnly ? { readAt: null } : {}) },
+      where: { companyId, userId, ...(unreadOnly ? { readAt: null } : {}) },
       orderBy: { createdAt: 'desc' },
       take: 100,
     });
   }
 
-  async unreadCount(userId: string) {
-    return this.prisma.notification.count({ where: { userId, readAt: null } });
+  async unreadCount(companyId: string, userId: string) {
+    return this.prisma.notification.count({ where: { companyId, userId, readAt: null } });
   }
 
   async create(
@@ -36,17 +36,22 @@ export class NotificationsService {
       data: { companyId, userId, kind, title, body: body ?? null, link: link ?? null },
     });
     // Dispara Web Push para os dispositivos do usuario (inerte se VAPID nao configurado).
-    void this.push.sendToUser(userId, { title, body: body ?? undefined, link: link ?? undefined, tag: kind });
+    void this.push.sendToUser(companyId, userId, { title, body: body ?? undefined, link: link ?? undefined, tag: kind });
     return notification;
   }
 
-  async markRead(id: string) {
-    return this.prisma.notification.update({ where: { id }, data: { readAt: new Date() } });
+  async markRead(companyId: string, userId: string, id: string) {
+    const updated = await this.prisma.notification.updateMany({
+      where: { id, companyId, userId },
+      data: { readAt: new Date() },
+    });
+    if (updated.count === 0) throw new NotFoundException('Notificação não encontrada.');
+    return { ok: true };
   }
 
-  async markAllRead(userId: string) {
+  async markAllRead(companyId: string, userId: string) {
     return this.prisma.notification.updateMany({
-      where: { userId, readAt: null },
+      where: { companyId, userId, readAt: null },
       data: { readAt: new Date() },
     });
   }
@@ -73,6 +78,7 @@ export class NotificationsService {
       if (!a.responsibleUser?.id) continue;
       const exists = await this.prisma.notification.findFirst({
         where: {
+          companyId,
           userId: a.responsibleUser.id,
           kind: NotificationKind.ACTION_OVERDUE,
           link: `/actions/${a.id}`,
@@ -104,6 +110,7 @@ export class NotificationsService {
       if (!uid) continue;
       const exists = await this.prisma.notification.findFirst({
         where: {
+          companyId,
           userId: uid,
           kind: NotificationKind.INDICATOR_OFF_TARGET,
           link: `/indicators/${r.indicator.id}`,
@@ -138,6 +145,7 @@ export class NotificationsService {
     for (const nc of overdueNcs) {
       const exists = await this.prisma.notification.findFirst({
         where: {
+          companyId,
           userId: nc.responsibleUserId!,
           kind: NotificationKind.ACTION_OVERDUE,
           link: `/nonconformities?focus=${nc.id}`,
@@ -170,7 +178,7 @@ export class NotificationsService {
       if (!balance.item.minimumStock || balance.quantity.gte(balance.item.minimumStock) || !balance.warehouse.managerUserId) continue;
       const link = `/suprimentos?tab=stock&item=${balance.item.id}&warehouse=${balance.warehouse.id}`;
       const exists = await this.prisma.notification.findFirst({
-        where: { userId: balance.warehouse.managerUserId, kind: NotificationKind.STOCK_MINIMUM_ALERT, link, readAt: null },
+        where: { companyId, userId: balance.warehouse.managerUserId, kind: NotificationKind.STOCK_MINIMUM_ALERT, link, readAt: null },
       });
       if (exists) continue;
       await this.create(
@@ -192,7 +200,7 @@ export class NotificationsService {
     for (const order of overdueOrders) {
       const link = `/suprimentos?tab=orders&order=${order.id}`;
       const exists = await this.prisma.notification.findFirst({
-        where: { userId: order.createdById, kind: NotificationKind.PURCHASE_ORDER_OVERDUE, link, readAt: null },
+        where: { companyId, userId: order.createdById, kind: NotificationKind.PURCHASE_ORDER_OVERDUE, link, readAt: null },
       });
       if (exists) continue;
       await this.create(
@@ -230,7 +238,7 @@ export class NotificationsService {
       });
       for (const manager of managers) {
         const exists = await this.prisma.notification.findFirst({
-          where: { userId: manager.id, kind: NotificationKind.DEVIATION_CRITICAL, link, readAt: null },
+          where: { companyId, userId: manager.id, kind: NotificationKind.DEVIATION_CRITICAL, link, readAt: null },
         });
         if (exists) continue;
         await this.create(
@@ -262,7 +270,7 @@ export class NotificationsService {
       if (!userId) continue;
       const link = `/recrutamento?focus=${req.id}`;
       const exists = await this.prisma.notification.findFirst({
-        where: { userId, kind: NotificationKind.RECRUITMENT_REQUISITION_STALE, link, readAt: null },
+        where: { companyId, userId, kind: NotificationKind.RECRUITMENT_REQUISITION_STALE, link, readAt: null },
       });
       if (exists) continue;
       await this.create(

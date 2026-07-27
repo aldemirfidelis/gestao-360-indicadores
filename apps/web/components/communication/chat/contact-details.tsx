@@ -9,6 +9,7 @@ import { Badge } from '@/components/ui/badge';
 import { PRESENCE_LABEL, type PresenceStatus } from '@/lib/communication/events';
 import type { ConversationSummary } from '@/lib/communication/types';
 import { api } from '@/lib/api';
+import { useAuth } from '@/components/auth/auth-provider';
 
 interface ProfileData {
   id: string;
@@ -25,9 +26,10 @@ interface ProfileData {
 }
 
 export function ContactDetails({ conversation }: { conversation: ConversationSummary | null }) {
+  const { user } = useAuth();
   const contactId = conversation?.counterpart?.id ?? null;
   const profile = useQuery<ProfileData>({
-    queryKey: ['profile', contactId],
+    queryKey: ['profile', user?.companyId, contactId],
     queryFn: () => api(`/communication/users/${contactId}/profile`),
     enabled: !!contactId,
     staleTime: 60_000,

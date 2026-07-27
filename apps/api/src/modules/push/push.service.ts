@@ -60,16 +60,16 @@ export class PushService {
     return { ok: true };
   }
 
-  async unsubscribe(endpoint: string) {
+  async unsubscribe(userId: string, companyId: string, endpoint: string) {
     if (!endpoint) return { ok: false };
-    await this.prisma.pushSubscription.deleteMany({ where: { endpoint } });
+    await this.prisma.pushSubscription.deleteMany({ where: { endpoint, userId, companyId } });
     return { ok: true };
   }
 
   /** Envia um push para todos os dispositivos inscritos de um usuario. Nao lanca. */
-  async sendToUser(userId: string, payload: PushPayload): Promise<void> {
+  async sendToUser(companyId: string, userId: string, payload: PushPayload): Promise<void> {
     if (!this.isEnabled) return;
-    const subs = await this.prisma.pushSubscription.findMany({ where: { userId } });
+    const subs = await this.prisma.pushSubscription.findMany({ where: { companyId, userId } });
     if (subs.length === 0) return;
     const data = JSON.stringify(payload);
     await Promise.all(

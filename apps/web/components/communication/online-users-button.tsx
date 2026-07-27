@@ -41,7 +41,7 @@ export function OnlineUsersButton() {
 
   // Carregar todos os usuários do diretório
   const directory = useQuery<{ items: OnlineUser[] }>({
-    queryKey: ['contacts-panel', q],
+    queryKey: ['contacts-panel', user?.companyId, q],
     queryFn: () => api(`/communication/directory?limit=100${q ? `&q=${encodeURIComponent(q)}` : ''}`),
     enabled: open,
     refetchInterval: open ? 30_000 : false,

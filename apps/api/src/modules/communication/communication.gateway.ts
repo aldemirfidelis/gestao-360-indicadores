@@ -15,7 +15,8 @@ import { PresenceService } from './presence/presence.service';
 import { ConversationService } from './conversations/conversation.service';
 import { RealtimeEmitter } from './realtime.emitter';
 import { AuthPayload } from '../auth/auth.types';
-import { WS, conversationRoom, userRoom } from './communication.events';
+import { effectiveCompanyId } from '../../common/effective-company';
+import { WS, accountRoom, companyRoom, conversationRoom, userRoom } from './communication.events';
 
 const corsOrigin = process.env.API_CORS_ORIGIN ?? 'http://localhost:3000';
 const isWildcard = corsOrigin === '*';
@@ -85,22 +86,24 @@ export class CommunicationGateway
       return;
     }
     client.data.user = user;
-    client.join(userRoom(user.sub));
-    await this.presence.connect(user.sub, client.id);
+    client.join(accountRoom(user.sub));
+    client.join(companyRoom(user.companyId));
+    client.join(userRoom(user.companyId, user.sub));
+    await this.presence.connect(user.sub, client.id, user.companyId);
     // Estado inicial para o cliente recém-conectado.
-    client.emit(WS.PRESENCE_ONLINE_COUNT, { count: this.presence.onlineCount() });
+    client.emit(WS.PRESENCE_ONLINE_COUNT, { count: this.presence.onlineCount(user.companyId) });
   }
 
   async handleDisconnect(client: Socket) {
     const user = client.data.user as SocketUser | undefined;
-    if (user) await this.presence.disconnect(user.sub, client.id);
+    if (user) await this.presence.disconnect(user.sub, client.id, user.companyId);
   }
 
   @SubscribeMessage(WS.PRESENCE_HEARTBEAT)
   async onHeartbeat(client: Socket, payload?: { active?: boolean }) {
     const user = client.data.user as SocketUser | undefined;
     if (!user) return;
-    await this.presence.heartbeat(user.sub, payload?.active ?? true);
+    await this.presence.heartbeat(user.sub, payload?.active ?? true, user.companyId);
   }
 
   @SubscribeMessage(WS.PRESENCE_SET_STATUS)
@@ -110,6 +113,7 @@ export class CommunicationGateway
     await this.presence.setManualStatus(
       user.sub,
       payload.status === PresenceStatus.OFFLINE ? null : payload.status,
+      user.companyId,
     );
   }
 
@@ -121,7 +125,7 @@ export class CommunicationGateway
     const user = client.data.user as SocketUser | undefined;
     if (!user || !payload?.conversationId) return;
     try {
-      await this.conversations.assertMember(payload.conversationId, user.sub);
+      await this.conversations.assertMember(payload.conversationId, user.sub, user.companyId);
       client.join(conversationRoom(payload.conversationId));
     } catch {
       /* não-membro: ignora silenciosamente */
@@ -134,13 +138,13 @@ export class CommunicationGateway
   }
 
   @SubscribeMessage(WS.MESSAGE_TYPING_START)
-  onTypingStart(client: Socket, payload?: { conversationId?: string }) {
-    this.emitTyping(client, payload?.conversationId, true);
+  async onTypingStart(client: Socket, payload?: { conversationId?: string }) {
+    await this.emitTyping(client, payload?.conversationId, true);
   }
 
   @SubscribeMessage(WS.MESSAGE_TYPING_STOP)
-  onTypingStop(client: Socket, payload?: { conversationId?: string }) {
-    this.emitTyping(client, payload?.conversationId, false);
+  async onTypingStop(client: Socket, payload?: { conversationId?: string }) {
+    await this.emitTyping(client, payload?.conversationId, false);
   }
 
   @SubscribeMessage(WS.MESSAGE_READ)
@@ -148,9 +152,9 @@ export class CommunicationGateway
     const user = client.data.user as SocketUser | undefined;
     if (!user || !payload?.conversationId) return;
     try {
-      await this.conversations.markRead(payload.conversationId, user.sub);
-      const ids = await this.conversations.participantIds(payload.conversationId);
-      this.emitter.toUsers(ids, WS.MESSAGE_READ_RECEIPT, {
+      await this.conversations.markRead(payload.conversationId, user.sub, user.companyId);
+      const ids = await this.conversations.participantIds(payload.conversationId, user.companyId);
+      this.emitter.toUsers(user.companyId, ids, WS.MESSAGE_READ_RECEIPT, {
         conversationId: payload.conversationId,
         userId: user.sub,
         readAt: new Date().toISOString(),
@@ -160,9 +164,14 @@ export class CommunicationGateway
     }
   }
 
-  private emitTyping(client: Socket, conversationId: string | undefined, typing: boolean) {
+  private async emitTyping(client: Socket, conversationId: string | undefined, typing: boolean) {
     const user = client.data.user as SocketUser | undefined;
     if (!user || !conversationId) return;
+    try {
+      await this.conversations.assertMember(conversationId, user.sub, user.companyId);
+    } catch {
+      return;
+    }
     // Broadcast para a sala da conversa, exceto o próprio remetente.
     client.to(conversationRoom(conversationId)).emit(WS.MESSAGE_TYPING, {
       conversationId,
@@ -182,10 +191,24 @@ export class CommunicationGateway
       const payload = await this.jwt.verifyAsync<AuthPayload>(raw);
       const dbUser = await this.prisma.user.findUnique({
         where: { id: payload.sub },
-        select: { active: true, status: true, deletedAt: true },
+        select: {
+          active: true,
+          status: true,
+          deletedAt: true,
+          role: true,
+          companyId: true,
+          activeCompanyId: true,
+        },
       });
       if (!dbUser || !dbUser.active || dbUser.status !== 'ACTIVE' || dbUser.deletedAt) return null;
-      return payload;
+      const companyId = effectiveCompanyId(dbUser);
+      return {
+        ...payload,
+        role: dbUser.role,
+        companyId,
+        homeCompanyId: dbUser.companyId,
+        impersonating: companyId !== dbUser.companyId,
+      };
     } catch {
       return null;
     }

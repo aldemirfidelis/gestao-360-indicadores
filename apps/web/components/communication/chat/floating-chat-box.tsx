@@ -54,7 +54,7 @@ export function FloatingChatBox({
 
   // Buscar mensagens da conversa
   const messages = useInfiniteQuery({
-    queryKey: ['messages', conversationId],
+    queryKey: ['messages', user?.companyId, conversationId],
     queryFn: ({ pageParam }) =>
       api<MessagesPage>(
         `/communication/conversations/${conversationId}/messages?limit=30${pageParam ? `&cursor=${pageParam}` : ''}`
@@ -105,7 +105,7 @@ export function FloatingChatBox({
     onSuccess: (message) => {
       setDraft('');
       socket?.emit(WS.MESSAGE_TYPING_STOP, { conversationId });
-      qc.setQueryData<MessagesInfiniteData>(['messages', conversationId], (old) => {
+      qc.setQueryData<MessagesInfiniteData>(['messages', user?.companyId, conversationId], (old) => {
         if (!old?.pages?.length) return old;
         const exists = old.pages.some((page) => page.items.some((item) => item.id === message.id));
         if (exists) return old;

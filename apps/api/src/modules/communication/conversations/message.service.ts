@@ -51,8 +51,8 @@ export class MessageService {
   ) {}
 
   /** Histórico paginado por cursor (carregamento progressivo para cima). */
-  async list(conversationId: string, meId: string, cursor?: string, limit = 30) {
-    await this.conversations.assertMember(conversationId, meId);
+  async list(conversationId: string, meId: string, companyId: string, cursor?: string, limit = 30) {
+    await this.conversations.assertMember(conversationId, meId, companyId);
     const take = Math.min(Math.max(limit, 1), 60);
     const rows = await this.prisma.message.findMany({
       where: { conversationId },
@@ -72,11 +72,12 @@ export class MessageService {
   async send(
     conversationId: string,
     meId: string,
+    companyId: string,
     body = '',
     replyToId?: string,
     attachments: MessageAttachmentInput[] = [],
   ) {
-    await this.conversations.assertMember(conversationId, meId);
+    await this.conversations.assertMember(conversationId, meId, companyId);
     const text = body.trim();
     if (!text && attachments.length === 0) throw new BadRequestException('Informe uma mensagem ou anexe um arquivo.');
     if (attachments.length > MAX_ATTACHMENTS) throw new BadRequestException(`Envie no máximo ${MAX_ATTACHMENTS} anexos por mensagem.`);
@@ -101,17 +102,17 @@ export class MessageService {
       where: { id: conversationId },
       data: { lastMessageAt: message.createdAt, lastMessagePreview: preview },
     });
-    await this.fanOut(conversationId, message);
+    await this.fanOut(conversationId, companyId, message);
     return serialize(message);
   }
 
-  async getAttachment(attachmentId: string, meId: string) {
-    const attachment = await this.prisma.messageAttachment.findUnique({
-      where: { id: attachmentId },
+  async getAttachment(attachmentId: string, meId: string, companyId: string) {
+    const attachment = await this.prisma.messageAttachment.findFirst({
+      where: { id: attachmentId, message: { conversation: { companyId } } },
       include: { message: { select: { conversationId: true, deletedAt: true } } },
     });
     if (!attachment || attachment.deletedAt || attachment.message.deletedAt) throw new NotFoundException('Anexo não encontrado.');
-    await this.conversations.assertMember(attachment.message.conversationId, meId);
+    await this.conversations.assertMember(attachment.message.conversationId, meId, companyId);
     return {
       id: attachment.id,
       fileName: attachment.fileName,
@@ -122,9 +123,10 @@ export class MessageService {
     };
   }
 
-  async edit(messageId: string, meId: string, body: string) {
-    const msg = await this.prisma.message.findUnique({ where: { id: messageId } });
+  async edit(messageId: string, meId: string, companyId: string, body: string) {
+    const msg = await this.prisma.message.findFirst({ where: { id: messageId, conversation: { companyId } } });
     if (!msg) throw new NotFoundException('Mensagem não encontrada.');
+    await this.conversations.assertMember(msg.conversationId, meId, companyId);
     if (msg.senderId !== meId) throw new ForbiddenException('Você só pode editar suas mensagens.');
     if (msg.deletedAt) throw new ForbiddenException('Mensagem excluída não pode ser editada.');
     const updated = await this.prisma.message.update({
@@ -132,36 +134,37 @@ export class MessageService {
       data: { body, editedAt: new Date() },
       include: MESSAGE_INCLUDE,
     });
-    await this.broadcast(updated.conversationId, WS.MESSAGE_UPDATED, {
+    await this.broadcast(updated.conversationId, companyId, WS.MESSAGE_UPDATED, {
       conversationId: updated.conversationId,
       message: serialize(updated),
     });
     return serialize(updated);
   }
 
-  async remove(messageId: string, meId: string) {
-    const msg = await this.prisma.message.findUnique({ where: { id: messageId } });
+  async remove(messageId: string, meId: string, companyId: string) {
+    const msg = await this.prisma.message.findFirst({ where: { id: messageId, conversation: { companyId } } });
     if (!msg) throw new NotFoundException('Mensagem não encontrada.');
+    await this.conversations.assertMember(msg.conversationId, meId, companyId);
     if (msg.senderId !== meId) throw new ForbiddenException('Você só pode excluir suas mensagens.');
     const updated = await this.prisma.message.update({
       where: { id: messageId },
       data: { deletedAt: new Date(), body: '' },
       include: MESSAGE_INCLUDE,
     });
-    await this.broadcast(updated.conversationId, WS.MESSAGE_DELETED, {
+    await this.broadcast(updated.conversationId, companyId, WS.MESSAGE_DELETED, {
       conversationId: updated.conversationId,
       messageId,
     });
     return { ok: true };
   }
 
-  async react(messageId: string, meId: string, emoji: string, add: boolean) {
-    const msg = await this.prisma.message.findUnique({
-      where: { id: messageId },
+  async react(messageId: string, meId: string, companyId: string, emoji: string, add: boolean) {
+    const msg = await this.prisma.message.findFirst({
+      where: { id: messageId, conversation: { companyId } },
       select: { id: true, conversationId: true },
     });
     if (!msg) throw new NotFoundException('Mensagem não encontrada.');
-    await this.conversations.assertMember(msg.conversationId, meId);
+    await this.conversations.assertMember(msg.conversationId, meId, companyId);
     if (add) {
       await this.prisma.messageReaction.upsert({
         where: { messageId_userId_emoji: { messageId, userId: meId, emoji } },
@@ -177,7 +180,7 @@ export class MessageService {
       where: { messageId },
       select: { userId: true, emoji: true },
     });
-    await this.broadcast(msg.conversationId, WS.REACTION_UPDATED, {
+    await this.broadcast(msg.conversationId, companyId, WS.REACTION_UPDATED, {
       conversationId: msg.conversationId,
       messageId,
       reactions,
@@ -186,13 +189,14 @@ export class MessageService {
   }
 
   /** Entrega a mensagem nova e gera notificações para participantes offline. */
-  private async fanOut(conversationId: string, message: MessagePayload) {
+  private async fanOut(conversationId: string, companyId: string, message: MessagePayload) {
     const participants = await this.prisma.conversationParticipant.findMany({
-      where: { conversationId, leftAt: null },
-      select: { userId: true, muted: true, user: { select: { companyId: true } } },
+      where: { conversationId, leftAt: null, conversation: { companyId } },
+      select: { userId: true, muted: true },
     });
     const payload = { conversationId, message: serialize(message) };
     this.emitter.toUsers(
+      companyId,
       participants.map((p) => p.userId),
       WS.MESSAGE_CREATED,
       payload,
@@ -204,23 +208,23 @@ export class MessageService {
       if (online) continue; // online recebe via evento ao vivo
       try {
         const notif = await this.notifications.create(
-          p.user.companyId,
+          companyId,
           p.userId,
           NotificationKind.MESSAGE,
           `Nova mensagem de ${message.sender.name}`,
           message.body.slice(0, 140),
           `/comunicacao?c=${conversationId}`,
         );
-        this.emitter.toUser(p.userId, WS.NOTIFICATION_CREATED, notif);
+        this.emitter.toUser(companyId, p.userId, WS.NOTIFICATION_CREATED, notif);
       } catch {
         /* notificação é best-effort */
       }
     }
   }
 
-  private async broadcast(conversationId: string, event: string, payload: unknown) {
-    const ids = await this.conversations.participantIds(conversationId);
-    this.emitter.toUsers(ids, event, payload);
+  private async broadcast(conversationId: string, companyId: string, event: string, payload: unknown) {
+    const ids = await this.conversations.participantIds(conversationId, companyId);
+    this.emitter.toUsers(companyId, ids, event, payload);
   }
 
   private prepareAttachment(input: MessageAttachmentInput, meId: string): Prisma.MessageAttachmentCreateWithoutMessageInput {

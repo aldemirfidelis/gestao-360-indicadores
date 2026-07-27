@@ -3,7 +3,6 @@ import { ProfileService } from './profile.service';
 import { CurrentUser } from '../../../common/decorators/current-user.decorator';
 import { RequirePermissions } from '../../../common/decorators/permissions.decorator';
 import { AuthPayload } from '../../auth/auth.types';
-import { UserRoleEnum } from '@prisma/client';
 import { SetStatusDto, UpdatePreferencesDto, UpdateProfileDto } from './profile.dto';
 
 @Controller('communication')
@@ -13,7 +12,7 @@ export class ProfileController {
 
   @Get('users/:id/profile')
   getProfile(@CurrentUser() me: AuthPayload, @Param('id') id: string) {
-    return this.service.getProfile(me.companyId, me.role === UserRoleEnum.SUPER_ADMIN, id);
+    return this.service.getProfile(me.companyId, me.sub, id);
   }
 
   @Get('me/preferences')
@@ -30,7 +29,7 @@ export class ProfileController {
   @Patch('me/status')
   @RequirePermissions('communication:update')
   setMyStatus(@CurrentUser() me: AuthPayload, @Body() dto: SetStatusDto) {
-    return this.service.setMyStatus(me.sub, dto.status);
+    return this.service.setMyStatus(me.sub, me.companyId, dto.status);
   }
 
   @Patch('me/preferences')
