@@ -1,4 +1,5 @@
 import {
+  GraduationCap,
   AlertTriangle,
   Banknote,
   BarChart3,
@@ -276,9 +277,24 @@ export const navSections: NavSection[] = [
       { href: '/servico-pessoal/admissoes', label: 'Admissão e Desligamento', description: 'Checklists de admissão/desligamento e saúde ocupacional (ASO)', icon: ClipboardCheck, permissions: ['pessoal:view', 'pessoal:manage'] },
       { href: '/servico-pessoal/folha', label: 'Folha de Pagamento', description: 'Cálculo de folha, holerites, competências e adiantamento', icon: Banknote, permissions: ['folha:view'] },
       { href: '/servico-pessoal/meu-holerite', label: 'Minha Vida Funcional', description: 'Seu ponto (bater ponto e espelho), férias, vagas internas, holerites e informe de rendimentos', icon: Wallet, permissions: EMPLOYEE_SELF_SERVICE_PERMISSIONS },
+      { href: '/servico-pessoal/meu-holerite?tab=treinamentos', label: 'Meus Treinamentos', description: 'Treinamentos obrigatórios, pendências, turmas e certificados', icon: GraduationCap, permissions: ['training:self', 'training:view'] },
       { href: '/servico-pessoal/meu-holerite?tab=comunicacao', label: 'Comunicação Interna', description: 'Comunicados, campanhas e informações importantes da empresa', icon: Megaphone, permissions: ['communication:view'] },
       { href: '/servico-pessoal/relatorios', label: 'Relatórios', description: 'Turnover, absenteísmo, horas extras e exportação para a folha', icon: FileBarChart, permissions: ['pessoal:view', 'pessoal:manage'] },
       { href: '/servico-pessoal/configuracoes', label: 'Configurações', description: 'Numeração da matrícula e modelo do crachá de identificação', icon: Settings, permissions: ['pessoal:settings', 'pessoal:manage'] },
+    ],
+  },
+  {
+    heading: 'Treinamento e Desenvolvimento',
+    description: 'Matriz de treinamento, turmas, pendências e certificados',
+    intent: 'management',
+    icon: GraduationCap,
+    permissions: ['training:view', 'training:manage'],
+    items: [
+      { href: '/treinamento', label: 'Visão Geral', description: 'Conformidade, pendências, vencimentos e turmas', icon: GraduationCap, permissions: ['training:view'], exact: true },
+      { href: '/treinamento/matriz', label: 'Matriz de Treinamento', description: 'O que cada colaborador precisa realizar e por quê', icon: ClipboardCheck, permissions: ['training:view'] },
+      { href: '/treinamento/pendencias', label: 'Pendências e Vencimentos', description: 'Pendentes, vencidos e próximos do vencimento', icon: AlertTriangle, permissions: ['training:view'] },
+      { href: '/treinamento/turmas', label: 'Turmas e Agenda', description: 'Programação, presença e conclusão', icon: CalendarDays, permissions: ['training:view'] },
+      { href: '/treinamento/treinamentos', label: 'Treinamentos', description: 'Catálogo e exigências por cargo, área ou colaborador', icon: FileText, permissions: ['training:view'] },
     ],
   },
   {
@@ -403,6 +419,7 @@ export const ROUTE_PERMISSIONS: Array<{ prefix: string; permissions: string[]; e
   { prefix: '/reports', permissions: ['reports:view', 'reports:export'] },
   { prefix: '/audit', permissions: ['users:view', 'users:manage'] },
   { prefix: '/comunicacao', permissions: ['communication:view'] },
+  { prefix: '/treinamento', permissions: ['training:view', 'training:manage'] },
   { prefix: '/pessoas', permissions: ['directory:view'] },
   { prefix: '/perfil', permissions: [] },
   { prefix: '/integracoes', permissions: [SUPER_ADMIN_ONLY_PERMISSION] },
