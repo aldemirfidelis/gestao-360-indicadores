@@ -5,11 +5,15 @@ import {
   TrainingCertificatesController,
   TrainingClassesController,
   TrainingController,
+  TrainingDevelopmentController,
   TrainingDocumentController,
   TrainingEmployeeController,
+  TrainingReportsController,
 } from './training.controller';
 import { TrainingCatalogService } from './training-catalog.service';
 import { TrainingDocumentService } from './training-document.service';
+import { TrainingDevelopmentService } from './training-development.service';
+import { TrainingReportsService } from './training-reports.service';
 import { TrainingCertificatesService } from './training-certificates.service';
 import { TrainingClassesService } from './training-classes.service';
 import { TrainingEmployeeService } from './training-employee.service';
@@ -35,11 +39,15 @@ import { TrainingQueryService } from './training-query.service';
     TrainingCertificatesController,
     TrainingEmployeeController,
     TrainingDocumentController,
+    TrainingDevelopmentController,
+    TrainingReportsController,
   ],
   providers: [
     TrainingMatrixService,
     TrainingCatalogService,
     TrainingDocumentService,
+    TrainingDevelopmentService,
+    TrainingReportsService,
     TrainingClassesService,
     TrainingCertificatesService,
     TrainingQueryService,

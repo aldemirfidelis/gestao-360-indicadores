@@ -295,6 +295,8 @@ export const navSections: NavSection[] = [
       { href: '/treinamento/pendencias', label: 'Pendências e Vencimentos', description: 'Pendentes, vencidos e próximos do vencimento', icon: AlertTriangle, permissions: ['training:view'] },
       { href: '/treinamento/turmas', label: 'Turmas e Agenda', description: 'Programação, presença e conclusão', icon: CalendarDays, permissions: ['training:view'] },
       { href: '/treinamento/treinamentos', label: 'Treinamentos', description: 'Catálogo e exigências por cargo, área ou colaborador', icon: FileText, permissions: ['training:view'] },
+      { href: '/treinamento/desenvolvimento', label: 'Eficácia e PDI', description: 'Avaliação de eficácia e planos de desenvolvimento', icon: Target, permissions: ['training:view'] },
+      { href: '/treinamento/relatorios', label: 'Relatórios', description: 'Consultas e exportação para Excel', icon: FileBarChart, permissions: ['training:view'] },
     ],
   },
   {

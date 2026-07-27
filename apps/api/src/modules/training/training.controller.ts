@@ -1,9 +1,12 @@
-import { Body, Controller, Delete, Get, Param, Patch, Post, Query, Req } from '@nestjs/common';
+import { Body, Controller, Delete, Get, Header, Param, Patch, Post, Query, Res } from '@nestjs/common';
+import type { Response } from 'express';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import { RequirePermissions } from '../../common/decorators/permissions.decorator';
 import { AuthPayload } from '../auth/auth.types';
 import { TrainingCatalogService } from './training-catalog.service';
 import { TrainingDocumentService } from './training-document.service';
+import { TrainingDevelopmentService } from './training-development.service';
+import { TrainingReportsService, type ReportKind } from './training-reports.service';
 import { TrainingCertificatesService } from './training-certificates.service';
 import { TrainingClassesService } from './training-classes.service';
 import { TrainingEmployeeService } from './training-employee.service';
@@ -293,5 +296,86 @@ export class TrainingDocumentController {
   @RequirePermissions('training:update', 'training:manage')
   setAction(@CurrentUser() me: AuthPayload, @Param('trainingId') trainingId: string, @Body() body: any) {
     return this.documents.setRevisionAction(me, trainingId, body?.action);
+  }
+}
+
+/** Avaliação de eficácia e Plano de Desenvolvimento Individual. */
+@Controller('training/development')
+export class TrainingDevelopmentController {
+  constructor(private readonly development: TrainingDevelopmentService) {}
+
+  @Get('effectiveness/pending')
+  @RequirePermissions('training:view')
+  pendingEffectiveness(@CurrentUser() me: AuthPayload) {
+    return this.development.pendingEffectiveness(me);
+  }
+
+  @Post('effectiveness/:id')
+  @RequirePermissions('training:effectiveness', 'training:manage')
+  reviewEffectiveness(@CurrentUser() me: AuthPayload, @Param('id') id: string, @Body() body: any) {
+    return this.development.reviewEffectiveness(me, id, body ?? {});
+  }
+
+  @Get('plans')
+  @RequirePermissions('training:view')
+  listPlans(@CurrentUser() me: AuthPayload, @Query() query: Record<string, string>) {
+    return this.development.listPlans(me, query);
+  }
+
+  @Get('plans/:id')
+  @RequirePermissions('training:view')
+  getPlan(@CurrentUser() me: AuthPayload, @Param('id') id: string) {
+    return this.development.getPlan(me, id);
+  }
+
+  @Post('plans')
+  @RequirePermissions('training:create', 'training:manage')
+  createPlan(@CurrentUser() me: AuthPayload, @Body() body: any) {
+    return this.development.createPlan(me, body ?? {});
+  }
+
+  @Patch('plans/:id')
+  @RequirePermissions('training:update', 'training:manage')
+  updatePlan(@CurrentUser() me: AuthPayload, @Param('id') id: string, @Body() body: any) {
+    return this.development.updatePlan(me, id, body ?? {});
+  }
+
+  @Post('plans/:id/actions')
+  @RequirePermissions('training:update', 'training:manage')
+  addAction(@CurrentUser() me: AuthPayload, @Param('id') id: string, @Body() body: any) {
+    return this.development.addAction(me, id, body ?? {});
+  }
+
+  @Patch('actions/:actionId')
+  @RequirePermissions('training:update', 'training:manage')
+  updateAction(@CurrentUser() me: AuthPayload, @Param('actionId') actionId: string, @Body() body: any) {
+    return this.development.updateAction(me, actionId, body ?? {});
+  }
+}
+
+/** Relatórios e exportação. */
+@Controller('training/reports')
+export class TrainingReportsController {
+  constructor(private readonly reports: TrainingReportsService) {}
+
+  @Get()
+  @RequirePermissions('training:view')
+  catalog() {
+    return this.reports.catalog();
+  }
+
+  @Get(':kind')
+  @RequirePermissions('training:view')
+  preview(@CurrentUser() me: AuthPayload, @Param('kind') kind: ReportKind) {
+    return this.reports.build(me, kind);
+  }
+
+  @Get(':kind/export.csv')
+  @RequirePermissions('training:export', 'training:manage')
+  @Header('Content-Type', 'text/csv; charset=utf-8')
+  async export(@CurrentUser() me: AuthPayload, @Param('kind') kind: ReportKind, @Res() res: Response) {
+    const { fileName, rows } = await this.reports.build(me, kind);
+    res.setHeader('Content-Disposition', `attachment; filename="${fileName}"`);
+    res.send(this.reports.toCsv(rows));
   }
 }

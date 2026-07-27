@@ -651,6 +651,7 @@ model Company {
   trainingAssignments          TrainingAssignment[]
   trainingClasses              TrainingClass[]
   trainingCertificates         TrainingCertificate[]
+  developmentPlans             DevelopmentPlan[]
   dataProcessingRecords        DataProcessingRecord[]       @relation("DataProcessingRecordCompany")
   subprocessors                Subprocessor[]               @relation("SubprocessorCompany")
   dataIncidents                DataIncident[]               @relation("DataIncidentCompany")
@@ -6447,6 +6448,7 @@ model OrgEmployee {
   trainingClasses     TrainingClassParticipant[]
   trainingCertificates TrainingCertificate[]
   trainingHistory     TrainingHistoryEntry[]
+  developmentPlans    DevelopmentPlan[]
 
   @@index([companyId])
   @@index([orgNodeId])
@@ -15215,6 +15217,7 @@ model Training {
   assignments  TrainingAssignment[]
   classes      TrainingClass[]
   certificates TrainingCertificate[]
+  developmentActions DevelopmentAction[]
 
   @@unique([companyId, code])
   @@index([companyId, status])
@@ -15494,5 +15497,93 @@ model TrainingHistoryEntry {
   @@index([companyId, employeeId, createdAt])
   @@index([assignmentId])
   @@map("training_history_entries")
+}
+
+
+/// Plano de Desenvolvimento Individual (PDI).
+/// Simples de proposito: o plano agrupa acoes, e a acao reaproveita um
+/// treinamento ja cadastrado em vez de criar um catalogo paralelo.
+enum DevelopmentPlanStatus {
+  DRAFT
+  ACTIVE
+  COMPLETED
+  CANCELLED
+}
+
+enum DevelopmentActionStatus {
+  PLANNED
+  IN_PROGRESS
+  DONE
+  CANCELLED
+}
+
+/// De onde nasceu a necessidade de desenvolvimento.
+enum DevelopmentPlanOrigin {
+  PERFORMANCE_REVIEW
+  MANAGER_REQUEST
+  JOB_CHANGE
+  SUCCESSION
+  COMPETENCY_GAP
+  AUDIT
+  OPERATIONAL_NEED
+  EMPLOYEE_REQUEST
+}
+
+model DevelopmentPlan {
+  id         String                @id @default(uuid())
+  companyId  String
+  company    Company               @relation(fields: [companyId], references: [id])
+  employeeId String
+  employee   OrgEmployee           @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+  title      String
+  origin     DevelopmentPlanOrigin @default(MANAGER_REQUEST)
+  status     DevelopmentPlanStatus @default(DRAFT)
+
+  competency      String?
+  objective       String?
+  expectedResult  String?
+  startsAt        DateTime?
+  dueAt           DateTime?
+  completedAt     DateTime?
+
+  ownerUserId     String?
+  managerReview   String?
+  reviewedAt      DateTime?
+  reviewedById    String?
+
+  createdById String?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  deletedAt   DateTime?
+
+  actions DevelopmentAction[]
+
+  @@index([companyId, status])
+  @@index([employeeId])
+  @@map("development_plans")
+}
+
+model DevelopmentAction {
+  id          String                  @id @default(uuid())
+  companyId   String
+  planId      String
+  plan        DevelopmentPlan         @relation(fields: [planId], references: [id], onDelete: Cascade)
+  description String
+  status      DevelopmentActionStatus @default(PLANNED)
+  /// Reaproveita o catalogo: a acao pode ser "fazer o treinamento X".
+  trainingId  String?
+  training    Training?               @relation(fields: [trainingId], references: [id])
+  responsibleUserId String?
+  dueAt       DateTime?
+  completedAt DateTime?
+  evidence    String?
+  note        String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([companyId, status])
+  @@index([planId])
+  @@map("development_actions")
 }
 
