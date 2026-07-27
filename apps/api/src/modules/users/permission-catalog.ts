@@ -342,6 +342,7 @@ export const PERMISSION_CATALOG = [
   ['training:certificate:validate', 'Validar certificados externos', 'Treinamento', 'approve'],
   ['training:waive', 'Dispensar treinamento de um colaborador', 'Treinamento', 'approve'],
   ['training:validity', 'Alterar validade de um treinamento realizado', 'Treinamento', 'update'],
+  ['training:assessment', 'Montar avaliações e corrigir questões discursivas', 'Treinamento', 'manage'],
   ['training:effectiveness', 'Avaliar a eficácia do treinamento', 'Treinamento', 'approve'],
   ['training:costs', 'Visualizar custos de treinamento', 'Treinamento', 'view'],
   ['training:export', 'Exportar relatórios de treinamento', 'Treinamento', 'export'],

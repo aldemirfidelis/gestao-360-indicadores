@@ -1,14 +1,16 @@
 'use client';
 
+import { useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
-import { CalendarDays, CheckCircle2, Download, FileText, GraduationCap } from 'lucide-react';
+import { CalendarDays, CheckCircle2, Download, FileText, GraduationCap, PencilLine } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
 import { api } from '@/lib/api';
 import { formatDate } from '@/lib/utils';
 import { CertificateStatusPill, EmptyState, MetricCard, StatusPill } from '@/components/training/training-bits';
+import { AssessmentDialog } from '@/components/training/assessment-dialog';
 import {
   ATTENDANCE_LABEL,
   MODALITY_LABEL,
@@ -29,7 +31,7 @@ interface MyTrainings {
     id: string;
     training: {
       id: string; code: string; name: string; description?: string | null;
-      modality: TrainingModality; workloadMinutes: number; allowsOnline: boolean;
+      modality: TrainingModality; workloadMinutes: number; allowsOnline: boolean; requiresAssessment?: boolean;
       document?: { id: string; code: string | null; title: string; version: number } | null;
     };
     status: AssignmentStatus;
@@ -69,6 +71,7 @@ interface MyTrainings {
  */
 export function MeusTreinamentosPanel() {
   const qc = useQueryClient();
+  const [examFor, setExamFor] = useState<{ id: string; name: string } | null>(null);
   const data = useQuery<MyTrainings>({
     queryKey: ['my-trainings'],
     queryFn: () => api('/training/me'),
@@ -170,14 +173,22 @@ export function MeusTreinamentosPanel() {
                       <p className="mt-1 line-clamp-2 text-xs text-muted-foreground">{item.training.description}</p>
                     )}
                   </div>
-                  {item.training.document && (
-                    <Button asChild size="sm" variant="outline">
-                      <a href={`/documents?doc=${item.training.document.id}`}>
-                        <FileText className="mr-1.5 h-3.5 w-3.5" />
-                        Ver documento
-                      </a>
-                    </Button>
-                  )}
+                  <div className="flex shrink-0 flex-wrap items-center gap-2">
+                    {item.training.document && (
+                      <Button asChild size="sm" variant="outline">
+                        <a href={`/documents?doc=${item.training.document.id}`}>
+                          <FileText className="mr-1.5 h-3.5 w-3.5" />
+                          Ver documento
+                        </a>
+                      </Button>
+                    )}
+                    {item.training.requiresAssessment && (
+                      <Button size="sm" onClick={() => setExamFor({ id: item.id, name: item.training.name })}>
+                        <PencilLine className="mr-1.5 h-3.5 w-3.5" />
+                        Fazer avaliação
+                      </Button>
+                    )}
+                  </div>
                 </CardContent>
               </Card>
             ))}
@@ -262,6 +273,13 @@ export function MeusTreinamentosPanel() {
           <p className="mt-3 text-sm">Nenhum treinamento exigido para o seu cargo no momento.</p>
         </div>
       )}
+
+      <AssessmentDialog
+        assignmentId={examFor?.id ?? null}
+        trainingName={examFor?.name}
+        onClose={() => setExamFor(null)}
+        onFinished={() => void qc.invalidateQueries({ queryKey: ['my-trainings'] })}
+      />
     </div>
   );
 }

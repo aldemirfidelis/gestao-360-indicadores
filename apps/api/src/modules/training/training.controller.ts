@@ -6,6 +6,7 @@ import { AuthPayload } from '../auth/auth.types';
 import { TrainingCatalogService } from './training-catalog.service';
 import { TrainingDocumentService } from './training-document.service';
 import { TrainingDevelopmentService } from './training-development.service';
+import { TrainingAssessmentService } from './training-assessment.service';
 import { TrainingReportsService, type ReportKind } from './training-reports.service';
 import { TrainingCertificatesService } from './training-certificates.service';
 import { TrainingClassesService } from './training-classes.service';
@@ -377,5 +378,62 @@ export class TrainingReportsController {
     const { fileName, rows } = await this.reports.build(me, kind);
     res.setHeader('Content-Disposition', `attachment; filename="${fileName}"`);
     res.send(this.reports.toCsv(rows));
+  }
+}
+
+/** Avaliação de aprendizagem: banco de questões, aplicação e correção. */
+@Controller('training/assessments')
+export class TrainingAssessmentController {
+  constructor(private readonly assessments: TrainingAssessmentService) {}
+
+  @Get('trainings/:trainingId')
+  @RequirePermissions('training:view')
+  get(@CurrentUser() me: AuthPayload, @Param('trainingId') trainingId: string) {
+    return this.assessments.getAssessment(me.companyId, trainingId);
+  }
+
+  @Post('trainings/:trainingId')
+  @RequirePermissions('training:assessment', 'training:manage')
+  upsert(@CurrentUser() me: AuthPayload, @Param('trainingId') trainingId: string, @Body() body: any) {
+    return this.assessments.upsertAssessment(me, trainingId, body ?? {});
+  }
+
+  @Post(':assessmentId/questions')
+  @RequirePermissions('training:assessment', 'training:manage')
+  addQuestion(@CurrentUser() me: AuthPayload, @Param('assessmentId') assessmentId: string, @Body() body: any) {
+    return this.assessments.addQuestion(me, assessmentId, body ?? {});
+  }
+
+  @Delete('questions/:questionId')
+  @RequirePermissions('training:assessment', 'training:manage')
+  removeQuestion(@CurrentUser() me: AuthPayload, @Param('questionId') questionId: string) {
+    return this.assessments.removeQuestion(me, questionId);
+  }
+
+  /** Correção manual das discursivas. */
+  @Get('grading/pending')
+  @RequirePermissions('training:assessment', 'training:manage')
+  pendingGrading(@CurrentUser() me: AuthPayload) {
+    return this.assessments.pendingGrading(me);
+  }
+
+  @Post('attempts/:attemptId/grade')
+  @RequirePermissions('training:assessment', 'training:manage')
+  grade(@CurrentUser() me: AuthPayload, @Param('attemptId') attemptId: string, @Body() body: any) {
+    return this.assessments.gradeAttempt(me, attemptId, body ?? {});
+  }
+
+  // ------------------- Aplicação da prova (colaborador) -------------------
+
+  @Post('start/:assignmentId')
+  @RequirePermissions('training:self')
+  start(@CurrentUser() me: AuthPayload, @Param('assignmentId') assignmentId: string) {
+    return this.assessments.startAttempt(me, assignmentId);
+  }
+
+  @Post('attempts/:attemptId/submit')
+  @RequirePermissions('training:self')
+  submit(@CurrentUser() me: AuthPayload, @Param('attemptId') attemptId: string, @Body() body: any) {
+    return this.assessments.submitAttempt(me, attemptId, body ?? {});
   }
 }

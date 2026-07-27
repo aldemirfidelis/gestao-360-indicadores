@@ -4,7 +4,7 @@ import { Suspense, useState } from 'react';
 import { useSearchParams } from 'next/navigation';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
-import { Archive, FileText, Plus, Search, Trash2 } from 'lucide-react';
+import { Archive, FileText, Plus, RefreshCw, Search, Trash2 } from 'lucide-react';
 import { PageHeader } from '@/components/shell/page-header';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
@@ -19,6 +19,7 @@ import { useAuth } from '@/components/auth/auth-provider';
 import { api } from '@/lib/api';
 import { cn } from '@/lib/utils';
 import { EmptyState } from '@/components/training/training-bits';
+import { AssessmentBuilder } from '@/components/training/assessment-builder';
 import {
   MODALITY_LABEL,
   REQUIREMENT_TARGET_LABEL,
@@ -44,6 +45,8 @@ function TreinamentosContent() {
   const [status, setStatus] = useState('');
   const [openForm, setOpenForm] = useState(searchParams.get('novo') === '1');
   const [requirementFor, setRequirementFor] = useState<TrainingItem | null>(null);
+  const [assessmentFor, setAssessmentFor] = useState<TrainingItem | null>(null);
+  const [revisionFor, setRevisionFor] = useState<TrainingItem | null>(null);
 
   const params = new URLSearchParams();
   if (search.trim()) params.set('search', search.trim());
@@ -174,6 +177,22 @@ function TreinamentosContent() {
                             </Button>
                           )}
                           {canCreate && (
+                            <Button variant="ghost" size="sm" className="h-7 px-2 text-xs" onClick={() => setAssessmentFor(training)}>
+                              Avaliação
+                            </Button>
+                          )}
+                          {canCreate && training.document && (
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              className="h-7 px-2 text-xs"
+                              title="Definir o que a revisão do documento exige"
+                              onClick={() => setRevisionFor(training)}
+                            >
+                              <RefreshCw className="h-3.5 w-3.5" />
+                            </Button>
+                          )}
+                          {canCreate && (
                             <Button
                               variant="ghost"
                               size="sm"
@@ -264,6 +283,12 @@ function TreinamentosContent() {
 
       <TrainingFormDialog open={openForm} onOpenChange={setOpenForm} onSaved={invalidate} />
       <RequirementDialog training={requirementFor} onClose={() => setRequirementFor(null)} onSaved={invalidate} />
+      <AssessmentBuilder
+        trainingId={assessmentFor?.id ?? null}
+        trainingName={assessmentFor?.name}
+        onClose={() => setAssessmentFor(null)}
+      />
+      <RevisionDialog training={revisionFor} onClose={() => setRevisionFor(null)} onSaved={invalidate} />
     </>
   );
 }
@@ -570,5 +595,92 @@ function Toggle({ checked, onChange, label }: { checked: boolean; onChange: (val
       <input type="checkbox" checked={checked} onChange={(e) => onChange(e.target.checked)} />
       {label}
     </label>
+  );
+}
+
+/**
+ * O que a revisão do documento exige de quem já foi treinado.
+ * A ação escolhida vira o padrão do treinamento; "Aplicar agora" reprocessa a
+ * revisão vigente sem esperar a próxima publicação.
+ */
+function RevisionDialog({
+  training,
+  onClose,
+  onSaved,
+}: {
+  training: TrainingItem | null;
+  onClose: () => void;
+  onSaved: () => void;
+}) {
+  const [action, setAction] = useState('ACKNOWLEDGE');
+
+  const ACTION_LABEL: Record<string, string> = {
+    NONE: 'Não exige novo treinamento',
+    ACKNOWLEDGE: 'Exige ciência da nova versão',
+    RECYCLE_PREVIOUS_VERSIONS: 'Exige reciclagem de quem foi treinado em versões anteriores',
+    RETRAIN_ALL: 'Exige novo treinamento para todo o público vinculado',
+  };
+
+  const setDefault = useMutation({
+    mutationFn: () =>
+      api(`/training/documents/trainings/${training?.id}/revision-action`, { method: 'PATCH', json: { action } }),
+    onSuccess: () => {
+      toast.success('Ação padrão salva. Vale para as próximas revisões do documento.');
+      onSaved();
+      onClose();
+    },
+    onError: (error: Error) => toast.error(error.message),
+  });
+
+  const applyNow = useMutation({
+    mutationFn: () =>
+      api(`/training/documents/${training?.document?.id}/revision`, { method: 'POST', json: { action } }),
+    onSuccess: (result: any) => {
+      const reopened = Array.isArray(result) ? result.reduce((sum: number, item: any) => sum + (item.reopened ?? 0), 0) : 0;
+      toast.success(
+        reopened > 0
+          ? `${reopened} colaborador(es) voltaram para pendente nesta revisão.`
+          : 'Nenhum colaborador precisou ser reaberto.',
+      );
+      onSaved();
+      onClose();
+    },
+    onError: (error: Error) => toast.error(error.message),
+  });
+
+  return (
+    <Dialog open={Boolean(training)} onOpenChange={(open) => !open && onClose()}>
+      <DialogContent className="max-w-lg">
+        <DialogHeader>
+          <DialogTitle>Revisão do documento</DialogTitle>
+        </DialogHeader>
+        <div className="space-y-3 text-sm">
+          <p className="text-muted-foreground">
+            {training?.document?.code ? `${training.document.code} — ` : ''}
+            {training?.document?.title} (revisão {training?.document?.version})
+          </p>
+          <p className="rounded-md border bg-muted/40 px-3 py-2 text-xs text-muted-foreground">
+            Ao publicar uma nova revisão no GED, o sistema aplica esta ação automaticamente. O histórico anterior nunca é
+            apagado: fica registrado em que revisão cada pessoa foi treinada.
+          </p>
+          <div className="space-y-1.5">
+            <Label className="text-xs">O que a revisão exige</Label>
+            <NativeSelect value={action} onChange={(e) => setAction(e.target.value)}>
+              {Object.keys(ACTION_LABEL).map((key) => (
+                <option key={key} value={key}>{ACTION_LABEL[key]}</option>
+              ))}
+            </NativeSelect>
+          </div>
+        </div>
+        <DialogFooter>
+          <Button variant="outline" onClick={() => setDefault.mutate()} disabled={setDefault.isPending}>
+            Salvar como padrão
+          </Button>
+          <Button onClick={() => applyNow.mutate()} disabled={applyNow.isPending}>
+            Aplicar na revisão atual
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
   );
 }

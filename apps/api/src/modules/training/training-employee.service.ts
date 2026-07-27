@@ -39,7 +39,7 @@ export class TrainingEmployeeService {
           training: {
             select: {
               id: true, code: true, name: true, description: true, modality: true, workloadMinutes: true,
-              allowsOnline: true, requiresCertificate: true,
+              allowsOnline: true, requiresCertificate: true, requiresAssessment: true,
               document: { select: { id: true, code: true, title: true, version: true } },
             },
           },

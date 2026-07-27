@@ -5,6 +5,7 @@ import {
   TrainingCertificatesController,
   TrainingClassesController,
   TrainingController,
+  TrainingAssessmentController,
   TrainingDevelopmentController,
   TrainingDocumentController,
   TrainingEmployeeController,
@@ -13,6 +14,7 @@ import {
 import { TrainingCatalogService } from './training-catalog.service';
 import { TrainingDocumentService } from './training-document.service';
 import { TrainingDevelopmentService } from './training-development.service';
+import { TrainingAssessmentService } from './training-assessment.service';
 import { TrainingReportsService } from './training-reports.service';
 import { TrainingCertificatesService } from './training-certificates.service';
 import { TrainingClassesService } from './training-classes.service';
@@ -39,6 +41,7 @@ import { TrainingQueryService } from './training-query.service';
     TrainingCertificatesController,
     TrainingEmployeeController,
     TrainingDocumentController,
+    TrainingAssessmentController,
     TrainingDevelopmentController,
     TrainingReportsController,
   ],
@@ -47,6 +50,7 @@ import { TrainingQueryService } from './training-query.service';
     TrainingCatalogService,
     TrainingDocumentService,
     TrainingDevelopmentService,
+    TrainingAssessmentService,
     TrainingReportsService,
     TrainingClassesService,
     TrainingCertificatesService,

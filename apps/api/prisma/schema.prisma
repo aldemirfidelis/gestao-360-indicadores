@@ -652,6 +652,7 @@ model Company {
   trainingClasses              TrainingClass[]
   trainingCertificates         TrainingCertificate[]
   developmentPlans             DevelopmentPlan[]
+  trainingAssessments          TrainingAssessment[]
   dataProcessingRecords        DataProcessingRecord[]       @relation("DataProcessingRecordCompany")
   subprocessors                Subprocessor[]               @relation("SubprocessorCompany")
   dataIncidents                DataIncident[]               @relation("DataIncidentCompany")
@@ -6449,6 +6450,7 @@ model OrgEmployee {
   trainingCertificates TrainingCertificate[]
   trainingHistory     TrainingHistoryEntry[]
   developmentPlans    DevelopmentPlan[]
+  trainingAttempts    TrainingAssessmentAttempt[]
 
   @@index([companyId])
   @@index([orgNodeId])
@@ -15218,6 +15220,7 @@ model Training {
   classes      TrainingClass[]
   certificates TrainingCertificate[]
   developmentActions DevelopmentAction[]
+  assessment         TrainingAssessment?
 
   @@unique([companyId, code])
   @@index([companyId, status])
@@ -15585,5 +15588,148 @@ model DevelopmentAction {
   @@index([companyId, status])
   @@index([planId])
   @@map("development_actions")
+}
+
+
+/// Avaliacao de aprendizagem aplicada pelo portal.
+enum TrainingQuestionType {
+  SINGLE
+  MULTIPLE
+  TRUE_FALSE
+  TEXT
+}
+
+enum TrainingAttemptStatus {
+  IN_PROGRESS
+  SUBMITTED
+  GRADED
+  EXPIRED
+  CANCELLED
+}
+
+/// Prova de um treinamento. A nota minima vem do proprio treinamento para nao
+/// existirem dois lugares definindo aprovacao.
+model TrainingAssessment {
+  id         String   @id @default(uuid())
+  companyId  String
+  company    Company  @relation(fields: [companyId], references: [id])
+  trainingId String   @unique
+  training   Training @relation(fields: [trainingId], references: [id], onDelete: Cascade)
+
+  title        String
+  instructions String?
+  /// Tempo limite em minutos (null = sem limite).
+  timeLimitMinutes Int?
+  /// Quantas questoes sortear do banco (null = todas).
+  questionCount    Int?
+  randomizeQuestions Boolean @default(true)
+  randomizeOptions   Boolean @default(true)
+  /// Mostra o resultado ao colaborador logo apos enviar.
+  showResult         Boolean @default(true)
+  active             Boolean @default(true)
+
+  createdById String?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  deletedAt   DateTime?
+
+  questions TrainingAssessmentQuestion[]
+  attempts  TrainingAssessmentAttempt[]
+
+  @@index([companyId, active])
+  @@map("training_assessments")
+}
+
+model TrainingAssessmentQuestion {
+  id           String               @id @default(uuid())
+  companyId    String
+  assessmentId String
+  assessment   TrainingAssessment   @relation(fields: [assessmentId], references: [id], onDelete: Cascade)
+  statement    String
+  type         TrainingQuestionType @default(SINGLE)
+  points       Int                  @default(1)
+  position     Int                  @default(0)
+  explanation  String?
+  active       Boolean              @default(true)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  options TrainingAssessmentOption[]
+  answers TrainingAssessmentAnswer[]
+
+  @@index([assessmentId, active])
+  @@map("training_assessment_questions")
+}
+
+model TrainingAssessmentOption {
+  id         String                     @id @default(uuid())
+  companyId  String
+  questionId String
+  question   TrainingAssessmentQuestion @relation(fields: [questionId], references: [id], onDelete: Cascade)
+  label      String
+  correct    Boolean                    @default(false)
+  position   Int                        @default(0)
+
+  @@index([questionId])
+  @@map("training_assessment_options")
+}
+
+model TrainingAssessmentAttempt {
+  id           String                @id @default(uuid())
+  companyId    String
+  assessmentId String
+  assessment   TrainingAssessment    @relation(fields: [assessmentId], references: [id], onDelete: Cascade)
+  assignmentId String?
+  employeeId   String
+  employee     OrgEmployee           @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+
+  attemptNumber Int                   @default(1)
+  status        TrainingAttemptStatus @default(IN_PROGRESS)
+  startedAt     DateTime              @default(now())
+  /// Prazo calculado no inicio quando ha tempo limite.
+  expiresAt     DateTime?
+  submittedAt   DateTime?
+  durationSeconds Int?
+
+  score       Decimal? @db.Decimal(5, 2)
+  maxScore    Int?
+  passed      Boolean?
+  gradedById  String?
+  /// Ordem sorteada das questoes desta tentativa.
+  questionOrder Json?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  answers TrainingAssessmentAnswer[]
+
+  @@index([companyId, status])
+  @@index([employeeId])
+  @@index([assignmentId])
+  @@map("training_assessment_attempts")
+}
+
+model TrainingAssessmentAnswer {
+  id         String                     @id @default(uuid())
+  companyId  String
+  attemptId  String
+  attempt    TrainingAssessmentAttempt  @relation(fields: [attemptId], references: [id], onDelete: Cascade)
+  questionId String
+  question   TrainingAssessmentQuestion @relation(fields: [questionId], references: [id], onDelete: Cascade)
+  /// Ids das alternativas marcadas.
+  optionIds  Json?
+  text       String?
+  correct    Boolean?
+  points     Int      @default(0)
+  /// Correcao manual das questoes discursivas.
+  gradedById String?
+  gradedAt   DateTime?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([attemptId, questionId])
+  @@map("training_assessment_answers")
 }
 
