@@ -1,6 +1,7 @@
 'use client';
 
 import Link from 'next/link';
+import { usePathname } from 'next/navigation';
 import type { AnchorHTMLAttributes, ReactNode } from 'react';
 import { DEMO_PATH } from '@/lib/public-site';
 
@@ -11,6 +12,11 @@ type DemoLinkProps = Omit<AnchorHTMLAttributes<HTMLAnchorElement>, 'href' | 'onC
 };
 
 export function DemoLink({ children, href = DEMO_PATH, source = 'site_cta', ...props }: DemoLinkProps) {
+  const pathname = usePathname();
+  // Já estamos na página de destino (o formulário está logo abaixo): o botão
+  // não leva a lugar nenhum, então some — vale para o cabeçalho e para o hero.
+  if (pathname === href.split('?')[0]) return null;
+
   function trackDemoAccess() {
     const payload = {
       event: 'demo_access_click',

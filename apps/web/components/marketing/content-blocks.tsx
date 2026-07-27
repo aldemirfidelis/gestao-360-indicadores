@@ -3,18 +3,32 @@ import { ArrowRight, CheckCircle2 } from 'lucide-react';
 import type { FaqItem, PublicPage } from '@/lib/public-site';
 import { DemoLink } from './demo-link';
 
-export function PageHero({ eyebrow, title, description }: { eyebrow: string; title: string; description: string }) {
+export function PageHero({
+  eyebrow,
+  title,
+  description,
+  showDemoCta = true,
+}: {
+  eyebrow: string;
+  title: string;
+  description: string;
+  /** Desligue em páginas que já são o próprio destino do CTA (ex.: /demonstracao),
+   *  senão sobra um bloco vazio com margem no lugar do botão. */
+  showDemoCta?: boolean;
+}) {
   return (
     <section className="border-b border-slate-200 bg-slate-950 py-16 text-white">
       <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
         <p className="text-sm font-semibold uppercase tracking-[0.18em] text-emerald-300">{eyebrow}</p>
         <h1 className="mt-4 max-w-4xl text-4xl font-semibold tracking-tight sm:text-5xl">{title}</h1>
         <p className="mt-5 max-w-3xl text-lg leading-8 text-slate-200">{description}</p>
-        <div className="mt-8 flex flex-col gap-3 sm:flex-row">
-          <DemoLink source="public_page_hero" className="inline-flex h-11 items-center justify-center gap-2 bg-emerald-400 px-5 text-sm font-semibold text-slate-950 hover:bg-emerald-300">
-            Agendar Demonstração <ArrowRight className="h-4 w-4" />
-          </DemoLink>
-        </div>
+        {showDemoCta && (
+          <div className="mt-8 flex flex-col gap-3 sm:flex-row">
+            <DemoLink source="public_page_hero" className="inline-flex h-11 items-center justify-center gap-2 bg-emerald-400 px-5 text-sm font-semibold text-slate-950 hover:bg-emerald-300">
+              Agendar Demonstração <ArrowRight className="h-4 w-4" />
+            </DemoLink>
+          </div>
+        )}
       </div>
     </section>
   );

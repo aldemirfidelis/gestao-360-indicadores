@@ -28,10 +28,12 @@ export default function DemonstracaoPage() {
           ]),
         ]}
       />
+      {/* Sem o CTA: o formulário de agendamento está logo abaixo. */}
       <PageHero
         eyebrow="Demonstração"
         title="Veja o Gestão 360 aplicado à sua operação."
         description="Preencha o formulário e nossa equipe entrará em contato pelo e-mail informado para enviar a demonstração e agendar uma apresentação com quem decide na sua empresa."
+        showDemoCta={false}
       />
       <section className="bg-slate-50 py-16">
         <div className="mx-auto grid max-w-7xl gap-10 px-4 sm:px-6 lg:grid-cols-[1.1fr,0.9fr] lg:px-8">
