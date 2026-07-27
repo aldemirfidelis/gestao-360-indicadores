@@ -276,6 +276,7 @@ export const navSections: NavSection[] = [
       { href: '/servico-pessoal/admissoes', label: 'Admissão e Desligamento', description: 'Checklists de admissão/desligamento e saúde ocupacional (ASO)', icon: ClipboardCheck, permissions: ['pessoal:view', 'pessoal:manage'] },
       { href: '/servico-pessoal/folha', label: 'Folha de Pagamento', description: 'Cálculo de folha, holerites, competências e adiantamento', icon: Banknote, permissions: ['folha:view'] },
       { href: '/servico-pessoal/meu-holerite', label: 'Minha Vida Funcional', description: 'Seu ponto (bater ponto e espelho), férias, vagas internas, holerites e informe de rendimentos', icon: Wallet, permissions: EMPLOYEE_SELF_SERVICE_PERMISSIONS },
+      { href: '/servico-pessoal/meu-holerite?tab=comunicacao', label: 'Comunicação Interna', description: 'Comunicados, campanhas e informações importantes da empresa', icon: Megaphone, permissions: ['communication:view'] },
       { href: '/servico-pessoal/relatorios', label: 'Relatórios', description: 'Turnover, absenteísmo, horas extras e exportação para a folha', icon: FileBarChart, permissions: ['pessoal:view', 'pessoal:manage'] },
       { href: '/servico-pessoal/configuracoes', label: 'Configurações', description: 'Numeração da matrícula e modelo do crachá de identificação', icon: Settings, permissions: ['pessoal:settings', 'pessoal:manage'] },
     ],
@@ -296,19 +297,20 @@ export const navSections: NavSection[] = [
     ],
   },
   {
+    // Central de publicações internas. O chat continua ativo em /comunicacao/chat,
+    // acessível pelo botão de mensagens do cabeçalho — fora deste menu, que trata
+    // apenas do fluxo de publicações.
     heading: 'Comunicação',
-    description: 'Mural, central, campanhas, mídias, métricas e chat',
+    description: 'Publicações institucionais enviadas aos colaboradores',
     intent: 'management',
     icon: Megaphone,
     permissions: ['communication:view'],
     items: [
-      { href: '/comunicacao?tab=mural', label: 'Meu Mural', description: 'Comunicados e pendências obrigatórias', icon: Megaphone, permissions: ['communication:view'] },
-      { href: '/comunicacao?tab=central', label: 'Central', description: 'Central de comunicados publicados e agendados', icon: FileText, permissions: ['communication:view'] },
-      { href: '/comunicacao?tab=criar', label: 'Criar', description: 'Criar novo comunicado', icon: Plus, permissions: ['communication:create', 'communication:manage'] },
-      { href: '/comunicacao?tab=campanhas', label: 'Campanhas', description: 'Campanhas internas', icon: Radio, permissions: ['communication:view'] },
-      { href: '/comunicacao?tab=midias', label: 'Mídias', description: 'Biblioteca de mídias e modelos', icon: ImageIcon, permissions: ['communication:view'] },
-      { href: '/comunicacao?tab=metricas', label: 'Métricas', description: 'Métricas e relatórios de comunicação', icon: FileBarChart, permissions: ['communication:reports', 'communication:view'] },
-      { href: '/comunicacao?tab=chat', label: 'Chat', description: 'Conversas internas', icon: MessageSquare, permissions: ['communication:view'] },
+      { href: '/comunicacao', label: 'Visão Geral', description: 'Indicadores, publicações recentes e programadas', icon: Megaphone, permissions: ['communication:view'], exact: true },
+      { href: '/comunicacao/publicacoes', label: 'Publicações', description: 'Gerenciar todas as publicações da empresa', icon: FileText, permissions: ['communication:view'] },
+      { href: '/comunicacao/publicacoes/nova', label: 'Criar Publicação', description: 'Conteúdo, aparência, público e divulgação', icon: Plus, permissions: ['communication:create', 'communication:manage'] },
+      { href: '/comunicacao/midias', label: 'Biblioteca de Mídias', description: 'Imagens, banners e documentos reutilizáveis', icon: ImageIcon, permissions: ['communication:view'] },
+      { href: '/comunicacao/configuracoes', label: 'Configurações', description: 'Categorias e fluxo de aprovação', icon: Settings, permissions: ['communication:manage', 'communication:categories'] },
     ],
   },
   {

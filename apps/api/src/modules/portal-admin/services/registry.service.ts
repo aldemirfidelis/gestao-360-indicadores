@@ -6,6 +6,13 @@ import { CATALOG_FEATURES, CATALOG_MODULES, CATALOG_PAGES } from '../portal-cata
 import { CRITICAL_CONFIRMATION_PHRASE, isNonBlockable, UNAVAILABLE_STATUSES } from '../portal-admin.constants';
 
 const DEPRECATED_PAGE_CODES = ['processes.sipoc'];
+/** Telas removidas na refatoração da Comunicação (viraram publicações). */
+const DEPRECATED_COMMUNICATION_PAGE_CODES = [
+  'communication.wall',
+  'communication.central',
+  'communication.campaigns',
+  'communication.metrics',
+];
 
 @Injectable()
 export class RegistryService implements OnModuleInit {
@@ -57,6 +64,10 @@ export class RegistryService implements OnModuleInit {
     await this.prisma.portalPage.updateMany({
       where: { code: { in: DEPRECATED_PAGE_CODES } },
       data: { status: 'HIDDEN', menuOrder: 9999, updateReason: 'Substituida pela tela unica de Processos.' },
+    });
+    await this.prisma.portalPage.updateMany({
+      where: { code: { in: DEPRECATED_COMMUNICATION_PAGE_CODES } },
+      data: { status: 'HIDDEN', menuOrder: 9999, updateReason: 'Substituida pela central de Publicacoes da Comunicacao.' },
     });
     for (const f of CATALOG_FEATURES) {
       const exists = await this.prisma.portalFeature.findUnique({ where: { code: f.code } });

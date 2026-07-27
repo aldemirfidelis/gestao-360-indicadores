@@ -5,7 +5,7 @@ import { useSearchParams } from 'next/navigation';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
 import { jsPDF } from 'jspdf';
-import { Briefcase, CheckCircle2, Download, FileText, Fingerprint, SunMedium, Trophy, Wallet } from 'lucide-react';
+import { Briefcase, CheckCircle2, Download, FileText, Fingerprint, Megaphone, SunMedium, Trophy, Wallet } from 'lucide-react';
 import { PageHeader } from '@/components/shell/page-header';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -15,6 +15,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { MeuPontoPanel } from '@/components/personnel/meu-ponto-panel';
 import { MinhasFeriasPanel } from '@/components/personnel/minhas-ferias-panel';
 import { VagasInternasPanel } from '@/components/personnel/vagas-internas-panel';
+import { InternalCommunicationFeed } from '@/components/communication/internal-feed';
 import { api } from '@/lib/api';
 
 interface Payslip { id: string; netPay: string; run: { kind: string; competence: { year: number; month: number } } }
@@ -35,7 +36,7 @@ interface PrizePayslip { id: string; competence: string; finalValue: string | nu
 const MONTHS = ['', 'Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun', 'Jul', 'Ago', 'Set', 'Out', 'Nov', 'Dez'];
 const money = (v: number | string) => Number(v).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
 
-const TABS = ['ponto', 'ferias', 'vagas', 'pagamentos'] as const;
+const TABS = ['ponto', 'ferias', 'vagas', 'pagamentos', 'comunicacao'] as const;
 
 export default function MyPayslipPage() {
   const qc = useQueryClient();
@@ -120,18 +121,23 @@ export default function MyPayslipPage() {
 
   return (
     <div className="space-y-4">
-      <PageHeader title="Minha Vida Funcional" description="Seu ponto, minhas férias, vagas internas, holerites e informe de rendimentos." />
+      <PageHeader title="Minha Vida Funcional" description="Seu ponto, minhas férias, vagas internas, comunicação interna, holerites e informe de rendimentos." />
 
       <Tabs defaultValue={initialTab} className="space-y-4">
         <TabsList className="bg-slate-100 dark:bg-slate-800">
           <TabsTrigger value="ponto" className="text-xs font-semibold"><Fingerprint className="mr-2 h-4 w-4" />Meu Ponto</TabsTrigger>
           <TabsTrigger value="ferias" className="text-xs font-semibold"><SunMedium className="mr-2 h-4 w-4" />Minhas Férias</TabsTrigger>
           <TabsTrigger value="vagas" className="text-xs font-semibold"><Briefcase className="mr-2 h-4 w-4" />Vagas Internas</TabsTrigger>
+          <TabsTrigger value="comunicacao" className="text-xs font-semibold"><Megaphone className="mr-2 h-4 w-4" />Comunicação Interna</TabsTrigger>
           <TabsTrigger value="pagamentos" className="text-xs font-semibold"><Wallet className="mr-2 h-4 w-4" />Holerites e Rendimentos</TabsTrigger>
         </TabsList>
 
         <TabsContent value="ponto">
           <MeuPontoPanel />
+        </TabsContent>
+
+        <TabsContent value="comunicacao">
+          <InternalCommunicationFeed />
         </TabsContent>
 
         <TabsContent value="ferias">

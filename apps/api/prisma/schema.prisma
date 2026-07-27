@@ -642,6 +642,8 @@ model Company {
   communicationPosts           CommunicationPost[]
   communicationCampaigns       CommunicationCampaign[]
   communicationMedia           CommunicationMedia[]
+  communicationCategories      CommunicationCategory[]
+  communicationSettings        CommunicationSettings?
   dataProcessingRecords        DataProcessingRecord[]       @relation("DataProcessingRecordCompany")
   subprocessors                Subprocessor[]               @relation("SubprocessorCompany")
   dataIncidents                DataIncident[]               @relation("DataIncidentCompany")
@@ -5642,6 +5644,32 @@ enum CommPostType {
   CAMPAIGN
 }
 
+/// Formato de exibicao da publicacao no feed do colaborador.
+enum CommPostLayout {
+  BANNER_WIDE // banner horizontal 16:9
+  FEED_CARD // card de feed 4:5
+  IMAGE_TEXT // imagem + texto
+  GALLERY // galeria de imagens
+  TEXT_ONLY // somente comunicado textual
+}
+
+/// Publico de uma publicacao. ORG_NODE cobre unidade/diretoria/area/setor
+/// (o tipo vem do proprio OrgNode) e propaga para os nos descendentes.
+enum CommAudienceKind {
+  ALL
+  ORG_NODE
+  JOB
+  ROLE
+  USER
+}
+
+/// Papel de uma midia dentro da publicacao (capa, galeria ou anexo).
+enum CommPostMediaRole {
+  COVER
+  GALLERY
+  ATTACHMENT
+}
+
 enum CommPostPriority {
   LOW
   NORMAL
@@ -5702,12 +5730,21 @@ model CommunicationPost {
   subtitle                 String?
   content                  String
   type                     CommPostType           @default(SIMPLE)
+  /// Categoria em tabela propria (configuravel por empresa). `category` (texto)
+  /// permanece como rotulo desnormalizado para listagens e historico.
+  categoryId               String?
+  categoryRef              CommunicationCategory? @relation(fields: [categoryId], references: [id])
   category                 String                 @default("Institucional")
+  layout                   CommPostLayout         @default(IMAGE_TEXT)
   priority                 CommPostPriority       @default(NORMAL)
   status                   CommPostStatus         @default(DRAFT)
   authorId                 String
+  updatedById              String?
+  publishedById            String?
   approverId               String?
   approvalComment          String?
+  /// Regra de publico legada (mantida so para leitura do historico). O publico
+  /// efetivo vive em CommunicationPostAudience/CommunicationPostRecipient.
   audience                 Json
   channels                 Json
   poll                     Json?
@@ -5718,21 +5755,28 @@ model CommunicationPost {
   publishedAt              DateTime?
   archivedAt               DateTime?
   coverImageUrl            String?
+  coverImageAlt            String?
   bannerUrl                String?
   videoUrl                 String?
   thumbnailUrl             String?
   actionUrl                String?
   actionLabel              String?
+  actionNewTab             Boolean                @default(false)
   estimatedMinutes         Int?
   requiresReadConfirmation Boolean                @default(false)
   requiresPollAnswer       Boolean                @default(false)
   requiresVideoCompletion  Boolean                @default(false)
   allowComments            Boolean                @default(true)
   allowReactions           Boolean                @default(true)
+  allowAttachmentDownload  Boolean                @default(true)
   isMandatory              Boolean                @default(false)
   isPinned                 Boolean                @default(false)
   isFeatured               Boolean                @default(false)
   publicLinkEnabled        Boolean                @default(false)
+  /// Exibir em Minha Vida Funcional > Comunicacao Interna (padrao do fluxo).
+  showInEmployeeFeed       Boolean                @default(true)
+  notifyInApp              Boolean                @default(true)
+  notifyEmail              Boolean                @default(false)
   qrCodeValue              String?
   linkedModule             String?
   linkedEntityId           String?
@@ -5745,10 +5789,90 @@ model CommunicationPost {
   reactions     CommunicationPostReaction[]
   comments      CommunicationPostComment[]
   pollResponses CommunicationPollResponse[]
+  audienceRules CommunicationPostAudience[]
+  recipients    CommunicationPostRecipient[]
+  mediaLinks    CommunicationPostMedia[]
 
   @@index([companyId, status])
   @@index([companyId, publishedAt])
+  @@index([companyId, status, showInEmployeeFeed])
   @@index([campaignId])
+  @@index([categoryId])
+}
+
+/// Categorias de publicacao configuraveis por empresa (Comunicado, Campanha,
+/// Beneficio, Evento, Seguranca, RH, Treinamento, Saude, Reconhecimento,
+/// Institucional — semeadas na primeira abertura do modulo).
+model CommunicationCategory {
+  id        String    @id @default(uuid())
+  companyId String
+  company   Company   @relation(fields: [companyId], references: [id])
+  name      String
+  slug      String
+  color     String?
+  active    Boolean   @default(true)
+  position  Int       @default(0)
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  deletedAt DateTime?
+
+  posts CommunicationPost[]
+
+  @@unique([companyId, slug])
+  @@index([companyId, active])
+}
+
+/// Configuracao do modulo por empresa (fluxo de aprovacao opcional).
+model CommunicationSettings {
+  id                String   @id @default(uuid())
+  companyId         String   @unique
+  company           Company  @relation(fields: [companyId], references: [id])
+  approvalRequired  Boolean  @default(false)
+  defaultEmployeeFeed Boolean @default(true)
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+}
+
+/// Publico definido na publicacao (relacao real, sem listas em texto).
+model CommunicationPostAudience {
+  id     String            @id @default(uuid())
+  postId String
+  post   CommunicationPost @relation(fields: [postId], references: [id], onDelete: Cascade)
+  kind   CommAudienceKind
+  /// OrgNode.id, OrgJob.id, User.id ou o codigo do papel (UserRoleEnum).
+  refId  String?
+
+  @@unique([postId, kind, refId])
+  @@index([postId])
+}
+
+/// Destinatarios materializados na publicacao — base das metricas (publico
+/// total, nao visualizados, confirmacoes pendentes) e do feed do colaborador.
+model CommunicationPostRecipient {
+  id        String            @id @default(uuid())
+  postId    String
+  post      CommunicationPost @relation(fields: [postId], references: [id], onDelete: Cascade)
+  userId    String
+  createdAt DateTime          @default(now())
+
+  @@unique([postId, userId])
+  @@index([userId])
+}
+
+/// Vinculo publicacao <-> biblioteca de midias (capa, galeria e anexos),
+/// evitando duplicar arquivos entre publicacoes.
+model CommunicationPostMedia {
+  id       String             @id @default(uuid())
+  postId   String
+  post     CommunicationPost  @relation(fields: [postId], references: [id], onDelete: Cascade)
+  mediaId  String
+  media    CommunicationMedia @relation(fields: [mediaId], references: [id], onDelete: Cascade)
+  role     CommPostMediaRole  @default(GALLERY)
+  position Int                @default(0)
+  alt      String?
+
+  @@unique([postId, mediaId, role])
+  @@index([mediaId])
 }
 
 model CommunicationPostRead {
@@ -5833,8 +5957,14 @@ model CommunicationMedia {
   name        String
   type        CommMediaType   @default(IMAGE)
   category    String?
+  /// Pasta livre da biblioteca (organizacao por pasta ou categoria).
+  folder      String?
   tags        Json?
   url         String?
+  mimeType    String?
+  sizeBytes   Int?
+  width       Int?
+  height      Int?
   ownerAreaId String?
   authorId    String?
   version     Int             @default(1)
@@ -5842,9 +5972,13 @@ model CommunicationMedia {
   validUntil  DateTime?
   usageCount  Int             @default(0)
   createdAt   DateTime        @default(now())
+  updatedAt   DateTime        @default(now()) @updatedAt
   deletedAt   DateTime?
 
+  postLinks CommunicationPostMedia[]
+
   @@index([companyId, status])
+  @@index([companyId, folder])
 }
 
 // =====================================================

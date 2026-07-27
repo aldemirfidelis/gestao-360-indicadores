@@ -1,366 +1,214 @@
 'use client';
 
 import Link from 'next/link';
-import { useEffect, useMemo, useRef, useState } from 'react';
-import { useRouter, useSearchParams } from 'next/navigation';
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { toast } from 'sonner';
-import { Plus, Users } from 'lucide-react';
+import { useQuery } from '@tanstack/react-query';
+import { CalendarClock, Eye, Images, Megaphone, Plus, ClipboardCheck } from 'lucide-react';
 import { PageHeader } from '@/components/shell/page-header';
-import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
-import { Tabs, TabsContent } from '@/components/ui/tabs';
+import { Card, CardContent } from '@/components/ui/card';
+import { Skeleton } from '@/components/ui/skeleton';
 import { useAuth } from '@/components/auth/auth-provider';
 import { api } from '@/lib/api';
-import type { ConversationSummary } from '@/lib/communication/types';
-import {
-  audienceLabel,
-  defaultForm,
-  formPayload,
-  isCommunicationTab,
-  type CommunicationOverview,
-  type CommunicationTab,
-  type MediaItem,
-  type MediaUploadPayload,
-  type PostStatus,
-} from '@/components/communication/organizational/shared';
-import { Dashboard, EngagementCharts, IntegrationSignals, MetricsPanel } from '@/components/communication/organizational/overview-panels';
-import { CommunicationTable, PostDetail, PostGrid } from '@/components/communication/organizational/post-views';
-import { CreatePostForm } from '@/components/communication/organizational/create-post-form';
-import { CampaignsPanel, MediaPanel } from '@/components/communication/organizational/campaigns-media';
-import { ChatWorkspace } from '@/components/communication/organizational/chat-workspace';
-import { CommunicationDashboardView } from '@/components/communication/organizational/dashboard-view';
+import { formatDate } from '@/lib/utils';
+import { CategoryChip, CoverImage, StatusBadge } from '@/components/communication/publication-bits';
+import type { Publication, PublicationOverview } from '@/lib/communication/publications';
 
 export default function ComunicacaoPage() {
-  const router = useRouter();
-  const searchParams = useSearchParams();
-  const qc = useQueryClient();
   const { hasPermission } = useAuth();
-  const requestedConversation = searchParams.get('c');
-  const requestedUser = searchParams.get('to');
-  const requestedPost = searchParams.get('post');
-  const requestedTab = searchParams.get('tab');
-  const startedFor = useRef<string | null>(null);
-  const initialTab = requestedConversation || requestedUser ? 'chat' : isCommunicationTab(requestedTab) ? requestedTab : 'mural';
-  const [tab, setTab] = useState<CommunicationTab>(initialTab);
-  const [selectedPostId, setSelectedPostId] = useState<string | null>(requestedPost);
-  const [form, setForm] = useState(defaultForm);
-  const [aiPrompt, setAiPrompt] = useState('');
-  const [commentText, setCommentText] = useState('');
-  const [pollAnswer, setPollAnswer] = useState('');
-  const [channelFilter, setChannelFilter] = useState('Todos os canais');
-  const [detailPostOpen, setDetailPostOpen] = useState(false);
+  const canCreate = hasPermission(['communication:create', 'communication:manage']);
 
-  const overview = useQuery<CommunicationOverview>({
-    queryKey: ['communication-organizational'],
-    queryFn: () => api('/communication/organizational'),
+  const overview = useQuery<PublicationOverview>({
+    queryKey: ['communication-overview'],
+    queryFn: () => api('/communication/publications/overview'),
   });
-
-  const conversations = useQuery<ConversationSummary[]>({
-    queryKey: ['conversations'],
-    queryFn: () => api('/communication/conversations'),
-    refetchInterval: tab === 'chat' ? 30_000 : false,
-  });
-
-  const startDirect = useMutation({
-    mutationFn: (userId: string) =>
-      api<ConversationSummary>('/communication/conversations/direct', {
-        method: 'POST',
-        json: { userId },
-      }),
-    onSuccess: (conversation) => {
-      qc.invalidateQueries({ queryKey: ['conversations'] });
-      router.replace(`/comunicacao?c=${conversation.id}`);
-      setTab('chat');
-    },
-    onError: (e: any) => {
-      toast.error(e?.message ?? 'Não foi possível iniciar a conversa');
-      router.replace('/comunicacao');
-    },
-  });
-
-  useEffect(() => {
-    if (!requestedUser || startedFor.current === requestedUser) return;
-    startedFor.current = requestedUser;
-    startDirect.mutate(requestedUser);
-  }, [requestedUser, startDirect]);
-
-  useEffect(() => {
-    if (requestedPost) {
-      setSelectedPostId(requestedPost);
-      setTab('mural');
-    }
-  }, [requestedPost]);
-
-  useEffect(() => {
-    if (requestedConversation || requestedUser) {
-      setTab('chat');
-      return;
-    }
-    if (isCommunicationTab(requestedTab)) setTab(requestedTab);
-  }, [requestedConversation, requestedUser, requestedTab]);
-
-  const createPost = useMutation({
-    mutationFn: () => api('/communication/organizational/posts', { method: 'POST', json: formPayload(form) }),
-    onSuccess: async () => {
-      toast.success('Comunicado salvo');
-      setForm(defaultForm);
-      await overview.refetch();
-      setTab('central');
-    },
-    onError: (e: Error) => toast.error(e.message),
-  });
-
-  const changeStatus = useMutation({
-    mutationFn: ({ id, status }: { id: string; status: PostStatus }) =>
-      api(`/communication/organizational/posts/${id}/status`, { method: 'POST', json: { status } }),
-    onSuccess: async () => {
-      toast.success('Status atualizado');
-      await overview.refetch();
-    },
-    onError: (e: Error) => toast.error(e.message),
-  });
-
-  const markRead = useMutation({
-    mutationFn: ({ id, confirmed }: { id: string; confirmed: boolean }) =>
-      api(`/communication/organizational/posts/${id}/read`, {
-        method: 'POST',
-        json: { confirmed, channel: 'Portal web', device: 'browser' },
-      }),
-    onSuccess: async () => {
-      toast.success('Ciência registrada');
-      await overview.refetch();
-    },
-  });
-
-  const react = useMutation({
-    mutationFn: ({ id, type }: { id: string; type: string }) =>
-      api(`/communication/organizational/posts/${id}/reactions`, { method: 'POST', json: { type } }),
-    onSuccess: () => overview.refetch(),
-  });
-
-  const addComment = useMutation({
-    mutationFn: ({ id, body }: { id: string; body: string }) =>
-      api(`/communication/organizational/posts/${id}/comments`, { method: 'POST', json: { body } }),
-    onSuccess: async () => {
-      setCommentText('');
-      await overview.refetch();
-    },
-  });
-
-  const respondPoll = useMutation({
-    mutationFn: ({ id, answer }: { id: string; answer: string }) =>
-      api(`/communication/organizational/posts/${id}/poll-responses`, { method: 'POST', json: { answers: [answer] } }),
-    onSuccess: async () => {
-      setPollAnswer('');
-      toast.success('Resposta registrada');
-      await overview.refetch();
-    },
-  });
-
-  const generateAi = useMutation({
-    mutationFn: () =>
-      api<any>('/communication/organizational/ai/draft', {
-        method: 'POST',
-        json: {
-          objective: aiPrompt || form.title || 'Comunicado interno',
-          audience: audienceLabel(form.audienceScope),
-          tone: 'corporativo, simples e acessível',
-          sourceText: form.content,
-          type: form.type,
-        },
-      }),
-    onSuccess: (data) => {
-      const draft = data.draft ?? {};
-      setForm((current) => ({
-        ...current,
-        title: draft.title ?? current.title,
-        subtitle: draft.subtitle ?? current.subtitle,
-        content: draft.fullVersion ?? draft.shortVersion ?? current.content,
-      }));
-      toast.success('Rascunho gerado');
-    },
-    onError: (e: Error) => toast.error(e.message),
-  });
-
-  const createCampaign = useMutation({
-    mutationFn: (payload: any) => api('/communication/organizational/campaigns', { method: 'POST', json: payload }),
-    onSuccess: () => overview.refetch(),
-  });
-
-  const createMedia = useMutation({
-    mutationFn: (payload: any) => api('/communication/organizational/media', { method: 'POST', json: payload }),
-    onSuccess: async () => {
-      toast.success('Mídia adicionada');
-      await overview.refetch();
-    },
-    onError: (e: Error) => toast.error(e.message),
-  });
-
-  const uploadMedia = useMutation<MediaItem, Error, MediaUploadPayload>({
-    mutationFn: (payload) => api<MediaItem>('/communication/organizational/media/upload', { method: 'POST', json: payload }),
-    onSuccess: () => overview.refetch(),
-    onError: (e: Error) => toast.error(e.message),
-  });
-
-  const selectedId = useMemo(() => {
-    const list = conversations.data ?? [];
-    if (requestedConversation && list.some((c) => c.id === requestedConversation)) return requestedConversation;
-    return list[0]?.id ?? null;
-  }, [conversations.data, requestedConversation]);
-
-  const selectedConversation = useMemo(
-    () => (conversations.data ?? []).find((c) => c.id === selectedId) ?? null,
-    [conversations.data, selectedId],
-  );
-  const unread = (conversations.data ?? []).reduce((sum, c) => sum + c.unread, 0);
   const data = overview.data;
-  const posts = data?.posts ?? [];
-  const selectedPost = posts.find((post) => post.id === selectedPostId) ?? data?.myWall?.mandatoryPending?.[0] ?? data?.myWall?.recent?.[0] ?? null;
-  const canCreate = hasPermission(['communication:create', 'communication:manage', 'communication:attachments']);
 
   return (
-    <div className="space-y-4">
-      {tab === 'mural' ? (
-        <CommunicationDashboardView
-          data={data}
-          loading={overview.isLoading}
-          channelFilter={channelFilter}
-          setChannelFilter={setChannelFilter}
-          setTab={setTab}
-          onCreatePreset={(preset) => {
-            setForm({ ...defaultForm, ...preset, channels: { ...defaultForm.channels, ...(preset.channels ?? {}) } });
-            setTab('criar');
-          }}
-          onSelectPost={(id) => {
-            setSelectedPostId(id);
-            setDetailPostOpen(true);
-          }}
-          unread={unread}
-          conversationCount={conversations.data?.length ?? 0}
-          onMessageUser={(id) => startDirect.mutate(id)}
-          canCreate={canCreate}
-        />
-      ) : (
-        <>
-          <PageHeader
-            eyebrow="Comunicação"
-            tone="view"
-            title="Comunicação Organizacional"
-            description="Comunicados, campanhas, mural, pesquisas, confirmações e chat corporativo."
-            actions={
-              <div className="flex flex-wrap items-center gap-2">
-                <Badge variant="secondary">{data?.metrics?.mandatoryPending ?? 0} ciência(s) pendente(s)</Badge>
-                <Badge variant="outline">{unread} mensagem(ns)</Badge>
-                <Button asChild variant="outline">
-                  <Link href="/pessoas">
-                    <Users className="mr-2 h-4 w-4" />
-                    Pessoas
-                  </Link>
-                </Button>
-                {canCreate && (
-                  <Button onClick={() => setTab('criar')}>
-                    <Plus className="mr-2 h-4 w-4" />
-                    Novo comunicado
-                  </Button>
-                )}
-              </div>
-            }
-          />
-
-          <Dashboard metrics={data?.metrics} loading={overview.isLoading} />
-
-          <Tabs value={tab} onValueChange={(value) => isCommunicationTab(value) && setTab(value)} className="space-y-4">
-            {/* abas removidas pois já estão no menu lateral */}
-
-            <TabsContent value="mural" className="hidden" />
-
-        <TabsContent value="central" className="space-y-4">
-          <CommunicationTable
-            posts={posts}
-            onSelect={(post) => {
-              setSelectedPostId(post.id);
-              setTab('mural');
-            }}
-            onStatus={(id, status) => changeStatus.mutate({ id, status })}
-          />
-        </TabsContent>
-
-        <TabsContent value="criar" className="space-y-4">
-          <CreatePostForm
-            form={form}
-            setForm={setForm}
-            overview={data}
-            aiPrompt={aiPrompt}
-            setAiPrompt={setAiPrompt}
-            generateAi={() => generateAi.mutate()}
-            saving={createPost.isPending}
-            uploadMedia={uploadMedia.mutateAsync}
-            uploadingMedia={uploadMedia.isPending}
-            onSubmit={() => createPost.mutate()}
-          />
-        </TabsContent>
-
-        <TabsContent value="campanhas" className="space-y-4">
-          <CampaignsPanel campaigns={data?.campaigns ?? []} createCampaign={(payload) => createCampaign.mutate(payload)} />
-        </TabsContent>
-
-        <TabsContent value="midias" className="space-y-4">
-          <MediaPanel
-            media={data?.media ?? []}
-            createMedia={(payload) => createMedia.mutateAsync(payload)}
-            uploadMedia={uploadMedia.mutateAsync}
-            uploadingMedia={uploadMedia.isPending}
-          />
-        </TabsContent>
-
-        <TabsContent value="metricas" className="space-y-4">
-          <div className="grid grid-cols-1 gap-4 xl:grid-cols-[1.2fr_0.8fr]">
-            <EngagementCharts data={data} />
-            <IntegrationSignals data={data} />
+    <div className="space-y-6">
+      <PageHeader
+        eyebrow="Comunicação"
+        tone="view"
+        title="Comunicação Interna"
+        description="Crie, programe e acompanhe as comunicações enviadas aos colaboradores."
+        actions={
+          <div className="flex flex-wrap items-center gap-2">
+            <Button asChild variant="outline">
+              <Link href="/comunicacao/midias">
+                <Images className="mr-2 h-4 w-4" />
+                Biblioteca de mídias
+              </Link>
+            </Button>
+            {canCreate && (
+              <Button asChild>
+                <Link href="/comunicacao/publicacoes/nova">
+                  <Plus className="mr-2 h-4 w-4" />
+                  Nova publicação
+                </Link>
+              </Button>
+            )}
           </div>
-          <MetricsPanel data={data} />
-          <PostGrid posts={data?.charts?.mostAccessed ?? []} onSelect={(post) => { setSelectedPostId(post.id); setTab('mural'); }} />
-        </TabsContent>
+        }
+      />
 
-        <TabsContent value="chat" className="space-y-4">
-          <ChatWorkspace
-            conversations={conversations.data ?? []}
-            selectedId={selectedId}
-            selected={selectedConversation}
-            isLoading={conversations.isLoading || startDirect.isPending}
-            onSelect={(id) => router.replace(`/comunicacao?c=${id}`)}
+      <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+        <Metric label="Publicações ativas" value={data?.metrics.active} icon={Megaphone} loading={overview.isLoading} />
+        <Metric label="Publicações programadas" value={data?.metrics.scheduled} icon={CalendarClock} loading={overview.isLoading} />
+        <Metric label="Visualizações no mês" value={data?.metrics.viewsThisMonth} icon={Eye} loading={overview.isLoading} />
+        <Metric
+          label="Confirmações pendentes"
+          value={data?.metrics.pendingConfirmations}
+          icon={ClipboardCheck}
+          loading={overview.isLoading}
+        />
+      </div>
+
+      <section className="space-y-3">
+        <div className="flex items-center justify-between">
+          <h2 className="text-base font-semibold">Publicações recentes</h2>
+          <Button asChild variant="ghost" size="sm">
+            <Link href="/comunicacao/publicacoes">Ver todas</Link>
+          </Button>
+        </div>
+        {overview.isLoading ? (
+          <Skeleton className="h-48 w-full" />
+        ) : (data?.recent.length ?? 0) === 0 ? (
+          <EmptyBlock
+            message="Nenhuma publicação divulgada ainda."
+            actionLabel={canCreate ? 'Criar primeira publicação' : undefined}
+            href="/comunicacao/publicacoes/nova"
           />
-        </TabsContent>
-      </Tabs>
-        </>
-      )}
+        ) : (
+          <RecentTable posts={data!.recent} />
+        )}
+      </section>
 
-      {detailPostOpen && selectedPost && (
-        <Dialog open={detailPostOpen} onOpenChange={setDetailPostOpen}>
-          <DialogContent className="max-w-3xl overflow-y-auto max-h-[90vh] bg-card text-card-foreground">
-            <DialogHeader>
-              <DialogTitle>Detalhes do Comunicado</DialogTitle>
-            </DialogHeader>
-            <div className="p-2">
-              <PostDetail
-                post={selectedPost}
-                markRead={(confirmed) => selectedPost && markRead.mutate({ id: selectedPost.id, confirmed })}
-                react={(type) => selectedPost && react.mutate({ id: selectedPost.id, type })}
-                commentText={commentText}
-                setCommentText={setCommentText}
-                submitComment={() => selectedPost && commentText.trim() && addComment.mutate({ id: selectedPost.id, body: commentText })}
-                pollAnswer={pollAnswer}
-                setPollAnswer={setPollAnswer}
-                submitPoll={() => selectedPost && pollAnswer && respondPoll.mutate({ id: selectedPost.id, answer: pollAnswer })}
-              />
-            </div>
-            <DialogFooter>
-              <Button onClick={() => setDetailPostOpen(false)}>Fechar</Button>
-            </DialogFooter>
-          </DialogContent>
-        </Dialog>
+      <section className="space-y-3">
+        <h2 className="text-base font-semibold">Publicações programadas</h2>
+        {overview.isLoading ? (
+          <Skeleton className="h-24 w-full" />
+        ) : (data?.scheduledPosts.length ?? 0) === 0 ? (
+          <EmptyBlock
+            message="Nenhuma publicação programada."
+            actionLabel={canCreate ? 'Programar publicação' : undefined}
+            href="/comunicacao/publicacoes/nova?agendar=1"
+          />
+        ) : (
+          <div className="divide-y rounded-lg border bg-card">
+            {data!.scheduledPosts.map((post) => (
+              <Link
+                key={post.id}
+                href={`/comunicacao/publicacoes/${post.id}`}
+                className="flex flex-wrap items-center justify-between gap-3 px-4 py-3 transition-colors hover:bg-muted/50"
+              >
+                <div className="min-w-0">
+                  <p className="truncate text-sm font-medium">{post.title}</p>
+                  <p className="text-xs text-muted-foreground">
+                    {post.category} · {post.audienceLabel}
+                  </p>
+                </div>
+                <div className="flex items-center gap-3 text-xs text-muted-foreground">
+                  <span className="inline-flex items-center gap-1.5">
+                    <CalendarClock className="h-3.5 w-3.5" />
+                    {formatDate(post.publishAt)}
+                  </span>
+                  <StatusBadge status={post.status} />
+                </div>
+              </Link>
+            ))}
+          </div>
+        )}
+      </section>
+    </div>
+  );
+}
+
+function Metric({
+  label,
+  value,
+  icon: Icon,
+  loading,
+}: {
+  label: string;
+  value?: number;
+  icon: React.ComponentType<{ className?: string }>;
+  loading: boolean;
+}) {
+  return (
+    <Card>
+      <CardContent className="flex items-center justify-between gap-3 p-4">
+        <div className="min-w-0">
+          <p className="truncate text-xs text-muted-foreground">{label}</p>
+          {loading ? (
+            <Skeleton className="mt-1.5 h-7 w-12" />
+          ) : (
+            <p className="mt-0.5 text-2xl font-semibold tabular-nums">{value ?? 0}</p>
+          )}
+        </div>
+        <Icon className="h-5 w-5 shrink-0 text-muted-foreground" />
+      </CardContent>
+    </Card>
+  );
+}
+
+function RecentTable({ posts }: { posts: Publication[] }) {
+  return (
+    <div className="overflow-x-auto rounded-lg border bg-card">
+      <table className="w-full min-w-[720px] text-sm">
+        <thead className="border-b bg-muted/40 text-xs uppercase tracking-wide text-muted-foreground">
+          <tr>
+            <th className="px-4 py-2.5 text-left font-medium">Publicação</th>
+            <th className="px-4 py-2.5 text-left font-medium">Categoria</th>
+            <th className="px-4 py-2.5 text-left font-medium">Público</th>
+            <th className="px-4 py-2.5 text-left font-medium">Publicada em</th>
+            <th className="px-4 py-2.5 text-left font-medium">Status</th>
+            <th className="px-4 py-2.5 text-right font-medium">Visualizações</th>
+          </tr>
+        </thead>
+        <tbody className="divide-y">
+          {posts.map((post) => (
+            <tr key={post.id} className="transition-colors hover:bg-muted/40">
+              <td className="px-4 py-2.5">
+                <Link href={`/comunicacao/publicacoes/${post.id}`} className="flex items-center gap-3">
+                  <CoverImage
+                    url={post.coverImageUrl}
+                    alt={post.coverImageAlt}
+                    aspect="aspect-[16/9]"
+                    className="h-10 w-16 shrink-0 rounded"
+                  />
+                  <span className="min-w-0 font-medium hover:underline">{post.title}</span>
+                </Link>
+              </td>
+              <td className="px-4 py-2.5">
+                <CategoryChip name={post.category} color={post.categoryColor} />
+              </td>
+              <td className="px-4 py-2.5 text-muted-foreground">{post.audienceLabel}</td>
+              <td className="px-4 py-2.5 text-muted-foreground">{formatDate(post.publishedAt)}</td>
+              <td className="px-4 py-2.5">
+                <StatusBadge status={post.status} />
+              </td>
+              <td className="px-4 py-2.5 text-right tabular-nums">
+                {post.views}
+                <span className="text-muted-foreground"> / {post.audienceTotal}</span>
+              </td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  );
+}
+
+function EmptyBlock({ message, actionLabel, href }: { message: string; actionLabel?: string; href: string }) {
+  return (
+    <div className="rounded-lg border border-dashed bg-card/50 px-4 py-8 text-center">
+      <p className="text-sm text-muted-foreground">{message}</p>
+      {actionLabel && (
+        <Button asChild variant="outline" size="sm" className="mt-3">
+          <Link href={href}>
+            <Plus className="mr-2 h-4 w-4" />
+            {actionLabel}
+          </Link>
+        </Button>
       )}
     </div>
   );

@@ -2,7 +2,7 @@ import { Injectable, Logger, OnApplicationBootstrap, OnApplicationShutdown } fro
 import { PrismaService } from '../prisma/prisma.service';
 import { DocumentsService } from '../modules/documents/documents.service';
 import { NotificationsService } from '../modules/notifications/notifications.service';
-import { OrganizationalCommunicationService } from '../modules/communication/organizational/organizational-communication.service';
+import { PublicationsService } from '../modules/communication/publications/publications.service';
 import { PersonnelService } from '../modules/personnel/personnel.service';
 import { TimeBankService } from '../modules/personnel/time-bank.service';
 import { addDays, dayKeyFor } from '../modules/personnel/time-clock.logic';
@@ -33,7 +33,7 @@ export class MaintenanceScheduler implements OnApplicationBootstrap, OnApplicati
     private readonly prisma: PrismaService,
     private readonly documents: DocumentsService,
     private readonly notifications: NotificationsService,
-    private readonly orgCommunication: OrganizationalCommunicationService,
+    private readonly publications: PublicationsService,
     private readonly personnel: PersonnelService,
     private readonly timeBank: TimeBankService,
   ) {}
@@ -91,7 +91,7 @@ export class MaintenanceScheduler implements OnApplicationBootstrap, OnApplicati
           this.logger.error(`Geração de alertas falhou (empresa ${company.id}): ${(error as Error).message}`);
         }
         try {
-          const sweep = await this.orgCommunication.publicationSweep(company.id);
+          const sweep = await this.publications.publicationSweep(company.id);
           postsPublished += sweep.published;
           postsExpired += sweep.expired;
         } catch (error) {

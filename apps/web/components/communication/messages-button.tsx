@@ -10,11 +10,13 @@ import { api } from '@/lib/api';
 import { shortTime } from '@/lib/communication/format';
 import type { ConversationSummary } from '@/lib/communication/types';
 import { useCommunication } from '@/components/communication/communication-provider';
+import { useAuth } from '@/components/auth/auth-provider';
 
 export function MessagesButton() {
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
   const { openChat } = useCommunication();
+  const { user } = useAuth();
 
   useEffect(() => {
     if (!open) return;
@@ -26,7 +28,7 @@ export function MessagesButton() {
   }, [open]);
 
   const conversations = useQuery<ConversationSummary[]>({
-    queryKey: ['conversations'],
+    queryKey: ['conversations', user?.companyId],
     queryFn: () => api('/communication/conversations'),
     refetchInterval: 30_000,
   });
@@ -59,7 +61,7 @@ export function MessagesButton() {
             <span className="text-xs font-medium uppercase tracking-[0.12em] text-muted-foreground">
               Mensagens
             </span>
-            <Link href="/comunicacao" onClick={() => setOpen(false)} className="text-xs text-foreground underline-offset-2 hover:underline">
+            <Link href="/comunicacao/chat" onClick={() => setOpen(false)} className="text-xs text-foreground underline-offset-2 hover:underline">
               Abrir central
             </Link>
           </div>

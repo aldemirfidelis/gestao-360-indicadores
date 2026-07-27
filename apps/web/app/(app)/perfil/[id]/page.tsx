@@ -56,7 +56,7 @@ export default function ProfilePage() {
   const isMe = user?.id === id;
 
   const profile = useQuery<ProfileData>({
-    queryKey: ['profile', id],
+    queryKey: ['profile', user?.companyId, id],
     queryFn: () => api(`/communication/users/${id}/profile`),
     enabled: !!id,
   });
@@ -92,7 +92,7 @@ export default function ProfilePage() {
           {!isMe && (
             <div className="flex flex-col gap-2">
               <Button asChild size="sm">
-                <Link href={`/comunicacao?to=${p.id}`}>
+                <Link href={`/comunicacao/chat?to=${p.id}`}>
                   <MessageSquare className="mr-1.5 h-4 w-4" /> Enviar mensagem
                 </Link>
               </Button>
@@ -144,14 +144,14 @@ export default function ProfilePage() {
 
           {isMe && (
             <>
-              <SelfEditor profile={p} onSaved={() => qc.invalidateQueries({ queryKey: ['profile', id] })} />
+              <SelfEditor profile={p} onSaved={() => qc.invalidateQueries({ queryKey: ['profile', user?.companyId, id] })} />
               <StatusEditor
                 current={liveStatus}
                 onChange={async (status) => {
                   setRealtimeStatus(status);
                   try {
                     await api('/communication/me/status', { method: 'PATCH', json: { status } });
-                    qc.invalidateQueries({ queryKey: ['profile', id] });
+                    qc.invalidateQueries({ queryKey: ['profile', user?.companyId, id] });
                   } catch {
                     toast.error('Não foi possível atualizar o status.');
                   }

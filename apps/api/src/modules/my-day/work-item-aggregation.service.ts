@@ -4,7 +4,7 @@ import { PrismaService } from '../../prisma/prisma.service';
 import { AuthPayload } from '../auth/auth.types';
 import { WorkItemPriorityService } from './work-item-priority.service';
 import type { WorkItemAction } from '@g360/shared';
-import { matchesAudience, type AudienceRule } from '../communication/organizational/audience.util';
+import { EMPLOYEE_FEED_PATH } from '../communication/publications/publications.service';
 
 /** Item "rascunho" coletado de um modulo de origem, antes da priorização. */
 interface WorkItemDraft {
@@ -1280,61 +1280,51 @@ export class WorkItemAggregationService {
    */
   private async collectUnreadCommunications(me: AuthPayload): Promise<WorkItemDraft[]> {
     const now = new Date();
-    const [user, posts] = await Promise.all([
-      this.prisma.user.findFirst({
-        where: { id: me.sub, companyId: me.companyId },
-        select: { id: true, defaultNodeId: true, role: true },
-      }),
-      this.prisma.communicationPost.findMany({
-        where: {
-          companyId: me.companyId,
-          deletedAt: null,
-          status: 'PUBLISHED',
-          OR: [{ expiresAt: null }, { expiresAt: { gt: now } }],
-          AND: [{ OR: [{ requiresReadConfirmation: true }, { isMandatory: true }] }],
-        },
-        orderBy: { publishedAt: 'desc' },
-        take: 50,
-        select: {
-          id: true,
-          title: true,
-          subtitle: true,
-          category: true,
-          priority: true,
-          audience: true,
-          requiresReadConfirmation: true,
-          publishedAt: true,
-          expiresAt: true,
-          reads: { where: { userId: me.sub }, select: { viewedAt: true, confirmedAt: true } },
-        },
-      }),
-    ]);
-    if (!user) return [];
+    // O público vem da tabela de destinatários da publicação — mesma fonte que
+    // alimenta a Comunicação Interna, sem regra de audiência duplicada aqui.
+    const posts = await this.prisma.communicationPost.findMany({
+      where: {
+        companyId: me.companyId,
+        deletedAt: null,
+        status: 'PUBLISHED',
+        showInEmployeeFeed: true,
+        requiresReadConfirmation: true,
+        recipients: { some: { userId: me.sub } },
+        OR: [{ expiresAt: null }, { expiresAt: { gt: now } }],
+      },
+      orderBy: { publishedAt: 'desc' },
+      take: 50,
+      select: {
+        id: true,
+        title: true,
+        subtitle: true,
+        category: true,
+        priority: true,
+        publishedAt: true,
+        expiresAt: true,
+        reads: { where: { userId: me.sub }, select: { viewedAt: true, confirmedAt: true } },
+      },
+    });
 
     const critFor: Record<string, string> = { LOW: 'LOW', NORMAL: 'MEDIUM', HIGH: 'HIGH', CRITICAL: 'HIGH', URGENT: 'HIGH' };
     return posts
-      .filter((post) => matchesAudience(user, post.audience as unknown as AudienceRule))
-      .filter((post) => {
-        const read = post.reads[0];
-        // Com confirmação exigida, só sai do Meu Dia após CONFIRMAR; sem
-        // confirmação (mandatório), basta ter visualizado.
-        return post.requiresReadConfirmation ? !read?.confirmedAt : !read?.viewedAt;
-      })
+      // Sai do Meu Dia somente após a confirmação de leitura.
+      .filter((post) => !post.reads[0]?.confirmedAt)
       .map((post) => ({
         sourceModule: 'communication',
         sourceEntityType: 'COMMUNICATION_POST',
         sourceEntityId: post.id,
         itemType: 'COMMUNICATION_UNREAD',
         title: post.title,
-        summary: post.subtitle ?? `Comunicado de ${post.category} aguardando sua leitura`,
+        summary: post.subtitle ?? `Comunicado de ${post.category} aguardando sua confirmação`,
         status: 'OPEN',
         criticality: critFor[post.priority as string] ?? 'MEDIUM',
         dueAt: post.expiresAt ?? null,
         assignedUserId: me.sub,
         requiresDecision: false,
-        recommendedAction: post.requiresReadConfirmation ? 'Ler e confirmar a leitura' : 'Ler o comunicado',
-        availableActions: [{ key: 'open', label: 'Ler comunicado', href: `/comunicacao?post=${post.id}` }],
-        context: { category: post.category, priority: post.priority, requiresReadConfirmation: post.requiresReadConfirmation },
+        recommendedAction: 'Ler e confirmar a leitura',
+        availableActions: [{ key: 'open', label: 'Ler comunicado', href: `${EMPLOYEE_FEED_PATH}?post=${post.id}` }],
+        context: { category: post.category, priority: post.priority, requiresReadConfirmation: true },
         sourceCreatedAt: post.publishedAt ?? null,
       }));
   }

@@ -218,13 +218,15 @@ export const CATALOG_PAGES: CatalogPage[] = [
   { code: 'inventory.warehouse', moduleCode: 'inventory', name: 'Almoxarifado', title: 'Almoxarifado', route: '/suprimentos?tab=warehouse', menuOrder: 100 },
   { code: 'procurement.registrations', moduleCode: 'procurement', name: 'Cadastros', title: 'Cadastros de Suprimentos', route: '/suprimentos?tab=registrations', menuOrder: 101 },
 
-  { code: 'communication.wall', moduleCode: 'communication', name: 'Meu Mural', title: 'Meu Mural', route: '/comunicacao?tab=mural', menuOrder: 100 },
-  { code: 'communication.central', moduleCode: 'communication', name: 'Central', title: 'Central', route: '/comunicacao?tab=central', menuOrder: 101 },
-  { code: 'communication.create', moduleCode: 'communication', name: 'Criar', title: 'Criar Comunicado', route: '/comunicacao?tab=criar', menuOrder: 102 },
-  { code: 'communication.campaigns', moduleCode: 'communication', name: 'Campanhas', title: 'Campanhas', route: '/comunicacao?tab=campanhas', menuOrder: 103 },
-  { code: 'communication.media', moduleCode: 'communication', name: 'Midias', title: 'Midias', route: '/comunicacao?tab=midias', menuOrder: 104 },
-  { code: 'communication.metrics', moduleCode: 'communication', name: 'Metricas', title: 'Metricas', route: '/comunicacao?tab=metricas', menuOrder: 105 },
-  { code: 'communication.chat', moduleCode: 'communication', name: 'Chat', title: 'Chat', route: '/comunicacao?tab=chat', menuOrder: 106 },
+  { code: 'communication.overview', moduleCode: 'communication', name: 'Visao Geral', title: 'Comunicacao Interna', route: '/comunicacao', menuOrder: 100 },
+  { code: 'communication.publications', moduleCode: 'communication', name: 'Publicacoes', title: 'Publicacoes', route: '/comunicacao/publicacoes', menuOrder: 101 },
+  { code: 'communication.create', moduleCode: 'communication', name: 'Criar Publicacao', title: 'Criar Publicacao', route: '/comunicacao/publicacoes/nova', menuOrder: 102 },
+  { code: 'communication.media', moduleCode: 'communication', name: 'Biblioteca de Midias', title: 'Biblioteca de Midias', route: '/comunicacao/midias', menuOrder: 103 },
+  { code: 'communication.settings', moduleCode: 'communication', name: 'Configuracoes', title: 'Configuracoes da Comunicacao', route: '/comunicacao/configuracoes', menuOrder: 104 },
+  // Feed do colaborador (dentro de Minha Vida Funcional) e chat corporativo,
+  // que permanece ativo fora do menu de Comunicacao.
+  { code: 'communication.employee-feed', moduleCode: 'communication', name: 'Comunicacao Interna (colaborador)', title: 'Comunicacao Interna', route: '/servico-pessoal/meu-holerite?tab=comunicacao', menuOrder: 105 },
+  { code: 'communication.chat', moduleCode: 'communication', name: 'Chat', title: 'Chat', route: '/comunicacao/chat', menuOrder: 106 },
 
   { code: 'prize.overview', moduleCode: 'prize', name: 'Visao Geral do Premio', title: 'Gestao de Premio', route: '/gestao-premio', menuOrder: 110 },
   { code: 'prize.programs', moduleCode: 'prize', name: 'Programas de Premio', title: 'Programas de Premio', route: '/gestao-premio/programas', menuOrder: 111 },

@@ -51,7 +51,7 @@ export function AccordionNavigation({
     section.items.some((item) => isActivePath(pathname, item.href, item.exact, currentSearch)),
   );
   const conversations = useQuery<ConversationSummary[]>({
-    queryKey: ['conversations'],
+    queryKey: ['conversations', user?.companyId],
     queryFn: () => api('/communication/conversations'),
     enabled: !!user,
     refetchInterval: 30_000,

@@ -73,7 +73,7 @@ export default function PessoasPage() {
   }, [searchInput]);
 
   const orgNodes = useQuery<Array<{ id: string; name: string; type: string }>>({
-    queryKey: ['orgnodes-min'],
+    queryKey: ['orgnodes-min', user?.companyId],
     queryFn: () => api('/orgnodes'),
     staleTime: 5 * 60_000,
   });
@@ -89,7 +89,7 @@ export default function PessoasPage() {
   }, [search, role, status, orgNodeId]);
 
   const directory = useInfiniteQuery({
-    queryKey: ['directory', params.toString()],
+    queryKey: ['directory', user?.companyId, params.toString()],
     queryFn: ({ pageParam }) => {
       const p = new URLSearchParams(params);
       if (pageParam) p.set('cursor', pageParam);
@@ -101,7 +101,7 @@ export default function PessoasPage() {
   });
 
   const online = useQuery<{ count: number; items: DirectoryUser[] }>({
-    queryKey: ['directory-online', search],
+    queryKey: ['directory-online', user?.companyId, search],
     queryFn: () => api(`/communication/directory/online${search ? `?q=${encodeURIComponent(search)}` : ''}`),
     enabled: onlineOnly,
     refetchInterval: onlineOnly ? 20_000 : false,
@@ -267,7 +267,7 @@ function PersonCard({ user, liveStatus, isMe }: { user: DirectoryUser; liveStatu
         </Button>
         {!isMe && (
           <Button asChild size="sm" className="h-8 flex-1">
-            <Link href={`/comunicacao?to=${user.id}`}>
+            <Link href={`/comunicacao/chat?to=${user.id}`}>
               <MessageSquare className="mr-1 h-3.5 w-3.5" /> Mensagem
             </Link>
           </Button>
@@ -299,7 +299,7 @@ function PersonRow({ user, liveStatus, isMe }: { user: DirectoryUser; liveStatus
         </Button>
         {!isMe && (
           <Button asChild size="sm" variant="outline" className="h-8">
-            <Link href={`/comunicacao?to=${user.id}`}>
+            <Link href={`/comunicacao/chat?to=${user.id}`}>
               <MessageSquare className="h-3.5 w-3.5" />
             </Link>
           </Button>

@@ -14,13 +14,20 @@ import { ConversationService } from './conversations/conversation.service';
 import { MessageService } from './conversations/message.service';
 import { ConversationsController } from './conversations/conversations.controller';
 import { CommunicationGateway } from './communication.gateway';
-import { OrganizationalCommunicationController } from './organizational/organizational-communication.controller';
-import { OrganizationalCommunicationService } from './organizational/organizational-communication.service';
+import { CommunicationSettingsController, PublicationsController } from './publications/publications.controller';
+import { EmployeeFeedController } from './publications/employee-feed.controller';
+import { MediaLibraryController } from './publications/media-library.controller';
+import { PublicationsService } from './publications/publications.service';
+import { EmployeeFeedService } from './publications/employee-feed.service';
+import { MediaLibraryService } from './publications/media-library.service';
+import { CommunicationAudienceService } from './publications/audience.service';
+import { CommunicationSettingsService } from './publications/communication-settings.service';
 
 /**
  * Módulo de Comunicação Corporativa.
- * Fase 1: Diretório Global, Perfil corporativo e Presença em tempo real.
- * (Fase 2 adiciona Conversas/Mensagens reaproveitando este gateway e a presença.)
+ * - Diretório Global, Perfil corporativo, Presença e Chat em tempo real;
+ * - Publicações internas (central administrativa) + Comunicação Interna do
+ *   colaborador, biblioteca de mídias e configurações do módulo.
  */
 @Module({
   imports: [
@@ -30,7 +37,15 @@ import { OrganizationalCommunicationService } from './organizational/organizatio
       useFactory: () => ({ secret: requireSecret('JWT_ACCESS_SECRET') }),
     }),
   ],
-  controllers: [DirectoryController, ProfileController, ConversationsController, OrganizationalCommunicationController],
+  controllers: [
+    DirectoryController,
+    ProfileController,
+    ConversationsController,
+    PublicationsController,
+    CommunicationSettingsController,
+    EmployeeFeedController,
+    MediaLibraryController,
+  ],
   providers: [
     { provide: PRESENCE_STORE, useClass: InMemoryPresenceStore },
     RealtimeEmitter,
@@ -39,11 +54,15 @@ import { OrganizationalCommunicationService } from './organizational/organizatio
     ProfileService,
     ConversationService,
     MessageService,
-    OrganizationalCommunicationService,
+    CommunicationAudienceService,
+    CommunicationSettingsService,
+    PublicationsService,
+    EmployeeFeedService,
+    MediaLibraryService,
     CommunicationGateway,
   ],
-  // OrganizationalCommunicationService exportado para o MaintenanceScheduler
-  // (publicação/expiração de comunicados agendados).
-  exports: [PresenceService, OrganizationalCommunicationService],
+  // PublicationsService exportado para o MaintenanceScheduler
+  // (publicação automática de agendamentos e encerramento por validade).
+  exports: [PresenceService, RealtimeEmitter, PublicationsService],
 })
 export class CommunicationModule {}
