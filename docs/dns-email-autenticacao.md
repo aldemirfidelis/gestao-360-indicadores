@@ -38,10 +38,25 @@ O domínio usa Titan para receber e Brevo para enviar. Os dois precisam conviver
 
 ### Passo 1 — Autenticar o domínio no Brevo (gera o DKIM)
 
-1. Acesse o painel do Brevo → **Settings → Senders, Domains & Dedicated IPs → Domains**
-2. Clique em **Authenticate this domain** em `gestao360.org`
-3. O Brevo mostrará **3 registros** para publicar. Eles são **específicos da sua conta**
-   — os valores abaixo são o formato, não os valores reais:
+**Caminho mais confiável (independe do idioma):** acesse direto
+**https://app.brevo.com/senders/domain/list**
+
+**Pelo menu, com a interface em português:**
+
+1. Canto superior direito → clique no **nome da conta/empresa**
+2. **Configurações**
+3. Cartão **Remetentes, Domínios e IPs dedicados** (em algumas contas: "Remetentes e IP")
+4. Aba **Domínios**
+5. Na linha do `gestao360.org` → **Autenticar este domínio**
+   (se o domínio não estiver na lista, use **Adicionar um domínio** antes)
+
+> O Brevo muda o layout com frequência e a tradução varia entre contas. Se o menu
+> não bater exatamente, procure por **Domínios** dentro de Configurações — é sempre
+> por ali.
+
+Na tela de **Registros DNS**, o Brevo mostra os valores para publicar. Eles são
+**específicos da sua conta** — os nomes abaixo são o formato esperado, os valores
+reais só aparecem lá:
 
 | Tipo | Nome/Host | Valor |
 |---|---|---|
