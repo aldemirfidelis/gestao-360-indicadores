@@ -644,6 +644,13 @@ model Company {
   communicationMedia           CommunicationMedia[]
   communicationCategories      CommunicationCategory[]
   communicationSettings        CommunicationSettings?
+  trainingCategories           TrainingCategory[]
+  trainingInstructors          TrainingInstructor[]
+  trainings                    Training[]
+  trainingRequirements         TrainingRequirement[]
+  trainingAssignments          TrainingAssignment[]
+  trainingClasses              TrainingClass[]
+  trainingCertificates         TrainingCertificate[]
   dataProcessingRecords        DataProcessingRecord[]       @relation("DataProcessingRecordCompany")
   subprocessors                Subprocessor[]               @relation("SubprocessorCompany")
   dataIncidents                DataIncident[]               @relation("DataIncidentCompany")
@@ -847,6 +854,8 @@ model User {
   ncCreated                    NonConformity[]                   @relation("NcCreatedBy")
   documentsOwned               Document[]                        @relation("DocOwner")
   documentsApproved            Document[]                        @relation("DocApprover")
+  trainingInstructorProfiles   TrainingInstructor[]              @relation("TrainingInstructorUser")
+  trainingsResponsible         Training[]                        @relation("TrainingResponsible")
   documentsCreated             Document[]                        @relation("DocCreatedBy")
   documentEditRequestsMade     DocumentEditRequest[]             @relation("DocumentEditRequester")
   documentEditRequestsToDecide DocumentEditRequest[]             @relation("DocumentEditOperator")
@@ -2140,6 +2149,9 @@ model Document {
   viewLogs            DocumentViewLog[]
   shareLinks          DocumentShareLink[]
   notifications       DocumentNotification[]
+  trainings              Training[]            @relation("TrainingDocument")
+  trainingRequirements   TrainingRequirement[] @relation("TrainingRequirementDocument")
+  trainingCertificates   TrainingCertificate[] @relation("TrainingCertificateDocument")
   auditLogs           DocumentAuditLog[]
   externalMetadata    DocumentExternalMetadata?
   editorSessions      DocumentEditorSession[]
@@ -6431,6 +6443,10 @@ model OrgEmployee {
   leaveRecords        LeaveRecord[]
   processes           EmployeeProcess[]
   medicalExams        MedicalExam[]
+  trainingAssignments TrainingAssignment[]
+  trainingClasses     TrainingClassParticipant[]
+  trainingCertificates TrainingCertificate[]
+  trainingHistory     TrainingHistoryEntry[]
 
   @@index([companyId])
   @@index([orgNodeId])
@@ -14975,3 +14991,506 @@ model RecruitProbationReview {
   @@index([companyId, status])
   @@map("recruit_probation_reviews")
 }
+
+// =====================================================
+// Treinamento e Desenvolvimento (T&D)
+//
+// Principio do modulo: NAO duplicar cadastro. Colaborador vem de OrgEmployee,
+// cargo de OrgJob, area de OrgNode, documento do GED de Document e instrutor
+// interno de User. Aqui vivem apenas as entidades proprias da capacitacao.
+//
+// A matriz de treinamento e MATERIALIZADA em TrainingAssignment (uma linha por
+// colaborador x treinamento). E a mesma escolha feita na Comunicacao Interna:
+// da consulta rapida, metrica exata e rastreio da origem da exigencia, em vez
+// de recalcular regras em memoria a cada tela.
+// =====================================================
+
+enum TrainingModality {
+  PRESENCIAL
+  ONLINE
+  HIBRIDO
+  LEITURA_ORIENTADA
+  DIALOGO_SEGURANCA
+  INTEGRACAO
+  PRATICO
+  EXTERNO
+  RECICLAGEM
+  CIENCIA
+}
+
+enum TrainingStatus {
+  ACTIVE
+  INACTIVE
+  DRAFT
+}
+
+/// Base do prazo de validade do treinamento.
+enum TrainingValidityKind {
+  NONE
+  DAYS
+  MONTHS
+  YEARS
+  FROM_DOCUMENT
+}
+
+/// A quem a exigencia se aplica. ORG_NODE propaga para os nos descendentes.
+enum TrainingRequirementTarget {
+  ALL_COMPANY
+  ORG_NODE
+  JOB
+  EMPLOYEE
+}
+
+/// Situacao de cada celula da matriz (colaborador x treinamento).
+enum TrainingAssignmentStatus {
+  NOT_STARTED
+  PENDING
+  SCHEDULED
+  CONFIRMED
+  IN_PROGRESS
+  AWAITING_ASSESSMENT
+  AWAITING_EFFECTIVENESS
+  AWAITING_VALIDATION
+  VALID
+  DUE_SOON
+  EXPIRED
+  FAILED
+  ABSENT
+  WAIVED
+  NOT_APPLICABLE
+  SUPERSEDED
+}
+
+enum TrainingClassStatus {
+  PLANNED
+  OPEN
+  IN_PROGRESS
+  DONE
+  CANCELLED
+}
+
+enum TrainingAttendanceStatus {
+  INVITED
+  CONFIRMED
+  PRESENT
+  ABSENT
+  EXCUSED
+}
+
+enum TrainingResult {
+  PENDING
+  APPROVED
+  FAILED
+  NOT_APPLICABLE
+}
+
+/// Como a presenca foi comprovada (fica registrado para auditoria).
+enum TrainingAttendanceMethod {
+  INSTRUCTOR
+  DIGITAL_SIGNATURE
+  DEVICE_SIGNATURE
+  SCANNED_LIST
+  QR_CODE
+  FACIAL
+  IMPORT
+}
+
+enum TrainingCertificateOrigin {
+  INTERNAL
+  EXTERNAL
+}
+
+enum TrainingCertificateStatus {
+  PENDING_VALIDATION
+  VALID
+  REJECTED
+  EXPIRED
+}
+
+/// O que a revisao de um documento do GED exige de quem ja foi treinado.
+enum TrainingRevisionAction {
+  NONE
+  ACKNOWLEDGE
+  RETRAIN_SPECIFIC_JOBS
+  RETRAIN_ALL
+  RECYCLE_PREVIOUS_VERSIONS
+}
+
+model TrainingCategory {
+  id        String    @id @default(uuid())
+  companyId String
+  company   Company   @relation(fields: [companyId], references: [id])
+  name      String
+  slug      String
+  color     String?
+  active    Boolean   @default(true)
+  position  Int       @default(0)
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  deletedAt DateTime?
+
+  trainings Training[]
+
+  @@unique([companyId, slug])
+  @@index([companyId, active])
+  @@map("training_categories")
+}
+
+/// Instrutor. `userId` aponta para o usuario interno; instrutor externo entra
+/// so com nome/instituicao, sem virar usuario do portal.
+model TrainingInstructor {
+  id          String    @id @default(uuid())
+  companyId   String
+  company     Company   @relation(fields: [companyId], references: [id])
+  userId      String?
+  user        User?     @relation("TrainingInstructorUser", fields: [userId], references: [id])
+  name        String
+  institution String?
+  email       String?
+  external    Boolean   @default(false)
+  active      Boolean   @default(true)
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  deletedAt   DateTime?
+
+  classes   TrainingClass[]
+  trainings Training[]      @relation("TrainingDefaultInstructor")
+
+  @@index([companyId, active])
+  @@map("training_instructors")
+}
+
+model Training {
+  id          String            @id @default(uuid())
+  companyId   String
+  company     Company           @relation(fields: [companyId], references: [id])
+  code        String
+  name        String
+  description String?
+  categoryId  String?
+  category    TrainingCategory? @relation(fields: [categoryId], references: [id])
+  modality    TrainingModality  @default(PRESENCIAL)
+  status      TrainingStatus    @default(ACTIVE)
+
+  /// Carga horaria em minutos (evita fracao de hora em decimal).
+  workloadMinutes Int @default(60)
+
+  validityKind  TrainingValidityKind @default(NONE)
+  validityValue Int?
+  /// Antecedencia (em dias) para a matriz marcar "proximo do vencimento".
+  dueSoonDays   Int                  @default(30)
+  /// Prazo padrao (em dias) para concluir apos a exigencia nascer.
+  deadlineDays  Int?
+
+  /// Documento controlado do GED que origina o treinamento. O arquivo NAO e
+  /// copiado: guardamos a referencia e a revisao treinada.
+  documentId      String?
+  document        Document? @relation("TrainingDocument", fields: [documentId], references: [id])
+  documentVersion Int?
+
+  requiresAssessment    Boolean  @default(false)
+  minimumScore          Decimal? @db.Decimal(5, 2)
+  maxAttempts           Int?
+  requiresAttendance    Boolean  @default(true)
+  requiresEffectiveness Boolean  @default(false)
+  effectivenessDays     Int?
+  requiresCertificate   Boolean  @default(false)
+  allowsOnline          Boolean  @default(false)
+
+  plannedCostCents Int?
+
+  responsibleUserId   String?
+  responsibleUser     User?               @relation("TrainingResponsible", fields: [responsibleUserId], references: [id])
+  defaultInstructorId String?
+  defaultInstructor   TrainingInstructor? @relation("TrainingDefaultInstructor", fields: [defaultInstructorId], references: [id])
+
+  createdById String?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  deletedAt   DateTime?
+
+  requirements TrainingRequirement[]
+  assignments  TrainingAssignment[]
+  classes      TrainingClass[]
+  certificates TrainingCertificate[]
+
+  @@unique([companyId, code])
+  @@index([companyId, status])
+  @@index([documentId])
+  @@map("trainings")
+}
+
+/// Regra que cria a exigencia. Uma exigencia alcanca um publico (empresa, no da
+/// estrutura, cargo ou colaborador) e carrega a rastreabilidade da origem
+/// (documento, risco, processo, nao conformidade ou auditoria).
+model TrainingRequirement {
+  id         String                    @id @default(uuid())
+  companyId  String
+  company    Company                   @relation(fields: [companyId], references: [id])
+  trainingId String
+  training   Training                  @relation(fields: [trainingId], references: [id], onDelete: Cascade)
+  target     TrainingRequirementTarget
+  /// OrgNode.id, OrgJob.id ou OrgEmployee.id conforme `target`.
+  targetId   String?
+
+  mandatory Boolean @default(true)
+  /// Prazos em dias contados do evento que cria a exigencia.
+  admissionDeadlineDays Int?
+  movementDeadlineDays  Int?
+  /// Sobrepoe a validade do treinamento quando a norma exige prazo diferente.
+  validityKind  TrainingValidityKind?
+  validityValue Int?
+
+  /// Rastreabilidade da origem: por que esta exigencia existe.
+  originDocumentId      String?
+  originDocument        Document? @relation("TrainingRequirementDocument", fields: [originDocumentId], references: [id])
+  originRiskId          String?
+  originProcessId       String?
+  originNonConformityId String?
+  originAuditId         String?
+  activity              String?
+  justification         String?
+
+  /// Bloqueia a autorizacao operacional quando pendente/vencido (seguranca).
+  blocksOperation Boolean @default(false)
+
+  active      Boolean   @default(true)
+  createdById String?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  deletedAt   DateTime?
+
+  assignments TrainingAssignment[]
+
+  @@unique([trainingId, target, targetId])
+  @@index([companyId, active])
+  @@index([originDocumentId])
+  @@map("training_requirements")
+}
+
+/// Celula da matriz: o que ESTE colaborador deve a ESTE treinamento.
+model TrainingAssignment {
+  id            String               @id @default(uuid())
+  companyId     String
+  company       Company              @relation(fields: [companyId], references: [id])
+  employeeId    String
+  employee      OrgEmployee          @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+  trainingId    String
+  training      Training             @relation(fields: [trainingId], references: [id], onDelete: Cascade)
+  /// Regra que originou a exigencia (null = atribuicao avulsa/manual).
+  requirementId String?
+  requirement   TrainingRequirement? @relation(fields: [requirementId], references: [id])
+
+  status    TrainingAssignmentStatus @default(PENDING)
+  mandatory Boolean                  @default(true)
+
+  dueAt       DateTime?
+  completedAt DateTime?
+  validUntil  DateTime?
+
+  /// Revisao do documento efetivamente treinada â€” responde "quem ainda nao foi
+  /// treinado na versao atual".
+  trainedDocumentVersion Int?
+
+  score        Decimal?       @db.Decimal(5, 2)
+  result       TrainingResult @default(PENDING)
+  attemptCount Int            @default(0)
+
+  classId String?
+  class   TrainingClass? @relation(fields: [classId], references: [id])
+
+  waivedById     String?
+  waivedAt       DateTime?
+  waiverReason   String?
+  supersededById String?
+
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  deletedAt DateTime?
+
+  certificates  TrainingCertificate[]
+  effectiveness TrainingEffectivenessReview[]
+  history       TrainingHistoryEntry[]
+
+  @@unique([employeeId, trainingId, requirementId])
+  @@index([companyId, status])
+  @@index([companyId, dueAt])
+  @@index([companyId, validUntil])
+  @@index([trainingId, status])
+  @@index([employeeId])
+  @@map("training_assignments")
+}
+
+model TrainingClass {
+  id           String              @id @default(uuid())
+  companyId    String
+  company      Company             @relation(fields: [companyId], references: [id])
+  trainingId   String
+  training     Training            @relation(fields: [trainingId], references: [id])
+  code         String?
+  instructorId String?
+  instructor   TrainingInstructor? @relation(fields: [instructorId], references: [id])
+
+  startsAt   DateTime
+  endsAt     DateTime?
+  location   String?
+  meetingUrl String?
+  capacity   Int?
+
+  status TrainingClassStatus @default(PLANNED)
+
+  attendanceMethod TrainingAttendanceMethod @default(INSTRUCTOR)
+  actualCostCents  Int?
+  notes            String?
+
+  closedAt    DateTime?
+  closedById  String?
+  createdById String?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  deletedAt   DateTime?
+
+  participants TrainingClassParticipant[]
+  assignments  TrainingAssignment[]
+  evidences    TrainingEvidence[]
+
+  @@index([companyId, status])
+  @@index([companyId, startsAt])
+  @@index([trainingId])
+  @@map("training_classes")
+}
+
+model TrainingClassParticipant {
+  id         String        @id @default(uuid())
+  companyId  String
+  classId    String
+  class      TrainingClass @relation(fields: [classId], references: [id], onDelete: Cascade)
+  employeeId String
+  employee   OrgEmployee   @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+  /// Pendencia da matriz que esta turma resolve (quando veio das pendencias).
+  assignmentId String?
+
+  attendance       TrainingAttendanceStatus  @default(INVITED)
+  attendanceMethod TrainingAttendanceMethod?
+  attendedAt       DateTime?
+  score            Decimal?                  @db.Decimal(5, 2)
+  result           TrainingResult            @default(PENDING)
+  absenceReason    String?
+  waitlisted       Boolean                   @default(false)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([classId, employeeId])
+  @@index([companyId, employeeId])
+  @@map("training_class_participants")
+}
+
+model TrainingCertificate {
+  id           String                    @id @default(uuid())
+  companyId    String
+  company      Company                   @relation(fields: [companyId], references: [id])
+  employeeId   String
+  employee     OrgEmployee               @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+  trainingId   String?
+  training     Training?                 @relation(fields: [trainingId], references: [id])
+  assignmentId String?
+  assignment   TrainingAssignment?       @relation(fields: [assignmentId], references: [id])
+  origin       TrainingCertificateOrigin @default(INTERNAL)
+  status       TrainingCertificateStatus @default(PENDING_VALIDATION)
+
+  number          String?
+  institution     String?
+  workloadMinutes Int?
+  issuedAt        DateTime?
+  validUntil      DateTime?
+  documentId      String?
+  document        Document? @relation("TrainingCertificateDocument", fields: [documentId], references: [id])
+  fileUrl         String?
+  fileName        String?
+
+  validatedById String?
+  validatedAt   DateTime?
+  rejectionNote String?
+
+  createdById String?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  deletedAt   DateTime?
+
+  @@index([companyId, status])
+  @@index([employeeId])
+  @@map("training_certificates")
+}
+
+/// Evidencia da turma (lista de presenca, foto, prova aplicada, video...).
+model TrainingEvidence {
+  id           String        @id @default(uuid())
+  companyId    String
+  classId      String
+  class        TrainingClass @relation(fields: [classId], references: [id], onDelete: Cascade)
+  kind         String
+  fileName     String?
+  fileUrl      String?
+  note         String?
+  uploadedById String?
+  createdAt    DateTime      @default(now())
+
+  @@index([companyId, classId])
+  @@map("training_evidences")
+}
+
+model TrainingEffectivenessReview {
+  id             String             @id @default(uuid())
+  companyId      String
+  assignmentId   String
+  assignment     TrainingAssignment @relation(fields: [assignmentId], references: [id], onDelete: Cascade)
+  dueAt          DateTime?
+  reviewerUserId String?
+  reviewedAt     DateTime?
+  effective      Boolean?
+  criteria       Json?
+  score          Decimal?           @db.Decimal(5, 2)
+  note           String?
+  actionPlanId   String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([companyId, dueAt])
+  @@index([assignmentId])
+  @@map("training_effectiveness_reviews")
+}
+
+/// Linha do tempo permanente e auditavel da capacitacao do colaborador.
+/// Historico de treinamento concluido nao e apagado: usa-se cancelamento ou
+/// inativacao com justificativa.
+model TrainingHistoryEntry {
+  id           String              @id @default(uuid())
+  companyId    String
+  employeeId   String
+  employee     OrgEmployee         @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+  assignmentId String?
+  assignment   TrainingAssignment? @relation(fields: [assignmentId], references: [id])
+  trainingId   String?
+  classId      String?
+
+  /// REQUIREMENT_CREATED | ENROLLED | SUMMONED | ATTENDED | ABSENT | ASSESSED |
+  /// APPROVED | FAILED | CERTIFIED | EXPIRED | RECYCLED | WAIVED | JOB_CHANGED |
+  /// MATRIX_CHANGED | DOCUMENT_REVISED | REVISION_TRAINED
+  event         String
+  description   String?
+  previousValue String?
+  newValue      String?
+  reason        String?
+  actorUserId   String?
+  source        String?
+  metadata      Json?
+
+  createdAt DateTime @default(now())
+
+  @@index([companyId, employeeId, createdAt])
+  @@index([assignmentId])
+  @@map("training_history_entries")
+}
+

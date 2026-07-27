@@ -65,6 +65,7 @@ import { LgpdModule } from './modules/lgpd/lgpd.module';
 import { PrizeModule } from './modules/prize/prize.module';
 import { CompensationModule } from './modules/compensation/compensation.module';
 import { PersonnelModule } from './modules/personnel/personnel.module';
+import { TrainingModule } from './modules/training/training.module';
 import { PayrollModule } from './modules/payroll/payroll.module';
 import { RecruitmentModule } from './modules/recruitment/recruitment.module';
 import { SuppliesModule } from './modules/supplies/supplies.module';
@@ -137,6 +138,7 @@ import { CompanyAdminModule } from './modules/company-admin/company-admin.module
     PrizeModule,
     CompensationModule,
     PersonnelModule,
+    TrainingModule,
     PayrollModule,
     RecruitmentModule,
     SuppliesModule,
