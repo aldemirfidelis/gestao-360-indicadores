@@ -28,6 +28,7 @@ import { NativeSelect } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
 import { LoadingState } from '@/components/platform/loading-state';
 import { ReasonDialog, type ReasonDialogState } from '@/components/platform/reason-dialog';
+import { WhatsAppButton } from '@/components/recruitment/whatsapp-button';
 import { StatusBadge } from '@/components/platform/status-badge';
 import { JourneyStepper, NextStepCallout, type JourneyStep } from '@/components/recruitment/journey-stepper';
 import { api } from '@/lib/api';
@@ -394,6 +395,12 @@ export function CandidateSheet({
                 <div className="flex flex-wrap items-center gap-2">
                   <SheetTitle>{detail.candidate.name}</SheetTitle>
                   <StatusBadge {...badge(APPLICATION_STATUS, detail.status)} />
+                  {/* Some quando o telefone é inválido ou ausente. */}
+                  <WhatsAppButton
+                    phone={detail.candidate.phone}
+                    name={detail.candidate.name}
+                    message={`Olá, ${detail.candidate.name.split(' ')[0]}! Sou do processo seletivo da vaga de ${detail.posting.title} e gostaria de falar com você.`}
+                  />
                   {typeof detail.score === 'number' && <Badge variant="outline" className="text-[10px]">triagem {detail.score} pts</Badge>}
                   {detail.referrerName && <Badge variant="outline" className="gap-1 text-[10px] text-status-blue">indicado por {detail.referrerName}</Badge>}
                 </div>
