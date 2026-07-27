@@ -45,6 +45,7 @@ import { useAuth } from '@/components/auth/auth-provider';
 import { api, getAccessToken } from '@/lib/api';
 import { cn, formatDate } from '@/lib/utils';
 import { ReasonDialog, type ReasonDialogState } from '@/components/platform/reason-dialog';
+import { PunchDiff, PunchDiffLegend } from '@/components/personnel/adjustment-diff';
 
 type DayStatus = 'DAY_OFF' | 'IN_PROGRESS' | 'OK' | 'INCOMPLETE' | 'ABSENT' | 'OVERTIME' | 'UNDERTIME' | 'VACATION' | 'LEAVE' | 'JUSTIFIED' | 'HOLIDAY';
 
@@ -191,6 +192,9 @@ interface AdjustmentRequest {
   type?: 'HORARIOS' | 'ABONO_DIA';
   category?: string | null;
   proposedTimes: string[];
+  /** Marcações já registradas no dia — base da comparação na aprovação. */
+  currentTimes?: string[];
+  currentSources?: string[];
   reason: string;
   status: 'REQUESTED' | 'APPROVED' | 'REJECTED' | 'CANCELLED';
   decisionNote: string | null;
@@ -1263,22 +1267,30 @@ export default function TimeClockPage() {
                         </Button>
                       </div>
                     </div>
-                    <div className="mt-2 flex flex-wrap gap-1.5">
+                    <div className="mt-2">
                       {request.type === 'ABONO_DIA' ? (
-                        <Badge variant="outline" className="border-teal-400/50 text-[10px] text-teal-600">
-                          Abono do dia{request.category ? ` · ${ADJUSTMENT_CATEGORY_LABEL[request.category] ?? request.category}` : ''}
-                        </Badge>
-                      ) : (
-                        (request.proposedTimes ?? []).map((time, index) => (
-                          <Badge key={`${request.id}-${index}`} variant="outline" className={cn('text-[10px] tabular-nums', index % 2 === 0 ? 'border-status-green/40 text-status-green' : 'border-status-red/40 text-status-red')}>
-                            {index % 2 === 0 ? '→' : '←'} {time}
+                        <div className="flex flex-wrap items-center gap-1.5">
+                          <Badge variant="outline" className="border-teal-400/50 text-[10px] text-teal-600">
+                            Abono do dia{request.category ? ` · ${ADJUSTMENT_CATEGORY_LABEL[request.category] ?? request.category}` : ''}
                           </Badge>
-                        ))
+                          {(request.currentTimes ?? []).length > 0 && (
+                            <span className="text-[10px] text-muted-foreground">
+                              Dia com {(request.currentTimes ?? []).length} marcação(ões) registrada(s).
+                            </span>
+                          )}
+                        </div>
+                      ) : (
+                        <PunchDiff
+                          current={request.currentTimes ?? []}
+                          proposed={request.proposedTimes ?? []}
+                          sources={request.currentSources}
+                        />
                       )}
                     </div>
-                    <div className="mt-2 text-muted-foreground">Motivo: {request.reason}</div>
+                    <div className="mt-2 border-t pt-2 text-muted-foreground">Motivo: {request.reason}</div>
                   </div>
                 ))}
+                {(pendingQuery.data ?? []).length > 0 && <PunchDiffLegend className="border-t pt-3" />}
               </CardContent>
             </Card>
           </TabsContent>

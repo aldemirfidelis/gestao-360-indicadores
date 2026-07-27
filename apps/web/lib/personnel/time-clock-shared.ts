@@ -102,6 +102,9 @@ export interface AdjustmentRequest {
   type?: 'HORARIOS' | 'ABONO_DIA';
   category?: string | null;
   proposedTimes: string[];
+  /** Marcações que existem hoje no dia — base da comparação na aprovação. */
+  currentTimes?: string[];
+  currentSources?: string[];
   reason: string;
   status: 'REQUESTED' | 'APPROVED' | 'REJECTED' | 'CANCELLED';
   decisionNote: string | null;

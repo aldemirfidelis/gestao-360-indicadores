@@ -14,6 +14,7 @@ import {
   resolveCareersCompanySlug,
   setCandidateToken,
 } from '@/lib/candidate-api';
+import { ASO_RESULT, ASO_STATUS, DOC_KIND, labelOf, metaOf } from '@/lib/recruitment/labels';
 
 interface Profile {
   id: string;
@@ -117,10 +118,71 @@ interface PreAdmission {
 const STATUS_LABEL: Record<string, string> = {
   ACTIVE: 'Em andamento',
   HIRED: 'Contratado',
-  REJECTED: 'Nao selecionado',
+  REJECTED: 'Não selecionado',
   WITHDRAWN: 'Desistiu',
   DISQUALIFIED: 'Desclassificado',
 };
+
+// Nada no portal do candidato pode aparecer no código do banco. ASO, resultado
+// e tipo de documento reaproveitam os mapas de `lib/recruitment/labels`; os de
+// baixo existem à parte porque o texto muda de perspectiva — o recrutador lê
+// "Enviada ao candidato", o candidato precisa ler "Aguardando sua resposta".
+const OFFER_STATUS_LABEL: Record<string, string> = {
+  DRAFT: 'Em elaboração',
+  PENDING_APPROVAL: 'Aguardando aprovação',
+  APPROVED: 'Aprovada',
+  SENT: 'Aguardando sua resposta',
+  ACCEPTED: 'Aceita por você',
+  DECLINED: 'Recusada por você',
+  CANCELLED: 'Cancelada',
+  EXPIRED: 'Expirada',
+};
+
+const PRE_ADMISSION_STATUS_LABEL: Record<string, string> = {
+  OPEN: 'Aberta',
+  IN_DOCUMENTS: 'Envio de documentos',
+  READY_FOR_ASO: 'Pronta para o exame admissional',
+  COMPLETED: 'Concluída',
+  CANCELLED: 'Cancelada',
+};
+
+const DOCUMENT_STATUS_LABEL: Record<string, string> = {
+  PENDING: 'Pendente',
+  SUBMITTED: 'Enviado, em análise',
+  APPROVED: 'Aprovado',
+  REJECTED: 'Reprovado, reenviar',
+  WAIVED: 'Dispensado',
+};
+
+
+const EXAM_TYPE_LABEL: Record<string, string> = {
+  ADMISSIONAL: 'Admissional',
+  PERIODICO: 'Periódico',
+  RETORNO_TRABALHO: 'Retorno ao trabalho',
+  MUDANCA_RISCO: 'Mudança de risco',
+  DEMISSIONAL: 'Demissional',
+};
+
+
+const DATA_REQUEST_TYPE_LABEL: Record<string, string> = {
+  ACCESS: 'Acesso aos dados',
+  RECTIFICATION: 'Retificação',
+  PORTABILITY: 'Portabilidade',
+  DELETION: 'Exclusão/anonimização',
+};
+
+const DATA_REQUEST_STATUS_LABEL: Record<string, string> = {
+  OPEN: 'Em aberto',
+  DONE: 'Atendida',
+  REJECTED: 'Recusada',
+};
+
+
+/** Traduz o código; se aparecer um valor novo, mostra algo legível em vez do código cru. */
+function label(map: Record<string, string>, value?: string | null): string {
+  if (!value) return '—';
+  return map[value] ?? value.replace(/_/g, ' ').toLowerCase();
+}
 
 const EMPTY_EXPERIENCE: CandidateExperience = { role: '', company: '', period: '', description: '' };
 const EMPTY_EDUCATION: CandidateEducation = { course: '', institution: '', period: '', status: '' };
@@ -133,7 +195,7 @@ const MAX_UPLOAD_BYTES = 8 * 1024 * 1024;
 
 export default function CandidatePortalPage() {
   return (
-    <Suspense fallback={<main className="min-h-screen bg-slate-50 px-4 py-8 text-sm text-slate-500 dark:bg-slate-950 dark:text-slate-300">Carregando area do candidato...</main>}>
+    <Suspense fallback={<main className="min-h-screen bg-slate-50 px-4 py-8 text-sm text-slate-500 dark:bg-slate-950 dark:text-slate-300">Carregando área do candidato...</main>}>
       <CandidatePortalContent />
     </Suspense>
   );
@@ -634,19 +696,19 @@ function CandidatePortalContent() {
               </div>
               <select value={dataRequestForm.type} onChange={(e) => setDataRequestForm((f) => ({ ...f, type: e.target.value }))} className="h-10 w-full rounded-md border bg-white px-3 text-sm dark:border-slate-700 dark:bg-slate-950">
                 <option value="ACCESS">Acesso aos dados</option>
-                <option value="RECTIFICATION">Retificacao</option>
+                <option value="RECTIFICATION">Retificação</option>
                 <option value="PORTABILITY">Portabilidade</option>
-                <option value="DELETION">Exclusao/anonimizacao</option>
+                <option value="DELETION">Exclusão/anonimização</option>
               </select>
               <textarea value={dataRequestForm.details} onChange={(e) => setDataRequestForm((f) => ({ ...f, details: e.target.value }))} rows={3} placeholder="Detalhes opcionais" className="w-full rounded-md border bg-white px-3 py-2 text-sm dark:border-slate-700 dark:bg-slate-950" />
-              <button onClick={createDataRequest} disabled={busy} className="w-full rounded-md border px-4 py-2 text-sm font-semibold hover:bg-slate-50 disabled:opacity-50 dark:border-slate-700 dark:hover:bg-slate-800">Abrir solicitacao</button>
+              <button onClick={createDataRequest} disabled={busy} className="w-full rounded-md border px-4 py-2 text-sm font-semibold hover:bg-slate-50 disabled:opacity-50 dark:border-slate-700 dark:hover:bg-slate-800">Abrir solicitação</button>
               <div className="divide-y rounded-md border dark:divide-slate-800 dark:border-slate-800">
-                {dataRequests.length === 0 && <div className="p-3 text-sm text-slate-400">Nenhuma solicitacao aberta.</div>}
+                {dataRequests.length === 0 && <div className="p-3 text-sm text-slate-400">Nenhuma solicitação aberta.</div>}
                 {dataRequests.map((item) => (
                   <div key={item.id} className="p-3 text-xs">
                     <div className="flex items-center justify-between gap-2">
-                      <span className="font-semibold">{item.type}</span>
-                      <span className="rounded-full bg-slate-100 px-2 py-0.5 text-[10px] dark:bg-slate-800">{item.status}</span>
+                      <span className="font-semibold">{label(DATA_REQUEST_TYPE_LABEL, item.type)}</span>
+                      <span className="rounded-full bg-slate-100 px-2 py-0.5 text-[10px] dark:bg-slate-800">{label(DATA_REQUEST_STATUS_LABEL, item.status)}</span>
                     </div>
                     {item.details && <div className="mt-1 text-slate-500">{item.details}</div>}
                   </div>
@@ -662,10 +724,10 @@ function CandidatePortalContent() {
                 Currículos: PDF, DOC ou DOCX. Outros documentos também podem ser PNG ou JPG. Tamanho máximo: 8 MB por arquivo.
               </p>
               <select value={uploadForm.kind} onChange={(e) => setUploadForm((f) => ({ ...f, kind: e.target.value }))} className="h-10 w-full rounded-md border bg-white px-3 text-sm dark:border-slate-700 dark:bg-slate-950">
-                <option value="CV">Curriculo</option>
-                <option value="COVER">Carta</option>
+                <option value="CV">Currículo</option>
+                <option value="COVER">Carta de apresentação</option>
                 <option value="CERTIFICATE">Certificado</option>
-                <option value="PORTFOLIO">Portfolio</option>
+                <option value="PORTFOLIO">Portfólio</option>
                 <option value="OTHER">Outro</option>
               </select>
               <select value={uploadForm.applicationId} onChange={(e) => setUploadForm((f) => ({ ...f, applicationId: e.target.value }))} className="h-10 w-full rounded-md border bg-white px-3 text-sm dark:border-slate-700 dark:bg-slate-950">
@@ -684,7 +746,7 @@ function CandidatePortalContent() {
                   <div key={doc.id} className="flex items-center gap-2 p-3 text-sm">
                     <div className="min-w-0 flex-1">
                       <div className="truncate font-medium">{doc.fileName}</div>
-                      <div className="text-[11px] text-slate-500">{doc.kind} | {formatBytes(doc.sizeBytes)}</div>
+                      <div className="text-[11px] text-slate-500">{labelOf(DOC_KIND, doc.kind)} · {formatBytes(doc.sizeBytes)}</div>
                     </div>
                     <button onClick={() => downloadDocument(doc.id)} title="Baixar" className="rounded p-2 hover:bg-slate-100 dark:hover:bg-slate-800"><Download className="h-4 w-4" /></button>
                     <button onClick={() => deleteDocument(doc.id)} title="Remover" className="rounded p-2 text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-950/20"><Trash2 className="h-4 w-4" /></button>
@@ -707,11 +769,11 @@ function CandidatePortalContent() {
                     <h3 className="font-semibold">{offer.application.posting.title}</h3>
                     <p className="text-xs text-slate-500">{[offer.application.posting.city, offer.application.posting.workMode].filter(Boolean).join(' | ')}</p>
                   </div>
-                  <span className="rounded-full bg-slate-100 px-2 py-1 text-[10px] font-semibold text-slate-700 dark:bg-slate-800 dark:text-slate-200">{offer.status}</span>
+                  <span className="rounded-full bg-slate-100 px-2 py-1 text-[10px] font-semibold text-slate-700 dark:bg-slate-800 dark:text-slate-200">{label(OFFER_STATUS_LABEL, offer.status)}</span>
                 </div>
                 <div className="mt-3 rounded-md bg-slate-50 p-3 text-xs text-slate-600 dark:bg-slate-950 dark:text-slate-300">
                   <div className="font-semibold">{formatMoney(offer.salaryAmountCents, offer.currency)}</div>
-                  <div>Inicio previsto: {formatDate(offer.startDate)} | Validade: {formatDate(offer.expiresAt)}</div>
+                  <div>Início previsto: {formatDate(offer.startDate)} | Validade: {formatDate(offer.expiresAt)}</div>
                 </div>
                 {offer.status === 'SENT' && (
                   <div className="mt-3 flex flex-wrap gap-2">
@@ -724,7 +786,7 @@ function CandidatePortalContent() {
           </div>
         </Panel>
 
-        <Panel title="Pre-admissao">
+        <Panel title="Pré-admissão">
           <div className="space-y-3">
             {preAdmissions.length === 0 && <div className="rounded-md border border-dashed p-6 text-center text-sm text-slate-400 dark:border-slate-800">Nenhum checklist aberto.</div>}
             {preAdmissions.map((pre) => (
@@ -734,14 +796,14 @@ function CandidatePortalContent() {
                     <h3 className="font-semibold">{pre.application.posting.title}</h3>
                     <p className="text-xs text-slate-500">Data alvo: {formatDate(pre.admissionTargetDate)}</p>
                   </div>
-                  <span className="rounded-full bg-slate-100 px-2 py-1 text-[10px] font-semibold text-slate-700 dark:bg-slate-800 dark:text-slate-200">{pre.status}</span>
+                  <span className="rounded-full bg-slate-100 px-2 py-1 text-[10px] font-semibold text-slate-700 dark:bg-slate-800 dark:text-slate-200">{label(PRE_ADMISSION_STATUS_LABEL, pre.status)}</span>
                 </div>
                 <div className="mt-3 divide-y rounded-md border dark:divide-slate-800 dark:border-slate-800">
                   {pre.documents.map((item) => (
                     <div key={item.id} className="p-3 text-xs">
                       <div className="flex flex-wrap items-center gap-2">
                         <span className="font-semibold">{item.title}</span>
-                        <span className="rounded-full bg-slate-100 px-2 py-0.5 text-[10px] dark:bg-slate-800">{item.status}</span>
+                        <span className="rounded-full bg-slate-100 px-2 py-0.5 text-[10px] dark:bg-slate-800">{label(DOCUMENT_STATUS_LABEL, item.status)}</span>
                         {item.required && <span className="text-rose-500">*</span>}
                       </div>
                       {item.candidateDocument && <div className="mt-1 text-slate-500">{item.candidateDocument.fileName}</div>}
@@ -776,9 +838,9 @@ function CandidatePortalContent() {
                       {(pre.occupationalExamRequests ?? []).map((aso) => (
                         <div key={aso.id} className="rounded-md bg-slate-50 p-2 dark:bg-slate-950">
                           <div className="flex flex-wrap items-center gap-2">
-                            <span className="font-semibold">{aso.examType}</span>
-                            <span className="rounded-full bg-slate-100 px-2 py-0.5 text-[10px] dark:bg-slate-800">{aso.status}</span>
-                            {aso.asoRecord?.result && <span className="rounded-full bg-slate-100 px-2 py-0.5 text-[10px] dark:bg-slate-800">{aso.asoRecord.result}</span>}
+                            <span className="font-semibold">{label(EXAM_TYPE_LABEL, aso.examType)}</span>
+                            <span className="rounded-full bg-slate-100 px-2 py-0.5 text-[10px] dark:bg-slate-800">{metaOf(ASO_STATUS, aso.status).label}</span>
+                            {aso.asoRecord?.result && <span className="rounded-full bg-slate-100 px-2 py-0.5 text-[10px] dark:bg-slate-800">{metaOf(ASO_RESULT, aso.asoRecord.result).label}</span>}
                           </div>
                           {aso.appointment && (
                             <div className="mt-1 text-slate-500">

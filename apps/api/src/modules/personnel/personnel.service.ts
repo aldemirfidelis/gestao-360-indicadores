@@ -17,6 +17,7 @@ import {
   dayKeyFor,
   dayRuleFromSchedule,
   effectiveWorkedMinutes,
+  COMPANY_UTC_OFFSET_MINUTES,
   enumerateDays,
   evaluateDay,
   isValidDayKey,
@@ -688,7 +689,48 @@ export class PersonnelService {
       orderBy: { createdAt: 'asc' },
       take: 200,
     });
-    return this.withUserNames(me.companyId, requests);
+    const withNames = await this.withUserNames(me.companyId, requests);
+    return this.withCurrentPunches(me.companyId, withNames);
+  }
+
+  /**
+   * Anexa as marcações que existem hoje no dia solicitado (`currentTimes`) para
+   * que o aprovador compare "o que está registrado" com "o que foi pedido" e
+   * enxergue exatamente qual horário muda — sem isso ele aprova às cegas.
+   */
+  private async withCurrentPunches(companyId: string, rows: Array<Record<string, any>>) {
+    if (rows.length === 0) return [];
+
+    const entries = await this.prisma.timeClockEntry.findMany({
+      where: {
+        companyId,
+        status: 'VALID',
+        OR: rows
+          .filter((row) => row.userId && row.dayKey)
+          .map((row) => ({ userId: row.userId as string, dayKey: row.dayKey as string })),
+      },
+      select: { userId: true, dayKey: true, punchedAt: true, source: true },
+      orderBy: { punchedAt: 'asc' },
+    });
+
+    const byKey = new Map<string, Array<{ time: string; source: string }>>();
+    for (const entry of entries) {
+      const key = `${entry.userId}:${entry.dayKey}`;
+      const list = byKey.get(key) ?? [];
+      // HH:MM no fuso da empresa (mesmo offset fixo usado pelo cálculo do espelho).
+      const local = new Date(entry.punchedAt.getTime() + COMPANY_UTC_OFFSET_MINUTES * 60_000);
+      list.push({ time: local.toISOString().slice(11, 16), source: entry.source });
+      byKey.set(key, list);
+    }
+
+    return rows.map((row) => {
+      const list = byKey.get(`${row.userId}:${row.dayKey}`) ?? [];
+      return {
+        ...row,
+        currentTimes: list.map((item) => item.time),
+        currentSources: list.map((item) => item.source),
+      };
+    });
   }
 
   async decideAdjustment(me: AuthPayload, id: string, action: 'approve' | 'reject', body: any = {}) {
