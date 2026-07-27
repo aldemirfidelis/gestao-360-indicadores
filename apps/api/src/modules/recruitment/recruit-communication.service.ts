@@ -64,7 +64,7 @@ const DEFAULT_TEMPLATES: Record<RecruitEmailEvent, { subject: string; body: stri
   },
   INTERVIEW_SCHEDULED: {
     subject: 'Entrevista agendada — {{vaga}}',
-    body: 'Olá, {{candidato}}!\n\nSua entrevista para "{{vaga}}" foi agendada para {{data_hora}}.\n{{link}}{{local}}{{instrucoes}}\nCaso precise reagendar, responda este e-mail.',
+    body: 'Olá, {{candidato}}!\n\nSua entrevista para "{{vaga}}" foi agendada para {{data_hora}}.\n{{link}}{{local}}{{instrucoes}}\nCaso precise reagendar, responda este e-mail — sua mensagem vai direto para a equipe de {{empresa}}.',
   },
   OFFER_SENT: {
     subject: 'Proposta de trabalho — {{vaga}}',
@@ -72,7 +72,7 @@ const DEFAULT_TEMPLATES: Record<RecruitEmailEvent, { subject: string; body: stri
   },
   DOCUMENTS_REQUESTED: {
     subject: 'Envie seus documentos de admissão — {{vaga}}',
-    body: 'Olá, {{candidato}}!\n\nPara darmos andamento à sua contratação para a vaga de {{vaga}} em {{empresa}}, precisamos que você envie alguns documentos:\n{{documentos}}\n\nAcesse a Área do candidato, faça login com este mesmo e-mail e envie os arquivos no painel "Pré-admissão".{{link}}\n\nQualquer dúvida, é só responder este e-mail.',
+    body: 'Olá, {{candidato}}!\n\nPara darmos andamento à sua contratação para a vaga de {{vaga}} em {{empresa}}, precisamos que você envie alguns documentos:\n{{documentos}}\n\nAcesse a Área do candidato, faça login com este mesmo e-mail e envie os arquivos no painel "Pré-admissão".{{link}}\n\nQualquer dúvida, é só responder este e-mail — sua mensagem vai direto para a equipe de {{empresa}}.',
   },
   ADMISSION_AUTHORIZED: {
     subject: 'Parabéns! Sua admissão foi autorizada — {{vaga}}',
@@ -82,6 +82,55 @@ const DEFAULT_TEMPLATES: Record<RecruitEmailEvent, { subject: string; body: stri
 
 function render(text: string, vars: Record<string, string>): string {
   return text.replace(/\{\{\s*([a-zA-Z0-9_]+)\s*\}\}/g, (_match, key: string) => vars[key] ?? '');
+}
+
+/** Escapa o corpo antes de virar HTML: o texto é configurável pela empresa. */
+function escapeHtml(value: string): string {
+  return value
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;');
+}
+
+/** Área do candidato da empresa (o slug preserva o branding da tela). */
+export function candidateAreaUrl(slug?: string | null): string {
+  const base = (process.env.PUBLIC_SITE_URL ?? process.env.NEXT_PUBLIC_SITE_URL ?? 'https://gestao360.org')
+    .trim()
+    .replace(/\/+$/, '');
+  return slug ? `${base}/candidato?empresa=${encodeURIComponent(slug)}` : `${base}/candidato`;
+}
+
+/**
+ * Versão HTML do e-mail: mesmo texto do corpo + botão de acesso à área do
+ * candidato + rodapé explicando a origem automática.
+ *
+ * O e-mail sai multipart (texto e HTML). Quem lê em cliente sem HTML continua
+ * recebendo a mensagem completa — e enviar as duas versões é melhor para a
+ * entregabilidade do que só HTML.
+ */
+function buildHtml(body: string, companyName: string, actionUrl: string, actionLabel: string): string {
+  const paragraphs = escapeHtml(body)
+    .split(/\n{2,}/)
+    .map((block) => `<p style="margin:0 0 16px;line-height:1.6">${block.replace(/\n/g, '<br>')}</p>`)
+    .join('');
+
+  return `<!doctype html><html lang="pt-BR"><body style="margin:0;padding:24px;background:#f1f5f9;font-family:-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif;color:#0f172a">
+  <div style="max-width:560px;margin:0 auto;background:#ffffff;border:1px solid #e2e8f0;border-radius:12px;overflow:hidden">
+    <div style="padding:24px 28px 8px">
+      <div style="font-size:13px;font-weight:600;color:#0284c7;letter-spacing:.04em;text-transform:uppercase">${escapeHtml(companyName)}</div>
+    </div>
+    <div style="padding:8px 28px 4px;font-size:15px">${paragraphs}</div>
+    <div style="padding:8px 28px 28px">
+      <a href="${actionUrl}" style="display:inline-block;background:#0284c7;color:#ffffff;text-decoration:none;font-weight:600;font-size:15px;padding:12px 22px;border-radius:8px">${escapeHtml(actionLabel)}</a>
+    </div>
+    <div style="padding:16px 28px;background:#f8fafc;border-top:1px solid #e2e8f0;font-size:12px;line-height:1.6;color:#64748b">
+      Este é um e-mail automático enviado pela plataforma Gestão 360 em nome de ${escapeHtml(companyName)}.
+      Para acompanhar o processo seletivo, use o botão acima ou acesse
+      <a href="${actionUrl}" style="color:#0284c7">a área do candidato</a>.
+    </div>
+  </div>
+</body></html>`;
 }
 
 /** Nome de exibição da empresa para compor os e-mails ao candidato (usado por vários services do módulo). */
@@ -108,11 +157,35 @@ export class RecruitCommunicationService {
       const bodyTpl = custom?.bodyText ?? DEFAULT_TEMPLATES[event].body;
       const cfg = await resolveSmtpConfig(this.prisma);
       if (!cfg?.host) return;
+
+      // O candidato se inscreveu na EMPRESA, não na plataforma: o nome exibido
+      // é o da empresa. O endereço continua sendo o autenticado no DNS
+      // (DKIM/DMARC) — trocá-lo derrubaria a entregabilidade.
+      const company = await this.prisma.company.findUnique({
+        where: { id: companyId },
+        select: { name: true, tradeName: true, slug: true, email: true },
+      });
+      const companyName = company?.tradeName ?? company?.name ?? 'Gestão 360';
+      const from = cfg.fromAddress ? `${companyName} <${cfg.fromAddress}>` : smtpFrom(cfg);
+
+      const bodyText = render(bodyTpl, vars);
+      const actionUrl = candidateAreaUrl(company?.slug);
+      const actionLabel = event === 'DOCUMENTS_REQUESTED' ? 'Enviar meus documentos' : 'Acompanhe sua candidatura';
+
       await buildTransport(cfg).sendMail({
-        from: smtpFrom(cfg),
+        from,
         to,
+        // Resposta vai para a empresa que contrata, não para a caixa da
+        // plataforma — é ela quem sabe responder sobre o processo.
+        ...(company?.email ? { replyTo: company.email } : {}),
         subject: render(subjectTpl, vars),
-        text: render(bodyTpl, vars),
+        text: `${bodyText}
+
+${actionLabel}: ${actionUrl}
+
+—
+Este é um e-mail automático enviado pela plataforma Gestão 360 em nome de ${companyName}.`,
+        html: buildHtml(bodyText, companyName, actionUrl, actionLabel),
       });
     } catch (err) {
       this.logger.warn(`Falha ao enviar e-mail de recrutamento (${event}) para ${to}: ${(err as Error).message}`);
