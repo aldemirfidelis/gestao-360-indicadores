@@ -36,6 +36,14 @@ import {
   X,
 } from 'lucide-react';
 import { PageHeader } from '@/components/shell/page-header';
+import { HeaderBuilder } from '@/components/forms/header-builder';
+import {
+  type HeaderFieldForm,
+  headerFieldFilter,
+  headerFieldsFromTemplate,
+  headerFieldsPayload,
+  headerSectionPayload,
+} from '@/lib/forms/header';
 import { MetricCard } from '@/components/platform/metric-card';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -253,6 +261,8 @@ interface TemplateForm {
   indicatorId: string;
   ownerUserId: string;
   fields: FieldForm[];
+  /** Campos do cabeçalho (seção HEADER), exibidos antes das perguntas. */
+  headerFields: HeaderFieldForm[];
   /** Gatilho: reprovação em campo de conformidade (ou sim/não crítico) gera NC automática. */
   autoNonconformity: boolean;
   /** Demais chaves de template.settings preservadas no round-trip. */
@@ -400,6 +410,7 @@ const EMPTY_TEMPLATE: TemplateForm = {
   indicatorId: '',
   ownerUserId: '',
   fields: [{ ...EMPTY_FIELD }],
+  headerFields: [],
   autoNonconformity: false,
   settingsRaw: {},
 };
@@ -704,8 +715,11 @@ export default function FormsPage() {
       ownerUserId: item.ownerUserId ?? '',
       autoNonconformity: Boolean((item.settings as { autoNonconformity?: { enabled?: boolean } } | null)?.autoNonconformity?.enabled),
       settingsRaw: (item.settings as Record<string, unknown> | null) ?? {},
-      fields: item.fields.length
-        ? item.fields.map((field) => ({
+      headerFields: headerFieldsFromTemplate(item.sections, item.fields),
+      // Campos do cabeçalho saem da lista de perguntas: são editados no bloco
+      // próprio, e apareceriam duplicados aqui.
+      fields: item.fields.filter((field) => !isHeaderField(item.sections, field)).length
+        ? item.fields.filter((field) => !isHeaderField(item.sections, field)).map((field) => ({
             order: String(field.order),
             code: field.code ?? '',
             label: field.label,
@@ -1258,6 +1272,14 @@ function TemplateDialog({ open, setOpen, editing, form, setForm, options, update
             </div>
           </div>
 
+          {/* Cabeçalho do preenchimento: contexto do registro, antes das perguntas */}
+          <HeaderBuilder
+            fields={form.headerFields}
+            fieldTypes={options?.fieldTypes ?? FIELD_TYPES}
+            fieldLabel={(value) => label(FIELD_LABEL, value)}
+            onChange={(headerFields) => setForm({ ...form, headerFields })}
+          />
+
           {/* Perguntas: um cartão por campo, com reordenar/duplicar/excluir */}
           <div className="space-y-3">
             {form.fields.map((field, index) => (
@@ -1559,23 +1581,36 @@ function templatePayload(form: TemplateForm) {
     indicatorId: form.indicatorId || null,
     ownerUserId: form.ownerUserId || null,
     settings: { ...form.settingsRaw, autoNonconformity: { enabled: form.autoNonconformity } },
-    fields: form.fields.filter((field) => field.label.trim()).map((field, index) => ({
-      order: field.order ? Number(field.order) : index + 1,
-      code: field.code || null,
-      label: field.label,
-      type: field.type,
-      required: field.required,
-      evidenceRequired: field.evidenceRequired,
-      commentRequired: field.commentRequired,
-      criticality: field.criticality || null,
-      options: field.options || null,
-      helpText: field.helpText || null,
-    })),
+    sections: headerSectionPayload(form.headerFields),
+    // Cabeçalho primeiro: é o topo do documento, antes das perguntas.
+    fields: [
+      ...headerFieldsPayload(form.headerFields),
+      ...form.fields.filter((field) => field.label.trim()).map((field, index) => ({
+        order: form.headerFields.length + (field.order ? Number(field.order) : index + 1),
+        code: field.code || null,
+        label: field.label,
+        type: field.type,
+        required: field.required,
+        evidenceRequired: field.evidenceRequired,
+        commentRequired: field.commentRequired,
+        criticality: field.criticality || null,
+        options: field.options || null,
+        helpText: field.helpText || null,
+      })),
+    ],
   };
 }
 
+/** O campo pertence ao cabeçalho? (evita duplicá-lo na lista de perguntas) */
+function isHeaderField(
+  sections: Array<{ id: string; code: string | null }> | undefined,
+  field: { sectionId?: string | null },
+): boolean {
+  return headerFieldFilter(sections)(field);
+}
+
 function cloneTemplateForm(): TemplateForm {
-  return { ...EMPTY_TEMPLATE, fields: [{ ...EMPTY_FIELD }] };
+  return { ...EMPTY_TEMPLATE, headerFields: [], fields: [{ ...EMPTY_FIELD }] };
 }
 
 function isExecutable(item: FormTemplate) {
