@@ -23,6 +23,7 @@ import { NonConformitiesService } from '../nonconformities/nonconformities.servi
 import { logSwallowed } from '../../common/logging/swallow';
 import { FormCodeService } from './form-code.service';
 import { sortSections } from './form-header.logic';
+import { conformityScore } from './form-scoring.logic';
 import { FormStorageService } from './form-storage.service';
 import { randomUUID } from 'node:crypto';
 
@@ -1258,6 +1259,16 @@ export class FormsService {
     const status = this.parseSubmissionStatus(body?.status) ?? FormSubmissionStatus.SUBMITTED;
     const now = new Date();
     const answers = this.buildAnswers(template, body?.answers);
+    // Conformidade do preenchimento: 100% quando todo item avaliavel esta
+    // conforme. "Nao aplicavel" fica fora da conta (ver form-scoring.logic).
+    const conformity = conformityScore(
+      answers.map((answer: { fieldType?: string | null; value?: string | null; critical?: boolean }) => ({
+        fieldType: answer.fieldType,
+        value: answer.value,
+        // Item crítico pesa mais: reprovar um crítico derruba mais o resultado.
+        weight: answer.critical ? 3 : 1,
+      })),
+    );
     const submission = await this.prisma.$transaction(async (tx) => {
       const version = await this.ensureCurrentVersion(tx, template, me.sub);
       const created = await tx.formSubmission.create({
@@ -1280,7 +1291,9 @@ export class FormsService {
           reviewedById: status === FormSubmissionStatus.REVIEWED || status === FormSubmissionStatus.APPROVED ? me.sub : null,
           reviewedAt: status === FormSubmissionStatus.REVIEWED || status === FormSubmissionStatus.APPROVED ? now : null,
           approvedAt: status === FormSubmissionStatus.APPROVED ? now : null,
-          score: this.float(body?.score),
+          // Percentual de conformidade calculado das respostas. O valor do
+          // corpo só prevalece se vier explícito (importação/integração).
+          score: this.float(body?.score) ?? conformity.percent,
           classification: this.nullableText(body?.classification) ?? null,
           source: this.nullableText(body?.source) ?? 'WEB',
           originEntityType: this.nullableText(body?.originEntityType) ?? null,

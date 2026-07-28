@@ -81,6 +81,8 @@ interface FormField {
   commentRequired?: boolean;
   criticality?: string | null;
   weight?: number | null;
+  /** Guarda a numeração fixada pelo autor em `displayNumber`. */
+  metadata?: { displayNumber?: string } | null;
   optionsV2?: Array<{ id: string; label: string; value: string; color: string | null; score: number | null }>;
 }
 
@@ -229,6 +231,8 @@ interface BuilderPayload {
 
 interface FieldForm {
   order: string;
+  /** Numeração fixada pelo autor; vazio = usa a posição na lista. */
+  displayNumber: string;
   code: string;
   label: string;
   type: FieldType;
@@ -378,6 +382,7 @@ const FIELD_TYPES = ['TEXT', 'TEXTAREA', 'NUMBER', 'DATE', 'BOOLEAN', 'CONFORMIT
 
 const EMPTY_FIELD: FieldForm = {
   order: '1',
+  displayNumber: '',
   code: '',
   label: '',
   type: 'TEXT',
@@ -721,6 +726,7 @@ export default function FormsPage() {
       fields: item.fields.filter((field) => !isHeaderField(item.sections, field)).length
         ? item.fields.filter((field) => !isHeaderField(item.sections, field)).map((field) => ({
             order: String(field.order),
+            displayNumber: String((field.metadata as { displayNumber?: unknown } | null)?.displayNumber ?? ''),
             code: field.code ?? '',
             label: field.label,
             type: field.type,
@@ -1285,7 +1291,14 @@ function TemplateDialog({ open, setOpen, editing, form, setForm, options, update
             {form.fields.map((field, index) => (
               <div key={`${index}-${field.order}`} className="group rounded-xl border border-l-4 border-l-primary/60 bg-white p-4 shadow-sm transition-shadow hover:shadow-md dark:bg-slate-900">
                 <div className="flex items-start gap-3">
-                  <span className="mt-2 grid h-7 w-7 shrink-0 place-items-center rounded-full bg-primary/10 text-xs font-bold text-primary">{index + 1}</span>
+                  {/* Numeração editável: em branco segue a posição na lista. */}
+                  <Input
+                    value={field.displayNumber}
+                    onChange={(e) => updateField(index, { displayNumber: e.target.value })}
+                    placeholder={String(index + 1)}
+                    title="Número da pergunta (deixe vazio para numerar automaticamente)"
+                    className="mt-2 h-7 w-11 shrink-0 rounded-full bg-primary/10 px-0 text-center text-xs font-bold text-primary shadow-none"
+                  />
                   <div className="min-w-0 flex-1 space-y-3">
                     <div className="grid gap-3 md:grid-cols-[1fr_220px]">
                       <Input
@@ -1406,14 +1419,31 @@ function SubmissionDialog({ open, setOpen, selected, title, setTitle, notes, set
   submit: () => void;
   saving: boolean;
 }) {
+  const isHeader = headerFieldFilter(selected?.sections);
+  const headerFields = (selected?.fields ?? []).filter(isHeader);
+  const questionFields = (selected?.fields ?? []).filter((field) => !isHeader(field));
+
   return (
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogContent className="max-h-[92vh] max-w-3xl overflow-y-auto">
         <DialogHeader><DialogTitle>Preencher {selected?.title}</DialogTitle></DialogHeader>
         <div className="grid gap-4 py-2">
-          <Field label="Título do preenchimento"><Input value={title} onChange={(e) => setTitle(e.target.value)} /></Field>
-          {selected?.fields.map((field) => (
-            <Field key={field.id} label={`${field.order}. ${field.label}${field.required ? ' *' : ''}`}>
+          {/* Cabecalho: contexto do registro, sem numeracao — nao sao perguntas. */}
+          {headerFields.length > 0 && (
+            <div className="rounded-lg border border-l-4 border-l-sky-500 bg-muted/30 p-3">
+              <p className="mb-2 text-xs font-semibold uppercase text-muted-foreground">Informações</p>
+              <div className="grid gap-3 sm:grid-cols-2">
+                {headerFields.map((field) => (
+                  <Field key={field.id} label={`${field.label}${field.required ? ' *' : ''}`}>
+                    <AnswerInput field={field} value={answers[field.id] ?? ''} onChange={(value) => setAnswers((current: Record<string, string>) => ({ ...current, [field.id]: value }))} />
+                  </Field>
+                ))}
+              </div>
+            </div>
+          )}
+          {/* Perguntas: numeradas de 1 em diante, pela posicao na lista. */}
+          {questionFields.map((field, index) => (
+            <Field key={field.id} label={`${questionNumber(field, index)}. ${field.label}${field.required ? ' *' : ''}`}>
               <AnswerInput field={field} value={answers[field.id] ?? ''} onChange={(value) => setAnswers((current: Record<string, string>) => ({ ...current, [field.id]: value }))} />
             </Field>
           ))}
@@ -1585,8 +1615,11 @@ function templatePayload(form: TemplateForm) {
     // Cabeçalho primeiro: é o topo do documento, antes das perguntas.
     fields: [
       ...headerFieldsPayload(form.headerFields),
+      // Ordem = posição na lista, sempre. Herdar a ordem antiga fazia a
+      // primeira pergunta de um modelo novo aparecer como "16".
       ...form.fields.filter((field) => field.label.trim()).map((field, index) => ({
-        order: form.headerFields.length + (field.order ? Number(field.order) : index + 1),
+        order: form.headerFields.length + index + 1,
+        metadata: field.displayNumber.trim() ? { displayNumber: field.displayNumber.trim() } : null,
         code: field.code || null,
         label: field.label,
         type: field.type,
@@ -1599,6 +1632,20 @@ function templatePayload(form: TemplateForm) {
       })),
     ],
   };
+}
+
+/**
+ * Número exibido da pergunta.
+ *
+ * A posição na lista manda; o autor pode fixar um número próprio (guardado em
+ * `metadata.displayNumber`) quando a numeração precisa seguir um padrão da
+ * empresa. Antes usávamos `field.order` cru, que vinha herdado de versões
+ * anteriores do modelo e fazia a primeira pergunta aparecer como "16".
+ */
+function questionNumber(field: { metadata?: unknown }, index: number): string {
+  const custom = (field.metadata as { displayNumber?: unknown } | null | undefined)?.displayNumber;
+  const text = String(custom ?? '').trim();
+  return text || String(index + 1);
 }
 
 /** O campo pertence ao cabeçalho? (evita duplicá-lo na lista de perguntas) */
