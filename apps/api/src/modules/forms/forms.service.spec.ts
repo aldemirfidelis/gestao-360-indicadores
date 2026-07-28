@@ -111,8 +111,10 @@ function makeService(opts?: {
     createFromChecklist: vi.fn().mockResolvedValue({ id: 'nc-1', number: 7, title: 'Checklist reprovado: Checklist' }),
   } as any;
 
-  const service = new FormsService(prisma, traceability, access, new FormCodeService(), new FormStorageService(), nonconformities);
-  return { service, prisma, traceability, access, nonconformities };
+  // Sync do indicador nao e o alvo destes testes: stub que registra a chamada.
+  const formIndicator = { syncFromSubmission: vi.fn().mockResolvedValue(null) } as any;
+  const service = new FormsService(prisma, traceability, access, new FormCodeService(), formIndicator, new FormStorageService(), nonconformities);
+  return { service, prisma, traceability, access, nonconformities, formIndicator };
 }
 
 describe('FormsService - formularios e checklists', () => {

@@ -35,6 +35,8 @@ export interface IndicatorFilter {
 }
 
 type IndicatorWriteInput = {
+  /** Formulário/checklist que alimenta este indicador automaticamente. */
+  formTemplateId?: string | null;
   companyId?: string | null;
   ownerNodeId?: string | null;
   guidelineNodeId?: string | null;
@@ -848,6 +850,7 @@ export class IndicatorsService {
       source: cleanString(input.source) ?? null,
       feedKind: enumOrDefault(FeedKind, input.feedKind, FeedKind.MANUAL),
       status: enumOrDefault(IndicatorStatus, input.status, IndicatorStatus.ACTIVE),
+      formTemplateId: cleanString(input.formTemplateId) ?? null,
       weight: optionalNumber(input.weight, 'Peso') ?? 1,
       yellowToleranceP: optionalNumber(input.yellowToleranceP, 'Tolerância amarela') ?? 90,
     };
@@ -869,6 +872,9 @@ export class IndicatorsService {
     if (input.strategicObjectiveId !== undefined) data.strategicObjectiveId = links.strategicObjectiveId ?? null;
     if (input.responsibleUserId !== undefined) data.responsibleUserId = links.responsibleUserId ?? null;
     if (input.feederUserId !== undefined) data.feederUserId = links.feederUserId ?? null;
+    // Formulário que alimenta este indicador. (área, setor) não basta para
+    // identificá-lo: um setor pode ter vários indicadores.
+    if (input.formTemplateId !== undefined) data.formTemplateId = cleanString(input.formTemplateId) ?? null;
     if (input.name !== undefined) data.name = requiredString(input.name, 'Informe o nome do indicador');
     if (input.code !== undefined) data.code = cleanString(input.code) ?? null;
     if (input.description !== undefined) data.description = cleanString(input.description) ?? null;

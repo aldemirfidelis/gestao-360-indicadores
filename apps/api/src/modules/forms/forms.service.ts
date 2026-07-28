@@ -22,6 +22,7 @@ import { GeminiService } from '../ai/gemini.service';
 import { NonConformitiesService } from '../nonconformities/nonconformities.service';
 import { logSwallowed } from '../../common/logging/swallow';
 import { FormCodeService } from './form-code.service';
+import { FormIndicatorService } from './form-indicator.service';
 import { sortSections } from './form-header.logic';
 import { conformityScore } from './form-scoring.logic';
 import { FormStorageService } from './form-storage.service';
@@ -78,6 +79,7 @@ export class FormsService {
     private readonly traceability: TraceabilityService,
     private readonly access: AccessService,
     private readonly codes: FormCodeService,
+    private readonly formIndicator: FormIndicatorService,
     private readonly storage: FormStorageService,
     private readonly nonconformities?: NonConformitiesService,
     private readonly gemini?: GeminiService,
@@ -1328,6 +1330,20 @@ export class FormsService {
     if (COMPLETED_SUBMISSION_STATUSES.has(status)) {
       // Usa as respostas construídas nesta chamada (fonte da verdade na criação).
       await this.maybeCreateNonconformity(me, template, submission, answers);
+      // Lança a média do mês no indicador vinculado ao par (setor, formulário).
+      // Não pode derrubar o preenchimento: o registro já está salvo, e o
+      // indicador é consequência dele.
+      try {
+        await this.formIndicator.syncFromSubmission(me, {
+          id: submission.id,
+          templateId: submission.templateId,
+          orgNodeId: submission.orgNodeId,
+          completedAt: submission.completedAt,
+          score: submission.score,
+        });
+      } catch (error) {
+        logSwallowed('forms.indicatorSync', error);
+      }
     }
 
     await this.traceability.record({

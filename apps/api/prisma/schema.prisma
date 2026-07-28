@@ -1285,6 +1285,11 @@ model Indicator {
   company              Company             @relation(fields: [companyId], references: [id])
   ownerNodeId          String
   ownerNode            OrgNode             @relation("IndicatorOwnerNode", fields: [ownerNodeId], references: [id])
+  /// Formulario/checklist que ALIMENTA este indicador automaticamente.
+  /// (area, setor) nao basta para identificar o indicador: um setor pode ter
+  /// varios. O par (ownerNodeId, formTemplateId) e que e unico.
+  formTemplateId       String?
+  formTemplate         FormTemplate?       @relation("IndicatorSourceForm", fields: [formTemplateId], references: [id], onDelete: SetNull)
   guidelineNodeId      String?
   guidelineNode        OrgNode?            @relation("IndicatorGuidelineNode", fields: [guidelineNodeId], references: [id])
   responsibleUserId    String?
@@ -4207,6 +4212,9 @@ model FormTemplate {
   @@index([indicatorId])
   @@index([ownerUserId])
   @@index([validUntil])
+  /// Indicadores alimentados por este formulario (um por setor).
+  sourceOfIndicators Indicator[] @relation("IndicatorSourceForm")
+
 }
 
 model FormField {
