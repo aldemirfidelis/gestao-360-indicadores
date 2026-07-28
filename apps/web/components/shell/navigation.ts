@@ -276,9 +276,9 @@ export const navSections: NavSection[] = [
       { href: '/servico-pessoal/ferias', label: 'Férias e Afastamentos', description: 'Gestão do DP: saldos, aprovação de solicitações e atestados/afastamentos (o colaborador solicita em Minha Vida Funcional)', icon: CalendarDays, permissions: ['pessoal:view', 'pessoal:manage'] },
       { href: '/servico-pessoal/admissoes', label: 'Admissão e Desligamento', description: 'Checklists de admissão/desligamento e saúde ocupacional (ASO)', icon: ClipboardCheck, permissions: ['pessoal:view', 'pessoal:manage'] },
       { href: '/servico-pessoal/folha', label: 'Folha de Pagamento', description: 'Cálculo de folha, holerites, competências e adiantamento', icon: Banknote, permissions: ['folha:view'] },
-      { href: '/servico-pessoal/meu-holerite', label: 'Minha Vida Funcional', description: 'Seu ponto (bater ponto e espelho), férias, vagas internas, holerites e informe de rendimentos', icon: Wallet, permissions: EMPLOYEE_SELF_SERVICE_PERMISSIONS },
-      { href: '/servico-pessoal/meu-holerite?tab=treinamentos', label: 'Meus Treinamentos', description: 'Treinamentos obrigatórios, pendências, turmas e certificados', icon: GraduationCap, permissions: ['training:self', 'training:view'] },
-      { href: '/servico-pessoal/meu-holerite?tab=comunicacao', label: 'Comunicação Interna', description: 'Comunicados, campanhas e informações importantes da empresa', icon: Megaphone, permissions: ['communication:view'] },
+      // Treinamentos e Comunicação Interna são ABAS desta página, não itens de
+      // menu: repetir os atalhos aqui duplicava o que já está um clique adiante.
+      { href: '/servico-pessoal/meu-holerite', label: 'Minha Vida Funcional', description: 'Seu ponto, férias, vagas internas, treinamentos, comunicação interna, holerites e informe de rendimentos', icon: Wallet, permissions: EMPLOYEE_SELF_SERVICE_PERMISSIONS },
       { href: '/servico-pessoal/relatorios', label: 'Relatórios', description: 'Turnover, absenteísmo, horas extras e exportação para a folha', icon: FileBarChart, permissions: ['pessoal:view', 'pessoal:manage'] },
       { href: '/servico-pessoal/configuracoes', label: 'Configurações', description: 'Numeração da matrícula e modelo do crachá de identificação', icon: Settings, permissions: ['pessoal:settings', 'pessoal:manage'] },
     ],
