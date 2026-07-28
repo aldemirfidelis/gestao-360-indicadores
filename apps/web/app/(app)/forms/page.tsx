@@ -38,6 +38,8 @@ import {
 import { PageHeader } from '@/components/shell/page-header';
 import { HeaderBuilder } from '@/components/forms/header-builder';
 import { PhotoCapture, type CapturedPhoto } from '@/components/forms/photo-capture';
+import { ExecutePicker } from '@/components/forms/execute-picker';
+import type { ExecuteSelection } from '@/lib/forms/execute';
 import {
   type HeaderFieldForm,
   headerFieldFilter,
@@ -201,7 +203,7 @@ interface FormsDashboard extends FormsSummary {
 }
 
 interface FormsOptions {
-  orgNodes: Array<{ id: string; name: string; type: string }>;
+  orgNodes: Array<{ id: string; name: string; type: string; parentId: string | null }>;
   indicators: Array<{ id: string; name: string; code: string | null; ownerNodeId: string }>;
   processes: Array<{ id: string; number: number; code: string | null; name: string; orgNodeId: string | null; indicatorId: string | null }>;
   users: Array<{ id: string; name: string; email: string; defaultNodeId: string | null }>;
@@ -452,6 +454,7 @@ export default function FormsPage() {
   const [form, setForm] = useState<TemplateForm>(cloneTemplateForm());
   const [submissionNotes, setSubmissionNotes] = useState('');
   const [photos, setPhotos] = useState<CapturedPhoto[]>([]);
+  const [execution, setExecution] = useState<ExecuteSelection>({ areaId: '', sectorId: '', templateId: '' });
   const [answers, setAnswers] = useState<Record<string, string>>({});
   const [executionForm, setExecutionForm] = useState({ title: '', assignedToId: '', dueDate: '', offlineEnabled: false });
   const [executionAnswers, setExecutionAnswers] = useState<Record<string, string>>({});
@@ -558,6 +561,8 @@ export default function FormsPage() {
         json: {
           notes: submissionNotes || null,
           status: 'SUBMITTED',
+          // O setor e o no mais especifico: e por ele que o indicador agrega.
+          ...(execution.sectorId ? { orgNodeId: execution.sectorId } : {}),
           answers: selected.fields.map((field) => ({ fieldId: field.id, value: answers[field.id] ?? '' })),
         },
       });
@@ -761,6 +766,7 @@ export default function FormsPage() {
     setSelectedId(item.id);
     setSubmissionNotes('');
     setPhotos([]);
+    setExecution({ areaId: '', sectorId: '', templateId: item.id });
     setAnswers(Object.fromEntries(item.fields.map((field) => [field.id, ''])));
     setSubmissionOpen(true);
   }
@@ -1029,7 +1035,7 @@ export default function FormsPage() {
         saving={saveTemplate.isPending}
       />
 
-      <SubmissionDialog open={submissionOpen} setOpen={setSubmissionOpen} selected={selected} photos={photos} setPhotos={setPhotos} notes={submissionNotes} setNotes={setSubmissionNotes} answers={answers} setAnswers={setAnswers} submit={() => submitForm.mutate()} saving={submitForm.isPending} />
+      <SubmissionDialog open={submissionOpen} setOpen={setSubmissionOpen} selected={selected} options={optionsQuery.data} execution={execution} setExecution={setExecution} photos={photos} setPhotos={setPhotos} notes={submissionNotes} setNotes={setSubmissionNotes} answers={answers} setAnswers={setAnswers} submit={() => submitForm.mutate()} saving={submitForm.isPending} />
       <QrPrintDialog open={qrOpen} onOpenChange={setQrOpen} type="form" token={qrInfo?.token ?? null} title={qrInfo?.title ?? 'Formulário'} subtitle="Escaneie para abrir e preencher a inspeção" />
 
       <ExecutionDialog open={executionOpen} setOpen={setExecutionOpen} selected={selected} options={options} form={executionForm} setForm={setExecutionForm} save={() => createExecution.mutate()} saving={createExecution.isPending} />
@@ -1421,10 +1427,13 @@ Não se aplica" />
   );
 }
 
-function SubmissionDialog({ open, setOpen, selected, photos, setPhotos, notes, setNotes, answers, setAnswers, submit, saving }: {
+function SubmissionDialog({ open, setOpen, selected, options, execution, setExecution, photos, setPhotos, notes, setNotes, answers, setAnswers, submit, saving }: {
   open: boolean;
   setOpen: (open: boolean) => void;
   selected: FormTemplate | null;
+  options?: FormsOptions;
+  execution: ExecuteSelection;
+  setExecution: (value: ExecuteSelection) => void;
   photos: CapturedPhoto[];
   setPhotos: (photos: CapturedPhoto[]) => void;
   notes: string;
@@ -1443,6 +1452,17 @@ function SubmissionDialog({ open, setOpen, selected, photos, setPhotos, notes, s
       <DialogContent className="max-h-[92vh] max-w-3xl overflow-y-auto">
         <DialogHeader><DialogTitle>Preencher {selected?.title}</DialogTitle></DialogHeader>
         <div className="grid gap-4 py-2">
+          {/* Onde a inspeção está sendo feita: define a qual indicador o
+              resultado vai somar. */}
+          <div className="rounded-lg border p-3">
+            <ExecutePicker
+              nodes={options?.orgNodes ?? []}
+              forms={selected ? [{ id: selected.id, title: selected.title, version: selected.version, code: selected.code }] : []}
+              value={execution}
+              onChange={setExecution}
+            />
+          </div>
+
           {/* Cabecalho: contexto do registro, sem numeracao — nao sao perguntas. */}
           {headerFields.length > 0 && (
             <div className="rounded-lg border border-l-4 border-l-sky-500 bg-muted/30 p-3">

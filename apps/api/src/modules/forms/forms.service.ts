@@ -705,7 +705,7 @@ export class FormsService {
       ? { OR: [{ orgNodeId: { in: permitted } }, { indicator: { ownerNodeId: { in: permitted } } }, { orgNodeId: null, indicatorId: null }] }
       : {};
     const [orgNodes, indicators, processes, users, typeConfigs, categories, folders, tags, reusableBlocks] = await Promise.all([
-      this.prisma.orgNode.findMany({ where: { companyId: me.companyId, deletedAt: null, active: true, ...areaWhere }, select: { id: true, name: true, type: true }, orderBy: [{ type: 'asc' }, { name: 'asc' }] }),
+      this.prisma.orgNode.findMany({ where: { companyId: me.companyId, deletedAt: null, active: true, ...areaWhere }, select: { id: true, name: true, type: true, parentId: true }, orderBy: [{ type: 'asc' }, { name: 'asc' }] }),
       this.prisma.indicator.findMany({ where: { companyId: me.companyId, deletedAt: null, ...indicatorWhere }, select: { id: true, name: true, code: true, ownerNodeId: true }, orderBy: { name: 'asc' } }),
       this.prisma.process.findMany({ where: { companyId: me.companyId, deletedAt: null, ...processWhere }, select: { id: true, number: true, code: true, name: true, orgNodeId: true, indicatorId: true }, orderBy: { name: 'asc' } }),
       this.prisma.user.findMany({ where: { companyId: me.companyId, deletedAt: null, active: true }, select: { id: true, name: true, email: true, defaultNodeId: true }, orderBy: { name: 'asc' } }),
