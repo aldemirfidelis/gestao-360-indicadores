@@ -58,6 +58,11 @@ function makeService(opts?: {
       findMany: vi.fn().mockResolvedValue([]),
       upsert: vi.fn().mockImplementation((args: any) => Promise.resolve({ id: `tag-${args.create.name}`, ...args.create })),
     },
+    formTemplateSection: {
+      deleteMany: vi.fn().mockResolvedValue({ count: 0 }),
+      create: vi.fn().mockImplementation((args: any) => Promise.resolve({ id: `section-${args.data.code ?? args.data.title}`, ...args.data })),
+      findMany: vi.fn().mockResolvedValue([]),
+    },
     formReusableBlock: { findMany: vi.fn().mockResolvedValue([]) },
     formTemplateVersion: {
       findFirst: vi.fn().mockResolvedValue(null),
@@ -167,8 +172,50 @@ describe('FormsService - formularios e checklists', () => {
     const data = prisma.formTemplate.create.mock.calls[0][0].data;
     expect(data.companyId).toBe('companyA');
     expect(data.number).toBe(1);
-    expect(data.fields.create[0].label).toBe('Extintor OK?');
+    // Campos são gravados depois do template, por createMany, porque agora
+    // podem se vincular a uma seção criada no mesmo passo.
+    expect(prisma.formField.createMany.mock.calls[0][0].data[0].label).toBe('Extintor OK?');
     expect(traceability.record).toHaveBeenCalledWith(expect.objectContaining({ entityType: 'FORM_TEMPLATE', eventType: 'CREATED' }));
+  });
+
+  it('create: cabecalho vira secao e os campos se ligam a ela por sectionCode', async () => {
+    const { service, prisma } = makeService({ user: { id: 'u2' } });
+    await service.create(me, {
+      title: 'Inspecao de seguranca',
+      type: 'INSPECTION',
+      sections: [
+        { code: 'DESVIOS', title: 'Desvios e providencias', position: 5 },
+        { code: 'HEADER', title: 'Informacoes', position: 9 },
+      ],
+      fields: [
+        { label: 'Local', type: 'TEXT', sectionCode: 'HEADER' },
+        { label: 'Existem situacoes de risco?', type: 'CONFORMITY', sectionCode: 'DESVIOS' },
+        { label: 'Campo solto', type: 'TEXT' },
+      ],
+    });
+
+    // Cabecalho sempre primeiro, mesmo tendo chegado com posicao maior.
+    const secoes = prisma.formTemplateSection.create.mock.calls.map((c: any[]) => c[0].data);
+    expect(secoes.map((s: any) => s.code)).toEqual(['HEADER', 'DESVIOS']);
+    expect(secoes[0].position).toBe(0);
+
+    const campos = prisma.formField.createMany.mock.calls[0][0].data;
+    expect(campos.find((f: any) => f.label === 'Local').sectionId).toBe('section-HEADER');
+    expect(campos.find((f: any) => f.label === 'Existem situacoes de risco?').sectionId).toBe('section-DESVIOS');
+    // Campo sem secao continua valido, so fica solto.
+    expect(campos.find((f: any) => f.label === 'Campo solto').sectionId).toBeNull();
+  });
+
+  it('create: sectionCode inexistente nao descarta o campo', async () => {
+    const { service, prisma } = makeService({ user: { id: 'u2' } });
+    await service.create(me, {
+      title: 'Modelo',
+      sections: [{ code: 'HEADER', title: 'Informacoes' }],
+      fields: [{ label: 'Orfao', type: 'TEXT', sectionCode: 'NAO_EXISTE' }],
+    });
+    const campos = prisma.formField.createMany.mock.calls[0][0].data;
+    expect(campos).toHaveLength(1);
+    expect(campos[0].sectionId).toBeNull();
   });
 
   it('create: vinculos em areas diferentes -> Conflict', async () => {

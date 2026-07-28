@@ -22,6 +22,7 @@ import { GeminiService } from '../ai/gemini.service';
 import { NonConformitiesService } from '../nonconformities/nonconformities.service';
 import { logSwallowed } from '../../common/logging/swallow';
 import { FormCodeService } from './form-code.service';
+import { sortSections } from './form-header.logic';
 import { FormStorageService } from './form-storage.service';
 import { randomUUID } from 'node:crypto';
 
@@ -412,6 +413,58 @@ export class FormsService {
     return ids;
   }
 
+  /**
+   * Seções do modelo. O cabeçalho é uma seção de código reservado (`HEADER`),
+   * sempre no topo — ver `form-header.logic.ts`.
+   */
+  /**
+   * Regrava seções e campos do modelo.
+   *
+   * Campos apontam para a seção por `sectionCode` (vínculo lógico), porque no
+   * `create` os ids das seções ainda não existem quando o payload é montado no
+   * navegador. Código sem seção correspondente vira campo solto — não perde
+   * conteúdo por causa de digitação errada.
+   */
+  private async replaceSectionsAndFields(
+    tx: Tx,
+    templateId: string,
+    companyId: string,
+    sections: Array<{ code: string | null; title: string; description: string | null; position: number; columns: number; repeatable: boolean }>,
+    fields: Array<Omit<Prisma.FormFieldCreateManyInput, 'templateId'> & { sectionCode?: string | null }>,
+  ) {
+    await tx.formField.deleteMany({ where: { templateId } });
+    await tx.formTemplateSection.deleteMany({ where: { templateId } });
+
+    const idByCode = new Map<string, string>();
+    for (const section of sections) {
+      const created = await tx.formTemplateSection.create({ data: { ...section, companyId, templateId } });
+      if (section.code) idByCode.set(section.code.trim().toUpperCase(), created.id);
+    }
+
+    if (!fields.length) return;
+    await tx.formField.createMany({
+      data: fields.map(({ sectionCode, sectionId, ...field }) => ({
+        ...field,
+        templateId,
+        sectionId: (sectionCode ? idByCode.get(String(sectionCode).trim().toUpperCase()) : sectionId) ?? null,
+      })),
+    });
+  }
+
+  private parseSections(raw: unknown) {
+    const items = Array.isArray(raw) ? raw : [];
+    return sortSections(
+      items.map((section: any, index) => ({
+        code: this.nullableText(section?.code) ?? null,
+        title: this.requiredText(section?.title, 'Titulo da secao'),
+        description: this.nullableText(section?.description) ?? null,
+        position: Number.isFinite(Number(section?.position)) ? Math.max(0, Math.round(Number(section.position))) : index,
+        columns: Math.min(4, Math.max(1, this.int(section?.columns) ?? 1)),
+        repeatable: Boolean(section?.repeatable),
+      })),
+    ).map((section, index) => ({ ...section, position: index }));
+  }
+
   private parseFields(raw: unknown) {
     const items = Array.isArray(raw) ? raw : [];
     return items
@@ -419,6 +472,8 @@ export class FormsService {
         order: Number.isFinite(Number(field?.order)) ? Math.max(1, Math.round(Number(field.order))) : index + 1,
         code: this.nullableText(field?.code) ?? null,
         sectionId: this.id(field?.sectionId),
+        /** Vínculo lógico com a seção: no create os ids ainda não existem. */
+        sectionCode: this.nullableText(field?.sectionCode) ?? null,
         label: this.requiredText(field?.label, 'Rotulo do campo'),
         type: this.parseFieldType(field?.type) ?? FormFieldType.TEXT,
         required: Boolean(field?.required),
@@ -719,6 +774,7 @@ export class FormsService {
       folderId: this.id(body?.folderId),
     });
     const fields = this.parseFields(body?.fields);
+    const sections = this.parseSections(body?.sections);
 
     const template = await this.prisma.$transaction(async (tx) => {
       const defaults = await this.codes.ensureDefaults(tx as any, me.companyId, me.sub);
@@ -757,10 +813,11 @@ export class FormsService {
           integrations: this.json(body?.integrations),
           tags: this.stringArray(body?.tags),
           ...links.ids,
-          fields: fields.length ? { create: fields.map(({ sectionId, ...field }) => field) } : undefined,
         },
         include: this.templateInclude(),
       });
+      // Seções primeiro: os campos precisam do id delas para se vincular.
+      await this.replaceSectionsAndFields(tx, created.id, me.companyId, sections, fields);
       const version = await this.createVersionInTx(tx, created, me.sub, { status: this.codes.versionStatus(status), versionLabel: created.version });
       return tx.formTemplate.findUniqueOrThrow({ where: { id: created.id }, include: this.templateInclude() }).then((item) => ({ ...item, currentVersionId: version.id }));
     });
@@ -831,9 +888,14 @@ export class FormsService {
     const updated = await this.prisma.$transaction(async (tx) => {
       await tx.formTemplate.update({ where: { id }, data });
       if (Array.isArray(patch?.fields)) {
-        const fields = this.parseFields(patch.fields);
-        await tx.formField.deleteMany({ where: { templateId: id } });
-        if (fields.length) await tx.formField.createMany({ data: fields.map((field) => ({ ...field, templateId: id })) });
+        // Seções vêm junto com os campos: regravar campos sem regravar seções
+        // deixaria o cabeçalho órfão.
+        const sections = Array.isArray(patch?.sections)
+          ? this.parseSections(patch.sections)
+          : this.parseSections(
+              (before.sections ?? []).filter((section: any) => !section.deletedAt),
+            );
+        await this.replaceSectionsAndFields(tx, id, me.companyId, sections, this.parseFields(patch.fields));
       }
       const latest = await tx.formTemplate.findUniqueOrThrow({ where: { id }, include: this.templateInclude() });
       if (Array.isArray(patch?.fields) || patch?.createVersion) {
