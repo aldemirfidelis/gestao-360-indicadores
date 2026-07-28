@@ -1598,6 +1598,41 @@ export class FormsService {
     return this.enrichExecution(completed);
   }
 
+  /**
+   * Foto tirada na hora da inspeção.
+   *
+   * O binário vai para o disco e a evidência guarda só a chave — base64 no
+   * banco incharia a linha e tornaria a listagem lenta.
+   */
+  async addPhoto(me: AuthPayload, submissionId: string, body: any) {
+    const saved = await this.storage.savePhoto(me.companyId, {
+      contentBase64: body?.contentBase64,
+      mimeType: body?.mimeType,
+      fileName: body?.fileName,
+    });
+    return this.addEvidence(me, submissionId, {
+      ...saved,
+      type: 'PHOTO',
+      description: this.nullableText(body?.description) ?? null,
+      location: body?.location,
+      metadata: { fieldId: this.id(body?.fieldId) ?? undefined, capturedAt: new Date().toISOString() },
+    });
+  }
+
+  /** Conteúdo binário de uma evidência, escopado pela empresa. */
+  async readEvidenceContent(me: AuthPayload, evidenceId: string) {
+    const evidence = await this.prisma.formEvidence.findFirst({
+      where: { id: evidenceId, companyId: me.companyId },
+      select: { storageKey: true, mimeType: true, fileName: true },
+    });
+    if (!evidence?.storageKey) throw new NotFoundException('Evidencia nao encontrada.');
+    return {
+      buffer: await this.storage.readPhoto(evidence.storageKey),
+      mimeType: evidence.mimeType ?? 'application/octet-stream',
+      fileName: evidence.fileName ?? 'evidencia',
+    };
+  }
+
   async addEvidence(me: AuthPayload, submissionId: string, body: any) {
     const submission = await this.loadSubmission(submissionId, me.companyId);
     await this.assertWriteArea(me, this.areaOfSubmission(submission), 'edit');

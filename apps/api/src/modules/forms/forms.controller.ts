@@ -1,4 +1,4 @@
-import { Body, Controller, Delete, Get, Param, Patch, Post, Query } from '@nestjs/common';
+import { Body, Controller, Delete, Get, Param, Patch, Post, Query, StreamableFile } from '@nestjs/common';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import { RequirePermissions } from '../../common/decorators/permissions.decorator';
 import { AuthPayload } from '../auth/auth.types';
@@ -167,6 +167,20 @@ export class FormsController {
   @RequirePermissions('forms:update')
   updateSubmission(@CurrentUser() me: AuthPayload, @Param('submissionId') submissionId: string, @Body() body: any) {
     return this.service.updateSubmission(me, submissionId, body);
+  }
+
+  /** Foto tirada na hora da inspeção (câmera do aparelho). */
+  @Post('submissions/:submissionId/photo')
+  @RequirePermissions('forms:evidence')
+  addPhoto(@CurrentUser() me: AuthPayload, @Param('submissionId') submissionId: string, @Body() body: any) {
+    return this.service.addPhoto(me, submissionId, body);
+  }
+
+  @Get('evidence/:evidenceId/content')
+  @RequirePermissions('forms:view')
+  async evidenceContent(@CurrentUser() me: AuthPayload, @Param('evidenceId') evidenceId: string) {
+    const file = await this.service.readEvidenceContent(me, evidenceId);
+    return new StreamableFile(file.buffer, { type: file.mimeType, disposition: 'inline' });
   }
 
   @Post('submissions/:submissionId/evidence')

@@ -37,6 +37,7 @@ import {
 } from 'lucide-react';
 import { PageHeader } from '@/components/shell/page-header';
 import { HeaderBuilder } from '@/components/forms/header-builder';
+import { PhotoCapture, type CapturedPhoto } from '@/components/forms/photo-capture';
 import {
   type HeaderFieldForm,
   headerFieldFilter,
@@ -449,8 +450,8 @@ export default function FormsPage() {
   const [selectedSubmission, setSelectedSubmission] = useState<FormSubmission | null>(null);
   const [selectedExecution, setSelectedExecution] = useState<FormExecution | null>(null);
   const [form, setForm] = useState<TemplateForm>(cloneTemplateForm());
-  const [submissionTitle, setSubmissionTitle] = useState('');
   const [submissionNotes, setSubmissionNotes] = useState('');
+  const [photos, setPhotos] = useState<CapturedPhoto[]>([]);
   const [answers, setAnswers] = useState<Record<string, string>>({});
   const [executionForm, setExecutionForm] = useState({ title: '', assignedToId: '', dueDate: '', offlineEnabled: false });
   const [executionAnswers, setExecutionAnswers] = useState<Record<string, string>>({});
@@ -550,24 +551,38 @@ export default function FormsPage() {
   });
 
   const submitForm = useMutation({
-    mutationFn: () => {
+    mutationFn: async () => {
       if (!selected) throw new Error('Formulário não selecionado');
-      return api<FormSubmission>(`/forms/${selected.id}/submissions`, {
+      const submission = await api<FormSubmission>(`/forms/${selected.id}/submissions`, {
         method: 'POST',
         json: {
-          title: submissionTitle || null,
           notes: submissionNotes || null,
           status: 'SUBMITTED',
           answers: selected.fields.map((field) => ({ fieldId: field.id, value: answers[field.id] ?? '' })),
         },
       });
+
+      // Fotos vão depois: o registro precisa existir para a evidência apontar
+      // para ele. Falha aqui não desfaz o preenchimento — o registro está
+      // salvo, e a foto pode ser reenviada pela ficha.
+      const enviadas = await Promise.allSettled(
+        photos.map((photo) =>
+          api(`/forms/submissions/${submission.id}/photo`, {
+            method: 'POST',
+            json: { contentBase64: photo.contentBase64, mimeType: photo.mimeType, fileName: photo.fileName },
+          }),
+        ),
+      );
+      const falhas = enviadas.filter((item) => item.status === 'rejected').length;
+      return { submission, falhas };
     },
-    onSuccess: () => {
-      toast.success('Preenchimento registrado');
+    onSuccess: ({ submission, falhas }) => {
+      if (falhas > 0) toast.warning(`Registro salvo, mas ${falhas} foto(s) não subiram. Reenvie pela ficha.`);
+      else toast.success(typeof submission.score === 'number' ? `Preenchimento registrado — ${formatPercent(submission.score)} de conformidade` : 'Preenchimento registrado');
       setSubmissionOpen(false);
-      setSubmissionTitle('');
       setSubmissionNotes('');
       setAnswers({});
+      setPhotos([]);
       invalidate();
     },
     onError: (err: Error) => toast.error(err.message),
@@ -744,8 +759,8 @@ export default function FormsPage() {
 
   function openSubmission(item: FormTemplate) {
     setSelectedId(item.id);
-    setSubmissionTitle('');
     setSubmissionNotes('');
+    setPhotos([]);
     setAnswers(Object.fromEntries(item.fields.map((field) => [field.id, ''])));
     setSubmissionOpen(true);
   }
@@ -1014,7 +1029,7 @@ export default function FormsPage() {
         saving={saveTemplate.isPending}
       />
 
-      <SubmissionDialog open={submissionOpen} setOpen={setSubmissionOpen} selected={selected} title={submissionTitle} setTitle={setSubmissionTitle} notes={submissionNotes} setNotes={setSubmissionNotes} answers={answers} setAnswers={setAnswers} submit={() => submitForm.mutate()} saving={submitForm.isPending} />
+      <SubmissionDialog open={submissionOpen} setOpen={setSubmissionOpen} selected={selected} photos={photos} setPhotos={setPhotos} notes={submissionNotes} setNotes={setSubmissionNotes} answers={answers} setAnswers={setAnswers} submit={() => submitForm.mutate()} saving={submitForm.isPending} />
       <QrPrintDialog open={qrOpen} onOpenChange={setQrOpen} type="form" token={qrInfo?.token ?? null} title={qrInfo?.title ?? 'Formulário'} subtitle="Escaneie para abrir e preencher a inspeção" />
 
       <ExecutionDialog open={executionOpen} setOpen={setExecutionOpen} selected={selected} options={options} form={executionForm} setForm={setExecutionForm} save={() => createExecution.mutate()} saving={createExecution.isPending} />
@@ -1406,12 +1421,12 @@ Não se aplica" />
   );
 }
 
-function SubmissionDialog({ open, setOpen, selected, title, setTitle, notes, setNotes, answers, setAnswers, submit, saving }: {
+function SubmissionDialog({ open, setOpen, selected, photos, setPhotos, notes, setNotes, answers, setAnswers, submit, saving }: {
   open: boolean;
   setOpen: (open: boolean) => void;
   selected: FormTemplate | null;
-  title: string;
-  setTitle: (value: string) => void;
+  photos: CapturedPhoto[];
+  setPhotos: (photos: CapturedPhoto[]) => void;
   notes: string;
   setNotes: (value: string) => void;
   answers: Record<string, string>;
@@ -1447,6 +1462,10 @@ function SubmissionDialog({ open, setOpen, selected, title, setTitle, notes, set
               <AnswerInput field={field} value={answers[field.id] ?? ''} onChange={(value) => setAnswers((current: Record<string, string>) => ({ ...current, [field.id]: value }))} />
             </Field>
           ))}
+          {/* Registro fotográfico: no celular abre a câmera direto. */}
+          <Field label="Registro fotográfico">
+            <PhotoCapture photos={photos} onChange={setPhotos} disabled={saving} />
+          </Field>
           <Field label="Observações"><Textarea value={notes} onChange={(e) => setNotes(e.target.value)} rows={3} /></Field>
         </div>
         <DialogFooter><Button variant="outline" onClick={() => setOpen(false)}>Cancelar</Button><Button onClick={submit} disabled={saving}><Send className="mr-2 h-4 w-4" /> Registrar</Button></DialogFooter>
@@ -1646,6 +1665,11 @@ function questionNumber(field: { metadata?: unknown }, index: number): string {
   const custom = (field.metadata as { displayNumber?: unknown } | null | undefined)?.displayNumber;
   const text = String(custom ?? '').trim();
   return text || String(index + 1);
+}
+
+/** Percentual de conformidade em pt-BR (ex.: 97,1%). */
+function formatPercent(value: number): string {
+  return `${value.toLocaleString('pt-BR', { maximumFractionDigits: 1 })}%`;
 }
 
 /** O campo pertence ao cabeçalho? (evita duplicá-lo na lista de perguntas) */
