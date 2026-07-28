@@ -1,22 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { internalApiBaseUrl as apiBaseUrl } from '@/lib/internal-api';
 
 const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-
-function apiBaseUrl(): string {
-  const configured =
-    process.env.INTERNAL_API_URL ??
-    process.env.NEXT_PUBLIC_API_URL ??
-    'http://localhost:3333/api';
-
-  if (/^https?:\/\//i.test(configured)) return configured.replace(/\/$/, '');
-
-  // No Docker, o serviço web alcança a API pelo nome interno `api`.
-  if (process.env.NODE_ENV === 'production') {
-    return `http://api:3333${configured.startsWith('/') ? configured : `/${configured}`}`.replace(/\/$/, '');
-  }
-
-  return `http://localhost:3333${configured.startsWith('/') ? configured : `/${configured}`}`.replace(/\/$/, '');
-}
 
 function responseMessage(status: number): string {
   if (status === 429) return 'Muitas tentativas em pouco tempo. Aguarde um minuto e tente novamente.';

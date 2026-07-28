@@ -90,3 +90,45 @@ e-mail de outra pessoa para assumir a candidatura dela.
 `recruit_candidate_identities` — migração
 `20260727235000_candidate_social_identity`. Um candidato pode ter as duas
 identidades; `(provider, providerAccountId)` é único.
+
+---
+
+# Compartilhar vaga no LinkedIn
+
+Botão na tela da vaga publicada (`/recrutamento/vagas/{id}`), ao lado de
+"Página pública". Só aparece com a vaga em `PUBLISHED` — não faz sentido
+divulgar rascunho.
+
+## O que o LinkedIn aceita (e o que não aceita)
+
+**Não dá para pré-preencher o texto do post.** Os parâmetros `title`/`summary`
+do endpoint de compartilhamento são legado e hoje são ignorados: o LinkedIn
+monta o card lendo as tags **Open Graph** da página da vaga, e o comentário é
+sempre digitado pela pessoa.
+
+Por isso o botão faz duas coisas:
+
+1. abre o compositor do LinkedIn já com a URL da vaga — o card sai pronto
+   (cargo, empresa, cidade, banner) porque a página tem OG por vaga;
+2. mostra um **texto sugerido** editável e copia para a área de transferência,
+   para o recrutador colar como comentário do post.
+
+## De onde vem o card
+
+`generateMetadata` em `apps/web/app/carreiras/vagas/[slug]/page.tsx` (server
+component; o conteúdo interativo ficou em
+`components/careers/vacancy-detail.tsx`). Busca a vaga pela API interna
+(`INTERNAL_API_URL`, com `revalidate: 3600` — robôs de link batem várias vezes)
+e monta `og:title`, `og:description`, `og:image` e canonical. Falha na busca
+nunca derruba a página: cai numa metadata padrão.
+
+A imagem do card é o **banner da página de carreiras** da empresa (ou o logo, se
+não houver banner), em URL absoluta — o robô do LinkedIn não baixa caminho
+relativo. Empresa sem banner nem logo compartilha sem imagem, o que o LinkedIn
+renderiza como card compacto.
+
+## Depurar o card
+
+O LinkedIn guarda o card em cache agressivo. Para forçar releitura depois de
+mudar a vaga, use o **Post Inspector**: <https://www.linkedin.com/post-inspector/>
+— cole a URL da vaga e clique em "Inspect".

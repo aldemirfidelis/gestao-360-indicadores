@@ -21,6 +21,7 @@ import { LoadingState } from '@/components/platform/loading-state';
 import { StatusBadge } from '@/components/platform/status-badge';
 import { CandidateSheet, type PipelineStage } from '@/components/recruitment/candidate-sheet';
 import { PipelineBoard, type BoardApplication } from '@/components/recruitment/pipeline-board';
+import { ShareVacancyButton } from '@/components/recruitment/share-vacancy-button';
 import { NextStepCallout } from '@/components/recruitment/journey-stepper';
 import { api } from '@/lib/api';
 import { useAuth } from '@/components/auth/auth-provider';
@@ -203,6 +204,18 @@ export default function VacancyDetailPage() {
               <a href={publicVacancyPath(posting.slug, posting.company)} target="_blank" rel="noreferrer">
                 <Button size="sm" variant="outline"><ExternalLink className="mr-1 h-3.5 w-3.5" /> Página pública</Button>
               </a>
+            )}
+            {posting.status === 'PUBLISHED' && (
+              <ShareVacancyButton
+                title={posting.title}
+                // O recrutador está logado na própria empresa; a API do posting
+                // devolve só o slug.
+                companyName={user?.activeCompany?.name}
+                city={posting.city}
+                workMode={posting.workMode}
+                contractType={posting.contractType}
+                vacancyPath={publicVacancyPath(posting.slug, posting.company)}
+              />
             )}
             {posting.status === 'PUBLISHED' && posting.allowsReferral !== false && user?.id && (
               <Button
